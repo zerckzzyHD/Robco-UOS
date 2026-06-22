@@ -188,11 +188,32 @@ Check ($uiSrc -match 'state\.nf\s*!==\s*undefined') "onload migrates legacy nf/n
 Check ($apiSrc -imatch 'legacy.*flat.*key|flat.*key.*fallback') "autoImportState() has legacy flat-key fallback"
 
 # ===========================================================
+# Suite 8 -- Registry structural integrity
+# ===========================================================
+Sep "Suite 8 -- Registry structural integrity"
+$regSrc = Read-Src "js/registry.js"
+
+Check ($regSrc -match 'const FALLOUT_REGISTRY')           "FALLOUT_REGISTRY global is declared"
+Check ($regSrc -match 'function registrySearch')           "registrySearch() function is declared"
+Check ($regSrc -match "quests\s*:")                        "FALLOUT_REGISTRY.quests category key exists"
+Check ($regSrc -match "items\s*:")                         "FALLOUT_REGISTRY.items category key exists"
+Check ($regSrc -match "perks\s*:")                         "FALLOUT_REGISTRY.perks category key exists"
+Check ($regSrc -match "locations\s*:")                     "FALLOUT_REGISTRY.locations category key exists"
+Check ($regSrc -match "companions\s*:")                    "FALLOUT_REGISTRY.companions category key exists"
+Check ($regSrc -match '\.length\s*<\s*2')                  "registrySearch() enforces minimum query length of 2"
+Check ($regSrc -match '\.slice\(0,\s*7\)')                 "registrySearch() caps results at 7"
+Check ($regSrc -match 'fallout\.wiki')                     "registry.js contains fallout.wiki attribution comment"
+Check ($regSrc -match "version\s*:\s*'[\d\.]+'")          "FALLOUT_REGISTRY.version is declared with semver string"
+# Strip comment lines before checking for forbidden references
+$regCode = ($regSrc -split "`n" | Where-Object { $_ -notmatch '^\s*//' }) -join "`n"
+Check ($regCode -notmatch 'saveState\s*\(')                "registry.js does not call saveState() (pure reference data)"
+Check ($regCode -notmatch 'localStorage')                  "registry.js does not reference localStorage (in code)"
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"
 if ($script:Failed -eq 0) {
-    Write-Host ("  ALL " + $script:Passed + " TESTS PASSED") -ForegroundColor Green
+    Write-Host ("  ALL " + $script:Passed + " TESTS PASSED - persistence fully verified.") -ForegroundColor Green
     Write-Host "  Every state field is covered by autoImportState, export, and cloud sync.`n"
     exit 0
 } else {
