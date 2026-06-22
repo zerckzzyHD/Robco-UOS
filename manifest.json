@@ -1,0 +1,25 @@
+{
+  "name": "RobCo U.O.S. 1.6.4",
+  "short_name": "RobCo",
+  "description": "RobCo Industries Unified Operating System — Fallout: New Vegas tactical companion terminal.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#010a07",
+  "theme_color": "#010a07",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

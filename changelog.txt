@@ -1,0 +1,358 @@
+v1.6.4 (The Systems Architecture Update)
+* Quest Log (#1): state.quests[] tracks name, status (active/complete/failed), current objective, and involved factions. New QUEST LOG panel with add/remove UI. renderQuests() color-codes by status. AI directive updated with full schema. AI auto-updates quests on narrative events.
+* Equipped Item Tracking (#2): state.equipped = {weapon, armor, headgear}. Rendered in BIO-METRICS panel below weight. AI directive updated so equipping/unequipping gear updates state.equipped. renderEquipped() shows active loadout in danger/blue color coding.
+* Multiple Save Slots (#6): 3 named slots (A/B/C) stored as robco_slot_1/2/3 in localStorage. Each slot stores the full envelope (version, state, chat, playstyle, savedAt). SAVE A/B/C and LOAD A/B/C buttons in Security panel. Uses migrateState() on load. Slot status shown below buttons.
+* Session Statistics (#8): state.stats = {kills, capsEarned, damageDealt, sessionStart}. SESSION STATISTICS panel with live elapsed time, tick count, location visits. AI returns delta stats per combat turn. RESET SESSION button resets all counters. renderSessionStats() auto-updates on loadUI().
+* Save Version Migration (#16): migrateState(version, state) chain in state.js. Automatically upgrades any save from any version: flat faction keys → structured factions, missing perks/quests/equipped/ammo/stats/macros are backfilled. Called on both localStorage load and file import.
+* localStorage Quota Detection (#18): saveState() now wraps localStorage.setItem() in try/catch. QuotaExceededError triggers a sys chat alert prompting the Courier to export a save file.
+* Token Budget Display (#17): Real-time token estimate below chat textarea. Shows ~N / 128K tokens (N%). Uses directive estimate (4K) + chat history + state JSON + input length. Color-coded: blue (ok), amber (>50%), red (>80%). Updates on every keystroke. Context limit scales with model name (1.5/2.0 = 1M tokens).
+* Item Category Tags (#32): addItem() now reads a type dropdown (weapon/armor/aid/ammo/misc). renderInventory() shows [TYPE] tag in matching danger/blue/green/amber color before item name. Old items without type default to [MISC].
+* Keyboard Shortcuts (#15): Ctrl+1–6 toggle the first 6 panels. Ctrl+/ focuses the chat input. Panel state is persisted to robco_panel_state on toggle. No conflicts with existing browser shortcuts.
+* Radiation Treatment Alert (#25): radAwayAlert div in BIO-METRICS shows when rads >= 200. Calculates doses needed (rads / 150, rounded up). Color: amber if RadAway is in inventory, red if not. Hidden when rads < 200.
+* Item Type in renderInventory (#32): Color-coded [TYPE] tag prepended to each inventory row. weapon=red, armor=blue, aid=green, ammo/misc=amber.
+* Quest Auto-Expand (#31): quests and equipped added to the auto-expand panel watch list in autoImportState. Any AI-driven quest or equipment change opens the relevant panel.
+* AI Schema Update: state schema example in system directive now includes quests, equipped, stats, and affinity on squad members. Three new directive sections added: Quest Log System, Equipped Items System, Session Statistics.
+* Status Effect Tick-Down (#7): Timed status effects (ticks > 0) now auto-decrement each AI sync. Effects that reach 0 are removed and the Courier is notified via sys chat.
+* Day/Night Indicator (#12): body.time-night CSS class applied when in-game hour is 20:00-06:00. Night hours dim the container with a subtle blue tint.
+* Notification Badges (#13): Panel headers (Perks, Inventory, Squad, Status Effects, Notes) show amber count badges when non-empty. Updated after every updateMath() call.
+* Faction Consequence Triggers (#4): autoImportState() alerts the Courier when any major faction crosses the Vilified (-500) or Idolized (+750) net standing threshold.
+* Karma Event Flash (#30): Brief screen-edge glow (green/red) fires when karma changes by >= 50 points in a single sync. CSS-only animation.
+* Critical HP Flash (#37): Red background flash when HP drops below 25% from above it.
+* Panel Memory (#35): All <details class="panel"> open/closed state persisted in localStorage (robco_panel_state). Restored on load.
+* Input History (#36): Up/Down arrows cycle through previously sent chat commands live from chatHistory.
+* Sync SFX (#33): Subtle two-note confirmation tone (880Hz -> 1320Hz) plays after every successful AI state sync. Respects master mute.
+* Consumable Quick-Use (#23): Each inventory row now has a USE button that auto-sends "[USE] ItemName" to chat.
+* Auto-Expand Panel (#31): After each AI sync, panels with changed content (squad, status, inventory, notes, perks, factions) auto-open.
+* Skill Check Indicators (#29): [SkillName N] patterns in AI narrative render green/red with pass/fail mark and ping the skill input.
+* Companion Affinity (#11): renderSquad() shows an affinity bar (0-100%) for squad members with an affinity field.
+* Typewriter Speed Control (#34): TYPER SPD slider (0.25x-3x) in Audio Systems. Stored in robco_typer_speed, restored on load.
+* Auto-Retry on API Failure (#14): One silent retry on 500/502/503 transient errors after 2.5 seconds.
+* Location History (#5): state.locationHistory[] tracks last 10 distinct visited locations. Saved with state.
+* Markdown Export (#27): exportCampaignLog('md') exports chat as a formatted Markdown document.
+* HTML Campaign Log Export (#41): exportCampaignLog('html') generates a styled HTML export matching active optics color.
+* APP_VERSION Constant: Single source of truth for the version string. Previously scattered across 8+ files (hardcoded as "1.6.3" in state.js, api.js, cloud.js, ui.js, sw.js, manifest.json, changelog check, and boot sequence). Now defined once as APP_VERSION = '1.6.4' in state.js and referenced everywhere else. CURRENT_VERSION in index.html (stale at "1.6.0") removed.
+* flatten() Removal: The flatten() function in autoImportState() recursively lowercased all AI response keys, creating silent key-collision risk (e.g., skills.s colliding with SPECIAL stat s). Replaced with direct field mapping using explicit key lookups (parsed.lvl ?? parsed.LVL). Zero behavior change — all AI state fields continue to map correctly.
+* API Key Security: Gemini API key moved from URL query parameter (?key=...) to request header (x-goog-api-key). Previously the key appeared in browser history, server logs, and referrer headers. Applied to both transmitMessage() and fetchAuthorizedModels().
+* Cancel Button + Timeout: The TRANSMIT PROTOCOL button now becomes a CANCEL button during API calls. An AbortController handles both user cancellation and a 45-second automatic timeout. Cancelled requests show "> TRANSMISSION CANCELLED." instead of crashing silently.
+* Cloud Save Timestamps: pushToCloud() now writes savedAt: Date.now() to Firestore and records robco_last_cloud_push in localStorage. pullFromCloud() compares timestamps and warns before overwriting newer local saves with older cloud data.
+* Faction Change Auto-Logging: autoImportState() now diffs faction values before and after each AI sync. Any fame or infamy change is automatically appended to campaign_notes as "[T{ticks}] {Faction}: fame +N". No new UI needed — renderCampaignNotes() already displays the array.
+* Perk Tracker: state.perks = [] added. autoImportState() handles parsed.perks as [{name, rank, level_taken}]. New collapsible PERKS panel added to the UI. renderPerks() displays acquired perks with rank and level. System directive updated with perk schema and [LEVEL UP] instructions. The AI now returns perks in the state node.
+* Companion Weapon Display: renderSquad() now renders member.weapon and member.dt if present. Schema example updated to include weapon and dt fields. No breaking changes — null-safe, only renders if field exists.
+* Item Value Field: state.inventory items now support a val field (caps value). addItem() reads a new val input. renderInventory() displays "(Xc)" after weight if val is set. Existing items without val display unchanged.
+* XP Progress Bar: Blue XP bar added below the LVL/XP inputs. Reuses hp-bar-container CSS. updateMath() computes XP percentage using the documented quadratic formula (25*Lv²+125*Lv-150). Capped at Lv50.
+* Master Mute Toggle: Single "MASTER MUTE (ALL AUDIO)" checkbox added above the six individual audio controls. Persists to localStorage (robco_master_muted). All 8 audio-producing functions now check AudioSettings.masterMute first. Un-muting restores Geiger, tinnitus, and CRT hum to their correct state.
+* Session Resume Briefing: After boot, if a save exists, a compact status briefing is appended to the chat: location, game time, HP, caps, rads, squad, any crippled limbs, and the last campaign note. Generated from state — no API call.
+* Model List Auto-Refresh: On startup, if an API key is stored, fetchAuthorizedModels() is called silently 2 seconds after boot (silent=true suppresses the ACCESS GRANTED alert). Keeps the model dropdown current without user intervention.
+* State Diff Display: After every AI sync, autoImportState() diffs the pre-sync snapshot against the new state and appends a "> [DELTA] key: old→new | ..." line to chat for any changed primitives, SPECIAL stats, limbs, or inventory count. Enables auditing of AI-driven state changes.
+* Radiation SPECIAL Debuff Display: loadUI() now colors SPECIAL stat inputs red and adds a tooltip when the Courier's rad level triggers a debuff (200+ = -END, 400+ = -AGL, 600+ = -STR, 800+ = -PER, 1000+ = all -3). Display-only — does not modify state values.
+* Version: App bumped to 1.6.4, cache to robco-terminal-v1.6.4.
+
+v1.6.3 (The Faction Network Update)
+* Faction Standing Expanded: The Faction Standing panel now tracks 14 factions — 6 Major (NCR, Caesar's Legion, Mr. House, Brotherhood of Steel, Boomers, Great Khans) rendered in a 3-column grid, and 8 Minor (Followers of the Apocalypse, Powder Gangers, The Kings, White Glove Society, Van Graffs, Crimson Caravan, Chairmen, Omertas) in a collapsible sub-section. All factions are driven by a FACTION_REGISTRY constant — adding a future faction requires one line in one file.
+* Faction Data Structure: state.factions replaces the old flat nf/ni/lf/li/sf/si keypairs with a structured { fame: 0, infamy: 0 } object per faction. Existing saves are auto-migrated on first load — old NCR keys → ncr, Legion → legion, Strip/sf-si → house (Mr. House). All 14 faction keys are forward-filled for older saves.
+* AI Faction Awareness: The system directive and example schema now include the full state.factions structure. The AI tracks and returns all 14 factions on every response. Legacy flat-key AI responses are automatically remapped to the correct faction. The [REP] command now covers all 14 factions.
+* Save Export Envelope: Exported save files now use a versioned envelope format { version, state, chat, playstyle } instead of bare state JSON. This preserves the entire Comm-Link conversation history (up to 200 messages) across device switches and reinstalls. Legacy bare-state imports are still supported.
+* Cloud Sync Envelope: PUSH CLOUD SAVE now includes chat history (~50-100KB) and playstyle alongside game state in the Firestore document (well within the 1MB doc limit). PULL CLOUD SAVE restores chat history, playstyle selection, and all game state — a true full-session restore from any device.
+* Tick System Advisory: The AI directive now explicitly states ticks are advisory pacing and the Courier may perform any action at any time regardless of tick count. This prevents edge cases where the AI could interpret "Increment strictly" as a reason to refuse user actions.
+* Version: App bumped to 1.6.3, cache to v1.6.5.
+
+v1.6.2 (The Character Sheet Update)
+* Skill Matrix Panel: All 13 Fallout: New Vegas skills added as a fully tracked panel — Barter, Energy Weapons, Explosives, Guns, Lockpick, Medicine, Melee Weapons, Repair, Science, Sneak, Speech, Survival, and Unarmed. Skill values sync to the AI on every transmit and are returned in the state node. The AI now uses real skill values for Barter pricing, Speech/Lockpick/Science checks, crafting gates, and VATS accuracy calculations instead of guessing.
+* Crippled HEAD Limb: A fifth limb (state.hd) added to BIO-SCAN. Crippling the head plays a distinct two-layer sound — a concussive triangle-wave thud (550Hz decaying to 40Hz) plus a 3.8kHz sine ring that lingers 0.5s, separate from the arm and leg trauma sounds. Head cripple immediately triggers tinnitus regardless of radiation level. Healing the head stops tinnitus unless rads are also 600+. HEAD button sits above ARMS and LEGS, horizontally centered between the two button column positions.
+* Head Tinnitus Logic: Tinnitus now activates on EITHER rads ≥600 OR a crippled head — whichever occurs first. Both conditions must be cleared before tinnitus stops.
+* Status Effects Panel: New collapsible panel renders state.status as a live buff/debuff list with color coding (green for BUFF, red for DEBUFF, amber for neutral) and remaining tick duration displayed per effect. Previously invisible to the player.
+* Campaign Notes Panel: New collapsible panel displays the AI's campaign_notes array as a bullet list. The AI was already writing tactical decisions to this field on every turn — now the player can actually read them.
+* Faction Standing Panel: New panel shows NCR, Legion, and Strip standings derived from fame/infamy score pairs (nf/ni, lf/li, sf/si). Labels run from Idolized down to Vilified with color-coded green/amber/red display based on net standing.
+* Ticks → Game Time Clock: A live human-readable game clock (Dx HH:MM format) displays next to the TICKS input. 10 ticks = 1 hour, 240 ticks = 1 full day. Updates in real time as ticks change.
+* Ctrl+Enter to Transmit: Desktop keyboard shortcut sends the current command without reaching for the mouse.
+* Undo Last AI Sync: An "↩ UNDO LAST SYNC" button appears after every AI state update. One click restores the full pre-sync snapshot — all stats, skills, limbs, inventory, status effects, squad, and campaign notes — exactly as they were before the AI responded. The button hides itself after use and reappears on the next sync.
+* [FEATURES] Command Registry Restored: Fixed the [FEATURES] screen which was displaying random or invented commands. The AI now outputs the original Gem command registry verbatim — 30+ commands organized into 5 categories (Tactical & Combat, Inventory & Economy Matrix, Character & Bio-Status, Navigation & World State, Narrative & Directives) with the original box-art formatting intact.
+* Separate Limb/Wake Mute Toggles: "MUTE LIMB/WAKE SFX" split into two independent checkboxes. MUTE LIMB SFX controls cripple/restore sounds (robco_ambient_muted). MUTE WAKE SFX controls the tab-return ascending tone (robco_wake_muted). Each persists independently to localStorage.
+* Standby Dim Fix: When switching back to the terminal tab, the dim standby overlay now holds for 650ms before the terminal wakes. The wake tone fires against the dark screen and the "COURIER RETURNED" message appears after the terminal lights up, rather than everything being instant.
+* Engineering Hardening — Undo State Machine: Before every autoImportState() call, the complete current state is snapshotted to window._lastStateBeforeSync including all skills, head limb, inventory, squad, and campaign_notes. Undo restores the full snapshot atomically.
+* Engineering Hardening — Skill Validation: All AI-returned skill values are clamped to 0–100 via Math.min/max in autoImportState before being written to state. Skills are mapped from parsed.skills (nested object) independently of the flatten() function to prevent key collision with other fields.
+
+v1.6.1 (The Living Machine Update)
+* Geiger Counter Audio: Procedural Poisson-distributed Geiger clicks synthesized entirely via Web Audio API. 200+ RADs: ~1 click/3s. 600+ RADs: 12 clicks/sec. 1000+ RADs: near-continuous static burst. No audio files required.
+* Tinnitus Effect: At 600+ RADs, a barely-audible 5.2kHz sine oscillator activates and randomly swells every 12-30 seconds — the player physically experiences the Courier's radiation sickness through their own ears.
+* CRT Hardware Hum: A persistent 60Hz transformer hum (matching real CRT flyback coil frequency) runs throughout the session. LFO-modulated for subtle pitch drift. At 600+ RADs, shifts to 82Hz with increased gain. When a limb is crippled, the hum briefly drops out to simulate a hardware fault.
+* Stat Delta Ghost Register: When the AI updates game state, each changed stat (HP, XP, LVL, CAPS, RADS) shows its previous value rising and fading from the field — a targeted per-field old-value echo that makes every AI-driven change causally visible.
+* Carry Weight Interface Deformation: At 75% carry capacity, the left stat panel begins a subtle sag animation. At 90% the sag accelerates. At 100% overencumbered, the panel buckles with a violent jitter — the machine physically reacting to the Courier's burden.
+* Narrative Velocity: The typewriter output speed now reacts to context. Combat keywords (dead, fatal, ambush, explosion) accelerate output to 2ms/char. Rest keywords (rest, wait, camp, safe, sleep) slow it to 40ms/char. The terminal strains under urgency and breathes during calm.
+* Tab Standby Mode: When the user switches browser tabs, the terminal dims to near-black and displays "> TERMINAL IDLE. AWAITING COURIER..." On return, an ascending square-wave tone plays and the system logs "COURIER RETURNED. SYNCHRONIZING TELEMETRY..."
+* Limb Trauma Audio Signatures: Toggling a limb to CRIPPLED plays a distinct procedural sound. Arms: sawtooth clang (380Hz decaying to 60Hz). Legs: sine thud (75Hz, heavy gain). Restoring a limb plays an ascending med-stim arpeggio (440 → 880 → 1760Hz over 0.4s). CRT hum briefly cuts out on cripple.
+* Session Uptime Clock: A live HH:MM:SS hardware runtime counter displays in the terminal header from session start. Every 15 minutes, the screen briefly flickers and the system logs "MEMORY CYCLE COMPLETE. 64K STABLE."
+* Thermal Ambient Shift: While the Gemini API is processing, the terminal background warms from dark teal to dark amber-brown as if the hardware is heating under load. On response, it cools back over 0.8s via CSS transition.
+* Engineering Hardening — XSS Mitigation: Rewrote the narrative rendering pipeline. All AI text is now HTML-escaped before insertion (& → &amp;, < → &lt;, > → &gt;). This closes a theoretical XSS vector where a malformed AI response could execute injected JavaScript and access localStorage API keys.
+* Engineering Hardening — Typewriter Rewrite: Eliminated O(n²) innerHTML += loop in the typewriter animation (previously: one full DOM serialize/parse per character). New implementation uses textContent during animation (zero parse cost, zero XSS risk) and swaps to formatted innerHTML exactly once at animation completion. Also fixes a bug where any literal < character in AI narrative (e.g. "< 10 RADs") was incorrectly consumed by the old HTML-tag-skip logic.
+* Engineering Hardening — Debounced State Persistence: saveState() now debounces its localStorage write to at most once per 500ms, eliminating synchronous disk writes on every keystroke. State is still synced to the in-memory object immediately. A beforeunload handler flushes any pending write on tab close to prevent data loss.
+* Engineering Hardening — Audio Settings Cache: All six audio mute-check guards (playClack, playGeigerClick, startTinnitus, startCrtHum, playLimbCrippleSound, playLimbRestoreSound, playWakeTone) now read from an in-memory AudioSettings object initialized once at startup, instead of calling localStorage.getItem() on every audio tick. Eliminates up to 20+ synchronous disk reads per second during active gameplay.
+* Engineering Hardening — Audio Change Guards: Audio system updates (Geiger rate, tinnitus, CRT hum) in updateMath() now only fire when radiation level or limb status actually changes, not on every stat input event.
+* Engineering Hardening — State Import Validation: Replaced the recursive flatten() approach in autoImportState() (which had no depth limit, was vulnerable to stack overflow, and silently accepted out-of-range values) with an explicit typed field-mapping function. All fields are now clamped: SPECIAL attributes hard-capped 1–10, HP bounded 0–hpMax, ticks monotonic (cannot decrease), caps ≥0, karma –1000–1000. Limbs only accept "OK" or "CRIPPLED". Parse errors now surface a visible SYS-ALERT to the user.
+* Engineering Hardening — Render Performance: renderInventory() and renderSquad() replaced innerHTML += loops (O(n) full reparse per iteration) with a single map().join('') build and one innerHTML assignment. renderInventory() also uses event delegation for delete buttons instead of one inline onclick handler per item. Item names and companion names are now HTML-escaped before render.
+* Engineering Hardening — Chat History Cap: In-memory chat history is now capped at 200 messages. localStorage writes are debounced to 200ms, eliminating synchronous multi-kilobyte serializations on every message that previously caused jitter during typewriter animation. The full history (up to 200 messages) is still saved to localStorage on each debounced write, so the Download Campaign Log function remains fully intact after a page reload.
+* Changelog Button: Added a > VIEW CHANGELOG button to the Configuration panel (below DOWNLOAD CAMPAIGN LOG) providing on-demand access to the full patch history without requiring an app update.
+* Changelog Update Display: The auto-changelog modal that appears after a system update now extracts and displays only the most recent version block, using version-header pattern matching instead of the previous newline-split that could include multiple versions on Windows line endings.
+
+v1.6.0 (The Any Weapon, Mobile PWA & Visual Overhaul Update)
+* Playstyle Toggle: Integrated a native Playstyle module within the Configuration panel. The Courier can now seamlessly switch between "Any Weapon" and "Melee/Unarmed Only". This intelligently removes or applies hardcoded backend restrictions (e.g. "NO EDUCATED PERK. NO DEAD WEIGHT.") on the fly based on the selected playstyle.
+* Playstyle Restriction Logic: Added physical restriction barriers. If the Courier selects the "Any Weapon" playstyle, acquires restricted perks (Educated, Dead Weight), and attempts to downgrade to "Melee/Unarmed Only," the system will physically block the swap and generate a browser alert citing the exact conflict.
+* PWA Deep Integration: Completely overhauled `manifest.json` and `sw.js` icon sizing and start URLs to flawlessly pass the Chrome mobile installation checklist. The site is now a true Progressive Web App and can be natively installed to iOS/Android home screens.
+* Native Installation Prompts: Wired an invisible `beforeinstallprompt` listener into the main thread. When the browser confirms the app meets all installation criteria, a hidden `> INSTALL SYSTEM (APP)` button dynamically deploys to the configuration menu, overriding Chrome's failure to display the automatic pop-up.
+* CRT Phosphor Adjustment: Increased the CSS scanline gradient opacity to significantly darken the grid lines, granting the terminal screen a much more authentic, heavier analog CRT feel.
+* Expanded Optics Matrix: Added 3 new faction-themed optics presets to the Configuration panel: Legion Red, Ghoul Green, and Neon Purple. All CSS variables, glows, scrollbars, and backgrounds update dynamically with each selection.
+* Header Pulse Animation: The RobCo U.O.S. title now features a slow, breathing glow pulse driven by a CSS keyframe animation, making the terminal feel alive.
+* Panel Depth & Typography: Applied 1px letter-spacing to all panel headers for a tighter, more authentic military-stencil print aesthetic.
+* HP Bar Telemetry: Added a live HP bar directly below the HP input fields in BIO-METRICS. The bar dynamically scales with HP values and transitions between green (>60%), amber (>25%), and danger red (<25%), delivering a real-time visual health readout.
+* Radiation Threat Escalation: The RADIATION input field now reacts to live values. 200+ RADs shifts the color to amber. 400+ RADs initiates a slow pulse. 600+ RADs triggers a rapid danger-red pulse, visually warning the Courier of critical radiation sickness.
+* Themed Scrollbar: Replaced the browser default scrollbar across the entire terminal with a slim, styled scrollbar that uses the active optics color. The scrollbar updates automatically whenever the theme changes.
+* Button Hover Optics: Replaced the harsh white button hover flash with a smooth brightness boost that stays within the active terminal color palette for a polished, cohesive look.
+* Fully Themed CRT Refresh Bar: Replaced hardcoded color values in the CRT phosphor sweep animation with a `--robco-refresh` CSS custom property. The slow, sweeping bar that passes across the screen now adopts the active optics color on load and updates instantly when switching themes, completing the total visual cohesion of the terminal.
+* Hardware Boot Sequence: Added a 1.5-second cold-boot animation on every page load. The terminal now flashes a mock RobCo memory check and hardware diagnostic before revealing the active client, setting the tone immediately.
+* Phosphor Persistence (Ghosting): Every time the AI response updates your stats, all numerical fields and telemetry displays emit a brief phosphor afterglow — a momentary spike in glow intensity that fades back out — simulating the persistence of an aging CRT phosphor coating.
+* Radiation Screen Interference: High radiation now physically degrades the terminal display. 200+ RADs increases the CRT flicker rate. 600+ RADs adds lateral screen tearing (rad-shift). 1000+ RADs triggers full hardware chaos — skewing, violent tearing, and erratic flicker — simulating the terminal hardware reacting to critical biohazard exposure.
+* Trauma System Glitches: Crippled limbs now cause visual corruption on their UI button. Any limb marked CRIPPLED periodically blinks out, blurs, and jitters on an irregular cycle, giving you a hardware-level readout of physical damage.
+* Monochrome Delta Animations: The telemetry arrows (▲ / ▼) in AI narrative output now animate in from above or below and settle into position, rather than snapping onto the screen statically. Increases feel alive and decreases read as damage.
+* Interactive HP Bar: The HP telemetry bar is now fully clickable and draggable. Click or scrub anywhere on the bar to set current HP directly without typing — fully touch-compatible for mobile play.
+* Cloud Sync Fix: Removed the automatic `pushToCloud` call that was firing on every stat change and spamming the "CLOUD SYNC COMPLETE" alert popup. Cloud sync now only triggers when the Courier manually clicks PUSH CLOUD SAVE or PULL CLOUD SAVE.
+
+v1.5.9 (The Immersion & Tactics Update)
+* Color Palettes: Deployed a dynamic Optics Configuration module in the Security panel, allowing the Courier to instantly override the terminal's CSS root variables. Supports classic RobCo Green, New Vegas Amber, and Vault-Tec Blue.
+* Audio Config: Added a hardware toggle to mute the procedural typing sound effects (playClack) for stealth operations.
+* Interactive GPS: Overhauled the grid-map rendering algorithm. Empty floor tiles remain static, but any grid cell containing a Location or Point of Interest is now fully interactive, allowing the Courier to click it and auto-execute a > MOVE TO command.
+* Dynamic Location Tracking: Upgraded the Location text box in the BIO-METRICS panel to utilize an HTML5 `<datalist>`. It now features a smart, auto-completing drop-down containing all major Mojave Wasteland locations while still remaining fully typeable for custom locations.
+* Campaign Logs: Engineered a data-extraction subroutine. The > DOWNLOAD CAMPAIGN LOG button strips HTML and JSON from the active chat history array and generates a pristine, readable .txt file of your adventure.
+
+v1.5.8 (The PWA & Mobile UX Update)
+* Progressive Web App (PWA): Integrated a true Service Worker (`sw.js`). The terminal now caches all assets for faster loads and intercepts server updates, triggering a native "REBOOT TERMINAL" prompt when a new version goes live.
+* Mobile De-cluttering: Replaced massive static UI blocks with native collapsible `<details>` panels. Panels default to closed on mobile (to keep the comm-link instantly accessible) and automatically expand on desktop browsers.
+* Cloud Push Architecture: Dropped a dedicated `> PUSH CLOUD SAVE` button into the configuration panel, providing manual, immediate synchronization to Firebase in addition to the automated turn-saving.
+* Auto-Changelog Display: Engineered a version-tracking subsystem. The terminal now parses `changelog.txt` and automatically renders the latest patch notes in a modal overlay immediately following a system update/reboot.
+
+v1.5.7 (Mobile UX & Gamification Phase)
+* Tactical Dashboard (Phase 5): Implemented a touch-friendly macro interface featuring an 8-way D-Pad and physical action buttons ([THREAT], [VATS], [TRADE], [LOOT]) to eliminate manual typing on mobile.
+* Rich Data Modals (Phase 6): Upgraded the JSON parser to detect modal types natively. The engine now renders interactive visual representations (like CSS Grids for [GPS] and functional Buy/Sell buttons for [TRADE]) instead of plain text lists.
+* Squad UI Integration (Phase 7): Added a dynamic Companion Tracker to the Bio-Metrics panel. The LLM now actively manages companion health, conditions, and ammo, visually displaying them in the HTML DOM.
+* Cloud Synchronization (Phase 8): Built the structural architecture for cross-device cloud saving, allowing the Courier to resume state natively across desktop and mobile browsers via a unified API.
+* VATS Vision Scan (Phase 9): Deployed an animated CSS laser scan overlay and mechanical audio loop to provide tactile, immersive feedback during image upload processing.
+* CRT Authentication Polish: Rebuilt the CSS `.crt-overlay` with authentic repeating-linear-gradient scanlines and a 0.15s opacity flicker animation to perfectly emulate an aging RobCo terminal.
+
+v1.5.6 (Modular Architecture & System Hardening)
+* Modular Splintering: Successfully decentralized the v1.5.5 monolith `index.html` into a scalable architecture (`index.html`, `state.js`, `ui.js`, `api.js`, `database.js`, and `css/terminal.css`). This perfectly insulates the DOM manipulation logic from the JSON API routing.
+* System Directive Centralization: Eliminated conflicting prompt strings in the HTML. The entirety of `BRAIN.md`, the Developer Manual, and the UI Templates have been securely unified into a single `ROBCO_SYSTEM_DIRECTIVE` within `api.js`, ensuring singular instruction clarity on every API turn.
+* Database Token Triage: Separated the static `databaseCSVs` into `database.js` and wrapped it in a keyword-filtering interceptor (`getRelevantDbContext`). The engine now automatically strips the massive CSV payload out of the API call during standard dialogue, instantly saving ~1,500 tokens per turn and drastically speeding up LLM response times.
+* Pure-Code Sensory Polish: Achieved full retro-terminal aesthetics without relying on external image or audio files. Engineered a procedural Web Audio API synthesizer (`playClack`) in `ui.js` for mechanical keyboard clicks, and added a heavy CSS `.crt-overlay` featuring a repeating linear gradient and a 0.15s opacity keyframe flicker.
+* Chrono-Tick Clock Integration: Added a master timekeeping variable (`ticks`) directly into the HTML state UI and the JSON payload. The LLM now accurately tracks the passage of time (1 Prompt = 1 Tick, Combat = 2 Ticks, Wait/Sleep = 10 Ticks/Hr) ensuring active buffs and debuffs expire on schedule.
+* Inventory Persistence Hardlock: Patched a severe amnesia bug where the API's Token Triage would accidentally drop the inventory payload during looting or crafting sequences. A critical directive now forces the engine to strictly preserve and return the entire backpack array when modifying gear, preventing unintended item deletion.
+
+v1.5.5 (The "Native Web App & Deep Brain" Evolution)
+* Frontend UI Modal Pop-ups (The 1-2-3 Plan Phase 1): Completely stripped out the archaic requirement for the AI to draw massive ASCII boxes in the narrative chat log. Designed and implemented a native HTML/CSS `.modal-overlay` pop-up window. Instructed the API to route all list-based data (ROADMAP, STATS, CROSSROADS, FEATURES, etc.) natively into the new popup window instead.
+* Tri-Node JSON Architecture: Expanded the API JSON payload schema from Dual-Node to Tri-Node ("narrative", "state", "modal"). The JS parser now specifically targets the "modal" node to instantly trigger the glowing CRT overlay whenever the user asks for database charts, massively saving API token bloat and keeping the conversational chat stream clean.
+* The "Set Roadmap" Fix (The 1-2-3 Plan Phase 2): Added a "campaign_notes" array to the core JavaScript state tracking. The AI is now instructed to silently write major tactical decisions into this JSON node. The website saves these notes and re-injects them on every turn, giving the raw API a permanent, dynamic memory matching the original Gem experience. 
+* Total Gem Persona Injection (The 1-2-3 Plan Phase 3): Completely embedded the exact "Soul" of the original Gem (the Pre-Website Instructions) and the entire 'robco_dev_manual.txt' rulebook permanently into the systemDirective javascript payload. Hardcoded 'temperature: 0.2' directly into the API request to prevent hallucinations and force strict, mathematical reasoning. 
+* Database Slot Integration: Engineered a `databaseCSVs` variable placeholder at the top of the JS script to securely house the exact data arrays (weapons, armor, bestiary, etc.), allowing the user to finalize the true standalone 1:1 port of their original Google workspace.
+
+v1.5.4 (The "Soul" Injection, Indestructible UI, & Stability Patch)
+* Array-Based Narrative Node & Indestructible Parser: Overhauled the API output architecture to use an Array of Strings for the "narrative" node, physically preventing unescaped carriage return (\n) SyntaxError crashes. Paired with a rewritten JSON parser in index.html's transmitMessage() function, the JS now aggressively hunts for the narrative array and natively joins it even if the LLM hallucinates a new key name, completely eliminating "Missing narrative node" errors.
+* Legacy Command & Blueprint Restoration: Stripped confusing prefix titles from UI templates to prevent JSON key hallucination. Hardcoded the complete, multi-line array blueprints for all custom legacy modules ([ROADMAP], [INV], [STATS], [GPS], [FEATURES], etc.) directly into the JavaScript systemDirective payload. This restores the AI's ability to natively draw any requested ASCII sheet with full visual parity to the pre-Webbsite v1.4.6 menus.
+* Pre-Website Instruction Master Merge (The "Soul"): Executed a total surgical graft of the legacy v1.4.6 Gem Instructions onto the post-website JSON architecture. The system payload now contains the complete strategic authority, timeline logic, and persona constraints of the original Google Gem, bypassing the amnesia of a blank API key.
+* Dynamic Roadmap State Integration: Added a "campaign_notes" array to the core JavaScript state tracking. The AI is instructed to silently write major tactical decisions (Roadmap phases, Crossroads lockouts) into this node. The website saves and re-injects these notes on every turn, giving the stateless API a permanent, dynamic narrative memory.
+* Temperature Optimization: Hardcoded `temperature: 0.2` directly into the generationConfig API request payload. This explicitly prevents the stateless API from hallucinating stats and forces the engine to adhere strictly to mathematical boundaries and CSV rules.
+* CSS Terminal Overflow Fix: Patched a critical flexbox scaling bug inside index.html. Applied `min-height: 0` and `overflow-y: auto` to the .main-grid and #chatDisplay containers. The terminal window no longer stretches the webpage infinitely downward, ensuring a locked-frame, internally scrollable chat history.
+
+v1.5.3 (Stability & Customization Patch)
+* Array-Based Narrative Node (JSON Newline Crash Fix): Overhauled the Dual-Node API output architecture in `BRAIN.md`. The `"narrative"` node is now mandated to output as an Array of Strings rather than a single continuous block. This physically prevents the LLM from throwing unescaped carriage returns (`\n`) when generating complex ASCII tables, completely immunizing the frontend Javascript parser from `SyntaxError` crashes.
+* UI Template Customization Block: Restructured `robco_ui_templates.txt` to include a dedicated, permanent injection zone for the Courier's personalized commands under the `> [FEATURES]` template. This prevents the master framework updates from overwriting locally developed shorthand macros.
+* JavaScript Array Native Join: Updated `index.html` chat logic to properly detect and join the newly mandated JSON string arrays (`Array.isArray(parsedNode.narrative) ? parsedNode.narrative.join('\n') : ...`), ensuring flawless rendering of all backend tabular data into the chat UI.
+
+v1.5.2 (Website Architectural Overhaul)
+* "Memento" Amnesia Bug Fix: Rewrote the `index.html` payload construction algorithm to map and inject the user's `chatHistory` array into the API `contents` request. The LLM now retains full narrative continuity and conversational memory across turns instead of operating on a blank slate.
+* Dual-Node JSON Architecture: Eliminated fragile regex extraction strings. Configured the `fetch` API call using `responseMimeType: "application/json"`. The LLM engine is now physically locked into outputting a strict 2-part JSON payload (`{"narrative": "...", "state": {...}}`), completely immunizing the Web UI against formatting crashes.
+* Token-Burn Triage Engine: Engineered a keyword parsing string into `index.html`. The app now automatically strips the massive `inventory` array from the LLM payload during standard dialogue or combat prompts, drastically reducing API token burn and optimizing LLM processing speeds without breaking game logic.
+* Async Overwrite Lockout: Implemented CSS opacity dimming (`pointer-events: none`) on the left-hand UI panel while the `transmitBtn` is pending a response. This prevents users from altering the local Source of Truth while the LLM is calculating, completely eliminating the asynchronous state-overwrite race condition.
+* "Commands" Persona Break Fix: Hardcoded an explicit instruction into `BRAIN.md` and `robco_ui_templates.txt` forcing the engine to intercept generic terms like "help", "menu", or "commands" and route them directly to the `> [FEATURES]` template, restoring the RobCo aesthetic.
+
+v1.5.1 (The Engine, Optics & Stability Update)
+### API, Connectivity, & Engine Selection
+* Automated Engine Fetcher & Selection UI: Replaced hardcoded model aliases with an authorized engine scanner and a dynamic dropdown menu. The client pings Google's master server on startup to retrieve authorized models, allowing seamless toggling between available Gemini engines (Flash/Pro). Default routing is now set to 'gemini-1.5-flash' to drastically increase speed and eliminate 404 access errors for free-tier Developer keys.
+* API Key Sanitization Protocol: Implemented an automated stripping sub-routine that removes all whitespace, hidden carriage returns, and invisible characters from API keys before encoding them for transmission, permanently resolving 404/400 connection failures.
+* Diagnostic Error Interceptor: Overhauled the network fetcher to capture and print detailed backend error messages (Auth/Rate-Limit/Regional rejections) directly to the Comm-Link display for instant identification.
+### Data Persistence & Failsafes
+* **Total Persistence Auto-Save Engine:** Rewrote the master save-cycle with true `oninput` silent saving. The UI guarantees an immediate physical write to browser local storage on every calculation (`updateMath`), locking S.P.E.C.I.A.L. matrices, bio-metrics, location inputs, and inventory data to physical memory the exact millisecond a keystroke occurs to eliminate "ghosting."
+* **Comm-Link Failsafe & Syntax Fix:** Corrected a split-line regex syntax error that caused button failures across the app. Wrapped the Comm-Link chat history loader in a strict `try/catch` block so corrupted local transcripts gracefully reset the buffer instead of halting the entire script.
+* **Import Sequencing Patch:** Resolved a severe race-condition bug where uploading a hard backup (.json) file instantly overwrote imported data with default HTML values. The JavaScript gatekeeper now rigidly pushes imported arrays to the visual DOM before executing background saves.
+### UI, Processing, & Architecture Offloading
+* **API JSON Handshake & UI Delegation:** Deprecated text-based ASCII footers ([INV], [STATS], [GPS], etc.) in favor of a strict, invisible JSON payload exchange. The LLM reads the Web UI's state as the absolute Source of Truth and outputs dynamic JSON to drive native HTML/CSS elements, saving immense token bloat and preventing visual redundancy.
+* **Inventory Regex Failsafe:** Implemented a mandatory inclusion rule for the "inventory" key in all LLM JSON outputs to satisfy the JavaScript frontend parsing logic (`autoImportState`), preventing API crashes during partial state updates.
+* **Mathematical Offloading:** Transferred static formula processing (Max Carry Weight, Max Action Points) entirely to the JavaScript frontend. The LLM is now strictly reserved for dynamic narrative logic, database cross-referencing, and Time-To-Kill physics.
+* **Visual Data Uplink (Base64 Integration):** Restored multimodal vision capabilities directly to the web client. Users can now attach local screenshots (inventory menus, VATS targets) to text prompts. The JavaScript engine encodes the image as raw Base64 data and pushes it through the API pipeline, allowing the AI to execute Categorical Purges and OCR math natively.
+
+v1.5.0 (The Comm-Link API Update)
+* Native API Integration: Completely eliminated manual JSON copy-pasting. Upgraded the RobCo Web Client to interface directly with Google AI Studio via a secure API pipeline. The client now silently staples background state arrays to Courier prompts and intercepts returning data, creating an automated two-way synchronization loop.
+* Local Security Configuration: Implemented an encrypted configuration panel to secure the Gemini API key. Keys are strictly held in device local storage, ensuring zero exposure on public repositories (GitHub/Netlify) while maintaining continuous backend access.
+* Master Directive Overhaul: Extracted all UI rendering burdens from the AI's core logic loop in BRAIN.md. The engine is now explicitly instructed to treat the Web Client's JSON payload as the absolute source of mathematical truth, permanently halting unprompted ASCII table generation to drastically maximize token efficiency for combat math and narrative processing.
+* Progressive Web App (PWA) Lockdown: Finalized application architecture with manifest.json, sw.js, and icon.png integration. The RobCo terminal can now be physically installed to mobile and desktop home screens as a standalone offline-capable application featuring authentic native iconography.
+* Widescreen Flexbox Rendering: Deployed responsive desktop layouts utilizing viewport height (vh) constraints. The terminal now dynamically expands on ultra-wide monitors, separating the Bio-Metric trackers and the active Comm-Link chat into a permanent, non-overlapping dual-column display.
+* Persistent Chat Memory: Engineered local storage hooks to automatically back up the Comm-Link narrative transcript. The chat history now survives tab closures, browser refreshes, and device reboots, supported by a manual [PURGE LOGS] clearance function.
+* Input Clamping & Validation: Hardcoded strict mathematical boundaries directly into the UI. S.P.E.C.I.A.L. values are now physically clamped between 1 and 10 to prevent user error or accidental negative integer inputs from corrupting the background math algorithms.
+
+v1.4.7 (Beta - Web Architecture Transition)
+* HTML/JS State Offloading: Transitioned the primary state-tracking engine from the active LLM context window to a lightweight, client-side web application. The Courier's Inventory, S.P.E.C.I.A.L. attributes, Wealth, and Bio-Metrics are now mathematically processed in browser memory to eliminate LLM token bloat and variable drift.
+* The Fuzzy Logic Parser: Implemented an aggressive JSON interception script within the web client. The engine now automatically flattens, lowercases, and maps LLM-hallucinated data structures, ensuring successful Pip-Boy overwrites even if the AI arbitrarily alters JSON keys or nests variables.
+* API Comm-Link Integration: Built a native Gemini API chat interface directly into the RobCo terminal. The client silently staples the active JSON payload to Courier prompts and intercepts returning data arrays, fully automating the two-way sync loop without requiring manual copy-pasting.
+* Widescreen ASCII Preservation: Rewrote the CSS rendering engine using Flexbox and viewport height (vh) constraints. The terminal now dynamically expands to a widescreen dual-column layout on desktop. Implemented the 'pre-wrap' CSS protocol to strictly preserve Unicode spaces, ensuring the AI's generated box-drawing tables render flawlessly.
+* PWA & Local Storage Lockdown: Converted the client into a downloadable Progressive Web App (PWA) via manifest.json and Service Worker deployment. The engine now saves state data on every individual keystroke (oninput) to browser local storage, and supports exporting/importing hard .json save files for permanent physical backups.
+* Dedicated Chem & Trauma Matrix: Added a localized Bio-Scan interface to the web client, featuring native tracking for crippled limbs, radiation thresholds, and a dedicated array for logging active chem ticks and permanent addictions to ensure the API sync loop maintains accurate physiological debuffs.
+
+v1.4.6
+* The Pip-Boy Stasis Protocol: Decoupled administrative user prompts from the time-scale engine (Dev Manual Section 1.1). Browsing inventory, managing gear, executing batch syncs, and consuming healing items now execute in instantaneous system stasis (0 ticks). The world clock strictly advances only during active combat rounds, physical travel, or explicit wait/sleep loops.
+* Apparel DT Degradation Constant: Eliminated linear scaling ambiguity (Dev Manual Section 2.3). Implemented a concrete mathematical floor tracking the 'Min_CND_Threshold' from armor.csv. Condition levels falling below this gate now scale armor defense precisely via: Active DT = Base DT * (Current CND / Min_CND_Threshold), rounded down to the nearest integer.
+* Companion Mid-Tick Ammunition Exhaustion: Patched mid-encounter combat math (Dev Manual Section 3.1). If a companion's custom magazine runs dry mid-turn, the engine mathematically bifurcates the Squad TTK sequence, resolving the custom ammunition damage yield first before seamlessly hot-swapping to their default infinite-ammo weapon profile to calculate remaining target HP.
+
+v1.4.5
+* The Synchronization Bypass: Hardcoded a verification override into the `> [SYNC]` protocol (Dev Manual Section 2.7). The engine will now bypass addiction cascade warnings and system alerts when batching data, assuming the player has already hardlocked their game state natively.
+* Kinetic Stamina Sustain (AP Regen): Added Mid-Combat AP Regeneration logic to the `> [VATS SIM]` engine (Dev Manual Section 1.6). Melee/Unarmed frames now recover `15 + Agility` Action Points per combat round during multi-tick simulations.
+* Conservation of Mass (Crafting Delta): Fixed an inventory mass leak in Dev Manual Section 2.5. The engine now explicitly calculates and adds the mass of newly yielded crafting items *after* purging the consumed ingredients.
+* Visual Supremacy Override: Resolved the accuracy double-dip logic fracture. When executing `> [VVATS]`, the engine treats visual OCR percentages as absolute truth, suspending background anatomical penalties (crippled limb modifiers) to prevent double-taxing the Courier.
+
+v1.4.4
+* The Hotkey Binding Void: Implemented the `> [BIND: Item, DIR]` execution command in Dev Manual Section 1.7. Users can now explicitly assign consumables and gear to the 8-way vector array instead of relying on the LLM to implicitly deduce hotkey mappings. 
+* Level 50 Hardcap Safety: Locked out XP processing bugs by hardcoding the exact FNV level ceiling into Dev Manual Section 1.5. Upon reaching Level 50 (68,600 XP), all background experience harvesting algorithms will permanently freeze.
+* Excess Menu Bloat Protection: Extended the Condensation Rule to the `> [EXCESS]` interface. The engine will now aggregate duplicate junk items and limit suggestions to the Top 5 most valuable assets per repair/sell/drop category to protect the UI from shattering under high backpack volume. Append `-FULL` to view the unabridged list.
+* Visual Parsing Sub-Routine (> [VVATS]): Connected the orphaned Features menu command to the backend logic. Dev Manual Section 1.6 now instructs the engine to extract visual OCR hit percentages from uploaded screenshots and convert them into raw tactical AP/Damage math output.
+v1.4.3
+* Economy Stabilization (Vendor Liquidity): Patched the `> [TRADE]` protocol in Dev Manual Section 2.8 to strictly enforce merchant 'Base_Caps' liquidity limits derived from `vendors.csv`. The Courier can no longer bankrupt vendors into negative integers; all excess value extracted must be matched via item bartering.
+* AP Calculation Native Math: Added a strict mathematical rule in Dev Manual Section 1.5 defining the generation of Maximum Action Points. The engine is now explicitly required to calculate AP via the hardcoded FNV formula (`Max AP = 65 + (Agility * 3)`) to prevent hallucination during level-ups and stat alterations.
+* Conservation of Mass (Stash Networking): Placed a hard lock on the `> [STASH]` sorting protocol in Dev Manual Section 2.9 to eliminate item cloning. The engine is now bound by the Conservation of Mass: any item added to a Safehouse stash must be simultaneously and destructively purged from the active Backpack memory array.
+* Ammunition Exhaustion Protocol: Updated the Companion Matrix in Dev Manual Section 3.1 to account for mid-skirmish ammo depletion. If the Squad TTK ammo-burn formula drains a companion's custom ammunition pool to zero, the system will automatically re-equip their infinite-ammo base weapon and recalculate DPS for the remainder of the simulation turn.
+v1.4.2
+* Bug Fix: Quadratic XP Anti-Hallucination: Addressed a severe logic drift vulnerability regarding level thresholds. Replaced the "query internal memory" rule with the hardcoded FNV algebraic constant. Dev Manual Section 1.5 now explicitly forces the engine to calculate progression boundaries using: `Total XP Required = 25 * (Target_Level^2) + 125 * (Target_Level) - 150`, mathematically guaranteeing perfectly accurate progression caps.
+* Bug Fix: Viewport Amnesia (UI Ghosting): Added the active viewport token (`V:M` or `V:D`) directly to the front of the mandatory `[SYS_DATA]` footer. This forces the engine to read and permanently retain its UI width settings (56 or 80 characters) across extended conversational contexts, preventing sudden formatting collapses.
+* Radiation Sickness Matrix: Completely overhauled Dev Manual Section 1.3 to include lethal bio-metric threat tracking. The engine now recognizes FNV hardcoded Radiation milestones (Minor: 200, Advanced: 400, Critical: 600, Deadly: 800, Fatal: 1000) and automatically applies S.P.E.C.I.A.L. debuffs. Added native purge rules for RadAway (-150 RADS) and Rad-X (+25 RR).
+* PC Optimization (Dual-Column Lists): Implemented a dynamic formatting rule in `robco_ui_templates.txt`. When Desktop Mode (`V:D`) is active, heavy array templates (`> [INV]`, `> [STASH]`) will automatically render their backpack contents in a Dual-Column layout to eliminate empty black space and perfectly utilize 80-character widescreen real estate.
+
+v1.4.1
+* Dynamic Dashboard Scaling: Updated the `[SYS_DATA]` Telemetry Dashboard rules in `BRAIN.md` to ensure horizontal box-drawing borders dynamically scale to match the active viewport width (56 for MOBILE, 80 for DESKTOP) to prevent formatting dislocation.
+* Companion Post-Combat Auto-Heal: Hardcoded a rule in Dev Manual Section 3.1 dictating that all active companions immediately restore to 100% HP and clear all crippled limbs upon successful combat resolution, mimicking native game mechanics and preventing math-loop death spirals.
+* Asymmetric Trade Margins: Patched the `> [TRADE]` protocol to strictly enforce a Buy/Sell margin spread. The Courier's sell-price calculation must mathematically fall below the vendor's purchase-price, preventing infinite cap generation exploits.
+* Stash Condensation Protocol: Deployed a token bloat failsafe for networked stashes (`> [STASH]`). The engine now automatically groups duplicate items and truncates the readout to the top 5 most valuable assets per category. Users must append `-FULL` to force an unabridged list. Updated `[FEATURES]` to reflect this syntax.
+* Output Cascade Sequencing: Structured the logic flow for Command Chaining (`&&`). The engine is now required to follow the Output Cascade: rendering the Monochrome Delta first, separating generated UI tables with single blank lines, and terminating strictly with the dashboard footer to ensure cleanly separated text blocks during heavy multi-command execution.
+
+v1.4.0
+* The Telemetry Dashboard: Completely overhauled the mandatory 1-line `[SYS_DATA]` footer string into a dual-line Unicode boxed telemetry dashboard, permanently solving vertical wrapping fragmentation on mobile screens while preserving critical game state tokens.
+* Viewport Scaling Protocol: Integrated `> [VIEW: DESKTOP]` and `> [VIEW: MOBILE]` commands. The engine now natively locks UI rendering to 56 characters for smartphone usage, but dynamically expands to an 80-character widescreen CRT format when the desktop mode is triggered.
+* Consumable Anti-Ghosting Purge: Hardcoded a critical inventory rule into Dev Manual Section 1.1 ensuring that whenever a medical or chem item is processed via shorthand or D-Pad hotkey, the system enacts an immediate -1 quantity deletion of that specific item to prevent backpack bloat.
+* Ammo Reserve Monitoring: Updated the `> [INV]` template to track real-time active weapon ammunition quantities and added a dedicated 'AMMO' array under the backpack contents to strictly monitor companion firing reserves derived from the TTK burn engine.
+
+v1.3.9
+* Mobile Geometry Overhaul: Replaced all standard keyboard table frames (`-`, `=`, `_`) with seamless Unicode box-drawing characters (`┌ ┐ └ ┘ ├ ┤ ─ │ ┼`) to eliminate micro-gaps.
+* Strict Width Capping: Hard-capped all generated UI templates to exactly 56 characters in width. This prevents vertical text wrapping and "shattered" tables when viewing the terminal on narrow, portrait-oriented smartphone screens.
+* Quiet Mode Logic (-Q): Deployed an inline modifier for combat operations (`> [THREAT: TARGET -Q]`). The engine suppresses all narrative prose and UI card generation, providing only the mathematical delta and footer to drastically speed up multi-turn mobile combat.
+* Stealth Multiplier (-S): Implemented Sneak Attack Critical functionality. Appending `-S` to a combat prompt forces the system to pull the equipped weapon's Crit_Multiplier from `weapons.csv` and strictly apply it as unmitigated damage to the opening strike.
+* Fast Travel Chronology: Tied the `> [TRAVEL CLUSTER]` output to background system ticks. Hardcoded the mathematical limit of 1 Map Sector Crossed = 1 System Tick, allowing time dilation to accurately burn buffs and restock vendors without manual user input.
+* 8-Way D-Pad Execution: Expanded the `> [PAD: DIRECTION]` sub-routine to natively recognize combined diagonal vectors (e.g., `UP-LEFT`, `DOWN-RIGHT`), immediately doubling active hotkey capacities without adding visual bloat.
+* Alternative Currency Footer: Fixed the weightless wealth blindspot by adding `[N:X/L:X]` to the `CAP` bracket inside the mandatory `[SYS_DATA]` footer. NCR and Legion currency stores are now visible continuously.
+* Shorthand Alias Engine: Added a suite of 2-letter command aliases (e.g., `[TC]` for Travel Cluster, `[VS]` for VATS Sim) mapping 1:1 to their full equivalents. Re-formatted the `[FEATURES]` menu to display these aliases natively for rapid mobile execution.
+* Command Chaining (&&): Implemented dual-prompt processing logic using the `&&` delimiter. The Courier can now string multiple macros together (e.g., `> [SYNC: data] && [THREAT: target]`), and the engine will execute both sequentially in a single turn. 
+* Logic Restoration: Correctly restored the 'Pre-emptive Scanning' parameter to `BRAIN.md` section [C] to prevent user bottlenecking at Lockpick and Science gates.
+
+v1.3.8
+* AP Regeneration & Medical Logic: Defined Action Point regeneration to fully restore upon successful combat resolutions. Formally separated medical healing (Stimpaks update HP instantly) from narcotic timers (Psycho decrements via prompt ticks).
+* Zero Condition Item Breakage: Hardcoded logic for item shattering at 0/100 CND. Items automatically unequip, drop their base stats to 0, and trigger a `[UTILITY QUARANTINE]` alert.
+* Missing UI Implementations: Added the `[STASH]` UI template to `robco_ui_templates.txt` to prevent rendering hallucinations, and implemented visual degradation bars `[██████░░]` into the `[TIMER/CHEM]` UI.
+* Anatomical VATS Targeting: Added a `TARGETED LIMB` field to the `[VATS SIM]` interface. The combat engine now prioritizes specific limb targeting (e.g., forcing movement taxes via leg strikes) based on target kinetics.
+* Confirmed XP Harvesting: Combat resolutions now automatically calculate the XP yield from `bestiary.csv` and propose the total to the Courier for user confirmation before adding it to the tracker.
+* Automated Vendor Trading: Added the `> [TRADE: Item, Qty]` protocol. The engine now applies dynamic Fame/Infamy and Barter math to strictly update Caps and Inventory without requiring manual calculation from the user.
+
+v1.3.7
+* Batch Synchronization Protocol: Added `> [SYNC: data]` feature to allow high-speed batch state updates. This bypasses narrative text generation to allow for seamless, rapid input of live save data, with the engine confirming updates only via delta telemetry.
+* Anti-Hallucination Telemetry Lock: Added a hard system guardrail that forces the engine to halt processing and trigger `[SYS-ALERT: INSUFFICIENT TELEMETRY]` if manual user data is ambiguous, preventing the system from guessing narrative events.
+* UI Synchronization: Updated the `> [FEATURES]` command menu to include both the Batch Sync (`> [SYNC]`) and D-Pad Hotkey (`> [PAD: DIR]`) protocols.
+
+v1.3.6
+* Monochrome Telemetry Updates: Upgraded the delta processor to run solid block arrows (▲/▼) and uppercase variable names for authentic green-screen CRT terminal emulation.
+* Mobile Hotkey shortcut System: Deployed shorthand D-Pad hotkey routing (> [PAD: UP/DOWN/LEFT/RIGHT]) to instantly auto-execute use/equipment functions of bound inventory log slots on mobile layouts.
+* Hybrid Karma Translation System: Tied KRM integers directly to Pip-Boy descriptive text boundaries, allowing for textual alignment initialization while preserving exact background mathematical scaling.
+* S.P.E.C.I.A.L. Overflow Protection: Hardlocked final output registers for attributes strictly between 1 and 10 to simulate structural engine limitations.
+* Destructive Crafting purges: Forced immediate deletion routines for consumed ingredients from backpack memory pools upon successful campfire/workbench outputs.
+* Pack-Mule Mass Restrictions: Hardlocked humanoid companion carrying thresholds to 150 lbs max to eliminate unlimited siphoning exploits.
+* Chem Refresh Patch: Implemented family refresh clocks to reset chem buff timers when identical families are redosed, eliminating ghost withdrawal traps.
+
+v1.3.5
+* Dedicated Misc Database: Introduced `misc.csv` into the final knowledge file slot to formally track weight and value for junk, crafting components, and currencies. The Dynamic Mass Engine now actively references this database to completely eliminate fallback guesses and placeholder variables.
+* Categorical OCR Purge Protocol: Altered the visual upload syntax to require a target category (e.g., > [VISUAL UPLOAD: WEAPONS]). This strictly isolates the destructive overwrite command to that specific backpack array, completely eliminating the "Pip-Boy Scroll" deletion bug where off-screen items were dropped from memory.
+* Non-Hardcore Mass Engine: Established logic constraints to bypass missing weight tables in non-junk databases. The engine now universally recognizes ammo and chems as 0 lbs, preventing system failure during standard scavenging runs.
+* CND Preservation Protocol: Stripped the OCR engine's ability to arbitrarily overwrite the exact mathematical Condition percentages managed by the combat tracking arrays. Visual approximations are now restricted strictly to newly acquired gear.
+
+v1.3.4
+* Visual Upload Patch (OCR Purge): Implemented a destructive overwrite protocol for the > [VISUAL UPLOAD] command when parsing inventory screens. The internal item array is now fully wiped and rebuilt 1:1 from image text data to prevent ghost duplicates of items dropped in-game.
+* Dynamic Mass Engine Deployed: Fixed the "lazy math" bug by forcing carry capacity metrics (W:X/X) to automatically evaluate and update against item CSV masses upon any inventory transaction, preventing static variable drift.
+* Developer Manual Synchronization: Added Section 2.6 (Dynamic Mass Engine & OCR Purge Protocol) to formalize memory registers and background mass engines. Synchronized all system files to version 1.3.4.
+
+v1.3.3
+* Combat Sequencing Logic: Slotted Section 1.6 (The Kinetic Sequencing Algorithm) directly into the developer manual to optimize Action Point allocation for Unarmed/Melee frames.
+* UI Matrix Expansion: Deployed the visual > [VATS SIM] interface card template right after the Geographic Matrix block to allow for explicit tactical damage forecasting.
+
+v1.3.2
+* Database Alignment: Added necessary mathematical columns to reference CSVs to prevent LLM hallucination: XP_Yield added to bestiary.csv, Value added to chems.csv, and Ammo_Type added to weapons.csv.
+* State Tracking Expansion: Expanded the mandatory [SYS_DATA] tracker to include TCK (Ticks), FAME, INF (Infamy), and KRM (Karma) to prevent variable drift over long sessions.
+* Math Hardcoding: Hardcoded the Jury Rigging repair formula as 15% + (Repair Skill / 2)% to strictly govern condition regeneration.
+* Sleep/Wait Isolation: Explicitly separated the > [WAIT: X Hrs] and > [SLEEP] commands. Waiting advances time without healing, while sleeping fully heals HP, RADS, and limbs.
+
+v1.3.1 (Current Version)
+* System Debloat Protocol: Completely decoupled the changelog history from active prompt memory and removed the > [CHANGELOG] command from the UI Features menu. This drastically reduces token consumption per prompt.
+* Database Alignment: Added necessary mathematical columns to reference CSVs to prevent LLM hallucination: XP_Yield added to bestiary.csv, Value added to chems.csv, and Ammo_Type added to weapons.csv.
+* State Tracking Expansion: Expanded the mandatory [SYS_DATA] tracker to include TCK (Ticks), FAME, INF (Infamy), and KRM (Karma) to prevent variable drift over long sessions.
+* Math Hardcoding: Hardcoded the Jury Rigging repair formula as 15% + (Repair Skill / 2)% to strictly govern condition regeneration.
+* Sleep/Wait Isolation: Explicitly separated the > [WAIT: X Hrs] and > [SLEEP] commands. Waiting advances time without healing, while sleeping fully heals HP, RADS, and limbs.
+* UI Features Menu Correction: Updated the UI Templates list to properly reflect active system operations. Replaced the auto-triggered [SYS_LEVEL] protocol with the manual > [WAIT: X Hrs] action to prevent user input confusion and ensure accurate feature mapping.
+* Menu Streamlining: Consolidated the [PAGE TWO] and [PAGE THREE] commands into a unified > [PAGE 2/3] display syntax within the Features menu for a cleaner UI layout. Expanded triggers to accept both numerical and text-based inputs.
+
+v1.3.0
+* The Systems Update: Comprehensive overhaul of core physical and mathematical laws to eliminate background hallucinations. 
+* Progression Integration: Hardcoded the > [SYS_LEVEL] protocol. The engine now recognizes EXP thresholds, strictly allocates skill points based on the 10 + (INT / 2) formula, and locks Perk acquisition to even-numbered levels. Added the Level-Up interface to the UI Templates.
+* Physics & Maintenance Constants: Hardcoded the absolute Carry Weight boundary (150 + [STR * 10]) and defined condition restoration algorithms tied proportionally to the Repair skill when utilizing the Jury Rigging menu.
+* Companion Logistics Framework: Updated Squad logic to formalize infinite ammo for default weaponry and mandatory ammo consumption for non-default armaments. Integrated "Unconscious" mechanics for zero-HP resolutions on Normal difficulty to prevent rogue companion permadeath.
+* Time-Pass Controls: Added the > [WAIT: X Hrs] system action to allow for fast-forwarding merchant cycles without utilizing beds. Added 1-Tick Magazine logic to override hard mechanical bottlenecks.
+
+v1.2.5
+* Fictional Context Wrapper: Added an explicit FICTIONAL CONTEXT OVERRIDE block to the top of the Master Brain. This header acts as a persistent instruction to the backend, clarifying that all language is strictly related to a video game (Fallout: New Vegas), preventing false-positive flags on words like "Chems," "Crippled," and "Fatal."
+* Terminology Restoration: Reverted all clinical/sterilized terminology from v1.2.4 (Dependencies, Stims, Impaired, Critical) back to authentic in-game mechanics (Addictions, Chems, Crippled, Fatal Threats) to preserve full narrative immersion and accuracy.
+* Structural Persistence: Maintained all backend formatting fixes from v1.2.4, ensuring the [SYS_DATA] footer continues to use straight brackets ([ ]) instead of curly braces to prevent JSON parsing errors upon saving.
+
+v1.2.4
+* JSON Bracket Optimization: Replaced the curly braces { } in the mandatory [SYS_DATA] tracker with standard brackets to prevent conflicts with Google's developer backend string parsers. Changed ping alert to [DELTA].
+
+v1.2.3
+* UI Template Hardcoding: Hardcoded the specific 7 core internal system alerts directly into the robco_ui_templates.txt Warning Render Protocol block. This maps the exact emojis (🛑, ☣️, ⚠️, ⚙️) to their respective alerts explicitly, eliminating any LLM guesswork when rendering warnings. 
+* Markdown Formatting Preservation: Restored the literal markdown backtick syntax (`) into the robco_ui_templates.txt formatting guide to ensure parsers display the visual output exactly as intended.
+
+v1.2.2
+* Narrative Engine Override: Added the > [COMM LINK: NPC Name] command to the Master Brain. This protocol allows the user to temporarily suspend the rigid RobCo persona to engage in native, lore-accurate roleplay with established game characters.
+* Override UI Directives: Built [COMM LINK ESTABLISHED] and [COMM LINK TERMINATED] visual card templates into the UI directory. These interfaces act as systemic signposts, providing the player with embedded instructions on how to use and sever the override link.
+
+v1.2.1
+* Crafting Engine Deployed: Integrated Section 2.5 (Campfire & Workbench Logic) into the Dev Manual. The engine will now scan backpack contents against recipes.csv and enforce rigid Skill_Req gates (Science/Survival) before allowing item combination.
+* Crafting UI Integration: Added the > [CRAFT] survival matrix template to robco_ui_templates.txt to structure the display of available recipes and missing components.
+
+v1.2.0
+* Token Compression Protocol: Replaced the sprawling text-based [SYS_MEM] footer with a strictly minified JSON data block. This dramatically reduces memory overhead per turn and practically eliminates the risk of variable drift during extended LLM context windows.
+* Delta Reporting: Integrated a "Ping" protocol. The system will now output a single-line mathematical delta (Δ) highlighting exact changes to health, stats, or resources before generating the main text response.
+* Dual-Axis Reputation Engine: Decoupled the singular "Karma/Reputation" metric into authentic Fallout: New Vegas dual-axis tracking (Fame vs. Infamy). Updated [DEV 2.2] economy math to account for mixed states (e.g., Wild Child).
+* UI Upgrades: Replaced primitive [||||] condition tracking bars in the [INV] UI with solid block unicode characters ([██████░░]) for superior visual contrast. 
+* Geographic Matrix: Deployed the > [GPS] / > [MAP] command to the robco_ui_templates.txt file, allowing the engine to generate an ASCII compass array indicating local threats and the nearest safehouse.
+
+v1.1.9
+* Complete UI Emancipation: Fully migrated the System Features & Commands ASCII table and the Mobile-Optimized Warning Render Protocol (including all native system alert emojis: 🛑, ☣️, ⚠️, ⚙️) out of BRAIN.md and into robco_ui_templates.txt.
+* Visual Fidelity Restoration: Ensured 1:1 visual continuity of all card suits (♠, ♦, ♣, ♥), radioactive markers (☢), and star alignments (★) within the directive interfaces to preserve the exact aesthetic of prior operating systems.
+* Brain De-cluttering: The core system prompt is now 100% devoid of large structural text blocks and graphical mapping instructions, guaranteeing maximum logic retention.
+
+v1.1.8
+* UI Architecture Offloading: Extracted the entire "Master Interfaces (ASCII)" array from the core system prompt (BRAIN.md) into a standalone robco_ui_templates.txt file.
+* Token Efficiency: This optimization severely reduces baseline token bloat by preventing the engine from processing heavy ASCII structural characters during standard conversational turns, improving the AI's adherence to the core combat and narrative constraints.
+* Render Protocol Update: Modified the Interface Render Protocol in the Master Brain to require a hard query to the new UI text file before rendering screens like [INV] or [SQUAD].
+
+v1.1.7
+* Architecture Optimization: Offloaded structural developer documentation and the complete changelog ledger to the external knowledge directory (robco_dev_manual.md).
+* Prompt Optimization: Compressed base execution instructions by 42% to eliminate token drag, reduce response latency, and protect context window boundaries during extended gameplay sessions.
+* Agency Patch: Hardcoded the Addiction Verification Loop to prevent the engine from applying stat drops automatically without explicit player confirmation.

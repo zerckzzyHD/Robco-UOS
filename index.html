@@ -1,0 +1,1414 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RobCo U.O.S. 1.6.4 - Optics Enabled</title>
+    <link rel="icon" type="image/png" href="icon.png" />
+    <link rel="apple-touch-icon" href="icon.png" />
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#010a07" />
+    <link rel="stylesheet" href="css/terminal.css" />
+    <script>
+      if (localStorage.getItem('robco_optics')) {
+        let color = localStorage.getItem('robco_optics');
+        let root = document.documentElement;
+        if (color === 'amber') {
+          root.style.setProperty('--robco-green', '#ffb642');
+          root.style.setProperty('--robco-glow', '0 0 6px rgba(255, 182, 66, 0.6)');
+          root.style.setProperty('--robco-dark', '#2e1d03');
+          root.style.setProperty('--robco-refresh', 'rgba(255, 182, 66, 0.12)');
+        } else if (color === 'blue') {
+          root.style.setProperty('--robco-green', '#42cbf5');
+          root.style.setProperty('--robco-glow', '0 0 6px rgba(66, 203, 245, 0.6)');
+          root.style.setProperty('--robco-dark', '#03202e');
+          root.style.setProperty('--robco-refresh', 'rgba(66, 203, 245, 0.12)');
+        } else if (color === 'legion') {
+          root.style.setProperty('--robco-green', '#ff4040');
+          root.style.setProperty('--robco-glow', '0 0 6px rgba(255, 64, 64, 0.6)');
+          root.style.setProperty('--robco-dark', '#2a0000');
+          root.style.setProperty('--robco-refresh', 'rgba(255, 64, 64, 0.12)');
+        } else if (color === 'ghoul') {
+          root.style.setProperty('--robco-green', '#7dff5f');
+          root.style.setProperty('--robco-glow', '0 0 6px rgba(125, 255, 95, 0.6)');
+          root.style.setProperty('--robco-dark', '#0a1e03');
+          root.style.setProperty('--robco-refresh', 'rgba(125, 255, 95, 0.12)');
+        } else if (color === 'neon') {
+          root.style.setProperty('--robco-green', '#c084fc');
+          root.style.setProperty('--robco-glow', '0 0 6px rgba(192, 132, 252, 0.6)');
+          root.style.setProperty('--robco-dark', '#1a0329');
+          root.style.setProperty('--robco-refresh', 'rgba(192, 132, 252, 0.12)');
+        }
+      }
+    </script>
+  </head>
+
+  <body>
+    <div id="bootScreen">
+      <div id="bootLines"></div>
+      <span id="bootCursor">_</span>
+    </div>
+
+    <div class="crt-overlay"></div>
+
+    <div id="sysModal" class="modal-overlay">
+      <div class="modal-box">
+        <div class="modal-title" id="modalTitle">> SYSTEM POP-UP</div>
+        <div class="modal-content" id="modalContent">Content goes here...</div>
+        <button class="blue-btn close-btn" onclick="closeModal()">[ CLOSE INTERFACE ]</button>
+      </div>
+    </div>
+
+    <div class="container">
+      <div class="header">
+        <h1>[ROBCO U.O.S. 1.6.4 - OPTICS ENABLED]</h1>
+        <p>SECURE NETWORK LINK ESTABLISHED _ | UPTIME: <span id="uptimeClock">00:00:00</span></p>
+      </div>
+
+      <div class="main-grid">
+        <div class="col-left" id="uiPanel">
+          <details class="panel">
+            <summary>
+              <h2>> BIO-METRICS</h2>
+            </summary>
+            <div class="special-grid">
+              <div>
+                <label>S</label
+                ><input
+                  type="number"
+                  id="s_s"
+                  value="5"
+                  min="1"
+                  max="10"
+                  oninput="
+                    clampStat(this);
+                    updateMath();
+                  "
+                />
+              </div>
+              <div>
+                <label>P</label
+                ><input
+                  type="number"
+                  id="s_p"
+                  value="5"
+                  min="1"
+                  max="10"
+                  oninput="
+                    clampStat(this);
+                    updateMath();
+                  "
+                />
+              </div>
+              <div>
+                <label>E</label
+                ><input
+                  type="number"
+                  id="s_e"
+                  value="5"
+                  min="1"
+                  max="10"
+                  oninput="
+                    clampStat(this);
+                    updateMath();
+                  "
+                />
+              </div>
+              <div>
+                <label>C</label
+                ><input
+                  type="number"
+                  id="s_c"
+                  value="5"
+                  min="1"
+                  max="10"
+                  oninput="
+                    clampStat(this);
+                    updateMath();
+                  "
+                />
+              </div>
+              <div>
+                <label>I</label
+                ><input
+                  type="number"
+                  id="s_i"
+                  value="5"
+                  min="1"
+                  max="10"
+                  oninput="
+                    clampStat(this);
+                    updateMath();
+                  "
+                />
+              </div>
+              <div>
+                <label>A</label
+                ><input
+                  type="number"
+                  id="s_a"
+                  value="5"
+                  min="1"
+                  max="10"
+                  oninput="
+                    clampStat(this);
+                    updateMath();
+                  "
+                />
+              </div>
+              <div>
+                <label>L</label
+                ><input
+                  type="number"
+                  id="s_l"
+                  value="5"
+                  min="1"
+                  max="10"
+                  oninput="
+                    clampStat(this);
+                    updateMath();
+                  "
+                />
+              </div>
+            </div>
+            <div class="input-group">
+              <label>HP:</label>
+              <div>
+                <input
+                  type="number"
+                  id="stat_hp_cur"
+                  value="100"
+                  min="0"
+                  style="width: 40px"
+                  oninput="updateMath()"
+                />
+                /
+                <input
+                  type="number"
+                  id="stat_hp_max"
+                  value="100"
+                  min="1"
+                  style="width: 40px"
+                  oninput="updateMath()"
+                />
+              </div>
+            </div>
+            <div class="hp-bar-container" id="hp_bar_container">
+              <div class="hp-bar-fill" id="hp_bar_fill" style="width: 100%"></div>
+            </div>
+            <div class="input-group">
+              <label>LVL/XP:</label>
+              <div>
+                <input
+                  type="number"
+                  id="stat_lvl"
+                  value="1"
+                  min="1"
+                  style="width: 40px"
+                  oninput="updateMath()"
+                />
+                /
+                <input
+                  type="number"
+                  id="stat_xp"
+                  value="0"
+                  min="0"
+                  style="width: 40px"
+                  oninput="updateMath()"
+                />
+              </div>
+            </div>
+            <div
+              class="hp-bar-container"
+              id="xp_bar_container"
+              style="cursor: default"
+              title="XP to next level"
+            >
+              <div
+                class="hp-bar-fill"
+                id="xp_bar_fill"
+                style="width: 0%; background: var(--robco-blue)"
+              ></div>
+            </div>
+            <div class="input-group">
+              <label>CAPS:</label
+              ><input type="number" id="c_caps" value="0" min="0" oninput="updateMath()" />
+            </div>
+
+            <div class="input-group" style="margin-top: 8px">
+              <label>KARMA:</label>
+              <div style="display: flex; align-items: center; gap: 5px">
+                <input
+                  type="range"
+                  id="stat_karma"
+                  min="-1000"
+                  max="1000"
+                  value="0"
+                  oninput="
+                    updateKarmaUI();
+                    updateMath();
+                  "
+                />
+                <span id="karma_label" style="font-size: 11px; width: 65px; text-align: right"
+                  >Neutral</span
+                >
+              </div>
+            </div>
+
+            <div class="input-group">
+              <label>LOCATION:</label>
+              <input
+                type="text"
+                id="stat_loc"
+                value="Mojave"
+                oninput="updateMath()"
+                style="width: 100px"
+                list="nv_locations"
+              />
+              <datalist id="nv_locations">
+                <option value="goodsprings">Goodsprings</option>
+                <option value="mojave_outpost">Mojave Outpost</option>
+                <option value="primm">Primm</option>
+                <option value="nipton">Nipton</option>
+                <option value="novac">Novac</option>
+                <option value="boulder_city">Boulder City</option>
+                <option value="freeside">Freeside</option>
+                <option value="the_strip">The Strip</option>
+                <option value="hidden_valley">Hidden Valley</option>
+                <option value="nellis_afb">Nellis AFB</option>
+                <option value="camp_mccarran">Camp McCarran</option>
+                <option value="hoover_dam">Hoover Dam</option>
+                <option value="the_fort">The Fort</option>
+                <option value="jacobstown">Jacobstown</option>
+                <option value="black_mountain">Black Mountain</option>
+                <option value="repconn_hq">REPCONN HQ</option>
+              </datalist>
+            </div>
+            <div class="input-group">
+              <label>TIME:</label>
+              <div style="display: flex; align-items: center; gap: 5px; flex-wrap: wrap">
+                <span style="font-size: 11px; opacity: 0.7">D</span>
+                <input
+                  type="number"
+                  id="time_day"
+                  value="1"
+                  min="1"
+                  style="width: 38px"
+                  oninput="onTimeInputChanged()"
+                />
+                <span style="font-size: 11px; opacity: 0.7">H</span>
+                <input
+                  type="number"
+                  id="time_hour"
+                  value="0"
+                  min="0"
+                  max="23"
+                  style="width: 32px"
+                  oninput="onTimeInputChanged()"
+                />
+                <span style="font-size: 11px; opacity: 0.7">M</span>
+                <input
+                  type="number"
+                  id="time_min"
+                  value="0"
+                  min="0"
+                  max="59"
+                  step="6"
+                  style="width: 32px"
+                  oninput="onTimeInputChanged()"
+                />
+              </div>
+              <input type="hidden" id="stat_ticks" value="0" />
+            </div>
+            <div class="input-group">
+              <label>WEIGHT [W]:</label><span id="display_weight">0 / 200</span>
+            </div>
+            <div class="input-group"><label>MAX AP:</label><span id="display_ap">80</span></div>
+            <div
+              class="input-group"
+              style="
+                margin-top: 6px;
+                padding-top: 6px;
+                border-top: 1px dashed rgba(20, 253, 206, 0.25);
+              "
+            >
+              <label style="font-size: 10px; opacity: 0.7">EQUIPPED:</label>
+              <div id="equippedDisplay" style="font-size: 11px; margin-top: 2px">
+                <span style="opacity: 0.4">Nothing equipped</span>
+              </div>
+            </div>
+            <div
+              id="radAwayAlert"
+              style="
+                display: none;
+                margin-top: 5px;
+                font-size: 10px;
+                color: var(--robco-danger);
+                border: 1px dashed var(--robco-danger);
+                padding: 4px;
+                text-align: center;
+              "
+            ></div>
+          </details>
+
+          <details class="panel">
+            <summary>
+              <h2>> BIO-SCAN & LIMB STATUS</h2>
+            </summary>
+            <div class="input-group">
+              <label>RADIATION:</label>
+              <div style="display: flex; width: 165px; justify-content: center">
+                <input
+                  type="number"
+                  id="stat_rads"
+                  value="0"
+                  min="0"
+                  oninput="updateMath()"
+                  style="width: 80px"
+                />
+              </div>
+            </div>
+            <div class="input-group">
+              <label>HEAD:</label>
+              <div style="display: flex; width: 165px; justify-content: center">
+                <button id="btn_l_hd" class="limb-ok" onclick="toggleLimb('hd')">[████] OK</button>
+              </div>
+            </div>
+            <div class="input-group">
+              <label>ARMS (L/R):</label>
+              <div style="display: flex; gap: 5px">
+                <button id="btn_l_la" class="limb-ok" onclick="toggleLimb('la')">[████] OK</button>
+                <button id="btn_l_ra" class="limb-ok" onclick="toggleLimb('ra')">[████] OK</button>
+              </div>
+            </div>
+            <div class="input-group" style="margin-top: 4px">
+              <label>LEGS (L/R):</label>
+              <div style="display: flex; gap: 5px">
+                <button id="btn_l_ll" class="limb-ok" onclick="toggleLimb('ll')">[████] OK</button>
+                <button id="btn_l_rl" class="limb-ok" onclick="toggleLimb('rl')">[████] OK</button>
+              </div>
+            </div>
+          </details>
+
+          <details class="panel">
+            <summary>
+              <h2>> BACKPACK INVENTORY</h2>
+            </summary>
+            <ul class="inventory-list" id="invList"></ul>
+            <div
+              style="
+                border-top: 1px dashed var(--robco-green);
+                padding-top: 10px;
+                display: flex;
+                gap: 5px;
+                flex-wrap: wrap;
+              "
+            >
+              <input
+                type="text"
+                id="newItemName"
+                placeholder="Item Name"
+                style="flex-grow: 1; min-width: 80px"
+              />
+              <input type="number" id="newItemQty" placeholder="Qty" min="1" style="width: 35px" />
+              <input
+                type="number"
+                id="newItemWeight"
+                placeholder="lbs"
+                min="0"
+                style="width: 40px"
+              />
+              <input
+                type="number"
+                id="newItemValue"
+                placeholder="val"
+                min="0"
+                style="width: 35px"
+              />
+              <select
+                id="newItemType"
+                style="width: 56px; background: rgba(0, 0, 0, 0.8); font-size: 10px"
+              >
+                <option value="misc">misc</option>
+                <option value="weapon">wpn</option>
+                <option value="armor">armor</option>
+                <option value="aid">aid</option>
+                <option value="ammo">ammo</option>
+              </select>
+            </div>
+            <button class="action-btn" onclick="addItem()">+ ADD ITEM</button>
+          </details>
+
+          <details class="panel">
+            <summary>
+              <h2>> SKILL MATRIX</h2>
+            </summary>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2px 10px">
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  padding: 3px 0;
+                  border-bottom: 1px dashed rgba(20, 253, 206, 0.15);
+                "
+              >
+                <label style="font-size: 11px">Barter</label
+                ><input
+                  type="number"
+                  id="sk_barter"
+                  value="15"
+                  min="0"
+                  max="100"
+                  oninput="saveState()"
+                  style="width: 42px; text-align: center; padding: 2px 3px; font-size: 12px"
+                />
+              </div>
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  padding: 3px 0;
+                  border-bottom: 1px dashed rgba(20, 253, 206, 0.15);
+                "
+              >
+                <label style="font-size: 11px">Energy Weapon</label
+                ><input
+                  type="number"
+                  id="sk_energy_weapons"
+                  value="15"
+                  min="0"
+                  max="100"
+                  oninput="saveState()"
+                  style="width: 42px; text-align: center; padding: 2px 3px; font-size: 12px"
+                />
+              </div>
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  padding: 3px 0;
+                  border-bottom: 1px dashed rgba(20, 253, 206, 0.15);
+                "
+              >
+                <label style="font-size: 11px">Explosives</label
+                ><input
+                  type="number"
+                  id="sk_explosives"
+                  value="15"
+                  min="0"
+                  max="100"
+                  oninput="saveState()"
+                  style="width: 42px; text-align: center; padding: 2px 3px; font-size: 12px"
+                />
+              </div>
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  padding: 3px 0;
+                  border-bottom: 1px dashed rgba(20, 253, 206, 0.15);
+                "
+              >
+                <label style="font-size: 11px">Guns</label
+                ><input
+                  type="number"
+                  id="sk_guns"
+                  value="15"
+                  min="0"
+                  max="100"
+                  oninput="saveState()"
+                  style="width: 42px; text-align: center; padding: 2px 3px; font-size: 12px"
+                />
+              </div>
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  padding: 3px 0;
+                  border-bottom: 1px dashed rgba(20, 253, 206, 0.15);
+                "
+              >
+                <label style="font-size: 11px">Lockpick</label
+                ><input
+                  type="number"
+                  id="sk_lockpick"
+                  value="15"
+                  min="0"
+                  max="100"
+                  oninput="saveState()"
+                  style="width: 42px; text-align: center; padding: 2px 3px; font-size: 12px"
+                />
+              </div>
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  padding: 3px 0;
+                  border-bottom: 1px dashed rgba(20, 253, 206, 0.15);
+                "
+              >
+                <label style="font-size: 11px">Medicine</label
+                ><input
+                  type="number"
+                  id="sk_medicine"
+                  value="15"
+                  min="0"
+                  max="100"
+                  oninput="saveState()"
+                  style="width: 42px; text-align: center; padding: 2px 3px; font-size: 12px"
+                />
+              </div>
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  padding: 3px 0;
+                  border-bottom: 1px dashed rgba(20, 253, 206, 0.15);
+                "
+              >
+                <label style="font-size: 11px">Melee Wpn</label
+                ><input
+                  type="number"
+                  id="sk_melee_weapons"
+                  value="15"
+                  min="0"
+                  max="100"
+                  oninput="saveState()"
+                  style="width: 42px; text-align: center; padding: 2px 3px; font-size: 12px"
+                />
+              </div>
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  padding: 3px 0;
+                  border-bottom: 1px dashed rgba(20, 253, 206, 0.15);
+                "
+              >
+                <label style="font-size: 11px">Repair</label
+                ><input
+                  type="number"
+                  id="sk_repair"
+                  value="15"
+                  min="0"
+                  max="100"
+                  oninput="saveState()"
+                  style="width: 42px; text-align: center; padding: 2px 3px; font-size: 12px"
+                />
+              </div>
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  padding: 3px 0;
+                  border-bottom: 1px dashed rgba(20, 253, 206, 0.15);
+                "
+              >
+                <label style="font-size: 11px">Science</label
+                ><input
+                  type="number"
+                  id="sk_science"
+                  value="15"
+                  min="0"
+                  max="100"
+                  oninput="saveState()"
+                  style="width: 42px; text-align: center; padding: 2px 3px; font-size: 12px"
+                />
+              </div>
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  padding: 3px 0;
+                  border-bottom: 1px dashed rgba(20, 253, 206, 0.15);
+                "
+              >
+                <label style="font-size: 11px">Sneak</label
+                ><input
+                  type="number"
+                  id="sk_sneak"
+                  value="15"
+                  min="0"
+                  max="100"
+                  oninput="saveState()"
+                  style="width: 42px; text-align: center; padding: 2px 3px; font-size: 12px"
+                />
+              </div>
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  padding: 3px 0;
+                  border-bottom: 1px dashed rgba(20, 253, 206, 0.15);
+                "
+              >
+                <label style="font-size: 11px">Speech</label
+                ><input
+                  type="number"
+                  id="sk_speech"
+                  value="15"
+                  min="0"
+                  max="100"
+                  oninput="saveState()"
+                  style="width: 42px; text-align: center; padding: 2px 3px; font-size: 12px"
+                />
+              </div>
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  padding: 3px 0;
+                  border-bottom: 1px dashed rgba(20, 253, 206, 0.15);
+                "
+              >
+                <label style="font-size: 11px">Survival</label
+                ><input
+                  type="number"
+                  id="sk_survival"
+                  value="15"
+                  min="0"
+                  max="100"
+                  oninput="saveState()"
+                  style="width: 42px; text-align: center; padding: 2px 3px; font-size: 12px"
+                />
+              </div>
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  padding: 3px 0;
+                "
+              >
+                <label style="font-size: 11px">Unarmed</label
+                ><input
+                  type="number"
+                  id="sk_unarmed"
+                  value="15"
+                  min="0"
+                  max="100"
+                  oninput="saveState()"
+                  style="width: 42px; text-align: center; padding: 2px 3px; font-size: 12px"
+                />
+              </div>
+            </div>
+          </details>
+
+          <!-- 5. QUEST LOG -->
+          <details class="panel">
+            <summary><h2>> QUEST LOG</h2></summary>
+            <div id="questsList">
+              <span style="color: rgba(20, 253, 206, 0.5)">No Active Quests</span>
+            </div>
+            <div
+              style="
+                border-top: 1px dashed var(--robco-green);
+                padding-top: 8px;
+                margin-top: 6px;
+                display: flex;
+                gap: 4px;
+                flex-wrap: wrap;
+              "
+            >
+              <input
+                type="text"
+                id="newQuestName"
+                placeholder="Quest Name"
+                style="flex: 1; min-width: 100px"
+              />
+              <select id="newQuestStatus" style="width: 80px; background: rgba(0, 0, 0, 0.8)">
+                <option value="active">Active</option>
+                <option value="complete">Complete</option>
+                <option value="failed">Failed</option>
+              </select>
+            </div>
+            <input
+              type="text"
+              id="newQuestObjective"
+              placeholder="Current objective (optional)"
+              style="width: 100%; margin-top: 4px"
+            />
+            <button class="action-btn" onclick="addQuest()" style="margin-top: 4px">
+              + ADD QUEST
+            </button>
+          </details>
+
+          <!-- 6. PERKS -->
+          <details class="panel">
+            <summary><h2>> PERKS</h2></summary>
+            <div id="perksList">
+              <span style="color: rgba(20, 253, 206, 0.5)">No Perks Acquired</span>
+            </div>
+          </details>
+
+          <!-- 7. STATUS EFFECTS -->
+          <details class="panel">
+            <summary>
+              <h2>> STATUS EFFECTS</h2>
+            </summary>
+            <div id="statusList">
+              <span style="color: rgba(20, 253, 206, 0.5)">No Active Effects</span>
+            </div>
+          </details>
+
+          <!-- 8. SQUAD STATUS -->
+          <details class="panel">
+            <summary>
+              <h2>> SQUAD STATUS</h2>
+            </summary>
+            <div id="squadList"></div>
+          </details>
+
+          <!-- 9. FACTION STANDING -->
+          <details class="panel">
+            <summary>
+              <h2>> FACTION STANDING</h2>
+            </summary>
+            <div id="factionContainer"></div>
+          </details>
+
+          <!-- 10. CAMPAIGN NOTES -->
+          <details class="panel">
+            <summary>
+              <h2>> CAMPAIGN NOTES</h2>
+            </summary>
+            <div id="campaignNotesList">
+              <span style="color: rgba(20, 253, 206, 0.5)">No Notes Recorded</span>
+            </div>
+          </details>
+
+          <!-- 11. SESSION STATISTICS -->
+          <details class="panel">
+            <summary><h2>> SESSION STATISTICS</h2></summary>
+            <div id="sessionStatsList"></div>
+            <button
+              class="action-btn"
+              onclick="resetSessionStats()"
+              style="margin-top: 6px; font-size: 10px"
+            >
+              RESET SESSION
+            </button>
+          </details>
+
+          <!-- 12. SECURITY & CONFIGURATION -->
+          <details class="panel" style="border-color: var(--robco-alert)">
+            <summary>
+              <h2 style="border-color: var(--robco-alert); color: var(--robco-alert)">
+                > SECURITY & CONFIGURATION
+              </h2>
+            </summary>
+            <div class="input-group">
+              <input
+                type="password"
+                id="apiKeyInput"
+                placeholder="Paste Gemini Key Here..."
+                style="width: 100%; border-color: var(--robco-alert); color: var(--robco-alert)"
+                oninput="saveApiKeySilent()"
+              />
+            </div>
+
+            <button id="btnFetchModels" class="alert-btn" onclick="fetchAuthorizedModels()">
+              > 1. VALIDATE KEY & FETCH ENGINES
+            </button>
+
+            <div class="input-group" style="margin-top: 5px">
+              <select
+                id="apiModelInput"
+                style="
+                  width: 100%;
+                  border-color: var(--robco-alert);
+                  background: rgba(0, 0, 0, 0.8);
+                  color: var(--robco-alert);
+                "
+                onchange="saveApiKeySilent()"
+              >
+                <option value="gemini-1.5-flash">Awaiting Server Link...</option>
+              </select>
+            </div>
+
+            <div class="input-group" style="margin-top: 10px">
+              <label style="color: var(--robco-alert)">OPTICS:</label>
+              <select
+                id="opticsColorInput"
+                style="
+                  width: 100%;
+                  border-color: var(--robco-alert);
+                  background: rgba(0, 0, 0, 0.8);
+                  color: var(--robco-alert);
+                "
+                onchange="changeOpticsColor(this.value)"
+              >
+                <option value="green">RobCo Green (Default)</option>
+                <option value="amber">New Vegas Amber</option>
+                <option value="blue">Vault-Tec Blue</option>
+                <option value="legion">Legion Red</option>
+                <option value="ghoul">Ghoul Green</option>
+                <option value="neon">Neon Purple</option>
+              </select>
+            </div>
+
+            <div class="input-group" style="margin-top: 10px">
+              <label style="color: var(--robco-alert)">PLAYSTYLE:</label>
+              <select
+                id="playstyleInput"
+                style="
+                  width: 100%;
+                  border-color: var(--robco-alert);
+                  background: rgba(0, 0, 0, 0.8);
+                  color: var(--robco-alert);
+                "
+                onchange="changePlaystyle(this.value)"
+              >
+                <option value="any">Any Weapon (Default)</option>
+                <option value="melee">Melee/Unarmed Only</option>
+              </select>
+            </div>
+
+            <details id="audioSystemsDetails" style="margin-top: 10px">
+              <summary
+                style="
+                  color: var(--robco-alert);
+                  cursor: pointer;
+                  user-select: none;
+                  list-style: none;
+                  outline: none;
+                  font-family: inherit;
+                  font-size: 13px;
+                  letter-spacing: 1px;
+                "
+              >
+                [+] AUDIO SYSTEMS
+              </summary>
+              <div
+                style="
+                  margin-top: 8px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                  padding-left: 4px;
+                  border-left: 1px dashed var(--robco-alert);
+                "
+              >
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    margin-bottom: 6px;
+                    padding-bottom: 6px;
+                    border-bottom: 1px dashed var(--robco-alert);
+                  "
+                >
+                  <input
+                    type="checkbox"
+                    id="masterMuteToggle"
+                    onchange="toggleMasterMute(this.checked)"
+                    style="width: auto; accent-color: var(--robco-alert)"
+                  />
+                  <label
+                    for="masterMuteToggle"
+                    style="color: var(--robco-alert); font-size: 12px; font-weight: bold"
+                    >MASTER MUTE (ALL AUDIO)</label
+                  >
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <input
+                    type="checkbox"
+                    id="muteTypingToggle"
+                    onchange="toggleAudio('robco_sfx_muted', this.checked)"
+                    style="width: auto; accent-color: var(--robco-alert)"
+                  />
+                  <label for="muteTypingToggle" style="color: var(--robco-alert); font-size: 12px"
+                    >MUTE TYPING SFX</label
+                  >
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <input
+                    type="checkbox"
+                    id="muteHumToggle"
+                    onchange="toggleAudio('robco_hum_muted', this.checked)"
+                    style="width: auto; accent-color: var(--robco-alert)"
+                  />
+                  <label for="muteHumToggle" style="color: var(--robco-alert); font-size: 12px"
+                    >MUTE CRT HUM</label
+                  >
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <input
+                    type="checkbox"
+                    id="muteGeigerToggle"
+                    onchange="toggleAudio('robco_geiger_muted', this.checked)"
+                    style="width: auto; accent-color: var(--robco-alert)"
+                  />
+                  <label for="muteGeigerToggle" style="color: var(--robco-alert); font-size: 12px"
+                    >MUTE GEIGER COUNTER</label
+                  >
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <input
+                    type="checkbox"
+                    id="muteTinnitusToggle"
+                    onchange="toggleAudio('robco_tinnitus_muted', this.checked)"
+                    style="width: auto; accent-color: var(--robco-alert)"
+                  />
+                  <label for="muteTinnitusToggle" style="color: var(--robco-alert); font-size: 12px"
+                    >MUTE TINNITUS</label
+                  >
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <input
+                    type="checkbox"
+                    id="muteLimbToggle"
+                    onchange="toggleAudio('robco_ambient_muted', this.checked)"
+                    style="width: auto; accent-color: var(--robco-alert)"
+                  />
+                  <label for="muteLimbToggle" style="color: var(--robco-alert); font-size: 12px"
+                    >MUTE LIMB SFX</label
+                  >
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <input
+                    type="checkbox"
+                    id="muteWakeToggle"
+                    onchange="toggleAudio('robco_wake_muted', this.checked)"
+                    style="width: auto; accent-color: var(--robco-alert)"
+                  />
+                  <label for="muteWakeToggle" style="color: var(--robco-alert); font-size: 12px"
+                    >MUTE WAKE SFX</label
+                  >
+                </div>
+                <!-- #34 Typewriter Speed Control -->
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    margin-top: 6px;
+                    padding-top: 6px;
+                    border-top: 1px dashed var(--robco-alert);
+                  "
+                >
+                  <label
+                    for="typerSpeedSlider"
+                    style="color: var(--robco-alert); font-size: 12px; white-space: nowrap"
+                    >TYPER SPD:</label
+                  >
+                  <input
+                    type="range"
+                    id="typerSpeedSlider"
+                    min="0.25"
+                    max="3"
+                    step="0.25"
+                    value="1"
+                    style="flex: 1; accent-color: var(--robco-alert)"
+                    oninput="
+                      localStorage.setItem('robco_typer_speed', this.value);
+                      document.getElementById('typerSpeedVal').textContent =
+                        parseFloat(this.value).toFixed(2) + '&#215;';
+                    "
+                  />
+                  <span
+                    id="typerSpeedVal"
+                    style="color: var(--robco-alert); font-size: 11px; width: 36px"
+                    >1.00&#215;</span
+                  >
+                </div>
+              </div>
+            </details>
+
+            <div class="input-group" style="margin-top: 5px">
+              <button
+                class="action-btn"
+                style="border-color: var(--robco-alert); color: var(--robco-alert); width: 100%"
+                onclick="exportCampaignLog('txt')"
+              >
+                DOWNLOAD CAMPAIGN LOG
+              </button>
+            </div>
+            <div style="display: flex; gap: 5px; margin-top: 3px">
+              <button
+                class="action-btn"
+                style="
+                  border-color: var(--robco-alert);
+                  color: var(--robco-alert);
+                  flex: 1;
+                  font-size: 10px;
+                "
+                onclick="exportCampaignLog('md')"
+              >
+                EXPORT .MD
+              </button>
+              <button
+                class="action-btn"
+                style="
+                  border-color: var(--robco-alert);
+                  color: var(--robco-alert);
+                  flex: 1;
+                  font-size: 10px;
+                "
+                onclick="exportCampaignLog('html')"
+              >
+                EXPORT .HTML
+              </button>
+            </div>
+            <div class="input-group" style="margin-top: 5px">
+              <button
+                class="action-btn"
+                id="btnViewChangelog"
+                style="border-color: var(--robco-alert); color: var(--robco-alert); width: 100%"
+                onclick="showFullChangelog()"
+              >
+                VIEW CHANGELOG
+              </button>
+            </div>
+            <div class="input-group" style="margin-top: 5px">
+              <button
+                id="btnInstallPwa"
+                class="alert-btn"
+                style="width: 100%; display: none"
+                onclick="installPwa()"
+              >
+                > INSTALL SYSTEM (APP)
+              </button>
+            </div>
+
+            <div
+              class="input-group"
+              style="margin-top: 15px; border-top: 1px dashed var(--robco-blue); padding-top: 10px"
+            >
+              <input
+                type="text"
+                id="courierIdInput"
+                placeholder="Courier Save ID (For Cloud Sync)"
+                style="width: 100%; border-color: var(--robco-blue); color: var(--robco-blue)"
+                onchange="localStorage.setItem('robco_courier_id', this.value)"
+              />
+            </div>
+            <div style="display: flex; gap: 10px">
+              <button
+                id="btnCloudPush"
+                class="action-btn"
+                style="border-color: var(--robco-blue); color: var(--robco-blue)"
+                onclick="
+                  if (window.pushToCloud)
+                    window.pushToCloud(document.getElementById('courierIdInput').value, state);
+                "
+              >
+                > PUSH CLOUD SAVE
+              </button>
+              <button
+                id="btnCloudPull"
+                class="action-btn"
+                style="border-color: var(--robco-blue); color: var(--robco-blue)"
+                onclick="
+                  if (window.pullFromCloud)
+                    window.pullFromCloud(document.getElementById('courierIdInput').value);
+                "
+              >
+                > PULL CLOUD SAVE
+              </button>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 10px">
+              <button class="action-btn" onclick="exportSaveFile()" style="font-size: 11px">
+                > EXPORT SAVE
+              </button>
+              <button class="action-btn" onclick="triggerFileInput()" style="font-size: 11px">
+                > IMPORT SAVE
+              </button>
+            </div>
+            <!-- #6 Multiple Save Slots -->
+            <div
+              style="margin-top: 8px; border-top: 1px dashed var(--robco-alert); padding-top: 8px"
+            >
+              <div
+                style="
+                  font-size: 10px;
+                  color: var(--robco-alert);
+                  margin-bottom: 5px;
+                  letter-spacing: 1px;
+                "
+              >
+                SAVE SLOTS
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px">
+                <button
+                  class="action-btn"
+                  style="
+                    font-size: 10px;
+                    border-color: var(--robco-alert);
+                    color: var(--robco-alert);
+                  "
+                  onclick="saveToSlot(1)"
+                >
+                  SAVE A
+                </button>
+                <button
+                  class="action-btn"
+                  style="
+                    font-size: 10px;
+                    border-color: var(--robco-alert);
+                    color: var(--robco-alert);
+                  "
+                  onclick="saveToSlot(2)"
+                >
+                  SAVE B
+                </button>
+                <button
+                  class="action-btn"
+                  style="
+                    font-size: 10px;
+                    border-color: var(--robco-alert);
+                    color: var(--robco-alert);
+                  "
+                  onclick="saveToSlot(3)"
+                >
+                  SAVE C
+                </button>
+                <button class="action-btn" style="font-size: 10px" onclick="loadFromSlot(1)">
+                  LOAD A
+                </button>
+                <button class="action-btn" style="font-size: 10px" onclick="loadFromSlot(2)">
+                  LOAD B
+                </button>
+                <button class="action-btn" style="font-size: 10px" onclick="loadFromSlot(3)">
+                  LOAD C
+                </button>
+              </div>
+              <div id="slotStatus" style="font-size: 9px; opacity: 0.55; margin-top: 4px"></div>
+            </div>
+            <input
+              type="file"
+              id="fileInput"
+              style="display: none"
+              accept=".json"
+              onchange="handleFileUpload(event)"
+            />
+          </details>
+        </div>
+
+        <div class="col-right">
+          <div class="panel chat-panel" style="border-color: var(--robco-blue)">
+            <div
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                border-bottom: 1px solid var(--robco-blue);
+                padding-bottom: 4px;
+              "
+            >
+              <h2 style="border: none; margin: 0; padding: 0; color: var(--robco-blue)">
+                > ROBCO COMM-LINK
+              </h2>
+              <button
+                onclick="clearChat()"
+                class="action-btn"
+                style="
+                  width: auto;
+                  padding: 3px 8px;
+                  margin: 0;
+                  font-size: 10px;
+                  border-color: var(--robco-blue);
+                  color: var(--robco-blue);
+                "
+              >
+                [ PURGE LOGS ]
+              </button>
+            </div>
+
+            <div id="chatDisplay" style="margin-top: 10px"></div>
+
+            <div style="display: flex; flex-direction: column; align-items: center; width: 100%">
+              <div
+                id="imagePreviewContainer"
+                style="position: relative; display: inline-block; width: 100%; text-align: center"
+              >
+                <img id="imagePreview" class="image-preview" src="" alt="Preview" />
+              </div>
+              <button
+                onclick="triggerImageUpload()"
+                class="action-btn"
+                style="
+                  width: 100%;
+                  margin-top: 0;
+                  margin-bottom: 5px;
+                  border-style: dashed;
+                  color: var(--robco-blue);
+                  border-color: var(--robco-blue);
+                "
+              >
+                [ + ATTACH VISUAL DATA ]
+              </button>
+            </div>
+            <input
+              type="file"
+              id="imageInput"
+              style="display: none"
+              accept="image/*"
+              onchange="handleImageSelection(event)"
+            />
+
+            <textarea
+              id="chatInput"
+              placeholder="Enter command or action (e.g. '> [THREAT] Geckos')..."
+              style="border-color: var(--robco-blue); color: var(--robco-blue)"
+              onkeydown="
+                if (event.ctrlKey && event.key === 'Enter') {
+                  event.preventDefault();
+                  transmitMessage();
+                }
+              "
+              oninput="updateTokenBudget()"
+            ></textarea>
+            <!-- #17 Token Budget Display -->
+            <div
+              id="tokenBudgetDisplay"
+              style="
+                font-size: 9px;
+                opacity: 0.5;
+                color: var(--robco-blue);
+                text-align: right;
+                margin-top: 2px;
+                margin-bottom: 2px;
+              "
+            ></div>
+
+            <div class="tactical-dashboard">
+              <div class="d-pad">
+                <button class="action-btn" onclick="macroCommand('[PAD: UP]')">▲</button>
+                <div class="d-pad-row">
+                  <button class="action-btn" onclick="macroCommand('[PAD: LEFT]')">◄</button>
+                  <button class="action-btn" onclick="macroCommand('[PAD: RIGHT]')">►</button>
+                </div>
+                <button class="action-btn" onclick="macroCommand('[PAD: DOWN]')">▼</button>
+              </div>
+              <div class="macro-actions">
+                <input
+                  type="text"
+                  id="macroTarget"
+                  placeholder="Target / Item..."
+                  style="
+                    border-color: var(--robco-blue);
+                    color: var(--robco-blue);
+                    width: 100%;
+                    margin-bottom: 5px;
+                  "
+                />
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px">
+                  <button
+                    class="action-btn"
+                    style="margin: 0; color: var(--robco-blue); border-color: var(--robco-blue)"
+                    onclick="macroCommand('[THREAT]')"
+                  >
+                    [THREAT]
+                  </button>
+                  <button
+                    class="action-btn"
+                    style="margin: 0; color: var(--robco-blue); border-color: var(--robco-blue)"
+                    onclick="macroCommand('[VATS SIM]')"
+                  >
+                    [VATS]
+                  </button>
+                  <button
+                    class="action-btn"
+                    style="margin: 0; color: var(--robco-blue); border-color: var(--robco-blue)"
+                    onclick="macroCommand('[TRADE]')"
+                  >
+                    [TRADE]
+                  </button>
+                  <button
+                    class="action-btn"
+                    style="margin: 0; color: var(--robco-blue); border-color: var(--robco-blue)"
+                    onclick="macroCommand('[LOOT]')"
+                  >
+                    [LOOT]
+                  </button>
+                </div>
+              </div>
+            </div>
+            <button onclick="transmitMessage()" class="blue-btn" id="transmitBtn">
+              > TRANSMIT PROTOCOL
+            </button>
+            <button
+              onclick="undoLastSync()"
+              class="action-btn"
+              id="undoSyncBtn"
+              style="
+                display: none;
+                border-color: var(--robco-alert);
+                color: var(--robco-alert);
+                font-size: 11px;
+                margin-top: 3px;
+              "
+            >
+              &#x21A9; UNDO LAST SYNC
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="js/database.js"></script>
+    <script src="js/state.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/api.js"></script>
+    <script type="module" src="js/cloud.js"></script>
+
+    <script>
+      // PWA Service Worker Registration & Auto-Update
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').then(reg => {
+          // Force browser to check for updates every time they open the webapp
+          reg.update();
+          setInterval(
+            () => {
+              reg.update();
+            },
+            60 * 60 * 1000
+          );
+
+          reg.addEventListener('updatefound', () => {
+            const newWorker = reg.installing;
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                // Native alert guarantees the user is notified immediately
+                alert('>> SYSTEM UPDATE AVAILABLE <<\nTap OK to Reboot Terminal.');
+                if (navigator.serviceWorker.controller)
+                  navigator.serviceWorker.ready.then(r => {
+                    if (r.waiting) r.waiting.postMessage({ type: 'SKIP_WAITING' });
+                  });
+              }
+            });
+          });
+        });
+
+        // controllerchange fires when the new SW takes over — this is the
+        // reliable signal to reload, avoiding the old setTimeout race condition.
+        // Guard: only reload if a SW was already controlling when this page loaded.
+        // If there was no previous controller (first install / first visit after
+        // clearing cache), skip the reload — the page already has fresh content
+        // from the network and reloading would cause an infinite boot loop.
+        const hadController = !!navigator.serviceWorker.controller;
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (refreshing || !hadController) return;
+          refreshing = true;
+          window.location.reload();
+        });
+      }
+    </script>
+  </body>
+</html>

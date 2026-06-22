@@ -1,0 +1,430 @@
+<!doctype html>
+<!--
+    RobCo Persistence Audit — tests/test.html
+    ==========================================
+    Runtime round-trip test. Loads the actual source JS, sets every state field
+    to a non-default value, serialises it, resets to defaults, imports it back,
+    and verifies every field survived unchanged.
+
+    Open this file in a browser. No server needed, no install needed.
+    Automatically discovers all state keys from Object.keys(state).
+    If a new field is added to state but not handled by autoImportState(),
+    that field's test will show FAIL.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>RobCo — Persistence Audit</title>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        --green: #14fdce;
+        --red: #ff4444;
+        --amber: #f0a500;
+        --dim: rgba(20, 253, 206, 0.4);
+        --bg: #010a07;
+        --panel: rgba(0, 30, 15, 0.9);
+      }
+
+      body {
+        background: var(--bg);
+        color: var(--green);
+        font-family: 'Share Tech Mono', monospace;
+        font-size: 13px;
+        padding: 24px;
+        line-height: 1.6;
+      }
+
+      h1 {
+        font-size: 16px;
+        letter-spacing: 3px;
+        border-bottom: 1px solid var(--dim);
+        padding-bottom: 8px;
+        margin-bottom: 4px;
+      }
+
+      .subtitle {
+        opacity: 0.5;
+        font-size: 11px;
+        margin-bottom: 20px;
+      }
+
+      .section-header {
+        margin: 20px 0 6px;
+        opacity: 0.7;
+        font-size: 11px;
+        letter-spacing: 1px;
+        border-bottom: 1px dashed var(--dim);
+        padding-bottom: 2px;
+      }
+
+      .row {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        padding: 1px 0;
+      }
+
+      .badge {
+        font-size: 10px;
+        letter-spacing: 1px;
+        min-width: 48px;
+        text-align: center;
+      }
+
+      .pass .badge {
+        color: var(--green);
+      }
+      .fail .badge {
+        color: var(--red);
+      }
+
+      .pass .label {
+        opacity: 0.7;
+      }
+      .fail .label {
+        color: var(--red);
+      }
+
+      .detail {
+        font-size: 11px;
+        opacity: 0.55;
+        margin-left: 56px;
+      }
+
+      #summary {
+        margin-top: 24px;
+        padding: 12px 16px;
+        border: 1px solid;
+        font-size: 14px;
+        letter-spacing: 1px;
+      }
+
+      #summary.all-pass {
+        border-color: var(--green);
+        color: var(--green);
+      }
+      #summary.has-fail {
+        border-color: var(--red);
+        color: var(--red);
+      }
+
+      .note {
+        margin-top: 20px;
+        opacity: 0.4;
+        font-size: 11px;
+        line-height: 1.8;
+      }
+    </style>
+
+    <!-- ═══════════════════════════════════════════════════════
+         MOCKS — must load before state.js / api.js
+         These stub the ui.js globals that autoImportState()
+         calls internally. They are intentional no-ops.
+    ════════════════════════════════════════════════════════ -->
+    <script>
+      window.chatHistory = [];
+      window.CHAT_MAX = 200;
+      window._chatSaveTimer = null;
+
+      // UI functions called by autoImportState — stubbed as no-ops
+      window.loadUI = function () {};
+      window.appendToChat = function () {};
+      window.triggerPhosphorGhost = function () {};
+      window.updateMath = function () {};
+      window.renderInventory = function () {};
+      window.renderSquad = function () {};
+      window.renderStatus = function () {};
+      window.renderCampaignNotes = function () {};
+      window.renderFactionRep = function () {};
+      window.updateKarmaUI = function () {};
+      window.renderSkillMatrix = function () {};
+      window.setGeigerRate = function () {};
+      window.startTinnitus = function () {};
+      window.stopTinnitus = function () {};
+
+      // Stub syncStateFromDom so exportSaveFile doesn't break on missing DOM
+      // The test builds the export payload manually instead.
+      window.syncStateFromDom = function () {};
+    </script>
+
+    <!-- Source files — same ones the live site uses -->
+    <script src="../js/state.js"></script>
+    <script src="../js/api.js"></script>
+  </head>
+  <body>
+    <h1>[ROBCO U.O.S. — PERSISTENCE AUDIT]</h1>
+    <div class="subtitle">
+      Runtime round-trip test. Discovers state keys automatically from Object.keys(state).
+    </div>
+
+    <div id="output"></div>
+    <div id="summary"></div>
+
+    <div class="note">
+      How this test catches new fields automatically:<br />
+      1. Reads Object.keys(state) — every field the live app stores.<br />
+      2. Serialises the full state, resets to defaults, calls autoImportState().<br />
+      3. Compares each key before and after. Missing handler in autoImportState() → FAIL.<br />
+      <br />
+      For static analysis (no browser needed): run tests\check-persistence.ps1
+    </div>
+
+    <script>
+      'use strict';
+
+      // ── Render helpers ─────────────────────────────────────────────
+      const out = document.getElementById('output');
+      let passed = 0;
+      let failed = 0;
+
+      function section(title) {
+        const h = document.createElement('div');
+        h.className = 'section-header';
+        h.textContent = `── ${title}`;
+        out.appendChild(h);
+      }
+
+      function row(ok, label, detail) {
+        const d = document.createElement('div');
+        d.className = `row ${ok ? 'pass' : 'fail'}`;
+        d.innerHTML = `
+        <span class="badge">[${ok ? 'PASS' : 'FAIL'}]</span>
+        <span class="label">${label}</span>
+    `;
+        out.appendChild(d);
+        if (!ok && detail) {
+          const dd = document.createElement('div');
+          dd.className = 'detail';
+          dd.textContent = detail;
+          out.appendChild(dd);
+        }
+        ok ? passed++ : failed++;
+      }
+
+      function assert(ok, label, detail) {
+        row(ok, label, detail);
+      }
+
+      // ── Deep equal check ───────────────────────────────────────────
+      function deepEqual(a, b) {
+        return JSON.stringify(a) === JSON.stringify(b);
+      }
+
+      // ── Clone and reset ────────────────────────────────────────────
+      function resetStateToDefaults() {
+        state.lvl = 1;
+        state.xp = 0;
+        state.hpCur = 100;
+        state.hpMax = 100;
+        state.s = 5;
+        state.p = 5;
+        state.e = 5;
+        state.c = 5;
+        state.i = 5;
+        state.a = 5;
+        state.l = 5;
+        state.caps = 0;
+        state.loc = 'Goodsprings';
+        state.rads = 0;
+        state.karma = 0;
+        state.ticks = 0;
+        state.la = 'OK';
+        state.ra = 'OK';
+        state.ll = 'OK';
+        state.rl = 'OK';
+        state.hd = 'OK';
+        state.status = [];
+        state.inventory = [];
+        state.squad = [];
+        state.campaign_notes = [];
+        FACTION_REGISTRY.forEach(f => {
+          state.factions[f.key] = { fame: 0, infamy: 0 };
+        });
+        SKILL_KEYS.forEach(sk => {
+          state.skills[sk] = 15;
+        });
+      }
+
+      // ══════════════════════════════════════════════════════════════
+      //  SUITE 0 — Discovery
+      // ══════════════════════════════════════════════════════════════
+      section('Suite 0 — Auto-discovery');
+
+      const discoveredKeys = Object.keys(state);
+      assert(
+        discoveredKeys.length > 0,
+        `Discovered ${discoveredKeys.length} top-level state keys: [ ${discoveredKeys.join(', ')} ]`
+      );
+      assert(
+        typeof FACTION_REGISTRY !== 'undefined' && FACTION_REGISTRY.length > 0,
+        `FACTION_REGISTRY loaded with ${typeof FACTION_REGISTRY !== 'undefined' ? FACTION_REGISTRY.length : 0} factions`
+      );
+      assert(
+        typeof SKILL_KEYS !== 'undefined' && SKILL_KEYS.length > 0,
+        `SKILL_KEYS loaded with ${typeof SKILL_KEYS !== 'undefined' ? SKILL_KEYS.length : 0} skills`
+      );
+      assert(typeof autoImportState === 'function', 'autoImportState() is available');
+
+      // ══════════════════════════════════════════════════════════════
+      //  SUITE 1 — Round-trip: every state key survives export/import
+      // ══════════════════════════════════════════════════════════════
+      section('Suite 1 — Full round-trip (every field)');
+
+      // Populate state with non-default, distinct values
+      state.lvl = 15;
+      state.xp = 7500;
+      state.hpCur = 63;
+      state.hpMax = 130;
+      state.s = 8;
+      state.p = 6;
+      state.e = 9;
+      state.c = 4;
+      state.i = 7;
+      state.a = 9;
+      state.l = 3;
+      state.caps = 8421;
+      state.loc = 'Boulder City';
+      state.rads = 420;
+      state.karma = -200;
+      state.ticks = 960;
+      state.la = 'CRIPPLED';
+      state.ra = 'OK';
+      state.ll = 'OK';
+      state.rl = 'CRIPPLED';
+      state.hd = 'CRIPPLED';
+
+      FACTION_REGISTRY.forEach((f, idx) => {
+        state.factions[f.key] = { fame: (idx + 1) * 15, infamy: (idx + 1) * 7 };
+      });
+      SKILL_KEYS.forEach((sk, idx) => {
+        state.skills[sk] = 20 + idx * 4;
+      });
+
+      state.status = [
+        { name: 'Hydra', ticks: 5, type: 'BUFF' },
+        { name: 'Crippled', ticks: 0, type: 'DEBUFF' },
+      ];
+      state.inventory = [
+        { name: '10mm Pistol', qty: 1, weight: 2.5, value: 200 },
+        { name: 'Stimpak', qty: 8, weight: 0.5, value: 75 },
+      ];
+      state.squad = [{ name: 'Boone', hp: 80, hpMax: 100, ammo: 30, condition: 'OK' }];
+      state.campaign_notes = ['Completed Goodsprings quest.', 'Benny sighted in New Vegas.'];
+
+      // Snapshot before
+      const before = JSON.parse(JSON.stringify(state));
+
+      // Simulate the v1.6.3 export envelope (same logic as exportSaveFile)
+      const envelope = { version: '1.6.3', state: JSON.parse(JSON.stringify(state)) };
+
+      // Reset to defaults
+      resetStateToDefaults();
+
+      // Import
+      autoImportState(JSON.stringify(envelope.state));
+
+      // Compare every discovered key
+      for (const key of discoveredKeys) {
+        const exp = before[key];
+        const got = state[key];
+        const ok = deepEqual(exp, got);
+        assert(
+          ok,
+          `state.${key}`,
+          ok
+            ? null
+            : `Expected: ${JSON.stringify(exp).slice(0, 80)}  Got: ${JSON.stringify(got).slice(0, 80)}`
+        );
+      }
+
+      // ══════════════════════════════════════════════════════════════
+      //  SUITE 2 — All 14 FACTION_REGISTRY keys preserved
+      // ══════════════════════════════════════════════════════════════
+      section('Suite 2 — Individual faction keys (FACTION_REGISTRY)');
+
+      FACTION_REGISTRY.forEach((f, idx) => {
+        const expected = { fame: (idx + 1) * 15, infamy: (idx + 1) * 7 };
+        const actual = state.factions[f.key];
+        assert(
+          deepEqual(expected, actual),
+          `factions.${f.key}  fame=${expected.fame} infamy=${expected.infamy}`,
+          actual ? `Got fame=${actual.fame} infamy=${actual.infamy}` : 'Key missing entirely'
+        );
+      });
+
+      // ══════════════════════════════════════════════════════════════
+      //  SUITE 3 — All 13 SKILL_KEYS preserved
+      // ══════════════════════════════════════════════════════════════
+      section('Suite 3 — Individual skill keys (SKILL_KEYS)');
+
+      SKILL_KEYS.forEach((sk, idx) => {
+        const expected = 20 + idx * 4;
+        const actual = state.skills[sk];
+        assert(expected === actual, `skills.${sk}  = ${expected}`, `Got ${actual}`);
+      });
+
+      // ══════════════════════════════════════════════════════════════
+      //  SUITE 4 — Array fields survive with correct contents
+      // ══════════════════════════════════════════════════════════════
+      section('Suite 4 — Array fields');
+
+      assert(
+        state.status.length === 2 && state.status[0].name === 'Hydra',
+        `state.status  (${state.status.length} entries)`
+      );
+      assert(
+        state.inventory.length === 2 && state.inventory[1].name === 'Stimpak',
+        `state.inventory  (${state.inventory.length} entries)`
+      );
+      assert(
+        state.squad.length === 1 && state.squad[0].name === 'Boone',
+        `state.squad  (${state.squad.length} entries)`
+      );
+      assert(
+        state.campaign_notes.length === 2 && state.campaign_notes[1].includes('Benny'),
+        `state.campaign_notes  (${state.campaign_notes.length} entries)`
+      );
+
+      // ══════════════════════════════════════════════════════════════
+      //  SUITE 5 — Boundary / clamping
+      // ══════════════════════════════════════════════════════════════
+      section('Suite 5 — Boundary clamping in autoImportState');
+
+      autoImportState(
+        JSON.stringify({
+          s: 15,
+          p: -1, // SPECIAL: should clamp 1–10
+          hpCur: 9999, // should clamp to hpMax
+          skills: { barter: 150, sneak: -5 }, // skills: clamp 0–100
+        })
+      );
+
+      assert(state.s <= 10 && state.s >= 1, `SPECIAL clamped: s=${state.s} (max 10)`);
+      assert(state.p <= 10 && state.p >= 1, `SPECIAL clamped: p=${state.p} (min 1)`);
+      assert(state.skills.barter <= 100, `skill clamped: barter=${state.skills.barter} (max 100)`);
+      assert(state.skills.sneak >= 0, `skill clamped: sneak=${state.skills.sneak} (min 0)`);
+
+      // ══════════════════════════════════════════════════════════════
+      //  Summary
+      // ══════════════════════════════════════════════════════════════
+      const summary = document.getElementById('summary');
+      if (failed === 0) {
+        summary.className = 'all-pass';
+        summary.textContent = `ALL ${passed} TESTS PASSED — persistence fully verified.`;
+      } else {
+        summary.className = 'has-fail';
+        summary.textContent = `${failed} TEST(S) FAILED  (${passed} passed) — fields marked [FAIL] are not persisted by autoImportState().`;
+      }
+    </script>
+  </body>
+</html>
