@@ -176,13 +176,14 @@ All sounds respect a master mute toggle and individual per-system mute controls.
 ├── css/terminal.css        All styling, animations, CRT effects
 ├── js/
 │   ├── state.js            State definition, persistence, migration
+│   ├── registry.js         Read-only Fallout Data Registry (~280 items, 130 quests, 110 perks, 120 locations)
 │   ├── api.js              System directive, AI import, API communication
-│   ├── ui.js               Audio engine, rendering, lifecycle, save slots
+│   ├── ui.js               Audio engine, rendering, lifecycle, save slots, autocomplete
 │   ├── cloud.js            Firebase push/pull (ES module)
 │   └── database.js         Game CSV data + token triage filter
 ├── sw.js                   Service Worker (cache-first, same-origin only)
 ├── tests/
-│   └── check-persistence.ps1  Pre-commit 106-test persistence audit
+│   └── check-persistence.ps1  Pre-commit 119-test persistence audit
 ├── ARCHITECTURE.md         Full system dependency map & patterns
 ├── changelog.txt           Complete version history (v1.1.7 → present)
 ├── icon.png                PWA icon
@@ -196,9 +197,10 @@ Scripts are loaded as `<script>` tags in strict order. All globals are shared vi
 ```
 1. state.js      →  state, chatHistory, APP_VERSION, saveState, migrateState
 2. database.js   →  databaseCSVs, getRelevantDbContext
-3. api.js        →  autoImportState, transmitMessage, fetchAuthorizedModels
-4. ui.js         →  appendToChat, loadUI, AudioSettings, all render/audio functions
-5. cloud.js      →  window.pushToCloud, window.pullFromCloud (ES module)
+3. registry.js   →  FALLOUT_REGISTRY, registrySearch
+4. api.js        →  autoImportState, transmitMessage, fetchAuthorizedModels
+5. ui.js         →  appendToChat, loadUI, AudioSettings, all render/audio functions
+6. cloud.js      →  window.pushToCloud, window.pullFromCloud (ES module)
 ```
 
 ### Persistence Architecture
@@ -238,19 +240,6 @@ Scripts are loaded as `<script>` tags in strict order. All globals are shared vi
 ```
 
 ### Testing & Quality Gates
-
-Every `git commit` automatically runs a **106-test persistence audit** via a pre-commit hook:
-
-| Suite                    | Tests | Validates                                                 |
-| ------------------------ | ----- | --------------------------------------------------------- |
-| Parser Sanity            | 27    | Test framework detects all state keys                     |
-| autoImportState Coverage | 33    | Every state field is handled by AI import                 |
-| FACTION_REGISTRY         | 16    | All 14 factions declared and imported                     |
-| SKILL_KEYS               | 14    | All 13 skills declared and imported                       |
-| exportSaveFile           | 4     | Save envelope contains state + chat + playstyle + version |
-| handleFileUpload         | 4     | Import detects envelope, restores chat/playstyle          |
-| Cloud Sync               | 6     | Push/pull serialize full state + chat + playstyle         |
-| Backward Compat          | 2     | Legacy flat-key migration still works                     |
 
 **Commits are blocked if any test fails.** Additional tooling:
 
@@ -343,7 +332,7 @@ Every audio function must check `AudioSettings.masterMute` and its specific mute
 npm run lint        ← catch bugs
 npm run format      ← enforce style
 git add -A
-git commit          ← persistence audit runs automatically (106 tests)
+git commit          ← persistence audit runs automatically (119 tests)
 git push origin main
 ```
 
@@ -388,7 +377,7 @@ Key milestones:
 - **v1.6.2** — Skill matrix, status effects, campaign notes, undo system
 - **v1.6.3** — 14-faction network, save envelope format, cloud sync envelope
 - **v1.6.4** — Quest log, equipped tracking, save slots, session stats, 48 features
-- **v1.6.5** — Fallout Data Registry populated (130 quests, 90+ perks, 120 locations, 10 companions)
+- **v1.6.5** — Fallout Data Registry fully populated: 130 quests, 110+ perks, 120 locations, 10 companions, ~280 items (wiki-sourced). Perk autocomplete wired.
 
 </details>
 
@@ -405,8 +394,8 @@ The project is a **production-quality browser application** with:
 - 6 color themes
 - 3 save slots
 - Installable PWA with offline support
-- **Fallout Data Registry** — 130 quests, 90+ perks, 120 locations, 10 companions (wiki-sourced)
-- **Registry Autocomplete** — live dropdown on Quest Name and Item Name inputs (keyboard + click, CRT-styled)
+- **Fallout Data Registry** — 130 quests · ~110 perks · ~120 locations · 10 companions · ~280 items (all wiki-sourced, CC-BY-SA 4.0)
+- **Registry Autocomplete** — live CRT-styled dropdown on Quest Name, Item Name, and Perk Name inputs (keyboard + click)
 
 ---
 

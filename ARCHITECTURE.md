@@ -1,6 +1,6 @@
 # RobCo U.O.S. — System Architecture
 
-> **Version:** 1.6.4
+> **Version:** 1.6.5
 > **Last Updated:** 2026-06-22
 > **Purpose:** Living reference for any engineer (human or AI) working on this project.
 > This document maps every system, its dependencies, its persistence contract, and the
@@ -44,20 +44,21 @@
 ## File Map
 
 ```
-├── index.html          51KB   DOM structure + all inline event handlers
-├── css/terminal.css    ~15KB  All styling, animations, CRT effects
+├── index.html          ~55KB  DOM structure + all inline event handlers
+├── css/terminal.css    ~16KB  All styling, animations, CRT effects
 ├── js/
 │   ├── state.js        7.6KB  State definition, persistence, migration
 │   ├── api.js          36.5KB System directive, autoImportState, transmitMessage
-│   ├── ui.js           75.4KB Audio, rendering, lifecycle, undo, save slots
+│   ├── ui.js           ~82KB  Audio, rendering, lifecycle, undo, save slots
 │   ├── cloud.js        3.6KB  Firebase push/pull (ES module)
+│   ├── registry.js     ~36KB  Read-only Fallout Data Registry + registrySearch()
 │   └── database.js     2.8KB  CSV data + token triage filter
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── check-persistence.ps1   10.3KB  106-test pre-commit audit
+│   ├── check-persistence.ps1   10.3KB  119-test pre-commit audit
 │   ├── check-persistence.js    (Node runner)
 │   └── run-tests.bat           (Batch launcher)
-├── changelog.txt       71.7KB Full version history
+├── changelog.txt       ~74KB  Full version history
 ├── icon.png            68KB   PWA icon
 ├── manifest.json       592B   PWA manifest
 └── ARCHITECTURE.md     THIS FILE
@@ -98,7 +99,7 @@ Added in v1.6.5. Read-only canonical Fallout: New Vegas reference data for autoc
 
 ### Key Properties
 
-- **Source of truth:** [Independent Fallout Wiki](https://fallout.wiki) — CC-BY-SA 3.0
+- **Source of truth:** [Independent Fallout Wiki](https://fallout.wiki) — CC-BY-SA 4.0
 - **NOT state:** Does not touch `state`, `localStorage`, cloud sync, undo, or the persistence audit.
 - **Read-only:** Defined once at startup. Never mutated.
 - **Single file, no build step:** Consistent with the project's zero-toolchain philosophy.
@@ -107,14 +108,24 @@ Added in v1.6.5. Read-only canonical Fallout: New Vegas reference data for autoc
 
 ```js
 const FALLOUT_REGISTRY = {
-  version: '1.0.0',
-  quests:     [ { name, type, dlc }, ... ],       // type: main|side|companion|unmarked
-  items:      [ { name, type }, ... ],             // type: weapon|armor|aid|ammo|misc
-  perks:      [ { name, type, level }, ... ],      // type: regular|companion|challenge|special
-  locations:  [ { name, type }, ... ],             // type: settlement|landmark|cave|vault|camp|other
-  companions: [ { name, fullName, location }, ... ] // 8 humanoid + Rex + ED-E
+  version: '2.0.0',
+  quests:     [ { name, type, dlc }, ... ],       // 130 entries. type: main|side|companion|unmarked
+  items:      [ { name, type }, ... ],             // ~280 entries. type: weapon|armor|aid|ammo|misc
+  perks:      [ { name, type, level }, ... ],      // ~110 entries. type: regular|companion|challenge|special
+  locations:  [ { name, type }, ... ],             // ~120 entries. type: settlement|landmark|cave|vault|camp|other
+  companions: [ { name, fullName, location }, ... ] // 10 entries (8 humanoid + Rex + ED-E)
 };
 ```
+
+**Data population status (as of v1.6.5):**
+
+| Category   | Count | Source       | Status       |
+| ---------- | ----- | ------------ | ------------ |
+| quests     | 130   | fallout.wiki | ✅ Populated |
+| items      | ~280  | fallout.wiki | ✅ Populated |
+| perks      | ~110  | fallout.wiki | ✅ Populated |
+| locations  | ~120  | fallout.wiki | ✅ Populated |
+| companions | 10    | fallout.wiki | ✅ Populated |
 
 ### Function: `registrySearch(category, query)`
 
@@ -188,6 +199,35 @@ persistence audit will block the commit if any step is missed:
 
 The pre-commit hook (`tests/check-persistence.ps1`) auto-discovers all keys in `state.js`
 and verifies that every key appears in `autoImportState()`.
+
+---
+
+## Registry Autocomplete System
+
+Added in v1.6.5. A singleton `AutocompletePanel` (`#acPanel`) wired to text inputs in `ui.js`.
+
+### Architecture
+
+```
+initRegistryAutocomplete()  ← called once in window.onload
+  → creates a single <div id="acPanel"> autocomplete panel
+  → wireInput(inputId, category) attaches to each registry-backed input:
+      - 'newQuestName' → 'quests'
+      - 'newItemName'  → 'items'
+      - 'newPerkName'  → 'perks'
+  → each input gets: oninput (150ms debounce), onkeydown (arrow/enter/escape),
+                     onblur (120ms grace for click-to-select)
+  → registrySearch(category, query) drives results (max 7, min 2 chars)
+  → panel positions dynamically via getBoundingClientRect()
+  → repositions on window scroll and resize
+```
+
+### Adding a new autocomplete-backed input
+
+1. Add `<input type="text" id="newXxxName" ...>` in **index.html**
+2. In `initRegistryAutocomplete()` in **ui.js**, add: `wireInput('newXxxName', 'category');`
+3. If the category is new, add it to `FALLOUT_REGISTRY` in **registry.js**
+4. If it has an add action, create `addXxx()` in **ui.js** mirroring `addPerk()`
 
 ---
 
@@ -572,10 +612,12 @@ graph TD
 
     J[sw.js] -->|cache-first| A
 
-    K[tests/check-persistence.ps1] -.->|validates| B
-    K -.->|validates| C
-    K -.->|validates| D
-    K -.->|validates| H
+    K[tests/check-persistence.ps1] -.-|validates| B
+    K -.-|validates| C
+    K -.-|validates| D
+    K -.-|validates| H
+
+    L[js/registry.js] -->|registrySearch| D
 ```
 
 ### Critical Paths (modify with extreme care)
@@ -661,7 +703,10 @@ fetches and reload loops.
 - [ ] If it needs a panel: add `<details class="panel">` in **index.html**
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit audit must pass (all 106+ tests)
+- [ ] `git commit` — pre-commit audit must pass (all 119+ tests)
+- [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
+- [ ] **Update changelog.txt** — add entry under the current version block
+- [ ] **Update README.md** — Current State section, feature tables if applicable
 
 ---
 
@@ -675,6 +720,8 @@ fetches and reload loops.
 - [ ] Add the localStorage key to `toggleAudio()`'s `keyMap` in **ui.js**
 - [ ] Add the localStorage key to `toggleMasterMute()`'s un-mute logic
 - [ ] Add the new localStorage key to the [Settings table](#settings--localstorage-keys)
+- [ ] **Update ARCHITECTURE.md** — add to AudioSettings table and Audio System section
+- [ ] **Update changelog.txt** and **README.md**
 
 ---
 
@@ -685,5 +732,8 @@ fetches and reload loops.
 - [ ] Call `render*()` from `loadUI()` in **ui.js**
 - [ ] If it shows a count: add to `_updatePanelBadges()` in **ui.js**
 - [ ] If AI changes should auto-expand it: add to `expandPanelForCategory()` map in **ui.js**
+- [ ] If it has a text input for adding items: call `wireInput()` in `initRegistryAutocomplete()`
 - [ ] Panel memory (#35) works automatically via the `details.panel` selector
 - [ ] Keyboard shortcut (#15) works automatically for the first 6 panels
+- [ ] **Update ARCHITECTURE.md** — add to UI Rendering Pipeline table
+- [ ] **Update changelog.txt** and **README.md**
