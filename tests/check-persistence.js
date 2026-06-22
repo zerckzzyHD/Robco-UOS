@@ -331,7 +331,6 @@ assert(
   'autoImportState() has legacy flat-key fallback for old AI responses'
 );
 
-
 // ══════════════════════════════════════════════════════════════
 //  SUITE 8 — Fallout Data Registry structural integrity
 //  Validates js/registry.js file structure without requiring
@@ -342,10 +341,7 @@ header('Registry structural integrity');
 const registrySource = readFile('js/registry.js');
 
 // 8.1 FALLOUT_REGISTRY global declaration must exist
-assert(
-  /const\s+FALLOUT_REGISTRY\s*=/.test(registrySource),
-  'FALLOUT_REGISTRY global is declared'
-);
+assert(/const\s+FALLOUT_REGISTRY\s*=/.test(registrySource), 'FALLOUT_REGISTRY global is declared');
 
 // 8.2 registrySearch function must be declared
 assert(
@@ -369,10 +365,7 @@ assert(
 );
 
 // 8.5 registrySearch must cap results at 7
-assert(
-  /slice\s*\(\s*0\s*,\s*7\s*\)/.test(registrySource),
-  'registrySearch() caps results at 7'
-);
+assert(/slice\s*\(\s*0\s*,\s*7\s*\)/.test(registrySource), 'registrySearch() caps results at 7');
 
 // 8.6 Source of truth attribution must be present
 assert(
@@ -391,15 +384,12 @@ assert(
 // Strip single-line and block comments before checking, handling CRLF on Windows.
 const registryCode = registrySource
   .replace(/\/\*[\s\S]*?\*\//g, '') // block comments
-  .replace(/\/\/[^\r\n]*/g, '');   // line comments (works with CRLF)
+  .replace(/\/\/[^\r\n]*/g, ''); // line comments (works with CRLF)
 assert(
   !/\bstate\b/.test(registryCode),
   'registry.js does not reference state (pure reference data)'
 );
-assert(
-  !/localStorage/.test(registryCode),
-  'registry.js does not reference localStorage (in code)'
-);
+assert(!/localStorage/.test(registryCode), 'registry.js does not reference localStorage (in code)');
 
 // ══════════════════════════════════════════════════════════════
 //  RESULTS

@@ -1,13 +1,23 @@
-v1.6.5 (Fallout Data Registry — Phase 2: Data Population)
+v1.6.5 (Fallout Data Registry — Data Population & Autocomplete Panel)
+* 119/119 persistence tests passing. 0 new ESLint issues introduced.
 * Fallout Data Registry populated with verified wiki data (fallout.wiki — CC-BY-SA 3.0).
 * Quests: 130 entries across tutorial, main (Yes Man / Mr. House / NCR / Legion), side, companion, and unmarked categories.
 * Perks: ~90 regular perks (level-gated), companion perks (8), challenge perks (16), and special perks (5).
 * Locations: ~120 named Mojave Wasteland map markers curated from the wiki (settlements, vaults, caves, camps, casinos, bases, factories, landmarks).
 * Companions: All 8 humanoid permanent companions + ED-E + Rex, with full names and recruit locations.
-* Items category: reserved for Phase 3 (higher complexity — deferred).
+* Items category: deferred to future phase (larger dataset, requires deeper wiki extraction).
 * registry.js version bumped to 2.0.0 to signal data population milestone.
 * Pre-phase2 safety checkpoint branch created (checkpoint/pre-phase2).
 * Attribution note maintained in README.md (CC-BY-SA 3.0 required).
+* Registry Autocomplete: initRegistryAutocomplete() singleton dropdown wired to #newQuestName and #newItemName inputs.
+* Queries registrySearch() with 150ms debounce, minimum 2 characters — consistent with registry contract.
+* Keyboard navigation: ArrowUp/Down to highlight, Enter to select, Escape to dismiss.
+* Click-to-fill using mousedown event to beat blur ordering — no accidental dismissals.
+* Fixed positioning with viewport clamping; auto-repositions on scroll and resize.
+* CRT-styled dropdown: glow border, dark translucent bg, dashed separators, type/level tag hints on each row.
+* 7 CSS rules added to terminal.css (.autocomplete-panel, .ac-item, .ac-item-name, .ac-item-tag, .ac-empty).
+* index.html title and h1 bumped to 1.6.5.
+* 119/119 persistence tests passing. 0 new ESLint issues introduced.
 
 v1.6.4 (The Systems Architecture Update)
 * Quest Log (#1): state.quests[] tracks name, status (active/complete/failed), current objective, and involved factions. New QUEST LOG panel with add/remove UI. renderQuests() color-codes by status. AI directive updated with full schema. AI auto-updates quests on narrative events.

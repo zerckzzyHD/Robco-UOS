@@ -132,15 +132,15 @@ const FALLOUT_REGISTRY = {
 
 ### Locked Decisions (see architecture_review.md)
 
-| Decision | Value |
-|----------|-------|
-| Global name | `FALLOUT_REGISTRY` |
-| File name | `js/registry.js` |
-| Category keys | `quests`, `items`, `perks`, `locations`, `companions` |
-| Search function | `registrySearch(category, query)` |
-| Max results | 7 |
-| Min query length | 2 chars |
-| Keywords | Deferred |
+| Decision         | Value                                                 |
+| ---------------- | ----------------------------------------------------- |
+| Global name      | `FALLOUT_REGISTRY`                                    |
+| File name        | `js/registry.js`                                      |
+| Category keys    | `quests`, `items`, `perks`, `locations`, `companions` |
+| Search function  | `registrySearch(category, query)`                     |
+| Max results      | 7                                                     |
+| Min query length | 2 chars                                               |
+| Keywords         | Deferred                                              |
 
 ---
 

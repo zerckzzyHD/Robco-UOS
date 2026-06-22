@@ -406,6 +406,7 @@ The project is a **production-quality browser application** with:
 - 3 save slots
 - Installable PWA with offline support
 - **Fallout Data Registry** — 130 quests, 90+ perks, 120 locations, 10 companions (wiki-sourced)
+- **Registry Autocomplete** — live dropdown on Quest Name and Item Name inputs (keyboard + click, CRT-styled)
 
 ---
 
