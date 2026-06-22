@@ -387,6 +387,7 @@ window.onload = function () {
   loadUI();
   setupHpBarInteraction();
   startCrtHum();
+  initRegistryAutocomplete();
 
   // ── TAB STANDBY MODE ───────────────────────────────────────────
   // enterStandby/exitStandby are shared so blur+visibilitychange
@@ -1916,4 +1917,188 @@ function handleImageSelection(event) {
     preview.style.display = 'block';
   };
   reader.readAsDataURL(file);
+}
+
+// ── REGISTRY AUTOCOMPLETE (Phase 3) ──────────────────────────────────────────
+/**
+ * Shared singleton autocomplete panel for registry-backed text inputs.
+ * Wires #newQuestName  → quests  category
+ *       #newItemName   → items   category
+ *
+ * Behaviour:
+ *  - Triggers after 2+ chars, debounced 150 ms.
+ *  - Keyboard: ArrowUp / ArrowDown to navigate, Enter to select, Escape to dismiss.
+ *  - Click item to fill and dismiss.
+ *  - Dismisses automatically on blur (after a 100 ms grace for click events).
+ *  - Does NOT modify state, save, or undo — pure UI read-only helper.
+ */
+function initRegistryAutocomplete() {
+  // Build the singleton panel once
+  var panel = document.getElementById('acPanel');
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.id = 'acPanel';
+    panel.className = 'autocomplete-panel';
+    panel.setAttribute('role', 'listbox');
+    document.body.appendChild(panel);
+  }
+
+  var _acTimer = null;
+  var _acActiveIdx = -1;
+  var _acResults = [];
+  var _acCurrentInput = null;
+
+  function acHide() {
+    panel.classList.remove('ac-visible');
+    _acActiveIdx = -1;
+    _acResults = [];
+    _acCurrentInput = null;
+  }
+
+  function acPosition(inputEl) {
+    var rect = inputEl.getBoundingClientRect();
+    panel.style.top = rect.bottom + 2 + 'px';
+    panel.style.left = rect.left + 'px';
+    // Clamp to viewport right edge
+    var panelW = Math.min(340, Math.max(220, rect.width));
+    panel.style.width = panelW + 'px';
+  }
+
+  function acRender(results, inputEl) {
+    _acResults = results;
+    _acActiveIdx = -1;
+    panel.innerHTML = '';
+
+    if (!results.length) {
+      var empty = document.createElement('div');
+      empty.className = 'ac-empty';
+      empty.textContent = 'No matches';
+      panel.appendChild(empty);
+    } else {
+      results.forEach(function (entry, i) {
+        var item = document.createElement('div');
+        item.className = 'ac-item';
+        item.setAttribute('role', 'option');
+        item.dataset.idx = i;
+
+        var nameSpan = document.createElement('span');
+        nameSpan.className = 'ac-item-name';
+        nameSpan.textContent = entry.name;
+
+        var tagSpan = document.createElement('span');
+        tagSpan.className = 'ac-item-tag';
+        // Show type or dlc as a tag hint
+        var tag = entry.type || '';
+        if (entry.dlc) tag += ' [' + entry.dlc.toUpperCase() + ']';
+        if (entry.level > 0) tag += ' L' + entry.level;
+        tagSpan.textContent = tag;
+
+        item.appendChild(nameSpan);
+        if (tag) item.appendChild(tagSpan);
+
+        item.addEventListener('mousedown', function (e) {
+          // Use mousedown so it fires before blur
+          e.preventDefault();
+          if (_acCurrentInput) {
+            _acCurrentInput.value = entry.name;
+            // Trigger input event so any live listeners see the change
+            _acCurrentInput.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+          acHide();
+        });
+
+        panel.appendChild(item);
+      });
+    }
+
+    acPosition(inputEl);
+    panel.classList.add('ac-visible');
+  }
+
+  function acSetActive(idx) {
+    var items = panel.querySelectorAll('.ac-item');
+    items.forEach(function (el) {
+      el.classList.remove('ac-active');
+    });
+    if (idx >= 0 && idx < items.length) {
+      items[idx].classList.add('ac-active');
+      items[idx].scrollIntoView({ block: 'nearest' });
+    }
+    _acActiveIdx = idx;
+  }
+
+  function wireInput(inputId, category) {
+    var el = document.getElementById(inputId);
+    if (!el) return;
+
+    el.addEventListener('input', function () {
+      clearTimeout(_acTimer);
+      var q = el.value;
+      if (q.length < 2) {
+        acHide();
+        return;
+      }
+      _acCurrentInput = el;
+      _acTimer = setTimeout(function () {
+        var results = registrySearch(category, q);
+        acRender(results, el);
+      }, 150);
+    });
+
+    el.addEventListener('keydown', function (e) {
+      if (!panel.classList.contains('ac-visible')) return;
+      var itemCount = _acResults.length;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        acSetActive(Math.min(_acActiveIdx + 1, itemCount - 1));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        acSetActive(Math.max(_acActiveIdx - 1, 0));
+      } else if (e.key === 'Enter') {
+        if (_acActiveIdx >= 0 && _acResults[_acActiveIdx]) {
+          e.preventDefault();
+          el.value = _acResults[_acActiveIdx].name;
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          acHide();
+        }
+      } else if (e.key === 'Escape') {
+        acHide();
+      }
+    });
+
+    el.addEventListener('blur', function () {
+      // 100 ms grace: mousedown on an item fires before blur resolves
+      setTimeout(acHide, 120);
+    });
+
+    el.addEventListener('focus', function () {
+      // Reopen if there's already enough text (e.g. user tabbed back)
+      var q = el.value;
+      if (q.length >= 2) {
+        _acCurrentInput = el;
+        var results = registrySearch(category, q);
+        if (results.length) acRender(results, el);
+      }
+    });
+  }
+
+  // Wire the two registry-backed inputs
+  wireInput('newQuestName', 'quests');
+  wireInput('newItemName', 'items');
+
+  // Reposition on scroll/resize so the panel doesn't orphan
+  window.addEventListener(
+    'scroll',
+    function () {
+      if (_acCurrentInput && panel.classList.contains('ac-visible')) {
+        acPosition(_acCurrentInput);
+      }
+    },
+    { passive: true }
+  );
+  window.addEventListener('resize', function () {
+    if (_acCurrentInput && panel.classList.contains('ac-visible')) {
+      acPosition(_acCurrentInput);
+    }
+  });
 }

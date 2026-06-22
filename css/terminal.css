@@ -1191,3 +1191,61 @@ body.sync-complete {
   opacity: 1;
   text-shadow: var(--robco-glow);
 }
+
+/* ─── Registry Autocomplete Panel (Phase 3) ──────────────────── */
+.autocomplete-panel {
+  position: fixed;
+  z-index: 8000;
+  background: rgba(2, 28, 20, 0.97);
+  border: 1px solid var(--robco-green);
+  box-shadow:
+    var(--robco-glow),
+    0 4px 16px rgba(0, 0, 0, 0.8);
+  max-height: 200px;
+  overflow-y: auto;
+  display: none;
+  min-width: 220px;
+  max-width: 340px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+}
+.autocomplete-panel.ac-visible {
+  display: block;
+}
+.ac-item {
+  padding: 5px 8px;
+  color: var(--robco-green);
+  cursor: pointer;
+  border-bottom: 1px dashed rgba(20, 253, 206, 0.15);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.1s ease;
+}
+.ac-item:last-child {
+  border-bottom: none;
+}
+.ac-item:hover,
+.ac-item.ac-active {
+  background: rgba(20, 253, 206, 0.15);
+  text-shadow: var(--robco-glow);
+}
+.ac-item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.ac-item-tag {
+  font-size: 10px;
+  color: rgba(20, 253, 206, 0.5);
+  flex-shrink: 0;
+  letter-spacing: 0.5px;
+}
+.ac-empty {
+  padding: 6px 8px;
+  color: rgba(20, 253, 206, 0.4);
+  font-style: italic;
+  font-size: 11px;
+}
