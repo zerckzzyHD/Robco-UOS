@@ -209,6 +209,61 @@ $regCode = ($regSrc -split "`n" | Where-Object { $_ -notmatch '^\s*//' }) -join 
 Check ($regCode -notmatch 'saveState\s*\(')                "registry.js does not call saveState() (pure reference data)"
 Check ($regCode -notmatch 'localStorage')                  "registry.js does not reference localStorage (in code)"
 # ===========================================================
+# Suite 9 -- Database structural integrity
+# Validates js/database.js: all CSV tables, trigger coverage,
+# invKeywords, systemInstruction placement, and purity contract.
+# ===========================================================
+Sep "Suite 9 -- Database structural integrity"
+$dbSrc = Read-Src "js/database.js"
+
+# 9.1 databaseCSVs global must be declared
+Check ($dbSrc -match 'const databaseCSVs')                          "databaseCSVs global is declared"
+
+# 9.2 getRelevantDbContext function must be declared (legacy utility)
+Check ($dbSrc -match 'function getRelevantDbContext')                "getRelevantDbContext() function is declared"
+
+# 9.3 All required CSV section headers must be present
+$REQUIRED_TABLES = @('[WEAPONS.CSV]','[AMMO.CSV]','[ARMOR.CSV]','[BESTIARY.CSV]',
+                     '[CHEMS.CSV]','[MISC.CSV]','[RECIPES.CSV]','[QUEST_ITEMS.CSV]','[VENDORS.CSV]')
+foreach ($tbl in $REQUIRED_TABLES) {
+    Check ($dbSrc.Contains($tbl)) "database.js contains $tbl section"
+}
+
+# 9.4 [TH] shorthand must be in triggerWords
+Check ($dbSrc -match '\[TH\]')                                       "'[TH]' shorthand is in triggerWords"
+
+# 9.5 BESTIARY must have >= 30 data rows (guards against data regression)
+$bestiaryMatch = [regex]::Match($dbSrc, '(?s)\[BESTIARY\.CSV\](.*?)(?=\[|`;)')
+$bestiaryRows  = 0
+if ($bestiaryMatch.Success) {
+    $bestiaryRows = ($bestiaryMatch.Groups[1].Value -split "`n" |
+                    Where-Object { $_.Trim() -ne '' -and $_ -notmatch 'Name,' }).Count
+}
+Check ($bestiaryRows -ge 30)                                         "BESTIARY.CSV has >= 30 entries (found $bestiaryRows)"
+
+# 9.6 [THREAT] and [TH] must be in invKeywords in api.js
+# Use IndexOf/Substring to avoid lazy regex stopping at ] inside quoted strings
+$invStart = $apiSrc.IndexOf('const invKeywords = [')
+$invEnd   = $apiSrc.IndexOf('];', $invStart)
+$invBlock  = if ($invStart -ge 0 -and $invEnd -gt $invStart) { $apiSrc.Substring($invStart, $invEnd - $invStart + 2) } else { '' }
+Check ($invBlock -match '\[THREAT\]')                                "'[THREAT]' is in transmitMessage() invKeywords (api.js)"
+Check ($invBlock -match '\[TH\]')                                    "'[TH]' is in transmitMessage() invKeywords (api.js)"
+
+# 9.7 databaseCSVs must be referenced in systemInstruction in api.js
+# Contains() avoids PS1 single-line -match limitations; also check literal injection pattern
+$hasSysInst = ($apiSrc.Contains('{ text: databaseCSVs }') -or
+               $apiSrc.Contains("{ text: databaseCSVs }") -or
+               [bool]([regex]::Match($apiSrc, '(?s)systemInstruction[\s\S]{1,300}databaseCSVs').Success))
+Check $hasSysInst                                                    "databaseCSVs is injected via systemInstruction in api.js"
+
+
+# 9.8 database.js must NOT reference state, localStorage, or chatHistory
+$dbCode = ($dbSrc -replace '(?s)/\*.*?\*/', '') -replace '//[^\r\n]*', ''
+Check ($dbCode -notmatch '\bstate\b')                                "database.js does not reference state (pure reference data)"
+Check ($dbCode -notmatch 'localStorage')                             "database.js does not reference localStorage"
+Check ($dbCode -notmatch 'chatHistory')                              "database.js does not reference chatHistory"
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

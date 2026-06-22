@@ -392,6 +392,73 @@ assert(
 assert(!/localStorage/.test(registryCode), 'registry.js does not reference localStorage (in code)');
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 9 — Database structural integrity
+//  Validates js/database.js: all CSV tables, trigger coverage,
+//  invKeywords, systemInstruction placement, and purity contract.
+// ══════════════════════════════════════════════════════════════
+header('Database structural integrity');
+
+const dbSource = readFile('js/database.js');
+
+// 9.1 databaseCSVs global must be declared
+assert(/const\s+databaseCSVs/.test(dbSource), 'databaseCSVs global is declared');
+
+// 9.2 getRelevantDbContext function must be declared (legacy utility)
+assert(
+  /function\s+getRelevantDbContext\s*\(/.test(dbSource),
+  'getRelevantDbContext() function is declared'
+);
+
+// 9.3 All required CSV section headers must be present
+const REQUIRED_TABLES = [
+  '[WEAPONS.CSV]',
+  '[AMMO.CSV]',
+  '[ARMOR.CSV]',
+  '[BESTIARY.CSV]',
+  '[CHEMS.CSV]',
+  '[MISC.CSV]',
+  '[RECIPES.CSV]',
+  '[QUEST_ITEMS.CSV]',
+  '[VENDORS.CSV]',
+];
+for (const tbl of REQUIRED_TABLES) {
+  assert(dbSource.includes(tbl), `database.js contains ${tbl} section`);
+}
+
+// 9.4 [TH] must be in the triggerWords array
+assert(/\[TH\]/.test(dbSource), "'[TH]' shorthand is in triggerWords");
+
+// 9.5 BESTIARY must have ≥ 30 data rows (guards against data regression)
+const bestiaryBlock = dbSource.match(/\[BESTIARY\.CSV\]([\s\S]*?)(?=\[|`;)/);
+const bestiaryRows = bestiaryBlock
+  ? bestiaryBlock[1].split('\n').filter(l => l.trim() && !l.includes('Name,'))
+  : [];
+assert(bestiaryRows.length >= 30, `BESTIARY.CSV has ≥ 30 entries (found ${bestiaryRows.length})`);
+
+// 9.6 [THREAT] and [TH] must be in invKeywords in api.js
+// Strategy: find the invKeywords declaration, then extract lines until the closing ];
+const invStart = apiSource.indexOf('const invKeywords = [');
+const invEnd = apiSource.indexOf('];', invStart);
+const invBlock = invStart !== -1 && invEnd !== -1 ? apiSource.slice(invStart, invEnd + 2) : '';
+assert(/\[THREAT\]/.test(invBlock), "'[THREAT]' is in transmitMessage() invKeywords (api.js)");
+assert(/\[TH\]/.test(invBlock), "'[TH]' is in transmitMessage() invKeywords (api.js)");
+
+// 9.7 databaseCSVs must be referenced in systemInstruction in api.js
+assert(
+  /systemInstruction.*databaseCSVs|databaseCSVs.*systemInstruction/s.test(apiSource) ||
+    /parts.*databaseCSVs|databaseCSVs.*parts/s.test(apiSource),
+  'databaseCSVs is injected via systemInstruction in api.js'
+);
+
+// 9.8 database.js must NOT reference state, localStorage, or chatHistory
+const dbCode = dbSource
+  .replace(/\/\*[\s\S]*?\*\//g, '') // strip block comments
+  .replace(/\/\/[^\r\n]*/g, ''); // strip line comments
+assert(!/\bstate\b/.test(dbCode), 'database.js does not reference state (pure reference data)');
+assert(!/localStorage/.test(dbCode), 'database.js does not reference localStorage');
+assert(!/chatHistory/.test(dbCode), 'database.js does not reference chatHistory');
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 console.log('\n══════════════════════════════════════════════════════════════\n');

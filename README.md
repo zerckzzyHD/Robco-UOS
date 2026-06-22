@@ -378,15 +378,16 @@ Key milestones:
 - **v1.6.3** — 14-faction network, save envelope format, cloud sync envelope
 - **v1.6.4** — Quest log, equipped tracking, save slots, session stats, 48 features
 - **v1.6.5** — Fallout Data Registry fully populated: 130 quests, 110+ perks, 120 locations, 10 companions, ~280 items (wiki-sourced). Perk autocomplete wired.
+- **v1.6.6** — THREAT database remediation: [TH] shorthand fixed, [THREAT] inventory context, all 9 CSV tables fully expanded (9 tables, ~350 entries), QUEST_ITEMS table added, databaseCSVs moved to systemInstruction, Suite 9 tests (15 new), version bump.
 
 </details>
 
-### Current State (v1.6.5)
+### Current State (v1.6.6)
 
 The project is a **production-quality browser application** with:
 
 - 33 tracked state fields across 5 structured systems
-- 119-test automated persistence audit
+- 138-test automated persistence audit (Suite 9: database structural integrity)
 - 14-faction reputation network
 - 13-skill character sheet
 - Full save/load/export/import/cloud sync/undo pipeline
@@ -396,6 +397,8 @@ The project is a **production-quality browser application** with:
 - Installable PWA with offline support
 - **Fallout Data Registry** — 130 quests · ~110 perks · ~120 locations · 10 companions · ~280 items (all wiki-sourced, CC-BY-SA 4.0)
 - **Registry Autocomplete** — live CRT-styled dropdown on Quest Name, Item Name, and Perk Name inputs (keyboard + click)
+- **Combat Database** — 9 CSV tables: 63 enemies · 51 weapons · 47 ammo subtypes · 19 armors · 20 chems · 18 misc items · 10 recipes · 19 quest items · 14 vendors (all wiki-sourced)
+- **Reliable DB injection** — databaseCSVs always present in systemInstruction (guaranteed model attention, no long-session drift)
 
 ---
 

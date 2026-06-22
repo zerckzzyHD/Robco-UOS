@@ -1,3 +1,25 @@
+v1.6.6 (THREAT Database Remediation & Full CSV Population)
+* 135/138 persistence tests passing (3 systemInstruction tests intentionally canary for Commit 3). Post-migration: all 138/138 pass.
+* [TH] shorthand fixed: '[TH]' was missing from triggerWords in database.js — every [TH] command silently omitted the database payload (DATA CORRUPTION). Added to triggerWords array.
+* [THREAT] inventory context fixed: '[THREAT]' and '[TH]' added to invKeywords in api.js — the AI now receives Courier equipped weapon, armor, and ammo payload for DPS/TTK calculations on threat assessment commands.
+* BESTIARY.CSV: 4 → 63 entries. Added: Bloatfly, Giant Bloatfly, Radroach, Mole Rat, Coyote, Coyote Alpha, Jackal Gang (2), Bark Scorpion, Giant Bark Scorpion, Radscorpion, Albino Radscorpion, Spore Plant, Giant Mantis (2), Giant Ant (2), Gecko, Golden Gecko, Fire Gecko, Lakelurk (2), Bighorner (2), Cazador, Giant Cazador, Tunneler, Powder Gangers (2), Viper (2), Great Khan (2), Fiend (2), Omerta Thug, Chairmen Thug, Feral Ghoul (3), Glowing One, Nightkin, Super Mutant (3), Legion faction units (6), NCR faction units (3), White Leg, Dead Horses, Deathclaw (3), Protectron, Mister Gutsy, Mister Handy, Sentry Bot, Eyebot, Securitron Mk I/II.
+* WEAPONS.CSV: 6 → 51 entries. Added: full unarmed/melee set, complete handgun/rifle/shotgun/SMG roster, heavy weapons, energy weapons, and thrown weapons.
+* AMMO.CSV: 7 → 47 subtypes. All major calibers with Standard/HP/AP/Surplus variants: 5.56mm, 9mm, .357, .44, .45 Auto, .45-70, .50 MG, 10mm, 12 Gauge, 12.7mm, .308, 5mm, EC (4 subtypes), 2mm EC, 40mm Grenade, Flamer Fuel, Missile.
+* ARMOR.CSV: 4 → 19 entries. NCR Trooper/Ranger/Veteran Ranger, Legion Centurion, Desert Ranger, Elite Riot Gear, Power Armor (T-45d, T-51b, NCR Salvaged, Remnants), Stealth Suit Mk II.
+* CHEMS.CSV: 4 → 20 entries. Added: Buffout, Med-X, Psycho, Super Stimpak, RadAway, Rad-X, Antivenom, Hydra, Fixer, Doctor's Bag, Jet, Ultrajet, Turbo, Mentats, Slasher, Whiskey Rose, Nuka-Cola (2), Atomic Cocktail.
+* MISC.CSV: 4 → 18 items. Added: Scrap Electronics, Sensor Module, Fission Battery, Conductors, Pilot Light, Wonderglue, Duct Tape, Surgical Tubing, Tin Can, Leather Belt, Abraxo Cleaner, Empty Nuka-Cola Bottle, Sunset Sarsaparilla Bottle + Star Cap.
+* RECIPES.CSV: 1 → 10 recipes. Added: Doctor's Bag, Frag Grenade, Molotov Cocktail, Nuka Grenade, Homemade Knife, Hand-Loaded .308, Hand-Loaded .44, Snakebite Tourniquet, Wasteland Omelet.
+* QUEST_ITEMS.CSV: NEW TABLE (0 → 19 entries). Quest-critical items: Platinum Chip, Lucky 38 VIP Keycard, Benny's Lighter, Benny's Hat, NCR Dog Tags, Remnants Passcard, Euclid's C-Finder, ARCHIMEDES II Holotape, Omertas Hit List, Vault 3 Master Key, Lucky 38 Presidential Suite Key, Snowglobes, Khans Disguise, NCR Emergency Radio, Deathclaw Egg, HELIOS One Power Chip, Mysterious Magnum, Joshua's Bible, Burned Man's Flag.
+* VENDORS.CSV: 2 → 14 vendors. Added: Alexander, Michelle Kerr, Samuel, Camp McCarran QM, Blake, Dale Barton, Knight Torres, Mick, Ralph, Old Lady Gibson, Cliff Briscoe, Jules.
+* Database injection architecture: databaseCSVs moved from contents[] into systemInstruction.parts[1] (always-present, unconditional). Eliminates long-session attention dilution where the DB was buried in message history. getRelevantDbContext() retained as legacy utility but no longer called from transmitMessage().
+* Token budget estimate updated from 4,000 to 6,500 in ui.js to account for directive + databaseCSVs always in systemInstruction.
+* Suite 9 — Database structural integrity: 15 new tests added to check-persistence.js and check-persistence.ps1. Validates all 9 CSV sections, [TH] in triggerWords, BESTIARY row count >= 30, [THREAT]/[TH] in invKeywords, systemInstruction DB placement, and database.js purity contract (no state/localStorage/chatHistory refs).
+* Service worker cache: robco-terminal-v1.6.5-r2 → v1.6.6-r5. All intermediate revisions (r3, r4) folded into v1.6.6 final.
+* index.html title and h1 bumped to 1.6.6.
+* manifest.json name bumped to 1.6.6.
+* APP_VERSION bumped to '1.6.6' in state.js.
+* All data sourced from fallout.wiki (CC-BY-SA 4.0).
+
 v1.6.5 (Fallout Data Registry — Data Population & Autocomplete Panel)
 * 119/119 persistence tests passing. 0 new ESLint issues introduced.
 * Fallout Data Registry populated with verified wiki data (fallout.wiki — CC-BY-SA 3.0).

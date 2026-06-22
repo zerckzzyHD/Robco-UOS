@@ -340,7 +340,14 @@ function autoImportState(jsonString) {
       });
     }
     let inv = parsed.inventory || parsed.Inventory || parsed.inv;
-    if (inv && Array.isArray(inv)) state.inventory = inv;
+    if (inv && Array.isArray(inv))
+      state.inventory = inv.map(it => ({
+        name: it.name ?? '',
+        qty: it.qty ?? 1,
+        wgt: it.wgt ?? it.weight ?? 0,
+        val: it.val ?? it.value ?? 0,
+        type: it.type ?? 'misc',
+      }));
     if (parsed.squad && Array.isArray(parsed.squad)) state.squad = parsed.squad;
     if (parsed.campaign_notes) state.campaign_notes = parsed.campaign_notes;
     // Perks (v1.6.4+)
@@ -580,12 +587,6 @@ async function transmitMessage() {
     delete currentPayload.inventory;
   }
 
-  // Retrieve Local DB Context ONLY if combat/trade is detected
-  let dbContextString = '';
-  if (typeof getRelevantDbContext === 'function') {
-    dbContextString = getRelevantDbContext(userText);
-  }
-
   let apiContents = [];
   chatHistory.forEach(msg => {
     if (msg.sender === 'sys') return;
@@ -596,7 +597,7 @@ async function transmitMessage() {
   });
 
   let lastUserMsg = apiContents[apiContents.length - 1];
-  lastUserMsg.parts[0].text = `${dbContextString}\n[CURRENT STATE]:\n${JSON.stringify(currentPayload)}\n\n[COMMAND]:\n${userText}`;
+  lastUserMsg.parts[0].text = `\n[CURRENT STATE]:\n${JSON.stringify(currentPayload)}\n\n[COMMAND]:\n${userText}`;
 
   if (attachedImageData) {
     lastUserMsg.parts.push({
@@ -621,7 +622,12 @@ async function transmitMessage() {
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': rawKey },
         signal: controller.signal,
         body: JSON.stringify({
-          systemInstruction: { parts: [{ text: getSystemDirective() }] },
+          systemInstruction: {
+            parts: [
+              { text: getSystemDirective() },
+              { text: databaseCSVs }, // always present — guaranteed model attention
+            ],
+          },
           contents: apiContents,
           generationConfig: { temperature: 0.2, responseMimeType: 'application/json' },
         }),

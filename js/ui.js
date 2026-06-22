@@ -1375,7 +1375,9 @@ function renderInventory() {
     .map((it, i) => {
       const cat = (it.type || 'misc').toLowerCase();
       const typeTag = `<span style="font-size:9px;opacity:0.7;margin-right:3px;color:${typeColors[cat] || 'inherit'};">[${cat.toUpperCase()}]</span>`;
-      return `<li><button class="use-btn" data-use="${i}" title="Quick-use: send [USE] ${escapeHtml(it.name)}">USE</button>${typeTag}<span>${it.qty}x ${escapeHtml(it.name)} (${it.wgt}lb${it.val ? ' · ' + it.val + 'c' : ''})</span> <button class="delete-btn" data-idx="${i}">X</button></li>`;
+      const wgtStr = it.wgt > 0 ? ` ${it.wgt} lb` : '';
+      const valStr = it.val > 0 ? ` · ${it.val}c` : '';
+      return `<li><button class="use-btn" data-use="${i}" title="Quick-use: send [USE] ${escapeHtml(it.name)}">USE</button>${typeTag}<span>${it.qty}x ${escapeHtml(it.name)}${wgtStr || valStr ? ` (${wgtStr.trim()}${wgtStr && valStr ? ' ' : ''}${valStr.trim()})` : ''}</span> <button class="delete-btn" data-idx="${i}">X</button></li>`;
     })
     .join('');
   lst.onclick = e => {
@@ -1867,8 +1869,8 @@ function updateTokenBudget() {
   if (!el) return;
   const model = (document.getElementById('apiModelInput') || {}).value || '';
   const ctxLimit = model.includes('1.5') ? 1000000 : model.includes('2.0') ? 1000000 : 128000;
-  // Estimate: system directive (~4k tokens) + chat history + state + user input
-  const directiveEst = 4000;
+  // Estimate: system directive (~2,875 tokens) + databaseCSVs (~3,200 tokens, now always in systemInstruction) + chat history + state + user input
+  const directiveEst = 6500;
   const chatEst = Math.round(chatHistory.reduce((a, m) => a + m.text.length, 0) / 4);
   const stateEst = Math.round(JSON.stringify(state).length / 4);
   const inputEst = Math.round((document.getElementById('chatInput')?.value?.length || 0) / 4);
