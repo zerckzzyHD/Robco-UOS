@@ -130,6 +130,8 @@ Brotherhood T-45d Power Armor,Heavy,22,45,6000,+2 STR,50%
 Ranger Combat Armor,Medium,20,30,7500,None,50%
 T-51b Power Armor,Heavy,25,40,5200,+1 STR / +1 CHA / +25 Rad Resist,50%
 Remnants Power Armor,Heavy,28,45,12000,+1 STR / +25 Rad Resist,50%
+Enclave Power Armor,Heavy,28,45,12000,+1 STR / +25 Rad Resist,50%
+Gannon Family Tesla Armor,Heavy,26,40,10000,+10 Energy Resist / +25 Rad Resist,50%
 
 [BESTIARY.CSV]
 Name,DT,HP,Perception,Speed_Factor,Base_Damage,Attack_Rate,Weakness_Weapon,Attack_Type,Resistances,XP_Yield
@@ -371,5 +373,20 @@ function _buildItemCache() {
 function lookupItemInDb(name) {
   if (!name) return null;
   if (!_itemCache) _buildItemCache();
-  return _itemCache.get(name.toLowerCase().trim()) || null;
+  const key = name.toLowerCase().trim();
+  // 1. Exact match
+  const exact = _itemCache.get(key);
+  if (exact) return exact;
+  // 2. Fuzzy fallback: substring match (longest name wins to avoid false positives)
+  let best = null;
+  let bestLen = 0;
+  for (const [dbKey, entry] of _itemCache) {
+    if (dbKey.includes(key) || key.includes(dbKey)) {
+      if (dbKey.length > bestLen) {
+        best = entry;
+        bestLen = dbKey.length;
+      }
+    }
+  }
+  return best;
 }
