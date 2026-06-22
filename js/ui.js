@@ -1018,6 +1018,8 @@ function expandPanelForCategory(categoryKey) {
     campaign_notes: '> CAMPAIGN NOTES',
     perks: '> PERKS',
     factions: '> FACTION STANDING',
+    quests: '> QUEST LOG',
+    equipped: '> EQUIPPED',
   };
   const target = map[categoryKey];
   if (!target) return;
