@@ -205,7 +205,7 @@ Name,Effect,Duration,Addiction_Risk,Addiction_Debuff,Chem_Family,Value,Weight
 Buffout,+2 STR / +2 END / +60 Max HP,4m,25%,-1 STR / -1 END,Buffout,20,0.5
 Med-X,+25 DR,4m,25%,-1 AGI,Med-X,20,0.5
 Psycho,+25% DMG,4m,25%,-1 PER / -1 END,Psycho,20,0.5
-Stimpack,Restore HP,0,0%,None,Medicine,20,0.5
+Stimpak,Restore HP,0,0%,None,Medicine,20,0.5
 Super Stimpak,Restore 100 HP,0,0%,None,Medicine,75,0.5
 RadAway,Remove 150 Rads,0,0%,None,Medicine,20,0.5
 Rad-X,+25 Rad Resistance,4m,0%,None,Medicine,20,0.5
