@@ -42,7 +42,7 @@ function assert(ok, msg) {
   ok ? pass(msg) : fail(msg);
 }
 function header(title) {
-  console.log(`\n── ${title} ${'─'.repeat(50 - title.length)}`);
+  console.log(`\n── ${title} ${'─'.repeat(Math.max(0, 50 - title.length))}`);
 }
 
 function readFile(rel) {
