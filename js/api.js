@@ -566,6 +566,8 @@ async function transmitMessage() {
     '[STASH]',
     '[EXCESS]',
     '[VISUAL]',
+    '[THREAT]',
+    '[TH]',
     'INVENTORY',
     'LOOT',
     'TAKE',

@@ -59,7 +59,7 @@ Vendortron,Gun Runners,8000,100,Independent,3,Caps / NCR / Legion
 
 // TOKEN TRIAGE LOGIC: Only send the DB if the prompt demands math.
 function getRelevantDbContext(userText) {
-  const triggerWords = ['[THREAT]', '[VATS', '[TRADE]', '[CRAFT]', '[EXCESS]'];
+  const triggerWords = ['[THREAT]', '[TH]', '[VATS', '[TRADE]', '[CRAFT]', '[EXCESS]'];
   const textUpper = userText.toUpperCase();
 
   // If the user is asking a combat/trade command, inject the DB.
