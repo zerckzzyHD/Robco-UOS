@@ -1341,11 +1341,20 @@ function updateMath() {
 
 function addItem() {
   let n = document.getElementById('newItemName').value;
-  let q = parseFloat(document.getElementById('newItemQty').value) || 1;
-  let w = parseFloat(document.getElementById('newItemWeight').value) || 0;
-  let v = parseFloat(document.getElementById('newItemValue').value) || 0;
-  let t = (document.getElementById('newItemType') || {}).value || 'misc';
   if (!n) return;
+
+  // Auto-populate from database if fields are empty
+  const dbEntry = typeof lookupItemInDb === 'function' ? lookupItemInDb(n) : null;
+
+  let q = parseFloat(document.getElementById('newItemQty').value) || 1;
+  const rawW = document.getElementById('newItemWeight').value;
+  const rawV = document.getElementById('newItemValue').value;
+  let w = rawW !== '' ? parseFloat(rawW) || 0 : dbEntry ? dbEntry.wgt : 0;
+  let v = rawV !== '' ? parseFloat(rawV) || 0 : dbEntry ? dbEntry.val : 0;
+  let t = (document.getElementById('newItemType') || {}).value || 'misc';
+  // Auto-set type from DB if user left it on the default 'misc'
+  if (t === 'misc' && dbEntry && dbEntry.type) t = dbEntry.type;
+
   let ex = state.inventory.find(i => i.name.toLowerCase() === n.toLowerCase());
   if (ex) ex.qty += q;
   else state.inventory.push({ name: n, qty: q, wgt: w, val: v, type: t });

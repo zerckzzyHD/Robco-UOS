@@ -311,3 +311,65 @@ function getRelevantDbContext(userText) {
   // Otherwise, return empty string to save 1,500+ tokens on narrative roleplay.
   return '\n[DATABASES_OMITTED_TO_SAVE_MEMORY_DUE_TO_NARRATIVE_PROMPT]\n';
 }
+
+// ── ITEM LOOKUP ──────────────────────────────────────────────
+// Searches all item CSV tables by name and returns { wgt, val, type }
+// or null if the item isn't in any table. Case-insensitive.
+// Lazy-initializes parsed cache on first call so the CSV is only parsed once.
+let _itemCache = null;
+
+function _buildItemCache() {
+  _itemCache = new Map();
+  const tables = [
+    // [sectionHeader, nameCol, weightCol, valueCol, itemType]
+    ['[WEAPONS.CSV]', 'Weapon_Name', 'Weight', 'Value', 'weapon'],
+    ['[AMMO.CSV]', 'Caliber', 'Weight_Per_Unit', null, 'ammo'],
+    ['[ARMOR.CSV]', 'Name', 'Weight', 'Value', 'armor'],
+    ['[CHEMS.CSV]', 'Name', 'Weight', 'Value', 'aid'],
+    ['[MISC.CSV]', 'Name', 'Weight', 'Value', 'misc'],
+    ['[QUEST_ITEMS.CSV]', 'Name', 'Weight', null, 'misc'],
+  ];
+
+  for (const [header, nameCol, wgtCol, valCol, type] of tables) {
+    const start = databaseCSVs.indexOf(header);
+    if (start === -1) continue;
+    // Find end: next section header or end of string
+    const nextSection = databaseCSVs.indexOf('\n[', start + header.length);
+    const block = databaseCSVs.substring(start, nextSection === -1 ? undefined : nextSection);
+    const lines = block.split('\n').filter(l => l.trim() && !l.startsWith('['));
+    if (lines.length < 2) continue;
+    const headers = lines[0].split(',');
+    const nameIdx = headers.indexOf(nameCol);
+    const wgtIdx = headers.indexOf(wgtCol);
+    const valIdx = valCol ? headers.indexOf(valCol) : -1;
+    if (nameIdx === -1) continue;
+
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(',');
+      const name = (cols[nameIdx] || '').trim();
+      if (!name) continue;
+      // For ammo, key is "Caliber Subtype" (e.g. "5.56mm Standard")
+      const key =
+        type === 'ammo' && cols[1] ? `${name} ${cols[1].trim()}`.toLowerCase() : name.toLowerCase();
+      _itemCache.set(key, {
+        wgt: wgtIdx >= 0 ? parseFloat(cols[wgtIdx]) || 0 : 0,
+        val: valIdx >= 0 ? parseFloat(cols[valIdx]) || 0 : 0,
+        type: type,
+      });
+      // For ammo, also index by caliber alone (first match wins)
+      if (type === 'ammo' && !_itemCache.has(name.toLowerCase())) {
+        _itemCache.set(name.toLowerCase(), {
+          wgt: wgtIdx >= 0 ? parseFloat(cols[wgtIdx]) || 0 : 0,
+          val: 0,
+          type: 'ammo',
+        });
+      }
+    }
+  }
+}
+
+function lookupItemInDb(name) {
+  if (!name) return null;
+  if (!_itemCache) _buildItemCache();
+  return _itemCache.get(name.toLowerCase().trim()) || null;
+}
