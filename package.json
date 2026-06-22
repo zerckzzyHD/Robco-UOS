@@ -14,16 +14,16 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/zerckzzyHD/Website-version.git"
+    "url": "git+https://github.com/zerckzzyHD/Robco-UOS.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "bugs": {
-    "url": "https://github.com/zerckzzyHD/Website-version/issues"
+    "url": "https://github.com/zerckzzyHD/Robco-UOS/issues"
   },
-  "homepage": "https://github.com/zerckzzyHD/Website-version#readme",
+  "homepage": "https://github.com/zerckzzyHD/Robco-UOS#readme",
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "eslint": "^10.5.0",
