@@ -388,15 +388,16 @@ Key milestones:
 - **v1.6.2** — Skill matrix, status effects, campaign notes, undo system
 - **v1.6.3** — 14-faction network, save envelope format, cloud sync envelope
 - **v1.6.4** — Quest log, equipped tracking, save slots, session stats, 48 features
+- **v1.6.5** — Fallout Data Registry populated (130 quests, 90+ perks, 120 locations, 10 companions)
 
 </details>
 
-### Current State (v1.6.4)
+### Current State (v1.6.5)
 
 The project is a **production-quality browser application** with:
 
 - 33 tracked state fields across 5 structured systems
-- 106-test automated persistence audit
+- 119-test automated persistence audit
 - 14-faction reputation network
 - 13-skill character sheet
 - Full save/load/export/import/cloud sync/undo pipeline
@@ -404,6 +405,7 @@ The project is a **production-quality browser application** with:
 - 6 color themes
 - 3 save slots
 - Installable PWA with offline support
+- **Fallout Data Registry** — 130 quests, 90+ perks, 120 locations, 10 companions (wiki-sourced)
 
 ---
 
