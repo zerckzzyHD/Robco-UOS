@@ -25,9 +25,10 @@
 13. [Settings & localStorage Keys](#settings--localstorage-keys)
 14. [System Dependency Map](#system-dependency-map)
 15. [Historical Lessons](#historical-lessons)
-16. [Adding a New State Field (Checklist)](#adding-a-new-state-field-checklist)
-17. [Adding a New Audio Source (Checklist)](#adding-a-new-audio-source-checklist)
-18. [Adding a New UI Panel (Checklist)](#adding-a-new-ui-panel-checklist)
+16. [Service Worker Cache Protocol](#service-worker-cache-protocol)
+17. [Adding a New State Field (Checklist)](#adding-a-new-state-field-checklist)
+18. [Adding a New Audio Source (Checklist)](#adding-a-new-audio-source-checklist)
+19. [Adding a New UI Panel (Checklist)](#adding-a-new-ui-panel-checklist)
 
 ---
 
@@ -693,6 +694,49 @@ fetches and reload loops.
 
 ---
 
+## Service Worker Cache Protocol
+
+> **⚠ This applies to EVERY commit that changes any user-visible file.**
+
+The Service Worker (`sw.js`) uses a **cache-first** strategy. Once a user has visited the site, their browser serves files from the SW cache — not the network. The **only** mechanism that forces an update is changing `CACHE_NAME`.
+
+### The Rule
+
+**Bump `CACHE_NAME` in `sw.js` on every commit that modifies:**
+
+- `index.html` (any UI change, new panel, new button, layout tweak)
+- `css/terminal.css` (any style change)
+- `js/*.js` (any logic change the user will see or interact with)
+- `sw.js` itself
+
+### Format
+
+```
+'robco-terminal-v{APP_VERSION}-r{N}'
+```
+
+- `APP_VERSION` matches the current `APP_VERSION` in `state.js`
+- `N` is a monotonically increasing integer, starting at 1 for each new `APP_VERSION`
+- Increment `N` on every qualifying commit, regardless of how small the change is
+
+**Examples:**
+
+| Scenario                     | Before      | After       |
+| ---------------------------- | ----------- | ----------- |
+| New version released         | `v1.6.5-r3` | `v1.6.6-r1` |
+| UI tweak within same version | `v1.6.5-r1` | `v1.6.5-r2` |
+| Second UI tweak same version | `v1.6.5-r2` | `v1.6.5-r3` |
+
+### Why It Matters
+
+Forgetting to bump means cached users **silently run the old UI** until they manually clear their browser cache — they will never see the "REBOOT TERMINAL" update prompt.
+
+### Historical Note
+
+This protocol was formalized in v1.6.5 after the perk panel (`addPerk()` + `#newPerkName`) was deployed within an existing `1.6.5` cache name, causing the feature to be invisible to cached users.
+
+---
+
 ## Adding a New State Field (Checklist)
 
 - [ ] Add field to `let state = { ... }` in **state.js** with default value
@@ -701,6 +745,7 @@ fetches and reload loops.
 - [ ] If the AI should return it: update `getSystemDirective()` schema in **api.js**
 - [ ] If it needs UI: add `render*()` function in **ui.js** and call from `loadUI()`
 - [ ] If it needs a panel: add `<details class="panel">` in **index.html**
+- [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
 - [ ] `git commit` — pre-commit audit must pass (all 119+ tests)
@@ -720,6 +765,7 @@ fetches and reload loops.
 - [ ] Add the localStorage key to `toggleAudio()`'s `keyMap` in **ui.js**
 - [ ] Add the localStorage key to `toggleMasterMute()`'s un-mute logic
 - [ ] Add the new localStorage key to the [Settings table](#settings--localstorage-keys)
+- [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix
 - [ ] **Update ARCHITECTURE.md** — add to AudioSettings table and Audio System section
 - [ ] **Update changelog.txt** and **README.md**
 
@@ -733,6 +779,7 @@ fetches and reload loops.
 - [ ] If it shows a count: add to `_updatePanelBadges()` in **ui.js**
 - [ ] If AI changes should auto-expand it: add to `expandPanelForCategory()` map in **ui.js**
 - [ ] If it has a text input for adding items: call `wireInput()` in `initRegistryAutocomplete()`
+- [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix
 - [ ] Panel memory (#35) works automatically via the `details.panel` selector
 - [ ] Keyboard shortcut (#15) works automatically for the first 6 panels
 - [ ] **Update ARCHITECTURE.md** — add to UI Rendering Pipeline table

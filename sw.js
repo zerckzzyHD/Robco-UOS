@@ -1,4 +1,9 @@
-const CACHE_NAME = 'robco-terminal-v1.6.5';
+// ⚠ PROTOCOL: Bump SW_REV on EVERY commit that touches index.html, css/, or js/.
+// Format: 'robco-terminal-v{APP_VERSION}-r{N}'  (N starts at 1, increments each UI change)
+// Changing this string is the ONLY thing that triggers the "REBOOT TERMINAL" update
+// prompt for users who already have the site cached. Forgetting to bump means cached
+// users silently run the old UI until they manually clear their browser cache.
+const CACHE_NAME = 'robco-terminal-v1.6.5-r1';
 const ASSETS = [
   './',
   './index.html',
