@@ -22,10 +22,19 @@ let _chatSaveTimer = null;
 const CHAT_MAX = 200; // max messages kept in memory; last 50 written to localStorage
 
 // The Mechanical Audio Synth (Procedural, no files required)
-const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+// Lazily created on first user gesture to comply with Chrome's autoplay policy.
+// Before any user interaction, audioCtx is null and all audio functions early-return.
+let audioCtx = null;
+function ensureAudioCtx() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
 function playClack() {
   if (AudioSettings.masterMute || AudioSettings.typing) return;
-  if (audioCtx.state === 'suspended') audioCtx.resume();
+  ensureAudioCtx();
   const osc = audioCtx.createOscillator();
   const gain = audioCtx.createGain();
   osc.type = 'square';
@@ -46,7 +55,7 @@ let geigerRunning = false,
 
 function playGeigerClick() {
   if (AudioSettings.masterMute || AudioSettings.geiger) return;
-  if (audioCtx.state === 'suspended') audioCtx.resume();
+  ensureAudioCtx();
   const bufSize = Math.floor(audioCtx.sampleRate * 0.003);
   const buf = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
   const data = buf.getChannelData(0);
@@ -99,7 +108,7 @@ let tinnitusNode = null,
 
 function startTinnitus() {
   if (tinnitusNode || AudioSettings.masterMute || AudioSettings.tinnitus) return;
-  if (audioCtx.state === 'suspended') audioCtx.resume();
+  ensureAudioCtx();
   tinnitusNode = audioCtx.createOscillator();
   tinnitusGain = audioCtx.createGain();
   tinnitusNode.type = 'sine';
@@ -145,7 +154,7 @@ let crtHumNode = null,
 
 function startCrtHum() {
   if (crtHumNode || AudioSettings.masterMute || AudioSettings.hum) return;
-  if (audioCtx.state === 'suspended') audioCtx.resume();
+  ensureAudioCtx();
   crtHumNode = audioCtx.createOscillator();
   crtHumGain = audioCtx.createGain();
   crtHumLfo = audioCtx.createOscillator();
@@ -165,7 +174,7 @@ function startCrtHum() {
 }
 
 function setCrtHumIntensity(rads, hasCrippled) {
-  if (!crtHumGain || !crtHumNode) return;
+  if (!crtHumGain || !crtHumNode || !audioCtx) return;
   let targetFreq = rads >= 600 ? 82 : 60;
   let targetGain = rads >= 600 ? 0.014 : 0.007;
   if (hasCrippled) targetGain *= 0.4;
@@ -178,7 +187,7 @@ function setCrtHumIntensity(rads, hasCrippled) {
 // ── LIMB TRAUMA SOUNDS ─────────────────────────────────────────
 function playLimbCrippleSound(limb) {
   if (AudioSettings.masterMute || AudioSettings.ambient) return;
-  if (audioCtx.state === 'suspended') audioCtx.resume();
+  ensureAudioCtx();
   const isArm = limb === 'la' || limb === 'ra';
   const osc = audioCtx.createOscillator();
   const g = audioCtx.createGain();
@@ -203,7 +212,7 @@ function playLimbCrippleSound(limb) {
 
 function playLimbRestoreSound() {
   if (AudioSettings.masterMute || AudioSettings.ambient) return;
-  if (audioCtx.state === 'suspended') audioCtx.resume();
+  ensureAudioCtx();
   [440, 880, 1760].forEach((freq, i) => {
     setTimeout(() => {
       const osc = audioCtx.createOscillator();
@@ -222,7 +231,7 @@ function playLimbRestoreSound() {
 
 function playHeadCrippleSound() {
   if (AudioSettings.masterMute || AudioSettings.ambient) return;
-  if (audioCtx.state === 'suspended') audioCtx.resume();
+  ensureAudioCtx();
   // Concussive thud
   const osc1 = audioCtx.createOscillator();
   const g1 = audioCtx.createGain();
@@ -252,7 +261,7 @@ function playHeadCrippleSound() {
 // ── WAKE TONE (Tab Standby) ────────────────────────────────────
 function playWakeTone() {
   if (AudioSettings.masterMute || AudioSettings.wake) return; // Separate mute from limb SFX
-  if (audioCtx.state === 'suspended') audioCtx.resume();
+  ensureAudioCtx();
   [220, 440, 880].forEach((freq, i) => {
     setTimeout(() => {
       const osc = audioCtx.createOscillator();
@@ -274,7 +283,7 @@ function playWakeTone() {
 // Respects master mute and the typing SFX mute (closest semantic match).
 function playSyncTone() {
   if (AudioSettings.masterMute || AudioSettings.typing) return;
-  if (audioCtx.state === 'suspended') audioCtx.resume();
+  ensureAudioCtx();
   [
     [880, 0],
     [1320, 0.08],
