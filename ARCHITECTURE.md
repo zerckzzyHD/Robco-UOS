@@ -70,14 +70,16 @@
 Scripts are loaded via `<script>` tags in `index.html` in this exact order:
 
 ```
-1. js/state.js      → defines: state, chatHistory, APP_VERSION, FACTION_REGISTRY,
+1. js/database.js   → defines: databaseCSVs, getRelevantDbContext
+2. js/state.js      → defines: state, chatHistory, APP_VERSION, FACTION_REGISTRY,
                        SKILL_KEYS, saveState, syncStateFromDom, generateSyncPayload,
                        exportSaveFile, migrateState, gameTimeToTicks (via ui.js)
-2. js/database.js   → defines: databaseCSVs, getRelevantDbContext
-3. js/api.js        → defines: autoImportState, transmitMessage, fetchAuthorizedModels
+3. js/registry.js   → defines: FALLOUT_REGISTRY (read-only reference data),
+                       registrySearch() (autocomplete search function)
 4. js/ui.js         → defines: appendToChat, loadUI, AudioSettings, all render*(),
                        all audio functions, toggleLimb, updateMath, etc.
-5. js/cloud.js      → loaded as <script type="module"> (ES import from Firebase CDN)
+5. js/api.js        → defines: autoImportState, transmitMessage, fetchAuthorizedModels
+6. js/cloud.js      → loaded as <script type="module"> (ES import from Firebase CDN)
                        attaches: window.pushToCloud, window.pullFromCloud
 ```
 
@@ -87,6 +89,58 @@ to prevent no-undef errors.
 
 `cloud.js` is the **only** ES module — it uses `import` from the Firebase CDN. It attaches
 its exports to `window.*` for the other scripts to call.
+
+---
+
+## Fallout Data Registry (`js/registry.js`)
+
+Added in v1.6.5. Read-only canonical Fallout: New Vegas reference data for autocomplete and future validation.
+
+### Key Properties
+
+- **Source of truth:** [Independent Fallout Wiki](https://fallout.wiki) — CC-BY-SA 3.0
+- **NOT state:** Does not touch `state`, `localStorage`, cloud sync, undo, or the persistence audit.
+- **Read-only:** Defined once at startup. Never mutated.
+- **Single file, no build step:** Consistent with the project's zero-toolchain philosophy.
+
+### Global: `FALLOUT_REGISTRY`
+
+```js
+const FALLOUT_REGISTRY = {
+  version: '1.0.0',
+  quests:     [ { name, type, dlc }, ... ],       // type: main|side|companion|unmarked
+  items:      [ { name, type }, ... ],             // type: weapon|armor|aid|ammo|misc
+  perks:      [ { name, type, level }, ... ],      // type: regular|companion|challenge|special
+  locations:  [ { name, type }, ... ],             // type: settlement|landmark|cave|vault|camp|other
+  companions: [ { name, fullName, location }, ... ] // 8 humanoid + Rex + ED-E
+};
+```
+
+### Function: `registrySearch(category, query)`
+
+- Returns up to 7 results sorted by relevance (prefix → word-boundary → substring)
+- Returns `[]` if query < 2 chars
+- No fuzzy matching — deterministic, predictable
+- Callers are responsible for debouncing
+
+### What `registry.js` does NOT do
+
+- Does not replace `database.js` (combat/trade CSV data — different concern)
+- Does not replace `FACTION_REGISTRY` in `state.js` (drives state structure)
+- Does not replace `SKILL_KEYS` in `state.js` (drives state structure)
+- Does not add fields to `state` — registry data is never persisted
+
+### Locked Decisions (see architecture_review.md)
+
+| Decision | Value |
+|----------|-------|
+| Global name | `FALLOUT_REGISTRY` |
+| File name | `js/registry.js` |
+| Category keys | `quests`, `items`, `perks`, `locations`, `companions` |
+| Search function | `registrySearch(category, query)` |
+| Max results | 7 |
+| Min query length | 2 chars |
+| Keywords | Deferred |
 
 ---
 

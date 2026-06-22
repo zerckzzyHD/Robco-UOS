@@ -423,4 +423,6 @@ _Copyright 2075-2077 RobCo Industries_
 
 _Built with vanilla JavaScript, procedural audio, and an unhealthy obsession with CRT aesthetics._
 
+_Game data sourced from the [Independent Fallout Wiki](https://fallout.wiki) under [CC-BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/)._
+
 </div>

@@ -95,6 +95,9 @@ export default [
         attachedImageMimeType: 'writable',
         _buildFactions: 'readonly',
         _saveTimer: 'writable',
+        // Fallout Data Registry (js/registry.js)
+        FALLOUT_REGISTRY: 'readonly',
+        registrySearch: 'readonly',
       },
     },
     rules: {

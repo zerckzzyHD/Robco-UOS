@@ -1,4 +1,4 @@
-const CACHE_NAME = 'robco-terminal-v1.6.4';
+const CACHE_NAME = 'robco-terminal-v1.6.5';
 const ASSETS = [
   './',
   './index.html',
@@ -9,6 +9,7 @@ const ASSETS = [
   './js/database.js',
   './js/state.js',
   './js/ui.js',
+  './js/registry.js',
   './changelog.txt',
 ];
 
