@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  check-and-release:
+    name: Auto-Release on Version Change
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version from state.js
+        id: version
+        run: |
+          VERSION=$(grep -oP "const APP_VERSION\s*=\s*'\K[^']+" js/state.js)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Detected version: $VERSION"
+
+      - name: Check if release already exists
+        id: check
+        run: |
+          if git tag -l "${{ steps.version.outputs.tag }}" | grep -q .; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Release ${{ steps.version.outputs.tag }} already exists — skipping."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "New version detected — creating release."
+          fi
+
+      - name: Extract changelog entry
+        if: steps.check.outputs.exists == 'false'
+        id: changelog
+        run: |
+          # Extract the latest version block from changelog.txt
+          ENTRY=$(sed -n "/^v${{ steps.version.outputs.version }}/,/^v[0-9]/p" changelog.txt | sed '$d')
+          if [ -z "$ENTRY" ]; then
+            ENTRY="Release ${{ steps.version.outputs.tag }}"
+          fi
+          # Write to file to handle multi-line content
+          echo "$ENTRY" > /tmp/release_notes.txt
+
+      - name: Create GitHub Release
+        if: steps.check.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: RobCo U.O.S. ${{ steps.version.outputs.tag }}
+          body_path: /tmp/release_notes.txt
+          generate_release_notes: false

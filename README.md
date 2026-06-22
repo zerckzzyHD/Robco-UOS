@@ -8,7 +8,9 @@
 
 _An AI-powered tactical companion terminal for Fallout: New Vegas_
 
-![Version](https://img.shields.io/badge/version-1.6.4-14fdce?style=flat-square&labelColor=010a07)
+![Version](https://img.shields.io/github/v/release/zerckzzyHD/Robco-UOS?style=flat-square&label=version&color=14fdce&labelColor=010a07)
+![CI](https://img.shields.io/github/actions/workflow/status/zerckzzyHD/Robco-UOS/ci.yml?style=flat-square&label=CI&labelColor=010a07)
+![Deploy](https://img.shields.io/github/actions/workflow/status/zerckzzyHD/Robco-UOS/deploy.yml?style=flat-square&label=deploy&labelColor=010a07)
 ![License](https://img.shields.io/badge/license-ISC-14fdce?style=flat-square&labelColor=010a07)
 ![JavaScript](https://img.shields.io/badge/javascript-ES2022-14fdce?style=flat-square&logo=javascript&logoColor=14fdce&labelColor=010a07)
 ![HTML5](https://img.shields.io/badge/html5-semantic-14fdce?style=flat-square&logo=html5&logoColor=14fdce&labelColor=010a07)
@@ -20,7 +22,7 @@ _An AI-powered tactical companion terminal for Fallout: New Vegas_
 **A full CRT terminal emulation that connects directly to the Gemini API,**
 **turning a browser tab into a living, breathing Pip-Boy companion.**
 
-[Features](#-features) · [Architecture](#-architecture) · [Getting Started](#-getting-started) · [Development](#-development) · [Project History](#-project-history)
+[Live Demo](https://zerckzzyHD.github.io/Robco-UOS/) · [Features](#-features) · [Architecture](#-architecture) · [Getting Started](#-getting-started) · [Development](#-development) · [Project History](#-project-history)
 
 ---
 
@@ -286,10 +288,14 @@ Open the URL shown in your terminal (typically `http://localhost:5173`).
 
 ### Production Deployment
 
-This is a **static site** — no build step required. Deploy the repository root to any static host:
+This is a **static site** — no build step required.
+
+**GitHub Pages** is deployed automatically on every push to `main` via GitHub Actions.
+The live site is available at: **https://zerckzzyHD.github.io/Robco-UOS/**
+
+You can also deploy to any other static host:
 
 - **Netlify** — Drag and drop the folder, or connect the GitHub repo
-- **GitHub Pages** — Enable Pages on the `main` branch
 - **Vercel** — Import the repository
 - **Any HTTP server** — Just serve the files
 
