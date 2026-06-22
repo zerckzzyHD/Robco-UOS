@@ -1498,6 +1498,24 @@ function renderPerks() {
     '</ul>';
 }
 
+function addPerk() {
+  const name = (document.getElementById('newPerkName') || {}).value?.trim();
+  if (!name) return;
+  const rank = parseInt((document.getElementById('newPerkRank') || {}).value) || 1;
+  const levelTaken = parseInt((document.getElementById('newPerkLevel') || {}).value) || 0;
+  if (!state.perks) state.perks = [];
+  const ex = state.perks.find(p => p.name.toLowerCase() === name.toLowerCase());
+  if (ex) {
+    ex.rank = Math.max(ex.rank, rank);
+  } else {
+    state.perks.push({ name, rank, level_taken: levelTaken || null });
+  }
+  document.getElementById('newPerkName').value = '';
+  document.getElementById('newPerkRank').value = '';
+  document.getElementById('newPerkLevel').value = '';
+  loadUI();
+}
+
 // #1 Quest Log — renders state.quests[] as a filterable list
 function renderQuests() {
   const questsDiv = document.getElementById('questsList');
@@ -2082,9 +2100,10 @@ function initRegistryAutocomplete() {
     });
   }
 
-  // Wire the two registry-backed inputs
+  // Wire all three registry-backed inputs
   wireInput('newQuestName', 'quests');
   wireInput('newItemName', 'items');
+  wireInput('newPerkName', 'perks');
 
   // Reposition on scroll/resize so the panel doesn't orphan
   window.addEventListener(
