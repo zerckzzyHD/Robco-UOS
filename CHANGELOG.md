@@ -5,7 +5,7 @@
 ---
 
 ## [v1.6.8] — Implementation Polish: Notes, Status, Squad, and UI Enhancements
-<!-- Date: 2026-06-23 | Tests: 139/139 | Cache: robco-terminal-v1.6.8-r1 -->
+<!-- Date: 2026-06-23 | Tests: 165/165 | Cache: robco-terminal-v1.6.8-r2 -->
 
 ### Added
 - **Campaign Notes enhancements**: Notes now have individual delete buttons. Auto-logged quest events are visually distinct (opacity 0.65). Added UI form to manually add notes.
