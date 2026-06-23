@@ -1384,6 +1384,7 @@ function addItem() {
     document.getElementById('newItemValue').value = '';
     saveState();
     loadUI();
+    expandPanelForCategory('ammo');
     return;
   }
 
