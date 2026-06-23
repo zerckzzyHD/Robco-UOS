@@ -318,11 +318,12 @@ if (!Array.isArray(migrated.quests)) throw new Error('Missing quests array');
 if (!migrated.equipped || migrated.equipped.weapon !== null) throw new Error('Missing equipped object');
 console.log('PASS');
 "@
-        $out = $testScript | node
-        if ($out.Trim() -eq 'PASS') {
+        $out = $testScript | node 2>&1 | Out-String
+        if ($out -match 'PASS') {
             Pass "Node runtime test successful: migrated legacy payload correctly"
         } else {
-            Fail "Node runtime test failed"
+            $err = if ([string]::IsNullOrWhiteSpace($out)) { "No output from node" } else { $out.Trim() }
+            Fail "Node runtime test failed: $err"
         }
     } else {
         Pass "Node not found, skipping runtime execution test"
