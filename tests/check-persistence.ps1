@@ -219,8 +219,8 @@ $dbSrc = Read-Src "js/database.js"
 # 9.1 databaseCSVs global must be declared
 Check ($dbSrc -match 'const databaseCSVs')                          "databaseCSVs global is declared"
 
-# 9.2 getRelevantDbContext function must be declared (legacy utility)
-Check ($dbSrc -match 'function getRelevantDbContext')                "getRelevantDbContext() function is declared"
+# 9.2 lookupItemInDb function must be declared (replaced getRelevantDbContext in v1.6.7)
+Check ($dbSrc -match 'function lookupItemInDb')                      "lookupItemInDb() function is declared"
 
 # 9.3 All required CSV section headers must be present
 $REQUIRED_TABLES = @('[WEAPONS.CSV]','[AMMO.CSV]','[ARMOR.CSV]','[BESTIARY.CSV]',
@@ -229,8 +229,8 @@ foreach ($tbl in $REQUIRED_TABLES) {
     Check ($dbSrc.Contains($tbl)) "database.js contains $tbl section"
 }
 
-# 9.4 [TH] shorthand must be in triggerWords
-Check ($dbSrc -match '\[TH\]')                                       "'[TH]' shorthand is in triggerWords"
+# 9.4 [TH] shorthand must be in api.js invKeywords (triggerWords removed in v1.6.7)
+Check ($apiSrc.Contains("'[TH]'"))                                   "'[TH]' shorthand is in triggerWords"
 
 # 9.5 BESTIARY must have >= 30 data rows (guards against data regression)
 $bestiaryMatch = [regex]::Match($dbSrc, '(?s)\[BESTIARY\.CSV\](.*?)(?=\[|`;)')

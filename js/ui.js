@@ -388,6 +388,7 @@ window.onload = function () {
   setupHpBarInteraction();
   startCrtHum();
   initRegistryAutocomplete();
+  initAmmoDatalist();
 
   // ── TAB STANDBY MODE ───────────────────────────────────────────
   // enterStandby/exitStandby are shared so blur+visibilitychange
@@ -560,10 +561,10 @@ window.onload = function () {
 
   runBootSequence(() => {
     if (needsChangelog) {
-      fetch('changelog.txt')
+      fetch('CHANGELOG.md')
         .then(r => r.text())
         .then(text => {
-          const entries = text.split(/\r?\n(?=v\d+\.\d+)/);
+          const entries = text.split(/\r?\n(?=## \[v\d+\.\d+)/);
           const latestEntry = entries[0] || text;
           document.getElementById('modalTitle').innerText = `> PATCH NOTES: ${APP_VERSION}`;
           document.getElementById('modalContent').innerText = latestEntry.trim();
@@ -980,7 +981,12 @@ function _downloadBlob(content, mimeType, filename) {
 function _updatePanelBadges() {
   const badges = [
     { h2text: '> PERKS', count: (state.perks || []).length },
-    { h2text: '> BACKPACK INVENTORY', count: (state.inventory || []).length },
+    {
+      h2text: '> BACKPACK INVENTORY',
+      // Combined: non-ammo inventory items + tracked ammo calibers
+      count: (state.inventory || []).filter(it => (it.type || 'misc') !== 'ammo').length +
+             Object.values(state.ammo || {}).filter(v => v > 0).length,
+    },
     { h2text: '> SQUAD STATUS', count: (state.squad || []).length },
     { h2text: '> STATUS EFFECTS', count: (state.status || []).filter(s => s.ticks !== 0).length },
     { h2text: '> CAMPAIGN NOTES', count: (state.campaign_notes || []).length },
@@ -1020,6 +1026,7 @@ function expandPanelForCategory(categoryKey) {
     perks: '> PERKS',
     factions: '> FACTION STANDING',
     quests: '> QUEST LOG',
+    ammo: '> BACKPACK INVENTORY', // ammo lives in the sub-panel inside BACKPACK
     equipped: '> EQUIPPED',
   };
   const target = map[categoryKey];
@@ -1038,10 +1045,15 @@ function expandPanelForCategory(categoryKey) {
       localStorage.setItem('robco_panel_state', JSON.stringify(ps));
     }
   }
+  // For ammo, also open the nested ammo sub-panel
+  if (categoryKey === 'ammo') {
+    const subPanel = document.getElementById('ammoSubPanel');
+    if (subPanel && !subPanel.open) subPanel.setAttribute('open', '');
+  }
 }
 
 function showFullChangelog() {
-  fetch('changelog.txt')
+  fetch('CHANGELOG.md')
     .then(r => r.text())
     .then(text => {
       document.getElementById('modalTitle').innerText = '> SYSTEM CHANGELOG — ALL VERSIONS';
@@ -1145,6 +1157,7 @@ function loadUI() {
   });
   updateKarmaUI();
   renderInventory();
+  renderAmmo();
   renderSquad();
   renderStatus();
   renderCampaignNotes();
@@ -1218,7 +1231,12 @@ function updateMath() {
   let maxAp = 65 + state.a * 3;
   document.getElementById('display_ap').innerText = maxAp;
   let maxWeight = 150 + state.s * 10;
-  let curWt = state.inventory.reduce((acc, item) => acc + item.qty * item.wgt, 0);
+  // Exclude ammo-typed items from carry weight — ammo items that leaked into
+  // state.inventory from old saves would be invisible (filtered from render)
+  // but would still add phantom weight without this filter.
+  let curWt = state.inventory
+    .filter(item => (item.type || 'misc') !== 'ammo')
+    .reduce((acc, item) => acc + item.qty * item.wgt, 0);
   document.getElementById('display_weight').innerText = `${curWt.toFixed(1)} / ${maxWeight}`;
   document.getElementById('display_weight').style.color =
     curWt > maxWeight ? 'var(--robco-danger)' : 'var(--robco-green)';
@@ -1355,8 +1373,28 @@ function addItem() {
   // Auto-set type from DB if user left it on the default 'misc'
   if (t === 'misc' && dbEntry && dbEntry.type) t = dbEntry.type;
 
+  // ── AMMO ROUTING ────────────────────────────────────────────────
+  // If the resolved type is 'ammo', route to state.ammo (sub-panel) instead of inventory
+  if (t === 'ammo') {
+    if (!state.ammo) state.ammo = {};
+    state.ammo[n] = (state.ammo[n] || 0) + q;
+    document.getElementById('newItemName').value = '';
+    document.getElementById('newItemQty').value = '';
+    document.getElementById('newItemWeight').value = '';
+    document.getElementById('newItemValue').value = '';
+    saveState();
+    loadUI();
+    return;
+  }
+
   let ex = state.inventory.find(i => i.name.toLowerCase() === n.toLowerCase());
-  if (ex) ex.qty += q;
+  if (ex) {
+    ex.qty += q;
+    // Retroactively correct weight/value if the existing entry had 0 and the new add has real data
+    if (ex.wgt === 0 && w > 0) ex.wgt = w;
+    if (ex.val === 0 && v > 0) ex.val = v;
+    if (ex.type === 'misc' && t !== 'misc') ex.type = t;
+  }
   else state.inventory.push({ name: n, qty: q, wgt: w, val: v, type: t });
   document.getElementById('newItemName').value = '';
   document.getElementById('newItemQty').value = '';
@@ -1380,11 +1418,16 @@ function renderInventory() {
     ammo: 'var(--robco-alert)',
     misc: 'var(--robco-alert)',
   };
-  lst.innerHTML = state.inventory
-    .map((it, i) => {
+  // Filter ammo-typed items — they render in the ammo sub-panel
+  // Map with original index FIRST so data-idx and data-use stay correct after filter
+  const displayItems = state.inventory
+    .map((it, idx) => ({ ...it, _origIdx: idx }))
+    .filter(it => (it.type || 'misc') !== 'ammo');
+  lst.innerHTML = displayItems
+    .map(it => {
       const cat = (it.type || 'misc').toLowerCase();
       const typeTag = `<span style="font-size:9px;opacity:0.7;margin-right:3px;color:${typeColors[cat] || 'inherit'};">[${cat.toUpperCase()}]</span>`;
-      return `<li><button class="use-btn" data-use="${i}" title="Quick-use: send [USE] ${escapeHtml(it.name)}">USE</button>${typeTag}<span>${it.qty}x ${escapeHtml(it.name)} (${it.wgt || 0} lb${it.val ? ' · ' + it.val + 'c' : ''})</span> <button class="delete-btn" data-idx="${i}">X</button></li>`;
+      return `<li><button class="use-btn" data-use="${it._origIdx}" title="Quick-use: send [USE] ${escapeHtml(it.name)}">USE</button>${typeTag}<span>${it.qty}x ${escapeHtml(it.name)} (${it.wgt || 0} lb${it.val ? ' · ' + it.val + 'c' : ''})</span> <button class="delete-btn" data-idx="${it._origIdx}">X</button></li>`;
     })
     .join('');
   lst.onclick = e => {
@@ -1401,6 +1444,53 @@ function renderInventory() {
       transmitMessage();
     }
   };
+}
+
+// ── AMMO RESERVES ──────────────────────────────────────────────
+function renderAmmo() {
+  const ammoDiv = document.getElementById('ammoList');
+  if (!ammoDiv) return;
+  const ammoObj = state.ammo || {};
+  const entries = Object.entries(ammoObj).filter(([, count]) => count > 0);
+  if (entries.length === 0) {
+    ammoDiv.innerHTML = '<span style="color: rgba(20,253,206,0.5)">No Ammo Tracked</span>';
+    return;
+  }
+  // Sort alphabetically by caliber name
+  entries.sort((a, b) => a[0].localeCompare(b[0]));
+  ammoDiv.innerHTML =
+    '<div style="display:grid;grid-template-columns:1fr auto auto;gap:2px 8px;font-size:11px;">' +
+    entries
+      .map(
+        ([caliber, count]) =>
+          `<span style="opacity:0.8;">${escapeHtml(caliber)}</span>` +
+          `<span style="text-align:right;">${count}</span>` +
+          `<button class="delete-btn" style="font-size:9px;padding:0 4px;" onclick="removeAmmo('${escapeHtml(caliber).replace(/'/g, '&#39;')}')" title="Remove">X</button>`
+      )
+      .join('') +
+    '</div>';
+}
+
+function addAmmo() {
+  const typeEl = document.getElementById('newAmmoType');
+  const countEl = document.getElementById('newAmmoCount');
+  if (!typeEl || !typeEl.value.trim()) return;
+  const caliber = typeEl.value.trim();
+  const count = parseInt(countEl.value) || 0;
+  if (count <= 0) return;
+  if (!state.ammo) state.ammo = {};
+  state.ammo[caliber] = (state.ammo[caliber] || 0) + count;
+  typeEl.value = '';
+  countEl.value = '';
+  saveState();
+  loadUI();
+}
+
+function removeAmmo(caliber) {
+  if (!state.ammo) return;
+  delete state.ammo[caliber];
+  saveState();
+  loadUI();
 }
 
 function renderSquad() {
@@ -2129,4 +2219,15 @@ function initRegistryAutocomplete() {
       acPosition(_acCurrentInput);
     }
   });
+}
+
+// ── AMMO DATALIST ─────────────────────────────────────────────────────────
+// Populates the #ammoCalibers <datalist> with unique caliber names from
+// AMMO.CSV in database.js. Called once on window.onload.
+function initAmmoDatalist() {
+  const dl = document.getElementById('ammoCalibers');
+  if (!dl) return;
+  if (typeof getAmmoCalibers !== 'function') return;
+  const calibers = getAmmoCalibers();
+  dl.innerHTML = calibers.map(c => `<option value="${c}"></option>`).join('');
 }
