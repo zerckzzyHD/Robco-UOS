@@ -400,7 +400,9 @@ function autoImportState(jsonString) {
         const prev = questsBefore.find(bq => bq.name.toLowerCase() === curr.name.toLowerCase());
         if (prev && prev.status !== curr.status) {
           if (!state.campaign_notes) state.campaign_notes = [];
-          state.campaign_notes.push(`[T${state.ticks || 0}] Quest: "${curr.name}" → ${curr.status.toUpperCase()}`);
+          state.campaign_notes.push(
+            `[T${state.ticks || 0}] Quest: "${curr.name}" → ${curr.status.toUpperCase()}`
+          );
         }
       });
     }
@@ -444,8 +446,12 @@ function autoImportState(jsonString) {
         ['la', 'ra', 'll', 'rl', 'hd'].forEach(k => {
           if (before[k] !== state[k]) changes.push(`${k.toUpperCase()}: ${before[k]}→${state[k]}`);
         });
-        const oldInvCount = (before.inventory || []).filter(it => (it.type || 'misc') !== 'ammo').length;
-        const newInvCount = (state.inventory || []).filter(it => (it.type || 'misc') !== 'ammo').length;
+        const oldInvCount = (before.inventory || []).filter(
+          it => (it.type || 'misc') !== 'ammo'
+        ).length;
+        const newInvCount = (state.inventory || []).filter(
+          it => (it.type || 'misc') !== 'ammo'
+        ).length;
         if (oldInvCount !== newInvCount)
           changes.push(`inventory: ${oldInvCount}→${newInvCount} items`);
         // Ammo round delta
@@ -529,6 +535,20 @@ function autoImportState(jsonString) {
       }
     }
 
+    // ── GAME CONTEXT (v2.0) ────────────────────────────────────
+    // Only accept valid context strings. AI directive does not return gameContext,
+    // so this guard only activates on save-file imports.
+    const gcV = _g(parsed, 'gameContext');
+    if (gcV === 'FNV' || gcV === 'FO3') state.gameContext = gcV;
+
+    // ── COLLECTIBLES (v2.0) ──────────────────────────────────
+    // Flat array of collected item name strings. Registry defines what names are valid;
+    // state only tracks which have been found. DLC collectibles slot in via registry only.
+    if (parsed.collectibles && Array.isArray(parsed.collectibles)) {
+      state.collectibles = parsed.collectibles.filter(
+        c => typeof c === 'string' && c.trim().length > 0
+      );
+    }
     loadUI();
     appendToChat('> PIP-BOY DATA SYNCED WITH ROBCO MAINFRAME <<', 'sys', true);
 
@@ -547,6 +567,7 @@ function autoImportState(jsonString) {
         'factions',
         'quests',
         'equipped',
+        'collectibles', // v2.0
       ].forEach(cat => {
         const before = JSON.parse(window._lastStateBeforeSync || '{}');
         const bArr = Array.isArray(before[cat])

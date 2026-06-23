@@ -984,8 +984,9 @@ function _updatePanelBadges() {
     {
       h2text: '> BACKPACK INVENTORY',
       // Combined: non-ammo inventory items + tracked ammo calibers
-      count: (state.inventory || []).filter(it => (it.type || 'misc') !== 'ammo').length +
-             Object.values(state.ammo || {}).filter(v => v > 0).length,
+      count:
+        (state.inventory || []).filter(it => (it.type || 'misc') !== 'ammo').length +
+        Object.values(state.ammo || {}).filter(v => v > 0).length,
     },
     { h2text: '> SQUAD STATUS', count: (state.squad || []).length },
     { h2text: '> STATUS EFFECTS', count: (state.status || []).length },
@@ -1412,8 +1413,7 @@ function addItem() {
     if (ex.wgt === 0 && w > 0) ex.wgt = w;
     if (ex.val === 0 && v > 0) ex.val = v;
     if (ex.type === 'misc' && t !== 'misc') ex.type = t;
-  }
-  else state.inventory.push({ name: n, qty: q, wgt: w, val: v, type: t });
+  } else state.inventory.push({ name: n, qty: q, wgt: w, val: v, type: t });
   document.getElementById('newItemName').value = '';
   document.getElementById('newItemQty').value = '';
   document.getElementById('newItemWeight').value = '';
@@ -1565,23 +1565,23 @@ function addSquadMember() {
   const nameInput = document.getElementById('newSquadName');
   if (!nameInput || !nameInput.value.trim()) return;
   if (!state.squad) state.squad = [];
-  
+
   const name = nameInput.value.trim();
   const existing = state.squad.find(m => m.name.toLowerCase() === name.toLowerCase());
   if (existing) {
     nameInput.value = '';
     return;
   }
-  
+
   state.squad.push({
     name: name,
     hp: 100,
     hpMax: 100,
-    weapon: "Unarmed",
+    weapon: 'Unarmed',
     ammo: 0,
-    condition: "OK"
+    condition: 'OK',
   });
-  
+
   nameInput.value = '';
   loadUI();
 }
@@ -1645,11 +1645,11 @@ function addStatusEffect() {
   const typeSelect = document.getElementById('newStatusType');
   if (!nameInput || !nameInput.value.trim()) return;
   if (!state.status) state.status = [];
-  
+
   const ticks = parseInt(ticksInput.value) || 0;
   const name = nameInput.value.trim();
   const type = (typeSelect ? typeSelect.value : 'BUFF').toUpperCase();
-  
+
   const existing = state.status.find(e => e.name.toLowerCase() === name.toLowerCase());
   if (existing) {
     existing.ticks = ticks;
@@ -1657,7 +1657,7 @@ function addStatusEffect() {
   } else {
     state.status.push({ name, ticks, type });
   }
-  
+
   nameInput.value = '';
   if (ticksInput) ticksInput.value = '';
   loadUI();
@@ -1774,11 +1774,13 @@ function renderCampaignNotes() {
   }
   notesDiv.innerHTML =
     '<ul class="notes-list">' +
-    state.campaign_notes.map((note, i) => {
-      const isAutoLog = /^\[T\d+\]/.test(note);
-      const opacity = isAutoLog ? '0.65' : '1';
-      return `<li style="opacity:${opacity};">${escapeHtml(String(note))}<button class="delete-btn" style="float:right;" onclick="removeCampaignNote(${i})">X</button></li>`;
-    }).join('') +
+    state.campaign_notes
+      .map((note, i) => {
+        const isAutoLog = /^\[T\d+\]/.test(note);
+        const opacity = isAutoLog ? '0.65' : '1';
+        return `<li style="opacity:${opacity};">${escapeHtml(String(note))}<button class="delete-btn" style="float:right;" onclick="removeCampaignNote(${i})">X</button></li>`;
+      })
+      .join('') +
     '</ul>';
 }
 
@@ -2307,7 +2309,6 @@ function initRegistryAutocomplete() {
   wireInput('newQuestName', 'quests');
   wireInput('newItemName', 'items');
   wireInput('newPerkName', 'perks');
-
 
   // Reposition on scroll/resize so the panel doesn't orphan
   window.addEventListener(

@@ -116,7 +116,8 @@ Sep "Suite 0 -- Parser sanity (guards against test regression)"
 $KNOWN = @('lvl','xp','hpCur','hpMax','s','p','e','c','i','a','l',
            'caps','loc','rads','karma','ticks',
            'la','ra','ll','rl','hd',
-           'factions','skills','status','inventory','squad','campaign_notes','locationHistory')
+           'factions','skills','status','inventory','squad','campaign_notes','locationHistory',
+           'gameContext','collectibles')  # v2.0 fields
 foreach ($k in $KNOWN) { Check ($stateKeys -contains $k) "Parser found known key: state.$k" }
 
 # ===========================================================

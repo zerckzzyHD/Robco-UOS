@@ -462,8 +462,8 @@ details.sub-panel[open] > summary h3::after {
   display: grid;
   grid-template-columns: auto 1fr;
   grid-template-areas:
-    "dpad input"
-    "dpad buttons";
+    'dpad input'
+    'dpad buttons';
   gap: 5px 15px;
   margin-top: 10px;
   margin-bottom: 10px;
@@ -473,8 +473,8 @@ details.sub-panel[open] > summary h3::after {
 }
 .tactical-dashboard:has(details:not([open])) {
   grid-template-areas:
-    "dpad input"
-    "buttons buttons";
+    'dpad input'
+    'buttons buttons';
 }
 .d-pad {
   display: flex;

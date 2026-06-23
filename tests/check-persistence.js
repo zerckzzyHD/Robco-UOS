@@ -404,10 +404,7 @@ const dbSource = readFile('js/database.js');
 assert(/const\s+databaseCSVs/.test(dbSource), 'databaseCSVs global is declared');
 
 // 9.2 lookupItemInDb function must be declared (item weight/value cache)
-assert(
-  /function\s+lookupItemInDb\s*\(/.test(dbSource),
-  'lookupItemInDb() function is declared'
-);
+assert(/function\s+lookupItemInDb\s*\(/.test(dbSource), 'lookupItemInDb() function is declared');
 
 // 9.3 All required CSV section headers must be present
 const REQUIRED_TABLES = [
@@ -486,12 +483,40 @@ try {
 } catch (e) {
   fail(`Cannot extract migrateState: ${e.message}`);
 }
-const legacyKeys = ['lvl','xp','hpCur','hpMax','s','p','e','c','i','a','l',
-                'caps','loc','rads','karma','ticks',
-                'la','ra','ll','rl','hd','status','inventory','squad','campaign_notes','skills'];
+const legacyKeys = [
+  'lvl',
+  'xp',
+  'hpCur',
+  'hpMax',
+  's',
+  'p',
+  'e',
+  'c',
+  'i',
+  'a',
+  'l',
+  'caps',
+  'loc',
+  'rads',
+  'karma',
+  'ticks',
+  'la',
+  'ra',
+  'll',
+  'rl',
+  'hd',
+  'status',
+  'inventory',
+  'squad',
+  'campaign_notes',
+  'skills',
+];
 for (const key of stateKeys) {
   if (!legacyKeys.includes(key)) {
-    assert(new RegExp(`s\\.${key}\\b`).test(migrateBody), `New field state.${key} has migration check in migrateState()`);
+    assert(
+      new RegExp(`s\\.${key}\\b`).test(migrateBody),
+      `New field state.${key} has migration check in migrateState()`
+    );
   }
 }
 
@@ -505,17 +530,38 @@ try {
   vm.createContext(sandbox);
   vm.runInContext(stateSource, sandbox);
   const v1Payload = {
-    lvl: 1, xp: 0, hpCur: 100, hpMax: 100,
-    s: 5, p: 5, e: 5, c: 5, i: 5, a: 5, l: 5,
-    nf: 50, ni: 0, lf: -10, li: 0 // Legacy faction data
+    lvl: 1,
+    xp: 0,
+    hpCur: 100,
+    hpMax: 100,
+    s: 5,
+    p: 5,
+    e: 5,
+    c: 5,
+    i: 5,
+    a: 5,
+    l: 5,
+    nf: 50,
+    ni: 0,
+    lf: -10,
+    li: 0, // Legacy faction data
   };
   const migrated = sandbox.migrateState('1.0.0', v1Payload);
   assert(migrated.factions && migrated.factions.ncr, 'Migrated state has structured factions.ncr');
-  assert(migrated.factions && migrated.factions.ncr.fame === 50, 'Migrated state preserved ncr fame (50)');
-  assert(migrated.factions && migrated.factions.legion.fame === -10, 'Migrated state preserved legion fame (-10)');
+  assert(
+    migrated.factions && migrated.factions.ncr.fame === 50,
+    'Migrated state preserved ncr fame (50)'
+  );
+  assert(
+    migrated.factions && migrated.factions.legion.fame === -10,
+    'Migrated state preserved legion fame (-10)'
+  );
   assert(Array.isArray(migrated.perks), 'Migrated state added perks array');
   assert(Array.isArray(migrated.quests), 'Migrated state added quests array');
-  assert(migrated.equipped && migrated.equipped.weapon === null, 'Migrated state added equipped object');
+  assert(
+    migrated.equipped && migrated.equipped.weapon === null,
+    'Migrated state added equipped object'
+  );
 } catch (e) {
   fail(`Runtime test failed: ${e.message}`);
 }
@@ -525,7 +571,9 @@ try {
 // ══════════════════════════════════════════════════════════════
 header('Service Worker Cache Guard (Protocol 1)');
 try {
-  const stagedStr = require('child_process').execSync('git diff --cached --name-only', { encoding: 'utf8' });
+  const stagedStr = require('child_process').execSync('git diff --cached --name-only', {
+    encoding: 'utf8',
+  });
   const staged = stagedStr.split('\n').filter(Boolean);
   const triggerStaged = staged.some(
     f => f === 'index.html' || f.startsWith('js/') || f.startsWith('css/')

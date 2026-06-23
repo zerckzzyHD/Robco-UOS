@@ -75,6 +75,10 @@ let state = {
   ammo: {},
   stats: { kills: 0, capsEarned: 0, damageDealt: 0, sessionStart: Date.now() },
   locationHistory: [],
+  // v2.0 fields
+  gameContext: 'FNV',     // 'FNV' | 'FO3' — set at boot, governs registry/AI context
+  collectibles: [],       // flat string[] of collected item names (game-context-aware)
+                          // DLC expansion adds entries to the registry only; no state schema change required
 };
 
 let chatHistory = [];
@@ -218,6 +222,9 @@ function migrateState(version, s) {
   if (!s.ammo) s.ammo = {};
   if (!s.stats) s.stats = { kills: 0, capsEarned: 0, damageDealt: 0, sessionStart: Date.now() };
   if (!s.locationHistory) s.locationHistory = []; // v1.6.8
+  // v2.0: dual-game context and collectibles tracker
+  if (!s.gameContext) s.gameContext = 'FNV';
+  if (!s.collectibles) s.collectibles = [];
   delete s.macros; // v1.6.7: macros removed — D-Pad handles this natively
   return s;
 }

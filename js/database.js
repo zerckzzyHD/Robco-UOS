@@ -546,7 +546,9 @@ function getAmmoCalibers() {
   if (start === -1) return [];
   const nextSection = databaseCSVs.indexOf('\n[', start + 10);
   const block = databaseCSVs.substring(start, nextSection === -1 ? undefined : nextSection);
-  const lines = block.split('\n').filter(l => l.trim() && !l.startsWith('[') && !l.startsWith('Caliber'));
+  const lines = block
+    .split('\n')
+    .filter(l => l.trim() && !l.startsWith('[') && !l.startsWith('Caliber'));
   const seen = new Set();
   lines.forEach(line => {
     const caliber = (line.split(',')[0] || '').trim();
