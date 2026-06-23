@@ -459,13 +459,22 @@ details.sub-panel[open] > summary h3::after {
 
 /* Tactical Command Dashboard */
 .tactical-dashboard {
-  display: flex;
-  gap: 15px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    "dpad input"
+    "dpad buttons";
+  gap: 5px 15px;
   margin-top: 10px;
   margin-bottom: 10px;
   padding: 10px;
   border: 1px dashed var(--robco-blue);
   background: rgba(0, 0, 0, 0.4);
+}
+.tactical-dashboard:has(details:not([open])) {
+  grid-template-areas:
+    "dpad input"
+    "buttons buttons";
 }
 .d-pad {
   display: flex;
@@ -494,12 +503,7 @@ details.sub-panel[open] > summary h3::after {
   display: flex;
   gap: 4px;
 }
-.macro-actions {
-  flex-grow: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
+/* .macro-actions styles removed for grid layout */
 
 /* Phase 6 & 9 Modals and VATS */
 .modal-grid-map {

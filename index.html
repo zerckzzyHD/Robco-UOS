@@ -1398,8 +1398,8 @@
             </div>
 
             <div class="tactical-dashboard">
-              <details style="align-self: start;" open>
-                <summary style="font-size: 11px; margin-bottom: 5px; color: var(--robco-blue); border-bottom: 1px dashed var(--robco-blue); padding-bottom: 2px; cursor: pointer;">
+                <details style="align-self: start; grid-area: dpad;" open>
+                  <summary style="font-size: 11px; margin-bottom: 5px; color: var(--robco-blue); border-bottom: 1px dashed var(--robco-blue); padding-bottom: 2px; cursor: pointer;">
                   [+] D-PAD
                 </summary>
                 <div class="d-pad" style="margin-right: 15px;">
@@ -1410,9 +1410,9 @@
                   </div>
                   <button class="action-btn" onclick="macroCommand('[PAD: DOWN]')">▼</button>
                 </div>
-              </details>
-              <div class="macro-actions">
-                <input
+                </details>
+                <div class="macro-actions" style="grid-area: input;">
+                  <input
                   type="text"
                   id="macroTarget"
                   placeholder="Target / Item..."
@@ -1422,8 +1422,9 @@
                     width: 100%;
                     margin-bottom: 5px;
                   "
-                />
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px">
+                  />
+                </div>
+                <div class="macro-buttons" style="grid-area: buttons; display: grid; grid-template-columns: 1fr 1fr; gap: 5px">
                   <button
                     class="action-btn"
                     style="margin: 0; color: var(--robco-blue); border-color: var(--robco-blue)"

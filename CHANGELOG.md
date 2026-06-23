@@ -1,6 +1,6 @@
 ## [v1.6.8] — Implementation Polish: Notes, Status, Squad, and UI Enhancements
 
-<!-- Date: 2026-06-23 | Tests: 165/165 | Cache: robco-terminal-v1.6.8-r4 -->
+<!-- Date: 2026-06-23 | Tests: 165/165 | Cache: robco-terminal-v1.6.8-r5 -->
 
 ### Added
 
@@ -17,11 +17,12 @@
 - **GPS/MAP title logic**: Removed redundant map title fallback detection (`getLegacyTitle()`) in `api.js` modal handler. Now exclusively relies on `mType === 'GPS'`.
 - **ARCHITECTURE.md references**: Updated stale `getRelevantDbContext` reference to `lookupItemInDb` and corrected `changelog.txt` to `CHANGELOG.md`.
 - **Input box cutoff**: Increased min-width of number inputs across UI panels so placeholder text (Qty, lbs, val, Rank, Lvl) is fully visible instead of cutting off behind spin buttons.
+- **Tactical Dashboard layout**: Converted `.tactical-dashboard` to CSS Grid. When the D-PAD details panel is closed, the combat/macro buttons (`[THREAT]`, `[VATS]`, etc.) now flow dynamically to the left to fill the empty space below the D-PAD header.
 
 ### Internal
 
 - **Tests**: 165/165 passing (JS runner) / 161/161 passing (PS1 runner). Added 4 new automated suites: DOM ID Binding (`syncStateFromDom`), Protocol 4 Migration Enforcement, `migrateState()` Node.js Runtime Execution, and Service Worker Cache Guard. Added `state.skills` to legacy keys exclusion list.
-- **Cache**: Bumped Service Worker cache to `robco-terminal-v1.6.8-r4`.
+- **Cache**: Bumped Service Worker cache to `robco-terminal-v1.6.8-r5`.
 - **Version**: App bumped to 1.6.8.
 
 ---
