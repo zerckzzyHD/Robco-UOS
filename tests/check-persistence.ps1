@@ -297,10 +297,12 @@ Sep "Suite 12 -- migrateState() Runtime Execution"
 try {
     $nodeCheck = Get-Command node -ErrorAction SilentlyContinue
     if ($nodeCheck) {
+        $repoRoot = (Get-Item $PSScriptRoot).Parent.FullName
+        $statePathNode = (Join-Path $repoRoot "js/state.js").Replace('\', '/')
         $testScript = @"
 const vm = require('vm');
 const fs = require('fs');
-const stateSource = fs.readFileSync('js/state.js', 'utf8');
+const stateSource = fs.readFileSync('$statePathNode', 'utf8');
 const sandbox = { window: {} };
 vm.createContext(sandbox);
 vm.runInContext(stateSource, sandbox);
