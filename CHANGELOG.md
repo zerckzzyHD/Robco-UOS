@@ -1,6 +1,6 @@
 ## [v1.6.8] — Implementation Polish: Notes, Status, Squad, and UI Enhancements
 
-<!-- Date: 2026-06-23 | Tests: 165/165 | Cache: robco-terminal-v1.6.8-r3 -->
+<!-- Date: 2026-06-23 | Tests: 165/165 | Cache: robco-terminal-v1.6.8-r4 -->
 
 ### Added
 
@@ -16,12 +16,12 @@
 - **Status Effects badge filtering**: Removed `.filter(s => s.ticks !== 0)` logic from `_updatePanelBadges` to allow permanent status effects to be correctly counted in the panel badge.
 - **GPS/MAP title logic**: Removed redundant map title fallback detection (`getLegacyTitle()`) in `api.js` modal handler. Now exclusively relies on `mType === 'GPS'`.
 - **ARCHITECTURE.md references**: Updated stale `getRelevantDbContext` reference to `lookupItemInDb` and corrected `changelog.txt` to `CHANGELOG.md`.
-- **Input box cutoff**: Increased min-width of number inputs across UI panels so placeholder text (Qty, lbs, val, Rank, Lv) is fully visible instead of cutting off behind spin buttons.
+- **Input box cutoff**: Increased min-width of number inputs across UI panels so placeholder text (Qty, lbs, val, Rank, Lvl) is fully visible instead of cutting off behind spin buttons.
 
 ### Internal
 
 - **Tests**: 165/165 passing (JS runner) / 161/161 passing (PS1 runner). Added 4 new automated suites: DOM ID Binding (`syncStateFromDom`), Protocol 4 Migration Enforcement, `migrateState()` Node.js Runtime Execution, and Service Worker Cache Guard. Added `state.skills` to legacy keys exclusion list.
-- **Cache**: Bumped Service Worker cache to `robco-terminal-v1.6.8-r3`.
+- **Cache**: Bumped Service Worker cache to `robco-terminal-v1.6.8-r4`.
 - **Version**: App bumped to 1.6.8.
 
 ---
@@ -905,4 +905,4 @@
 
 ---
 
-_All game data sourced from [fallout.wiki](https://fallout.wiki) (CC-BY-SA 4.0)._
+> All game data sourced from [fallout.wiki](https://fallout.wiki) (CC-BY-SA 4.0).
