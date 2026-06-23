@@ -536,7 +536,7 @@ try {
   } else {
     pass('No UI/JS changes staged (SW bump not required)');
   }
-} catch (e) {
+} catch {
   pass('Git diff skipped (not running in staged environment)');
 }
 
