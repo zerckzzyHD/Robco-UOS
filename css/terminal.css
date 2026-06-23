@@ -391,6 +391,41 @@ details.panel:not([open]) summary h2 {
   margin-bottom: 0;
   border-bottom: none;
 }
+
+/* ─── Sub-Panel (nested <details> inside a top-level panel) ──────── */
+/* Used by AMMO RESERVES nested inside BACKPACK INVENTORY */
+details.sub-panel {
+  margin-top: 10px;
+  border-top: 1px dashed rgba(20, 253, 206, 0.4);
+  padding-top: 6px;
+}
+details.sub-panel > summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+  padding: 2px 0;
+}
+details.sub-panel > summary::-webkit-details-marker {
+  display: none;
+}
+details.sub-panel > summary h3 {
+  display: inline;
+  font-size: 12px;
+  font-weight: normal;
+  letter-spacing: 1px;
+  margin: 0;
+  opacity: 0.85;
+}
+details.sub-panel > summary h3::after {
+  content: ' [+]';
+  font-family: monospace;
+  font-size: 11px;
+}
+details.sub-panel[open] > summary h3::after {
+  content: ' [-]';
+}
+
 .modal-box {
   background: rgba(2, 28, 20, 0.95);
   border: 2px solid var(--robco-green);

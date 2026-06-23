@@ -1,7 +1,6 @@
 // Localized Database String — Fallout: New Vegas canonical data (fallout.wiki, CC-BY-SA 4.0)
-// NOTE: getRelevantDbContext() is retained as a legacy utility.
-// As of v1.6.6, databaseCSVs is injected via systemInstruction for guaranteed
-// model attention. This function is no longer called from transmitMessage().
+// v1.6.7: Expanded to ~170 weapons, ~70 armors, ~45 chems.
+// databaseCSVs is injected via systemInstruction in api.js for guaranteed model attention.
 const databaseCSVs = `
 [WEAPONS.CSV]
 Weapon_Name,Base_Damage,Crit_Damage,Crit_Multiplier,Attacks_Per_Second,Weight,Value,Req_Unarmed,Req_STR,Reach,Special_Attack_AP,Special_Rules,Ammo_Type
@@ -58,6 +57,108 @@ Frag Grenade,50,50,1.0,1.0,1,100,0,0,0,0,Splash,None
 Plasma Grenade,80,80,1.0,1.0,1,200,0,0,0,0,Splash,None
 Incendiary Grenade,15,15,1.0,1.0,1,150,0,0,0,0,Fire DoT,None
 Bottlecap Mine,200,200,1.0,1.0,0,75,0,0,0,0,Triggered/Splash,None
+Bear Trap Fist,28,28,1.0,1.4,1,1200,50,5,0.7,30,Cripple,None
+Corrosive Glove,22,22,1.0,1.5,1,800,50,4,0.6,25,Acid DoT,None
+Cram Opener,20,20,1.0,1.8,1,500,0,3,0.6,20,None,None
+Displacer Glove,32,32,1.5,1.4,2,2000,75,5,0.7,30,Knockback,None
+Fist of Rawr,60,60,2.0,1.2,4,3000,100,7,1.0,40,None,None
+Mantis Gauntlet,28,28,1.0,1.3,1,1500,50,5,0.8,30,Poison,None
+Pushy,45,45,1.0,1.6,3,3000,75,6,0.7,35,Knockback,None
+Rebound,40,40,1.0,1.5,2,2500,75,5,0.7,35,None,None
+Saturnite Fist,40,40,1.0,1.6,2,800,50,5,0.6,30,None,None
+Zap Glove,20,20,1.5,1.5,1,600,50,4,0.6,25,EMP,None
+Blade of the East,75,75,1.0,1.5,6,4000,0,7,1.0,35,None,None
+Bowie Knife,18,18,2.0,2.8,1,100,0,0,0.6,20,None,None
+Broad Machete,22,22,1.0,2.3,2,200,0,5,0.7,25,None,None
+Chance's Knife,22,22,2.0,3.0,1,750,0,0,0.6,25,None,None
+Figaro,20,20,2.0,3.5,0.5,2000,0,0,0.5,20,None,None
+Katana,35,35,2.0,1.5,3,2000,0,5,0.9,30,None,None
+Machete Gladius,36,36,1.0,1.5,3,1500,0,6,0.8,30,None,None
+Shishkebab,45,45,1.5,1.5,3,2000,0,5,0.9,30,Fire DoT,None
+Straight Razor,12,12,2.0,3.5,0.5,100,0,0,0.5,15,Bleed,None
+Throwing Knife,6,6,1.0,1.0,0.5,15,0,0,0.5,0,Thrown,None
+Throwing Knife Spear,22,22,1.0,1.0,2,35,0,0,0.5,0,Thrown,None
+Baseball Bat,24,24,1.0,1.8,3,150,0,4,1.0,25,None,None
+Bumper Sword,40,40,1.0,1.5,4,1500,0,7,1.0,30,None,None
+Golf Club,18,18,1.0,2.0,2,75,0,3,1.1,20,None,None
+Oh Baby!,80,80,1.0,1.0,12,10000,0,8,1.2,45,None,None
+Pool Cue,12,12,1.0,2.5,2,15,0,2,1.2,20,None,None
+Sledgehammer,36,36,1.0,1.0,8,100,0,7,1.2,40,Knockdown,None
+Super Sledge,80,80,1.5,1.0,15,10000,0,8,1.2,55,Knockdown,None
+Thermic Lance,80,80,1.0,1.0,6,5000,0,8,1.0,40,Fire DoT,None
+Tire Iron,18,18,1.0,2.0,3,15,0,4,1.0,25,None,None
+Two-Step Goodbye,75,75,1.5,1.0,10,8000,0,8,1.2,50,Explosion,None
+War Club,42,42,1.0,1.3,5,1000,0,6,1.1,35,None,None
+Hunting Revolver,50,55,2.0,1.0,4,750,0,5,0,0,None,.44 Magnum
+.45 Auto Pistol,28,28,1.5,1.4,2,700,0,4,0,0,None,.45 Auto
+5.56mm Pistol,20,20,1.0,1.5,2,850,0,3,0,0,None,5.56mm
+A Light Shining in Darkness,30,30,1.5,2.0,2,5000,0,3,0,0,None,.45 Auto
+Li'l Devil,32,32,2.0,1.8,1,6000,0,2,0,0,None,.357 Magnum
+Maria,18,18,2.0,1.8,2,800,0,2,0,0,None,9mm
+Police Pistol,30,30,1.5,1.4,2,600,0,3,0,0,None,.38 Spl
+Ranger Sequoia,62,62,2.0,1.0,4,8000,0,6,0,0,None,.45-70 Gov't
+Silenced .22 Pistol,8,16,2.0,2.0,1,600,0,2,0,0,Silenced,.22 LR
+That Gun,50,50,2.0,0.9,2,450,0,5,0,0,None,5.56mm
+Weathered 10mm Pistol,18,18,1.0,1.8,2,300,0,2,0,0,None,10mm
+Abilene Kid LE BB Gun,4,8,2.0,2.0,2,8000,0,1,0,0,None,BB
+Assault Carbine,20,20,1.0,3.0,5,3500,0,4,0,0,None,5mm
+Automatic Rifle,35,35,1.0,2.0,12,5000,0,6,0,0,Full Auto,.30 Cal
+Battle Rifle,50,50,2.0,1.3,6,3000,0,6,0,0,None,.308
+BB Gun,4,8,2.0,2.0,2,35,0,1,0,0,None,BB
+Bozar,30,30,1.0,4.0,16,75000,0,6,0,0,Full Auto,.308
+Christine's COS Silencer Rifle,65,65,2.0,1.0,14,11000,0,7,0,0,Silenced,.50 MG
+La Longue Carabine,55,55,2.0,1.2,5,3500,0,5,0,0,None,.357 Magnum
+Light Machine Gun,22,22,1.0,3.5,10,4500,0,6,0,0,Full Auto,5.56mm
+Medicine Stick,65,65,2.0,1.1,7,5000,0,7,0,0,None,.45-70 Gov't
+Paciencia,80,80,2.0,0.8,7,8000,0,7,0,0,None,.45-70 Gov't
+Ratslayer,22,44,2.0,1.5,6,5000,0,2,0,0,Silenced,.223
+Survivalist's Rifle,52,52,2.0,1.0,6,6500,0,6,0,0,None,.45-70 Gov't
+Varmint Rifle,12,24,2.0,1.5,5,400,0,2,0,0,None,.22 LR
+10mm Submachine Gun,16,16,1.0,4.5,4,2500,0,3,0,0,Full Auto,10mm
+Vance's 9mm Submachine Gun,14,14,1.0,5.0,4,5000,0,3,0,0,Full Auto,9mm
+H&H Tools Nail Gun,5,5,1.0,3.0,3,300,0,2,0,0,None,2mm EC
+Silenced .22 SMG,8,16,2.0,3.5,3,5000,0,2,0,0,Silenced,.22 LR
+Sleepytyme,22,22,1.0,4.0,4,8500,0,5,0,0,Silenced,.45 Auto
+Big Boomer,150,150,1.0,0.5,10,3500,0,7,0,0,None,20 Gauge
+Caravan Shotgun,55,55,1.0,1.0,6,500,0,4,0,0,None,20 Gauge
+Dinner Bell,80,80,1.5,1.0,9,4000,0,5,0,0,None,20 Gauge
+Riot Shotgun,70,70,1.0,1.3,8,5500,0,5,0,0,Full Auto,12 Gauge
+Sawed-Off Shotgun,75,75,1.0,0.7,4,750,0,4,0,0,None,20 Gauge
+Single Shotgun,55,55,1.0,0.5,6,100,0,4,0,0,None,20 Gauge
+Sturdy Caravan Shotgun,55,55,1.0,1.0,6,750,0,4,0,0,None,20 Gauge
+CZ57 Avenger,14,14,1.5,8.5,15,62000,0,7,0,0,Full Auto,5mm
+FIDO,22,22,1.0,3.5,10,7500,0,6,0,0,Full Auto,5.56mm
+K9000 Cyberdog Gun,18,18,1.0,4.5,8,5000,0,6,0,0,Full Auto,5.56mm
+Shoulder Mounted Machine Gun,22,22,1.0,4.5,10,4500,0,6,0,0,Full Auto,5.56mm
+Alien Blaster,75,150,2.0,1.5,0.5,8000,0,0,0,0,None,Alien Power Cell
+Compliance Regulator,8,16,2.0,1.5,2,6000,0,2,0,0,Paralysis,EC
+MF Hyperbreeder Alpha,12,24,2.0,1.5,1,8000,0,2,0,0,Unlimited Charge,EC
+Pew Pew,45,90,2.0,1.0,2,8000,0,3,0,0,None,EC
+Recharger Pistol,8,16,2.0,1.5,1,1500,0,2,0,0,Unlimited Charge,EC
+AER14 Prototype,24,48,2.0,1.5,3,8000,0,2,0,0,None,EC
+Elijah's Advanced LAER,80,160,2.0,0.9,5,8000,0,6,0,0,None,EC
+LAER,55,110,2.0,0.9,5,6000,0,5,0,0,None,EC
+Laser RCW,12,24,1.0,4.0,5,5000,0,3,0,0,Full Auto,EC
+Recharger Rifle,10,20,2.0,1.5,2,2500,0,2,0,0,Unlimited Charge,EC
+Plasma Defender,30,60,2.0,1.5,2,3500,0,4,0,0,None,EC
+Q-35 Matter Modulator,55,110,2.0,1.5,3,8000,0,5,0,0,None,EC
+YCS/186,225,225,2.0,0.5,20,10000,0,8,0,0,None,2mm EC
+Heavy Incinerator,12,12,1.0,3.5,12,5000,0,8,0,0,Fire DoT,Flamer Fuel
+Incinerator,10,10,1.0,2.5,8,4500,0,5,0,0,Fire DoT,Flamer Fuel
+Multiplas Rifle,50,100,1.0,1.0,4,8000,0,7,0,0,Splash,EC
+Tesla-Beaton Prototype,120,120,2.0,0.7,15,10000,0,7,0,0,EMP Chain,EC
+Grenade Machinegun,100,100,1.0,1.5,8,12000,0,8,0,0,Full Auto/Splash,40mm Grenade
+Grenade Rifle,110,110,1.0,0.9,4,2000,0,5,0,0,Splash,40mm Grenade
+Red Glare,150,150,1.0,1.5,10,15000,0,7,0,0,Splash/Incendiary,Rocket
+Annabelle,200,200,1.0,1.0,10,10000,0,5,0,0,Splash,Missile
+Mercy,100,100,1.0,1.5,4,10000,0,8,0,0,Full Auto/Splash,40mm Grenade
+Pulse Grenade,60,60,1.0,1.0,1,75,0,0,0,0,EMP/Splash,None
+Holy Frag Grenade,500,500,1.0,1.0,1,500,0,0,0,0,Splash,None
+Frag Mine,100,100,1.0,1.0,0.5,250,0,0,0,0,Triggered/Splash,None
+Plasma Mine,120,120,1.0,1.0,0.5,350,0,0,0,0,Triggered/Splash,None
+Pulse Mine,80,80,1.0,1.0,0.5,200,0,0,0,0,Triggered/EMP,None
+Tin Grenade,50,50,1.0,1.0,0.5,15,0,0,0,0,Splash,None
+Dynamite,100,100,1.0,1.0,1,35,0,0,0,0,Timed/Splash,None
 
 [AMMO.CSV]
 Caliber,Subtype,DMG_Multiplier,DT_Modifier,Condition_Degradation,Weight_Per_Unit
@@ -132,6 +233,47 @@ T-51b Power Armor,Heavy,25,40,5200,+1 STR / +1 CHA / +25 Rad Resist,50%
 Remnants Power Armor,Heavy,28,45,12000,+1 STR / +25 Rad Resist,50%
 Enclave Power Armor,Heavy,28,45,12000,+1 STR / +25 Rad Resist,50%
 Gannon Family Tesla Armor,Heavy,26,40,10000,+10 Energy Resist / +25 Rad Resist,50%
+Advanced Radiation Suit,Light,0,4,350,+60 Rad Resist,50%
+Armored Vault 13 Jumpsuit,Light,10,10,2000,+5 Barter / +5 Repair,50%
+Armored Vault 21 Jumpsuit,Light,10,10,1000,None,50%
+Assassin Suit,Light,14,18,3000,+10 Sneak,50%
+Caesar's Armor,Medium,18,25,4000,+5 Barter / Legion Fame,50%
+Chinese Stealth Armor,Light,16,25,7000,+10 Sneak / Auto-Stealth,50%
+Gecko-Backed Leather Armor Reinforced,Light,10,20,500,None,50%
+Gladiator Armor,Light,12,20,800,None,50%
+Great Khan Armored Leather,Light,8,15,250,None,50%
+Great Khan Simple Armor,Light,4,10,100,None,50%
+Joshua Graham's Armor,Light,18,20,3500,+5 Guns,50%
+Leather Armor Reinforced,Light,8,18,300,None,50%
+Lightweight Leather Armor,Light,6,10,200,None,50%
+NCR Trooper Fatigues,Light,4,5,100,None,50%
+Radiation Suit,Light,0,3,200,+40 Rad Resist,50%
+Raider Badlands Armor,Light,6,14,200,None,50%
+Raider Blastmaster Armor,Light,8,16,250,-1 AGL,50%
+Raider Painspike Armor,Light,8,16,250,+5 Melee,50%
+Raider Sadist Armor,Light,10,18,300,None,50%
+Sierra Madre Armor,Light,10,15,1000,+5 Sneak,50%
+Sierra Madre Armor Reinforced,Light,14,18,2000,+5 Sneak / +5 Energy Weapons,50%
+Space Suit,Light,0,5,500,+60 Rad Resist,50%
+Tribal Raiding Armor,Light,6,12,150,None,50%
+Advanced Riot Gear,Medium,20,28,7500,+1 PER / +1 AGL,50%
+Combat Armor Reinforced Mark 2,Medium,20,30,7000,None,50%
+Lightweight Metal Armor,Medium,10,20,450,None,50%
+NCR Bandoleer Armor,Medium,14,20,500,None,50%
+NCR Ranger Combat Armor,Medium,20,30,7500,None,50%
+Recon Armor,Medium,15,20,3500,None,50%
+Riot Gear,Medium,18,26,5000,+1 PER,50%
+Van Graff Combat Armor,Medium,18,25,5000,None,50%
+1st Recon Assault Armor,Heavy,22,30,5000,+5 Guns,50%
+1st Recon Survival Armor,Heavy,22,30,5500,+5 Survival / +5 Medicine,50%
+Brotherhood T-51b Power Armor,Heavy,25,40,5200,+1 STR / +25 Rad Resist,50%
+Gecko-Backed Metal Armor,Medium,14,32,600,None,50%
+Legate's Armor,Heavy,28,40,15000,+5 Melee / +5 Unarmed,50%
+Metal Armor Reinforced,Medium,14,32,1200,None,50%
+Remnants Tesla Armor,Heavy,24,42,10000,+10 Energy Resist / +25 Rad Resist,50%
+Scorched Sierra Power Armor,Heavy,22,45,7000,+4 STR / Fire DoT Aura,50%
+T-45d Power Armor,Heavy,22,45,5000,+2 STR,50%
+Tesla Armor,Heavy,24,40,8500,+10 Energy Resist / +25 Rad Resist,50%
 
 [BESTIARY.CSV]
 Name,DT,HP,Perception,Speed_Factor,Base_Damage,Attack_Rate,Weakness_Weapon,Attack_Type,Resistances,XP_Yield
@@ -224,6 +366,26 @@ Whiskey Rose,+1 STR / DT vs Energy,1m,10%,-1 CHR,Alcohol,20,0.5
 Nuka-Cola,Restore 20 HP / +5 RAD,0,0%,None,Food,5,0.5
 Nuka-Cola Quartz,Restore 20 HP / Night Vision,5m,0%,None,Food,50,0.5
 Atomic Cocktail,Restore 20 HP / +30 RAD,0,0%,None,Alcohol,20,0.5
+Steady,+2 AGL / No weapon sway,2m,15%,-1 PER,Steady,35,0.5
+Rocket,+25% Melee DMG / +25 AP,1m,20%,-1 AGL,Rocket,35,0.5
+Cateye,Night Vision,2m,0%,None,Cateye,25,0.5
+Dixon's Jet,+15 AP,30s,30%,-1 PER / -1 END,Jet,20,0.5
+Party Time Mentats,+5 CHR / +2 INT,1m,15%,-1 INT / -1 PER,Mentats,50,0.5
+Blood Shield,+50 Poison Resist,2m,0%,None,Medicine,30,0.5
+Rushing Water,+50% Attack Speed,30s,15%,-1 AGL,Rushing Water,50,0.5
+Ant Nectar,+4 STR / -3 INT / Fire Resist,2m,10%,-2 INT,Ant Nectar,30,0.5
+Healing Powder,Restore 15 HP / -2 PER,0,0%,None,Medicine,4,0.5
+Healing Poultice,Restore 20 HP / -2 PER,0,0%,None,Medicine,12,0.5
+Purified Water,Restore 20 HP,0,0%,None,Food,20,0.5
+Dirty Water,Restore 5 HP / +5 RAD,0,0%,None,Food,5,0.5
+Beer,+1 STR / +1 CHR / -1 INT,4m,10%,-1 CHR,Alcohol,5,0.5
+Scotch,+1 STR / +1 CHR / -1 INT,4m,10%,-1 CHR,Alcohol,10,0.5
+Vodka,+1 END / +1 CHR / -1 INT,4m,10%,-1 CHR,Alcohol,10,0.5
+Wine,+1 STR / +1 CHR / -1 INT,4m,10%,-1 CHR,Alcohol,10,0.5
+Absinthe,+1 STR / +1 CHR / -1 INT,4m,10%,-1 CHR,Alcohol,15,0.5
+Moonshine,+2 STR / -2 INT,4m,10%,-2 CHR,Alcohol,10,0.5
+Gecko Steak,Restore 50 HP,0,0%,None,Food,15,1.0
+Brahmin Steak,Restore 50 HP,0,0%,None,Food,15,1.0
 
 [MISC.CSV]
 Name,Weight,Value,Category
@@ -298,21 +460,6 @@ Old Lady Gibson,Gibson Scrap Yard,800,40,Independent,4,Caps
 Cliff Briscoe,Novac,750,20,Independent,3,Caps
 Jules,North Vegas Square,600,15,Independent,3,Caps
 `;
-
-// TOKEN TRIAGE LOGIC: Legacy utility — no longer called from transmitMessage().
-// Database is now always present via systemInstruction (see api.js).
-// Retained for reference and potential future selective-injection use.
-function getRelevantDbContext(userText) {
-  const triggerWords = ['[THREAT]', '[TH]', '[VATS', '[TRADE]', '[CRAFT]', '[EXCESS]'];
-  const textUpper = userText.toUpperCase();
-
-  // If the user is asking a combat/trade command, inject the DB.
-  if (triggerWords.some(word => textUpper.includes(word))) {
-    return `\n[DATABASES_ATTACHED]:\n${databaseCSVs}\n`;
-  }
-  // Otherwise, return empty string to save 1,500+ tokens on narrative roleplay.
-  return '\n[DATABASES_OMITTED_TO_SAVE_MEMORY_DUE_TO_NARRATIVE_PROMPT]\n';
-}
 
 // ── ITEM LOOKUP ──────────────────────────────────────────────
 // Searches all item CSV tables by name and returns { wgt, val, type }
@@ -389,4 +536,21 @@ function lookupItemInDb(name) {
     }
   }
   return best;
+}
+
+// ── AMMO CALIBER LIST ─────────────────────────────────────────────────────
+// Returns a sorted, deduplicated array of caliber strings from AMMO.CSV.
+// Used to populate the #ammoCalibers datalist for the Ammo Reserves panel.
+function getAmmoCalibers() {
+  const start = databaseCSVs.indexOf('[AMMO.CSV]');
+  if (start === -1) return [];
+  const nextSection = databaseCSVs.indexOf('\n[', start + 10);
+  const block = databaseCSVs.substring(start, nextSection === -1 ? undefined : nextSection);
+  const lines = block.split('\n').filter(l => l.trim() && !l.startsWith('[') && !l.startsWith('Caliber'));
+  const seen = new Set();
+  lines.forEach(line => {
+    const caliber = (line.split(',')[0] || '').trim();
+    if (caliber) seen.add(caliber);
+  });
+  return [...seen].sort((a, b) => a.localeCompare(b));
 }

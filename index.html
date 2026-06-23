@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>RobCo U.O.S. 1.6.6 - Optics Enabled</title>
+    <title>RobCo U.O.S. 1.6.8 - Optics Enabled</title>
     <link rel="icon" type="image/png" href="icon.png" />
     <link rel="apple-touch-icon" href="icon.png" />
     <link rel="manifest" href="manifest.json" />
@@ -61,7 +61,7 @@
 
     <div class="container">
       <div class="header">
-        <h1>[ROBCO U.O.S. 1.6.6 - OPTICS ENABLED]</h1>
+        <h1>[ROBCO U.O.S. 1.6.8 - OPTICS ENABLED]</h1>
         <p>SECURE NETWORK LINK ESTABLISHED _ | UPTIME: <span id="uptimeClock">00:00:00</span></p>
       </div>
 
@@ -395,6 +395,46 @@
               <h2>> BACKPACK INVENTORY</h2>
             </summary>
             <ul class="inventory-list" id="invList"></ul>
+
+            <!-- 3b. AMMO RESERVES — nested sub-panel -->
+            <details class="sub-panel" id="ammoSubPanel">
+              <summary>
+                <h3>> AMMO RESERVES</h3>
+              </summary>
+              <div id="ammoList"></div>
+              <div
+                style="
+                  border-top: 1px dashed var(--robco-green);
+                  padding-top: 8px;
+                  margin-top: 6px;
+                  display: flex;
+                  gap: 4px;
+                  flex-wrap: wrap;
+                "
+              >
+                <input
+                  type="text"
+                  id="newAmmoType"
+                  list="ammoCalibers"
+                  placeholder="Caliber (e.g. 5.56mm)"
+                  style="flex: 1; min-width: 100px"
+                  autocomplete="off"
+                />
+                <datalist id="ammoCalibers"></datalist>
+                <input
+                  type="number"
+                  id="newAmmoCount"
+                  placeholder="Qty"
+                  min="0"
+                  style="width: 50px"
+                />
+              </div>
+              <button class="action-btn" onclick="addAmmo()" style="margin-top: 4px">
+                + ADD AMMO
+              </button>
+            </details>
+            <!-- end AMMO RESERVES sub-panel -->
+
             <div
               style="
                 border-top: 1px dashed var(--robco-green);
@@ -790,6 +830,36 @@
             <div id="statusList">
               <span style="color: rgba(20, 253, 206, 0.5)">No Active Effects</span>
             </div>
+            <div style="display: flex; gap: 4px; margin-top: 6px">
+              <select id="newStatusName" style="flex: 2; background: rgba(0,0,0,0.8); color: var(--robco-green); border: 1px solid var(--robco-green)">
+                <option value="Well Rested">Well Rested</option>
+                <option value="Dehydrated">Dehydrated</option>
+                <option value="Starving">Starving</option>
+                <option value="Sleep Deprived">Sleep Deprived</option>
+                <option value="Radiation Sickness">Radiation Sickness</option>
+                <option value="Addicted">Addicted</option>
+                <option value="Chem Sickness">Chem Sickness</option>
+                <option value="Overencumbered">Overencumbered</option>
+                <option value="Stealth Boy Active">Stealth Boy Active</option>
+                <option value="Med-X Resistance">Med-X Resistance</option>
+                <option value="Psycho Rage">Psycho Rage</option>
+                <option value="Buffout Boost">Buffout Boost</option>
+                <option value="Mentats Insight">Mentats Insight</option>
+                <option value="Jet Rush">Jet Rush</option>
+                <option value="Turbo Time">Turbo Time</option>
+                <option value="Poisoned">Poisoned</option>
+                <option value="Crippled">Crippled</option>
+                <option value="Bleeding">Bleeding</option>
+                <option value="Concussed">Concussed</option>
+              </select>
+              <input type="number" id="newStatusTicks" placeholder="Ticks" style="flex: 1; width: 50px" />
+              <select id="newStatusType" style="flex: 1; background: rgba(0,0,0,0.8); color: var(--robco-green); border: 1px solid var(--robco-green)">
+                <option value="BUFF">BUFF</option>
+                <option value="DEBUFF">DEBUFF</option>
+                <option value="NEUTRAL">NEUTRAL</option>
+              </select>
+              <button class="action-btn" style="width: auto; padding: 0 10px" onclick="addStatusEffect()">ADD</button>
+            </div>
           </details>
 
           <!-- 8. SQUAD STATUS -->
@@ -798,6 +868,19 @@
               <h2>> SQUAD STATUS</h2>
             </summary>
             <div id="squadList"></div>
+            <div style="display: flex; gap: 4px; margin-top: 6px">
+              <select id="newSquadName" style="flex: 1; background: rgba(0,0,0,0.8); color: var(--robco-green); border: 1px solid var(--robco-green)">
+                <option value="Arcade Gannon">Arcade Gannon</option>
+                <option value="Boone">Boone</option>
+                <option value="Cass">Cass</option>
+                <option value="Lily">Lily</option>
+                <option value="Raul">Raul</option>
+                <option value="Veronica">Veronica</option>
+                <option value="ED-E">ED-E</option>
+                <option value="Rex">Rex</option>
+              </select>
+              <button class="action-btn" style="width: auto; padding: 0 10px" onclick="addSquadMember()">ADD</button>
+            </div>
           </details>
 
           <!-- 9. FACTION STANDING -->
@@ -815,6 +898,10 @@
             </summary>
             <div id="campaignNotesList">
               <span style="color: rgba(20, 253, 206, 0.5)">No Notes Recorded</span>
+            </div>
+            <div style="display: flex; gap: 4px; margin-top: 6px">
+              <input type="text" id="newCampaignNote" placeholder="Enter tactical note..." style="flex: 1" onkeydown="if(event.key==='Enter') addCampaignNote()" />
+              <button class="action-btn" style="width: auto; padding: 0 10px" onclick="addCampaignNote()">ADD</button>
             </div>
           </details>
 
@@ -1302,28 +1389,28 @@
               "
               oninput="updateTokenBudget()"
             ></textarea>
-            <!-- #17 Token Budget Display -->
-            <div
-              id="tokenBudgetDisplay"
-              style="
-                font-size: 9px;
-                opacity: 0.5;
-                color: var(--robco-blue);
-                text-align: right;
-                margin-top: 2px;
-                margin-bottom: 2px;
-              "
-            ></div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px; margin-bottom: 2px;">
+              <button class="action-btn" style="width: auto; padding: 2px 8px; margin: 0; font-size: 11px;" onclick="showHelpModal()">[?]</button>
+              <div
+                id="tokenBudgetDisplay"
+                style="font-size: 9px; opacity: 0.5; color: var(--robco-blue); text-align: right;"
+              ></div>
+            </div>
 
             <div class="tactical-dashboard">
-              <div class="d-pad">
-                <button class="action-btn" onclick="macroCommand('[PAD: UP]')">▲</button>
-                <div class="d-pad-row">
-                  <button class="action-btn" onclick="macroCommand('[PAD: LEFT]')">◄</button>
-                  <button class="action-btn" onclick="macroCommand('[PAD: RIGHT]')">►</button>
+              <details style="align-self: start;" open>
+                <summary style="font-size: 11px; margin-bottom: 5px; color: var(--robco-blue); border-bottom: 1px dashed var(--robco-blue); padding-bottom: 2px; cursor: pointer;">
+                  [+] D-PAD
+                </summary>
+                <div class="d-pad" style="margin-right: 15px;">
+                  <button class="action-btn" onclick="macroCommand('[PAD: UP]')">▲</button>
+                  <div class="d-pad-row">
+                    <button class="action-btn" onclick="macroCommand('[PAD: LEFT]')">◄</button>
+                    <button class="action-btn" onclick="macroCommand('[PAD: RIGHT]')">►</button>
+                  </div>
+                  <button class="action-btn" onclick="macroCommand('[PAD: DOWN]')">▼</button>
                 </div>
-                <button class="action-btn" onclick="macroCommand('[PAD: DOWN]')">▼</button>
-              </div>
+              </details>
               <div class="macro-actions">
                 <input
                   type="text"

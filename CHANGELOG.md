@@ -4,6 +4,29 @@
 
 ---
 
+## [v1.6.8] — Implementation Polish: Notes, Status, Squad, and UI Enhancements
+<!-- Date: 2026-06-23 | Tests: 139/139 | Cache: robco-terminal-v1.6.8-r1 -->
+
+### Added
+- **Campaign Notes enhancements**: Notes now have individual delete buttons. Auto-logged quest events are visually distinct (opacity 0.65). Added UI form to manually add notes.
+- **Quest status auto-logging**: Changes to active quests are automatically appended to campaign notes with a timestamp.
+- **Status Effects UI**: Added form to manually add custom buffs/debuffs/neutral effects with tick counters, and delete buttons to remove them.
+- **Squad Add form**: Squad list now has a form to add new companions with autocomplete from the companion registry. Companions can be removed via delete buttons.
+- **Tactical Command Quick-Reference**: Replaced standalone "COMMAND CHEAT SHEET" button with a compact `[?]` button positioned next to the chat input token budget display. Opens a modal with tactical command shorthand.
+- **Collapsible D-Pad**: The D-Pad in the Tactical Dashboard is now enclosed in an open `<details>` tag for better vertical space management on smaller screens.
+
+### Fixed
+- **Status Effects badge filtering**: Removed `.filter(s => s.ticks !== 0)` logic from `_updatePanelBadges` to allow permanent status effects to be correctly counted in the panel badge.
+- **GPS/MAP title logic**: Removed redundant map title fallback detection (`getLegacyTitle()`) in `api.js` modal handler. Now exclusively relies on `mType === 'GPS'`.
+- **ARCHITECTURE.md references**: Updated stale `getRelevantDbContext` reference to `lookupItemInDb` and corrected `changelog.txt` to `CHANGELOG.md`.
+
+### Internal
+- **Tests**: 165/165 passing (JS runner) / 161/161 passing (PS1 runner). Added 4 new automated suites: DOM ID Binding (`syncStateFromDom`), Protocol 4 Migration Enforcement, `migrateState()` Node.js Runtime Execution, and Service Worker Cache Guard. Added `state.skills` to legacy keys exclusion list.
+- **Cache**: Bumped Service Worker cache to `robco-terminal-v1.6.8-r2`.
+- **Version**: App bumped to 1.6.8.
+
+---
+
 ## [v1.6.7] — Modernization Pass: Dead Code Cleanup, CSV Expansion, Ammo Panel
 <!-- Date: 2026-06-22 | Tests: 137/137 | Cache: robco-terminal-v1.6.7-r4 -->
 

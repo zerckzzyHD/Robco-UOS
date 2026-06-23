@@ -57,6 +57,7 @@ It started as a Google Gemini Gem (chat preset) and evolved into a complete brow
 | System             | Description                                                                            |
 | ------------------ | -------------------------------------------------------------------------------------- |
 | **Full Inventory** | Name, quantity, weight, value, and category (weapon/armor/aid/ammo/misc)               |
+| **Ammo Reserves**  | Track ammo counts by caliber type — auto-updated by AI, editable manually              |
 | **Carry Weight**   | Real-time calculation: `150 + (STR × 10)` with UI deformation at capacity              |
 | **Item Quick-Use** | One-tap `[USE]` buttons on every inventory row                                         |
 | **Category Tags**  | Color-coded `[TYPE]` badges per item                                                   |
@@ -167,7 +168,7 @@ All sounds respect a master mute toggle and individual per-system mute controls.
 | **Cloud**       | Firebase Firestore            | Cross-device save synchronization         |
 | **PWA**         | Service Worker + Manifest     | Installable offline-capable app           |
 | **Dev Tooling** | ESLint + Prettier + Vite      | Linting, formatting, dev server           |
-| **Testing**     | PowerShell persistence audit  | 106-test pre-commit gate                  |
+| **Testing**     | PowerShell persistence audit  | 161-test pre-commit gate                  |
 
 ### File Structure
 
@@ -180,7 +181,7 @@ All sounds respect a master mute toggle and individual per-system mute controls.
 │   ├── api.js              System directive, AI import, API communication
 │   ├── ui.js               Audio engine, rendering, lifecycle, save slots, autocomplete
 │   ├── cloud.js            Firebase push/pull (ES module)
-│   └── database.js         Game CSV data + token triage filter
+│   └── database.js         Game CSV data (~170 weapons, ~68 armors, ~45 chems) + lookupItemInDb()
 ├── sw.js                   Service Worker (cache-first, same-origin only)
 ├── tests/
 │   └── check-persistence.ps1  Pre-commit 119-test persistence audit
@@ -196,7 +197,7 @@ Scripts are loaded as `<script>` tags in strict order. All globals are shared vi
 
 ```
 1. state.js      →  state, chatHistory, APP_VERSION, saveState, migrateState
-2. database.js   →  databaseCSVs, getRelevantDbContext
+2. database.js   →  databaseCSVs, lookupItemInDb
 3. registry.js   →  FALLOUT_REGISTRY, registrySearch
 4. api.js        →  autoImportState, transmitMessage, fetchAuthorizedModels
 5. ui.js         →  appendToChat, loadUI, AudioSettings, all render/audio functions
@@ -378,16 +379,17 @@ Key milestones:
 - **v1.6.3** — 14-faction network, save envelope format, cloud sync envelope
 - **v1.6.4** — Quest log, equipped tracking, save slots, session stats, 48 features
 - **v1.6.5** — Fallout Data Registry fully populated: 130 quests, 110+ perks, 120 locations, 10 companions, ~280 items (wiki-sourced). Perk autocomplete wired.
-- **v1.6.6** — THREAT database remediation: [TH] shorthand fixed, [THREAT] inventory context, all 9 CSV tables fully expanded (9 tables, ~350 entries), QUEST_ITEMS table added, databaseCSVs moved to systemInstruction, Suite 9 tests (15 new), version bump.
+- **v1.6.6** — THREAT database remediation: [TH] shorthand fixed, [THREAT] inventory context, all 9 CSV tables fully expanded, QUEST_ITEMS table added, databaseCSVs moved to systemInstruction.
+- **v1.6.7** — Modernization pass: dead code removal (getRelevantDbContext, macros), CSV full expansion (~170 weapons, ~68 armors, ~45 chems), Ammo Reserves panel (renderAmmo/addAmmo/removeAmmo), DB-backed autoImportState weight normalization, APP_VERSION 1.6.7.
 
 </details>
 
-### Current State (v1.6.6)
+### Current State (v1.6.8)
 
 The project is a **production-quality browser application** with:
 
 - 33 tracked state fields across 5 structured systems
-- 138-test automated persistence audit (Suite 9: database structural integrity)
+- 165-test automated persistence audit (DOM binding, Protocol 4 enforcement, migrateState mock execution)
 - 14-faction reputation network
 - 13-skill character sheet
 - Full save/load/export/import/cloud sync/undo pipeline
@@ -397,7 +399,9 @@ The project is a **production-quality browser application** with:
 - Installable PWA with offline support
 - **Fallout Data Registry** — 130 quests · ~110 perks · ~120 locations · 10 companions · ~280 items (all wiki-sourced, CC-BY-SA 4.0)
 - **Registry Autocomplete** — live CRT-styled dropdown on Quest Name, Item Name, and Perk Name inputs (keyboard + click)
-- **Combat Database** — 9 CSV tables: 63 enemies · 51 weapons · 47 ammo subtypes · 19 armors · 20 chems · 18 misc items · 10 recipes · 19 quest items · 14 vendors (all wiki-sourced)
+- **Combat Database** — 9 CSV tables: 66 enemies · ~170 weapons · 47 ammo subtypes · ~68 armors · ~45 chems · 18 misc items · 10 recipes · 19 quest items · 14 vendors (all wiki-sourced)
+- **Ammo Reserves Panel** — track ammo counts per caliber, manually added or AI-updated, with badge count and auto-expand on AI sync
+- **DB-backed weight normalization** — `lookupItemInDb()` auto-corrects 0-weight items on every AI sync using canonical CSV data
 - **Reliable DB injection** — databaseCSVs always present in systemInstruction (guaranteed model attention, no long-session drift)
 
 ---

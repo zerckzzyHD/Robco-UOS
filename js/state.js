@@ -1,5 +1,5 @@
 // ── APP VERSION ───────────────────────────────────────────────
-const APP_VERSION = '1.6.6';
+const APP_VERSION = '1.6.8';
 window.APP_VERSION = APP_VERSION;
 
 // ── FACTION REGISTRY ─────────────────────────────────────────────
@@ -74,7 +74,7 @@ let state = {
   equipped: { weapon: null, armor: null, headgear: null },
   ammo: {},
   stats: { kills: 0, capsEarned: 0, damageDealt: 0, sessionStart: Date.now() },
-  macros: [],
+  locationHistory: [],
 };
 
 let chatHistory = [];
@@ -217,6 +217,7 @@ function migrateState(version, s) {
   if (!s.equipped) s.equipped = { weapon: null, armor: null, headgear: null };
   if (!s.ammo) s.ammo = {};
   if (!s.stats) s.stats = { kills: 0, capsEarned: 0, damageDealt: 0, sessionStart: Date.now() };
-  if (!s.macros) s.macros = [];
+  if (!s.locationHistory) s.locationHistory = []; // v1.6.8
+  delete s.macros; // v1.6.7: macros removed — D-Pad handles this natively
   return s;
 }

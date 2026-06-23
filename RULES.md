@@ -22,9 +22,10 @@ git push origin main
 
 ## Protocol 1 — Service Worker Cache Bump
 
-Bump `CACHE_NAME` in `sw.js` on **every commit** that modifies `index.html`, `css/terminal.css`, any file in `js/`, or `sw.js` itself.
+Bump `CACHE_NAME` in `sw.js` on **every commit** that modifies `index.html`, `css/terminal.css`, or any file in `js/`.
 
 **Format:** `'robco-terminal-v{APP_VERSION}-r{N}'`
+
 - `N` starts at 1 for each new `APP_VERSION`.
 - Increment `N` on every qualifying commit. No exceptions.
 
@@ -36,11 +37,11 @@ Bump `CACHE_NAME` in `sw.js` on **every commit** that modifies `index.html`, `cs
 
 After every meaningful commit, update these files **in the same commit:**
 
-| File | What to update |
-|---|---|
-| `ARCHITECTURE.md` | Version header, any new/changed architecture sections |
-| `CHANGELOG.md` | Add entries under the current version block |
-| `README.md` | Current State section, feature tables, project history |
+| File              | What to update                                         |
+| ----------------- | ------------------------------------------------------ |
+| `ARCHITECTURE.md` | Version header, any new/changed architecture sections  |
+| `CHANGELOG.md`    | Add entries under the current version block            |
+| `README.md`       | Current State section, feature tables, project history |
 
 **Version bumps:** Always ask the user before bumping `APP_VERSION`. Never assume a bump is warranted.
 
@@ -110,22 +111,23 @@ Requires changes in **4 files minimum.** The pre-commit audit will block if any 
 
 ## Prohibited Patterns
 
-| Never Do | Why |
-|---|---|
-| `clients.claim()` in the service worker | Causes reload loops and black screens |
-| `innerHTML +=` inside loops | O(n²) DOM re-parsing. Use `map().join('')` with single assignment |
-| Untrusted text directly as `innerHTML` | XSS risk. Always run through `escapeHtml()` first |
-| `localStorage.getItem()` in audio hot paths | Read from the `AudioSettings` cache object instead |
-| Recursive key transformation on AI JSON responses | Use explicit field mapping in `autoImportState()` |
-| Silent drops of inventory during token triage | Inventory must always be returned when relevant keywords match |
-| Auto-push to cloud on stat changes | Cloud sync is manual button only |
-| Implement or discuss features #44 or #45 | Permanently excluded by owner |
+| Never Do                                          | Why                                                               |
+| ------------------------------------------------- | ----------------------------------------------------------------- |
+| `clients.claim()` in the service worker           | Causes reload loops and black screens                             |
+| `innerHTML +=` inside loops                       | O(n²) DOM re-parsing. Use `map().join('')` with single assignment |
+| Untrusted text directly as `innerHTML`            | XSS risk. Always run through `escapeHtml()` first                 |
+| `localStorage.getItem()` in audio hot paths       | Read from the `AudioSettings` cache object instead                |
+| Recursive key transformation on AI JSON responses | Use explicit field mapping in `autoImportState()`                 |
+| Silent drops of inventory during token triage     | Inventory must always be returned when relevant keywords match    |
+| Auto-push to cloud on stat changes                | Cloud sync is manual button only                                  |
+| Implement or discuss features #44 or #45          | Permanently excluded by owner                                     |
 
 ---
 
 ## Architecture Quick Reference
 
 **Script load order** (global scope, not modules):
+
 1. `js/database.js` → `databaseCSVs`, `lookupItemInDb()`
 2. `js/state.js` → `state`, `APP_VERSION`, `FACTION_REGISTRY`, `SKILL_KEYS`, `saveState()`, `migrateState()`
 3. `js/registry.js` → `FALLOUT_REGISTRY`, `registrySearch()` (read-only, never touches state)

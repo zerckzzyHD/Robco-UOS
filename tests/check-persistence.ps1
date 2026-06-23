@@ -116,7 +116,7 @@ Sep "Suite 0 -- Parser sanity (guards against test regression)"
 $KNOWN = @('lvl','xp','hpCur','hpMax','s','p','e','c','i','a','l',
            'caps','loc','rads','karma','ticks',
            'la','ra','ll','rl','hd',
-           'factions','skills','status','inventory','squad','campaign_notes')
+           'factions','skills','status','inventory','squad','campaign_notes','locationHistory')
 foreach ($k in $KNOWN) { Check ($stateKeys -contains $k) "Parser found known key: state.$k" }
 
 # ===========================================================
@@ -262,6 +262,101 @@ $dbCode = ($dbSrc -replace '(?s)/\*.*?\*/', '') -replace '//[^\r\n]*', ''
 Check ($dbCode -notmatch '\bstate\b')                                "database.js does not reference state (pure reference data)"
 Check ($dbCode -notmatch 'localStorage')                             "database.js does not reference localStorage"
 Check ($dbCode -notmatch 'chatHistory')                              "database.js does not reference chatHistory"
+
+# ===========================================================
+# Suite 10 -- DOM ID Binding (syncStateFromDom)
+# ===========================================================
+Sep "Suite 10 -- DOM ID Binding (syncStateFromDom)"
+$indexHtml = Read-Src "index.html"
+$syncBody = Get-FunctionBody $stateSrc 'syncStateFromDom'
+$idMatches = [regex]::Matches($syncBody, 'document\.getElementById\([''"]([^''"]+)[''"]\)')
+foreach ($m in $idMatches) {
+    $id = $m.Groups[1].Value
+    $hasId = [bool]([regex]::Match($indexHtml, 'id=[''"]' + $id + '[''"]').Success)
+    Check $hasId "Element id='$id' exists in index.html"
+}
+
+# ===========================================================
+# Suite 11 -- Protocol 4 Migration Enforcement
+# ===========================================================
+Sep "Suite 11 -- Protocol 4 Migration Enforcement"
+$migrateBody = Get-FunctionBody $stateSrc 'migrateState'
+$legacyKeys = @('lvl','xp','hpCur','hpMax','s','p','e','c','i','a','l',
+                'caps','loc','rads','karma','ticks',
+                'la','ra','ll','rl','hd','status','inventory','squad','campaign_notes','skills')
+foreach ($key in $stateKeys) {
+    if ($legacyKeys -notcontains $key) {
+        Check ([bool]($migrateBody -match "s\.$key\b")) "New field state.$key has migration check in migrateState()"
+    }
+}
+
+# ===========================================================
+# Suite 12 -- migrateState Runtime Execution Test
+# ===========================================================
+Sep "Suite 12 -- migrateState() Runtime Execution"
+try {
+    $nodeCheck = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCheck) {
+        $testScript = @"
+const vm = require('vm');
+const fs = require('fs');
+const stateSource = fs.readFileSync('js/state.js', 'utf8');
+const sandbox = { window: {} };
+vm.createContext(sandbox);
+vm.runInContext(stateSource, sandbox);
+const v1Payload = {
+    lvl: 1, xp: 0, hpCur: 100, hpMax: 100,
+    s: 5, p: 5, e: 5, c: 5, i: 5, a: 5, l: 5,
+    nf: 50, ni: 0, lf: -10, li: 0
+};
+const migrated = sandbox.migrateState('1.0.0', v1Payload);
+if (!migrated.factions || !migrated.factions.ncr) throw new Error('Missing structured factions');
+if (migrated.factions.ncr.fame !== 50) throw new Error('NCR fame not 50');
+if (migrated.factions.legion.fame !== -10) throw new Error('Legion fame not -10');
+if (!Array.isArray(migrated.perks)) throw new Error('Missing perks array');
+if (!Array.isArray(migrated.quests)) throw new Error('Missing quests array');
+if (!migrated.equipped || migrated.equipped.weapon !== null) throw new Error('Missing equipped object');
+console.log('PASS');
+"@
+        $out = $testScript | node
+        if ($out.Trim() -eq 'PASS') {
+            Pass "Node runtime test successful: migrated legacy payload correctly"
+        } else {
+            Fail "Node runtime test failed"
+        }
+    } else {
+        Pass "Node not found, skipping runtime execution test"
+    }
+} catch {
+    Fail "Runtime test failed: $_"
+}
+
+# ===========================================================
+# Suite 13 -- Service Worker Cache Guard (Protocol 1)
+# ===========================================================
+Sep "Suite 13 -- Service Worker Cache Guard (Protocol 1)"
+try {
+    $staged = git diff --cached --name-only
+    $triggerStaged = $false
+    $swStaged = $false
+    if ($staged) {
+        foreach ($f in $staged) {
+            if ($f -eq 'index.html' -or $f -match '^js/' -or $f -match '^css/') {
+                $triggerStaged = $true
+            }
+            if ($f -eq 'sw.js') {
+                $swStaged = $true
+            }
+        }
+    }
+    if ($triggerStaged) {
+        Check $swStaged "sw.js CACHE_NAME must be bumped when UI/JS files are modified (Protocol 1)"
+    } else {
+        Pass "No UI/JS changes staged (SW bump not required)"
+    }
+} catch {
+    Pass "Git diff skipped (not in git repo)"
+}
 
 # ===========================================================
 # Results

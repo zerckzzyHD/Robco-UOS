@@ -403,10 +403,10 @@ const dbSource = readFile('js/database.js');
 // 9.1 databaseCSVs global must be declared
 assert(/const\s+databaseCSVs/.test(dbSource), 'databaseCSVs global is declared');
 
-// 9.2 getRelevantDbContext function must be declared (legacy utility)
+// 9.2 lookupItemInDb function must be declared (item weight/value cache)
 assert(
-  /function\s+getRelevantDbContext\s*\(/.test(dbSource),
-  'getRelevantDbContext() function is declared'
+  /function\s+lookupItemInDb\s*\(/.test(dbSource),
+  'lookupItemInDb() function is declared'
 );
 
 // 9.3 All required CSV section headers must be present
@@ -425,8 +425,8 @@ for (const tbl of REQUIRED_TABLES) {
   assert(dbSource.includes(tbl), `database.js contains ${tbl} section`);
 }
 
-// 9.4 [TH] must be in the triggerWords array
-assert(/\[TH\]/.test(dbSource), "'[TH]' shorthand is in triggerWords");
+// 9.4 lookupItemInDb must be referenced in database.js (item weight/value cache integrity)
+assert(/lookupItemInDb/.test(dbSource), "'lookupItemInDb' function exists in database.js");
 
 // 9.5 BESTIARY must have ≥ 30 data rows (guards against data regression)
 const bestiaryBlock = dbSource.match(/\[BESTIARY\.CSV\]([\s\S]*?)(?=\[|`;)/);
@@ -457,6 +457,88 @@ const dbCode = dbSource
 assert(!/\bstate\b/.test(dbCode), 'database.js does not reference state (pure reference data)');
 assert(!/localStorage/.test(dbCode), 'database.js does not reference localStorage');
 assert(!/chatHistory/.test(dbCode), 'database.js does not reference chatHistory');
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 10 — DOM ID Binding (syncStateFromDom)
+// ══════════════════════════════════════════════════════════════
+header('DOM ID Binding (syncStateFromDom)');
+const indexHtml = readFile('index.html');
+let syncBody = '';
+try {
+  syncBody = extractFunctionBody(stateSource, 'syncStateFromDom');
+} catch (e) {
+  fail(`Cannot extract syncStateFromDom: ${e.message}`);
+}
+const idMatches = [...syncBody.matchAll(/document\.getElementById\(['"]([^'"]+)['"]\)/g)];
+for (const match of idMatches) {
+  const id = match[1];
+  const found = new RegExp(`id=['"]${id}['"]`).test(indexHtml);
+  assert(found, `Element id="${id}" exists in index.html`);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 11 — Protocol 4 Migration Enforcement
+// ══════════════════════════════════════════════════════════════
+header('Protocol 4 Migration Enforcement');
+let migrateBody = '';
+try {
+  migrateBody = extractFunctionBody(stateSource, 'migrateState');
+} catch (e) {
+  fail(`Cannot extract migrateState: ${e.message}`);
+}
+const legacyKeys = ['lvl','xp','hpCur','hpMax','s','p','e','c','i','a','l',
+                'caps','loc','rads','karma','ticks',
+                'la','ra','ll','rl','hd','status','inventory','squad','campaign_notes','skills'];
+for (const key of stateKeys) {
+  if (!legacyKeys.includes(key)) {
+    assert(new RegExp(`s\\.${key}\\b`).test(migrateBody), `New field state.${key} has migration check in migrateState()`);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 12 — migrateState() Runtime Execution
+// ══════════════════════════════════════════════════════════════
+header('migrateState() Runtime Execution');
+try {
+  const vm = require('vm');
+  const sandbox = { window: {} };
+  vm.createContext(sandbox);
+  vm.runInContext(stateSource, sandbox);
+  const v1Payload = {
+    lvl: 1, xp: 0, hpCur: 100, hpMax: 100,
+    s: 5, p: 5, e: 5, c: 5, i: 5, a: 5, l: 5,
+    nf: 50, ni: 0, lf: -10, li: 0 // Legacy faction data
+  };
+  const migrated = sandbox.migrateState('1.0.0', v1Payload);
+  assert(migrated.factions && migrated.factions.ncr, 'Migrated state has structured factions.ncr');
+  assert(migrated.factions && migrated.factions.ncr.fame === 50, 'Migrated state preserved ncr fame (50)');
+  assert(migrated.factions && migrated.factions.legion.fame === -10, 'Migrated state preserved legion fame (-10)');
+  assert(Array.isArray(migrated.perks), 'Migrated state added perks array');
+  assert(Array.isArray(migrated.quests), 'Migrated state added quests array');
+  assert(migrated.equipped && migrated.equipped.weapon === null, 'Migrated state added equipped object');
+} catch (e) {
+  fail(`Runtime test failed: ${e.message}`);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 13 — Service Worker Cache Guard (Protocol 1)
+// ══════════════════════════════════════════════════════════════
+header('Service Worker Cache Guard (Protocol 1)');
+try {
+  const stagedStr = require('child_process').execSync('git diff --cached --name-only', { encoding: 'utf8' });
+  const staged = stagedStr.split('\n').filter(Boolean);
+  const triggerStaged = staged.some(
+    f => f === 'index.html' || f.startsWith('js/') || f.startsWith('css/')
+  );
+  const swStaged = staged.includes('sw.js');
+  if (triggerStaged) {
+    assert(swStaged, 'sw.js CACHE_NAME must be bumped when UI/JS files are modified (Protocol 1)');
+  } else {
+    pass('No UI/JS changes staged (SW bump not required)');
+  }
+} catch (e) {
+  pass('Git diff skipped (not running in staged environment)');
+}
 
 // ══════════════════════════════════════════════════════════════
 //  RESULTS

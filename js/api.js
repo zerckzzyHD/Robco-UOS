@@ -42,7 +42,7 @@ Example Schema:
     "skills": {"barter":15,"energy_weapons":15,"explosives":15,"guns":15,"lockpick":15,"medicine":15,"melee_weapons":15,"repair":15,"science":15,"sneak":15,"speech":15,"survival":15,"unarmed":15},
     "factions": {"ncr":{"fame":0,"infamy":0},"legion":{"fame":0,"infamy":0},"house":{"fame":0,"infamy":0},"bos":{"fame":0,"infamy":0},"boomers":{"fame":0,"infamy":0},"khans":{"fame":0,"infamy":0},"followers":{"fame":0,"infamy":0},"powder":{"fame":0,"infamy":0},"kings":{"fame":0,"infamy":0},"wgs":{"fame":0,"infamy":0},"vangraff":{"fame":0,"infamy":0},"crimson":{"fame":0,"infamy":0},"chairmen":{"fame":0,"infamy":0},"omertas":{"fame":0,"infamy":0}},
     "status": [],
-    "inventory": [],
+    "inventory": [{"name": "Stimpak", "qty": 3, "wgt": 0.5, "val": 20, "type": "aid"}],
     "squad": [{"name": "Boone", "hp": 100, "hpMax": 100, "weapon": "Hunting Rifle", "ammo": 50, "condition": "OK", "dt": 15, "affinity": 75}],
     "campaign_notes": ["Phase 2 initiated."],
     "perks": [{"name": "Cowboy", "rank": 1, "level_taken": 6}],
@@ -62,6 +62,7 @@ Example Schema:
 ### **Core State Tracking & Formatting**
 Time & Ticks Clock: Track "ticks" in the state node. 1 Prompt = 1 Tick. 1 Combat Round = 2 Ticks. > [WAIT: X Hrs] = X * 10 Ticks. Increment this integer on each response. NEVER block or refuse a user action due to insufficient ticks. Ticks are advisory pacing — the Courier may perform any action at any time regardless of tick count.
 Inventory & Squad Persistence (CRITICAL): If the Courier loots an item or uses > [CRAFT], you MUST return the ENTIRE inventory array. Companions in "squad" must be updated during combat and returned to 100% HP after.
+Inventory Item Schema: Each item in the inventory array MUST include: name (string), qty (integer), wgt (weight in lbs, float), val (value in caps, integer), type ("weapon"|"armor"|"aid"|"misc"). Do NOT put ammo in the inventory array — use state.ammo instead (caliber → count integer, e.g. {"5.56mm": 120, "10mm": 45}). Reference the attached database CSVs for canonical weight and value data.
 Telemetry Lock: FORBIDDEN from inventing narrative outcomes, combat damage, or inventory changes. If ambiguous, output 🛑 [SYS-ALERT: INSUFFICIENT TELEMETRY].
 
 ### **Operational Matrix**
@@ -340,14 +341,40 @@ function autoImportState(jsonString) {
       });
     }
     let inv = parsed.inventory || parsed.Inventory || parsed.inv;
-    if (inv && Array.isArray(inv))
-      state.inventory = inv.map(it => ({
-        name: it.name ?? '',
-        qty: it.qty ?? 1,
-        wgt: it.wgt ?? it.weight ?? 0,
-        val: it.val ?? it.value ?? 0,
-        type: it.type ?? 'misc',
-      }));
+    if (inv && Array.isArray(inv)) {
+      if (!state.ammo) state.ammo = {};
+      state.inventory = inv
+        .map(it => {
+          let wgt = it.wgt ?? it.weight ?? 0;
+          let val = it.val ?? it.value ?? 0;
+          let type = it.type ?? 'misc';
+          // Auto-fill from database if AI omitted weight/value
+          if ((wgt === 0 || type === 'misc') && it.name) {
+            const dbHit = typeof lookupItemInDb === 'function' ? lookupItemInDb(it.name) : null;
+            if (dbHit) {
+              if (wgt === 0 && dbHit.wgt > 0) wgt = dbHit.wgt;
+              if (val === 0 && dbHit.val > 0) val = dbHit.val;
+              if (type === 'misc' && dbHit.type !== 'misc') type = dbHit.type;
+            }
+          }
+          return {
+            name: it.name ?? '',
+            qty: it.qty ?? 1,
+            wgt: wgt,
+            val: val,
+            type: type,
+          };
+        })
+        .filter(it => {
+          // Belt-and-suspenders: AI may still return ammo in inventory array
+          // Silently reroute to state.ammo instead of letting it pollute state.inventory
+          if (it.type === 'ammo') {
+            state.ammo[it.name] = (state.ammo[it.name] || 0) + (it.qty || 1);
+            return false;
+          }
+          return true;
+        });
+    }
     if (parsed.squad && Array.isArray(parsed.squad)) state.squad = parsed.squad;
     if (parsed.campaign_notes) state.campaign_notes = parsed.campaign_notes;
     // Perks (v1.6.4+)
@@ -361,12 +388,21 @@ function autoImportState(jsonString) {
 
     // Quest Log (#1)
     if (parsed.quests && Array.isArray(parsed.quests)) {
+      const questsBefore = JSON.parse(window._lastStateBeforeSync || '{}').quests || [];
       state.quests = parsed.quests.map(q => ({
         name: q.name || 'Unknown',
         status: (q.status || 'active').toLowerCase(),
         objective: q.objective || null,
         factions: q.factions || null,
       }));
+      // Auto-log quest status changes
+      state.quests.forEach(curr => {
+        const prev = questsBefore.find(bq => bq.name.toLowerCase() === curr.name.toLowerCase());
+        if (prev && prev.status !== curr.status) {
+          if (!state.campaign_notes) state.campaign_notes = [];
+          state.campaign_notes.push(`[T${state.ticks || 0}] Quest: "${curr.name}" → ${curr.status.toUpperCase()}`);
+        }
+      });
     }
 
     // Equipped Items (#2)
@@ -394,11 +430,6 @@ function autoImportState(jsonString) {
       state.ammo = parsed.ammo;
     }
 
-    // Macros — array of saved command strings
-    if (parsed.macros && Array.isArray(parsed.macros)) {
-      state.macros = parsed.macros;
-    }
-
     // ── STATE DIFF DISPLAY (shows what changed this sync) ────────────────────
     if (window._lastStateBeforeSync) {
       try {
@@ -413,10 +444,15 @@ function autoImportState(jsonString) {
         ['la', 'ra', 'll', 'rl', 'hd'].forEach(k => {
           if (before[k] !== state[k]) changes.push(`${k.toUpperCase()}: ${before[k]}→${state[k]}`);
         });
-        const oldInvCount = (before.inventory || []).length;
-        const newInvCount = (state.inventory || []).length;
+        const oldInvCount = (before.inventory || []).filter(it => (it.type || 'misc') !== 'ammo').length;
+        const newInvCount = (state.inventory || []).filter(it => (it.type || 'misc') !== 'ammo').length;
         if (oldInvCount !== newInvCount)
           changes.push(`inventory: ${oldInvCount}→${newInvCount} items`);
+        // Ammo round delta
+        const oldAmmoRounds = Object.values(before.ammo || {}).reduce((a, b) => a + b, 0);
+        const newAmmoRounds = Object.values(state.ammo || {}).reduce((a, b) => a + b, 0);
+        if (oldAmmoRounds !== newAmmoRounds)
+          changes.push(`ammo: ${oldAmmoRounds}→${newAmmoRounds} rounds`);
         if (changes.length > 0) {
           appendToChat('> [DELTA] ' + changes.join(' | '), 'sys', true);
         }
@@ -505,6 +541,7 @@ function autoImportState(jsonString) {
         'squad',
         'status',
         'inventory',
+        'ammo',
         'campaign_notes',
         'perks',
         'factions',
@@ -649,11 +686,7 @@ async function transmitMessage() {
         let mContent = document.getElementById('modalContent');
         let mType = parsedNode.modal.type || 'TEXT';
 
-        if (
-          mType === 'GPS' ||
-          parsedNode.modal.title.includes('GPS') ||
-          parsedNode.modal.title.includes('MAP')
-        ) {
+        if (mType === 'GPS') {
           mContent.innerHTML = '<div class="modal-grid-map"></div>';
           let gridMap = mContent.querySelector('.modal-grid-map');
           let rows = Array.isArray(parsedNode.modal.content) ? parsedNode.modal.content : [];

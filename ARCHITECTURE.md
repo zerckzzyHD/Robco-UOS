@@ -1,7 +1,7 @@
 # RobCo U.O.S. — System Architecture
 
-> **Version:** 1.6.5
-> **Last Updated:** 2026-06-22
+> **Version:** 1.6.8
+> **Last Updated:** 2026-06-23
 > **Purpose:** Living reference for any engineer (human or AI) working on this project.
 > This document maps every system, its dependencies, its persistence contract, and the
 > historical lessons that shaped it.
@@ -53,13 +53,13 @@
 │   ├── ui.js           ~82KB  Audio, rendering, lifecycle, undo, save slots
 │   ├── cloud.js        3.6KB  Firebase push/pull (ES module)
 │   ├── registry.js     ~36KB  Read-only Fallout Data Registry + registrySearch()
-│   └── database.js     2.8KB  CSV data + token triage filter
+│   └── database.js     ~25KB CSV data (~170 weapons, ~68 armors, ~45 chems) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── check-persistence.ps1   10.3KB  119-test pre-commit audit
+│   ├── check-persistence.ps1   19KB    161-test pre-commit audit
 │   ├── check-persistence.js    (Node runner)
 │   └── run-tests.bat           (Batch launcher)
-├── changelog.txt       ~74KB  Full version history
+├── CHANGELOG.md        ~74KB  Full version history
 ├── icon.png            68KB   PWA icon
 ├── manifest.json       592B   PWA manifest
 └── ARCHITECTURE.md     THIS FILE
@@ -72,7 +72,7 @@
 Scripts are loaded via `<script>` tags in `index.html` in this exact order:
 
 ```
-1. js/database.js   → defines: databaseCSVs, getRelevantDbContext
+1. js/database.js   → defines: databaseCSVs, lookupItemInDb
 2. js/state.js      → defines: state, chatHistory, APP_VERSION, FACTION_REGISTRY,
                        SKILL_KEYS, saveState, syncStateFromDom, generateSyncPayload,
                        exportSaveFile, migrateState, gameTimeToTicks (via ui.js)
@@ -184,7 +184,6 @@ let state = {
   campaign_notes: [],   // AI-written tactical notes (strings)
   perks: [],            // [{name, rank, level_taken}]
   quests: [],           // [{name, status, objective, factions}]
-  macros: [],           // Saved command strings
 };
 ```
 
@@ -327,7 +326,7 @@ User types command → chatInput
   → appendToChat(userText, 'user')
   → generateSyncPayload()                    // Deep clone of current state
   → Token triage: strip inventory if not needed
-  → getRelevantDbContext(userText)            // Attach DB CSVs only for combat/trade
+  → Attach databaseCSVs (always present)
   → Build apiContents from chatHistory        // Full conversation context
   → Inject: [CURRENT STATE] + [COMMAND] into last user message
   → fetch(Gemini API) with:
@@ -359,8 +358,7 @@ JSON string → parse
   → Map quests (normalized {name, status, objective, factions})
   → Map equipped ({weapon, armor, headgear})
   → Map stats (DELTA accumulation: kills += parsed.kills)
-  → Map ammo (direct object replace)
-  → Map macros (direct array replace)
+  → Map ammo (direct object replace + auto-expand if changed)
   → State diff display (DELTA log to chat)
   → Status effect tick-down (#7)
   → Faction consequence triggers (#4)
@@ -468,6 +466,7 @@ loadUI()
 | Function                | State Source           | UI Target                                   |
 | ----------------------- | ---------------------- | ------------------------------------------- |
 | `renderInventory()`     | `state.inventory`      | `#invList` — event-delegated click handlers |
+| `renderAmmo()`          | `state.ammo`           | `#ammoList` — sorted grid, X remove buttons |
 | `renderSquad()`         | `state.squad`          | `#squadList` — HP bars, affinity, weapon    |
 | `renderStatus()`        | `state.status`         | `#statusList` — color-coded buff/debuff     |
 | `renderPerks()`         | `state.perks`          | `#perksList` — rank, level taken            |
@@ -595,10 +594,10 @@ graph TD
     B --> D[ui.js]
     B --> E[database.js]
 
-    C -->|autoImportState| D
-    C -->|getRelevantDbContext| E
-    C -->|transmitMessage| F[Gemini API]
-    C -->|getSystemDirective| F
+    C --> |autoImportState| D
+    C --> |databaseCSVs injection| E
+    C --> |transmitMessage| F[Gemini API]
+    C --> |getSystemDirective| F
 
     D -->|loadUI / updateMath| A
     D -->|saveState| B
@@ -748,9 +747,9 @@ This protocol was formalized in v1.6.5 after the perk panel (`addPerk()` + `#new
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit audit must pass (all 119+ tests)
+- [ ] `git commit` — pre-commit audit must pass (all 161+ tests)
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
-- [ ] **Update changelog.txt** — add entry under the current version block
+- [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable
 
 ---
@@ -767,7 +766,7 @@ This protocol was formalized in v1.6.5 after the perk panel (`addPerk()` + `#new
 - [ ] Add the new localStorage key to the [Settings table](#settings--localstorage-keys)
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix
 - [ ] **Update ARCHITECTURE.md** — add to AudioSettings table and Audio System section
-- [ ] **Update changelog.txt** and **README.md**
+- [ ] **Update CHANGELOG.md** and **README.md**
 
 ---
 
@@ -783,4 +782,4 @@ This protocol was formalized in v1.6.5 after the perk panel (`addPerk()` + `#new
 - [ ] Panel memory (#35) works automatically via the `details.panel` selector
 - [ ] Keyboard shortcut (#15) works automatically for the first 6 panels
 - [ ] **Update ARCHITECTURE.md** — add to UI Rendering Pipeline table
-- [ ] **Update changelog.txt** and **README.md**
+- [ ] **Update CHANGELOG.md** and **README.md**

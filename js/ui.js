@@ -988,7 +988,7 @@ function _updatePanelBadges() {
              Object.values(state.ammo || {}).filter(v => v > 0).length,
     },
     { h2text: '> SQUAD STATUS', count: (state.squad || []).length },
-    { h2text: '> STATUS EFFECTS', count: (state.status || []).filter(s => s.ticks !== 0).length },
+    { h2text: '> STATUS EFFECTS', count: (state.status || []).length },
     { h2text: '> CAMPAIGN NOTES', count: (state.campaign_notes || []).length },
     {
       h2text: '> QUEST LOG',
@@ -1069,6 +1069,23 @@ function showFullChangelog() {
 
 function closeModal() {
   document.getElementById('sysModal').style.display = 'none';
+}
+
+function showHelpModal() {
+  const modal = document.getElementById('sysModal');
+  const title = document.getElementById('modalTitle');
+  const content = document.getElementById('modalContent');
+  if (!modal || !title || !content) return;
+  title.innerText = '> COMMAND CHEAT SHEET';
+  content.innerHTML = `
+<b>[THREAT]</b>: Analyzes current enemies/environment for weaknesses.
+<b>[VATS]</b>: Simulates combat outcomes and hit probabilities.
+<b>[TRADE]</b>: Appraises items and calculates barter advantage.
+<b>[LOOT]</b>: Scans the room/corpses for valuable salvage.
+
+<i>Use the D-Pad arrows or macro buttons below the input line for quick tactical entries.</i>
+  `.trim();
+  modal.style.display = 'flex';
 }
 function clampStat(el) {
   if (el.value > 10) el.value = 10;
@@ -1502,7 +1519,7 @@ function renderSquad() {
     return;
   }
   squadDiv.innerHTML = state.squad
-    .map(member => {
+    .map((member, i) => {
       const hpRatio = member.hp / (member.hpMax || 100);
       const pBars = Math.ceil(hpRatio * 10);
       const barStr = '['.padEnd(pBars + 1, '\u2588').padEnd(11, '\u2591') + ']';
@@ -1521,7 +1538,10 @@ function renderSquad() {
         affinityStr = `<div style="font-size:10px;margin-top:2px;color:${affColor};">AFF: ${affBar} ${aff}%</div>`;
       }
       return `<div style="margin-bottom: 5px; border-bottom: 1px dashed rgba(20, 253, 206, 0.3); padding-bottom: 4px;">
-            <div style="font-weight:bold;">${barStr} ${escapeHtml(member.name)}</div>
+            <div style="font-weight:bold;display:flex;justify-content:space-between;align-items:center;">
+                <span>${barStr} ${escapeHtml(member.name)}</span>
+                <button class="delete-btn" onclick="removeSquadMember(${i})">X</button>
+            </div>
             <div style="font-size: 11px; display:flex; justify-content:space-between; margin-top:2px;">
                 <span style="color: var(--robco-green)">HP: ${member.hp}/${member.hpMax}</span>
                 <span style="color: var(--robco-alert)">AMMO: ${member.ammo}</span>
@@ -1532,6 +1552,38 @@ function renderSquad() {
         </div>`;
     })
     .join('');
+}
+
+function removeSquadMember(idx) {
+  if (state.squad && state.squad.length > idx) {
+    state.squad.splice(idx, 1);
+    loadUI();
+  }
+}
+
+function addSquadMember() {
+  const nameInput = document.getElementById('newSquadName');
+  if (!nameInput || !nameInput.value.trim()) return;
+  if (!state.squad) state.squad = [];
+  
+  const name = nameInput.value.trim();
+  const existing = state.squad.find(m => m.name.toLowerCase() === name.toLowerCase());
+  if (existing) {
+    nameInput.value = '';
+    return;
+  }
+  
+  state.squad.push({
+    name: name,
+    hp: 100,
+    hpMax: 100,
+    weapon: "Unarmed",
+    ammo: 0,
+    condition: "OK"
+  });
+  
+  nameInput.value = '';
+  loadUI();
 }
 
 // ── UTILITY FUNCTIONS ──────────────────────────────────────────
@@ -1567,7 +1619,7 @@ function renderStatus() {
     return;
   }
   statusDiv.innerHTML = state.status
-    .map(eff => {
+    .map((eff, i) => {
       let typeClass =
         eff.type === 'BUFF'
           ? 'effect-buff'
@@ -1575,9 +1627,40 @@ function renderStatus() {
             ? 'effect-debuff'
             : 'effect-neutral';
       let tickInfo = eff.ticks > 0 ? ` [${eff.ticks}t]` : '';
-      return `<div class="effect-item"><span class="${typeClass}">${escapeHtml(eff.name || '')}${tickInfo}</span><span class="effect-type">${escapeHtml(eff.type || 'BUFF')}</span></div>`;
+      return `<div class="effect-item"><span class="${typeClass}">${escapeHtml(eff.name || '')}${tickInfo}</span><div><span class="effect-type" style="margin-right:8px;">${escapeHtml(eff.type || 'BUFF')}</span><button class="delete-btn" onclick="removeStatusEffect(${i})">X</button></div></div>`;
     })
     .join('');
+}
+
+function removeStatusEffect(idx) {
+  if (state.status && state.status.length > idx) {
+    state.status.splice(idx, 1);
+    loadUI();
+  }
+}
+
+function addStatusEffect() {
+  const nameInput = document.getElementById('newStatusName');
+  const ticksInput = document.getElementById('newStatusTicks');
+  const typeSelect = document.getElementById('newStatusType');
+  if (!nameInput || !nameInput.value.trim()) return;
+  if (!state.status) state.status = [];
+  
+  const ticks = parseInt(ticksInput.value) || 0;
+  const name = nameInput.value.trim();
+  const type = (typeSelect ? typeSelect.value : 'BUFF').toUpperCase();
+  
+  const existing = state.status.find(e => e.name.toLowerCase() === name.toLowerCase());
+  if (existing) {
+    existing.ticks = ticks;
+    existing.type = type;
+  } else {
+    state.status.push({ name, ticks, type });
+  }
+  
+  nameInput.value = '';
+  if (ticksInput) ticksInput.value = '';
+  loadUI();
 }
 
 function renderPerks() {
@@ -1691,8 +1774,28 @@ function renderCampaignNotes() {
   }
   notesDiv.innerHTML =
     '<ul class="notes-list">' +
-    state.campaign_notes.map(note => `<li>${escapeHtml(String(note))}</li>`).join('') +
+    state.campaign_notes.map((note, i) => {
+      const isAutoLog = /^\[T\d+\]/.test(note);
+      const opacity = isAutoLog ? '0.65' : '1';
+      return `<li style="opacity:${opacity};">${escapeHtml(String(note))}<button class="delete-btn" style="float:right;" onclick="removeCampaignNote(${i})">X</button></li>`;
+    }).join('') +
     '</ul>';
+}
+
+function removeCampaignNote(idx) {
+  if (state.campaign_notes && state.campaign_notes.length > idx) {
+    state.campaign_notes.splice(idx, 1);
+    loadUI();
+  }
+}
+
+function addCampaignNote() {
+  const input = document.getElementById('newCampaignNote');
+  if (!input || !input.value.trim()) return;
+  if (!state.campaign_notes) state.campaign_notes = [];
+  state.campaign_notes.push(input.value.trim());
+  input.value = '';
+  loadUI();
 }
 
 function renderFactionRep() {
@@ -2204,6 +2307,7 @@ function initRegistryAutocomplete() {
   wireInput('newQuestName', 'quests');
   wireInput('newItemName', 'items');
   wireInput('newPerkName', 'perks');
+
 
   // Reposition on scroll/resize so the panel doesn't orphan
   window.addEventListener(
