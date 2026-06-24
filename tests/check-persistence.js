@@ -234,7 +234,9 @@ for (const key of EXPECTED_FACTIONS) {
   assert(factionKeys.includes(key), `FACTION_REGISTRY key: "${key}"`);
 }
 assert(
-  /FACTION_REGISTRY\.forEach/.test(importBody) && /parsed\.factions/.test(importBody),
+  (/FACTION_REGISTRY\.forEach/.test(importBody) ||
+    /getFactionRegistry\(\)\.forEach/.test(importBody)) &&
+    /parsed\.factions/.test(importBody),
   'autoImportState() imports all factions via FACTION_REGISTRY.forEach'
 );
 assert(
@@ -335,7 +337,8 @@ for (const key of EXPECTED_SKILLS) {
   assert(skillKeys.includes(key), `SKILL_KEYS entry: "${key}"`);
 }
 assert(
-  /SKILL_KEYS\.forEach/.test(importBody) && /parsed\.skills/.test(importBody),
+  (/SKILL_KEYS\.forEach/.test(importBody) || /getSkillKeys\(\)\.forEach/.test(importBody)) &&
+    /parsed\.skills/.test(importBody),
   'autoImportState() imports all skills via SKILL_KEYS.forEach'
 );
 
