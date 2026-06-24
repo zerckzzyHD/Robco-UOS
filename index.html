@@ -69,9 +69,33 @@
         <div class="col-left" id="uiPanel">
           <!-- TAB NAVIGATION BAR -->
           <div class="tab-bar" role="tablist">
-            <button id="tab-btn-stat" class="tab-btn active" role="tab" onclick="switchTab('stat')" title="STAT [1]">STAT</button>
-            <button id="tab-btn-inv" class="tab-btn" role="tab" onclick="switchTab('inv')" title="INV [2]">INV</button>
-            <button id="tab-btn-data" class="tab-btn" role="tab" onclick="switchTab('data')" title="DATA [3]">DATA</button>
+            <button
+              id="tab-btn-stat"
+              class="tab-btn active"
+              role="tab"
+              onclick="switchTab('stat')"
+              title="STAT [1]"
+            >
+              STAT
+            </button>
+            <button
+              id="tab-btn-inv"
+              class="tab-btn"
+              role="tab"
+              onclick="switchTab('inv')"
+              title="INV [2]"
+            >
+              INV
+            </button>
+            <button
+              id="tab-btn-data"
+              class="tab-btn"
+              role="tab"
+              onclick="switchTab('data')"
+              title="DATA [3]"
+            >
+              DATA
+            </button>
           </div>
 
           <!-- 1. BIO-METRICS (STAT tab) -->
@@ -329,7 +353,28 @@
               <input type="hidden" id="stat_ticks" value="0" />
             </div>
             <div class="input-group">
-              <label>DATE:</label><span id="gameDateDisplay" style="font-size:11px;opacity:0.85;letter-spacing:0.5px;">—</span>
+              <label>DATE:</label
+              ><span
+                id="gameDateDisplay"
+                style="font-size: 11px; opacity: 0.85; letter-spacing: 0.5px"
+                >—</span
+              >
+            </div>
+            <div
+              class="input-group"
+              style="flex-direction: column; align-items: flex-start; gap: 1px"
+            >
+              <label style="margin-bottom: 1px">IN-GAME TIME:</label>
+              <span
+                id="gameTimeDisplay"
+                style="
+                  font-size: 10px;
+                  opacity: 0.8;
+                  letter-spacing: 0.3px;
+                  color: var(--robco-green);
+                "
+                >—</span
+              >
             </div>
             <div class="input-group">
               <label>WEIGHT [W]:</label><span id="display_weight">0 / 200</span>
@@ -836,7 +881,13 @@
                 max="5"
                 style="width: 58px"
               />
-              <input type="number" id="newPerkLevel" placeholder="Lvl" min="0" style="width: 46px" />
+              <input
+                type="number"
+                id="newPerkLevel"
+                placeholder="Lvl"
+                min="0"
+                style="width: 46px"
+              />
             </div>
             <button class="action-btn" onclick="addPerk()" style="margin-top: 4px">
               + ADD PERK
@@ -852,7 +903,15 @@
               <span style="color: rgba(20, 253, 206, 0.5)">No Active Effects</span>
             </div>
             <div style="display: flex; gap: 4px; margin-top: 6px">
-              <select id="newStatusName" style="flex: 2; background: rgba(0,0,0,0.8); color: var(--robco-green); border: 1px solid var(--robco-green)">
+              <select
+                id="newStatusName"
+                style="
+                  flex: 2;
+                  background: rgba(0, 0, 0, 0.8);
+                  color: var(--robco-green);
+                  border: 1px solid var(--robco-green);
+                "
+              >
                 <option value="Well Rested">Well Rested</option>
                 <option value="Dehydrated">Dehydrated</option>
                 <option value="Starving">Starving</option>
@@ -873,13 +932,32 @@
                 <option value="Bleeding">Bleeding</option>
                 <option value="Concussed">Concussed</option>
               </select>
-              <input type="number" id="newStatusTicks" placeholder="Ticks" style="flex: 1; width: 50px" />
-              <select id="newStatusType" style="flex: 1; background: rgba(0,0,0,0.8); color: var(--robco-green); border: 1px solid var(--robco-green)">
+              <input
+                type="number"
+                id="newStatusTicks"
+                placeholder="Ticks"
+                style="flex: 1; width: 50px"
+              />
+              <select
+                id="newStatusType"
+                style="
+                  flex: 1;
+                  background: rgba(0, 0, 0, 0.8);
+                  color: var(--robco-green);
+                  border: 1px solid var(--robco-green);
+                "
+              >
                 <option value="BUFF">BUFF</option>
                 <option value="DEBUFF">DEBUFF</option>
                 <option value="NEUTRAL">NEUTRAL</option>
               </select>
-              <button class="action-btn" style="width: auto; padding: 0 10px" onclick="addStatusEffect()">ADD</button>
+              <button
+                class="action-btn"
+                style="width: auto; padding: 0 10px"
+                onclick="addStatusEffect()"
+              >
+                ADD
+              </button>
             </div>
           </details>
 
@@ -890,7 +968,15 @@
             </summary>
             <div id="squadList"></div>
             <div style="display: flex; gap: 4px; margin-top: 6px">
-              <select id="newSquadName" style="flex: 1; background: rgba(0,0,0,0.8); color: var(--robco-green); border: 1px solid var(--robco-green)">
+              <select
+                id="newSquadName"
+                style="
+                  flex: 1;
+                  background: rgba(0, 0, 0, 0.8);
+                  color: var(--robco-green);
+                  border: 1px solid var(--robco-green);
+                "
+              >
                 <option value="Arcade Gannon">Arcade Gannon</option>
                 <option value="Boone">Boone</option>
                 <option value="Cass">Cass</option>
@@ -900,7 +986,13 @@
                 <option value="ED-E">ED-E</option>
                 <option value="Rex">Rex</option>
               </select>
-              <button class="action-btn" style="width: auto; padding: 0 10px" onclick="addSquadMember()">ADD</button>
+              <button
+                class="action-btn"
+                style="width: auto; padding: 0 10px"
+                onclick="addSquadMember()"
+              >
+                ADD
+              </button>
             </div>
           </details>
 
@@ -913,12 +1005,12 @@
           </details>
 
           <!-- 9b. KARMA CENTER (FO3 — G4) -->
-          <details class="panel" data-tab="stat" id="karmaPanel" style="display:none;">
+          <details class="panel" data-tab="stat" id="karmaPanel" style="display: none">
             <summary>
               <h2>&gt; KARMA CENTER</h2>
             </summary>
             <div id="karmaCenterDisplay">
-              <span style="opacity:0.4;">[FO3 MODE REQUIRED]</span>
+              <span style="opacity: 0.4">[FO3 MODE REQUIRED]</span>
             </div>
           </details>
 
@@ -931,8 +1023,20 @@
               <span style="color: rgba(20, 253, 206, 0.5)">No Notes Recorded</span>
             </div>
             <div style="display: flex; gap: 4px; margin-top: 6px">
-              <input type="text" id="newCampaignNote" placeholder="Enter tactical note..." style="flex: 1" onkeydown="if(event.key==='Enter') addCampaignNote()" />
-              <button class="action-btn" style="width: auto; padding: 0 10px" onclick="addCampaignNote()">ADD</button>
+              <input
+                type="text"
+                id="newCampaignNote"
+                placeholder="Enter tactical note..."
+                style="flex: 1"
+                onkeydown="if (event.key === 'Enter') addCampaignNote();"
+              />
+              <button
+                class="action-btn"
+                style="width: auto; padding: 0 10px"
+                onclick="addCampaignNote()"
+              >
+                ADD
+              </button>
             </div>
           </details>
 
@@ -953,7 +1057,7 @@
           <details class="panel" data-tab="data" id="worldMapPanel">
             <summary><h2>&gt; WORLD MAP</h2></summary>
             <div id="worldMapDisplay">
-              <span style="opacity:0.4;">[LOADING MAP...]</span>
+              <span style="opacity: 0.4">[LOADING MAP...]</span>
             </div>
           </details>
 
@@ -1151,7 +1255,9 @@
                     onchange="toggleAudio('robco_panelclick_muted', this.checked)"
                     style="width: auto; accent-color: var(--robco-alert)"
                   />
-                  <label for="mutePanelClickToggle" style="color: var(--robco-alert); font-size: 12px"
+                  <label
+                    for="mutePanelClickToggle"
+                    style="color: var(--robco-alert); font-size: 12px"
                     >MUTE PANEL CLICKS</label
                   >
                 </div>
@@ -1162,7 +1268,9 @@
                     onchange="toggleAudio('robco_bootdrone_muted', this.checked)"
                     style="width: auto; accent-color: var(--robco-alert)"
                   />
-                  <label for="muteBootDroneToggle" style="color: var(--robco-alert); font-size: 12px"
+                  <label
+                    for="muteBootDroneToggle"
+                    style="color: var(--robco-alert); font-size: 12px"
                     >MUTE BOOT DRONE</label
                   >
                 </div>
@@ -1184,7 +1292,9 @@
                     onchange="toggleAudio('robco_heartbeat_muted', this.checked)"
                     style="width: auto; accent-color: var(--robco-alert)"
                   />
-                  <label for="muteHeartbeatToggle" style="color: var(--robco-alert); font-size: 12px"
+                  <label
+                    for="muteHeartbeatToggle"
+                    style="color: var(--robco-alert); font-size: 12px"
                     >MUTE HEARTBEAT</label
                   >
                 </div>
@@ -1396,8 +1506,22 @@
               onchange="handleFileUpload(event)"
             />
             <!-- F6: New Campaign Flow — WIPE TERMINAL -->
-            <div style="margin-top: 16px; border-top: 1px dashed rgba(231,76,60,0.4); padding-top: 12px;">
-              <div style="font-size: 10px; opacity: 0.65; letter-spacing: 1px; margin-bottom: 8px; color: var(--robco-danger);">
+            <div
+              style="
+                margin-top: 16px;
+                border-top: 1px dashed rgba(231, 76, 60, 0.4);
+                padding-top: 12px;
+              "
+            >
+              <div
+                style="
+                  font-size: 10px;
+                  opacity: 0.65;
+                  letter-spacing: 1px;
+                  margin-bottom: 8px;
+                  color: var(--robco-danger);
+                "
+              >
                 ⚠ DANGER ZONE
               </div>
               <button
@@ -1492,20 +1616,43 @@
               "
               oninput="updateTokenBudget()"
             ></textarea>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px; margin-bottom: 2px;">
-              <button class="action-btn" style="width: auto; padding: 2px 8px; margin: 0; font-size: 11px;" onclick="showHelpModal()">[?]</button>
+            <div
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-top: 2px;
+                margin-bottom: 2px;
+              "
+            >
+              <button
+                class="action-btn"
+                style="width: auto; padding: 2px 8px; margin: 0; font-size: 11px"
+                onclick="showHelpModal()"
+              >
+                [?]
+              </button>
               <div
                 id="tokenBudgetDisplay"
-                style="font-size: 9px; opacity: 0.5; color: var(--robco-blue); text-align: right;"
+                style="font-size: 9px; opacity: 0.5; color: var(--robco-blue); text-align: right"
               ></div>
             </div>
 
             <div class="tactical-dashboard">
-                <details style="align-self: start; grid-area: dpad;" open>
-                  <summary style="font-size: 11px; margin-bottom: 5px; color: var(--robco-blue); border-bottom: 1px dashed var(--robco-blue); padding-bottom: 2px; cursor: pointer;">
+              <details style="align-self: start; grid-area: dpad" open>
+                <summary
+                  style="
+                    font-size: 11px;
+                    margin-bottom: 5px;
+                    color: var(--robco-blue);
+                    border-bottom: 1px dashed var(--robco-blue);
+                    padding-bottom: 2px;
+                    cursor: pointer;
+                  "
+                >
                   [+] D-PAD
                 </summary>
-                <div class="d-pad" style="margin-right: 15px;">
+                <div class="d-pad" style="margin-right: 15px">
                   <button class="action-btn" onclick="macroCommand('[PAD: UP]')">▲</button>
                   <div class="d-pad-row">
                     <button class="action-btn" onclick="macroCommand('[PAD: LEFT]')">◄</button>
@@ -1513,9 +1660,9 @@
                   </div>
                   <button class="action-btn" onclick="macroCommand('[PAD: DOWN]')">▼</button>
                 </div>
-                </details>
-                <div class="macro-actions" style="grid-area: input;">
-                  <input
+              </details>
+              <div class="macro-actions" style="grid-area: input">
+                <input
                   type="text"
                   id="macroTarget"
                   placeholder="Target / Item..."
@@ -1525,66 +1672,75 @@
                     width: 100%;
                     margin-bottom: 5px;
                   "
-                  />
-                </div>
-                <div class="macro-buttons" style="grid-area: buttons; display: grid; grid-template-columns: 1fr 1fr; gap: 5px">
-                  <button
-                    class="action-btn"
-                    style="margin: 0; color: var(--robco-blue); border-color: var(--robco-blue)"
-                    onclick="macroCommand('[THREAT]')"
-                  >
-                    [THREAT]
-                  </button>
-                  <button
-                    class="action-btn"
-                    style="margin: 0; color: var(--robco-blue); border-color: var(--robco-blue)"
-                    onclick="macroCommand('[VATS SIM]')"
-                  >
-                    [VATS]
-                  </button>
-                  <button
-                    class="action-btn"
-                    style="margin: 0; color: var(--robco-blue); border-color: var(--robco-blue)"
-                    onclick="macroCommand('[TRADE]')"
-                  >
-                    [TRADE]
-                  </button>
-                  <button
-                    class="action-btn"
-                    style="margin: 0; color: var(--robco-blue); border-color: var(--robco-blue)"
-                    onclick="macroCommand('[LOOT]')"
-                  >
-                    [LOOT]
-                  </button>
-                  <button
-                    class="action-btn"
-                    id="vatsCalcBtn"
-                    style="margin: 0; color: var(--robco-green); border-color: var(--robco-green); grid-column: 1 / -1; font-size: 10px; letter-spacing: 1.5px;"
-                    onclick="showVATSOverlay()"
-                  >
-                    V.A.T.S. CALCULATOR
-                  </button>
-                </div>
+                />
+              </div>
+              <div
+                class="macro-buttons"
+                style="grid-area: buttons; display: grid; grid-template-columns: 1fr 1fr; gap: 5px"
+              >
+                <button
+                  class="action-btn"
+                  style="margin: 0; color: var(--robco-blue); border-color: var(--robco-blue)"
+                  onclick="macroCommand('[THREAT]')"
+                >
+                  [THREAT]
+                </button>
+                <button
+                  class="action-btn"
+                  style="margin: 0; color: var(--robco-blue); border-color: var(--robco-blue)"
+                  onclick="macroCommand('[VATS SIM]')"
+                >
+                  [VATS]
+                </button>
+                <button
+                  class="action-btn"
+                  style="margin: 0; color: var(--robco-blue); border-color: var(--robco-blue)"
+                  onclick="macroCommand('[TRADE]')"
+                >
+                  [TRADE]
+                </button>
+                <button
+                  class="action-btn"
+                  style="margin: 0; color: var(--robco-blue); border-color: var(--robco-blue)"
+                  onclick="macroCommand('[LOOT]')"
+                >
+                  [LOOT]
+                </button>
+                <button
+                  class="action-btn"
+                  id="vatsCalcBtn"
+                  style="
+                    margin: 0;
+                    color: var(--robco-green);
+                    border-color: var(--robco-green);
+                    grid-column: 1 / -1;
+                    font-size: 10px;
+                    letter-spacing: 1.5px;
+                  "
+                  onclick="showVATSOverlay()"
+                >
+                  V.A.T.S. CALCULATOR
+                </button>
               </div>
             </div>
-            <button onclick="transmitMessage()" class="blue-btn" id="transmitBtn">
-              > TRANSMIT PROTOCOL
-            </button>
-            <button
-              onclick="undoLastSync()"
-              class="action-btn"
-              id="undoSyncBtn"
-              style="
-                display: none;
-                border-color: var(--robco-alert);
-                color: var(--robco-alert);
-                font-size: 11px;
-                margin-top: 3px;
-              "
-            >
-              &#x21A9; UNDO LAST SYNC
-            </button>
           </div>
+          <button onclick="transmitMessage()" class="blue-btn" id="transmitBtn">
+            > TRANSMIT PROTOCOL
+          </button>
+          <button
+            onclick="undoLastSync()"
+            class="action-btn"
+            id="undoSyncBtn"
+            style="
+              display: none;
+              border-color: var(--robco-alert);
+              color: var(--robco-alert);
+              font-size: 11px;
+              margin-top: 3px;
+            "
+          >
+            &#x21A9; UNDO LAST SYNC
+          </button>
         </div>
       </div>
     </div>

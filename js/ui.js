@@ -638,7 +638,7 @@ window.onload = function () {
         state.squad && state.squad.length > 0 ? state.squad.map(m => m.name).join(', ') : 'None';
       const limbStatus = ['la', 'ra', 'll', 'rl', 'hd'].filter(l => state[l] === 'CRIPPLED');
       const briefing = [
-        `> LOC: ${state.loc} | ${ticksToGameTime(state.ticks)} | HP: ${state.hpCur}/${state.hpMax}`,
+        `> LOC: ${state.loc} | ${formatGameTime(state.ticks)} | HP: ${state.hpCur}/${state.hpMax}`,
         `> CAPS: ${state.caps} | RADS: ${state.rads} | SQUAD: ${companionNames}`,
         limbStatus.length > 0 ? `> ⚠ CRIPPLED: ${limbStatus.join(', ').toUpperCase()}` : null,
         lastNote ? `> LAST NOTE: ${lastNote}` : null,
@@ -1115,7 +1115,7 @@ function exportCampaignLog(format = 'txt') {
         return `<div style="margin-bottom:10px;"><span style="color:${color};opacity:0.6;font-size:11px;">[${label}]</span><br><span style="color:${color};white-space:pre-wrap;">${safe}</span></div>`;
       })
       .join('');
-    const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>RobCo U.O.S. Campaign Log</title><style>body{background:#010a07;color:${fg};font-family:'Courier New',monospace;padding:20px;font-size:13px;line-height:1.5;}.header{text-align:center;border-bottom:1px dashed ${fg};padding-bottom:10px;margin-bottom:20px;letter-spacing:2px;}</style></head><body><div class="header"><h1>ROBCO INDUSTRIES U.O.S.<br>AFTER-ACTION CAMPAIGN LOG</h1><p>Courier: ${escapeHtml(state.loc || '?')} | ${ticksToGameTime(state.ticks || 0)} | Lv.${state.lvl || 1}</p></div>${rows}</body></html>`;
+    const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>RobCo U.O.S. Campaign Log</title><style>body{background:#010a07;color:${fg};font-family:'Courier New',monospace;padding:20px;font-size:13px;line-height:1.5;}.header{text-align:center;border-bottom:1px dashed ${fg};padding-bottom:10px;margin-bottom:20px;letter-spacing:2px;}</style></head><body><div class="header"><h1>ROBCO INDUSTRIES U.O.S.<br>AFTER-ACTION CAMPAIGN LOG</h1><p>Courier: ${escapeHtml(state.loc || '?')} | ${formatGameTime(state.ticks || 0)} | Lv.${state.lvl || 1}</p></div>${rows}</body></html>`;
     _downloadBlob(html, 'text/html', 'robco_campaign_log.html');
     return;
   }
@@ -1123,7 +1123,7 @@ function exportCampaignLog(format = 'txt') {
   if (format === 'md') {
     // #27 Export as Markdown
     let md = `# RobCo U.O.S. — Campaign Log\n\n`;
-    md += `**Location:** ${state.loc || '?'} | **Time:** ${ticksToGameTime(state.ticks || 0)} | **Level:** ${state.lvl || 1}\n\n---\n\n`;
+    md += `**Location:** ${state.loc || '?'} | **Time:** ${formatGameTime(state.ticks || 0)} | **Level:** ${state.lvl || 1}\n\n---\n\n`;
     chatHistory.forEach(msg => {
       let clean = msg.text
         .replace(/<[^>]*>?/gm, '')
@@ -1950,7 +1950,20 @@ function addSquadMember() {
 }
 
 // ── UTILITY FUNCTIONS ──────────────────────────────────────────
+// ── TIME SYSTEM ───────────────────────────────────────────────────
+// Internal representation: ticks (integer). 240 ticks = 1 in-game day.
+// 1 tick = 6 minutes. 10 ticks = 1 hour.
+//
+// ticksToGameTime(t)  → internal 'D1 14:00' format (legacy, used internally)
+// formatGameTime(t)   → Fallout-style 'Wednesday, 10.23.81, 1:40 AM' (display)
+// getGameDate()       → 'OCT 19, 2281' (calendar date only)
+// gameTimeToTicks()   → inverse: D/H/M → ticks (used by time input handler)
+//
+// Design: All display-facing code uses formatGameTime(). Internal logic and
+// save/persistence remain tick-based. Shared by FNV and FO3 via gameContext.
+
 function ticksToGameTime(t) {
+  // Internal format — kept for backward compatibility (log exports, any future consumers).
   let day = Math.floor(t / 240) + 1;
   let hr = Math.floor((t % 240) / 10);
   let mn = (t % 10) * 6;
@@ -1958,9 +1971,69 @@ function ticksToGameTime(t) {
 }
 
 // ── CALENDAR DATE (G7) ────────────────────────────────────────────
-// Computes the in-universe calendar date from state.ticks and state.gameContext.
+// Computes the absolute in-universe calendar from ticks + gameContext.
 // FNV starting date: October 19, 2281. FO3 starting date: August 17, 2277.
-// Returns string like "OCT 19, 2281" (or "NOV 06, 2281" for day 18).
+//
+// Returns a structured object so all downstream formatters share one source:
+//   { month, day, year, weekday, hour, minute } — all integers + strings.
+function _resolveGameDateTime(ticks) {
+  const MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  const isFO3 = typeof state !== 'undefined' && state.gameContext === 'FO3';
+
+  // Game-specific epoch
+  const startMonth = isFO3 ? 7 : 9; // Aug=7 (0-indexed), Oct=9
+  const startDay = isFO3 ? 17 : 19;
+  const startYear = isFO3 ? 2277 : 2281;
+
+  // FNV: Oct 19, 2281 = Sunday. FO3: Aug 17, 2277 = Wednesday.
+  // Weekday of epoch (0=Sun … 6=Sat)
+  const epochWeekday = isFO3 ? 3 : 0; // FO3=Wed(3), FNV=Sun(0)
+
+  const t = ticks || 0;
+  const dayOffset = Math.floor(t / 240); // whole days elapsed
+  const hr = Math.floor((t % 240) / 10);
+  const mn = (t % 10) * 6;
+
+  let month = startMonth;
+  let day = startDay + dayOffset;
+  let year = startYear;
+
+  // Roll calendar forward
+  while (day > MONTH_DAYS[month]) {
+    day -= MONTH_DAYS[month];
+    month++;
+    if (month > 11) {
+      month = 0;
+      year++;
+    }
+  }
+
+  const weekday = (epochWeekday + dayOffset) % 7;
+
+  return { month, day, year, weekday, hour: hr, minute: mn };
+}
+
+// Formats ticks as Fallout-style: 'Wednesday, 10.23.81, 1:40 AM'
+// Used for all player-visible time displays.
+function formatGameTime(t) {
+  const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const dt = _resolveGameDateTime(t);
+
+  // Date: MM.DD.YY (Fallout UI convention — 2-digit year)
+  const mm = String(dt.month + 1).padStart(2, '0');
+  const dd = String(dt.day).padStart(2, '0');
+  const yy = String(dt.year).slice(-2);
+  const dateStr = `${mm}.${dd}.${yy}`;
+
+  // Time: 12-hour with AM/PM
+  const ampm = dt.hour < 12 ? 'AM' : 'PM';
+  const h12 = dt.hour % 12 || 12;
+  const timeStr = `${h12}:${String(dt.minute).padStart(2, '0')} ${ampm}`;
+
+  return `${WEEKDAYS[dt.weekday]}, ${dateStr}, ${timeStr}`;
+}
+
+// Returns calendar date only as 'OCT 19, 2281' — used by gameDateDisplay.
 function getGameDate() {
   const MONTHS = [
     'JAN',
@@ -1976,37 +2049,18 @@ function getGameDate() {
     'NOV',
     'DEC',
   ];
-  const MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-  const isFO3 = typeof state !== 'undefined' && state.gameContext === 'FO3';
-  // Starting dates (month is 0-indexed)
-  const startMonth = isFO3 ? 7 : 9; // Aug=7, Oct=9
-  const startDay = isFO3 ? 17 : 19;
-  const startYear = isFO3 ? 2277 : 2281;
-
-  const ticks = (typeof state !== 'undefined' && state.ticks) || 0;
-  const dayOffset = Math.floor(ticks / 240); // 0-indexed days since campaign start
-
-  let month = startMonth;
-  let day = startDay + dayOffset;
-  let year = startYear;
-
-  // Roll over days into months/years
-  while (day > MONTH_DAYS[month]) {
-    day -= MONTH_DAYS[month];
-    month++;
-    if (month > 11) {
-      month = 0;
-      year++;
-    }
-  }
-
-  return `${MONTHS[month]} ${String(day).padStart(2, '0')}, ${year}`;
+  const dt = _resolveGameDateTime((typeof state !== 'undefined' && state.ticks) || 0);
+  return `${MONTHS[dt.month]} ${String(dt.day).padStart(2, '0')}, ${dt.year}`;
 }
 
-// Updates the #gameDateDisplay element in the Bio-Metrics panel.
+// Updates the DATE + TIME display in the Bio-Metrics panel.
+// Shows calendar date on the DATE row and Fallout-style time on the TIME row.
 function renderGameDate() {
-  const el = document.getElementById('gameDateDisplay');
-  if (el) el.textContent = getGameDate();
+  const dateEl = document.getElementById('gameDateDisplay');
+  if (dateEl) dateEl.textContent = getGameDate();
+  const timeEl = document.getElementById('gameTimeDisplay');
+  if (timeEl)
+    timeEl.textContent = formatGameTime((typeof state !== 'undefined' && state.ticks) || 0);
 }
 
 // Minute resolution snaps to nearest tick boundary (floor to multiple of 6).
@@ -2444,34 +2498,63 @@ function renderWorldMap() {
   display.innerHTML = html;
 }
 
+// ── FACTION REPUTATION — inline editing (Implementation 3) ─────────
+// adjustFaction(key, field, delta) — nudges fame or infamy by delta.
+// Called by inline [+] / [-] buttons in each faction card.
+// Clamps to 0–1000. Saves state and re-renders.
+function adjustFaction(key, field, delta) {
+  if (!state.factions) state.factions = {};
+  if (!state.factions[key]) state.factions[key] = { fame: 0, infamy: 0 };
+  const cur = state.factions[key][field] || 0;
+  state.factions[key][field] = Math.max(0, Math.min(1000, cur + delta));
+  saveState();
+  renderFactionRep();
+  _updatePanelBadges();
+}
+
 function renderFactionRep() {
   const container = document.getElementById('factionContainer');
   if (!container) return;
   const factions = state.factions || {};
 
+  // Build faction card with inline [+]/[-] fame/infamy nudges.
+  // Net standing label shown prominently; fame/infamy counts shown below for context.
+  // Buttons adjust by 50 per click — matches the 50-point standing tier boundaries.
   function factionCard(f) {
     const data = factions[f.key] || { fame: 0, infamy: 0 };
     const s = getFactionStanding(data.fame, data.infamy);
-    return `<div style="display:flex;flex-direction:column;align-items:center;gap:3px;padding:5px 3px;border:1px dashed rgba(20,253,206,0.3);text-align:center;min-width:0;">
-            <span style="font-size:9px;letter-spacing:0.4px;opacity:0.65;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%;">${escapeHtml(f.name)}</span>
-            <span style="font-size:10px;font-weight:bold;color:${s.color};">${s.label}</span>
-        </div>`;
+    const net = (data.fame || 0) - (data.infamy || 0);
+    const netStr = net > 0 ? `+${net}` : `${net}`;
+    const btnStyle =
+      'font-family:inherit;font-size:9px;background:rgba(0,0,0,0.6);border:1px dashed rgba(20,253,206,0.3);color:rgba(20,253,206,0.75);cursor:pointer;padding:1px 3px;line-height:1.4;';
+    return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 3px;border:1px dashed rgba(20,253,206,0.3);text-align:center;min-width:0;">
+      <span style="font-size:9px;letter-spacing:0.4px;opacity:0.65;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%;" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</span>
+      <span style="font-size:10px;font-weight:bold;color:${s.color};">${s.label}</span>
+      <span style="font-size:9px;opacity:0.55;">(${netStr})</span>
+      <div style="display:flex;gap:2px;flex-wrap:wrap;justify-content:center;margin-top:1px;">
+        <button style="${btnStyle}" title="Fame +50" onclick="adjustFaction('${f.key}','fame',50)">F+</button>
+        <button style="${btnStyle}" title="Fame -50" onclick="adjustFaction('${f.key}','fame',-50)">F-</button>
+        <button style="${btnStyle}color:var(--robco-danger);border-color:rgba(231,76,60,0.35);" title="Infamy +50" onclick="adjustFaction('${f.key}','infamy',50)">I+</button>
+        <button style="${btnStyle}color:var(--robco-danger);border-color:rgba(231,76,60,0.35);" title="Infamy -50" onclick="adjustFaction('${f.key}','infamy',-50)">I-</button>
+      </div>
+    </div>`;
   }
 
   const major = getFactionRegistry().filter(f => f.tier === 'major');
   const minor = getFactionRegistry().filter(f => f.tier === 'minor');
 
   container.innerHTML = `
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-top:4px;">
-            ${major.map(factionCard).join('')}
-        </div>
-        <details style="margin-top:6px;">
-            <summary style="font-size:11px;letter-spacing:1px;opacity:0.6;cursor:pointer;user-select:none;list-style:none;outline:none;font-family:inherit;padding:2px 0;">[+] MINOR FACTIONS</summary>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:5px;">
-                ${minor.map(factionCard).join('')}
-            </div>
-        </details>
-    `;
+    <div style="font-size:9px;opacity:0.45;margin-bottom:4px;letter-spacing:0.5px;">F+/F- = Fame ±50 &nbsp; I+/I- = Infamy ±50</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-top:2px;">
+      ${major.map(factionCard).join('')}
+    </div>
+    <details style="margin-top:6px;">
+      <summary style="font-size:11px;letter-spacing:1px;opacity:0.6;cursor:pointer;user-select:none;list-style:none;outline:none;font-family:inherit;padding:2px 0;">[+] MINOR FACTIONS</summary>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:5px;">
+        ${minor.map(factionCard).join('')}
+      </div>
+    </details>
+  `;
 }
 
 // ── G4: EXPANDED KARMA SYSTEM (FO3) ─────────────────────────────

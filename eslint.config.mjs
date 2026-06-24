@@ -122,6 +122,14 @@ export default [
         FALLOUT_REGISTRY: 'readonly',
         registrySearch: 'readonly',
         renderCollectibles: 'readonly',
+        // Time system (js/ui.js)
+        formatGameTime: 'readonly',
+        ticksToGameTime: 'readonly',
+        _resolveGameDateTime: 'readonly',
+        getGameDate: 'readonly',
+        renderGameDate: 'readonly',
+        // Faction reputation editing (js/ui.js)
+        adjustFaction: 'readonly',
         // Game database CSVs (js/db_nv.js or js/db_fo3.js)
         databaseCSVs: 'readonly',
       },

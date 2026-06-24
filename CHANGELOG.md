@@ -1,3 +1,50 @@
+## [v2.0.0] — The Universal Fallout Companion OS
+
+<!-- Date: 2026-06-24 | Tests: 169/169 | Cache: robco-terminal-v1.6.8-r13 -->
+
+### Major Features
+
+- **STAT / INV / DATA Tab Navigation** (F2): Three top-level tabs replace the single-scroll layout. All panels remain in DOM, hidden via CSS class toggling. Keyboard shortcuts 1/2/3 switch tabs. Chat/Comm-Link and Tactical Dashboard remain persistent outside tabs. Mobile sticky bottom tab bar above chat input.
+- **Game Context Abstraction Layer** (F1): `state.gameContext` field (`'FNV'` | `'FO3'`). `getFactionRegistry()` and `getSkillKeys()` getter functions are now context-aware. Boot sequence presents game context selection on first launch. AI system directive is a context-aware template.
+- **Database & Registry Modularization** (F3): `database.js` → `db_nv.js`, `registry.js` → `reg_nv.js`. New `db_fo3.js` and `reg_fo3.js` (base game). Both expose identical globals — downstream code is game-agnostic.
+- **Tab-Aware Panel Expansion** (F4): `expandPanelForCategory()` switches to the correct tab before opening a panel.
+- **Save Slot Game Context Validation** (F5): Save envelopes store `gameContext`. Load/save operations display game context on each slot and warn with a confirmation dialog when loading a save with mismatched context.
+- **New Campaign Flow** (F6): "WIPE TERMINAL — NEW CAMPAIGN" button in Security & Configuration. Double-confirmation dialog. Resets `state` to defaults, clears `chatHistory`, prompts game context selection.
+- **V.A.T.S. Tactical Overlay** (G1): Browser-side deterministic hit% calculator. Reads PER, AGI, weapon skill, active chem boosts. Outputs estimated hit% per body region (HEAD/TORSO/ARMS/LEGS/EYES/GROIN) with ASCII bar display. Clearly labeled ESTIMATED. Full-width button in Tactical Dashboard.
+- **Point-of-No-Return Safety Net** (G2): Context-aware prompt engineering in `getSystemDirective()`. FNV: warns before faction lockouts, Mr. House/Yes Man/Legion endings, quest branch closures. FO3: warns before karma threshold crossings, Megaton destruction, Purifier activation.
+- **Active Chem/Magazine Visualizer** (G3): `renderStatus()` enhanced — active BUFFs with ticks > 0 apply green highlight to affected Skill Matrix rows. Countdown tick display. Highlight snaps off on expiry.
+- **Expanded Karma System (FO3)** (G4): When `gameContext === 'FO3'`: Faction Standing panel hidden, Karma Center panel shown. Thresholds: Very Evil (<-750) / Evil (<-250) / Neutral / Good (>250) / Very Good (>750). Karma bar, companion availability notes, Enclave hit squad warning.
+- **Collectibles System** (G5): `state.collectibles[]` tracks acquired collectible names. INV tab panel showing ACQUIRED/MISSING status for FNV Snow Globes (7) and FO3 Bobbleheads (20). Terminal-style `[ACQUIRED]` / `[MISSING]` markers only. Panel badge shows `n/total`.
+- **Regional Zone Map** (G6): DATA tab persistent World Map panel. 6×6 CSS grid from `FALLOUT_REGISTRY.zones`. `[YOU]` blinking cursor on current zone (fuzzy match against `state.loc`), `[·]` visited breadcrumb from `state.locationHistory`, `[?]` uncollected collectible zone markers.
+- **Calendar Date Display** (G7): In Bio-Metrics panel as `DATE: OCT 19, 2281`. Starting date constants per game context (FNV: October 19, 2281; FO3: August 17, 2277). Offset computed from `state.ticks`.
+
+### Audio Additions
+
+- **H1 — Rotary Dial Clicks**: Short synthesized click (square wave, ~2000Hz, 15ms decay) on `<details>` toggle and tab switch. `panelClick` AudioSettings key.
+- **H2 — Thermal Load Pitch Shift**: During API call: CRT hum shifts 60Hz→80Hz over 5s, gain +20%. On return: snaps to 60Hz. No new AudioSettings key — modifies existing hum.
+- **H3 — Level Up Jingle**: Triggered when `autoImportState()` detects `state.lvl` increase. Three-note ascending arpeggio (sine, 440→660→880Hz, 80ms/note). `levelUp` AudioSettings key.
+- **H4 — Low Health Heartbeat**: Activates when HP < 25% (checked in `updateMath()`). Sine pulse ~1.2Hz, gain proportional to HP deficit. When concurrent with tinnitus (crippled head), tinnitus gain reduces 50%. `heartbeat` AudioSettings key.
+- **Boot Sequence Drone** (bonus): Sawtooth 30→60Hz power-on ramp on first user interaction after boot. `bootDrone` AudioSettings key.
+
+### Immersion Polish
+
+- **I1 — Hardware Memory Dump Errors**: API errors and parse failures render as `> ⚠ FATAL EXCEPTION AT 0x{hex} — MODULE: COMM_LINK — {error}`. Pure string formatting in `transmitMessage()` catch blocks.
+- **I2 — Collectibles in Session Statistics**: Session Statistics displays `COLLECTIBLES: {collected}/{total}`.
+
+### Data
+
+- **FNV Registry** (`reg_nv.js`): Added `collectibles` (7 Snow Globes with zone location hints) and `zones` (6×6 Mojave grid, 36 named zones with fuzzy location arrays) to the FNV registry.
+- **FO3 Registry** (`reg_fo3.js`): Added `collectibles` (20 Bobbleheads — STRENGTH, PERCEPTION, ENDURANCE, CHARISMA, INTELLIGENCE, AGILITY, LUCK, MEDICINE, SCIENCE, REPAIR, LOCKPICK, SPEECH, BARTER, SNEAK, EXPLOSIVES, ENERGY WEAPONS, MELEE WEAPONS, SMALL GUNS, UNARMED, BIG GUNS) with location hints. Added `zones` (6×6 Capital Wasteland grid, 36 named zones).
+- **FO3 Database** (`db_fo3.js`): Base game weapons, armor, chems, enemies for Fallout 3.
+
+### Internal
+
+- **Tests**: 169/169 passing.
+- **Cache**: Bumped Service Worker cache to `robco-terminal-v1.6.8-r13`.
+- **ESLint globals**: Added all new functions: `switchTab`, `renderCollectibles`, `renderGameDate`, `renderWorldMap`, `renderKarmaCenter`, `_updateContextPanels`, `showVATSOverlay`, `wipeTerminal`, `playPanelClick`, `playLevelUpJingle`, `startHeartbeat`, `stopHeartbeat`, `playBootDrone`, `startThermalLoad`, `stopThermalLoad`.
+
+---
+
 ## [v1.6.8] — Implementation Polish: Notes, Status, Squad, and UI Enhancements
 
 <!-- Date: 2026-06-23 | Tests: 165/165 | Cache: robco-terminal-v1.6.8-r5 -->

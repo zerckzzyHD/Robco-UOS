@@ -338,7 +338,7 @@ assert(
 // ══════════════════════════════════════════════════════════════
 header('Registry structural integrity');
 
-const registrySource = readFile('js/registry.js');
+const registrySource = readFile('js/reg_nv.js');
 
 // 8.1 FALLOUT_REGISTRY global declaration must exist
 assert(/const\s+FALLOUT_REGISTRY\s*=/.test(registrySource), 'FALLOUT_REGISTRY global is declared');
@@ -370,7 +370,7 @@ assert(/slice\s*\(\s*0\s*,\s*7\s*\)/.test(registrySource), 'registrySearch() cap
 // 8.6 Source of truth attribution must be present
 assert(
   /fallout\.wiki/i.test(registrySource),
-  'registry.js contains fallout.wiki attribution comment'
+  'reg_nv.js contains fallout.wiki attribution comment'
 );
 
 // 8.7 Version field must be declared
@@ -385,11 +385,8 @@ assert(
 const registryCode = registrySource
   .replace(/\/\*[\s\S]*?\*\//g, '') // block comments
   .replace(/\/\/[^\r\n]*/g, ''); // line comments (works with CRLF)
-assert(
-  !/\bstate\b/.test(registryCode),
-  'registry.js does not reference state (pure reference data)'
-);
-assert(!/localStorage/.test(registryCode), 'registry.js does not reference localStorage (in code)');
+assert(!/\bstate\b/.test(registryCode), 'reg_nv.js does not reference state (pure reference data)');
+assert(!/localStorage/.test(registryCode), 'reg_nv.js does not reference localStorage (in code)');
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 9 — Database structural integrity
@@ -398,7 +395,7 @@ assert(!/localStorage/.test(registryCode), 'registry.js does not reference local
 // ══════════════════════════════════════════════════════════════
 header('Database structural integrity');
 
-const dbSource = readFile('js/database.js');
+const dbSource = readFile('js/db_nv.js');
 
 // 9.1 databaseCSVs global must be declared
 assert(/const\s+databaseCSVs/.test(dbSource), 'databaseCSVs global is declared');
@@ -419,11 +416,11 @@ const REQUIRED_TABLES = [
   '[VENDORS.CSV]',
 ];
 for (const tbl of REQUIRED_TABLES) {
-  assert(dbSource.includes(tbl), `database.js contains ${tbl} section`);
+  assert(dbSource.includes(tbl), `db_nv.js contains ${tbl} section`);
 }
 
 // 9.4 lookupItemInDb must be referenced in database.js (item weight/value cache integrity)
-assert(/lookupItemInDb/.test(dbSource), "'lookupItemInDb' function exists in database.js");
+assert(/lookupItemInDb/.test(dbSource), "'lookupItemInDb' function exists in db_nv.js");
 
 // 9.5 BESTIARY must have ≥ 30 data rows (guards against data regression)
 const bestiaryBlock = dbSource.match(/\[BESTIARY\.CSV\]([\s\S]*?)(?=\[|`;)/);
@@ -451,9 +448,9 @@ assert(
 const dbCode = dbSource
   .replace(/\/\*[\s\S]*?\*\//g, '') // strip block comments
   .replace(/\/\/[^\r\n]*/g, ''); // strip line comments
-assert(!/\bstate\b/.test(dbCode), 'database.js does not reference state (pure reference data)');
-assert(!/localStorage/.test(dbCode), 'database.js does not reference localStorage');
-assert(!/chatHistory/.test(dbCode), 'database.js does not reference chatHistory');
+assert(!/\bstate\b/.test(dbCode), 'db_nv.js does not reference state (pure reference data)');
+assert(!/localStorage/.test(dbCode), 'db_nv.js does not reference localStorage');
+assert(!/chatHistory/.test(dbCode), 'db_nv.js does not reference chatHistory');
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 10 — DOM ID Binding (syncStateFromDom)

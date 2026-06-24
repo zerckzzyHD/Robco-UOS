@@ -548,6 +548,10 @@ const FALLOUT_REGISTRY = {
     { name: 'Leather Belt', type: 'misc' },
     { name: 'Tin Can', type: 'misc' },
     { name: 'Wonderglue', type: 'misc' },
+    // Caravan game items — FNV-specific playing card mechanic
+    // Source: https://fallout.wiki/wiki/Caravan_(game)
+    { name: 'Caravan Deck', type: 'misc' },
+    { name: 'Caravan Card', type: 'misc' },
   ],
 
   // ── PERKS ──────────────────────────────────────────────────────────────────

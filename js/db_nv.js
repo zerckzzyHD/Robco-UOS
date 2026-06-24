@@ -404,6 +404,8 @@ Abraxo Cleaner,1.0,8,Cleaning
 Empty Nuka-Cola Bottle,1.0,1,Container
 Sunset Sarsaparilla Bottle,1.0,1,Container
 Sunset Sarsaparilla Star Cap,0.0,25,Special
+Caravan Deck,1.0,50,Game
+Caravan Card (single),0.0,5,Game
 Pre-War Money,0.0,10,Currency
 NCR Money,0.0,40,Currency
 Legion Coin,0.0,50,Currency
