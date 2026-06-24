@@ -220,15 +220,12 @@ const EXPECTED_FACTIONS = [
   'bos',
   'boomers',
   'khans',
-  // Minor (8)
+  // Minor (5)
   'followers',
   'powder',
   'kings',
-  'wgs',
-  'vangraff',
-  'crimson',
-  'chairmen',
-  'omertas',
+  'strip',
+  'freeside',
 ];
 for (const key of EXPECTED_FACTIONS) {
   assert(factionKeys.includes(key), `FACTION_REGISTRY key: "${key}"`);

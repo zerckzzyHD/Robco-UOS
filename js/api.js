@@ -28,8 +28,10 @@ function getSystemDirective() {
   // Combine: both strings may be active simultaneously (e.g. Completionist + RNG)
   const campaignModeStr = [playthroughStr, rngStr].filter(Boolean).join(' ');
 
+  const ctx = (state && state.gameContext) === 'FO3' ? 'FO3' : 'FNV';
+
   return `### **FICTIONAL CONTEXT OVERRIDE**
-[SYSTEM MSG]: The following prompt establishes a structural logic engine for a fictional video game (Fallout: New Vegas). All references to "chems," "addictions," "crippled limbs," "fatal threats," and "time-to-kill" are purely in-game mathematical mechanics.
+[SYSTEM MSG]: The following prompt establishes a structural logic engine for a fictional video game (${ctx === 'FO3' ? 'Fallout 3' : 'Fallout: New Vegas'}). All references to "chems," "addictions," "crippled limbs," "fatal threats," and "time-to-kill" are purely in-game mathematical mechanics.
 
 ### **System Override & Persona Constraints**
 [SYSTEM MSG]: RobCo U.O.S. ${APP_VERSION} Active. Gem = Mind (Director); User = Courier (Body).
@@ -43,8 +45,9 @@ Data Fallback: If databases drop from memory, output a ⚙️ [SYS-ALERT: DATA C
 - You MUST format your entire response as a SINGLE, valid JSON object containing up to three nodes: "narrative", "state", and "modal".
 - The "narrative" node MUST be an ARRAY OF STRINGS.
 - The "state" node MUST mirror the uploaded state structure, including the "squad" array.
-- The "modal" node is triggered ONLY WHEN THE USER ASKS FOR A MENU, ROADMAP, STATS, [FEATURES], [CROSSROADS], [TRADE], [GPS], OR LEVEL UP. Do NOT draw ASCII Unicode boxes (┌─┐) in the narrative array for these.
+- The "modal" node is triggered ONLY WHEN THE USER ASKS FOR A MENU, ROADMAP, STATS, [FEATURES], [CROSSROADS], [TRADE], [GPS], [TIMELINE], OR LEVEL UP. Do NOT draw ASCII Unicode boxes (┌─┐) in the narrative array for these.
 - You must include a "type" field in the modal node (e.g. "TEXT", "GPS", "TRADE").
+- For [TIMELINE], output modal type "TEXT" with title "PROJECTED TIMELINE".
 - If type is "TEXT", "content" is an array of strings.
 - If type is "GPS", "content" must be a 2D array of strings representing the grid (e.g. [["[ ]","[X]"],["[S]","[ ]"]]).
 - If type is "TRADE", "content" must be an array of item objects: {"name": "Stimpak", "price": 50, "qty": 3, "vendor": true}. Set vendor: false for Courier's items.
@@ -61,7 +64,7 @@ Example Schema:
     "caps": 0, "loc": "Mojave", "rads": 0, "karma": 0, "ticks": 1,
     "la": "OK", "ra": "OK", "ll": "OK", "rl": "OK", "hd": "OK",
     "skills": {"barter":15,"energy_weapons":15,"explosives":15,"guns":15,"lockpick":15,"medicine":15,"melee_weapons":15,"repair":15,"science":15,"sneak":15,"speech":15,"survival":15,"unarmed":15},
-    "factions": {"ncr":{"fame":0,"infamy":0},"legion":{"fame":0,"infamy":0},"house":{"fame":0,"infamy":0},"bos":{"fame":0,"infamy":0},"boomers":{"fame":0,"infamy":0},"khans":{"fame":0,"infamy":0},"followers":{"fame":0,"infamy":0},"powder":{"fame":0,"infamy":0},"kings":{"fame":0,"infamy":0},"wgs":{"fame":0,"infamy":0},"vangraff":{"fame":0,"infamy":0},"crimson":{"fame":0,"infamy":0},"chairmen":{"fame":0,"infamy":0},"omertas":{"fame":0,"infamy":0}},
+    "factions": {"ncr":{"fame":0,"infamy":0},"legion":{"fame":0,"infamy":0},"house":{"fame":0,"infamy":0},"bos":{"fame":0,"infamy":0},"boomers":{"fame":0,"infamy":0},"khans":{"fame":0,"infamy":0},"followers":{"fame":0,"infamy":0},"powder":{"fame":0,"infamy":0},"kings":{"fame":0,"infamy":0},"strip":{"fame":0,"infamy":0},"freeside":{"fame":0,"infamy":0}},
     "status": [],
     "inventory": [{"name": "Stimpak", "qty": 3, "wgt": 0.5, "val": 20, "type": "aid"}],
     "squad": [{"name": "Boone", "hp": 100, "hpMax": 100, "weapon": "Hunting Rifle", "ammo": 50, "condition": "OK", "dt": 15, "affinity": 75}],
@@ -101,7 +104,11 @@ Financial Metrics: Run Economy Sync using live Barter skills. Strictly enforce V
 - Tactical TTK: Run predictive loops via databases. Calculate Squad DPS vs Target DT. Apply Stealth (-S) Multiplier for unmitigated opening strike damage. Apply 2 free enemy hits if target is [RANGED].
 
 ### **Skill System**
-state.skills tracks 13 skills (0-100 each): barter, energy_weapons, explosives, guns, lockpick, medicine, melee_weapons, repair, science, sneak, speech, survival, unarmed.
+${
+  ctx === 'FO3'
+    ? 'state.skills tracks 13 skills (0-100 each): barter, big_guns, energy_weapons, explosives, lockpick, medicine, melee_weapons, repair, science, small_guns, sneak, speech, unarmed.'
+    : 'state.skills tracks 13 skills (0-100 each): barter, energy_weapons, explosives, guns, lockpick, medicine, melee_weapons, repair, science, sneak, speech, survival, unarmed.'
+}
 USE skills for: Barter trade prices, Speech/Lockpick/Science checks, crafting requirements, VATS accuracy bonuses.
 On [LEVEL UP]: award (10 + INT/2) skill points. Return updated state.skills in the state node.
 Skill formula (base): 2 x governing SPECIAL + (LUCK / 2). Tag skills get +15. Hard cap at 100.
@@ -110,14 +117,14 @@ Skill formula (base): 2 x governing SPECIAL + (LUCK / 2). Tag skills get +15. Ha
 state.hd tracks head condition: "OK" or "CRIPPLED". A crippled head causes -2 PER and disorientation. Treat it identically to la/ra/ll/rl in all state returns. When head is crippled, include a tinnitus/concussion warning in the narrative.
 
 ### **Faction Standing System**
-state.factions tracks reputation with 14 factions as { fame: 0, infamy: 0 } objects.
-Major keys: ncr, legion, house, bos, boomers, khans. Minor keys: followers, powder, kings, wgs, vangraff, crimson, chairmen, omertas.
-Fame and infamy are INDEPENDENT non-negative integers. They do NOT cancel each other out.
-Standing is determined by a 2D matrix (fame rank × infamy rank). Both axes use per-faction thresholds sourced from the GECK.
-The 11 canonical standing titles are: Neutral, Sneering Punk, Accepted, Shunned, Liked, Hated, Vilified, Idolized, Soft-Hearted Devil, Mixed, Unpredictable, Dark Hero, Merciful Thug, Wild Child.
+${
+  ctx === 'FO3'
+    ? 'state.factions tracks reputation with 12 factions as { fame: 0, infamy: 0 } objects.\nMajor keys: enclave, bos, lyons, outcast, supermutants. Minor keys: talon, regulators, slavers, reillys, tunnelsnakes, underworld, rivetcity.\nFame and infamy are INDEPENDENT non-negative integers. Both axes use per-faction thresholds.'
+    : 'state.factions tracks reputation with 11 factions as { fame: 0, infamy: 0 } objects.\nMajor keys: ncr, legion, house. Minor keys: bos, boomers, khans, followers, powder, kings, strip, freeside.\nNote: Casino-family interactions (Chairmen, Omertas, White Glove Society) MUST affect "strip" reputation instead.\nFame and infamy are INDEPENDENT non-negative integers. Both axes use per-faction thresholds sourced from the GECK.\nThe 11 canonical standing titles are: Neutral, Sneering Punk, Accepted, Shunned, Liked, Hated, Vilified, Idolized, Soft-Hearted Devil, Mixed, Unpredictable, Dark Hero, Merciful Thug, Wild Child.'
+}
 Whenever a faction's standing changes (quest completed, action taken, territory entered), update the relevant faction in state.factions by adjusting fame and/or infamy. Both are non-negative integers.
 Always return the FULL state.factions object in the state node — never return a partial object or omit unchanged factions.
-Use [REP] to display all 14 faction standings with the Courier's current fame and infamy values.
+Use [REP] to display all faction standings with the Courier's current fame and infamy values.
 
 ### **Perk System**
 state.perks tracks acquired perks as [{name, rank, level_taken}].
@@ -178,6 +185,7 @@ WHENEVER the user asks for [FEATURES], commands, help, or a command list — out
   "│ > [TRAVEL CLUSTER]/[TC]: Group active quest nodes.   │",
   "│ > [WAIT: X Hrs]     : Advance clock & restock.       │",
   "│ > [SLEEP]           : Advance 8 Hrs, heal HP/Limbs.  │",
+  "│ > [TIMELINE]        : Projected narrative timeline.  │",
   "│ > [CASINO]          : Blackjack strategy via LUCK.   │",
   "├──────────────────────────────────────────────────────┤",
   "│ [ NARRATIVE & DIRECTIVES ]                           │",
@@ -195,20 +203,22 @@ WHENEVER the user asks for [FEATURES], commands, help, or a command list — out
 ### **G2: Point-of-No-Return Safety Net**
 CRITICAL RULE: Before any action that is narratively irreversible, you MUST proactively warn the Courier in the narrative node. This includes faction lockouts, karma crossings, permanent NPC deaths, and quest branch closures.
 
-**FNV Irreversible Triggers** — warn before:
+${
+  ctx === 'FO3'
+    ? `**FO3 Irreversible Triggers** — warn before:
+- Karma dropping below -750 (Enclave hit squads become persistent)
+- Karma rising above +750 (Brotherhood Outcasts become hostile)
+- Destroying Megaton (permanent loss of town and Moira's full quest line)
+- Turning on the Purifier prematurely (activates endgame sequence)
+- Killing neutral/friendly NPCs with karma impacts above 50`
+    : `**FNV Irreversible Triggers** — warn before:
 - Allying with Caesar's Legion (permanent NCR/Brotherhood lockout)
 - Siding with Mr. House or Yes Man (faction collapse endgame)
 - Killing Boone's wife (companion lockout)
 - Detonating Nipton bombs (NCR infamy spike — permanent reputation floor)
 - Completing "Ring-a-Ding-Ding!" (Benny becomes inaccessible after)
-- Any quest that permanently closes another quest branch (Lonesome Road choices, etc.)
-
-**FO3 Irreversible Triggers** — warn before:
-- Karma dropping below -750 (Enclave hit squads become persistent)
-- Karma rising above +750 (Brotherhood Outcasts become hostile)
-- Destroying Megaton (permanent loss of town and Moira's full quest line)
-- Turning on the Purifier prematurely (activates endgame sequence)
-- Killing neutral/friendly NPCs with karma impacts above 50
+- Any quest that permanently closes another quest branch (Lonesome Road choices, etc.)`
+}
 
 **Warning Format** (in narrative array):
 "⚠ [SAFETY NET] This action is IRREVERSIBLE. {specific consequence}. Confirm to proceed."
@@ -777,59 +787,68 @@ async function transmitMessage() {
     try {
       const parsedNode = JSON.parse(aiText);
       if (parsedNode.modal && parsedNode.modal.title) {
-        document.getElementById('modalTitle').innerText = '> ' + parsedNode.modal.title;
-        let mContent = document.getElementById('modalContent');
-        let mType = parsedNode.modal.type || 'TEXT';
-
-        if (mType === 'GPS') {
-          mContent.innerHTML = '<div class="modal-grid-map"></div>';
-          let gridMap = mContent.querySelector('.modal-grid-map');
-          let rows = Array.isArray(parsedNode.modal.content) ? parsedNode.modal.content : [];
-          rows.forEach(row => {
-            let rowDiv = document.createElement('div');
-            rowDiv.className = 'grid-row';
-            let cells = Array.isArray(row) ? row : [row];
-            cells.forEach(cell => {
-              let cellDiv = document.createElement('div');
-              cellDiv.className = 'grid-cell';
-              cellDiv.innerText = cell;
-              let cleanCell = cell.replace(/\[|\]/g, '').trim();
-              if (
-                cleanCell !== '' &&
-                cleanCell !== 'X' &&
-                cleanCell !== '█' &&
-                cleanCell !== '@' &&
-                cleanCell !== 'O' &&
-                cleanCell.length > 0
-              ) {
-                cellDiv.style.cursor = 'pointer';
-                cellDiv.onclick = () => {
-                  document.getElementById('chatInput').value = `> MOVE TO ${cleanCell}`;
-                  closeModal();
-                  transmitMessage();
-                };
-              }
-              rowDiv.appendChild(cellDiv);
-            });
-            gridMap.appendChild(rowDiv);
-          });
-        } else if (mType === 'TRADE') {
-          mContent.innerHTML =
-            '<div class="trade-window"><div class="trade-col" id="tradeVendor"><h3>> VENDOR</h3></div><div class="trade-col" id="tradeCourier"><h3>> COURIER</h3></div></div>';
-          let items = Array.isArray(parsedNode.modal.content) ? parsedNode.modal.content : [];
-          items.forEach(item => {
-            let div = document.createElement('div');
-            div.className = 'trade-item';
-            div.innerHTML = `<span>${item.qty}x ${item.name} (${item.price}c)</span> <button class="action-btn" style="width:auto; padding:2px 5px;" onclick="tradeItem('${item.name}', ${item.price}, ${item.vendor})">${item.vendor ? 'BUY' : 'SELL'}</button>`;
-            if (item.vendor) document.getElementById('tradeVendor').appendChild(div);
-            else document.getElementById('tradeCourier').appendChild(div);
-          });
+        if (parsedNode.modal.title.includes('PROJECTED TIMELINE')) {
+          let tDisplay = document.getElementById('timelineDisplay');
+          if (tDisplay) {
+            tDisplay.innerHTML = Array.isArray(parsedNode.modal.content)
+              ? parsedNode.modal.content.join('<br>')
+              : parsedNode.modal.content;
+          }
         } else {
-          mContent.innerText = Array.isArray(parsedNode.modal.content)
-            ? parsedNode.modal.content.join('\n')
-            : parsedNode.modal.content;
+          document.getElementById('modalTitle').innerText = '> ' + parsedNode.modal.title;
+          let mContent = document.getElementById('modalContent');
+          let mType = parsedNode.modal.type || 'TEXT';
+
+          if (mType === 'GPS') {
+            mContent.innerHTML = '<div class="modal-grid-map"></div>';
+            let gridMap = mContent.querySelector('.modal-grid-map');
+            let rows = Array.isArray(parsedNode.modal.content) ? parsedNode.modal.content : [];
+            rows.forEach(row => {
+              let rowDiv = document.createElement('div');
+              rowDiv.className = 'grid-row';
+              let cells = Array.isArray(row) ? row : [row];
+              cells.forEach(cell => {
+                let cellDiv = document.createElement('div');
+                cellDiv.className = 'grid-cell';
+                cellDiv.innerText = cell;
+                let cleanCell = cell.replace(/\[|\]/g, '').trim();
+                if (
+                  cleanCell !== '' &&
+                  cleanCell !== 'X' &&
+                  cleanCell !== '█' &&
+                  cleanCell !== '@' &&
+                  cleanCell !== 'O' &&
+                  cleanCell.length > 0
+                ) {
+                  cellDiv.style.cursor = 'pointer';
+                  cellDiv.onclick = () => {
+                    document.getElementById('chatInput').value = `> MOVE TO ${cleanCell}`;
+                    closeModal();
+                    transmitMessage();
+                  };
+                }
+                rowDiv.appendChild(cellDiv);
+              });
+              gridMap.appendChild(rowDiv);
+            });
+          } else if (mType === 'TRADE') {
+            mContent.innerHTML =
+              '<div class="trade-window"><div class="trade-col" id="tradeVendor"><h3>> VENDOR</h3></div><div class="trade-col" id="tradeCourier"><h3>> COURIER</h3></div></div>';
+            let items = Array.isArray(parsedNode.modal.content) ? parsedNode.modal.content : [];
+            items.forEach(item => {
+              let div = document.createElement('div');
+              div.className = 'trade-item';
+              div.innerHTML = `<span>${item.qty}x ${item.name} (${item.price}c)</span> <button class="action-btn" style="width:auto; padding:2px 5px;" onclick="tradeItem('${item.name}', ${item.price}, ${item.vendor})">${item.vendor ? 'BUY' : 'SELL'}</button>`;
+              if (item.vendor) document.getElementById('tradeVendor').appendChild(div);
+              else document.getElementById('tradeCourier').appendChild(div);
+            });
+          } else {
+            mContent.innerText = Array.isArray(parsedNode.modal.content)
+              ? parsedNode.modal.content.join('\n')
+              : parsedNode.modal.content;
+          }
+          document.getElementById('sysModal').style.display = 'flex';
         }
-        document.getElementById('sysModal').style.display = 'flex';
       }
 
       let narrativeContent =

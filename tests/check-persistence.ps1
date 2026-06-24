@@ -134,7 +134,7 @@ foreach ($key in $stateKeys) {
 # ===========================================================
 Sep "Suite 2 -- FACTION_REGISTRY completeness"
 $EXP_FACTIONS = @('ncr','legion','house','bos','boomers','khans',
-                  'followers','powder','kings','wgs','vangraff','crimson','chairmen','omertas')
+                  'followers','powder','kings','strip','freeside')
 foreach ($k in $EXP_FACTIONS) { Check ($factionKeys -contains $k) "FACTION_REGISTRY key: '$k'" }
 $hasForEach = ($importBody -match 'getFactionRegistry\(\)\.forEach') -and ($importBody -match 'parsed\.factions')
 Check $hasForEach "autoImportState() imports factions via getFactionRegistry().forEach"

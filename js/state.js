@@ -1,5 +1,5 @@
 // ── APP VERSION ───────────────────────────────────────────────
-const APP_VERSION = '1.6.8';
+const APP_VERSION = '2.0.0';
 window.APP_VERSION = APP_VERSION;
 
 // ── FACTION REGISTRY ─────────────────────────────────────────────
@@ -13,11 +13,8 @@ const FACTION_REGISTRY = [
   { key: 'followers', name: 'Followers of the Apocalypse', tier: 'minor' },
   { key: 'powder', name: 'Powder Gangers', tier: 'minor' },
   { key: 'kings', name: 'The Kings', tier: 'minor' },
-  { key: 'wgs', name: 'White Glove Society', tier: 'minor' },
-  { key: 'vangraff', name: 'Van Graffs', tier: 'minor' },
-  { key: 'crimson', name: 'Crimson Caravan', tier: 'minor' },
-  { key: 'chairmen', name: 'Chairmen', tier: 'minor' },
-  { key: 'omertas', name: 'Omertas', tier: 'minor' },
+  { key: 'strip', name: 'The Strip', tier: 'minor' },
+  { key: 'freeside', name: 'Freeside', tier: 'minor' },
 ];
 
 // FO3 faction registry — Capital Wasteland factions
@@ -298,6 +295,28 @@ function migrateState(version, s) {
         : 'standard';
     s.playthroughType = _validPT.includes(_lsPT) ? _lsPT : 'standard';
   }
+  // C6: Faction Pruning & Archival Migration
+  // Archive wgs, chairmen, omertas, vangraff, crimson to campaign notes
+  if (s.factions) {
+    const legacyKeys = ['wgs', 'chairmen', 'omertas', 'vangraff', 'crimson'];
+    let removedData = [];
+    legacyKeys.forEach(k => {
+      if (s.factions[k] && (s.factions[k].fame > 0 || s.factions[k].infamy > 0)) {
+        removedData.push(
+          `${k.toUpperCase()} (Fame: ${s.factions[k].fame}, Infamy: ${s.factions[k].infamy})`
+        );
+      }
+      delete s.factions[k];
+    });
+    if (removedData.length > 0) {
+      if (!s.campaign_notes) s.campaign_notes = [];
+      s.campaign_notes.push(`[LEGACY FACTION ARCHIVE] ${removedData.join(' | ')}`);
+    }
+    // Ensure new factions exist
+    if (!s.factions.strip) s.factions.strip = { fame: 0, infamy: 0 };
+    if (!s.factions.freeside) s.factions.freeside = { fame: 0, infamy: 0 };
+  }
+
   delete s.macros; // v1.6.7: macros removed — D-Pad handles this natively
   return s;
 }
