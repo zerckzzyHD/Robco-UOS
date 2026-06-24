@@ -1,6 +1,6 @@
 ## [v2.0.0] — The Universal Fallout Companion OS
 
-<!-- Date: 2026-06-24 | Tests: 176/178 (2 pre-existing failures) | Cache: robco-terminal-v1.6.8-r16 -->
+<!-- Date: 2026-06-24 | Tests: 178/178 | Cache: robco-terminal-v1.6.8-r16 -->
 
 ### [C1] Reputation 2D Matrix Rewrite (2026-06-24)
 
@@ -50,7 +50,7 @@
 
 ### Internal
 
-- **Tests**: 169/169 passing.
+- **Tests**: 178/178 passing.
 - **Cache**: Bumped Service Worker cache to `robco-terminal-v1.6.8-r13`.
 - **ESLint globals**: Added all new functions: `switchTab`, `renderCollectibles`, `renderGameDate`, `renderWorldMap`, `renderKarmaCenter`, `_updateContextPanels`, `showVATSOverlay`, `wipeTerminal`, `playPanelClick`, `playLevelUpJingle`, `startHeartbeat`, `stopHeartbeat`, `playBootDrone`, `startThermalLoad`, `stopThermalLoad`.
 
