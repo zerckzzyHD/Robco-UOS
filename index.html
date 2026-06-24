@@ -1875,18 +1875,18 @@
           var v7 = JSON.parse(localStorage.getItem('robco_v7') || '{}');
           var ctx = v8.activeContext || v7.gameContext || 'FNV';
           if (ctx === 'FO3') {
-            document.write('<script src="js/db_fo3.js"><\\/script>');
-            document.write('<script src="js/state.js"><\\/script>');
-            document.write('<script src="js/reg_fo3.js"><\\/script>');
+            document.write('<script src="js/db_fo3.js"><\/script>');
+            document.write('<script src="js/state.js"><\/script>');
+            document.write('<script src="js/reg_fo3.js"><\/script>');
           } else {
-            document.write('<script src="js/db_nv.js"><\\/script>');
-            document.write('<script src="js/state.js"><\\/script>');
-            document.write('<script src="js/reg_nv.js"><\\/script>');
+            document.write('<script src="js/db_nv.js"><\/script>');
+            document.write('<script src="js/state.js"><\/script>');
+            document.write('<script src="js/reg_nv.js"><\/script>');
           }
         } catch (e) {
-          document.write('<script src="js/db_nv.js"><\\/script>');
-          document.write('<script src="js/state.js"><\\/script>');
-          document.write('<script src="js/reg_nv.js"><\\/script>');
+          document.write('<script src="js/db_nv.js"><\/script>');
+          document.write('<script src="js/state.js"><\/script>');
+          document.write('<script src="js/reg_nv.js"><\/script>');
         }
       })();
     </script>
