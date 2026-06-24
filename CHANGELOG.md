@@ -21,7 +21,7 @@
 ### [C10] World Map UX Redesign (2026-06-24)
 
 - **2-Tier Map Zoom**: Solved the information density ceiling by upgrading the static 6x6 map grid into an interactive UI.
-  - **Zoom Level 1 (World Grid)**: Displays the 36 major campaign zones with real-time `[YOU]`, `[·]`, and `[?]` density markers. Employs a strict two-line clamp with `overflow-wrap` to prevent long zone names from forcibly expanding the CSS Grid column beyond the viewport limits, ensuring the map stays perfectly fitted.
+  - **Zoom Level 1 (World Grid)**: Displays the 36 major campaign zones with real-time `[YOU]`, `[·]`, and `[?]` density markers. Employs a strict four-line clamp with `overflow-wrap: break-word` and CSS hyphens to prevent long zone names from forcibly expanding the CSS Grid column beyond the viewport limits, ensuring the map stays perfectly fitted without cutting off words early.
   - **Zoom Level 2 (Zone Detail)**: Clicking/tapping any zone zooms into a detailed scrollable layout listing every individual sub-location within that zone.
 - **Micro-interactions**: Added `.map-cell` CRT hover states and instant touch-target expansion for mobile clients.
 - **Dynamic Diagnostics**: Zoom Level 2 individually evaluates each discovered location and flags exactly which sub-location contains an undiscovered collectible.

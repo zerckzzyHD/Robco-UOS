@@ -2788,7 +2788,7 @@ function renderWorldMap() {
         flex-direction:column;
         justify-content:space-between;
       ">
-        <span style="line-height:1.2; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; text-overflow:ellipsis; overflow-wrap:anywhere;">${escapeHtml(zone.name)}</span>
+        <span style="line-height:1.2; display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; text-overflow:ellipsis; overflow-wrap:break-word; hyphens:auto;">${escapeHtml(zone.name)}</span>
         <span style="font-size:8px;">${marker}</span>
       </div>`;
     }
