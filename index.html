@@ -1395,6 +1395,26 @@
               accept=".json"
               onchange="handleFileUpload(event)"
             />
+            <!-- F6: New Campaign Flow — WIPE TERMINAL -->
+            <div style="margin-top: 16px; border-top: 1px dashed rgba(231,76,60,0.4); padding-top: 12px;">
+              <div style="font-size: 10px; opacity: 0.65; letter-spacing: 1px; margin-bottom: 8px; color: var(--robco-danger);">
+                ⚠ DANGER ZONE
+              </div>
+              <button
+                id="wipeTerminalBtn"
+                class="action-btn"
+                onclick="wipeTerminal()"
+                style="
+                  width: 100%;
+                  color: var(--robco-danger);
+                  border-color: var(--robco-danger);
+                  font-size: 11px;
+                  letter-spacing: 1.5px;
+                "
+              >
+                &gt; WIPE TERMINAL — NEW CAMPAIGN
+              </button>
+            </div>
           </details>
         </div>
 

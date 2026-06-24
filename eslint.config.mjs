@@ -109,6 +109,7 @@ export default [
         _updateContextPanels: 'readonly',
         renderWorldMap: 'readonly',
         showVATSOverlay: 'readonly',
+        wipeTerminal: 'readonly',
         attachedImageData: 'writable',
         attachedImageMimeType: 'writable',
         _buildFactions: 'readonly',

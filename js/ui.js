@@ -2704,6 +2704,55 @@ function clearChat() {
   }
 }
 
+// ── F6: WIPE TERMINAL — NEW CAMPAIGN ────────────────────────────────
+// Double-confirmation wipe: resets state to defaults, clears chat history,
+// re-presents game context selection screen.
+function wipeTerminal() {
+  if (
+    !confirm(
+      '> WIPE TERMINAL\n\nThis will erase ALL Courier data:\n- SPECIAL / Skills / Perks / Quests\n- Inventory / Factions / Status Effects\n- Campaign Notes / Collectibles / Squad\n- Chat History / Session Statistics\n\nSave slots are preserved.\n\nThis CANNOT be undone. Continue?'
+    )
+  )
+    return;
+  if (
+    !confirm(
+      '> FINAL CONFIRMATION\n\nAre you absolutely certain?\nType OK to confirm terminal wipe.\n\nThis will destroy all unsaved progress.'
+    )
+  )
+    return;
+
+  // Reset state to defaults (preserves gameContext selection from boot)
+  const freshState = JSON.parse(JSON.stringify(window._defaultState || {}));
+  freshState.gameContext = state.gameContext || 'FNV'; // preserve game context for now
+  Object.assign(state, freshState);
+
+  // Clear chat history
+  chatHistory = [];
+  localStorage.removeItem('robco_chat');
+  localStorage.removeItem('robco_v7'); // force fresh state on next save
+
+  // Re-present game context selection
+  state.gameContext = null;
+
+  // Save the wiped state
+  saveState();
+
+  // Clear chat display
+  const chatDisplay = document.getElementById('chatDisplay');
+  if (chatDisplay) chatDisplay.innerHTML = '';
+
+  // Reload UI
+  loadUI();
+  switchTab('stat');
+
+  // Show context selection prompt in chat
+  appendToChat('> TERMINAL WIPED. INITIATING NEW CAMPAIGN...', 'sys', true);
+  appendToChat('> SELECT GAME CONTEXT:', 'sys', true);
+  appendToChat('> Type [CONTEXT: FNV] for Fallout: New Vegas', 'sys', true);
+  appendToChat('> Type [CONTEXT: FO3] for Fallout 3', 'sys', true);
+  appendToChat('> Or the AI will detect your game automatically.', 'sys', true);
+}
+
 // ── SAVE SLOTS (#6) ────────────────────────────────────────────────
 // 3 named slots (A/B/C) stored as robco_slot_1/2/3 in localStorage.
 // Each slot stores the full envelope {version, state, chat, playstyle, savedAt, slotName}.
@@ -2724,13 +2773,15 @@ function saveToSlot(slotNum) {
     playstyle: localStorage.getItem('robco_playstyle') || 'any',
     savedAt: Date.now(),
     slotName: _slotLabel(slotNum),
+    gameContext: state.gameContext || 'FNV', // F5: store game context in envelope
   };
   try {
     localStorage.setItem(_slotKey(slotNum), JSON.stringify(envelope));
     const el = document.getElementById('slotStatus');
     const ts = new Date(envelope.savedAt).toLocaleTimeString();
-    if (el) el.textContent = `${_slotLabel(slotNum)} saved at ${ts}`;
-    appendToChat(`> [SAVE] ${_slotLabel(slotNum)} written at ${ts}`, 'sys', true);
+    const ctx = envelope.gameContext;
+    if (el) el.textContent = `${_slotLabel(slotNum)} [${ctx}] saved at ${ts}`;
+    appendToChat(`> [SAVE] ${_slotLabel(slotNum)} [${ctx}] written at ${ts}`, 'sys', true);
   } catch (e) {
     appendToChat('> [ERROR] Save slot write failed — storage quota exceeded.', 'sys', true);
   }
@@ -2744,6 +2795,15 @@ function loadFromSlot(slotNum) {
   }
   try {
     let env = JSON.parse(raw);
+    // F5: Warn on gameContext mismatch between slot and current session
+    const slotCtx = env.gameContext || env.state?.gameContext || 'FNV';
+    const curCtx = state.gameContext || 'FNV';
+    if (slotCtx !== curCtx) {
+      const ok = confirm(
+        `> CONTEXT MISMATCH\n\nThis save is a ${slotCtx} campaign.\nYou are currently in ${curCtx} mode.\n\nLoading will switch to ${slotCtx}. Continue?`
+      );
+      if (!ok) return;
+    }
     if (typeof migrateState === 'function')
       env.state = migrateState(env.version || '1.0', env.state);
     state = { ...state, ...env.state };
@@ -2755,9 +2815,10 @@ function loadFromSlot(slotNum) {
     }
     loadUI();
     const ts = env.savedAt ? new Date(env.savedAt).toLocaleString() : 'unknown';
-    appendToChat(`> [LOAD] ${_slotLabel(slotNum)} restored. Saved: ${ts}`, 'sys', true);
+    const ctx = slotCtx;
+    appendToChat(`> [LOAD] ${_slotLabel(slotNum)} [${ctx}] restored. Saved: ${ts}`, 'sys', true);
     const statusEl = document.getElementById('slotStatus');
-    if (statusEl) statusEl.textContent = `${_slotLabel(slotNum)} loaded (saved: ${ts})`;
+    if (statusEl) statusEl.textContent = `${_slotLabel(slotNum)} [${ctx}] loaded (saved: ${ts})`;
   } catch (e) {
     appendToChat('> [ERROR] Save slot corrupted or unreadable.', 'sys', true);
   }
