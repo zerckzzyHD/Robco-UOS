@@ -1,6 +1,6 @@
 ## [v2.0.0] — The Universal Fallout Companion OS
 
-<!-- Date: 2026-06-24 | Tests: 181/181 | Cache: robco-terminal-v1.6.8-r17 -->
+<!-- Date: 2026-06-24 | Tests: 188/188 | Cache: robco-terminal-v1.6.8-r18 -->
 
 ### [C1] Reputation 2D Matrix Rewrite (2026-06-24)
 
@@ -20,6 +20,18 @@
 - **Expanded Help Modal**: `showHelpModal()` rewritten with the full 27-command canonical registry from `api.js` (all 5 sections: Tactical, Inventory, Character, Navigation, Narrative). Title updated from "COMMAND CHEAT SHEET" to "COMM-LINK COMMAND REGISTRY". Displayed as a monospace box-drawing grid, matching the in-game [FEATURES] output exactly.
 - **Tests**: 3 new tests in `tests/check-persistence.js` (Suite 2c): `removePerk` exists, `toggleCollectible` exists, help modal contains expanded registry.
 - **CACHE_NAME**: Bumped to `robco-terminal-v1.6.8-r17`.
+
+### [C3] CAMPG Tab + Game Context + Playstyle Relocation (2026-06-24)
+
+- **CAMPG Tab**: 4th tab added to the tab bar (`data-tab="campg"`, keyboard shortcut `4`). `TAB_NAMES` expanded to `['stat', 'inv', 'data', 'campg']` in `ui.js`.
+- **Game Context Selector**: `<select id="gameContextSelect">` added to CAMPG panel. Options: `Fallout: New Vegas` (FNV) and `Fallout 3` (FO3). Selecting FO3 shows an amber informational warning banner — FO3 data systems are not yet active (deferred to v2.0.0). `onGameContextChange()` handler updates `state.gameContext` and saves.
+- **Playstyle Relocated**: Playstyle `<select>` moved from Security & Config panel to CAMPG panel. Security & Config now focuses purely on API key, optics, audio, cloud sync, and save management.
+- **Wipe Terminal Relocated**: Wipe Terminal danger-zone button moved from Security & Config to CAMPG panel. CAMPG is now the authoritative location for all campaign lifecycle actions.
+- **Timeline Shell**: `<div id="timelineDisplay">` placeholder added inside a collapsible PROJECTED TIMELINE panel in CAMPG. Displays "NO TIMELINE GENERATED" hint until the `[TIMELINE]` command is used (C7).
+- **FO3 Warning Banner CSS**: `.fo3-warning-banner` class added to `terminal.css` — amber dashed border, small font, displayed when FO3 context is selected.
+- **Context Restore on Load**: `onGameContextChange()` initializes the context selector and banner state on every page load from `state.gameContext`.
+- **Tests**: 7 new tests in `tests/check-persistence.js` (Suite 2d): CAMPG tab button, panel, game context select, FO3 banner, timeline display, `onGameContextChange()` function, `TAB_NAMES` includes `campg`.
+- **CACHE_NAME**: Bumped to `robco-terminal-v1.6.8-r18`.
 
 ### Major Features
 

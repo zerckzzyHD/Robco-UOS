@@ -330,6 +330,35 @@ assert(
 );
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 2d — C3 CAMPG Tab (C3)
+//  Verifies CAMPG tab and related DOM elements exist.
+// ══════════════════════════════════════════════════════════════
+header('C3 CAMPG Tab');
+const htmlSource = readFile('index.html');
+assert(
+  /id="tab-btn-campg"/.test(htmlSource),
+  'CAMPG tab button exists in index.html (id="tab-btn-campg")'
+);
+assert(/id="campgPanel"/.test(htmlSource), 'CAMPG panel exists in index.html (id="campgPanel")');
+assert(
+  /id="gameContextSelect"/.test(htmlSource),
+  'Game context select exists in index.html (id="gameContextSelect")'
+);
+assert(
+  /id="fo3WarningBanner"/.test(htmlSource),
+  'FO3 warning banner exists in index.html (id="fo3WarningBanner")'
+);
+assert(
+  /id="timelineDisplay"/.test(htmlSource),
+  'Timeline display shell exists in index.html (id="timelineDisplay")'
+);
+assert(
+  /function onGameContextChange\b/.test(uiSource),
+  'onGameContextChange() function exists in ui.js'
+);
+assert(/TAB_NAMES.*campg/.test(uiSource), "TAB_NAMES includes 'campg' in ui.js");
+
+// ══════════════════════════════════════════════════════════════
 //  SUITE 3 — SKILL_KEYS completeness
 // ══════════════════════════════════════════════════════════════
 header('SKILL_KEYS completeness');

@@ -388,6 +388,19 @@ textarea {
   display: block;
 }
 
+/* C3: FO3 warning banner — shown when gameContext = FO3 */
+.fo3-warning-banner {
+  margin-top: 6px;
+  padding: 6px 8px;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  line-height: 1.5;
+  color: var(--robco-alert);
+  border: 1px dashed var(--robco-alert);
+  background: rgba(231, 204, 60, 0.06);
+  opacity: 0.85;
+}
+
 .modal-overlay {
   display: none;
   position: fixed;

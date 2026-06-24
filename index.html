@@ -96,6 +96,15 @@
             >
               DATA
             </button>
+            <button
+              id="tab-btn-campg"
+              class="tab-btn"
+              role="tab"
+              onclick="switchTab('campg')"
+              title="CAMPG [4]"
+            >
+              CAMPG
+            </button>
           </div>
 
           <!-- 1. BIO-METRICS (STAT tab) -->
@@ -1061,6 +1070,111 @@
             </div>
           </details>
 
+          <!-- 13b. CAMPG — Campaign & Configuration -->
+          <details class="panel" data-tab="campg" id="campgPanel" open>
+            <summary>
+              <h2>> CAMPAIGN CONFIGURATION</h2>
+            </summary>
+
+            <!-- Game Context -->
+            <div class="input-group" style="margin-bottom: 10px">
+              <label style="font-size: 11px; letter-spacing: 1px; opacity: 0.8">GAME:</label>
+              <select
+                id="gameContextSelect"
+                style="width: 100%"
+                onchange="onGameContextChange(this.value)"
+              >
+                <option value="FNV">Fallout: New Vegas</option>
+                <option value="FO3">Fallout 3</option>
+              </select>
+              <div id="fo3WarningBanner" class="fo3-warning-banner" style="display: none">
+                &#9888; FO3 DATA SYSTEMS NOT YET ACTIVE. Narrative and tracking remain in FNV mode
+                until v2.0.0.
+              </div>
+            </div>
+
+            <!-- Playstyle -->
+            <div class="input-group" style="margin-bottom: 10px">
+              <label style="font-size: 11px; letter-spacing: 1px; opacity: 0.8">PLAYSTYLE:</label>
+              <select
+                id="playstyleInput"
+                style="width: 100%"
+                onchange="changePlaystyle(this.value)"
+              >
+                <option value="any">Any Weapon (Default)</option>
+                <option value="melee">Melee/Unarmed Only</option>
+              </select>
+            </div>
+
+            <!-- Timeline Panel Shell -->
+            <details style="margin-bottom: 10px">
+              <summary
+                style="
+                  cursor: pointer;
+                  user-select: none;
+                  list-style: none;
+                  outline: none;
+                  font-size: 12px;
+                  letter-spacing: 1px;
+                  opacity: 0.85;
+                "
+              >
+                [+] PROJECTED TIMELINE
+              </summary>
+              <div
+                id="timelineDisplay"
+                style="
+                  margin-top: 8px;
+                  font-size: 10px;
+                  opacity: 0.7;
+                  line-height: 1.6;
+                  padding-left: 4px;
+                  border-left: 1px dashed var(--robco-green);
+                  min-height: 32px;
+                "
+              >
+                <span style="opacity: 0.45"
+                  >[NO TIMELINE GENERATED — USE [TIMELINE] COMMAND IN COMM-LINK]</span
+                >
+              </div>
+            </details>
+
+            <!-- Wipe Terminal (Danger Zone) -->
+            <div
+              style="
+                margin-top: 16px;
+                border-top: 1px dashed rgba(231, 76, 60, 0.4);
+                padding-top: 12px;
+              "
+            >
+              <div
+                style="
+                  font-size: 10px;
+                  opacity: 0.65;
+                  letter-spacing: 1px;
+                  margin-bottom: 8px;
+                  color: var(--robco-danger);
+                "
+              >
+                &#9888; DANGER ZONE
+              </div>
+              <button
+                id="wipeTerminalBtn"
+                class="action-btn"
+                onclick="wipeTerminal()"
+                style="
+                  width: 100%;
+                  color: var(--robco-danger);
+                  border-color: var(--robco-danger);
+                  font-size: 11px;
+                  letter-spacing: 1.5px;
+                "
+              >
+                &gt; WIPE TERMINAL &mdash; NEW CAMPAIGN
+              </button>
+            </div>
+          </details>
+
           <!-- 13. SECURITY & CONFIGURATION -->
           <details class="panel" style="border-color: var(--robco-alert)">
             <summary>
@@ -1115,23 +1229,6 @@
                 <option value="legion">Legion Red</option>
                 <option value="ghoul">Ghoul Green</option>
                 <option value="neon">Neon Purple</option>
-              </select>
-            </div>
-
-            <div class="input-group" style="margin-top: 10px">
-              <label style="color: var(--robco-alert)">PLAYSTYLE:</label>
-              <select
-                id="playstyleInput"
-                style="
-                  width: 100%;
-                  border-color: var(--robco-alert);
-                  background: rgba(0, 0, 0, 0.8);
-                  color: var(--robco-alert);
-                "
-                onchange="changePlaystyle(this.value)"
-              >
-                <option value="any">Any Weapon (Default)</option>
-                <option value="melee">Melee/Unarmed Only</option>
               </select>
             </div>
 
@@ -1505,40 +1602,6 @@
               accept=".json"
               onchange="handleFileUpload(event)"
             />
-            <!-- F6: New Campaign Flow — WIPE TERMINAL -->
-            <div
-              style="
-                margin-top: 16px;
-                border-top: 1px dashed rgba(231, 76, 60, 0.4);
-                padding-top: 12px;
-              "
-            >
-              <div
-                style="
-                  font-size: 10px;
-                  opacity: 0.65;
-                  letter-spacing: 1px;
-                  margin-bottom: 8px;
-                  color: var(--robco-danger);
-                "
-              >
-                ⚠ DANGER ZONE
-              </div>
-              <button
-                id="wipeTerminalBtn"
-                class="action-btn"
-                onclick="wipeTerminal()"
-                style="
-                  width: 100%;
-                  color: var(--robco-danger);
-                  border-color: var(--robco-danger);
-                  font-size: 11px;
-                  letter-spacing: 1.5px;
-                "
-              >
-                &gt; WIPE TERMINAL — NEW CAMPAIGN
-              </button>
-            </div>
           </details>
         </div>
 

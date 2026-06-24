@@ -11,11 +11,11 @@
 npm run lint        # ESLint — zero new errors
 npm run format      # Prettier — all files clean
 git add -A
-git commit          # Pre-commit hook: 181 tests must pass
+git commit          # Pre-commit hook: 188 tests must pass
 git push origin main
 ```
 
-- **181 tests must pass.** If fewer pass, something is broken. Investigate before committing.
+- **188 tests must pass.** If fewer pass, something is broken. Investigate before committing.
 - **Never use `--no-verify`** unless the user explicitly authorizes it for a stated emergency.
 
 ---
@@ -67,7 +67,7 @@ Requires changes in **4 files minimum.** The pre-commit audit will block if any 
 - [ ] Add `<details class="panel">` block in `index.html` (if it needs a panel)
 - [ ] Bump `CACHE_NAME` in `sw.js` → Protocol 1
 - [ ] Run `npm run lint` and `npm run format`
-- [ ] Run `git commit` — 181 tests must pass
+- [ ] Run `git commit` — 188 tests must pass
 - [ ] Update `ARCHITECTURE.md`, `CHANGELOG.md`, `README.md` → Protocol 2
 
 ---
@@ -81,7 +81,7 @@ Requires changes in **4 files minimum.** The pre-commit audit will block if any 
 - [ ] If AI changes should auto-expand it: add key to `expandPanelForCategory()` map in `ui.js`
 - [ ] If it has a text input with autocomplete: call `wireInput()` in `initRegistryAutocomplete()` in `ui.js`
 - [ ] Bump `CACHE_NAME` → Protocol 1
-- [ ] Lint, format, commit (181 tests) → Protocol 2
+- [ ] Lint, format, commit (188 tests) → Protocol 2
 
 ---
 
@@ -139,4 +139,4 @@ Requires changes in **4 files minimum.** The pre-commit audit will block if any 
 
 **State persistence:** `localStorage` key `robco_v7`. Debounced 500ms writes. Flushed immediately on `beforeunload`.
 
-**Test suite:** 181 tests across 10 suites in `tests/check-persistence.ps1` (PowerShell) and `tests/check-persistence.js` (Node). Covers parser sanity, autoImportState coverage, faction registry, skill keys, save envelope, file upload, cloud sync, backward compatibility, registry structural integrity, reputation 2D matrix, and C2 CRUD function existence.
+**Test suite:** 188 tests across 10 suites in `tests/check-persistence.ps1` (PowerShell) and `tests/check-persistence.js` (Node). Covers parser sanity, autoImportState coverage, faction registry, skill keys, save envelope, file upload, cloud sync, backward compatibility, registry structural integrity, reputation 2D matrix, C2 CRUD function existence, and C3 CAMPG tab DOM binding.

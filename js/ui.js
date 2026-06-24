@@ -551,6 +551,15 @@ window.onload = function () {
     }
   }
 
+  // Restore game context selector
+  {
+    const ctx = (state && state.gameContext) || 'FNV';
+    const sel = document.getElementById('gameContextSelect');
+    if (sel) sel.value = ctx;
+    const banner = document.getElementById('fo3WarningBanner');
+    if (banner) banner.style.display = ctx === 'FO3' ? 'block' : 'none';
+  }
+
   // #34 Typewriter Speed — restore slider + label on load
   {
     const savedSpeed = parseFloat(localStorage.getItem('robco_typer_speed') || '1');
@@ -602,6 +611,9 @@ window.onload = function () {
         } else if (e.key === '3') {
           e.preventDefault();
           switchTab('data');
+        } else if (e.key === '4') {
+          e.preventDefault();
+          switchTab('campg');
         }
       }
     }
@@ -1082,6 +1094,14 @@ function changePlaystyle(style) {
   localStorage.setItem('robco_playstyle', style);
 }
 
+function onGameContextChange(ctx) {
+  if (ctx !== 'FNV' && ctx !== 'FO3') return;
+  state.gameContext = ctx;
+  saveState();
+  const banner = document.getElementById('fo3WarningBanner');
+  if (banner) banner.style.display = ctx === 'FO3' ? 'block' : 'none';
+}
+
 // ── CAMPAIGN LOG EXPORT ────────────────────────────────────────
 // format: 'txt' (default), 'html' (#41), 'md' (#27)
 function exportCampaignLog(format = 'txt') {
@@ -1219,9 +1239,9 @@ function _updatePanelBadges() {
 // ── AUTO-EXPAND PANEL (#31) ──────────────────────────────────────────
 // ── TAB NAVIGATION ───────────────────────────────────────────────
 // Tabs: 'stat' | 'inv' | 'data'
-// Each panel has data-tab="stat|inv|data". Panels with no data-tab always show.
+// Each panel has data-tab="stat|inv|data|campg". Panels with no data-tab always show.
 // Security & Configuration has no data-tab and is always visible.
-const TAB_NAMES = ['stat', 'inv', 'data'];
+const TAB_NAMES = ['stat', 'inv', 'data', 'campg'];
 
 function switchTab(tab) {
   if (!TAB_NAMES.includes(tab)) return;
