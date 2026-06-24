@@ -1039,7 +1039,7 @@ body.thermal-load .panel {
     min-width: 0;
     min-height: 0;
   }
-  .chat-panel {
+  .panel.chat-panel {
     flex-grow: 1;
     display: flex;
     flex-direction: column;
