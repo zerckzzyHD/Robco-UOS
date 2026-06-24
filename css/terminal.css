@@ -767,6 +767,19 @@ details.sub-panel[open] > summary h3::after {
   font-weight: bold;
 }
 
+/* ─── G3: Active Chem Boost Highlight ─────────────────────────── */
+/* Applied to skill matrix rows when an active BUFF with ticks > 0 matches the skill. */
+/* Monochrome: brighter phosphor only, not a different color. */
+.chem-boost {
+  text-shadow:
+    0 0 6px var(--robco-green),
+    0 0 14px var(--robco-green);
+  filter: brightness(1.45);
+  transition:
+    text-shadow 0.3s ease,
+    filter 0.3s ease;
+}
+
 /* ─── Limb Trauma Glitch ──────────────────────────────────────── */
 @keyframes limb-glitch {
   0%,

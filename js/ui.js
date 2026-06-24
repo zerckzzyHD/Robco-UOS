@@ -10,6 +10,7 @@ const AudioSettings = {
   tinnitus: localStorage.getItem('robco_tinnitus_muted') === 'true',
   ambient: localStorage.getItem('robco_ambient_muted') === 'true',
   wake: localStorage.getItem('robco_wake_muted') === 'true',
+  panelClick: localStorage.getItem('robco_panelclick_muted') === 'true', // H1: rotary dial clicks
   masterMute: localStorage.getItem('robco_master_muted') === 'true',
 };
 
@@ -391,6 +392,12 @@ window.onload = function () {
   initRegistryAutocomplete();
   initAmmoDatalist();
 
+  // H1: Rotary Dial Click — fire on any <details> panel toggle inside uiPanel
+  const _uiPanel = document.getElementById('uiPanel');
+  if (_uiPanel) {
+    _uiPanel.addEventListener('toggle', () => playPanelClick(), true);
+  }
+
   // ── TAB STANDBY MODE ───────────────────────────────────────────
   // enterStandby/exitStandby are shared so blur+visibilitychange
   // can both fire without doubling the wake tone or log message.
@@ -717,6 +724,7 @@ function toggleAudio(key, isMuted) {
     robco_tinnitus_muted: 'tinnitus',
     robco_ambient_muted: 'ambient',
     robco_wake_muted: 'wake',
+    robco_panelclick_muted: 'panelClick', // H1
   };
   if (keyMap[key] !== undefined) AudioSettings[keyMap[key]] = isMuted;
 
@@ -780,6 +788,25 @@ function toggleMasterMute(isMuted) {
       crtHumGain.gain.linearRampToValueAtTime(0.007, audioCtx.currentTime + 0.3);
     }
   }
+}
+
+// ── H1: ROTARY DIAL CLICK ───────────────────────────────────
+// Short synthesized click on details toggle and tab switch.
+// Square wave ~2000Hz, 15ms decay.
+function playPanelClick() {
+  if (AudioSettings.masterMute) return;
+  if (AudioSettings.panelClick) return;
+  ensureAudioCtx();
+  const osc = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  osc.type = 'square';
+  osc.frequency.setValueAtTime(2000, audioCtx.currentTime);
+  g.gain.setValueAtTime(0.035, audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.015);
+  osc.connect(g);
+  g.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.018);
 }
 
 function runBootSequence(onComplete) {
@@ -1017,6 +1044,10 @@ function _updatePanelBadges() {
       h2text: '> QUEST LOG',
       count: (state.quests || []).filter(q => q.status === 'active' || !q.status).length,
     },
+    {
+      h2text: '> COLLECTIBLES',
+      count: (state.collectibles || []).length,
+    },
   ];
   badges.forEach(({ h2text, count }) => {
     // Find the h2 with exactly this text (case-insensitive prefix match)
@@ -1046,6 +1077,7 @@ const TAB_NAMES = ['stat', 'inv', 'data'];
 
 function switchTab(tab) {
   if (!TAB_NAMES.includes(tab)) return;
+  playPanelClick(); // H1: rotary dial click on tab switch
   // Show panels for the active tab, hide others
   document.querySelectorAll('.panel[data-tab]').forEach(el => {
     if (el.dataset.tab === tab) {
@@ -1259,6 +1291,8 @@ function loadUI() {
   renderQuests();
   renderSessionStats();
   renderEquipped();
+  renderCollectibles();
+  renderGameDate();
   updateMath();
   triggerPhosphorGhost();
   // Radiation SPECIAL debuff coloring (display-only, does not modify state)
@@ -1313,6 +1347,7 @@ function onTimeInputChanged() {
   if (parseInt(minEl.value) > 59) minEl.value = 59;
 
   state.ticks = gameTimeToTicks(parseInt(dayEl.value), parseInt(hrEl.value), parseInt(minEl.value));
+  renderGameDate(); // Update calendar date display when time changes
   saveState();
 }
 
@@ -1669,7 +1704,58 @@ function ticksToGameTime(t) {
   return `D${day} ${String(hr).padStart(2, '0')}:${String(mn).padStart(2, '0')}`;
 }
 
-// ── INVERSE: D/H/M → ticks (1 tick = 6 minutes, 10 ticks/hr, 240 ticks/day) ──
+// ── CALENDAR DATE (G7) ────────────────────────────────────────────
+// Computes the in-universe calendar date from state.ticks and state.gameContext.
+// FNV starting date: October 19, 2281. FO3 starting date: August 17, 2277.
+// Returns string like "OCT 19, 2281" (or "NOV 06, 2281" for day 18).
+function getGameDate() {
+  const MONTHS = [
+    'JAN',
+    'FEB',
+    'MAR',
+    'APR',
+    'MAY',
+    'JUN',
+    'JUL',
+    'AUG',
+    'SEP',
+    'OCT',
+    'NOV',
+    'DEC',
+  ];
+  const MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  const isFO3 = typeof state !== 'undefined' && state.gameContext === 'FO3';
+  // Starting dates (month is 0-indexed)
+  const startMonth = isFO3 ? 7 : 9; // Aug=7, Oct=9
+  const startDay = isFO3 ? 17 : 19;
+  const startYear = isFO3 ? 2277 : 2281;
+
+  const ticks = (typeof state !== 'undefined' && state.ticks) || 0;
+  const dayOffset = Math.floor(ticks / 240); // 0-indexed days since campaign start
+
+  let month = startMonth;
+  let day = startDay + dayOffset;
+  let year = startYear;
+
+  // Roll over days into months/years
+  while (day > MONTH_DAYS[month]) {
+    day -= MONTH_DAYS[month];
+    month++;
+    if (month > 11) {
+      month = 0;
+      year++;
+    }
+  }
+
+  return `${MONTHS[month]} ${String(day).padStart(2, '0')}, ${year}`;
+}
+
+// Updates the #gameDateDisplay element in the Bio-Metrics panel.
+function renderGameDate() {
+  const el = document.getElementById('gameDateDisplay');
+  if (el) el.textContent = getGameDate();
+}
+
 // Minute resolution snaps to nearest tick boundary (floor to multiple of 6).
 function gameTimeToTicks(day, hour, min) {
   return (day - 1) * 240 + hour * 10 + Math.floor(min / 6);
@@ -1705,6 +1791,45 @@ function renderStatus() {
       return `<div class="effect-item"><span class="${typeClass}">${escapeHtml(eff.name || '')}${tickInfo}</span><div><span class="effect-type" style="margin-right:8px;">${escapeHtml(eff.type || 'BUFF')}</span><button class="delete-btn" onclick="removeStatusEffect(${i})">X</button></div></div>`;
     })
     .join('');
+  // G3: Apply chem boost highlights to Skill Matrix rows
+  _applyChemHighlights();
+}
+
+// G3: Active Chem Visualizer ─────────────────────────────────────────────────
+// Active BUFFs (type='BUFF', ticks > 0) apply .chem-boost class to matching skill rows.
+// Matching: buff name fuzzy-matched against skill key display names.
+// Highlight is a brighter phosphor effect (CSS class only, no color change).
+function _applyChemHighlights() {
+  // First, clear all existing highlights
+  document
+    .querySelectorAll('.skill-row.chem-boost')
+    .forEach(el => el.classList.remove('chem-boost'));
+
+  if (!state.status || state.status.length === 0) return;
+
+  // Active buffs with ticks > 0 (time-limited chems, not permanent)
+  const activeBuffs = state.status.filter(eff => eff.type === 'BUFF' && (eff.ticks || 0) > 0);
+  if (activeBuffs.length === 0) return;
+
+  // Build skill key → display name mapping from getSkillKeys()
+  const skillKeys = getSkillKeys();
+  const skillNames = skillKeys.map(k => ({ key: k, name: k.replace(/_/g, ' ').toUpperCase() }));
+
+  activeBuffs.forEach(buff => {
+    const buffName = (buff.name || '').toLowerCase();
+    skillNames.forEach(({ key }) => {
+      const skillName = key.replace(/_/g, ' ').toLowerCase();
+      // Simple substring match: buff name contains skill name or vice versa
+      if (buffName.includes(skillName) || skillName.includes(buffName.split(' ')[0])) {
+        const row = document.getElementById('sk_' + key);
+        if (row) {
+          // Target the parent input-group row
+          const inputGroup = row.closest('.skill-row') || row.parentElement;
+          if (inputGroup) inputGroup.classList.add('chem-boost');
+        }
+      }
+    });
+  });
 }
 
 function removeStatusEffect(idx) {
@@ -1812,6 +1937,17 @@ function renderSessionStats() {
   if (!statsDiv) return;
   const s = state.stats || {};
   const elapsed = Math.round((Date.now() - (s.sessionStart || Date.now())) / 60000);
+  // I2: Collectibles count for session stats
+  const collectDefs =
+    typeof FALLOUT_REGISTRY !== 'undefined' && FALLOUT_REGISTRY.collectibles
+      ? FALLOUT_REGISTRY.collectibles
+      : [];
+  const collectAcquired = (state.collectibles || []).length;
+  const collectTotal = collectDefs.length;
+  const collectLine =
+    collectTotal > 0
+      ? `<span style="opacity:0.65;">COLLECTIBLES</span><span>${collectAcquired}/${collectTotal}</span>`
+      : '';
   statsDiv.innerHTML = `
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;font-size:11px;">
             <span style="opacity:0.65;">KILLS</span><span>${s.kills || 0}</span>
@@ -1820,6 +1956,7 @@ function renderSessionStats() {
             <span style="opacity:0.65;">SESSION TIME</span><span>${elapsed}m</span>
             <span style="opacity:0.65;">TICKS</span><span>${state.ticks || 0}</span>
             <span style="opacity:0.65;">LOCATION VISITS</span><span>${(state.locationHistory || []).length}</span>
+            ${collectLine}
         </div>`;
 }
 
@@ -1838,6 +1975,56 @@ function renderEquipped() {
   eqDiv.innerHTML = lines.length
     ? lines.join('<br>')
     : '<span style="opacity:0.4;">Nothing equipped</span>';
+}
+
+// ── COLLECTIBLES PANEL ────────────────────────────────────────────
+// Reads FALLOUT_REGISTRY.collectibles (game-specific list) and state.collectibles
+// (flat array of collected item names). Renders terminal-style [ACQUIRED]/[MISSING] list.
+function renderCollectibles() {
+  const container = document.getElementById('collectiblesDisplay');
+  if (!container) return;
+
+  const defs =
+    typeof FALLOUT_REGISTRY !== 'undefined' && FALLOUT_REGISTRY.collectibles
+      ? FALLOUT_REGISTRY.collectibles
+      : [];
+  const acquired = new Set((state.collectibles || []).map(n => n.toLowerCase()));
+  const total = defs.length;
+  const acquiredCount = defs.filter(d => acquired.has(d.name.toLowerCase())).length;
+
+  if (total === 0) {
+    container.innerHTML =
+      '<span style="opacity:0.4;font-size:11px;">[NO COLLECTIBLES REGISTRY LOADED]</span>';
+    return;
+  }
+
+  // Determine collectible type label based on game context
+  const isF03 = typeof state !== 'undefined' && state.gameContext === 'FO3';
+  const typeLabel = isF03 ? 'BOBBLEHEADS' : 'SNOW GLOBES';
+
+  // Header line: SNOW GLOBES  [3/7]
+  let html = `<div style="font-weight:bold;letter-spacing:1px;margin-bottom:6px;font-size:11px;">${typeLabel}&nbsp;&nbsp;[${acquiredCount}/${total}]</div>`;
+
+  // Acquired items first
+  const acquiredDefs = defs.filter(d => acquired.has(d.name.toLowerCase()));
+  const missingDefs = defs.filter(d => !acquired.has(d.name.toLowerCase()));
+
+  acquiredDefs.forEach(d => {
+    html += `<div style="font-size:11px;letter-spacing:0.5px;margin-bottom:2px;"><span style="color:var(--robco-green);">[ACQUIRED]</span> ${escapeHtml(d.name.toUpperCase())}</div>`;
+  });
+
+  if (acquiredDefs.length > 0 && missingDefs.length > 0) {
+    html += '<div style="border-top:1px dashed rgba(20,253,206,0.2);margin:4px 0;"></div>';
+  }
+
+  missingDefs.forEach(d => {
+    const locHint = d.location
+      ? ` &mdash; <span style="opacity:0.5;font-size:10px;">LOC: ${escapeHtml(d.location)}</span>`
+      : '';
+    html += `<div style="font-size:11px;letter-spacing:0.5px;margin-bottom:2px;opacity:0.75;"><span style="opacity:0.6;">[MISSING]</span> ${escapeHtml(d.name.toUpperCase())}${locHint}</div>`;
+  });
+
+  container.innerHTML = html;
 }
 
 function renderCampaignNotes() {

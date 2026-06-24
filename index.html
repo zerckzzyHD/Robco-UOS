@@ -329,6 +329,9 @@
               <input type="hidden" id="stat_ticks" value="0" />
             </div>
             <div class="input-group">
+              <label>DATE:</label><span id="gameDateDisplay" style="font-size:11px;opacity:0.85;letter-spacing:0.5px;">—</span>
+            </div>
+            <div class="input-group">
               <label>WEIGHT [W]:</label><span id="display_weight">0 / 200</span>
             </div>
             <div class="input-group"><label>MAX AP:</label><span id="display_ap">80</span></div>
@@ -485,6 +488,16 @@
               </select>
             </div>
             <button class="action-btn" onclick="addItem()">+ ADD ITEM</button>
+          </details>
+
+          <!-- 3c. COLLECTIBLES (INV tab) -->
+          <details class="panel" data-tab="inv">
+            <summary>
+              <h2>&gt; COLLECTIBLES</h2>
+            </summary>
+            <div id="collectiblesDisplay">
+              <span style="color: rgba(20, 253, 206, 0.5)">[NO COLLECTIBLES LOADED]</span>
+            </div>
           </details>
 
           <details class="panel" data-tab="stat">
@@ -1111,6 +1124,17 @@
                   />
                   <label for="muteWakeToggle" style="color: var(--robco-alert); font-size: 12px"
                     >MUTE WAKE SFX</label
+                  >
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <input
+                    type="checkbox"
+                    id="mutePanelClickToggle"
+                    onchange="toggleAudio('robco_panelclick_muted', this.checked)"
+                    style="width: auto; accent-color: var(--robco-alert)"
+                  />
+                  <label for="mutePanelClickToggle" style="color: var(--robco-alert); font-size: 12px"
+                    >MUTE PANEL CLICKS</label
                   >
                 </div>
                 <!-- #34 Typewriter Speed Control -->

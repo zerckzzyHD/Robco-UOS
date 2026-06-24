@@ -592,7 +592,13 @@ async function transmitMessage() {
   let rawKey = localStorage.getItem('robco_gemini_key');
   let selectedModel = localStorage.getItem('robco_gemini_model');
   if (!rawKey) {
-    appendToChat('🛑 ERROR: No Gemini API Key detected.', 'sys');
+    appendToChat(
+      `> ⚠ FATAL EXCEPTION AT 0x${Math.floor(Math.random() * 0xffff)
+        .toString(16)
+        .toUpperCase()
+        .padStart(4, '0')} — MODULE: COMM_LINK — NO API KEY DETECTED`,
+      'sys'
+    );
     return;
   }
 
@@ -773,7 +779,13 @@ async function transmitMessage() {
         autoImportState(JSON.stringify(parsedNode.state));
       }
     } catch (e) {
-      appendToChat(`> DATA CORRUPTION: Failed to parse backend JSON.`, 'sys');
+      appendToChat(
+        `> ⚠ FATAL EXCEPTION AT 0x${Math.floor(Math.random() * 0xffff)
+          .toString(16)
+          .toUpperCase()
+          .padStart(4, '0')} — MODULE: COMM_LINK — JSON PARSE FAILURE`,
+        'sys'
+      );
     }
   } catch (error) {
     if (error.name === 'AbortError') {
@@ -795,7 +807,13 @@ async function transmitMessage() {
         }, 2500);
       } else {
         transmitMessage._retrying = false;
-        appendToChat(`🛑 NETWORK FAILURE: ${error.message}`, 'sys');
+        appendToChat(
+          `> ⚠ FATAL EXCEPTION AT 0x${Math.floor(Math.random() * 0xffff)
+            .toString(16)
+            .toUpperCase()
+            .padStart(4, '0')} — MODULE: COMM_LINK — ${error.message}`,
+          'sys'
+        );
       }
     }
   } finally {

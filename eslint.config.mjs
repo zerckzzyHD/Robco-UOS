@@ -98,6 +98,7 @@ export default [
         closeModal: 'readonly',
         playSyncTone: 'readonly',
         playClack: 'readonly',
+        playPanelClick: 'readonly',
         attachedImageData: 'writable',
         attachedImageMimeType: 'writable',
         _buildFactions: 'readonly',
@@ -109,6 +110,7 @@ export default [
         // Fallout Data Registry (js/reg_nv.js or js/reg_fo3.js)
         FALLOUT_REGISTRY: 'readonly',
         registrySearch: 'readonly',
+        renderCollectibles: 'readonly',
         // Game database CSVs (js/db_nv.js or js/db_fo3.js)
         databaseCSVs: 'readonly',
       },
