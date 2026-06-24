@@ -1106,6 +1106,44 @@
               </select>
             </div>
 
+            <!-- Playthrough Type -->
+            <div class="input-group" style="margin-bottom: 10px">
+              <label style="font-size: 11px; letter-spacing: 1px; opacity: 0.8"
+                >PLAYTHROUGH TYPE:</label
+              >
+              <select
+                id="campaignModeSelect"
+                style="width: 100%"
+                onchange="onCampaignModeChange(this.value)"
+              >
+                <option value="standard">Standard</option>
+                <option value="minmaxed">Min-Maxed</option>
+                <option value="completionist">Completionist</option>
+                <option value="casual">Casual</option>
+                <option value="speedrun">Speedrun</option>
+                <option value="rng">Complete RNG</option>
+              </select>
+              <div
+                id="rngModeBanner"
+                style="
+                  display: none;
+                  margin-top: 6px;
+                  padding: 6px 8px;
+                  font-size: 9px;
+                  letter-spacing: 0.5px;
+                  line-height: 1.5;
+                  color: var(--robco-green);
+                  border: 1px dashed var(--robco-green);
+                  background: rgba(20, 253, 206, 0.04);
+                "
+              >
+                &#9658; COMPLETE RNG ACTIVE. All SPECIAL, traits, tag skills, skill points, and perk
+                selections will be randomised by the AI when requested. Opt-in only &mdash; wipe
+                terminal and start a new campaign to apply. NEVER retroactively applied to existing
+                saves.
+              </div>
+            </div>
+
             <!-- Timeline Panel Shell -->
             <details style="margin-bottom: 10px">
               <summary

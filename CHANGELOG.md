@@ -1,6 +1,6 @@
 ## [v2.0.0] — The Universal Fallout Companion OS
 
-<!-- Date: 2026-06-24 | Tests: 188/188 | Cache: robco-terminal-v1.6.8-r18 -->
+<!-- Date: 2026-06-24 | Tests: 197/197 | Cache: robco-terminal-v1.6.8-r19 -->
 
 ### [C1] Reputation 2D Matrix Rewrite (2026-06-24)
 
@@ -32,6 +32,17 @@
 - **Context Restore on Load**: `onGameContextChange()` initializes the context selector and banner state on every page load from `state.gameContext`.
 - **Tests**: 7 new tests in `tests/check-persistence.js` (Suite 2d): CAMPG tab button, panel, game context select, FO3 banner, timeline display, `onGameContextChange()` function, `TAB_NAMES` includes `campg`.
 - **CACHE_NAME**: Bumped to `robco-terminal-v1.6.8-r18`.
+
+### [C4] Playthrough Type + Complete RNG (2026-06-24)
+
+- **New State Field `state.campaignMode`**: Added per Protocol 4 checklist. Default: `'standard'`. Valid values: `'standard' | 'minmaxed' | 'completionist' | 'casual' | 'speedrun' | 'rng'`. Migration guard added in `migrateState()` — invalid or missing values fall back to `'standard'`.
+- **Playthrough Type Selector**: `<select id="campaignModeSelect">` added to CAMPG panel. Five standard modes (Standard, Min-Maxed, Completionist, Casual, Speedrun) plus Complete RNG. `onCampaignModeChange()` handler updates `state.campaignMode` and saves.
+- **Complete RNG Mode**: Selecting `rng` shows a green informational banner explaining that all SPECIAL, trait, tag skill, skill point, and perk selections will be randomised by the AI when requested. Opt-in only — requires Wipe Terminal + new campaign to take effect. Never automatically applied. Never retroactively applied to existing saves.
+- **AI Directive Updated**: `getSystemDirective()` in `api.js` now includes a `Playthrough Type:` line read from `state.campaignMode`. If `rng`, an explicit RNG MODE ACTIVE instruction is appended to the directive, instructing the AI to make all build randomisation decisions when triggered by the player.
+- **autoImportState() Guard**: `campaignMode` is a read-only import — only restored from save files; never written by the AI. A strict allowlist guard (`_validModes`) prevents AI injection of invalid mode strings.
+- **Protocol 4 compliance**: All 4 required locations updated: state.js default, migrateState() guard, autoImportState() handler, getSystemDirective() schema reference.
+- **Tests**: 7 new tests in `tests/check-persistence.js` (Suite 2e): all 4 Protocol 4 locations, CAMPG DOM elements, `onCampaignModeChange()` function.
+- **CACHE_NAME**: Bumped to `robco-terminal-v1.6.8-r19`.
 
 ### Major Features
 

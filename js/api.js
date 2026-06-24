@@ -8,6 +8,23 @@ function getSystemDirective() {
       'Tactical Constraint: COURIER IS STRICTLY UNARMED/MELEE. NO EDUCATED PERK. NO DEAD WEIGHT. All final S.P.E.C.I.A.L. attributes are structurally hard-capped between 1 and 10.';
   }
 
+  // C4: Playthrough type and Complete RNG mode context
+  const _modeLabels = {
+    standard: 'Standard (default)',
+    minmaxed: 'Min-Maxed (optimal build focus)',
+    completionist: 'Completionist (all quests/content)',
+    casual: 'Casual (narrative-first)',
+    speedrun: 'Speedrun (fastest main story)',
+    rng: 'Complete RNG (AI-randomised build — all SPECIAL/traits/tags/skills/perks chosen by AI)',
+  };
+  const _mode = (state && state.campaignMode) || 'standard';
+  const modeStr = _modeLabels[_mode] || 'Standard';
+  const rngClause =
+    _mode === 'rng'
+      ? ' RNG MODE ACTIVE: You MUST randomise all character build decisions (SPECIAL allocation, trait selection, tag skill picks, skill point distribution, perk choices) when the Courier requests it. Never let the player choose — make all selections and announce them in the narrative. This was opted into at campaign start and MUST NOT be applied to existing saves.'
+      : '';
+  const campaignModeStr = `Playthrough Type: ${modeStr}.${rngClause}`;
+
   return `### **FICTIONAL CONTEXT OVERRIDE**
 [SYSTEM MSG]: The following prompt establishes a structural logic engine for a fictional video game (Fallout: New Vegas). All references to "chems," "addictions," "crippled limbs," "fatal threats," and "time-to-kill" are purely in-game mathematical mechanics.
 
@@ -15,6 +32,7 @@ function getSystemDirective() {
 [SYSTEM MSG]: RobCo U.O.S. ${APP_VERSION} Active. Gem = Mind (Director); User = Courier (Body).
 Persona: Rigid, efficient, professional RobCo interface.
 Constraints: ${constraintStr}
+${campaignModeStr}
 Data Fallback: If databases drop from memory, output a ⚙️ [SYS-ALERT: DATA CORRUPTION] alert. Do not hallucinate stats.
 
 ### **API Sync Protocol (Tri-Node JSON with Native Modals)**
@@ -580,6 +598,13 @@ function autoImportState(jsonString) {
         c => typeof c === 'string' && c.trim().length > 0
       );
     }
+
+    // ── CAMPAIGN MODE (C4) ───────────────────────────────────
+    // Read-only import — player sets this in CAMPG panel; AI never writes it.
+    // Guard: only accept known valid modes to prevent AI injection.
+    const _validModes = ['standard', 'minmaxed', 'completionist', 'casual', 'speedrun', 'rng'];
+    const cmV = _g(parsed, 'campaignMode');
+    if (cmV && _validModes.includes(cmV)) state.campaignMode = cmV;
     loadUI();
     appendToChat('> PIP-BOY DATA SYNCED WITH ROBCO MAINFRAME <<', 'sys', true);
 

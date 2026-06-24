@@ -359,6 +359,46 @@ assert(
 assert(/TAB_NAMES.*campg/.test(uiSource), "TAB_NAMES includes 'campg' in ui.js");
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 2e — C4 campaignMode Protocol 4 (C4)
+//  Verifies all 4 mandatory Protocol 4 locations for state.campaignMode.
+// ══════════════════════════════════════════════════════════════
+header('C4 campaignMode Protocol 4');
+// Protocol 4 location 1: default value in let state = { ... }
+assert(
+  /campaignMode\s*:\s*'standard'/.test(stateSource),
+  "state.campaignMode default 'standard' exists in state.js"
+);
+// Protocol 4 location 2: migration guard in migrateState()
+assert(
+  /s\.campaignMode/.test(stateSource),
+  'state.campaignMode migration guard exists in migrateState() in state.js'
+);
+// Protocol 4 location 3: import handling in autoImportState()
+assert(
+  /CAMPAIGN MODE/.test(apiSource) && /cmV/.test(apiSource),
+  'autoImportState() handles campaignMode import in api.js'
+);
+// Protocol 4 location 4: getSystemDirective() schema reference
+assert(
+  /campaignModeStr/.test(apiSource),
+  'getSystemDirective() references campaignMode context string in api.js'
+);
+// CAMPG panel DOM elements
+assert(
+  /id="campaignModeSelect"/.test(htmlSource),
+  'Playthrough Type select exists in index.html (id="campaignModeSelect")'
+);
+assert(
+  /id="rngModeBanner"/.test(htmlSource),
+  'RNG mode banner exists in index.html (id="rngModeBanner")'
+);
+// ui.js handler
+assert(
+  /function onCampaignModeChange\b/.test(uiSource),
+  'onCampaignModeChange() function exists in ui.js'
+);
+
+// ══════════════════════════════════════════════════════════════
 //  SUITE 3 — SKILL_KEYS completeness
 // ══════════════════════════════════════════════════════════════
 header('SKILL_KEYS completeness');

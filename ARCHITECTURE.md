@@ -786,7 +786,7 @@ This protocol was formalized in v1.6.5 after the perk panel (`addPerk()` + `#new
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit audit must pass (all 188+ tests)
+- [ ] `git commit` — pre-commit audit must pass (all 197+ tests)
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

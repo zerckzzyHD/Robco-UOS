@@ -560,6 +560,15 @@ window.onload = function () {
     if (banner) banner.style.display = ctx === 'FO3' ? 'block' : 'none';
   }
 
+  // C4: Restore campaign mode selector and RNG banner
+  {
+    const mode = (state && state.campaignMode) || 'standard';
+    const sel = document.getElementById('campaignModeSelect');
+    if (sel) sel.value = mode;
+    const banner = document.getElementById('rngModeBanner');
+    if (banner) banner.style.display = mode === 'rng' ? 'block' : 'none';
+  }
+
   // #34 Typewriter Speed — restore slider + label on load
   {
     const savedSpeed = parseFloat(localStorage.getItem('robco_typer_speed') || '1');
@@ -1100,6 +1109,18 @@ function onGameContextChange(ctx) {
   saveState();
   const banner = document.getElementById('fo3WarningBanner');
   if (banner) banner.style.display = ctx === 'FO3' ? 'block' : 'none';
+}
+
+// C4: Playthrough type selector — updates state.campaignMode and saves
+// 'rng' mode is opt-in only and shows an informational banner.
+// AI randomisation is triggered by player commands; it is never automatic.
+function onCampaignModeChange(mode) {
+  const valid = ['standard', 'minmaxed', 'completionist', 'casual', 'speedrun', 'rng'];
+  if (!valid.includes(mode)) return;
+  state.campaignMode = mode;
+  saveState();
+  const banner = document.getElementById('rngModeBanner');
+  if (banner) banner.style.display = mode === 'rng' ? 'block' : 'none';
 }
 
 // ── CAMPAIGN LOG EXPORT ────────────────────────────────────────

@@ -107,6 +107,7 @@ let state = {
   // v2.0 fields
   gameContext: 'FNV', // 'FNV' | 'FO3' — set at boot, governs registry/AI context
   collectibles: [], // flat string[] of collected item names (game-context-aware)
+  campaignMode: 'standard', // 'standard'|'minmaxed'|'completionist'|'casual'|'speedrun'|'rng'
   // DLC expansion adds entries to the registry only; no state schema change required
 };
 
@@ -280,6 +281,9 @@ function migrateState(version, s) {
   // v2.0: dual-game context and collectibles tracker
   if (!s.gameContext) s.gameContext = 'FNV';
   if (!s.collectibles) s.collectibles = [];
+  // C4: playthrough type and Complete RNG mode
+  const _validModes = ['standard', 'minmaxed', 'completionist', 'casual', 'speedrun', 'rng'];
+  if (!s.campaignMode || !_validModes.includes(s.campaignMode)) s.campaignMode = 'standard';
   delete s.macros; // v1.6.7: macros removed — D-Pad handles this natively
   return s;
 }
