@@ -192,7 +192,7 @@ Check ($apiSrc -imatch 'legacy.*flat.*key|flat.*key.*fallback') "autoImportState
 # Suite 8 -- Registry structural integrity
 # ===========================================================
 Sep "Suite 8 -- Registry structural integrity"
-$regSrc = Read-Src "js/registry.js"
+$regSrc = Read-Src "js/reg_nv.js"
 
 Check ($regSrc -match 'const FALLOUT_REGISTRY')           "FALLOUT_REGISTRY global is declared"
 Check ($regSrc -match 'function registrySearch')           "registrySearch() function is declared"
@@ -201,21 +201,23 @@ Check ($regSrc -match "items\s*:")                         "FALLOUT_REGISTRY.ite
 Check ($regSrc -match "perks\s*:")                         "FALLOUT_REGISTRY.perks category key exists"
 Check ($regSrc -match "locations\s*:")                     "FALLOUT_REGISTRY.locations category key exists"
 Check ($regSrc -match "companions\s*:")                    "FALLOUT_REGISTRY.companions category key exists"
+Check ($regSrc -match "collectibles\s*:")                  "FALLOUT_REGISTRY.collectibles category key exists"
+Check ($regSrc -match "zones\s*:")                         "FALLOUT_REGISTRY.zones category key exists"
 Check ($regSrc -match '\.length\s*<\s*2')                  "registrySearch() enforces minimum query length of 2"
 Check ($regSrc -match '\.slice\(0,\s*7\)')                 "registrySearch() caps results at 7"
-Check ($regSrc -match 'fallout\.wiki')                     "registry.js contains fallout.wiki attribution comment"
+Check ($regSrc -match 'fallout\.wiki')                     "reg_nv.js contains fallout.wiki attribution comment"
 Check ($regSrc -match "version\s*:\s*'[\d\.]+'")          "FALLOUT_REGISTRY.version is declared with semver string"
 # Strip comment lines before checking for forbidden references
 $regCode = ($regSrc -split "`n" | Where-Object { $_ -notmatch '^\s*//' }) -join "`n"
-Check ($regCode -notmatch 'saveState\s*\(')                "registry.js does not call saveState() (pure reference data)"
-Check ($regCode -notmatch 'localStorage')                  "registry.js does not reference localStorage (in code)"
+Check ($regCode -notmatch 'saveState\s*\(')                "reg_nv.js does not call saveState() (pure reference data)"
+Check ($regCode -notmatch 'localStorage')                  "reg_nv.js does not reference localStorage (in code)"
 # ===========================================================
 # Suite 9 -- Database structural integrity
 # Validates js/database.js: all CSV tables, trigger coverage,
 # invKeywords, systemInstruction placement, and purity contract.
 # ===========================================================
 Sep "Suite 9 -- Database structural integrity"
-$dbSrc = Read-Src "js/database.js"
+$dbSrc = Read-Src "js/db_nv.js"
 
 # 9.1 databaseCSVs global must be declared
 Check ($dbSrc -match 'const databaseCSVs')                          "databaseCSVs global is declared"

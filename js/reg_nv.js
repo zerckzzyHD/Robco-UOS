@@ -850,6 +850,255 @@ const FALLOUT_REGISTRY = {
       location: "Freeside (The King's)",
     },
   ],
+
+  // ── COLLECTIBLES ────────────────────────────────────────────────────────────
+  // FNV: 7 Snow Globes. Turned in to Jane at Lucky 38 for 2000 caps each.
+  // fields: name (registry key stored in state.collectibles), stat (reward type),
+  //         boost (reward amount), location (canonical display string — CAPS, terse)
+  // Data source: https://fallout.wiki/wiki/Snow_globe
+  collectibles: [
+    { name: 'Goodsprings', stat: 'caps', boost: 2000, location: 'GOODSPRINGS CEMETERY' },
+    { name: 'Hoover Dam', stat: 'caps', boost: 2000, location: 'HOOVER DAM VISITOR CENTER' },
+    { name: 'Lucky 38', stat: 'caps', boost: 2000, location: 'LUCKY 38 CASINO (VIP LOUNGE)' },
+    {
+      name: 'Mormon Fort',
+      stat: 'caps',
+      boost: 2000,
+      location: "OLD MORMON FORT (JULIE FARKAS' OFFICE)",
+    },
+    { name: 'Mt. Charleston', stat: 'caps', boost: 2000, location: 'JACOBSTOWN' },
+    { name: 'Nellis AFB', stat: 'caps', boost: 2000, location: 'NELLIS AIR FORCE BASE' },
+    { name: 'Test Site', stat: 'caps', boost: 2000, location: 'CRESCENT CANYON WEST' },
+  ],
+
+  // ── ZONES ───────────────────────────────────────────────────────────────────
+  // 6×6 grid covering the Mojave Wasteland. N→S = row 1→6. W→E = col 1→6.
+  // locations[]: primary named map markers in that cell, used for fuzzy loc matching.
+  // Used by renderWorldMap() to place the [YOU] cursor and [?] collectible markers.
+  zones: [
+    // Row 1 — Northern strip
+    {
+      name: 'Jacobstown',
+      gridRow: 1,
+      gridCol: 1,
+      locations: ['Jacobstown', 'Charleston Cave', 'Dead Wind Cavern'],
+    },
+    {
+      name: 'Bitter Springs',
+      gridRow: 1,
+      gridCol: 2,
+      locations: ['Bitter Springs', 'Coyote Mines', 'Ranger Station Foxtrot'],
+    },
+    {
+      name: 'Camp Golf',
+      gridRow: 1,
+      gridCol: 3,
+      locations: ['Camp Golf', 'Lake Las Vegas', 'The Divide (entrance)'],
+    },
+    {
+      name: 'Boulder City',
+      gridRow: 1,
+      gridCol: 4,
+      locations: ['Boulder City', 'Boulder City Ruins', 'Ranger Station Charlie'],
+    },
+    {
+      name: 'Hoover Dam',
+      gridRow: 1,
+      gridCol: 5,
+      locations: ['Hoover Dam', 'Hoover Dam Visitor Center', 'Camp Golf South'],
+    },
+    {
+      name: 'Camp Forlorn Hope',
+      gridRow: 1,
+      gridCol: 6,
+      locations: ['Camp Forlorn Hope', 'Nelson', 'Cottonwood Cove'],
+    },
+    // Row 2 — Upper middle
+    {
+      name: 'Red Rock Canyon',
+      gridRow: 2,
+      gridCol: 1,
+      locations: ['Red Rock Canyon', 'Vault 19', 'Great Khan Encampment'],
+    },
+    {
+      name: 'Hidden Valley',
+      gridRow: 2,
+      gridCol: 2,
+      locations: ['Hidden Valley Bunker', 'Black Mountain', 'REPCONN Test Site'],
+    },
+    {
+      name: 'North Vegas',
+      gridRow: 2,
+      gridCol: 3,
+      locations: ['North Vegas Square', 'Aerotech Office Park', 'Crimson Caravan Company'],
+    },
+    {
+      name: 'Nellis AFB',
+      gridRow: 2,
+      gridCol: 4,
+      locations: ['Nellis Air Force Base', 'Nellis Boomer Museum', 'Crashed B-29'],
+    },
+    {
+      name: 'Lake Mead',
+      gridRow: 2,
+      gridCol: 5,
+      locations: ['Lake Mead', 'Callville Bay', 'Ranger Station Echo'],
+    },
+    {
+      name: 'Cottonwood Cove',
+      gridRow: 2,
+      gridCol: 6,
+      locations: ['Cottonwood Cove', 'Ranger Station Delta', 'East Pump Station'],
+    },
+    // Row 3 — Vegas core
+    {
+      name: 'Freeside',
+      gridRow: 3,
+      gridCol: 1,
+      locations: ['Freeside', 'Old Mormon Fort', 'Mormon Fort', 'The Kings'],
+    },
+    {
+      name: 'New Vegas Strip',
+      gridRow: 3,
+      gridCol: 2,
+      locations: ['The Strip', 'Lucky 38', 'Gomorrah', 'Tops', 'Ultra-Luxe', 'Vault 21'],
+    },
+    {
+      name: 'East Vegas',
+      gridRow: 3,
+      gridCol: 3,
+      locations: ['East Vegas', 'North Gate', 'Camp McCarran', 'Gun Runners'],
+    },
+    {
+      name: 'Camp McCarran',
+      gridRow: 3,
+      gridCol: 4,
+      locations: ['Camp McCarran', 'HELIOS One', 'El Dorado Substation'],
+    },
+    {
+      name: 'Camp Searchlight',
+      gridRow: 3,
+      gridCol: 5,
+      locations: ['Camp Searchlight', 'Searchlight', 'Ranger Station Bravo'],
+    },
+    {
+      name: 'Nipton',
+      gridRow: 3,
+      gridCol: 6,
+      locations: ['Nipton', 'Nipton Road Reststop', 'Mojave Drive-In'],
+    },
+    // Row 4 — Goodsprings belt
+    {
+      name: 'NCRCF',
+      gridRow: 4,
+      gridCol: 1,
+      locations: ['NCR Correctional Facility', 'NCRCF', 'Powder Gangers'],
+    },
+    {
+      name: 'Goodsprings',
+      gridRow: 4,
+      gridCol: 2,
+      locations: ['Goodsprings', 'Goodsprings Cemetery', 'Goodsprings Source'],
+    },
+    {
+      name: 'Primm',
+      gridRow: 4,
+      gridCol: 3,
+      locations: ['Primm', 'Bison Steve Hotel', 'Vikki and Vance Casino'],
+    },
+    {
+      name: '188 Trading Post',
+      gridRow: 4,
+      gridCol: 4,
+      locations: ['188 Trading Post', 'Mountain Shadows Campground'],
+    },
+    {
+      name: 'Novac',
+      gridRow: 4,
+      gridCol: 5,
+      locations: ['Novac', 'Dinky the T-Rex', 'REPCONN Test Site'],
+    },
+    {
+      name: 'Ranger Station Alpha',
+      gridRow: 4,
+      gridCol: 6,
+      locations: ['Ranger Station Alpha', 'Ivanpah Dry Lake', 'Mojave Outpost'],
+    },
+    // Row 5 — Southern mid
+    {
+      name: 'Sloan',
+      gridRow: 5,
+      gridCol: 1,
+      locations: ['Sloan', 'Quarry Junction', 'Deathclaw Promontory'],
+    },
+    {
+      name: 'Mojave Outpost',
+      gridRow: 5,
+      gridCol: 2,
+      locations: ['Mojave Outpost', 'Yangtze Memorial', 'Mountain Shadows'],
+    },
+    {
+      name: 'Crescent Canyon',
+      gridRow: 5,
+      gridCol: 3,
+      locations: ['Crescent Canyon', 'Crescent Canyon West', 'Test Site', 'Nevada Test Site'],
+    },
+    {
+      name: 'Ranger Station Foxtrot',
+      gridRow: 5,
+      gridCol: 4,
+      locations: ['Ranger Station Foxtrot', 'El Dorado', 'Gypsum Train Yard'],
+    },
+    {
+      name: 'Clark Field',
+      gridRow: 5,
+      gridCol: 5,
+      locations: ['Clark Field', 'Ranger Station Echo South', 'Wolfhorn Ranch'],
+    },
+    {
+      name: 'Long 15',
+      gridRow: 5,
+      gridCol: 6,
+      locations: ['Long 15', 'South Vegas Ruins', 'Emergency Service Railyard'],
+    },
+    // Row 6 — Far south / edge
+    {
+      name: 'Vault 11',
+      gridRow: 6,
+      gridCol: 1,
+      locations: ['Vault 11', 'Vault 19', 'Canyon Wreckage'],
+    },
+    {
+      name: 'Searchlight Airport',
+      gridRow: 6,
+      gridCol: 2,
+      locations: ['Searchlight Airport', 'Campo Mine', "Field's Shack"],
+    },
+    {
+      name: 'Jacobstown South',
+      gridRow: 6,
+      gridCol: 3,
+      locations: ['Jacobstown', 'Mount Charleston', 'Charleston Cave South'],
+    },
+    {
+      name: 'Nelson',
+      gridRow: 6,
+      gridCol: 4,
+      locations: ['Nelson', 'Dead Wind Cavern South', 'Techatticup Mine'],
+    },
+    {
+      name: 'Bitter Lake',
+      gridRow: 6,
+      gridCol: 5,
+      locations: ['Bitter Lake', "Cannibal Johnson's Cave", 'Ranger Station Bravo South'],
+    },
+    {
+      name: 'Fortification Hill',
+      gridRow: 6,
+      gridCol: 6,
+      locations: ['The Fort', 'Fortification Hill', "Caesar's Camp"],
+    },
+  ],
 };
 
 // ── REGISTRY SEARCH ──────────────────────────────────────────────────────────

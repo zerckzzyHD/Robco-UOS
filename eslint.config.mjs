@@ -100,9 +100,11 @@ export default [
         addAmmo: 'readonly',
         removeAmmo: 'readonly',
         initAmmoDatalist: 'readonly',
-        // Fallout Data Registry (js/registry.js)
+        // Fallout Data Registry (js/reg_nv.js or js/reg_fo3.js)
         FALLOUT_REGISTRY: 'readonly',
         registrySearch: 'readonly',
+        // Game database CSVs (js/db_nv.js or js/db_fo3.js)
+        databaseCSVs: 'readonly',
       },
     },
     rules: {

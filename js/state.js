@@ -76,9 +76,9 @@ let state = {
   stats: { kills: 0, capsEarned: 0, damageDealt: 0, sessionStart: Date.now() },
   locationHistory: [],
   // v2.0 fields
-  gameContext: 'FNV',     // 'FNV' | 'FO3' — set at boot, governs registry/AI context
-  collectibles: [],       // flat string[] of collected item names (game-context-aware)
-                          // DLC expansion adds entries to the registry only; no state schema change required
+  gameContext: 'FNV', // 'FNV' | 'FO3' — set at boot, governs registry/AI context
+  collectibles: [], // flat string[] of collected item names (game-context-aware)
+  // DLC expansion adds entries to the registry only; no state schema change required
 };
 
 let chatHistory = [];
