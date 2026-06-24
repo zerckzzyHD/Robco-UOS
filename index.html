@@ -1106,23 +1106,45 @@
               </select>
             </div>
 
-            <!-- Playthrough Type -->
+            <!-- Playthrough Type (localStorage: robco_playstyle_type — NOT a state field) -->
             <div class="input-group" style="margin-bottom: 10px">
               <label style="font-size: 11px; letter-spacing: 1px; opacity: 0.8"
                 >PLAYTHROUGH TYPE:</label
               >
               <select
-                id="campaignModeSelect"
+                id="playthroughTypeSelect"
                 style="width: 100%"
-                onchange="onCampaignModeChange(this.value)"
+                onchange="onPlaythroughTypeChange(this.value)"
               >
                 <option value="standard">Standard</option>
                 <option value="minmaxed">Min-Maxed</option>
                 <option value="completionist">Completionist</option>
                 <option value="casual">Casual</option>
                 <option value="speedrun">Speedrun</option>
-                <option value="rng">Complete RNG</option>
               </select>
+            </div>
+
+            <!-- Complete RNG (state.campaignMode — opt-in, new campaign only) -->
+            <div class="input-group" style="margin-bottom: 10px">
+              <label
+                style="
+                  display: flex;
+                  align-items: center;
+                  gap: 8px;
+                  cursor: pointer;
+                  font-size: 11px;
+                  letter-spacing: 1px;
+                  opacity: 0.8;
+                "
+              >
+                <input
+                  type="checkbox"
+                  id="completeRngToggle"
+                  onchange="onCampaignModeChange(this.checked)"
+                  style="width: auto; accent-color: var(--robco-green)"
+                />
+                COMPLETE RNG
+              </label>
               <div
                 id="rngModeBanner"
                 style="
@@ -1140,7 +1162,7 @@
                 &#9658; COMPLETE RNG ACTIVE. All SPECIAL, traits, tag skills, skill points, and perk
                 selections will be randomised by the AI when requested. Opt-in only &mdash; wipe
                 terminal and start a new campaign to apply. NEVER retroactively applied to existing
-                saves.
+                saves. Combines freely with any Playthrough Type.
               </div>
             </div>
 

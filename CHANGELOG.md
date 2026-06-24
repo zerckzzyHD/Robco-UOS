@@ -1,6 +1,4 @@
-## [v2.0.0] — The Universal Fallout Companion OS
-
-<!-- Date: 2026-06-24 | Tests: 197/197 | Cache: robco-terminal-v1.6.8-r19 -->
+## [v2.0.0] — The Universal Fallout Companion OS<!-- Date: 2026-06-24 | Tests: 203/203 | Cache: robco-terminal-v1.6.8-r20 -->
 
 ### [C1] Reputation 2D Matrix Rewrite (2026-06-24)
 
@@ -33,16 +31,34 @@
 - **Tests**: 7 new tests in `tests/check-persistence.js` (Suite 2d): CAMPG tab button, panel, game context select, FO3 banner, timeline display, `onGameContextChange()` function, `TAB_NAMES` includes `campg`.
 - **CACHE_NAME**: Bumped to `robco-terminal-v1.6.8-r18`.
 
-### [C4] Playthrough Type + Complete RNG (2026-06-24)
+### [C4] Playthrough Type + Complete RNG (2026-06-24) — _corrected by C4-fix_
 
-- **New State Field `state.campaignMode`**: Added per Protocol 4 checklist. Default: `'standard'`. Valid values: `'standard' | 'minmaxed' | 'completionist' | 'casual' | 'speedrun' | 'rng'`. Migration guard added in `migrateState()` — invalid or missing values fall back to `'standard'`.
-- **Playthrough Type Selector**: `<select id="campaignModeSelect">` added to CAMPG panel. Five standard modes (Standard, Min-Maxed, Completionist, Casual, Speedrun) plus Complete RNG. `onCampaignModeChange()` handler updates `state.campaignMode` and saves.
-- **Complete RNG Mode**: Selecting `rng` shows a green informational banner explaining that all SPECIAL, trait, tag skill, skill point, and perk selections will be randomised by the AI when requested. Opt-in only — requires Wipe Terminal + new campaign to take effect. Never automatically applied. Never retroactively applied to existing saves.
-- **AI Directive Updated**: `getSystemDirective()` in `api.js` now includes a `Playthrough Type:` line read from `state.campaignMode`. If `rng`, an explicit RNG MODE ACTIVE instruction is appended to the directive, instructing the AI to make all build randomisation decisions when triggered by the player.
-- **autoImportState() Guard**: `campaignMode` is a read-only import — only restored from save files; never written by the AI. A strict allowlist guard (`_validModes`) prevents AI injection of invalid mode strings.
-- **Protocol 4 compliance**: All 4 required locations updated: state.js default, migrateState() guard, autoImportState() handler, getSystemDirective() schema reference.
-- **Tests**: 7 new tests in `tests/check-persistence.js` (Suite 2e): all 4 Protocol 4 locations, CAMPG DOM elements, `onCampaignModeChange()` function.
-- **CACHE_NAME**: Bumped to `robco-terminal-v1.6.8-r19`.
+- **New State Field `state.campaignMode`**: Added per Protocol 4 checklist. Default: `'standard'`. Valid values: `'standard'` | `'rng'` (binary RNG flag only). Migration guard: `if (s.campaignMode !== 'rng') s.campaignMode = 'standard'`.
+- **Playthrough Type Selector**: `<select id="playthroughTypeSelect">` in CAMPG panel. Options: Standard, Min-Maxed, Completionist, Casual, Speedrun. Stored in `localStorage('robco_playstyle_type')` — **NOT a state field**. Handler: `onPlaythroughTypeChange(type)`.
+- **Complete RNG Checkbox**: `<input type="checkbox" id="completeRngToggle">` in CAMPG panel — separate and independent from Playthrough Type. Stored as `state.campaignMode = 'rng'`. Handler: `onCampaignModeChange(checked)`.
+- **Independent Systems**: Playthrough Type and Complete RNG are orthogonal. All combinations are valid: Completionist + RNG, Speedrun + RNG, Min-Maxed + RNG, Casual + RNG, etc.
+- **Complete RNG Mode**: Checking the toggle shows a green banner and sets `state.campaignMode = 'rng'`. Opt-in only — requires Wipe Terminal + new campaign. Never automatically applied. Never retroactively applied to existing saves.
+- **AI Directive — Behavioral Strings**: `getSystemDirective()` reads `robco_playstyle_type` from localStorage and injects the roadmap-specified behavioral instruction string for each type (e.g. `"Optimize all build decisions for maximum combat effectiveness."` for Min-Maxed). Both the playthrough type directive and the RNG directive are concatenated when both are active.
+- **Protocol 4 compliance**: All 4 required locations updated: state.js default, `migrateState()` binary guard, `autoImportState()` handler, `getSystemDirective()` schema reference.
+- **Tests**: 13 tests in `tests/check-persistence.js` (Suite 2e, updated in C4-fix): all 4 Protocol 4 locations, both DOM elements, both handlers, binary guard, behavioral strings, `robco_playstyle_type` read.
+- **CACHE_NAME**: Bumped to `robco-terminal-v1.6.8-r20` (r19 was the initial incorrect C4; r20 is the corrected C4-fix).
+
+### [C4-fix] Playthrough Type + Complete RNG Structural Correction (2026-06-24)
+
+- **Root Cause**: The original C4 implementation merged Playthrough Type and Complete RNG into a single 6-option `<select id="campaignModeSelect">`, making combinations like Completionist + RNG impossible and contradicting the roadmap storage specification.
+- **Correction Applied**:
+  - Removed `<select id="campaignModeSelect">` (the merged 6-option control).
+  - Added `<select id="playthroughTypeSelect">` (5 options: Standard, Min-Maxed, Completionist, Casual, Speedrun).
+  - Added `<input type="checkbox" id="completeRngToggle">` (independent Complete RNG toggle).
+  - Added `onPlaythroughTypeChange()` handler — writes `robco_playstyle_type` to localStorage only.
+  - Rewrote `onCampaignModeChange()` to accept a boolean (from `this.checked`) instead of a string.
+  - Narrowed `state.campaignMode` valid values from 6 to 2 (`'standard'` | `'rng'`).
+  - Replaced descriptive mode labels in `getSystemDirective()` with roadmap-specified behavioral instruction strings.
+  - Updated `autoImportState()` guard to binary (`cmV === 'rng'` / `cmV === 'standard'`).
+  - Updated `migrateState()` guard to binary (`if (s.campaignMode !== 'rng') s.campaignMode = 'standard'`).
+- **Migration safety**: Old saves with `campaignMode: 'minmaxed'`/`'completionist'`/`'casual'`/`'speedrun'` (from the incorrectly implemented C4) are reset to `'standard'` on first load. No data loss — those values were never user-facing in a shipped release.
+- **Tests**: Suite 2e expanded from 7 to 13 tests; net suite count +6.
+- **CACHE_NAME**: Bumped to `robco-terminal-v1.6.8-r20`.
 
 ### Major Features
 

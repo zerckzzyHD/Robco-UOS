@@ -171,7 +171,7 @@ let state = {
   la, ra, ll, rl, hd,
 
   // --- Structured Objects ---
-  factions: { ncr: {fame,infamy}, ... },   // 14 factions via FACTION_REGISTRY
+  factions: { ncr: {fame,infamy}, ... },   // 14 factions via FACTION_REGISTRY (pending C6 → 11)
   skills: { barter: 15, ... },              // 13 skills via SKILL_KEYS
   equipped: { weapon, armor, headgear },    // Currently equipped gear
   stats: { kills, capsEarned, damageDealt, sessionStart }, // Session stats
@@ -184,6 +184,15 @@ let state = {
   campaign_notes: [],   // AI-written tactical notes (strings)
   perks: [],            // [{name, rank, level_taken}]
   quests: [],           // [{name, status, objective, factions}]
+
+  // --- v1.6.8+ fields ---
+  locationHistory: [],  // Last 10 distinct locations visited (string[])
+
+  // --- v2.0 fields (C3–C4) ---
+  gameContext: 'FNV',       // 'FNV' | 'FO3' — governs FACTION_REGISTRY, SKILL_KEYS, AI context
+  collectibles: [],         // Collected item names (game-context-aware, flat string[])
+  campaignMode: 'standard', // 'standard' | 'rng' — Complete RNG opt-in flag (binary; Protocol 4)
+                            // Playthrough Type is SEPARATE: localStorage('robco_playstyle_type')
 };
 ```
 
@@ -199,6 +208,42 @@ persistence audit will block the commit if any step is missed:
 
 The pre-commit hook (`tests/check-persistence.ps1`) auto-discovers all keys in `state.js`
 and verifies that every key appears in `autoImportState()`.
+
+---
+
+## CAMPG Tab System
+
+Added in C3 (v2.0). A 4th top-level tab alongside STAT, INV, and DATA.
+
+### Tab Architecture
+
+```
+TAB_NAMES = ['stat', 'inv', 'data', 'campg']   // declared in ui.js
+
+switchTab(tab)                                   // ui.js
+  → adds/removes .active class on [data-tab="{tab}"] panels
+  → updates [data-tab="{tab}"] button active state
+  → persists to localStorage('robco_active_tab')
+  → restores on page load
+```
+
+**Keyboard shortcuts**: `1` = STAT, `2` = INV, `3` = DATA, `4` = CAMPG.
+
+**Security & Config** panel has no `data-tab` attribute — always visible across all tabs.
+
+### CAMPG Panel Content
+
+CAMPG (`id="campgPanel"`, `data-tab="campg"`) is the authority for all campaign lifecycle settings:
+
+| Control                 | ID                      | Storage                                      | Handler                         |
+| ----------------------- | ----------------------- | -------------------------------------------- | ------------------------------- |
+| Game Context select     | `gameContextSelect`     | `state.gameContext`                          | `onGameContextChange(ctx)`      |
+| Playthrough Type select | `playthroughTypeSelect` | `localStorage('robco_playstyle_type')`       | `onPlaythroughTypeChange(type)` |
+| Complete RNG checkbox   | `completeRngToggle`     | `state.campaignMode` (`'standard'`\|`'rng'`) | `onCampaignModeChange(checked)` |
+| Timeline display        | `timelineDisplay`       | Cache only — not persisted                   | `[TIMELINE]` command (C7)       |
+| Wipe Terminal button    | `wipeTerminalBtn`       | —                                            | `wipeTerminal()`                |
+
+**Complete RNG and Playthrough Type are independent.** All combinations are valid (e.g. Completionist + RNG, Speedrun + RNG). The playthrough type directive and RNG directive are both injected into the AI system prompt and concatenated when both are active.
 
 ---
 
@@ -600,27 +645,29 @@ The undo button appears after every sync and hides after use.
 
 ## Settings & localStorage Keys
 
-| Key                     | Type      | Used By  | Description                            |
-| ----------------------- | --------- | -------- | -------------------------------------- |
-| `robco_v7`              | JSON      | state.js | Full game state                        |
-| `robco_chat`            | JSON      | ui.js    | Chat history (up to 200 messages)      |
-| `robco_gemini_key`      | string    | api.js   | Gemini API key                         |
-| `robco_gemini_model`    | string    | api.js   | Selected model name                    |
-| `robco_courier_id`      | string    | cloud.js | Cloud sync identifier                  |
-| `robco_optics`          | string    | ui.js    | Color theme name                       |
-| `robco_playstyle`       | string    | api.js   | "any" or "melee"                       |
-| `robco_panel_state`     | JSON      | ui.js    | Panel open/closed memory               |
-| `robco_version`         | string    | ui.js    | Last seen version (triggers changelog) |
-| `robco_sfx_muted`       | bool      | ui.js    | Typing sound mute                      |
-| `robco_hum_muted`       | bool      | ui.js    | CRT hum mute                           |
-| `robco_geiger_muted`    | bool      | ui.js    | Geiger counter mute                    |
-| `robco_tinnitus_muted`  | bool      | ui.js    | Tinnitus mute                          |
-| `robco_ambient_muted`   | bool      | ui.js    | Limb SFX mute                          |
-| `robco_wake_muted`      | bool      | ui.js    | Tab-return wake tone mute              |
-| `robco_master_muted`    | bool      | ui.js    | Global audio kill switch               |
-| `robco_typer_speed`     | float     | ui.js    | Typewriter speed multiplier            |
-| `robco_last_cloud_push` | timestamp | cloud.js | Conflict detection                     |
-| `robco_slot_1/2/3`      | JSON      | ui.js    | Save slots A/B/C                       |
+| Key                     | Type      | Used By  | Description                                                                            |
+| ----------------------- | --------- | -------- | -------------------------------------------------------------------------------------- |
+| `robco_v7`              | JSON      | state.js | Full game state                                                                        |
+| `robco_chat`            | JSON      | ui.js    | Chat history (up to 200 messages)                                                      |
+| `robco_gemini_key`      | string    | api.js   | Gemini API key                                                                         |
+| `robco_gemini_model`    | string    | api.js   | Selected model name                                                                    |
+| `robco_courier_id`      | string    | cloud.js | Cloud sync identifier                                                                  |
+| `robco_optics`          | string    | ui.js    | Color theme name                                                                       |
+| `robco_playstyle`       | string    | api.js   | "any" or "melee"                                                                       |
+| `robco_panel_state`     | JSON      | ui.js    | Panel open/closed memory                                                               |
+| `robco_version`         | string    | ui.js    | Last seen version (triggers changelog)                                                 |
+| `robco_sfx_muted`       | bool      | ui.js    | Typing sound mute                                                                      |
+| `robco_hum_muted`       | bool      | ui.js    | CRT hum mute                                                                           |
+| `robco_geiger_muted`    | bool      | ui.js    | Geiger counter mute                                                                    |
+| `robco_tinnitus_muted`  | bool      | ui.js    | Tinnitus mute                                                                          |
+| `robco_ambient_muted`   | bool      | ui.js    | Limb SFX mute                                                                          |
+| `robco_wake_muted`      | bool      | ui.js    | Tab-return wake tone mute                                                              |
+| `robco_master_muted`    | bool      | ui.js    | Global audio kill switch                                                               |
+| `robco_typer_speed`     | float     | ui.js    | Typewriter speed multiplier                                                            |
+| `robco_last_cloud_push` | timestamp | cloud.js | Conflict detection                                                                     |
+| `robco_active_tab`      | string    | ui.js    | Last active tab (`'stat'`/`'inv'`/`'data'`/`'campg'`)                                  |
+| `robco_playstyle_type`  | string    | ui.js    | Playthrough type (`'standard'`/`'minmaxed'`/`'completionist'`/`'casual'`/`'speedrun'`) |
+| `robco_slot_1/2/3`      | JSON      | ui.js    | Save slots A/B/C                                                                       |
 
 ---
 
@@ -786,7 +833,7 @@ This protocol was formalized in v1.6.5 after the perk panel (`addPerk()` + `#new
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit audit must pass (all 197+ tests)
+- [ ] `git commit` — pre-commit audit must pass (all 203+ tests)
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

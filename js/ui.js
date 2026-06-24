@@ -560,13 +560,18 @@ window.onload = function () {
     if (banner) banner.style.display = ctx === 'FO3' ? 'block' : 'none';
   }
 
-  // C4: Restore campaign mode selector and RNG banner
+  // C4-fix: Restore playthrough type select (localStorage) independently from RNG checkbox (state)
   {
-    const mode = (state && state.campaignMode) || 'standard';
-    const sel = document.getElementById('campaignModeSelect');
-    if (sel) sel.value = mode;
+    const type = localStorage.getItem('robco_playstyle_type') || 'standard';
+    const sel = document.getElementById('playthroughTypeSelect');
+    if (sel) sel.value = type;
+  }
+  {
+    const rng = (state && state.campaignMode) === 'rng';
+    const cb = document.getElementById('completeRngToggle');
+    if (cb) cb.checked = rng;
     const banner = document.getElementById('rngModeBanner');
-    if (banner) banner.style.display = mode === 'rng' ? 'block' : 'none';
+    if (banner) banner.style.display = rng ? 'block' : 'none';
   }
 
   // #34 Typewriter Speed — restore slider + label on load
@@ -1068,6 +1073,26 @@ function setupHpBarInteraction() {
   });
 }
 
+// C4-fix: Playthrough type handler — localStorage only (NOT a state field).
+// Affects AI directive only; does not trigger saveState().
+// Valid combinations with Complete RNG are all supported.
+function onPlaythroughTypeChange(type) {
+  const valid = ['standard', 'minmaxed', 'completionist', 'casual', 'speedrun'];
+  if (!valid.includes(type)) return;
+  localStorage.setItem('robco_playstyle_type', type);
+}
+
+// C4-fix: Complete RNG toggle — receives boolean from checkbox this.checked.
+// Updates state.campaignMode ('standard' | 'rng') and saves.
+// Opt-in only. Combines freely with any Playthrough Type.
+// AI randomisation is triggered by player commands; never automatic.
+function onCampaignModeChange(checked) {
+  state.campaignMode = checked ? 'rng' : 'standard';
+  saveState();
+  const banner = document.getElementById('rngModeBanner');
+  if (banner) banner.style.display = checked ? 'block' : 'none';
+}
+
 let deferredPrompt;
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault();
@@ -1109,18 +1134,6 @@ function onGameContextChange(ctx) {
   saveState();
   const banner = document.getElementById('fo3WarningBanner');
   if (banner) banner.style.display = ctx === 'FO3' ? 'block' : 'none';
-}
-
-// C4: Playthrough type selector — updates state.campaignMode and saves
-// 'rng' mode is opt-in only and shows an informational banner.
-// AI randomisation is triggered by player commands; it is never automatic.
-function onCampaignModeChange(mode) {
-  const valid = ['standard', 'minmaxed', 'completionist', 'casual', 'speedrun', 'rng'];
-  if (!valid.includes(mode)) return;
-  state.campaignMode = mode;
-  saveState();
-  const banner = document.getElementById('rngModeBanner');
-  if (banner) banner.style.display = mode === 'rng' ? 'block' : 'none';
 }
 
 // ── CAMPAIGN LOG EXPORT ────────────────────────────────────────

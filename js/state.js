@@ -107,7 +107,7 @@ let state = {
   // v2.0 fields
   gameContext: 'FNV', // 'FNV' | 'FO3' — set at boot, governs registry/AI context
   collectibles: [], // flat string[] of collected item names (game-context-aware)
-  campaignMode: 'standard', // 'standard'|'minmaxed'|'completionist'|'casual'|'speedrun'|'rng'
+  campaignMode: 'standard', // 'standard' | 'rng' — Complete RNG opt-in flag (binary)
   // DLC expansion adds entries to the registry only; no state schema change required
 };
 
@@ -281,9 +281,10 @@ function migrateState(version, s) {
   // v2.0: dual-game context and collectibles tracker
   if (!s.gameContext) s.gameContext = 'FNV';
   if (!s.collectibles) s.collectibles = [];
-  // C4: playthrough type and Complete RNG mode
-  const _validModes = ['standard', 'minmaxed', 'completionist', 'casual', 'speedrun', 'rng'];
-  if (!s.campaignMode || !_validModes.includes(s.campaignMode)) s.campaignMode = 'standard';
+  // C4-fix: campaignMode is a binary RNG flag only ('standard' | 'rng').
+  // Old saves that stored playthrough-type values (minmaxed/completionist/casual/speedrun)
+  // are reset to 'standard' — those values now live in localStorage('robco_playstyle_type') only.
+  if (s.campaignMode !== 'rng') s.campaignMode = 'standard';
   delete s.macros; // v1.6.7: macros removed — D-Pad handles this natively
   return s;
 }

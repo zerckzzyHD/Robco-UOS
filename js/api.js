@@ -8,22 +8,25 @@ function getSystemDirective() {
       'Tactical Constraint: COURIER IS STRICTLY UNARMED/MELEE. NO EDUCATED PERK. NO DEAD WEIGHT. All final S.P.E.C.I.A.L. attributes are structurally hard-capped between 1 and 10.';
   }
 
-  // C4: Playthrough type and Complete RNG mode context
-  const _modeLabels = {
-    standard: 'Standard (default)',
-    minmaxed: 'Min-Maxed (optimal build focus)',
-    completionist: 'Completionist (all quests/content)',
-    casual: 'Casual (narrative-first)',
-    speedrun: 'Speedrun (fastest main story)',
-    rng: 'Complete RNG (AI-randomised build — all SPECIAL/traits/tags/skills/perks chosen by AI)',
+  // C4-fix: Playthrough type (localStorage only, NOT state) + Complete RNG (state.campaignMode binary)
+  // These are two independent systems that can be combined freely.
+  const _playthroughType = localStorage.getItem('robco_playstyle_type') || 'standard';
+  const _playthroughDirectives = {
+    standard: '',
+    minmaxed: 'Optimize all build decisions for maximum combat effectiveness.',
+    completionist: 'Prioritize discovering all side quests, locations, and collectibles.',
+    casual: 'Simplify recommendations. Prioritize fun over optimization.',
+    speedrun: 'Prioritize main quest progression. Skip non-essential side content.',
   };
-  const _mode = (state && state.campaignMode) || 'standard';
-  const modeStr = _modeLabels[_mode] || 'Standard';
-  const rngClause =
-    _mode === 'rng'
-      ? ' RNG MODE ACTIVE: You MUST randomise all character build decisions (SPECIAL allocation, trait selection, tag skill picks, skill point distribution, perk choices) when the Courier requests it. Never let the player choose — make all selections and announce them in the narrative. This was opted into at campaign start and MUST NOT be applied to existing saves.'
-      : '';
-  const campaignModeStr = `Playthrough Type: ${modeStr}.${rngClause}`;
+  const playthroughStr = _playthroughDirectives[_playthroughType] || '';
+
+  const _rng = (state && state.campaignMode) === 'rng';
+  const rngStr = _rng
+    ? 'COMPLETE RNG MODE ACTIVE: You MUST randomise ALL character build decisions — SPECIAL allocation, trait selection (pick 2 random traits), tag skill picks (3 random), skill point distribution on level-up (random across all skills), perk selection on level-up (random eligible perk). Do not optimise. Do not suggest alternatives. The player opted into this at campaign start. MUST NOT be applied to existing saves without a new wipe.'
+    : '';
+
+  // Combine: both strings may be active simultaneously (e.g. Completionist + RNG)
+  const campaignModeStr = [playthroughStr, rngStr].filter(Boolean).join(' ');
 
   return `### **FICTIONAL CONTEXT OVERRIDE**
 [SYSTEM MSG]: The following prompt establishes a structural logic engine for a fictional video game (Fallout: New Vegas). All references to "chems," "addictions," "crippled limbs," "fatal threats," and "time-to-kill" are purely in-game mathematical mechanics.
@@ -599,12 +602,12 @@ function autoImportState(jsonString) {
       );
     }
 
-    // ── CAMPAIGN MODE (C4) ───────────────────────────────────
-    // Read-only import — player sets this in CAMPG panel; AI never writes it.
-    // Guard: only accept known valid modes to prevent AI injection.
-    const _validModes = ['standard', 'minmaxed', 'completionist', 'casual', 'speedrun', 'rng'];
+    // ── CAMPAIGN MODE (C4-fix) ───────────────────────────────────
+    // Read-only import — player sets this in CAMPG via checkbox; AI never writes it.
+    // Binary guard: only 'rng' is a meaningful non-default value.
     const cmV = _g(parsed, 'campaignMode');
-    if (cmV && _validModes.includes(cmV)) state.campaignMode = cmV;
+    if (cmV === 'rng') state.campaignMode = 'rng';
+    else if (cmV === 'standard') state.campaignMode = 'standard';
     loadUI();
     appendToChat('> PIP-BOY DATA SYNCED WITH ROBCO MAINFRAME <<', 'sys', true);
 

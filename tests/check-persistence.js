@@ -359,10 +359,10 @@ assert(
 assert(/TAB_NAMES.*campg/.test(uiSource), "TAB_NAMES includes 'campg' in ui.js");
 
 // ══════════════════════════════════════════════════════════════
-//  SUITE 2e — C4 campaignMode Protocol 4 (C4)
-//  Verifies all 4 mandatory Protocol 4 locations for state.campaignMode.
+//  SUITE 2e — C4 campaignMode Protocol 4 + C4-fix separation (C4-fix)
+//  Verifies all 4 Protocol 4 locations AND the corrected two-control design.
 // ══════════════════════════════════════════════════════════════
-header('C4 campaignMode Protocol 4');
+header('C4 campaignMode Protocol 4 + separation fix');
 // Protocol 4 location 1: default value in let state = { ... }
 assert(
   /campaignMode\s*:\s*'standard'/.test(stateSource),
@@ -378,24 +378,49 @@ assert(
   /CAMPAIGN MODE/.test(apiSource) && /cmV/.test(apiSource),
   'autoImportState() handles campaignMode import in api.js'
 );
-// Protocol 4 location 4: getSystemDirective() schema reference
+// Protocol 4 location 4: getSystemDirective() reference (campaignModeStr preserved)
+assert(/campaignModeStr/.test(apiSource), 'getSystemDirective() builds campaignModeStr in api.js');
+// C4-fix: Playthrough Type is now a separate <select> (NOT campaignModeSelect)
 assert(
-  /campaignModeStr/.test(apiSource),
-  'getSystemDirective() references campaignMode context string in api.js'
+  /id="playthroughTypeSelect"/.test(htmlSource),
+  'Playthrough Type select exists in index.html (id="playthroughTypeSelect")'
 );
-// CAMPG panel DOM elements
 assert(
-  /id="campaignModeSelect"/.test(htmlSource),
-  'Playthrough Type select exists in index.html (id="campaignModeSelect")'
+  !/id="campaignModeSelect"/.test(htmlSource),
+  'Old merged select (id="campaignModeSelect") has been removed from index.html'
 );
+// C4-fix: Complete RNG is now a separate checkbox
+assert(
+  /id="completeRngToggle"/.test(htmlSource),
+  'Complete RNG checkbox exists in index.html (id="completeRngToggle")'
+);
+// RNG banner still present
 assert(
   /id="rngModeBanner"/.test(htmlSource),
   'RNG mode banner exists in index.html (id="rngModeBanner")'
 );
-// ui.js handler
+// ui.js: both handlers present
+assert(
+  /function onPlaythroughTypeChange\b/.test(uiSource),
+  'onPlaythroughTypeChange() function exists in ui.js'
+);
 assert(
   /function onCampaignModeChange\b/.test(uiSource),
   'onCampaignModeChange() function exists in ui.js'
+);
+// C4-fix: campaignMode binary — 'rng' is the only non-standard value in migration
+assert(
+  /s\.campaignMode !== 'rng'/.test(stateSource),
+  'migrateState() uses binary guard (campaignMode !== rng) in state.js'
+);
+// C4-fix: playstyle_type behavioral directive strings in api.js
+assert(
+  /robco_playstyle_type/.test(apiSource),
+  'getSystemDirective() reads robco_playstyle_type from localStorage in api.js'
+);
+assert(
+  /Optimize all build decisions for maximum combat effectiveness/.test(apiSource),
+  'Behavioral directive string for min-maxed exists in api.js'
 );
 
 // ══════════════════════════════════════════════════════════════

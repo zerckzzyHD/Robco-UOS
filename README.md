@@ -333,7 +333,7 @@ Every audio function must check `AudioSettings.masterMute` and its specific mute
 npm run lint        ← catch bugs
 npm run format      ← enforce style
 git add -A
-git commit          ← persistence audit runs automatically (197 tests)
+git commit          ← persistence audit runs automatically (203 tests)
 git push origin main
 ```
 
@@ -389,7 +389,7 @@ Key milestones:
 The project is a **production-quality browser application** with:
 
 - 33 tracked state fields across 5 structured systems
-- 197-test automated persistence audit (DOM binding, Protocol 4 enforcement, migrateState mock execution, reputation 2D matrix, CRUD function existence, CAMPG tab DOM binding, campaignMode Protocol 4)
+- 203-test automated persistence audit (DOM binding, Protocol 4 enforcement, migrateState mock execution, reputation 2D matrix, CRUD function existence, CAMPG tab DOM binding, campaignMode Protocol 4 binary + separation)
 - 14-faction reputation network
 - 13-skill character sheet
 - Full save/load/export/import/cloud sync/undo pipeline
