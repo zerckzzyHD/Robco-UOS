@@ -511,16 +511,55 @@ FACTION_REGISTRY = [
 
 ### Standing Calculation (ui.js)
 
+Canonical FNV 2D fame/infamy matrix. Fame and infamy are independent axes.
+Per-faction thresholds sourced from GECK `GetReputationThreshold` documentation (fallout.wiki).
+
+```javascript
+// FACTION_THRESHOLDS (ui.js) — GECK-sourced, per-faction
+const FACTION_THRESHOLDS = {
+  ncr: { t1: 4, t2: 20, t3: 50, t4: 80 }, // t4 = Idolized/Vilified threshold
+  legion: { t1: 4, t2: 25, t3: 50, t4: 100 },
+  house: { t1: 3, t2: 10, t3: 25, t4: 50 },
+  bos: { t1: 2, t2: 3, t3: 10, t4: 20 },
+  // ... (11 FNV factions + 11 FO3 factions in table)
+};
+
+// getFactionStanding(key, fame, infamy) → { label, color }
+// Ranks each axis 0–4 against per-faction thresholds, then resolves title:
 ```
-net = fame - infamy
-≥ 750  → Idolized (green)
-≥ 250  → Liked (green)
-≥ 50   → Accepted (green)
-≥ -50  → Neutral (amber)
-≥ -250 → Tolerated (amber)
-≥ -500 → Shunned (red)
-< -500 → Vilified (red)
-```
+
+| fameRank | infamyRank | Title              |
+| -------- | ---------- | ------------------ |
+| 4        | 0          | Idolized           |
+| 4        | 1–2        | Merciful Thug      |
+| 4        | 3–4        | Wild Child         |
+| 3        | 0–1        | Liked              |
+| 3        | 2          | Unpredictable      |
+| 3        | 3–4        | Wild Child         |
+| 2        | 0          | Accepted           |
+| 2        | 1          | Mixed              |
+| 2        | 2          | Unpredictable      |
+| 2        | 3–4        | Dark Hero          |
+| 1        | 0          | Accepted           |
+| 1        | 1          | Soft-Hearted Devil |
+| 1        | 2          | Mixed              |
+| 1        | 3–4        | Dark Hero          |
+| 0        | 0          | Neutral            |
+| 0        | 1          | Sneering Punk      |
+| 0        | 2          | Shunned            |
+| 0        | 3          | Hated              |
+| 0        | 4          | Vilified           |
+
+### Panel Preservation
+
+`renderFactionRep()` saves the `<details open>` state of the minor-factions
+collapsible before replacing `container.innerHTML`, then restores it afterward.
+This prevents the panel collapsing when the user clicks F+/F-/I+/I- buttons.
+
+### Faction Card Display
+
+Each faction card now shows `F:{fame} / I:{infamy}` rather than a net score.
+Fame and infamy are independent and the display reflects this.
 
 ### Auto-Logging
 

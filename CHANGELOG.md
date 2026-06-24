@@ -1,6 +1,17 @@
 ## [v2.0.0] — The Universal Fallout Companion OS
 
-<!-- Date: 2026-06-24 | Tests: 169/169 | Cache: robco-terminal-v1.6.8-r13 -->
+<!-- Date: 2026-06-24 | Tests: 176/178 (2 pre-existing failures) | Cache: robco-terminal-v1.6.8-r16 -->
+
+### [C1] Reputation 2D Matrix Rewrite (2026-06-24)
+
+- **2D Fame/Infamy Matrix**: Replaced 1D net-score standing system with canonical FNV 2D matrix. Fame and infamy are now fully independent axes. Standing is resolved by the intersection of fame rank × infamy rank per GECK data.
+- **FACTION_THRESHOLDS**: New constant in `ui.js` — per-faction fame/infamy tier boundaries sourced from GECK `GetReputationThreshold` documentation (fallout.wiki). Covers all 11 FNV factions and all 11 FO3 factions.
+- **11 Canonical Titles**: Idolized, Merciful Thug, Wild Child, Liked, Unpredictable, Accepted, Mixed, Soft-Hearted Devil, Dark Hero, Sneering Punk, Shunned, Hated, Neutral, Vilified.
+- **Independent Display**: Faction cards now show `F:{fame} / I:{infamy}` instead of net score, reflecting the 2D model.
+- **Panel-Close Bug Fix**: `renderFactionRep()` now saves and restores the `<details open>` state of the minor-factions panel before replacing `innerHTML`. Clicking F+/F-/I+/I- no longer collapses the minor faction section.
+- **AI Directive Updated**: `api.js` system directive updated to instruct the AI that fame/infamy are independent and describe the 2D standing model.
+- **Tests**: 9 new reputation matrix tests in `tests/check-persistence.js` (Suite 2b). All pass.
+- **CACHE_NAME**: Bumped to `robco-terminal-v1.6.8-r16`.
 
 ### Major Features
 

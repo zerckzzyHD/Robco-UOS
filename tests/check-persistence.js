@@ -243,6 +243,76 @@ assert(
 );
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 2b — Reputation 2D Matrix (C1)
+//  Verifies getFactionStanding() produces canonical FNV titles.
+//  Runs FACTION_THRESHOLDS + getFactionStanding in an isolated vm.
+// ══════════════════════════════════════════════════════════════
+header('Reputation 2D Matrix');
+try {
+  const vm = require('vm');
+
+  // Extract FACTION_THRESHOLDS block and getFactionStanding from ui.js source
+  const threshMatch = uiSource.match(/const FACTION_THRESHOLDS\s*=\s*\{[\s\S]*?\};\s*\/\/ Default/);
+  const defaultMatch = uiSource.match(/const _DEFAULT_THRESHOLDS\s*=\s*\{[^}]+\};/);
+  const fnMatch = uiSource.match(/function getFactionStanding\([\s\S]*?\n\}/);
+
+  if (!threshMatch || !defaultMatch || !fnMatch) {
+    fail('Could not extract FACTION_THRESHOLDS or getFactionStanding from ui.js');
+  } else {
+    const sandboxCode = `${threshMatch[0]}\n${defaultMatch[0]}\n${fnMatch[0]}`;
+    const sandbox = {};
+    vm.createContext(sandbox);
+    vm.runInContext(sandboxCode, sandbox);
+    const gfs = sandbox.getFactionStanding;
+
+    // NCR: max fame (100), no infamy → Idolized
+    assert(
+      gfs('ncr', 100, 0).label === 'Idolized',
+      "getFactionStanding('ncr', 100, 0) returns 'Idolized'"
+    );
+    // BOS: fame=20 (at t4), infamy=0 → Idolized (BOS t4=20)
+    assert(
+      gfs('bos', 20, 0).label === 'Idolized',
+      "getFactionStanding('bos', 20, 0) returns 'Idolized'"
+    );
+    // BOS: fame=20 (t4), infamy=20 (t4) → Wild Child
+    assert(
+      gfs('bos', 20, 20).label === 'Wild Child',
+      "getFactionStanding('bos', 20, 20) returns 'Wild Child'"
+    );
+    // NCR: fame=50 (t3=fr3), infamy=20 (t2=ir2) → Unpredictable
+    assert(
+      gfs('ncr', 50, 20).label === 'Unpredictable',
+      "getFactionStanding('ncr', 50, 20) returns 'Unpredictable'"
+    );
+    // NCR: fame=0, infamy=30 (t3=ir2) → Shunned (fr=0, ir=2)
+    assert(
+      gfs('ncr', 0, 30).label === 'Shunned',
+      "getFactionStanding('ncr', 0, 30) returns 'Shunned'"
+    );
+    // NCR: fame=80 (t4=fr4), infamy=20 (t2=ir2) → Merciful Thug (fr=4, ir=2)
+    assert(
+      gfs('ncr', 80, 20).label === 'Merciful Thug',
+      "getFactionStanding('ncr', 80, 20) returns 'Merciful Thug'"
+    );
+    // NCR: fame=0, infamy=50 (t3=ir3) → Hated (fr=0, ir=3)
+    assert(gfs('ncr', 0, 50).label === 'Hated', "getFactionStanding('ncr', 0, 50) returns 'Hated'");
+    // NCR: fame=0, infamy=0 → Neutral
+    assert(
+      gfs('ncr', 0, 0).label === 'Neutral',
+      "getFactionStanding('ncr', 0, 0) returns 'Neutral'"
+    );
+    // NCR: fame=0, infamy=80 (t4) → Vilified
+    assert(
+      gfs('ncr', 0, 80).label === 'Vilified',
+      "getFactionStanding('ncr', 0, 80) returns 'Vilified'"
+    );
+  }
+} catch (e) {
+  fail(`Reputation 2D Matrix runtime test failed: ${e.message}`);
+}
+
+// ══════════════════════════════════════════════════════════════
 //  SUITE 3 — SKILL_KEYS completeness
 // ══════════════════════════════════════════════════════════════
 header('SKILL_KEYS completeness');

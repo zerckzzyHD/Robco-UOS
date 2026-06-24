@@ -2068,15 +2068,74 @@ function gameTimeToTicks(day, hour, min) {
   return (day - 1) * 240 + hour * 10 + Math.floor(min / 6);
 }
 
-function getFactionStanding(fame, infamy) {
-  let net = (fame || 0) - (infamy || 0);
-  if (net >= 750) return { label: 'Idolized', color: 'var(--robco-green)' };
-  if (net >= 250) return { label: 'Liked', color: 'var(--robco-green)' };
-  if (net >= 50) return { label: 'Accepted', color: 'var(--robco-green)' };
-  if (net >= -50) return { label: 'Neutral', color: 'var(--robco-alert)' };
-  if (net >= -250) return { label: 'Tolerated', color: 'var(--robco-alert)' };
-  if (net >= -500) return { label: 'Shunned', color: 'var(--robco-danger)' };
-  return { label: 'Vilified', color: 'var(--robco-danger)' };
+// ── FACTION THRESHOLDS (GECK-sourced, per-faction) ─────────────────
+// t1: Smiling Troublemaker / Sneering Punk boundary
+// t2: Accepted / Shunned boundary
+// t3: Liked / Hated boundary
+// t4: Idolized / Vilified boundary
+// Source: fallout.wiki — GECK GetReputationThreshold documentation
+const FACTION_THRESHOLDS = {
+  ncr: { t1: 4, t2: 20, t3: 50, t4: 80 },
+  legion: { t1: 4, t2: 25, t3: 50, t4: 100 },
+  house: { t1: 3, t2: 10, t3: 25, t4: 50 },
+  boomers: { t1: 3, t2: 8, t3: 25, t4: 50 },
+  bos: { t1: 2, t2: 3, t3: 10, t4: 20 },
+  followers: { t1: 3, t2: 8, t3: 25, t4: 50 },
+  khans: { t1: 2, t2: 5, t3: 15, t4: 30 },
+  powder: { t1: 2, t2: 5, t3: 15, t4: 30 },
+  kings: { t1: 2, t2: 5, t3: 15, t4: 30 },
+  strip: { t1: 3, t2: 8, t3: 20, t4: 40 },
+  freeside: { t1: 3, t2: 10, t3: 35, t4: 70 },
+  // FO3 factions — use generic thresholds (no independent GECK data)
+  enclave: { t1: 3, t2: 10, t3: 30, t4: 60 },
+  lyons: { t1: 3, t2: 10, t3: 30, t4: 60 },
+  outcast: { t1: 2, t2: 8, t3: 25, t4: 50 },
+  talon: { t1: 2, t2: 5, t3: 15, t4: 30 },
+  regulators: { t1: 2, t2: 5, t3: 15, t4: 30 },
+  slavers: { t1: 2, t2: 5, t3: 15, t4: 30 },
+  reillys: { t1: 2, t2: 5, t3: 15, t4: 30 },
+  tunnelsnakes: { t1: 2, t2: 5, t3: 15, t4: 30 },
+  supermutants: { t1: 3, t2: 8, t3: 20, t4: 50 },
+  underworld: { t1: 2, t2: 5, t3: 15, t4: 30 },
+  rivetcity: { t1: 2, t2: 5, t3: 15, t4: 30 },
+};
+// Default thresholds for any faction key not in the table above
+const _DEFAULT_THRESHOLDS = { t1: 3, t2: 8, t3: 25, t4: 50 };
+
+// ── getFactionStanding(key, fame, infamy) ───────────────────────────
+// Canonical FNV 2D fame/infamy matrix.
+// Returns { label, color } based on the intersection of fame rank × infamy rank.
+// Source: fallout.wiki GECK GetReputationThreshold function table.
+function getFactionStanding(key, fame, infamy) {
+  const th = FACTION_THRESHOLDS[key] || _DEFAULT_THRESHOLDS;
+  const f = fame || 0;
+  const i = infamy || 0;
+
+  // Rank each axis: 0=none, 1=low, 2=mid, 3=high, 4=max
+  const fr = f < th.t1 ? 0 : f < th.t2 ? 1 : f < th.t3 ? 2 : f < th.t4 ? 3 : 4;
+  const ir = i < th.t1 ? 0 : i < th.t2 ? 1 : i < th.t3 ? 2 : i < th.t4 ? 3 : 4;
+
+  // 2D resolution matrix (fameRank × infamyRank)
+  // Derived from GECK GetReputationThreshold output table
+  if (fr === 4 && ir === 0) return { label: 'Idolized', color: 'var(--robco-green)' };
+  if (fr === 4 && ir <= 2) return { label: 'Merciful Thug', color: 'var(--robco-alert)' };
+  if (fr >= 3 && ir <= 1) return { label: 'Liked', color: 'var(--robco-green)' };
+  if (fr >= 2 && ir === 0) return { label: 'Accepted', color: 'var(--robco-green)' };
+  if (fr === 1 && ir === 0) return { label: 'Accepted', color: 'var(--robco-green)' };
+  if (fr >= 3 && ir >= 3) return { label: 'Wild Child', color: 'var(--robco-alert)' };
+  if (fr >= 2 && ir >= 2) return { label: 'Unpredictable', color: 'var(--robco-alert)' };
+  if (fr === 4 && ir >= 3) return { label: 'Wild Child', color: 'var(--robco-alert)' };
+  if (fr >= 1 && ir >= 3) return { label: 'Dark Hero', color: 'var(--robco-alert)' };
+  if (fr === 1 && ir === 1) return { label: 'Soft-Hearted Devil', color: 'var(--robco-alert)' };
+  if (fr === 1 && ir === 2) return { label: 'Mixed', color: 'var(--robco-alert)' };
+  if (fr === 2 && ir === 1) return { label: 'Mixed', color: 'var(--robco-alert)' };
+  if (fr === 0 && ir === 0) return { label: 'Neutral', color: 'var(--robco-alert)' };
+  if (fr === 0 && ir === 1) return { label: 'Sneering Punk', color: 'var(--robco-danger)' };
+  if (fr === 0 && ir === 2) return { label: 'Shunned', color: 'var(--robco-danger)' };
+  if (fr === 0 && ir === 3) return { label: 'Hated', color: 'var(--robco-danger)' };
+  if (fr === 0 && ir === 4) return { label: 'Vilified', color: 'var(--robco-danger)' };
+  // Fallback for any unhandled combination
+  return { label: 'Neutral', color: 'var(--robco-alert)' };
 }
 
 function renderStatus() {
@@ -2522,15 +2581,15 @@ function renderFactionRep() {
   // Buttons adjust by 50 per click — matches the 50-point standing tier boundaries.
   function factionCard(f) {
     const data = factions[f.key] || { fame: 0, infamy: 0 };
-    const s = getFactionStanding(data.fame, data.infamy);
-    const net = (data.fame || 0) - (data.infamy || 0);
-    const netStr = net > 0 ? `+${net}` : `${net}`;
+    const s = getFactionStanding(f.key, data.fame, data.infamy);
+    const famVal = data.fame || 0;
+    const infamyVal = data.infamy || 0;
     const btnStyle =
       'font-family:inherit;font-size:9px;background:rgba(0,0,0,0.6);border:1px dashed rgba(20,253,206,0.3);color:rgba(20,253,206,0.75);cursor:pointer;padding:1px 3px;line-height:1.4;';
     return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 3px;border:1px dashed rgba(20,253,206,0.3);text-align:center;min-width:0;">
       <span style="font-size:9px;letter-spacing:0.4px;opacity:0.65;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%;" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</span>
       <span style="font-size:10px;font-weight:bold;color:${s.color};">${s.label}</span>
-      <span style="font-size:9px;opacity:0.55;">(${netStr})</span>
+      <span style="font-size:9px;opacity:0.55;">F:${famVal} / I:${infamyVal}</span>
       <div style="display:flex;gap:2px;flex-wrap:wrap;justify-content:center;margin-top:1px;">
         <button style="${btnStyle}" title="Fame +50" onclick="adjustFaction('${f.key}','fame',50)">F+</button>
         <button style="${btnStyle}" title="Fame -50" onclick="adjustFaction('${f.key}','fame',-50)">F-</button>
@@ -2542,6 +2601,11 @@ function renderFactionRep() {
 
   const major = getFactionRegistry().filter(f => f.tier === 'major');
   const minor = getFactionRegistry().filter(f => f.tier === 'minor');
+
+  // Bug fix: save the open state of the minor-factions <details> panel
+  // before replacing innerHTML, so clicking F+/F-/I+/I- doesn't collapse it.
+  const minorDetails = container.querySelector('details');
+  const minorWasOpen = minorDetails ? minorDetails.open : false;
 
   container.innerHTML = `
     <div style="font-size:9px;opacity:0.45;margin-bottom:4px;letter-spacing:0.5px;">F+/F- = Fame ±50 &nbsp; I+/I- = Infamy ±50</div>
@@ -2555,6 +2619,12 @@ function renderFactionRep() {
       </div>
     </details>
   `;
+
+  // Restore open state after re-render
+  if (minorWasOpen) {
+    const newDetails = container.querySelector('details');
+    if (newDetails) newDetails.open = true;
+  }
 }
 
 // ── G4: EXPANDED KARMA SYSTEM (FO3) ─────────────────────────────

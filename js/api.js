@@ -91,9 +91,12 @@ state.hd tracks head condition: "OK" or "CRIPPLED". A crippled head causes -2 PE
 ### **Faction Standing System**
 state.factions tracks reputation with 14 factions as { fame: 0, infamy: 0 } objects.
 Major keys: ncr, legion, house, bos, boomers, khans. Minor keys: followers, powder, kings, wgs, vangraff, crimson, chairmen, omertas.
+Fame and infamy are INDEPENDENT non-negative integers. They do NOT cancel each other out.
+Standing is determined by a 2D matrix (fame rank × infamy rank). Both axes use per-faction thresholds sourced from the GECK.
+The 11 canonical standing titles are: Neutral, Sneering Punk, Accepted, Shunned, Liked, Hated, Vilified, Idolized, Soft-Hearted Devil, Mixed, Unpredictable, Dark Hero, Merciful Thug, Wild Child.
 Whenever a faction's standing changes (quest completed, action taken, territory entered), update the relevant faction in state.factions by adjusting fame and/or infamy. Both are non-negative integers.
 Always return the FULL state.factions object in the state node — never return a partial object or omit unchanged factions.
-Use [REP] to display all 14 faction standings with the Courier's current net standing.
+Use [REP] to display all 14 faction standings with the Courier's current fame and infamy values.
 
 ### **Perk System**
 state.perks tracks acquired perks as [{name, rank, level_taken}].
