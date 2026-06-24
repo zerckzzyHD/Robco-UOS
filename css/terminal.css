@@ -342,7 +342,52 @@ textarea {
   transition: opacity 0.3s;
 }
 
-/* MODAL CSS */
+/* ─── Tab Navigation Bar ──────────────────────────────────────── */
+.tab-bar {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--robco-green);
+  padding-bottom: 4px;
+}
+.tab-btn {
+  background: transparent;
+  border: 1px solid var(--robco-green);
+  color: var(--robco-green);
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 2px;
+  padding: 4px 12px;
+  margin: 0;
+  cursor: pointer;
+  width: auto;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+  opacity: 0.55;
+}
+.tab-btn:hover {
+  filter: brightness(1.3);
+  opacity: 0.85;
+}
+.tab-btn.active {
+  background: rgba(20, 253, 206, 0.18);
+  border-color: var(--robco-green);
+  opacity: 1;
+  box-shadow: 0 0 6px rgba(20, 253, 206, 0.35);
+}
+/* Hidden panels (not in active tab) */
+.panel[data-tab] {
+  display: none;
+}
+.panel[data-tab].tab-visible {
+  display: block;
+}
+/* Security panel (no data-tab) always shows */
+.panel:not([data-tab]) {
+  display: block;
+}
+
 .modal-overlay {
   display: none;
   position: fixed;

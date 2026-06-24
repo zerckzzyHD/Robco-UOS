@@ -385,6 +385,7 @@ window.onload = function () {
     appendToChat('> SYSTEM INITIALIZED. DIAGNOSTIC CORE ACTIVE...', 'sys', true);
   }
   loadUI();
+  initTabs(); // Phase 4: restore active tab (defaults to 'stat' on first load)
   setupHpBarInteraction();
   startCrtHum();
   initRegistryAutocomplete();
@@ -548,6 +549,27 @@ window.onload = function () {
         e.preventDefault();
         const ci = document.getElementById('chatInput');
         if (ci) ci.focus();
+      }
+    }
+    // Tab keyboard shortcuts: 1=STAT, 2=INV, 3=DATA (no modifier, not in input)
+    if (!e.ctrlKey && !e.altKey && !e.metaKey) {
+      const activeEl = document.activeElement;
+      const inInput =
+        activeEl &&
+        (activeEl.tagName === 'INPUT' ||
+          activeEl.tagName === 'TEXTAREA' ||
+          activeEl.tagName === 'SELECT');
+      if (!inInput) {
+        if (e.key === '1') {
+          e.preventDefault();
+          switchTab('stat');
+        } else if (e.key === '2') {
+          e.preventDefault();
+          switchTab('inv');
+        } else if (e.key === '3') {
+          e.preventDefault();
+          switchTab('data');
+        }
       }
     }
   });
@@ -1016,9 +1038,61 @@ function _updatePanelBadges() {
 }
 
 // ── AUTO-EXPAND PANEL (#31) ──────────────────────────────────────────
+// ── TAB NAVIGATION ───────────────────────────────────────────────
+// Tabs: 'stat' | 'inv' | 'data'
+// Each panel has data-tab="stat|inv|data". Panels with no data-tab always show.
+// Security & Configuration has no data-tab and is always visible.
+const TAB_NAMES = ['stat', 'inv', 'data'];
+
+function switchTab(tab) {
+  if (!TAB_NAMES.includes(tab)) return;
+  // Show panels for the active tab, hide others
+  document.querySelectorAll('.panel[data-tab]').forEach(el => {
+    if (el.dataset.tab === tab) {
+      el.classList.add('tab-visible');
+    } else {
+      el.classList.remove('tab-visible');
+    }
+  });
+  // Update button active states
+  TAB_NAMES.forEach(t => {
+    const btn = document.getElementById('tab-btn-' + t);
+    if (btn) btn.classList.toggle('active', t === tab);
+  });
+  // Store active tab so page reload restores it
+  try {
+    localStorage.setItem('robco_active_tab', tab);
+  } catch (_) {}
+}
+
+// Initialize tab on page load (restores last used tab, defaults to 'stat')
+function initTabs() {
+  let tab = 'stat';
+  try {
+    const saved = localStorage.getItem('robco_active_tab');
+    if (saved && TAB_NAMES.includes(saved)) tab = saved;
+  } catch (_) {}
+  switchTab(tab);
+}
+
 // Called by autoImportState() after a state delta with the changed category key.
 // Opens the relevant panel so the Courier can immediately see what changed.
 function expandPanelForCategory(categoryKey) {
+  // Tab routing: switch to the correct tab before expanding the panel
+  const tabMap = {
+    squad: 'inv',
+    status: 'stat',
+    inventory: 'inv',
+    campaign_notes: 'data',
+    perks: 'stat',
+    factions: 'stat',
+    quests: 'data',
+    ammo: 'inv',
+    equipped: 'inv',
+    collectibles: 'inv',
+  };
+  if (tabMap[categoryKey]) switchTab(tabMap[categoryKey]);
+
   const map = {
     squad: '> SQUAD STATUS',
     status: '> STATUS EFFECTS',
@@ -1029,6 +1103,7 @@ function expandPanelForCategory(categoryKey) {
     quests: '> QUEST LOG',
     ammo: '> BACKPACK INVENTORY', // ammo lives in the sub-panel inside BACKPACK
     equipped: '> EQUIPPED',
+    collectibles: '> COLLECTIBLES',
   };
   const target = map[categoryKey];
   if (!target) return;

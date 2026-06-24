@@ -67,7 +67,15 @@
 
       <div class="main-grid">
         <div class="col-left" id="uiPanel">
-          <details class="panel">
+          <!-- TAB NAVIGATION BAR -->
+          <div class="tab-bar" role="tablist">
+            <button id="tab-btn-stat" class="tab-btn active" role="tab" onclick="switchTab('stat')" title="STAT [1]">STAT</button>
+            <button id="tab-btn-inv" class="tab-btn" role="tab" onclick="switchTab('inv')" title="INV [2]">INV</button>
+            <button id="tab-btn-data" class="tab-btn" role="tab" onclick="switchTab('data')" title="DATA [3]">DATA</button>
+          </div>
+
+          <!-- 1. BIO-METRICS (STAT tab) -->
+          <details class="panel" data-tab="stat">
             <summary>
               <h2>> BIO-METRICS</h2>
             </summary>
@@ -351,7 +359,7 @@
             ></div>
           </details>
 
-          <details class="panel">
+          <details class="panel" data-tab="stat">
             <summary>
               <h2>> BIO-SCAN & LIMB STATUS</h2>
             </summary>
@@ -390,7 +398,7 @@
             </div>
           </details>
 
-          <details class="panel">
+          <details class="panel" data-tab="inv">
             <summary>
               <h2>> BACKPACK INVENTORY</h2>
             </summary>
@@ -479,7 +487,7 @@
             <button class="action-btn" onclick="addItem()">+ ADD ITEM</button>
           </details>
 
-          <details class="panel">
+          <details class="panel" data-tab="stat">
             <summary>
               <h2>> SKILL MATRIX</h2>
             </summary>
@@ -747,7 +755,7 @@
           </details>
 
           <!-- 5. QUEST LOG -->
-          <details class="panel">
+          <details class="panel" data-tab="data">
             <summary><h2>> QUEST LOG</h2></summary>
             <div id="questsList">
               <span style="color: rgba(20, 253, 206, 0.5)">No Active Quests</span>
@@ -786,7 +794,7 @@
           </details>
 
           <!-- 6. PERKS -->
-          <details class="panel">
+          <details class="panel" data-tab="stat">
             <summary><h2>> PERKS</h2></summary>
             <div id="perksList">
               <span style="color: rgba(20, 253, 206, 0.5)">No Perks Acquired</span>
@@ -823,7 +831,7 @@
           </details>
 
           <!-- 7. STATUS EFFECTS -->
-          <details class="panel">
+          <details class="panel" data-tab="stat">
             <summary>
               <h2>> STATUS EFFECTS</h2>
             </summary>
@@ -863,7 +871,7 @@
           </details>
 
           <!-- 8. SQUAD STATUS -->
-          <details class="panel">
+          <details class="panel" data-tab="inv">
             <summary>
               <h2>> SQUAD STATUS</h2>
             </summary>
@@ -884,7 +892,7 @@
           </details>
 
           <!-- 9. FACTION STANDING -->
-          <details class="panel">
+          <details class="panel" data-tab="stat">
             <summary>
               <h2>> FACTION STANDING</h2>
             </summary>
@@ -892,7 +900,7 @@
           </details>
 
           <!-- 10. CAMPAIGN NOTES -->
-          <details class="panel">
+          <details class="panel" data-tab="data">
             <summary>
               <h2>> CAMPAIGN NOTES</h2>
             </summary>
@@ -906,7 +914,7 @@
           </details>
 
           <!-- 11. SESSION STATISTICS -->
-          <details class="panel">
+          <details class="panel" data-tab="data">
             <summary><h2>> SESSION STATISTICS</h2></summary>
             <div id="sessionStatsList"></div>
             <button

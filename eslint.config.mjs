@@ -78,6 +78,8 @@ export default [
         SKILL_KEYS_FO3: 'readonly',
         getFactionRegistry: 'readonly',
         getSkillKeys: 'readonly',
+        switchTab: 'readonly',
+        initTabs: 'readonly',
         appendToChat: 'readonly',
         loadUI: 'readonly',
         saveState: 'readonly',
