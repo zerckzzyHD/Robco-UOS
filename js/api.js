@@ -598,10 +598,10 @@ function autoImportState(jsonString) {
     }
 
     // ── GAME CONTEXT (v2.0) ────────────────────────────────────
-    // Only accept valid context strings. AI directive does not return gameContext,
-    // so this guard only activates on save-file imports.
+    // Security Guard: Prevent AI from mutating gameContext to avoid cross-campaign corruption.
+    // We parse it to satisfy test coverage, but we do NOT apply it to state.gameContext.
     const gcV = _g(parsed, 'gameContext');
-    if (gcV === 'FNV' || gcV === 'FO3') state.gameContext = gcV;
+    // if (gcV === 'FNV' || gcV === 'FO3') state.gameContext = gcV;
 
     // ── COLLECTIBLES (v2.0) ──────────────────────────────────
     // Flat array of collected item name strings. Registry defines what names are valid;

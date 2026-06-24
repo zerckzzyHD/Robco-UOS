@@ -698,6 +698,11 @@ window.onload = function () {
         .join('\n');
       appendToChat(briefing, 'sys', true);
     }
+
+    if (window._lastStateBeforeSync || localStorage.getItem('robco_backup')) {
+      let undoBtn = document.getElementById('undoSyncBtn');
+      if (undoBtn) undoBtn.style.display = 'block';
+    }
   });
 
   // Session Uptime Clock
@@ -2854,24 +2859,25 @@ function _updateContextPanels() {
 }
 
 function undoLastSync() {
-  if (!window._lastStateBeforeSync) {
-    appendToChat('> NO RECENT SYNC TO UNDO.', 'sys', true);
-    return;
-  }
   try {
-    let prev = JSON.parse(window._lastStateBeforeSync);
-    if (prev.robco_v8) {
-      localStorage.setItem('robco_v8', JSON.stringify(prev.robco_v8));
-      window._lastStateBeforeSync = null;
-      alert('> STATE ROLLBACK COMPLETE. REBOOTING SYSTEM...');
-      window.location.reload();
-    } else {
+    if (window._lastStateBeforeSync) {
+      let prev = JSON.parse(window._lastStateBeforeSync);
       state = { ...state, ...prev };
       window._lastStateBeforeSync = null;
       let undoBtn = document.getElementById('undoSyncBtn');
       if (undoBtn) undoBtn.style.display = 'none';
       loadUI();
       appendToChat('> STATE ROLLBACK COMPLETE. PREVIOUS TELEMETRY RESTORED.', 'sys', true);
+    } else if (localStorage.getItem('robco_backup')) {
+      let prev = JSON.parse(localStorage.getItem('robco_backup'));
+      if (prev.robco_v8) {
+        localStorage.setItem('robco_v8', JSON.stringify(prev.robco_v8));
+        localStorage.removeItem('robco_backup');
+        alert('> HARD BACKUP RESTORED SUCCESSFULLY. REBOOTING SYSTEM...');
+        window.location.reload();
+      }
+    } else {
+      appendToChat('> NO RECENT SYNC TO UNDO.', 'sys', true);
     }
   } catch (e) {
     appendToChat('> ROLLBACK FAILED: DATA CORRUPTED.', 'sys', true);
@@ -3200,6 +3206,10 @@ function handleFileUpload(event) {
       const parsed = JSON.parse(e.target.result);
       if (parsed.robco_v8) {
         // v8 Container payload
+        localStorage.setItem(
+          'robco_backup',
+          JSON.stringify({ robco_v8: JSON.parse(localStorage.getItem('robco_v8') || '{}') })
+        );
         localStorage.setItem('robco_v8', JSON.stringify(parsed.robco_v8));
         if (parsed.chat && Array.isArray(parsed.chat))
           localStorage.setItem('robco_chat', JSON.stringify(parsed.chat));
