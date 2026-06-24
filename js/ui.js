@@ -2758,7 +2758,7 @@ function renderWorldMap() {
     for (let c = 1; c <= 6; c++) {
       const zone = grid[r][c];
       if (!zone) {
-        html += `<div style="border:1px solid rgba(20,253,206,0.08); min-height:44px; padding:3px;"></div>`;
+        html += `<div style="border:1px solid rgba(20,253,206,0.08); min-width:0; min-height:44px; padding:3px;"></div>`;
         continue;
       }
 
@@ -2779,7 +2779,8 @@ function renderWorldMap() {
         marker += '<span style="opacity:0.8;font-size:8px;">[?]</span>';
       }
 
-      html += `<div class="map-cell" onclick="zoomMapToZone('${escapeHtml(zone.name.replace(/'/g, "\\'"))}')" style="
+      html += `<div class="map-cell" onclick="zoomMapToZone('${escapeHtml(zone.name.replace(/'/g, "\\'"))}')" title="${escapeHtml(zone.name)}" style="
+        min-width:0;
         min-height:44px;
         padding:3px;
         ${brightnessStyle}
@@ -2787,7 +2788,7 @@ function renderWorldMap() {
         flex-direction:column;
         justify-content:space-between;
       ">
-        <span style="line-height:1.2;">${escapeHtml(zone.name)}</span>
+        <span style="line-height:1.2; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; text-overflow:ellipsis; overflow-wrap:anywhere;">${escapeHtml(zone.name)}</span>
         <span style="font-size:8px;">${marker}</span>
       </div>`;
     }
