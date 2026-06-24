@@ -315,6 +315,21 @@ try {
 }
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 2c — C2 CRUD Functions (C2)
+//  Verifies new CRUD functions were added to ui.js.
+// ══════════════════════════════════════════════════════════════
+header('C2 CRUD Functions');
+assert(/function removePerk\b/.test(uiSource), 'removePerk() function exists in ui.js');
+assert(
+  /function toggleCollectible\b/.test(uiSource),
+  'toggleCollectible() function exists in ui.js'
+);
+assert(
+  /COMM-LINK COMMAND REGISTRY/.test(uiSource),
+  'showHelpModal() contains expanded command registry (COMM-LINK COMMAND REGISTRY)'
+);
+
+// ══════════════════════════════════════════════════════════════
 //  SUITE 3 — SKILL_KEYS completeness
 // ══════════════════════════════════════════════════════════════
 header('SKILL_KEYS completeness');

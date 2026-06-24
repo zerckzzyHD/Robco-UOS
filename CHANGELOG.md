@@ -1,6 +1,6 @@
 ## [v2.0.0] — The Universal Fallout Companion OS
 
-<!-- Date: 2026-06-24 | Tests: 178/178 | Cache: robco-terminal-v1.6.8-r16 -->
+<!-- Date: 2026-06-24 | Tests: 181/181 | Cache: robco-terminal-v1.6.8-r17 -->
 
 ### [C1] Reputation 2D Matrix Rewrite (2026-06-24)
 
@@ -12,6 +12,14 @@
 - **AI Directive Updated**: `api.js` system directive updated to instruct the AI that fame/infamy are independent and describe the 2D standing model.
 - **Tests**: 9 new reputation matrix tests in `tests/check-persistence.js` (Suite 2b). All pass.
 - **CACHE_NAME**: Bumped to `robco-terminal-v1.6.8-r16`.
+
+### [C2] CRUD Completion (2026-06-24)
+
+- **Perk Removal**: `removePerk(idx)` added to `ui.js`. Each perk entry in the Perks panel now includes an `[X]` delete button, consistent with the pattern used by Quest Log and Campaign Notes.
+- **Collectible Toggle**: `toggleCollectible(name)` added to `ui.js`. Clicking `[ACQUIRED]` or `[MISSING]` labels in the collectibles panel toggles the collectible's state immediately and saves. Both labels are clickable with a tooltip hint. No full `loadUI()` re-render required — only `renderCollectibles()` is called for fast response.
+- **Expanded Help Modal**: `showHelpModal()` rewritten with the full 27-command canonical registry from `api.js` (all 5 sections: Tactical, Inventory, Character, Navigation, Narrative). Title updated from "COMMAND CHEAT SHEET" to "COMM-LINK COMMAND REGISTRY". Displayed as a monospace box-drawing grid, matching the in-game [FEATURES] output exactly.
+- **Tests**: 3 new tests in `tests/check-persistence.js` (Suite 2c): `removePerk` exists, `toggleCollectible` exists, help modal contains expanded registry.
+- **CACHE_NAME**: Bumped to `robco-terminal-v1.6.8-r17`.
 
 ### Major Features
 

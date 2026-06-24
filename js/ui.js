@@ -1428,15 +1428,54 @@ function showHelpModal() {
   const title = document.getElementById('modalTitle');
   const content = document.getElementById('modalContent');
   if (!modal || !title || !content) return;
-  title.innerText = '> COMMAND CHEAT SHEET';
-  content.innerHTML = `
-<b>[THREAT]</b>: Analyzes current enemies/environment for weaknesses.
-<b>[VATS]</b>: Simulates combat outcomes and hit probabilities.
-<b>[TRADE]</b>: Appraises items and calculates barter advantage.
-<b>[LOOT]</b>: Scans the room/corpses for valuable salvage.
-
-<i>Use the D-Pad arrows or macro buttons below the input line for quick tactical entries.</i>
-  `.trim();
+  title.innerText = '> COMM-LINK COMMAND REGISTRY';
+  content.innerHTML = `<pre style="font-family:inherit;font-size:10px;line-height:1.5;white-space:pre-wrap;">
+┌──────────────────────────────────────────────────────┐
+│ [ TACTICAL &amp; COMBAT SYSTEMS ]                        │
+│ &gt; [VATS SIM] / [VS] : Opt. Melee/Unarmed AP strikes. │
+│ &gt; [VVATS]           : Analyze screenshot for hit %.  │
+│ &gt; [THREAT] / [TH]   : Calc Squad TTK &amp; ammo burn.    │
+│ &gt; [TACTICS] / [TA]  : Multi-companion combat guide.  │
+│ &gt; [BIO-SCAN]        : Evaluate limbs &amp; med routing.  │
+├──────────────────────────────────────────────────────┤
+│ [ INVENTORY &amp; ECONOMY MATRIX ]                       │
+│ &gt; [VISUAL UPLOAD:X] : Parse screenshot (Wpn/App/Msc).│
+│ &gt; [SYNC: data]      : Batch state update via string. │
+│ &gt; [BIND: X, DIR]    : Assign gear to D-Pad vectors.  │
+│ &gt; [PAD: DIR]        : Auto-execute 8-way hotkeys.    │
+│ &gt; [TRADE: X] / [TD] : Live barter math &amp; updates.    │
+│ &gt; [INV]             : Inventory/hotkey/gear log.     │
+│ &gt; [STASH: Loc]/[-FULL]: Network inventory sum/full.  │
+│ &gt; [EXCESS]/[-FULL]  : Jury Rig &amp; weight triage.      │
+│ &gt; [CURRENCY]        : Weightless Wealth exchange.    │
+│ &gt; [CRAFT]           : Consume ingredients to build.  │
+│ &gt; [AUDIT]           : Stash value for liquidation.   │
+├──────────────────────────────────────────────────────┤
+│ [ CHARACTER &amp; BIO-STATUS ]                           │
+│ &gt; [STATS]           : S.P.E.C.I.A.L, Skills, Karma.  │
+│ &gt; [TIMER/CHEM]/[CH] : Buff ticks &amp; addictions.       │
+│ &gt; [REP]             : Dual-Axis Faction Rep &amp; Impact.│
+│ &gt; [SQUAD]           : Squad loadouts &amp; 150lb weight. │
+│ &gt; [ROADMAP]         : Perks to Cap; implant overlap. │
+├──────────────────────────────────────────────────────┤
+│ [ NAVIGATION &amp; WORLD STATE ]                         │
+│ &gt; [GPS/MAP]         : Localized geographic compass.  │
+│ &gt; [TRAVEL CLUSTER]/[TC]: Group active quest nodes.   │
+│ &gt; [WAIT: X Hrs]     : Advance clock &amp; restock.       │
+│ &gt; [SLEEP]           : Advance 8 Hrs, heal HP/Limbs.  │
+│ &gt; [CASINO]          : Blackjack strategy via LUCK.   │
+├──────────────────────────────────────────────────────┤
+│ [ NARRATIVE &amp; DIRECTIVES ]                           │
+│ &gt; [CROSSROADS]      : Butterfly-effect lockouts.     │
+│ &gt; [COMM LINK]       : NPC persona override. (SEVER)  │
+│ &gt; [PAUSE]           : Master Directive (Page One).   │
+│ &gt; [PAGE 2/3]        : Dynamic routes &amp; alignment.    │
+│ &gt; [ARCHIVE]         : 3 most recent story choices.   │
+│ &gt; [DEV 1/2/3]       : Query 'robco_dev_manual.txt'.  │
+│ &gt; [VIEW: D/M]       : Toggle Desktop/Mobile width.   │
+│ &gt; &amp;&amp; / -Q / -S      : Chain cmds, Quiet, Stealth.   │
+└──────────────────────────────────────────────────────┘
+<i style="font-size:9px;opacity:0.6;">Type any command above in the Comm-Link input to execute.</i></pre>`;
   modal.style.display = 'flex';
 }
 function clampStat(el) {
@@ -2240,11 +2279,18 @@ function renderPerks() {
     '<ul class="notes-list">' +
     state.perks
       .map(
-        p =>
-          `<li>${escapeHtml(p.name)}${p.rank > 1 ? ' (Rank ' + p.rank + ')' : ''}${p.level_taken ? ' — Lv.' + p.level_taken : ''}</li>`
+        (p, i) =>
+          `<li>${escapeHtml(p.name)}${p.rank > 1 ? ' (Rank ' + p.rank + ')' : ''}${p.level_taken ? ' — Lv.' + p.level_taken : ''}<button class="delete-btn" style="float:right;" onclick="removePerk(${i})">X</button></li>`
       )
       .join('') +
     '</ul>';
+}
+
+function removePerk(idx) {
+  if (state.perks && state.perks.length > idx) {
+    state.perks.splice(idx, 1);
+    loadUI();
+  }
 }
 
 function addPerk() {
@@ -2376,7 +2422,8 @@ function renderCollectibles() {
   const missingDefs = defs.filter(d => !acquired.has(d.name.toLowerCase()));
 
   acquiredDefs.forEach(d => {
-    html += `<div style="font-size:11px;letter-spacing:0.5px;margin-bottom:2px;"><span style="color:var(--robco-green);">[ACQUIRED]</span> ${escapeHtml(d.name.toUpperCase())}</div>`;
+    const safeName = escapeHtml(d.name);
+    html += `<div style="font-size:11px;letter-spacing:0.5px;margin-bottom:2px;"><span style="color:var(--robco-green);cursor:pointer;" onclick="toggleCollectible('${safeName}')" title="Click to mark MISSING">[ACQUIRED]</span> ${escapeHtml(d.name.toUpperCase())}</div>`;
   });
 
   if (acquiredDefs.length > 0 && missingDefs.length > 0) {
@@ -2384,13 +2431,27 @@ function renderCollectibles() {
   }
 
   missingDefs.forEach(d => {
+    const safeName = escapeHtml(d.name);
     const locHint = d.location
       ? ` &mdash; <span style="opacity:0.5;font-size:10px;">LOC: ${escapeHtml(d.location)}</span>`
       : '';
-    html += `<div style="font-size:11px;letter-spacing:0.5px;margin-bottom:2px;opacity:0.75;"><span style="opacity:0.6;">[MISSING]</span> ${escapeHtml(d.name.toUpperCase())}${locHint}</div>`;
+    html += `<div style="font-size:11px;letter-spacing:0.5px;margin-bottom:2px;opacity:0.75;"><span style="opacity:0.6;cursor:pointer;" onclick="toggleCollectible('${safeName}')" title="Click to mark ACQUIRED">[MISSING]</span> ${escapeHtml(d.name.toUpperCase())}${locHint}</div>`;
   });
 
   container.innerHTML = html;
+}
+
+function toggleCollectible(name) {
+  if (!state.collectibles) state.collectibles = [];
+  const lowerName = name.toLowerCase();
+  const idx = state.collectibles.findIndex(n => n.toLowerCase() === lowerName);
+  if (idx >= 0) {
+    state.collectibles.splice(idx, 1);
+  } else {
+    state.collectibles.push(name);
+  }
+  renderCollectibles();
+  saveState();
 }
 
 function renderCampaignNotes() {
