@@ -7,6 +7,16 @@
 - **Dynamic Skills**: AI prompt swaps Big Guns/Small Guns into the matrix when in FO3 context.
 - **Irreversible Triggers**: AI safety net now warns of FO3 specific endpoints (Megaton, Purifier, Karma hit squads) based on context.
 
+### Multi-Campaign Container Architecture (2026-06-24)
+
+- **robco_v8 Container**: Upgraded root storage from bare `state` arrays to the `robco_v8` Multi-Campaign Container (`{ activeContext: 'FNV', campaigns: { FNV: {...}, FO3: {...} } }`), mathematically eliminating cross-game save contamination.
+- **Legacy Migration**: App automatically detects legacy `robco_v7` saves, silently migrates them into the `robco_v8` FNV campaign slot, and leaves the `v7` string untouched on disk as an ultimate fail-safe backup.
+- **Dynamic Registry Injection**: Removed hardcoded `<script src="js/reg_nv.js">`. `index.html` now reads `activeContext` and dynamically injects `reg_fo3` or `reg_nv` during boot sequence. Autocomplete lists are now perfectly game-isolated.
+- **Hard Reload Context Switching**: Changing context in the CAMPG tab now saves the active context and triggers a `window.location.reload()`, completely annihilating stale DOM elements and closures, ensuring a pristine memory environment for the new game context.
+- **Working Memory Mapping**: The global `let state = { ... }` object was left structurally untouched as "Working Memory". It correctly reads from and flushes to the active `robco_v8` campaign, requiring zero code churn to the hundreds of DOM read/write handlers in `ui.js`.
+- **Atomic Cloud Sync**: `cloud.js` `pushToCloud` and `pullFromCloud` now transact the entire `robco_v8` container. Mobile and desktop sessions now execute holistic account-syncs, eliminating split-brain.
+- **Undo Consistency**: `undoLastSync()` now correctly restores the entire account state across all games, preventing partial campaign corruption.
+
 ### [C6] Faction Registry Modernization (2026-06-24)
 
 - **Registry Pruning**: Removed 5 legacy FNV casino/caravan factions (`wgs`, `omertas`, `chairmen`, `vangraff`, `crimson`) and added `strip` and `freeside` to `FACTION_REGISTRY`.

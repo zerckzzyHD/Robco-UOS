@@ -208,7 +208,12 @@ function saveState() {
   clearTimeout(_saveTimer);
   _saveTimer = setTimeout(() => {
     try {
-      localStorage.setItem('robco_v7', JSON.stringify(state));
+      if (!window.robco_v8) {
+        window.robco_v8 = { activeContext: state.gameContext || 'FNV', campaigns: {} };
+      }
+      window.robco_v8.activeContext = state.gameContext || 'FNV';
+      window.robco_v8.campaigns[window.robco_v8.activeContext] = JSON.parse(JSON.stringify(state));
+      localStorage.setItem('robco_v8', JSON.stringify(window.robco_v8));
     } catch (e) {
       // #18 localStorage Quota Detection — warn Courier on storage full
       if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
@@ -233,9 +238,15 @@ function generateSyncPayload() {
 
 function exportSaveFile(slotName = null) {
   syncStateFromDom();
+  if (!window.robco_v8) {
+    window.robco_v8 = { activeContext: state.gameContext || 'FNV', campaigns: {} };
+  }
+  window.robco_v8.activeContext = state.gameContext || 'FNV';
+  window.robco_v8.campaigns[window.robco_v8.activeContext] = JSON.parse(JSON.stringify(state));
+
   const exportPayload = {
     version: APP_VERSION,
-    state: state,
+    robco_v8: window.robco_v8,
     chat: chatHistory,
     playstyle: localStorage.getItem('robco_playstyle') || 'any',
   };

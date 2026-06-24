@@ -30,10 +30,17 @@ window.pushToCloud = async function (courierId, stateObj) {
   const btn = document.getElementById('btnCloudPush');
   if (btn) btn.innerText = '> SYNCING...';
   try {
+    if (!window.robco_v8) {
+      window.robco_v8 = { activeContext: state.gameContext || 'FNV', campaigns: {} };
+    }
+    window.robco_v8.activeContext = state.gameContext || 'FNV';
+    window.robco_v8.campaigns[window.robco_v8.activeContext] = JSON.parse(JSON.stringify(state));
+    localStorage.setItem('robco_v8', JSON.stringify(window.robco_v8));
+
     await setDoc(doc(db, 'saves', safeId), {
-      version: window.APP_VERSION || '1.6.4',
+      version: window.APP_VERSION || '2.0.0',
       savedAt: Date.now(),
-      state: stateObj,
+      robco_v8: window.robco_v8,
       chat: JSON.parse(localStorage.getItem('robco_chat') || '[]'),
       playstyle: localStorage.getItem('robco_playstyle') || 'any',
     });
@@ -82,18 +89,38 @@ window.pullFromCloud = async function (courierId) {
         }
       }
       if (typeof autoImportState === 'function') {
-        // Support envelope format (v1.6.3+) and legacy bare state
-        const stateData = data.version && data.state ? data.state : data;
-        autoImportState(JSON.stringify(stateData));
-        if (data.chat && Array.isArray(data.chat) && typeof restoreChatHistory === 'function') {
-          restoreChatHistory(data.chat);
+        if (data.robco_v8) {
+          // Store an atomic backup for undo
+          localStorage.setItem(
+            'robco_backup',
+            JSON.stringify({ robco_v8: JSON.parse(localStorage.getItem('robco_v8') || '{}') })
+          );
+
+          localStorage.setItem('robco_v8', JSON.stringify(data.robco_v8));
+          if (data.chat && Array.isArray(data.chat) && typeof restoreChatHistory === 'function') {
+            restoreChatHistory(data.chat);
+          }
+          if (data.playstyle) {
+            localStorage.setItem('robco_playstyle', data.playstyle);
+            let el = document.getElementById('playstyleInput');
+            if (el) el.value = data.playstyle;
+          }
+          alert('>> CLOUD SAVE RESTORED SUCCESSFULLY. REBOOTING SYSTEM... <<');
+          window.location.reload();
+        } else {
+          // Support legacy cloud payload
+          const stateData = data.version && data.state ? data.state : data;
+          autoImportState(JSON.stringify(stateData));
+          if (data.chat && Array.isArray(data.chat) && typeof restoreChatHistory === 'function') {
+            restoreChatHistory(data.chat);
+          }
+          if (data.playstyle) {
+            localStorage.setItem('robco_playstyle', data.playstyle);
+            let el = document.getElementById('playstyleInput');
+            if (el) el.value = data.playstyle;
+          }
+          alert('>> LEGACY CLOUD SAVE RESTORED SUCCESSFULLY <<');
         }
-        if (data.playstyle) {
-          localStorage.setItem('robco_playstyle', data.playstyle);
-          let el = document.getElementById('playstyleInput');
-          if (el) el.value = data.playstyle;
-        }
-        alert('>> CLOUD SAVE RESTORED SUCCESSFULLY <<');
       }
     } else {
       alert('No cloud save found for that Courier ID.');

@@ -154,7 +154,7 @@ Check $hasSkillLoop "autoImportState() imports skills via getSkillKeys().forEach
 # Suite 4 -- exportSaveFile envelope
 # ===========================================================
 Sep "Suite 4 -- exportSaveFile() envelope"
-Check ($exportBody -match 'state\s*:\s*state\b')    "serialises full state object"
+Check ($exportBody -match 'robco_v8\s*:\s*window\.robco_v8')    "serialises full robco_v8 container"
 Check ($exportBody -match 'chat\s*:\s*chatHistory') "includes chat history"
 Check ($exportBody -match 'playstyle')               "includes playstyle"
 Check ($exportBody -match 'version')                 "includes version tag"
@@ -173,7 +173,7 @@ Check ($fileBody -match 'autoImportState')    "calls autoImportState()"
 # Suite 6 -- Cloud sync
 # ===========================================================
 Sep "Suite 6 -- cloud.js push / pull"
-Check ($cloudSrc -match 'state\s*:\s*stateObj')   "pushToCloud() serialises full state"
+Check ($cloudSrc -match 'robco_v8\s*:\s*window\.robco_v8')   "pushToCloud() serialises full robco_v8 container"
 Check ($cloudSrc -match 'chat\s*:\s*JSON\.parse') "pushToCloud() includes chat history"
 Check ($cloudSrc -match 'playstyle')               "pushToCloud() includes playstyle"
 $hasPullEnv = ($cloudSrc -match 'data\.version') -and ($cloudSrc -match 'data\.state')

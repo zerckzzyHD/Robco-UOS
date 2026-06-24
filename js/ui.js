@@ -354,15 +354,40 @@ function showDeltaGhost(fieldId, oldVal, newVal) {
 }
 
 window.onload = function () {
-  if (localStorage.getItem('robco_v7')) {
-    let savedState = JSON.parse(localStorage.getItem('robco_v7'));
-    // #16 Save Version Migration — upgrade old saves in-place before spreading into state
+  let v8Str = localStorage.getItem('robco_v8');
+  let v7Str = localStorage.getItem('robco_v7');
+
+  if (v8Str) {
+    window.robco_v8 = JSON.parse(v8Str);
+    let activeCampaign = window.robco_v8.campaigns[window.robco_v8.activeContext] || {};
+    state = { ...state, ...activeCampaign };
+    state.gameContext = window.robco_v8.activeContext;
+  } else if (v7Str) {
+    let savedState = JSON.parse(v7Str);
     if (typeof migrateState === 'function')
       savedState = migrateState(savedState.version || '1.0', savedState);
+
+    window.robco_v8 = {
+      activeContext: savedState.gameContext || 'FNV',
+      campaigns: {},
+    };
+    window.robco_v8.campaigns[window.robco_v8.activeContext] = savedState;
+    localStorage.setItem('robco_v8', JSON.stringify(window.robco_v8));
+
     state = { ...state, ...savedState };
+    state.gameContext = window.robco_v8.activeContext;
   } else {
-    // Fresh load: run migration to populate all new fields
-    if (typeof migrateState === 'function') state = migrateState(APP_VERSION, state);
+    window.robco_v8 = {
+      activeContext: 'FNV',
+      campaigns: { FNV: state },
+    };
+    if (typeof migrateState === 'function') {
+      window.robco_v8.campaigns['FNV'] = migrateState(
+        APP_VERSION,
+        window.robco_v8.campaigns['FNV']
+      );
+      state = { ...window.robco_v8.campaigns['FNV'] };
+    }
   }
   // ── FACTION MIGRATION: old flat keys (nf/ni/lf/li/sf/si) → state.factions ──
   if (state.nf !== undefined) {
@@ -1131,10 +1156,11 @@ function changePlaystyle(style) {
 
 function onGameContextChange(ctx) {
   if (ctx !== 'FNV' && ctx !== 'FO3') return;
-  state.gameContext = ctx;
-  saveState();
-  const banner = document.getElementById('fo3WarningBanner');
-  if (banner) banner.style.display = ctx === 'FO3' ? 'block' : 'none';
+  if (!window.robco_v8) window.robco_v8 = { activeContext: 'FNV', campaigns: {} };
+  window.robco_v8.activeContext = ctx;
+  window.robco_v8.campaigns[state.gameContext] = JSON.parse(JSON.stringify(state));
+  localStorage.setItem('robco_v8', JSON.stringify(window.robco_v8));
+  window.location.reload();
 }
 
 // ── CAMPAIGN LOG EXPORT ────────────────────────────────────────
@@ -2834,12 +2860,19 @@ function undoLastSync() {
   }
   try {
     let prev = JSON.parse(window._lastStateBeforeSync);
-    state = { ...state, ...prev };
-    window._lastStateBeforeSync = null;
-    let undoBtn = document.getElementById('undoSyncBtn');
-    if (undoBtn) undoBtn.style.display = 'none';
-    loadUI();
-    appendToChat('> STATE ROLLBACK COMPLETE. PREVIOUS TELEMETRY RESTORED.', 'sys', true);
+    if (prev.robco_v8) {
+      localStorage.setItem('robco_v8', JSON.stringify(prev.robco_v8));
+      window._lastStateBeforeSync = null;
+      alert('> STATE ROLLBACK COMPLETE. REBOOTING SYSTEM...');
+      window.location.reload();
+    } else {
+      state = { ...state, ...prev };
+      window._lastStateBeforeSync = null;
+      let undoBtn = document.getElementById('undoSyncBtn');
+      if (undoBtn) undoBtn.style.display = 'none';
+      loadUI();
+      appendToChat('> STATE ROLLBACK COMPLETE. PREVIOUS TELEMETRY RESTORED.', 'sys', true);
+    }
   } catch (e) {
     appendToChat('> ROLLBACK FAILED: DATA CORRUPTED.', 'sys', true);
   }
@@ -3165,7 +3198,15 @@ function handleFileUpload(event) {
   reader.onload = function (e) {
     try {
       const parsed = JSON.parse(e.target.result);
-      if (parsed.version && parsed.state) {
+      if (parsed.robco_v8) {
+        // v8 Container payload
+        localStorage.setItem('robco_v8', JSON.stringify(parsed.robco_v8));
+        if (parsed.chat && Array.isArray(parsed.chat))
+          localStorage.setItem('robco_chat', JSON.stringify(parsed.chat));
+        if (parsed.playstyle) localStorage.setItem('robco_playstyle', parsed.playstyle);
+        alert('>> HARD BACKUP RESTORED SUCCESSFULLY. REBOOTING SYSTEM... <<');
+        window.location.reload();
+      } else if (parsed.version && parsed.state) {
         // Envelope format (v1.6.3+): contains state, chat, playstyle
         autoImportState(JSON.stringify(parsed.state));
         if (parsed.chat && Array.isArray(parsed.chat)) restoreChatHistory(parsed.chat);
@@ -3174,11 +3215,12 @@ function handleFileUpload(event) {
           let el = document.getElementById('playstyleInput');
           if (el) el.value = parsed.playstyle;
         }
+        alert('>> LEGACY BACKUP RESTORED SUCCESSFULLY <<');
       } else {
         // Legacy: bare state JSON
         autoImportState(e.target.result);
+        alert('>> LEGACY BACKUP RESTORED SUCCESSFULLY <<');
       }
-      alert('>> HARD BACKUP RESTORED SUCCESSFULLY <<');
     } catch (err) {
       appendToChat('> [SYS-ALERT: SAVE FILE CORRUPTED OR UNREADABLE]', 'sys');
     }

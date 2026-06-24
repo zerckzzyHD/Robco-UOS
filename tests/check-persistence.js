@@ -477,7 +477,7 @@ try {
   fail(`Cannot extract exportSaveFile: ${e.message}`);
 }
 
-assert(/state\s*:\s*state\b/.test(exportBody), 'serialises full state object');
+assert(/robco_v8\s*:\s*window\.robco_v8\b/.test(exportBody), 'serialises full robco_v8 container');
 assert(/chat\s*:\s*chatHistory/.test(exportBody), 'includes chat history');
 assert(/playstyle/.test(exportBody), 'includes playstyle');
 assert(/version/.test(exportBody), 'includes version tag (envelope detection)');
@@ -505,7 +505,10 @@ assert(/autoImportState/.test(fileImportBody), 'calls autoImportState() for game
 //  SUITE 6 — Cloud sync (cloud.js)
 // ══════════════════════════════════════════════════════════════
 header('cloud.js push / pull');
-assert(/state\s*:\s*stateObj/.test(cloudSource), 'pushToCloud() serialises full state');
+assert(
+  /robco_v8\s*:\s*window\.robco_v8/.test(cloudSource),
+  'pushToCloud() serialises full robco_v8 container'
+);
 assert(/chat\s*:\s*JSON\.parse/.test(cloudSource), 'pushToCloud() includes chat history');
 assert(/playstyle/.test(cloudSource), 'pushToCloud() includes playstyle');
 assert(

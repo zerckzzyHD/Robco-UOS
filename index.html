@@ -1868,9 +1868,28 @@
       </div>
     </div>
 
-    <script src="js/db_nv.js"></script>
-    <script src="js/state.js"></script>
-    <script src="js/reg_nv.js"></script>
+    <script>
+      (function () {
+        try {
+          var v8 = JSON.parse(localStorage.getItem('robco_v8') || '{}');
+          var v7 = JSON.parse(localStorage.getItem('robco_v7') || '{}');
+          var ctx = v8.activeContext || v7.gameContext || 'FNV';
+          if (ctx === 'FO3') {
+            document.write('<script src="js/db_fo3.js"><\\/script>');
+            document.write('<script src="js/state.js"><\\/script>');
+            document.write('<script src="js/reg_fo3.js"><\\/script>');
+          } else {
+            document.write('<script src="js/db_nv.js"><\\/script>');
+            document.write('<script src="js/state.js"><\\/script>');
+            document.write('<script src="js/reg_nv.js"><\\/script>');
+          }
+        } catch (e) {
+          document.write('<script src="js/db_nv.js"><\\/script>');
+          document.write('<script src="js/state.js"><\\/script>');
+          document.write('<script src="js/reg_nv.js"><\\/script>');
+        }
+      })();
+    </script>
     <script src="js/ui.js"></script>
     <script src="js/api.js"></script>
     <script type="module" src="js/cloud.js"></script>
