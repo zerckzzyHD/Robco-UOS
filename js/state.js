@@ -19,9 +19,38 @@ const FACTION_REGISTRY = [
   { key: 'chairmen', name: 'Chairmen', tier: 'minor' },
   { key: 'omertas', name: 'Omertas', tier: 'minor' },
 ];
+
+// FO3 faction registry — Capital Wasteland factions
+const FACTION_REGISTRY_FO3 = [
+  { key: 'enclave', name: 'Enclave', tier: 'major' },
+  { key: 'bos', name: 'Brotherhood of Steel', tier: 'major' },
+  { key: 'lyons', name: "Lyons' Brotherhood", tier: 'major' },
+  { key: 'outcast', name: 'Outcasts', tier: 'major' },
+  { key: 'talon', name: 'Talon Company', tier: 'minor' },
+  { key: 'regulators', name: 'Regulators', tier: 'minor' },
+  { key: 'slavers', name: 'Slavers (Paradise Falls)', tier: 'minor' },
+  { key: 'reillys', name: "Reilly's Rangers", tier: 'minor' },
+  { key: 'tunnelsnakes', name: 'Tunnel Snakes', tier: 'minor' },
+  { key: 'supermutants', name: 'Super Mutants', tier: 'major' },
+  { key: 'underworld', name: 'Underworld Ghouls', tier: 'minor' },
+  { key: 'rivetcity', name: 'Rivet City', tier: 'minor' },
+];
+
+// ── CONTEXT-AWARE GETTERS ────────────────────────────────────────
+// These return the correct registry for the current gameContext.
+// Always use these instead of referencing FACTION_REGISTRY or SKILL_KEYS directly
+// in code that may run for either FNV or FO3.
+function getFactionRegistry() {
+  try {
+    return state.gameContext === 'FO3' ? FACTION_REGISTRY_FO3 : FACTION_REGISTRY;
+  } catch (_) {
+    return FACTION_REGISTRY; // state not yet initialized (TDZ) — default to FNV
+  }
+}
+
 function _buildFactions() {
   const f = {};
-  FACTION_REGISTRY.forEach(r => {
+  getFactionRegistry().forEach(r => {
     f[r.key] = { fame: 0, infamy: 0 };
   });
   return f;
@@ -84,6 +113,7 @@ let state = {
 let chatHistory = [];
 
 // ── SKILL KEYS (shared constant used by state, ui, and api) ─────
+// FNV skills
 const SKILL_KEYS = [
   'barter',
   'energy_weapons',
@@ -99,6 +129,31 @@ const SKILL_KEYS = [
   'survival',
   'unarmed',
 ];
+
+// FO3 skills — Big Guns and Small Guns instead of Guns and Survival
+const SKILL_KEYS_FO3 = [
+  'barter',
+  'big_guns',
+  'energy_weapons',
+  'explosives',
+  'lockpick',
+  'medicine',
+  'melee_weapons',
+  'repair',
+  'science',
+  'small_guns',
+  'sneak',
+  'speech',
+  'unarmed',
+];
+
+function getSkillKeys() {
+  try {
+    return state.gameContext === 'FO3' ? SKILL_KEYS_FO3 : SKILL_KEYS;
+  } catch (_) {
+    return SKILL_KEYS; // state not yet initialized (TDZ) — default to FNV
+  }
+}
 
 // ── STATE PERSISTENCE ───────────────────────────────────────────
 // Decoupled into two steps:
@@ -135,9 +190,9 @@ function syncStateFromDom() {
     let ticksEl = document.getElementById('stat_ticks');
     if (ticksEl) state.ticks = parseInt(ticksEl.value) || 0;
   }
-  // Skills
+  // Skills — use getSkillKeys() so FO3 skill keys also sync
   if (!state.skills) state.skills = {};
-  SKILL_KEYS.forEach(sk => {
+  getSkillKeys().forEach(sk => {
     let el = document.getElementById('sk_' + sk);
     if (el) state.skills[sk] = Math.min(100, Math.max(0, parseInt(el.value) || 0));
   });

@@ -340,7 +340,7 @@ window.onload = function () {
   // ── FACTION MIGRATION: old flat keys (nf/ni/lf/li/sf/si) → state.factions ──
   if (state.nf !== undefined) {
     if (!state.factions) state.factions = {};
-    FACTION_REGISTRY.forEach(f => {
+    getFactionRegistry().forEach(f => {
       if (!state.factions[f.key]) state.factions[f.key] = { fame: 0, infamy: 0 };
     });
     state.factions.ncr.fame = state.nf || 0;
@@ -354,7 +354,7 @@ window.onload = function () {
   }
   // Ensure all 14 faction keys exist (handles older saves missing new factions)
   if (!state.factions) state.factions = _buildFactions();
-  FACTION_REGISTRY.forEach(f => {
+  getFactionRegistry().forEach(f => {
     if (!state.factions[f.key]) state.factions[f.key] = { fame: 0, infamy: 0 };
   });
 
@@ -1156,8 +1156,8 @@ function loadUI() {
     if (minEl) minEl.value = mn;
     if (hidden) hidden.value = t; // keep hidden field in sync
   }
-  // Skills
-  SKILL_KEYS.forEach(sk => {
+  // Skills — use getSkillKeys() for context-aware FNV/FO3 support
+  getSkillKeys().forEach(sk => {
     let el = document.getElementById('sk_' + sk);
     if (el) el.value = state.skills && state.skills[sk] !== undefined ? state.skills[sk] : 15;
   });
@@ -1814,8 +1814,8 @@ function renderFactionRep() {
         </div>`;
   }
 
-  const major = FACTION_REGISTRY.filter(f => f.tier === 'major');
-  const minor = FACTION_REGISTRY.filter(f => f.tier === 'minor');
+  const major = getFactionRegistry().filter(f => f.tier === 'major');
+  const minor = getFactionRegistry().filter(f => f.tier === 'minor');
 
   container.innerHTML = `
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-top:4px;">
@@ -1873,7 +1873,7 @@ function escapeAndFormat(text) {
       // #29 Skill Check Indicators: highlight [SkillName N] patterns (e.g. [Speech 50])
       .replace(/\[([A-Za-z_ ]+)\s+(\d{1,3})\]/g, (match, skill, req) => {
         const skillKey = skill.toLowerCase().replace(/\s+/g, '_');
-        if (SKILL_KEYS.includes(skillKey)) {
+        if (getSkillKeys().includes(skillKey)) {
           const playerVal = (state.skills && state.skills[skillKey]) || 0;
           const pass = playerVal >= parseInt(req);
           const color = pass ? 'var(--robco-green)' : 'var(--robco-danger)';

@@ -276,7 +276,7 @@ function autoImportState(jsonString) {
     // Faction standing — structured format (v1.6.3+)
     if (parsed.factions && typeof parsed.factions === 'object' && !Array.isArray(parsed.factions)) {
       if (!state.factions) state.factions = {};
-      FACTION_REGISTRY.forEach(f => {
+      getFactionRegistry().forEach(f => {
         if (parsed.factions[f.key] && typeof parsed.factions[f.key] === 'object') {
           state.factions[f.key] = {
             fame: Math.max(0, parseInt(parsed.factions[f.key].fame) || 0),
@@ -306,7 +306,7 @@ function autoImportState(jsonString) {
     }
     // Auto-log faction changes to campaign_notes
     if (state.factions && factionsBefore) {
-      FACTION_REGISTRY.forEach(f => {
+      getFactionRegistry().forEach(f => {
         const old = factionsBefore[f.key] || { fame: 0, infamy: 0 };
         const cur = state.factions[f.key] || { fame: 0, infamy: 0 };
         const fameDelta = cur.fame - old.fame;
@@ -323,7 +323,7 @@ function autoImportState(jsonString) {
     // Skills (nested object — map from parsed.skills directly)
     if (parsed.skills && typeof parsed.skills === 'object' && !Array.isArray(parsed.skills)) {
       if (!state.skills) state.skills = {};
-      SKILL_KEYS.forEach(sk => {
+      getSkillKeys().forEach(sk => {
         if (parsed.skills[sk] !== undefined)
           state.skills[sk] = Math.min(100, Math.max(0, parseInt(parsed.skills[sk]) || 0));
       });

@@ -136,8 +136,8 @@ Sep "Suite 2 -- FACTION_REGISTRY completeness"
 $EXP_FACTIONS = @('ncr','legion','house','bos','boomers','khans',
                   'followers','powder','kings','wgs','vangraff','crimson','chairmen','omertas')
 foreach ($k in $EXP_FACTIONS) { Check ($factionKeys -contains $k) "FACTION_REGISTRY key: '$k'" }
-$hasForEach = ($importBody -match 'FACTION_REGISTRY\.forEach') -and ($importBody -match 'parsed\.factions')
-Check $hasForEach "autoImportState() imports factions via FACTION_REGISTRY.forEach"
+$hasForEach = ($importBody -match 'getFactionRegistry\(\)\.forEach') -and ($importBody -match 'parsed\.factions')
+Check $hasForEach "autoImportState() imports factions via getFactionRegistry().forEach"
 Check ($factionKeys.Count -eq $EXP_FACTIONS.Count) ("FACTION_REGISTRY count = " + $factionKeys.Count + " (expected " + $EXP_FACTIONS.Count + ")")
 
 # ===========================================================
@@ -147,8 +147,8 @@ Sep "Suite 3 -- SKILL_KEYS completeness"
 $EXP_SKILLS = @('barter','energy_weapons','explosives','guns','lockpick',
                 'medicine','melee_weapons','repair','science','sneak','speech','survival','unarmed')
 foreach ($k in $EXP_SKILLS) { Check ($skillKeys -contains $k) "SKILL_KEYS: '$k'" }
-$hasSkillLoop = ($importBody -match 'SKILL_KEYS\.forEach') -and ($importBody -match 'parsed\.skills')
-Check $hasSkillLoop "autoImportState() imports skills via SKILL_KEYS.forEach"
+$hasSkillLoop = ($importBody -match 'getSkillKeys\(\)\.forEach') -and ($importBody -match 'parsed\.skills')
+Check $hasSkillLoop "autoImportState() imports skills via getSkillKeys().forEach"
 
 # ===========================================================
 # Suite 4 -- exportSaveFile envelope
