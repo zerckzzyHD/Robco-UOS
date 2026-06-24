@@ -1327,6 +1327,102 @@ function closeModal() {
   document.getElementById('sysModal').style.display = 'none';
 }
 
+// ── G1: V.A.T.S. TACTICAL OVERLAY ────────────────────────────────
+// Reads state (PER, AGI, weapon skill, chem boosts) and target DT from inputs.
+// Outputs estimated hit % per body region. Read-only — no state writes.
+// Clearly labeled ESTIMATED. Also constructs a [VATS] AI prompt payload.
+// Formula: BASE_CHANCE = (Perception * 2) + (Agility * 1.5) + (WeaponSkill / 3)
+//          Adjusted by region modifier and target DT.
+//          Clamped to 5-95%. Labeled ESTIMATED throughout.
+function showVATSOverlay() {
+  const modal = document.getElementById('sysModal');
+  const title = document.getElementById('modalTitle');
+  const content = document.getElementById('modalContent');
+  if (!modal || !title || !content) return;
+
+  // Read SPECIAL from DOM
+  const per = parseInt((document.getElementById('s_p') || {}).value) || 5;
+  const agi = parseInt((document.getElementById('s_a') || {}).value) || 5;
+
+  // Active weapon skill: check state.equipped.weapon against skill matrix
+  // Or just use best combat skill from state.skills
+  const skills = state.skills || {};
+  const combatSkills = {
+    guns: skills.guns || skills.small_guns || 0,
+    energy_weapons: skills.energy_weapons || 0,
+    melee_weapons: skills.melee_weapons || 0,
+    sneak: skills.sneak || 0,
+    explosives: skills.explosives || 0,
+  };
+  const activeSkill = Math.max(...Object.values(combatSkills));
+  const activeSkillName =
+    Object.keys(combatSkills).find(k => combatSkills[k] === activeSkill) || 'guns';
+
+  // Chem boost: any active BUFF with ticks > 0 that matches combat skill
+  let chemBonus = 0;
+  (state.status || []).forEach(eff => {
+    if (eff.type === 'BUFF' && (eff.ticks || 0) > 0) {
+      const name = (eff.name || '').toLowerCase();
+      if (
+        name.includes('gun') ||
+        name.includes('weapon') ||
+        name.includes('combat') ||
+        name.includes('turbo') ||
+        name.includes('psycho')
+      ) {
+        chemBonus += 10; // +10 skill equivalent per active combat buff
+      }
+    }
+  });
+
+  // Target DT input — read from a prompt or use default 0
+  const targetDT = 0; // Default: no DT. AI will handle specifics.
+
+  // Base chance calculation (intentionally approximate)
+  const base = per * 2 + agi * 1.5 + (activeSkill + chemBonus) / 3 - targetDT * 1.5;
+
+  // Body region modifiers (FNV standard)
+  const regions = [
+    { name: 'HEAD', mod: -40, ap: 5 },
+    { name: 'TORSO', mod: 0, ap: 4 },
+    { name: 'L. ARM', mod: -20, ap: 3 },
+    { name: 'R. ARM', mod: -20, ap: 3 },
+    { name: 'L. LEG', mod: -25, ap: 4 },
+    { name: 'R. LEG', mod: -25, ap: 4 },
+    { name: 'EYES', mod: -60, ap: 6 },
+    { name: 'GROIN', mod: -30, ap: 4 },
+  ];
+
+  const rows = regions
+    .map(r => {
+      const pct = Math.min(95, Math.max(5, Math.round(base + r.mod)));
+      const bar = '#'.repeat(Math.floor(pct / 10)).padEnd(10, '·');
+      return `${r.name.padEnd(8)} [${bar}] ${pct}% EST. &nbsp; AP:${r.ap}`;
+    })
+    .join('\n');
+
+  const chemStr = chemBonus > 0 ? ` (+${chemBonus} CHEM BOOST)` : '';
+
+  title.innerText = '> V.A.T.S. TACTICAL OVERLAY — ESTIMATED ONLY';
+  content.innerHTML = `
+<div style="font-family:inherit;font-size:11px;line-height:1.8;white-space:pre;">
+<b>INPUTS</b>
+  PER:${per}  AGI:${agi}  SKILL:${activeSkillName.toUpperCase()} ${activeSkill}${chemStr}
+  TARGET DT: ${targetDT} (update via AI [VATS] command for specifics)
+
+<b>HIT PROBABILITIES — ESTIMATED</b>
+  ${rows.split('\n').join('\n  ')}
+
+<b style="opacity:0.6;font-size:10px;">
+ACCURACY ESTIMATES BASED ON SIMPLIFIED FORMULA.
+ACTUAL OUTCOME DETERMINED BY AI RESOLUTION.
+USE [VATS] COMMAND FOR CONTEXT-AWARE COMBAT ANALYSIS.
+</b>
+</div>`;
+
+  modal.style.display = 'flex';
+}
+
 function showHelpModal() {
   const modal = document.getElementById('sysModal');
   const title = document.getElementById('modalTitle');

@@ -166,7 +166,30 @@ WHENEVER the user asks for [FEATURES], commands, help, or a command list — out
   "│ > [VIEW: D/M]       : Toggle Desktop/Mobile width.   │",
   "│ > && / -Q / -S      : Chain cmds, Quiet, Stealth.   │",
   "└──────────────────────────────────────────────────────┘"
-]`;
+]
+
+### **G2: Point-of-No-Return Safety Net**
+CRITICAL RULE: Before any action that is narratively irreversible, you MUST proactively warn the Courier in the narrative node. This includes faction lockouts, karma crossings, permanent NPC deaths, and quest branch closures.
+
+**FNV Irreversible Triggers** — warn before:
+- Allying with Caesar's Legion (permanent NCR/Brotherhood lockout)
+- Siding with Mr. House or Yes Man (faction collapse endgame)
+- Killing Boone's wife (companion lockout)
+- Detonating Nipton bombs (NCR infamy spike — permanent reputation floor)
+- Completing "Ring-a-Ding-Ding!" (Benny becomes inaccessible after)
+- Any quest that permanently closes another quest branch (Lonesome Road choices, etc.)
+
+**FO3 Irreversible Triggers** — warn before:
+- Karma dropping below -750 (Enclave hit squads become persistent)
+- Karma rising above +750 (Brotherhood Outcasts become hostile)
+- Destroying Megaton (permanent loss of town and Moira's full quest line)
+- Turning on the Purifier prematurely (activates endgame sequence)
+- Killing neutral/friendly NPCs with karma impacts above 50
+
+**Warning Format** (in narrative array):
+"⚠ [SAFETY NET] This action is IRREVERSIBLE. {specific consequence}. Confirm to proceed."
+
+Do not block the action — only warn. The Courier has full agency.`;
 }
 
 async function fetchAuthorizedModels(silent = false) {

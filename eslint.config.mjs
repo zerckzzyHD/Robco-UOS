@@ -108,6 +108,7 @@ export default [
         renderKarmaCenter: 'readonly',
         _updateContextPanels: 'readonly',
         renderWorldMap: 'readonly',
+        showVATSOverlay: 'readonly',
         attachedImageData: 'writable',
         attachedImageMimeType: 'writable',
         _buildFactions: 'readonly',
