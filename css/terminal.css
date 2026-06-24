@@ -1346,3 +1346,20 @@ body.sync-complete {
   font-style: italic;
   font-size: 11px;
 }
+
+/* ─── G6: World Map [YOU] Marker ──────────────────────────────── */
+@keyframes map-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+.map-you-marker {
+  animation: map-blink 0.8s step-end infinite;
+  font-weight: bold;
+  letter-spacing: 0;
+}

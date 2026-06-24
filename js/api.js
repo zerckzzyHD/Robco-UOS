@@ -235,7 +235,12 @@ function autoImportState(jsonString) {
           ? obj[k.toUpperCase()]
           : undefined;
     const lvlV = _g(parsed, 'lvl');
+    const _prevLvl = state.lvl; // H3: capture before update
     if (lvlV !== undefined) state.lvl = parseInt(lvlV);
+    // H3: Level Up Jingle — fire when lvl increases
+    if (lvlV !== undefined && state.lvl > _prevLvl && typeof playLevelUpJingle === 'function') {
+      playLevelUpJingle();
+    }
     const xpV = _g(parsed, 'xp');
     if (xpV !== undefined) state.xp = parseInt(xpV);
     const hpCurV =
@@ -617,6 +622,7 @@ async function transmitMessage() {
   uiPanel.style.pointerEvents = 'none';
   uiPanel.style.opacity = '0.5';
   document.body.classList.add('thermal-load');
+  if (typeof startThermalLoad === 'function') startThermalLoad(); // H2
 
   let isVatsScanning = false;
   if (attachedImageData) {
@@ -823,6 +829,7 @@ async function transmitMessage() {
     document.getElementById('chatInput').focus();
     uiPanel.style.pointerEvents = 'auto';
     uiPanel.style.opacity = '1';
+    if (typeof stopThermalLoad === 'function') stopThermalLoad(); // H2
     document.body.classList.remove('thermal-load');
     if (typeof isVatsScanning !== 'undefined' && isVatsScanning) {
       isVatsScanning = false;

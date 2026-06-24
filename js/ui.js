@@ -11,6 +11,9 @@ const AudioSettings = {
   ambient: localStorage.getItem('robco_ambient_muted') === 'true',
   wake: localStorage.getItem('robco_wake_muted') === 'true',
   panelClick: localStorage.getItem('robco_panelclick_muted') === 'true', // H1: rotary dial clicks
+  bootDrone: localStorage.getItem('robco_bootdrone_muted') === 'true', // H4-bonus: boot drone
+  levelUp: localStorage.getItem('robco_levelup_muted') === 'true', // H3: level up jingle
+  heartbeat: localStorage.getItem('robco_heartbeat_muted') === 'true', // H4: low health heartbeat
   masterMute: localStorage.getItem('robco_master_muted') === 'true',
 };
 
@@ -183,6 +186,29 @@ function setCrtHumIntensity(rads, hasCrippled) {
   crtHumNode.frequency.linearRampToValueAtTime(targetFreq, audioCtx.currentTime + 2);
   crtHumGain.gain.cancelScheduledValues(audioCtx.currentTime);
   crtHumGain.gain.linearRampToValueAtTime(targetGain, audioCtx.currentTime + 1);
+}
+
+// ── H2: THERMAL LOAD PITCH SHIFT ───────────────────────────────
+// During API call: hum shifts 60Hz→80Hz over 5s, gain +20%.
+// On return: snaps back to 60Hz over 0.5s. No new AudioSettings key.
+function startThermalLoad() {
+  if (!crtHumNode || !crtHumGain || !audioCtx) return;
+  if (AudioSettings.masterMute || AudioSettings.hum) return;
+  crtHumNode.frequency.cancelScheduledValues(audioCtx.currentTime);
+  crtHumNode.frequency.linearRampToValueAtTime(80, audioCtx.currentTime + 5);
+  crtHumGain.gain.cancelScheduledValues(audioCtx.currentTime);
+  crtHumGain.gain.linearRampToValueAtTime(0.0084, audioCtx.currentTime + 3); // +20%
+}
+
+function stopThermalLoad() {
+  if (!crtHumNode || !crtHumGain || !audioCtx) return;
+  const rads = parseInt((document.getElementById('stat_rads') || {}).value) || 0;
+  const baseFreq = rads >= 600 ? 82 : 60;
+  const baseGain = rads >= 600 ? 0.014 : 0.007;
+  crtHumNode.frequency.cancelScheduledValues(audioCtx.currentTime);
+  crtHumNode.frequency.linearRampToValueAtTime(baseFreq, audioCtx.currentTime + 0.5);
+  crtHumGain.gain.cancelScheduledValues(audioCtx.currentTime);
+  crtHumGain.gain.linearRampToValueAtTime(baseGain, audioCtx.currentTime + 0.5);
 }
 
 // ── LIMB TRAUMA SOUNDS ─────────────────────────────────────────
@@ -725,6 +751,9 @@ function toggleAudio(key, isMuted) {
     robco_ambient_muted: 'ambient',
     robco_wake_muted: 'wake',
     robco_panelclick_muted: 'panelClick', // H1
+    robco_bootdrone_muted: 'bootDrone', // boot bonus
+    robco_levelup_muted: 'levelUp', // H3
+    robco_heartbeat_muted: 'heartbeat', // H4
   };
   if (keyMap[key] !== undefined) AudioSettings[keyMap[key]] = isMuted;
 
@@ -809,6 +838,124 @@ function playPanelClick() {
   osc.stop(audioCtx.currentTime + 0.018);
 }
 
+// ── H4: BOOT SEQUENCE DRONE ─────────────────────────────────────
+// On boot: a startup drone ramping from 30Hz → 60Hz over 2s, then decaying.
+// Mimics CRT power-on. Fires once at boot before user gesture, so audioCtx
+// might not exist — use setTimeout to attempt after first user touch.
+function playBootDrone() {
+  if (AudioSettings.masterMute) return;
+  if (AudioSettings.bootDrone) return;
+  // audioCtx requires user gesture — try immediately (will fail silently if locked)
+  function _tryDrone() {
+    try {
+      ensureAudioCtx();
+    } catch (_) {
+      return;
+    }
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(30, audioCtx.currentTime);
+    osc.frequency.linearRampToValueAtTime(60, audioCtx.currentTime + 2);
+    g.gain.setValueAtTime(0.0, audioCtx.currentTime);
+    g.gain.linearRampToValueAtTime(0.02, audioCtx.currentTime + 0.5);
+    g.gain.setValueAtTime(0.02, audioCtx.currentTime + 1.5);
+    g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 3);
+    osc.connect(g);
+    g.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 3.1);
+  }
+  // First user interaction triggers audioCtx creation; boot runs before it.
+  // Wire to first click/key so drone plays immediately on interaction.
+  function _onFirstInteract() {
+    _tryDrone();
+    document.removeEventListener('click', _onFirstInteract);
+    document.removeEventListener('keydown', _onFirstInteract);
+  }
+  document.addEventListener('click', _onFirstInteract, { once: true });
+  document.addEventListener('keydown', _onFirstInteract, { once: true });
+}
+
+// ── H3: LEVEL UP JINGLE ──────────────────────────────────────────
+// Fired by autoImportState() when state.lvl increases.
+// Three-note ascending arpeggio: 440 → 660 → 880Hz (sine, 80ms each).
+function playLevelUpJingle() {
+  if (AudioSettings.masterMute) return;
+  if (AudioSettings.levelUp) return;
+  ensureAudioCtx();
+  if (!audioCtx) return;
+  const notes = [440, 660, 880];
+  notes.forEach((freq, i) => {
+    const osc = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    const t = audioCtx.currentTime + i * 0.1;
+    g.gain.setValueAtTime(0.0, t);
+    g.gain.linearRampToValueAtTime(0.12, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+    osc.connect(g);
+    g.connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + 0.1);
+  });
+}
+
+// ── H4: LOW HEALTH HEARTBEAT ─────────────────────────────────────
+// Activates when HP < 25% (checked in updateMath()).
+// Sine pulse ~1.2Hz. When concurrent with tinnitus (crippled head),
+// tinnitus gain reduces 50%.
+let _heartbeatTimer = null;
+
+function startHeartbeat(hpFraction) {
+  if (AudioSettings.masterMute) return;
+  if (AudioSettings.heartbeat) return;
+  if (_heartbeatTimer) return; // already running
+  ensureAudioCtx();
+  if (!audioCtx) return;
+  // Gain proportional to HP deficit: 0 at 25%, max at 0%
+  const deficit = 1 - hpFraction / 0.25;
+  const gainVal = Math.max(0.01, Math.min(0.06, deficit * 0.06));
+  function _beat() {
+    if (!audioCtx || AudioSettings.masterMute || AudioSettings.heartbeat) {
+      stopHeartbeat();
+      return;
+    }
+    const osc = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = 80;
+    g.gain.setValueAtTime(gainVal, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
+    osc.connect(g);
+    g.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.1);
+  }
+  _beat(); // fire immediately
+  _heartbeatTimer = setInterval(_beat, Math.round(1000 / 1.2)); // ~833ms
+  // H4: When concurrent with tinnitus, reduce tinnitus gain 50% per spec
+  if (tinnitusGain && tinnitusNode && audioCtx) {
+    tinnitusGain.gain.linearRampToValueAtTime(
+      tinnitusGain.gain.value * 0.5,
+      audioCtx.currentTime + 0.5
+    );
+  }
+}
+
+function stopHeartbeat() {
+  if (_heartbeatTimer) {
+    clearInterval(_heartbeatTimer);
+    _heartbeatTimer = null;
+    // Restore tinnitus gain if it was reduced
+    if (tinnitusGain && tinnitusNode && audioCtx) {
+      tinnitusGain.gain.linearRampToValueAtTime(0.0001, audioCtx.currentTime + 0.5);
+    }
+  }
+}
+
 function runBootSequence(onComplete) {
   const bootScreen = document.getElementById('bootScreen');
   if (!bootScreen) {
@@ -816,6 +963,7 @@ function runBootSequence(onComplete) {
     return;
   }
   const bootLines = document.getElementById('bootLines');
+  playBootDrone(); // H4: boot sequence drone
   const lines = [
     '> ROBCO INDUSTRIES (TM) UNIFIED OPERATING SYSTEM',
     '> COPYRIGHT 2075-2077 ROBCO INDUSTRIES',
@@ -1293,6 +1441,9 @@ function loadUI() {
   renderEquipped();
   renderCollectibles();
   renderGameDate();
+  renderWorldMap(); // G6: Regional Zone Map
+  renderKarmaCenter(); // G4: FO3 Karma Center
+  _updateContextPanels(); // G4: switch faction/karma panel visibility
   updateMath();
   triggerPhosphorGhost();
   // Radiation SPECIAL debuff coloring (display-only, does not modify state)
@@ -1387,6 +1538,12 @@ function updateMath() {
       setTimeout(() => document.body.classList.remove('crit-hp-flash'), 750);
     }
     _lastHpPct = pct;
+    // H4: Low Health Heartbeat — start when HP < 25%, stop when >= 25%
+    if (pct < 25 && hpMax > 0) {
+      startHeartbeat(pct / 100);
+    } else {
+      stopHeartbeat();
+    }
   }
 
   // XP progress bar
@@ -2062,6 +2219,135 @@ function addCampaignNote() {
   loadUI();
 }
 
+// ── G6: REGIONAL ZONE MAP (WORLD MAP) ────────────────────────────
+// Registry-driven 6×6 CSS grid. Markers:
+//   [YOU] — blinking, on zone matching state.loc (fuzzy match against zone.locations[])
+//   [· ] — dimmed, on zones matching locationHistory entries (breadcrumb)
+//   [?] — on zones containing uncollected collectibles (cross-referenced with FALLOUT_REGISTRY)
+// Terminal-only styling. No color. Brightness only.
+function renderWorldMap() {
+  const display = document.getElementById('worldMapDisplay');
+  if (!display) return;
+
+  const zones =
+    typeof FALLOUT_REGISTRY !== 'undefined' && FALLOUT_REGISTRY.zones ? FALLOUT_REGISTRY.zones : [];
+
+  if (!zones.length) {
+    display.innerHTML = '<span style="opacity:0.4;">[MAP DATA NOT LOADED]</span>';
+    return;
+  }
+
+  // Build a set of visited zone names from locationHistory
+  const visited = new Set((state.locationHistory || []).map(l => (l || '').toLowerCase()));
+
+  // Build a set of zones with uncollected collectibles
+  // Collectible zone hint: collectible item names fuzzy-match zone.locations[]
+  const collected = new Set((state.collectibles || []).map(c => (c || '').toLowerCase()));
+  const collectDefs =
+    typeof FALLOUT_REGISTRY !== 'undefined' && FALLOUT_REGISTRY.collectibles
+      ? FALLOUT_REGISTRY.collectibles
+      : [];
+
+  // For each zone, check if any uncollected collectible's name fuzzy-matches zone name or locations
+  function zoneHasUncollectedCollectible(zone) {
+    return collectDefs.some(def => {
+      const defName = (def.name || '').toLowerCase();
+      if (collected.has(defName)) return false; // already acquired
+      // Match against zone name or any location
+      const searchIn = [zone.name, ...(zone.locations || [])].map(s => s.toLowerCase());
+      return searchIn.some(s => s.includes(defName) || defName.includes(s.split(' ')[0]));
+    });
+  }
+
+  // Find which zone [YOU] is in — fuzzy match state.loc against zone.locations[]
+  const currentLoc = (state.loc || '').toLowerCase();
+  function zoneFuzzyMatchesLoc(zone, loc) {
+    if (!loc) return false;
+    const searchIn = [zone.name, ...(zone.locations || [])].map(s => s.toLowerCase());
+    return searchIn.some(s => {
+      const locWords = loc.split(/[ ,]+/).filter(w => w.length > 2);
+      const sWords = s.split(/[ ,]+/).filter(w => w.length > 2);
+      return locWords.some(lw => sWords.some(sw => sw.includes(lw) || lw.includes(sw)));
+    });
+  }
+
+  function zoneVisited(zone) {
+    const searchIn = [zone.name, ...(zone.locations || [])].map(s => s.toLowerCase());
+    for (const v of visited) {
+      if (searchIn.some(s => s.includes(v) || v.includes(s.split(' ')[0]))) return true;
+    }
+    return false;
+  }
+
+  // Build the 6×6 grid in row-major order
+  const grid = []; // grid[row][col] = zone or null
+  for (let r = 1; r <= 6; r++) {
+    grid[r] = [];
+    for (let c = 1; c <= 6; c++) {
+      grid[r][c] = zones.find(z => z.gridRow === r && z.gridCol === c) || null;
+    }
+  }
+
+  let html = `<div style="
+    display:grid;
+    grid-template-columns:repeat(6,1fr);
+    gap:2px;
+    font-size:9px;
+    letter-spacing:0.5px;
+    margin:4px 0;
+  ">`;
+
+  for (let r = 1; r <= 6; r++) {
+    for (let c = 1; c <= 6; c++) {
+      const zone = grid[r][c];
+      if (!zone) {
+        html += `<div style="
+          border:1px solid rgba(20,253,206,0.08);
+          min-height:44px;
+          padding:3px;
+        "></div>`;
+        continue;
+      }
+
+      const isYou = currentLoc && zoneFuzzyMatchesLoc(zone, currentLoc);
+      const wasVisited = zoneVisited(zone);
+      const hasUncollected = zoneHasUncollectedCollectible(zone);
+
+      let marker = '';
+      let brightnessStyle = 'opacity:0.35;';
+      if (isYou) {
+        marker = '<span class="map-you-marker">[YOU]</span>';
+        brightnessStyle = 'opacity:1.0;filter:brightness(1.5);';
+      } else if (wasVisited) {
+        marker = '<span style="opacity:0.6;">[·]</span>';
+        brightnessStyle = 'opacity:0.75;';
+      }
+      if (hasUncollected) {
+        marker += '<span style="opacity:0.8;font-size:8px;">[?]</span>';
+      }
+
+      html += `<div style="
+        border:1px solid rgba(20,253,206,0.2);
+        min-height:44px;
+        padding:3px;
+        ${brightnessStyle}
+        display:flex;
+        flex-direction:column;
+        justify-content:space-between;
+      ">
+        <span style="line-height:1.2;">${escapeHtml(zone.name)}</span>
+        <span style="font-size:8px;">${marker}</span>
+      </div>`;
+    }
+  }
+
+  html += '</div>';
+  html +=
+    '<div style="font-size:9px;opacity:0.45;margin-top:4px;">[YOU]=CURRENT &nbsp; [·]=VISITED &nbsp; [?]=COLLECTIBLE</div>';
+
+  display.innerHTML = html;
+}
+
 function renderFactionRep() {
   const container = document.getElementById('factionContainer');
   if (!container) return;
@@ -2090,6 +2376,80 @@ function renderFactionRep() {
             </div>
         </details>
     `;
+}
+
+// ── G4: EXPANDED KARMA SYSTEM (FO3) ─────────────────────────────
+// When gameContext === 'FO3': Karma Center shown, Faction Standing hidden.
+// When gameContext === 'FNV' (or default): Faction Standing shown, Karma Center hidden.
+// Thresholds: Very Evil (<-750) / Evil (<-250) / Neutral / Good (>250) / Very Good (>750).
+// Differentiated by text labels and brightness — no multi-color.
+function renderKarmaCenter() {
+  const display = document.getElementById('karmaCenterDisplay');
+  if (!display) return;
+
+  const karma = state.karma || 0;
+  let label, opacity, hitSquad;
+  if (karma <= -750) {
+    label = 'VERY EVIL';
+    opacity = 1.0;
+    hitSquad = true;
+  } else if (karma <= -250) {
+    label = 'EVIL';
+    opacity = 0.85;
+    hitSquad = false;
+  } else if (karma < 250) {
+    label = 'NEUTRAL';
+    opacity = 0.65;
+    hitSquad = false;
+  } else if (karma < 750) {
+    label = 'GOOD';
+    opacity = 0.85;
+    hitSquad = false;
+  } else {
+    label = 'VERY GOOD';
+    opacity = 1.0;
+    hitSquad = false;
+  }
+
+  const barPct = Math.max(0, Math.min(100, ((karma + 1000) / 2000) * 100));
+  let html = `
+    <div style="text-align:center;font-size:18px;letter-spacing:3px;filter:brightness(${opacity + 0.4});padding:6px 0;">${label}</div>
+    <div style="font-size:11px;opacity:0.6;text-align:center;margin-bottom:6px;">KARMA: ${karma > 0 ? '+' : ''}${karma}</div>
+    <div style="background:rgba(20,253,206,0.1);height:4px;border-radius:2px;margin:0 0 8px;">
+      <div style="height:4px;width:${barPct}%;background:var(--robco-green);border-radius:2px;transition:width 0.4s;"></div>
+    </div>`;
+
+  if (hitSquad) {
+    html += `<div style="font-size:10px;letter-spacing:1px;opacity:0.8;border:1px dashed rgba(255,80,80,0.6);padding:4px 6px;margin-bottom:6px;">[!] ENCLAVE HIT SQUAD RISK</div>`;
+  }
+
+  // Companion availability notes based on karma
+  html += `<div style="font-size:10px;opacity:0.55;margin-top:4px;">`;
+  if (karma >= 250) {
+    html += `COMPANIONS: Dogmeat, Fawkes, Star Paladin Cross available`;
+  } else if (karma <= -250) {
+    html += `COMPANIONS: Clover, Jericho available`;
+  } else {
+    html += `COMPANIONS: Charon, Sergeant RL-3 available`;
+  }
+  html += `</div>`;
+
+  display.innerHTML = html;
+}
+
+// Switch faction/karma panels based on game context (called from loadUI).
+function _updateContextPanels() {
+  const isFO3 = typeof state !== 'undefined' && state.gameContext === 'FO3';
+  const factionPanel = document.getElementById('factionPanel');
+  const karmaPanel = document.getElementById('karmaPanel');
+  if (factionPanel) {
+    // Let the tab system control visibility via tab-visible; just toggle display
+    factionPanel.style.display = isFO3 ? 'none' : '';
+  }
+  if (karmaPanel) {
+    // Only show if on stat tab and FO3 mode; otherwise hide
+    karmaPanel.style.display = isFO3 ? '' : 'none';
+  }
 }
 
 function undoLastSync() {

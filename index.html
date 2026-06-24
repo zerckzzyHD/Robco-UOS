@@ -904,12 +904,22 @@
             </div>
           </details>
 
-          <!-- 9. FACTION STANDING -->
-          <details class="panel" data-tab="stat">
+          <!-- 9. FACTION STANDING (FNV) -->
+          <details class="panel" data-tab="stat" id="factionPanel">
             <summary>
-              <h2>> FACTION STANDING</h2>
+              <h2>&gt; FACTION STANDING</h2>
             </summary>
             <div id="factionContainer"></div>
+          </details>
+
+          <!-- 9b. KARMA CENTER (FO3 — G4) -->
+          <details class="panel" data-tab="stat" id="karmaPanel" style="display:none;">
+            <summary>
+              <h2>&gt; KARMA CENTER</h2>
+            </summary>
+            <div id="karmaCenterDisplay">
+              <span style="opacity:0.4;">[FO3 MODE REQUIRED]</span>
+            </div>
           </details>
 
           <!-- 10. CAMPAIGN NOTES -->
@@ -939,7 +949,15 @@
             </button>
           </details>
 
-          <!-- 12. SECURITY & CONFIGURATION -->
+          <!-- 12. WORLD MAP (G6) -->
+          <details class="panel" data-tab="data" id="worldMapPanel">
+            <summary><h2>&gt; WORLD MAP</h2></summary>
+            <div id="worldMapDisplay">
+              <span style="opacity:0.4;">[LOADING MAP...]</span>
+            </div>
+          </details>
+
+          <!-- 13. SECURITY & CONFIGURATION -->
           <details class="panel" style="border-color: var(--robco-alert)">
             <summary>
               <h2 style="border-color: var(--robco-alert); color: var(--robco-alert)">
@@ -1135,6 +1153,39 @@
                   />
                   <label for="mutePanelClickToggle" style="color: var(--robco-alert); font-size: 12px"
                     >MUTE PANEL CLICKS</label
+                  >
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <input
+                    type="checkbox"
+                    id="muteBootDroneToggle"
+                    onchange="toggleAudio('robco_bootdrone_muted', this.checked)"
+                    style="width: auto; accent-color: var(--robco-alert)"
+                  />
+                  <label for="muteBootDroneToggle" style="color: var(--robco-alert); font-size: 12px"
+                    >MUTE BOOT DRONE</label
+                  >
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <input
+                    type="checkbox"
+                    id="muteLevelUpToggle"
+                    onchange="toggleAudio('robco_levelup_muted', this.checked)"
+                    style="width: auto; accent-color: var(--robco-alert)"
+                  />
+                  <label for="muteLevelUpToggle" style="color: var(--robco-alert); font-size: 12px"
+                    >MUTE LEVEL UP SFX</label
+                  >
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <input
+                    type="checkbox"
+                    id="muteHeartbeatToggle"
+                    onchange="toggleAudio('robco_heartbeat_muted', this.checked)"
+                    style="width: auto; accent-color: var(--robco-alert)"
+                  />
+                  <label for="muteHeartbeatToggle" style="color: var(--robco-alert); font-size: 12px"
+                    >MUTE HEARTBEAT</label
                   >
                 </div>
                 <!-- #34 Typewriter Speed Control -->

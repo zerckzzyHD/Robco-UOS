@@ -39,6 +39,7 @@ window.pushToCloud = async function (courierId, stateObj) {
     });
     localStorage.setItem('robco_last_cloud_push', Date.now().toString());
     console.log('Cloud sync complete.');
+    if (typeof playSyncTone === 'function') playSyncTone(); // H3: Data Sync Ping
     alert('>> CLOUD SYNC COMPLETE <<');
   } catch (e) {
     console.error('Error syncing to cloud: ', e);
