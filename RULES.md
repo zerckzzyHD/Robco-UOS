@@ -45,6 +45,25 @@ After every meaningful commit, update these files **in the same commit:**
 
 **Version bumps:** Always ask the user before bumping `APP_VERSION`. Never assume a bump is warranted.
 
+### Protocol 2a — Test Count Sync
+
+Whenever tests are **added or removed**, update the hardcoded count in **every** location below in the **same commit** as the test change. No deferred updates.
+
+| File              | Location to update                                                                                                                                                     |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `RULES.md`        | Pre-commit gate code block · Pre-commit gate note · Protocol 4 checklist · Protocol 5 checklist · Architecture Quick Reference (count + suite count if suites changed) |
+| `README.md`       | Technology stack table · File structure comment · Commit workflow block · Current State bullet                                                                         |
+| `ARCHITECTURE.md` | Pre-commit checklist (`all N+ tests`)                                                                                                                                  |
+| `CHANGELOG.md`    | Header comment (`Tests: N/N`)                                                                                                                                          |
+
+**How to find all stale counts before committing:**
+
+```powershell
+Select-String -Path "RULES.md","README.md","ARCHITECTURE.md","CHANGELOG.md" -Pattern "\d+ tests?" | Select-Object Filename,LineNumber,Line
+```
+
+Run this after every test addition or removal. Every hit must show the new count.
+
 ---
 
 ## Protocol 3 — Source of Truth
@@ -111,16 +130,17 @@ Requires changes in **4 files minimum.** The pre-commit audit will block if any 
 
 ## Prohibited Patterns
 
-| Never Do                                          | Why                                                               |
-| ------------------------------------------------- | ----------------------------------------------------------------- |
-| `clients.claim()` in the service worker           | Causes reload loops and black screens                             |
-| `innerHTML +=` inside loops                       | O(n²) DOM re-parsing. Use `map().join('')` with single assignment |
-| Untrusted text directly as `innerHTML`            | XSS risk. Always run through `escapeHtml()` first                 |
-| `localStorage.getItem()` in audio hot paths       | Read from the `AudioSettings` cache object instead                |
-| Recursive key transformation on AI JSON responses | Use explicit field mapping in `autoImportState()`                 |
-| Silent drops of inventory during token triage     | Inventory must always be returned when relevant keywords match    |
-| Auto-push to cloud on stat changes                | Cloud sync is manual button only                                  |
-| Implement or discuss features #44 or #45          | Permanently excluded by owner                                     |
+| Never Do                                                    | Why                                                               |
+| ----------------------------------------------------------- | ----------------------------------------------------------------- |
+| `clients.claim()` in the service worker                     | Causes reload loops and black screens                             |
+| `innerHTML +=` inside loops                                 | O(n²) DOM re-parsing. Use `map().join('')` with single assignment |
+| Untrusted text directly as `innerHTML`                      | XSS risk. Always run through `escapeHtml()` first                 |
+| `localStorage.getItem()` in audio hot paths                 | Read from the `AudioSettings` cache object instead                |
+| Recursive key transformation on AI JSON responses           | Use explicit field mapping in `autoImportState()`                 |
+| Silent drops of inventory during token triage               | Inventory must always be returned when relevant keywords match    |
+| Auto-push to cloud on stat changes                          | Cloud sync is manual button only                                  |
+| Implement or discuss features #44 or #45                    | Permanently excluded by owner                                     |
+| Leave stale test counts in docs after adding/removing tests | Protocol 2a requires all counts updated in the same commit        |
 
 ---
 
