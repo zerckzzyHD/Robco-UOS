@@ -350,6 +350,16 @@ textarea {
   border-bottom: 1px solid var(--robco-green);
   padding-bottom: 4px;
 }
+/* F2: sticky tab-bar on mobile — desktop keeps it visible via fixed column height */
+@media (max-width: 999px) {
+  .tab-bar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: #010a07;
+    padding-top: 4px;
+  }
+}
 .tab-btn {
   background: transparent;
   border: 1px solid var(--robco-green);

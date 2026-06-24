@@ -1,0 +1,6 @@
+F2: mobile sticky tab-bar, CACHE r22
+
+- css/terminal.css: @media max-width 999px .tab-bar position sticky top 0 z-index 100
+- All F4 JS confirmed already complete, no JS changes needed
+- CACHE_NAME bumped to robco-terminal-v1.6.8-r22 (Protocol 1)
+- 209/209 tests pass

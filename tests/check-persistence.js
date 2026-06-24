@@ -359,27 +359,45 @@ assert(
 assert(/TAB_NAMES.*campg/.test(uiSource), "TAB_NAMES includes 'campg' in ui.js");
 
 // ══════════════════════════════════════════════════════════════
-//  SUITE 2e — C4 campaignMode Protocol 4 + C4-fix separation (C4-fix)
-//  Verifies all 4 Protocol 4 locations AND the corrected two-control design.
+//  SUITE 2e — C4 campaignMode + C5 playthroughType Protocol 4
+//  Verifies all Protocol 4 locations for both state fields
+//  AND the corrected two-control design.
 // ══════════════════════════════════════════════════════════════
-header('C4 campaignMode Protocol 4 + separation fix');
+header('C4 campaignMode + C5 playthroughType Protocol 4');
 // Protocol 4 location 1: default value in let state = { ... }
 assert(
   /campaignMode\s*:\s*'standard'/.test(stateSource),
   "state.campaignMode default 'standard' exists in state.js"
+);
+assert(
+  /playthroughType\s*:\s*'standard'/.test(stateSource),
+  "state.playthroughType default 'standard' exists in state.js"
 );
 // Protocol 4 location 2: migration guard in migrateState()
 assert(
   /s\.campaignMode/.test(stateSource),
   'state.campaignMode migration guard exists in migrateState() in state.js'
 );
+assert(
+  /s\.playthroughType/.test(stateSource),
+  'state.playthroughType migration guard exists in migrateState() in state.js'
+);
 // Protocol 4 location 3: import handling in autoImportState()
 assert(
   /CAMPAIGN MODE/.test(apiSource) && /cmV/.test(apiSource),
   'autoImportState() handles campaignMode import in api.js'
 );
+assert(
+  /PLAYTHROUGH TYPE/.test(apiSource) && /ptV/.test(apiSource),
+  'autoImportState() handles playthroughType import in api.js'
+);
 // Protocol 4 location 4: getSystemDirective() reference (campaignModeStr preserved)
 assert(/campaignModeStr/.test(apiSource), 'getSystemDirective() builds campaignModeStr in api.js');
+// C5: getSystemDirective() reads state.playthroughType (NOT localStorage)
+assert(
+  /state\.playthroughType/.test(apiSource),
+  'getSystemDirective() reads state.playthroughType in api.js'
+);
 // C4-fix: Playthrough Type is now a separate <select> (NOT campaignModeSelect)
 assert(
   /id="playthroughTypeSelect"/.test(htmlSource),
@@ -413,10 +431,10 @@ assert(
   /s\.campaignMode !== 'rng'/.test(stateSource),
   'migrateState() uses binary guard (campaignMode !== rng) in state.js'
 );
-// C4-fix: playstyle_type behavioral directive strings in api.js
+// C5: _defaultState is defined for wipeTerminal()
 assert(
-  /robco_playstyle_type/.test(apiSource),
-  'getSystemDirective() reads robco_playstyle_type from localStorage in api.js'
+  /window\._defaultState/.test(stateSource),
+  'window._defaultState is defined in state.js (wipeTerminal fix)'
 );
 assert(
   /Optimize all build decisions for maximum combat effectiveness/.test(apiSource),

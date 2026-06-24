@@ -560,9 +560,9 @@ window.onload = function () {
     if (banner) banner.style.display = ctx === 'FO3' ? 'block' : 'none';
   }
 
-  // C4-fix: Restore playthrough type select (localStorage) independently from RNG checkbox (state)
+  // C5: Restore playthrough type select from state (was localStorage in C4-fix)
   {
-    const type = localStorage.getItem('robco_playstyle_type') || 'standard';
+    const type = (state && state.playthroughType) || 'standard';
     const sel = document.getElementById('playthroughTypeSelect');
     if (sel) sel.value = type;
   }
@@ -1073,13 +1073,14 @@ function setupHpBarInteraction() {
   });
 }
 
-// C4-fix: Playthrough type handler — localStorage only (NOT a state field).
-// Affects AI directive only; does not trigger saveState().
+// C5: Playthrough type handler — writes state field (Protocol 4).
+// Affects AI directive. Triggers saveState() so the change persists.
 // Valid combinations with Complete RNG are all supported.
 function onPlaythroughTypeChange(type) {
   const valid = ['standard', 'minmaxed', 'completionist', 'casual', 'speedrun'];
   if (!valid.includes(type)) return;
-  localStorage.setItem('robco_playstyle_type', type);
+  state.playthroughType = type;
+  saveState();
 }
 
 // C4-fix: Complete RNG toggle — receives boolean from checkbox this.checked.
@@ -1633,6 +1634,16 @@ function loadUI() {
   renderWorldMap(); // G6: Regional Zone Map
   renderKarmaCenter(); // G4: FO3 Karma Center
   _updateContextPanels(); // G4: switch faction/karma panel visibility
+  // C5: Restore CAMPG dropdowns from state (must be in loadUI so slot loads update them)
+  {
+    const ptSel = document.getElementById('playthroughTypeSelect');
+    if (ptSel) ptSel.value = state.playthroughType || 'standard';
+    const rng = (state && state.campaignMode) === 'rng';
+    const cb = document.getElementById('completeRngToggle');
+    if (cb) cb.checked = rng;
+    const banner = document.getElementById('rngModeBanner');
+    if (banner) banner.style.display = rng ? 'block' : 'none';
+  }
   updateMath();
   triggerPhosphorGhost();
   // Radiation SPECIAL debuff coloring (display-only, does not modify state)
@@ -3001,6 +3012,9 @@ function wipeTerminal() {
 
   // Re-present game context selection
   state.gameContext = null;
+
+  // C5: Clean up dead legacy localStorage key
+  localStorage.removeItem('robco_playstyle_type');
 
   // Save the wiped state
   saveState();

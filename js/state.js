@@ -108,8 +108,13 @@ let state = {
   gameContext: 'FNV', // 'FNV' | 'FO3' — set at boot, governs registry/AI context
   collectibles: [], // flat string[] of collected item names (game-context-aware)
   campaignMode: 'standard', // 'standard' | 'rng' — Complete RNG opt-in flag (binary)
+  playthroughType: 'standard', // 'standard' | 'minmaxed' | 'completionist' | 'casual' | 'speedrun'
   // DLC expansion adds entries to the registry only; no state schema change required
 };
+
+// Snapshot pristine defaults for wipeTerminal(). Must be set immediately after state
+// definition and before any migration or load overwrites the live state object.
+window._defaultState = JSON.parse(JSON.stringify(state));
 
 let chatHistory = [];
 
@@ -282,9 +287,17 @@ function migrateState(version, s) {
   if (!s.gameContext) s.gameContext = 'FNV';
   if (!s.collectibles) s.collectibles = [];
   // C4-fix: campaignMode is a binary RNG flag only ('standard' | 'rng').
-  // Old saves that stored playthrough-type values (minmaxed/completionist/casual/speedrun)
-  // are reset to 'standard' — those values now live in localStorage('robco_playstyle_type') only.
   if (s.campaignMode !== 'rng') s.campaignMode = 'standard';
+  // C5: playthroughType — migrate from legacy localStorage key if not yet in state.
+  // Transfer preserves the player's existing campaign intent on upgrade.
+  if (!s.playthroughType) {
+    const _validPT = ['standard', 'minmaxed', 'completionist', 'casual', 'speedrun'];
+    const _lsPT =
+      typeof localStorage !== 'undefined'
+        ? localStorage.getItem('robco_playstyle_type') || 'standard'
+        : 'standard';
+    s.playthroughType = _validPT.includes(_lsPT) ? _lsPT : 'standard';
+  }
   delete s.macros; // v1.6.7: macros removed — D-Pad handles this natively
   return s;
 }

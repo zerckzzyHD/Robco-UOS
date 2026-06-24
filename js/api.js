@@ -8,9 +8,9 @@ function getSystemDirective() {
       'Tactical Constraint: COURIER IS STRICTLY UNARMED/MELEE. NO EDUCATED PERK. NO DEAD WEIGHT. All final S.P.E.C.I.A.L. attributes are structurally hard-capped between 1 and 10.';
   }
 
-  // C4-fix: Playthrough type (localStorage only, NOT state) + Complete RNG (state.campaignMode binary)
+  // C5: Playthrough type (state field — Protocol 4) + Complete RNG (state.campaignMode binary)
   // These are two independent systems that can be combined freely.
-  const _playthroughType = localStorage.getItem('robco_playstyle_type') || 'standard';
+  const _playthroughType = (state && state.playthroughType) || 'standard';
   const _playthroughDirectives = {
     standard: '',
     minmaxed: 'Optimize all build decisions for maximum combat effectiveness.',
@@ -608,6 +608,14 @@ function autoImportState(jsonString) {
     const cmV = _g(parsed, 'campaignMode');
     if (cmV === 'rng') state.campaignMode = 'rng';
     else if (cmV === 'standard') state.campaignMode = 'standard';
+
+    // ── PLAYTHROUGH TYPE (C5) ────────────────────────────────────
+    // Read-only import — player sets this in CAMPG via dropdown; AI never writes it.
+    // Only file imports and slot loads provide this field; AI responses do not.
+    const ptV = _g(parsed, 'playthroughType');
+    const _validPT = ['standard', 'minmaxed', 'completionist', 'casual', 'speedrun'];
+    if (_validPT.includes(ptV)) state.playthroughType = ptV;
+
     loadUI();
     appendToChat('> PIP-BOY DATA SYNCED WITH ROBCO MAINFRAME <<', 'sys', true);
 

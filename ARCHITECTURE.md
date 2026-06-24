@@ -1,7 +1,7 @@
 # RobCo U.O.S. — System Architecture
 
 > **Version:** 1.6.8
-> **Last Updated:** 2026-06-23
+> **Last Updated:** 2026-06-24
 > **Purpose:** Living reference for any engineer (human or AI) working on this project.
 > This document maps every system, its dependencies, its persistence contract, and the
 > historical lessons that shaped it.
@@ -192,7 +192,7 @@ let state = {
   gameContext: 'FNV',       // 'FNV' | 'FO3' — governs FACTION_REGISTRY, SKILL_KEYS, AI context
   collectibles: [],         // Collected item names (game-context-aware, flat string[])
   campaignMode: 'standard', // 'standard' | 'rng' — Complete RNG opt-in flag (binary; Protocol 4)
-                            // Playthrough Type is SEPARATE: localStorage('robco_playstyle_type')
+  playthroughType: 'standard', // 'standard' | 'minmaxed' | 'completionist' | 'casual' | 'speedrun' (Protocol 4)
 };
 ```
 
@@ -238,7 +238,7 @@ CAMPG (`id="campgPanel"`, `data-tab="campg"`) is the authority for all campaign 
 | Control                 | ID                      | Storage                                      | Handler                         |
 | ----------------------- | ----------------------- | -------------------------------------------- | ------------------------------- |
 | Game Context select     | `gameContextSelect`     | `state.gameContext`                          | `onGameContextChange(ctx)`      |
-| Playthrough Type select | `playthroughTypeSelect` | `localStorage('robco_playstyle_type')`       | `onPlaythroughTypeChange(type)` |
+| Playthrough Type select | `playthroughTypeSelect` | `state.playthroughType`                      | `onPlaythroughTypeChange(type)` |
 | Complete RNG checkbox   | `completeRngToggle`     | `state.campaignMode` (`'standard'`\|`'rng'`) | `onCampaignModeChange(checked)` |
 | Timeline display        | `timelineDisplay`       | Cache only — not persisted                   | `[TIMELINE]` command (C7)       |
 | Wipe Terminal button    | `wipeTerminalBtn`       | —                                            | `wipeTerminal()`                |
@@ -645,29 +645,29 @@ The undo button appears after every sync and hides after use.
 
 ## Settings & localStorage Keys
 
-| Key                     | Type      | Used By  | Description                                                                            |
-| ----------------------- | --------- | -------- | -------------------------------------------------------------------------------------- |
-| `robco_v7`              | JSON      | state.js | Full game state                                                                        |
-| `robco_chat`            | JSON      | ui.js    | Chat history (up to 200 messages)                                                      |
-| `robco_gemini_key`      | string    | api.js   | Gemini API key                                                                         |
-| `robco_gemini_model`    | string    | api.js   | Selected model name                                                                    |
-| `robco_courier_id`      | string    | cloud.js | Cloud sync identifier                                                                  |
-| `robco_optics`          | string    | ui.js    | Color theme name                                                                       |
-| `robco_playstyle`       | string    | api.js   | "any" or "melee"                                                                       |
-| `robco_panel_state`     | JSON      | ui.js    | Panel open/closed memory                                                               |
-| `robco_version`         | string    | ui.js    | Last seen version (triggers changelog)                                                 |
-| `robco_sfx_muted`       | bool      | ui.js    | Typing sound mute                                                                      |
-| `robco_hum_muted`       | bool      | ui.js    | CRT hum mute                                                                           |
-| `robco_geiger_muted`    | bool      | ui.js    | Geiger counter mute                                                                    |
-| `robco_tinnitus_muted`  | bool      | ui.js    | Tinnitus mute                                                                          |
-| `robco_ambient_muted`   | bool      | ui.js    | Limb SFX mute                                                                          |
-| `robco_wake_muted`      | bool      | ui.js    | Tab-return wake tone mute                                                              |
-| `robco_master_muted`    | bool      | ui.js    | Global audio kill switch                                                               |
-| `robco_typer_speed`     | float     | ui.js    | Typewriter speed multiplier                                                            |
-| `robco_last_cloud_push` | timestamp | cloud.js | Conflict detection                                                                     |
-| `robco_active_tab`      | string    | ui.js    | Last active tab (`'stat'`/`'inv'`/`'data'`/`'campg'`)                                  |
-| `robco_playstyle_type`  | string    | ui.js    | Playthrough type (`'standard'`/`'minmaxed'`/`'completionist'`/`'casual'`/`'speedrun'`) |
-| `robco_slot_1/2/3`      | JSON      | ui.js    | Save slots A/B/C                                                                       |
+| Key                     | Type      | Used By  | Description                                                                      |
+| ----------------------- | --------- | -------- | -------------------------------------------------------------------------------- |
+| `robco_v7`              | JSON      | state.js | Full game state                                                                  |
+| `robco_chat`            | JSON      | ui.js    | Chat history (up to 200 messages)                                                |
+| `robco_gemini_key`      | string    | api.js   | Gemini API key                                                                   |
+| `robco_gemini_model`    | string    | api.js   | Selected model name                                                              |
+| `robco_courier_id`      | string    | cloud.js | Cloud sync identifier                                                            |
+| `robco_optics`          | string    | ui.js    | Color theme name                                                                 |
+| `robco_playstyle`       | string    | api.js   | "any" or "melee"                                                                 |
+| `robco_panel_state`     | JSON      | ui.js    | Panel open/closed memory                                                         |
+| `robco_version`         | string    | ui.js    | Last seen version (triggers changelog)                                           |
+| `robco_sfx_muted`       | bool      | ui.js    | Typing sound mute                                                                |
+| `robco_hum_muted`       | bool      | ui.js    | CRT hum mute                                                                     |
+| `robco_geiger_muted`    | bool      | ui.js    | Geiger counter mute                                                              |
+| `robco_tinnitus_muted`  | bool      | ui.js    | Tinnitus mute                                                                    |
+| `robco_ambient_muted`   | bool      | ui.js    | Limb SFX mute                                                                    |
+| `robco_wake_muted`      | bool      | ui.js    | Tab-return wake tone mute                                                        |
+| `robco_master_muted`    | bool      | ui.js    | Global audio kill switch                                                         |
+| `robco_typer_speed`     | float     | ui.js    | Typewriter speed multiplier                                                      |
+| `robco_last_cloud_push` | timestamp | cloud.js | Conflict detection                                                               |
+| `robco_active_tab`      | string    | ui.js    | Last active tab (`'stat'`/`'inv'`/`'data'`/`'campg'`)                            |
+| `robco_playstyle_type`  | string    | state.js | _(deprecated C5)_ Legacy key migrated into `state.playthroughType` on first load |
+| `robco_slot_1/2/3`      | JSON      | ui.js    | Save slots A/B/C                                                                 |
 
 ---
 
@@ -833,7 +833,7 @@ This protocol was formalized in v1.6.5 after the perk panel (`addPerk()` + `#new
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit audit must pass (all 203+ tests)
+- [ ] `git commit` — pre-commit audit must pass (all 209+ tests)
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable
