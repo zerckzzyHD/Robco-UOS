@@ -28,6 +28,8 @@
 
 ### [C6] Faction Registry Modernization (2026-06-24)
 
+- **UI Density Redesign**: Faction cards have been aggressively compacted. The standing label and numeric stats (Fame/Infamy) are now combined into a single inline string (`Neutral (F:0|I:0)`). Card padding was halved and gaps were removed, resulting in a ~35% vertical height reduction per card without shrinking any text sizes.
+- **Grid Layout Optimization**: The "Minor Factions" view was upgraded from a 2-column grid to a 3-column grid (`1fr 1fr 1fr`), radically increasing horizontal density and effectively eliminating the need to scroll on most displays.
 - **Registry Pruning**: Removed 5 legacy FNV casino/caravan factions (`wgs`, `omertas`, `chairmen`, `vangraff`, `crimson`) and added `strip` and `freeside` to `FACTION_REGISTRY`.
 - **Archival Migration**: `migrateState()` cleanly detects legacy keys and archives the data strings into `campaign_notes` prior to deletion, preventing user data loss.
 - **Tests**: Persistence suite updated to validate the exact 11 canonical factions.

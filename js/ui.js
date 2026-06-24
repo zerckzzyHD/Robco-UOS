@@ -2829,11 +2829,10 @@ function renderFactionRep() {
     const infamyVal = data.infamy || 0;
     const btnStyle =
       'font-family:inherit;font-size:9px;background:rgba(0,0,0,0.6);border:1px dashed rgba(20,253,206,0.3);color:rgba(20,253,206,0.75);cursor:pointer;padding:1px 3px;line-height:1.4;';
-    return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 3px;border:1px dashed rgba(20,253,206,0.3);text-align:center;min-width:0;">
-      <span style="font-size:9px;letter-spacing:0.4px;opacity:0.65;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%;" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</span>
-      <span style="font-size:10px;font-weight:bold;color:${s.color};">${s.label}</span>
-      <span style="font-size:9px;opacity:0.55;">F:${famVal} / I:${infamyVal}</span>
-      <div style="display:flex;gap:2px;flex-wrap:wrap;justify-content:center;margin-top:1px;">
+    return `<div style="display:flex;flex-direction:column;align-items:center;padding:2px;border:1px dashed rgba(20,253,206,0.3);text-align:center;min-width:0;">
+      <span style="font-size:9px;letter-spacing:0.4px;opacity:0.8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%;font-weight:bold;" title="${escapeHtml(f.name)}">${escapeHtml(f.name).toUpperCase()}</span>
+      <span style="font-size:8.5px;opacity:0.75;margin:2px 0;line-height:1.2;"><span style="color:${s.color};font-weight:bold;">${s.label}</span> (F:${famVal}|I:${infamyVal})</span>
+      <div style="display:flex;gap:2px;justify-content:center;">
         <button style="${btnStyle}" title="Fame +50" onclick="adjustFaction('${f.key}','fame',50)">F+</button>
         <button style="${btnStyle}" title="Fame -50" onclick="adjustFaction('${f.key}','fame',-50)">F-</button>
         <button style="${btnStyle}color:var(--robco-danger);border-color:rgba(231,76,60,0.35);" title="Infamy +50" onclick="adjustFaction('${f.key}','infamy',50)">I+</button>
@@ -2857,7 +2856,7 @@ function renderFactionRep() {
     </div>
     <details style="margin-top:6px;">
       <summary style="font-size:11px;letter-spacing:1px;opacity:0.6;cursor:pointer;user-select:none;list-style:none;outline:none;font-family:inherit;padding:2px 0;">[+] MINOR FACTIONS</summary>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:5px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-top:5px;">
         ${minor.map(factionCard).join('')}
       </div>
     </details>
