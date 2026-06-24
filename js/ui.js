@@ -2591,6 +2591,18 @@ function addCampaignNote() {
 //   [· ] — dimmed, on zones matching locationHistory entries (breadcrumb)
 //   [?] — on zones containing uncollected collectibles (cross-referenced with FALLOUT_REGISTRY)
 // Terminal-only styling. No color. Brightness only.
+let _mapActiveZone = null;
+
+function zoomMapToZone(zoneName) {
+  _mapActiveZone = zoneName;
+  renderWorldMap();
+}
+
+function resetMapZoom() {
+  _mapActiveZone = null;
+  renderWorldMap();
+}
+
 function renderWorldMap() {
   const display = document.getElementById('worldMapDisplay');
   if (!display) return;
@@ -2603,30 +2615,35 @@ function renderWorldMap() {
     return;
   }
 
-  // Build a set of visited zone names from locationHistory
+  // Build sets for quick lookups
   const visited = new Set((state.locationHistory || []).map(l => (l || '').toLowerCase()));
-
-  // Build a set of zones with uncollected collectibles
-  // Collectible zone hint: collectible item names fuzzy-match zone.locations[]
   const collected = new Set((state.collectibles || []).map(c => (c || '').toLowerCase()));
   const collectDefs =
     typeof FALLOUT_REGISTRY !== 'undefined' && FALLOUT_REGISTRY.collectibles
       ? FALLOUT_REGISTRY.collectibles
       : [];
 
-  // For each zone, check if any uncollected collectible's name fuzzy-matches zone name or locations
+  const currentLoc = (state.loc || '').toLowerCase();
+
+  // Helper functions
   function zoneHasUncollectedCollectible(zone) {
     return collectDefs.some(def => {
       const defName = (def.name || '').toLowerCase();
-      if (collected.has(defName)) return false; // already acquired
-      // Match against zone name or any location
+      if (collected.has(defName)) return false;
       const searchIn = [zone.name, ...(zone.locations || [])].map(s => s.toLowerCase());
       return searchIn.some(s => s.includes(defName) || defName.includes(s.split(' ')[0]));
     });
   }
 
-  // Find which zone [YOU] is in — fuzzy match state.loc against zone.locations[]
-  const currentLoc = (state.loc || '').toLowerCase();
+  function locHasUncollectedCollectible(locName) {
+    const locLower = locName.toLowerCase();
+    return collectDefs.some(def => {
+      const defName = (def.name || '').toLowerCase();
+      if (collected.has(defName)) return false;
+      return locLower.includes(defName) || defName.includes(locLower.split(' ')[0]);
+    });
+  }
+
   function zoneFuzzyMatchesLoc(zone, loc) {
     if (!loc) return false;
     const searchIn = [zone.name, ...(zone.locations || [])].map(s => s.toLowerCase());
@@ -2637,6 +2654,16 @@ function renderWorldMap() {
     });
   }
 
+  function locFuzzyMatchesLoc(targetLoc, loc) {
+    if (!loc) return false;
+    const locWords = loc.split(/[ ,]+/).filter(w => w.length > 2);
+    const sWords = targetLoc
+      .toLowerCase()
+      .split(/[ ,]+/)
+      .filter(w => w.length > 2);
+    return locWords.some(lw => sWords.some(sw => sw.includes(lw) || lw.includes(sw)));
+  }
+
   function zoneVisited(zone) {
     const searchIn = [zone.name, ...(zone.locations || [])].map(s => s.toLowerCase());
     for (const v of visited) {
@@ -2645,8 +2672,72 @@ function renderWorldMap() {
     return false;
   }
 
-  // Build the 6×6 grid in row-major order
-  const grid = []; // grid[row][col] = zone or null
+  function locVisited(locName) {
+    const locLower = locName.toLowerCase();
+    for (const v of visited) {
+      if (locLower.includes(v) || v.includes(locLower.split(' ')[0])) return true;
+    }
+    return false;
+  }
+
+  // --- ZOOM LEVEL 2: DETAILED REGIONAL VIEW ---
+  if (_mapActiveZone) {
+    const activeZone = zones.find(z => z.name === _mapActiveZone);
+    if (!activeZone) {
+      _mapActiveZone = null;
+      return renderWorldMap();
+    }
+
+    let html = `
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed rgba(20,253,206,0.3); padding-bottom:4px; margin-bottom:8px;">
+        <button class="action-btn" onclick="resetMapZoom()" style="padding:2px 8px; font-size:10px;">&lt; WORLD GRID</button>
+        <span style="font-weight:bold; font-size:11px; letter-spacing:1px;">${escapeHtml(activeZone.name).toUpperCase()} REGION</span>
+      </div>
+      <div style="max-height:250px; overflow-y:auto; padding-right:4px;">
+    `;
+
+    const locs = activeZone.locations || [];
+    if (locs.length === 0) {
+      html += `<div style="opacity:0.5; font-style:italic;">[NO DATA]</div>`;
+    } else {
+      locs.forEach(loc => {
+        const isYou = currentLoc && locFuzzyMatchesLoc(loc, currentLoc);
+        const wasVisited = locVisited(loc);
+        const hasCollectible = locHasUncollectedCollectible(loc);
+
+        let statusText = '<span style="opacity:0.4;">[UNKNOWN]</span>';
+        let rowStyle = 'opacity:0.6;';
+        if (isYou) {
+          statusText =
+            '<span class="map-you-marker" style="color:var(--robco-green);">[CURRENT]</span>';
+          rowStyle = 'opacity:1.0; font-weight:bold;';
+        } else if (wasVisited) {
+          statusText = '<span style="opacity:0.8;">[VISITED]</span>';
+          rowStyle = 'opacity:0.9;';
+        }
+
+        let collectibleBadge = '';
+        if (hasCollectible) {
+          collectibleBadge =
+            '<span style="margin-left:8px; color:var(--robco-alert); font-size:9px;">[?] COLLECTIBLE DETECTED</span>';
+        }
+
+        html += `
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:4px; border-bottom:1px solid rgba(20,253,206,0.1); ${rowStyle}">
+            <span>- ${escapeHtml(loc)}${collectibleBadge}</span>
+            <span style="font-size:9px;">${statusText}</span>
+          </div>
+        `;
+      });
+    }
+
+    html += `</div>`;
+    display.innerHTML = html;
+    return;
+  }
+
+  // --- ZOOM LEVEL 1: STRATEGIC WORLD VIEW (6x6) ---
+  const grid = [];
   for (let r = 1; r <= 6; r++) {
     grid[r] = [];
     for (let c = 1; c <= 6; c++) {
@@ -2667,11 +2758,7 @@ function renderWorldMap() {
     for (let c = 1; c <= 6; c++) {
       const zone = grid[r][c];
       if (!zone) {
-        html += `<div style="
-          border:1px solid rgba(20,253,206,0.08);
-          min-height:44px;
-          padding:3px;
-        "></div>`;
+        html += `<div style="border:1px solid rgba(20,253,206,0.08); min-height:44px; padding:3px;"></div>`;
         continue;
       }
 
@@ -2692,8 +2779,7 @@ function renderWorldMap() {
         marker += '<span style="opacity:0.8;font-size:8px;">[?]</span>';
       }
 
-      html += `<div style="
-        border:1px solid rgba(20,253,206,0.2);
+      html += `<div class="map-cell" onclick="zoomMapToZone('${escapeHtml(zone.name.replace(/'/g, "\\'"))}')" style="
         min-height:44px;
         padding:3px;
         ${brightnessStyle}
@@ -2709,8 +2795,7 @@ function renderWorldMap() {
 
   html += '</div>';
   html +=
-    '<div style="font-size:9px;opacity:0.45;margin-top:4px;">[YOU]=CURRENT &nbsp; [·]=VISITED &nbsp; [?]=COLLECTIBLE</div>';
-
+    '<div style="font-size:9px;opacity:0.45;margin-top:4px;">[YOU]=CURRENT &nbsp; [·]=VISITED &nbsp; [?]=COLLECTIBLE &nbsp; :: TAP TO ZOOM</div>';
   display.innerHTML = html;
 }
 

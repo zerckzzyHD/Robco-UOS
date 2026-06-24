@@ -15,7 +15,16 @@
 - **Hard Reload Context Switching**: Changing context in the CAMPG tab now saves the active context and triggers a `window.location.reload()`, completely annihilating stale DOM elements and closures, ensuring a pristine memory environment for the new game context.
 - **Working Memory Mapping**: The global `let state = { ... }` object was left structurally untouched as "Working Memory". It correctly reads from and flushes to the active `robco_v8` campaign, requiring zero code churn to the hundreds of DOM read/write handlers in `ui.js`.
 - **Atomic Cloud Sync**: `cloud.js` `pushToCloud` and `pullFromCloud` now transact the entire `robco_v8` container. Mobile and desktop sessions now execute holistic account-syncs, eliminating split-brain.
-- **Undo Consistency**: `undoLastSync()` now correctly restores the entire account state across all games, preventing partial campaign corruption.
+- **Unified Undo Pipeline**: Upgraded `undoLastSync()` to support dual-channel rollbacks. It seamlessly processes both volatile AI memory snapshots (`window._lastStateBeforeSync`) and hard-disk Cloud/File imports (`localStorage.getItem('robco_backup')`), resolving the inaccessible cloud rollback vulnerability. The "UNDO LAST SYNC" button now automatically surfaces on boot if a hard backup is detected.
+- **AI Context Security Guard**: Patched a critical vulnerability where the AI could silently alter the active game context (e.g., hallucinating a `gameContext: FO3` key). The API gateway `autoImportState()` now explicitly intercepts and blocks context mutation to prevent save-slot destruction.
+
+### [C10] World Map UX Redesign (2026-06-24)
+
+- **2-Tier Map Zoom**: Solved the information density ceiling by upgrading the static 6x6 map grid into an interactive UI.
+  - **Zoom Level 1 (World Grid)**: Displays the 36 major campaign zones with real-time `[YOU]`, `[·]`, and `[?]` density markers.
+  - **Zoom Level 2 (Zone Detail)**: Clicking/tapping any zone zooms into a detailed scrollable layout listing every individual sub-location within that zone.
+- **Micro-interactions**: Added `.map-cell` CRT hover states and instant touch-target expansion for mobile clients.
+- **Dynamic Diagnostics**: Zoom Level 2 individually evaluates each discovered location and flags exactly which sub-location contains an undiscovered collectible.
 
 ### [C6] Faction Registry Modernization (2026-06-24)
 
