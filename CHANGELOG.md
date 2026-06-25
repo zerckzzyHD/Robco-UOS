@@ -1,4 +1,4 @@
-## [v2.0.0] — The Universal Fallout Companion OS<!-- Date: 2026-06-25 | Tests: 206/206 | Cache: robco-terminal-v2.0.0-r10 -->
+## [v2.0.0] — The Universal Fallout Companion OS<!-- Date: 2026-06-25 | Tests: 206/206 | Cache: robco-terminal-v2.0.0-r11 -->
 
 ### [C11] UX / Density Improvements & State Management Updates (2026-06-25)
 
@@ -11,6 +11,7 @@
 - **FO3 Banner Cleanup**: Disabled `fo3WarningBanner` elements in active HTML pending v2.0 rollout completion.
 - **Faction Registration**: Moved `B.O.S.`, `Boomers`, and `Great Khans` from `major` to `minor` tier in the FNV registry to fit correctly in the UI.
 - **Wipe Terminal Sync Fix**: Re-ordered the `wipeTerminal()` execution flow so the DOM is fully reset _before_ `syncStateFromDom()` runs, fixing a bug where wiped state was immediately overwritten by dirty inputs.
+- **Date Calendar Fix**: Rewired `onTimeInputChanged()` to correctly target the new `cal_month`/`cal_day`/`cal_year` inputs instead of the legacy `time_day` field, making the calendar fully editable.
 
 ### [C9/C10] FO3 AI Context Integration (2026-06-24)
 

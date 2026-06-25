@@ -1803,21 +1803,36 @@ function loadUI() {
 }
 
 // ── TIME INPUT HANDLER ───────────────────────────────────────────────
-// Called by oninput on the D/H/M inputs. Clamps values and triggers a save.
+// Called by oninput on the calendar and time inputs. Clamps values and triggers a save.
 function onTimeInputChanged() {
-  const dayEl = document.getElementById('time_day');
+  const calMonthEl = document.getElementById('cal_month');
+  const calDayEl = document.getElementById('cal_day');
+  const calYearEl = document.getElementById('cal_year');
   const hrEl = document.getElementById('time_hour');
   const minEl = document.getElementById('time_min');
-  if (!dayEl || !hrEl || !minEl) return;
-  // Clamp
-  if (parseInt(dayEl.value) < 1 || isNaN(parseInt(dayEl.value))) dayEl.value = 1;
-  if (parseInt(hrEl.value) < 0) hrEl.value = 0;
-  if (parseInt(hrEl.value) > 23) hrEl.value = 23;
-  if (parseInt(minEl.value) < 0) minEl.value = 0;
-  if (parseInt(minEl.value) > 59) minEl.value = 59;
+  if (!calMonthEl || !calDayEl || !calYearEl || !hrEl || !minEl) return;
 
-  state.ticks = gameTimeToTicks(parseInt(dayEl.value), parseInt(hrEl.value), parseInt(minEl.value));
-  renderGameDate(); // Update calendar date display when time changes
+  // Clamp
+  let mo = Math.min(12, Math.max(1, parseInt(calMonthEl.value) || 1));
+  let dy = Math.min(31, Math.max(1, parseInt(calDayEl.value) || 1));
+  let yr = Math.max(2200, parseInt(calYearEl.value) || 2281);
+  let h = Math.min(23, Math.max(0, parseInt(hrEl.value) || 0));
+  let m = Math.min(59, Math.max(0, parseInt(minEl.value) || 0));
+
+  calMonthEl.value = mo;
+  calDayEl.value = dy;
+  calYearEl.value = yr;
+  hrEl.value = h;
+  minEl.value = m;
+
+  state.ticks = calendarToTicks(mo, dy, yr, h, m);
+
+  // Keep hidden fields in sync
+  let hiddenTicks = document.getElementById('stat_ticks');
+  if (hiddenTicks) hiddenTicks.value = state.ticks;
+  let hiddenDay = document.getElementById('time_day');
+  if (hiddenDay) hiddenDay.value = Math.floor(state.ticks / 240) + 1;
+
   saveState();
 }
 

@@ -108,6 +108,7 @@ export default [
         calendarToTicks: 'readonly',
         setupXpBarInteraction: 'readonly',
         onLvlInputChanged: 'readonly',
+        onTimeInputChanged: 'readonly',
         renderKarmaCenter: 'readonly',
         _updateContextPanels: 'readonly',
         renderWorldMap: 'readonly',
