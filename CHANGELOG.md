@@ -1,4 +1,4 @@
-## [v2.0.0] — The Universal Fallout Companion OS<!-- Date: 2026-06-25 | Tests: 206/206 | Cache: robco-terminal-v2.0.0-r12 -->
+## [v2.0.0] — The Universal Fallout Companion OS<!-- Date: 2026-06-25 | Tests: 206/206 | Cache: robco-terminal-v2.0.0-r13 -->
 
 ### [C11] UX / Density Improvements & State Management Updates (2026-06-25)
 
@@ -13,6 +13,7 @@
 - **Wipe Terminal Sync Fix**: Re-ordered the `wipeTerminal()` execution flow so the DOM is fully reset _before_ `syncStateFromDom()` runs, fixing a bug where wiped state was immediately overwritten by dirty inputs.
 - **Date Calendar Fix**: Rewired `onTimeInputChanged()` to correctly target the new `cal_month`/`cal_day`/`cal_year` inputs instead of the legacy `time_day` field, making the calendar fully editable.
 - **XP Curve Math Fix**: Replaced the incorrect quadratic XP formula (`25L^2 + 125L - 150`) with the actual vanilla Fallout 3 / New Vegas engine formula (`75L^2 - 25L - 50`), fixing inaccurate XP thresholds across all levels (e.g. Level 3 is now correctly 550 XP instead of 450).
+- **UI Tuning**: Increased the width of the Calendar input boxes to prevent four-digit years from clipping. Increased the opacity of the mobile Critical HP Flash from `0.12` to `0.25` to make the heartbeat warning more noticeable.
 
 ### [C9/C10] FO3 AI Context Integration (2026-06-24)
 

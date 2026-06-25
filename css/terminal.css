@@ -1232,7 +1232,7 @@ body.karma-flash-evil {
     background-color: transparent;
   }
   20% {
-    background-color: rgba(231, 76, 60, 0.12);
+    background-color: rgba(231, 76, 60, 0.25);
   }
   100% {
     background-color: transparent;
