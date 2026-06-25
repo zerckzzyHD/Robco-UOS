@@ -439,6 +439,7 @@ window.onload = function () {
   loadUI();
   initTabs(); // Phase 4: restore active tab (defaults to 'stat' on first load)
   setupHpBarInteraction();
+  setupXpBarInteraction(); // C11: XP bar click-drag (mirrors HP bar, within current level range)
   startCrtHum();
   initRegistryAutocomplete();
   initAmmoDatalist();
@@ -581,8 +582,7 @@ window.onload = function () {
     const ctx = (state && state.gameContext) || 'FNV';
     const sel = document.getElementById('gameContextSelect');
     if (sel) sel.value = ctx;
-    const banner = document.getElementById('fo3WarningBanner');
-    if (banner) banner.style.display = ctx === 'FO3' ? 'block' : 'none';
+    // fo3WarningBanner removed in C11 — banner element no longer in DOM
   }
 
   // C5: Restore playthrough type select from state (was localStorage in C4-fix)
@@ -592,11 +592,18 @@ window.onload = function () {
     if (sel) sel.value = type;
   }
   {
-    const rng = (state && state.campaignMode) === 'rng';
+    const mode = (state && state.campaignMode) || 'standard';
+    const locked = mode === 'rng-locked';
+    const armed = mode === 'rng';
     const cb = document.getElementById('completeRngToggle');
-    if (cb) cb.checked = rng;
+    if (cb) {
+      cb.checked = locked || armed;
+      cb.disabled = locked;
+    }
     const banner = document.getElementById('rngModeBanner');
-    if (banner) banner.style.display = rng ? 'block' : 'none';
+    if (banner) banner.style.display = armed ? 'block' : 'none';
+    const lockedBanner = document.getElementById('rngLockedBanner');
+    if (lockedBanner) lockedBanner.style.display = locked ? 'block' : 'none';
   }
 
   // #34 Typewriter Speed — restore slider + label on load
@@ -1103,6 +1110,66 @@ function setupHpBarInteraction() {
   });
 }
 
+// C11: XP bar click-drag — mirrors HP bar but sets XP within [xpCur, xpNext-1] range.
+// Allows direct manipulation of XP progress within the current level.
+function setupXpBarInteraction() {
+  const container = document.getElementById('xp_bar_container');
+  if (!container) return;
+  function applyXp(e) {
+    const rect = container.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const pct = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    const lvl = Math.max(1, parseInt(document.getElementById('stat_lvl').value) || 1);
+    const xpCur = lvl <= 1 ? 0 : 25 * (lvl * lvl) + 125 * lvl - 150;
+    const xpNext = 25 * ((lvl + 1) * (lvl + 1)) + 125 * (lvl + 1) - 150;
+    const newXp = Math.round(xpCur + pct * (xpNext - xpCur - 1));
+    document.getElementById('stat_xp').value = newXp;
+    state.xp = newXp;
+    updateMath();
+  }
+  let dragging = false;
+  container.addEventListener('mousedown', e => {
+    dragging = true;
+    applyXp(e);
+  });
+  document.addEventListener('mousemove', e => {
+    if (dragging) applyXp(e);
+  });
+  document.addEventListener('mouseup', () => {
+    dragging = false;
+  });
+  container.addEventListener(
+    'touchstart',
+    e => {
+      dragging = true;
+      applyXp(e);
+      e.preventDefault();
+    },
+    { passive: false }
+  );
+  document.addEventListener(
+    'touchmove',
+    e => {
+      if (dragging) applyXp(e);
+    },
+    { passive: false }
+  );
+  document.addEventListener('touchend', () => {
+    dragging = false;
+  });
+}
+
+// C11: Level input change handler — when user edits the level field,
+// auto-set XP to the minimum XP required for that level (xpCur).
+function onLvlInputChanged() {
+  const lvl = Math.max(1, parseInt(document.getElementById('stat_lvl').value) || 1);
+  const xpCur = lvl <= 1 ? 0 : 25 * (lvl * lvl) + 125 * lvl - 150;
+  document.getElementById('stat_xp').value = xpCur;
+  state.lvl = lvl;
+  state.xp = xpCur;
+  updateMath();
+}
+
 // C5: Playthrough type handler — writes state field (Protocol 4).
 // Affects AI directive. Triggers saveState() so the change persists.
 // Valid combinations with Complete RNG are all supported.
@@ -1113,11 +1180,19 @@ function onPlaythroughTypeChange(type) {
   saveState();
 }
 
-// C4-fix: Complete RNG toggle — receives boolean from checkbox this.checked.
+// C4-fix / C11: Complete RNG toggle — receives boolean from checkbox this.checked.
 // Updates state.campaignMode ('standard' | 'rng') and saves.
-// Opt-in only. Combines freely with any Playthrough Type.
-// AI randomisation is triggered by player commands; never automatic.
+// If mode is 'rng-locked', toggle is a no-op (cannot be disabled).
 function onCampaignModeChange(checked) {
+  if (state.campaignMode === 'rng-locked') {
+    // Permanently locked — force checkbox back to checked, do nothing
+    const cb = document.getElementById('completeRngToggle');
+    if (cb) {
+      cb.checked = true;
+      cb.disabled = true;
+    }
+    return;
+  }
   state.campaignMode = checked ? 'rng' : 'standard';
   saveState();
   const banner = document.getElementById('rngModeBanner');
@@ -1617,20 +1692,26 @@ function loadUI() {
   document.getElementById('stat_loc').value = state.loc;
   document.getElementById('stat_rads').value = state.rads;
   document.getElementById('stat_karma').value = state.karma;
-  // TIME: decompose ticks → D/H/M inputs
+  // TIME: decompose ticks → Calendar Date (M/D/Y) + H/M inputs
   {
     const t = state.ticks || 0;
-    const day = Math.floor(t / 240) + 1;
+    const dt = _resolveGameDateTime(t);
     const hr = Math.floor((t % 240) / 10);
     const mn = (t % 10) * 6;
-    const dayEl = document.getElementById('time_day');
+    const calMonthEl = document.getElementById('cal_month');
+    const calDayEl = document.getElementById('cal_day');
+    const calYearEl = document.getElementById('cal_year');
     const hrEl = document.getElementById('time_hour');
     const minEl = document.getElementById('time_min');
     const hidden = document.getElementById('stat_ticks');
-    if (dayEl) dayEl.value = day;
+    const hiddenDay = document.getElementById('time_day');
+    if (calMonthEl) calMonthEl.value = dt.month + 1; // _resolveGameDateTime uses 0-indexed month
+    if (calDayEl) calDayEl.value = dt.day;
+    if (calYearEl) calYearEl.value = dt.year;
     if (hrEl) hrEl.value = hr;
     if (minEl) minEl.value = mn;
-    if (hidden) hidden.value = t; // keep hidden field in sync
+    if (hidden) hidden.value = t;
+    if (hiddenDay) hiddenDay.value = Math.floor(t / 240) + 1;
   }
   // Skills — use getSkillKeys() for context-aware FNV/FO3 support
   getSkillKeys().forEach(sk => {
@@ -1665,15 +1746,22 @@ function loadUI() {
   renderWorldMap(); // G6: Regional Zone Map
   renderKarmaCenter(); // G4: FO3 Karma Center
   _updateContextPanels(); // G4: switch faction/karma panel visibility
-  // C5: Restore CAMPG dropdowns from state (must be in loadUI so slot loads update them)
+  // C5/C11: Restore CAMPG dropdowns from state
   {
     const ptSel = document.getElementById('playthroughTypeSelect');
     if (ptSel) ptSel.value = state.playthroughType || 'standard';
-    const rng = (state && state.campaignMode) === 'rng';
+    const mode = (state && state.campaignMode) || 'standard';
+    const locked = mode === 'rng-locked';
+    const armed = mode === 'rng';
     const cb = document.getElementById('completeRngToggle');
-    if (cb) cb.checked = rng;
+    if (cb) {
+      cb.checked = locked || armed;
+      cb.disabled = locked; // cannot uncheck when permanently active
+    }
     const banner = document.getElementById('rngModeBanner');
-    if (banner) banner.style.display = rng ? 'block' : 'none';
+    if (banner) banner.style.display = armed ? 'block' : 'none';
+    const lockedBanner = document.getElementById('rngLockedBanner');
+    if (lockedBanner) lockedBanner.style.display = locked ? 'block' : 'none';
   }
   updateMath();
   triggerPhosphorGhost();
@@ -1777,12 +1865,12 @@ function updateMath() {
     }
   }
 
-  // XP progress bar
+  // XP progress bar — reads DOM directly (same approach as HP bar) to avoid stale state reads
   let xpFill = document.getElementById('xp_bar_fill');
   if (xpFill) {
-    let lvl = state.lvl || 1;
-    let xp = state.xp || 0;
-    let xpCur = 25 * (lvl * lvl) + 125 * lvl - 150;
+    let lvl = Math.max(1, parseInt(document.getElementById('stat_lvl').value) || 1);
+    let xp = parseInt(document.getElementById('stat_xp').value) || 0;
+    let xpCur = lvl <= 1 ? 0 : 25 * (lvl * lvl) + 125 * lvl - 150;
     let xpNext = 25 * ((lvl + 1) * (lvl + 1)) + 125 * (lvl + 1) - 150;
     let pct = lvl >= 50 ? 100 : Math.min(100, Math.max(0, ((xp - xpCur) / (xpNext - xpCur)) * 100));
     xpFill.style.width = pct + '%';
@@ -2201,6 +2289,31 @@ function renderGameDate() {
 // Minute resolution snaps to nearest tick boundary (floor to multiple of 6).
 function gameTimeToTicks(day, hour, min) {
   return (day - 1) * 240 + hour * 10 + Math.floor(min / 6);
+}
+
+// ── calendarToTicks() — C11: Calendar Date Editor ────────────────────
+// Converts (month [1-12], day [1-31], year, hour [0-23], min [0-59]) to ticks.
+// Uses the same MONTH_DAYS table as _resolveGameDateTime() — no leap years (game convention).
+// Game-context aware: FNV epoch Oct 19, 2281; FO3 epoch Aug 17, 2277.
+function calendarToTicks(month, day, year, hour, min) {
+  const MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  const isFO3 = typeof state !== 'undefined' && state.gameContext === 'FO3';
+  const startMonth = isFO3 ? 7 : 9; // 0-indexed: Aug=7, Oct=9
+  const startDay = isFO3 ? 17 : 19;
+  const startYear = isFO3 ? 2277 : 2281;
+  // Count total days since an arbitrary base year using MONTH_DAYS (no leap years)
+  function daysSinceBase(yr, mo0, dy) {
+    // mo0 = 0-indexed month
+    let total = (yr - 2200) * 365; // close-enough base offset
+    for (let i = 0; i < mo0; i++) total += MONTH_DAYS[i];
+    return total + dy;
+  }
+  const startTotal = daysSinceBase(startYear, startMonth, startDay);
+  const targetTotal = daysSinceBase(year, (month - 1 + 12) % 12, day);
+  const dayOffset = Math.max(0, targetTotal - startTotal);
+  const h = Math.min(23, Math.max(0, hour || 0));
+  const mn = Math.min(59, Math.max(0, min || 0));
+  return dayOffset * 240 + h * 10 + Math.floor(mn / 6);
 }
 
 // ── FACTION THRESHOLDS (GECK-sourced, per-faction) ─────────────────
@@ -2648,19 +2761,19 @@ function renderWorldMap() {
     if (!loc) return false;
     const searchIn = [zone.name, ...(zone.locations || [])].map(s => s.toLowerCase());
     return searchIn.some(s => {
-      const locWords = loc.split(/[ ,]+/).filter(w => w.length > 2);
-      const sWords = s.split(/[ ,]+/).filter(w => w.length > 2);
+      const locWords = loc.split(/[ ,]+/).filter(w => w.length > 3);
+      const sWords = s.split(/[ ,]+/).filter(w => w.length > 3);
       return locWords.some(lw => sWords.some(sw => sw.includes(lw) || lw.includes(sw)));
     });
   }
 
   function locFuzzyMatchesLoc(targetLoc, loc) {
     if (!loc) return false;
-    const locWords = loc.split(/[ ,]+/).filter(w => w.length > 2);
+    const locWords = loc.split(/[ ,]+/).filter(w => w.length > 3);
     const sWords = targetLoc
       .toLowerCase()
       .split(/[ ,]+/)
-      .filter(w => w.length > 2);
+      .filter(w => w.length > 3);
     return locWords.some(lw => sWords.some(sw => sw.includes(lw) || lw.includes(sw)));
   }
 
@@ -2758,7 +2871,7 @@ function renderWorldMap() {
     for (let c = 1; c <= 6; c++) {
       const zone = grid[r][c];
       if (!zone) {
-        html += `<div style="border:1px solid rgba(20,253,206,0.08); min-width:0; min-height:44px; padding:3px;"></div>`;
+        html += `<div style="border:1px solid rgba(20,253,206,0.08); min-width:0; min-height:36px; padding:3px; overflow-x:hidden;"></div>`;
         continue;
       }
 
@@ -2781,8 +2894,9 @@ function renderWorldMap() {
 
       html += `<div class="map-cell" onclick="zoomMapToZone('${escapeHtml(zone.name.replace(/'/g, "\\'"))}')" title="${escapeHtml(zone.name)}" style="
         min-width:0;
-        min-height:44px;
+        min-height:36px;
         padding:3px;
+        overflow-x:hidden;
         ${brightnessStyle}
         display:flex;
         flex-direction:column;
@@ -3125,8 +3239,19 @@ function wipeTerminal() {
     return;
 
   // Reset state to defaults (preserves gameContext selection from boot)
+  const wasRngArmed = state.campaignMode === 'rng';
   const freshState = JSON.parse(JSON.stringify(window._defaultState || {}));
   freshState.gameContext = state.gameContext || 'FNV'; // preserve game context for now
+  // C11: If Complete RNG was armed (checked) when player wiped, activate the lock permanently
+  if (wasRngArmed) freshState.campaignMode = 'rng-locked';
+
+  // Wipe all current state properties to ensure no phantom arrays or strings remain
+  for (let key in state) {
+    if (Object.prototype.hasOwnProperty.call(state, key)) {
+      delete state[key];
+    }
+  }
+
   Object.assign(state, freshState);
 
   // Clear chat history
@@ -3140,16 +3265,16 @@ function wipeTerminal() {
   // C5: Clean up dead legacy localStorage key
   localStorage.removeItem('robco_playstyle_type');
 
-  // Save the wiped state
-  saveState();
-
   // Clear chat display
   const chatDisplay = document.getElementById('chatDisplay');
   if (chatDisplay) chatDisplay.innerHTML = '';
 
-  // Reload UI
+  // Reload UI first, so the DOM matches the fresh state
   loadUI();
   switchTab('stat');
+
+  // Save the wiped state (now that syncStateFromDom will see clean DOM)
+  saveState();
 
   // Show context selection prompt in chat
   appendToChat('> TERMINAL WIPED. INITIATING NEW CAMPAIGN...', 'sys', true);

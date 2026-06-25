@@ -1,4 +1,16 @@
-## [v2.0.0] — The Universal Fallout Companion OS<!-- Date: 2026-06-24 | Tests: 206/206 | Cache: robco-terminal-v2.0.0-r1 -->
+## [v2.0.0] — The Universal Fallout Companion OS<!-- Date: 2026-06-25 | Tests: 206/206 | Cache: robco-terminal-v2.0.0-r10 -->
+
+### [C11] UX / Density Improvements & State Management Updates (2026-06-25)
+
+- **Map Redesign**: World grid cells reduced in `min-height` from `44px` to `36px` to fit 6x6 inside `.col-left` container on desktop without overflow.
+- **Location Deduping**: Tightened location fuzzy match thresholds (from `> 2` to `> 3` chars) to stop short words (e.g. "Run") from activating multiple zones.
+- **Date/Time Calendar Editing**: Replaced raw `Ticks` internal Day/Hour/Min inputs with true Month/Day/Year inputs (bidirectional D/H/M/Y to Ticks sync).
+- **XP Bar Interaction**: Wired `setupXpBarInteraction()` allowing drag-to-set XP progress within the current level. Wired `onLvlInputChanged()` to auto-set XP boundary.
+- **Complete RNG 3-State**: Migrated `campaignMode` from binary (`'standard'`|`'rng'`) to 3-state (`'standard'`|`'rng'`|`'rng-locked'`). RNG becomes permanently locked (cannot be unchecked) if the player performs a Terminal Wipe while RNG is armed.
+- **Mobile HP Flash Fix**: `crit-hp-flash` CSS keyframes now animate a `fixed` pseudo-element overlay instead of mutating `body.background-color`, fixing white-flash rendering bugs on iOS WebViews.
+- **FO3 Banner Cleanup**: Disabled `fo3WarningBanner` elements in active HTML pending v2.0 rollout completion.
+- **Faction Registration**: Moved `B.O.S.`, `Boomers`, and `Great Khans` from `major` to `minor` tier in the FNV registry to fit correctly in the UI.
+- **Wipe Terminal Sync Fix**: Re-ordered the `wipeTerminal()` execution flow so the DOM is fully reset _before_ `syncStateFromDom()` runs, fixing a bug where wiped state was immediately overwritten by dirty inputs.
 
 ### [C9/C10] FO3 AI Context Integration (2026-06-24)
 

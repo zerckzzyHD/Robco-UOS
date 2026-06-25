@@ -7,9 +7,9 @@ const FACTION_REGISTRY = [
   { key: 'ncr', name: 'NCR', tier: 'major' },
   { key: 'legion', name: "Caesar's Legion", tier: 'major' },
   { key: 'house', name: 'Mr. House', tier: 'major' },
-  { key: 'bos', name: 'B.O.S.', tier: 'major' },
-  { key: 'boomers', name: 'Boomers', tier: 'major' },
-  { key: 'khans', name: 'Great Khans', tier: 'major' },
+  { key: 'bos', name: 'B.O.S.', tier: 'minor' },
+  { key: 'boomers', name: 'Boomers', tier: 'minor' },
+  { key: 'khans', name: 'Great Khans', tier: 'minor' },
   { key: 'followers', name: 'Followers of the Apocalypse', tier: 'minor' },
   { key: 'powder', name: 'Powder Gangers', tier: 'minor' },
   { key: 'kings', name: 'The Kings', tier: 'minor' },
@@ -104,7 +104,7 @@ let state = {
   // v2.0 fields
   gameContext: 'FNV', // 'FNV' | 'FO3' — set at boot, governs registry/AI context
   collectibles: [], // flat string[] of collected item names (game-context-aware)
-  campaignMode: 'standard', // 'standard' | 'rng' — Complete RNG opt-in flag (binary)
+  campaignMode: 'standard', // 'standard' | 'rng' (armed) | 'rng-locked' (permanently active after wipe)
   playthroughType: 'standard', // 'standard' | 'minmaxed' | 'completionist' | 'casual' | 'speedrun'
   // DLC expansion adds entries to the registry only; no state schema change required
 };
@@ -176,18 +176,25 @@ function syncStateFromDom() {
   state.loc = document.getElementById('stat_loc').value;
   state.rads = parseInt(document.getElementById('stat_rads').value) || 0;
   state.karma = parseInt(document.getElementById('stat_karma').value) || 0;
-  // TIME: read D/H/M inputs → convert to ticks (bidirectional layer)
-  let dayEl = document.getElementById('time_day');
+  // TIME: read calendar Date (M/D/Y) + H/M inputs → convert to ticks via calendarToTicks()
+  // Backward-compat: if new inputs missing, fall back to hidden stat_ticks field
+  let calMonthEl = document.getElementById('cal_month');
+  let calDayEl = document.getElementById('cal_day');
+  let calYearEl = document.getElementById('cal_year');
   let hrEl = document.getElementById('time_hour');
   let minEl = document.getElementById('time_min');
-  if (dayEl && hrEl && minEl) {
-    let d = Math.max(1, parseInt(dayEl.value) || 1);
+  if (calMonthEl && calDayEl && calYearEl && hrEl && minEl) {
+    let mo = Math.min(12, Math.max(1, parseInt(calMonthEl.value) || 1));
+    let dy = Math.min(31, Math.max(1, parseInt(calDayEl.value) || 1));
+    let yr = Math.max(2200, parseInt(calYearEl.value) || 2281);
     let h = Math.min(23, Math.max(0, parseInt(hrEl.value) || 0));
     let m = Math.min(59, Math.max(0, parseInt(minEl.value) || 0));
-    state.ticks = gameTimeToTicks(d, h, m);
-    // Keep the hidden #stat_ticks in sync (backward compat for any direct readers)
+    state.ticks = calendarToTicks(mo, dy, yr, h, m);
+    // Keep hidden fields in sync (backward compat for any direct readers)
     let hiddenTicks = document.getElementById('stat_ticks');
     if (hiddenTicks) hiddenTicks.value = state.ticks;
+    let hiddenDay = document.getElementById('time_day');
+    if (hiddenDay) hiddenDay.value = Math.floor(state.ticks / 240) + 1;
   } else {
     // Fallback: if new inputs aren't in DOM yet, read hidden field
     let ticksEl = document.getElementById('stat_ticks');
@@ -294,8 +301,8 @@ function migrateState(version, s) {
   // v2.0: dual-game context and collectibles tracker
   if (!s.gameContext) s.gameContext = 'FNV';
   if (!s.collectibles) s.collectibles = [];
-  // C4-fix: campaignMode is a binary RNG flag only ('standard' | 'rng').
-  if (s.campaignMode !== 'rng') s.campaignMode = 'standard';
+  // C4-fix / C11: campaignMode has 3 states: 'standard' | 'rng' (armed) | 'rng-locked' (activated by wipe).
+  if (s.campaignMode !== 'rng' && s.campaignMode !== 'rng-locked') s.campaignMode = 'standard';
   // C5: playthroughType — migrate from legacy localStorage key if not yet in state.
   // Transfer preserves the player's existing campaign intent on upgrade.
   if (!s.playthroughType) {

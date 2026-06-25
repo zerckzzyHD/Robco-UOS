@@ -246,7 +246,7 @@
                   value="1"
                   min="1"
                   style="width: 40px"
-                  oninput="updateMath()"
+                  oninput="onLvlInputChanged()"
                 />
                 /
                 <input
@@ -326,17 +326,44 @@
               </datalist>
             </div>
             <div class="input-group">
-              <label>TIME:</label>
-              <div style="display: flex; align-items: center; gap: 5px; flex-wrap: wrap">
-                <span style="font-size: 11px; opacity: 0.7">D</span>
+              <label>DATE:</label>
+              <div style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap">
                 <input
                   type="number"
-                  id="time_day"
-                  value="1"
+                  id="cal_month"
+                  value="10"
                   min="1"
-                  style="width: 38px"
+                  max="12"
+                  style="width: 34px"
+                  title="Month (1-12)"
                   oninput="onTimeInputChanged()"
                 />
+                <span style="font-size: 11px; opacity: 0.5">/</span>
+                <input
+                  type="number"
+                  id="cal_day"
+                  value="19"
+                  min="1"
+                  max="31"
+                  style="width: 34px"
+                  title="Day (1-31)"
+                  oninput="onTimeInputChanged()"
+                />
+                <span style="font-size: 11px; opacity: 0.5">/</span>
+                <input
+                  type="number"
+                  id="cal_year"
+                  value="2281"
+                  min="2270"
+                  style="width: 48px"
+                  title="Year"
+                  oninput="onTimeInputChanged()"
+                />
+              </div>
+            </div>
+            <div class="input-group">
+              <label>TIME:</label>
+              <div style="display: flex; align-items: center; gap: 5px; flex-wrap: wrap">
                 <span style="font-size: 11px; opacity: 0.7">H</span>
                 <input
                   type="number"
@@ -359,6 +386,7 @@
                   oninput="onTimeInputChanged()"
                 />
               </div>
+              <input type="hidden" id="time_day" value="1" />
               <input type="hidden" id="stat_ticks" value="0" />
             </div>
             <div class="input-group">
@@ -1087,10 +1115,12 @@
                 <option value="FNV">Fallout: New Vegas</option>
                 <option value="FO3">Fallout 3</option>
               </select>
+              <!-- fo3WarningBanner: kept for future FO3 status indicator use — not active in v2.0.0
               <div id="fo3WarningBanner" class="fo3-warning-banner" style="display: none">
                 &#9888; FO3 DATA SYSTEMS NOT YET ACTIVE. Narrative and tracking remain in FNV mode
                 until v2.0.0.
               </div>
+              -->
             </div>
 
             <!-- Playstyle -->
@@ -1145,6 +1175,7 @@
                 />
                 COMPLETE RNG
               </label>
+              <!-- Armed: checkbox checked, wipe not yet performed -->
               <div
                 id="rngModeBanner"
                 style="
@@ -1163,6 +1194,24 @@
                 selections will be randomised by the AI when requested. Opt-in only &mdash; wipe
                 terminal and start a new campaign to apply. NEVER retroactively applied to existing
                 saves. Combines freely with any Playthrough Type.
+              </div>
+              <!-- Locked: wipe performed while armed; now permanent -->
+              <div
+                id="rngLockedBanner"
+                style="
+                  display: none;
+                  margin-top: 6px;
+                  padding: 6px 8px;
+                  font-size: 9px;
+                  letter-spacing: 0.5px;
+                  line-height: 1.5;
+                  color: var(--robco-danger);
+                  border: 1px dashed var(--robco-danger);
+                  background: rgba(231, 76, 60, 0.06);
+                "
+              >
+                &#9888; COMPLETE RNG &mdash; PERMANENTLY ACTIVE. This run is locked to full
+                randomisation. Cannot be disabled.
               </div>
             </div>
 

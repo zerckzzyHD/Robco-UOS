@@ -1226,6 +1226,7 @@ body.karma-flash-evil {
 }
 
 /* ── Critical HP Flash ───────────────────────────────────────── */
+/* Fixed for mobile: animates a pseudo-element overlay rather than body background */
 @keyframes crit-hp-flash {
   0% {
     background-color: transparent;
@@ -1237,7 +1238,15 @@ body.karma-flash-evil {
     background-color: transparent;
   }
 }
-body.crit-hp-flash {
+body.crit-hp-flash::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 9999;
   animation: crit-hp-flash 0.7s ease-out;
 }
 

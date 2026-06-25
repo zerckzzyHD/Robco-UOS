@@ -20,9 +20,12 @@ function getSystemDirective() {
   };
   const playthroughStr = _playthroughDirectives[_playthroughType] || '';
 
-  const _rng = (state && state.campaignMode) === 'rng';
+  const _rng =
+    (state && state.campaignMode) === 'rng' || (state && state.campaignMode) === 'rng-locked';
+  const lockedModifier =
+    (state && state.campaignMode) === 'rng-locked' ? ' [LOCKED: PERMANENTLY ACTIVE]' : '';
   const rngStr = _rng
-    ? 'COMPLETE RNG MODE ACTIVE: You MUST randomise ALL character build decisions — SPECIAL allocation, trait selection (pick 2 random traits), tag skill picks (3 random), skill point distribution on level-up (random across all skills), perk selection on level-up (random eligible perk). Do not optimise. Do not suggest alternatives. The player opted into this at campaign start. MUST NOT be applied to existing saves without a new wipe.'
+    ? `COMPLETE RNG MODE ACTIVE${lockedModifier}: You MUST randomise ALL character build decisions — SPECIAL allocation, trait selection (pick 2 random traits), tag skill picks (3 random), skill point distribution on level-up (random across all skills), perk selection on level-up (random eligible perk). Do not optimise. Do not suggest alternatives. The player opted into this at campaign start. MUST NOT be applied to existing saves without a new wipe.`
     : '';
 
   // Combine: both strings may be active simultaneously (e.g. Completionist + RNG)
@@ -612,12 +615,13 @@ function autoImportState(jsonString) {
       );
     }
 
-    // ── CAMPAIGN MODE (C4-fix) ───────────────────────────────────
+    // ── CAMPAIGN MODE (C4-fix / C11) ───────────────────────────────────
     // Read-only import — player sets this in CAMPG via checkbox; AI never writes it.
-    // Binary guard: only 'rng' is a meaningful non-default value.
+    // Guard: only 'rng' and 'rng-locked' are meaningful non-default values.
     const cmV = _g(parsed, 'campaignMode');
-    if (cmV === 'rng') state.campaignMode = 'rng';
-    else if (cmV === 'standard') state.campaignMode = 'standard';
+    if (cmV === 'rng-locked') state.campaignMode = 'rng-locked';
+    else if (cmV === 'rng') state.campaignMode = 'rng';
+    else state.campaignMode = 'standard';
 
     // ── PLAYTHROUGH TYPE (C5) ────────────────────────────────────
     // Read-only import — player sets this in CAMPG via dropdown; AI never writes it.
