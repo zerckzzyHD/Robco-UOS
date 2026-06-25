@@ -1,4 +1,4 @@
-## [v2.0.0] — The Universal Fallout Companion OS<!-- Date: 2026-06-25 | Tests: 206/206 | Cache: robco-terminal-v2.0.0-r11 -->
+## [v2.0.0] — The Universal Fallout Companion OS<!-- Date: 2026-06-25 | Tests: 206/206 | Cache: robco-terminal-v2.0.0-r12 -->
 
 ### [C11] UX / Density Improvements & State Management Updates (2026-06-25)
 
@@ -12,6 +12,7 @@
 - **Faction Registration**: Moved `B.O.S.`, `Boomers`, and `Great Khans` from `major` to `minor` tier in the FNV registry to fit correctly in the UI.
 - **Wipe Terminal Sync Fix**: Re-ordered the `wipeTerminal()` execution flow so the DOM is fully reset _before_ `syncStateFromDom()` runs, fixing a bug where wiped state was immediately overwritten by dirty inputs.
 - **Date Calendar Fix**: Rewired `onTimeInputChanged()` to correctly target the new `cal_month`/`cal_day`/`cal_year` inputs instead of the legacy `time_day` field, making the calendar fully editable.
+- **XP Curve Math Fix**: Replaced the incorrect quadratic XP formula (`25L^2 + 125L - 150`) with the actual vanilla Fallout 3 / New Vegas engine formula (`75L^2 - 25L - 50`), fixing inaccurate XP thresholds across all levels (e.g. Level 3 is now correctly 550 XP instead of 450).
 
 ### [C9/C10] FO3 AI Context Integration (2026-06-24)
 

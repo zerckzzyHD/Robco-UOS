@@ -1120,8 +1120,8 @@ function setupXpBarInteraction() {
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const pct = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
     const lvl = Math.max(1, parseInt(document.getElementById('stat_lvl').value) || 1);
-    const xpCur = lvl <= 1 ? 0 : 25 * (lvl * lvl) + 125 * lvl - 150;
-    const xpNext = 25 * ((lvl + 1) * (lvl + 1)) + 125 * (lvl + 1) - 150;
+    const xpCur = lvl <= 1 ? 0 : 75 * (lvl * lvl) - 25 * lvl - 50;
+    const xpNext = 75 * ((lvl + 1) * (lvl + 1)) - 25 * (lvl + 1) - 50;
     const newXp = Math.round(xpCur + pct * (xpNext - xpCur - 1));
     document.getElementById('stat_xp').value = newXp;
     state.xp = newXp;
@@ -1163,7 +1163,7 @@ function setupXpBarInteraction() {
 // auto-set XP to the minimum XP required for that level (xpCur).
 function onLvlInputChanged() {
   const lvl = Math.max(1, parseInt(document.getElementById('stat_lvl').value) || 1);
-  const xpCur = lvl <= 1 ? 0 : 25 * (lvl * lvl) + 125 * lvl - 150;
+  const xpCur = lvl <= 1 ? 0 : 75 * (lvl * lvl) - 25 * lvl - 50;
   document.getElementById('stat_xp').value = xpCur;
   state.lvl = lvl;
   state.xp = xpCur;
@@ -1885,8 +1885,8 @@ function updateMath() {
   if (xpFill) {
     let lvl = Math.max(1, parseInt(document.getElementById('stat_lvl').value) || 1);
     let xp = parseInt(document.getElementById('stat_xp').value) || 0;
-    let xpCur = lvl <= 1 ? 0 : 25 * (lvl * lvl) + 125 * lvl - 150;
-    let xpNext = 25 * ((lvl + 1) * (lvl + 1)) + 125 * (lvl + 1) - 150;
+    let xpCur = lvl <= 1 ? 0 : 75 * (lvl * lvl) - 25 * lvl - 50;
+    let xpNext = 75 * ((lvl + 1) * (lvl + 1)) - 25 * (lvl + 1) - 50;
     let pct = lvl >= 50 ? 100 : Math.min(100, Math.max(0, ((xp - xpCur) / (xpNext - xpCur)) * 100));
     xpFill.style.width = pct + '%';
   }
