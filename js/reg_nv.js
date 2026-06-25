@@ -891,7 +891,7 @@ const FALLOUT_REGISTRY = {
       name: 'Bitter Springs',
       gridRow: 1,
       gridCol: 2,
-      locations: ['Bitter Springs', 'Coyote Mines', 'Ranger Station Foxtrot'],
+      locations: ['Bitter Springs', 'Coyote Mines', 'Coyote Hole'],
     },
     {
       name: 'Camp Golf',
@@ -909,13 +909,13 @@ const FALLOUT_REGISTRY = {
       name: 'Hoover Dam',
       gridRow: 1,
       gridCol: 5,
-      locations: ['Hoover Dam', 'Hoover Dam Visitor Center', 'Camp Golf South'],
+      locations: ['Hoover Dam', 'Hoover Dam Visitor Center', "Legate's Camp"],
     },
     {
       name: 'Camp Forlorn Hope',
       gridRow: 1,
       gridCol: 6,
-      locations: ['Camp Forlorn Hope', 'Nelson', 'Cottonwood Cove'],
+      locations: ['Camp Forlorn Hope', 'Nelson', 'Techatticup Mine'],
     },
     // Row 2 — Upper middle
     {
@@ -928,7 +928,7 @@ const FALLOUT_REGISTRY = {
       name: 'Hidden Valley',
       gridRow: 2,
       gridCol: 2,
-      locations: ['Hidden Valley Bunker', 'Black Mountain', 'REPCONN Test Site'],
+      locations: ['Hidden Valley Bunker', 'Black Mountain', 'Broadcast Tower KMK'],
     },
     {
       name: 'North Vegas',
@@ -971,7 +971,7 @@ const FALLOUT_REGISTRY = {
       name: 'East Vegas',
       gridRow: 3,
       gridCol: 3,
-      locations: ['East Vegas', 'North Gate', 'Camp McCarran', 'Gun Runners'],
+      locations: ['East Vegas', 'North Gate', 'Gun Runners', 'Followers Outpost'],
     },
     {
       name: 'Camp McCarran',
@@ -1026,7 +1026,7 @@ const FALLOUT_REGISTRY = {
       name: 'Ranger Station Alpha',
       gridRow: 4,
       gridCol: 6,
-      locations: ['Ranger Station Alpha', 'Ivanpah Dry Lake', 'Mojave Outpost'],
+      locations: ['Ranger Station Alpha', 'Ivanpah Dry Lake', 'Primm Pass'],
     },
     // Row 5 — Southern mid
     {
@@ -1045,7 +1045,7 @@ const FALLOUT_REGISTRY = {
       name: 'Crescent Canyon',
       gridRow: 5,
       gridCol: 3,
-      locations: ['Crescent Canyon', 'Crescent Canyon West', 'Test Site', 'Nevada Test Site'],
+      locations: ['Crescent Canyon', 'Crescent Canyon West', 'Searchlight Brahmin Pen'],
     },
     {
       name: 'Ranger Station Foxtrot',
@@ -1070,7 +1070,7 @@ const FALLOUT_REGISTRY = {
       name: 'Vault 11',
       gridRow: 6,
       gridCol: 1,
-      locations: ['Vault 11', 'Vault 19', 'Canyon Wreckage'],
+      locations: ['Vault 11', 'Canyon Wreckage', 'Calville Bay'],
     },
     {
       name: 'Searchlight Airport',
@@ -1079,16 +1079,16 @@ const FALLOUT_REGISTRY = {
       locations: ['Searchlight Airport', 'Campo Mine', "Field's Shack"],
     },
     {
-      name: 'Jacobstown South',
+      name: 'Mount Charleston',
       gridRow: 6,
       gridCol: 3,
-      locations: ['Jacobstown', 'Mount Charleston', 'Charleston Cave South'],
+      locations: ['Mount Charleston', 'Charleston Cave South', 'Ranger Station Foxtrot South'],
     },
     {
       name: 'Nelson',
       gridRow: 6,
       gridCol: 4,
-      locations: ['Nelson', 'Dead Wind Cavern South', 'Techatticup Mine'],
+      locations: ['Nelson', 'Dead Wind Cavern', 'Cottonwood Cove'],
     },
     {
       name: 'Bitter Lake',

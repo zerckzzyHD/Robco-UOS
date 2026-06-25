@@ -14,6 +14,9 @@ const AudioSettings = {
   bootDrone: localStorage.getItem('robco_bootdrone_muted') === 'true', // H4-bonus: boot drone
   levelUp: localStorage.getItem('robco_levelup_muted') === 'true', // H3: level up jingle
   heartbeat: localStorage.getItem('robco_heartbeat_muted') === 'true', // H4: low health heartbeat
+  questComplete: localStorage.getItem('robco_questcomplete_muted') === 'true', // quest complete chime
+  questFail: localStorage.getItem('robco_questfail_muted') === 'true', // quest fail tone
+  factionThreshold: localStorage.getItem('robco_factionthreshold_muted') === 'true', // faction standing alert
   masterMute: localStorage.getItem('robco_master_muted') === 'true',
 };
 
@@ -554,6 +557,18 @@ window.onload = function () {
     let el = document.getElementById('muteWakeToggle');
     if (el) el.checked = true;
   }
+  if (localStorage.getItem('robco_questcomplete_muted') === 'true') {
+    let el = document.getElementById('muteQuestCompleteToggle');
+    if (el) el.checked = true;
+  }
+  if (localStorage.getItem('robco_questfail_muted') === 'true') {
+    let el = document.getElementById('muteQuestFailToggle');
+    if (el) el.checked = true;
+  }
+  if (localStorage.getItem('robco_factionthreshold_muted') === 'true') {
+    let el = document.getElementById('muteFactionThresholdToggle');
+    if (el) el.checked = true;
+  }
   // Master mute restore
   if (localStorage.getItem('robco_master_muted') === 'true') {
     let el = document.getElementById('masterMuteToggle');
@@ -695,15 +710,44 @@ window.onload = function () {
       const companionNames =
         state.squad && state.squad.length > 0 ? state.squad.map(m => m.name).join(', ') : 'None';
       const limbStatus = ['la', 'ra', 'll', 'rl', 'hd'].filter(l => state[l] === 'CRIPPLED');
-      const briefing = [
-        `> LOC: ${state.loc} | ${formatGameTime(state.ticks)} | HP: ${state.hpCur}/${state.hpMax}`,
+
+      // Active quests (in-progress only, max 3 shown)
+      const activeQuests = (state.quests || [])
+        .filter(q => q.status === 'IN PROGRESS' || q.status === 'ACTIVE')
+        .slice(0, 3)
+        .map(q => `    [ACTIVE] ${q.name}`);
+
+      // Faction standings at extremes (Idolized / Vilified)
+      const extremeFactions = Object.entries(state.factions || {})
+        .filter(([, f]) => {
+          const rep = typeof f === 'object' ? f.rep || 0 : 0;
+          return Math.abs(rep) >= 75;
+        })
+        .map(([name, f]) => {
+          const rep = typeof f === 'object' ? f.rep || 0 : 0;
+          return `    ${name.toUpperCase()}: ${rep >= 75 ? 'IDOLIZED' : 'VILIFIED'}`;
+        })
+        .slice(0, 3);
+
+      // Expiring chems (ticks 1–2)
+      const expiringChems = (state.status || [])
+        .filter(eff => eff.type === 'BUFF' && (eff.ticks || 0) > 0 && (eff.ticks || 0) <= 2)
+        .map(eff => `    ⚠ ${eff.name.toUpperCase()} EXPIRING [${eff.ticks}T]`);
+
+      const briefingLines = [
+        '> ── SESSION RESUMED ─────────────────────────────────────────',
+        `> LOC: ${state.loc || 'UNKNOWN'} | ${formatGameTime(state.ticks)} | HP: ${state.hpCur}/${state.hpMax}`,
         `> CAPS: ${state.caps} | RADS: ${state.rads} | SQUAD: ${companionNames}`,
-        limbStatus.length > 0 ? `> ⚠ CRIPPLED: ${limbStatus.join(', ').toUpperCase()}` : null,
-        lastNote ? `> LAST NOTE: ${lastNote}` : null,
+        limbStatus.length > 0 ? `> CRIPPLED LIMBS: ${limbStatus.join(', ').toUpperCase()}` : null,
+        activeQuests.length > 0 ? `> ACTIVE OBJECTIVES:\n${activeQuests.join('\n')}` : null,
+        extremeFactions.length > 0 ? `> FACTION ALERTS:\n${extremeFactions.join('\n')}` : null,
+        expiringChems.length > 0 ? `> CHEM WARNINGS:\n${expiringChems.join('\n')}` : null,
+        lastNote ? `> LAST LOG: ${lastNote}` : null,
+        '> ─────────────────────────────────────────────────────────────',
       ]
         .filter(Boolean)
         .join('\n');
-      appendToChat(briefing, 'sys', true);
+      appendToChat(briefingLines, 'sys', true);
     }
 
     if (window._lastStateBeforeSync || localStorage.getItem('robco_backup')) {
@@ -817,6 +861,9 @@ function toggleAudio(key, isMuted) {
     robco_bootdrone_muted: 'bootDrone', // boot bonus
     robco_levelup_muted: 'levelUp', // H3
     robco_heartbeat_muted: 'heartbeat', // H4
+    robco_questcomplete_muted: 'questComplete', // quest complete chime
+    robco_questfail_muted: 'questFail', // quest fail tone
+    robco_factionthreshold_muted: 'factionThreshold', // faction standing alert
   };
   if (keyMap[key] !== undefined) AudioSettings[keyMap[key]] = isMuted;
 
@@ -880,6 +927,72 @@ function toggleMasterMute(isMuted) {
       crtHumGain.gain.linearRampToValueAtTime(0.007, audioCtx.currentTime + 0.3);
     }
   }
+}
+
+// ── QUEST COMPLETE CHIME ────────────────────────────────────
+// Rising two-note major chord (C5 → E5 → G5), synth arpeggio, ~0.5s decay.
+// Fired from autoImportState() when a quest transitions to COMPLETED.
+function playQuestCompleteSound() {
+  if (AudioSettings.masterMute) return;
+  if (AudioSettings.questComplete) return;
+  ensureAudioCtx();
+  const now = audioCtx.currentTime;
+  [523.25, 659.25, 783.99].forEach((freq, i) => {
+    const osc = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, now + i * 0.08);
+    g.gain.setValueAtTime(0, now + i * 0.08);
+    g.gain.linearRampToValueAtTime(0.09, now + i * 0.08 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.08 + 0.45);
+    osc.connect(g);
+    g.connect(audioCtx.destination);
+    osc.start(now + i * 0.08);
+    osc.stop(now + i * 0.08 + 0.5);
+  });
+}
+
+// ── QUEST FAIL TONE ─────────────────────────────────────────
+// Descending minor third (E4 → C4), sawtooth, short stinger.
+// Fired from autoImportState() when a quest transitions to FAILED.
+function playQuestFailSound() {
+  if (AudioSettings.masterMute) return;
+  if (AudioSettings.questFail) return;
+  ensureAudioCtx();
+  const now = audioCtx.currentTime;
+  [329.63, 261.63].forEach((freq, i) => {
+    const osc = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(freq, now + i * 0.12);
+    g.gain.setValueAtTime(0.07, now + i * 0.12);
+    g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.12 + 0.35);
+    osc.connect(g);
+    g.connect(audioCtx.destination);
+    osc.start(now + i * 0.12);
+    osc.stop(now + i * 0.12 + 0.4);
+  });
+}
+
+// ── FACTION THRESHOLD TONE ──────────────────────────────────
+// Single sustained square-wave beep tuned to signify a faction standing
+// reaching Idolized (high G5) or Vilified (low A2).
+// Fired from autoImportState() at faction consequence threshold crossings.
+function playFactionThresholdSound(isIdolized) {
+  if (AudioSettings.masterMute) return;
+  if (AudioSettings.factionThreshold) return;
+  ensureAudioCtx();
+  const now = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  osc.type = 'square';
+  osc.frequency.setValueAtTime(isIdolized ? 783.99 : 110, now);
+  g.gain.setValueAtTime(0.055, now);
+  g.gain.exponentialRampToValueAtTime(0.001, now + (isIdolized ? 0.6 : 0.8));
+  osc.connect(g);
+  g.connect(audioCtx.destination);
+  osc.start(now);
+  osc.stop(now + (isIdolized ? 0.65 : 0.85));
 }
 
 // ── H1: ROTARY DIAL CLICK ───────────────────────────────────
@@ -1745,6 +1858,7 @@ function loadUI() {
   renderGameDate();
   renderWorldMap(); // G6: Regional Zone Map
   renderKarmaCenter(); // G4: FO3 Karma Center
+  renderCampaignStatus(); // v2.0.1: Campaign Status + Crossroads Record
   _updateContextPanels(); // G4: switch faction/karma panel visibility
   // C5/C11: Restore CAMPG dropdowns from state
   {
@@ -1836,9 +1950,15 @@ function onTimeInputChanged() {
   saveState();
 }
 
-// ── KARMA / HP change tracking (for flash effects) ────────────
+// ── KARMA / HP / contextual-message gate variables ────────────
 let _lastKarma = null,
   _lastHpPct = null;
+
+// Contextual terminal message gate variables
+// Each tracks the last-emitted threshold so we only fire once per crossing.
+let _lastRadThreshold = 0; // 0 / 200 / 400 / 600 / 1000
+let _lastGameHourBand = -1; // 0=night(20-5), 1=morning(6-11), 2=day(12-18), 3=evening(19)
+let _lastChemExpiry = new Set(); // names of chems we've already warned about
 
 function updateMath() {
   let maxAp = 65 + state.a * 3;
@@ -1972,6 +2092,75 @@ function updateMath() {
 
   // Notification Badges (#13) — update panel summary badges after all renders
   _updatePanelBadges();
+
+  // ── CONTEXTUAL TERMINAL MESSAGES ────────────────────────────────
+  // These fire once per threshold crossing so the terminal gives situational
+  // feedback without spamming. Gate variables ensure single-fire per state.
+  {
+    // Radiation threshold crossing messages
+    const curRads = parseInt((document.getElementById('stat_rads') || {}).value) || 0;
+    const radThreshold =
+      curRads >= 1000
+        ? 1000
+        : curRads >= 600
+          ? 600
+          : curRads >= 400
+            ? 400
+            : curRads >= 200
+              ? 200
+              : 0;
+    if (radThreshold !== _lastRadThreshold) {
+      if (radThreshold > _lastRadThreshold) {
+        // Escalating
+        const radMsgs = {
+          200: '> RADIATION DETECTED. GEIGER COUNTER ACTIVE. SEEK DECONTAMINATION.',
+          400: '> RAD LEVEL ELEVATED. HP DEGRADATION RISK. RADAWAY RECOMMENDED.',
+          600: '> CRITICAL IRRADIATION. SEEK IMMEDIATE TREATMENT.',
+          1000: '> FATAL RADIATION EXPOSURE. SURVIVAL PROBABILITY: NEGLIGIBLE.',
+        };
+        if (radMsgs[radThreshold]) appendToChat(radMsgs[radThreshold], 'sys', true);
+      } else if (radThreshold < _lastRadThreshold && _lastRadThreshold > 0) {
+        // De-escalating
+        appendToChat('> RADIATION LEVELS DECLINING. DECONTAMINATION IN PROGRESS.', 'sys', true);
+      }
+      _lastRadThreshold = radThreshold;
+    }
+
+    // Time-of-day transition messages (fires once per band change)
+    const gameHr = Math.floor(((state.ticks || 0) % 240) / 10);
+    const hourBand = gameHr >= 20 || gameHr < 6 ? 0 : gameHr < 12 ? 1 : gameHr < 19 ? 2 : 3;
+    if (_lastGameHourBand !== -1 && hourBand !== _lastGameHourBand) {
+      const bandMsgs = [
+        '> NIGHT CYCLE. CURFEW IN EFFECT. TRAVEL WITH CAUTION.',
+        '> DAWN DETECTED. AMBIENT TEMPERATURE RISING.',
+        '> MIDDAY. VISIBILITY OPTIMAL.',
+        '> DUSK. PREPARE FOR NIGHT CYCLE.',
+      ];
+      appendToChat(bandMsgs[hourBand], 'sys', true);
+    }
+    _lastGameHourBand = hourBand;
+
+    // Expiring chem warnings (ticks 1–2, fire once per chem name)
+    if (state.status && state.status.length > 0) {
+      state.status.forEach(eff => {
+        if (eff.type === 'BUFF' && (eff.ticks || 0) > 0 && (eff.ticks || 0) <= 2) {
+          const key = (eff.name || '').toLowerCase();
+          if (!_lastChemExpiry.has(key)) {
+            _lastChemExpiry.add(key);
+            appendToChat(
+              `> CHEM WARNING: ${(eff.name || 'UNKNOWN').toUpperCase()} WEARING OFF. [${eff.ticks}T REMAINING]`,
+              'sys',
+              true
+            );
+          }
+        } else {
+          // Reset if ticks went up (new dose) or effect removed
+          const key = (eff.name || '').toLowerCase();
+          if ((eff.ticks || 0) > 2) _lastChemExpiry.delete(key);
+        }
+      });
+    }
+  }
 
   saveState();
 }
@@ -2410,14 +2599,25 @@ function renderStatus() {
   }
   statusDiv.innerHTML = state.status
     .map((eff, i) => {
+      const ticks = eff.ticks || 0;
       let typeClass =
         eff.type === 'BUFF'
           ? 'effect-buff'
           : eff.type === 'DEBUFF'
             ? 'effect-debuff'
             : 'effect-neutral';
-      let tickInfo = eff.ticks > 0 ? ` [${eff.ticks}t]` : '';
-      return `<div class="effect-item"><span class="${typeClass}">${escapeHtml(eff.name || '')}${tickInfo}</span><div><span class="effect-type" style="margin-right:8px;">${escapeHtml(eff.type || 'BUFF')}</span><button class="delete-btn" onclick="removeStatusEffect(${i})">X</button></div></div>`;
+      let tickInfo = ticks > 0 ? ` [${ticks}t]` : '';
+      // Expiry warning: 1–2 ticks remaining on a timed effect
+      let expiryBadge = '';
+      let itemCls = 'effect-item';
+      if (ticks > 0 && ticks <= 2) {
+        itemCls += ' effect-item--expiring';
+        expiryBadge = `<span class="effect-expiring-badge">[EXPIRING]</span>`;
+      } else if (ticks === 0 && eff.type !== 'NEUTRAL') {
+        // permanent effects get a subtle marker
+        tickInfo = ' [∞]';
+      }
+      return `<div class="${itemCls}"><span class="${typeClass}">${escapeHtml(eff.name || '')}${tickInfo}${expiryBadge}</span><div><span class="effect-type" style="margin-right:8px;">${escapeHtml(eff.type || 'BUFF')}</span><button class="delete-btn" onclick="removeStatusEffect(${i})">X</button></div></div>`;
     })
     .join('');
   // G3: Apply chem boost highlights to Skill Matrix rows
@@ -2713,12 +2913,106 @@ function addCampaignNote() {
   loadUI();
 }
 
+// ── CAMPAIGN STATUS PANEL (v2.0.1) ───────────────────────────────
+// Reads existing state fields — no new state fields, no Protocol 4 required.
+// Displays: quest summary, top faction standings, active effects, and campaign notes count.
+// Crossroads Record tab reads campaign_notes for auto-logged quest/faction events.
+function renderCampaignStatus() {
+  const display = document.getElementById('campaignStatusDisplay');
+  const crossroads = document.getElementById('crossroadsDisplay');
+
+  // ── Campaign Status ──────────────────────────────────────
+  if (display) {
+    const quests = state.quests || [];
+    const completed = quests.filter(
+      q => q.status === 'completed' || q.status === 'complete'
+    ).length;
+    const active = quests.filter(q => q.status === 'in progress' || q.status === 'active').length;
+    const failed = quests.filter(q => q.status === 'failed').length;
+    const total = quests.length;
+
+    // Top 3 faction standings by absolute net rep
+    const factions = state.factions || {};
+    const factionReg = typeof getFactionRegistry === 'function' ? getFactionRegistry() : [];
+    const topFactions = factionReg
+      .map(f => {
+        const data = factions[f.key] || { fame: 0, infamy: 0 };
+        const s =
+          typeof getFactionStanding === 'function'
+            ? getFactionStanding(f.key, data.fame || 0, data.infamy || 0)
+            : { label: 'NEUTRAL', color: 'var(--robco-green)' };
+        return { name: f.name, label: s.label, color: s.color };
+      })
+      .filter(f => f.label !== 'Neutral' && f.label !== 'NEUTRAL')
+      .slice(0, 4);
+
+    // Active effects summary
+    const activeEffects = (state.status || []).length;
+    const expiringEffects = (state.status || []).filter(
+      e => (e.ticks || 0) > 0 && (e.ticks || 0) <= 2
+    ).length;
+
+    // Build the HTML
+    let html = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;">
+      <div class="campg-stat-box">
+        <div class="campg-stat-label">QUESTS</div>
+        <div class="campg-stat-value">${total}</div>
+        <div class="campg-stat-sub">${completed} done · ${active} active · ${failed} failed</div>
+      </div>
+      <div class="campg-stat-box">
+        <div class="campg-stat-label">EFFECTS</div>
+        <div class="campg-stat-value">${activeEffects}</div>
+        <div class="campg-stat-sub">${expiringEffects > 0 ? expiringEffects + ' expiring' : 'none expiring'}</div>
+      </div>
+    </div>`;
+
+    if (topFactions.length > 0) {
+      html += `<div style="margin-bottom:6px;font-size:9px;opacity:0.5;letter-spacing:0.5px;">NOTABLE STANDINGS</div>`;
+      html += `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;">`;
+      topFactions.forEach(f => {
+        html += `<span style="font-size:9px;border:1px dashed rgba(20,253,206,0.25);padding:2px 6px;color:${f.color};">${escapeHtml(f.name.toUpperCase())}: ${f.label}</span>`;
+      });
+      html += `</div>`;
+    } else {
+      html += `<div style="font-size:9px;opacity:0.4;margin-bottom:6px;">[NO NOTABLE FACTION STANDINGS]</div>`;
+    }
+
+    // Recent campaign note count
+    const noteCount = (state.campaign_notes || []).length;
+    html += `<div style="font-size:9px;opacity:0.5;">${noteCount} campaign log entr${noteCount === 1 ? 'y' : 'ies'}</div>`;
+
+    display.innerHTML = html;
+  }
+
+  // ── Crossroads Record ────────────────────────────────────
+  // Reads campaign_notes that were auto-logged by quest/faction transitions.
+  // Auto-logged entries start with [T<ticks>].
+  if (crossroads) {
+    const autoLogs = (state.campaign_notes || [])
+      .filter(n => /^\[T\d+\]/.test(String(n)))
+      .slice(-20) // last 20 events
+      .reverse(); // newest first
+
+    if (autoLogs.length === 0) {
+      crossroads.innerHTML =
+        '<span style="opacity:0.45;">[NO DECISIONS RECORDED — CROSSROADS EVENTS WILL APPEAR HERE]</span>';
+    } else {
+      crossroads.innerHTML = autoLogs
+        .map(
+          note =>
+            `<div style="border-bottom:1px solid rgba(20,253,206,0.1);padding:4px 0;font-size:10px;opacity:0.75;">${escapeHtml(String(note))}</div>`
+        )
+        .join('');
+    }
+  }
+}
+
 // ── G6: REGIONAL ZONE MAP (WORLD MAP) ────────────────────────────
 // Registry-driven 6×6 CSS grid. Markers:
-//   [YOU] — blinking, on zone matching state.loc (fuzzy match against zone.locations[])
-//   [· ] — dimmed, on zones matching locationHistory entries (breadcrumb)
-//   [?] — on zones containing uncollected collectibles (cross-referenced with FALLOUT_REGISTRY)
-// Terminal-only styling. No color. Brightness only.
+//   CURRENT — bright border, on zone matching state.loc (fuzzy match against zone.locations[])
+//   VISITED — dashed muted border, on zones in locationHistory
+//   [?] pip  — on zones containing uncollected collectibles
+// Compass strip labels orientation. Narrow viewports get a 4×4 core-zone fallback.
 let _mapActiveZone = null;
 
 function zoomMapToZone(zoneName) {
@@ -2729,6 +3023,27 @@ function zoomMapToZone(zoneName) {
 function resetMapZoom() {
   _mapActiveZone = null;
   renderWorldMap();
+}
+
+// Abbreviation map for long zone names in the 6×6 grid display.
+// Full names are always available via the title tooltip.
+const _MAP_ABBREV = {
+  'Ranger Station Foxtrot': 'R.S. Foxtrot',
+  'Ranger Station Alpha': 'R.S. Alpha',
+  'Ranger Station Bravo': 'R.S. Bravo',
+  'Ranger Station Charlie': 'R.S. Charlie',
+  'Ranger Station Delta': 'R.S. Delta',
+  'Ranger Station Echo': 'R.S. Echo',
+  'Camp Forlorn Hope': 'Forlorn Hope',
+  'Camp Searchlight': 'Searchlight',
+  'Camp McCarran': 'McCarran',
+  '188 Trading Post': '188 Post',
+  'Mount Charleston': 'Mt. Charleston',
+  'Searchlight Airport': 'S.L. Airport',
+};
+
+function _mapAbbrev(name) {
+  return _MAP_ABBREV[name] || name;
 }
 
 function renderWorldMap() {
@@ -2753,7 +3068,7 @@ function renderWorldMap() {
 
   const currentLoc = (state.loc || '').toLowerCase();
 
-  // Helper functions
+  // Helper: check if a zone has an uncollected collectible
   function zoneHasUncollectedCollectible(zone) {
     return collectDefs.some(def => {
       const defName = (def.name || '').toLowerCase();
@@ -2772,6 +3087,7 @@ function renderWorldMap() {
     });
   }
 
+  // Helper: fuzzy-match a zone against the current location string
   function zoneFuzzyMatchesLoc(zone, loc) {
     if (!loc) return false;
     const searchIn = [zone.name, ...(zone.locations || [])].map(s => s.toLowerCase());
@@ -2808,7 +3124,7 @@ function renderWorldMap() {
     return false;
   }
 
-  // --- ZOOM LEVEL 2: DETAILED REGIONAL VIEW ---
+  // ── ZOOM LEVEL 2: DETAILED REGIONAL VIEW ─────────────────────────
   if (_mapActiveZone) {
     const activeZone = zones.find(z => z.name === _mapActiveZone);
     if (!activeZone) {
@@ -2817,16 +3133,16 @@ function renderWorldMap() {
     }
 
     let html = `
-      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed rgba(20,253,206,0.3); padding-bottom:4px; margin-bottom:8px;">
-        <button class="action-btn" onclick="resetMapZoom()" style="padding:2px 8px; font-size:10px;">&lt; WORLD GRID</button>
+      <div class="map-detail-header">
+        <button class="action-btn map-back-btn" onclick="resetMapZoom()">&lt; WORLD GRID</button>
         <span style="font-weight:bold; font-size:11px; letter-spacing:1px;">${escapeHtml(activeZone.name).toUpperCase()} REGION</span>
       </div>
-      <div style="max-height:250px; overflow-y:auto; padding-right:4px;">
+      <div class="map-detail-list">
     `;
 
     const locs = activeZone.locations || [];
     if (locs.length === 0) {
-      html += `<div style="opacity:0.5; font-style:italic;">[NO DATA]</div>`;
+      html += `<div style="opacity:0.5; font-style:italic; padding:8px 4px;">[NO DATA]</div>`;
     } else {
       locs.forEach(loc => {
         const isYou = currentLoc && locFuzzyMatchesLoc(loc, currentLoc);
@@ -2834,26 +3150,23 @@ function renderWorldMap() {
         const hasCollectible = locHasUncollectedCollectible(loc);
 
         let statusText = '<span style="opacity:0.4;">[UNKNOWN]</span>';
-        let rowStyle = 'opacity:0.6;';
+        let rowCls = 'map-detail-row';
         if (isYou) {
-          statusText =
-            '<span class="map-you-marker" style="color:var(--robco-green);">[CURRENT]</span>';
-          rowStyle = 'opacity:1.0; font-weight:bold;';
+          statusText = '<span class="map-you-marker">[CURRENT]</span>';
+          rowCls += ' map-detail-row--current';
         } else if (wasVisited) {
           statusText = '<span style="opacity:0.8;">[VISITED]</span>';
-          rowStyle = 'opacity:0.9;';
+          rowCls += ' map-detail-row--visited';
         }
 
-        let collectibleBadge = '';
-        if (hasCollectible) {
-          collectibleBadge =
-            '<span style="margin-left:8px; color:var(--robco-alert); font-size:9px;">[?] COLLECTIBLE DETECTED</span>';
-        }
+        const collectibleBadge = hasCollectible
+          ? `<span class="map-collectible-badge">[?]</span>`
+          : '';
 
         html += `
-          <div style="display:flex; justify-content:space-between; align-items:center; padding:4px; border-bottom:1px solid rgba(20,253,206,0.1); ${rowStyle}">
+          <div class="${rowCls}">
             <span>- ${escapeHtml(loc)}${collectibleBadge}</span>
-            <span style="font-size:9px;">${statusText}</span>
+            <span style="font-size:9px;white-space:nowrap;">${statusText}</span>
           </div>
         `;
       });
@@ -2864,29 +3177,52 @@ function renderWorldMap() {
     return;
   }
 
-  // --- ZOOM LEVEL 1: STRATEGIC WORLD VIEW (6x6) ---
-  const grid = [];
-  for (let r = 1; r <= 6; r++) {
-    grid[r] = [];
-    for (let c = 1; c <= 6; c++) {
-      grid[r][c] = zones.find(z => z.gridRow === r && z.gridCol === c) || null;
-    }
+  // ── ZOOM LEVEL 1: STRATEGIC WORLD VIEW ───────────────────────────
+  // Narrow viewports (< 490px) default to a 4×4 core-zone view (rows 2–5, cols 2–5).
+  // A toggle expands to the full 6×6.
+  const isNarrow = display.offsetWidth > 0 && display.offsetWidth < 490;
+  const showFull = display.dataset.mapFull === '1';
+  const useFull = !isNarrow || showFull;
+
+  const rowMin = useFull ? 1 : 2;
+  const rowMax = useFull ? 6 : 5;
+  const colMin = useFull ? 1 : 2;
+  const colMax = useFull ? 6 : 5;
+  const cols = colMax - colMin + 1;
+
+  // Build zone lookup by grid position
+  const gridMap = {};
+  zones.forEach(z => {
+    gridMap[`${z.gridRow},${z.gridCol}`] = z;
+  });
+
+  // Compass column labels (W → E)
+  const compassCols = [];
+  for (let c = colMin; c <= colMax; c++) {
+    if (c === colMin) compassCols.push('W');
+    else if (c === colMax) compassCols.push('E');
+    else compassCols.push('·');
   }
 
-  let html = `<div style="
-    display:grid;
-    grid-template-columns:repeat(6,1fr);
-    gap:2px;
-    font-size:9px;
-    letter-spacing:0.5px;
-    margin:4px 0;
-  ">`;
+  let html = `<div style="display:grid; grid-template-columns:14px repeat(${cols},1fr); gap:2px; font-size:9px; letter-spacing:0.3px; margin:4px 0;">`;
 
-  for (let r = 1; r <= 6; r++) {
-    for (let c = 1; c <= 6; c++) {
-      const zone = grid[r][c];
+  // Compass header row
+  html += `<div></div>`; // corner spacer
+  compassCols.forEach(lbl => {
+    html += `<div style="text-align:center;font-size:8px;opacity:0.35;line-height:1.4;">${lbl}</div>`;
+  });
+
+  for (let r = rowMin; r <= rowMax; r++) {
+    // Row N/S label
+    let rowLbl = '·';
+    if (r === rowMin) rowLbl = 'N';
+    else if (r === rowMax) rowLbl = 'S';
+    html += `<div style="display:flex;align-items:center;justify-content:center;font-size:8px;opacity:0.35;">${rowLbl}</div>`;
+
+    for (let c = colMin; c <= colMax; c++) {
+      const zone = gridMap[`${r},${c}`] || null;
       if (!zone) {
-        html += `<div style="border:1px solid rgba(20,253,206,0.08); min-width:0; min-height:36px; padding:3px; overflow-x:hidden;"></div>`;
+        html += `<div class="map-cell map-cell--empty"></div>`;
         continue;
       }
 
@@ -2894,38 +3230,30 @@ function renderWorldMap() {
       const wasVisited = zoneVisited(zone);
       const hasUncollected = zoneHasUncollectedCollectible(zone);
 
-      let marker = '';
-      let brightnessStyle = 'opacity:0.35;';
-      if (isYou) {
-        marker = '<span class="map-you-marker">[YOU]</span>';
-        brightnessStyle = 'opacity:1.0;filter:brightness(1.5);';
-      } else if (wasVisited) {
-        marker = '<span style="opacity:0.6;">[·]</span>';
-        brightnessStyle = 'opacity:0.75;';
-      }
-      if (hasUncollected) {
-        marker += '<span style="opacity:0.8;font-size:8px;">[?]</span>';
-      }
+      let cellCls = 'map-cell';
+      if (isYou) cellCls += ' map-cell--current';
+      else if (wasVisited) cellCls += ' map-cell--visited';
 
-      html += `<div class="map-cell" onclick="zoomMapToZone('${escapeHtml(zone.name.replace(/'/g, "\\'"))}')" title="${escapeHtml(zone.name)}" style="
-        min-width:0;
-        min-height:36px;
-        padding:3px;
-        overflow-x:hidden;
-        ${brightnessStyle}
-        display:flex;
-        flex-direction:column;
-        justify-content:space-between;
-      ">
-        <span style="line-height:1.2; display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; text-overflow:ellipsis; overflow-wrap:break-word; hyphens:auto;">${escapeHtml(zone.name)}</span>
-        <span style="font-size:8px;">${marker}</span>
+      const collectiblePip = hasUncollected ? `<span class="map-cell-pip">[?]</span>` : '';
+      const displayName = escapeHtml(_mapAbbrev(zone.name));
+
+      html += `<div class="${cellCls}" onclick="zoomMapToZone('${escapeHtml(zone.name.replace(/'/g, "\\'"))}')" title="${escapeHtml(zone.name)}">
+        <span class="map-cell-name">${displayName}</span>
+        ${collectiblePip}
       </div>`;
     }
   }
 
   html += '</div>';
-  html +=
-    '<div style="font-size:9px;opacity:0.45;margin-top:4px;">[YOU]=CURRENT &nbsp; [·]=VISITED &nbsp; [?]=COLLECTIBLE &nbsp; :: TAP TO ZOOM</div>';
+
+  // Legend + narrow-viewport toggle button
+  const toggleBtn = isNarrow
+    ? showFull
+      ? `<button class="map-toggle-btn" onclick="(function(){document.getElementById('worldMapDisplay').dataset.mapFull='0';renderWorldMap();})()">CORE VIEW</button>`
+      : `<button class="map-toggle-btn" onclick="(function(){document.getElementById('worldMapDisplay').dataset.mapFull='1';renderWorldMap();})()">FULL MAP</button>`
+    : '';
+
+  html += `<div class="map-legend">N=CURRENT &nbsp;·=VISITED &nbsp;[?]=COLLECTIBLE &nbsp;TAP=ZOOM ${toggleBtn}</div>`;
   display.innerHTML = html;
 }
 
@@ -2949,23 +3277,37 @@ function renderFactionRep() {
   const factions = state.factions || {};
 
   // Build faction card with inline [+]/[-] fame/infamy nudges.
-  // Net standing label shown prominently; fame/infamy counts shown below for context.
-  // Buttons adjust by 50 per click — matches the 50-point standing tier boundaries.
+  // Net standing label shown prominently; reputation trend bar and threshold
+  // markers (Vilified/Idolized) give at-a-glance progress context.
+  // Mobile-friendly: buttons have min 28×28px touch targets via CSS class.
   function factionCard(f) {
     const data = factions[f.key] || { fame: 0, infamy: 0 };
     const s = getFactionStanding(f.key, data.fame, data.infamy);
     const famVal = data.fame || 0;
     const infamyVal = data.infamy || 0;
-    const btnStyle =
-      'font-family:inherit;font-size:9px;background:rgba(0,0,0,0.6);border:1px dashed rgba(20,253,206,0.3);color:rgba(20,253,206,0.75);cursor:pointer;padding:1px 3px;line-height:1.4;';
-    return `<div style="display:flex;flex-direction:column;align-items:center;padding:2px;border:1px dashed rgba(20,253,206,0.3);text-align:center;min-width:0;">
-      <span style="font-size:9px;letter-spacing:0.4px;opacity:0.8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%;font-weight:bold;" title="${escapeHtml(f.name)}">${escapeHtml(f.name).toUpperCase()}</span>
-      <span style="font-size:8.5px;opacity:0.75;margin:2px 0;line-height:1.2;"><span style="color:${s.color};font-weight:bold;">${s.label}</span> (F:${famVal}|I:${infamyVal})</span>
-      <div style="display:flex;gap:2px;justify-content:center;">
-        <button style="${btnStyle}" title="Fame +50" onclick="adjustFaction('${f.key}','fame',50)">F+</button>
-        <button style="${btnStyle}" title="Fame -50" onclick="adjustFaction('${f.key}','fame',-50)">F-</button>
-        <button style="${btnStyle}color:var(--robco-danger);border-color:rgba(231,76,60,0.35);" title="Infamy +50" onclick="adjustFaction('${f.key}','infamy',50)">I+</button>
-        <button style="${btnStyle}color:var(--robco-danger);border-color:rgba(231,76,60,0.35);" title="Infamy -50" onclick="adjustFaction('${f.key}','infamy',-50)">I-</button>
+
+    // Net rep for bar: ranges -100 (pure infamy) to +100 (pure fame).
+    // bar fill = fame fraction; threshold markers at ±75 standing.
+    const total = famVal + infamyVal || 1;
+    const netPct = Math.min(100, Math.max(0, (famVal / total) * 100));
+    // Vilified threshold marker = 25% (infamy dominant), Idolized = 75%
+    const barHtml = `
+      <div class="faction-rep-bar-track" title="Fame ${famVal} / Infamy ${infamyVal}">
+        <div class="faction-rep-bar-fill" style="width:${netPct}%;background:${s.color};"></div>
+        <div class="faction-rep-bar-marker" style="left:25%;" title="Vilified threshold"></div>
+        <div class="faction-rep-bar-marker" style="left:75%;" title="Idolized threshold"></div>
+      </div>`;
+
+    return `<div class="faction-card">
+      <span class="faction-card-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name).toUpperCase()}</span>
+      <span class="faction-card-standing" style="color:${s.color};">${s.label}</span>
+      <span class="faction-card-counts">F:${famVal} / I:${infamyVal}</span>
+      ${barHtml}
+      <div class="faction-card-btns">
+        <button class="faction-btn faction-btn--fame" title="Fame +50" onclick="adjustFaction('${f.key}','fame',50)">F+</button>
+        <button class="faction-btn faction-btn--fame" title="Fame -50" onclick="adjustFaction('${f.key}','fame',-50)">F-</button>
+        <button class="faction-btn faction-btn--infamy" title="Infamy +50" onclick="adjustFaction('${f.key}','infamy',50)">I+</button>
+        <button class="faction-btn faction-btn--infamy" title="Infamy -50" onclick="adjustFaction('${f.key}','infamy',-50)">I-</button>
       </div>
     </div>`;
   }
@@ -2979,13 +3321,13 @@ function renderFactionRep() {
   const minorWasOpen = minorDetails ? minorDetails.open : false;
 
   container.innerHTML = `
-    <div style="font-size:9px;opacity:0.45;margin-bottom:4px;letter-spacing:0.5px;">F+/F- = Fame ±50 &nbsp; I+/I- = Infamy ±50</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-top:2px;">
+    <div style="font-size:9px;opacity:0.45;margin-bottom:4px;letter-spacing:0.5px;">F+/F- = Fame ±50 &nbsp; I+/I- = Infamy ±50 &nbsp; BAR = F/(F+I) ratio</div>
+    <div class="faction-grid">
       ${major.map(factionCard).join('')}
     </div>
     <details style="margin-top:6px;">
       <summary style="font-size:11px;letter-spacing:1px;opacity:0.6;cursor:pointer;user-select:none;list-style:none;outline:none;font-family:inherit;padding:2px 0;">[+] MINOR FACTIONS</summary>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-top:5px;">
+      <div class="faction-grid" style="margin-top:5px;">
         ${minor.map(factionCard).join('')}
       </div>
     </details>

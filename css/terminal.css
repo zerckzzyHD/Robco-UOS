@@ -1140,6 +1140,17 @@ body.thermal-load .panel {
 .effect-neutral {
   color: var(--robco-alert);
 }
+.effect-item--expiring {
+  border-bottom-color: rgba(255, 165, 0, 0.45);
+  background: rgba(255, 165, 0, 0.06);
+}
+.effect-expiring-badge {
+  font-size: 9px;
+  color: var(--robco-alert);
+  margin-left: 6px;
+  animation: map-blink 1s step-end infinite;
+  letter-spacing: 0.5px;
+}
 
 /* ── Campaign Notes ──────────────────────────────────────────── */
 .notes-list {
@@ -1184,6 +1195,85 @@ body.thermal-load .panel {
 .faction-standing {
   font-size: 11px;
   font-weight: bold;
+}
+
+/* ── Faction Card (v2.0.1 redesign) ─────────────────────────── */
+.faction-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 3px;
+  border: 1px dashed rgba(20, 253, 206, 0.3);
+  text-align: center;
+  min-width: 0;
+}
+.faction-card-name {
+  font-size: 9px;
+  letter-spacing: 0.4px;
+  font-weight: bold;
+  opacity: 0.85;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+.faction-card-standing {
+  font-size: 9px;
+  font-weight: bold;
+  letter-spacing: 0.3px;
+}
+.faction-card-counts {
+  font-size: 8px;
+  opacity: 0.55;
+}
+/* Fame/Infamy ratio bar */
+.faction-rep-bar-track {
+  position: relative;
+  width: 100%;
+  height: 4px;
+  background: rgba(20, 253, 206, 0.08);
+  border-radius: 2px;
+  margin: 2px 0;
+}
+.faction-rep-bar-fill {
+  height: 4px;
+  border-radius: 2px;
+  transition: width 0.35s ease;
+  min-width: 2px;
+}
+.faction-rep-bar-marker {
+  position: absolute;
+  top: -2px;
+  width: 1px;
+  height: 8px;
+  background: rgba(20, 253, 206, 0.35);
+}
+/* Faction adjustment buttons — mobile-friendly min touch target */
+.faction-card-btns {
+  display: flex;
+  gap: 2px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.faction-btn {
+  font-family: inherit;
+  font-size: 9px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px dashed rgba(20, 253, 206, 0.3);
+  color: rgba(20, 253, 206, 0.8);
+  cursor: pointer;
+  /* min 28×28 touch target for mobile accessibility */
+  min-width: 28px;
+  min-height: 28px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.faction-btn--infamy {
+  color: var(--robco-danger);
+  border-color: rgba(231, 76, 60, 0.35);
 }
 
 /* ── Day/Night Indicator ─────────────────────────────────────── */
@@ -1313,7 +1403,7 @@ body.sync-complete {
   animation: sync-flash 0.4s ease-out;
 }
 
-/* ── USE button in inventory ─────────────────────────────────── */
+/* ── USE button in inventory ────────────────────────── */
 .use-btn {
   background: transparent;
   border: 1px solid var(--robco-green);
@@ -1332,7 +1422,7 @@ body.sync-complete {
   text-shadow: var(--robco-glow);
 }
 
-/* ─── Registry Autocomplete Panel (Phase 3) ──────────────────── */
+/* ─── Registry Autocomplete Panel (Phase 3) ────────────── */
 .autocomplete-panel {
   position: fixed;
   z-index: 8000;
@@ -1390,7 +1480,7 @@ body.sync-complete {
   font-size: 11px;
 }
 
-/* ─── G6: World Map [YOU] Marker ──────────────────────────────── */
+/* ─── G6: World Map [YOU] Marker ─────────────────────── */
 @keyframes map-blink {
   0%,
   49% {
@@ -1405,4 +1495,131 @@ body.sync-complete {
   animation: map-blink 0.8s step-end infinite;
   font-weight: bold;
   letter-spacing: 0;
+}
+
+/* ── Map Cell States (v2.0.1) ──────────────────────────────── */
+.map-cell--current {
+  border: 1px solid var(--robco-green);
+  box-shadow:
+    0 0 6px rgba(20, 253, 206, 0.55),
+    inset 0 0 4px rgba(20, 253, 206, 0.1);
+  background: rgba(20, 253, 206, 0.08);
+}
+.map-cell--visited {
+  border: 1px dashed rgba(20, 253, 206, 0.45);
+  opacity: 0.75;
+}
+.map-cell--empty {
+  border: 1px solid rgba(20, 253, 206, 0.06);
+  opacity: 0.25;
+  pointer-events: none;
+}
+.map-cell-name {
+  display: block;
+  font-size: 8px;
+  letter-spacing: 0.2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  opacity: 0.8;
+}
+.map-cell-pip {
+  display: block;
+  font-size: 9px;
+  color: var(--robco-alert);
+  line-height: 1;
+}
+
+/* ── Zone Detail View (v2.0.1) ─────────────────────────── */
+.map-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  border-bottom: 1px dashed rgba(20, 253, 206, 0.25);
+  padding-bottom: 4px;
+}
+.map-back-btn {
+  font-size: 10px;
+  padding: 2px 8px;
+}
+.map-detail-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.map-detail-row {
+  padding: 3px 0;
+  border-bottom: 1px dashed rgba(20, 253, 206, 0.12);
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.map-detail-row--current {
+  color: var(--robco-green);
+  text-shadow: var(--robco-glow);
+  font-weight: bold;
+}
+.map-detail-row--visited {
+  opacity: 0.65;
+}
+.map-collectible-badge {
+  font-size: 9px;
+  color: var(--robco-alert);
+  margin-left: 3px;
+}
+
+/* ── Map Legend & Toggle (v2.0.1) ───────────────────────── */
+.map-legend {
+  font-size: 9px;
+  opacity: 0.55;
+  letter-spacing: 0.4px;
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.map-toggle-btn {
+  font-family: inherit;
+  font-size: 9px;
+  background: transparent;
+  border: 1px dashed rgba(20, 253, 206, 0.4);
+  color: rgba(20, 253, 206, 0.7);
+  cursor: pointer;
+  padding: 1px 6px;
+  letter-spacing: 0.5px;
+}
+.map-toggle-btn:hover {
+  color: var(--robco-green);
+  border-color: var(--robco-green);
+}
+
+/* ── Campaign Status Panel (v2.0.1) ────────────────────── */
+.campg-stat-box {
+  border: 1px dashed rgba(20, 253, 206, 0.3);
+  padding: 5px 8px;
+  text-align: center;
+}
+.campg-stat-label {
+  font-size: 8px;
+  letter-spacing: 1px;
+  opacity: 0.5;
+  margin-bottom: 2px;
+}
+.campg-stat-value {
+  font-size: 20px;
+  font-weight: bold;
+  line-height: 1;
+}
+.campg-stat-sub {
+  font-size: 8px;
+  opacity: 0.55;
+  margin-top: 2px;
+  letter-spacing: 0.3px;
 }

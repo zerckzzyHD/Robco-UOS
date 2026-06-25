@@ -384,7 +384,7 @@ Key milestones:
 
 </details>
 
-### Current State (v2.0.0)
+### Current State (v2.0.1)
 
 The project is a **production-quality browser application** with:
 
@@ -393,7 +393,7 @@ The project is a **production-quality browser application** with:
 - 14-faction reputation network
 - 13-skill character sheet
 - Full save/load/export/import/cloud sync/undo pipeline
-- 8 procedural audio sources
+- 11 procedural audio sources
 - 6 color themes
 - 3 save slots
 - Installable PWA with offline support

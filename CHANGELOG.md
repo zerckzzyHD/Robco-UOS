@@ -1,3 +1,58 @@
+## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-25 | Tests: 209/209 | Cache: robco-terminal-v2.0.1-r1 -->
+
+### [B1b] Map Readability Overhaul (2026-06-25)
+
+- **Compass Strip**: World map now renders an N/S/E/W compass row and column header above/left of the grid so orientation is always visible.
+- **Cell State CSS**: Three new modifier classes — `.map-cell--current` (bright green border + glow), `.map-cell--visited` (dashed, 75% opacity), `.map-cell--empty` (hairline border, non-interactive) — replace the previous uniform cell style.
+- **Collectible Pip**: Cells with uncollected collectibles show an amber `[?]` pip via `.map-cell-pip`.
+- **Zone Detail Zoom**: Clicking any occupied cell now renders a full Zone Detail view listing every sub-location, flagged with `[CURRENT]`, `[·]` (visited), or `[?]` (collectible present). A `< WORLD GRID` back button returns to the grid.
+- **Mobile 4×4 Fallback**: Narrow viewports (≤ 520 px) automatically collapse to a 4×4 core-zones-only view; a toggle button switches between CORE VIEW and FULL MAP.
+- **Map Legend**: Single-line key `N=CURRENT ·=VISITED [?]=COLLECTIBLE TAP=ZOOM` appended below the grid.
+- **Long-Name Abbreviation**: `_MAP_ABBREV` table maps verbose zone names (e.g. "Ranger Station Foxtrot" → "R.S. Foxtrot") so cells never overflow.
+
+### [B1c] Status Expiry Warning Styling (2026-06-25)
+
+- **Expiring Detection**: `renderStatus()` flags any effect with `1 ≤ ticks ≤ 2` with the CSS class `effect-item--expiring` (amber background) and an inline `[EXPIRING]` badge that blinks via the shared `map-blink` keyframe.
+- **Permanent Effects**: Effects with `ticks === 0` (non-NEUTRAL) now display `[∞]` as the tick info so players know they are indefinite.
+
+### [B2a] Contextual Terminal Messaging + Session Briefing (2026-06-25)
+
+- **Radiation Threshold Crossings**: `updateMath()` fires a one-shot OS message each time rads cross 200 / 400 / 600 / 1000 in either direction. Uses change-detection gate `_lastRadThreshold`.
+- **Time-of-Day Band Transitions**: Messages fire on night → morning → day → evening transitions using `_lastGameHourBand` gate. Flavour text matches each band.
+- **Expiring Chem Warnings**: Single-fire warning posted when any active effect enters the expiry window (ticks ≤ 2). Gate `_lastChemExpiry` (Set) prevents repeat spam.
+- **Enhanced Session Briefing**: Boot message in `loadUI()` now includes up to 3 active quest names, extreme faction standings (Idolized/Vilified), expiring chems, and section dividers — replacing the flat stat dump.
+
+### [B3a] Reputation Trend Visualization + Mobile Fix (2026-06-25)
+
+- **Fame/Infamy Ratio Bar**: Each faction card now renders a `.faction-rep-bar-track` → `.faction-rep-bar-fill` bar showing the fame proportion of total rep. Two `.faction-rep-bar-marker` lines mark the 25% and 75% thresholds.
+- **Touch Target Fix**: `.faction-btn` and `.faction-btn--infamy` now enforce `min-width: 28px; min-height: 28px` to meet mobile tap-target minimums on all faction adjustment buttons.
+
+### [B3b/B3c] Audio — Quest + Faction Threshold Tones (2026-06-25) — Protocol 7
+
+Three new synthesized audio sources added to `ui.js` per Protocol 7 checklist:
+
+- **`playQuestCompleteSound()`** — Rising C5→E5→G5 sine arpeggio (~0.5 s decay). Fired by `autoImportState()` when a quest status transitions to COMPLETED.
+- **`playQuestFailSound()`** — Descending E4→C4 sawtooth stinger (~0.4 s). Fired on FAILED quest transition.
+- **`playFactionThresholdSound(isIdolized)`** — Square-wave single beep: G5 (0.65 s) for Idolized, A2 (0.85 s) for Vilified. Fired at threshold crossings in `autoImportState()`.
+
+All three respect `AudioSettings.masterMute` and their individual mute keys. Checkboxes added to the Audio Systems panel in `index.html`. `toggleAudio()` keyMap and `toggleMasterMute()` restore logic updated.
+
+### [B4] Campaign Status Panel + Crossroads Record (2026-06-25)
+
+- **Campaign Status Panel** (`#campaignStatusPanel`): New `<details class="panel">` block in the CAMPG tab. Rendered by `renderCampaignStatus()`, called from `loadUI()`. Shows a 2-column stat grid (total/completed/active/failed quests; active effects count + expiry count), up to 4 notable faction standings (non-NEUTRAL only), and a campaign log entry count.
+- **Crossroads Record** (`#crossroadsDisplay`): Scrollable list of the last 20 auto-logged `[T<ticks>]` campaign_notes entries, displayed newest-first. Placeholder shown when no decisions have been recorded.
+- **CSS**: `.campg-stat-box`, `.campg-stat-label`, `.campg-stat-value`, `.campg-stat-sub` added to `terminal.css`.
+
+### [B5] [CROSSROADS] Directive Improvement (2026-06-25)
+
+- **Live State Injection**: The `[CROSSROADS]` command handler in `getSystemDirective()` now injects live state at call time — current location, active/completed quest names (up to 5 each), last 5 crossroads log entries, and net fame/infamy deltas for NCR, Legion, and House. Eliminates hallucinated faction data in CROSSROADS output.
+
+### Protocol 2a — Test Count Sync (2026-06-25)
+
+- Test count was already 209/209 (updated in v2.0.0 C5). `RULES.md` had five stale `203` references; corrected to `209`. `CLAUDE.md` synced.
+- `css/terminal.css` recovered from truncation (missing `use-btn`, `autocomplete-panel`, `map-you-marker`, `@keyframes map-blink` restored from git HEAD; new CSS appended).
+- `js/api.js` recovered from truncation (missing `transmitMessage()` `finally` block tail restored from git HEAD).
+
 ## [v2.0.0] — The Universal Fallout Companion OS<!-- Date: 2026-06-25 | Tests: 206/206 | Cache: robco-terminal-v2.0.0-r13 -->
 
 ### [C11] UX / Density Improvements & State Management Updates (2026-06-25)

@@ -1215,6 +1215,62 @@
               </div>
             </div>
 
+            <!-- Campaign Status Panel (v2.0.1) -->
+            <details class="panel" id="campaignStatusPanel" style="margin-bottom: 10px">
+              <summary
+                style="
+                  cursor: pointer;
+                  user-select: none;
+                  list-style: none;
+                  outline: none;
+                  font-size: 12px;
+                  letter-spacing: 1px;
+                  opacity: 0.85;
+                "
+              >
+                [+] CAMPAIGN STATUS
+              </summary>
+              <div
+                id="campaignStatusDisplay"
+                style="margin-top: 8px; font-size: 10px; line-height: 1.7"
+              >
+                <span style="opacity: 0.4">[LOADING...]</span>
+              </div>
+            </details>
+
+            <!-- Crossroads Record (v2.0.1) -->
+            <details style="margin-bottom: 10px">
+              <summary
+                style="
+                  cursor: pointer;
+                  user-select: none;
+                  list-style: none;
+                  outline: none;
+                  font-size: 12px;
+                  letter-spacing: 1px;
+                  opacity: 0.85;
+                "
+              >
+                [+] CROSSROADS RECORD
+              </summary>
+              <div
+                id="crossroadsDisplay"
+                style="
+                  margin-top: 8px;
+                  font-size: 10px;
+                  opacity: 0.75;
+                  line-height: 1.6;
+                  padding-left: 4px;
+                  border-left: 1px dashed var(--robco-green);
+                  min-height: 32px;
+                "
+              >
+                <span style="opacity: 0.45"
+                  >[NO DECISIONS RECORDED — CROSSROADS EVENTS WILL APPEAR HERE]</span
+                >
+              </div>
+            </details>
+
             <!-- Timeline Panel Shell -->
             <details style="margin-bottom: 10px">
               <summary
@@ -1502,6 +1558,45 @@
                     for="muteHeartbeatToggle"
                     style="color: var(--robco-alert); font-size: 12px"
                     >MUTE HEARTBEAT</label
+                  >
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <input
+                    type="checkbox"
+                    id="muteQuestCompleteToggle"
+                    onchange="toggleAudio('robco_questcomplete_muted', this.checked)"
+                    style="width: auto; accent-color: var(--robco-alert)"
+                  />
+                  <label
+                    for="muteQuestCompleteToggle"
+                    style="color: var(--robco-alert); font-size: 12px"
+                    >MUTE QUEST COMPLETE</label
+                  >
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <input
+                    type="checkbox"
+                    id="muteQuestFailToggle"
+                    onchange="toggleAudio('robco_questfail_muted', this.checked)"
+                    style="width: auto; accent-color: var(--robco-alert)"
+                  />
+                  <label
+                    for="muteQuestFailToggle"
+                    style="color: var(--robco-alert); font-size: 12px"
+                    >MUTE QUEST FAIL</label
+                  >
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <input
+                    type="checkbox"
+                    id="muteFactionThresholdToggle"
+                    onchange="toggleAudio('robco_factionthreshold_muted', this.checked)"
+                    style="width: auto; accent-color: var(--robco-alert)"
+                  />
+                  <label
+                    for="muteFactionThresholdToggle"
+                    style="color: var(--robco-alert); font-size: 12px"
+                    >MUTE FACTION ALERTS</label
                   >
                 </div>
                 <!-- #34 Typewriter Speed Control -->
@@ -1896,95 +1991,8 @@
               </div>
             </div>
           </div>
-          <button onclick="transmitMessage()" class="blue-btn" id="transmitBtn">
-            > TRANSMIT PROTOCOL
-          </button>
-          <button
-            onclick="undoLastSync()"
-            class="action-btn"
-            id="undoSyncBtn"
-            style="
-              display: none;
-              border-color: var(--robco-alert);
-              color: var(--robco-alert);
-              font-size: 11px;
-              margin-top: 3px;
-            "
-          >
-            &#x21A9; UNDO LAST SYNC
-          </button>
         </div>
       </div>
     </div>
-
-    <script>
-      (function () {
-        try {
-          var v8 = JSON.parse(localStorage.getItem('robco_v8') || '{}');
-          var v7 = JSON.parse(localStorage.getItem('robco_v7') || '{}');
-          var ctx = v8.activeContext || v7.gameContext || 'FNV';
-          if (ctx === 'FO3') {
-            document.write('<script src="js/db_fo3.js"><\/script>');
-            document.write('<script src="js/state.js"><\/script>');
-            document.write('<script src="js/reg_fo3.js"><\/script>');
-          } else {
-            document.write('<script src="js/db_nv.js"><\/script>');
-            document.write('<script src="js/state.js"><\/script>');
-            document.write('<script src="js/reg_nv.js"><\/script>');
-          }
-        } catch (e) {
-          document.write('<script src="js/db_nv.js"><\/script>');
-          document.write('<script src="js/state.js"><\/script>');
-          document.write('<script src="js/reg_nv.js"><\/script>');
-        }
-      })();
-    </script>
-    <script src="js/ui.js"></script>
-    <script src="js/api.js"></script>
-    <script type="module" src="js/cloud.js"></script>
-
-    <script>
-      // PWA Service Worker Registration & Auto-Update
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js').then(reg => {
-          // Force browser to check for updates every time they open the webapp
-          reg.update();
-          setInterval(
-            () => {
-              reg.update();
-            },
-            60 * 60 * 1000
-          );
-
-          reg.addEventListener('updatefound', () => {
-            const newWorker = reg.installing;
-            newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                // Native alert guarantees the user is notified immediately
-                alert('>> SYSTEM UPDATE AVAILABLE <<\nTap OK to Reboot Terminal.');
-                if (navigator.serviceWorker.controller)
-                  navigator.serviceWorker.ready.then(r => {
-                    if (r.waiting) r.waiting.postMessage({ type: 'SKIP_WAITING' });
-                  });
-              }
-            });
-          });
-        });
-
-        // controllerchange fires when the new SW takes over — this is the
-        // reliable signal to reload, avoiding the old setTimeout race condition.
-        // Guard: only reload if a SW was already controlling when this page loaded.
-        // If there was no previous controller (first install / first visit after
-        // clearing cache), skip the reload — the page already has fresh content
-        // from the network and reloading would cause an infinite boot loop.
-        const hadController = !!navigator.serviceWorker.controller;
-        let refreshing = false;
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-          if (refreshing || !hadController) return;
-          refreshing = true;
-          window.location.reload();
-        });
-      }
-    </script>
   </body>
 </html>

@@ -1,3 +1,4 @@
+/* global playQuestCompleteSound, playQuestFailSound, playFactionThresholdSound */
 // THE MASTER SYSTEM PROMPT (Consolidated BRAIN.md)
 function getSystemDirective() {
   let playstyle = localStorage.getItem('robco_playstyle') || 'any';
@@ -226,7 +227,42 @@ ${
 **Warning Format** (in narrative array):
 "⚠ [SAFETY NET] This action is IRREVERSIBLE. {specific consequence}. Confirm to proceed."
 
-Do not block the action — only warn. The Courier has full agency.`;
+Do not block the action — only warn. The Courier has full agency.
+
+### **[CROSSROADS] Command Handler**
+When the user sends [CROSSROADS], output a modal node with type "TEXT", title "CROSSROADS ANALYSIS", and a structured content array. This is a deterministic analysis of the Courier's current faction/quest state — not creative fiction.
+
+**Content must include these sections in order:**
+
+1. FACTION LOCKOUT STATUS — for each major faction, state whether allying with them is still possible, locked, or at risk. Use the live faction data below.
+2. QUEST BRANCH CLOSURES — list any completed/failed quests that permanently closed alternative paths.
+3. UPCOMING IRREVERSIBLE DECISIONS — based on current quest objectives, identify the next 2-3 decisions that will lock or unlock major paths.
+4. CROSSROADS LOG — reproduce the 5 most recent auto-logged events from the record below.
+
+**Live state at time of [CROSSROADS] call:**
+- Location: ${(state && state.loc) || 'Unknown'}
+- Active quests: ${
+    ((state && state.quests) || [])
+      .filter(q => q.status === 'active' || q.status === 'in progress')
+      .map(q => q.name)
+      .join(', ') || 'None'
+  }
+- Completed quests: ${
+    ((state && state.quests) || [])
+      .filter(q => q.status === 'completed' || q.status === 'complete')
+      .map(q => q.name)
+      .join(', ') || 'None'
+  }
+- Crossroads log (last 5): ${
+    ((state && state.campaign_notes) || [])
+      .filter(n => /^\[T\d+\]/.test(String(n)))
+      .slice(-5)
+      .join(' | ') || 'No events recorded'
+  }
+- Faction net: NCR=${state && state.factions && state.factions.ncr ? (state.factions.ncr.fame || 0) - (state.factions.ncr.infamy || 0) : 0}, Legion=${state && state.factions && state.factions.legion ? (state.factions.legion.fame || 0) - (state.factions.legion.infamy || 0) : 0}, House=${state && state.factions && state.factions.house ? (state.factions.house.fame || 0) - (state.factions.house.infamy || 0) : 0}
+
+Format each section as: ["--- SECTION TITLE ---", "line 1", "line 2", ...]. Keep lines under 55 characters.
+Do not include a state node in the response to [CROSSROADS].`;
 }
 
 async function fetchAuthorizedModels(silent = false) {
@@ -460,7 +496,7 @@ function autoImportState(jsonString) {
         objective: q.objective || null,
         factions: q.factions || null,
       }));
-      // Auto-log quest status changes
+      // Auto-log quest status changes + audio feedback
       state.quests.forEach(curr => {
         const prev = questsBefore.find(bq => bq.name.toLowerCase() === curr.name.toLowerCase());
         if (prev && prev.status !== curr.status) {
@@ -468,6 +504,16 @@ function autoImportState(jsonString) {
           state.campaign_notes.push(
             `[T${state.ticks || 0}] Quest: "${curr.name}" → ${curr.status.toUpperCase()}`
           );
+          // Quest audio — fire appropriate tone on terminal
+          const newStatus = curr.status.toUpperCase();
+          if (
+            (newStatus === 'COMPLETED' || newStatus === 'COMPLETE') &&
+            typeof playQuestCompleteSound === 'function'
+          ) {
+            playQuestCompleteSound();
+          } else if (newStatus === 'FAILED' && typeof playQuestFailSound === 'function') {
+            playQuestFailSound();
+          }
         }
       });
     }
@@ -576,10 +622,12 @@ function autoImportState(jsonString) {
             'sys',
             true
           );
+          if (typeof playFactionThresholdSound === 'function') playFactionThresholdSound(false);
         }
         // Alert on Idolized threshold crossing
         if (prevNet < 750 && curNet >= 750) {
           appendToChat(`> ★ [FACTION ALERT] ${fname}: STATUS ELEVATED TO IDOLIZED.`, 'sys', true);
+          if (typeof playFactionThresholdSound === 'function') playFactionThresholdSound(true);
         }
       });
     }
