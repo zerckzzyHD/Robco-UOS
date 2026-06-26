@@ -2024,43 +2024,48 @@
     <script>
       // PWA Service Worker Registration & Auto-Update
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js').then(reg => {
-          // Force browser to check for updates every time they open the webapp
-          reg.update();
-          setInterval(
-            () => {
-              reg.update();
-            },
-            60 * 60 * 1000
-          );
-
-          reg.addEventListener('updatefound', () => {
-            const newWorker = reg.installing;
-            newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                // Native alert guarantees the user is notified immediately
-                alert('>> SYSTEM UPDATE AVAILABLE <<\nTap OK to Reboot Terminal.');
-                if (navigator.serviceWorker.controller)
-                  navigator.serviceWorker.ready.then(r => {
-                    if (r.waiting) r.waiting.postMessage({ type: 'SKIP_WAITING' });
-                  });
-              }
-            });
-          });
-        });
-
-        // controllerchange fires when the new SW takes over — this is the
-        // reliable signal to reload, avoiding the old setTimeout race condition.
-        // Guard: only reload if a SW was already controlling when this page loaded.
-        // If there was no previous controller (first install / first visit after
-        // clearing cache), skip the reload — the page already has fresh content
-        // from the network and reloading would cause an infinite boot loop.
+        // Capture controller state synchronously at page-load time.
+        // hadController = false on first install (no previous SW) so the
+        // controllerchange that fires when the brand-new SW activates does NOT
+        // trigger a reload (the page already has fresh content from the network).
+        // hadController = true on updates (old SW was controlling) so the
+        // controllerchange after the user accepts the prompt DOES trigger a reload.
         const hadController = !!navigator.serviceWorker.controller;
         let refreshing = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
           if (refreshing || !hadController) return;
           refreshing = true;
           window.location.reload();
+        });
+
+        // Send SKIP_WAITING to the given waiting worker, then wait for
+        // controllerchange (fired when it activates) to reload the page.
+        function _triggerUpdate(worker) {
+          alert('>> SYSTEM UPDATE AVAILABLE <<\nTap OK to Reboot Terminal.');
+          worker.postMessage({ type: 'SKIP_WAITING' });
+        }
+
+        navigator.serviceWorker.register('sw.js').then(reg => {
+          // Force an update check on every page load and hourly thereafter.
+          reg.update();
+          setInterval(() => reg.update(), 60 * 60 * 1000);
+
+          // Case A: new SW already installed and waiting when this page loaded.
+          // This happens when the user had the tab open while the SW downloaded
+          // in the background, or when the prompt was dismissed without reloading.
+          if (reg.waiting && navigator.serviceWorker.controller) {
+            _triggerUpdate(reg.waiting);
+          }
+
+          // Case B: new SW found and reaches 'installed' while this page is open.
+          reg.addEventListener('updatefound', () => {
+            const newWorker = reg.installing;
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                _triggerUpdate(newWorker);
+              }
+            });
+          });
         });
       }
     </script>

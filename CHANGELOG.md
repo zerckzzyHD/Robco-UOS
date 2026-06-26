@@ -1,4 +1,21 @@
-## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-25 | Tests: 209/209 | Cache: robco-terminal-v2.0.1-r5 -->
+## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 209/209 | Cache: robco-terminal-v2.0.1-r6 -->
+
+### [B5] Service Worker Update Flow Fix — users no longer need to clear cache (2026-06-26)
+
+- **Root cause**: `self.skipWaiting()` was called directly inside the `install` event handler in `sw.js`. This caused every new SW to activate immediately upon installation, skipping the "waiting" state entirely. As a result:
+  1. `reg.waiting` was always `null` by the time the alert fired (the SW had already transitioned from `installed` → `activating` → `activated`).
+  2. The `postMessage({ type: 'SKIP_WAITING' })` call in the accept handler was silently dropped (no waiting worker to receive it).
+  3. Without `clients.claim()` (prohibited — causes reload loops), `controllerchange` never fired for the current page.
+  4. `window.location.reload()` never ran. The user saw the alert, tapped OK, and nothing happened.
+- **Fix** (`sw.js`): Removed `self.skipWaiting()` from the `install` handler. The SW now waits in the "waiting" state. `skipWaiting()` is only called from the existing `message` listener when the main thread explicitly sends `{ type: 'SKIP_WAITING' }` after the user accepts the prompt. This makes `reg.waiting` non-null when the accept path runs.
+- **Fix** (`index.html` SW registration block):
+  - Moved `hadController` / `controllerchange` setup to before the `register()` call so the listener is in place before any async resolution.
+  - Added `reg.waiting` check immediately after registration resolves (Case A: SW already installed and waiting on page load — previously unhandled).
+  - Replaced `navigator.serviceWorker.ready.then(r => { if (r.waiting) r.waiting.postMessage(...) })` with a direct `worker.postMessage()` on the worker reference already in hand. The old path went async through `ready`, re-checked `r.waiting` (which was always null), and silently failed.
+  - Extracted `_triggerUpdate(worker)` helper so both Case A and Case B share the same accept path.
+- **Backward compatibility**: Users currently stuck on r4/r5 do **not** need to clear cache one final time. The old registration code in those cached pages already had the `if (r.waiting) r.waiting.postMessage(...)` path — it just never fired because `r.waiting` was always null under the old SW. With r6's SW no longer auto-skipping, `r.waiting` will be the new worker, the message will land, `controllerchange` will fire, and the page will reload automatically. Users on any cached version should auto-update to r6.
+- **From r6 onward**: every future `CACHE_NAME` bump will reliably surface the update prompt and auto-reload on accept.
+- **Cache**: `CACHE_NAME` → `robco-terminal-v2.0.1-r6` (Protocol 1).
 
 ### [B4] Mobile Overflow Fix — ballooned BIO-METRICS inputs (2026-06-25)
 

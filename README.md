@@ -396,7 +396,7 @@ The project is a **production-quality browser application** with:
 - 11 procedural audio sources
 - 6 color themes
 - 3 save slots
-- Installable PWA with offline support
+- Installable PWA with offline support and **reliable auto-update flow** — a `CACHE_NAME` bump now reliably surfaces the "REBOOT TERMINAL" prompt and reloads on accept (fixed: `skipWaiting()` in `install` was silently breaking the accept path)
 - Responsive phone layout — `@media (max-width: 480px)` reflows panels, wraps the boot/header text and tab bar, caps number inputs and shrinks limb buttons, and flexes text inputs so nothing overflows or truncates (verified at 360 px and 412 px)
 - **Fallout Data Registry** — 130 quests · ~110 perks · ~120 locations · 10 companions · ~280 items (all wiki-sourced, CC-BY-SA 4.0)
 - **Registry Autocomplete** — live CRT-styled dropdown on Quest Name, Item Name, and Perk Name inputs (keyboard + click)

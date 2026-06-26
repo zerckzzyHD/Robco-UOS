@@ -3,7 +3,7 @@
 // Changing this string is the ONLY thing that triggers the "REBOOT TERMINAL" update
 // prompt for users who already have the site cached. Forgetting to bump means cached
 // users silently run the old UI until they manually clear their browser cache.
-const CACHE_NAME = 'robco-terminal-v2.0.1-r5';
+const CACHE_NAME = 'robco-terminal-v2.0.1-r6';
 const ASSETS = [
   './',
   './index.html',
@@ -21,9 +21,11 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', event => {
-  // skipWaiting forces this SW to activate immediately instead of waiting
-  // for all tabs running the old SW to close — fixes the "clear cache" requirement.
-  self.skipWaiting();
+  // Do NOT call self.skipWaiting() here. Activating immediately means the SW
+  // never enters the "waiting" state, so reg.waiting is always null when the
+  // update prompt fires and the postMessage(SKIP_WAITING) is silently dropped.
+  // The SW must wait here; skipWaiting() is triggered explicitly by the main
+  // thread via the 'message' listener below once the user accepts the prompt.
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)));
 });
 

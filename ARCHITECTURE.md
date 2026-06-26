@@ -777,6 +777,23 @@ fetches and reload loops.
 **Fix:** Removed `clients.claim()`. The new SW naturally controls the next page load.
 **Lesson:** Never use `clients.claim()` in a cache-first service worker.
 
+### 8. The Silent Update Prompt Bug — `skipWaiting()` in `install` (v2.0.1-r6)
+
+**What happened:** `self.skipWaiting()` was called directly inside the SW `install` handler. The
+new SW activated immediately, skipping the "waiting" state. When the update alert fired and the
+user tapped OK, `reg.waiting` was `null` (SW already activated), so `postMessage(SKIP_WAITING)`
+was silently dropped. Without `clients.claim()`, `controllerchange` never fired for the open
+page, so `window.location.reload()` never ran. Users saw the prompt, tapped OK, and nothing
+happened — they had to manually clear cache.
+**Fix:** Removed `self.skipWaiting()` from `install`. The SW now sits in the "waiting" state
+until the main thread explicitly sends `SKIP_WAITING` (after user accepts the prompt). Also added
+a `reg.waiting` check on registration resolve to handle SWs already waiting at page load, and
+changed the accept handler to call `worker.postMessage()` directly on the known worker reference
+rather than re-querying `navigator.serviceWorker.ready.then(r => r.waiting.postMessage(...))`.
+**Lesson:** Never call `self.skipWaiting()` in `install` when you want user-gated updates. The
+"waiting" state is the mechanism that makes `reg.waiting` non-null and the SKIP_WAITING message
+path reachable. `skipWaiting()` belongs only in the `message` listener.
+
 ---
 
 ## Service Worker Cache Protocol
