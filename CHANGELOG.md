@@ -1,4 +1,4 @@
-## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 425/425 | Cache: robco-terminal-v2.0.1-r38 -->
+## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 429/429 | Cache: robco-terminal-v2.0.1-r39 -->
 
 ### Added
 

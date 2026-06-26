@@ -1315,6 +1315,73 @@ Check ($updateMathBody37.Contains('saveState()') -and $updateMathBody37.Contains
     'updateMath() contains saveState() AND _updatePanelBadges() -- shared-tail invariant intact'
 
 # ===========================================================
+# Suite 38 -- DB<->Registry Weapon Parity (FNV + FO3)
+# Every FALLOUT_REGISTRY weapon-type entry must have an exact-name
+# match in [WEAPONS.CSV], and every WEAPONS.CSV row must have a
+# registry entry. Guards against future drift in either direction.
+# 4 tests
+# ===========================================================
+Sep "Suite 38 -- DB<->Registry Weapon Parity"
+
+function Get-DbWeaponNames($src) {
+    $start = $src.IndexOf('[WEAPONS.CSV]')
+    if ($start -lt 0) { return [System.Collections.Generic.HashSet[string]]::new() }
+    $rest = $src.Substring($start + 13)
+    $endIdx = $rest.IndexOf("`n[")
+    $block = if ($endIdx -ge 0) { $rest.Substring(0, $endIdx) } else { $rest }
+    $names = [System.Collections.Generic.HashSet[string]]::new()
+    foreach ($line in $block -split "`n") {
+        $t = $line.Trim()
+        if (-not $t -or $t.StartsWith('[') -or $t.StartsWith('Weapon_Name')) { continue }
+        # Split on first comma followed by digit (handles names like "Oh, Baby!")
+        $m = [regex]::Match($t, '^(.*?),\d')
+        $name = if ($m.Success) { $m.Groups[1].Value.Trim() } else { ($t -split ',')[0].Trim() }
+        if ($name) { [void]$names.Add($name) }
+    }
+    return $names
+}
+
+function Get-RegWeaponNames($src) {
+    $names = [System.Collections.Generic.HashSet[string]]::new()
+    # Handle both 'name' (no apostrophe) and "name" (contains apostrophe)
+    $sq = [char]39  # single quote
+    $dq = [char]34  # double quote
+    $pat = "\{\s*name\s*:\s*(?:$sq([^$sq]*)$sq|$dq([^$dq]*)$dq)\s*,\s*type\s*:\s*${sq}weapon${sq}\s*\}"
+    $re = [regex]$pat
+    foreach ($m in $re.Matches($src)) {
+        $name = if ($m.Groups[1].Success) { $m.Groups[1].Value } else { $m.Groups[2].Value }
+        [void]$names.Add($name)
+    }
+    return $names
+}
+
+$dbNv38  = Read-Src 'js/db_nv.js'
+$regNv38 = Read-Src 'js/reg_nv.js'
+$dbW38   = Get-DbWeaponNames $dbNv38
+$regW38  = Get-RegWeaponNames $regNv38
+
+# 38.1 FNV: every registry weapon exists in WEAPONS.CSV
+$miss381 = ($regW38 | Where-Object { -not $dbW38.Contains($_) }) -join ', '
+Check ([string]::IsNullOrEmpty($miss381)) "FNV: all registry weapons exist in WEAPONS.CSV (missing: $(if ($miss381) { $miss381 } else { 'none' }))"
+
+# 38.2 FNV: every WEAPONS.CSV row exists in registry
+$miss382 = ($dbW38 | Where-Object { -not $regW38.Contains($_) }) -join ', '
+Check ([string]::IsNullOrEmpty($miss382)) "FNV: all WEAPONS.CSV rows exist in registry (missing: $(if ($miss382) { $miss382 } else { 'none' }))"
+
+$dbFo3_38  = Read-Src 'js/db_fo3.js'
+$regFo3_38 = Read-Src 'js/reg_fo3.js'
+$dbW383    = Get-DbWeaponNames $dbFo3_38
+$regW383   = Get-RegWeaponNames $regFo3_38
+
+# 38.3 FO3: every registry weapon exists in WEAPONS.CSV
+$miss383 = ($regW383 | Where-Object { -not $dbW383.Contains($_) }) -join ', '
+Check ([string]::IsNullOrEmpty($miss383)) "FO3: all registry weapons exist in WEAPONS.CSV (missing: $(if ($miss383) { $miss383 } else { 'none' }))"
+
+# 38.4 FO3: every WEAPONS.CSV row exists in registry
+$miss384 = ($dbW383 | Where-Object { -not $regW383.Contains($_) }) -join ', '
+Check ([string]::IsNullOrEmpty($miss384)) "FO3: all WEAPONS.CSV rows exist in registry (missing: $(if ($miss384) { $miss384 } else { 'none' }))"
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

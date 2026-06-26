@@ -60,11 +60,15 @@ Plunger,4,4,1.0,2.5,1,5,0,1,0.8,10,None,None
 Blackhawk,60,60,2.0,0.9,4,8000,0,4,0,0,None,.44 Magnum
 Alien Blaster,100,200,2.0,1.5,0.5,8000,0,0,0,0,None,Alien Power Cell
 Firelance,90,180,2.0,1.5,2,10000,0,0,0,0,None,Alien Power Cell
-Shishkebab Unique,50,50,2.0,1.5,4,3500,0,5,0.9,35,Fire DoT,None
 Jingwei's Shocksword,20,40,2.0,2.0,4,3000,0,4,0.9,30,EMP,None
 The Mauler,80,80,1.0,1.1,5,4000,75,7,0.7,40,None,None
 O'cta Brain,25,25,1.0,1.3,4,1500,0,5,0.8,30,Knockback,None
 Stabhappy,30,30,2.0,2.5,1,3500,0,0,0.6,25,None,None
+Dart Gun,1,1,1.0,1.5,3,250,0,2,0,0,Cripple Legs,Dart
+Deathclaw Gauntlet,60,60,1.0,1.1,1,5000,75,7,0.7,45,None,None
+Nuka Grenade,500,500,1.0,1.0,1,200,0,0,0,0,Splash,None
+Railway Rifle,20,40,2.0,1.5,15,500,0,5,0,0,None,Railway Spike
+Tin Grenade,50,50,1.0,1.0,0.5,15,0,0,0,0,Splash,None
 
 [AMMO.CSV]
 Caliber,Subtype,DMG_Multiplier,DT_Modifier,Condition_Degradation,Weight_Per_Unit

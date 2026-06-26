@@ -2191,6 +2191,95 @@ header('Render Fan-out (P7-1)');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 38 — DB↔Registry Weapon Parity (FNV + FO3)
+//  Every FALLOUT_REGISTRY weapon-type entry must have an exact-name
+//  match in [WEAPONS.CSV], and every WEAPONS.CSV row must have a
+//  registry entry. Guards against future drift in either direction.
+//  4 tests
+// ══════════════════════════════════════════════════════════════
+header('DB↔Registry Weapon Parity');
+{
+  function getDbWeaponNames(src) {
+    const start = src.indexOf('[WEAPONS.CSV]');
+    if (start === -1) return new Set();
+    const rest = src.substring(start + 13);
+    const endIdx = rest.search(/\n\[/);
+    const block = endIdx === -1 ? rest : rest.substring(0, endIdx);
+    const names = new Set();
+    block.split('\n').forEach(l => {
+      const t = l.trim();
+      if (!t || t.startsWith('[') || t.startsWith('Weapon_Name')) return;
+      // Split on first comma followed by a digit — handles names with commas like "Oh, Baby!"
+      const m = t.match(/^(.*?),\d/);
+      const name = m ? m[1].trim() : t.split(',')[0].trim();
+      if (name) names.add(name);
+    });
+    return names;
+  }
+
+  function getRegWeaponNames(src) {
+    const names = new Set();
+    // Handle both 'name' (no apostrophe) and "name" (contains apostrophe)
+    const re = /\{\s*name\s*:\s*(?:'([^']*)'|"([^"]*)")\s*,\s*type\s*:\s*'weapon'\s*\}/g;
+    let m;
+    while ((m = re.exec(src)) !== null) names.add(m[1] !== undefined ? m[1] : m[2]);
+    return names;
+  }
+
+  // 38.1 FNV: every registry weapon exists in WEAPONS.CSV
+  {
+    const dbNv = readFile('js/db_nv.js');
+    const regNv = readFile('js/reg_nv.js');
+    const dbW = getDbWeaponNames(dbNv);
+    const regW = getRegWeaponNames(regNv);
+    const missing = [...regW].filter(n => !dbW.has(n));
+    assert(
+      missing.length === 0,
+      `FNV: all registry weapons exist in WEAPONS.CSV (missing: ${missing.join(', ') || 'none'})`
+    );
+  }
+
+  // 38.2 FNV: every WEAPONS.CSV row exists in registry
+  {
+    const dbNv = readFile('js/db_nv.js');
+    const regNv = readFile('js/reg_nv.js');
+    const dbW = getDbWeaponNames(dbNv);
+    const regW = getRegWeaponNames(regNv);
+    const missing = [...dbW].filter(n => !regW.has(n));
+    assert(
+      missing.length === 0,
+      `FNV: all WEAPONS.CSV rows exist in registry (missing: ${missing.join(', ') || 'none'})`
+    );
+  }
+
+  // 38.3 FO3: every registry weapon exists in WEAPONS.CSV
+  {
+    const dbFo3 = readFile('js/db_fo3.js');
+    const regFo3 = readFile('js/reg_fo3.js');
+    const dbW = getDbWeaponNames(dbFo3);
+    const regW = getRegWeaponNames(regFo3);
+    const missing = [...regW].filter(n => !dbW.has(n));
+    assert(
+      missing.length === 0,
+      `FO3: all registry weapons exist in WEAPONS.CSV (missing: ${missing.join(', ') || 'none'})`
+    );
+  }
+
+  // 38.4 FO3: every WEAPONS.CSV row exists in registry
+  {
+    const dbFo3 = readFile('js/db_fo3.js');
+    const regFo3 = readFile('js/reg_fo3.js');
+    const dbW = getDbWeaponNames(dbFo3);
+    const regW = getRegWeaponNames(regFo3);
+    const missing = [...dbW].filter(n => !regW.has(n));
+    assert(
+      missing.length === 0,
+      `FO3: all WEAPONS.CSV rows exist in registry (missing: ${missing.join(', ') || 'none'})`
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 console.log('\n══════════════════════════════════════════════════════════════\n');

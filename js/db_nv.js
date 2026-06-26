@@ -38,9 +38,9 @@ Anti-Materiel Rifle,110,110,2.0,0.9,18,15000,0,8,0,0,Armor Piercing,.50 MG
 Pump-Action Shotgun,65,65,1.0,0.9,8,1200,0,4,0,0,None,20 Gauge
 Hunting Shotgun,80,80,1.0,1.0,9,2800,0,5,0,0,None,20 Gauge
 Lever-Action Shotgun,70,70,1.0,0.9,7,2000,0,5,0,0,None,20 Gauge
-9mm SMG,12,12,1.0,5.0,4,3500,0,3,0,0,Full Auto,9mm
-.45 Auto SMG,22,22,1.0,4.0,4,3500,0,5,0,0,Full Auto,.45 Auto
-12.7mm SMG,30,30,1.0,4.0,7,7500,0,6,0,0,Full Auto,12.7mm
+9mm Submachine Gun,12,12,1.0,5.0,4,3500,0,3,0,0,Full Auto,9mm
+.45 Auto Submachine Gun,22,22,1.0,4.0,4,3500,0,5,0,0,Full Auto,.45 Auto
+12.7mm Submachine Gun,30,30,1.0,4.0,7,7500,0,6,0,0,Full Auto,12.7mm
 Minigun,12,12,1.0,8.0,28,22500,0,7,0,0,Full Auto,5mm
 Grenade Launcher,110,110,1.0,0.9,2,2000,0,4,0,0,Splash,40mm Grenade
 Rocket Launcher,200,200,1.0,0.5,15,8000,0,6,0,0,Splash,Missile
@@ -50,7 +50,7 @@ Laser Pistol,12,24,2.0,1.5,1,400,0,2,0,0,None,EC
 Plasma Pistol,26,52,2.0,1.3,1,1400,0,3,0,0,None,EC
 Laser Rifle,24,48,2.0,1.5,3,3500,0,2,0,0,None,EC
 Plasma Rifle,50,100,2.0,1.5,4,4000,0,5,0,0,None,EC
-Tri-Beam Laser Rifle,54,108,2.0,1.3,3,7500,0,4,0,0,None,EC
+Tri-beam Laser Rifle,54,108,2.0,1.3,3,7500,0,4,0,0,None,EC
 Gauss Rifle,120,120,2.0,1.0,15,14000,0,7,0,0,Stagger,2mm EC
 Tesla Cannon,120,120,2.0,0.7,15,10000,0,7,0,0,EMP Burst,EC
 Frag Grenade,50,50,1.0,1.0,1,100,0,0,0,0,Splash,None
@@ -159,6 +159,10 @@ Plasma Mine,120,120,1.0,1.0,0.5,350,0,0,0,0,Triggered/Splash,None
 Pulse Mine,80,80,1.0,1.0,0.5,200,0,0,0,0,Triggered/EMP,None
 Tin Grenade,50,50,1.0,1.0,0.5,15,0,0,0,0,Splash,None
 Dynamite,100,100,1.0,1.0,1,35,0,0,0,0,Timed/Splash,None
+Euclid's C-Finder,0,0,1.0,0.5,0.5,8000,0,0,0,0,ARCHIMEDES II Strike,None
+Lily's Vertibird Blade,75,75,1.0,1.5,6,0,0,7,1.0,40,None,None
+Mysterious Magnum,28,42,1.5,1.6,2,5000,0,3,0,0,Plays Harmonica,.357 Magnum
+Vance's Lucky Hat Knife,12,18,1.5,3.5,1,3000,0,0,0.5,20,None,None
 
 [AMMO.CSV]
 Caliber,Subtype,DMG_Multiplier,DT_Modifier,Condition_Degradation,Weight_Per_Unit
