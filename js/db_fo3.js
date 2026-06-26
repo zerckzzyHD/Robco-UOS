@@ -69,6 +69,58 @@ Deathclaw Gauntlet,60,60,1.0,1.1,1,5000,75,7,0.7,45,None,None
 Nuka Grenade,500,500,1.0,1.0,1,200,0,0,0,0,Splash,None
 Railway Rifle,20,40,2.0,1.5,15,500,0,5,0,0,None,Railway Spike
 Tin Grenade,50,50,1.0,1.0,0.5,15,0,0,0,0,Splash,None
+Chinese Pistol,4,4,1.0,6.0,2,190,0,0,0,0,None,10mm
+Silenced 10mm Pistol,8,5,2.0,6.0,3,250,0,0,0,0,Suppressed,10mm
+BB Gun,4,4,1.0,0.75,2,36,0,0,0,0,None,BB
+Reservist's Rifle,40,40,5.0,1.607,10,500,0,0,0,0,None,.308 Caliber
+Ol' Painless,30,30,1.0,1.125,6,250,0,0,0,0,None,.32 Caliber
+Sawed-Off Shotgun,50,0,0.0,2.25,6,190,0,0,0,0,Splash,Shotgun Shell
+Eugene,7,0,0.0,20.0,18,1500,0,0,0,0,Full Auto,5mm
+Vengeance,11,12,1.0,20.0,18,2400,0,0,0,0,None,Electron Charge Pack
+Burnmaster,24,1,4.0,8.0,15,500,0,0,0,0,Fire DoT,Flamer Fuel
+Experimental MIRV,80,0,0.0,1.579,30,2498,0,0,0,0,Splash,Mini Nuke
+Miss Launcher,20,0,0.0,1.579,15,400,0,0,0,0,Splash,Missile
+Wazer Wifle,29,28,1.5,2.046,8,900,0,0,0,0,None,Microfusion Cell
+Smuggler's End,18,18,1.5,6.0,2,450,0,0,0,0,None,Energy Cell
+The Break,6,6,1.0,1.429,1,50,0,2,1.2,20,None,None
+Jack,30,15,1.0,1.0,6,200,0,0,1.0,65,Limb Damage,None
+Highwayman's Friend,10,10,1.0,2.308,5,75,0,0,1.0,27,None,None
+Fisto!,25,25,1.5,1.091,6,100,25,0,0.7,25,None,None
+The Tenderizer,30,15,1.0,1.429,12,230,0,0,1.2,20,None,None
+Vampire's Edge,15,20,3.0,2.308,1,100,0,0,0.9,17,None,None
+Occam's Razor,10,13,3.0,3.0,1,65,0,0,0.6,17,None,None
+Ant's Sting,4,4,1.0,3.0,1,30,0,0,0.5,17,Poison DoT,None
+Butch's Toothpick,10,13,2.5,3.0,1,50,0,0,0.5,17,None,None
+Gauss Rifle,100,50,5.0,1.071,12,500,0,0,0,0,Knockdown,Microfusion Cell
+Trench Knife,7,13,3.0,3.0,1,50,0,0,0.6,17,None,None
+Auto Axe,35,0,0.0,1.0,20,200,0,0,1.2,65,Full Auto,None
+Man Opener,35,0,0.0,1.0,20,200,0,0,1.2,65,Ignores DR,None
+Steel Saw,16,0,0.0,1.0,20,200,0,0,1.2,65,Full Auto,None
+Infiltrator,7,10,1.0,8.0,7,400,0,0,0,0,Suppressed,5.56mm
+Perforator,10,14,2.0,6.0,7,600,0,0,0,0,Suppressed,5.56mm
+Wild Bill's Sidearm,10,15,1.0,3.0,2,250,0,0,0,0,None,.32 Caliber
+Metal Blaster,55,27,1.5,2.046,8,1000,0,0,0,0,None,Microfusion Cell
+Tri-beam Laser Rifle,75,15,1.5,2.727,9,1000,0,0,0,0,None,Microfusion Cell
+Callahan's Magnum,65,50,2.0,2.25,4,750,0,0,0,0,None,.44 Magnum
+Precision Gatling Laser,8,6,4.0,20.0,18,3000,0,0,0,0,Full Auto,Electron Charge Pack
+Lever-Action Rifle,40,40,5.0,0.75,8,200,0,0,0,0,None,10mm
+Double-Barrel Shotgun,85,30,1.0,2.25,6,175,0,0,0,0,Splash,Shotgun Shell
+Backwater Rifle,45,45,5.0,0.75,7,250,0,0,0,0,None,10mm
+The Dismemberer,25,40,2.0,1.429,6,55,0,0,1.2,20,Limb Damage,None
+Microwave Emitter,60,100,2.0,1.035,8,500,0,0,0,0,Ignores DR,Microfusion Cell
+Axe,20,30,2.0,1.429,6,60,0,0,1.2,20,None,None
+Fertilizer Shovel,15,30,3.0,1.429,3,55,0,0,1.2,20,Poison DoT,None
+Ritual Knife,6,18,3.0,3.0,1,20,0,0,0.6,12,None,None
+Alien Atomizer,35,40,1.0,3.0,2,500,0,0,0,0,None,Alien Power Module
+Alien Disintegrator,65,50,2.0,2.0,7,300,0,0,0,0,None,Alien Power Module
+Atomic Pulverizer,37,40,2.0,3.0,2,500,0,0,0,0,None,Alien Power Module
+Captain's Sidearm,35,40,1.0,3.0,2,500,0,0,0,0,None,Alien Power Module
+Destabilizer,30,20,2.0,4.5,7,1199,0,0,0,0,None,Alien Power Module
+Drone Cannon,40,50,1.0,3.333,18,1999,0,0,0,0,Splash,Alien Power Module
+Drone Cannon Ex-B,40,50,1.0,3.333,18,1999,0,0,0,0,Splash,Alien Power Module
+Electro-Suppressor,25,4,1.0,2.308,2,70,0,0,1.0,25,Knockdown,None
+Cryo Grenade,1,0,1.0,0.652,0.5,50,0,0,0,0,Cryo Stun,None
+Cryo Mine,1,0,1.0,0.5,0.5,25,0,0,0,0,Cryo Stun,None
 
 [AMMO.CSV]
 Caliber,Subtype,DMG_Multiplier,DT_Modifier,Condition_Degradation,Weight_Per_Unit
@@ -90,6 +142,11 @@ Flamer Fuel,Standard,1.0,0,1.0,0.02
 Missile,Standard,1.0,0,1.0,3.0
 Mini Nuke,Standard,1.0,0,1.0,5.0
 Alien Power Cell,Standard,1.5,0,0.5,0.0
+Alien Power Module,Standard,1.0,0,0.5,0.0
+Mesmetron Power Cell,Standard,1.0,0,1.0,0.01
+Dart,Standard,1.0,0,1.5,0.0
+Railway Spike,Standard,1.0,0,1.5,0.1
+BB,Standard,1.0,0,0.5,0.0
 Junk,,1.0,0,0.0,0.0
 
 [ARMOR.CSV]
