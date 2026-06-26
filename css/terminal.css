@@ -1949,6 +1949,16 @@ details[open] > summary.config-summary::after {
   justify-content: center;
 }
 
+/* ── Inventory Category Filter Buttons (P4d) ────────────────── */
+.inv-filter-btn {
+  opacity: 0.5;
+}
+.inv-filter-btn.active {
+  opacity: 1;
+  background: rgba(var(--robco-green-rgb), 0.18);
+  border-color: var(--robco-green);
+}
+
 /* ── List-Row Layout Utilities (P2-2) ───────────────────────── */
 /* Prefix glyph ("> ") in perks/quests/notes flex rows */
 .list-row-prefix {

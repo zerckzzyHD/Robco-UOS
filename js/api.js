@@ -90,7 +90,7 @@ Example Schema:
 ### **Core State Tracking & Formatting**
 Time & Ticks Clock: Track "ticks" in the state node. 1 Prompt = 1 Tick. 1 Combat Round = 2 Ticks. > [WAIT: X Hrs] = X * 10 Ticks. Increment this integer on each response. NEVER block or refuse a user action due to insufficient ticks. Ticks are advisory pacing — the Courier may perform any action at any time regardless of tick count.
 Inventory & Squad Persistence (CRITICAL): If the Courier loots an item or uses > [CRAFT], you MUST return the ENTIRE inventory array. Companions in "squad" must be updated during combat and returned to 100% HP after.
-Inventory Item Schema: Each item in the inventory array MUST include: name (string), qty (integer), wgt (weight in lbs, float), val (value in caps, integer), type ("weapon"|"armor"|"aid"|"misc"). Do NOT put ammo in the inventory array — use state.ammo instead (caliber → count integer, e.g. {"5.56mm": 120, "10mm": 45}). Reference the attached database CSVs for canonical weight and value data.
+Inventory Item Schema: Each item in the inventory array MUST include: name (string), qty (integer), wgt (weight in lbs, float), val (value in caps, integer), type ("weapon"|"armor"|"aid"|"mod"|"misc"). Use "mod" for weapon modifications (suppressors, scopes, grips, etc.). Do NOT put ammo in the inventory array — use state.ammo instead (caliber → count integer, e.g. {"5.56mm": 120, "10mm": 45}). Reference the attached database CSVs for canonical weight and value data.
 Telemetry Lock: FORBIDDEN from inventing narrative outcomes, combat damage, or inventory changes. If ambiguous, output 🛑 [SYS-ALERT: INSUFFICIENT TELEMETRY].
 
 ### **Operational Matrix**

@@ -1,5 +1,6 @@
 ﻿let attachedImageData = null;
 let attachedImageMimeType = null;
+let _invFilter = 'all';
 
 // ── AUDIO SETTINGS CACHE ──────────────────────────────────────
 // Read mute prefs once at startup — avoids localStorage reads on every audio tick
@@ -2355,6 +2356,17 @@ function delItem(idx) {
   renderInventory();
   updateMath();
 }
+function setInvFilter(cat) {
+  _invFilter = cat;
+  const bar = document.getElementById('invFilterBar');
+  if (bar) {
+    bar.querySelectorAll('.inv-filter-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.filter === cat);
+    });
+  }
+  renderInventory();
+}
+
 function renderInventory() {
   const lst = document.getElementById('invList');
   if (!lst) return;
@@ -2364,6 +2376,7 @@ function renderInventory() {
     weapon: 'var(--robco-danger)',
     armor: 'var(--robco-blue)',
     aid: 'var(--robco-green)',
+    mod: 'var(--robco-alert)',
     ammo: 'var(--robco-alert)',
     misc: 'var(--robco-alert)',
   };
@@ -2371,7 +2384,25 @@ function renderInventory() {
   // Map with original index FIRST so data-idx and data-use stay correct after filter
   const displayItems = state.inventory
     .map((it, idx) => ({ ...it, _origIdx: idx }))
-    .filter(it => (it.type || 'misc') !== 'ammo');
+    .filter(it => {
+      const type = it.type || 'misc';
+      if (type === 'ammo') return false;
+      if (_invFilter === 'all') return true;
+      return type === _invFilter;
+    });
+  if (displayItems.length === 0) {
+    const label =
+      _invFilter === 'all'
+        ? 'inventory items'
+        : _invFilter === 'armor'
+          ? 'apparel'
+          : _invFilter === 'ammo'
+            ? 'ammo — see AMMO RESERVES below'
+            : _invFilter + ' items';
+    lst.innerHTML = emptyState('No ' + label);
+    lst.onclick = null;
+    return;
+  }
   lst.innerHTML = displayItems
     .map(it => {
       const cat = (it.type || 'misc').toLowerCase();

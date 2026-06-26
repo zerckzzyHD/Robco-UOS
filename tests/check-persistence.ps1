@@ -967,11 +967,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-39)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-39)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-40)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-40)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -1448,6 +1448,45 @@ Check (-not $fo3Cals39.Contains('EC')) 'FO3 AMMO.CSV: bare EC ammo token is gone
 # 39.10 FO3 WEAPONS.CSV has no Ammo_Type EC
 $fo3Types39 = Get-WeaponAmmoTypes39 $fo3Src39
 Check (-not $fo3Types39.Contains('EC')) 'FO3 WEAPONS.CSV: no weapon has Ammo_Type EC'
+
+# ===========================================================
+# Suite 40 -- Inventory Category Filter + Mod Type (Phase 4d-i)
+# 'mod' accepted in schema + autoImportState; filter bar exists;
+# renderInventory() honours the active filter; mod in type select.
+# 6 tests
+# ===========================================================
+Sep "Suite 40 -- Inventory Category Filter + Mod Type"
+$apiSrc40  = Read-Src 'js/api.js'
+$htmlSrc40 = Read-Src 'index.html'
+$uiSrc40   = Read-Src 'js/ui.js'
+
+# 40.1  'mod' in inventory type enum in api.js
+Check ([bool]($apiSrc40 -match '"mod"')) `
+    'api.js inventory schema includes "mod" as a valid item type (Phase 4d-i)'
+
+# 40.2  autoImportState() routes 'ammo' but not 'mod'
+$importBody40 = ''
+try { $importBody40 = Get-FunctionBody $apiSrc40 'autoImportState' } catch {}
+Check ([bool]($importBody40 -match "type.*===.*[`"']ammo[`"']") -and -not [bool]($importBody40 -match "type.*===.*[`"']mod[`"']")) `
+    "autoImportState() routes 'ammo' to state.ammo but passes 'mod' items through to inventory"
+
+# 40.3  Inventory filter bar element exists in index.html
+Check ([bool]($htmlSrc40 -match 'id="invFilterBar"')) `
+    'id="invFilterBar" element exists in index.html (inventory category filter bar)'
+
+# 40.4  Filter bar contains a button for the 'mod' category
+Check ([bool]($htmlSrc40 -match 'data-filter="mod"')) `
+    'index.html filter bar has data-filter="mod" button (Mods category filter)'
+
+# 40.5  'mod' option in #newItemType select
+Check ([bool]($htmlSrc40 -match 'value="mod"')) `
+    '#newItemType select contains value="mod" option (Phase 4d-i mod type)'
+
+# 40.6  renderInventory() references _invFilter
+$renderBody40 = ''
+try { $renderBody40 = Get-FunctionBody $uiSrc40 'renderInventory' } catch {}
+Check ([bool]($renderBody40 -match '_invFilter')) `
+    'renderInventory() references _invFilter to honour the active category filter'
 
 # ===========================================================
 # Results

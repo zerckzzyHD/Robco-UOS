@@ -1541,7 +1541,7 @@ header('Assets Completeness');
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 28 — Meta / Runner Parity (Group 7)
-//  Verifies that both runners contain all gate-guard suites (22-37)
+//  Verifies that both runners contain all gate-guard suites (22-40)
 //  and that the canonical test count matches README.md, ARCHITECTURE.md,
 //  and (conditionally, if present) RULES.md and CLAUDE.md.
 //
@@ -1555,7 +1555,7 @@ header('Meta / Runner Parity');
   const jsRunner = readFile('tests/check-persistence.js');
   const psRunner = readFile('tests/check-persistence.ps1');
 
-  // Structural parity: both runners must contain every gate-guard suite marker (22-39).
+  // Structural parity: both runners must contain every gate-guard suite marker (22-40).
   // A missing marker means a suite was added to one runner but not ported to the other.
   const GATE_SUITES = [
     'Suite 22',
@@ -1576,17 +1576,18 @@ header('Meta / Runner Parity');
     'Suite 37',
     'Suite 38',
     'Suite 39',
+    'Suite 40',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-39)' +
+    'JS runner contains all gate-guard suites (22-40)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-39)' +
+    'PS runner contains all gate-guard suites (22-40)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -2355,6 +2356,63 @@ header('Ammo Token Split (EC→3)');
   // 39.10 FO3 WEAPONS.CSV has no Ammo_Type EC
   const fo3Types39 = getWeaponAmmoTypes39(fo3Src39);
   assert(!fo3Types39.has('EC'), 'FO3 WEAPONS.CSV: no weapon has Ammo_Type EC');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 40 — Inventory Category Filter + Mod Type (Phase 4d-i)
+//  'mod' is accepted in schema + autoImportState; filter bar exists;
+//  renderInventory() honours the active filter; mod in type select.
+//  6 tests
+// ══════════════════════════════════════════════════════════════
+header('Inventory Category Filter + Mod Type');
+
+// 40.1  'mod' appears in the inventory type enum in getSystemDirective() in api.js
+assert(
+  /"mod"/.test(apiSource),
+  'api.js inventory schema includes "mod" as a valid item type (Phase 4d-i)'
+);
+
+// 40.2  autoImportState() filter block only redirects type === 'ammo' — mod passes through
+{
+  let importBody40 = '';
+  try {
+    importBody40 = extractFunctionBody(apiSource, 'autoImportState');
+  } catch (_) {}
+  // The filter must contain 'ammo' but must NOT redirect or reject 'mod'
+  assert(
+    /type.*===.*['"]ammo['"]/.test(importBody40) && !/type.*===.*['"]mod['"]/.test(importBody40),
+    "autoImportState() routes 'ammo' to state.ammo but passes 'mod' items through to inventory"
+  );
+}
+
+// 40.3  Inventory filter bar element exists in index.html
+assert(
+  /id="invFilterBar"/.test(htmlSource),
+  'id="invFilterBar" element exists in index.html (inventory category filter bar)'
+);
+
+// 40.4  Filter bar contains a button for the 'mod' category
+assert(
+  /data-filter="mod"/.test(htmlSource),
+  'index.html filter bar has data-filter="mod" button (Mods category filter)'
+);
+
+// 40.5  'mod' option exists in the #newItemType select in index.html
+assert(
+  /value="mod"/.test(htmlSource),
+  '#newItemType select contains value="mod" option (Phase 4d-i mod type)'
+);
+
+// 40.6  renderInventory() in ui.js references _invFilter (honours category filter)
+{
+  let renderBody40 = '';
+  try {
+    renderBody40 = extractFunctionBody(uiSource, 'renderInventory');
+  } catch (_) {}
+  assert(
+    /_invFilter/.test(renderBody40),
+    'renderInventory() references _invFilter to honour the active category filter'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════

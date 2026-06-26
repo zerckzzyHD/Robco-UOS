@@ -504,6 +504,60 @@
             <summary>
               <h2>> BACKPACK INVENTORY</h2>
             </summary>
+            <div
+              id="invFilterBar"
+              style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px"
+            >
+              <button
+                class="btn-sm action-btn inv-filter-btn active"
+                data-filter="all"
+                onclick="setInvFilter('all')"
+              >
+                All
+              </button>
+              <button
+                class="btn-sm action-btn inv-filter-btn"
+                data-filter="weapon"
+                onclick="setInvFilter('weapon')"
+              >
+                Weapons
+              </button>
+              <button
+                class="btn-sm action-btn inv-filter-btn"
+                data-filter="armor"
+                onclick="setInvFilter('armor')"
+              >
+                Apparel
+              </button>
+              <button
+                class="btn-sm action-btn inv-filter-btn"
+                data-filter="aid"
+                onclick="setInvFilter('aid')"
+              >
+                Aid
+              </button>
+              <button
+                class="btn-sm action-btn inv-filter-btn"
+                data-filter="mod"
+                onclick="setInvFilter('mod')"
+              >
+                Mods
+              </button>
+              <button
+                class="btn-sm action-btn inv-filter-btn"
+                data-filter="misc"
+                onclick="setInvFilter('misc')"
+              >
+                Misc
+              </button>
+              <button
+                class="btn-sm action-btn inv-filter-btn"
+                data-filter="ammo"
+                onclick="setInvFilter('ammo')"
+              >
+                Ammo
+              </button>
+            </div>
             <ul class="inventory-list" id="invList"></ul>
 
             <!-- 3b. AMMO RESERVES — nested sub-panel -->
@@ -580,6 +634,7 @@
                 <option value="weapon">wpn</option>
                 <option value="armor">armor</option>
                 <option value="aid">aid</option>
+                <option value="mod">mod</option>
                 <option value="ammo">ammo</option>
               </select>
             </div>
