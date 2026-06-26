@@ -967,11 +967,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-37)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-37)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-39)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-39)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -1380,6 +1380,74 @@ Check ([string]::IsNullOrEmpty($miss383)) "FO3: all registry weapons exist in WE
 # 38.4 FO3: every WEAPONS.CSV row exists in registry
 $miss384 = ($dbW383 | Where-Object { -not $regW383.Contains($_) }) -join ', '
 Check ([string]::IsNullOrEmpty($miss384)) "FO3: all WEAPONS.CSV rows exist in registry (missing: $(if ($miss384) { $miss384 } else { 'none' }))"
+
+# ===========================================================
+# Suite 39 -- Ammo Token Split (Energy Cell / MFC / ECP)
+# AMMO.CSV must carry three distinct caliber names; no bare EC
+# token may remain as a caliber or as a weapon Ammo_Type.
+# 10 tests
+# ===========================================================
+Sep "Suite 39 -- Ammo Token Split (EC->3)"
+
+function Get-AmmoCalibers39($src) {
+    $start = $src.IndexOf('[AMMO.CSV]')
+    if ($start -lt 0) { return [System.Collections.Generic.HashSet[string]]::new() }
+    $rest = $src.Substring($start + 10)
+    $endIdx = $rest.IndexOf("`n[")
+    $block = if ($endIdx -ge 0) { $rest.Substring(0, $endIdx) } else { $rest }
+    $cals = [System.Collections.Generic.HashSet[string]]::new()
+    foreach ($line in $block -split "`n") {
+        $t = $line.Trim()
+        if (-not $t -or $t.StartsWith('[') -or $t.StartsWith('Caliber')) { continue }
+        $cal = ($t -split ',')[0].Trim()
+        if ($cal) { [void]$cals.Add($cal) }
+    }
+    return $cals
+}
+
+function Get-WeaponAmmoTypes39($src) {
+    $start = $src.IndexOf('[WEAPONS.CSV]')
+    if ($start -lt 0) { return [System.Collections.Generic.HashSet[string]]::new() }
+    $rest = $src.Substring($start + 13)
+    $endIdx = $rest.IndexOf("`n[")
+    $block = if ($endIdx -ge 0) { $rest.Substring(0, $endIdx) } else { $rest }
+    $types = [System.Collections.Generic.HashSet[string]]::new()
+    foreach ($line in $block -split "`n") {
+        $t = $line.Trim()
+        if (-not $t -or $t.StartsWith('[') -or $t.StartsWith('Weapon_Name')) { continue }
+        $parts = $t -split ','
+        $ammoType = $parts[$parts.Length - 1].Trim()
+        if ($ammoType) { [void]$types.Add($ammoType) }
+    }
+    return $types
+}
+
+$nvSrc39  = Read-Src 'js/db_nv.js'
+$fo3Src39 = Read-Src 'js/db_fo3.js'
+$nvCals39  = Get-AmmoCalibers39 $nvSrc39
+$fo3Cals39 = Get-AmmoCalibers39 $fo3Src39
+# 39.1 FNV AMMO.CSV contains Energy Cell
+Check $nvCals39.Contains('Energy Cell') 'FNV AMMO.CSV contains Energy Cell caliber'
+# 39.2 FNV AMMO.CSV contains Microfusion Cell
+Check $nvCals39.Contains('Microfusion Cell') 'FNV AMMO.CSV contains Microfusion Cell caliber'
+# 39.3 FNV AMMO.CSV contains Electron Charge Pack
+Check $nvCals39.Contains('Electron Charge Pack') 'FNV AMMO.CSV contains Electron Charge Pack caliber'
+# 39.4 FNV AMMO.CSV has no bare EC caliber
+Check (-not $nvCals39.Contains('EC')) 'FNV AMMO.CSV: bare EC ammo token is gone'
+# 39.5 FNV WEAPONS.CSV has no Ammo_Type EC
+$nvTypes39 = Get-WeaponAmmoTypes39 $nvSrc39
+Check (-not $nvTypes39.Contains('EC')) 'FNV WEAPONS.CSV: no weapon has Ammo_Type EC'
+# 39.6 FO3 AMMO.CSV contains Energy Cell
+Check $fo3Cals39.Contains('Energy Cell') 'FO3 AMMO.CSV contains Energy Cell caliber'
+# 39.7 FO3 AMMO.CSV contains Microfusion Cell
+Check $fo3Cals39.Contains('Microfusion Cell') 'FO3 AMMO.CSV contains Microfusion Cell caliber'
+# 39.8 FO3 AMMO.CSV contains Electron Charge Pack
+Check $fo3Cals39.Contains('Electron Charge Pack') 'FO3 AMMO.CSV contains Electron Charge Pack caliber'
+# 39.9 FO3 AMMO.CSV has no bare EC caliber
+Check (-not $fo3Cals39.Contains('EC')) 'FO3 AMMO.CSV: bare EC ammo token is gone'
+# 39.10 FO3 WEAPONS.CSV has no Ammo_Type EC
+$fo3Types39 = Get-WeaponAmmoTypes39 $fo3Src39
+Check (-not $fo3Types39.Contains('EC')) 'FO3 WEAPONS.CSV: no weapon has Ammo_Type EC'
 
 # ===========================================================
 # Results

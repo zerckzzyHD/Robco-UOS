@@ -20,12 +20,12 @@ Xuanlong Assault Rifle,30,30,1.0,3.5,7,5000,0,4,0,0,None,5.56mm
 Victory Rifle,55,55,2.5,0.9,10,5000,0,6,0,0,Silenced,.308 Caliber
 Colonel Autumn's 10mm Pistol,13,13,2.0,1.7,2,1500,0,2,0,0,None,10mm
 The Terrible Shotgun,80,80,1.0,1.0,8,7000,0,5,0,0,None,Shotgun Shell
-Laser Pistol,12,24,2.0,1.5,2,400,0,2,0,0,None,EC
-Laser Rifle,22,44,2.0,1.5,3,3500,0,2,0,0,None,EC
-Plasma Pistol,25,50,2.0,1.3,3,1400,0,3,0,0,None,EC
-Plasma Rifle,45,90,2.0,1.5,7,4000,0,5,0,0,None,EC
-A3-21 Plasma Rifle,55,110,2.0,1.5,7,6500,0,5,0,0,None,EC
-Gatling Laser,8,16,1.5,8.0,18,22500,0,6,0,0,Full Auto,EC
+Laser Pistol,12,24,2.0,1.5,2,400,0,2,0,0,None,Energy Cell
+Laser Rifle,22,44,2.0,1.5,3,3500,0,2,0,0,None,Energy Cell
+Plasma Pistol,25,50,2.0,1.3,3,1400,0,3,0,0,None,Microfusion Cell
+Plasma Rifle,45,90,2.0,1.5,7,4000,0,5,0,0,None,Microfusion Cell
+A3-21 Plasma Rifle,55,110,2.0,1.5,7,6500,0,5,0,0,None,Microfusion Cell
+Gatling Laser,8,16,1.5,8.0,18,22500,0,6,0,0,Full Auto,Electron Charge Pack
 Mesmetron,0,0,1.0,1.0,2,200,0,2,0,0,Paralyze/Confuse,None
 Minigun,10,10,1.0,8.0,28,22500,0,7,0,0,Full Auto,5mm
 Missile Launcher,100,100,1.0,0.5,15,4500,0,6,0,0,Splash,Missile
@@ -80,8 +80,12 @@ Caliber,Subtype,DMG_Multiplier,DT_Modifier,Condition_Degradation,Weight_Per_Unit
 .308 Caliber,Standard,1.0,0,1.0,0.006
 Shotgun Shell,Standard,1.0,0,1.0,0.009
 5mm,Standard,1.0,0,1.0,0.001
-EC,Standard,1.0,0,1.0,0.0
-EC,Optimized,1.15,0,1.0,0.0
+Energy Cell,Standard,1.0,0,1.0,0.0
+Energy Cell,Optimized,1.15,0,1.0,0.0
+Microfusion Cell,Standard,1.0,0,1.0,0.0
+Microfusion Cell,Optimized,1.15,0,1.0,0.0
+Electron Charge Pack,Standard,1.0,0,1.0,0.0
+Electron Charge Pack,Optimized,1.15,0,1.0,0.0
 Flamer Fuel,Standard,1.0,0,1.0,0.02
 Missile,Standard,1.0,0,1.0,3.0
 Mini Nuke,Standard,1.0,0,1.0,5.0

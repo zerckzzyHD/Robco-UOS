@@ -46,13 +46,13 @@ Grenade Launcher,110,110,1.0,0.9,2,2000,0,4,0,0,Splash,40mm Grenade
 Rocket Launcher,200,200,1.0,0.5,15,8000,0,6,0,0,Splash,Missile
 Fat Man,600,600,1.0,0.4,30,8500,0,8,0,0,Splash,Mini Nuke
 Flamer,10,10,1.0,4.0,10,15000,0,8,0,0,Fire DoT,Flamer Fuel
-Laser Pistol,12,24,2.0,1.5,1,400,0,2,0,0,None,EC
-Plasma Pistol,26,52,2.0,1.3,1,1400,0,3,0,0,None,EC
-Laser Rifle,24,48,2.0,1.5,3,3500,0,2,0,0,None,EC
-Plasma Rifle,50,100,2.0,1.5,4,4000,0,5,0,0,None,EC
-Tri-beam Laser Rifle,54,108,2.0,1.3,3,7500,0,4,0,0,None,EC
+Laser Pistol,12,24,2.0,1.5,1,400,0,2,0,0,None,Energy Cell
+Plasma Pistol,26,52,2.0,1.3,1,1400,0,3,0,0,None,Microfusion Cell
+Laser Rifle,24,48,2.0,1.5,3,3500,0,2,0,0,None,Microfusion Cell
+Plasma Rifle,50,100,2.0,1.5,4,4000,0,5,0,0,None,Microfusion Cell
+Tri-beam Laser Rifle,54,108,2.0,1.3,3,7500,0,4,0,0,None,Microfusion Cell
 Gauss Rifle,120,120,2.0,1.0,15,14000,0,7,0,0,Stagger,2mm EC
-Tesla Cannon,120,120,2.0,0.7,15,10000,0,7,0,0,EMP Burst,EC
+Tesla Cannon,120,120,2.0,0.7,15,10000,0,7,0,0,EMP Burst,Electron Charge Pack
 Frag Grenade,50,50,1.0,1.0,1,100,0,0,0,0,Splash,None
 Plasma Grenade,80,80,1.0,1.0,1,200,0,0,0,0,Splash,None
 Incendiary Grenade,15,15,1.0,1.0,1,150,0,0,0,0,Fire DoT,None
@@ -131,22 +131,22 @@ FIDO,22,22,1.0,3.5,10,7500,0,6,0,0,Full Auto,5.56mm
 K9000 Cyberdog Gun,18,18,1.0,4.5,8,5000,0,6,0,0,Full Auto,5.56mm
 Shoulder Mounted Machine Gun,22,22,1.0,4.5,10,4500,0,6,0,0,Full Auto,5.56mm
 Alien Blaster,75,150,2.0,1.5,0.5,8000,0,0,0,0,None,Alien Power Cell
-Compliance Regulator,8,16,2.0,1.5,2,6000,0,2,0,0,Paralysis,EC
-MF Hyperbreeder Alpha,12,24,2.0,1.5,1,8000,0,2,0,0,Unlimited Charge,EC
-Pew Pew,45,90,2.0,1.0,2,8000,0,3,0,0,None,EC
-Recharger Pistol,8,16,2.0,1.5,1,1500,0,2,0,0,Unlimited Charge,EC
-AER14 Prototype,24,48,2.0,1.5,3,8000,0,2,0,0,None,EC
-Elijah's Advanced LAER,80,160,2.0,0.9,5,8000,0,6,0,0,None,EC
-LAER,55,110,2.0,0.9,5,6000,0,5,0,0,None,EC
-Laser RCW,12,24,1.0,4.0,5,5000,0,3,0,0,Full Auto,EC
-Recharger Rifle,10,20,2.0,1.5,2,2500,0,2,0,0,Unlimited Charge,EC
-Plasma Defender,30,60,2.0,1.5,2,3500,0,4,0,0,None,EC
-Q-35 Matter Modulator,55,110,2.0,1.5,3,8000,0,5,0,0,None,EC
+Compliance Regulator,8,16,2.0,1.5,2,6000,0,2,0,0,Paralysis,Energy Cell
+MF Hyperbreeder Alpha,12,24,2.0,1.5,1,8000,0,2,0,0,Unlimited Charge,Microfusion Cell
+Pew Pew,45,90,2.0,1.0,2,8000,0,3,0,0,None,Energy Cell
+Recharger Pistol,8,16,2.0,1.5,1,1500,0,2,0,0,Unlimited Charge,Energy Cell
+AER14 Prototype,24,48,2.0,1.5,3,8000,0,2,0,0,None,Energy Cell
+Elijah's Advanced LAER,80,160,2.0,0.9,5,8000,0,6,0,0,None,Energy Cell
+LAER,55,110,2.0,0.9,5,6000,0,5,0,0,None,Energy Cell
+Laser RCW,12,24,1.0,4.0,5,5000,0,3,0,0,Full Auto,Energy Cell
+Recharger Rifle,10,20,2.0,1.5,2,2500,0,2,0,0,Unlimited Charge,Energy Cell
+Plasma Defender,30,60,2.0,1.5,2,3500,0,4,0,0,None,Microfusion Cell
+Q-35 Matter Modulator,55,110,2.0,1.5,3,8000,0,5,0,0,None,Microfusion Cell
 YCS/186,225,225,2.0,0.5,20,10000,0,8,0,0,None,2mm EC
 Heavy Incinerator,12,12,1.0,3.5,12,5000,0,8,0,0,Fire DoT,Flamer Fuel
 Incinerator,10,10,1.0,2.5,8,4500,0,5,0,0,Fire DoT,Flamer Fuel
-Multiplas Rifle,50,100,1.0,1.0,4,8000,0,7,0,0,Splash,EC
-Tesla-Beaton Prototype,120,120,2.0,0.7,15,10000,0,7,0,0,EMP Chain,EC
+Multiplas Rifle,50,100,1.0,1.0,4,8000,0,7,0,0,Splash,Microfusion Cell
+Tesla-Beaton Prototype,120,120,2.0,0.7,15,10000,0,7,0,0,EMP Chain,Electron Charge Pack
 Grenade Machinegun,100,100,1.0,1.5,8,12000,0,8,0,0,Full Auto/Splash,40mm Grenade
 Grenade Rifle,110,110,1.0,0.9,4,2000,0,5,0,0,Splash,40mm Grenade
 Red Glare,150,150,1.0,1.5,10,15000,0,7,0,0,Splash/Incendiary,Rocket
@@ -205,10 +205,18 @@ Caliber,Subtype,DMG_Multiplier,DT_Modifier,Condition_Degradation,Weight_Per_Unit
 5mm,Armor Piercing,0.75,-15,1.0,0.001
 5mm,Hollow Point,1.5,x3.0,1.0,0.001
 5mm,Surplus,1.15,0,3.0,0.001
-EC,Standard,1.0,0,1.0,0.0
-EC,Optimized,1.15,0,1.0,0.0
-EC,Overcharged,1.5,0,2.0,0.0
-EC,Bulk,0.75,0,0.75,0.0
+Energy Cell,Standard,1.0,0,1.0,0.0
+Energy Cell,Optimized,1.15,0,1.0,0.0
+Energy Cell,Overcharged,1.5,0,2.0,0.0
+Energy Cell,Bulk,0.75,0,0.75,0.0
+Microfusion Cell,Standard,1.0,0,1.0,0.0
+Microfusion Cell,Optimized,1.15,0,1.0,0.0
+Microfusion Cell,Overcharged,1.5,0,2.0,0.0
+Microfusion Cell,Bulk,0.75,0,0.75,0.0
+Electron Charge Pack,Standard,1.0,0,1.0,0.0
+Electron Charge Pack,Optimized,1.15,0,1.0,0.0
+Electron Charge Pack,Overcharged,1.5,0,2.0,0.0
+Electron Charge Pack,Bulk,0.75,0,0.75,0.0
 2mm EC,Standard,1.0,0,1.0,0.0
 40mm Grenade,Standard,1.0,0,1.0,0.5
 Flamer Fuel,Standard,1.0,0,1.0,0.02

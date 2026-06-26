@@ -1555,7 +1555,7 @@ header('Meta / Runner Parity');
   const jsRunner = readFile('tests/check-persistence.js');
   const psRunner = readFile('tests/check-persistence.ps1');
 
-  // Structural parity: both runners must contain every gate-guard suite marker (22-37).
+  // Structural parity: both runners must contain every gate-guard suite marker (22-39).
   // A missing marker means a suite was added to one runner but not ported to the other.
   const GATE_SUITES = [
     'Suite 22',
@@ -1574,17 +1574,19 @@ header('Meta / Runner Parity');
     'Suite 35',
     'Suite 36',
     'Suite 37',
+    'Suite 38',
+    'Suite 39',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-37)' +
+    'JS runner contains all gate-guard suites (22-39)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-37)' +
+    'PS runner contains all gate-guard suites (22-39)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -2277,6 +2279,82 @@ header('DB↔Registry Weapon Parity');
       `FO3: all WEAPONS.CSV rows exist in registry (missing: ${missing.join(', ') || 'none'})`
     );
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 39 — Ammo Token Split (Energy Cell / MFC / ECP)
+//  AMMO.CSV must carry three distinct caliber names; no bare EC
+//  token may remain as a caliber or as a weapon Ammo_Type.
+//  10 tests
+// ══════════════════════════════════════════════════════════════
+header('Ammo Token Split (EC→3)');
+{
+  function getAmmoCalibers39(src) {
+    const start = src.indexOf('[AMMO.CSV]');
+    if (start === -1) return new Set();
+    const rest = src.substring(start + 10);
+    const endIdx = rest.search(/\n\[/);
+    const block = endIdx === -1 ? rest : rest.substring(0, endIdx);
+    const cals = new Set();
+    block.split('\n').forEach(l => {
+      const t = l.trim();
+      if (!t || t.startsWith('[') || t.startsWith('Caliber')) return;
+      const cal = t.split(',')[0].trim();
+      if (cal) cals.add(cal);
+    });
+    return cals;
+  }
+
+  function getWeaponAmmoTypes39(src) {
+    const start = src.indexOf('[WEAPONS.CSV]');
+    if (start === -1) return new Set();
+    const rest = src.substring(start + 13);
+    const endIdx = rest.search(/\n\[/);
+    const block = endIdx === -1 ? rest : rest.substring(0, endIdx);
+    const types = new Set();
+    block.split('\n').forEach(l => {
+      const t = l.trim();
+      if (!t || t.startsWith('[') || t.startsWith('Weapon_Name')) return;
+      const parts = t.split(',');
+      const ammoType = parts[parts.length - 1].trim();
+      if (ammoType) types.add(ammoType);
+    });
+    return types;
+  }
+
+  const nvSrc39 = readFile('js/db_nv.js');
+  const nvCals39 = getAmmoCalibers39(nvSrc39);
+  // 39.1 FNV AMMO.CSV contains Energy Cell
+  assert(nvCals39.has('Energy Cell'), 'FNV AMMO.CSV contains Energy Cell caliber');
+  // 39.2 FNV AMMO.CSV contains Microfusion Cell
+  assert(nvCals39.has('Microfusion Cell'), 'FNV AMMO.CSV contains Microfusion Cell caliber');
+  // 39.3 FNV AMMO.CSV contains Electron Charge Pack
+  assert(
+    nvCals39.has('Electron Charge Pack'),
+    'FNV AMMO.CSV contains Electron Charge Pack caliber'
+  );
+  // 39.4 FNV AMMO.CSV has no bare EC caliber
+  assert(!nvCals39.has('EC'), 'FNV AMMO.CSV: bare EC ammo token is gone');
+  // 39.5 FNV WEAPONS.CSV has no Ammo_Type EC
+  const nvTypes39 = getWeaponAmmoTypes39(nvSrc39);
+  assert(!nvTypes39.has('EC'), 'FNV WEAPONS.CSV: no weapon has Ammo_Type EC');
+
+  const fo3Src39 = readFile('js/db_fo3.js');
+  const fo3Cals39 = getAmmoCalibers39(fo3Src39);
+  // 39.6 FO3 AMMO.CSV contains Energy Cell
+  assert(fo3Cals39.has('Energy Cell'), 'FO3 AMMO.CSV contains Energy Cell caliber');
+  // 39.7 FO3 AMMO.CSV contains Microfusion Cell
+  assert(fo3Cals39.has('Microfusion Cell'), 'FO3 AMMO.CSV contains Microfusion Cell caliber');
+  // 39.8 FO3 AMMO.CSV contains Electron Charge Pack
+  assert(
+    fo3Cals39.has('Electron Charge Pack'),
+    'FO3 AMMO.CSV contains Electron Charge Pack caliber'
+  );
+  // 39.9 FO3 AMMO.CSV has no bare EC caliber
+  assert(!fo3Cals39.has('EC'), 'FO3 AMMO.CSV: bare EC ammo token is gone');
+  // 39.10 FO3 WEAPONS.CSV has no Ammo_Type EC
+  const fo3Types39 = getWeaponAmmoTypes39(fo3Src39);
+  assert(!fo3Types39.has('EC'), 'FO3 WEAPONS.CSV: no weapon has Ammo_Type EC');
 }
 
 // ══════════════════════════════════════════════════════════════
