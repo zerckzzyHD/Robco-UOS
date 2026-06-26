@@ -1,4 +1,12 @@
-## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 243/243 | Cache: robco-terminal-v2.0.1-r12 -->
+## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 243/243 | Cache: robco-terminal-v2.0.1-r13 -->
+
+### [B12] Protocol 21 added — Plain-English Changelog rule (2026-06-26)
+
+Docs-only update — no app behavior changed, test counts stay at 243.
+
+**One new protocol added** (Protocol 21, bringing the total to 1–21):
+
+- **Protocol 21 — Plain-English Changelog:** Every changelog entry must be written so that a non-developer can understand it — what changed, why it matters, no jargon. The structural markers (version headers, the Tests/cache comment line) stay as-is; only the prose is held to a plain-English standard. This keeps the history readable for anyone, not just people who wrote the code.
 
 ### [B11] World map bug fixes + Protocol 20 static test guards (2026-06-26)
 

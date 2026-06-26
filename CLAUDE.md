@@ -223,6 +223,12 @@ Critical CSS rules, render-function class/markup contracts, and service-worker i
 
 ---
 
+## Protocol 21 — Plain-English Changelog
+
+Every `CHANGELOG.md` entry must be written in clear, plain English that a non-developer can understand — describe what changed and why it matters from the user's perspective, not in developer jargon — in one consistent, readable style across the whole file. Preserve structural markers (version headers, the `Tests`/cache header comment) while keeping the prose plain.
+
+---
+
 ## Prohibited Patterns
 
 | Never Do                                                    | Why                                                                                                                                                                                                    |
