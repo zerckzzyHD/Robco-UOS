@@ -651,11 +651,11 @@ The undo button appears after every sync and hides after use.
 
 Grid size is a pure function of `state.mapView` ∈ `{'auto','full','core'}` (persisted to `localStorage`). No `offsetWidth` or `window.innerWidth` measurements are made in the size decision.
 
-| `state.mapView` | Grid | Rows/Cols |
-| --- | --- | --- |
+| `state.mapView`    | Grid     | Rows/Cols          |
+| ------------------ | -------- | ------------------ |
 | `'auto'` (default) | Core 4×4 | rows 2–5, cols 2–5 |
-| `'core'` | Core 4×4 | rows 2–5, cols 2–5 |
-| `'full'` | Full 6×6 | rows 1–6, cols 1–6 |
+| `'core'`           | Core 4×4 | rows 2–5, cols 2–5 |
+| `'full'`           | Full 6×6 | rows 1–6, cols 1–6 |
 
 The toggle button (`setMapView('full')` / `setMapView('core')`) is always visible and writes `state.mapView` + saves before re-rendering.
 
@@ -666,6 +666,7 @@ The toggle button (`setMapView('full')` / `setMapView('core')`) is always visibl
 ### Current-zone matching
 
 `scoreZoneForLoc(zone, loc)` scores a zone against the current location string:
+
 - `100` = exact string match
 - `50+len` = whole-word token match (at least one word > 2 chars equals a word in zone name/locations)
 - `10` = substring-only match (intentionally below the threshold)
@@ -884,6 +885,10 @@ The Service Worker (`sw.js`) uses a **cache-first** strategy. Once a user has vi
 
 Forgetting to bump means cached users **silently run the old UI** until they manually clear their browser cache — they will never see the "REBOOT TERMINAL" update prompt.
 
+### Automated Guard
+
+The pre-commit hook enforces this rule automatically. Before running the 251-test suite, it reads `CACHE_NAME` from the staged `sw.js` and compares it to `origin/main:sw.js`. If they match, the commit is blocked with a clear error. A missed bump is impossible to commit past.
+
 ### Historical Note
 
 This protocol was formalized in v1.6.5 after the perk panel (`addPerk()` + `#newPerkName`) was deployed within an existing `1.6.5` cache name, causing the feature to be invisible to cached users.
@@ -901,7 +906,7 @@ This protocol was formalized in v1.6.5 after the perk panel (`addPerk()` + `#new
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit audit must pass (all 251+ tests)
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (fails immediately if not bumped), then the 251-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

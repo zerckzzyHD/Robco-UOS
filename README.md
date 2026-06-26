@@ -333,7 +333,7 @@ Every audio function must check `AudioSettings.masterMute` and its specific mute
 npm run lint        ← catch bugs
 npm run format      ← enforce style
 git add -A
-git commit          ← persistence audit runs automatically (251 tests)
+git commit          ← cache-bump guard runs first, then persistence audit (251 tests)
 git push origin main
 ```
 

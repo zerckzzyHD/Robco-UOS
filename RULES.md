@@ -12,12 +12,13 @@
 npm run lint        # ESLint — zero new errors
 npm run format      # Prettier — all files clean
 git add -A
-git commit          # Pre-commit hook: 251 tests must pass
+git commit          # Pre-commit hook: cache-bump guard runs first, then 251 tests
 git push origin main  # CACHE_NAME must already be bumped (Protocol 1)
 ```
 
 - **251 tests must pass.** If fewer pass, something is broken. Investigate before committing.
 - **Bump `CACHE_NAME` before every push.** No push may ship without a new cache rev (Protocol 1) — this is a hard gate, not just for UI/JS changes.
+- **Cache-bump guard runs at commit time** — the hook compares the staged `CACHE_NAME` against `origin/main` and blocks if they match. A missed bump fails the commit before the test suite even runs.
 - **Never use `--no-verify`** unless the user explicitly authorizes it for a stated emergency.
 
 ---
@@ -32,6 +33,8 @@ Bump `CACHE_NAME` in `sw.js` before **every `git push`** — full stop. Every pu
 - Increment `N` on **every push**. No exceptions.
 
 **Why:** The SW is cache-first. Without a new `CACHE_NAME`, cached users silently run the old build and never see the "REBOOT TERMINAL" update prompt. Bumping on every push guarantees the prompt fires for all clients on every release.
+
+**Automated guard:** This requirement is now enforced by the pre-commit hook. Before the 251-test suite runs, the hook compares the staged `CACHE_NAME` against `origin/main:sw.js` and fails the commit immediately if they match. A missed bump is impossible to commit, not just discouraged.
 
 ---
 

@@ -1,4 +1,4 @@
-## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 251/251 | Cache: robco-terminal-v2.0.1-r19 -->
+## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 251/251 | Cache: robco-terminal-v2.0.1-r20 -->
 
 ### Added
 
@@ -33,6 +33,7 @@
 
 ### Under the Hood
 
+- Added an automated guard to the commit gate that blocks any commit where the service worker cache version was not bumped from the last release. Forgetting to update the cache version is now impossible to commit, not just discouraged. Protocol 1 updated to reflect the enforcement.
 - Both automated test runners were brought to parity and now run the same tests. Previously the Windows runner was silently skipping many tests.
 - Added 42 new automated tests guarding the map fixes, static layout invariants, and service-worker rules from regressing.
 - Added an optional Playwright render check for mobile overflow at 360px and 412px.
