@@ -1,20 +1,25 @@
-## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 243/243 | Cache: robco-terminal-v2.0.1-r14 -->
+## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 243/243 | Cache: robco-terminal-v2.0.1-r15 -->
 
-### [B13] Protocols 22–26 added, Protocols 2/16/17/18/21 refined (2026-06-26)
+### [B15] Protocol 26 removed — version discipline folded into Protocol 2 (2026-06-26)
+
+Docs-only correction — no app behavior changed, test counts stay at 243.
+
+The standalone Protocol 26 (Version Discipline) added in r14 was redundant: Protocol 2 already governs documentation and version bumps, so adding a separate protocol for the same concern was unnecessary overhead. The semver version-bump rule is now part of Protocol 2 directly, where it belongs. Total protocols: 1–25.
+
+### [B14] Protocols 22–25 added, Protocols 2/16/17/18/21 refined (2026-06-26)
 
 Docs-only update — no app behavior changed, test counts stay at 243.
 
-**Five new protocols added** (Protocols 22–26, bringing the total to 1–26):
+**Four new protocols added** (Protocols 22–25, bringing the total to 1–25):
 
 - **Protocol 22 — Extend Before Creating:** Before adding any new manager, service, renderer, helper, component, or state object, search for equivalent functionality first and extend it. Parallel implementations (a second save manager, a `renderXNew()` alongside an existing one) are architectural regressions and are not allowed.
 - **Protocol 23 — Architectural Boundaries:** Respect the established layering (database → state → registry → ui → api → cloud). Each layer has one job — rendering only renders, `state.js` owns state, `registry.js` is read-only and never touches state, `api.js` handles AI and import, `cloud.js` handles sync. Layers communicate only through established functions, not by reaching across boundaries.
 - **Protocol 24 — AI Determinism:** The AI is never the sole source of truth for anything saved to disk. All AI output must be validated and explicitly field-mapped before it is persisted. If the AI fails or returns bad data, the app stays fully usable offline.
 - **Protocol 25 — UX Stability:** Existing user workflows must not change unless the requested feature requires it. Improve what's there before replacing it; preserve the habits users have already built. Do not redesign or relocate working UI without being asked.
-- **Protocol 26 — Version Discipline:** Every user-visible change updates `APP_VERSION`, `CACHE_NAME`, and the changelog together. PATCH and MINOR version bumps are now automatic (no asking needed). MAJOR bumps — rewrites or breaking changes — still need explicit confirmation.
 
 **Five existing protocols refined:**
 
-- **Protocol 2:** The "always ask before bumping APP_VERSION" line now defers to Protocol 26 — patch and minor bumps are automatic; major still needs user approval.
+- **Protocol 2:** The old "always ask before bumping APP_VERSION" rule replaced with the semver policy — PATCH and MINOR bumps are automatic; MAJOR bumps still need explicit user confirmation. Every user-visible change must update APP_VERSION, CACHE_NAME, and the changelog together as one unit.
 - **Protocol 16 (Hotfix):** After a rollback, document the root cause, add a regression test, and record it in the changelog before re-attempting the fix.
 - **Protocol 17 (Mobile Baseline):** Added touch-first design requirement — no hover-only UI, no desktop-only interactions; focus states must always be visible, and color alone must never be the only way something conveys meaning.
 - **Protocol 18 (Memory):** Reworded to be more precise — store architecture decisions and engineering gotchas, not transient task state or temporary implementation details.

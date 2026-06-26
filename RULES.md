@@ -45,7 +45,7 @@ After every meaningful commit, update these files **in the same commit:**
 | `CHANGELOG.md`    | Add entries under the current version block            |
 | `README.md`       | Current State section, feature tables, project history |
 
-**Version bumps:** See Protocol 26 for version bump rules — PATCH and MINOR bumps are automatic per semver; MAJOR bumps still require user confirmation.
+**Version bumps:** Every user-visible change updates `APP_VERSION`, `CACHE_NAME`, and `CHANGELOG` together as one unit. `APP_VERSION` follows semver automatically — PATCH (x.y.Z) for bug/UI/internal fixes, MINOR (x.Y.0) for new user-facing features or panels — no need to ask. MAJOR (X.0.0) bumps (rewrites or breaking changes) still require explicit user confirmation. This replaces the old "always ask before bumping `APP_VERSION`" rule.
 
 ### Protocol 2a — Test Count Sync
 
@@ -250,12 +250,6 @@ The AI is never the sole source of truth for durable application state. All AI o
 ## Protocol 25 — UX Stability
 
 Existing user workflows must not change unless the requested feature requires it. Improve the current experience before replacing it; preserve user muscle memory. Do not redesign or relocate working UI unprompted.
-
----
-
-## Protocol 26 — Version Discipline
-
-Every user-visible change updates `APP_VERSION`, `CACHE_NAME`, and `CHANGELOG` together as one unit. `APP_VERSION` follows semver automatically: PATCH (x.y.Z) for bug/UI/internal fixes, MINOR (x.Y.0) for new user-facing features or panels, MAJOR (X.0.0) only for rewrites or breaking changes. MAJOR bumps still require explicit user confirmation; PATCH and MINOR are automatic and no longer require asking. This supersedes the old "always ask before bumping `APP_VERSION`" rule for patch/minor.
 
 ---
 
