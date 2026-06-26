@@ -8,6 +8,12 @@
     <link rel="apple-touch-icon" href="icon.png" />
     <link rel="manifest" href="manifest.json" />
     <meta name="theme-color" content="#010a07" />
+    <!-- CSP report-only: passively surfaces violations without blocking the app.
+         Plan: monitor reports, tighten directives, then switch to enforcing CSP. -->
+    <meta
+      http-equiv="Content-Security-Policy-Report-Only"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com; connect-src 'self' https://generativelanguage.googleapis.com https://firestore.googleapis.com https://firebase.googleapis.com; img-src 'self' data:; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'"
+    />
     <link rel="stylesheet" href="css/terminal.css" />
     <script>
       if (localStorage.getItem('robco_optics')) {
@@ -306,6 +312,7 @@
                 type="text"
                 id="stat_loc"
                 value="Mojave"
+                maxlength="100"
                 oninput="updateMath()"
                 onchange="onLocationChange()"
                 style="width: 100px"
@@ -515,6 +522,7 @@
                   id="newAmmoType"
                   list="ammoCalibers"
                   placeholder="Caliber (e.g. 5.56mm)"
+                  maxlength="40"
                   style="flex: 1; min-width: 100px"
                   autocomplete="off"
                 />
@@ -546,6 +554,7 @@
                 type="text"
                 id="newItemName"
                 placeholder="Item Name"
+                maxlength="80"
                 style="flex-grow: 1; min-width: 80px"
               />
               <input type="number" id="newItemQty" placeholder="Qty" min="1" style="width: 48px" />
@@ -874,6 +883,7 @@
                 type="text"
                 id="newQuestName"
                 placeholder="Quest Name"
+                maxlength="100"
                 style="flex: 1; min-width: 100px"
               />
               <select id="newQuestStatus" style="width: 80px; background: rgba(0, 0, 0, 0.8)">
@@ -913,6 +923,7 @@
                 type="text"
                 id="newPerkName"
                 placeholder="Perk Name"
+                maxlength="80"
                 style="flex: 1; min-width: 100px"
               />
               <input
@@ -1069,6 +1080,7 @@
                 type="text"
                 id="newCampaignNote"
                 placeholder="Enter tactical note..."
+                maxlength="500"
                 style="flex: 1"
                 onkeydown="if (event.key === 'Enter') addCampaignNote();"
               />
@@ -1357,6 +1369,7 @@
                 type="password"
                 id="apiKeyInput"
                 placeholder="Paste Gemini Key Here..."
+                maxlength="200"
                 style="width: 100%; border-color: var(--robco-alert); color: var(--robco-alert)"
                 oninput="saveApiKeySilent()"
               />
@@ -1707,6 +1720,7 @@
                 type="text"
                 id="courierIdInput"
                 placeholder="Courier Save ID (For Cloud Sync)"
+                maxlength="100"
                 style="width: 100%; border-color: var(--robco-blue); color: var(--robco-blue)"
                 onchange="localStorage.setItem('robco_courier_id', this.value)"
               />
@@ -1878,6 +1892,7 @@
 
             <textarea
               id="chatInput"
+              maxlength="2000"
               placeholder="Enter command or action (e.g. '> [THREAT] Geckos')..."
               style="border-color: var(--robco-blue); color: var(--robco-blue)"
               onkeydown="

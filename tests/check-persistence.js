@@ -1554,7 +1554,7 @@ header('Meta / Runner Parity');
   const jsRunner = readFile('tests/check-persistence.js');
   const psRunner = readFile('tests/check-persistence.ps1');
 
-  // Structural parity: both runners must contain every gate-guard suite marker (22-28).
+  // Structural parity: both runners must contain every gate-guard suite marker (22-30).
   // A missing marker means a suite was added to one runner but not ported to the other.
   const GATE_SUITES = [
     'Suite 22',
@@ -1565,17 +1565,18 @@ header('Meta / Runner Parity');
     'Suite 27',
     'Suite 28',
     'Suite 29',
+    'Suite 30',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-29)' +
+    'JS runner contains all gate-guard suites (22-30)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-29)' +
+    'PS runner contains all gate-guard suites (22-30)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -1635,6 +1636,42 @@ assert(
 assert(
   /refreshing/.test(htmlSource) && /hadController/.test(htmlSource),
   'controllerchange reload guard (refreshing + hadController) intact in index.html (Protocol 20)'
+);
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 30 — Phase 1b Guards
+//  Input maxlength caps, CSP-Report-Only header, monotonic cache
+//  guard in pre-commit hook, proactive localStorage quota warning.
+//  4 tests
+// ══════════════════════════════════════════════════════════════
+header('Phase 1b Guards');
+
+// 30.1 #chatInput textarea has maxlength attribute
+assert(
+  /id="chatInput"[\s\S]{0,300}maxlength/.test(htmlSource),
+  '#chatInput textarea has maxlength attribute (Phase 1b input cap guard)'
+);
+
+// 30.2 CSP-Report-Only meta present in index.html
+assert(
+  /Content-Security-Policy-Report-Only/.test(htmlSource),
+  'index.html contains Content-Security-Policy-Report-Only meta (Phase 1b security header)'
+);
+
+// 30.3 Pre-commit hook enforces monotonic rev increase
+{
+  const hookPath = path.join(ROOT, '.git', 'hooks', 'pre-commit');
+  const hookSource = fs.existsSync(hookPath) ? fs.readFileSync(hookPath, 'utf8') : '';
+  assert(
+    /LOCAL_N.*-gt.*ORIGIN_N|-gt.*ORIGIN_N.*LOCAL_N/.test(hookSource),
+    'pre-commit hook enforces strict monotonic rev increase (LOCAL_N -gt ORIGIN_N)'
+  );
+}
+
+// 30.4 saveState() contains proactive quota warning
+assert(
+  /_quotaWarnShown/.test(stateSource),
+  'saveState() contains proactive localStorage quota warning (once-per-session guard)'
 );
 
 // ══════════════════════════════════════════════════════════════

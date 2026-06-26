@@ -221,7 +221,20 @@ function saveState() {
       }
       window.robco_v8.activeContext = state.gameContext || 'FNV';
       window.robco_v8.campaigns[window.robco_v8.activeContext] = JSON.parse(JSON.stringify(state));
-      localStorage.setItem('robco_v8', JSON.stringify(window.robco_v8));
+      const _saveStr = JSON.stringify(window.robco_v8);
+      // Proactive warning at ~4MB (2M chars × 2 bytes UTF-16) of the ~5MB localStorage ceiling.
+      // Fires once per session so the Courier can export before a real QuotaExceededError hits.
+      if (_saveStr.length > 2097152 && !window._quotaWarnShown) {
+        window._quotaWarnShown = true;
+        if (typeof appendToChat === 'function') {
+          appendToChat(
+            '> ⚠ [SYS-WARNING] SAVE SIZE NEARING LIMIT (~4MB). Export a save file now to prevent data loss.',
+            'sys',
+            true
+          );
+        }
+      }
+      localStorage.setItem('robco_v8', _saveStr);
     } catch (e) {
       // #18 localStorage Quota Detection — warn Courier on storage full
       if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {

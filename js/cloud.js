@@ -1,3 +1,6 @@
+// SRI (Subresource Integrity) cannot be applied to ES module import statements in JS source —
+// there is no HTML element to attach an integrity= attribute to. The version pin @12.15.0
+// is the primary supply-chain mitigation; updates are always deliberate (no floating 'latest').
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js';
 import {
   getFirestore,

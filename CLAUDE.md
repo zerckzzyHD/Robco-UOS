@@ -1,4 +1,4 @@
-# RobCo U.O.S. — Agent Rules
+﻿# RobCo U.O.S. — Agent Rules
 
 > Every rule here was formalized from a real bug or established by the project owner.
 > Follow this document first, `ARCHITECTURE.md` second.
@@ -12,11 +12,11 @@
 npm run lint        # ESLint — zero new errors
 npm run format      # Prettier — all files clean
 git add -A
-git commit          # Pre-commit hook: cache-bump guard runs first, then 359 tests
+git commit          # Pre-commit hook: cache-bump guard runs first, then 363 tests
 git push origin main  # CACHE_NAME must already be bumped (Protocol 1)
 ```
 
-- **359 tests must pass.** If fewer pass, something is broken. Investigate before committing.
+- **363 tests must pass.** If fewer pass, something is broken. Investigate before committing.
 - **Bump `CACHE_NAME` before every push.** No push may ship without a new cache rev (Protocol 1) — this is a hard gate, not just for UI/JS changes.
 - **Cache-bump guard runs at commit time** — the hook compares the staged `CACHE_NAME` against `origin/main` and blocks if they match. A missed bump fails the commit before the test suite even runs.
 - **Never use `--no-verify`** unless the user explicitly authorizes it for a stated emergency.
@@ -34,7 +34,7 @@ Bump `CACHE_NAME` in `sw.js` before **every `git push`** — full stop. Every pu
 
 **Why:** The SW is cache-first. Without a new `CACHE_NAME`, cached users silently run the old build and never see the "REBOOT TERMINAL" update prompt. Bumping on every push guarantees the prompt fires for all clients on every release.
 
-**Automated guard:** This requirement is now enforced by the pre-commit hook. Before the 359-test suite runs, the hook compares the staged `CACHE_NAME` against `origin/main:sw.js` and fails the commit immediately if they match. A missed bump is impossible to commit, not just discouraged.
+**Automated guard:** This requirement is now enforced by the pre-commit hook. Before the 363-test suite runs, the hook parses the staged `CACHE_NAME` against `origin/main:sw.js` and requires a strict monotonic increase in the `-rN` revision number when `APP_VERSION` is unchanged — equal or lower revs are blocked, not just equal ones. When `APP_VERSION` changes, the revision can reset. A missed or decremented bump is impossible to commit past.
 
 ---
 
@@ -80,7 +80,6 @@ Run this after every test addition or removal. Every hit must show the new count
 
 - **Fallout game data** (items, quests, perks, locations): Source from `fallout.wiki` only. The AI acts as typist, not authority.
 - **Architecture decisions:** `ARCHITECTURE.md` is canonical. Treat it as approved unless the user explicitly overrides.
-- **Features #44 and #45** are permanently excluded. Never discuss, implement, or suggest alternatives.
 
 ---
 
@@ -96,7 +95,7 @@ Requires changes in **4 files minimum.** The pre-commit audit will block if any 
 - [ ] Add `<details class="panel">` block in `index.html` (if it needs a panel)
 - [ ] Bump `CACHE_NAME` in `sw.js` → Protocol 1
 - [ ] Run `npm run lint` and `npm run format`
-- [ ] Run `git commit` — 359 tests must pass
+- [ ] Run `git commit` — 363 tests must pass
 - [ ] Update `ARCHITECTURE.md`, `CHANGELOG.md`, `README.md` → Protocol 2
 
 ---
@@ -110,7 +109,7 @@ Requires changes in **4 files minimum.** The pre-commit audit will block if any 
 - [ ] If AI changes should auto-expand it: add key to `expandPanelForCategory()` map in `ui.js`
 - [ ] If it has a text input with autocomplete: call `wireInput()` in `initRegistryAutocomplete()` in `ui.js`
 - [ ] Bump `CACHE_NAME` → Protocol 1
-- [ ] Lint, format, commit (359 tests) → Protocol 2
+- [ ] Lint, format, commit (363 tests) → Protocol 2
 
 ---
 
@@ -310,7 +309,6 @@ Treat model usage as a budget — and the burden of efficiency is on the orchest
 | Recursive key transformation on AI JSON responses           | Use explicit field mapping in `autoImportState()`                                                                                                                                                      |
 | Silent drops of inventory during token triage               | Inventory must always be returned when relevant keywords match                                                                                                                                         |
 | Auto-push to cloud on stat changes                          | Cloud sync is manual button only                                                                                                                                                                       |
-| Implement or discuss features #44 or #45                    | Permanently excluded by owner                                                                                                                                                                          |
 | Leave stale test counts in docs after adding/removing tests | Protocol 2a requires all counts updated in the same commit                                                                                                                                             |
 
 ---
@@ -330,4 +328,4 @@ Treat model usage as a budget — and the burden of efficiency is on the orchest
 
 **State persistence:** `localStorage` key `robco_v7`. Debounced 500ms writes. Flushed immediately on `beforeunload`.
 
-**Test suite:** 359 tests across 34 suites, mirrored in `tests/check-persistence.ps1` (PowerShell, run by the pre-commit hook) and `tests/check-persistence.js` (Node) — both runners are kept at exact parity (same suites, same per-suite counts, same 359 total). Covers parser sanity, autoImportState coverage, faction registry, skill keys, save envelope, file upload, cloud sync, backward compatibility, registry structural integrity, reputation 2D matrix, C2 CRUD function existence, C3 CAMPG tab DOM binding, C4 Protocol 4 campaignMode (binary) + separation, render contracts, CSS invariants, SW invariants, structural integrity (Protocol 20 static guards), detail-current dedup guard (Protocol 27), FO3 database structural integrity, CSV column-count integrity, security regression guards (XSS-1/XSS-2/XSS-3), critical feature presence and SW update banner regression (Suites 22–29 gate guards: UI controls, prohibited patterns, protocol completeness, AI contract lock, architectural boundaries, assets completeness, meta/runner parity, SW update banner). **When you change one runner, update the other in the same commit** — drift here is what let the PS runner silently fall to 173.
+**Test suite:** 363 tests across 34 suites, mirrored in `tests/check-persistence.ps1` (PowerShell, run by the pre-commit hook) and `tests/check-persistence.js` (Node) — both runners are kept at exact parity (same suites, same per-suite counts, same 363 total). Covers parser sanity, autoImportState coverage, faction registry, skill keys, save envelope, file upload, cloud sync, backward compatibility, registry structural integrity, reputation 2D matrix, C2 CRUD function existence, C3 CAMPG tab DOM binding, C4 Protocol 4 campaignMode (binary) + separation, render contracts, CSS invariants, SW invariants, structural integrity (Protocol 20 static guards), detail-current dedup guard (Protocol 27), FO3 database structural integrity, CSV column-count integrity, security regression guards (XSS-1/XSS-2/XSS-3), critical feature presence and SW update banner regression (Suites 22–29 gate guards: UI controls, prohibited patterns, protocol completeness, AI contract lock, architectural boundaries, assets completeness, meta/runner parity, SW update banner). **When you change one runner, update the other in the same commit** — drift here is what let the PS runner silently fall to 173.

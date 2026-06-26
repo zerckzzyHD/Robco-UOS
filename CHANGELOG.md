@@ -1,4 +1,4 @@
-## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 359/359 | Cache: robco-terminal-v2.0.1-r29 -->
+## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 363/363 | Cache: robco-terminal-v2.0.1-r30 -->
 
 ### Added
 
@@ -48,6 +48,11 @@
 - Added and refined agent protocols 8 through 28 governing the multi-model workflow, dispatch reporting, UI verification, deploy verification, mobile standards, and process rules.
 - Expanded the plain-English changelog style guide (Protocol 21) with a seven-rule universal style section. Updated dispatch reporting rules (Protocol 9) to require short, scannable, mobile-optimized reports. Restyled the entire changelog to conform.
 - Fixed two ways a crafted save or AI response could inject code: companion squad numeric fields (HP, ammo, damage threshold) are now coerced to integers before being written to the page, and the trade window click handler no longer embeds item names directly into the page's script — it uses a safe event listener instead.
+- The terminal now warns you when your save file is approaching the browser's storage limit — an alert appears in the chat log so you can export before a write failure occurs.
+- Free-text inputs now have character caps to prevent oversized entries from bloating save data or stretching the layout.
+- The pre-commit revision guard now blocks decremented or unchanged revisions — any attempt to lower or keep the revision number is caught before the test suite runs, enforcing a strict monotonic increase.
+- Added a passive Content Security Policy header to the page that logs unexpected resource origins without blocking anything — groundwork for enforcing a full security policy later.
+- Added 4 new automated tests (Suite 30) guarding the input caps, CSP header, quota warning, and monotonic cache guard.
 - Closed three more spots where a malicious save or AI response could inject content into the page: inventory item quantities, weights, and values are now coerced to numbers before rendering; quest faction tags are now escaped; and quest status values are now restricted to a fixed list (active, complete, or failed) and also escaped. Added 5 automated tests guarding these fixes from regressing.
 - The app now survives a corrupt save file instead of showing a blank screen. If the save data cannot be read, it is automatically set aside and the app starts fresh, rather than crashing on boot.
 - Fixed a broken data row in the Fallout 3 weapon database: the Fat Man had an extra trailing field that caused one column to be misread.

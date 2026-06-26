@@ -966,11 +966,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-29)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-29)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-30)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-30)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -995,6 +995,31 @@ Check ([bool]($triggerBody29 -match 'SKIP_WAITING') -and [bool]($triggerBody29 -
     "_triggerUpdate() wires banner tap to postMessage SKIP_WAITING (update path intact)"
 Check ([bool]($htmlSrc -match 'refreshing') -and [bool]($htmlSrc -match 'hadController')) `
     "controllerchange reload guard (refreshing + hadController) intact in index.html (Protocol 20)"
+
+# ===========================================================
+# Suite 30 -- Phase 1b Guards
+# Input maxlength caps, CSP-Report-Only header, monotonic cache
+# guard in pre-commit hook, proactive localStorage quota warning.
+# 4 tests
+# ===========================================================
+Sep "Suite 30 -- Phase 1b Guards"
+# 30.1 #chatInput textarea has maxlength attribute
+Check ([bool]($htmlSrc -match 'id="chatInput"[\s\S]{0,300}maxlength')) `
+    '#chatInput textarea has maxlength attribute (Phase 1b input cap guard)'
+# 30.2 CSP-Report-Only meta present in index.html
+Check ([bool]($htmlSrc -match 'Content-Security-Policy-Report-Only')) `
+    'index.html contains Content-Security-Policy-Report-Only meta (Phase 1b security header)'
+# 30.3 Pre-commit hook enforces monotonic rev increase
+$hookSrc30 = ''
+if (Test-Path (Join-Path $Root '.git/hooks/pre-commit')) {
+    $hookSrc30 = [System.IO.File]::ReadAllText((Join-Path $Root '.git/hooks/pre-commit'))
+}
+Check ([bool]($hookSrc30 -match 'LOCAL_N.*-gt.*ORIGIN_N')) `
+    'pre-commit hook enforces strict monotonic rev increase (LOCAL_N -gt ORIGIN_N)'
+# 30.4 saveState() contains proactive quota warning
+$stateSrc30 = Read-Src 'js/state.js'
+Check ([bool]($stateSrc30 -match '_quotaWarnShown')) `
+    'saveState() contains proactive localStorage quota warning (once-per-session guard)'
 
 # ===========================================================
 # Results
