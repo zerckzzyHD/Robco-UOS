@@ -724,9 +724,11 @@ Test-WeaponsCsvColumnCount -src $dbFo3Src  -label "db_fo3.js"
 
 # ===========================================================
 # Suite 21 -- Security regression guards (Protocol 13/20)
-# Static assertions that XSS-1 (squad numeric coercion) and
-# XSS-2 (trade modal click binding) fixes cannot regress.
-# 4 tests
+# Static assertions that XSS-1 (squad numeric coercion),
+# XSS-2 (trade modal click binding), and XSS-3 (inventory
+# qty/wgt/val coercion + quest factions/status escaping) fixes
+# cannot regress.
+# 9 tests
 # ===========================================================
 Sep "Suite 21 -- Security regression guards"
 
@@ -753,6 +755,30 @@ Check ($tradeBlock -notmatch 'onclick\s*=\s*[''"`]\s*tradeItem\s*\(') `
 # 21.4 Trade modal uses addEventListener for click binding
 Check ($tradeBlock -match "addEventListener\s*\(\s*['""]click['""]") `
     "Trade modal binds click via addEventListener (XSS-2 guard)"
+
+# 21.5 autoImportState() coerces inventory qty with parseInt and wgt with parseFloat
+Check ([bool]([regex]::Match($importBody21, 'parseInt\s*\(\s*it\.qty\s*\)').Success) -and
+       [bool]([regex]::Match($importBody21, 'parseFloat\s*\(\s*it\.wgt').Success)) `
+    "autoImportState() coerces inventory qty (parseInt) and wgt (parseFloat) at import (XSS-3 guard)"
+
+# 21.6 renderInventory() coerces qty/wgt with parseInt/parseFloat before innerHTML
+$renderInvBody = Get-FunctionBody $uiSrc 'renderInventory'
+Check ([bool]([regex]::Match($renderInvBody, 'parseInt\s*\(\s*it\.qty\s*\)').Success) -and
+       [bool]([regex]::Match($renderInvBody, 'parseFloat\s*\(\s*it\.wgt\s*\)').Success)) `
+    "renderInventory() coerces qty and wgt with parseInt/parseFloat before innerHTML (XSS-3 guard)"
+
+# 21.7 autoImportState() whitelists quest status to active|complete|failed
+Check ([bool]([regex]::Match($importBody21, "\['active',\s*'complete',\s*'failed'\]\.includes").Success)) `
+    "autoImportState() whitelists quest status to active|complete|failed (XSS-3 guard)"
+
+# 21.8 renderQuests() escapes quest factions with escapeHtml
+$renderQuestsBody = Get-FunctionBody $uiSrc 'renderQuests'
+Check ([bool]([regex]::Match($renderQuestsBody, 'escapeHtml.*q\.factions').Success)) `
+    "renderQuests() escapes quest factions with escapeHtml before innerHTML (XSS-3 guard)"
+
+# 21.9 renderQuests() escapes quest status with escapeHtml
+Check ([bool]([regex]::Match($renderQuestsBody, 'escapeHtml\s*\(\s*st\.toUpperCase').Success)) `
+    "renderQuests() escapes quest status with escapeHtml before innerHTML (XSS-3 guard)"
 
 # ===========================================================
 # Results

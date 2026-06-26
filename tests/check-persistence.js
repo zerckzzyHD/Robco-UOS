@@ -1125,9 +1125,11 @@ checkWeaponsCsvColumnCount(dbFo3Source, 'db_fo3.js');
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 21 — Security regression guards (Protocol 13/20)
-//  Static assertions that XSS-1 (squad numeric coercion) and
-//  XSS-2 (trade modal click binding) fixes cannot regress.
-//  4 tests
+//  Static assertions that XSS-1 (squad numeric coercion),
+//  XSS-2 (trade modal click binding), and XSS-3 (inventory
+//  qty/wgt/val coercion + quest factions/status escaping) fixes
+//  cannot regress.
+//  9 tests
 // ══════════════════════════════════════════════════════════════
 header('Security regression guards');
 
@@ -1175,6 +1177,51 @@ assert(
   assert(
     /addEventListener\s*\(\s*['"]click['"]/.test(tradeBlock),
     'Trade modal binds click via addEventListener (XSS-2 guard)'
+  );
+}
+
+// 21.5 autoImportState() coerces inventory qty with parseInt and wgt with parseFloat
+assert(
+  /parseInt\s*\(\s*it\.qty\s*\)/.test(importBody) && /parseFloat\s*\(\s*it\.wgt/.test(importBody),
+  'autoImportState() coerces inventory qty (parseInt) and wgt (parseFloat) at import (XSS-3 guard)'
+);
+
+// 21.6 renderInventory() coerces qty/wgt with parseInt/parseFloat before innerHTML
+{
+  let renderInvBody = '';
+  try {
+    renderInvBody = extractFunctionBody(uiSource, 'renderInventory');
+  } catch (e) {
+    fail(`Cannot extract renderInventory: ${e.message}`);
+  }
+  assert(
+    /parseInt\s*\(\s*it\.qty\s*\)/.test(renderInvBody) &&
+      /parseFloat\s*\(\s*it\.wgt\s*\)/.test(renderInvBody),
+    'renderInventory() coerces qty and wgt with parseInt/parseFloat before innerHTML (XSS-3 guard)'
+  );
+}
+
+// 21.7 autoImportState() whitelists quest status to active|complete|failed
+assert(
+  /\['active',\s*'complete',\s*'failed'\]\.includes/.test(importBody),
+  'autoImportState() whitelists quest status to active|complete|failed (XSS-3 guard)'
+);
+
+// 21.8–21.9 renderQuests() escapes quest factions and status with escapeHtml
+{
+  let renderQuestsBody = '';
+  try {
+    renderQuestsBody = extractFunctionBody(uiSource, 'renderQuests');
+  } catch (e) {
+    fail(`Cannot extract renderQuests: ${e.message}`);
+  }
+  assert(
+    /escapeHtml.*q\.factions/.test(renderQuestsBody),
+    'renderQuests() escapes quest factions with escapeHtml before innerHTML (XSS-3 guard)'
+  );
+  assert(
+    /escapeHtml\s*\(\s*st\.toUpperCase/.test(renderQuestsBody),
+    'renderQuests() escapes quest status with escapeHtml before innerHTML (XSS-3 guard)'
   );
 }
 

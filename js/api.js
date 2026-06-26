@@ -446,8 +446,8 @@ function autoImportState(jsonString) {
       if (!state.ammo) state.ammo = {};
       state.inventory = inv
         .map(it => {
-          let wgt = it.wgt ?? it.weight ?? 0;
-          let val = it.val ?? it.value ?? 0;
+          let wgt = parseFloat(it.wgt ?? it.weight ?? 0) || 0;
+          let val = parseInt(it.val ?? it.value ?? 0) || 0;
           let type = it.type ?? 'misc';
           // Auto-fill from database if AI omitted weight/value
           if ((wgt === 0 || type === 'misc') && it.name) {
@@ -460,7 +460,7 @@ function autoImportState(jsonString) {
           }
           return {
             name: it.name ?? '',
-            qty: it.qty ?? 1,
+            qty: parseInt(it.qty) || 1,
             wgt: wgt,
             val: val,
             type: type,
@@ -503,7 +503,10 @@ function autoImportState(jsonString) {
       const questsBefore = JSON.parse(window._lastStateBeforeSync || '{}').quests || [];
       state.quests = parsed.quests.map(q => ({
         name: q.name || 'Unknown',
-        status: (q.status || 'active').toLowerCase(),
+        status: (() => {
+          const s = (q.status || '').toLowerCase();
+          return ['active', 'complete', 'failed'].includes(s) ? s : 'active';
+        })(),
         objective: q.objective || null,
         factions: q.factions || null,
       }));

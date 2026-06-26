@@ -56,8 +56,8 @@
 │   └── database.js     ~25KB CSV data (~170 weapons, ~68 armors, ~45 chems) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── check-persistence.ps1   28KB    280-test pre-commit audit
-│   ├── check-persistence.js    36KB    280-test Node runner (parity with .ps1)
+│   ├── check-persistence.ps1   28KB    285-test pre-commit audit
+│   ├── check-persistence.js    36KB    285-test Node runner (parity with .ps1)
 │   └── run-tests.bat           (Batch launcher)
 ├── CHANGELOG.md        ~74KB  Full version history
 ├── icon.png            68KB   PWA icon
@@ -887,7 +887,7 @@ Forgetting to bump means cached users **silently run the old UI** until they man
 
 ### Automated Guard
 
-The pre-commit hook enforces this rule automatically. Before running the 280-test suite, it reads `CACHE_NAME` from the staged `sw.js` and compares it to `origin/main:sw.js`. If they match, the commit is blocked with a clear error. A missed bump is impossible to commit past.
+The pre-commit hook enforces this rule automatically. Before running the 285-test suite, it reads `CACHE_NAME` from the staged `sw.js` and compares it to `origin/main:sw.js`. If they match, the commit is blocked with a clear error. A missed bump is impossible to commit past.
 
 ### Historical Note
 
@@ -906,7 +906,7 @@ This protocol was formalized in v1.6.5 after the perk panel (`addPerk()` + `#new
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (fails immediately if not bumped), then the 280-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (fails immediately if not bumped), then the 285-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

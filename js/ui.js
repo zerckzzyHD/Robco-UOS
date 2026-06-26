@@ -2289,7 +2289,7 @@ function renderInventory() {
     .map(it => {
       const cat = (it.type || 'misc').toLowerCase();
       const typeTag = `<span style="font-size:9px;opacity:0.7;margin-right:3px;color:${typeColors[cat] || 'inherit'};">[${cat.toUpperCase()}]</span>`;
-      return `<li><button class="use-btn" data-use="${it._origIdx}" title="Quick-use: send [USE] ${escapeHtml(it.name)}">USE</button>${typeTag}<span>${it.qty}x ${escapeHtml(it.name)} (${it.wgt || 0} lb${it.val ? ' · ' + it.val + 'c' : ''})</span> <button class="delete-btn" data-idx="${it._origIdx}">X</button></li>`;
+      return `<li><button class="use-btn" data-use="${it._origIdx}" title="Quick-use: send [USE] ${escapeHtml(it.name)}">USE</button>${typeTag}<span>${parseInt(it.qty) || 0}x ${escapeHtml(it.name)} (${parseFloat(it.wgt) || 0} lb${parseInt(it.val) ? ' · ' + parseInt(it.val) + 'c' : ''})</span> <button class="delete-btn" data-idx="${it._origIdx}">X</button></li>`;
     })
     .join('');
   lst.onclick = e => {
@@ -2809,9 +2809,9 @@ function renderQuests() {
         const st = (q.status || 'active').toLowerCase();
         const color = statusColors[st] || 'inherit';
         const factions = q.factions
-          ? ` <span style="font-size:9px;opacity:0.6;">[${q.factions}]</span>`
+          ? ` <span style="font-size:9px;opacity:0.6;">[${escapeHtml(String(q.factions))}]</span>`
           : '';
-        return `<li style="color:${color};">[${st.toUpperCase()}] ${escapeHtml(q.name)}${factions}${q.objective ? '<div style="font-size:10px;opacity:0.7;margin-left:10px;">' + escapeHtml(q.objective) + '</div>' : ''}<button class="delete-btn" style="float:right;" onclick="removeQuest(${i})">X</button></li>`;
+        return `<li style="color:${color};">[${escapeHtml(st.toUpperCase())}] ${escapeHtml(q.name)}${factions}${q.objective ? '<div style="font-size:10px;opacity:0.7;margin-left:10px;">' + escapeHtml(q.objective) + '</div>' : ''}<button class="delete-btn" style="float:right;" onclick="removeQuest(${i})">X</button></li>`;
       })
       .join('') +
     '</ul>';
