@@ -980,7 +980,7 @@ assert(
 // ══════════════════════════════════════════════════════════════
 //  SUITE 17 — Structural Integrity (Protocol 20)
 //  Verifies key render functions exist, are called, and their DOM targets exist.
-//  9 tests
+//  11 tests
 // ══════════════════════════════════════════════════════════════
 header('Structural Integrity (Protocol 20)');
 assert(
@@ -998,6 +998,16 @@ assert(/renderFactionRep\(\)/.test(uiSource), 'renderFactionRep() is called in u
 assert(/id="worldMapPanel"/.test(indexHtml), 'worldMapPanel panel exists in index.html');
 assert(/id="worldMapDisplay"/.test(indexHtml), 'worldMapDisplay element exists in index.html');
 assert(/id="factionContainer"/.test(indexHtml), 'factionContainer element exists in index.html');
+assert(
+  /id="transmitBtn"/.test(indexHtml),
+  'transmitBtn send button exists in index.html (Protocol 13 — regression guard)'
+);
+assert(
+  /<button[^>]*onclick="transmitMessage\(\)"[^>]*id="transmitBtn"|<button[^>]*id="transmitBtn"[^>]*onclick="transmitMessage\(\)"/.test(
+    indexHtml
+  ),
+  'transmitBtn is wired to transmitMessage() (Protocol 13 — send-button regression guard)'
+);
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 18 — Detail-Current Dedup Guard (Protocol 27)

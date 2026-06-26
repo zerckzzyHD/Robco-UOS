@@ -1,4 +1,4 @@
-## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 285/285 | Cache: robco-terminal-v2.0.1-r25 -->
+## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 287/287 | Cache: robco-terminal-v2.0.1-r26 -->
 
 ### Added
 
@@ -13,6 +13,7 @@
 
 ### Fixed
 
+- The SEND button (labeled "TRANSMIT PROTOCOL") in the chat area was missing — it had been accidentally removed when the v2.0.1 UI was rebuilt. Sending a message now works by tapping the button as well as Ctrl+Enter. A regression test was added to prevent this from being silently dropped again.
 - Tapping OK on the "new version available" prompt now actually updates and reloads the app. Previously, tapping OK did nothing.
 - Number input fields in the character panel no longer stretch too wide on phones and no longer left a stray vertical green line down the page.
 - Faction buttons inside each faction card no longer stack as full-width rectangles on phones — they stay compact in a row at the correct size.

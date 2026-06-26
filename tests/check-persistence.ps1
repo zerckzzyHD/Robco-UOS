@@ -585,7 +585,7 @@ Check ($htmlSrc -match 'SKIP_WAITING' -and $htmlSrc -match 'reg\.waiting' -and $
 # ===========================================================
 # Suite 17 -- Structural Integrity (Protocol 20)
 # Verifies key render functions exist, are called, and their DOM targets exist.
-# 9 tests
+# 11 tests
 # ===========================================================
 Sep "Suite 17 -- Structural Integrity (Protocol 20)"
 Check ($uiSrc -match 'function _updatePanelBadges\b')   '_updatePanelBadges() function exists in ui.js'
@@ -597,6 +597,8 @@ Check ($uiSrc -match 'renderFactionRep\(\)')             'renderFactionRep() is 
 Check ($htmlSrc -match 'id="worldMapPanel"')             'worldMapPanel panel exists in index.html'
 Check ($htmlSrc -match 'id="worldMapDisplay"')           'worldMapDisplay element exists in index.html'
 Check ($htmlSrc -match 'id="factionContainer"')          'factionContainer element exists in index.html'
+Check ($htmlSrc -match 'id="transmitBtn"')               'transmitBtn send button exists in index.html (Protocol 13 -- regression guard)'
+Check ([bool]([regex]::Match($htmlSrc, '<button[^>]*onclick="transmitMessage\(\)"[^>]*id="transmitBtn"|<button[^>]*id="transmitBtn"[^>]*onclick="transmitMessage\(\)"').Success)) 'transmitBtn is wired to transmitMessage() (Protocol 13 -- send-button regression guard)'
 
 # ===========================================================
 # Suite 18 -- Detail-Current Dedup Guard (Protocol 27)
