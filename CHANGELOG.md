@@ -1,4 +1,4 @@
-## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 355/355 | Cache: robco-terminal-v2.0.1-r28 -->
+## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 359/359 | Cache: robco-terminal-v2.0.1-r29 -->
 
 ### Added
 
@@ -13,6 +13,7 @@
 
 ### Fixed
 
+- The "new version available" notification is now an amber bar across the top of the screen instead of a browser pop-up dialog. Mobile browsers can silently block pop-up dialogs — the amber bar cannot be suppressed, so users will always be told when an update is ready. Tap the bar to apply the update and reload immediately.
 - The SEND button (labeled "TRANSMIT PROTOCOL") in the chat area was missing — it had been accidentally removed when the v2.0.1 UI was rebuilt. Sending a message now works by tapping the button as well as Ctrl+Enter. A regression test was added to prevent this from being silently dropped again.
 - Tapping OK on the "new version available" prompt now actually updates and reloads the app. Previously, tapping OK did nothing.
 - Number input fields in the character panel no longer stretch too wide on phones and no longer left a stray vertical green line down the page.

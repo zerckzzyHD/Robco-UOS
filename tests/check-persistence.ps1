@@ -966,17 +966,35 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-28)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-28)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-29)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-29)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
 Check ($canon28 -ne '') "CHANGELOG.md contains Tests: N/N header (Protocol 2a)"
 $readmeSrc28 = Read-Src "README.md"
 Check ($canon28 -ne '' -and ($readmeSrc28 -match $canon28)) "README.md contains CHANGELOG.md canonical test count ($canon28)"
+
+# ===========================================================
+# Suite 29 -- SW Update Banner (Protocol 13/20)
+# Regression guards: alert() replaced by in-page banner;
+# banner element + tap->SKIP_WAITING wiring; reload guard intact.
+# 4 tests
+# ===========================================================
+Sep "Suite 29 -- SW Update Banner"
+$triggerBody29 = ''
+try { $triggerBody29 = Get-FunctionBody $htmlSrc '_triggerUpdate' } catch {}
+Check (-not ($triggerBody29 -match '\balert\s*\(')) `
+    "_triggerUpdate() does not call alert() -- banner replaces browser dialog (Protocol 13 guard)"
+Check ([bool]($htmlSrc -match 'id="updateBanner"')) `
+    'id="updateBanner" element exists in index.html (in-page update UI)'
+Check ([bool]($triggerBody29 -match 'SKIP_WAITING') -and [bool]($triggerBody29 -match 'onclick|addEventListener')) `
+    "_triggerUpdate() wires banner tap to postMessage SKIP_WAITING (update path intact)"
+Check ([bool]($htmlSrc -match 'refreshing') -and [bool]($htmlSrc -match 'hadController')) `
+    "controllerchange reload guard (refreshing + hadController) intact in index.html (Protocol 20)"
 
 # ===========================================================
 # Results

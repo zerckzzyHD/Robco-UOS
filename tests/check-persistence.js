@@ -1564,17 +1564,18 @@ header('Meta / Runner Parity');
     'Suite 26',
     'Suite 27',
     'Suite 28',
+    'Suite 29',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-28)' +
+    'JS runner contains all gate-guard suites (22-29)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-28)' +
+    'PS runner contains all gate-guard suites (22-29)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -1591,6 +1592,50 @@ header('Meta / Runner Parity');
     `README.md contains CHANGELOG.md canonical test count (${canonicalCount})`
   );
 }
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 29 — SW Update Banner (Protocol 13/20)
+//  Regression guards: alert() replaced by in-page banner;
+//  banner element + tap→SKIP_WAITING wiring; reload guard intact.
+//  4 tests
+// ══════════════════════════════════════════════════════════════
+header('SW Update Banner');
+
+// 29.1 _triggerUpdate() no longer calls alert()
+{
+  let triggerBody = '';
+  try {
+    triggerBody = extractFunctionBody(htmlSource, '_triggerUpdate');
+  } catch (_) {}
+  assert(
+    !/\balert\s*\(/.test(triggerBody),
+    '_triggerUpdate() does not call alert() — banner replaces browser dialog (Protocol 13 guard)'
+  );
+}
+
+// 29.2 updateBanner element exists in index.html
+assert(
+  /id="updateBanner"/.test(htmlSource),
+  'id="updateBanner" element exists in index.html (in-page update UI)'
+);
+
+// 29.3 Banner tap wires to SKIP_WAITING (onclick sends postMessage SKIP_WAITING)
+{
+  let triggerBody = '';
+  try {
+    triggerBody = extractFunctionBody(htmlSource, '_triggerUpdate');
+  } catch (_) {}
+  assert(
+    /SKIP_WAITING/.test(triggerBody) && /onclick|addEventListener/.test(triggerBody),
+    "_triggerUpdate() wires banner tap to postMessage({ type: 'SKIP_WAITING' }) (update path intact)"
+  );
+}
+
+// 29.4 controllerchange single-reload guard still present
+assert(
+  /refreshing/.test(htmlSource) && /hadController/.test(htmlSource),
+  'controllerchange reload guard (refreshing + hadController) intact in index.html (Protocol 20)'
+);
 
 // ══════════════════════════════════════════════════════════════
 //  RESULTS

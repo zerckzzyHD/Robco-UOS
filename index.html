@@ -44,6 +44,10 @@
   </head>
 
   <body>
+    <!-- SW update banner: replaces alert(); fixed amber strip, tap to reload -->
+    <div id="updateBanner" role="alert" aria-live="assertive" style="display: none" tabindex="0">
+      &gt;&nbsp;&#x21BA;&nbsp;UPDATE AVAILABLE &mdash; TAP TO REBOOT TERMINAL
+    </div>
     <div id="bootScreen">
       <div id="bootLines"></div>
       <span id="bootCursor">_</span>
@@ -2045,8 +2049,19 @@
         // Send SKIP_WAITING to the given waiting worker, then wait for
         // controllerchange (fired when it activates) to reload the page.
         function _triggerUpdate(worker) {
-          alert('>> SYSTEM UPDATE AVAILABLE <<\nTap OK to Reboot Terminal.');
-          worker.postMessage({ type: 'SKIP_WAITING' });
+          const banner = document.getElementById('updateBanner');
+          if (!banner) {
+            worker.postMessage({ type: 'SKIP_WAITING' });
+            return;
+          }
+          banner.style.display = 'flex';
+          banner.onclick = function () {
+            banner.style.display = 'none';
+            worker.postMessage({ type: 'SKIP_WAITING' });
+          };
+          banner.onkeydown = function (e) {
+            if (e.key === 'Enter' || e.key === ' ') banner.onclick();
+          };
         }
 
         navigator.serviceWorker.register('sw.js').then(reg => {

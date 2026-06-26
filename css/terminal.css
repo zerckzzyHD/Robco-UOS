@@ -1824,3 +1824,39 @@ body.sync-complete {
     animation: none !important;
   }
 }
+
+/* ─── SW Update Banner ────────────────────────────────────────── */
+/* Fixed amber strip shown when a new service-worker version is waiting.
+   Uses position:fixed so it never contributes to document overflow. */
+#updateBanner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10000;
+  background: var(--robco-alert);
+  color: #000;
+  padding: 10px 16px;
+  text-align: center;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 0.9rem;
+  letter-spacing: 0.06em;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  animation: update-banner-pulse 2s ease-in-out infinite;
+  user-select: none;
+  -webkit-user-select: none;
+  text-shadow: none;
+}
+@keyframes update-banner-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.72;
+  }
+}
