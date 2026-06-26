@@ -152,6 +152,60 @@ When work is run via Dispatch, never finish a task or complete a git push silent
 
 ---
 
+## Protocol 10 — UI Verification
+
+Any change touching `index.html`, `css/`, or render JS (`ui.js` `render*` functions) must be verified by actually **rendering** the affected UI at **360px, 412px, and ≥1000px (desktop)** before it is considered done — never from headless width measurements alone. Confirm no horizontal page overflow (`document.documentElement.scrollWidth === window.innerWidth`), the component looks correct, and desktop is unchanged.
+
+---
+
+## Protocol 11 — Deploy Verification
+
+After any push that affects the live site, confirm the change actually reached `origin/main` AND is served by GitHub Pages (account for CDN + service-worker caching), then tell the user the exact step to see it (reload + tap "Reboot Terminal"). Never report a UI change as live without this check.
+
+---
+
+## Protocol 12 — No Concurrent Pushes
+
+Never run two sessions that commit/push this repo at the same time — sequence them to avoid branch/worktree collisions. Combined with the Protocol 8 audit gate, only one change lands at a time.
+
+---
+
+## Protocol 13 — Regression Test Required
+
+When a bug is fixed, add a test (in the same commit, or the immediately following one) that would have caught it, and re-sync the count per Protocol 2a in both runners. No bug fix ships without a guarding test where feasible.
+
+---
+
+## Protocol 14 — AI Contract Safety
+
+When changing `getSystemDirective()`'s schema or the Tri-Node JSON response shape (`narrative`/`state`/`modal`), add or update a test in the **same commit** that validates the schema and the `autoImportState()` round-trip. The app is locked to JSON AI responses (`responseMimeType: 'application/json'`); a silent schema break is catastrophic and must be guarded by a test.
+
+---
+
+## Protocol 15 — Test-Runner Parity
+
+`tests/check-persistence.js` (Node) and `tests/check-persistence.ps1` (PowerShell) must stay at identical coverage and count. Change one → update the other in the **same commit**, and verify both report the same count and pass. (This is what drifted into the 173-vs-209 gap.)
+
+---
+
+## Protocol 16 — Hotfix / Rollback
+
+If a push breaks the live site (e.g. black screen / failed boot), restore users **first** — `git revert` the offending commit, bump `CACHE_NAME`, push — **then** diagnose the root cause. Restore first, debug second.
+
+---
+
+## Protocol 17 — Mobile Baseline
+
+All UI must hold these mobile invariants: focusable inputs render at ≥16px font (prevents iOS/Android focus auto-zoom), interactive controls have ≥28px tap targets, and no component may force horizontal overflow at 360px (`document.documentElement.scrollWidth` must equal `window.innerWidth`). Verify per Protocol 10.
+
+---
+
+## Protocol 18 — Memory Maintenance
+
+Keep durable project facts (repo path, current `APP_VERSION` and cache rev, key architecture decisions, recurring gotchas) recorded and current as they change, so context isn't re-litigated across sessions.
+
+---
+
 ## Prohibited Patterns
 
 | Never Do                                                    | Why                                                               |

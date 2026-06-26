@@ -1,4 +1,24 @@
-## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 209/209 | Cache: robco-terminal-v2.0.1-r9 -->
+## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 209/209 | Cache: robco-terminal-v2.0.1-r10 -->
+
+### [B9] Nine new project protocols + CRLF/LF line-ending fix (2026-06-26)
+
+Docs-only update — no app behavior changed, test counts stay at 209.
+
+**Nine new agent protocols added** (Protocols 10–18), locking in lessons learned across recent sessions:
+
+- **Protocol 10 — UI Verification:** Any change to HTML, CSS, or render functions must be verified by actually rendering at 360px, 412px, and desktop width — not from headless measurements alone. No horizontal overflow allowed (`scrollWidth === innerWidth`).
+- **Protocol 11 — Deploy Verification:** After any push, confirm the change reached origin/main and GitHub Pages, and tell the user exactly what to do to see it (reload + "Reboot Terminal").
+- **Protocol 12 — No Concurrent Pushes:** Never run two sessions pushing this repo at the same time. Sequence them.
+- **Protocol 13 — Regression Test Required:** Bug fixed → guarding test added in the same or immediately following commit, both runners synced per Protocol 2a.
+- **Protocol 14 — AI Contract Safety:** Changing the AI response schema (narrative/state/modal) requires a test in the same commit validating the schema and the autoImportState round-trip.
+- **Protocol 15 — Test-Runner Parity:** Node and PowerShell test runners must stay identical — same suites, same counts. (This gap previously caused 173-vs-209 drift.)
+- **Protocol 16 — Hotfix / Rollback:** Broken live site → revert + cache bump first, then diagnose. Users restored before root-cause work begins.
+- **Protocol 17 — Mobile Baseline:** All UI must meet: inputs ≥16px font, tap targets ≥28px, zero horizontal overflow at 360px.
+- **Protocol 18 — Memory Maintenance:** Durable project facts (repo path, version, architecture decisions, gotchas) must be kept current across sessions.
+
+**CRLF/LF line-ending fix:** Added `.gitattributes` at the repo root (`* text=auto eol=lf`, with `.bat`/`.ps1`/`.cmd` files kept as `eol=crlf`). Ran `git add --renormalize .` to normalize all existing files in one shot. This eliminates the phantom thousands-of-lines diffs caused by Windows/Unix line-ending churn. No content changed — only line endings.
+
+**Map overflow re-verified:** Opening the World Map panel (4×4 compact view and 6×6 FULL MAP toggle) at 360px and 412px still produces zero page overflow — `scrollWidth === innerWidth` (509) in all states, panel widths unchanged (`diffs: {}`). The r7+r8 fix holds.
 
 ### [B8] Dispatch workflow upgraded to 3-stage with audit and reporting (2026-06-26)
 
