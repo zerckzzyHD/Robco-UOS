@@ -1,4 +1,10 @@
-## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-25 | Tests: 209/209 | Cache: robco-terminal-v2.0.1-r1 -->
+## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-25 | Tests: 209/209 | Cache: robco-terminal-v2.0.1-r2 -->
+
+### [HOTFIX] Boot Failure — Missing Script Loaders (2026-06-25)
+
+- **Symptom**: Terminal stuck on a black boot screen showing only the `#bootCursor` dash; no UI ever rendered.
+- **Root cause**: The v2.0.1 edit to `index.html` accidentally deleted the entire script-loading block at the bottom of the document — the `document.write` context loader (`db_*.js` / `state.js` / `reg_*.js`), the `ui.js` / `api.js` / `cloud.js` tags, **and** the service-worker registration script. With no application JS loaded, the static `#bootScreen` rendered but `runBootSequence()` never ran, so boot never handed off to `loadUI()`. Not a stray slash — a missing `<script>` section.
+- **Fix**: Restored the script-loading block verbatim before `</body>` in `index.html`. Bumped `CACHE_NAME` → `robco-terminal-v2.0.1-r2` (Protocol 1) so cached users are prompted to reboot and receive the repaired page.
 
 ### [B1b] Map Readability Overhaul (2026-06-25)
 
