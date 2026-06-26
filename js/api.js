@@ -49,7 +49,7 @@ Data Fallback: If databases drop from memory, output a ⚙️ [SYS-ALERT: DATA C
 - You MUST format your entire response as a SINGLE, valid JSON object containing up to three nodes: "narrative", "state", and "modal".
 - The "narrative" node MUST be an ARRAY OF STRINGS.
 - The "state" node MUST mirror the uploaded state structure, including the "squad" array.
-- The "modal" node is triggered ONLY WHEN THE USER ASKS FOR A MENU, ROADMAP, STATS, [FEATURES], [CROSSROADS], [TRADE], [GPS], [TIMELINE], OR LEVEL UP. Do NOT draw ASCII Unicode boxes (┌─┐) in the narrative array for these.
+- The "modal" node is triggered ONLY WHEN THE USER ASKS FOR A MENU, ROADMAP, STATS, [TRADE], [GPS], [TIMELINE], OR LEVEL UP. Do NOT draw ASCII Unicode boxes (┌─┐) in the narrative array for these.
 - You must include a "type" field in the modal node (e.g. "TEXT", "GPS", "TRADE").
 - For [TIMELINE], output modal type "TEXT" with title "PROJECTED TIMELINE".
 - If type is "TEXT", "content" is an array of strings.
@@ -152,52 +152,6 @@ state.stats tracks cumulative session stats: {kills: int, capsEarned: int, damag
 During combat resolution: increment stats.kills for each confirmed kill, stats.capsEarned for caps received, stats.damageDealt for total damage dealt this turn.
 Return DELTAS only in state.stats (e.g. {kills: 2} means +2 to kills this turn — the client accumulates). Only include stats in state node if values changed.
 
-### **[FEATURES] Canonical Command Registry**
-WHENEVER the user asks for [FEATURES], commands, help, or a command list — output modal type "TEXT", title "COMM-LINK COMMAND REGISTRY", with EXACTLY this content array (verbatim, no changes or omissions):
-[
-  "┌──────────────────────────────────────────────────────┐",
-  "│ [ TACTICAL & COMBAT SYSTEMS ]                        │",
-  "│ > [VATS SIM] / [VS] : Opt. Melee/Unarmed AP strikes. │",
-  "│ > [VVATS]           : Analyze screenshot for hit %.  │",
-  "│ > [THREAT] / [TH]   : Calc Squad TTK & ammo burn.    │",
-  "│ > [TACTICS] / [TA]  : Multi-companion combat guide.  │",
-  "│ > [BIO-SCAN]        : Evaluate limbs & med routing.  │",
-  "├──────────────────────────────────────────────────────┤",
-  "│ [ INVENTORY & ECONOMY MATRIX ]                       │",
-  "│ > [VISUAL UPLOAD:X] : Parse screenshot (Wpn/App/Msc).│",
-  "│ > [SYNC: data]      : Batch state update via string. │",
-  "│ > [BIND: X, DIR]    : Assign gear to D-Pad vectors.  │",
-  "│ > [PAD: DIR]        : Auto-execute 8-way hotkeys.    │",
-  "│ > [TRADE: X] / [TD] : Live barter math & updates.    │",
-  "│ > [STASH: Loc]/[-FULL]: Network inventory sum/full.  │",
-  "│ > [EXCESS]/[-FULL]  : Jury Rig & weight triage.      │",
-  "│ > [CURRENCY]        : Weightless Wealth exchange.    │",
-  "│ > [CRAFT]           : Consume ingredients to build.  │",
-  "│ > [AUDIT]           : Stash value for liquidation.   │",
-  "├──────────────────────────────────────────────────────┤",
-  "│ [ CHARACTER & BIO-STATUS ]                           │",
-  "│ > [TIMER/CHEM]/[CH] : Buff ticks & addictions.       │",
-  "│ > [SQUAD]           : Squad loadouts & 150lb weight. │",
-  "│ > [ROADMAP]         : Perks to Cap; implant overlap. │",
-  "├──────────────────────────────────────────────────────┤",
-  "│ [ NAVIGATION & WORLD STATE ]                         │",
-  "│ > [GPS/MAP]         : Localized geographic compass.  │",
-  "│ > [TRAVEL CLUSTER]/[TC]: Group active quest nodes.   │",
-  "│ > [WAIT: X Hrs]     : Advance clock & restock.       │",
-  "│ > [SLEEP]           : Advance 8 Hrs, heal HP/Limbs.  │",
-  "│ > [TIMELINE]        : Projected narrative timeline.  │",
-  "│ > [CASINO]          : Blackjack strategy via LUCK.   │",
-  "├──────────────────────────────────────────────────────┤",
-  "│ [ NARRATIVE & DIRECTIVES ]                           │",
-  "│ > [CROSSROADS]      : Butterfly-effect lockouts.     │",
-  "│ > [COMM LINK]       : NPC persona override. (SEVER)  │",
-  "│ > [PAUSE]           : Master Directive (Page One).   │",
-  "│ > [PAGE 2/3]        : Dynamic routes & alignment.    │",
-  "│ > [ARCHIVE]         : 3 most recent story choices.   │",
-  "│ > && / -Q / -S      : Chain cmds, Quiet, Stealth.   │",
-  "└──────────────────────────────────────────────────────┘"
-]
-
 ### **G2: Point-of-No-Return Safety Net**
 CRITICAL RULE: Before any action that is narratively irreversible, you MUST proactively warn the Courier in the narrative node. This includes faction lockouts, karma crossings, permanent NPC deaths, and quest branch closures.
 
@@ -221,42 +175,7 @@ ${
 **Warning Format** (in narrative array):
 "⚠ [SAFETY NET] This action is IRREVERSIBLE. {specific consequence}. Confirm to proceed."
 
-Do not block the action — only warn. The Courier has full agency.
-
-### **[CROSSROADS] Command Handler**
-When the user sends [CROSSROADS], output a modal node with type "TEXT", title "CROSSROADS ANALYSIS", and a structured content array. This is a deterministic analysis of the Courier's current faction/quest state — not creative fiction.
-
-**Content must include these sections in order:**
-
-1. FACTION LOCKOUT STATUS — for each major faction, state whether allying with them is still possible, locked, or at risk. Use the live faction data below.
-2. QUEST BRANCH CLOSURES — list any completed/failed quests that permanently closed alternative paths.
-3. UPCOMING IRREVERSIBLE DECISIONS — based on current quest objectives, identify the next 2-3 decisions that will lock or unlock major paths.
-4. CROSSROADS LOG — reproduce the 5 most recent auto-logged events from the record below.
-
-**Live state at time of [CROSSROADS] call:**
-- Location: ${(state && state.loc) || 'Unknown'}
-- Active quests: ${
-    ((state && state.quests) || [])
-      .filter(q => q.status === 'active' || q.status === 'in progress')
-      .map(q => q.name)
-      .join(', ') || 'None'
-  }
-- Completed quests: ${
-    ((state && state.quests) || [])
-      .filter(q => q.status === 'completed' || q.status === 'complete')
-      .map(q => q.name)
-      .join(', ') || 'None'
-  }
-- Crossroads log (last 5): ${
-    ((state && state.campaign_notes) || [])
-      .filter(n => /^\[T\d+\]/.test(String(n)))
-      .slice(-5)
-      .join(' | ') || 'No events recorded'
-  }
-- Faction net: NCR=${state && state.factions && state.factions.ncr ? (state.factions.ncr.fame || 0) - (state.factions.ncr.infamy || 0) : 0}, Legion=${state && state.factions && state.factions.legion ? (state.factions.legion.fame || 0) - (state.factions.legion.infamy || 0) : 0}, House=${state && state.factions && state.factions.house ? (state.factions.house.fame || 0) - (state.factions.house.infamy || 0) : 0}
-
-Format each section as: ["--- SECTION TITLE ---", "line 1", "line 2", ...]. Keep lines under 55 characters.
-Do not include a state node in the response to [CROSSROADS].`;
+Do not block the action — only warn. The Courier has full agency.`;
 }
 
 async function fetchAuthorizedModels(silent = false) {
@@ -735,7 +654,172 @@ function autoImportState(jsonString) {
   }
 }
 
+// ── Native Command Router (Phase 5a) ─────────────────────────────
+// Deterministic commands intercepted BEFORE the Gemini fetch.
+// Unknown or creative input falls through to the AI unchanged.
+const NATIVE_COMMAND_ROUTER = {
+  '[FEATURES]': () => showHelpModal(),
+  '[CROSSROADS]': () => _nativeCrossroads(),
+  '[SLEEP]': () => _nativeSleep(),
+};
+
+function _routeNativeCommand(userText) {
+  const upper = userText.toUpperCase().trim().replace(/^>\s*/, '');
+  for (const [cmd, handler] of Object.entries(NATIVE_COMMAND_ROUTER)) {
+    if (upper === cmd || upper.startsWith(cmd + ' ') || upper.startsWith(cmd + '\t')) {
+      handler();
+      return true;
+    }
+  }
+  const waitMatch = userText.match(/\[WAIT[:\s]+(\d+)\s*(?:HRS?|HOURS?)?\]/i);
+  if (waitMatch) {
+    _nativeWait(parseInt(waitMatch[1], 10));
+    return true;
+  }
+  return false;
+}
+
+function _nativeCrossroads() {
+  const ctx = (state && state.gameContext) === 'FO3' ? 'FO3' : 'FNV';
+  const factions = (state && state.factions) || {};
+  const quests = (state && state.quests) || [];
+  const notes = (state && state.campaign_notes) || [];
+  const loc = (state && state.loc) || 'Unknown';
+  const lines = [];
+
+  lines.push(`Location: ${String(loc).slice(0, 44)}`);
+  lines.push('');
+
+  lines.push('--- FACTION LOCKOUT STATUS ---');
+  const factionKeys =
+    ctx === 'FO3'
+      ? [
+          'enclave',
+          'bos',
+          'lyons',
+          'outcast',
+          'supermutants',
+          'talon',
+          'regulators',
+          'slavers',
+          'reillys',
+          'tunnelsnakes',
+          'underworld',
+          'rivetcity',
+        ]
+      : [
+          'ncr',
+          'legion',
+          'house',
+          'bos',
+          'boomers',
+          'khans',
+          'followers',
+          'powder',
+          'kings',
+          'strip',
+          'freeside',
+        ];
+  factionKeys.forEach(key => {
+    const f = factions[key] || { fame: 0, infamy: 0 };
+    const net = (f.fame || 0) - (f.infamy || 0);
+    const sign = net >= 0 ? '+' : '';
+    lines.push(`${key.toUpperCase().slice(0, 13).padEnd(13)} net ${sign}${net}`);
+  });
+
+  lines.push('');
+  lines.push('--- QUEST BRANCH CLOSURES ---');
+  const closed = quests.filter(
+    q => q.status === 'failed' || q.status === 'complete' || q.status === 'completed'
+  );
+  if (closed.length === 0) {
+    lines.push('None on record.');
+  } else {
+    closed.forEach(q => {
+      const tag = q.status === 'failed' ? '[FAILED]' : '[DONE]  ';
+      lines.push(`${tag} ${String(q.name).slice(0, 44)}`);
+    });
+  }
+
+  lines.push('');
+  lines.push('--- UPCOMING DECISIONS ---');
+  const active = quests.filter(q => q.status === 'active' || q.status === 'in progress');
+  if (active.length === 0) {
+    lines.push('No active quests on record.');
+  } else {
+    active.slice(0, 3).forEach(q => {
+      lines.push(`> ${String(q.name).slice(0, 52)}`);
+      if (q.objective) lines.push(`  ${String(q.objective).slice(0, 52)}`);
+    });
+  }
+
+  lines.push('');
+  lines.push('--- CROSSROADS LOG ---');
+  const events = notes.filter(n => /^\[T\d+\]/.test(String(n))).slice(-5);
+  if (events.length === 0) {
+    lines.push('No events recorded.');
+  } else {
+    events.forEach(e => lines.push(String(e).slice(0, 55)));
+  }
+
+  const mTitle = document.getElementById('modalTitle');
+  const mContent = document.getElementById('modalContent');
+  const modal = document.getElementById('sysModal');
+  if (!mTitle || !mContent || !modal) return;
+  mTitle.innerText = '> CROSSROADS ANALYSIS';
+  mContent.innerText = lines.join('\n');
+  modal.style.display = 'flex';
+  appendToChat('> [CROSSROADS] Analysis computed from current state.', 'sys');
+}
+
+function _nativeSleep() {
+  const oldTicks = (state && state.ticks) || 0;
+  const newTicks = oldTicks + 80;
+  if (state) {
+    state.ticks = newTicks;
+    state.hpCur = state.hpMax || state.hpCur || 0;
+    state.la = 'OK';
+    state.ra = 'OK';
+    state.ll = 'OK';
+    state.rl = 'OK';
+    state.hd = 'OK';
+  }
+  appendToChat(
+    `> [SLEEP] Courier rested 8 hours.\n> Ticks: ${oldTicks} → ${newTicks} (+80)\n> HP restored. All limbs healed.`,
+    'sys'
+  );
+  if (typeof updateMath === 'function') updateMath();
+  if (typeof saveState === 'function') saveState();
+}
+
+function _nativeWait(hours) {
+  const ticks = hours * 10;
+  const oldTicks = (state && state.ticks) || 0;
+  const newTicks = oldTicks + ticks;
+  if (state) state.ticks = newTicks;
+  appendToChat(
+    `> [WAIT: ${hours} Hrs] Time advanced ${hours} hour${hours === 1 ? '' : 's'}.\n> Ticks: ${oldTicks} → ${newTicks} (+${ticks})`,
+    'sys'
+  );
+  if (typeof updateMath === 'function') updateMath();
+  if (typeof saveState === 'function') saveState();
+}
+
 async function transmitMessage() {
+  const inputEl = document.getElementById('chatInput');
+  const userText = inputEl.value.trim();
+  if (!userText && !attachedImageData) return;
+
+  let displayUserText = attachedImageData ? '[VISUAL DATA UPLOADED] ' + userText : userText;
+  appendToChat(`> ${displayUserText}`, 'user');
+  inputEl.value = '';
+
+  // Native command router — intercepts deterministic commands before any network call
+  if (!attachedImageData && _routeNativeCommand(userText)) {
+    document.getElementById('chatInput').focus();
+    return;
+  }
+
   let rawKey = localStorage.getItem('robco_gemini_key');
   let selectedModel = localStorage.getItem('robco_gemini_model');
   if (!rawKey) {
@@ -748,14 +832,6 @@ async function transmitMessage() {
     );
     return;
   }
-
-  const inputEl = document.getElementById('chatInput');
-  const userText = inputEl.value.trim();
-  if (!userText && !attachedImageData) return;
-
-  let displayUserText = attachedImageData ? '[VISUAL DATA UPLOADED] ' + userText : userText;
-  appendToChat(`> ${displayUserText}`, 'user');
-  inputEl.value = '';
 
   const btn = document.getElementById('transmitBtn');
   const uiPanel = document.getElementById('uiPanel');

@@ -1560,6 +1560,55 @@ $missing41b = @($csvNames41 | Where-Object { -not $regNames41.Contains($_) })
 Check ($missing41b.Count -eq 0) "FNV: all WEAPON_MODS.CSV rows exist in registry$(if($missing41b.Count){' (missing: ' + ($missing41b -join ', ') + ')'})"
 
 # ===========================================================
+# Suite 42 -- Native Command Router (Phase 5a)
+# Deterministic commands ([FEATURES]/[CROSSROADS]/[SLEEP]/[WAIT])
+# are intercepted pre-fetch; dead system-prompt blocks removed
+# from getSystemDirective().
+# 8 tests
+# ===========================================================
+Sep "Suite 42 -- Native Command Router (Phase 5a)"
+
+$apiSrc42 = Read-Src 'js/api.js'
+
+# 42.1  NATIVE_COMMAND_ROUTER object defined in api.js
+Check ([bool]($apiSrc42 -match 'const NATIVE_COMMAND_ROUTER')) `
+    'api.js defines NATIVE_COMMAND_ROUTER object'
+
+# 42.2  [FEATURES] key in NATIVE_COMMAND_ROUTER
+Check ([bool]($apiSrc42 -match "'\[FEATURES\]'\s*:")) `
+    'NATIVE_COMMAND_ROUTER has [FEATURES] handler'
+
+# 42.3  [CROSSROADS] key in NATIVE_COMMAND_ROUTER
+Check ([bool]($apiSrc42 -match "'\[CROSSROADS\]'\s*:")) `
+    'NATIVE_COMMAND_ROUTER has [CROSSROADS] handler'
+
+# 42.4  [SLEEP] key in NATIVE_COMMAND_ROUTER
+Check ([bool]($apiSrc42 -match "'\[SLEEP\]'\s*:")) `
+    'NATIVE_COMMAND_ROUTER has [SLEEP] handler'
+
+# 42.5  transmitMessage() calls _routeNativeCommand before the Gemini fetch
+$txBody42 = ''
+try { $txBody42 = Get-FunctionBody $apiSrc42 'transmitMessage' } catch {}
+$routerIdx42 = $txBody42.IndexOf('_routeNativeCommand')
+$fetchIdx42  = $txBody42.IndexOf('generativelanguage.googleapis.com')
+Check ($routerIdx42 -ge 0 -and $fetchIdx42 -ge 0 -and $routerIdx42 -lt $fetchIdx42) `
+    'transmitMessage() invokes _routeNativeCommand before the Gemini fetch'
+
+# 42.6  getSystemDirective() no longer has dead [FEATURES] instruction block
+$sdBody42 = ''
+try { $sdBody42 = Get-FunctionBody $apiSrc42 'getSystemDirective' } catch {}
+Check (-not ($sdBody42 -match '\[FEATURES\] Canonical Command Registry')) `
+    'getSystemDirective() no longer contains the dead [FEATURES] instruction block'
+
+# 42.7  getSystemDirective() no longer has dead [CROSSROADS] instruction block
+Check (-not ($sdBody42 -match '\[CROSSROADS\] Command Handler')) `
+    'getSystemDirective() no longer contains the dead [CROSSROADS] instruction block'
+
+# 42.8  _nativeWait function exists for [WAIT: X Hrs] handling
+Check ([bool]($apiSrc42 -match 'function _nativeWait')) `
+    'api.js defines _nativeWait() for [WAIT: X Hrs] native handling'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

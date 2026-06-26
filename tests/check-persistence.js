@@ -2511,6 +2511,78 @@ header('Weapon Mods CSV + Registry Parity');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 42 — Native Command Router (Phase 5a)
+//  Deterministic commands ([FEATURES]/[CROSSROADS]/[SLEEP]/[WAIT])
+//  are intercepted pre-fetch in transmitMessage(); dead system-prompt
+//  blocks ([FEATURES] Canonical Command Registry, [CROSSROADS]
+//  Command Handler) are removed from getSystemDirective().
+//  8 tests
+// ══════════════════════════════════════════════════════════════
+header('Native Command Router (Phase 5a)');
+{
+  const apiSrc42 = readFile('js/api.js');
+
+  // 42.1  NATIVE_COMMAND_ROUTER object is defined in api.js
+  assert(
+    apiSrc42.includes('const NATIVE_COMMAND_ROUTER'),
+    'api.js defines NATIVE_COMMAND_ROUTER object'
+  );
+
+  // 42.2  [FEATURES] is a key in NATIVE_COMMAND_ROUTER
+  assert(/'\[FEATURES\]'\s*:/.test(apiSrc42), 'NATIVE_COMMAND_ROUTER has [FEATURES] handler');
+
+  // 42.3  [CROSSROADS] is a key in NATIVE_COMMAND_ROUTER
+  assert(/'\[CROSSROADS\]'\s*:/.test(apiSrc42), 'NATIVE_COMMAND_ROUTER has [CROSSROADS] handler');
+
+  // 42.4  [SLEEP] is a key in NATIVE_COMMAND_ROUTER
+  assert(/'\[SLEEP\]'\s*:/.test(apiSrc42), 'NATIVE_COMMAND_ROUTER has [SLEEP] handler');
+
+  // 42.5  transmitMessage() calls _routeNativeCommand before the Gemini fetch
+  {
+    let txBody = '';
+    try {
+      txBody = extractFunctionBody(apiSrc42, 'transmitMessage');
+    } catch (_) {}
+    const routerIdx = txBody.indexOf('_routeNativeCommand');
+    const fetchIdx = txBody.indexOf('generativelanguage.googleapis.com');
+    assert(
+      routerIdx !== -1 && fetchIdx !== -1 && routerIdx < fetchIdx,
+      'transmitMessage() invokes _routeNativeCommand before the Gemini fetch'
+    );
+  }
+
+  // 42.6  getSystemDirective() no longer contains the dead [FEATURES] instruction block
+  {
+    let sdBody = '';
+    try {
+      sdBody = extractFunctionBody(apiSrc42, 'getSystemDirective');
+    } catch (_) {}
+    assert(
+      !sdBody.includes('[FEATURES] Canonical Command Registry'),
+      'getSystemDirective() no longer contains the dead [FEATURES] instruction block'
+    );
+  }
+
+  // 42.7  getSystemDirective() no longer contains the dead [CROSSROADS] instruction block
+  {
+    let sdBody = '';
+    try {
+      sdBody = extractFunctionBody(apiSrc42, 'getSystemDirective');
+    } catch (_) {}
+    assert(
+      !sdBody.includes('[CROSSROADS] Command Handler'),
+      'getSystemDirective() no longer contains the dead [CROSSROADS] instruction block'
+    );
+  }
+
+  // 42.8  _nativeWait function exists for [WAIT: X Hrs] native handling
+  assert(
+    apiSrc42.includes('function _nativeWait'),
+    'api.js defines _nativeWait() for [WAIT: X Hrs] native handling'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 console.log('\n══════════════════════════════════════════════════════════════\n');
