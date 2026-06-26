@@ -1,4 +1,4 @@
-## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 376/376 | Cache: robco-terminal-v2.0.1-r33 -->
+## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 386/386 | Cache: robco-terminal-v2.0.1-r34 -->
 
 ### Added
 
@@ -68,6 +68,11 @@
 - Rebuilt the features help menu as a data-driven responsive card grid — five command groups, one card per command, readable on phones without scrolling sideways. Removed five legacy commands that no longer do anything: the Desktop/Mobile width toggle (layout is automatic now), the dev manual query hook, and the three redundant panel shortcuts for stats, inventory, and reputation that were left over from an earlier version of the app. The AI is also no longer instructed to handle those removed commands.
 - Fixed the skill matrix highlight feature (chem boost), which was silently broken: active chems were supposed to glow the matching skill row amber when they were in effect, but the highlight could never attach because the skill rows had no class to target. The rows now use the correct CSS class and the highlight applies and clears correctly.
 - Added 7 new automated guard tests (Suite 32, 376 total across 36 suites) that verify the command registry is data-driven with no legacy pipe characters, all removed commands are absent from both the UI and AI instructions, the skill matrix rows carry the correct class, and the chem-boost highlight function targets them correctly.
+- The optics color themes (Amber, Vault-Tec Blue, Legion Red, Ghoul Green, Neon Purple) now correctly recolor every border, glow, bar, and highlight across the entire app. Previously the theme switcher only changed the main text and glow colors — dozens of borders and fill colors were hardcoded to the default teal and would not change when you switched themes.
+- Empty-state messages (shown when a list such as Perks, Quests, or Status Effects is empty) now use a single consistent style across all panels.
+- Audio toggle rows, inner panel expanders (Campaign Status, Crossroads, Timeline, Audio Systems), and add-item form rows now share consistent CSS classes instead of carrying large duplicated inline styles. No visual change.
+- Inner panel expanders now show a live [+] / [-] indicator in CSS rather than static text — the indicator flips automatically when the panel opens and closes.
+- Added 10 new automated guard tests (Suite 33, 386 total across 37 suites) that verify the optics RGB variable is defined everywhere it must be, no hardcoded teal color literals survive in the stylesheet, the empty-state helper exists and is used, all utility classes are present in the CSS, and the toggle indicator is driven by CSS rather than static text.
 
 ---
 

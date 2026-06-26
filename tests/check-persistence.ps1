@@ -966,11 +966,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-32)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-32)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-33)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-33)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -1092,6 +1092,51 @@ $chemBody32 = ''
 try { $chemBody32 = Get-FunctionBody $uiSrc32 '_applyChemHighlights' } catch {}
 $chem32ok = ([bool]($chemBody32 -match '\.skill-row\.chem-boost')) -and ([bool]($chemBody32 -match "closest\('\.skill-row'\)"))
 Check $chem32ok "_applyChemHighlights() clears via .skill-row.chem-boost and applies via closest(.skill-row)"
+
+# ===========================================================
+# Suite 33 -- Phase 2b Guards (Optics RGB, Empty-State, Utility Classes)
+# --robco-green-rgb CSS var chain; emptyState() helper; utility classes;
+# config-summary toggle; no residual rgba(20,253,206) literals.
+# 10 tests
+# ===========================================================
+Sep "Suite 33 -- Phase 2b Guards"
+$cssSrc33 = Read-Src 'css/terminal.css'
+$htmlSrc33 = Read-Src 'index.html'
+
+# 33.1 --robco-green-rgb defined in terminal.css :root
+Check ([bool]($cssSrc33 -match '--robco-green-rgb\s*:\s*20,\s*253,\s*206')) '--robco-green-rgb: 20, 253, 206 defined in terminal.css :root (P1-1)'
+
+# 33.2 No rgba(20,253,206, literal survives in terminal.css
+Check (-not [bool]($cssSrc33 -match 'rgba\(20,\s*253,\s*206,')) 'No hardcoded rgba(20,253,206,...) literal remains in terminal.css (P1-1)'
+
+# 33.3 --robco-green-rgb set in index.html optics branches (>=5 calls)
+$rgbHtml33 = ([regex]::Matches($htmlSrc33, "setProperty\('--robco-green-rgb'")).Count
+Check ($rgbHtml33 -ge 5) "index.html optics script sets --robco-green-rgb in >=5 branches (found $rgbHtml33) (P1-1)"
+
+# 33.4 --robco-green-rgb set in changeOpticsColor() branches in ui.js (>=6 calls)
+$rgbUi33 = ([regex]::Matches($uiSrc, "setProperty\('--robco-green-rgb'")).Count
+Check ($rgbUi33 -ge 6) "changeOpticsColor() sets --robco-green-rgb in >=6 branches (found $rgbUi33) (P1-1)"
+
+# 33.5 .empty-state CSS class defined in terminal.css
+Check ([bool]($cssSrc33 -match '\.empty-state\s*\{')) '.empty-state CSS class defined in terminal.css (P1-2)'
+
+# 33.6 emptyState() function defined in ui.js
+Check ([bool]($uiSrc -match 'function\s+emptyState\s*\(')) 'emptyState() helper function defined in ui.js (P1-2)'
+
+# 33.7 emptyState() appears >=7 times in ui.js (1 definition + 6 calls)
+$emptyCount33 = ([regex]::Matches($uiSrc, 'emptyState\(')).Count
+Check ($emptyCount33 -ge 7) "emptyState() defined + called >=6 times (found $emptyCount33 total) (P1-2)"
+
+# 33.8 .audio-row CSS class defined in terminal.css
+Check ([bool]($cssSrc33 -match '\.audio-row\s*\{')) '.audio-row utility class defined in terminal.css (P1-3)'
+
+# 33.9 config-summary::after toggle CSS exists in terminal.css
+$csCss33 = ([bool]($cssSrc33 -match 'config-summary::after')) -and ([bool]($cssSrc33 -match "content\s*:\s*['""\s]*\[\+\]"))
+Check $csCss33 'summary.config-summary::after [+]/[-] toggle CSS exists in terminal.css (P1-4)'
+
+# 33.10 No hardcoded [+] text inside <summary> elements in index.html
+$noPlus33 = -not [bool]($htmlSrc33 -match '<summary[^>]*>[^<]*\[\+\][^<]*<\/summary>')
+Check $noPlus33 'No hardcoded [+] text in index.html summary elements (P1-4)'
 
 # ===========================================================
 # Results

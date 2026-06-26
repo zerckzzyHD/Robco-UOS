@@ -1,4 +1,4 @@
-name: CI
+﻿name: CI
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   lint-and-test:
-    name: Lint & Persistence Audit (376 tests)
+    name: Lint & Persistence Audit (386 tests)
     runs-on: ubuntu-latest
 
     steps:
@@ -30,10 +30,10 @@ jobs:
       - name: Prettier check
         run: npx prettier --check .
 
-      - name: Persistence audit — Node runner (376 tests)
+      - name: Persistence audit — Node runner (386 tests)
         run: node tests/check-persistence.js
 
-      - name: Persistence audit — PowerShell runner (376 tests)
+      - name: Persistence audit — PowerShell runner (386 tests)
         shell: bash
         run: pwsh -File tests/check-persistence.ps1
 

@@ -1554,7 +1554,7 @@ header('Meta / Runner Parity');
   const jsRunner = readFile('tests/check-persistence.js');
   const psRunner = readFile('tests/check-persistence.ps1');
 
-  // Structural parity: both runners must contain every gate-guard suite marker (22-32).
+  // Structural parity: both runners must contain every gate-guard suite marker (22-33).
   // A missing marker means a suite was added to one runner but not ported to the other.
   const GATE_SUITES = [
     'Suite 22',
@@ -1568,17 +1568,18 @@ header('Meta / Runner Parity');
     'Suite 30',
     'Suite 31',
     'Suite 32',
+    'Suite 33',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-32)' +
+    'JS runner contains all gate-guard suites (22-33)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-32)' +
+    'PS runner contains all gate-guard suites (22-33)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -1808,6 +1809,100 @@ assert(
       /closest\(['"]\.skill-row['"]\)/.test(chemBody32),
     "_applyChemHighlights() clears via '.skill-row.chem-boost' and applies via closest('.skill-row')"
   );
+}
+
+// ══════════════════════════════════════════════════════════════
+// Suite 33 -- Phase 2b Guards (Optics RGB, Empty-State, Utility Classes)
+// --robco-green-rgb CSS var chain; emptyState() helper; utility classes;
+// config-summary toggle; no residual rgba(20,253,206) literals.
+// 10 tests
+// ══════════════════════════════════════════════════════════════
+header('Phase 2b Guards');
+
+// 33.1 --robco-green-rgb defined in terminal.css :root
+{
+  const cssSrc33 = readFile('css/terminal.css');
+  assert(
+    /--robco-green-rgb\s*:\s*20,\s*253,\s*206/.test(cssSrc33),
+    '--robco-green-rgb: 20, 253, 206 defined in terminal.css :root (P1-1)'
+  );
+}
+
+// 33.2 No rgba(20,253,206, literal survives in terminal.css
+{
+  const cssSrc33 = readFile('css/terminal.css');
+  assert(
+    !/rgba\(20,\s*253,\s*206,/.test(cssSrc33),
+    'No hardcoded rgba(20,253,206,...) literal remains in terminal.css (P1-1)'
+  );
+}
+
+// 33.3 --robco-green-rgb set in index.html optics branches (≥5 setProperty calls)
+{
+  const htmlSrc33 = readFile('index.html');
+  const rgbCount = (htmlSrc33.match(/setProperty\(['"]--robco-green-rgb['"]/g) || []).length;
+  assert(
+    rgbCount >= 5,
+    `index.html optics script sets --robco-green-rgb in ≥5 branches (found ${rgbCount}) (P1-1)`
+  );
+}
+
+// 33.4 --robco-green-rgb set in changeOpticsColor() branches in ui.js (≥6 calls)
+{
+  const rgbCount = (uiSource.match(/setProperty\(['"]--robco-green-rgb['"]/g) || []).length;
+  assert(
+    rgbCount >= 6,
+    `changeOpticsColor() sets --robco-green-rgb in ≥6 branches (found ${rgbCount}) (P1-1)`
+  );
+}
+
+// 33.5 .empty-state CSS class defined in terminal.css
+{
+  const cssSrc33 = readFile('css/terminal.css');
+  assert(
+    /\.empty-state\s*\{/.test(cssSrc33),
+    '.empty-state CSS class defined in terminal.css (P1-2)'
+  );
+}
+
+// 33.6 emptyState() function defined in ui.js
+assert(
+  /function\s+emptyState\s*\(/.test(uiSource),
+  'emptyState() helper function defined in ui.js (P1-2)'
+);
+
+// 33.7 emptyState() appears ≥7 times in ui.js (1 definition + 6 calls)
+{
+  const callCount = (uiSource.match(/emptyState\(/g) || []).length;
+  assert(
+    callCount >= 7,
+    `emptyState() defined + called ≥6 times (found ${callCount} total) (P1-2)`
+  );
+}
+
+// 33.8 .audio-row CSS class defined in terminal.css
+{
+  const cssSrc33 = readFile('css/terminal.css');
+  assert(
+    /\.audio-row\s*\{/.test(cssSrc33),
+    '.audio-row utility class defined in terminal.css (P1-3)'
+  );
+}
+
+// 33.9 config-summary::after toggle CSS exists in terminal.css
+{
+  const cssSrc33 = readFile('css/terminal.css');
+  assert(
+    /config-summary::after/.test(cssSrc33) && /content\s*:\s*['"]\s*\[\+\]/.test(cssSrc33),
+    'summary.config-summary::after [+]/[-] toggle CSS exists in terminal.css (P1-4)'
+  );
+}
+
+// 33.10 No hardcoded [+] text inside <summary> elements in index.html
+{
+  const htmlSrc33 = readFile('index.html');
+  const bad = (htmlSrc33.match(/<summary[^>]*>[^<]*\[\+\][^<]*<\/summary>/g) || []).length;
+  assert(bad === 0, `No hardcoded [+] text in index.html <summary> elements (found ${bad}) (P1-4)`);
 }
 
 // ══════════════════════════════════════════════════════════════

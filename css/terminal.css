@@ -1,11 +1,12 @@
-:root {
+﻿:root {
+  --robco-green-rgb: 20, 253, 206;
   --robco-green: #14fdce;
   --robco-dark: #021c14;
-  --robco-glow: 0 0 6px rgba(20, 253, 206, 0.6);
+  --robco-glow: 0 0 6px rgba(var(--robco-green-rgb), 0.6);
   --robco-alert: #f39c12;
   --robco-danger: #e74c3c;
   --robco-blue: #3498db;
-  --robco-refresh: rgba(20, 253, 206, 0.12);
+  --robco-refresh: rgba(var(--robco-green-rgb), 0.12);
 }
 html {
   overflow-x: hidden;
@@ -217,7 +218,7 @@ button.action-btn:hover {
 }
 
 .map-cell {
-  border: 1px solid rgba(20, 253, 206, 0.2);
+  border: 1px solid rgba(var(--robco-green-rgb), 0.2);
   cursor: pointer;
   transition: all 0.1s ease;
   /* Without min-width:0 a grid item won't shrink below its content width
@@ -239,7 +240,7 @@ button.action-btn:hover {
   box-sizing: border-box;
 }
 .map-cell:hover {
-  background: rgba(20, 253, 206, 0.2);
+  background: rgba(var(--robco-green-rgb), 0.2);
   filter: brightness(1.3);
 }
 
@@ -278,7 +279,7 @@ input[type='range'] {
 input[type='range']::-webkit-slider-runnable-track {
   width: 100%;
   height: 4px;
-  background: rgba(20, 253, 206, 0.3);
+  background: rgba(var(--robco-green-rgb), 0.3);
   border: 1px solid var(--robco-green);
 }
 input[type='range']::-webkit-slider-thumb {
@@ -301,7 +302,7 @@ input[type='range']::-webkit-slider-thumb {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px dashed rgba(20, 253, 206, 0.3);
+  border-bottom: 1px dashed rgba(var(--robco-green-rgb), 0.3);
   padding: 5px 0;
 }
 .delete-btn {
@@ -439,10 +440,10 @@ textarea {
   opacity: 0.85;
 }
 .tab-btn.active {
-  background: rgba(20, 253, 206, 0.18);
+  background: rgba(var(--robco-green-rgb), 0.18);
   border-color: var(--robco-green);
   opacity: 1;
-  box-shadow: 0 0 6px rgba(20, 253, 206, 0.35);
+  box-shadow: 0 0 6px rgba(var(--robco-green-rgb), 0.35);
 }
 /* Hidden panels (not in active tab) */
 .panel[data-tab] {
@@ -485,7 +486,7 @@ textarea {
 .panel h2 {
   margin: -10px -10px 10px -10px;
   padding: 10px;
-  background: rgba(20, 253, 206, 0.2);
+  background: rgba(var(--robco-green-rgb), 0.2);
   border-bottom: 1px solid var(--robco-green);
   font-size: 14px;
   font-weight: normal;
@@ -522,7 +523,7 @@ details.panel:not([open]) summary h2 {
 /* Used by AMMO RESERVES nested inside BACKPACK INVENTORY */
 details.sub-panel {
   margin-top: 10px;
-  border-top: 1px dashed rgba(20, 253, 206, 0.4);
+  border-top: 1px dashed rgba(var(--robco-green-rgb), 0.4);
   padding-top: 6px;
 }
 details.sub-panel > summary {
@@ -591,7 +592,7 @@ details.sub-panel[open] > summary h3::after {
   white-space: normal;
 }
 .cmd-group {
-  border: 1px dashed rgba(20, 253, 206, 0.3);
+  border: 1px dashed rgba(var(--robco-green-rgb), 0.3);
   padding: 8px;
 }
 .cmd-group-title {
@@ -599,14 +600,14 @@ details.sub-panel[open] > summary h3::after {
   letter-spacing: 1px;
   opacity: 0.5;
   margin-bottom: 6px;
-  border-bottom: 1px dashed rgba(20, 253, 206, 0.2);
+  border-bottom: 1px dashed rgba(var(--robco-green-rgb), 0.2);
   padding-bottom: 4px;
 }
 .cmd-card {
   display: flex;
   flex-direction: column;
   padding: 3px 0;
-  border-bottom: 1px dashed rgba(20, 253, 206, 0.1);
+  border-bottom: 1px dashed rgba(var(--robco-green-rgb), 0.1);
   font-size: 11px;
 }
 .cmd-card:last-child {
@@ -710,7 +711,7 @@ details.sub-panel[open] > summary h3::after {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid rgba(20, 253, 206, 0.2);
+  border-bottom: 1px solid rgba(var(--robco-green-rgb), 0.2);
   padding: 4px 0;
   font-size: 13px;
 }
@@ -721,7 +722,7 @@ details.sub-panel[open] > summary h3::after {
   left: 0;
   width: 100%;
   height: 2px;
-  background: rgba(20, 253, 206, 0.9);
+  background: rgba(var(--robco-green-rgb), 0.9);
   box-shadow: 0 0 8px var(--robco-green);
   animation: vats-scan 1s linear infinite alternate;
   z-index: 10;
@@ -1188,7 +1189,7 @@ body.thermal-load .panel {
   justify-content: space-between;
   align-items: center;
   padding: 3px 0;
-  border-bottom: 1px dashed rgba(20, 253, 206, 0.15);
+  border-bottom: 1px dashed rgba(var(--robco-green-rgb), 0.15);
 }
 .skills-grid div:last-child {
   border-bottom: none;
@@ -1211,7 +1212,7 @@ body.thermal-load .panel {
   justify-content: space-between;
   align-items: center;
   padding: 3px 0;
-  border-bottom: 1px dashed rgba(20, 253, 206, 0.2);
+  border-bottom: 1px dashed rgba(var(--robco-green-rgb), 0.2);
   font-size: 12px;
 }
 .effect-type {
@@ -1250,7 +1251,7 @@ body.thermal-load .panel {
 }
 .notes-list li {
   padding: 3px 0;
-  border-bottom: 1px dashed rgba(20, 253, 206, 0.2);
+  border-bottom: 1px dashed rgba(var(--robco-green-rgb), 0.2);
   font-size: 12px;
   line-height: 1.4;
 }
@@ -1272,7 +1273,7 @@ body.thermal-load .panel {
   align-items: center;
   gap: 4px;
   padding: 6px 4px;
-  border: 1px dashed rgba(20, 253, 206, 0.3);
+  border: 1px dashed rgba(var(--robco-green-rgb), 0.3);
   text-align: center;
 }
 .faction-name {
@@ -1292,7 +1293,7 @@ body.thermal-load .panel {
   align-items: center;
   gap: 2px;
   padding: 4px 3px;
-  border: 1px dashed rgba(20, 253, 206, 0.3);
+  border: 1px dashed rgba(var(--robco-green-rgb), 0.3);
   text-align: center;
   min-width: 0;
 }
@@ -1320,7 +1321,7 @@ body.thermal-load .panel {
   position: relative;
   width: 100%;
   height: 4px;
-  background: rgba(20, 253, 206, 0.08);
+  background: rgba(var(--robco-green-rgb), 0.08);
   border-radius: 2px;
   margin: 2px 0;
 }
@@ -1335,7 +1336,7 @@ body.thermal-load .panel {
   top: -2px;
   width: 1px;
   height: 8px;
-  background: rgba(20, 253, 206, 0.35);
+  background: rgba(var(--robco-green-rgb), 0.35);
 }
 /* Faction adjustment buttons — mobile-friendly min touch target */
 .faction-card-btns {
@@ -1348,8 +1349,8 @@ body.thermal-load .panel {
   font-family: inherit;
   font-size: 9px;
   background: rgba(0, 0, 0, 0.6);
-  border: 1px dashed rgba(20, 253, 206, 0.3);
-  color: rgba(20, 253, 206, 0.8);
+  border: 1px dashed rgba(var(--robco-green-rgb), 0.3);
+  color: rgba(var(--robco-green-rgb), 0.8);
   cursor: pointer;
   /* min 28×28 touch target for mobile accessibility */
   min-width: 28px;
@@ -1383,13 +1384,13 @@ body.time-night .crt-overlay {
 /* ── Karma Event Flash ───────────────────────────────────────── */
 @keyframes karma-good-flash {
   0% {
-    box-shadow: inset 0 0 0 3px rgba(20, 253, 206, 0);
+    box-shadow: inset 0 0 0 3px rgba(var(--robco-green-rgb), 0);
   }
   30% {
-    box-shadow: inset 0 0 0 3px rgba(20, 253, 206, 0.55);
+    box-shadow: inset 0 0 0 3px rgba(var(--robco-green-rgb), 0.55);
   }
   100% {
-    box-shadow: inset 0 0 0 3px rgba(20, 253, 206, 0);
+    box-shadow: inset 0 0 0 3px rgba(var(--robco-green-rgb), 0);
   }
 }
 @keyframes karma-evil-flash {
@@ -1541,7 +1542,7 @@ body.sync-complete {
   padding: 5px 8px;
   color: var(--robco-green);
   cursor: pointer;
-  border-bottom: 1px dashed rgba(20, 253, 206, 0.15);
+  border-bottom: 1px dashed rgba(var(--robco-green-rgb), 0.15);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1553,7 +1554,7 @@ body.sync-complete {
 }
 .ac-item:hover,
 .ac-item.ac-active {
-  background: rgba(20, 253, 206, 0.15);
+  background: rgba(var(--robco-green-rgb), 0.15);
   text-shadow: var(--robco-glow);
 }
 .ac-item-name {
@@ -1564,13 +1565,13 @@ body.sync-complete {
 }
 .ac-item-tag {
   font-size: 10px;
-  color: rgba(20, 253, 206, 0.5);
+  color: rgba(var(--robco-green-rgb), 0.5);
   flex-shrink: 0;
   letter-spacing: 0.5px;
 }
 .ac-empty {
   padding: 6px 8px;
-  color: rgba(20, 253, 206, 0.4);
+  color: rgba(var(--robco-green-rgb), 0.4);
   font-style: italic;
   font-size: 11px;
 }
@@ -1596,16 +1597,16 @@ body.sync-complete {
 .map-cell--current {
   border: 1px solid var(--robco-green);
   box-shadow:
-    0 0 6px rgba(20, 253, 206, 0.55),
-    inset 0 0 4px rgba(20, 253, 206, 0.1);
-  background: rgba(20, 253, 206, 0.08);
+    0 0 6px rgba(var(--robco-green-rgb), 0.55),
+    inset 0 0 4px rgba(var(--robco-green-rgb), 0.1);
+  background: rgba(var(--robco-green-rgb), 0.08);
 }
 .map-cell--visited {
-  border: 1px dashed rgba(20, 253, 206, 0.45);
+  border: 1px dashed rgba(var(--robco-green-rgb), 0.45);
   opacity: 0.75;
 }
 .map-cell--empty {
-  border: 1px solid rgba(20, 253, 206, 0.06);
+  border: 1px solid rgba(var(--robco-green-rgb), 0.06);
   opacity: 0.25;
   pointer-events: none;
 }
@@ -1632,7 +1633,7 @@ body.sync-complete {
   align-items: center;
   gap: 8px;
   margin-bottom: 6px;
-  border-bottom: 1px dashed rgba(20, 253, 206, 0.25);
+  border-bottom: 1px dashed rgba(var(--robco-green-rgb), 0.25);
   padding-bottom: 4px;
 }
 .map-back-btn {
@@ -1648,7 +1649,7 @@ body.sync-complete {
 }
 .map-detail-row {
   padding: 3px 0;
-  border-bottom: 1px dashed rgba(20, 253, 206, 0.12);
+  border-bottom: 1px dashed rgba(var(--robco-green-rgb), 0.12);
   font-size: 11px;
   display: flex;
   align-items: center;
@@ -1684,8 +1685,8 @@ body.sync-complete {
   font-family: inherit;
   font-size: 9px;
   background: transparent;
-  border: 1px dashed rgba(20, 253, 206, 0.4);
-  color: rgba(20, 253, 206, 0.7);
+  border: 1px dashed rgba(var(--robco-green-rgb), 0.4);
+  color: rgba(var(--robco-green-rgb), 0.7);
   cursor: pointer;
   padding: 1px 6px;
   letter-spacing: 0.5px;
@@ -1697,7 +1698,7 @@ body.sync-complete {
 
 /* ── Campaign Status Panel (v2.0.1) ────────────────────── */
 .campg-stat-box {
-  border: 1px dashed rgba(20, 253, 206, 0.3);
+  border: 1px dashed rgba(var(--robco-green-rgb), 0.3);
   padding: 5px 8px;
   text-align: center;
 }
@@ -1900,4 +1901,46 @@ body.sync-complete {
   50% {
     opacity: 0.72;
   }
+}
+
+/* ─── Phase 2b Utility Classes ─────────────────────────────────── */
+
+/* Empty-state message shown when a list has no items */
+.empty-state {
+  color: rgba(var(--robco-green-rgb), 0.5);
+}
+
+/* Audio toggle row: checkbox + label pair in the Audio Systems panel */
+.audio-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Inner <details> summary: consistent appearance + CSS [+]/[-] toggle */
+summary.config-summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+  font-family: inherit;
+  letter-spacing: 1px;
+}
+summary.config-summary::-webkit-details-marker {
+  display: none;
+}
+summary.config-summary::after {
+  content: ' [+]';
+  font-family: monospace;
+}
+details[open] > summary.config-summary::after {
+  content: ' [-]';
+}
+
+/* Add-row form: flex row below each panel's list */
+.panel-form {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 6px;
 }

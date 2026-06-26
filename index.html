@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -20,26 +20,31 @@
         let color = localStorage.getItem('robco_optics');
         let root = document.documentElement;
         if (color === 'amber') {
+          root.style.setProperty('--robco-green-rgb', '255, 182, 66');
           root.style.setProperty('--robco-green', '#ffb642');
           root.style.setProperty('--robco-glow', '0 0 6px rgba(255, 182, 66, 0.6)');
           root.style.setProperty('--robco-dark', '#2e1d03');
           root.style.setProperty('--robco-refresh', 'rgba(255, 182, 66, 0.12)');
         } else if (color === 'blue') {
+          root.style.setProperty('--robco-green-rgb', '66, 203, 245');
           root.style.setProperty('--robco-green', '#42cbf5');
           root.style.setProperty('--robco-glow', '0 0 6px rgba(66, 203, 245, 0.6)');
           root.style.setProperty('--robco-dark', '#03202e');
           root.style.setProperty('--robco-refresh', 'rgba(66, 203, 245, 0.12)');
         } else if (color === 'legion') {
+          root.style.setProperty('--robco-green-rgb', '255, 64, 64');
           root.style.setProperty('--robco-green', '#ff4040');
           root.style.setProperty('--robco-glow', '0 0 6px rgba(255, 64, 64, 0.6)');
           root.style.setProperty('--robco-dark', '#2a0000');
           root.style.setProperty('--robco-refresh', 'rgba(255, 64, 64, 0.12)');
         } else if (color === 'ghoul') {
+          root.style.setProperty('--robco-green-rgb', '125, 255, 95');
           root.style.setProperty('--robco-green', '#7dff5f');
           root.style.setProperty('--robco-glow', '0 0 6px rgba(125, 255, 95, 0.6)');
           root.style.setProperty('--robco-dark', '#0a1e03');
           root.style.setProperty('--robco-refresh', 'rgba(125, 255, 95, 0.12)');
         } else if (color === 'neon') {
+          root.style.setProperty('--robco-green-rgb', '192, 132, 252');
           root.style.setProperty('--robco-green', '#c084fc');
           root.style.setProperty('--robco-glow', '0 0 6px rgba(192, 132, 252, 0.6)');
           root.style.setProperty('--robco-dark', '#1a0329');
@@ -434,7 +439,7 @@
               style="
                 margin-top: 6px;
                 padding-top: 6px;
-                border-top: 1px dashed rgba(20, 253, 206, 0.25);
+                border-top: 1px dashed rgba(var(--robco-green-rgb), 0.25);
               "
             >
               <label style="font-size: 10px; opacity: 0.7">EQUIPPED:</label>
@@ -542,13 +547,8 @@
             <!-- end AMMO RESERVES sub-panel -->
 
             <div
-              style="
-                border-top: 1px dashed var(--robco-green);
-                padding-top: 10px;
-                display: flex;
-                gap: 5px;
-                flex-wrap: wrap;
-              "
+              class="panel-form"
+              style="border-top: 1px dashed var(--robco-green); padding-top: 10px; gap: 5px"
             >
               <input
                 type="text"
@@ -592,7 +592,7 @@
               <h2>&gt; COLLECTIBLES</h2>
             </summary>
             <div id="collectiblesDisplay">
-              <span style="color: rgba(20, 253, 206, 0.5)">[NO COLLECTIBLES LOADED]</span>
+              <span class="empty-state">[NO COLLECTIBLES LOADED]</span>
             </div>
           </details>
 
@@ -751,17 +751,11 @@
           <details class="panel" data-tab="data">
             <summary><h2>> QUEST LOG</h2></summary>
             <div id="questsList">
-              <span style="color: rgba(20, 253, 206, 0.5)">No Active Quests</span>
+              <span class="empty-state">No active quests</span>
             </div>
             <div
-              style="
-                border-top: 1px dashed var(--robco-green);
-                padding-top: 8px;
-                margin-top: 6px;
-                display: flex;
-                gap: 4px;
-                flex-wrap: wrap;
-              "
+              class="panel-form"
+              style="border-top: 1px dashed var(--robco-green); padding-top: 8px"
             >
               <input
                 type="text"
@@ -791,17 +785,11 @@
           <details class="panel" data-tab="stat">
             <summary><h2>> PERKS</h2></summary>
             <div id="perksList">
-              <span style="color: rgba(20, 253, 206, 0.5)">No Perks Acquired</span>
+              <span class="empty-state">No perks acquired</span>
             </div>
             <div
-              style="
-                border-top: 1px dashed var(--robco-green);
-                padding-top: 8px;
-                margin-top: 6px;
-                display: flex;
-                gap: 4px;
-                flex-wrap: wrap;
-              "
+              class="panel-form"
+              style="border-top: 1px dashed var(--robco-green); padding-top: 8px"
             >
               <input
                 type="text"
@@ -837,9 +825,9 @@
               <h2>> STATUS EFFECTS</h2>
             </summary>
             <div id="statusList">
-              <span style="color: rgba(20, 253, 206, 0.5)">No Active Effects</span>
+              <span class="empty-state">No active effects</span>
             </div>
-            <div style="display: flex; gap: 4px; margin-top: 6px">
+            <div class="panel-form">
               <select
                 id="newStatusName"
                 style="
@@ -904,7 +892,7 @@
               <h2>> SQUAD STATUS</h2>
             </summary>
             <div id="squadList"></div>
-            <div style="display: flex; gap: 4px; margin-top: 6px">
+            <div class="panel-form">
               <select
                 id="newSquadName"
                 style="
@@ -957,9 +945,9 @@
               <h2>> CAMPAIGN NOTES</h2>
             </summary>
             <div id="campaignNotesList">
-              <span style="color: rgba(20, 253, 206, 0.5)">No Notes Recorded</span>
+              <span class="empty-state">No notes recorded</span>
             </div>
-            <div style="display: flex; gap: 4px; margin-top: 6px">
+            <div class="panel-form">
               <input
                 type="text"
                 id="newCampaignNote"
@@ -1088,7 +1076,7 @@
                   line-height: 1.5;
                   color: var(--robco-green);
                   border: 1px dashed var(--robco-green);
-                  background: rgba(20, 253, 206, 0.04);
+                  background: rgba(var(--robco-green-rgb), 0.04);
                 "
               >
                 &#9658; COMPLETE RNG ACTIVE. All SPECIAL, traits, tag skills, skill points, and perk
@@ -1118,18 +1106,8 @@
 
             <!-- Campaign Status Panel (v2.0.1) -->
             <details class="panel" id="campaignStatusPanel" style="margin-bottom: 10px">
-              <summary
-                style="
-                  cursor: pointer;
-                  user-select: none;
-                  list-style: none;
-                  outline: none;
-                  font-size: 12px;
-                  letter-spacing: 1px;
-                  opacity: 0.85;
-                "
-              >
-                [+] CAMPAIGN STATUS
+              <summary class="config-summary" style="font-size: 12px; opacity: 0.85">
+                CAMPAIGN STATUS
               </summary>
               <div
                 id="campaignStatusDisplay"
@@ -1141,18 +1119,8 @@
 
             <!-- Crossroads Record (v2.0.1) -->
             <details style="margin-bottom: 10px">
-              <summary
-                style="
-                  cursor: pointer;
-                  user-select: none;
-                  list-style: none;
-                  outline: none;
-                  font-size: 12px;
-                  letter-spacing: 1px;
-                  opacity: 0.85;
-                "
-              >
-                [+] CROSSROADS RECORD
+              <summary class="config-summary" style="font-size: 12px; opacity: 0.85">
+                CROSSROADS RECORD
               </summary>
               <div
                 id="crossroadsDisplay"
@@ -1174,18 +1142,8 @@
 
             <!-- Timeline Panel Shell -->
             <details style="margin-bottom: 10px">
-              <summary
-                style="
-                  cursor: pointer;
-                  user-select: none;
-                  list-style: none;
-                  outline: none;
-                  font-size: 12px;
-                  letter-spacing: 1px;
-                  opacity: 0.85;
-                "
-              >
-                [+] PROJECTED TIMELINE
+              <summary class="config-summary" style="font-size: 12px; opacity: 0.85">
+                PROJECTED TIMELINE
               </summary>
               <div
                 id="timelineDisplay"
@@ -1300,19 +1258,8 @@
             </div>
 
             <details id="audioSystemsDetails" style="margin-top: 10px">
-              <summary
-                style="
-                  color: var(--robco-alert);
-                  cursor: pointer;
-                  user-select: none;
-                  list-style: none;
-                  outline: none;
-                  font-family: inherit;
-                  font-size: 13px;
-                  letter-spacing: 1px;
-                "
-              >
-                [+] AUDIO SYSTEMS
+              <summary class="config-summary" style="color: var(--robco-alert); font-size: 13px">
+                AUDIO SYSTEMS
               </summary>
               <div
                 style="
@@ -1346,7 +1293,7 @@
                     >MASTER MUTE (ALL AUDIO)</label
                   >
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px">
+                <div class="audio-row">
                   <input
                     type="checkbox"
                     id="muteTypingToggle"
@@ -1357,7 +1304,7 @@
                     >MUTE TYPING SFX</label
                   >
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px">
+                <div class="audio-row">
                   <input
                     type="checkbox"
                     id="muteHumToggle"
@@ -1368,7 +1315,7 @@
                     >MUTE CRT HUM</label
                   >
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px">
+                <div class="audio-row">
                   <input
                     type="checkbox"
                     id="muteGeigerToggle"
@@ -1379,7 +1326,7 @@
                     >MUTE GEIGER COUNTER</label
                   >
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px">
+                <div class="audio-row">
                   <input
                     type="checkbox"
                     id="muteTinnitusToggle"
@@ -1390,7 +1337,7 @@
                     >MUTE TINNITUS</label
                   >
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px">
+                <div class="audio-row">
                   <input
                     type="checkbox"
                     id="muteLimbToggle"
@@ -1401,7 +1348,7 @@
                     >MUTE LIMB SFX</label
                   >
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px">
+                <div class="audio-row">
                   <input
                     type="checkbox"
                     id="muteWakeToggle"
@@ -1412,7 +1359,7 @@
                     >MUTE WAKE SFX</label
                   >
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px">
+                <div class="audio-row">
                   <input
                     type="checkbox"
                     id="mutePanelClickToggle"
@@ -1425,7 +1372,7 @@
                     >MUTE PANEL CLICKS</label
                   >
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px">
+                <div class="audio-row">
                   <input
                     type="checkbox"
                     id="muteBootDroneToggle"
@@ -1438,7 +1385,7 @@
                     >MUTE BOOT DRONE</label
                   >
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px">
+                <div class="audio-row">
                   <input
                     type="checkbox"
                     id="muteLevelUpToggle"
@@ -1449,7 +1396,7 @@
                     >MUTE LEVEL UP SFX</label
                   >
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px">
+                <div class="audio-row">
                   <input
                     type="checkbox"
                     id="muteHeartbeatToggle"
@@ -1462,7 +1409,7 @@
                     >MUTE HEARTBEAT</label
                   >
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px">
+                <div class="audio-row">
                   <input
                     type="checkbox"
                     id="muteQuestCompleteToggle"
@@ -1475,7 +1422,7 @@
                     >MUTE QUEST COMPLETE</label
                   >
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px">
+                <div class="audio-row">
                   <input
                     type="checkbox"
                     id="muteQuestFailToggle"
@@ -1488,7 +1435,7 @@
                     >MUTE QUEST FAIL</label
                   >
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px">
+                <div class="audio-row">
                   <input
                     type="checkbox"
                     id="muteFactionThresholdToggle"
@@ -1812,16 +1759,16 @@
             <div class="tactical-dashboard">
               <details style="align-self: start; grid-area: dpad" open>
                 <summary
+                  class="config-summary"
                   style="
                     font-size: 11px;
                     margin-bottom: 5px;
                     color: var(--robco-blue);
                     border-bottom: 1px dashed var(--robco-blue);
                     padding-bottom: 2px;
-                    cursor: pointer;
                   "
                 >
-                  [+] D-PAD
+                  D-PAD
                 </summary>
                 <div class="d-pad" style="margin-right: 15px">
                   <button class="action-btn" onclick="macroCommand('[PAD: UP]')">▲</button>

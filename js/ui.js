@@ -1,4 +1,4 @@
-let attachedImageData = null;
+﻿let attachedImageData = null;
 let attachedImageMimeType = null;
 
 // ── AUDIO SETTINGS CACHE ──────────────────────────────────────
@@ -859,35 +859,41 @@ window.onload = function () {
 function changeOpticsColor(color) {
   let root = document.documentElement;
   if (color === 'amber') {
+    root.style.setProperty('--robco-green-rgb', '255, 182, 66');
     root.style.setProperty('--robco-green', '#ffb642');
     root.style.setProperty('--robco-glow', '0 0 6px rgba(255, 182, 66, 0.6)');
     root.style.setProperty('--robco-dark', '#2e1d03');
     root.style.setProperty('--robco-refresh', 'rgba(255, 182, 66, 0.12)');
   } else if (color === 'blue') {
+    root.style.setProperty('--robco-green-rgb', '66, 203, 245');
     root.style.setProperty('--robco-green', '#42cbf5');
     root.style.setProperty('--robco-glow', '0 0 6px rgba(66, 203, 245, 0.6)');
     root.style.setProperty('--robco-dark', '#03202e');
     root.style.setProperty('--robco-refresh', 'rgba(66, 203, 245, 0.12)');
   } else if (color === 'legion') {
+    root.style.setProperty('--robco-green-rgb', '255, 64, 64');
     root.style.setProperty('--robco-green', '#ff4040');
     root.style.setProperty('--robco-glow', '0 0 6px rgba(255, 64, 64, 0.6)');
     root.style.setProperty('--robco-dark', '#2a0000');
     root.style.setProperty('--robco-refresh', 'rgba(255, 64, 64, 0.12)');
   } else if (color === 'ghoul') {
+    root.style.setProperty('--robco-green-rgb', '125, 255, 95');
     root.style.setProperty('--robco-green', '#7dff5f');
     root.style.setProperty('--robco-glow', '0 0 6px rgba(125, 255, 95, 0.6)');
     root.style.setProperty('--robco-dark', '#0a1e03');
     root.style.setProperty('--robco-refresh', 'rgba(125, 255, 95, 0.12)');
   } else if (color === 'neon') {
+    root.style.setProperty('--robco-green-rgb', '192, 132, 252');
     root.style.setProperty('--robco-green', '#c084fc');
     root.style.setProperty('--robco-glow', '0 0 6px rgba(192, 132, 252, 0.6)');
     root.style.setProperty('--robco-dark', '#1a0329');
     root.style.setProperty('--robco-refresh', 'rgba(192, 132, 252, 0.12)');
   } else {
+    root.style.setProperty('--robco-green-rgb', '20, 253, 206');
     root.style.setProperty('--robco-green', '#14fdce');
-    root.style.setProperty('--robco-glow', '0 0 6px rgba(20, 253, 206, 0.6)');
+    root.style.setProperty('--robco-glow', '0 0 6px rgba(var(--robco-green-rgb), 0.6)');
     root.style.setProperty('--robco-dark', '#021c14');
-    root.style.setProperty('--robco-refresh', 'rgba(20, 253, 206, 0.12)');
+    root.style.setProperty('--robco-refresh', 'rgba(var(--robco-green-rgb), 0.12)');
   }
   localStorage.setItem('robco_optics', color);
 }
@@ -2346,7 +2352,7 @@ function renderAmmo() {
   const ammoObj = state.ammo || {};
   const entries = Object.entries(ammoObj).filter(([, count]) => count > 0);
   if (entries.length === 0) {
-    ammoDiv.innerHTML = '<span style="color: rgba(20,253,206,0.5)">No Ammo Tracked</span>';
+    ammoDiv.innerHTML = emptyState('No ammo tracked');
     return;
   }
   // Sort alphabetically by caliber name
@@ -2390,7 +2396,7 @@ function renderSquad() {
   const squadDiv = document.getElementById('squadList');
   if (!squadDiv) return;
   if (!state.squad || state.squad.length === 0) {
-    squadDiv.innerHTML = '<span style="color: rgba(20, 253, 206, 0.5)">No Active Companions</span>';
+    squadDiv.innerHTML = emptyState('No active companions');
     return;
   }
   squadDiv.innerHTML = state.squad
@@ -2412,7 +2418,7 @@ function renderSquad() {
               : 'var(--robco-danger)';
         affinityStr = `<div style="font-size:10px;margin-top:2px;color:${affColor};">AFF: ${affBar} ${aff}%</div>`;
       }
-      return `<div style="margin-bottom: 5px; border-bottom: 1px dashed rgba(20, 253, 206, 0.3); padding-bottom: 4px;">
+      return `<div style="margin-bottom: 5px; border-bottom: 1px dashed rgba(var(--robco-green-rgb), 0.3); padding-bottom: 4px;">
             <div style="font-weight:bold;display:flex;justify-content:space-between;align-items:center;">
                 <span>${barStr} ${escapeHtml(member.name)}</span>
                 <button class="delete-btn" onclick="removeSquadMember(${i})">X</button>
@@ -2679,7 +2685,7 @@ function renderStatus() {
   const statusDiv = document.getElementById('statusList');
   if (!statusDiv) return;
   if (!state.status || state.status.length === 0) {
-    statusDiv.innerHTML = '<span style="color: rgba(20,253,206,0.5)">No Active Effects</span>';
+    statusDiv.innerHTML = emptyState('No active effects');
     return;
   }
   statusDiv.innerHTML = state.status
@@ -2781,7 +2787,7 @@ function renderPerks() {
   const perksDiv = document.getElementById('perksList');
   if (!perksDiv) return;
   if (!state.perks || state.perks.length === 0) {
-    perksDiv.innerHTML = '<span style="color: rgba(20,253,206,0.5)">No Perks Acquired</span>';
+    perksDiv.innerHTML = emptyState('No perks acquired');
     return;
   }
   perksDiv.innerHTML =
@@ -2825,7 +2831,7 @@ function renderQuests() {
   const questsDiv = document.getElementById('questsList');
   if (!questsDiv) return;
   if (!state.quests || state.quests.length === 0) {
-    questsDiv.innerHTML = '<span style="color: rgba(20,253,206,0.5)">No Active Quests</span>';
+    questsDiv.innerHTML = emptyState('No active quests');
     return;
   }
   const statusColors = {
@@ -2936,7 +2942,8 @@ function renderCollectibles() {
   });
 
   if (acquiredDefs.length > 0 && missingDefs.length > 0) {
-    html += '<div style="border-top:1px dashed rgba(20,253,206,0.2);margin:4px 0;"></div>';
+    html +=
+      '<div style="border-top:1px dashed rgba(var(--robco-green-rgb),0.2);margin:4px 0;"></div>';
   }
 
   missingDefs.forEach(d => {
@@ -2967,7 +2974,7 @@ function renderCampaignNotes() {
   const notesDiv = document.getElementById('campaignNotesList');
   if (!notesDiv) return;
   if (!state.campaign_notes || state.campaign_notes.length === 0) {
-    notesDiv.innerHTML = '<span style="color: rgba(20,253,206,0.5)">No Notes Recorded</span>';
+    notesDiv.innerHTML = emptyState('No notes recorded');
     return;
   }
   notesDiv.innerHTML =
@@ -3055,7 +3062,7 @@ function renderCampaignStatus() {
       html += `<div style="margin-bottom:6px;font-size:9px;opacity:0.5;letter-spacing:0.5px;">NOTABLE STANDINGS</div>`;
       html += `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;">`;
       topFactions.forEach(f => {
-        html += `<span style="font-size:9px;border:1px dashed rgba(20,253,206,0.25);padding:2px 6px;color:${f.color};">${escapeHtml(f.name.toUpperCase())}: ${f.label}</span>`;
+        html += `<span style="font-size:9px;border:1px dashed rgba(var(--robco-green-rgb),0.25);padding:2px 6px;color:${f.color};">${escapeHtml(f.name.toUpperCase())}: ${f.label}</span>`;
       });
       html += `</div>`;
     } else {
@@ -3085,7 +3092,7 @@ function renderCampaignStatus() {
       crossroads.innerHTML = autoLogs
         .map(
           note =>
-            `<div style="border-bottom:1px solid rgba(20,253,206,0.1);padding:4px 0;font-size:10px;opacity:0.75;">${escapeHtml(String(note))}</div>`
+            `<div style="border-bottom:1px solid rgba(var(--robco-green-rgb),0.1);padding:4px 0;font-size:10px;opacity:0.75;">${escapeHtml(String(note))}</div>`
         )
         .join('');
     }
@@ -3446,7 +3453,7 @@ function renderFactionRep() {
       ${major.map(factionCard).join('')}
     </div>
     <details style="margin-top:6px;">
-      <summary style="font-size:11px;letter-spacing:1px;opacity:0.6;cursor:pointer;user-select:none;list-style:none;outline:none;font-family:inherit;padding:2px 0;">[+] MINOR FACTIONS</summary>
+      <summary class="config-summary" style="font-size:11px;opacity:0.6;padding:2px 0;">MINOR FACTIONS</summary>
       <div class="faction-grid" style="margin-top:5px;">
         ${minor.map(factionCard).join('')}
       </div>
@@ -3497,7 +3504,7 @@ function renderKarmaCenter() {
   let html = `
     <div style="text-align:center;font-size:18px;letter-spacing:3px;filter:brightness(${opacity + 0.4});padding:6px 0;">${label}</div>
     <div style="font-size:11px;opacity:0.6;text-align:center;margin-bottom:6px;">KARMA: ${karma > 0 ? '+' : ''}${karma}</div>
-    <div style="background:rgba(20,253,206,0.1);height:4px;border-radius:2px;margin:0 0 8px;">
+    <div style="background:rgba(var(--robco-green-rgb),0.1);height:4px;border-radius:2px;margin:0 0 8px;">
       <div style="height:4px;width:${barPct}%;background:var(--robco-green);border-radius:2px;transition:width 0.4s;"></div>
     </div>`;
 
@@ -3567,6 +3574,10 @@ function escapeHtml(str) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+function emptyState(msg) {
+  return '<span class="empty-state">' + escapeHtml(msg) + '</span>';
 }
 
 // Escape first (prevents XSS), then apply known-safe HTML replacements
