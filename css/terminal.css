@@ -343,6 +343,10 @@ textarea {
   border-left: 2px solid var(--robco-green);
   padding-left: 10px;
   margin-left: 40px;
+  /* Match .msg-ai: a long unbroken token in a restored user message must wrap,
+     not set a wide min-content that blows out the single 1fr main-grid track. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .msg-ai {
   color: var(--robco-blue);
@@ -359,6 +363,9 @@ textarea {
   text-align: center;
   font-style: italic;
   font-size: 12px;
+  /* Match .msg-ai: wrap long unbroken tokens instead of widening the track. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .image-preview {
@@ -374,6 +381,15 @@ textarea {
   /* Without min-width:0 a grid item defaults to min-width:auto (min-content).
      On mobile the single 1fr column then expands to hold a wide open panel
      (e.g. the 6×6 world map) instead of shrinking to the viewport. */
+  min-width: 0;
+}
+
+/* Mirror of .col-left: on mobile both columns share the single 1fr main-grid
+   track, so col-right must also be shrinkable. Without this, a wide chat
+   min-content (e.g. a long unbroken token in a restored user/sys message)
+   blows out the shared track and stretches the STAT-tab column too. The
+   ≥1000px block already sets this; here it covers the mobile single-column. */
+.col-right {
   min-width: 0;
 }
 

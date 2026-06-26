@@ -858,7 +858,7 @@ assert(
 // ══════════════════════════════════════════════════════════════
 //  SUITE 15 — CSS Invariants (Protocol 20)
 //  Verifies critical CSS rules that guard mobile layout and faction button sizing.
-//  12 tests
+//  15 tests
 // ══════════════════════════════════════════════════════════════
 header('CSS Invariants (Protocol 20)');
 const cssSource = readFile('css/terminal.css');
@@ -902,6 +902,27 @@ const worldMapDisplayRule = (cssSourceStripped.match(/#worldMapDisplay\s*\{[^}]*
 assert(
   /overflow-x/.test(worldMapDisplayRule),
   '#worldMapDisplay has overflow-x (map overflow containment)'
+);
+// Mobile overflow guard (r23): .col-right must ALSO have min-width:0 in the base
+// styles. On mobile both columns share the single 1fr main-grid track, so a wide
+// chat min-content (a long unbroken token in a restored user/sys message) would
+// otherwise blow out the track and stretch the STAT-tab column too.
+const colRightBaseRule = (cssSourceStripped.match(/\.col-right\s*\{[^}]*\}/) || [''])[0];
+assert(
+  /min-width\s*:\s*0/.test(colRightBaseRule),
+  '.col-right has min-width:0 in base styles (mobile chat overflow fix)'
+);
+// Chat bubbles (r23): user/sys messages must wrap long unbroken tokens like .msg-ai
+// already does, so restored chat never forces horizontal overflow.
+const msgUserRule = (cssSourceStripped.match(/\.msg-user\s*\{[^}]*\}/) || [''])[0];
+assert(
+  /(word-break|overflow-wrap)/.test(msgUserRule),
+  '.msg-user wraps long tokens (word-break/overflow-wrap)'
+);
+const msgSysRule = (cssSourceStripped.match(/\.msg-sys\s*\{[^}]*\}/) || [''])[0];
+assert(
+  /(word-break|overflow-wrap)/.test(msgSysRule),
+  '.msg-sys wraps long tokens (word-break/overflow-wrap)'
 );
 
 // ══════════════════════════════════════════════════════════════

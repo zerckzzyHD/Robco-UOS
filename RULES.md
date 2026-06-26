@@ -12,11 +12,11 @@
 npm run lint        # ESLint — zero new errors
 npm run format      # Prettier — all files clean
 git add -A
-git commit          # Pre-commit hook: cache-bump guard runs first, then 255 tests
+git commit          # Pre-commit hook: cache-bump guard runs first, then 258 tests
 git push origin main  # CACHE_NAME must already be bumped (Protocol 1)
 ```
 
-- **255 tests must pass.** If fewer pass, something is broken. Investigate before committing.
+- **258 tests must pass.** If fewer pass, something is broken. Investigate before committing.
 - **Bump `CACHE_NAME` before every push.** No push may ship without a new cache rev (Protocol 1) — this is a hard gate, not just for UI/JS changes.
 - **Cache-bump guard runs at commit time** — the hook compares the staged `CACHE_NAME` against `origin/main` and blocks if they match. A missed bump fails the commit before the test suite even runs.
 - **Never use `--no-verify`** unless the user explicitly authorizes it for a stated emergency.
@@ -34,7 +34,7 @@ Bump `CACHE_NAME` in `sw.js` before **every `git push`** — full stop. Every pu
 
 **Why:** The SW is cache-first. Without a new `CACHE_NAME`, cached users silently run the old build and never see the "REBOOT TERMINAL" update prompt. Bumping on every push guarantees the prompt fires for all clients on every release.
 
-**Automated guard:** This requirement is now enforced by the pre-commit hook. Before the 255-test suite runs, the hook compares the staged `CACHE_NAME` against `origin/main:sw.js` and fails the commit immediately if they match. A missed bump is impossible to commit, not just discouraged.
+**Automated guard:** This requirement is now enforced by the pre-commit hook. Before the 258-test suite runs, the hook compares the staged `CACHE_NAME` against `origin/main:sw.js` and fails the commit immediately if they match. A missed bump is impossible to commit, not just discouraged.
 
 ---
 
@@ -49,6 +49,8 @@ After every meaningful commit, update these files **in the same commit:**
 | `README.md`       | Current State section, feature tables, project history |
 
 **Version bumps:** Every user-visible change updates `APP_VERSION`, `CACHE_NAME`, and `CHANGELOG` together as one unit. `APP_VERSION` follows semver automatically — PATCH (x.y.Z) for bug/UI/internal fixes, MINOR (x.Y.0) for new user-facing features or panels — no need to ask. MAJOR (X.0.0) bumps (rewrites or breaking changes) still require explicit user confirmation. This replaces the old "always ask before bumping `APP_VERSION`" rule.
+
+**`manifest.json` version discipline:** The PWA `name` field must never include a hardcoded version number — it is intentionally version-less (`"name": "RobCo U.O.S."`). If a version string is ever added back, it must be kept in sync with `APP_VERSION` on every bump. The `short_name` is `"RobCo"` and is also version-less.
 
 ### Protocol 2a — Test Count Sync
 
@@ -94,7 +96,7 @@ Requires changes in **4 files minimum.** The pre-commit audit will block if any 
 - [ ] Add `<details class="panel">` block in `index.html` (if it needs a panel)
 - [ ] Bump `CACHE_NAME` in `sw.js` → Protocol 1
 - [ ] Run `npm run lint` and `npm run format`
-- [ ] Run `git commit` — 255 tests must pass
+- [ ] Run `git commit` — 258 tests must pass
 - [ ] Update `ARCHITECTURE.md`, `CHANGELOG.md`, `README.md` → Protocol 2
 
 ---
@@ -108,7 +110,7 @@ Requires changes in **4 files minimum.** The pre-commit audit will block if any 
 - [ ] If AI changes should auto-expand it: add key to `expandPanelForCategory()` map in `ui.js`
 - [ ] If it has a text input with autocomplete: call `wireInput()` in `initRegistryAutocomplete()` in `ui.js`
 - [ ] Bump `CACHE_NAME` → Protocol 1
-- [ ] Lint, format, commit (255 tests) → Protocol 2
+- [ ] Lint, format, commit (258 tests) → Protocol 2
 
 ---
 
@@ -328,4 +330,4 @@ Treat model usage as a budget — and the burden of efficiency is on the orchest
 
 **State persistence:** `localStorage` key `robco_v7`. Debounced 500ms writes. Flushed immediately on `beforeunload`.
 
-**Test suite:** 255 tests across 23 suites, mirrored in `tests/check-persistence.ps1` (PowerShell, run by the pre-commit hook) and `tests/check-persistence.js` (Node) — both runners are kept at exact parity (same suites, same per-suite counts, same 255 total). Covers parser sanity, autoImportState coverage, faction registry, skill keys, save envelope, file upload, cloud sync, backward compatibility, registry structural integrity, reputation 2D matrix, C2 CRUD function existence, C3 CAMPG tab DOM binding, C4 Protocol 4 campaignMode (binary) + separation, render contracts, CSS invariants, SW invariants, structural integrity (Protocol 20 static guards), and detail-current dedup guard (Protocol 27). **When you change one runner, update the other in the same commit** — drift here is what let the PS runner silently fall to 173.
+**Test suite:** 258 tests across 23 suites, mirrored in `tests/check-persistence.ps1` (PowerShell, run by the pre-commit hook) and `tests/check-persistence.js` (Node) — both runners are kept at exact parity (same suites, same per-suite counts, same 258 total). Covers parser sanity, autoImportState coverage, faction registry, skill keys, save envelope, file upload, cloud sync, backward compatibility, registry structural integrity, reputation 2D matrix, C2 CRUD function existence, C3 CAMPG tab DOM binding, C4 Protocol 4 campaignMode (binary) + separation, render contracts, CSS invariants, SW invariants, structural integrity (Protocol 20 static guards), and detail-current dedup guard (Protocol 27). **When you change one runner, update the other in the same commit** — drift here is what let the PS runner silently fall to 173.

@@ -522,7 +522,7 @@ try {
 # ===========================================================
 # Suite 15 -- CSS Invariants (Protocol 20)
 # Verifies critical CSS rules that guard mobile layout and faction button sizing.
-# 12 tests
+# 15 tests
 # ===========================================================
 Sep "Suite 15 -- CSS Invariants (Protocol 20)"
 $cssSrc = Read-Src "css/terminal.css"
@@ -550,6 +550,15 @@ $colLeftBaseRule = ([regex]::Match($cssSrcStripped, '\.col-left\s*\{[^}]*\}')).V
 Check ($colLeftBaseRule -match 'min-width\s*:\s*0') '.col-left has min-width:0 in base styles (mobile overflow fix)'
 $worldMapDisplayRule = ([regex]::Match($cssSrcStripped, '#worldMapDisplay\s*\{[^}]*\}')).Value
 Check ($worldMapDisplayRule -match 'overflow-x') '#worldMapDisplay has overflow-x (map overflow containment)'
+# Mobile overflow guard (r23): .col-right must ALSO have min-width:0 in base styles,
+# since both columns share the single 1fr main-grid track on mobile.
+$colRightBaseRule = ([regex]::Match($cssSrcStripped, '\.col-right\s*\{[^}]*\}')).Value
+Check ($colRightBaseRule -match 'min-width\s*:\s*0') '.col-right has min-width:0 in base styles (mobile chat overflow fix)'
+# Chat bubbles (r23): user/sys messages must wrap long unbroken tokens like .msg-ai.
+$msgUserRule = ([regex]::Match($cssSrcStripped, '\.msg-user\s*\{[^}]*\}')).Value
+Check ($msgUserRule -match 'word-break|overflow-wrap') '.msg-user wraps long tokens (word-break/overflow-wrap)'
+$msgSysRule = ([regex]::Match($cssSrcStripped, '\.msg-sys\s*\{[^}]*\}')).Value
+Check ($msgSysRule -match 'word-break|overflow-wrap') '.msg-sys wraps long tokens (word-break/overflow-wrap)'
 
 # ===========================================================
 # Suite 16 -- Service Worker Invariants (Protocol 20)

@@ -51,6 +51,13 @@ for (const vp of VIEWPORTS) {
   // Give boot sequence a moment to settle
   await page.waitForTimeout(800);
 
+  // The world map lives on the DATA tab (hidden while STAT is active), so switch
+  // to it before opening the map panel.
+  await page.evaluate(() => {
+    if (typeof switchTab === 'function') switchTab('data');
+  });
+  await page.waitForTimeout(150);
+
   // Open the World Map panel if it exists
   const mapSummary = page.locator('#worldMapPanel > summary');
   if ((await mapSummary.count()) > 0) {
@@ -72,6 +79,39 @@ for (const vp of VIEWPORTS) {
       `${vp.label} — horizontal overflow! scrollWidth ${overflow.scrollWidth} > innerWidth ${overflow.innerWidth}`
     );
   }
+
+  // 1b. Restored chat with a long unbroken token in a user/sys message must NOT
+  //     stretch the shared 1fr main-grid track (r23 regression guard). scrollWidth
+  //     alone does NOT catch this — assert the column widths directly.
+  await page.evaluate(() => {
+    localStorage.setItem(
+      'robco_chat',
+      JSON.stringify([
+        { sender: 'sys', text: 'SYS' + 'x'.repeat(90) + 'INIT' },
+        { sender: 'user', text: 'a'.repeat(100) },
+        { sender: 'ai', text: 'A normal spaced reply that wraps fine.' },
+      ])
+    );
+  });
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForTimeout(800);
+  const cols = await page.evaluate(() => {
+    const w = sel => {
+      const e = document.querySelector(sel);
+      return e ? Math.round(e.getBoundingClientRect().width) : -1;
+    };
+    return { iw: window.innerWidth, colLeft: w('.col-left'), colRight: w('.col-right') };
+  });
+  if (cols.colLeft <= cols.iw + 1 && cols.colRight <= cols.iw + 1) {
+    pass(
+      `${vp.label} — restored long-token chat does not stretch columns (colLeft ${cols.colLeft}, colRight ${cols.colRight} <= ${cols.iw})`
+    );
+  } else {
+    fail(
+      `${vp.label} — restored long-token chat stretched columns! colLeft ${cols.colLeft}, colRight ${cols.colRight} > innerWidth ${cols.iw}`
+    );
+  }
+  await page.evaluate(() => localStorage.removeItem('robco_chat'));
 
   // 2. Focus does not trigger auto-zoom (input font-size >= 16px guard)
   const scaleAfterFocus = await page.evaluate(() => {
