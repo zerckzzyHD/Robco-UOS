@@ -1,4 +1,16 @@
-## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-25 | Tests: 209/209 | Cache: robco-terminal-v2.0.1-r4 -->
+## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-25 | Tests: 209/209 | Cache: robco-terminal-v2.0.1-r5 -->
+
+### [B4] Mobile Overflow Fix — ballooned BIO-METRICS inputs (2026-06-25)
+
+- **Symptom (real device, not caught by the r3 390px check)**: On phones the right-hand value column ran off the right edge — the HP `/ 100`, LVL/XP `/ 1249` and CAPS fields and the ARMS/LEGS `OK` badges were clipped — plus a stray vertical green line ran top-to-bottom through the panels.
+- **Root cause**: the r3 media query applied `flex: 1 1 auto; width: auto !important` to **`input[type='number']`**. A UA-default `<input type=number>` with `width:auto` balloons to ~170–260px on mobile (measured: HP fields 174px, CAPS 259px), pushing the value column past the viewport. The stacked green right-borders of those over-wide inputs, aligned down the page, were the "stray vertical line." Desktop didn't reproduce it because the inputs wrapped inside a constrained wrapper there — which is why the earlier 390px desktop-emulated check passed.
+- **Fix** (`css/terminal.css`, `@media (max-width: 480px)`):
+  - Removed number inputs from the flex-grow rule (only `text`/`password`/`select` grow to fill).
+  - Hard-capped `input[type='number'] { max-width: 56px; box-sizing: border-box }` so neither flex nor UA intrinsic sizing can over-widen them.
+  - Added `flex-wrap: wrap` to `.input-group` and `.input-group > div` so a too-wide right column wraps under the label instead of clipping.
+  - Limb buttons (`.limb-ok` / `.limb-crip`) now `flex: 1 1 auto; min-width: 0` so they shrink to share the row (80px → ~60px) instead of being cut off.
+- **Verification**: deterministic harness at fixed **360px and 412px** with the media query active — **zero** right-side overflow; HP/XP back to 40px, CAPS 56px, limb buttons 60px, Location fills the row showing the full value. No stray vertical line.
+- **Cache**: `CACHE_NAME` → `robco-terminal-v2.0.1-r5` (Protocol 1 — bump on every push).
 
 ### [B3] Test-Runner Reconciliation — PowerShell suite 173 → 209 (2026-06-25)
 

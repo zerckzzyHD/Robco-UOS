@@ -397,7 +397,7 @@ The project is a **production-quality browser application** with:
 - 6 color themes
 - 3 save slots
 - Installable PWA with offline support
-- Responsive phone layout — `@media (max-width: 480px)` reflows panels, wraps the boot/header text and tab bar, and flexes inputs so nothing overflows or truncates on ~390 px screens
+- Responsive phone layout — `@media (max-width: 480px)` reflows panels, wraps the boot/header text and tab bar, caps number inputs and shrinks limb buttons, and flexes text inputs so nothing overflows or truncates (verified at 360 px and 412 px)
 - **Fallout Data Registry** — 130 quests · ~110 perks · ~120 locations · 10 companions · ~280 items (all wiki-sourced, CC-BY-SA 4.0)
 - **Registry Autocomplete** — live CRT-styled dropdown on Quest Name, Item Name, and Perk Name inputs (keyboard + click)
 - **Combat Database** — 9 CSV tables: 66 enemies · ~170 weapons · 47 ammo subtypes · ~68 armors · ~45 chems · 18 misc items · 10 recipes · 19 quest items · 14 vendors (all wiki-sourced)

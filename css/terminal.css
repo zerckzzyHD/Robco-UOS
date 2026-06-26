@@ -1627,9 +1627,11 @@ body.sync-complete {
 /* ─── Narrow Phone Layout (≤ 480px) ─────────────────────────────────
    The mobile-first base styles already collapse the main grid to a single
    column below 1000px. This block fixes the remaining horizontal overflow
-   on true phone widths (~360–430px): oversized boot/header text, fixed-pixel
-   inputs (e.g. the Location field truncating "Goodsprings"), wide tab
-   buttons, and multi-column sub-grids. Tested against a 390px viewport. */
+   on true phone widths: oversized boot/header text, wide tab buttons, the
+   Location field truncating "Goodsprings", multi-column sub-grids, and — the
+   r5 fix — number inputs / limb buttons in the BIO-METRICS rows that were
+   running off the right edge. Verified at 360px and 412px with the media
+   query active: zero right-side overflow in the bio-metrics panel. */
 @media (max-width: 480px) {
   body {
     padding: 6px;
@@ -1670,20 +1672,52 @@ body.sync-complete {
     font-size: 10px;
   }
 
-  /* Inputs fill the row instead of using fixed pixel widths. The override
-     beats inline style="width:100px/130px" (e.g. #stat_loc) via !important,
-     so the full value is visible and nothing spills past the panel edge. */
+  /* Rows wrap their right-hand control column under the label instead of
+     spilling past the viewport edge when it is too wide. */
   .input-group {
     gap: 8px;
+    flex-wrap: wrap;
+    row-gap: 2px;
   }
+
+  /* TEXT inputs / selects grow to fill the row (e.g. #stat_loc shows the full
+     value). The override beats inline style="width:100px/130px" via !important. */
   .input-group input[type='text'],
   .input-group input[type='password'],
-  .input-group input[type='number'],
   .input-group select {
     flex: 1 1 auto;
     width: auto !important;
     min-width: 0;
     max-width: 100%;
+  }
+
+  /* NUMBER inputs must stay compact — NEVER grow. A UA-default <input
+     type=number> with width:auto balloons to ~170px+ on mobile, which pushed
+     the HP "/ 100", LVL/XP "/ 1249" and CAPS value columns off the right edge
+     and produced a stray vertical green line from the stacked input borders.
+     Cap them hard so neither flex nor UA intrinsic sizing can over-widen them. */
+  input[type='number'] {
+    max-width: 56px;
+    box-sizing: border-box;
+  }
+
+  /* Nested value wrappers (HP/LVL "cur / max") and the limb button groups stay
+     inside the row and may wrap rather than clip. */
+  .input-group > div {
+    max-width: 100%;
+    flex-wrap: wrap;
+  }
+
+  /* Limb status buttons shrink to share the row instead of clipping at the
+     right edge, while keeping a usable tap target. */
+  button.limb-ok,
+  button.limb-crip {
+    width: auto;
+    min-width: 0;
+    flex: 1 1 auto;
+    font-size: 10px;
+    padding: 4px 2px;
+    box-sizing: border-box;
   }
 
   /* Faction standing drops from 3 columns to 2 to keep cells legible */
