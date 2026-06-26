@@ -1,4 +1,16 @@
-## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 209/209 | Cache: robco-terminal-v2.0.1-r8 -->
+## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 209/209 | Cache: robco-terminal-v2.0.1-r9 -->
+
+### [B8] Dispatch workflow upgraded to 3-stage with audit and reporting (2026-06-26)
+
+Docs-only update to the internal agent rules. No app behavior changed.
+
+**The two-stage Dispatch workflow wasn't catching incomplete fixes.** The previous process had Opus AI plan and Sonnet AI implement — but no independent check that the fix actually worked end-to-end and landed on the live site. This led to repeated cycles where a fix was "done" locally but something was still broken in production. Updated to a three-stage process: Opus diagnoses and plans, Sonnet reviews the plan against current code and implements, then Opus independently audits the committed diff and live deployment before the task is called done. If the audit finds anything wrong, the work loops back rather than shipping.
+
+**Added adaptive escalation.** The three stages are the default track, not a rigid rule. The workflow now explicitly allows switching to deeper analysis (Opus) mid-task whenever the root cause turns out to be wrong, a fix fails verification, or the change is high-risk — instead of grinding forward on the same wrong path.
+
+**Added Protocol 9 — Dispatch must always report back.** After every push and completed task, the Dispatch session is now required to confirm in plain English: what changed, the commit ref, whether the push landed on origin/main, and whether a "Reboot Terminal" reload is needed to see it.
+
+**Also confirmed:** opening the World Map panel on mobile (4×4 compact and 6×6 full) does not cause any page overflow. Measured `scrollWidth === innerWidth` in all three states (before map open, after 4×4 render, after 6×6 toggle); zero panel width changes (`diffs: {}`). The r7+r8 fix holds.
 
 ### [B7] Mobile World Map — 4×4 view and square cells (2026-06-26)
 
