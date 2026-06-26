@@ -1519,6 +1519,8 @@ function switchTab(tab) {
   try {
     localStorage.setItem('robco_active_tab', tab);
   } catch (_) {}
+  // Re-render world map when switching to the DATA tab so it measures real panel width
+  if (tab === 'data' && typeof renderWorldMap === 'function') renderWorldMap();
 }
 
 // Initialize tab on page load (restores last used tab, defaults to 'stat')
@@ -1529,6 +1531,15 @@ function initTabs() {
     if (saved && TAB_NAMES.includes(saved)) tab = saved;
   } catch (_) {}
   switchTab(tab);
+}
+
+// Called by #stat_loc onchange: persists the new location, resets the map to core
+// view on narrow screens, and re-renders so the current-zone highlight updates.
+function onLocationChange() {
+  saveState();
+  const d = document.getElementById('worldMapDisplay');
+  if (d) d.dataset.mapFull = '0';
+  renderWorldMap();
 }
 
 // Called by autoImportState() after a state delta with the changed category key.
@@ -3089,15 +3100,25 @@ function renderWorldMap() {
     });
   }
 
-  // Helper: fuzzy-match a zone against the current location string
-  function zoneFuzzyMatchesLoc(zone, loc) {
-    if (!loc) return false;
+  // Scores a zone against the current location string to pick ONE best-match cell.
+  // 100 = exact string match, 50+len = whole-word token match, 10 = substring fallback.
+  function scoreZoneForLoc(zone, loc) {
+    const locLower = loc.toLowerCase();
     const searchIn = [zone.name, ...(zone.locations || [])].map(s => s.toLowerCase());
-    return searchIn.some(s => {
-      const locWords = loc.split(/[ ,]+/).filter(w => w.length > 3);
-      const sWords = s.split(/[ ,]+/).filter(w => w.length > 3);
-      return locWords.some(lw => sWords.some(sw => sw.includes(lw) || lw.includes(sw)));
-    });
+    let best = 0;
+    for (const s of searchIn) {
+      if (s === locLower) return 100;
+      const locWords = locLower.split(/[ ,]+/).filter(w => w.length > 2);
+      const sWords = s.split(/[ ,]+/).filter(w => w.length > 2);
+      if (locWords.some(lw => sWords.some(sw => sw === lw))) {
+        best = Math.max(best, 50 + s.length);
+      } else if (
+        locWords.some(lw => lw.length > 3 && sWords.some(sw => sw.includes(lw) || lw.includes(sw)))
+      ) {
+        best = Math.max(best, 10);
+      }
+    }
+    return best;
   }
 
   function locFuzzyMatchesLoc(targetLoc, loc) {
@@ -3199,6 +3220,21 @@ function renderWorldMap() {
     gridMap[`${z.gridRow},${z.gridCol}`] = z;
   });
 
+  // Compute ONE winning grid key for current location to prevent multi-highlight
+  let currentZoneKey = null;
+  if (currentLoc) {
+    let bestScore = 0,
+      bestLen = 0;
+    Object.entries(gridMap).forEach(([key, zone]) => {
+      const score = scoreZoneForLoc(zone, currentLoc);
+      if (score > bestScore || (score > 0 && score === bestScore && zone.name.length > bestLen)) {
+        bestScore = score;
+        bestLen = zone.name.length;
+        currentZoneKey = score > 0 ? key : null;
+      }
+    });
+  }
+
   // Compass column labels (W → E)
   const compassCols = [];
   for (let c = colMin; c <= colMax; c++) {
@@ -3229,7 +3265,7 @@ function renderWorldMap() {
         continue;
       }
 
-      const isYou = currentLoc && zoneFuzzyMatchesLoc(zone, currentLoc);
+      const isYou = currentZoneKey === `${r},${c}`;
       const wasVisited = zoneVisited(zone);
       const hasUncollected = zoneHasUncollectedCollectible(zone);
 

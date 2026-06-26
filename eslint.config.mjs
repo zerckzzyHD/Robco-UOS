@@ -134,6 +134,8 @@ export default [
         renderGameDate: 'readonly',
         // Faction reputation editing (js/ui.js)
         adjustFaction: 'readonly',
+        // Location field change handler (js/ui.js)
+        onLocationChange: 'readonly',
         // Game database CSVs (js/db_nv.js or js/db_fo3.js)
         databaseCSVs: 'readonly',
       },
@@ -169,6 +171,6 @@ export default [
     },
   },
   {
-    ignores: ['node_modules/', 'dist/', '*.min.js', 'eslint.config.mjs'],
+    ignores: ['node_modules/', 'dist/', '*.min.js', 'eslint.config.mjs', 'tests/render-check.mjs'],
   },
 ];

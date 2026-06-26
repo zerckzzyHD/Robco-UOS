@@ -1,4 +1,21 @@
-## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 209/209 | Cache: robco-terminal-v2.0.1-r11 -->
+## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 243/243 | Cache: robco-terminal-v2.0.1-r12 -->
+
+### [B11] World map bug fixes + Protocol 20 static test guards (2026-06-26)
+
+**Three world map rendering bugs fixed** — all three were silent regressions where the map either showed the wrong cell highlighted, didn't update when it should have, or snapped back to full 6×6 view after switching tabs on mobile.
+
+- **Double highlight fixed:** The location-matching logic used to highlight any zone whose name appeared as a substring of yours (and vice versa) — so standing in "Goodsprings" would also light up "Bitter Springs." It now scores each zone (exact match = 100, whole-word token = 50+, substring fallback = 10) and picks the single best winner. Only one zone ever highlights.
+- **Map now updates when you change location:** Typing a new location and tabbing away previously did nothing — the map stayed stale. Added `onchange="onLocationChange();"` to the location field so the map re-renders (and resets to compact view) as soon as you leave the field.
+- **Mobile 4×4 compact view survives tab switches:** Switching from another tab back to the Data tab was re-rendering the map while the panel was hidden, so `offsetWidth` was zero and the map defaulted to full 6×6. The tab switcher now triggers a map re-render after the panel is visible, so the compact/full state is preserved correctly.
+
+**34 new static source-invariant tests added (Protocol 20)** — four new suites (Suites 14–17) in both test runners, now at 243 tests across 22 suites:
+
+- **Suite 14 — Render Contracts (9 tests):** Guards that `renderFactionRep` and `renderWorldMap` produce the expected CSS classes and markup in their function bodies. If a class name gets renamed or dropped in a refactor, a test fails before it ships.
+- **Suite 15 — CSS Invariants (8 tests):** Guards that key layout rules in `terminal.css` still exist — faction button sizing, flex layout on card containers, map cell shape, button widths, and the 480px media query breakpoint. A dropped rule fails the gate.
+- **Suite 16 — SW Invariants (8 tests):** Guards that `sw.js` follows every service-worker protocol: no `skipWaiting()` in the `install` handler, no `clients.claim()`, `CACHE_NAME` format is correct and matches `APP_VERSION`, the `activate` handler cleans old caches, and `index.html` + `SKIP_WAITING` wiring are present.
+- **Suite 17 — Structural Integrity (9 tests):** Guards that the key render functions exist in `ui.js`, are called from `loadUI()`, and that the panel/container IDs they target exist in `index.html`. A silently orphaned function or missing DOM hook fails immediately.
+
+**Also created** `tests/render-check.mjs` — an optional Playwright check (not in the 243-test gate) that loads the page at 360px and 412px, opens the World Map panel, and asserts no horizontal overflow and no focus-zoom. Run it manually after map or mobile layout changes per Protocol 10.
 
 ### [B10] Protocol ruleset completed: Protocols 19–20, 2a/10 tightened, SW prohibition added (2026-06-26)
 

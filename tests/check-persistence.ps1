@@ -486,6 +486,91 @@ try {
 }
 
 # ===========================================================
+# Suite 14 -- Render Contracts (Protocol 20)
+# Static source checks that render*() markup/class contracts are intact.
+# 9 tests
+# ===========================================================
+Sep "Suite 14 -- Render Contracts (Protocol 20)"
+try {
+    $renderFactionRepBody = Get-FunctionBody $uiSrc 'renderFactionRep'
+    $renderWorldMapBody   = Get-FunctionBody $uiSrc 'renderWorldMap'
+    Check ($renderFactionRepBody -match 'class="faction-card-btns"')   'renderFactionRep contains class="faction-card-btns"'
+    Check ($renderFactionRepBody -match 'faction-btn')                  'renderFactionRep contains faction-btn class reference'
+    $adjCount = ([regex]::Matches($renderFactionRepBody, 'adjustFaction\(')).Count
+    Check ($adjCount -ge 4)                                             "renderFactionRep has >=4 adjustFaction() calls (found $adjCount)"
+    Check (-not ($renderFactionRepBody -match '<button[^>]*class="faction-btn[^"]*"[^>]*style=') -and `
+           -not ($renderFactionRepBody -match '<button[^>]*style=[^>]*class="faction-btn'))     'renderFactionRep faction-btn buttons have no inline style attribute'
+    Check ($renderWorldMapBody -match 'minmax\(0,\s*1fr\)')             'renderWorldMap uses minmax(0,1fr) for grid columns'
+    Check ($renderWorldMapBody -match 'max-width\s*:\s*100%')           'renderWorldMap uses max-width:100% on the grid container'
+    Check ($renderWorldMapBody -match 'map-cell' -and $renderWorldMapBody -match 'map-cell-name' -and $renderWorldMapBody -match 'map-cell-pip') 'renderWorldMap contains map-cell, map-cell-name, map-cell-pip class references'
+    Check (($renderWorldMapBody -match 'innerWidth' -or $renderWorldMapBody -match 'offsetWidth') -and $renderWorldMapBody -match '490') 'renderWorldMap uses innerWidth/offsetWidth and 490 for narrow-viewport detection'
+    Check ($renderWorldMapBody -match 'map-toggle-btn')                 'renderWorldMap contains map-toggle-btn reference'
+} catch {
+    Fail "Render contract extraction failed: $_"
+}
+
+# ===========================================================
+# Suite 15 -- CSS Invariants (Protocol 20)
+# Verifies critical CSS rules that guard mobile layout and faction button sizing.
+# 8 tests
+# ===========================================================
+Sep "Suite 15 -- CSS Invariants (Protocol 20)"
+$cssSrc = Read-Src "css/terminal.css"
+# Strip block comments so embedded {} in comments don't break rule-block extraction
+$cssSrcStripped = $cssSrc -replace '(?s)/\*.*?\*/', ''
+$factionBtnRule     = ([regex]::Match($cssSrcStripped, '\.faction-btn\s*\{[^}]*\}')).Value
+$factionCardBtnsRule= ([regex]::Match($cssSrcStripped, '\.faction-card-btns\s*\{[^}]*\}')).Value
+$mapCellRule        = ([regex]::Match($cssSrcStripped, '\.map-cell\s*\{[^}]*\}')).Value
+$buttonRule         = ([regex]::Match($cssSrcStripped, '(?m)^button\s*\{[^}]*\}')).Value
+
+Check ($factionBtnRule -match 'width\s*:\s*auto')          '.faction-btn has width:auto'
+Check ($factionBtnRule -match 'display\s*:\s*flex')        '.faction-btn uses display:flex'
+Check ($factionCardBtnsRule -match 'flex-wrap')            '.faction-card-btns has flex-wrap'
+Check ($mapCellRule -match 'min-width\s*:\s*0')            '.map-cell has min-width:0'
+Check ($mapCellRule -match 'overflow\s*:\s*hidden')        '.map-cell has overflow:hidden'
+Check ($mapCellRule -match 'min-height|aspect-ratio')      '.map-cell has height floor (min-height or aspect-ratio)'
+Check ([bool]([regex]::Match($cssSrc, '(?s)@media[^{]*480px.{0,2000}max-width\s*:\s*56px').Success)) '@media max-width:480px has max-width:56px for number inputs'
+Check ($buttonRule -match 'width\s*:\s*100%')              'global button{} has width:100%'
+
+# ===========================================================
+# Suite 16 -- Service Worker Invariants (Protocol 20)
+# Static source guards for SW install/activate/message behavior.
+# 8 tests
+# ===========================================================
+Sep "Suite 16 -- Service Worker Invariants (Protocol 20)"
+$swSrc = Read-Src "sw.js"
+# Strip all comments so embedded mentions in comments don't confuse assertions
+$swSrcStripped = ($swSrc -replace '(?s)/\*.*?\*/', '') -replace '//[^\n]*', ''
+$swInstallMatch = [regex]::Match($swSrcStripped, "self\.addEventListener\s*\(\s*'install'[\s\S]*?\}\s*\)")
+$swInstallStripped = if ($swInstallMatch.Success) { $swInstallMatch.Value } else { '' }
+Check (-not ($swInstallStripped -match 'self\.skipWaiting\s*\('))      'install handler does NOT call self.skipWaiting() (r6 bug guard)'
+Check (-not ($swSrcStripped -match 'clients\.claim\s*\('))             'sw.js does NOT call clients.claim() (reload-loop guard)'
+Check ([bool]([regex]::Match($swSrc, "addEventListener\s*\(\s*'message'[\s\S]{0,500}skipWaiting").Success)) "message listener calls self.skipWaiting() (update-prompt path)"
+Check ($swSrc -match "CACHE_NAME\s*=\s*'robco-terminal-v[\d.]+(-r\d+)?'") "CACHE_NAME matches robco-terminal-v<version>-rN format"
+$cacheVer = ([regex]::Match($swSrc, "CACHE_NAME\s*=\s*'robco-terminal-v([\d.]+)")).Groups[1].Value
+$appVer   = ([regex]::Match($stateSrc, "const APP_VERSION\s*=\s*'([\d.]+)'")).Groups[1].Value
+Check ($cacheVer -ne '' -and $appVer -ne '' -and $cacheVer -eq $appVer) "CACHE_NAME version ($cacheVer) matches APP_VERSION ($appVer)"
+Check ([bool]([regex]::Match($swSrcStripped, 'activate[\s\S]{0,400}caches\.delete').Success)) 'activate handler calls caches.delete for old-cache cleanup'
+Check ($swSrc -match "'./index.html'" -and $swSrc -match "'./js/ui.js'")  'ASSETS list includes index.html and js/ui.js'
+Check ($htmlSrc -match 'SKIP_WAITING' -and $htmlSrc -match 'reg\.waiting' -and $htmlSrc -match 'controllerchange') 'index.html SW registration references SKIP_WAITING, reg.waiting, and controllerchange'
+
+# ===========================================================
+# Suite 17 -- Structural Integrity (Protocol 20)
+# Verifies key render functions exist, are called, and their DOM targets exist.
+# 9 tests
+# ===========================================================
+Sep "Suite 17 -- Structural Integrity (Protocol 20)"
+Check ($uiSrc -match 'function _updatePanelBadges\b')   '_updatePanelBadges() function exists in ui.js'
+Check ($uiSrc -match 'function expandPanelForCategory\b') 'expandPanelForCategory() function exists in ui.js'
+Check ($uiSrc -match 'function renderWorldMap\b')        'renderWorldMap() function exists in ui.js'
+Check ($uiSrc -match 'function renderFactionRep\b')      'renderFactionRep() function exists in ui.js'
+Check ($uiSrc -match 'renderWorldMap\(\)')               'renderWorldMap() is called in ui.js'
+Check ($uiSrc -match 'renderFactionRep\(\)')             'renderFactionRep() is called in ui.js'
+Check ($htmlSrc -match 'id="worldMapPanel"')             'worldMapPanel panel exists in index.html'
+Check ($htmlSrc -match 'id="worldMapDisplay"')           'worldMapDisplay element exists in index.html'
+Check ($htmlSrc -match 'id="factionContainer"')          'factionContainer element exists in index.html'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

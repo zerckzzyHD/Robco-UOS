@@ -786,6 +786,163 @@ try {
 }
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 14 — Render Contracts (Protocol 20)
+//  Static source checks that render*() markup/class contracts are intact.
+//  9 tests
+// ══════════════════════════════════════════════════════════════
+header('Render Contracts (Protocol 20)');
+let renderFactionRepBody = '';
+let renderWorldMapBody = '';
+try {
+  renderFactionRepBody = extractFunctionBody(uiSource, 'renderFactionRep');
+  renderWorldMapBody = extractFunctionBody(uiSource, 'renderWorldMap');
+} catch (e) {
+  fail(`Cannot extract render functions: ${e.message}`);
+}
+assert(
+  /class="faction-card-btns"/.test(renderFactionRepBody),
+  'renderFactionRep contains class="faction-card-btns"'
+);
+assert(
+  /faction-btn/.test(renderFactionRepBody),
+  'renderFactionRep contains faction-btn class reference'
+);
+assert(
+  (renderFactionRepBody.match(/adjustFaction\(/g) || []).length >= 4,
+  'renderFactionRep has ≥4 adjustFaction() calls'
+);
+assert(
+  !/<button[^>]*class="faction-btn[^"]*"[^>]*style=/.test(renderFactionRepBody) &&
+    !/<button[^>]*style=[^>]*class="faction-btn/.test(renderFactionRepBody),
+  'renderFactionRep faction-btn buttons have no inline style attribute'
+);
+assert(
+  /minmax\(0,\s*1fr\)/.test(renderWorldMapBody),
+  'renderWorldMap uses minmax(0,1fr) for grid columns'
+);
+assert(
+  /max-width\s*:\s*100%/.test(renderWorldMapBody),
+  'renderWorldMap uses max-width:100% on the grid container'
+);
+assert(
+  /map-cell/.test(renderWorldMapBody) &&
+    /map-cell-name/.test(renderWorldMapBody) &&
+    /map-cell-pip/.test(renderWorldMapBody),
+  'renderWorldMap contains map-cell, map-cell-name, map-cell-pip class references'
+);
+assert(
+  /(innerWidth|offsetWidth)/.test(renderWorldMapBody) && /490/.test(renderWorldMapBody),
+  'renderWorldMap uses innerWidth/offsetWidth and 490 for narrow-viewport detection'
+);
+assert(
+  /map-toggle-btn/.test(renderWorldMapBody),
+  'renderWorldMap contains map-toggle-btn reference'
+);
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 15 — CSS Invariants (Protocol 20)
+//  Verifies critical CSS rules that guard mobile layout and faction button sizing.
+//  8 tests
+// ══════════════════════════════════════════════════════════════
+header('CSS Invariants (Protocol 20)');
+const cssSource = readFile('css/terminal.css');
+// Strip block comments so embedded {} in comments don't break rule-block extraction
+const cssSourceStripped = cssSource.replace(/\/\*[\s\S]*?\*\//g, '');
+const factionBtnRule = (cssSourceStripped.match(/\.faction-btn\s*\{[^}]*\}/) || [''])[0];
+const factionCardBtnsRule = (cssSourceStripped.match(/\.faction-card-btns\s*\{[^}]*\}/) || [''])[0];
+const mapCellRule = (cssSourceStripped.match(/\.map-cell\s*\{[^}]*\}/) || [''])[0];
+const buttonRule = (cssSourceStripped.match(/^button\s*\{[^}]*\}/m) || [''])[0];
+
+assert(/width\s*:\s*auto/.test(factionBtnRule), '.faction-btn has width:auto');
+assert(/display\s*:\s*flex/.test(factionBtnRule), '.faction-btn uses display:flex');
+assert(/flex-wrap/.test(factionCardBtnsRule), '.faction-card-btns has flex-wrap');
+assert(/min-width\s*:\s*0/.test(mapCellRule), '.map-cell has min-width:0');
+assert(/overflow\s*:\s*hidden/.test(mapCellRule), '.map-cell has overflow:hidden');
+assert(
+  /(min-height|aspect-ratio)/.test(mapCellRule),
+  '.map-cell has height floor (min-height or aspect-ratio)'
+);
+assert(
+  /@media[^{]*480px[\s\S]{0,2000}max-width\s*:\s*56px/.test(cssSource),
+  '@media max-width:480px has max-width:56px for number inputs'
+);
+assert(/width\s*:\s*100%/.test(buttonRule), 'global button{} has width:100%');
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 16 — Service Worker Invariants (Protocol 20)
+//  Static source guards for SW install/activate/message behavior.
+//  8 tests
+// ══════════════════════════════════════════════════════════════
+header('Service Worker Invariants (Protocol 20)');
+const swSource = readFile('sw.js');
+// Strip all comments so embedded mentions in comments don't confuse assertions
+const swSourceStripped = swSource.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+const swInstallMatch = swSourceStripped.match(
+  /self\.addEventListener\s*\(\s*['"]install['"][\s\S]*?\}\s*\)/
+);
+const swInstallStripped = swInstallMatch ? swInstallMatch[0] : '';
+assert(
+  !/self\.skipWaiting\s*\(/.test(swInstallStripped),
+  'install handler does NOT call self.skipWaiting() (r6 bug guard)'
+);
+assert(
+  !/clients\.claim\s*\(/.test(swSourceStripped),
+  'sw.js does NOT call clients.claim() (reload-loop guard)'
+);
+assert(
+  /addEventListener\s*\(\s*['"]message['"][\s\S]{0,500}skipWaiting/.test(swSource),
+  'message listener calls self.skipWaiting() (update-prompt path)'
+);
+assert(
+  /CACHE_NAME\s*=\s*'robco-terminal-v[\d.]+(-r\d+)?'/.test(swSource),
+  'CACHE_NAME matches robco-terminal-v<version>-rN format'
+);
+{
+  const cacheVer = (swSource.match(/CACHE_NAME\s*=\s*'robco-terminal-v([\d.]+)/) || [])[1];
+  const appVer = (stateSource.match(/const APP_VERSION\s*=\s*'([\d.]+)'/) || [])[1];
+  assert(
+    cacheVer && appVer && cacheVer === appVer,
+    `CACHE_NAME version (${cacheVer}) matches APP_VERSION (${appVer})`
+  );
+}
+assert(
+  /activate[\s\S]{0,400}caches\.delete/.test(swSourceStripped),
+  'activate handler calls caches.delete for old-cache cleanup'
+);
+assert(
+  /['"]\.\/index\.html['"]/.test(swSource) && /['"]\.\/js\/ui\.js['"]/.test(swSource),
+  'ASSETS list includes index.html and js/ui.js'
+);
+assert(
+  /SKIP_WAITING/.test(indexHtml) &&
+    /reg\.waiting/.test(indexHtml) &&
+    /controllerchange/.test(indexHtml),
+  'index.html SW registration references SKIP_WAITING, reg.waiting, and controllerchange'
+);
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 17 — Structural Integrity (Protocol 20)
+//  Verifies key render functions exist, are called, and their DOM targets exist.
+//  9 tests
+// ══════════════════════════════════════════════════════════════
+header('Structural Integrity (Protocol 20)');
+assert(
+  /function _updatePanelBadges\b/.test(uiSource),
+  '_updatePanelBadges() function exists in ui.js'
+);
+assert(
+  /function expandPanelForCategory\b/.test(uiSource),
+  'expandPanelForCategory() function exists in ui.js'
+);
+assert(/function renderWorldMap\b/.test(uiSource), 'renderWorldMap() function exists in ui.js');
+assert(/function renderFactionRep\b/.test(uiSource), 'renderFactionRep() function exists in ui.js');
+assert(/renderWorldMap\(\)/.test(uiSource), 'renderWorldMap() is called in ui.js');
+assert(/renderFactionRep\(\)/.test(uiSource), 'renderFactionRep() is called in ui.js');
+assert(/id="worldMapPanel"/.test(indexHtml), 'worldMapPanel panel exists in index.html');
+assert(/id="worldMapDisplay"/.test(indexHtml), 'worldMapDisplay element exists in index.html');
+assert(/id="factionContainer"/.test(indexHtml), 'factionContainer element exists in index.html');
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 console.log('\n══════════════════════════════════════════════════════════════\n');

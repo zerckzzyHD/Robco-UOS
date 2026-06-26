@@ -56,8 +56,8 @@
 │   └── database.js     ~25KB CSV data (~170 weapons, ~68 armors, ~45 chems) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── check-persistence.ps1   28KB    209-test pre-commit audit
-│   ├── check-persistence.js    36KB    209-test Node runner (parity with .ps1)
+│   ├── check-persistence.ps1   28KB    243-test pre-commit audit
+│   ├── check-persistence.js    36KB    243-test Node runner (parity with .ps1)
 │   └── run-tests.bat           (Batch launcher)
 ├── CHANGELOG.md        ~74KB  Full version history
 ├── icon.png            68KB   PWA icon
@@ -866,7 +866,7 @@ This protocol was formalized in v1.6.5 after the perk panel (`addPerk()` + `#new
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit audit must pass (all 209+ tests)
+- [ ] `git commit` — pre-commit audit must pass (all 243+ tests)
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable
