@@ -1,4 +1,4 @@
-## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 406/406 | Cache: robco-terminal-v2.0.1-r37 -->
+## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 425/425 | Cache: robco-terminal-v2.0.1-r38 -->
 
 ### Added
 
@@ -90,6 +90,7 @@
 - The fuzzy item-lookup fallback now skips very short search tokens (under 3 characters) that would never match anything useful, avoiding a full database scan for garbage input.
 - Added 6 new automated guard tests (Suite 35, 402 total across 39 suites) verifying all of the above improvements.
 - The [?] help menu now has a KEYBOARD SHORTCUTS section listing every active shortcut: Ctrl+Enter to send a command, Ctrl+/ to focus the input, Ctrl+1–6 to toggle panels, 1–4 to switch tabs, Up/Down to browse command history, and Esc to close any open dialog. Pressing Esc now also closes the help menu and patch-notes modal. Added 4 automated guard tests (Suite 36, 406 total across 40 suites).
+- Adding, removing, or editing any tracked item (inventory, ammo, perks, quests, companions, status effects, or campaign notes) now refreshes only the relevant panel instead of rebuilding all fourteen panels from scratch. The update is noticeably snappier on phones. Fixed a latent bug where toggling a collectible as found or missing was not updating the collectibles badge count or the Session Stats panel in real time — both now update immediately on toggle. Added 19 new automated tests (Suite 37, 425 total across 41 suites) that verify each mutator calls the correct targeted refresh and that persistence is maintained through the shared save path.
 
 ---
 

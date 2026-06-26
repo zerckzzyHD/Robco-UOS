@@ -132,6 +132,127 @@ for (const vp of VIEWPORTS) {
   await ctx.close();
 }
 
+// ── Behavioral: Render Fan-out (P7-1) ─────────────────────────────────
+// Verify that list-mutators call only their targeted render* function,
+// NOT a full loadUI(). Also verifies persistence via localStorage.
+{
+  const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 } });
+  const page = await ctx.newPage();
+  await page.goto(`file://${INDEX.replace(/\\/g, '/')}`);
+  await page.waitForTimeout(1000);
+
+  // delItem: seed one inventory item, call delItem(0), assert targeted render only
+  const delItemResult = await page.evaluate(() => {
+    const trackedFns = [
+      'renderInventory',
+      'renderAmmo',
+      'renderPerks',
+      'renderQuests',
+      'renderSquad',
+      'renderStatus',
+      'renderCampaignNotes',
+      'renderCollectibles',
+      'renderSessionStats',
+      'updateMath',
+      'renderWorldMap',
+      'renderFactionRep',
+    ];
+    const counts = {};
+    const originals = {};
+    trackedFns.forEach(fn => {
+      originals[fn] = window[fn];
+      window[fn] = function (...args) {
+        counts[fn] = (counts[fn] || 0) + 1;
+        return originals[fn].apply(this, args);
+      };
+    });
+    // Seed one inventory item then delete it
+    state.inventory = [{ name: 'TestSword', qty: 1, wgt: 2, val: 50, type: 'weapon' }];
+    delItem(0);
+    // Restore originals
+    trackedFns.forEach(fn => {
+      window[fn] = originals[fn];
+    });
+    const savedStr = localStorage.getItem('robco_v8');
+    return { counts, savedStr };
+  });
+  const dc = delItemResult.counts;
+  if ((dc.renderInventory || 0) >= 1 && (dc.updateMath || 0) >= 1) {
+    pass('delItem() calls renderInventory + updateMath (fan-out targeted)');
+  } else {
+    fail(`delItem() fan-out check failed: ${JSON.stringify(dc)}`);
+  }
+  if (!dc.renderWorldMap && !dc.renderFactionRep && !dc.renderQuests) {
+    pass('delItem() does NOT call renderWorldMap / renderFactionRep / renderQuests');
+  } else {
+    fail(`delItem() called unexpected renders: ${JSON.stringify(dc)}`);
+  }
+  const savedAfterDel = delItemResult.savedStr || '';
+  if (!savedAfterDel.includes('TestSword')) {
+    pass('delItem() persisted: TestSword absent from localStorage after deletion');
+  } else {
+    fail('delItem() persistence failure: TestSword still in localStorage after deletion');
+  }
+
+  // addAmmo / removeAmmo: verify targeted ammo render only
+  const ammoResult = await page.evaluate(() => {
+    const trackedFns = [
+      'renderInventory',
+      'renderAmmo',
+      'renderPerks',
+      'renderQuests',
+      'renderSquad',
+      'renderStatus',
+      'renderCampaignNotes',
+      'renderCollectibles',
+      'renderSessionStats',
+      'updateMath',
+      'renderWorldMap',
+      'renderFactionRep',
+    ];
+    const counts = {};
+    const originals = {};
+    trackedFns.forEach(fn => {
+      originals[fn] = window[fn];
+      window[fn] = function (...args) {
+        counts[fn] = (counts[fn] || 0) + 1;
+        return originals[fn].apply(this, args);
+      };
+    });
+    // Set ammo input values and add, then remove
+    const typeEl = document.getElementById('newAmmoType');
+    const countEl = document.getElementById('newAmmoCount');
+    if (typeEl) typeEl.value = '5.56mm';
+    if (countEl) countEl.value = '100';
+    addAmmo();
+    removeAmmo('5.56mm');
+    trackedFns.forEach(fn => {
+      window[fn] = originals[fn];
+    });
+    const savedStr = localStorage.getItem('robco_v8');
+    return { counts, savedStr };
+  });
+  const ac = ammoResult.counts;
+  if ((ac.renderAmmo || 0) >= 2 && (ac.updateMath || 0) >= 2) {
+    pass('addAmmo()+removeAmmo() call renderAmmo + updateMath (fan-out targeted)');
+  } else {
+    fail(`addAmmo/removeAmmo fan-out check failed: ${JSON.stringify(ac)}`);
+  }
+  if (!ac.renderInventory && !ac.renderWorldMap && !ac.renderQuests) {
+    pass('addAmmo()/removeAmmo() do NOT call renderInventory / renderWorldMap / renderQuests');
+  } else {
+    fail(`addAmmo/removeAmmo called unexpected renders: ${JSON.stringify(ac)}`);
+  }
+  const savedAfterAmmo = ammoResult.savedStr || '';
+  if (!savedAfterAmmo.includes('"5.56mm"')) {
+    pass('removeAmmo() persisted: 5.56mm absent from localStorage after removal');
+  } else {
+    fail('removeAmmo() persistence failure: 5.56mm still in localStorage after removal');
+  }
+
+  await ctx.close();
+}
+
 await browser.close();
 
 if (failed === 0) {

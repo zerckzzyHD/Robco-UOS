@@ -2329,8 +2329,8 @@ function addItem() {
     document.getElementById('newItemQty').value = '';
     document.getElementById('newItemWeight').value = '';
     document.getElementById('newItemValue').value = '';
-    saveState();
-    loadUI();
+    renderAmmo();
+    updateMath();
     expandPanelForCategory('ammo');
     return;
   }
@@ -2347,11 +2347,13 @@ function addItem() {
   document.getElementById('newItemQty').value = '';
   document.getElementById('newItemWeight').value = '';
   document.getElementById('newItemValue').value = '';
-  loadUI();
+  renderInventory();
+  updateMath();
 }
 function delItem(idx) {
   state.inventory.splice(idx, 1);
-  loadUI();
+  renderInventory();
+  updateMath();
 }
 function renderInventory() {
   const lst = document.getElementById('invList');
@@ -2429,15 +2431,15 @@ function addAmmo() {
   state.ammo[caliber] = (state.ammo[caliber] || 0) + count;
   typeEl.value = '';
   countEl.value = '';
-  saveState();
-  loadUI();
+  renderAmmo();
+  updateMath();
 }
 
 function removeAmmo(caliber) {
   if (!state.ammo) return;
   delete state.ammo[caliber];
-  saveState();
-  loadUI();
+  renderAmmo();
+  updateMath();
 }
 
 function renderSquad() {
@@ -2486,7 +2488,8 @@ function renderSquad() {
 function removeSquadMember(idx) {
   if (state.squad && state.squad.length > idx) {
     state.squad.splice(idx, 1);
-    loadUI();
+    renderSquad();
+    updateMath();
   }
 }
 
@@ -2512,7 +2515,8 @@ function addSquadMember() {
   });
 
   nameInput.value = '';
-  loadUI();
+  renderSquad();
+  updateMath();
 }
 
 // ── UTILITY FUNCTIONS ──────────────────────────────────────────
@@ -2803,7 +2807,8 @@ function _applyChemHighlights() {
 function removeStatusEffect(idx) {
   if (state.status && state.status.length > idx) {
     state.status.splice(idx, 1);
-    loadUI();
+    renderStatus();
+    updateMath();
   }
 }
 
@@ -2828,7 +2833,8 @@ function addStatusEffect() {
 
   nameInput.value = '';
   if (ticksInput) ticksInput.value = '';
-  loadUI();
+  renderStatus();
+  updateMath();
 }
 
 function renderPerks() {
@@ -2852,7 +2858,8 @@ function renderPerks() {
 function removePerk(idx) {
   if (state.perks && state.perks.length > idx) {
     state.perks.splice(idx, 1);
-    loadUI();
+    renderPerks();
+    updateMath();
   }
 }
 
@@ -2871,7 +2878,8 @@ function addPerk() {
   document.getElementById('newPerkName').value = '';
   document.getElementById('newPerkRank').value = '';
   document.getElementById('newPerkLevel').value = '';
-  loadUI();
+  renderPerks();
+  updateMath();
 }
 
 // #1 Quest Log — renders state.quests[] as a filterable list
@@ -2903,7 +2911,8 @@ function renderQuests() {
 }
 function removeQuest(idx) {
   state.quests.splice(idx, 1);
-  loadUI();
+  renderQuests();
+  updateMath();
 }
 
 // #8 Session Statistics — renders state.stats
@@ -3015,7 +3024,8 @@ function toggleCollectible(name) {
     state.collectibles.push(name);
   }
   renderCollectibles();
-  saveState();
+  renderSessionStats();
+  updateMath();
 }
 
 function renderCampaignNotes() {
@@ -3040,7 +3050,8 @@ function renderCampaignNotes() {
 function removeCampaignNote(idx) {
   if (state.campaign_notes && state.campaign_notes.length > idx) {
     state.campaign_notes.splice(idx, 1);
-    loadUI();
+    renderCampaignNotes();
+    updateMath();
   }
 }
 
@@ -3050,7 +3061,8 @@ function addCampaignNote() {
   if (!state.campaign_notes) state.campaign_notes = [];
   state.campaign_notes.push(input.value.trim());
   input.value = '';
-  loadUI();
+  renderCampaignNotes();
+  updateMath();
 }
 
 // ── CAMPAIGN STATUS PANEL (v2.0.1) ───────────────────────────────
@@ -3902,7 +3914,8 @@ function addQuest() {
   state.quests.push({ name, status, objective: obj });
   document.getElementById('newQuestName').value = '';
   document.getElementById('newQuestObjective').value = '';
-  loadUI();
+  renderQuests();
+  updateMath();
 }
 
 // ── SESSION STATISTICS HELPERS (#8) ────────────────────────────────

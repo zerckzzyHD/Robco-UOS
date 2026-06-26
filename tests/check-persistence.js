@@ -1541,20 +1541,21 @@ header('Assets Completeness');
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 28 — Meta / Runner Parity (Group 7)
-//  Verifies that both runners contain all gate-guard suites (22-36)
-//  and that the canonical test count in CHANGELOG.md matches README.md.
+//  Verifies that both runners contain all gate-guard suites (22-37)
+//  and that the canonical test count matches README.md, ARCHITECTURE.md,
+//  and (conditionally, if present) RULES.md and CLAUDE.md.
 //
 //  NOTE: source-level assert() / Check() counts cannot reliably track
 //  runtime test counts because loops multiply results at runtime. Parity
 //  is enforced structurally — both runners must contain every named suite.
-//  4 tests
+//  7 tests
 // ══════════════════════════════════════════════════════════════
 header('Meta / Runner Parity');
 {
   const jsRunner = readFile('tests/check-persistence.js');
   const psRunner = readFile('tests/check-persistence.ps1');
 
-  // Structural parity: both runners must contain every gate-guard suite marker (22-34).
+  // Structural parity: both runners must contain every gate-guard suite marker (22-37).
   // A missing marker means a suite was added to one runner but not ported to the other.
   const GATE_SUITES = [
     'Suite 22',
@@ -1572,21 +1573,22 @@ header('Meta / Runner Parity');
     'Suite 34',
     'Suite 35',
     'Suite 36',
+    'Suite 37',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-36)' +
+    'JS runner contains all gate-guard suites (22-37)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-36)' +
+    'PS runner contains all gate-guard suites (22-37)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
-  // Canonical count in CHANGELOG.md matches README.md (Protocol 2a consistency).
+  // Canonical count in CHANGELOG.md matches README.md and ARCHITECTURE.md (Protocol 2a).
   // The CHANGELOG header format is: <!-- Tests: N/N | Cache: ... -->
   const changelog = readFile('CHANGELOG.md');
   const countMatch = changelog.match(/Tests:\s*(\d+)\/\d+/);
@@ -1597,6 +1599,30 @@ header('Meta / Runner Parity');
     !!canonicalCount &&
       (readme.includes(canonicalCount + ' tests') || readme.includes(canonicalCount + '-test')),
     `README.md contains CHANGELOG.md canonical test count (${canonicalCount})`
+  );
+  const arch = readFile('ARCHITECTURE.md');
+  assert(
+    !!canonicalCount && arch.includes(canonicalCount),
+    `ARCHITECTURE.md contains canonical test count (${canonicalCount})`
+  );
+
+  // Conditional: RULES.md and CLAUDE.md are untracked local files (absent on CI/fresh clone).
+  // If present, assert their count matches; if absent, skip gracefully (pass trivially).
+  const rulesPath = path.join(ROOT, 'RULES.md');
+  const rulesExists = fs.existsSync(rulesPath);
+  const rulesSrc = rulesExists ? fs.readFileSync(rulesPath, 'utf8') : null;
+  const rulesCountM = rulesSrc ? rulesSrc.match(/\b(\d+)\s*tests?\b/) : null;
+  assert(
+    !rulesExists || (!!rulesCountM && rulesCountM[1] === canonicalCount),
+    `RULES.md test count matches canonical (${canonicalCount}) — skipped if absent`
+  );
+  const claudePath = path.join(ROOT, 'CLAUDE.md');
+  const claudeExists = fs.existsSync(claudePath);
+  const claudeSrc = claudeExists ? fs.readFileSync(claudePath, 'utf8') : null;
+  const claudeCountM = claudeSrc ? claudeSrc.match(/\b(\d+)\s*tests?\b/) : null;
+  assert(
+    !claudeExists || (!!claudeCountM && claudeCountM[1] === canonicalCount),
+    `CLAUDE.md test count matches canonical (${canonicalCount}) — skipped if absent`
   );
 }
 
@@ -2097,6 +2123,71 @@ header('Keyboard Shortcuts Group');
 
   // 36.4 closeModal() function exists in ui.js
   assert(/function\s+closeModal\s*\(/.test(uiSrc36), 'closeModal() function defined in ui.js');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 37 — Render Fan-out (P7-1)
+//  Every list-mutator calls its targeted render* + updateMath()
+//  instead of loadUI(). updateMath() tail must still hold saveState()
+//  and _updatePanelBadges(). toggleCollectible latent-bug fix verified.
+//  16 tests
+// ══════════════════════════════════════════════════════════════
+header('Render Fan-out (P7-1)');
+{
+  const uiSrc37 = readFile('js/ui.js');
+
+  function checkMutator(fnName, expectedRenders) {
+    let body = '';
+    try {
+      body = extractFunctionBody(uiSrc37, fnName);
+    } catch (_) {}
+    const hasLoadUI = body.includes('loadUI()');
+    const hasUpdateMath = body.includes('updateMath()');
+    const rendersOk = expectedRenders.every(r => body.includes(r));
+    assert(
+      !hasLoadUI && hasUpdateMath && rendersOk,
+      `${fnName}() calls [${expectedRenders.join(', ')}] + updateMath(), NOT loadUI()`
+    );
+  }
+
+  checkMutator('delItem', ['renderInventory()']);
+  checkMutator('addItem', ['renderInventory()', 'renderAmmo()']);
+  checkMutator('addAmmo', ['renderAmmo()']);
+  checkMutator('removeAmmo', ['renderAmmo()']);
+  checkMutator('removePerk', ['renderPerks()']);
+  checkMutator('addPerk', ['renderPerks()']);
+  checkMutator('removeQuest', ['renderQuests()']);
+  checkMutator('addQuest', ['renderQuests()']);
+  checkMutator('removeSquadMember', ['renderSquad()']);
+  checkMutator('addSquadMember', ['renderSquad()']);
+  checkMutator('removeStatusEffect', ['renderStatus()']);
+  checkMutator('addStatusEffect', ['renderStatus()']);
+  checkMutator('removeCampaignNote', ['renderCampaignNotes()']);
+  checkMutator('addCampaignNote', ['renderCampaignNotes()']);
+
+  // 37.15 toggleCollectible bug fix: now calls renderSessionStats() + updateMath()
+  {
+    let body = '';
+    try {
+      body = extractFunctionBody(uiSrc37, 'toggleCollectible');
+    } catch (_) {}
+    assert(
+      body.includes('renderSessionStats()') && body.includes('updateMath()'),
+      'toggleCollectible() calls renderSessionStats() + updateMath() (collectibles badge live-update fix)'
+    );
+  }
+
+  // 37.16 updateMath() shared-tail invariant: must contain saveState() AND _updatePanelBadges()
+  {
+    let body = '';
+    try {
+      body = extractFunctionBody(uiSrc37, 'updateMath');
+    } catch (_) {}
+    assert(
+      body.includes('saveState()') && body.includes('_updatePanelBadges()'),
+      'updateMath() contains saveState() AND _updatePanelBadges() — shared-tail invariant intact'
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

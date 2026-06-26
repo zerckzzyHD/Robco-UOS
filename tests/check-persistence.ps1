@@ -958,25 +958,41 @@ Check ($missingFiles27.Count -eq 0) ("All sw.js ASSETS entries exist on disk" + 
 # ===========================================================
 # Suite 28 -- Meta / Runner Parity (Group 7)
 # JS and PS runners must have identical test counts (Protocol 15)
-# and CHANGELOG.md canonical count must match README.md.
-# 4 tests
+# and CHANGELOG.md canonical count must match README.md, ARCHITECTURE.md,
+# and (conditionally, if present) RULES.md and CLAUDE.md.
+# 7 tests
 # ===========================================================
 Sep "Suite 28 -- Meta / Runner Parity"
 # NOTE: source-level Check/assert counts cannot reliably track runtime test counts
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-36)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-36)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-37)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-37)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
 Check ($canon28 -ne '') "CHANGELOG.md contains Tests: N/N header (Protocol 2a)"
 $readmeSrc28 = Read-Src "README.md"
 Check ($canon28 -ne '' -and ($readmeSrc28 -match $canon28)) "README.md contains CHANGELOG.md canonical test count ($canon28)"
+$archSrc28 = Read-Src "ARCHITECTURE.md"
+Check ($canon28 -ne '' -and $archSrc28.Contains($canon28)) "ARCHITECTURE.md contains canonical test count ($canon28)"
+# Conditional: RULES.md and CLAUDE.md are untracked local files — skip gracefully if absent.
+$rulesPath28 = Join-Path $Root "RULES.md"
+$rulesExists28 = Test-Path $rulesPath28
+$rulesSrc28 = if ($rulesExists28) { Get-Content $rulesPath28 -Raw } else { $null }
+$rulesCountM28 = if ($rulesSrc28) { [regex]::Match($rulesSrc28, '\b(\d+)\s*tests?\b') } else { $null }
+$rulesOk28 = (-not $rulesExists28) -or ($rulesCountM28 -and $rulesCountM28.Success -and $rulesCountM28.Groups[1].Value -eq $canon28)
+Check $rulesOk28 "RULES.md test count matches canonical ($canon28) -- skipped if absent"
+$claudePath28 = Join-Path $Root "CLAUDE.md"
+$claudeExists28 = Test-Path $claudePath28
+$claudeSrc28 = if ($claudeExists28) { Get-Content $claudePath28 -Raw } else { $null }
+$claudeCountM28 = if ($claudeSrc28) { [regex]::Match($claudeSrc28, '\b(\d+)\s*tests?\b') } else { $null }
+$claudeOk28 = (-not $claudeExists28) -or ($claudeCountM28 -and $claudeCountM28.Success -and $claudeCountM28.Groups[1].Value -eq $canon28)
+Check $claudeOk28 "CLAUDE.md test count matches canonical ($canon28) -- skipped if absent"
 
 # ===========================================================
 # Suite 29 -- SW Update Banner (Protocol 13/20)
@@ -1250,6 +1266,53 @@ Check (($kdSnippet36 -match 'Escape') -and ($kdSnippet36 -match 'closeModal')) "
 
 # 36.4 closeModal() function exists in ui.js
 Check ([bool]($uiSrc36 -match 'function\s+closeModal\s*\(')) 'closeModal() function defined in ui.js'
+
+# ===========================================================
+# Suite 37 -- Render Fan-out (P7-1)
+# Every list-mutator calls its targeted render* + updateMath()
+# instead of loadUI(). updateMath() shared-tail invariant preserved.
+# toggleCollectible latent-bug fix: renderSessionStats() now called.
+# 16 tests
+# ===========================================================
+Sep "Suite 37 -- Render Fan-out (P7-1)"
+$uiSrc37 = Read-Src 'js/ui.js'
+
+function Test-Mutator($fnName, $expectedRenders) {
+    $body = ''
+    try { $body = Get-FunctionBody $uiSrc37 $fnName } catch {}
+    $hasLoadUI   = $body.Contains('loadUI()')
+    $hasUpdate   = $body.Contains('updateMath()')
+    $rendersOk   = ($expectedRenders | ForEach-Object { $body.Contains($_) }) -notcontains $false
+    $label       = "$fnName() calls [$($expectedRenders -join ', ')] + updateMath(), NOT loadUI()"
+    Check ((-not $hasLoadUI) -and $hasUpdate -and $rendersOk) $label
+}
+
+Test-Mutator 'delItem'            @('renderInventory()')
+Test-Mutator 'addItem'            @('renderInventory()', 'renderAmmo()')
+Test-Mutator 'addAmmo'            @('renderAmmo()')
+Test-Mutator 'removeAmmo'         @('renderAmmo()')
+Test-Mutator 'removePerk'         @('renderPerks()')
+Test-Mutator 'addPerk'            @('renderPerks()')
+Test-Mutator 'removeQuest'        @('renderQuests()')
+Test-Mutator 'addQuest'           @('renderQuests()')
+Test-Mutator 'removeSquadMember'  @('renderSquad()')
+Test-Mutator 'addSquadMember'     @('renderSquad()')
+Test-Mutator 'removeStatusEffect' @('renderStatus()')
+Test-Mutator 'addStatusEffect'    @('renderStatus()')
+Test-Mutator 'removeCampaignNote' @('renderCampaignNotes()')
+Test-Mutator 'addCampaignNote'    @('renderCampaignNotes()')
+
+# 37.15 toggleCollectible bug fix: renderSessionStats() + updateMath()
+$toggleBody37 = ''
+try { $toggleBody37 = Get-FunctionBody $uiSrc37 'toggleCollectible' } catch {}
+Check ($toggleBody37.Contains('renderSessionStats()') -and $toggleBody37.Contains('updateMath()')) `
+    'toggleCollectible() calls renderSessionStats() + updateMath() (collectibles badge live-update fix)'
+
+# 37.16 updateMath() shared-tail invariant: saveState() AND _updatePanelBadges() present
+$updateMathBody37 = ''
+try { $updateMathBody37 = Get-FunctionBody $uiSrc37 'updateMath' } catch {}
+Check ($updateMathBody37.Contains('saveState()') -and $updateMathBody37.Contains('_updatePanelBadges()')) `
+    'updateMath() contains saveState() AND _updatePanelBadges() -- shared-tail invariant intact'
 
 # ===========================================================
 # Results
