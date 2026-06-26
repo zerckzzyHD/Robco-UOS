@@ -12,11 +12,11 @@
 npm run lint        # ESLint — zero new errors
 npm run format      # Prettier — all files clean
 git add -A
-git commit          # Pre-commit hook: 243 tests must pass
+git commit          # Pre-commit hook: 251 tests must pass
 git push origin main  # CACHE_NAME must already be bumped (Protocol 1)
 ```
 
-- **243 tests must pass.** If fewer pass, something is broken. Investigate before committing.
+- **251 tests must pass.** If fewer pass, something is broken. Investigate before committing.
 - **Bump `CACHE_NAME` before every push.** No push may ship without a new cache rev (Protocol 1) — this is a hard gate, not just for UI/JS changes.
 - **Never use `--no-verify`** unless the user explicitly authorizes it for a stated emergency.
 
@@ -91,7 +91,7 @@ Requires changes in **4 files minimum.** The pre-commit audit will block if any 
 - [ ] Add `<details class="panel">` block in `index.html` (if it needs a panel)
 - [ ] Bump `CACHE_NAME` in `sw.js` → Protocol 1
 - [ ] Run `npm run lint` and `npm run format`
-- [ ] Run `git commit` — 243 tests must pass
+- [ ] Run `git commit` — 251 tests must pass
 - [ ] Update `ARCHITECTURE.md`, `CHANGELOG.md`, `README.md` → Protocol 2
 
 ---
@@ -105,7 +105,7 @@ Requires changes in **4 files minimum.** The pre-commit audit will block if any 
 - [ ] If AI changes should auto-expand it: add key to `expandPanelForCategory()` map in `ui.js`
 - [ ] If it has a text input with autocomplete: call `wireInput()` in `initRegistryAutocomplete()` in `ui.js`
 - [ ] Bump `CACHE_NAME` → Protocol 1
-- [ ] Lint, format, commit (243 tests) → Protocol 2
+- [ ] Lint, format, commit (251 tests) → Protocol 2
 
 ---
 
@@ -156,6 +156,8 @@ Non-trivial work run via Dispatch uses a three-stage model hand-off. Dispatch au
 ## Protocol 9 — Dispatch Reporting
 
 When work is run via Dispatch, never finish a task or complete a git push silently. After every completed task AND after every git push, report back to the user on Dispatch in plain English: what was done and why, the commit reference and what it changed, confirmation that the push landed on origin/main (and whether a reload / "Reboot Terminal" update is needed to see it), and anything the user should check. Keep it readable for a non-developer — same plain-English style as the changelog. Every time, no exceptions.
+
+Because the Dispatch user typically cannot view the code or repo directly, any push that changes user-facing behavior must be reported with an explicit "it's live — here's what changed and exactly how to test it" message (live confirmation plus step-by-step test instructions), not just a commit summary.
 
 ---
 
@@ -307,4 +309,4 @@ Treat model usage as a budget — and the burden of efficiency is on the orchest
 
 **State persistence:** `localStorage` key `robco_v7`. Debounced 500ms writes. Flushed immediately on `beforeunload`.
 
-**Test suite:** 243 tests across 22 suites, mirrored in `tests/check-persistence.ps1` (PowerShell, run by the pre-commit hook) and `tests/check-persistence.js` (Node) — both runners are kept at exact parity (same suites, same per-suite counts, same 243 total). Covers parser sanity, autoImportState coverage, faction registry, skill keys, save envelope, file upload, cloud sync, backward compatibility, registry structural integrity, reputation 2D matrix, C2 CRUD function existence, C3 CAMPG tab DOM binding, C4 Protocol 4 campaignMode (binary) + separation, render contracts, CSS invariants, SW invariants, and structural integrity (Protocol 20 static guards). **When you change one runner, update the other in the same commit** — drift here is what let the PS runner silently fall to 173.
+**Test suite:** 251 tests across 23 suites, mirrored in `tests/check-persistence.ps1` (PowerShell, run by the pre-commit hook) and `tests/check-persistence.js` (Node) — both runners are kept at exact parity (same suites, same per-suite counts, same 251 total). Covers parser sanity, autoImportState coverage, faction registry, skill keys, save envelope, file upload, cloud sync, backward compatibility, registry structural integrity, reputation 2D matrix, C2 CRUD function existence, C3 CAMPG tab DOM binding, C4 Protocol 4 campaignMode (binary) + separation, render contracts, CSS invariants, SW invariants, structural integrity (Protocol 20 static guards), and detail-current dedup guard (Protocol 27). **When you change one runner, update the other in the same commit** — drift here is what let the PS runner silently fall to 173.

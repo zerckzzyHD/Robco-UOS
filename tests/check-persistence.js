@@ -788,7 +788,7 @@ try {
 // ══════════════════════════════════════════════════════════════
 //  SUITE 14 — Render Contracts (Protocol 20)
 //  Static source checks that render*() markup/class contracts are intact.
-//  9 tests
+//  13 tests
 // ══════════════════════════════════════════════════════════════
 header('Render Contracts (Protocol 20)');
 let renderFactionRepBody = '';
@@ -830,10 +830,26 @@ assert(
     /map-cell-pip/.test(renderWorldMapBody),
   'renderWorldMap contains map-cell, map-cell-name, map-cell-pip class references'
 );
+// Reload-size guard: size is state-driven, no width measurement (Protocol 8 plan)
 assert(
-  /(innerWidth|offsetWidth)/.test(renderWorldMapBody) && /490/.test(renderWorldMapBody),
-  'renderWorldMap uses innerWidth/offsetWidth and 490 for narrow-viewport detection'
+  /state\.mapView/.test(renderWorldMapBody),
+  'renderWorldMap reads state.mapView (state-driven size, not viewport measurement)'
 );
+assert(
+  !/window\.innerWidth/.test(renderWorldMapBody),
+  'renderWorldMap size path has no window.innerWidth (measurement removed)'
+);
+assert(
+  !/dataset\.mapFull/.test(renderWorldMapBody),
+  'renderWorldMap size path has no dataset.mapFull (ephemeral flag removed)'
+);
+try {
+  const setMapViewBody = extractFunctionBody(uiSource, 'setMapView');
+  assert(/state\.mapView/.test(setMapViewBody), 'setMapView() writes state.mapView');
+  assert(/saveState\(\)/.test(setMapViewBody), 'setMapView() calls saveState()');
+} catch (e) {
+  fail(`setMapView function not found: ${e.message}`);
+}
 assert(
   /map-toggle-btn/.test(renderWorldMapBody),
   'renderWorldMap contains map-toggle-btn reference'
@@ -941,6 +957,40 @@ assert(/renderFactionRep\(\)/.test(uiSource), 'renderFactionRep() is called in u
 assert(/id="worldMapPanel"/.test(indexHtml), 'worldMapPanel panel exists in index.html');
 assert(/id="worldMapDisplay"/.test(indexHtml), 'worldMapDisplay element exists in index.html');
 assert(/id="factionContainer"/.test(indexHtml), 'factionContainer element exists in index.html');
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 18 — Detail-Current Dedup Guard (Protocol 27)
+//  Verifies scoreZoneForLoc correctly rejects substring-only matches (<50).
+//  2 tests
+// ══════════════════════════════════════════════════════════════
+header('Detail-Current Dedup Guard');
+try {
+  const vm = require('vm');
+  const fnIdx = uiSource.indexOf('function scoreZoneForLoc');
+  if (fnIdx === -1) {
+    fail('scoreZoneForLoc not found in ui.js');
+  } else {
+    const body = extractFunctionBody(uiSource, 'scoreZoneForLoc');
+    const headerEnd = uiSource.indexOf('{', fnIdx);
+    const fullFn = uiSource.slice(fnIdx, headerEnd) + body;
+    const sandbox = {};
+    vm.createContext(sandbox);
+    vm.runInContext(fullFn, sandbox);
+    const szl = sandbox.scoreZoneForLoc;
+    const bitterScore = szl({ name: 'Bitter Springs', locations: [] }, 'goodsprings');
+    const goodScore = szl({ name: 'Goodsprings', locations: [] }, 'goodsprings');
+    assert(
+      bitterScore < 50,
+      `scoreZoneForLoc: Bitter Springs vs 'goodsprings' = ${bitterScore} (must be < 50)`
+    );
+    assert(
+      goodScore === 100,
+      `scoreZoneForLoc: Goodsprings vs 'goodsprings' = ${goodScore} (must be 100)`
+    );
+  }
+} catch (e) {
+  fail(`Detail-current guard: ${e.message}`);
+}
 
 // ══════════════════════════════════════════════════════════════
 //  RESULTS

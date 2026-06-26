@@ -106,6 +106,7 @@ let state = {
   collectibles: [], // flat string[] of collected item names (game-context-aware)
   campaignMode: 'standard', // 'standard' | 'rng' (armed) | 'rng-locked' (permanently active after wipe)
   playthroughType: 'standard', // 'standard' | 'minmaxed' | 'completionist' | 'casual' | 'speedrun'
+  mapView: 'auto', // 'auto' | 'full' | 'core' — persisted map size preference; 'auto' and 'core' → 4×4 grid
   // DLC expansion adds entries to the registry only; no state schema change required
 };
 
@@ -313,6 +314,7 @@ function migrateState(version, s) {
         : 'standard';
     s.playthroughType = _validPT.includes(_lsPT) ? _lsPT : 'standard';
   }
+  if (s.mapView !== 'full' && s.mapView !== 'core') s.mapView = 'auto';
   // C6: Faction Pruning & Archival Migration
   // Archive wgs, chairmen, omertas, vangraff, crimson to campaign notes
   if (s.factions) {

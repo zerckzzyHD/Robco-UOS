@@ -678,6 +678,10 @@ function autoImportState(jsonString) {
     const _validPT = ['standard', 'minmaxed', 'completionist', 'casual', 'speedrun'];
     if (_validPT.includes(ptV)) state.playthroughType = ptV;
 
+    // mapView — client UI preference; AI never sets this, only file imports / cloud pulls
+    const mvV = _g(parsed, 'mapView');
+    if (['auto', 'full', 'core'].includes(mvV)) state.mapView = mvV;
+
     loadUI();
     appendToChat('> PIP-BOY DATA SYNCED WITH ROBCO MAINFRAME <<', 'sys', true);
 

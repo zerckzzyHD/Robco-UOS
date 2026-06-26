@@ -136,6 +136,8 @@ export default [
         adjustFaction: 'readonly',
         // Location field change handler (js/ui.js)
         onLocationChange: 'readonly',
+        // Map view toggle handler (js/ui.js)
+        setMapView: 'readonly',
         // Game database CSVs (js/db_nv.js or js/db_fo3.js)
         databaseCSVs: 'readonly',
       },

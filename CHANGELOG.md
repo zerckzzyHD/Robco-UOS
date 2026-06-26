@@ -1,4 +1,14 @@
-## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 243/243 | Cache: robco-terminal-v2.0.1-r17 -->
+## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 251/251 | Cache: robco-terminal-v2.0.1-r18 -->
+
+### [B18] Map view persists across reloads + [CURRENT] marker fixed (2026-06-26)
+
+Two map bugs fixed in a single push:
+
+**Map size now persists across reloads.** Previously, toggling the map between CORE VIEW and FULL MAP was forgotten the moment you reloaded, switched tabs, or changed your location — the map always reset to core on the next render. The root cause was that the size decision read a transient `dataset.mapFull` value on the display element, which was wiped by every re-render. The fix is a new persisted state field, `state.mapView` (values: `'auto'`, `'core'`, `'full'`), that the toggle button writes before saving. Grid size is now a pure function of saved state — no viewport measurement at all. The toggle button is also now always visible regardless of screen width.
+
+**[CURRENT] marker no longer appears on wrong locations.** If your location was "Goodsprings", the detail view for Bitter Springs would incorrectly show [CURRENT] because "springs" is a substring of "goodsprings". The fix is a whole-word scoring threshold: only locations that match by an exact string (100 points) or a matching whole word (50+ points) can be marked [CURRENT]. Substring-only coincidences score 10 and are excluded. The same threshold now applies to the grid view's zone highlight, so shared-token names can no longer produce two highlighted zones.
+
+**Test count:** 243 → 251 (+8). New Suite 18 (Detail-Current Dedup Guard) and expanded Suite 14 guards these two bugs from regressing. Two additional tests were auto-added by the new `mapView` state field (Suite 1 autoImportState coverage + Suite 11 migration enforcement).
 
 ### [B17] Protocols 26, 27, 28 added — Definition of Done, Reproduce Before Fixing, Usage Efficiency (2026-06-26)
 

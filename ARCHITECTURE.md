@@ -56,8 +56,8 @@
 │   └── database.js     ~25KB CSV data (~170 weapons, ~68 armors, ~45 chems) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── check-persistence.ps1   28KB    243-test pre-commit audit
-│   ├── check-persistence.js    36KB    243-test Node runner (parity with .ps1)
+│   ├── check-persistence.ps1   28KB    251-test pre-commit audit
+│   ├── check-persistence.js    36KB    251-test Node runner (parity with .ps1)
 │   └── run-tests.bat           (Batch launcher)
 ├── CHANGELOG.md        ~74KB  Full version history
 ├── icon.png            68KB   PWA icon
@@ -643,6 +643,41 @@ The undo button appears after every sync and hides after use.
 
 ---
 
+## World Map (G6)
+
+`renderWorldMap()` in `ui.js` — a registry-driven CSS grid that shows the Mojave as a 4×4 or 6×6 zone grid.
+
+### Size: state-driven, not viewport-measured
+
+Grid size is a pure function of `state.mapView` ∈ `{'auto','full','core'}` (persisted to `localStorage`). No `offsetWidth` or `window.innerWidth` measurements are made in the size decision.
+
+| `state.mapView` | Grid | Rows/Cols |
+| --- | --- | --- |
+| `'auto'` (default) | Core 4×4 | rows 2–5, cols 2–5 |
+| `'core'` | Core 4×4 | rows 2–5, cols 2–5 |
+| `'full'` | Full 6×6 | rows 1–6, cols 1–6 |
+
+The toggle button (`setMapView('full')` / `setMapView('core')`) is always visible and writes `state.mapView` + saves before re-rendering.
+
+### Why state-driven matters
+
+`offsetWidth` is 0 inside a collapsed `<details>` panel, and `window.innerWidth` varies by browser and entry path (cold load vs tab switch). Measuring at render-time caused the grid to flip size on every location change or reload depending on which code path triggered it. Now size is stable across all paths because it is read from the save — not measured.
+
+### Current-zone matching
+
+`scoreZoneForLoc(zone, loc)` scores a zone against the current location string:
+- `100` = exact string match
+- `50+len` = whole-word token match (at least one word > 2 chars equals a word in zone name/locations)
+- `10` = substring-only match (intentionally below the threshold)
+
+The grid highlights **only zones with score ≥ 50** to prevent coincidental substring matches (e.g. "springs" in "goodsprings" wrongly matching Bitter Springs). The detail view uses the same threshold to pick a single-winner [CURRENT] marker per location list.
+
+### AI exclusion
+
+`mapView` is excluded from `getSystemDirective()` — it is a client-side UI preference that the AI has no reason to set or read.
+
+---
+
 ## Settings & localStorage Keys
 
 | Key                     | Type      | Used By  | Description                                                                      |
@@ -866,7 +901,7 @@ This protocol was formalized in v1.6.5 after the perk panel (`addPerk()` + `#new
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit audit must pass (all 243+ tests)
+- [ ] `git commit` — pre-commit audit must pass (all 251+ tests)
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

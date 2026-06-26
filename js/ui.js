@@ -1533,12 +1533,10 @@ function initTabs() {
   switchTab(tab);
 }
 
-// Called by #stat_loc onchange: persists the new location, resets the map to core
-// view on narrow screens, and re-renders so the current-zone highlight updates.
+// Called by #stat_loc onchange: persists the new location and re-renders so the
+// current-zone highlight updates. View preference (state.mapView) is kept as-is.
 function onLocationChange() {
   saveState();
-  const d = document.getElementById('worldMapDisplay');
-  if (d) d.dataset.mapFull = '0';
   renderWorldMap();
 }
 
@@ -3028,6 +3026,12 @@ function renderCampaignStatus() {
 // Compass strip labels orientation. Narrow viewports get a 4×4 core-zone fallback.
 let _mapActiveZone = null;
 
+function setMapView(v) {
+  state.mapView = v;
+  saveState();
+  renderWorldMap();
+}
+
 function zoomMapToZone(zoneName) {
   _mapActiveZone = zoneName;
   renderWorldMap();
@@ -3121,16 +3125,6 @@ function renderWorldMap() {
     return best;
   }
 
-  function locFuzzyMatchesLoc(targetLoc, loc) {
-    if (!loc) return false;
-    const locWords = loc.split(/[ ,]+/).filter(w => w.length > 3);
-    const sWords = targetLoc
-      .toLowerCase()
-      .split(/[ ,]+/)
-      .filter(w => w.length > 3);
-    return locWords.some(lw => sWords.some(sw => sw.includes(lw) || lw.includes(sw)));
-  }
-
   function zoneVisited(zone) {
     const searchIn = [zone.name, ...(zone.locations || [])].map(s => s.toLowerCase());
     for (const v of visited) {
@@ -3167,8 +3161,24 @@ function renderWorldMap() {
     if (locs.length === 0) {
       html += `<div style="opacity:0.5; font-style:italic; padding:8px 4px;">[NO DATA]</div>`;
     } else {
-      locs.forEach(loc => {
-        const isYou = currentLoc && locFuzzyMatchesLoc(loc, currentLoc);
+      // Single-winner: find the one best-matching location index (score ≥50 required).
+      // Prevents "goodsprings" substring match from marking Bitter Springs as [CURRENT].
+      let currentLocIdx = -1;
+      if (currentLoc) {
+        let bestLocScore = 0,
+          bestLocLen = 0;
+        locs.forEach((loc, i) => {
+          const s = scoreZoneForLoc({ name: loc, locations: [] }, currentLoc);
+          if (s > bestLocScore || (s > 0 && s === bestLocScore && loc.length > bestLocLen)) {
+            bestLocScore = s;
+            bestLocLen = loc.length;
+            currentLocIdx = i;
+          }
+        });
+        if (bestLocScore < 50) currentLocIdx = -1;
+      }
+      locs.forEach((loc, i) => {
+        const isYou = i === currentLocIdx;
         const wasVisited = locVisited(loc);
         const hasCollectible = locHasUncollectedCollectible(loc);
 
@@ -3201,12 +3211,10 @@ function renderWorldMap() {
   }
 
   // ── ZOOM LEVEL 1: STRATEGIC WORLD VIEW ───────────────────────────
-  // Narrow viewports (< 490px) default to a 4×4 core-zone view (rows 2–5, cols 2–5).
-  // A toggle expands to the full 6×6.
-  const measuredW = display.offsetWidth || window.innerWidth;
-  const isNarrow = measuredW < 490;
-  const showFull = display.dataset.mapFull === '1';
-  const useFull = !isNarrow || showFull;
+  // Size is a pure function of state.mapView (persisted) — no width measurement.
+  // 'full' → 6×6 grid; 'auto' and 'core' → 4×4 core grid (rows 2–5, cols 2–5).
+  const mv = state.mapView || 'auto';
+  const useFull = mv === 'full';
 
   const rowMin = useFull ? 1 : 2;
   const rowMax = useFull ? 6 : 5;
@@ -3230,9 +3238,10 @@ function renderWorldMap() {
       if (score > bestScore || (score > 0 && score === bestScore && zone.name.length > bestLen)) {
         bestScore = score;
         bestLen = zone.name.length;
-        currentZoneKey = score > 0 ? key : null;
+        currentZoneKey = score >= 50 ? key : null;
       }
     });
+    if (bestScore < 50) currentZoneKey = null;
   }
 
   // Compass column labels (W → E)
@@ -3285,12 +3294,10 @@ function renderWorldMap() {
 
   html += '</div>';
 
-  // Legend + narrow-viewport toggle button
-  const toggleBtn = isNarrow
-    ? showFull
-      ? `<button class="map-toggle-btn" onclick="(function(){document.getElementById('worldMapDisplay').dataset.mapFull='0';renderWorldMap();})()">CORE VIEW</button>`
-      : `<button class="map-toggle-btn" onclick="(function(){document.getElementById('worldMapDisplay').dataset.mapFull='1';renderWorldMap();})()">FULL MAP</button>`
-    : '';
+  // Legend + toggle button (shown on all widths; persists view preference via state.mapView)
+  const toggleBtn = useFull
+    ? `<button class="map-toggle-btn" onclick="setMapView('core')">CORE VIEW</button>`
+    : `<button class="map-toggle-btn" onclick="setMapView('full')">FULL MAP</button>`;
 
   html += `<div class="map-legend">N=CURRENT &nbsp;·=VISITED &nbsp;[?]=COLLECTIBLE &nbsp;TAP=ZOOM ${toggleBtn}</div>`;
   display.innerHTML = html;

@@ -488,7 +488,7 @@ try {
 # ===========================================================
 # Suite 14 -- Render Contracts (Protocol 20)
 # Static source checks that render*() markup/class contracts are intact.
-# 9 tests
+# 13 tests
 # ===========================================================
 Sep "Suite 14 -- Render Contracts (Protocol 20)"
 try {
@@ -503,7 +503,17 @@ try {
     Check ($renderWorldMapBody -match 'minmax\(0,\s*1fr\)')             'renderWorldMap uses minmax(0,1fr) for grid columns'
     Check ($renderWorldMapBody -match 'max-width\s*:\s*100%')           'renderWorldMap uses max-width:100% on the grid container'
     Check ($renderWorldMapBody -match 'map-cell' -and $renderWorldMapBody -match 'map-cell-name' -and $renderWorldMapBody -match 'map-cell-pip') 'renderWorldMap contains map-cell, map-cell-name, map-cell-pip class references'
-    Check (($renderWorldMapBody -match 'innerWidth' -or $renderWorldMapBody -match 'offsetWidth') -and $renderWorldMapBody -match '490') 'renderWorldMap uses innerWidth/offsetWidth and 490 for narrow-viewport detection'
+    # Reload-size guard: size is state-driven, no width measurement (Protocol 8 plan)
+    Check ($renderWorldMapBody -match 'state\.mapView')                 'renderWorldMap reads state.mapView (state-driven size)'
+    Check (-not ($renderWorldMapBody -match 'window\.innerWidth'))      'renderWorldMap size path has no window.innerWidth'
+    Check (-not ($renderWorldMapBody -match 'dataset\.mapFull'))        'renderWorldMap size path has no dataset.mapFull'
+    try {
+        $setMapViewBody = Get-FunctionBody $uiSrc 'setMapView'
+        Check ($setMapViewBody -match 'state\.mapView')                 'setMapView() writes state.mapView'
+        Check ($setMapViewBody -match 'saveState\(\)')                  'setMapView() calls saveState()'
+    } catch {
+        Fail "setMapView function not found: $_"
+    }
     Check ($renderWorldMapBody -match 'map-toggle-btn')                 'renderWorldMap contains map-toggle-btn reference'
 } catch {
     Fail "Render contract extraction failed: $_"
@@ -569,6 +579,65 @@ Check ($uiSrc -match 'renderFactionRep\(\)')             'renderFactionRep() is 
 Check ($htmlSrc -match 'id="worldMapPanel"')             'worldMapPanel panel exists in index.html'
 Check ($htmlSrc -match 'id="worldMapDisplay"')           'worldMapDisplay element exists in index.html'
 Check ($htmlSrc -match 'id="factionContainer"')          'factionContainer element exists in index.html'
+
+# ===========================================================
+# Suite 18 -- Detail-Current Dedup Guard (Protocol 27)
+# Verifies scoreZoneForLoc rejects substring-only matches (<50).
+# 2 tests
+# ===========================================================
+Sep "Suite 18 -- Detail-Current Dedup Guard"
+$dcLabels = @(
+    "scoreZoneForLoc: Bitter Springs vs 'goodsprings' scores < 50",
+    "scoreZoneForLoc: Goodsprings vs 'goodsprings' scores === 100"
+)
+try {
+    $nodeCheck = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCheck) {
+        $repoRoot = (Get-Item $PSScriptRoot).Parent.FullName
+        $uiPathNode = (Join-Path $repoRoot "js/ui.js").Replace('\', '/')
+        $dcScript = @"
+const vm = require('vm');
+const fs = require('fs');
+const src = fs.readFileSync('$uiPathNode', 'utf8');
+const fnIdx = src.indexOf('function scoreZoneForLoc');
+if (fnIdx === -1) { console.log('EXTRACT_FAIL'); process.exit(0); }
+function extractBody(source, name) {
+  const idx = source.indexOf('function ' + name);
+  let i = source.indexOf('{', idx);
+  let depth = 0; const start = i;
+  while (i < source.length) {
+    if (source[i] === '{') depth++;
+    else if (source[i] === '}' && --depth === 0) return source.slice(start, i + 1);
+    i++;
+  }
+}
+const body = extractBody(src, 'scoreZoneForLoc');
+const headerEnd = src.indexOf('{', fnIdx);
+const sandbox = {};
+vm.createContext(sandbox);
+vm.runInContext(src.slice(fnIdx, headerEnd) + body, sandbox);
+const szl = sandbox.scoreZoneForLoc;
+const r = [
+  szl({name:'Bitter Springs',locations:[]},'goodsprings') < 50,
+  szl({name:'Goodsprings',locations:[]},'goodsprings') === 100
+];
+console.log('RESULT:' + r.map(b => b ? '1' : '0').join(''));
+"@
+        $out = ($dcScript | node 2>&1 | Out-String)
+        $rm = [regex]::Match($out, 'RESULT:([01]{2})')
+        if ($rm.Success) {
+            $bits = $rm.Groups[1].Value
+            for ($bi = 0; $bi -lt 2; $bi++) { Check ($bits.Substring($bi, 1) -eq '1') $dcLabels[$bi] }
+        } else {
+            $err = if ([string]::IsNullOrWhiteSpace($out)) { "No output from node" } else { $out.Trim() }
+            foreach ($lbl in $dcLabels) { Fail "$lbl  (runtime error: $err)" }
+        }
+    } else {
+        foreach ($lbl in $dcLabels) { Fail "$lbl  (node not found)" }
+    }
+} catch {
+    foreach ($lbl in $dcLabels) { Fail "$lbl  (exception: $_)" }
+}
 
 # ===========================================================
 # Results
