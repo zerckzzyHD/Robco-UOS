@@ -159,6 +159,8 @@ When work is run via Dispatch, never finish a task or complete a git push silent
 
 Because the Dispatch user typically cannot view the code or repo directly, any push that changes user-facing behavior must be reported with an explicit "it's live — here's what changed and exactly how to test it" message (live confirmation plus step-by-step test instructions), not just a commit summary.
 
+Dispatch reports must be formatted for mobile reading: lead with a one-line summary of what changed, keep it short and scannable (no walls of text, no code dumps or file paths), clearly state what was updated, and give the exact steps to test it. Optimize for a phone screen.
+
 ---
 
 ## Protocol 10 — UI Verification
@@ -232,6 +234,20 @@ Critical CSS rules, render-function class/markup contracts, and service-worker i
 ## Protocol 21 — Plain-English Changelog
 
 Every `CHANGELOG.md` entry must be written in clear, plain English that a non-developer can understand — describe what changed and why it matters from the user's perspective, not in developer jargon — in one consistent, readable style across the whole file. Preserve structural markers (version headers, the `Tests`/cache header comment) while keeping the prose plain. Avoid internal implementation details unless they explain a user-visible change.
+
+### Universal style
+
+Every version block follows the same seven rules:
+
+1. **Group entries under fixed headings**, in this order, skipping any that are empty: **Added** (new features), **Fixed** (bug fixes), **Changed** (behavior changes), **Improved** (refinements), and optionally **Under the Hood** (internal or dev-only changes — kept short and clearly separated so the user-facing part stays on top).
+2. **Lead with user impact:** each entry starts with what the user can now do or what stopped breaking, in plain language. The "why" is optional and only if it helps.
+3. **Consistent voice and tense:** past tense, the same throughout the whole file — "Added…", "Fixed…", "Improved…".
+4. **No code identifiers in the prose:** no file names, function names, commit hashes, or cache revs in entry text — those belong only in the structural header comment, never the human-readable body.
+5. **One entry per user-visible change, deduplicated:** merge related commits into a single readable line, not one entry per commit.
+6. **Consistent granularity:** short, scannable sentences; do not mix terse fragments with long paragraphs.
+7. **Preserve the structural markers exactly** (version number, date, the Tests/cache header comment) — only the prose changes.
+
+Rule 7 governs only the rewrite of EXISTING entries; it does not restrict versioning. The user may always manually instruct a version bump (e.g. 'bump version' or 'make this 2.1.0'), which follows Protocol 2's semver rules and creates a new version block in the changelog.
 
 ---
 
