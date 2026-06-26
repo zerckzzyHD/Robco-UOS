@@ -1,7 +1,7 @@
 # RobCo U.O.S. — System Architecture
 
 > **Version:** 2.0.1
-> **Last Updated:** 2026-06-25
+> **Last Updated:** 2026-06-26
 > **Purpose:** Living reference for any engineer (human or AI) working on this project.
 > This document maps every system, its dependencies, its persistence contract, and the
 > historical lessons that shaped it.
