@@ -1,4 +1,4 @@
-## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 386/386 | Cache: robco-terminal-v2.0.1-r34 -->
+## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 396/396 | Cache: robco-terminal-v2.0.1-r35 -->
 
 ### Added
 
@@ -73,6 +73,11 @@
 - Audio toggle rows, inner panel expanders (Campaign Status, Crossroads, Timeline, Audio Systems), and add-item form rows now share consistent CSS classes instead of carrying large duplicated inline styles. No visual change.
 - Inner panel expanders now show a live [+] / [-] indicator in CSS rather than static text — the indicator flips automatically when the panel opens and closes.
 - Added 10 new automated guard tests (Suite 33, 386 total across 37 suites) that verify the optics RGB variable is defined everywhere it must be, no hardcoded teal color literals survive in the stylesheet, the empty-state helper exists and is used, all utility classes are present in the CSS, and the toggle indicator is driven by CSS rather than static text.
+- Removed three legacy CSS rules that were superseded by the faction card layout and no longer applied to anything on the page.
+- Unified delete-button placement across the Perks, Quests, and Notes panels to use the same flex layout already used everywhere else — visual appearance unchanged.
+- Added a shared compact-button style so the PURGE LOGS button, the help button, and all delete buttons guarantee a minimum 28-pixel tap target on phones (Protocol 17 mobile standard). Previously each button carried its own inline compact style.
+- Empty-state messages shown when a panel list is empty now use plain sentence case throughout. Bracketed caps (such as [LOADING...]) are now reserved for true loading states only.
+- Added 10 new automated guard tests (Suite 34, 396 total across 38 suites) verifying the dead CSS was removed, the flex list-row and compact-button utilities exist, delete buttons meet the 28-pixel tap-target standard, and the bracketed empty-state vocabulary is correct.
 
 ---
 

@@ -1541,7 +1541,7 @@ header('Assets Completeness');
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 28 — Meta / Runner Parity (Group 7)
-//  Verifies that both runners contain all gate-guard suites (22-31)
+//  Verifies that both runners contain all gate-guard suites (22-34)
 //  and that the canonical test count in CHANGELOG.md matches README.md.
 //
 //  NOTE: source-level assert() / Check() counts cannot reliably track
@@ -1554,7 +1554,7 @@ header('Meta / Runner Parity');
   const jsRunner = readFile('tests/check-persistence.js');
   const psRunner = readFile('tests/check-persistence.ps1');
 
-  // Structural parity: both runners must contain every gate-guard suite marker (22-33).
+  // Structural parity: both runners must contain every gate-guard suite marker (22-34).
   // A missing marker means a suite was added to one runner but not ported to the other.
   const GATE_SUITES = [
     'Suite 22',
@@ -1569,17 +1569,18 @@ header('Meta / Runner Parity');
     'Suite 31',
     'Suite 32',
     'Suite 33',
+    'Suite 34',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-33)' +
+    'JS runner contains all gate-guard suites (22-34)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-33)' +
+    'PS runner contains all gate-guard suites (22-34)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -1903,6 +1904,99 @@ assert(
   const htmlSrc33 = readFile('index.html');
   const bad = (htmlSrc33.match(/<summary[^>]*>[^<]*\[\+\][^<]*<\/summary>/g) || []).length;
   assert(bad === 0, `No hardcoded [+] text in index.html <summary> elements (found ${bad}) (P1-4)`);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 34 — Phase 2c Guards (CSS Hygiene, List-Row, Btn-Sm, Empty-State Vocab)
+//  Deleted dead CSS, unified delete-btn flex pattern, .btn-sm utility, vocab fix.
+//  10 tests
+// ══════════════════════════════════════════════════════════════
+header('Phase 2c Guards');
+
+// 34.1 .faction-item rule absent from terminal.css (P2-1 dead CSS removed)
+{
+  const css34 = readFile('css/terminal.css');
+  assert(!/\.faction-item\s*\{/.test(css34), '.faction-item rule deleted from terminal.css (P2-1)');
+}
+
+// 34.2 .faction-name rule absent from terminal.css (P2-1 dead CSS removed)
+{
+  const css34 = readFile('css/terminal.css');
+  assert(!/\.faction-name\s*\{/.test(css34), '.faction-name rule deleted from terminal.css (P2-1)');
+}
+
+// 34.3 .faction-standing rule absent from terminal.css (P2-1 dead CSS removed)
+{
+  const css34 = readFile('css/terminal.css');
+  assert(
+    !/\.faction-standing\s*\{/.test(css34),
+    '.faction-standing rule deleted from terminal.css (P2-1)'
+  );
+}
+
+// 34.4 .list-row-content utility defined in terminal.css (P2-2 flex pattern)
+{
+  const css34 = readFile('css/terminal.css');
+  assert(
+    /\.list-row-content\s*\{/.test(css34),
+    '.list-row-content utility defined in terminal.css (P2-2)'
+  );
+}
+
+// 34.5 .btn-sm utility defined in terminal.css (P2-3 compact button)
+{
+  const css34 = readFile('css/terminal.css');
+  assert(/\.btn-sm\s*\{/.test(css34), '.btn-sm utility class defined in terminal.css (P2-3)');
+}
+
+// 34.6 .delete-btn has min-height:28px in terminal.css (P2-3 tap target Protocol 17)
+{
+  const css34 = readFile('css/terminal.css');
+  const css34Stripped = css34.replace(/\/\*[\s\S]*?\*\//g, '');
+  const deleteBtnRule = (css34Stripped.match(/\.delete-btn\s*\{[^}]*\}/) || [''])[0];
+  assert(
+    /min-height\s*:\s*28px/.test(deleteBtnRule),
+    '.delete-btn has min-height:28px (Protocol 17 tap target)'
+  );
+}
+
+// 34.7 renderPerks has no style="float:right;" on delete-btn (P2-2 float removed)
+{
+  const renderPerksBody = extractFunctionBody(uiSource, 'renderPerks');
+  assert(
+    !/delete-btn[^"]*"[^>]*style="float:right;"/.test(renderPerksBody) &&
+      !/style="float:right;"[^>]*delete-btn/.test(renderPerksBody),
+    'renderPerks() delete-btn has no inline style="float:right;" (P2-2)'
+  );
+}
+
+// 34.8 renderQuests has no style="float:right;" on delete-btn (P2-2 float removed)
+{
+  const renderQuestsBody = extractFunctionBody(uiSource, 'renderQuests');
+  assert(
+    !/delete-btn[^"]*"[^>]*style="float:right;"/.test(renderQuestsBody) &&
+      !/style="float:right;"[^>]*delete-btn/.test(renderQuestsBody),
+    'renderQuests() delete-btn has no inline style="float:right;" (P2-2)'
+  );
+}
+
+// 34.9 renderCampaignNotes has no style="float:right;" on delete-btn (P2-2 float removed)
+{
+  const renderCampaignNotesBody = extractFunctionBody(uiSource, 'renderCampaignNotes');
+  assert(
+    !/delete-btn[^"]*"[^>]*style="float:right;"/.test(renderCampaignNotesBody) &&
+      !/style="float:right;"[^>]*delete-btn/.test(renderCampaignNotesBody),
+    'renderCampaignNotes() delete-btn has no inline style="float:right;" (P2-2)'
+  );
+}
+
+// 34.10 [NO COLLECTIBLES LOADED] bracketed empty-state absent from index.html (P2-5)
+{
+  const html34 = readFile('index.html');
+  assert(
+    !/\[NO COLLECTIBLES LOADED\]/.test(html34),
+    'index.html static empty-state uses plain text, not [NO COLLECTIBLES LOADED] (P2-5)'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════

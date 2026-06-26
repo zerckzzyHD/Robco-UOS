@@ -592,7 +592,7 @@
               <h2>&gt; COLLECTIBLES</h2>
             </summary>
             <div id="collectiblesDisplay">
-              <span class="empty-state">[NO COLLECTIBLES LOADED]</span>
+              <span class="empty-state">No collectibles loaded</span>
             </div>
           </details>
 
@@ -1135,7 +1135,7 @@
                 "
               >
                 <span style="opacity: 0.45"
-                  >[NO DECISIONS RECORDED — CROSSROADS EVENTS WILL APPEAR HERE]</span
+                  >No decisions recorded — crossroads events will appear here</span
                 >
               </div>
             </details>
@@ -1158,7 +1158,7 @@
                 "
               >
                 <span style="opacity: 0.45"
-                  >[NO TIMELINE GENERATED — USE [TIMELINE] COMMAND IN COMM-LINK]</span
+                  >No timeline generated — use the [TIMELINE] command in COMM-LINK</span
                 >
               </div>
             </details>
@@ -1675,15 +1675,8 @@
               </h2>
               <button
                 onclick="clearChat()"
-                class="action-btn"
-                style="
-                  width: auto;
-                  padding: 3px 8px;
-                  margin: 0;
-                  font-size: 10px;
-                  border-color: var(--robco-blue);
-                  color: var(--robco-blue);
-                "
+                class="action-btn btn-sm"
+                style="border-color: var(--robco-blue); color: var(--robco-blue)"
               >
                 [ PURGE LOGS ]
               </button>
@@ -1743,13 +1736,7 @@
                 margin-bottom: 2px;
               "
             >
-              <button
-                class="action-btn"
-                style="width: auto; padding: 2px 8px; margin: 0; font-size: 11px"
-                onclick="showHelpModal()"
-              >
-                [?]
-              </button>
+              <button class="action-btn btn-sm" onclick="showHelpModal()">[?]</button>
               <div
                 id="tokenBudgetDisplay"
                 style="font-size: 9px; opacity: 0.5; color: var(--robco-blue); text-align: right"

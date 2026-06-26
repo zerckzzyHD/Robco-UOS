@@ -966,11 +966,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-33)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-33)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-34)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-34)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -1137,6 +1137,54 @@ Check $csCss33 'summary.config-summary::after [+]/[-] toggle CSS exists in termi
 # 33.10 No hardcoded [+] text inside <summary> elements in index.html
 $noPlus33 = -not [bool]($htmlSrc33 -match '<summary[^>]*>[^<]*\[\+\][^<]*<\/summary>')
 Check $noPlus33 'No hardcoded [+] text in index.html summary elements (P1-4)'
+
+# ===========================================================
+# Suite 34 -- Phase 2c Guards (CSS Hygiene, List-Row, Btn-Sm, Empty-State Vocab)
+# Deleted dead CSS, unified delete-btn flex pattern, .btn-sm utility, vocab fix.
+# 10 tests
+# ===========================================================
+Sep "Suite 34 -- Phase 2c Guards"
+$cssSrc34 = Read-Src 'css/terminal.css'
+$htmlSrc34 = Read-Src 'index.html'
+$uiSrc34   = Read-Src 'js/ui.js'
+
+# 34.1 .faction-item rule absent from terminal.css (P2-1 dead CSS removed)
+Check (-not [bool]($cssSrc34 -match '\.faction-item\s*\{')) '.faction-item rule deleted from terminal.css (P2-1)'
+
+# 34.2 .faction-name rule absent from terminal.css (P2-1 dead CSS removed)
+Check (-not [bool]($cssSrc34 -match '\.faction-name\s*\{')) '.faction-name rule deleted from terminal.css (P2-1)'
+
+# 34.3 .faction-standing rule absent from terminal.css (P2-1 dead CSS removed)
+Check (-not [bool]($cssSrc34 -match '\.faction-standing\s*\{')) '.faction-standing rule deleted from terminal.css (P2-1)'
+
+# 34.4 .list-row-content utility defined in terminal.css (P2-2 flex pattern)
+Check ([bool]($cssSrc34 -match '\.list-row-content\s*\{')) '.list-row-content utility defined in terminal.css (P2-2)'
+
+# 34.5 .btn-sm utility defined in terminal.css (P2-3 compact button)
+Check ([bool]($cssSrc34 -match '\.btn-sm\s*\{')) '.btn-sm utility class defined in terminal.css (P2-3)'
+
+# 34.6 .delete-btn has min-height:28px (P2-3 tap target Protocol 17)
+$css34Stripped = [regex]::Replace($cssSrc34, '/\*[\s\S]*?\*/', '')
+$deleteBtnRule34 = ([regex]::Match($css34Stripped, '\.delete-btn\s*\{[^}]*\}')).Value
+Check ([bool]($deleteBtnRule34 -match 'min-height\s*:\s*28px')) '.delete-btn has min-height:28px (Protocol 17 tap target)'
+
+# 34.7 renderPerks has no style="float:right;" on delete-btn (P2-2)
+$renderPerksBody34 = ''
+try { $renderPerksBody34 = Get-FunctionBody $uiSrc34 'renderPerks' } catch {}
+Check (-not [bool]($renderPerksBody34 -match 'style="float:right;"')) 'renderPerks() delete-btn has no inline float:right (P2-2)'
+
+# 34.8 renderQuests has no style="float:right;" on delete-btn (P2-2)
+$renderQuestsBody34 = ''
+try { $renderQuestsBody34 = Get-FunctionBody $uiSrc34 'renderQuests' } catch {}
+Check (-not [bool]($renderQuestsBody34 -match 'style="float:right;"')) 'renderQuests() delete-btn has no inline float:right (P2-2)'
+
+# 34.9 renderCampaignNotes has no style="float:right;" on delete-btn (P2-2)
+$renderNotesBody34 = ''
+try { $renderNotesBody34 = Get-FunctionBody $uiSrc34 'renderCampaignNotes' } catch {}
+Check (-not [bool]($renderNotesBody34 -match 'style="float:right;"')) 'renderCampaignNotes() delete-btn has no inline float:right (P2-2)'
+
+# 34.10 [NO COLLECTIBLES LOADED] bracketed empty-state absent from index.html (P2-5)
+Check (-not [bool]($htmlSrc34 -match '\[NO COLLECTIBLES LOADED\]')) 'index.html uses plain text, not [NO COLLECTIBLES LOADED] (P2-5)'
 
 # ===========================================================
 # Results

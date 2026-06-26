@@ -2795,7 +2795,7 @@ function renderPerks() {
     state.perks
       .map(
         (p, i) =>
-          `<li>${escapeHtml(p.name)}${p.rank > 1 ? ' (Rank ' + p.rank + ')' : ''}${p.level_taken ? ' — Lv.' + p.level_taken : ''}<button class="delete-btn" style="float:right;" onclick="removePerk(${i})">X</button></li>`
+          `<li><span class="list-row-prefix">> </span><span class="list-row-content">${escapeHtml(p.name)}${p.rank > 1 ? ' (Rank ' + p.rank + ')' : ''}${p.level_taken ? ' — Lv.' + p.level_taken : ''}</span><button class="delete-btn" onclick="removePerk(${i})">X</button></li>`
       )
       .join('') +
     '</ul>';
@@ -2848,7 +2848,7 @@ function renderQuests() {
         const factions = q.factions
           ? ` <span style="font-size:9px;opacity:0.6;">[${escapeHtml(String(q.factions))}]</span>`
           : '';
-        return `<li style="color:${color};">[${escapeHtml(st.toUpperCase())}] ${escapeHtml(q.name)}${factions}${q.objective ? '<div style="font-size:10px;opacity:0.7;margin-left:10px;">' + escapeHtml(q.objective) + '</div>' : ''}<button class="delete-btn" style="float:right;" onclick="removeQuest(${i})">X</button></li>`;
+        return `<li style="color:${color};"><span class="list-row-prefix">> </span><div class="list-row-content">[${escapeHtml(st.toUpperCase())}] ${escapeHtml(q.name)}${factions}${q.objective ? '<div style="font-size:10px;opacity:0.7;margin-left:10px;">' + escapeHtml(q.objective) + '</div>' : ''}</div><button class="delete-btn" onclick="removeQuest(${i})">X</button></li>`;
       })
       .join('') +
     '</ul>';
@@ -2921,7 +2921,7 @@ function renderCollectibles() {
 
   if (total === 0) {
     container.innerHTML =
-      '<span style="opacity:0.4;font-size:11px;">[NO COLLECTIBLES REGISTRY LOADED]</span>';
+      '<span class="empty-state" style="font-size:11px;">No collectibles registry loaded</span>';
     return;
   }
 
@@ -2983,7 +2983,7 @@ function renderCampaignNotes() {
       .map((note, i) => {
         const isAutoLog = /^\[T\d+\]/.test(note);
         const opacity = isAutoLog ? '0.65' : '1';
-        return `<li style="opacity:${opacity};">${escapeHtml(String(note))}<button class="delete-btn" style="float:right;" onclick="removeCampaignNote(${i})">X</button></li>`;
+        return `<li style="opacity:${opacity};"><span class="list-row-prefix">> </span><span class="list-row-content">${escapeHtml(String(note))}</span><button class="delete-btn" onclick="removeCampaignNote(${i})">X</button></li>`;
       })
       .join('') +
     '</ul>';
@@ -3066,7 +3066,7 @@ function renderCampaignStatus() {
       });
       html += `</div>`;
     } else {
-      html += `<div style="font-size:9px;opacity:0.4;margin-bottom:6px;">[NO NOTABLE FACTION STANDINGS]</div>`;
+      html += `<div style="font-size:9px;opacity:0.4;margin-bottom:6px;">No notable faction standings</div>`;
     }
 
     // Recent campaign note count
@@ -3086,8 +3086,9 @@ function renderCampaignStatus() {
       .reverse(); // newest first
 
     if (autoLogs.length === 0) {
-      crossroads.innerHTML =
-        '<span style="opacity:0.45;">[NO DECISIONS RECORDED — CROSSROADS EVENTS WILL APPEAR HERE]</span>';
+      crossroads.innerHTML = emptyState(
+        'No decisions recorded — crossroads events will appear here'
+      );
     } else {
       crossroads.innerHTML = autoLogs
         .map(
@@ -3240,7 +3241,7 @@ function renderWorldMap() {
 
     const locs = activeZone.locations || [];
     if (locs.length === 0) {
-      html += `<div style="opacity:0.5; font-style:italic; padding:8px 4px;">[NO DATA]</div>`;
+      html += `<div style="opacity:0.5; font-style:italic; padding:8px 4px;">No data</div>`;
     } else {
       // Single-winner: find the one best-matching location index (score ≥50 required).
       // Prevents "goodsprings" substring match from marking Bitter Springs as [CURRENT].

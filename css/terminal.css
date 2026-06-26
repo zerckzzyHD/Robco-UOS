@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   --robco-green-rgb: 20, 253, 206;
   --robco-green: #14fdce;
   --robco-dark: #021c14;
@@ -313,6 +313,9 @@ input[type='range']::-webkit-slider-thumb {
   background: transparent;
   color: var(--robco-danger);
   border: 1px solid var(--robco-danger);
+  min-height: 28px;
+  min-width: 28px;
+  box-sizing: border-box;
 }
 textarea {
   width: 100%;
@@ -1250,14 +1253,13 @@ body.thermal-load .panel {
   overflow-y: auto;
 }
 .notes-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
   padding: 3px 0;
   border-bottom: 1px dashed rgba(var(--robco-green-rgb), 0.2);
   font-size: 12px;
   line-height: 1.4;
-}
-.notes-list li::before {
-  content: '> ';
-  opacity: 0.45;
 }
 
 /* ── Faction Standing ────────────────────────────────────────── */
@@ -1267,25 +1269,6 @@ body.thermal-load .panel {
   gap: 6px;
   margin-top: 4px;
 }
-.faction-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 4px;
-  border: 1px dashed rgba(var(--robco-green-rgb), 0.3);
-  text-align: center;
-}
-.faction-name {
-  font-size: 10px;
-  letter-spacing: 1px;
-  opacity: 0.6;
-}
-.faction-standing {
-  font-size: 11px;
-  font-weight: bold;
-}
-
 /* ── Faction Card (v2.0.1 redesign) ─────────────────────────── */
 .faction-card {
   display: flex;
@@ -1943,4 +1926,32 @@ details[open] > summary.config-summary::after {
   gap: 4px;
   flex-wrap: wrap;
   margin-top: 6px;
+}
+
+/* ── Compact-Button Utility (P2-3) ──────────────────────────── */
+/* Overrides the global button{width:100%;padding:12px;margin-top:5px} defaults.
+   min 28×28 touch target (Protocol 17). Use alongside action-btn or alert-btn. */
+.btn-sm {
+  width: auto;
+  padding: 3px 8px;
+  font-size: 11px;
+  margin: 0;
+  min-height: 28px;
+  min-width: 28px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── List-Row Layout Utilities (P2-2) ───────────────────────── */
+/* Prefix glyph ("> ") in perks/quests/notes flex rows */
+.list-row-prefix {
+  opacity: 0.45;
+  flex-shrink: 0;
+}
+/* Grows to fill available width, pushes delete-btn to the right */
+.list-row-content {
+  flex: 1;
+  min-width: 0;
 }
