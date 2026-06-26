@@ -1,4 +1,13 @@
-## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 243/243 | Cache: robco-terminal-v2.0.1-r15 -->
+## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 243/243 | Cache: robco-terminal-v2.0.1-r16 -->
+
+### [B16] Protocol 8 updated — plan audit and spec-lock rules added (2026-06-26)
+
+Docs-only update — no app behavior changed, test counts stay at 243.
+
+Two new requirements added to Protocol 8 (Dispatch Multi-Model Workflow):
+
+- **Plan audit before implementation:** Before Opus hands off a plan to Sonnet, it must read every file the change touches and explicitly list every path the change can encounter — every load state, saved-state value, tab visibility, desktop vs. mobile scenario, and brand-new vs. migrated state — with the intended behavior for each. Opus then checks its own plan against that list before handing off. This closes the gap where a plan could fix one code path while silently leaving another broken.
+- **Spec lock:** The full specification must be settled before a Dispatch session starts. Do not send new requirements or changes to a session that is already running — it may commit and push before it can incorporate them, leaving the result partial or inconsistent. If the spec needs to change, wait until the session finishes, then issue one complete follow-up.
 
 ### [B15] Protocol 26 removed — version discipline folded into Protocol 2 (2026-06-26)
 
