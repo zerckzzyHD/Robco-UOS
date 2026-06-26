@@ -1,4 +1,14 @@
-## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 243/243 | Cache: robco-terminal-v2.0.1-r16 -->
+## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 243/243 | Cache: robco-terminal-v2.0.1-r17 -->
+
+### [B17] Protocols 26, 27, 28 added — Definition of Done, Reproduce Before Fixing, Usage Efficiency (2026-06-26)
+
+Docs-only update — no app behavior changed, test counts stay at 243.
+
+Three new protocols added (Protocols 26–28, bringing the total to 1–28):
+
+- **Protocol 26 — Definition of Done:** Before starting any implementation, write out the specific scenarios that must pass for the task to count as finished. The task is not done until every one of those scenarios is verified on the real, running artifact — never assumed. This is the checklist version of Protocol 8's plan-audit requirement, and it is the primary guard against fixing one code path while quietly leaving another broken.
+- **Protocol 27 — Reproduce Before Fixing:** Confirm the actual cause before writing any fix — reproduce the bug or trace its mechanism directly in the code. Speculative fixes are not allowed: a wrong guess wastes a full implement → verify → fail → re-diagnose cycle. The confirmed root cause must be stated in the plan before implementation begins.
+- **Protocol 28 — Usage Efficiency:** Model usage is a budget, and managing it is Dispatch's job — not the user's. Users are expected to send scattered, evolving requests across many messages; that is normal and fine. Dispatch must absorb that input, consolidate related work, wait for a natural stopping point, and lock one complete specification before starting a session (per Protocol 8's spec-lock) — rather than firing each message fragment into a running session and generating cleanup passes. Prefer one complete, verified pass over many partial pushes; reuse a session that already has context instead of spinning up a new one; batch related work (Protocol 19). Every avoidable cleanup pass is wasted spend.
 
 ### [B16] Protocol 8 updated — plan audit and spec-lock rules added (2026-06-26)
 
