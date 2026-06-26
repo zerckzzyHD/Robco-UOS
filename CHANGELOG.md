@@ -1,4 +1,4 @@
-## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 258/258 | Cache: robco-terminal-v2.0.1-r23 -->
+## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 280/280 | Cache: robco-terminal-v2.0.1-r24 -->
 
 ### Added
 
@@ -45,6 +45,10 @@
 - Normalized line endings across all files to prevent false diffs.
 - Added and refined agent protocols 8 through 28 governing the multi-model workflow, dispatch reporting, UI verification, deploy verification, mobile standards, and process rules.
 - Expanded the plain-English changelog style guide (Protocol 21) with a seven-rule universal style section. Updated dispatch reporting rules (Protocol 9) to require short, scannable, mobile-optimized reports. Restyled the entire changelog to conform.
+- Fixed two ways a crafted save or AI response could inject code: companion squad numeric fields (HP, ammo, damage threshold) are now coerced to integers before being written to the page, and the trade window click handler no longer embeds item names directly into the page's script — it uses a safe event listener instead.
+- The app now survives a corrupt save file instead of showing a blank screen. If the save data cannot be read, it is automatically set aside and the app starts fresh, rather than crashing on boot.
+- Fixed a broken data row in the Fallout 3 weapon database: the Fat Man had an extra trailing field that caused one column to be misread.
+- Added 22 new automated tests: coverage for the Fallout 3 database structure, a column-count check ensuring every weapon data row matches its header, and static guards confirming the two XSS fixes cannot silently regress.
 
 ---
 

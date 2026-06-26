@@ -29,7 +29,7 @@ Gatling Laser,8,16,1.5,8.0,18,22500,0,6,0,0,Full Auto,EC
 Mesmetron,0,0,1.0,1.0,2,200,0,2,0,0,Paralyze/Confuse,None
 Minigun,10,10,1.0,8.0,28,22500,0,7,0,0,Full Auto,5mm
 Missile Launcher,100,100,1.0,0.5,15,4500,0,6,0,0,Splash,Missile
-Fat Man,600,600,1.0,0.4,30,8500,0,8,0,0,Splash,Mini Nuke,None
+Fat Man,600,600,1.0,0.4,30,8500,0,8,0,0,Splash,Mini Nuke
 Rock-It Launcher,25,25,1.0,1.5,10,250,0,5,0,0,Junk Ammo,Junk
 Flamer,10,10,1.0,4.0,10,1500,0,8,0,0,Fire DoT,Flamer Fuel
 Heavy Incinerator,12,12,1.0,3.5,12,5000,0,8,0,0,Fire DoT,Flamer Fuel

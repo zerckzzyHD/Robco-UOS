@@ -658,6 +658,103 @@ console.log('RESULT:' + r.map(b => b ? '1' : '0').join(''));
 }
 
 # ===========================================================
+# Suite 19 -- FO3 Database structural integrity
+# Mirrors Suite 9 for js/db_fo3.js: CSV tables, purity contract.
+# 16 tests
+# ===========================================================
+Sep "Suite 19 -- FO3 Database structural integrity"
+$dbFo3Src = Read-Src "js/db_fo3.js"
+
+# 19.1 databaseCSVs global must be declared
+Check ($dbFo3Src -match 'const databaseCSVs')                          "db_fo3.js: databaseCSVs global is declared"
+
+# 19.2 lookupItemInDb function must be declared
+Check ($dbFo3Src -match 'function lookupItemInDb')                      "db_fo3.js: lookupItemInDb() function is declared"
+
+# 19.3 All required CSV section headers must be present
+$FO3_REQUIRED_TABLES = @('[WEAPONS.CSV]','[AMMO.CSV]','[ARMOR.CSV]','[BESTIARY.CSV]',
+                         '[CHEMS.CSV]','[MISC.CSV]','[RECIPES.CSV]','[QUEST_ITEMS.CSV]','[VENDORS.CSV]')
+foreach ($tbl in $FO3_REQUIRED_TABLES) {
+    Check ($dbFo3Src.Contains($tbl)) "db_fo3.js contains $tbl section"
+}
+
+# 19.4 lookupItemInDb must be referenced in db_fo3.js
+Check ($dbFo3Src -match 'lookupItemInDb')                               "db_fo3.js: lookupItemInDb function exists"
+
+# 19.5 BESTIARY must have >= 30 data rows
+$fo3BestiaryMatch = [regex]::Match($dbFo3Src, '(?s)\[BESTIARY\.CSV\](.*?)(?=\[|`;)')
+$fo3BestiaryRows  = 0
+if ($fo3BestiaryMatch.Success) {
+    $fo3BestiaryRows = ($fo3BestiaryMatch.Groups[1].Value -split "`n" |
+                    Where-Object { $_.Trim() -ne '' -and $_ -notmatch 'Name,' }).Count
+}
+Check ($fo3BestiaryRows -ge 30)                                         "db_fo3.js BESTIARY.CSV has >= 30 entries (found $fo3BestiaryRows)"
+
+# 19.6-19.8 db_fo3.js must NOT reference state, localStorage, or chatHistory
+$dbFo3Code = ($dbFo3Src -replace '(?s)/\*.*?\*/', '') -replace '//[^\r\n]*', ''
+Check ($dbFo3Code -notmatch '\bstate\b')                                "db_fo3.js does not reference state (pure reference data)"
+Check ($dbFo3Code -notmatch 'localStorage')                             "db_fo3.js does not reference localStorage"
+Check ($dbFo3Code -notmatch 'chatHistory')                              "db_fo3.js does not reference chatHistory"
+
+# ===========================================================
+# Suite 20 -- CSV column-count integrity
+# Every WEAPONS.CSV data row in db_nv and db_fo3 must have the
+# same number of fields as the header row.
+# 2 tests
+# ===========================================================
+Sep "Suite 20 -- CSV column-count integrity"
+
+function Test-WeaponsCsvColumnCount {
+    param([string]$src, [string]$label)
+    $blockMatch = [regex]::Match($src, '(?s)\[WEAPONS\.CSV\](.*?)(?=\[|`;)')
+    if (-not $blockMatch.Success) { Fail "$label`: could not extract [WEAPONS.CSV] block"; return }
+    $lines = ($blockMatch.Groups[1].Value -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' })
+    if ($lines.Count -lt 2) { Fail "$label`: [WEAPONS.CSV] block has fewer than 2 lines"; return }
+    $headerCount = ($lines[0] -split ',').Count
+    $badRows = @()
+    for ($r = 1; $r -lt $lines.Count; $r++) {
+        $cols = ($lines[$r] -split ',').Count
+        if ($cols -ne $headerCount) { $badRows += "row $($r+1) ($cols cols)" }
+    }
+    Check ($badRows.Count -eq 0) "$label`: all WEAPONS.CSV data rows have $headerCount columns$(if($badRows.Count){' -- bad: ' + ($badRows -join '; ')})"
+}
+
+Test-WeaponsCsvColumnCount -src $dbSrc     -label "db_nv.js"
+Test-WeaponsCsvColumnCount -src $dbFo3Src  -label "db_fo3.js"
+
+# ===========================================================
+# Suite 21 -- Security regression guards (Protocol 13/20)
+# Static assertions that XSS-1 (squad numeric coercion) and
+# XSS-2 (trade modal click binding) fixes cannot regress.
+# 4 tests
+# ===========================================================
+Sep "Suite 21 -- Security regression guards"
+
+# 21.1 autoImportState() maps squad array with parseInt for hp/hpMax/ammo
+$importBody21 = Get-FunctionBody $apiSrc 'autoImportState'
+Check ([bool]([regex]::Match($importBody21, 'parsed\.squad[\s\S]{0,400}parseInt[\s\S]{0,20}m\.hp').Success) -or
+       [bool]([regex]::Match($importBody21, 'parsed\.squad[\s\S]{0,400}parseInt.*hp').Success)) `
+    "autoImportState() sanitizes squad numeric fields with parseInt (XSS-1 guard)"
+
+# 21.2 renderSquad() wraps hp, hpMax, ammo in parseInt
+$renderSquadBody = Get-FunctionBody $uiSrc 'renderSquad'
+Check ($renderSquadBody -match 'parseInt\s*\(\s*member\.hp\s*\)' -and
+       $renderSquadBody -match 'parseInt\s*\(\s*member\.hpMax\s*\)' -and
+       $renderSquadBody -match 'parseInt\s*\(\s*member\.ammo\s*\)') `
+    "renderSquad() coerces hp, hpMax, ammo with parseInt before innerHTML (XSS-1 guard)"
+
+# 21.3 Trade modal does NOT embed raw item.name in an inline onclick attribute
+$tradeStart = $apiSrc.IndexOf("mType === 'TRADE'")
+$tradeEnd   = $apiSrc.IndexOf("} else {", $tradeStart)
+$tradeBlock = if ($tradeStart -ge 0 -and $tradeEnd -gt $tradeStart) { $apiSrc.Substring($tradeStart, $tradeEnd - $tradeStart) } else { '' }
+Check ($tradeBlock -notmatch 'onclick\s*=\s*[''"`]\s*tradeItem\s*\(') `
+    "Trade modal does not use inline onclick=""tradeItem(...)"" (XSS-2 guard)"
+
+# 21.4 Trade modal uses addEventListener for click binding
+Check ($tradeBlock -match "addEventListener\s*\(\s*['""]click['""]") `
+    "Trade modal binds click via addEventListener (XSS-2 guard)"
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

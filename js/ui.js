@@ -20,6 +20,34 @@ const AudioSettings = {
   masterMute: localStorage.getItem('robco_master_muted') === 'true',
 };
 
+// ── GLOBAL ERROR NET ──────────────────────────────────────────
+// Catches uncaught JS errors and unhandled promise rejections and surfaces a
+// recoverable on-screen diagnostic instead of leaving the user with a blank screen.
+window.addEventListener('error', ev => {
+  const msg =
+    (ev.message || 'Unknown error') + (ev.filename ? ` [${ev.filename}:${ev.lineno}]` : '');
+  console.error('[RobCo] Uncaught error:', msg, ev.error);
+  const diag = document.getElementById('chatDisplay');
+  if (diag) {
+    const el = document.createElement('div');
+    el.className = 'msg-sys';
+    el.textContent = `> ⚠ SYSTEM FAULT — ${msg} — save your data and reload.`;
+    diag.appendChild(el);
+  }
+});
+window.addEventListener('unhandledrejection', ev => {
+  const reason =
+    ev.reason instanceof Error ? ev.reason.message : String(ev.reason || 'Unhandled rejection');
+  console.error('[RobCo] Unhandled rejection:', reason, ev.reason);
+  const diag = document.getElementById('chatDisplay');
+  if (diag) {
+    const el = document.createElement('div');
+    el.className = 'msg-sys';
+    el.textContent = `> ⚠ ASYNC FAULT — ${reason} — save your data and reload.`;
+    diag.appendChild(el);
+  }
+});
+
 // ── CHANGE GUARDS (skip audio calls when nothing changed) ──────
 let _lastRads = -1,
   _lastCrippled = false;
@@ -360,26 +388,41 @@ window.onload = function () {
   let v8Str = localStorage.getItem('robco_v8');
   let v7Str = localStorage.getItem('robco_v7');
 
+  let loadedOk = false;
   if (v8Str) {
-    window.robco_v8 = JSON.parse(v8Str);
-    let activeCampaign = window.robco_v8.campaigns[window.robco_v8.activeContext] || {};
-    state = { ...state, ...activeCampaign };
-    state.gameContext = window.robco_v8.activeContext;
-  } else if (v7Str) {
-    let savedState = JSON.parse(v7Str);
-    if (typeof migrateState === 'function')
-      savedState = migrateState(savedState.version || '1.0', savedState);
+    try {
+      window.robco_v8 = JSON.parse(v8Str);
+      let activeCampaign = window.robco_v8.campaigns[window.robco_v8.activeContext] || {};
+      state = { ...state, ...activeCampaign };
+      state.gameContext = window.robco_v8.activeContext;
+      loadedOk = true;
+    } catch (e) {
+      console.error('[RobCo] Corrupt robco_v8 — quarantined, booting fresh:', e);
+      localStorage.removeItem('robco_v8');
+    }
+  }
+  if (!loadedOk && v7Str) {
+    try {
+      let savedState = JSON.parse(v7Str);
+      if (typeof migrateState === 'function')
+        savedState = migrateState(savedState.version || '1.0', savedState);
 
-    window.robco_v8 = {
-      activeContext: savedState.gameContext || 'FNV',
-      campaigns: {},
-    };
-    window.robco_v8.campaigns[window.robco_v8.activeContext] = savedState;
-    localStorage.setItem('robco_v8', JSON.stringify(window.robco_v8));
+      window.robco_v8 = {
+        activeContext: savedState.gameContext || 'FNV',
+        campaigns: {},
+      };
+      window.robco_v8.campaigns[window.robco_v8.activeContext] = savedState;
+      localStorage.setItem('robco_v8', JSON.stringify(window.robco_v8));
 
-    state = { ...state, ...savedState };
-    state.gameContext = window.robco_v8.activeContext;
-  } else {
+      state = { ...state, ...savedState };
+      state.gameContext = window.robco_v8.activeContext;
+      loadedOk = true;
+    } catch (e) {
+      console.error('[RobCo] Corrupt robco_v7 — quarantined, booting fresh:', e);
+      localStorage.removeItem('robco_v7');
+    }
+  }
+  if (!loadedOk) {
     window.robco_v8 = {
       activeContext: 'FNV',
       campaigns: { FNV: state },
@@ -2344,11 +2387,11 @@ function renderSquad() {
                 <button class="delete-btn" onclick="removeSquadMember(${i})">X</button>
             </div>
             <div style="font-size: 11px; display:flex; justify-content:space-between; margin-top:2px;">
-                <span style="color: var(--robco-green)">HP: ${member.hp}/${member.hpMax}</span>
-                <span style="color: var(--robco-alert)">AMMO: ${member.ammo}</span>
+                <span style="color: var(--robco-green)">HP: ${parseInt(member.hp) || 0}/${parseInt(member.hpMax) || 0}</span>
+                <span style="color: var(--robco-alert)">AMMO: ${parseInt(member.ammo) || 0}</span>
                 <span style="color: var(--robco-danger)">CND: ${escapeHtml(String(member.condition))}</span>
             </div>
-            ${member.weapon ? `<div style="font-size:10px;opacity:0.6;margin-top:1px;">WPN: ${escapeHtml(member.weapon)}${member.dt !== undefined ? ' | DT: ' + member.dt : ''}</div>` : ''}
+            ${member.weapon ? `<div style="font-size:10px;opacity:0.6;margin-top:1px;">WPN: ${escapeHtml(member.weapon)}${member.dt !== undefined ? ' | DT: ' + (parseInt(member.dt) || 0) : ''}</div>` : ''}
             ${affinityStr}
         </div>`;
     })

@@ -1034,6 +1034,151 @@ try {
 }
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 19 — FO3 Database structural integrity
+//  Mirrors Suite 9 for js/db_fo3.js: CSV tables, purity contract.
+//  16 tests
+// ══════════════════════════════════════════════════════════════
+header('FO3 Database structural integrity');
+const dbFo3Source = readFile('js/db_fo3.js');
+
+// 19.1 databaseCSVs global must be declared
+assert(/const\s+databaseCSVs/.test(dbFo3Source), 'db_fo3.js: databaseCSVs global is declared');
+
+// 19.2 lookupItemInDb function must be declared
+assert(
+  /function\s+lookupItemInDb\s*\(/.test(dbFo3Source),
+  'db_fo3.js: lookupItemInDb() function is declared'
+);
+
+// 19.3 All required CSV section headers must be present
+const FO3_REQUIRED_TABLES = [
+  '[WEAPONS.CSV]',
+  '[AMMO.CSV]',
+  '[ARMOR.CSV]',
+  '[BESTIARY.CSV]',
+  '[CHEMS.CSV]',
+  '[MISC.CSV]',
+  '[RECIPES.CSV]',
+  '[QUEST_ITEMS.CSV]',
+  '[VENDORS.CSV]',
+];
+for (const tbl of FO3_REQUIRED_TABLES) {
+  assert(dbFo3Source.includes(tbl), `db_fo3.js contains ${tbl} section`);
+}
+
+// 19.4 lookupItemInDb must be referenced in db_fo3.js
+assert(/lookupItemInDb/.test(dbFo3Source), "'lookupItemInDb' function exists in db_fo3.js");
+
+// 19.5 BESTIARY must have ≥ 30 data rows
+const fo3BestiaryBlock = dbFo3Source.match(/\[BESTIARY\.CSV\]([\s\S]*?)(?=\[|`;)/);
+const fo3BestiaryRows = fo3BestiaryBlock
+  ? fo3BestiaryBlock[1].split('\n').filter(l => l.trim() && !l.includes('Name,'))
+  : [];
+assert(
+  fo3BestiaryRows.length >= 30,
+  `db_fo3.js BESTIARY.CSV has ≥ 30 entries (found ${fo3BestiaryRows.length})`
+);
+
+// 19.6–19.8 db_fo3.js must NOT reference state, localStorage, or chatHistory
+const dbFo3Code = dbFo3Source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\r\n]*/g, '');
+assert(!/\bstate\b/.test(dbFo3Code), 'db_fo3.js does not reference state (pure reference data)');
+assert(!/localStorage/.test(dbFo3Code), 'db_fo3.js does not reference localStorage');
+assert(!/chatHistory/.test(dbFo3Code), 'db_fo3.js does not reference chatHistory');
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 20 — CSV column-count integrity
+//  Every WEAPONS.CSV data row in db_nv and db_fo3 must have the
+//  same number of fields as the header row.
+//  2 tests
+// ══════════════════════════════════════════════════════════════
+header('CSV column-count integrity');
+
+function checkWeaponsCsvColumnCount(src, label) {
+  const block = src.match(/\[WEAPONS\.CSV\]([\s\S]*?)(?=\[|`;)/);
+  if (!block) {
+    fail(`${label}: could not extract [WEAPONS.CSV] block`);
+    return;
+  }
+  const lines = block[1]
+    .split('\n')
+    .map(l => l.trim())
+    .filter(Boolean);
+  if (lines.length < 2) {
+    fail(`${label}: [WEAPONS.CSV] block has fewer than 2 lines (no data rows)`);
+    return;
+  }
+  const headerCount = lines[0].split(',').length;
+  const badRows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(',').length;
+    if (cols !== headerCount) badRows.push(`row ${i + 1} (${cols} cols): ${lines[i].slice(0, 40)}`);
+  }
+  assert(
+    badRows.length === 0,
+    `${label}: all WEAPONS.CSV data rows have ${headerCount} columns` +
+      (badRows.length ? ` — bad: ${badRows.join('; ')}` : '')
+  );
+}
+
+checkWeaponsCsvColumnCount(dbSource, 'db_nv.js');
+checkWeaponsCsvColumnCount(dbFo3Source, 'db_fo3.js');
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 21 — Security regression guards (Protocol 13/20)
+//  Static assertions that XSS-1 (squad numeric coercion) and
+//  XSS-2 (trade modal click binding) fixes cannot regress.
+//  4 tests
+// ══════════════════════════════════════════════════════════════
+header('Security regression guards');
+
+// 21.1 autoImportState() maps squad array with parseInt for hp, hpMax, ammo
+assert(
+  /parsed\.squad[\s\S]{0,400}parseInt\s*\(\s*m\.hp\s*\)/.test(importBody) ||
+    /parsed\.squad[\s\S]{0,400}parseInt.*hp/.test(importBody),
+  'autoImportState() sanitizes squad numeric fields with parseInt (XSS-1 guard)'
+);
+
+// 21.2 renderSquad() wraps hp, hpMax, ammo in parseInt in the innerHTML template
+{
+  let renderSquadBody = '';
+  try {
+    renderSquadBody = extractFunctionBody(uiSource, 'renderSquad');
+  } catch (e) {
+    fail(`Cannot extract renderSquad: ${e.message}`);
+  }
+  assert(
+    /parseInt\s*\(\s*member\.hp\s*\)/.test(renderSquadBody) &&
+      /parseInt\s*\(\s*member\.hpMax\s*\)/.test(renderSquadBody) &&
+      /parseInt\s*\(\s*member\.ammo\s*\)/.test(renderSquadBody),
+    'renderSquad() coerces hp, hpMax, ammo with parseInt before innerHTML (XSS-1 guard)'
+  );
+}
+
+// 21.3 Trade modal does NOT embed raw item.name in an inline onclick attribute
+{
+  const tradeStart = apiSource.indexOf("mType === 'TRADE'");
+  const tradeEnd = apiSource.indexOf('} else {', tradeStart);
+  const tradeBlock =
+    tradeStart !== -1 && tradeEnd !== -1 ? apiSource.slice(tradeStart, tradeEnd) : '';
+  assert(
+    !/onclick\s*=\s*[`'"]\s*tradeItem\s*\(/.test(tradeBlock),
+    'Trade modal does not use inline onclick="tradeItem(...)" (XSS-2 guard)'
+  );
+}
+
+// 21.4 Trade modal uses addEventListener for click binding
+{
+  const tradeStart = apiSource.indexOf("mType === 'TRADE'");
+  const tradeEnd = apiSource.indexOf('} else {', tradeStart);
+  const tradeBlock =
+    tradeStart !== -1 && tradeEnd !== -1 ? apiSource.slice(tradeStart, tradeEnd) : '';
+  assert(
+    /addEventListener\s*\(\s*['"]click['"]/.test(tradeBlock),
+    'Trade modal binds click via addEventListener (XSS-2 guard)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 console.log('\n══════════════════════════════════════════════════════════════\n');

@@ -476,7 +476,18 @@ function autoImportState(jsonString) {
           return true;
         });
     }
-    if (parsed.squad && Array.isArray(parsed.squad)) state.squad = parsed.squad;
+    if (parsed.squad && Array.isArray(parsed.squad)) {
+      state.squad = parsed.squad.map(m => ({
+        name: String(m.name || ''),
+        hp: parseInt(m.hp) || 0,
+        hpMax: parseInt(m.hpMax) || 100,
+        ammo: parseInt(m.ammo) || 0,
+        condition: String(m.condition || 'Good'),
+        weapon: m.weapon ? String(m.weapon) : null,
+        dt: m.dt !== undefined ? parseInt(m.dt) || 0 : undefined,
+        affinity: m.affinity !== undefined ? parseInt(m.affinity) || 0 : undefined,
+      }));
+    }
     if (parsed.campaign_notes) state.campaign_notes = parsed.campaign_notes;
     // Perks (v1.6.4+)
     if (parsed.perks && Array.isArray(parsed.perks)) {
@@ -894,7 +905,15 @@ async function transmitMessage() {
             items.forEach(item => {
               let div = document.createElement('div');
               div.className = 'trade-item';
-              div.innerHTML = `<span>${item.qty}x ${item.name} (${item.price}c)</span> <button class="action-btn" style="width:auto; padding:2px 5px;" onclick="tradeItem('${item.name}', ${item.price}, ${item.vendor})">${item.vendor ? 'BUY' : 'SELL'}</button>`;
+              let span = document.createElement('span');
+              span.textContent = `${item.qty}x ${item.name} (${item.price}c)`;
+              let btn = document.createElement('button');
+              btn.className = 'action-btn';
+              btn.setAttribute('style', 'width:auto; padding:2px 5px;');
+              btn.textContent = item.vendor ? 'BUY' : 'SELL';
+              btn.addEventListener('click', () => tradeItem(item.name, item.price, item.vendor));
+              div.appendChild(span);
+              div.appendChild(btn);
               if (item.vendor) document.getElementById('tradeVendor').appendChild(div);
               else document.getElementById('tradeCourier').appendChild(div);
             });

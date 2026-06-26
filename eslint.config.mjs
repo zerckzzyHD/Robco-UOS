@@ -96,6 +96,7 @@ export default [
         gameTimeToTicks: 'readonly',
         expandPanelForCategory: 'readonly',
         closeModal: 'readonly',
+        tradeItem: 'readonly',
         playSyncTone: 'readonly',
         playClack: 'readonly',
         playPanelClick: 'readonly',
