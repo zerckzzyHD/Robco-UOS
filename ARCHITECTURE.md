@@ -56,8 +56,8 @@
 │   └── database.js     ~25KB CSV data (~170 weapons, ~68 armors, ~45 chems) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── check-persistence.ps1   19KB    161-test pre-commit audit
-│   ├── check-persistence.js    (Node runner)
+│   ├── check-persistence.ps1   28KB    209-test pre-commit audit
+│   ├── check-persistence.js    36KB    209-test Node runner (parity with .ps1)
 │   └── run-tests.bat           (Batch launcher)
 ├── CHANGELOG.md        ~74KB  Full version history
 ├── icon.png            68KB   PWA icon

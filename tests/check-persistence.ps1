@@ -113,11 +113,14 @@ Write-Host ("  [ " + ($stateKeys -join ', ') + " ]") -ForegroundColor DarkCyan
 # Suite 0 -- Parser sanity
 # ===========================================================
 Sep "Suite 0 -- Parser sanity (guards against test regression)"
+# Mirror of Node KNOWN_KEYS (check-persistence.js Suite 0): the 27 legacy keys.
+# Newer fields (locationHistory, gameContext, collectibles) are still fully covered
+# by Suite 1 (autoImportState auto-discovery) and Suite 11 (migration enforcement),
+# which iterate ALL discovered stateKeys — so this guard list stays at the 27.
 $KNOWN = @('lvl','xp','hpCur','hpMax','s','p','e','c','i','a','l',
            'caps','loc','rads','karma','ticks',
            'la','ra','ll','rl','hd',
-           'factions','skills','status','inventory','squad','campaign_notes','locationHistory',
-           'gameContext','collectibles')  # v2.0 fields
+           'factions','skills','status','inventory','squad','campaign_notes')
 foreach ($k in $KNOWN) { Check ($stateKeys -contains $k) "Parser found known key: state.$k" }
 
 # ===========================================================
@@ -139,6 +142,111 @@ foreach ($k in $EXP_FACTIONS) { Check ($factionKeys -contains $k) "FACTION_REGIS
 $hasForEach = ($importBody -match 'getFactionRegistry\(\)\.forEach') -and ($importBody -match 'parsed\.factions')
 Check $hasForEach "autoImportState() imports factions via getFactionRegistry().forEach"
 Check ($factionKeys.Count -eq $EXP_FACTIONS.Count) ("FACTION_REGISTRY count = " + $factionKeys.Count + " (expected " + $EXP_FACTIONS.Count + ")")
+
+# ===========================================================
+# Suite 2a -- Reputation 2D Matrix (mirror of Node Suite "Reputation 2D Matrix")
+# Runtime-executes getFactionStanding() from ui.js via a node sandbox.
+# ===========================================================
+Sep "Suite 2a -- Reputation 2D Matrix"
+$repLabels = @(
+    "getFactionStanding('ncr', 100, 0) returns 'Idolized'",
+    "getFactionStanding('bos', 20, 0) returns 'Idolized'",
+    "getFactionStanding('bos', 20, 20) returns 'Wild Child'",
+    "getFactionStanding('ncr', 50, 20) returns 'Unpredictable'",
+    "getFactionStanding('ncr', 0, 30) returns 'Shunned'",
+    "getFactionStanding('ncr', 80, 20) returns 'Merciful Thug'",
+    "getFactionStanding('ncr', 0, 50) returns 'Hated'",
+    "getFactionStanding('ncr', 0, 0) returns 'Neutral'",
+    "getFactionStanding('ncr', 0, 80) returns 'Vilified'"
+)
+try {
+    $nodeCheck = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCheck) {
+        $repoRoot = (Get-Item $PSScriptRoot).Parent.FullName
+        $uiPathNode = (Join-Path $repoRoot "js/ui.js").Replace('\', '/')
+        $repScript = @"
+const vm = require('vm');
+const fs = require('fs');
+const uiSource = fs.readFileSync('$uiPathNode', 'utf8');
+const threshMatch = uiSource.match(/const FACTION_THRESHOLDS\s*=\s*\{[\s\S]*?\};\s*\/\/ Default/);
+const defaultMatch = uiSource.match(/const _DEFAULT_THRESHOLDS\s*=\s*\{[^}]+\};/);
+const fnMatch = uiSource.match(/function getFactionStanding\([\s\S]*?\n\}/);
+if (!threshMatch || !defaultMatch || !fnMatch) { console.log('EXTRACT_FAIL'); process.exit(0); }
+const sandbox = {};
+vm.createContext(sandbox);
+vm.runInContext(threshMatch[0] + '\n' + defaultMatch[0] + '\n' + fnMatch[0], sandbox);
+const gfs = sandbox.getFactionStanding;
+const r = [
+    gfs('ncr', 100, 0).label === 'Idolized',
+    gfs('bos', 20, 0).label === 'Idolized',
+    gfs('bos', 20, 20).label === 'Wild Child',
+    gfs('ncr', 50, 20).label === 'Unpredictable',
+    gfs('ncr', 0, 30).label === 'Shunned',
+    gfs('ncr', 80, 20).label === 'Merciful Thug',
+    gfs('ncr', 0, 50).label === 'Hated',
+    gfs('ncr', 0, 0).label === 'Neutral',
+    gfs('ncr', 0, 80).label === 'Vilified'
+];
+console.log('RESULT:' + r.map(b => b ? '1' : '0').join(''));
+"@
+        $out = ($repScript | node 2>&1 | Out-String)
+        $rm = [regex]::Match($out, 'RESULT:([01]{9})')
+        if ($rm.Success) {
+            $bits = $rm.Groups[1].Value
+            for ($bi = 0; $bi -lt 9; $bi++) { Check ($bits.Substring($bi, 1) -eq '1') $repLabels[$bi] }
+        } else {
+            $err = if ([string]::IsNullOrWhiteSpace($out)) { "extract/runtime failure" } else { $out.Trim() }
+            foreach ($lbl in $repLabels) { Fail "$lbl  (runtime error: $err)" }
+        }
+    } else {
+        foreach ($lbl in $repLabels) { Fail "$lbl  (node not found)" }
+    }
+} catch {
+    foreach ($lbl in $repLabels) { Fail "$lbl  (exception: $_)" }
+}
+
+# ===========================================================
+# Suite 2b -- C2 CRUD Functions
+# ===========================================================
+Sep "Suite 2b -- C2 CRUD Functions"
+Check ([bool]($uiSrc -match 'function removePerk\b')) "removePerk() function exists in ui.js"
+Check ([bool]($uiSrc -match 'function toggleCollectible\b')) "toggleCollectible() function exists in ui.js"
+Check ([bool]($uiSrc -match 'COMM-LINK COMMAND REGISTRY')) "showHelpModal() contains expanded command registry (COMM-LINK COMMAND REGISTRY)"
+
+# ===========================================================
+# Suite 2c -- C3 CAMPG Tab
+# ===========================================================
+Sep "Suite 2c -- C3 CAMPG Tab"
+$htmlSrc = Read-Src "index.html"
+Check ([bool]($htmlSrc -match 'id="tab-btn-campg"')) 'CAMPG tab button exists in index.html (id="tab-btn-campg")'
+Check ([bool]($htmlSrc -match 'id="campgPanel"')) 'CAMPG panel exists in index.html (id="campgPanel")'
+Check ([bool]($htmlSrc -match 'id="gameContextSelect"')) 'Game context select exists in index.html (id="gameContextSelect")'
+Check ([bool]($htmlSrc -match 'id="fo3WarningBanner"')) 'FO3 warning banner exists in index.html (id="fo3WarningBanner")'
+Check ([bool]($htmlSrc -match 'id="timelineDisplay"')) 'Timeline display shell exists in index.html (id="timelineDisplay")'
+Check ([bool]($uiSrc -match 'function onGameContextChange\b')) "onGameContextChange() function exists in ui.js"
+Check ([bool]($uiSrc -match 'TAB_NAMES.*campg')) "TAB_NAMES includes 'campg' in ui.js"
+
+# ===========================================================
+# Suite 2d -- C4 campaignMode + C5 playthroughType Protocol 4
+# ===========================================================
+Sep "Suite 2d -- C4 campaignMode + C5 playthroughType Protocol 4"
+Check ([bool]($stateSrc -match "campaignMode\s*:\s*'standard'")) "state.campaignMode default 'standard' exists in state.js"
+Check ([bool]($stateSrc -match "playthroughType\s*:\s*'standard'")) "state.playthroughType default 'standard' exists in state.js"
+Check ([bool]($stateSrc -match 's\.campaignMode')) "state.campaignMode migration guard exists in migrateState() in state.js"
+Check ([bool]($stateSrc -match 's\.playthroughType')) "state.playthroughType migration guard exists in migrateState() in state.js"
+Check ([bool](($apiSrc -match 'CAMPAIGN MODE') -and ($apiSrc -match 'cmV'))) "autoImportState() handles campaignMode import in api.js"
+Check ([bool](($apiSrc -match 'PLAYTHROUGH TYPE') -and ($apiSrc -match 'ptV'))) "autoImportState() handles playthroughType import in api.js"
+Check ([bool]($apiSrc -match 'campaignModeStr')) "getSystemDirective() builds campaignModeStr in api.js"
+Check ([bool]($apiSrc -match 'state\.playthroughType')) "getSystemDirective() reads state.playthroughType in api.js"
+Check ([bool]($htmlSrc -match 'id="playthroughTypeSelect"')) 'Playthrough Type select exists in index.html (id="playthroughTypeSelect")'
+Check (-not [bool]($htmlSrc -match 'id="campaignModeSelect"')) 'Old merged select (id="campaignModeSelect") has been removed from index.html'
+Check ([bool]($htmlSrc -match 'id="completeRngToggle"')) 'Complete RNG checkbox exists in index.html (id="completeRngToggle")'
+Check ([bool]($htmlSrc -match 'id="rngModeBanner"')) 'RNG mode banner exists in index.html (id="rngModeBanner")'
+Check ([bool]($uiSrc -match 'function onPlaythroughTypeChange\b')) "onPlaythroughTypeChange() function exists in ui.js"
+Check ([bool]($uiSrc -match 'function onCampaignModeChange\b')) "onCampaignModeChange() function exists in ui.js"
+Check ([bool]($stateSrc -match "s\.campaignMode !== 'rng'")) "migrateState() uses binary guard (campaignMode !== rng) in state.js"
+Check ([bool]($stateSrc -match 'window\._defaultState')) "window._defaultState is defined in state.js (wipeTerminal fix)"
+Check ([bool]($apiSrc -match 'Optimize all build decisions for maximum combat effectiveness')) "Behavioral directive string for min-maxed exists in api.js"
 
 # ===========================================================
 # Suite 3 -- SKILL_KEYS completeness
@@ -201,15 +309,14 @@ Check ($regSrc -match "items\s*:")                         "FALLOUT_REGISTRY.ite
 Check ($regSrc -match "perks\s*:")                         "FALLOUT_REGISTRY.perks category key exists"
 Check ($regSrc -match "locations\s*:")                     "FALLOUT_REGISTRY.locations category key exists"
 Check ($regSrc -match "companions\s*:")                    "FALLOUT_REGISTRY.companions category key exists"
-Check ($regSrc -match "collectibles\s*:")                  "FALLOUT_REGISTRY.collectibles category key exists"
-Check ($regSrc -match "zones\s*:")                         "FALLOUT_REGISTRY.zones category key exists"
 Check ($regSrc -match '\.length\s*<\s*2')                  "registrySearch() enforces minimum query length of 2"
 Check ($regSrc -match '\.slice\(0,\s*7\)')                 "registrySearch() caps results at 7"
 Check ($regSrc -match 'fallout\.wiki')                     "reg_nv.js contains fallout.wiki attribution comment"
 Check ($regSrc -match "version\s*:\s*'[\d\.]+'")          "FALLOUT_REGISTRY.version is declared with semver string"
-# Strip comment lines before checking for forbidden references
-$regCode = ($regSrc -split "`n" | Where-Object { $_ -notmatch '^\s*//' }) -join "`n"
-Check ($regCode -notmatch 'saveState\s*\(')                "reg_nv.js does not call saveState() (pure reference data)"
+# Strip block + inline comments before checking forbidden references (mirror Node Suite 8.8).
+# Case-sensitive on 'state' to match Node's /\bstate\b/ exactly.
+$regCode = ($regSrc -replace '(?s)/\*.*?\*/', '') -replace '//[^\r\n]*', ''
+Check ($regCode -cnotmatch '\bstate\b')                    "reg_nv.js does not reference state (pure reference data)"
 Check ($regCode -notmatch 'localStorage')                  "reg_nv.js does not reference localStorage (in code)"
 # ===========================================================
 # Suite 9 -- Database structural integrity
@@ -297,6 +404,16 @@ foreach ($key in $stateKeys) {
 # Suite 12 -- migrateState Runtime Execution Test
 # ===========================================================
 Sep "Suite 12 -- migrateState() Runtime Execution"
+# Mirror of Node Suite "migrateState() Runtime Execution": 6 granular assertions
+# against the same legacy v1 payload (not a single coarse pass/fail).
+$migrateLabels = @(
+    'Migrated state has structured factions.ncr',
+    'Migrated state preserved ncr fame (50)',
+    'Migrated state preserved legion fame (-10)',
+    'Migrated state added perks array',
+    'Migrated state added quests array',
+    'Migrated state added equipped object'
+)
 try {
     $nodeCheck = Get-Command node -ErrorAction SilentlyContinue
     if ($nodeCheck) {
@@ -314,27 +431,31 @@ const v1Payload = {
     s: 5, p: 5, e: 5, c: 5, i: 5, a: 5, l: 5,
     nf: 50, ni: 0, lf: -10, li: 0
 };
-const migrated = sandbox.migrateState('1.0.0', v1Payload);
-if (!migrated.factions || !migrated.factions.ncr) throw new Error('Missing structured factions');
-if (migrated.factions.ncr.fame !== 50) throw new Error('NCR fame not 50');
-if (migrated.factions.legion.fame !== -10) throw new Error('Legion fame not -10');
-if (!Array.isArray(migrated.perks)) throw new Error('Missing perks array');
-if (!Array.isArray(migrated.quests)) throw new Error('Missing quests array');
-if (!migrated.equipped || migrated.equipped.weapon !== null) throw new Error('Missing equipped object');
-console.log('PASS');
+const m = sandbox.migrateState('1.0.0', v1Payload);
+const r = [
+    !!(m.factions && m.factions.ncr),
+    !!(m.factions && m.factions.ncr && m.factions.ncr.fame === 50),
+    !!(m.factions && m.factions.legion && m.factions.legion.fame === -10),
+    Array.isArray(m.perks),
+    Array.isArray(m.quests),
+    !!(m.equipped && m.equipped.weapon === null)
+];
+console.log('RESULT:' + r.map(b => b ? '1' : '0').join(''));
 "@
-        $out = $testScript | node 2>&1 | Out-String
-        if ($out -match 'PASS') {
-            Pass "Node runtime test successful: migrated legacy payload correctly"
+        $out = ($testScript | node 2>&1 | Out-String)
+        $rm = [regex]::Match($out, 'RESULT:([01]{6})')
+        if ($rm.Success) {
+            $bits = $rm.Groups[1].Value
+            for ($bi = 0; $bi -lt 6; $bi++) { Check ($bits.Substring($bi, 1) -eq '1') $migrateLabels[$bi] }
         } else {
             $err = if ([string]::IsNullOrWhiteSpace($out)) { "No output from node" } else { $out.Trim() }
-            Fail "Node runtime test failed: $err"
+            foreach ($lbl in $migrateLabels) { Fail "$lbl  (runtime error: $err)" }
         }
     } else {
-        Pass "Node not found, skipping runtime execution test"
+        foreach ($lbl in $migrateLabels) { Fail "$lbl  (node not found)" }
     }
 } catch {
-    Fail "Runtime test failed: $_"
+    foreach ($lbl in $migrateLabels) { Fail "$lbl  (exception: $_)" }
 }
 
 # ===========================================================

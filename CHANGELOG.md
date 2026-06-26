@@ -1,4 +1,14 @@
-## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-25 | Tests: 209/209 | Cache: robco-terminal-v2.0.1-r3 -->
+## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-25 | Tests: 209/209 | Cache: robco-terminal-v2.0.1-r4 -->
+
+### [B3] Test-Runner Reconciliation — PowerShell suite 173 → 209 (2026-06-25)
+
+- **Root cause**: `tests/check-persistence.js` (Node) and `tests/check-persistence.ps1` (PowerShell, run by the pre-commit hook) are parallel re-implementations that drifted. The Node suite gained four newer suites and finer-grained assertions over time; the PowerShell mirror was never updated to match, so it ran only **173** tests while the docs (and the Node runner) claimed **209**. The hook was therefore gating on 173, not 209.
+- **Fix**: Ported the missing coverage into `check-persistence.ps1` so it now runs the same **209** tests across the same 18 suites, with identical per-suite counts:
+  - Added 4 suites absent from the PS runner — **Reputation 2D Matrix** (9, runtime-executes `getFactionStanding()` via a node sandbox), **C2 CRUD Functions** (3), **C3 CAMPG Tab** (7), **C4 campaignMode + C5 playthroughType Protocol 4** (17).
+  - Expanded **migrateState() Runtime Execution** from 1 coarse pass/fail to the 6 granular assertions the Node runner makes.
+  - Reconciled two PS-only assertions back to the Node canonical set so both total exactly 209: the Suite 0 parser-key guard list (back to the 27 legacy keys — newer fields remain covered by Suites 1 and 11) and the Registry suite (`collectibles`/`zones` category checks; `saveState` check reworded to Node's `\bstate\b` reference check).
+- **Verification**: Both runners now report **209/209** with zero failures, suite-for-suite identical coverage. The pre-commit hook now genuinely gates on 209.
+- **Cache**: `CACHE_NAME` → `robco-terminal-v2.0.1-r4` (Protocol 1 — bump on every push).
 
 ### [B2] Mobile Layout, Version Sync & Push-Cache Protocol (2026-06-25)
 
