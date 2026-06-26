@@ -500,6 +500,8 @@ window.onload = function () {
   // enterStandby/exitStandby are shared so blur+visibilitychange
   // can both fire without doubling the wake tone or log message.
   let _standbyActive = false;
+  let _uptimeInterval = null;
+  let _memCycleInterval = null;
 
   function enterStandby() {
     if (_standbyActive) return;
@@ -515,6 +517,11 @@ window.onload = function () {
       crtHumGain.gain.cancelScheduledValues(audioCtx.currentTime);
       crtHumGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5);
     }
+    clearInterval(_uptimeInterval);
+    _uptimeInterval = null;
+    clearInterval(_memCycleInterval);
+    _memCycleInterval = null;
+    stopHeartbeat();
   }
 
   function exitStandby() {
@@ -530,6 +537,27 @@ window.onload = function () {
       appendToChat('> COURIER RETURNED. SYNCHRONIZING TELEMETRY...', 'sys', true);
       let _rads = parseInt(document.getElementById('stat_rads').value) || 0;
       setGeigerRate(_rads >= 1000 ? 25 : _rads >= 600 ? 12 : _rads >= 200 ? 0.33 : 0);
+      if (!_uptimeInterval) {
+        _uptimeInterval = setInterval(() => {
+          let elapsed = Math.floor((Date.now() - sessionStart) / 1000);
+          let h = Math.floor(elapsed / 3600),
+            m = Math.floor((elapsed % 3600) / 60),
+            s = elapsed % 60;
+          let el = document.getElementById('uptimeClock');
+          if (el)
+            el.innerText = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        }, 1000);
+      }
+      if (!_memCycleInterval) {
+        _memCycleInterval = setInterval(() => {
+          appendToChat('> MEMORY CYCLE COMPLETE. 64K STABLE.', 'sys', true);
+          document.body.style.filter = 'brightness(0.35)';
+          setTimeout(() => {
+            document.body.style.filter = '';
+          }, 150);
+        }, 900000);
+      }
+      updateMath();
     }, 650);
   }
 
@@ -803,7 +831,7 @@ window.onload = function () {
 
   // Session Uptime Clock
   let sessionStart = Date.now();
-  setInterval(() => {
+  _uptimeInterval = setInterval(() => {
     let elapsed = Math.floor((Date.now() - sessionStart) / 1000);
     let h = Math.floor(elapsed / 3600),
       m = Math.floor((elapsed % 3600) / 60),
@@ -814,7 +842,7 @@ window.onload = function () {
   }, 1000);
 
   // Memory Cycle Event (every 15 minutes)
-  setInterval(() => {
+  _memCycleInterval = setInterval(() => {
     appendToChat('> MEMORY CYCLE COMPLETE. 64K STABLE.', 'sys', true);
     document.body.style.filter = 'brightness(0.35)';
     setTimeout(() => {
@@ -852,7 +880,11 @@ window.onload = function () {
   // Flush any pending debounced save immediately on tab close
   window.addEventListener('beforeunload', () => {
     clearTimeout(_saveTimer);
-    localStorage.setItem('robco_v7', JSON.stringify(state));
+    if (!window.robco_v8)
+      window.robco_v8 = { activeContext: state.gameContext || 'FNV', campaigns: {} };
+    window.robco_v8.activeContext = state.gameContext || 'FNV';
+    window.robco_v8.campaigns[window.robco_v8.activeContext] = JSON.parse(JSON.stringify(state));
+    localStorage.setItem('robco_v8', JSON.stringify(window.robco_v8));
   });
 };
 

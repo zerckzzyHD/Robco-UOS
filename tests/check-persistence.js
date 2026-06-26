@@ -2000,6 +2000,62 @@ header('Phase 2c Guards');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 35 — Phase 3a Performance Guards (P7 optimizations)
+//  campaign_notes cap, saveState dirty-check, standby interval/animation
+//  pause, beforeunload v8 key, registrySearch cache.
+//  6 tests
+// ══════════════════════════════════════════════════════════════
+header('Phase 3a Performance Guards');
+const apiSrc35 = readFile('js/api.js');
+const stateSrc35 = readFile('js/state.js');
+const uiSrc35 = readFile('js/ui.js');
+const cssSrc35 = readFile('css/terminal.css');
+const regNvSrc35 = readFile('js/reg_nv.js');
+
+// 35.1 campaign_notes capped to 200 after auto-log pushes in api.js (P7-14)
+assert(
+  (apiSrc35.match(/campaign_notes\.length\s*>\s*200/g) || []).length >= 2,
+  'campaign_notes capped to 200 after auto-log pushes in api.js (P7-14)'
+);
+
+// 35.2 saveState has a dirty-check: skips write when _saveStr === _lastSaveStr (P7-6)
+assert(
+  /_lastSaveStr/.test(stateSrc35) && /=== _lastSaveStr/.test(stateSrc35),
+  'saveState dirty-check: _lastSaveStr declared and compared in state.js (P7-6)'
+);
+
+// 35.3 enterStandby() clears _uptimeInterval on standby (P7-9)
+{
+  const enterStandbyBody = extractFunctionBody(uiSrc35, 'enterStandby');
+  assert(
+    /clearInterval\(_uptimeInterval\)/.test(enterStandbyBody),
+    'enterStandby() clears _uptimeInterval on standby (P7-9)'
+  );
+}
+
+// 35.4 body.standby context has animation-play-state: paused in terminal.css (P7-9)
+assert(
+  /body\.standby[^{]*\{[^}]*animation-play-state\s*:\s*paused/.test(cssSrc35.replace(/\n/g, ' ')),
+  'body.standby context sets animation-play-state: paused in terminal.css (P7-9)'
+);
+
+// 35.5 beforeunload flush writes robco_v8, not robco_v7 (P7-8)
+{
+  const blIdx = uiSrc35.indexOf("addEventListener('beforeunload'");
+  const blSnippet = blIdx >= 0 ? uiSrc35.slice(blIdx, blIdx + 350) : '';
+  assert(
+    blSnippet.includes('robco_v8') && !blSnippet.includes('robco_v7'),
+    'beforeunload flush writes robco_v8, not robco_v7 (P7-8)'
+  );
+}
+
+// 35.6 registrySearch has _registrySearchCache memoization in reg_nv.js (P7-13)
+assert(
+  /_registrySearchCache/.test(regNvSrc35),
+  'registrySearch has _registrySearchCache memoization in reg_nv.js (P7-13)'
+);
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 console.log('\n══════════════════════════════════════════════════════════════\n');

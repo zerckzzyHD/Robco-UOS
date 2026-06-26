@@ -412,6 +412,8 @@ function autoImportState(jsonString) {
           if (infamyDelta !== 0) parts.push(`infamy ${infamyDelta > 0 ? '+' : ''}${infamyDelta}`);
           if (!state.campaign_notes) state.campaign_notes = [];
           state.campaign_notes.push(`[T${state.ticks}] ${f.name}: ${parts.join(', ')}`);
+          if (state.campaign_notes.length > 200)
+            state.campaign_notes = state.campaign_notes.slice(-200);
         }
       });
     }
@@ -482,7 +484,9 @@ function autoImportState(jsonString) {
         affinity: m.affinity !== undefined ? parseInt(m.affinity) || 0 : undefined,
       }));
     }
-    if (parsed.campaign_notes) state.campaign_notes = parsed.campaign_notes;
+    if (parsed.campaign_notes && Array.isArray(parsed.campaign_notes)) {
+      state.campaign_notes = parsed.campaign_notes.slice(-200);
+    }
     // Perks (v1.6.4+)
     if (parsed.perks && Array.isArray(parsed.perks)) {
       state.perks = parsed.perks.map(p => ({
@@ -512,6 +516,8 @@ function autoImportState(jsonString) {
           state.campaign_notes.push(
             `[T${state.ticks || 0}] Quest: "${curr.name}" → ${curr.status.toUpperCase()}`
           );
+          if (state.campaign_notes.length > 200)
+            state.campaign_notes = state.campaign_notes.slice(-200);
           // Quest audio — fire appropriate tone on terminal
           const newStatus = curr.status.toUpperCase();
           if (

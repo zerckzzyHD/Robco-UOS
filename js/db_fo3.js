@@ -342,6 +342,7 @@ function lookupItemInDb(name) {
   const key = name.toLowerCase().trim();
   const exact = _itemCache.get(key);
   if (exact) return exact;
+  if (key.length < 3) return null;
   let best = null;
   let bestLen = 0;
   for (const [dbKey, entry] of _itemCache) {

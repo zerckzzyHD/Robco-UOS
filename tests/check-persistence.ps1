@@ -1187,6 +1187,43 @@ Check (-not [bool]($renderNotesBody34 -match 'style="float:right;"')) 'renderCam
 Check (-not [bool]($htmlSrc34 -match '\[NO COLLECTIBLES LOADED\]')) 'index.html uses plain text, not [NO COLLECTIBLES LOADED] (P2-5)'
 
 # ===========================================================
+# Suite 35 -- Phase 3a Performance Guards (P7 optimizations)
+# campaign_notes cap, saveState dirty-check, standby interval/animation
+# pause, beforeunload v8 key, registrySearch cache.
+# 6 tests
+# ===========================================================
+Sep "Suite 35 -- Phase 3a Performance Guards"
+$apiSrc35    = Read-Src 'js/api.js'
+$stateSrc35  = Read-Src 'js/state.js'
+$uiSrc35     = Read-Src 'js/ui.js'
+$cssSrc35    = Read-Src 'css/terminal.css'
+$regNvSrc35  = Read-Src 'js/reg_nv.js'
+
+# 35.1 campaign_notes capped to 200 after auto-log pushes in api.js (P7-14)
+$capCount35 = ([regex]::Matches($apiSrc35, 'campaign_notes\.length\s*>\s*200')).Count
+Check ($capCount35 -ge 2) "campaign_notes capped to 200 after auto-log pushes in api.js (P7-14)"
+
+# 35.2 saveState dirty-check: _lastSaveStr declared and compared in state.js (P7-6)
+Check ([bool]($stateSrc35 -match '_lastSaveStr') -and [bool]($stateSrc35 -match '=== _lastSaveStr')) 'saveState dirty-check: _lastSaveStr declared and compared in state.js (P7-6)'
+
+# 35.3 enterStandby() clears _uptimeInterval on standby (P7-9)
+$enterStandbyBody35 = ''
+try { $enterStandbyBody35 = Get-FunctionBody $uiSrc35 'enterStandby' } catch {}
+Check ([bool]($enterStandbyBody35 -match 'clearInterval\(_uptimeInterval\)')) 'enterStandby() clears _uptimeInterval on standby (P7-9)'
+
+# 35.4 body.standby context has animation-play-state: paused in terminal.css (P7-9)
+$cssFlat35 = $cssSrc35 -replace "`n", ' '
+Check ([bool]($cssFlat35 -match 'body\.standby[^{]*\{[^}]*animation-play-state\s*:\s*paused')) 'body.standby context sets animation-play-state: paused in terminal.css (P7-9)'
+
+# 35.5 beforeunload flush writes robco_v8, not robco_v7 (P7-8)
+$blIdx35 = $uiSrc35.IndexOf("addEventListener('beforeunload'")
+$blSnippet35 = if ($blIdx35 -ge 0) { $uiSrc35.Substring($blIdx35, [Math]::Min(350, $uiSrc35.Length - $blIdx35)) } else { '' }
+Check ($blSnippet35.Contains('robco_v8') -and (-not $blSnippet35.Contains('robco_v7'))) "beforeunload flush writes robco_v8, not robco_v7 (P7-8)"
+
+# 35.6 registrySearch has _registrySearchCache memoization in reg_nv.js (P7-13)
+Check ([bool]($regNvSrc35 -match '_registrySearchCache')) 'registrySearch has _registrySearchCache memoization in reg_nv.js (P7-13)'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

@@ -1112,6 +1112,11 @@ body.standby::after {
   animation: cursor-blink 1s step-end infinite;
   pointer-events: none;
 }
+body.standby .crt-overlay,
+body.standby .crt-overlay::after,
+body.standby .header h1 {
+  animation-play-state: paused;
+}
 
 /* ── Thermal Ambient Shift ─────────────────────────────────────── */
 body {

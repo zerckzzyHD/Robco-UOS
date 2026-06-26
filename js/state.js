@@ -209,6 +209,7 @@ function syncStateFromDom() {
   });
 }
 
+let _lastSaveStr = null;
 function saveState() {
   syncStateFromDom();
   // Debounce the disk write — at most once per 500ms
@@ -222,6 +223,7 @@ function saveState() {
       window.robco_v8.activeContext = state.gameContext || 'FNV';
       window.robco_v8.campaigns[window.robco_v8.activeContext] = JSON.parse(JSON.stringify(state));
       const _saveStr = JSON.stringify(window.robco_v8);
+      if (_saveStr === _lastSaveStr) return;
       // Proactive warning at ~4MB (2M chars × 2 bytes UTF-16) of the ~5MB localStorage ceiling.
       // Fires once per session so the Courier can export before a real QuotaExceededError hits.
       if (_saveStr.length > 2097152 && !window._quotaWarnShown) {
@@ -235,6 +237,7 @@ function saveState() {
         }
       }
       localStorage.setItem('robco_v8', _saveStr);
+      _lastSaveStr = _saveStr;
     } catch (e) {
       // #18 localStorage Quota Detection — warn Courier on storage full
       if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {

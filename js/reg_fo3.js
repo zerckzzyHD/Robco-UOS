@@ -645,8 +645,16 @@ const FALLOUT_REGISTRY = {
  * @param {string} query
  * @returns {Array<Object>} Up to 7 results sorted by relevance.
  */
+let _registrySearchCache = null;
 function registrySearch(category, query) {
   if (!query || query.length < 2) return [];
+  if (
+    _registrySearchCache &&
+    _registrySearchCache.category === category &&
+    _registrySearchCache.query === query
+  ) {
+    return _registrySearchCache.results;
+  }
 
   const entries = FALLOUT_REGISTRY[category];
   if (!entries || !Array.isArray(entries) || entries.length === 0) return [];
@@ -684,5 +692,7 @@ function registrySearch(category, query) {
     return (a.entry.name || '').localeCompare(b.entry.name || '');
   });
 
-  return scored.slice(0, 7).map(s => s.entry);
+  const results = scored.slice(0, 7).map(s => s.entry);
+  _registrySearchCache = { category, query, results };
+  return results;
 }

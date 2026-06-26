@@ -1,4 +1,4 @@
-## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 396/396 | Cache: robco-terminal-v2.0.1-r35 -->
+## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 402/402 | Cache: robco-terminal-v2.0.1-r36 -->
 
 ### Added
 
@@ -78,6 +78,17 @@
 - Added a shared compact-button style so the PURGE LOGS button, the help button, and all delete buttons guarantee a minimum 28-pixel tap target on phones (Protocol 17 mobile standard). Previously each button carried its own inline compact style.
 - Empty-state messages shown when a panel list is empty now use plain sentence case throughout. Bracketed caps (such as [LOADING...]) are now reserved for true loading states only.
 - Added 10 new automated guard tests (Suite 34, 396 total across 38 suites) verifying the dead CSS was removed, the flex list-row and compact-button utilities exist, delete buttons meet the 28-pixel tap-target standard, and the bracketed empty-state vocabulary is correct.
+
+### Under the Hood
+
+- Campaign log entries are now capped at 200 so a very long play session can no longer push save data toward the browser storage limit.
+- Save writes now skip the write entirely when the state hasn't changed since the last save, cutting idle I/O on the localStorage quota.
+- Background timers (uptime clock, memory-cycle alert, and heartbeat) are now paused when you switch away from the tab and restart when you return, stopping unnecessary CPU and repaint work while the app is hidden.
+- Decorative CRT animations (screen flicker, scan-bar, header pulse) are now paused while the terminal is in standby mode.
+- The final save written when you close the tab now correctly targets the current save slot instead of a legacy key that was no longer read on startup.
+- Autocomplete searches are now cached so typing the same characters twice in a row reuses the previous result instead of rescanning the registry.
+- The fuzzy item-lookup fallback now skips very short search tokens (under 3 characters) that would never match anything useful, avoiding a full database scan for garbage input.
+- Added 6 new automated guard tests (Suite 35, 402 total across 39 suites) verifying all of the above improvements.
 
 ---
 

@@ -1125,8 +1125,16 @@ const FALLOUT_REGISTRY = {
  *   - Max 7 results — UI panel is designed around this limit.
  *   - Min 2 chars — prevents showing the entire list on single keystrokes.
  */
+let _registrySearchCache = null;
 function registrySearch(category, query) {
   if (!query || query.length < 2) return [];
+  if (
+    _registrySearchCache &&
+    _registrySearchCache.category === category &&
+    _registrySearchCache.query === query
+  ) {
+    return _registrySearchCache.results;
+  }
 
   const entries = FALLOUT_REGISTRY[category];
   if (!entries || !Array.isArray(entries) || entries.length === 0) return [];
@@ -1168,5 +1176,7 @@ function registrySearch(category, query) {
   });
 
   // Return top 7 entry objects
-  return scored.slice(0, 7).map(s => s.entry);
+  const results = scored.slice(0, 7).map(s => s.entry);
+  _registrySearchCache = { category, query, results };
+  return results;
 }

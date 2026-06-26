@@ -526,7 +526,8 @@ function lookupItemInDb(name) {
   // 1. Exact match
   const exact = _itemCache.get(key);
   if (exact) return exact;
-  // 2. Fuzzy fallback: substring match (longest name wins to avoid false positives)
+  // 2. Fuzzy fallback: skip very short tokens; substring match (longest name wins)
+  if (key.length < 3) return null;
   let best = null;
   let bestLen = 0;
   for (const [dbKey, entry] of _itemCache) {
