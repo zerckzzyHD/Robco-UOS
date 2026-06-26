@@ -51,17 +51,20 @@ After every meaningful commit, update these files **in the same commit:**
 
 Whenever tests are **added or removed**, update the hardcoded count in **every** location below in the **same commit** as the test change. No deferred updates.
 
-| File              | Location to update                                                                                                                                                     |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `RULES.md`        | Pre-commit gate code block · Pre-commit gate note · Protocol 4 checklist · Protocol 5 checklist · Architecture Quick Reference (count + suite count if suites changed) |
-| `README.md`       | Technology stack table · File structure comment · Commit workflow block · Current State bullet                                                                         |
-| `ARCHITECTURE.md` | Pre-commit checklist (`all N+ tests`)                                                                                                                                  |
-| `CHANGELOG.md`    | Header comment (`Tests: N/N`)                                                                                                                                          |
+| File                          | Location to update                                                                                                                                                     |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `RULES.md`                    | Pre-commit gate code block · Pre-commit gate note · Protocol 4 checklist · Protocol 5 checklist · Architecture Quick Reference (count + suite count if suites changed) |
+| `CLAUDE.md`                   | Same locations as `RULES.md` — the files are kept identical for protocol sections                                                                                      |
+| `README.md`                   | Technology stack table · File structure comment · Commit workflow block · Current State bullet                                                                         |
+| `ARCHITECTURE.md`             | Pre-commit checklist (`all N+ tests`)                                                                                                                                  |
+| `CHANGELOG.md`                | Header comment (`Tests: N/N`)                                                                                                                                          |
+| `tests/check-persistence.js`  | Per-suite `// N tests` comments at the top of each suite block                                                                                                         |
+| `tests/check-persistence.ps1` | Per-suite `# N tests` comments at the top of each suite block                                                                                                          |
 
 **How to find all stale counts before committing:**
 
 ```powershell
-Select-String -Path "RULES.md","README.md","ARCHITECTURE.md","CHANGELOG.md" -Pattern "\d+ tests?" | Select-Object Filename,LineNumber,Line
+Select-String -Path "RULES.md","CLAUDE.md","README.md","ARCHITECTURE.md","CHANGELOG.md","tests/check-persistence.js","tests/check-persistence.ps1" -Pattern "\d+ tests?" | Select-Object Filename,LineNumber,Line
 ```
 
 Run this after every test addition or removal. Every hit must show the new count.
@@ -156,6 +159,8 @@ When work is run via Dispatch, never finish a task or complete a git push silent
 
 Any change touching `index.html`, `css/`, or render JS (`ui.js` `render*` functions) must be verified by actually **rendering** the affected UI at **360px, 412px, and ≥1000px (desktop)** before it is considered done — never from headless width measurements alone. Confirm no horizontal page overflow (`document.documentElement.scrollWidth === window.innerWidth`), the component looks correct, and desktop is unchanged.
 
+The definitive verification step is `tests/render-check.mjs` — a Playwright render-check that loads the page at 360px and 412px and asserts no horizontal overflow and no focus-zoom. Run it outside the 209/243 test gate whenever map or mobile layout changes land. It is the only check that catches real pixel/overflow regressions.
+
 ---
 
 ## Protocol 11 — Deploy Verification
@@ -206,19 +211,32 @@ Keep durable project facts (repo path, current `APP_VERSION` and cache rev, key 
 
 ---
 
+## Protocol 19 — Batch Before Push
+
+Do not push incrementally after each sub-task when multiple related changes are queued. Complete all queued/related work first, run the full pre-commit test gate **once**, then push a single time. Every push must have the entire test suite passing and the test count synced everywhere per Protocol 2a. Prefer fewer, complete, verified pushes over many partial ones.
+
+---
+
+## Protocol 20 — Static Source-Invariant Guards
+
+Critical CSS rules, render-function class/markup contracts, and service-worker invariants must each be covered by a static test that fails if the safeguard is removed in a refactor. Lost-safeguard regressions (a dropped class, an overridden CSS rule, `skipWaiting` in install) must surface as a gate failure, not reach production.
+
+---
+
 ## Prohibited Patterns
 
-| Never Do                                                    | Why                                                               |
-| ----------------------------------------------------------- | ----------------------------------------------------------------- |
-| `clients.claim()` in the service worker                     | Causes reload loops and black screens                             |
-| `innerHTML +=` inside loops                                 | O(n²) DOM re-parsing. Use `map().join('')` with single assignment |
-| Untrusted text directly as `innerHTML`                      | XSS risk. Always run through `escapeHtml()` first                 |
-| `localStorage.getItem()` in audio hot paths                 | Read from the `AudioSettings` cache object instead                |
-| Recursive key transformation on AI JSON responses           | Use explicit field mapping in `autoImportState()`                 |
-| Silent drops of inventory during token triage               | Inventory must always be returned when relevant keywords match    |
-| Auto-push to cloud on stat changes                          | Cloud sync is manual button only                                  |
-| Implement or discuss features #44 or #45                    | Permanently excluded by owner                                     |
-| Leave stale test counts in docs after adding/removing tests | Protocol 2a requires all counts updated in the same commit        |
+| Never Do                                                    | Why                                                                                                                                                                                                    |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `clients.claim()` in the service worker                     | Causes reload loops and black screens                                                                                                                                                                  |
+| `self.skipWaiting()` inside the SW `install` handler        | Activates the new SW immediately so it never enters the waiting state — `reg.waiting` is null, the update prompt's `SKIP_WAITING` message goes nowhere, and clients silently never update (the r6 bug) |
+| `innerHTML +=` inside loops                                 | O(n²) DOM re-parsing. Use `map().join('')` with single assignment                                                                                                                                      |
+| Untrusted text directly as `innerHTML`                      | XSS risk. Always run through `escapeHtml()` first                                                                                                                                                      |
+| `localStorage.getItem()` in audio hot paths                 | Read from the `AudioSettings` cache object instead                                                                                                                                                     |
+| Recursive key transformation on AI JSON responses           | Use explicit field mapping in `autoImportState()`                                                                                                                                                      |
+| Silent drops of inventory during token triage               | Inventory must always be returned when relevant keywords match                                                                                                                                         |
+| Auto-push to cloud on stat changes                          | Cloud sync is manual button only                                                                                                                                                                       |
+| Implement or discuss features #44 or #45                    | Permanently excluded by owner                                                                                                                                                                          |
+| Leave stale test counts in docs after adding/removing tests | Protocol 2a requires all counts updated in the same commit                                                                                                                                             |
 
 ---
 

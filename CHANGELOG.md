@@ -1,4 +1,19 @@
-## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 209/209 | Cache: robco-terminal-v2.0.1-r10 -->
+## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 209/209 | Cache: robco-terminal-v2.0.1-r11 -->
+
+### [B10] Protocol ruleset completed: Protocols 19–20, 2a/10 tightened, SW prohibition added (2026-06-26)
+
+Docs-only update — no app behavior changed, test counts stay at 209.
+
+**Two more protocols added** (Protocols 19–20, bringing the total to 1–20):
+
+- **Protocol 19 — Batch Before Push:** Don't push after each sub-task when multiple related changes are queued. Finish everything, run the full test gate once, then push once. Fewer, complete pushes over many partial ones.
+- **Protocol 20 — Static Source-Invariant Guards:** Critical CSS rules, render-function markup contracts, and service-worker invariants must each have a static test that fails if the safeguard is removed in a refactor — so regressions surface at the gate, not in production.
+
+**Four targeted doc improvements:**
+
+- **Protocol 2a expanded:** The test-count sync file list now explicitly includes `CLAUDE.md` (which has hardcoded counts matching RULES.md) and both test runners (`tests/check-persistence.js` and `tests/check-persistence.ps1`). The stale-count search command also updated to cover all seven files.
+- **Protocol 10 updated:** Added the Playwright render-check (`tests/render-check.mjs`) as the definitive 360/412px verification step — the only check that catches real pixel/overflow regressions. Run it outside the 209/243 test gate whenever map or mobile layout changes.
+- **Prohibited Patterns — new row:** `self.skipWaiting()` inside the SW `install` handler is now explicitly banned. Putting it there activates the new service worker immediately so it never waits — `reg.waiting` is null, the update prompt's message goes nowhere, and users silently never get updates. This was the r6 bug.
 
 ### [B9] Nine new project protocols + CRLF/LF line-ending fix (2026-06-26)
 
