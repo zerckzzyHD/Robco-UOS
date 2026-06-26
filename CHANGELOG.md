@@ -1,4 +1,4 @@
-## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 363/363 | Cache: robco-terminal-v2.0.1-r30 -->
+## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 369/369 | Cache: robco-terminal-v2.0.1-r31 -->
 
 ### Added
 
@@ -58,6 +58,13 @@
 - Fixed a broken data row in the Fallout 3 weapon database: the Fat Man had an extra trailing field that caused one column to be misread.
 - Added 22 new automated tests: coverage for the Fallout 3 database structure, a column-count check ensuring every weapon data row matches its header, and static guards confirming the two XSS fixes cannot silently regress.
 - Added 68 new automated gate-guard tests (355 total across 33 suites): static checks that every critical UI control is wired, banned code patterns cannot silently return, every render function is called on load, every audio function has the required mute guards, the AI JSON contract is locked, both registry files stay read-only, all PWA assets are in the service-worker cache, and both test runners always stay in sync.
+- Upgraded CI to run both the Node and PowerShell test runners, compare their totals to catch any drift, and add a browser-based boot smoke test and mobile render check on every push. Previously CI only ran the Node runner with a stale test count label, and the PowerShell runner was never verified in CI.
+- The GitHub Pages deploy now publishes only the app's public files. Previously the entire repository was uploaded, which exposed CLAUDE.md, RULES.md, ARCHITECTURE.md, the test suite, and all config files as publicly indexed pages.
+- Fixed the auto-release workflow: release notes were silently falling back to a stub because the workflow was reading from a file called changelog.txt that does not exist. It now reads CHANGELOG.md correctly.
+- Added weekly automated dependency updates via Dependabot for npm packages.
+- Added a hook installer so the pre-commit gate is automatically set up on a fresh clone after npm install. Previously the hook only existed in .git/hooks and was lost whenever the repo was cloned.
+- Added a one-command rollback script (scripts/rollback.sh) that reverts the offending commit, bumps the cache version, and commits — making the Protocol 16 "restore users first" step a single command instead of a manual multi-step process.
+- Added 6 new automated guard tests (Suite 31, 369 total across 35 suites) that verify the CI workflow has no stale labels, runs both runners, includes the render check, the deploy restricts what it uploads, and the hook-install and boot-smoke scripts exist.
 
 ---
 

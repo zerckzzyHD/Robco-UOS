@@ -966,11 +966,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-30)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-30)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-31)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-31)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -1020,6 +1020,35 @@ Check ([bool]($hookSrc30 -match 'LOCAL_N.*-gt.*ORIGIN_N')) `
 $stateSrc30 = Read-Src 'js/state.js'
 Check ([bool]($stateSrc30 -match '_quotaWarnShown')) `
     'saveState() contains proactive localStorage quota warning (once-per-session guard)'
+
+# ===========================================================
+# Suite 31 -- CI/CD Automation Guards (Phase 1c)
+# ci.yml has no stale "(106 tests)" label; runs PS runner;
+# has render-check step; deploy.yml uses _site staging dir;
+# hook-install and boot-smoke scripts exist.
+# 6 tests
+# ===========================================================
+Sep "Suite 31 -- CI/CD Automation Guards"
+$ciSrc31 = Read-Src '.github/workflows/ci.yml'
+# 31.1 ci.yml no stale "(106 tests)" label
+Check (-not ($ciSrc31 -match '\(106 tests\)')) `
+    'ci.yml does not contain stale "(106 tests)" label (Phase 1c update)'
+# 31.2 ci.yml runs PowerShell persistence runner
+Check ([bool]($ciSrc31 -match 'check-persistence\.ps1')) `
+    'ci.yml runs PowerShell persistence runner (Protocol 15 parity)'
+# 31.3 ci.yml has render-check step
+Check ([bool]($ciSrc31 -match 'render-check')) `
+    'ci.yml includes render-check step (Protocol 10 CI enforcement)'
+# 31.4 deploy.yml uses _site staging dir (not path: .)
+$deploySrc31 = Read-Src '.github/workflows/deploy.yml'
+Check ($deploySrc31 -match '_site' -and -not ($deploySrc31 -match 'path:\s*\.')) `
+    'deploy.yml uses _site staging directory instead of path: . (private files excluded)'
+# 31.5 hook install script exists
+Check (Test-Path (Join-Path $Root 'scripts/install-hooks.js')) `
+    'scripts/install-hooks.js exists (auto-installs pre-commit hook on npm install)'
+# 31.6 boot smoke test exists
+Check (Test-Path (Join-Path $Root 'tests/boot-smoke.mjs')) `
+    'tests/boot-smoke.mjs exists (CI boot smoke test -- Phase 1c)'
 
 # ===========================================================
 # Results

@@ -3,3 +3,5 @@ dist/
 package-lock.json
 *.min.js
 *.min.css
+scripts/rollback.sh
+scripts/pre-commit

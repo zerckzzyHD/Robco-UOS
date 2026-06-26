@@ -56,9 +56,15 @@
 │   └── database.js     ~25KB CSV data (~170 weapons, ~68 armors, ~45 chems) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── check-persistence.ps1   28KB    363-test pre-commit audit
-│   ├── check-persistence.js    36KB    363-test Node runner (parity with .ps1)
+│   ├── check-persistence.ps1   28KB    369-test pre-commit audit
+│   ├── check-persistence.js    36KB    369-test Node runner (parity with .ps1)
+│   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
+│   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
+├── scripts/
+│   ├── pre-commit              Versioned pre-commit hook source (installed by prepare)
+│   ├── install-hooks.js        Copies pre-commit hook into .git/hooks on npm install
+│   └── rollback.sh             Protocol 16 one-command hotfix rollback
 ├── CHANGELOG.md        ~74KB  Full version history
 ├── icon.png            68KB   PWA icon
 ├── manifest.json       592B   PWA manifest
@@ -887,11 +893,26 @@ Forgetting to bump means cached users **silently run the old UI** until they man
 
 ### Automated Guard
 
-The pre-commit hook enforces this rule automatically. Before running the 363-test suite, it parses the staged `CACHE_NAME` against `origin/main:sw.js` and requires a strict monotonic increase in the `-rN` revision number when `APP_VERSION` is unchanged — equal or lower revs are blocked. When `APP_VERSION` changes, the revision can reset. A missed or decremented bump is impossible to commit past.
+The pre-commit hook enforces this rule automatically. Before running the 369-test suite, it parses the staged `CACHE_NAME` against `origin/main:sw.js` and requires a strict monotonic increase in the `-rN` revision number when `APP_VERSION` is unchanged — equal or lower revs are blocked. When `APP_VERSION` changes, the revision can reset. A missed or decremented bump is impossible to commit past.
 
 ### Historical Note
 
 This protocol was formalized in v1.6.5 after the perk panel (`addPerk()` + `#newPerkName`) was deployed within an existing `1.6.5` cache name, causing the feature to be invisible to cached users.
+
+---
+
+## Hotfix Rollback (Protocol 16)
+
+If a push breaks the live site, restore users **first** — then diagnose. The rollback script handles the revert + cache bump in one step:
+
+```bash
+# From repo root in Git Bash:
+sh scripts/rollback.sh           # reverts HEAD
+sh scripts/rollback.sh <hash>    # reverts a specific commit
+git push origin main
+```
+
+The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev (so all cached clients receive the update prompt), and commits through the pre-commit gate. After pushing, diagnose the root cause, add a regression test (Protocol 13), and record it in CHANGELOG.md before re-attempting the fix.
 
 ---
 
@@ -906,7 +927,7 @@ This protocol was formalized in v1.6.5 after the perk panel (`addPerk()` + `#new
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (fails immediately if not bumped or decremented), then the 363-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (fails immediately if not bumped or decremented), then the 369-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

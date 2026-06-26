@@ -180,6 +180,7 @@ export default [
       '*.min.js',
       'eslint.config.mjs',
       'tests/render-check.mjs',
+      'tests/boot-smoke.mjs',
       'tests/_diag*.mjs',
     ],
   },

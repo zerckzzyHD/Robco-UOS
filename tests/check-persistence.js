@@ -1541,7 +1541,7 @@ header('Assets Completeness');
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 28 — Meta / Runner Parity (Group 7)
-//  Verifies that both runners contain all gate-guard suites (22-28)
+//  Verifies that both runners contain all gate-guard suites (22-31)
 //  and that the canonical test count in CHANGELOG.md matches README.md.
 //
 //  NOTE: source-level assert() / Check() counts cannot reliably track
@@ -1554,7 +1554,7 @@ header('Meta / Runner Parity');
   const jsRunner = readFile('tests/check-persistence.js');
   const psRunner = readFile('tests/check-persistence.ps1');
 
-  // Structural parity: both runners must contain every gate-guard suite marker (22-30).
+  // Structural parity: both runners must contain every gate-guard suite marker (22-31).
   // A missing marker means a suite was added to one runner but not ported to the other.
   const GATE_SUITES = [
     'Suite 22',
@@ -1566,17 +1566,18 @@ header('Meta / Runner Parity');
     'Suite 28',
     'Suite 29',
     'Suite 30',
+    'Suite 31',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-30)' +
+    'JS runner contains all gate-guard suites (22-31)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-30)' +
+    'PS runner contains all gate-guard suites (22-31)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -1672,6 +1673,63 @@ assert(
 assert(
   /_quotaWarnShown/.test(stateSource),
   'saveState() contains proactive localStorage quota warning (once-per-session guard)'
+);
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 31 — CI/CD Automation Guards (Phase 1c)
+//  ci.yml has no stale "(106 tests)" label; runs PS runner;
+//  has render-check step; deploy.yml uses _site staging dir;
+//  hook-install and boot-smoke scripts exist.
+//  6 tests
+// ══════════════════════════════════════════════════════════════
+header('CI/CD Automation Guards');
+
+// 31.1 ci.yml does not contain stale "(106 tests)" label
+{
+  const ciSource = readFile('.github/workflows/ci.yml');
+  assert(
+    !/\(106 tests\)/.test(ciSource),
+    'ci.yml does not contain stale "(106 tests)" label (Phase 1c update)'
+  );
+}
+
+// 31.2 ci.yml runs PowerShell persistence runner
+{
+  const ciSource = readFile('.github/workflows/ci.yml');
+  assert(
+    /check-persistence\.ps1/.test(ciSource),
+    'ci.yml runs PowerShell persistence runner (Protocol 15 parity)'
+  );
+}
+
+// 31.3 ci.yml has render-check step
+{
+  const ciSource = readFile('.github/workflows/ci.yml');
+  assert(
+    /render-check/.test(ciSource),
+    'ci.yml includes render-check step (Protocol 10 CI enforcement)'
+  );
+}
+
+// 31.4 deploy.yml uses _site staging dir (not full path: .)
+{
+  const deploySource = readFile('.github/workflows/deploy.yml');
+  assert(
+    deploySource.includes('_site') && !/path:\s*\./.test(deploySource),
+    'deploy.yml uses _site staging directory instead of path: . (private files excluded)'
+  );
+}
+
+// 31.5 hook install script exists
+assert(
+  fs.existsSync(path.join(ROOT, 'scripts', 'install-hooks.js')),
+  'scripts/install-hooks.js exists (auto-installs pre-commit hook on npm install)'
+);
+
+// 31.6 boot smoke test exists
+assert(
+  fs.existsSync(path.join(ROOT, 'tests', 'boot-smoke.mjs')),
+  'tests/boot-smoke.mjs exists (CI boot smoke test — Phase 1c)'
 );
 
 // ══════════════════════════════════════════════════════════════

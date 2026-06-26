@@ -12,11 +12,11 @@
 npm run lint        # ESLint — zero new errors
 npm run format      # Prettier — all files clean
 git add -A
-git commit          # Pre-commit hook: cache-bump guard runs first, then 363 tests
+git commit          # Pre-commit hook: cache-bump guard runs first, then 369 tests
 git push origin main  # CACHE_NAME must already be bumped (Protocol 1)
 ```
 
-- **363 tests must pass.** If fewer pass, something is broken. Investigate before committing.
+- **369 tests must pass.** If fewer pass, something is broken. Investigate before committing.
 - **Bump `CACHE_NAME` before every push.** No push may ship without a new cache rev (Protocol 1) — this is a hard gate, not just for UI/JS changes.
 - **Cache-bump guard runs at commit time** — the hook compares the staged `CACHE_NAME` against `origin/main` and blocks if they match. A missed bump fails the commit before the test suite even runs.
 - **Never use `--no-verify`** unless the user explicitly authorizes it for a stated emergency.
@@ -34,7 +34,7 @@ Bump `CACHE_NAME` in `sw.js` before **every `git push`** — full stop. Every pu
 
 **Why:** The SW is cache-first. Without a new `CACHE_NAME`, cached users silently run the old build and never see the "REBOOT TERMINAL" update prompt. Bumping on every push guarantees the prompt fires for all clients on every release.
 
-**Automated guard:** This requirement is now enforced by the pre-commit hook. Before the 363-test suite runs, the hook parses the staged `CACHE_NAME` against `origin/main:sw.js` and requires a strict monotonic increase in the `-rN` revision number when `APP_VERSION` is unchanged — equal or lower revs are blocked, not just equal ones. When `APP_VERSION` changes, the revision can reset. A missed or decremented bump is impossible to commit past.
+**Automated guard:** This requirement is now enforced by the pre-commit hook. Before the 369-test suite runs, the hook parses the staged `CACHE_NAME` against `origin/main:sw.js` and requires a strict monotonic increase in the `-rN` revision number when `APP_VERSION` is unchanged — equal or lower revs are blocked, not just equal ones. When `APP_VERSION` changes, the revision can reset. A missed or decremented bump is impossible to commit past.
 
 ---
 
@@ -95,7 +95,7 @@ Requires changes in **4 files minimum.** The pre-commit audit will block if any 
 - [ ] Add `<details class="panel">` block in `index.html` (if it needs a panel)
 - [ ] Bump `CACHE_NAME` in `sw.js` → Protocol 1
 - [ ] Run `npm run lint` and `npm run format`
-- [ ] Run `git commit` — 363 tests must pass
+- [ ] Run `git commit` — 369 tests must pass
 - [ ] Update `ARCHITECTURE.md`, `CHANGELOG.md`, `README.md` → Protocol 2
 
 ---
@@ -109,7 +109,7 @@ Requires changes in **4 files minimum.** The pre-commit audit will block if any 
 - [ ] If AI changes should auto-expand it: add key to `expandPanelForCategory()` map in `ui.js`
 - [ ] If it has a text input with autocomplete: call `wireInput()` in `initRegistryAutocomplete()` in `ui.js`
 - [ ] Bump `CACHE_NAME` → Protocol 1
-- [ ] Lint, format, commit (363 tests) → Protocol 2
+- [ ] Lint, format, commit (369 tests) → Protocol 2
 
 ---
 
@@ -143,7 +143,7 @@ Non-trivial work run via Dispatch uses a three-stage model hand-off. Dispatch au
 
 1. **Opus — Diagnose & Plan.** Opus investigates the actual code and git history, identifies the root cause, and writes a concrete plan: exact files, selectors, and line numbers; the change and its rationale; desktop/regression safety; and explicit verification steps. No edits in this stage.
 
-2. **Sonnet — Review & Implement.** Sonnet first critically reviews the Opus plan against the current files (line numbers drift, selectors go stale, diagnoses can be wrong) and corrects any discrepancy. Then it implements, runs the full pre-commit gate (lint, format, Protocol 1 cache bump, 209-test gate, Protocol 2/2a docs), and verifies the user-facing result by actually rendering/exercising it at the real target (e.g. a 360/412px mobile viewport) — never from headless width measurements alone.
+2. **Sonnet — Review & Implement.** Sonnet first critically reviews the Opus plan against the current files (line numbers drift, selectors go stale, diagnoses can be wrong) and corrects any discrepancy. Then it implements, runs the full pre-commit gate (lint, format, Protocol 1 cache bump, 369-test gate, Protocol 2/2a docs), and verifies the user-facing result by actually rendering/exercising it at the real target (e.g. a 360/412px mobile viewport) — never from headless width measurements alone.
 
 3. **Opus — Audit before done.** Opus independently reviews the actual committed diff and the verification evidence against the original root cause: is the issue fully resolved, nothing regressed, and is the change actually live on the deployed branch (origin/main) and site — not just a local/worktree commit? If anything falls short, loop back to stage 2. The task is "done" only after this audit passes.
 
@@ -171,7 +171,7 @@ Dispatch reports must be formatted for mobile reading: lead with a one-line summ
 
 Any change touching `index.html`, `css/`, or render JS (`ui.js` `render*` functions) must be verified by actually **rendering** the affected UI at **360px, 412px, and ≥1000px (desktop)** before it is considered done — never from headless width measurements alone. Confirm no horizontal page overflow (`document.documentElement.scrollWidth === window.innerWidth`), the component looks correct, and desktop is unchanged.
 
-The definitive verification step is `tests/render-check.mjs` — a Playwright render-check that loads the page at 360px and 412px and asserts no horizontal overflow and no focus-zoom. Run it outside the 209/243 test gate whenever map or mobile layout changes land. It is the only check that catches real pixel/overflow regressions.
+The definitive verification step is `tests/render-check.mjs` — a Playwright render-check that loads the page at 360px and 412px and asserts no horizontal overflow and no focus-zoom. Run it outside the 369-test pre-commit gate whenever map or mobile layout changes land. It is the only check that catches real pixel/overflow regressions.
 
 ---
 
@@ -328,4 +328,4 @@ Treat model usage as a budget — and the burden of efficiency is on the orchest
 
 **State persistence:** `localStorage` key `robco_v7`. Debounced 500ms writes. Flushed immediately on `beforeunload`.
 
-**Test suite:** 363 tests across 34 suites, mirrored in `tests/check-persistence.ps1` (PowerShell, run by the pre-commit hook) and `tests/check-persistence.js` (Node) — both runners are kept at exact parity (same suites, same per-suite counts, same 363 total). Covers parser sanity, autoImportState coverage, faction registry, skill keys, save envelope, file upload, cloud sync, backward compatibility, registry structural integrity, reputation 2D matrix, C2 CRUD function existence, C3 CAMPG tab DOM binding, C4 Protocol 4 campaignMode (binary) + separation, render contracts, CSS invariants, SW invariants, structural integrity (Protocol 20 static guards), detail-current dedup guard (Protocol 27), FO3 database structural integrity, CSV column-count integrity, security regression guards (XSS-1/XSS-2/XSS-3), critical feature presence and SW update banner regression (Suites 22–29 gate guards: UI controls, prohibited patterns, protocol completeness, AI contract lock, architectural boundaries, assets completeness, meta/runner parity, SW update banner). **When you change one runner, update the other in the same commit** — drift here is what let the PS runner silently fall to 173.
+**Test suite:** 369 tests across 35 suites, mirrored in `tests/check-persistence.ps1` (PowerShell, run by the pre-commit hook) and `tests/check-persistence.js` (Node) — both runners are kept at exact parity (same suites, same per-suite counts, same 369 total). Covers parser sanity, autoImportState coverage, faction registry, skill keys, save envelope, file upload, cloud sync, backward compatibility, registry structural integrity, reputation 2D matrix, C2 CRUD function existence, C3 CAMPG tab DOM binding, C4 Protocol 4 campaignMode (binary) + separation, render contracts, CSS invariants, SW invariants, structural integrity (Protocol 20 static guards), detail-current dedup guard (Protocol 27), FO3 database structural integrity, CSV column-count integrity, security regression guards (XSS-1/XSS-2/XSS-3), critical feature presence and SW update banner regression (Suites 22–31 gate guards: UI controls, prohibited patterns, protocol completeness, AI contract lock, architectural boundaries, assets completeness, meta/runner parity, SW update banner, Phase 1b guards, CI/CD automation guards). **When you change one runner, update the other in the same commit** — drift here is what let the PS runner silently fall to 173.

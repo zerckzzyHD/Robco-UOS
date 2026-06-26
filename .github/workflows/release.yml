@@ -40,8 +40,8 @@ jobs:
         if: steps.check.outputs.exists == 'false'
         id: changelog
         run: |
-          # Extract the latest version block from changelog.txt
-          ENTRY=$(sed -n "/^v${{ steps.version.outputs.version }}/,/^v[0-9]/p" changelog.txt | sed '$d')
+          # Extract the latest version block from CHANGELOG.md
+          ENTRY=$(sed -n "/^## \[v${{ steps.version.outputs.version }}\]/,/^## \[v[0-9]/p" CHANGELOG.md | sed '$d')
           if [ -z "$ENTRY" ]; then
             ENTRY="Release ${{ steps.version.outputs.tag }}"
           fi

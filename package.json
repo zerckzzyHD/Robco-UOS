@@ -10,7 +10,9 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "dev": "vite",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node tests/check-persistence.js",
+    "prepare": "node scripts/install-hooks.js",
+    "rollback": "sh scripts/rollback.sh"
   },
   "repository": {
     "type": "git",

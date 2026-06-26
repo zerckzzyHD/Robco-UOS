@@ -1,0 +1,71 @@
+#!/bin/sh
+
+# ── Protocol 1 guard: staged CACHE_NAME must be a strict monotonic increase ──
+ORIGIN_CACHE=$(git show origin/main:sw.js 2>/dev/null | grep "^const CACHE_NAME" | sed "s/.*'\([^']*\)'.*/\1/")
+LOCAL_CACHE=$(git show :sw.js 2>/dev/null | grep "^const CACHE_NAME" | sed "s/.*'\([^']*\)'.*/\1/")
+if [ -z "$LOCAL_CACHE" ]; then
+  LOCAL_CACHE=$(grep "^const CACHE_NAME" sw.js 2>/dev/null | sed "s/.*'\([^']*\)'.*/\1/")
+fi
+
+# Format: robco-terminal-v{APP_VERSION}-r{N}
+VALID_FMT="^robco-terminal-v[0-9][^[:space:]]*-r[0-9][0-9]*$"
+
+if [ -z "$ORIGIN_CACHE" ]; then
+  # Origin unreachable — validate format only
+  if echo "$LOCAL_CACHE" | grep -qE "$VALID_FMT"; then
+    echo "  [WARN]  origin/main unreachable -- CACHE_NAME format OK: $LOCAL_CACHE"
+  else
+    echo ""
+    echo "  [FAIL]  CACHE_NAME missing or invalid: '$LOCAL_CACHE'"
+    echo "  Expected format: robco-terminal-v{APP_VERSION}-r{N}"
+    echo "  Bump CACHE_NAME in sw.js (Protocol 1), then stage and commit again."
+    echo ""
+    exit 1
+  fi
+else
+  # Parse APP_VERSION and rev number from both strings
+  ORIGIN_VER=$(echo "$ORIGIN_CACHE" | sed 's/robco-terminal-v\([^-]*\)-r[0-9]*/\1/')
+  LOCAL_VER=$(echo "$LOCAL_CACHE"  | sed 's/robco-terminal-v\([^-]*\)-r[0-9]*/\1/')
+  ORIGIN_N=$(echo "$ORIGIN_CACHE"  | sed 's/.*-r\([0-9]*\)$/\1/')
+  LOCAL_N=$(echo "$LOCAL_CACHE"    | sed 's/.*-r\([0-9]*\)$/\1/')
+
+  if [ "$LOCAL_VER" = "$ORIGIN_VER" ]; then
+    # Same APP_VERSION: rev must strictly increase (new N > origin N)
+    if ! [ "$LOCAL_N" -gt "$ORIGIN_N" ] 2>/dev/null; then
+      echo ""
+      echo "  [FAIL]  CACHE_NAME rev not strictly incremented (Protocol 1 — monotonic guard)!"
+      echo "  Staged:       $LOCAL_CACHE  (r${LOCAL_N})"
+      echo "  origin/main:  $ORIGIN_CACHE  (r${ORIGIN_N})"
+      echo ""
+      echo "  N must be > $ORIGIN_N. Increment the -rN suffix, run: git add sw.js, then commit again."
+      echo ""
+      exit 1
+    fi
+  else
+    # Different APP_VERSION: N can reset — just verify valid format
+    if ! echo "$LOCAL_CACHE" | grep -qE "$VALID_FMT"; then
+      echo ""
+      echo "  [FAIL]  CACHE_NAME invalid after version change: '$LOCAL_CACHE'"
+      echo "  Expected format: robco-terminal-v{APP_VERSION}-r{N}"
+      echo ""
+      exit 1
+    fi
+  fi
+  echo "  [PASS]  CACHE_NAME bumped: $ORIGIN_CACHE -> $LOCAL_CACHE"
+fi
+# ── End Protocol 1 guard ──────────────────────────────────────────────────────
+
+if command -v powershell >/dev/null 2>&1; then
+  powershell -ExecutionPolicy Bypass -File tests/check-persistence.ps1
+elif command -v node >/dev/null 2>&1; then
+  node tests/check-persistence.js
+else
+  echo "No test runner (powershell or node) found."
+  exit 1
+fi
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "Commit blocked: persistence audit failed."
+  echo "Fix the [FAIL] items in autoImportState() in js/api.js, then commit again."
+  exit 1
+fi
