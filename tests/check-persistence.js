@@ -1541,7 +1541,7 @@ header('Assets Completeness');
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 28 — Meta / Runner Parity (Group 7)
-//  Verifies that both runners contain all gate-guard suites (22-34)
+//  Verifies that both runners contain all gate-guard suites (22-36)
 //  and that the canonical test count in CHANGELOG.md matches README.md.
 //
 //  NOTE: source-level assert() / Check() counts cannot reliably track
@@ -1570,17 +1570,19 @@ header('Meta / Runner Parity');
     'Suite 32',
     'Suite 33',
     'Suite 34',
+    'Suite 35',
+    'Suite 36',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-34)' +
+    'JS runner contains all gate-guard suites (22-36)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-34)' +
+    'PS runner contains all gate-guard suites (22-36)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -2054,6 +2056,48 @@ assert(
   /_registrySearchCache/.test(regNvSrc35),
   'registrySearch has _registrySearchCache memoization in reg_nv.js (P7-13)'
 );
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 36 — Keyboard Shortcuts Group ([?] menu discoverability)
+//  COMMAND_REGISTRY has KEYBOARD SHORTCUTS group with ≥6 entries;
+//  global keydown handler closes modal on Escape; closeModal() exists.
+//  4 tests
+// ══════════════════════════════════════════════════════════════
+header('Keyboard Shortcuts Group');
+{
+  const uiSrc36 = readFile('js/ui.js');
+
+  // 36.1 COMMAND_REGISTRY contains a KEYBOARD SHORTCUTS group
+  const cmdRegM36 = uiSrc36.match(/const COMMAND_REGISTRY\s*=\s*\[[\s\S]*?\];/);
+  const cmdRegSrc36 = cmdRegM36 ? cmdRegM36[0] : '';
+  assert(
+    /['"]KEYBOARD SHORTCUTS['"]/.test(cmdRegSrc36),
+    "COMMAND_REGISTRY has a 'KEYBOARD SHORTCUTS' group (Suite 36)"
+  );
+
+  // 36.2 KEYBOARD SHORTCUTS group has ≥6 entries
+  {
+    const kbM = uiSrc36.match(
+      /group\s*:\s*['"]KEYBOARD SHORTCUTS['"][\s\S]*?cmds\s*:\s*\[([\s\S]*?)\]\s*\}/
+    );
+    const kbCmds = kbM ? kbM[1] : '';
+    const entryCount = (kbCmds.match(/cmd\s*:/g) || []).length;
+    assert(entryCount >= 6, `KEYBOARD SHORTCUTS group has ≥6 entries (found ${entryCount})`);
+  }
+
+  // 36.3 Global keydown listener calls closeModal() on Escape
+  {
+    const kdIdx = uiSrc36.indexOf("document.addEventListener('keydown'");
+    const kdSnippet = kdIdx >= 0 ? uiSrc36.slice(kdIdx, kdIdx + 2000) : '';
+    assert(
+      /Escape/.test(kdSnippet) && /closeModal/.test(kdSnippet),
+      "Global keydown listener handles 'Escape' → closeModal() (Esc closes dialog)"
+    );
+  }
+
+  // 36.4 closeModal() function exists in ui.js
+  assert(/function\s+closeModal\s*\(/.test(uiSrc36), 'closeModal() function defined in ui.js');
+}
 
 // ══════════════════════════════════════════════════════════════
 //  RESULTS

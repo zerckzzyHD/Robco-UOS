@@ -1,4 +1,4 @@
-## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 402/402 | Cache: robco-terminal-v2.0.1-r36 -->
+## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 406/406 | Cache: robco-terminal-v2.0.1-r37 -->
 
 ### Added
 
@@ -89,6 +89,7 @@
 - Autocomplete searches are now cached so typing the same characters twice in a row reuses the previous result instead of rescanning the registry.
 - The fuzzy item-lookup fallback now skips very short search tokens (under 3 characters) that would never match anything useful, avoiding a full database scan for garbage input.
 - Added 6 new automated guard tests (Suite 35, 402 total across 39 suites) verifying all of the above improvements.
+- The [?] help menu now has a KEYBOARD SHORTCUTS section listing every active shortcut: Ctrl+Enter to send a command, Ctrl+/ to focus the input, Ctrl+1–6 to toggle panels, 1–4 to switch tabs, Up/Down to browse command history, and Esc to close any open dialog. Pressing Esc now also closes the help menu and patch-notes modal. Added 4 automated guard tests (Suite 36, 406 total across 40 suites).
 
 ---
 

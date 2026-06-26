@@ -751,6 +751,10 @@ window.onload = function () {
         }
       }
     }
+    if (e.key === 'Escape') {
+      const modal = document.getElementById('sysModal');
+      if (modal && modal.style.display !== 'none') closeModal();
+    }
   });
 
   // Defer changelog display until after boot sequence completes
@@ -1843,6 +1847,18 @@ const COMMAND_REGISTRY = [
       { cmd: '[PAGE 2/3]', desc: 'Dynamic routes & alignment.' },
       { cmd: '[ARCHIVE]', desc: '3 most recent story choices.' },
       { cmd: '&& / -Q / -S', desc: 'Chain cmds, Quiet, Stealth.' },
+    ],
+  },
+  {
+    group: 'KEYBOARD SHORTCUTS',
+    cmds: [
+      { cmd: 'Ctrl + Enter', desc: 'Send command.' },
+      { cmd: 'Ctrl + /', desc: 'Focus command input.' },
+      { cmd: 'Ctrl + 1–6', desc: 'Toggle panels 1–6 open/close.' },
+      { cmd: '1 / 2 / 3 / 4', desc: 'Switch tab: STAT / INV / DATA / CAMPG.' },
+      { cmd: '↑ / ↓', desc: 'Cycle command history in input.' },
+      { cmd: '↑ / ↓ + Enter', desc: 'Navigate and select autocomplete.' },
+      { cmd: 'Esc', desc: 'Close dialog or dismiss autocomplete.' },
     ],
   },
 ];

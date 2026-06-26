@@ -966,11 +966,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-34)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-34)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-36)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-36)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -1222,6 +1222,34 @@ Check ($blSnippet35.Contains('robco_v8') -and (-not $blSnippet35.Contains('robco
 
 # 35.6 registrySearch has _registrySearchCache memoization in reg_nv.js (P7-13)
 Check ([bool]($regNvSrc35 -match '_registrySearchCache')) 'registrySearch has _registrySearchCache memoization in reg_nv.js (P7-13)'
+
+# ===========================================================
+# Suite 36 -- Keyboard Shortcuts Group ([?] menu discoverability)
+# COMMAND_REGISTRY has KEYBOARD SHORTCUTS group with >=6 entries;
+# global keydown handler closes modal on Escape; closeModal() exists.
+# 4 tests
+# ===========================================================
+Sep "Suite 36 -- Keyboard Shortcuts Group"
+$uiSrc36 = Read-Src 'js/ui.js'
+
+# 36.1 COMMAND_REGISTRY contains a KEYBOARD SHORTCUTS group
+$cmdRegM36 = [regex]::Match($uiSrc36, 'const COMMAND_REGISTRY\s*=\s*\[[\s\S]*?\];')
+$cmdRegSrc36 = if ($cmdRegM36.Success) { $cmdRegM36.Value } else { '' }
+Check ([bool]($cmdRegSrc36 -match "['`"]KEYBOARD SHORTCUTS['`"]")) "COMMAND_REGISTRY has a 'KEYBOARD SHORTCUTS' group (Suite 36)"
+
+# 36.2 KEYBOARD SHORTCUTS group has >=6 entries
+$kbM36 = [regex]::Match($uiSrc36, "group\s*:\s*['\`"]KEYBOARD SHORTCUTS['\`"][\s\S]*?cmds\s*:\s*\[([\s\S]*?)\]\s*\}")
+$kbCmds36 = if ($kbM36.Success) { $kbM36.Groups[1].Value } else { '' }
+$kbCount36 = ([regex]::Matches($kbCmds36, 'cmd\s*:')).Count
+Check ($kbCount36 -ge 6) "KEYBOARD SHORTCUTS group has >=6 entries (found $kbCount36)"
+
+# 36.3 Global keydown listener calls closeModal() on Escape
+$kdIdx36 = $uiSrc36.IndexOf("document.addEventListener('keydown'")
+$kdSnippet36 = if ($kdIdx36 -ge 0) { $uiSrc36.Substring($kdIdx36, [Math]::Min(2000, $uiSrc36.Length - $kdIdx36)) } else { '' }
+Check (($kdSnippet36 -match 'Escape') -and ($kdSnippet36 -match 'closeModal')) "Global keydown listener handles 'Escape' -> closeModal() (Esc closes dialog)"
+
+# 36.4 closeModal() function exists in ui.js
+Check ([bool]($uiSrc36 -match 'function\s+closeModal\s*\(')) 'closeModal() function defined in ui.js'
 
 # ===========================================================
 # Results
