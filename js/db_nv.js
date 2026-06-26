@@ -507,6 +507,120 @@ Ralph,Freeside,900,40,Independent,3,Caps
 Old Lady Gibson,Gibson Scrap Yard,800,40,Independent,4,Caps
 Cliff Briscoe,Novac,750,20,Independent,3,Caps
 Jules,North Vegas Square,600,15,Independent,3,Caps
+
+[WEAPON_MODS.CSV]
+Name,Weapon,Effect,Value,Weight
+.357 Revolver Long Barrel,.357 Magnum Revolver,Increases damage,250,0
+.357 Revolver HD Cylinder,.357 Magnum Revolver,Increases condition by 50%,450,0
+.44 Revolver Scope,.44 Magnum Revolver,Adds short-range scope,1100,0
+.44 Revolver Heavy Frame,.44 Magnum Revolver,Increases condition by 50%,1000,0
+.45 AP HD Slide,.45 Auto Pistol,Increases condition by 50%,100,0
+.45 AP Silencer,.45 Auto Pistol,Reduces weapon noise,100,0
+9mm Pistol Extended Mags,9mm Pistol,Increases magazine capacity,250,0
+9mm Pistol Scope,9mm Pistol,Adds short-range scope,150,0
+10mm Pistol Silencer,10mm Pistol,Reduces weapon noise,750,0
+10mm Pistol Extended Mags,10mm Pistol,Increases magazine capacity,750,0
+10mm Pistol Laser Sight,10mm Pistol,Decreases spread,650,0
+12.7mm Pistol Silencer,12.7mm Pistol,Reduces weapon noise,1750,0
+Hunting Rev. 6-Shot Cylinder,Hunting Revolver,Increases cylinder capacity,1100,0
+Hunting Rev. Match Barrel,Hunting Revolver,Decreases spread,1400,0
+Anti-Mat. Rifle CF Parts,Anti-Materiel Rifle,Reduces weight,2200,0
+Anti-Mat. Rifle Custom Bolt,Anti-Materiel Rifle,Increases rate of fire,3000,0
+Anti-Mat. Rifle Suppressor,Anti-Materiel Rifle,Reduces weapon noise,2500,0
+Assault Carbine Extended Magazines,Assault Carbine,Increases magazine capacity,1300,0
+Assault Carb. Ext. Mags,Assault Carbine,Increases magazine capacity,1300,0
+Assault Carb. Forged Receiver,Assault Carbine,Increases condition,1500,0
+Assault Carb. Light Bolt,Assault Carbine,Increases rate of fire,1950,0
+Auto. Rifle Upgr. Internals,Automatic Rifle,Increases rate of fire,250,0
+Brush Gun Forged Receiver,Brush Gun,Increases condition,1750,0
+Cby. Rep. Custom Action,Cowboy Repeater,Increases rate of fire,850,0
+Cby. Rep. Long Tube,Cowboy Repeater,Increases magazine capacity,750,0
+Cby. Rep. Maple Stock,Cowboy Repeater,Reduces weight,675,0
+Hunting Rifle Extended Mag,Hunting Rifle,Increases magazine capacity,1600,0
+Hunting Rifle Scope,Hunting Rifle,Adds high-powered scope,1300,0
+Hunting Rifle Custom Action,Hunting Rifle,Increases rate of fire,1200,0
+Light MG Expanded Drums,Light Machine Gun,Increases magazine capacity,3200,0
+Sniper Rifle Carbon Fiber Parts,Sniper Rifle,Reduces weight,1500,0
+Sniper Rifle Suppressor,Sniper Rifle,Reduces weapon noise,1800,0
+Svc. Rifle Forged Receiver,Service Rifle,Increases condition,650,0
+Svc. Rifle Upgraded Springs,Service Rifle,Increases rate of fire,850,0
+Trail Carbine Scope,Trail Carbine,Adds mid-range scope,1500,0
+Varmint Rifle Extended Mags,Varmint Rifle,Increases magazine capacity,75,0
+Varmint Rifle Night Scope,Varmint Rifle,Adds night-vision scope,125,0
+Varmint Rifle Silencer,Varmint Rifle,Reduces weapon noise,100,0
+.45 Auto SMG Comp.,.45 Auto Submachine Gun,Reduces spread,250,0
+.45 Auto SMG Drums,.45 Auto Submachine Gun,Increases magazine capacity,250,0
+9mm SMG Drums,9mm Submachine Gun,Increases magazine capacity,800,0
+9mm SMG Light Bolt,9mm Submachine Gun,Increases rate of fire,850,0
+10mm SMG Extended Mags,10mm Submachine Gun,Increases magazine capacity,1000,0
+10mm SMG Recoil Comp.,10mm Submachine Gun,Decreases spread,1100,0
+12.7mm Submachine Gun Silencer,12.7mm Submachine Gun,Reduces weapon noise,2750,0
+12.7mm SMG Laser Sight,12.7mm Submachine Gun,Decreases spread,2600,0
+12.7mm SMG Stacked Magazine,12.7mm Submachine Gun,Increases magazine capacity,2200,0
+12.7mm SMG Suppressor,12.7mm Submachine Gun,Reduces weapon noise,2800,0
+Sil. .22 SMG Exp. Drums,Silenced .22 SMG,Increases magazine capacity,1100,0
+Hunting Shotgun Long Tube,Hunting Shotgun,Increases magazine capacity,1750,0
+Hunting Shotgun Choke,Hunting Shotgun,Decreases spread,1500,0
+K9000 Mod - Resla Roil,K9000 Cyberdog Gun,Increases damage,3000,0
+K9000 Mod - Mentat Chow,K9000 Cyberdog Gun,Increases rate of fire,3000,0
+Minigun Damped Subframe,Minigun,Reduces spread,2000,0
+Minigun High-Speed Motor,Minigun,Increases rate of fire,2750,0
+SMMG Mechanical Upgrade,Shoulder Mounted Machine Gun,Increases condition,9750,0
+SMMG Recoil Compensator,Shoulder Mounted Machine Gun,Reduces spread,9750,0
+SMMG Extended Magazine,Shoulder Mounted Machine Gun,Increases magazine capacity,10750,0
+Laser Pistol Combat Sights,Laser Pistol,Adds iron sights,125,0
+Laser Pistol Focus Optics,Laser Pistol,Increases damage,200,0
+Laser Pistol Recycler,Laser Pistol,Every 4th shot is free,275,0
+Plasma Def. Hi-Cap Terminal,Plasma Defender,Increases ammo capacity,1600,0
+Plasma Def. Scope,Plasma Defender,Adds short-range scope,1200,0
+Plasma Def. Sheath Stabilizer,Plasma Defender,Decreases spread,1300,0
+Plas. Pistol Hi-Energy Ionizer,Plasma Pistol,Increases damage,325,0
+Plas. Pistol Mag. Accelerator,Plasma Pistol,Increases projectile speed,225,0
+Plas. Pistol Recycler,Plasma Pistol,Every 4th shot is free,325,0
+Holorifle Focus Optics,Holorifle,Increases damage,300,0
+Holorifle Adv. Calibration,Holorifle,Decreases spread,200,0
+Holorifle Reinf. Components,Holorifle,Improves weapon condition,150,0
+LAER Mod - Auxiliary Recharger Clip,LAER,Every 4th shot is free,2498,0
+LAER Mod - Prismatic Lens,LAER,Splits beam for increased damage,2998,0
+Laser RCW Recycler,Laser RCW,Every 4th shot is free,1900,0
+Laser Rifle Focus Optics,Laser Rifle,Increases damage,900,0
+Laser Rifle Beam Splitter,Laser Rifle,Splits beam for increased damage,650,0
+Laser Rifle Scope,Laser Rifle,Adds long-range scope,850,0
+Plasma Rifle Mag. Accelerator,Plasma Rifle,Increases projectile speed,800,0
+Tri-beam LR Focus Optics,Tri-beam Laser Rifle,Increases damage,1900,0
+Tri-beam LR HD Caps,Tri-beam Laser Rifle,Increases condition,2100,0
+Tri-beam LR Hi-Cap Terminal,Tri-beam Laser Rifle,Increases ammo capacity,1800,0
+Flamer Expanded Tanks,Flamer,Increases magazine capacity,1300,0
+Gat. Laser Focus Optics,Gatling Laser,Increases damage,3000,0
+Gat. Laser CF Frame,Gatling Laser,Reduces weight,2200,0
+Plasma Caster HS Electrode,Plasma Caster,Increases rate of fire,2500,0
+25mm G. APW Exp. Drum,25mm Grenade APW,Increases magazine capacity,1200,0
+25mm G. APW Long Barrel,25mm Grenade APW,Increases projectile speed,1300,0
+25mm G. APW Upgraded Int.,25mm Grenade APW,Increases rate of fire,1900,0
+Grenade Rifle Long Barrel,Grenade Rifle,Increases range,700,0
+Fat Man Little Boy Kit,Fat Man,Reduces weight,2500,0
+Grenade MG High-Speed Kit,Grenade Machinegun,Increases rate of fire,3500,0
+Miss. Launcher Guidance Sys.,Missile Launcher,Increases accuracy,1500,0
+Red Glare Alpha Strike,Red Glare,Increases rocket speed,10750,0
+Red Glare Auto Launcher,Red Glare,Increases rate of fire,10250,0
+Red Glare Far Sighting,Red Glare,Adds zoom,10500,0
+Chainsaw Alloy Frame,Chainsaw,Reduces weight,1500,0
+Chainsaw Carbide Teeth,Chainsaw,Increases damage,1800,0
+Chainsaw HD Chain,Chainsaw,Increases condition,1200,0
+Katana Authentic Blade,Katana,Increases damage,1000,0
+Katana Balanced Grip,Katana,Increases attack speed,950,0
+Katana Protective Sheath,Katana,Increases condition,849,0
+Ripper Carbide Teeth,Ripper,Increases damage,1500,0
+Ripper HD Chain,Ripper,Increases condition,1200,0
+Baseball Bat Cork Core,Baseball Bat,Increases attack speed,350,0
+Baseball Bat Maple Body,Baseball Bat,Increases condition,325,0
+Baseball Bat Nails,Baseball Bat,Increases damage,315,0
+War Club Casings,War Club,Increases damage,250,0
+War Club Honors,War Club,Increases attack speed,250,0
+Bear Trap Fist HD Springs,Bear Trap Fist,Increases damage,250,0
+Power Fist Chromed Tubes,Power Fist,Increases condition,1200,0
+Power Fist Hi-Cap Valves,Power Fist,Increases damage,1400,0
+Power Fist Ported Chambers,Power Fist,Increases attack speed,1500,0
 `;
 
 // ── ITEM LOOKUP ──────────────────────────────────────────────
@@ -525,6 +639,7 @@ function _buildItemCache() {
     ['[CHEMS.CSV]', 'Name', 'Weight', 'Value', 'aid'],
     ['[MISC.CSV]', 'Name', 'Weight', 'Value', 'misc'],
     ['[QUEST_ITEMS.CSV]', 'Name', 'Weight', null, 'misc'],
+    ['[WEAPON_MODS.CSV]', 'Name', 'Weight', 'Value', 'mod'],
   ];
 
   for (const [header, nameCol, wgtCol, valCol, type] of tables) {

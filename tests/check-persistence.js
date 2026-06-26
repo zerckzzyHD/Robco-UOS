@@ -1577,6 +1577,7 @@ header('Meta / Runner Parity');
     'Suite 38',
     'Suite 39',
     'Suite 40',
+    'Suite 41',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
@@ -2413,6 +2414,100 @@ assert(
     /_invFilter/.test(renderBody40),
     'renderInventory() references _invFilter to honour the active category filter'
   );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 41 — Weapon Mods CSV + Registry Parity (Phase 4d-ii)
+//  [WEAPON_MODS.CSV] structural guard: section exists, correct
+//  column header, all rows 5 cols; parity between db_nv.js CSV
+//  and reg_nv.js 'mod' entries in both directions.
+//  5 tests
+// ══════════════════════════════════════════════════════════════
+header('Weapon Mods CSV + Registry Parity');
+{
+  const dbNv41 = readFile('js/db_nv.js');
+  const regNv41 = readFile('js/reg_nv.js');
+
+  // 41.1  [WEAPON_MODS.CSV] section exists in db_nv.js
+  assert(dbNv41.includes('[WEAPON_MODS.CSV]'), 'db_nv.js contains [WEAPON_MODS.CSV] section');
+
+  // 41.2 + 41.3  Column header correct and all data rows have exactly 5 columns
+  {
+    const EXPECTED_HEADER = 'Name,Weapon,Effect,Value,Weight';
+    const blockMatch = dbNv41.match(/\[WEAPON_MODS\.CSV\]([\s\S]*?)(?=\n\[|\n`;)/);
+    if (!blockMatch) {
+      fail('db_nv.js [WEAPON_MODS.CSV]: could not extract block');
+    } else {
+      const lines = blockMatch[1]
+        .split('\n')
+        .map(l => l.trim())
+        .filter(Boolean);
+      assert(
+        lines.length >= 1 && lines[0] === EXPECTED_HEADER,
+        `[WEAPON_MODS.CSV] header is "${EXPECTED_HEADER}"`
+      );
+      const EXPECTED_COLS = EXPECTED_HEADER.split(',').length;
+      const badRows = [];
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(',').length;
+        if (cols !== EXPECTED_COLS)
+          badRows.push(`row ${i + 1} (${cols} cols): ${lines[i].slice(0, 50)}`);
+      }
+      assert(
+        badRows.length === 0,
+        `[WEAPON_MODS.CSV] all data rows have ${EXPECTED_COLS} columns` +
+          (badRows.length ? ` — bad: ${badRows.join('; ')}` : '')
+      );
+    }
+  }
+
+  // Helper: extract all mod Names from WEAPON_MODS.CSV
+  function getModCsvNames(src) {
+    const start = src.indexOf('[WEAPON_MODS.CSV]');
+    if (start === -1) return new Set();
+    const rest = src.substring(start + 17);
+    const endIdx = rest.search(/\n\[|\n`;/);
+    const block = endIdx === -1 ? rest : rest.substring(0, endIdx);
+    const names = new Set();
+    block.split('\n').forEach(l => {
+      const t = l.trim();
+      if (!t || t.startsWith('[') || t.startsWith('Name,')) return;
+      const name = t.split(',')[0].trim();
+      if (name) names.add(name);
+    });
+    return names;
+  }
+
+  // Helper: extract all 'mod' type names from registry
+  function getRegModNames(src) {
+    const names = new Set();
+    const re = /\{\s*name\s*:\s*(?:'([^']*)'|"([^"]*)")\s*,\s*type\s*:\s*'mod'\s*\}/g;
+    let m;
+    while ((m = re.exec(src)) !== null) names.add(m[1] !== undefined ? m[1] : m[2]);
+    return names;
+  }
+
+  // 41.4  Every reg_nv 'mod' entry exists in WEAPON_MODS.CSV
+  {
+    const csvNames = getModCsvNames(dbNv41);
+    const regNames = getRegModNames(regNv41);
+    const missing = [...regNames].filter(n => !csvNames.has(n));
+    assert(
+      missing.length === 0,
+      `FNV: all registry mods exist in WEAPON_MODS.CSV (missing: ${missing.join(', ') || 'none'})`
+    );
+  }
+
+  // 41.5  Every WEAPON_MODS.CSV row exists in reg_nv 'mod' entries
+  {
+    const csvNames = getModCsvNames(dbNv41);
+    const regNames = getRegModNames(regNv41);
+    const missing = [...csvNames].filter(n => !regNames.has(n));
+    assert(
+      missing.length === 0,
+      `FNV: all WEAPON_MODS.CSV rows exist in registry (missing: ${missing.join(', ') || 'none'})`
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

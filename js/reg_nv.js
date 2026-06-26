@@ -201,7 +201,7 @@ const FALLOUT_REGISTRY = {
   ],
 
   // ── ITEMS ──────────────────────────────────────────────────────────────────
-  // type: 'weapon' | 'armor' | 'aid' | 'ammo' | 'misc'
+  // type: 'weapon' | 'armor' | 'aid' | 'ammo' | 'misc' | 'mod'
   // Data source: https://fallout.wiki/wiki/Fallout:_New_Vegas_weapons
   //              https://fallout.wiki/wiki/Fallout:_New_Vegas_armor_and_clothing
   //              https://fallout.wiki/wiki/Fallout:_New_Vegas_consumables
@@ -607,6 +607,143 @@ const FALLOUT_REGISTRY = {
     // Source: https://fallout.wiki/wiki/Caravan_(game)
     { name: 'Caravan Deck', type: 'misc' },
     { name: 'Caravan Card', type: 'misc' },
+
+    // ── WEAPON MODS ───────────────────────────────────────────────────────────
+    // Source: https://fallout.wiki/wiki/Fallout:_New_Vegas_Weapon_Mods (CC-BY-SA 4.0)
+    // Base game mods — GUNS: Pistols
+    { name: '.357 Revolver Long Barrel', type: 'mod' },
+    { name: '.357 Revolver HD Cylinder', type: 'mod' },
+    { name: '.44 Revolver Scope', type: 'mod' },
+    { name: '.44 Revolver Heavy Frame', type: 'mod' },
+    { name: '.45 AP HD Slide', type: 'mod' },
+    { name: '.45 AP Silencer', type: 'mod' },
+    { name: '9mm Pistol Extended Mags', type: 'mod' },
+    { name: '9mm Pistol Scope', type: 'mod' },
+    { name: '10mm Pistol Silencer', type: 'mod' },
+    { name: '10mm Pistol Extended Mags', type: 'mod' },
+    { name: '10mm Pistol Laser Sight', type: 'mod' },
+    { name: '12.7mm Pistol Silencer', type: 'mod' },
+    // GRA: Hunting Revolver
+    { name: 'Hunting Rev. 6-Shot Cylinder', type: 'mod' },
+    { name: 'Hunting Rev. Match Barrel', type: 'mod' },
+    // Base game mods — GUNS: Rifles
+    { name: 'Anti-Mat. Rifle CF Parts', type: 'mod' },
+    { name: 'Anti-Mat. Rifle Custom Bolt', type: 'mod' },
+    { name: 'Anti-Mat. Rifle Suppressor', type: 'mod' },
+    { name: 'Assault Carbine Extended Magazines', type: 'mod' },
+    // GRA: Assault Carbine
+    { name: 'Assault Carb. Ext. Mags', type: 'mod' },
+    { name: 'Assault Carb. Forged Receiver', type: 'mod' },
+    { name: 'Assault Carb. Light Bolt', type: 'mod' },
+    { name: 'Auto. Rifle Upgr. Internals', type: 'mod' },
+    { name: 'Brush Gun Forged Receiver', type: 'mod' },
+    { name: 'Cby. Rep. Custom Action', type: 'mod' },
+    { name: 'Cby. Rep. Long Tube', type: 'mod' },
+    { name: 'Cby. Rep. Maple Stock', type: 'mod' },
+    { name: 'Hunting Rifle Extended Mag', type: 'mod' },
+    { name: 'Hunting Rifle Scope', type: 'mod' },
+    { name: 'Hunting Rifle Custom Action', type: 'mod' },
+    { name: 'Light MG Expanded Drums', type: 'mod' },
+    { name: 'Sniper Rifle Carbon Fiber Parts', type: 'mod' },
+    { name: 'Sniper Rifle Suppressor', type: 'mod' },
+    { name: 'Svc. Rifle Forged Receiver', type: 'mod' },
+    { name: 'Svc. Rifle Upgraded Springs', type: 'mod' },
+    { name: 'Trail Carbine Scope', type: 'mod' },
+    { name: 'Varmint Rifle Extended Mags', type: 'mod' },
+    { name: 'Varmint Rifle Night Scope', type: 'mod' },
+    { name: 'Varmint Rifle Silencer', type: 'mod' },
+    // Base game mods — GUNS: SMGs
+    { name: '.45 Auto SMG Comp.', type: 'mod' },
+    { name: '.45 Auto SMG Drums', type: 'mod' },
+    { name: '9mm SMG Drums', type: 'mod' },
+    { name: '9mm SMG Light Bolt', type: 'mod' },
+    { name: '10mm SMG Extended Mags', type: 'mod' },
+    { name: '10mm SMG Recoil Comp.', type: 'mod' },
+    { name: '12.7mm Submachine Gun Silencer', type: 'mod' },
+    // GRA: 12.7mm SMG
+    { name: '12.7mm SMG Laser Sight', type: 'mod' },
+    { name: '12.7mm SMG Stacked Magazine', type: 'mod' },
+    { name: '12.7mm SMG Suppressor', type: 'mod' },
+    { name: 'Sil. .22 SMG Exp. Drums', type: 'mod' },
+    // Base game mods — GUNS: Shotguns
+    { name: 'Hunting Shotgun Long Tube', type: 'mod' },
+    { name: 'Hunting Shotgun Choke', type: 'mod' },
+    // OWB DLC mods — GUNS: Heavy
+    { name: 'K9000 Mod - Resla Roil', type: 'mod' },
+    { name: 'K9000 Mod - Mentat Chow', type: 'mod' },
+    // Base game mods — GUNS: Heavy
+    { name: 'Minigun Damped Subframe', type: 'mod' },
+    { name: 'Minigun High-Speed Motor', type: 'mod' },
+    // OWB DLC mods — GUNS: Heavy
+    { name: 'SMMG Mechanical Upgrade', type: 'mod' },
+    { name: 'SMMG Recoil Compensator', type: 'mod' },
+    { name: 'SMMG Extended Magazine', type: 'mod' },
+    // GRA: Energy pistols
+    { name: 'Laser Pistol Combat Sights', type: 'mod' },
+    { name: 'Laser Pistol Focus Optics', type: 'mod' },
+    { name: 'Laser Pistol Recycler', type: 'mod' },
+    { name: 'Plasma Def. Hi-Cap Terminal', type: 'mod' },
+    { name: 'Plasma Def. Scope', type: 'mod' },
+    { name: 'Plasma Def. Sheath Stabilizer', type: 'mod' },
+    { name: 'Plas. Pistol Hi-Energy Ionizer', type: 'mod' },
+    { name: 'Plas. Pistol Mag. Accelerator', type: 'mod' },
+    { name: 'Plas. Pistol Recycler', type: 'mod' },
+    // Dead Money DLC mods — Energy rifles
+    { name: 'Holorifle Focus Optics', type: 'mod' },
+    { name: 'Holorifle Adv. Calibration', type: 'mod' },
+    { name: 'Holorifle Reinf. Components', type: 'mod' },
+    // OWB DLC mods — Energy rifles
+    { name: 'LAER Mod - Auxiliary Recharger Clip', type: 'mod' },
+    { name: 'LAER Mod - Prismatic Lens', type: 'mod' },
+    // Base game mods — Energy rifles
+    { name: 'Laser RCW Recycler', type: 'mod' },
+    { name: 'Laser Rifle Focus Optics', type: 'mod' },
+    { name: 'Laser Rifle Beam Splitter', type: 'mod' },
+    { name: 'Laser Rifle Scope', type: 'mod' },
+    { name: 'Plasma Rifle Mag. Accelerator', type: 'mod' },
+    // GRA: Energy rifles
+    { name: 'Tri-beam LR Focus Optics', type: 'mod' },
+    { name: 'Tri-beam LR HD Caps', type: 'mod' },
+    { name: 'Tri-beam LR Hi-Cap Terminal', type: 'mod' },
+    // Base game mods — Energy heavy
+    { name: 'Flamer Expanded Tanks', type: 'mod' },
+    { name: 'Gat. Laser Focus Optics', type: 'mod' },
+    { name: 'Gat. Laser CF Frame', type: 'mod' },
+    { name: 'Plasma Caster HS Electrode', type: 'mod' },
+    // GRA: Explosives
+    { name: '25mm G. APW Exp. Drum', type: 'mod' },
+    { name: '25mm G. APW Long Barrel', type: 'mod' },
+    { name: '25mm G. APW Upgraded Int.', type: 'mod' },
+    // Base game mods — Explosives
+    { name: 'Grenade Rifle Long Barrel', type: 'mod' },
+    { name: 'Fat Man Little Boy Kit', type: 'mod' },
+    { name: 'Grenade MG High-Speed Kit', type: 'mod' },
+    { name: 'Miss. Launcher Guidance Sys.', type: 'mod' },
+    // Lonesome Road DLC mods
+    { name: 'Red Glare Alpha Strike', type: 'mod' },
+    { name: 'Red Glare Auto Launcher', type: 'mod' },
+    { name: 'Red Glare Far Sighting', type: 'mod' },
+    // GRA: Melee
+    { name: 'Chainsaw Alloy Frame', type: 'mod' },
+    { name: 'Chainsaw Carbide Teeth', type: 'mod' },
+    { name: 'Chainsaw HD Chain', type: 'mod' },
+    { name: 'Katana Authentic Blade', type: 'mod' },
+    { name: 'Katana Balanced Grip', type: 'mod' },
+    { name: 'Katana Protective Sheath', type: 'mod' },
+    { name: 'Ripper Carbide Teeth', type: 'mod' },
+    { name: 'Ripper HD Chain', type: 'mod' },
+    { name: 'Baseball Bat Cork Core', type: 'mod' },
+    { name: 'Baseball Bat Maple Body', type: 'mod' },
+    { name: 'Baseball Bat Nails', type: 'mod' },
+    // Base game mods — Melee
+    { name: 'War Club Casings', type: 'mod' },
+    { name: 'War Club Honors', type: 'mod' },
+    // Base game mods — Unarmed
+    { name: 'Bear Trap Fist HD Springs', type: 'mod' },
+    // GRA: Unarmed
+    { name: 'Power Fist Chromed Tubes', type: 'mod' },
+    { name: 'Power Fist Hi-Cap Valves', type: 'mod' },
+    { name: 'Power Fist Ported Chambers', type: 'mod' },
   ],
 
   // ── PERKS ──────────────────────────────────────────────────────────────────

@@ -967,7 +967,7 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
 Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-40)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
@@ -1487,6 +1487,77 @@ $renderBody40 = ''
 try { $renderBody40 = Get-FunctionBody $uiSrc40 'renderInventory' } catch {}
 Check ([bool]($renderBody40 -match '_invFilter')) `
     'renderInventory() references _invFilter to honour the active category filter'
+
+# ===========================================================
+# Suite 41 -- Weapon Mods CSV + Registry Parity (Phase 4d-ii)
+# [WEAPON_MODS.CSV] structural guard: section exists, correct
+# column header, all rows 5 cols; parity between db_nv.js CSV
+# and reg_nv.js 'mod' entries in both directions.
+# 5 tests
+# ===========================================================
+Sep "Suite 41 -- Weapon Mods CSV + Registry Parity"
+$dbNv41  = Read-Src 'js/db_nv.js'
+$regNv41 = Read-Src 'js/reg_nv.js'
+
+# 41.1  [WEAPON_MODS.CSV] section exists in db_nv.js
+Check ([bool]($dbNv41 -match '\[WEAPON_MODS\.CSV\]')) `
+    'db_nv.js contains [WEAPON_MODS.CSV] section'
+
+# 41.2 + 41.3  Column header correct; all data rows have exactly 5 columns
+$modBlockMatch = [regex]::Match($dbNv41, '(?s)\[WEAPON_MODS\.CSV\](.*?)(?=\n\[|\n`;)')
+if (-not $modBlockMatch.Success) {
+    Fail 'db_nv.js [WEAPON_MODS.CSV]: could not extract block'
+} else {
+    $modLines = ($modBlockMatch.Groups[1].Value -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' })
+    $EXPECTED_HEADER = 'Name,Weapon,Effect,Value,Weight'
+    Check ($modLines.Count -ge 1 -and $modLines[0] -eq $EXPECTED_HEADER) `
+        "[WEAPON_MODS.CSV] header is `"$EXPECTED_HEADER`""
+    $EXPECTED_COLS = ($EXPECTED_HEADER -split ',').Count
+    $badRows = @()
+    for ($r = 1; $r -lt $modLines.Count; $r++) {
+        $cols = ($modLines[$r] -split ',').Count
+        if ($cols -ne $EXPECTED_COLS) { $badRows += "row $($r+1) ($cols cols)" }
+    }
+    Check ($badRows.Count -eq 0) "[WEAPON_MODS.CSV] all data rows have $EXPECTED_COLS columns$(if($badRows.Count){' -- bad: ' + ($badRows -join '; ')})"
+}
+
+# Helper: get mod Names from WEAPON_MODS.CSV
+function Get-ModCsvNames([string]$src) {
+    $idx = $src.IndexOf('[WEAPON_MODS.CSV]')
+    if ($idx -lt 0) { return [System.Collections.Generic.HashSet[string]]::new() }
+    $rest = $src.Substring($idx + 17)
+    $endMatch = [regex]::Match($rest, '\n\[|\n`;')
+    $block = if ($endMatch.Success) { $rest.Substring(0, $endMatch.Index) } else { $rest }
+    $names = [System.Collections.Generic.HashSet[string]]::new()
+    foreach ($l in ($block -split "`n")) {
+        $t = $l.Trim()
+        if (-not $t -or $t.StartsWith('[') -or $t.StartsWith('Name,')) { continue }
+        $name = ($t -split ',')[0].Trim()
+        if ($name) { [void]$names.Add($name) }
+    }
+    return $names
+}
+
+# Helper: get 'mod' type names from registry
+function Get-RegModNames([string]$src) {
+    $names = [System.Collections.Generic.HashSet[string]]::new()
+    $re = [regex]"{\s*name\s*:\s*(?:'([^']*)'|`"([^`"]*)`")\s*,\s*type\s*:\s*'mod'\s*}"
+    foreach ($m in $re.Matches($src)) {
+        $val = if ($m.Groups[1].Success) { $m.Groups[1].Value } else { $m.Groups[2].Value }
+        [void]$names.Add($val)
+    }
+    return $names
+}
+
+# 41.4  Every reg_nv 'mod' entry exists in WEAPON_MODS.CSV
+$csvNames41 = Get-ModCsvNames $dbNv41
+$regNames41 = Get-RegModNames $regNv41
+$missing41a = @($regNames41 | Where-Object { -not $csvNames41.Contains($_) })
+Check ($missing41a.Count -eq 0) "FNV: all registry mods exist in WEAPON_MODS.CSV$(if($missing41a.Count){' (missing: ' + ($missing41a -join ', ') + ')'})"
+
+# 41.5  Every WEAPON_MODS.CSV row exists in reg_nv 'mod' entries
+$missing41b = @($csvNames41 | Where-Object { -not $regNames41.Contains($_) })
+Check ($missing41b.Count -eq 0) "FNV: all WEAPON_MODS.CSV rows exist in registry$(if($missing41b.Count){' (missing: ' + ($missing41b -join ', ') + ')'})"
 
 # ===========================================================
 # Results
