@@ -222,6 +222,18 @@ button.action-btn:hover {
      cell clip its content so the 1fr track can stay within the viewport. */
   min-width: 0;
   overflow: hidden;
+  /* Give cells vertical presence: aspect-ratio derives height from the
+     resolved track width so cells are roughly square without widening.
+     min-height is a floor for very wide tracks on desktop. */
+  aspect-ratio: 1 / 1;
+  min-height: 38px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2px;
+  box-sizing: border-box;
 }
 .map-cell:hover {
   background: rgba(20, 253, 206, 0.2);

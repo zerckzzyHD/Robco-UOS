@@ -794,6 +794,22 @@ rather than re-querying `navigator.serviceWorker.ready.then(r => r.waiting.postM
 "waiting" state is the mechanism that makes `reg.waiting` non-null and the SKIP_WAITING message
 path reachable. `skipWaiting()` belongs only in the `message` listener.
 
+### 9. The Collapsed-Panel Width Trap — `offsetWidth === 0` on mobile (v2.0.1-r8)
+
+**What happened:** `renderWorldMap()` is called from `loadUI()` at boot. On mobile, the World Map
+`<details>` panel is closed by default (panels only auto-open on desktop). A closed `<details>`
+panel reports `offsetWidth === 0` for any element inside it. The `isNarrow` gate was
+`display.offsetWidth > 0 && display.offsetWidth < 490` — the `> 0` guard meant a 0-width
+measurement always produced `isNarrow = false`, so the full 6×6 grid was baked in on every mobile
+cold load. The FULL MAP toggle was also gated on `isNarrow`, so it never appeared.
+**Fix:** `const measuredW = display.offsetWidth || window.innerWidth; const isNarrow = measuredW < 490;`
+— falls back to viewport width when the panel is collapsed. Also added a re-render call in the
+`<details>` toggle listener for `worldMapPanel` so the correct view loads the first time the user
+opens the panel on any device.
+**Lesson:** Never trust `element.offsetWidth` as a "is this narrow?" signal inside a collapsed
+`<details>` panel. The element is in the DOM but not laid out — offsetWidth is 0. Always have a
+layout-independent fallback (viewport width, a CSS media query, or a resize observer).
+
 ---
 
 ## Service Worker Cache Protocol

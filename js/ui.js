@@ -524,6 +524,8 @@ window.onload = function () {
       const ps = JSON.parse(localStorage.getItem('robco_panel_state') || '{}');
       ps[id] = d.open;
       localStorage.setItem('robco_panel_state', JSON.stringify(ps));
+      if (d.id === 'worldMapPanel' && d.open && typeof renderWorldMap === 'function')
+        renderWorldMap();
     });
   });
 
@@ -3180,7 +3182,8 @@ function renderWorldMap() {
   // ── ZOOM LEVEL 1: STRATEGIC WORLD VIEW ───────────────────────────
   // Narrow viewports (< 490px) default to a 4×4 core-zone view (rows 2–5, cols 2–5).
   // A toggle expands to the full 6×6.
-  const isNarrow = display.offsetWidth > 0 && display.offsetWidth < 490;
+  const measuredW = display.offsetWidth || window.innerWidth;
+  const isNarrow = measuredW < 490;
   const showFull = display.dataset.mapFull === '1';
   const useFull = !isNarrow || showFull;
 
