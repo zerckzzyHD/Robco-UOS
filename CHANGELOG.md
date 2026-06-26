@@ -1,4 +1,26 @@
-## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 209/209 | Cache: robco-terminal-v2.0.1-r6 -->
+## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 209/209 | Cache: robco-terminal-v2.0.1-r7 -->
+
+### [B6] Mobile Regressions — Faction buttons & World Map overflow (2026-06-26)
+
+Two regressions introduced in commit 73a16e4 (v2.0.1), diagnosed by Opus and implemented/verified by Sonnet per Protocol 8.
+
+**Regression 1 — FACTION STANDING buttons rendered as huge full-width stacked rectangles.**
+
+- **Root cause**: v2.0.1 moved button styling into `.faction-btn` but never overrode the global `button { width:100%; padding:12px; margin-top:5px }` rule. With `flex-wrap:wrap` on `.faction-card-btns`, each 100%-wide button stacked one per row, making every faction card enormous.
+- **Fix** (`css/terminal.css`, `.faction-btn` only): added `width:auto; flex:0 0 auto; padding:2px 4px; margin-top:0; box-sizing:border-box` to override the global rule. Buttons are now 28×28px and sit in a compact row within each faction card.
+- **Verification (360px)**: all 4 buttons per card at identical Y coordinate, confirmed in-row. **Not regressed at 1280px**: buttons remain 28px wide and wrap 2×2 within narrow cards — the `flex-wrap` is intentional.
+
+**Regression 2 — WORLD MAP grid overflowed the viewport, scrolling the whole page right.**
+
+- **Root cause**: the map grid used `repeat(N,1fr)` with default `min-width:auto` on grid items. `1fr` doesn't shrink below a track's minimum content size; with `white-space:nowrap` on `.map-cell-name`, the minimum was the full unbroken location name width. The grid expanded wider than the viewport.
+- **Fix** (`js/ui.js` line 3207 + `css/terminal.css`):
+  - Changed `repeat(${cols},1fr)` → `repeat(${cols},minmax(0,1fr))` so tracks can shrink to zero before forcing overflow. Added `max-width:100%` to the grid container's inline style.
+  - Added `min-width:0; overflow:hidden` to `.map-cell` in CSS so grid items can shrink without exposing their content. `text-overflow:ellipsis` on `.map-cell-name` (already present) now engages correctly.
+- **Verification**: at 360px `docScrollWidth=innerWidth=360` (zero overflow); map `scrollWidth=offsetWidth=306`. At 412px same (`scrollWidth=offsetWidth=358`). At 1280px `scrollWidth=offsetWidth=348`, unaffected.
+
+**Also:** Added Protocol 8 to `RULES.md` and `CLAUDE.md` codifying the Dispatch multi-model workflow (Opus plans → Sonnet reviews + implements).
+
+- **Cache**: `CACHE_NAME` → `robco-terminal-v2.0.1-r7` (Protocol 1).
 
 ### [B5] Service Worker Update Flow Fix — users no longer need to clear cache (2026-06-26)
 

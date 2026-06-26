@@ -217,6 +217,11 @@ button.action-btn:hover {
   border: 1px solid rgba(20, 253, 206, 0.2);
   cursor: pointer;
   transition: all 0.1s ease;
+  /* Without min-width:0 a grid item won't shrink below its content width
+     (default is min-width:auto = min-content). overflow:hidden lets the
+     cell clip its content so the 1fr track can stay within the viewport. */
+  min-width: 0;
+  overflow: hidden;
 }
 .map-cell:hover {
   background: rgba(20, 253, 206, 0.2);
@@ -1270,6 +1275,13 @@ body.thermal-load .panel {
   display: flex;
   align-items: center;
   justify-content: center;
+  /* Override global button{width:100%;padding:12px;margin-top:5px} so buttons
+     stay compact and sit in a row rather than stretching full-width and stacking */
+  width: auto;
+  flex: 0 0 auto;
+  padding: 2px 4px;
+  margin-top: 0;
+  box-sizing: border-box;
 }
 .faction-btn--infamy {
   color: var(--robco-danger);

@@ -3204,7 +3204,7 @@ function renderWorldMap() {
     else compassCols.push('·');
   }
 
-  let html = `<div style="display:grid; grid-template-columns:14px repeat(${cols},1fr); gap:2px; font-size:9px; letter-spacing:0.3px; margin:4px 0;">`;
+  let html = `<div style="display:grid; grid-template-columns:14px repeat(${cols},minmax(0,1fr)); gap:2px; font-size:9px; letter-spacing:0.3px; margin:4px 0; max-width:100%;">`;
 
   // Compass header row
   html += `<div></div>`; // corner spacer

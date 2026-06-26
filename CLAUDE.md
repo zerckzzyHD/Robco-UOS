@@ -130,6 +130,19 @@ Requires changes in **4 files minimum.** The pre-commit audit will block if any 
 
 ---
 
+## Protocol 8 — Dispatch Multi-Model Workflow
+
+For non-trivial tasks run via Dispatch sessions, use a two-step model hand-off:
+
+1. **Opus session** — problem-solving and planning. The Opus session diagnoses the issue, researches the codebase, and produces a written plan (file locations, exact selectors/line numbers, proposed changes, rationale).
+2. **Sonnet session** — review and implementation. The Sonnet session critically reviews the Opus plan against the actual current files (line numbers drift, diagnoses can be stale), then implements the verified plan, runs all gates, and pushes.
+
+Dispatch auto-selects the model per step; the two sessions work hand-in-hand, not in isolation.
+
+**Why:** Opus produces deeper analysis at higher cost; Sonnet implements efficiently at lower cost. The review step catches plan drift and hallucinated selectors before they land in a commit. Neither session should skip the other's role.
+
+---
+
 ## Prohibited Patterns
 
 | Never Do                                                    | Why                                                               |
