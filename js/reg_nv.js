@@ -380,6 +380,52 @@ const FALLOUT_REGISTRY = {
     { name: 'Power Fist', type: 'weapon' },
     { name: 'Saturnite Fist Super-Heated', type: 'weapon' },
     { name: 'Spiked Knuckles', type: 'weapon' },
+    // ── UNARMED: GRA ─────────────────────────────────────────────────────────
+    { name: 'Greased Lightning', type: 'weapon' },
+    { name: 'Embrace of the Mantis King!', type: 'weapon' },
+    // ── UNARMED: Honest Hearts ────────────────────────────────────────────────
+    { name: 'Yao Guai Gauntlet', type: 'weapon' },
+    // ── MELEE: GRA / Courier's Stash ─────────────────────────────────────────
+    { name: 'Chopper', type: 'weapon' },
+    { name: '9 Iron', type: 'weapon' },
+    { name: 'Dress Cane', type: 'weapon' },
+    { name: 'Chainsaw', type: 'weapon' },
+    { name: 'Gehenna', type: 'weapon' },
+    { name: 'Nuka-Breaker', type: 'weapon' },
+    // ── MELEE: Dead Money ────────────────────────────────────────────────────
+    { name: 'Cosmic Knife', type: 'weapon' },
+    { name: 'Cosmic Knife Clean', type: 'weapon' },
+    { name: 'Cosmic Knife Super-Heated', type: 'weapon' },
+    { name: 'Knife Spear', type: 'weapon' },
+    { name: 'Knife Spear Clean', type: 'weapon' },
+    // ── MELEE: Old World Blues ────────────────────────────────────────────────
+    { name: 'Proton Axe', type: 'weapon' },
+    { name: 'Protonic Inversal Axe', type: 'weapon' },
+    // ── MELEE: Lonesome Road ─────────────────────────────────────────────────
+    { name: 'Old Glory', type: 'weapon' },
+    // ── GUNS/HEAVY: GRA ──────────────────────────────────────────────────────
+    { name: 'Esther', type: 'weapon' },
+    { name: 'Sprtel-Wood 9700', type: 'weapon' },
+    { name: 'Cleansing Flame', type: 'weapon' },
+    { name: 'The Smitty Special', type: 'weapon' },
+    // ── ENERGY: Old World Blues Sonic Emitters ────────────────────────────────
+    { name: "Sonic Emitter - Gabriel's Bark", type: 'weapon' },
+    { name: 'Sonic Emitter - Revelation', type: 'weapon' },
+    { name: 'Sonic Emitter - Tarantula', type: 'weapon' },
+    { name: 'Sonic Emitter - Robo-Scorpion', type: 'weapon' },
+    // ── ENERGY: Lonesome Road ────────────────────────────────────────────────
+    { name: 'Arc Welder', type: 'weapon' },
+    // ── EXPLOSIVES: GRA / Courier's Stash ────────────────────────────────────
+    { name: '25mm Grenade APW', type: 'weapon' },
+    { name: 'Time Bomb', type: 'weapon' },
+    // ── EXPLOSIVES: Dead Money ────────────────────────────────────────────────
+    { name: 'Gas Bomb', type: 'weapon' },
+    // ── EXPLOSIVES: Honest Hearts ────────────────────────────────────────────
+    { name: 'Tomahawk', type: 'weapon' },
+    { name: 'Fire Bomb', type: 'weapon' },
+    // ── EXPLOSIVES: Lonesome Road ─────────────────────────────────────────────
+    { name: 'Flash Bang', type: 'weapon' },
+    { name: 'Satchel Charge', type: 'weapon' },
 
     // ── ARMOR: Light ─────────────────────────────────────────────────────────
     { name: 'Advanced Radiation Suit', type: 'armor' },

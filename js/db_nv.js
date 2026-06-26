@@ -163,6 +163,39 @@ Euclid's C-Finder,0,0,1.0,0.5,0.5,8000,0,0,0,0,ARCHIMEDES II Strike,None
 Lily's Vertibird Blade,75,75,1.0,1.5,6,0,0,7,1.0,40,None,None
 Mysterious Magnum,28,42,1.5,1.6,2,5000,0,3,0,0,Plays Harmonica,.357 Magnum
 Vance's Lucky Hat Knife,12,18,1.5,3.5,1,3000,0,0,0.5,20,None,None
+Esther,475,475,1.0,0.4,40,18000,0,8,0,0,Splash,Mini Nuke
+Sprtel-Wood 9700,16,16,1.0,8.5,15,20000,0,6,0,0,Full Auto,Electron Charge Pack
+Cleansing Flame,15,15,1.0,4.0,22,9500,0,7,0,0,Fire DoT,Flamer Fuel
+The Smitty Special,35,35,1.0,2.0,20,20000,0,8,0,0,Full Auto,Microfusion Cell
+25mm Grenade APW,50,50,1.0,1.3,8,4200,0,5,0,25,Splash,25mm Grenade
+Time Bomb,150,150,1.0,0.5,0.5,750,0,1,0,0,Timed/Splash,None
+Chopper,14,14,2.0,3.9,2,800,0,2,0.7,17,None,None
+9 Iron,17,17,1.0,2.3,3,55,0,2,1.0,35,Knockdown,None
+Dress Cane,22,35,1.0,2.3,3,40,50,2,0.9,35,None,None
+Chainsaw,80,8,1.0,4.0,20,2800,75,7,0.7,45,Chainsaw,None
+Gehenna,42,21,2.0,2.8,3,12000,75,6,0.6,22,Fire DoT,None
+Nuka-Breaker,50,50,2.0,1.4,8,7800,50,9,1.2,42,None,None
+Greased Lightning,32,32,1.0,3.0,6,15000,50,5,0.7,35,None,None
+Embrace of the Mantis King!,42,64,3.0,1.6,12,8500,75,4,0.8,25,None,None
+Cosmic Knife,10,10,2.0,3.0,1,55,0,1,0.6,20,None,None
+Cosmic Knife Clean,15,15,1.2,3.0,1,50,0,1,0.6,25,None,None
+Cosmic Knife Super-Heated,14,14,5.0,3.0,1,50,0,1,0.6,25,Fire DoT,None
+Knife Spear,20,20,1.0,1.9,3,55,25,2,0.9,35,None,None
+Knife Spear Clean,25,25,1.2,1.9,3,55,25,2,0.9,35,None,None
+Gas Bomb,80,80,1.0,0.5,5,100,0,1,0,0,Fire DoT/Splash,None
+Tomahawk,30,30,1.0,0.7,0.5,75,50,3,0,23,Thrown,None
+Yao Guai Gauntlet,20,30,2.5,1.6,10,150,50,4,0.8,22,Ignores DT,None
+Fire Bomb,20,20,1.0,0.4,0.5,200,0,2,0,24,Fire DoT/Splash,None
+Proton Axe,50,25,1.0,1.9,8,3500,50,5,1.0,35,EMP/Robot,None
+Protonic Inversal Axe,58,45,1.0,1.9,8,4000,50,5,1.0,35,EMP/Robot,None
+Sonic Emitter - Gabriel's Bark,55,25,1.0,1.0,2,3500,0,2,0,30,Knockback,Energy Cell
+Sonic Emitter - Revelation,31,18,1.0,1.0,2,3500,0,2,0,30,Paralysis,Energy Cell
+Sonic Emitter - Tarantula,60,30,1.0,1.0,2,3500,0,2,0,30,Fire DoT,Energy Cell
+Sonic Emitter - Robo-Scorpion,65,30,1.0,1.0,2,3500,0,2,0,30,Explosion,Energy Cell
+Old Glory,45,80,1.5,1.9,8,2500,50,7,1.1,35,None,None
+Arc Welder,9,9,4.0,8.0,15,3700,0,7,0,0,Full Auto,Electron Charge Pack
+Flash Bang,1,1,1.0,0.7,0.5,50,0,4,0,0,Blind,None
+Satchel Charge,250,250,1.0,0.5,0.75,125,0,4,0,0,Triggered/Splash,None
 
 [AMMO.CSV]
 Caliber,Subtype,DMG_Multiplier,DT_Modifier,Condition_Degradation,Weight_Per_Unit
@@ -218,6 +251,7 @@ Electron Charge Pack,Optimized,1.15,0,1.0,0.0
 Electron Charge Pack,Overcharged,1.5,0,2.0,0.0
 Electron Charge Pack,Bulk,0.75,0,0.75,0.0
 2mm EC,Standard,1.0,0,1.0,0.0
+25mm Grenade,Standard,1.0,0,1.0,0.3
 40mm Grenade,Standard,1.0,0,1.0,0.5
 Flamer Fuel,Standard,1.0,0,1.0,0.02
 Missile,Standard,1.0,0,1.0,3.0
