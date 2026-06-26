@@ -1623,3 +1623,79 @@ body.sync-complete {
   margin-top: 2px;
   letter-spacing: 0.3px;
 }
+
+/* ─── Narrow Phone Layout (≤ 480px) ─────────────────────────────────
+   The mobile-first base styles already collapse the main grid to a single
+   column below 1000px. This block fixes the remaining horizontal overflow
+   on true phone widths (~360–430px): oversized boot/header text, fixed-pixel
+   inputs (e.g. the Location field truncating "Goodsprings"), wide tab
+   buttons, and multi-column sub-grids. Tested against a 390px viewport. */
+@media (max-width: 480px) {
+  body {
+    padding: 6px;
+    font-size: 13px;
+  }
+  .container {
+    padding: 8px;
+  }
+
+  /* Boot screen: wrap and shrink long uplink lines so they never overflow */
+  #bootScreen {
+    font-size: 12px;
+  }
+  #bootLines {
+    width: 94%;
+    word-break: break-word;
+  }
+
+  /* Header / boot title: shrink and allow wrap so it never forces a scrollbar */
+  .header h1 {
+    font-size: 13px;
+    letter-spacing: 1px;
+    line-height: 1.3;
+    word-break: break-word;
+  }
+  .header p {
+    font-size: 9px;
+    word-break: break-word;
+  }
+
+  /* Tab bar: let buttons wrap onto a second row and tighten spacing */
+  .tab-bar {
+    flex-wrap: wrap;
+  }
+  .tab-btn {
+    padding: 4px 8px;
+    letter-spacing: 1px;
+    font-size: 10px;
+  }
+
+  /* Inputs fill the row instead of using fixed pixel widths. The override
+     beats inline style="width:100px/130px" (e.g. #stat_loc) via !important,
+     so the full value is visible and nothing spills past the panel edge. */
+  .input-group {
+    gap: 8px;
+  }
+  .input-group input[type='text'],
+  .input-group input[type='password'],
+  .input-group input[type='number'],
+  .input-group select {
+    flex: 1 1 auto;
+    width: auto !important;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  /* Faction standing drops from 3 columns to 2 to keep cells legible */
+  .faction-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  /* Hard guard: no embedded element may force a horizontal scrollbar */
+  img,
+  pre,
+  table,
+  canvas {
+    max-width: 100%;
+  }
+}

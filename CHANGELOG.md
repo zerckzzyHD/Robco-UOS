@@ -1,4 +1,11 @@
-## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-25 | Tests: 209/209 | Cache: robco-terminal-v2.0.1-r2 -->
+## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-25 | Tests: 209/209 | Cache: robco-terminal-v2.0.1-r3 -->
+
+### [B2] Mobile Layout, Version Sync & Push-Cache Protocol (2026-06-25)
+
+- **Responsive phone layout** (`css/terminal.css`): New `@media (max-width: 480px)` block fixes horizontal overflow on ~360–430 px phones. Boot/header text now shrinks and wraps; tab buttons wrap onto a second row; `.input-group` inputs (including the inline-width `#stat_loc` Location field that was truncating "Goodsprings") flex to fill the row instead of using fixed pixel widths; the faction grid drops from 3 columns to 2; and `img/pre/table/canvas` are capped at `max-width: 100%` to kill any residual horizontal scrollbar. Verified against a 390 px viewport.
+- **Version string sync** (`js/state.js`, `index.html`): `APP_VERSION` bumped `2.0.0` → `2.0.1`; the boot `<title>` and header `<h1>` now read `2.0.1` (they were stuck on `2.0.0`).
+- **Protocol 1 change** (`RULES.md`, `CLAUDE.md`): `CACHE_NAME` must now be bumped before **every** `git push`, not only commits that touch `index.html`/`css`/`js`. Every push forces a client update. Format unchanged (`robco-terminal-v{APP_VERSION}-r{N}`, `N` resets to 1 per `APP_VERSION`). Pre-commit/pre-push gate wording updated accordingly.
+- **Cache**: `CACHE_NAME` → `robco-terminal-v2.0.1-r3`.
 
 ### [HOTFIX] Boot Failure — Missing Script Loaders (2026-06-25)
 

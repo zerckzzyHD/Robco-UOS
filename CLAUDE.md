@@ -5,31 +5,33 @@
 
 ---
 
-## Pre-Commit Gate
+## Pre-Commit / Pre-Push Gate
 
 ```powershell
+# → Bump CACHE_NAME in sw.js FIRST (Protocol 1 — required before EVERY push)
 npm run lint        # ESLint — zero new errors
 npm run format      # Prettier — all files clean
 git add -A
 git commit          # Pre-commit hook: 209 tests must pass
-git push origin main
+git push origin main  # CACHE_NAME must already be bumped (Protocol 1)
 ```
 
 - **209 tests must pass.** If fewer pass, something is broken. Investigate before committing.
+- **Bump `CACHE_NAME` before every push.** No push may ship without a new cache rev (Protocol 1) — this is a hard gate, not just for UI/JS changes.
 - **Never use `--no-verify`** unless the user explicitly authorizes it for a stated emergency.
 
 ---
 
 ## Protocol 1 — Service Worker Cache Bump
 
-Bump `CACHE_NAME` in `sw.js` on **every commit** that modifies `index.html`, `css/terminal.css`, or any file in `js/`.
+Bump `CACHE_NAME` in `sw.js` before **every `git push`** — full stop. Every push must ship a new `CACHE_NAME` so every client is forced to update, regardless of what changed (this includes doc-only, config-only, and test-only pushes).
 
 **Format:** `'robco-terminal-v{APP_VERSION}-r{N}'`
 
 - `N` starts at 1 for each new `APP_VERSION`.
-- Increment `N` on every qualifying commit. No exceptions.
+- Increment `N` on **every push**. No exceptions.
 
-**Why:** The SW is cache-first. Without a new `CACHE_NAME`, cached users silently run the old UI and never see the update prompt.
+**Why:** The SW is cache-first. Without a new `CACHE_NAME`, cached users silently run the old build and never see the "REBOOT TERMINAL" update prompt. Bumping on every push guarantees the prompt fires for all clients on every release.
 
 ---
 

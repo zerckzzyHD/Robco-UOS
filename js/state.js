@@ -1,5 +1,5 @@
 // ── APP VERSION ───────────────────────────────────────────────
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.0.1';
 window.APP_VERSION = APP_VERSION;
 
 // ── FACTION REGISTRY ─────────────────────────────────────────────

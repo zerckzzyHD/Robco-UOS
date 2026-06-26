@@ -787,7 +787,7 @@ The Service Worker (`sw.js`) uses a **cache-first** strategy. Once a user has vi
 
 ### The Rule
 
-**Bump `CACHE_NAME` in `sw.js` on every commit that modifies:**
+**Bump `CACHE_NAME` in `sw.js` before _every_ `git push` — no exceptions.** Every push must ship a new cache rev so all clients are forced to update (this includes doc-only, config-only, and test-only pushes). The following always qualify and must never ship without a bump:
 
 - `index.html` (any UI change, new panel, new button, layout tweak)
 - `css/terminal.css` (any style change)
@@ -802,7 +802,7 @@ The Service Worker (`sw.js`) uses a **cache-first** strategy. Once a user has vi
 
 - `APP_VERSION` matches the current `APP_VERSION` in `state.js`
 - `N` is a monotonically increasing integer, starting at 1 for each new `APP_VERSION`
-- Increment `N` on every qualifying commit, regardless of how small the change is
+- Increment `N` on every push, regardless of how small the change is
 
 **Examples:**
 
