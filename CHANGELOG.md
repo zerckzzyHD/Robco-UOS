@@ -1,4 +1,4 @@
-## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 251/251 | Cache: robco-terminal-v2.0.1-r20 -->
+## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 253/253 | Cache: robco-terminal-v2.0.1-r21 -->
 
 ### Added
 
@@ -26,16 +26,19 @@
 - A zone is no longer incorrectly highlighted just because its name shares letters with another zone. Only the single best-matching zone highlights at a time.
 - The CURRENT marker now only appears on your actual location. Previously a location whose name contained the name of another location (such as Goodsprings containing "springs") would incorrectly mark both.
 - The map view preference (core vs. full map) now persists across reloads, tab switches, and location changes.
+- Tapping any input on iOS or Android no longer causes the page to zoom in and stay zoomed. The zoom was triggered by input font sizes below 16px, and because the zoom persisted across reloads, the page looked fine on a fresh visit but appeared oversized and clipped the right side — including buttons in the Campaign tab — on every subsequent reload. All inputs now render at 16px on phones.
 
 ### Improved
 
 - First mobile layout pass: header and boot text wrap instead of overflowing, tab buttons stack when needed, input fields expand to fill available space, the faction grid uses two columns on narrow screens, and images and tables are capped at screen width.
+- Added two extra overflow guards on phones: the page root element (in addition to the page body) now clips horizontal overflow, and status-effect animations that could shear content off the right edge are disabled on narrow screens.
 
 ### Under the Hood
 
 - Added an automated guard to the commit gate that blocks any commit where the service worker cache version was not bumped from the last release. Forgetting to update the cache version is now impossible to commit, not just discouraged. Protocol 1 updated to reflect the enforcement.
 - Both automated test runners were brought to parity and now run the same tests. Previously the Windows runner was silently skipping many tests.
 - Added 42 new automated tests guarding the map fixes, static layout invariants, and service-worker rules from regressing.
+- Added 2 new automated tests confirming that both the page root and body block horizontal overflow, and that the mobile media query sets a 16px minimum font size on all inputs (auto-zoom guard).
 - Added an optional Playwright render check for mobile overflow at 360px and 412px.
 - Normalized line endings across all files to prevent false diffs.
 - Added and refined agent protocols 8 through 28 governing the multi-model workflow, dispatch reporting, UI verification, deploy verification, mobile standards, and process rules.

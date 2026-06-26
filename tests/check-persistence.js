@@ -858,7 +858,7 @@ assert(
 // ══════════════════════════════════════════════════════════════
 //  SUITE 15 — CSS Invariants (Protocol 20)
 //  Verifies critical CSS rules that guard mobile layout and faction button sizing.
-//  8 tests
+//  10 tests
 // ══════════════════════════════════════════════════════════════
 header('CSS Invariants (Protocol 20)');
 const cssSource = readFile('css/terminal.css');
@@ -883,6 +883,12 @@ assert(
   '@media max-width:480px has max-width:56px for number inputs'
 );
 assert(/width\s*:\s*100%/.test(buttonRule), 'global button{} has width:100%');
+const htmlRule = (cssSourceStripped.match(/html\s*\{[^}]*\}/) || [''])[0];
+assert(/overflow-x\s*:\s*hidden/.test(htmlRule), 'html{} has overflow-x:hidden');
+assert(
+  /@media[^{]*480px[\s\S]{0,5000}font-size\s*:\s*16px\s*!important/.test(cssSource),
+  '@media max-width:480px sets font-size:16px on inputs (auto-zoom guard)'
+);
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 16 — Service Worker Invariants (Protocol 20)

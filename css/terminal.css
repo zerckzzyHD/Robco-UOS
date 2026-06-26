@@ -7,6 +7,9 @@
   --robco-blue: #3498db;
   --robco-refresh: rgba(20, 253, 206, 0.12);
 }
+html {
+  overflow-x: hidden;
+}
 body {
   background-color: #010a07;
   color: var(--robco-green);
@@ -1755,5 +1758,42 @@ body.sync-complete {
   table,
   canvas {
     max-width: 100%;
+  }
+
+  /* AUTO-ZOOM GUARD — iOS/Android zoom any focusable input whose font-size is
+     below 16px and persist that zoom across reloads. A fresh navigation resets
+     scale to 1.0, so the page looks fine on a clean load but is zoomed-in and
+     clipped after a reload. !important beats the UA 13px default, the 12px
+     SPECIAL/skills rule, and any inline style="font-size:12px" on those inputs.
+     Widths are unaffected — box-sizing:border-box + the existing max-width caps
+     (56px numbers, 100% text) still hold, so this does NOT reintroduce the
+     r5 number-input ballooning. */
+  input[type='number'],
+  input[type='text'],
+  input[type='password'],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  /* Cap standalone controls (outside .input-group) at viewport width. */
+  select,
+  textarea,
+  input[type='password'] {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Neutralize horizontal-shear animations on mobile — weight/rad overlays
+     apply translate/skew keyframes that can push content past the right edge
+     when the viewport is zoom-locked from a previous visit. Desktop keeps
+     the effects; they are disabled only on narrow screens. */
+  body.weight-heavy .col-left,
+  body.weight-critical .col-left,
+  body.weight-over .col-left,
+  body.rad-warning .crt-overlay,
+  body.rad-critical .crt-overlay,
+  body.rad-fatal .crt-overlay {
+    animation: none !important;
   }
 }

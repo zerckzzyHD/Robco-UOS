@@ -522,7 +522,7 @@ try {
 # ===========================================================
 # Suite 15 -- CSS Invariants (Protocol 20)
 # Verifies critical CSS rules that guard mobile layout and faction button sizing.
-# 8 tests
+# 10 tests
 # ===========================================================
 Sep "Suite 15 -- CSS Invariants (Protocol 20)"
 $cssSrc = Read-Src "css/terminal.css"
@@ -541,6 +541,9 @@ Check ($mapCellRule -match 'overflow\s*:\s*hidden')        '.map-cell has overfl
 Check ($mapCellRule -match 'min-height|aspect-ratio')      '.map-cell has height floor (min-height or aspect-ratio)'
 Check ([bool]([regex]::Match($cssSrc, '(?s)@media[^{]*480px.{0,2000}max-width\s*:\s*56px').Success)) '@media max-width:480px has max-width:56px for number inputs'
 Check ($buttonRule -match 'width\s*:\s*100%')              'global button{} has width:100%'
+$htmlRule = ([regex]::Match($cssSrcStripped, 'html\s*\{[^}]*\}')).Value
+Check ($htmlRule -match 'overflow-x\s*:\s*hidden')         'html{} has overflow-x:hidden'
+Check ([bool]([regex]::Match($cssSrc, '(?s)@media[^{]*480px.{0,5000}font-size\s*:\s*16px\s*!important').Success)) '@media max-width:480px sets font-size:16px on inputs (auto-zoom guard)'
 
 # ===========================================================
 # Suite 16 -- Service Worker Invariants (Protocol 20)
