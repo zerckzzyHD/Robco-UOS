@@ -600,17 +600,9 @@
             <summary>
               <h2>> SKILL MATRIX</h2>
             </summary>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2px 10px">
-              <div
-                style="
-                  display: flex;
-                  justify-content: space-between;
-                  align-items: center;
-                  padding: 3px 0;
-                  border-bottom: 1px dashed rgba(20, 253, 206, 0.15);
-                "
-              >
-                <label style="font-size: 11px">Barter</label
+            <div class="skills-grid">
+              <div class="skill-row">
+                <label>Barter</label
                 ><input
                   type="number"
                   id="sk_barter"
@@ -618,19 +610,10 @@
                   min="0"
                   max="100"
                   oninput="saveState()"
-                  style="width: 42px; text-align: center; padding: 2px 3px; font-size: 12px"
                 />
               </div>
-              <div
-                style="
-                  display: flex;
-                  justify-content: space-between;
-                  align-items: center;
-                  padding: 3px 0;
-                  border-bottom: 1px dashed rgba(20, 253, 206, 0.15);
-                "
-              >
-                <label style="font-size: 11px">Energy Weapon</label
+              <div class="skill-row">
+                <label>Energy Weapon</label
                 ><input
                   type="number"
                   id="sk_energy_weapons"
@@ -638,19 +621,10 @@
                   min="0"
                   max="100"
                   oninput="saveState()"
-                  style="width: 42px; text-align: center; padding: 2px 3px; font-size: 12px"
                 />
               </div>
-              <div
-                style="
-                  display: flex;
-                  justify-content: space-between;
-                  align-items: center;
-                  padding: 3px 0;
-                  border-bottom: 1px dashed rgba(20, 253, 206, 0.15);
-                "
-              >
-                <label style="font-size: 11px">Explosives</label
+              <div class="skill-row">
+                <label>Explosives</label
                 ><input
                   type="number"
                   id="sk_explosives"
@@ -658,19 +632,10 @@
                   min="0"
                   max="100"
                   oninput="saveState()"
-                  style="width: 42px; text-align: center; padding: 2px 3px; font-size: 12px"
                 />
               </div>
-              <div
-                style="
-                  display: flex;
-                  justify-content: space-between;
-                  align-items: center;
-                  padding: 3px 0;
-                  border-bottom: 1px dashed rgba(20, 253, 206, 0.15);
-                "
-              >
-                <label style="font-size: 11px">Guns</label
+              <div class="skill-row">
+                <label>Guns</label
                 ><input
                   type="number"
                   id="sk_guns"
@@ -678,19 +643,10 @@
                   min="0"
                   max="100"
                   oninput="saveState()"
-                  style="width: 42px; text-align: center; padding: 2px 3px; font-size: 12px"
                 />
               </div>
-              <div
-                style="
-                  display: flex;
-                  justify-content: space-between;
-                  align-items: center;
-                  padding: 3px 0;
-                  border-bottom: 1px dashed rgba(20, 253, 206, 0.15);
-                "
-              >
-                <label style="font-size: 11px">Lockpick</label
+              <div class="skill-row">
+                <label>Lockpick</label
                 ><input
                   type="number"
                   id="sk_lockpick"
@@ -698,19 +654,10 @@
                   min="0"
                   max="100"
                   oninput="saveState()"
-                  style="width: 42px; text-align: center; padding: 2px 3px; font-size: 12px"
                 />
               </div>
-              <div
-                style="
-                  display: flex;
-                  justify-content: space-between;
-                  align-items: center;
-                  padding: 3px 0;
-                  border-bottom: 1px dashed rgba(20, 253, 206, 0.15);
-                "
-              >
-                <label style="font-size: 11px">Medicine</label
+              <div class="skill-row">
+                <label>Medicine</label
                 ><input
                   type="number"
                   id="sk_medicine"
@@ -718,19 +665,10 @@
                   min="0"
                   max="100"
                   oninput="saveState()"
-                  style="width: 42px; text-align: center; padding: 2px 3px; font-size: 12px"
                 />
               </div>
-              <div
-                style="
-                  display: flex;
-                  justify-content: space-between;
-                  align-items: center;
-                  padding: 3px 0;
-                  border-bottom: 1px dashed rgba(20, 253, 206, 0.15);
-                "
-              >
-                <label style="font-size: 11px">Melee Wpn</label
+              <div class="skill-row">
+                <label>Melee Wpn</label
                 ><input
                   type="number"
                   id="sk_melee_weapons"
@@ -738,19 +676,10 @@
                   min="0"
                   max="100"
                   oninput="saveState()"
-                  style="width: 42px; text-align: center; padding: 2px 3px; font-size: 12px"
                 />
               </div>
-              <div
-                style="
-                  display: flex;
-                  justify-content: space-between;
-                  align-items: center;
-                  padding: 3px 0;
-                  border-bottom: 1px dashed rgba(20, 253, 206, 0.15);
-                "
-              >
-                <label style="font-size: 11px">Repair</label
+              <div class="skill-row">
+                <label>Repair</label
                 ><input
                   type="number"
                   id="sk_repair"
@@ -758,19 +687,10 @@
                   min="0"
                   max="100"
                   oninput="saveState()"
-                  style="width: 42px; text-align: center; padding: 2px 3px; font-size: 12px"
                 />
               </div>
-              <div
-                style="
-                  display: flex;
-                  justify-content: space-between;
-                  align-items: center;
-                  padding: 3px 0;
-                  border-bottom: 1px dashed rgba(20, 253, 206, 0.15);
-                "
-              >
-                <label style="font-size: 11px">Science</label
+              <div class="skill-row">
+                <label>Science</label
                 ><input
                   type="number"
                   id="sk_science"
@@ -778,19 +698,10 @@
                   min="0"
                   max="100"
                   oninput="saveState()"
-                  style="width: 42px; text-align: center; padding: 2px 3px; font-size: 12px"
                 />
               </div>
-              <div
-                style="
-                  display: flex;
-                  justify-content: space-between;
-                  align-items: center;
-                  padding: 3px 0;
-                  border-bottom: 1px dashed rgba(20, 253, 206, 0.15);
-                "
-              >
-                <label style="font-size: 11px">Sneak</label
+              <div class="skill-row">
+                <label>Sneak</label
                 ><input
                   type="number"
                   id="sk_sneak"
@@ -798,19 +709,10 @@
                   min="0"
                   max="100"
                   oninput="saveState()"
-                  style="width: 42px; text-align: center; padding: 2px 3px; font-size: 12px"
                 />
               </div>
-              <div
-                style="
-                  display: flex;
-                  justify-content: space-between;
-                  align-items: center;
-                  padding: 3px 0;
-                  border-bottom: 1px dashed rgba(20, 253, 206, 0.15);
-                "
-              >
-                <label style="font-size: 11px">Speech</label
+              <div class="skill-row">
+                <label>Speech</label
                 ><input
                   type="number"
                   id="sk_speech"
@@ -818,19 +720,10 @@
                   min="0"
                   max="100"
                   oninput="saveState()"
-                  style="width: 42px; text-align: center; padding: 2px 3px; font-size: 12px"
                 />
               </div>
-              <div
-                style="
-                  display: flex;
-                  justify-content: space-between;
-                  align-items: center;
-                  padding: 3px 0;
-                  border-bottom: 1px dashed rgba(20, 253, 206, 0.15);
-                "
-              >
-                <label style="font-size: 11px">Survival</label
+              <div class="skill-row">
+                <label>Survival</label
                 ><input
                   type="number"
                   id="sk_survival"
@@ -838,18 +731,10 @@
                   min="0"
                   max="100"
                   oninput="saveState()"
-                  style="width: 42px; text-align: center; padding: 2px 3px; font-size: 12px"
                 />
               </div>
-              <div
-                style="
-                  display: flex;
-                  justify-content: space-between;
-                  align-items: center;
-                  padding: 3px 0;
-                "
-              >
-                <label style="font-size: 11px">Unarmed</label
+              <div class="skill-row">
+                <label>Unarmed</label
                 ><input
                   type="number"
                   id="sk_unarmed"
@@ -857,7 +742,6 @@
                   min="0"
                   max="100"
                   oninput="saveState()"
-                  style="width: 42px; text-align: center; padding: 2px 3px; font-size: 12px"
                 />
               </div>
             </div>

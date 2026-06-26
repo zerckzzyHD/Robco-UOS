@@ -1751,59 +1751,90 @@ USE [VATS] COMMAND FOR CONTEXT-AWARE COMBAT ANALYSIS.
   modal.style.display = 'flex';
 }
 
+const COMMAND_REGISTRY = [
+  {
+    group: 'TACTICAL & COMBAT',
+    cmds: [
+      { cmd: '[VATS SIM] / [VS]', desc: 'Melee/Unarmed AP strike optimizer.' },
+      { cmd: '[VVATS]', desc: 'Analyze screenshot for hit %.' },
+      { cmd: '[THREAT] / [TH]', desc: 'Squad TTK & ammo burn calc.' },
+      { cmd: '[TACTICS] / [TA]', desc: 'Multi-companion combat guide.' },
+      { cmd: '[BIO-SCAN]', desc: 'Limb evaluation & med routing.' },
+    ],
+  },
+  {
+    group: 'INVENTORY & ECONOMY',
+    cmds: [
+      { cmd: '[VISUAL UPLOAD:X]', desc: 'Parse screenshot (Wpn/App/Msc).' },
+      { cmd: '[SYNC: data]', desc: 'Batch state update via string.' },
+      { cmd: '[BIND: X, DIR]', desc: 'Assign gear to D-Pad vectors.' },
+      { cmd: '[PAD: DIR]', desc: 'Auto-execute 8-way hotkeys.' },
+      { cmd: '[TRADE: X] / [TD]', desc: 'Live barter math & updates.' },
+      { cmd: '[STASH: Loc] / [-FULL]', desc: 'Network inventory sum/full.' },
+      { cmd: '[EXCESS] / [-FULL]', desc: 'Jury Rig & weight triage.' },
+      { cmd: '[CURRENCY]', desc: 'Weightless Wealth exchange.' },
+      { cmd: '[CRAFT]', desc: 'Consume ingredients to build.' },
+      { cmd: '[AUDIT]', desc: 'Stash value for liquidation.' },
+    ],
+  },
+  {
+    group: 'CHARACTER & BIO-STATUS',
+    cmds: [
+      { cmd: '[TIMER/CHEM] / [CH]', desc: 'Buff ticks & addictions.' },
+      { cmd: '[SQUAD]', desc: 'Squad loadouts & 150lb weight.' },
+      { cmd: '[ROADMAP]', desc: 'Perks to Cap; implant overlap.' },
+    ],
+  },
+  {
+    group: 'NAVIGATION & WORLD STATE',
+    cmds: [
+      { cmd: '[GPS/MAP]', desc: 'Localized geographic compass.' },
+      { cmd: '[TRAVEL CLUSTER] / [TC]', desc: 'Group active quest nodes.' },
+      { cmd: '[WAIT: X Hrs]', desc: 'Advance clock & restock.' },
+      { cmd: '[SLEEP]', desc: 'Advance 8 Hrs, heal HP/Limbs.' },
+      { cmd: '[TIMELINE]', desc: 'Projected narrative timeline.' },
+      { cmd: '[CASINO]', desc: 'Blackjack strategy via LUCK.' },
+    ],
+  },
+  {
+    group: 'NARRATIVE & DIRECTIVES',
+    cmds: [
+      { cmd: '[CROSSROADS]', desc: 'Butterfly-effect lockouts.' },
+      { cmd: '[COMM LINK]', desc: 'NPC persona override. (SEVER)' },
+      { cmd: '[PAUSE]', desc: 'Master Directive (Page One).' },
+      { cmd: '[PAGE 2/3]', desc: 'Dynamic routes & alignment.' },
+      { cmd: '[ARCHIVE]', desc: '3 most recent story choices.' },
+      { cmd: '&& / -Q / -S', desc: 'Chain cmds, Quiet, Stealth.' },
+    ],
+  },
+];
+
 function showHelpModal() {
   const modal = document.getElementById('sysModal');
   const title = document.getElementById('modalTitle');
   const content = document.getElementById('modalContent');
   if (!modal || !title || !content) return;
   title.innerText = '> COMM-LINK COMMAND REGISTRY';
-  content.innerHTML = `<pre style="font-family:inherit;font-size:10px;line-height:1.5;white-space:pre-wrap;">
-┌──────────────────────────────────────────────────────┐
-│ [ TACTICAL &amp; COMBAT SYSTEMS ]                        │
-│ &gt; [VATS SIM] / [VS] : Opt. Melee/Unarmed AP strikes. │
-│ &gt; [VVATS]           : Analyze screenshot for hit %.  │
-│ &gt; [THREAT] / [TH]   : Calc Squad TTK &amp; ammo burn.    │
-│ &gt; [TACTICS] / [TA]  : Multi-companion combat guide.  │
-│ &gt; [BIO-SCAN]        : Evaluate limbs &amp; med routing.  │
-├──────────────────────────────────────────────────────┤
-│ [ INVENTORY &amp; ECONOMY MATRIX ]                       │
-│ &gt; [VISUAL UPLOAD:X] : Parse screenshot (Wpn/App/Msc).│
-│ &gt; [SYNC: data]      : Batch state update via string. │
-│ &gt; [BIND: X, DIR]    : Assign gear to D-Pad vectors.  │
-│ &gt; [PAD: DIR]        : Auto-execute 8-way hotkeys.    │
-│ &gt; [TRADE: X] / [TD] : Live barter math &amp; updates.    │
-│ &gt; [INV]             : Inventory/hotkey/gear log.     │
-│ &gt; [STASH: Loc]/[-FULL]: Network inventory sum/full.  │
-│ &gt; [EXCESS]/[-FULL]  : Jury Rig &amp; weight triage.      │
-│ &gt; [CURRENCY]        : Weightless Wealth exchange.    │
-│ &gt; [CRAFT]           : Consume ingredients to build.  │
-│ &gt; [AUDIT]           : Stash value for liquidation.   │
-├──────────────────────────────────────────────────────┤
-│ [ CHARACTER &amp; BIO-STATUS ]                           │
-│ &gt; [STATS]           : S.P.E.C.I.A.L, Skills, Karma.  │
-│ &gt; [TIMER/CHEM]/[CH] : Buff ticks &amp; addictions.       │
-│ &gt; [REP]             : Dual-Axis Faction Rep &amp; Impact.│
-│ &gt; [SQUAD]           : Squad loadouts &amp; 150lb weight. │
-│ &gt; [ROADMAP]         : Perks to Cap; implant overlap. │
-├──────────────────────────────────────────────────────┤
-│ [ NAVIGATION &amp; WORLD STATE ]                         │
-│ &gt; [GPS/MAP]         : Localized geographic compass.  │
-│ &gt; [TRAVEL CLUSTER]/[TC]: Group active quest nodes.   │
-│ &gt; [WAIT: X Hrs]     : Advance clock &amp; restock.       │
-│ &gt; [SLEEP]           : Advance 8 Hrs, heal HP/Limbs.  │
-│ &gt; [CASINO]          : Blackjack strategy via LUCK.   │
-├──────────────────────────────────────────────────────┤
-│ [ NARRATIVE &amp; DIRECTIVES ]                           │
-│ &gt; [CROSSROADS]      : Butterfly-effect lockouts.     │
-│ &gt; [COMM LINK]       : NPC persona override. (SEVER)  │
-│ &gt; [PAUSE]           : Master Directive (Page One).   │
-│ &gt; [PAGE 2/3]        : Dynamic routes &amp; alignment.    │
-│ &gt; [ARCHIVE]         : 3 most recent story choices.   │
-│ &gt; [DEV 1/2/3]       : Query 'robco_dev_manual.txt'.  │
-│ &gt; [VIEW: D/M]       : Toggle Desktop/Mobile width.   │
-│ &gt; &amp;&amp; / -Q / -S      : Chain cmds, Quiet, Stealth.   │
-└──────────────────────────────────────────────────────┘
-<i style="font-size:9px;opacity:0.6;">Type any command above in the Comm-Link input to execute.</i></pre>`;
+  content.innerHTML =
+    '<div class="cmd-registry">' +
+    COMMAND_REGISTRY.map(
+      g =>
+        '<div class="cmd-group"><div class="cmd-group-title">' +
+        escapeHtml(g.group) +
+        '</div>' +
+        g.cmds
+          .map(
+            c =>
+              '<div class="cmd-card"><span class="cmd-name">' +
+              escapeHtml(c.cmd) +
+              '</span><span class="cmd-desc">' +
+              escapeHtml(c.desc) +
+              '</span></div>'
+          )
+          .join('') +
+        '</div>'
+    ).join('') +
+    '</div><p style="font-size:9px;opacity:0.6;margin-top:8px;">Type any command in the Comm-Link input to execute.</p>';
   modal.style.display = 'flex';
 }
 function clampStat(el) {

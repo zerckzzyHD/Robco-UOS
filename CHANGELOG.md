@@ -1,4 +1,4 @@
-## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 369/369 | Cache: robco-terminal-v2.0.1-r32 -->
+## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 376/376 | Cache: robco-terminal-v2.0.1-r33 -->
 
 ### Added
 
@@ -65,6 +65,9 @@
 - Added a hook installer so the pre-commit gate is automatically set up on a fresh clone after npm install. Previously the hook only existed in .git/hooks and was lost whenever the repo was cloned.
 - Added a one-command rollback script (scripts/rollback.sh) that reverts the offending commit, bumps the cache version, and commits — making the Protocol 16 "restore users first" step a single command instead of a manual multi-step process.
 - Added 6 new automated guard tests (Suite 31, 369 total across 35 suites) that verify the CI workflow has no stale labels, runs both runners, includes the render check, the deploy restricts what it uploads, and the hook-install and boot-smoke scripts exist.
+- Rebuilt the features help menu as a data-driven responsive card grid — five command groups, one card per command, readable on phones without scrolling sideways. Removed five legacy commands that no longer do anything: the Desktop/Mobile width toggle (layout is automatic now), the dev manual query hook, and the three redundant panel shortcuts for stats, inventory, and reputation that were left over from an earlier version of the app. The AI is also no longer instructed to handle those removed commands.
+- Fixed the skill matrix highlight feature (chem boost), which was silently broken: active chems were supposed to glow the matching skill row amber when they were in effect, but the highlight could never attach because the skill rows had no class to target. The rows now use the correct CSS class and the highlight applies and clears correctly.
+- Added 7 new automated guard tests (Suite 32, 376 total across 36 suites) that verify the command registry is data-driven with no legacy pipe characters, all removed commands are absent from both the UI and AI instructions, the skill matrix rows carry the correct class, and the chem-boost highlight function targets them correctly.
 
 ---
 

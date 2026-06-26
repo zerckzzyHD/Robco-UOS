@@ -128,7 +128,6 @@ ${
 }
 Whenever a faction's standing changes (quest completed, action taken, territory entered), update the relevant faction in state.factions by adjusting fame and/or infamy. Both are non-negative integers.
 Always return the FULL state.factions object in the state node — never return a partial object or omit unchanged factions.
-Use [REP] to display all faction standings with the Courier's current fame and infamy values.
 
 ### **Perk System**
 state.perks tracks acquired perks as [{name, rank, level_taken}].
@@ -170,7 +169,6 @@ WHENEVER the user asks for [FEATURES], commands, help, or a command list — out
   "│ > [BIND: X, DIR]    : Assign gear to D-Pad vectors.  │",
   "│ > [PAD: DIR]        : Auto-execute 8-way hotkeys.    │",
   "│ > [TRADE: X] / [TD] : Live barter math & updates.    │",
-  "│ > [INV]             : Inventory/hotkey/gear log.     │",
   "│ > [STASH: Loc]/[-FULL]: Network inventory sum/full.  │",
   "│ > [EXCESS]/[-FULL]  : Jury Rig & weight triage.      │",
   "│ > [CURRENCY]        : Weightless Wealth exchange.    │",
@@ -178,9 +176,7 @@ WHENEVER the user asks for [FEATURES], commands, help, or a command list — out
   "│ > [AUDIT]           : Stash value for liquidation.   │",
   "├──────────────────────────────────────────────────────┤",
   "│ [ CHARACTER & BIO-STATUS ]                           │",
-  "│ > [STATS]           : S.P.E.C.I.A.L, Skills, Karma.  │",
   "│ > [TIMER/CHEM]/[CH] : Buff ticks & addictions.       │",
-  "│ > [REP]             : Dual-Axis Faction Rep & Impact.│",
   "│ > [SQUAD]           : Squad loadouts & 150lb weight. │",
   "│ > [ROADMAP]         : Perks to Cap; implant overlap. │",
   "├──────────────────────────────────────────────────────┤",
@@ -198,8 +194,6 @@ WHENEVER the user asks for [FEATURES], commands, help, or a command list — out
   "│ > [PAUSE]           : Master Directive (Page One).   │",
   "│ > [PAGE 2/3]        : Dynamic routes & alignment.    │",
   "│ > [ARCHIVE]         : 3 most recent story choices.   │",
-  "│ > [DEV 1/2/3]       : Query 'robco_dev_manual.txt'.  │",
-  "│ > [VIEW: D/M]       : Toggle Desktop/Mobile width.   │",
   "│ > && / -Q / -S      : Chain cmds, Quiet, Stealth.   │",
   "└──────────────────────────────────────────────────────┘"
 ]

@@ -1554,7 +1554,7 @@ header('Meta / Runner Parity');
   const jsRunner = readFile('tests/check-persistence.js');
   const psRunner = readFile('tests/check-persistence.ps1');
 
-  // Structural parity: both runners must contain every gate-guard suite marker (22-31).
+  // Structural parity: both runners must contain every gate-guard suite marker (22-32).
   // A missing marker means a suite was added to one runner but not ported to the other.
   const GATE_SUITES = [
     'Suite 22',
@@ -1567,17 +1567,18 @@ header('Meta / Runner Parity');
     'Suite 29',
     'Suite 30',
     'Suite 31',
+    'Suite 32',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-31)' +
+    'JS runner contains all gate-guard suites (22-32)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-31)' +
+    'PS runner contains all gate-guard suites (22-32)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -1731,6 +1732,83 @@ assert(
   fs.existsSync(path.join(ROOT, 'tests', 'boot-smoke.mjs')),
   'tests/boot-smoke.mjs exists (CI boot smoke test — Phase 1c)'
 );
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 32 — Phase 2a Guards (Help Menu Rebuild + Chem Boost Fix)
+//  Data-driven COMMAND_REGISTRY; no box-drawing glyphs; removed commands
+//  absent from both ui.js and api.js; .skill-row markup in index.html;
+//  _applyChemHighlights targets .skill-row selector.
+//  7 tests
+// ══════════════════════════════════════════════════════════════
+header('Phase 2a Guards');
+
+// 32.1 COMMAND_REGISTRY data array exists at module scope in ui.js
+assert(
+  /const COMMAND_REGISTRY\s*=\s*\[/.test(uiSource),
+  'COMMAND_REGISTRY data array declared at module scope in ui.js'
+);
+
+// 32.2 showHelpModal() body references COMMAND_REGISTRY (data-driven rendering)
+{
+  let helpBody32 = '';
+  try {
+    helpBody32 = extractFunctionBody(uiSource, 'showHelpModal');
+  } catch (e) {}
+  assert(
+    /COMMAND_REGISTRY/.test(helpBody32),
+    'showHelpModal() references COMMAND_REGISTRY data array'
+  );
+}
+
+// 32.3 showHelpModal() function body contains no box-drawing glyphs
+{
+  let helpBody32 = '';
+  try {
+    helpBody32 = extractFunctionBody(uiSource, 'showHelpModal');
+  } catch (e) {}
+  assert(
+    !/[│├┤└┘┌─┐]/.test(helpBody32),
+    'showHelpModal() contains no box-drawing glyphs (│ ├ ┤ └ ─ etc.)'
+  );
+}
+
+// 32.4 Removed display commands absent from COMMAND_REGISTRY source in ui.js
+{
+  const cmdRegM = uiSource.match(/const COMMAND_REGISTRY\s*=\s*\[[\s\S]*?\];/);
+  const cmdRegSrc = cmdRegM ? cmdRegM[0] : '';
+  assert(
+    !/VIEW.*D.*M|DEV 1\/2\/3|\[INV\]|\[STATS\]|\[REP\]/.test(cmdRegSrc),
+    'Removed commands ([VIEW: D/M], [DEV 1/2/3], [INV], [STATS], [REP]) absent from COMMAND_REGISTRY'
+  );
+}
+
+// 32.5 Removed commands absent from api.js canonical command list
+assert(
+  !/VIEW.*D.*M|DEV 1\/2\/3|\[INV\]\s*:.*[Ii]nventory|\[STATS\]\s*:|\[REP\]\s*:.*[Ff]action/.test(
+    apiSource
+  ),
+  'Removed commands absent from api.js canonical command list'
+);
+
+// 32.6 index.html skill matrix rows use class="skill-row" (≥13 rows)
+{
+  const htmlSrc32 = readFile('index.html');
+  const count = (htmlSrc32.match(/class="skill-row"/g) || []).length;
+  assert(count >= 13, `index.html skill matrix has ≥13 .skill-row elements (found ${count})`);
+}
+
+// 32.7 _applyChemHighlights() uses .skill-row for both clear and highlight selectors
+{
+  let chemBody32 = '';
+  try {
+    chemBody32 = extractFunctionBody(uiSource, '_applyChemHighlights');
+  } catch (e) {}
+  assert(
+    /querySelectorAll\(['"]\.skill-row\.chem-boost['"]\)/.test(chemBody32) &&
+      /closest\(['"]\.skill-row['"]\)/.test(chemBody32),
+    "_applyChemHighlights() clears via '.skill-row.chem-boost' and applies via closest('.skill-row')"
+  );
+}
 
 // ══════════════════════════════════════════════════════════════
 //  RESULTS

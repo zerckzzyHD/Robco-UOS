@@ -966,11 +966,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-31)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-31)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-32)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-32)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -1049,6 +1049,49 @@ Check (Test-Path (Join-Path $Root 'scripts/install-hooks.js')) `
 # 31.6 boot smoke test exists
 Check (Test-Path (Join-Path $Root 'tests/boot-smoke.mjs')) `
     'tests/boot-smoke.mjs exists (CI boot smoke test -- Phase 1c)'
+
+# ===========================================================
+# Suite 32 -- Phase 2a Guards (Help Menu Rebuild + Chem Boost Fix)
+# Data-driven COMMAND_REGISTRY; no box-drawing glyphs; removed commands
+# absent from both ui.js and api.js; .skill-row markup; _applyChemHighlights
+# targets .skill-row selector.
+# 7 tests
+# ===========================================================
+Sep "Suite 32 -- Phase 2a Guards"
+$uiSrc32  = $uiSrc
+$apiSrc32 = $apiSrc
+
+# 32.1 COMMAND_REGISTRY data array exists in ui.js
+Check ([bool]($uiSrc32 -match 'const COMMAND_REGISTRY\s*=\s*\[')) 'COMMAND_REGISTRY data array declared at module scope in ui.js'
+
+# 32.2 showHelpModal() body references COMMAND_REGISTRY
+$helpBody32 = ''
+try { $helpBody32 = Get-FunctionBody $uiSrc32 'showHelpModal' } catch {}
+Check ([bool]($helpBody32 -match 'COMMAND_REGISTRY')) 'showHelpModal() references COMMAND_REGISTRY data array (data-driven rendering)'
+
+# 32.3 showHelpModal() body has no box-drawing glyphs (check for pipe glyph U+2502)
+Check (-not [bool]($helpBody32 -match [char]0x2502)) 'showHelpModal() contains no box-drawing glyphs (pipe glyph absent)'
+
+# 32.4 Removed commands absent from COMMAND_REGISTRY source in ui.js
+$cmdRegM32 = [regex]::Match($uiSrc32, 'const COMMAND_REGISTRY\s*=\s*\[[\s\S]*?\];')
+$cmdRegSrc32 = if ($cmdRegM32.Success) { $cmdRegM32.Value } else { '' }
+$removed32ok = (-not ($cmdRegSrc32 -match 'VIEW.*D.*M')) -and (-not ($cmdRegSrc32 -match 'DEV 1/2/3')) -and (-not ($cmdRegSrc32 -match '\[INV\]')) -and (-not ($cmdRegSrc32 -match '\[STATS\]')) -and (-not ($cmdRegSrc32 -match '\[REP\]'))
+Check $removed32ok 'Removed legacy commands (VIEW D/M, DEV 1/2/3, INV, STATS, REP) absent from COMMAND_REGISTRY'
+
+# 32.5 Removed commands absent from api.js canonical command list
+$removed32api = (-not ($apiSrc32 -match 'VIEW.*D.*M')) -and (-not ($apiSrc32 -match 'DEV 1/2/3')) -and (-not ($apiSrc32 -match '\[INV\]\s*:\s*Inventory')) -and (-not ($apiSrc32 -match '\[STATS\]\s*:')) -and (-not ($apiSrc32 -match '\[REP\]\s*:\s*Dual'))
+Check $removed32api 'Removed legacy commands absent from api.js canonical command list'
+
+# 32.6 index.html skill matrix has >= 13 class="skill-row" elements
+$htmlSrc32 = Read-Src 'index.html'
+$skillRowCount32 = ([regex]::Matches($htmlSrc32, 'class="skill-row"')).Count
+Check ($skillRowCount32 -ge 13) "index.html skill matrix has >= 13 .skill-row elements (found $skillRowCount32)"
+
+# 32.7 _applyChemHighlights() uses .skill-row for both clear and highlight
+$chemBody32 = ''
+try { $chemBody32 = Get-FunctionBody $uiSrc32 '_applyChemHighlights' } catch {}
+$chem32ok = ([bool]($chemBody32 -match '\.skill-row\.chem-boost')) -and ([bool]($chemBody32 -match "closest\('\.skill-row'\)"))
+Check $chem32ok "_applyChemHighlights() clears via .skill-row.chem-boost and applies via closest(.skill-row)"
 
 # ===========================================================
 # Results
