@@ -522,7 +522,7 @@ try {
 # ===========================================================
 # Suite 15 -- CSS Invariants (Protocol 20)
 # Verifies critical CSS rules that guard mobile layout and faction button sizing.
-# 10 tests
+# 12 tests
 # ===========================================================
 Sep "Suite 15 -- CSS Invariants (Protocol 20)"
 $cssSrc = Read-Src "css/terminal.css"
@@ -544,6 +544,12 @@ Check ($buttonRule -match 'width\s*:\s*100%')              'global button{} has 
 $htmlRule = ([regex]::Match($cssSrcStripped, 'html\s*\{[^}]*\}')).Value
 Check ($htmlRule -match 'overflow-x\s*:\s*hidden')         'html{} has overflow-x:hidden'
 Check ([bool]([regex]::Match($cssSrc, '(?s)@media[^{]*480px.{0,5000}font-size\s*:\s*16px\s*!important').Success)) '@media max-width:480px sets font-size:16px on inputs (auto-zoom guard)'
+# Mobile overflow guard: .col-left must have min-width:0 in the BASE styles
+# so the single 1fr grid track can shrink on phones.
+$colLeftBaseRule = ([regex]::Match($cssSrcStripped, '\.col-left\s*\{[^}]*\}')).Value
+Check ($colLeftBaseRule -match 'min-width\s*:\s*0') '.col-left has min-width:0 in base styles (mobile overflow fix)'
+$worldMapDisplayRule = ([regex]::Match($cssSrcStripped, '#worldMapDisplay\s*\{[^}]*\}')).Value
+Check ($worldMapDisplayRule -match 'overflow-x') '#worldMapDisplay has overflow-x (map overflow containment)'
 
 # ===========================================================
 # Suite 16 -- Service Worker Invariants (Protocol 20)

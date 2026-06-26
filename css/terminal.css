@@ -371,6 +371,17 @@ textarea {
 
 .col-left {
   transition: opacity 0.3s;
+  /* Without min-width:0 a grid item defaults to min-width:auto (min-content).
+     On mobile the single 1fr column then expands to hold a wide open panel
+     (e.g. the 6×6 world map) instead of shrinking to the viewport. */
+  min-width: 0;
+}
+
+/* Safety net: keep any map overflow local to the display element
+   rather than letting it stretch the page. */
+#worldMapDisplay {
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 /* ─── Tab Navigation Bar ──────────────────────────────────────── */

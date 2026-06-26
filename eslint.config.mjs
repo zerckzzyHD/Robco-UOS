@@ -173,6 +173,13 @@ export default [
     },
   },
   {
-    ignores: ['node_modules/', 'dist/', '*.min.js', 'eslint.config.mjs', 'tests/render-check.mjs'],
+    ignores: [
+      'node_modules/',
+      'dist/',
+      '*.min.js',
+      'eslint.config.mjs',
+      'tests/render-check.mjs',
+      'tests/_diag*.mjs',
+    ],
   },
 ];

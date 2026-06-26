@@ -858,7 +858,7 @@ assert(
 // ══════════════════════════════════════════════════════════════
 //  SUITE 15 — CSS Invariants (Protocol 20)
 //  Verifies critical CSS rules that guard mobile layout and faction button sizing.
-//  10 tests
+//  12 tests
 // ══════════════════════════════════════════════════════════════
 header('CSS Invariants (Protocol 20)');
 const cssSource = readFile('css/terminal.css');
@@ -888,6 +888,20 @@ assert(/overflow-x\s*:\s*hidden/.test(htmlRule), 'html{} has overflow-x:hidden')
 assert(
   /@media[^{]*480px[\s\S]{0,5000}font-size\s*:\s*16px\s*!important/.test(cssSource),
   '@media max-width:480px sets font-size:16px on inputs (auto-zoom guard)'
+);
+// Mobile overflow guard: .col-left must have min-width:0 in the BASE styles
+// (not only inside the @media ≥1000px block) so the single 1fr grid track
+// can shrink to the viewport and a wide open panel (e.g. 6×6 world map)
+// cannot stretch the page on phones.
+const colLeftBaseRule = (cssSourceStripped.match(/\.col-left\s*\{[^}]*\}/) || [''])[0];
+assert(
+  /min-width\s*:\s*0/.test(colLeftBaseRule),
+  '.col-left has min-width:0 in base styles (mobile overflow fix)'
+);
+const worldMapDisplayRule = (cssSourceStripped.match(/#worldMapDisplay\s*\{[^}]*\}/) || [''])[0];
+assert(
+  /overflow-x/.test(worldMapDisplayRule),
+  '#worldMapDisplay has overflow-x (map overflow containment)'
 );
 
 // ══════════════════════════════════════════════════════════════

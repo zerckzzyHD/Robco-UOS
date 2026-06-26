@@ -1,4 +1,4 @@
-## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 253/253 | Cache: robco-terminal-v2.0.1-r21 -->
+## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 255/255 | Cache: robco-terminal-v2.0.1-r22 -->
 
 ### Added
 
@@ -26,6 +26,7 @@
 - A zone is no longer incorrectly highlighted just because its name shares letters with another zone. Only the single best-matching zone highlights at a time.
 - The CURRENT marker now only appears on your actual location. Previously a location whose name contained the name of another location (such as Goodsprings containing "springs") would incorrectly mark both.
 - The map view preference (core vs. full map) now persists across reloads, tab switches, and location changes.
+- On phones, opening the full 6×6 world map no longer stretches the entire UI past the right edge of the screen. The layout now correctly constrains the map column to the viewport width. The full map view is still available and usable on phones — only the overflow is fixed.
 - Tapping any input on iOS or Android no longer causes the page to zoom in and stay zoomed. The zoom was triggered by input font sizes below 16px, and because the zoom persisted across reloads, the page looked fine on a fresh visit but appeared oversized and clipped the right side — including buttons in the Campaign tab — on every subsequent reload. All inputs now render at 16px on phones.
 
 ### Improved
