@@ -45,7 +45,7 @@ After every meaningful commit, update these files **in the same commit:**
 | `CHANGELOG.md`    | Add entries under the current version block            |
 | `README.md`       | Current State section, feature tables, project history |
 
-**Version bumps:** Always ask the user before bumping `APP_VERSION`. Never assume a bump is warranted.
+**Version bumps:** See Protocol 26 for version bump rules — PATCH and MINOR bumps are automatic per semver; MAJOR bumps still require user confirmation.
 
 ### Protocol 2a — Test Count Sync
 
@@ -195,19 +195,19 @@ When changing `getSystemDirective()`'s schema or the Tri-Node JSON response shap
 
 ## Protocol 16 — Hotfix / Rollback
 
-If a push breaks the live site (e.g. black screen / failed boot), restore users **first** — `git revert` the offending commit, bump `CACHE_NAME`, push — **then** diagnose the root cause. Restore first, debug second.
+If a push breaks the live site (e.g. black screen / failed boot), restore users **first** — `git revert` the offending commit, bump `CACHE_NAME`, push — **then** diagnose the root cause. Restore first, debug second. After a rollback, document the root cause, add a regression test (Protocol 13), and record it in the CHANGELOG before re-attempting the fix.
 
 ---
 
 ## Protocol 17 — Mobile Baseline
 
-All UI must hold these mobile invariants: focusable inputs render at ≥16px font (prevents iOS/Android focus auto-zoom), interactive controls have ≥28px tap targets, and no component may force horizontal overflow at 360px (`document.documentElement.scrollWidth` must equal `window.innerWidth`). Verify per Protocol 10.
+All UI must hold these mobile invariants: focusable inputs render at ≥16px font (prevents iOS/Android focus auto-zoom), interactive controls have ≥28px tap targets, and no component may force horizontal overflow at 360px (`document.documentElement.scrollWidth` must equal `window.innerWidth`). Verify per Protocol 10. No hover-only UI and no desktop-only interactions; design touch-first. Keep focus states visible and never convey meaning by color alone.
 
 ---
 
 ## Protocol 18 — Memory Maintenance
 
-Keep durable project facts (repo path, current `APP_VERSION` and cache rev, key architecture decisions, recurring gotchas) recorded and current as they change, so context isn't re-litigated across sessions.
+Keep durable project facts current (repo path, APP_VERSION, cache rev, architecture decisions, recurring engineering gotchas). Do not store transient task state or temporary implementation details.
 
 ---
 
@@ -225,7 +225,37 @@ Critical CSS rules, render-function class/markup contracts, and service-worker i
 
 ## Protocol 21 — Plain-English Changelog
 
-Every `CHANGELOG.md` entry must be written in clear, plain English that a non-developer can understand — describe what changed and why it matters from the user's perspective, not in developer jargon — in one consistent, readable style across the whole file. Preserve structural markers (version headers, the `Tests`/cache header comment) while keeping the prose plain.
+Every `CHANGELOG.md` entry must be written in clear, plain English that a non-developer can understand — describe what changed and why it matters from the user's perspective, not in developer jargon — in one consistent, readable style across the whole file. Preserve structural markers (version headers, the `Tests`/cache header comment) while keeping the prose plain. Avoid internal implementation details unless they explain a user-visible change.
+
+---
+
+## Protocol 22 — Extend Before Creating
+
+Before introducing any new manager, service, renderer, helper, component, or state object, search the repo for equivalent functionality and extend it where reasonable. Do not create parallel implementations (e.g. `renderXNew()`, `StateV2`, a second save manager). Duplicate systems are architectural regressions.
+
+---
+
+## Protocol 23 — Architectural Boundaries
+
+Respect the established layering (script load order: database → state → registry → ui → api → cloud). Rendering only renders; `state.js` owns state; `registry.js` is read-only and never touches state; `api.js` handles AI + import; `cloud.js` handles sync. Systems communicate only through established functions/interfaces — render code must not write saves, registry must not mutate state, etc.
+
+---
+
+## Protocol 24 — AI Determinism
+
+The AI is never the sole source of truth for durable application state. All AI output must be validated and explicitly field-mapped (via `autoImportState`'s explicit mapping, never recursive key transforms) before it is persisted. If the AI fails or returns malformed data, the app must remain fully usable offline. Never let AI responses overwrite state without validation.
+
+---
+
+## Protocol 25 — UX Stability
+
+Existing user workflows must not change unless the requested feature requires it. Improve the current experience before replacing it; preserve user muscle memory. Do not redesign or relocate working UI unprompted.
+
+---
+
+## Protocol 26 — Version Discipline
+
+Every user-visible change updates `APP_VERSION`, `CACHE_NAME`, and `CHANGELOG` together as one unit. `APP_VERSION` follows semver automatically: PATCH (x.y.Z) for bug/UI/internal fixes, MINOR (x.Y.0) for new user-facing features or panels, MAJOR (X.0.0) only for rewrites or breaking changes. MAJOR bumps still require explicit user confirmation; PATCH and MINOR are automatic and no longer require asking. This supersedes the old "always ask before bumping `APP_VERSION`" rule for patch/minor.
 
 ---
 
