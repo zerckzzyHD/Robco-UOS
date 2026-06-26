@@ -1,4 +1,4 @@
-## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 287/287 | Cache: robco-terminal-v2.0.1-r26 -->
+## [v2.0.1] — Map Readability, Audio Depth & Campaign Intelligence<!-- Date: 2026-06-26 | Tests: 355/355 | Cache: robco-terminal-v2.0.1-r27 -->
 
 ### Added
 
@@ -51,6 +51,7 @@
 - The app now survives a corrupt save file instead of showing a blank screen. If the save data cannot be read, it is automatically set aside and the app starts fresh, rather than crashing on boot.
 - Fixed a broken data row in the Fallout 3 weapon database: the Fat Man had an extra trailing field that caused one column to be misread.
 - Added 22 new automated tests: coverage for the Fallout 3 database structure, a column-count check ensuring every weapon data row matches its header, and static guards confirming the two XSS fixes cannot silently regress.
+- Added 68 new automated gate-guard tests (355 total across 33 suites): static checks that every critical UI control is wired, banned code patterns cannot silently return, every render function is called on load, every audio function has the required mute guards, the AI JSON contract is locked, both registry files stay read-only, all PWA assets are in the service-worker cache, and both test runners always stay in sync.
 
 ---
 

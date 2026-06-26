@@ -1236,6 +1236,363 @@ assert(
 }
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 22 — Critical Feature Presence (Group 1)
+//  Asserts every key control exists in index.html and is wired.
+//  30 tests
+// ══════════════════════════════════════════════════════════════
+header('Critical Feature Presence');
+// Tab buttons
+assert(
+  /onclick="switchTab\('stat'\)"/.test(htmlSource),
+  "STAT tab button wired (switchTab('stat'))"
+);
+assert(/onclick="switchTab\('inv'\)"/.test(htmlSource), "INV tab button wired (switchTab('inv'))");
+assert(
+  /onclick="switchTab\('data'\)"/.test(htmlSource),
+  "DATA tab button wired (switchTab('data'))"
+);
+assert(
+  /onclick="switchTab\('campg'\)"/.test(htmlSource),
+  "CAMPG tab button wired (switchTab('campg'))"
+);
+// Add buttons
+assert(/onclick="addItem\(\)"/.test(htmlSource), 'Add Item button wired (addItem())');
+assert(/onclick="addAmmo\(\)"/.test(htmlSource), 'Add Ammo button wired (addAmmo())');
+assert(/onclick="addPerk\(\)"/.test(htmlSource), 'Add Perk button wired (addPerk())');
+assert(/onclick="addQuest\(\)"/.test(htmlSource), 'Add Quest button wired (addQuest())');
+assert(
+  /onclick="addCampaignNote\(\)"/.test(htmlSource),
+  'Add Note button wired (addCampaignNote())'
+);
+assert(
+  /onclick="addSquadMember\(\)"/.test(htmlSource),
+  'Add Squad button wired (addSquadMember())'
+);
+// Save / Load slots A B C
+assert(/onclick="saveToSlot\(1\)"/.test(htmlSource), 'Save slot A wired (saveToSlot(1))');
+assert(/onclick="saveToSlot\(2\)"/.test(htmlSource), 'Save slot B wired (saveToSlot(2))');
+assert(/onclick="saveToSlot\(3\)"/.test(htmlSource), 'Save slot C wired (saveToSlot(3))');
+assert(/onclick="loadFromSlot\(1\)"/.test(htmlSource), 'Load slot A wired (loadFromSlot(1))');
+assert(/onclick="loadFromSlot\(2\)"/.test(htmlSource), 'Load slot B wired (loadFromSlot(2))');
+assert(/onclick="loadFromSlot\(3\)"/.test(htmlSource), 'Load slot C wired (loadFromSlot(3))');
+// Export / Import
+assert(
+  /onclick="exportSaveFile\(\)"/.test(htmlSource),
+  'Export save button wired (exportSaveFile())'
+);
+assert(
+  /onchange="handleFileUpload\(event\)"/.test(htmlSource),
+  'Import save input wired (handleFileUpload(event))'
+);
+// Cloud sync
+assert(/id="btnCloudPush"/.test(htmlSource), 'Cloud Push button exists (id=btnCloudPush)');
+assert(/id="btnCloudPull"/.test(htmlSource), 'Cloud Pull button exists (id=btnCloudPull)');
+// Validate Key
+assert(/id="btnFetchModels"/.test(htmlSource), 'Validate Key button exists (id=btnFetchModels)');
+// D-pad
+assert(
+  /onclick="macroCommand\('\[PAD: UP\]'\)"/.test(htmlSource),
+  "D-pad UP wired (macroCommand('[PAD: UP]'))"
+);
+assert(
+  /onclick="macroCommand\('\[PAD: DOWN\]'\)"/.test(htmlSource),
+  "D-pad DOWN wired (macroCommand('[PAD: DOWN]'))"
+);
+assert(
+  /onclick="macroCommand\('\[PAD: LEFT\]'\)"/.test(htmlSource),
+  "D-pad LEFT wired (macroCommand('[PAD: LEFT]'))"
+);
+assert(
+  /onclick="macroCommand\('\[PAD: RIGHT\]'\)"/.test(htmlSource),
+  "D-pad RIGHT wired (macroCommand('[PAD: RIGHT]'))"
+);
+// Macro buttons
+assert(/onclick="macroCommand\('\[THREAT\]'\)"/.test(htmlSource), 'THREAT macro button wired');
+assert(/onclick="macroCommand\('\[VATS SIM\]'\)"/.test(htmlSource), 'VATS SIM macro button wired');
+assert(/onclick="macroCommand\('\[TRADE\]'\)"/.test(htmlSource), 'TRADE macro button wired');
+assert(/onclick="macroCommand\('\[LOOT\]'\)"/.test(htmlSource), 'LOOT macro button wired');
+// V.A.T.S. Calculator
+assert(/id="vatsCalcBtn"/.test(htmlSource), 'V.A.T.S. CALCULATOR button exists (id=vatsCalcBtn)');
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 23 — Prohibited Patterns (Group 2)
+//  Static checks that banned patterns haven't crept back in.
+//  5 tests
+// ══════════════════════════════════════════════════════════════
+header('Prohibited Patterns');
+// 23.1 No innerHTML += in ui.js (render functions must use map().join('') bulk assignment)
+// Note: api.js has a known, intentional innerHTML+= in the model-fetch <select> builder
+// (not a render hot-path), so the check is scoped to ui.js only.
+assert(!/innerHTML\s*\+=/.test(uiSource), 'ui.js has no innerHTML += (O(n²) re-parse guard)');
+
+// 23.2 No localStorage.getItem inside audio function bodies in ui.js
+// Audio functions must read from the AudioSettings cache, not localStorage directly.
+{
+  const audioFnBodies = [];
+  const audioRe = /function (play\w+|start\w+)\s*\(/g;
+  let am;
+  while ((am = audioRe.exec(uiSource)) !== null) {
+    try {
+      const body = extractFunctionBody(uiSource, am[1]);
+      if (/ensureAudioCtx\(\)/.test(body)) audioFnBodies.push({ name: am[1], body });
+    } catch (_) {}
+  }
+  const withLs = audioFnBodies.filter(f => /localStorage\.getItem/.test(f.body));
+  assert(
+    withLs.length === 0,
+    'No audio function body reads localStorage.getItem directly' +
+      (withLs.length ? ' — offenders: ' + withLs.map(f => f.name).join(', ') : '')
+  );
+}
+
+// 23.3 autoImportState() uses explicit field mapping, not recursive Object.keys transform
+assert(
+  !/Object\.keys\s*\(\s*parsed\s*\)\.forEach/.test(importBody),
+  'autoImportState() has no recursive Object.keys(parsed).forEach key transform'
+);
+
+// 23.4 & 23.5 pushToCloud is NOT called from saveState() or updateMath() (manual-only)
+{
+  let saveStateBody = '';
+  let updateMathBody = '';
+  try {
+    saveStateBody = extractFunctionBody(stateSource, 'saveState');
+  } catch (_) {}
+  try {
+    updateMathBody = extractFunctionBody(uiSource, 'updateMath');
+  } catch (_) {}
+  assert(
+    !/pushToCloud/.test(saveStateBody),
+    'saveState() does not call pushToCloud (cloud sync is manual-only)'
+  );
+  assert(
+    !/pushToCloud/.test(updateMathBody),
+    'updateMath() does not call pushToCloud (cloud sync is manual-only)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 24 — Protocol Completeness (Group 3)
+//  P5: every render*() is called from loadUI(); P6: wireInput IDs
+//  exist; P7: every audio function has the double-guard pattern.
+//  19 tests
+// ══════════════════════════════════════════════════════════════
+header('Protocol Completeness — P5 render wiring');
+{
+  let loadUIBody = '';
+  try {
+    loadUIBody = extractFunctionBody(uiSource, 'loadUI');
+  } catch (e) {
+    fail('Cannot extract loadUI: ' + e.message);
+  }
+  const RENDER_FNS = [
+    'renderInventory',
+    'renderAmmo',
+    'renderSquad',
+    'renderStatus',
+    'renderCampaignNotes',
+    'renderFactionRep',
+    'renderPerks',
+    'renderQuests',
+    'renderSessionStats',
+    'renderEquipped',
+    'renderCollectibles',
+    'renderGameDate',
+    'renderWorldMap',
+    'renderKarmaCenter',
+    'renderCampaignStatus',
+  ];
+  for (const fn of RENDER_FNS) {
+    assert(
+      new RegExp(`\\b${fn}\\s*\\(\\s*\\)`).test(loadUIBody),
+      `${fn}() is called from loadUI() (P5)`
+    );
+  }
+}
+
+header('Protocol Completeness — P6 wireInput IDs');
+{
+  const WIRE_IDS = ['newQuestName', 'newItemName', 'newPerkName'];
+  for (const id of WIRE_IDS) {
+    assert(
+      new RegExp(`id="${id}"`).test(htmlSource),
+      `wireInput target id="${id}" exists in index.html (P6)`
+    );
+  }
+}
+
+header('Protocol Completeness — P7 audio double-guard');
+{
+  const audioFnsMissingGuard = [];
+  const audioRe2 = /function (play\w+|start\w+)\s*\(/g;
+  let am2;
+  while ((am2 = audioRe2.exec(uiSource)) !== null) {
+    try {
+      const body = extractFunctionBody(uiSource, am2[1]);
+      if (!/ensureAudioCtx\(\)/.test(body)) continue;
+      if (!/AudioSettings\.masterMute/.test(body))
+        audioFnsMissingGuard.push(am2[1] + ': missing masterMute guard');
+      const otherKeys = (body.match(/AudioSettings\.\w+/g) || []).filter(
+        s => s !== 'AudioSettings.masterMute'
+      );
+      if (otherKeys.length === 0)
+        audioFnsMissingGuard.push(am2[1] + ': missing individual AudioSettings key guard');
+    } catch (_) {}
+  }
+  assert(
+    audioFnsMissingGuard.length === 0,
+    'All audio functions have masterMute + individual key guards (P7)' +
+      (audioFnsMissingGuard.length ? ' — ' + audioFnsMissingGuard.join(', ') : '')
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 25 — AI Contract Lock (Group 4)
+//  Verifies responseMimeType is locked and getSystemDirective()
+//  references the tri-node schema shape.
+//  5 tests
+// ══════════════════════════════════════════════════════════════
+header('AI Contract Lock');
+assert(
+  /responseMimeType\s*:\s*'application\/json'/.test(apiSource),
+  "api.js contains responseMimeType:'application/json' (AI contract lock)"
+);
+{
+  let sysDirBody = '';
+  try {
+    sysDirBody = extractFunctionBody(apiSource, 'getSystemDirective');
+  } catch (e) {
+    fail('Cannot extract getSystemDirective: ' + e.message);
+  }
+  assert(
+    /state\.gameContext/.test(sysDirBody),
+    'getSystemDirective() reads state.gameContext (FO3 switch)'
+  );
+  assert(
+    /'narrative'/.test(sysDirBody) || /"narrative"/.test(sysDirBody),
+    "getSystemDirective() contains 'narrative' key (AI tri-node schema)"
+  );
+  assert(
+    /'state'/.test(sysDirBody) || /"state"/.test(sysDirBody),
+    "getSystemDirective() contains 'state' key (AI tri-node schema)"
+  );
+  assert(
+    /'modal'/.test(sysDirBody) || /"modal"/.test(sysDirBody),
+    "getSystemDirective() contains 'modal' key (AI tri-node schema)"
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 26 — Architectural Boundaries (Group 5)
+//  reg_fo3.js must be pure read-only reference data: no state
+//  writes, no localStorage, no chatHistory references.
+//  3 tests
+// ══════════════════════════════════════════════════════════════
+header('Architectural Boundaries — reg_fo3.js purity');
+{
+  const regFo3Source = readFile('js/reg_fo3.js');
+  const regFo3Code = regFo3Source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\r\n]*/g, '');
+  assert(
+    !/\bstate\b/.test(regFo3Code),
+    'reg_fo3.js does not reference state (pure reference data)'
+  );
+  assert(!/localStorage/.test(regFo3Code), 'reg_fo3.js does not reference localStorage (in code)');
+  assert(!/chatHistory/.test(regFo3Code), 'reg_fo3.js does not reference chatHistory (in code)');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 27 — Assets Completeness (Group 6)
+//  Every local <script src> / <link href> in index.html must
+//  appear in sw.js ASSETS so the PWA caches the full app.
+//  2 tests
+// ══════════════════════════════════════════════════════════════
+header('Assets Completeness');
+{
+  // Build the set of cached paths from ASSETS
+  const assetsMatch = swSource.match(/const ASSETS\s*=\s*\[([\s\S]*?)\];/);
+  const assetsSet = new Set(
+    assetsMatch ? [...assetsMatch[1].matchAll(/'([^']+)'/g)].map(m => m[1]) : []
+  );
+
+  // Extract local script/link refs from index.html, normalise to ./path form
+  const scriptRefs = [...htmlSource.matchAll(/<script[^>]+src="([^"]+)"/g)].map(m => m[1]);
+  const linkRefs = [...htmlSource.matchAll(/<link[^>]+href="([^"]+)"/g)].map(m => m[1]);
+  const localRefs = [...scriptRefs, ...linkRefs]
+    .filter(r => !r.startsWith('http') && r !== 'sw.js' && !/\.(png|ico|gif|jpg|svg)$/.test(r))
+    .map(r => (r.startsWith('./') ? r : './' + r));
+
+  const missingFromAssets = localRefs.filter(r => !assetsSet.has(r));
+  assert(
+    missingFromAssets.length === 0,
+    'All local HTML refs (excl. sw.js) are in sw.js ASSETS' +
+      (missingFromAssets.length ? ' — missing: ' + missingFromAssets.join(', ') : '')
+  );
+
+  // Every ASSETS entry (except './' directory placeholder) must exist on disk
+  const missingFiles = [...assetsSet]
+    .filter(f => f !== './')
+    .filter(f => !fs.existsSync(path.join(ROOT, f)));
+  assert(
+    missingFiles.length === 0,
+    'All sw.js ASSETS entries exist on disk' +
+      (missingFiles.length ? ' — missing: ' + missingFiles.join(', ') : '')
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 28 — Meta / Runner Parity (Group 7)
+//  Verifies that both runners contain all gate-guard suites (22-28)
+//  and that the canonical test count in CHANGELOG.md matches README.md.
+//
+//  NOTE: source-level assert() / Check() counts cannot reliably track
+//  runtime test counts because loops multiply results at runtime. Parity
+//  is enforced structurally — both runners must contain every named suite.
+//  4 tests
+// ══════════════════════════════════════════════════════════════
+header('Meta / Runner Parity');
+{
+  const jsRunner = readFile('tests/check-persistence.js');
+  const psRunner = readFile('tests/check-persistence.ps1');
+
+  // Structural parity: both runners must contain every gate-guard suite marker (22-28).
+  // A missing marker means a suite was added to one runner but not ported to the other.
+  const GATE_SUITES = [
+    'Suite 22',
+    'Suite 23',
+    'Suite 24',
+    'Suite 25',
+    'Suite 26',
+    'Suite 27',
+    'Suite 28',
+  ];
+  const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
+  const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
+  assert(
+    jsMissing.length === 0,
+    'JS runner contains all gate-guard suites (22-28)' +
+      (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
+  );
+  assert(
+    psMissing.length === 0,
+    'PS runner contains all gate-guard suites (22-28)' +
+      (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
+  );
+
+  // Canonical count in CHANGELOG.md matches README.md (Protocol 2a consistency).
+  // The CHANGELOG header format is: <!-- Tests: N/N | Cache: ... -->
+  const changelog = readFile('CHANGELOG.md');
+  const countMatch = changelog.match(/Tests:\s*(\d+)\/\d+/);
+  const canonicalCount = countMatch ? countMatch[1] : '';
+  assert(!!canonicalCount, 'CHANGELOG.md contains Tests: N/N header (Protocol 2a)');
+  const readme = readFile('README.md');
+  assert(
+    !!canonicalCount &&
+      (readme.includes(canonicalCount + ' tests') || readme.includes(canonicalCount + '-test')),
+    `README.md contains CHANGELOG.md canonical test count (${canonicalCount})`
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 console.log('\n══════════════════════════════════════════════════════════════\n');

@@ -12,11 +12,11 @@
 npm run lint        # ESLint — zero new errors
 npm run format      # Prettier — all files clean
 git add -A
-git commit          # Pre-commit hook: cache-bump guard runs first, then 287 tests
+git commit          # Pre-commit hook: cache-bump guard runs first, then 355 tests
 git push origin main  # CACHE_NAME must already be bumped (Protocol 1)
 ```
 
-- **287 tests must pass.** If fewer pass, something is broken. Investigate before committing.
+- **355 tests must pass.** If fewer pass, something is broken. Investigate before committing.
 - **Bump `CACHE_NAME` before every push.** No push may ship without a new cache rev (Protocol 1) — this is a hard gate, not just for UI/JS changes.
 - **Cache-bump guard runs at commit time** — the hook compares the staged `CACHE_NAME` against `origin/main` and blocks if they match. A missed bump fails the commit before the test suite even runs.
 - **Never use `--no-verify`** unless the user explicitly authorizes it for a stated emergency.
@@ -34,7 +34,7 @@ Bump `CACHE_NAME` in `sw.js` before **every `git push`** — full stop. Every pu
 
 **Why:** The SW is cache-first. Without a new `CACHE_NAME`, cached users silently run the old build and never see the "REBOOT TERMINAL" update prompt. Bumping on every push guarantees the prompt fires for all clients on every release.
 
-**Automated guard:** This requirement is now enforced by the pre-commit hook. Before the 287-test suite runs, the hook compares the staged `CACHE_NAME` against `origin/main:sw.js` and fails the commit immediately if they match. A missed bump is impossible to commit, not just discouraged.
+**Automated guard:** This requirement is now enforced by the pre-commit hook. Before the 355-test suite runs, the hook compares the staged `CACHE_NAME` against `origin/main:sw.js` and fails the commit immediately if they match. A missed bump is impossible to commit, not just discouraged.
 
 ---
 
@@ -96,7 +96,7 @@ Requires changes in **4 files minimum.** The pre-commit audit will block if any 
 - [ ] Add `<details class="panel">` block in `index.html` (if it needs a panel)
 - [ ] Bump `CACHE_NAME` in `sw.js` → Protocol 1
 - [ ] Run `npm run lint` and `npm run format`
-- [ ] Run `git commit` — 287 tests must pass
+- [ ] Run `git commit` — 355 tests must pass
 - [ ] Update `ARCHITECTURE.md`, `CHANGELOG.md`, `README.md` → Protocol 2
 
 ---
@@ -110,7 +110,7 @@ Requires changes in **4 files minimum.** The pre-commit audit will block if any 
 - [ ] If AI changes should auto-expand it: add key to `expandPanelForCategory()` map in `ui.js`
 - [ ] If it has a text input with autocomplete: call `wireInput()` in `initRegistryAutocomplete()` in `ui.js`
 - [ ] Bump `CACHE_NAME` → Protocol 1
-- [ ] Lint, format, commit (287 tests) → Protocol 2
+- [ ] Lint, format, commit (355 tests) → Protocol 2
 
 ---
 
@@ -330,4 +330,4 @@ Treat model usage as a budget — and the burden of efficiency is on the orchest
 
 **State persistence:** `localStorage` key `robco_v7`. Debounced 500ms writes. Flushed immediately on `beforeunload`.
 
-**Test suite:** 287 tests across 26 suites, mirrored in `tests/check-persistence.ps1` (PowerShell, run by the pre-commit hook) and `tests/check-persistence.js` (Node) — both runners are kept at exact parity (same suites, same per-suite counts, same 287 total). Covers parser sanity, autoImportState coverage, faction registry, skill keys, save envelope, file upload, cloud sync, backward compatibility, registry structural integrity, reputation 2D matrix, C2 CRUD function existence, C3 CAMPG tab DOM binding, C4 Protocol 4 campaignMode (binary) + separation, render contracts, CSS invariants, SW invariants, structural integrity (Protocol 20 static guards), detail-current dedup guard (Protocol 27), FO3 database structural integrity, CSV column-count integrity, and security regression guards (XSS-1/XSS-2/XSS-3). **When you change one runner, update the other in the same commit** — drift here is what let the PS runner silently fall to 173.
+**Test suite:** 355 tests across 33 suites, mirrored in `tests/check-persistence.ps1` (PowerShell, run by the pre-commit hook) and `tests/check-persistence.js` (Node) — both runners are kept at exact parity (same suites, same per-suite counts, same 355 total). Covers parser sanity, autoImportState coverage, faction registry, skill keys, save envelope, file upload, cloud sync, backward compatibility, registry structural integrity, reputation 2D matrix, C2 CRUD function existence, C3 CAMPG tab DOM binding, C4 Protocol 4 campaignMode (binary) + separation, render contracts, CSS invariants, SW invariants, structural integrity (Protocol 20 static guards), detail-current dedup guard (Protocol 27), FO3 database structural integrity, CSV column-count integrity, security regression guards (XSS-1/XSS-2/XSS-3), critical feature presence (Suites 22–28 gate guards: UI controls, prohibited patterns, protocol completeness, AI contract lock, architectural boundaries, assets completeness, meta/runner parity). **When you change one runner, update the other in the same commit** — drift here is what let the PS runner silently fall to 173.

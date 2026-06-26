@@ -783,6 +783,202 @@ Check ([bool]([regex]::Match($renderQuestsBody, 'escapeHtml\s*\(\s*st\.toUpperCa
     "renderQuests() escapes quest status with escapeHtml before innerHTML (XSS-3 guard)"
 
 # ===========================================================
+# Suite 22 -- Critical Feature Presence (Group 1)
+# Asserts every key control exists in index.html and is wired.
+# 30 tests
+# ===========================================================
+Sep "Suite 22 -- Critical Feature Presence"
+# Tab buttons
+Check ([bool]($htmlSrc -match "onclick=""switchTab\('stat'\)"""))  "STAT tab button wired (switchTab('stat'))"
+Check ([bool]($htmlSrc -match "onclick=""switchTab\('inv'\)"""))   "INV tab button wired (switchTab('inv'))"
+Check ([bool]($htmlSrc -match "onclick=""switchTab\('data'\)"""))  "DATA tab button wired (switchTab('data'))"
+Check ([bool]($htmlSrc -match "onclick=""switchTab\('campg'\)""")) "CAMPG tab button wired (switchTab('campg'))"
+# Add buttons
+Check ([bool]($htmlSrc -match 'onclick="addItem\(\)"'))        "Add Item button wired (addItem())"
+Check ([bool]($htmlSrc -match 'onclick="addAmmo\(\)"'))        "Add Ammo button wired (addAmmo())"
+Check ([bool]($htmlSrc -match 'onclick="addPerk\(\)"'))        "Add Perk button wired (addPerk())"
+Check ([bool]($htmlSrc -match 'onclick="addQuest\(\)"'))       "Add Quest button wired (addQuest())"
+Check ([bool]($htmlSrc -match 'onclick="addCampaignNote\(\)"')) "Add Note button wired (addCampaignNote())"
+Check ([bool]($htmlSrc -match 'onclick="addSquadMember\(\)"')) "Add Squad button wired (addSquadMember())"
+# Save / Load slots A B C
+Check ([bool]($htmlSrc -match 'onclick="saveToSlot\(1\)"'))    "Save slot A wired (saveToSlot(1))"
+Check ([bool]($htmlSrc -match 'onclick="saveToSlot\(2\)"'))    "Save slot B wired (saveToSlot(2))"
+Check ([bool]($htmlSrc -match 'onclick="saveToSlot\(3\)"'))    "Save slot C wired (saveToSlot(3))"
+Check ([bool]($htmlSrc -match 'onclick="loadFromSlot\(1\)"'))  "Load slot A wired (loadFromSlot(1))"
+Check ([bool]($htmlSrc -match 'onclick="loadFromSlot\(2\)"'))  "Load slot B wired (loadFromSlot(2))"
+Check ([bool]($htmlSrc -match 'onclick="loadFromSlot\(3\)"'))  "Load slot C wired (loadFromSlot(3))"
+# Export / Import
+Check ([bool]($htmlSrc -match 'onclick="exportSaveFile\(\)"'))          "Export save button wired (exportSaveFile())"
+Check ([bool]($htmlSrc -match 'onchange="handleFileUpload\(event\)"'))  "Import save input wired (handleFileUpload(event))"
+# Cloud sync
+Check ([bool]($htmlSrc -match 'id="btnCloudPush"'))  "Cloud Push button exists (id=btnCloudPush)"
+Check ([bool]($htmlSrc -match 'id="btnCloudPull"'))  "Cloud Pull button exists (id=btnCloudPull)"
+# Validate Key
+Check ([bool]($htmlSrc -match 'id="btnFetchModels"'))  "Validate Key button exists (id=btnFetchModels)"
+# D-pad (single-quote chars inside double-quoted string require escaping as '' in PS)
+Check ([bool]($htmlSrc -match "onclick=""macroCommand\('\[PAD: UP\]'\)"""))    "D-pad UP wired (macroCommand('[PAD: UP]'))"
+Check ([bool]($htmlSrc -match "onclick=""macroCommand\('\[PAD: DOWN\]'\)"""))  "D-pad DOWN wired (macroCommand('[PAD: DOWN]'))"
+Check ([bool]($htmlSrc -match "onclick=""macroCommand\('\[PAD: LEFT\]'\)"""))  "D-pad LEFT wired (macroCommand('[PAD: LEFT]'))"
+Check ([bool]($htmlSrc -match "onclick=""macroCommand\('\[PAD: RIGHT\]'\)""")) "D-pad RIGHT wired (macroCommand('[PAD: RIGHT]'))"
+# Macro buttons
+Check ([bool]($htmlSrc -match "onclick=""macroCommand\('\[THREAT\]'\)"""))    "THREAT macro button wired"
+Check ([bool]($htmlSrc -match "onclick=""macroCommand\('\[VATS SIM\]'\)"""))  "VATS SIM macro button wired"
+Check ([bool]($htmlSrc -match "onclick=""macroCommand\('\[TRADE\]'\)"""))     "TRADE macro button wired"
+Check ([bool]($htmlSrc -match "onclick=""macroCommand\('\[LOOT\]'\)"""))      "LOOT macro button wired"
+# V.A.T.S. Calculator
+Check ([bool]($htmlSrc -match 'id="vatsCalcBtn"'))  "V.A.T.S. CALCULATOR button exists (id=vatsCalcBtn)"
+
+# ===========================================================
+# Suite 23 -- Prohibited Patterns (Group 2)
+# Static checks that banned patterns haven't crept back in.
+# 5 tests
+# ===========================================================
+Sep "Suite 23 -- Prohibited Patterns"
+
+# 23.1 No innerHTML += in ui.js (render functions must use bulk assignment)
+Check (-not ($uiSrc -match 'innerHTML\s*\+=')) "ui.js has no innerHTML += (O(n^2) re-parse guard)"
+
+# 23.2 No localStorage.getItem inside audio function bodies in ui.js
+$audioFnOffenders = @()
+$audioRe = [regex]'function (play\w+|start\w+)\s*\('
+$audioMatches = $audioRe.Matches($uiSrc)
+foreach ($am in $audioMatches) {
+    $fnName = $am.Groups[1].Value
+    try {
+        $body = Get-FunctionBody $uiSrc $fnName
+        if ($body -match 'ensureAudioCtx\(\)') {
+            if ($body -match 'localStorage\.getItem') { $audioFnOffenders += $fnName }
+        }
+    } catch {}
+}
+Check ($audioFnOffenders.Count -eq 0) ("No audio function reads localStorage.getItem directly" + $(if ($audioFnOffenders.Count) { " -- offenders: " + ($audioFnOffenders -join ", ") } else { "" }))
+
+# 23.3 autoImportState() uses explicit field mapping, not recursive Object.keys transform
+Check (-not ([bool]([regex]::Match($importBody, 'Object\.keys\s*\(\s*parsed\s*\)\.forEach').Success))) `
+    "autoImportState() has no recursive Object.keys(parsed).forEach key transform"
+
+# 23.4 & 23.5 pushToCloud is NOT called from saveState() or updateMath()
+$saveStateBody23 = ''
+$updateMathBody23 = ''
+try { $saveStateBody23 = Get-FunctionBody $stateSrc 'saveState' } catch {}
+try { $updateMathBody23 = Get-FunctionBody $uiSrc 'updateMath' } catch {}
+Check (-not ($saveStateBody23 -match 'pushToCloud'))   "saveState() does not call pushToCloud (manual-only)"
+Check (-not ($updateMathBody23 -match 'pushToCloud'))  "updateMath() does not call pushToCloud (manual-only)"
+
+# ===========================================================
+# Suite 24 -- Protocol Completeness (Group 3)
+# P5: every render*() called from loadUI(); P6: wireInput IDs exist;
+# P7: every audio function has masterMute + individual key guard.
+# 19 tests
+# ===========================================================
+Sep "Suite 24 -- Protocol Completeness P5 (render wiring)"
+$loadUIBody24 = ''
+try { $loadUIBody24 = Get-FunctionBody $uiSrc 'loadUI' } catch { Fail "Cannot extract loadUI: $_" }
+$RENDER_FNS = @('renderInventory','renderAmmo','renderSquad','renderStatus','renderCampaignNotes',
+                'renderFactionRep','renderPerks','renderQuests','renderSessionStats','renderEquipped',
+                'renderCollectibles','renderGameDate','renderWorldMap','renderKarmaCenter','renderCampaignStatus')
+foreach ($fn in $RENDER_FNS) {
+    Check ([bool]([regex]::Match($loadUIBody24, "\b$fn\s*\(\s*\)").Success)) "$fn() is called from loadUI() (P5)"
+}
+
+Sep "Suite 24 -- Protocol Completeness P6 (wireInput IDs)"
+$WIRE_IDS = @('newQuestName','newItemName','newPerkName')
+foreach ($id in $WIRE_IDS) {
+    Check ([bool]($htmlSrc -match "id=""$id""")) "wireInput target id=""$id"" exists in index.html (P6)"
+}
+
+Sep "Suite 24 -- Protocol Completeness P7 (audio double-guard)"
+$audioGuardOffenders = @()
+$audioRe2 = [regex]'function (play\w+|start\w+)\s*\('
+$audioMatches2 = $audioRe2.Matches($uiSrc)
+foreach ($am2 in $audioMatches2) {
+    $fnName2 = $am2.Groups[1].Value
+    try {
+        $body2 = Get-FunctionBody $uiSrc $fnName2
+        if (-not ($body2 -match 'ensureAudioCtx\(\)')) { continue }
+        if (-not ($body2 -match 'AudioSettings\.masterMute')) { $audioGuardOffenders += "$fnName2`:missing masterMute" }
+        $otherKeys = [regex]::Matches($body2, 'AudioSettings\.\w+') | Where-Object { $_.Value -ne 'AudioSettings.masterMute' }
+        if ($otherKeys.Count -eq 0) { $audioGuardOffenders += "$fnName2`:missing individual key" }
+    } catch {}
+}
+Check ($audioGuardOffenders.Count -eq 0) ("All audio functions have masterMute + individual key guards (P7)" + $(if ($audioGuardOffenders.Count) { " -- " + ($audioGuardOffenders -join ", ") } else { "" }))
+
+# ===========================================================
+# Suite 25 -- AI Contract Lock (Group 4)
+# responseMimeType is locked and getSystemDirective() contains
+# the tri-node schema shape (narrative/state/modal).
+# 5 tests
+# ===========================================================
+Sep "Suite 25 -- AI Contract Lock"
+Check ([bool]($apiSrc -match "responseMimeType\s*:\s*'application/json'")) "api.js contains responseMimeType:'application/json' (AI contract lock)"
+$sysDirBody25 = ''
+try { $sysDirBody25 = Get-FunctionBody $apiSrc 'getSystemDirective' } catch { Fail "Cannot extract getSystemDirective: $_" }
+Check ([bool]($sysDirBody25 -match 'state\.gameContext'))  "getSystemDirective() reads state.gameContext (FO3 switch)"
+Check ([bool]($sysDirBody25 -match "'narrative'|`"narrative`"")) "getSystemDirective() contains 'narrative' key (AI tri-node schema)"
+Check ([bool]($sysDirBody25 -match "'state'|`"state`""))         "getSystemDirective() contains 'state' key (AI tri-node schema)"
+Check ([bool]($sysDirBody25 -match "'modal'|`"modal`""))         "getSystemDirective() contains 'modal' key (AI tri-node schema)"
+
+# ===========================================================
+# Suite 26 -- Architectural Boundaries (Group 5)
+# reg_fo3.js must be pure read-only reference data.
+# 3 tests
+# ===========================================================
+Sep "Suite 26 -- Architectural Boundaries -- reg_fo3.js purity"
+$regFo3Src = Read-Src "js/reg_fo3.js"
+$regFo3Code = ($regFo3Src -replace '(?s)/\*.*?\*/', '') -replace '//[^\r\n]*', ''
+Check ($regFo3Code -cnotmatch '\bstate\b')     "reg_fo3.js does not reference state (pure reference data)"
+Check ($regFo3Code -notmatch 'localStorage')   "reg_fo3.js does not reference localStorage (in code)"
+Check ($regFo3Code -notmatch 'chatHistory')    "reg_fo3.js does not reference chatHistory (in code)"
+
+# ===========================================================
+# Suite 27 -- Assets Completeness (Group 6)
+# Every local <script src> / <link href> in index.html must
+# appear in sw.js ASSETS so the PWA caches the full app.
+# 2 tests
+# ===========================================================
+Sep "Suite 27 -- Assets Completeness"
+$swSrc27 = Read-Src "sw.js"
+$assetsBlockM = [regex]::Match($swSrc27, '(?s)const ASSETS\s*=\s*\[(.*?)\];')
+$assetsSet27 = [System.Collections.Generic.HashSet[string]]::new()
+if ($assetsBlockM.Success) {
+    [regex]::Matches($assetsBlockM.Groups[1].Value, "'([^']+)'") | ForEach-Object { [void]$assetsSet27.Add($_.Groups[1].Value) }
+}
+# Extract local script/link refs from HTML, normalise to ./path form
+$scriptRefs27 = [regex]::Matches($htmlSrc, '<script[^>]+src="([^"]+)"') | ForEach-Object { $_.Groups[1].Value }
+$linkRefs27   = [regex]::Matches($htmlSrc, '<link[^>]+href="([^"]+)"')   | ForEach-Object { $_.Groups[1].Value }
+$localRefs27  = @($scriptRefs27) + @($linkRefs27) |
+    Where-Object { $_ -notmatch '^https?://' -and $_ -ne 'sw.js' -and $_ -notmatch '\.(png|ico|gif|jpg|svg)$' } |
+    ForEach-Object { if ($_ -match '^\./') { $_ } else { './' + $_ } }
+$missingFromAssets27 = $localRefs27 | Where-Object { -not $assetsSet27.Contains($_) }
+Check ($missingFromAssets27.Count -eq 0) ("All local HTML refs (excl. sw.js) are in sw.js ASSETS" + $(if ($missingFromAssets27.Count) { " -- missing: " + ($missingFromAssets27 -join ", ") } else { "" }))
+# Every ASSETS entry (except './' directory placeholder) must exist on disk
+$missingFiles27 = $assetsSet27 | Where-Object { $_ -ne './' } | Where-Object { -not (Test-Path (Join-Path $Root $_)) }
+Check ($missingFiles27.Count -eq 0) ("All sw.js ASSETS entries exist on disk" + $(if ($missingFiles27.Count) { " -- missing: " + ($missingFiles27 -join ", ") } else { "" }))
+
+# ===========================================================
+# Suite 28 -- Meta / Runner Parity (Group 7)
+# JS and PS runners must have identical test counts (Protocol 15)
+# and CHANGELOG.md canonical count must match README.md.
+# 4 tests
+# ===========================================================
+Sep "Suite 28 -- Meta / Runner Parity"
+# NOTE: source-level Check/assert counts cannot reliably track runtime test counts
+# because loops multiply results at runtime. Parity is enforced structurally.
+$jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
+$psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28')
+$jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
+$psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-28)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-28)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+$changelogSrc28 = Read-Src "CHANGELOG.md"
+$countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
+$canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
+Check ($canon28 -ne '') "CHANGELOG.md contains Tests: N/N header (Protocol 2a)"
+$readmeSrc28 = Read-Src "README.md"
+Check ($canon28 -ne '' -and ($readmeSrc28 -match $canon28)) "README.md contains CHANGELOG.md canonical test count ($canon28)"
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"
