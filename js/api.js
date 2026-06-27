@@ -788,7 +788,8 @@ function _nativeSleep() {
     `> [SLEEP] Courier rested 8 hours.\n> Ticks: ${oldTicks} → ${newTicks} (+80)\n> HP restored. All limbs healed.`,
     'sys'
   );
-  if (typeof updateMath === 'function') updateMath();
+  // loadUI() pushes state→DOM (ticks, hpCur, limbs) before saveState() reads DOM back
+  if (typeof loadUI === 'function') loadUI();
   if (typeof saveState === 'function') saveState();
 }
 
@@ -801,7 +802,8 @@ function _nativeWait(hours) {
     `> [WAIT: ${hours} Hrs] Time advanced ${hours} hour${hours === 1 ? '' : 's'}.\n> Ticks: ${oldTicks} → ${newTicks} (+${ticks})`,
     'sys'
   );
-  if (typeof updateMath === 'function') updateMath();
+  // loadUI() pushes state→DOM (ticks) before saveState() reads DOM back
+  if (typeof loadUI === 'function') loadUI();
   if (typeof saveState === 'function') saveState();
 }
 

@@ -1560,11 +1560,15 @@ $missing41b = @($csvNames41 | Where-Object { -not $regNames41.Contains($_) })
 Check ($missing41b.Count -eq 0) "FNV: all WEAPON_MODS.CSV rows exist in registry$(if($missing41b.Count){' (missing: ' + ($missing41b -join ', ') + ')'})"
 
 # ===========================================================
-# Suite 42 -- Native Command Router (Phase 5a)
+# Suite 42 -- Native Command Router (Phase 5a / 5a-fix)
 # Deterministic commands ([FEATURES]/[CROSSROADS]/[SLEEP]/[WAIT])
-# are intercepted pre-fetch; dead system-prompt blocks removed
-# from getSystemDirective().
-# 8 tests
+# are intercepted pre-fetch; dead system-prompt blocks removed.
+# 42.6 non-empty guard prevents vacuous pass on 42.7/42.8.
+# 42.10/42.11 guard the syncStateFromDom round-trip bug fix:
+# _nativeSleep/_nativeWait must call loadUI() BEFORE saveState()
+# so state->DOM is written first and syncStateFromDom reads back
+# the new values (not stale ones from unchanged inputs).
+# 11 tests
 # ===========================================================
 Sep "Suite 42 -- Native Command Router (Phase 5a)"
 
@@ -1594,19 +1598,45 @@ $fetchIdx42  = $txBody42.IndexOf('generativelanguage.googleapis.com')
 Check ($routerIdx42 -ge 0 -and $fetchIdx42 -ge 0 -and $routerIdx42 -lt $fetchIdx42) `
     'transmitMessage() invokes _routeNativeCommand before the Gemini fetch'
 
-# 42.6  getSystemDirective() no longer has dead [FEATURES] instruction block
+# Extract getSystemDirective body once -- shared by 42.6/42.7/42.8
+# 42.6 asserts it's non-empty to prevent 42.7/42.8 passing vacuously
+# when Get-FunctionBody returns '' on a parse failure.
 $sdBody42 = ''
 try { $sdBody42 = Get-FunctionBody $apiSrc42 'getSystemDirective' } catch {}
+
+# 42.6  body extractable (guards 42.7/42.8 against vacuous false-green)
+Check ($sdBody42.Length -gt 100) `
+    'getSystemDirective() body is extractable (non-vacuous guard for 42.7/42.8)'
+
+# 42.7  getSystemDirective() no longer has dead [FEATURES] instruction block
 Check (-not ($sdBody42 -match '\[FEATURES\] Canonical Command Registry')) `
     'getSystemDirective() no longer contains the dead [FEATURES] instruction block'
 
-# 42.7  getSystemDirective() no longer has dead [CROSSROADS] instruction block
+# 42.8  getSystemDirective() no longer has dead [CROSSROADS] instruction block
 Check (-not ($sdBody42 -match '\[CROSSROADS\] Command Handler')) `
     'getSystemDirective() no longer contains the dead [CROSSROADS] instruction block'
 
-# 42.8  _nativeWait function exists for [WAIT: X Hrs] handling
+# 42.9  _nativeWait function exists for [WAIT: X Hrs] handling
 Check ([bool]($apiSrc42 -match 'function _nativeWait')) `
     'api.js defines _nativeWait() for [WAIT: X Hrs] native handling'
+
+# 42.10  _nativeSleep calls loadUI() BEFORE saveState()
+# Regression guard: without loadUI(), syncStateFromDom() in saveState()
+# reads stale DOM inputs (unchanged hp_cur, calendar) and wipes mutations.
+$sleepBody42 = ''
+try { $sleepBody42 = Get-FunctionBody $apiSrc42 '_nativeSleep' } catch {}
+$sleepLoadIdx = $sleepBody42.IndexOf('loadUI')
+$sleepSaveIdx = $sleepBody42.IndexOf('saveState')
+Check ($sleepLoadIdx -ge 0 -and $sleepSaveIdx -ge 0 -and $sleepLoadIdx -lt $sleepSaveIdx) `
+    '_nativeSleep calls loadUI() before saveState() (syncStateFromDom round-trip guard)'
+
+# 42.11  _nativeWait calls loadUI() BEFORE saveState()
+$waitBody42 = ''
+try { $waitBody42 = Get-FunctionBody $apiSrc42 '_nativeWait' } catch {}
+$waitLoadIdx = $waitBody42.IndexOf('loadUI')
+$waitSaveIdx = $waitBody42.IndexOf('saveState')
+Check ($waitLoadIdx -ge 0 -and $waitSaveIdx -ge 0 -and $waitLoadIdx -lt $waitSaveIdx) `
+    '_nativeWait calls loadUI() before saveState() (syncStateFromDom round-trip guard)'
 
 # ===========================================================
 # Results

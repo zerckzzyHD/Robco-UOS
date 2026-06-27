@@ -2511,12 +2511,15 @@ header('Weapon Mods CSV + Registry Parity');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  SUITE 42 — Native Command Router (Phase 5a)
+//  SUITE 42 — Native Command Router (Phase 5a / 5a-fix)
 //  Deterministic commands ([FEATURES]/[CROSSROADS]/[SLEEP]/[WAIT])
-//  are intercepted pre-fetch in transmitMessage(); dead system-prompt
-//  blocks ([FEATURES] Canonical Command Registry, [CROSSROADS]
-//  Command Handler) are removed from getSystemDirective().
-//  8 tests
+//  are intercepted pre-fetch; dead system-prompt blocks removed.
+//  42.6 non-empty guard prevents vacuous pass on 42.7/42.8.
+//  42.10/42.11 guard the syncStateFromDom round-trip bug fix:
+//  _nativeSleep/_nativeWait must call loadUI() BEFORE saveState()
+//  so state→DOM is written first and syncStateFromDom reads back
+//  the new values (not the stale ones from unchanged inputs).
+//  11 tests
 // ══════════════════════════════════════════════════════════════
 header('Native Command Router (Phase 5a)');
 {
@@ -2551,35 +2554,67 @@ header('Native Command Router (Phase 5a)');
     );
   }
 
-  // 42.6  getSystemDirective() no longer contains the dead [FEATURES] instruction block
-  {
-    let sdBody = '';
-    try {
-      sdBody = extractFunctionBody(apiSrc42, 'getSystemDirective');
-    } catch (_) {}
-    assert(
-      !sdBody.includes('[FEATURES] Canonical Command Registry'),
-      'getSystemDirective() no longer contains the dead [FEATURES] instruction block'
-    );
-  }
+  // Extract getSystemDirective body once — shared by 42.6/42.7/42.8
+  // 42.6 asserts it's non-empty to prevent 42.7/42.8 from passing vacuously
+  // when extractFunctionBody returns '' on a parse failure.
+  let sdBody42 = '';
+  try {
+    sdBody42 = extractFunctionBody(apiSrc42, 'getSystemDirective');
+  } catch (_) {}
 
-  // 42.7  getSystemDirective() no longer contains the dead [CROSSROADS] instruction block
-  {
-    let sdBody = '';
-    try {
-      sdBody = extractFunctionBody(apiSrc42, 'getSystemDirective');
-    } catch (_) {}
-    assert(
-      !sdBody.includes('[CROSSROADS] Command Handler'),
-      'getSystemDirective() no longer contains the dead [CROSSROADS] instruction block'
-    );
-  }
+  // 42.6  body is extractable (guards 42.7/42.8 against vacuous false-green)
+  assert(
+    sdBody42.length > 100,
+    'getSystemDirective() body is extractable (non-vacuous guard for 42.7/42.8)'
+  );
 
-  // 42.8  _nativeWait function exists for [WAIT: X Hrs] native handling
+  // 42.7  getSystemDirective() no longer contains the dead [FEATURES] instruction block
+  assert(
+    !sdBody42.includes('[FEATURES] Canonical Command Registry'),
+    'getSystemDirective() no longer contains the dead [FEATURES] instruction block'
+  );
+
+  // 42.8  getSystemDirective() no longer contains the dead [CROSSROADS] instruction block
+  assert(
+    !sdBody42.includes('[CROSSROADS] Command Handler'),
+    'getSystemDirective() no longer contains the dead [CROSSROADS] instruction block'
+  );
+
+  // 42.9  _nativeWait function exists for [WAIT: X Hrs] native handling
   assert(
     apiSrc42.includes('function _nativeWait'),
     'api.js defines _nativeWait() for [WAIT: X Hrs] native handling'
   );
+
+  // 42.10  _nativeSleep calls loadUI() BEFORE saveState()
+  //  Regression guard: without loadUI(), syncStateFromDom() in saveState()
+  //  reads stale DOM inputs (unchanged hp_cur, calendar) and wipes the mutations.
+  {
+    let sleepBody = '';
+    try {
+      sleepBody = extractFunctionBody(apiSrc42, '_nativeSleep');
+    } catch (_) {}
+    const loadIdx = sleepBody.indexOf('loadUI');
+    const saveIdx = sleepBody.indexOf('saveState');
+    assert(
+      loadIdx !== -1 && saveIdx !== -1 && loadIdx < saveIdx,
+      '_nativeSleep calls loadUI() before saveState() (syncStateFromDom round-trip guard)'
+    );
+  }
+
+  // 42.11  _nativeWait calls loadUI() BEFORE saveState()
+  {
+    let waitBody = '';
+    try {
+      waitBody = extractFunctionBody(apiSrc42, '_nativeWait');
+    } catch (_) {}
+    const loadIdx = waitBody.indexOf('loadUI');
+    const saveIdx = waitBody.indexOf('saveState');
+    assert(
+      loadIdx !== -1 && saveIdx !== -1 && loadIdx < saveIdx,
+      '_nativeWait calls loadUI() before saveState() (syncStateFromDom round-trip guard)'
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
