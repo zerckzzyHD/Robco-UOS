@@ -134,7 +134,17 @@ function extractSkillKeys(source) {
 const stateSource = readFile('js/state.js');
 const apiSource = readFile('js/api.js');
 const cloudSource = readFile('js/cloud.js');
-const uiSource = readFile('js/ui.js');
+const uiSource = [
+  'js/ui-audio.js',
+  'js/ui-render.js',
+  'js/ui-saves.js',
+  'js/ui-account.js',
+  'js/ui-core.js',
+  'js/ui.js',
+]
+  .filter(f => fs.existsSync(path.join(ROOT, f)))
+  .map(f => readFile(f))
+  .join('\n');
 
 console.log('\n══ RobCo Persistence Audit ════════════════════════════════════\n');
 
@@ -1585,17 +1595,18 @@ header('Meta / Runner Parity');
     'Suite 53',
     'Suite 54',
     'Suite 55',
+    'Suite 56',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-54)' +
+    'JS runner contains all gate-guard suites (22-41, 49-56)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-54)' +
+    'PS runner contains all gate-guard suites (22-41, 49-56)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -4786,6 +4797,56 @@ header('Suite 55 — CSP Stage 1 Origin Guards + Firebase Pin');
     /img-src[^;]*blob:/.test(htmlSrc55),
     'CSP img-src contains blob: (canvas/screenshot-preview images — Protocol 20 guard)'
   );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 56 — UI Module Split Guards
+//  Protocol-20 static guards: each ui-*.js must exist, appear
+//  in sw.js ASSETS, and be wired in index.html before api.js.
+//  5 tests
+// ══════════════════════════════════════════════════════════════
+header('Suite 56 — UI Module Split Guards');
+{
+  const htmlSrc56 = readFile('index.html');
+  const swSrc56 = readFile('sw.js');
+
+  // 56.1 js/ui-audio.js file exists on disk
+  assert(
+    fs.existsSync(path.join(ROOT, 'js/ui-audio.js')),
+    'js/ui-audio.js file exists (Slice A: audio module extracted)'
+  );
+
+  // 56.2 ./js/ui-audio.js appears in sw.js ASSETS list
+  assert(
+    /['"]\.\/js\/ui-audio\.js['"]/.test(swSrc56),
+    "'./js/ui-audio.js' in sw.js ASSETS (cache covers the audio module)"
+  );
+
+  // 56.3 <script src="js/ui-audio.js"> appears in index.html
+  assert(
+    /src=['"]js\/ui-audio\.js['"]/.test(htmlSrc56),
+    '<script src="js/ui-audio.js"> present in index.html'
+  );
+
+  // 56.4 ui-audio.js script appears before api.js in index.html (load-order guard)
+  {
+    const audioIdx56 = htmlSrc56.indexOf('js/ui-audio.js');
+    const apiIdx56 = htmlSrc56.indexOf('js/api.js');
+    assert(
+      audioIdx56 !== -1 && apiIdx56 !== -1 && audioIdx56 < apiIdx56,
+      'ui-audio.js <script> appears before api.js in index.html (load-order guard)'
+    );
+  }
+
+  // 56.5 ui-audio.js script appears before ui.js in index.html (ui-audio must load first)
+  {
+    const audioIdx56b = htmlSrc56.indexOf('js/ui-audio.js');
+    const uiIdx56 = htmlSrc56.indexOf('"js/ui.js"');
+    assert(
+      audioIdx56b !== -1 && uiIdx56 !== -1 && audioIdx56b < uiIdx56,
+      'ui-audio.js <script> appears before ui.js in index.html (audio loads before core)'
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

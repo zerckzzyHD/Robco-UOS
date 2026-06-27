@@ -1,4 +1,4 @@
-## [v2.5.0] — Unreleased<!-- Tests: 674/674 | Cache: robco-terminal-v2.0.1-r66 -->
+## [v2.5.0] — Unreleased<!-- Tests: 679/679 | Cache: robco-terminal-v2.0.1-r67 -->
 
 ### Added
 
@@ -17,6 +17,7 @@
 
 ### Under the Hood
 
+- Split all audio functions out of ui.js into a dedicated js/ui-audio.js module (Slice A of a 5-part internal refactor). No user-facing behaviour changes — all audio functions work identically, the module loads before ui.js in the same script order, and the service worker pre-caches both files. Added 5 static guard tests (Suite 56, 679 total across 60 suites) that verify the new file exists, is in the service worker cache list, and loads in the correct order relative to ui.js and api.js. Bumped CACHE_NAME to r67 (new served file added).
 - Tightened the Content Security Policy: every load-bearing origin is now explicitly allowlisted (Gemini API, Firebase Auth, token refresh, Firestore, App Check, Google Sign-In popup, gstatic CDN) and the previously missing directives — `font-src`, `worker-src`, `form-action`, and `frame-ancestors 'none'` — are now included. The policy stays in report-only mode for this push; Stage 2 will flip it to enforcing once live violations are confirmed clear.
 - Evaluated self-hosting the Firebase SDK and deferred: all App Check and reCAPTCHA calls must still reach gstatic/google, so self-hosting removes zero CSP origins and gains nothing for the current zero-build-step architecture. The version pin on the CDN import URL is the supply-chain control. Revisit if Firebase ships a bundleable SDK or the project adopts a build step.
 - Added 12 automated guard tests (Suite 55, 672 total across 59 suites): CSP origin-presence checks for nine load-bearing origins and directives (Protocol 20 guard), an `unsafe-inline` tripwire that fails if a `sha256-` or `nonce-` token is added to `script-src` (because that disables `unsafe-inline` per CSP spec level 2 and would silently break all 148 inline handlers), and a Firebase SDK version-pin guard that fails if any import URL drifts from the pinned version.

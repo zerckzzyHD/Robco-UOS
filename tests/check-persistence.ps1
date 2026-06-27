@@ -90,7 +90,8 @@ function Get-SkillKeys($source) {
 $stateSrc  = Read-Src "js\state.js"
 $apiSrc    = Read-Src "js\api.js"
 $cloudSrc  = Read-Src "js\cloud.js"
-$uiSrc     = Read-Src "js\ui.js"
+$uiFiles   = @('js\ui-audio.js','js\ui-render.js','js\ui-saves.js','js\ui-account.js','js\ui-core.js','js\ui.js')
+$uiSrc     = ($uiFiles | Where-Object { Test-Path (Join-Path $Root $_) } | ForEach-Object { [IO.File]::ReadAllText((Join-Path $Root $_)) }) -join "`n"
 
 Write-Host "`n==  RobCo Persistence Audit  ==============================`n"
 
@@ -163,11 +164,13 @@ try {
     $nodeCheck = Get-Command node -ErrorAction SilentlyContinue
     if ($nodeCheck) {
         $repoRoot = (Get-Item $PSScriptRoot).Parent.FullName
-        $uiPathNode = (Join-Path $repoRoot "js/ui.js").Replace('\', '/')
+        $repoRootNode = $repoRoot.Replace('\', '/')
         $repScript = @"
 const vm = require('vm');
 const fs = require('fs');
-const uiSource = fs.readFileSync('$uiPathNode', 'utf8');
+const path = require('path');
+const UI_FILES = ['js/ui-audio.js','js/ui-render.js','js/ui-saves.js','js/ui-account.js','js/ui-core.js','js/ui.js'];
+const uiSource = UI_FILES.filter(f => fs.existsSync(path.join('$repoRootNode', f))).map(f => fs.readFileSync(path.join('$repoRootNode', f), 'utf8')).join('\n');
 const threshMatch = uiSource.match(/const FACTION_THRESHOLDS\s*=\s*\{[\s\S]*?\};\s*\/\/ Default/);
 const defaultMatch = uiSource.match(/const _DEFAULT_THRESHOLDS\s*=\s*\{[^}]+\};/);
 const fnMatch = uiSource.match(/function getFactionStanding\([\s\S]*?\n\}/);
@@ -967,7 +970,7 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
 Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-54)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
@@ -2882,6 +2885,40 @@ Check $allPinned55 `
 # 55.13 img-src contains blob: (canvas / screenshot-preview images)
 Check ([bool]($htmlSrc55 -match 'img-src[^;]*blob:')) `
     "CSP img-src contains blob: (canvas/screenshot-preview images -- Protocol 20 guard)"
+
+# ===========================================================
+# Suite 56 -- UI Module Split Guards
+# Protocol-20 static guards: each ui-*.js must exist, appear
+# in sw.js ASSETS, and be wired in index.html before api.js.
+# 5 tests
+# ===========================================================
+Sep "Suite 56 -- UI Module Split Guards"
+$htmlSrc56 = $htmlSrc55  # reuse (same index.html read above)
+$swSrc56   = Read-Src "sw.js"
+
+# 56.1 js/ui-audio.js file exists on disk
+Check (Test-Path (Join-Path $Root "js\ui-audio.js")) `
+    "js/ui-audio.js file exists (Slice A: audio module extracted)"
+
+# 56.2 ./js/ui-audio.js appears in sw.js ASSETS list
+Check ([bool]($swSrc56 -match 'js/ui-audio\.js')) `
+    "'./js/ui-audio.js' in sw.js ASSETS (cache covers the audio module)"
+
+# 56.3 <script src="js/ui-audio.js"> appears in index.html
+Check ([bool]($htmlSrc56 -match 'src="js/ui-audio\.js"')) `
+    '<script src="js/ui-audio.js"> present in index.html'
+
+# 56.4 ui-audio.js script appears before api.js in index.html (load-order guard)
+$audioIdx56  = $htmlSrc56.IndexOf('js/ui-audio.js')
+$apiIdx56    = $htmlSrc56.IndexOf('js/api.js')
+Check ($audioIdx56 -ne -1 -and $apiIdx56 -ne -1 -and $audioIdx56 -lt $apiIdx56) `
+    "ui-audio.js <script> appears before api.js in index.html (load-order guard)"
+
+# 56.5 ui-audio.js script appears before ui.js in index.html
+$audioIdx56b = $htmlSrc56.IndexOf('js/ui-audio.js')
+$uiIdx56     = $htmlSrc56.IndexOf('"js/ui.js"')
+Check ($audioIdx56b -ne -1 -and $uiIdx56 -ne -1 -and $audioIdx56b -lt $uiIdx56) `
+    "ui-audio.js <script> appears before ui.js in index.html (audio loads before core)"
 
 # ===========================================================
 # Results
