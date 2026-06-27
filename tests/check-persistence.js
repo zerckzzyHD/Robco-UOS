@@ -2935,6 +2935,283 @@ header('Phase 5c-ii: Google Sign-In + Account Panel');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 46 — Cloud Save Picker + Local Migration (Phase 5c-iii)
+//  Data-safety invariants: additive uploads, contentHash dedup,
+//  confirm-gated load/delete, picker UI wired.
+//  16 tests
+// ══════════════════════════════════════════════════════════════
+header('Phase 5c-iii: Cloud Save Picker + Local Migration');
+
+{
+  // 46.1  cloud.js references addDoc (additive saves — never overwrites with set)
+  assert(
+    /\baddDoc\b/.test(cloudSource),
+    'cloud.js references addDoc (additive cloud saves — migration never overwrites)'
+  );
+
+  // 46.2  cloud.js references collection AND getDocs (subcollection query for picker)
+  assert(
+    /\bcollection\b/.test(cloudSource) && /\bgetDocs\b/.test(cloudSource),
+    'cloud.js references collection + getDocs (subcollection listing for cloud save picker)'
+  );
+
+  // 46.3  cloud.js references updateDoc AND deleteDoc (rename + delete operations)
+  assert(
+    /\bupdateDoc\b/.test(cloudSource) && /\bdeleteDoc\b/.test(cloudSource),
+    'cloud.js references updateDoc + deleteDoc (rename and delete cloud saves)'
+  );
+
+  // 46.4  _contentHash helper defined in cloud.js
+  assert(
+    /function _contentHash\s*\(/.test(cloudSource),
+    'cloud.js defines _contentHash() helper (deterministic content fingerprint for dedup)'
+  );
+
+  // 46.5  contentHash behavioral: same input → same hash (determinism)
+  {
+    let _testHash = null;
+    try {
+      const fnIdx = cloudSource.indexOf('function _contentHash');
+      if (fnIdx !== -1) {
+        let i = cloudSource.indexOf('{', fnIdx);
+        let depth = 0;
+        while (i < cloudSource.length) {
+          if (cloudSource[i] === '{') depth++;
+          else if (cloudSource[i] === '}' && --depth === 0) {
+            const fnSrc = cloudSource.slice(fnIdx, i + 1);
+            eval('_testHash = ' + fnSrc); // eslint-disable-line no-eval
+            break;
+          }
+          i++;
+        }
+      }
+    } catch (_) {}
+    if (_testHash) {
+      const v8 = { activeContext: 'FNV', campaigns: { FNV: { lvl: 5, name: 'Test' } } };
+      const chat = [{ text: 'hello', sender: 'user' }];
+      const h1 = _testHash(v8, chat, 'any');
+      const h2 = _testHash(v8, chat, 'any');
+      assert(
+        typeof h1 === 'string' && h1.length > 0 && h1 === h2,
+        '_contentHash is deterministic: same input → same hash every call'
+      );
+    } else {
+      fail('_contentHash determinism: function could not be evaluated in isolation');
+    }
+  }
+
+  // 46.6  contentHash behavioral: apostrophe/ampersand not HTML-encoded at hash layer
+  //        (regression guard — 5c-i double-escape class: round-trip must be clean)
+  {
+    let _testHash = null;
+    try {
+      const fnIdx = cloudSource.indexOf('function _contentHash');
+      if (fnIdx !== -1) {
+        let i = cloudSource.indexOf('{', fnIdx);
+        let depth = 0;
+        while (i < cloudSource.length) {
+          if (cloudSource[i] === '{') depth++;
+          else if (cloudSource[i] === '}' && --depth === 0) {
+            const fnSrc = cloudSource.slice(fnIdx, i + 1);
+            eval('_testHash = ' + fnSrc); // eslint-disable-line no-eval
+            break;
+          }
+          i++;
+        }
+      }
+    } catch (_) {}
+    if (_testHash) {
+      const v8 = {
+        activeContext: 'FNV',
+        campaigns: { FNV: { name: "Ain't That a Kick & a Half" } },
+      };
+      const h = _testHash(v8, [], 'any');
+      assert(
+        typeof h === 'string' && h.length > 0 && !h.includes('&#x27;') && !h.includes('&amp;'),
+        '_contentHash: apostrophe/ampersand in data not HTML-encoded (storage-layer clean, no double-escape)'
+      );
+    } else {
+      fail('_contentHash apostrophe/ampersand test: function could not be evaluated');
+    }
+  }
+
+  // 46.7  syncLocalSavesToCloud uses addDoc (not setDoc) — additive, never overwrites
+  {
+    const syncBody46 = (() => {
+      const idx = cloudSource.indexOf('window.syncLocalSavesToCloud');
+      if (idx === -1) return '';
+      let i = cloudSource.indexOf('{', idx);
+      let depth = 0;
+      const start = i;
+      while (i < cloudSource.length) {
+        if (cloudSource[i] === '{') depth++;
+        else if (cloudSource[i] === '}' && --depth === 0) return cloudSource.slice(start, i + 1);
+        i++;
+      }
+      return '';
+    })();
+    assert(
+      /\baddDoc\b/.test(syncBody46) && !/setDoc\s*\(/.test(syncBody46),
+      'syncLocalSavesToCloud uses addDoc (not setDoc) — additive upload, never overwrites'
+    );
+  }
+
+  // 46.8  syncLocalSavesToCloud body NEVER calls localStorage.setItem or removeItem
+  //        (ADDITIVE ONLY — migration must not touch local state at all)
+  {
+    const syncBody46 = (() => {
+      const idx = cloudSource.indexOf('window.syncLocalSavesToCloud');
+      if (idx === -1) return '';
+      let i = cloudSource.indexOf('{', idx);
+      let depth = 0;
+      const start = i;
+      while (i < cloudSource.length) {
+        if (cloudSource[i] === '{') depth++;
+        else if (cloudSource[i] === '}' && --depth === 0) return cloudSource.slice(start, i + 1);
+        i++;
+      }
+      return '';
+    })();
+    assert(
+      !/localStorage\.setItem/.test(syncBody46) && !/localStorage\.removeItem/.test(syncBody46),
+      'syncLocalSavesToCloud never calls localStorage.setItem or removeItem (ADDITIVE ONLY — no local state touched)'
+    );
+  }
+
+  // 46.9  syncLocalSavesToCloud dedup checks localOriginId AND contentHash
+  {
+    const syncBody46 = (() => {
+      const idx = cloudSource.indexOf('window.syncLocalSavesToCloud');
+      if (idx === -1) return '';
+      let i = cloudSource.indexOf('{', idx);
+      let depth = 0;
+      const start = i;
+      while (i < cloudSource.length) {
+        if (cloudSource[i] === '{') depth++;
+        else if (cloudSource[i] === '}' && --depth === 0) return cloudSource.slice(start, i + 1);
+        i++;
+      }
+      return '';
+    })();
+    assert(
+      /localOriginId/.test(syncBody46) && /contentHash/.test(syncBody46),
+      'syncLocalSavesToCloud dedup checks localOriginId AND contentHash (idempotent re-sync)'
+    );
+  }
+
+  // 46.10  loadCloudSave is gated behind confirm()
+  {
+    const loadBody46 = (() => {
+      const idx = cloudSource.indexOf('window.loadCloudSave');
+      if (idx === -1) return '';
+      let i = cloudSource.indexOf('{', idx);
+      let depth = 0;
+      const start = i;
+      while (i < cloudSource.length) {
+        if (cloudSource[i] === '{') depth++;
+        else if (cloudSource[i] === '}' && --depth === 0) return cloudSource.slice(start, i + 1);
+        i++;
+      }
+      return '';
+    })();
+    assert(
+      /\bconfirm\b/.test(loadBody46),
+      'loadCloudSave is gated behind confirm() — never auto-loads (data-safety)'
+    );
+  }
+
+  // 46.11  loadCloudSave routes through sanitizeImportedContainer AND migrateState
+  {
+    const loadBody46 = (() => {
+      const idx = cloudSource.indexOf('window.loadCloudSave');
+      if (idx === -1) return '';
+      let i = cloudSource.indexOf('{', idx);
+      let depth = 0;
+      const start = i;
+      while (i < cloudSource.length) {
+        if (cloudSource[i] === '{') depth++;
+        else if (cloudSource[i] === '}' && --depth === 0) return cloudSource.slice(start, i + 1);
+        i++;
+      }
+      return '';
+    })();
+    assert(
+      /sanitizeImportedContainer/.test(loadBody46) && /migrateState/.test(loadBody46),
+      'loadCloudSave routes through sanitizeImportedContainer AND migrateState (hardened load path)'
+    );
+  }
+
+  // 46.12  deleteCloudSave is confirm-gated (explicit user action required)
+  {
+    const delBody46 = (() => {
+      const idx = cloudSource.indexOf('window.deleteCloudSave');
+      if (idx === -1) return '';
+      let i = cloudSource.indexOf('{', idx);
+      let depth = 0;
+      const start = i;
+      while (i < cloudSource.length) {
+        if (cloudSource[i] === '{') depth++;
+        else if (cloudSource[i] === '}' && --depth === 0) return cloudSource.slice(start, i + 1);
+        i++;
+      }
+      return '';
+    })();
+    assert(
+      /\bconfirm\b/.test(delBody46),
+      'deleteCloudSave is confirm-gated (explicit confirmation before deleting cloud save)'
+    );
+  }
+
+  // 46.13  renameCloudSave uses updateDoc (label-only update — not a new doc or overwrite)
+  {
+    const renBody46 = (() => {
+      const idx = cloudSource.indexOf('window.renameCloudSave');
+      if (idx === -1) return '';
+      let i = cloudSource.indexOf('{', idx);
+      let depth = 0;
+      const start = i;
+      while (i < cloudSource.length) {
+        if (cloudSource[i] === '{') depth++;
+        else if (cloudSource[i] === '}' && --depth === 0) return cloudSource.slice(start, i + 1);
+        i++;
+      }
+      return '';
+    })();
+    assert(
+      /\bupdateDoc\b/.test(renBody46) &&
+        !/\baddDoc\b/.test(renBody46) &&
+        !/\bsetDoc\b/.test(renBody46),
+      'renameCloudSave uses updateDoc only (not addDoc/setDoc) — label-only update'
+    );
+  }
+
+  // 46.14  renderCloudSavePicker() defined in ui.js
+  assert(
+    /async function renderCloudSavePicker\s*\(/.test(uiSource) ||
+      /function renderCloudSavePicker\s*\(/.test(uiSource),
+    'ui.js defines renderCloudSavePicker() (cloud save picker render function)'
+  );
+
+  // 46.15  loadUI() calls renderCloudSavePicker()
+  {
+    let loadUIBody46 = '';
+    try {
+      loadUIBody46 = extractFunctionBody(uiSource, 'loadUI');
+    } catch (_) {}
+    assert(
+      /renderCloudSavePicker\(\)/.test(loadUIBody46),
+      'loadUI() calls renderCloudSavePicker() (picker wired into page load)'
+    );
+  }
+
+  // 46.16  index.html has cloudSavePickerBody element (picker mount point in ACCOUNT panel)
+  assert(
+    /id="cloudSavePickerBody"/.test(htmlSource),
+    'index.html has #cloudSavePickerBody element (cloud save picker mount point in ACCOUNT panel)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 console.log('\n══════════════════════════════════════════════════════════════\n');

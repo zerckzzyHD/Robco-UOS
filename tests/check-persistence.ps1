@@ -1843,6 +1843,144 @@ Check ($hasAuthStateReady -and $hasCurrentUserCheck) `
     'cloud.js boot sign-in is conditional: authStateReady() + !auth.currentUser guard present (not unconditional — prevents clobbering Google session on reload)'
 
 # ===========================================================
+# Suite 46 -- Cloud Save Picker + Local Migration (Phase 5c-iii)
+# Data-safety invariants: additive uploads, contentHash dedup,
+# confirm-gated load/delete, picker UI wired.
+# 16 tests
+# ===========================================================
+Sep "Suite 46 -- Phase 5c-iii: Cloud Save Picker + Local Migration"
+
+# 46.1  cloud.js references addDoc (additive saves — never overwrites)
+Check ([bool]($cloudSrc -match '\baddDoc\b')) `
+    'cloud.js references addDoc (additive cloud saves — migration never overwrites)'
+
+# 46.2  cloud.js references collection AND getDocs (subcollection query for picker)
+Check (([bool]($cloudSrc -match '\bcollection\b')) -and ([bool]($cloudSrc -match '\bgetDocs\b'))) `
+    'cloud.js references collection + getDocs (subcollection listing for cloud save picker)'
+
+# 46.3  cloud.js references updateDoc AND deleteDoc (rename + delete operations)
+Check (([bool]($cloudSrc -match '\bupdateDoc\b')) -and ([bool]($cloudSrc -match '\bdeleteDoc\b'))) `
+    'cloud.js references updateDoc + deleteDoc (rename and delete cloud saves)'
+
+# 46.4  _contentHash helper defined in cloud.js
+Check ([bool]($cloudSrc -match 'function _contentHash\s*\(')) `
+    'cloud.js defines _contentHash() helper (deterministic content fingerprint for dedup)'
+
+# 46.5  contentHash: function body uses JSON.stringify and has no random/date (deterministic by construction)
+#        Structural check: PS double-quoted here-strings expand $vars so behavioral node-eval is error-prone.
+#        The JS runner (check-persistence.js) covers the full behavioral eval.
+$hashBody46 = ''
+$hIdx46 = $cloudSrc.IndexOf('function _contentHash')
+if ($hIdx46 -ge 0) {
+    $hStart46 = $cloudSrc.IndexOf('{', $hIdx46); $hDep46 = 0; $hI46 = $hStart46
+    while ($hI46 -lt $cloudSrc.Length) {
+        $ch = $cloudSrc[$hI46]
+        if ($ch -eq '{') { $hDep46++ }
+        elseif ($ch -eq '}') { $hDep46--; if ($hDep46 -eq 0) { $hashBody46 = $cloudSrc.Substring($hStart46, $hI46 - $hStart46 + 1); break } }
+        $hI46++
+    }
+}
+$hashDet46 = ($hashBody46.Length -gt 50) -and ($hashBody46 -match 'JSON\.stringify') -and
+             -not ($hashBody46 -match 'Math\.random') -and -not ($hashBody46 -match 'Date\.')
+Check $hashDet46 `
+    '_contentHash uses JSON.stringify with no Math.random/Date (deterministic by construction)'
+
+# 46.6  contentHash: function body contains no HTML entity encoding (apostrophe/ampersand not escaped)
+$hashApos46 = ($hashBody46.Length -gt 50) -and
+              -not ($hashBody46 -match '&#x27;') -and
+              -not ($hashBody46 -match '&amp;') -and
+              -not ($hashBody46 -match 'encodeURI') -and
+              -not ($hashBody46 -match '\.replace.*&lt;')
+Check $hashApos46 `
+    '_contentHash: no HTML entity encoding in function body (apostrophe/ampersand safe at hash layer)'
+
+# 46.7  syncLocalSavesToCloud uses addDoc (not setDoc) — additive
+$syncIdx46 = $cloudSrc.IndexOf('window.syncLocalSavesToCloud')
+$syncBody46 = ''
+if ($syncIdx46 -ge 0) {
+    $sStart = $cloudSrc.IndexOf('{', $syncIdx46); $sDep = 0; $sI = $sStart
+    while ($sI -lt $cloudSrc.Length) {
+        $ch = $cloudSrc[$sI]
+        if ($ch -eq '{') { $sDep++ }
+        elseif ($ch -eq '}') { $sDep--; if ($sDep -eq 0) { $syncBody46 = $cloudSrc.Substring($sStart, $sI - $sStart + 1); break } }
+        $sI++
+    }
+}
+Check (([bool]($syncBody46 -match '\baddDoc\b')) -and -not ([bool]($syncBody46 -match 'setDoc\s*\('))) `
+    'syncLocalSavesToCloud uses addDoc (not setDoc) — additive upload, never overwrites'
+
+# 46.8  syncLocalSavesToCloud body NEVER calls localStorage.setItem or removeItem
+Check (-not ([bool]($syncBody46 -match 'localStorage\.setItem')) -and -not ([bool]($syncBody46 -match 'localStorage\.removeItem'))) `
+    'syncLocalSavesToCloud never calls localStorage.setItem or removeItem (ADDITIVE ONLY — no local state touched)'
+
+# 46.9  syncLocalSavesToCloud dedup checks localOriginId AND contentHash
+Check (([bool]($syncBody46 -match 'localOriginId')) -and ([bool]($syncBody46 -match 'contentHash'))) `
+    'syncLocalSavesToCloud dedup checks localOriginId AND contentHash (idempotent re-sync)'
+
+# 46.10  loadCloudSave is gated behind confirm()
+$loadIdx46 = $cloudSrc.IndexOf('window.loadCloudSave')
+$loadBody46 = ''
+if ($loadIdx46 -ge 0) {
+    $lStart = $cloudSrc.IndexOf('{', $loadIdx46); $lDep = 0; $lI = $lStart
+    while ($lI -lt $cloudSrc.Length) {
+        $ch = $cloudSrc[$lI]
+        if ($ch -eq '{') { $lDep++ }
+        elseif ($ch -eq '}') { $lDep--; if ($lDep -eq 0) { $loadBody46 = $cloudSrc.Substring($lStart, $lI - $lStart + 1); break } }
+        $lI++
+    }
+}
+Check ([bool]($loadBody46 -match '\bconfirm\b')) `
+    'loadCloudSave is gated behind confirm() — never auto-loads (data-safety)'
+
+# 46.11  loadCloudSave routes through sanitizeImportedContainer AND migrateState
+Check (([bool]($loadBody46 -match 'sanitizeImportedContainer')) -and ([bool]($loadBody46 -match 'migrateState'))) `
+    'loadCloudSave routes through sanitizeImportedContainer AND migrateState (hardened load path)'
+
+# 46.12  deleteCloudSave is confirm-gated
+$delIdx46 = $cloudSrc.IndexOf('window.deleteCloudSave')
+$delBody46 = ''
+if ($delIdx46 -ge 0) {
+    $dStart = $cloudSrc.IndexOf('{', $delIdx46); $dDep = 0; $dI = $dStart
+    while ($dI -lt $cloudSrc.Length) {
+        $ch = $cloudSrc[$dI]
+        if ($ch -eq '{') { $dDep++ }
+        elseif ($ch -eq '}') { $dDep--; if ($dDep -eq 0) { $delBody46 = $cloudSrc.Substring($dStart, $dI - $dStart + 1); break } }
+        $dI++
+    }
+}
+Check ([bool]($delBody46 -match '\bconfirm\b')) `
+    'deleteCloudSave is confirm-gated (explicit confirmation before deleting cloud save)'
+
+# 46.13  renameCloudSave uses updateDoc (label-only update — not a new doc or overwrite)
+$renIdx46 = $cloudSrc.IndexOf('window.renameCloudSave')
+$renBody46 = ''
+if ($renIdx46 -ge 0) {
+    $rStart = $cloudSrc.IndexOf('{', $renIdx46); $rDep = 0; $rI = $rStart
+    while ($rI -lt $cloudSrc.Length) {
+        $ch = $cloudSrc[$rI]
+        if ($ch -eq '{') { $rDep++ }
+        elseif ($ch -eq '}') { $rDep--; if ($rDep -eq 0) { $renBody46 = $cloudSrc.Substring($rStart, $rI - $rStart + 1); break } }
+        $rI++
+    }
+}
+Check (([bool]($renBody46 -match '\bupdateDoc\b')) -and -not ([bool]($renBody46 -match '\baddDoc\b')) -and -not ([bool]($renBody46 -match '\bsetDoc\b'))) `
+    'renameCloudSave uses updateDoc only (not addDoc/setDoc) — label-only update'
+
+# 46.14  renderCloudSavePicker() defined in ui.js
+Check (([bool]($uiSrc -match 'async function renderCloudSavePicker\s*\(')) -or ([bool]($uiSrc -match 'function renderCloudSavePicker\s*\('))) `
+    'ui.js defines renderCloudSavePicker() (cloud save picker render function)'
+
+# 46.15  loadUI() calls renderCloudSavePicker()
+$loadUIBody46 = ''
+try { $loadUIBody46 = Get-FunctionBody $uiSrc 'loadUI' } catch {}
+Check ([bool]($loadUIBody46 -match 'renderCloudSavePicker\(\)')) `
+    'loadUI() calls renderCloudSavePicker() (picker wired into page load)'
+
+# 46.16  index.html has cloudSavePickerBody element (picker mount point in ACCOUNT panel)
+Check ([bool]($htmlSrc -match 'id="cloudSavePickerBody"')) `
+    'index.html has #cloudSavePickerBody element (cloud save picker mount point in ACCOUNT panel)'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

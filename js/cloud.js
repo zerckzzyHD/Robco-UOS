@@ -7,6 +7,11 @@ import {
   doc,
   setDoc,
   getDoc,
+  addDoc,
+  collection,
+  getDocs,
+  updateDoc,
+  deleteDoc,
 } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js';
 import {
   getAuth,
@@ -68,6 +73,7 @@ onAuthStateChanged(auth, user => {
   _currentUid = user ? user.uid : null;
   _currentUser = user || null;
   if (typeof window.renderAccount === 'function') window.renderAccount();
+  if (typeof window.renderCloudSavePicker === 'function') window.renderCloudSavePicker();
 });
 
 // Complete any pending redirect sign-in from a previous page load (mobile flow)
@@ -276,5 +282,236 @@ window.pullFromCloud = async function (courierId) {
     alert('>> CLOUD NETWORK FAILURE <<');
   } finally {
     if (btn) btn.innerText = '> PULL CLOUD SAVE';
+  }
+};
+
+// ── contentHash: deterministic FNV-1a 32-bit fingerprint ────────────
+// Used to detect duplicate local saves before uploading. Sorted keys ensure
+// field-insertion-order differences don't produce different hashes.
+function _contentHash(robco_v8_obj, chat_arr, playstyle_str) {
+  function _sortedKeys(o) {
+    if (Array.isArray(o)) return o.map(_sortedKeys);
+    if (o && typeof o === 'object') {
+      const out = {};
+      Object.keys(o)
+        .sort()
+        .forEach(k => (out[k] = _sortedKeys(o[k])));
+      return out;
+    }
+    return o;
+  }
+  const payload = JSON.stringify({
+    v: _sortedKeys(robco_v8_obj),
+    c: _sortedKeys(chat_arr),
+    p: String(playstyle_str || ''),
+  });
+  let h = 0x811c9dc5;
+  for (let i = 0; i < payload.length; i++) {
+    h ^= payload.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(16).padStart(8, '0');
+}
+
+// ── List all cloud saves for the current user ────────────────────────
+// Returns [{id, data}, ...] sorted by updatedAt desc (savedAt as fallback).
+window.listCloudSaves = async function () {
+  if (!_currentUid) return [];
+  try {
+    const col = collection(db, 'users', _currentUid, 'saves');
+    const snap = await getDocs(col);
+    const docs = [];
+    snap.forEach(d => docs.push({ id: d.id, data: d.data() }));
+    docs.sort((a, b) => {
+      const ta = a.data.updatedAt || a.data.savedAt || 0;
+      const tb = b.data.updatedAt || b.data.savedAt || 0;
+      return tb - ta;
+    });
+    return docs;
+  } catch (e) {
+    console.warn('listCloudSaves failed (non-fatal):', e);
+    return [];
+  }
+};
+
+// ── Sync local saves to cloud (ADDITIVE ONLY — never overwrites) ─────
+// Uploads robco_v8 + robco_slot_1/2/3. Dedupes by localOriginId+contentHash
+// so re-syncing creates no duplicates. Never touches localStorage.
+window.syncLocalSavesToCloud = async function () {
+  if (!_currentUid) {
+    alert('>> NOT SIGNED IN — please sign in to sync saves <<');
+    return;
+  }
+
+  const localSaves = [];
+
+  // Active robco_v8 container
+  const v8raw = localStorage.getItem('robco_v8');
+  if (v8raw) {
+    try {
+      const v8 = JSON.parse(v8raw);
+      const chatRaw = localStorage.getItem('robco_chat');
+      const chat = chatRaw ? JSON.parse(chatRaw) : [];
+      const playstyle = localStorage.getItem('robco_playstyle') || 'any';
+      const ctx = v8.activeContext || 'FNV';
+      localSaves.push({
+        localOriginId: 'robco_v8',
+        robco_v8: v8,
+        chat,
+        playstyle,
+        gameContext: ctx,
+        label: 'Local (' + ctx + ') — ' + new Date().toLocaleDateString(),
+      });
+    } catch (_) {}
+  }
+
+  // Slots 1-3
+  for (let n = 1; n <= 3; n++) {
+    const slotRaw = localStorage.getItem('robco_slot_' + n);
+    if (!slotRaw) continue;
+    try {
+      const slot = JSON.parse(slotRaw);
+      const slotCtx = slot.gameContext || (slot.state && slot.state.gameContext) || 'FNV';
+      const slotV8 = { activeContext: slotCtx, campaigns: {} };
+      slotV8.campaigns[slotCtx] = slot.state || {};
+      const savedDate = slot.savedAt
+        ? new Date(slot.savedAt).toLocaleDateString()
+        : new Date().toLocaleDateString();
+      const slotName = slot.slotName || 'Slot ' + n;
+      localSaves.push({
+        localOriginId: 'robco_slot_' + n,
+        robco_v8: slotV8,
+        chat: Array.isArray(slot.chat) ? slot.chat : [],
+        playstyle: slot.playstyle || 'any',
+        gameContext: slotCtx,
+        label: slotName + ': ' + savedDate,
+      });
+    } catch (_) {}
+  }
+
+  if (localSaves.length === 0) {
+    alert('>> NO LOCAL SAVES FOUND <<');
+    return;
+  }
+
+  // Query existing cloud saves for dedup check
+  const col = collection(db, 'users', _currentUid, 'saves');
+  let existingDocs = [];
+  try {
+    const snap = await getDocs(col);
+    snap.forEach(d => existingDocs.push(d.data()));
+  } catch (e) {
+    console.warn('Could not fetch existing saves for dedup:', e);
+  }
+
+  let uploaded = 0;
+  let skipped = 0;
+  const now = Date.now();
+
+  for (const ls of localSaves) {
+    const contentHash = _contentHash(ls.robco_v8, ls.chat, ls.playstyle);
+    const isDupe = existingDocs.some(
+      d => d.localOriginId === ls.localOriginId && d.contentHash === contentHash
+    );
+    if (isDupe) {
+      skipped++;
+      continue;
+    }
+    try {
+      await addDoc(col, {
+        schema: 2,
+        version: window.APP_VERSION || '2.0.1',
+        savedAt: now,
+        updatedAt: now,
+        label: ls.label,
+        gameContext: ls.gameContext,
+        localOriginId: ls.localOriginId,
+        contentHash,
+        robco_v8: ls.robco_v8,
+        chat: ls.chat,
+        playstyle: ls.playstyle,
+      });
+      uploaded++;
+    } catch (e) {
+      console.warn('Upload failed for', ls.localOriginId, e);
+    }
+  }
+
+  alert('» SYNC COMPLETE — ' + uploaded + ' uploaded, ' + skipped + ' already synced «');
+  if (typeof window.renderCloudSavePicker === 'function') window.renderCloudSavePicker();
+};
+
+// ── Load a cloud save into local state (confirm-gated) ───────────────
+// Sanitizes and migrates the cloud container before writing to localStorage.
+// NEVER auto-loads; always requires explicit user confirmation.
+window.loadCloudSave = async function (docId) {
+  if (!_currentUid) return;
+  if (!confirm('>> LOAD CLOUD SAVE?\nThis replaces your current in-app campaign — continue?'))
+    return;
+  try {
+    const docRef = doc(db, 'users', _currentUid, 'saves', docId);
+    const docSnap = await getDoc(docRef);
+    if (!docSnap.exists()) {
+      alert('>> SAVE NOT FOUND <<');
+      return;
+    }
+    const data = docSnap.data();
+    if (!data.robco_v8) {
+      alert('>> SAVE FORMAT NOT SUPPORTED <<');
+      return;
+    }
+    // Backup current state for undo
+    localStorage.setItem(
+      'robco_backup',
+      JSON.stringify({ robco_v8: JSON.parse(localStorage.getItem('robco_v8') || '{}') })
+    );
+    // Sanitize (XSS hardening — same path as cloud pull and file import)
+    const sanitized =
+      typeof sanitizeImportedContainer === 'function'
+        ? sanitizeImportedContainer(data.robco_v8)
+        : data.robco_v8;
+    // Apply migrateState to each campaign to bring schema up to date
+    if (typeof migrateState === 'function' && sanitized.campaigns) {
+      Object.keys(sanitized.campaigns).forEach(ctx => {
+        sanitized.campaigns[ctx] = migrateState(data.version || '1.0', sanitized.campaigns[ctx]);
+      });
+    }
+    localStorage.setItem('robco_v8', JSON.stringify(sanitized));
+    if (data.chat && Array.isArray(data.chat))
+      localStorage.setItem('robco_chat', JSON.stringify(data.chat));
+    if (data.playstyle) localStorage.setItem('robco_playstyle', data.playstyle);
+    alert('>> CLOUD SAVE RESTORED. REBOOTING SYSTEM... <<');
+    window.location.reload();
+  } catch (e) {
+    console.warn('loadCloudSave failed (non-fatal):', e);
+    alert('>> CLOUD NETWORK FAILURE <<');
+  }
+};
+
+// ── Rename a cloud save (label only — no data change) ───────────────
+window.renameCloudSave = async function (docId, newLabel) {
+  if (!_currentUid || !newLabel) return;
+  try {
+    await updateDoc(doc(db, 'users', _currentUid, 'saves', docId), {
+      label: String(newLabel),
+      updatedAt: Date.now(),
+    });
+    if (typeof window.renderCloudSavePicker === 'function') window.renderCloudSavePicker();
+  } catch (e) {
+    console.warn('renameCloudSave failed (non-fatal):', e);
+    alert('>> RENAME FAILED — NETWORK ERROR <<');
+  }
+};
+
+// ── Delete a cloud save (confirm-gated — user-initiated only) ────────
+window.deleteCloudSave = async function (docId) {
+  if (!_currentUid) return;
+  if (!confirm('>> PERMANENTLY DELETE this cloud save?\nThis cannot be undone.')) return;
+  try {
+    await deleteDoc(doc(db, 'users', _currentUid, 'saves', docId));
+    if (typeof window.renderCloudSavePicker === 'function') window.renderCloudSavePicker();
+  } catch (e) {
+    console.warn('deleteCloudSave failed (non-fatal):', e);
+    alert('>> DELETE FAILED — NETWORK ERROR <<');
   }
 };

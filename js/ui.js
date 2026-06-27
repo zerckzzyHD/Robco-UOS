@@ -2000,6 +2000,7 @@ function loadUI() {
   renderKarmaCenter(); // G4: FO3 Karma Center
   renderCampaignStatus(); // v2.0.1: Campaign Status + Crossroads Record
   renderAccount();
+  renderCloudSavePicker();
   _updateContextPanels(); // G4: switch faction/karma panel visibility
   // C5/C11: Restore CAMPG dropdowns from state
   {
@@ -3076,9 +3077,79 @@ function renderAccount() {
       (email
         ? '<div style="font-size:11px;opacity:0.6;margin-bottom:8px;">' + email + '</div>'
         : '') +
+      '<button class="action-btn" style="width:100%;margin-bottom:4px;" onclick="if(window.syncLocalSavesToCloud)window.syncLocalSavesToCloud()">' +
+      '> SYNC LOCAL SAVES TO ACCOUNT</button>' +
       '<button class="action-btn" style="width:100%" onclick="if(window.signOutAccount)window.signOutAccount()">' +
       '> SIGN OUT</button>';
   }
+  renderCloudSavePicker();
+}
+
+// ── CLOUD SAVE PICKER (Phase 5c-iii) ─────────────────────────────────
+// Renders the cloud save list inside #cloudSavePickerBody (ACCOUNT panel).
+// Async — fires-and-forgets from loadUI() and renderAccount(); safe to call anytime.
+// All user-supplied labels are escaped; Firestore auto-IDs are alphanumeric (safe in onclick).
+async function renderCloudSavePicker() {
+  const body = document.getElementById('cloudSavePickerBody');
+  if (!body) return;
+
+  const acct =
+    typeof window.getAccountState === 'function'
+      ? window.getAccountState()
+      : { uid: null, isAnonymous: true };
+
+  if (!acct.uid || acct.isAnonymous) {
+    body.innerHTML = emptyState('Sign in to use cloud saves');
+    return;
+  }
+
+  body.innerHTML = emptyState('Loading cloud saves...');
+
+  let saves;
+  try {
+    saves = typeof window.listCloudSaves === 'function' ? await window.listCloudSaves() : [];
+  } catch (_) {
+    body.innerHTML = emptyState('Failed to load cloud saves');
+    return;
+  }
+
+  if (!saves.length) {
+    body.innerHTML = emptyState('No cloud saves yet — tap Sync Local Saves.');
+    return;
+  }
+
+  body.innerHTML =
+    '<div style="font-size:10px;opacity:0.55;margin-bottom:5px;letter-spacing:1px;">CLOUD SAVES</div>' +
+    saves
+      .map(s => {
+        const d = s.data;
+        const docId = s.id;
+        const label = escapeHtml(d.label || (docId === 'main' ? 'Quick Save' : 'Untitled'));
+        const ctx = d.gameContext ? '[' + escapeHtml(d.gameContext) + '] ' : '';
+        const ts = d.updatedAt || d.savedAt || 0;
+        const dateStr = ts ? escapeHtml(new Date(ts).toLocaleDateString()) : '';
+        return (
+          '<div style="display:flex;align-items:center;gap:3px;margin-bottom:3px;">' +
+          '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;">' +
+          '<span style="opacity:0.5;">' +
+          ctx +
+          '</span>' +
+          label +
+          (dateStr ? '<span style="opacity:0.4;margin-left:3px;">' + dateStr + '</span>' : '') +
+          '</span>' +
+          '<button class="btn-sm" onclick="window.loadCloudSave(\'' +
+          docId +
+          '\')">LOAD</button>' +
+          '<button class="btn-sm" style="margin-left:2px;" onclick="(function(){var l=prompt(\'Rename:\');if(l)window.renameCloudSave(\'' +
+          docId +
+          '\',l);})()">REN</button>' +
+          '<button class="btn-sm delete-btn" style="margin-left:2px;" onclick="window.deleteCloudSave(\'' +
+          docId +
+          '\')">DEL</button>' +
+          '</div>'
+        );
+      })
+      .join('');
 }
 
 function renderCampaignNotes() {

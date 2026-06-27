@@ -56,8 +56,8 @@
 │   └── database.js     ~25KB CSV data (~170 weapons, ~68 armors, ~45 chems) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── check-persistence.ps1   28KB    496-test pre-commit audit
-│   ├── check-persistence.js    36KB    496-test Node runner (parity with .ps1)
+│   ├── check-persistence.ps1   28KB    512-test pre-commit audit
+│   ├── check-persistence.js    36KB    512-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -895,7 +895,7 @@ Forgetting to bump means cached users **silently run the old UI** until they man
 
 ### Automated Guard
 
-The pre-commit hook enforces this rule automatically. Before running the 496-test suite, it parses the staged `CACHE_NAME` against `origin/main:sw.js` and requires a strict monotonic increase in the `-rN` revision number when `APP_VERSION` is unchanged — equal or lower revs are blocked. When `APP_VERSION` changes, the revision can reset. A missed or decremented bump is impossible to commit past.
+The pre-commit hook enforces this rule automatically. Before running the 512-test suite, it parses the staged `CACHE_NAME` against `origin/main:sw.js` and requires a strict monotonic increase in the `-rN` revision number when `APP_VERSION` is unchanged — equal or lower revs are blocked. When `APP_VERSION` changes, the revision can reset. A missed or decremented bump is impossible to commit past.
 
 ### Historical Note
 
@@ -929,7 +929,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (fails immediately if not bumped or decremented), then the 496-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (fails immediately if not bumped or decremented), then the 512-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable
@@ -965,3 +965,4 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] Keyboard shortcut (#15) works automatically for the first 6 panels
 - [ ] **Update ARCHITECTURE.md** — add to UI Rendering Pipeline table
 - [ ] **Update CHANGELOG.md** and **README.md**
+
