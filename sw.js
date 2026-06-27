@@ -4,7 +4,7 @@
 // Changing this string is the ONLY thing that triggers the "REBOOT TERMINAL" update
 // prompt for users who already have the site cached. Forgetting to bump means cached
 // users silently run the old UI until they manually clear their browser cache.
-const CACHE_NAME = 'robco-terminal-v2.0.1-r70';
+const CACHE_NAME = 'robco-terminal-v2.0.1-r71';
 const ASSETS = [
   './',
   './index.html',
@@ -19,7 +19,7 @@ const ASSETS = [
   './js/ui-render.js',
   './js/ui-saves.js',
   './js/ui-account.js',
-  './js/ui.js',
+  './js/ui-core.js',
   './js/reg_nv.js',
   './js/reg_fo3.js',
 ];

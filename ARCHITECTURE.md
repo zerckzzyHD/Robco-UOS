@@ -54,14 +54,14 @@
 │   ├── ui-render.js    ~30KB  All render* functions, CRUD helpers, faction/map/time utilities
 │   ├── ui-saves.js     ~14KB  Save slots, file import/export, rolling backups, registry autocomplete
 │   ├── ui-account.js   ~3KB   Account panel, cloud save picker, undo-sync
-│   ├── ui.js           ~43KB  Core UI lifecycle, appendToChat, loadUI, updateMath
+│   ├── ui-core.js      ~43KB  Core UI lifecycle, appendToChat, loadUI, updateMath
 │   ├── cloud.js        3.6KB  Firebase push/pull (ES module)
 │   ├── registry.js     ~36KB  Read-only Fallout Data Registry + registrySearch()
 │   └── database.js     ~25KB CSV data (~170 weapons, ~68 armors, ~45 chems) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── check-persistence.ps1   28KB    694-test pre-commit audit
-│   ├── check-persistence.js    36KB    694-test Node runner (parity with .ps1)
+│   ├── check-persistence.ps1   28KB    695-test pre-commit audit
+│   ├── check-persistence.js    36KB    695-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -102,7 +102,7 @@ Scripts are loaded via `<script>` tags in `index.html` in this exact order:
                        initRegistryAutocomplete (wireInput), initAmmoDatalist,
                        addQuest, triggerFileInput, triggerImageUpload
 7. js/ui-account.js → defines: renderAccount, renderCloudSavePicker, undoLastSync
-8. js/ui.js         → defines: AudioSettings, appendToChat, loadUI, updateMath, etc.
+8. js/ui-core.js    → defines: AudioSettings, appendToChat, loadUI, updateMath, etc.
 9. js/api.js        → defines: autoImportState, transmitMessage, fetchAuthorizedModels
 10. js/cloud.js     → loaded as <script type="module"> (ES import from Firebase CDN)
                        attaches: window.pushToCloud, window.pullFromCloud
@@ -950,7 +950,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 694-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 695-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

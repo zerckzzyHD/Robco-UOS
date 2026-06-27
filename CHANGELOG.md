@@ -1,4 +1,4 @@
-## [v2.5.0] — Unreleased<!-- Tests: 694/694 | Cache: robco-terminal-v2.0.1-r70 -->
+## [v2.5.0] — Unreleased<!-- Tests: 695/695 | Cache: robco-terminal-v2.0.1-r71 -->
 
 ### Added
 
@@ -17,6 +17,7 @@
 
 ### Under the Hood
 
+- Renamed the remaining core UI file from ui.js to ui-core.js, completing the 5-part internal refactor (Slice E). The file now has a name that matches its role — core UI lifecycle, chat rendering, command dispatch, and math updates. No user-facing behaviour changes. Added 1 test to Suite 56 confirming the old ui.js no longer exists on disk (695 total across 60 suites). Bumped CACHE_NAME to r71.
 - Split the account panel, cloud save picker, and undo-sync function out of ui.js into a dedicated js/ui-account.js module (Slice D of a 5-part internal refactor). No user-facing behaviour changes. Extended Suite 56 from 15 to 20 tests — added file-exists, service-worker cache, script-tag, and load-order checks for the new account module (694 total across 60 suites). Bumped CACHE_NAME to r70 (new served file added).
 - Split save-related functions — save slots, file import and export, rolling backup restore, registry autocomplete wiring, and the ammo datalist — out of ui.js into a dedicated js/ui-saves.js module (Slice C of a 5-part internal refactor). No user-facing behaviour changes. Extended Suite 56 from 10 to 15 tests — added file-exists, service-worker cache, script-tag, and load-order checks for the new saves module (689 total across 60 suites). Bumped CACHE_NAME to r69 (new served file added).
 - Split all render functions, CRUD helpers (add/remove items, ammo, squad members, etc.), faction utilities, game-time helpers, and map functions out of ui.js into a dedicated js/ui-render.js module (Slice B of a 5-part internal refactor). No user-facing behaviour changes. Updated the test suite's CRUD-mutator checks to read from the combined UI source so they survive the move. Extended Suite 56 from 5 to 10 tests — added file-exists, service-worker cache, script-tag, and load-order checks for the new render module (684 total across 60 suites). Bumped CACHE_NAME to r68 (new served file added).

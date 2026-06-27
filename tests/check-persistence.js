@@ -140,7 +140,6 @@ const uiSource = [
   'js/ui-saves.js',
   'js/ui-account.js',
   'js/ui-core.js',
-  'js/ui.js',
 ]
   .filter(f => fs.existsSync(path.join(ROOT, f)))
   .map(f => readFile(f))
@@ -977,8 +976,8 @@ assert(
   'activate handler calls caches.delete for old-cache cleanup'
 );
 assert(
-  /['"]\.\/index\.html['"]/.test(swSource) && /['"]\.\/js\/ui\.js['"]/.test(swSource),
-  'ASSETS list includes index.html and js/ui.js'
+  /['"]\.\/index\.html['"]/.test(swSource) && /['"]\.\/js\/ui-core\.js['"]/.test(swSource),
+  'ASSETS list includes index.html and js/ui-core.js'
 );
 assert(
   /SKIP_WAITING/.test(indexHtml) &&
@@ -2113,7 +2112,7 @@ header('Phase 2c Guards');
 header('Phase 3a Performance Guards');
 const apiSrc35 = readFile('js/api.js');
 const stateSrc35 = readFile('js/state.js');
-const uiSrc35 = readFile('js/ui.js');
+const uiSrc35 = readFile('js/ui-core.js');
 const cssSrc35 = readFile('css/terminal.css');
 const regNvSrc35 = readFile('js/reg_nv.js');
 
@@ -2168,7 +2167,7 @@ assert(
 // ══════════════════════════════════════════════════════════════
 header('Keyboard Shortcuts Group');
 {
-  const uiSrc36 = readFile('js/ui.js'); // COMMAND_REGISTRY and keydown listener still in ui.js
+  const uiSrc36 = readFile('js/ui-core.js'); // COMMAND_REGISTRY and keydown listener in ui-core.js (Slice E)
 
   // 36.1 COMMAND_REGISTRY contains a KEYBOARD SHORTCUTS group
   const cmdRegM36 = uiSrc36.match(/const COMMAND_REGISTRY\s*=\s*\[[\s\S]*?\];/);
@@ -4803,7 +4802,7 @@ header('Suite 55 — CSP Stage 1 Origin Guards + Firebase Pin');
 //  Suite 56 — UI Module Split Guards
 //  Protocol-20 static guards: each ui-*.js must exist, appear
 //  in sw.js ASSETS, and be wired in index.html before api.js.
-// 20 tests
+// 21 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 56 — UI Module Split Guards');
 {
@@ -4841,7 +4840,7 @@ header('Suite 56 — UI Module Split Guards');
   // 56.5 ui-audio.js script appears before ui.js in index.html (ui-audio must load first)
   {
     const audioIdx56b = htmlSrc56.indexOf('js/ui-audio.js');
-    const uiIdx56 = htmlSrc56.indexOf('"js/ui.js"');
+    const uiIdx56 = htmlSrc56.indexOf('"js/ui-core.js"');
     assert(
       audioIdx56b !== -1 && uiIdx56 !== -1 && audioIdx56b < uiIdx56,
       'ui-audio.js <script> appears before ui.js in index.html (audio loads before core)'
@@ -4879,7 +4878,7 @@ header('Suite 56 — UI Module Split Guards');
   // 56.10 ui-render.js script appears before ui.js in index.html
   {
     const renderIdx56b = htmlSrc56.indexOf('js/ui-render.js');
-    const uiIdx56b = htmlSrc56.indexOf('"js/ui.js"');
+    const uiIdx56b = htmlSrc56.indexOf('"js/ui-core.js"');
     assert(
       renderIdx56b !== -1 && uiIdx56b !== -1 && renderIdx56b < uiIdx56b,
       'ui-render.js <script> appears before ui.js in index.html (render loads before core)'
@@ -4917,7 +4916,7 @@ header('Suite 56 — UI Module Split Guards');
   // 56.15 ui-saves.js script appears before ui.js in index.html
   {
     const savesIdx56b = htmlSrc56.indexOf('js/ui-saves.js');
-    const uiIdx56c = htmlSrc56.indexOf('"js/ui.js"');
+    const uiIdx56c = htmlSrc56.indexOf('"js/ui-core.js"');
     assert(
       savesIdx56b !== -1 && uiIdx56c !== -1 && savesIdx56b < uiIdx56c,
       'ui-saves.js <script> appears before ui.js in index.html (saves loads before core)'
@@ -4952,15 +4951,21 @@ header('Suite 56 — UI Module Split Guards');
     );
   }
 
-  // 56.20 ui-account.js script appears before ui.js in index.html
+  // 56.20 ui-account.js script appears before ui-core.js in index.html
   {
     const acctIdx56b = htmlSrc56.indexOf('js/ui-account.js');
-    const uiIdx56d = htmlSrc56.indexOf('"js/ui.js"');
+    const uiIdx56d = htmlSrc56.indexOf('"js/ui-core.js"');
     assert(
       acctIdx56b !== -1 && uiIdx56d !== -1 && acctIdx56b < uiIdx56d,
-      'ui-account.js <script> appears before ui.js in index.html (account loads before core)'
+      'ui-account.js <script> appears before ui-core.js in index.html (account loads before core)'
     );
   }
+
+  // 56.21 js/ui.js must NOT exist (Slice E: fully renamed to ui-core.js)
+  assert(
+    !fs.existsSync(path.join(ROOT, 'js/ui.js')),
+    'js/ui.js does not exist on disk (Slice E: renamed to ui-core.js — old file must be absent)'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════

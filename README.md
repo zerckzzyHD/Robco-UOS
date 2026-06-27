@@ -168,7 +168,7 @@ All sounds respect a master mute toggle and individual per-system mute controls.
 | **Cloud**       | Firebase Firestore            | Cross-device save synchronization         |
 | **PWA**         | Service Worker + Manifest     | Installable offline-capable app           |
 | **Dev Tooling** | ESLint + Prettier + Vite      | Linting, formatting, dev server           |
-| **Testing**     | PowerShell persistence audit  | 694-test pre-commit gate                  |
+| **Testing**     | PowerShell persistence audit  | 695-test pre-commit gate                  |
 
 ### File Structure
 
@@ -183,13 +183,13 @@ All sounds respect a master mute toggle and individual per-system mute controls.
 │   ├── ui-render.js        All render* functions, CRUD helpers, faction/map/time utilities
 │   ├── ui-saves.js         Save slots, file import/export, rolling backups, registry autocomplete
 │   ├── ui-account.js       Account panel, cloud save picker, undo-sync
-│   ├── ui.js               Core UI lifecycle, appendToChat, loadUI, updateMath
+│   ├── ui-core.js          Core UI lifecycle, appendToChat, loadUI, updateMath
 │   ├── cloud.js            Firebase push/pull (ES module)
 │   └── database.js         Game CSV data (~170 weapons, ~68 armors, ~45 chems) + lookupItemInDb()
 ├── sw.js                   Service Worker (cache-first, same-origin only)
 ├── tests/
-│   ├── check-persistence.ps1  Pre-commit 694-test persistence audit (PowerShell)
-│   └── check-persistence.js   Pre-commit 694-test persistence audit (Node)
+│   ├── check-persistence.ps1  Pre-commit 695-test persistence audit (PowerShell)
+│   └── check-persistence.js   Pre-commit 695-test persistence audit (Node)
 ├── ARCHITECTURE.md         Full system dependency map & patterns
 ├── changelog.txt           Complete version history (v1.1.7 → present)
 ├── icon.png                PWA icon
@@ -208,7 +208,7 @@ Scripts are loaded as `<script>` tags in strict order. All globals are shared vi
 5. ui-render.js  →  all render*() functions, CRUD helpers, faction/map/time utilities
 6. ui-saves.js   →  saveToSlot, loadFromSlot, handleFileUpload, initRegistryAutocomplete
 7. ui-account.js →  renderAccount, renderCloudSavePicker, undoLastSync
-8. ui.js         →  appendToChat, loadUI, updateMath, COMMAND_REGISTRY
+8. ui-core.js    →  appendToChat, loadUI, updateMath, COMMAND_REGISTRY
 9. api.js        →  autoImportState, transmitMessage, fetchAuthorizedModels
 10. cloud.js     →  window.pushToCloud, window.pullFromCloud (ES module)
 ```
@@ -342,7 +342,7 @@ Every audio function must check `AudioSettings.masterMute` and its specific mute
 npm run lint        ← catch bugs
 npm run format      ← enforce style
 git add -A
-git commit          ← cache-bump guard runs first, then persistence audit (694 tests)
+git commit          ← cache-bump guard runs first, then persistence audit (695 tests)
 git push origin main
 ```
 
@@ -398,7 +398,7 @@ Key milestones:
 The project is a **production-quality browser application** with:
 
 - 34 tracked state fields across 5 structured systems
-- 694-test automated persistence audit (DOM binding, Protocol 4 enforcement, migrateState mock execution, reputation 2D matrix, CRUD function existence, CAMPG tab DOM binding, campaignMode + playthroughType Protocol 4, render contracts, CSS invariants, SW invariants, structural integrity, detail-current dedup guard, gate guards for critical UI controls, prohibited patterns, protocol completeness, AI contract lock, architectural boundaries, assets completeness, CSS hygiene guards, DB↔registry weapon parity, weapon mods CSV + registry parity, native command router, GAME_DEFS structural integrity, anonymous auth + security rules + XSS coercion fix, no-double-escape behavioral regression, Gemini key sync security guards, remote kill-switch + client auto-disable guards, CI/repo hardening guards, gate commit/push split + powershell fallback guards, save integrity checksum + rolling backup + forward-compat guard, AI key resilience + Tri-Node schema validation, prompt-injection hardening + input caps + quota warning, CSP origin guards + Firebase SDK pin, UI module split guards)
+- 695-test automated persistence audit (DOM binding, Protocol 4 enforcement, migrateState mock execution, reputation 2D matrix, CRUD function existence, CAMPG tab DOM binding, campaignMode + playthroughType Protocol 4, render contracts, CSS invariants, SW invariants, structural integrity, detail-current dedup guard, gate guards for critical UI controls, prohibited patterns, protocol completeness, AI contract lock, architectural boundaries, assets completeness, CSS hygiene guards, DB↔registry weapon parity, weapon mods CSV + registry parity, native command router, GAME_DEFS structural integrity, anonymous auth + security rules + XSS coercion fix, no-double-escape behavioral regression, Gemini key sync security guards, remote kill-switch + client auto-disable guards, CI/repo hardening guards, gate commit/push split + powershell fallback guards, save integrity checksum + rolling backup + forward-compat guard, AI key resilience + Tri-Node schema validation, prompt-injection hardening + input caps + quota warning, CSP origin guards + Firebase SDK pin, UI module split guards)
 - 14-faction reputation network
 - 13-skill character sheet
 - Full save/load/export/import/cloud sync/undo pipeline

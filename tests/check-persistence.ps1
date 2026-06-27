@@ -90,7 +90,7 @@ function Get-SkillKeys($source) {
 $stateSrc  = Read-Src "js\state.js"
 $apiSrc    = Read-Src "js\api.js"
 $cloudSrc  = Read-Src "js\cloud.js"
-$uiFiles   = @('js\ui-audio.js','js\ui-render.js','js\ui-saves.js','js\ui-account.js','js\ui-core.js','js\ui.js')
+$uiFiles   = @('js\ui-audio.js','js\ui-render.js','js\ui-saves.js','js\ui-account.js','js\ui-core.js')
 $uiSrc     = ($uiFiles | Where-Object { Test-Path (Join-Path $Root $_) } | ForEach-Object { [IO.File]::ReadAllText((Join-Path $Root $_)) }) -join "`n"
 
 Write-Host "`n==  RobCo Persistence Audit  ==============================`n"
@@ -169,7 +169,7 @@ try {
 const vm = require('vm');
 const fs = require('fs');
 const path = require('path');
-const UI_FILES = ['js/ui-audio.js','js/ui-render.js','js/ui-saves.js','js/ui-account.js','js/ui-core.js','js/ui.js'];
+const UI_FILES = ['js/ui-audio.js','js/ui-render.js','js/ui-saves.js','js/ui-account.js','js/ui-core.js'];
 const uiSource = UI_FILES.filter(f => fs.existsSync(path.join('$repoRootNode', f))).map(f => fs.readFileSync(path.join('$repoRootNode', f), 'utf8')).join('\n');
 const threshMatch = uiSource.match(/const FACTION_THRESHOLDS\s*=\s*\{[\s\S]*?\};\s*\/\/ Default/);
 const defaultMatch = uiSource.match(/const _DEFAULT_THRESHOLDS\s*=\s*\{[^}]+\};/);
@@ -582,7 +582,7 @@ $cacheVer = ([regex]::Match($swSrc, "CACHE_NAME\s*=\s*'robco-terminal-v([\d.]+)"
 $appVer   = ([regex]::Match($stateSrc, "const APP_VERSION\s*=\s*'([\d.]+)'")).Groups[1].Value
 Check ($cacheVer -ne '' -and $appVer -ne '' -and $cacheVer -eq $appVer) "CACHE_NAME version ($cacheVer) matches APP_VERSION ($appVer)"
 Check ([bool]([regex]::Match($swSrcStripped, 'activate[\s\S]{0,400}caches\.delete').Success)) 'activate handler calls caches.delete for old-cache cleanup'
-Check ($swSrc -match "'./index.html'" -and $swSrc -match "'./js/ui.js'")  'ASSETS list includes index.html and js/ui.js'
+Check ($swSrc -match "'./index.html'" -and $swSrc -match "'./js/ui-core.js'")  'ASSETS list includes index.html and js/ui-core.js'
 Check ($htmlSrc -match 'SKIP_WAITING' -and $htmlSrc -match 'reg\.waiting' -and $htmlSrc -match 'controllerchange') 'index.html SW registration references SKIP_WAITING, reg.waiting, and controllerchange'
 
 # ===========================================================
@@ -617,7 +617,7 @@ try {
     $nodeCheck = Get-Command node -ErrorAction SilentlyContinue
     if ($nodeCheck) {
         $repoRoot = (Get-Item $PSScriptRoot).Parent.FullName
-        $uiPathNode = (Join-Path $repoRoot "js/ui.js").Replace('\', '/')
+        $uiPathNode = (Join-Path $repoRoot "js/ui-core.js").Replace('\', '/')
         $uiRenderPathNode = (Join-Path $repoRoot "js/ui-render.js").Replace('\', '/')
         $dcScript = @"
 const vm = require('vm');
@@ -1189,7 +1189,7 @@ Check $noPlus33 'No hardcoded [+] text in index.html summary elements (P1-4)'
 Sep "Suite 34 -- Phase 2c Guards"
 $cssSrc34 = Read-Src 'css/terminal.css'
 $htmlSrc34 = Read-Src 'index.html'
-$uiSrc34   = Read-Src 'js/ui.js'
+$uiSrc34   = Read-Src 'js/ui-core.js'
 
 # 34.1 .faction-item rule absent from terminal.css (P2-1 dead CSS removed)
 Check (-not [bool]($cssSrc34 -match '\.faction-item\s*\{')) '.faction-item rule deleted from terminal.css (P2-1)'
@@ -1238,7 +1238,7 @@ Check (-not [bool]($htmlSrc34 -match '\[NO COLLECTIBLES LOADED\]')) 'index.html 
 Sep "Suite 35 -- Phase 3a Performance Guards"
 $apiSrc35    = Read-Src 'js/api.js'
 $stateSrc35  = Read-Src 'js/state.js'
-$uiSrc35     = Read-Src 'js/ui.js'
+$uiSrc35     = Read-Src 'js/ui-core.js'
 $cssSrc35    = Read-Src 'css/terminal.css'
 $regNvSrc35  = Read-Src 'js/reg_nv.js'
 
@@ -1273,7 +1273,7 @@ Check ([bool]($regNvSrc35 -match '_registrySearchCache')) 'registrySearch has _r
 # 4 tests
 # ===========================================================
 Sep "Suite 36 -- Keyboard Shortcuts Group"
-$uiSrc36 = Read-Src 'js/ui.js'  # COMMAND_REGISTRY and keydown listener still in ui.js
+$uiSrc36 = Read-Src 'js/ui-core.js'  # COMMAND_REGISTRY and keydown listener in ui-core.js (Slice E)
 
 # 36.1 COMMAND_REGISTRY contains a KEYBOARD SHORTCUTS group
 $cmdRegM36 = [regex]::Match($uiSrc36, 'const COMMAND_REGISTRY\s*=\s*\[[\s\S]*?\];')
@@ -1485,7 +1485,7 @@ Check (-not $fo3Types39.Contains('EC')) 'FO3 WEAPONS.CSV: no weapon has Ammo_Typ
 Sep "Suite 40 -- Inventory Category Filter + Mod Type"
 $apiSrc40  = Read-Src 'js/api.js'
 $htmlSrc40 = Read-Src 'index.html'
-$uiSrc40   = Read-Src 'js/ui.js'
+$uiSrc40   = Read-Src 'js/ui-core.js'
 
 # 40.1  'mod' in inventory type enum in api.js
 Check ([bool]($apiSrc40 -match '"mod"')) `
@@ -2891,7 +2891,7 @@ Check ([bool]($htmlSrc55 -match 'img-src[^;]*blob:')) `
 # Suite 56 -- UI Module Split Guards
 # Protocol-20 static guards: each ui-*.js must exist, appear
 # in sw.js ASSETS, and be wired in index.html before api.js.
-# 20 tests
+# 21 tests
 # ===========================================================
 Sep "Suite 56 -- UI Module Split Guards"
 $htmlSrc56 = $htmlSrc55  # reuse (same index.html read above)
@@ -2917,7 +2917,7 @@ Check ($audioIdx56 -ne -1 -and $apiIdx56 -ne -1 -and $audioIdx56 -lt $apiIdx56) 
 
 # 56.5 ui-audio.js script appears before ui.js in index.html
 $audioIdx56b = $htmlSrc56.IndexOf('js/ui-audio.js')
-$uiIdx56     = $htmlSrc56.IndexOf('"js/ui.js"')
+$uiIdx56     = $htmlSrc56.IndexOf('"js/ui-core.js"')
 Check ($audioIdx56b -ne -1 -and $uiIdx56 -ne -1 -and $audioIdx56b -lt $uiIdx56) `
     "ui-audio.js <script> appears before ui.js in index.html (audio loads before core)"
 
@@ -2941,7 +2941,7 @@ Check ($renderIdx56 -ne -1 -and $apiIdx56b -ne -1 -and $renderIdx56 -lt $apiIdx5
 
 # 56.10 ui-render.js script appears before ui.js in index.html
 $renderIdx56b = $htmlSrc56.IndexOf('js/ui-render.js')
-$uiIdx56b     = $htmlSrc56.IndexOf('"js/ui.js"')
+$uiIdx56b     = $htmlSrc56.IndexOf('"js/ui-core.js"')
 Check ($renderIdx56b -ne -1 -and $uiIdx56b -ne -1 -and $renderIdx56b -lt $uiIdx56b) `
     "ui-render.js <script> appears before ui.js in index.html (render loads before core)"
 
@@ -2961,7 +2961,7 @@ Check ($savesIdx56 -ne -1 -and $apiIdx56c -ne -1 -and $savesIdx56 -lt $apiIdx56c
     "ui-saves.js <script> appears before api.js in index.html (load-order guard)"
 # 56.15 ui-saves.js script appears before ui.js in index.html
 $savesIdx56b = $htmlSrc56.IndexOf('js/ui-saves.js')
-$uiIdx56c    = $htmlSrc56.IndexOf('"js/ui.js"')
+$uiIdx56c    = $htmlSrc56.IndexOf('"js/ui-core.js"')
 Check ($savesIdx56b -ne -1 -and $uiIdx56c -ne -1 -and $savesIdx56b -lt $uiIdx56c) `
     "ui-saves.js <script> appears before ui.js in index.html (saves loads before core)"
 # 56.16 js/ui-account.js file exists on disk
@@ -2978,11 +2978,14 @@ $acctIdx56  = $htmlSrc56.IndexOf('js/ui-account.js')
 $apiIdx56d  = $htmlSrc56.IndexOf('js/api.js')
 Check ($acctIdx56 -ne -1 -and $apiIdx56d -ne -1 -and $acctIdx56 -lt $apiIdx56d) `
     "ui-account.js <script> appears before api.js in index.html (load-order guard)"
-# 56.20 ui-account.js script appears before ui.js in index.html
+# 56.20 ui-account.js script appears before ui-core.js in index.html
 $acctIdx56b = $htmlSrc56.IndexOf('js/ui-account.js')
-$uiIdx56d   = $htmlSrc56.IndexOf('"js/ui.js"')
+$uiIdx56d   = $htmlSrc56.IndexOf('"js/ui-core.js"')
 Check ($acctIdx56b -ne -1 -and $uiIdx56d -ne -1 -and $acctIdx56b -lt $uiIdx56d) `
-    "ui-account.js <script> appears before ui.js in index.html (account loads before core)"
+    "ui-account.js <script> appears before ui-core.js in index.html (account loads before core)"
+# 56.21 js/ui.js must NOT exist (Slice E: fully renamed to ui-core.js)
+Check (-not (Test-Path (Join-Path $Root "js\ui.js"))) `
+    "js/ui.js does not exist on disk (Slice E: renamed to ui-core.js -- old file must be absent)"
 
 # ===========================================================
 # Results
