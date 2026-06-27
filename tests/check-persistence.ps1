@@ -971,11 +971,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-59)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-59)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-60)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-60)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -3148,14 +3148,14 @@ Check ([bool]($uiCoreSrc58 -match 'function\s+showErrorLog\s*\(') `
     -and [bool]($apiSrc58 -match "'\[LOGS\]'\s*:")) `
     "showErrorLog() defined in ui-core.js, references escapeHtml(), and '[LOGS]' wired in NATIVE_COMMAND_ROUTER"
 
-# 58.5 No-exfil: bounded window from each fn contains no fetch( or XMLHttpRequest
+# 58.5 No-exfil: bounded window from each fn contains no fetch(, XMLHttpRequest, or sendBeacon
 $recIdx58  = $uiCoreSrc58.IndexOf('function _recordError(')
 $showIdx58 = $uiCoreSrc58.IndexOf('function showErrorLog(')
 $recSlice58  = if ($recIdx58 -ge 0)  { $uiCoreSrc58.Substring($recIdx58,  [Math]::Min(500,  $uiCoreSrc58.Length - $recIdx58))  } else { '' }
 $showSlice58 = if ($showIdx58 -ge 0) { $uiCoreSrc58.Substring($showIdx58, [Math]::Min(2500, $uiCoreSrc58.Length - $showIdx58)) } else { '' }
-Check (-not ($recSlice58  -match 'fetch\(') -and -not ($recSlice58  -match 'XMLHttpRequest') `
-    -and -not ($showSlice58 -match 'fetch\(') -and -not ($showSlice58 -match 'XMLHttpRequest')) `
-    "_recordError and showErrorLog bodies contain no fetch() or XMLHttpRequest (privacy: log is local-only)"
+Check (-not ($recSlice58  -match 'fetch\(') -and -not ($recSlice58  -match 'XMLHttpRequest') -and -not ($recSlice58  -match 'sendBeacon') `
+    -and -not ($showSlice58 -match 'fetch\(') -and -not ($showSlice58 -match 'XMLHttpRequest') -and -not ($showSlice58 -match 'sendBeacon')) `
+    "_recordError and showErrorLog bodies contain no fetch(), XMLHttpRequest, or sendBeacon (privacy: log is local-only)"
 
 # ===========================================================
 # Suite 59 -- Inline Handler Integrity (Item D-proxy)
@@ -3170,15 +3170,21 @@ $jsFiles59   = @('js/ui-audio.js','js/ui-render.js','js/ui-saves.js','js/ui-acco
                   'js/reg_nv.js','js/reg_fo3.js')
 $allJsSrc59  = ($jsFiles59 | ForEach-Object { Read-Src $_ }) -join "`n"
 
+# JS keywords + browser built-ins that appear as standalone calls in handler code
 $jsKeywords59 = @('if','else','for','while','switch','function','return','typeof','instanceof',
                    'new','throw','try','catch','finally','delete','void','in','of',
-                   'let','const','var','do','break','continue','case','default','import','export')
+                   'let','const','var','do','break','continue','case','default','import','export',
+                   'parseFloat','parseInt','isNaN','isFinite','Number','String','Boolean',
+                   'Array','Object','Math','JSON','Date','encodeURIComponent','decodeURIComponent')
 
 $attrMatches59   = [regex]::Matches($htmlSrc59, '(?i)\bon[a-z]+\s*=\s*"([^"]*)"')
 $handlerNames59  = [System.Collections.Generic.HashSet[string]]::new()
 foreach ($am in $attrMatches59) {
     $handlerText = $am.Groups[1].Value
-    $fnCallMs = [regex]::Matches($handlerText, '(?<!\.)([A-Za-z_$][A-Za-z0-9_$]*)\s*\(')
+    # (?<![A-Za-z0-9_$.]) excludes method calls (preceded by '.') AND partial-identifier
+    # false extractions (preceded by another word char). Without this wider exclusion,
+    # 'this.setItem(' would yield 'etItem' rather than 'setItem'.
+    $fnCallMs = [regex]::Matches($handlerText, '(?<![A-Za-z0-9_$.])([A-Za-z_$][A-Za-z0-9_$]*)\s*\(')
     foreach ($fm in $fnCallMs) {
         $name = $fm.Groups[1].Value
         if ($name -notin $jsKeywords59) { [void]$handlerNames59.Add($name) }
@@ -3189,10 +3195,50 @@ foreach ($am in $attrMatches59) {
 Check ($handlerNames59.Count -ge 20) `
     ("Inline handler scanner found " + $handlerNames59.Count + " unique handler function names (>=20 expected)")
 
-# 59.2 All handler names resolve in js/*.js (aggregate)
-$dangling59 = $handlerNames59 | Where-Object { -not $allJsSrc59.Contains($_) }
+# 59.2 All handler names resolve as definitions in js/*.js (definition-anchored)
+#      Matches: function NAME( | NAME = function | NAME = ( | window.NAME = | const/let/var NAME =
+function Test-Defined59($name, $src) {
+    $pattern = "(?:function\s+$([regex]::Escape($name))\s*\(|\b$([regex]::Escape($name))\s*=\s*(?:function|\()|window\.$([regex]::Escape($name))\s*=|(?:const|let|var)\s+$([regex]::Escape($name))\s*=)"
+    return [bool]([regex]::IsMatch($src, $pattern))
+}
+$dangling59 = $handlerNames59 | Where-Object { -not (Test-Defined59 $_ $allJsSrc59) }
 Check ($dangling59.Count -eq 0) `
-    ("All inline handler function names resolve in js/*.js" + $(if ($dangling59.Count) { " -- DANGLING (real bug): " + ($dangling59 -join ", ") } else { "" }))
+    ("All inline handler function names resolve as definitions in js/*.js" + $(if ($dangling59.Count) { " -- DANGLING (real bug): " + ($dangling59 -join ", ") } else { "" }))
+
+# ===========================================================
+# Suite 60 -- A11y Gate Guards
+# Verifies @axe-core/playwright devDep, a11y-check.mjs + baseline
+# exist, gate.js invokes a11y step, package.json has a11y script.
+# 5 tests
+# ===========================================================
+Sep "Suite 60 -- A11y Gate Guards"
+$pkgSrc60   = Read-Src "package.json"
+$pkgJson60  = $pkgSrc60 | ConvertFrom-Json
+$gateSrc60  = Read-Src "scripts/gate.js"
+
+# 60.1 @axe-core/playwright present in devDependencies
+Check ([bool]($pkgJson60.devDependencies.'@axe-core/playwright')) `
+    "@axe-core/playwright present in package.json devDependencies"
+
+# 60.2 tests/a11y-check.mjs exists
+Check (Test-Path (Join-Path $ROOT "tests/a11y-check.mjs")) `
+    "tests/a11y-check.mjs exists"
+
+# 60.3 tests/a11y-baseline.json exists and is valid JSON
+$baselinePath60 = Join-Path $ROOT "tests/a11y-baseline.json"
+$baselineOk60 = $false
+if (Test-Path $baselinePath60) {
+    try { $null = Get-Content $baselinePath60 -Raw | ConvertFrom-Json; $baselineOk60 = $true } catch {}
+}
+Check $baselineOk60 "tests/a11y-baseline.json exists and is valid JSON"
+
+# 60.4 scripts/gate.js invokes a11y-check.mjs in the non-fast block
+Check ([bool]($gateSrc60 -match 'a11y-check\.mjs') -and [bool]($gateSrc60 -match 'if\s*\(!fast\)')) `
+    "scripts/gate.js invokes a11y-check.mjs inside the non-fast block"
+
+# 60.5 package.json has "a11y" script
+Check ([bool]$pkgJson60.scripts.a11y) `
+    'package.json has "a11y" script entry'
 
 # ===========================================================
 # Results

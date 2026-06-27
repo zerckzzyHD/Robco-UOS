@@ -14,7 +14,8 @@
     "gate": "node scripts/gate.js",
     "gate:fast": "node scripts/gate.js --fast",
     "prepare": "node scripts/install-hooks.js",
-    "rollback": "sh scripts/rollback.sh"
+    "rollback": "sh scripts/rollback.sh",
+    "a11y": "node tests/a11y-check.mjs"
   },
   "repository": {
     "type": "git",
@@ -29,6 +30,7 @@
   },
   "homepage": "https://github.com/zerckzzyHD/Robco-UOS#readme",
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
     "@eslint/js": "^10.0.1",
     "eslint": "^10.5.0",
     "playwright": "^1.61.1",

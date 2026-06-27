@@ -1598,17 +1598,18 @@ header('Meta / Runner Parity');
     'Suite 57',
     'Suite 58',
     'Suite 59',
+    'Suite 60',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-59)' +
+    'JS runner contains all gate-guard suites (22-41, 49-60)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-59)' +
+    'PS runner contains all gate-guard suites (22-41, 49-60)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -5198,7 +5199,7 @@ header('Suite 58 — Client Error Ring-Buffer Guards');
     "showErrorLog() defined in ui-core.js, references escapeHtml(), and '[LOGS]' wired in NATIVE_COMMAND_ROUTER"
   );
 
-  // 58.5  No-exfil: bounded window from each fn start contains no fetch( or XMLHttpRequest
+  // 58.5  No-exfil: bounded window from each fn start contains no fetch(, XMLHttpRequest, or sendBeacon
   {
     const recIdx58 = uiCoreSrc58.indexOf('function _recordError(');
     const showIdx58 = uiCoreSrc58.indexOf('function showErrorLog(');
@@ -5208,9 +5209,11 @@ header('Suite 58 — Client Error Ring-Buffer Guards');
     assert(
       !recSlice58.includes('fetch(') &&
         !recSlice58.includes('XMLHttpRequest') &&
+        !recSlice58.includes('sendBeacon') &&
         !showSlice58.includes('fetch(') &&
-        !showSlice58.includes('XMLHttpRequest'),
-      '_recordError and showErrorLog bodies contain no fetch() or XMLHttpRequest (privacy: log is local-only)'
+        !showSlice58.includes('XMLHttpRequest') &&
+        !showSlice58.includes('sendBeacon'),
+      '_recordError and showErrorLog bodies contain no fetch(), XMLHttpRequest, or sendBeacon (privacy: log is local-only)'
     );
   }
 }
@@ -5240,6 +5243,8 @@ header('Suite 59 — Inline Handler Integrity');
 
   // Extract all inline handler attribute values: on*="..."
   const attrRe59 = /\bon[a-z]+\s*=\s*"([^"]*)"/gi;
+  // JS keywords + browser built-ins that appear as standalone calls in handler code
+  // (these are not defined in js/*.js and are not dangling — they're host-env globals)
   const jsKeywords59 = new Set([
     'if',
     'else',
@@ -5269,13 +5274,33 @@ header('Suite 59 — Inline Handler Integrity');
     'default',
     'import',
     'export',
+    // browser built-ins commonly called directly from inline handlers
+    'parseFloat',
+    'parseInt',
+    'isNaN',
+    'isFinite',
+    'Number',
+    'String',
+    'Boolean',
+    'Array',
+    'Object',
+    'Math',
+    'JSON',
+    'Date',
+    'encodeURIComponent',
+    'decodeURIComponent',
   ]);
   const handlerNames59 = new Set();
   let attrM59;
   while ((attrM59 = attrRe59.exec(htmlSrc59)) !== null) {
     const handlerText = attrM59[1];
-    // Match standalone function calls not preceded by '.' (excludes method calls)
-    for (const [, name] of handlerText.matchAll(/(?<!\.)([A-Za-z_$][A-Za-z0-9_$]*)\s*\(/g)) {
+    // Match standalone function calls not preceded by any word char or dot.
+    // (?<![A-Za-z0-9_$.]) excludes both method calls (preceded by '.') and
+    // partial-identifier false extractions (preceded by another word char).
+    // Without this wider exclusion, 'this.setItem(' would yield 'etItem' not 'setItem'.
+    for (const [, name] of handlerText.matchAll(
+      /(?<![A-Za-z0-9_$.])([A-Za-z_$][A-Za-z0-9_$]*)\s*\(/g
+    )) {
       if (!jsKeywords59.has(name)) handlerNames59.add(name);
     }
   }
@@ -5286,13 +5311,78 @@ header('Suite 59 — Inline Handler Integrity');
     `Inline handler scanner found ${handlerNames59.size} unique handler function names (≥20 expected)`
   );
 
-  // 59.2  All extracted handler names resolve in js/*.js (aggregate — lists any dangling)
-  const dangling59 = [...handlerNames59].filter(name => !allJsSrc59.includes(name));
+  // 59.2  All extracted handler names resolve as definitions in js/*.js
+  //       Matches: function NAME( | NAME = function | NAME = ( | window.NAME = | const/let/var NAME =
+  //       This is definition-anchored — a name that only appears as a substring of another
+  //       identifier or inside a comment will not match and will be flagged as dangling.
+  function isDefined59(name, src) {
+    const r = new RegExp(
+      '(?:function\\s+' +
+        name +
+        '\\s*\\(' +
+        '|\\b' +
+        name +
+        '\\s*=\\s*(?:function|\\()' +
+        '|window\\.' +
+        name +
+        '\\s*=' +
+        '|(?:const|let|var)\\s+' +
+        name +
+        '\\s*=)',
+      ''
+    );
+    return r.test(src);
+  }
+  const dangling59 = [...handlerNames59].filter(name => !isDefined59(name, allJsSrc59));
   assert(
     dangling59.length === 0,
-    'All inline handler function names resolve in js/*.js' +
+    'All inline handler function names resolve as definitions in js/*.js' +
       (dangling59.length ? ' — DANGLING (real bug): ' + dangling59.join(', ') : '')
   );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 60 — A11y Gate Guards
+//  Verifies @axe-core/playwright devDep, a11y-check.mjs + baseline
+//  exist, gate.js invokes a11y step, package.json has a11y script.
+//  5 tests
+// ══════════════════════════════════════════════════════════════
+header('Suite 60 — A11y Gate Guards');
+{
+  const pkgSrc60 = readFile('package.json');
+  const pkgJson60 = JSON.parse(pkgSrc60);
+  const gateSrc60 = readFile('scripts/gate.js');
+
+  // 60.1  @axe-core/playwright present in devDependencies
+  assert(
+    !!(pkgJson60.devDependencies && pkgJson60.devDependencies['@axe-core/playwright']),
+    '@axe-core/playwright present in package.json devDependencies'
+  );
+
+  // 60.2  tests/a11y-check.mjs exists
+  assert(fs.existsSync(path.join(ROOT, 'tests', 'a11y-check.mjs')), 'tests/a11y-check.mjs exists');
+
+  // 60.3  tests/a11y-baseline.json exists and is valid JSON
+  {
+    const baselinePath60 = path.join(ROOT, 'tests', 'a11y-baseline.json');
+    let baselineOk60 = false;
+    if (fs.existsSync(baselinePath60)) {
+      try {
+        JSON.parse(fs.readFileSync(baselinePath60, 'utf8'));
+        baselineOk60 = true;
+      } catch (_) {}
+    }
+    assert(baselineOk60, 'tests/a11y-baseline.json exists and is valid JSON');
+  }
+
+  // 60.4  scripts/gate.js invokes a11y-check.mjs in the non-fast block
+  assert(
+    /a11y-check\.mjs/.test(gateSrc60) && /if\s*\(!fast\)/.test(gateSrc60),
+    'scripts/gate.js invokes a11y-check.mjs inside the non-fast block'
+  );
+
+  // 60.5  package.json has the "a11y" script
+  assert(!!(pkgJson60.scripts && pkgJson60.scripts.a11y), 'package.json has "a11y" script entry');
 }
 
 // ══════════════════════════════════════════════════════════════

@@ -250,6 +250,7 @@ export default [
       'eslint.config.mjs',
       'tests/render-check.mjs',
       'tests/boot-smoke.mjs',
+      'tests/a11y-check.mjs',
       'tests/_diag*.mjs',
     ],
   },

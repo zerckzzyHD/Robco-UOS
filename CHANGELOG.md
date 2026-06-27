@@ -1,4 +1,4 @@
-## [v2.5.0] — Unreleased<!-- Tests: 727/727 | Cache: robco-terminal-v2.0.1-r74 -->
+## [v2.5.0] — Unreleased<!-- Tests: 732/732 | Cache: robco-terminal-v2.0.1-r74 -->
 
 ### Added
 
@@ -19,6 +19,8 @@
 
 ### Under the Hood
 
+- Added an accessibility regression gate (axe-core) that runs as part of the full pre-push and CI checks. It scans the app for serious and critical accessibility violations and fails if any new rule appears or any existing count increases versus a saved baseline. The baseline was captured at the time of introduction and reflects the current state of the app — existing violations are tracked, not silently ignored. Added 5 automated guard tests (Suite 60) confirming the gate is wired up correctly.
+- Tightened the inline handler integrity scan (Suite 59) so that handler function names are now verified against actual definitions in the JavaScript source — not just substring presence. The extraction was also corrected to prevent false positives from method calls like `this.setItem()` generating `etItem` as an apparent standalone handler name. Added `sendBeacon` to the no-exfil tripwire in the error ring-buffer guard (Suite 58), which previously only checked for `fetch` and `XMLHttpRequest`.
 - Added two automated guard tests for the new diagnostic and reliability features. Suite 58 (5 tests) verifies that the client error ring-buffer cannot exfiltrate data — confirms that neither the record function nor the log viewer contains any network calls. Suite 59 (2 tests) performs an inline handler integrity scan: it reads every onclick/onchange/oninput/etc. attribute from index.html at test time and confirms every function name resolves in the JavaScript source — catches typos and stale event handlers before they reach production. Found 54 unique handler names in the current codebase; all resolved.
 - Replaced the legacy boot-loader with a modern equivalent that works the same way but avoids the deprecated `document.write` API. The new loader creates script tags at runtime and inserts them in order — the database, state, and registry scripts still load in the same guaranteed sequence, the correct files for each game context (Fallout: New Vegas or Fallout 3) are still selected from saved settings, and the fallback when settings are unreadable still defaults to New Vegas. No user-facing change. Added 13 automated guard tests (Suite 56 extended, 708 total across 60 suites). Bumped CACHE_NAME to r72.
 - Renamed the remaining core UI file from ui.js to ui-core.js, completing the 5-part internal refactor (Slice E). The file now has a name that matches its role — core UI lifecycle, chat rendering, command dispatch, and math updates. No user-facing behaviour changes. Added 1 test to Suite 56 confirming the old ui.js no longer exists on disk (695 total across 60 suites). Bumped CACHE_NAME to r71.
