@@ -1768,8 +1768,8 @@ Check $noHtmlEsc44 `
 # ===========================================================
 # Suite 45 -- Google Sign-In + Account Panel (Phase 5c-ii)
 # Durable identity: Google auth link, collision recovery,
-# sign-out -> re-anon, redirect flow, ACCOUNT UI panel, boot guard.
-# 13 tests
+# sign-out -> re-anon, popup-only flow, ACCOUNT UI panel, boot guard.
+# 15 tests
 # ===========================================================
 Sep "Suite 45 -- Phase 5c-ii: Google Sign-In + Account Panel"
 
@@ -1781,9 +1781,9 @@ Check ([bool]($cloudSrc -match 'GoogleAuthProvider')) `
 Check ([bool]($cloudSrc -match 'linkWithPopup')) `
     'cloud.js references linkWithPopup (desktop Google sign-in flow)'
 
-# 45.3  cloud.js references linkWithRedirect (mobile sign-in flow)
-Check ([bool]($cloudSrc -match 'linkWithRedirect')) `
-    'cloud.js references linkWithRedirect (mobile Google sign-in flow)'
+# 45.3  cloud.js does NOT import or call linkWithRedirect (popup-only mobile fix)
+Check (-not ([bool]($cloudSrc -match 'linkWithRedirect'))) `
+    'cloud.js does not reference linkWithRedirect (popup-only fix: redirect path removed)'
 
 # 45.4  cloud.js references getRedirectResult (completes mobile redirect on boot)
 Check ([bool]($cloudSrc -match 'getRedirectResult')) `
@@ -1841,6 +1841,30 @@ $hasAuthStateReady = [bool]($cloudSrc -match 'authStateReady\(\)')
 $hasCurrentUserCheck = [bool]($cloudSrc -match '!\s*auth\.currentUser')
 Check ($hasAuthStateReady -and $hasCurrentUserCheck) `
     'cloud.js boot sign-in is conditional: authStateReady() + !auth.currentUser guard present (not unconditional — prevents clobbering Google session on reload)'
+
+# 45.14  boot order: getRedirectResult awaited before authStateReady()
+#        (sequential IIFE — redirect drained before anon-fallback guard)
+$grIdx45 = $cloudSrc.IndexOf('await getRedirectResult')
+$asIdx45 = $cloudSrc.IndexOf('await auth.authStateReady')
+Check (($grIdx45 -ge 0) -and ($asIdx45 -ge 0) -and ($grIdx45 -lt $asIdx45)) `
+    'cloud.js boot: await getRedirectResult appears before await auth.authStateReady (hardened sequential boot order)'
+
+# 45.15  gesture safety: first await in signInWithGoogle is linkWithPopup itself
+$signInBody45 = ''
+$sgIdx45 = $cloudSrc.IndexOf('window.signInWithGoogle')
+if ($sgIdx45 -ge 0) {
+    $sgStart = $cloudSrc.IndexOf('{', $sgIdx45); $sgDep = 0; $sgI = $sgStart
+    while ($sgI -lt $cloudSrc.Length) {
+        $ch = $cloudSrc[$sgI]
+        if ($ch -eq '{') { $sgDep++ }
+        elseif ($ch -eq '}') { $sgDep--; if ($sgDep -eq 0) { $signInBody45 = $cloudSrc.Substring($sgStart, $sgI - $sgStart + 1); break } }
+        $sgI++
+    }
+}
+$firstAwait45 = $signInBody45.IndexOf('await')
+$awaitPopup45 = $signInBody45.IndexOf('await linkWithPopup')
+Check (($firstAwait45 -ge 0) -and ($awaitPopup45 -eq $firstAwait45)) `
+    'cloud.js signInWithGoogle: first await is linkWithPopup (gesture-safe — popup opened with no prior async work)'
 
 # ===========================================================
 # Suite 46 -- Cloud Save Picker + Local Migration (Phase 5c-iii)

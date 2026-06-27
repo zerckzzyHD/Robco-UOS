@@ -2830,8 +2830,8 @@ header('Phase 5c-i: Auth + Rules + XSS Fix');
 // ══════════════════════════════════════════════════════════════
 //  SUITE 45 — Google Sign-In + Account Panel (Phase 5c-ii)
 //  Durable identity: Google auth link, collision recovery,
-//  sign-out → re-anon, redirect flow, ACCOUNT UI panel, boot guard.
-//  13 tests
+//  sign-out → re-anon, popup-only flow, ACCOUNT UI panel, boot guard.
+//  15 tests
 // ══════════════════════════════════════════════════════════════
 header('Phase 5c-ii: Google Sign-In + Account Panel');
 
@@ -2848,10 +2848,11 @@ header('Phase 5c-ii: Google Sign-In + Account Panel');
     'cloud.js references linkWithPopup (desktop Google sign-in flow)'
   );
 
-  // 45.3  cloud.js references linkWithRedirect (mobile sign-in flow)
+  // 45.3  cloud.js does NOT import or call linkWithRedirect (popup-only mobile fix — redirect broke
+  //        on iOS/Chrome due to third-party storage partitioning blocking getRedirectResult)
   assert(
-    /linkWithRedirect/.test(cloudSource),
-    'cloud.js references linkWithRedirect (mobile Google sign-in flow)'
+    !/linkWithRedirect/.test(cloudSource),
+    'cloud.js does not reference linkWithRedirect (popup-only fix: redirect path removed)'
   );
 
   // 45.4  cloud.js references getRedirectResult (completes mobile redirect on boot)
@@ -2932,6 +2933,42 @@ header('Phase 5c-ii: Google Sign-In + Account Panel');
     /authStateReady\(\)/.test(cloudSource) && /!\s*auth\.currentUser/.test(cloudSource),
     'cloud.js boot sign-in is conditional: authStateReady() + !auth.currentUser guard present (not unconditional — prevents clobbering Google session on reload)'
   );
+
+  // 45.14  boot order hardened: getRedirectResult awaited before authStateReady()
+  //        (sequential IIFE ensures redirect result is visible before the anon-fallback guard runs)
+  assert(
+    cloudSource.indexOf('await getRedirectResult') <
+      cloudSource.indexOf('await auth.authStateReady'),
+    'cloud.js boot: await getRedirectResult appears before await auth.authStateReady (hardened sequential boot order)'
+  );
+
+  // 45.15  gesture safety: first await in signInWithGoogle is linkWithPopup itself
+  //        (no async work before the popup open — iOS/Android require the popup to open
+  //        synchronously in the user-gesture context)
+  {
+    let signInBody = '';
+    try {
+      const idx = cloudSource.indexOf('window.signInWithGoogle');
+      if (idx !== -1) {
+        let i = cloudSource.indexOf('{', idx);
+        let depth = 0;
+        const start = i;
+        while (i < cloudSource.length) {
+          if (cloudSource[i] === '{') depth++;
+          else if (cloudSource[i] === '}' && --depth === 0) {
+            signInBody = cloudSource.slice(start, i + 1);
+            break;
+          }
+          i++;
+        }
+      }
+    } catch (_) {}
+    const firstAwait = signInBody.indexOf('await');
+    assert(
+      firstAwait !== -1 && signInBody.indexOf('await linkWithPopup') === firstAwait,
+      'cloud.js signInWithGoogle: first await is linkWithPopup (gesture-safe — popup opened with no prior async work)'
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

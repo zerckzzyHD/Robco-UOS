@@ -168,7 +168,7 @@ All sounds respect a master mute toggle and individual per-system mute controls.
 | **Cloud**       | Firebase Firestore            | Cross-device save synchronization         |
 | **PWA**         | Service Worker + Manifest     | Installable offline-capable app           |
 | **Dev Tooling** | ESLint + Prettier + Vite      | Linting, formatting, dev server           |
-| **Testing**     | PowerShell persistence audit  | 512-test pre-commit gate                  |
+| **Testing**     | PowerShell persistence audit  | 514-test pre-commit gate                  |
 
 ### File Structure
 
@@ -184,7 +184,7 @@ All sounds respect a master mute toggle and individual per-system mute controls.
 │   └── database.js         Game CSV data (~170 weapons, ~68 armors, ~45 chems) + lookupItemInDb()
 ├── sw.js                   Service Worker (cache-first, same-origin only)
 ├── tests/
-│   └── check-persistence.ps1  Pre-commit 512-test persistence audit
+│   └── check-persistence.ps1  Pre-commit 514-test persistence audit
 ├── ARCHITECTURE.md         Full system dependency map & patterns
 ├── changelog.txt           Complete version history (v1.1.7 → present)
 ├── icon.png                PWA icon
@@ -333,7 +333,7 @@ Every audio function must check `AudioSettings.masterMute` and its specific mute
 npm run lint        ← catch bugs
 npm run format      ← enforce style
 git add -A
-git commit          ← cache-bump guard runs first, then persistence audit (512 tests)
+git commit          ← cache-bump guard runs first, then persistence audit (514 tests)
 git push origin main
 ```
 
@@ -389,7 +389,7 @@ Key milestones:
 The project is a **production-quality browser application** with:
 
 - 34 tracked state fields across 5 structured systems
-- 512-test automated persistence audit (DOM binding, Protocol 4 enforcement, migrateState mock execution, reputation 2D matrix, CRUD function existence, CAMPG tab DOM binding, campaignMode + playthroughType Protocol 4, render contracts, CSS invariants, SW invariants, structural integrity, detail-current dedup guard, gate guards for critical UI controls, prohibited patterns, protocol completeness, AI contract lock, architectural boundaries, assets completeness, CSS hygiene guards, DB↔registry weapon parity, weapon mods CSV + registry parity, native command router, GAME_DEFS structural integrity, anonymous auth + security rules + XSS coercion fix, and no-double-escape behavioral regression)
+- 514-test automated persistence audit (DOM binding, Protocol 4 enforcement, migrateState mock execution, reputation 2D matrix, CRUD function existence, CAMPG tab DOM binding, campaignMode + playthroughType Protocol 4, render contracts, CSS invariants, SW invariants, structural integrity, detail-current dedup guard, gate guards for critical UI controls, prohibited patterns, protocol completeness, AI contract lock, architectural boundaries, assets completeness, CSS hygiene guards, DB↔registry weapon parity, weapon mods CSV + registry parity, native command router, GAME_DEFS structural integrity, anonymous auth + security rules + XSS coercion fix, and no-double-escape behavioral regression)
 - 14-faction reputation network
 - 13-skill character sheet
 - Full save/load/export/import/cloud sync/undo pipeline
@@ -426,4 +426,3 @@ _Built with vanilla JavaScript, procedural audio, and an unhealthy obsession wit
 _Game data sourced from the [Independent Fallout Wiki](https://fallout.wiki) under [CC-BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/)._
 
 </div>
-

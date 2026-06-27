@@ -19,7 +19,6 @@ import {
   onAuthStateChanged,
   GoogleAuthProvider,
   linkWithPopup,
-  linkWithRedirect,
   signInWithCredential,
   signOut,
   getRedirectResult,
@@ -65,10 +64,6 @@ const auth = getAuth(app);
 let _currentUid = null;
 let _currentUser = null;
 
-function _isMobile() {
-  return /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) || 'ontouchstart' in window;
-}
-
 onAuthStateChanged(auth, user => {
   _currentUid = user ? user.uid : null;
   _currentUser = user || null;
@@ -76,14 +71,16 @@ onAuthStateChanged(auth, user => {
   if (typeof window.renderCloudSavePicker === 'function') window.renderCloudSavePicker();
 });
 
-// Complete any pending redirect sign-in from a previous page load (mobile flow)
-getRedirectResult(auth)
-  .then(result => {
+// Boot: drain any in-flight redirect first, then establish anonymous baseline.
+// Sequential order guarantees authStateReady() sees the post-redirect user before the
+// anon-fallback guard runs — prevents a race where anon fires before the redirect resolves.
+(async () => {
+  try {
+    const result = await getRedirectResult(auth);
     if (result && result.user && typeof window.renderAccount === 'function') {
       window.renderAccount();
     }
-  })
-  .catch(e => {
+  } catch (e) {
     if (e.code === 'auth/credential-already-in-use') {
       const cred = GoogleAuthProvider.credentialFromError(e);
       if (cred) {
@@ -94,23 +91,27 @@ getRedirectResult(auth)
     } else {
       console.warn('getRedirectResult failed (non-fatal):', e);
     }
-  });
-
-// Boot: establish anonymous baseline ONLY when no session is restored from persistence.
-// signInAnonymously is a no-op for an existing ANONYMOUS user but REPLACES a non-anonymous
-// (Google-linked) user, so guard on currentUser after init to avoid clobbering it.
-auth
-  .authStateReady()
-  .then(() => {
+  }
+  // Guard: signInAnonymously replaces a non-anonymous user — only call when truly no session.
+  try {
+    await auth.authStateReady();
     if (!auth.currentUser) {
-      signInAnonymously(auth).catch(e => console.warn('Anonymous sign-in failed (non-fatal):', e));
+      await signInAnonymously(auth).catch(e =>
+        console.warn('Anonymous sign-in failed (non-fatal):', e)
+      );
     }
-  })
-  .catch(() => {
+  } catch {
     if (!auth.currentUser) signInAnonymously(auth).catch(() => {});
-  });
+  }
+})();
 
 // ── Google sign-in: links anonymous → Google; handles collision ──────────────
+// Popup is used unconditionally (mobile + desktop). The redirect flow broke on mobile
+// because modern browsers deny third-party iframe storage to nv-overlord.firebaseapp.com,
+// so getRedirectResult returned null and the link was never applied.
+// Popup communicates via opener↔popup postMessage and is unaffected by storage partitioning.
+// GESTURE SAFETY: linkWithPopup is the FIRST await — no async work precedes it so iOS/Android
+// browsers honour the user-gesture requirement for window.open.
 window.signInWithGoogle = async function () {
   const user = auth.currentUser;
   if (!user) {
@@ -119,11 +120,7 @@ window.signInWithGoogle = async function () {
   }
   const provider = new GoogleAuthProvider();
   try {
-    if (_isMobile()) {
-      await linkWithRedirect(user, provider);
-    } else {
-      await linkWithPopup(user, provider);
-    }
+    await linkWithPopup(user, provider);
   } catch (e) {
     if (e.code === 'auth/credential-already-in-use') {
       // Google account already linked to a separate uid — sign into that account
