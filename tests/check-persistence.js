@@ -3685,7 +3685,7 @@ header('Suite 50 — Gate Parity Guards (Protocol 36)');
 //  Suite 51 — Save Integrity + Rolling Backups (Data Safety Hardening)
 //  Verify checksum stamping, forward-compat guard, and rolling backup
 //  ring are wired consistently across all load/save paths.
-//  34 tests
+//  56 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 51 — Save Integrity + Rolling Backups');
 {
@@ -3872,7 +3872,72 @@ header('Suite 51 — Save Integrity + Rolling Backups');
     'computeSaveChecksum/_fnv1a32 uses canonical FNV-1a magic numbers (algorithm regression guard)'
   );
 
-  // 51.21–51.34  Behavioral: eval state.js helpers and exercise the actual logic
+  // ── Additional structural guards (51.35–51.43) ──────────────────────────
+
+  // 51.35  _contentHash removed from cloud.js (Protocol 22 — dedup in computeSaveChecksum)
+  assert(
+    !cloudSrc51.includes('function _contentHash'),
+    'cloud.js: _contentHash removed (Protocol 22 — dedup uses shared window.computeSaveChecksum in state.js)'
+  );
+
+  // 51.36  restoreRollingBackup is confirm-gated (Protocol 34 — destructive op)
+  {
+    let restoreBody51c = '';
+    try {
+      restoreBody51c = extractFunctionBody(uiSrc51, 'restoreRollingBackup');
+    } catch (e) {
+      fail('Cannot extract restoreRollingBackup for confirm check: ' + e.message);
+    }
+    assert(
+      restoreBody51c.includes('confirm('),
+      'restoreRollingBackup is confirm-gated (Protocol 34 — destructive state replacement requires user confirmation)'
+    );
+  }
+
+  // 51.37  snapRollingBackup stores timestamp: Date.now() in each backup entry
+  assert(
+    stateSrc51.includes('timestamp: Date.now()'),
+    'snapRollingBackup stores timestamp: Date.now() in each backup entry (getRollingBackups sorts on this)'
+  );
+
+  // 51.38  getRollingBackups has a sort() call (sorting mechanism present)
+  assert(
+    /results\.sort\(/.test(stateSrc51),
+    'getRollingBackups uses sort() to order backups by timestamp'
+  );
+
+  // 51.39  cloud.js pushToCloud stamps checksum field via computeSaveChecksum
+  assert(
+    cloudSrc51.includes('computeSaveChecksum') && cloudSrc51.includes('checksum'),
+    'cloud.js pushToCloud stamps checksum field via computeSaveChecksum (integrity on cloud push)'
+  );
+
+  // 51.40  verifySaveEnvelope accepts both robco_v8 (file/cloud) and state (slot) as content source
+  assert(
+    stateSrc51.includes('envelope.robco_v8') && stateSrc51.includes('envelope.state'),
+    'verifySaveEnvelope handles both envelope.robco_v8 (file/cloud) and envelope.state (slot saves)'
+  );
+
+  // 51.41  _fnv1a32 returns 8-char padded hex string
+  assert(
+    stateSrc51.includes('toString(16)') && stateSrc51.includes('padStart(8'),
+    "_fnv1a32 returns 8-char padded hex string (toString(16).padStart(8,'0'))"
+  );
+
+  // 51.42  verifySaveEnvelope has null/non-object guard at function top
+  assert(
+    /verifySaveEnvelope\s*=\s*function[\s\S]{0,120}!envelope/.test(stateSrc51),
+    'verifySaveEnvelope has null/non-object guard at function top (graceful on malformed input)'
+  );
+
+  // 51.43  computeSaveChecksum applies _sortedForHash to contentObj and chat individually
+  assert(
+    stateSrc51.includes('v: _sortedForHash(contentObj') &&
+      stateSrc51.includes('c: _sortedForHash(chat'),
+    'computeSaveChecksum applies _sortedForHash to contentObj and chat individually (key-order invariant per field)'
+  );
+
+  // 51.21–51.34 + 51.44–51.56  Behavioral: eval state.js helpers and exercise the actual logic
   //   These fail on real regressions (wrong semver comparison, checksum field in hash,
   //   ring overflow, dedup missing) — not just grep-based presence checks.
   {
@@ -3915,7 +3980,7 @@ header('Suite 51 — Save Integrity + Rolling Backups');
 
     if (!_bCtx || !_bCtx.window.computeSaveChecksum || !_bCtx.window.verifySaveEnvelope) {
       fail('51.21 behavioral setup: could not eval helpers block from state.js');
-      for (let _bi = 0; _bi < 13; _bi++) fail('51.B behavioral test (setup failed)');
+      for (let _bi = 0; _bi < 26; _bi++) fail('51.B behavioral test (setup failed)');
     } else {
       const _cs = _bCtx.window.computeSaveChecksum;
       const _ve = _bCtx.window.verifySaveEnvelope;
@@ -4045,6 +4110,153 @@ header('Suite 51 — Save Integrity + Rolling Backups');
         uiSource.includes('getRollingBackups') &&
           !/localStorage\.getItem\(['"]robco_backup['"]\)/.test(uiSource),
         "ui.js undo wired to getRollingBackups(), legacy 'robco_backup' key removed (F2 fix guard)"
+      );
+
+      // ── Behavioral: computeSaveChecksum (51.44–51.49) ────────────────────
+
+      // 51.44  computeSaveChecksum determinism: same inputs → identical output on repeated calls
+      {
+        const _ck44a = _cs({ lvl: 5, name: 'Tester' }, [{ text: 'hi', sender: 'user' }], 'any');
+        const _ck44b = _cs({ lvl: 5, name: 'Tester' }, [{ text: 'hi', sender: 'user' }], 'any');
+        assert(
+          _ck44a === _ck44b,
+          'computeSaveChecksum behavioral: same inputs → same output (determinism)'
+        );
+      }
+
+      // 51.45  computeSaveChecksum content sensitivity: different robco_v8 → different checksum
+      assert(
+        _cs({ lvl: 1 }, [], 'any') !== _cs({ lvl: 99 }, [], 'any'),
+        'computeSaveChecksum behavioral: different content (lvl 1 vs 99) → different checksum (content-sensitive)'
+      );
+
+      // 51.46  computeSaveChecksum chat sensitivity: different chat → different checksum
+      assert(
+        _cs({}, [{ text: 'hello' }], 'any') !== _cs({}, [{ text: 'goodbye' }], 'any'),
+        'computeSaveChecksum behavioral: different chat messages → different checksum (chat-sensitive)'
+      );
+
+      // 51.47  computeSaveChecksum playstyle sensitivity: different playstyle → different checksum
+      assert(
+        _cs({}, [], 'any') !== _cs({}, [], 'completionist'),
+        "computeSaveChecksum behavioral: different playstyle ('any' vs 'completionist') → different checksum"
+      );
+
+      // 51.48  computeSaveChecksum returns an 8-char lowercase hex string
+      {
+        const _ckHex = _cs({ test: true }, [], '');
+        assert(
+          typeof _ckHex === 'string' && /^[0-9a-f]{8}$/.test(_ckHex),
+          'computeSaveChecksum behavioral: return value is an 8-char lowercase hex string'
+        );
+      }
+
+      // 51.49  computeSaveChecksum(null, null, null) → no throw, returns a string
+      {
+        let _ckNull = null;
+        try {
+          _ckNull = _cs(null, null, null);
+        } catch (_) {}
+        assert(
+          typeof _ckNull === 'string',
+          'computeSaveChecksum behavioral: null/undefined args → no throw, returns a string (null-safe)'
+        );
+      }
+
+      // ── Behavioral: verifySaveEnvelope extended (51.50–51.53) ────────────
+
+      // 51.50  verifySaveEnvelope(null) → {status:'ok'} (null guard at function top)
+      assert(
+        _ve(null).status === 'ok',
+        "verifySaveEnvelope behavioral: null input → {status:'ok'} (null guard — not 'legacy', not throw)"
+      );
+
+      // 51.51  _semverGt: 10.0.0 → future_version (double-digit major, numeric comparison)
+      assert(
+        _ve({ schemaVersion: '10.0.0' }).status === 'future_version',
+        'verifySaveEnvelope/_semverGt behavioral: 10.0.0 > 2.0.1 uses numeric comparison (double-digit major)'
+      );
+
+      // 51.52  _semverGt: 2.10.0 → future_version (double-digit minor)
+      assert(
+        _ve({ schemaVersion: '2.10.0' }).status === 'future_version',
+        'verifySaveEnvelope/_semverGt behavioral: 2.10.0 > 2.0.1 numeric (double-digit minor)'
+      );
+
+      // 51.53  backward compat: older schemaVersion (2.0.0) + valid checksum → 'ok'
+      {
+        const _oldC53 = { activeContext: 'FNV', campaigns: {} };
+        const _oldE53 = {
+          schemaVersion: '2.0.0',
+          robco_v8: _oldC53,
+          chat: [],
+          playstyle: 'any',
+          checksum: _cs(_oldC53, [], 'any'),
+        };
+        assert(
+          _ve(_oldE53).status === 'ok',
+          "verifySaveEnvelope behavioral: older schemaVersion (2.0.0) + valid checksum → 'ok' (backward compat)"
+        );
+      }
+
+      // ── Behavioral: getRollingBackups / snapRollingBackup (51.54–51.56) ──
+
+      // 51.54  getRollingBackups newest-first: manually seeded backups with known timestamps
+      Object.keys(_ls).forEach(k => {
+        delete _ls[k];
+      });
+      _ls['robco_backup_1'] = JSON.stringify({
+        timestamp: 1000,
+        robco_v8: { lvl: 1 },
+        chat: [],
+        playstyle: 'any',
+      });
+      _ls['robco_backup_2'] = JSON.stringify({
+        timestamp: 3000,
+        robco_v8: { lvl: 3 },
+        chat: [],
+        playstyle: 'any',
+      });
+      _ls['robco_backup_3'] = JSON.stringify({
+        timestamp: 2000,
+        robco_v8: { lvl: 2 },
+        chat: [],
+        playstyle: 'any',
+      });
+      {
+        const _sorted54 = _getRing();
+        assert(
+          _sorted54.length === 3 &&
+            _sorted54[0].timestamp === 3000 &&
+            _sorted54[1].timestamp === 2000 &&
+            _sorted54[2].timestamp === 1000,
+          'getRollingBackups behavioral: newest-first sort (timestamps 3000→2000→1000, index 0 most recent)'
+        );
+
+        // 51.55  getRollingBackups entry structure: has key, data, data.robco_v8
+        assert(
+          _sorted54[0].key === 'robco_backup_2' &&
+            typeof _sorted54[0].data === 'object' &&
+            _sorted54[0].data.robco_v8 !== undefined,
+          'getRollingBackups behavioral: entry has .key, .data, .data.robco_v8 fields'
+        );
+      }
+
+      // 51.56  snapRollingBackup: A→B→A non-consecutive → 3 entries (dedup only blocks consecutive)
+      Object.keys(_ls).forEach(k => {
+        delete _ls[k];
+      });
+      _ls['robco_v8'] = JSON.stringify({ lvl: 10 });
+      _ls['robco_chat'] = '[]';
+      _ls['robco_playstyle'] = 'any';
+      _snap(); // A → slot 1, ptr=1
+      _ls['robco_v8'] = JSON.stringify({ lvl: 20 }); // B (different from A)
+      _snap(); // B → slot 2, ptr=2 (most-recent = slot 2)
+      _ls['robco_v8'] = JSON.stringify({ lvl: 10 }); // A again (most-recent is B, not A → should write)
+      _snap(); // A → slot 3, ptr=0
+      assert(
+        _getRing().length === 3,
+        'snapRollingBackup behavioral: A,B,A non-consecutive → 3 entries (dedup skips only consecutive repeats)'
       );
     }
   }

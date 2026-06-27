@@ -2257,7 +2257,7 @@ Check ($installHooksSrc50 -match 'pre-push') `
 # Suite 51 -- Save Integrity + Rolling Backups (Data Safety Hardening)
 # Verify checksum stamping, forward-compat guard, and rolling backup
 # ring are wired consistently across all load/save paths.
-# 34 tests
+# 56 tests
 # ===========================================================
 Sep "Suite 51 -- Save Integrity + Rolling Backups"
 
@@ -2421,6 +2421,106 @@ Check ($stateSrc51 -match '_prevKey' -and $stateSrc51 -match '_prevSnap' -and
 Check ($uiSrc51 -match 'getRollingBackups' -and
        -not ($uiSrc51 -match "localStorage\.getItem\('robco_backup'\)")) `
     "ui.js undo behavioral: wired to getRollingBackups(), legacy 'robco_backup' key removed (F2)"
+
+# -- Additional structural guards (51.35-51.43) ---------------------------------
+
+# 51.35  _contentHash removed from cloud.js (Protocol 22 -- dedup in computeSaveChecksum)
+Check (-not ($cloudSrc51 -match 'function _contentHash')) `
+    'cloud.js: _contentHash removed (Protocol 22 -- dedup uses shared window.computeSaveChecksum in state.js)'
+
+# 51.36  restoreRollingBackup is confirm-gated (Protocol 34)
+Check ($restoreBody51 -match 'confirm\(') `
+    'restoreRollingBackup is confirm-gated (Protocol 34 -- destructive state replacement requires user confirmation)'
+
+# 51.37  snapRollingBackup stores timestamp: Date.now() in each backup entry
+Check ($stateSrc51 -match 'timestamp: Date\.now\(\)') `
+    'snapRollingBackup stores timestamp: Date.now() in each backup entry (getRollingBackups sorts on this)'
+
+# 51.38  getRollingBackups has a sort() call (sorting mechanism present)
+Check ($stateSrc51 -match 'results\.sort\(') `
+    'getRollingBackups uses sort() to order backups by timestamp'
+
+# 51.39  cloud.js pushToCloud stamps checksum via computeSaveChecksum
+Check ($cloudSrc51 -match 'computeSaveChecksum' -and $cloudSrc51 -match 'checksum') `
+    'cloud.js pushToCloud stamps checksum field via computeSaveChecksum (integrity on cloud push)'
+
+# 51.40  verifySaveEnvelope accepts both robco_v8 and state content fields
+Check ($stateSrc51 -match 'envelope\.robco_v8' -and $stateSrc51 -match 'envelope\.state') `
+    'verifySaveEnvelope handles both envelope.robco_v8 (file/cloud) and envelope.state (slot saves)'
+
+# 51.41  _fnv1a32 returns 8-char padded hex string
+Check ($stateSrc51 -match 'toString\(16\)' -and $stateSrc51 -match 'padStart\(8') `
+    "_fnv1a32 returns 8-char padded hex string (toString(16).padStart(8,'0'))"
+
+# 51.42  verifySaveEnvelope has null/non-object guard at function top
+Check ($stateSrc51 -match '!envelope' -and $stateSrc51 -match 'typeof envelope') `
+    'verifySaveEnvelope has null/non-object guard at function top (graceful on malformed input)'
+
+# 51.43  computeSaveChecksum applies _sortedForHash to contentObj and chat individually
+Check ($stateSrc51 -match 'v: _sortedForHash\(contentObj' -and $stateSrc51 -match 'c: _sortedForHash\(chat') `
+    'computeSaveChecksum applies _sortedForHash to contentObj and chat individually (not outer key sort)'
+
+# -- Behavioral structural equivalents (51.44-51.56) ---------------------------
+
+# 51.44 behavioral equiv: _fnv1a32 is pure (no Math.random/Date.now -- determinism guaranteed)
+$fnvIdx44 = $stateSrc51.IndexOf('function _fnv1a32')
+$fnvEnd44 = $stateSrc51.IndexOf('function _sortedForHash')
+$fnvBody44 = ''
+if ($fnvIdx44 -ge 0 -and $fnvEnd44 -gt $fnvIdx44) {
+    $fnvBody44 = $stateSrc51.Substring($fnvIdx44, $fnvEnd44 - $fnvIdx44)
+}
+Check ($fnvBody44 -ne '' -and -not ($fnvBody44 -match 'Math\.random') -and -not ($fnvBody44 -match 'Date\.now')) `
+    '_fnv1a32 is pure (no Math.random/Date.now in body) -- same input always yields same output'
+
+# 51.45 behavioral equiv: JSON.stringify in computeSaveChecksum includes v, c, p keys (all 3 params)
+Check ($stateSrc51 -match 'v: _sortedForHash' -and $stateSrc51 -match 'c: _sortedForHash' -and $stateSrc51 -match 'p: String\(') `
+    'computeSaveChecksum JSON.stringify includes v (content), c (chat), p (playstyle) -- all 3 params hashed'
+
+# 51.46 behavioral equiv: || [] fallback for chat param (null-safe)
+Check ($stateSrc51 -match 'chat \|\| \[\]') `
+    'computeSaveChecksum has chat || [] fallback (null-safe for missing chat arg)'
+
+# 51.47 behavioral equiv: String() wrapper on playstyle (null coercion)
+Check ($stateSrc51 -match 'String\(playstyle') `
+    'computeSaveChecksum wraps playstyle in String() for null-safe coercion'
+
+# 51.48 behavioral equiv: _fnv1a32 uses >>> 0 (unsigned 32-bit, no negative hashes)
+Check ($stateSrc51 -match '>>> 0') `
+    '_fnv1a32 uses >>> 0 to keep result unsigned 32-bit (prevents negative hash values)'
+
+# 51.49 behavioral equiv: || null fallback for contentObj (null-safe)
+Check ($stateSrc51 -match 'contentObj \|\| null') `
+    'computeSaveChecksum has contentObj || null fallback (null-safe for missing content arg)'
+
+# 51.50 behavioral equiv: verifySaveEnvelope null guard returns ok (not legacy, not throw)
+Check ($stateSrc51 -match '!envelope' -and $stateSrc51 -match "status.*'ok'") `
+    "verifySaveEnvelope behavioral: null/non-object guard returns 'ok' (not 'legacy', not throw)"
+
+# 51.51 behavioral equiv: _semverGt segment access uses (pa[i] || 0) guard
+Check ($stateSrc51 -match '\(pa\[i\] \|\| 0\)') `
+    '_semverGt uses (pa[i] || 0) for undefined-segment safety (handles short version strings)'
+
+# 51.52 behavioral equiv: _semverGt strict > comparison (numeric, catches double-digit values)
+Check ($stateSrc51 -match '\(pa\[i\] \|\| 0\) > \(pb\[i\] \|\| 0\)') `
+    '_semverGt strict > operator: numeric comparison catches 10.0.0 > 2.0.1, 2.10.0 > 2.0.1'
+
+# 51.53 behavioral equiv: future_version return precedes legacy return (guard ordering in function body)
+$fvIdx53 = $stateSrc51.IndexOf("status: 'future_version'")
+$legIdx53 = $stateSrc51.IndexOf("status: 'legacy'")
+Check ($fvIdx53 -gt 0 -and $legIdx53 -gt 0 -and $fvIdx53 -lt $legIdx53) `
+    "verifySaveEnvelope guard order: status 'future_version' return precedes 'legacy' return (correct ordering)"
+
+# 51.54 behavioral equiv: getRollingBackups sort is descending (b.timestamp - a.timestamp)
+Check ($stateSrc51 -match 'b\.timestamp - a\.timestamp') `
+    'getRollingBackups sort: b.timestamp - a.timestamp (descending = newest at index 0)'
+
+# 51.55 behavioral equiv: getRollingBackups entry wraps full backup in .data field
+Check ($stateSrc51 -match 'data: b,') `
+    'getRollingBackups entry: data: b wraps full backup object (entry.data.robco_v8 accessible)'
+
+# 51.56 behavioral equiv: snapRollingBackup dedup reads only most-recent slot
+Check ($stateSrc51 -match '_prevKey' -and $stateSrc51 -match 'ptr === 0 \? 3 : ptr') `
+    'snapRollingBackup dedup reads most-recent slot via _prevKey calculation -- non-consecutive repeats allowed'
 
 # ===========================================================
 # Results
