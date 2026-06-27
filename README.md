@@ -168,7 +168,7 @@ All sounds respect a master mute toggle and individual per-system mute controls.
 | **Cloud**       | Firebase Firestore            | Cross-device save synchronization         |
 | **PWA**         | Service Worker + Manifest     | Installable offline-capable app           |
 | **Dev Tooling** | ESLint + Prettier + Vite      | Linting, formatting, dev server           |
-| **Testing**     | PowerShell persistence audit  | 679-test pre-commit gate                  |
+| **Testing**     | PowerShell persistence audit  | 684-test pre-commit gate                  |
 
 ### File Structure
 
@@ -179,12 +179,15 @@ All sounds respect a master mute toggle and individual per-system mute controls.
 │   ├── state.js            State definition, persistence, migration
 │   ├── registry.js         Read-only Fallout Data Registry (~280 items, 130 quests, 110 perks, 120 locations)
 │   ├── api.js              System directive, AI import, API communication
-│   ├── ui.js               Audio engine, rendering, lifecycle, save slots, autocomplete
+│   ├── ui-audio.js         Audio engine (geiger, tinnitus, CRT hum, boot/level-up sounds)
+│   ├── ui-render.js        All render* functions, CRUD helpers, faction/map/time utilities
+│   ├── ui.js               Core UI lifecycle, appendToChat, loadUI, save slots, autocomplete
 │   ├── cloud.js            Firebase push/pull (ES module)
 │   └── database.js         Game CSV data (~170 weapons, ~68 armors, ~45 chems) + lookupItemInDb()
 ├── sw.js                   Service Worker (cache-first, same-origin only)
 ├── tests/
-│   └── check-persistence.ps1  Pre-commit 679-test persistence audit
+│   ├── check-persistence.ps1  Pre-commit 684-test persistence audit (PowerShell)
+│   └── check-persistence.js   Pre-commit 684-test persistence audit (Node)
 ├── ARCHITECTURE.md         Full system dependency map & patterns
 ├── changelog.txt           Complete version history (v1.1.7 → present)
 ├── icon.png                PWA icon
@@ -333,7 +336,7 @@ Every audio function must check `AudioSettings.masterMute` and its specific mute
 npm run lint        ← catch bugs
 npm run format      ← enforce style
 git add -A
-git commit          ← cache-bump guard runs first, then persistence audit (679 tests)
+git commit          ← cache-bump guard runs first, then persistence audit (684 tests)
 git push origin main
 ```
 
@@ -389,7 +392,7 @@ Key milestones:
 The project is a **production-quality browser application** with:
 
 - 34 tracked state fields across 5 structured systems
-- 679-test automated persistence audit (DOM binding, Protocol 4 enforcement, migrateState mock execution, reputation 2D matrix, CRUD function existence, CAMPG tab DOM binding, campaignMode + playthroughType Protocol 4, render contracts, CSS invariants, SW invariants, structural integrity, detail-current dedup guard, gate guards for critical UI controls, prohibited patterns, protocol completeness, AI contract lock, architectural boundaries, assets completeness, CSS hygiene guards, DB↔registry weapon parity, weapon mods CSV + registry parity, native command router, GAME_DEFS structural integrity, anonymous auth + security rules + XSS coercion fix, no-double-escape behavioral regression, Gemini key sync security guards, remote kill-switch + client auto-disable guards, CI/repo hardening guards, gate commit/push split + powershell fallback guards, save integrity checksum + rolling backup + forward-compat guard, AI key resilience + Tri-Node schema validation, prompt-injection hardening + input caps + quota warning, CSP origin guards + Firebase SDK pin, UI module split guards)
+- 684-test automated persistence audit (DOM binding, Protocol 4 enforcement, migrateState mock execution, reputation 2D matrix, CRUD function existence, CAMPG tab DOM binding, campaignMode + playthroughType Protocol 4, render contracts, CSS invariants, SW invariants, structural integrity, detail-current dedup guard, gate guards for critical UI controls, prohibited patterns, protocol completeness, AI contract lock, architectural boundaries, assets completeness, CSS hygiene guards, DB↔registry weapon parity, weapon mods CSV + registry parity, native command router, GAME_DEFS structural integrity, anonymous auth + security rules + XSS coercion fix, no-double-escape behavioral regression, Gemini key sync security guards, remote kill-switch + client auto-disable guards, CI/repo hardening guards, gate commit/push split + powershell fallback guards, save integrity checksum + rolling backup + forward-compat guard, AI key resilience + Tri-Node schema validation, prompt-injection hardening + input caps + quota warning, CSP origin guards + Firebase SDK pin, UI module split guards)
 - 14-faction reputation network
 - 13-skill character sheet
 - Full save/load/export/import/cloud sync/undo pipeline

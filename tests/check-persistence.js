@@ -1029,7 +1029,7 @@ try {
   const vm = require('vm');
   const fnIdx = uiSource.indexOf('function scoreZoneForLoc');
   if (fnIdx === -1) {
-    fail('scoreZoneForLoc not found in ui.js');
+    fail('scoreZoneForLoc not found in concatenated UI source');
   } else {
     const body = extractFunctionBody(uiSource, 'scoreZoneForLoc');
     const headerEnd = uiSource.indexOf('{', fnIdx);
@@ -2211,7 +2211,7 @@ header('Keyboard Shortcuts Group');
 // ══════════════════════════════════════════════════════════════
 header('Render Fan-out (P7-1)');
 {
-  const uiSrc37 = readFile('js/ui.js');
+  const uiSrc37 = uiSource; // concatenated — CRUD mutators now in ui-render.js
 
   function checkMutator(fnName, expectedRenders) {
     let body = '';
@@ -4803,7 +4803,7 @@ header('Suite 55 — CSP Stage 1 Origin Guards + Firebase Pin');
 //  Suite 56 — UI Module Split Guards
 //  Protocol-20 static guards: each ui-*.js must exist, appear
 //  in sw.js ASSETS, and be wired in index.html before api.js.
-//  5 tests
+// 10 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 56 — UI Module Split Guards');
 {
@@ -4845,6 +4845,44 @@ header('Suite 56 — UI Module Split Guards');
     assert(
       audioIdx56b !== -1 && uiIdx56 !== -1 && audioIdx56b < uiIdx56,
       'ui-audio.js <script> appears before ui.js in index.html (audio loads before core)'
+    );
+  }
+
+  // 56.6 js/ui-render.js file exists on disk
+  assert(
+    fs.existsSync(path.join(ROOT, 'js/ui-render.js')),
+    'js/ui-render.js file exists (Slice B: render module extracted)'
+  );
+
+  // 56.7 ./js/ui-render.js appears in sw.js ASSETS list
+  assert(
+    /['"]\.\/js\/ui-render\.js['"]/.test(swSrc56),
+    "'./js/ui-render.js' in sw.js ASSETS (cache covers the render module)"
+  );
+
+  // 56.8 <script src="js/ui-render.js"> appears in index.html
+  assert(
+    /src=['"]js\/ui-render\.js['"]/.test(htmlSrc56),
+    '<script src="js/ui-render.js"> present in index.html'
+  );
+
+  // 56.9 ui-render.js script appears before api.js in index.html
+  {
+    const renderIdx56 = htmlSrc56.indexOf('js/ui-render.js');
+    const apiIdx56b = htmlSrc56.indexOf('js/api.js');
+    assert(
+      renderIdx56 !== -1 && apiIdx56b !== -1 && renderIdx56 < apiIdx56b,
+      'ui-render.js <script> appears before api.js in index.html (load-order guard)'
+    );
+  }
+
+  // 56.10 ui-render.js script appears before ui.js in index.html
+  {
+    const renderIdx56b = htmlSrc56.indexOf('js/ui-render.js');
+    const uiIdx56b = htmlSrc56.indexOf('"js/ui.js"');
+    assert(
+      renderIdx56b !== -1 && uiIdx56b !== -1 && renderIdx56b < uiIdx56b,
+      'ui-render.js <script> appears before ui.js in index.html (render loads before core)'
     );
   }
 }

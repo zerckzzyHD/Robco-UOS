@@ -618,10 +618,11 @@ try {
     if ($nodeCheck) {
         $repoRoot = (Get-Item $PSScriptRoot).Parent.FullName
         $uiPathNode = (Join-Path $repoRoot "js/ui.js").Replace('\', '/')
+        $uiRenderPathNode = (Join-Path $repoRoot "js/ui-render.js").Replace('\', '/')
         $dcScript = @"
 const vm = require('vm');
 const fs = require('fs');
-const src = fs.readFileSync('$uiPathNode', 'utf8');
+const src = (fs.existsSync('$uiRenderPathNode') ? fs.readFileSync('$uiRenderPathNode', 'utf8') + '\n' : '') + fs.readFileSync('$uiPathNode', 'utf8');
 const fnIdx = src.indexOf('function scoreZoneForLoc');
 if (fnIdx === -1) { console.log('EXTRACT_FAIL'); process.exit(0); }
 function extractBody(source, name) {
@@ -1301,7 +1302,7 @@ Check ([bool]($uiSrc36 -match 'function\s+closeModal\s*\(')) 'closeModal() funct
 # 16 tests
 # ===========================================================
 Sep "Suite 37 -- Render Fan-out (P7-1)"
-$uiSrc37 = Read-Src 'js/ui.js'
+$uiSrc37 = $uiSrc  # concatenated — CRUD mutators now in ui-render.js
 
 function Test-Mutator($fnName, $expectedRenders) {
     $body = ''
@@ -1510,7 +1511,7 @@ Check ([bool]($htmlSrc40 -match 'value="mod"')) `
 
 # 40.6  renderInventory() references _invFilter
 $renderBody40 = ''
-try { $renderBody40 = Get-FunctionBody $uiSrc40 'renderInventory' } catch {}
+try { $renderBody40 = Get-FunctionBody $uiSrc 'renderInventory' } catch {}  # now in ui-render.js
 Check ([bool]($renderBody40 -match '_invFilter')) `
     'renderInventory() references _invFilter to honour the active category filter'
 
@@ -2890,7 +2891,7 @@ Check ([bool]($htmlSrc55 -match 'img-src[^;]*blob:')) `
 # Suite 56 -- UI Module Split Guards
 # Protocol-20 static guards: each ui-*.js must exist, appear
 # in sw.js ASSETS, and be wired in index.html before api.js.
-# 5 tests
+# 10 tests
 # ===========================================================
 Sep "Suite 56 -- UI Module Split Guards"
 $htmlSrc56 = $htmlSrc55  # reuse (same index.html read above)
@@ -2919,6 +2920,30 @@ $audioIdx56b = $htmlSrc56.IndexOf('js/ui-audio.js')
 $uiIdx56     = $htmlSrc56.IndexOf('"js/ui.js"')
 Check ($audioIdx56b -ne -1 -and $uiIdx56 -ne -1 -and $audioIdx56b -lt $uiIdx56) `
     "ui-audio.js <script> appears before ui.js in index.html (audio loads before core)"
+
+# 56.6 js/ui-render.js file exists on disk
+Check (Test-Path (Join-Path $Root "js\ui-render.js")) `
+    "js/ui-render.js file exists (Slice B: render module extracted)"
+
+# 56.7 ./js/ui-render.js appears in sw.js ASSETS list
+Check ([bool]($swSrc56 -match 'js/ui-render\.js')) `
+    "'./js/ui-render.js' in sw.js ASSETS (cache covers the render module)"
+
+# 56.8 <script src="js/ui-render.js"> appears in index.html
+Check ([bool]($htmlSrc56 -match 'src="js/ui-render\.js"')) `
+    '<script src="js/ui-render.js"> present in index.html'
+
+# 56.9 ui-render.js script appears before api.js in index.html
+$renderIdx56  = $htmlSrc56.IndexOf('js/ui-render.js')
+$apiIdx56b    = $htmlSrc56.IndexOf('js/api.js')
+Check ($renderIdx56 -ne -1 -and $apiIdx56b -ne -1 -and $renderIdx56 -lt $apiIdx56b) `
+    "ui-render.js <script> appears before api.js in index.html (load-order guard)"
+
+# 56.10 ui-render.js script appears before ui.js in index.html
+$renderIdx56b = $htmlSrc56.IndexOf('js/ui-render.js')
+$uiIdx56b     = $htmlSrc56.IndexOf('"js/ui.js"')
+Check ($renderIdx56b -ne -1 -and $uiIdx56b -ne -1 -and $renderIdx56b -lt $uiIdx56b) `
+    "ui-render.js <script> appears before ui.js in index.html (render loads before core)"
 
 # ===========================================================
 # Results

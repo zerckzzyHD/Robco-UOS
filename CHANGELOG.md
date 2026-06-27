@@ -1,4 +1,4 @@
-## [v2.5.0] — Unreleased<!-- Tests: 679/679 | Cache: robco-terminal-v2.0.1-r67 -->
+## [v2.5.0] — Unreleased<!-- Tests: 684/684 | Cache: robco-terminal-v2.0.1-r68 -->
 
 ### Added
 
@@ -17,6 +17,7 @@
 
 ### Under the Hood
 
+- Split all render functions, CRUD helpers (add/remove items, ammo, squad members, etc.), faction utilities, game-time helpers, and map functions out of ui.js into a dedicated js/ui-render.js module (Slice B of a 5-part internal refactor). No user-facing behaviour changes. Updated the test suite's CRUD-mutator checks to read from the combined UI source so they survive the move. Extended Suite 56 from 5 to 10 tests — added file-exists, service-worker cache, script-tag, and load-order checks for the new render module (684 total across 60 suites). Bumped CACHE_NAME to r68 (new served file added).
 - Split all audio functions out of ui.js into a dedicated js/ui-audio.js module (Slice A of a 5-part internal refactor). No user-facing behaviour changes — all audio functions work identically, the module loads before ui.js in the same script order, and the service worker pre-caches both files. Added 5 static guard tests (Suite 56, 679 total across 60 suites) that verify the new file exists, is in the service worker cache list, and loads in the correct order relative to ui.js and api.js. Bumped CACHE_NAME to r67 (new served file added).
 - Tightened the Content Security Policy: every load-bearing origin is now explicitly allowlisted (Gemini API, Firebase Auth, token refresh, Firestore, App Check, Google Sign-In popup, gstatic CDN) and the previously missing directives — `font-src`, `worker-src`, `form-action`, and `frame-ancestors 'none'` — are now included. The policy stays in report-only mode for this push; Stage 2 will flip it to enforcing once live violations are confirmed clear.
 - Evaluated self-hosting the Firebase SDK and deferred: all App Check and reCAPTCHA calls must still reach gstatic/google, so self-hosting removes zero CSP origins and gains nothing for the current zero-build-step architecture. The version pin on the CDN import URL is the supply-chain control. Revisit if Firebase ships a bundleable SDK or the project adopts a build step.

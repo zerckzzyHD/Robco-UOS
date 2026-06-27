@@ -50,14 +50,16 @@
 ├── js/
 │   ├── state.js        7.6KB  State definition, persistence, migration
 │   ├── api.js          36.5KB System directive, autoImportState, transmitMessage
-│   ├── ui.js           ~82KB  Audio, rendering, lifecycle, undo, save slots
+│   ├── ui-audio.js     ~16KB  Audio engine (geiger, tinnitus, CRT hum, boot/level-up sounds)
+│   ├── ui-render.js    ~30KB  All render* functions, CRUD helpers, faction/map/time utilities
+│   ├── ui.js           ~54KB  Core UI lifecycle, appendToChat, loadUI, save slots, autocomplete
 │   ├── cloud.js        3.6KB  Firebase push/pull (ES module)
 │   ├── registry.js     ~36KB  Read-only Fallout Data Registry + registrySearch()
 │   └── database.js     ~25KB CSV data (~170 weapons, ~68 armors, ~45 chems) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── check-persistence.ps1   28KB    679-test pre-commit audit
-│   ├── check-persistence.js    36KB    679-test Node runner (parity with .ps1)
+│   ├── check-persistence.ps1   28KB    684-test pre-commit audit
+│   ├── check-persistence.js    36KB    684-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -87,10 +89,15 @@ Scripts are loaded via `<script>` tags in `index.html` in this exact order:
 4. js/ui-audio.js   → defines: audioCtx, all audio functions (geiger/tinnitus/CRT hum,
                        limb/wake/boot/level-up sounds, runBootSequence,
                        triggerPhosphorGhost, changeOpticsColor)
-5. js/ui.js         → defines: AudioSettings, appendToChat, loadUI, all render*(),
-                       toggleLimb, updateMath, etc.
-6. js/api.js        → defines: autoImportState, transmitMessage, fetchAuthorizedModels
-7. js/cloud.js      → loaded as <script type="module"> (ES import from Firebase CDN)
+5. js/ui-render.js  → defines: all render*() functions, CRUD helpers (addItem/delItem,
+                       addAmmo/removeAmmo, addPerk/removePerk, etc.), FACTION_THRESHOLDS,
+                       getFactionStanding, adjustFaction, game-time helpers
+                       (ticksToGameTime/_resolveGameDateTime/formatGameTime/getGameDate),
+                       map helpers (setMapView/zoomMapToZone/renderWorldMap),
+                       _updateContextPanels, _invFilter, setInvFilter
+6. js/ui.js         → defines: AudioSettings, appendToChat, loadUI, updateMath, etc.
+7. js/api.js        → defines: autoImportState, transmitMessage, fetchAuthorizedModels
+8. js/cloud.js      → loaded as <script type="module"> (ES import from Firebase CDN)
                        attaches: window.pushToCloud, window.pullFromCloud
 ```
 
@@ -936,7 +943,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 679-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 684-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable
