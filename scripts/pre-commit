@@ -65,7 +65,7 @@ fi
 # ── Q3 — Secret scan: block staged private keys and Google API keys ──────────
 STAGED_DIFF=$(git diff --cached)
 # Check for private key blocks in added lines (all staged files)
-if printf '%s\n' "$STAGED_DIFF" | grep -E '^\+[^+]' | grep -qE '-----BEGIN .{0,20}PRIVATE KEY-----'; then
+if printf '%s\n' "$STAGED_DIFF" | grep -E '^\+[^+]' | grep -qE 'BEGIN [A-Z0-9 ]*PRIVATE KEY'; then
   echo ""
   echo "  [FAIL]  Secret detected: private key block found in staged diff."
   echo "  Remove the private key and commit again."
