@@ -1,0 +1,7 @@
+#!/bin/sh
+
+# ── Full gate at push boundary (Protocol 36) ──────────────────────────────────
+# Runs the complete gate including browser checks (boot-smoke + render-check)
+# before anything reaches origin. CI runs the same gate — parity holds here.
+npm run gate || exit 1
+# ── End pre-push gate ─────────────────────────────────────────────────────────

@@ -3,25 +3,27 @@
  * scripts/gate.js — Full pre-commit / CI gate (Protocol 36)
  *
  * Runs exactly what CI runs, in order. Exit code non-zero if ANY step fails.
- * Called via:  npm run gate
+ * Called via:
+ *   npm run gate       — full gate (lint + format + tests + browser checks)
+ *   npm run gate:fast  — fast gate (lint + format + tests; browser checks skipped)
  *
- * Steps:
+ * Steps (full; --fast skips steps 5-7):
  *   1. ESLint (--max-warnings 0)
  *   2. Prettier format check
  *   3. Persistence audit — Node runner
  *   4. Persistence audit — PowerShell runner (+ parity check)
- *   5. Playwright Chromium availability check
- *   6. Boot smoke test (HTTP)
- *   7. Render check (360px & 412px)
+ *   5. Playwright Chromium availability check     ← skipped by --fast
+ *   6. Boot smoke test (HTTP)                     ← skipped by --fast
+ *   7. Render check (360px & 412px)               ← skipped by --fast
  */
 'use strict';
 
 const { spawnSync } = require('child_process');
-const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
 const isCI = !!process.env.CI;
+const fast = process.argv.includes('--fast');
 
 function run(label, cmd) {
   console.log(`\n[gate] ${label}`);
@@ -51,13 +53,27 @@ run('Prettier (format check)', 'npx prettier --check .');
 run('Persistence audit (Node)', 'node tests/check-persistence.js');
 
 // ── 4. PowerShell persistence audit + parity ─────────────────────────────────
-const pwshCheck = spawnSync('pwsh --version', { shell: true, stdio: 'pipe' });
-if (pwshCheck.status === 0) {
-  run('Persistence audit (PowerShell)', 'pwsh -File tests/check-persistence.ps1');
+// Probe for pwsh (PowerShell Core) first; fall back to powershell (Windows PS 5.1).
+// Only warn-skip when neither is found (e.g. bare Linux dev box without pwsh installed).
+const pwshProbe = spawnSync('pwsh --version', { shell: true, stdio: 'pipe' });
+const psProbe =
+  pwshProbe.status === 0
+    ? null
+    : spawnSync('powershell -Command "exit 0"', { shell: true, stdio: 'pipe' });
+const psBin =
+  pwshProbe.status === 0 ? 'pwsh' : psProbe && psProbe.status === 0 ? 'powershell' : null;
+
+if (psBin) {
+  const psFileCmd =
+    psBin === 'pwsh'
+      ? 'pwsh -File tests/check-persistence.ps1'
+      : 'powershell -ExecutionPolicy Bypass -File tests/check-persistence.ps1';
+
+  run('Persistence audit (PowerShell)', psFileCmd);
 
   console.log('\n[gate] Runner parity check');
   const nodeOut = capture('node tests/check-persistence.js');
-  const psOut = capture('pwsh -File tests/check-persistence.ps1');
+  const psOut = capture(psFileCmd);
   // ANSI codes wrap lines, not words — /ALL N TESTS/ matches even in colored output
   const nodeTotal = (nodeOut.stdout + nodeOut.stderr).match(/ALL (\d+) TESTS/)?.[1];
   const psTotal = (psOut.stdout + psOut.stderr).match(/ALL (\d+) TESTS/)?.[1];
@@ -72,34 +88,42 @@ if (pwshCheck.status === 0) {
   console.error('\n[GATE FAIL] pwsh not available in CI — required for parity check (Protocol 15)');
   process.exit(1);
 } else {
-  console.warn('\n[GATE WARN] pwsh not available locally — PowerShell & parity checks skipped.');
+  console.warn(
+    '\n[GATE WARN] Neither pwsh nor powershell found — PowerShell & parity checks skipped.'
+  );
   console.warn('  Install PowerShell Core: https://aka.ms/pscore6');
   console.warn('  CI will enforce parity; this step is required for a passing push.\n');
 }
 
-// ── 5. Playwright Chromium check ──────────────────────────────────────────────
-console.log('\n[gate] Playwright Chromium availability');
-const chromiumScript =
-  "try{const{chromium}=require('playwright');const p=chromium.executablePath();" +
-  "require('fs').accessSync(p);}catch(e){process.stderr.write(String(e.message||e));process.exit(1);}";
-const pwResult = spawnSync(`node -e "${chromiumScript}"`, {
-  cwd: ROOT,
-  shell: true,
-  stdio: 'pipe',
-  timeout: 10000,
-});
-if (pwResult.status !== 0) {
-  const msg = (pwResult.stderr || '').toString().trim();
-  console.error('\n[GATE FAIL] Playwright Chromium binary not found' + (msg ? ': ' + msg : '.'));
-  console.error('  Run: npx playwright install chromium');
-  process.exit(1);
+if (!fast) {
+  // ── 5. Playwright Chromium check ──────────────────────────────────────────────
+  console.log('\n[gate] Playwright Chromium availability');
+  const chromiumScript =
+    "try{const{chromium}=require('playwright');const p=chromium.executablePath();" +
+    "require('fs').accessSync(p);}catch(e){process.stderr.write(String(e.message||e));process.exit(1);}";
+  const pwResult = spawnSync(`node -e "${chromiumScript}"`, {
+    cwd: ROOT,
+    shell: true,
+    stdio: 'pipe',
+    timeout: 10000,
+  });
+  if (pwResult.status !== 0) {
+    const msg = (pwResult.stderr || '').toString().trim();
+    console.error('\n[GATE FAIL] Playwright Chromium binary not found' + (msg ? ': ' + msg : '.'));
+    console.error('  Run: npx playwright install chromium');
+    process.exit(1);
+  }
+  console.log('  Chromium found.');
+
+  // ── 6. Boot smoke ─────────────────────────────────────────────────────────────
+  run('Boot smoke (HTTP)', 'node tests/boot-smoke.mjs');
+
+  // ── 7. Render check ───────────────────────────────────────────────────────────
+  run('Render check (360px & 412px)', 'node tests/render-check.mjs');
 }
-console.log('  Chromium found.');
 
-// ── 6. Boot smoke ─────────────────────────────────────────────────────────────
-run('Boot smoke (HTTP)', 'node tests/boot-smoke.mjs');
-
-// ── 7. Render check ───────────────────────────────────────────────────────────
-run('Render check (360px & 412px)', 'node tests/render-check.mjs');
-
-console.log('\n[GATE] All checks passed!\n');
+console.log(
+  fast
+    ? '\n[GATE] Fast gate passed (browser checks skipped — run npm run gate before pushing).\n'
+    : '\n[GATE] All checks passed!\n'
+);

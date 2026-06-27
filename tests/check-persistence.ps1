@@ -2211,7 +2211,7 @@ Check (([bool]($releaseSrc49 -match 'workflow_run')) -and ([bool]($releaseSrc49 
 # ===========================================================
 # Suite 50 -- Gate Parity Guards (Protocol 36)
 # Verify that the local gate == CI gate and the escape-ratchet is wired.
-# 4 tests
+# 8 tests
 # ===========================================================
 Sep "Suite 50 -- Gate Parity Guards (Protocol 36)"
 
@@ -2220,9 +2220,9 @@ $gateSrc50 = Read-Src "scripts/gate.js"
 $pkgSrc50 = Read-Src "package.json"
 $bootSmokeSrc50 = Read-Src "tests/boot-smoke.mjs"
 
-# 50.1  scripts/pre-commit invokes npm run gate
-Check ($preCommitSrc50 -match 'npm run gate') `
-    "scripts/pre-commit invokes npm run gate (Protocol 36 -- local gate == CI gate)"
+# 50.1  scripts/pre-commit invokes npm run gate:fast (fast gate at commit boundary)
+Check ($preCommitSrc50 -match 'npm run gate:fast') `
+    "scripts/pre-commit invokes npm run gate:fast (Protocol 36 -- fast gate at commit boundary)"
 
 # 50.2  scripts/gate.js enforces --max-warnings 0
 Check ($gateSrc50 -match '--max-warnings 0') `
@@ -2235,6 +2235,24 @@ Check (($bootSmokeSrc50 -match 'http\.createServer') -and ($bootSmokeSrc50 -matc
 # 50.4  package.json has a gate script
 Check ($pkgSrc50 -match '"gate"') `
     'package.json defines a "gate" script (Protocol 36 -- single source of truth for gate)'
+
+# 50.5  gate.js has --fast flag that skips browser steps
+Check (($gateSrc50 -match '--fast') -and ($gateSrc50 -match '!fast')) `
+    "scripts/gate.js has --fast flag that skips browser steps (Protocol 36 -- fast commit / full push split)"
+
+# 50.6  gate.js falls back to powershell when pwsh absent
+Check (($gateSrc50 -match 'pwsh') -and ($gateSrc50 -match 'powershell')) `
+    "scripts/gate.js falls back to powershell when pwsh absent (Protocol 36 -- Windows PS 5.1 support)"
+
+# 50.7  scripts/pre-push exists and invokes full npm run gate
+$prePushSrc50 = Read-Src "scripts/pre-push"
+Check ($prePushSrc50 -match 'npm run gate(?!:)') `
+    "scripts/pre-push invokes full npm run gate (Protocol 36 -- full gate at push boundary)"
+
+# 50.8  install-hooks.js installs pre-push hook
+$installHooksSrc50 = Read-Src "scripts/install-hooks.js"
+Check ($installHooksSrc50 -match 'pre-push') `
+    "scripts/install-hooks.js installs pre-push hook (Protocol 36 -- full gate at push boundary)"
 
 # ===========================================================
 # Results

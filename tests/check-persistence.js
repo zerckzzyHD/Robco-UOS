@@ -3599,7 +3599,7 @@ header('Suite 49 — CI / Repo Hardening Guards');
 // ══════════════════════════════════════════════════════════════
 //  Suite 50 — Gate Parity Guards (Protocol 36)
 //  Verify that the local gate == CI gate and the escape-ratchet is wired.
-//  4 tests
+//  8 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 50 — Gate Parity Guards (Protocol 36)');
 {
@@ -3608,10 +3608,10 @@ header('Suite 50 — Gate Parity Guards (Protocol 36)');
   const pkgSrc50 = readFile('package.json');
   const bootSmokeSrc50 = readFile('tests/boot-smoke.mjs');
 
-  // 50.1  scripts/pre-commit invokes npm run gate (gate parity enforced in hook)
+  // 50.1  scripts/pre-commit invokes npm run gate:fast (fast gate at commit boundary)
   assert(
-    preCommitSrc50.includes('npm run gate'),
-    'scripts/pre-commit invokes npm run gate (Protocol 36 — local gate == CI gate)'
+    preCommitSrc50.includes('npm run gate:fast'),
+    'scripts/pre-commit invokes npm run gate:fast (Protocol 36 — fast gate at commit boundary)'
   );
 
   // 50.2  scripts/gate.js enforces --max-warnings 0 (ESLint escape-ratchet)
@@ -3630,6 +3630,32 @@ header('Suite 50 — Gate Parity Guards (Protocol 36)');
   assert(
     pkgSrc50.includes('"gate"'),
     'package.json defines a "gate" script (Protocol 36 — single source of truth for gate)'
+  );
+
+  // 50.5  gate.js has --fast flag that skips browser steps
+  assert(
+    gateSrc50.includes('--fast') && gateSrc50.includes('!fast'),
+    'scripts/gate.js has --fast flag that skips browser steps (Protocol 36 — fast commit / full push split)'
+  );
+
+  // 50.6  gate.js falls back to powershell when pwsh absent
+  assert(
+    gateSrc50.includes('pwsh') && gateSrc50.includes('powershell'),
+    'scripts/gate.js falls back to powershell when pwsh absent (Protocol 36 — Windows PS 5.1 support)'
+  );
+
+  // 50.7  scripts/pre-push exists and invokes full npm run gate
+  const prePushSrc50 = readFile('scripts/pre-push');
+  assert(
+    /npm run gate(?!:)/.test(prePushSrc50),
+    'scripts/pre-push invokes full npm run gate (Protocol 36 — full gate at push boundary)'
+  );
+
+  // 50.8  install-hooks.js installs pre-push hook
+  const installHooksSrc50 = readFile('scripts/install-hooks.js');
+  assert(
+    installHooksSrc50.includes('pre-push'),
+    'scripts/install-hooks.js installs pre-push hook (Protocol 36 — full gate at push boundary)'
   );
 }
 

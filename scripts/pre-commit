@@ -84,6 +84,7 @@ fi
 echo "  [PASS]  No secrets detected in staged diff."
 # ── End Q3 ───────────────────────────────────────────────────────────────────
 
-# ── Full gate: lint + format + tests + browser (Protocol 36) ─────────────────
-npm run gate || exit 1
+# ── Fast gate: lint + format + tests (Protocol 36) ───────────────────────────
+# Browser checks (boot-smoke + render-check) run via the pre-push hook instead.
+npm run gate:fast || exit 1
 # ── End gate ─────────────────────────────────────────────────────────────────
