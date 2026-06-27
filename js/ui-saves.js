@@ -1,0 +1,561 @@
+function exportCampaignLog(format = 'txt') {
+  if (!chatHistory || chatHistory.length === 0) {
+    alert('> ERROR: COMM-LINK LOGS EMPTY.');
+    return;
+  }
+
+  if (format === 'html') {
+    // #41 HTML Campaign Log Export — green-on-black styled HTML matching current optics
+    const optics = localStorage.getItem('robco_optics') || 'green';
+    const fgMap = {
+      green: '#14fdce',
+      amber: '#ffb642',
+      blue: '#42cbf5',
+      legion: '#ff4040',
+      ghoul: '#7dff5f',
+      neon: '#c084fc',
+    };
+    const fg = fgMap[optics] || '#14fdce';
+    let rows = chatHistory
+      .map(msg => {
+        let clean = msg.text
+          .replace(/<[^>]*>?/gm, '')
+          .replace(/```[a-z]*\n?/gi, '')
+          .replace(/```/g, '');
+        const label =
+          msg.sender === 'user' ? 'COURIER' : msg.sender === 'sys' ? 'SYSTEM' : 'DATABANK';
+        const color = msg.sender === 'user' ? '#fff' : msg.sender === 'sys' ? '#f39c12' : fg;
+        const safe = clean.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return `<div style="margin-bottom:10px;"><span style="color:${color};opacity:0.6;font-size:11px;">[${label}]</span><br><span style="color:${color};white-space:pre-wrap;">${safe}</span></div>`;
+      })
+      .join('');
+    const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>RobCo U.O.S. Campaign Log</title><style>body{background:#010a07;color:${fg};font-family:'Courier New',monospace;padding:20px;font-size:13px;line-height:1.5;}.header{text-align:center;border-bottom:1px dashed ${fg};padding-bottom:10px;margin-bottom:20px;letter-spacing:2px;}</style></head><body><div class="header"><h1>ROBCO INDUSTRIES U.O.S.<br>AFTER-ACTION CAMPAIGN LOG</h1><p>Courier: ${escapeHtml(state.loc || '?')} | ${formatGameTime(state.ticks || 0)} | Lv.${state.lvl || 1}</p></div>${rows}</body></html>`;
+    _downloadBlob(html, 'text/html', 'robco_campaign_log.html');
+    return;
+  }
+
+  if (format === 'md') {
+    // #27 Export as Markdown
+    let md = `# RobCo U.O.S. — Campaign Log\n\n`;
+    md += `**Location:** ${state.loc || '?'} | **Time:** ${formatGameTime(state.ticks || 0)} | **Level:** ${state.lvl || 1}\n\n---\n\n`;
+    chatHistory.forEach(msg => {
+      let clean = msg.text
+        .replace(/<[^>]*>?/gm, '')
+        .replace(/```[a-z]*\n?/gi, '')
+        .replace(/```/g, '')
+        .trim();
+      if (!clean) return;
+      const prefix =
+        msg.sender === 'user'
+          ? '**[COURIER]**'
+          : msg.sender === 'sys'
+            ? '*[SYSTEM]*'
+            : '> [DATABANK]';
+      md += `${prefix} ${clean}\n\n`;
+    });
+    _downloadBlob(md, 'text/markdown', 'robco_campaign_log.md');
+    return;
+  }
+
+  // Default: plain text (original behavior)
+  let logStr = '=========================================================\n';
+  logStr += '         ROBCO INDUSTRIES UNIFIED OPERATING SYSTEM\n';
+  logStr += '                 AFTER-ACTION CAMPAIGN LOG\n';
+  logStr += '=========================================================\n\n';
+  chatHistory.forEach(msg => {
+    let cleanText = msg.text
+      .replace(/<[^>]*>?/gm, '')
+      .replace(/\x60{3}[a-z]*\n/gi, '')
+      .replace(/\x60{3}/g, '');
+    if (msg.sender === 'user') logStr += `[COURIER]: ${cleanText}\n\n`;
+    else if (msg.sender === 'sys') logStr += `[SYSTEM]: ${cleanText}\n\n`;
+    else logStr += `[DATABANK]: ${cleanText}\n\n`;
+  });
+  _downloadBlob(logStr, 'text/plain', 'robco_campaign_log.txt');
+}
+
+function _downloadBlob(content, mimeType, filename) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ── NOTIFICATION BADGES (#13) ────────────────────────────────────────
+// Shows count badges on panel summaries whenever their contents are non-empty.
+// Called at end of updateMath() so it always reflects current state.
+const SLOT_NAMES = ['A', 'B', 'C'];
+function _slotKey(n) {
+  return `robco_slot_${n}`;
+}
+function _slotLabel(n) {
+  return `SLOT ${SLOT_NAMES[n - 1]}`;
+}
+
+function saveToSlot(slotNum) {
+  syncStateFromDom();
+  const _slotState = JSON.parse(JSON.stringify(state));
+  const _slotChat = chatHistory.slice(-200);
+  const _slotPlaystyle = localStorage.getItem('robco_playstyle') || 'any';
+  const envelope = {
+    version: APP_VERSION,
+    schemaVersion: APP_VERSION,
+    state: _slotState,
+    chat: _slotChat,
+    playstyle: _slotPlaystyle,
+    savedAt: Date.now(),
+    slotName: _slotLabel(slotNum),
+    gameContext: state.gameContext || 'FNV', // F5: store game context in envelope
+  };
+  if (typeof window.computeSaveChecksum === 'function') {
+    envelope.checksum = window.computeSaveChecksum(_slotState, _slotChat, _slotPlaystyle);
+  }
+  try {
+    localStorage.setItem(_slotKey(slotNum), JSON.stringify(envelope));
+    const el = document.getElementById('slotStatus');
+    const ts = new Date(envelope.savedAt).toLocaleTimeString();
+    const ctx = envelope.gameContext;
+    if (el) el.textContent = `${_slotLabel(slotNum)} [${ctx}] saved at ${ts}`;
+    appendToChat(`> [SAVE] ${_slotLabel(slotNum)} [${ctx}] written at ${ts}`, 'sys', true);
+  } catch (e) {
+    appendToChat('> [ERROR] Save slot write failed — storage quota exceeded.', 'sys', true);
+  }
+}
+
+function loadFromSlot(slotNum) {
+  const raw = localStorage.getItem(_slotKey(slotNum));
+  if (!raw) {
+    appendToChat(`> [LOAD] ${_slotLabel(slotNum)} is empty.`, 'sys', true);
+    return;
+  }
+  try {
+    let env = JSON.parse(raw);
+    // Integrity + forward-compat check before applying
+    if (typeof window.verifySaveEnvelope === 'function') {
+      const integrity = window.verifySaveEnvelope(env);
+      if (integrity.status === 'future_version') {
+        if (
+          !confirm(
+            `> VERSION MISMATCH\n\nThis save was made on a newer version of RobCo (v${integrity.version}).\nYour app is on v${APP_VERSION}.\n\nLoading may cause data loss — update the app first.\n\nForce-load anyway?`
+          )
+        )
+          return;
+      } else if (integrity.status === 'checksum_mismatch') {
+        if (
+          !confirm(
+            '> SAVE INTEGRITY WARNING\n\nThis save may be corrupt or was edited outside the app.\n\nLoad anyway? (Data may be incomplete or incorrect.)'
+          )
+        )
+          return;
+      }
+    }
+    // F5: Warn on gameContext mismatch between slot and current session
+    const slotCtx = env.gameContext || env.state?.gameContext || 'FNV';
+    const curCtx = state.gameContext || 'FNV';
+    if (slotCtx !== curCtx) {
+      const ok = confirm(
+        `> CONTEXT MISMATCH\n\nThis save is a ${slotCtx} campaign.\nYou are currently in ${curCtx} mode.\n\nLoading will switch to ${slotCtx}. Continue?`
+      );
+      if (!ok) return;
+    }
+    // Snapshot current state as rolling backup before replacing
+    if (typeof window.snapRollingBackup === 'function') window.snapRollingBackup();
+    if (typeof migrateState === 'function')
+      env.state = migrateState(env.version || '1.0', env.state);
+    state = { ...state, ...env.state };
+    if (env.chat && Array.isArray(env.chat)) restoreChatHistory(env.chat);
+    if (env.playstyle) {
+      localStorage.setItem('robco_playstyle', env.playstyle);
+      let el = document.getElementById('playstyleInput');
+      if (el) el.value = env.playstyle;
+    }
+    loadUI();
+    const ts = env.savedAt ? new Date(env.savedAt).toLocaleString() : 'unknown';
+    const ctx = slotCtx;
+    appendToChat(`> [LOAD] ${_slotLabel(slotNum)} [${ctx}] restored. Saved: ${ts}`, 'sys', true);
+    const statusEl = document.getElementById('slotStatus');
+    if (statusEl) statusEl.textContent = `${_slotLabel(slotNum)} [${ctx}] loaded (saved: ${ts})`;
+  } catch (e) {
+    appendToChat('> [ERROR] Save slot corrupted or unreadable.', 'sys', true);
+  }
+}
+
+// ── QUEST LOG HELPERS (#1) ──────────────────────────────────────────
+function addQuest() {
+  const name = ((document.getElementById('newQuestName') || {}).value?.trim() || '').slice(0, 100);
+  if (!name) return;
+  const status = (document.getElementById('newQuestStatus') || {}).value || 'active';
+  const obj = (document.getElementById('newQuestObjective') || {}).value?.trim() || null;
+  if (!state.quests) state.quests = [];
+  state.quests.push({ name, status, objective: obj });
+  document.getElementById('newQuestName').value = '';
+  document.getElementById('newQuestObjective').value = '';
+  renderQuests();
+  updateMath();
+}
+
+// ── SESSION STATISTICS HELPERS (#8) ────────────────────────────────
+function resetSessionStats() {
+  state.stats = { kills: 0, capsEarned: 0, damageDealt: 0, sessionStart: Date.now() };
+  saveState();
+  renderSessionStats();
+}
+
+// ── TOKEN BUDGET DISPLAY (#17) ────────────────────────────────────────
+// Rough estimate: 1 token ≈ 4 chars. Updates on textarea input.
+function updateTokenBudget() {
+  const el = document.getElementById('tokenBudgetDisplay');
+  if (!el) return;
+  const model = (document.getElementById('apiModelInput') || {}).value || '';
+  const ctxLimit = model.includes('1.5') ? 1000000 : model.includes('2.0') ? 1000000 : 128000;
+  // Estimate: system directive (~2,875 tokens) + databaseCSVs (~3,200 tokens, now always in systemInstruction) + chat history + state + user input
+  const directiveEst = 6500;
+  const chatEst = Math.round(chatHistory.reduce((a, m) => a + m.text.length, 0) / 4);
+  const stateEst = Math.round(JSON.stringify(state).length / 4);
+  const inputEst = Math.round((document.getElementById('chatInput')?.value?.length || 0) / 4);
+  const total = directiveEst + chatEst + stateEst + inputEst;
+  const pct = Math.round((total / ctxLimit) * 100);
+  el.textContent = `~${total.toLocaleString()} / ${(ctxLimit / 1000).toFixed(0)}K tokens (${pct}%)`;
+  el.style.color =
+    pct > 80 ? 'var(--robco-danger)' : pct > 50 ? 'var(--robco-alert)' : 'var(--robco-blue)';
+}
+
+function triggerFileInput() {
+  document.getElementById('fileInput').click();
+}
+
+// ── RESTORE ROLLING BACKUP ─────────────────────────────────────────
+// Presents the rolling backup ring and lets the user restore one — confirm-gated,
+// routed through sanitizeImportedContainer + migrateState (Protocol 34).
+function restoreRollingBackup() {
+  if (typeof window.getRollingBackups !== 'function') return;
+  const backups = window.getRollingBackups();
+  if (!backups.length) {
+    alert('>> NO BACKUP SAVES AVAILABLE <<');
+    return;
+  }
+  const listStr = backups.map((b, i) => `${i + 1}. ${b.label}`).join('\n');
+  const choice = prompt(
+    `>> SELECT BACKUP TO RESTORE:\n\n${listStr}\n\nEnter number (1–${backups.length}) or Cancel:`
+  );
+  if (!choice) return;
+  const n = parseInt(choice);
+  if (isNaN(n) || n < 1 || n > backups.length) {
+    alert('>> INVALID SELECTION <<');
+    return;
+  }
+  const backup = backups[n - 1];
+  if (
+    !confirm(
+      `>> RESTORE BACKUP FROM ${backup.label}?\n\nThis replaces your current campaign state.`
+    )
+  )
+    return;
+  try {
+    const data = backup.data;
+    const sanitized =
+      typeof sanitizeImportedContainer === 'function'
+        ? sanitizeImportedContainer(data.robco_v8)
+        : data.robco_v8;
+    if (typeof migrateState === 'function' && sanitized && sanitized.campaigns) {
+      Object.keys(sanitized.campaigns).forEach(ctx => {
+        sanitized.campaigns[ctx] = migrateState(data.version || '1.0', sanitized.campaigns[ctx]);
+      });
+    }
+    localStorage.setItem('robco_v8', JSON.stringify(sanitized));
+    if (data.chat && Array.isArray(data.chat))
+      localStorage.setItem('robco_chat', JSON.stringify(data.chat));
+    if (data.playstyle) localStorage.setItem('robco_playstyle', data.playstyle);
+    alert('>> BACKUP RESTORED. REBOOTING SYSTEM... <<');
+    window.location.reload();
+  } catch (_) {
+    appendToChat('> [SYS-ALERT: BACKUP RESTORE FAILED]', 'sys');
+  }
+}
+function restoreChatHistory(history) {
+  chatHistory = history.slice(-CHAT_MAX);
+  const chatBox = document.getElementById('chatDisplay');
+  if (chatBox) {
+    chatBox.innerHTML = '';
+    chatHistory.forEach(msg => appendToChat(msg.text, msg.sender, true));
+  }
+  clearTimeout(_chatSaveTimer);
+  localStorage.setItem('robco_chat', JSON.stringify(chatHistory));
+}
+function handleFileUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    try {
+      const parsed = JSON.parse(e.target.result);
+      if (parsed.robco_v8) {
+        // v8 Container payload — integrity check + rolling backup before applying
+        if (typeof window.verifySaveEnvelope === 'function') {
+          const _fi = window.verifySaveEnvelope(parsed);
+          if (_fi.status === 'future_version') {
+            if (
+              !confirm(
+                `> VERSION MISMATCH\n\nThis save was made on a newer version of RobCo (v${_fi.version}).\nYour app is on v${APP_VERSION}.\n\nLoading may cause data loss — update the app first.\n\nForce-load anyway?`
+              )
+            )
+              return;
+          } else if (_fi.status === 'checksum_mismatch') {
+            if (
+              !confirm(
+                '> SAVE INTEGRITY WARNING\n\nThis save may be corrupt or was edited outside the app.\n\nLoad anyway? (Data may be incomplete or incorrect.)'
+              )
+            )
+              return;
+          }
+        }
+        if (typeof window.snapRollingBackup === 'function') window.snapRollingBackup();
+        const _sanitized =
+          typeof sanitizeImportedContainer === 'function'
+            ? sanitizeImportedContainer(parsed.robco_v8)
+            : parsed.robco_v8;
+        localStorage.setItem('robco_v8', JSON.stringify(_sanitized));
+        if (parsed.chat && Array.isArray(parsed.chat))
+          localStorage.setItem('robco_chat', JSON.stringify(parsed.chat));
+        if (parsed.playstyle) localStorage.setItem('robco_playstyle', parsed.playstyle);
+        alert('>> HARD BACKUP RESTORED SUCCESSFULLY. REBOOTING SYSTEM... <<');
+        window.location.reload();
+      } else if (parsed.version && parsed.state) {
+        // Envelope format (v1.6.3+): contains state, chat, playstyle
+        autoImportState(JSON.stringify(parsed.state));
+        if (parsed.chat && Array.isArray(parsed.chat)) restoreChatHistory(parsed.chat);
+        if (parsed.playstyle) {
+          localStorage.setItem('robco_playstyle', parsed.playstyle);
+          let el = document.getElementById('playstyleInput');
+          if (el) el.value = parsed.playstyle;
+        }
+        alert('>> LEGACY BACKUP RESTORED SUCCESSFULLY <<');
+      } else {
+        // Legacy: bare state JSON
+        autoImportState(e.target.result);
+        alert('>> LEGACY BACKUP RESTORED SUCCESSFULLY <<');
+      }
+    } catch (err) {
+      appendToChat('> [SYS-ALERT: SAVE FILE CORRUPTED OR UNREADABLE]', 'sys');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function triggerImageUpload() {
+  document.getElementById('imageInput').click();
+}
+function handleImageSelection(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  attachedImageMimeType = file.type;
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    attachedImageData = e.target.result;
+    const preview = document.getElementById('imagePreview');
+    preview.src = attachedImageData;
+    preview.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── REGISTRY AUTOCOMPLETE (Phase 3) ──────────────────────────────────────────
+/**
+ * Shared singleton autocomplete panel for registry-backed text inputs.
+ * Wires #newQuestName  → quests  category
+ *       #newItemName   → items   category
+ *
+ * Behaviour:
+ *  - Triggers after 2+ chars, debounced 150 ms.
+ *  - Keyboard: ArrowUp / ArrowDown to navigate, Enter to select, Escape to dismiss.
+ *  - Click item to fill and dismiss.
+ *  - Dismisses automatically on blur (after a 100 ms grace for click events).
+ *  - Does NOT modify state, save, or undo — pure UI read-only helper.
+ */
+function initRegistryAutocomplete() {
+  // Build the singleton panel once
+  var panel = document.getElementById('acPanel');
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.id = 'acPanel';
+    panel.className = 'autocomplete-panel';
+    panel.setAttribute('role', 'listbox');
+    document.body.appendChild(panel);
+  }
+
+  var _acTimer = null;
+  var _acActiveIdx = -1;
+  var _acResults = [];
+  var _acCurrentInput = null;
+
+  function acHide() {
+    panel.classList.remove('ac-visible');
+    _acActiveIdx = -1;
+    _acResults = [];
+    _acCurrentInput = null;
+  }
+
+  function acPosition(inputEl) {
+    var rect = inputEl.getBoundingClientRect();
+    panel.style.top = rect.bottom + 2 + 'px';
+    panel.style.left = rect.left + 'px';
+    // Clamp to viewport right edge
+    var panelW = Math.min(340, Math.max(220, rect.width));
+    panel.style.width = panelW + 'px';
+  }
+
+  function acRender(results, inputEl) {
+    _acResults = results;
+    _acActiveIdx = -1;
+    panel.innerHTML = '';
+
+    if (!results.length) {
+      var empty = document.createElement('div');
+      empty.className = 'ac-empty';
+      empty.textContent = 'No matches';
+      panel.appendChild(empty);
+    } else {
+      results.forEach(function (entry, i) {
+        var item = document.createElement('div');
+        item.className = 'ac-item';
+        item.setAttribute('role', 'option');
+        item.dataset.idx = i;
+
+        var nameSpan = document.createElement('span');
+        nameSpan.className = 'ac-item-name';
+        nameSpan.textContent = entry.name;
+
+        var tagSpan = document.createElement('span');
+        tagSpan.className = 'ac-item-tag';
+        // Show type or dlc as a tag hint
+        var tag = entry.type || '';
+        if (entry.dlc) tag += ' [' + entry.dlc.toUpperCase() + ']';
+        if (entry.level > 0) tag += ' L' + entry.level;
+        tagSpan.textContent = tag;
+
+        item.appendChild(nameSpan);
+        if (tag) item.appendChild(tagSpan);
+
+        item.addEventListener('mousedown', function (e) {
+          // Use mousedown so it fires before blur
+          e.preventDefault();
+          if (_acCurrentInput) {
+            _acCurrentInput.value = entry.name;
+            // Trigger input event so any live listeners see the change
+            _acCurrentInput.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+          acHide();
+        });
+
+        panel.appendChild(item);
+      });
+    }
+
+    acPosition(inputEl);
+    panel.classList.add('ac-visible');
+  }
+
+  function acSetActive(idx) {
+    var items = panel.querySelectorAll('.ac-item');
+    items.forEach(function (el) {
+      el.classList.remove('ac-active');
+    });
+    if (idx >= 0 && idx < items.length) {
+      items[idx].classList.add('ac-active');
+      items[idx].scrollIntoView({ block: 'nearest' });
+    }
+    _acActiveIdx = idx;
+  }
+
+  function wireInput(inputId, category) {
+    var el = document.getElementById(inputId);
+    if (!el) return;
+
+    el.addEventListener('input', function () {
+      clearTimeout(_acTimer);
+      var q = el.value;
+      if (q.length < 2) {
+        acHide();
+        return;
+      }
+      _acCurrentInput = el;
+      _acTimer = setTimeout(function () {
+        var results = registrySearch(category, q);
+        acRender(results, el);
+      }, 150);
+    });
+
+    el.addEventListener('keydown', function (e) {
+      if (!panel.classList.contains('ac-visible')) return;
+      var itemCount = _acResults.length;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        acSetActive(Math.min(_acActiveIdx + 1, itemCount - 1));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        acSetActive(Math.max(_acActiveIdx - 1, 0));
+      } else if (e.key === 'Enter') {
+        if (_acActiveIdx >= 0 && _acResults[_acActiveIdx]) {
+          e.preventDefault();
+          el.value = _acResults[_acActiveIdx].name;
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          acHide();
+        }
+      } else if (e.key === 'Escape') {
+        acHide();
+      }
+    });
+
+    el.addEventListener('blur', function () {
+      // 100 ms grace: mousedown on an item fires before blur resolves
+      setTimeout(acHide, 120);
+    });
+
+    el.addEventListener('focus', function () {
+      // Reopen if there's already enough text (e.g. user tabbed back)
+      var q = el.value;
+      if (q.length >= 2) {
+        _acCurrentInput = el;
+        var results = registrySearch(category, q);
+        if (results.length) acRender(results, el);
+      }
+    });
+  }
+
+  // Wire all three registry-backed inputs
+  wireInput('newQuestName', 'quests');
+  wireInput('newItemName', 'items');
+  wireInput('newPerkName', 'perks');
+
+  // Reposition on scroll/resize so the panel doesn't orphan
+  window.addEventListener(
+    'scroll',
+    function () {
+      if (_acCurrentInput && panel.classList.contains('ac-visible')) {
+        acPosition(_acCurrentInput);
+      }
+    },
+    { passive: true }
+  );
+  window.addEventListener('resize', function () {
+    if (_acCurrentInput && panel.classList.contains('ac-visible')) {
+      acPosition(_acCurrentInput);
+    }
+  });
+}
+
+// ── AMMO DATALIST ─────────────────────────────────────────────────────────
+// Populates the #ammoCalibers <datalist> with unique caliber names from
+// AMMO.CSV in database.js. Called once on window.onload.
+function initAmmoDatalist() {
+  const dl = document.getElementById('ammoCalibers');
+  if (!dl) return;
+  if (typeof getAmmoCalibers !== 'function') return;
+  const calibers = getAmmoCalibers();
+  dl.innerHTML = calibers.map(c => `<option value="${c}"></option>`).join('');
+}

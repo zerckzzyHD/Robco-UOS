@@ -1273,7 +1273,7 @@ Check ([bool]($regNvSrc35 -match '_registrySearchCache')) 'registrySearch has _r
 # 4 tests
 # ===========================================================
 Sep "Suite 36 -- Keyboard Shortcuts Group"
-$uiSrc36 = Read-Src 'js/ui.js'
+$uiSrc36 = Read-Src 'js/ui.js'  # COMMAND_REGISTRY and keydown listener still in ui.js
 
 # 36.1 COMMAND_REGISTRY contains a KEYBOARD SHORTCUTS group
 $cmdRegM36 = [regex]::Match($uiSrc36, 'const COMMAND_REGISTRY\s*=\s*\[[\s\S]*?\];')
@@ -1281,7 +1281,7 @@ $cmdRegSrc36 = if ($cmdRegM36.Success) { $cmdRegM36.Value } else { '' }
 Check ([bool]($cmdRegSrc36 -match "['`"]KEYBOARD SHORTCUTS['`"]")) "COMMAND_REGISTRY has a 'KEYBOARD SHORTCUTS' group (Suite 36)"
 
 # 36.2 KEYBOARD SHORTCUTS group has >=6 entries
-$kbM36 = [regex]::Match($uiSrc36, "group\s*:\s*['\`"]KEYBOARD SHORTCUTS['\`"][\s\S]*?cmds\s*:\s*\[([\s\S]*?)\]\s*\}")
+$kbM36 = [regex]::Match($uiSrc36, "group\s*:\s*['\`"]KEYBOARD SHORTCUTS['\`"][\s\S]*?cmds\s*:\s*\[([\s\S]*?)\],?\s*\}")
 $kbCmds36 = if ($kbM36.Success) { $kbM36.Groups[1].Value } else { '' }
 $kbCount36 = ([regex]::Matches($kbCmds36, 'cmd\s*:')).Count
 Check ($kbCount36 -ge 6) "KEYBOARD SHORTCUTS group has >=6 entries (found $kbCount36)"
@@ -2269,7 +2269,7 @@ Check ($installHooksSrc50 -match 'pre-push') `
 Sep "Suite 51 -- Save Integrity + Rolling Backups"
 
 $stateSrc51 = Read-Src "js/state.js"
-$uiSrc51    = Read-Src "js/ui.js"
+$uiSrc51    = $uiSrc  # concatenated -- save functions now in ui-saves.js
 $cloudSrc51 = Read-Src "js/cloud.js"
 $indexSrc51 = Read-Src "index.html"
 
@@ -2891,7 +2891,7 @@ Check ([bool]($htmlSrc55 -match 'img-src[^;]*blob:')) `
 # Suite 56 -- UI Module Split Guards
 # Protocol-20 static guards: each ui-*.js must exist, appear
 # in sw.js ASSETS, and be wired in index.html before api.js.
-# 10 tests
+# 15 tests
 # ===========================================================
 Sep "Suite 56 -- UI Module Split Guards"
 $htmlSrc56 = $htmlSrc55  # reuse (same index.html read above)
@@ -2944,6 +2944,26 @@ $renderIdx56b = $htmlSrc56.IndexOf('js/ui-render.js')
 $uiIdx56b     = $htmlSrc56.IndexOf('"js/ui.js"')
 Check ($renderIdx56b -ne -1 -and $uiIdx56b -ne -1 -and $renderIdx56b -lt $uiIdx56b) `
     "ui-render.js <script> appears before ui.js in index.html (render loads before core)"
+
+# 56.11 js/ui-saves.js file exists on disk
+Check (Test-Path (Join-Path $Root "js\ui-saves.js")) `
+    "js/ui-saves.js file exists (Slice C: saves module extracted)"
+# 56.12 ./js/ui-saves.js appears in sw.js ASSETS list
+Check ([bool]($swSrc56 -match 'js/ui-saves\.js')) `
+    "'./js/ui-saves.js' in sw.js ASSETS (cache covers the saves module)"
+# 56.13 <script src="js/ui-saves.js"> appears in index.html
+Check ([bool]($htmlSrc56 -match 'src="js/ui-saves\.js"')) `
+    '<script src="js/ui-saves.js"> present in index.html'
+# 56.14 ui-saves.js script appears before api.js in index.html
+$savesIdx56  = $htmlSrc56.IndexOf('js/ui-saves.js')
+$apiIdx56c   = $htmlSrc56.IndexOf('js/api.js')
+Check ($savesIdx56 -ne -1 -and $apiIdx56c -ne -1 -and $savesIdx56 -lt $apiIdx56c) `
+    "ui-saves.js <script> appears before api.js in index.html (load-order guard)"
+# 56.15 ui-saves.js script appears before ui.js in index.html
+$savesIdx56b = $htmlSrc56.IndexOf('js/ui-saves.js')
+$uiIdx56c    = $htmlSrc56.IndexOf('"js/ui.js"')
+Check ($savesIdx56b -ne -1 -and $uiIdx56c -ne -1 -and $savesIdx56b -lt $uiIdx56c) `
+    "ui-saves.js <script> appears before ui.js in index.html (saves loads before core)"
 
 # ===========================================================
 # Results

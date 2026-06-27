@@ -109,6 +109,11 @@ export default [
         playBootDrone: 'readonly',
         startThermalLoad: 'readonly',
         stopThermalLoad: 'readonly',
+        // Saves module cross-file globals (js/ui-saves.js ↔ js/ui.js)
+        CHAT_MAX: 'readonly',
+        _chatSaveTimer: 'writable',
+        initRegistryAutocomplete: 'readonly',
+        restoreRollingBackup: 'readonly',
         // Render module cross-file globals (js/ui-render.js ↔ js/ui.js)
         _invFilter: 'writable',
         _updatePanelBadges: 'readonly',

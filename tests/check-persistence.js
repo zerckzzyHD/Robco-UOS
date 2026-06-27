@@ -2168,7 +2168,7 @@ assert(
 // ══════════════════════════════════════════════════════════════
 header('Keyboard Shortcuts Group');
 {
-  const uiSrc36 = readFile('js/ui.js');
+  const uiSrc36 = readFile('js/ui.js'); // COMMAND_REGISTRY and keydown listener still in ui.js
 
   // 36.1 COMMAND_REGISTRY contains a KEYBOARD SHORTCUTS group
   const cmdRegM36 = uiSrc36.match(/const COMMAND_REGISTRY\s*=\s*\[[\s\S]*?\];/);
@@ -2181,7 +2181,7 @@ header('Keyboard Shortcuts Group');
   // 36.2 KEYBOARD SHORTCUTS group has ≥6 entries
   {
     const kbM = uiSrc36.match(
-      /group\s*:\s*['"]KEYBOARD SHORTCUTS['"][\s\S]*?cmds\s*:\s*\[([\s\S]*?)\]\s*\}/
+      /group\s*:\s*['"]KEYBOARD SHORTCUTS['"][\s\S]*?cmds\s*:\s*\[([\s\S]*?)\],?\s*\}/
     );
     const kbCmds = kbM ? kbM[1] : '';
     const entryCount = (kbCmds.match(/cmd\s*:/g) || []).length;
@@ -3711,7 +3711,7 @@ header('Suite 50 — Gate Parity Guards (Protocol 36)');
 header('Suite 51 — Save Integrity + Rolling Backups');
 {
   const stateSrc51 = readFile('js/state.js');
-  const uiSrc51 = readFile('js/ui.js');
+  const uiSrc51 = uiSource; // concatenated — save functions now in ui-saves.js
   const cloudSrc51 = readFile('js/cloud.js');
   const indexSrc51 = readFile('index.html');
 
@@ -4803,7 +4803,7 @@ header('Suite 55 — CSP Stage 1 Origin Guards + Firebase Pin');
 //  Suite 56 — UI Module Split Guards
 //  Protocol-20 static guards: each ui-*.js must exist, appear
 //  in sw.js ASSETS, and be wired in index.html before api.js.
-// 10 tests
+// 15 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 56 — UI Module Split Guards');
 {
@@ -4883,6 +4883,44 @@ header('Suite 56 — UI Module Split Guards');
     assert(
       renderIdx56b !== -1 && uiIdx56b !== -1 && renderIdx56b < uiIdx56b,
       'ui-render.js <script> appears before ui.js in index.html (render loads before core)'
+    );
+  }
+
+  // 56.11 js/ui-saves.js file exists on disk
+  assert(
+    fs.existsSync(path.join(ROOT, 'js/ui-saves.js')),
+    'js/ui-saves.js file exists (Slice C: saves module extracted)'
+  );
+
+  // 56.12 ./js/ui-saves.js appears in sw.js ASSETS list
+  assert(
+    /['"]\.\/js\/ui-saves\.js['"]/.test(swSrc56),
+    "'./js/ui-saves.js' in sw.js ASSETS (cache covers the saves module)"
+  );
+
+  // 56.13 <script src="js/ui-saves.js"> appears in index.html
+  assert(
+    /src=['"]js\/ui-saves\.js['"]/.test(htmlSrc56),
+    '<script src="js/ui-saves.js"> present in index.html'
+  );
+
+  // 56.14 ui-saves.js script appears before api.js in index.html
+  {
+    const savesIdx56 = htmlSrc56.indexOf('js/ui-saves.js');
+    const apiIdx56c = htmlSrc56.indexOf('js/api.js');
+    assert(
+      savesIdx56 !== -1 && apiIdx56c !== -1 && savesIdx56 < apiIdx56c,
+      'ui-saves.js <script> appears before api.js in index.html (load-order guard)'
+    );
+  }
+
+  // 56.15 ui-saves.js script appears before ui.js in index.html
+  {
+    const savesIdx56b = htmlSrc56.indexOf('js/ui-saves.js');
+    const uiIdx56c = htmlSrc56.indexOf('"js/ui.js"');
+    assert(
+      savesIdx56b !== -1 && uiIdx56c !== -1 && savesIdx56b < uiIdx56c,
+      'ui-saves.js <script> appears before ui.js in index.html (saves loads before core)'
     );
   }
 }
