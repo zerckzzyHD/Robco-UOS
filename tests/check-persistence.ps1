@@ -3390,20 +3390,21 @@ Check ([bool]($htmlSrc -match 'id="btnSaveToCloud"')) `
     'index.html has #btnSaveToCloud button (replaces btnCloudPush -- additive save to cloud)'
 
 # ===========================================================
-# Suite 64 -- SPECIAL stats editable (commit-on-blur) guards (Phase 6 Task 1)
-# commitStat replaces clampStat; no snap-to-1 mid-edit; validate on blur only
-# 9 tests
+# Suite 64 -- SPECIAL stats editable (commit-on-blur) guards (Phase 6 Task 1+follow-up)
+# commitStat replaces clampStat; capStatMax upper cap on input; syncStateFromDom clamp
+# 13 tests
 # ===========================================================
 Sep "Suite 64 -- SPECIAL stats editable (commit-on-blur) guards"
 $uiCoreSrc64 = Read-Src "js\ui-core.js"
 $specialIds64 = @('s_s','s_p','s_e','s_c','s_i','s_a','s_l')
 
 # 64.1  All 7 SPECIAL inputs have onchange="commitStat(this)"
+# 750 total window (200 before + 550 after) accommodates multiline oninput Prettier expands
 $missing641 = $specialIds64 | Where-Object {
     $id = $_
     $idIdx = $htmlSrc.IndexOf("id=""$id""")
     if ($idIdx -lt 0) { return $true }
-    $slice = $htmlSrc.Substring([Math]::Max(0, $idIdx - 200), [Math]::Min(500, $htmlSrc.Length - [Math]::Max(0, $idIdx - 200)))
+    $slice = $htmlSrc.Substring([Math]::Max(0, $idIdx - 200), [Math]::Min(750, $htmlSrc.Length - [Math]::Max(0, $idIdx - 200)))
     -not ($slice -match 'onchange="commitStat\(this\)"')
 }
 Check ($missing641.Count -eq 0) `
@@ -3414,8 +3415,9 @@ $broken642 = $specialIds64 | Where-Object {
     $id = $_
     $idIdx = $htmlSrc.IndexOf("id=""$id""")
     if ($idIdx -lt 0) { return $false }
-    $slice = $htmlSrc.Substring([Math]::Max(0, $idIdx - 200), [Math]::Min(500, $htmlSrc.Length - [Math]::Max(0, $idIdx - 200)))
-    $slice -match 'oninput="[^"]*clampStat'
+    $slice = $htmlSrc.Substring([Math]::Max(0, $idIdx - 200), [Math]::Min(750, $htmlSrc.Length - [Math]::Max(0, $idIdx - 200)))
+    $attrM642 = [regex]::Match($slice, '(?s)oninput\s*=\s*"([^"]*)"')
+    $attrM642.Success -and ($attrM642.Groups[1].Value -match 'clampStat')
 }
 Check ($broken642.Count -eq 0) `
     ("No SPECIAL input oninput contains clampStat (snap-to-1 regression guard)" + $(if ($broken642.Count) { " -- found in: $($broken642 -join ', ')" } else { "" }))
@@ -3449,7 +3451,7 @@ $missing648 = $specialIds64 | Where-Object {
     $id = $_
     $idIdx = $htmlSrc.IndexOf("id=""$id""")
     if ($idIdx -lt 0) { return $true }
-    $slice = $htmlSrc.Substring([Math]::Max(0, $idIdx - 200), [Math]::Min(500, $htmlSrc.Length - [Math]::Max(0, $idIdx - 200)))
+    $slice = $htmlSrc.Substring([Math]::Max(0, $idIdx - 200), [Math]::Min(750, $htmlSrc.Length - [Math]::Max(0, $idIdx - 200)))
     -not ($slice -match 'inputmode="numeric"')
 }
 Check ($missing648.Count -eq 0) `
@@ -3458,6 +3460,35 @@ Check ($missing648.Count -eq 0) `
 # 64.9  clampStat is NOT defined (fully removed -- regression guard)
 Check (-not ([bool]($uiCoreSrc64 -match 'function clampStat\s*\('))) `
     'clampStat is not defined in ui-core.js (removed -- regression guard)'
+
+# 64.10  capStatMax is defined in ui-core.js
+Check ([bool]($uiCoreSrc64 -match 'function capStatMax\s*\(')) `
+    'capStatMax is defined in ui-core.js (upper-only cap on input)'
+
+# 64.11  capStatMax has n>10 upper-only guard and no lower-bound force
+$capBody64 = ''
+try { $capBody64 = Get-FunctionBody $uiCoreSrc64 'capStatMax' } catch {}
+Check (([bool]($capBody64 -match 'n\s*>\s*10')) -and -not ([bool]($capBody64 -match 'n\s*<\s*1'))) `
+    'capStatMax caps at 10 only (n>10 guard present; no lower-bound n<1 force -- deletion works)'
+
+# 64.12  All 7 SPECIAL inputs oninput contains capStatMax (multi-line attr safe)
+$missing6412 = $specialIds64 | Where-Object {
+    $id = $_
+    $idIdx = $htmlSrc.IndexOf("id=""$id""")
+    if ($idIdx -lt 0) { return $true }
+    $slice = $htmlSrc.Substring([Math]::Max(0, $idIdx - 200), [Math]::Min(750, $htmlSrc.Length - [Math]::Max(0, $idIdx - 200)))
+    $attrM = [regex]::Match($slice, '(?s)oninput\s*=\s*"([^"]*)"')
+    -not ($attrM.Success -and ($attrM.Groups[1].Value -match 'capStatMax'))
+}
+Check ($missing6412.Count -eq 0) `
+    ("All 7 SPECIAL inputs oninput contains capStatMax (live upper-cap guard)" + $(if ($missing6412.Count) { " -- missing: $($missing6412 -join ', ')" } else { "" }))
+
+# 64.13  syncStateFromDom clamps SPECIAL reads to 1-10 (defense-in-depth)
+$stateSrc64 = Read-Src "js\state.js"
+$syncBody64 = ''
+try { $syncBody64 = Get-FunctionBody $stateSrc64 'syncStateFromDom' } catch {}
+Check ([bool]($syncBody64 -match 'Math\.max\s*\(\s*1,\s*Math\.min\s*\(\s*10,' -or $syncBody64 -match 'Math\.Max\s*\(\s*1,\s*Math\.Min\s*\(\s*10,')) `
+    'syncStateFromDom clamps SPECIAL reads to 1-10 (defense-in-depth: no save path leaks >10)'
 
 # ===========================================================
 # Results

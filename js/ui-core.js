@@ -1205,6 +1205,10 @@ function showHelpModal() {
     '</div><p style="font-size:9px;opacity:0.6;margin-top:8px;">Type any command in the Comm-Link input to execute.</p>';
   modal.style.display = 'flex';
 }
+function capStatMax(el) {
+  const n = parseInt(el.value, 10);
+  if (!isNaN(n) && n > 10) el.value = '10';
+}
 function commitStat(el) {
   const k = el.id.slice(2);
   let v = parseInt(el.value, 10);

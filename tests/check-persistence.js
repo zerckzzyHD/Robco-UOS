@@ -5622,9 +5622,9 @@ header('Suite 63 — Save/Cloud UI consolidation guards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 64 — SPECIAL stats editable (commit-on-blur) guards (Phase 6 Task 1)
-//  commitStat replaces clampStat; no snap-to-1 mid-edit; validate on blur only
-//  9 tests
+//  Suite 64 — SPECIAL stats editable (commit-on-blur) guards (Phase 6 Task 1+follow-up)
+//  commitStat replaces clampStat; capStatMax upper cap on input; syncStateFromDom clamp
+//  13 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 {
@@ -5636,7 +5636,8 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     const missing = specialIds.filter(id => {
       const idIdx = htmlSource.indexOf(`id="${id}"`);
       if (idIdx === -1) return true;
-      const slice = htmlSource.slice(Math.max(0, idIdx - 200), idIdx + 300);
+      // 550 chars after id accommodates the multiline oninput attribute that Prettier expands
+      const slice = htmlSource.slice(Math.max(0, idIdx - 200), idIdx + 550);
       return !/onchange="commitStat\(this\)"/.test(slice);
     });
     assert(
@@ -5651,8 +5652,9 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     const broken = specialIds.filter(id => {
       const idIdx = htmlSource.indexOf(`id="${id}"`);
       if (idIdx === -1) return false;
-      const slice = htmlSource.slice(Math.max(0, idIdx - 200), idIdx + 300);
-      return /oninput="[^"]*clampStat/.test(slice);
+      const slice = htmlSource.slice(Math.max(0, idIdx - 200), idIdx + 550);
+      const oinputM = slice.match(/oninput\s*=\s*"([^"]*)"/s);
+      return !!oinputM && /clampStat/.test(oinputM[1]);
     });
     assert(
       broken.length === 0,
@@ -5703,7 +5705,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     const missing = specialIds.filter(id => {
       const idIdx = htmlSource.indexOf(`id="${id}"`);
       if (idIdx === -1) return true;
-      const slice = htmlSource.slice(Math.max(0, idIdx - 200), idIdx + 300);
+      const slice = htmlSource.slice(Math.max(0, idIdx - 200), idIdx + 550);
       return !/inputmode="numeric"/.test(slice);
     });
     assert(
@@ -5718,6 +5720,55 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     !/function clampStat\s*\(/.test(uiCoreSrc64),
     'clampStat is not defined in ui-core.js (removed — regression guard)'
   );
+
+  // 64.10  capStatMax is defined in ui-core.js
+  assert(
+    /function capStatMax\s*\(/.test(uiCoreSrc64),
+    'capStatMax is defined in ui-core.js (upper-only cap on input)'
+  );
+
+  // 64.11  capStatMax has n>10 upper-only guard and no lower-bound force
+  {
+    let capBody = '';
+    try {
+      capBody = extractFunctionBody(uiCoreSrc64, 'capStatMax');
+    } catch (_) {}
+    assert(
+      /n\s*>\s*10/.test(capBody) && !/n\s*<\s*1/.test(capBody),
+      'capStatMax caps at 10 only (n>10 guard present; no lower-bound n<1 force — deletion works)'
+    );
+  }
+
+  // 64.12  All 7 SPECIAL inputs oninput contains capStatMax
+  {
+    const missing = specialIds.filter(id => {
+      const idIdx = htmlSource.indexOf(`id="${id}"`);
+      if (idIdx === -1) return true;
+      const slice = htmlSource.slice(Math.max(0, idIdx - 200), idIdx + 300);
+      // oninput may be multi-line (Prettier); search for capStatMax anywhere in
+      // the attribute value (between oninput=" and the closing ")
+      const oinputM = slice.match(/oninput\s*=\s*"([^"]*)"/s);
+      return !oinputM || !/capStatMax/.test(oinputM[1]);
+    });
+    assert(
+      missing.length === 0,
+      'All 7 SPECIAL inputs oninput contains capStatMax (live upper-cap guard)' +
+        (missing.length ? ' — missing: ' + missing.join(', ') : '')
+    );
+  }
+
+  // 64.13  syncStateFromDom clamps SPECIAL reads to 1–10 (defense-in-depth)
+  {
+    const stateSrc64 = readFile('js/state.js');
+    let syncBody = '';
+    try {
+      syncBody = extractFunctionBody(stateSrc64, 'syncStateFromDom');
+    } catch (_) {}
+    assert(
+      /Math\.max\s*\(\s*1,\s*Math\.min\s*\(\s*10,/.test(syncBody),
+      'syncStateFromDom clamps SPECIAL reads to 1–10 (defense-in-depth: no save path leaks >10)'
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

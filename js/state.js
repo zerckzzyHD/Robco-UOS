@@ -373,9 +373,10 @@ function syncStateFromDom() {
   state.xp = parseInt(document.getElementById('stat_xp').value) || 0;
   state.hpCur = parseInt(document.getElementById('stat_hp_cur').value) || 0;
   state.hpMax = parseInt(document.getElementById('stat_hp_max').value) || 100;
-  ['s', 'p', 'e', 'c', 'i', 'a', 'l'].forEach(
-    k => (state[k] = parseInt(document.getElementById('s_' + k).value) || 5)
-  );
+  ['s', 'p', 'e', 'c', 'i', 'a', 'l'].forEach(k => {
+    const _n = parseInt(document.getElementById('s_' + k).value, 10);
+    state[k] = isNaN(_n) ? 5 : Math.max(1, Math.min(10, _n));
+  });
   state.caps = parseInt(document.getElementById('c_caps').value) || 0;
   state.loc = document.getElementById('stat_loc').value;
   state.rads = parseInt(document.getElementById('stat_rads').value) || 0;
