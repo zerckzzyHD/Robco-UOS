@@ -1,4 +1,4 @@
-## [v2.5.0] — Unreleased<!-- Tests: 540/540 | Cache: robco-terminal-v2.0.1-r57 -->
+## [v2.5.0] — Unreleased<!-- Tests: 544/544 | Cache: robco-terminal-v2.0.1-r57 -->
 
 ### Added
 
@@ -13,6 +13,7 @@
 
 - Added 10 automated guard tests (Suite 47, 529 total across 51 suites) verifying that the Gemini key is never synced to Firestore for anonymous users or when the sync toggle is off, the toggle persists correctly, the AI Studio link is present with the correct security attributes, and the picker date-duplication regression cannot silently return.
 - Added a remote kill-switch and client auto-disable system (Suite 48, 540 total across 52 suites). A public Firestore document lets the operator disable individual features without a redeploy — each disabled feature shows a clear message and leaves local data untouched. If a feature fails three times in a session, the client pauses it automatically until reload. The app reads the config on boot without blocking start-up; when the config is absent or unreachable, all features stay on (fail-open). Added the /config/flags security rules and Protocol 35 defining the live-flip-first regression response.
+- Hardened the repo and CI pipeline (Suite 49, 544 total across 53 suites): asset-manifest completeness now fails if any JS or CSS file is missing from the service-worker cache list, a Firestore safety check prevents broad write-access rules from shipping silently, and the release workflow now only creates a version tag when CI passes. Added a pre-commit secret scan that blocks private keys and stray API keys before they enter version control. Added Dependabot tracking for GitHub Actions, set least-privilege read-only permissions on the CI workflow, and added LICENSE, SECURITY.md, and .editorconfig to the repo.
 
 ---
 

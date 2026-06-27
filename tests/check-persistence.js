@@ -1578,17 +1578,18 @@ header('Meta / Runner Parity');
     'Suite 39',
     'Suite 40',
     'Suite 41',
+    'Suite 49',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-40)' +
+    'JS runner contains all gate-guard suites (22-41, 49)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-40)' +
+    'PS runner contains all gate-guard suites (22-41, 49)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -3529,6 +3530,66 @@ header('Remote Kill-Switch + Client Auto-Disable (Protocol 32/35)');
       /allow\s+read\s*:\s*if\s+true/.test(rulesSrc48) &&
       /allow\s+write\s*:\s*if\s+false/.test(rulesSrc48),
     'firestore.rules has /config/{doc} rule: allow read if true, allow write if false (public read, console-only write)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 49 — CI / Repo Hardening Guards (Q-series)
+//  Asset-manifest completeness, Firestore no-allow-all, release.yml CI gating.
+//  4 tests
+// ══════════════════════════════════════════════════════════════
+header('Suite 49 — CI / Repo Hardening Guards');
+{
+  const swSrc49 = readFile('sw.js');
+  const assetsM49 = swSrc49.match(/const ASSETS\s*=\s*\[([\s\S]*?)\];/);
+  const assetsSet49 = new Set();
+  if (assetsM49) {
+    for (const m of assetsM49[1].matchAll(/'([^']+)'/g)) assetsSet49.add(m[1]);
+  }
+
+  // 49.1  Every js/ file is listed in sw.js ASSETS
+  const jsFiles49 = fs.readdirSync(path.join(ROOT, 'js')).filter(f => f.endsWith('.js'));
+  const jsMissing49 = jsFiles49.filter(f => !assetsSet49.has('./js/' + f));
+  assert(
+    jsMissing49.length === 0,
+    'All js/ files listed in sw.js ASSETS (asset-manifest completeness)' +
+      (jsMissing49.length ? ' — missing: ' + jsMissing49.join(', ') : '')
+  );
+
+  // 49.2  Every css/ file is listed in sw.js ASSETS
+  const cssFiles49 = fs.readdirSync(path.join(ROOT, 'css')).filter(f => f.endsWith('.css'));
+  const cssMissing49 = cssFiles49.filter(f => !assetsSet49.has('./css/' + f));
+  assert(
+    cssMissing49.length === 0,
+    'All css/ files listed in sw.js ASSETS (asset-manifest completeness)' +
+      (cssMissing49.length ? ' — missing: ' + cssMissing49.join(', ') : '')
+  );
+
+  // 49.3  firestore.rules has no dangerous broad write grants
+  //       Fails on: allow write: if true  |  allow read, write: if true
+  //       Fails on: allow (read,)write: if request.auth != null  WITHOUT == uid on the same line
+  //       Passes:   allow read: if true  (read-only public config — intentional)
+  //       Passes:   allow read, write: if request.auth != null && request.auth.uid == uid
+  const rulesSource49 = fs.existsSync(path.join(ROOT, 'firestore.rules'))
+    ? fs.readFileSync(path.join(ROOT, 'firestore.rules'), 'utf8')
+    : '';
+  const hasWriteAllowAll49 = /allow\s+(read\s*,\s*write|write)\s*:\s*if\s+true/.test(rulesSource49);
+  const hasUnscopedAuthGrant49 = rulesSource49.split('\n').some(line => {
+    if (/allow\s+(read\s*,\s*write|write)\s*:\s*if\s+request\.auth\s*!=\s*null/.test(line)) {
+      return !/==\s*uid|uid\s*==/.test(line);
+    }
+    return false;
+  });
+  assert(
+    !hasWriteAllowAll49 && !hasUnscopedAuthGrant49,
+    'firestore.rules has no dangerous broad write grants (no allow-all or unscoped auth-only write)'
+  );
+
+  // 49.4  release.yml is gated on CI via workflow_run + conclusion == 'success'
+  const releaseSrc49 = readFile('.github/workflows/release.yml');
+  assert(
+    /workflow_run/.test(releaseSrc49) && /conclusion\s*==\s*['"]success['"]/.test(releaseSrc49),
+    "release.yml uses workflow_run trigger with conclusion == 'success' (release gated on CI)"
   );
 }
 

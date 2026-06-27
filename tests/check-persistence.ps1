@@ -967,11 +967,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-40)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-40)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -2161,6 +2161,51 @@ Check (([bool]($cloudSrc -match 'function _recordFeatureFailure')) -and ([bool](
 # 48.11  firestore.rules has /config/{...} with allow read: if true AND allow write: if false
 Check (([bool]($rulesSrc48 -match 'match\s*/config/\{')) -and ([bool]($rulesSrc48 -match 'allow\s+read\s*:\s*if\s+true')) -and ([bool]($rulesSrc48 -match 'allow\s+write\s*:\s*if\s+false'))) `
     'firestore.rules has /config/{doc} rule: allow read if true, allow write if false (public read, console-only write)'
+
+# ===========================================================
+# Suite 49 -- CI / Repo Hardening Guards (Q-series)
+# Asset-manifest completeness, Firestore no-allow-all, release.yml CI gating.
+# 4 tests
+# ===========================================================
+Sep "Suite 49 -- CI / Repo Hardening Guards"
+
+$swSrc49 = Read-Src "sw.js"
+$assetsBlockM49 = [regex]::Match($swSrc49, '(?s)const ASSETS\s*=\s*\[(.*?)\];')
+$assetsSet49 = [System.Collections.Generic.HashSet[string]]::new()
+if ($assetsBlockM49.Success) {
+    [regex]::Matches($assetsBlockM49.Groups[1].Value, "'([^']+)'") | ForEach-Object { [void]$assetsSet49.Add($_.Groups[1].Value) }
+}
+
+# 49.1  All js/ files listed in sw.js ASSETS
+$jsFiles49 = Get-ChildItem (Join-Path $Root "js") -File -Filter "*.js" | Select-Object -ExpandProperty Name
+$jsMissing49 = @($jsFiles49 | Where-Object { -not $assetsSet49.Contains("./js/$_") })
+Check ($jsMissing49.Count -eq 0) ("All js/ files listed in sw.js ASSETS (asset-manifest completeness)" + $(if ($jsMissing49.Count) { " -- missing: " + ($jsMissing49 -join ", ") } else { "" }))
+
+# 49.2  All css/ files listed in sw.js ASSETS
+$cssFiles49 = Get-ChildItem (Join-Path $Root "css") -File -Filter "*.css" | Select-Object -ExpandProperty Name
+$cssMissing49 = @($cssFiles49 | Where-Object { -not $assetsSet49.Contains("./css/$_") })
+Check ($cssMissing49.Count -eq 0) ("All css/ files listed in sw.js ASSETS (asset-manifest completeness)" + $(if ($cssMissing49.Count) { " -- missing: " + ($cssMissing49 -join ", ") } else { "" }))
+
+# 49.3  firestore.rules has no dangerous broad write grants
+#        Fails on: allow write: if true  |  allow read, write: if true
+#        Fails on: allow (read,)write: if request.auth != null  WITHOUT == uid on the same line
+#        Passes:   allow read: if true  (read-only public config -- intentional)
+#        Passes:   allow read, write: if request.auth != null && request.auth.uid == uid
+$rulesSrc49 = ''
+$rulesPath49 = Join-Path $Root 'firestore.rules'
+if (Test-Path $rulesPath49) { $rulesSrc49 = [IO.File]::ReadAllText($rulesPath49) }
+$hasWriteAllowAll49 = [bool]($rulesSrc49 -match 'allow\s+(read\s*,\s*write|write)\s*:\s*if\s+true')
+$hasUnscopedAuth49 = @(($rulesSrc49 -split "`n") | Where-Object {
+    ($_ -match 'allow\s+(read\s*,\s*write|write)\s*:\s*if\s+request\.auth\s*!=\s*null') -and
+    ($_ -notmatch '==\s*uid|uid\s*==')
+})
+Check ((-not $hasWriteAllowAll49) -and ($hasUnscopedAuth49.Count -eq 0)) `
+    "firestore.rules has no dangerous broad write grants (no allow-all or unscoped auth-only write)"
+
+# 49.4  release.yml is gated on CI via workflow_run + conclusion == 'success'
+$releaseSrc49 = Read-Src ".github/workflows/release.yml"
+Check (([bool]($releaseSrc49 -match 'workflow_run')) -and ([bool]($releaseSrc49 -match "conclusion\s*==\s*'success'"))) `
+    "release.yml uses workflow_run trigger with conclusion == 'success' (release gated on CI)"
 
 # ===========================================================
 # Results
