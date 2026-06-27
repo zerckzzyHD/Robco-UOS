@@ -4803,7 +4803,7 @@ header('Suite 55 — CSP Stage 1 Origin Guards + Firebase Pin');
 //  Suite 56 — UI Module Split Guards
 //  Protocol-20 static guards: each ui-*.js must exist, appear
 //  in sw.js ASSETS, and be wired in index.html before api.js.
-// 15 tests
+// 20 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 56 — UI Module Split Guards');
 {
@@ -4921,6 +4921,44 @@ header('Suite 56 — UI Module Split Guards');
     assert(
       savesIdx56b !== -1 && uiIdx56c !== -1 && savesIdx56b < uiIdx56c,
       'ui-saves.js <script> appears before ui.js in index.html (saves loads before core)'
+    );
+  }
+
+  // 56.16 js/ui-account.js file exists on disk
+  assert(
+    fs.existsSync(path.join(ROOT, 'js/ui-account.js')),
+    'js/ui-account.js file exists (Slice D: account module extracted)'
+  );
+
+  // 56.17 ./js/ui-account.js appears in sw.js ASSETS list
+  assert(
+    /['"]\.\/js\/ui-account\.js['"]/.test(swSrc56),
+    "'./js/ui-account.js' in sw.js ASSETS (cache covers the account module)"
+  );
+
+  // 56.18 <script src="js/ui-account.js"> appears in index.html
+  assert(
+    /src=['"]js\/ui-account\.js['"]/.test(htmlSrc56),
+    '<script src="js/ui-account.js"> present in index.html'
+  );
+
+  // 56.19 ui-account.js script appears before api.js in index.html
+  {
+    const acctIdx56 = htmlSrc56.indexOf('js/ui-account.js');
+    const apiIdx56d = htmlSrc56.indexOf('js/api.js');
+    assert(
+      acctIdx56 !== -1 && apiIdx56d !== -1 && acctIdx56 < apiIdx56d,
+      'ui-account.js <script> appears before api.js in index.html (load-order guard)'
+    );
+  }
+
+  // 56.20 ui-account.js script appears before ui.js in index.html
+  {
+    const acctIdx56b = htmlSrc56.indexOf('js/ui-account.js');
+    const uiIdx56d = htmlSrc56.indexOf('"js/ui.js"');
+    assert(
+      acctIdx56b !== -1 && uiIdx56d !== -1 && acctIdx56b < uiIdx56d,
+      'ui-account.js <script> appears before ui.js in index.html (account loads before core)'
     );
   }
 }

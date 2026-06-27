@@ -1,4 +1,4 @@
-## [v2.5.0] — Unreleased<!-- Tests: 689/689 | Cache: robco-terminal-v2.0.1-r69 -->
+## [v2.5.0] — Unreleased<!-- Tests: 694/694 | Cache: robco-terminal-v2.0.1-r70 -->
 
 ### Added
 
@@ -17,6 +17,7 @@
 
 ### Under the Hood
 
+- Split the account panel, cloud save picker, and undo-sync function out of ui.js into a dedicated js/ui-account.js module (Slice D of a 5-part internal refactor). No user-facing behaviour changes. Extended Suite 56 from 15 to 20 tests — added file-exists, service-worker cache, script-tag, and load-order checks for the new account module (694 total across 60 suites). Bumped CACHE_NAME to r70 (new served file added).
 - Split save-related functions — save slots, file import and export, rolling backup restore, registry autocomplete wiring, and the ammo datalist — out of ui.js into a dedicated js/ui-saves.js module (Slice C of a 5-part internal refactor). No user-facing behaviour changes. Extended Suite 56 from 10 to 15 tests — added file-exists, service-worker cache, script-tag, and load-order checks for the new saves module (689 total across 60 suites). Bumped CACHE_NAME to r69 (new served file added).
 - Split all render functions, CRUD helpers (add/remove items, ammo, squad members, etc.), faction utilities, game-time helpers, and map functions out of ui.js into a dedicated js/ui-render.js module (Slice B of a 5-part internal refactor). No user-facing behaviour changes. Updated the test suite's CRUD-mutator checks to read from the combined UI source so they survive the move. Extended Suite 56 from 5 to 10 tests — added file-exists, service-worker cache, script-tag, and load-order checks for the new render module (684 total across 60 suites). Bumped CACHE_NAME to r68 (new served file added).
 - Split all audio functions out of ui.js into a dedicated js/ui-audio.js module (Slice A of a 5-part internal refactor). No user-facing behaviour changes — all audio functions work identically, the module loads before ui.js in the same script order, and the service worker pre-caches both files. Added 5 static guard tests (Suite 56, 679 total across 60 suites) that verify the new file exists, is in the service worker cache list, and loads in the correct order relative to ui.js and api.js. Bumped CACHE_NAME to r67 (new served file added).

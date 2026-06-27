@@ -2891,7 +2891,7 @@ Check ([bool]($htmlSrc55 -match 'img-src[^;]*blob:')) `
 # Suite 56 -- UI Module Split Guards
 # Protocol-20 static guards: each ui-*.js must exist, appear
 # in sw.js ASSETS, and be wired in index.html before api.js.
-# 15 tests
+# 20 tests
 # ===========================================================
 Sep "Suite 56 -- UI Module Split Guards"
 $htmlSrc56 = $htmlSrc55  # reuse (same index.html read above)
@@ -2964,6 +2964,25 @@ $savesIdx56b = $htmlSrc56.IndexOf('js/ui-saves.js')
 $uiIdx56c    = $htmlSrc56.IndexOf('"js/ui.js"')
 Check ($savesIdx56b -ne -1 -and $uiIdx56c -ne -1 -and $savesIdx56b -lt $uiIdx56c) `
     "ui-saves.js <script> appears before ui.js in index.html (saves loads before core)"
+# 56.16 js/ui-account.js file exists on disk
+Check (Test-Path (Join-Path $Root "js\ui-account.js")) `
+    "js/ui-account.js file exists (Slice D: account module extracted)"
+# 56.17 ./js/ui-account.js appears in sw.js ASSETS list
+Check ([bool]($swSrc56 -match 'js/ui-account\.js')) `
+    "'./js/ui-account.js' in sw.js ASSETS (cache covers the account module)"
+# 56.18 <script src="js/ui-account.js"> appears in index.html
+Check ([bool]($htmlSrc56 -match 'src="js/ui-account\.js"')) `
+    '<script src="js/ui-account.js"> present in index.html'
+# 56.19 ui-account.js script appears before api.js in index.html
+$acctIdx56  = $htmlSrc56.IndexOf('js/ui-account.js')
+$apiIdx56d  = $htmlSrc56.IndexOf('js/api.js')
+Check ($acctIdx56 -ne -1 -and $apiIdx56d -ne -1 -and $acctIdx56 -lt $apiIdx56d) `
+    "ui-account.js <script> appears before api.js in index.html (load-order guard)"
+# 56.20 ui-account.js script appears before ui.js in index.html
+$acctIdx56b = $htmlSrc56.IndexOf('js/ui-account.js')
+$uiIdx56d   = $htmlSrc56.IndexOf('"js/ui.js"')
+Check ($acctIdx56b -ne -1 -and $uiIdx56d -ne -1 -and $acctIdx56b -lt $uiIdx56d) `
+    "ui-account.js <script> appears before ui.js in index.html (account loads before core)"
 
 # ===========================================================
 # Results

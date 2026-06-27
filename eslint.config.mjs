@@ -109,6 +109,10 @@ export default [
         playBootDrone: 'readonly',
         startThermalLoad: 'readonly',
         stopThermalLoad: 'readonly',
+        // Account module cross-file globals (js/ui-account.js ↔ js/ui.js)
+        renderAccount: 'readonly',
+        renderCloudSavePicker: 'readonly',
+        undoLastSync: 'readonly',
         // Saves module cross-file globals (js/ui-saves.js ↔ js/ui.js)
         CHAT_MAX: 'readonly',
         _chatSaveTimer: 'writable',
