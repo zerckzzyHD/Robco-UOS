@@ -1580,17 +1580,18 @@ header('Meta / Runner Parity');
     'Suite 41',
     'Suite 49',
     'Suite 50',
+    'Suite 51',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-50)' +
+    'JS runner contains all gate-guard suites (22-41, 49-51)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-50)' +
+    'PS runner contains all gate-guard suites (22-41, 49-51)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -3049,25 +3050,35 @@ header('Phase 5c-iii: Cloud Save Picker + Local Migration');
     'cloud.js references updateDoc + deleteDoc (rename and delete cloud saves)'
   );
 
-  // 46.4  _contentHash helper defined in cloud.js
+  // 46.4  cloud.js uses the shared computeSaveChecksum helper (moved to state.js per Protocol 22)
   assert(
-    /function _contentHash\s*\(/.test(cloudSource),
-    'cloud.js defines _contentHash() helper (deterministic content fingerprint for dedup)'
+    cloudSource.includes('window.computeSaveChecksum'),
+    'cloud.js uses window.computeSaveChecksum helper (FNV-1a dedup fingerprint from state.js)'
   );
 
-  // 46.5  contentHash behavioral: same input → same hash (determinism)
+  // 46.5  computeSaveChecksum behavioral: same input → same hash (determinism)
+  //        Extracts _fnv1a32 from state.js (where the canonical algorithm now lives)
   {
     let _testHash = null;
     try {
-      const fnIdx = cloudSource.indexOf('function _contentHash');
+      const fnIdx = stateSource.indexOf('function _fnv1a32');
       if (fnIdx !== -1) {
-        let i = cloudSource.indexOf('{', fnIdx);
+        let i = stateSource.indexOf('{', fnIdx);
         let depth = 0;
-        while (i < cloudSource.length) {
-          if (cloudSource[i] === '{') depth++;
-          else if (cloudSource[i] === '}' && --depth === 0) {
-            const fnSrc = cloudSource.slice(fnIdx, i + 1);
-            eval('_testHash = ' + fnSrc);
+        while (i < stateSource.length) {
+          if (stateSource[i] === '{') depth++;
+          else if (stateSource[i] === '}' && --depth === 0) {
+            const fnSrc = stateSource.slice(fnIdx, i + 1);
+            eval(
+              fnSrc +
+                '\n_testHash = function(v, c, p) {' +
+                '  function _s(o) { if (Array.isArray(o)) return o.map(_s);' +
+                '    if (o && typeof o === "object") { var r = {};' +
+                '      Object.keys(o).sort().forEach(function(k) { r[k] = _s(o[k]); }); return r; }' +
+                '    return o; }' +
+                '  return _fnv1a32(JSON.stringify(_s({ v: v||null, c: c||[], p: String(p||"") })));' +
+                '};'
+            );
             break;
           }
           i++;
@@ -3081,27 +3092,36 @@ header('Phase 5c-iii: Cloud Save Picker + Local Migration');
       const h2 = _testHash(v8, chat, 'any');
       assert(
         typeof h1 === 'string' && h1.length > 0 && h1 === h2,
-        '_contentHash is deterministic: same input → same hash every call'
+        'computeSaveChecksum is deterministic: same input → same hash every call'
       );
     } else {
-      fail('_contentHash determinism: function could not be evaluated in isolation');
+      fail('computeSaveChecksum determinism: _fnv1a32 could not be evaluated from state.js');
     }
   }
 
-  // 46.6  contentHash behavioral: apostrophe/ampersand not HTML-encoded at hash layer
+  // 46.6  computeSaveChecksum behavioral: apostrophe/ampersand not HTML-encoded at hash layer
   //        (regression guard — 5c-i double-escape class: round-trip must be clean)
   {
     let _testHash = null;
     try {
-      const fnIdx = cloudSource.indexOf('function _contentHash');
+      const fnIdx = stateSource.indexOf('function _fnv1a32');
       if (fnIdx !== -1) {
-        let i = cloudSource.indexOf('{', fnIdx);
+        let i = stateSource.indexOf('{', fnIdx);
         let depth = 0;
-        while (i < cloudSource.length) {
-          if (cloudSource[i] === '{') depth++;
-          else if (cloudSource[i] === '}' && --depth === 0) {
-            const fnSrc = cloudSource.slice(fnIdx, i + 1);
-            eval('_testHash = ' + fnSrc);
+        while (i < stateSource.length) {
+          if (stateSource[i] === '{') depth++;
+          else if (stateSource[i] === '}' && --depth === 0) {
+            const fnSrc = stateSource.slice(fnIdx, i + 1);
+            eval(
+              fnSrc +
+                '\n_testHash = function(v, c, p) {' +
+                '  function _s(o) { if (Array.isArray(o)) return o.map(_s);' +
+                '    if (o && typeof o === "object") { var r = {};' +
+                '      Object.keys(o).sort().forEach(function(k) { r[k] = _s(o[k]); }); return r; }' +
+                '    return o; }' +
+                '  return _fnv1a32(JSON.stringify(_s({ v: v||null, c: c||[], p: String(p||"") })));' +
+                '};'
+            );
             break;
           }
           i++;
@@ -3116,10 +3136,12 @@ header('Phase 5c-iii: Cloud Save Picker + Local Migration');
       const h = _testHash(v8, [], 'any');
       assert(
         typeof h === 'string' && h.length > 0 && !h.includes('&#x27;') && !h.includes('&amp;'),
-        '_contentHash: apostrophe/ampersand in data not HTML-encoded (storage-layer clean, no double-escape)'
+        'computeSaveChecksum: apostrophe/ampersand in data not HTML-encoded (storage-layer clean, no double-escape)'
       );
     } else {
-      fail('_contentHash apostrophe/ampersand test: function could not be evaluated');
+      fail(
+        'computeSaveChecksum apostrophe/ampersand test: _fnv1a32 could not be evaluated from state.js'
+      );
     }
   }
 
@@ -3656,6 +3678,198 @@ header('Suite 50 — Gate Parity Guards (Protocol 36)');
   assert(
     installHooksSrc50.includes('pre-push'),
     'scripts/install-hooks.js installs pre-push hook (Protocol 36 — full gate at push boundary)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 51 — Save Integrity + Rolling Backups (Data Safety Hardening)
+//  Verify checksum stamping, forward-compat guard, and rolling backup
+//  ring are wired consistently across all load/save paths.
+//  20 tests
+// ══════════════════════════════════════════════════════════════
+header('Suite 51 — Save Integrity + Rolling Backups');
+{
+  const stateSrc51 = readFile('js/state.js');
+  const uiSrc51 = readFile('js/ui.js');
+  const cloudSrc51 = readFile('js/cloud.js');
+  const indexSrc51 = readFile('index.html');
+
+  // 51.1  computeSaveChecksum exists in state.js (FNV-1a global helper)
+  assert(
+    stateSrc51.includes('window.computeSaveChecksum') && stateSrc51.includes('function _fnv1a32'),
+    'state.js defines window.computeSaveChecksum and _fnv1a32 helper (FNV-1a algorithm)'
+  );
+
+  // 51.2  verifySaveEnvelope exists in state.js
+  assert(
+    stateSrc51.includes('window.verifySaveEnvelope'),
+    'state.js defines window.verifySaveEnvelope (integrity + forward-compat check)'
+  );
+
+  // 51.3  snapRollingBackup exists in state.js
+  assert(
+    stateSrc51.includes('window.snapRollingBackup'),
+    'state.js defines window.snapRollingBackup (rolling backup ring)'
+  );
+
+  // 51.4  getRollingBackups exists in state.js
+  assert(
+    stateSrc51.includes('window.getRollingBackups'),
+    'state.js defines window.getRollingBackups (backup listing helper)'
+  );
+
+  // 51.5  verifySaveEnvelope returns 'legacy' when checksum is absent
+  assert(
+    /status.*legacy/.test(stateSrc51) && /!envelope\.checksum/.test(stateSrc51),
+    "verifySaveEnvelope returns 'legacy' when checksum field is absent (old saves load normally)"
+  );
+
+  // 51.6  verifySaveEnvelope returns 'future_version' when save version > running version
+  assert(
+    /status.*future_version/.test(stateSrc51) && /_semverGt/.test(stateSrc51),
+    "verifySaveEnvelope returns 'future_version' for saves from newer app versions (semver guard)"
+  );
+
+  // 51.7  verifySaveEnvelope returns 'checksum_mismatch' when recomputed checksum differs
+  assert(
+    /status.*checksum_mismatch/.test(stateSrc51),
+    "verifySaveEnvelope returns 'checksum_mismatch' when checksum doesn't match (tamper detection)"
+  );
+
+  // 51.8  exportSaveFile stamps schemaVersion and checksum
+  {
+    let exportBody51 = '';
+    try {
+      exportBody51 = extractFunctionBody(stateSrc51, 'exportSaveFile');
+    } catch (e) {
+      fail('Cannot extract exportSaveFile: ' + e.message);
+    }
+    assert(
+      exportBody51.includes('schemaVersion') && exportBody51.includes('checksum'),
+      'exportSaveFile stamps schemaVersion and checksum on exported envelope'
+    );
+  }
+
+  // 51.9  saveToSlot stamps schemaVersion and checksum
+  {
+    let saveSlotBody51 = '';
+    try {
+      saveSlotBody51 = extractFunctionBody(uiSrc51, 'saveToSlot');
+    } catch (e) {
+      fail('Cannot extract saveToSlot: ' + e.message);
+    }
+    assert(
+      saveSlotBody51.includes('schemaVersion') && saveSlotBody51.includes('checksum'),
+      'saveToSlot stamps schemaVersion and checksum on slot envelope'
+    );
+  }
+
+  // 51.10  loadFromSlot calls verifySaveEnvelope before applying state
+  {
+    let loadSlotBody51 = '';
+    try {
+      loadSlotBody51 = extractFunctionBody(uiSrc51, 'loadFromSlot');
+    } catch (e) {
+      fail('Cannot extract loadFromSlot: ' + e.message);
+    }
+    assert(
+      loadSlotBody51.includes('verifySaveEnvelope'),
+      'loadFromSlot calls verifySaveEnvelope (integrity check before slot load)'
+    );
+  }
+
+  // 51.11  loadFromSlot calls snapRollingBackup before applying state
+  {
+    let loadSlotBody51b = '';
+    try {
+      loadSlotBody51b = extractFunctionBody(uiSrc51, 'loadFromSlot');
+    } catch (e) {
+      fail('Cannot extract loadFromSlot: ' + e.message);
+    }
+    assert(
+      loadSlotBody51b.includes('snapRollingBackup'),
+      'loadFromSlot calls snapRollingBackup (rolling backup before slot load)'
+    );
+  }
+
+  // 51.12  handleFileUpload calls verifySaveEnvelope
+  {
+    let uploadBody51 = '';
+    try {
+      uploadBody51 = extractFunctionBody(uiSrc51, 'handleFileUpload');
+    } catch (e) {
+      fail('Cannot extract handleFileUpload: ' + e.message);
+    }
+    assert(
+      uploadBody51.includes('verifySaveEnvelope'),
+      'handleFileUpload calls verifySaveEnvelope (integrity check on file import)'
+    );
+  }
+
+  // 51.13  handleFileUpload calls snapRollingBackup
+  {
+    let uploadBody51b = '';
+    try {
+      uploadBody51b = extractFunctionBody(uiSrc51, 'handleFileUpload');
+    } catch (e) {
+      fail('Cannot extract handleFileUpload: ' + e.message);
+    }
+    assert(
+      uploadBody51b.includes('snapRollingBackup'),
+      'handleFileUpload calls snapRollingBackup (rolling backup before file import)'
+    );
+  }
+
+  // 51.14  pullFromCloud calls snapRollingBackup
+  assert(
+    cloudSrc51.includes('snapRollingBackup'),
+    'cloud.js pullFromCloud/loadCloudSave calls snapRollingBackup (rolling backup before cloud load)'
+  );
+
+  // 51.15  loadCloudSave calls verifySaveEnvelope
+  assert(
+    cloudSrc51.includes('verifySaveEnvelope'),
+    'cloud.js calls verifySaveEnvelope on cloud load paths (integrity check)'
+  );
+
+  // 51.16  restoreRollingBackup exists in ui.js and routes through sanitizeImportedContainer + migrateState
+  {
+    let restoreBody51 = '';
+    try {
+      restoreBody51 = extractFunctionBody(uiSrc51, 'restoreRollingBackup');
+    } catch (e) {
+      fail('Cannot extract restoreRollingBackup: ' + e.message);
+    }
+    assert(
+      restoreBody51.includes('sanitizeImportedContainer') && restoreBody51.includes('migrateState'),
+      'restoreRollingBackup routes through sanitizeImportedContainer + migrateState (Protocol 34)'
+    );
+  }
+
+  // 51.17  index.html has a restore backup button calling restoreRollingBackup
+  assert(
+    indexSrc51.includes('restoreRollingBackup'),
+    'index.html has a RESTORE BACKUP button calling restoreRollingBackup()'
+  );
+
+  // 51.18  snapRollingBackup uses ring key prefix 'robco_backup_' (N computed dynamically) + robco_backup_ptr
+  assert(
+    stateSrc51.includes("'robco_backup_'") && stateSrc51.includes("'robco_backup_ptr'"),
+    "snapRollingBackup uses 'robco_backup_' ring key prefix (dynamic N) and 'robco_backup_ptr' pointer"
+  );
+
+  // 51.19  snapRollingBackup handles QuotaExceededError — drops oldest slot and retries
+  assert(
+    stateSrc51.includes('QuotaExceededError') &&
+      /removeItem\s*\(/.test(stateSrc51) &&
+      /snapRollingBackup[\s\S]{0,800}QuotaExceededError/.test(stateSrc51),
+    'snapRollingBackup handles QuotaExceededError gracefully (drop-oldest-retry, no crash)'
+  );
+
+  // 51.20  computeSaveChecksum uses FNV-1a magic number (algorithm integrity guard)
+  assert(
+    stateSrc51.includes('0x811c9dc5') && stateSrc51.includes('0x01000193'),
+    'computeSaveChecksum/_fnv1a32 uses canonical FNV-1a magic numbers (algorithm regression guard)'
   );
 }
 

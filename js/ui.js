@@ -386,6 +386,8 @@ function showDeltaGhost(fieldId, oldVal, newVal) {
 }
 
 window.onload = function () {
+  // Snapshot current state as rolling backup before any boot migration (Protocol: Rolling Backups)
+  if (typeof window.snapRollingBackup === 'function') window.snapRollingBackup();
   let v8Str = localStorage.getItem('robco_v8');
   let v7Str = localStorage.getItem('robco_v7');
 
@@ -3975,15 +3977,22 @@ function _slotLabel(n) {
 
 function saveToSlot(slotNum) {
   syncStateFromDom();
+  const _slotState = JSON.parse(JSON.stringify(state));
+  const _slotChat = chatHistory.slice(-200);
+  const _slotPlaystyle = localStorage.getItem('robco_playstyle') || 'any';
   const envelope = {
     version: APP_VERSION,
-    state: JSON.parse(JSON.stringify(state)),
-    chat: chatHistory.slice(-200),
-    playstyle: localStorage.getItem('robco_playstyle') || 'any',
+    schemaVersion: APP_VERSION,
+    state: _slotState,
+    chat: _slotChat,
+    playstyle: _slotPlaystyle,
     savedAt: Date.now(),
     slotName: _slotLabel(slotNum),
     gameContext: state.gameContext || 'FNV', // F5: store game context in envelope
   };
+  if (typeof window.computeSaveChecksum === 'function') {
+    envelope.checksum = window.computeSaveChecksum(_slotState, _slotChat, _slotPlaystyle);
+  }
   try {
     localStorage.setItem(_slotKey(slotNum), JSON.stringify(envelope));
     const el = document.getElementById('slotStatus');
@@ -4004,6 +4013,25 @@ function loadFromSlot(slotNum) {
   }
   try {
     let env = JSON.parse(raw);
+    // Integrity + forward-compat check before applying
+    if (typeof window.verifySaveEnvelope === 'function') {
+      const integrity = window.verifySaveEnvelope(env);
+      if (integrity.status === 'future_version') {
+        if (
+          !confirm(
+            `> VERSION MISMATCH\n\nThis save was made on a newer version of RobCo (v${integrity.version}).\nYour app is on v${APP_VERSION}.\n\nLoading may cause data loss — update the app first.\n\nForce-load anyway?`
+          )
+        )
+          return;
+      } else if (integrity.status === 'checksum_mismatch') {
+        if (
+          !confirm(
+            '> SAVE INTEGRITY WARNING\n\nThis save may be corrupt or was edited outside the app.\n\nLoad anyway? (Data may be incomplete or incorrect.)'
+          )
+        )
+          return;
+      }
+    }
     // F5: Warn on gameContext mismatch between slot and current session
     const slotCtx = env.gameContext || env.state?.gameContext || 'FNV';
     const curCtx = state.gameContext || 'FNV';
@@ -4013,6 +4041,8 @@ function loadFromSlot(slotNum) {
       );
       if (!ok) return;
     }
+    // Snapshot current state as rolling backup before replacing
+    if (typeof window.snapRollingBackup === 'function') window.snapRollingBackup();
     if (typeof migrateState === 'function')
       env.state = migrateState(env.version || '1.0', env.state);
     state = { ...state, ...env.state };
@@ -4076,6 +4106,55 @@ function updateTokenBudget() {
 function triggerFileInput() {
   document.getElementById('fileInput').click();
 }
+
+// ── RESTORE ROLLING BACKUP ─────────────────────────────────────────
+// Presents the rolling backup ring and lets the user restore one — confirm-gated,
+// routed through sanitizeImportedContainer + migrateState (Protocol 34).
+function restoreRollingBackup() {
+  if (typeof window.getRollingBackups !== 'function') return;
+  const backups = window.getRollingBackups();
+  if (!backups.length) {
+    alert('>> NO BACKUP SAVES AVAILABLE <<');
+    return;
+  }
+  const listStr = backups.map((b, i) => `${i + 1}. ${b.label}`).join('\n');
+  const choice = prompt(
+    `>> SELECT BACKUP TO RESTORE:\n\n${listStr}\n\nEnter number (1–${backups.length}) or Cancel:`
+  );
+  if (!choice) return;
+  const n = parseInt(choice);
+  if (isNaN(n) || n < 1 || n > backups.length) {
+    alert('>> INVALID SELECTION <<');
+    return;
+  }
+  const backup = backups[n - 1];
+  if (
+    !confirm(
+      `>> RESTORE BACKUP FROM ${backup.label}?\n\nThis replaces your current campaign state.`
+    )
+  )
+    return;
+  try {
+    const data = backup.data;
+    const sanitized =
+      typeof sanitizeImportedContainer === 'function'
+        ? sanitizeImportedContainer(data.robco_v8)
+        : data.robco_v8;
+    if (typeof migrateState === 'function' && sanitized && sanitized.campaigns) {
+      Object.keys(sanitized.campaigns).forEach(ctx => {
+        sanitized.campaigns[ctx] = migrateState(data.version || '1.0', sanitized.campaigns[ctx]);
+      });
+    }
+    localStorage.setItem('robco_v8', JSON.stringify(sanitized));
+    if (data.chat && Array.isArray(data.chat))
+      localStorage.setItem('robco_chat', JSON.stringify(data.chat));
+    if (data.playstyle) localStorage.setItem('robco_playstyle', data.playstyle);
+    alert('>> BACKUP RESTORED. REBOOTING SYSTEM... <<');
+    window.location.reload();
+  } catch (_) {
+    appendToChat('> [SYS-ALERT: BACKUP RESTORE FAILED]', 'sys');
+  }
+}
 function restoreChatHistory(history) {
   chatHistory = history.slice(-CHAT_MAX);
   const chatBox = document.getElementById('chatDisplay');
@@ -4094,11 +4173,26 @@ function handleFileUpload(event) {
     try {
       const parsed = JSON.parse(e.target.result);
       if (parsed.robco_v8) {
-        // v8 Container payload
-        localStorage.setItem(
-          'robco_backup',
-          JSON.stringify({ robco_v8: JSON.parse(localStorage.getItem('robco_v8') || '{}') })
-        );
+        // v8 Container payload — integrity check + rolling backup before applying
+        if (typeof window.verifySaveEnvelope === 'function') {
+          const _fi = window.verifySaveEnvelope(parsed);
+          if (_fi.status === 'future_version') {
+            if (
+              !confirm(
+                `> VERSION MISMATCH\n\nThis save was made on a newer version of RobCo (v${_fi.version}).\nYour app is on v${APP_VERSION}.\n\nLoading may cause data loss — update the app first.\n\nForce-load anyway?`
+              )
+            )
+              return;
+          } else if (_fi.status === 'checksum_mismatch') {
+            if (
+              !confirm(
+                '> SAVE INTEGRITY WARNING\n\nThis save may be corrupt or was edited outside the app.\n\nLoad anyway? (Data may be incomplete or incorrect.)'
+              )
+            )
+              return;
+          }
+        }
+        if (typeof window.snapRollingBackup === 'function') window.snapRollingBackup();
         const _sanitized =
           typeof sanitizeImportedContainer === 'function'
             ? sanitizeImportedContainer(parsed.robco_v8)

@@ -2,6 +2,144 @@
 const APP_VERSION = '2.0.1';
 window.APP_VERSION = APP_VERSION;
 
+// ── SAVE INTEGRITY + ROLLING BACKUP HELPERS ──────────────────────
+// FNV-1a 32-bit hash over a string (same algorithm as cloud.js _contentHash)
+function _fnv1a32(str) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(16).padStart(8, '0');
+}
+function _sortedForHash(o) {
+  if (Array.isArray(o)) return o.map(_sortedForHash);
+  if (o && typeof o === 'object') {
+    const out = {};
+    Object.keys(o)
+      .sort()
+      .forEach(k => (out[k] = _sortedForHash(o[k])));
+    return out;
+  }
+  return o;
+}
+// Compute a deterministic FNV-1a checksum for a save's payload fields.
+// contentObj: robco_v8 (file/cloud saves) or state (slot saves)
+// chat: chat history array; playstyle: string
+// The checksum field itself must NOT be included in contentObj before calling this.
+window.computeSaveChecksum = function (contentObj, chat, playstyle) {
+  return _fnv1a32(
+    JSON.stringify(
+      _sortedForHash({ v: contentObj || null, c: chat || [], p: String(playstyle || '') })
+    )
+  );
+};
+
+// Semver comparison helper: returns true if version string a is strictly newer than b.
+function _semverGt(a, b) {
+  const pa = String(a || '0')
+    .split('.')
+    .map(n => parseInt(n) || 0);
+  const pb = String(b || '0')
+    .split('.')
+    .map(n => parseInt(n) || 0);
+  for (let i = 0; i < 3; i++) {
+    if ((pa[i] || 0) > (pb[i] || 0)) return true;
+    if ((pa[i] || 0) < (pb[i] || 0)) return false;
+  }
+  return false;
+}
+
+// Verify a save envelope before loading.
+// Returns { status: 'ok' | 'legacy' | 'checksum_mismatch' | 'future_version', version? }
+// 'legacy'           — no checksum field (old save); load normally, no warning
+// 'ok'               — checksum present and matches; load normally
+// 'checksum_mismatch'— checksum present but wrong; warn + require confirm
+// 'future_version'   — envelope was saved on a newer app version; warn + require confirm
+window.verifySaveEnvelope = function (envelope) {
+  if (!envelope || typeof envelope !== 'object') return { status: 'ok' };
+  // Forward-compat: use schemaVersion if present, fall back to version
+  const sv = envelope.schemaVersion || envelope.version || null;
+  if (sv && _semverGt(String(sv), APP_VERSION)) {
+    return { status: 'future_version', version: sv };
+  }
+  // Integrity: only fires when checksum field is present
+  if (!envelope.checksum) return { status: 'legacy' };
+  // Content can be robco_v8 (file/cloud saves) or state (slot saves)
+  const contentObj =
+    envelope.robco_v8 != null ? envelope.robco_v8 : envelope.state != null ? envelope.state : null;
+  const expected = window.computeSaveChecksum(
+    contentObj,
+    envelope.chat || [],
+    envelope.playstyle || ''
+  );
+  if (envelope.checksum !== expected) return { status: 'checksum_mismatch' };
+  return { status: 'ok' };
+};
+
+// ── ROLLING BACKUPS ──────────────────────────────────────────────
+// Snapshot the current localStorage state into a ring of 3 backup slots
+// (robco_backup_1/2/3). Call before every user-initiated state-replacing load.
+// The ring pointer (robco_backup_ptr) tracks the next slot to overwrite.
+window.snapRollingBackup = function () {
+  let ptr = 0;
+  try {
+    ptr = ((parseInt(localStorage.getItem('robco_backup_ptr') || '0') % 3) + 3) % 3;
+  } catch (_) {}
+  let snap;
+  try {
+    snap = JSON.stringify({
+      timestamp: Date.now(),
+      robco_v8: JSON.parse(localStorage.getItem('robco_v8') || '{}'),
+      chat: JSON.parse(localStorage.getItem('robco_chat') || '[]'),
+      playstyle: localStorage.getItem('robco_playstyle') || 'any',
+    });
+  } catch (_) {
+    return;
+  }
+  const writeKey = 'robco_backup_' + (ptr + 1);
+  const nextPtr = (ptr + 1) % 3;
+  function _tryWrite() {
+    localStorage.setItem(writeKey, snap);
+    localStorage.setItem('robco_backup_ptr', String(nextPtr));
+  }
+  try {
+    _tryWrite();
+  } catch (e) {
+    if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+      // Drop the oldest remaining slot to free space, then retry
+      try {
+        localStorage.removeItem('robco_backup_' + (nextPtr + 1));
+        _tryWrite();
+      } catch (_) {
+        console.warn('[RobCo] snapRollingBackup: quota exceeded, backup not saved');
+      }
+    }
+  }
+};
+
+// Returns an array of backup entries sorted newest-first.
+// Each entry: { key, timestamp, label, data }
+window.getRollingBackups = function () {
+  const results = [];
+  for (let i = 1; i <= 3; i++) {
+    const raw = localStorage.getItem('robco_backup_' + i);
+    if (!raw) continue;
+    try {
+      const b = JSON.parse(raw);
+      if (b && b.timestamp) {
+        results.push({
+          key: 'robco_backup_' + i,
+          timestamp: b.timestamp,
+          label: new Date(b.timestamp).toLocaleString(),
+          data: b,
+        });
+      }
+    } catch (_) {}
+  }
+  return results.sort((a, b) => b.timestamp - a.timestamp);
+};
+
 // ── FACTION REGISTRY ─────────────────────────────────────────────
 const FACTION_REGISTRY = [
   { key: 'ncr', name: 'NCR', tier: 'major' },
@@ -321,12 +459,21 @@ function exportSaveFile(slotName = null) {
   window.robco_v8.activeContext = state.gameContext || 'FNV';
   window.robco_v8.campaigns[window.robco_v8.activeContext] = JSON.parse(JSON.stringify(state));
 
+  const _exportPlaystyle = localStorage.getItem('robco_playstyle') || 'any';
   const exportPayload = {
     version: APP_VERSION,
+    schemaVersion: APP_VERSION,
     robco_v8: window.robco_v8,
     chat: chatHistory,
-    playstyle: localStorage.getItem('robco_playstyle') || 'any',
+    playstyle: _exportPlaystyle,
   };
+  if (typeof window.computeSaveChecksum === 'function') {
+    exportPayload.checksum = window.computeSaveChecksum(
+      exportPayload.robco_v8,
+      exportPayload.chat,
+      _exportPlaystyle
+    );
+  }
   const dataStr =
     'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(exportPayload, null, 2));
   const dl = document.createElement('a');

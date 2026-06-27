@@ -262,13 +262,23 @@ window.pushToCloud = async function (_courierId, _stateObj) {
     window.robco_v8.campaigns[window.robco_v8.activeContext] = JSON.parse(JSON.stringify(state));
     localStorage.setItem('robco_v8', JSON.stringify(window.robco_v8));
 
-    await setDoc(doc(db, 'users', _currentUid, 'saves', 'main'), {
+    const _pushPlaystyle = localStorage.getItem('robco_playstyle') || 'any';
+    const _pushPayload = {
       version: window.APP_VERSION || '2.0.0',
+      schemaVersion: window.APP_VERSION || '2.0.0',
       savedAt: Date.now(),
       robco_v8: window.robco_v8,
       chat: JSON.parse(localStorage.getItem('robco_chat') || '[]'),
-      playstyle: localStorage.getItem('robco_playstyle') || 'any',
-    });
+      playstyle: _pushPlaystyle,
+    };
+    if (typeof window.computeSaveChecksum === 'function') {
+      _pushPayload.checksum = window.computeSaveChecksum(
+        _pushPayload.robco_v8,
+        _pushPayload.chat,
+        _pushPayload.playstyle
+      );
+    }
+    await setDoc(doc(db, 'users', _currentUid, 'saves', 'main'), _pushPayload);
     localStorage.setItem('robco_last_cloud_push', Date.now().toString());
     console.log('Cloud sync complete.');
     if (typeof playSyncTone === 'function') playSyncTone(); // H3: Data Sync Ping
@@ -321,11 +331,31 @@ window.pullFromCloud = async function (_courierId) {
       }
       if (typeof autoImportState === 'function') {
         if (data.robco_v8) {
-          // Store an atomic backup for undo
-          localStorage.setItem(
-            'robco_backup',
-            JSON.stringify({ robco_v8: JSON.parse(localStorage.getItem('robco_v8') || '{}') })
-          );
+          // Integrity + forward-compat check before applying cloud pull
+          if (typeof window.verifySaveEnvelope === 'function') {
+            const _pullIntegrity = window.verifySaveEnvelope(data);
+            if (_pullIntegrity.status === 'future_version') {
+              if (
+                !confirm(
+                  `> VERSION MISMATCH\n\nThis cloud save was made on a newer version of RobCo (v${_pullIntegrity.version}).\nYour app is on v${window.APP_VERSION}.\n\nLoading may cause data loss — update the app first.\n\nForce-load anyway?`
+                )
+              ) {
+                if (btn) btn.innerText = '> PULL CLOUD SAVE';
+                return;
+              }
+            } else if (_pullIntegrity.status === 'checksum_mismatch') {
+              if (
+                !confirm(
+                  '> CLOUD SAVE INTEGRITY WARNING\n\nThis cloud save may be corrupt or was modified outside the app.\n\nLoad anyway? (Data may be incomplete or incorrect.)'
+                )
+              ) {
+                if (btn) btn.innerText = '> PULL CLOUD SAVE';
+                return;
+              }
+            }
+          }
+          // Rolling backup: snapshot current state before replacing
+          if (typeof window.snapRollingBackup === 'function') window.snapRollingBackup();
 
           // XSS-fix: route cloud-pulled container through sanitizer before writing to localStorage.
           // The raw setItem fast-path bypassed autoImportState's coercion hardening; this closes it.
@@ -374,33 +404,9 @@ window.pullFromCloud = async function (_courierId) {
   }
 };
 
-// ── contentHash: deterministic FNV-1a 32-bit fingerprint ────────────
-// Used to detect duplicate local saves before uploading. Sorted keys ensure
-// field-insertion-order differences don't produce different hashes.
-function _contentHash(robco_v8_obj, chat_arr, playstyle_str) {
-  function _sortedKeys(o) {
-    if (Array.isArray(o)) return o.map(_sortedKeys);
-    if (o && typeof o === 'object') {
-      const out = {};
-      Object.keys(o)
-        .sort()
-        .forEach(k => (out[k] = _sortedKeys(o[k])));
-      return out;
-    }
-    return o;
-  }
-  const payload = JSON.stringify({
-    v: _sortedKeys(robco_v8_obj),
-    c: _sortedKeys(chat_arr),
-    p: String(playstyle_str || ''),
-  });
-  let h = 0x811c9dc5;
-  for (let i = 0; i < payload.length; i++) {
-    h ^= payload.charCodeAt(i);
-    h = Math.imul(h, 0x01000193) >>> 0;
-  }
-  return h.toString(16).padStart(8, '0');
-}
+// ── contentHash: reuse the global computeSaveChecksum helper from state.js ─
+// (Protocol 22: extend existing rather than duplicate)
+// state.js is loaded before cloud.js so window.computeSaveChecksum is available.
 
 // ── List all cloud saves for the current user ────────────────────────
 // Returns [{id, data}, ...] sorted by updatedAt desc (savedAt as fallback).
@@ -503,7 +509,7 @@ window.syncLocalSavesToCloud = async function () {
   const now = Date.now();
 
   for (const ls of localSaves) {
-    const contentHash = _contentHash(ls.robco_v8, ls.chat, ls.playstyle);
+    const contentHash = window.computeSaveChecksum(ls.robco_v8, ls.chat, ls.playstyle);
     const isDupe = existingDocs.some(
       d => d.localOriginId === ls.localOriginId && d.contentHash === contentHash
     );
@@ -558,11 +564,27 @@ window.loadCloudSave = async function (docId) {
       alert('>> SAVE FORMAT NOT SUPPORTED <<');
       return;
     }
-    // Backup current state for undo
-    localStorage.setItem(
-      'robco_backup',
-      JSON.stringify({ robco_v8: JSON.parse(localStorage.getItem('robco_v8') || '{}') })
-    );
+    // Integrity + forward-compat check before applying cloud picker load
+    if (typeof window.verifySaveEnvelope === 'function') {
+      const _lcIntegrity = window.verifySaveEnvelope(data);
+      if (_lcIntegrity.status === 'future_version') {
+        if (
+          !confirm(
+            `> VERSION MISMATCH\n\nThis cloud save was made on a newer version of RobCo (v${_lcIntegrity.version}).\nYour app is on v${window.APP_VERSION}.\n\nLoading may cause data loss — update the app first.\n\nForce-load anyway?`
+          )
+        )
+          return;
+      } else if (_lcIntegrity.status === 'checksum_mismatch') {
+        if (
+          !confirm(
+            '> CLOUD SAVE INTEGRITY WARNING\n\nThis cloud save may be corrupt or was modified outside the app.\n\nLoad anyway? (Data may be incomplete or incorrect.)'
+          )
+        )
+          return;
+      }
+    }
+    // Rolling backup: snapshot current state before replacing
+    if (typeof window.snapRollingBackup === 'function') window.snapRollingBackup();
     // Sanitize (XSS hardening — same path as cloud pull and file import)
     const sanitized =
       typeof sanitizeImportedContainer === 'function'

@@ -967,11 +967,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-50)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-50)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-51)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-51)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -1906,37 +1906,36 @@ Check (([bool]($cloudSrc -match '\bcollection\b')) -and ([bool]($cloudSrc -match
 Check (([bool]($cloudSrc -match '\bupdateDoc\b')) -and ([bool]($cloudSrc -match '\bdeleteDoc\b'))) `
     'cloud.js references updateDoc + deleteDoc (rename and delete cloud saves)'
 
-# 46.4  _contentHash helper defined in cloud.js
-Check ([bool]($cloudSrc -match 'function _contentHash\s*\(')) `
-    'cloud.js defines _contentHash() helper (deterministic content fingerprint for dedup)'
+# 46.4  cloud.js uses the shared computeSaveChecksum helper (moved to state.js per Protocol 22)
+Check ([bool]($cloudSrc -match 'window\.computeSaveChecksum')) `
+    'cloud.js uses window.computeSaveChecksum helper (FNV-1a dedup fingerprint from state.js)'
 
-# 46.5  contentHash: function body uses JSON.stringify and has no random/date (deterministic by construction)
-#        Structural check: PS double-quoted here-strings expand $vars so behavioral node-eval is error-prone.
-#        The JS runner (check-persistence.js) covers the full behavioral eval.
+# 46.5  computeSaveChecksum: _fnv1a32 in state.js has no Math.random/Date (deterministic by construction)
+#        The JS runner covers the full behavioral eval; PS runner does structural check.
 $hashBody46 = ''
-$hIdx46 = $cloudSrc.IndexOf('function _contentHash')
+$hIdx46 = $stateSrc.IndexOf('function _fnv1a32')
 if ($hIdx46 -ge 0) {
-    $hStart46 = $cloudSrc.IndexOf('{', $hIdx46); $hDep46 = 0; $hI46 = $hStart46
-    while ($hI46 -lt $cloudSrc.Length) {
-        $ch = $cloudSrc[$hI46]
+    $hStart46 = $stateSrc.IndexOf('{', $hIdx46); $hDep46 = 0; $hI46 = $hStart46
+    while ($hI46 -lt $stateSrc.Length) {
+        $ch = $stateSrc[$hI46]
         if ($ch -eq '{') { $hDep46++ }
-        elseif ($ch -eq '}') { $hDep46--; if ($hDep46 -eq 0) { $hashBody46 = $cloudSrc.Substring($hStart46, $hI46 - $hStart46 + 1); break } }
+        elseif ($ch -eq '}') { $hDep46--; if ($hDep46 -eq 0) { $hashBody46 = $stateSrc.Substring($hStart46, $hI46 - $hStart46 + 1); break } }
         $hI46++
     }
 }
-$hashDet46 = ($hashBody46.Length -gt 50) -and ($hashBody46 -match 'JSON\.stringify') -and
+$hashDet46 = ($hashBody46.Length -gt 20) -and
              -not ($hashBody46 -match 'Math\.random') -and -not ($hashBody46 -match 'Date\.')
 Check $hashDet46 `
-    '_contentHash uses JSON.stringify with no Math.random/Date (deterministic by construction)'
+    'computeSaveChecksum (_fnv1a32) has no Math.random/Date (deterministic by construction)'
 
-# 46.6  contentHash: function body contains no HTML entity encoding (apostrophe/ampersand not escaped)
-$hashApos46 = ($hashBody46.Length -gt 50) -and
+# 46.6  computeSaveChecksum: no HTML entity encoding in hash function (apostrophe/ampersand safe)
+$hashApos46 = ($hashBody46.Length -gt 20) -and
               -not ($hashBody46 -match '&#x27;') -and
               -not ($hashBody46 -match '&amp;') -and
               -not ($hashBody46 -match 'encodeURI') -and
               -not ($hashBody46 -match '\.replace.*&lt;')
 Check $hashApos46 `
-    '_contentHash: no HTML entity encoding in function body (apostrophe/ampersand safe at hash layer)'
+    'computeSaveChecksum: no HTML entity encoding in _fnv1a32 body (apostrophe/ampersand safe at hash layer)'
 
 # 46.7  syncLocalSavesToCloud uses addDoc (not setDoc) — additive
 $syncIdx46 = $cloudSrc.IndexOf('window.syncLocalSavesToCloud')
@@ -2253,6 +2252,114 @@ Check ($prePushSrc50 -match 'npm run gate(?!:)') `
 $installHooksSrc50 = Read-Src "scripts/install-hooks.js"
 Check ($installHooksSrc50 -match 'pre-push') `
     "scripts/install-hooks.js installs pre-push hook (Protocol 36 -- full gate at push boundary)"
+
+# ===========================================================
+# Suite 51 -- Save Integrity + Rolling Backups (Data Safety Hardening)
+# Verify checksum stamping, forward-compat guard, and rolling backup
+# ring are wired consistently across all load/save paths.
+# 20 tests
+# ===========================================================
+Sep "Suite 51 -- Save Integrity + Rolling Backups"
+
+$stateSrc51 = Read-Src "js/state.js"
+$uiSrc51    = Read-Src "js/ui.js"
+$cloudSrc51 = Read-Src "js/cloud.js"
+$indexSrc51 = Read-Src "index.html"
+
+# 51.1  computeSaveChecksum and _fnv1a32 exist in state.js
+Check ($stateSrc51 -match 'window\.computeSaveChecksum' -and $stateSrc51 -match 'function _fnv1a32') `
+    "state.js defines window.computeSaveChecksum and _fnv1a32 helper (FNV-1a algorithm)"
+
+# 51.2  verifySaveEnvelope exists in state.js
+Check ($stateSrc51 -match 'window\.verifySaveEnvelope') `
+    "state.js defines window.verifySaveEnvelope (integrity + forward-compat check)"
+
+# 51.3  snapRollingBackup exists in state.js
+Check ($stateSrc51 -match 'window\.snapRollingBackup') `
+    "state.js defines window.snapRollingBackup (rolling backup ring)"
+
+# 51.4  getRollingBackups exists in state.js
+Check ($stateSrc51 -match 'window\.getRollingBackups') `
+    "state.js defines window.getRollingBackups (backup listing helper)"
+
+# 51.5  verifySaveEnvelope returns 'legacy' when checksum is absent
+Check ($stateSrc51 -match "status.*legacy" -and $stateSrc51 -match '!envelope\.checksum') `
+    "verifySaveEnvelope returns 'legacy' when checksum field is absent (old saves load normally)"
+
+# 51.6  verifySaveEnvelope returns 'future_version' with semver guard
+Check ($stateSrc51 -match "status.*future_version" -and $stateSrc51 -match '_semverGt') `
+    "verifySaveEnvelope returns 'future_version' for saves from newer app versions (semver guard)"
+
+# 51.7  verifySaveEnvelope returns 'checksum_mismatch'
+Check ($stateSrc51 -match "status.*checksum_mismatch") `
+    "verifySaveEnvelope returns 'checksum_mismatch' when checksum doesn't match (tamper detection)"
+
+# 51.8  exportSaveFile stamps schemaVersion and checksum
+function Get-FnBody51 { param($src, $fn)
+    $idx = $src.IndexOf("function $fn")
+    if ($idx -lt 0) { return '' }
+    $start = $src.IndexOf('{', $idx); $depth = 0; $i = $start
+    while ($i -lt $src.Length) {
+        if ($src[$i] -eq '{') { $depth++ } elseif ($src[$i] -eq '}') { $depth--; if ($depth -eq 0) { return $src.Substring($start, $i - $start + 1) } }
+        $i++
+    }
+    return ''
+}
+$exportBody51 = Get-FnBody51 $stateSrc51 'exportSaveFile'
+Check ($exportBody51 -match 'schemaVersion' -and $exportBody51 -match 'checksum') `
+    "exportSaveFile stamps schemaVersion and checksum on exported envelope"
+
+# 51.9  saveToSlot stamps schemaVersion and checksum
+$saveSlotBody51 = Get-FnBody51 $uiSrc51 'saveToSlot'
+Check ($saveSlotBody51 -match 'schemaVersion' -and $saveSlotBody51 -match 'checksum') `
+    "saveToSlot stamps schemaVersion and checksum on slot envelope"
+
+# 51.10  loadFromSlot calls verifySaveEnvelope
+$loadSlotBody51 = Get-FnBody51 $uiSrc51 'loadFromSlot'
+Check ($loadSlotBody51 -match 'verifySaveEnvelope') `
+    "loadFromSlot calls verifySaveEnvelope (integrity check before slot load)"
+
+# 51.11  loadFromSlot calls snapRollingBackup
+Check ($loadSlotBody51 -match 'snapRollingBackup') `
+    "loadFromSlot calls snapRollingBackup (rolling backup before slot load)"
+
+# 51.12  handleFileUpload calls verifySaveEnvelope
+$uploadBody51 = Get-FnBody51 $uiSrc51 'handleFileUpload'
+Check ($uploadBody51 -match 'verifySaveEnvelope') `
+    "handleFileUpload calls verifySaveEnvelope (integrity check on file import)"
+
+# 51.13  handleFileUpload calls snapRollingBackup
+Check ($uploadBody51 -match 'snapRollingBackup') `
+    "handleFileUpload calls snapRollingBackup (rolling backup before file import)"
+
+# 51.14  cloud.js pullFromCloud/loadCloudSave calls snapRollingBackup
+Check ($cloudSrc51 -match 'snapRollingBackup') `
+    "cloud.js calls snapRollingBackup on cloud load paths (rolling backup before cloud load)"
+
+# 51.15  cloud.js calls verifySaveEnvelope on cloud load paths
+Check ($cloudSrc51 -match 'verifySaveEnvelope') `
+    "cloud.js calls verifySaveEnvelope on cloud load paths (integrity check)"
+
+# 51.16  restoreRollingBackup routes through sanitizeImportedContainer + migrateState
+$restoreBody51 = Get-FnBody51 $uiSrc51 'restoreRollingBackup'
+Check ($restoreBody51 -match 'sanitizeImportedContainer' -and $restoreBody51 -match 'migrateState') `
+    "restoreRollingBackup routes through sanitizeImportedContainer + migrateState (Protocol 34)"
+
+# 51.17  index.html has RESTORE BACKUP button calling restoreRollingBackup
+Check ($indexSrc51 -match 'restoreRollingBackup') `
+    "index.html has a RESTORE BACKUP button calling restoreRollingBackup()"
+
+# 51.18  snapRollingBackup uses ring key prefix 'robco_backup_' (N computed dynamically) + robco_backup_ptr
+Check ($stateSrc51 -match "'robco_backup_'" -and $stateSrc51 -match "'robco_backup_ptr'") `
+    "snapRollingBackup uses 'robco_backup_' ring key prefix (dynamic N) and 'robco_backup_ptr' pointer"
+
+# 51.19  snapRollingBackup handles QuotaExceededError gracefully
+Check ($stateSrc51 -match 'QuotaExceededError' -and $stateSrc51 -match 'removeItem') `
+    "snapRollingBackup handles QuotaExceededError gracefully (drop-oldest-retry, no crash)"
+
+# 51.20  computeSaveChecksum uses FNV-1a magic numbers
+Check ($stateSrc51 -match '0x811c9dc5' -and $stateSrc51 -match '0x01000193') `
+    "computeSaveChecksum/_fnv1a32 uses canonical FNV-1a magic numbers (algorithm regression guard)"
 
 # ===========================================================
 # Results
