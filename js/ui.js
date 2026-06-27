@@ -3066,10 +3066,16 @@ function renderAccount() {
       ? window.getAccountState()
       : { uid: null, isAnonymous: true, email: null, displayName: null };
   if (acct.isAnonymous || !acct.uid) {
-    body.innerHTML =
-      '<div style="font-size:11px;opacity:0.7;margin-bottom:8px;">NOT SIGNED IN — saves are local only.</div>' +
-      '<button class="action-btn" style="width:100%" onclick="if(window.signInWithGoogle)window.signInWithGoogle()">' +
-      '> SIGN IN WITH GOOGLE (SYNC ACROSS DEVICES)</button>';
+    if (typeof window.isFeatureEnabled === 'function' && !window.isFeatureEnabled('googleSignIn')) {
+      body.innerHTML =
+        '<div style="font-size:11px;opacity:0.7;margin-bottom:8px;">NOT SIGNED IN — saves are local only.</div>' +
+        '<div style="font-size:11px;opacity:0.5;padding:6px 0;">SIGN-IN TEMPORARILY UNAVAILABLE — local saves active.</div>';
+    } else {
+      body.innerHTML =
+        '<div style="font-size:11px;opacity:0.7;margin-bottom:8px;">NOT SIGNED IN — saves are local only.</div>' +
+        '<button class="action-btn" style="width:100%" onclick="if(window.signInWithGoogle)window.signInWithGoogle()">' +
+        '> SIGN IN WITH GOOGLE (SYNC ACROSS DEVICES)</button>';
+    }
   } else {
     const name = acct.displayName ? escapeHtml(acct.displayName) : '';
     const email = acct.email ? escapeHtml(acct.email) : '';

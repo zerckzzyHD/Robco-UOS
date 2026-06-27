@@ -47,6 +47,79 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
+// ── Remote Kill-Switch Feature Flags (Protocol 32/35) ───────────────────────
+// Seeded all-enabled synchronously at module load (fail-open baseline).
+// LKG merged from localStorage before any async work, so the first call to
+// isFeatureEnabled() is correct even before loadRemoteConfig() resolves.
+let _featureFlags = {
+  cloudSync: true,
+  googleSignIn: true,
+  aiChat: true,
+  keySync: true,
+  saveMigration: true,
+};
+try {
+  const _lkgRaw = localStorage.getItem('robco_feature_flags');
+  if (_lkgRaw) {
+    const _lkg = JSON.parse(_lkgRaw);
+    if (_lkg && typeof _lkg === 'object') {
+      Object.keys(_lkg).forEach(k => {
+        if (k in _featureFlags) _featureFlags[k] = _lkg[k] !== false;
+      });
+    }
+  }
+} catch (_) {}
+
+const FAIL_THRESHOLD = 3;
+const _autoDisabled = {};
+const _failCounts = {};
+
+function _recordFeatureFailure(key, msg) {
+  _failCounts[key] = (_failCounts[key] || 0) + 1;
+  if (_failCounts[key] >= FAIL_THRESHOLD && !_autoDisabled[key]) {
+    _autoDisabled[key] = true;
+    if (msg && typeof appendToChat === 'function') appendToChat(msg, 'sys');
+  }
+}
+window._recordFeatureFailure = _recordFeatureFailure;
+
+async function loadRemoteConfig() {
+  try {
+    const _timeoutP = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('config-timeout')), 3000)
+    );
+    const snap = await Promise.race([getDoc(doc(db, 'config', 'flags')), _timeoutP]);
+    if (snap && snap.exists && snap.exists()) {
+      const data = snap.data();
+      if (data && data.features && typeof data.features === 'object') {
+        Object.keys(data.features).forEach(k => {
+          if (k in _featureFlags) _featureFlags[k] = data.features[k] !== false;
+        });
+        try {
+          localStorage.setItem('robco_feature_flags', JSON.stringify(_featureFlags));
+        } catch (_) {}
+      }
+      if (data.message && typeof data.message === 'string' && data.message.trim()) {
+        if (typeof appendToChat === 'function') appendToChat('> [OPERATOR] ' + data.message, 'sys');
+      }
+      if (data.minVersion && typeof data.minVersion === 'string' && data.minVersion.trim()) {
+        if (typeof appendToChat === 'function')
+          appendToChat(
+            '>> A newer version is available — reload and tap "REBOOT TERMINAL" to update. <<',
+            'sys'
+          );
+      }
+    }
+  } catch (e) {
+    console.warn('loadRemoteConfig failed (non-fatal):', e);
+  }
+}
+
+window.isFeatureEnabled = function (key) {
+  if (_autoDisabled[key]) return false;
+  return _featureFlags[key] !== false;
+};
+
 // App Check — non-fatal; skipped until real site key is configured
 try {
   if (RECAPTCHA_V3_SITE_KEY !== 'REPLACE_WITH_RECAPTCHA_SITE_KEY') {
@@ -104,6 +177,8 @@ onAuthStateChanged(auth, user => {
   } catch {
     if (!auth.currentUser) signInAnonymously(auth).catch(() => {});
   }
+  // Fire-and-forget — never blocks boot or auth (Protocol 32/33)
+  loadRemoteConfig();
 })();
 
 // ── Google sign-in: links anonymous → Google; handles collision ──────────────
@@ -168,6 +243,10 @@ window.getAccountState = function () {
 };
 
 window.pushToCloud = async function (courierId, stateObj) {
+  if (!window.isFeatureEnabled('cloudSync')) {
+    alert('>> CLOUD SYNC TEMPORARILY UNAVAILABLE — saves remain local <<');
+    return;
+  }
   if (!_currentUid) {
     alert('>> ERROR: NOT AUTHENTICATED — PLEASE WAIT A MOMENT AND TRY AGAIN <<');
     return;
@@ -196,6 +275,10 @@ window.pushToCloud = async function (courierId, stateObj) {
     alert('>> CLOUD SYNC COMPLETE <<');
   } catch (e) {
     console.error('Error syncing to cloud: ', e);
+    _recordFeatureFailure(
+      'cloudSync',
+      '>> CLOUD SYNC PAUSED after repeated errors — using local saves. Reload to retry. <<'
+    );
     alert('>> CLOUD NETWORK FAILURE <<');
   } finally {
     if (btn) btn.innerText = '> PUSH CLOUD SAVE';
@@ -203,6 +286,10 @@ window.pushToCloud = async function (courierId, stateObj) {
 };
 
 window.pullFromCloud = async function (courierId) {
+  if (!window.isFeatureEnabled('cloudSync')) {
+    alert('>> CLOUD SYNC TEMPORARILY UNAVAILABLE — saves remain local <<');
+    return;
+  }
   if (!_currentUid) {
     alert('>> ERROR: NOT AUTHENTICATED — PLEASE WAIT A MOMENT AND TRY AGAIN <<');
     return;
@@ -277,6 +364,10 @@ window.pullFromCloud = async function (courierId) {
     }
   } catch (e) {
     console.error('Error fetching from cloud: ', e);
+    _recordFeatureFailure(
+      'cloudSync',
+      '>> CLOUD SYNC PAUSED after repeated errors — using local saves. Reload to retry. <<'
+    );
     alert('>> CLOUD NETWORK FAILURE <<');
   } finally {
     if (btn) btn.innerText = '> PULL CLOUD SAVE';
@@ -314,6 +405,7 @@ function _contentHash(robco_v8_obj, chat_arr, playstyle_str) {
 // ── List all cloud saves for the current user ────────────────────────
 // Returns [{id, data}, ...] sorted by updatedAt desc (savedAt as fallback).
 window.listCloudSaves = async function () {
+  if (!window.isFeatureEnabled('cloudSync')) return [];
   if (!_currentUid) return [];
   try {
     const col = collection(db, 'users', _currentUid, 'saves');
@@ -336,6 +428,10 @@ window.listCloudSaves = async function () {
 // Uploads robco_v8 + robco_slot_1/2/3. Dedupes by localOriginId+contentHash
 // so re-syncing creates no duplicates. Never touches localStorage.
 window.syncLocalSavesToCloud = async function () {
+  if (!window.isFeatureEnabled('saveMigration')) {
+    alert('>> SAVE SYNC TEMPORARILY UNAVAILABLE <<');
+    return;
+  }
   if (!_currentUid) {
     alert('>> NOT SIGNED IN — please sign in to sync saves <<');
     return;
@@ -443,6 +539,10 @@ window.syncLocalSavesToCloud = async function () {
 // Sanitizes and migrates the cloud container before writing to localStorage.
 // NEVER auto-loads; always requires explicit user confirmation.
 window.loadCloudSave = async function (docId) {
+  if (!window.isFeatureEnabled('cloudSync')) {
+    alert('>> CLOUD SYNC TEMPORARILY UNAVAILABLE — saves remain local <<');
+    return;
+  }
   if (!_currentUid) return;
   if (!confirm('>> LOAD CLOUD SAVE?\nThis replaces your current in-app campaign — continue?'))
     return;
@@ -488,6 +588,7 @@ window.loadCloudSave = async function (docId) {
 
 // ── Rename a cloud save (label only — no data change) ───────────────
 window.renameCloudSave = async function (docId, newLabel) {
+  if (!window.isFeatureEnabled('cloudSync')) return;
   if (!_currentUid || !newLabel) return;
   try {
     await updateDoc(doc(db, 'users', _currentUid, 'saves', docId), {
@@ -503,6 +604,7 @@ window.renameCloudSave = async function (docId, newLabel) {
 
 // ── Delete a cloud save (confirm-gated — user-initiated only) ────────
 window.deleteCloudSave = async function (docId) {
+  if (!window.isFeatureEnabled('cloudSync')) return;
   if (!_currentUid) return;
   if (!confirm('>> PERMANENTLY DELETE this cloud save?\nThis cannot be undone.')) return;
   try {
@@ -519,6 +621,7 @@ window.deleteCloudSave = async function (docId) {
 // with the sync toggle ON (robco_gemini_key_sync === 'true'). NEVER writes for
 // anonymous users or when the toggle is off. Non-fatal on network failure.
 async function loadGeminiKeyFromCloud() {
+  if (!window.isFeatureEnabled('keySync')) return;
   if (!_currentUser || _currentUser.isAnonymous) return;
   if (localStorage.getItem('robco_gemini_key_sync') !== 'true') return;
   if (!_currentUid) return;
@@ -546,6 +649,7 @@ async function loadGeminiKeyFromCloud() {
 }
 
 window.saveGeminiKeyToCloud = async function (key, model) {
+  if (!window.isFeatureEnabled('keySync')) return;
   if (!_currentUser || _currentUser.isAnonymous) return; // never sync for anonymous users
   if (localStorage.getItem('robco_gemini_key_sync') !== 'true') return; // only sync when toggle ON
   if (!_currentUid) return;
@@ -566,6 +670,7 @@ window.saveGeminiKeyToCloud = async function (key, model) {
 // the current local key (if any); turning it OFF stops future syncs (key
 // remains in Firestore until the user explicitly deletes their account data).
 window.setGeminiKeySync = async function (checked) {
+  if (!window.isFeatureEnabled('keySync')) return;
   localStorage.setItem('robco_gemini_key_sync', checked ? 'true' : 'false');
   if (_currentUser && !_currentUser.isAnonymous && _currentUid) {
     try {

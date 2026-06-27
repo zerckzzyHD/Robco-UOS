@@ -2096,6 +2096,73 @@ Check (-not ([bool]($pickerBody47 -match '\bdateStr\b'))) `
     'renderCloudSavePicker does not use dateStr (double-date regression guard -- date shown once via label)'
 
 # ===========================================================
+# Suite 48 -- Remote Kill-Switch + Client Auto-Disable (Protocol 32/35)
+# Fail-open: boot completes + all features work when config/flags absent.
+# Session-scoped auto-disable on repeated failures (FAIL_THRESHOLD=3).
+# 11 tests
+# ===========================================================
+Sep "Suite 48 -- Remote Kill-Switch + Client Auto-Disable (Protocol 32/35)"
+
+$rulesSrc48 = ''
+$rulesPath48 = Join-Path $Root 'firestore.rules'
+if (Test-Path $rulesPath48) { $rulesSrc48 = [IO.File]::ReadAllText($rulesPath48) }
+
+# 48.1  cloud.js defines loadRemoteConfig
+Check ([bool]($cloudSrc -match 'async function loadRemoteConfig\s*\(')) `
+    'cloud.js defines loadRemoteConfig (remote config reader)'
+
+# 48.2  loadRemoteConfig reads doc(db, 'config', 'flags') path
+Check (([bool]($cloudSrc -match "getDoc\s*\(")) -and ([bool]($cloudSrc -match "'config'")) -and ([bool]($cloudSrc -match "'flags'"))) `
+    "loadRemoteConfig reads doc(db, 'config', 'flags') path"
+
+# 48.3  loadRemoteConfig uses Promise.race with a timeout
+Check (([bool]($cloudSrc -match 'Promise\.race')) -and (([bool]($cloudSrc -match 'config-timeout')) -or ([bool]($cloudSrc -match 'setTimeout')))) `
+    'loadRemoteConfig races config fetch against a timeout (fail-open on slow network)'
+
+# 48.4  loadRemoteConfig body is wrapped in try/catch (fail-open on any error)
+$rcBody48 = ''
+$rcIdx48 = $cloudSrc.IndexOf('async function loadRemoteConfig')
+if ($rcIdx48 -ge 0) {
+    $rc48Start = $cloudSrc.IndexOf('{', $rcIdx48); $rc48Dep = 0; $rc48I = $rc48Start
+    while ($rc48I -lt $cloudSrc.Length) {
+        $ch = $cloudSrc[$rc48I]
+        if ($ch -eq '{') { $rc48Dep++ }
+        elseif ($ch -eq '}') { $rc48Dep--; if ($rc48Dep -eq 0) { $rcBody48 = $cloudSrc.Substring($rc48Start, $rc48I - $rc48Start + 1); break } }
+        $rc48I++
+    }
+}
+Check (([bool]($rcBody48 -match '\btry\b')) -and ([bool]($rcBody48 -match '\bcatch\b'))) `
+    'loadRemoteConfig body is wrapped in try/catch (fail-open -- any error keeps LKG/defaults)'
+
+# 48.5  loadRemoteConfig is NOT awaited in the boot IIFE
+Check (-not ([bool]($cloudSrc -match 'await\s+loadRemoteConfig'))) `
+    'loadRemoteConfig is NOT awaited in boot IIFE (fire-and-forget -- never on critical path)'
+
+# 48.6  window.isFeatureEnabled defined + uses !== false pattern (fail-open for unknown keys)
+Check (([bool]($cloudSrc -match 'window\.isFeatureEnabled\s*=')) -and ([bool]($cloudSrc -match '!==\s*false'))) `
+    "window.isFeatureEnabled defined and uses !== false pattern (unknown/missing keys return true -- fail-open)"
+
+# 48.7  LKG key robco_feature_flags is both read from and written to localStorage
+Check (([bool]($cloudSrc -match 'robco_feature_flags')) -and ([bool]($cloudSrc -match "localStorage\.setItem\s*\(\s*'robco_feature_flags")) -and ([bool]($cloudSrc -match "localStorage\.getItem\s*\(\s*'robco_feature_flags"))) `
+    "cloud.js reads and writes 'robco_feature_flags' localStorage key (last-known-good persistence)"
+
+# 48.8  transmitMessage in api.js references isFeatureEnabled with 'aiChat'
+Check (([bool]($apiSrc -match 'isFeatureEnabled')) -and ([bool]($apiSrc -match "'aiChat'"))) `
+    "transmitMessage references isFeatureEnabled('aiChat') (AI chat kill-switch gate)"
+
+# 48.9  a cloud operation references isFeatureEnabled with 'cloudSync'
+Check (([bool]($cloudSrc -match 'isFeatureEnabled')) -and ([bool]($cloudSrc -match "'cloudSync'"))) `
+    "cloud.js references isFeatureEnabled('cloudSync') (cloud sync kill-switch gate)"
+
+# 48.10  _recordFeatureFailure defined + FAIL_THRESHOLD present
+Check (([bool]($cloudSrc -match 'function _recordFeatureFailure')) -and ([bool]($cloudSrc -match 'FAIL_THRESHOLD'))) `
+    'cloud.js defines _recordFeatureFailure and FAIL_THRESHOLD (session-scoped auto-disable after repeated failures)'
+
+# 48.11  firestore.rules has /config/{...} with allow read: if true AND allow write: if false
+Check (([bool]($rulesSrc48 -match 'match\s*/config/\{')) -and ([bool]($rulesSrc48 -match 'allow\s+read\s*:\s*if\s+true')) -and ([bool]($rulesSrc48 -match 'allow\s+write\s*:\s*if\s+false'))) `
+    'firestore.rules has /config/{doc} rule: allow read if true, allow write if false (public read, console-only write)'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

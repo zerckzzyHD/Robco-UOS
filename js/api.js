@@ -898,6 +898,14 @@ async function transmitMessage() {
     return;
   }
 
+  if (typeof window.isFeatureEnabled === 'function' && !window.isFeatureEnabled('aiChat')) {
+    appendToChat(
+      '> AI LINK TEMPORARILY DISABLED BY OPERATOR — local terminal still fully usable.',
+      'sys'
+    );
+    return;
+  }
+
   let rawKey = localStorage.getItem('robco_gemini_key');
   let selectedModel = localStorage.getItem('robco_gemini_model');
   if (!rawKey) {
@@ -1126,6 +1134,11 @@ async function transmitMessage() {
         }, 2500);
       } else {
         transmitMessage._retrying = false;
+        if (typeof window._recordFeatureFailure === 'function')
+          window._recordFeatureFailure(
+            'aiChat',
+            '>> AI LINK PAUSED after repeated errors. Reload to retry. <<'
+          );
         appendToChat(
           `> ⚠ FATAL EXCEPTION AT 0x${Math.floor(Math.random() * 0xffff)
             .toString(16)

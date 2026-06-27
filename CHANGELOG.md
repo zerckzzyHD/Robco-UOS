@@ -1,4 +1,4 @@
-## [v2.5.0] — Unreleased<!-- Tests: 529/529 | Cache: robco-terminal-v2.0.1-r56 -->
+## [v2.5.0] — Unreleased<!-- Tests: 540/540 | Cache: robco-terminal-v2.0.1-r57 -->
 
 ### Added
 
@@ -12,6 +12,7 @@
 ### Under the Hood
 
 - Added 10 automated guard tests (Suite 47, 529 total across 51 suites) verifying that the Gemini key is never synced to Firestore for anonymous users or when the sync toggle is off, the toggle persists correctly, the AI Studio link is present with the correct security attributes, and the picker date-duplication regression cannot silently return.
+- Added a remote kill-switch and client auto-disable system (Suite 48, 540 total across 52 suites). A public Firestore document lets the operator disable individual features without a redeploy — each disabled feature shows a clear message and leaves local data untouched. If a feature fails three times in a session, the client pauses it automatically until reload. The app reads the config on boot without blocking start-up; when the config is absent or unreachable, all features stay on (fail-open). Added the /config/flags security rules and Protocol 35 defining the live-flip-first regression response.
 
 ---
 
