@@ -1205,9 +1205,15 @@ function showHelpModal() {
     '</div><p style="font-size:9px;opacity:0.6;margin-top:8px;">Type any command in the Comm-Link input to execute.</p>';
   modal.style.display = 'flex';
 }
-function clampStat(el) {
-  if (el.value > 10) el.value = 10;
-  if (el.value < 1) el.value = 1;
+function commitStat(el) {
+  const k = el.id.slice(2);
+  let v = parseInt(el.value, 10);
+  if (isNaN(v)) v = (state && state[k]) || 5;
+  v = Math.max(1, Math.min(10, v));
+  el.value = String(v);
+  if (state) state[k] = v;
+  updateMath();
+  saveState();
 }
 function toggleLimb(limb) {
   let wasOk = state[limb] === 'OK';

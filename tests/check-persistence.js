@@ -1611,17 +1611,18 @@ header('Meta / Runner Parity');
     'Suite 61',
     'Suite 62',
     'Suite 63',
+    'Suite 64',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-63)' +
+    'JS runner contains all gate-guard suites (22-41, 49-64)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-63)' +
+    'PS runner contains all gate-guard suites (22-41, 49-64)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -5617,6 +5618,105 @@ header('Suite 63 — Save/Cloud UI consolidation guards');
   assert(
     /id="btnSaveToCloud"/.test(htmlSource),
     'index.html has #btnSaveToCloud button (replaces btnCloudPush — additive save to cloud)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 64 — SPECIAL stats editable (commit-on-blur) guards (Phase 6 Task 1)
+//  commitStat replaces clampStat; no snap-to-1 mid-edit; validate on blur only
+//  9 tests
+// ══════════════════════════════════════════════════════════════
+header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
+{
+  const uiCoreSrc64 = readFile('js/ui-core.js');
+  const specialIds = ['s_s', 's_p', 's_e', 's_c', 's_i', 's_a', 's_l'];
+
+  // 64.1  All 7 SPECIAL inputs have onchange="commitStat(this)" (commit-on-blur)
+  {
+    const missing = specialIds.filter(id => {
+      const idIdx = htmlSource.indexOf(`id="${id}"`);
+      if (idIdx === -1) return true;
+      const slice = htmlSource.slice(Math.max(0, idIdx - 200), idIdx + 300);
+      return !/onchange="commitStat\(this\)"/.test(slice);
+    });
+    assert(
+      missing.length === 0,
+      'All 7 SPECIAL inputs have onchange="commitStat(this)" (commit-on-blur guard)' +
+        (missing.length ? ' — missing: ' + missing.join(', ') : '')
+    );
+  }
+
+  // 64.2  No SPECIAL input oninput contains clampStat (snap-to-1 regression guard)
+  {
+    const broken = specialIds.filter(id => {
+      const idIdx = htmlSource.indexOf(`id="${id}"`);
+      if (idIdx === -1) return false;
+      const slice = htmlSource.slice(Math.max(0, idIdx - 200), idIdx + 300);
+      return /oninput="[^"]*clampStat/.test(slice);
+    });
+    assert(
+      broken.length === 0,
+      'No SPECIAL input oninput contains clampStat (snap-to-1 regression guard)' +
+        (broken.length ? ' — found in: ' + broken.join(', ') : '')
+    );
+  }
+
+  // 64.3  commitStat is defined in ui-core.js
+  assert(/function commitStat\s*\(/.test(uiCoreSrc64), 'commitStat is defined in ui-core.js');
+
+  // 64.4–64.7: inspect commitStat body
+  {
+    let commitStatBody = '';
+    try {
+      commitStatBody = extractFunctionBody(uiCoreSrc64, 'commitStat');
+    } catch (_) {}
+
+    // 64.4  1–10 clamp on commit only
+    assert(
+      /Math\.max\s*\(\s*1,\s*Math\.min\s*\(\s*10,/.test(commitStatBody),
+      'commitStat clamps value to 1–10 on commit (Math.max/min guard)'
+    );
+
+    // 64.5  calls updateMath() for downstream recalcs
+    assert(
+      /updateMath\s*\(\s*\)/.test(commitStatBody),
+      'commitStat calls updateMath() to trigger downstream recalcs'
+    );
+
+    // 64.6  calls saveState() to persist
+    assert(
+      /saveState\s*\(\s*\)/.test(commitStatBody),
+      'commitStat calls saveState() to debounce-persist the new value'
+    );
+
+    // 64.7  isNaN guard reverts to prior state value (not a hard 1)
+    assert(
+      /isNaN\s*\(v\)/.test(commitStatBody) &&
+        /state\s*\[.*k.*\]/.test(commitStatBody) &&
+        /\|\|\s*5/.test(commitStatBody),
+      'commitStat reverts empty/NaN to state[k]||5 (not forced to 1) — regression guard'
+    );
+  }
+
+  // 64.8  All 7 SPECIAL inputs have inputmode="numeric"
+  {
+    const missing = specialIds.filter(id => {
+      const idIdx = htmlSource.indexOf(`id="${id}"`);
+      if (idIdx === -1) return true;
+      const slice = htmlSource.slice(Math.max(0, idIdx - 200), idIdx + 300);
+      return !/inputmode="numeric"/.test(slice);
+    });
+    assert(
+      missing.length === 0,
+      'All 7 SPECIAL inputs have inputmode="numeric" (mobile numeric keyboard guard)' +
+        (missing.length ? ' — missing: ' + missing.join(', ') : '')
+    );
+  }
+
+  // 64.9  clampStat is NOT defined (fully removed — regression guard)
+  assert(
+    !/function clampStat\s*\(/.test(uiCoreSrc64),
+    'clampStat is not defined in ui-core.js (removed — regression guard)'
   );
 }
 

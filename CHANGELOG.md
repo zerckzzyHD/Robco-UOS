@@ -1,4 +1,4 @@
-## [Unreleased]<!-- Tests: 757/757 | Cache: robco-terminal-v2.5.0-r3 -->
+## [Unreleased]<!-- Tests: 766/766 | Cache: robco-terminal-v2.5.0-r4 -->
 
 ### Changed
 
@@ -11,6 +11,7 @@
 
 ### Fixed
 
+- The SPECIAL stat fields (S P E C I A L) no longer fight you while typing. Previously, clearing a field to retype a value would immediately snap it back to 1 on every keystroke. Now the field is free to edit and only validates when you leave it (blur): blank or invalid reverts to your last saved value, out-of-range numbers clamp to the nearest valid value (1 or 10), and derived stats (skill points, VATS, etc.) update immediately after you commit.
 - The in-app patch notes viewer now shows the current release notes instead of the empty placeholder section. The viewer skips any unreleased placeholder block and goes straight to the first dated version; HTML comments in the version header no longer appear in the displayed text.
 
 ---

@@ -971,11 +971,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-63)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-63)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-64)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-64)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -3388,6 +3388,76 @@ Check ([bool]($htmlSrc -match 'id="savesListBody"')) `
 # 63.8  index.html has #btnSaveToCloud (replaces btnCloudPush -- additive save)
 Check ([bool]($htmlSrc -match 'id="btnSaveToCloud"')) `
     'index.html has #btnSaveToCloud button (replaces btnCloudPush -- additive save to cloud)'
+
+# ===========================================================
+# Suite 64 -- SPECIAL stats editable (commit-on-blur) guards (Phase 6 Task 1)
+# commitStat replaces clampStat; no snap-to-1 mid-edit; validate on blur only
+# 9 tests
+# ===========================================================
+Sep "Suite 64 -- SPECIAL stats editable (commit-on-blur) guards"
+$uiCoreSrc64 = Read-Src "js\ui-core.js"
+$specialIds64 = @('s_s','s_p','s_e','s_c','s_i','s_a','s_l')
+
+# 64.1  All 7 SPECIAL inputs have onchange="commitStat(this)"
+$missing641 = $specialIds64 | Where-Object {
+    $id = $_
+    $idIdx = $htmlSrc.IndexOf("id=""$id""")
+    if ($idIdx -lt 0) { return $true }
+    $slice = $htmlSrc.Substring([Math]::Max(0, $idIdx - 200), [Math]::Min(500, $htmlSrc.Length - [Math]::Max(0, $idIdx - 200)))
+    -not ($slice -match 'onchange="commitStat\(this\)"')
+}
+Check ($missing641.Count -eq 0) `
+    ("All 7 SPECIAL inputs have onchange=""commitStat(this)"" (commit-on-blur guard)" + $(if ($missing641.Count) { " -- missing: $($missing641 -join ', ')" } else { "" }))
+
+# 64.2  No SPECIAL input oninput contains clampStat (snap-to-1 regression guard)
+$broken642 = $specialIds64 | Where-Object {
+    $id = $_
+    $idIdx = $htmlSrc.IndexOf("id=""$id""")
+    if ($idIdx -lt 0) { return $false }
+    $slice = $htmlSrc.Substring([Math]::Max(0, $idIdx - 200), [Math]::Min(500, $htmlSrc.Length - [Math]::Max(0, $idIdx - 200)))
+    $slice -match 'oninput="[^"]*clampStat'
+}
+Check ($broken642.Count -eq 0) `
+    ("No SPECIAL input oninput contains clampStat (snap-to-1 regression guard)" + $(if ($broken642.Count) { " -- found in: $($broken642 -join ', ')" } else { "" }))
+
+# 64.3  commitStat is defined in ui-core.js
+Check ([bool]($uiCoreSrc64 -match 'function commitStat\s*\(')) `
+    'commitStat is defined in ui-core.js'
+
+# 64.4-64.7  inspect commitStat body
+$commitStatBody64 = ''
+try { $commitStatBody64 = Get-FunctionBody $uiCoreSrc64 'commitStat' } catch {}
+
+# 64.4  1-10 clamp on commit only
+Check ([bool]($commitStatBody64 -match 'Math\.Max\s*\(\s*1,\s*Math\.Min\s*\(\s*10,' -or $commitStatBody64 -match 'Math\.max\s*\(\s*1,\s*Math\.min\s*\(\s*10,')) `
+    'commitStat clamps value to 1-10 on commit (Math.max/min guard)'
+
+# 64.5  calls updateMath()
+Check ([bool]($commitStatBody64 -match 'updateMath\s*\(\s*\)')) `
+    'commitStat calls updateMath() to trigger downstream recalcs'
+
+# 64.6  calls saveState()
+Check ([bool]($commitStatBody64 -match 'saveState\s*\(\s*\)')) `
+    'commitStat calls saveState() to debounce-persist the new value'
+
+# 64.7  isNaN guard reverts to prior state value (not hard 1)
+Check (([bool]($commitStatBody64 -match 'isNaN\s*\(v\)')) -and ([bool]($commitStatBody64 -match 'state\s*\[.*k.*\]')) -and ([bool]($commitStatBody64 -match '\|\|\s*5'))) `
+    'commitStat reverts empty/NaN to state[k]||5 (not forced to 1) -- regression guard'
+
+# 64.8  All 7 SPECIAL inputs have inputmode="numeric"
+$missing648 = $specialIds64 | Where-Object {
+    $id = $_
+    $idIdx = $htmlSrc.IndexOf("id=""$id""")
+    if ($idIdx -lt 0) { return $true }
+    $slice = $htmlSrc.Substring([Math]::Max(0, $idIdx - 200), [Math]::Min(500, $htmlSrc.Length - [Math]::Max(0, $idIdx - 200)))
+    -not ($slice -match 'inputmode="numeric"')
+}
+Check ($missing648.Count -eq 0) `
+    ("All 7 SPECIAL inputs have inputmode=""numeric"" (mobile numeric keyboard guard)" + $(if ($missing648.Count) { " -- missing: $($missing648 -join ', ')" } else { "" }))
+
+# 64.9  clampStat is NOT defined (fully removed -- regression guard)
+Check (-not ([bool]($uiCoreSrc64 -match 'function clampStat\s*\('))) `
+    'clampStat is not defined in ui-core.js (removed -- regression guard)'
 
 # ===========================================================
 # Results
