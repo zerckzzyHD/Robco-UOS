@@ -2888,10 +2888,11 @@ Check ([bool]($htmlSrc55 -match 'img-src[^;]*blob:')) `
     "CSP img-src contains blob: (canvas/screenshot-preview images -- Protocol 20 guard)"
 
 # ===========================================================
-# Suite 56 -- UI Module Split Guards
+# Suite 56 -- UI Module Split Guards + Boot-Loader Migration
 # Protocol-20 static guards: each ui-*.js must exist, appear
 # in sw.js ASSETS, and be wired in index.html before api.js.
-# 21 tests
+# Also guards the document.write -> createElement migration.
+# 34 tests
 # ===========================================================
 Sep "Suite 56 -- UI Module Split Guards"
 $htmlSrc56 = $htmlSrc55  # reuse (same index.html read above)
@@ -2986,6 +2987,59 @@ Check ($acctIdx56b -ne -1 -and $uiIdx56d -ne -1 -and $acctIdx56b -lt $uiIdx56d) 
 # 56.21 js/ui.js must NOT exist (Slice E: fully renamed to ui-core.js)
 Check (-not (Test-Path (Join-Path $Root "js\ui.js"))) `
     "js/ui.js does not exist on disk (Slice E: renamed to ui-core.js -- old file must be absent)"
+
+# -- Boot-loader migration guards (56.22-56.34) --
+# 56.22 document.write is gone from index.html (headline regression guard)
+Check (-not ($htmlSrc56 -match 'document\.write')) `
+    "index.html contains no document.write (boot-loader migration guard)"
+
+# 56.23 Boot loader uses createElement('script') for dynamic injection
+Check ([bool]($htmlSrc56 -match "createElement\([`"']script[`"']\)")) `
+    "boot loader uses document.createElement('script') (dynamic injection guard)"
+
+# 56.24 Boot loader uses .appendChild() to insert scripts
+Check ([bool]($htmlSrc56 -match '\.appendChild\(')) `
+    "boot loader uses .appendChild() to inject scripts into <head> (dynamic injection guard)"
+
+# 56.25 Boot loader sets .async = false to preserve db->state->reg order
+Check ([bool]($htmlSrc56 -match '\.async\s*=\s*false')) `
+    "boot loader sets script.async = false (preserves db->state->reg load order)"
+
+# 56.26 Boot loader references js/db_nv.js (FNV database)
+Check ([bool]($htmlSrc56 -match 'js/db_nv\.js')) `
+    "boot loader references js/db_nv.js (FNV database path present)"
+
+# 56.27 Boot loader references js/db_fo3.js (FO3 database)
+Check ([bool]($htmlSrc56 -match 'js/db_fo3\.js')) `
+    "boot loader references js/db_fo3.js (FO3 database path present)"
+
+# 56.28 Boot loader references js/state.js (shared state module)
+Check ([bool]($htmlSrc56 -match 'js/state\.js')) `
+    "boot loader references js/state.js (shared state module path present)"
+
+# 56.29 Boot loader references js/reg_nv.js (FNV registry)
+Check ([bool]($htmlSrc56 -match 'js/reg_nv\.js')) `
+    "boot loader references js/reg_nv.js (FNV registry path present)"
+
+# 56.30 Boot loader references js/reg_fo3.js (FO3 registry)
+Check ([bool]($htmlSrc56 -match 'js/reg_fo3\.js')) `
+    "boot loader references js/reg_fo3.js (FO3 registry path present)"
+
+# 56.31 Boot loader reads activeContext (primary context selector)
+Check ([bool]($htmlSrc56 -match 'activeContext')) `
+    "boot loader reads activeContext (primary game-context selector)"
+
+# 56.32 Boot loader has try/catch for fail-safe LocalStorage access
+Check ([bool]($htmlSrc56 -match 'try\s*\{')) `
+    "boot loader has try { } catch (fail-safe: corrupt LocalStorage -> FNV default)"
+
+# 56.33 Boot loader has 'FNV' as the fail-safe default
+Check ([bool]($htmlSrc56 -match "'FNV'" -or $htmlSrc56 -match '"FNV"')) `
+    "boot loader has 'FNV' fail-safe default (loads FNV when context is absent/unreadable)"
+
+# 56.34 Boot loader handles 'FO3' context
+Check ([bool]($htmlSrc56 -match "'FO3'" -or $htmlSrc56 -match '"FO3"')) `
+    "boot loader handles 'FO3' context (switches to FO3 db + reg when activeContext is FO3)"
 
 # ===========================================================
 # Results

@@ -4799,10 +4799,11 @@ header('Suite 55 — CSP Stage 1 Origin Guards + Firebase Pin');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 56 — UI Module Split Guards
+//  Suite 56 — UI Module Split Guards + Boot-Loader Migration
 //  Protocol-20 static guards: each ui-*.js must exist, appear
 //  in sw.js ASSETS, and be wired in index.html before api.js.
-// 21 tests
+//  Also guards the document.write → createElement migration.
+// 34 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 56 — UI Module Split Guards');
 {
@@ -4965,6 +4966,85 @@ header('Suite 56 — UI Module Split Guards');
   assert(
     !fs.existsSync(path.join(ROOT, 'js/ui.js')),
     'js/ui.js does not exist on disk (Slice E: renamed to ui-core.js — old file must be absent)'
+  );
+
+  // ── Boot-loader migration guards (56.22–56.34) ────────────
+  // 56.22 document.write is gone from index.html (headline regression guard)
+  assert(
+    !/document\.write/.test(htmlSrc56),
+    'index.html contains no document.write (boot-loader migration guard)'
+  );
+
+  // 56.23 Boot loader uses createElement('script') for dynamic injection
+  assert(
+    /createElement\(['"]script['"]\)/.test(htmlSrc56),
+    "boot loader uses document.createElement('script') (dynamic injection guard)"
+  );
+
+  // 56.24 Boot loader uses .appendChild() to insert scripts
+  assert(
+    /\.appendChild\(/.test(htmlSrc56),
+    'boot loader uses .appendChild() to inject scripts into <head> (dynamic injection guard)'
+  );
+
+  // 56.25 Boot loader sets .async = false to preserve db→state→reg order
+  assert(
+    /\.async\s*=\s*false/.test(htmlSrc56),
+    'boot loader sets script.async = false (preserves db→state→reg load order)'
+  );
+
+  // 56.26 Boot loader references js/db_nv.js (FNV database)
+  assert(
+    /js\/db_nv\.js/.test(htmlSrc56),
+    'boot loader references js/db_nv.js (FNV database path present)'
+  );
+
+  // 56.27 Boot loader references js/db_fo3.js (FO3 database)
+  assert(
+    /js\/db_fo3\.js/.test(htmlSrc56),
+    'boot loader references js/db_fo3.js (FO3 database path present)'
+  );
+
+  // 56.28 Boot loader references js/state.js (shared state module)
+  assert(
+    /js\/state\.js/.test(htmlSrc56),
+    'boot loader references js/state.js (shared state module path present)'
+  );
+
+  // 56.29 Boot loader references js/reg_nv.js (FNV registry)
+  assert(
+    /js\/reg_nv\.js/.test(htmlSrc56),
+    'boot loader references js/reg_nv.js (FNV registry path present)'
+  );
+
+  // 56.30 Boot loader references js/reg_fo3.js (FO3 registry)
+  assert(
+    /js\/reg_fo3\.js/.test(htmlSrc56),
+    'boot loader references js/reg_fo3.js (FO3 registry path present)'
+  );
+
+  // 56.31 Boot loader reads activeContext (primary context selector)
+  assert(
+    /activeContext/.test(htmlSrc56),
+    'boot loader reads activeContext (primary game-context selector)'
+  );
+
+  // 56.32 Boot loader has try/catch for fail-safe LocalStorage access
+  assert(
+    /try\s*\{/.test(htmlSrc56),
+    'boot loader has try { ... } catch (fail-safe: corrupt LocalStorage → FNV default)'
+  );
+
+  // 56.33 Boot loader has 'FNV' as the fail-safe default
+  assert(
+    /'FNV'/.test(htmlSrc56) || /"FNV"/.test(htmlSrc56),
+    "boot loader has 'FNV' fail-safe default (loads FNV when context is absent/unreadable)"
+  );
+
+  // 56.34 Boot loader handles 'FO3' context
+  assert(
+    /'FO3'/.test(htmlSrc56) || /"FO3"/.test(htmlSrc56),
+    "boot loader handles 'FO3' context (switches to FO3 db + reg when activeContext is FO3)"
   );
 }
 

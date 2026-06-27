@@ -1,4 +1,4 @@
-## [v2.5.0] — Unreleased<!-- Tests: 695/695 | Cache: robco-terminal-v2.0.1-r71 -->
+## [v2.5.0] — Unreleased<!-- Tests: 708/708 | Cache: robco-terminal-v2.0.1-r72 -->
 
 ### Added
 
@@ -17,6 +17,7 @@
 
 ### Under the Hood
 
+- Replaced the legacy boot-loader with a modern equivalent that works the same way but avoids the deprecated `document.write` API. The new loader creates script tags at runtime and inserts them in order — the database, state, and registry scripts still load in the same guaranteed sequence, the correct files for each game context (Fallout: New Vegas or Fallout 3) are still selected from saved settings, and the fallback when settings are unreadable still defaults to New Vegas. No user-facing change. Added 13 automated guard tests (Suite 56 extended, 708 total across 60 suites). Bumped CACHE_NAME to r72.
 - Renamed the remaining core UI file from ui.js to ui-core.js, completing the 5-part internal refactor (Slice E). The file now has a name that matches its role — core UI lifecycle, chat rendering, command dispatch, and math updates. No user-facing behaviour changes. Added 1 test to Suite 56 confirming the old ui.js no longer exists on disk (695 total across 60 suites). Bumped CACHE_NAME to r71.
 - Split the account panel, cloud save picker, and undo-sync function out of ui.js into a dedicated js/ui-account.js module (Slice D of a 5-part internal refactor). No user-facing behaviour changes. Extended Suite 56 from 15 to 20 tests — added file-exists, service-worker cache, script-tag, and load-order checks for the new account module (694 total across 60 suites). Bumped CACHE_NAME to r70 (new served file added).
 - Split save-related functions — save slots, file import and export, rolling backup restore, registry autocomplete wiring, and the ammo datalist — out of ui.js into a dedicated js/ui-saves.js module (Slice C of a 5-part internal refactor). No user-facing behaviour changes. Extended Suite 56 from 10 to 15 tests — added file-exists, service-worker cache, script-tag, and load-order checks for the new saves module (689 total across 60 suites). Bumped CACHE_NAME to r69 (new served file added).

@@ -1947,25 +1947,43 @@
     </div>
 
     <script>
+      // Context-conditional boot loader — replaces the legacy write-based script injector.
+      // Injects exactly ONE db + ONE reg + shared state.js, chosen by activeContext, as
+      // ordered classic scripts. script.async = false preserves db→state→reg order;
+      // dynamically-inserted scripts also delay the window 'load' event, so window.onload
+      // (registered in ui-core.js) cannot fire until all three run. Static ui-*/api/cloud
+      // tags below are pure declarations and may parse first — harmless, nothing reads
+      // `state` until onload.
       (function () {
+        var ctx = 'FNV'; // fail-safe default if localStorage is unreadable/empty
         try {
           var v8 = JSON.parse(localStorage.getItem('robco_v8') || '{}');
           var v7 = JSON.parse(localStorage.getItem('robco_v7') || '{}');
-          var ctx = v8.activeContext || v7.gameContext || 'FNV';
-          if (ctx === 'FO3') {
-            document.write('<script src="js/db_fo3.js"><\/script>');
-            document.write('<script src="js/state.js"><\/script>');
-            document.write('<script src="js/reg_fo3.js"><\/script>');
-          } else {
-            document.write('<script src="js/db_nv.js"><\/script>');
-            document.write('<script src="js/state.js"><\/script>');
-            document.write('<script src="js/reg_nv.js"><\/script>');
-          }
+          ctx = (v8.activeContext || v7.gameContext) === 'FO3' ? 'FO3' : 'FNV';
         } catch (e) {
-          document.write('<script src="js/db_nv.js"><\/script>');
-          document.write('<script src="js/state.js"><\/script>');
-          document.write('<script src="js/reg_nv.js"><\/script>');
+          ctx = 'FNV';
         }
+
+        var bootScripts =
+          ctx === 'FO3'
+            ? ['js/db_fo3.js', 'js/state.js', 'js/reg_fo3.js']
+            : ['js/db_nv.js', 'js/state.js', 'js/reg_nv.js'];
+
+        bootScripts.forEach(function (src) {
+          var s = document.createElement('script');
+          s.src = src;
+          s.async = false; // preserve insertion order (db → state → reg)
+          s.onerror = function () {
+            document.documentElement.innerHTML =
+              '<pre style="color:#41ff00;background:#000;margin:0;padding:2em;' +
+              'font-family:monospace;white-space:pre-wrap">' +
+              '⚙ [SYS-ALERT: BOOT DATA FAILED TO LOAD]\n\n' +
+              'Module: ' +
+              src +
+              '\n\nReconnect to the network and reload the terminal.</pre>';
+          };
+          document.head.appendChild(s);
+        });
       })();
     </script>
     <script src="js/ui-audio.js"></script>
