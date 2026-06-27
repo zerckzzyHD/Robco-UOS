@@ -967,7 +967,7 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
 Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-51)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
@@ -2588,6 +2588,94 @@ Check ($null -ne $manifest52.categories -and $manifest52.categories.Count -gt 0)
 $readmeSrc52 = Read-Src "README.md"
 Check ($readmeSrc52 -match "ci\.yml" -and $readmeSrc52 -match "badge") `
     "README.md contains GitHub Actions CI badge referencing ci.yml"
+
+# ===========================================================
+# Suite 53 -- AI + Gemini-Key Resilience Guards
+# Key validation hardening, bounded exponential backoff,
+# error classification, Tri-Node schema validation.
+# 14 tests
+# ===========================================================
+Sep "Suite 53 -- AI + Gemini-Key Resilience Guards"
+$apiSrc53 = Read-Src "js/api.js"
+
+# 53.1  _AI_RETRY_MAX constant defined
+Check ($apiSrc53 -match '_AI_RETRY_MAX\s*=\s*\d+') `
+    "_AI_RETRY_MAX constant defined in api.js"
+
+# 53.2  _AI_RETRY_DELAYS_MS array defined with ≥3 entries
+$delaysMatch53 = [regex]::Match($apiSrc53, '_AI_RETRY_DELAYS_MS\s*=\s*\[([^\]]+)\]')
+$delayEntries53 = if ($delaysMatch53.Success) {
+    $delaysMatch53.Groups[1].Value -split ',' | Where-Object { $_.Trim().Length -gt 0 }
+} else { @() }
+Check ($delayEntries53.Count -ge 3) `
+    "_AI_RETRY_DELAYS_MS defined with >=3 delay entries (found $($delayEntries53.Count))"
+
+# 53.3  Delay values are exponentially increasing
+$delayVals53 = $delayEntries53 | ForEach-Object { [int]$_.Trim() }
+$isExponential53 = $delayVals53.Count -ge 2
+for ($di = 1; $di -lt $delayVals53.Count; $di++) {
+    if ($delayVals53[$di] -lt $delayVals53[$di-1] * 2) { $isExponential53 = $false }
+}
+Check $isExponential53 `
+    "_AI_RETRY_DELAYS_MS values are exponentially increasing"
+
+# 53.4  fetchAuthorizedModels checks response.status for 401/403
+$fnFetch53 = Get-FunctionBody $apiSrc53 'fetchAuthorizedModels'
+Check ($fnFetch53 -match 'response\.status\s*===\s*401\s*\|\|\s*response\.status\s*===\s*403') `
+    "fetchAuthorizedModels checks response.status === 401 || 403 explicitly"
+
+# 53.5  Auth failure path returns before saveApiKeySilent (bad key never saved)
+$authIdx53  = $fnFetch53.IndexOf('401')
+$returnIdx53 = $fnFetch53.IndexOf('return', $authIdx53)
+$saveIdx53   = $fnFetch53.IndexOf('saveApiKeySilent')
+Check ($authIdx53 -ge 0 -and $returnIdx53 -ge 0 -and $saveIdx53 -ge 0 -and $returnIdx53 -lt $saveIdx53) `
+    "fetchAuthorizedModels: return appears before saveApiKeySilent (invalid key not saved)"
+
+# 53.6  Auth failure message contains "REJECTED"
+Check ($fnFetch53 -imatch 'REJECTED') `
+    "fetchAuthorizedModels auth failure message contains REJECTED"
+
+# 53.7  transmitMessage 401/403 branch has no setTimeout (auth errors not retried)
+$fnTm53 = Get-FunctionBody $apiSrc53 'transmitMessage'
+$authBranchIdx53 = $fnTm53.IndexOf('_code === 401 || _code === 403')
+$next429Idx53    = $fnTm53.IndexOf('_code === 429')
+$authBlock53 = if ($authBranchIdx53 -ge 0 -and $next429Idx53 -gt $authBranchIdx53) {
+    $fnTm53.Substring($authBranchIdx53, $next429Idx53 - $authBranchIdx53)
+} else { '' }
+Check ($authBlock53.Length -gt 0 -and -not ($authBlock53 -match 'setTimeout')) `
+    "transmitMessage 401/403 branch has no setTimeout -- auth errors not retried"
+
+# 53.8  transmitMessage has 429 handling with rate-limit message
+Check ($fnTm53 -match '_code === 429' -and $fnTm53 -imatch 'RATE LIMIT') `
+    "transmitMessage handles 429 with a RATE LIMIT message"
+
+# 53.9  Retry logic references _AI_RETRY_MAX (bounded)
+$retryMaxCount53 = ([regex]::Matches($fnTm53, '_AI_RETRY_MAX')).Count
+Check ($retryMaxCount53 -ge 2) `
+    "transmitMessage references _AI_RETRY_MAX >=2 times (bounded backoff)"
+
+# 53.10  _validateTriNode function defined in api.js
+Check ($apiSrc53 -match 'function\s+_validateTriNode\s*\(') `
+    "_validateTriNode() function defined in api.js"
+
+# 53.11  _validateTriNode called before autoImportState in transmitMessage
+$vIdx53 = $fnTm53.IndexOf('_validateTriNode')
+$aIdx53 = $fnTm53.IndexOf('autoImportState')
+Check ($vIdx53 -ge 0 -and $aIdx53 -ge 0 -and $vIdx53 -lt $aIdx53) `
+    "_validateTriNode called before autoImportState in transmitMessage"
+
+# 53.12  _validateTriNode body guards against null/falsy input
+$fnVtN53 = Get-FunctionBody $apiSrc53 '_validateTriNode'
+Check ($fnVtN53 -match '!parsed') `
+    "_validateTriNode body has !parsed guard (null/falsy input rejected)"
+
+# 53.13  _validateTriNode body guards against arrays
+Check ($fnVtN53 -match 'Array\.isArray') `
+    "_validateTriNode body has Array.isArray guard (array response rejected)"
+
+# 53.14  _validateTriNode body accepts objects with Tri-Node keys
+Check ($fnVtN53 -match "'narrative' in parsed" -or $fnVtN53 -match '"narrative" in parsed') `
+    "_validateTriNode body accepts objects with 'narrative' key"
 
 # ===========================================================
 # Results

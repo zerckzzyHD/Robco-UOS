@@ -1582,17 +1582,18 @@ header('Meta / Runner Parity');
     'Suite 50',
     'Suite 51',
     'Suite 52',
+    'Suite 53',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-51)' +
+    'JS runner contains all gate-guard suites (22-41, 49-53)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-51)' +
+    'PS runner contains all gate-guard suites (22-41, 49-53)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -4344,6 +4345,144 @@ header('Suite 52 — Repo / Site Enrichment Guards (Protocol 37)');
   assert(
     readmeSrc52.includes('ci.yml') && readmeSrc52.includes('badge'),
     'README.md contains GitHub Actions CI badge referencing ci.yml'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 53 — AI + Gemini-Key Resilience Guards
+//  Key validation hardening, bounded exponential backoff,
+//  error classification, Tri-Node schema validation.
+//  14 tests
+// ══════════════════════════════════════════════════════════════
+header('Suite 53 — AI + Gemini-Key Resilience Guards');
+{
+  const apiSrc53 = readFile('js/api.js');
+
+  // 53.1  _AI_RETRY_MAX constant defined
+  assert(/_AI_RETRY_MAX\s*=\s*\d+/.test(apiSrc53), '_AI_RETRY_MAX constant defined in api.js');
+
+  // 53.2  _AI_RETRY_DELAYS_MS array defined with ≥3 entries
+  {
+    const m = apiSrc53.match(/_AI_RETRY_DELAYS_MS\s*=\s*\[([^\]]+)\]/);
+    const entries = m ? m[1].split(',').filter(s => s.trim().length > 0) : [];
+    assert(
+      entries.length >= 3,
+      `_AI_RETRY_DELAYS_MS defined with ≥3 delay entries (found ${entries.length})`
+    );
+  }
+
+  // 53.3  Delay values are exponentially increasing (each ≥ 2× the previous)
+  {
+    const m = apiSrc53.match(/_AI_RETRY_DELAYS_MS\s*=\s*\[([^\]]+)\]/);
+    const vals = m
+      ? m[1]
+          .split(',')
+          .map(s => parseInt(s.trim()))
+          .filter(n => !isNaN(n))
+      : [];
+    const isExponential = vals.length >= 2 && vals.every((v, i) => i === 0 || v >= vals[i - 1] * 2);
+    assert(
+      isExponential,
+      `_AI_RETRY_DELAYS_MS values are exponentially increasing (${vals.join(', ')})`
+    );
+  }
+
+  // 53.4  fetchAuthorizedModels explicitly checks response.status for 401/403
+  {
+    const fnBody53 = extractFunctionBody(apiSrc53, 'fetchAuthorizedModels');
+    assert(
+      /response\.status\s*===\s*401\s*\|\|\s*response\.status\s*===\s*403/.test(fnBody53),
+      'fetchAuthorizedModels checks response.status === 401 || 403 explicitly'
+    );
+  }
+
+  // 53.5  Auth failure path returns before saveApiKeySilent (bad key never saved)
+  {
+    const fnBody53 = extractFunctionBody(apiSrc53, 'fetchAuthorizedModels');
+    const authIdx = fnBody53.indexOf('401');
+    const returnIdx = fnBody53.indexOf('return', authIdx);
+    const saveIdx = fnBody53.indexOf('saveApiKeySilent');
+    assert(
+      authIdx !== -1 && returnIdx !== -1 && saveIdx !== -1 && returnIdx < saveIdx,
+      'fetchAuthorizedModels: return appears before saveApiKeySilent (invalid key not saved)'
+    );
+  }
+
+  // 53.6  Auth failure message contains "REJECTED"
+  {
+    const fnBody53 = extractFunctionBody(apiSrc53, 'fetchAuthorizedModels');
+    assert(
+      /REJECTED/i.test(fnBody53),
+      'fetchAuthorizedModels auth failure message contains "REJECTED" (clear user guidance)'
+    );
+  }
+
+  // 53.7  transmitMessage 401/403 branch has no setTimeout (auth errors not retried)
+  {
+    const tmBody53 = extractFunctionBody(apiSrc53, 'transmitMessage');
+    const authIdx = tmBody53.indexOf('_code === 401 || _code === 403');
+    const next429Idx = tmBody53.indexOf('_code === 429');
+    // Extract the 401/403 block text (from auth check to the next else if)
+    const authBlock =
+      authIdx !== -1 && next429Idx !== -1 ? tmBody53.slice(authIdx, next429Idx) : '';
+    assert(
+      authBlock.length > 0 && !authBlock.includes('setTimeout'),
+      'transmitMessage 401/403 branch has no setTimeout — auth errors are not retried'
+    );
+  }
+
+  // 53.8  transmitMessage has 429 handling with rate-limit message
+  {
+    const tmBody53 = extractFunctionBody(apiSrc53, 'transmitMessage');
+    assert(
+      tmBody53.includes('_code === 429') && /RATE LIMIT/i.test(tmBody53),
+      'transmitMessage handles 429 with a RATE LIMIT user message'
+    );
+  }
+
+  // 53.9  Retry logic references _AI_RETRY_MAX (bounded, not hardcoded loop)
+  {
+    const tmBody53 = extractFunctionBody(apiSrc53, 'transmitMessage');
+    assert(
+      (tmBody53.match(/_AI_RETRY_MAX/g) || []).length >= 2,
+      'transmitMessage retry logic references _AI_RETRY_MAX ≥2 times (bounded backoff)'
+    );
+  }
+
+  // 53.10  _validateTriNode function defined in api.js
+  assert(
+    /function\s+_validateTriNode\s*\(/.test(apiSrc53),
+    '_validateTriNode() function defined in api.js'
+  );
+
+  // 53.11  _validateTriNode called before autoImportState in transmitMessage
+  {
+    const tmBody53 = extractFunctionBody(apiSrc53, 'transmitMessage');
+    const vIdx = tmBody53.indexOf('_validateTriNode');
+    const aIdx = tmBody53.indexOf('autoImportState');
+    assert(
+      vIdx !== -1 && aIdx !== -1 && vIdx < aIdx,
+      '_validateTriNode called before autoImportState in transmitMessage (schema validated before state mutation)'
+    );
+  }
+
+  // 53.12–53.14  Static: _validateTriNode body guards are all present
+  const fnVtN53 = extractFunctionBody(apiSrc53, '_validateTriNode');
+
+  // 53.12  Guards against null/falsy input
+  assert(
+    /!parsed/.test(fnVtN53),
+    '_validateTriNode body has !parsed guard (null/falsy input rejected)'
+  );
+  // 53.13  Guards against arrays
+  assert(
+    /Array\.isArray/.test(fnVtN53),
+    '_validateTriNode body has Array.isArray guard (array responses rejected)'
+  );
+  // 53.14  Accepts objects with Tri-Node keys
+  assert(
+    /'narrative' in parsed/.test(fnVtN53) || /"narrative" in parsed/.test(fnVtN53),
+    "_validateTriNode body accepts objects with 'narrative' key (valid Tri-Node accepted)"
   );
 }
 

@@ -155,6 +155,14 @@ ${GAME_DEFS[ctx].ai.irreversibleTriggers}
 Do not block the action — only warn. The Courier has full agency.`;
 }
 
+const _AI_RETRY_MAX = 3;
+const _AI_RETRY_DELAYS_MS = [1000, 2000, 4000];
+
+function _validateTriNode(parsed) {
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return false;
+  return 'narrative' in parsed || 'state' in parsed || 'modal' in parsed;
+}
+
 async function fetchAuthorizedModels(silent = false) {
   let rawKey = document.getElementById('apiKeyInput').value.trim();
   if (!rawKey) {
@@ -169,6 +177,11 @@ async function fetchAuthorizedModels(silent = false) {
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models`, {
       headers: { 'x-goog-api-key': rawKey },
     });
+    if (response.status === 401 || response.status === 403) {
+      if (!silent)
+        alert('>> KEY REJECTED — Invalid or unauthorized API key. Verify it in Google AI Studio.');
+      return;
+    }
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
     const selectEl = document.getElementById('apiModelInput');
@@ -884,6 +897,9 @@ function _nativeWait(hours) {
 }
 
 async function transmitMessage() {
+  if (!transmitMessage._inRetry) transmitMessage._retryCount = 0;
+  transmitMessage._inRetry = false;
+
   const inputEl = document.getElementById('chatInput');
   const userText = inputEl.value.trim();
   if (!userText && !attachedImageData) return;
@@ -1010,6 +1026,7 @@ async function transmitMessage() {
     clearTimeout(timeoutId);
 
     if (!response.ok) throw new Error(`API Error ${response.status}`);
+    transmitMessage._retryCount = 0;
     const data = await response.json();
     let aiText = data.candidates[0].content.parts[0].text
       .replace(/```json/gi, '')
@@ -1018,93 +1035,103 @@ async function transmitMessage() {
 
     try {
       const parsedNode = JSON.parse(aiText);
-      if (parsedNode.modal && parsedNode.modal.title) {
-        if (parsedNode.modal.title.includes('PROJECTED TIMELINE')) {
-          let tDisplay = document.getElementById('timelineDisplay');
-          if (tDisplay) {
-            tDisplay.innerHTML = Array.isArray(parsedNode.modal.content)
-              ? parsedNode.modal.content.join('<br>')
-              : parsedNode.modal.content;
-          }
-        } else {
-          document.getElementById('modalTitle').innerText = '> ' + parsedNode.modal.title;
-          let mContent = document.getElementById('modalContent');
-          let mType = parsedNode.modal.type || 'TEXT';
-
-          if (mType === 'GPS') {
-            mContent.innerHTML = '<div class="modal-grid-map"></div>';
-            let gridMap = mContent.querySelector('.modal-grid-map');
-            let rows = Array.isArray(parsedNode.modal.content) ? parsedNode.modal.content : [];
-            rows.forEach(row => {
-              let rowDiv = document.createElement('div');
-              rowDiv.className = 'grid-row';
-              let cells = Array.isArray(row) ? row : [row];
-              cells.forEach(cell => {
-                let cellDiv = document.createElement('div');
-                cellDiv.className = 'grid-cell';
-                cellDiv.innerText = cell;
-                let cleanCell = cell.replace(/\[|\]/g, '').trim();
-                if (
-                  cleanCell !== '' &&
-                  cleanCell !== 'X' &&
-                  cleanCell !== '█' &&
-                  cleanCell !== '@' &&
-                  cleanCell !== 'O' &&
-                  cleanCell.length > 0
-                ) {
-                  cellDiv.style.cursor = 'pointer';
-                  cellDiv.onclick = () => {
-                    document.getElementById('chatInput').value = `> MOVE TO ${cleanCell}`;
-                    closeModal();
-                    transmitMessage();
-                  };
-                }
-                rowDiv.appendChild(cellDiv);
-              });
-              gridMap.appendChild(rowDiv);
-            });
-          } else if (mType === 'TRADE') {
-            mContent.innerHTML =
-              '<div class="trade-window"><div class="trade-col" id="tradeVendor"><h3>> VENDOR</h3></div><div class="trade-col" id="tradeCourier"><h3>> COURIER</h3></div></div>';
-            let items = Array.isArray(parsedNode.modal.content) ? parsedNode.modal.content : [];
-            items.forEach(item => {
-              let div = document.createElement('div');
-              div.className = 'trade-item';
-              let span = document.createElement('span');
-              span.textContent = `${item.qty}x ${item.name} (${item.price}c)`;
-              let btn = document.createElement('button');
-              btn.className = 'action-btn';
-              btn.setAttribute('style', 'width:auto; padding:2px 5px;');
-              btn.textContent = item.vendor ? 'BUY' : 'SELL';
-              btn.addEventListener('click', () => tradeItem(item.name, item.price, item.vendor));
-              div.appendChild(span);
-              div.appendChild(btn);
-              if (item.vendor) document.getElementById('tradeVendor').appendChild(div);
-              else document.getElementById('tradeCourier').appendChild(div);
-            });
-          } else {
-            mContent.innerText = Array.isArray(parsedNode.modal.content)
-              ? parsedNode.modal.content.join('\n')
-              : parsedNode.modal.content;
-          }
-          document.getElementById('sysModal').style.display = 'flex';
-        }
-      }
-
-      let narrativeContent =
-        parsedNode.narrative || parsedNode.narrative_array || parsedNode.text || parsedNode.message;
-      if (narrativeContent) {
+      if (!_validateTriNode(parsedNode)) {
         appendToChat(
-          Array.isArray(narrativeContent) ? narrativeContent.join('\n') : narrativeContent,
-          'ai'
+          '> ⚠ [SYS] AI returned an unexpected response format — nothing was changed. Please try again.',
+          'sys'
         );
-      } else if (!parsedNode.modal) {
-        appendToChat('> SYS-ALERT: Missing narrative and modal nodes.', 'sys');
-      }
+      } else {
+        if (parsedNode.modal && parsedNode.modal.title) {
+          if (parsedNode.modal.title.includes('PROJECTED TIMELINE')) {
+            let tDisplay = document.getElementById('timelineDisplay');
+            if (tDisplay) {
+              tDisplay.innerHTML = Array.isArray(parsedNode.modal.content)
+                ? parsedNode.modal.content.join('<br>')
+                : parsedNode.modal.content;
+            }
+          } else {
+            document.getElementById('modalTitle').innerText = '> ' + parsedNode.modal.title;
+            let mContent = document.getElementById('modalContent');
+            let mType = parsedNode.modal.type || 'TEXT';
 
-      if (parsedNode.state) {
-        autoImportState(JSON.stringify(parsedNode.state));
-      }
+            if (mType === 'GPS') {
+              mContent.innerHTML = '<div class="modal-grid-map"></div>';
+              let gridMap = mContent.querySelector('.modal-grid-map');
+              let rows = Array.isArray(parsedNode.modal.content) ? parsedNode.modal.content : [];
+              rows.forEach(row => {
+                let rowDiv = document.createElement('div');
+                rowDiv.className = 'grid-row';
+                let cells = Array.isArray(row) ? row : [row];
+                cells.forEach(cell => {
+                  let cellDiv = document.createElement('div');
+                  cellDiv.className = 'grid-cell';
+                  cellDiv.innerText = cell;
+                  let cleanCell = cell.replace(/\[|\]/g, '').trim();
+                  if (
+                    cleanCell !== '' &&
+                    cleanCell !== 'X' &&
+                    cleanCell !== '█' &&
+                    cleanCell !== '@' &&
+                    cleanCell !== 'O' &&
+                    cleanCell.length > 0
+                  ) {
+                    cellDiv.style.cursor = 'pointer';
+                    cellDiv.onclick = () => {
+                      document.getElementById('chatInput').value = `> MOVE TO ${cleanCell}`;
+                      closeModal();
+                      transmitMessage();
+                    };
+                  }
+                  rowDiv.appendChild(cellDiv);
+                });
+                gridMap.appendChild(rowDiv);
+              });
+            } else if (mType === 'TRADE') {
+              mContent.innerHTML =
+                '<div class="trade-window"><div class="trade-col" id="tradeVendor"><h3>> VENDOR</h3></div><div class="trade-col" id="tradeCourier"><h3>> COURIER</h3></div></div>';
+              let items = Array.isArray(parsedNode.modal.content) ? parsedNode.modal.content : [];
+              items.forEach(item => {
+                let div = document.createElement('div');
+                div.className = 'trade-item';
+                let span = document.createElement('span');
+                span.textContent = `${item.qty}x ${item.name} (${item.price}c)`;
+                let btn = document.createElement('button');
+                btn.className = 'action-btn';
+                btn.setAttribute('style', 'width:auto; padding:2px 5px;');
+                btn.textContent = item.vendor ? 'BUY' : 'SELL';
+                btn.addEventListener('click', () => tradeItem(item.name, item.price, item.vendor));
+                div.appendChild(span);
+                div.appendChild(btn);
+                if (item.vendor) document.getElementById('tradeVendor').appendChild(div);
+                else document.getElementById('tradeCourier').appendChild(div);
+              });
+            } else {
+              mContent.innerText = Array.isArray(parsedNode.modal.content)
+                ? parsedNode.modal.content.join('\n')
+                : parsedNode.modal.content;
+            }
+            document.getElementById('sysModal').style.display = 'flex';
+          }
+        }
+
+        let narrativeContent =
+          parsedNode.narrative ||
+          parsedNode.narrative_array ||
+          parsedNode.text ||
+          parsedNode.message;
+        if (narrativeContent) {
+          appendToChat(
+            Array.isArray(narrativeContent) ? narrativeContent.join('\n') : narrativeContent,
+            'ai'
+          );
+        } else if (!parsedNode.modal) {
+          appendToChat('> SYS-ALERT: Missing narrative and modal nodes.', 'sys');
+        }
+
+        if (parsedNode.state) {
+          autoImportState(JSON.stringify(parsedNode.state));
+        }
+      } // end _validateTriNode else
     } catch (e) {
       appendToChat(
         `> ⚠ FATAL EXCEPTION AT 0x${Math.floor(Math.random() * 0xffff)
@@ -1117,35 +1144,90 @@ async function transmitMessage() {
   } catch (error) {
     if (error.name === 'AbortError') {
       appendToChat('> TRANSMISSION CANCELLED.', 'sys');
-    } else if (!error.name || error.name !== 'AbortError') {
-      // #14 Auto-Retry on API Failure — one silent retry on transient server errors
-      const isTransient = error.message && /50[023]/.test(error.message);
-      if (isTransient && !transmitMessage._retrying) {
-        transmitMessage._retrying = true;
-        appendToChat('> [SYS] RETRANSMITTING... (TRANSIENT ERROR DETECTED)', 'sys', true);
-        setTimeout(() => {
-          transmitMessage._retrying = false;
-          // Re-populate input with the last user message and retransmit silently
-          const lastUser = chatHistory.filter(m => m.sender === 'user').slice(-1)[0];
-          if (lastUser) {
-            document.getElementById('chatInput').value = lastUser.text;
-            transmitMessage();
-          }
-        }, 2500);
-      } else {
-        transmitMessage._retrying = false;
-        if (typeof window._recordFeatureFailure === 'function')
-          window._recordFeatureFailure(
-            'aiChat',
-            '>> AI LINK PAUSED after repeated errors. Reload to retry. <<'
-          );
+    } else {
+      const _codeMatch = error.message && error.message.match(/API Error (\d+)/);
+      const _code = _codeMatch ? parseInt(_codeMatch[1]) : 0;
+
+      if (_code === 401 || _code === 403) {
+        // Auth failure — never retry; key must be re-entered
+        transmitMessage._retryCount = 0;
+        transmitMessage._inRetry = false;
         appendToChat(
-          `> ⚠ FATAL EXCEPTION AT 0x${Math.floor(Math.random() * 0xffff)
-            .toString(16)
-            .toUpperCase()
-            .padStart(4, '0')} — MODULE: COMM_LINK — ${error.message}`,
+          '> ⚠ AI KEY REJECTED — Your Gemini key was refused. Re-enter it in the API KEY field.',
           'sys'
         );
+      } else if (_code === 429) {
+        // Rate limit / quota — bounded exponential backoff
+        const _attempt = (transmitMessage._retryCount || 0) + 1;
+        if (_attempt <= _AI_RETRY_MAX) {
+          transmitMessage._retryCount = _attempt;
+          const _delay =
+            _AI_RETRY_DELAYS_MS[_attempt - 1] ||
+            _AI_RETRY_DELAYS_MS[_AI_RETRY_DELAYS_MS.length - 1];
+          appendToChat(
+            `> [SYS] RATE LIMIT HIT — retrying in ${_delay / 1000}s (${_attempt}/${_AI_RETRY_MAX})...`,
+            'sys',
+            true
+          );
+          transmitMessage._inRetry = true;
+          setTimeout(() => {
+            const _lastUser = chatHistory.filter(m => m.sender === 'user').slice(-1)[0];
+            if (_lastUser) {
+              document.getElementById('chatInput').value = _lastUser.text;
+              transmitMessage();
+            }
+          }, _delay);
+        } else {
+          transmitMessage._retryCount = 0;
+          transmitMessage._inRetry = false;
+          if (typeof window._recordFeatureFailure === 'function')
+            window._recordFeatureFailure(
+              'aiChat',
+              '>> AI LINK PAUSED after repeated errors. Reload to retry. <<'
+            );
+          appendToChat(
+            '> ⚠ RATE LIMIT / QUOTA EXCEEDED — You have reached your Gemini API quota. Wait and try again later.',
+            'sys'
+          );
+        }
+      } else {
+        // 5xx / network error — transient, bounded exponential backoff
+        const _isTransient = (_code >= 500 && _code < 600) || _code === 0;
+        const _attempt = (transmitMessage._retryCount || 0) + 1;
+        if (_isTransient && _attempt <= _AI_RETRY_MAX) {
+          transmitMessage._retryCount = _attempt;
+          const _delay =
+            _AI_RETRY_DELAYS_MS[_attempt - 1] ||
+            _AI_RETRY_DELAYS_MS[_AI_RETRY_DELAYS_MS.length - 1];
+          appendToChat(
+            `> [SYS] RETRANSMITTING... (attempt ${_attempt}/${_AI_RETRY_MAX}, delay ${_delay / 1000}s)`,
+            'sys',
+            true
+          );
+          transmitMessage._inRetry = true;
+          setTimeout(() => {
+            const _lastUser = chatHistory.filter(m => m.sender === 'user').slice(-1)[0];
+            if (_lastUser) {
+              document.getElementById('chatInput').value = _lastUser.text;
+              transmitMessage();
+            }
+          }, _delay);
+        } else {
+          transmitMessage._retryCount = 0;
+          transmitMessage._inRetry = false;
+          if (typeof window._recordFeatureFailure === 'function')
+            window._recordFeatureFailure(
+              'aiChat',
+              '>> AI LINK PAUSED after repeated errors. Reload to retry. <<'
+            );
+          appendToChat(
+            `> ⚠ FATAL EXCEPTION AT 0x${Math.floor(Math.random() * 0xffff)
+              .toString(16)
+              .toUpperCase()
+              .padStart(4, '0')} — MODULE: COMM_LINK — ${error.message}`,
+            'sys'
+          );
+        }
       }
     }
   } finally {

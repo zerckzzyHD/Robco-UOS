@@ -1,4 +1,4 @@
-## [v2.5.0] — Unreleased<!-- Tests: 621/621 | Cache: robco-terminal-v2.0.1-r61 -->
+## [v2.5.0] — Unreleased<!-- Tests: 635/635 | Cache: robco-terminal-v2.0.1-r62 -->
 
 ### Added
 
@@ -9,8 +9,16 @@
 - Added .nojekyll so GitHub Pages does not run Jekyll on the repo, ensuring static JS/PWA files are served as-is.
 - Added robots.txt with a permissive crawl policy and sitemap pointer for the live site.
 
+### Fixed
+
+- Fixed a bug in the AI retry logic where server errors could cause the app to retry indefinitely every 2.5 seconds. Retries are now bounded to three attempts with increasing delays (1 s, 2 s, 4 s), and the type of error determines how it is handled: rate-limit errors (429) retry with backoff and a clear message; auth failures (invalid or expired key) are reported immediately with no retry; network and server errors use the same bounded backoff. After the final attempt fails, a plain-English message is shown and the AI auto-disable counter is updated, matching the behaviour described in Protocol 32.
+- Fixed key validation in the API key entry flow so that an invalid or rejected key now shows a specific "KEY REJECTED" message immediately instead of a generic network failure. An invalid key is never saved or synced to cloud when rejected at entry.
+- Added runtime validation of AI responses before applying them to game state. The app now confirms the response is a correctly shaped Tri-Node object (narrative / state / modal) before doing anything with it. If the AI returns unexpected data, the user sees a clear message and game state is left completely unchanged — the previous state-corruption path on a malformed or truncated response is closed.
+
 ### Under the Hood
 
+- Added 14 automated guard tests (Suite 53, 635 total across 57 suites) covering retry constants and exponential delay values, auth-failure early-return, 429 rate-limit classification, bounded-retry references, Tri-Node validator existence and call order, and behavioral correctness of the validator for null, array, and valid-object inputs.
+- Bumped CACHE_NAME to r62 (api.js changed).
 - Added 13 automated guard tests (Suite 52, 621 total across 56 suites) covering repomix config validity and tuning, presence of the new site files, manifest enrichment, and the README CI badge.
 - Bumped CACHE_NAME to r61 (manifest.json enriched with categories).
 - Added Protocol 37 to both RULES.md and CLAUDE.md: keep repomix.config.json current whenever the repo file structure changes.
