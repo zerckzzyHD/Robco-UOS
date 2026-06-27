@@ -1600,17 +1600,18 @@ header('Meta / Runner Parity');
     'Suite 59',
     'Suite 60',
     'Suite 61',
+    'Suite 62',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-61)' +
+    'JS runner contains all gate-guard suites (22-41, 49-62)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-61)' +
+    'PS runner contains all gate-guard suites (22-41, 49-62)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -5509,6 +5510,27 @@ header('Suite 61 — Mobile Layout Overflow Guards');
       '@media (max-width: 999px) includes overflow-x: clip for .col-left/.col-right (mobile column clip guard)'
     );
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 62 — Changelog viewer guards
+//  2 tests
+// ══════════════════════════════════════════════════════════════
+header('Suite 62 — Changelog viewer guards');
+{
+  const uiCoreSrc62 = readFile('js/ui-core.js');
+
+  // 62.1 Boot-time viewer skips [Unreleased] — uses sections.find() to select first versioned section
+  assert(
+    /sections\.find/.test(uiCoreSrc62),
+    'Changelog boot-time viewer uses .find() to skip [Unreleased] and select first versioned section'
+  );
+
+  // 62.2 Viewer strips HTML comments
+  assert(
+    /replace\(.*<!--/.test(uiCoreSrc62),
+    'Changelog viewer strips HTML comments (<!-- --> pattern)'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════

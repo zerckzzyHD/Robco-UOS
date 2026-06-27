@@ -1,4 +1,8 @@
-## [Unreleased]<!-- Tests: 747/747 | Cache: robco-terminal-v2.5.0-r1 -->
+## [Unreleased]<!-- Tests: 749/749 | Cache: robco-terminal-v2.5.0-r2 -->
+
+### Fixed
+
+- The in-app patch notes viewer now shows the current release notes instead of the empty placeholder section. The viewer skips any unreleased placeholder block and goes straight to the first dated version; HTML comments in the version header no longer appear in the displayed text.
 
 ---
 
@@ -88,43 +92,8 @@
 - The terminal now warns you when your save file is approaching the browser's storage limit — an alert appears in the chat log so you can export before a write failure occurs.
 - Free-text inputs now have character caps to prevent oversized entries from bloating save data or stretching the layout.
 - The pre-commit revision guard now blocks decremented or unchanged revisions — any attempt to lower or keep the revision number is caught before the test suite runs, enforcing a strict monotonic increase.
-- Added a passive Content Security Policy header to the page that logs unexpected resource origins without blocking anything — groundwork for enforcing a full security policy later.
-- Added 4 new automated tests (Suite 30) guarding the input caps, CSP header, quota warning, and monotonic cache guard.
-- Closed three more spots where a malicious save or AI response could inject content into the page: inventory item quantities, weights, and values are now coerced to numbers before rendering; quest faction tags are now escaped; and quest status values are now restricted to a fixed list (active, complete, or failed) and also escaped. Added 5 automated tests guarding these fixes from regressing.
 - The app now survives a corrupt save file instead of showing a blank screen. If the save data cannot be read, it is automatically set aside and the app starts fresh, rather than crashing on boot.
 - Fixed a broken data row in the Fallout 3 weapon database: the Fat Man had an extra trailing field that caused one column to be misread.
-- Added 22 new automated tests: coverage for the Fallout 3 database structure, a column-count check ensuring every weapon data row matches its header, and static guards confirming the two XSS fixes cannot silently regress.
-- Added 68 new automated gate-guard tests (355 total across 33 suites): static checks that every critical UI control is wired, banned code patterns cannot silently return, every render function is called on load, every audio function has the required mute guards, the AI JSON contract is locked, both registry files stay read-only, all PWA assets are in the service-worker cache, and both test runners always stay in sync.
-- Upgraded CI to run both the Node and PowerShell test runners, compare their totals to catch any drift, and add a browser-based boot smoke test and mobile render check on every push. Previously CI only ran the Node runner with a stale test count label, and the PowerShell runner was never verified in CI.
-- The GitHub Pages deploy now publishes only the app's public files. Previously the entire repository was uploaded, which exposed CLAUDE.md, RULES.md, ARCHITECTURE.md, the test suite, and all config files as publicly indexed pages.
-- Fixed the auto-release workflow: release notes were silently falling back to a stub because the workflow was reading from a file called changelog.txt that does not exist. It now reads CHANGELOG.md correctly.
-- Added weekly automated dependency updates via Dependabot for npm packages.
-- Added a hook installer so the pre-commit gate is automatically set up on a fresh clone after npm install. Previously the hook only existed in .git/hooks and was lost whenever the repo was cloned.
-- Added a one-command rollback script (scripts/rollback.sh) that reverts the offending commit, bumps the cache version, and commits — making the Protocol 16 "restore users first" step a single command instead of a manual multi-step process.
-- Added 6 new automated guard tests (Suite 31, 369 total across 35 suites) that verify the CI workflow has no stale labels, runs both runners, includes the render check, the deploy restricts what it uploads, and the hook-install and boot-smoke scripts exist.
-- Rebuilt the features help menu as a data-driven responsive card grid — five command groups, one card per command, readable on phones without scrolling sideways. Removed five legacy commands that no longer do anything: the Desktop/Mobile width toggle (layout is automatic now), the dev manual query hook, and the three redundant panel shortcuts for stats, inventory, and reputation that were left over from an earlier version of the app. The AI is also no longer instructed to handle those removed commands.
-- Fixed the skill matrix highlight feature (chem boost), which was silently broken: active chems were supposed to glow the matching skill row amber when they were in effect, but the highlight could never attach because the skill rows had no class to target. The rows now use the correct CSS class and the highlight applies and clears correctly.
-- Added 7 new automated guard tests (Suite 32, 376 total across 36 suites) that verify the command registry is data-driven with no legacy pipe characters, all removed commands are absent from both the UI and AI instructions, the skill matrix rows carry the correct class, and the chem-boost highlight function targets them correctly.
-- The optics color themes (Amber, Vault-Tec Blue, Legion Red, Ghoul Green, Neon Purple) now correctly recolor every border, glow, bar, and highlight across the entire app. Previously the theme switcher only changed the main text and glow colors — dozens of borders and fill colors were hardcoded to the default teal and would not change when you switched themes.
-- Empty-state messages (shown when a list such as Perks, Quests, or Status Effects is empty) now use a single consistent style across all panels.
-- Audio toggle rows, inner panel expanders (Campaign Status, Crossroads, Timeline, Audio Systems), and add-item form rows now share consistent CSS classes instead of carrying large duplicated inline styles. No visual change.
-- Inner panel expanders now show a live [+] / [-] indicator in CSS rather than static text — the indicator flips automatically when the panel opens and closes.
-- Added 10 new automated guard tests (Suite 33, 386 total across 37 suites) that verify the optics RGB variable is defined everywhere it must be, no hardcoded teal color literals survive in the stylesheet, the empty-state helper exists and is used, all utility classes are present in the CSS, and the toggle indicator is driven by CSS rather than static text.
-- Removed three legacy CSS rules that were superseded by the faction card layout and no longer applied to anything on the page.
-- Unified delete-button placement across the Perks, Quests, and Notes panels to use the same flex layout already used everywhere else — visual appearance unchanged.
-- Added a shared compact-button style so the PURGE LOGS button, the help button, and all delete buttons guarantee a minimum 28-pixel tap target on phones (Protocol 17 mobile standard). Previously each button carried its own inline compact style.
-- Empty-state messages shown when a panel list is empty now use plain sentence case throughout. Bracketed caps (such as [LOADING...]) are now reserved for true loading states only.
-- Added 10 new automated guard tests (Suite 34, 396 total across 38 suites) verifying the dead CSS was removed, the flex list-row and compact-button utilities exist, delete buttons meet the 28-pixel tap-target standard, and the bracketed empty-state vocabulary is correct.
-- Campaign log entries are now capped at 200 so a very long play session can no longer push save data toward the browser storage limit.
-- Save writes now skip the write entirely when the state hasn't changed since the last save, cutting idle I/O on the localStorage quota.
-- Background timers (uptime clock, memory-cycle alert, and heartbeat) are now paused when you switch away from the tab and restart when you return, stopping unnecessary CPU and repaint work while the app is hidden.
-- Decorative CRT animations (screen flicker, scan-bar, header pulse) are now paused while the terminal is in standby mode.
-- The final save written when you close the tab now correctly targets the current save slot instead of a legacy key that was no longer read on startup.
-- Autocomplete searches are now cached so typing the same characters twice in a row reuses the previous result instead of rescanning the registry.
-- The fuzzy item-lookup fallback now skips very short search tokens (under 3 characters) that would never match anything useful, avoiding a full database scan for garbage input.
-- Added 6 new automated guard tests (Suite 35, 402 total across 39 suites) verifying all of the above improvements.
-- The [?] help menu now has a KEYBOARD SHORTCUTS section listing every active shortcut: Ctrl+Enter to send a command, Ctrl+/ to focus the input, Ctrl+1–6 to toggle panels, 1–4 to switch tabs, Up/Down to browse command history, and Esc to close any open dialog. Pressing Esc now also closes the help menu and patch-notes modal. Added 4 automated guard tests (Suite 36, 406 total across 40 suites).
-- Adding, removing, or editing any tracked item (inventory, ammo, perks, quests, companions, status effects, or campaign notes) now refreshes only the relevant panel instead of rebuilding all fourteen panels from scratch. The update is noticeably snappier on phones. Fixed a latent bug where toggling a collectible as found or missing was not updating the collectibles badge count or the Session Stats panel in real time — both now update immediately on toggle. Added 19 new automated tests (Suite 37, 425 total across 41 suites) that verify each mutator calls the correct targeted refresh and that persistence is maintained through the shared save path.
 
 ---
 

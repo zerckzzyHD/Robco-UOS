@@ -463,10 +463,15 @@ window.onload = function () {
       fetch('CHANGELOG.md')
         .then(r => r.text())
         .then(text => {
-          const entries = text.split(/\r?\n(?=## \[v\d+\.\d+)/);
-          const latestEntry = entries[0] || text;
+          const sections = text.split(/\r?\n(?=## \[)/);
+          const released =
+            sections.find(s => /^## \[v\d+\.\d+/.test(s.trimStart())) || sections[0] || text;
+          const display = released
+            .replace(/<!--[\s\S]*?-->/g, '')
+            .replace(/^## /, '')
+            .trim();
           document.getElementById('modalTitle').innerText = `> PATCH NOTES: ${APP_VERSION}`;
-          document.getElementById('modalContent').innerText = latestEntry.trim();
+          document.getElementById('modalContent').innerText = display;
           document.getElementById('sysModal').style.display = 'flex';
         })
         .catch(e => console.error('Could not load changelog'));
@@ -950,7 +955,9 @@ function showFullChangelog() {
     .then(r => r.text())
     .then(text => {
       document.getElementById('modalTitle').innerText = '> SYSTEM CHANGELOG — ALL VERSIONS';
-      document.getElementById('modalContent').innerText = text.trim();
+      document.getElementById('modalContent').innerText = text
+        .replace(/<!--[\s\S]*?-->/g, '')
+        .trim();
       document.getElementById('sysModal').style.display = 'flex';
     })
     .catch(() => {
