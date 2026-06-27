@@ -967,7 +967,7 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
 Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-54)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
@@ -2805,6 +2805,76 @@ Check ($saveStateFn54 -match 'QuotaExceededError') `
 # 54.14  The QuotaExceededError handler in saveState() calls appendToChat with a warning
 Check ($saveStateFn54 -match 'QuotaExceededError[\s\S]{0,400}appendToChat') `
     "saveState() QuotaExceededError handler calls appendToChat (quota failures shown to user, not silently swallowed)"
+
+# ===========================================================
+# Suite 55 -- CSP Stage 1 Origin Guards + Firebase Pin
+# Protocol-20 origin guard (load-bearing CSP origins),
+# unsafe-inline tripwire, Firebase version-pin guard.
+# 12 tests
+# ===========================================================
+Sep "Suite 55 -- CSP Stage 1 Origin Guards + Firebase Pin"
+$htmlSrc55 = Read-Src "index.html"
+$cloudSrc55 = Read-Src "js/cloud.js"
+
+# 55.1 generativelanguage.googleapis.com present in CSP (Gemini API)
+Check ([bool]($htmlSrc55 -match 'generativelanguage\.googleapis\.com')) `
+    "CSP contains generativelanguage.googleapis.com (Gemini API origin -- Protocol 20 guard)"
+
+# 55.2 identitytoolkit.googleapis.com present in CSP (Firebase Auth)
+Check ([bool]($htmlSrc55 -match 'identitytoolkit\.googleapis\.com')) `
+    "CSP contains identitytoolkit.googleapis.com (Firebase Auth origin -- Protocol 20 guard)"
+
+# 55.3 securetoken.googleapis.com present in CSP (Firebase token refresh)
+Check ([bool]($htmlSrc55 -match 'securetoken\.googleapis\.com')) `
+    "CSP contains securetoken.googleapis.com (Firebase token refresh -- Protocol 20 guard)"
+
+# 55.4 firestore.googleapis.com present in CSP (Firestore)
+Check ([bool]($htmlSrc55 -match 'firestore\.googleapis\.com')) `
+    "CSP contains firestore.googleapis.com (Firestore origin -- Protocol 20 guard)"
+
+# 55.5 apis.google.com present in CSP (Google Sign-In popup + Firebase SDK)
+Check ([bool]($htmlSrc55 -match 'apis\.google\.com')) `
+    "CSP contains apis.google.com (Google Sign-In + Firebase SDK origin -- Protocol 20 guard)"
+
+# 55.6 nv-overlord.firebaseapp.com present in CSP (Firebase hosting + auth handler)
+Check ([bool]($htmlSrc55 -match 'nv-overlord\.firebaseapp\.com')) `
+    "CSP contains nv-overlord.firebaseapp.com (Firebase hosting + auth handler -- Protocol 20 guard)"
+
+# 55.7 object-src 'none' present in CSP (blocks plugin content)
+Check ([bool]($htmlSrc55 -match "object-src\s+'none'")) `
+    "CSP contains object-src 'none' (blocks plugin content -- Protocol 20 guard)"
+
+# 55.8 base-uri 'none' present in CSP (blocks base-tag injection)
+Check ([bool]($htmlSrc55 -match "base-uri\s+'none'")) `
+    "CSP contains base-uri 'none' (blocks base-tag injection -- Protocol 20 guard)"
+
+# 55.9 frame-ancestors 'none' present in CSP (prevents clickjacking)
+Check ([bool]($htmlSrc55 -match "frame-ancestors\s+'none'")) `
+    "CSP contains frame-ancestors 'none' (prevents clickjacking -- Protocol 20 guard)"
+
+# 55.10 Tripwire: script-src still contains 'unsafe-inline'
+# (~148 inline event handlers require this; must not be silently dropped)
+Check ([bool]($htmlSrc55 -match "script-src[^;]*'unsafe-inline'")) `
+    "CSP script-src contains 'unsafe-inline' (tripwire: required for ~148 inline handlers)"
+
+# 55.11 Tripwire: script-src contains NO sha256- or nonce- token
+# CSP level 2+: a hash/nonce in script-src disables unsafe-inline, breaking all inline handlers
+$cspContent55 = ''
+if ($htmlSrc55 -match 'http-equiv="Content-Security-Policy[^"]*"[^>]*content="([^"]*)"') {
+    $cspContent55 = $Matches[1]
+}
+$scriptSrc55 = ''
+if ($cspContent55 -match 'script-src([^;]*)') {
+    $scriptSrc55 = $Matches[1]
+}
+Check (-not ($scriptSrc55 -match 'sha256-|nonce-')) `
+    "CSP script-src contains no sha256- or nonce- token (tripwire: a hash/nonce disables unsafe-inline per CSP spec, breaking all 148 inline handlers)"
+
+# 55.12 Firebase pin guard: all firebasejs import URLs in cloud.js carry version 12.15.0
+$fbPins55 = ([regex]'firebasejs/[\d.]+').Matches($cloudSrc55)
+$allPinned55 = ($fbPins55.Count -gt 0) -and (($fbPins55 | ForEach-Object { $_.Value } | Where-Object { $_ -notmatch '12\.15\.0' }).Count -eq 0)
+Check $allPinned55 `
+    "Firebase SDK import URLs in cloud.js are all pinned to 12.15.0 (supply-chain guard)"
 
 # ===========================================================
 # Results

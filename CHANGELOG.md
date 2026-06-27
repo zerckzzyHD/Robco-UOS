@@ -1,4 +1,4 @@
-## [v2.5.0] — Unreleased<!-- Tests: 660/660 | Cache: robco-terminal-v2.0.1-r64 -->
+## [v2.5.0] — Unreleased<!-- Tests: 672/672 | Cache: robco-terminal-v2.0.1-r65 -->
 
 ### Added
 
@@ -17,6 +17,10 @@
 
 ### Under the Hood
 
+- Tightened the Content Security Policy: every load-bearing origin is now explicitly allowlisted (Gemini API, Firebase Auth, token refresh, Firestore, App Check, Google Sign-In popup, gstatic CDN) and the previously missing directives — `font-src`, `worker-src`, `form-action`, and `frame-ancestors 'none'` — are now included. The policy stays in report-only mode for this push; Stage 2 will flip it to enforcing once live violations are confirmed clear.
+- Evaluated self-hosting the Firebase SDK and deferred: all App Check and reCAPTCHA calls must still reach gstatic/google, so self-hosting removes zero CSP origins and gains nothing for the current zero-build-step architecture. The version pin on the CDN import URL is the supply-chain control. Revisit if Firebase ships a bundleable SDK or the project adopts a build step.
+- Added 12 automated guard tests (Suite 55, 672 total across 59 suites): CSP origin-presence checks for nine load-bearing origins and directives (Protocol 20 guard), an `unsafe-inline` tripwire that fails if a `sha256-` or `nonce-` token is added to `script-src` (because that disables `unsafe-inline` per CSP spec level 2 and would silently break all 148 inline handlers), and a Firebase SDK version-pin guard that fails if any import URL drifts from the pinned version.
+- Bumped CACHE_NAME to r65 (index.html CSP directives changed).
 - Added 14 automated guard tests (Suite 54, 660 total across 58 suites) covering the prompt-injection hardening directive in the system prompt, the player-input delimiter in outgoing requests, HTML maxlength caps on chat and data-entry fields, the JS length guard in the send path, and saveState quota-failure handling.
 - Bumped CACHE_NAME to r64 (api.js, ui.js, index.html touched).
 - Added 25 automated guard tests (Suite 53, 646 total across 57 suites) covering retry constants and exponential delay values, auth-failure early-return, 400-body key-error detection, 429 rate-limit classification, bounded-retry references, key-error branch auto-disable guard, Tri-Node validator existence and call order, and seven behavioral correctness checks of the validator (null, array, string, plain-object rejected; narrative-only, state-only, modal-only objects accepted).

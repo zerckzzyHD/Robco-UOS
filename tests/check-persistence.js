@@ -1584,6 +1584,7 @@ header('Meta / Runner Parity');
     'Suite 52',
     'Suite 53',
     'Suite 54',
+    'Suite 55',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
@@ -4677,6 +4678,102 @@ header('Suite 54 — Prompt-Injection Hardening, Input Caps, Quota Warning');
     /QuotaExceededError[\s\S]{0,400}appendToChat/.test(saveStateFn54),
     'saveState() QuotaExceededError handler calls appendToChat (quota failures shown to user, not silently swallowed)'
   );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 55 — CSP Stage 1 Origin Guards + Firebase Pin
+//  Protocol-20 origin guard (load-bearing CSP origins),
+//  unsafe-inline tripwire, Firebase version-pin guard.
+//  12 tests
+// ══════════════════════════════════════════════════════════════
+header('Suite 55 — CSP Stage 1 Origin Guards + Firebase Pin');
+{
+  const htmlSrc55 = readFile('index.html');
+  const cloudSrc55 = readFile('js/cloud.js');
+
+  // 55.1 generativelanguage.googleapis.com present in CSP (Gemini API)
+  assert(
+    /generativelanguage\.googleapis\.com/.test(htmlSrc55),
+    'CSP contains generativelanguage.googleapis.com (Gemini API origin — Protocol 20 guard)'
+  );
+
+  // 55.2 identitytoolkit.googleapis.com present in CSP (Firebase Auth)
+  assert(
+    /identitytoolkit\.googleapis\.com/.test(htmlSrc55),
+    'CSP contains identitytoolkit.googleapis.com (Firebase Auth origin — Protocol 20 guard)'
+  );
+
+  // 55.3 securetoken.googleapis.com present in CSP (Firebase token refresh)
+  assert(
+    /securetoken\.googleapis\.com/.test(htmlSrc55),
+    'CSP contains securetoken.googleapis.com (Firebase token refresh — Protocol 20 guard)'
+  );
+
+  // 55.4 firestore.googleapis.com present in CSP (Firestore)
+  assert(
+    /firestore\.googleapis\.com/.test(htmlSrc55),
+    'CSP contains firestore.googleapis.com (Firestore origin — Protocol 20 guard)'
+  );
+
+  // 55.5 apis.google.com present in CSP (Google Sign-In popup + Firebase SDK)
+  assert(
+    /apis\.google\.com/.test(htmlSrc55),
+    'CSP contains apis.google.com (Google Sign-In + Firebase SDK origin — Protocol 20 guard)'
+  );
+
+  // 55.6 nv-overlord.firebaseapp.com present in CSP (Firebase hosting + auth handler)
+  assert(
+    /nv-overlord\.firebaseapp\.com/.test(htmlSrc55),
+    'CSP contains nv-overlord.firebaseapp.com (Firebase hosting + auth handler — Protocol 20 guard)'
+  );
+
+  // 55.7 object-src 'none' present in CSP (blocks plugin content)
+  assert(
+    /object-src\s+'none'/.test(htmlSrc55),
+    "CSP contains object-src 'none' (blocks plugin content — Protocol 20 guard)"
+  );
+
+  // 55.8 base-uri 'none' present in CSP (blocks base-tag injection)
+  assert(
+    /base-uri\s+'none'/.test(htmlSrc55),
+    "CSP contains base-uri 'none' (blocks base-tag injection — Protocol 20 guard)"
+  );
+
+  // 55.9 frame-ancestors 'none' present in CSP (prevents clickjacking)
+  assert(
+    /frame-ancestors\s+'none'/.test(htmlSrc55),
+    "CSP contains frame-ancestors 'none' (prevents clickjacking — Protocol 20 guard)"
+  );
+
+  // 55.10 Tripwire: script-src still contains 'unsafe-inline'
+  // (~148 inline event handlers require this; must not be silently dropped)
+  assert(
+    /script-src[^;]*'unsafe-inline'/.test(htmlSrc55),
+    "CSP script-src contains 'unsafe-inline' (tripwire: required for ~148 inline handlers)"
+  );
+
+  // 55.11 Tripwire: script-src contains NO sha256- or nonce- token
+  // CSP level 2+: a hash/nonce in script-src disables unsafe-inline, silently breaking all inline handlers
+  {
+    const csp55 = (htmlSrc55.match(
+      /http-equiv="Content-Security-Policy[^"]*"[^>]*content="([^"]*)"/
+    ) || ['', ''])[1];
+    const scriptSrc55 = (csp55.match(/script-src([^;]*)/) || ['', ''])[1];
+    assert(
+      !/sha256-|nonce-/.test(scriptSrc55),
+      'CSP script-src contains no sha256- or nonce- token (tripwire: a hash/nonce disables unsafe-inline per CSP spec, breaking all 148 inline handlers)'
+    );
+  }
+
+  // 55.12 Firebase pin guard: all firebasejs import URLs in cloud.js carry version 12.15.0
+  {
+    const fbPins55 = cloudSrc55.match(/firebasejs\/[\d.]+/g) || [];
+    const allPinned55 = fbPins55.length > 0 && fbPins55.every(m => m.endsWith('12.15.0'));
+    assert(
+      allPinned55,
+      `Firebase SDK import URLs in cloud.js are all pinned to 12.15.0 (found: ${fbPins55.join(', ')}) — supply-chain guard`
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
