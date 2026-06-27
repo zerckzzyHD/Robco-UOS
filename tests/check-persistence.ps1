@@ -967,7 +967,7 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
 Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-51)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
@@ -2521,6 +2521,73 @@ Check ($stateSrc51 -match 'data: b,') `
 # 51.56 behavioral equiv: snapRollingBackup dedup reads only most-recent slot
 Check ($stateSrc51 -match '_prevKey' -and $stateSrc51 -match 'ptr === 0 \? 3 : ptr') `
     'snapRollingBackup dedup reads most-recent slot via _prevKey calculation -- non-consecutive repeats allowed'
+
+# ===========================================================
+# Suite 52 -- Repo / Site Enrichment Guards (Protocol 37)
+# Verifies static site files, repomix config tuning, manifest
+# enrichment, and README CI badge are present and correct.
+# 13 tests
+# ===========================================================
+Sep "Suite 52 -- Repo / Site Enrichment Guards (Protocol 37)"
+
+# 52.1  repomix.config.json exists
+Check (Test-Path (Join-Path $Root "repomix.config.json")) `
+    "repomix.config.json exists at repo root"
+
+# 52.2  repomix.config.json is valid JSON
+$repomixRaw52 = $null
+$repomixCfg52 = $null
+try {
+    $repomixRaw52 = [IO.File]::ReadAllText((Join-Path $Root "repomix.config.json"))
+    $repomixCfg52 = $repomixRaw52 | ConvertFrom-Json
+} catch {}
+Check ($null -ne $repomixCfg52) "repomix.config.json parses as valid JSON"
+
+# 52.3  include array contains a js/ pattern
+$hasJsInclude52 = $null -ne $repomixCfg52 -and $null -ne $repomixCfg52.include -and
+    ($repomixCfg52.include | Where-Object { $_.StartsWith("js/") }).Count -gt 0
+Check $hasJsInclude52 "repomix.config.json include array has a js/ pattern"
+
+# 52.4  customPatterns ignores node_modules
+$patterns52 = if ($null -ne $repomixCfg52 -and $null -ne $repomixCfg52.ignore) { $repomixCfg52.ignore.customPatterns } else { $null }
+$hasNodeModules52 = $null -ne $patterns52 -and ($patterns52 | Where-Object { $_ -match "node_modules" }).Count -gt 0
+Check $hasNodeModules52 "repomix.config.json customPatterns excludes node_modules"
+
+# 52.5  customPatterns ignores package-lock.json (lockfile)
+$hasLockfile52 = $null -ne $patterns52 -and ($patterns52 | Where-Object { $_ -match "package-lock" }).Count -gt 0
+Check $hasLockfile52 "repomix.config.json customPatterns excludes package-lock.json (lockfile)"
+
+# 52.6  customPatterns excludes RULES.md (private agent file)
+$hasRulesMd52 = $null -ne $patterns52 -and ($patterns52 -contains "RULES.md")
+Check $hasRulesMd52 "repomix.config.json customPatterns excludes RULES.md (private agent file)"
+
+# 52.7  .nojekyll exists at root
+Check (Test-Path (Join-Path $Root ".nojekyll")) `
+    ".nojekyll exists at repo root (disables GitHub Pages Jekyll processing)"
+
+# 52.8  robots.txt exists at root
+Check (Test-Path (Join-Path $Root "robots.txt")) "robots.txt exists at repo root"
+
+# 52.9  404.html exists at root
+Check (Test-Path (Join-Path $Root "404.html")) "404.html exists at repo root"
+
+# 52.10  PRIVACY.md exists at root
+Check (Test-Path (Join-Path $Root "PRIVACY.md")) "PRIVACY.md exists at repo root"
+
+# 52.11  manifest.json has description field
+$manifestRaw52 = Read-Src "manifest.json"
+$manifest52 = $manifestRaw52 | ConvertFrom-Json
+Check ($null -ne $manifest52.description -and $manifest52.description.Length -gt 0) `
+    "manifest.json has a non-empty description field"
+
+# 52.12  manifest.json has categories field (array)
+Check ($null -ne $manifest52.categories -and $manifest52.categories.Count -gt 0) `
+    "manifest.json has a non-empty categories array"
+
+# 52.13  README.md contains the GitHub Actions CI badge for ci.yml
+$readmeSrc52 = Read-Src "README.md"
+Check ($readmeSrc52 -match "ci\.yml" -and $readmeSrc52 -match "badge") `
+    "README.md contains GitHub Actions CI badge referencing ci.yml"
 
 # ===========================================================
 # Results

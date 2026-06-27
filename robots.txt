@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://zerckzzyHD.github.io/Robco-UOS/

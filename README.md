@@ -168,7 +168,7 @@ All sounds respect a master mute toggle and individual per-system mute controls.
 | **Cloud**       | Firebase Firestore            | Cross-device save synchronization         |
 | **PWA**         | Service Worker + Manifest     | Installable offline-capable app           |
 | **Dev Tooling** | ESLint + Prettier + Vite      | Linting, formatting, dev server           |
-| **Testing**     | PowerShell persistence audit  | 608-test pre-commit gate                  |
+| **Testing**     | PowerShell persistence audit  | 621-test pre-commit gate                  |
 
 ### File Structure
 
@@ -184,7 +184,7 @@ All sounds respect a master mute toggle and individual per-system mute controls.
 │   └── database.js         Game CSV data (~170 weapons, ~68 armors, ~45 chems) + lookupItemInDb()
 ├── sw.js                   Service Worker (cache-first, same-origin only)
 ├── tests/
-│   └── check-persistence.ps1  Pre-commit 608-test persistence audit
+│   └── check-persistence.ps1  Pre-commit 621-test persistence audit
 ├── ARCHITECTURE.md         Full system dependency map & patterns
 ├── changelog.txt           Complete version history (v1.1.7 → present)
 ├── icon.png                PWA icon
@@ -333,7 +333,7 @@ Every audio function must check `AudioSettings.masterMute` and its specific mute
 npm run lint        ← catch bugs
 npm run format      ← enforce style
 git add -A
-git commit          ← cache-bump guard runs first, then persistence audit (608 tests)
+git commit          ← cache-bump guard runs first, then persistence audit (621 tests)
 git push origin main
 ```
 
@@ -389,7 +389,7 @@ Key milestones:
 The project is a **production-quality browser application** with:
 
 - 34 tracked state fields across 5 structured systems
-- 608-test automated persistence audit (DOM binding, Protocol 4 enforcement, migrateState mock execution, reputation 2D matrix, CRUD function existence, CAMPG tab DOM binding, campaignMode + playthroughType Protocol 4, render contracts, CSS invariants, SW invariants, structural integrity, detail-current dedup guard, gate guards for critical UI controls, prohibited patterns, protocol completeness, AI contract lock, architectural boundaries, assets completeness, CSS hygiene guards, DB↔registry weapon parity, weapon mods CSV + registry parity, native command router, GAME_DEFS structural integrity, anonymous auth + security rules + XSS coercion fix, no-double-escape behavioral regression, Gemini key sync security guards, remote kill-switch + client auto-disable guards, CI/repo hardening guards, gate commit/push split + powershell fallback guards, save integrity checksum + rolling backup + forward-compat guard)
+- 621-test automated persistence audit (DOM binding, Protocol 4 enforcement, migrateState mock execution, reputation 2D matrix, CRUD function existence, CAMPG tab DOM binding, campaignMode + playthroughType Protocol 4, render contracts, CSS invariants, SW invariants, structural integrity, detail-current dedup guard, gate guards for critical UI controls, prohibited patterns, protocol completeness, AI contract lock, architectural boundaries, assets completeness, CSS hygiene guards, DB↔registry weapon parity, weapon mods CSV + registry parity, native command router, GAME_DEFS structural integrity, anonymous auth + security rules + XSS coercion fix, no-double-escape behavioral regression, Gemini key sync security guards, remote kill-switch + client auto-disable guards, CI/repo hardening guards, gate commit/push split + powershell fallback guards, save integrity checksum + rolling backup + forward-compat guard)
 - 14-faction reputation network
 - 13-skill character sheet
 - Full save/load/export/import/cloud sync/undo pipeline
@@ -412,6 +412,7 @@ The project is a **production-quality browser application** with:
 | Document                           | Description                                                                                                                              |
 | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | System dependency map, persistence lifecycle, audio chain, historical lessons, and checklists for adding state fields, audio, and panels |
+| [PRIVACY.md](PRIVACY.md)           | Plain-English privacy policy — what data is stored, where, and how to delete it                                                          |
 | [changelog.txt](changelog.txt)     | Complete version history from v1.1.7 to present                                                                                          |
 
 ---

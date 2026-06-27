@@ -1,0 +1,44 @@
+{
+  "output": {
+    "filePath": "repomix-output.md",
+    "style": "markdown",
+    "showLineNumbers": true,
+    "removeComments": false,
+    "topFilesLength": 20,
+    "compress": false,
+    "headerText": "RobCo U.O.S. — full-repo AI context pack. Private agent files (RULES.md, CLAUDE.md, .claude/) are excluded. Run: npx repomix"
+  },
+  "include": [
+    "js/**",
+    "css/**",
+    "*.html",
+    "sw.js",
+    "manifest.json",
+    "tests/**",
+    "*.md",
+    ".github/workflows/**",
+    "scripts/**",
+    "firestore.rules",
+    "firebase.json"
+  ],
+  "ignore": {
+    "useGitignore": true,
+    "useDefaultPatterns": true,
+    "customPatterns": [
+      "node_modules/**",
+      "package-lock.json",
+      "repomix-output.*",
+      "*.png",
+      "*.ico",
+      ".git/**",
+      "dist/**",
+      "_site/**",
+      "RULES.md",
+      "CLAUDE.md",
+      ".claude/**"
+    ]
+  },
+  "security": {
+    "enableSecurityCheck": true
+  }
+}

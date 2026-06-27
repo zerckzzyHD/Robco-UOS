@@ -21,6 +21,9 @@ desktop.ini
 *.swp
 *.swo
 
+# Repomix output (generated artifact — never committed)
+repomix-output.*
+
 # Logs
 *.log
 npm-debug.log*

@@ -1,6 +1,19 @@
-## [v2.5.0] — Unreleased<!-- Tests: 608/608 | Cache: robco-terminal-v2.0.1-r60 -->
+## [v2.5.0] — Unreleased<!-- Tests: 621/621 | Cache: robco-terminal-v2.0.1-r61 -->
 
 ### Added
+
+- Added a plain-English privacy policy (PRIVACY.md) describing exactly what data the app stores and where — localStorage for saves and settings, Firebase Firestore only when you opt into cloud features, Gemini API calls go directly from your browser to Google using your own key, and no analytics, ads, or third-party tracking of any kind. Linked from the README.
+- Added a custom 404 page styled to match the RobCo terminal aesthetic — dark background, phosphor green glow, and a link back to the app.
+- Added a repomix configuration file (repomix.config.json) so the full repo can be packed into a single AI-readable context in one command (`npx repomix`). Private agent files (RULES.md, CLAUDE.md) are excluded. Protocol 37 ensures the config is kept current whenever the file structure changes.
+- Added manifest categories and confirmed the description field — the PWA now declares itself under `games` and `utilities` for app-store and browser install context.
+- Added .nojekyll so GitHub Pages does not run Jekyll on the repo, ensuring static JS/PWA files are served as-is.
+- Added robots.txt with a permissive crawl policy and sitemap pointer for the live site.
+
+### Under the Hood
+
+- Added 13 automated guard tests (Suite 52, 621 total across 56 suites) covering repomix config validity and tuning, presence of the new site files, manifest enrichment, and the README CI badge.
+- Bumped CACHE_NAME to r61 (manifest.json enriched with categories).
+- Added Protocol 37 to both RULES.md and CLAUDE.md: keep repomix.config.json current whenever the repo file structure changes.
 
 - Added an optional Gemini key sync toggle to the Security & Configuration panel. When signed in with Google, turning it on saves your API key to your account so it follows you across devices — no need to re-paste it when you open the app on a phone, tablet, or another browser. The toggle is off by default and the key never leaves your device when it is off or when you are not signed in. A "> GET A FREE GEMINI KEY" link now appears below the key field, pointing directly to Google AI Studio.
 

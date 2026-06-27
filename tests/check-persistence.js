@@ -1581,6 +1581,7 @@ header('Meta / Runner Parity');
     'Suite 49',
     'Suite 50',
     'Suite 51',
+    'Suite 52',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
@@ -4260,6 +4261,90 @@ header('Suite 51 — Save Integrity + Rolling Backups');
       );
     }
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 52 — Repo / Site Enrichment Guards (Protocol 37)
+//  Verifies static site files, repomix config tuning, manifest
+//  enrichment, and README CI badge are present and correct.
+//  13 tests
+// ══════════════════════════════════════════════════════════════
+header('Suite 52 — Repo / Site Enrichment Guards (Protocol 37)');
+{
+  // 52.1  repomix.config.json exists
+  assert(
+    fs.existsSync(path.join(ROOT, 'repomix.config.json')),
+    'repomix.config.json exists at repo root'
+  );
+
+  // 52.2  repomix.config.json is valid JSON
+  let repomixCfg52 = null;
+  try {
+    repomixCfg52 = JSON.parse(fs.readFileSync(path.join(ROOT, 'repomix.config.json'), 'utf8'));
+  } catch (_) {}
+  assert(repomixCfg52 !== null, 'repomix.config.json parses as valid JSON');
+
+  // 52.3  include array contains a js/ pattern
+  assert(
+    Array.isArray(repomixCfg52 && repomixCfg52.include) &&
+      repomixCfg52.include.some(p => p.startsWith('js/')),
+    'repomix.config.json include array has a js/ pattern'
+  );
+
+  // 52.4  customPatterns ignores node_modules
+  const patterns52 = repomixCfg52 && repomixCfg52.ignore && repomixCfg52.ignore.customPatterns;
+  assert(
+    Array.isArray(patterns52) && patterns52.some(p => p.includes('node_modules')),
+    'repomix.config.json customPatterns excludes node_modules'
+  );
+
+  // 52.5  customPatterns ignores package-lock.json (lockfile)
+  assert(
+    Array.isArray(patterns52) && patterns52.some(p => p.includes('package-lock')),
+    'repomix.config.json customPatterns excludes package-lock.json (lockfile)'
+  );
+
+  // 52.6  customPatterns excludes RULES.md (private agent file)
+  assert(
+    Array.isArray(patterns52) && patterns52.includes('RULES.md'),
+    'repomix.config.json customPatterns excludes RULES.md (private agent file)'
+  );
+
+  // 52.7  .nojekyll exists at root (stops GitHub Pages running Jekyll)
+  assert(
+    fs.existsSync(path.join(ROOT, '.nojekyll')),
+    '.nojekyll exists at repo root (disables GitHub Pages Jekyll processing)'
+  );
+
+  // 52.8  robots.txt exists at root
+  assert(fs.existsSync(path.join(ROOT, 'robots.txt')), 'robots.txt exists at repo root');
+
+  // 52.9  404.html exists at root
+  assert(fs.existsSync(path.join(ROOT, '404.html')), '404.html exists at repo root');
+
+  // 52.10  PRIVACY.md exists at root
+  assert(fs.existsSync(path.join(ROOT, 'PRIVACY.md')), 'PRIVACY.md exists at repo root');
+
+  // 52.11  manifest.json has description field
+  const manifestSrc52 = readFile('manifest.json');
+  const manifest52 = JSON.parse(manifestSrc52);
+  assert(
+    typeof manifest52.description === 'string' && manifest52.description.length > 0,
+    'manifest.json has a non-empty description field'
+  );
+
+  // 52.12  manifest.json has categories field (array)
+  assert(
+    Array.isArray(manifest52.categories) && manifest52.categories.length > 0,
+    'manifest.json has a non-empty categories array'
+  );
+
+  // 52.13  README.md contains the GitHub Actions CI badge for ci.yml
+  const readmeSrc52 = readFile('README.md');
+  assert(
+    readmeSrc52.includes('ci.yml') && readmeSrc52.includes('badge'),
+    'README.md contains GitHub Actions CI badge referencing ci.yml'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════
