@@ -4352,7 +4352,7 @@ header('Suite 52 — Repo / Site Enrichment Guards (Protocol 37)');
 //  Suite 53 — AI + Gemini-Key Resilience Guards
 //  Key validation hardening, bounded exponential backoff,
 //  error classification, Tri-Node schema validation.
-//  14 tests
+//  25 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 53 — AI + Gemini-Key Resilience Guards');
 {
@@ -4483,6 +4483,92 @@ header('Suite 53 — AI + Gemini-Key Resilience Guards');
   assert(
     /'narrative' in parsed/.test(fnVtN53) || /"narrative" in parsed/.test(fnVtN53),
     "_validateTriNode body accepts objects with 'narrative' key (valid Tri-Node accepted)"
+  );
+
+  // 53.15  fetchAuthorizedModels: 400 body inspected for INVALID_ARGUMENT (Finding A)
+  {
+    const fnBody53 = extractFunctionBody(apiSrc53, 'fetchAuthorizedModels');
+    assert(
+      /INVALID_ARGUMENT/.test(fnBody53),
+      'fetchAuthorizedModels inspects error body for INVALID_ARGUMENT (bad-key 400 detected)'
+    );
+  }
+
+  // 53.16  fetchAuthorizedModels: 400 body inspected for PERMISSION_DENIED (Finding A)
+  {
+    const fnBody53 = extractFunctionBody(apiSrc53, 'fetchAuthorizedModels');
+    assert(
+      /PERMISSION_DENIED/.test(fnBody53),
+      'fetchAuthorizedModels inspects error body for PERMISSION_DENIED (auth-denied 400 detected)'
+    );
+  }
+
+  // 53.17  transmitMessage: throws "API Key Error" for key-specific 400s (Finding A)
+  {
+    const tmBody53 = extractFunctionBody(apiSrc53, 'transmitMessage');
+    assert(
+      /API Key Error/.test(tmBody53),
+      'transmitMessage throws "API Key Error" for key-specific 400 responses (key errors distinguished from generic 400s)'
+    );
+  }
+
+  // 53.18  transmitMessage: key-error/auth branch does NOT call _recordFeatureFailure (Finding A)
+  {
+    const tmBody53 = extractFunctionBody(apiSrc53, 'transmitMessage');
+    const _keyErrIdx = tmBody53.indexOf('_isKeyError || _code === 401 || _code === 403');
+    const _next429Idx = tmBody53.indexOf('_code === 429');
+    const _keyErrBlock =
+      _keyErrIdx !== -1 && _next429Idx > _keyErrIdx ? tmBody53.slice(_keyErrIdx, _next429Idx) : '';
+    assert(
+      _keyErrBlock.length > 0 && !_keyErrBlock.includes('_recordFeatureFailure'),
+      'transmitMessage key-error/auth branch does NOT call _recordFeatureFailure (bad key does not auto-disable AI)'
+    );
+  }
+
+  // 53.19–53.25  Behavioral: _validateTriNode exact return-value tests (Finding B)
+  const _vtFn53 = (() => {
+    try {
+      const _body = extractFunctionBody(apiSrc53, '_validateTriNode');
+      return new Function('parsed', _body.slice(1, -1).trim());
+    } catch (_) {
+      return null;
+    }
+  })();
+
+  // 53.19  behavioral: {narrative:[]} → true
+  assert(
+    typeof _vtFn53 === 'function' && _vtFn53({ narrative: [] }) === true,
+    '_validateTriNode({narrative:[]}) → true (valid Tri-Node with narrative key)'
+  );
+  // 53.20  behavioral: {state:{}} → true
+  assert(
+    typeof _vtFn53 === 'function' && _vtFn53({ state: {} }) === true,
+    '_validateTriNode({state:{}}) → true (valid Tri-Node with state key)'
+  );
+  // 53.21  behavioral: {modal:{}} → true
+  assert(
+    typeof _vtFn53 === 'function' && _vtFn53({ modal: {} }) === true,
+    '_validateTriNode({modal:{}}) → true (valid Tri-Node with modal key)'
+  );
+  // 53.22  behavioral: null → false
+  assert(
+    typeof _vtFn53 === 'function' && _vtFn53(null) === false,
+    '_validateTriNode(null) → false (null rejected)'
+  );
+  // 53.23  behavioral: [] → false
+  assert(
+    typeof _vtFn53 === 'function' && _vtFn53([]) === false,
+    '_validateTriNode([]) → false (array rejected)'
+  );
+  // 53.24  behavioral: "x" → false
+  assert(
+    typeof _vtFn53 === 'function' && _vtFn53('x') === false,
+    "_validateTriNode('x') → false (string rejected)"
+  );
+  // 53.25  behavioral: {foo:1} → false
+  assert(
+    typeof _vtFn53 === 'function' && _vtFn53({ foo: 1 }) === false,
+    '_validateTriNode({foo:1}) → false (non-Tri-Node object rejected)'
   );
 }
 

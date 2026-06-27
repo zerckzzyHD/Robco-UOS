@@ -182,7 +182,28 @@ async function fetchAuthorizedModels(silent = false) {
         alert('>> KEY REJECTED — Invalid or unauthorized API key. Verify it in Google AI Studio.');
       return;
     }
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    if (!response.ok) {
+      let _isKeyErr = false;
+      if (response.status === 400) {
+        try {
+          const _errBody = await response.json();
+          const _es = _errBody?.error?.status;
+          const _em = (_errBody?.error?.message || '').toLowerCase();
+          _isKeyErr =
+            (_es === 'INVALID_ARGUMENT' &&
+              (_em.includes('api key') || _em.includes('api_key_invalid'))) ||
+            _es === 'PERMISSION_DENIED';
+        } catch (_) {}
+      }
+      if (_isKeyErr) {
+        if (!silent)
+          alert(
+            '>> KEY REJECTED — Invalid or unauthorized API key. Verify it in Google AI Studio.'
+          );
+        return;
+      }
+      throw new Error(`HTTP ${response.status}`);
+    }
     const data = await response.json();
     const selectEl = document.getElementById('apiModelInput');
     selectEl.innerHTML = '';
@@ -1025,7 +1046,23 @@ async function transmitMessage() {
     );
     clearTimeout(timeoutId);
 
-    if (!response.ok) throw new Error(`API Error ${response.status}`);
+    if (!response.ok) {
+      let _isKeyErr = false;
+      if (response.status === 400) {
+        try {
+          const _errBody = await response.json();
+          const _es = _errBody?.error?.status;
+          const _em = (_errBody?.error?.message || '').toLowerCase();
+          _isKeyErr =
+            (_es === 'INVALID_ARGUMENT' &&
+              (_em.includes('api key') || _em.includes('api_key_invalid'))) ||
+            _es === 'PERMISSION_DENIED';
+        } catch (_) {}
+      }
+      throw new Error(
+        _isKeyErr ? `API Key Error ${response.status}` : `API Error ${response.status}`
+      );
+    }
     transmitMessage._retryCount = 0;
     const data = await response.json();
     let aiText = data.candidates[0].content.parts[0].text
@@ -1145,10 +1182,11 @@ async function transmitMessage() {
     if (error.name === 'AbortError') {
       appendToChat('> TRANSMISSION CANCELLED.', 'sys');
     } else {
-      const _codeMatch = error.message && error.message.match(/API Error (\d+)/);
+      const _isKeyError = /API Key Error/.test(error.message || '');
+      const _codeMatch = error.message && error.message.match(/API (?:Key )?Error (\d+)/);
       const _code = _codeMatch ? parseInt(_codeMatch[1]) : 0;
 
-      if (_code === 401 || _code === 403) {
+      if (_isKeyError || _code === 401 || _code === 403) {
         // Auth failure — never retry; key must be re-entered
         transmitMessage._retryCount = 0;
         transmitMessage._inRetry = false;

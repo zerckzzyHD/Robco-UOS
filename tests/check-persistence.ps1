@@ -2593,7 +2593,7 @@ Check ($readmeSrc52 -match "ci\.yml" -and $readmeSrc52 -match "badge") `
 # Suite 53 -- AI + Gemini-Key Resilience Guards
 # Key validation hardening, bounded exponential backoff,
 # error classification, Tri-Node schema validation.
-# 14 tests
+# 25 tests
 # ===========================================================
 Sep "Suite 53 -- AI + Gemini-Key Resilience Guards"
 $apiSrc53 = Read-Src "js/api.js"
@@ -2676,6 +2676,59 @@ Check ($fnVtN53 -match 'Array\.isArray') `
 # 53.14  _validateTriNode body accepts objects with Tri-Node keys
 Check ($fnVtN53 -match "'narrative' in parsed" -or $fnVtN53 -match '"narrative" in parsed') `
     "_validateTriNode body accepts objects with 'narrative' key"
+
+# 53.15  fetchAuthorizedModels: 400 body inspected for INVALID_ARGUMENT (Finding A)
+$fnFetch53b = Get-FunctionBody $apiSrc53 'fetchAuthorizedModels'
+Check ($fnFetch53b -match 'INVALID_ARGUMENT') `
+    "fetchAuthorizedModels inspects error body for INVALID_ARGUMENT (bad-key 400 detected)"
+
+# 53.16  fetchAuthorizedModels: 400 body inspected for PERMISSION_DENIED (Finding A)
+Check ($fnFetch53b -match 'PERMISSION_DENIED') `
+    "fetchAuthorizedModels inspects error body for PERMISSION_DENIED (auth-denied 400 detected)"
+
+# 53.17  transmitMessage: throws "API Key Error" for key-specific 400s (Finding A)
+Check ($fnTm53 -match 'API Key Error') `
+    "transmitMessage throws 'API Key Error' for key-specific 400 responses"
+
+# 53.18  transmitMessage: key-error/auth branch does NOT call _recordFeatureFailure (Finding A)
+$keyErrBranchIdx53 = $fnTm53.IndexOf('_isKeyError || _code === 401 || _code === 403')
+$next429Idx53b    = $fnTm53.IndexOf('_code === 429')
+$keyErrBlock53 = if ($keyErrBranchIdx53 -ge 0 -and $next429Idx53b -gt $keyErrBranchIdx53) {
+    $fnTm53.Substring($keyErrBranchIdx53, $next429Idx53b - $keyErrBranchIdx53)
+} else { '' }
+Check ($keyErrBlock53.Length -gt 0 -and -not ($keyErrBlock53 -match '_recordFeatureFailure')) `
+    "transmitMessage key-error/auth branch does NOT call _recordFeatureFailure (bad key does not auto-disable AI)"
+
+# 53.19  _validateTriNode body: accepts 'state' key (state-only AI responses are valid)
+Check ($fnVtN53 -match "'state' in parsed" -or $fnVtN53 -match '"state" in parsed') `
+    "_validateTriNode body checks 'state' in parsed (state-only Tri-Node accepted)"
+
+# 53.20  _validateTriNode body: accepts 'modal' key (modal-only AI responses are valid)
+Check ($fnVtN53 -match "'modal' in parsed" -or $fnVtN53 -match '"modal" in parsed') `
+    "_validateTriNode body checks 'modal' in parsed (modal-only Tri-Node accepted)"
+
+# 53.21  _validateTriNode body: typeof guard rejects non-objects (strings, numbers, booleans)
+Check ($fnVtN53 -match "typeof parsed !== 'object'" -or $fnVtN53 -match 'typeof parsed !== "object"') `
+    "_validateTriNode body has typeof guard (non-objects like strings are rejected)"
+
+# 53.22  _validateTriNode body: has explicit return false (invalid inputs return false, not undefined/null)
+Check ($fnVtN53 -match '\breturn false\b') `
+    "_validateTriNode body has explicit 'return false' (invalid inputs rejected with boolean false)"
+
+# 53.23  _validateTriNode body: multiple 'in parsed' checks (not a trivial single-key check)
+$inParsedCount53 = ([regex]::Matches($fnVtN53, 'in parsed')).Count
+Check ($inParsedCount53 -ge 2) `
+    "_validateTriNode body has >=2 'in parsed' checks (validates multiple Tri-Node keys)"
+
+# 53.24  _validateTriNode body: no side effects (no saveState or localStorage calls)
+Check (-not ($fnVtN53 -match 'saveState') -and -not ($fnVtN53 -match 'localStorage')) `
+    "_validateTriNode body has no side effects (pure validation - no state writes)"
+
+# 53.25  _validateTriNode body: !parsed guard appears before first return false (falsy caught first)
+$bangParsedIdx53 = $fnVtN53.IndexOf('!parsed')
+$firstRetFalseIdx53 = $fnVtN53.IndexOf('return false')
+Check ($bangParsedIdx53 -ge 0 -and $firstRetFalseIdx53 -ge 0 -and $bangParsedIdx53 -lt $firstRetFalseIdx53) `
+    "_validateTriNode: !parsed guard appears before first return false (falsy inputs caught first)"
 
 # ===========================================================
 # Results
