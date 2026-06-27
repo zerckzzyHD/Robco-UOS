@@ -520,7 +520,7 @@ window.syncLocalSavesToCloud = async function () {
     try {
       await addDoc(col, {
         schema: 2,
-        version: window.APP_VERSION || '2.0.1',
+        version: window.APP_VERSION || '2.5.0',
         savedAt: now,
         updatedAt: now,
         label: ls.label,

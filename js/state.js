@@ -1,5 +1,5 @@
 // ── APP VERSION ───────────────────────────────────────────────
-const APP_VERSION = '2.0.1';
+const APP_VERSION = '2.5.0';
 window.APP_VERSION = APP_VERSION;
 
 // ── SAVE INTEGRITY + ROLLING BACKUP HELPERS ──────────────────────
