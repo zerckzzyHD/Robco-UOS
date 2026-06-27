@@ -516,16 +516,19 @@ assert(/autoImportState/.test(fileImportBody), 'calls autoImportState() for game
 header('cloud.js push / pull');
 assert(
   /robco_v8\s*:\s*window\.robco_v8/.test(cloudSource),
-  'pushToCloud() serialises full robco_v8 container'
+  'saveCurrentToCloud() serialises full robco_v8 container'
 );
-assert(/chat\s*:\s*JSON\.parse/.test(cloudSource), 'pushToCloud() includes chat history');
-assert(/playstyle/.test(cloudSource), 'pushToCloud() includes playstyle');
+assert(/robco_chat/.test(cloudSource), 'cloud.js reads and writes chat history (robco_chat key)');
+assert(/playstyle/.test(cloudSource), 'cloud.js includes playstyle in cloud saves');
 assert(
-  /data\.version/.test(cloudSource) && /data\.state/.test(cloudSource),
-  'pullFromCloud() detects envelope format'
+  /data\.robco_v8/.test(cloudSource) && /data\.version/.test(cloudSource),
+  'loadCloudSave() checks robco_v8 container and handles version for migration'
 );
-assert(/restoreChatHistory/.test(cloudSource), 'pullFromCloud() restores chat history');
-assert(/robco_playstyle/.test(cloudSource), 'pullFromCloud() restores playstyle');
+assert(
+  /robco_chat/.test(cloudSource),
+  'cloud.js restores chat history on cloud load (robco_chat key)'
+);
+assert(/robco_playstyle/.test(cloudSource), 'cloud.js restores playstyle on cloud load');
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 7 — Backward compatibility / migration
@@ -1294,8 +1297,14 @@ assert(
   'Import save input wired (handleFileUpload(event))'
 );
 // Cloud sync
-assert(/id="btnCloudPush"/.test(htmlSource), 'Cloud Push button exists (id=btnCloudPush)');
-assert(/id="btnCloudPull"/.test(htmlSource), 'Cloud Pull button exists (id=btnCloudPull)');
+assert(
+  /id="btnSaveToCloud"/.test(htmlSource),
+  'Save to Cloud button exists (id=btnSaveToCloud — replaces btnCloudPush)'
+);
+assert(
+  !/id="courierIdInput"/.test(htmlSource),
+  'Vestigial courier ID input is absent (id=courierIdInput removed in Phase 6)'
+);
 // Validate Key
 assert(/id="btnFetchModels"/.test(htmlSource), 'Validate Key button exists (id=btnFetchModels)');
 // D-pad
@@ -1360,7 +1369,7 @@ assert(
   'autoImportState() has no recursive Object.keys(parsed).forEach key transform'
 );
 
-// 23.4 & 23.5 pushToCloud is NOT called from saveState() or updateMath() (manual-only)
+// 23.4 & 23.5 saveCurrentToCloud is NOT called from saveState() or updateMath() (manual-only)
 {
   let saveStateBody = '';
   let updateMathBody = '';
@@ -1371,12 +1380,12 @@ assert(
     updateMathBody = extractFunctionBody(uiSource, 'updateMath');
   } catch (_) {}
   assert(
-    !/pushToCloud/.test(saveStateBody),
-    'saveState() does not call pushToCloud (cloud sync is manual-only)'
+    !/saveCurrentToCloud/.test(saveStateBody),
+    'saveState() does not call saveCurrentToCloud (cloud sync is manual-only)'
   );
   assert(
-    !/pushToCloud/.test(updateMathBody),
-    'updateMath() does not call pushToCloud (cloud sync is manual-only)'
+    !/saveCurrentToCloud/.test(updateMathBody),
+    'updateMath() does not call saveCurrentToCloud (cloud sync is manual-only)'
   );
 }
 
@@ -1601,17 +1610,18 @@ header('Meta / Runner Parity');
     'Suite 60',
     'Suite 61',
     'Suite 62',
+    'Suite 63',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-62)' +
+    'JS runner contains all gate-guard suites (22-41, 49-63)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-62)' +
+    'PS runner contains all gate-guard suites (22-41, 49-63)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -3321,29 +3331,29 @@ header('Phase 5c-iii: Cloud Save Picker + Local Migration');
     );
   }
 
-  // 46.14  renderCloudSavePicker() defined in ui.js
+  // 46.14  renderSavesList() defined in ui.js (unified saves list — replaces renderCloudSavePicker)
   assert(
-    /async function renderCloudSavePicker\s*\(/.test(uiSource) ||
-      /function renderCloudSavePicker\s*\(/.test(uiSource),
-    'ui.js defines renderCloudSavePicker() (cloud save picker render function)'
+    /async function renderSavesList\s*\(/.test(uiSource) ||
+      /function renderSavesList\s*\(/.test(uiSource),
+    'ui.js defines renderSavesList() (unified saves list — replaces renderCloudSavePicker)'
   );
 
-  // 46.15  loadUI() calls renderCloudSavePicker()
+  // 46.15  loadUI() calls renderSavesList()
   {
     let loadUIBody46 = '';
     try {
       loadUIBody46 = extractFunctionBody(uiSource, 'loadUI');
     } catch (_) {}
     assert(
-      /renderCloudSavePicker\(\)/.test(loadUIBody46),
-      'loadUI() calls renderCloudSavePicker() (picker wired into page load)'
+      /renderSavesList\(\)/.test(loadUIBody46),
+      'loadUI() calls renderSavesList() (unified saves list wired into page load)'
     );
   }
 
-  // 46.16  index.html has cloudSavePickerBody element (picker mount point in ACCOUNT panel)
+  // 46.16  index.html has savesListBody element (unified list mount point in Security & Config)
   assert(
-    /id="cloudSavePickerBody"/.test(htmlSource),
-    'index.html has #cloudSavePickerBody element (cloud save picker mount point in ACCOUNT panel)'
+    /id="savesListBody"/.test(htmlSource),
+    'index.html has #savesListBody element (unified saves list mount point in Security & Config)'
   );
 }
 
@@ -3451,28 +3461,28 @@ header('Phase 5c-iv: Gemini Key Sync + AI Studio Link');
     'index.html has AI Studio link (aistudio.google.com/app/apikey) with rel="noopener" (security)'
   );
 
-  // 47.9  renderCloudSavePicker shows "NAME" button (not "REN")
+  // 47.9  renderSavesList shows "NAME" button for cloud saves (not "REN")
   {
     let pickerBody = '';
     try {
-      pickerBody = extractFunctionBody(uiSource, 'renderCloudSavePicker');
+      pickerBody = extractFunctionBody(uiSource, 'renderSavesList');
     } catch (_) {}
     assert(
       />NAME</.test(pickerBody) && !/>REN</.test(pickerBody),
-      'renderCloudSavePicker shows NAME button (not REN) — Part B rename fix'
+      'renderSavesList shows NAME button for cloud saves (not REN) — Part B rename fix'
     );
   }
 
-  // 47.10 renderCloudSavePicker does not append a separate dateStr after the label
+  // 47.10 renderSavesList does not append a separate dateStr after the label
   //        (double-date regression guard: label already contains date from syncLocalSavesToCloud)
   {
     let pickerBody = '';
     try {
-      pickerBody = extractFunctionBody(uiSource, 'renderCloudSavePicker');
+      pickerBody = extractFunctionBody(uiSource, 'renderSavesList');
     } catch (_) {}
     assert(
       !/\bdateStr\b/.test(pickerBody),
-      'renderCloudSavePicker does not use dateStr (double-date regression guard — date shown once via label)'
+      'renderSavesList does not use dateStr (double-date regression guard — date shown once via label)'
     );
   }
 }
@@ -3942,10 +3952,10 @@ header('Suite 51 — Save Integrity + Rolling Backups');
     'getRollingBackups uses sort() to order backups by timestamp'
   );
 
-  // 51.39  cloud.js pushToCloud stamps checksum field via computeSaveChecksum
+  // 51.39  cloud.js saveCurrentToCloud stamps contentHash via computeSaveChecksum (integrity on cloud push)
   assert(
-    cloudSrc51.includes('computeSaveChecksum') && cloudSrc51.includes('checksum'),
-    'cloud.js pushToCloud stamps checksum field via computeSaveChecksum (integrity on cloud push)'
+    cloudSrc51.includes('computeSaveChecksum') && cloudSrc51.includes('contentHash'),
+    'cloud.js saveCurrentToCloud stamps contentHash via computeSaveChecksum (integrity on cloud push)'
   );
 
   // 51.40  verifySaveEnvelope accepts both robco_v8 (file/cloud) and state (slot) as content source
@@ -5530,6 +5540,83 @@ header('Suite 62 — Changelog viewer guards');
   assert(
     /replace\(.*<!--/.test(uiCoreSrc62),
     'Changelog viewer strips HTML comments (<!-- --> pattern)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 63 — Save/Cloud UI consolidation guards (Phase 6 Task 7)
+//  saveCurrentToCloud additive, renderSavesList unified, new HTML elements
+//  8 tests
+// ══════════════════════════════════════════════════════════════
+header('Suite 63 — Save/Cloud UI consolidation guards');
+{
+  const cloudSrc63 = readFile('js/cloud.js');
+
+  // 63.1  cloud.js defines window.saveCurrentToCloud (replaces pushToCloud)
+  assert(
+    /window\.saveCurrentToCloud\s*=/.test(cloudSrc63),
+    'cloud.js defines window.saveCurrentToCloud (replaces pushToCloud)'
+  );
+
+  // 63.2  saveCurrentToCloud uses addDoc (additive) and not setDoc (Protocol 34)
+  {
+    const scIdx = cloudSrc63.indexOf('saveCurrentToCloud');
+    const scSlice = scIdx >= 0 ? cloudSrc63.slice(scIdx, scIdx + 2000) : '';
+    assert(
+      /\baddDoc\b/.test(scSlice) && !/\bsetDoc\b/.test(scSlice),
+      'saveCurrentToCloud uses addDoc (additive) and not setDoc (Protocol 34 — no blind overwrite)'
+    );
+  }
+
+  // 63.3  saveCurrentToCloud guards anonymous users
+  {
+    const scIdx = cloudSrc63.indexOf('saveCurrentToCloud');
+    const scSlice = scIdx >= 0 ? cloudSrc63.slice(scIdx, scIdx + 2000) : '';
+    assert(
+      /isAnonymous/.test(scSlice),
+      'saveCurrentToCloud has isAnonymous guard (cannot save to cloud when not signed in)'
+    );
+  }
+
+  // 63.4  saveCurrentToCloud deduplicates by contentHash
+  {
+    const scIdx = cloudSrc63.indexOf('saveCurrentToCloud');
+    const scSlice = scIdx >= 0 ? cloudSrc63.slice(scIdx, scIdx + 2000) : '';
+    assert(
+      /contentHash/.test(scSlice),
+      'saveCurrentToCloud deduplicates by contentHash (prevents duplicate cloud saves)'
+    );
+  }
+
+  // 63.5  renderSavesList() defined in ui.js (unified local+cloud list)
+  assert(
+    /async function renderSavesList\s*\(/.test(uiSource) ||
+      /function renderSavesList\s*\(/.test(uiSource),
+    'ui.js defines renderSavesList() (unified local+cloud list — replaces renderCloudSavePicker)'
+  );
+
+  // 63.6  loadUI() calls renderSavesList()
+  {
+    let loadUIBody63 = '';
+    try {
+      loadUIBody63 = extractFunctionBody(uiSource, 'loadUI');
+    } catch (_) {}
+    assert(
+      /renderSavesList\(\)/.test(loadUIBody63),
+      'loadUI() calls renderSavesList() (unified saves list wired into page load)'
+    );
+  }
+
+  // 63.7  index.html has #savesListBody (new mount point in Security & Config)
+  assert(
+    /id="savesListBody"/.test(htmlSource),
+    'index.html has #savesListBody element (unified saves list mount point in Security & Config)'
+  );
+
+  // 63.8  index.html has #btnSaveToCloud (replaces btnCloudPush — additive save)
+  assert(
+    /id="btnSaveToCloud"/.test(htmlSource),
+    'index.html has #btnSaveToCloud button (replaces btnCloudPush — additive save to cloud)'
   );
 }
 

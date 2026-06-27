@@ -1,4 +1,13 @@
-## [Unreleased]<!-- Tests: 749/749 | Cache: robco-terminal-v2.5.0-r2 -->
+## [Unreleased]<!-- Tests: 757/757 | Cache: robco-terminal-v2.5.0-r3 -->
+
+### Changed
+
+- The Security & Configuration panel now shows a unified list of all your saves — both local slots and cloud saves — in one place, each clearly labelled [LOCAL] or [CLOUD]. Signed-in users see "Save Current to Cloud" and "Sync Local Slots → Cloud" buttons here. The Account panel is now focused on identity and sign-in only, with a pointer to Security & Configuration for save management.
+- Saving to the cloud now creates a new named save each time (you get to pick the name) rather than overwriting a fixed slot. Identical saves are automatically deduplicated. Loading a cloud save warns you if you have a more recent local save.
+
+### Removed
+
+- The old "Push Cloud Save" / "Pull Cloud Save" buttons and the Courier Save ID field in Security & Configuration have been replaced by the unified save list and the new "Save Current to Cloud" button.
 
 ### Fixed
 

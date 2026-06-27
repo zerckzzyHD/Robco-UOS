@@ -1264,7 +1264,9 @@
             <div id="accountBody" style="font-size: 12px">
               <span class="empty-state">Initializing...</span>
             </div>
-            <div id="cloudSavePickerBody" style="font-size: 12px; margin-top: 8px"></div>
+            <div style="font-size: 11px; opacity: 0.5; margin-top: 6px">
+              Manage saves in Security &amp; Configuration below.
+            </div>
           </details>
 
           <!-- 13. SECURITY & CONFIGURATION -->
@@ -1650,38 +1652,38 @@
               class="input-group"
               style="margin-top: 15px; border-top: 1px dashed var(--robco-blue); padding-top: 10px"
             >
-              <input
-                type="text"
-                id="courierIdInput"
-                placeholder="Courier Save ID (For Cloud Sync)"
-                maxlength="100"
-                style="width: 100%; border-color: var(--robco-blue); color: var(--robco-blue)"
-                onchange="localStorage.setItem('robco_courier_id', this.value)"
-              />
-            </div>
-            <div style="display: flex; gap: 10px">
-              <button
-                id="btnCloudPush"
-                class="action-btn"
-                style="border-color: var(--robco-blue); color: var(--robco-blue)"
-                onclick="
-                  if (window.pushToCloud)
-                    window.pushToCloud(document.getElementById('courierIdInput').value, state);
-                "
-              >
-                > PUSH CLOUD SAVE
-              </button>
-              <button
-                id="btnCloudPull"
-                class="action-btn"
-                style="border-color: var(--robco-blue); color: var(--robco-blue)"
-                onclick="
-                  if (window.pullFromCloud)
-                    window.pullFromCloud(document.getElementById('courierIdInput').value);
-                "
-              >
-                > PULL CLOUD SAVE
-              </button>
+              <div style="font-size: 10px; opacity: 0.55; margin-bottom: 5px; letter-spacing: 1px">
+                ALL SAVES
+              </div>
+              <div id="savesListBody" style="font-size: 12px; margin-bottom: 4px"></div>
+              <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px">
+                <button
+                  id="btnSaveToCloud"
+                  class="action-btn"
+                  style="
+                    font-size: 11px;
+                    border-color: var(--robco-blue);
+                    color: var(--robco-blue);
+                    display: none;
+                  "
+                  onclick="if (window.saveCurrentToCloud) window.saveCurrentToCloud();"
+                >
+                  &gt; SAVE CURRENT TO CLOUD
+                </button>
+                <button
+                  id="btnSyncSlotsToCloud"
+                  class="action-btn"
+                  style="
+                    font-size: 11px;
+                    border-color: var(--robco-blue);
+                    color: var(--robco-blue);
+                    display: none;
+                  "
+                  onclick="if (window.syncLocalSavesToCloud) window.syncLocalSavesToCloud();"
+                >
+                  &gt; SYNC LOCAL SLOTS &rarr; CLOUD
+                </button>
+              </div>
             </div>
 
             <div style="display: flex; gap: 10px; margin-top: 10px">

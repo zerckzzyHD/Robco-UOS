@@ -284,13 +284,13 @@ Check ($fileBody -match 'autoImportState')    "calls autoImportState()"
 # Suite 6 -- Cloud sync
 # ===========================================================
 Sep "Suite 6 -- cloud.js push / pull"
-Check ($cloudSrc -match 'robco_v8\s*:\s*window\.robco_v8')   "pushToCloud() serialises full robco_v8 container"
-Check ($cloudSrc -match 'chat\s*:\s*JSON\.parse') "pushToCloud() includes chat history"
-Check ($cloudSrc -match 'playstyle')               "pushToCloud() includes playstyle"
-$hasPullEnv = ($cloudSrc -match 'data\.version') -and ($cloudSrc -match 'data\.state')
-Check $hasPullEnv                                  "pullFromCloud() detects envelope format"
-Check ($cloudSrc -match 'restoreChatHistory')      "pullFromCloud() restores chat history"
-Check ($cloudSrc -match 'robco_playstyle')         "pullFromCloud() restores playstyle"
+Check ($cloudSrc -match 'robco_v8\s*:\s*window\.robco_v8')   "saveCurrentToCloud() serialises full robco_v8 container"
+Check ($cloudSrc -match 'robco_chat')              "cloud.js reads and writes chat history (robco_chat key)"
+Check ($cloudSrc -match 'playstyle')               "cloud.js includes playstyle in cloud saves"
+$hasPullEnv = ($cloudSrc -match 'data\.robco_v8') -and ($cloudSrc -match 'data\.version')
+Check $hasPullEnv                                  "loadCloudSave() checks robco_v8 container and handles version for migration"
+Check ($cloudSrc -match 'robco_chat')              "cloud.js restores chat history on cloud load (robco_chat key)"
+Check ($cloudSrc -match 'robco_playstyle')         "cloud.js restores playstyle on cloud load"
 
 # ===========================================================
 # Suite 7 -- Backward compatibility
@@ -815,8 +815,8 @@ Check ([bool]($htmlSrc -match 'onclick="loadFromSlot\(3\)"'))  "Load slot C wire
 Check ([bool]($htmlSrc -match 'onclick="exportSaveFile\(\)"'))          "Export save button wired (exportSaveFile())"
 Check ([bool]($htmlSrc -match 'onchange="handleFileUpload\(event\)"'))  "Import save input wired (handleFileUpload(event))"
 # Cloud sync
-Check ([bool]($htmlSrc -match 'id="btnCloudPush"'))  "Cloud Push button exists (id=btnCloudPush)"
-Check ([bool]($htmlSrc -match 'id="btnCloudPull"'))  "Cloud Pull button exists (id=btnCloudPull)"
+Check ([bool]($htmlSrc -match 'id="btnSaveToCloud"'))      "Save to Cloud button exists (id=btnSaveToCloud -- replaces btnCloudPush)"
+Check (-not ([bool]($htmlSrc -match 'id="courierIdInput"'))) "Vestigial courier ID input is absent (id=courierIdInput removed in Phase 6)"
 # Validate Key
 Check ([bool]($htmlSrc -match 'id="btnFetchModels"'))  "Validate Key button exists (id=btnFetchModels)"
 # D-pad (single-quote chars inside double-quoted string require escaping as '' in PS)
@@ -861,13 +861,13 @@ Check ($audioFnOffenders.Count -eq 0) ("No audio function reads localStorage.get
 Check (-not ([bool]([regex]::Match($importBody, 'Object\.keys\s*\(\s*parsed\s*\)\.forEach').Success))) `
     "autoImportState() has no recursive Object.keys(parsed).forEach key transform"
 
-# 23.4 & 23.5 pushToCloud is NOT called from saveState() or updateMath()
+# 23.4 & 23.5 saveCurrentToCloud is NOT called from saveState() or updateMath() (manual-only)
 $saveStateBody23 = ''
 $updateMathBody23 = ''
 try { $saveStateBody23 = Get-FunctionBody $stateSrc 'saveState' } catch {}
 try { $updateMathBody23 = Get-FunctionBody $uiSrc 'updateMath' } catch {}
-Check (-not ($saveStateBody23 -match 'pushToCloud'))   "saveState() does not call pushToCloud (manual-only)"
-Check (-not ($updateMathBody23 -match 'pushToCloud'))  "updateMath() does not call pushToCloud (manual-only)"
+Check (-not ($saveStateBody23 -match 'saveCurrentToCloud'))   "saveState() does not call saveCurrentToCloud (manual-only)"
+Check (-not ($updateMathBody23 -match 'saveCurrentToCloud'))  "updateMath() does not call saveCurrentToCloud (manual-only)"
 
 # ===========================================================
 # Suite 24 -- Protocol Completeness (Group 3)
@@ -971,11 +971,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-62)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-62)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-63)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-63)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -2016,19 +2016,19 @@ if ($renIdx46 -ge 0) {
 Check (([bool]($renBody46 -match '\bupdateDoc\b')) -and -not ([bool]($renBody46 -match '\baddDoc\b')) -and -not ([bool]($renBody46 -match '\bsetDoc\b'))) `
     'renameCloudSave uses updateDoc only (not addDoc/setDoc) — label-only update'
 
-# 46.14  renderCloudSavePicker() defined in ui.js
-Check (([bool]($uiSrc -match 'async function renderCloudSavePicker\s*\(')) -or ([bool]($uiSrc -match 'function renderCloudSavePicker\s*\('))) `
-    'ui.js defines renderCloudSavePicker() (cloud save picker render function)'
+# 46.14  renderSavesList() defined in ui.js (unified saves list -- replaces renderCloudSavePicker)
+Check (([bool]($uiSrc -match 'async function renderSavesList\s*\(')) -or ([bool]($uiSrc -match 'function renderSavesList\s*\('))) `
+    'ui.js defines renderSavesList() (unified saves list -- replaces renderCloudSavePicker)'
 
-# 46.15  loadUI() calls renderCloudSavePicker()
+# 46.15  loadUI() calls renderSavesList()
 $loadUIBody46 = ''
 try { $loadUIBody46 = Get-FunctionBody $uiSrc 'loadUI' } catch {}
-Check ([bool]($loadUIBody46 -match 'renderCloudSavePicker\(\)')) `
-    'loadUI() calls renderCloudSavePicker() (picker wired into page load)'
+Check ([bool]($loadUIBody46 -match 'renderSavesList\(\)')) `
+    'loadUI() calls renderSavesList() (unified saves list wired into page load)'
 
-# 46.16  index.html has cloudSavePickerBody element (picker mount point in ACCOUNT panel)
-Check ([bool]($htmlSrc -match 'id="cloudSavePickerBody"')) `
-    'index.html has #cloudSavePickerBody element (cloud save picker mount point in ACCOUNT panel)'
+# 46.16  index.html has savesListBody element (unified list mount point in Security & Config)
+Check ([bool]($htmlSrc -match 'id="savesListBody"')) `
+    'index.html has #savesListBody element (unified saves list mount point in Security & Config)'
 
 # ===========================================================
 # Suite 47 -- Gemini Key Sync + AI Studio Link (Phase 5c-iv)
@@ -2092,15 +2092,15 @@ Check ([bool]($htmlSrc -match 'id="geminiKeySyncToggle"')) `
 Check (([bool]($htmlSrc -match 'aistudio\.google\.com/app/apikey')) -and ([bool]($htmlSrc -match 'rel="noopener'))) `
     'index.html has AI Studio link (aistudio.google.com/app/apikey) with rel="noopener" (security)'
 
-# 47.9  renderCloudSavePicker shows NAME button (not REN)
+# 47.9  renderSavesList shows NAME button for cloud saves (not REN)
 $pickerBody47 = ''
-try { $pickerBody47 = Get-FunctionBody $uiSrc 'renderCloudSavePicker' } catch {}
+try { $pickerBody47 = Get-FunctionBody $uiSrc 'renderSavesList' } catch {}
 Check (([bool]($pickerBody47 -match '>NAME<')) -and -not ([bool]($pickerBody47 -match '>REN<'))) `
-    'renderCloudSavePicker shows NAME button (not REN) -- Part B rename fix'
+    'renderSavesList shows NAME button for cloud saves (not REN) -- Part B rename fix'
 
-# 47.10 renderCloudSavePicker does not use dateStr (double-date regression guard)
+# 47.10 renderSavesList does not use dateStr (double-date regression guard)
 Check (-not ([bool]($pickerBody47 -match '\bdateStr\b'))) `
-    'renderCloudSavePicker does not use dateStr (double-date regression guard -- date shown once via label)'
+    'renderSavesList does not use dateStr (double-date regression guard -- date shown once via label)'
 
 # ===========================================================
 # Suite 48 -- Remote Kill-Switch + Client Auto-Disable (Protocol 32/35)
@@ -2454,9 +2454,9 @@ Check ($stateSrc51 -match 'timestamp: Date\.now\(\)') `
 Check ($stateSrc51 -match 'results\.sort\(') `
     'getRollingBackups uses sort() to order backups by timestamp'
 
-# 51.39  cloud.js pushToCloud stamps checksum via computeSaveChecksum
-Check ($cloudSrc51 -match 'computeSaveChecksum' -and $cloudSrc51 -match 'checksum') `
-    'cloud.js pushToCloud stamps checksum field via computeSaveChecksum (integrity on cloud push)'
+# 51.39  cloud.js saveCurrentToCloud stamps contentHash via computeSaveChecksum (integrity on cloud push)
+Check ($cloudSrc51 -match 'computeSaveChecksum' -and $cloudSrc51 -match 'contentHash') `
+    'cloud.js saveCurrentToCloud stamps contentHash via computeSaveChecksum (integrity on cloud push)'
 
 # 51.40  verifySaveEnvelope accepts both robco_v8 and state content fields
 Check ($stateSrc51 -match 'envelope\.robco_v8' -and $stateSrc51 -match 'envelope\.state') `
@@ -3344,6 +3344,50 @@ Check ([bool]($uiCoreSrc62 -match 'sections\.find')) `
 # 62.2 Viewer strips HTML comments
 Check ([bool]($uiCoreSrc62 -match 'replace\(.*<!--')) `
     'Changelog viewer strips HTML comments (<!-- --> pattern)'
+
+# ===========================================================
+# Suite 63 -- Save/Cloud UI consolidation guards (Phase 6 Task 7)
+# saveCurrentToCloud additive, renderSavesList unified, new HTML elements
+# 8 tests
+# ===========================================================
+Sep "Suite 63 -- Save/Cloud UI consolidation guards"
+$cloudSrc63 = Read-Src "js/cloud.js"
+
+# 63.1  cloud.js defines window.saveCurrentToCloud (replaces pushToCloud)
+Check ([bool]($cloudSrc63 -match 'window\.saveCurrentToCloud\s*=')) `
+    'cloud.js defines window.saveCurrentToCloud (replaces pushToCloud)'
+
+# 63.2  saveCurrentToCloud uses addDoc (additive) and not setDoc (Protocol 34)
+$scIdx63 = $cloudSrc63.IndexOf('saveCurrentToCloud')
+$scSlice63 = if ($scIdx63 -ge 0) { $cloudSrc63.Substring($scIdx63, [Math]::Min(2000, $cloudSrc63.Length - $scIdx63)) } else { '' }
+Check (([bool]($scSlice63 -match '\baddDoc\b')) -and -not ([bool]($scSlice63 -match '\bsetDoc\b'))) `
+    'saveCurrentToCloud uses addDoc (additive) and not setDoc (Protocol 34 -- no blind overwrite)'
+
+# 63.3  saveCurrentToCloud guards anonymous users
+Check ([bool]($scSlice63 -match 'isAnonymous')) `
+    'saveCurrentToCloud has isAnonymous guard (cannot save to cloud when not signed in)'
+
+# 63.4  saveCurrentToCloud deduplicates by contentHash
+Check ([bool]($scSlice63 -match 'contentHash')) `
+    'saveCurrentToCloud deduplicates by contentHash (prevents duplicate cloud saves)'
+
+# 63.5  renderSavesList() defined in ui.js (unified local+cloud list)
+Check (([bool]($uiSrc -match 'async function renderSavesList\s*\(')) -or ([bool]($uiSrc -match 'function renderSavesList\s*\('))) `
+    'ui.js defines renderSavesList() (unified local+cloud list -- replaces renderCloudSavePicker)'
+
+# 63.6  loadUI() calls renderSavesList()
+$loadUIBody63 = ''
+try { $loadUIBody63 = Get-FunctionBody $uiSrc 'loadUI' } catch {}
+Check ([bool]($loadUIBody63 -match 'renderSavesList\(\)')) `
+    'loadUI() calls renderSavesList() (unified saves list wired into page load)'
+
+# 63.7  index.html has #savesListBody (new mount point in Security & Config)
+Check ([bool]($htmlSrc -match 'id="savesListBody"')) `
+    'index.html has #savesListBody element (unified saves list mount point in Security & Config)'
+
+# 63.8  index.html has #btnSaveToCloud (replaces btnCloudPush -- additive save)
+Check ([bool]($htmlSrc -match 'id="btnSaveToCloud"')) `
+    'index.html has #btnSaveToCloud button (replaces btnCloudPush -- additive save to cloud)'
 
 # ===========================================================
 # Results

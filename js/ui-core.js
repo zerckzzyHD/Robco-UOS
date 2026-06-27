@@ -158,11 +158,6 @@ window.onload = function () {
     document.getElementById('apiModelInput').innerHTML =
       `<option value="${savedModel}">${savedModel} (Secured)</option>`;
   }
-  if (localStorage.getItem('robco_courier_id')) {
-    let courierInput = document.getElementById('courierIdInput');
-    if (courierInput) courierInput.value = localStorage.getItem('robco_courier_id');
-  }
-
   try {
     if (localStorage.getItem('robco_chat')) {
       chatHistory = JSON.parse(localStorage.getItem('robco_chat'));
@@ -1318,7 +1313,7 @@ function loadUI() {
   renderKarmaCenter(); // G4: FO3 Karma Center
   renderCampaignStatus(); // v2.0.1: Campaign Status + Crossroads Record
   renderAccount();
-  renderCloudSavePicker();
+  renderSavesList();
   _updateContextPanels(); // G4: switch faction/karma panel visibility
   // C5/C11: Restore CAMPG dropdowns from state
   {

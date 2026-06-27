@@ -111,7 +111,8 @@ export default [
         stopThermalLoad: 'readonly',
         // Account module cross-file globals (js/ui-account.js ↔ js/ui.js)
         renderAccount: 'readonly',
-        renderCloudSavePicker: 'readonly',
+        renderSavesList: 'readonly',
+        listLocalSaves: 'readonly',
         undoLastSync: 'readonly',
         // Saves module cross-file globals (js/ui-saves.js ↔ js/ui.js)
         CHAT_MAX: 'readonly',

@@ -141,7 +141,7 @@ onAuthStateChanged(auth, user => {
   _currentUid = user ? user.uid : null;
   _currentUser = user || null;
   if (typeof window.renderAccount === 'function') window.renderAccount();
-  if (typeof window.renderCloudSavePicker === 'function') window.renderCloudSavePicker();
+  if (typeof window.renderSavesList === 'function') window.renderSavesList();
   if (user && !user.isAnonymous) loadGeminiKeyFromCloud();
 });
 
@@ -242,18 +242,19 @@ window.getAccountState = function () {
   };
 };
 
-window.pushToCloud = async function (_courierId, _stateObj) {
+window.saveCurrentToCloud = async function () {
   if (!window.isFeatureEnabled('cloudSync')) {
     alert('>> CLOUD SYNC TEMPORARILY UNAVAILABLE — saves remain local <<');
     return;
   }
-  if (!_currentUid) {
-    alert('>> ERROR: NOT AUTHENTICATED — PLEASE WAIT A MOMENT AND TRY AGAIN <<');
+  if (!_currentUid || !_currentUser || _currentUser.isAnonymous) {
+    alert('>> SIGN IN WITH GOOGLE TO SAVE TO CLOUD <<');
     return;
   }
-
-  const btn = document.getElementById('btnCloudPush');
-  if (btn) btn.innerText = '> SYNCING...';
+  const labelInput = prompt("Save name (leave blank to use today's date):");
+  const finalLabel = (labelInput && labelInput.trim()) || new Date().toLocaleDateString();
+  const btn = document.getElementById('btnSaveToCloud');
+  if (btn) btn.innerText = '> SAVING...';
   try {
     if (!window.robco_v8) {
       window.robco_v8 = { activeContext: state.gameContext || 'FNV', campaigns: {} };
@@ -261,146 +262,52 @@ window.pushToCloud = async function (_courierId, _stateObj) {
     window.robco_v8.activeContext = state.gameContext || 'FNV';
     window.robco_v8.campaigns[window.robco_v8.activeContext] = JSON.parse(JSON.stringify(state));
     localStorage.setItem('robco_v8', JSON.stringify(window.robco_v8));
-
-    const _pushPlaystyle = localStorage.getItem('robco_playstyle') || 'any';
-    const _pushPayload = {
-      version: window.APP_VERSION || '2.0.0',
-      schemaVersion: window.APP_VERSION || '2.0.0',
-      savedAt: Date.now(),
+    const chatRaw = localStorage.getItem('robco_chat');
+    const chat = chatRaw ? JSON.parse(chatRaw) : [];
+    const playstyle = localStorage.getItem('robco_playstyle') || 'any';
+    const ctx = window.robco_v8.activeContext;
+    const contentHash =
+      typeof window.computeSaveChecksum === 'function'
+        ? window.computeSaveChecksum(window.robco_v8, chat, playstyle)
+        : '';
+    // Dedup: skip if identical save already exists in cloud
+    const col = collection(db, 'users', _currentUid, 'saves');
+    let existingDocs = [];
+    try {
+      const snap = await getDocs(col);
+      snap.forEach(d => existingDocs.push(d.data()));
+    } catch (_) {}
+    if (contentHash && existingDocs.some(d => d.contentHash === contentHash)) {
+      alert('>> IDENTICAL SAVE ALREADY IN CLOUD — no new save created. <<');
+      if (btn) btn.innerText = '> SAVE CURRENT TO CLOUD';
+      return;
+    }
+    const now = Date.now();
+    await addDoc(col, {
+      schema: 2,
+      version: window.APP_VERSION || '2.5.0',
+      savedAt: now,
+      updatedAt: now,
+      label: finalLabel,
+      gameContext: ctx,
+      contentHash,
       robco_v8: window.robco_v8,
-      chat: JSON.parse(localStorage.getItem('robco_chat') || '[]'),
-      playstyle: _pushPlaystyle,
-    };
-    if (typeof window.computeSaveChecksum === 'function') {
-      _pushPayload.checksum = window.computeSaveChecksum(
-        _pushPayload.robco_v8,
-        _pushPayload.chat,
-        _pushPayload.playstyle
-      );
-    }
-    await setDoc(doc(db, 'users', _currentUid, 'saves', 'main'), _pushPayload);
-    localStorage.setItem('robco_last_cloud_push', Date.now().toString());
-    console.log('Cloud sync complete.');
-    if (typeof playSyncTone === 'function') playSyncTone(); // H3: Data Sync Ping
-    alert('>> CLOUD SYNC COMPLETE <<');
+      chat,
+      playstyle,
+    });
+    localStorage.setItem('robco_last_cloud_push', now.toString());
+    if (typeof playSyncTone === 'function') playSyncTone();
+    alert('>> SAVED TO CLOUD: "' + finalLabel + '" <<');
+    if (typeof window.renderSavesList === 'function') window.renderSavesList();
   } catch (e) {
-    console.error('Error syncing to cloud: ', e);
+    console.error('saveCurrentToCloud failed:', e);
     _recordFeatureFailure(
       'cloudSync',
       '>> CLOUD SYNC PAUSED after repeated errors — using local saves. Reload to retry. <<'
     );
     alert('>> CLOUD NETWORK FAILURE <<');
   } finally {
-    if (btn) btn.innerText = '> PUSH CLOUD SAVE';
-  }
-};
-
-window.pullFromCloud = async function (_courierId) {
-  if (!window.isFeatureEnabled('cloudSync')) {
-    alert('>> CLOUD SYNC TEMPORARILY UNAVAILABLE — saves remain local <<');
-    return;
-  }
-  if (!_currentUid) {
-    alert('>> ERROR: NOT AUTHENTICATED — PLEASE WAIT A MOMENT AND TRY AGAIN <<');
-    return;
-  }
-
-  const btn = document.getElementById('btnCloudPull');
-  if (btn) btn.innerText = '> FETCHING...';
-
-  try {
-    const docRef = doc(db, 'users', _currentUid, 'saves', 'main');
-    const docSnap = await getDoc(docRef);
-
-    if (docSnap.exists()) {
-      let data = docSnap.data();
-      // Conflict check: warn if cloud save is older than local save
-      const cloudTime = data.savedAt || 0;
-      const localTime = parseInt(localStorage.getItem('robco_last_cloud_push') || '0');
-      if (localTime > cloudTime && cloudTime > 0) {
-        const cloudDate = new Date(cloudTime).toLocaleString();
-        const localDate = new Date(localTime).toLocaleString();
-        if (
-          !confirm(
-            `>> WARNING: Local save is NEWER than cloud save.\nCloud: ${cloudDate}\nLocal: ${localDate}\n\nOverwrite local with older cloud data?`
-          )
-        ) {
-          if (btn) btn.innerText = '> PULL CLOUD SAVE';
-          return;
-        }
-      }
-      if (typeof autoImportState === 'function') {
-        if (data.robco_v8) {
-          // Integrity + forward-compat check before applying cloud pull
-          if (typeof window.verifySaveEnvelope === 'function') {
-            const _pullIntegrity = window.verifySaveEnvelope(data);
-            if (_pullIntegrity.status === 'future_version') {
-              if (
-                !confirm(
-                  `> VERSION MISMATCH\n\nThis cloud save was made on a newer version of RobCo (v${_pullIntegrity.version}).\nYour app is on v${window.APP_VERSION}.\n\nLoading may cause data loss — update the app first.\n\nForce-load anyway?`
-                )
-              ) {
-                if (btn) btn.innerText = '> PULL CLOUD SAVE';
-                return;
-              }
-            } else if (_pullIntegrity.status === 'checksum_mismatch') {
-              if (
-                !confirm(
-                  '> CLOUD SAVE INTEGRITY WARNING\n\nThis cloud save may be corrupt or was modified outside the app.\n\nLoad anyway? (Data may be incomplete or incorrect.)'
-                )
-              ) {
-                if (btn) btn.innerText = '> PULL CLOUD SAVE';
-                return;
-              }
-            }
-          }
-          // Rolling backup: snapshot current state before replacing
-          if (typeof window.snapRollingBackup === 'function') window.snapRollingBackup();
-
-          // XSS-fix: route cloud-pulled container through sanitizer before writing to localStorage.
-          // The raw setItem fast-path bypassed autoImportState's coercion hardening; this closes it.
-          const sanitized =
-            typeof sanitizeImportedContainer === 'function'
-              ? sanitizeImportedContainer(data.robco_v8)
-              : data.robco_v8;
-          localStorage.setItem('robco_v8', JSON.stringify(sanitized));
-          if (data.chat && Array.isArray(data.chat) && typeof restoreChatHistory === 'function') {
-            restoreChatHistory(data.chat);
-          }
-          if (data.playstyle) {
-            localStorage.setItem('robco_playstyle', data.playstyle);
-            let el = document.getElementById('playstyleInput');
-            if (el) el.value = data.playstyle;
-          }
-          alert('>> CLOUD SAVE RESTORED SUCCESSFULLY. REBOOTING SYSTEM... <<');
-          window.location.reload();
-        } else {
-          // Support legacy cloud payload
-          const stateData = data.version && data.state ? data.state : data;
-          autoImportState(JSON.stringify(stateData));
-          if (data.chat && Array.isArray(data.chat) && typeof restoreChatHistory === 'function') {
-            restoreChatHistory(data.chat);
-          }
-          if (data.playstyle) {
-            localStorage.setItem('robco_playstyle', data.playstyle);
-            let el = document.getElementById('playstyleInput');
-            if (el) el.value = data.playstyle;
-          }
-          alert('>> LEGACY CLOUD SAVE RESTORED SUCCESSFULLY <<');
-        }
-      }
-    } else {
-      alert('No cloud save found. Push a save first.');
-    }
-  } catch (e) {
-    console.error('Error fetching from cloud: ', e);
-    _recordFeatureFailure(
-      'cloudSync',
-      '>> CLOUD SYNC PAUSED after repeated errors — using local saves. Reload to retry. <<'
-    );
-    alert('>> CLOUD NETWORK FAILURE <<');
-  } finally {
-    if (btn) btn.innerText = '> PULL CLOUD SAVE';
+    if (btn) btn.innerText = '> SAVE CURRENT TO CLOUD';
   }
 };
 
@@ -538,7 +445,7 @@ window.syncLocalSavesToCloud = async function () {
   }
 
   alert('» SYNC COMPLETE — ' + uploaded + ' uploaded, ' + skipped + ' already synced «');
-  if (typeof window.renderCloudSavePicker === 'function') window.renderCloudSavePicker();
+  if (typeof window.renderSavesList === 'function') window.renderSavesList();
 };
 
 // ── Load a cloud save into local state (confirm-gated) ───────────────
@@ -560,6 +467,21 @@ window.loadCloudSave = async function (docId) {
       return;
     }
     const data = docSnap.data();
+    // Timestamp warning: warn if this cloud save is older than the last local push
+    {
+      const cloudTime = data.savedAt || 0;
+      const localTime = parseInt(localStorage.getItem('robco_last_cloud_push') || '0');
+      if (localTime > cloudTime && cloudTime > 0) {
+        const cloudDate = new Date(cloudTime).toLocaleString();
+        const localDate = new Date(localTime).toLocaleString();
+        if (
+          !confirm(
+            `>> NOTE: You have a more recent local save.\nThis cloud save: ${cloudDate}\nLast local push: ${localDate}\n\nLoad the older cloud save anyway?`
+          )
+        )
+          return;
+      }
+    }
     if (!data.robco_v8) {
       alert('>> SAVE FORMAT NOT SUPPORTED <<');
       return;
@@ -617,7 +539,7 @@ window.renameCloudSave = async function (docId, newLabel) {
       label: String(newLabel),
       updatedAt: Date.now(),
     });
-    if (typeof window.renderCloudSavePicker === 'function') window.renderCloudSavePicker();
+    if (typeof window.renderSavesList === 'function') window.renderSavesList();
   } catch (e) {
     console.warn('renameCloudSave failed (non-fatal):', e);
     alert('>> RENAME FAILED — NETWORK ERROR <<');
@@ -631,7 +553,7 @@ window.deleteCloudSave = async function (docId) {
   if (!confirm('>> PERMANENTLY DELETE this cloud save?\nThis cannot be undone.')) return;
   try {
     await deleteDoc(doc(db, 'users', _currentUid, 'saves', docId));
-    if (typeof window.renderCloudSavePicker === 'function') window.renderCloudSavePicker();
+    if (typeof window.renderSavesList === 'function') window.renderSavesList();
   } catch (e) {
     console.warn('deleteCloudSave failed (non-fatal):', e);
     alert('>> DELETE FAILED — NETWORK ERROR <<');
