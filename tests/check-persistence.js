@@ -1583,17 +1583,18 @@ header('Meta / Runner Parity');
     'Suite 51',
     'Suite 52',
     'Suite 53',
+    'Suite 54',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-53)' +
+    'JS runner contains all gate-guard suites (22-41, 49-54)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-53)' +
+    'PS runner contains all gate-guard suites (22-41, 49-54)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -4569,6 +4570,112 @@ header('Suite 53 — AI + Gemini-Key Resilience Guards');
   assert(
     typeof _vtFn53 === 'function' && _vtFn53({ foo: 1 }) === false,
     '_validateTriNode({foo:1}) → false (non-Tri-Node object rejected)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 54 — Prompt-Injection Hardening, Input Caps, Quota Warning
+//  Injection-resistance directive, player-input wrapper,
+//  HTML + JS length caps, saveState quota handling.
+//  14 tests
+// ══════════════════════════════════════════════════════════════
+header('Suite 54 — Prompt-Injection Hardening, Input Caps, Quota Warning');
+{
+  const apiSrc54 = readFile('js/api.js');
+  const stateSrc54 = readFile('js/state.js');
+  const htmlSrc54 = readFile('index.html');
+  const gsdBody54 = extractFunctionBody(apiSrc54, 'getSystemDirective');
+  const tmBody54 = extractFunctionBody(apiSrc54, 'transmitMessage');
+  const saveStateFn54 = extractFunctionBody(stateSrc54, 'saveState');
+
+  // 54.1  getSystemDirective() contains an injection-resistance / source-boundary section
+  assert(
+    /Instruction-Source Boundary|injection.resist/i.test(gsdBody54),
+    'getSystemDirective() contains an instruction-source-boundary / injection-resistance section'
+  );
+
+  // 54.2  The section instructs that player input is DATA, not instructions
+  assert(
+    /data.*player|player.*data|DATA.*player/i.test(gsdBody54) ||
+      /data.*not.*instruction|not.*a.*command/i.test(gsdBody54),
+    'getSystemDirective() injection-resistance section marks player input as data not instructions'
+  );
+
+  // 54.3  The section prohibits following instructions embedded in user/image content
+  assert(
+    /MUST NOT|must not/i.test(gsdBody54) &&
+      /role|persona|schema|system instruction/i.test(gsdBody54),
+    'getSystemDirective() injection-resistance section prohibits following embedded instructions (role/schema changes)'
+  );
+
+  // 54.4  The section requires Tri-Node JSON schema response regardless of player input
+  assert(
+    /Tri-Node JSON/i.test(gsdBody54) && /regardless/i.test(gsdBody54),
+    'getSystemDirective() injection-resistance section requires Tri-Node JSON response regardless of player input'
+  );
+
+  // 54.5  transmitMessage() wraps user content in a labeled player-input block
+  assert(
+    /PLAYER INPUT/i.test(tmBody54),
+    'transmitMessage() labels user content as PLAYER INPUT (clear data delimiter in outgoing request)'
+  );
+
+  // 54.6  The player-input label includes "data, not instructions" or equivalent
+  assert(
+    /data.*not.*instructions|not instructions/i.test(tmBody54),
+    'transmitMessage() player-input label contains "data, not instructions" (clear injection barrier)'
+  );
+
+  // 54.7  #chatInput has maxlength ≥ 4000 in index.html
+  {
+    const chatInputML54Match = htmlSrc54.match(/id="chatInput"[\s\S]{0,200}maxlength="(\d+)"/);
+    const chatInputML54 = chatInputML54Match ? parseInt(chatInputML54Match[1]) : 0;
+    assert(
+      chatInputML54 >= 4000,
+      `#chatInput maxlength is ≥ 4000 (found: ${chatInputML54}) — pathological chat input blocked at source`
+    );
+  }
+
+  // 54.8  #newItemName has a maxlength attribute in index.html
+  assert(
+    /id="newItemName"[\s\S]{0,200}maxlength="/.test(htmlSrc54),
+    '#newItemName has a maxlength attribute in index.html (item name length capped)'
+  );
+
+  // 54.9  #newQuestName has a maxlength attribute in index.html
+  assert(
+    /id="newQuestName"[\s\S]{0,200}maxlength="/.test(htmlSrc54),
+    '#newQuestName has a maxlength attribute in index.html (quest name length capped)'
+  );
+
+  // 54.10  #newPerkName has a maxlength attribute in index.html
+  assert(
+    /id="newPerkName"[\s\S]{0,200}maxlength="/.test(htmlSrc54),
+    '#newPerkName has a maxlength attribute in index.html (perk name length capped)'
+  );
+
+  // 54.11  #newCampaignNote has a maxlength attribute in index.html
+  assert(
+    /id="newCampaignNote"[\s\S]{0,200}maxlength="/.test(htmlSrc54),
+    '#newCampaignNote has a maxlength attribute in index.html (campaign note length capped)'
+  );
+
+  // 54.12  transmitMessage() has a JS length guard checking userText.length
+  assert(
+    /userText\.length\s*>\s*\d+/.test(tmBody54),
+    'transmitMessage() has a JS length guard on userText.length (defense-in-depth beyond maxlength attribute)'
+  );
+
+  // 54.13  saveState() catch block handles QuotaExceededError
+  assert(
+    /QuotaExceededError/.test(saveStateFn54),
+    'saveState() catch block handles QuotaExceededError (save failures surface to the user)'
+  );
+
+  // 54.14  The QuotaExceededError handler in saveState() calls appendToChat with a warning
+  assert(
+    /QuotaExceededError[\s\S]{0,400}appendToChat/.test(saveStateFn54),
+    'saveState() QuotaExceededError handler calls appendToChat (quota failures shown to user, not silently swallowed)'
   );
 }
 

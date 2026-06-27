@@ -967,11 +967,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-51)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-51)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-54)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-54)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -2729,6 +2729,82 @@ $bangParsedIdx53 = $fnVtN53.IndexOf('!parsed')
 $firstRetFalseIdx53 = $fnVtN53.IndexOf('return false')
 Check ($bangParsedIdx53 -ge 0 -and $firstRetFalseIdx53 -ge 0 -and $bangParsedIdx53 -lt $firstRetFalseIdx53) `
     "_validateTriNode: !parsed guard appears before first return false (falsy inputs caught first)"
+
+# ===========================================================
+# Suite 54 -- Prompt-Injection Hardening, Input Caps, Quota Warning
+# Injection-resistance directive, player-input wrapper,
+# HTML + JS length caps, saveState quota handling.
+# 14 tests
+# ===========================================================
+Sep "Suite 54 -- Prompt-Injection Hardening, Input Caps, Quota Warning"
+$apiSrc54  = Read-Src "js/api.js"
+$stateSrc54 = Read-Src "js/state.js"
+$htmlSrc54 = Read-Src "index.html"
+$gsdBody54 = Get-FunctionBody $apiSrc54 'getSystemDirective'
+$tmBody54  = Get-FunctionBody $apiSrc54 'transmitMessage'
+$saveStateFn54 = Get-FunctionBody $stateSrc54 'saveState'
+
+# 54.1  getSystemDirective() contains an injection-resistance / source-boundary section
+Check ($gsdBody54 -match 'Instruction-Source Boundary' -or $gsdBody54 -match 'injection.resist') `
+    "getSystemDirective() contains an instruction-source-boundary / injection-resistance section"
+
+# 54.2  The section instructs that player input is DATA, not instructions
+Check (($gsdBody54 -match 'data.*player' -or $gsdBody54 -match 'player.*data' -or $gsdBody54 -match 'DATA.*player') -or
+       ($gsdBody54 -match 'data.*not.*instruction' -or $gsdBody54 -match 'not.*a.*command')) `
+    "getSystemDirective() injection-resistance section marks player input as data not instructions"
+
+# 54.3  The section prohibits following instructions embedded in user/image content
+Check (($gsdBody54 -match 'MUST NOT' -or $gsdBody54 -match 'must not') -and
+       ($gsdBody54 -match 'role' -or $gsdBody54 -match 'persona' -or $gsdBody54 -match 'schema' -or $gsdBody54 -match 'system instruction')) `
+    "getSystemDirective() injection-resistance section prohibits following embedded instructions (role/schema changes)"
+
+# 54.4  The section requires Tri-Node JSON schema response regardless of player input
+Check ($gsdBody54 -match 'Tri-Node JSON' -and $gsdBody54 -match 'regardless') `
+    "getSystemDirective() injection-resistance section requires Tri-Node JSON response regardless of player input"
+
+# 54.5  transmitMessage() wraps user content in a labeled player-input block
+Check ($tmBody54 -match 'PLAYER INPUT') `
+    "transmitMessage() labels user content as PLAYER INPUT (clear data delimiter in outgoing request)"
+
+# 54.6  The player-input label includes 'data, not instructions' or equivalent
+Check ($tmBody54 -match 'data.*not.*instructions' -or $tmBody54 -match 'not instructions') `
+    "transmitMessage() player-input label contains 'data, not instructions' (clear injection barrier)"
+
+# 54.7  #chatInput has maxlength >= 4000 in index.html
+$chatInputML54 = 0
+if ($htmlSrc54 -match 'id="chatInput"[\s\S]{0,200}maxlength="(\d+)"') {
+    $chatInputML54 = [int]$Matches[1]
+}
+Check ($chatInputML54 -ge 4000) `
+    "#chatInput maxlength is >= 4000 (found: $chatInputML54) -- pathological chat input blocked at source"
+
+# 54.8  #newItemName has a maxlength attribute in index.html
+Check ($htmlSrc54 -match 'id="newItemName"[\s\S]{0,200}maxlength="') `
+    "#newItemName has a maxlength attribute in index.html (item name length capped)"
+
+# 54.9  #newQuestName has a maxlength attribute in index.html
+Check ($htmlSrc54 -match 'id="newQuestName"[\s\S]{0,200}maxlength="') `
+    "#newQuestName has a maxlength attribute in index.html (quest name length capped)"
+
+# 54.10  #newPerkName has a maxlength attribute in index.html
+Check ($htmlSrc54 -match 'id="newPerkName"[\s\S]{0,200}maxlength="') `
+    "#newPerkName has a maxlength attribute in index.html (perk name length capped)"
+
+# 54.11  #newCampaignNote has a maxlength attribute in index.html
+Check ($htmlSrc54 -match 'id="newCampaignNote"[\s\S]{0,200}maxlength="') `
+    "#newCampaignNote has a maxlength attribute in index.html (campaign note length capped)"
+
+# 54.12  transmitMessage() has a JS length guard checking userText.length
+Check ($tmBody54 -match 'userText\.length\s*>\s*\d+') `
+    "transmitMessage() has a JS length guard on userText.length (defense-in-depth beyond maxlength attribute)"
+
+# 54.13  saveState() catch block handles QuotaExceededError
+Check ($saveStateFn54 -match 'QuotaExceededError') `
+    "saveState() catch block handles QuotaExceededError (save failures surface to the user)"
+
+# 54.14  The QuotaExceededError handler in saveState() calls appendToChat with a warning
+Check ($saveStateFn54 -match 'QuotaExceededError[\s\S]{0,400}appendToChat') `
+    "saveState() QuotaExceededError handler calls appendToChat (quota failures shown to user, not silently swallowed)"
 
 # ===========================================================
 # Results

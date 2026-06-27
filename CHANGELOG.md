@@ -1,4 +1,4 @@
-## [v2.5.0] — Unreleased<!-- Tests: 646/646 | Cache: robco-terminal-v2.0.1-r63 -->
+## [v2.5.0] — Unreleased<!-- Tests: 660/660 | Cache: robco-terminal-v2.0.1-r64 -->
 
 ### Added
 
@@ -17,6 +17,8 @@
 
 ### Under the Hood
 
+- Added 14 automated guard tests (Suite 54, 660 total across 58 suites) covering the prompt-injection hardening directive in the system prompt, the player-input delimiter in outgoing requests, HTML maxlength caps on chat and data-entry fields, the JS length guard in the send path, and saveState quota-failure handling.
+- Bumped CACHE_NAME to r64 (api.js, ui.js, index.html touched).
 - Added 25 automated guard tests (Suite 53, 646 total across 57 suites) covering retry constants and exponential delay values, auth-failure early-return, 400-body key-error detection, 429 rate-limit classification, bounded-retry references, key-error branch auto-disable guard, Tri-Node validator existence and call order, and seven behavioral correctness checks of the validator (null, array, string, plain-object rejected; narrative-only, state-only, modal-only objects accepted).
 - Bumped CACHE_NAME to r63 (api.js changed).
 - Added 13 automated guard tests (Suite 52, 621 total across 56 suites) covering repomix config validity and tuning, presence of the new site files, manifest enrichment, and the README CI badge.

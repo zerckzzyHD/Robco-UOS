@@ -2319,6 +2319,7 @@ function updateMath() {
 function addItem() {
   let n = document.getElementById('newItemName').value;
   if (!n) return;
+  n = n.slice(0, 100); // defensive clamp
 
   // Auto-populate from database if fields are empty
   const dbEntry = typeof lookupItemInDb === 'function' ? lookupItemInDb(n) : null;
@@ -2901,7 +2902,7 @@ function removePerk(idx) {
 }
 
 function addPerk() {
-  const name = (document.getElementById('newPerkName') || {}).value?.trim();
+  const name = ((document.getElementById('newPerkName') || {}).value?.trim() || '').slice(0, 80);
   if (!name) return;
   const rank = parseInt((document.getElementById('newPerkRank') || {}).value) || 1;
   const levelTaken = parseInt((document.getElementById('newPerkLevel') || {}).value) || 0;
@@ -3193,7 +3194,7 @@ function addCampaignNote() {
   const input = document.getElementById('newCampaignNote');
   if (!input || !input.value.trim()) return;
   if (!state.campaign_notes) state.campaign_notes = [];
-  state.campaign_notes.push(input.value.trim());
+  state.campaign_notes.push(input.value.trim().slice(0, 5000)); // defensive clamp
   input.value = '';
   renderCampaignNotes();
   updateMath();
@@ -4065,7 +4066,7 @@ function loadFromSlot(slotNum) {
 
 // ── QUEST LOG HELPERS (#1) ──────────────────────────────────────────
 function addQuest() {
-  const name = (document.getElementById('newQuestName') || {}).value?.trim();
+  const name = ((document.getElementById('newQuestName') || {}).value?.trim() || '').slice(0, 100);
   if (!name) return;
   const status = (document.getElementById('newQuestStatus') || {}).value || 'active';
   const obj = (document.getElementById('newQuestObjective') || {}).value?.trim() || null;
