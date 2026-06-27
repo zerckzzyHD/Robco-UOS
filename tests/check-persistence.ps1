@@ -3047,20 +3047,20 @@ Check ([bool]($htmlSrc56 -match "'FO3'" -or $htmlSrc56 -match '"FO3"')) `
 # SHORTCUT_ROUTES / routeLaunchShortcut implementation.
 # Also checks custom per-shortcut icon files exist and are
 # listed in sw.js ASSETS.
-# 20 tests
+# 19 tests
 # ===========================================================
 Sep "Suite 57 -- PWA App Shortcuts Guards"
 $manifestSrc57 = Read-Src "manifest.json"
 $manifest57    = $manifestSrc57 | ConvertFrom-Json
 $uiCoreSrc57   = Read-Src "js/ui-core.js"
 
-# 57.1 manifest.shortcuts is an array of exactly 5 entries
-Check ([bool]($manifest57.shortcuts -is [array]) -and $manifest57.shortcuts.Count -eq 5) `
-    ("manifest.shortcuts is an array of 5 entries (found: " + $(if ($manifest57.shortcuts -is [array]) { $manifest57.shortcuts.Count } else { "not an array" }) + ")")
+# 57.1 manifest.shortcuts is an array of exactly 4 entries
+Check ([bool]($manifest57.shortcuts -is [array]) -and $manifest57.shortcuts.Count -eq 4) `
+    ("manifest.shortcuts is an array of 4 entries (found: " + $(if ($manifest57.shortcuts -is [array]) { $manifest57.shortcuts.Count } else { "not an array" }) + ")")
 
-# 57.2 All 5 expected shortcuts present by name and url
-$expectedNames57 = @('Comm-Link','Inventory','Stats','Data','New Campaign')
-$expectedUrls57  = @('./#go=comm','./#go=inv','./#go=stat','./#go=data','./#go=new')
+# 57.2 All 4 expected shortcuts present by name and url (Data shortcut removed from manifest)
+$expectedNames57 = @('Comm-Link','Inventory','Stats','New Campaign')
+$expectedUrls57  = @('./#go=comm','./#go=inv','./#go=stat','./#go=new')
 $shorts57 = if ($manifest57.shortcuts -is [array]) { $manifest57.shortcuts } else { @() }
 $allPresent57 = $true
 for ($ii = 0; $ii -lt $expectedNames57.Count; $ii++) {
@@ -3068,7 +3068,7 @@ for ($ii = 0; $ii -lt $expectedNames57.Count; $ii++) {
     if (-not ($shorts57 | Where-Object { $_.name -eq $n -and $_.url -eq $u })) { $allPresent57 = $false }
 }
 Check $allPresent57 `
-    "All 5 shortcuts present with correct names and ./#go=<id> urls (Comm-Link, Inventory, Stats, Data, New Campaign)"
+    "All 4 shortcuts present with correct names and ./#go=<id> urls (Comm-Link, Inventory, Stats, New Campaign)"
 
 # 57.3 Every shortcut url starts with ./ and contains #go= (offline-safe, no query param)
 $allUrlsSafe57 = ($shorts57 | Where-Object { -not ($_.url -like './*' -and $_.url -match '#go=') }).Count -eq 0 -and $shorts57.Count -gt 0
@@ -3123,7 +3123,6 @@ $expectedIconMap57 = @{
     'Comm-Link'    = 'comm-link-icon.png'
     'Inventory'    = 'inventory-icon.png'
     'Stats'        = 'stats-icon.png'
-    'Data'         = 'data-icon.png'
     'New Campaign' = 'new-campaign-icon.png'
 }
 $allCustomIcons57 = $true
@@ -3134,21 +3133,21 @@ foreach ($s in $shorts57) {
     if ($exp -notin $iconSrcs) { $allCustomIcons57 = $false; break }
 }
 Check $allCustomIcons57 `
-    "Each shortcut has its own custom icon src (comm-link-icon.png, inventory-icon.png, stats-icon.png, data-icon.png, new-campaign-icon.png)"
+    "Each shortcut has its own custom icon src (comm-link-icon.png, inventory-icon.png, stats-icon.png, new-campaign-icon.png)"
 
-# 57.12-57.16 Each shortcut icon file exists on disk
-$shortcutIconFiles57 = @('comm-link-icon.png','inventory-icon.png','stats-icon.png','data-icon.png','new-campaign-icon.png')
+# 57.12-57.15 Each shortcut icon file exists on disk
+$shortcutIconFiles57 = @('comm-link-icon.png','inventory-icon.png','stats-icon.png','new-campaign-icon.png')
 foreach ($iconFile in $shortcutIconFiles57) {
     Check (Test-Path (Join-Path $Root $iconFile)) "$iconFile exists on disk"
 }
 
-# 57.17 All 5 shortcut icon files are listed in sw.js ASSETS precache array
+# 57.16 All 4 shortcut icon files are listed in sw.js ASSETS precache array
 $swSrc57 = Read-Src "sw.js"
 $allIconsInAssets57 = ($shortcutIconFiles57 | Where-Object { -not $swSrc57.Contains("'./$_'") }).Count -eq 0
 Check $allIconsInAssets57 `
-    "All 5 shortcut icon files are listed in sw.js ASSETS precache array"
+    "All 4 shortcut icon files are listed in sw.js ASSETS precache array"
 
-# 57.18 App icon (icon.png) exists on disk
+# 57.17 App icon (icon.png) exists on disk
 Check (Test-Path (Join-Path $Root 'icon.png')) `
     "icon.png exists on disk (PWA app icon)"
 

@@ -1,8 +1,8 @@
-## [v2.5.0] — Unreleased<!-- Tests: 747/747 | Cache: robco-terminal-v2.0.1-r76 -->
+## [v2.5.0] — Unreleased<!-- Tests: 746/746 | Cache: robco-terminal-v2.0.1-r77 -->
 
 ### Added
 
-- Replaced the app icon with a new R logo and gave each home-screen shortcut its own distinct icon — Comm-Link, Inventory, Stats, Data, and New Campaign each have a unique image rather than the same generic icon. The icons are now precached by the service worker so they load instantly offline.
+- Replaced the app icon with a new R logo and gave each home-screen shortcut its own distinct icon — Comm-Link, Inventory, Stats, and New Campaign each have a unique image rather than the same generic icon. The icons are now precached by the service worker so they load instantly offline. The Data shortcut has been removed from the manifest (Android shows a maximum of four shortcuts; the Data tab remains fully accessible inside the app and via deep-link).
 
 - Added a `[LOGS]` command to the Comm-Link that shows a diagnostic panel listing recent errors caught by the app — JavaScript faults and unhandled async errors, timestamped and capped at 50 entries. Includes a CLEAR LOGS button. The log is stored only on your device and is never transmitted anywhere.
 - Added PWA app shortcuts so the terminal can be launched directly to a specific section from the home screen or app launcher. On Android, long-pressing the app icon shows four quick-launch options: Comm-Link (opens the AI chat), Inventory, Stats, and Data. A fifth shortcut — New Campaign — is included but Android only shows the first four; iOS ignores shortcuts entirely (a platform limitation). Each shortcut opens the app exactly as normal, then navigates to the right section automatically, and works offline because it uses a URL hash rather than a query parameter (which would bypass the service worker cache). The New Campaign shortcut still requires the usual double confirmation before wiping any data.

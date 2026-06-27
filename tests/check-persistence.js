@@ -5059,7 +5059,7 @@ header('Suite 56 — UI Module Split Guards');
 //  SHORTCUT_ROUTES / routeLaunchShortcut implementation.
 //  Also checks custom per-shortcut icon files exist and are
 //  listed in sw.js ASSETS.
-//  20 tests
+//  19 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 57 — PWA App Shortcuts Guards');
 {
@@ -5067,18 +5067,17 @@ header('Suite 57 — PWA App Shortcuts Guards');
   const manifest57 = JSON.parse(manifestSrc57);
   const uiCoreSrc57 = readFile('js/ui-core.js');
 
-  // 57.1  manifest.shortcuts is an array of exactly 5 entries
+  // 57.1  manifest.shortcuts is an array of exactly 4 entries
   assert(
-    Array.isArray(manifest57.shortcuts) && manifest57.shortcuts.length === 5,
-    `manifest.shortcuts is an array of 5 entries (found ${Array.isArray(manifest57.shortcuts) ? manifest57.shortcuts.length : 'not an array'})`
+    Array.isArray(manifest57.shortcuts) && manifest57.shortcuts.length === 4,
+    `manifest.shortcuts is an array of 4 entries (found ${Array.isArray(manifest57.shortcuts) ? manifest57.shortcuts.length : 'not an array'})`
   );
 
-  // 57.2  All 5 expected shortcuts present by name and url
+  // 57.2  All 4 expected shortcuts present by name and url (Data shortcut removed from manifest)
   const expectedShortcuts57 = [
     { name: 'Comm-Link', url: './#go=comm' },
     { name: 'Inventory', url: './#go=inv' },
     { name: 'Stats', url: './#go=stat' },
-    { name: 'Data', url: './#go=data' },
     { name: 'New Campaign', url: './#go=new' },
   ];
   const shortcuts57 = Array.isArray(manifest57.shortcuts) ? manifest57.shortcuts : [];
@@ -5087,7 +5086,7 @@ header('Suite 57 — PWA App Shortcuts Guards');
   );
   assert(
     allPresent57,
-    'All 5 shortcuts present with correct names and ./#go=<id> urls (Comm-Link, Inventory, Stats, Data, New Campaign)'
+    'All 4 shortcuts present with correct names and ./#go=<id> urls (Comm-Link, Inventory, Stats, New Campaign)'
   );
 
   // 57.3  Every shortcut url starts with ./ and contains #go= (offline-safe, no query param)
@@ -5165,7 +5164,6 @@ header('Suite 57 — PWA App Shortcuts Guards');
     'Comm-Link': 'comm-link-icon.png',
     Inventory: 'inventory-icon.png',
     Stats: 'stats-icon.png',
-    Data: 'data-icon.png',
     'New Campaign': 'new-campaign-icon.png',
   };
   const allCustomIcons57 = shortcuts57.every(s => {
@@ -5174,27 +5172,26 @@ header('Suite 57 — PWA App Shortcuts Guards');
   });
   assert(
     allCustomIcons57,
-    'Each shortcut has its own custom icon src (comm-link-icon.png, inventory-icon.png, stats-icon.png, data-icon.png, new-campaign-icon.png)'
+    'Each shortcut has its own custom icon src (comm-link-icon.png, inventory-icon.png, stats-icon.png, new-campaign-icon.png)'
   );
 
-  // 57.12-57.16  Each shortcut icon file exists on disk
+  // 57.12-57.15  Each shortcut icon file exists on disk
   const shortcutIconFiles57 = [
     'comm-link-icon.png',
     'inventory-icon.png',
     'stats-icon.png',
-    'data-icon.png',
     'new-campaign-icon.png',
   ];
   for (const iconFile of shortcutIconFiles57) {
     assert(fs.existsSync(path.join(ROOT, iconFile)), `${iconFile} exists on disk`);
   }
 
-  // 57.17  All 5 shortcut icon files are listed in sw.js ASSETS precache array
+  // 57.16  All 4 shortcut icon files are listed in sw.js ASSETS precache array
   const swSrc57 = readFile('sw.js');
   const allIconsInAssets57 = shortcutIconFiles57.every(f => swSrc57.includes(`'./${f}'`));
-  assert(allIconsInAssets57, 'All 5 shortcut icon files are listed in sw.js ASSETS precache array');
+  assert(allIconsInAssets57, 'All 4 shortcut icon files are listed in sw.js ASSETS precache array');
 
-  // 57.18  App icon (icon.png) exists on disk
+  // 57.17  App icon (icon.png) exists on disk
   assert(fs.existsSync(path.join(ROOT, 'icon.png')), 'icon.png exists on disk (PWA app icon)');
 }
 
