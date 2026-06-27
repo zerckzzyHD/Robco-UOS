@@ -8,6 +8,22 @@ import {
   setDoc,
   getDoc,
 } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js';
+import {
+  getAuth,
+  signInAnonymously,
+  onAuthStateChanged,
+} from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js';
+import {
+  initializeAppCheck,
+  ReCaptchaV3Provider,
+} from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-app-check.js';
+
+// ── App Check reCAPTCHA v3 site key ─────────────────────────────────────────
+// IMPORTANT: Replace this placeholder with the real key from the Firebase console
+// (App Check → Register App → reCAPTCHA v3) before pushing to production.
+// App Check initialization is skipped while this placeholder string is present,
+// so the app stays fully functional without the real key configured.
+const RECAPTCHA_V3_SITE_KEY = 'REPLACE_WITH_RECAPTCHA_SITE_KEY';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyCm4Pdxn9kC2dUU-Od_hYhUvPugjLMYfCA',
@@ -21,14 +37,35 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
+// App Check — non-fatal; skipped until real site key is configured
+try {
+  if (RECAPTCHA_V3_SITE_KEY !== 'REPLACE_WITH_RECAPTCHA_SITE_KEY') {
+    initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider(RECAPTCHA_V3_SITE_KEY),
+      isTokenAutoRefreshEnabled: true,
+    });
+  }
+} catch (e) {
+  console.warn('App Check init skipped (non-fatal):', e);
+}
+
+// Anonymous auth — non-fatal; app remains fully usable if auth/network is unavailable
+const auth = getAuth(app);
+let _currentUid = null;
+onAuthStateChanged(auth, user => {
+  _currentUid = user ? user.uid : null;
+});
+try {
+  signInAnonymously(auth);
+} catch (e) {
+  console.warn('Anonymous sign-in failed (non-fatal):', e);
+}
+
 window.pushToCloud = async function (courierId, stateObj) {
-  if (!courierId) {
-    alert('>> ERROR: MISSING COURIER ID <<');
+  if (!_currentUid) {
+    alert('>> ERROR: NOT AUTHENTICATED — PLEASE WAIT A MOMENT AND TRY AGAIN <<');
     return;
   }
-
-  // Firebase document IDs cannot contain slashes. Replace them with dashes.
-  let safeId = courierId.replace(/\//g, '-');
 
   const btn = document.getElementById('btnCloudPush');
   if (btn) btn.innerText = '> SYNCING...';
@@ -40,7 +77,7 @@ window.pushToCloud = async function (courierId, stateObj) {
     window.robco_v8.campaigns[window.robco_v8.activeContext] = JSON.parse(JSON.stringify(state));
     localStorage.setItem('robco_v8', JSON.stringify(window.robco_v8));
 
-    await setDoc(doc(db, 'saves', safeId), {
+    await setDoc(doc(db, 'users', _currentUid, 'saves', 'main'), {
       version: window.APP_VERSION || '2.0.0',
       savedAt: Date.now(),
       robco_v8: window.robco_v8,
@@ -60,18 +97,16 @@ window.pushToCloud = async function (courierId, stateObj) {
 };
 
 window.pullFromCloud = async function (courierId) {
-  if (!courierId) {
-    alert('Please enter a Courier ID first.');
+  if (!_currentUid) {
+    alert('>> ERROR: NOT AUTHENTICATED — PLEASE WAIT A MOMENT AND TRY AGAIN <<');
     return;
   }
-
-  let safeId = courierId.replace(/\//g, '-');
 
   const btn = document.getElementById('btnCloudPull');
   if (btn) btn.innerText = '> FETCHING...';
 
   try {
-    const docRef = doc(db, 'saves', safeId);
+    const docRef = doc(db, 'users', _currentUid, 'saves', 'main');
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
@@ -99,7 +134,13 @@ window.pullFromCloud = async function (courierId) {
             JSON.stringify({ robco_v8: JSON.parse(localStorage.getItem('robco_v8') || '{}') })
           );
 
-          localStorage.setItem('robco_v8', JSON.stringify(data.robco_v8));
+          // XSS-fix: route cloud-pulled container through sanitizer before writing to localStorage.
+          // The raw setItem fast-path bypassed autoImportState's coercion hardening; this closes it.
+          const sanitized =
+            typeof sanitizeImportedContainer === 'function'
+              ? sanitizeImportedContainer(data.robco_v8)
+              : data.robco_v8;
+          localStorage.setItem('robco_v8', JSON.stringify(sanitized));
           if (data.chat && Array.isArray(data.chat) && typeof restoreChatHistory === 'function') {
             restoreChatHistory(data.chat);
           }
@@ -126,7 +167,7 @@ window.pullFromCloud = async function (courierId) {
         }
       }
     } else {
-      alert('No cloud save found for that Courier ID.');
+      alert('No cloud save found. Push a save first.');
     }
   } catch (e) {
     console.error('Error fetching from cloud: ', e);

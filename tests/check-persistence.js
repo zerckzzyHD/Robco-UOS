@@ -2695,6 +2695,93 @@ header('GAME_DEFS Structural Integrity (Phase 5b)');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 44 — Anonymous Auth + Security Rules + XSS Coercion Fix (Phase 5c-i)
+//  Closed P0 hole: auth-gated Firestore paths, per-uid rules, App Check gate,
+//  and XSS bypass via cloud pull routed through sanitizeImportedContainer.
+//  11 tests
+// ══════════════════════════════════════════════════════════════
+header('Phase 5c-i: Auth + Rules + XSS Fix');
+
+{
+  // 44.1  cloud.js references signInAnonymously (Firebase Auth import)
+  assert(
+    /signInAnonymously/.test(cloudSource),
+    'cloud.js references signInAnonymously (anonymous auth on boot)'
+  );
+
+  // 44.2  cloud.js references onAuthStateChanged (tracks current uid)
+  assert(
+    /onAuthStateChanged/.test(cloudSource),
+    'cloud.js references onAuthStateChanged (uid state tracking)'
+  );
+
+  // 44.3  cloud.js push/pull targets users/{uid} path, not flat saves/{courierId}
+  assert(
+    /doc\(db,\s*['"]users['"]/.test(cloudSource) &&
+      !/doc\(db,\s*['"]saves['"],\s*safeId/.test(cloudSource),
+    "cloud.js push/pull uses doc(db, 'users', uid, ...) not flat doc(db, 'saves', safeId)"
+  );
+
+  // 44.4  firestore.rules file exists
+  assert(
+    fs.existsSync(path.join(ROOT, 'firestore.rules')),
+    'firestore.rules exists in repo root (security lockdown file)'
+  );
+
+  // 44.5  firestore.rules contains per-uid access rule
+  {
+    const rulesSource = fs.existsSync(path.join(ROOT, 'firestore.rules'))
+      ? fs.readFileSync(path.join(ROOT, 'firestore.rules'), 'utf8')
+      : '';
+    assert(
+      rulesSource.includes('request.auth.uid == uid'),
+      'firestore.rules contains per-uid access rule (request.auth.uid == uid)'
+    );
+
+    // 44.6  firestore.rules denies legacy flat saves collection
+    assert(
+      /match\s*\/saves\/\{/.test(rulesSource) && rulesSource.includes('if false'),
+      'firestore.rules denies legacy flat saves/{id} collection (if false)'
+    );
+  }
+
+  // 44.7  firebase.json references firestore.rules
+  {
+    const firebaseJsonSource = fs.existsSync(path.join(ROOT, 'firebase.json'))
+      ? fs.readFileSync(path.join(ROOT, 'firebase.json'), 'utf8')
+      : '';
+    assert(
+      firebaseJsonSource.includes('firestore.rules'),
+      'firebase.json references "firestore.rules" (deploy configuration)'
+    );
+  }
+
+  // 44.8  cloud.js references initializeAppCheck and ReCaptchaV3Provider (App Check init)
+  assert(
+    /initializeAppCheck/.test(cloudSource) && /ReCaptchaV3Provider/.test(cloudSource),
+    'cloud.js references initializeAppCheck and ReCaptchaV3Provider (App Check gate)'
+  );
+
+  // 44.9  api.js defines sanitizeImportedContainer function
+  assert(
+    /function sanitizeImportedContainer/.test(apiSource),
+    'api.js defines sanitizeImportedContainer() (XSS coercion layer for cloud pull path)'
+  );
+
+  // 44.10  cloud.js pull path calls sanitizeImportedContainer (XSS bypass closed)
+  assert(
+    /sanitizeImportedContainer/.test(cloudSource),
+    'cloud.js pull path calls sanitizeImportedContainer() (raw setItem XSS bypass closed)'
+  );
+
+  // 44.11  CSP in index.html contains identitytoolkit.googleapis.com (Firebase Auth endpoint)
+  assert(
+    /identitytoolkit\.googleapis\.com/.test(htmlSource),
+    'CSP in index.html covers identitytoolkit.googleapis.com (Firebase Auth endpoint)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 console.log('\n══════════════════════════════════════════════════════════════\n');

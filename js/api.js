@@ -205,6 +205,64 @@ function saveApiKeySilent() {
   if (model && !model.includes('Awaiting')) localStorage.setItem('robco_gemini_model', model);
 }
 
+// Sanitize a robco_v8 container pulled from an untrusted source (cloud, file import).
+// Escapes HTML in string fields that render as innerHTML so a crafted save cannot inject script.
+// Called by pullFromCloud's fast-path which writes directly to localStorage, bypassing
+// autoImportState's field-level coercion. Extend this list if new rendered string fields are added.
+function sanitizeImportedContainer(container) {
+  if (!container || typeof container !== 'object') return container;
+
+  function _esc(s) {
+    if (typeof s !== 'string') return s;
+    return s
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#x27;');
+  }
+
+  function _sanitizeState(s) {
+    if (!s || typeof s !== 'object') return s;
+    const o = Object.assign({}, s);
+    if (typeof o.loc === 'string') o.loc = _esc(o.loc);
+    if (Array.isArray(o.campaign_notes))
+      o.campaign_notes = o.campaign_notes.map(n => (typeof n === 'string' ? _esc(n) : n));
+    if (Array.isArray(o.quests))
+      o.quests = o.quests.map(q => ({
+        ...q,
+        name: _esc(q.name),
+        objective: q.objective ? _esc(q.objective) : q.objective,
+      }));
+    if (Array.isArray(o.inventory))
+      o.inventory = o.inventory.map(it => ({ ...it, name: _esc(it.name) }));
+    if (Array.isArray(o.squad))
+      o.squad = o.squad.map(m => ({
+        ...m,
+        name: _esc(m.name),
+        weapon: m.weapon ? _esc(m.weapon) : m.weapon,
+        condition: m.condition ? _esc(m.condition) : m.condition,
+      }));
+    if (Array.isArray(o.perks)) o.perks = o.perks.map(p => ({ ...p, name: _esc(p.name) }));
+    if (Array.isArray(o.status)) o.status = o.status.map(e => ({ ...e, name: _esc(e.name) }));
+    if (o.equipped && typeof o.equipped === 'object')
+      o.equipped = {
+        weapon: o.equipped.weapon ? _esc(o.equipped.weapon) : o.equipped.weapon,
+        armor: o.equipped.armor ? _esc(o.equipped.armor) : o.equipped.armor,
+        headgear: o.equipped.headgear ? _esc(o.equipped.headgear) : o.equipped.headgear,
+      };
+    return o;
+  }
+
+  const out = Object.assign({}, container);
+  if (out.campaigns && typeof out.campaigns === 'object') {
+    out.campaigns = Object.fromEntries(
+      Object.entries(out.campaigns).map(([k, v]) => [k, _sanitizeState(v)])
+    );
+  }
+  return out;
+}
+
 function autoImportState(jsonString) {
   try {
     // Snapshot current state for undo before applying changes

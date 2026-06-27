@@ -1,0 +1,23 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Per-uid lockdown: authenticated users may only read/write their own saves.
+    // All sub-collections under users/{uid}/ are covered by the recursive wildcard.
+    match /users/{uid}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Deny the legacy flat saves collection entirely.
+    // The app now writes to users/{uid}/saves/main; no path under saves/ is valid.
+    match /saves/{id} {
+      allow read, write: if false;
+    }
+
+    // Catch-all: deny everything not matched above.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+  }
+}

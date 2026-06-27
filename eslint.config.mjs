@@ -175,6 +175,15 @@ export default [
     files: ['js/cloud.js'],
     languageOptions: {
       sourceType: 'module',
+      globals: {
+        // api.js globals consumed by the ES module
+        sanitizeImportedContainer: 'readonly',
+        autoImportState: 'readonly',
+        restoreChatHistory: 'readonly',
+        playSyncTone: 'readonly',
+        state: 'writable',
+        APP_VERSION: 'readonly',
+      },
     },
   },
   {

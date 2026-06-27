@@ -1696,6 +1696,64 @@ Check ([bool]($skBody43 -match '_activeDef')) `
     'getSkillKeys() delegates to _activeDef()'
 
 # ===========================================================
+# Suite 44 -- Anonymous Auth + Security Rules + XSS Coercion Fix (Phase 5c-i)
+# Closed P0 hole: auth-gated Firestore paths, per-uid rules, App Check gate,
+# and XSS bypass via cloud pull routed through sanitizeImportedContainer.
+# 11 tests
+# ===========================================================
+Sep "Suite 44 -- Phase 5c-i: Auth + Rules + XSS Fix"
+
+# 44.1  cloud.js references signInAnonymously
+Check ([bool]($cloudSrc -match 'signInAnonymously')) `
+    'cloud.js references signInAnonymously (anonymous auth on boot)'
+
+# 44.2  cloud.js references onAuthStateChanged
+Check ([bool]($cloudSrc -match 'onAuthStateChanged')) `
+    'cloud.js references onAuthStateChanged (uid state tracking)'
+
+# 44.3  cloud.js push/pull targets users/{uid} path not flat saves/{courierId}
+$hasUsersPath = [bool]($cloudSrc -match "doc\(db,\s*['""]users['""]")
+$hasOldPath   = [bool]($cloudSrc -match "doc\(db,\s*['""]saves['""],\s*safeId")
+Check ($hasUsersPath -and -not $hasOldPath) `
+    "cloud.js push/pull uses doc(db, 'users', uid, ...) not flat doc(db, 'saves', safeId)"
+
+# 44.4  firestore.rules exists
+$rulesPath44 = Join-Path $Root 'firestore.rules'
+Check (Test-Path $rulesPath44) `
+    'firestore.rules exists in repo root (security lockdown file)'
+
+# 44.5  firestore.rules contains per-uid access rule
+$rulesSrc44 = if (Test-Path $rulesPath44) { [IO.File]::ReadAllText($rulesPath44) } else { '' }
+Check ($rulesSrc44 -match 'request\.auth\.uid\s*==\s*uid') `
+    'firestore.rules contains per-uid access rule (request.auth.uid == uid)'
+
+# 44.6  firestore.rules denies legacy flat saves collection
+Check (($rulesSrc44 -match 'match\s*/saves/\{') -and ($rulesSrc44 -match 'if false')) `
+    'firestore.rules denies legacy flat saves/{id} collection (if false)'
+
+# 44.7  firebase.json references firestore.rules
+$fbJsonPath44 = Join-Path $Root 'firebase.json'
+$fbJsonSrc44  = if (Test-Path $fbJsonPath44) { [IO.File]::ReadAllText($fbJsonPath44) } else { '' }
+Check ($fbJsonSrc44 -match 'firestore\.rules') `
+    'firebase.json references "firestore.rules" (deploy configuration)'
+
+# 44.8  cloud.js references initializeAppCheck and ReCaptchaV3Provider
+Check (([bool]($cloudSrc -match 'initializeAppCheck')) -and ([bool]($cloudSrc -match 'ReCaptchaV3Provider'))) `
+    'cloud.js references initializeAppCheck and ReCaptchaV3Provider (App Check gate)'
+
+# 44.9  api.js defines sanitizeImportedContainer function
+Check ([bool]($apiSrc -match 'function sanitizeImportedContainer')) `
+    'api.js defines sanitizeImportedContainer() (XSS coercion layer for cloud pull path)'
+
+# 44.10  cloud.js pull path calls sanitizeImportedContainer
+Check ([bool]($cloudSrc -match 'sanitizeImportedContainer')) `
+    'cloud.js pull path calls sanitizeImportedContainer() (raw setItem XSS bypass closed)'
+
+# 44.11  CSP in index.html contains identitytoolkit.googleapis.com
+Check ([bool]($htmlSrc -match 'identitytoolkit\.googleapis\.com')) `
+    'CSP in index.html covers identitytoolkit.googleapis.com (Firebase Auth endpoint)'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"
