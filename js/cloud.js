@@ -23,7 +23,7 @@ import {
 // (App Check → Register App → reCAPTCHA v3) before pushing to production.
 // App Check initialization is skipped while this placeholder string is present,
 // so the app stays fully functional without the real key configured.
-const RECAPTCHA_V3_SITE_KEY = 'REPLACE_WITH_RECAPTCHA_SITE_KEY';
+const RECAPTCHA_V3_SITE_KEY = '6LdEhzctAAAAAKPi-QarEVtKnkJd6q9CJxYA6NDt';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyCm4Pdxn9kC2dUU-Od_hYhUvPugjLMYfCA',
