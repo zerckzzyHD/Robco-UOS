@@ -1,9 +1,10 @@
-// ⚠ PROTOCOL: Bump SW_REV on EVERY commit that touches index.html, css/, or js/.
-// Format: 'robco-terminal-v{APP_VERSION}-r{N}'  (N starts at 1, increments each UI change)
+// ⚠ PROTOCOL: Bump CACHE_NAME on commits that touch a served/precached file:
+// index.html, sw.js, manifest.json, icon*.png, css/, or js/.
+// Format: 'robco-terminal-v{APP_VERSION}-r{N}'  (N starts at 1, increments each served-file change)
 // Changing this string is the ONLY thing that triggers the "REBOOT TERMINAL" update
 // prompt for users who already have the site cached. Forgetting to bump means cached
 // users silently run the old UI until they manually clear their browser cache.
-const CACHE_NAME = 'robco-terminal-v2.0.1-r54';
+const CACHE_NAME = 'robco-terminal-v2.0.1-r55';
 const ASSETS = [
   './',
   './index.html',
@@ -17,7 +18,6 @@ const ASSETS = [
   './js/ui.js',
   './js/reg_nv.js',
   './js/reg_fo3.js',
-  './CHANGELOG.md',
 ];
 
 self.addEventListener('install', event => {

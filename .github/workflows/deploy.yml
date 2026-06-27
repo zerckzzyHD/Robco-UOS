@@ -1,8 +1,11 @@
 name: Deploy to GitHub Pages
 
 on:
-  push:
+  # Deploy only after CI passes on main — never deploy a broken build.
+  workflow_run:
+    workflows: ['CI']
     branches: [main]
+    types: [completed]
 
   # Allow manual trigger from the Actions tab
   workflow_dispatch:
@@ -21,6 +24,12 @@ jobs:
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
+    # For workflow_run: only deploy when CI passed on main.
+    # For workflow_dispatch: always allow (manual override).
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main')
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -28,6 +37,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Deploy the exact commit CI tested; fall back to HEAD for manual dispatch.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Stage app files
         # Copy only the files that belong on the public site.

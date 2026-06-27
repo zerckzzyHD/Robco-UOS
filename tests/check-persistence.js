@@ -1712,10 +1712,12 @@ assert(
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 31 — CI/CD Automation Guards (Phase 1c)
-//  ci.yml has no stale "(106 tests)" label; runs PS runner;
-//  has render-check step; deploy.yml uses _site staging dir;
-//  hook-install and boot-smoke scripts exist.
-//  6 tests
+//  ci.yml has no stale "(106 tests)" or "(386 tests)" label; runs PS runner;
+//  has render-check step; deploy.yml uses _site staging dir and is
+//  gated on CI via workflow_run + conclusion == 'success';
+//  hook-install and boot-smoke scripts exist;
+//  pre-commit hook is conditional (served-file gate).
+//  11 tests
 // ══════════════════════════════════════════════════════════════
 header('CI/CD Automation Guards');
 
@@ -1766,6 +1768,51 @@ assert(
   fs.existsSync(path.join(ROOT, 'tests', 'boot-smoke.mjs')),
   'tests/boot-smoke.mjs exists (CI boot smoke test — Phase 1c)'
 );
+
+// 31.7 ci.yml does not contain stale "(386 tests)" label
+{
+  const ciSource = readFile('.github/workflows/ci.yml');
+  assert(
+    !/\(386 tests\)/.test(ciSource),
+    'ci.yml does not contain stale "(386 tests)" label (updated to 519)'
+  );
+}
+
+// 31.8 deploy.yml uses workflow_run trigger (gated on CI — not a bare push)
+{
+  const deploySource = readFile('.github/workflows/deploy.yml');
+  assert(
+    /workflow_run/.test(deploySource),
+    'deploy.yml uses workflow_run trigger (deploy gated on CI — not a bare push to main)'
+  );
+}
+
+// 31.9 deploy.yml workflow_run gate requires conclusion == 'success'
+{
+  const deploySource = readFile('.github/workflows/deploy.yml');
+  assert(
+    /conclusion\s*==\s*['"]success['"]/.test(deploySource),
+    "deploy.yml workflow_run gate requires conclusion == 'success' (broken CI cannot deploy)"
+  );
+}
+
+// 31.10 scripts/pre-commit gates cache-bump on staged served files (conditional)
+{
+  const hookSource = readFile('scripts/pre-commit');
+  assert(
+    /git diff --cached --name-only/.test(hookSource) && /SERVED=/.test(hookSource),
+    'scripts/pre-commit gates cache-bump check on staged served files via git diff --cached (conditional Protocol 1)'
+  );
+}
+
+// 31.11 scripts/pre-commit has SKIP branch for non-served commits
+{
+  const hookSource = readFile('scripts/pre-commit');
+  assert(
+    /SKIP.*No served|cache bump not required/.test(hookSource),
+    'scripts/pre-commit has SKIP branch — non-served commits bypass the cache-bump check'
+  );
+}
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 32 — Phase 2a Guards (Help Menu Rebuild + Chem Boost Fix)

@@ -56,8 +56,8 @@
 │   └── database.js     ~25KB CSV data (~170 weapons, ~68 armors, ~45 chems) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── check-persistence.ps1   28KB    514-test pre-commit audit
-│   ├── check-persistence.js    36KB    514-test Node runner (parity with .ps1)
+│   ├── check-persistence.ps1   28KB    519-test pre-commit audit
+│   ├── check-persistence.js    36KB    519-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -858,13 +858,13 @@ layout-independent fallback (viewport width, a CSS media query, or a resize obse
 
 ## Service Worker Cache Protocol
 
-> **⚠ This applies to EVERY commit that changes any user-visible file.**
+> **⚠ This applies to any commit that stages a served/precached file** (index.html, sw.js, manifest.json, icon\*.png, css/, js/). Doc-, config-, and test-only commits are exempt.
 
 The Service Worker (`sw.js`) uses a **cache-first** strategy. Once a user has visited the site, their browser serves files from the SW cache — not the network. The **only** mechanism that forces an update is changing `CACHE_NAME`.
 
 ### The Rule
 
-**Bump `CACHE_NAME` in `sw.js` before _every_ `git push` — no exceptions.** Every push must ship a new cache rev so all clients are forced to update (this includes doc-only, config-only, and test-only pushes). The following always qualify and must never ship without a bump:
+**Bump `CACHE_NAME` in `sw.js` whenever a commit stages a served/precached file.** Doc-only, config-only, and test-only commits do not require a bump. The following always qualify and must never ship without a bump:
 
 - `index.html` (any UI change, new panel, new button, layout tweak)
 - `css/terminal.css` (any style change)
@@ -879,7 +879,7 @@ The Service Worker (`sw.js`) uses a **cache-first** strategy. Once a user has vi
 
 - `APP_VERSION` matches the current `APP_VERSION` in `state.js`
 - `N` is a monotonically increasing integer, starting at 1 for each new `APP_VERSION`
-- Increment `N` on every push, regardless of how small the change is
+- Increment `N` whenever a served-file commit is pushed
 
 **Examples:**
 
@@ -895,7 +895,7 @@ Forgetting to bump means cached users **silently run the old UI** until they man
 
 ### Automated Guard
 
-The pre-commit hook enforces this rule automatically. Before running the 514-test suite, it parses the staged `CACHE_NAME` against `origin/main:sw.js` and requires a strict monotonic increase in the `-rN` revision number when `APP_VERSION` is unchanged — equal or lower revs are blocked. When `APP_VERSION` changes, the revision can reset. A missed or decremented bump is impossible to commit past.
+The pre-commit hook enforces this conditionally: it first checks whether any staged file matches the served/precached set (`index.html`, `sw.js`, `manifest.json`, icons, `css/`, `js/`). If matched, it requires a strict monotonic increase in the `-rN` revision number when `APP_VERSION` is unchanged — equal or lower revs are blocked. Non-served commits (doc-only, CI, tests) skip the check. When `APP_VERSION` changes, the revision can reset.
 
 ### Historical Note
 
@@ -929,7 +929,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (fails immediately if not bumped or decremented), then the 514-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 519-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

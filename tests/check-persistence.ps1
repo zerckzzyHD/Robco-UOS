@@ -1039,10 +1039,12 @@ Check ([bool]($stateSrc30 -match '_quotaWarnShown')) `
 
 # ===========================================================
 # Suite 31 -- CI/CD Automation Guards (Phase 1c)
-# ci.yml has no stale "(106 tests)" label; runs PS runner;
-# has render-check step; deploy.yml uses _site staging dir;
-# hook-install and boot-smoke scripts exist.
-# 6 tests
+# ci.yml has no stale "(106 tests)" or "(386 tests)" label; runs PS runner;
+# has render-check step; deploy.yml uses _site staging dir and is
+# gated on CI via workflow_run + conclusion == 'success';
+# hook-install and boot-smoke scripts exist;
+# pre-commit hook is conditional (served-file gate).
+# 11 tests
 # ===========================================================
 Sep "Suite 31 -- CI/CD Automation Guards"
 $ciSrc31 = Read-Src '.github/workflows/ci.yml'
@@ -1065,6 +1067,23 @@ Check (Test-Path (Join-Path $Root 'scripts/install-hooks.js')) `
 # 31.6 boot smoke test exists
 Check (Test-Path (Join-Path $Root 'tests/boot-smoke.mjs')) `
     'tests/boot-smoke.mjs exists (CI boot smoke test -- Phase 1c)'
+# 31.7 ci.yml no stale "(386 tests)" label
+Check (-not ($ciSrc31 -match '\(386 tests\)')) `
+    'ci.yml does not contain stale "(386 tests)" label (updated to 519)'
+# 31.8 deploy.yml uses workflow_run trigger (gated on CI)
+$deploySrc31b = Read-Src '.github/workflows/deploy.yml'
+Check ([bool]($deploySrc31b -match 'workflow_run')) `
+    'deploy.yml uses workflow_run trigger (deploy gated on CI -- not a bare push to main)'
+# 31.9 deploy.yml workflow_run gate requires conclusion == 'success'
+Check ([bool]($deploySrc31b -match "conclusion == 'success'")) `
+    "deploy.yml workflow_run gate requires conclusion == 'success' (broken CI cannot deploy)"
+# 31.10 scripts/pre-commit gates cache-bump on staged served files (conditional)
+$hookSrc31 = Read-Src 'scripts/pre-commit'
+Check (([bool]($hookSrc31 -match 'git diff --cached --name-only')) -and ([bool]($hookSrc31 -match 'SERVED='))) `
+    'scripts/pre-commit gates cache-bump check on staged served files via git diff --cached (conditional Protocol 1)'
+# 31.11 scripts/pre-commit has SKIP branch for non-served commits
+Check (([bool]($hookSrc31 -match 'SKIP.*No served')) -or ([bool]($hookSrc31 -match 'cache bump not required'))) `
+    'scripts/pre-commit has SKIP branch -- non-served commits bypass the cache-bump check'
 
 # ===========================================================
 # Suite 32 -- Phase 2a Guards (Help Menu Rebuild + Chem Boost Fix)
