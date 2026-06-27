@@ -3045,7 +3045,9 @@ Check ([bool]($htmlSrc56 -match "'FO3'" -or $htmlSrc56 -match '"FO3"')) `
 # Suite 57 -- PWA App Shortcuts Guards
 # Verifies manifest.json shortcuts array and ui-core.js
 # SHORTCUT_ROUTES / routeLaunchShortcut implementation.
-# 12 tests
+# Also checks custom per-shortcut icon files exist and are
+# listed in sw.js ASSETS.
+# 20 tests
 # ===========================================================
 Sep "Suite 57 -- PWA App Shortcuts Guards"
 $manifestSrc57 = Read-Src "manifest.json"
@@ -3115,6 +3117,40 @@ Check ($initTabsIdx57 -ge 0 -and $routeCallIdx57 -ge 0 -and $routeCallIdx57 -gt 
 # 57.10 Reload-safety: history.replaceState present in routeLaunchShortcut
 Check ([bool]($uiCoreSrc57 -match 'history\.replaceState')) `
     "routeLaunchShortcut clears the hash via history.replaceState (reload-safety -- prevents re-trigger on reload)"
+
+# 57.11 Each shortcut references its own specific custom icon (not icon.png)
+$expectedIconMap57 = @{
+    'Comm-Link'    = 'comm-link-icon.png'
+    'Inventory'    = 'inventory-icon.png'
+    'Stats'        = 'stats-icon.png'
+    'Data'         = 'data-icon.png'
+    'New Campaign' = 'new-campaign-icon.png'
+}
+$allCustomIcons57 = $true
+foreach ($s in $shorts57) {
+    $exp = $expectedIconMap57[$s.name]
+    if (-not $exp) { $allCustomIcons57 = $false; break }
+    $iconSrcs = if ($s.icons -is [array]) { $s.icons | ForEach-Object { $_.src } } else { @($s.icons.src) }
+    if ($exp -notin $iconSrcs) { $allCustomIcons57 = $false; break }
+}
+Check $allCustomIcons57 `
+    "Each shortcut has its own custom icon src (comm-link-icon.png, inventory-icon.png, stats-icon.png, data-icon.png, new-campaign-icon.png)"
+
+# 57.12-57.16 Each shortcut icon file exists on disk
+$shortcutIconFiles57 = @('comm-link-icon.png','inventory-icon.png','stats-icon.png','data-icon.png','new-campaign-icon.png')
+foreach ($iconFile in $shortcutIconFiles57) {
+    Check (Test-Path (Join-Path $Root $iconFile)) "$iconFile exists on disk"
+}
+
+# 57.17 All 5 shortcut icon files are listed in sw.js ASSETS precache array
+$swSrc57 = Read-Src "sw.js"
+$allIconsInAssets57 = ($shortcutIconFiles57 | Where-Object { -not $swSrc57.Contains("'./$_'") }).Count -eq 0
+Check $allIconsInAssets57 `
+    "All 5 shortcut icon files are listed in sw.js ASSETS precache array"
+
+# 57.18 App icon (icon.png) exists on disk
+Check (Test-Path (Join-Path $Root 'icon.png')) `
+    "icon.png exists on disk (PWA app icon)"
 
 # ===========================================================
 # Suite 58 -- Client Error Ring-Buffer Guards (Item C)

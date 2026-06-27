@@ -5057,7 +5057,9 @@ header('Suite 56 — UI Module Split Guards');
 //  Suite 57 — PWA App Shortcuts Guards
 //  Verifies manifest.json shortcuts array and ui-core.js
 //  SHORTCUT_ROUTES / routeLaunchShortcut implementation.
-//  12 tests
+//  Also checks custom per-shortcut icon files exist and are
+//  listed in sw.js ASSETS.
+//  20 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 57 — PWA App Shortcuts Guards');
 {
@@ -5157,6 +5159,43 @@ header('Suite 57 — PWA App Shortcuts Guards');
     /history\.replaceState/.test(uiCoreSrc57),
     'routeLaunchShortcut clears the hash via history.replaceState (reload-safety — prevents re-trigger on reload)'
   );
+
+  // 57.11  Each shortcut references its own specific custom icon (not icon.png)
+  const expectedIcons57 = {
+    'Comm-Link': 'comm-link-icon.png',
+    Inventory: 'inventory-icon.png',
+    Stats: 'stats-icon.png',
+    Data: 'data-icon.png',
+    'New Campaign': 'new-campaign-icon.png',
+  };
+  const allCustomIcons57 = shortcuts57.every(s => {
+    const expected = expectedIcons57[s.name];
+    return expected && Array.isArray(s.icons) && s.icons.some(ic => ic.src === expected);
+  });
+  assert(
+    allCustomIcons57,
+    'Each shortcut has its own custom icon src (comm-link-icon.png, inventory-icon.png, stats-icon.png, data-icon.png, new-campaign-icon.png)'
+  );
+
+  // 57.12-57.16  Each shortcut icon file exists on disk
+  const shortcutIconFiles57 = [
+    'comm-link-icon.png',
+    'inventory-icon.png',
+    'stats-icon.png',
+    'data-icon.png',
+    'new-campaign-icon.png',
+  ];
+  for (const iconFile of shortcutIconFiles57) {
+    assert(fs.existsSync(path.join(ROOT, iconFile)), `${iconFile} exists on disk`);
+  }
+
+  // 57.17  All 5 shortcut icon files are listed in sw.js ASSETS precache array
+  const swSrc57 = readFile('sw.js');
+  const allIconsInAssets57 = shortcutIconFiles57.every(f => swSrc57.includes(`'./${f}'`));
+  assert(allIconsInAssets57, 'All 5 shortcut icon files are listed in sw.js ASSETS precache array');
+
+  // 57.18  App icon (icon.png) exists on disk
+  assert(fs.existsSync(path.join(ROOT, 'icon.png')), 'icon.png exists on disk (PWA app icon)');
 }
 
 // ══════════════════════════════════════════════════════════════
