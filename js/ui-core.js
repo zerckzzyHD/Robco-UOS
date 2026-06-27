@@ -572,6 +572,8 @@ window.onload = function () {
     window.robco_v8.campaigns[window.robco_v8.activeContext] = JSON.parse(JSON.stringify(state));
     localStorage.setItem('robco_v8', JSON.stringify(window.robco_v8));
   });
+
+  routeLaunchShortcut(); // PWA shortcut deep-link routing — must run last, after initTabs
 };
 
 function setupHpBarInteraction() {
@@ -834,6 +836,38 @@ function initTabs() {
     if (saved && TAB_NAMES.includes(saved)) tab = saved;
   } catch (_) {}
   switchTab(tab);
+}
+
+// PWA app-shortcut deep-link routes. Keys are the only accepted #go= values (allow-list).
+const SHORTCUT_ROUTES = {
+  comm: () => {
+    const i = document.getElementById('chatInput');
+    if (i) {
+      i.scrollIntoView({ block: 'center' });
+      i.focus();
+    }
+  },
+  inv: () => switchTab('inv'),
+  stat: () => switchTab('stat'),
+  data: () => switchTab('data'),
+  new: () => wipeTerminal(),
+};
+function routeLaunchShortcut() {
+  let raw;
+  try {
+    raw = (window.location.hash || '').replace(/^#/, '');
+  } catch (_) {
+    return;
+  }
+  if (!raw) return;
+  const m = raw.match(/^go=([a-z]+)$/);
+  if (!m) return;
+  const action = SHORTCUT_ROUTES[m[1]];
+  if (typeof action !== 'function') return;
+  try {
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+  } catch (_) {}
+  action();
 }
 
 // Called by #stat_loc onchange: persists the new location and re-renders so the

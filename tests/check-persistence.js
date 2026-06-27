@@ -1595,17 +1595,18 @@ header('Meta / Runner Parity');
     'Suite 54',
     'Suite 55',
     'Suite 56',
+    'Suite 57',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-56)' +
+    'JS runner contains all gate-guard suites (22-41, 49-57)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-56)' +
+    'PS runner contains all gate-guard suites (22-41, 49-57)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -5045,6 +5046,112 @@ header('Suite 56 — UI Module Split Guards');
   assert(
     /'FO3'/.test(htmlSrc56) || /"FO3"/.test(htmlSrc56),
     "boot loader handles 'FO3' context (switches to FO3 db + reg when activeContext is FO3)"
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 57 — PWA App Shortcuts Guards
+//  Verifies manifest.json shortcuts array and ui-core.js
+//  SHORTCUT_ROUTES / routeLaunchShortcut implementation.
+//  12 tests
+// ══════════════════════════════════════════════════════════════
+header('Suite 57 — PWA App Shortcuts Guards');
+{
+  const manifestSrc57 = readFile('manifest.json');
+  const manifest57 = JSON.parse(manifestSrc57);
+  const uiCoreSrc57 = readFile('js/ui-core.js');
+
+  // 57.1  manifest.shortcuts is an array of exactly 5 entries
+  assert(
+    Array.isArray(manifest57.shortcuts) && manifest57.shortcuts.length === 5,
+    `manifest.shortcuts is an array of 5 entries (found ${Array.isArray(manifest57.shortcuts) ? manifest57.shortcuts.length : 'not an array'})`
+  );
+
+  // 57.2  All 5 expected shortcuts present by name and url
+  const expectedShortcuts57 = [
+    { name: 'Comm-Link', url: './#go=comm' },
+    { name: 'Inventory', url: './#go=inv' },
+    { name: 'Stats', url: './#go=stat' },
+    { name: 'Data', url: './#go=data' },
+    { name: 'New Campaign', url: './#go=new' },
+  ];
+  const shortcuts57 = Array.isArray(manifest57.shortcuts) ? manifest57.shortcuts : [];
+  const allPresent57 = expectedShortcuts57.every(exp =>
+    shortcuts57.some(s => s.name === exp.name && s.url === exp.url)
+  );
+  assert(
+    allPresent57,
+    'All 5 shortcuts present with correct names and ./#go=<id> urls (Comm-Link, Inventory, Stats, Data, New Campaign)'
+  );
+
+  // 57.3  Every shortcut url starts with ./ and contains #go= (offline-safe, no query param)
+  const allUrlsSafe57 = shortcuts57.every(
+    s => typeof s.url === 'string' && s.url.startsWith('./') && s.url.includes('#go=')
+  );
+  assert(
+    allUrlsSafe57,
+    'Every shortcut url starts with ./ and uses #go= hash (not a query param — safe for SW cache-first offline)'
+  );
+
+  // 57.4  SHORTCUT_ROUTES const defined in ui-core.js
+  assert(
+    /const\s+SHORTCUT_ROUTES\s*=/.test(uiCoreSrc57),
+    'SHORTCUT_ROUTES const defined in js/ui-core.js'
+  );
+
+  // 57.5  routeLaunchShortcut function defined in ui-core.js
+  assert(
+    /function\s+routeLaunchShortcut\s*\(/.test(uiCoreSrc57),
+    'routeLaunchShortcut() function defined in js/ui-core.js'
+  );
+
+  // 57.6  Allow-list guard: /^go=/ regex present, no eval or innerHTML in routing fn
+  {
+    const fnMatch = uiCoreSrc57.match(/function\s+routeLaunchShortcut\s*\(\)[^{]*\{([\s\S]*?)^}/m);
+    const fnBody = fnMatch ? fnMatch[1] : uiCoreSrc57;
+    assert(
+      /\^go=/.test(uiCoreSrc57),
+      'routeLaunchShortcut uses /^go=/ allow-list regex to validate hash value'
+    );
+    assert(
+      !/\beval\b/.test(fnBody) && !/\.innerHTML\b/.test(fnBody),
+      'routeLaunchShortcut body contains no eval or innerHTML (XSS safety)'
+    );
+  }
+
+  // 57.7  New Campaign routes to wipeTerminal, and wipeTerminal still has >=2 confirm() calls
+  assert(
+    /new\s*:\s*\(\s*\)\s*=>\s*wipeTerminal\s*\(/.test(uiCoreSrc57),
+    "SHORTCUT_ROUTES 'new' key routes to wipeTerminal()"
+  );
+  const confirmCount57 = (uiCoreSrc57.match(/\bconfirm\s*\(/g) || []).length;
+  assert(
+    confirmCount57 >= 2,
+    `wipeTerminal still has >=2 confirm() calls (found ${confirmCount57}) — double-confirm gate intact`
+  );
+
+  // 57.8  Tab routes reuse switchTab for inv, stat, data
+  assert(
+    /inv\s*:\s*\(\s*\)\s*=>\s*switchTab\s*\(\s*['"]inv['"]\s*\)/.test(uiCoreSrc57) &&
+      /stat\s*:\s*\(\s*\)\s*=>\s*switchTab\s*\(\s*['"]stat['"]\s*\)/.test(uiCoreSrc57) &&
+      /data\s*:\s*\(\s*\)\s*=>\s*switchTab\s*\(\s*['"]data['"]\s*\)/.test(uiCoreSrc57),
+    'SHORTCUT_ROUTES inv/stat/data keys route via switchTab() — reuses existing tab system'
+  );
+
+  // 57.9  routeLaunchShortcut() call appears after initTabs( in ui-core.js source (boot order guard)
+  {
+    const initTabsIdx = uiCoreSrc57.indexOf('initTabs(');
+    const routeCallIdx = uiCoreSrc57.indexOf('routeLaunchShortcut()');
+    assert(
+      initTabsIdx !== -1 && routeCallIdx !== -1 && routeCallIdx > initTabsIdx,
+      'routeLaunchShortcut() call appears after initTabs() in source — tab system ready before routing'
+    );
+  }
+
+  // 57.10  Reload-safety: history.replaceState present in routeLaunchShortcut
+  assert(
+    /history\.replaceState/.test(uiCoreSrc57),
+    'routeLaunchShortcut clears the hash via history.replaceState (reload-safety — prevents re-trigger on reload)'
   );
 }
 

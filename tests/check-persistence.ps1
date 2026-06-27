@@ -971,11 +971,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-54)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-54)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-57)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-57)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -3040,6 +3040,81 @@ Check ([bool]($htmlSrc56 -match "'FNV'" -or $htmlSrc56 -match '"FNV"')) `
 # 56.34 Boot loader handles 'FO3' context
 Check ([bool]($htmlSrc56 -match "'FO3'" -or $htmlSrc56 -match '"FO3"')) `
     "boot loader handles 'FO3' context (switches to FO3 db + reg when activeContext is FO3)"
+
+# ===========================================================
+# Suite 57 -- PWA App Shortcuts Guards
+# Verifies manifest.json shortcuts array and ui-core.js
+# SHORTCUT_ROUTES / routeLaunchShortcut implementation.
+# 12 tests
+# ===========================================================
+Sep "Suite 57 -- PWA App Shortcuts Guards"
+$manifestSrc57 = Read-Src "manifest.json"
+$manifest57    = $manifestSrc57 | ConvertFrom-Json
+$uiCoreSrc57   = Read-Src "js/ui-core.js"
+
+# 57.1 manifest.shortcuts is an array of exactly 5 entries
+Check ([bool]($manifest57.shortcuts -is [array]) -and $manifest57.shortcuts.Count -eq 5) `
+    ("manifest.shortcuts is an array of 5 entries (found: " + $(if ($manifest57.shortcuts -is [array]) { $manifest57.shortcuts.Count } else { "not an array" }) + ")")
+
+# 57.2 All 5 expected shortcuts present by name and url
+$expectedNames57 = @('Comm-Link','Inventory','Stats','Data','New Campaign')
+$expectedUrls57  = @('./#go=comm','./#go=inv','./#go=stat','./#go=data','./#go=new')
+$shorts57 = if ($manifest57.shortcuts -is [array]) { $manifest57.shortcuts } else { @() }
+$allPresent57 = $true
+for ($ii = 0; $ii -lt $expectedNames57.Count; $ii++) {
+    $n = $expectedNames57[$ii]; $u = $expectedUrls57[$ii]
+    if (-not ($shorts57 | Where-Object { $_.name -eq $n -and $_.url -eq $u })) { $allPresent57 = $false }
+}
+Check $allPresent57 `
+    "All 5 shortcuts present with correct names and ./#go=<id> urls (Comm-Link, Inventory, Stats, Data, New Campaign)"
+
+# 57.3 Every shortcut url starts with ./ and contains #go= (offline-safe, no query param)
+$allUrlsSafe57 = ($shorts57 | Where-Object { -not ($_.url -like './*' -and $_.url -match '#go=') }).Count -eq 0 -and $shorts57.Count -gt 0
+Check $allUrlsSafe57 `
+    "Every shortcut url starts with ./ and uses #go= hash (not a query param -- safe for SW cache-first offline)"
+
+# 57.4 SHORTCUT_ROUTES const defined in ui-core.js
+Check ([bool]($uiCoreSrc57 -match 'const\s+SHORTCUT_ROUTES\s*=')) `
+    "SHORTCUT_ROUTES const defined in js/ui-core.js"
+
+# 57.5 routeLaunchShortcut function defined in ui-core.js
+Check ([bool]($uiCoreSrc57 -match 'function\s+routeLaunchShortcut\s*\(')) `
+    "routeLaunchShortcut() function defined in js/ui-core.js"
+
+# 57.6a Allow-list guard: /^go=/ regex present in routing source
+Check ([bool]($uiCoreSrc57 -match '\^go=')) `
+    "routeLaunchShortcut uses /^go=/ allow-list regex to validate hash value"
+
+# 57.6b No eval or innerHTML in routing fn body (check only the function body, not full source)
+$fnStart57  = $uiCoreSrc57.IndexOf('function routeLaunchShortcut(')
+$fnBody57   = if ($fnStart57 -ge 0) { $uiCoreSrc57.Substring($fnStart57, [Math]::Min(600, $uiCoreSrc57.Length - $fnStart57)) } else { '' }
+Check (-not ($fnBody57 -match '\beval\b') -and -not ($fnBody57 -match '\.innerHTML')) `
+    "routeLaunchShortcut body contains no eval or innerHTML (XSS safety)"
+
+# 57.7a New Campaign routes to wipeTerminal
+Check ([bool]($uiCoreSrc57 -match "new\s*:\s*\(\s*\)\s*=>\s*wipeTerminal\s*\(")) `
+    "SHORTCUT_ROUTES 'new' key routes to wipeTerminal()"
+
+# 57.7b wipeTerminal still has >=2 confirm() calls (double-confirm gate regression guard)
+$confirmCount57 = ([regex]::Matches($uiCoreSrc57, '\bconfirm\s*\(')).Count
+Check ($confirmCount57 -ge 2) `
+    ("wipeTerminal still has >=2 confirm() calls (found $confirmCount57) -- double-confirm gate intact")
+
+# 57.8 Tab routes reuse switchTab for inv, stat, data
+Check ([bool]($uiCoreSrc57 -match "inv\s*:\s*\(\s*\)\s*=>\s*switchTab\s*\(\s*[`"']inv[`"']\s*\)") `
+    -and [bool]($uiCoreSrc57 -match "stat\s*:\s*\(\s*\)\s*=>\s*switchTab\s*\(\s*[`"']stat[`"']\s*\)") `
+    -and [bool]($uiCoreSrc57 -match "data\s*:\s*\(\s*\)\s*=>\s*switchTab\s*\(\s*[`"']data[`"']\s*\)")) `
+    "SHORTCUT_ROUTES inv/stat/data keys route via switchTab() -- reuses existing tab system"
+
+# 57.9 routeLaunchShortcut() call appears after initTabs( in source (boot order guard)
+$initTabsIdx57  = $uiCoreSrc57.IndexOf('initTabs(')
+$routeCallIdx57 = $uiCoreSrc57.IndexOf('routeLaunchShortcut()')
+Check ($initTabsIdx57 -ge 0 -and $routeCallIdx57 -ge 0 -and $routeCallIdx57 -gt $initTabsIdx57) `
+    "routeLaunchShortcut() call appears after initTabs() in source -- tab system ready before routing"
+
+# 57.10 Reload-safety: history.replaceState present in routeLaunchShortcut
+Check ([bool]($uiCoreSrc57 -match 'history\.replaceState')) `
+    "routeLaunchShortcut clears the hash via history.replaceState (reload-safety -- prevents re-trigger on reload)"
 
 # ===========================================================
 # Results

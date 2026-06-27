@@ -1,7 +1,8 @@
-## [v2.5.0] — Unreleased<!-- Tests: 708/708 | Cache: robco-terminal-v2.0.1-r72 -->
+## [v2.5.0] — Unreleased<!-- Tests: 720/720 | Cache: robco-terminal-v2.0.1-r73 -->
 
 ### Added
 
+- Added PWA app shortcuts so the terminal can be launched directly to a specific section from the home screen or app launcher. On Android, long-pressing the app icon shows four quick-launch options: Comm-Link (opens the AI chat), Inventory, Stats, and Data. A fifth shortcut — New Campaign — is included but Android only shows the first four; iOS ignores shortcuts entirely (a platform limitation). Each shortcut opens the app exactly as normal, then navigates to the right section automatically, and works offline because it uses a URL hash rather than a query parameter (which would bypass the service worker cache). The New Campaign shortcut still requires the usual double confirmation before wiping any data.
 - Added a plain-English privacy policy (PRIVACY.md) describing exactly what data the app stores and where — localStorage for saves and settings, Firebase Firestore only when you opt into cloud features, Gemini API calls go directly from your browser to Google using your own key, and no analytics, ads, or third-party tracking of any kind. Linked from the README.
 - Added a custom 404 page styled to match the RobCo terminal aesthetic — dark background, phosphor green glow, and a link back to the app.
 - Added a repomix configuration file (repomix.config.json) so the full repo can be packed into a single AI-readable context in one command (`npx repomix`). Private agent files (RULES.md, CLAUDE.md) are excluded. Protocol 37 ensures the config is kept current whenever the file structure changes.

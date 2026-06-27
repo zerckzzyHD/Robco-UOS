@@ -22,5 +22,42 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "Comm-Link",
+      "short_name": "Comm-Link",
+      "description": "Open the AI Comm-Link chat",
+      "url": "./#go=comm",
+      "icons": [{ "src": "icon.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Inventory",
+      "short_name": "Inventory",
+      "description": "Open the Inventory tab",
+      "url": "./#go=inv",
+      "icons": [{ "src": "icon.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Stats",
+      "short_name": "Stats",
+      "description": "Open the S.P.E.C.I.A.L. / Stats tab",
+      "url": "./#go=stat",
+      "icons": [{ "src": "icon.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Data",
+      "short_name": "Data",
+      "description": "Open the Data tab — map, quests, factions",
+      "url": "./#go=data",
+      "icons": [{ "src": "icon.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "New Campaign",
+      "short_name": "New Campaign",
+      "description": "Wipe terminal and start a new campaign (confirmation required)",
+      "url": "./#go=new",
+      "icons": [{ "src": "icon.png", "sizes": "192x192", "type": "image/png" }]
+    }
   ]
 }
