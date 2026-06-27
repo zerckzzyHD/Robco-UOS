@@ -87,6 +87,12 @@ function isExpectedNoise(text) {
   // Covers: (a) report-only CSP via <meta>, (b) frame-ancestors violations from
   // Firebase/Google Auth SDK iframes. All are expected in the test environment.
   if (/content.security.policy/i.test(text) && /report.only/i.test(text)) return true;
+  // frame-ancestors is spec-invalid in a <meta> CSP (CSP spec §5.1 — the browser MUST
+  // ignore it when delivered via meta; it can only be enforced via HTTP response headers).
+  // The directive is retained in the meta for documentation intent and is guarded by
+  // test 55.9. GitHub Pages does not allow custom HTTP headers, so this is the best
+  // available expression of intent. Not an app bug — expected in enforcing mode.
+  if (/frame-ancestors/i.test(text) && /ignored/i.test(text)) return true;
   // Service worker noise (edge-case environments)
   if (text.includes('ServiceWorker') || text.includes('service-worker')) return true;
   // Firebase Auth / Firestore / remote-config calls return network errors in the test
