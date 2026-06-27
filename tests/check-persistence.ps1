@@ -1766,6 +1766,76 @@ Check $noHtmlEsc44 `
     'sanitizeImportedContainer body: no HTML escape sequences, has type coercion (no double-escape at storage layer)'
 
 # ===========================================================
+# Suite 45 -- Google Sign-In + Account Panel (Phase 5c-ii)
+# Durable identity: Google auth link, collision recovery,
+# sign-out -> re-anon, redirect flow, and ACCOUNT UI panel.
+# 12 tests
+# ===========================================================
+Sep "Suite 45 -- Phase 5c-ii: Google Sign-In + Account Panel"
+
+# 45.1  cloud.js imports GoogleAuthProvider
+Check ([bool]($cloudSrc -match 'GoogleAuthProvider')) `
+    'cloud.js references GoogleAuthProvider (Google auth import)'
+
+# 45.2  cloud.js references linkWithPopup (desktop sign-in flow)
+Check ([bool]($cloudSrc -match 'linkWithPopup')) `
+    'cloud.js references linkWithPopup (desktop Google sign-in flow)'
+
+# 45.3  cloud.js references linkWithRedirect (mobile sign-in flow)
+Check ([bool]($cloudSrc -match 'linkWithRedirect')) `
+    'cloud.js references linkWithRedirect (mobile Google sign-in flow)'
+
+# 45.4  cloud.js references getRedirectResult (completes mobile redirect on boot)
+Check ([bool]($cloudSrc -match 'getRedirectResult')) `
+    'cloud.js references getRedirectResult (boot-time mobile redirect completion)'
+
+# 45.5  cloud.js references signOut (account sign-out)
+Check ([bool]($cloudSrc -match '\bsignOut\b')) `
+    'cloud.js references signOut (account sign-out)'
+
+# 45.6  cloud.js signOutAccount() calls signOut then signInAnonymously
+$signOutBody45 = ''
+$soIdx = $cloudSrc.IndexOf('signOutAccount')
+if ($soIdx -ge 0) {
+    $soStart = $cloudSrc.IndexOf('{', $soIdx)
+    $soDep = 0; $soI = $soStart
+    while ($soI -lt $cloudSrc.Length) {
+        $ch = $cloudSrc[$soI]
+        if ($ch -eq '{') { $soDep++ }
+        elseif ($ch -eq '}') { $soDep--; if ($soDep -eq 0) { $signOutBody45 = $cloudSrc.Substring($soStart, $soI - $soStart + 1); break } }
+        $soI++
+    }
+}
+Check (($signOutBody45 -match 'signOut') -and ($signOutBody45 -match 'signInAnonymously')) `
+    'cloud.js signOutAccount() calls signOut then signInAnonymously (returns to anon session)'
+
+# 45.7  cloud.js handles auth/credential-already-in-use (collision recovery)
+Check ([bool]($cloudSrc -match 'credential-already-in-use')) `
+    'cloud.js handles auth/credential-already-in-use error (Google account collision recovery)'
+
+# 45.8  cloud.js references signInWithCredential (collision recovery path)
+Check ([bool]($cloudSrc -match 'signInWithCredential')) `
+    'cloud.js references signInWithCredential (collision recovery — signs into existing account)'
+
+# 45.9  ui.js defines renderAccount() function
+Check ([bool]($uiSrc -match 'function renderAccount\(\)')) `
+    'ui.js defines renderAccount() (ACCOUNT panel render function)'
+
+# 45.10  loadUI() calls renderAccount()
+$loadUIBody45 = ''
+try { $loadUIBody45 = Get-FunctionBody $uiSrc 'loadUI' } catch {}
+Check ([bool]($loadUIBody45 -match 'renderAccount\(\)')) `
+    'loadUI() calls renderAccount() (account panel wired into page load)'
+
+# 45.11  index.html has ACCOUNT details.panel element
+Check (([bool]($htmlSrc -match 'id="accountPanel"')) -or ([bool]($htmlSrc -match '>\s*ACCOUNT\s*</h2>'))) `
+    'index.html has ACCOUNT panel element (id=accountPanel or ACCOUNT heading)'
+
+# 45.12  CSP in index.html covers apis.google.com (Google Sign-In popup script)
+Check ([bool]($htmlSrc -match 'apis\.google\.com')) `
+    'CSP in index.html covers apis.google.com (Google Sign-In popup flow)'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

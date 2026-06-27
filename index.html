@@ -12,7 +12,7 @@
          Plan: monitor reports, tighten directives, then switch to enforcing CSP. -->
     <meta
       http-equiv="Content-Security-Policy-Report-Only"
-      content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/; connect-src 'self' https://generativelanguage.googleapis.com https://firestore.googleapis.com https://firebase.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://nv-overlord.firebaseapp.com https://content-firebaseappcheck.googleapis.com https://www.google.com; img-src 'self' data:; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'; frame-src https://nv-overlord.firebaseapp.com https://www.google.com https://accounts.google.com"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/ https://apis.google.com; connect-src 'self' https://generativelanguage.googleapis.com https://firestore.googleapis.com https://firebase.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://nv-overlord.firebaseapp.com https://content-firebaseappcheck.googleapis.com https://www.google.com; img-src 'self' data:; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'; frame-src https://nv-overlord.firebaseapp.com https://www.google.com https://accounts.google.com"
     />
     <link rel="stylesheet" href="css/terminal.css" />
     <script>
@@ -1251,6 +1251,16 @@
               >
                 &gt; WIPE TERMINAL &mdash; NEW CAMPAIGN
               </button>
+            </div>
+          </details>
+
+          <!-- 14. ACCOUNT -->
+          <details class="panel" id="accountPanel" data-tab="data">
+            <summary>
+              <h2>> ACCOUNT</h2>
+            </summary>
+            <div id="accountBody" style="font-size: 12px">
+              <span class="empty-state">Initializing...</span>
             </div>
           </details>
 

@@ -12,6 +12,12 @@ import {
   getAuth,
   signInAnonymously,
   onAuthStateChanged,
+  GoogleAuthProvider,
+  linkWithPopup,
+  linkWithRedirect,
+  signInWithCredential,
+  signOut,
+  getRedirectResult,
 } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js';
 import {
   initializeAppCheck,
@@ -49,13 +55,102 @@ try {
   console.warn('App Check init skipped (non-fatal):', e);
 }
 
-// Anonymous auth — non-fatal; app remains fully usable if auth/network is unavailable
+// ── Auth — non-fatal; app remains fully usable if auth/network is unavailable ──
 const auth = getAuth(app);
 let _currentUid = null;
+let _currentUser = null;
+
+function _isMobile() {
+  return /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) || 'ontouchstart' in window;
+}
+
 onAuthStateChanged(auth, user => {
   _currentUid = user ? user.uid : null;
+  _currentUser = user || null;
+  if (typeof window.renderAccount === 'function') window.renderAccount();
 });
+
+// Complete any pending redirect sign-in from a previous page load (mobile flow)
+getRedirectResult(auth)
+  .then(result => {
+    if (result && result.user && typeof window.renderAccount === 'function') {
+      window.renderAccount();
+    }
+  })
+  .catch(e => {
+    if (e.code === 'auth/credential-already-in-use') {
+      const cred = GoogleAuthProvider.credentialFromError(e);
+      if (cred) {
+        signInWithCredential(auth, cred).catch(e2 =>
+          console.warn('Redirect credential fallback failed (non-fatal):', e2)
+        );
+      }
+    } else {
+      console.warn('getRedirectResult failed (non-fatal):', e);
+    }
+  });
+
+// Boot: create anonymous user if no persistent session exists (no-op if user already set)
 signInAnonymously(auth).catch(e => console.warn('Anonymous sign-in failed (non-fatal):', e));
+
+// ── Google sign-in: links anonymous → Google; handles collision ──────────────
+window.signInWithGoogle = async function () {
+  const user = auth.currentUser;
+  if (!user) {
+    console.warn('signInWithGoogle called before auth ready');
+    return;
+  }
+  const provider = new GoogleAuthProvider();
+  try {
+    if (_isMobile()) {
+      await linkWithRedirect(user, provider);
+    } else {
+      await linkWithPopup(user, provider);
+    }
+  } catch (e) {
+    if (e.code === 'auth/credential-already-in-use') {
+      // Google account already linked to a separate uid — sign into that account
+      const cred = GoogleAuthProvider.credentialFromError(e);
+      if (cred) {
+        try {
+          await signInWithCredential(auth, cred);
+          // Signed into existing account; local saves are untouched
+          if (typeof window.renderAccount === 'function') window.renderAccount();
+        } catch (e2) {
+          console.warn('Credential sign-in fallback failed (non-fatal):', e2);
+        }
+      }
+    } else if (
+      e.code !== 'auth/popup-closed-by-user' &&
+      e.code !== 'auth/cancelled-popup-request'
+    ) {
+      console.warn('Google sign-in failed (non-fatal):', e);
+    }
+  }
+};
+
+// ── Sign out: returns to anonymous session; local saves untouched ─────────────
+window.signOutAccount = async function () {
+  try {
+    await signOut(auth);
+    await signInAnonymously(auth);
+  } catch (e) {
+    console.warn('Sign-out failed (non-fatal):', e);
+  }
+};
+
+// ── Account state for UI rendering ───────────────────────────────────────────
+window.getAccountState = function () {
+  if (!_currentUser) {
+    return { uid: null, isAnonymous: true, email: null, displayName: null };
+  }
+  return {
+    uid: _currentUser.uid,
+    isAnonymous: _currentUser.isAnonymous,
+    email: _currentUser.email || null,
+    displayName: _currentUser.displayName || null,
+  };
+};
 
 window.pushToCloud = async function (courierId, stateObj) {
   if (!_currentUid) {

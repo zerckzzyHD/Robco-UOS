@@ -1999,6 +1999,7 @@ function loadUI() {
   renderWorldMap(); // G6: Regional Zone Map
   renderKarmaCenter(); // G4: FO3 Karma Center
   renderCampaignStatus(); // v2.0.1: Campaign Status + Crossroads Record
+  renderAccount();
   _updateContextPanels(); // G4: switch faction/karma panel visibility
   // C5/C11: Restore CAMPG dropdowns from state
   {
@@ -3050,6 +3051,34 @@ function toggleCollectible(name) {
   renderCollectibles();
   renderSessionStats();
   updateMath();
+}
+
+function renderAccount() {
+  const body = document.getElementById('accountBody');
+  if (!body) return;
+  const acct =
+    typeof window.getAccountState === 'function'
+      ? window.getAccountState()
+      : { uid: null, isAnonymous: true, email: null, displayName: null };
+  if (acct.isAnonymous || !acct.uid) {
+    body.innerHTML =
+      '<div style="font-size:11px;opacity:0.7;margin-bottom:8px;">NOT SIGNED IN — saves are local only.</div>' +
+      '<button class="action-btn" style="width:100%" onclick="if(window.signInWithGoogle)window.signInWithGoogle()">' +
+      '> SIGN IN WITH GOOGLE (SYNC ACROSS DEVICES)</button>';
+  } else {
+    const name = acct.displayName ? escapeHtml(acct.displayName) : '';
+    const email = acct.email ? escapeHtml(acct.email) : '';
+    body.innerHTML =
+      '<div style="font-size:11px;margin-bottom:4px;">SIGNED IN</div>' +
+      (name
+        ? '<div style="font-size:11px;opacity:0.85;margin-bottom:2px;">' + name + '</div>'
+        : '') +
+      (email
+        ? '<div style="font-size:11px;opacity:0.6;margin-bottom:8px;">' + email + '</div>'
+        : '') +
+      '<button class="action-btn" style="width:100%" onclick="if(window.signOutAccount)window.signOutAccount()">' +
+      '> SIGN OUT</button>';
+  }
 }
 
 function renderCampaignNotes() {

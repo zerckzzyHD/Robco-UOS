@@ -2828,6 +2828,106 @@ header('Phase 5c-i: Auth + Rules + XSS Fix');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 45 — Google Sign-In + Account Panel (Phase 5c-ii)
+//  Durable identity: Google auth link, collision recovery,
+//  sign-out → re-anon, redirect flow, and ACCOUNT UI panel.
+//  12 tests
+// ══════════════════════════════════════════════════════════════
+header('Phase 5c-ii: Google Sign-In + Account Panel');
+
+{
+  // 45.1  cloud.js imports GoogleAuthProvider
+  assert(
+    /GoogleAuthProvider/.test(cloudSource),
+    'cloud.js references GoogleAuthProvider (Google auth import)'
+  );
+
+  // 45.2  cloud.js references linkWithPopup (desktop sign-in flow)
+  assert(
+    /linkWithPopup/.test(cloudSource),
+    'cloud.js references linkWithPopup (desktop Google sign-in flow)'
+  );
+
+  // 45.3  cloud.js references linkWithRedirect (mobile sign-in flow)
+  assert(
+    /linkWithRedirect/.test(cloudSource),
+    'cloud.js references linkWithRedirect (mobile Google sign-in flow)'
+  );
+
+  // 45.4  cloud.js references getRedirectResult (completes mobile redirect on boot)
+  assert(
+    /getRedirectResult/.test(cloudSource),
+    'cloud.js references getRedirectResult (boot-time mobile redirect completion)'
+  );
+
+  // 45.5  cloud.js references signOut (account sign-out function)
+  assert(/\bsignOut\b/.test(cloudSource), 'cloud.js references signOut (account sign-out)');
+
+  // 45.6  cloud.js sign-out path re-signs-in anonymously (signOut + signInAnonymously together)
+  {
+    const signOutBody = (() => {
+      const idx = cloudSource.indexOf('signOutAccount');
+      if (idx === -1) return '';
+      let i = cloudSource.indexOf('{', idx);
+      let depth = 0;
+      const start = i;
+      while (i < cloudSource.length) {
+        if (cloudSource[i] === '{') depth++;
+        else if (cloudSource[i] === '}' && --depth === 0) return cloudSource.slice(start, i + 1);
+        i++;
+      }
+      return '';
+    })();
+    assert(
+      /signOut/.test(signOutBody) && /signInAnonymously/.test(signOutBody),
+      'cloud.js signOutAccount() calls signOut then signInAnonymously (returns to anon session)'
+    );
+  }
+
+  // 45.7  cloud.js handles auth/credential-already-in-use (collision recovery)
+  assert(
+    /credential-already-in-use/.test(cloudSource),
+    'cloud.js handles auth/credential-already-in-use error (Google account collision recovery)'
+  );
+
+  // 45.8  cloud.js references signInWithCredential (collision recovery path)
+  assert(
+    /signInWithCredential/.test(cloudSource),
+    'cloud.js references signInWithCredential (collision recovery — signs into existing account)'
+  );
+
+  // 45.9  ui.js defines renderAccount() function
+  assert(
+    /function renderAccount\(\)/.test(uiSource),
+    'ui.js defines renderAccount() (ACCOUNT panel render function)'
+  );
+
+  // 45.10  loadUI() calls renderAccount()
+  {
+    let loadUIBody = '';
+    try {
+      loadUIBody = extractFunctionBody(uiSource, 'loadUI');
+    } catch (_) {}
+    assert(
+      /renderAccount\(\)/.test(loadUIBody),
+      'loadUI() calls renderAccount() (account panel wired into page load)'
+    );
+  }
+
+  // 45.11  index.html has ACCOUNT details.panel element
+  assert(
+    /id="accountPanel"/.test(htmlSource) || />\s*ACCOUNT\s*<\/h2>/.test(htmlSource),
+    'index.html has ACCOUNT panel element (id=accountPanel or ACCOUNT heading)'
+  );
+
+  // 45.12  CSP in index.html covers apis.google.com (Google Sign-In popup script)
+  assert(
+    /apis\.google\.com/.test(htmlSource),
+    'CSP in index.html covers apis.google.com (Google Sign-In popup flow)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 console.log('\n══════════════════════════════════════════════════════════════\n');
