@@ -1,4 +1,4 @@
-## [v2.5.0] — Unreleased<!-- Tests: 672/672 | Cache: robco-terminal-v2.0.1-r65 -->
+## [v2.5.0] — Unreleased<!-- Tests: 674/674 | Cache: robco-terminal-v2.0.1-r66 -->
 
 ### Added
 
@@ -21,6 +21,7 @@
 - Evaluated self-hosting the Firebase SDK and deferred: all App Check and reCAPTCHA calls must still reach gstatic/google, so self-hosting removes zero CSP origins and gains nothing for the current zero-build-step architecture. The version pin on the CDN import URL is the supply-chain control. Revisit if Firebase ships a bundleable SDK or the project adopts a build step.
 - Added 12 automated guard tests (Suite 55, 672 total across 59 suites): CSP origin-presence checks for nine load-bearing origins and directives (Protocol 20 guard), an `unsafe-inline` tripwire that fails if a `sha256-` or `nonce-` token is added to `script-src` (because that disables `unsafe-inline` per CSP spec level 2 and would silently break all 148 inline handlers), and a Firebase SDK version-pin guard that fails if any import URL drifts from the pinned version.
 - Bumped CACHE_NAME to r65 (index.html CSP directives changed).
+- Promoted the Content Security Policy from report-only to enforcing — after a clean live scan with zero violations during Stage 1, the policy now actively blocks any request that falls outside the declared allowlist rather than just logging it. Added blob: to the image source allowlist to cover canvas and screenshot-preview images. Added 2 automated guard tests (674 total across 59 suites): Suite 30 now asserts that an enforcing policy is present and the report-only variant is absent; Suite 55 now asserts blob: is in the image source allowlist. Bumped CACHE_NAME to r66.
 - Added 14 automated guard tests (Suite 54, 660 total across 58 suites) covering the prompt-injection hardening directive in the system prompt, the player-input delimiter in outgoing requests, HTML maxlength caps on chat and data-entry fields, the JS length guard in the send path, and saveState quota-failure handling.
 - Bumped CACHE_NAME to r64 (api.js, ui.js, index.html touched).
 - Added 25 automated guard tests (Suite 53, 646 total across 57 suites) covering retry constants and exponential delay values, auth-failure early-return, 400-body key-error detection, 429 rate-limit classification, bounded-retry references, key-error branch auto-disable guard, Tri-Node validator existence and call order, and seven behavioral correctness checks of the validator (null, array, string, plain-object rejected; narrative-only, state-only, modal-only objects accepted).

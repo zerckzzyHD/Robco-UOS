@@ -1683,9 +1683,9 @@ assert(
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 30 — Phase 1b Guards
-//  Input maxlength caps, CSP-Report-Only header, monotonic cache
+//  Input maxlength caps, enforcing CSP (Stage 2), monotonic cache
 //  guard in pre-commit hook, proactive localStorage quota warning.
-//  4 tests
+//  5 tests
 // ══════════════════════════════════════════════════════════════
 header('Phase 1b Guards');
 
@@ -1695,10 +1695,16 @@ assert(
   '#chatInput textarea has maxlength attribute (Phase 1b input cap guard)'
 );
 
-// 30.2 CSP-Report-Only meta present in index.html
+// 30.2a Enforcing CSP present in index.html (http-equiv must be exactly "Content-Security-Policy")
 assert(
-  /Content-Security-Policy-Report-Only/.test(htmlSource),
-  'index.html contains Content-Security-Policy-Report-Only meta (Phase 1b security header)'
+  /http-equiv="Content-Security-Policy"/.test(htmlSource),
+  'index.html contains enforcing Content-Security-Policy meta (CSP Stage 2 — not report-only)'
+);
+
+// 30.2b Report-Only CSP absent — regression guard: flip back to passive is caught
+assert(
+  !/Content-Security-Policy-Report-Only/.test(htmlSource),
+  'index.html does NOT contain Content-Security-Policy-Report-Only (CSP Stage 2 regression guard)'
 );
 
 // 30.3 Pre-commit hook enforces monotonic rev increase
@@ -4681,10 +4687,10 @@ header('Suite 54 — Prompt-Injection Hardening, Input Caps, Quota Warning');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 55 — CSP Stage 1 Origin Guards + Firebase Pin
+//  Suite 55 — CSP Stage 2 Origin Guards + Firebase Pin
 //  Protocol-20 origin guard (load-bearing CSP origins),
-//  unsafe-inline tripwire, Firebase version-pin guard.
-//  12 tests
+//  unsafe-inline tripwire, blob: img-src guard, Firebase version-pin guard.
+//  13 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 55 — CSP Stage 1 Origin Guards + Firebase Pin');
 {
@@ -4774,6 +4780,12 @@ header('Suite 55 — CSP Stage 1 Origin Guards + Firebase Pin');
       `Firebase SDK import URLs in cloud.js are all pinned to 12.15.0 (found: ${fbPins55.join(', ')}) — supply-chain guard`
     );
   }
+
+  // 55.13 img-src contains blob: (canvas / screenshot-preview images)
+  assert(
+    /img-src[^;]*blob:/.test(htmlSrc55),
+    'CSP img-src contains blob: (canvas/screenshot-preview images — Protocol 20 guard)'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════

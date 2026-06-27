@@ -1014,17 +1014,20 @@ Check ([bool]($htmlSrc -match 'refreshing') -and [bool]($htmlSrc -match 'hadCont
 
 # ===========================================================
 # Suite 30 -- Phase 1b Guards
-# Input maxlength caps, CSP-Report-Only header, monotonic cache
+# Input maxlength caps, enforcing CSP (Stage 2), monotonic cache
 # guard in pre-commit hook, proactive localStorage quota warning.
-# 4 tests
+# 5 tests
 # ===========================================================
 Sep "Suite 30 -- Phase 1b Guards"
 # 30.1 #chatInput textarea has maxlength attribute
 Check ([bool]($htmlSrc -match 'id="chatInput"[\s\S]{0,300}maxlength')) `
     '#chatInput textarea has maxlength attribute (Phase 1b input cap guard)'
-# 30.2 CSP-Report-Only meta present in index.html
-Check ([bool]($htmlSrc -match 'Content-Security-Policy-Report-Only')) `
-    'index.html contains Content-Security-Policy-Report-Only meta (Phase 1b security header)'
+# 30.2a Enforcing CSP present in index.html (http-equiv must be exactly "Content-Security-Policy")
+Check ([bool]($htmlSrc -match 'http-equiv="Content-Security-Policy"')) `
+    'index.html contains enforcing Content-Security-Policy meta (CSP Stage 2 -- not report-only)'
+# 30.2b Report-Only CSP absent -- regression guard: flip back to passive is caught
+Check (-not ($htmlSrc -match 'Content-Security-Policy-Report-Only')) `
+    'index.html does NOT contain Content-Security-Policy-Report-Only (CSP Stage 2 regression guard)'
 # 30.3 Pre-commit hook enforces monotonic rev increase
 $hookSrc30 = ''
 if (Test-Path (Join-Path $Root '.git/hooks/pre-commit')) {
@@ -2807,10 +2810,10 @@ Check ($saveStateFn54 -match 'QuotaExceededError[\s\S]{0,400}appendToChat') `
     "saveState() QuotaExceededError handler calls appendToChat (quota failures shown to user, not silently swallowed)"
 
 # ===========================================================
-# Suite 55 -- CSP Stage 1 Origin Guards + Firebase Pin
+# Suite 55 -- CSP Stage 2 Origin Guards + Firebase Pin
 # Protocol-20 origin guard (load-bearing CSP origins),
-# unsafe-inline tripwire, Firebase version-pin guard.
-# 12 tests
+# unsafe-inline tripwire, blob: img-src guard, Firebase version-pin guard.
+# 13 tests
 # ===========================================================
 Sep "Suite 55 -- CSP Stage 1 Origin Guards + Firebase Pin"
 $htmlSrc55 = Read-Src "index.html"
@@ -2875,6 +2878,10 @@ $fbPins55 = ([regex]'firebasejs/[\d.]+').Matches($cloudSrc55)
 $allPinned55 = ($fbPins55.Count -gt 0) -and (($fbPins55 | ForEach-Object { $_.Value } | Where-Object { $_ -notmatch '12\.15\.0' }).Count -eq 0)
 Check $allPinned55 `
     "Firebase SDK import URLs in cloud.js are all pinned to 12.15.0 (supply-chain guard)"
+
+# 55.13 img-src contains blob: (canvas / screenshot-preview images)
+Check ([bool]($htmlSrc55 -match 'img-src[^;]*blob:')) `
+    "CSP img-src contains blob: (canvas/screenshot-preview images -- Protocol 20 guard)"
 
 # ===========================================================
 # Results
