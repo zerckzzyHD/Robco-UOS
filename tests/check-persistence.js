@@ -1596,17 +1596,19 @@ header('Meta / Runner Parity');
     'Suite 55',
     'Suite 56',
     'Suite 57',
+    'Suite 58',
+    'Suite 59',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-57)' +
+    'JS runner contains all gate-guard suites (22-41, 49-59)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-57)' +
+    'PS runner contains all gate-guard suites (22-41, 49-59)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -5152,6 +5154,144 @@ header('Suite 57 — PWA App Shortcuts Guards');
   assert(
     /history\.replaceState/.test(uiCoreSrc57),
     'routeLaunchShortcut clears the hash via history.replaceState (reload-safety — prevents re-trigger on reload)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 58 — Client Error Ring-Buffer Guards (Item C)
+//  Verifies ERROR_LOG_KEY/CAP, _recordError, both handlers wired,
+//  showErrorLog + escapeHtml + [LOGS] in router, no-exfil.
+//  5 tests
+// ══════════════════════════════════════════════════════════════
+header('Suite 58 — Client Error Ring-Buffer Guards');
+{
+  const uiCoreSrc58 = readFile('js/ui-core.js');
+  const apiSrc58 = readFile('js/api.js');
+
+  // 58.1  ERROR_LOG_KEY, ERROR_LOG_CAP, _recordError all defined in ui-core.js
+  assert(
+    /ERROR_LOG_KEY\s*=/.test(uiCoreSrc58) &&
+      /ERROR_LOG_CAP\s*=/.test(uiCoreSrc58) &&
+      /function\s+_recordError\s*\(/.test(uiCoreSrc58),
+    'ERROR_LOG_KEY, ERROR_LOG_CAP, and _recordError() are defined in js/ui-core.js'
+  );
+
+  // 58.2  Both global handlers call _recordError (error + rejection)
+  assert(
+    /_recordError\s*\(\s*['"]error['"]/.test(uiCoreSrc58) &&
+      /_recordError\s*\(\s*['"]rejection['"]/.test(uiCoreSrc58),
+    "Both 'error' and 'unhandledrejection' handlers call _recordError() with the correct type string"
+  );
+
+  // 58.3  Ring cap enforced — body contains .shift() and the cap value
+  assert(
+    /\.shift\s*\(\s*\)/.test(uiCoreSrc58) &&
+      (/ERROR_LOG_CAP/.test(uiCoreSrc58) || /\b50\b/.test(uiCoreSrc58)),
+    '_recordError enforces ring cap via .shift() with ERROR_LOG_CAP / 50 guard'
+  );
+
+  // 58.4  showErrorLog defined, references escapeHtml, and [LOGS] in NATIVE_COMMAND_ROUTER
+  assert(
+    /function\s+showErrorLog\s*\(/.test(uiCoreSrc58) &&
+      /escapeHtml\s*\(/.test(uiCoreSrc58) &&
+      /'\[LOGS\]'\s*:/.test(apiSrc58),
+    "showErrorLog() defined in ui-core.js, references escapeHtml(), and '[LOGS]' wired in NATIVE_COMMAND_ROUTER"
+  );
+
+  // 58.5  No-exfil: bounded window from each fn start contains no fetch( or XMLHttpRequest
+  {
+    const recIdx58 = uiCoreSrc58.indexOf('function _recordError(');
+    const showIdx58 = uiCoreSrc58.indexOf('function showErrorLog(');
+    // 500 chars covers _recordError (small fn); 2500 chars covers showErrorLog before next fetch
+    const recSlice58 = recIdx58 >= 0 ? uiCoreSrc58.slice(recIdx58, recIdx58 + 500) : '';
+    const showSlice58 = showIdx58 >= 0 ? uiCoreSrc58.slice(showIdx58, showIdx58 + 2500) : '';
+    assert(
+      !recSlice58.includes('fetch(') &&
+        !recSlice58.includes('XMLHttpRequest') &&
+        !showSlice58.includes('fetch(') &&
+        !showSlice58.includes('XMLHttpRequest'),
+      '_recordError and showErrorLog bodies contain no fetch() or XMLHttpRequest (privacy: log is local-only)'
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 59 — Inline Handler Integrity (Item D-proxy)
+//  Scans index.html for on*="..." inline handlers, extracts
+//  standalone function names, asserts all resolve in js/*.js.
+//  2 tests
+// ══════════════════════════════════════════════════════════════
+header('Suite 59 — Inline Handler Integrity');
+{
+  const htmlSrc59 = readFile('index.html');
+  const jsFiles59 = [
+    'js/ui-audio.js',
+    'js/ui-render.js',
+    'js/ui-saves.js',
+    'js/ui-account.js',
+    'js/ui-core.js',
+    'js/api.js',
+    'js/cloud.js',
+    'js/state.js',
+    'js/reg_nv.js',
+    'js/reg_fo3.js',
+  ];
+  const allJsSrc59 = jsFiles59.map(f => readFile(f)).join('\n');
+
+  // Extract all inline handler attribute values: on*="..."
+  const attrRe59 = /\bon[a-z]+\s*=\s*"([^"]*)"/gi;
+  const jsKeywords59 = new Set([
+    'if',
+    'else',
+    'for',
+    'while',
+    'switch',
+    'function',
+    'return',
+    'typeof',
+    'instanceof',
+    'new',
+    'throw',
+    'try',
+    'catch',
+    'finally',
+    'delete',
+    'void',
+    'in',
+    'of',
+    'let',
+    'const',
+    'var',
+    'do',
+    'break',
+    'continue',
+    'case',
+    'default',
+    'import',
+    'export',
+  ]);
+  const handlerNames59 = new Set();
+  let attrM59;
+  while ((attrM59 = attrRe59.exec(htmlSrc59)) !== null) {
+    const handlerText = attrM59[1];
+    // Match standalone function calls not preceded by '.' (excludes method calls)
+    for (const [, name] of handlerText.matchAll(/(?<!\.)([A-Za-z_$][A-Za-z0-9_$]*)\s*\(/g)) {
+      if (!jsKeywords59.has(name)) handlerNames59.add(name);
+    }
+  }
+
+  // 59.1  Scanner found at least 20 unique handler names (sanity — confirms scanner is live)
+  assert(
+    handlerNames59.size >= 20,
+    `Inline handler scanner found ${handlerNames59.size} unique handler function names (≥20 expected)`
+  );
+
+  // 59.2  All extracted handler names resolve in js/*.js (aggregate — lists any dangling)
+  const dangling59 = [...handlerNames59].filter(name => !allJsSrc59.includes(name));
+  assert(
+    dangling59.length === 0,
+    'All inline handler function names resolve in js/*.js' +
+      (dangling59.length ? ' — DANGLING (real bug): ' + dangling59.join(', ') : '')
   );
 }
 

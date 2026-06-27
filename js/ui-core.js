@@ -21,6 +21,19 @@ const AudioSettings = {
   masterMute: localStorage.getItem('robco_master_muted') === 'true',
 };
 
+// ── CLIENT ERROR RING-BUFFER ──────────────────────────────────
+// Local-only diagnostic log — never transmitted. Cap 50 entries × 300 chars ≈ 15 KB max.
+const ERROR_LOG_KEY = 'robco_error_log';
+const ERROR_LOG_CAP = 50;
+function _recordError(type, msg) {
+  try {
+    const log = JSON.parse(localStorage.getItem(ERROR_LOG_KEY) || '[]');
+    log.push({ t: Date.now(), type, msg: String(msg).slice(0, 300) });
+    while (log.length > ERROR_LOG_CAP) log.shift();
+    localStorage.setItem(ERROR_LOG_KEY, JSON.stringify(log));
+  } catch (_) {} // never let logging throw
+}
+
 // ── GLOBAL ERROR NET ──────────────────────────────────────────
 // Catches uncaught JS errors and unhandled promise rejections and surfaces a
 // recoverable on-screen diagnostic instead of leaving the user with a blank screen.
@@ -28,6 +41,7 @@ window.addEventListener('error', ev => {
   const msg =
     (ev.message || 'Unknown error') + (ev.filename ? ` [${ev.filename}:${ev.lineno}]` : '');
   console.error('[RobCo] Uncaught error:', msg, ev.error);
+  _recordError('error', msg);
   const diag = document.getElementById('chatDisplay');
   if (diag) {
     const el = document.createElement('div');
@@ -40,6 +54,7 @@ window.addEventListener('unhandledrejection', ev => {
   const reason =
     ev.reason instanceof Error ? ev.reason.message : String(ev.reason || 'Unhandled rejection');
   console.error('[RobCo] Unhandled rejection:', reason, ev.reason);
+  _recordError('rejection', reason);
   const diag = document.getElementById('chatDisplay');
   if (diag) {
     const el = document.createElement('div');
@@ -949,6 +964,47 @@ function closeModal() {
   document.getElementById('sysModal').style.display = 'none';
 }
 
+function showErrorLog() {
+  const modal = document.getElementById('sysModal');
+  const title = document.getElementById('modalTitle');
+  const content = document.getElementById('modalContent');
+  if (!modal || !title || !content) return;
+  title.innerText = '> CLIENT ERROR LOG';
+  let log = [];
+  try {
+    log = JSON.parse(localStorage.getItem(ERROR_LOG_KEY) || '[]');
+  } catch (_) {}
+  if (log.length === 0) {
+    content.innerHTML = '<pre style="color:var(--robco-dim)">No errors recorded.</pre>';
+  } else {
+    const rows = log
+      .map(e => {
+        const ts = new Date(e.t).toISOString().replace('T', ' ').slice(0, 19);
+        return (
+          '<div style="margin-bottom:6px;border-bottom:1px solid var(--robco-dim);padding-bottom:4px">' +
+          '<span style="color:var(--robco-dim);font-size:10px">' +
+          escapeHtml(ts) +
+          ' [' +
+          escapeHtml(e.type || '?') +
+          ']</span><br>' +
+          '<span>' +
+          escapeHtml(e.msg || '') +
+          '</span></div>'
+        );
+      })
+      .join('');
+    content.innerHTML =
+      '<div style="font-size:11px">' +
+      rows +
+      '<button class="action-btn" style="margin-top:6px;font-size:10px" ' +
+      'onclick="localStorage.removeItem(\'' +
+      ERROR_LOG_KEY +
+      '\');showErrorLog()">' +
+      'CLEAR LOGS</button></div>';
+  }
+  modal.style.display = 'flex';
+}
+
 // ── G1: V.A.T.S. TACTICAL OVERLAY ────────────────────────────────
 // Reads state (PER, AGI, weapon skill, chem boosts) and target DT from inputs.
 // Outputs estimated hit % per body region. Read-only — no state writes.
@@ -1112,6 +1168,10 @@ const COMMAND_REGISTRY = [
       { cmd: '↑ / ↓ + Enter', desc: 'Navigate and select autocomplete.' },
       { cmd: 'Esc', desc: 'Close dialog or dismiss autocomplete.' },
     ],
+  },
+  {
+    group: 'SYSTEM',
+    cmds: [{ cmd: '[LOGS]', desc: 'Show client error log (local-only).' }],
   },
 ];
 

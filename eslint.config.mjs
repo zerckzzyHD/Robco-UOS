@@ -163,6 +163,7 @@ export default [
         renderWorldMap: 'readonly',
         showVATSOverlay: 'readonly',
         showHelpModal: 'readonly',
+        showErrorLog: 'readonly',
         updateMath: 'readonly',
         wipeTerminal: 'readonly',
         attachedImageData: 'writable',

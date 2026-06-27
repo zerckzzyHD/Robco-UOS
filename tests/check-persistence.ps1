@@ -971,11 +971,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-57)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-57)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-59)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-59)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -3115,6 +3115,84 @@ Check ($initTabsIdx57 -ge 0 -and $routeCallIdx57 -ge 0 -and $routeCallIdx57 -gt 
 # 57.10 Reload-safety: history.replaceState present in routeLaunchShortcut
 Check ([bool]($uiCoreSrc57 -match 'history\.replaceState')) `
     "routeLaunchShortcut clears the hash via history.replaceState (reload-safety -- prevents re-trigger on reload)"
+
+# ===========================================================
+# Suite 58 -- Client Error Ring-Buffer Guards (Item C)
+# Verifies ERROR_LOG_KEY/CAP, _recordError, both handlers wired,
+# showErrorLog + escapeHtml + [LOGS] in router, no-exfil.
+# 5 tests
+# ===========================================================
+Sep "Suite 58 -- Client Error Ring-Buffer Guards"
+$uiCoreSrc58 = Read-Src "js/ui-core.js"
+$apiSrc58    = Read-Src "js/api.js"
+
+# 58.1 ERROR_LOG_KEY, ERROR_LOG_CAP, _recordError all defined in ui-core.js
+Check ([bool]($uiCoreSrc58 -match 'ERROR_LOG_KEY\s*=') `
+    -and [bool]($uiCoreSrc58 -match 'ERROR_LOG_CAP\s*=') `
+    -and [bool]($uiCoreSrc58 -match 'function\s+_recordError\s*\(')) `
+    "ERROR_LOG_KEY, ERROR_LOG_CAP, and _recordError() are defined in js/ui-core.js"
+
+# 58.2 Both handlers call _recordError (error + rejection)
+Check ([bool]($uiCoreSrc58 -match "_recordError\s*\(\s*'error'") `
+    -and [bool]($uiCoreSrc58 -match "_recordError\s*\(\s*'rejection'")) `
+    "Both 'error' and 'unhandledrejection' handlers call _recordError() with the correct type string"
+
+# 58.3 Ring cap enforced -- .shift() + ERROR_LOG_CAP / 50
+Check ([bool]($uiCoreSrc58 -match '\.shift\s*\(\s*\)') `
+    -and ([bool]($uiCoreSrc58 -match 'ERROR_LOG_CAP') -or [bool]($uiCoreSrc58 -match '\b50\b'))) `
+    "_recordError enforces ring cap via .shift() with ERROR_LOG_CAP / 50 guard"
+
+# 58.4 showErrorLog defined, references escapeHtml, [LOGS] in NATIVE_COMMAND_ROUTER
+Check ([bool]($uiCoreSrc58 -match 'function\s+showErrorLog\s*\(') `
+    -and [bool]($uiCoreSrc58 -match 'escapeHtml\s*\(') `
+    -and [bool]($apiSrc58 -match "'\[LOGS\]'\s*:")) `
+    "showErrorLog() defined in ui-core.js, references escapeHtml(), and '[LOGS]' wired in NATIVE_COMMAND_ROUTER"
+
+# 58.5 No-exfil: bounded window from each fn contains no fetch( or XMLHttpRequest
+$recIdx58  = $uiCoreSrc58.IndexOf('function _recordError(')
+$showIdx58 = $uiCoreSrc58.IndexOf('function showErrorLog(')
+$recSlice58  = if ($recIdx58 -ge 0)  { $uiCoreSrc58.Substring($recIdx58,  [Math]::Min(500,  $uiCoreSrc58.Length - $recIdx58))  } else { '' }
+$showSlice58 = if ($showIdx58 -ge 0) { $uiCoreSrc58.Substring($showIdx58, [Math]::Min(2500, $uiCoreSrc58.Length - $showIdx58)) } else { '' }
+Check (-not ($recSlice58  -match 'fetch\(') -and -not ($recSlice58  -match 'XMLHttpRequest') `
+    -and -not ($showSlice58 -match 'fetch\(') -and -not ($showSlice58 -match 'XMLHttpRequest')) `
+    "_recordError and showErrorLog bodies contain no fetch() or XMLHttpRequest (privacy: log is local-only)"
+
+# ===========================================================
+# Suite 59 -- Inline Handler Integrity (Item D-proxy)
+# Scans index.html for on*="..." inline handlers, extracts
+# standalone function names, asserts all resolve in js/*.js.
+# 2 tests
+# ===========================================================
+Sep "Suite 59 -- Inline Handler Integrity"
+$htmlSrc59   = Read-Src "index.html"
+$jsFiles59   = @('js/ui-audio.js','js/ui-render.js','js/ui-saves.js','js/ui-account.js',
+                  'js/ui-core.js','js/api.js','js/cloud.js','js/state.js',
+                  'js/reg_nv.js','js/reg_fo3.js')
+$allJsSrc59  = ($jsFiles59 | ForEach-Object { Read-Src $_ }) -join "`n"
+
+$jsKeywords59 = @('if','else','for','while','switch','function','return','typeof','instanceof',
+                   'new','throw','try','catch','finally','delete','void','in','of',
+                   'let','const','var','do','break','continue','case','default','import','export')
+
+$attrMatches59   = [regex]::Matches($htmlSrc59, '(?i)\bon[a-z]+\s*=\s*"([^"]*)"')
+$handlerNames59  = [System.Collections.Generic.HashSet[string]]::new()
+foreach ($am in $attrMatches59) {
+    $handlerText = $am.Groups[1].Value
+    $fnCallMs = [regex]::Matches($handlerText, '(?<!\.)([A-Za-z_$][A-Za-z0-9_$]*)\s*\(')
+    foreach ($fm in $fnCallMs) {
+        $name = $fm.Groups[1].Value
+        if ($name -notin $jsKeywords59) { [void]$handlerNames59.Add($name) }
+    }
+}
+
+# 59.1 Scanner found at least 20 unique handler names (sanity)
+Check ($handlerNames59.Count -ge 20) `
+    ("Inline handler scanner found " + $handlerNames59.Count + " unique handler function names (>=20 expected)")
+
+# 59.2 All handler names resolve in js/*.js (aggregate)
+$dangling59 = $handlerNames59 | Where-Object { -not $allJsSrc59.Contains($_) }
+Check ($dangling59.Count -eq 0) `
+    ("All inline handler function names resolve in js/*.js" + $(if ($dangling59.Count) { " -- DANGLING (real bug): " + ($dangling59 -join ", ") } else { "" }))
 
 # ===========================================================
 # Results

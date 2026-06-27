@@ -779,6 +779,7 @@ function autoImportState(jsonString) {
 // Unknown or creative input falls through to the AI unchanged.
 const NATIVE_COMMAND_ROUTER = {
   '[FEATURES]': () => showHelpModal(),
+  '[LOGS]': () => showErrorLog(),
   '[CROSSROADS]': () => _nativeCrossroads(),
   '[SLEEP]': () => _nativeSleep(),
 };
