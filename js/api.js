@@ -205,51 +205,88 @@ function saveApiKeySilent() {
   if (model && !model.includes('Awaiting')) localStorage.setItem('robco_gemini_model', model);
 }
 
-// Sanitize a robco_v8 container pulled from an untrusted source (cloud, file import).
-// Escapes HTML in string fields that render as innerHTML so a crafted save cannot inject script.
-// Called by pullFromCloud's fast-path which writes directly to localStorage, bypassing
-// autoImportState's field-level coercion. Extend this list if new rendered string fields are added.
+// Type-coerces and validates a robco_v8 container before writing to localStorage.
+// Defense in depth for the cloud pull / file import fast-paths that bypass autoImportState.
+// Contract: raw strings live in state; render functions (renderInventory, renderQuests, etc.)
+// call escapeHtml() at display time. DO NOT HTML-escape here — that would double-encode
+// apostrophes and ampersands on every round-trip (e.g. "Ain't" → stored as "Ain&#x27;t" →
+// rendered as "Ain&amp;#x27;t" → corrupts after each pull/autosave cycle).
 function sanitizeImportedContainer(container) {
   if (!container || typeof container !== 'object') return container;
 
-  function _esc(s) {
-    if (typeof s !== 'string') return s;
-    return s
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#x27;');
+  function _str(v) {
+    return typeof v === 'string' ? v : v == null ? '' : String(v);
   }
 
   function _sanitizeState(s) {
     if (!s || typeof s !== 'object') return s;
     const o = Object.assign({}, s);
-    if (typeof o.loc === 'string') o.loc = _esc(o.loc);
+    // Type-coerce numeric fields
+    [
+      'lvl',
+      'xp',
+      'hpCur',
+      'hpMax',
+      's',
+      'p',
+      'e',
+      'c',
+      'i',
+      'a',
+      'l',
+      'caps',
+      'rads',
+      'karma',
+      'ticks',
+    ].forEach(k => {
+      if (k in o) o[k] = parseInt(o[k]) || 0;
+    });
+    // Whitelist limb values
+    ['la', 'ra', 'll', 'rl', 'hd'].forEach(k => {
+      if (k in o) o[k] = String(o[k]).toUpperCase() === 'CRIPPLED' ? 'CRIPPLED' : 'OK';
+    });
+    if (o.loc != null) o.loc = _str(o.loc);
     if (Array.isArray(o.campaign_notes))
-      o.campaign_notes = o.campaign_notes.map(n => (typeof n === 'string' ? _esc(n) : n));
+      o.campaign_notes = o.campaign_notes.filter(n => n != null).map(_str);
     if (Array.isArray(o.quests))
       o.quests = o.quests.map(q => ({
         ...q,
-        name: _esc(q.name),
-        objective: q.objective ? _esc(q.objective) : q.objective,
+        name: _str(q.name),
+        status: ['active', 'complete', 'failed'].includes(String(q.status || '').toLowerCase())
+          ? String(q.status).toLowerCase()
+          : 'active',
+        objective: q.objective != null ? _str(q.objective) : null,
       }));
     if (Array.isArray(o.inventory))
-      o.inventory = o.inventory.map(it => ({ ...it, name: _esc(it.name) }));
+      o.inventory = o.inventory.map(it => ({
+        ...it,
+        name: _str(it.name),
+        qty: parseInt(it.qty) || 1,
+        wgt: parseFloat(it.wgt) || 0,
+        val: parseInt(it.val) || 0,
+      }));
     if (Array.isArray(o.squad))
       o.squad = o.squad.map(m => ({
         ...m,
-        name: _esc(m.name),
-        weapon: m.weapon ? _esc(m.weapon) : m.weapon,
-        condition: m.condition ? _esc(m.condition) : m.condition,
+        name: _str(m.name),
+        hp: parseInt(m.hp) || 0,
+        hpMax: parseInt(m.hpMax) || 100,
       }));
-    if (Array.isArray(o.perks)) o.perks = o.perks.map(p => ({ ...p, name: _esc(p.name) }));
-    if (Array.isArray(o.status)) o.status = o.status.map(e => ({ ...e, name: _esc(e.name) }));
+    if (Array.isArray(o.perks)) o.perks = o.perks.map(p => ({ ...p, name: _str(p.name) }));
+    if (Array.isArray(o.status))
+      o.status = o.status.map(e => ({
+        ...e,
+        name: _str(e.name),
+        ticks: parseInt(e.ticks) || 0,
+        type: ['BUFF', 'DEBUFF', 'NEUTRAL'].includes(String(e.type || '').toUpperCase())
+          ? String(e.type).toUpperCase()
+          : 'BUFF',
+      }));
     if (o.equipped && typeof o.equipped === 'object')
       o.equipped = {
-        weapon: o.equipped.weapon ? _esc(o.equipped.weapon) : o.equipped.weapon,
-        armor: o.equipped.armor ? _esc(o.equipped.armor) : o.equipped.armor,
-        headgear: o.equipped.headgear ? _esc(o.equipped.headgear) : o.equipped.headgear,
+        weapon: o.equipped.weapon != null ? _str(o.equipped.weapon) : null,
+        armor: o.equipped.armor != null ? _str(o.equipped.armor) : null,
+        headgear: o.equipped.headgear != null ? _str(o.equipped.headgear) : null,
       };
     return o;
   }

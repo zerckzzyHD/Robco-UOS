@@ -2698,7 +2698,7 @@ header('GAME_DEFS Structural Integrity (Phase 5b)');
 //  SUITE 44 — Anonymous Auth + Security Rules + XSS Coercion Fix (Phase 5c-i)
 //  Closed P0 hole: auth-gated Firestore paths, per-uid rules, App Check gate,
 //  and XSS bypass via cloud pull routed through sanitizeImportedContainer.
-//  11 tests
+//  12 tests
 // ══════════════════════════════════════════════════════════════
 header('Phase 5c-i: Auth + Rules + XSS Fix');
 
@@ -2779,6 +2779,52 @@ header('Phase 5c-i: Auth + Rules + XSS Fix');
     /identitytoolkit\.googleapis\.com/.test(htmlSource),
     'CSP in index.html covers identitytoolkit.googleapis.com (Firebase Auth endpoint)'
   );
+
+  // 44.12  sanitizeImportedContainer round-trip: apostrophes and ampersands survive as raw
+  //        strings; no HTML encoding at the storage layer (double-escape regression guard).
+  //        A <script> payload is preserved as a literal string — render-time escapeHtml() stops it.
+  {
+    let _testSanitize = null;
+    try {
+      const fnBody = extractFunctionBody(apiSource, 'sanitizeImportedContainer');
+      const fnStart = apiSource.indexOf('function sanitizeImportedContainer');
+      const paramsStart = apiSource.indexOf('(', fnStart);
+      const paramsEnd = apiSource.indexOf('{', paramsStart);
+      const params = apiSource.slice(paramsStart, paramsEnd).trim();
+      _testSanitize = eval(`(function sanitizeImportedContainer${params}${fnBody})`);
+    } catch (_) {}
+    if (_testSanitize) {
+      const _tc = {
+        activeContext: 'FNV',
+        campaigns: {
+          FNV: {
+            quests: [
+              { name: "Ain't That a Kick in the Head", status: 'active', objective: 'R&R cap' },
+              { name: '<script>alert(1)</script>', status: 'active', objective: null },
+            ],
+            inventory: [{ name: "Programmer's Rifle", qty: 1, wgt: 3.5, val: 100 }],
+          },
+        },
+      };
+      const _r = _testSanitize(_tc);
+      const _q0 = _r.campaigns.FNV.quests[0];
+      const _q1 = _r.campaigns.FNV.quests[1];
+      const _i0 = _r.campaigns.FNV.inventory[0];
+      assert(
+        _q0.name === "Ain't That a Kick in the Head" &&
+          !_q0.name.includes('&#x27;') &&
+          _q0.objective === 'R&R cap' &&
+          !_q0.objective.includes('&amp;') &&
+          _i0.name === "Programmer's Rifle" &&
+          _q1.name === '<script>alert(1)</script>',
+        'sanitizeImportedContainer: apostrophe/ampersand survive as raw strings; <script> stored literal (no HTML encoding at storage layer)'
+      );
+    } else {
+      fail(
+        'sanitizeImportedContainer behavioral test: function could not be evaluated in isolation'
+      );
+    }
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

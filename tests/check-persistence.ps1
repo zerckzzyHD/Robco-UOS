@@ -1699,7 +1699,7 @@ Check ([bool]($skBody43 -match '_activeDef')) `
 # Suite 44 -- Anonymous Auth + Security Rules + XSS Coercion Fix (Phase 5c-i)
 # Closed P0 hole: auth-gated Firestore paths, per-uid rules, App Check gate,
 # and XSS bypass via cloud pull routed through sanitizeImportedContainer.
-# 11 tests
+# 12 tests
 # ===========================================================
 Sep "Suite 44 -- Phase 5c-i: Auth + Rules + XSS Fix"
 
@@ -1752,6 +1752,18 @@ Check ([bool]($cloudSrc -match 'sanitizeImportedContainer')) `
 # 44.11  CSP in index.html contains identitytoolkit.googleapis.com
 Check ([bool]($htmlSrc -match 'identitytoolkit\.googleapis\.com')) `
     'CSP in index.html covers identitytoolkit.googleapis.com (Firebase Auth endpoint)'
+
+# 44.12  sanitizeImportedContainer must NOT HTML-encode apostrophes or ampersands
+#        (double-escape regression guard — old code had &#x27; and &amp; in body)
+$sanBody44 = ''
+try { $sanBody44 = Get-FunctionBody $apiSrc 'sanitizeImportedContainer' } catch {}
+$noHtmlEsc44 = ($sanBody44.Length -gt 100) -and
+               -not ($sanBody44 -match '&#x27;') -and
+               -not ($sanBody44 -match '&amp;') -and
+               -not ($sanBody44 -match '&lt;') -and
+               ($sanBody44 -match 'parseInt|_str\(')
+Check $noHtmlEsc44 `
+    'sanitizeImportedContainer body: no HTML escape sequences, has type coercion (no double-escape at storage layer)'
 
 # ===========================================================
 # Results

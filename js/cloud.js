@@ -55,11 +55,7 @@ let _currentUid = null;
 onAuthStateChanged(auth, user => {
   _currentUid = user ? user.uid : null;
 });
-try {
-  signInAnonymously(auth);
-} catch (e) {
-  console.warn('Anonymous sign-in failed (non-fatal):', e);
-}
+signInAnonymously(auth).catch(e => console.warn('Anonymous sign-in failed (non-fatal):', e));
 
 window.pushToCloud = async function (courierId, stateObj) {
   if (!_currentUid) {

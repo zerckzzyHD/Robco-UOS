@@ -3994,7 +3994,11 @@ function handleFileUpload(event) {
           'robco_backup',
           JSON.stringify({ robco_v8: JSON.parse(localStorage.getItem('robco_v8') || '{}') })
         );
-        localStorage.setItem('robco_v8', JSON.stringify(parsed.robco_v8));
+        const _sanitized =
+          typeof sanitizeImportedContainer === 'function'
+            ? sanitizeImportedContainer(parsed.robco_v8)
+            : parsed.robco_v8;
+        localStorage.setItem('robco_v8', JSON.stringify(_sanitized));
         if (parsed.chat && Array.isArray(parsed.chat))
           localStorage.setItem('robco_chat', JSON.stringify(parsed.chat));
         if (parsed.playstyle) localStorage.setItem('robco_playstyle', parsed.playstyle);

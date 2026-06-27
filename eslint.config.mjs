@@ -87,6 +87,7 @@ export default [
         saveState: 'readonly',
         migrateState: 'readonly',
         autoImportState: 'readonly',
+        sanitizeImportedContainer: 'readonly',
         syncStateFromDom: 'readonly',
         generateSyncPayload: 'readonly',
         restoreChatHistory: 'readonly',
