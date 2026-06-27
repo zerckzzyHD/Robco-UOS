@@ -242,7 +242,7 @@ window.getAccountState = function () {
   };
 };
 
-window.pushToCloud = async function (courierId, stateObj) {
+window.pushToCloud = async function (_courierId, _stateObj) {
   if (!window.isFeatureEnabled('cloudSync')) {
     alert('>> CLOUD SYNC TEMPORARILY UNAVAILABLE — saves remain local <<');
     return;
@@ -285,7 +285,7 @@ window.pushToCloud = async function (courierId, stateObj) {
   }
 };
 
-window.pullFromCloud = async function (courierId) {
+window.pullFromCloud = async function (_courierId) {
   if (!window.isFeatureEnabled('cloudSync')) {
     alert('>> CLOUD SYNC TEMPORARILY UNAVAILABLE — saves remain local <<');
     return;

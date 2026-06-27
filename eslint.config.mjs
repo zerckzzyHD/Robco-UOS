@@ -152,7 +152,16 @@ export default [
       // Catch real bugs
       'no-undef': 'error',
       'no-redeclare': 'off', // Cross-file globals are declared in config AND defined in source
-      'no-unused-vars': ['warn', { argsIgnorePattern: '^_|^e$|^err$', varsIgnorePattern: '^_' }],
+      'no-unused-vars': [
+        'warn',
+        {
+          vars: 'local', // top-level declarations are cross-file global API — only check local scope
+          argsIgnorePattern: '^_|^e$|^err$',
+          varsIgnorePattern: '^_',
+          caughtErrors: 'all',
+          caughtErrorsIgnorePattern: '^_$|^e$|^err$', // catch (e) / catch (_) patterns
+        },
+      ],
       'no-constant-condition': 'warn',
       'no-debugger': 'warn',
       'no-dupe-keys': 'error',

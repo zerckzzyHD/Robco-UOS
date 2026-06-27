@@ -161,7 +161,7 @@ async function fetchAuthorizedModels(silent = false) {
     alert('Please paste an API Key first.');
     return;
   }
-  const cleanKey = encodeURIComponent(rawKey);
+  const _cleanKey = encodeURIComponent(rawKey);
   const btn = document.getElementById('btnFetchModels');
   btn.innerText = '> SCANNING MAINFRAME...';
 
@@ -660,7 +660,7 @@ function autoImportState(jsonString) {
     // ── GAME CONTEXT (v2.0) ────────────────────────────────────
     // Security Guard: Prevent AI from mutating gameContext to avoid cross-campaign corruption.
     // We parse it to satisfy test coverage, but we do NOT apply it to state.gameContext.
-    const gcV = _g(parsed, 'gameContext');
+    const _gcV = _g(parsed, 'gameContext');
     // if (gcV === 'FNV' || gcV === 'FO3') state.gameContext = gcV;
 
     // ── COLLECTIBLES (v2.0) ──────────────────────────────────

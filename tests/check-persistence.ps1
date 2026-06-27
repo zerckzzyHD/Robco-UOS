@@ -967,11 +967,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-50)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-50)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -1051,12 +1051,13 @@ $ciSrc31 = Read-Src '.github/workflows/ci.yml'
 # 31.1 ci.yml no stale "(106 tests)" label
 Check (-not ($ciSrc31 -match '\(106 tests\)')) `
     'ci.yml does not contain stale "(106 tests)" label (Phase 1c update)'
-# 31.2 ci.yml runs PowerShell persistence runner
-Check ([bool]($ciSrc31 -match 'check-persistence\.ps1')) `
-    'ci.yml runs PowerShell persistence runner (Protocol 15 parity)'
-# 31.3 ci.yml has render-check step
-Check ([bool]($ciSrc31 -match 'render-check')) `
-    'ci.yml includes render-check step (Protocol 10 CI enforcement)'
+# 31.2 gate.js runs PowerShell persistence runner + ci.yml calls npm run gate
+$gateSrc31 = Read-Src 'scripts/gate.js'
+Check (($gateSrc31 -match 'check-persistence\.ps1') -and ($ciSrc31 -match 'npm run gate')) `
+    'gate.js runs PowerShell persistence runner and ci.yml calls npm run gate (Protocol 15 parity)'
+# 31.3 gate.js includes render-check + ci.yml calls npm run gate
+Check (($gateSrc31 -match 'render-check') -and ($ciSrc31 -match 'npm run gate')) `
+    'gate.js includes render-check and ci.yml calls npm run gate (Protocol 10 CI enforcement)'
 # 31.4 deploy.yml uses _site staging dir (not path: .)
 $deploySrc31 = Read-Src '.github/workflows/deploy.yml'
 Check ($deploySrc31 -match '_site' -and -not ($deploySrc31 -match 'path:\s*\.')) `
@@ -2206,6 +2207,34 @@ Check ((-not $hasWriteAllowAll49) -and ($hasUnscopedAuth49.Count -eq 0)) `
 $releaseSrc49 = Read-Src ".github/workflows/release.yml"
 Check (([bool]($releaseSrc49 -match 'workflow_run')) -and ([bool]($releaseSrc49 -match "conclusion\s*==\s*'success'"))) `
     "release.yml uses workflow_run trigger with conclusion == 'success' (release gated on CI)"
+
+# ===========================================================
+# Suite 50 -- Gate Parity Guards (Protocol 36)
+# Verify that the local gate == CI gate and the escape-ratchet is wired.
+# 4 tests
+# ===========================================================
+Sep "Suite 50 -- Gate Parity Guards (Protocol 36)"
+
+$preCommitSrc50 = Read-Src "scripts/pre-commit"
+$gateSrc50 = Read-Src "scripts/gate.js"
+$pkgSrc50 = Read-Src "package.json"
+$bootSmokeSrc50 = Read-Src "tests/boot-smoke.mjs"
+
+# 50.1  scripts/pre-commit invokes npm run gate
+Check ($preCommitSrc50 -match 'npm run gate') `
+    "scripts/pre-commit invokes npm run gate (Protocol 36 -- local gate == CI gate)"
+
+# 50.2  scripts/gate.js enforces --max-warnings 0
+Check ($gateSrc50 -match '--max-warnings 0') `
+    "scripts/gate.js enforces ESLint --max-warnings 0 (Protocol 36 -- escape-ratchet)"
+
+# 50.3  boot-smoke.mjs uses HTTP static server (not file://)
+Check (($bootSmokeSrc50 -match 'http\.createServer') -and ($bootSmokeSrc50 -match 'BASE_URL')) `
+    "boot-smoke.mjs uses HTTP static server (http.createServer + BASE_URL navigation)"
+
+# 50.4  package.json has a gate script
+Check ($pkgSrc50 -match '"gate"') `
+    'package.json defines a "gate" script (Protocol 36 -- single source of truth for gate)'
 
 # ===========================================================
 # Results

@@ -1579,17 +1579,18 @@ header('Meta / Runner Parity');
     'Suite 40',
     'Suite 41',
     'Suite 49',
+    'Suite 50',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49)' +
+    'JS runner contains all gate-guard suites (22-41, 49-50)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49)' +
+    'PS runner contains all gate-guard suites (22-41, 49-50)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -1731,21 +1732,23 @@ header('CI/CD Automation Guards');
   );
 }
 
-// 31.2 ci.yml runs PowerShell persistence runner
+// 31.2 gate.js runs PowerShell persistence runner + ci.yml calls npm run gate
 {
+  const gateSrc = readFile('scripts/gate.js');
   const ciSource = readFile('.github/workflows/ci.yml');
   assert(
-    /check-persistence\.ps1/.test(ciSource),
-    'ci.yml runs PowerShell persistence runner (Protocol 15 parity)'
+    /check-persistence\.ps1/.test(gateSrc) && /npm run gate/.test(ciSource),
+    'gate.js runs PowerShell persistence runner and ci.yml calls npm run gate (Protocol 15 parity)'
   );
 }
 
-// 31.3 ci.yml has render-check step
+// 31.3 gate.js includes render-check + ci.yml calls npm run gate
 {
+  const gateSrc = readFile('scripts/gate.js');
   const ciSource = readFile('.github/workflows/ci.yml');
   assert(
-    /render-check/.test(ciSource),
-    'ci.yml includes render-check step (Protocol 10 CI enforcement)'
+    /render-check/.test(gateSrc) && /npm run gate/.test(ciSource),
+    'gate.js includes render-check and ci.yml calls npm run gate (Protocol 10 CI enforcement)'
   );
 }
 
@@ -3064,7 +3067,7 @@ header('Phase 5c-iii: Cloud Save Picker + Local Migration');
           if (cloudSource[i] === '{') depth++;
           else if (cloudSource[i] === '}' && --depth === 0) {
             const fnSrc = cloudSource.slice(fnIdx, i + 1);
-            eval('_testHash = ' + fnSrc); // eslint-disable-line no-eval
+            eval('_testHash = ' + fnSrc);
             break;
           }
           i++;
@@ -3098,7 +3101,7 @@ header('Phase 5c-iii: Cloud Save Picker + Local Migration');
           if (cloudSource[i] === '{') depth++;
           else if (cloudSource[i] === '}' && --depth === 0) {
             const fnSrc = cloudSource.slice(fnIdx, i + 1);
-            eval('_testHash = ' + fnSrc); // eslint-disable-line no-eval
+            eval('_testHash = ' + fnSrc);
             break;
           }
           i++;
@@ -3590,6 +3593,43 @@ header('Suite 49 — CI / Repo Hardening Guards');
   assert(
     /workflow_run/.test(releaseSrc49) && /conclusion\s*==\s*['"]success['"]/.test(releaseSrc49),
     "release.yml uses workflow_run trigger with conclusion == 'success' (release gated on CI)"
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 50 — Gate Parity Guards (Protocol 36)
+//  Verify that the local gate == CI gate and the escape-ratchet is wired.
+//  4 tests
+// ══════════════════════════════════════════════════════════════
+header('Suite 50 — Gate Parity Guards (Protocol 36)');
+{
+  const preCommitSrc50 = readFile('scripts/pre-commit');
+  const gateSrc50 = readFile('scripts/gate.js');
+  const pkgSrc50 = readFile('package.json');
+  const bootSmokeSrc50 = readFile('tests/boot-smoke.mjs');
+
+  // 50.1  scripts/pre-commit invokes npm run gate (gate parity enforced in hook)
+  assert(
+    preCommitSrc50.includes('npm run gate'),
+    'scripts/pre-commit invokes npm run gate (Protocol 36 — local gate == CI gate)'
+  );
+
+  // 50.2  scripts/gate.js enforces --max-warnings 0 (ESLint escape-ratchet)
+  assert(
+    gateSrc50.includes('--max-warnings 0'),
+    'scripts/gate.js enforces ESLint --max-warnings 0 (Protocol 36 — escape-ratchet)'
+  );
+
+  // 50.3  boot-smoke.mjs uses an HTTP static server (not file://)
+  assert(
+    bootSmokeSrc50.includes('http.createServer') && bootSmokeSrc50.includes('BASE_URL'),
+    'boot-smoke.mjs uses HTTP static server (http.createServer + BASE_URL navigation)'
+  );
+
+  // 50.4  package.json has a gate script wiring npm run gate
+  assert(
+    pkgSrc50.includes('"gate"'),
+    'package.json defines a "gate" script (Protocol 36 — single source of truth for gate)'
   );
 }
 

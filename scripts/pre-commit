@@ -84,17 +84,6 @@ fi
 echo "  [PASS]  No secrets detected in staged diff."
 # ── End Q3 ───────────────────────────────────────────────────────────────────
 
-if command -v powershell >/dev/null 2>&1; then
-  powershell -ExecutionPolicy Bypass -File tests/check-persistence.ps1
-elif command -v node >/dev/null 2>&1; then
-  node tests/check-persistence.js
-else
-  echo "No test runner (powershell or node) found."
-  exit 1
-fi
-if [ $? -ne 0 ]; then
-  echo ""
-  echo "Commit blocked: persistence audit failed."
-  echo "Fix the [FAIL] items in autoImportState() in js/api.js, then commit again."
-  exit 1
-fi
+# ── Full gate: lint + format + tests + browser (Protocol 36) ─────────────────
+npm run gate || exit 1
+# ── End gate ─────────────────────────────────────────────────────────────────
