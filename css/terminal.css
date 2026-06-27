@@ -127,13 +127,14 @@ body {
 }
 .main-grid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
 }
 .panel {
   border: 1px solid var(--robco-green);
   padding: 10px;
   background: rgba(2, 28, 20, 0.5);
+  overflow-wrap: anywhere;
 }
 .panel h2 {
   margin-top: 0;
@@ -305,6 +306,11 @@ input[type='range']::-webkit-slider-thumb {
   border-bottom: 1px dashed rgba(var(--robco-green-rgb), 0.3);
   padding: 5px 0;
 }
+.inventory-list li > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 .delete-btn {
   width: auto;
   margin: 0;
@@ -420,6 +426,12 @@ textarea {
     z-index: 100;
     background: #010a07;
     padding-top: 4px;
+  }
+  /* Clip overflow within each column on mobile without creating a scroll container.
+     position:fixed children (autocomplete panel) are unaffected by clip. */
+  .col-left,
+  .col-right {
+    overflow-x: clip;
   }
 }
 .tab-btn {
@@ -1969,4 +1981,6 @@ details[open] > summary.config-summary::after {
 .list-row-content {
   flex: 1;
   min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }

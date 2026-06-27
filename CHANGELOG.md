@@ -1,4 +1,4 @@
-## [v2.5.0] — Unreleased<!-- Tests: 732/732 | Cache: robco-terminal-v2.0.1-r74 -->
+## [v2.5.0] — Unreleased<!-- Tests: 739/739 | Cache: robco-terminal-v2.0.1-r75 -->
 
 ### Added
 
@@ -13,6 +13,7 @@
 
 ### Fixed
 
+- Fixed a mobile layout issue where restoring a save with long item names, quest titles, or notes could silently stretch the page beyond the screen width. On narrow screens the layout column did not shrink below its content, so an unbroken string (like a long item name without spaces) would push the grid wider than the viewport. The overflow was hidden rather than scrollable, so the content was clipped and invisible. Fixed by constraining the grid track to always fit within the viewport width and forcing long text to wrap rather than expand its container. Added a Playwright regression check (render-check.mjs) that seeds a worst-case populated save and verifies no overflow at 360px, 390px, and 412px; added 7 automated CSS invariant guard tests (Suite 61).
 - Fixed a bug in the AI retry logic where server errors could cause the app to retry indefinitely every 2.5 seconds. Retries are now bounded to three attempts with increasing delays (1 s, 2 s, 4 s), and the type of error determines how it is handled: rate-limit errors (429) retry with backoff and a clear message; auth failures (invalid or expired key) are reported immediately with no retry; network and server errors use the same bounded backoff. After the final attempt fails, a plain-English message is shown and the AI auto-disable counter is updated, matching the behaviour described in Protocol 32.
 - Fixed key validation in the API key entry flow so that an invalid or rejected key now shows a specific "KEY REJECTED" message immediately instead of a generic network failure. This now correctly detects the HTTP 400 error body that Google returns for invalid keys (INVALID_ARGUMENT), in addition to the rarer 401/403 codes. An invalid key is never saved or synced to cloud when rejected at entry. When a key is rejected during an AI call, the error is shown immediately with no retry and the AI auto-disable counter is not incremented — a fixable key problem should not trigger feature lock-out.
 - Added runtime validation of AI responses before applying them to game state. The app now confirms the response is a correctly shaped Tri-Node object (narrative / state / modal) before doing anything with it. If the AI returns unexpected data, the user sees a clear message and game state is left completely unchanged — the previous state-corruption path on a malformed or truncated response is closed.

@@ -971,11 +971,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-60)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-60)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-61)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-61)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -3239,6 +3239,54 @@ Check ([bool]($gateSrc60 -match 'a11y-check\.mjs') -and [bool]($gateSrc60 -match
 # 60.5 package.json has "a11y" script
 Check ([bool]$pkgJson60.scripts.a11y) `
     'package.json has "a11y" script entry'
+
+# ===========================================================
+# Suite 61 -- Mobile Layout Overflow Guards (CSS invariants)
+# Regression guards for r75 mobile layout stretch fix.
+# Ensures minmax(0,1fr) grid track, overflow-wrap on panels/rows,
+# inventory-span wrap rule, and mobile column clip are in place.
+# 7 tests
+# ===========================================================
+Sep "Suite 61 -- Mobile Layout Overflow Guards"
+$css61 = Read-Src "css/terminal.css"
+
+# 61.1 .main-grid uses minmax(0, 1fr)
+Check ([bool]($css61 -match '\.main-grid\s*\{[^}]*grid-template-columns\s*:\s*minmax\s*\(\s*0\s*,\s*1fr\s*\)')) `
+    '.main-grid grid-template-columns is minmax(0, 1fr) -- not bare 1fr (mobile stretch guard)'
+
+# 61.2 .list-row-content has overflow-wrap: anywhere
+$rowMatch61 = if ($css61 -match '(\.list-row-content\s*\{[^}]*\})') { $Matches[1] } else { '' }
+Check ([bool]($rowMatch61 -match 'overflow-wrap\s*:\s*anywhere')) `
+    '.list-row-content has overflow-wrap: anywhere (long text wrap guard)'
+
+# 61.3 .list-row-content has word-break: break-word
+Check ([bool]($rowMatch61 -match 'word-break\s*:\s*break-word')) `
+    '.list-row-content has word-break: break-word (unbroken token guard)'
+
+# 61.4 .inventory-list li > span rule exists with min-width: 0
+$spanMatch61 = if ($css61 -match '(\.inventory-list\s+li\s*>\s*span\s*\{[^}]*\})') { $Matches[1] } else { '' }
+Check ($spanMatch61.Length -gt 0 -and [bool]($spanMatch61 -match 'min-width\s*:\s*0')) `
+    '.inventory-list li > span rule exists with min-width: 0 (inventory name shrink guard)'
+
+# 61.5 .inventory-list li > span has overflow-wrap: anywhere
+Check ([bool]($spanMatch61 -match 'overflow-wrap\s*:\s*anywhere')) `
+    '.inventory-list li > span has overflow-wrap: anywhere (inventory long-name wrap guard)'
+
+# 61.6 .panel has overflow-wrap: anywhere
+$panelMatch61 = if ($css61 -match '(\.panel\s*\{[^}]*\})') { $Matches[1] } else { '' }
+Check ([bool]($panelMatch61 -match 'overflow-wrap\s*:\s*anywhere')) `
+    '.panel has overflow-wrap: anywhere (panel content wrap guard)'
+
+# 61.7 Mobile @media (max-width: 999px) has overflow-x: clip
+# Find block start index, then extract slice up to next @media to avoid stopping at first inner }
+$mobileIdx61   = $css61.IndexOf('@media (max-width: 999px)')
+$nextMedia61   = $css61.IndexOf('@media', $mobileIdx61 + 10)
+$mobileSlice61 = if ($mobileIdx61 -ge 0) {
+    if ($nextMedia61 -gt $mobileIdx61) { $css61.Substring($mobileIdx61, $nextMedia61 - $mobileIdx61) }
+    else { $css61.Substring($mobileIdx61) }
+} else { '' }
+Check ([bool]($mobileSlice61 -match 'overflow-x\s*:\s*clip')) `
+    '@media (max-width: 999px) includes overflow-x: clip for .col-left/.col-right (mobile column clip guard)'
 
 # ===========================================================
 # Results

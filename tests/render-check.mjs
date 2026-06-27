@@ -253,6 +253,153 @@ for (const vp of VIEWPORTS) {
   await ctx.close();
 }
 
+// ── Populated-save mobile overflow guard (Protocol 36 escape-ratchet r75) ──────
+// Seeds a worst-case robco_v8 (long unbroken inventory/quest/note tokens) and
+// asserts no unexpected inner-element overflow at 360px, 390px, and 412px.
+// Excludes the known empty-boot baseline elements (SELECT, INPUT, SUMMARY [+]
+// float, faction-card-name) — only flags NEW overflow introduced by save content.
+{
+  const WORST_CASE_SAVE = JSON.stringify({
+    activeContext: 'FNV',
+    campaigns: {
+      FNV: {
+        lvl: 10,
+        xp: 5000,
+        hpCur: 95,
+        hpMax: 100,
+        inventory: [
+          {
+            name: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGHIJKLMNOP',
+            qty: 1,
+            wgt: 1,
+            val: 1,
+            type: 'misc',
+          },
+          {
+            name: 'Anti-Materiel Rifle (Extended Magazine Modification)',
+            qty: 1,
+            wgt: 18,
+            val: 8500,
+            type: 'weapon',
+          },
+          {
+            name: 'Brotherhood T-51b Power Armor (Fully Repaired)',
+            qty: 1,
+            wgt: 45,
+            val: 6000,
+            type: 'armor',
+          },
+        ],
+        quests: [
+          {
+            name: 'Volare! (Boomers Main Quest: Restore the B-29 from Lake Mead)',
+            status: 'active',
+            objective:
+              'Speak with Loyal about raising the B-29 from Lake Mead and restoring it to flight.',
+          },
+          {
+            name: 'Wild Card: Side Bets (Independent New Vegas Route)',
+            status: 'active',
+            objective: 'Secure alliances without committing to any faction.',
+          },
+        ],
+        campaign_notes: [
+          'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGHIJKLMNOP',
+        ],
+        perks: [{ name: 'Old World Gourmet (Superior Survival Skill Enhancement Perk)', rank: 1 }],
+        squad: [{ name: 'Veronica Santangelo (Brotherhood of Steel Scribe)' }],
+        factions: {
+          ncr: { fame: 500, infamy: 0 },
+          legion: { fame: 0, infamy: 200 },
+          house: { fame: 100, infamy: 0 },
+          bos: { fame: 300, infamy: 0 },
+          boomers: { fame: 150, infamy: 0 },
+          khans: { fame: 50, infamy: 50 },
+          followers: { fame: 200, infamy: 0 },
+          powder: { fame: 0, infamy: 400 },
+          kings: { fame: 100, infamy: 0 },
+          strip: { fame: 200, infamy: 0 },
+          freeside: { fame: 50, infamy: 0 },
+        },
+        gameContext: 'FNV',
+        collectibles: [],
+        campaignMode: 'standard',
+        playthroughType: 'completionist',
+        mapView: 'auto',
+      },
+    },
+  });
+
+  const SAVE_VIEWPORTS = [
+    { width: 360, height: 800, label: '360px' },
+    { width: 390, height: 844, label: '390px' },
+    { width: 412, height: 915, label: '412px' },
+  ];
+
+  for (const vp of SAVE_VIEWPORTS) {
+    const ctx = await browser.newContext({ viewport: vp });
+    await ctx.addInitScript(save => {
+      localStorage.setItem('robco_v8', save);
+    }, WORST_CASE_SAVE);
+    const page = await ctx.newPage();
+    await page.goto(`file://${INDEX.replace(/\\/g, '/')}`);
+    try {
+      await page.waitForFunction(
+        () => {
+          const bs = document.getElementById('bootScreen');
+          return !bs || bs.style.display === 'none' || getComputedStyle(bs).display === 'none';
+        },
+        { timeout: 8000 }
+      );
+    } catch {
+      /* boot timed out — continue to overflow check */
+    }
+    await page.waitForTimeout(500);
+    await page.evaluate(() => {
+      document.querySelectorAll('details.panel').forEach(d => {
+        d.open = true;
+      });
+    });
+    await page.waitForTimeout(200);
+
+    const result = await page.evaluate(() => {
+      const offenders = [...document.querySelectorAll('*')]
+        .filter(el => el.scrollWidth > el.clientWidth + 1)
+        .filter(el => {
+          if (el.tagName === 'SELECT' || el.tagName === 'INPUT') return false;
+          if (el.tagName === 'SUMMARY') return false;
+          const cls = (el.className || '').toString();
+          if (cls.includes('faction-card-name') || cls.includes('phosphor-ghost')) return false;
+          return true;
+        })
+        .map(
+          el =>
+            `${el.tagName} sw=${el.scrollWidth} cw=${el.clientWidth} "${(el.textContent || '').slice(0, 40).trim()}"`
+        );
+      return {
+        pageOverflow: document.documentElement.scrollWidth > window.innerWidth,
+        offenders,
+      };
+    });
+
+    if (!result.pageOverflow) {
+      pass(`populated-save ${vp.label} — no page-level horizontal overflow`);
+    } else {
+      fail(`populated-save ${vp.label} — page-level overflow (scrollWidth > innerWidth)`);
+    }
+
+    if (result.offenders.length === 0) {
+      pass(`populated-save ${vp.label} — no unexpected inner-element overflow`);
+    } else {
+      fail(
+        `populated-save ${vp.label} — unexpected inner overflow: ${result.offenders.slice(0, 3).join('; ')}`
+      );
+    }
+
+    await ctx.close();
+  }
+}
+
 await browser.close();
 
 if (failed === 0) {

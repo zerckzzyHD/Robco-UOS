@@ -1599,17 +1599,18 @@ header('Meta / Runner Parity');
     'Suite 58',
     'Suite 59',
     'Suite 60',
+    'Suite 61',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-60)' +
+    'JS runner contains all gate-guard suites (22-41, 49-61)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-60)' +
+    'PS runner contains all gate-guard suites (22-41, 49-61)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -5383,6 +5384,85 @@ header('Suite 60 — A11y Gate Guards');
 
   // 60.5  package.json has the "a11y" script
   assert(!!(pkgJson60.scripts && pkgJson60.scripts.a11y), 'package.json has "a11y" script entry');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 61 — Mobile Layout Overflow Guards (CSS invariants)
+//  Regression guards for r75 mobile layout stretch fix.
+//  Ensures minmax(0,1fr) grid track, overflow-wrap on panels/rows,
+//  inventory-span wrap rule, and mobile column clip are in place.
+//  7 tests
+// ══════════════════════════════════════════════════════════════
+header('Suite 61 — Mobile Layout Overflow Guards');
+{
+  const css61 = readFile('css/terminal.css');
+
+  // 61.1 .main-grid uses minmax(0, 1fr) — not bare 1fr (which silently expands grid track)
+  assert(
+    /\.main-grid\s*\{[^}]*grid-template-columns\s*:\s*minmax\s*\(\s*0\s*,\s*1fr\s*\)/.test(css61),
+    '.main-grid grid-template-columns is minmax(0, 1fr) — not bare 1fr (mobile stretch guard)'
+  );
+
+  // 61.2 .list-row-content has overflow-wrap: anywhere
+  {
+    const rowMatch = (css61.match(/\.list-row-content\s*\{[^}]*\}/) || [''])[0];
+    assert(
+      /overflow-wrap\s*:\s*anywhere/.test(rowMatch),
+      '.list-row-content has overflow-wrap: anywhere (long text wrap guard)'
+    );
+  }
+
+  // 61.3 .list-row-content has word-break: break-word
+  {
+    const rowMatch = (css61.match(/\.list-row-content\s*\{[^}]*\}/) || [''])[0];
+    assert(
+      /word-break\s*:\s*break-word/.test(rowMatch),
+      '.list-row-content has word-break: break-word (unbroken token guard)'
+    );
+  }
+
+  // 61.4 .inventory-list li > span rule exists with min-width: 0
+  {
+    const spanMatch = (css61.match(/\.inventory-list\s+li\s*>\s*span\s*\{[^}]*\}/) || [''])[0];
+    assert(
+      spanMatch.length > 0 && /min-width\s*:\s*0/.test(spanMatch),
+      '.inventory-list li > span rule exists with min-width: 0 (inventory name shrink guard)'
+    );
+  }
+
+  // 61.5 .inventory-list li > span has overflow-wrap: anywhere
+  {
+    const spanMatch = (css61.match(/\.inventory-list\s+li\s*>\s*span\s*\{[^}]*\}/) || [''])[0];
+    assert(
+      /overflow-wrap\s*:\s*anywhere/.test(spanMatch),
+      '.inventory-list li > span has overflow-wrap: anywhere (inventory long-name wrap guard)'
+    );
+  }
+
+  // 61.6 .panel has overflow-wrap: anywhere
+  {
+    const panelMatch = (css61.match(/\.panel\s*\{[^}]*\}/) || [''])[0];
+    assert(
+      /overflow-wrap\s*:\s*anywhere/.test(panelMatch),
+      '.panel has overflow-wrap: anywhere (panel content wrap guard)'
+    );
+  }
+
+  // 61.7 Mobile @media (max-width: 999px) has overflow-x: clip for .col-left / .col-right
+  {
+    // Find the @media (max-width:999px) block start, then extract up to the next @media
+    // to avoid stopping at the first nested } (lazy match limitation).
+    const mobileIdx = css61.search(/@media\s*\([^)]*max-width\s*:\s*999px/);
+    const nextMediaIdx = css61.indexOf('@media', mobileIdx + 10);
+    const mobileSlice =
+      mobileIdx >= 0
+        ? css61.slice(mobileIdx, nextMediaIdx > mobileIdx ? nextMediaIdx : undefined)
+        : '';
+    assert(
+      /overflow-x\s*:\s*clip/.test(mobileSlice),
+      '@media (max-width: 999px) includes overflow-x: clip for .col-left/.col-right (mobile column clip guard)'
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
