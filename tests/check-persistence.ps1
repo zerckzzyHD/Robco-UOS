@@ -1768,8 +1768,8 @@ Check $noHtmlEsc44 `
 # ===========================================================
 # Suite 45 -- Google Sign-In + Account Panel (Phase 5c-ii)
 # Durable identity: Google auth link, collision recovery,
-# sign-out -> re-anon, redirect flow, and ACCOUNT UI panel.
-# 12 tests
+# sign-out -> re-anon, redirect flow, ACCOUNT UI panel, boot guard.
+# 13 tests
 # ===========================================================
 Sep "Suite 45 -- Phase 5c-ii: Google Sign-In + Account Panel"
 
@@ -1834,6 +1834,13 @@ Check (([bool]($htmlSrc -match 'id="accountPanel"')) -or ([bool]($htmlSrc -match
 # 45.12  CSP in index.html covers apis.google.com (Google Sign-In popup script)
 Check ([bool]($htmlSrc -match 'apis\.google\.com')) `
     'CSP in index.html covers apis.google.com (Google Sign-In popup flow)'
+
+# 45.13  boot signInAnonymously is guarded by authStateReady() + currentUser check
+#        (unconditional call replaces a Google-linked session on every reload)
+$hasAuthStateReady = [bool]($cloudSrc -match 'authStateReady\(\)')
+$hasCurrentUserCheck = [bool]($cloudSrc -match '!\s*auth\.currentUser')
+Check ($hasAuthStateReady -and $hasCurrentUserCheck) `
+    'cloud.js boot sign-in is conditional: authStateReady() + !auth.currentUser guard present (not unconditional — prevents clobbering Google session on reload)'
 
 # ===========================================================
 # Results

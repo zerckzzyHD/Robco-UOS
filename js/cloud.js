@@ -90,8 +90,19 @@ getRedirectResult(auth)
     }
   });
 
-// Boot: create anonymous user if no persistent session exists (no-op if user already set)
-signInAnonymously(auth).catch(e => console.warn('Anonymous sign-in failed (non-fatal):', e));
+// Boot: establish anonymous baseline ONLY when no session is restored from persistence.
+// signInAnonymously is a no-op for an existing ANONYMOUS user but REPLACES a non-anonymous
+// (Google-linked) user, so guard on currentUser after init to avoid clobbering it.
+auth
+  .authStateReady()
+  .then(() => {
+    if (!auth.currentUser) {
+      signInAnonymously(auth).catch(e => console.warn('Anonymous sign-in failed (non-fatal):', e));
+    }
+  })
+  .catch(() => {
+    if (!auth.currentUser) signInAnonymously(auth).catch(() => {});
+  });
 
 // ── Google sign-in: links anonymous → Google; handles collision ──────────────
 window.signInWithGoogle = async function () {
