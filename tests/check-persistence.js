@@ -3685,7 +3685,7 @@ header('Suite 50 — Gate Parity Guards (Protocol 36)');
 //  Suite 51 — Save Integrity + Rolling Backups (Data Safety Hardening)
 //  Verify checksum stamping, forward-compat guard, and rolling backup
 //  ring are wired consistently across all load/save paths.
-//  20 tests
+//  34 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 51 — Save Integrity + Rolling Backups');
 {
@@ -3862,7 +3862,7 @@ header('Suite 51 — Save Integrity + Rolling Backups');
   assert(
     stateSrc51.includes('QuotaExceededError') &&
       /removeItem\s*\(/.test(stateSrc51) &&
-      /snapRollingBackup[\s\S]{0,800}QuotaExceededError/.test(stateSrc51),
+      /snapRollingBackup[\s\S]{0,1500}QuotaExceededError/.test(stateSrc51),
     'snapRollingBackup handles QuotaExceededError gracefully (drop-oldest-retry, no crash)'
   );
 
@@ -3871,6 +3871,183 @@ header('Suite 51 — Save Integrity + Rolling Backups');
     stateSrc51.includes('0x811c9dc5') && stateSrc51.includes('0x01000193'),
     'computeSaveChecksum/_fnv1a32 uses canonical FNV-1a magic numbers (algorithm regression guard)'
   );
+
+  // 51.21–51.34  Behavioral: eval state.js helpers and exercise the actual logic
+  //   These fail on real regressions (wrong semver comparison, checksum field in hash,
+  //   ring overflow, dedup missing) — not just grep-based presence checks.
+  {
+    const _bvm = require('vm');
+    const _lsStore = Object.create(null);
+    const _mockLS = {
+      getItem: k => (_lsStore[k] !== undefined ? String(_lsStore[k]) : null),
+      setItem: (k, v) => {
+        _lsStore[k] = String(v);
+      },
+      removeItem: k => {
+        delete _lsStore[k];
+      },
+    };
+    const _hStart = stateSrc51.indexOf('function _fnv1a32');
+    const _hEnd = stateSrc51.indexOf('// ── FACTION REGISTRY');
+    let _bCtx = null;
+    if (_hStart !== -1 && _hEnd !== -1) {
+      try {
+        _bCtx = {
+          window: {},
+          localStorage: _mockLS,
+          _lsStore,
+          JSON,
+          Math,
+          String,
+          Array,
+          Object,
+          parseInt,
+          isNaN,
+          Date,
+          console: { warn: () => {} },
+        };
+        _bvm.createContext(_bCtx);
+        _bvm.runInContext('var APP_VERSION = "2.0.1";\n' + stateSrc51.slice(_hStart, _hEnd), _bCtx);
+      } catch (_) {
+        _bCtx = null;
+      }
+    }
+
+    if (!_bCtx || !_bCtx.window.computeSaveChecksum || !_bCtx.window.verifySaveEnvelope) {
+      fail('51.21 behavioral setup: could not eval helpers block from state.js');
+      for (let _bi = 0; _bi < 13; _bi++) fail('51.B behavioral test (setup failed)');
+    } else {
+      const _cs = _bCtx.window.computeSaveChecksum;
+      const _ve = _bCtx.window.verifySaveEnvelope;
+      const _snap = _bCtx.window.snapRollingBackup;
+      const _getRing = _bCtx.window.getRollingBackups;
+      const _ls = _bCtx._lsStore;
+
+      // 51.21  legacy: no checksum, no version → 'legacy' (old saves load clean, never blocked)
+      assert(
+        _ve({}).status === 'legacy',
+        'verifySaveEnvelope behavioral: empty envelope → legacy (old saves load without warning)'
+      );
+
+      // 51.22  legacy: has payload but no checksum → 'legacy'
+      assert(
+        _ve({ robco_v8: { activeContext: 'FNV', campaigns: {} }, chat: [], playstyle: 'any' })
+          .status === 'legacy',
+        'verifySaveEnvelope behavioral: payload with no checksum field → legacy (backward compat)'
+      );
+
+      // 51.23  tamper detection: mutated payload + stale checksum → 'checksum_mismatch'
+      const _bv8 = { activeContext: 'FNV', campaigns: { FNV: { lvl: 5, name: 'Tester' } } };
+      const _bcht = [{ text: 'hello', sender: 'user' }];
+      const _goodCk = _cs(_bv8, _bcht, 'any');
+      const _tampEnv = {
+        schemaVersion: '2.0.1',
+        robco_v8: { activeContext: 'FNV', campaigns: { FNV: { lvl: 99, name: 'Hacked' } } },
+        chat: _bcht,
+        playstyle: 'any',
+        checksum: _goodCk,
+      };
+      assert(
+        _ve(_tampEnv).status === 'checksum_mismatch',
+        'verifySaveEnvelope behavioral: tampered payload with stale checksum → checksum_mismatch'
+      );
+
+      // 51.24  valid round-trip → 'ok'
+      const _validEnv = {
+        schemaVersion: '2.0.1',
+        robco_v8: _bv8,
+        chat: _bcht,
+        playstyle: 'any',
+        checksum: _cs(_bv8, _bcht, 'any'),
+      };
+      assert(
+        _ve(_validEnv).status === 'ok',
+        'verifySaveEnvelope behavioral: valid checksum + matching payload → ok'
+      );
+
+      // 51.25  JSON serialize/deserialize round-trip → still 'ok' (determinism guard)
+      assert(
+        _ve(JSON.parse(JSON.stringify(_validEnv))).status === 'ok',
+        'verifySaveEnvelope behavioral: valid checksum survives JSON round-trip → ok'
+      );
+
+      // 51.26  future version 2.0.2 → 'future_version'
+      assert(
+        _ve({ schemaVersion: '2.0.2' }).status === 'future_version',
+        'verifySaveEnvelope behavioral: schemaVersion 2.0.2 > APP_VERSION 2.0.1 → future_version'
+      );
+
+      // 51.27  future version 2.1.0 → 'future_version'
+      assert(
+        _ve({ schemaVersion: '2.1.0' }).status === 'future_version',
+        'verifySaveEnvelope behavioral: schemaVersion 2.1.0 → future_version'
+      );
+
+      // 51.28  future version 3.0.0 → 'future_version'
+      assert(
+        _ve({ schemaVersion: '3.0.0' }).status === 'future_version',
+        'verifySaveEnvelope behavioral: schemaVersion 3.0.0 → future_version'
+      );
+
+      // 51.29  same version, no checksum → 'legacy' (not future_version)
+      assert(
+        _ve({ schemaVersion: '2.0.1' }).status !== 'future_version',
+        'verifySaveEnvelope behavioral: schemaVersion 2.0.1 (same) → not future_version'
+      );
+
+      // 51.30  older version → not 'future_version'
+      assert(
+        _ve({ schemaVersion: '1.9.0' }).status !== 'future_version',
+        'verifySaveEnvelope behavioral: schemaVersion 1.9.0 (older) → not future_version'
+      );
+
+      // 51.31  _semverGt numeric: 2.0.10 > 2.0.1 must be true (fails if string-compared)
+      assert(
+        _ve({ schemaVersion: '2.0.10' }).status === 'future_version',
+        'verifySaveEnvelope/_semverGt behavioral: 2.0.10 > 2.0.1 uses numeric, not string, comparison'
+      );
+
+      // 51.32  ring-cap-3: 4 distinct snaps → exactly 3 ring entries
+      Object.keys(_ls).forEach(k => {
+        delete _ls[k];
+      });
+      for (let _i = 1; _i <= 4; _i++) {
+        _ls['robco_v8'] = JSON.stringify({
+          activeContext: 'FNV',
+          campaigns: { FNV: { lvl: _i } },
+        });
+        _ls['robco_chat'] = '[]';
+        _ls['robco_playstyle'] = 'any';
+        _snap();
+      }
+      const _ringArr = _getRing();
+      assert(
+        _ringArr.length === 3,
+        'snapRollingBackup behavioral: 4 distinct snaps fills ring to exactly 3 entries (cap-3)'
+      );
+
+      // 51.33  ring dedup: consecutive identical snaps → only 1 entry (not 2)
+      Object.keys(_ls).forEach(k => {
+        delete _ls[k];
+      });
+      _ls['robco_v8'] = JSON.stringify({ activeContext: 'FNV', campaigns: { FNV: { lvl: 42 } } });
+      _ls['robco_chat'] = '[]';
+      _ls['robco_playstyle'] = 'any';
+      _snap();
+      _snap(); // same robco_v8 — must be deduped
+      assert(
+        _getRing().length === 1,
+        'snapRollingBackup behavioral: consecutive identical snaps are deduped (only 1 entry written)'
+      );
+
+      // 51.34  F2 guard: ui.js undo no longer reads legacy robco_backup key; uses getRollingBackups
+      assert(
+        uiSource.includes('getRollingBackups') &&
+          !/localStorage\.getItem\(['"]robco_backup['"]\)/.test(uiSource),
+        "ui.js undo wired to getRollingBackups(), legacy 'robco_backup' key removed (F2 fix guard)"
+      );
+    }
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

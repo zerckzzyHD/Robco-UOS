@@ -29,9 +29,11 @@ function _sortedForHash(o) {
 // The checksum field itself must NOT be included in contentObj before calling this.
 window.computeSaveChecksum = function (contentObj, chat, playstyle) {
   return _fnv1a32(
-    JSON.stringify(
-      _sortedForHash({ v: contentObj || null, c: chat || [], p: String(playstyle || '') })
-    )
+    JSON.stringify({
+      v: _sortedForHash(contentObj || null),
+      c: _sortedForHash(chat || []),
+      p: String(playstyle || ''),
+    })
   );
 };
 
@@ -86,11 +88,21 @@ window.snapRollingBackup = function () {
   try {
     ptr = ((parseInt(localStorage.getItem('robco_backup_ptr') || '0') % 3) + 3) % 3;
   } catch (_) {}
+  // Dedup: skip if robco_v8 is unchanged since the most-recent backup (prevents boot-reload dilution)
+  const _curV8 = localStorage.getItem('robco_v8');
+  try {
+    const _prevKey = 'robco_backup_' + (ptr === 0 ? 3 : ptr);
+    const _prevRaw = localStorage.getItem(_prevKey);
+    if (_prevRaw) {
+      const _prevSnap = JSON.parse(_prevRaw);
+      if (JSON.stringify(_prevSnap.robco_v8) === _curV8) return;
+    }
+  } catch (_) {}
   let snap;
   try {
     snap = JSON.stringify({
       timestamp: Date.now(),
-      robco_v8: JSON.parse(localStorage.getItem('robco_v8') || '{}'),
+      robco_v8: JSON.parse(_curV8 || '{}'),
       chat: JSON.parse(localStorage.getItem('robco_chat') || '[]'),
       playstyle: localStorage.getItem('robco_playstyle') || 'any',
     });

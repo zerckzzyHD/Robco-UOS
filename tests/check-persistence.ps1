@@ -2257,7 +2257,7 @@ Check ($installHooksSrc50 -match 'pre-push') `
 # Suite 51 -- Save Integrity + Rolling Backups (Data Safety Hardening)
 # Verify checksum stamping, forward-compat guard, and rolling backup
 # ring are wired consistently across all load/save paths.
-# 20 tests
+# 34 tests
 # ===========================================================
 Sep "Suite 51 -- Save Integrity + Rolling Backups"
 
@@ -2360,6 +2360,67 @@ Check ($stateSrc51 -match 'QuotaExceededError' -and $stateSrc51 -match 'removeIt
 # 51.20  computeSaveChecksum uses FNV-1a magic numbers
 Check ($stateSrc51 -match '0x811c9dc5' -and $stateSrc51 -match '0x01000193') `
     "computeSaveChecksum/_fnv1a32 uses canonical FNV-1a magic numbers (algorithm regression guard)"
+
+# 51.21–51.34  Behavioral structural equivalents (mirrors JS runner behavioral tests)
+
+# 51.21  verifySaveEnvelope has all 4 return statuses (full path coverage)
+Check ($stateSrc51 -match "'legacy'" -and $stateSrc51 -match "'ok'" -and
+       $stateSrc51 -match "'checksum_mismatch'" -and $stateSrc51 -match "'future_version'") `
+    "verifySaveEnvelope behavioral: all 4 return statuses present (legacy/ok/mismatch/future)"
+
+# 51.22  legacy path: no-checksum guard present (backward compat — old saves load clean)
+Check ($stateSrc51 -match '!envelope\.checksum' -and $stateSrc51 -match "status.*legacy") `
+    "verifySaveEnvelope behavioral: !envelope.checksum → legacy path present (old saves load clean)"
+
+# 51.23  tamper detection: checksum comparison present
+Check ($stateSrc51 -match "envelope\.checksum !== expected") `
+    "verifySaveEnvelope behavioral: checksum_mismatch detection via envelope.checksum !== expected"
+
+# 51.24  valid round-trip: checksum recomputed from envelope.chat
+Check ($stateSrc51 -match 'envelope\.chat \|\| \[\]') `
+    "verifySaveEnvelope behavioral: recomputes checksum using envelope.chat field"
+
+# 51.25  valid round-trip: checksum recomputed from envelope.playstyle
+Check ($stateSrc51 -match 'envelope\.playstyle \|\| ') `
+    "verifySaveEnvelope behavioral: recomputes checksum using envelope.playstyle field"
+
+# 51.26  future version detection: _semverGt called with sv and APP_VERSION
+Check ($stateSrc51 -match '_semverGt\(String\(sv\)') `
+    "verifySaveEnvelope behavioral: _semverGt(sv, APP_VERSION) called for future-version guard"
+
+# 51.27  _semverGt loops over 3 version segments
+Check ($stateSrc51 -match 'i < 3') `
+    "verifySaveEnvelope/_semverGt behavioral: all 3 version segments compared (major.minor.patch)"
+
+# 51.28  _semverGt uses strict greater-than (not >= — same/older must not be blocked)
+Check (-not ($stateSrc51 -match 'pa\[i\].*>=.*pb\[i\]')) `
+    "verifySaveEnvelope/_semverGt behavioral: strictly > only (not >=, so equal versions pass through)"
+
+# 51.29  _semverGt numeric: uses parseInt (not string comparison of version segments)
+Check ($stateSrc51 -match 'parseInt\(n\)') `
+    "verifySaveEnvelope/_semverGt behavioral: parseInt() used for numeric segment comparison (not string)"
+
+# 51.30  schemaVersion fallback: version field used if schemaVersion absent
+Check ($stateSrc51 -match 'envelope\.schemaVersion \|\| envelope\.version') `
+    "verifySaveEnvelope behavioral: schemaVersion || version fallback (both fields honored)"
+
+# 51.31  computeSaveChecksum uses explicit {v,c,p} key order (F3 - not _sortedForHash on outer wrapper)
+Check ($stateSrc51 -match 'v: _sortedForHash' -and $stateSrc51 -match 'c: _sortedForHash') `
+    'computeSaveChecksum: explicit outer key order preserved for cloud dedup compat (F3 fix)'
+
+# 51.32  ring-cap-3: ring iterates i = 1 to 3 (exactly 3 slots)
+Check ($stateSrc51 -match 'i = 1' -and $stateSrc51 -match 'i <= 3') `
+    "snapRollingBackup/getRollingBackups behavioral: ring uses exactly 3 slots (i=1..3)"
+
+# 51.33  ring dedup: snapRollingBackup reads most-recent backup for comparison (F4 fix)
+Check ($stateSrc51 -match '_prevKey' -and $stateSrc51 -match '_prevSnap' -and
+       $stateSrc51 -match 'JSON\.stringify\(_prevSnap\.robco_v8\)') `
+    "snapRollingBackup behavioral: dedup check reads most-recent backup and compares robco_v8 (F4)"
+
+# 51.34  F2 guard: ui.js undo uses getRollingBackups, no longer reads legacy robco_backup key
+Check ($uiSrc51 -match 'getRollingBackups' -and
+       -not ($uiSrc51 -match "localStorage\.getItem\('robco_backup'\)")) `
+    "ui.js undo behavioral: wired to getRollingBackups(), legacy 'robco_backup' key removed (F2)"
 
 # ===========================================================
 # Results

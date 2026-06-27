@@ -834,7 +834,10 @@ window.onload = function () {
       appendToChat(briefingLines, 'sys', true);
     }
 
-    if (window._lastStateBeforeSync || localStorage.getItem('robco_backup')) {
+    if (
+      window._lastStateBeforeSync ||
+      (typeof window.getRollingBackups === 'function' && window.getRollingBackups().length > 0)
+    ) {
       let undoBtn = document.getElementById('undoSyncBtn');
       if (undoBtn) undoBtn.style.display = 'block';
     }
@@ -3743,14 +3746,11 @@ function undoLastSync() {
       if (undoBtn) undoBtn.style.display = 'none';
       loadUI();
       appendToChat('> STATE ROLLBACK COMPLETE. PREVIOUS TELEMETRY RESTORED.', 'sys', true);
-    } else if (localStorage.getItem('robco_backup')) {
-      let prev = JSON.parse(localStorage.getItem('robco_backup'));
-      if (prev.robco_v8) {
-        localStorage.setItem('robco_v8', JSON.stringify(prev.robco_v8));
-        localStorage.removeItem('robco_backup');
-        alert('> HARD BACKUP RESTORED SUCCESSFULLY. REBOOTING SYSTEM...');
-        window.location.reload();
-      }
+    } else if (
+      typeof window.getRollingBackups === 'function' &&
+      window.getRollingBackups().length > 0
+    ) {
+      restoreRollingBackup();
     } else {
       appendToChat('> NO RECENT SYNC TO UNDO.', 'sys', true);
     }
