@@ -2171,8 +2171,9 @@ Check (([bool]($rulesSrc48 -match 'match\s*/config/\{')) -and ([bool]($rulesSrc4
 
 # ===========================================================
 # Suite 49 -- CI / Repo Hardening Guards (Q-series)
-# Asset-manifest completeness, Firestore no-allow-all, release.yml CI gating.
-# 4 tests
+# Asset-manifest completeness, Firestore no-allow-all, release.yml CI gating,
+# deploy.yml shortcut-icon staging guard (Protocol 36 escape-ratchet).
+# 5 tests
 # ===========================================================
 Sep "Suite 49 -- CI / Repo Hardening Guards"
 
@@ -2213,6 +2214,12 @@ Check ((-not $hasWriteAllowAll49) -and ($hasUnscopedAuth49.Count -eq 0)) `
 $releaseSrc49 = Read-Src ".github/workflows/release.yml"
 Check (([bool]($releaseSrc49 -match 'workflow_run')) -and ([bool]($releaseSrc49 -match "conclusion\s*==\s*'success'"))) `
     "release.yml uses workflow_run trigger with conclusion == 'success' (release gated on CI)"
+
+# 49.5  deploy.yml stage step deploys root-level PNGs via *.png glob
+#        (Protocol 36 escape-ratchet: shortcut icon 404 regression guard)
+$deployYml49 = Read-Src ".github/workflows/deploy.yml"
+Check ([bool]($deployYml49 -match 'cp\s+[^\n]*\*\.png')) `
+    "deploy.yml stage step uses *.png glob so all root-level icon files (icon.png + shortcut icons) are copied to _site/"
 
 # ===========================================================
 # Suite 50 -- Gate Parity Guards (Protocol 36)

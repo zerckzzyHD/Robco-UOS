@@ -3585,8 +3585,9 @@ header('Remote Kill-Switch + Client Auto-Disable (Protocol 32/35)');
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 49 — CI / Repo Hardening Guards (Q-series)
-//  Asset-manifest completeness, Firestore no-allow-all, release.yml CI gating.
-//  4 tests
+//  Asset-manifest completeness, Firestore no-allow-all, release.yml CI gating,
+//  deploy.yml shortcut-icon staging guard (Protocol 36 escape-ratchet).
+//  5 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 49 — CI / Repo Hardening Guards');
 {
@@ -3640,6 +3641,15 @@ header('Suite 49 — CI / Repo Hardening Guards');
   assert(
     /workflow_run/.test(releaseSrc49) && /conclusion\s*==\s*['"]success['"]/.test(releaseSrc49),
     "release.yml uses workflow_run trigger with conclusion == 'success' (release gated on CI)"
+  );
+
+  // 49.5  deploy.yml stage step deploys root-level PNGs via *.png glob
+  //       (Protocol 36 escape-ratchet: shortcut icon 404 regression guard — ff42c51→c64617c deployed
+  //       the icons to git but deploy.yml only listed icon.png by name, leaving the 4 shortcut icons unserved)
+  const deployYml49 = readFile('.github/workflows/deploy.yml');
+  assert(
+    /cp\s+[^\n]*\*\.png/.test(deployYml49),
+    'deploy.yml stage step uses *.png glob so all root-level icon files (icon.png + shortcut icons) are copied to _site/'
   );
 }
 
