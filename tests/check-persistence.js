@@ -2618,6 +2618,83 @@ header('Native Command Router (Phase 5a)');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 43 — GAME_DEFS Structural Integrity (Phase 5b)
+//  Aggregation layer: GAME_DEFS in state.js + _activeDef() helper.
+//  Collapses FNV/FO3 ternaries into config lookups; zero behavior change.
+//  10 tests
+// ══════════════════════════════════════════════════════════════
+header('GAME_DEFS Structural Integrity (Phase 5b)');
+{
+  const stateSrc43 = readFile('js/state.js');
+
+  // 43.1  state.js declares const GAME_DEFS = {
+  assert(
+    /const GAME_DEFS\s*=\s*\{/.test(stateSrc43),
+    'state.js declares const GAME_DEFS = { ... }'
+  );
+
+  // 43.2  window.GAME_DEFS exposed on the global object
+  assert(
+    /window\.GAME_DEFS\s*=\s*GAME_DEFS/.test(stateSrc43),
+    'state.js assigns window.GAME_DEFS = GAME_DEFS (global exposure)'
+  );
+
+  // 43.3  _activeDef() helper function defined in state.js
+  assert(
+    /function _activeDef\s*\(/.test(stateSrc43),
+    'state.js defines _activeDef() TDZ-safe helper'
+  );
+
+  // 43.4  GAME_DEFS has FNV and FO3 top-level keys
+  assert(
+    /\bFNV\s*:\s*\{/.test(stateSrc43) && /\bFO3\s*:\s*\{/.test(stateSrc43),
+    'GAME_DEFS has FNV and FO3 top-level keys'
+  );
+
+  // 43.5  GAME_DEFS ai sub-object has all three directive fields
+  assert(
+    /skillSystemText\s*:/.test(stateSrc43) &&
+      /factionSystemText\s*:/.test(stateSrc43) &&
+      /irreversibleTriggers\s*:/.test(stateSrc43),
+    'GAME_DEFS ai sub-object has skillSystemText, factionSystemText, irreversibleTriggers'
+  );
+
+  // 43.6  FNV calendar startYear = 2281
+  assert(/startYear\s*:\s*2281/.test(stateSrc43), 'GAME_DEFS.FNV.calendar.startYear is 2281');
+
+  // 43.7  FO3 calendar startYear = 2277
+  assert(/startYear\s*:\s*2277/.test(stateSrc43), 'GAME_DEFS.FO3.calendar.startYear is 2277');
+
+  // 43.8  SKILL_KEYS_FO3 literal includes big_guns and small_guns
+  {
+    const fo3M = stateSrc43.match(/const SKILL_KEYS_FO3\s*=\s*\[([^\]]+)\]/);
+    const fo3Skills = fo3M ? fo3M[1] : '';
+    assert(
+      fo3Skills.includes("'big_guns'") && fo3Skills.includes("'small_guns'"),
+      "SKILL_KEYS_FO3 literal includes 'big_guns' and 'small_guns'"
+    );
+  }
+
+  // 43.9  getFactionRegistry() body references _activeDef (not the old inline ternary)
+  {
+    let frBody = '';
+    try {
+      frBody = extractFunctionBody(stateSrc43, 'getFactionRegistry');
+    } catch (_) {}
+    assert(frBody.includes('_activeDef'), 'getFactionRegistry() delegates to _activeDef()');
+  }
+
+  // 43.10  getSkillKeys() body references _activeDef
+  {
+    let skBody = '';
+    try {
+      skBody = extractFunctionBody(stateSrc43, 'getSkillKeys');
+    } catch (_) {}
+    assert(skBody.includes('_activeDef'), 'getSkillKeys() delegates to _activeDef()');
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 console.log('\n══════════════════════════════════════════════════════════════\n');

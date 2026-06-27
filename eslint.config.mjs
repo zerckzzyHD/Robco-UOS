@@ -76,6 +76,8 @@ export default [
         FACTION_REGISTRY_FO3: 'readonly',
         SKILL_KEYS: 'readonly',
         SKILL_KEYS_FO3: 'readonly',
+        GAME_DEFS: 'readonly',
+        _activeDef: 'readonly',
         getFactionRegistry: 'readonly',
         getSkillKeys: 'readonly',
         switchTab: 'readonly',

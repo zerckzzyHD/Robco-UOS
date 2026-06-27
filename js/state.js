@@ -33,16 +33,112 @@ const FACTION_REGISTRY_FO3 = [
   { key: 'rivetcity', name: 'Rivet City', tier: 'minor' },
 ];
 
+// ── SKILL KEYS (shared constant used by state, ui, and api) ─────
+// FNV skills
+const SKILL_KEYS = [
+  'barter',
+  'energy_weapons',
+  'explosives',
+  'guns',
+  'lockpick',
+  'medicine',
+  'melee_weapons',
+  'repair',
+  'science',
+  'sneak',
+  'speech',
+  'survival',
+  'unarmed',
+];
+
+// FO3 skills — Big Guns and Small Guns instead of Guns and Survival
+const SKILL_KEYS_FO3 = [
+  'barter',
+  'big_guns',
+  'energy_weapons',
+  'explosives',
+  'lockpick',
+  'medicine',
+  'melee_weapons',
+  'repair',
+  'science',
+  'small_guns',
+  'sneak',
+  'speech',
+  'unarmed',
+];
+
+// ── GAME_DEFS — per-game configuration aggregation layer ─────────
+// Aggregates faction lists, skill keys, calendar epochs, labels,
+// and AI directive text into one entry per game. Adding a 3rd game
+// requires only a new entry here + two data files (db_XX.js / reg_XX.js).
+const GAME_DEFS = {
+  FNV: {
+    id: 'FNV',
+    label: 'Fallout: New Vegas',
+    factions: FACTION_REGISTRY,
+    skillKeys: SKILL_KEYS,
+    usesKarmaCenter: false,
+    collectibleLabel: 'SNOW GLOBES',
+    calendar: { startMonth: 9, startDay: 19, startYear: 2281, epochWeekday: 0 },
+    ai: {
+      skillSystemText:
+        'state.skills tracks 13 skills (0-100 each): barter, energy_weapons, explosives, guns, lockpick, medicine, melee_weapons, repair, science, sneak, speech, survival, unarmed.',
+      factionSystemText:
+        'state.factions tracks reputation with 11 factions as { fame: 0, infamy: 0 } objects.\nMajor keys: ncr, legion, house. Minor keys: bos, boomers, khans, followers, powder, kings, strip, freeside.\nNote: Casino-family interactions (Chairmen, Omertas, White Glove Society) MUST affect "strip" reputation instead.\nFame and infamy are INDEPENDENT non-negative integers. Both axes use per-faction thresholds sourced from the GECK.\nThe 11 canonical standing titles are: Neutral, Sneering Punk, Accepted, Shunned, Liked, Hated, Vilified, Idolized, Soft-Hearted Devil, Mixed, Unpredictable, Dark Hero, Merciful Thug, Wild Child.',
+      irreversibleTriggers: `**FNV Irreversible Triggers** — warn before:
+- Allying with Caesar's Legion (permanent NCR/Brotherhood lockout)
+- Siding with Mr. House or Yes Man (faction collapse endgame)
+- Killing Boone's wife (companion lockout)
+- Detonating Nipton bombs (NCR infamy spike — permanent reputation floor)
+- Completing "Ring-a-Ding-Ding!" (Benny becomes inaccessible after)
+- Any quest that permanently closes another quest branch (Lonesome Road choices, etc.)`,
+    },
+  },
+  FO3: {
+    id: 'FO3',
+    label: 'Fallout 3',
+    factions: FACTION_REGISTRY_FO3,
+    skillKeys: SKILL_KEYS_FO3,
+    usesKarmaCenter: true,
+    collectibleLabel: 'BOBBLEHEADS',
+    calendar: { startMonth: 7, startDay: 17, startYear: 2277, epochWeekday: 3 },
+    ai: {
+      skillSystemText:
+        'state.skills tracks 13 skills (0-100 each): barter, big_guns, energy_weapons, explosives, lockpick, medicine, melee_weapons, repair, science, small_guns, sneak, speech, unarmed.',
+      factionSystemText:
+        'state.factions tracks reputation with 12 factions as { fame: 0, infamy: 0 } objects.\nMajor keys: enclave, bos, lyons, outcast, supermutants. Minor keys: talon, regulators, slavers, reillys, tunnelsnakes, underworld, rivetcity.\nFame and infamy are INDEPENDENT non-negative integers. Both axes use per-faction thresholds.',
+      irreversibleTriggers: `**FO3 Irreversible Triggers** — warn before:
+- Karma dropping below -750 (Enclave hit squads become persistent)
+- Karma rising above +750 (Brotherhood Outcasts become hostile)
+- Destroying Megaton (permanent loss of town and Moira's full quest line)
+- Turning on the Purifier prematurely (activates endgame sequence)
+- Killing neutral/friendly NPCs with karma impacts above 50`,
+    },
+  },
+};
+window.GAME_DEFS = GAME_DEFS;
+
+// _activeDef() — TDZ-safe: returns the active game's config object.
+// Falls back to FNV if state is not yet initialized (during let state init).
+function _activeDef() {
+  try {
+    return GAME_DEFS[state.gameContext] || GAME_DEFS.FNV;
+  } catch (_) {
+    return GAME_DEFS.FNV;
+  }
+}
+
 // ── CONTEXT-AWARE GETTERS ────────────────────────────────────────
 // These return the correct registry for the current gameContext.
 // Always use these instead of referencing FACTION_REGISTRY or SKILL_KEYS directly
 // in code that may run for either FNV or FO3.
 function getFactionRegistry() {
-  try {
-    return state.gameContext === 'FO3' ? FACTION_REGISTRY_FO3 : FACTION_REGISTRY;
-  } catch (_) {
-    return FACTION_REGISTRY; // state not yet initialized (TDZ) — default to FNV
-  }
+  return _activeDef().factions;
+}
+
+function getSkillKeys() {
+  return _activeDef().skillKeys;
 }
 
 function _buildFactions() {
@@ -115,49 +211,6 @@ let state = {
 window._defaultState = JSON.parse(JSON.stringify(state));
 
 let chatHistory = [];
-
-// ── SKILL KEYS (shared constant used by state, ui, and api) ─────
-// FNV skills
-const SKILL_KEYS = [
-  'barter',
-  'energy_weapons',
-  'explosives',
-  'guns',
-  'lockpick',
-  'medicine',
-  'melee_weapons',
-  'repair',
-  'science',
-  'sneak',
-  'speech',
-  'survival',
-  'unarmed',
-];
-
-// FO3 skills — Big Guns and Small Guns instead of Guns and Survival
-const SKILL_KEYS_FO3 = [
-  'barter',
-  'big_guns',
-  'energy_weapons',
-  'explosives',
-  'lockpick',
-  'medicine',
-  'melee_weapons',
-  'repair',
-  'science',
-  'small_guns',
-  'sneak',
-  'speech',
-  'unarmed',
-];
-
-function getSkillKeys() {
-  try {
-    return state.gameContext === 'FO3' ? SKILL_KEYS_FO3 : SKILL_KEYS;
-  } catch (_) {
-    return SKILL_KEYS; // state not yet initialized (TDZ) — default to FNV
-  }
-}
 
 // ── STATE PERSISTENCE ───────────────────────────────────────────
 // Decoupled into two steps:
@@ -317,6 +370,7 @@ function migrateState(version, s) {
   if (!s.locationHistory) s.locationHistory = []; // v1.6.8
   // v2.0: dual-game context and collectibles tracker
   if (!s.gameContext) s.gameContext = 'FNV';
+  if (!GAME_DEFS[s.gameContext]) s.gameContext = 'FNV'; // defensive: unknown game → FNV
   if (!s.collectibles) s.collectibles = [];
   // C4-fix / C11: campaignMode has 3 states: 'standard' | 'rng' (armed) | 'rng-locked' (activated by wipe).
   if (s.campaignMode !== 'rng' && s.campaignMode !== 'rng-locked') s.campaignMode = 'standard';

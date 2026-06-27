@@ -1639,6 +1639,63 @@ Check ($waitLoadIdx -ge 0 -and $waitSaveIdx -ge 0 -and $waitLoadIdx -lt $waitSav
     '_nativeWait calls loadUI() before saveState() (syncStateFromDom round-trip guard)'
 
 # ===========================================================
+# Suite 43 -- GAME_DEFS Structural Integrity (Phase 5b)
+# Aggregation layer: GAME_DEFS in state.js + _activeDef() helper.
+# Collapses FNV/FO3 ternaries into config lookups; zero behavior change.
+# 10 tests
+# ===========================================================
+Sep "Suite 43 -- GAME_DEFS Structural Integrity (Phase 5b)"
+$stateSrc43 = Read-Src 'js/state.js'
+
+# 43.1  state.js declares const GAME_DEFS = {
+Check ([bool]($stateSrc43 -match 'const GAME_DEFS\s*=\s*\{')) `
+    'state.js declares const GAME_DEFS = { ... }'
+
+# 43.2  window.GAME_DEFS exposed on the global object
+Check ([bool]($stateSrc43 -match 'window\.GAME_DEFS\s*=\s*GAME_DEFS')) `
+    'state.js assigns window.GAME_DEFS = GAME_DEFS (global exposure)'
+
+# 43.3  _activeDef() helper function defined in state.js
+Check ([bool]($stateSrc43 -match 'function _activeDef\s*\(')) `
+    'state.js defines _activeDef() TDZ-safe helper'
+
+# 43.4  GAME_DEFS has FNV and FO3 top-level keys
+Check ([bool]($stateSrc43 -match '\bFNV\s*:\s*\{') -and [bool]($stateSrc43 -match '\bFO3\s*:\s*\{')) `
+    'GAME_DEFS has FNV and FO3 top-level keys'
+
+# 43.5  GAME_DEFS ai sub-object has all three directive fields
+Check ([bool]($stateSrc43 -match 'skillSystemText\s*:') -and `
+       [bool]($stateSrc43 -match 'factionSystemText\s*:') -and `
+       [bool]($stateSrc43 -match 'irreversibleTriggers\s*:')) `
+    'GAME_DEFS ai sub-object has skillSystemText, factionSystemText, irreversibleTriggers'
+
+# 43.6  FNV calendar startYear = 2281
+Check ([bool]($stateSrc43 -match 'startYear\s*:\s*2281')) `
+    'GAME_DEFS.FNV.calendar.startYear is 2281'
+
+# 43.7  FO3 calendar startYear = 2277
+Check ([bool]($stateSrc43 -match 'startYear\s*:\s*2277')) `
+    'GAME_DEFS.FO3.calendar.startYear is 2277'
+
+# 43.8  SKILL_KEYS_FO3 literal includes big_guns and small_guns
+$fo3SkillM43 = [regex]::Match($stateSrc43, "const SKILL_KEYS_FO3\s*=\s*\[([^\]]+)\]")
+$fo3Skills43 = if ($fo3SkillM43.Success) { $fo3SkillM43.Groups[1].Value } else { '' }
+Check ($fo3Skills43.Contains("'big_guns'") -and $fo3Skills43.Contains("'small_guns'")) `
+    "SKILL_KEYS_FO3 literal includes 'big_guns' and 'small_guns'"
+
+# 43.9  getFactionRegistry() body references _activeDef (not the old inline ternary)
+$frBody43 = ''
+try { $frBody43 = Get-FunctionBody $stateSrc43 'getFactionRegistry' } catch {}
+Check ([bool]($frBody43 -match '_activeDef')) `
+    'getFactionRegistry() delegates to _activeDef()'
+
+# 43.10  getSkillKeys() body references _activeDef
+$skBody43 = ''
+try { $skBody43 = Get-FunctionBody $stateSrc43 'getSkillKeys' } catch {}
+Check ([bool]($skBody43 -match '_activeDef')) `
+    'getSkillKeys() delegates to _activeDef()'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

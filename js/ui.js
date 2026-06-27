@@ -2579,16 +2579,11 @@ function ticksToGameTime(t) {
 //   { month, day, year, weekday, hour, minute } — all integers + strings.
 function _resolveGameDateTime(ticks) {
   const MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-  const isFO3 = typeof state !== 'undefined' && state.gameContext === 'FO3';
-
-  // Game-specific epoch
-  const startMonth = isFO3 ? 7 : 9; // Aug=7 (0-indexed), Oct=9
-  const startDay = isFO3 ? 17 : 19;
-  const startYear = isFO3 ? 2277 : 2281;
-
-  // FNV: Oct 19, 2281 = Sunday. FO3: Aug 17, 2277 = Wednesday.
-  // Weekday of epoch (0=Sun … 6=Sat)
-  const epochWeekday = isFO3 ? 3 : 0; // FO3=Wed(3), FNV=Sun(0)
+  const cal = _activeDef().calendar;
+  const startMonth = cal.startMonth;
+  const startDay = cal.startDay;
+  const startYear = cal.startYear;
+  const epochWeekday = cal.epochWeekday;
 
   const t = ticks || 0;
   const dayOffset = Math.floor(t / 240); // whole days elapsed
@@ -2675,10 +2670,10 @@ function gameTimeToTicks(day, hour, min) {
 // Game-context aware: FNV epoch Oct 19, 2281; FO3 epoch Aug 17, 2277.
 function calendarToTicks(month, day, year, hour, min) {
   const MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-  const isFO3 = typeof state !== 'undefined' && state.gameContext === 'FO3';
-  const startMonth = isFO3 ? 7 : 9; // 0-indexed: Aug=7, Oct=9
-  const startDay = isFO3 ? 17 : 19;
-  const startYear = isFO3 ? 2277 : 2281;
+  const cal = _activeDef().calendar;
+  const startMonth = cal.startMonth;
+  const startDay = cal.startDay;
+  const startYear = cal.startYear;
   // Count total days since an arbitrary base year using MONTH_DAYS (no leap years)
   function daysSinceBase(yr, mo0, dy) {
     // mo0 = 0-indexed month
@@ -3013,9 +3008,7 @@ function renderCollectibles() {
     return;
   }
 
-  // Determine collectible type label based on game context
-  const isF03 = typeof state !== 'undefined' && state.gameContext === 'FO3';
-  const typeLabel = isF03 ? 'BOBBLEHEADS' : 'SNOW GLOBES';
+  const typeLabel = _activeDef().collectibleLabel;
 
   // Header line: SNOW GLOBES  [3/7]
   let html = `<div style="font-weight:bold;letter-spacing:1px;margin-bottom:6px;font-size:11px;">${typeLabel}&nbsp;&nbsp;[${acquiredCount}/${total}]</div>`;
@@ -3620,16 +3613,16 @@ function renderKarmaCenter() {
 
 // Switch faction/karma panels based on game context (called from loadUI).
 function _updateContextPanels() {
-  const isFO3 = typeof state !== 'undefined' && state.gameContext === 'FO3';
+  const usesKarmaCenter = _activeDef().usesKarmaCenter;
   const factionPanel = document.getElementById('factionPanel');
   const karmaPanel = document.getElementById('karmaPanel');
   if (factionPanel) {
     // Let the tab system control visibility via tab-visible; just toggle display
-    factionPanel.style.display = isFO3 ? 'none' : '';
+    factionPanel.style.display = usesKarmaCenter ? 'none' : '';
   }
   if (karmaPanel) {
     // Only show if on stat tab and FO3 mode; otherwise hide
-    karmaPanel.style.display = isFO3 ? '' : 'none';
+    karmaPanel.style.display = usesKarmaCenter ? '' : 'none';
   }
 }
 
