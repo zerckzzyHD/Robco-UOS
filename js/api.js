@@ -200,9 +200,13 @@ async function fetchAuthorizedModels(silent = false) {
 }
 
 function saveApiKeySilent() {
-  localStorage.setItem('robco_gemini_key', document.getElementById('apiKeyInput').value.trim());
+  const key = document.getElementById('apiKeyInput').value.trim();
+  localStorage.setItem('robco_gemini_key', key);
   let model = document.getElementById('apiModelInput').value;
   if (model && !model.includes('Awaiting')) localStorage.setItem('robco_gemini_model', model);
+  if (typeof window.saveGeminiKeyToCloud === 'function') {
+    window.saveGeminiKeyToCloud(key, localStorage.getItem('robco_gemini_model') || '');
+  }
 }
 
 // Type-coerces and validates a robco_v8 container before writing to localStorage.

@@ -69,6 +69,7 @@ onAuthStateChanged(auth, user => {
   _currentUser = user || null;
   if (typeof window.renderAccount === 'function') window.renderAccount();
   if (typeof window.renderCloudSavePicker === 'function') window.renderCloudSavePicker();
+  if (user && !user.isAnonymous) loadGeminiKeyFromCloud();
 });
 
 // Boot: drain any in-flight redirect first, then establish anonymous baseline.
@@ -510,5 +511,76 @@ window.deleteCloudSave = async function (docId) {
   } catch (e) {
     console.warn('deleteCloudSave failed (non-fatal):', e);
     alert('>> DELETE FAILED — NETWORK ERROR <<');
+  }
+};
+
+// ── Gemini Key Sync (Phase 5c-iv) ────────────────────────────────────
+// Writes key+model to users/{uid}/secrets/gemini — only for non-anonymous users
+// with the sync toggle ON (robco_gemini_key_sync === 'true'). NEVER writes for
+// anonymous users or when the toggle is off. Non-fatal on network failure.
+async function loadGeminiKeyFromCloud() {
+  if (!_currentUser || _currentUser.isAnonymous) return;
+  if (localStorage.getItem('robco_gemini_key_sync') !== 'true') return;
+  if (!_currentUid) return;
+  const localKey = localStorage.getItem('robco_gemini_key');
+  if (localKey) return; // local key already present — no need to pull
+  try {
+    const docSnap = await getDoc(doc(db, 'users', _currentUid, 'secrets', 'gemini'));
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      if (data.key) {
+        localStorage.setItem('robco_gemini_key', data.key);
+        const input = document.getElementById('apiKeyInput');
+        if (input) input.value = data.key;
+        if (data.model) {
+          localStorage.setItem('robco_gemini_model', data.model);
+          const modelInput = document.getElementById('apiModelInput');
+          if (modelInput)
+            modelInput.innerHTML = `<option value="${data.model}">${data.model} (Secured)</option>`;
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('loadGeminiKeyFromCloud failed (non-fatal):', e);
+  }
+}
+
+window.saveGeminiKeyToCloud = async function (key, model) {
+  if (!_currentUser || _currentUser.isAnonymous) return; // never sync for anonymous users
+  if (localStorage.getItem('robco_gemini_key_sync') !== 'true') return; // only sync when toggle ON
+  if (!_currentUid) return;
+  try {
+    await setDoc(doc(db, 'users', _currentUid, 'secrets', 'gemini'), {
+      key,
+      model: model || '',
+      updatedAt: Date.now(),
+    });
+  } catch (e) {
+    console.warn('saveGeminiKeyToCloud failed (non-fatal):', e);
+  }
+};
+
+// Sets the geminiKeySync toggle — persists to localStorage and, when signed in
+// with Google, also to users/{uid}/settings/preferences in Firestore so the
+// setting follows the user across devices. Turning sync ON immediately pushes
+// the current local key (if any); turning it OFF stops future syncs (key
+// remains in Firestore until the user explicitly deletes their account data).
+window.setGeminiKeySync = async function (checked) {
+  localStorage.setItem('robco_gemini_key_sync', checked ? 'true' : 'false');
+  if (_currentUser && !_currentUser.isAnonymous && _currentUid) {
+    try {
+      await setDoc(
+        doc(db, 'users', _currentUid, 'settings', 'preferences'),
+        { geminiKeySync: checked },
+        { merge: true }
+      );
+    } catch (e) {
+      console.warn('setGeminiKeySync Firestore write failed (non-fatal):', e);
+    }
+  }
+  if (checked) {
+    const key = localStorage.getItem('robco_gemini_key');
+    const model = localStorage.getItem('robco_gemini_model') || '';
+    if (key) window.saveGeminiKeyToCloud(key, model);
   }
 };

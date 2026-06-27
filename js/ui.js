@@ -460,6 +460,10 @@ window.onload = function () {
   if (localStorage.getItem('robco_gemini_key')) {
     document.getElementById('apiKeyInput').value = localStorage.getItem('robco_gemini_key');
   }
+  if (localStorage.getItem('robco_gemini_key_sync') === 'true') {
+    const syncEl = document.getElementById('geminiKeySyncToggle');
+    if (syncEl) syncEl.checked = true;
+  }
   if (localStorage.getItem('robco_gemini_model')) {
     let savedModel = localStorage.getItem('robco_gemini_model');
     document.getElementById('apiModelInput').innerHTML =
@@ -3125,27 +3129,22 @@ async function renderCloudSavePicker() {
         const d = s.data;
         const docId = s.id;
         const label = escapeHtml(d.label || (docId === 'main' ? 'Quick Save' : 'Untitled'));
-        const ctx = d.gameContext ? '[' + escapeHtml(d.gameContext) + '] ' : '';
-        const ts = d.updatedAt || d.savedAt || 0;
-        const dateStr = ts ? escapeHtml(new Date(ts).toLocaleDateString()) : '';
         return (
           '<div style="display:flex;align-items:center;gap:3px;margin-bottom:3px;">' +
           '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;">' +
-          '<span style="opacity:0.5;">' +
-          ctx +
-          '</span>' +
           label +
-          (dateStr ? '<span style="opacity:0.4;margin-left:3px;">' + dateStr + '</span>' : '') +
           '</span>' +
+          '<span style="flex-shrink:0;display:flex;gap:2px;">' +
           '<button class="btn-sm" onclick="window.loadCloudSave(\'' +
           docId +
           '\')">LOAD</button>' +
-          '<button class="btn-sm" style="margin-left:2px;" onclick="(function(){var l=prompt(\'Rename:\');if(l)window.renameCloudSave(\'' +
+          '<button class="btn-sm" onclick="(function(){var l=prompt(\'Rename:\');if(l)window.renameCloudSave(\'' +
           docId +
-          '\',l);})()">REN</button>' +
-          '<button class="btn-sm delete-btn" style="margin-left:2px;" onclick="window.deleteCloudSave(\'' +
+          '\',l);})()">NAME</button>' +
+          '<button class="btn-sm delete-btn" onclick="window.deleteCloudSave(\'' +
           docId +
           '\')">DEL</button>' +
+          '</span>' +
           '</div>'
         );
       })

@@ -2024,6 +2024,78 @@ Check ([bool]($htmlSrc -match 'id="cloudSavePickerBody"')) `
     'index.html has #cloudSavePickerBody element (cloud save picker mount point in ACCOUNT panel)'
 
 # ===========================================================
+# Suite 47 -- Gemini Key Sync + AI Studio Link (Phase 5c-iv)
+# Security: key never leaves device for anon or sync-OFF.
+# Picker: NAME button, date rendered once.
+# 10 tests
+# ===========================================================
+Sep "Suite 47 -- Phase 5c-iv: Gemini Key Sync + AI Studio Link"
+
+# 47.1  cloud.js defines window.saveGeminiKeyToCloud
+Check ([bool]($cloudSrc -match 'window\.saveGeminiKeyToCloud\s*=')) `
+    'cloud.js defines window.saveGeminiKeyToCloud (key sync write function)'
+
+# 47.2  cloud.js defines loadGeminiKeyFromCloud (module-local or window)
+Check (([bool]($cloudSrc -match 'function loadGeminiKeyFromCloud\s*\(')) -or ([bool]($cloudSrc -match 'window\.loadGeminiKeyFromCloud\s*='))) `
+    'cloud.js defines loadGeminiKeyFromCloud (key sync read function for boot restore)'
+
+# 47.3  saveGeminiKeyToCloud body checks isAnonymous AND robco_gemini_key_sync (double guard)
+$saveGeminiIdx47 = $cloudSrc.IndexOf('window.saveGeminiKeyToCloud')
+$saveGeminiBody47 = ''
+if ($saveGeminiIdx47 -ge 0) {
+    $sg47Start = $cloudSrc.IndexOf('{', $saveGeminiIdx47); $sg47Dep = 0; $sg47I = $sg47Start
+    while ($sg47I -lt $cloudSrc.Length) {
+        $ch = $cloudSrc[$sg47I]
+        if ($ch -eq '{') { $sg47Dep++ }
+        elseif ($ch -eq '}') { $sg47Dep--; if ($sg47Dep -eq 0) { $saveGeminiBody47 = $cloudSrc.Substring($sg47Start, $sg47I - $sg47Start + 1); break } }
+        $sg47I++
+    }
+}
+Check (([bool]($saveGeminiBody47 -match 'isAnonymous')) -and ([bool]($saveGeminiBody47 -match 'robco_gemini_key_sync'))) `
+    'saveGeminiKeyToCloud guards on isAnonymous AND robco_gemini_key_sync (key never synced for anon or sync-off)'
+
+# 47.4  saveGeminiKeyToCloud body writes to secrets/ path
+Check ([bool]($saveGeminiBody47 -match 'secrets')) `
+    'saveGeminiKeyToCloud writes to secrets/ subcollection (Firestore path for key storage)'
+
+# 47.5  window.setGeminiKeySync defined + references geminiKeySync
+$setSyncIdx47 = $cloudSrc.IndexOf('window.setGeminiKeySync')
+$setSyncBody47 = ''
+if ($setSyncIdx47 -ge 0) {
+    $ss47Start = $cloudSrc.IndexOf('{', $setSyncIdx47); $ss47Dep = 0; $ss47I = $ss47Start
+    while ($ss47I -lt $cloudSrc.Length) {
+        $ch = $cloudSrc[$ss47I]
+        if ($ch -eq '{') { $ss47Dep++ }
+        elseif ($ch -eq '}') { $ss47Dep--; if ($ss47Dep -eq 0) { $setSyncBody47 = $cloudSrc.Substring($ss47Start, $ss47I - $ss47Start + 1); break } }
+        $ss47I++
+    }
+}
+Check (($setSyncBody47.Length -gt 50) -and ([bool]($setSyncBody47 -match 'geminiKeySync'))) `
+    'window.setGeminiKeySync defined and references geminiKeySync (toggle persists to Firestore settings)'
+
+# 47.6  robco_gemini_key_sync used as local toggle mirror in cloud.js
+Check ([bool]($cloudSrc -match 'robco_gemini_key_sync')) `
+    "cloud.js uses 'robco_gemini_key_sync' as local toggle mirror (localStorage key for sync preference)"
+
+# 47.7  index.html has #geminiKeySyncToggle checkbox
+Check ([bool]($htmlSrc -match 'id="geminiKeySyncToggle"')) `
+    'index.html has #geminiKeySyncToggle checkbox (opt-in sync toggle in SECURITY panel)'
+
+# 47.8  index.html has AI Studio link with correct href and rel="noopener"
+Check (([bool]($htmlSrc -match 'aistudio\.google\.com/app/apikey')) -and ([bool]($htmlSrc -match 'rel="noopener'))) `
+    'index.html has AI Studio link (aistudio.google.com/app/apikey) with rel="noopener" (security)'
+
+# 47.9  renderCloudSavePicker shows NAME button (not REN)
+$pickerBody47 = ''
+try { $pickerBody47 = Get-FunctionBody $uiSrc 'renderCloudSavePicker' } catch {}
+Check (([bool]($pickerBody47 -match '>NAME<')) -and -not ([bool]($pickerBody47 -match '>REN<'))) `
+    'renderCloudSavePicker shows NAME button (not REN) -- Part B rename fix'
+
+# 47.10 renderCloudSavePicker does not use dateStr (double-date regression guard)
+Check (-not ([bool]($pickerBody47 -match '\bdateStr\b'))) `
+    'renderCloudSavePicker does not use dateStr (double-date regression guard -- date shown once via label)'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

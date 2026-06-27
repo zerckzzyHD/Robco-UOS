@@ -1,4 +1,17 @@
-## [v2.5.0] — Unreleased<!-- Tests: 519/519 | Cache: robco-terminal-v2.0.1-r55 -->
+## [v2.5.0] — Unreleased<!-- Tests: 529/529 | Cache: robco-terminal-v2.0.1-r56 -->
+
+### Added
+
+- Added an optional Gemini key sync toggle to the Security & Configuration panel. When signed in with Google, turning it on saves your API key to your account so it follows you across devices — no need to re-paste it when you open the app on a phone, tablet, or another browser. The toggle is off by default and the key never leaves your device when it is off or when you are not signed in. A "> GET A FREE GEMINI KEY" link now appears below the key field, pointing directly to Google AI Studio.
+
+### Fixed
+
+- Fixed the cloud save list showing the date twice and the save label being cut off behind the action buttons. The date was being added both inside the label (when saves are first synced) and again as a separate overlay, producing entries like "Local (FNV) — 6/26/2026 6/26/2026". The label now shows cleanly with a single date, truncating with an ellipsis if it is too long, and the buttons stay on the right without overlapping.
+- Renamed the "REN" button in the cloud save list to "NAME" for clarity.
+
+### Under the Hood
+
+- Added 10 automated guard tests (Suite 47, 529 total across 51 suites) verifying that the Gemini key is never synced to Firestore for anonymous users or when the sync toggle is off, the toggle persists correctly, the AI Studio link is present with the correct security attributes, and the picker date-duplication regression cannot silently return.
 
 ---
 

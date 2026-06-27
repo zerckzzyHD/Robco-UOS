@@ -1283,6 +1283,41 @@
               />
             </div>
 
+            <div style="margin: 3px 0 4px; font-size: 11px">
+              <a
+                href="https://aistudio.google.com/app/apikey"
+                target="_blank"
+                rel="noopener noreferrer"
+                style="color: var(--robco-alert); opacity: 0.75; text-decoration: none"
+                >&gt; GET A FREE GEMINI KEY</a
+              >
+            </div>
+
+            <div style="display: flex; align-items: flex-start; gap: 6px; margin-bottom: 6px">
+              <input
+                type="checkbox"
+                id="geminiKeySyncToggle"
+                onchange="if (window.setGeminiKeySync) window.setGeminiKeySync(this.checked);"
+                style="
+                  margin-top: 2px;
+                  accent-color: var(--robco-alert);
+                  cursor: pointer;
+                  flex-shrink: 0;
+                "
+              />
+              <label
+                for="geminiKeySyncToggle"
+                style="
+                  color: var(--robco-alert);
+                  font-size: 11px;
+                  cursor: pointer;
+                  line-height: 1.3;
+                  opacity: 0.85;
+                "
+                >Sync my Gemini key to my account (follows me across devices)</label
+              >
+            </div>
+
             <button id="btnFetchModels" class="alert-btn" onclick="fetchAuthorizedModels()">
               > 1. VALIDATE KEY & FETCH ENGINES
             </button>

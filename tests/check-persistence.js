@@ -3296,6 +3296,136 @@ header('Phase 5c-iii: Cloud Save Picker + Local Migration');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 47 — Gemini Key Sync + AI Studio Link (Phase 5c-iv)
+//  Security: key never leaves device for anon or sync-OFF.
+//  Picker: NAME button, date rendered once.
+//  10 tests
+// ══════════════════════════════════════════════════════════════
+header('Phase 5c-iv: Gemini Key Sync + AI Studio Link');
+
+{
+  // 47.1  cloud.js defines window.saveGeminiKeyToCloud
+  assert(
+    /window\.saveGeminiKeyToCloud\s*=/.test(cloudSource),
+    'cloud.js defines window.saveGeminiKeyToCloud (key sync write function)'
+  );
+
+  // 47.2  cloud.js defines window.loadGeminiKeyFromCloud (via module-local function)
+  assert(
+    /function loadGeminiKeyFromCloud\s*\(/.test(cloudSource) ||
+      /window\.loadGeminiKeyFromCloud\s*=/.test(cloudSource),
+    'cloud.js defines loadGeminiKeyFromCloud (key sync read function for boot restore)'
+  );
+
+  // 47.3  saveGeminiKeyToCloud body checks isAnonymous AND robco_gemini_key_sync
+  //        (double guard: secrets never written for anon users or when toggle is OFF)
+  {
+    const saveGeminiBody = (() => {
+      const idx = cloudSource.indexOf('window.saveGeminiKeyToCloud');
+      if (idx === -1) return '';
+      let i = cloudSource.indexOf('{', idx);
+      let depth = 0;
+      const start = i;
+      while (i < cloudSource.length) {
+        if (cloudSource[i] === '{') depth++;
+        else if (cloudSource[i] === '}' && --depth === 0) return cloudSource.slice(start, i + 1);
+        i++;
+      }
+      return '';
+    })();
+    assert(
+      /isAnonymous/.test(saveGeminiBody) && /robco_gemini_key_sync/.test(saveGeminiBody),
+      'saveGeminiKeyToCloud guards on isAnonymous AND robco_gemini_key_sync (key never synced for anon or sync-off)'
+    );
+  }
+
+  // 47.4  saveGeminiKeyToCloud body writes to secrets/ subcollection path
+  {
+    const saveGeminiBody = (() => {
+      const idx = cloudSource.indexOf('window.saveGeminiKeyToCloud');
+      if (idx === -1) return '';
+      let i = cloudSource.indexOf('{', idx);
+      let depth = 0;
+      const start = i;
+      while (i < cloudSource.length) {
+        if (cloudSource[i] === '{') depth++;
+        else if (cloudSource[i] === '}' && --depth === 0) return cloudSource.slice(start, i + 1);
+        i++;
+      }
+      return '';
+    })();
+    assert(
+      /secrets/.test(saveGeminiBody),
+      'saveGeminiKeyToCloud writes to secrets/ subcollection (Firestore path for key storage)'
+    );
+  }
+
+  // 47.5  window.setGeminiKeySync defined in cloud.js + references geminiKeySync for Firestore write
+  {
+    const setSyncBody = (() => {
+      const idx = cloudSource.indexOf('window.setGeminiKeySync');
+      if (idx === -1) return '';
+      let i = cloudSource.indexOf('{', idx);
+      let depth = 0;
+      const start = i;
+      while (i < cloudSource.length) {
+        if (cloudSource[i] === '{') depth++;
+        else if (cloudSource[i] === '}' && --depth === 0) return cloudSource.slice(start, i + 1);
+        i++;
+      }
+      return '';
+    })();
+    assert(
+      setSyncBody.length > 50 && /geminiKeySync/.test(setSyncBody),
+      'window.setGeminiKeySync defined and references geminiKeySync (toggle persists to Firestore settings)'
+    );
+  }
+
+  // 47.6  robco_gemini_key_sync used as the local toggle mirror in cloud.js
+  assert(
+    /robco_gemini_key_sync/.test(cloudSource),
+    "cloud.js uses 'robco_gemini_key_sync' as the local toggle mirror (localStorage key for sync preference)"
+  );
+
+  // 47.7  index.html has #geminiKeySyncToggle checkbox
+  assert(
+    /id="geminiKeySyncToggle"/.test(htmlSource),
+    'index.html has #geminiKeySyncToggle checkbox (opt-in sync toggle in SECURITY panel)'
+  );
+
+  // 47.8  index.html has AI Studio link with correct href and rel="noopener"
+  assert(
+    /aistudio\.google\.com\/app\/apikey/.test(htmlSource) && /rel="noopener/.test(htmlSource),
+    'index.html has AI Studio link (aistudio.google.com/app/apikey) with rel="noopener" (security)'
+  );
+
+  // 47.9  renderCloudSavePicker shows "NAME" button (not "REN")
+  {
+    let pickerBody = '';
+    try {
+      pickerBody = extractFunctionBody(uiSource, 'renderCloudSavePicker');
+    } catch (_) {}
+    assert(
+      />NAME</.test(pickerBody) && !/>REN</.test(pickerBody),
+      'renderCloudSavePicker shows NAME button (not REN) — Part B rename fix'
+    );
+  }
+
+  // 47.10 renderCloudSavePicker does not append a separate dateStr after the label
+  //        (double-date regression guard: label already contains date from syncLocalSavesToCloud)
+  {
+    let pickerBody = '';
+    try {
+      pickerBody = extractFunctionBody(uiSource, 'renderCloudSavePicker');
+    } catch (_) {}
+    assert(
+      !/\bdateStr\b/.test(pickerBody),
+      'renderCloudSavePicker does not use dateStr (double-date regression guard — date shown once via label)'
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 console.log('\n══════════════════════════════════════════════════════════════\n');
