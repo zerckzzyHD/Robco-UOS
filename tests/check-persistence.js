@@ -6599,8 +6599,9 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  sub-panel persistence via robco_panel_state, fail-safe,
 //  default-collapsed, Lincoln compact rows, faction lone-card CSS.
 //  no-dup-header guard, Lincoln data-lname onclick safety,
-//  setLincolnDisposition re-render guard, Lincoln no-inline-flex guard.
-//  22 tests
+//  setLincolnDisposition re-render guard, Lincoln no-inline-flex guard,
+//  Traits no-inline-flex guard (compact rows matching collectibles density).
+//  23 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 71 — Phase 6 UI Consistency');
@@ -6788,6 +6789,18 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     assert(
       !/min-height:28px;display:inline-flex/.test(lincolnBody71c),
       'renderLincolnMemorabilia() toggle spans do not use min-height:28px;display:inline-flex — compact rows match bobblehead density'
+    );
+  }
+
+  // 71.23  Traits toggle spans do not use min-height:28px;display:inline-flex (compact rows)
+  {
+    let traitsBody71 = '';
+    try {
+      traitsBody71 = extractFunctionBody(uiRenderSrc71, 'renderTraits');
+    } catch (_) {}
+    assert(
+      !/min-height:28px;display:inline-flex/.test(traitsBody71),
+      'renderTraits() toggle spans do not use min-height:28px;display:inline-flex — compact rows match collectibles/bobblehead density'
     );
   }
 }

@@ -1,4 +1,4 @@
-## [Unreleased]<!-- Tests: 880/880 | Cache: robco-terminal-v2.5.0-r18 -->
+## [Unreleased]<!-- Tests: 881/881 | Cache: robco-terminal-v2.5.0-r19 -->
 
 ### Added
 
@@ -40,6 +40,7 @@
 - Clicking a missing Lincoln memorabilia item no longer shows a "SYSTEM FAULT" error in the terminal. Items with apostrophes in their names (Lincoln's Repeater, Lincoln's Hat, Lincoln's Voice, Lincoln's Diary) were causing a JavaScript error when clicked because the name was embedded directly in the click handler. Names are now passed safely via a data attribute.
 - The Lincoln Memorabilia buyer tally (Hannibal, Leroy, Washington, Undecided counts) now updates immediately when you assign or change who you gave an item to. Previously it only refreshed when something else triggered a re-render.
 - Lincoln Memorabilia rows are now as compact as the Bobbleheads rows — tight single-line entries with no extra height from the previous inline-flex layout.
+- Traits rows now match the same tight density as the Bobbleheads and Snow Globes rows — the extra vertical gap caused by the inline-flex layout on each row's status tag has been removed.
 
 ---
 

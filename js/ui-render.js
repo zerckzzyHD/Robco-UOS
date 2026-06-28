@@ -882,13 +882,13 @@ function renderTraits() {
       d.dlc === 'owb' ? ' <span style="font-size:9px;opacity:0.5;">[OWB]</span>' : '';
     const effectSpan = `<span style="font-size:10px;opacity:0.6;"> &mdash; ${escapeHtml(d.effect)}</span>`;
     if (isSel) {
-      html += `<div style="font-size:11px;margin-bottom:2px;line-height:1.4;">`;
-      html += `<span style="color:var(--robco-green);cursor:pointer;min-height:28px;display:inline-flex;align-items:center;margin-right:4px;" onclick="toggleTrait('${safeName}')" title="Deselect">[SEL]</span>`;
+      html += `<div style="font-size:11px;letter-spacing:0.5px;margin-bottom:2px;">`;
+      html += `<span style="color:var(--robco-green);cursor:pointer;margin-right:4px;" onclick="toggleTrait('${safeName}')" title="Deselect">[SEL]</span>`;
       html += `<strong>${escapeHtml(d.name.toUpperCase())}${dlcBadge}</strong>${effectSpan}`;
       html += `</div>`;
     } else {
-      html += `<div style="font-size:11px;margin-bottom:2px;opacity:0.7;line-height:1.4;">`;
-      html += `<span style="opacity:0.5;cursor:pointer;min-height:28px;display:inline-flex;align-items:center;margin-right:4px;" onclick="toggleTrait('${safeName}')" title="Select">[---]</span>`;
+      html += `<div style="font-size:11px;letter-spacing:0.5px;margin-bottom:2px;opacity:0.7;">`;
+      html += `<span style="opacity:0.5;cursor:pointer;margin-right:4px;" onclick="toggleTrait('${safeName}')" title="Select">[---]</span>`;
       html += `${escapeHtml(d.name.toUpperCase())}${dlcBadge}${effectSpan}`;
       html += `</div>`;
     }

@@ -3990,8 +3990,9 @@ Check ([bool]($seedBody70 -match 'ticks')) `
 # sub-panel persistence + fail-safe + default-collapsed,
 # Lincoln compact rows, faction lone-card CSS,
 # no-dup-header guard, Lincoln data-lname onclick safety,
-# setLincolnDisposition re-render guard, Lincoln no-inline-flex guard.
-# 22 tests
+# setLincolnDisposition re-render guard, Lincoln no-inline-flex guard,
+# Traits no-inline-flex guard (compact rows matching collectibles density).
+# 23 tests
 # ===========================================================
 Sep "Suite 71 -- Phase 6 UI Consistency"
 $htmlSrc71     = Read-Src 'index.html'
@@ -4101,6 +4102,13 @@ Check ($dispBody71 -match 'renderLincolnMemorabilia\s*\(\s*\)') `
 # 71.22  Lincoln toggle spans do not use min-height:28px;display:inline-flex (compact rows)
 Check (-not ($lincolnBody71b -match 'min-height:28px;display:inline-flex')) `
     'renderLincolnMemorabilia() toggle spans do not use min-height:28px;display:inline-flex -- compact rows match bobblehead density'
+
+# 71.23  Traits toggle spans do not use min-height:28px;display:inline-flex (compact rows)
+$traitsBody71 = ''
+$traitsMatch71 = [regex]::Match($uiRenderSrc71, '(?s)function renderTraits\s*\([^)]*\)\s*\{(.*?)\n\}')
+if ($traitsMatch71.Success) { $traitsBody71 = $traitsMatch71.Groups[1].Value }
+Check (-not ($traitsBody71 -match 'min-height:28px;display:inline-flex')) `
+    'renderTraits() toggle spans do not use min-height:28px;display:inline-flex -- compact rows match collectibles/bobblehead density'
 
 # ===========================================================
 # Suite 72 -- Fix A: location datalist per-game bleed + Fix B: update-modal whitespace
