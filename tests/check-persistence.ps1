@@ -1125,10 +1125,10 @@ Check $removed32ok 'Removed legacy commands (VIEW D/M, DEV 1/2/3, INV, STATS, RE
 $removed32api = (-not ($apiSrc32 -match 'VIEW.*D.*M')) -and (-not ($apiSrc32 -match 'DEV 1/2/3')) -and (-not ($apiSrc32 -match '\[INV\]\s*:\s*Inventory')) -and (-not ($apiSrc32 -match '\[STATS\]\s*:')) -and (-not ($apiSrc32 -match '\[REP\]\s*:\s*Dual'))
 Check $removed32api 'Removed legacy commands absent from api.js canonical command list'
 
-# 32.6 index.html skill matrix has >= 13 class="skill-row" elements
-$htmlSrc32 = Read-Src 'index.html'
-$skillRowCount32 = ([regex]::Matches($htmlSrc32, 'class="skill-row"')).Count
-Check ($skillRowCount32 -ge 13) "index.html skill matrix has >= 13 .skill-row elements (found $skillRowCount32)"
+# 32.6 renderSkills() in ui-core.js generates .skill-row elements dynamically
+$uiCoreSrc32 = Read-Src 'js/ui-core.js'
+Check ([bool]($uiCoreSrc32 -match 'class="skill-row"')) `
+    'ui-core.js: renderSkills() generates .skill-row elements dynamically (static index.html rows replaced)'
 
 # 32.7 _applyChemHighlights() uses .skill-row for both clear and highlight
 $chemBody32 = ''
@@ -4156,6 +4156,72 @@ Check ([bool]($cssSrc72 -match '(?s)#updateModalMsg[\s\S]{0,200}white-space\s*:\
 # 72.8  #updateModalMsg content starts immediately after > with no leading whitespace
 Check ([bool]($htmlSrc72 -match 'id="updateModalMsg">[A-Z]')) `
     'index.html: #updateModalMsg content starts immediately after > with no leading whitespace or newline'
+
+# ===========================================================
+# Suite 73 -- Skills panel game-aware render (FNV/FO3 bleed fix)
+# 12 tests
+# ===========================================================
+$htmlSrc73   = Get-Content "$ROOT\index.html" -Raw
+$uiCoreSrc73 = Get-Content "$ROOT\js\ui-core.js" -Raw
+$stateSrc73  = Get-Content "$ROOT\js\state.js" -Raw
+
+Sep "Suite 73 -- Skills panel game-aware render (FNV/FO3 bleed fix)"
+
+# 73.1  #skillsGrid container exists in index.html
+Check ([bool]($htmlSrc73 -match 'id="skillsGrid"')) `
+    'index.html: #skillsGrid container exists (empty div populated dynamically by renderSkills)'
+
+# 73.2  #skillsGrid has no static .skill-row children
+Check (-not ($htmlSrc73 -match '(?s)id="skillsGrid"[^>]*>[\s\S]*?<div[^>]*class="skill-row"')) `
+    'index.html: #skillsGrid has no static .skill-row children -- grid is empty in HTML, populated dynamically per game'
+
+# 73.3  No hardcoded id="sk_guns" (FNV-only skill bleed regression guard)
+Check (-not ($htmlSrc73 -match 'id="sk_guns"')) `
+    'index.html: no hardcoded id="sk_guns" -- FNV-only Guns skill must not appear as static HTML (bleed regression guard)'
+
+# 73.4  No hardcoded id="sk_survival" (FNV-only skill bleed regression guard)
+Check (-not ($htmlSrc73 -match 'id="sk_survival"')) `
+    'index.html: no hardcoded id="sk_survival" -- FNV-only Survival skill must not appear as static HTML (bleed regression guard)'
+
+# 73.5  renderSkills() is defined in ui-core.js
+Check ([bool]($uiCoreSrc73 -match 'function renderSkills\s*\(\s*\)')) `
+    'ui-core.js: renderSkills() is defined'
+
+# 73.6  renderSkills() body calls getSkillKeys() to iterate game-aware keys
+$renderSkillsBody73 = ''
+$renderSkillsMatch73 = [regex]::Match($uiCoreSrc73, '(?s)function renderSkills\s*\([^)]*\)\s*\{(.*?)\n\}')
+if ($renderSkillsMatch73.Success) { $renderSkillsBody73 = $renderSkillsMatch73.Groups[1].Value }
+Check ($renderSkillsBody73 -match 'getSkillKeys\s*\(\s*\)') `
+    'renderSkills() calls getSkillKeys() to build per-game skill rows'
+
+# 73.7  renderSkills() uses SKILL_LABELS for human-readable display names
+Check ($renderSkillsBody73 -match 'SKILL_LABELS') `
+    'renderSkills() uses SKILL_LABELS to look up human-readable skill names'
+
+# 73.8  renderSkills() escapes label text with escapeHtml (XSS safety)
+Check ($renderSkillsBody73 -match 'escapeHtml') `
+    'renderSkills() runs label text through escapeHtml() (XSS safety on skill names)'
+
+# 73.9  renderSkills() is called from loadUI()
+Check ([bool]($uiCoreSrc73 -match '(?s)function loadUI[\s\S]{0,200}renderSkills\s*\(\s*\)')) `
+    'ui-core.js: renderSkills() is called at the top of loadUI() so rows exist before state values are synced into them'
+
+# 73.10  SKILL_LABELS is defined and covers all 15 game skill keys
+$allSkills73 = @('barter','big_guns','energy_weapons','explosives','guns','lockpick','medicine','melee_weapons','repair','science','small_guns','sneak','speech','survival','unarmed')
+$missingSkills73 = @($allSkills73 | Where-Object { -not ($uiCoreSrc73 -match "$_\s*:") })
+Check ($uiCoreSrc73 -match 'const SKILL_LABELS\s*=' -and $missingSkills73.Count -eq 0) `
+    'ui-core.js: SKILL_LABELS covers all 15 possible skill keys (barter, big_guns, small_guns, guns, survival, and the 11 shared keys)'
+
+# 73.11  SKILL_LABELS maps game-specific keys to correct display names
+Check ([bool]($uiCoreSrc73 -match "big_guns\s*:\s*'Big Guns'") -and `
+       [bool]($uiCoreSrc73 -match "small_guns\s*:\s*'Small Guns'") -and `
+       [bool]($uiCoreSrc73 -match "\bguns\s*:\s*'Guns'") -and `
+       [bool]($uiCoreSrc73 -match "survival\s*:\s*'Survival'")) `
+    "SKILL_LABELS maps game-specific keys: big_guns->'Big Guns', small_guns->'Small Guns', guns->'Guns', survival->'Survival'"
+
+# 73.12  syncStateFromDom() still iterates getSkillKeys() -- data layer regression guard
+Check ([bool]($stateSrc73 -match 'getSkillKeys\s*\(\s*\)')) `
+    'state.js: syncStateFromDom() still iterates getSkillKeys() -- data layer unchanged by this render refactor'
 
 # ===========================================================
 # Results

@@ -1,4 +1,4 @@
-## [Unreleased]<!-- Tests: 881/881 | Cache: robco-terminal-v2.5.0-r19 -->
+## [Unreleased]<!-- Tests: 893/893 | Cache: robco-terminal-v2.5.0-r20 -->
 
 ### Added
 
@@ -31,6 +31,7 @@
 
 - The SPECIAL stat fields (S P E C I A L) no longer fight you while typing. Previously, clearing a field to retype a value would immediately snap it back to 1 on every keystroke. Now the field is free to edit and only validates when you leave it (blur): blank or invalid reverts to your last saved value, out-of-range numbers clamp to the nearest valid value (1 or 10), and derived stats (skill points, VATS, etc.) update immediately after you commit. Values above 10 are capped as you type and can never be saved above 10 regardless of how the save is triggered.
 - The in-app patch notes viewer now shows the current release notes instead of the empty placeholder section. The viewer skips any unreleased placeholder block and goes straight to the first dated version; HTML comments in the version header no longer appear in the displayed text.
+- The Skills panel now shows the correct skills for the active game. Fallout 3 campaigns now display Big Guns and Small Guns (and hide Guns and Survival, which are New Vegas skills); New Vegas campaigns are unchanged. Skill values from existing saves load as before — only the labels and inputs that appear on screen have changed.
 - The location autocomplete in the Stats panel now shows places from the active game. Previously the list was hard-coded to 16 New Vegas locations and always showed up in Fallout 3 campaigns, making it useless and misleading. The list is now built dynamically from the active registry so FO3 shows Fallout 3 locations and FNV shows New Vegas locations.
 - The update prompt's message text now reads flush-left with no stray indentation. The message was split across multiple source lines with leading whitespace, which was rendering as visible indentation and a ragged break mid-sentence; it is now a single clean line that wraps naturally.
 - Selecting a third trait is now blocked with a clear message ("Maximum 2 traits — deselect one first") instead of silently allowing it. Deselecting always works regardless of count.

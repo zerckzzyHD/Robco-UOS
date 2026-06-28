@@ -1920,11 +1920,13 @@ assert(
   'Removed commands absent from api.js canonical command list'
 );
 
-// 32.6 index.html skill matrix rows use class="skill-row" (≥13 rows)
+// 32.6 renderSkills() in ui-core.js generates .skill-row elements dynamically
 {
-  const htmlSource32 = readFile('index.html');
-  const count = (htmlSource32.match(/class="skill-row"/g) || []).length;
-  assert(count >= 13, `index.html skill matrix has ≥13 .skill-row elements (found ${count})`);
+  const uiCoreSrc32 = readFile('js/ui-core.js');
+  assert(
+    /class="skill-row"/.test(uiCoreSrc32),
+    'ui-core.js: renderSkills() generates .skill-row elements dynamically (static index.html rows replaced)'
+  );
 }
 
 // 32.7 _applyChemHighlights() uses .skill-row for both clear and highlight selectors
@@ -6867,6 +6869,114 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   assert(
     /id="updateModalMsg">[A-Z]/.test(htmlSrc72),
     'index.html: #updateModalMsg content starts immediately after > with no leading whitespace or newline'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 73 — Skills panel game-aware render (FNV/FO3 bleed fix)
+//  12 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 73 — Skills panel game-aware render (FNV/FO3 bleed fix)');
+  const htmlSrc73 = readFile('index.html');
+  const uiCoreSrc73 = readFile('js/ui-core.js');
+  const stateSrc73 = readFile('js/state.js');
+
+  // 73.1  #skillsGrid container exists in index.html
+  assert(
+    /id="skillsGrid"/.test(htmlSrc73),
+    'index.html: #skillsGrid container exists (empty div populated dynamically by renderSkills)'
+  );
+
+  // 73.2  #skillsGrid is empty in HTML — no static .skill-row children
+  assert(
+    !/id="skillsGrid"[^>]*>[\s\S]*?<div[^>]*class="skill-row"/.test(htmlSrc73),
+    'index.html: #skillsGrid has no static .skill-row children — grid is empty in HTML, populated dynamically per game'
+  );
+
+  // 73.3  No hardcoded id="sk_guns" (FNV-only skill bleed regression guard)
+  assert(
+    !/id="sk_guns"/.test(htmlSrc73),
+    'index.html: no hardcoded id="sk_guns" — FNV-only Guns skill must not appear as static HTML (bleed regression guard)'
+  );
+
+  // 73.4  No hardcoded id="sk_survival" (FNV-only skill bleed regression guard)
+  assert(
+    !/id="sk_survival"/.test(htmlSrc73),
+    'index.html: no hardcoded id="sk_survival" — FNV-only Survival skill must not appear as static HTML (bleed regression guard)'
+  );
+
+  // 73.5  renderSkills() is defined in ui-core.js
+  assert(
+    /function renderSkills\s*\(\s*\)/.test(uiCoreSrc73),
+    'ui-core.js: renderSkills() is defined'
+  );
+
+  // 73.6  renderSkills() body calls getSkillKeys() to iterate game-aware keys
+  const renderSkillsBody73 = (() => {
+    const m = /function renderSkills\s*\([^)]*\)\s*\{([\s\S]*?)\n\}/.exec(uiCoreSrc73);
+    return m ? m[1] : '';
+  })();
+  assert(
+    /getSkillKeys\s*\(\s*\)/.test(renderSkillsBody73),
+    'renderSkills() calls getSkillKeys() to build per-game skill rows'
+  );
+
+  // 73.7  renderSkills() uses SKILL_LABELS for human-readable display names
+  assert(
+    /SKILL_LABELS/.test(renderSkillsBody73),
+    'renderSkills() uses SKILL_LABELS to look up human-readable skill names'
+  );
+
+  // 73.8  renderSkills() escapes label text with escapeHtml (XSS safety)
+  assert(
+    /escapeHtml/.test(renderSkillsBody73),
+    'renderSkills() runs label text through escapeHtml() (XSS safety on skill names)'
+  );
+
+  // 73.9  renderSkills() is called from loadUI()
+  assert(
+    /function loadUI[\s\S]{0,200}renderSkills\s*\(\s*\)/.test(uiCoreSrc73),
+    'ui-core.js: renderSkills() is called at the top of loadUI() so rows exist before state values are synced into them'
+  );
+
+  // 73.10  SKILL_LABELS is defined and covers all 15 game skill keys
+  const allSkillKeys73 = [
+    'barter',
+    'big_guns',
+    'energy_weapons',
+    'explosives',
+    'guns',
+    'lockpick',
+    'medicine',
+    'melee_weapons',
+    'repair',
+    'science',
+    'small_guns',
+    'sneak',
+    'speech',
+    'survival',
+    'unarmed',
+  ];
+  assert(
+    /const SKILL_LABELS\s*=/.test(uiCoreSrc73) &&
+      allSkillKeys73.every(k => new RegExp(`${k}\\s*:`).test(uiCoreSrc73)),
+    'ui-core.js: SKILL_LABELS covers all 15 possible skill keys (barter, big_guns, small_guns, guns, survival, and the 11 shared keys)'
+  );
+
+  // 73.11  SKILL_LABELS maps game-specific keys to correct display names
+  assert(
+    /big_guns\s*:\s*'Big Guns'/.test(uiCoreSrc73) &&
+      /small_guns\s*:\s*'Small Guns'/.test(uiCoreSrc73) &&
+      /\bguns\s*:\s*'Guns'/.test(uiCoreSrc73) &&
+      /survival\s*:\s*'Survival'/.test(uiCoreSrc73),
+    "SKILL_LABELS maps game-specific keys: big_guns→'Big Guns', small_guns→'Small Guns', guns→'Guns', survival→'Survival'"
+  );
+
+  // 73.12  syncStateFromDom() still iterates getSkillKeys() — data layer regression guard
+  assert(
+    /getSkillKeys\s*\(\s*\)/.test(stateSrc73),
+    'state.js: syncStateFromDom() still iterates getSkillKeys() — data layer unchanged by this render refactor'
   );
 }
 

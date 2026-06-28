@@ -1287,8 +1287,39 @@ function seedNewCampaignInventory(ctx) {
   state.inventory.push({ name: 'Vault 13 Canteen', qty: 1, wgt: 1, val: 2, type: 'aid' });
 }
 
+const SKILL_LABELS = {
+  barter: 'Barter',
+  big_guns: 'Big Guns',
+  energy_weapons: 'Energy Weapons',
+  explosives: 'Explosives',
+  guns: 'Guns',
+  lockpick: 'Lockpick',
+  medicine: 'Medicine',
+  melee_weapons: 'Melee Weapons',
+  repair: 'Repair',
+  science: 'Science',
+  small_guns: 'Small Guns',
+  sneak: 'Sneak',
+  speech: 'Speech',
+  survival: 'Survival',
+  unarmed: 'Unarmed',
+};
+
+function renderSkills() {
+  const grid = document.getElementById('skillsGrid');
+  if (!grid) return;
+  grid.innerHTML = getSkillKeys()
+    .map(sk => {
+      const val = state.skills && state.skills[sk] !== undefined ? state.skills[sk] : 15;
+      const label = SKILL_LABELS[sk] || sk;
+      return `<div class="skill-row"><label for="sk_${sk}">${escapeHtml(label)}</label><input type="number" id="sk_${sk}" value="${val}" min="0" max="100" inputmode="numeric" oninput="saveState()"></div>`;
+    })
+    .join('');
+}
+
 function loadUI() {
   seedNewCampaignInventory(state.gameContext);
+  renderSkills();
   document.getElementById('stat_lvl').value = state.lvl;
   document.getElementById('stat_xp').value = state.xp;
   document.getElementById('stat_hp_cur').value = state.hpCur;
