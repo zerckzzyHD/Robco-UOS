@@ -477,6 +477,59 @@ const FALLOUT_REGISTRY = {
     { name: 'Unarmed', stat: 'unarmed', boost: 10, location: 'SEWERS — BENEATH TEPID SEWER' },
   ],
 
+  // ── LINCOLN MEMORABILIA ─────────────────────────────────────────────────────
+  // 9 artifacts for the "Head of State" quest (Museum of History, Washington DC).
+  // buyers: which NPCs will purchase — hannibal=Hannibal Hamlin (Temple of the Union),
+  //         leroy=Leroy Walker (Lincoln Memorial), washington=Abraham Washington (Rivet City).
+  // Data source: https://fallout.wiki/wiki/Lincoln%27s_Profit_Margins
+  lincolnMemorabilia: [
+    {
+      name: "Lincoln's Repeater",
+      location: 'MUSEUM OFFICES — ARCHIVE ROOM DISPLAY CASE',
+      buyers: ['hannibal', 'leroy', 'washington'],
+    },
+    {
+      name: "Lincoln's Hat",
+      location: 'MUSEUM 1ST FLOOR OFFICES — COLLAPSED-CEILING ROOM (ON FLOOR)',
+      buyers: ['hannibal', 'leroy', 'washington'],
+    },
+    {
+      name: "Lincoln's Voice",
+      location: 'MUSEUM 2ND FLOOR OFFICES — 2ND DESK LEFT AT TOP OF STAIRS',
+      buyers: ['hannibal', 'leroy', 'washington'],
+    },
+    {
+      name: 'Action Abe Action Figure',
+      location: 'MUSEUM OFFICES — VERY HARD LOCKED ARCHIVE DOOR, DESK SW CORNER',
+      buyers: ['hannibal', 'leroy', 'washington'],
+    },
+    {
+      name: 'Civil War Draft Poster',
+      location: 'MUSEUM OFFICES — SE CORNER TOP SHELF (CAN FALL TO FLOOR)',
+      buyers: ['hannibal', 'leroy', 'washington'],
+    },
+    {
+      name: "Lincoln's Diary",
+      location: 'MUSEUM LOWER HALLS — FIRST DISPLAY ROOM UP THE STEPS',
+      buyers: ['hannibal', 'leroy', 'washington'],
+    },
+    {
+      name: 'Antique Lincoln Coin Collection',
+      location: 'MUSEUM 2ND FLOOR OFFICES — BOOKSHELF',
+      buyers: ['hannibal', 'leroy', 'washington'],
+    },
+    {
+      name: 'John Wilkes Booth Wanted Poster',
+      location: 'MUSEUM OFFICES — SW CORNER, LAST BOOKSHELF 3RD SHELF',
+      buyers: ['hannibal', 'leroy', 'washington'],
+    },
+    {
+      name: 'Lincoln Memorial Poster',
+      location: 'MUSEUM 2ND FLOOR — WALL BEHIND FIRST DESK (spawns after Head of State started)',
+      buyers: ['leroy'],
+    },
+  ],
+
   // ── ZONES ───────────────────────────────────────────────────────────────────
   // 6×6 grid covering the Capital Wasteland. N→S = row 1→6. W→E = col 1→6.
   // locations[]: primary named map markers in that cell.

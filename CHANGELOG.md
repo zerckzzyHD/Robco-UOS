@@ -1,4 +1,8 @@
-## [Unreleased]<!-- Tests: 781/781 | Cache: robco-terminal-v2.5.0-r7 -->
+## [Unreleased]<!-- Tests: 800/800 | Cache: robco-terminal-v2.5.0-r8 -->
+
+### Added
+
+- **FO3 Lincoln Memorabilia tracker** — in the Collectibles panel (FO3 campaigns only), track each of the 9 Head-of-State artifacts: mark items found, then record who you gave them to — Hannibal Hamlin (to free the slaves, Temple of the Union), Leroy Walker (Lincoln Memorial), Abraham Washington (Rivet City Capitol Preservation Society), or Other. A tally shows how many went to each buyer. Location hints appear for missing items.
 
 ### Changed
 

@@ -252,6 +252,7 @@ const GAME_DEFS = {
     skillKeys: SKILL_KEYS_FO3,
     usesKarmaCenter: true,
     collectibleLabel: 'BOBBLEHEADS',
+    tracksLincoln: true,
     calendar: { startMonth: 7, startDay: 17, startYear: 2277, epochWeekday: 3 },
     ai: {
       skillSystemText:
@@ -350,6 +351,7 @@ let state = {
   // v2.0 fields
   gameContext: 'FNV', // 'FNV' | 'FO3' — set at boot, governs registry/AI context
   collectibles: [], // flat string[] of collected item names (game-context-aware)
+  lincolnItems: {}, // FO3 only — map of artifact name → disposition (found|hannibal|leroy|washington|other)
   campaignMode: 'standard', // 'standard' | 'rng' (armed) | 'rng-locked' (permanently active after wipe)
   playthroughType: 'standard', // 'standard' | 'minmaxed' | 'completionist' | 'casual' | 'speedrun'
   mapView: 'auto', // 'auto' | 'full' | 'core' — persisted map size preference; 'auto' and 'core' → 4×4 grid
@@ -532,6 +534,8 @@ function migrateState(version, s) {
   if (!s.gameContext) s.gameContext = 'FNV';
   if (!GAME_DEFS[s.gameContext]) s.gameContext = 'FNV'; // defensive: unknown game → FNV
   if (!s.collectibles) s.collectibles = [];
+  if (!s.lincolnItems || typeof s.lincolnItems !== 'object' || Array.isArray(s.lincolnItems))
+    s.lincolnItems = {};
   // C4-fix / C11: campaignMode has 3 states: 'standard' | 'rng' (armed) | 'rng-locked' (activated by wipe).
   if (s.campaignMode !== 'rng' && s.campaignMode !== 'rng-locked') s.campaignMode = 'standard';
   // C5: playthroughType — migrate from legacy localStorage key if not yet in state.

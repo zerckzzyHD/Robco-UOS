@@ -1318,6 +1318,7 @@ function loadUI() {
   renderSessionStats();
   renderEquipped();
   renderCollectibles();
+  renderLincolnMemorabilia();
   renderGameDate();
   renderWorldMap(); // G6: Regional Zone Map
   renderKarmaCenter(); // G4: FO3 Karma Center

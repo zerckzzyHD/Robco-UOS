@@ -179,6 +179,9 @@ export default [
         FALLOUT_REGISTRY: 'readonly',
         registrySearch: 'readonly',
         renderCollectibles: 'readonly',
+        renderLincolnMemorabilia: 'readonly',
+        toggleLincolnItem: 'readonly',
+        setLincolnDisposition: 'readonly',
         // Time system (js/ui.js)
         formatGameTime: 'readonly',
         ticksToGameTime: 'readonly',

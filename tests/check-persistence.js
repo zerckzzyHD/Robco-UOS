@@ -1613,17 +1613,18 @@ header('Meta / Runner Parity');
     'Suite 63',
     'Suite 64',
     'Suite 65',
+    'Suite 66',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-65)' +
+    'JS runner contains all gate-guard suites (22-41, 49-66)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-65)' +
+    'PS runner contains all gate-guard suites (22-41, 49-66)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -5853,6 +5854,180 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     !/updateModal/.test(uiCoreSrc65),
     'ui-core.js ESC handler does not reference updateModal (updateModal manages its own Esc — not caught by global handler)'
   );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 66 — FO3 Lincoln Memorabilia Tracker (Phase 6 Task 4)
+//  state.lincolnItems, migration, autoImportState validated map,
+//  reg_fo3 array, GAME_DEFS.FO3.tracksLincoln, render/handler guards.
+//  17 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('FO3 Lincoln Memorabilia Tracker');
+  const stateSrc66 = readFile('js/state.js');
+  const apiSrc66 = readFile('js/api.js');
+  const uiRenderSrc66 = readFile('js/ui-render.js');
+  const uiCoreSrc66 = readFile('js/ui-core.js');
+  const fo3RegSrc66 = readFile('js/reg_fo3.js');
+  const nvRegSrc66 = readFile('js/reg_nv.js');
+
+  // 66.1  state.lincolnItems default {} in state.js
+  assert(
+    /lincolnItems\s*:\s*\{\}/.test(stateSrc66),
+    'state.lincolnItems default {} in state object (Protocol 4 default)'
+  );
+
+  // 66.2  migrateState() has lincolnItems migration guard
+  {
+    let migrateBody = '';
+    try {
+      migrateBody = extractFunctionBody(stateSrc66, 'migrateState');
+    } catch (_) {}
+    assert(
+      /lincolnItems/.test(migrateBody) &&
+        /Array\.isArray/.test(migrateBody) &&
+        /lincolnItems\s*=\s*\{\}/.test(migrateBody),
+      'migrateState() guards lincolnItems — coerces non-object/array to {} (Protocol 4 migration)'
+    );
+  }
+
+  // 66.3  autoImportState() has lincolnItems plain-object check
+  {
+    let importBody = '';
+    try {
+      importBody = extractFunctionBody(apiSrc66, 'autoImportState');
+    } catch (_) {}
+    assert(
+      /lincolnItems/.test(importBody) && /Array\.isArray/.test(importBody),
+      'autoImportState() validates lincolnItems as plain object (not array) before importing'
+    );
+  }
+
+  // 66.4  autoImportState() validates vocabulary before accepting disposition values
+  {
+    let importBody = '';
+    try {
+      importBody = extractFunctionBody(apiSrc66, 'autoImportState');
+    } catch (_) {}
+    assert(
+      /LINCOLN_VOCAB/.test(importBody) &&
+        /hannibal/.test(importBody) &&
+        /washington/.test(importBody),
+      'autoImportState() uses LINCOLN_VOCAB list to validate disposition values (Protocol 24)'
+    );
+  }
+
+  // 66.5  autoImportState() filters keys against registry item names (no arbitrary keys accepted)
+  {
+    let importBody = '';
+    try {
+      importBody = extractFunctionBody(apiSrc66, 'autoImportState');
+    } catch (_) {}
+    assert(
+      /registryNames/.test(importBody) && /lincolnMemorabilia/.test(importBody),
+      'autoImportState() filters lincolnItems keys against registry names (Protocol 24 — no arbitrary keys)'
+    );
+  }
+
+  // 66.6  reg_fo3.js has lincolnMemorabilia array (non-empty)
+  assert(
+    /lincolnMemorabilia\s*:\s*\[/.test(fo3RegSrc66),
+    'reg_fo3.js has lincolnMemorabilia array (FO3 artifact registry)'
+  );
+
+  // 66.7  reg_fo3.js lincolnMemorabilia has exactly 9 items
+  {
+    const m = fo3RegSrc66.match(/lincolnMemorabilia\s*:\s*\[([\s\S]*?)\],\s*\/\//);
+    const block = m
+      ? m[1]
+      : fo3RegSrc66.match(/lincolnMemorabilia\s*:\s*\[([\s\S]*?)\],/)?.[1] || '';
+    const count = (block.match(/\bname\s*:/g) || []).length;
+    assert(count === 9, `reg_fo3.js lincolnMemorabilia has exactly 9 items (found ${count})`);
+  }
+
+  // 66.8  reg_nv.js does NOT have lincolnMemorabilia (FO3-only)
+  assert(
+    !/lincolnMemorabilia/.test(nvRegSrc66),
+    'reg_nv.js does NOT contain lincolnMemorabilia (FO3-only registry entry)'
+  );
+
+  // 66.9  GAME_DEFS.FO3.tracksLincoln === true in state.js
+  assert(
+    /tracksLincoln\s*:\s*true/.test(stateSrc66),
+    'GAME_DEFS.FO3.tracksLincoln: true in state.js (FO3-only feature flag)'
+  );
+
+  // 66.10  renderLincolnMemorabilia is defined in ui-render.js
+  assert(
+    /function renderLincolnMemorabilia\s*\(/.test(uiRenderSrc66),
+    'renderLincolnMemorabilia() is defined in ui-render.js'
+  );
+
+  // 66.11  renderLincolnMemorabilia is called from loadUI() in ui-core.js
+  {
+    let loadUIBody = '';
+    try {
+      loadUIBody = extractFunctionBody(uiCoreSrc66, 'loadUI');
+    } catch (_) {}
+    assert(
+      /renderLincolnMemorabilia\s*\(\s*\)/.test(loadUIBody),
+      'renderLincolnMemorabilia() called from loadUI() in ui-core.js (Protocol 5)'
+    );
+  }
+
+  // 66.12  renderLincolnMemorabilia has FO3 guard (tracksLincoln)
+  {
+    let renderBody = '';
+    try {
+      renderBody = extractFunctionBody(uiRenderSrc66, 'renderLincolnMemorabilia');
+    } catch (_) {}
+    assert(
+      /tracksLincoln/.test(renderBody),
+      'renderLincolnMemorabilia() has tracksLincoln guard (FO3-only — returns early in FNV)'
+    );
+  }
+
+  // 66.13  toggleLincolnItem is defined in ui-render.js
+  assert(
+    /function toggleLincolnItem\s*\(/.test(uiRenderSrc66),
+    'toggleLincolnItem() is defined in ui-render.js'
+  );
+
+  // 66.14  setLincolnDisposition is defined in ui-render.js
+  assert(
+    /function setLincolnDisposition\s*\(/.test(uiRenderSrc66),
+    'setLincolnDisposition() is defined in ui-render.js'
+  );
+
+  // 66.15  setLincolnDisposition validates vocab before writing state
+  {
+    let dispBody = '';
+    try {
+      dispBody = extractFunctionBody(uiRenderSrc66, 'setLincolnDisposition');
+    } catch (_) {}
+    assert(
+      /VOCAB/.test(dispBody) && /includes\s*\(value\)/.test(dispBody),
+      'setLincolnDisposition() validates value against VOCAB before writing state (Protocol 24)'
+    );
+  }
+
+  // 66.16  index.html has #lincolnMemorabiliaDisplay
+  assert(
+    /id="lincolnMemorabiliaDisplay"/.test(htmlSource),
+    'index.html has #lincolnMemorabiliaDisplay container (Protocol 5 panel element)'
+  );
+
+  // 66.17  getSystemDirective() mentions lincolnItems in FO3 context
+  {
+    let sdBody = '';
+    try {
+      sdBody = extractFunctionBody(apiSrc66, 'getSystemDirective');
+    } catch (_) {}
+    assert(
+      /lincolnItems/.test(sdBody),
+      'getSystemDirective() references lincolnItems (Protocol 14 — AI contract updated for new state field)'
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

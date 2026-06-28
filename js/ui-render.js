@@ -745,6 +745,98 @@ function toggleCollectible(name) {
   renderSessionStats();
   updateMath();
 }
+function renderLincolnMemorabilia() {
+  const container = document.getElementById('lincolnMemorabiliaDisplay');
+  if (!container) return;
+  if (!_activeDef().tracksLincoln) {
+    container.style.display = 'none';
+    return;
+  }
+  container.style.display = '';
+
+  const defs =
+    typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.lincolnMemorabilia)
+      ? FALLOUT_REGISTRY.lincolnMemorabilia
+      : [];
+  const items = state.lincolnItems || {};
+  const foundCount = Object.keys(items).length;
+
+  const dispTally = { hannibal: 0, leroy: 0, washington: 0, undecided: 0 };
+  defs.forEach(d => {
+    const disp = items[d.name];
+    if (disp === 'hannibal') dispTally.hannibal++;
+    else if (disp === 'leroy') dispTally.leroy++;
+    else if (disp === 'washington') dispTally.washington++;
+    else if (disp === 'found') dispTally.undecided++;
+  });
+
+  let html = `<div style="border-top:1px dashed var(--robco-blue);margin-top:8px;padding-top:8px;">`;
+  html += `<div style="font-weight:bold;letter-spacing:1px;margin-bottom:4px;font-size:11px;color:var(--robco-blue);">LINCOLN MEMORABILIA&nbsp;&nbsp;[${foundCount}/9]</div>`;
+  html += `<div style="font-size:10px;opacity:0.65;margin-bottom:6px;letter-spacing:0.5px;">`;
+  html += `HANNIBAL ${dispTally.hannibal} &middot; LEROY ${dispTally.leroy} &middot; WASHINGTON ${dispTally.washington} &middot; UNDECIDED ${dispTally.undecided}`;
+  html += `</div>`;
+
+  defs.forEach(d => {
+    const safeName = escapeHtml(d.name);
+    const disp = items[d.name];
+    const isFound = !!disp;
+    if (isFound) {
+      html += `<div style="font-size:11px;margin-bottom:4px;">`;
+      html += `<span style="color:var(--robco-green);cursor:pointer;min-height:28px;display:inline-flex;align-items:center;" onclick="toggleLincolnItem('${safeName}')" title="Click to mark missing">[ACQUIRED]</span> `;
+      html += `${escapeHtml(d.name.toUpperCase())} `;
+      html += `<select onchange="setLincolnDisposition('${safeName}',this.value)" style="font-size:11px;background:transparent;color:inherit;border:1px solid var(--robco-green);min-height:28px;cursor:pointer;">`;
+      const opts = [
+        ['found', 'UNDECIDED'],
+        ['hannibal', 'HANNIBAL (FREE SLAVES)'],
+        ['leroy', 'LEROY WALKER (SLAVERS)'],
+        ['washington', 'WASHINGTON (MUSEUM)'],
+        ['other', 'OTHER'],
+      ];
+      opts.forEach(([val, label]) => {
+        if (val !== 'leroy' || d.buyers.includes('leroy')) {
+          if (val !== 'hannibal' || d.buyers.includes('hannibal')) {
+            if (val !== 'washington' || d.buyers.includes('washington')) {
+              html += `<option value="${val}"${disp === val ? ' selected' : ''}>${label}</option>`;
+            }
+          }
+        }
+      });
+      html += `</select>`;
+      html += `</div>`;
+    } else {
+      const locHint = d.location
+        ? ` &mdash; <span style="opacity:0.5;font-size:10px;">LOC: ${escapeHtml(d.location)}</span>`
+        : '';
+      html += `<div style="font-size:11px;margin-bottom:4px;opacity:0.75;">`;
+      html += `<span style="opacity:0.6;cursor:pointer;min-height:28px;display:inline-flex;align-items:center;" onclick="toggleLincolnItem('${safeName}')" title="Click to mark acquired">[MISSING]</span> `;
+      html += `${escapeHtml(d.name.toUpperCase())}${locHint}`;
+      html += `</div>`;
+    }
+  });
+
+  html += `</div>`;
+  container.innerHTML = html;
+}
+
+function toggleLincolnItem(name) {
+  if (!state.lincolnItems) state.lincolnItems = {};
+  if (state.lincolnItems[name]) {
+    delete state.lincolnItems[name];
+  } else {
+    state.lincolnItems[name] = 'found';
+  }
+  renderLincolnMemorabilia();
+  saveState();
+}
+
+function setLincolnDisposition(name, value) {
+  const VOCAB = ['found', 'hannibal', 'leroy', 'washington', 'other'];
+  if (!VOCAB.includes(value)) return;
+  if (!state.lincolnItems) state.lincolnItems = {};
+  state.lincolnItems[name] = value;
+  saveState();
+}
+
 function renderCampaignNotes() {
   const notesDiv = document.getElementById('campaignNotesList');
   if (!notesDiv) return;

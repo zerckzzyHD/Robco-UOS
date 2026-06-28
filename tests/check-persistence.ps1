@@ -971,11 +971,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-65)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-65)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-66)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-66)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -3546,6 +3546,103 @@ Check ([bool]($triggerBody65 -match '!\s*modal\s*\|\|\s*!\s*btn') -and [bool]($t
 # 65.11  Global ESC handler in ui-core.js targets sysModal only -- updateModal not wired to it
 Check (-not ($uiCoreSrc65 -match 'updateModal')) `
     'ui-core.js ESC handler does not reference updateModal (updateModal manages its own Esc -- not caught by global handler)'
+
+# ===========================================================
+# Suite 66 -- FO3 Lincoln Memorabilia Tracker (Phase 6 Task 4)
+# state.lincolnItems, migration, autoImportState validated map,
+# reg_fo3 array, GAME_DEFS.FO3.tracksLincoln, render/handler guards.
+# 17 tests
+# ===========================================================
+Sep "Suite 66 -- FO3 Lincoln Memorabilia Tracker"
+$stateSrc66  = Read-Src "js\state.js"
+$apiSrc66    = Read-Src "js\api.js"
+$uiRenderSrc66 = Read-Src "js\ui-render.js"
+$uiCoreSrc66   = Read-Src "js\ui-core.js"
+$fo3RegSrc66   = Read-Src "js\reg_fo3.js"
+$nvRegSrc66    = Read-Src "js\reg_nv.js"
+
+# 66.1  state.lincolnItems default {} in state.js
+Check ([bool]($stateSrc66 -match 'lincolnItems\s*:\s*\{\}')) `
+    'state.lincolnItems default {} in state object (Protocol 4 default)'
+
+# 66.2  migrateState() has lincolnItems migration guard
+$migrateBody66 = ''
+try { $migrateBody66 = Get-FunctionBody $stateSrc66 'migrateState' } catch {}
+Check ([bool]($migrateBody66 -match 'lincolnItems') -and [bool]($migrateBody66 -match 'Array\.isArray') -and [bool]($migrateBody66 -match 'lincolnItems\s*=\s*\{\}')) `
+    'migrateState() guards lincolnItems -- coerces non-object/array to {} (Protocol 4 migration)'
+
+# 66.3  autoImportState() has lincolnItems plain-object check
+$importBody66 = ''
+try { $importBody66 = Get-FunctionBody $apiSrc66 'autoImportState' } catch {}
+Check ([bool]($importBody66 -match 'lincolnItems') -and [bool]($importBody66 -match 'Array\.isArray')) `
+    'autoImportState() validates lincolnItems as plain object (not array) before importing'
+
+# 66.4  autoImportState() validates vocabulary before accepting disposition values
+Check ([bool]($importBody66 -match 'LINCOLN_VOCAB') -and [bool]($importBody66 -match 'hannibal') -and [bool]($importBody66 -match 'washington')) `
+    'autoImportState() uses LINCOLN_VOCAB list to validate disposition values (Protocol 24)'
+
+# 66.5  autoImportState() filters keys against registry item names
+Check ([bool]($importBody66 -match 'registryNames') -and [bool]($importBody66 -match 'lincolnMemorabilia')) `
+    'autoImportState() filters lincolnItems keys against registry names (Protocol 24 -- no arbitrary keys)'
+
+# 66.6  reg_fo3.js has lincolnMemorabilia array (non-empty)
+Check ([bool]($fo3RegSrc66 -match 'lincolnMemorabilia\s*:\s*\[')) `
+    'reg_fo3.js has lincolnMemorabilia array (FO3 artifact registry)'
+
+# 66.7  reg_fo3.js lincolnMemorabilia has exactly 9 items
+$linBlock66 = ''
+$linMatch66 = [regex]::Match($fo3RegSrc66, '(?s)lincolnMemorabilia\s*:\s*\[(.*?)\n  \],')
+if ($linMatch66.Success) { $linBlock66 = $linMatch66.Groups[1].Value }
+$linCount66 = ([regex]::Matches($linBlock66, '\bname\s*:')).Count
+Check ($linCount66 -eq 9) "reg_fo3.js lincolnMemorabilia has exactly 9 items (found $linCount66)"
+
+# 66.8  reg_nv.js does NOT have lincolnMemorabilia (FO3-only)
+Check (-not ($nvRegSrc66 -match 'lincolnMemorabilia')) `
+    'reg_nv.js does NOT contain lincolnMemorabilia (FO3-only registry entry)'
+
+# 66.9  GAME_DEFS.FO3.tracksLincoln: true in state.js
+Check ([bool]($stateSrc66 -match 'tracksLincoln\s*:\s*true')) `
+    'GAME_DEFS.FO3.tracksLincoln: true in state.js (FO3-only feature flag)'
+
+# 66.10  renderLincolnMemorabilia is defined in ui-render.js
+Check ([bool]($uiRenderSrc66 -match 'function renderLincolnMemorabilia\s*\(')) `
+    'renderLincolnMemorabilia() is defined in ui-render.js'
+
+# 66.11  renderLincolnMemorabilia is called from loadUI() in ui-core.js
+$loadUIBody66 = ''
+try { $loadUIBody66 = Get-FunctionBody $uiCoreSrc66 'loadUI' } catch {}
+Check ([bool]($loadUIBody66 -match 'renderLincolnMemorabilia\s*\(\s*\)')) `
+    'renderLincolnMemorabilia() called from loadUI() in ui-core.js (Protocol 5)'
+
+# 66.12  renderLincolnMemorabilia has FO3 guard (tracksLincoln)
+$renderLinBody66 = ''
+try { $renderLinBody66 = Get-FunctionBody $uiRenderSrc66 'renderLincolnMemorabilia' } catch {}
+Check ([bool]($renderLinBody66 -match 'tracksLincoln')) `
+    'renderLincolnMemorabilia() has tracksLincoln guard (FO3-only -- returns early in FNV)'
+
+# 66.13  toggleLincolnItem is defined in ui-render.js
+Check ([bool]($uiRenderSrc66 -match 'function toggleLincolnItem\s*\(')) `
+    'toggleLincolnItem() is defined in ui-render.js'
+
+# 66.14  setLincolnDisposition is defined in ui-render.js
+Check ([bool]($uiRenderSrc66 -match 'function setLincolnDisposition\s*\(')) `
+    'setLincolnDisposition() is defined in ui-render.js'
+
+# 66.15  setLincolnDisposition validates vocab before writing state
+$dispBody66 = ''
+try { $dispBody66 = Get-FunctionBody $uiRenderSrc66 'setLincolnDisposition' } catch {}
+Check ([bool]($dispBody66 -match 'VOCAB') -and [bool]($dispBody66 -match 'includes\s*\(value\)')) `
+    'setLincolnDisposition() validates value against VOCAB before writing state (Protocol 24)'
+
+# 66.16  index.html has #lincolnMemorabiliaDisplay
+Check ([bool]($htmlSrc -match 'id="lincolnMemorabiliaDisplay"')) `
+    'index.html has #lincolnMemorabiliaDisplay container (Protocol 5 panel element)'
+
+# 66.17  getSystemDirective() mentions lincolnItems in FO3 context
+$sdBody66 = ''
+try { $sdBody66 = Get-FunctionBody $apiSrc66 'getSystemDirective' } catch {}
+Check ([bool]($sdBody66 -match 'lincolnItems')) `
+    'getSystemDirective() references lincolnItems (Protocol 14 -- AI contract updated for new state field)'
 
 # ===========================================================
 # Results
