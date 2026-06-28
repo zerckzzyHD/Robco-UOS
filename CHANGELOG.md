@@ -1,6 +1,8 @@
-﻿## [Unreleased]<!-- Tests: 933/933 | Cache: robco-terminal-v2.5.0-r24 -->
+﻿## [Unreleased]<!-- Tests: 940/940 | Cache: robco-terminal-v2.5.0-r25 -->
 
 ### Added
+
+- **Expanded New Vegas vendor reference data from 14 to 39 merchants** — the AI's vendor directory now covers the full Mojave: Strip vendors (Mister Holdout, Van Graffs), NCR quartermasters (Hoover Dam, Camp Forlorn Hope, Camp McCarran), faction traders (Great Khans, Boomers, Powder Gangers, Followers of the Apocalypse), DLC merchants (Joshua Graham, Sink Central Intelligence Unit, Commissary Terminal), and a wider spread of Freeside, Goodsprings, and Wasteland vendors. Data sourced from the Fallout wiki.
 
 - **Collectibles now mark their region on the world map** â€” every Snow Globe (New Vegas) and Bobblehead (Fallout 3) is linked to a specific map cell, so the region grid highlights any cell where an uncollected collectible is waiting. FO3 Bobbleheads previously never appeared on the map at all; this is now fixed. A handful of New Vegas Snow Globes that were matched by name were also pointing at the wrong cells â€” all are now placed correctly. Lincoln Memorabilia items in FO3 likewise flag their museum region on the map until collected.
 

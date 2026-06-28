@@ -549,6 +549,31 @@ Ralph,Freeside,900,40,Independent,3,Caps
 Old Lady Gibson,Gibson Scrap Yard,800,40,Independent,4,Caps
 Cliff Briscoe,Novac,750,20,Independent,3,Caps
 Jules,North Vegas Square,600,15,Independent,3,Caps
+Trudy,Goodsprings,400,15,Independent,3,Caps
+Johnson Nash,Goodsprings,500,20,Independent,3,Caps
+Doc Mitchell,Goodsprings,300,10,Independent,3,Caps
+Lacey,Mojave Outpost,700,20,Independent,3,Caps
+Francine Garret,Atomic Wrangler,900,15,Independent,3,Caps
+James Garret,Atomic Wrangler,900,15,Independent,3,Caps
+Mister Holdout,The Strip,600,25,Independent,3,Caps / NCR / Legion
+Gloria Van Graff,Silver Rush,3000,50,Van Graffs,4,Caps
+Great Khan Armorer,Red Rock Canyon,1200,50,Great Khans,4,Caps
+Jack,Red Rock Canyon,800,25,Great Khans,4,Caps
+Doctor Usanagi,New Vegas Medical Clinic,800,10,Independent,3,Caps
+Dr. Ada Straus,Old Mormon Fort,600,10,Followers of the Apocalypse,3,Caps
+Julie Farkas,Old Mormon Fort,700,15,Followers of the Apocalypse,3,Caps
+Quartermaster Bardon,Hoover Dam,3000,50,NCR,4,Caps / NCR
+Sgt. Daniel Contreras,Camp McCarran,2000,40,NCR,3,Caps / NCR
+Quartermaster Mayes,Camp Forlorn Hope,1500,40,NCR,4,Caps / NCR
+Ike,NCR Correctional Facility,800,25,Powder Gangers,4,Caps
+Dixon,Freeside,500,15,Independent,3,Caps
+Jas Wilkins,Aerotech Office Park,400,10,Independent,3,Caps
+Boomer Munitions Manager,Nellis Air Force Base,2000,40,Boomers,4,Caps
+Joshua Graham,Zion Canyon,1500,50,New Canaanites,4,Caps
+Sink Central Intelligence Unit,Big MT,1000,75,Think Tank,3,Caps
+Commissary Terminal,Sierra Madre,2000,25,Automated,3,Sierra Madre Chips
+Traveling Merchant,Mojave Wasteland,800,30,Independent,4,Caps
+Street Vendor,Westside,400,10,Independent,3,Caps
 
 [WEAPON_MODS.CSV]
 Name,Weapon,Effect,Value,Weight

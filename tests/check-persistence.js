@@ -1625,17 +1625,18 @@ header('Meta / Runner Parity');
     'Suite 75',
     'Suite 76',
     'Suite 77',
+    'Suite 78',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-77)' +
+    'JS runner contains all gate-guard suites (22-41, 49-78)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-77)' +
+    'PS runner contains all gate-guard suites (22-41, 49-78)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -7481,6 +7482,36 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
       !/adjustFaction\([^)]*,\s*-50\)/.test(uiSrc77),
     'Faction buttons use ±5 increment — adjustFaction with ±50 removed from ui-render.js'
   );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 78 — VENDORS.CSV structural integrity
+//  7 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 78 — VENDORS.CSV structural integrity');
+  const nvSrc78 = readFile('js/db_nv.js');
+  // Extract the VENDORS.CSV block
+  const vStart = nvSrc78.indexOf('[VENDORS.CSV]');
+  const vEnd = nvSrc78.indexOf('\n[', vStart + 1);
+  const vBlock = nvSrc78.slice(vStart, vEnd === -1 ? undefined : vEnd);
+  const vLines = vBlock.split('\n').filter(l => l.trim() && !l.startsWith('['));
+  const vData = vLines.slice(1); // strip header row
+
+  // 78.1  39 data rows
+  assert(vData.length === 39, `VENDORS.CSV has exactly 39 data rows (got ${vData.length})`);
+
+  // 78.2  every row has exactly 7 columns
+  const badCols = vData.filter(l => l.split(',').length !== 7);
+  assert(badCols.length === 0, `VENDORS.CSV all rows have 7 columns — bad: ${badCols.join(' | ')}`);
+
+  // 78.3–78.7  sentinel names present
+  const vNames = vData.map(l => l.split(',')[0].trim());
+  assert(vNames.includes('Gloria Van Graff'), "VENDORS.CSV contains 'Gloria Van Graff'");
+  assert(vNames.includes('Joshua Graham'), "VENDORS.CSV contains 'Joshua Graham'");
+  assert(vNames.includes('Doctor Usanagi'), "VENDORS.CSV contains 'Doctor Usanagi'");
+  assert(vNames.includes('Quartermaster Bardon'), "VENDORS.CSV contains 'Quartermaster Bardon'");
+  assert(vNames.includes('Street Vendor'), "VENDORS.CSV contains 'Street Vendor'");
 }
 
 // ══════════════════════════════════════════════════════════════
