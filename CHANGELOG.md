@@ -1,4 +1,4 @@
-## [Unreleased]<!-- Tests: 832/832 | Cache: robco-terminal-v2.5.0-r12 -->
+## [Unreleased]<!-- Tests: 836/836 | Cache: robco-terminal-v2.5.0-r13 -->
 
 ### Added
 
@@ -24,6 +24,7 @@
 - The SPECIAL stat fields (S P E C I A L) no longer fight you while typing. Previously, clearing a field to retype a value would immediately snap it back to 1 on every keystroke. Now the field is free to edit and only validates when you leave it (blur): blank or invalid reverts to your last saved value, out-of-range numbers clamp to the nearest valid value (1 or 10), and derived stats (skill points, VATS, etc.) update immediately after you commit. Values above 10 are capped as you type and can never be saved above 10 regardless of how the save is triggered.
 - The in-app patch notes viewer now shows the current release notes instead of the empty placeholder section. The viewer skips any unreleased placeholder block and goes straight to the first dated version; HTML comments in the version header no longer appear in the displayed text.
 - The update prompt's message text now reads flush-left instead of ragged/centered.
+- Switching the game from New Vegas to Fallout 3 (or back) now correctly sticks after reloading. Previously the choice was silently reverted on every reload because the in-memory game context was never updated before the page saved its state — causing the old game to overwrite the new choice on the way out.
 
 ---
 

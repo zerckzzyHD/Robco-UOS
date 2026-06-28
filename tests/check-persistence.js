@@ -1616,17 +1616,18 @@ header('Meta / Runner Parity');
     'Suite 66',
     'Suite 67',
     'Suite 68',
+    'Suite 69',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-68)' +
+    'JS runner contains all gate-guard suites (22-41, 49-69)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-68)' +
+    'PS runner contains all gate-guard suites (22-41, 49-69)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -6330,6 +6331,64 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     /gridRow:\s*4[\s\S]{0,200}gridCol:\s*1[\s\S]{0,500}Powder Ganger Camp South/.test(nvRegSrc68),
     'Zone [4,1] NCRCF locations[] contains "Powder Ganger Camp South" (zone↔registry parity)'
   );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 69 — FO3 game-switch regression (Protocol 13)
+//  Fixes: switching to FO3 reverted to FNV on reload.
+//  Root cause: onGameContextChange never updated state.gameContext,
+//  so beforeunload/saveState re-derived activeContext='FNV' and
+//  clobbered the deliberate 'FO3' localStorage write.
+//  4 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('FO3 game-switch regression guard');
+  const uiCoreSrc69 = readFile('js/ui-core.js');
+  const stateSrc69 = readFile('js/state.js');
+
+  // Extract the body of onGameContextChange for targeted checks
+  let gcBody69 = '';
+  try {
+    gcBody69 = extractFunctionBody(uiCoreSrc69, 'onGameContextChange');
+  } catch (_) {}
+
+  // 69.1  onGameContextChange sets state.gameContext = ctx (the missing line that caused the bug)
+  assert(
+    /state\.gameContext\s*=\s*ctx/.test(gcBody69),
+    'onGameContextChange() sets state.gameContext = ctx — keeps in-memory source-of-truth in sync (regression guard)'
+  );
+
+  // 69.2  onGameContextChange sets window._contextSwitching = true before reload
+  assert(
+    /window\._contextSwitching\s*=\s*true/.test(gcBody69),
+    'onGameContextChange() sets window._contextSwitching = true before reload — guards beforeunload/saveState from clobbering the switch (regression guard)'
+  );
+
+  // 69.3  beforeunload handler early-exits when _contextSwitching is set
+  {
+    // Find the beforeunload callback body
+    const buMatch = uiCoreSrc69.match(
+      /addEventListener\s*\(\s*['"]beforeunload['"]\s*,\s*\(\s*\)\s*=>\s*\{([\s\S]*?)\}\s*\)/
+    );
+    const buBody = buMatch ? buMatch[1] : '';
+    assert(
+      /_contextSwitching/.test(buBody) && /return/.test(buBody),
+      'beforeunload handler early-exits when window._contextSwitching is set — prevents clobbering the deliberate FO3 write (regression guard)'
+    );
+  }
+
+  // 69.4  saveState debounced body early-exits when _contextSwitching is set
+  {
+    // Extract the setTimeout callback body inside saveState
+    const saveStateMatch = stateSrc69.match(
+      /function saveState\s*\(\s*\)([\s\S]*?)(?=\nfunction |\nlet |\nconst |\nvar |$)/
+    );
+    const saveBody = saveStateMatch ? saveStateMatch[1] : '';
+    assert(
+      /_contextSwitching/.test(saveBody) && /return/.test(saveBody),
+      'saveState() debounced setTimeout body early-exits when window._contextSwitching is set — prevents pending debounce from clobbering the FO3 write (regression guard)'
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

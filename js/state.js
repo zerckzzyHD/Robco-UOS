@@ -424,6 +424,7 @@ function saveState() {
   // A beforeunload handler in ui.js flushes immediately on tab close
   clearTimeout(_saveTimer);
   _saveTimer = setTimeout(() => {
+    if (window._contextSwitching) return;
     try {
       if (!window.robco_v8) {
         window.robco_v8 = { activeContext: state.gameContext || 'FNV', campaigns: {} };

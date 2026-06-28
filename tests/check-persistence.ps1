@@ -971,11 +971,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-68)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-68)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-69)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-69)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -3820,6 +3820,42 @@ Check ([bool]($nvRegSrc68 -match '(?s)gridRow:\s*4.{0,200}gridCol:\s*2.{0,500}Je
 # 68.10  Zone parity -- zone [4,1] NCRCF locations[] contains 'Powder Ganger Camp South'
 Check ([bool]($nvRegSrc68 -match '(?s)gridRow:\s*4.{0,200}gridCol:\s*1.{0,500}Powder Ganger Camp South')) `
     'Zone [4,1] NCRCF locations[] contains "Powder Ganger Camp South" (zone<->registry parity)'
+
+# ===========================================================
+# Suite 69 -- FO3 game-switch regression (Protocol 13)
+# Fixes: switching to FO3 reverted to FNV on reload.
+# Root cause: onGameContextChange never updated state.gameContext,
+# so beforeunload/saveState re-derived activeContext='FNV' and
+# clobbered the deliberate 'FO3' localStorage write.
+# 4 tests
+# ===========================================================
+Sep "Suite 69 -- FO3 game-switch regression guard"
+$uiCoreSrc69 = Read-Src "js\ui-core.js"
+$stateSrc69  = Read-Src "js\state.js"
+
+# Extract onGameContextChange function body
+$gcMatch69 = [regex]::Match($uiCoreSrc69, '(?s)function onGameContextChange\s*\([^)]*\)\s*\{(.*?)\n\}')
+$gcBody69  = if ($gcMatch69.Success) { $gcMatch69.Groups[1].Value } else { '' }
+
+# 69.1  onGameContextChange sets state.gameContext = ctx
+Check ([bool]($gcBody69 -match 'state\.gameContext\s*=\s*ctx')) `
+    'onGameContextChange() sets state.gameContext = ctx -- keeps in-memory source-of-truth in sync (regression guard)'
+
+# 69.2  onGameContextChange sets window._contextSwitching = true before reload
+Check ([bool]($gcBody69 -match 'window\._contextSwitching\s*=\s*true')) `
+    'onGameContextChange() sets window._contextSwitching = true before reload -- guards beforeunload/saveState from clobbering the switch (regression guard)'
+
+# 69.3  beforeunload handler early-exits when _contextSwitching is set
+$buMatch69 = [regex]::Match($uiCoreSrc69, "(?s)addEventListener\s*\(\s*['""]beforeunload['""],\s*\(\s*\)\s*=>\s*\{(.*?)\}\s*\)")
+$buBody69  = if ($buMatch69.Success) { $buMatch69.Groups[1].Value } else { '' }
+Check ($buBody69 -match '_contextSwitching' -and $buBody69 -match '\breturn\b') `
+    'beforeunload handler early-exits when window._contextSwitching is set -- prevents clobbering the deliberate FO3 write (regression guard)'
+
+# 69.4  saveState debounced body early-exits when _contextSwitching is set
+$ssMatch69 = [regex]::Match($stateSrc69, '(?s)function saveState\s*\(\s*\)(.*?)(?=\nfunction |\nlet |\nconst |\nvar |$)')
+$ssBody69  = if ($ssMatch69.Success) { $ssMatch69.Groups[1].Value } else { '' }
+Check ($ssBody69 -match '_contextSwitching' -and $ssBody69 -match '\breturn\b') `
+    'saveState() debounced setTimeout body early-exits when window._contextSwitching is set -- prevents pending debounce from clobbering the FO3 write (regression guard)'
 
 # ===========================================================
 # Results

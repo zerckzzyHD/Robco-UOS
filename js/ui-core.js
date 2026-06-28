@@ -581,6 +581,7 @@ window.onload = function () {
   // Flush any pending debounced save immediately on tab close
   window.addEventListener('beforeunload', () => {
     clearTimeout(_saveTimer);
+    if (window._contextSwitching) return;
     if (!window.robco_v8)
       window.robco_v8 = { activeContext: state.gameContext || 'FNV', campaigns: {} };
     window.robco_v8.activeContext = state.gameContext || 'FNV';
@@ -763,8 +764,10 @@ function changePlaystyle(style) {
 function onGameContextChange(ctx) {
   if (ctx !== 'FNV' && ctx !== 'FO3') return;
   if (!window.robco_v8) window.robco_v8 = { activeContext: 'FNV', campaigns: {} };
-  window.robco_v8.activeContext = ctx;
   window.robco_v8.campaigns[state.gameContext] = JSON.parse(JSON.stringify(state));
+  window.robco_v8.activeContext = ctx;
+  state.gameContext = ctx;
+  window._contextSwitching = true;
   localStorage.setItem('robco_v8', JSON.stringify(window.robco_v8));
   window.location.reload();
 }
