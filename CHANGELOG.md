@@ -1,8 +1,8 @@
-﻿## [Unreleased]<!-- Tests: 1044/1044 | Cache: robco-terminal-v2.5.0-r34 -->
+﻿## [Unreleased]<!-- Tests: 1051/1051 | Cache: robco-terminal-v2.5.0-r35 -->
 
 ### Added
 
-- **Skill Books tracker** — a new SKILL BOOKS panel on the STAT tab shows all 13 skill books for the active game. Clicking a book marks it as read (or unread). Read books float to the top; unread show below a divider, each labeled with the skill it raises. The AI knows which books the Courier has read and can reference them. Books are tracked for both Fallout: New Vegas (including Wasteland Survival Guide for Survival) and Fallout 3 (including U.S. Army: 30 Handy Flamethrower Recipes for Big Guns). The SKILL BOOKS panel badge shows the current read count.
+- **Skill Books tracker** — a new SKILL BOOKS panel on the STAT tab tracks all 13 skill books for the active game, split into live READ and UNREAD sub-menus. Tap a book to move it between them instantly — no reload needed; the counts update as you go. Each book shows the skill it raises. The AI knows which books have been read and can reference them in play. Books are tracked for both Fallout: New Vegas (including Wasteland Survival Guide for Survival) and Fallout 3 (including U.S. Army: 30 Handy Flamethrower Recipes for Big Guns). Both sub-menus are individually collapsible and remember their collapsed state across reloads.
 
 - **Craft panel** — a new CRAFTING menu in the INV tab with a station-grouped dropdown that shows one recipe card at a time: pick a recipe from the select (Workbench / Campfire / Reloading groups), then see live have/need ingredient checks, a soft skill indicator, and batch crafting with a MAX button. The Scrap/Breakdown sub-panel uses the same picker design. Crafting and scrapping consume and produce real inventory behind a confirmation prompt (local only, never auto-synced to cloud).
 

@@ -4922,7 +4922,7 @@ Check ($uiRSrc84.Contains('function _craftGetHave(')) "_craftGetHave() helper de
 
 # ===========================================================
 # Suite 85 -- Skill Books Tracker (FNV+FO3, Protocol 4)
-# 16 tests
+# 23 tests
 # ===========================================================
 Sep "Suite 85 -- Skill Books Tracker (FNV+FO3, Protocol 4)"
 $nvRegSrc85 = Get-Content 'js/reg_nv.js' -Raw
@@ -5005,6 +5005,29 @@ Check ($loadUIBody85 -match 'renderSkillBooks\s*\(\s*\)') "renderSkillBooks() ca
 
 # 85.16  index.html has #skillBooksDisplay container
 Check ($idxSrc85 -match 'id="skillBooksDisplay"') 'index.html has #skillBooksDisplay container (Protocol 5 panel element)'
+
+# 85.17  renderSkillBooks source has skill_books_read sub-panel marker
+$renderSBBody85 = ''
+try { $renderSBBody85 = Get-FunctionBody $uiRenderSrc85 'renderSkillBooks' } catch {}
+Check ($renderSBBody85.Contains('skill_books_read')) "renderSkillBooks() references skill_books_read sub-panel data-sub-id (READ/UNREAD split)"
+
+# 85.18  renderSkillBooks source has skill_books_unread sub-panel marker
+Check ($renderSBBody85.Contains('skill_books_unread')) "renderSkillBooks() references skill_books_unread sub-panel data-sub-id (READ/UNREAD split)"
+
+# 85.19  renderSkillBooks wires toggle events on dynamic sub-panels after innerHTML
+Check ($renderSBBody85.Contains('querySelectorAll') -and ($renderSBBody85 -match "addEventListener\s*\(\s*'toggle'")) "renderSkillBooks() wires 'toggle' event listeners on dynamic sub-panels (collapse persistence)"
+
+# 85.20  Old static skillBooksSubPanel removed from index.html (Protocol 20 regression guard)
+Check (-not ($idxSrc85 -match 'id="skillBooksSubPanel"')) 'index.html: old static skillBooksSubPanel removed -- READ/UNREAD sub-panels are dynamic (Protocol 20)'
+
+# 85.21  renderSkillBooks splits by read.includes / !read.includes (behavioral correctness guard)
+Check ($renderSBBody85.Contains('read.includes(d.name)') -and ($renderSBBody85 -match '!read\.includes')) "renderSkillBooks() splits by read.includes(d.name) for READ list and !read.includes for UNREAD list"
+
+# 85.22  "NO BOOKS READ" empty state present in renderSkillBooks source
+Check ($renderSBBody85.Contains('NO BOOKS READ')) "renderSkillBooks() has 'NO BOOKS READ' empty state for empty READ list"
+
+# 85.23  "ALL BOOKS READ" empty state present in renderSkillBooks source
+Check ($renderSBBody85.Contains('ALL BOOKS READ')) "renderSkillBooks() has 'ALL BOOKS READ' empty state for empty UNREAD list"
 
 
 # ===========================================================

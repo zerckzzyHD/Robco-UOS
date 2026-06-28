@@ -908,40 +908,60 @@ function renderSkillBooks() {
       ? FALLOUT_REGISTRY.skillBooks
       : [];
   const read = Array.isArray(state.skillBooks) ? state.skillBooks : [];
-  const n = read.length;
-
-  let html = `<div style="font-size:11px;color:var(--robco-blue);font-weight:bold;letter-spacing:1px;margin-bottom:4px;">BOOKS READ [${n}/${defs.length}]</div>`;
-
   const readDefs = defs.filter(d => read.includes(d.name));
   const unreadDefs = defs.filter(d => !read.includes(d.name));
 
-  const renderRow = d => {
+  let ps = {};
+  try {
+    ps = JSON.parse(localStorage.getItem('robco_panel_state') || '{}');
+  } catch (_) {}
+  const readOpen = ps['skill_books_read'] !== false;
+  const unreadOpen = ps['skill_books_unread'] !== false;
+
+  const rowHtml = (d, isRead) => {
     const safeName = escapeHtml(d.name);
     const skillLabel = escapeHtml((d.skill || '').replace(/_/g, ' ').toUpperCase());
-    if (read.includes(d.name)) {
-      html += `<div style="font-size:11px;letter-spacing:0.5px;margin-bottom:2px;">`;
-      html += `<span style="color:var(--robco-green);cursor:pointer;margin-right:4px;" onclick="toggleSkillBook('${safeName}')" title="Mark unread">[READ]</span>`;
-      html += `<strong>${escapeHtml(d.name.toUpperCase())}</strong> <span style="font-size:10px;opacity:0.6;">&mdash; ${skillLabel}</span>`;
-      html += `</div>`;
-    } else {
-      html += `<div style="font-size:11px;letter-spacing:0.5px;margin-bottom:2px;opacity:0.7;">`;
-      html += `<span style="opacity:0.5;cursor:pointer;margin-right:4px;" onclick="toggleSkillBook('${safeName}')" title="Mark read">[----]</span>`;
-      html += `${escapeHtml(d.name.toUpperCase())} <span style="font-size:10px;opacity:0.6;">&mdash; ${skillLabel}</span>`;
-      html += `</div>`;
-    }
+    const tag = isRead
+      ? `<span style="color:var(--robco-green);cursor:pointer;margin-right:4px;" onclick="toggleSkillBook('${safeName}')" title="Mark unread">[READ]</span>`
+      : `<span style="opacity:0.5;cursor:pointer;margin-right:4px;" onclick="toggleSkillBook('${safeName}')" title="Mark read">[----]</span>`;
+    const nameHtml = isRead
+      ? `<strong>${escapeHtml(d.name.toUpperCase())}</strong>`
+      : escapeHtml(d.name.toUpperCase());
+    return (
+      `<div style="font-size:11px;letter-spacing:0.5px;margin-bottom:2px;${isRead ? '' : 'opacity:0.7;'}">` +
+      tag +
+      nameHtml +
+      ` <span style="font-size:10px;opacity:0.6;">&mdash; ${skillLabel}</span>` +
+      `</div>`
+    );
   };
 
-  if (defs.length === 0) {
-    html += `<div style="font-size:11px;opacity:0.5;padding:4px 0;">No skill books in registry.</div>`;
-  } else {
-    readDefs.forEach(renderRow);
-    if (readDefs.length > 0 && unreadDefs.length > 0) {
-      html += `<div style="border-top:1px dashed var(--robco-green);margin:4px 0;opacity:0.3;"></div>`;
-    }
-    unreadDefs.forEach(renderRow);
-  }
+  const readRows = readDefs.length
+    ? readDefs.map(d => rowHtml(d, true)).join('')
+    : `<div style="font-size:11px;opacity:0.5;padding:2px 0 4px;">NO BOOKS READ</div>`;
+  const unreadRows = unreadDefs.length
+    ? unreadDefs.map(d => rowHtml(d, false)).join('')
+    : `<div style="font-size:11px;opacity:0.5;padding:2px 0 4px;">ALL BOOKS READ</div>`;
 
-  container.innerHTML = html;
+  container.innerHTML =
+    `<details class="sub-panel" data-sub-id="skill_books_read"${readOpen ? ' open' : ''}>` +
+    `<summary><h3>&gt; READ [${readDefs.length}]</h3></summary>` +
+    readRows +
+    `</details>` +
+    `<details class="sub-panel" data-sub-id="skill_books_unread"${unreadOpen ? ' open' : ''}>` +
+    `<summary><h3>&gt; UNREAD [${unreadDefs.length}]</h3></summary>` +
+    unreadRows +
+    `</details>`;
+
+  container.querySelectorAll('details[data-sub-id]').forEach(d => {
+    d.addEventListener('toggle', () => {
+      try {
+        const p = JSON.parse(localStorage.getItem('robco_panel_state') || '{}');
+        p[d.dataset.subId] = d.open;
+        localStorage.setItem('robco_panel_state', JSON.stringify(p));
+      } catch (_) {}
+    });
+  });
 }
 
 function toggleSkillBook(name) {

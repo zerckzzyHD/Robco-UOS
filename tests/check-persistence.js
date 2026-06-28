@@ -8251,8 +8251,8 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  Suite 85 — Skill Books Tracker (FNV+FO3, Protocol 4)
 //  registry count/skills, sentinel checks, state default/migrate,
 //  autoImportState validation, getSystemDirective, render wiring,
-//  index.html container.
-//  16 tests
+//  index.html container, READ/UNREAD sub-panel structural guards.
+//  23 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 85 — Skill Books Tracker (FNV+FO3, Protocol 4)');
@@ -8441,6 +8441,86 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     /id="skillBooksDisplay"/.test(htmlSource),
     'index.html has #skillBooksDisplay container (Protocol 5 panel element)'
   );
+
+  // 85.17  renderSkillBooks source has skill_books_read sub-panel marker
+  {
+    let renderSBBody85 = '';
+    try {
+      renderSBBody85 = extractFunctionBody(uiRenderSrc85, 'renderSkillBooks');
+    } catch (_) {}
+    assert(
+      /skill_books_read/.test(renderSBBody85),
+      'renderSkillBooks() references skill_books_read sub-panel data-sub-id (READ/UNREAD split)'
+    );
+  }
+
+  // 85.18  renderSkillBooks source has skill_books_unread sub-panel marker
+  {
+    let renderSBBody85b = '';
+    try {
+      renderSBBody85b = extractFunctionBody(uiRenderSrc85, 'renderSkillBooks');
+    } catch (_) {}
+    assert(
+      /skill_books_unread/.test(renderSBBody85b),
+      'renderSkillBooks() references skill_books_unread sub-panel data-sub-id (READ/UNREAD split)'
+    );
+  }
+
+  // 85.19  renderSkillBooks wires toggle events on dynamic sub-panels after innerHTML
+  {
+    let renderSBBody85c = '';
+    try {
+      renderSBBody85c = extractFunctionBody(uiRenderSrc85, 'renderSkillBooks');
+    } catch (_) {}
+    assert(
+      /querySelectorAll/.test(renderSBBody85c) &&
+        /addEventListener\s*\(\s*'toggle'/.test(renderSBBody85c),
+      "renderSkillBooks() wires 'toggle' event listeners on dynamic sub-panels (collapse persistence)"
+    );
+  }
+
+  // 85.20  Old static skillBooksSubPanel removed from index.html (Protocol 20 regression guard)
+  assert(
+    !/id="skillBooksSubPanel"/.test(htmlSource),
+    'index.html: old static skillBooksSubPanel removed — READ/UNREAD sub-panels are dynamic (Protocol 20)'
+  );
+
+  // 85.21  renderSkillBooks splits by read.includes / !read.includes (behavioral correctness guard)
+  {
+    let renderSBBody85d = '';
+    try {
+      renderSBBody85d = extractFunctionBody(uiRenderSrc85, 'renderSkillBooks');
+    } catch (_) {}
+    assert(
+      /read\.includes\(d\.name\)/.test(renderSBBody85d) &&
+        /!read\.includes\(d\.name\)/.test(renderSBBody85d),
+      'renderSkillBooks() splits by read.includes(d.name) for READ list and !read.includes for UNREAD list'
+    );
+  }
+
+  // 85.22  "NO BOOKS READ" empty state present in renderSkillBooks source
+  {
+    let renderSBBody85e = '';
+    try {
+      renderSBBody85e = extractFunctionBody(uiRenderSrc85, 'renderSkillBooks');
+    } catch (_) {}
+    assert(
+      /NO BOOKS READ/.test(renderSBBody85e),
+      'renderSkillBooks() has "NO BOOKS READ" empty state for empty READ list'
+    );
+  }
+
+  // 85.23  "ALL BOOKS READ" empty state present in renderSkillBooks source
+  {
+    let renderSBBody85f = '';
+    try {
+      renderSBBody85f = extractFunctionBody(uiRenderSrc85, 'renderSkillBooks');
+    } catch (_) {}
+    assert(
+      /ALL BOOKS READ/.test(renderSBBody85f),
+      'renderSkillBooks() has "ALL BOOKS READ" empty state for empty UNREAD list'
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
