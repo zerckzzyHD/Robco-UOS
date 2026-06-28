@@ -7924,7 +7924,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 84 — Craft panel UI + mechanics (behavioral + data-safety)
-//  20 tests
+//  24 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 84 — Craft panel UI + mechanics (behavioral + data-safety)');
@@ -7992,6 +7992,28 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 
   // 84.k  confirm( gate in doScrap
   assert(doScrapBody84.includes('confirm('), 'confirm() gate present in doScrap body');
+
+  // ── Picker structure guards ──────────────────────────────────────────────
+  // 84.u  renderCraft builds craftRecipeSelect
+  assert(
+    uiRSrc84.includes('craftRecipeSelect'),
+    'renderCraft() builds <select id="craftRecipeSelect"> (recipe picker)'
+  );
+
+  // 84.v  renderCraft builds <optgroup> elements for station grouping
+  assert(uiRSrc84.includes('<optgroup'), 'renderCraft() builds <optgroup> for station grouping');
+
+  // 84.w  renderCraftCard defined in ui-render.js
+  assert(
+    uiRSrc84.includes('function renderCraftCard('),
+    'renderCraftCard() defined in js/ui-render.js (recipe detail card renderer)'
+  );
+
+  // 84.x  renderCraft builds scrapItemSelect
+  assert(
+    uiRSrc84.includes('scrapItemSelect'),
+    'renderCraft() builds <select id="scrapItemSelect"> for scrap/breakdown picker'
+  );
 
   // ── Behavioral sandbox ───────────────────────────────────────────────────
   {

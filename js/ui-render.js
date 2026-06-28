@@ -1460,19 +1460,6 @@ function renderKarmaCenter() {
 
 // ── CRAFT PANEL ──────────────────────────────────────────────────────────────
 
-let _craftFilter = 'all';
-
-function setCraftFilter(value) {
-  _craftFilter = value;
-  const bar = document.getElementById('craftFilterBar');
-  if (bar) {
-    bar.querySelectorAll('.craft-filter-btn').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.filter === value);
-    });
-  }
-  renderCraft();
-}
-
 function _craftGetHave(itemName) {
   const lower = itemName.toLowerCase();
   if (state.ammo) {
@@ -1507,6 +1494,95 @@ function craftSetMax(recipeIdx, maxVal) {
   if (el) el.value = Math.max(1, maxVal);
 }
 
+function renderCraftCard() {
+  const card = document.getElementById('craftRecipeCard');
+  if (!card) return;
+  const sel = document.getElementById('craftRecipeSelect');
+  const ri = sel ? parseInt(sel.value) : 0;
+  const recipes =
+    typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.recipes)
+      ? FALLOUT_REGISTRY.recipes
+      : [];
+  const recipe = recipes[ri];
+  if (!recipe) {
+    card.innerHTML = '';
+    return;
+  }
+  const MAX_CAP = 99;
+  const req = recipe.skillReq;
+  let skillHtml = '';
+  if (req) {
+    const haveSkill =
+      state.skills && typeof state.skills[req.skill] === 'number' ? state.skills[req.skill] : 0;
+    const met = haveSkill >= req.level;
+    const lbl =
+      typeof SKILL_LABELS !== 'undefined' && SKILL_LABELS[req.skill]
+        ? SKILL_LABELS[req.skill]
+        : req.skill;
+    const col = met ? 'var(--robco-green)' : 'var(--robco-danger)';
+    skillHtml = `<span style="font-size:10px;color:${col};white-space:nowrap;">(${escapeHtml(lbl)} ${req.level} ${met ? '✓' : '✗'})</span>`;
+  }
+  let maxBatch = MAX_CAP;
+  const ingHtml = recipe.ingredients
+    .map(ing => {
+      const haveN = _craftGetHave(ing.item);
+      const canMake = ing.qty > 0 ? Math.floor(haveN / ing.qty) : MAX_CAP;
+      if (canMake < maxBatch) maxBatch = canMake;
+      const col = haveN >= ing.qty ? 'var(--robco-green)' : 'var(--robco-danger)';
+      return `<span style="color:${col};font-size:10px;margin-right:5px;">${escapeHtml(ing.item)} ${haveN}/${ing.qty}</span>`;
+    })
+    .join('');
+  const allMet = recipe.ingredients.every(ing => _craftGetHave(ing.item) >= ing.qty);
+  const missingItems = allMet
+    ? ''
+    : recipe.ingredients
+        .filter(ing => _craftGetHave(ing.item) < ing.qty)
+        .map(ing => escapeHtml(ing.item))
+        .join(', ');
+  card.innerHTML =
+    `<div style="margin-top:4px;padding-bottom:4px;">` +
+    `<div style="font-size:11px;font-weight:bold;display:flex;flex-wrap:wrap;gap:4px;align-items:center;">` +
+    `<span style="flex:1;">${escapeHtml(recipe.name.toUpperCase())}</span>` +
+    `${skillHtml}` +
+    `<span style="display:flex;gap:3px;align-items:center;flex-shrink:0;">` +
+    `<input type="number" id="craftQty_${ri}" value="1" min="1" max="${Math.max(1, maxBatch)}" style="width:38px;font-size:11px;">` +
+    `<button class="btn-sm action-btn" onclick="craftSetMax(${ri},${maxBatch})" style="padding:0 5px;font-size:10px;">MAX</button>` +
+    `<button class="btn-sm action-btn" data-ridx="${ri}" onclick="doCraft(parseInt(this.dataset.ridx))" style="${allMet ? '' : 'opacity:0.45;'}padding:0 7px;font-size:10px;">CRAFT</button>` +
+    `</span></div>` +
+    `<div style="margin-top:1px;">${ingHtml}</div>` +
+    (missingItems
+      ? `<div style="font-size:9px;color:var(--robco-danger);opacity:0.85;">MISSING: ${missingItems}</div>`
+      : '') +
+    `</div>`;
+}
+
+function renderScrapCard() {
+  const card = document.getElementById('scrapItemCard');
+  if (!card) return;
+  const sel = document.getElementById('scrapItemSelect');
+  const bi = sel ? parseInt(sel.value) : 0;
+  const breakdowns =
+    typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.breakdowns)
+      ? FALLOUT_REGISTRY.breakdowns
+      : [];
+  const breakdown = breakdowns[bi];
+  if (!breakdown) {
+    card.innerHTML = '';
+    return;
+  }
+  const have = _craftGetHave(breakdown.item);
+  const yieldPreview = breakdown.yields.map(y => `${y.qty}× ${escapeHtml(y.item)}`).join(', ');
+  card.innerHTML =
+    `<div style="font-size:11px;margin-top:4px;display:flex;flex-wrap:wrap;gap:4px;align-items:center;">` +
+    `<span style="flex:1;">${escapeHtml(breakdown.item.toUpperCase())}</span>` +
+    `<span style="font-size:10px;opacity:0.6;">→ ${yieldPreview}</span>` +
+    `<span style="display:flex;gap:3px;align-items:center;flex-shrink:0;">` +
+    `<span style="font-size:10px;opacity:0.6;margin-right:2px;">have: ${have}</span>` +
+    `<input type="number" id="scrapQty_${bi}" value="1" min="1" max="${Math.max(1, have)}" style="width:38px;font-size:11px;">` +
+    `<button class="btn-sm action-btn" data-bidx="${bi}" onclick="doScrap(parseInt(this.dataset.bidx))" style="padding:0 7px;font-size:10px;">SCRAP</button>` +
+    `</span></div>`;
+}
+
 function renderCraft() {
   const recipeList = document.getElementById('craftRecipeList');
   const scrapList = document.getElementById('craftScrapList');
@@ -1521,106 +1597,59 @@ function renderCraft() {
       ? FALLOUT_REGISTRY.breakdowns
       : [];
 
-  const filtered =
-    _craftFilter === 'all' ? recipes : recipes.filter(r => r.station === _craftFilter);
-
-  if (filtered.length === 0) {
+  // ── Recipe picker ──────────────────────────────────────────────
+  if (recipes.length === 0) {
     recipeList.innerHTML = '<span class="empty-state">No recipes for this game.</span>';
   } else {
+    const prevVal = (document.getElementById('craftRecipeSelect') || {}).value || '0';
     const stations = [];
-    filtered.forEach(r => {
+    recipes.forEach(r => {
       if (!stations.includes(r.station)) stations.push(r.station);
     });
-    recipeList.innerHTML = stations
+    const optgroups = stations
       .map(station => {
-        const stRows = filtered
+        const opts = recipes
           .filter(r => r.station === station)
-          .map(recipe => {
-            const ri = recipes.indexOf(recipe);
-            const MAX_CAP = 99;
-            const req = recipe.skillReq;
-            let skillHtml = '';
-            if (req) {
-              const haveSkill =
-                state.skills && typeof state.skills[req.skill] === 'number'
-                  ? state.skills[req.skill]
-                  : 0;
-              const met = haveSkill >= req.level;
-              const lbl =
-                typeof SKILL_LABELS !== 'undefined' && SKILL_LABELS[req.skill]
-                  ? SKILL_LABELS[req.skill]
-                  : req.skill;
-              const col = met ? 'var(--robco-green)' : 'var(--robco-danger)';
-              skillHtml = `<span style="font-size:10px;color:${col};white-space:nowrap;">(${escapeHtml(lbl)} ${req.level} ${met ? '✓' : '✗'})</span>`;
-            }
-            let maxBatch = MAX_CAP;
-            const ingHtml = recipe.ingredients
-              .map(ing => {
-                const haveN = _craftGetHave(ing.item);
-                const canMake = ing.qty > 0 ? Math.floor(haveN / ing.qty) : MAX_CAP;
-                if (canMake < maxBatch) maxBatch = canMake;
-                const col = haveN >= ing.qty ? 'var(--robco-green)' : 'var(--robco-danger)';
-                return `<span style="color:${col};font-size:10px;margin-right:5px;">${escapeHtml(ing.item)} ${haveN}/${ing.qty}</span>`;
-              })
-              .join('');
-            const allMet = recipe.ingredients.every(ing => _craftGetHave(ing.item) >= ing.qty);
-            const missingItems = allMet
-              ? ''
-              : recipe.ingredients
-                  .filter(ing => _craftGetHave(ing.item) < ing.qty)
-                  .map(ing => escapeHtml(ing.item))
-                  .join(', ');
-            return (
-              `<div style="margin-bottom:5px;padding-bottom:4px;border-bottom:1px dashed rgba(var(--robco-green-rgb),0.12);">` +
-              `<div style="font-size:11px;font-weight:bold;display:flex;flex-wrap:wrap;gap:4px;align-items:center;">` +
-              `<span style="flex:1;">${escapeHtml(recipe.name.toUpperCase())}</span>` +
-              `${skillHtml}` +
-              `<span style="display:flex;gap:3px;align-items:center;flex-shrink:0;">` +
-              `<input type="number" id="craftQty_${ri}" value="1" min="1" max="${Math.max(1, maxBatch)}" style="width:38px;font-size:11px;">` +
-              `<button class="btn-sm action-btn" onclick="craftSetMax(${ri},${maxBatch})" style="padding:0 5px;font-size:10px;">MAX</button>` +
-              `<button class="btn-sm action-btn" data-ridx="${ri}" onclick="doCraft(parseInt(this.dataset.ridx))" style="${allMet ? '' : 'opacity:0.45;'}padding:0 7px;font-size:10px;">CRAFT</button>` +
-              `</span></div>` +
-              `<div style="margin-top:1px;">${ingHtml}</div>` +
-              (missingItems
-                ? `<div style="font-size:9px;color:var(--robco-danger);opacity:0.85;">MISSING: ${missingItems}</div>`
-                : '') +
-              `</div>`
-            );
+          .map(r => {
+            const ri = recipes.indexOf(r);
+            return `<option value="${ri}">${escapeHtml(r.name)}</option>`;
           })
           .join('');
-        return (
-          `<div style="font-size:10px;opacity:0.55;letter-spacing:1px;border-top:1px dashed rgba(var(--robco-green-rgb),0.3);padding:3px 0 2px;margin-top:3px;">${escapeHtml(station.toUpperCase())}</div>` +
-          stRows
-        );
+        return `<optgroup label="${escapeHtml(station.toUpperCase())}">${opts}</optgroup>`;
       })
       .join('');
+    recipeList.innerHTML =
+      `<select id="craftRecipeSelect" onchange="renderCraftCard()" style="width:100%;margin-bottom:6px;">${optgroups}</select>` +
+      `<div id="craftRecipeCard"></div>`;
+    const newSel = document.getElementById('craftRecipeSelect');
+    if (newSel) {
+      newSel.value = prevVal;
+      if (!newSel.value) newSel.selectedIndex = 0;
+    }
+    renderCraftCard();
   }
 
+  // ── Scrap picker ──────────────────────────────────────────────
   if (breakdowns.length === 0) {
     scrapList.innerHTML =
       '<div style="font-size:11px;opacity:0.5;padding:2px 0;">No breakdown recipes for this game.</div>';
   } else {
-    const available = breakdowns.filter(b => _craftGetHave(b.item) > 0);
-    if (available.length === 0) {
-      scrapList.innerHTML = '<span class="empty-state">No matching items in inventory.</span>';
-    } else {
-      scrapList.innerHTML = available
-        .map(b => {
-          const bi = breakdowns.indexOf(b);
-          const have = _craftGetHave(b.item);
-          const yieldPreview = b.yields.map(y => `${y.qty}× ${escapeHtml(y.item)}`).join(', ');
-          return (
-            `<div style="font-size:11px;margin-bottom:4px;display:flex;flex-wrap:wrap;gap:4px;align-items:center;">` +
-            `<span style="flex:1;">${escapeHtml(b.item.toUpperCase())}</span>` +
-            `<span style="font-size:10px;opacity:0.6;">→ ${yieldPreview}</span>` +
-            `<span style="display:flex;gap:3px;align-items:center;flex-shrink:0;">` +
-            `<input type="number" id="scrapQty_${bi}" value="1" min="1" max="${have}" style="width:38px;font-size:11px;">` +
-            `<button class="btn-sm action-btn" data-bidx="${bi}" onclick="doScrap(parseInt(this.dataset.bidx))" style="padding:0 7px;font-size:10px;">SCRAP</button>` +
-            `</span></div>`
-          );
-        })
-        .join('');
+    const prevScrapVal = (document.getElementById('scrapItemSelect') || {}).value || '0';
+    const scrapOpts = breakdowns
+      .map(b => {
+        const bi = breakdowns.indexOf(b);
+        return `<option value="${bi}">${escapeHtml(b.item)}</option>`;
+      })
+      .join('');
+    scrapList.innerHTML =
+      `<select id="scrapItemSelect" onchange="renderScrapCard()" style="width:100%;margin-bottom:4px;">${scrapOpts}</select>` +
+      `<div id="scrapItemCard"></div>`;
+    const newScrapSel = document.getElementById('scrapItemSelect');
+    if (newScrapSel) {
+      newScrapSel.value = prevScrapVal;
+      if (!newScrapSel.value) newScrapSel.selectedIndex = 0;
     }
+    renderScrapCard();
   }
 }
 

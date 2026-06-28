@@ -1,8 +1,8 @@
-﻿## [Unreleased]<!-- Tests: 1016/1016 | Cache: robco-terminal-v2.5.0-r31 -->
+﻿## [Unreleased]<!-- Tests: 1020/1020 | Cache: robco-terminal-v2.5.0-r32 -->
 
 ### Added
 
-- **Craft panel** — a new CRAFTING menu in the INV tab that reads the recipe registry: per-station recipe list with live have/need ingredient checks, soft skill indicators, batch crafting with a MAX button, and a Scrap/Breakdown sub-panel. Crafting and scrapping consume and produce real inventory behind a confirmation prompt (local only, never auto-synced to cloud).
+- **Craft panel** — a new CRAFTING menu in the INV tab with a station-grouped dropdown that shows one recipe card at a time: pick a recipe from the select (Workbench / Campfire / Reloading groups), then see live have/need ingredient checks, a soft skill indicator, and batch crafting with a MAX button. The Scrap/Breakdown sub-panel uses the same picker design. Crafting and scrapping consume and produce real inventory behind a confirmation prompt (local only, never auto-synced to cloud).
 
 - **Structured crafting recipe and breakdown data added to the registry** — 25 New Vegas recipes covering the workbench (stimpaks, repair kits, mines, upgraded weapons, Nuka-Cola variants), recycling bench (energy cell recharging), and campfire (chems, food, survival items); 12 ammo and cookware breakdown entries for the reloading bench; and 7 Fallout 3 workbench schematics (Bottlecap Mine, Dart Gun, Deathclaw Gauntlet, Nuka-Grenade, Railway Rifle, Rock-It Launcher, Shishkebab). This is the data foundation for the upcoming Craft panel — not yet shown in the UI.
 

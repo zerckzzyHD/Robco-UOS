@@ -4818,7 +4818,7 @@ Check ($fo3RecBlock83.Contains("name: 'Deathclaw Gauntlet'") -and $fo3RecBlock83
     "FO3 recipes contain 'Deathclaw Gauntlet' and 'Shishkebab'"
 # ===========================================================
 # Suite 84 -- Craft panel UI + mechanics (behavioral + data-safety)
-# 20 tests
+# 24 tests
 # ===========================================================
 Sep "Suite 84 -- Craft panel UI + mechanics (behavioral + data-safety)"
 
@@ -4879,6 +4879,18 @@ Check ($doCraftBody84.Contains('confirm(')) "confirm() gate present in doCraft b
 
 # 84.k  confirm( gate in doScrap
 Check ($doScrapBody84.Contains('confirm(')) "confirm() gate present in doScrap body"
+
+# 84.u  renderCraft builds craftRecipeSelect
+Check ($uiRSrc84.Contains('craftRecipeSelect')) 'renderCraft() builds <select id="craftRecipeSelect"> (recipe picker)'
+
+# 84.v  renderCraft builds <optgroup elements for station grouping
+Check ($uiRSrc84.Contains('<optgroup')) 'renderCraft() builds <optgroup> for station grouping'
+
+# 84.w  renderCraftCard defined in ui-render.js
+Check ($uiRSrc84.Contains('function renderCraftCard(')) 'renderCraftCard() defined in js/ui-render.js (recipe detail card renderer)'
+
+# 84.x  renderCraft builds scrapItemSelect
+Check ($uiRSrc84.Contains('scrapItemSelect')) 'renderCraft() builds <select id="scrapItemSelect"> for scrap/breakdown picker'
 
 # 84.l  doCraft body has ingredient missing-check logic
 Check ($doCraftBody84.Contains('missing')) "doCraft body has ingredient missing-check logic"
