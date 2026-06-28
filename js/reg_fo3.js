@@ -967,6 +967,24 @@ const FALLOUT_REGISTRY = {
       locations: ['Collapsed Car Fort', 'Rivet City South', 'Takoma Industrial'],
     },
   ],
+  // ── SKILL BOOKS ──────────────────────────────────────────────────────────────
+  // One book per skill. Reading permanently raises the skill by 1–3 pts.
+  // Data source: https://fallout.wiki/wiki/Fallout_3_skill_books
+  skillBooks: [
+    { name: 'Tales of a Junktown Jerky Vendor', skill: 'barter' },
+    { name: 'U.S. Army: 30 Handy Flamethrower Recipes', skill: 'big_guns' },
+    { name: 'Nikola Tesla and You', skill: 'energy_weapons' },
+    { name: 'Duck and Cover!', skill: 'explosives' },
+    { name: 'Tumblers Today', skill: 'lockpick' },
+    { name: 'D.C. Journal of Internal Medicine', skill: 'medicine' },
+    { name: 'Grognak the Barbarian', skill: 'melee_weapons' },
+    { name: "Dean's Electronics", skill: 'repair' },
+    { name: 'Big Book of Science', skill: 'science' },
+    { name: 'Guns and Bullets', skill: 'small_guns' },
+    { name: 'Chinese Army: Special Ops Training Manual', skill: 'sneak' },
+    { name: 'Lying, Congressional Style', skill: 'speech' },
+    { name: 'Pugilism Illustrated', skill: 'unarmed' },
+  ],
   // ── CRAFTING RECIPES ─────────────────────────────────────────────────────
   // Data source: https://fallout.wiki/wiki/Fallout_3_crafting
   // FO3 uses workbench schematics only; no skill requirements.

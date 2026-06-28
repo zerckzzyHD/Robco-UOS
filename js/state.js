@@ -354,6 +354,7 @@ let state = {
   collectibles: [], // flat string[] of collected item names (game-context-aware)
   lincolnItems: {}, // FO3 only — map of artifact name → disposition (found|hannibal|leroy|washington)
   traits: [], // FNV only — string[] of selected trait names (soft cap 2; OWB allows re-selection)
+  skillBooks: [], // string[] of skill-book titles read (both games)
   campaignMode: 'standard', // 'standard' | 'rng' (armed) | 'rng-locked' (permanently active after wipe)
   playthroughType: 'standard', // 'standard' | 'minmaxed' | 'completionist' | 'casual' | 'speedrun'
   mapView: 'auto', // 'auto' | 'full' | 'core' — persisted map size preference; 'auto' and 'core' → 4×4 grid
@@ -543,6 +544,7 @@ function migrateState(version, s) {
     if (s.lincolnItems[k] === 'other') s.lincolnItems[k] = 'found';
   });
   if (!Array.isArray(s.traits)) s.traits = [];
+  if (!Array.isArray(s.skillBooks)) s.skillBooks = [];
   // C4-fix / C11: campaignMode has 3 states: 'standard' | 'rng' (armed) | 'rng-locked' (activated by wipe).
   if (s.campaignMode !== 'rng' && s.campaignMode !== 'rng-locked') s.campaignMode = 'standard';
   // C5: playthroughType — migrate from legacy localStorage key if not yet in state.

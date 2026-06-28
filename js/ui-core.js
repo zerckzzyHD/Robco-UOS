@@ -824,6 +824,7 @@ function _updatePanelBadges() {
             ).length
           : 0,
     },
+    { h2text: '> SKILL BOOKS', count: (state.skillBooks || []).length },
   ];
   badges.forEach(({ h2text, count }) => {
     // Find the h2 with exactly this text (case-insensitive prefix match)
@@ -940,6 +941,7 @@ function expandPanelForCategory(categoryKey) {
     equipped: 'inv',
     collectibles: 'inv',
     craft: 'inv',
+    skillBooks: 'stat',
   };
   if (tabMap[categoryKey]) switchTab(tabMap[categoryKey]);
 
@@ -955,6 +957,7 @@ function expandPanelForCategory(categoryKey) {
     equipped: '> EQUIPPED',
     collectibles: '> COLLECTIBLES',
     craft: '> CRAFTING',
+    skillBooks: '> SKILL BOOKS',
   };
   const target = map[categoryKey];
   if (!target) return;
@@ -1394,6 +1397,7 @@ function loadUI() {
   renderCollectibles();
   renderLincolnMemorabilia();
   renderTraits();
+  renderSkillBooks();
   renderCraft();
   renderGameDate();
   renderWorldMap(); // G6: Regional Zone Map

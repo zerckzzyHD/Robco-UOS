@@ -900,6 +900,62 @@ function toggleTrait(name) {
   saveState();
 }
 
+function renderSkillBooks() {
+  const container = document.getElementById('skillBooksDisplay');
+  if (!container) return;
+  const defs =
+    typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.skillBooks)
+      ? FALLOUT_REGISTRY.skillBooks
+      : [];
+  const read = Array.isArray(state.skillBooks) ? state.skillBooks : [];
+  const n = read.length;
+
+  let html = `<div style="font-size:11px;color:var(--robco-blue);font-weight:bold;letter-spacing:1px;margin-bottom:4px;">BOOKS READ [${n}/${defs.length}]</div>`;
+
+  const readDefs = defs.filter(d => read.includes(d.name));
+  const unreadDefs = defs.filter(d => !read.includes(d.name));
+
+  const renderRow = d => {
+    const safeName = escapeHtml(d.name);
+    const skillLabel = escapeHtml((d.skill || '').replace(/_/g, ' ').toUpperCase());
+    if (read.includes(d.name)) {
+      html += `<div style="font-size:11px;letter-spacing:0.5px;margin-bottom:2px;">`;
+      html += `<span style="color:var(--robco-green);cursor:pointer;margin-right:4px;" onclick="toggleSkillBook('${safeName}')" title="Mark unread">[READ]</span>`;
+      html += `<strong>${escapeHtml(d.name.toUpperCase())}</strong> <span style="font-size:10px;opacity:0.6;">&mdash; ${skillLabel}</span>`;
+      html += `</div>`;
+    } else {
+      html += `<div style="font-size:11px;letter-spacing:0.5px;margin-bottom:2px;opacity:0.7;">`;
+      html += `<span style="opacity:0.5;cursor:pointer;margin-right:4px;" onclick="toggleSkillBook('${safeName}')" title="Mark read">[----]</span>`;
+      html += `${escapeHtml(d.name.toUpperCase())} <span style="font-size:10px;opacity:0.6;">&mdash; ${skillLabel}</span>`;
+      html += `</div>`;
+    }
+  };
+
+  if (defs.length === 0) {
+    html += `<div style="font-size:11px;opacity:0.5;padding:4px 0;">No skill books in registry.</div>`;
+  } else {
+    readDefs.forEach(renderRow);
+    if (readDefs.length > 0 && unreadDefs.length > 0) {
+      html += `<div style="border-top:1px dashed var(--robco-green);margin:4px 0;opacity:0.3;"></div>`;
+    }
+    unreadDefs.forEach(renderRow);
+  }
+
+  container.innerHTML = html;
+}
+
+function toggleSkillBook(name) {
+  if (!Array.isArray(state.skillBooks)) state.skillBooks = [];
+  const idx = state.skillBooks.indexOf(name);
+  if (idx !== -1) {
+    state.skillBooks.splice(idx, 1);
+  } else {
+    state.skillBooks.push(name);
+  }
+  renderSkillBooks();
+  saveState();
+}
+
 function renderCampaignNotes() {
   const notesDiv = document.getElementById('campaignNotesList');
   if (!notesDiv) return;

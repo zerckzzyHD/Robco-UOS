@@ -971,11 +971,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84','Suite 85')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-84)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-84)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-85)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-85)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -4919,6 +4919,92 @@ Check (-not $doCraftBody84.Contains('state.skills')) "Soft skill: doCraft body d
 
 # 84.t  _craftGetHave helper defined in ui-render.js
 Check ($uiRSrc84.Contains('function _craftGetHave(')) "_craftGetHave() helper defined in js/ui-render.js"
+
+# ===========================================================
+# Suite 85 -- Skill Books Tracker (FNV+FO3, Protocol 4)
+# 16 tests
+# ===========================================================
+Sep "Suite 85 -- Skill Books Tracker (FNV+FO3, Protocol 4)"
+$nvRegSrc85 = Get-Content 'js/reg_nv.js' -Raw
+$fo3RegSrc85 = Get-Content 'js/reg_fo3.js' -Raw
+$stateSrc85 = Get-Content 'js/state.js' -Raw
+$apiSrc85 = Get-Content 'js/api.js' -Raw
+$uiRenderSrc85 = Get-Content 'js/ui-render.js' -Raw
+$uiCoreSrc85 = Get-Content 'js/ui-core.js' -Raw
+$idxSrc85 = Get-Content 'index.html' -Raw
+
+$fnvSkillKeys = @('barter','energy_weapons','explosives','guns','lockpick','medicine','melee_weapons','repair','science','sneak','speech','survival','unarmed')
+$fo3SkillKeys = @('barter','big_guns','energy_weapons','explosives','lockpick','medicine','melee_weapons','repair','science','small_guns','sneak','speech','unarmed')
+
+function Get-SkillBooksBlock85 { param($src)
+    if ($src -match '(?s)skillBooks\s*:\s*\[(.*?)\n  \],') { return $Matches[1] } else { return '' }
+}
+
+# 85.1  reg_nv.js has skillBooks array
+Check ($nvRegSrc85 -match 'skillBooks\s*:\s*\[') "reg_nv.js has skillBooks array (FNV skill-book registry)"
+
+# 85.2  reg_nv.js skillBooks has exactly 13 items
+$nvSBBlock85 = Get-SkillBooksBlock85 $nvRegSrc85
+$nvSBCount85 = ([regex]::Matches($nvSBBlock85, 'name\s*:')).Count
+Check ($nvSBCount85 -eq 13) "reg_nv.js skillBooks has exactly 13 entries (found $nvSBCount85)"
+
+# 85.3  all FNV skillBooks entries have valid skill keys
+$nvSBSkills85 = [regex]::Matches($nvSBBlock85, "skill\s*:\s*'([^']+)'") | ForEach-Object { $_.Groups[1].Value }
+$nvBadSkills85 = $nvSBSkills85 | Where-Object { $fnvSkillKeys -notcontains $_ }
+Check ($nvBadSkills85.Count -eq 0 -and $nvSBSkills85.Count -eq 13) "reg_nv.js skillBooks: all 13 skill keys are valid FNV keys (bad: $($nvBadSkills85 -join ', '))"
+
+# 85.4  FNV sentinel: Wasteland Survival Guide -> survival
+Check ($nvRegSrc85 -match "(?s)Wasteland Survival Guide.{0,60}skill\s*:\s*'survival'") "reg_nv.js skillBooks: 'Wasteland Survival Guide' maps to skill 'survival'"
+
+# 85.5  reg_fo3.js has skillBooks array
+Check ($fo3RegSrc85 -match 'skillBooks\s*:\s*\[') "reg_fo3.js has skillBooks array (FO3 skill-book registry)"
+
+# 85.6  reg_fo3.js skillBooks has exactly 13 items
+$fo3SBBlock85 = Get-SkillBooksBlock85 $fo3RegSrc85
+$fo3SBCount85 = ([regex]::Matches($fo3SBBlock85, 'name\s*:')).Count
+Check ($fo3SBCount85 -eq 13) "reg_fo3.js skillBooks has exactly 13 entries (found $fo3SBCount85)"
+
+# 85.7  all FO3 skillBooks entries have valid skill keys
+$fo3SBSkills85 = [regex]::Matches($fo3SBBlock85, "skill\s*:\s*'([^']+)'") | ForEach-Object { $_.Groups[1].Value }
+$fo3BadSkills85 = $fo3SBSkills85 | Where-Object { $fo3SkillKeys -notcontains $_ }
+Check ($fo3BadSkills85.Count -eq 0 -and $fo3SBSkills85.Count -eq 13) "reg_fo3.js skillBooks: all 13 skill keys are valid FO3 keys (bad: $($fo3BadSkills85 -join ', '))"
+
+# 85.8  FO3 sentinel: U.S. Army: 30 Handy Flamethrower Recipes -> big_guns
+Check ($fo3RegSrc85 -match "(?s)U\.S\. Army: 30 Handy Flamethrower Recipes.{0,60}skill\s*:\s*'big_guns'") "reg_fo3.js skillBooks: 'U.S. Army: 30 Handy Flamethrower Recipes' maps to skill 'big_guns'"
+
+# 85.9  Guns and Bullets: FNV='guns', FO3='small_guns'
+$nvGnB85 = $nvSBBlock85 -match "(?s)Guns and Bullets.{0,60}skill\s*:\s*'guns'"
+$fo3GnB85 = $fo3SBBlock85 -match "(?s)Guns and Bullets.{0,60}skill\s*:\s*'small_guns'"
+Check ($nvGnB85 -and $fo3GnB85) "'Guns and Bullets' maps to 'guns' in FNV and 'small_guns' in FO3"
+
+# 85.10  state.skillBooks default [] in state object (Protocol 4)
+Check ($stateSrc85 -match 'skillBooks\s*:\s*\[\s*\]') "state.skillBooks default [] in state object (Protocol 4 default)"
+
+# 85.11  migrateState() coerces non-array skillBooks to []
+$migrateBody85 = ''
+try { $migrateBody85 = Get-FunctionBody $stateSrc85 'migrateState' } catch {}
+Check ($migrateBody85 -match 'Array\.isArray\(s\.skillBooks\)' -and $migrateBody85 -match 's\.skillBooks\s*=\s*\[\]') "migrateState() coerces non-array s.skillBooks to [] (Protocol 4 migration)"
+
+# 85.12  autoImportState() validates skillBooks array and filters against registry names
+$importBody85 = ''
+try { $importBody85 = Get-FunctionBody $apiSrc85 'autoImportState' } catch {}
+Check ($importBody85 -match 'skillBooks' -and $importBody85 -match 'FALLOUT_REGISTRY\.skillBooks' -and $importBody85 -match 'bookNames') "autoImportState() validates skillBooks array and filters against FALLOUT_REGISTRY.skillBooks names (Protocol 24)"
+
+# 85.13  getSystemDirective() mentions state.skillBooks (Protocol 14)
+$sdBody85 = ''
+try { $sdBody85 = Get-FunctionBody $apiSrc85 'getSystemDirective' } catch {}
+Check ($sdBody85 -match 'state\.skillBooks') "getSystemDirective() references state.skillBooks (Protocol 14 -- AI contract updated)"
+
+# 85.14  renderSkillBooks() defined in ui-render.js
+Check ($uiRenderSrc85 -match 'function renderSkillBooks\s*\(') "renderSkillBooks() is defined in ui-render.js"
+
+# 85.15  renderSkillBooks() called from loadUI() in ui-core.js
+$loadUIBody85 = ''
+try { $loadUIBody85 = Get-FunctionBody $uiCoreSrc85 'loadUI' } catch {}
+Check ($loadUIBody85 -match 'renderSkillBooks\s*\(\s*\)') "renderSkillBooks() called from loadUI() in ui-core.js (Protocol 5)"
+
+# 85.16  index.html has #skillBooksDisplay container
+Check ($idxSrc85 -match 'id="skillBooksDisplay"') 'index.html has #skillBooksDisplay container (Protocol 5 panel element)'
 
 # ===========================================================
 # Results

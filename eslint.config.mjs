@@ -186,6 +186,8 @@ export default [
         setLincolnDisposition: 'readonly',
         renderTraits: 'readonly',
         toggleTrait: 'readonly',
+        renderSkillBooks: 'readonly',
+        toggleSkillBook: 'readonly',
         renderCraft: 'readonly',
         setCraftFilter: 'readonly',
         craftSetMax: 'readonly',

@@ -1532,6 +1532,24 @@ const FALLOUT_REGISTRY = {
       dlc: 'owb',
     },
   ],
+  // ── SKILL BOOKS ──────────────────────────────────────────────────────────────
+  // One book per skill. Reading permanently raises the skill by 1–3 pts.
+  // Data source: https://fallout.wiki/wiki/Fallout:_New_Vegas_skill_books
+  skillBooks: [
+    { name: 'Tales of a Junktown Jerky Vendor', skill: 'barter' },
+    { name: 'Nikola Tesla and You', skill: 'energy_weapons' },
+    { name: 'Duck and Cover!', skill: 'explosives' },
+    { name: 'Guns and Bullets', skill: 'guns' },
+    { name: 'Tumblers Today', skill: 'lockpick' },
+    { name: 'D.C. Journal of Internal Medicine', skill: 'medicine' },
+    { name: 'Grognak the Barbarian', skill: 'melee_weapons' },
+    { name: "Dean's Electronics", skill: 'repair' },
+    { name: 'Big Book of Science', skill: 'science' },
+    { name: 'Chinese Army: Special Ops Training Manual', skill: 'sneak' },
+    { name: 'Lying, Congressional Style', skill: 'speech' },
+    { name: 'Wasteland Survival Guide', skill: 'survival' },
+    { name: 'Pugilism Illustrated', skill: 'unarmed' },
+  ],
   // ── CRAFTING RECIPES ─────────────────────────────────────────────────────
   // Data source: https://fallout.wiki/wiki/Fallout:_New_Vegas_crafting
   // Schema: { name, station, output:{item,qty,ammo?:true}, ingredients:[{item,qty}],

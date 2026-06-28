@@ -1632,17 +1632,18 @@ header('Meta / Runner Parity');
     'Suite 82',
     'Suite 83',
     'Suite 84',
+    'Suite 85',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-84)' +
+    'JS runner contains all gate-guard suites (22-41, 49-85)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-84)' +
+    'PS runner contains all gate-guard suites (22-41, 49-85)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -8243,6 +8244,202 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
       );
     }
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 85 — Skill Books Tracker (FNV+FO3, Protocol 4)
+//  registry count/skills, sentinel checks, state default/migrate,
+//  autoImportState validation, getSystemDirective, render wiring,
+//  index.html container.
+//  16 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 85 — Skill Books Tracker (FNV+FO3, Protocol 4)');
+  const stateSrc85 = readFile('js/state.js');
+  const apiSrc85 = readFile('js/api.js');
+  const uiRenderSrc85 = readFile('js/ui-render.js');
+  const uiCoreSrc85 = readFile('js/ui-core.js');
+  const nvRegSrc85 = readFile('js/reg_nv.js');
+  const fo3RegSrc85 = readFile('js/reg_fo3.js');
+
+  const FNV_SKILL_KEYS = [
+    'barter',
+    'energy_weapons',
+    'explosives',
+    'guns',
+    'lockpick',
+    'medicine',
+    'melee_weapons',
+    'repair',
+    'science',
+    'sneak',
+    'speech',
+    'survival',
+    'unarmed',
+  ];
+  const FO3_SKILL_KEYS = [
+    'barter',
+    'big_guns',
+    'energy_weapons',
+    'explosives',
+    'lockpick',
+    'medicine',
+    'melee_weapons',
+    'repair',
+    'science',
+    'small_guns',
+    'sneak',
+    'speech',
+    'unarmed',
+  ];
+
+  function extractSkillBooksBlock85(src) {
+    const m = src.match(/skillBooks\s*:\s*\[([\s\S]*?)\n {2}\],/);
+    return m ? m[1] : '';
+  }
+
+  // 85.1  reg_nv.js has skillBooks array
+  assert(
+    /skillBooks\s*:\s*\[/.test(nvRegSrc85),
+    'reg_nv.js has skillBooks array (FNV skill-book registry)'
+  );
+
+  // 85.2  reg_nv.js skillBooks has exactly 13 items
+  {
+    const block = extractSkillBooksBlock85(nvRegSrc85);
+    const count = (block.match(/\bname\s*:/g) || []).length;
+    assert(count === 13, `reg_nv.js skillBooks has exactly 13 entries (found ${count})`);
+  }
+
+  // 85.3  all FNV skillBooks entries have valid skill keys
+  {
+    const block = extractSkillBooksBlock85(nvRegSrc85);
+    const skillMatches = [...block.matchAll(/skill\s*:\s*'([^']+)'/g)].map(m => m[1]);
+    const invalid = skillMatches.filter(sk => !FNV_SKILL_KEYS.includes(sk));
+    assert(
+      invalid.length === 0 && skillMatches.length === 13,
+      `reg_nv.js skillBooks: all 13 skill keys are valid FNV keys (invalid: ${invalid.join(', ') || 'none'})`
+    );
+  }
+
+  // 85.4  FNV sentinel: Wasteland Survival Guide → survival
+  assert(
+    /name\s*:\s*'Wasteland Survival Guide'[\s\S]{0,60}skill\s*:\s*'survival'/.test(nvRegSrc85),
+    "reg_nv.js skillBooks: 'Wasteland Survival Guide' maps to skill 'survival'"
+  );
+
+  // 85.5  reg_fo3.js has skillBooks array
+  assert(
+    /skillBooks\s*:\s*\[/.test(fo3RegSrc85),
+    'reg_fo3.js has skillBooks array (FO3 skill-book registry)'
+  );
+
+  // 85.6  reg_fo3.js skillBooks has exactly 13 items
+  {
+    const block = extractSkillBooksBlock85(fo3RegSrc85);
+    const count = (block.match(/\bname\s*:/g) || []).length;
+    assert(count === 13, `reg_fo3.js skillBooks has exactly 13 entries (found ${count})`);
+  }
+
+  // 85.7  all FO3 skillBooks entries have valid skill keys
+  {
+    const block = extractSkillBooksBlock85(fo3RegSrc85);
+    const skillMatches = [...block.matchAll(/skill\s*:\s*'([^']+)'/g)].map(m => m[1]);
+    const invalid = skillMatches.filter(sk => !FO3_SKILL_KEYS.includes(sk));
+    assert(
+      invalid.length === 0 && skillMatches.length === 13,
+      `reg_fo3.js skillBooks: all 13 skill keys are valid FO3 keys (invalid: ${invalid.join(', ') || 'none'})`
+    );
+  }
+
+  // 85.8  FO3 sentinel: U.S. Army: 30 Handy Flamethrower Recipes → big_guns
+  assert(
+    /name\s*:\s*'U\.S\. Army: 30 Handy Flamethrower Recipes'[\s\S]{0,60}skill\s*:\s*'big_guns'/.test(
+      fo3RegSrc85
+    ),
+    "reg_fo3.js skillBooks: 'U.S. Army: 30 Handy Flamethrower Recipes' maps to skill 'big_guns'"
+  );
+
+  // 85.9  Guns and Bullets: FNV='guns', FO3='small_guns' (shared title, different skill)
+  {
+    const nvBlock = extractSkillBooksBlock85(nvRegSrc85);
+    const fo3Block = extractSkillBooksBlock85(fo3RegSrc85);
+    const nvGnB = /Guns and Bullets[\s\S]{0,60}skill\s*:\s*'guns'/.test(nvBlock);
+    const fo3GnB = /Guns and Bullets[\s\S]{0,60}skill\s*:\s*'small_guns'/.test(fo3Block);
+    assert(
+      nvGnB && fo3GnB,
+      "'Guns and Bullets' maps to 'guns' in FNV and 'small_guns' in FO3 (shared title, game-specific skill)"
+    );
+  }
+
+  // 85.10  state.skillBooks default [] in state object (Protocol 4)
+  assert(
+    /skillBooks\s*:\s*\[\s*\]/.test(stateSrc85),
+    'state.skillBooks default [] in state object (Protocol 4 default)'
+  );
+
+  // 85.11  migrateState() coerces non-array skillBooks to []
+  {
+    let migrateBody85 = '';
+    try {
+      migrateBody85 = extractFunctionBody(stateSrc85, 'migrateState');
+    } catch (_) {}
+    assert(
+      /Array\.isArray\(s\.skillBooks\)/.test(migrateBody85) &&
+        /s\.skillBooks\s*=\s*\[\]/.test(migrateBody85),
+      'migrateState() coerces non-array s.skillBooks to [] (Protocol 4 migration)'
+    );
+  }
+
+  // 85.12  autoImportState() validates skillBooks as array and filters against registry names
+  {
+    let importBody85 = '';
+    try {
+      importBody85 = extractFunctionBody(apiSrc85, 'autoImportState');
+    } catch (_) {}
+    assert(
+      /skillBooks/.test(importBody85) &&
+        /FALLOUT_REGISTRY\.skillBooks/.test(importBody85) &&
+        /bookNames/.test(importBody85),
+      'autoImportState() validates skillBooks array and filters against FALLOUT_REGISTRY.skillBooks names (Protocol 24)'
+    );
+  }
+
+  // 85.13  getSystemDirective() mentions state.skillBooks (Protocol 14 — AI contract)
+  {
+    let sdBody85 = '';
+    try {
+      sdBody85 = extractFunctionBody(apiSrc85, 'getSystemDirective');
+    } catch (_) {}
+    assert(
+      /state\.skillBooks/.test(sdBody85),
+      'getSystemDirective() references state.skillBooks (Protocol 14 — AI contract updated)'
+    );
+  }
+
+  // 85.14  renderSkillBooks() defined in ui-render.js
+  assert(
+    /function renderSkillBooks\s*\(/.test(uiRenderSrc85),
+    'renderSkillBooks() is defined in ui-render.js'
+  );
+
+  // 85.15  renderSkillBooks() called from loadUI() in ui-core.js
+  {
+    let loadUIBody85 = '';
+    try {
+      loadUIBody85 = extractFunctionBody(uiCoreSrc85, 'loadUI');
+    } catch (_) {}
+    assert(
+      /renderSkillBooks\s*\(\s*\)/.test(loadUIBody85),
+      'renderSkillBooks() called from loadUI() in ui-core.js (Protocol 5)'
+    );
+  }
+
+  // 85.16  index.html has #skillBooksDisplay container
+  assert(
+    /id="skillBooksDisplay"/.test(htmlSource),
+    'index.html has #skillBooksDisplay container (Protocol 5 panel element)'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════
