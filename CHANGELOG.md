@@ -1,4 +1,4 @@
-## [Unreleased]<!-- Tests: 850/850 | Cache: robco-terminal-v2.5.0-r15 -->
+## [Unreleased]<!-- Tests: 868/868 | Cache: robco-terminal-v2.5.0-r16 -->
 
 ### Added
 
@@ -14,6 +14,9 @@
 
 ### Changed
 
+- **All trackers now use a compact one-line format** — the Traits list (New Vegas), the Bobbleheads/Snow Globes list, and the Lincoln Memorabilia list each show one line per entry: status tag, name, and detail all on the same row. This matches the dense bobblehead style throughout and removes the extra vertical gap between rows.
+- **Traits, Bobbleheads/Snow Globes, and Lincoln Memorabilia are now individually collapsible** — each sub-list within its parent panel has its own expand/collapse toggle. All three default to collapsed on first launch (so the panels stay tidy), then remember their state across reloads. The state is saved separately from your game save and never affects your character data.
+- **Mr. House faction card is centered when alone on a row** — on mobile (two-column layout), when there are an odd number of major factions, the last card is centered instead of left-aligned with blank space next to it. The general rule applies to any lone last card in the faction grid.
 - **Traits moved into the Perks panel** — instead of a separate panel, Traits now appears as a compact subsection directly below the Perks list (New Vegas campaigns only). The sub-header shows the current count (e.g. TRAITS [1/2]); a filter box lets you search by name or effect. Fallout 3 campaigns are unaffected — the subsection is hidden automatically.
 - The update prompt is now a full-screen blocking reboot dialog. When a new version is ready, a modal covers the screen and must be acknowledged — tap REBOOT TERMINAL to update. The dialog cannot be dismissed any other way. It only appears when an update is genuinely waiting; first-time launch is unaffected.
 - The "Save to Cloud" button in the All Saves section now matches the style and sizing of the local save slot buttons, giving the section a consistent look.

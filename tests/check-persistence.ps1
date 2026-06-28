@@ -971,7 +971,7 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
 Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-69)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
@@ -3980,6 +3980,103 @@ Check ($seedBody70 -match 'inventory' -and $seedBody70 -match 'length') `
 # 70.14  New-campaign guard (ticks === 0)
 Check ([bool]($seedBody70 -match 'ticks')) `
     'seedNewCampaignInventory() checks ticks -- prevents seeding on reload of played campaign'
+
+# ===========================================================
+# Suite 71 -- Phase 6 UI Consistency (compact trackers,
+# collapsible sub-panels, persist collapse, center lone faction card)
+# Guards: #traitsSection is <details.sub-panel> + data-sub-id,
+# renderTraits compact inline effect span,
+# #collectiblesSubPanel + #lincolnSubPanel as sub-panels,
+# sub-panel persistence + fail-safe + default-collapsed,
+# Lincoln compact rows, faction lone-card CSS.
+# 18 tests
+# ===========================================================
+Sep "Suite 71 -- Phase 6 UI Consistency"
+$htmlSrc71     = Read-Src 'index.html'
+$uiRenderSrc71 = Read-Src 'js\ui-render.js'
+$uiCoreSrc71   = Read-Src 'js\ui-core.js'
+$cssSrc71      = Read-Src 'css\terminal.css'
+
+# 71.1  #traitsSection is a <details> element
+Check ([bool]($htmlSrc71 -match '<details[^>]+id="traitsSection"')) `
+    'index.html: #traitsSection is a <details> element (collapsible sub-panel, not a plain div)'
+
+# 71.2  #traitsSection has class="sub-panel"
+Check ([bool]($htmlSrc71 -match '(?s)<details[^>]*class="sub-panel"[^>]*id="traitsSection"|<details[^>]*id="traitsSection"[^>]*class="sub-panel"')) `
+    'index.html: #traitsSection has class="sub-panel"'
+
+# 71.3  #traitsSection has data-sub-id attribute
+Check ([bool]($htmlSrc71 -match 'id="traitsSection"[^>]*data-sub-id|data-sub-id[^>]*id="traitsSection"')) `
+    'index.html: #traitsSection has data-sub-id attribute for persistence'
+
+# 71.4  renderTraits() compact: effect is inline span not block div
+$renderBody71 = ''
+$renderMatch71 = [regex]::Match($uiRenderSrc71, '(?s)function renderTraits\s*\([^)]*\)\s*\{(.*?)\n\}')
+if ($renderMatch71.Success) { $renderBody71 = $renderMatch71.Groups[1].Value }
+Check ($renderBody71 -match 'effectSpan' -and $renderBody71 -notmatch "html\s*\+=\s*``<div[^``]*font-size:10px[^``]*>`\s*`\$\{escapeHtml\(d\.effect\)") `
+    'renderTraits() renders effect inline as <span> (compact one-line format -- no block <div> per effect)'
+
+# 71.5  #collectiblesSubPanel exists in index.html
+Check ([bool]($htmlSrc71 -match 'id="collectiblesSubPanel"')) `
+    'index.html has #collectiblesSubPanel (collectibles list sub-tracker)'
+
+# 71.6  #collectiblesSubPanel has class="sub-panel"
+Check ([bool]($htmlSrc71 -match '(?s)<details[^>]*class="sub-panel"[^>]*id="collectiblesSubPanel"|<details[^>]*id="collectiblesSubPanel"[^>]*class="sub-panel"')) `
+    'index.html: #collectiblesSubPanel has class="sub-panel"'
+
+# 71.7  #collectiblesSubPanel has data-sub-id attribute
+Check ([bool]($htmlSrc71 -match 'id="collectiblesSubPanel"[^>]*data-sub-id|data-sub-id[^>]*id="collectiblesSubPanel"')) `
+    'index.html: #collectiblesSubPanel has data-sub-id attribute for persistence'
+
+# 71.8  #lincolnSubPanel exists in index.html
+Check ([bool]($htmlSrc71 -match 'id="lincolnSubPanel"')) `
+    'index.html has #lincolnSubPanel (Lincoln Memorabilia sub-tracker)'
+
+# 71.9  #lincolnSubPanel has class="sub-panel"
+Check ([bool]($htmlSrc71 -match '(?s)<details[^>]*class="sub-panel"[^>]*id="lincolnSubPanel"|<details[^>]*id="lincolnSubPanel"[^>]*class="sub-panel"')) `
+    'index.html: #lincolnSubPanel has class="sub-panel"'
+
+# 71.10  #lincolnSubPanel has data-sub-id attribute
+Check ([bool]($htmlSrc71 -match 'id="lincolnSubPanel"[^>]*data-sub-id|data-sub-id[^>]*id="lincolnSubPanel"')) `
+    'index.html: #lincolnSubPanel has data-sub-id attribute for persistence'
+
+# 71.11  Sub-panel persistence in ui-core.js reads robco_panel_state for data-sub-id elements
+Check ($uiCoreSrc71 -match 'data-sub-id' -and $uiCoreSrc71 -match 'robco_panel_state') `
+    'ui-core.js wires persistence for details[data-sub-id] elements using robco_panel_state key'
+
+# 71.12  Sub-panel toggle listener saves state
+Check ($uiCoreSrc71 -match 'data-sub-id' -and $uiCoreSrc71 -match 'toggle' -and $uiCoreSrc71 -match 'subId') `
+    'ui-core.js wires "toggle" event on sub-panels to persist open/closed state'
+
+# 71.13  Default collapsed: no 'open' attribute on #collectiblesSubPanel
+Check (-not ($htmlSrc71 -match '<details[^>]*id="collectiblesSubPanel"[^>]*\sopen[\s>]')) `
+    'index.html: #collectiblesSubPanel has no "open" attribute -- defaults to collapsed'
+
+# 71.14  Default collapsed: no 'open' attribute on #lincolnSubPanel
+Check (-not ($htmlSrc71 -match '<details[^>]*id="lincolnSubPanel"[^>]*\sopen[\s>]')) `
+    'index.html: #lincolnSubPanel has no "open" attribute -- defaults to collapsed'
+
+# 71.15  Fail-safe: sub-panel persistence uses JSON.parse with '{}' fallback
+Check ([bool]($uiCoreSrc71 -match "JSON\.parse\s*\(\s*localStorage\.getItem\s*\(\s*['""]robco_panel_state['""]\s*\)\s*\|\|\s*'\{\}'")) `
+    "ui-core.js sub-panel persistence uses JSON.parse(... || '{}') fail-safe"
+
+# 71.16  Lincoln compact: margin-bottom:2px (not 4px) in renderLincolnMemorabilia
+$lincolnBody71 = ''
+$lincolnMatch71 = [regex]::Match($uiRenderSrc71, '(?s)function renderLincolnMemorabilia\s*\([^)]*\)\s*\{(.*?)\n\}')
+if ($lincolnMatch71.Success) { $lincolnBody71 = $lincolnMatch71.Groups[1].Value }
+Check ($lincolnBody71 -match 'margin-bottom:2px' -and $lincolnBody71 -notmatch 'margin-bottom:4px') `
+    'renderLincolnMemorabilia() uses margin-bottom:2px (compact one-line format) -- no 4px spacing'
+
+# 71.17  Faction lone-card CSS: :last-child:nth-child(odd) in terminal.css
+Check ([bool]($cssSrc71 -match 'faction-card:last-child:nth-child\(odd\)')) `
+    'terminal.css has .faction-card:last-child:nth-child(odd) rule for centering lone card in mobile grid'
+
+# 71.18  renderCollectibles updates sub-panel summary h3
+$collectiblesBody71 = ''
+$collectiblesMatch71 = [regex]::Match($uiRenderSrc71, '(?s)function renderCollectibles\s*\([^)]*\)\s*\{(.*?)\n\}')
+if ($collectiblesMatch71.Success) { $collectiblesBody71 = $collectiblesMatch71.Groups[1].Value }
+Check ($collectiblesBody71 -match 'collectiblesSubPanel' -and ($collectiblesBody71 -match 'summaryH3|querySelector.*h3')) `
+    'renderCollectibles() updates #collectiblesSubPanel summary h3 with game-specific label and count'
 
 # ===========================================================
 # Results

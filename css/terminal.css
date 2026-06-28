@@ -1823,6 +1823,12 @@ body.sync-complete {
   .faction-grid {
     grid-template-columns: 1fr 1fr;
   }
+  /* Center a lone last card in the 2-col grid (e.g. Mr. House when major count is odd) */
+  .faction-grid > .faction-card:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+    justify-self: center;
+    width: calc(50% - 3px);
+  }
 
   /* Hard guard: no embedded element may force a horizontal scrollbar */
   img,

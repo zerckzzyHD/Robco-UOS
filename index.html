@@ -684,10 +684,27 @@
             <summary>
               <h2>&gt; COLLECTIBLES</h2>
             </summary>
-            <div id="collectiblesDisplay">
-              <span class="empty-state">No collectibles loaded</span>
-            </div>
-            <div id="lincolnMemorabiliaDisplay"></div>
+            <!-- Bobbleheads / Snow Globes sub-tracker -->
+            <details class="sub-panel" id="collectiblesSubPanel" data-sub-id="collectibles_main">
+              <summary>
+                <h3>&gt; COLLECTIBLES LIST</h3>
+              </summary>
+              <div id="collectiblesDisplay">
+                <span class="empty-state">No collectibles loaded</span>
+              </div>
+            </details>
+            <!-- Lincoln Memorabilia sub-tracker (FO3 only — shown/hidden by renderLincolnMemorabilia()) -->
+            <details
+              class="sub-panel"
+              id="lincolnSubPanel"
+              data-sub-id="lincoln_memorabilia"
+              style="display: none"
+            >
+              <summary>
+                <h3>&gt; LINCOLN MEMORABILIA</h3>
+              </summary>
+              <div id="lincolnMemorabiliaDisplay"></div>
+            </details>
           </details>
 
           <details class="panel" data-tab="stat">
@@ -911,16 +928,16 @@
             <button class="action-btn" onclick="addPerk()" style="margin-top: 4px">
               + ADD PERK
             </button>
-            <!-- Traits subsection (FNV only — shown/hidden by renderTraits()) -->
-            <div
+            <!-- Traits subsection (FNV only — shown/hidden by renderTraits(), collapsible sub-panel) -->
+            <details
+              class="sub-panel"
               id="traitsSection"
-              style="
-                border-top: 1px dashed var(--robco-blue);
-                margin-top: 10px;
-                padding-top: 8px;
-                display: none;
-              "
+              data-sub-id="traits"
+              style="display: none"
             >
+              <summary>
+                <h3>&gt; TRAITS</h3>
+              </summary>
               <input
                 type="text"
                 id="traitFilter"
@@ -930,7 +947,7 @@
                 style="width: 100%; box-sizing: border-box; margin-bottom: 4px; font-size: 16px"
               />
               <div id="traitsDisplay"></div>
-            </div>
+            </details>
           </details>
 
           <!-- 7. STATUS EFFECTS -->

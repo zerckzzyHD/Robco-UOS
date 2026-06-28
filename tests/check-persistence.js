@@ -1618,17 +1618,18 @@ header('Meta / Runner Parity');
     'Suite 68',
     'Suite 69',
     'Suite 70',
+    'Suite 71',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-70)' +
+    'JS runner contains all gate-guard suites (22-41, 49-71)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-70)' +
+    'PS runner contains all gate-guard suites (22-41, 49-71)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -6585,6 +6586,164 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     assert(
       /ticks/.test(seedBody70),
       'seedNewCampaignInventory() checks ticks — prevents seeding on reload of played campaign'
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 71 — Phase 6 UI Consistency (compact trackers,
+//  collapsible sub-panels, persist collapse, center lone faction card)
+//  Guards: #traitsSection is <details.sub-panel> with data-sub-id,
+//  renderTraits compact one-line format (inline effect span),
+//  #collectiblesSubPanel + #lincolnSubPanel as sub-panels,
+//  sub-panel persistence via robco_panel_state, fail-safe,
+//  default-collapsed, Lincoln compact rows, faction lone-card CSS.
+//  18 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 71 — Phase 6 UI Consistency');
+  const htmlSrc71 = readFile('index.html');
+  const uiRenderSrc71 = readFile('js/ui-render.js');
+  const uiCoreSrc71 = readFile('js/ui-core.js');
+  const cssSrc71 = readFile('css/terminal.css');
+
+  // 71.1  #traitsSection is a <details> element (collapsible sub-panel)
+  assert(
+    /<details[^>]+id="traitsSection"/.test(htmlSrc71),
+    'index.html: #traitsSection is a <details> element (collapsible sub-panel, not a plain div)'
+  );
+
+  // 71.2  #traitsSection has class="sub-panel"
+  assert(
+    /<details[^>]*class="sub-panel"[^>]*id="traitsSection"|<details[^>]*id="traitsSection"[^>]*class="sub-panel"/.test(
+      htmlSrc71
+    ),
+    'index.html: #traitsSection has class="sub-panel"'
+  );
+
+  // 71.3  #traitsSection has data-sub-id attribute (persistence key)
+  assert(
+    /id="traitsSection"[^>]*data-sub-id|data-sub-id[^>]*id="traitsSection"/.test(htmlSrc71),
+    'index.html: #traitsSection has data-sub-id attribute for persistence'
+  );
+
+  // 71.4  renderTraits() compact: effect is an inline <span>, not a block <div>
+  {
+    let renderBody71 = '';
+    try {
+      renderBody71 = extractFunctionBody(uiRenderSrc71, 'renderTraits');
+    } catch (_) {}
+    assert(
+      /effectSpan/.test(renderBody71) &&
+        !/html\s*\+=\s*`<div[^`]*font-size:10px[^`]*>\s*\$\{escapeHtml\(d\.effect\)/.test(
+          renderBody71
+        ),
+      'renderTraits() renders effect inline as <span> (compact one-line format — no block <div> per effect)'
+    );
+  }
+
+  // 71.5  #collectiblesSubPanel exists in index.html
+  assert(
+    /id="collectiblesSubPanel"/.test(htmlSrc71),
+    'index.html has #collectiblesSubPanel (collectibles list sub-tracker)'
+  );
+
+  // 71.6  #collectiblesSubPanel has class="sub-panel"
+  assert(
+    /<details[^>]*class="sub-panel"[^>]*id="collectiblesSubPanel"|<details[^>]*id="collectiblesSubPanel"[^>]*class="sub-panel"/.test(
+      htmlSrc71
+    ),
+    'index.html: #collectiblesSubPanel has class="sub-panel"'
+  );
+
+  // 71.7  #collectiblesSubPanel has data-sub-id attribute
+  assert(
+    /id="collectiblesSubPanel"[^>]*data-sub-id|data-sub-id[^>]*id="collectiblesSubPanel"/.test(
+      htmlSrc71
+    ),
+    'index.html: #collectiblesSubPanel has data-sub-id attribute for persistence'
+  );
+
+  // 71.8  #lincolnSubPanel exists in index.html
+  assert(
+    /id="lincolnSubPanel"/.test(htmlSrc71),
+    'index.html has #lincolnSubPanel (Lincoln Memorabilia sub-tracker)'
+  );
+
+  // 71.9  #lincolnSubPanel has class="sub-panel"
+  assert(
+    /<details[^>]*class="sub-panel"[^>]*id="lincolnSubPanel"|<details[^>]*id="lincolnSubPanel"[^>]*class="sub-panel"/.test(
+      htmlSrc71
+    ),
+    'index.html: #lincolnSubPanel has class="sub-panel"'
+  );
+
+  // 71.10  #lincolnSubPanel has data-sub-id attribute
+  assert(
+    /id="lincolnSubPanel"[^>]*data-sub-id|data-sub-id[^>]*id="lincolnSubPanel"/.test(htmlSrc71),
+    'index.html: #lincolnSubPanel has data-sub-id attribute for persistence'
+  );
+
+  // 71.11  Sub-panel persistence in ui-core.js: reads robco_panel_state for data-sub-id elements
+  assert(
+    /data-sub-id/.test(uiCoreSrc71) && /robco_panel_state/.test(uiCoreSrc71),
+    'ui-core.js wires persistence for details[data-sub-id] elements using robco_panel_state key'
+  );
+
+  // 71.12  Sub-panel toggle listener saves state in ui-core.js
+  assert(
+    /data-sub-id/.test(uiCoreSrc71) && /toggle/.test(uiCoreSrc71) && /subId/.test(uiCoreSrc71),
+    'ui-core.js wires "toggle" event on sub-panels to persist open/closed state'
+  );
+
+  // 71.13  Default collapsed: no 'open' attribute on #collectiblesSubPanel in HTML
+  assert(
+    !/<details[^>]*id="collectiblesSubPanel"[^>]*\sopen[\s>]/.test(htmlSrc71),
+    'index.html: #collectiblesSubPanel has no "open" attribute — defaults to collapsed'
+  );
+
+  // 71.14  Default collapsed: no 'open' attribute on #lincolnSubPanel in HTML
+  assert(
+    !/<details[^>]*id="lincolnSubPanel"[^>]*\sopen[\s>]/.test(htmlSrc71),
+    'index.html: #lincolnSubPanel has no "open" attribute — defaults to collapsed'
+  );
+
+  // 71.15  Fail-safe: sub-panel persistence uses JSON.parse with '{}' fallback
+  assert(
+    /JSON\.parse\s*\(\s*localStorage\.getItem\s*\(\s*['"]robco_panel_state['"]\s*\)\s*\|\|\s*'\{\}'/.test(
+      uiCoreSrc71
+    ),
+    "ui-core.js sub-panel persistence uses JSON.parse(...|| '{}') fail-safe"
+  );
+
+  // 71.16  Lincoln memorabilia compact: margin-bottom:2px (not 4px) in renderLincolnMemorabilia
+  {
+    let lincolnBody71 = '';
+    try {
+      lincolnBody71 = extractFunctionBody(uiRenderSrc71, 'renderLincolnMemorabilia');
+    } catch (_) {}
+    assert(
+      /margin-bottom:2px/.test(lincolnBody71) && !/margin-bottom:4px/.test(lincolnBody71),
+      'renderLincolnMemorabilia() uses margin-bottom:2px (compact one-line format) — no 4px spacing'
+    );
+  }
+
+  // 71.17  Faction lone-card CSS rule: :last-child:nth-child(odd) in terminal.css
+  assert(
+    /faction-card:last-child:nth-child\(odd\)/.test(cssSrc71),
+    'terminal.css has .faction-card:last-child:nth-child(odd) rule for centering lone card in mobile grid'
+  );
+
+  // 71.18  renderCollectibles updates sub-panel summary h3 with game-specific label
+  {
+    let collectiblesBody71 = '';
+    try {
+      collectiblesBody71 = extractFunctionBody(uiRenderSrc71, 'renderCollectibles');
+    } catch (_) {}
+    assert(
+      /collectiblesSubPanel/.test(collectiblesBody71) &&
+        /summaryH3|summary.*h3|querySelector.*h3/.test(collectiblesBody71),
+      'renderCollectibles() updates #collectiblesSubPanel summary h3 with game-specific label and count'
     );
   }
 }

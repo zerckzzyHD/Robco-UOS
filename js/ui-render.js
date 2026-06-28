@@ -704,6 +704,10 @@ function renderCollectibles() {
 
   const typeLabel = _activeDef().collectibleLabel;
 
+  // Update sub-panel summary label with game-specific type and count
+  const collectiblesH3 = document.querySelector('#collectiblesSubPanel > summary > h3');
+  if (collectiblesH3) collectiblesH3.textContent = `> ${typeLabel} [${acquiredCount}/${total}]`;
+
   // Header line: SNOW GLOBES  [3/7]
   let html = `<div style="font-weight:bold;letter-spacing:1px;margin-bottom:6px;font-size:11px;">${typeLabel}&nbsp;&nbsp;[${acquiredCount}/${total}]</div>`;
 
@@ -746,13 +750,14 @@ function toggleCollectible(name) {
   updateMath();
 }
 function renderLincolnMemorabilia() {
+  const subPanel = document.getElementById('lincolnSubPanel');
   const container = document.getElementById('lincolnMemorabiliaDisplay');
   if (!container) return;
   if (!_activeDef().tracksLincoln) {
-    container.style.display = 'none';
+    if (subPanel) subPanel.style.display = 'none';
     return;
   }
-  container.style.display = '';
+  if (subPanel) subPanel.style.display = '';
 
   const defs =
     typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.lincolnMemorabilia)
@@ -760,6 +765,10 @@ function renderLincolnMemorabilia() {
       : [];
   const items = state.lincolnItems || {};
   const foundCount = Object.keys(items).length;
+
+  // Update sub-panel summary label with current count
+  const summaryH3 = subPanel?.querySelector('summary > h3');
+  if (summaryH3) summaryH3.textContent = `> LINCOLN MEMORABILIA [${foundCount}/9]`;
 
   const dispTally = { hannibal: 0, leroy: 0, washington: 0, undecided: 0 };
   defs.forEach(d => {
@@ -770,9 +779,7 @@ function renderLincolnMemorabilia() {
     else if (disp === 'found') dispTally.undecided++;
   });
 
-  let html = `<div style="border-top:1px dashed var(--robco-blue);margin-top:8px;padding-top:8px;">`;
-  html += `<div style="font-weight:bold;letter-spacing:1px;margin-bottom:4px;font-size:11px;color:var(--robco-blue);">LINCOLN MEMORABILIA&nbsp;&nbsp;[${foundCount}/9]</div>`;
-  html += `<div style="font-size:10px;opacity:0.65;margin-bottom:6px;letter-spacing:0.5px;">`;
+  let html = `<div style="font-size:10px;opacity:0.65;margin-bottom:2px;letter-spacing:0.5px;">`;
   html += `HANNIBAL ${dispTally.hannibal} &middot; LEROY ${dispTally.leroy} &middot; WASHINGTON ${dispTally.washington} &middot; UNDECIDED ${dispTally.undecided}`;
   html += `</div>`;
 
@@ -781,7 +788,7 @@ function renderLincolnMemorabilia() {
     const disp = items[d.name];
     const isFound = !!disp;
     if (isFound) {
-      html += `<div style="font-size:11px;margin-bottom:4px;">`;
+      html += `<div style="font-size:11px;margin-bottom:2px;">`;
       html += `<span style="color:var(--robco-green);cursor:pointer;min-height:28px;display:inline-flex;align-items:center;" onclick="toggleLincolnItem('${safeName}')" title="Click to mark missing">[ACQUIRED]</span> `;
       html += `${escapeHtml(d.name.toUpperCase())} `;
       html += `<select onchange="setLincolnDisposition('${safeName}',this.value)" style="font-size:11px;background:transparent;color:inherit;border:1px solid var(--robco-green);min-height:28px;cursor:pointer;">`;
@@ -807,14 +814,13 @@ function renderLincolnMemorabilia() {
       const locHint = d.location
         ? ` &mdash; <span style="opacity:0.5;font-size:10px;">LOC: ${escapeHtml(d.location)}</span>`
         : '';
-      html += `<div style="font-size:11px;margin-bottom:4px;opacity:0.75;">`;
+      html += `<div style="font-size:11px;margin-bottom:2px;opacity:0.75;">`;
       html += `<span style="opacity:0.6;cursor:pointer;min-height:28px;display:inline-flex;align-items:center;" onclick="toggleLincolnItem('${safeName}')" title="Click to mark acquired">[MISSING]</span> `;
       html += `${escapeHtml(d.name.toUpperCase())}${locHint}`;
       html += `</div>`;
     }
   });
 
-  html += `</div>`;
   container.innerHTML = html;
 }
 
@@ -874,17 +880,16 @@ function renderTraits() {
     const isSel = selected.includes(d.name);
     const dlcBadge =
       d.dlc === 'owb' ? ' <span style="font-size:9px;opacity:0.5;">[OWB]</span>' : '';
+    const effectSpan = `<span style="font-size:10px;opacity:0.6;"> &mdash; ${escapeHtml(d.effect)}</span>`;
     if (isSel) {
-      html += `<div style="font-size:11px;margin-bottom:2px;line-height:1.3;">`;
+      html += `<div style="font-size:11px;margin-bottom:2px;line-height:1.4;">`;
       html += `<span style="color:var(--robco-green);cursor:pointer;min-height:28px;display:inline-flex;align-items:center;margin-right:4px;" onclick="toggleTrait('${safeName}')" title="Deselect">[SEL]</span>`;
-      html += `<strong>${escapeHtml(d.name.toUpperCase())}${dlcBadge}</strong>`;
-      html += `<div style="font-size:10px;opacity:0.65;padding-left:4px;">${escapeHtml(d.effect)}</div>`;
+      html += `<strong>${escapeHtml(d.name.toUpperCase())}${dlcBadge}</strong>${effectSpan}`;
       html += `</div>`;
     } else {
-      html += `<div style="font-size:11px;margin-bottom:2px;opacity:0.7;line-height:1.3;">`;
+      html += `<div style="font-size:11px;margin-bottom:2px;opacity:0.7;line-height:1.4;">`;
       html += `<span style="opacity:0.5;cursor:pointer;min-height:28px;display:inline-flex;align-items:center;margin-right:4px;" onclick="toggleTrait('${safeName}')" title="Select">[---]</span>`;
-      html += `${escapeHtml(d.name.toUpperCase())}${dlcBadge}`;
-      html += `<div style="font-size:10px;opacity:0.5;padding-left:4px;">${escapeHtml(d.effect)}</div>`;
+      html += `${escapeHtml(d.name.toUpperCase())}${dlcBadge}${effectSpan}`;
       html += `</div>`;
     }
   };

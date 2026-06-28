@@ -289,6 +289,25 @@ window.onload = function () {
     });
   });
 
+  // Sub-panel persistence — traits, collectibles sub-trackers (default: collapsed)
+  // Reuses robco_panel_state; new sub-trackers default to closed on first ever load.
+  document.querySelectorAll('details[data-sub-id]').forEach(d => {
+    const id = d.dataset.subId;
+    if (!id) return;
+    if (savedPanelState && savedPanelState[id] !== undefined) {
+      if (savedPanelState[id]) d.setAttribute('open', '');
+      else d.removeAttribute('open');
+    }
+    // Default: no 'open' (collapsed) — new sub-trackers start closed until user expands
+    d.addEventListener('toggle', () => {
+      try {
+        const ps = JSON.parse(localStorage.getItem('robco_panel_state') || '{}');
+        ps[id] = d.open;
+        localStorage.setItem('robco_panel_state', JSON.stringify(ps));
+      } catch (_) {}
+    });
+  });
+
   if (localStorage.getItem('robco_optics')) {
     let color = localStorage.getItem('robco_optics');
     document.getElementById('opticsColorInput').value = color;
