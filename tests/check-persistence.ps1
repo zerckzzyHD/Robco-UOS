@@ -3645,11 +3645,12 @@ Check ([bool]($sdBody66 -match 'lincolnItems')) `
     'getSystemDirective() references lincolnItems (Protocol 14 -- AI contract updated for new state field)'
 
 # ===========================================================
-# Suite 67 -- FNV Traits Tracker (Phase 6 Task 5)
+# Suite 67 -- FNV Traits Tracker (Phase 6 Task 5 + filter follow-up)
 # state.traits, migration, autoImportState validated array,
 # reg_nv traits 16-item array, GAME_DEFS.FNV.hasTraits,
-# renderTraits/toggleTrait guards, #traitsDisplay distinct from #perksList.
-# 17 tests
+# renderTraits/toggleTrait guards, #traitsDisplay distinct from #perksList,
+# #traitFilter input + renderTraits substring-filter guard.
+# 19 tests
 # ===========================================================
 Sep "Suite 67 -- FNV Traits Tracker"
 $stateSrc67  = Read-Src "js\state.js"
@@ -3741,6 +3742,16 @@ $sdBody67 = ''
 try { $sdBody67 = Get-FunctionBody $apiSrc67 'getSystemDirective' } catch {}
 Check ([bool]($sdBody67 -match 'state\.traits')) `
     'getSystemDirective() references state.traits (Protocol 14 -- AI contract updated for new state field)'
+
+# 67.18  index.html has #traitFilter input (trait name filter)
+Check ([bool]($htmlSrc -match 'id="traitFilter"')) `
+    'index.html has #traitFilter input (trait name filter)'
+
+# 67.19  renderTraits() reads traitFilter and applies substring filter
+$renderBody67b = ''
+try { $renderBody67b = Get-FunctionBody $uiRenderSrc67 'renderTraits' } catch {}
+Check (([bool]($renderBody67b -match 'traitFilter')) -and ([bool]($renderBody67b -match 'includes\s*\(filterQ\)'))) `
+    'renderTraits() reads #traitFilter value and applies substring filter'
 
 # ===========================================================
 # Results

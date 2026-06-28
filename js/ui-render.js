@@ -861,9 +861,18 @@ function renderTraits() {
   }
   html += `</div>`;
 
-  // Selected first, then unselected
-  const selectedDefs = defs.filter(d => selected.includes(d.name));
-  const unselectedDefs = defs.filter(d => !selected.includes(d.name));
+  const filterQ = (document.getElementById('traitFilter')?.value || '').toLowerCase().trim();
+
+  // Apply name/effect filter; [n/2] header always counts ALL selected regardless of filter
+  const visibleDefs = filterQ
+    ? defs.filter(
+        d => d.name.toLowerCase().includes(filterQ) || d.effect.toLowerCase().includes(filterQ)
+      )
+    : defs;
+
+  // Selected first, then unselected (within filtered set)
+  const selectedDefs = visibleDefs.filter(d => selected.includes(d.name));
+  const unselectedDefs = visibleDefs.filter(d => !selected.includes(d.name));
 
   const renderRow = d => {
     const safeName = escapeHtml(d.name);
@@ -885,11 +894,15 @@ function renderTraits() {
     }
   };
 
-  selectedDefs.forEach(renderRow);
-  if (selectedDefs.length > 0 && unselectedDefs.length > 0) {
-    html += `<div style="border-top:1px dashed var(--robco-green);margin:4px 0 6px;opacity:0.3;"></div>`;
+  if (filterQ && visibleDefs.length === 0) {
+    html += `<div style="font-size:11px;opacity:0.5;padding:4px 0;">No matching traits.</div>`;
+  } else {
+    selectedDefs.forEach(renderRow);
+    if (selectedDefs.length > 0 && unselectedDefs.length > 0) {
+      html += `<div style="border-top:1px dashed var(--robco-green);margin:4px 0 6px;opacity:0.3;"></div>`;
+    }
+    unselectedDefs.forEach(renderRow);
   }
-  unselectedDefs.forEach(renderRow);
 
   container.innerHTML = html;
 }

@@ -6032,11 +6032,12 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  SUITE 67 — FNV Traits Tracker (Phase 6 Task 5)
+//  SUITE 67 — FNV Traits Tracker (Phase 6 Task 5 + filter follow-up)
 //  state.traits, migration, autoImportState validated array,
 //  reg_nv traits 16-item array, GAME_DEFS.FNV.hasTraits,
-//  renderTraits/toggleTrait guards, #traitsDisplay distinct from #perksList.
-//  17 tests
+//  renderTraits/toggleTrait guards, #traitsDisplay distinct from #perksList,
+//  #traitFilter input + renderTraits substring-filter guard.
+//  19 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('FNV Traits Tracker');
@@ -6192,6 +6193,24 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     assert(
       /state\.traits/.test(sdBody67),
       'getSystemDirective() references state.traits (Protocol 14 — AI contract updated for new state field)'
+    );
+  }
+
+  // 67.18  index.html has #traitFilter input (trait name filter)
+  assert(
+    /id="traitFilter"/.test(htmlSource),
+    'index.html has #traitFilter input (trait name filter)'
+  );
+
+  // 67.19  renderTraits() reads traitFilter and applies substring filter
+  {
+    let renderBody67b = '';
+    try {
+      renderBody67b = extractFunctionBody(uiRenderSrc67, 'renderTraits');
+    } catch (_) {}
+    assert(
+      /traitFilter/.test(renderBody67b) && /includes\s*\(filterQ\)/.test(renderBody67b),
+      'renderTraits() reads #traitFilter value and applies substring filter'
     );
   }
 }
