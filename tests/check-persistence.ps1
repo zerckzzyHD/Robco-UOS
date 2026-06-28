@@ -971,11 +971,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-75)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-75)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-76)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-76)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -4374,6 +4374,63 @@ Check ($fo3Dups75.Count -eq 0) "reg_fo3.js items[] has no duplicate (name,type) 
 $nvItemsSection75 = Get-ItemsSection75 $nvSrc75
 $reboundCount75   = ([regex]::Matches($nvItemsSection75, "name\s*:\s*'Rebound'[\s\S]{0,30}type\s*:\s*'weapon'")).Count
 Check ($reboundCount75 -eq 1) "reg_nv.js: Rebound weapon entry appears exactly once (found $reboundCount75)"
+
+# ===========================================================
+# Suite 76 -- autoImportState Hardening Guards (F1/F2/F3)
+# 9 tests
+# ===========================================================
+Sep "Suite 76 -- autoImportState Hardening Guards (F1/F2/F3)"
+$apiSrc76    = Read-Src "js\api.js"
+$importBody76 = ''
+try { $importBody76 = Get-FunctionBody $apiSrc76 'autoImportState' } catch {}
+
+# -- Fix 2: equipped unequip --
+
+# 76.1  equipped block uses 'key' in obj (key-present test - distinguishes null from absent)
+Check ([bool]($importBody76 -match "'weapon'\s+in\s+e")) `
+    "autoImportState equipped: 'weapon' in e pattern present (key-present test, not falsy-check)"
+
+# 76.2  all three slots use 'in' check
+Check (([bool]($importBody76 -match "'armor'\s+in\s+e")) -and ([bool]($importBody76 -match "'headgear'\s+in\s+e"))) `
+    "autoImportState equipped: 'armor' in e and 'headgear' in e also present (all three slots covered)"
+
+# 76.3  Regression: old || short-circuit absent from equipped section
+$eqIdx76   = $importBody76.IndexOf('parsed.equipped')
+$eqBlock76 = if ($eqIdx76 -ge 0) { $importBody76.Substring($eqIdx76, [Math]::Min(400, $importBody76.Length - $eqIdx76)) } else { '' }
+Check (-not ($eqBlock76 -match 'parsed\.equipped\.(weapon|armor|headgear)\s*\|\|')) `
+    "autoImportState equipped: old parsed.equipped.slot || short-circuit removed - null now clears the slot"
+
+# -- Fix 3: collectibles registry-validation --
+
+# 76.4  collectibles block references FALLOUT_REGISTRY.collectibles
+Check ([bool]($importBody76 -match 'FALLOUT_REGISTRY\.collectibles')) `
+    "autoImportState collectibles: FALLOUT_REGISTRY.collectibles referenced (registry-validated, not freeform)"
+
+# 76.5  collectibles block uses Set-based name guard
+Check ([bool]($importBody76 -match '_collectNames\.has\(c\)')) `
+    "autoImportState collectibles: _collectNames.has(c) guard active (hallucinated names rejected)"
+
+# 76.6  Regression: old permissive c.trim() filter absent from collectibles block
+$colIdx76   = $importBody76.IndexOf('parsed.collectibles')
+$colBlock76 = if ($colIdx76 -ge 0) { $importBody76.Substring($colIdx76, [Math]::Min(600, $importBody76.Length - $colIdx76)) } else { '' }
+Check (-not ($colBlock76 -match 'c\.trim\(\)\.length')) `
+    "autoImportState collectibles: old c.trim().length permissive filter removed (registry guard active)"
+
+# -- Fix 1: status type whitelist --
+
+# 76.7  status type assignment uses BUFF/DEBUFF/NEUTRAL whitelist
+$stIdx76   = $importBody76.IndexOf('st.map(item =>')
+$stBlock76 = if ($stIdx76 -ge 0) { $importBody76.Substring($stIdx76, [Math]::Min(400, $importBody76.Length - $stIdx76)) } else { '' }
+Check ([bool]($stBlock76 -match "\['BUFF',\s*'DEBUFF',\s*'NEUTRAL'\]")) `
+    "autoImportState status: BUFF/DEBUFF/NEUTRAL whitelist array present in status type assignment"
+
+# 76.8  status uses item.type with .toUpperCase() normalization
+Check ([bool]($importBody76 -match 'String\(item\.type\)\.toUpperCase\(\)')) `
+    "autoImportState status: String(item.type).toUpperCase() present (type normalized to uppercase)"
+
+# 76.9  Regression: raw item.type || 'BUFF' (no whitelist) absent from status section
+Check (-not ($stBlock76 -match "type\s*:\s*item\.type\s*\|\|\s*'BUFF'")) `
+    "autoImportState status: raw item.type || 'BUFF' passthrough removed (whitelist active)"
 
 # ===========================================================
 # Results

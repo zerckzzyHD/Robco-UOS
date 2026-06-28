@@ -1,4 +1,4 @@
-## [Unreleased]<!-- Tests: 910/910 | Cache: robco-terminal-v2.5.0-r22 -->
+## [Unreleased]<!-- Tests: 919/919 | Cache: robco-terminal-v2.5.0-r23 -->
 
 ### Added
 
@@ -9,6 +9,12 @@
 - **Lincoln "Other" disposition removed** — the redundant "Other" option has been dropped from the Lincoln Memorabilia disposition selector. Items previously saved with "Other" are automatically updated to "Found" so no data is lost.
 
 - **Registry no-duplicate-item guard added** — a new automated check now catches copy-paste errors in the item catalog. If the same item (identical name and type) appears twice in either the New Vegas or Fallout 3 catalog, the commit gate blocks it. Items that share a name but have different types (like the New Vegas weapon "Rebound" and the chem "Rebound," which are genuinely different items) are correctly allowed.
+
+- **The AI can now un-equip weapons and armor** — asking the AI to remove or un-equip something no longer gets silently ignored. Previously, when the AI sent a null value for a slot (to indicate "nothing equipped"), the app treated it the same as "no instruction" and kept the old item. The slot now clears correctly.
+
+- **The AI can no longer invent collectibles** — when the AI returns a list of collected items, each entry is now checked against the actual game's collectibles catalog. Made-up names are filtered out automatically, preventing phantom entries from appearing in your tracker.
+
+- **Status effect types are now normalized** — status effects created by the AI (buffs, debuffs, etc.) always carry a clean BUFF / DEBUFF / NEUTRAL label. Previously, a value like "buff" or "Debuff" (lowercase or mixed case) or an unrecognized word would pass through unchecked; all values are now uppercased and validated against the allowed set.
 
 - **Expanded New Vegas location database** — added 22 notable minor locations to the map and autocomplete (e.g. Jean Sky Diving, Jack Rabbit Springs, the three Powder Ganger camps, Bonnie Springs, Goodsprings Cave, Scorpion Gulch, The Devil's Throat, Walking Box Cavern, El Dorado Dry Lake, and more). Each location was sourced from the independent Fallout wiki and placed in the correct map region. Existing saves are unaffected — the location catalog is read-only reference data.
 

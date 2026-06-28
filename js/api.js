@@ -488,7 +488,9 @@ function autoImportState(jsonString) {
         return {
           name: item.name || 'Unknown',
           ticks: parseInt(item.ticks) || 0,
-          type: item.type || 'BUFF',
+          type: ['BUFF', 'DEBUFF', 'NEUTRAL'].includes(String(item.type || '').toUpperCase())
+            ? String(item.type).toUpperCase()
+            : 'BUFF',
         };
       });
     }
@@ -588,12 +590,14 @@ function autoImportState(jsonString) {
     }
 
     // Equipped Items (#2)
+    // Use 'key' in obj to distinguish "AI sent null to unequip" from "AI omitted key (no change)".
+    // The old || short-circuit treated null as falsy and kept the old value, blocking unequip.
     if (parsed.equipped && typeof parsed.equipped === 'object') {
-      state.equipped = {
-        weapon: parsed.equipped.weapon || state.equipped?.weapon || null,
-        armor: parsed.equipped.armor || state.equipped?.armor || null,
-        headgear: parsed.equipped.headgear || state.equipped?.headgear || null,
-      };
+      const e = parsed.equipped;
+      state.equipped = state.equipped || { weapon: null, armor: null, headgear: null };
+      if ('weapon' in e) state.equipped.weapon = e.weapon || null;
+      if ('armor' in e) state.equipped.armor = e.armor || null;
+      if ('headgear' in e) state.equipped.headgear = e.headgear || null;
     }
 
     // Session Stats (#8) — AI can update kills, capsEarned, damageDealt
@@ -727,9 +731,16 @@ function autoImportState(jsonString) {
     // Flat array of collected item name strings. Registry defines what names are valid;
     // state only tracks which have been found. DLC collectibles slot in via registry only.
     if (parsed.collectibles && Array.isArray(parsed.collectibles)) {
-      state.collectibles = parsed.collectibles.filter(
-        c => typeof c === 'string' && c.trim().length > 0
-      );
+      const _collectNames =
+        typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.collectibles)
+          ? new Set(FALLOUT_REGISTRY.collectibles.map(c => c.name))
+          : new Set();
+      const _collectSeen = new Set();
+      state.collectibles = parsed.collectibles.filter(c => {
+        if (typeof c !== 'string' || !_collectNames.has(c) || _collectSeen.has(c)) return false;
+        _collectSeen.add(c);
+        return true;
+      });
     }
 
     // ── LINCOLN MEMORABILIA (FO3 — Phase 6 Task 4) ──────────────────────────

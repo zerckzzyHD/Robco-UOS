@@ -1623,17 +1623,18 @@ header('Meta / Runner Parity');
     'Suite 73',
     'Suite 74',
     'Suite 75',
+    'Suite 76',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-75)' +
+    'JS runner contains all gate-guard suites (22-41, 49-76)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-75)' +
+    'PS runner contains all gate-guard suites (22-41, 49-76)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -7269,6 +7270,95 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     const count = (section.match(/name\s*:\s*'Rebound'[\s\S]{0,30}type\s*:\s*'weapon'/g) || [])
       .length;
     assert(count === 1, `reg_nv.js: Rebound weapon entry appears exactly once (found ${count})`);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 76 — autoImportState Hardening Guards (F1/F2/F3)
+//  9 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 76 — autoImportState Hardening Guards (F1/F2/F3)');
+  const apiSrc76 = readFile('js/api.js');
+  let importBody76 = '';
+  try {
+    importBody76 = extractFunctionBody(apiSrc76, 'autoImportState');
+  } catch (_) {}
+
+  // ── Fix 2: equipped unequip ──────────────────────────────────────────────
+
+  // 76.1  equipped block uses 'key' in obj (key-present test — distinguishes null from absent)
+  assert(
+    /'weapon'\s+in\s+e/.test(importBody76),
+    "autoImportState equipped: 'weapon' in e pattern present (key-present test, not falsy-check)"
+  );
+
+  // 76.2  all three slots use 'in' check
+  assert(
+    /'armor'\s+in\s+e/.test(importBody76) && /'headgear'\s+in\s+e/.test(importBody76),
+    "autoImportState equipped: 'armor' in e and 'headgear' in e also present (all three slots covered)"
+  );
+
+  // 76.3  Regression: old || short-circuit absent from equipped section
+  {
+    const eqIdx76 = importBody76.indexOf('parsed.equipped');
+    const eqBlock76 = eqIdx76 !== -1 ? importBody76.slice(eqIdx76, eqIdx76 + 400) : '';
+    assert(
+      !/parsed\.equipped\.(weapon|armor|headgear)\s*\|\|/.test(eqBlock76),
+      'autoImportState equipped: old parsed.equipped.slot || short-circuit removed — null now clears the slot'
+    );
+  }
+
+  // ── Fix 3: collectibles registry-validation ──────────────────────────────
+
+  // 76.4  collectibles block references FALLOUT_REGISTRY.collectibles
+  assert(
+    /FALLOUT_REGISTRY\.collectibles/.test(importBody76),
+    'autoImportState collectibles: FALLOUT_REGISTRY.collectibles referenced (registry-validated, not freeform)'
+  );
+
+  // 76.5  collectibles block uses Set-based name guard
+  assert(
+    /_collectNames\.has\(c\)/.test(importBody76),
+    'autoImportState collectibles: _collectNames.has(c) guard active (hallucinated names rejected)'
+  );
+
+  // 76.6  Regression: old permissive c.trim() filter absent from collectibles block
+  {
+    const colIdx76 = importBody76.indexOf('parsed.collectibles');
+    const colBlock76 = colIdx76 !== -1 ? importBody76.slice(colIdx76, colIdx76 + 600) : '';
+    assert(
+      !/c\.trim\(\)\.length/.test(colBlock76),
+      'autoImportState collectibles: old c.trim().length permissive filter removed (registry guard active)'
+    );
+  }
+
+  // ── Fix 1: status type whitelist ─────────────────────────────────────────
+
+  // 76.7  status type assignment uses BUFF/DEBUFF/NEUTRAL whitelist
+  {
+    const stIdx76 = importBody76.indexOf('st.map(item =>');
+    const stBlock76 = stIdx76 !== -1 ? importBody76.slice(stIdx76, stIdx76 + 400) : '';
+    assert(
+      /\['BUFF',\s*'DEBUFF',\s*'NEUTRAL'\]/.test(stBlock76),
+      'autoImportState status: BUFF/DEBUFF/NEUTRAL whitelist array present in status type assignment'
+    );
+  }
+
+  // 76.8  status uses item.type with .toUpperCase() normalization
+  assert(
+    /String\(item\.type\)\.toUpperCase\(\)/.test(importBody76),
+    'autoImportState status: String(item.type).toUpperCase() present (type normalized to uppercase)'
+  );
+
+  // 76.9  Regression: raw item.type || 'BUFF' (no whitelist) absent from status section
+  {
+    const stIdx76 = importBody76.indexOf('st.map(item =>');
+    const stBlock76 = stIdx76 !== -1 ? importBody76.slice(stIdx76, stIdx76 + 400) : '';
+    assert(
+      !/type\s*:\s*item\.type\s*\|\|\s*'BUFF'/.test(stBlock76),
+      "autoImportState status: raw item.type || 'BUFF' passthrough removed (whitelist active)"
+    );
   }
 }
 
