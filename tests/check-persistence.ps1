@@ -971,11 +971,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-67)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-67)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-68)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-68)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -3752,6 +3752,69 @@ $renderBody67b = ''
 try { $renderBody67b = Get-FunctionBody $uiRenderSrc67 'renderTraits' } catch {}
 Check (([bool]($renderBody67b -match 'traitFilter')) -and ([bool]($renderBody67b -match 'includes\s*\(filterQ\)'))) `
     'renderTraits() reads #traitFilter value and applies substring filter'
+
+# ===========================================================
+# Suite 68 -- FNV Location Database Expansion (Phase 6 Task 6)
+# Adds 22 verified minor/notable NV locations sourced from fallout.wiki.
+# Floor guard, type validity, dedup, seed examples, zone<->registry parity.
+# 10 tests
+# ===========================================================
+Sep "Suite 68 -- FNV Location Database Expansion"
+$nvRegSrc68 = Read-Src "js\reg_nv.js"
+
+# Isolate main locations array (between LOCATIONS and COMPANIONS section comments)
+$locsSectionMatch68 = [regex]::Match($nvRegSrc68, '(?s)// -- LOCATIONS.*?// -- COMPANIONS')
+if (-not $locsSectionMatch68.Success) {
+    $locsSectionMatch68 = [regex]::Match($nvRegSrc68, '(?s)//.*?LOCATIONS.*?//.*?COMPANIONS')
+}
+$locsSection68 = if ($locsSectionMatch68.Success) { $locsSectionMatch68.Value } else { '' }
+# Also try direct capture of the locations array in the FALLOUT_REGISTRY
+$locsArrMatch68 = [regex]::Match($nvRegSrc68, '(?s)locations:\s*\[((?:(?!\n  \]).)*)\n  \]', [System.Text.RegularExpressions.RegexOptions]::Singleline)
+$locBlock68 = if ($locsArrMatch68.Success) { $locsArrMatch68.Groups[1].Value } else { $locsSection68 }
+
+# 68.1  FNV locations count >= 108 (floor guard -- 86 original + 22 new)
+$locCount68 = ([regex]::Matches($locBlock68, '\bname\s*:')).Count
+Check ($locCount68 -ge 108) "FALLOUT_REGISTRY.locations has >= 108 entries (found $locCount68) -- floor guard"
+
+# 68.2  "Jean Sky Diving" present (seed example)
+Check ([bool]($locBlock68 -match "name:\s*'Jean Sky Diving'")) `
+    '"Jean Sky Diving" is in FALLOUT_REGISTRY.locations (fallout.wiki verified)'
+
+# 68.3  "Jack Rabbit Springs" present (seed example)
+Check ([bool]($locBlock68 -match "name:\s*'Jack Rabbit Springs'")) `
+    '"Jack Rabbit Springs" is in FALLOUT_REGISTRY.locations (fallout.wiki verified)'
+
+# 68.4  "Powder Ganger Camp South" present (seed example)
+Check ([bool]($locBlock68 -match "name:\s*'Powder Ganger Camp South'")) `
+    '"Powder Ganger Camp South" is in FALLOUT_REGISTRY.locations (fallout.wiki verified)'
+
+# 68.5  "Wolfhorn Ranch" in registry (was zone-only before this task)
+Check ([bool]($locBlock68 -match "name:\s*'Wolfhorn Ranch'")) `
+    '"Wolfhorn Ranch" is in FALLOUT_REGISTRY.locations (promoted from zone-only)'
+
+# 68.6  "Ivanpah Dry Lake" in registry (was zone-only before this task)
+Check ([bool]($locBlock68 -match "name:\s*'Ivanpah Dry Lake'")) `
+    '"Ivanpah Dry Lake" is in FALLOUT_REGISTRY.locations (promoted from zone-only)'
+
+# 68.7  All location entries use a valid type from the 9 approved types
+$validLocTypes68 = @('settlement','other','landmark','camp','base','vault','casino','factory','cave')
+$typeMatches68 = [regex]::Matches($locBlock68, "type:\s*'([^']+)'")
+$badTypes68 = @($typeMatches68 | ForEach-Object { $_.Groups[1].Value } | Where-Object { $_ -notin $validLocTypes68 })
+Check ($badTypes68.Count -eq 0) ("All FALLOUT_REGISTRY.locations entries use valid type (9 approved) -- bad: " + ($badTypes68 -join ', '))
+
+# 68.8  No duplicate location names in FNV registry
+$nameMatches68 = [regex]::Matches($locBlock68, "name:\s*'([^']+)'")
+$names68 = @($nameMatches68 | ForEach-Object { $_.Groups[1].Value })
+$uniqueNames68 = @($names68 | Select-Object -Unique)
+Check ($names68.Count -eq $uniqueNames68.Count) ("No duplicate location names in FALLOUT_REGISTRY.locations -- $($names68.Count) names, $($uniqueNames68.Count) unique")
+
+# 68.9  Zone parity -- zone [4,2] Goodsprings locations[] contains 'Jean Sky Diving'
+Check ([bool]($nvRegSrc68 -match '(?s)gridRow:\s*4.{0,200}gridCol:\s*2.{0,500}Jean Sky Diving')) `
+    'Zone [4,2] Goodsprings locations[] contains "Jean Sky Diving" (zone<->registry parity)'
+
+# 68.10  Zone parity -- zone [4,1] NCRCF locations[] contains 'Powder Ganger Camp South'
+Check ([bool]($nvRegSrc68 -match '(?s)gridRow:\s*4.{0,200}gridCol:\s*1.{0,500}Powder Ganger Camp South')) `
+    'Zone [4,1] NCRCF locations[] contains "Powder Ganger Camp South" (zone<->registry parity)'
 
 # ===========================================================
 # Results

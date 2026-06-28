@@ -1615,17 +1615,18 @@ header('Meta / Runner Parity');
     'Suite 65',
     'Suite 66',
     'Suite 67',
+    'Suite 68',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-67)' +
+    'JS runner contains all gate-guard suites (22-41, 49-68)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-67)' +
+    'PS runner contains all gate-guard suites (22-41, 49-68)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -6213,6 +6214,115 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
       'renderTraits() reads #traitFilter value and applies substring filter'
     );
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 68 — FNV Location Database Expansion (Phase 6 Task 6)
+//  Adds 22 verified minor/notable NV locations sourced from fallout.wiki.
+//  Floor guard, type validity, dedup, seed examples, zone↔registry parity.
+//  10 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('FNV Location Database Expansion');
+  const nvRegSrc68 = readFile('js/reg_nv.js');
+
+  // Isolate main locations array (between LOCATIONS and COMPANIONS section comments)
+  const locsSectionMatch = nvRegSrc68.match(/\/\/ ── LOCATIONS[\s\S]*?\/\/ ── COMPANIONS/);
+  const locsSection68 = locsSectionMatch ? locsSectionMatch[0] : '';
+  const locsArrMatch = locsSection68.match(/locations:\s*\[([\s\S]*?)\n {2}\]/);
+  const locBlock68 = locsArrMatch ? locsArrMatch[1] : '';
+
+  // 68.1  FNV locations count ≥ 108 (floor guard — 86 original + 22 new)
+  const locCount68 = (locBlock68.match(/\bname\s*:/g) || []).length;
+  assert(
+    locCount68 >= 108,
+    `FALLOUT_REGISTRY.locations has ≥ 108 entries (found ${locCount68}) — floor guard`
+  );
+
+  // 68.2  "Jean Sky Diving" present (seed example)
+  assert(
+    /name:\s*'Jean Sky Diving'/.test(locBlock68),
+    '"Jean Sky Diving" is in FALLOUT_REGISTRY.locations (fallout.wiki verified)'
+  );
+
+  // 68.3  "Jack Rabbit Springs" present (seed example)
+  assert(
+    /name:\s*'Jack Rabbit Springs'/.test(locBlock68),
+    '"Jack Rabbit Springs" is in FALLOUT_REGISTRY.locations (fallout.wiki verified)'
+  );
+
+  // 68.4  "Powder Ganger Camp South" present (seed example)
+  assert(
+    /name:\s*'Powder Ganger Camp South'/.test(locBlock68),
+    '"Powder Ganger Camp South" is in FALLOUT_REGISTRY.locations (fallout.wiki verified)'
+  );
+
+  // 68.5  "Wolfhorn Ranch" now in registry (was zone-only before this task)
+  assert(
+    /name:\s*'Wolfhorn Ranch'/.test(locBlock68),
+    '"Wolfhorn Ranch" is in FALLOUT_REGISTRY.locations (promoted from zone-only)'
+  );
+
+  // 68.6  "Ivanpah Dry Lake" now in registry (was zone-only before this task)
+  assert(
+    /name:\s*'Ivanpah Dry Lake'/.test(locBlock68),
+    '"Ivanpah Dry Lake" is in FALLOUT_REGISTRY.locations (promoted from zone-only)'
+  );
+
+  // 68.7  All location entries use a valid type from the 9 approved types
+  {
+    const VALID_LOC_TYPES = new Set([
+      'settlement',
+      'other',
+      'landmark',
+      'camp',
+      'base',
+      'vault',
+      'casino',
+      'factory',
+      'cave',
+    ]);
+    const typeRe = /type:\s*'([^']+)'/g;
+    let tm;
+    const badTypes68 = [];
+    while ((tm = typeRe.exec(locBlock68)) !== null) {
+      if (!VALID_LOC_TYPES.has(tm[1])) badTypes68.push(tm[1]);
+    }
+    assert(
+      badTypes68.length === 0,
+      `All FALLOUT_REGISTRY.locations entries use valid type (9 approved) — bad: ${badTypes68.join(', ') || 'none'}`
+    );
+  }
+
+  // 68.8  No duplicate location names in FNV registry
+  {
+    const nameRe = /name:\s*(?:'([^']+)'|"([^"]+)")/g;
+    let nm;
+    const names68 = [];
+    while ((nm = nameRe.exec(locBlock68)) !== null) names68.push(nm[1] || nm[2]);
+    const seen68 = new Set();
+    const dupes68 = names68.filter(n => {
+      const dup = seen68.has(n);
+      seen68.add(n);
+      return dup;
+    });
+    assert(
+      dupes68.length === 0,
+      `No duplicate location names in FALLOUT_REGISTRY.locations — dupes: ${dupes68.join(', ') || 'none'}`
+    );
+  }
+
+  // 68.9  Zone parity — zone [4,2] Goodsprings locations[] contains 'Jean Sky Diving'
+  assert(
+    /gridRow:\s*4[\s\S]{0,200}gridCol:\s*2[\s\S]{0,500}Jean Sky Diving/.test(nvRegSrc68),
+    'Zone [4,2] Goodsprings locations[] contains "Jean Sky Diving" (zone↔registry parity)'
+  );
+
+  // 68.10  Zone parity — zone [4,1] NCRCF locations[] contains 'Powder Ganger Camp South'
+  assert(
+    /gridRow:\s*4[\s\S]{0,200}gridCol:\s*1[\s\S]{0,500}Powder Ganger Camp South/.test(nvRegSrc68),
+    'Zone [4,1] NCRCF locations[] contains "Powder Ganger Camp South" (zone↔registry parity)'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════

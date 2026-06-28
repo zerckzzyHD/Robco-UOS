@@ -1,6 +1,8 @@
-## [Unreleased]<!-- Tests: 821/821 | Cache: robco-terminal-v2.5.0-r10 -->
+## [Unreleased]<!-- Tests: 831/831 | Cache: robco-terminal-v2.5.0-r11 -->
 
 ### Added
+
+- **Expanded New Vegas location database** — added 22 notable minor locations to the map and autocomplete (e.g. Jean Sky Diving, Jack Rabbit Springs, the three Powder Ganger camps, Bonnie Springs, Goodsprings Cave, Scorpion Gulch, The Devil's Throat, Walking Box Cavern, El Dorado Dry Lake, and more). Each location was sourced from the independent Fallout wiki and placed in the correct map region. Existing saves are unaffected — the location catalog is read-only reference data.
 
 - **FNV Traits tracker** — new Traits panel (New Vegas campaigns only, FO3 has no traits) showing all 16 traits with their benefit and penalty. Mark which traits your Courier took at character creation; the panel shows how many are selected out of the usual limit of 2 and gently flags it if you go over (Old World Blues allows re-selecting traits, so going beyond 2 is allowed). Traits are tracked separately from Perks and can be filtered by name.
 
