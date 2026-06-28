@@ -796,7 +796,6 @@ function renderLincolnMemorabilia() {
         ['hannibal', 'HANNIBAL (FREE SLAVES)'],
         ['leroy', 'LEROY WALKER (SLAVERS)'],
         ['washington', 'WASHINGTON (MUSEUM)'],
-        ['other', 'OTHER'],
       ];
       opts.forEach(([val, label]) => {
         if (val !== 'leroy' || d.buyers.includes('leroy')) {
@@ -835,7 +834,7 @@ function toggleLincolnItem(name) {
 }
 
 function setLincolnDisposition(name, value) {
-  const VOCAB = ['found', 'hannibal', 'leroy', 'washington', 'other'];
+  const VOCAB = ['found', 'hannibal', 'leroy', 'washington'];
   if (!VOCAB.includes(value)) return;
   if (!state.lincolnItems) state.lincolnItems = {};
   state.lincolnItems[name] = value;
@@ -1124,22 +1123,23 @@ function renderWorldMap() {
 
   const currentLoc = (state.loc || '').toLowerCase();
 
-  // Helper: check if a zone has an uncollected collectible
+  // Helper: check if a zone has an uncollected collectible or Lincoln item by grid coord.
   function zoneHasUncollectedCollectible(zone) {
-    return collectDefs.some(def => {
-      const defName = (def.name || '').toLowerCase();
-      if (collected.has(defName)) return false;
-      const searchIn = [zone.name, ...(zone.locations || [])].map(s => s.toLowerCase());
-      return searchIn.some(s => s.includes(defName) || defName.includes(s.split(' ')[0]));
+    const hasCollectible = collectDefs.some(def => {
+      if (typeof def.gridRow !== 'number' || typeof def.gridCol !== 'number') return false;
+      if (collected.has((def.name || '').toLowerCase())) return false;
+      return def.gridRow === zone.gridRow && def.gridCol === zone.gridCol;
     });
-  }
-
-  function locHasUncollectedCollectible(locName) {
-    const locLower = locName.toLowerCase();
-    return collectDefs.some(def => {
-      const defName = (def.name || '').toLowerCase();
-      if (collected.has(defName)) return false;
-      return locLower.includes(defName) || defName.includes(locLower.split(' ')[0]);
+    if (hasCollectible) return true;
+    const lincolnDefs =
+      typeof FALLOUT_REGISTRY !== 'undefined' && FALLOUT_REGISTRY.lincolnMemorabilia
+        ? FALLOUT_REGISTRY.lincolnMemorabilia
+        : [];
+    const lincolnAcquired = state.lincolnItems || {};
+    return lincolnDefs.some(def => {
+      if (typeof def.gridRow !== 'number' || typeof def.gridCol !== 'number') return false;
+      if (lincolnAcquired[def.name]) return false;
+      return def.gridRow === zone.gridRow && def.gridCol === zone.gridCol;
     });
   }
 
@@ -1188,10 +1188,13 @@ function renderWorldMap() {
       return renderWorldMap();
     }
 
+    const zoneBadge = zoneHasUncollectedCollectible(activeZone)
+      ? `<span class="map-collectible-badge">[?]</span>`
+      : '';
     let html = `
       <div class="map-detail-header">
         <button class="action-btn map-back-btn" onclick="resetMapZoom()">&lt; WORLD GRID</button>
-        <span style="font-weight:bold; font-size:11px; letter-spacing:1px;">${escapeHtml(activeZone.name).toUpperCase()} REGION</span>
+        <span style="font-weight:bold; font-size:11px; letter-spacing:1px;">${escapeHtml(activeZone.name).toUpperCase()} REGION</span>${zoneBadge}
       </div>
       <div class="map-detail-list">
     `;
@@ -1219,7 +1222,6 @@ function renderWorldMap() {
       locs.forEach((loc, i) => {
         const isYou = i === currentLocIdx;
         const wasVisited = locVisited(loc);
-        const hasCollectible = locHasUncollectedCollectible(loc);
 
         let statusText = '<span style="opacity:0.4;">[UNKNOWN]</span>';
         let rowCls = 'map-detail-row';
@@ -1231,13 +1233,9 @@ function renderWorldMap() {
           rowCls += ' map-detail-row--visited';
         }
 
-        const collectibleBadge = hasCollectible
-          ? `<span class="map-collectible-badge">[?]</span>`
-          : '';
-
         html += `
           <div class="${rowCls}">
-            <span>- ${escapeHtml(loc)}${collectibleBadge}</span>
+            <span>- ${escapeHtml(loc)}</span>
             <span style="font-size:9px;white-space:nowrap;">${statusText}</span>
           </div>
         `;

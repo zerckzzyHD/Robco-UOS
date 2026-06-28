@@ -352,7 +352,7 @@ let state = {
   // v2.0 fields
   gameContext: 'FNV', // 'FNV' | 'FO3' — set at boot, governs registry/AI context
   collectibles: [], // flat string[] of collected item names (game-context-aware)
-  lincolnItems: {}, // FO3 only — map of artifact name → disposition (found|hannibal|leroy|washington|other)
+  lincolnItems: {}, // FO3 only — map of artifact name → disposition (found|hannibal|leroy|washington)
   traits: [], // FNV only — string[] of selected trait names (soft cap 2; OWB allows re-selection)
   campaignMode: 'standard', // 'standard' | 'rng' (armed) | 'rng-locked' (permanently active after wipe)
   playthroughType: 'standard', // 'standard' | 'minmaxed' | 'completionist' | 'casual' | 'speedrun'
@@ -539,6 +539,9 @@ function migrateState(version, s) {
   if (!s.collectibles) s.collectibles = [];
   if (!s.lincolnItems || typeof s.lincolnItems !== 'object' || Array.isArray(s.lincolnItems))
     s.lincolnItems = {};
+  Object.keys(s.lincolnItems).forEach(k => {
+    if (s.lincolnItems[k] === 'other') s.lincolnItems[k] = 'found';
+  });
   if (!Array.isArray(s.traits)) s.traits = [];
   // C4-fix / C11: campaignMode has 3 states: 'standard' | 'rng' (armed) | 'rng-locked' (activated by wipe).
   if (s.campaignMode !== 'rng' && s.campaignMode !== 'rng-locked') s.campaignMode = 'standard';

@@ -1621,17 +1621,18 @@ header('Meta / Runner Parity');
     'Suite 71',
     'Suite 72',
     'Suite 73',
+    'Suite 74',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-73)' +
+    'JS runner contains all gate-guard suites (22-41, 49-74)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-73)' +
+    'PS runner contains all gate-guard suites (22-41, 49-74)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -5875,8 +5876,9 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 // ══════════════════════════════════════════════════════════════
 //  SUITE 66 — FO3 Lincoln Memorabilia Tracker (Phase 6 Task 4)
 //  state.lincolnItems, migration, autoImportState validated map,
-//  reg_fo3 array, GAME_DEFS.FO3.tracksLincoln, render/handler guards.
-//  17 tests
+//  reg_fo3 array, GAME_DEFS.FO3.tracksLincoln, render/handler guards,
+//  'other' vocab removed + coercion guard.
+//  20 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('FO3 Lincoln Memorabilia Tracker');
@@ -6042,6 +6044,30 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     assert(
       /lincolnItems/.test(sdBody),
       'getSystemDirective() references lincolnItems (Protocol 14 — AI contract updated for new state field)'
+    );
+  }
+
+  // 66.18  LINCOLN_VOCAB in api.js does NOT include 'other' (Change 2 regression guard)
+  assert(
+    !/LINCOLN_VOCAB\s*=\s*\[[^\]]*['"]other['"]/.test(apiSrc66),
+    "api.js LINCOLN_VOCAB does not include 'other' — removed in Change 2 (regression guard)"
+  );
+
+  // 66.19  renderLincolnMemorabilia opts does NOT include 'other' option
+  assert(
+    !/\[\s*['"]other['"]\s*,/.test(uiRenderSrc66),
+    "ui-render.js opts array does not include 'other' option — removed in Change 2"
+  );
+
+  // 66.20  autoImportState() coerces legacy 'other' disposition to 'found'
+  {
+    let importBody66b = '';
+    try {
+      importBody66b = extractFunctionBody(apiSrc66, 'autoImportState');
+    } catch (_) {}
+    assert(
+      /other.*found|coerced/.test(importBody66b),
+      "autoImportState() coerces legacy 'other' disposition to 'found' for backward-compatibility"
     );
   }
 }
@@ -6980,6 +7006,186 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     /getSkillKeys\s*\(\s*\)/.test(stateSrc73),
     'state.js: syncStateFromDom() still iterates getSkillKeys() — data layer unchanged by this render refactor'
   );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 74 — Collectibles Map Coord Guards (Change 1)
+//  gridRow/gridCol on every FNV/FO3 collectible + lincoln entry,
+//  cells match existing zones[], coord-based badge source guard,
+//  regression: no name-based badge logic, lincoln check present.
+//  11 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 74 — Collectibles Map Coord Guards');
+  const nvRegSrc74 = readFile('js/reg_nv.js');
+  const fo3RegSrc74 = readFile('js/reg_fo3.js');
+  const uiRenderSrc74 = readFile('js/ui-render.js');
+
+  // 74.1  All FNV collectibles have gridRow and gridCol (both numbers in 1..6)
+  {
+    const FALLOUT_REGISTRY_NV = (() => {
+      try {
+        const m = nvRegSrc74.match(/collectibles\s*:\s*\[([\s\S]*?)\],\s*\/\//);
+        const block = m ? m[1] : nvRegSrc74.match(/collectibles\s*:\s*\[([\s\S]*?)\],/)?.[1] || '';
+        const rows = (block.match(/gridRow\s*:\s*(\d+)/g) || []).map(s =>
+          parseInt(s.match(/\d+/)[0])
+        );
+        const cols = (block.match(/gridCol\s*:\s*(\d+)/g) || []).map(s =>
+          parseInt(s.match(/\d+/)[0])
+        );
+        return { rows, cols };
+      } catch (_) {
+        return { rows: [], cols: [] };
+      }
+    })();
+    assert(
+      FALLOUT_REGISTRY_NV.rows.length === 7 &&
+        FALLOUT_REGISTRY_NV.rows.every(r => r >= 1 && r <= 6) &&
+        FALLOUT_REGISTRY_NV.cols.length === 7 &&
+        FALLOUT_REGISTRY_NV.cols.every(c => c >= 1 && c <= 6),
+      'reg_nv.js: all 7 FNV collectibles have gridRow and gridCol in 1..6'
+    );
+  }
+
+  // 74.2  FNV collectible cells all match an existing NV zones[] entry
+  {
+    // Zone entries have 'locations:' (plural array); collectibles have 'location:' (singular string)
+    const zoneKeys74nv = new Set(
+      [
+        ...nvRegSrc74.matchAll(/gridRow\s*:\s*(\d+)[\s,]+gridCol\s*:\s*(\d+)[\s,]+locations\s*:/g),
+      ].map(m => `${m[1]},${m[2]}`)
+    );
+    const collectBlock = nvRegSrc74.match(/collectibles\s*:\s*\[([\s\S]*?)\],/)?.[1] || '';
+    const collectCoords = [
+      ...collectBlock.matchAll(/gridRow\s*:\s*(\d+)[\s\S]*?gridCol\s*:\s*(\d+)/g),
+    ].map(m => `${m[1]},${m[2]}`);
+    const badCoords = collectCoords.filter(k => !zoneKeys74nv.has(k));
+    assert(
+      badCoords.length === 0,
+      'reg_nv.js: all FNV collectible gridRow/gridCol cells match an existing zones[] entry' +
+        (badCoords.length ? ' — bad: ' + badCoords.join(', ') : '')
+    );
+  }
+
+  // 74.3  All FO3 collectibles have gridRow and gridCol in 1..6
+  {
+    const collectBlock = fo3RegSrc74.match(/collectibles\s*:\s*\[([\s\S]*?)\],/)?.[1] || '';
+    const rows = (collectBlock.match(/gridRow\s*:\s*(\d+)/g) || []).map(s =>
+      parseInt(s.match(/\d+/)[0])
+    );
+    const cols = (collectBlock.match(/gridCol\s*:\s*(\d+)/g) || []).map(s =>
+      parseInt(s.match(/\d+/)[0])
+    );
+    assert(
+      rows.length === 20 &&
+        rows.every(r => r >= 1 && r <= 6) &&
+        cols.length === 20 &&
+        cols.every(c => c >= 1 && c <= 6),
+      'reg_fo3.js: all 20 FO3 collectibles have gridRow and gridCol in 1..6'
+    );
+  }
+
+  // 74.4  FO3 collectible cells all match an existing FO3 zones[] entry
+  {
+    // Zone entries have 'locations:' (plural array); collectibles have 'location:' (singular string)
+    const zoneKeys74fo3 = new Set(
+      [
+        ...fo3RegSrc74.matchAll(/gridRow\s*:\s*(\d+)[\s,]+gridCol\s*:\s*(\d+)[\s,]+locations\s*:/g),
+      ].map(m => `${m[1]},${m[2]}`)
+    );
+    const collectBlock = fo3RegSrc74.match(/collectibles\s*:\s*\[([\s\S]*?)\],/)?.[1] || '';
+    const collectCoords = [
+      ...collectBlock.matchAll(/gridRow\s*:\s*(\d+)[\s\S]*?gridCol\s*:\s*(\d+)/g),
+    ].map(m => `${m[1]},${m[2]}`);
+    const badCoords = collectCoords.filter(k => !zoneKeys74fo3.has(k));
+    assert(
+      badCoords.length === 0,
+      'reg_fo3.js: all FO3 collectible gridRow/gridCol cells match an existing FO3 zones[] entry' +
+        (badCoords.length ? ' — bad: ' + badCoords.join(', ') : '')
+    );
+  }
+
+  // 74.5  All lincolnMemorabilia entries have gridRow=4 and gridCol=2
+  {
+    const linBlock =
+      fo3RegSrc74.match(/lincolnMemorabilia\s*:\s*\[([\s\S]*?)\],\s*\/\//)?.[1] ||
+      fo3RegSrc74.match(/lincolnMemorabilia\s*:\s*\[([\s\S]*?)\],/)?.[1] ||
+      '';
+    const rows = (linBlock.match(/gridRow\s*:\s*(\d+)/g) || []).map(s =>
+      parseInt(s.match(/\d+/)[0])
+    );
+    const cols = (linBlock.match(/gridCol\s*:\s*(\d+)/g) || []).map(s =>
+      parseInt(s.match(/\d+/)[0])
+    );
+    assert(
+      rows.length === 9 &&
+        rows.every(r => r === 4) &&
+        cols.length === 9 &&
+        cols.every(c => c === 2),
+      'reg_fo3.js: all 9 lincolnMemorabilia entries have gridRow=4 and gridCol=2 (Museum of History)'
+    );
+  }
+
+  // 74.6  lincolnMemorabilia cell [4,2] matches an existing FO3 zone
+  {
+    // Zone entries have 'locations:' (plural); this anchors to zone-only entries
+    const zoneKeys74fo3b = new Set(
+      [
+        ...fo3RegSrc74.matchAll(/gridRow\s*:\s*(\d+)[\s,]+gridCol\s*:\s*(\d+)[\s,]+locations\s*:/g),
+      ].map(m => `${m[1]},${m[2]}`)
+    );
+    assert(
+      zoneKeys74fo3b.has('4,2'),
+      'reg_fo3.js: lincolnMemorabilia cell [4,2] matches an existing FO3 zones[] entry (Museum of History zone)'
+    );
+  }
+
+  // 74.7  renderWorldMap badge uses coord-based matching (gridRow === zone.gridRow source guard)
+  assert(
+    /def\.gridRow\s*===\s*zone\.gridRow/.test(uiRenderSrc74) &&
+      /def\.gridCol\s*===\s*zone\.gridCol/.test(uiRenderSrc74),
+    'ui-render.js: zoneHasUncollectedCollectible uses def.gridRow===zone.gridRow coord comparison (coord-based badge)'
+  );
+
+  // 74.8  renderWorldMap badge NOT using old name-based collectible matching (regression guard)
+  {
+    let mapBody74 = '';
+    try {
+      mapBody74 = extractFunctionBody(uiRenderSrc74, 'zoneHasUncollectedCollectible');
+    } catch (_) {}
+    assert(
+      !/defName\.includes\s*\(/.test(mapBody74) && !/searchIn\.some/.test(mapBody74),
+      'ui-render.js: zoneHasUncollectedCollectible no longer uses name-substring matching (coord-based regression guard)'
+    );
+  }
+
+  // 74.9  zoneHasUncollectedCollectible also checks Lincoln items (lincolnMemorabilia present)
+  {
+    let mapBody74b = '';
+    try {
+      mapBody74b = extractFunctionBody(uiRenderSrc74, 'zoneHasUncollectedCollectible');
+    } catch (_) {}
+    assert(
+      /lincolnMemorabilia/.test(mapBody74b),
+      'ui-render.js: zoneHasUncollectedCollectible checks lincolnMemorabilia entries (Lincoln items flag their zone cell)'
+    );
+  }
+
+  // 74.10  FNV collectibles count unchanged = 7
+  {
+    const m = nvRegSrc74.match(/collectibles\s*:\s*\[([\s\S]*?)\],/);
+    const block = m ? m[1] : '';
+    const count = (block.match(/\bname\s*:/g) || []).length;
+    assert(count === 7, `reg_nv.js: FNV collectibles count unchanged = 7 (found ${count})`);
+  }
+
+  // 74.11  FO3 collectibles count unchanged = 20
+  {
+    const m = fo3RegSrc74.match(/collectibles\s*:\s*\[([\s\S]*?)\],/);
+    const block = m ? m[1] : '';
+    const count = (block.match(/\bname\s*:/g) || []).length;
+    assert(count === 20, `reg_fo3.js: FO3 collectibles count unchanged = 20 (found ${count})`);
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

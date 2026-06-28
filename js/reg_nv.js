@@ -1121,18 +1121,62 @@ const FALLOUT_REGISTRY = {
   //         boost (reward amount), location (canonical display string — CAPS, terse)
   // Data source: https://fallout.wiki/wiki/Snow_globe
   collectibles: [
-    { name: 'Goodsprings', stat: 'caps', boost: 2000, location: 'GOODSPRINGS CEMETERY' },
-    { name: 'Hoover Dam', stat: 'caps', boost: 2000, location: 'HOOVER DAM VISITOR CENTER' },
-    { name: 'Lucky 38', stat: 'caps', boost: 2000, location: 'LUCKY 38 CASINO (VIP LOUNGE)' },
+    {
+      name: 'Goodsprings',
+      stat: 'caps',
+      boost: 2000,
+      location: 'GOODSPRINGS CEMETERY',
+      gridRow: 4,
+      gridCol: 2,
+    },
+    {
+      name: 'Hoover Dam',
+      stat: 'caps',
+      boost: 2000,
+      location: 'HOOVER DAM VISITOR CENTER',
+      gridRow: 1,
+      gridCol: 5,
+    },
+    {
+      name: 'Lucky 38',
+      stat: 'caps',
+      boost: 2000,
+      location: 'LUCKY 38 CASINO (VIP LOUNGE)',
+      gridRow: 3,
+      gridCol: 2,
+    },
     {
       name: 'Mormon Fort',
       stat: 'caps',
       boost: 2000,
       location: "OLD MORMON FORT (JULIE FARKAS' OFFICE)",
+      gridRow: 3,
+      gridCol: 1,
     },
-    { name: 'Mt. Charleston', stat: 'caps', boost: 2000, location: 'JACOBSTOWN' },
-    { name: 'Nellis AFB', stat: 'caps', boost: 2000, location: 'NELLIS AIR FORCE BASE' },
-    { name: 'Test Site', stat: 'caps', boost: 2000, location: 'CRESCENT CANYON WEST' },
+    {
+      name: 'Mt. Charleston',
+      stat: 'caps',
+      boost: 2000,
+      location: 'JACOBSTOWN',
+      gridRow: 1,
+      gridCol: 1,
+    },
+    {
+      name: 'Nellis AFB',
+      stat: 'caps',
+      boost: 2000,
+      location: 'NELLIS AIR FORCE BASE',
+      gridRow: 2,
+      gridCol: 4,
+    },
+    {
+      name: 'Test Site',
+      stat: 'caps',
+      boost: 2000,
+      location: 'CRESCENT CANYON WEST',
+      gridRow: 5,
+      gridCol: 3,
+    },
   ],
 
   // ── ZONES ───────────────────────────────────────────────────────────────────

@@ -738,7 +738,7 @@ function autoImportState(jsonString) {
     {
       const raw = _g(parsed, 'lincolnItems');
       if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
-        const LINCOLN_VOCAB = ['found', 'hannibal', 'leroy', 'washington', 'other'];
+        const LINCOLN_VOCAB = ['found', 'hannibal', 'leroy', 'washington'];
         const registryNames =
           typeof FALLOUT_REGISTRY !== 'undefined' &&
           Array.isArray(FALLOUT_REGISTRY.lincolnMemorabilia)
@@ -746,7 +746,8 @@ function autoImportState(jsonString) {
             : new Set();
         const validated = {};
         Object.keys(raw).forEach(k => {
-          if (registryNames.has(k) && LINCOLN_VOCAB.includes(raw[k])) validated[k] = raw[k];
+          const coerced = raw[k] === 'other' ? 'found' : raw[k];
+          if (registryNames.has(k) && LINCOLN_VOCAB.includes(coerced)) validated[k] = coerced;
         });
         state.lincolnItems = validated;
       }

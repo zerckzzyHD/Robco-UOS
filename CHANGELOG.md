@@ -1,6 +1,12 @@
-## [Unreleased]<!-- Tests: 893/893 | Cache: robco-terminal-v2.5.0-r20 -->
+## [Unreleased]<!-- Tests: 907/907 | Cache: robco-terminal-v2.5.0-r21 -->
 
 ### Added
+
+- **Collectibles now mark their region on the world map** — every Snow Globe (New Vegas) and Bobblehead (Fallout 3) is linked to a specific map cell, so the region grid highlights any cell where an uncollected collectible is waiting. FO3 Bobbleheads previously never appeared on the map at all; this is now fixed. A handful of New Vegas Snow Globes that were matched by name were also pointing at the wrong cells — all are now placed correctly. Lincoln Memorabilia items in FO3 likewise flag their museum region on the map until collected.
+
+### Fixed
+
+- **Lincoln "Other" disposition removed** — the redundant "Other" option has been dropped from the Lincoln Memorabilia disposition selector. Items previously saved with "Other" are automatically updated to "Found" so no data is lost.
 
 - **Expanded New Vegas location database** — added 22 notable minor locations to the map and autocomplete (e.g. Jean Sky Diving, Jack Rabbit Springs, the three Powder Ganger camps, Bonnie Springs, Goodsprings Cave, Scorpion Gulch, The Devil's Throat, Walking Box Cavern, El Dorado Dry Lake, and more). Each location was sourced from the independent Fallout wiki and placed in the correct map region. Existing saves are unaffected — the location catalog is read-only reference data.
 

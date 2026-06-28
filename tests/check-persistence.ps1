@@ -971,11 +971,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-73)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-73)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-74)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-74)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -3555,8 +3555,9 @@ Check ([bool]($cssSrc65 -match '(?s)#updateModalMsg[\s\S]{0,100}text-align\s*:\s
 # ===========================================================
 # Suite 66 -- FO3 Lincoln Memorabilia Tracker (Phase 6 Task 4)
 # state.lincolnItems, migration, autoImportState validated map,
-# reg_fo3 array, GAME_DEFS.FO3.tracksLincoln, render/handler guards.
-# 17 tests
+# reg_fo3 array, GAME_DEFS.FO3.tracksLincoln, render/handler guards,
+# 'other' vocab removed + coercion guard.
+# 20 tests
 # ===========================================================
 Sep "Suite 66 -- FO3 Lincoln Memorabilia Tracker"
 $stateSrc66  = Read-Src "js\state.js"
@@ -3648,6 +3649,20 @@ $sdBody66 = ''
 try { $sdBody66 = Get-FunctionBody $apiSrc66 'getSystemDirective' } catch {}
 Check ([bool]($sdBody66 -match 'lincolnItems')) `
     'getSystemDirective() references lincolnItems (Protocol 14 -- AI contract updated for new state field)'
+
+# 66.18  LINCOLN_VOCAB in api.js does NOT include 'other' (Change 2 regression guard)
+Check (-not ($apiSrc66 -match "LINCOLN_VOCAB\s*=\s*\[[^\]]*['""]other['""]")) `
+    "api.js LINCOLN_VOCAB does not include 'other' -- removed in Change 2 (regression guard)"
+
+# 66.19  renderLincolnMemorabilia opts does NOT include 'other' option
+Check (-not ($uiRenderSrc66 -match "\[\s*['""]other['""]\s*,")) `
+    "ui-render.js opts array does not include 'other' option -- removed in Change 2"
+
+# 66.20  autoImportState() coerces legacy 'other' disposition to 'found'
+$importBody66b = ''
+try { $importBody66b = Get-FunctionBody $apiSrc66 'autoImportState' } catch {}
+Check ([bool]($importBody66b -match 'other.*found|coerced')) `
+    "autoImportState() coerces legacy 'other' disposition to 'found' for backward-compatibility"
 
 # ===========================================================
 # Suite 67 -- FNV Traits Tracker (Phase 6 Task 5 + filter follow-up)
@@ -4222,6 +4237,87 @@ Check ([bool]($uiCoreSrc73 -match "big_guns\s*:\s*'Big Guns'") -and `
 # 73.12  syncStateFromDom() still iterates getSkillKeys() -- data layer regression guard
 Check ([bool]($stateSrc73 -match 'getSkillKeys\s*\(\s*\)')) `
     'state.js: syncStateFromDom() still iterates getSkillKeys() -- data layer unchanged by this render refactor'
+
+# ===========================================================
+# Suite 74 -- Collectibles Map Coord Guards (Change 1)
+# gridRow/gridCol on every FNV/FO3 collectible + lincoln entry,
+# cells match existing zones[], coord-based badge source guard,
+# regression: no name-based badge logic, lincoln check present.
+# 11 tests
+# ===========================================================
+Sep "Suite 74 -- Collectibles Map Coord Guards"
+$nvRegSrc74   = Read-Src "js\reg_nv.js"
+$fo3RegSrc74  = Read-Src "js\reg_fo3.js"
+$uiRenderSrc74 = Read-Src "js\ui-render.js"
+
+# 74.1  All FNV collectibles have gridRow and gridCol in 1..6
+$nvCollectBlock74 = ''
+$nvCM74 = [regex]::Match($nvRegSrc74, '(?s)collectibles\s*:\s*\[(.*?)\],')
+if ($nvCM74.Success) { $nvCollectBlock74 = $nvCM74.Groups[1].Value }
+$nvRows74 = [regex]::Matches($nvCollectBlock74, 'gridRow\s*:\s*(\d+)') | ForEach-Object { [int]$_.Groups[1].Value }
+$nvCols74 = [regex]::Matches($nvCollectBlock74, 'gridCol\s*:\s*(\d+)') | ForEach-Object { [int]$_.Groups[1].Value }
+Check ($nvRows74.Count -eq 7 -and ($nvRows74 | Where-Object { $_ -lt 1 -or $_ -gt 6 }).Count -eq 0 -and $nvCols74.Count -eq 7 -and ($nvCols74 | Where-Object { $_ -lt 1 -or $_ -gt 6 }).Count -eq 0) `
+    'reg_nv.js: all 7 FNV collectibles have gridRow and gridCol in 1..6'
+
+# 74.2  FNV collectible cells all match an existing NV zones[] entry
+$nvZonesBlock74 = ''
+$nvZM74 = [regex]::Match($nvRegSrc74, '(?s)zones\s*:\s*\[(.*?)\],\s*\/\/')
+if ($nvZM74.Success) { $nvZonesBlock74 = $nvZM74.Groups[1].Value }
+$nvZoneKeys74 = New-Object System.Collections.Generic.HashSet[string]
+[regex]::Matches($nvZonesBlock74, '(?s)gridRow\s*:\s*(\d+).*?gridCol\s*:\s*(\d+)') | ForEach-Object { [void]$nvZoneKeys74.Add("$($_.Groups[1].Value),$($_.Groups[2].Value)") }
+$nvBadCoords74 = [regex]::Matches($nvCollectBlock74, '(?s)gridRow\s*:\s*(\d+).*?gridCol\s*:\s*(\d+)') | Where-Object { -not $nvZoneKeys74.Contains("$($_.Groups[1].Value),$($_.Groups[2].Value)") }
+Check ($nvBadCoords74.Count -eq 0) ('reg_nv.js: all FNV collectible gridRow/gridCol cells match an existing zones[] entry' + $(if ($nvBadCoords74.Count) { " -- bad: " + ($nvBadCoords74 | ForEach-Object { "$($_.Groups[1].Value),$($_.Groups[2].Value)" } | Join-String -Separator ', ') } else { '' }))
+
+# 74.3  All FO3 collectibles have gridRow and gridCol in 1..6
+$fo3CollectBlock74 = ''
+$fo3CM74 = [regex]::Match($fo3RegSrc74, '(?s)collectibles\s*:\s*\[(.*?)\],')
+if ($fo3CM74.Success) { $fo3CollectBlock74 = $fo3CM74.Groups[1].Value }
+$fo3Rows74 = [regex]::Matches($fo3CollectBlock74, 'gridRow\s*:\s*(\d+)') | ForEach-Object { [int]$_.Groups[1].Value }
+$fo3Cols74 = [regex]::Matches($fo3CollectBlock74, 'gridCol\s*:\s*(\d+)') | ForEach-Object { [int]$_.Groups[1].Value }
+Check ($fo3Rows74.Count -eq 20 -and ($fo3Rows74 | Where-Object { $_ -lt 1 -or $_ -gt 6 }).Count -eq 0 -and $fo3Cols74.Count -eq 20 -and ($fo3Cols74 | Where-Object { $_ -lt 1 -or $_ -gt 6 }).Count -eq 0) `
+    'reg_fo3.js: all 20 FO3 collectibles have gridRow and gridCol in 1..6'
+
+# 74.4  FO3 collectible cells all match an existing FO3 zones[] entry
+# Zone entries have 'locations:' (plural array); collectibles have 'location:' (singular string)
+$fo3ZoneKeys74 = New-Object System.Collections.Generic.HashSet[string]
+[regex]::Matches($fo3RegSrc74, 'gridRow\s*:\s*(\d+)[\s,]+gridCol\s*:\s*(\d+)[\s,]+locations\s*:') | ForEach-Object { [void]$fo3ZoneKeys74.Add("$($_.Groups[1].Value),$($_.Groups[2].Value)") }
+$fo3BadCoords74 = [regex]::Matches($fo3CollectBlock74, '(?s)gridRow\s*:\s*(\d+).*?gridCol\s*:\s*(\d+)') | Where-Object { -not $fo3ZoneKeys74.Contains("$($_.Groups[1].Value),$($_.Groups[2].Value)") }
+Check ($fo3BadCoords74.Count -eq 0) ('reg_fo3.js: all FO3 collectible gridRow/gridCol cells match an existing FO3 zones[] entry' + $(if ($fo3BadCoords74.Count) { " -- bad: " + ($fo3BadCoords74 | ForEach-Object { "$($_.Groups[1].Value),$($_.Groups[2].Value)" } | Join-String -Separator ', ') } else { '' }))
+
+# 74.5  All lincolnMemorabilia entries have gridRow=4 and gridCol=2
+$linBlock74 = ''
+$linM74 = [regex]::Match($fo3RegSrc74, '(?s)lincolnMemorabilia\s*:\s*\[(.*?)\n  \],')
+if ($linM74.Success) { $linBlock74 = $linM74.Groups[1].Value }
+$linRows74 = [regex]::Matches($linBlock74, 'gridRow\s*:\s*(\d+)') | ForEach-Object { [int]$_.Groups[1].Value }
+$linCols74 = [regex]::Matches($linBlock74, 'gridCol\s*:\s*(\d+)') | ForEach-Object { [int]$_.Groups[1].Value }
+Check ($linRows74.Count -eq 9 -and ($linRows74 | Where-Object { $_ -ne 4 }).Count -eq 0 -and $linCols74.Count -eq 9 -and ($linCols74 | Where-Object { $_ -ne 2 }).Count -eq 0) `
+    'reg_fo3.js: all 9 lincolnMemorabilia entries have gridRow=4 and gridCol=2 (Museum of History)'
+
+# 74.6  lincolnMemorabilia cell [4,2] matches an existing FO3 zone
+Check ($fo3ZoneKeys74.Contains('4,2')) `
+    'reg_fo3.js: lincolnMemorabilia cell [4,2] matches an existing FO3 zones[] entry (Museum of History zone)'
+
+# 74.7  renderWorldMap badge uses coord-based matching
+Check ([bool]($uiRenderSrc74 -match 'def\.gridRow\s*===\s*zone\.gridRow') -and [bool]($uiRenderSrc74 -match 'def\.gridCol\s*===\s*zone\.gridCol')) `
+    'ui-render.js: zoneHasUncollectedCollectible uses def.gridRow===zone.gridRow coord comparison (coord-based badge)'
+
+# 74.8  renderWorldMap badge NOT using old name-based matching (regression guard)
+$mapBody74 = ''
+try { $mapBody74 = Get-FunctionBody $uiRenderSrc74 'zoneHasUncollectedCollectible' } catch {}
+Check (-not ($mapBody74 -match 'defName\.includes\s*\(') -and -not ($mapBody74 -match 'searchIn\.some')) `
+    'ui-render.js: zoneHasUncollectedCollectible no longer uses name-substring matching (coord-based regression guard)'
+
+# 74.9  zoneHasUncollectedCollectible also checks Lincoln items
+Check ([bool]($mapBody74 -match 'lincolnMemorabilia')) `
+    'ui-render.js: zoneHasUncollectedCollectible checks lincolnMemorabilia entries (Lincoln items flag their zone cell)'
+
+# 74.10  FNV collectibles count unchanged = 7
+$nvCollectCount74 = ([regex]::Matches($nvCollectBlock74, '\bname\s*:')).Count
+Check ($nvCollectCount74 -eq 7) "reg_nv.js: FNV collectibles count unchanged = 7 (found $nvCollectCount74)"
+
+# 74.11  FO3 collectibles count unchanged = 20
+$fo3CollectCount74 = ([regex]::Matches($fo3CollectBlock74, '\bname\s*:')).Count
+Check ($fo3CollectCount74 -eq 20) "reg_fo3.js: FO3 collectibles count unchanged = 20 (found $fo3CollectCount74)"
 
 # ===========================================================
 # Results
