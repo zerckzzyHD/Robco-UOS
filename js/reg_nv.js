@@ -1295,6 +1295,84 @@ const FALLOUT_REGISTRY = {
       locations: ['The Fort', 'Fortification Hill', "Caesar's Camp"],
     },
   ],
+
+  // ── TRAITS ───────────────────────────────────────────────────────────────────
+  // 16 FNV traits (11 base + 5 Old World Blues DLC).
+  // Source: https://fallout.wiki/wiki/Fallout:_New_Vegas_traits
+  // "Hit the Deck" is a PERK — NOT included here.
+  traits: [
+    {
+      name: 'Built to Destroy',
+      effect: '+3% Critical Chance / +15% weapon wear',
+    },
+    {
+      name: 'Fast Shot',
+      effect:
+        '+20% fire rate & -20% AP cost (Guns & Energy Weapons) / +20% weapon spread & -20% V.A.T.S. accuracy',
+    },
+    {
+      name: 'Four Eyes',
+      effect: '+2 Perception when wearing glasses / -1 base Perception',
+    },
+    {
+      name: 'Good Natured',
+      effect:
+        '+5 Barter, Medicine, Repair, Science, Speech / -5 Energy Weapons, Explosives, Guns, Melee, Unarmed',
+    },
+    {
+      name: 'Heavy Handed',
+      effect: '+20% melee & unarmed damage / -60% melee & unarmed critical damage',
+    },
+    {
+      name: 'Kamikaze',
+      effect: '+10 Action Points / -2 Damage Threshold, -15% Damage Resistance',
+    },
+    {
+      name: 'Loose Cannon',
+      effect: '+30% thrown weapon attack rate / -25% thrown weapon range',
+    },
+    {
+      name: 'Skilled',
+      effect: '+5 to all skills / -10% XP gained',
+    },
+    {
+      name: 'Small Frame',
+      effect: '+1 Agility / +25% limb damage taken',
+    },
+    {
+      name: 'Trigger Discipline',
+      effect: '+20% accuracy (Guns & Energy Weapons) / -20% fire rate & +20% AP per shot',
+    },
+    {
+      name: 'Wild Wasteland',
+      effect: 'Unlocks quirky/off-beat content & Easter eggs / (no direct stat effect)',
+    },
+    {
+      name: 'Claustrophobia',
+      effect: '+1 to all SPECIAL when outside / -1 to all SPECIAL when indoors',
+      dlc: 'owb',
+    },
+    {
+      name: 'Early Bird',
+      effect: '+2 SPECIAL from 6AM–12PM / -1 SPECIAL from 6PM–6AM',
+      dlc: 'owb',
+    },
+    {
+      name: 'Hoarder',
+      effect: '+25 lbs Carry Weight / -1 to all SPECIAL when carry weight is below 160 lbs',
+      dlc: 'owb',
+    },
+    {
+      name: 'Hot Blooded',
+      effect: '+15% damage when health below 50% / -2 Agility & Perception when health below 50%',
+      dlc: 'owb',
+    },
+    {
+      name: "Logan's Loophole",
+      effect: 'Chems last twice as long & addiction rate 0% / level cap locks at 30',
+      dlc: 'owb',
+    },
+  ],
 };
 
 // ── REGISTRY SEARCH ──────────────────────────────────────────────────────────

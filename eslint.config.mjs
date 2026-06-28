@@ -182,6 +182,8 @@ export default [
         renderLincolnMemorabilia: 'readonly',
         toggleLincolnItem: 'readonly',
         setLincolnDisposition: 'readonly',
+        renderTraits: 'readonly',
+        toggleTrait: 'readonly',
         // Time system (js/ui.js)
         formatGameTime: 'readonly',
         ticksToGameTime: 'readonly',

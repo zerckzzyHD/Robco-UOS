@@ -837,6 +837,83 @@ function setLincolnDisposition(name, value) {
   saveState();
 }
 
+function renderTraits() {
+  const container = document.getElementById('traitsDisplay');
+  if (!container) return;
+  if (!_activeDef().hasTraits) {
+    container.style.display = 'none';
+    return;
+  }
+  container.style.display = '';
+
+  const defs =
+    typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.traits)
+      ? FALLOUT_REGISTRY.traits
+      : [];
+  const selected = Array.isArray(state.traits) ? state.traits : [];
+  const n = selected.length;
+  const overCap = n > 2;
+
+  let html = `<div style="border-bottom:1px dashed var(--robco-blue);margin-bottom:6px;padding-bottom:4px;font-size:11px;color:var(--robco-blue);font-weight:bold;letter-spacing:1px;">`;
+  html += `TRAITS [${n}/2]`;
+  if (overCap) {
+    html += `<span style="color:#e8a020;font-size:10px;font-weight:normal;margin-left:8px;">[${n}/2] — exceeds 2-trait limit (OWB allows re-selection)</span>`;
+  }
+  html += `</div>`;
+
+  // Selected first, then unselected
+  const selectedDefs = defs.filter(d => selected.includes(d.name));
+  const unselectedDefs = defs.filter(d => !selected.includes(d.name));
+
+  const renderRow = d => {
+    const safeName = escapeHtml(d.name);
+    const isSel = selected.includes(d.name);
+    const dlcBadge =
+      d.dlc === 'owb' ? ' <span style="font-size:9px;opacity:0.6;">[OWB]</span>' : '';
+    if (isSel) {
+      html += `<div style="font-size:11px;margin-bottom:5px;padding:3px 0;">`;
+      html += `<span style="color:var(--robco-green);cursor:pointer;min-height:28px;display:inline-flex;align-items:center;margin-right:4px;" onclick="toggleTrait('${safeName}')" title="Click to deselect">[SELECTED]</span>`;
+      html += `<strong>${escapeHtml(d.name.toUpperCase())}${dlcBadge}</strong>`;
+      html += `<div style="font-size:10px;opacity:0.7;margin-top:2px;padding-left:4px;">${escapeHtml(d.effect)}</div>`;
+      html += `</div>`;
+    } else {
+      html += `<div style="font-size:11px;margin-bottom:5px;padding:3px 0;opacity:0.75;">`;
+      html += `<span style="opacity:0.55;cursor:pointer;min-height:28px;display:inline-flex;align-items:center;margin-right:4px;" onclick="toggleTrait('${safeName}')" title="Click to select">[&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;]</span>`;
+      html += `${escapeHtml(d.name.toUpperCase())}${dlcBadge}`;
+      html += `<div style="font-size:10px;opacity:0.55;margin-top:2px;padding-left:4px;">${escapeHtml(d.effect)}</div>`;
+      html += `</div>`;
+    }
+  };
+
+  selectedDefs.forEach(renderRow);
+  if (selectedDefs.length > 0 && unselectedDefs.length > 0) {
+    html += `<div style="border-top:1px dashed var(--robco-green);margin:4px 0 6px;opacity:0.3;"></div>`;
+  }
+  unselectedDefs.forEach(renderRow);
+
+  container.innerHTML = html;
+}
+
+function toggleTrait(name) {
+  if (!Array.isArray(state.traits)) state.traits = [];
+  const idx = state.traits.indexOf(name);
+  if (idx !== -1) {
+    state.traits.splice(idx, 1);
+  } else {
+    state.traits.push(name);
+    if (state.traits.length > 2) {
+      if (typeof appendToChat === 'function') {
+        appendToChat(
+          `> [TRAITS] ${state.traits.length}/2 — exceeds standard limit. Old World Blues allows re-selection.`,
+          'sys'
+        );
+      }
+    }
+  }
+  renderTraits();
+  saveState();
+}
+
 function renderCampaignNotes() {
   const notesDiv = document.getElementById('campaignNotesList');
   if (!notesDiv) return;

@@ -1614,17 +1614,18 @@ header('Meta / Runner Parity');
     'Suite 64',
     'Suite 65',
     'Suite 66',
+    'Suite 67',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-66)' +
+    'JS runner contains all gate-guard suites (22-41, 49-67)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-66)' +
+    'PS runner contains all gate-guard suites (22-41, 49-67)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -1917,8 +1918,8 @@ assert(
 
 // 32.6 index.html skill matrix rows use class="skill-row" (≥13 rows)
 {
-  const htmlSrc32 = readFile('index.html');
-  const count = (htmlSrc32.match(/class="skill-row"/g) || []).length;
+  const htmlSource32 = readFile('index.html');
+  const count = (htmlSource32.match(/class="skill-row"/g) || []).length;
   assert(count >= 13, `index.html skill matrix has ≥13 .skill-row elements (found ${count})`);
 }
 
@@ -1963,8 +1964,8 @@ header('Phase 2b Guards');
 
 // 33.3 --robco-green-rgb set in index.html optics branches (≥5 setProperty calls)
 {
-  const htmlSrc33 = readFile('index.html');
-  const rgbCount = (htmlSrc33.match(/setProperty\(['"]--robco-green-rgb['"]/g) || []).length;
+  const htmlSource33 = readFile('index.html');
+  const rgbCount = (htmlSource33.match(/setProperty\(['"]--robco-green-rgb['"]/g) || []).length;
   assert(
     rgbCount >= 5,
     `index.html optics script sets --robco-green-rgb in ≥5 branches (found ${rgbCount}) (P1-1)`
@@ -2024,8 +2025,8 @@ assert(
 
 // 33.10 No hardcoded [+] text inside <summary> elements in index.html
 {
-  const htmlSrc33 = readFile('index.html');
-  const bad = (htmlSrc33.match(/<summary[^>]*>[^<]*\[\+\][^<]*<\/summary>/g) || []).length;
+  const htmlSource33 = readFile('index.html');
+  const bad = (htmlSource33.match(/<summary[^>]*>[^<]*\[\+\][^<]*<\/summary>/g) || []).length;
   assert(bad === 0, `No hardcoded [+] text in index.html <summary> elements (found ${bad}) (P1-4)`);
 }
 
@@ -4629,7 +4630,7 @@ header('Suite 54 — Prompt-Injection Hardening, Input Caps, Quota Warning');
 {
   const apiSrc54 = readFile('js/api.js');
   const stateSrc54 = readFile('js/state.js');
-  const htmlSrc54 = readFile('index.html');
+  const htmlSource54 = readFile('index.html');
   const gsdBody54 = extractFunctionBody(apiSrc54, 'getSystemDirective');
   const tmBody54 = extractFunctionBody(apiSrc54, 'transmitMessage');
   const saveStateFn54 = extractFunctionBody(stateSrc54, 'saveState');
@@ -4674,7 +4675,7 @@ header('Suite 54 — Prompt-Injection Hardening, Input Caps, Quota Warning');
 
   // 54.7  #chatInput has maxlength ≥ 4000 in index.html
   {
-    const chatInputML54Match = htmlSrc54.match(/id="chatInput"[\s\S]{0,200}maxlength="(\d+)"/);
+    const chatInputML54Match = htmlSource54.match(/id="chatInput"[\s\S]{0,200}maxlength="(\d+)"/);
     const chatInputML54 = chatInputML54Match ? parseInt(chatInputML54Match[1]) : 0;
     assert(
       chatInputML54 >= 4000,
@@ -4684,25 +4685,25 @@ header('Suite 54 — Prompt-Injection Hardening, Input Caps, Quota Warning');
 
   // 54.8  #newItemName has a maxlength attribute in index.html
   assert(
-    /id="newItemName"[\s\S]{0,200}maxlength="/.test(htmlSrc54),
+    /id="newItemName"[\s\S]{0,200}maxlength="/.test(htmlSource54),
     '#newItemName has a maxlength attribute in index.html (item name length capped)'
   );
 
   // 54.9  #newQuestName has a maxlength attribute in index.html
   assert(
-    /id="newQuestName"[\s\S]{0,200}maxlength="/.test(htmlSrc54),
+    /id="newQuestName"[\s\S]{0,200}maxlength="/.test(htmlSource54),
     '#newQuestName has a maxlength attribute in index.html (quest name length capped)'
   );
 
   // 54.10  #newPerkName has a maxlength attribute in index.html
   assert(
-    /id="newPerkName"[\s\S]{0,200}maxlength="/.test(htmlSrc54),
+    /id="newPerkName"[\s\S]{0,200}maxlength="/.test(htmlSource54),
     '#newPerkName has a maxlength attribute in index.html (perk name length capped)'
   );
 
   // 54.11  #newCampaignNote has a maxlength attribute in index.html
   assert(
-    /id="newCampaignNote"[\s\S]{0,200}maxlength="/.test(htmlSrc54),
+    /id="newCampaignNote"[\s\S]{0,200}maxlength="/.test(htmlSource54),
     '#newCampaignNote has a maxlength attribute in index.html (campaign note length capped)'
   );
 
@@ -4733,74 +4734,74 @@ header('Suite 54 — Prompt-Injection Hardening, Input Caps, Quota Warning');
 // ══════════════════════════════════════════════════════════════
 header('Suite 55 — CSP Stage 1 Origin Guards + Firebase Pin');
 {
-  const htmlSrc55 = readFile('index.html');
+  const htmlSource55 = readFile('index.html');
   const cloudSrc55 = readFile('js/cloud.js');
 
   // 55.1 generativelanguage.googleapis.com present in CSP (Gemini API)
   assert(
-    /generativelanguage\.googleapis\.com/.test(htmlSrc55),
+    /generativelanguage\.googleapis\.com/.test(htmlSource55),
     'CSP contains generativelanguage.googleapis.com (Gemini API origin — Protocol 20 guard)'
   );
 
   // 55.2 identitytoolkit.googleapis.com present in CSP (Firebase Auth)
   assert(
-    /identitytoolkit\.googleapis\.com/.test(htmlSrc55),
+    /identitytoolkit\.googleapis\.com/.test(htmlSource55),
     'CSP contains identitytoolkit.googleapis.com (Firebase Auth origin — Protocol 20 guard)'
   );
 
   // 55.3 securetoken.googleapis.com present in CSP (Firebase token refresh)
   assert(
-    /securetoken\.googleapis\.com/.test(htmlSrc55),
+    /securetoken\.googleapis\.com/.test(htmlSource55),
     'CSP contains securetoken.googleapis.com (Firebase token refresh — Protocol 20 guard)'
   );
 
   // 55.4 firestore.googleapis.com present in CSP (Firestore)
   assert(
-    /firestore\.googleapis\.com/.test(htmlSrc55),
+    /firestore\.googleapis\.com/.test(htmlSource55),
     'CSP contains firestore.googleapis.com (Firestore origin — Protocol 20 guard)'
   );
 
   // 55.5 apis.google.com present in CSP (Google Sign-In popup + Firebase SDK)
   assert(
-    /apis\.google\.com/.test(htmlSrc55),
+    /apis\.google\.com/.test(htmlSource55),
     'CSP contains apis.google.com (Google Sign-In + Firebase SDK origin — Protocol 20 guard)'
   );
 
   // 55.6 nv-overlord.firebaseapp.com present in CSP (Firebase hosting + auth handler)
   assert(
-    /nv-overlord\.firebaseapp\.com/.test(htmlSrc55),
+    /nv-overlord\.firebaseapp\.com/.test(htmlSource55),
     'CSP contains nv-overlord.firebaseapp.com (Firebase hosting + auth handler — Protocol 20 guard)'
   );
 
   // 55.7 object-src 'none' present in CSP (blocks plugin content)
   assert(
-    /object-src\s+'none'/.test(htmlSrc55),
+    /object-src\s+'none'/.test(htmlSource55),
     "CSP contains object-src 'none' (blocks plugin content — Protocol 20 guard)"
   );
 
   // 55.8 base-uri 'none' present in CSP (blocks base-tag injection)
   assert(
-    /base-uri\s+'none'/.test(htmlSrc55),
+    /base-uri\s+'none'/.test(htmlSource55),
     "CSP contains base-uri 'none' (blocks base-tag injection — Protocol 20 guard)"
   );
 
   // 55.9 frame-ancestors 'none' present in CSP (prevents clickjacking)
   assert(
-    /frame-ancestors\s+'none'/.test(htmlSrc55),
+    /frame-ancestors\s+'none'/.test(htmlSource55),
     "CSP contains frame-ancestors 'none' (prevents clickjacking — Protocol 20 guard)"
   );
 
   // 55.10 Tripwire: script-src still contains 'unsafe-inline'
   // (~148 inline event handlers require this; must not be silently dropped)
   assert(
-    /script-src[^;]*'unsafe-inline'/.test(htmlSrc55),
+    /script-src[^;]*'unsafe-inline'/.test(htmlSource55),
     "CSP script-src contains 'unsafe-inline' (tripwire: required for ~148 inline handlers)"
   );
 
   // 55.11 Tripwire: script-src contains NO sha256- or nonce- token
   // CSP level 2+: a hash/nonce in script-src disables unsafe-inline, silently breaking all inline handlers
   {
-    const csp55 = (htmlSrc55.match(
+    const csp55 = (htmlSource55.match(
       /http-equiv="Content-Security-Policy[^"]*"[^>]*content="([^"]*)"/
     ) || ['', ''])[1];
     const scriptSrc55 = (csp55.match(/script-src([^;]*)/) || ['', ''])[1];
@@ -4822,7 +4823,7 @@ header('Suite 55 — CSP Stage 1 Origin Guards + Firebase Pin');
 
   // 55.13 img-src contains blob: (canvas / screenshot-preview images)
   assert(
-    /img-src[^;]*blob:/.test(htmlSrc55),
+    /img-src[^;]*blob:/.test(htmlSource55),
     'CSP img-src contains blob: (canvas/screenshot-preview images — Protocol 20 guard)'
   );
 }
@@ -4836,7 +4837,7 @@ header('Suite 55 — CSP Stage 1 Origin Guards + Firebase Pin');
 // ══════════════════════════════════════════════════════════════
 header('Suite 56 — UI Module Split Guards');
 {
-  const htmlSrc56 = readFile('index.html');
+  const htmlSource56 = readFile('index.html');
   const swSrc56 = readFile('sw.js');
 
   // 56.1 js/ui-audio.js file exists on disk
@@ -4853,14 +4854,14 @@ header('Suite 56 — UI Module Split Guards');
 
   // 56.3 <script src="js/ui-audio.js"> appears in index.html
   assert(
-    /src=['"]js\/ui-audio\.js['"]/.test(htmlSrc56),
+    /src=['"]js\/ui-audio\.js['"]/.test(htmlSource56),
     '<script src="js/ui-audio.js"> present in index.html'
   );
 
   // 56.4 ui-audio.js script appears before api.js in index.html (load-order guard)
   {
-    const audioIdx56 = htmlSrc56.indexOf('js/ui-audio.js');
-    const apiIdx56 = htmlSrc56.indexOf('js/api.js');
+    const audioIdx56 = htmlSource56.indexOf('js/ui-audio.js');
+    const apiIdx56 = htmlSource56.indexOf('js/api.js');
     assert(
       audioIdx56 !== -1 && apiIdx56 !== -1 && audioIdx56 < apiIdx56,
       'ui-audio.js <script> appears before api.js in index.html (load-order guard)'
@@ -4869,8 +4870,8 @@ header('Suite 56 — UI Module Split Guards');
 
   // 56.5 ui-audio.js script appears before ui.js in index.html (ui-audio must load first)
   {
-    const audioIdx56b = htmlSrc56.indexOf('js/ui-audio.js');
-    const uiIdx56 = htmlSrc56.indexOf('"js/ui-core.js"');
+    const audioIdx56b = htmlSource56.indexOf('js/ui-audio.js');
+    const uiIdx56 = htmlSource56.indexOf('"js/ui-core.js"');
     assert(
       audioIdx56b !== -1 && uiIdx56 !== -1 && audioIdx56b < uiIdx56,
       'ui-audio.js <script> appears before ui.js in index.html (audio loads before core)'
@@ -4891,14 +4892,14 @@ header('Suite 56 — UI Module Split Guards');
 
   // 56.8 <script src="js/ui-render.js"> appears in index.html
   assert(
-    /src=['"]js\/ui-render\.js['"]/.test(htmlSrc56),
+    /src=['"]js\/ui-render\.js['"]/.test(htmlSource56),
     '<script src="js/ui-render.js"> present in index.html'
   );
 
   // 56.9 ui-render.js script appears before api.js in index.html
   {
-    const renderIdx56 = htmlSrc56.indexOf('js/ui-render.js');
-    const apiIdx56b = htmlSrc56.indexOf('js/api.js');
+    const renderIdx56 = htmlSource56.indexOf('js/ui-render.js');
+    const apiIdx56b = htmlSource56.indexOf('js/api.js');
     assert(
       renderIdx56 !== -1 && apiIdx56b !== -1 && renderIdx56 < apiIdx56b,
       'ui-render.js <script> appears before api.js in index.html (load-order guard)'
@@ -4907,8 +4908,8 @@ header('Suite 56 — UI Module Split Guards');
 
   // 56.10 ui-render.js script appears before ui.js in index.html
   {
-    const renderIdx56b = htmlSrc56.indexOf('js/ui-render.js');
-    const uiIdx56b = htmlSrc56.indexOf('"js/ui-core.js"');
+    const renderIdx56b = htmlSource56.indexOf('js/ui-render.js');
+    const uiIdx56b = htmlSource56.indexOf('"js/ui-core.js"');
     assert(
       renderIdx56b !== -1 && uiIdx56b !== -1 && renderIdx56b < uiIdx56b,
       'ui-render.js <script> appears before ui.js in index.html (render loads before core)'
@@ -4929,14 +4930,14 @@ header('Suite 56 — UI Module Split Guards');
 
   // 56.13 <script src="js/ui-saves.js"> appears in index.html
   assert(
-    /src=['"]js\/ui-saves\.js['"]/.test(htmlSrc56),
+    /src=['"]js\/ui-saves\.js['"]/.test(htmlSource56),
     '<script src="js/ui-saves.js"> present in index.html'
   );
 
   // 56.14 ui-saves.js script appears before api.js in index.html
   {
-    const savesIdx56 = htmlSrc56.indexOf('js/ui-saves.js');
-    const apiIdx56c = htmlSrc56.indexOf('js/api.js');
+    const savesIdx56 = htmlSource56.indexOf('js/ui-saves.js');
+    const apiIdx56c = htmlSource56.indexOf('js/api.js');
     assert(
       savesIdx56 !== -1 && apiIdx56c !== -1 && savesIdx56 < apiIdx56c,
       'ui-saves.js <script> appears before api.js in index.html (load-order guard)'
@@ -4945,8 +4946,8 @@ header('Suite 56 — UI Module Split Guards');
 
   // 56.15 ui-saves.js script appears before ui.js in index.html
   {
-    const savesIdx56b = htmlSrc56.indexOf('js/ui-saves.js');
-    const uiIdx56c = htmlSrc56.indexOf('"js/ui-core.js"');
+    const savesIdx56b = htmlSource56.indexOf('js/ui-saves.js');
+    const uiIdx56c = htmlSource56.indexOf('"js/ui-core.js"');
     assert(
       savesIdx56b !== -1 && uiIdx56c !== -1 && savesIdx56b < uiIdx56c,
       'ui-saves.js <script> appears before ui.js in index.html (saves loads before core)'
@@ -4967,14 +4968,14 @@ header('Suite 56 — UI Module Split Guards');
 
   // 56.18 <script src="js/ui-account.js"> appears in index.html
   assert(
-    /src=['"]js\/ui-account\.js['"]/.test(htmlSrc56),
+    /src=['"]js\/ui-account\.js['"]/.test(htmlSource56),
     '<script src="js/ui-account.js"> present in index.html'
   );
 
   // 56.19 ui-account.js script appears before api.js in index.html
   {
-    const acctIdx56 = htmlSrc56.indexOf('js/ui-account.js');
-    const apiIdx56d = htmlSrc56.indexOf('js/api.js');
+    const acctIdx56 = htmlSource56.indexOf('js/ui-account.js');
+    const apiIdx56d = htmlSource56.indexOf('js/api.js');
     assert(
       acctIdx56 !== -1 && apiIdx56d !== -1 && acctIdx56 < apiIdx56d,
       'ui-account.js <script> appears before api.js in index.html (load-order guard)'
@@ -4983,8 +4984,8 @@ header('Suite 56 — UI Module Split Guards');
 
   // 56.20 ui-account.js script appears before ui-core.js in index.html
   {
-    const acctIdx56b = htmlSrc56.indexOf('js/ui-account.js');
-    const uiIdx56d = htmlSrc56.indexOf('"js/ui-core.js"');
+    const acctIdx56b = htmlSource56.indexOf('js/ui-account.js');
+    const uiIdx56d = htmlSource56.indexOf('"js/ui-core.js"');
     assert(
       acctIdx56b !== -1 && uiIdx56d !== -1 && acctIdx56b < uiIdx56d,
       'ui-account.js <script> appears before ui-core.js in index.html (account loads before core)'
@@ -5000,79 +5001,79 @@ header('Suite 56 — UI Module Split Guards');
   // ── Boot-loader migration guards (56.22–56.34) ────────────
   // 56.22 document.write is gone from index.html (headline regression guard)
   assert(
-    !/document\.write/.test(htmlSrc56),
+    !/document\.write/.test(htmlSource56),
     'index.html contains no document.write (boot-loader migration guard)'
   );
 
   // 56.23 Boot loader uses createElement('script') for dynamic injection
   assert(
-    /createElement\(['"]script['"]\)/.test(htmlSrc56),
+    /createElement\(['"]script['"]\)/.test(htmlSource56),
     "boot loader uses document.createElement('script') (dynamic injection guard)"
   );
 
   // 56.24 Boot loader uses .appendChild() to insert scripts
   assert(
-    /\.appendChild\(/.test(htmlSrc56),
+    /\.appendChild\(/.test(htmlSource56),
     'boot loader uses .appendChild() to inject scripts into <head> (dynamic injection guard)'
   );
 
   // 56.25 Boot loader sets .async = false to preserve db→state→reg order
   assert(
-    /\.async\s*=\s*false/.test(htmlSrc56),
+    /\.async\s*=\s*false/.test(htmlSource56),
     'boot loader sets script.async = false (preserves db→state→reg load order)'
   );
 
   // 56.26 Boot loader references js/db_nv.js (FNV database)
   assert(
-    /js\/db_nv\.js/.test(htmlSrc56),
+    /js\/db_nv\.js/.test(htmlSource56),
     'boot loader references js/db_nv.js (FNV database path present)'
   );
 
   // 56.27 Boot loader references js/db_fo3.js (FO3 database)
   assert(
-    /js\/db_fo3\.js/.test(htmlSrc56),
+    /js\/db_fo3\.js/.test(htmlSource56),
     'boot loader references js/db_fo3.js (FO3 database path present)'
   );
 
   // 56.28 Boot loader references js/state.js (shared state module)
   assert(
-    /js\/state\.js/.test(htmlSrc56),
+    /js\/state\.js/.test(htmlSource56),
     'boot loader references js/state.js (shared state module path present)'
   );
 
   // 56.29 Boot loader references js/reg_nv.js (FNV registry)
   assert(
-    /js\/reg_nv\.js/.test(htmlSrc56),
+    /js\/reg_nv\.js/.test(htmlSource56),
     'boot loader references js/reg_nv.js (FNV registry path present)'
   );
 
   // 56.30 Boot loader references js/reg_fo3.js (FO3 registry)
   assert(
-    /js\/reg_fo3\.js/.test(htmlSrc56),
+    /js\/reg_fo3\.js/.test(htmlSource56),
     'boot loader references js/reg_fo3.js (FO3 registry path present)'
   );
 
   // 56.31 Boot loader reads activeContext (primary context selector)
   assert(
-    /activeContext/.test(htmlSrc56),
+    /activeContext/.test(htmlSource56),
     'boot loader reads activeContext (primary game-context selector)'
   );
 
   // 56.32 Boot loader has try/catch for fail-safe LocalStorage access
   assert(
-    /try\s*\{/.test(htmlSrc56),
+    /try\s*\{/.test(htmlSource56),
     'boot loader has try { ... } catch (fail-safe: corrupt LocalStorage → FNV default)'
   );
 
   // 56.33 Boot loader has 'FNV' as the fail-safe default
   assert(
-    /'FNV'/.test(htmlSrc56) || /"FNV"/.test(htmlSrc56),
+    /'FNV'/.test(htmlSource56) || /"FNV"/.test(htmlSource56),
     "boot loader has 'FNV' fail-safe default (loads FNV when context is absent/unreadable)"
   );
 
   // 56.34 Boot loader handles 'FO3' context
   assert(
-    /'FO3'/.test(htmlSrc56) || /"FO3"/.test(htmlSrc56),
+    /'FO3'/.test(htmlSource56) || /"FO3"/.test(htmlSource56),
     "boot loader handles 'FO3' context (switches to FO3 db + reg when activeContext is FO3)"
   );
 }
@@ -5287,7 +5288,7 @@ header('Suite 58 — Client Error Ring-Buffer Guards');
 // ══════════════════════════════════════════════════════════════
 header('Suite 59 — Inline Handler Integrity');
 {
-  const htmlSrc59 = readFile('index.html');
+  const htmlSource59 = readFile('index.html');
   const jsFiles59 = [
     'js/ui-audio.js',
     'js/ui-render.js',
@@ -5353,7 +5354,7 @@ header('Suite 59 — Inline Handler Integrity');
   ]);
   const handlerNames59 = new Set();
   let attrM59;
-  while ((attrM59 = attrRe59.exec(htmlSrc59)) !== null) {
+  while ((attrM59 = attrRe59.exec(htmlSource59)) !== null) {
     const handlerText = attrM59[1];
     // Match standalone function calls not preceded by any word char or dot.
     // (?<![A-Za-z0-9_$.]) excludes both method calls (preceded by '.') and
@@ -6026,6 +6027,171 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     assert(
       /lincolnItems/.test(sdBody),
       'getSystemDirective() references lincolnItems (Protocol 14 — AI contract updated for new state field)'
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 67 — FNV Traits Tracker (Phase 6 Task 5)
+//  state.traits, migration, autoImportState validated array,
+//  reg_nv traits 16-item array, GAME_DEFS.FNV.hasTraits,
+//  renderTraits/toggleTrait guards, #traitsDisplay distinct from #perksList.
+//  17 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('FNV Traits Tracker');
+  const stateSrc67 = readFile('js/state.js');
+  const apiSrc67 = readFile('js/api.js');
+  const uiRenderSrc67 = readFile('js/ui-render.js');
+  const uiCoreSrc67 = readFile('js/ui-core.js');
+  const nvRegSrc67 = readFile('js/reg_nv.js');
+  const fo3RegSrc67 = readFile('js/reg_fo3.js');
+
+  // 67.1  state.traits default [] in state object
+  assert(
+    /traits\s*:\s*\[\s*\]/.test(stateSrc67),
+    'state.traits default [] in state object (Protocol 4 default)'
+  );
+
+  // 67.2  migrateState() coerces non-array traits to []
+  {
+    let migrateBody67 = '';
+    try {
+      migrateBody67 = extractFunctionBody(stateSrc67, 'migrateState');
+    } catch (_) {}
+    assert(
+      /Array\.isArray\(s\.traits\)/.test(migrateBody67) &&
+        /s\.traits\s*=\s*\[\]/.test(migrateBody67),
+      'migrateState() coerces non-array s.traits to [] (Protocol 4 migration)'
+    );
+  }
+
+  // 67.3  autoImportState() validates traits as array before importing
+  {
+    const importBody67 = readFile('js/api.js');
+    assert(
+      /Array\.isArray\(raw\)/.test(importBody67) && /traits/.test(importBody67),
+      'autoImportState() validates traits as array before importing'
+    );
+  }
+
+  // 67.4  autoImportState() filters trait entries against registry names (Protocol 24)
+  {
+    let importBody67 = '';
+    try {
+      importBody67 = extractFunctionBody(apiSrc67, 'autoImportState');
+    } catch (_) {}
+    assert(
+      /FALLOUT_REGISTRY\.traits/.test(importBody67) && /traitNames/.test(importBody67),
+      'autoImportState() filters traits against FALLOUT_REGISTRY.traits names (Protocol 24)'
+    );
+  }
+
+  // 67.5  autoImportState() deduplicates trait entries
+  {
+    let importBody67 = '';
+    try {
+      importBody67 = extractFunctionBody(apiSrc67, 'autoImportState');
+    } catch (_) {}
+    assert(
+      /seen/.test(importBody67) && /traits/.test(importBody67),
+      'autoImportState() deduplicates trait entries (seen Set guard)'
+    );
+  }
+
+  // 67.6  reg_nv.js has traits array
+  assert(/traits\s*:\s*\[/.test(nvRegSrc67), 'reg_nv.js has traits array (FNV trait registry)');
+
+  // 67.7  reg_nv.js traits has exactly 16 items
+  {
+    let traitBlock67 = '';
+    const traitMatch67 = nvRegSrc67.match(/traits\s*:\s*\[([\s\S]*?)\n {2}\],/);
+    if (traitMatch67) traitBlock67 = traitMatch67[1];
+    const traitCount67 = (traitBlock67.match(/\bname\s*:/g) || []).length;
+    assert(traitCount67 === 16, `reg_nv.js traits has exactly 16 items (found ${traitCount67})`);
+  }
+
+  // 67.8  reg_fo3.js does NOT have traits (FNV-only)
+  assert(
+    !/\btraits\s*:\s*\[/.test(fo3RegSrc67),
+    'reg_fo3.js does NOT contain traits array (FNV-only registry entry)'
+  );
+
+  // 67.9  GAME_DEFS.FNV.hasTraits === true
+  assert(
+    /hasTraits\s*:\s*true/.test(stateSrc67),
+    'GAME_DEFS.FNV.hasTraits: true in state.js (FNV-only feature flag)'
+  );
+
+  // 67.10  renderTraits() defined in ui-render.js
+  assert(
+    /function renderTraits\s*\(/.test(uiRenderSrc67),
+    'renderTraits() is defined in ui-render.js'
+  );
+
+  // 67.11  renderTraits() called from loadUI() in ui-core.js
+  {
+    let loadUIBody67 = '';
+    try {
+      loadUIBody67 = extractFunctionBody(uiCoreSrc67, 'loadUI');
+    } catch (_) {}
+    assert(
+      /renderTraits\s*\(\s*\)/.test(loadUIBody67),
+      'renderTraits() called from loadUI() in ui-core.js (Protocol 5)'
+    );
+  }
+
+  // 67.12  renderTraits() has FNV guard (hasTraits)
+  {
+    let renderBody67 = '';
+    try {
+      renderBody67 = extractFunctionBody(uiRenderSrc67, 'renderTraits');
+    } catch (_) {}
+    assert(
+      /hasTraits/.test(renderBody67),
+      'renderTraits() has hasTraits guard (FNV-only — returns early in FO3)'
+    );
+  }
+
+  // 67.13  toggleTrait() defined in ui-render.js
+  assert(
+    /function toggleTrait\s*\(/.test(uiRenderSrc67),
+    'toggleTrait() is defined in ui-render.js'
+  );
+
+  // 67.14  toggleTrait() soft-cap only — always pushes the trait (no hard block on >2)
+  {
+    let toggleBody67 = '';
+    try {
+      toggleBody67 = extractFunctionBody(uiRenderSrc67, 'toggleTrait');
+    } catch (_) {}
+    assert(
+      /\.push\(name\)/.test(toggleBody67) && /length\s*>\s*2/.test(toggleBody67),
+      'toggleTrait() pushes trait + has soft-cap warn (>2) — never hard-blocks selection'
+    );
+  }
+
+  // 67.15  index.html has #traitsDisplay container
+  assert(
+    /id="traitsDisplay"/.test(htmlSource),
+    'index.html has #traitsDisplay container (Protocol 5 panel element)'
+  );
+
+  // 67.16  TRAITS panel is distinct from PERKS panel — both #traitsDisplay and #perksList exist
+  assert(
+    /id="traitsDisplay"/.test(htmlSource) && /id="perksList"/.test(htmlSource),
+    'index.html has #traitsDisplay AND #perksList — Traits panel is distinct from Perks panel'
+  );
+
+  // 67.17  getSystemDirective() mentions traits (Protocol 14 — AI contract updated)
+  {
+    let sdBody67 = '';
+    try {
+      sdBody67 = extractFunctionBody(apiSrc67, 'getSystemDirective');
+    } catch (_) {}
+    assert(
+      /state\.traits/.test(sdBody67),
+      'getSystemDirective() references state.traits (Protocol 14 — AI contract updated for new state field)'
     );
   }
 }

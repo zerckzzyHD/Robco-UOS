@@ -1,6 +1,8 @@
-## [Unreleased]<!-- Tests: 800/800 | Cache: robco-terminal-v2.5.0-r8 -->
+## [Unreleased]<!-- Tests: 819/819 | Cache: robco-terminal-v2.5.0-r9 -->
 
 ### Added
+
+- **FNV Traits tracker** — new Traits panel (New Vegas campaigns only, FO3 has no traits) showing all 16 traits with their benefit and penalty. Mark which traits your Courier took at character creation; the panel shows how many are selected out of the usual limit of 2 and gently flags it if you go over (Old World Blues allows re-selecting traits, so going beyond 2 is allowed). Traits are tracked separately from Perks and can be filtered by name.
 
 - **FO3 Lincoln Memorabilia tracker** — in the Collectibles panel (FO3 campaigns only), track each of the 9 Head-of-State artifacts: mark items found, then record who you gave them to — Hannibal Hamlin (to free the slaves, Temple of the Union), Leroy Walker (Lincoln Memorial), Abraham Washington (Rivet City Capitol Preservation Society), or Other. A tally shows how many went to each buyer. Location hints appear for missing items.
 

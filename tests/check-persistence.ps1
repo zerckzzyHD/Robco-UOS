@@ -971,11 +971,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-66)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-66)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-67)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-67)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -3643,6 +3643,104 @@ $sdBody66 = ''
 try { $sdBody66 = Get-FunctionBody $apiSrc66 'getSystemDirective' } catch {}
 Check ([bool]($sdBody66 -match 'lincolnItems')) `
     'getSystemDirective() references lincolnItems (Protocol 14 -- AI contract updated for new state field)'
+
+# ===========================================================
+# Suite 67 -- FNV Traits Tracker (Phase 6 Task 5)
+# state.traits, migration, autoImportState validated array,
+# reg_nv traits 16-item array, GAME_DEFS.FNV.hasTraits,
+# renderTraits/toggleTrait guards, #traitsDisplay distinct from #perksList.
+# 17 tests
+# ===========================================================
+Sep "Suite 67 -- FNV Traits Tracker"
+$stateSrc67  = Read-Src "js\state.js"
+$apiSrc67    = Read-Src "js\api.js"
+$uiRenderSrc67 = Read-Src "js\ui-render.js"
+$uiCoreSrc67 = Read-Src "js\ui-core.js"
+$nvRegSrc67  = Read-Src "js\reg_nv.js"
+$fo3RegSrc67 = Read-Src "js\reg_fo3.js"
+
+# 67.1  state.traits default [] in state object
+Check ([bool]($stateSrc67 -match 'traits\s*:\s*\[\s*\]')) `
+    'state.traits default [] in state object (Protocol 4 default)'
+
+# 67.2  migrateState() coerces non-array traits to []
+$migrateBody67 = ''
+try { $migrateBody67 = Get-FunctionBody $stateSrc67 'migrateState' } catch {}
+Check ([bool]($migrateBody67 -match 'Array\.isArray\(s\.traits\)') -and [bool]($migrateBody67 -match 's\.traits\s*=\s*\[\]')) `
+    'migrateState() coerces non-array s.traits to [] (Protocol 4 migration)'
+
+# 67.3  autoImportState() validates traits as array before importing
+Check ([bool]($apiSrc67 -match 'Array\.isArray\(raw\)') -and [bool]($apiSrc67 -match 'traits')) `
+    'autoImportState() validates traits as array before importing'
+
+# 67.4  autoImportState() filters trait entries against registry names (Protocol 24)
+$importBody67 = ''
+try { $importBody67 = Get-FunctionBody $apiSrc67 'autoImportState' } catch {}
+Check ([bool]($importBody67 -match 'FALLOUT_REGISTRY\.traits') -and [bool]($importBody67 -match 'traitNames')) `
+    'autoImportState() filters traits against FALLOUT_REGISTRY.traits names (Protocol 24)'
+
+# 67.5  autoImportState() deduplicates trait entries
+Check ([bool]($importBody67 -match 'seen') -and [bool]($importBody67 -match 'traits')) `
+    'autoImportState() deduplicates trait entries (seen Set guard)'
+
+# 67.6  reg_nv.js has traits array
+Check ([bool]($nvRegSrc67 -match 'traits\s*:\s*\[')) `
+    'reg_nv.js has traits array (FNV trait registry)'
+
+# 67.7  reg_nv.js traits has exactly 16 items
+$traitBlock67 = ''
+$traitMatch67 = [regex]::Match($nvRegSrc67, '(?s)traits\s*:\s*\[(.*?)\n  \],')
+if ($traitMatch67.Success) { $traitBlock67 = $traitMatch67.Groups[1].Value }
+$traitCount67 = ([regex]::Matches($traitBlock67, '\bname\s*:')).Count
+Check ($traitCount67 -eq 16) "reg_nv.js traits has exactly 16 items (found $traitCount67)"
+
+# 67.8  reg_fo3.js does NOT have traits (FNV-only)
+Check (-not ($fo3RegSrc67 -match '\btraits\s*:\s*\[')) `
+    'reg_fo3.js does NOT contain traits array (FNV-only registry entry)'
+
+# 67.9  GAME_DEFS.FNV.hasTraits: true in state.js
+Check ([bool]($stateSrc67 -match 'hasTraits\s*:\s*true')) `
+    'GAME_DEFS.FNV.hasTraits: true in state.js (FNV-only feature flag)'
+
+# 67.10  renderTraits() is defined in ui-render.js
+Check ([bool]($uiRenderSrc67 -match 'function renderTraits\s*\(')) `
+    'renderTraits() is defined in ui-render.js'
+
+# 67.11  renderTraits() called from loadUI() in ui-core.js
+$loadUIBody67 = ''
+try { $loadUIBody67 = Get-FunctionBody $uiCoreSrc67 'loadUI' } catch {}
+Check ([bool]($loadUIBody67 -match 'renderTraits\s*\(\s*\)')) `
+    'renderTraits() called from loadUI() in ui-core.js (Protocol 5)'
+
+# 67.12  renderTraits() has FNV guard (hasTraits)
+$renderBody67 = ''
+try { $renderBody67 = Get-FunctionBody $uiRenderSrc67 'renderTraits' } catch {}
+Check ([bool]($renderBody67 -match 'hasTraits')) `
+    'renderTraits() has hasTraits guard (FNV-only -- returns early in FO3)'
+
+# 67.13  toggleTrait() is defined in ui-render.js
+Check ([bool]($uiRenderSrc67 -match 'function toggleTrait\s*\(')) `
+    'toggleTrait() is defined in ui-render.js'
+
+# 67.14  toggleTrait() soft-cap only -- always pushes the trait (no hard block on >2)
+$toggleBody67 = ''
+try { $toggleBody67 = Get-FunctionBody $uiRenderSrc67 'toggleTrait' } catch {}
+Check ([bool]($toggleBody67 -match '\.push\(name\)') -and [bool]($toggleBody67 -match 'length\s*>\s*2')) `
+    'toggleTrait() pushes trait + has soft-cap warn (>2) -- never hard-blocks selection'
+
+# 67.15  index.html has #traitsDisplay container
+Check ([bool]($htmlSrc -match 'id="traitsDisplay"')) `
+    'index.html has #traitsDisplay container (Protocol 5 panel element)'
+
+# 67.16  TRAITS panel is distinct from PERKS panel -- both exist
+Check ([bool]($htmlSrc -match 'id="traitsDisplay"') -and [bool]($htmlSrc -match 'id="perksList"')) `
+    'index.html has #traitsDisplay AND #perksList -- Traits panel is distinct from Perks panel'
+
+# 67.17  getSystemDirective() references state.traits (Protocol 14)
+$sdBody67 = ''
+try { $sdBody67 = Get-FunctionBody $apiSrc67 'getSystemDirective' } catch {}
+Check ([bool]($sdBody67 -match 'state\.traits')) `
+    'getSystemDirective() references state.traits (Protocol 14 -- AI contract updated for new state field)'
 
 # ===========================================================
 # Results
