@@ -3988,8 +3988,10 @@ Check ([bool]($seedBody70 -match 'ticks')) `
 # renderTraits compact inline effect span,
 # #collectiblesSubPanel + #lincolnSubPanel as sub-panels,
 # sub-panel persistence + fail-safe + default-collapsed,
-# Lincoln compact rows, faction lone-card CSS.
-# 18 tests
+# Lincoln compact rows, faction lone-card CSS,
+# no-dup-header guard, Lincoln data-lname onclick safety,
+# setLincolnDisposition re-render guard, Lincoln no-inline-flex guard.
+# 22 tests
 # ===========================================================
 Sep "Suite 71 -- Phase 6 UI Consistency"
 $htmlSrc71     = Read-Src 'index.html'
@@ -4077,6 +4079,28 @@ $collectiblesMatch71 = [regex]::Match($uiRenderSrc71, '(?s)function renderCollec
 if ($collectiblesMatch71.Success) { $collectiblesBody71 = $collectiblesMatch71.Groups[1].Value }
 Check ($collectiblesBody71 -match 'collectiblesSubPanel' -and ($collectiblesBody71 -match 'summaryH3|querySelector.*h3')) `
     'renderCollectibles() updates #collectiblesSubPanel summary h3 with game-specific label and count'
+
+# 71.19  No redundant inner bold-header div in renderCollectibles
+Check (-not ($collectiblesBody71 -match "html\s*=\s*``<div[^``]*font-weight:bold")) `
+    'renderCollectibles() does not output a redundant inner bold-header div -- typeLabel shown only in sub-panel summary, not duplicated inside content'
+
+# 71.20  Lincoln rows use data-lname attribute for safe onclick (prevents apostrophe JS error)
+$lincolnBody71b = ''
+$lincolnMatch71b = [regex]::Match($uiRenderSrc71, '(?s)function renderLincolnMemorabilia\s*\([^)]*\)\s*\{(.*?)\n\}')
+if ($lincolnMatch71b.Success) { $lincolnBody71b = $lincolnMatch71b.Groups[1].Value }
+Check ($lincolnBody71b -match 'data-lname' -and $lincolnBody71b -match 'this\.dataset\.lname') `
+    "renderLincolnMemorabilia() uses data-lname attribute + this.dataset.lname (safe name passing -- prevents apostrophe SyntaxError on click)"
+
+# 71.21  setLincolnDisposition calls renderLincolnMemorabilia() (live tally update)
+$dispBody71 = ''
+$dispMatch71 = [regex]::Match($uiRenderSrc71, '(?s)function setLincolnDisposition\s*\([^)]*\)\s*\{(.*?)\n\}')
+if ($dispMatch71.Success) { $dispBody71 = $dispMatch71.Groups[1].Value }
+Check ($dispBody71 -match 'renderLincolnMemorabilia\s*\(\s*\)') `
+    'setLincolnDisposition() calls renderLincolnMemorabilia() -- tally and counts update immediately when disposition changes'
+
+# 71.22  Lincoln toggle spans do not use min-height:28px;display:inline-flex (compact rows)
+Check (-not ($lincolnBody71b -match 'min-height:28px;display:inline-flex')) `
+    'renderLincolnMemorabilia() toggle spans do not use min-height:28px;display:inline-flex -- compact rows match bobblehead density'
 
 # ===========================================================
 # Suite 72 -- Fix A: location datalist per-game bleed + Fix B: update-modal whitespace

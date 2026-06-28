@@ -6598,7 +6598,9 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  #collectiblesSubPanel + #lincolnSubPanel as sub-panels,
 //  sub-panel persistence via robco_panel_state, fail-safe,
 //  default-collapsed, Lincoln compact rows, faction lone-card CSS.
-//  18 tests
+//  no-dup-header guard, Lincoln data-lname onclick safety,
+//  setLincolnDisposition re-render guard, Lincoln no-inline-flex guard.
+//  22 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 71 — Phase 6 UI Consistency');
@@ -6744,6 +6746,48 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
       /collectiblesSubPanel/.test(collectiblesBody71) &&
         /summaryH3|summary.*h3|querySelector.*h3/.test(collectiblesBody71),
       'renderCollectibles() updates #collectiblesSubPanel summary h3 with game-specific label and count'
+    );
+
+    // 71.19  No redundant inner bold-header div in renderCollectibles (label shown only in sub-panel summary)
+    assert(
+      !/html\s*=\s*`<div[^`]*font-weight:bold/.test(collectiblesBody71),
+      'renderCollectibles() does not output a redundant inner bold-header div — typeLabel shown only in sub-panel summary, not duplicated inside content'
+    );
+  }
+
+  // 71.20  Lincoln rows use data-lname attribute for safe onclick (prevents apostrophe JS error)
+  {
+    let lincolnBody71b = '';
+    try {
+      lincolnBody71b = extractFunctionBody(uiRenderSrc71, 'renderLincolnMemorabilia');
+    } catch (_) {}
+    assert(
+      /data-lname/.test(lincolnBody71b) && /this\.dataset\.lname/.test(lincolnBody71b),
+      'renderLincolnMemorabilia() uses data-lname attribute + this.dataset.lname (safe name passing — prevents apostrophe SyntaxError on click)'
+    );
+  }
+
+  // 71.21  setLincolnDisposition calls renderLincolnMemorabilia() (live tally update)
+  {
+    let dispBody71 = '';
+    try {
+      dispBody71 = extractFunctionBody(uiRenderSrc71, 'setLincolnDisposition');
+    } catch (_) {}
+    assert(
+      /renderLincolnMemorabilia\s*\(\s*\)/.test(dispBody71),
+      'setLincolnDisposition() calls renderLincolnMemorabilia() — tally and counts update immediately when disposition changes'
+    );
+  }
+
+  // 71.22  Lincoln toggle spans do not use min-height:28px;display:inline-flex (compact rows)
+  {
+    let lincolnBody71c = '';
+    try {
+      lincolnBody71c = extractFunctionBody(uiRenderSrc71, 'renderLincolnMemorabilia');
+    } catch (_) {}
+    assert(
+      !/min-height:28px;display:inline-flex/.test(lincolnBody71c),
+      'renderLincolnMemorabilia() toggle spans do not use min-height:28px;display:inline-flex — compact rows match bobblehead density'
     );
   }
 }

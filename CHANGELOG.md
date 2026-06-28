@@ -1,4 +1,4 @@
-## [Unreleased]<!-- Tests: 876/876 | Cache: robco-terminal-v2.5.0-r17 -->
+## [Unreleased]<!-- Tests: 880/880 | Cache: robco-terminal-v2.5.0-r18 -->
 
 ### Added
 
@@ -36,6 +36,10 @@
 - Selecting a third trait is now blocked with a clear message ("Maximum 2 traits — deselect one first") instead of silently allowing it. Deselecting always works regardless of count.
 - The PWA home-screen shortcut icons (Comm-Link, Inventory, Stats, New Campaign) now fill the tile edge-to-edge with no gray ring on Android and iOS home screens.
 - Switching the game from New Vegas to Fallout 3 (or back) now correctly sticks after reloading. Previously the choice was silently reverted on every reload because the in-memory game context was never updated before the page saved its state — causing the old game to overwrite the new choice on the way out.
+- The Bobbleheads and Snow Globes headers no longer appear twice. The collapsible sub-panel header is now the only title; the duplicate bold header that was rendered inside the content area has been removed.
+- Clicking a missing Lincoln memorabilia item no longer shows a "SYSTEM FAULT" error in the terminal. Items with apostrophes in their names (Lincoln's Repeater, Lincoln's Hat, Lincoln's Voice, Lincoln's Diary) were causing a JavaScript error when clicked because the name was embedded directly in the click handler. Names are now passed safely via a data attribute.
+- The Lincoln Memorabilia buyer tally (Hannibal, Leroy, Washington, Undecided counts) now updates immediately when you assign or change who you gave an item to. Previously it only refreshed when something else triggered a re-render.
+- Lincoln Memorabilia rows are now as compact as the Bobbleheads rows — tight single-line entries with no extra height from the previous inline-flex layout.
 
 ---
 

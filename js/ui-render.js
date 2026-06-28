@@ -708,8 +708,7 @@ function renderCollectibles() {
   const collectiblesH3 = document.querySelector('#collectiblesSubPanel > summary > h3');
   if (collectiblesH3) collectiblesH3.textContent = `> ${typeLabel} [${acquiredCount}/${total}]`;
 
-  // Header line: SNOW GLOBES  [3/7]
-  let html = `<div style="font-weight:bold;letter-spacing:1px;margin-bottom:6px;font-size:11px;">${typeLabel}&nbsp;&nbsp;[${acquiredCount}/${total}]</div>`;
+  let html = '';
 
   // Acquired items first
   const acquiredDefs = defs.filter(d => acquired.has(d.name.toLowerCase()));
@@ -788,10 +787,10 @@ function renderLincolnMemorabilia() {
     const disp = items[d.name];
     const isFound = !!disp;
     if (isFound) {
-      html += `<div style="font-size:11px;margin-bottom:2px;">`;
-      html += `<span style="color:var(--robco-green);cursor:pointer;min-height:28px;display:inline-flex;align-items:center;" onclick="toggleLincolnItem('${safeName}')" title="Click to mark missing">[ACQUIRED]</span> `;
+      html += `<div style="font-size:11px;letter-spacing:0.5px;margin-bottom:2px;">`;
+      html += `<span style="color:var(--robco-green);cursor:pointer;" data-lname="${safeName}" onclick="toggleLincolnItem(this.dataset.lname)" title="Click to mark missing">[ACQUIRED]</span> `;
       html += `${escapeHtml(d.name.toUpperCase())} `;
-      html += `<select onchange="setLincolnDisposition('${safeName}',this.value)" style="font-size:11px;background:transparent;color:inherit;border:1px solid var(--robco-green);min-height:28px;cursor:pointer;">`;
+      html += `<select data-lname="${safeName}" onchange="setLincolnDisposition(this.dataset.lname,this.value)" style="font-size:11px;background:transparent;color:inherit;border:1px solid var(--robco-green);min-height:28px;cursor:pointer;">`;
       const opts = [
         ['found', 'UNDECIDED'],
         ['hannibal', 'HANNIBAL (FREE SLAVES)'],
@@ -814,8 +813,8 @@ function renderLincolnMemorabilia() {
       const locHint = d.location
         ? ` &mdash; <span style="opacity:0.5;font-size:10px;">LOC: ${escapeHtml(d.location)}</span>`
         : '';
-      html += `<div style="font-size:11px;margin-bottom:2px;opacity:0.75;">`;
-      html += `<span style="opacity:0.6;cursor:pointer;min-height:28px;display:inline-flex;align-items:center;" onclick="toggleLincolnItem('${safeName}')" title="Click to mark acquired">[MISSING]</span> `;
+      html += `<div style="font-size:11px;letter-spacing:0.5px;margin-bottom:2px;opacity:0.75;">`;
+      html += `<span style="opacity:0.6;cursor:pointer;" data-lname="${safeName}" onclick="toggleLincolnItem(this.dataset.lname)" title="Click to mark acquired">[MISSING]</span> `;
       html += `${escapeHtml(d.name.toUpperCase())}${locHint}`;
       html += `</div>`;
     }
@@ -840,6 +839,7 @@ function setLincolnDisposition(name, value) {
   if (!VOCAB.includes(value)) return;
   if (!state.lincolnItems) state.lincolnItems = {};
   state.lincolnItems[name] = value;
+  renderLincolnMemorabilia();
   saveState();
 }
 
