@@ -971,11 +971,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-78)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-78)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-79)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-79)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -4539,6 +4539,52 @@ Check ($vNames78 -contains 'Joshua Graham') "VENDORS.CSV contains 'Joshua Graham
 Check ($vNames78 -contains 'Doctor Usanagi') "VENDORS.CSV contains 'Doctor Usanagi'"
 Check ($vNames78 -contains 'Quartermaster Bardon') "VENDORS.CSV contains 'Quartermaster Bardon'"
 Check ($vNames78 -contains 'Street Vendor') "VENDORS.CSV contains 'Street Vendor'"
+
+# ===========================================================
+# Suite 79 -- FO3 location database expansion (57 -> 90)
+# 10 tests
+# ===========================================================
+Sep "Suite 79 -- FO3 location database expansion (57 -> 90)"
+$fo3RegSrc79 = Read-Src "js\reg_fo3.js"
+
+# Extract main locations block: find '  locations: [' (2-space root indent, unique to main array)
+$lsMarker79 = "  locations: ["
+$lsIdx79 = $fo3RegSrc79.IndexOf($lsMarker79)
+$leIdx79 = $fo3RegSrc79.IndexOf("`n  ],", $lsIdx79 + $lsMarker79.Length)
+$locBlock79 = if ($lsIdx79 -ge 0 -and $leIdx79 -ge 0) {
+    $fo3RegSrc79.Substring($lsIdx79 + $lsMarker79.Length, $leIdx79 - $lsIdx79 - $lsMarker79.Length)
+} else { '' }
+
+# 79.1  exactly 90 entries
+$locCount79 = ([regex]::Matches($locBlock79, '\bname\s*:')).Count
+Check ($locCount79 -eq 90) ("FO3 FALLOUT_REGISTRY.locations has exactly 90 entries (found " + $locCount79 + ")")
+
+# 79.2  all entries have non-empty names
+$allNames79 = [regex]::Matches($locBlock79, "name:\s*(?:'([^']+)'|""([^""]+)"")") | ForEach-Object {
+    if ($_.Groups[1].Success) { $_.Groups[1].Value } else { $_.Groups[2].Value }
+}
+$emptyNames79 = @($allNames79 | Where-Object { [string]::IsNullOrWhiteSpace($_) })
+Check ($allNames79.Count -eq 90 -and $emptyNames79.Count -eq 0) `
+    ("All 90 FO3 location entries have non-empty names (extracted " + $allNames79.Count + ")")
+
+# 79.3  all types valid (FO3 6-type set)
+$validTypes79 = @('settlement','landmark','base','factory','vault','other')
+$typeMatches79 = [regex]::Matches($locBlock79, "type:\s*'([^']+)'")
+$badTypes79 = @($typeMatches79 | ForEach-Object { $_.Groups[1].Value } | Where-Object { $validTypes79 -notcontains $_ })
+Check ($badTypes79.Count -eq 0) ("All FO3 location entries use valid type -- bad: " + $(if ($badTypes79.Count) { $badTypes79 -join ', ' } else { 'none' }))
+
+# 79.4-79.8  sentinel names (DLC worldspaces + expansion entries)
+Check ([bool]($locBlock79 -match "name:\s*'The Pitt'")) "FO3 locations contains 'The Pitt' (DLC)"
+Check ([bool]($locBlock79 -match "name:\s*'Point Lookout'")) "FO3 locations contains 'Point Lookout' (DLC)"
+Check ([bool]($locBlock79 -match "name:\s*'Mothership Zeta'")) "FO3 locations contains 'Mothership Zeta' (DLC)"
+Check ([bool]($locBlock79 -match "name:\s*'Andale'")) "FO3 locations contains 'Andale'"
+Check ([bool]($locBlock79 -match "name:\s*'Vault 106'")) "FO3 locations contains 'Vault 106'"
+
+# 79.9  typo entry removed
+Check (-not ($locBlock79 -match "name:\s*'Georgtown West'")) "FO3 locations has NO 'Georgtown West' entry (typo removed)"
+
+# 79.10  corrected spelling present
+Check ([bool]($locBlock79 -match "name:\s*'Georgetown West'")) "FO3 locations contains 'Georgetown West' (typo fixed)"
 
 # ===========================================================
 # Results

@@ -1626,17 +1626,18 @@ header('Meta / Runner Parity');
     'Suite 76',
     'Suite 77',
     'Suite 78',
+    'Suite 79',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-78)' +
+    'JS runner contains all gate-guard suites (22-41, 49-79)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-78)' +
+    'PS runner contains all gate-guard suites (22-41, 49-79)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -7512,6 +7513,75 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   assert(vNames.includes('Doctor Usanagi'), "VENDORS.CSV contains 'Doctor Usanagi'");
   assert(vNames.includes('Quartermaster Bardon'), "VENDORS.CSV contains 'Quartermaster Bardon'");
   assert(vNames.includes('Street Vendor'), "VENDORS.CSV contains 'Street Vendor'");
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 79 — FO3 location database expansion (57 → 90)
+//  10 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 79 — FO3 location database expansion (57 → 90)');
+  const fo3RegSrc79 = readFile('js/reg_fo3.js');
+
+  // Isolate main locations array (between LOCATIONS and COMPANIONS section comments)
+  const locsSectionMatch79 = fo3RegSrc79.match(/\/\/ ── LOCATIONS[\s\S]*?\/\/ ── COMPANIONS/);
+  const locsSection79 = locsSectionMatch79 ? locsSectionMatch79[0] : '';
+  const locsArrMatch79 = locsSection79.match(/locations:\s*\[([\s\S]*?)\n {2}\]/);
+  const locBlock79 = locsArrMatch79 ? locsArrMatch79[1] : '';
+
+  // 79.1  exactly 90 entries
+  const locCount79 = (locBlock79.match(/\bname\s*:/g) || []).length;
+  assert(
+    locCount79 === 90,
+    `FO3 FALLOUT_REGISTRY.locations has exactly 90 entries (found ${locCount79})`
+  );
+
+  // 79.2  all entries have non-empty names
+  const allNames79 = [...locBlock79.matchAll(/name:\s*(?:'([^']+)'|"([^"]+)")/g)].map(
+    m => m[1] || m[2]
+  );
+  assert(
+    allNames79.length === 90 && allNames79.every(n => n && n.trim()),
+    `All 90 FO3 location entries have non-empty names (extracted ${allNames79.length})`
+  );
+
+  // 79.3  all types valid (FO3 6-type set: settlement/landmark/base/factory/vault/other)
+  const FO3_LOC_TYPES79 = new Set(['settlement', 'landmark', 'base', 'factory', 'vault', 'other']);
+  const typeRe79 = /type:\s*'([^']+)'/g;
+  let tm79;
+  const badTypes79 = [];
+  while ((tm79 = typeRe79.exec(locBlock79)) !== null) {
+    if (!FO3_LOC_TYPES79.has(tm79[1])) badTypes79.push(tm79[1]);
+  }
+  assert(
+    badTypes79.length === 0,
+    `All FO3 location entries use valid type — bad: ${badTypes79.join(', ') || 'none'}`
+  );
+
+  // 79.4–79.8  sentinel names (DLC worldspaces + expansion entries)
+  assert(/name:\s*'The Pitt'/.test(locBlock79), "FO3 locations contains 'The Pitt' (DLC)");
+  assert(
+    /name:\s*'Point Lookout'/.test(locBlock79),
+    "FO3 locations contains 'Point Lookout' (DLC)"
+  );
+  assert(
+    /name:\s*'Mothership Zeta'/.test(locBlock79),
+    "FO3 locations contains 'Mothership Zeta' (DLC)"
+  );
+  assert(/name:\s*'Andale'/.test(locBlock79), "FO3 locations contains 'Andale'");
+  assert(/name:\s*'Vault 106'/.test(locBlock79), "FO3 locations contains 'Vault 106'");
+
+  // 79.9  typo entry removed
+  assert(
+    !/name:\s*'Georgtown West'/.test(locBlock79),
+    "FO3 locations has NO 'Georgtown West' entry (typo removed)"
+  );
+
+  // 79.10  corrected spelling present
+  assert(
+    /name:\s*'Georgetown West'/.test(locBlock79),
+    "FO3 locations contains 'Georgetown West' (typo fixed)"
+  );
 }
 
 // ══════════════════════════════════════════════════════════════

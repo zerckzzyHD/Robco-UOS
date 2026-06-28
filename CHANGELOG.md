@@ -1,12 +1,16 @@
-﻿## [Unreleased]<!-- Tests: 940/940 | Cache: robco-terminal-v2.5.0-r25 -->
+﻿## [Unreleased]<!-- Tests: 950/950 | Cache: robco-terminal-v2.5.0-r26 -->
 
 ### Added
+
+- **Expanded Fallout 3 location autocomplete from 57 to 90 locations** — the location name field now suggests 33 additional Fallout 3 sites, including settlements (Andale, Girdershade, Republic of Dave, Temple of the Union), DC metro stops and neighborhoods (Farragut West, Anacostia Crossing, Metro Central, L'Enfant Plaza, Vernon Square, Dupont Circle), factories and bases (RobCo Facility, Red Racer Factory, Wheaton Armory, Fort Bannister, National Guard Depot), landmarks (Old Olney, Deathclaw Sanctuary, Bethesda Ruins, The Statesman Hotel, Our Lady of Hope Hospital), and all four DLC worldspaces (The Pitt, Point Lookout, Mothership Zeta, Adams Air Force Base). All names sourced from the Fallout wiki.
 
 - **Expanded New Vegas vendor reference data from 14 to 39 merchants** — the AI's vendor directory now covers the full Mojave: Strip vendors (Mister Holdout, Van Graffs), NCR quartermasters (Hoover Dam, Camp Forlorn Hope, Camp McCarran), faction traders (Great Khans, Boomers, Powder Gangers, Followers of the Apocalypse), DLC merchants (Joshua Graham, Sink Central Intelligence Unit, Commissary Terminal), and a wider spread of Freeside, Goodsprings, and Wasteland vendors. Data sourced from the Fallout wiki.
 
 - **Collectibles now mark their region on the world map** â€” every Snow Globe (New Vegas) and Bobblehead (Fallout 3) is linked to a specific map cell, so the region grid highlights any cell where an uncollected collectible is waiting. FO3 Bobbleheads previously never appeared on the map at all; this is now fixed. A handful of New Vegas Snow Globes that were matched by name were also pointing at the wrong cells â€” all are now placed correctly. Lincoln Memorabilia items in FO3 likewise flag their museum region on the map until collected.
 
 ### Fixed
+
+- **Georgetown West location name corrected** — the autocomplete option previously misspelled as "Georgtown West" has been corrected to "Georgetown West."
 
 - **Lincoln "Other" disposition removed** â€” the redundant "Other" option has been dropped from the Lincoln Memorabilia disposition selector. Items previously saved with "Other" are automatically updated to "Found" so no data is lost.
 
