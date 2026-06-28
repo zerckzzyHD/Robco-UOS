@@ -1628,17 +1628,18 @@ header('Meta / Runner Parity');
     'Suite 78',
     'Suite 79',
     'Suite 80',
+    'Suite 81',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-80)' +
+    'JS runner contains all gate-guard suites (22-41, 49-81)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-80)' +
+    'PS runner contains all gate-guard suites (22-41, 49-81)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -7638,6 +7639,60 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   assert(
     mre80 && mre80.val === 50 && mre80.wgt === 0.2 && mre80.type === 'aid',
     `lookupItemInDb('MRE') → wgt=0.2/val=50/type='aid' (got ${JSON.stringify(mre80)})`
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 81 — FO3 [ARMOR.CSV] expansion (32 → 62)
+//  9 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 81 — FO3 [ARMOR.CSV] expansion (32 → 62)');
+  const fo3Src81 = readFile('js/db_fo3.js');
+  const aStart81 = fo3Src81.indexOf('[ARMOR.CSV]');
+  const aEnd81 = fo3Src81.indexOf('\n[', aStart81 + 1);
+  const aBlock81 = fo3Src81.slice(aStart81, aEnd81 === -1 ? undefined : aEnd81);
+  const aLines81 = aBlock81.split('\n').filter(l => l.trim() && !l.startsWith('['));
+  const aData81 = aLines81.slice(1); // skip header row
+
+  // 81.a  exactly 62 data rows
+  assert(aData81.length === 62, `FO3 [ARMOR.CSV] has exactly 62 data rows (got ${aData81.length})`);
+
+  // 81.b  every row has exactly 7 comma-separated fields (stray-comma guard)
+  const badFields81 = aData81.filter(r => r.split(',').length !== 7);
+  assert(
+    badFields81.length === 0,
+    `All FO3 ARMOR rows have exactly 7 comma-separated fields — bad: ${badFields81.join(' | ') || 'none'}`
+  );
+
+  // 81.c  sentinel names present
+  const aNames81 = aData81.map(r => r.split(',')[0].trim());
+  assert(aNames81.includes('Combat Helmet'), "FO3 ARMOR contains 'Combat Helmet'");
+  assert(aNames81.includes('Samurai Armor'), "FO3 ARMOR contains 'Samurai Armor'");
+  assert(aNames81.includes('T-51b Power Helmet'), "FO3 ARMOR contains 'T-51b Power Helmet'");
+  assert(aNames81.includes('Ghoul Mask'), "FO3 ARMOR contains 'Ghoul Mask'");
+  assert(aNames81.includes('Composite Recon Armor'), "FO3 ARMOR contains 'Composite Recon Armor'");
+
+  // 81.d  lookupItemInDb column-mapping spot-checks (header-resolved: Name=0, Weight=3, Value=4)
+  const armorMap81 = aData81.reduce((m, row) => {
+    const cols = row.split(',');
+    if (cols.length >= 5)
+      m.set(cols[0].trim().toLowerCase(), {
+        wgt: parseFloat(cols[3]) || 0,
+        val: parseFloat(cols[4]) || 0,
+        type: 'armor',
+      });
+    return m;
+  }, new Map());
+  const ch81 = armorMap81.get('combat helmet');
+  assert(
+    ch81 && ch81.wgt === 3 && ch81.val === 50 && ch81.type === 'armor',
+    `lookupItemInDb('Combat Helmet') → wgt=3/val=50/type='armor' (got ${JSON.stringify(ch81)})`
+  );
+  const sa81 = armorMap81.get('samurai armor');
+  assert(
+    sa81 && sa81.wgt === 20 && sa81.val === 1000 && sa81.type === 'armor',
+    `lookupItemInDb('Samurai Armor') → wgt=20/val=1000/type='armor' (got ${JSON.stringify(sa81)})`
   );
 }
 

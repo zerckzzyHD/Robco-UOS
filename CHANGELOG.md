@@ -1,6 +1,8 @@
-﻿## [Unreleased]<!-- Tests: 959/959 | Cache: robco-terminal-v2.5.0-r27 -->
+﻿## [Unreleased]<!-- Tests: 968/968 | Cache: robco-terminal-v2.5.0-r28 -->
 
 ### Added
+
+- **Expanded Fallout 3 armor reference data from 32 to 62** — added body armor (Ranger Battle Armor, Composite Recon Armor, Winterized Combat Armor, Samurai Armor, Pitt and DLC sets), power armor variants (Tribal Power Armor, Prototype Medic Power Armor, Cross' Power Armor), outfits and suits (Chinese Stealth adjacents, RobCo Jumpsuit, Enclave Scientist Outfit, Spacesuit, The Mechanist's Costume), and a full headgear set (Combat Helmet, Composite Recon Helmet, T-51b Power Helmet, Enclave Hellfire Helmet, Outcast Power Helmet, Samurai Helmet, Ghoul Mask, Lincoln's Hat, Ledoux's Hockey Mask, Boogeyman's Hood). All weights and values sourced from the Fallout wiki.
 
 - **Expanded New Vegas consumable reference data from 40 to 76 items** — the AI's consumable directory now covers pre-war food and snacks (Cram, InstaMash, Fancy Lads Snack Cakes, Dandy Boy Apples, YumYum Deviled Eggs, Salisbury Steak, MRE), Mojave wild food (Bighorner Steak, Iguana on a Stick, Gecko Steak, Trail Mix, Brahmin Wellington, Grilled Mantis), forageable plants (Banana Yucca Fruit, Barrel Cactus Fruit, Pinyon Nuts, Broc Flower, Xander Root, Nightstalker Tail), expanded Nuka-Cola and soda varieties (Sunset Sarsaparilla, Nuka-Cola Victory, Nuka-Cola Quantum), expanded alcohol (Whiskey, Rum & Nuka, Wasteland Tequila), DLC consumables (Sierra Madre Martini, Battle Brew, Rebound), and crafting ingredients (Sacred Datura Root, Ant Queen Pheromones). All weights and values sourced from the Fallout wiki.
 

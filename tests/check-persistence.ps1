@@ -971,11 +971,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-80)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-80)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-81)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-81)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -4628,6 +4628,45 @@ $mreSatisfied = ($null -ne $mre80Row) -and ($mre80Cols.Count -ge 8) -and `
     ([Math]::Abs([double]$mre80Cols[6] - 50) -lt 0.001) -and ([Math]::Abs([double]$mre80Cols[7] - 0.2) -lt 0.001)
 Check $mreSatisfied "lookupItemInDb('MRE') -> wgt=0.2/val=50/type='aid'"
 
+
+# ===========================================================
+# Suite 81 -- FO3 [ARMOR.CSV] expansion (32 -> 62)
+# 9 tests
+# ===========================================================
+Sep "Suite 81 -- FO3 [ARMOR.CSV] expansion (32 -> 62)"
+$fo3Src81 = Read-Src "js\db_fo3.js"
+$aStart81 = $fo3Src81.IndexOf('[ARMOR.CSV]')
+$aEnd81 = $fo3Src81.IndexOf("`n[", $aStart81 + 1)
+$aBlock81 = if ($aEnd81 -ge 0) { $fo3Src81.Substring($aStart81, $aEnd81 - $aStart81) } else { $fo3Src81.Substring($aStart81) }
+$aLines81 = $aBlock81 -split "`n" | Where-Object { $_.Trim() -ne '' -and -not $_.StartsWith('[') }
+$aData81 = $aLines81 | Select-Object -Skip 1
+
+# 81.a  exactly 62 data rows
+Check ($aData81.Count -eq 62) ("FO3 [ARMOR.CSV] has exactly 62 data rows (got " + $aData81.Count + ")")
+
+# 81.b  every row has exactly 7 fields (stray-comma guard)
+$badFields81 = @($aData81 | Where-Object { ($_ -split ',').Count -ne 7 })
+Check ($badFields81.Count -eq 0) ("All FO3 ARMOR rows have exactly 7 comma-separated fields" + $(if ($badFields81.Count) { " -- bad: " + ($badFields81 -join " | ") } else { "" }))
+
+# 81.c  sentinel names present
+$aNames81 = @($aData81 | ForEach-Object { ($_ -split ',')[0].Trim() })
+Check ($aNames81 -contains 'Combat Helmet') "FO3 ARMOR contains 'Combat Helmet'"
+Check ($aNames81 -contains 'Samurai Armor') "FO3 ARMOR contains 'Samurai Armor'"
+Check ($aNames81 -contains 'T-51b Power Helmet') "FO3 ARMOR contains 'T-51b Power Helmet'"
+Check ($aNames81 -contains 'Ghoul Mask') "FO3 ARMOR contains 'Ghoul Mask'"
+Check ($aNames81 -contains 'Composite Recon Armor') "FO3 ARMOR contains 'Composite Recon Armor'"
+
+# 81.d  lookupItemInDb column-mapping spot-checks (header-resolved: Name=0, Weight=3, Value=4)
+$ch81Row = $aData81 | Where-Object { ($_ -split ',')[0].Trim() -eq 'Combat Helmet' } | Select-Object -First 1
+$ch81Cols = if ($ch81Row) { $ch81Row -split ',' } else { @() }
+$chSatisfied = ($null -ne $ch81Row) -and ($ch81Cols.Count -ge 5) -and `
+    ([Math]::Abs([double]$ch81Cols[3] - 3) -lt 0.001) -and ([Math]::Abs([double]$ch81Cols[4] - 50) -lt 0.001)
+Check $chSatisfied "lookupItemInDb('Combat Helmet') -> wgt=3/val=50/type='armor'"
+$sa81Row = $aData81 | Where-Object { ($_ -split ',')[0].Trim() -eq 'Samurai Armor' } | Select-Object -First 1
+$sa81Cols = if ($sa81Row) { $sa81Row -split ',' } else { @() }
+$saSatisfied = ($null -ne $sa81Row) -and ($sa81Cols.Count -ge 5) -and `
+    ([Math]::Abs([double]$sa81Cols[3] - 20) -lt 0.001) -and ([Math]::Abs([double]$sa81Cols[4] - 1000) -lt 0.001)
+Check $saSatisfied "lookupItemInDb('Samurai Armor') -> wgt=20/val=1000/type='armor'"
 # ===========================================================
 # Results
 # ===========================================================

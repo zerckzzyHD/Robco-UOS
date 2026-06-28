@@ -183,6 +183,36 @@ Pre-War Business Wear,Light,0,1,100,+5 Speech,50%
 Point Lookout Tribal Outfit,Light,4,5,100,None,50%
 Brotherhood Power Armor,Heavy,38,45,6000,+1 STR,50%
 Advanced Radiation Suit,Light,0,4,350,+60 Rad Resist,50%
+Ranger Battle Armor,Medium,39,27,430,None,50%
+Rivet City Security Uniform,Medium,24,20,330,None,50%
+Composite Recon Armor,Medium,28,20,180,None,50%
+Winterized Combat Armor,Medium,32,25,390,None,50%
+Samurai Armor,Medium,30,20,1000,None,50%
+Tribal Power Armor,Heavy,35,40,740,+1 STR,50%
+Metal Master Armor,Medium,36,15,160,None,50%
+Leather Rebel,Light,30,15,160,None,50%
+Bombshell Armor,Light,24,15,160,None,50%
+Gamma Shield Armor,Heavy,36,45,520,+Rad Resistance,50%
+Vault 101 Security Armor,Light,12,15,70,None,50%
+Wanderer's Leather Armor,Light,24,15,160,None,50%
+Prototype Medic Power Armor,Heavy,40,45,1000,Auto-heal stimpak pump,50%
+Cross' Power Armor,Heavy,40,45,740,None,50%
+Environment Suit,Light,6,5,100,+Rad Resistance,50%
+Radiation Suit,Light,5,5,60,+Rad Resistance,50%
+RobCo Jumpsuit,Light,2,1,6,None,50%
+The Mechanist's Costume,Light,20,15,30,None,50%
+Spacesuit,Light,1,5,60,None,50%
+Enclave Scientist Outfit,Light,3,2,8,None,50%
+Combat Helmet,Medium,5,3,50,None,50%
+Composite Recon Helmet,Light,4,3,40,None,50%
+T-51b Power Helmet,Heavy,10,4,120,None,50%
+Enclave Hellfire Helmet,Heavy,10,4,120,None,50%
+Outcast Power Helmet,Heavy,8,5,110,None,50%
+Samurai Helmet,Light,5,3,300,None,50%
+Ghoul Mask,Light,3,1,50,Feral Ghouls non-hostile,50%
+Lincoln's Hat,Light,1,1,40,None,50%
+Ledoux's Hockey Mask,Light,4,1,100,None,50%
+Boogeyman's Hood,Light,8,3,110,None,50%
 
 [BESTIARY.CSV]
 Name,DT,HP,Perception,Speed_Factor,Base_Damage,Attack_Rate,Weakness_Weapon,Attack_Type,Resistances,XP_Yield
