@@ -1,4 +1,4 @@
-## [Unreleased]<!-- Tests: 907/907 | Cache: robco-terminal-v2.5.0-r21 -->
+## [Unreleased]<!-- Tests: 910/910 | Cache: robco-terminal-v2.5.0-r22 -->
 
 ### Added
 
@@ -7,6 +7,8 @@
 ### Fixed
 
 - **Lincoln "Other" disposition removed** — the redundant "Other" option has been dropped from the Lincoln Memorabilia disposition selector. Items previously saved with "Other" are automatically updated to "Found" so no data is lost.
+
+- **Registry no-duplicate-item guard added** — a new automated check now catches copy-paste errors in the item catalog. If the same item (identical name and type) appears twice in either the New Vegas or Fallout 3 catalog, the commit gate blocks it. Items that share a name but have different types (like the New Vegas weapon "Rebound" and the chem "Rebound," which are genuinely different items) are correctly allowed.
 
 - **Expanded New Vegas location database** — added 22 notable minor locations to the map and autocomplete (e.g. Jean Sky Diving, Jack Rabbit Springs, the three Powder Ganger camps, Bonnie Springs, Goodsprings Cave, Scorpion Gulch, The Devil's Throat, Walking Box Cavern, El Dorado Dry Lake, and more). Each location was sourced from the independent Fallout wiki and placed in the correct map region. Existing saves are unaffected — the location catalog is read-only reference data.
 

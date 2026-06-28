@@ -1622,17 +1622,18 @@ header('Meta / Runner Parity');
     'Suite 72',
     'Suite 73',
     'Suite 74',
+    'Suite 75',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-74)' +
+    'JS runner contains all gate-guard suites (22-41, 49-75)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-74)' +
+    'PS runner contains all gate-guard suites (22-41, 49-75)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -7185,6 +7186,89 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     const block = m ? m[1] : '';
     const count = (block.match(/\bname\s*:/g) || []).length;
     assert(count === 20, `reg_fo3.js: FO3 collectibles count unchanged = 20 (found ${count})`);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 75 — Registry items[] no-duplicate-names guard
+//  behavioral: extract items section, build name set, assert no name appears twice.
+//  Also regression-guards the Rebound weapon typo fix.
+//  3 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 75 — Registry items[] No-Duplicate-Names Guard');
+  const nvSrc75 = readFile('js/reg_nv.js');
+  const fo3Src75 = readFile('js/reg_fo3.js');
+
+  function extractItemsSection75(src) {
+    const start = src.indexOf('items:');
+    if (start === -1) return '';
+    let depth = 0,
+      inItems = false,
+      itemsStart = -1;
+    for (let i = start; i < src.length; i++) {
+      if (src[i] === '[') {
+        depth++;
+        if (!inItems) {
+          inItems = true;
+          itemsStart = i;
+        }
+      } else if (src[i] === ']') {
+        depth--;
+        if (inItems && depth === 0) return src.slice(itemsStart, i + 1);
+      }
+    }
+    return '';
+  }
+
+  function getItemEntries75(src) {
+    const section = extractItemsSection75(src);
+    const entries = [];
+    for (const m of section.matchAll(/\{[^}]+\}/g)) {
+      const nameM = m[0].match(/name\s*:\s*(?:'([^']*)'|"([^"]*)")/);
+      const typeM = m[0].match(/type\s*:\s*(?:'([^']*)'|"([^"]*)")/);
+      if (nameM && typeM) entries.push({ name: nameM[1] ?? nameM[2], type: typeM[1] ?? typeM[2] });
+    }
+    return entries;
+  }
+
+  // 75.1  FNV items[] has no duplicate (name, type) pairs
+  {
+    const entries = getItemEntries75(nvSrc75);
+    const seen = new Map();
+    for (const e of entries) {
+      const key = `${e.name}::${e.type}`;
+      seen.set(key, (seen.get(key) || 0) + 1);
+    }
+    const dups = [...seen.entries()].filter(([, c]) => c > 1).map(([k]) => k);
+    assert(
+      dups.length === 0,
+      `reg_nv.js items[] has no duplicate (name,type) pairs (dups: ${dups.join(', ') || 'none'})`
+    );
+  }
+
+  // 75.2  FO3 items[] has no duplicate (name, type) pairs
+  {
+    const entries = getItemEntries75(fo3Src75);
+    const seen = new Map();
+    for (const e of entries) {
+      const key = `${e.name}::${e.type}`;
+      seen.set(key, (seen.get(key) || 0) + 1);
+    }
+    const dups = [...seen.entries()].filter(([, c]) => c > 1).map(([k]) => k);
+    assert(
+      dups.length === 0,
+      `reg_fo3.js items[] has no duplicate (name,type) pairs (dups: ${dups.join(', ') || 'none'})`
+    );
+  }
+
+  // 75.3  Regression: {name:'Rebound', type:'weapon'} appears exactly once in reg_nv.js items[]
+  //       (Previously appeared twice due to a copy-paste error — this guards against recurrence)
+  {
+    const section = extractItemsSection75(nvSrc75);
+    const count = (section.match(/name\s*:\s*'Rebound'[\s\S]{0,30}type\s*:\s*'weapon'/g) || [])
+      .length;
+    assert(count === 1, `reg_nv.js: Rebound weapon entry appears exactly once (found ${count})`);
   }
 }
 

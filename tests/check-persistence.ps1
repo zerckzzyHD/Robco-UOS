@@ -971,11 +971,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-74)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-74)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-75)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-75)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -4318,6 +4318,62 @@ Check ($nvCollectCount74 -eq 7) "reg_nv.js: FNV collectibles count unchanged = 7
 # 74.11  FO3 collectibles count unchanged = 20
 $fo3CollectCount74 = ([regex]::Matches($fo3CollectBlock74, '\bname\s*:')).Count
 Check ($fo3CollectCount74 -eq 20) "reg_fo3.js: FO3 collectibles count unchanged = 20 (found $fo3CollectCount74)"
+
+# ===========================================================
+# Suite 75 -- Registry items[] No-Duplicate-Names Guard
+# behavioral: extract items section, build name set, assert no name appears twice.
+# Also regression-guards the Rebound weapon typo fix.
+# 3 tests
+# ===========================================================
+Sep "Suite 75 -- Registry items[] No-Duplicate-Names Guard"
+$nvSrc75  = Read-Src "js\reg_nv.js"
+$fo3Src75 = Read-Src "js\reg_fo3.js"
+
+function Get-ItemsSection75 {
+    param([string]$src)
+    $start = $src.IndexOf('items:')
+    if ($start -lt 0) { return '' }
+    $depth = 0; $inItems = $false; $itemsStart = -1
+    for ($i = $start; $i -lt $src.Length; $i++) {
+        if ($src[$i] -eq '[') { $depth++; if (-not $inItems) { $inItems = $true; $itemsStart = $i } }
+        elseif ($src[$i] -eq ']') { $depth--; if ($inItems -and $depth -eq 0) { return $src.Substring($itemsStart, $i - $itemsStart + 1) } }
+    }
+    return ''
+}
+
+function Get-ItemEntries75 {
+    param([string]$src)
+    $section = Get-ItemsSection75 $src
+    $entries = @()
+    $itemPattern = [regex]'\{[^}]+\}'
+    foreach ($m in $itemPattern.Matches($section)) {
+        $block = $m.Value
+        $nameM = [regex]::Match($block, "name\s*:\s*(?:'([^']*)'|""([^""]*)"")")
+        $typeM = [regex]::Match($block, "type\s*:\s*(?:'([^']*)'|""([^""]*)"")")
+        if ($nameM.Success -and $typeM.Success) {
+            $name = if ($nameM.Groups[1].Success) { $nameM.Groups[1].Value } else { $nameM.Groups[2].Value }
+            $type = if ($typeM.Groups[1].Success) { $typeM.Groups[1].Value } else { $typeM.Groups[2].Value }
+            $entries += "${name}::${type}"
+        }
+    }
+    return $entries
+}
+
+# 75.1  FNV items[] has no duplicate (name, type) pairs
+$nvEntries75 = Get-ItemEntries75 $nvSrc75
+$nvDups75    = $nvEntries75 | Group-Object | Where-Object { $_.Count -gt 1 } | ForEach-Object { $_.Name }
+Check ($nvDups75.Count -eq 0) "reg_nv.js items[] has no duplicate (name,type) pairs (dups: $(if ($nvDups75.Count) { $nvDups75 -join ', ' } else { 'none' }))"
+
+# 75.2  FO3 items[] has no duplicate (name, type) pairs
+$fo3Entries75 = Get-ItemEntries75 $fo3Src75
+$fo3Dups75    = $fo3Entries75 | Group-Object | Where-Object { $_.Count -gt 1 } | ForEach-Object { $_.Name }
+Check ($fo3Dups75.Count -eq 0) "reg_fo3.js items[] has no duplicate (name,type) pairs (dups: $(if ($fo3Dups75.Count) { $fo3Dups75 -join ', ' } else { 'none' }))"
+
+# 75.3  Regression: {name:'Rebound', type:'weapon'} appears exactly once in reg_nv.js items[]
+#       (Previously appeared twice due to a copy-paste error; this guards against recurrence)
+$nvItemsSection75 = Get-ItemsSection75 $nvSrc75
+$reboundCount75   = ([regex]::Matches($nvItemsSection75, "name\s*:\s*'Rebound'[\s\S]{0,30}type\s*:\s*'weapon'")).Count
+Check ($reboundCount75 -eq 1) "reg_nv.js: Rebound weapon entry appears exactly once (found $reboundCount75)"
 
 # ===========================================================
 # Results
