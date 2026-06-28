@@ -153,9 +153,9 @@ $repLabels = @(
     "getFactionStanding('ncr', 100, 0) returns 'Idolized'",
     "getFactionStanding('bos', 20, 0) returns 'Idolized'",
     "getFactionStanding('bos', 20, 20) returns 'Wild Child'",
-    "getFactionStanding('ncr', 50, 20) returns 'Unpredictable'",
+    "getFactionStanding('ncr', 50, 20) returns 'Smiling Troublemaker'",
     "getFactionStanding('ncr', 0, 30) returns 'Shunned'",
-    "getFactionStanding('ncr', 80, 20) returns 'Merciful Thug'",
+    "getFactionStanding('ncr', 80, 20) returns 'Good-Natured Rascal'",
     "getFactionStanding('ncr', 0, 50) returns 'Hated'",
     "getFactionStanding('ncr', 0, 0) returns 'Neutral'",
     "getFactionStanding('ncr', 0, 80) returns 'Vilified'"
@@ -183,9 +183,9 @@ const r = [
     gfs('ncr', 100, 0).label === 'Idolized',
     gfs('bos', 20, 0).label === 'Idolized',
     gfs('bos', 20, 20).label === 'Wild Child',
-    gfs('ncr', 50, 20).label === 'Unpredictable',
+    gfs('ncr', 50, 20).label === 'Smiling Troublemaker',
     gfs('ncr', 0, 30).label === 'Shunned',
-    gfs('ncr', 80, 20).label === 'Merciful Thug',
+    gfs('ncr', 80, 20).label === 'Good-Natured Rascal',
     gfs('ncr', 0, 50).label === 'Hated',
     gfs('ncr', 0, 0).label === 'Neutral',
     gfs('ncr', 0, 80).label === 'Vilified'
@@ -971,11 +971,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-76)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-76)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-77)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-77)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -4374,6 +4374,85 @@ Check ($fo3Dups75.Count -eq 0) "reg_fo3.js items[] has no duplicate (name,type) 
 $nvItemsSection75 = Get-ItemsSection75 $nvSrc75
 $reboundCount75   = ([regex]::Matches($nvItemsSection75, "name\s*:\s*'Rebound'[\s\S]{0,30}type\s*:\s*'weapon'")).Count
 Check ($reboundCount75 -eq 1) "reg_nv.js: Rebound weapon entry appears exactly once (found $reboundCount75)"
+
+# ===========================================================
+# Suite 77 -- Faction Rep Regression: Canon Thresholds + +-5 Increment
+# 14 tests
+# ===========================================================
+Sep "Suite 77 -- Faction Rep Regression: Canon Thresholds + +-5 Increment"
+$uiSrc77 = Read-Src "js\ui-render.js"
+
+# -- Behavioral tests via Node subprocess (tests 77.1-77.13) --
+$rep77Labels = @(
+    "getFactionStanding generic (0,0) -> Neutral",
+    "getFactionStanding generic (8,0) -> Accepted (NOT Idolized)",
+    "getFactionStanding generic (25,0) -> Liked",
+    "getFactionStanding generic (50,0) -> Idolized",
+    "getFactionStanding generic (0,8) -> Shunned",
+    "getFactionStanding generic (0,25) -> Hated",
+    "getFactionStanding generic (0,50) -> Vilified",
+    "getFactionStanding generic (50,50) -> Wild Child",
+    "getFactionStanding generic (50,8) -> Good-Natured Rascal",
+    "getFactionStanding generic (8,8) -> Mixed",
+    "getFactionStanding generic (25,25) -> Unpredictable",
+    "getFactionStanding generic (8,25) -> Sneering Punk",
+    "getFactionStanding ncr (50,0) -> Liked (NCR bp3=80, 50<80 is not max rank)"
+)
+try {
+    $nodeCheck77 = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCheck77) {
+        $repoRoot77 = (Get-Item $PSScriptRoot).Parent.FullName
+        $repoRootNode77 = $repoRoot77.Replace('\', '/')
+        $repScript77 = @"
+const vm = require('vm');
+const fs = require('fs');
+const src = fs.readFileSync('$repoRootNode77/js/ui-render.js', 'utf8');
+const threshMatch = src.match(/const FACTION_THRESHOLDS\s*=\s*\{[\s\S]*?\};\s*\/\/ Default/);
+const defaultMatch = src.match(/const _DEFAULT_THRESHOLDS\s*=\s*\{[^}]+\};/);
+const fnMatch = src.match(/function getFactionStanding\([\s\S]*?\n\}/);
+if (!threshMatch || !defaultMatch || !fnMatch) { console.log('EXTRACT_FAIL'); process.exit(0); }
+const sandbox = {};
+vm.createContext(sandbox);
+vm.runInContext(threshMatch[0] + '\n' + defaultMatch[0] + '\n' + fnMatch[0], sandbox);
+const gfs = sandbox.getFactionStanding;
+const r = [
+    gfs('generic', 0, 0).label === 'Neutral',
+    gfs('generic', 8, 0).label === 'Accepted',
+    gfs('generic', 25, 0).label === 'Liked',
+    gfs('generic', 50, 0).label === 'Idolized',
+    gfs('generic', 0, 8).label === 'Shunned',
+    gfs('generic', 0, 25).label === 'Hated',
+    gfs('generic', 0, 50).label === 'Vilified',
+    gfs('generic', 50, 50).label === 'Wild Child',
+    gfs('generic', 50, 8).label === 'Good-Natured Rascal',
+    gfs('generic', 8, 8).label === 'Mixed',
+    gfs('generic', 25, 25).label === 'Unpredictable',
+    gfs('generic', 8, 25).label === 'Sneering Punk',
+    gfs('ncr', 50, 0).label === 'Liked'
+];
+console.log('RESULT:' + r.map(b => b ? '1' : '0').join(''));
+"@
+        $out77 = ($repScript77 | node 2>&1 | Out-String)
+        $rm77 = [regex]::Match($out77, 'RESULT:([01]{13})')
+        if ($rm77.Success) {
+            $bits77 = $rm77.Groups[1].Value
+            for ($bi77 = 0; $bi77 -lt 13; $bi77++) { Check ($bits77.Substring($bi77, 1) -eq '1') $rep77Labels[$bi77] }
+        } else {
+            $err77 = if ([string]::IsNullOrWhiteSpace($out77)) { "extract/runtime failure" } else { $out77.Trim() }
+            foreach ($lbl77 in $rep77Labels) { Fail "$lbl77  (runtime error: $err77)" }
+        }
+    } else {
+        foreach ($lbl77 in $rep77Labels) { Fail "$lbl77  (node not found)" }
+    }
+} catch {
+    foreach ($lbl77 in $rep77Labels) { Fail "$lbl77  (exception: $_)" }
+}
+
+# -- Increment regression guard --
+
+# 77.14  Faction buttons use +-5 delta -- no adjustFaction with +-50 remains
+Check (([bool]($uiSrc77 -match 'adjustFaction\(.*,5\)')) -and (-not ($uiSrc77 -match 'adjustFaction\([^)]*,\s*50\)')) -and (-not ($uiSrc77 -match 'adjustFaction\([^)]*,\s*-50\)'))) `
+    "Faction buttons use +-5 increment -- adjustFaction with +-50 removed from ui-render.js"
 
 # ===========================================================
 # Suite 76 -- autoImportState Hardening Guards (F1/F2/F3)

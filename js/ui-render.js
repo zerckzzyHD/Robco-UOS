@@ -386,71 +386,47 @@ function calendarToTicks(month, day, year, hour, min) {
 // ── FACTION THRESHOLDS (GECK-sourced, per-faction) ─────────────────
 // t1: Smiling Troublemaker / Sneering Punk boundary
 // t2: Accepted / Shunned boundary
-// t3: Liked / Hated boundary
-// t4: Idolized / Vilified boundary
-// Source: fallout.wiki — GECK GetReputationThreshold documentation
+// 3 breakpoints per faction → 4 ranks: x<bp1=R1, bp1≤x<bp2=R2, bp2≤x<bp3=R3, x≥bp3=R4
+// Source: fallout.wiki — canonical NV GECK GetReputationThreshold values
+// Only factions with non-default breakpoints are listed; all others use _DEFAULT_THRESHOLDS.
 const FACTION_THRESHOLDS = {
-  ncr: { t1: 4, t2: 20, t3: 50, t4: 80 },
-  legion: { t1: 4, t2: 25, t3: 50, t4: 100 },
-  house: { t1: 3, t2: 10, t3: 25, t4: 50 },
-  boomers: { t1: 3, t2: 8, t3: 25, t4: 50 },
-  bos: { t1: 2, t2: 3, t3: 10, t4: 20 },
-  followers: { t1: 3, t2: 8, t3: 25, t4: 50 },
-  khans: { t1: 2, t2: 5, t3: 15, t4: 30 },
-  powder: { t1: 2, t2: 5, t3: 15, t4: 30 },
-  kings: { t1: 2, t2: 5, t3: 15, t4: 30 },
-  strip: { t1: 3, t2: 8, t3: 20, t4: 40 },
-  freeside: { t1: 3, t2: 10, t3: 35, t4: 70 },
-  // FO3 factions — use generic thresholds (no independent GECK data)
-  enclave: { t1: 3, t2: 10, t3: 30, t4: 60 },
-  lyons: { t1: 3, t2: 10, t3: 30, t4: 60 },
-  outcast: { t1: 2, t2: 8, t3: 25, t4: 50 },
-  talon: { t1: 2, t2: 5, t3: 15, t4: 30 },
-  regulators: { t1: 2, t2: 5, t3: 15, t4: 30 },
-  slavers: { t1: 2, t2: 5, t3: 15, t4: 30 },
-  reillys: { t1: 2, t2: 5, t3: 15, t4: 30 },
-  tunnelsnakes: { t1: 2, t2: 5, t3: 15, t4: 30 },
-  supermutants: { t1: 3, t2: 8, t3: 20, t4: 50 },
-  underworld: { t1: 2, t2: 5, t3: 15, t4: 30 },
-  rivetcity: { t1: 2, t2: 5, t3: 15, t4: 30 },
+  ncr: { bp1: 12, bp2: 40, bp3: 80 },
+  legion: { bp1: 15, bp2: 50, bp3: 100 },
+  bos: { bp1: 3, bp2: 10, bp3: 20 },
 };
-// Default thresholds for any faction key not in the table above
-const _DEFAULT_THRESHOLDS = { t1: 3, t2: 8, t3: 25, t4: 50 };
+// Default thresholds (generic 8/25/50) — used by all factions not listed above
+const _DEFAULT_THRESHOLDS = { bp1: 8, bp2: 25, bp3: 50 };
 
 // ── getFactionStanding(key, fame, infamy) ───────────────────────────
-// Canonical FNV 2D fame/infamy matrix.
+// Canonical FNV 2D fame/infamy matrix (4 fame ranks × 4 infamy ranks = 16 titles).
 // Returns { label, color } based on the intersection of fame rank × infamy rank.
-// Source: fallout.wiki GECK GetReputationThreshold function table.
+// Source: fallout.wiki — GECK GetReputationThreshold canonical table.
 function getFactionStanding(key, fame, infamy) {
   const th = FACTION_THRESHOLDS[key] || _DEFAULT_THRESHOLDS;
   const f = fame || 0;
   const i = infamy || 0;
 
-  // Rank each axis: 0=none, 1=low, 2=mid, 3=high, 4=max
-  const fr = f < th.t1 ? 0 : f < th.t2 ? 1 : f < th.t3 ? 2 : f < th.t4 ? 3 : 4;
-  const ir = i < th.t1 ? 0 : i < th.t2 ? 1 : i < th.t3 ? 2 : i < th.t4 ? 3 : 4;
+  // Rank each axis 1–4: R1 x<bp1, R2 bp1≤x<bp2, R3 bp2≤x<bp3, R4 x≥bp3
+  const fr = f < th.bp1 ? 1 : f < th.bp2 ? 2 : f < th.bp3 ? 3 : 4;
+  const ir = i < th.bp1 ? 1 : i < th.bp2 ? 2 : i < th.bp3 ? 3 : 4;
 
-  // 2D resolution matrix (fameRank × infamyRank)
-  // Derived from GECK GetReputationThreshold output table
-  if (fr === 4 && ir === 0) return { label: 'Idolized', color: 'var(--robco-green)' };
-  if (fr === 4 && ir <= 2) return { label: 'Merciful Thug', color: 'var(--robco-alert)' };
-  if (fr >= 3 && ir <= 1) return { label: 'Liked', color: 'var(--robco-green)' };
-  if (fr >= 2 && ir === 0) return { label: 'Accepted', color: 'var(--robco-green)' };
-  if (fr === 1 && ir === 0) return { label: 'Accepted', color: 'var(--robco-green)' };
-  if (fr >= 3 && ir >= 3) return { label: 'Wild Child', color: 'var(--robco-alert)' };
-  if (fr >= 2 && ir >= 2) return { label: 'Unpredictable', color: 'var(--robco-alert)' };
-  if (fr === 4 && ir >= 3) return { label: 'Wild Child', color: 'var(--robco-alert)' };
-  if (fr >= 1 && ir >= 3) return { label: 'Dark Hero', color: 'var(--robco-alert)' };
-  if (fr === 1 && ir === 1) return { label: 'Soft-Hearted Devil', color: 'var(--robco-alert)' };
-  if (fr === 1 && ir === 2) return { label: 'Mixed', color: 'var(--robco-alert)' };
-  if (fr === 2 && ir === 1) return { label: 'Mixed', color: 'var(--robco-alert)' };
-  if (fr === 0 && ir === 0) return { label: 'Neutral', color: 'var(--robco-alert)' };
-  if (fr === 0 && ir === 1) return { label: 'Sneering Punk', color: 'var(--robco-danger)' };
-  if (fr === 0 && ir === 2) return { label: 'Shunned', color: 'var(--robco-danger)' };
-  if (fr === 0 && ir === 3) return { label: 'Hated', color: 'var(--robco-danger)' };
-  if (fr === 0 && ir === 4) return { label: 'Vilified', color: 'var(--robco-danger)' };
-  // Fallback for any unhandled combination
-  return { label: 'Neutral', color: 'var(--robco-alert)' };
+  // Canonical 4×4 matrix indexed [ir-1][fr-1]
+  const MATRIX = [
+    ['Neutral', 'Accepted', 'Liked', 'Idolized'], // ir=1
+    ['Shunned', 'Mixed', 'Smiling Troublemaker', 'Good-Natured Rascal'], // ir=2
+    ['Hated', 'Sneering Punk', 'Unpredictable', 'Dark Hero'], // ir=3
+    ['Vilified', 'Merciful Thug', 'Soft-Hearted Devil', 'Wild Child'], // ir=4
+  ];
+  const label = MATRIX[ir - 1][fr - 1];
+
+  const POSITIVE = new Set(['Accepted', 'Liked', 'Idolized']);
+  const DANGER = new Set(['Shunned', 'Hated', 'Vilified', 'Sneering Punk']);
+  const color = POSITIVE.has(label)
+    ? 'var(--robco-green)'
+    : DANGER.has(label)
+      ? 'var(--robco-danger)'
+      : 'var(--robco-alert)';
+  return { label, color };
 }
 
 function renderStatus() {
@@ -1387,10 +1363,10 @@ function renderFactionRep() {
       <span class="faction-card-counts">F:${famVal} / I:${infamyVal}</span>
       ${barHtml}
       <div class="faction-card-btns">
-        <button class="faction-btn faction-btn--fame" title="Fame +50" onclick="adjustFaction('${f.key}','fame',50)">F+</button>
-        <button class="faction-btn faction-btn--fame" title="Fame -50" onclick="adjustFaction('${f.key}','fame',-50)">F-</button>
-        <button class="faction-btn faction-btn--infamy" title="Infamy +50" onclick="adjustFaction('${f.key}','infamy',50)">I+</button>
-        <button class="faction-btn faction-btn--infamy" title="Infamy -50" onclick="adjustFaction('${f.key}','infamy',-50)">I-</button>
+        <button class="faction-btn faction-btn--fame" title="Fame +5" onclick="adjustFaction('${f.key}','fame',5)">F+</button>
+        <button class="faction-btn faction-btn--fame" title="Fame -5" onclick="adjustFaction('${f.key}','fame',-5)">F-</button>
+        <button class="faction-btn faction-btn--infamy" title="Infamy +5" onclick="adjustFaction('${f.key}','infamy',5)">I+</button>
+        <button class="faction-btn faction-btn--infamy" title="Infamy -5" onclick="adjustFaction('${f.key}','infamy',-5)">I-</button>
       </div>
     </div>`;
   }

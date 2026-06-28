@@ -288,20 +288,20 @@ try {
       gfs('bos', 20, 20).label === 'Wild Child',
       "getFactionStanding('bos', 20, 20) returns 'Wild Child'"
     );
-    // NCR: fame=50 (t3=fr3), infamy=20 (t2=ir2) → Unpredictable
+    // NCR: fame=50 (fr3: 40≤50<80), infamy=20 (ir2: 12≤20<40) → Smiling Troublemaker
     assert(
-      gfs('ncr', 50, 20).label === 'Unpredictable',
-      "getFactionStanding('ncr', 50, 20) returns 'Unpredictable'"
+      gfs('ncr', 50, 20).label === 'Smiling Troublemaker',
+      "getFactionStanding('ncr', 50, 20) returns 'Smiling Troublemaker'"
     );
     // NCR: fame=0, infamy=30 (t3=ir2) → Shunned (fr=0, ir=2)
     assert(
       gfs('ncr', 0, 30).label === 'Shunned',
       "getFactionStanding('ncr', 0, 30) returns 'Shunned'"
     );
-    // NCR: fame=80 (t4=fr4), infamy=20 (t2=ir2) → Merciful Thug (fr=4, ir=2)
+    // NCR: fame=80 (fr4: ≥bp3=80), infamy=20 (ir2: 12≤20<40) → Good-Natured Rascal
     assert(
-      gfs('ncr', 80, 20).label === 'Merciful Thug',
-      "getFactionStanding('ncr', 80, 20) returns 'Merciful Thug'"
+      gfs('ncr', 80, 20).label === 'Good-Natured Rascal',
+      "getFactionStanding('ncr', 80, 20) returns 'Good-Natured Rascal'"
     );
     // NCR: fame=0, infamy=50 (t3=ir3) → Hated (fr=0, ir=3)
     assert(gfs('ncr', 0, 50).label === 'Hated', "getFactionStanding('ncr', 0, 50) returns 'Hated'");
@@ -1624,17 +1624,18 @@ header('Meta / Runner Parity');
     'Suite 74',
     'Suite 75',
     'Suite 76',
+    'Suite 77',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-76)' +
+    'JS runner contains all gate-guard suites (22-41, 49-77)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-76)' +
+    'PS runner contains all gate-guard suites (22-41, 49-77)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -7360,6 +7361,126 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
       "autoImportState status: raw item.type || 'BUFF' passthrough removed (whitelist active)"
     );
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 77 — Faction Rep Regression: Canon Thresholds + ±5 Increment
+//  14 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 77 — Faction Rep Regression: Canon Thresholds + ±5 Increment');
+  const uiSrc77 = readFile('js/ui-render.js');
+
+  // Reuse vm sandbox to run getFactionStanding with new canonical thresholds
+  let gfs77 = null;
+  try {
+    const vm = require('vm');
+    const threshMatch77 = uiSrc77.match(
+      /const FACTION_THRESHOLDS\s*=\s*\{[\s\S]*?\};\s*\/\/ Default/
+    );
+    const defaultMatch77 = uiSrc77.match(/const _DEFAULT_THRESHOLDS\s*=\s*\{[^}]+\};/);
+    const fnMatch77 = uiSrc77.match(/function getFactionStanding\([\s\S]*?\n\}/);
+    if (threshMatch77 && defaultMatch77 && fnMatch77) {
+      const sb77 = {};
+      vm.createContext(sb77);
+      vm.runInContext(`${threshMatch77[0]}\n${defaultMatch77[0]}\n${fnMatch77[0]}`, sb77);
+      gfs77 = sb77.getFactionStanding;
+    }
+  } catch (_) {}
+
+  // ── Generic (default 8/25/50) threshold tests ────────────────────────
+
+  // 77.1  (0,0) → Neutral
+  assert(
+    gfs77 && gfs77('generic', 0, 0).label === 'Neutral',
+    'getFactionStanding generic (0,0) → Neutral'
+  );
+
+  // 77.2  (8,0) → Accepted — core regression: one ±5 click can't reach Idolized
+  assert(
+    gfs77 && gfs77('generic', 8, 0).label === 'Accepted',
+    'getFactionStanding generic (8,0) → Accepted (NOT Idolized)'
+  );
+
+  // 77.3  (25,0) → Liked
+  assert(
+    gfs77 && gfs77('generic', 25, 0).label === 'Liked',
+    'getFactionStanding generic (25,0) → Liked'
+  );
+
+  // 77.4  (50,0) → Idolized
+  assert(
+    gfs77 && gfs77('generic', 50, 0).label === 'Idolized',
+    'getFactionStanding generic (50,0) → Idolized'
+  );
+
+  // 77.5  (0,8) → Shunned
+  assert(
+    gfs77 && gfs77('generic', 0, 8).label === 'Shunned',
+    'getFactionStanding generic (0,8) → Shunned'
+  );
+
+  // 77.6  (0,25) → Hated
+  assert(
+    gfs77 && gfs77('generic', 0, 25).label === 'Hated',
+    'getFactionStanding generic (0,25) → Hated'
+  );
+
+  // 77.7  (0,50) → Vilified
+  assert(
+    gfs77 && gfs77('generic', 0, 50).label === 'Vilified',
+    'getFactionStanding generic (0,50) → Vilified'
+  );
+
+  // ── 2D matrix (mixed fame+infamy) tests ─────────────────────────────
+
+  // 77.8  (50,50) → Wild Child
+  assert(
+    gfs77 && gfs77('generic', 50, 50).label === 'Wild Child',
+    'getFactionStanding generic (50,50) → Wild Child'
+  );
+
+  // 77.9  (50,8) → Good-Natured Rascal
+  assert(
+    gfs77 && gfs77('generic', 50, 8).label === 'Good-Natured Rascal',
+    'getFactionStanding generic (50,8) → Good-Natured Rascal'
+  );
+
+  // 77.10  (8,8) → Mixed
+  assert(
+    gfs77 && gfs77('generic', 8, 8).label === 'Mixed',
+    'getFactionStanding generic (8,8) → Mixed'
+  );
+
+  // 77.11  (25,25) → Unpredictable
+  assert(
+    gfs77 && gfs77('generic', 25, 25).label === 'Unpredictable',
+    'getFactionStanding generic (25,25) → Unpredictable'
+  );
+
+  // 77.12  (8,25) → Sneering Punk
+  assert(
+    gfs77 && gfs77('generic', 8, 25).label === 'Sneering Punk',
+    'getFactionStanding generic (8,25) → Sneering Punk'
+  );
+
+  // ── Per-faction threshold test ───────────────────────────────────────
+
+  // 77.13  NCR (50,0) → Liked  — NCR bp3=80, so fame=50 < 80 is R3=Liked, NOT Idolized
+  assert(
+    gfs77 && gfs77('ncr', 50, 0).label === 'Liked',
+    'getFactionStanding ncr (50,0) → Liked (NCR bp3=80, 50<80 is not max rank)'
+  );
+
+  // ── Increment regression guard ───────────────────────────────────────
+
+  // 77.14  Faction buttons use ±5 delta — no adjustFaction with ±50 remains
+  assert(
+    /adjustFaction\(.*,5\)/.test(uiSrc77) &&
+      !/adjustFaction\([^)]*,\s*50\)/.test(uiSrc77) &&
+      !/adjustFaction\([^)]*,\s*-50\)/.test(uiSrc77),
+    'Faction buttons use ±5 increment — adjustFaction with ±50 removed from ui-render.js'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════
