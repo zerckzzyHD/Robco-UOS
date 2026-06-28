@@ -1630,17 +1630,18 @@ header('Meta / Runner Parity');
     'Suite 80',
     'Suite 81',
     'Suite 82',
+    'Suite 83',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-82)' +
+    'JS runner contains all gate-guard suites (22-41, 49-83)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-82)' +
+    'PS runner contains all gate-guard suites (22-41, 49-83)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -7786,6 +7787,137 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   assert(
     si82 && si82.wgt === 1 && si82.type === 'misc',
     `lookupItemInDb('Steel Ingot') → wgt=1/type='misc' (got ${JSON.stringify(si82)})`
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 83 — Crafting recipe + breakdown registry (NV + FO3)
+//  15 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 83 — Crafting recipe + breakdown registry (NV + FO3)');
+
+  const nvSrc83 = readFile('js/reg_nv.js');
+  const nvRecStart83 = nvSrc83.indexOf('\n  recipes: [');
+  const nvBdStart83 = nvSrc83.indexOf('\n  breakdowns: [', nvRecStart83);
+  const nvRecBlock83 = nvSrc83.slice(nvRecStart83, nvBdStart83);
+  const nvBdBlock83 = nvSrc83.slice(nvBdStart83);
+
+  const fo3Src83 = readFile('js/reg_fo3.js');
+  const fo3RecStart83 = fo3Src83.indexOf('\n  recipes: [');
+  const fo3BdStart83 = fo3Src83.indexOf('\n  breakdowns:', fo3RecStart83);
+  const fo3RecBlock83 = fo3Src83.slice(fo3RecStart83, fo3BdStart83);
+
+  // 83.a  NV recipes: exactly 25 (count by station:)
+  const nvStationCount83 = (nvRecBlock83.match(/\bstation:/g) || []).length;
+  assert(nvStationCount83 === 25, `NV recipes has exactly 25 entries (got ${nvStationCount83})`);
+
+  // 83.b  FO3 recipes: exactly 7
+  const fo3StationCount83 = (fo3RecBlock83.match(/\bstation:/g) || []).length;
+  assert(fo3StationCount83 === 7, `FO3 recipes has exactly 7 entries (got ${fo3StationCount83})`);
+
+  // 83.c  NV breakdowns: exactly 12 (count by yields:)
+  const nvYieldsCount83 = (nvBdBlock83.match(/\byields:/g) || []).length;
+  assert(nvYieldsCount83 === 12, `NV breakdowns has exactly 12 entries (got ${nvYieldsCount83})`);
+
+  // 83.d  FO3 breakdowns: empty array
+  assert(fo3Src83.includes('  breakdowns: []'), 'FO3 breakdowns is empty array []');
+
+  // 83.e  NV station values all valid
+  const nvStVals83 = [...nvRecBlock83.matchAll(/\bstation:\s*'([^']+)'/g)].map(m => m[1]);
+  const validStations83 = new Set(['workbench', 'campfire', 'reloading', 'sink']);
+  const badStations83 = nvStVals83.filter(s => !validStations83.has(s));
+  assert(
+    badStations83.length === 0 && nvStVals83.length === 25,
+    `NV station values all valid (total=${nvStVals83.length} bad=${badStations83.join(',') || 'none'})`
+  );
+
+  // 83.f  FO3 station values all workbench
+  const fo3StVals83 = [...fo3RecBlock83.matchAll(/\bstation:\s*'([^']+)'/g)].map(m => m[1]);
+  const badFO3Stations83 = fo3StVals83.filter(s => s !== 'workbench');
+  assert(
+    badFO3Stations83.length === 0 && fo3StVals83.length === 7,
+    `FO3 station values all workbench (total=${fo3StVals83.length} bad=${badFO3Stations83.join(',') || 'none'})`
+  );
+
+  // 83.g  NV skill values all valid FNV keys
+  const nvSkillVals83 = [...nvRecBlock83.matchAll(/\bskill:\s*'([^']+)'/g)].map(m => m[1]);
+  const validNVSkills83 = new Set([
+    'barter',
+    'energy_weapons',
+    'explosives',
+    'guns',
+    'lockpick',
+    'medicine',
+    'melee_weapons',
+    'repair',
+    'science',
+    'sneak',
+    'speech',
+    'survival',
+    'unarmed',
+  ]);
+  const badNVSkills83 = nvSkillVals83.filter(s => !validNVSkills83.has(s));
+  assert(
+    badNVSkills83.length === 0,
+    `NV recipe skill values all valid FNV keys (bad: ${badNVSkills83.join(',') || 'none'})`
+  );
+
+  // 83.h  FO3 recipe skillReqs all null
+  const fo3SkillReqCount83 = (fo3RecBlock83.match(/\bskillReq:/g) || []).length;
+  const fo3NullReqCount83 = (fo3RecBlock83.match(/\bskillReq: null/g) || []).length;
+  assert(
+    fo3SkillReqCount83 === 7 && fo3NullReqCount83 === 7,
+    `FO3 all 7 skillReqs null (total=${fo3SkillReqCount83} null=${fo3NullReqCount83})`
+  );
+
+  // 83.i  NV recipe names no duplicates
+  const nvSqNames83 = [...nvRecBlock83.matchAll(/\bname:\s*'([^']+)'/g)].map(m => m[1]);
+  const nvDqNames83 = [...nvRecBlock83.matchAll(/\bname:\s*"([^"]+)"/g)].map(m => m[1]);
+  const nvNames83 = [...nvSqNames83, ...nvDqNames83];
+  const nvNameSet83 = new Set(nvNames83);
+  assert(
+    nvNameSet83.size === 25 && nvNames83.length === 25,
+    `NV recipe names no duplicates (${nvNameSet83.size} unique / ${nvNames83.length} total)`
+  );
+
+  // 83.j  FO3 recipe names no duplicates
+  const fo3Names83 = [...fo3RecBlock83.matchAll(/\bname:\s*'([^']+)'/g)].map(m => m[1]);
+  const fo3NameSet83 = new Set(fo3Names83);
+  assert(
+    fo3NameSet83.size === 7 && fo3Names83.length === 7,
+    `FO3 recipe names no duplicates (${fo3NameSet83.size} unique / ${fo3Names83.length} total)`
+  );
+
+  // 83.k  NV breakdown items no duplicates
+  // Handles both inline `{ item: '...', yields:` and Prettier-expanded `item: '...',\n      yields:` forms.
+  const nvBdItems83 = [
+    ...nvBdBlock83.matchAll(/\{ item: '([^']+)', yields:/g),
+    ...nvBdBlock83.matchAll(/item: '([^']+)',\n {6}yields:/g),
+  ].map(m => m[1]);
+  const nvBdItemSet83 = new Set(nvBdItems83);
+  assert(
+    nvBdItemSet83.size === 12 && nvBdItems83.length === 12,
+    `NV breakdown items no duplicates (${nvBdItemSet83.size} unique / ${nvBdItems83.length} total)`
+  );
+
+  // 83.l  NV sentinel: 'Stimpak'
+  assert(nvRecBlock83.includes("name: 'Stimpak'"), "NV recipes contain 'Stimpak'");
+
+  // 83.m  NV sentinel: 'Weapon Repair Kit'
+  assert(
+    nvRecBlock83.includes("name: 'Weapon Repair Kit'"),
+    "NV recipes contain 'Weapon Repair Kit'"
+  );
+
+  // 83.n  NV sentinel: 'Bottlecap Mine'
+  assert(nvRecBlock83.includes("name: 'Bottlecap Mine'"), "NV recipes contain 'Bottlecap Mine'");
+
+  // 83.o  FO3 sentinels
+  assert(
+    fo3RecBlock83.includes("name: 'Deathclaw Gauntlet'") &&
+      fo3RecBlock83.includes("name: 'Shishkebab'"),
+    "FO3 recipes contain 'Deathclaw Gauntlet' and 'Shishkebab'"
   );
 }
 

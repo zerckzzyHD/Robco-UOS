@@ -967,63 +967,103 @@ const FALLOUT_REGISTRY = {
       locations: ['Collapsed Car Fort', 'Rivet City South', 'Takoma Industrial'],
     },
   ],
+  // ── CRAFTING RECIPES ─────────────────────────────────────────────────────
+  // Data source: https://fallout.wiki/wiki/Fallout_3_crafting
+  // FO3 uses workbench schematics only; no skill requirements.
+  recipes: [
+    // ── Workbench — Schematics (no skill requirement) ───────────────────────────
+    {
+      name: 'Bottlecap Mine',
+      station: 'workbench',
+      output: { item: 'Bottlecap Mine', qty: 1 },
+      ingredients: [
+        { item: 'Lunchbox', qty: 1 },
+        { item: 'Cherry Bomb', qty: 1 },
+        { item: 'Sensor Module', qty: 1 },
+      ],
+      skillReq: null,
+      dlc: null,
+    },
+    {
+      name: 'Dart Gun',
+      station: 'workbench',
+      output: { item: 'Dart Gun', qty: 1 },
+      ingredients: [
+        { item: 'Paint Gun', qty: 1 },
+        { item: 'Radscorpion Poison Gland', qty: 1 },
+        { item: 'Surgical Tubing', qty: 1 },
+        { item: 'Toy Car', qty: 1 },
+      ],
+      skillReq: null,
+      dlc: null,
+    },
+    {
+      name: 'Deathclaw Gauntlet',
+      station: 'workbench',
+      output: { item: 'Deathclaw Gauntlet', qty: 1 },
+      ingredients: [
+        { item: 'Deathclaw Hand', qty: 1 },
+        { item: 'Leather Belt', qty: 1 },
+        { item: 'Medical Brace', qty: 1 },
+        { item: 'Wonderglue', qty: 1 },
+      ],
+      skillReq: null,
+      dlc: null,
+    },
+    {
+      name: 'Nuka-Grenade',
+      station: 'workbench',
+      output: { item: 'Nuka-Grenade', qty: 1 },
+      ingredients: [
+        { item: 'Nuka-Cola Quantum', qty: 1 },
+        { item: 'Abraxo Cleaner', qty: 1 },
+        { item: 'Tin Can', qty: 1 },
+        { item: 'Turpentine', qty: 1 },
+      ],
+      skillReq: null,
+      dlc: null,
+    },
+    {
+      name: 'Railway Rifle',
+      station: 'workbench',
+      output: { item: 'Railway Rifle', qty: 1 },
+      ingredients: [
+        { item: 'Crutch', qty: 1 },
+        { item: 'Fission Battery', qty: 1 },
+        { item: 'Pressure Cooker', qty: 1 },
+        { item: 'Steam Gauge Assembly', qty: 1 },
+      ],
+      skillReq: null,
+      dlc: null,
+    },
+    {
+      name: 'Rock-It Launcher',
+      station: 'workbench',
+      output: { item: 'Rock-It Launcher', qty: 1 },
+      ingredients: [
+        { item: 'Conductor', qty: 1 },
+        { item: 'Firehose Nozzle', qty: 1 },
+        { item: 'Leaf Blower', qty: 1 },
+        { item: 'Vacuum Cleaner', qty: 1 },
+      ],
+      skillReq: null,
+      dlc: null,
+    },
+    {
+      name: 'Shishkebab',
+      station: 'workbench',
+      output: { item: 'Shishkebab', qty: 1 },
+      ingredients: [
+        { item: 'Lawn Mower Blade', qty: 1 },
+        { item: 'Motorcycle Gas Tank', qty: 1 },
+        { item: 'Motorcycle Handbrake', qty: 1 },
+        { item: 'Pilot Light', qty: 1 },
+      ],
+      skillReq: null,
+      dlc: null,
+    },
+  ],
+
+  // FO3 has no reloading bench or ammo breakdown mechanic.
+  breakdowns: [],
 };
-
-// ── REGISTRY SEARCH ──────────────────────────────────────────────────────────
-/**
- * Identical implementation to reg_nv.js. Searches FALLOUT_REGISTRY by category and query.
- * @param {string} category
- * @param {string} query
- * @returns {Array<Object>} Up to 7 results sorted by relevance.
- */
-let _registrySearchCache = null;
-function registrySearch(category, query) {
-  if (!query || query.length < 2) return [];
-  if (
-    _registrySearchCache &&
-    _registrySearchCache.category === category &&
-    _registrySearchCache.query === query
-  ) {
-    return _registrySearchCache.results;
-  }
-
-  const entries = FALLOUT_REGISTRY[category];
-  if (!entries || !Array.isArray(entries) || entries.length === 0) return [];
-
-  const q = query.toLowerCase();
-
-  const scored = [];
-  for (let i = 0; i < entries.length; i++) {
-    const entry = entries[i];
-    const nameLower = (entry.name || '').toLowerCase();
-    let score = 0;
-
-    if (nameLower.startsWith(q)) {
-      score = 3;
-    } else {
-      const words = nameLower.split(/[\s\-']+/);
-      for (let w = 0; w < words.length; w++) {
-        if (words[w].startsWith(q)) {
-          score = 2;
-          break;
-        }
-      }
-      if (score === 0 && nameLower.includes(q)) {
-        score = 1;
-      }
-    }
-
-    if (score > 0) {
-      scored.push({ entry, score });
-    }
-  }
-
-  scored.sort((a, b) => {
-    if (b.score !== a.score) return b.score - a.score;
-    return (a.entry.name || '').localeCompare(b.entry.name || '');
-  });
-
-  const results = scored.slice(0, 7).map(s => s.entry);
-  _registrySearchCache = { category, query, results };
-  return results;
-}

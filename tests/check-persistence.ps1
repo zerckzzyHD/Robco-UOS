@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     RobCo Persistence Audit
 
@@ -971,11 +971,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-82)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-82)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-83)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-83)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -4731,6 +4731,91 @@ $si82Row = $qiData82 | Where-Object { ($_ -split ',')[0].Trim() -eq 'Steel Ingot
 $si82Cols = if ($si82Row) { $si82Row -split ',' } else { @() }
 $siSatisfied = ($null -ne $si82Row) -and ($si82Cols.Count -ge 5) -and ([Math]::Abs([double]$si82Cols[4] - 1.0) -lt 0.001)
 Check $siSatisfied "lookupItemInDb('Steel Ingot') -> wgt=1/type='misc'"
+
+# ===========================================================
+# Suite 83 -- Crafting recipe + breakdown registry (NV + FO3)
+# 15 tests
+# ===========================================================
+Sep "Suite 83 -- Crafting recipe + breakdown registry (NV + FO3)"
+$nvSrc83 = Read-Src "js\reg_nv.js"
+$nvRecStart83 = $nvSrc83.IndexOf("`n  recipes: [")
+$nvBdStart83 = $nvSrc83.IndexOf("`n  breakdowns: [", $nvRecStart83)
+$nvRecBlock83 = $nvSrc83.Substring($nvRecStart83, $nvBdStart83 - $nvRecStart83)
+$nvBdBlock83 = $nvSrc83.Substring($nvBdStart83)
+
+$fo3Src83 = Read-Src "js\reg_fo3.js"
+$fo3RecStart83 = $fo3Src83.IndexOf("`n  recipes: [")
+$fo3BdStart83 = $fo3Src83.IndexOf("`n  breakdowns:", $fo3RecStart83)
+$fo3RecBlock83 = $fo3Src83.Substring($fo3RecStart83, $fo3BdStart83 - $fo3RecStart83)
+
+# 83.a  NV recipes: exactly 25
+$nvStationCount83 = ([regex]::Matches($nvRecBlock83, '\bstation:')).Count
+Check ($nvStationCount83 -eq 25) ("NV recipes has exactly 25 entries (got " + $nvStationCount83 + ")")
+
+# 83.b  FO3 recipes: exactly 7
+$fo3StationCount83 = ([regex]::Matches($fo3RecBlock83, '\bstation:')).Count
+Check ($fo3StationCount83 -eq 7) ("FO3 recipes has exactly 7 entries (got " + $fo3StationCount83 + ")")
+
+# 83.c  NV breakdowns: exactly 12
+$nvYieldsCount83 = ([regex]::Matches($nvBdBlock83, '\byields:')).Count
+Check ($nvYieldsCount83 -eq 12) ("NV breakdowns has exactly 12 entries (got " + $nvYieldsCount83 + ")")
+
+# 83.d  FO3 breakdowns: empty array
+Check ($fo3Src83.Contains("  breakdowns: []")) "FO3 breakdowns is empty array []"
+
+# 83.e  NV station values all valid
+$nvStVals83 = [regex]::Matches($nvRecBlock83, "station: '([^']+)'") | ForEach-Object { $_.Groups[1].Value }
+$validStations83 = @('workbench', 'campfire', 'reloading', 'sink')
+$badStations83 = @($nvStVals83 | Where-Object { $validStations83 -notcontains $_ })
+Check ($badStations83.Count -eq 0 -and $nvStVals83.Count -eq 25) ("NV station values all valid (total=" + $nvStVals83.Count + " bad=" + ($badStations83 -join ',') + ")")
+
+# 83.f  FO3 station values all workbench
+$fo3StVals83 = [regex]::Matches($fo3RecBlock83, "station: '([^']+)'") | ForEach-Object { $_.Groups[1].Value }
+$badFO3Stations83 = @($fo3StVals83 | Where-Object { $_ -ne 'workbench' })
+Check ($badFO3Stations83.Count -eq 0 -and $fo3StVals83.Count -eq 7) ("FO3 stations all workbench (total=" + $fo3StVals83.Count + " bad=" + ($badFO3Stations83 -join ',') + ")")
+
+# 83.g  NV skill values all valid FNV keys
+$nvSkillVals83 = [regex]::Matches($nvRecBlock83, "skill: '([^']+)'") | ForEach-Object { $_.Groups[1].Value }
+$validNVSkills83 = @('barter','energy_weapons','explosives','guns','lockpick','medicine','melee_weapons','repair','science','sneak','speech','survival','unarmed')
+$badNVSkills83 = @($nvSkillVals83 | Where-Object { $validNVSkills83 -notcontains $_ })
+Check ($badNVSkills83.Count -eq 0 -and $nvSkillVals83.Count -gt 0) ("NV recipe skill values all valid (found=" + $nvSkillVals83.Count + " bad: " + ($badNVSkills83 -join ',') + ")")
+
+# 83.h  FO3 recipe skillReqs all null
+$fo3SkillReqCount83 = ([regex]::Matches($fo3RecBlock83, 'skillReq: ')).Count
+$fo3NullReqCount83 = ([regex]::Matches($fo3RecBlock83, 'skillReq: null')).Count
+Check ($fo3SkillReqCount83 -eq 7 -and $fo3NullReqCount83 -eq 7) ("FO3 all 7 skillReqs null (total=$fo3SkillReqCount83 null=$fo3NullReqCount83)")
+
+# 83.i  NV recipe names no duplicates
+$nvSqNames83 = [regex]::Matches($nvRecBlock83, "name: '([^']+)'") | ForEach-Object { $_.Groups[1].Value }
+$nvDqNames83 = [regex]::Matches($nvRecBlock83, 'name: "([^"]+)"') | ForEach-Object { $_.Groups[1].Value }
+$nvNames83 = @($nvSqNames83) + @($nvDqNames83)
+$nvNameSet83 = @($nvNames83 | Select-Object -Unique)
+Check ($nvNameSet83.Count -eq 25 -and $nvNames83.Count -eq 25) ("NV recipe names no duplicates (" + $nvNameSet83.Count + " unique / " + $nvNames83.Count + " total)")
+
+# 83.j  FO3 recipe names no duplicates
+$fo3Names83 = [regex]::Matches($fo3RecBlock83, "name: '([^']+)'") | ForEach-Object { $_.Groups[1].Value }
+$fo3NameSet83 = @($fo3Names83 | Select-Object -Unique)
+Check ($fo3NameSet83.Count -eq 7 -and $fo3Names83.Count -eq 7) ("FO3 recipe names no duplicates (" + $fo3NameSet83.Count + " unique / " + $fo3Names83.Count + " total)")
+
+# 83.k  NV breakdown items no duplicates (inline + Prettier-expanded forms)
+$nvBdItems83Inline83 = [regex]::Matches($nvBdBlock83, "\{ item: '([^']+)', yields:") | ForEach-Object { $_.Groups[1].Value }
+$nvBdItems83Expanded83 = [regex]::Matches($nvBdBlock83, "item: '([^']+)',`n {6}yields:") | ForEach-Object { $_.Groups[1].Value }
+$nvBdItems83 = @($nvBdItems83Inline83) + @($nvBdItems83Expanded83)
+$nvBdItemSet83 = @($nvBdItems83 | Select-Object -Unique)
+Check ($nvBdItemSet83.Count -eq 12 -and $nvBdItems83.Count -eq 12) ("NV breakdown items no duplicates (" + $nvBdItemSet83.Count + " unique / " + $nvBdItems83.Count + " total)")
+
+# 83.l  NV sentinel: Stimpak
+Check ($nvRecBlock83.Contains("name: 'Stimpak'")) "NV recipes contain 'Stimpak'"
+
+# 83.m  NV sentinel: Weapon Repair Kit
+Check ($nvRecBlock83.Contains("name: 'Weapon Repair Kit'")) "NV recipes contain 'Weapon Repair Kit'"
+
+# 83.n  NV sentinel: Bottlecap Mine
+Check ($nvRecBlock83.Contains("name: 'Bottlecap Mine'")) "NV recipes contain 'Bottlecap Mine'"
+
+# 83.o  FO3 sentinels
+Check ($fo3RecBlock83.Contains("name: 'Deathclaw Gauntlet'") -and $fo3RecBlock83.Contains("name: 'Shishkebab'")) `
+    "FO3 recipes contain 'Deathclaw Gauntlet' and 'Shishkebab'"
 # ===========================================================
 # Results
 # ===========================================================

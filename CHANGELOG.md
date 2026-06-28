@@ -1,6 +1,8 @@
-﻿## [Unreleased]<!-- Tests: 981/981 | Cache: robco-terminal-v2.5.0-r29 -->
+﻿## [Unreleased]<!-- Tests: 996/996 | Cache: robco-terminal-v2.5.0-r30 -->
 
 ### Added
+
+- **Structured crafting recipe and breakdown data added to the registry** — 25 New Vegas recipes covering the workbench (stimpaks, repair kits, mines, upgraded weapons, Nuka-Cola variants), recycling bench (energy cell recharging), and campfire (chems, food, survival items); 12 ammo and cookware breakdown entries for the reloading bench; and 7 Fallout 3 workbench schematics (Bottlecap Mine, Dart Gun, Deathclaw Gauntlet, Nuka-Grenade, Railway Rifle, Rock-It Launcher, Shishkebab). This is the data foundation for the upcoming Craft panel — not yet shown in the UI.
 
 - **Expanded Fallout 3 quest log autocomplete with all five add-ons' quests** (Operation: Anchorage, The Pitt, Broken Steel, Point Lookout, Mothership Zeta) plus Big Trouble in Big Town, bringing the FO3 quest catalog from 44 to 64 entries. The new entries include the correct add-on label for each quest so the autocomplete now surfaces DLC quests when typing. Also expanded FO3 quest-item reference data from 15 to 25 entries — added quest-critical items for the add-on story lines (Steel Ingot, Krivbeknih, Cryo Key, Punga Fruit, Wernher's Holotape, Keller Family Transcripts, and more). All quest names and items sourced from the Fallout wiki.
 
