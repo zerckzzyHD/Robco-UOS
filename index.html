@@ -57,9 +57,24 @@
   </head>
 
   <body>
-    <!-- SW update banner: replaces alert(); fixed amber strip, tap to reload -->
-    <div id="updateBanner" role="alert" aria-live="assertive" style="display: none" tabindex="0">
-      &gt;&nbsp;&#x21BA;&nbsp;UPDATE AVAILABLE &mdash; TAP TO REBOOT TERMINAL
+    <!-- SW update modal: blocking full-screen dialog, shown only by _triggerUpdate when a genuine update is waiting -->
+    <div
+      id="updateModal"
+      class="modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="updateModalTitle"
+      aria-describedby="updateModalMsg"
+      style="display: none; z-index: 3000"
+    >
+      <div class="modal-box">
+        <div class="modal-title" id="updateModalTitle">&gt; &#x26A0; TERMINAL UPDATE REQUIRED</div>
+        <div class="modal-content" id="updateModalMsg">
+          A new version of RobCo U.O.S. is ready. Reboot to load it &mdash; the terminal must update
+          to continue.
+        </div>
+        <button id="updateRebootBtn" class="blue-btn">&gt; REBOOT TERMINAL</button>
+      </div>
     </div>
     <div id="bootScreen">
       <div id="bootLines"></div>
@@ -2037,19 +2052,39 @@
         // Send SKIP_WAITING to the given waiting worker, then wait for
         // controllerchange (fired when it activates) to reload the page.
         function _triggerUpdate(worker) {
-          const banner = document.getElementById('updateBanner');
-          if (!banner) {
+          const modal = document.getElementById('updateModal');
+          const btn = document.getElementById('updateRebootBtn');
+          if (!modal || !btn) {
             worker.postMessage({ type: 'SKIP_WAITING' });
             return;
-          }
-          banner.style.display = 'flex';
-          banner.onclick = function () {
-            banner.style.display = 'none';
+          } // fail-safe: no UI → auto-update
+          modal.style.display = 'flex';
+          btn.focus();
+          let rebooting = false;
+          const doReboot = function () {
+            if (rebooting) return;
+            rebooting = true;
+            btn.disabled = true;
+            btn.innerText = '> REBOOTING...';
             worker.postMessage({ type: 'SKIP_WAITING' });
+            setTimeout(() => {
+              try {
+                window.location.reload();
+              } catch (_) {}
+            }, 4000);
           };
-          banner.onkeydown = function (e) {
-            if (e.key === 'Enter' || e.key === ' ') banner.onclick();
-          };
+          btn.onclick = doReboot;
+          modal.addEventListener('keydown', function (e) {
+            if (e.key === 'Tab') {
+              e.preventDefault();
+              btn.focus();
+            } else if (e.key === 'Escape') {
+              e.preventDefault();
+            } else if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              doReboot();
+            }
+          });
         }
 
         navigator.serviceWorker.register('sw.js').then(reg => {

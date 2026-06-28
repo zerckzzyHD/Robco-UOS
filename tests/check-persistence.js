@@ -1612,17 +1612,18 @@ header('Meta / Runner Parity');
     'Suite 62',
     'Suite 63',
     'Suite 64',
+    'Suite 65',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-64)' +
+    'JS runner contains all gate-guard suites (22-41, 49-65)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-64)' +
+    'PS runner contains all gate-guard suites (22-41, 49-65)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -1684,10 +1685,10 @@ header('SW Update Banner');
   );
 }
 
-// 29.2 updateBanner element exists in index.html
+// 29.2 updateModal element exists in index.html (replaced updateBanner — blocking modal)
 assert(
-  /id="updateBanner"/.test(htmlSource),
-  'id="updateBanner" element exists in index.html (in-page update UI)'
+  /id="updateModal"/.test(htmlSource),
+  'id="updateModal" element exists in index.html (blocking update dialog replaced updateBanner)'
 );
 
 // 29.3 Banner tap wires to SKIP_WAITING (onclick sends postMessage SKIP_WAITING)
@@ -5769,6 +5770,89 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
       'syncStateFromDom clamps SPECIAL reads to 1–10 (defense-in-depth: no save path leaks >10)'
     );
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 65 — Blocking Update Modal (Phase 6 Task 2)
+//  #updateModal replaces #updateBanner; full-screen blocking dialog;
+//  focus trap, Esc blocked, fail-safe, &&controller regression guards.
+//  11 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Blocking Update Modal');
+  const uiCoreSrc65 = readFile('js/ui-core.js');
+
+  // 65.1  #updateModal exists in index.html (replaced #updateBanner)
+  assert(
+    /id="updateModal"/.test(htmlSource),
+    'id="updateModal" exists in index.html (blocking modal replaced updateBanner)'
+  );
+
+  // 65.2  #updateModal has role="dialog"
+  assert(
+    /id="updateModal"[\s\S]{0,400}role="dialog"/.test(htmlSource),
+    '#updateModal has role="dialog" (accessible dialog semantics)'
+  );
+
+  // 65.3  #updateModal has aria-modal="true"
+  assert(
+    /id="updateModal"[\s\S]{0,400}aria-modal="true"/.test(htmlSource),
+    '#updateModal has aria-modal="true" (marks background inert for screen readers)'
+  );
+
+  // 65.4  #updateModal has aria-labelledby
+  assert(
+    /id="updateModal"[\s\S]{0,400}aria-labelledby/.test(htmlSource),
+    '#updateModal has aria-labelledby attribute (screen-reader accessible label)'
+  );
+
+  // 65.5–65.7: _triggerUpdate body checks
+  let triggerBody65 = '';
+  try {
+    triggerBody65 = extractFunctionBody(htmlSource, '_triggerUpdate');
+  } catch (_) {}
+
+  // 65.5  _triggerUpdate moves focus to the reboot button
+  assert(
+    /\.focus\s*\(\s*\)/.test(triggerBody65),
+    '_triggerUpdate calls btn.focus() to move keyboard focus into the modal'
+  );
+
+  // 65.6  _triggerUpdate traps Tab (focus trap — single focusable element)
+  assert(
+    /e\.key\s*===\s*'Tab'[\s\S]{0,60}preventDefault/.test(triggerBody65),
+    '_triggerUpdate traps Tab key + preventDefault (focus trap — single focusable)'
+  );
+
+  // 65.7  _triggerUpdate blocks Escape (mandatory — no dismiss path)
+  assert(
+    /e\.key\s*===\s*'Escape'[\s\S]{0,60}preventDefault/.test(triggerBody65),
+    '_triggerUpdate blocks Escape key + preventDefault (modal cannot be dismissed — must reboot)'
+  );
+
+  // 65.8  Case A call site still gates on navigator.serviceWorker.controller (boot-safety regression guard)
+  assert(
+    /reg\.waiting\s*&&\s*navigator\.serviceWorker\.controller/.test(htmlSource),
+    'Case A: _triggerUpdate called only when reg.waiting && navigator.serviceWorker.controller (boot-safety guard intact)'
+  );
+
+  // 65.9  Case B call site still gates on navigator.serviceWorker.controller
+  assert(
+    /state\s*===\s*'installed'\s*&&\s*navigator\.serviceWorker\.controller/.test(htmlSource),
+    "Case B: _triggerUpdate called only when state==='installed' && navigator.serviceWorker.controller (boot-safety guard intact)"
+  );
+
+  // 65.10  _triggerUpdate has fail-safe: missing DOM → auto SKIP_WAITING (no silent hang)
+  assert(
+    /!\s*modal\s*\|\|\s*!\s*btn/.test(triggerBody65) && /SKIP_WAITING/.test(triggerBody65),
+    '_triggerUpdate has !modal||!btn fail-safe that posts SKIP_WAITING (no silent hang if DOM missing)'
+  );
+
+  // 65.11  Global ESC handler in ui-core.js targets sysModal only — updateModal not wired to it
+  assert(
+    !/updateModal/.test(uiCoreSrc65),
+    'ui-core.js ESC handler does not reference updateModal (updateModal manages its own Esc — not caught by global handler)'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════

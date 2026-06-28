@@ -1,7 +1,8 @@
-## [Unreleased]<!-- Tests: 770/770 | Cache: robco-terminal-v2.5.0-r6 -->
+## [Unreleased]<!-- Tests: 781/781 | Cache: robco-terminal-v2.5.0-r7 -->
 
 ### Changed
 
+- The update prompt is now a full-screen blocking reboot dialog. When a new version is ready, a modal covers the screen and must be acknowledged — tap REBOOT TERMINAL to update. The dialog cannot be dismissed any other way. It only appears when an update is genuinely waiting; first-time launch is unaffected.
 - The "Save to Cloud" button in the All Saves section now matches the style and sizing of the local save slot buttons, giving the section a consistent look.
 - The Security & Configuration panel now shows a unified list of all your saves — both local slots and cloud saves — in one place, each clearly labelled [LOCAL] or [CLOUD]. Signed-in users see "Save Current to Cloud" and "Sync Local Slots → Cloud" buttons here. The Account panel is now focused on identity and sign-in only, with a pointer to Security & Configuration for save management.
 - Saving to the cloud now creates a new named save each time (you get to pick the name) rather than overwriting a fixed slot. Identical saves are automatically deduplicated. Loading a cloud save warns you if you have a more recent local save.

@@ -971,11 +971,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-64)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-64)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-65)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-65)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -1009,8 +1009,8 @@ $triggerBody29 = ''
 try { $triggerBody29 = Get-FunctionBody $htmlSrc '_triggerUpdate' } catch {}
 Check (-not ($triggerBody29 -match '\balert\s*\(')) `
     "_triggerUpdate() does not call alert() -- banner replaces browser dialog (Protocol 13 guard)"
-Check ([bool]($htmlSrc -match 'id="updateBanner"')) `
-    'id="updateBanner" element exists in index.html (in-page update UI)'
+Check ([bool]($htmlSrc -match 'id="updateModal"')) `
+    'id="updateModal" element exists in index.html (blocking update dialog replaced updateBanner)'
 Check ([bool]($triggerBody29 -match 'SKIP_WAITING') -and [bool]($triggerBody29 -match 'onclick|addEventListener')) `
     "_triggerUpdate() wires banner tap to postMessage SKIP_WAITING (update path intact)"
 Check ([bool]($htmlSrc -match 'refreshing') -and [bool]($htmlSrc -match 'hadController')) `
@@ -3489,6 +3489,63 @@ $syncBody64 = ''
 try { $syncBody64 = Get-FunctionBody $stateSrc64 'syncStateFromDom' } catch {}
 Check ([bool]($syncBody64 -match 'Math\.max\s*\(\s*1,\s*Math\.min\s*\(\s*10,' -or $syncBody64 -match 'Math\.Max\s*\(\s*1,\s*Math\.Min\s*\(\s*10,')) `
     'syncStateFromDom clamps SPECIAL reads to 1-10 (defense-in-depth: no save path leaks >10)'
+
+# ===========================================================
+# Suite 65 -- Blocking Update Modal (Phase 6 Task 2)
+# #updateModal replaces #updateBanner; full-screen blocking dialog;
+# focus trap, Esc blocked, fail-safe, &&controller regression guards.
+# 11 tests
+# ===========================================================
+Sep "Suite 65 -- Blocking Update Modal"
+$uiCoreSrc65 = Read-Src "js\ui-core.js"
+
+# 65.1  #updateModal exists in index.html (replaced #updateBanner)
+Check ([bool]($htmlSrc -match 'id="updateModal"')) `
+    'id="updateModal" exists in index.html (blocking modal replaced updateBanner)'
+
+# 65.2  #updateModal has role="dialog"
+Check ([bool]($htmlSrc -match '(?s)id="updateModal"[\s\S]{0,400}role="dialog"')) `
+    '#updateModal has role="dialog" (accessible dialog semantics)'
+
+# 65.3  #updateModal has aria-modal="true"
+Check ([bool]($htmlSrc -match '(?s)id="updateModal"[\s\S]{0,400}aria-modal="true"')) `
+    '#updateModal has aria-modal="true" (marks background inert for screen readers)'
+
+# 65.4  #updateModal has aria-labelledby
+Check ([bool]($htmlSrc -match '(?s)id="updateModal"[\s\S]{0,400}aria-labelledby')) `
+    '#updateModal has aria-labelledby attribute (screen-reader accessible label)'
+
+# 65.5-65.7: _triggerUpdate body checks
+$triggerBody65 = ''
+try { $triggerBody65 = Get-FunctionBody $htmlSrc '_triggerUpdate' } catch {}
+
+# 65.5  _triggerUpdate moves focus to reboot button
+Check ([bool]($triggerBody65 -match '\.focus\s*\(\s*\)')) `
+    '_triggerUpdate calls btn.focus() to move keyboard focus into the modal'
+
+# 65.6  _triggerUpdate traps Tab key (focus trap)
+Check ([bool]($triggerBody65 -match "e\.key\s*===\s*'Tab'") -and [bool]($triggerBody65 -match 'preventDefault')) `
+    "_triggerUpdate traps Tab key + preventDefault (focus trap -- single focusable)"
+
+# 65.7  _triggerUpdate blocks Escape (mandatory -- no dismiss path)
+Check ([bool]($triggerBody65 -match "e\.key\s*===\s*'Escape'") -and [bool]($triggerBody65 -match 'preventDefault')) `
+    "_triggerUpdate blocks Escape key + preventDefault (modal cannot be dismissed -- must reboot)"
+
+# 65.8  Case A call site still gates on navigator.serviceWorker.controller (boot-safety regression guard)
+Check ([bool]($htmlSrc -match 'reg\.waiting\s*&&\s*navigator\.serviceWorker\.controller')) `
+    'Case A: _triggerUpdate called only when reg.waiting && navigator.serviceWorker.controller (boot-safety guard intact)'
+
+# 65.9  Case B call site still gates on navigator.serviceWorker.controller
+Check ([bool]($htmlSrc -match "state\s*===\s*'installed'\s*&&\s*navigator\.serviceWorker\.controller")) `
+    "Case B: _triggerUpdate called only when state==='installed' && navigator.serviceWorker.controller (boot-safety guard intact)"
+
+# 65.10  _triggerUpdate has fail-safe: missing DOM -> auto SKIP_WAITING (no silent hang)
+Check ([bool]($triggerBody65 -match '!\s*modal\s*\|\|\s*!\s*btn') -and [bool]($triggerBody65 -match 'SKIP_WAITING')) `
+    '_triggerUpdate has !modal||!btn fail-safe that posts SKIP_WAITING (no silent hang if DOM missing)'
+
+# 65.11  Global ESC handler in ui-core.js targets sysModal only -- updateModal not wired to it
+Check (-not ($uiCoreSrc65 -match 'updateModal')) `
+    'ui-core.js ESC handler does not reference updateModal (updateModal manages its own Esc -- not caught by global handler)'
 
 # ===========================================================
 # Results
