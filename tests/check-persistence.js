@@ -6749,6 +6749,71 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 72 — Fix A: location datalist per-game bleed + Fix B: update-modal whitespace
+//  8 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 72 — Location datalist bleed fix + update-modal whitespace');
+  const htmlSrc72 = readFile('index.html');
+  const uiSavesSrc72 = readFile('js/ui-saves.js');
+  const uiCoreSrc72 = readFile('js/ui-core.js');
+  const cssSrc72 = readFile('css/terminal.css');
+
+  // 72.1  Static nv_locations datalist is gone from index.html
+  assert(
+    !/id="nv_locations"/.test(htmlSrc72),
+    'index.html: static id="nv_locations" datalist removed (was FNV-only, caused context bleed into FO3)'
+  );
+
+  // 72.2  #stat_loc now points to locationOptions
+  assert(
+    /id="stat_loc"[^>]*list="locationOptions"|list="locationOptions"[^>]*id="stat_loc"/.test(
+      htmlSrc72
+    ),
+    'index.html: #stat_loc input has list="locationOptions" (dynamic datalist)'
+  );
+
+  // 72.3  #locationOptions datalist exists and is empty in HTML
+  assert(
+    /<datalist\s[^>]*id="locationOptions"[^>]*>\s*<\/datalist>/.test(htmlSrc72),
+    'index.html: #locationOptions datalist exists and is empty (populated dynamically by initLocationDatalist)'
+  );
+
+  // 72.4  initLocationDatalist is defined in ui-saves.js, reads FALLOUT_REGISTRY.locations, uses escapeHtml
+  assert(
+    /function initLocationDatalist/.test(uiSavesSrc72) &&
+      /FALLOUT_REGISTRY\.locations/.test(uiSavesSrc72) &&
+      /escapeHtml/.test(uiSavesSrc72.slice(uiSavesSrc72.indexOf('function initLocationDatalist'))),
+    'ui-saves.js: initLocationDatalist() defined, reads FALLOUT_REGISTRY.locations, escapes output with escapeHtml'
+  );
+
+  // 72.5  initLocationDatalist is called in ui-core.js
+  assert(
+    /initLocationDatalist\s*\(\s*\)/.test(uiCoreSrc72),
+    'ui-core.js: initLocationDatalist() is called on load (alongside initAmmoDatalist)'
+  );
+
+  // 72.6  Bleed-class regression guard: no <datalist> in index.html has static <option> children
+  //       [^<]* stops at the first < after opening tag, so </datalist> blocks the match before any <option>
+  assert(
+    !/<datalist\b[^>]*>[^<]*<option/.test(htmlSrc72),
+    'index.html: no <datalist> contains static <option> children — all datalists are empty in HTML, populated dynamically'
+  );
+
+  // 72.7  #updateModalMsg has white-space:normal in terminal.css
+  assert(
+    /#updateModalMsg[\s\S]{0,200}white-space\s*:\s*normal/.test(cssSrc72),
+    'terminal.css: #updateModalMsg has white-space:normal (overrides inherited pre-wrap so message flows cleanly)'
+  );
+
+  // 72.8  #updateModalMsg content starts immediately after > with no leading whitespace in index.html
+  assert(
+    /id="updateModalMsg">[A-Z]/.test(htmlSrc72),
+    'index.html: #updateModalMsg content starts immediately after > with no leading whitespace or newline'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 console.log('\n══════════════════════════════════════════════════════════════\n');

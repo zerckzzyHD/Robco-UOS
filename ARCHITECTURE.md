@@ -1,7 +1,7 @@
 ﻿# RobCo U.O.S. — System Architecture
 
 > **Version:** 2.5.0
-> **Last Updated:** 2026-06-27
+> **Last Updated:** 2026-06-28
 > **Purpose:** Living reference for any engineer (human or AI) working on this project.
 > This document maps every system, its dependencies, its persistence contract, and the
 > historical lessons that shaped it.
@@ -60,8 +60,8 @@
 │   └── database.js     ~25KB CSV data (~170 weapons, ~68 armors, ~45 chems) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── check-persistence.ps1   28KB    868-test pre-commit audit
-│   ├── check-persistence.js    36KB    868-test Node runner (parity with .ps1)
+│   ├── check-persistence.ps1   28KB    876-test pre-commit audit
+│   ├── check-persistence.js    36KB    876-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -950,7 +950,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 868-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 876-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

@@ -178,6 +178,7 @@ window.onload = function () {
   startCrtHum();
   initRegistryAutocomplete();
   initAmmoDatalist();
+  initLocationDatalist();
 
   // H1: Rotary Dial Click — fire on any <details> panel toggle inside uiPanel
   const _uiPanel = document.getElementById('uiPanel');

@@ -971,7 +971,7 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
 Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-69)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
@@ -4077,6 +4077,53 @@ $collectiblesMatch71 = [regex]::Match($uiRenderSrc71, '(?s)function renderCollec
 if ($collectiblesMatch71.Success) { $collectiblesBody71 = $collectiblesMatch71.Groups[1].Value }
 Check ($collectiblesBody71 -match 'collectiblesSubPanel' -and ($collectiblesBody71 -match 'summaryH3|querySelector.*h3')) `
     'renderCollectibles() updates #collectiblesSubPanel summary h3 with game-specific label and count'
+
+# ===========================================================
+# Suite 72 -- Fix A: location datalist per-game bleed + Fix B: update-modal whitespace
+# 8 tests
+# ===========================================================
+$htmlSrc72  = Get-Content "$ROOT\index.html"      -Raw
+$uiSavesSrc72 = Get-Content "$ROOT\js\ui-saves.js" -Raw
+$uiCoreSrc72  = Get-Content "$ROOT\js\ui-core.js"  -Raw
+$cssSrc72     = Get-Content "$ROOT\css\terminal.css" -Raw
+
+Sep "Suite 72 -- Location datalist bleed fix + update-modal whitespace"
+
+# 72.1  Static nv_locations datalist is gone from index.html
+Check (-not ($htmlSrc72 -match 'id="nv_locations"')) `
+    'index.html: static id="nv_locations" datalist removed (was FNV-only, caused context bleed into FO3)'
+
+# 72.2  #stat_loc now points to locationOptions
+Check ([bool]($htmlSrc72 -match 'id="stat_loc"[^>]*list="locationOptions"|list="locationOptions"[^>]*id="stat_loc"')) `
+    'index.html: #stat_loc input has list="locationOptions" (dynamic datalist)'
+
+# 72.3  #locationOptions datalist exists and is empty in HTML
+Check ([bool]($htmlSrc72 -match '(?s)<datalist\s[^>]*id="locationOptions"[^>]*>\s*</datalist>')) `
+    'index.html: #locationOptions datalist exists and is empty (populated dynamically by initLocationDatalist)'
+
+# 72.4  initLocationDatalist defined in ui-saves.js, reads FALLOUT_REGISTRY.locations, uses escapeHtml
+$initLocIdx72 = $uiSavesSrc72.IndexOf('function initLocationDatalist')
+Check ($uiSavesSrc72 -match 'function initLocationDatalist' -and `
+      $uiSavesSrc72 -match 'FALLOUT_REGISTRY\.locations' -and `
+      ($initLocIdx72 -ge 0 -and $uiSavesSrc72.Substring($initLocIdx72) -match 'escapeHtml')) `
+    'ui-saves.js: initLocationDatalist() defined, reads FALLOUT_REGISTRY.locations, escapes output with escapeHtml'
+
+# 72.5  initLocationDatalist is called in ui-core.js
+Check ([bool]($uiCoreSrc72 -match 'initLocationDatalist\s*\(\s*\)')) `
+    'ui-core.js: initLocationDatalist() is called on load (alongside initAmmoDatalist)'
+
+# 72.6  Bleed-class regression guard: no <datalist> has static <option> children
+# [^<]* stops at the first < after opening tag so </datalist> blocks the match before any <option>
+Check (-not ($htmlSrc72 -match '<datalist\b[^>]*>[^<]*<option')) `
+    'index.html: no <datalist> contains static <option> children -- all datalists empty in HTML, populated dynamically'
+
+# 72.7  #updateModalMsg has white-space:normal in terminal.css
+Check ([bool]($cssSrc72 -match '(?s)#updateModalMsg[\s\S]{0,200}white-space\s*:\s*normal')) `
+    'terminal.css: #updateModalMsg has white-space:normal (overrides inherited pre-wrap so message flows cleanly)'
+
+# 72.8  #updateModalMsg content starts immediately after > with no leading whitespace
+Check ([bool]($htmlSrc72 -match 'id="updateModalMsg">[A-Z]')) `
+    'index.html: #updateModalMsg content starts immediately after > with no leading whitespace or newline'
 
 # ===========================================================
 # Results

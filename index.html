@@ -69,10 +69,8 @@
     >
       <div class="modal-box">
         <div class="modal-title" id="updateModalTitle">&gt; &#x26A0; TERMINAL UPDATE REQUIRED</div>
-        <div class="modal-content" id="updateModalMsg">
-          A new version of RobCo U.O.S. is ready. Reboot to load it &mdash; the terminal must update
-          to continue.
-        </div>
+        <!-- prettier-ignore -->
+        <div class="modal-content" id="updateModalMsg">A new version of RobCo U.O.S. is ready. Reboot to load it &mdash; the terminal must update to continue.</div>
         <button id="updateRebootBtn" class="blue-btn">&gt; REBOOT TERMINAL</button>
       </div>
     </div>
@@ -359,26 +357,9 @@
                 oninput="updateMath()"
                 onchange="onLocationChange()"
                 style="width: 100px"
-                list="nv_locations"
+                list="locationOptions"
               />
-              <datalist id="nv_locations">
-                <option value="goodsprings">Goodsprings</option>
-                <option value="mojave_outpost">Mojave Outpost</option>
-                <option value="primm">Primm</option>
-                <option value="nipton">Nipton</option>
-                <option value="novac">Novac</option>
-                <option value="boulder_city">Boulder City</option>
-                <option value="freeside">Freeside</option>
-                <option value="the_strip">The Strip</option>
-                <option value="hidden_valley">Hidden Valley</option>
-                <option value="nellis_afb">Nellis AFB</option>
-                <option value="camp_mccarran">Camp McCarran</option>
-                <option value="hoover_dam">Hoover Dam</option>
-                <option value="the_fort">The Fort</option>
-                <option value="jacobstown">Jacobstown</option>
-                <option value="black_mountain">Black Mountain</option>
-                <option value="repconn_hq">REPCONN HQ</option>
-              </datalist>
+              <datalist id="locationOptions"></datalist>
             </div>
             <div class="input-group">
               <label>DATE:</label>

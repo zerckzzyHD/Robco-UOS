@@ -559,3 +559,16 @@ function initAmmoDatalist() {
   const calibers = getAmmoCalibers();
   dl.innerHTML = calibers.map(c => `<option value="${c}"></option>`).join('');
 }
+
+// ── LOCATION DATALIST ──────────────────────────────────────────────────────
+// Populates the #locationOptions <datalist> from the active game's registry.
+// Called once on window.onload — game context switch triggers a full reload
+// which re-runs this against the freshly loaded FALLOUT_REGISTRY.
+function initLocationDatalist() {
+  const dl = document.getElementById('locationOptions');
+  if (!dl || typeof FALLOUT_REGISTRY === 'undefined' || !Array.isArray(FALLOUT_REGISTRY.locations))
+    return;
+  dl.innerHTML = FALLOUT_REGISTRY.locations
+    .map(l => `<option value="${escapeHtml(l.name)}"></option>`)
+    .join('');
+}

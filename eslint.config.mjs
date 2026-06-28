@@ -175,6 +175,7 @@ export default [
         addAmmo: 'readonly',
         removeAmmo: 'readonly',
         initAmmoDatalist: 'readonly',
+        initLocationDatalist: 'readonly',
         // Fallout Data Registry (js/reg_nv.js or js/reg_fo3.js)
         FALLOUT_REGISTRY: 'readonly',
         registrySearch: 'readonly',
