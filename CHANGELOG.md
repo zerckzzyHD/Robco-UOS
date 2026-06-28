@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1038/1038 | Cache: robco-terminal-v2.5.0-r33 -->
+﻿## [Unreleased]<!-- Tests: 1044/1044 | Cache: robco-terminal-v2.5.0-r34 -->
 
 ### Added
 
@@ -69,7 +69,8 @@
 - The location autocomplete in the Stats panel now shows places from the active game. Previously the list was hard-coded to 16 New Vegas locations and always showed up in Fallout 3 campaigns, making it useless and misleading. The list is now built dynamically from the active registry so FO3 shows Fallout 3 locations and FNV shows New Vegas locations.
 - The update prompt's message text now reads flush-left with no stray indentation. The message was split across multiple source lines with leading whitespace, which was rendering as visible indentation and a ragged break mid-sentence; it is now a single clean line that wraps naturally.
 - Selecting a third trait is now blocked with a clear message ("Maximum 2 traits â€” deselect one first") instead of silently allowing it. Deselecting always works regardless of count.
-- The PWA home-screen shortcut icons (Comm-Link, Inventory, Stats, New Campaign) now fill the tile edge-to-edge with no gray ring on Android and iOS home screens.
+- The PWA home-screen shortcut icons (Comm-Link, Inventory, Stats, New Campaign) now fill the tile edge-to-edge with no gray ring on Android and iOS home screens. The icons are now marked maskable in the app manifest, so Android uses them as full-bleed adaptive icons and applies the dark green background instead of a gray plate.
+- The OPTICS label in the Security & Configuration panel no longer wraps onto a second line on desktop. The label now stays on one line next to the color selector at all viewport widths.
 - Switching the game from New Vegas to Fallout 3 (or back) now correctly sticks after reloading. Previously the choice was silently reverted on every reload because the in-memory game context was never updated before the page saved its state â€” causing the old game to overwrite the new choice on the way out.
 - The Bobbleheads and Snow Globes headers no longer appear twice. The collapsible sub-panel header is now the only title; the duplicate bold header that was rendered inside the content area has been removed.
 - Clicking a missing Lincoln memorabilia item no longer shows a "SYSTEM FAULT" error in the terminal. Items with apostrophes in their names (Lincoln's Repeater, Lincoln's Hat, Lincoln's Voice, Lincoln's Diary) were causing a JavaScript error when clicked because the name was embedded directly in the click handler. Names are now passed safely via a data attribute.

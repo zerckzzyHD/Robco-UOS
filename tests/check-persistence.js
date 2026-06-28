@@ -1633,17 +1633,18 @@ header('Meta / Runner Parity');
     'Suite 83',
     'Suite 84',
     'Suite 85',
+    'Suite 86',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-85)' +
+    'JS runner contains all gate-guard suites (22-41, 49-86)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-85)' +
+    'PS runner contains all gate-guard suites (22-41, 49-86)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -8439,6 +8440,42 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   assert(
     /id="skillBooksDisplay"/.test(htmlSource),
     'index.html has #skillBooksDisplay container (Protocol 5 panel element)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+// Suite 86 — Maskable shortcut icons + OPTICS label wrap (6 tests)
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 86 — Maskable shortcut icons + OPTICS label wrap');
+
+  const manifest86 = JSON.parse(readFile('manifest.json'));
+  const shortcuts86 = manifest86.shortcuts || [];
+  const shortcutNames86 = ['Comm-Link', 'Inventory', 'Stats', 'New Campaign'];
+
+  // 86.1-86.4  Each shortcut icon has purpose containing 'maskable'
+  shortcutNames86.forEach((name, idx) => {
+    const sc = shortcuts86[idx];
+    const icons = (sc && sc.icons) || [];
+    const purpose = (icons[0] && icons[0].purpose) || '';
+    assert(
+      purpose.includes('maskable'),
+      'manifest.json shortcut "' +
+        name +
+        '" icon has purpose containing "maskable" (Android gray-plate fix)'
+    );
+  });
+
+  // 86.5  terminal.css .optics-label has white-space: nowrap
+  assert(
+    /\.optics-label[\s\S]{0,120}white-space\s*:\s*nowrap/.test(cssSource),
+    'terminal.css .optics-label has white-space: nowrap (desktop OPTICS label wrap fix)'
+  );
+
+  // 86.6  index.html OPTICS label has class="optics-label" (Protocol 20 static guard)
+  assert(
+    /class="optics-label"[^>]*>OPTICS:/.test(htmlSource),
+    'index.html OPTICS label has class="optics-label" (Protocol 20 static guard)'
   );
 }
 

@@ -148,6 +148,9 @@ body {
   justify-content: space-between;
   align-items: center;
 }
+.optics-label {
+  white-space: nowrap;
+}
 .special-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
