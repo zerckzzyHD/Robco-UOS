@@ -1619,17 +1619,19 @@ header('Meta / Runner Parity');
     'Suite 69',
     'Suite 70',
     'Suite 71',
+    'Suite 72',
+    'Suite 73',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-71)' +
+    'JS runner contains all gate-guard suites (22-41, 49-73)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-71)' +
+    'PS runner contains all gate-guard suites (22-41, 49-73)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
