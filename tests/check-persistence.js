@@ -1627,17 +1627,18 @@ header('Meta / Runner Parity');
     'Suite 77',
     'Suite 78',
     'Suite 79',
+    'Suite 80',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-79)' +
+    'JS runner contains all gate-guard suites (22-41, 49-80)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-79)' +
+    'PS runner contains all gate-guard suites (22-41, 49-80)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -7581,6 +7582,62 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   assert(
     /name:\s*'Georgetown West'/.test(locBlock79),
     "FO3 locations contains 'Georgetown West' (typo fixed)"
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 80 — [CHEMS.CSV] consumables expansion (40 → 76)
+//  9 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 80 — [CHEMS.CSV] consumables expansion (40 → 76)');
+  const nvSrc80 = readFile('js/db_nv.js');
+  const cStart80 = nvSrc80.indexOf('[CHEMS.CSV]');
+  const cEnd80 = nvSrc80.indexOf('\n[', cStart80 + 1);
+  const cBlock80 = nvSrc80.slice(cStart80, cEnd80 === -1 ? undefined : cEnd80);
+  const cLines80 = cBlock80.split('\n').filter(l => l.trim() && !l.startsWith('['));
+  const cData80 = cLines80.slice(1); // skip header row
+
+  // 80.a  exactly 76 data rows
+  assert(cData80.length === 76, `[CHEMS.CSV] has exactly 76 data rows (got ${cData80.length})`);
+
+  // 80.b  every row has exactly 8 comma-separated fields (stray-comma guard)
+  const badFields80 = cData80.filter(r => r.split(',').length !== 8);
+  assert(
+    badFields80.length === 0,
+    `All CHEMS rows have exactly 8 comma-separated fields — bad: ${badFields80.join(' | ') || 'none'}`
+  );
+
+  // 80.c  sentinel names present
+  const cNames80 = cData80.map(r => r.split(',')[0].trim());
+  assert(cNames80.includes('Cram'), "CHEMS contains 'Cram'");
+  assert(cNames80.includes('Sunset Sarsaparilla'), "CHEMS contains 'Sunset Sarsaparilla'");
+  assert(cNames80.includes('Rebound'), "CHEMS contains 'Rebound'");
+  assert(cNames80.includes('Wasteland Omelet'), "CHEMS contains 'Wasteland Omelet'");
+  assert(cNames80.includes('Sierra Madre Martini'), "CHEMS contains 'Sierra Madre Martini'");
+
+  // 80.d  lookupItemInDb column-mapping spot-checks
+  //   CHEMS columns: Name(0), Effect(1), Duration(2), Addiction_Risk(3),
+  //                  Addiction_Debuff(4), Chem_Family(5), Value(6), Weight(7)
+  const chemsMap80 = cData80.reduce((m, row) => {
+    const cols = row.split(',');
+    if (cols.length >= 8)
+      m.set(cols[0].trim().toLowerCase(), {
+        wgt: parseFloat(cols[7]) || 0,
+        val: parseFloat(cols[6]) || 0,
+        type: 'aid',
+      });
+    return m;
+  }, new Map());
+  const ss80 = chemsMap80.get('sunset sarsaparilla');
+  assert(
+    ss80 && ss80.val === 3 && ss80.wgt === 1 && ss80.type === 'aid',
+    `lookupItemInDb('Sunset Sarsaparilla') → wgt=1/val=3/type='aid' (got ${JSON.stringify(ss80)})`
+  );
+  const mre80 = chemsMap80.get('mre');
+  assert(
+    mre80 && mre80.val === 50 && mre80.wgt === 0.2 && mre80.type === 'aid',
+    `lookupItemInDb('MRE') → wgt=0.2/val=50/type='aid' (got ${JSON.stringify(mre80)})`
   );
 }
 

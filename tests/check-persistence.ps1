@@ -971,11 +971,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-79)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-79)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-80)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-80)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -4585,6 +4585,48 @@ Check (-not ($locBlock79 -match "name:\s*'Georgtown West'")) "FO3 locations has 
 
 # 79.10  corrected spelling present
 Check ([bool]($locBlock79 -match "name:\s*'Georgetown West'")) "FO3 locations contains 'Georgetown West' (typo fixed)"
+
+# ===========================================================
+# Suite 80 -- [CHEMS.CSV] consumables expansion (40 -> 76)
+# 9 tests
+# ===========================================================
+Sep "Suite 80 -- [CHEMS.CSV] consumables expansion (40 -> 76)"
+$nvSrc80 = Read-Src "js\db_nv.js"
+$cStart80 = $nvSrc80.IndexOf('[CHEMS.CSV]')
+$cEnd80 = $nvSrc80.IndexOf("`n[", $cStart80 + 1)
+$cBlock80 = if ($cEnd80 -ge 0) { $nvSrc80.Substring($cStart80, $cEnd80 - $cStart80) } else { $nvSrc80.Substring($cStart80) }
+$cLines80 = $cBlock80 -split "`n" | Where-Object { $_.Trim() -ne '' -and -not $_.StartsWith('[') }
+$cData80 = $cLines80 | Select-Object -Skip 1
+
+# 80.a  exactly 76 data rows
+Check ($cData80.Count -eq 76) ("CHEMS.CSV has exactly 76 data rows (got " + $cData80.Count + ")")
+
+# 80.b  every row has exactly 8 fields (stray-comma guard)
+$badFields80 = @($cData80 | Where-Object { ($_ -split ',').Count -ne 8 })
+Check ($badFields80.Count -eq 0) ("All CHEMS rows have exactly 8 comma-separated fields" + $(if ($badFields80.Count) { " -- bad: " + ($badFields80 -join " | ") } else { "" }))
+
+# 80.c  sentinel names present
+$cNames80 = @($cData80 | ForEach-Object { ($_ -split ',')[0].Trim() })
+Check ($cNames80 -contains 'Cram') "CHEMS contains 'Cram'"
+Check ($cNames80 -contains 'Sunset Sarsaparilla') "CHEMS contains 'Sunset Sarsaparilla'"
+Check ($cNames80 -contains 'Rebound') "CHEMS contains 'Rebound'"
+Check ($cNames80 -contains 'Wasteland Omelet') "CHEMS contains 'Wasteland Omelet'"
+Check ($cNames80 -contains 'Sierra Madre Martini') "CHEMS contains 'Sierra Madre Martini'"
+
+# 80.d  lookupItemInDb column-mapping spot-checks
+#   CHEMS columns: Name(0) Effect(1) Duration(2) Addiction_Risk(3)
+#                  Addiction_Debuff(4) Chem_Family(5) Value(6) Weight(7)
+$ss80Row = $cData80 | Where-Object { ($_ -split ',')[0].Trim() -eq 'Sunset Sarsaparilla' } | Select-Object -First 1
+$ss80Cols = if ($ss80Row) { $ss80Row -split ',' } else { @() }
+$ssSatisfied = ($null -ne $ss80Row) -and ($ss80Cols.Count -ge 8) -and `
+    ([Math]::Abs([double]$ss80Cols[6] - 3) -lt 0.001) -and ([Math]::Abs([double]$ss80Cols[7] - 1) -lt 0.001)
+Check $ssSatisfied "lookupItemInDb('Sunset Sarsaparilla') -> wgt=1/val=3/type='aid'"
+
+$mre80Row = $cData80 | Where-Object { ($_ -split ',')[0].Trim() -eq 'MRE' } | Select-Object -First 1
+$mre80Cols = if ($mre80Row) { $mre80Row -split ',' } else { @() }
+$mreSatisfied = ($null -ne $mre80Row) -and ($mre80Cols.Count -ge 8) -and `
+    ([Math]::Abs([double]$mre80Cols[6] - 50) -lt 0.001) -and ([Math]::Abs([double]$mre80Cols[7] - 0.2) -lt 0.001)
+Check $mreSatisfied "lookupItemInDb('MRE') -> wgt=0.2/val=50/type='aid'"
 
 # ===========================================================
 # Results

@@ -473,6 +473,42 @@ Absinthe,+1 STR / +1 CHR / -1 INT,4m,10%,-1 CHR,Alcohol,15,0.5
 Moonshine,+2 STR / -2 INT,4m,10%,-2 CHR,Alcohol,10,0.5
 Gecko Steak,Restore 50 HP,0,0%,None,Food,15,1.0
 Brahmin Steak,Restore 50 HP,0,0%,None,Food,15,1.0
+Cram,Restore 15 HP,0,0%,None,Food,5,1
+InstaMash,Restore 15 HP,0,0%,None,Food,5,1
+Fancy Lads Snack Cakes,Restore 15 HP,0,0%,None,Food,5,1
+Dandy Boy Apples,Restore 15 HP,0,0%,None,Food,5,1
+YumYum Deviled Eggs,Restore 15 HP,0,0%,None,Food,5,1
+Salisbury Steak,Restore 20 HP,0,0%,None,Food,5,1
+Pre-War Steak,Restore 20 HP,0,0%,None,Food,5,1
+MRE,Restore 30 HP,0,0%,None,Food,50,0.2
+Junk Food,Restore 10 HP,0,0%,None,Food,5,1
+Bighorner Steak,+2 HP/s for 10s,0,0%,None,Food,5,0.8
+Iguana on a Stick,+1 HP/s for 12s,0,0%,None,Food,5,1
+Trail Mix,+5 HP/s for 15s / +5 Max AP,0,0%,None,Food,5,3
+Mole Rat Wonder Meat,Restore HP / +RAD,0,0%,None,Food,20,1
+Wasteland Omelet,Restore HP / +Max HP,0,0%,None,Food,100,1
+Cook-Cook's Fiend Stew,Restore HP / +STR,0,0%,None,Food,25,1
+Caravan Lunch,Restore HP,0,0%,None,Food,5,2.5
+Brahmin Wellington,Restore HP,0,0%,None,Food,5,0.8
+Desert Salad,Restore HP,0,0%,None,Food,5,0.2
+Grilled Mantis,Restore HP,0,0%,None,Food,8,1
+Banana Yucca Fruit,Restore 5 HP,0,0%,None,Food,6,0.5
+Barrel Cactus Fruit,Restore 5 HP,0,0%,None,Food,5,0.2
+Pinyon Nuts,Restore HP,0,0%,None,Food,5,0.03
+Broc Flower,Stimpak crafting ingredient,0,0%,None,Food,3,0.01
+Xander Root,Stimpak crafting ingredient,0,0%,None,Food,0,0.02
+Nightstalker Tail,Antivenom crafting ingredient,0,0%,None,Food,18,1
+Sunset Sarsaparilla,Restore 20 HP,0,0%,None,Food,3,1
+Nuka-Cola Victory,Restore HP / +AP,0,0%,None,Food,75,1
+Nuka-Cola Quantum,Restore HP / +Max AP,0,0%,None,Food,30,1
+Whiskey,+1 STR / +1 CHR / -1 INT,4m,10%,-1 CHR,Alcohol,10,1
+Rum & Nuka,+1 STR / +1 CHR / -1 INT,4m,10%,-1 CHR,Alcohol,20,1
+Wasteland Tequila,+1 STR / +1 CHR / -1 INT,4m,10%,-1 CHR,Alcohol,20,1
+Sierra Madre Martini,+2 STR / Restore HP,2m,10%,-1 END,Alcohol,20,0
+Battle Brew,Buffout + alcohol effects,4m,15%,-1 END,Alcohol,150,1
+Rebound,+AP regeneration,2m,15%,-1 PER,Rebound,20,0
+Sacred Datura Root,Chem crafting ingredient,0,0%,None,Medicine,10,0.02
+Ant Queen Pheromones,+25% companion DMG,5m,0%,None,Medicine,75,1
 
 [MISC.CSV]
 Name,Weight,Value,Category

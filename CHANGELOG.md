@@ -1,6 +1,8 @@
-﻿## [Unreleased]<!-- Tests: 950/950 | Cache: robco-terminal-v2.5.0-r26 -->
+﻿## [Unreleased]<!-- Tests: 959/959 | Cache: robco-terminal-v2.5.0-r27 -->
 
 ### Added
+
+- **Expanded New Vegas consumable reference data from 40 to 76 items** — the AI's consumable directory now covers pre-war food and snacks (Cram, InstaMash, Fancy Lads Snack Cakes, Dandy Boy Apples, YumYum Deviled Eggs, Salisbury Steak, MRE), Mojave wild food (Bighorner Steak, Iguana on a Stick, Gecko Steak, Trail Mix, Brahmin Wellington, Grilled Mantis), forageable plants (Banana Yucca Fruit, Barrel Cactus Fruit, Pinyon Nuts, Broc Flower, Xander Root, Nightstalker Tail), expanded Nuka-Cola and soda varieties (Sunset Sarsaparilla, Nuka-Cola Victory, Nuka-Cola Quantum), expanded alcohol (Whiskey, Rum & Nuka, Wasteland Tequila), DLC consumables (Sierra Madre Martini, Battle Brew, Rebound), and crafting ingredients (Sacred Datura Root, Ant Queen Pheromones). All weights and values sourced from the Fallout wiki.
 
 - **Expanded Fallout 3 location autocomplete from 57 to 90 locations** — the location name field now suggests 33 additional Fallout 3 sites, including settlements (Andale, Girdershade, Republic of Dave, Temple of the Union), DC metro stops and neighborhoods (Farragut West, Anacostia Crossing, Metro Central, L'Enfant Plaza, Vernon Square, Dupont Circle), factories and bases (RobCo Facility, Red Racer Factory, Wheaton Armory, Fort Bannister, National Guard Depot), landmarks (Old Olney, Deathclaw Sanctuary, Bethesda Ruins, The Statesman Hotel, Our Lady of Hope Hospital), and all four DLC worldspaces (The Pitt, Point Lookout, Mothership Zeta, Adams Air Force Base). All names sourced from the Fallout wiki.
 
