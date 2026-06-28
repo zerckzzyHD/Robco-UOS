@@ -1259,7 +1259,16 @@ function updateKarmaUI() {
   document.getElementById('karma_label').innerText = label;
 }
 
+function seedNewCampaignInventory(ctx) {
+  if (ctx !== 'FNV') return;
+  if ((state.inventory || []).length !== 0) return;
+  if ((state.ticks || 0) !== 0) return;
+  state.inventory = state.inventory || [];
+  state.inventory.push({ name: 'Vault 13 Canteen', qty: 1, wgt: 1, val: 2, type: 'aid' });
+}
+
 function loadUI() {
+  seedNewCampaignInventory(state.gameContext);
   document.getElementById('stat_lvl').value = state.lvl;
   document.getElementById('stat_xp').value = state.xp;
   document.getElementById('stat_hp_cur').value = state.hpCur;

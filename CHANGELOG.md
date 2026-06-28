@@ -1,4 +1,4 @@
-## [Unreleased]<!-- Tests: 836/836 | Cache: robco-terminal-v2.5.0-r14 -->
+## [Unreleased]<!-- Tests: 850/850 | Cache: robco-terminal-v2.5.0-r15 -->
 
 ### Added
 
@@ -7,6 +7,10 @@
 - **FNV Traits tracker** — new Traits panel (New Vegas campaigns only, FO3 has no traits) showing all 16 traits with their benefit and penalty. Mark which traits your Courier took at character creation; the panel shows how many are selected out of the usual limit of 2 and gently flags it if you go over (Old World Blues allows re-selecting traits, so going beyond 2 is allowed). Traits are tracked separately from Perks and can be filtered by name.
 
 - **FO3 Lincoln Memorabilia tracker** — in the Collectibles panel (FO3 campaigns only), track each of the 9 Head-of-State artifacts: mark items found, then record who you gave them to — Hannibal Hamlin (to free the slaves, Temple of the Union), Leroy Walker (Lincoln Memorial), Abraham Washington (Rivet City Capitol Preservation Society), or Other. A tally shows how many went to each buyer. Location hints appear for missing items.
+
+- **FNV unique apparel catalog expanded** — added 41 new entries to the New Vegas armor/apparel database, covering unique headwear (Motor-Runner's Helmet, Salt-Upon-Wounds' Helmet, all four Marked Beast helmets, Lucky Shades, Ulysses' Mask, and more), NPC outfits (Vera's Outfit, Dean's Tuxedo, Naughty Nightwear, Father Elijah's Robes, Followers Lab Coat, and more), and DLC armor (Christine's COS Recon Armor, Courier Duster, Ulysses' Duster, Armor of the 87th Tribe). Three specifically requested items were included: Benny's Suit (Barter +5 / Speech +5), Suave Gambler Hat (Perception +1), and the Vault 13 Canteen. All stats sourced from the Fallout wiki.
+
+- **Vault 13 Canteen auto-seeded on new FNV campaigns** — when you start a brand-new Fallout: New Vegas campaign the Vault 13 Canteen is placed in your inventory automatically. It never appears in Fallout 3 saves, never duplicates if you reload, and never fires for an existing save that already has progress.
 
 ### Changed
 

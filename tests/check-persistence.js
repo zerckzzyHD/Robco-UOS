@@ -1617,17 +1617,18 @@ header('Meta / Runner Parity');
     'Suite 67',
     'Suite 68',
     'Suite 69',
+    'Suite 70',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-69)' +
+    'JS runner contains all gate-guard suites (22-41, 49-70)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-69)' +
+    'PS runner contains all gate-guard suites (22-41, 49-70)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -6397,6 +6398,193 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     assert(
       /_contextSwitching/.test(saveBody) && /return/.test(saveBody),
       'saveState() debounced setTimeout body early-exits when window._contextSwitching is set — prevents pending debounce from clobbering the FO3 write (regression guard)'
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 70 — FNV unique apparel sweep + Vault 13 Canteen
+//  (Phase 6 Task 7 chunk 1)
+//  Guards: ARMOR.CSV floor count, named mandated items,
+//  no-duplicate, column-count, DB↔registry parity for new
+//  apparel, Vault 13 Canteen in MISC + registry,
+//  seedNewCampaignInventory definition + guards.
+//  14 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 70 — FNV unique apparel + Vault 13 Canteen');
+  const dbNv70 = readFile('js/db_nv.js');
+  const regNv70 = readFile('js/reg_nv.js');
+  const uiCore70 = readFile('js/ui-core.js');
+
+  // Helper: extract ARMOR.CSV data rows (excluding header)
+  function getArmorRows70(src) {
+    const block = src.match(/\[ARMOR\.CSV\]([\s\S]*?)(?=\n\[|\n`;)/);
+    if (!block) return [];
+    return block[1]
+      .split('\n')
+      .map(l => l.trim())
+      .filter(l => l && !l.startsWith('Name,') && !l.startsWith('['));
+  }
+
+  // Helper: extract armor names from ARMOR.CSV
+  function getArmorNames70(src) {
+    return getArmorRows70(src).map(l => l.split(',')[0].trim());
+  }
+
+  // Helper: extract MISC.CSV data rows
+  function getMiscRows70(src) {
+    const block = src.match(/\[MISC\.CSV\]([\s\S]*?)(?=\n\[|\n`;)/);
+    if (!block) return [];
+    return block[1]
+      .split('\n')
+      .map(l => l.trim())
+      .filter(l => l && !l.startsWith('Name,') && !l.startsWith('['));
+  }
+
+  // Helper: extract names from registry by type
+  function getRegNamesByType70(src, type) {
+    const names = new Set();
+    const re = new RegExp(
+      `\\{\\s*name\\s*:\\s*(?:'([^']*)'|"([^"]*)")\\s*,\\s*type\\s*:\\s*'${type}'\\s*\\}`,
+      'g'
+    );
+    let m;
+    while ((m = re.exec(src)) !== null) names.add(m[1] !== undefined ? m[1] : m[2]);
+    return names;
+  }
+
+  // 70.1  ARMOR.CSV row count ≥ 103 (62 original + 41 new unique apparel)
+  const armorRows70 = getArmorRows70(dbNv70);
+  assert(
+    armorRows70.length >= 103,
+    `ARMOR.CSV has ≥ 103 entries (found ${armorRows70.length}) — floor guard after unique apparel sweep`
+  );
+
+  // 70.2  MISC.CSV has Vault 13 Canteen
+  const miscRows70 = getMiscRows70(dbNv70);
+  assert(
+    miscRows70.some(r => r.split(',')[0].trim() === 'Vault 13 Canteen'),
+    'MISC.CSV contains "Vault 13 Canteen" row'
+  );
+
+  // 70.3  Benny's Suit in ARMOR.CSV (mandated section A)
+  const armorNames70 = getArmorNames70(dbNv70);
+  assert(
+    armorNames70.includes("Benny's Suit"),
+    '"Benny\'s Suit" is in ARMOR.CSV (mandated, sourced from fallout.wiki)'
+  );
+
+  // 70.4  Suave Gambler Hat in ARMOR.CSV (mandated section A)
+  assert(
+    armorNames70.includes('Suave Gambler Hat'),
+    '"Suave Gambler Hat" is in ARMOR.CSV (mandated, sourced from fallout.wiki)'
+  );
+
+  // 70.5  No duplicate names in ARMOR.CSV
+  {
+    const seen70 = new Set();
+    const dupes70 = armorNames70.filter(n => {
+      const dup = seen70.has(n);
+      seen70.add(n);
+      return dup;
+    });
+    assert(
+      dupes70.length === 0,
+      `No duplicate names in ARMOR.CSV — dupes: ${dupes70.join(', ') || 'none'}`
+    );
+  }
+
+  // 70.6  No duplicate names in MISC.CSV
+  {
+    const miscNames70 = miscRows70.map(r => r.split(',')[0].trim());
+    const seenM70 = new Set();
+    const dupesM70 = miscNames70.filter(n => {
+      const dup = seenM70.has(n);
+      seenM70.add(n);
+      return dup;
+    });
+    assert(
+      dupesM70.length === 0,
+      `No duplicate names in MISC.CSV — dupes: ${dupesM70.join(', ') || 'none'}`
+    );
+  }
+
+  // 70.7  ARMOR.CSV all data rows have exactly 7 columns (Name,Type,DT,Weight,Value,Effects,Min_CND_Threshold)
+  {
+    const EXPECTED_ARMOR_COLS = 7;
+    const badArmorRows70 = armorRows70.filter(r => r.split(',').length !== EXPECTED_ARMOR_COLS);
+    assert(
+      badArmorRows70.length === 0,
+      `ARMOR.CSV all data rows have ${EXPECTED_ARMOR_COLS} columns` +
+        (badArmorRows70.length
+          ? ` — bad: ${badArmorRows70
+              .slice(0, 3)
+              .map(r => r.slice(0, 50))
+              .join('; ')}`
+          : '')
+    );
+  }
+
+  // 70.8  Benny's Suit in registry as type:'armor'
+  const regArmorNames70 = getRegNamesByType70(regNv70, 'armor');
+  assert(
+    regArmorNames70.has("Benny's Suit"),
+    '"Benny\'s Suit" in FALLOUT_REGISTRY.items as type:"armor"'
+  );
+
+  // 70.9  Suave Gambler Hat in registry as type:'armor'
+  assert(
+    regArmorNames70.has('Suave Gambler Hat'),
+    '"Suave Gambler Hat" in FALLOUT_REGISTRY.items as type:"armor"'
+  );
+
+  // 70.10  Vault 13 Canteen in registry as type:'aid'
+  const regAidNames70 = getRegNamesByType70(regNv70, 'aid');
+  assert(
+    regAidNames70.has('Vault 13 Canteen'),
+    '"Vault 13 Canteen" in FALLOUT_REGISTRY.items as type:"aid"'
+  );
+
+  // 70.11  seedNewCampaignInventory function is defined in ui-core.js
+  assert(
+    /function\s+seedNewCampaignInventory\s*\(/.test(uiCore70),
+    'seedNewCampaignInventory() is defined in ui-core.js'
+  );
+
+  // 70.12  FNV guard: function returns early if ctx !== 'FNV'
+  {
+    let seedBody70 = '';
+    try {
+      seedBody70 = extractFunctionBody(uiCore70, 'seedNewCampaignInventory');
+    } catch (_) {}
+    assert(
+      /ctx\s*!==\s*['"]FNV['"]/.test(seedBody70),
+      'seedNewCampaignInventory() has FNV guard (ctx !== "FNV") — prevents canteen leaking to FO3'
+    );
+  }
+
+  // 70.13  Empty-inventory guard
+  {
+    let seedBody70 = '';
+    try {
+      seedBody70 = extractFunctionBody(uiCore70, 'seedNewCampaignInventory');
+    } catch (_) {}
+    assert(
+      /inventory/.test(seedBody70) && /length/.test(seedBody70),
+      'seedNewCampaignInventory() checks inventory.length — prevents duplicate seed'
+    );
+  }
+
+  // 70.14  New-campaign guard (ticks === 0) — prevents seeding on save-load of played campaign
+  {
+    let seedBody70 = '';
+    try {
+      seedBody70 = extractFunctionBody(uiCore70, 'seedNewCampaignInventory');
+    } catch (_) {}
+    assert(
+      /ticks/.test(seedBody70),
+      'seedNewCampaignInventory() checks ticks — prevents seeding on reload of played campaign'
     );
   }
 }

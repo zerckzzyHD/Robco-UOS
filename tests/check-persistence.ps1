@@ -971,7 +971,7 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
 Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-69)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
@@ -3859,6 +3859,127 @@ $ssMatch69 = [regex]::Match($stateSrc69, '(?s)function saveState\s*\(\s*\)(.*?)(
 $ssBody69  = if ($ssMatch69.Success) { $ssMatch69.Groups[1].Value } else { '' }
 Check ($ssBody69 -match '_contextSwitching' -and $ssBody69 -match '\breturn\b') `
     'saveState() debounced setTimeout body early-exits when window._contextSwitching is set -- prevents pending debounce from clobbering the FO3 write (regression guard)'
+
+# ===========================================================
+# Suite 70 -- FNV unique apparel sweep + Vault 13 Canteen
+# (Phase 6 Task 7 chunk 1)
+# Guards: ARMOR.CSV floor count, named mandated items,
+# no-duplicate, column-count, DB-registry parity for new
+# apparel, Vault 13 Canteen in MISC + registry,
+# seedNewCampaignInventory definition + guards.
+# 14 tests
+# ===========================================================
+Sep "Suite 70 -- FNV unique apparel + Vault 13 Canteen"
+$dbNv70      = Read-Src "js\db_nv.js"
+$regNv70     = Read-Src "js\reg_nv.js"
+$uiCore70    = Read-Src "js\ui-core.js"
+
+# Helper: extract ARMOR.CSV data rows
+function Get-ArmorRows70 {
+    param([string]$src)
+    $m = [regex]::Match($src, '(?s)\[ARMOR\.CSV\](.*?)(?=\n\[|\n`;)')
+    if (-not $m.Success) { return @() }
+    $block = $m.Groups[1].Value
+    $lines = $block -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -and $_ -notmatch '^Name,' -and $_ -notmatch '^\[' }
+    return $lines
+}
+
+# Helper: get armor name from a row (first CSV field)
+function Get-ArmorName70 { param([string]$row); ($row -split ',')[0].Trim() }
+
+# Helper: get MISC.CSV data rows
+function Get-MiscRows70 {
+    param([string]$src)
+    $m = [regex]::Match($src, '(?s)\[MISC\.CSV\](.*?)(?=\n\[|\n`;)')
+    if (-not $m.Success) { return @() }
+    $block = $m.Groups[1].Value
+    return $block -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -and $_ -notmatch '^Name,' -and $_ -notmatch '^\[' }
+}
+
+# Helper: extract registry names by type
+function Get-RegNamesByType70 {
+    param([string]$src, [string]$type)
+    $names = [System.Collections.Generic.HashSet[string]]::new()
+    $re = [regex]('(?<=[{,]\s*)name\s*:\s*(?:''([^'']*)''\s*|"([^"]*)")\s*,\s*type\s*:\s*''' + $type + '''')
+    foreach ($m in $re.Matches($src)) {
+        $v = if ($m.Groups[1].Value) { $m.Groups[1].Value } else { $m.Groups[2].Value }
+        if ($v) { [void]$names.Add($v) }
+    }
+    return $names
+}
+
+$armorRows70 = Get-ArmorRows70 $dbNv70
+$armorNames70 = $armorRows70 | ForEach-Object { Get-ArmorName70 $_ }
+
+# 70.1  ARMOR.CSV row count >= 103
+Check ($armorRows70.Count -ge 103) `
+    "ARMOR.CSV has >= 103 entries (found $($armorRows70.Count)) -- floor guard after unique apparel sweep"
+
+# 70.2  MISC.CSV has Vault 13 Canteen
+$miscRows70 = Get-MiscRows70 $dbNv70
+Check ($miscRows70 | Where-Object { ($_ -split ',')[0].Trim() -eq 'Vault 13 Canteen' }) `
+    'MISC.CSV contains "Vault 13 Canteen" row'
+
+# 70.3  Benny's Suit in ARMOR.CSV
+Check ($armorNames70 -contains "Benny's Suit") `
+    '"Benny''s Suit" is in ARMOR.CSV (mandated, sourced from fallout.wiki)'
+
+# 70.4  Suave Gambler Hat in ARMOR.CSV
+Check ($armorNames70 -contains 'Suave Gambler Hat') `
+    '"Suave Gambler Hat" is in ARMOR.CSV (mandated, sourced from fallout.wiki)'
+
+# 70.5  No duplicate names in ARMOR.CSV
+$seen70 = [System.Collections.Generic.HashSet[string]]::new()
+$dupes70 = $armorNames70 | Where-Object { -not $seen70.Add($_) }
+Check ($dupes70.Count -eq 0 -or $null -eq $dupes70) `
+    "No duplicate names in ARMOR.CSV -- dupes: $($dupes70 -join ', ')"
+
+# 70.6  No duplicate names in MISC.CSV
+$miscNames70 = $miscRows70 | ForEach-Object { ($_ -split ',')[0].Trim() }
+$seenM70 = [System.Collections.Generic.HashSet[string]]::new()
+$dupesM70 = $miscNames70 | Where-Object { -not $seenM70.Add($_) }
+Check ($dupesM70.Count -eq 0 -or $null -eq $dupesM70) `
+    "No duplicate names in MISC.CSV -- dupes: $($dupesM70 -join ', ')"
+
+# 70.7  ARMOR.CSV all data rows have exactly 7 columns
+$EXPECTED_ARMOR_COLS = 7
+$badArmorRows70 = $armorRows70 | Where-Object { ($_ -split ',').Count -ne $EXPECTED_ARMOR_COLS }
+Check ($badArmorRows70.Count -eq 0 -or $null -eq $badArmorRows70) `
+    "ARMOR.CSV all data rows have $EXPECTED_ARMOR_COLS columns"
+
+# 70.8  Benny's Suit in registry as type:'armor'
+$regArmorNames70 = Get-RegNamesByType70 $regNv70 'armor'
+Check ($regArmorNames70.Contains("Benny's Suit")) `
+    '"Benny''s Suit" in FALLOUT_REGISTRY.items as type:"armor"'
+
+# 70.9  Suave Gambler Hat in registry as type:'armor'
+Check ($regArmorNames70.Contains('Suave Gambler Hat')) `
+    '"Suave Gambler Hat" in FALLOUT_REGISTRY.items as type:"armor"'
+
+# 70.10  Vault 13 Canteen in registry as type:'aid'
+$regAidNames70 = Get-RegNamesByType70 $regNv70 'aid'
+Check ($regAidNames70.Contains('Vault 13 Canteen')) `
+    '"Vault 13 Canteen" in FALLOUT_REGISTRY.items as type:"aid"'
+
+# 70.11  seedNewCampaignInventory function defined in ui-core.js
+Check ([bool]($uiCore70 -match 'function\s+seedNewCampaignInventory\s*\(')) `
+    'seedNewCampaignInventory() is defined in ui-core.js'
+
+# Extract seedNewCampaignInventory body
+$seedMatch70 = [regex]::Match($uiCore70, '(?s)function seedNewCampaignInventory\s*\([^)]*\)\s*\{(.*?)\n\}')
+$seedBody70  = if ($seedMatch70.Success) { $seedMatch70.Groups[1].Value } else { '' }
+
+# 70.12  FNV guard: function returns early if ctx !== 'FNV'
+Check ([bool]($seedBody70 -match "ctx\s*!==\s*['""]FNV['""]")) `
+    'seedNewCampaignInventory() has FNV guard (ctx !== "FNV") -- prevents canteen leaking to FO3'
+
+# 70.13  Empty-inventory guard
+Check ($seedBody70 -match 'inventory' -and $seedBody70 -match 'length') `
+    'seedNewCampaignInventory() checks inventory.length -- prevents duplicate seed'
+
+# 70.14  New-campaign guard (ticks === 0)
+Check ([bool]($seedBody70 -match 'ticks')) `
+    'seedNewCampaignInventory() checks ticks -- prevents seeding on reload of played campaign'
 
 # ===========================================================
 # Results

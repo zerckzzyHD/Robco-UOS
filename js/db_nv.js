@@ -320,6 +320,47 @@ Remnants Tesla Armor,Heavy,24,42,10000,+10 Energy Resist / +25 Rad Resist,50%
 Scorched Sierra Power Armor,Heavy,22,45,7000,+4 STR / Fire DoT Aura,50%
 T-45d Power Armor,Heavy,22,45,5000,+2 STR,50%
 Tesla Armor,Heavy,24,40,8500,+10 Energy Resist / +25 Rad Resist,50%
+Boone's Beret,Headwear,0,0,40,None,—
+Caleb McCaffery's Hat,Headwear,0,0,0,None,—
+Chalk's Headdress,Headwear,1,3,150,Melee Weapons +5,—
+Fedora,Headwear,0,1,30,None,—
+Jessup's Bandana,Headwear,0,1,6,Perception +1,—
+Lucky Shades,Headwear,0,1,40,Luck +1,—
+Marked Beast Eyes Helmet,Headwear,3,3,800,Melee Weapons +3 / HP +10,50%
+Marked Beast Face Helmet,Headwear,3,3,800,Melee Weapons +3 / Crit +2%,50%
+Marked Beast Helmet,Headwear,3,3,800,Energy Resist +10 / Energy Weapons +2,50%
+Marked Beast Tribal Helmet,Headwear,4,2,250,Melee Weapons +3 / Unarmed +3,50%
+Motor-Runner's Helmet,Headwear,2,0,8,Melee Weapons +5 / Perception +1,50%
+Party Hat,Headwear,0,1,5,None,—
+Police Hat,Headwear,0,1,8,None,—
+Salt-Upon-Wounds' Helmet,Headwear,4,3,300,Crit +2% / Sneak +5,50%
+Suave Gambler Hat,Headwear,0,1,8,Perception +1,—
+Tuxedo Hat,Headwear,0,1,8,Perception +1,—
+Ulysses' Mask,Headwear,3,2,250,Radiation Resist +50,—
+Vance's Lucky Hat,Headwear,0,1,8,Perception +1,—
+Vikki's Bonnet,Headwear,0,1,8,Perception +1,—
+Ambassador Crocker's Suit,Clothing,1,1,6,None,—
+Arcade's Lab Coat,Clothing,0,2,8,Science +5,—
+Benny's Suit,Clothing,1,3,390,Barter +5 / Speech +5,—
+Brotherhood Elder's Robe,Clothing,1,2,8,None,—
+Daniel's Outfit,Clothing,2,2,700,Barter +5 / Medicine +5,—
+Dean's Tuxedo,Clothing,0,2,6,Speech +5,—
+Father Elijah's Robes,Clothing,2,2,6,BOS Faction Disguise,—
+Followers Lab Coat,Clothing,0,2,16,Medicine +10 / Science +10,—
+General Oliver's Uniform,Clothing,0,1,0,Charisma +2 / AP +20,—
+Mysterious Stranger Outfit,Clothing,55,3,40,None,—
+Naughty Nightwear,Clothing,0,1,200,Speech +10 / Luck +1,—
+President Kimball's Suit,Clothing,0,2,5,Speech +5,—
+RobCo Jumpsuit,Clothing,0,1,6,Repair +5,—
+Trenchcoat,Clothing,0,3,40,None,—
+US Army General Outfit,Clothing,1,1,1500,Speech +10 / Guns +5,—
+Vault Lab Uniform,Clothing,0,1,6,Science +5,—
+Vera's Outfit,Clothing,2,2,250,Barter +5 / Speech +5 / Charisma +1,—
+Viva Las Vegas,Clothing,5,1,6,None,—
+Christine's COS Recon Armor,Medium,19,20,9500,Sneak +5,50%
+Courier Duster,Light,13,3,1700,Effects vary by alignment,50%
+Ulysses' Duster,Light,13,3,1700,Crit Chance +5% / Charisma +1,50%
+Armor of the 87th Tribe,Heavy,22,35,6495,AP +10 / Crit +3% / Charisma +1,50%
 
 [BESTIARY.CSV]
 Name,DT,HP,Perception,Speed_Factor,Base_Damage,Attack_Rate,Weakness_Weapon,Attack_Type,Resistances,XP_Yield
@@ -455,6 +496,7 @@ Caravan Card (single),0.0,5,Game
 Pre-War Money,0.0,10,Currency
 NCR Money,0.0,40,Currency
 Legion Coin,0.0,50,Currency
+Vault 13 Canteen,1,2,Aid
 
 [RECIPES.CSV]
 Recipe_Name,Skill_Req,Components,Output,Quarantine_Cap
