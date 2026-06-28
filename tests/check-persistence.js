@@ -1629,17 +1629,18 @@ header('Meta / Runner Parity');
     'Suite 79',
     'Suite 80',
     'Suite 81',
+    'Suite 82',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-81)' +
+    'JS runner contains all gate-guard suites (22-41, 49-82)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-81)' +
+    'PS runner contains all gate-guard suites (22-41, 49-82)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -7693,6 +7694,98 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   assert(
     sa81 && sa81.wgt === 20 && sa81.val === 1000 && sa81.type === 'armor',
     `lookupItemInDb('Samurai Armor') → wgt=20/val=1000/type='armor' (got ${JSON.stringify(sa81)})`
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 82 — FO3 quests expansion (44→64) + quest items (15→25)
+//  13 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 82 — FO3 quests expansion (44→64) + quest items (15→25)');
+  const fo3Src82 = readFile('js/reg_fo3.js');
+
+  // Extract quests array block
+  const qStart82 = fo3Src82.indexOf('  quests: [');
+  const qEnd82 = fo3Src82.indexOf('\n  ],', qStart82);
+  const qBlock82 = fo3Src82.slice(qStart82, qEnd82 === -1 ? fo3Src82.length : qEnd82);
+
+  // 82.a  exactly 64 entries — count by dlc: (handles multi-line objects)
+  const qCount82 = (qBlock82.match(/\bdlc:/g) || []).length;
+  assert(qCount82 === 64, `FO3 quests has exactly 64 entries (got ${qCount82})`);
+
+  // 82.b  dedup guard — exactly 1 'Strictly Business'
+  const sbCount82 = (qBlock82.match(/name:\s*'Strictly Business'/g) || []).length;
+  assert(sbCount82 === 1, `FO3 quests has exactly 1 'Strictly Business' entry (got ${sbCount82})`);
+
+  // 82.c  DLC sentinels with correct dlc value
+  assert(
+    qBlock82.includes("name: 'Operation: Anchorage!'") &&
+      qBlock82.includes("dlc: 'Operation: Anchorage'"),
+    "'Operation: Anchorage!' present with dlc='Operation: Anchorage'"
+  );
+  assert(
+    qBlock82.includes("name: 'Into the Pitt'") && qBlock82.includes("dlc: 'The Pitt'"),
+    "'Into the Pitt' present with dlc='The Pitt'"
+  );
+  assert(
+    qBlock82.includes("name: 'Not of This World'") && qBlock82.includes("dlc: 'Mothership Zeta'"),
+    "'Not of This World' present with dlc='Mothership Zeta'"
+  );
+
+  // 82.d  every entry has type field (type count === entry count)
+  const typeCount82 = (qBlock82.match(/\btype:/g) || []).length;
+  assert(
+    typeCount82 === qCount82,
+    `All quest entries have type field (type count=${typeCount82} / entry count=${qCount82})`
+  );
+
+  // 82.e  every type ∈ valid set
+  const typeVals82 = [...qBlock82.matchAll(/type:\s*'([^']+)'/g)].map(m => m[1]);
+  const validTypes82 = new Set(['tutorial', 'main', 'side', 'companion', 'unmarked']);
+  const badTypes82 = typeVals82.filter(t => !validTypes82.has(t));
+  assert(
+    badTypes82.length === 0,
+    `All FO3 quest types are valid — bad: ${badTypes82.join(', ') || 'none'}`
+  );
+
+  // 82.f  QUEST_ITEMS.CSV: exactly 25 data rows
+  const fo3Db82 = readFile('js/db_fo3.js');
+  const qiStart82 = fo3Db82.indexOf('[QUEST_ITEMS.CSV]');
+  const qiEnd82 = fo3Db82.indexOf('\n[', qiStart82 + 1);
+  const qiBlock82 = fo3Db82.slice(qiStart82, qiEnd82 === -1 ? undefined : qiEnd82);
+  const qiLines82 = qiBlock82.split('\n').filter(l => l.trim() && !l.startsWith('['));
+  const qiData82 = qiLines82.slice(1);
+  assert(
+    qiData82.length === 25,
+    `FO3 [QUEST_ITEMS.CSV] has exactly 25 data rows (got ${qiData82.length})`
+  );
+
+  // 82.g  every QUEST_ITEMS row has exactly 5 comma-separated fields (stray-comma guard)
+  const badQiFields82 = qiData82.filter(r => r.split(',').length !== 5);
+  assert(
+    badQiFields82.length === 0,
+    `All QUEST_ITEMS rows have exactly 5 fields — bad: ${badQiFields82.join(' | ') || 'none'}`
+  );
+
+  // 82.h  sentinel names present
+  const qiNames82 = qiData82.map(r => r.split(',')[0].trim());
+  assert(qiNames82.includes('Steel Ingot'), "QUEST_ITEMS contains 'Steel Ingot'");
+  assert(qiNames82.includes('Krivbeknih'), "QUEST_ITEMS contains 'Krivbeknih'");
+  assert(qiNames82.includes('Cryo Key'), "QUEST_ITEMS contains 'Cryo Key'");
+
+  // 82.i  lookupItemInDb spot-check: Steel Ingot → wgt=1, type='misc' (no val col)
+  // QUEST_ITEMS columns: Name(0), Associated_Quest(1), Tradeable(2), Special_Property(3), Weight(4)
+  const qiMap82 = qiData82.reduce((m, row) => {
+    const cols = row.split(',');
+    if (cols.length >= 5)
+      m.set(cols[0].trim().toLowerCase(), { wgt: parseFloat(cols[4]) || 0, type: 'misc' });
+    return m;
+  }, new Map());
+  const si82 = qiMap82.get('steel ingot');
+  assert(
+    si82 && si82.wgt === 1 && si82.type === 'misc',
+    `lookupItemInDb('Steel Ingot') → wgt=1/type='misc' (got ${JSON.stringify(si82)})`
   );
 }
 

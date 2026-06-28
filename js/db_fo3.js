@@ -367,6 +367,16 @@ Vault 87 Keycard,Finding the Garden of Eden,No,Access key for Vault 87 decontami
 Vault 101 Pip-Boy,Escape!,No,Tutorial item; equipped at game start,0.0
 Dad's Terminal Password,Picking Up the Trail,No,Password to James's lab terminal in Rivet City,0.0
 Colonel Autumn's Laser Pistol,Colonel Autumn encounters,Yes,Unique laser pistol dropped by Colonel Autumn,3.0
+Steel Ingot,Into the Pitt,No,Collectible traded for unique Pitt weapons,1.0
+Wernher's Holotape,Into the Pitt,No,Distress message that begins The Pitt,0.0
+Ashur's Audio Diaries,Free Labor,No,Reveal Ashur's backstory and the cure,0.0
+Krivbeknih,The Dark Heart of Blackhall,No,Forbidden tome sought by Obadiah Blackhall,1.0
+Cryo Key,Among the Stars,No,Releases human captives aboard Mothership Zeta,0.0
+Keller Family Transcripts,Bobblehead Hunt,No,Five recordings revealing the experimental MIRV cache,0.0
+Punga Fruit,Walking with Spirits,Yes,Refined swamp fruit used in the Point Lookout ritual,0.5
+Outcast Distress Signal,Aiding the Outcasts,No,Transmission that starts Operation: Anchorage,0.0
+Lump of Brain Matter,Thought Control,No,Brain used in the Point Lookout rivalry,1.0
+Replicated Man Holotape,The Replicated Man,No,Evidence used to track the android Harkness,0.0
 
 [VENDORS.CSV]
 Vendor_Name,Location,Base_Caps,Repair_Skill,Faction,Restock_Days,Accepted_Currencies

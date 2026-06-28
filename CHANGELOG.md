@@ -1,6 +1,8 @@
-﻿## [Unreleased]<!-- Tests: 968/968 | Cache: robco-terminal-v2.5.0-r28 -->
+﻿## [Unreleased]<!-- Tests: 981/981 | Cache: robco-terminal-v2.5.0-r29 -->
 
 ### Added
+
+- **Expanded Fallout 3 quest log autocomplete with all five add-ons' quests** (Operation: Anchorage, The Pitt, Broken Steel, Point Lookout, Mothership Zeta) plus Big Trouble in Big Town, bringing the FO3 quest catalog from 44 to 64 entries. The new entries include the correct add-on label for each quest so the autocomplete now surfaces DLC quests when typing. Also expanded FO3 quest-item reference data from 15 to 25 entries — added quest-critical items for the add-on story lines (Steel Ingot, Krivbeknih, Cryo Key, Punga Fruit, Wernher's Holotape, Keller Family Transcripts, and more). All quest names and items sourced from the Fallout wiki.
 
 - **Expanded Fallout 3 armor reference data from 32 to 62** — added body armor (Ranger Battle Armor, Composite Recon Armor, Winterized Combat Armor, Samurai Armor, Pitt and DLC sets), power armor variants (Tribal Power Armor, Prototype Medic Power Armor, Cross' Power Armor), outfits and suits (Chinese Stealth adjacents, RobCo Jumpsuit, Enclave Scientist Outfit, Spacesuit, The Mechanist's Costume), and a full headgear set (Combat Helmet, Composite Recon Helmet, T-51b Power Helmet, Enclave Hellfire Helmet, Outcast Power Helmet, Samurai Helmet, Ghoul Mask, Lincoln's Hat, Ledoux's Hockey Mask, Boogeyman's Hood). All weights and values sourced from the Fallout wiki.
 
@@ -13,6 +15,8 @@
 - **Collectibles now mark their region on the world map** â€” every Snow Globe (New Vegas) and Bobblehead (Fallout 3) is linked to a specific map cell, so the region grid highlights any cell where an uncollected collectible is waiting. FO3 Bobbleheads previously never appeared on the map at all; this is now fixed. A handful of New Vegas Snow Globes that were matched by name were also pointing at the wrong cells â€” all are now placed correctly. Lincoln Memorabilia items in FO3 likewise flag their museum region on the map until collected.
 
 ### Fixed
+
+- **Removed duplicate 'Strictly Business' entry from the FO3 quest registry** — the entry appeared twice in the autocomplete list; one has been removed.
 
 - **Georgetown West location name corrected** — the autocomplete option previously misspelled as "Georgtown West" has been corrected to "Georgetown West."
 

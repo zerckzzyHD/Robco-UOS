@@ -52,7 +52,6 @@ const FALLOUT_REGISTRY = {
     { name: 'Strictly Business', type: 'side', dlc: null },
     { name: "You Gotta Shoot 'Em in the Head", type: 'side', dlc: null },
     { name: 'Rescue from Paradise', type: 'side', dlc: null },
-    { name: 'Strictly Business', type: 'side', dlc: null },
     { name: 'The Nuka-Cola Challenge', type: 'side', dlc: null },
     { name: "Jiggs' Loot", type: 'side', dlc: null },
     { name: 'Searching for Cheryl', type: 'side', dlc: null },
@@ -70,6 +69,43 @@ const FALLOUT_REGISTRY = {
     { name: 'A Suit No One Wants', type: 'unmarked', dlc: null },
     { name: 'An Antique Land', type: 'unmarked', dlc: null },
     { name: 'Knowledge of the Past', type: 'unmarked', dlc: null },
+
+    // ── DLC: Operation Anchorage ──────────────────────────────────────
+    { name: 'Aiding the Outcasts', type: 'side', dlc: 'Operation: Anchorage' },
+    { name: 'Operation: Anchorage!', type: 'main', dlc: 'Operation: Anchorage' },
+
+    // ── DLC: The Pitt ─────────────────────────────────────────────────
+    { name: 'Into the Pitt', type: 'main', dlc: 'The Pitt' },
+    { name: 'Unsafe Working Conditions', type: 'main', dlc: 'The Pitt' },
+    { name: 'Free Labor', type: 'main', dlc: 'The Pitt' },
+
+    // ── DLC: Broken Steel ─────────────────────────────────────────────
+    { name: 'Death From Above', type: 'main', dlc: 'Broken Steel' },
+    { name: 'Shock Value', type: 'main', dlc: 'Broken Steel' },
+    { name: 'Who Dares Wins', type: 'main', dlc: 'Broken Steel' },
+    { name: 'The Amazing Aqua Cura', type: 'side', dlc: 'Broken Steel' },
+    { name: 'Holy Water', type: 'side', dlc: 'Broken Steel' },
+
+    // ── DLC: Point Lookout ────────────────────────────────────────────
+    { name: 'The Local Flavor', type: 'main', dlc: 'Point Lookout' },
+    { name: 'Walking with Spirits', type: 'main', dlc: 'Point Lookout' },
+    { name: 'A Meeting of the Minds', type: 'main', dlc: 'Point Lookout' },
+    { name: 'The Velvet Curtain', type: 'side', dlc: 'Point Lookout' },
+    { name: 'Thought Control', type: 'side', dlc: 'Point Lookout' },
+    { name: 'Hearing Voices', type: 'side', dlc: 'Point Lookout' },
+    { name: 'The Dark Heart of Blackhall', type: 'side', dlc: 'Point Lookout' },
+
+    // ── DLC: Mothership Zeta ──────────────────────────────────────────
+    { name: 'Not of This World', type: 'main', dlc: 'Mothership Zeta' },
+    { name: 'Among the Stars', type: 'main', dlc: 'Mothership Zeta' },
+    {
+      name: "This Galaxy Ain't Big Enough for the Both of Us",
+      type: 'main',
+      dlc: 'Mothership Zeta',
+    },
+
+    // ── Side (base game, added) ───────────────────────────────────────
+    { name: 'Big Trouble in Big Town', type: 'side', dlc: null },
   ],
 
   // ── ITEMS ──────────────────────────────────────────────────────────────────

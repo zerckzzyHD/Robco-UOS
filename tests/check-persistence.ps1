@@ -971,11 +971,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-81)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-81)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-82)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-82)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -4667,6 +4667,70 @@ $sa81Cols = if ($sa81Row) { $sa81Row -split ',' } else { @() }
 $saSatisfied = ($null -ne $sa81Row) -and ($sa81Cols.Count -ge 5) -and `
     ([Math]::Abs([double]$sa81Cols[3] - 20) -lt 0.001) -and ([Math]::Abs([double]$sa81Cols[4] - 1000) -lt 0.001)
 Check $saSatisfied "lookupItemInDb('Samurai Armor') -> wgt=20/val=1000/type='armor'"
+
+# ===========================================================
+# Suite 82 -- FO3 quests expansion (44->64) + quest items (15->25)
+# 13 tests
+# ===========================================================
+Sep "Suite 82 -- FO3 quests expansion (44->64) + quest items (15->25)"
+$fo3Src82 = Read-Src "js\reg_fo3.js"
+$qStart82 = $fo3Src82.IndexOf("  quests: [")
+$qEnd82 = $fo3Src82.IndexOf("`n  ],", $qStart82)
+$qBlock82 = if ($qEnd82 -ge 0) { $fo3Src82.Substring($qStart82, $qEnd82 - $qStart82) } else { $fo3Src82.Substring($qStart82) }
+
+# 82.a  exactly 64 entries -- count by dlc: (handles multi-line objects)
+$qCount82 = ([regex]::Matches($qBlock82, 'dlc:')).Count
+Check ($qCount82 -eq 64) ("FO3 quests has exactly 64 entries (got " + $qCount82 + ")")
+
+# 82.b  dedup guard -- exactly 1 'Strictly Business'
+$sbCount82 = ([regex]::Matches($qBlock82, "name:\s*'Strictly Business'")).Count
+Check ($sbCount82 -eq 1) ("FO3 quests has exactly 1 'Strictly Business' entry (got " + $sbCount82 + ")")
+
+# 82.c  DLC sentinels with correct dlc value
+Check ($qBlock82.Contains("name: 'Operation: Anchorage!'") -and $qBlock82.Contains("dlc: 'Operation: Anchorage'")) `
+    "'Operation: Anchorage!' present with dlc='Operation: Anchorage'"
+Check ($qBlock82.Contains("name: 'Into the Pitt'") -and $qBlock82.Contains("dlc: 'The Pitt'")) `
+    "'Into the Pitt' present with dlc='The Pitt'"
+Check ($qBlock82.Contains("name: 'Not of This World'") -and $qBlock82.Contains("dlc: 'Mothership Zeta'")) `
+    "'Not of This World' present with dlc='Mothership Zeta'"
+
+# 82.d  every entry has type field (type count === entry count)
+$typeCount82 = ([regex]::Matches($qBlock82, 'type:')).Count
+Check ($typeCount82 -eq $qCount82) ("All quest entries have type field (type=$typeCount82 / entries=$qCount82)")
+
+# 82.e  every type is valid
+$typeVals82 = [regex]::Matches($qBlock82, "type:s*'([^']+)'") | ForEach-Object { $_.Groups[1].Value }
+$validTypes82 = @('tutorial', 'main', 'side', 'companion', 'unmarked')
+$badTypes82 = @($typeVals82 | Where-Object { $validTypes82 -notcontains $_ })
+Check ($badTypes82.Count -eq 0) ("All FO3 quest types are valid -- bad: " + ($badTypes82 -join ', '))
+
+# QUEST_ITEMS.CSV tests
+$fo3Db82 = Read-Src "js\db_fo3.js"
+$qiStart82 = $fo3Db82.IndexOf('[QUEST_ITEMS.CSV]')
+$qiEnd82 = $fo3Db82.IndexOf("`n[", $qiStart82 + 1)
+$qiBlock82 = if ($qiEnd82 -ge 0) { $fo3Db82.Substring($qiStart82, $qiEnd82 - $qiStart82) } else { $fo3Db82.Substring($qiStart82) }
+$qiLines82 = $qiBlock82 -split "`n" | Where-Object { $_.Trim() -ne '' -and -not $_.StartsWith('[') }
+$qiData82 = $qiLines82 | Select-Object -Skip 1
+
+# 82.f  exactly 25 data rows
+Check ($qiData82.Count -eq 25) ("FO3 [QUEST_ITEMS.CSV] has exactly 25 data rows (got " + $qiData82.Count + ")")
+
+# 82.g  every row has exactly 5 fields (stray-comma guard)
+$badQiFields82 = @($qiData82 | Where-Object { ($_ -split ',').Count -ne 5 })
+Check ($badQiFields82.Count -eq 0) ("All QUEST_ITEMS rows have exactly 5 comma-separated fields" + $(if ($badQiFields82.Count) { " -- bad: " + ($badQiFields82 -join " | ") } else { "" }))
+
+# 82.h  sentinel names present
+$qiNames82 = @($qiData82 | ForEach-Object { ($_ -split ',')[0].Trim() })
+Check ($qiNames82 -contains 'Steel Ingot') "QUEST_ITEMS contains 'Steel Ingot'"
+Check ($qiNames82 -contains 'Krivbeknih') "QUEST_ITEMS contains 'Krivbeknih'"
+Check ($qiNames82 -contains 'Cryo Key') "QUEST_ITEMS contains 'Cryo Key'"
+
+# 82.i  lookupItemInDb spot-check: Steel Ingot -> wgt=1/type='misc'
+# QUEST_ITEMS columns: Name(0) Associated_Quest(1) Tradeable(2) Special_Property(3) Weight(4)
+$si82Row = $qiData82 | Where-Object { ($_ -split ',')[0].Trim() -eq 'Steel Ingot' } | Select-Object -First 1
+$si82Cols = if ($si82Row) { $si82Row -split ',' } else { @() }
+$siSatisfied = ($null -ne $si82Row) -and ($si82Cols.Count -ge 5) -and ([Math]::Abs([double]$si82Cols[4] - 1.0) -lt 0.001)
+Check $siSatisfied "lookupItemInDb('Steel Ingot') -> wgt=1/type='misc'"
 # ===========================================================
 # Results
 # ===========================================================
