@@ -594,6 +594,9 @@ details.sub-panel[open] > summary h3::after {
   padding-right: 10px;
   line-height: 1.3;
 }
+#updateModalMsg {
+  text-align: left;
+}
 .close-btn {
   margin-top: 15px;
   width: 100%;

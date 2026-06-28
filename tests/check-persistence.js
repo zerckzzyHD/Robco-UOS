@@ -5779,7 +5779,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  SUITE 65 — Blocking Update Modal (Phase 6 Task 2)
 //  #updateModal replaces #updateBanner; full-screen blocking dialog;
 //  focus trap, Esc blocked, fail-safe, &&controller regression guards.
-//  11 tests
+//  12 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Blocking Update Modal');
@@ -5855,6 +5855,13 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   assert(
     !/updateModal/.test(uiCoreSrc65),
     'ui-core.js ESC handler does not reference updateModal (updateModal manages its own Esc — not caught by global handler)'
+  );
+
+  // 65.12  #updateModalMsg is left-aligned in terminal.css (message body reads flush-left, not ragged/centered)
+  const cssSrc65 = readFile('css/terminal.css');
+  assert(
+    /#updateModalMsg[\s\S]{0,100}text-align\s*:\s*left/.test(cssSrc65),
+    '#updateModalMsg has text-align:left in terminal.css (update modal message body is flush-left, not centered)'
   );
 }
 

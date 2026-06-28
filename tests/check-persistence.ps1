@@ -3494,7 +3494,7 @@ Check ([bool]($syncBody64 -match 'Math\.max\s*\(\s*1,\s*Math\.min\s*\(\s*10,' -o
 # Suite 65 -- Blocking Update Modal (Phase 6 Task 2)
 # #updateModal replaces #updateBanner; full-screen blocking dialog;
 # focus trap, Esc blocked, fail-safe, &&controller regression guards.
-# 11 tests
+# 12 tests
 # ===========================================================
 Sep "Suite 65 -- Blocking Update Modal"
 $uiCoreSrc65 = Read-Src "js\ui-core.js"
@@ -3546,6 +3546,11 @@ Check ([bool]($triggerBody65 -match '!\s*modal\s*\|\|\s*!\s*btn') -and [bool]($t
 # 65.11  Global ESC handler in ui-core.js targets sysModal only -- updateModal not wired to it
 Check (-not ($uiCoreSrc65 -match 'updateModal')) `
     'ui-core.js ESC handler does not reference updateModal (updateModal manages its own Esc -- not caught by global handler)'
+
+# 65.12  #updateModalMsg is left-aligned in terminal.css (message body reads flush-left, not ragged/centered)
+$cssSrc65 = Read-Src "css\terminal.css"
+Check ([bool]($cssSrc65 -match '(?s)#updateModalMsg[\s\S]{0,100}text-align\s*:\s*left')) `
+    '#updateModalMsg has text-align:left in terminal.css (update modal message body is flush-left, not centered)'
 
 # ===========================================================
 # Suite 66 -- FO3 Lincoln Memorabilia Tracker (Phase 6 Task 4)
