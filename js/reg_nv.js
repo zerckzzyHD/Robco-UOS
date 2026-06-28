@@ -1550,6 +1550,25 @@ const FALLOUT_REGISTRY = {
     { name: 'Wasteland Survival Guide', skill: 'survival' },
     { name: 'Pugilism Illustrated', skill: 'unarmed' },
   ],
+  // ── SKILL MAGAZINES ──────────────────────────────────────────────────────
+  // FNV only — reading gives a temporary +10 skill boost (or Critical Chance for True Police Stories).
+  // Data source: https://fallout.wiki/wiki/Fallout:_New_Vegas_skill_magazines
+  magazines: [
+    { name: 'Boxing Times', skill: 'unarmed' },
+    { name: "Fixin' Things", skill: 'repair' },
+    { name: 'Future Weapons Today', skill: 'energy_weapons' },
+    { name: "Lad's Life", skill: 'survival' },
+    { name: '¡La Fantoma!', skill: 'sneak' },
+    { name: "Locksmith's Reader", skill: 'lockpick' },
+    { name: 'Meeting People', skill: 'speech' },
+    { name: 'Milsurp Review', skill: 'guns' },
+    { name: "Patriot's Cookbook", skill: 'explosives' },
+    { name: "Programmer's Digest", skill: 'science' },
+    { name: 'Salesman Weekly', skill: 'barter' },
+    { name: 'Tæles of Chivalrie', skill: 'melee_weapons' },
+    { name: "Today's Physician", skill: 'medicine' },
+    { name: 'True Police Stories', skill: 'Critical Chance' },
+  ],
   // ── CRAFTING RECIPES ─────────────────────────────────────────────────────
   // Data source: https://fallout.wiki/wiki/Fallout:_New_Vegas_crafting
   // Schema: { name, station, output:{item,qty,ammo?:true}, ingredients:[{item,qty}],

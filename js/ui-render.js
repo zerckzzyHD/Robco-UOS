@@ -976,6 +976,91 @@ function toggleSkillBook(name) {
   saveState();
 }
 
+function renderMagazines() {
+  const panel = document.getElementById('magazinesPanel');
+  const container = document.getElementById('magazinesDisplay');
+  if (!container) return;
+  if (!_activeDef().hasMagazines) {
+    if (panel) panel.style.display = 'none';
+    return;
+  }
+  if (panel) panel.style.display = '';
+  const defs =
+    typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.magazines)
+      ? FALLOUT_REGISTRY.magazines
+      : [];
+  const read = Array.isArray(state.magazines) ? state.magazines : [];
+  const readDefs = defs.filter(d => read.includes(d.name));
+  const unreadDefs = defs.filter(d => !read.includes(d.name));
+
+  let ps = {};
+  try {
+    ps = JSON.parse(localStorage.getItem('robco_panel_state') || '{}');
+  } catch (_) {}
+  const readOpen = ps['magazines_read'] !== false;
+  const unreadOpen = ps['magazines_unread'] !== false;
+
+  const rowHtml = (d, isRead) => {
+    const safeAttr = escapeHtml(d.name);
+    const skillDisplay =
+      d.skill === 'Critical Chance'
+        ? '(Critical Chance)'
+        : `(boosts ${escapeHtml((d.skill || '').replace(/_/g, ' ').toUpperCase())})`;
+    const tag = isRead
+      ? `<span style="color:var(--robco-green);cursor:pointer;margin-right:4px;" data-name="${safeAttr}" onclick="toggleMagazine(this.dataset.name)" title="Mark unread">[READ]</span>`
+      : `<span style="opacity:0.5;cursor:pointer;margin-right:4px;" data-name="${safeAttr}" onclick="toggleMagazine(this.dataset.name)" title="Mark read">[----]</span>`;
+    const nameHtml = isRead
+      ? `<strong>${escapeHtml(d.name.toUpperCase())}</strong>`
+      : escapeHtml(d.name.toUpperCase());
+    return (
+      `<div style="font-size:11px;letter-spacing:0.5px;margin-bottom:2px;${isRead ? '' : 'opacity:0.7;'}">` +
+      tag +
+      nameHtml +
+      ` <span style="font-size:10px;opacity:0.6;">&mdash; ${skillDisplay}</span>` +
+      `</div>`
+    );
+  };
+
+  const readRows = readDefs.length
+    ? readDefs.map(d => rowHtml(d, true)).join('')
+    : `<div style="font-size:11px;opacity:0.5;padding:2px 0 4px;">NO MAGAZINES READ</div>`;
+  const unreadRows = unreadDefs.length
+    ? unreadDefs.map(d => rowHtml(d, false)).join('')
+    : `<div style="font-size:11px;opacity:0.5;padding:2px 0 4px;">ALL MAGAZINES READ</div>`;
+
+  container.innerHTML =
+    `<details class="sub-panel" data-sub-id="magazines_read"${readOpen ? ' open' : ''}>` +
+    `<summary><h3>&gt; READ [${readDefs.length}]</h3></summary>` +
+    readRows +
+    `</details>` +
+    `<details class="sub-panel" data-sub-id="magazines_unread"${unreadOpen ? ' open' : ''}>` +
+    `<summary><h3>&gt; UNREAD [${unreadDefs.length}]</h3></summary>` +
+    unreadRows +
+    `</details>`;
+
+  container.querySelectorAll('details[data-sub-id]').forEach(d => {
+    d.addEventListener('toggle', () => {
+      try {
+        const p = JSON.parse(localStorage.getItem('robco_panel_state') || '{}');
+        p[d.dataset.subId] = d.open;
+        localStorage.setItem('robco_panel_state', JSON.stringify(p));
+      } catch (_) {}
+    });
+  });
+}
+
+function toggleMagazine(name) {
+  if (!Array.isArray(state.magazines)) state.magazines = [];
+  const idx = state.magazines.indexOf(name);
+  if (idx !== -1) {
+    state.magazines.splice(idx, 1);
+  } else {
+    state.magazines.push(name);
+  }
+  renderMagazines();
+  saveState();
+}
+
 function renderCampaignNotes() {
   const notesDiv = document.getElementById('campaignNotesList');
   if (!notesDiv) return;

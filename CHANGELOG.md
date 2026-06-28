@@ -1,6 +1,8 @@
-﻿## [Unreleased]<!-- Tests: 1051/1051 | Cache: robco-terminal-v2.5.0-r36 -->
+﻿## [Unreleased]<!-- Tests: 1078/1078 | Cache: robco-terminal-v2.5.0-r37 -->
 
 ### Added
+
+- **Skill Magazines tracker (New Vegas)** — a new SKILL MAGAZINES panel on the STAT tab tracks all 14 NV skill magazines, split into READ and UNREAD sub-menus just like the Skill Books panel. Each magazine shows the skill it temporarily boosts (or "Critical Chance" for True Police Stories). Tap a magazine to move it between READ and UNREAD; counts update instantly. FNV-only — the panel is hidden in Fallout 3 campaigns. The AI knows which magazines have been read and can reference them in play.
 
 - **Skill Books tracker** — a new SKILL BOOKS panel on the STAT tab tracks all 13 skill books for the active game, split into live READ and UNREAD sub-menus. Tap a book to move it between them instantly — no reload needed; the counts update as you go. Each book shows the skill it raises. The AI knows which books have been read and can reference them in play. Books are tracked for both Fallout: New Vegas (including Wasteland Survival Guide for Survival) and Fallout 3 (including U.S. Army: 30 Handy Flamethrower Recipes for Big Guns). Both sub-menus are individually collapsible and remember their collapsed state across reloads.
 

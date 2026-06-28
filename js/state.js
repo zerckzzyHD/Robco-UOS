@@ -231,6 +231,7 @@ const GAME_DEFS = {
     usesKarmaCenter: false,
     collectibleLabel: 'SNOW GLOBES',
     hasTraits: true,
+    hasMagazines: true,
     calendar: { startMonth: 9, startDay: 19, startYear: 2281, epochWeekday: 0 },
     ai: {
       skillSystemText:
@@ -355,6 +356,7 @@ let state = {
   lincolnItems: {}, // FO3 only — map of artifact name → disposition (found|hannibal|leroy|washington)
   traits: [], // FNV only — string[] of selected trait names (soft cap 2; OWB allows re-selection)
   skillBooks: [], // string[] of skill-book titles read (both games)
+  magazines: [], // FNV only — string[] of skill magazine titles read (temporary boosts)
   campaignMode: 'standard', // 'standard' | 'rng' (armed) | 'rng-locked' (permanently active after wipe)
   playthroughType: 'standard', // 'standard' | 'minmaxed' | 'completionist' | 'casual' | 'speedrun'
   mapView: 'auto', // 'auto' | 'full' | 'core' — persisted map size preference; 'auto' and 'core' → 4×4 grid
@@ -545,6 +547,7 @@ function migrateState(version, s) {
   });
   if (!Array.isArray(s.traits)) s.traits = [];
   if (!Array.isArray(s.skillBooks)) s.skillBooks = [];
+  if (!Array.isArray(s.magazines)) s.magazines = [];
   // C4-fix / C11: campaignMode has 3 states: 'standard' | 'rng' (armed) | 'rng-locked' (activated by wipe).
   if (s.campaignMode !== 'rng' && s.campaignMode !== 'rng-locked') s.campaignMode = 'standard';
   // C5: playthroughType — migrate from legacy localStorage key if not yet in state.

@@ -1634,17 +1634,18 @@ header('Meta / Runner Parity');
     'Suite 84',
     'Suite 85',
     'Suite 86',
+    'Suite 87',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-86)' +
+    'JS runner contains all gate-guard suites (22-41, 49-87)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-86)' +
+    'PS runner contains all gate-guard suites (22-41, 49-87)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -8556,6 +8557,195 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   assert(
     /class="optics-label"[^>]*>OPTICS:/.test(htmlSource),
     'index.html OPTICS label has class="optics-label" (Protocol 20 static guard)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+// Suite 87 — NV Skill Magazines tracker (FNV-only, Protocol 4)
+// 25 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 87 — NV Skill Magazines tracker (FNV-only, Protocol 4)');
+
+  const nvRegSrc87 = readFile('js/reg_nv.js');
+  const fo3RegSrc87 = readFile('js/reg_fo3.js');
+  const stateSrc87 = readFile('js/state.js');
+  const apiSrc87 = readFile('js/api.js');
+  const uiRenderSrc87 = readFile('js/ui-render.js');
+  const idxSrc87 = readFile('index.html');
+
+  const fnvSkillKeys87 = [
+    'barter',
+    'energy_weapons',
+    'explosives',
+    'guns',
+    'lockpick',
+    'medicine',
+    'melee_weapons',
+    'repair',
+    'science',
+    'sneak',
+    'speech',
+    'survival',
+    'unarmed',
+  ];
+
+  // Extract the magazines block from reg_nv.js
+  const magBlockMatch87 = nvRegSrc87.match(/magazines\s*:\s*\[([\s\S]*?)\n {2}\],/);
+  const magBlock87 = magBlockMatch87 ? magBlockMatch87[1] : '';
+
+  // 87.1  reg_nv.js has FALLOUT_REGISTRY.magazines array
+  assert(
+    /magazines\s*:\s*\[/.test(nvRegSrc87),
+    'reg_nv.js has FALLOUT_REGISTRY.magazines array (FNV-only)'
+  );
+
+  // 87.2  exactly 14 entries
+  const mag87Count = (magBlock87.match(/name\s*:/g) || []).length;
+  assert(mag87Count === 14, `reg_nv.js magazines has exactly 14 entries (found ${mag87Count})`);
+
+  // 87.3  reg_fo3.js has NO magazines array (FNV-only guard)
+  assert(
+    !/magazines\s*:\s*\[/.test(fo3RegSrc87),
+    'reg_fo3.js has NO magazines array (FNV-only guard)'
+  );
+
+  // 87.4  all skill values in FNV getSkillKeys() OR 'Critical Chance'
+  const magSkills87 = [...magBlock87.matchAll(/skill\s*:\s*'([^']+)'/g)].map(m => m[1]);
+  const badMagSkills87 = magSkills87.filter(
+    s => !fnvSkillKeys87.includes(s) && s !== 'Critical Chance'
+  );
+  assert(
+    badMagSkills87.length === 0 && magSkills87.length === 14,
+    `All 14 magazine skill values are in FNV getSkillKeys() or 'Critical Chance' (bad: ${badMagSkills87.join(', ')})`
+  );
+
+  // 87.5  no duplicate names
+  const magNames87 = [...magBlock87.matchAll(/name\s*:\s*'([^']*)'|name\s*:\s*"([^"]*)"/g)].map(
+    m => m[1] ?? m[2]
+  );
+  const magNameSet87 = new Set(magNames87);
+  assert(
+    magNameSet87.size === 14 && magNames87.length === 14,
+    `reg_nv.js magazines: no duplicate names (${magNames87.length} names, ${magNameSet87.size} unique)`
+  );
+
+  // 87.6  sentinel: Boxing Times → unarmed
+  assert(
+    /Boxing Times/.test(magBlock87) && /Boxing Times[\s\S]{0,60}unarmed/.test(magBlock87),
+    "Sentinel: 'Boxing Times' present with skill='unarmed'"
+  );
+
+  // 87.7  sentinel: True Police Stories → Critical Chance
+  assert(
+    /True Police Stories/.test(magBlock87) &&
+      /True Police Stories[\s\S]{0,60}Critical Chance/.test(magBlock87),
+    "Sentinel: 'True Police Stories' present with skill='Critical Chance'"
+  );
+
+  // 87.8  sentinel: Salesman Weekly
+  assert(/Salesman Weekly/.test(magBlock87), "Sentinel: 'Salesman Weekly' present in magazines");
+
+  // 87.9  sentinel: Programmer's Digest (partial match to avoid PS encoding fragility)
+  assert(/Programmer/.test(magBlock87), "Sentinel: Programmer's Digest present in magazines");
+
+  // 87.10  state.magazines default = []
+  assert(
+    /magazines\s*:\s*\[\]/.test(stateSrc87),
+    'state.js has magazines: [] default (Protocol 4)'
+  );
+
+  // 87.11  migrateState() coerces magazines to []
+  assert(
+    /!Array\.isArray\(s\.magazines\)/.test(stateSrc87),
+    'state.js migrateState() coerces magazines to [] (Protocol 4 migration)'
+  );
+
+  // 87.12  autoImportState handles 'magazines'
+  assert(
+    /_g\(parsed,\s*'magazines'\)/.test(apiSrc87),
+    "autoImportState() handles 'magazines' field (_g extraction present)"
+  );
+
+  // 87.13  magazines import uses magazines-specific registry Set
+  assert(/magNames/.test(apiSrc87), 'autoImportState magazines block uses magNames registry Set');
+
+  // 87.14  magazines import filters against registry
+  assert(
+    /magNames\.has\(m\)/.test(apiSrc87),
+    'autoImportState magazines block filters to registry names (magNames.has(m))'
+  );
+
+  // 87.15  magazines import dedups
+  assert(
+    /state\.magazines\s*=\s*raw\.filter/.test(apiSrc87),
+    'autoImportState assigns state.magazines from registry-filtered dedup (state.magazines = raw.filter)'
+  );
+
+  // Extract renderMagazines body for structural checks
+  const rmStart87 = uiRenderSrc87.indexOf('function renderMagazines()');
+  const rmEnd87 = uiRenderSrc87.indexOf('\nfunction ', rmStart87 + 1);
+  const renderMagBody87 = rmStart87 >= 0 ? uiRenderSrc87.slice(rmStart87, rmEnd87) : '';
+
+  // 87.16  renderMagazines() defined
+  assert(rmStart87 >= 0, 'renderMagazines() is defined in js/ui-render.js');
+
+  // 87.17  references magazines_read sub-panel
+  assert(
+    /magazines_read/.test(renderMagBody87),
+    "renderMagazines() references 'magazines_read' sub-panel data-sub-id"
+  );
+
+  // 87.18  references magazines_unread sub-panel
+  assert(
+    /magazines_unread/.test(renderMagBody87),
+    "renderMagazines() references 'magazines_unread' sub-panel data-sub-id"
+  );
+
+  // 87.19  wires toggle persistence via querySelectorAll + addEventListener
+  assert(
+    /querySelectorAll/.test(renderMagBody87) &&
+      /addEventListener\s*\(\s*'toggle'/.test(renderMagBody87),
+    "renderMagazines() wires toggle events via querySelectorAll + addEventListener('toggle')"
+  );
+
+  // 87.20  NO MAGAZINES READ empty state
+  assert(
+    /NO MAGAZINES READ/.test(renderMagBody87),
+    "renderMagazines() has 'NO MAGAZINES READ' empty state"
+  );
+
+  // 87.21  ALL MAGAZINES READ empty state
+  assert(
+    /ALL MAGAZINES READ/.test(renderMagBody87),
+    "renderMagazines() has 'ALL MAGAZINES READ' empty state"
+  );
+
+  // 87.22  toggleMagazine() defined
+  assert(
+    /function toggleMagazine\(/.test(uiRenderSrc87),
+    'toggleMagazine() is defined in js/ui-render.js'
+  );
+
+  // 87.23  GAME_DEFS.FNV.hasMagazines = true
+  assert(
+    /hasMagazines\s*:\s*true/.test(stateSrc87),
+    'GAME_DEFS.FNV.hasMagazines = true (FNV-only gate flag)'
+  );
+
+  // 87.24  index.html has #magazinesDisplay container
+  assert(
+    /id="magazinesDisplay"/.test(idxSrc87),
+    'index.html has #magazinesDisplay container for renderMagazines()'
+  );
+
+  // 87.25  getSystemDirective references magazines in FNV-only context
+  const sdStart87 = apiSrc87.indexOf('function getSystemDirective()');
+  const sdEnd87 = apiSrc87.indexOf('\nfunction ', sdStart87 + 1);
+  const sdBody87 = sdStart87 >= 0 ? apiSrc87.slice(sdStart87, sdEnd87) : '';
+  assert(
+    /magazines/.test(sdBody87) && /FNV/.test(sdBody87),
+    'getSystemDirective() references magazines in FNV-only context (Protocol 4 AI contract)'
   );
 }
 

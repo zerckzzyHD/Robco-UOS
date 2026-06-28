@@ -188,6 +188,8 @@ export default [
         toggleTrait: 'readonly',
         renderSkillBooks: 'readonly',
         toggleSkillBook: 'readonly',
+        renderMagazines: 'readonly',
+        toggleMagazine: 'readonly',
         renderCraft: 'readonly',
         setCraftFilter: 'readonly',
         craftSetMax: 'readonly',

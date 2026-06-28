@@ -170,6 +170,14 @@ Update state.traits when the Courier gains, re-selects, or removes a trait. Incl
     : ''
 }
 
+${
+  ctx === 'FNV'
+    ? `### **Skill Magazines Tracker (FNV only)**
+state.magazines is a string[] of skill magazine titles the Courier has read (each gives a temporary +10 skill boost, or Critical Chance for True Police Stories).
+Update state.magazines when the Courier reads a skill magazine. Include only names exactly as defined in the FNV magazine registry. Omit this field entirely for FO3.`
+    : ''
+}
+
 ### **Skill Books Tracker**
 state.skillBooks is a string[] of skill-book titles the Courier has read. Include only names exactly as defined in the active game's skill-book registry. Update when the Courier reads a skill book.
 
@@ -797,6 +805,23 @@ function autoImportState(jsonString) {
         state.skillBooks = raw.filter(b => {
           if (typeof b !== 'string' || !bookNames.has(b) || seen.has(b)) return false;
           seen.add(b);
+          return true;
+        });
+      }
+    }
+
+    // Validated array: accept only entries matching a registry magazine name (FNV only); dedup.
+    {
+      const raw = _g(parsed, 'magazines');
+      if (Array.isArray(raw)) {
+        const magNames =
+          typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.magazines)
+            ? new Set(FALLOUT_REGISTRY.magazines.map(m => m.name))
+            : new Set();
+        const seen = new Set();
+        state.magazines = raw.filter(m => {
+          if (typeof m !== 'string' || !magNames.has(m) || seen.has(m)) return false;
+          seen.add(m);
           return true;
         });
       }
