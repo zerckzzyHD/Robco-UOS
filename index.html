@@ -688,6 +688,57 @@
             </details>
           </details>
 
+          <!-- CRAFTING (INV tab) -->
+          <details class="panel" data-tab="inv" id="craftPanel">
+            <summary>
+              <h2>&gt; CRAFTING</h2>
+            </summary>
+            <div
+              id="craftFilterBar"
+              style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px"
+            >
+              <button
+                class="btn-sm action-btn craft-filter-btn active"
+                data-filter="all"
+                onclick="setCraftFilter('all')"
+              >
+                All
+              </button>
+              <button
+                class="btn-sm action-btn craft-filter-btn"
+                data-filter="workbench"
+                onclick="setCraftFilter('workbench')"
+              >
+                Workbench
+              </button>
+              <button
+                class="btn-sm action-btn craft-filter-btn"
+                data-filter="campfire"
+                onclick="setCraftFilter('campfire')"
+              >
+                Campfire
+              </button>
+              <button
+                class="btn-sm action-btn craft-filter-btn"
+                data-filter="reloading"
+                onclick="setCraftFilter('reloading')"
+              >
+                Reloading
+              </button>
+            </div>
+            <div id="craftRecipeList">
+              <span class="empty-state">No recipes loaded</span>
+            </div>
+            <details class="sub-panel" data-sub-id="craft_breakdown">
+              <summary>
+                <h3>&gt; SCRAP / BREAKDOWN</h3>
+              </summary>
+              <div id="craftScrapList">
+                <span class="empty-state">No matching items in inventory.</span>
+              </div>
+            </details>
+          </details>
+
           <details class="panel" data-tab="stat">
             <summary>
               <h2>> SKILL MATRIX</h2>

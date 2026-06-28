@@ -1458,6 +1458,285 @@ function renderKarmaCenter() {
   display.innerHTML = html;
 }
 
+// ── CRAFT PANEL ──────────────────────────────────────────────────────────────
+
+let _craftFilter = 'all';
+
+function setCraftFilter(value) {
+  _craftFilter = value;
+  const bar = document.getElementById('craftFilterBar');
+  if (bar) {
+    bar.querySelectorAll('.craft-filter-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.filter === value);
+    });
+  }
+  renderCraft();
+}
+
+function _craftGetHave(itemName) {
+  const lower = itemName.toLowerCase();
+  if (state.ammo) {
+    for (const k of Object.keys(state.ammo)) {
+      if (k.toLowerCase() === lower && (state.ammo[k] || 0) > 0) return state.ammo[k];
+    }
+  }
+  const inv = (state.inventory || []).find(i => i.name.toLowerCase() === lower);
+  return inv ? inv.qty || 0 : 0;
+}
+
+function _craftConsume(itemName, qty) {
+  const lower = itemName.toLowerCase();
+  if (state.ammo) {
+    for (const k of Object.keys(state.ammo)) {
+      if (k.toLowerCase() === lower) {
+        state.ammo[k] = Math.max(0, (state.ammo[k] || 0) - qty);
+        if (state.ammo[k] === 0) delete state.ammo[k];
+        if (typeof renderAmmo === 'function') renderAmmo();
+        return;
+      }
+    }
+  }
+  const idx = (state.inventory || []).findIndex(i => i.name.toLowerCase() === lower);
+  if (idx === -1) return;
+  state.inventory[idx].qty = Math.max(0, (state.inventory[idx].qty || 0) - qty);
+  if (state.inventory[idx].qty === 0) state.inventory.splice(idx, 1);
+}
+
+function craftSetMax(recipeIdx, maxVal) {
+  const el = document.getElementById('craftQty_' + recipeIdx);
+  if (el) el.value = Math.max(1, maxVal);
+}
+
+function renderCraft() {
+  const recipeList = document.getElementById('craftRecipeList');
+  const scrapList = document.getElementById('craftScrapList');
+  if (!recipeList || !scrapList) return;
+
+  const recipes =
+    typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.recipes)
+      ? FALLOUT_REGISTRY.recipes
+      : [];
+  const breakdowns =
+    typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.breakdowns)
+      ? FALLOUT_REGISTRY.breakdowns
+      : [];
+
+  const filtered =
+    _craftFilter === 'all' ? recipes : recipes.filter(r => r.station === _craftFilter);
+
+  if (filtered.length === 0) {
+    recipeList.innerHTML = '<span class="empty-state">No recipes for this game.</span>';
+  } else {
+    const stations = [];
+    filtered.forEach(r => {
+      if (!stations.includes(r.station)) stations.push(r.station);
+    });
+    recipeList.innerHTML = stations
+      .map(station => {
+        const stRows = filtered
+          .filter(r => r.station === station)
+          .map(recipe => {
+            const ri = recipes.indexOf(recipe);
+            const MAX_CAP = 99;
+            const req = recipe.skillReq;
+            let skillHtml = '';
+            if (req) {
+              const haveSkill =
+                state.skills && typeof state.skills[req.skill] === 'number'
+                  ? state.skills[req.skill]
+                  : 0;
+              const met = haveSkill >= req.level;
+              const lbl =
+                typeof SKILL_LABELS !== 'undefined' && SKILL_LABELS[req.skill]
+                  ? SKILL_LABELS[req.skill]
+                  : req.skill;
+              const col = met ? 'var(--robco-green)' : 'var(--robco-danger)';
+              skillHtml = `<span style="font-size:10px;color:${col};white-space:nowrap;">(${escapeHtml(lbl)} ${req.level} ${met ? '✓' : '✗'})</span>`;
+            }
+            let maxBatch = MAX_CAP;
+            const ingHtml = recipe.ingredients
+              .map(ing => {
+                const haveN = _craftGetHave(ing.item);
+                const canMake = ing.qty > 0 ? Math.floor(haveN / ing.qty) : MAX_CAP;
+                if (canMake < maxBatch) maxBatch = canMake;
+                const col = haveN >= ing.qty ? 'var(--robco-green)' : 'var(--robco-danger)';
+                return `<span style="color:${col};font-size:10px;margin-right:5px;">${escapeHtml(ing.item)} ${haveN}/${ing.qty}</span>`;
+              })
+              .join('');
+            const allMet = recipe.ingredients.every(ing => _craftGetHave(ing.item) >= ing.qty);
+            const missingItems = allMet
+              ? ''
+              : recipe.ingredients
+                  .filter(ing => _craftGetHave(ing.item) < ing.qty)
+                  .map(ing => escapeHtml(ing.item))
+                  .join(', ');
+            return (
+              `<div style="margin-bottom:5px;padding-bottom:4px;border-bottom:1px dashed rgba(var(--robco-green-rgb),0.12);">` +
+              `<div style="font-size:11px;font-weight:bold;display:flex;flex-wrap:wrap;gap:4px;align-items:center;">` +
+              `<span style="flex:1;">${escapeHtml(recipe.name.toUpperCase())}</span>` +
+              `${skillHtml}` +
+              `<span style="display:flex;gap:3px;align-items:center;flex-shrink:0;">` +
+              `<input type="number" id="craftQty_${ri}" value="1" min="1" max="${Math.max(1, maxBatch)}" style="width:38px;font-size:11px;">` +
+              `<button class="btn-sm action-btn" onclick="craftSetMax(${ri},${maxBatch})" style="padding:0 5px;font-size:10px;">MAX</button>` +
+              `<button class="btn-sm action-btn" data-ridx="${ri}" onclick="doCraft(parseInt(this.dataset.ridx))" style="${allMet ? '' : 'opacity:0.45;'}padding:0 7px;font-size:10px;">CRAFT</button>` +
+              `</span></div>` +
+              `<div style="margin-top:1px;">${ingHtml}</div>` +
+              (missingItems
+                ? `<div style="font-size:9px;color:var(--robco-danger);opacity:0.85;">MISSING: ${missingItems}</div>`
+                : '') +
+              `</div>`
+            );
+          })
+          .join('');
+        return (
+          `<div style="font-size:10px;opacity:0.55;letter-spacing:1px;border-top:1px dashed rgba(var(--robco-green-rgb),0.3);padding:3px 0 2px;margin-top:3px;">${escapeHtml(station.toUpperCase())}</div>` +
+          stRows
+        );
+      })
+      .join('');
+  }
+
+  if (breakdowns.length === 0) {
+    scrapList.innerHTML =
+      '<div style="font-size:11px;opacity:0.5;padding:2px 0;">No breakdown recipes for this game.</div>';
+  } else {
+    const available = breakdowns.filter(b => _craftGetHave(b.item) > 0);
+    if (available.length === 0) {
+      scrapList.innerHTML = '<span class="empty-state">No matching items in inventory.</span>';
+    } else {
+      scrapList.innerHTML = available
+        .map(b => {
+          const bi = breakdowns.indexOf(b);
+          const have = _craftGetHave(b.item);
+          const yieldPreview = b.yields.map(y => `${y.qty}× ${escapeHtml(y.item)}`).join(', ');
+          return (
+            `<div style="font-size:11px;margin-bottom:4px;display:flex;flex-wrap:wrap;gap:4px;align-items:center;">` +
+            `<span style="flex:1;">${escapeHtml(b.item.toUpperCase())}</span>` +
+            `<span style="font-size:10px;opacity:0.6;">→ ${yieldPreview}</span>` +
+            `<span style="display:flex;gap:3px;align-items:center;flex-shrink:0;">` +
+            `<input type="number" id="scrapQty_${bi}" value="1" min="1" max="${have}" style="width:38px;font-size:11px;">` +
+            `<button class="btn-sm action-btn" data-bidx="${bi}" onclick="doScrap(parseInt(this.dataset.bidx))" style="padding:0 7px;font-size:10px;">SCRAP</button>` +
+            `</span></div>`
+          );
+        })
+        .join('');
+    }
+  }
+}
+
+function doCraft(recipeIdx) {
+  const recipes =
+    typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.recipes)
+      ? FALLOUT_REGISTRY.recipes
+      : [];
+  const recipe = recipes[recipeIdx];
+  if (!recipe) return;
+
+  const qtyEl = document.getElementById('craftQty_' + recipeIdx);
+  const qty = Math.max(1, parseInt(qtyEl ? qtyEl.value : '1') || 1);
+
+  const missing = recipe.ingredients.filter(ing => _craftGetHave(ing.item) < ing.qty * qty);
+  if (missing.length > 0) {
+    if (typeof appendToChat === 'function')
+      appendToChat(
+        '> [CRAFT] FAILED — Missing: ' + missing.map(i => i.item).join(', ') + '.',
+        'sys'
+      );
+    return;
+  }
+
+  const consumeList = recipe.ingredients.map(ing => `${ing.qty * qty}× ${ing.item}`).join(', ');
+  const outputQty = recipe.output.qty * qty;
+  if (
+    !confirm(
+      `Craft ${qty}× ${recipe.name}?\n\nConsumes: ${consumeList}\nProduces: ${outputQty}× ${recipe.output.item}`
+    )
+  )
+    return;
+
+  recipe.ingredients.forEach(ing => _craftConsume(ing.item, ing.qty * qty));
+
+  if (recipe.output.ammo) {
+    if (!state.ammo) state.ammo = {};
+    const key = recipe.output.item;
+    state.ammo[key] = (state.ammo[key] || 0) + outputQty;
+    if (typeof renderAmmo === 'function') renderAmmo();
+  } else {
+    const dbEntry =
+      typeof lookupItemInDb === 'function' ? lookupItemInDb(recipe.output.item) : null;
+    const ex = (state.inventory || []).find(
+      i => i.name.toLowerCase() === recipe.output.item.toLowerCase()
+    );
+    if (ex) {
+      ex.qty += outputQty;
+    } else {
+      if (!state.inventory) state.inventory = [];
+      state.inventory.push({
+        name: recipe.output.item,
+        qty: outputQty,
+        wgt: dbEntry ? dbEntry.wgt : 0,
+        val: dbEntry ? dbEntry.val : 0,
+        type: dbEntry ? dbEntry.type : 'misc',
+      });
+    }
+    if (typeof renderInventory === 'function') renderInventory();
+  }
+  if (typeof updateMath === 'function') updateMath();
+  renderCraft();
+  saveState();
+  if (typeof appendToChat === 'function')
+    appendToChat(`> [CRAFT] Built ${qty}× ${recipe.name}.`, 'sys');
+}
+
+function doScrap(bdIdx) {
+  const breakdowns =
+    typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.breakdowns)
+      ? FALLOUT_REGISTRY.breakdowns
+      : [];
+  const breakdown = breakdowns[bdIdx];
+  if (!breakdown) return;
+
+  const qtyEl = document.getElementById('scrapQty_' + bdIdx);
+  const qty = Math.max(1, parseInt(qtyEl ? qtyEl.value : '1') || 1);
+  const have = _craftGetHave(breakdown.item);
+
+  if (have < qty) {
+    if (typeof appendToChat === 'function')
+      appendToChat(`> [SCRAP] FAILED — Need ${qty}× ${breakdown.item}, have ${have}.`, 'sys');
+    return;
+  }
+
+  const yieldStr = breakdown.yields.map(y => `${y.qty * qty}× ${y.item}`).join(', ');
+  if (!confirm(`Scrap ${qty}× ${breakdown.item}?\n\nProduces: ${yieldStr}`)) return;
+
+  _craftConsume(breakdown.item, qty);
+
+  breakdown.yields.forEach(y => {
+    const totalYield = y.qty * qty;
+    const dbEntry = typeof lookupItemInDb === 'function' ? lookupItemInDb(y.item) : null;
+    if (!state.inventory) state.inventory = [];
+    const ex = state.inventory.find(i => i.name.toLowerCase() === y.item.toLowerCase());
+    if (ex) {
+      ex.qty += totalYield;
+    } else {
+      state.inventory.push({
+        name: y.item,
+        qty: totalYield,
+        wgt: dbEntry ? dbEntry.wgt : 0,
+        val: dbEntry ? dbEntry.val : 0,
+        type: dbEntry ? dbEntry.type : 'misc',
+      });
+    }
+  });
+
+  if (typeof renderInventory === 'function') renderInventory();
+  if (typeof updateMath === 'function') updateMath();
+  renderCraft();
+  saveState();
+  if (typeof appendToChat === 'function')
+    appendToChat(`> [SCRAP] Scrapped ${qty}× ${breakdown.item} → ${yieldStr}.`, 'sys');
+}
+
 // Switch faction/karma panels based on game context (called from loadUI).
 function _updateContextPanels() {
   const usesKarmaCenter = _activeDef().usesKarmaCenter;

@@ -815,6 +815,15 @@ function _updatePanelBadges() {
       h2text: '> COLLECTIBLES',
       count: (state.collectibles || []).length,
     },
+    {
+      h2text: '> CRAFTING',
+      count:
+        typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.recipes)
+          ? FALLOUT_REGISTRY.recipes.filter(r =>
+              r.ingredients.every(ing => _craftGetHave(ing.item) >= ing.qty)
+            ).length
+          : 0,
+    },
   ];
   badges.forEach(({ h2text, count }) => {
     // Find the h2 with exactly this text (case-insensitive prefix match)
@@ -930,6 +939,7 @@ function expandPanelForCategory(categoryKey) {
     ammo: 'inv',
     equipped: 'inv',
     collectibles: 'inv',
+    craft: 'inv',
   };
   if (tabMap[categoryKey]) switchTab(tabMap[categoryKey]);
 
@@ -944,6 +954,7 @@ function expandPanelForCategory(categoryKey) {
     ammo: '> BACKPACK INVENTORY', // ammo lives in the sub-panel inside BACKPACK
     equipped: '> EQUIPPED',
     collectibles: '> COLLECTIBLES',
+    craft: '> CRAFTING',
   };
   const target = map[categoryKey];
   if (!target) return;
@@ -1383,6 +1394,7 @@ function loadUI() {
   renderCollectibles();
   renderLincolnMemorabilia();
   renderTraits();
+  renderCraft();
   renderGameDate();
   renderWorldMap(); // G6: Regional Zone Map
   renderKarmaCenter(); // G4: FO3 Karma Center

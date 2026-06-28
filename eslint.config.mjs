@@ -178,6 +178,7 @@ export default [
         initLocationDatalist: 'readonly',
         // Fallout Data Registry (js/reg_nv.js or js/reg_fo3.js)
         FALLOUT_REGISTRY: 'readonly',
+        SKILL_LABELS: 'readonly',
         registrySearch: 'readonly',
         renderCollectibles: 'readonly',
         renderLincolnMemorabilia: 'readonly',
@@ -185,6 +186,12 @@ export default [
         setLincolnDisposition: 'readonly',
         renderTraits: 'readonly',
         toggleTrait: 'readonly',
+        renderCraft: 'readonly',
+        setCraftFilter: 'readonly',
+        craftSetMax: 'readonly',
+        doCraft: 'readonly',
+        doScrap: 'readonly',
+        _craftGetHave: 'readonly',
         // Time system (js/ui.js)
         formatGameTime: 'readonly',
         ticksToGameTime: 'readonly',

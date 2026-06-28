@@ -971,11 +971,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-83)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-83)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-84)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-84)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -4816,6 +4816,98 @@ Check ($nvRecBlock83.Contains("name: 'Bottlecap Mine'")) "NV recipes contain 'Bo
 # 83.o  FO3 sentinels
 Check ($fo3RecBlock83.Contains("name: 'Deathclaw Gauntlet'") -and $fo3RecBlock83.Contains("name: 'Shishkebab'")) `
     "FO3 recipes contain 'Deathclaw Gauntlet' and 'Shishkebab'"
+# ===========================================================
+# Suite 84 -- Craft panel UI + mechanics (behavioral + data-safety)
+# 20 tests
+# ===========================================================
+Sep "Suite 84 -- Craft panel UI + mechanics (behavioral + data-safety)"
+
+$uiRSrc84 = Read-Src "js\ui-render.js"
+$uiCSrc84 = Read-Src "js\ui-core.js"
+$idxSrc84 = Read-Src "index.html"
+
+function Get-FnBody84($src, $fnName) {
+    $start = $src.IndexOf("function $fnName(")
+    if ($start -lt 0) { return '' }
+    $i = $src.IndexOf('{', $start)
+    if ($i -lt 0) { return '' }
+    $depth = 0; $end = $i
+    while ($end -lt $src.Length) {
+        if ($src[$end] -eq '{') { $depth++ }
+        elseif ($src[$end] -eq '}') { $depth--; if ($depth -eq 0) { break } }
+        $end++
+    }
+    $src.Substring($i, $end - $i + 1)
+}
+
+# 84.a  renderCraft defined in ui-render.js
+Check ($uiRSrc84.Contains('function renderCraft(')) "renderCraft() defined in js/ui-render.js"
+
+# 84.b  doCraft defined in ui-render.js
+Check ($uiRSrc84.Contains('function doCraft(')) "doCraft() defined in js/ui-render.js"
+
+# 84.c  doScrap defined in ui-render.js
+Check ($uiRSrc84.Contains('function doScrap(')) "doScrap() defined in js/ui-render.js"
+
+# 84.d  #craftPanel in index.html
+Check ($idxSrc84.Contains('id="craftPanel"')) '#craftPanel element present in index.html'
+
+# 84.e  craft_breakdown sub-panel in index.html
+Check ($idxSrc84.Contains('data-sub-id="craft_breakdown"')) 'data-sub-id="craft_breakdown" sub-panel present in index.html'
+
+# 84.f  renderCraft called from loadUI in ui-core.js
+$loadUIBody84 = Get-FnBody84 $uiCSrc84 'loadUI'
+Check ($loadUIBody84.Contains('renderCraft(')) "renderCraft() called from loadUI() in js/ui-core.js"
+
+# 84.g  "> CRAFTING" badge entry in _updatePanelBadges
+$badgesBody84 = Get-FnBody84 $uiCSrc84 '_updatePanelBadges'
+Check ($badgesBody84.Contains('> CRAFTING')) '"> CRAFTING" badge entry present in _updatePanelBadges()'
+
+# 84.h  craft key in expandPanelForCategory tabMap and map
+$expandBody84 = Get-FnBody84 $uiCSrc84 'expandPanelForCategory'
+Check ($expandBody84.Contains("craft: 'inv'") -and $expandBody84.Contains("craft: '> CRAFTING'")) `
+    "'craft' key in expandPanelForCategory tabMap and panel map"
+
+# 84.i  NO-CLOUD guard: doCraft + doScrap bodies have no cloud write calls
+$doCraftBody84 = Get-FnBody84 $uiRSrc84 'doCraft'
+$doScrapBody84 = Get-FnBody84 $uiRSrc84 'doScrap'
+$cloudHit84 = @('pushToCloud','addDoc','setDoc','writeBatch') | Where-Object { $doCraftBody84.Contains($_) -or $doScrapBody84.Contains($_) }
+Check ($cloudHit84.Count -eq 0) ("NO-CLOUD guard: doCraft/doScrap have no cloud write calls (got: " + $(if ($cloudHit84.Count) { $cloudHit84 -join ',' } else { 'none' }) + ")")
+
+# 84.j  confirm( gate in doCraft
+Check ($doCraftBody84.Contains('confirm(')) "confirm() gate present in doCraft body"
+
+# 84.k  confirm( gate in doScrap
+Check ($doScrapBody84.Contains('confirm(')) "confirm() gate present in doScrap body"
+
+# 84.l  doCraft body has ingredient missing-check logic
+Check ($doCraftBody84.Contains('missing')) "doCraft body has ingredient missing-check logic"
+
+# 84.m  _craftConsume removes zero-qty entries via splice
+$craftConsumeBody84 = Get-FnBody84 $uiRSrc84 '_craftConsume'
+Check ($craftConsumeBody84.Contains('splice(idx, 1)')) "_craftConsume removes zero-qty entry via splice"
+
+# 84.n  _craftConsume clamps at 0 (never-negative guard)
+Check ($craftConsumeBody84.Contains('Math.max(0,')) "_craftConsume uses Math.max(0, ...) clamp (never-negative)"
+
+# 84.o  doCraft body has ammo-output routing
+Check ($doCraftBody84.Contains('output.ammo')) "doCraft body has ammo-output routing (output.ammo)"
+
+# 84.p  doCraft body multiplies ingredient qty by batch qty
+Check ($doCraftBody84.Contains('ing.qty * qty')) "doCraft body multiplies ingredient qty by batch qty"
+
+# 84.q  doScrap body adds yields via forEach
+Check ($doScrapBody84.Contains('breakdown.yields.forEach')) "doScrap body adds yields via breakdown.yields.forEach"
+
+# 84.r  doScrap body has insufficient-qty guard
+Check ($doScrapBody84.Contains('have < qty')) "doScrap body has insufficient-qty guard (have < qty)"
+
+# 84.s  doCraft body does NOT reference state.skills (soft skill -- display only)
+Check (-not $doCraftBody84.Contains('state.skills')) "Soft skill: doCraft body does not consult state.skills (display-only)"
+
+# 84.t  _craftGetHave helper defined in ui-render.js
+Check ($uiRSrc84.Contains('function _craftGetHave(')) "_craftGetHave() helper defined in js/ui-render.js"
+
 # ===========================================================
 # Results
 # ===========================================================

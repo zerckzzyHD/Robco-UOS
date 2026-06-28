@@ -1631,17 +1631,18 @@ header('Meta / Runner Parity');
     'Suite 81',
     'Suite 82',
     'Suite 83',
+    'Suite 84',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-83)' +
+    'JS runner contains all gate-guard suites (22-41, 49-84)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-83)' +
+    'PS runner contains all gate-guard suites (22-41, 49-84)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -7919,6 +7920,307 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
       fo3RecBlock83.includes("name: 'Shishkebab'"),
     "FO3 recipes contain 'Deathclaw Gauntlet' and 'Shishkebab'"
   );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 84 — Craft panel UI + mechanics (behavioral + data-safety)
+//  20 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 84 — Craft panel UI + mechanics (behavioral + data-safety)');
+
+  const uiRSrc84 = readFile('js/ui-render.js');
+  const uiCSrc84 = readFile('js/ui-core.js');
+  const idxSrc84 = readFile('index.html');
+
+  // ── Structural ───────────────────────────────────────────────────────────
+  // 84.a  renderCraft defined in ui-render.js
+  assert(uiRSrc84.includes('function renderCraft('), 'renderCraft() defined in js/ui-render.js');
+
+  // 84.b  doCraft defined in ui-render.js
+  assert(uiRSrc84.includes('function doCraft('), 'doCraft() defined in js/ui-render.js');
+
+  // 84.c  doScrap defined in ui-render.js
+  assert(uiRSrc84.includes('function doScrap('), 'doScrap() defined in js/ui-render.js');
+
+  // 84.d  #craftPanel in index.html
+  assert(idxSrc84.includes('id="craftPanel"'), '#craftPanel element present in index.html');
+
+  // 84.e  craft_breakdown sub-panel in index.html
+  assert(
+    idxSrc84.includes('data-sub-id="craft_breakdown"'),
+    'data-sub-id="craft_breakdown" sub-panel present in index.html'
+  );
+
+  // 84.f  renderCraft called from loadUI in ui-core.js
+  const loadUIBody84 = extractFunctionBody(uiCSrc84, 'loadUI');
+  assert(
+    loadUIBody84.includes('renderCraft('),
+    'renderCraft() called from loadUI() in js/ui-core.js'
+  );
+
+  // 84.g  "> CRAFTING" badge entry in _updatePanelBadges
+  const badgesBody84 = extractFunctionBody(uiCSrc84, '_updatePanelBadges');
+  assert(
+    badgesBody84.includes('> CRAFTING'),
+    '"> CRAFTING" badge entry present in _updatePanelBadges()'
+  );
+
+  // 84.h  craft key in expandPanelForCategory tabMap and map
+  const expandBody84 = extractFunctionBody(uiCSrc84, 'expandPanelForCategory');
+  assert(
+    expandBody84.includes("craft: 'inv'") && expandBody84.includes("craft: '> CRAFTING'"),
+    "'craft' key in expandPanelForCategory tabMap and panel map"
+  );
+
+  // ── Static safety guards ─────────────────────────────────────────────────
+  // 84.i  NO-CLOUD guard: doCraft + doScrap bodies have no cloud write calls
+  const doCraftBody84 = extractFunctionBody(uiRSrc84, 'doCraft');
+  const doScrapBody84 = extractFunctionBody(uiRSrc84, 'doScrap');
+  const cloudHits84 = ['pushToCloud', 'addDoc', 'setDoc', 'writeBatch'].filter(
+    p => doCraftBody84.includes(p) || doScrapBody84.includes(p)
+  );
+  assert(
+    cloudHits84.length === 0,
+    'NO-CLOUD guard: doCraft/doScrap have no cloud write calls (got: ' +
+      (cloudHits84.join(',') || 'none') +
+      ')'
+  );
+
+  // 84.j  confirm( gate in doCraft
+  assert(doCraftBody84.includes('confirm('), 'confirm() gate present in doCraft body');
+
+  // 84.k  confirm( gate in doScrap
+  assert(doScrapBody84.includes('confirm('), 'confirm() gate present in doScrap body');
+
+  // ── Behavioral sandbox ───────────────────────────────────────────────────
+  {
+    const vm84 = require('vm');
+
+    function getFullFn84(src, name) {
+      const idx = src.indexOf(`function ${name}`);
+      if (idx === -1) return `function ${name}() {}`;
+      let i = src.indexOf('{', idx);
+      if (i === -1) return `function ${name}() {}`;
+      let depth = 0;
+      while (i < src.length) {
+        if (src[i] === '{') depth++;
+        else if (src[i] === '}' && --depth === 0) return src.slice(idx, i + 1);
+        i++;
+      }
+      return `function ${name}() {}`;
+    }
+
+    const craftCode84 = [
+      getFullFn84(uiRSrc84, '_craftGetHave'),
+      getFullFn84(uiRSrc84, '_craftConsume'),
+      getFullFn84(uiRSrc84, 'craftSetMax'),
+      getFullFn84(uiRSrc84, 'doCraft'),
+      getFullFn84(uiRSrc84, 'doScrap'),
+    ].join('\n');
+
+    const mockRegistry84 = {
+      recipes: [
+        {
+          name: 'Weapon Repair Kit',
+          station: 'workbench',
+          output: { item: 'Weapon Repair Kit', qty: 1 },
+          ingredients: [
+            { item: 'Scrap Electronics', qty: 1 },
+            { item: 'Scrap Metal', qty: 1 },
+          ],
+          skillReq: { skill: 'repair', level: 50 },
+          dlc: null,
+        },
+        {
+          name: 'Recycle Energy Cell',
+          station: 'workbench',
+          output: { item: 'Energy Cell', qty: 4, ammo: true },
+          ingredients: [{ item: 'Drained Small Energy Cell', qty: 4 }],
+          skillReq: null,
+          dlc: null,
+        },
+      ],
+      breakdowns: [
+        {
+          item: '.44 Magnum Round',
+          yields: [{ item: 'Case, .44 Magnum', qty: 1 }],
+          skillReq: null,
+        },
+      ],
+    };
+
+    function makeSb84(inv, ammo, skills, confirmRet, elemMap) {
+      const sb = {
+        state: { inventory: inv || [], ammo: ammo || {}, skills: skills || {} },
+        confirm: () => confirmRet !== false,
+        FALLOUT_REGISTRY: mockRegistry84,
+        document: {
+          getElementById: id =>
+            elemMap && elemMap[id] !== undefined ? { value: String(elemMap[id]) } : null,
+        },
+        appendToChat: () => {},
+        renderInventory: () => {},
+        renderAmmo: () => {},
+        renderCraft: () => {},
+        saveState: () => {},
+        updateMath: () => {},
+        lookupItemInDb: () => null,
+        SKILL_LABELS: { repair: 'Repair' },
+      };
+      vm84.createContext(sb);
+      vm84.runInContext(craftCode84, sb);
+      return sb;
+    }
+
+    // 84.l  Craft success: WRK added to inventory
+    {
+      const sb = makeSb84(
+        [
+          { name: 'Scrap Electronics', qty: 2, wgt: 0, val: 0, type: 'misc' },
+          { name: 'Scrap Metal', qty: 1, wgt: 0, val: 0, type: 'misc' },
+        ],
+        {},
+        { repair: 75 },
+        true,
+        { craftQty_0: 1 }
+      );
+      sb.doCraft(0);
+      const wrk = sb.state.inventory.find(i => i.name === 'Weapon Repair Kit');
+      assert(wrk && wrk.qty === 1, 'Craft success: Weapon Repair Kit (qty=1) added to inventory');
+    }
+
+    // 84.m  Ingredient at exactly need → entry removed (not left at qty=0)
+    {
+      const sb = makeSb84(
+        [
+          { name: 'Scrap Electronics', qty: 2, wgt: 0, val: 0, type: 'misc' },
+          { name: 'Scrap Metal', qty: 1, wgt: 0, val: 0, type: 'misc' },
+        ],
+        {},
+        { repair: 75 },
+        true,
+        { craftQty_0: 1 }
+      );
+      sb.doCraft(0);
+      const metal = sb.state.inventory.find(i => i.name === 'Scrap Metal');
+      assert(
+        !metal,
+        'Craft: ingredient at exactly need qty is removed from inventory (not left at qty=0)'
+      );
+    }
+
+    // 84.n  Insufficient ingredients → craft no-op (inventory unchanged)
+    {
+      const inv = [{ name: 'Scrap Electronics', qty: 1, wgt: 0, val: 0, type: 'misc' }];
+      const sb = makeSb84(JSON.parse(JSON.stringify(inv)), {}, {}, true, { craftQty_0: 1 });
+      const before = JSON.stringify(sb.state.inventory);
+      sb.doCraft(0);
+      const after = JSON.stringify(sb.state.inventory);
+      assert(before === after, 'Insufficient ingredients → craft no-op (inventory byte-identical)');
+    }
+
+    // 84.o  Never-negative: _craftConsume clamps at 0, removes entry
+    {
+      const sb = makeSb84(
+        [{ name: 'Lead', qty: 1, wgt: 0, val: 0, type: 'misc' }],
+        {},
+        {},
+        true,
+        {}
+      );
+      sb._craftConsume('Lead', 5);
+      const lead = sb.state.inventory.find(i => i.name === 'Lead');
+      assert(!lead, 'Never-negative: _craftConsume removes entry (no qty<0 left in inventory)');
+    }
+
+    // 84.p  Ammo-output recipe routes yield to state.ammo, not state.inventory
+    {
+      const sb = makeSb84(
+        [{ name: 'Drained Small Energy Cell', qty: 4, wgt: 0, val: 0, type: 'misc' }],
+        {},
+        {},
+        true,
+        { craftQty_1: 1 }
+      );
+      sb.doCraft(1);
+      assert(
+        sb.state.ammo['Energy Cell'] === 4 &&
+          !sb.state.inventory.find(i => i.name === 'Energy Cell'),
+        'Ammo-output recipe: yield in state.ammo (Energy Cell=4), absent from inventory'
+      );
+    }
+
+    // 84.q  Batch craft 2×: produces 2× output
+    {
+      const sb = makeSb84(
+        [
+          { name: 'Scrap Electronics', qty: 3, wgt: 0, val: 0, type: 'misc' },
+          { name: 'Scrap Metal', qty: 2, wgt: 0, val: 0, type: 'misc' },
+        ],
+        {},
+        { repair: 60 },
+        true,
+        { craftQty_0: 2 }
+      );
+      sb.doCraft(0);
+      const wrk = sb.state.inventory.find(i => i.name === 'Weapon Repair Kit');
+      assert(wrk && wrk.qty === 2, 'Batch craft 2×: produces 2× output (WRK qty=2)');
+    }
+
+    // 84.r  Scrap success: item consumed and yields added
+    {
+      const sb = makeSb84(
+        [{ name: '.44 Magnum Round', qty: 3, wgt: 0, val: 0, type: 'ammo' }],
+        {},
+        {},
+        true,
+        { scrapQty_0: 2 }
+      );
+      sb.doScrap(0);
+      const round = sb.state.inventory.find(i => i.name === '.44 Magnum Round');
+      const casing = sb.state.inventory.find(i => i.name === 'Case, .44 Magnum');
+      assert(
+        (!round || round.qty === 1) && casing && casing.qty === 2,
+        'Scrap success: 2× .44 Magnum Round consumed (3→1) and 2× Case, .44 Magnum added'
+      );
+    }
+
+    // 84.s  Scrap insufficient qty → no-op
+    {
+      const sb = makeSb84(
+        [{ name: '.44 Magnum Round', qty: 1, wgt: 0, val: 0, type: 'ammo' }],
+        {},
+        {},
+        true,
+        { scrapQty_0: 5 }
+      );
+      const before = JSON.stringify(sb.state.inventory);
+      sb.doScrap(0);
+      const after = JSON.stringify(sb.state.inventory);
+      assert(before === after, 'Scrap insufficient qty → no-op (inventory unchanged)');
+    }
+
+    // 84.t  Soft skill: craft proceeds when player skill < skill requirement
+    {
+      const sb = makeSb84(
+        [
+          { name: 'Scrap Electronics', qty: 1, wgt: 0, val: 0, type: 'misc' },
+          { name: 'Scrap Metal', qty: 1, wgt: 0, val: 0, type: 'misc' },
+        ],
+        {},
+        { repair: 10 },
+        true,
+        { craftQty_0: 1 }
+      );
+      sb.doCraft(0);
+      const wrk = sb.state.inventory.find(i => i.name === 'Weapon Repair Kit');
+      assert(
+        wrk && wrk.qty === 1,
+        'Soft skill: craft succeeds when player skill not met (Repair 10 < required 50)'
+      );
+    }
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
