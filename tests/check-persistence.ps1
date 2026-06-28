@@ -3728,19 +3728,22 @@ Check ([bool]($renderBody67 -match 'hasTraits')) `
 Check ([bool]($uiRenderSrc67 -match 'function toggleTrait\s*\(')) `
     'toggleTrait() is defined in ui-render.js'
 
-# 67.14  toggleTrait() soft-cap only -- always pushes the trait (no hard block on >2)
+# 67.14  toggleTrait() hard-caps at 2 -- refuses to add a 3rd trait (returns without push)
 $toggleBody67 = ''
 try { $toggleBody67 = Get-FunctionBody $uiRenderSrc67 'toggleTrait' } catch {}
-Check ([bool]($toggleBody67 -match '\.push\(name\)') -and [bool]($toggleBody67 -match 'length\s*>\s*2')) `
-    'toggleTrait() pushes trait + has soft-cap warn (>2) -- never hard-blocks selection'
+Check ([bool]($toggleBody67 -match 'length\s*>=\s*2') -and [bool]($toggleBody67 -match '\breturn\b')) `
+    'toggleTrait() hard-blocks adding a 3rd trait (length>=2 -> return without push) -- regression guard'
 
 # 67.15  index.html has #traitsDisplay container
 Check ([bool]($htmlSrc -match 'id="traitsDisplay"')) `
     'index.html has #traitsDisplay container (Protocol 5 panel element)'
 
-# 67.16  TRAITS panel is distinct from PERKS panel -- both exist
-Check ([bool]($htmlSrc -match 'id="traitsDisplay"') -and [bool]($htmlSrc -match 'id="perksList"')) `
-    'index.html has #traitsDisplay AND #perksList -- Traits panel is distinct from Perks panel'
+# 67.16  #traitsDisplay is inside the Perks panel; no standalone top-level TRAITS <details> panel
+$perksIdx67   = $htmlSrc.IndexOf('id="perksList"')
+$traitsIdx67  = $htmlSrc.IndexOf('id="traitsDisplay"')
+$noStandalone67 = -not ($htmlSrc -match '(?s)<details[^>]*class="panel"[^>]*>[\s\S]{0,200}<summary[^>]*>[^<]*TRAITS[^<]*</summary>')
+Check ($perksIdx67 -ne -1 -and $traitsIdx67 -ne -1 -and $traitsIdx67 -gt $perksIdx67 -and $noStandalone67) `
+    'index.html: #traitsDisplay is inside the Perks panel (after #perksList); no standalone TRAITS <details class="panel"> -- distinct IDs preserved'
 
 # 67.17  getSystemDirective() references state.traits (Protocol 14)
 $sdBody67 = ''

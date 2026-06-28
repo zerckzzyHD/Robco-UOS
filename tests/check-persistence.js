@@ -6169,15 +6169,15 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     'toggleTrait() is defined in ui-render.js'
   );
 
-  // 67.14  toggleTrait() soft-cap only — always pushes the trait (no hard block on >2)
+  // 67.14  toggleTrait() hard-caps at 2 — refuses to add a 3rd trait (returns without push)
   {
     let toggleBody67 = '';
     try {
       toggleBody67 = extractFunctionBody(uiRenderSrc67, 'toggleTrait');
     } catch (_) {}
     assert(
-      /\.push\(name\)/.test(toggleBody67) && /length\s*>\s*2/.test(toggleBody67),
-      'toggleTrait() pushes trait + has soft-cap warn (>2) — never hard-blocks selection'
+      /length\s*>=\s*2/.test(toggleBody67) && /return/.test(toggleBody67),
+      'toggleTrait() hard-blocks adding a 3rd trait (length>=2 → return without push) — regression guard'
     );
   }
 
@@ -6187,11 +6187,21 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     'index.html has #traitsDisplay container (Protocol 5 panel element)'
   );
 
-  // 67.16  TRAITS panel is distinct from PERKS panel — both #traitsDisplay and #perksList exist
-  assert(
-    /id="traitsDisplay"/.test(htmlSource) && /id="perksList"/.test(htmlSource),
-    'index.html has #traitsDisplay AND #perksList — Traits panel is distinct from Perks panel'
-  );
+  // 67.16  #traitsDisplay is inside the Perks panel; no standalone top-level TRAITS <details> panel
+  {
+    const perksIdx = htmlSource.indexOf('id="perksList"');
+    const traitsIdx = htmlSource.indexOf('id="traitsDisplay"');
+    assert(
+      perksIdx !== -1 &&
+        traitsIdx !== -1 &&
+        traitsIdx > perksIdx &&
+        !/id="traitsDisplay"[\s\S]*?<\/details>[\s\S]*?id="perksList"/.test(htmlSource) &&
+        !/<details[^>]*class="panel"[^>]*>[\s\S]{0,200}<summary[^>]*>[^<]*TRAITS[^<]*<\/summary>/.test(
+          htmlSource
+        ),
+      'index.html: #traitsDisplay is inside the Perks panel (after #perksList); no standalone TRAITS <details class="panel"> — distinct IDs preserved'
+    );
+  }
 
   // 67.17  getSystemDirective() mentions traits (Protocol 14 — AI contract updated)
   {

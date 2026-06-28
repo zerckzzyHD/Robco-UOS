@@ -911,21 +911,25 @@
             <button class="action-btn" onclick="addPerk()" style="margin-top: 4px">
               + ADD PERK
             </button>
-          </details>
-
-          <!-- 6b. TRAITS (FNV only) -->
-          <details class="panel" data-tab="stat">
-            <summary><h2>&gt; TRAITS</h2></summary>
-            <input
-              type="text"
-              id="traitFilter"
-              placeholder="Filter traits..."
-              maxlength="80"
-              oninput="renderTraits()"
-              style="width: 100%; box-sizing: border-box; margin-bottom: 6px; font-size: 16px"
-            />
-            <div id="traitsDisplay">
-              <span class="empty-state">No traits selected</span>
+            <!-- Traits subsection (FNV only — shown/hidden by renderTraits()) -->
+            <div
+              id="traitsSection"
+              style="
+                border-top: 1px dashed var(--robco-blue);
+                margin-top: 10px;
+                padding-top: 8px;
+                display: none;
+              "
+            >
+              <input
+                type="text"
+                id="traitFilter"
+                placeholder="Filter traits..."
+                maxlength="80"
+                oninput="renderTraits()"
+                style="width: 100%; box-sizing: border-box; margin-bottom: 4px; font-size: 16px"
+              />
+              <div id="traitsDisplay"></div>
             </div>
           </details>
 

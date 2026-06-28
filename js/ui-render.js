@@ -838,12 +838,15 @@ function setLincolnDisposition(name, value) {
 }
 
 function renderTraits() {
+  const section = document.getElementById('traitsSection');
   const container = document.getElementById('traitsDisplay');
   if (!container) return;
   if (!_activeDef().hasTraits) {
+    if (section) section.style.display = 'none';
     container.style.display = 'none';
     return;
   }
+  if (section) section.style.display = '';
   container.style.display = '';
 
   const defs =
@@ -852,25 +855,17 @@ function renderTraits() {
       : [];
   const selected = Array.isArray(state.traits) ? state.traits : [];
   const n = selected.length;
-  const overCap = n > 2;
 
-  let html = `<div style="border-bottom:1px dashed var(--robco-blue);margin-bottom:6px;padding-bottom:4px;font-size:11px;color:var(--robco-blue);font-weight:bold;letter-spacing:1px;">`;
-  html += `TRAITS [${n}/2]`;
-  if (overCap) {
-    html += `<span style="color:#e8a020;font-size:10px;font-weight:normal;margin-left:8px;">[${n}/2] — exceeds 2-trait limit (OWB allows re-selection)</span>`;
-  }
-  html += `</div>`;
+  let html = `<div style="font-size:11px;color:var(--robco-blue);font-weight:bold;letter-spacing:1px;margin-bottom:4px;">TRAITS [${n}/2]</div>`;
 
   const filterQ = (document.getElementById('traitFilter')?.value || '').toLowerCase().trim();
 
-  // Apply name/effect filter; [n/2] header always counts ALL selected regardless of filter
   const visibleDefs = filterQ
     ? defs.filter(
         d => d.name.toLowerCase().includes(filterQ) || d.effect.toLowerCase().includes(filterQ)
       )
     : defs;
 
-  // Selected first, then unselected (within filtered set)
   const selectedDefs = visibleDefs.filter(d => selected.includes(d.name));
   const unselectedDefs = visibleDefs.filter(d => !selected.includes(d.name));
 
@@ -878,18 +873,18 @@ function renderTraits() {
     const safeName = escapeHtml(d.name);
     const isSel = selected.includes(d.name);
     const dlcBadge =
-      d.dlc === 'owb' ? ' <span style="font-size:9px;opacity:0.6;">[OWB]</span>' : '';
+      d.dlc === 'owb' ? ' <span style="font-size:9px;opacity:0.5;">[OWB]</span>' : '';
     if (isSel) {
-      html += `<div style="font-size:11px;margin-bottom:5px;padding:3px 0;">`;
-      html += `<span style="color:var(--robco-green);cursor:pointer;min-height:28px;display:inline-flex;align-items:center;margin-right:4px;" onclick="toggleTrait('${safeName}')" title="Click to deselect">[SELECTED]</span>`;
+      html += `<div style="font-size:11px;margin-bottom:2px;line-height:1.3;">`;
+      html += `<span style="color:var(--robco-green);cursor:pointer;min-height:28px;display:inline-flex;align-items:center;margin-right:4px;" onclick="toggleTrait('${safeName}')" title="Deselect">[SEL]</span>`;
       html += `<strong>${escapeHtml(d.name.toUpperCase())}${dlcBadge}</strong>`;
-      html += `<div style="font-size:10px;opacity:0.7;margin-top:2px;padding-left:4px;">${escapeHtml(d.effect)}</div>`;
+      html += `<div style="font-size:10px;opacity:0.65;padding-left:4px;">${escapeHtml(d.effect)}</div>`;
       html += `</div>`;
     } else {
-      html += `<div style="font-size:11px;margin-bottom:5px;padding:3px 0;opacity:0.75;">`;
-      html += `<span style="opacity:0.55;cursor:pointer;min-height:28px;display:inline-flex;align-items:center;margin-right:4px;" onclick="toggleTrait('${safeName}')" title="Click to select">[&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;]</span>`;
+      html += `<div style="font-size:11px;margin-bottom:2px;opacity:0.7;line-height:1.3;">`;
+      html += `<span style="opacity:0.5;cursor:pointer;min-height:28px;display:inline-flex;align-items:center;margin-right:4px;" onclick="toggleTrait('${safeName}')" title="Select">[---]</span>`;
       html += `${escapeHtml(d.name.toUpperCase())}${dlcBadge}`;
-      html += `<div style="font-size:10px;opacity:0.55;margin-top:2px;padding-left:4px;">${escapeHtml(d.effect)}</div>`;
+      html += `<div style="font-size:10px;opacity:0.5;padding-left:4px;">${escapeHtml(d.effect)}</div>`;
       html += `</div>`;
     }
   };
@@ -899,7 +894,7 @@ function renderTraits() {
   } else {
     selectedDefs.forEach(renderRow);
     if (selectedDefs.length > 0 && unselectedDefs.length > 0) {
-      html += `<div style="border-top:1px dashed var(--robco-green);margin:4px 0 6px;opacity:0.3;"></div>`;
+      html += `<div style="border-top:1px dashed var(--robco-green);margin:4px 0;opacity:0.3;"></div>`;
     }
     unselectedDefs.forEach(renderRow);
   }
@@ -913,15 +908,13 @@ function toggleTrait(name) {
   if (idx !== -1) {
     state.traits.splice(idx, 1);
   } else {
-    state.traits.push(name);
-    if (state.traits.length > 2) {
+    if (state.traits.length >= 2) {
       if (typeof appendToChat === 'function') {
-        appendToChat(
-          `> [TRAITS] ${state.traits.length}/2 — exceeds standard limit. Old World Blues allows re-selection.`,
-          'sys'
-        );
+        appendToChat('> [TRAITS] Maximum 2 traits — deselect one first.', 'sys');
       }
+      return;
     }
+    state.traits.push(name);
   }
   renderTraits();
   saveState();
