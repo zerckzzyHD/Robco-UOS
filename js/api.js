@@ -256,7 +256,10 @@ async function fetchAuthorizedModels(silent = false) {
         )
         .map(m => {
           const shortName = m.name.replace('models/', '');
-          return `<option value="${shortName}">${m.displayName || shortName} (${shortName})</option>`;
+          // Escape the externally-sourced model name before innerHTML (Prohibited Patterns — XSS)
+          const safeShort = escapeHtml(shortName);
+          const safeDisplay = escapeHtml(m.displayName || shortName);
+          return `<option value="${safeShort}">${safeDisplay} (${safeShort})</option>`;
         });
       added = opts.length;
       optionsHtml = opts.join('');

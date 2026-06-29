@@ -584,8 +584,10 @@ async function loadGeminiKeyFromCloud() {
         if (data.model) {
           localStorage.setItem('robco_gemini_model', data.model);
           const modelInput = document.getElementById('apiModelInput');
-          if (modelInput)
-            modelInput.innerHTML = `<option value="${data.model}">${data.model} (Secured)</option>`;
+          if (modelInput) {
+            const safeModel = escapeHtml(data.model);
+            modelInput.innerHTML = `<option value="${safeModel}">${safeModel} (Secured)</option>`;
+          }
         }
       }
     }

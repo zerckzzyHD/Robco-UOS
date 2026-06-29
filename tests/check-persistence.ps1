@@ -734,8 +734,11 @@ Test-WeaponsCsvColumnCount -src $dbFo3Src  -label "db_fo3.js"
 # Static assertions that XSS-1 (squad numeric coercion),
 # XSS-2 (trade modal click binding), and XSS-3 (inventory
 # qty/wgt/val coercion + quest factions/status escaping) fixes
-# cannot regress.
-# 9 tests
+# cannot regress. Includes GH-2 (WU-B2): untrusted/external model
+# strings (localStorage, Firestore, Gemini API) are escaped before
+# innerHTML, and no served JS inlines a localStorage read into a
+# template literal.
+# 13 tests
 # ===========================================================
 Sep "Suite 21 -- Security regression guards"
 
@@ -786,6 +789,23 @@ Check ([bool]([regex]::Match($renderQuestsBody, 'escapeHtml.*q\.factions').Succe
 # 21.9 renderQuests() escapes quest status with escapeHtml
 Check ([bool]([regex]::Match($renderQuestsBody, 'escapeHtml\s*\(\s*st\.toUpperCase').Success)) `
     "renderQuests() escapes quest status with escapeHtml before innerHTML (XSS-3 guard)"
+
+# 21.10 GH-2a: ui-core.js escapes the localStorage-derived saved model before innerHTML
+Check (($uiSrc -match 'escapeHtml\s*\(\s*savedModel\s*\)') -and -not ($uiSrc -match '<option value="\$\{savedModel\}')) `
+    "ui-core.js escapes localStorage model with escapeHtml before innerHTML -- no raw interpolation (GH-2 XSS guard)"
+
+# 21.11 GH-2b: cloud.js escapes the Firestore-derived model before innerHTML
+Check (($cloudSrc -match 'escapeHtml\s*\(\s*data\.model\s*\)') -and -not ($cloudSrc -match '<option value="\$\{data\.model\}')) `
+    "cloud.js escapes Firestore model with escapeHtml before innerHTML -- no raw interpolation (GH-2 XSS guard)"
+
+# 21.12 GH-2c: api.js escapes the externally-sourced Gemini model name before innerHTML
+Check (($apiSrc -match 'escapeHtml\s*\(\s*shortName\s*\)') -and -not ($apiSrc -match '<option value="\$\{shortName\}') -and -not ($apiSrc -match '\$\{m\.displayName')) `
+    "api.js escapes Gemini model name with escapeHtml before innerHTML -- no raw interpolation (GH-2 XSS guard)"
+
+# 21.13 GH-2 ratchet (general, forward-looking): no served JS inlines a localStorage.getItem() read into a template literal
+$servedJs21 = @($uiSrc, $apiSrc, $cloudSrc) -join "`n"
+Check (-not ($servedJs21 -match '\$\{[^}]*localStorage\.getItem')) `
+    "No served JS interpolates localStorage.getItem() into a template literal (GH-2 escape-before-innerHTML ratchet)"
 
 # ===========================================================
 # Suite 22 -- Critical Feature Presence (Group 1)

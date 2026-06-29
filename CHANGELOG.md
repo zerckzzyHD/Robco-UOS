@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1166/1166 | Cache: robco-terminal-v2.6.0-r11 -->
+﻿## [Unreleased]<!-- Tests: 1170/1170 | Cache: robco-terminal-v2.6.0-r12 -->
 
 ### Added
 
@@ -42,6 +42,7 @@
 - Reworked how the terminal picks which game's data to load at startup: a single game→files manifest now drives it, so adding a future Fallout title takes one line plus its two data files instead of editing boot logic. No change to how the app loads or behaves for New Vegas or Fallout 3.
 - Hardened the save-on-exit safeguard with two new locked-in checks: one proves a guarded reload keeps freshly-loaded data and an unguarded one would lose it (the "save then reload" footgun), the other ensures the safeguard can't be accidentally reordered out of effect. Added a standing rule (Protocol 42) that any flaw found while testing must be fixed and covered by a test in the same commit rather than worked around. No user-facing change — current save/load already behaves correctly.
 - The AI engine list (the model dropdown populated after validating your Google AI Studio key) is now built in a single pass instead of one slow DOM update per model, removing an inefficient pattern that re-parsed the whole list on every entry. No visible change — the same engines appear in the same order. The build gate was also tightened so this inefficient pattern can no longer slip back into any served code.
+- Hardened how AI engine names are shown in the model dropdown against malformed or hostile text. The model name — whether typed by you, restored from a synced key, or returned by Google's model list — is now safely escaped before it is displayed, closing a potential cross-site-scripting hole. No visible change for normal model names; the build gate now also fails if any externally-sourced value is ever placed into the page without escaping it first.
 
 ---
 

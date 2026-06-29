@@ -1154,8 +1154,11 @@ checkWeaponsCsvColumnCount(dbFo3Source, 'db_fo3.js');
 //  Static assertions that XSS-1 (squad numeric coercion),
 //  XSS-2 (trade modal click binding), and XSS-3 (inventory
 //  qty/wgt/val coercion + quest factions/status escaping) fixes
-//  cannot regress.
-//  9 tests
+//  cannot regress. Includes GH-2 (WU-B2): untrusted/external model
+//  strings (localStorage, Firestore, Gemini API) are escaped before
+//  innerHTML, and no served JS inlines a localStorage read into a
+//  template literal.
+//  13 tests
 // ══════════════════════════════════════════════════════════════
 header('Security regression guards');
 
@@ -1248,6 +1251,42 @@ assert(
   assert(
     /escapeHtml\s*\(\s*st\.toUpperCase/.test(renderQuestsBody),
     'renderQuests() escapes quest status with escapeHtml before innerHTML (XSS-3 guard)'
+  );
+}
+
+// 21.10 GH-2a: ui-core.js escapes the localStorage-derived saved model before
+// building the <option> innerHTML (no raw ${savedModel} reaches innerHTML).
+assert(
+  /escapeHtml\s*\(\s*savedModel\s*\)/.test(uiSource) &&
+    !/<option value="\$\{savedModel\}/.test(uiSource),
+  'ui-core.js escapes localStorage model with escapeHtml before innerHTML — no raw interpolation (GH-2 XSS guard)'
+);
+
+// 21.11 GH-2b: cloud.js escapes the Firestore-derived model before building the
+// <option> innerHTML (no raw ${data.model} reaches innerHTML).
+assert(
+  /escapeHtml\s*\(\s*data\.model\s*\)/.test(cloudSource) &&
+    !/<option value="\$\{data\.model\}/.test(cloudSource),
+  'cloud.js escapes Firestore model with escapeHtml before innerHTML — no raw interpolation (GH-2 XSS guard)'
+);
+
+// 21.12 GH-2c: api.js escapes the externally-sourced Gemini model name before
+// building the <option> innerHTML (no raw ${shortName}/${m.displayName} reaches innerHTML).
+assert(
+  /escapeHtml\s*\(\s*shortName\s*\)/.test(apiSource) &&
+    !/<option value="\$\{shortName\}/.test(apiSource) &&
+    !/\$\{m\.displayName/.test(apiSource),
+  'api.js escapes Gemini model name with escapeHtml before innerHTML — no raw interpolation (GH-2 XSS guard)'
+);
+
+// 21.13 GH-2 ratchet (general, forward-looking): no served JS may inline a
+// localStorage.getItem(...) read directly into a template-literal interpolation
+// (${localStorage.getItem(...)}) — storage values must be cached + escaped first.
+{
+  const servedJs21 = [uiSource, apiSource, cloudSource].join('\n');
+  assert(
+    !/\$\{[^}]*localStorage\.getItem/.test(servedJs21),
+    'No served JS interpolates localStorage.getItem() into a template literal (GH-2 escape-before-innerHTML ratchet)'
   );
 }
 

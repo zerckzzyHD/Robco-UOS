@@ -173,8 +173,9 @@ window.onload = function () {
   }
   if (localStorage.getItem('robco_gemini_model')) {
     let savedModel = localStorage.getItem('robco_gemini_model');
+    const safeModel = escapeHtml(savedModel);
     document.getElementById('apiModelInput').innerHTML =
-      `<option value="${savedModel}">${savedModel} (Secured)</option>`;
+      `<option value="${safeModel}">${safeModel} (Secured)</option>`;
   }
   try {
     if (localStorage.getItem('robco_chat')) {
