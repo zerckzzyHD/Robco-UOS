@@ -522,6 +522,8 @@ window.loadCloudSave = async function (docId) {
     if (data.chat && Array.isArray(data.chat))
       localStorage.setItem('robco_chat', JSON.stringify(data.chat));
     if (data.playstyle) localStorage.setItem('robco_playstyle', data.playstyle);
+    // Guard the impending reload's beforeunload flush (clobber regression).
+    window._loadingSave = true;
     alert('>> CLOUD SAVE RESTORED. REBOOTING SYSTEM... <<');
     window.location.reload();
   } catch (e) {

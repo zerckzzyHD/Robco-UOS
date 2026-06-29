@@ -1646,17 +1646,18 @@ header('Meta / Runner Parity');
     'Suite 92',
     'Suite 93',
     'Suite 94',
+    'Suite 95',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-94)' +
+    'JS runner contains all gate-guard suites (22-41, 49-95)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-94)' +
+    'PS runner contains all gate-guard suites (22-41, 49-95)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -9271,6 +9272,114 @@ header('Suite 94 — Accessibility Guards');
     /function\s+_openSysModal\s*\(/.test(uiCore94),
     'GATE-A11Y-10: _openSysModal() helper defined in ui-core.js (focus management + Tab-trap entrypoint)'
   );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 95 — SAVE-LOAD RELOAD GUARD (import clobber regression) (7 tests)
+//  Regression for the d0f0429 beforeunload bug: a load path writes the new
+//  robco_v8 then calls location.reload(); the beforeunload flush fired during
+//  teardown and re-serialized the STALE in-memory state over robco_v8, so
+//  IMPORT SAVE / RESTORE BACKUP / cloud load silently did nothing. The fix
+//  sets window._loadingSave before each reload and suppresses the unload +
+//  debounced flush while it is set. These guards must never be removed.
+// ══════════════════════════════════════════════════════════════
+header('Suite 95 — Save-Load Reload Guard (import clobber regression)');
+{
+  const uiCore95 = fs.readFileSync(path.join(__dirname, '../js/ui-core.js'), 'utf8');
+  const state95 = fs.readFileSync(path.join(__dirname, '../js/state.js'), 'utf8');
+  const saves95 = fs.readFileSync(path.join(__dirname, '../js/ui-saves.js'), 'utf8');
+  const cloud95 = fs.readFileSync(path.join(__dirname, '../js/cloud.js'), 'utf8');
+  const api95 = fs.readFileSync(path.join(__dirname, '../js/api.js'), 'utf8');
+
+  // 95.1  beforeunload flush is guarded by _loadingSave (not an unconditional robco_v8 write)
+  assert(
+    /beforeunload[\s\S]{0,400}?_loadingSave/.test(uiCore95),
+    '95.1: ui-core.js beforeunload flush guards on window._loadingSave (no stale clobber of an imported robco_v8)'
+  );
+
+  // 95.2  debounced saveState write is guarded by _loadingSave too
+  assert(
+    /_saveTimer\s*=\s*setTimeout\([\s\S]{0,400}?_loadingSave/.test(state95),
+    '95.2: state.js debounced saveState() write guards on window._loadingSave (no stale clobber during a load reload)'
+  );
+
+  // 95.3  handleFileUpload sets _loadingSave before its reload
+  {
+    const fn = extractFunctionBody(saves95, 'handleFileUpload');
+    assert(
+      /_loadingSave\s*=\s*true[\s\S]*?location\.reload\(\)/.test(fn),
+      '95.3: handleFileUpload sets window._loadingSave = true before location.reload() (import survives unload flush)'
+    );
+  }
+
+  // 95.4  restoreRollingBackup sets _loadingSave before its reload
+  {
+    const fn = extractFunctionBody(saves95, 'restoreRollingBackup');
+    assert(
+      /_loadingSave\s*=\s*true[\s\S]*?location\.reload\(\)/.test(fn),
+      '95.4: restoreRollingBackup sets window._loadingSave = true before location.reload() (backup restore survives unload flush)'
+    );
+  }
+
+  // 95.5  loadCloudSave sets _loadingSave before its reload
+  assert(
+    /_loadingSave\s*=\s*true[\s\S]{0,200}?location\.reload\(\)/.test(cloud95),
+    '95.5: cloud.js loadCloudSave sets window._loadingSave = true before location.reload() (cloud load survives unload flush)'
+  );
+
+  // 95.6  onGameContextChange still guards its reload (working context-switch path not regressed)
+  {
+    const fn = extractFunctionBody(uiCore95, 'onGameContextChange');
+    assert(
+      /_contextSwitching\s*=\s*true[\s\S]*?location\.reload\(\)/.test(fn),
+      '95.6: onGameContextChange still sets window._contextSwitching = true before reload (context-switch persistence intact)'
+    );
+  }
+
+  // 95.7  BEHAVIORAL: a current-version save container round-trips through
+  //       sanitizeImportedContainer + the boot merge, and the loaded state
+  //       reflects the imported file (lvl/caps/loc/inventory).
+  {
+    let _testSanitize = null;
+    try {
+      const fnBody = extractFunctionBody(api95, 'sanitizeImportedContainer');
+      const fnStart = api95.indexOf('function sanitizeImportedContainer');
+      const paramsStart = api95.indexOf('(', fnStart);
+      const paramsEnd = api95.indexOf('{', paramsStart);
+      const params = api95.slice(paramsStart, paramsEnd).trim();
+      _testSanitize = eval(`(function sanitizeImportedContainer${params}${fnBody})`);
+    } catch (_) {}
+    if (_testSanitize) {
+      // The container as it appears inside a real current-version export file.
+      const importedContainer = {
+        activeContext: 'FNV',
+        campaigns: {
+          FNV: {
+            lvl: 42,
+            caps: 9999,
+            loc: 'New Vegas Strip',
+            inventory: [{ name: 'Plasma Rifle', qty: 1, wgt: 5, val: 3800, type: 'WEAPON' }],
+          },
+        },
+      };
+      // handleFileUpload: sanitize then persist (JSON round-trip = localStorage write).
+      const stored = JSON.parse(JSON.stringify(_testSanitize(importedContainer)));
+      // ui-core.js boot merge: state = { ...defaults, ...campaigns[activeContext] }.
+      const bootDefaults = { lvl: 1, caps: 0, loc: 'Goodsprings', inventory: [] };
+      const active = stored.campaigns[stored.activeContext] || {};
+      const merged = { ...bootDefaults, ...active };
+      assert(
+        merged.lvl === 42 &&
+          merged.caps === 9999 &&
+          merged.loc === 'New Vegas Strip' &&
+          merged.inventory.length === 1 &&
+          merged.inventory[0].name === 'Plasma Rifle',
+        '95.7: imported save container round-trips through sanitize + boot merge — loaded state reflects the file (lvl/caps/loc/inventory)'
+      );
+    } else {
+      fail('95.7: behavioral import round-trip — sanitizeImportedContainer could not be evaluated');
+    }
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

@@ -1,4 +1,8 @@
-﻿## [Unreleased]<!-- Tests: 1141/1141 | Cache: robco-terminal-v2.6.0-r8 -->
+﻿## [Unreleased]<!-- Tests: 1148/1148 | Cache: robco-terminal-v2.6.0-r9 -->
+
+### Fixed
+
+- Loading a saved game now actually loads it. Importing a save file, restoring a backup, or loading a cloud save would appear to do nothing — the terminal kept showing your current data instead of the loaded save. The newly-loaded data was being written correctly, but a routine "save on exit" step was firing during the reload and silently overwriting it with your old data first. All three load paths — IMPORT SAVE, RESTORE BACKUP, and cloud load — now load correctly, including older and reconstructed saves.
 
 ### Added
 
@@ -17,6 +21,7 @@
 
 ### Under the Hood
 
+- Added Suite 95 (7 regression tests) permanently guarding the save-load fix above: the exit-save flush and debounced save are both gated by the new load-in-progress flag, each of the three load paths sets that flag before reloading, the working game-switch path keeps its own guard, and a behavioral test imports a save container and asserts the loaded state reflects the file.
 - Added Suite 94 (10 regression tests) permanently guarding the accessibility changes above: `:focus-visible` CSS rule present, `prefers-reduced-motion` block with correct freeze parameters, `aria-live` on the chat display, `role=dialog`/`aria-modal` on the system modal, and the `_openSysModal()` focus-management helper.
 - Extended Suite 92 with a test for the macro-button nowrap guard (now 5 tests total).
 

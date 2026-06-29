@@ -429,7 +429,9 @@ function saveState() {
   // A beforeunload handler in ui.js flushes immediately on tab close
   clearTimeout(_saveTimer);
   _saveTimer = setTimeout(() => {
-    if (window._contextSwitching) return;
+    // Same suppression as the unload flush: never let a debounced write of stale
+    // in-memory state land on top of a robco_v8 that a load path just wrote.
+    if (window._contextSwitching || window._loadingSave) return;
     try {
       if (!window.robco_v8) {
         window.robco_v8 = { activeContext: state.gameContext || 'FNV', campaigns: {} };

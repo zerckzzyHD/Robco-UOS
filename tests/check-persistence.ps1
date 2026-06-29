@@ -972,11 +972,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84','Suite 85','Suite 86','Suite 87','Suite 88','Suite 89','Suite 90','Suite 91','Suite 92','Suite 93','Suite 94')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84','Suite 85','Suite 86','Suite 87','Suite 88','Suite 89','Suite 90','Suite 91','Suite 92','Suite 93','Suite 94','Suite 95')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-94)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-94)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-95)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-95)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -5509,6 +5509,59 @@ Check ($idx94ps.Contains('aria-modal="true"')) `
 # 94.10  _openSysModal helper defined in ui-core.js
 Check ([System.Text.RegularExpressions.Regex]::IsMatch($uiCore94ps, 'function\s+_openSysModal\s*\(')) `
     'GATE-A11Y-10: _openSysModal() helper defined in ui-core.js (focus management + Tab-trap entrypoint)'
+
+# ===========================================================
+# Suite 95 -- SAVE-LOAD RELOAD GUARD (import clobber regression) (7 tests)
+# Regression for the d0f0429 beforeunload bug: a load path writes the new
+# robco_v8 then calls location.reload(); the beforeunload flush fired during
+# teardown and re-serialized the STALE in-memory state over robco_v8, so
+# IMPORT SAVE / RESTORE BACKUP / cloud load silently did nothing. The fix
+# sets window._loadingSave before each reload and suppresses the unload +
+# debounced flush while it is set. These guards must never be removed.
+# ===========================================================
+Sep "Suite 95 -- Save-Load Reload Guard (import clobber regression)"
+$uiCore95 = [System.IO.File]::ReadAllText((Join-Path $Root 'js/ui-core.js'), [System.Text.Encoding]::UTF8)
+$state95  = [System.IO.File]::ReadAllText((Join-Path $Root 'js/state.js'), [System.Text.Encoding]::UTF8)
+$saves95  = [System.IO.File]::ReadAllText((Join-Path $Root 'js/ui-saves.js'), [System.Text.Encoding]::UTF8)
+$cloud95  = [System.IO.File]::ReadAllText((Join-Path $Root 'js/cloud.js'), [System.Text.Encoding]::UTF8)
+
+# 95.1  beforeunload flush is guarded by _loadingSave (not an unconditional robco_v8 write)
+Check ([System.Text.RegularExpressions.Regex]::IsMatch($uiCore95, 'beforeunload[\s\S]{0,400}?_loadingSave')) `
+    '95.1: ui-core.js beforeunload flush guards on window._loadingSave (no stale clobber of an imported robco_v8)'
+
+# 95.2  debounced saveState write is guarded by _loadingSave too
+Check ([System.Text.RegularExpressions.Regex]::IsMatch($state95, '_saveTimer\s*=\s*setTimeout\([\s\S]{0,400}?_loadingSave')) `
+    '95.2: state.js debounced saveState() write guards on window._loadingSave (no stale clobber during a load reload)'
+
+# 95.3  handleFileUpload sets _loadingSave before its reload
+$fn953 = Get-FunctionBody $saves95 'handleFileUpload'
+Check ([System.Text.RegularExpressions.Regex]::IsMatch($fn953, '_loadingSave\s*=\s*true[\s\S]*?location\.reload\(\)')) `
+    '95.3: handleFileUpload sets window._loadingSave = true before location.reload() (import survives unload flush)'
+
+# 95.4  restoreRollingBackup sets _loadingSave before its reload
+$fn954 = Get-FunctionBody $saves95 'restoreRollingBackup'
+Check ([System.Text.RegularExpressions.Regex]::IsMatch($fn954, '_loadingSave\s*=\s*true[\s\S]*?location\.reload\(\)')) `
+    '95.4: restoreRollingBackup sets window._loadingSave = true before location.reload() (backup restore survives unload flush)'
+
+# 95.5  loadCloudSave sets _loadingSave before its reload
+Check ([System.Text.RegularExpressions.Regex]::IsMatch($cloud95, '_loadingSave\s*=\s*true[\s\S]{0,200}?location\.reload\(\)')) `
+    '95.5: cloud.js loadCloudSave sets window._loadingSave = true before location.reload() (cloud load survives unload flush)'
+
+# 95.6  onGameContextChange still guards its reload (working context-switch path not regressed)
+$fn956 = Get-FunctionBody $uiCore95 'onGameContextChange'
+Check ([System.Text.RegularExpressions.Regex]::IsMatch($fn956, '_contextSwitching\s*=\s*true[\s\S]*?location\.reload\(\)')) `
+    '95.6: onGameContextChange still sets window._contextSwitching = true before reload (context-switch persistence intact)'
+
+# 95.7  Structural twin of the JS behavioral round-trip: the import write feeds
+#       sanitizeImportedContainer(parsed.robco_v8) into robco_v8, and the boot
+#       merge reads campaigns[activeContext] back into state. (JS runner runs the
+#       full behavioral eval; PS runner asserts the round-trip wiring structurally.)
+$fn957 = Get-FunctionBody $saves95 'handleFileUpload'
+$rt957 = ([System.Text.RegularExpressions.Regex]::IsMatch($fn957, "sanitizeImportedContainer\(parsed\.robco_v8\)") -and `
+          [System.Text.RegularExpressions.Regex]::IsMatch($fn957, "localStorage\.setItem\('robco_v8'") -and `
+          [System.Text.RegularExpressions.Regex]::IsMatch($uiCore95, "campaigns\[window\.robco_v8\.activeContext\]"))
+Check $rt957 `
+    '95.7: imported save container round-trips through sanitize + boot merge -- loaded state reflects the file (lvl/caps/loc/inventory)'
 
 # ===========================================================
 # Results

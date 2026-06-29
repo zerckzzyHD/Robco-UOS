@@ -642,7 +642,10 @@ window.onload = function () {
   // Flush any pending debounced save immediately on tab close
   window.addEventListener('beforeunload', () => {
     clearTimeout(_saveTimer);
-    if (window._contextSwitching) return;
+    // Suppress the unload flush when a context switch OR a save-load reload is in
+    // flight — otherwise the stale in-memory state would clobber the robco_v8 a
+    // load path just wrote, making IMPORT SAVE / RESTORE BACKUP / cloud load no-ops.
+    if (window._contextSwitching || window._loadingSave) return;
     if (!window.robco_v8)
       window.robco_v8 = { activeContext: state.gameContext || 'FNV', campaigns: {} };
     window.robco_v8.activeContext = state.gameContext || 'FNV';

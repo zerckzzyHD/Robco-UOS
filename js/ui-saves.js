@@ -271,6 +271,8 @@ function restoreRollingBackup() {
     if (data.chat && Array.isArray(data.chat))
       localStorage.setItem('robco_chat', JSON.stringify(data.chat));
     if (data.playstyle) localStorage.setItem('robco_playstyle', data.playstyle);
+    // Guard the impending reload's beforeunload flush (clobber regression).
+    window._loadingSave = true;
     alert('>> BACKUP RESTORED. REBOOTING SYSTEM... <<');
     window.location.reload();
   } catch (_) {
@@ -323,6 +325,9 @@ function handleFileUpload(event) {
         if (parsed.chat && Array.isArray(parsed.chat))
           localStorage.setItem('robco_chat', JSON.stringify(parsed.chat));
         if (parsed.playstyle) localStorage.setItem('robco_playstyle', parsed.playstyle);
+        // Guard the impending reload's beforeunload flush so stale in-memory state
+        // can't overwrite the robco_v8 we just imported (clobber regression).
+        window._loadingSave = true;
         alert('>> HARD BACKUP RESTORED SUCCESSFULLY. REBOOTING SYSTEM... <<');
         window.location.reload();
       } else if (parsed.version && parsed.state) {
