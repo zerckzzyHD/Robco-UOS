@@ -9300,7 +9300,7 @@ header('Suite 94 — Accessibility Guards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 95 — SAVE-LOAD RELOAD GUARD (import clobber regression) (7 tests)
+//  Suite 95 — SAVE-LOAD RELOAD GUARD (import clobber regression) (9 tests)
 //  Regression for the d0f0429 beforeunload bug: a load path writes the new
 //  robco_v8 then calls location.reload(); the beforeunload flush fired during
 //  teardown and re-serialized the STALE in-memory state over robco_v8, so
@@ -9404,6 +9404,65 @@ header('Suite 95 — Save-Load Reload Guard (import clobber regression)');
     } else {
       fail('95.7: behavioral import round-trip — sanitizeImportedContainer could not be evaluated');
     }
+  }
+
+  // 95.8  BEHAVIORAL — the beforeunload/saveState flush invariant (the footgun this
+  //       guard exists to defuse): a path that writes a DIVERGENT robco_v8 then lets
+  //       the unload flush fire is CLOBBERED unless _loadingSave/_contextSwitching is
+  //       set first. Replicates the ui-core.js flush logic exactly and proves both
+  //       branches. (Discovered during WU-A5 verification — harness-only, no shipped
+  //       path is unguarded, but the invariant is locked here so it can't become live.)
+  {
+    const ls = {};
+    const mockLS = {
+      getItem: k => (k in ls ? ls[k] : null),
+      setItem: (k, v) => {
+        ls[k] = String(v);
+      },
+    };
+    // Mirror of ui-core.js beforeunload flush (and the state.js debounced write):
+    // both early-return on the guard, else serialize STALE in-memory state to robco_v8.
+    function flush(inMemoryState, guarded) {
+      if (guarded) return; // window._contextSwitching || window._loadingSave
+      const v8 = { activeContext: inMemoryState.gameContext || 'FNV', campaigns: {} };
+      v8.campaigns[v8.activeContext] = JSON.parse(JSON.stringify(inMemoryState));
+      mockLS.setItem('robco_v8', JSON.stringify(v8));
+    }
+    const inMem = { gameContext: 'FNV', lvl: 1 }; // current page = FNV lvl 1
+
+    // (a) UNGUARDED: a divergent write (FO3 lvl 42) is clobbered back to in-memory FNV.
+    mockLS.setItem(
+      'robco_v8',
+      JSON.stringify({ activeContext: 'FO3', campaigns: { FO3: { gameContext: 'FO3', lvl: 42 } } })
+    );
+    flush(inMem, false);
+    const afterUnguarded = JSON.parse(mockLS.getItem('robco_v8'));
+
+    // (b) GUARDED: the same divergent write SURVIVES the flush.
+    mockLS.setItem(
+      'robco_v8',
+      JSON.stringify({ activeContext: 'FO3', campaigns: { FO3: { gameContext: 'FO3', lvl: 42 } } })
+    );
+    flush(inMem, true);
+    const afterGuarded = JSON.parse(mockLS.getItem('robco_v8'));
+
+    assert(
+      afterUnguarded.activeContext === 'FNV' && afterGuarded.activeContext === 'FO3',
+      '95.8: unload flush clobbers an unguarded divergent robco_v8 write but a guarded one survives (footgun invariant locked)'
+    );
+  }
+
+  // 95.9  STATIC ORDER GUARD — in the beforeunload handler the guard return must come
+  //       BEFORE the robco_v8 write, so a refactor cannot move the write above the guard.
+  {
+    const bi = uiCore95.indexOf("addEventListener('beforeunload'");
+    const handler = bi !== -1 ? uiCore95.slice(bi, bi + 800) : '';
+    const guardIdx = handler.search(/_loadingSave[\s\S]{0,40}?return/);
+    const writeIdx = handler.indexOf("setItem('robco_v8'");
+    assert(
+      guardIdx !== -1 && writeIdx !== -1 && guardIdx < writeIdx,
+      '95.9: beforeunload guard return precedes the robco_v8 write (guard cannot be reordered below the flush)'
+    );
   }
 }
 

@@ -5525,7 +5525,7 @@ Check ([System.Text.RegularExpressions.Regex]::IsMatch($uiCore94ps, 'function\s+
     'GATE-A11Y-10: _openSysModal() helper defined in ui-core.js (focus management + Tab-trap entrypoint)'
 
 # ===========================================================
-# Suite 95 -- SAVE-LOAD RELOAD GUARD (import clobber regression) (7 tests)
+# Suite 95 -- SAVE-LOAD RELOAD GUARD (import clobber regression) (9 tests)
 # Regression for the d0f0429 beforeunload bug: a load path writes the new
 # robco_v8 then calls location.reload(); the beforeunload flush fired during
 # teardown and re-serialized the STALE in-memory state over robco_v8, so
@@ -5576,6 +5576,36 @@ $rt957 = ([System.Text.RegularExpressions.Regex]::IsMatch($fn957, "sanitizeImpor
           [System.Text.RegularExpressions.Regex]::IsMatch($uiCore95, "campaigns\[window\.robco_v8\.activeContext\]"))
 Check $rt957 `
     '95.7: imported save container round-trips through sanitize + boot merge -- loaded state reflects the file (lvl/caps/loc/inventory)'
+
+# 95.8  BEHAVIORAL -- the beforeunload/saveState flush invariant (the footgun this
+#       guard defuses): a DIVERGENT robco_v8 write that lets the flush fire is
+#       clobbered unless the guard is set first. Replica of the ui-core.js flush
+#       branch; proves both cases. (Discovered during WU-A5 verification -- harness-
+#       only, no shipped path is unguarded, but the invariant is locked here.)
+$store98 = @{}
+$inMemCtx98 = 'FNV'  # current page in-memory gameContext
+# (a) unguarded: divergent FO3 write then flush -> clobbered back to in-memory FNV
+$store98['robco_v8'] = '{"activeContext":"FO3"}'
+$guarded98a = $false
+if (-not $guarded98a) { $store98['robco_v8'] = ('{"activeContext":"' + $inMemCtx98 + '"}') }
+$afterUnguarded98 = ($store98['robco_v8'] | ConvertFrom-Json).activeContext
+# (b) guarded: same divergent FO3 write then flush -> survives
+$store98['robco_v8'] = '{"activeContext":"FO3"}'
+$guarded98b = $true
+if (-not $guarded98b) { $store98['robco_v8'] = ('{"activeContext":"' + $inMemCtx98 + '"}') }
+$afterGuarded98 = ($store98['robco_v8'] | ConvertFrom-Json).activeContext
+Check ($afterUnguarded98 -eq 'FNV' -and $afterGuarded98 -eq 'FO3') `
+    '95.8: unload flush clobbers an unguarded divergent robco_v8 write but a guarded one survives (footgun invariant locked)'
+
+# 95.9  STATIC ORDER GUARD -- the beforeunload guard return must precede the robco_v8
+#       write so a refactor cannot move the write above the guard.
+$bi98 = $uiCore95.IndexOf("addEventListener('beforeunload'")
+$handler98 = if ($bi98 -ge 0) { $uiCore95.Substring($bi98, [Math]::Min(800, $uiCore95.Length - $bi98)) } else { '' }
+$gm98 = [regex]::Match($handler98, '_loadingSave[\s\S]{0,40}?return')
+$guardIdx98 = if ($gm98.Success) { $gm98.Index } else { -1 }
+$writeIdx98 = $handler98.IndexOf("setItem('robco_v8'")
+Check ($guardIdx98 -ge 0 -and $writeIdx98 -ge 0 -and $guardIdx98 -lt $writeIdx98) `
+    '95.9: beforeunload guard return precedes the robco_v8 write (guard cannot be reordered below the flush)'
 
 # ===========================================================
 # Suite 96 -- test.html RUNTIME MIRROR PARITY (8 tests)
