@@ -1339,13 +1339,22 @@ assert(/id="vatsCalcBtn"/.test(htmlSource), 'V.A.T.S. CALCULATOR button exists (
 // ══════════════════════════════════════════════════════════════
 //  SUITE 23 — Prohibited Patterns (Group 2)
 //  Static checks that banned patterns haven't crept back in.
-//  5 tests
+//  6 tests
 // ══════════════════════════════════════════════════════════════
 header('Prohibited Patterns');
 // 23.1 No innerHTML += in ui.js (render functions must use map().join('') bulk assignment)
-// Note: api.js has a known, intentional innerHTML+= in the model-fetch <select> builder
-// (not a render hot-path), so the check is scoped to ui.js only.
 assert(!/innerHTML\s*\+=/.test(uiSource), 'ui.js has no innerHTML += (O(n²) re-parse guard)');
+
+// 23.1b No innerHTML += anywhere in served JS — WU-B1 closed the former api.js carve-out
+// (the model-fetch <select> builder now uses map().join('') single-assignment). The guard
+// scans every served module so the O(n²) DOM-reparse pattern can never return (Protocol 36b).
+{
+  const servedJs = [uiSource, apiSource, cloudSource].join('\n');
+  assert(
+    !/innerHTML\s*\+=/.test(servedJs),
+    'No served JS (ui/api/cloud) contains innerHTML += (O(n²) re-parse guard — Prohibited Patterns)'
+  );
+}
 
 // 23.2 No localStorage.getItem inside audio function bodies in ui.js
 // Audio functions must read from the AudioSettings cache, not localStorage directly.

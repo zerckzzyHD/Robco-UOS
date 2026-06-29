@@ -836,12 +836,18 @@ Check ([bool]($htmlSrc -match 'id="vatsCalcBtn"'))  "V.A.T.S. CALCULATOR button 
 # ===========================================================
 # Suite 23 -- Prohibited Patterns (Group 2)
 # Static checks that banned patterns haven't crept back in.
-# 5 tests
+# 6 tests
 # ===========================================================
 Sep "Suite 23 -- Prohibited Patterns"
 
 # 23.1 No innerHTML += in ui.js (render functions must use bulk assignment)
 Check (-not ($uiSrc -match 'innerHTML\s*\+=')) "ui.js has no innerHTML += (O(n^2) re-parse guard)"
+
+# 23.1b No innerHTML += anywhere in served JS -- WU-B1 closed the former api.js carve-out
+# (the model-fetch <select> builder now uses map().join('') single-assignment). The guard
+# scans every served module so the O(n^2) DOM-reparse pattern can never return (Protocol 36b).
+$servedJs23 = @($uiSrc, $apiSrc, $cloudSrc) -join "`n"
+Check (-not ($servedJs23 -match 'innerHTML\s*\+=')) "No served JS (ui/api/cloud) contains innerHTML += (O(n^2) re-parse guard -- Prohibited Patterns)"
 
 # 23.2 No localStorage.getItem inside audio function bodies in ui.js
 $audioFnOffenders = @()

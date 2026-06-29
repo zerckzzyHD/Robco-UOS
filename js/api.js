@@ -243,22 +243,26 @@ async function fetchAuthorizedModels(silent = false) {
     }
     const data = await response.json();
     const selectEl = document.getElementById('apiModelInput');
-    selectEl.innerHTML = '';
 
     let added = 0;
+    let optionsHtml = '';
     if (data.models) {
-      data.models.forEach(m => {
-        if (
-          m.supportedGenerationMethods &&
-          m.supportedGenerationMethods.includes('generateContent') &&
-          m.name.includes('gemini')
-        ) {
-          let shortName = m.name.replace('models/', '');
-          selectEl.innerHTML += `<option value="${shortName}">${m.displayName || shortName} (${shortName})</option>`;
-          added++;
-        }
-      });
+      const opts = data.models
+        .filter(
+          m =>
+            m.supportedGenerationMethods &&
+            m.supportedGenerationMethods.includes('generateContent') &&
+            m.name.includes('gemini')
+        )
+        .map(m => {
+          const shortName = m.name.replace('models/', '');
+          return `<option value="${shortName}">${m.displayName || shortName} (${shortName})</option>`;
+        });
+      added = opts.length;
+      optionsHtml = opts.join('');
     }
+    // Single assignment (map().join('')) — avoids the O(n²) DOM re-parse of append-in-loop (Protocol: Prohibited Patterns)
+    selectEl.innerHTML = optionsHtml;
     if (added > 0) {
       if (!silent) alert(`>> ACCESS GRANTED <<`);
       saveApiKeySilent();
