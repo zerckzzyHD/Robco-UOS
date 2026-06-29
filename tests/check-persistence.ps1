@@ -972,11 +972,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84','Suite 85','Suite 86','Suite 87','Suite 88','Suite 89','Suite 90','Suite 91','Suite 92','Suite 93','Suite 94','Suite 95','Suite 96')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84','Suite 85','Suite 86','Suite 87','Suite 88','Suite 89','Suite 90','Suite 91','Suite 92','Suite 93','Suite 94','Suite 95','Suite 96','Suite 97')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-96)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-96)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-97)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-97)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -5613,6 +5613,48 @@ $rules96 = [System.IO.File]::ReadAllText((Join-Path $Root 'RULES.md'), [System.T
 $claude96 = [System.IO.File]::ReadAllText((Join-Path $Root 'CLAUDE.md'), [System.Text.Encoding]::UTF8)
 Check ($rules96.Contains('Protocol 40') -and $claude96.Contains('Protocol 40')) `
     '96.8: Protocol 40 (test.html sync) present in RULES.md and CLAUDE.md'
+
+# ===========================================================
+# Suite 97 -- CHANGELOG category-heading integrity (Protocol 21) (2 tests)
+# Keep a Changelog convention: under one `## [version]` block there must be
+# exactly ONE heading per category (a single ### Added / ### Fixed / etc.).
+# Guards against duplicate-heading splits and rogue/typo category headings.
+# Self-improving -- Protocol 36b.
+# ===========================================================
+Sep "Suite 97 -- CHANGELOG category-heading integrity"
+$cl97 = [System.IO.File]::ReadAllText((Join-Path $Root 'CHANGELOG.md'), [System.Text.Encoding]::UTF8)
+$validCats97 = @('Added', 'Changed', 'Deprecated', 'Removed', 'Fixed', 'Security', 'Improved', 'Under the Hood')
+# Split into version blocks on top-level "## [" headers; collect "### Category" per block.
+$blocks97 = New-Object System.Collections.Generic.List[object]
+$cur97 = $null
+foreach ($ln in ($cl97 -split "`n")) {
+    if ($ln -match '^##\s+\[') {
+        $cur97 = [pscustomobject]@{ header = $ln.Trim(); cats = (New-Object System.Collections.Generic.List[string]) }
+        $blocks97.Add($cur97)
+    } elseif ($null -ne $cur97) {
+        $m = [regex]::Match($ln, '^###\s+(.+?)\s*$')
+        if ($m.Success) { $cur97.cats.Add($m.Groups[1].Value) }
+    }
+}
+
+# 97.1  No version block repeats a category heading.
+$dupReports97 = New-Object System.Collections.Generic.List[string]
+foreach ($b in $blocks97) {
+    $seen = New-Object System.Collections.Generic.HashSet[string]
+    $dups = New-Object System.Collections.Generic.HashSet[string]
+    foreach ($c in $b.cats) { if (-not $seen.Add($c)) { [void]$dups.Add($c) } }
+    if ($dups.Count) { $dupReports97.Add($b.header + ' -> duplicate: ' + ($dups -join ', ')) }
+}
+Check ($dupReports97.Count -eq 0) `
+    ('CHANGELOG.md: each version block has at most one heading per category (Protocol 21)' + $(if ($dupReports97.Count) { ' -- ' + ($dupReports97 -join ' | ') } else { '' }))
+
+# 97.2  Every category heading is a recognized Keep-a-Changelog category.
+$badCats97 = New-Object System.Collections.Generic.List[string]
+foreach ($b in $blocks97) {
+    foreach ($c in $b.cats) { if ($validCats97 -notcontains $c) { $badCats97.Add($b.header + ' -> "' + $c + '"') } }
+}
+Check ($badCats97.Count -eq 0) `
+    ('CHANGELOG.md: all category headings are recognized (Added/Changed/Deprecated/Removed/Fixed/Security/Improved/Under the Hood)' + $(if ($badCats97.Count) { ' -- unknown: ' + ($badCats97 -join ', ') } else { '' }))
 
 # ===========================================================
 # Results

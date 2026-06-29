@@ -1,8 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1156/1156 | Cache: robco-terminal-v2.6.0-r9 -->
-
-### Fixed
-
-- Loading a saved game now actually loads it. Importing a save file, restoring a backup, or loading a cloud save would appear to do nothing — the terminal kept showing your current data instead of the loaded save. The newly-loaded data was being written correctly, but a routine "save on exit" step was firing during the reload and silently overwriting it with your old data first. All three load paths — IMPORT SAVE, RESTORE BACKUP, and cloud load — now load correctly, including older and reconstructed saves.
+﻿## [Unreleased]<!-- Tests: 1158/1158 | Cache: robco-terminal-v2.6.0-r9 -->
 
 ### Added
 
@@ -11,6 +7,7 @@
 
 ### Fixed
 
+- Loading a saved game now actually loads it. Importing a save file, restoring a backup, or loading a cloud save would appear to do nothing — the terminal kept showing your current data instead of the loaded save. The newly-loaded data was being written correctly, but a routine "save on exit" step was firing during the reload and silently overwriting it with your old data first. All three load paths — IMPORT SAVE, RESTORE BACKUP, and cloud load — now load correctly, including older and reconstructed saves.
 - Fixed the [THREAT], [VATS], [TRADE], and [LOOT] macro buttons word-wrapping mid-label on narrow screens — they now stay as a single line at all viewport widths.
 - Screen readers now hear each new chat message as it arrives — the chat history panel is a live region (`aria-live`) so assistive technology announces AI and player messages immediately without the user having to navigate to the chat area.
 - The system modal (changelog, help, [LOGS], command reference) now has proper dialog semantics for assistive technology — it announces itself as a dialog, traps Tab focus inside while open, closes on Esc, and returns focus to the element that opened it when dismissed.
@@ -18,16 +15,6 @@
 - Faction reputation buttons now have descriptive labels (e.g. "Fame +5 for NCR") instead of the single-character "F+" / "F-" / "I+" / "I-" labels that were invisible to screen readers.
 - Limb condition buttons now announce their current state to screen readers — each button says "Head: OK" or "Right Arm: Crippled" and reports its toggle state, so users navigating by keyboard or AT always know which limbs are injured without looking at the visual bar.
 - Inactive tab buttons now have higher contrast — opacity raised from 55% to 75%, which brings all six optics colour themes above the WCAG AA 3:1 contrast ratio for interface controls.
-
-### Under the Hood
-
-- Refreshed the in-browser test page (`tests/test.html`) so it once again matches how the app actually loads and imports saves — it had drifted badly and would have failed if run. It now executes the real import logic across 10 suites (field import, factions, skills, collections, clamping, registry-validated trackers, save-file sanitising, and the save-load path), and it now runs automatically in the build gate so it can never silently fall out of date again. Added a new project rule (Protocol 40) and a build check (Suite 96) that keep it in sync going forward.
-- Added Suite 95 (7 regression tests) permanently guarding the save-load fix above: the exit-save flush and debounced save are both gated by the new load-in-progress flag, each of the three load paths sets that flag before reloading, the working game-switch path keeps its own guard, and a behavioral test imports a save container and asserts the loaded state reflects the file.
-- Added Suite 94 (10 regression tests) permanently guarding the accessibility changes above: `:focus-visible` CSS rule present, `prefers-reduced-motion` block with correct freeze parameters, `aria-live` on the chat display, `role=dialog`/`aria-modal` on the system modal, and the `_openSysModal()` focus-management helper.
-- Extended Suite 92 with a test for the macro-button nowrap guard (now 5 tests total).
-
-### Fixed
-
 - Fixed registry autocomplete not working in Fallout 3 campaigns — quest, item, and perk name inputs now search the active game's registry correctly. Previously, the autocomplete helper only loaded with Fallout: New Vegas and was absent in FO3 sessions, leaving all three inputs completely silent.
 - Fixed config labels (GAME:, PLAYSTYLE:, PLAYTHROUGH TYPE:) wrapping to a second line on narrow screens — they now stay inline at all viewport widths.
 - Fixed map cell names being cut off mid-word with a trailing underscore artifact — names now wrap to a second line, or truncate cleanly with an ellipsis, and the full name is always accessible in the tooltip.
@@ -39,6 +26,11 @@
 
 ### Under the Hood
 
+- Refreshed the in-browser test page (`tests/test.html`) so it once again matches how the app actually loads and imports saves — it had drifted badly and would have failed if run. It now executes the real import logic across 10 suites (field import, factions, skills, collections, clamping, registry-validated trackers, save-file sanitising, and the save-load path), and it now runs automatically in the build gate so it can never silently fall out of date again. Added a new project rule (Protocol 40) and a build check (Suite 96) that keep it in sync going forward.
+- Added a build check that fails if any single version block in the changelog repeats a category heading (two `### Fixed` under one version, etc.), so the changelog keeps exactly one heading per category.
+- Added Suite 95 (7 regression tests) permanently guarding the save-load fix above: the exit-save flush and debounced save are both gated by the new load-in-progress flag, each of the three load paths sets that flag before reloading, the working game-switch path keeps its own guard, and a behavioral test imports a save container and asserts the loaded state reflects the file.
+- Added Suite 94 (10 regression tests) permanently guarding the accessibility changes above: `:focus-visible` CSS rule present, `prefers-reduced-motion` block with correct freeze parameters, `aria-live` on the chat display, `role=dialog`/`aria-modal` on the system modal, and the `_openSysModal()` focus-management helper.
+- Extended Suite 92 with a test for the macro-button nowrap guard (now 5 tests total).
 - The Vault 13 Canteen seed item is now defined in game data rather than hard-coded into the new-campaign logic — so it seeds for New Vegas but not Fallout 3 automatically, without any special-casing.
 - Context-switching and faction lookups now use game definitions data instead of hard-coded lists of game names, making it easier to add new games in the future.
 - Added Protocol 38 (game-agnostic feature code rule) to the engineering guide.
@@ -127,7 +119,7 @@
 
 ## [v2.5.0] — Living Operating System<!-- Date: 2026-06-27 | Tests: 747/747 | Cache: robco-terminal-v2.5.0-r1 -->
 
-### New
+### Added
 
 - Accounts and Google sign-in: sign in with Google to back up your campaigns to the cloud. Works in a normal mobile browser and in the installed app. You can also keep using the terminal fully offline without signing in.
 - Cloud saves: save a campaign to your account and load it on any device. Uploading never overwrites an existing save, and loading or deleting a cloud save always asks you to confirm. Existing local saves can be moved up to the cloud.

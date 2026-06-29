@@ -1648,17 +1648,18 @@ header('Meta / Runner Parity');
     'Suite 94',
     'Suite 95',
     'Suite 96',
+    'Suite 97',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-96)' +
+    'JS runner contains all gate-guard suites (22-41, 49-97)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-96)' +
+    'PS runner contains all gate-guard suites (22-41, 49-97)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -9460,6 +9461,69 @@ header('Suite 96 — test.html Runtime Mirror Parity');
       '96.8: Protocol 40 (test.html sync) present in RULES.md and CLAUDE.md'
     );
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 97 — CHANGELOG category-heading integrity (Protocol 21) (2 tests)
+//  Keep a Changelog convention: under one `## [version]` block there must be
+//  exactly ONE heading per category (a single ### Added / ### Fixed / etc.).
+//  This guards against the recurrence of a duplicate-heading split (e.g. two
+//  separate ### Fixed sections under [Unreleased]) and against rogue/typo
+//  category headings. Self-improving — Protocol 36b.
+// ══════════════════════════════════════════════════════════════
+header('Suite 97 — CHANGELOG category-heading integrity');
+{
+  const cl97 = readFile('CHANGELOG.md');
+  const VALID_CATS = [
+    'Added',
+    'Changed',
+    'Deprecated',
+    'Removed',
+    'Fixed',
+    'Security',
+    'Improved',
+    'Under the Hood',
+  ];
+  // Split into version blocks on top-level `## [` headers.
+  const lines97 = cl97.split('\n');
+  const blocks97 = [];
+  let cur97 = null;
+  for (const ln of lines97) {
+    if (/^##\s+\[/.test(ln)) {
+      cur97 = { header: ln.trim(), cats: [] };
+      blocks97.push(cur97);
+    } else if (cur97) {
+      const m = ln.match(/^###\s+(.+?)\s*$/);
+      if (m) cur97.cats.push(m[1]);
+    }
+  }
+
+  // 97.1  No version block repeats a category heading.
+  const dupReports = [];
+  blocks97.forEach(b => {
+    const seen = new Set();
+    const dups = new Set();
+    b.cats.forEach(c => (seen.has(c) ? dups.add(c) : seen.add(c)));
+    if (dups.size) dupReports.push(`${b.header} → duplicate: ${[...dups].join(', ')}`);
+  });
+  assert(
+    dupReports.length === 0,
+    'CHANGELOG.md: each version block has at most one heading per category (Protocol 21)' +
+      (dupReports.length ? ' — ' + dupReports.join(' | ') : '')
+  );
+
+  // 97.2  Every category heading is a recognized Keep-a-Changelog category.
+  const badCats = [];
+  blocks97.forEach(b => {
+    b.cats.forEach(c => {
+      if (!VALID_CATS.includes(c)) badCats.push(`${b.header} → "${c}"`);
+    });
+  });
+  assert(
+    badCats.length === 0,
+    'CHANGELOG.md: all category headings are recognized (Added/Changed/Deprecated/Removed/Fixed/Security/Improved/Under the Hood)' +
+      (badCats.length ? ' — unknown: ' + badCats.join(', ') : '')
+  );
 }
 
 // ══════════════════════════════════════════════════════════════
