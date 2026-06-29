@@ -1,13 +1,14 @@
 name: Deploy to GitHub Pages
 
 on:
-  # Deploy only after CI passes on main — never deploy a broken build.
-  workflow_run:
-    workflows: ['CI']
-    branches: [main]
-    types: [completed]
+  # Production is RELEASE-GATED (Protocol 43): this workflow is invoked ONLY by
+  # release.yml, and only when a version release (APP_VERSION bump) is detected.
+  # It is NOT triggered by ordinary pushes to main, so unreleased work on main
+  # (or dev) can never reach production automatically — only a deliberate version
+  # bump publishes.
+  workflow_call:
 
-  # Allow manual trigger from the Actions tab
+  # Manual override for emergency redeploy / rollback from the Actions tab.
   workflow_dispatch:
 
 permissions:
@@ -24,8 +25,9 @@ jobs:
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
-    # For workflow_run: only deploy when CI passed on main.
-    # For workflow_dispatch: always allow (manual override).
+    # Defense in depth (composes with release.yml's release-only gate + branch
+    # protection): when invoked by release.yml the inherited CI run must have
+    # succeeded on main; a manual dispatch is always allowed.
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.conclusion == 'success' &&

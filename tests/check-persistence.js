@@ -1870,10 +1870,12 @@ assert(
 //  SUITE 31 — CI/CD Automation Guards (Phase 1c)
 //  ci.yml has no stale "(106 tests)" or "(386 tests)" label; runs PS runner;
 //  has render-check step; deploy.yml uses _site staging dir and is
-//  gated on CI via workflow_run + conclusion == 'success';
+//  RELEASE-GATED via workflow_call — invoked only by release.yml on a version
+//  bump (never a bare push to main); deploy keeps a defense-in-depth
+//  success+main job guard + manual dispatch;
 //  hook-install and boot-smoke scripts exist;
 //  pre-commit hook is conditional (served-file gate).
-//  11 tests
+//  14 tests
 // ══════════════════════════════════════════════════════════════
 header('CI/CD Automation Guards');
 
@@ -1936,21 +1938,30 @@ assert(
   );
 }
 
-// 31.8 deploy.yml uses workflow_run trigger (gated on CI — not a bare push)
+// 31.8 deploy.yml trigger is release-gated (workflow_call — invoked only by release.yml)
 {
   const deploySource = readFile('.github/workflows/deploy.yml');
+  const onBlock = deploySource.slice(
+    deploySource.indexOf('\non:'),
+    deploySource.indexOf('\npermissions:')
+  );
   assert(
-    /workflow_run/.test(deploySource),
-    'deploy.yml uses workflow_run trigger (deploy gated on CI — not a bare push to main)'
+    /workflow_call/.test(onBlock),
+    'deploy.yml on: block uses workflow_call (release-gated — invoked only by release.yml on a version bump, Protocol 43)'
   );
 }
 
-// 31.9 deploy.yml workflow_run gate requires conclusion == 'success'
+// 31.9 deploy.yml on: block has NO workflow_run trigger — regression guard:
+//      production must never regress to deploy-on-every-CI/push (Protocol 36b)
 {
   const deploySource = readFile('.github/workflows/deploy.yml');
+  const onBlock = deploySource.slice(
+    deploySource.indexOf('\non:'),
+    deploySource.indexOf('\npermissions:')
+  );
   assert(
-    /conclusion\s*==\s*['"]success['"]/.test(deploySource),
-    "deploy.yml workflow_run gate requires conclusion == 'success' (broken CI cannot deploy)"
+    !/workflow_run/.test(onBlock),
+    'deploy.yml on: block has NO workflow_run trigger (cannot deploy on every CI / bare push — release-gated only)'
   );
 }
 
@@ -1969,6 +1980,40 @@ assert(
   assert(
     /SKIP.*No served|cache bump not required/.test(hookSource),
     'scripts/pre-commit has SKIP branch — non-served commits bypass the cache-bump check'
+  );
+}
+
+// 31.12 release.yml invokes deploy.yml as a reusable workflow (only automated path to prod)
+{
+  const releaseSource = readFile('.github/workflows/release.yml');
+  assert(
+    /uses:\s*\.\/\.github\/workflows\/deploy\.yml/.test(releaseSource),
+    'release.yml invokes deploy.yml via uses: (reusable workflow — the only automated path to production)'
+  );
+}
+
+// 31.13 release.yml gates that deploy on a NEW version release only (APP_VERSION bump)
+{
+  const releaseSource = readFile('.github/workflows/release.yml');
+  assert(
+    /needs\.check-and-release\.outputs\.released\s*==\s*['"]true['"]/.test(releaseSource) &&
+      /released:\s*\$\{\{\s*steps\.check\.outputs\.exists/.test(releaseSource),
+    'release.yml deploys to prod ONLY on a new version release (released output derived from the APP_VERSION tag check)'
+  );
+}
+
+// 31.14 deploy.yml keeps manual dispatch + defense-in-depth success+main job guard
+{
+  const deploySource = readFile('.github/workflows/deploy.yml');
+  const onBlock = deploySource.slice(
+    deploySource.indexOf('\non:'),
+    deploySource.indexOf('\npermissions:')
+  );
+  assert(
+    /workflow_dispatch/.test(onBlock) &&
+      /conclusion\s*==\s*['"]success['"]/.test(deploySource) &&
+      /head_branch\s*==\s*['"]main['"]/.test(deploySource),
+    'deploy.yml keeps workflow_dispatch (manual rollback) + defense-in-depth job guard (CI success + main)'
   );
 }
 

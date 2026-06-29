@@ -7,14 +7,24 @@ on:
     branches: [main]
     types: [completed]
 
+# Run-wide grants: contents (create the tag + GitHub Release) plus pages +
+# id-token, which the reusable deploy.yml job below needs to publish to Pages.
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
 jobs:
   check-and-release:
     name: Auto-Release on Version Change
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     # Only release when CI passed on main.
     if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main'
+    # 'released' is the production deploy gate (Protocol 43): true ONLY when a new
+    # version tag was just created (an APP_VERSION bump). An ordinary push to main
+    # with no version change → exists == 'true' → released == 'false' → no deploy.
+    outputs:
+      released: ${{ steps.check.outputs.exists == 'false' && 'true' || 'false' }}
 
     steps:
       - name: Checkout
@@ -62,3 +72,14 @@ jobs:
           name: RobCo U.O.S. ${{ steps.version.outputs.tag }}
           body_path: /tmp/release_notes.txt
           generate_release_notes: false
+
+  # ── Production deploy — the ONLY automated path to prod (Protocol 43) ──
+  # Runs ONLY when check-and-release just created a NEW version release. Because
+  # deploy.yml is workflow_call-only, it can never fire on an ordinary push to
+  # main; this gated invocation is what makes production release-only. (Defense
+  # in depth with deploy.yml's own main-only guard + branch protection.)
+  deploy-production:
+    name: Deploy released version to production
+    needs: check-and-release
+    if: needs.check-and-release.outputs.released == 'true'
+    uses: ./.github/workflows/deploy.yml
