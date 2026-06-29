@@ -296,6 +296,39 @@ function getSkillKeys() {
   return _activeDef().skillKeys;
 }
 
+// getGameContext() — the sanctioned read accessor for the active game context.
+// External modules (cloud.js, the cloud-sync boundary) MUST call this instead of
+// reading the global `state.gameContext` directly, so state ownership stays inside
+// state.js (Protocol 23). TDZ-safe and absence-guarded: returns 'FNV' before state
+// is initialized or if gameContext is unset — identical to the old `state.gameContext
+// || 'FNV'` reads it replaces, so the swap is behavior-preserving.
+function getGameContext() {
+  try {
+    return (state && state.gameContext) || 'FNV';
+  } catch (_) {
+    return 'FNV';
+  }
+}
+window.getGameContext = getGameContext;
+
+// snapshotActiveCampaign() — the sanctioned accessor that flushes the live `state`
+// object into the window.robco_v8 container (creating it if absent) under the active
+// game context, and returns the container. This is the SINGLE source for the
+// "build-if-absent → set activeContext → deep-snapshot state into campaigns[ctx]"
+// idiom; saveState(), exportSaveFile(), and the cloud-sync push all route through it
+// (Protocol 22) so an external module never reaches into the global `state` directly
+// (Protocol 23). Behavior-preserving: the body is the exact 3-step block it replaces.
+function snapshotActiveCampaign() {
+  const ctx = getGameContext();
+  if (!window.robco_v8) {
+    window.robco_v8 = { activeContext: ctx, campaigns: {} };
+  }
+  window.robco_v8.activeContext = ctx;
+  window.robco_v8.campaigns[ctx] = JSON.parse(JSON.stringify(state));
+  return window.robco_v8;
+}
+window.snapshotActiveCampaign = snapshotActiveCampaign;
+
 function _buildFactions() {
   const f = {};
   getFactionRegistry().forEach(r => {
@@ -433,11 +466,7 @@ function saveState() {
     // in-memory state land on top of a robco_v8 that a load path just wrote.
     if (window._contextSwitching || window._loadingSave) return;
     try {
-      if (!window.robco_v8) {
-        window.robco_v8 = { activeContext: state.gameContext || 'FNV', campaigns: {} };
-      }
-      window.robco_v8.activeContext = state.gameContext || 'FNV';
-      window.robco_v8.campaigns[window.robco_v8.activeContext] = JSON.parse(JSON.stringify(state));
+      snapshotActiveCampaign();
       const _saveStr = JSON.stringify(window.robco_v8);
       if (_saveStr === _lastSaveStr) return;
       // Proactive warning at ~4MB (2M chars × 2 bytes UTF-16) of the ~5MB localStorage ceiling.
@@ -478,11 +507,7 @@ function generateSyncPayload() {
 
 function exportSaveFile(slotName = null) {
   syncStateFromDom();
-  if (!window.robco_v8) {
-    window.robco_v8 = { activeContext: state.gameContext || 'FNV', campaigns: {} };
-  }
-  window.robco_v8.activeContext = state.gameContext || 'FNV';
-  window.robco_v8.campaigns[window.robco_v8.activeContext] = JSON.parse(JSON.stringify(state));
+  snapshotActiveCampaign();
 
   const _exportPlaystyle = localStorage.getItem('robco_playstyle') || 'any';
   const exportPayload = {

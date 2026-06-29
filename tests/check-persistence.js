@@ -1755,6 +1755,7 @@ header('Meta / Runner Parity');
     'Suite 98',
     'Suite 99',
     'Suite 100',
+    'Suite 101',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
@@ -10392,6 +10393,69 @@ header('Suite 100 — Staging build output guards (Cloudflare Pages)');
   assert(
     /FILES\s*=\s*\[[^\]]*'sw\.js'/.test(cfSrc100),
     '100.4: cf-staging-build.mjs stages sw.js at the served root (root-scope SW registration)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 101 — WU-B9 cloud.js → state.js boundary fix (8 tests)
+//  Protocol 23 module boundary: cloud.js (the cloud-sync module) must never reach
+//  into the global `state` object directly — it reads the active game context and
+//  snapshots state ONLY through the sanctioned state.js accessors. These guards lock
+//  the accessors into existence and fail if cloud.js ever re-introduces a direct
+//  `state.gameContext` read or a `JSON.stringify(state)` whole-state read.
+// ══════════════════════════════════════════════════════════════
+header('Suite 101 — WU-B9 cloud.js → state.js boundary fix');
+{
+  const state101 = readFile('js/state.js');
+  const cloud101 = readFile('js/cloud.js');
+
+  // ── state.js sanctioned accessors exist + are exposed for the module boundary ──
+  assert(
+    /function\s+getGameContext\s*\(/.test(state101),
+    '101.1: state.js defines getGameContext() — sanctioned read accessor for the active game context'
+  );
+  assert(
+    /window\.getGameContext\s*=/.test(state101),
+    '101.2: state.js exposes window.getGameContext so the cloud.js module can reach it across the boundary'
+  );
+  {
+    let body = '';
+    try {
+      body = extractFunctionBody(state101, 'getGameContext');
+    } catch (_) {}
+    assert(
+      /'FNV'/.test(body) && /state\s*&&\s*state\.gameContext|state\.gameContext/.test(body),
+      "101.3: getGameContext() preserves the `|| 'FNV'` absence fallback (behavior-preserving swap)"
+    );
+  }
+  assert(
+    /function\s+snapshotActiveCampaign\s*\(/.test(state101),
+    '101.4: state.js defines snapshotActiveCampaign() — sanctioned accessor to flush state into robco_v8'
+  );
+  assert(
+    /window\.snapshotActiveCampaign\s*=/.test(state101),
+    '101.5: state.js exposes window.snapshotActiveCampaign for cross-module use'
+  );
+  {
+    let body = '';
+    try {
+      body = extractFunctionBody(state101, 'snapshotActiveCampaign');
+    } catch (_) {}
+    assert(
+      /getGameContext\s*\(/.test(body) && /JSON\.parse\(JSON\.stringify\(state\)\)/.test(body),
+      '101.6: snapshotActiveCampaign() is the single-source builder — uses getGameContext() + deep-snapshots state'
+    );
+  }
+
+  // ── cloud.js boundary restored — no direct global `state` reads remain ──
+  assert(
+    !/(^|[^.\w])state\.gameContext/m.test(cloud101),
+    '101.7: cloud.js no longer reads the global state.gameContext directly (Protocol 23 boundary restored)'
+  );
+  assert(
+    !/JSON\.stringify\(\s*state\s*\)/.test(cloud101) &&
+      /snapshotActiveCampaign\s*\(/.test(cloud101),
+    '101.8: cloud.js no longer serializes the global state directly — routes through snapshotActiveCampaign()'
   );
 }
 

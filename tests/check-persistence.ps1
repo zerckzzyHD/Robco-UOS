@@ -1010,7 +1010,7 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84','Suite 85','Suite 86','Suite 87','Suite 88','Suite 89','Suite 90','Suite 91','Suite 92','Suite 93','Suite 94','Suite 95','Suite 96','Suite 97','Suite 98','Suite 99','Suite 100')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84','Suite 85','Suite 86','Suite 87','Suite 88','Suite 89','Suite 90','Suite 91','Suite 92','Suite 93','Suite 94','Suite 95','Suite 96','Suite 97','Suite 98','Suite 99','Suite 100','Suite 101')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
 Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-99)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
@@ -5998,6 +5998,42 @@ Check ([bool]($cfSrc100 -match '/manifest\.json\s+/manifest\.json\s+200')) `
 # 100.4 sw.js is staged at the served root so the SW registers at root scope.
 Check ([bool]($cfSrc100 -match "FILES\s*=\s*\[[^\]]*'sw\.js'")) `
     '100.4: cf-staging-build.mjs stages sw.js at the served root (root-scope SW registration)'
+
+# ===========================================================
+# Suite 101 -- WU-B9 cloud.js -> state.js boundary fix (8 tests)
+# Protocol 23 module boundary: cloud.js (the cloud-sync module) must never reach into
+# the global `state` object directly -- it reads the active game context and snapshots
+# state ONLY through the sanctioned state.js accessors. These guards lock the accessors
+# into existence and fail if cloud.js ever re-introduces a direct state.gameContext read
+# or a JSON.stringify(state) whole-state read.
+# ===========================================================
+Sep "Suite 101 -- WU-B9 cloud.js -> state.js boundary fix"
+$state101 = Read-Src "js/state.js"
+$cloud101 = Read-Src "js/cloud.js"
+
+# state.js sanctioned accessors exist + are exposed for the module boundary
+Check ([bool]($state101 -match 'function\s+getGameContext\s*\(')) `
+    '101.1: state.js defines getGameContext() -- sanctioned read accessor for the active game context'
+Check ([bool]($state101 -match 'window\.getGameContext\s*=')) `
+    '101.2: state.js exposes window.getGameContext so the cloud.js module can reach it across the boundary'
+$body1013 = ''
+try { $body1013 = Get-FunctionBody $state101 'getGameContext' } catch {}
+Check ([bool](($body1013 -match "'FNV'") -and ($body1013 -match 'state\.gameContext'))) `
+    '101.3: getGameContext() preserves the || ''FNV'' absence fallback (behavior-preserving swap)'
+Check ([bool]($state101 -match 'function\s+snapshotActiveCampaign\s*\(')) `
+    '101.4: state.js defines snapshotActiveCampaign() -- sanctioned accessor to flush state into robco_v8'
+Check ([bool]($state101 -match 'window\.snapshotActiveCampaign\s*=')) `
+    '101.5: state.js exposes window.snapshotActiveCampaign for cross-module use'
+$body1016 = ''
+try { $body1016 = Get-FunctionBody $state101 'snapshotActiveCampaign' } catch {}
+Check ([bool](($body1016 -match 'getGameContext\s*\(') -and ($body1016 -match 'JSON\.parse\(JSON\.stringify\(state\)\)'))) `
+    '101.6: snapshotActiveCampaign() is the single-source builder -- uses getGameContext() + deep-snapshots state'
+
+# cloud.js boundary restored -- no direct global `state` reads remain
+Check ([bool](-not ($cloud101 -match '(^|[^.\w])state\.gameContext'))) `
+    '101.7: cloud.js no longer reads the global state.gameContext directly (Protocol 23 boundary restored)'
+Check ([bool]((-not ($cloud101 -match 'JSON\.stringify\(\s*state\s*\)')) -and ($cloud101 -match 'snapshotActiveCampaign\s*\('))) `
+    '101.8: cloud.js no longer serializes the global state directly -- routes through snapshotActiveCampaign()'
 
 # ===========================================================
 # Results

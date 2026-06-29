@@ -256,11 +256,10 @@ window.saveCurrentToCloud = async function () {
   const btn = document.getElementById('btnSaveToCloud');
   if (btn) btn.innerText = '> SAVING...';
   try {
-    if (!window.robco_v8) {
-      window.robco_v8 = { activeContext: state.gameContext || 'FNV', campaigns: {} };
-    }
-    window.robco_v8.activeContext = state.gameContext || 'FNV';
-    window.robco_v8.campaigns[window.robco_v8.activeContext] = JSON.parse(JSON.stringify(state));
+    // Boundary: never read the global `state` directly from this module — go through
+    // the sanctioned state.js accessor (Protocol 23). snapshotActiveCampaign() flushes
+    // the live state into window.robco_v8 under the active game context and returns it.
+    window.snapshotActiveCampaign();
     localStorage.setItem('robco_v8', JSON.stringify(window.robco_v8));
     const chatRaw = localStorage.getItem('robco_chat');
     const chat = chatRaw ? JSON.parse(chatRaw) : [];
