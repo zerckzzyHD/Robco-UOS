@@ -212,6 +212,32 @@ window.onload = function () {
   let _uptimeInterval = null;
   let _memCycleInterval = null;
 
+  // Shared interval starters (DUP-3/DUP-4). Both the boot path and exitStandby()
+  // restart these after standby clears them; the guard keeps a double-call from
+  // ever stacking a second timer.
+  function _startUptimeClock() {
+    if (_uptimeInterval) return;
+    _uptimeInterval = setInterval(() => {
+      let elapsed = Math.floor((Date.now() - sessionStart) / 1000);
+      let h = Math.floor(elapsed / 3600),
+        m = Math.floor((elapsed % 3600) / 60),
+        s = elapsed % 60;
+      let el = document.getElementById('uptimeClock');
+      if (el)
+        el.innerText = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }, 1000);
+  }
+  function _startMemCycle() {
+    if (_memCycleInterval) return;
+    _memCycleInterval = setInterval(() => {
+      appendToChat('> MEMORY CYCLE COMPLETE. 64K STABLE.', 'sys', true);
+      document.body.style.filter = 'brightness(0.35)';
+      setTimeout(() => {
+        document.body.style.filter = '';
+      }, 150);
+    }, 900000);
+  }
+
   function enterStandby() {
     if (_standbyActive) return;
     _standbyActive = true;
@@ -246,26 +272,8 @@ window.onload = function () {
       appendToChat('> COURIER RETURNED. SYNCHRONIZING TELEMETRY...', 'sys', true);
       let _rads = parseInt(document.getElementById('stat_rads').value) || 0;
       setGeigerRate(_rads >= 1000 ? 25 : _rads >= 600 ? 12 : _rads >= 200 ? 0.33 : 0);
-      if (!_uptimeInterval) {
-        _uptimeInterval = setInterval(() => {
-          let elapsed = Math.floor((Date.now() - sessionStart) / 1000);
-          let h = Math.floor(elapsed / 3600),
-            m = Math.floor((elapsed % 3600) / 60),
-            s = elapsed % 60;
-          let el = document.getElementById('uptimeClock');
-          if (el)
-            el.innerText = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-        }, 1000);
-      }
-      if (!_memCycleInterval) {
-        _memCycleInterval = setInterval(() => {
-          appendToChat('> MEMORY CYCLE COMPLETE. 64K STABLE.', 'sys', true);
-          document.body.style.filter = 'brightness(0.35)';
-          setTimeout(() => {
-            document.body.style.filter = '';
-          }, 150);
-        }, 900000);
-      }
+      _startUptimeClock();
+      _startMemCycle();
       updateMath();
     }, 650);
   }
@@ -595,29 +603,13 @@ window.onload = function () {
     }
   });
 
-  // Session Uptime Clock
+  // Session Uptime Clock + Memory Cycle Event (every 15 minutes) — shared starters (DUP-3/4)
   let sessionStart = Date.now();
-  _uptimeInterval = setInterval(() => {
-    let elapsed = Math.floor((Date.now() - sessionStart) / 1000);
-    let h = Math.floor(elapsed / 3600),
-      m = Math.floor((elapsed % 3600) / 60),
-      s = elapsed % 60;
-    let el = document.getElementById('uptimeClock');
-    if (el)
-      el.innerText = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-  }, 1000);
-
-  // Memory Cycle Event (every 15 minutes)
-  _memCycleInterval = setInterval(() => {
-    appendToChat('> MEMORY CYCLE COMPLETE. 64K STABLE.', 'sys', true);
-    document.body.style.filter = 'brightness(0.35)';
-    setTimeout(() => {
-      document.body.style.filter = '';
-    }, 150);
-  }, 900000);
+  _startUptimeClock();
+  _startMemCycle();
 
   // #36 Input History — Up/Down arrows cycle through sent user commands
-  const _inputHistory = [];
+  // (history source is chatHistory filtered to user messages; _inputHistoryIdx is the nav cursor)
   let _inputHistoryIdx = -1;
   const _chatInput = document.getElementById('chatInput');
   if (_chatInput) {
@@ -1201,11 +1193,9 @@ function showVATSOverlay() {
     }
   });
 
-  // Target DT input — read from a prompt or use default 0
-  const targetDT = 0; // Default: no DT. AI will handle specifics.
-
-  // Base chance calculation (intentionally approximate)
-  const base = per * 2 + agi * 1.5 + (activeSkill + chemBonus) / 3 - targetDT * 1.5;
+  // Base chance calculation (intentionally approximate).
+  // Target DT is fixed at 0 here (no DT term) — the AI [VATS] command handles DT specifics.
+  const base = per * 2 + agi * 1.5 + (activeSkill + chemBonus) / 3;
 
   // Body region modifiers (FNV standard)
   const regions = [
@@ -1234,7 +1224,7 @@ function showVATSOverlay() {
 <div style="font-family:inherit;font-size:11px;line-height:1.8;white-space:pre;">
 <b>INPUTS</b>
   PER:${per}  AGI:${agi}  SKILL:${activeSkillName.toUpperCase()} ${activeSkill}${chemStr}
-  TARGET DT: ${targetDT} (update via AI [VATS] command for specifics)
+  TARGET DT: 0 (update via AI [VATS] command for specifics)
 
 <b>HIT PROBABILITIES — ESTIMATED</b>
   ${rows.split('\n').join('\n  ')}

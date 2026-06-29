@@ -97,6 +97,39 @@ function _slotLabel(n) {
   return `SLOT ${SLOT_NAMES[n - 1]}`;
 }
 
+// ── Local save list (synchronous) ────────────────────────────────────────────
+// Returns an array of {id, label, isActive|isSlot, n} for the active save + slots 1-3.
+// Co-located with the slot-schema helpers (_slotKey/_slotLabel) so a slot-key or
+// slot-count change touches only this file (DUP-2). Consumed by ui-account.js's
+// renderSavesList() as a global.
+function listLocalSaves() {
+  const saves = [];
+  const v8raw = localStorage.getItem('robco_v8');
+  if (v8raw) {
+    try {
+      const v8 = JSON.parse(v8raw);
+      const ctx = v8.activeContext || 'FNV';
+      saves.push({ id: 'active', label: 'Active (' + ctx + ')', isActive: true });
+    } catch (_) {}
+  }
+  for (let n = 1; n <= 3; n++) {
+    const slotRaw = localStorage.getItem(_slotKey(n));
+    if (!slotRaw) continue;
+    try {
+      const slot = JSON.parse(slotRaw);
+      const slotName = slot.slotName || 'Slot ' + n;
+      const savedDate = slot.savedAt ? new Date(slot.savedAt).toLocaleDateString() : '';
+      saves.push({
+        id: 'slot_' + n,
+        label: slotName + (savedDate ? ': ' + savedDate : ''),
+        isSlot: true,
+        n,
+      });
+    } catch (_) {}
+  }
+  return saves;
+}
+
 function saveToSlot(slotNum) {
   syncStateFromDom();
   const _slotState = JSON.parse(JSON.stringify(state));

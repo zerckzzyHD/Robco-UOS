@@ -308,23 +308,6 @@ function playSyncTone() {
   setTimeout(() => document.body.classList.remove('sync-complete'), 450);
 }
 
-// ── STAT DELTA GHOST ───────────────────────────────────────────
-function showDeltaGhost(fieldId, oldVal, newVal) {
-  if (oldVal === newVal) return;
-  const el = document.getElementById(fieldId);
-  if (!el) return;
-  const ghost = document.createElement('span');
-  ghost.className = 'delta-ghost';
-  ghost.textContent = oldVal;
-  const rect = el.getBoundingClientRect();
-  ghost.style.left = rect.left + 'px';
-  ghost.style.top = rect.top + 'px';
-  ghost.style.width = rect.width + 'px';
-  document.body.appendChild(ghost);
-  setTimeout(() => {
-    if (ghost.parentNode) ghost.parentNode.removeChild(ghost);
-  }, 900);
-}
 function changeOpticsColor(color) {
   let root = document.documentElement;
   if (color === 'amber') {

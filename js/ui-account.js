@@ -1,32 +1,6 @@
-// ── Local save list (synchronous) ────────────────────────────────────────────
-// Returns an array of {id, label, isSlot, n} for the active save + slots 1-3.
-function listLocalSaves() {
-  const saves = [];
-  const v8raw = localStorage.getItem('robco_v8');
-  if (v8raw) {
-    try {
-      const v8 = JSON.parse(v8raw);
-      const ctx = v8.activeContext || 'FNV';
-      saves.push({ id: 'active', label: 'Active (' + ctx + ')', isActive: true });
-    } catch (_) {}
-  }
-  for (let n = 1; n <= 3; n++) {
-    const slotRaw = localStorage.getItem('robco_slot_' + n);
-    if (!slotRaw) continue;
-    try {
-      const slot = JSON.parse(slotRaw);
-      const slotName = slot.slotName || 'Slot ' + n;
-      const savedDate = slot.savedAt ? new Date(slot.savedAt).toLocaleDateString() : '';
-      saves.push({
-        id: 'slot_' + n,
-        label: slotName + (savedDate ? ': ' + savedDate : ''),
-        isSlot: true,
-        n,
-      });
-    } catch (_) {}
-  }
-  return saves;
-}
+// listLocalSaves() — the synchronous local-save lister — lives in ui-saves.js
+// (co-located with the slot-schema helpers _slotKey/_slotLabel). renderSavesList()
+// below calls it as a global. (DUP-2 consolidation, WU-B7.)
 
 function renderAccount() {
   const body = document.getElementById('accountBody');

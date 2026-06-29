@@ -1010,11 +1010,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84','Suite 85','Suite 86','Suite 87','Suite 88','Suite 89','Suite 90','Suite 91','Suite 92','Suite 93','Suite 94','Suite 95','Suite 96','Suite 97','Suite 98')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84','Suite 85','Suite 86','Suite 87','Suite 88','Suite 89','Suite 90','Suite 91','Suite 92','Suite 93','Suite 94','Suite 95','Suite 96','Suite 97','Suite 98','Suite 99')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-98)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-98)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-99)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-99)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -5867,6 +5867,58 @@ $junkDirNames98 = @('.yoke')
 $junkDirs98 = @($rootDirs98 | Where-Object { $junkDirNames98 -contains $_ })
 Check ($junkDirs98.Count -eq 0) `
     ('Project root has no stray tool directories (e.g. .yoke/) -- Protocol 41' + $(if ($junkDirs98.Count) { ' -- found: ' + ($junkDirs98 -join ', ') } else { '' }))
+
+# ===========================================================
+# Suite 99 -- WU-B7 dead-code purge + duplication consolidation (16 tests)
+# Locks the removals so a refactor can't silently re-introduce the dead code,
+# and proves the consolidated helpers stayed consolidated. Each removed symbol
+# had zero call sites at purge time; each consolidation reuses one shared
+# helper / one slot-schema source.
+# ===========================================================
+Sep "Suite 99 -- WU-B7 dead-code purge + duplication consolidation"
+$audio99   = Get-Content "$Root\js\ui-audio.js"    -Raw
+$render99  = Get-Content "$Root\js\ui-render.js"   -Raw
+$api99     = Get-Content "$Root\js\api.js"         -Raw
+$core99    = Get-Content "$Root\js\ui-core.js"     -Raw
+$saves99   = Get-Content "$Root\js\ui-saves.js"    -Raw
+$account99 = Get-Content "$Root\js\ui-account.js"  -Raw
+$eslint99  = Get-Content "$Root\eslint.config.mjs" -Raw
+
+# -- Dead-code purge (must stay absent) --
+Check ($audio99 -notmatch '\bshowDeltaGhost\b') `
+    '99.1: showDeltaGhost() removed from ui-audio.js (QA-DEAD-1 -- zero call sites)'
+Check ($render99 -notmatch '\bticksToGameTime\b') `
+    '99.2: ticksToGameTime() removed from ui-render.js (QA-DEAD-4 -- zero call sites)'
+Check ($render99 -notmatch '\bgameTimeToTicks\b') `
+    '99.3: gameTimeToTicks() removed from ui-render.js (QA-DEAD-5 -- zero call sites, wrong comment)'
+Check ($api99 -notmatch '\b_cleanKey\b') `
+    '99.4: _cleanKey removed from api.js (QA-DEAD-3 -- computed then discarded)'
+Check (($api99 -notmatch '\b_gcV\b') -and ($api99 -notmatch 'state\.gameContext\s*=\s*gcV')) `
+    '99.5: dead commented gameContext assignment + unused _gcV parse removed from api.js (QA-DEAD-8)'
+Check ($core99 -notmatch '_inputHistory\s*=\s*\[\s*\]') `
+    '99.6: unused _inputHistory array removed from ui-core.js (QA-DEAD-2)'
+Check ($core99 -match '\b_inputHistoryIdx\b') `
+    '99.7: _inputHistoryIdx nav cursor retained -- Up/Down history nav still wired (no behavior change)'
+Check ($core99 -notmatch '\btargetDT\b') `
+    '99.8: targetDT=0 binding removed/inlined in showVATSOverlay (QA-DEAD-6)'
+Check (($eslint99 -notmatch '\bticksToGameTime\b') -and ($eslint99 -notmatch '\bgameTimeToTicks\b')) `
+    '99.9: ticksToGameTime + gameTimeToTicks globals removed from eslint.config.mjs'
+
+# -- Duplication consolidation (shared helpers / single source) --
+Check ($core99 -match 'function\s+_startUptimeClock\s*\(') `
+    '99.10: _startUptimeClock() shared helper defined in ui-core.js (QA-DUP-4)'
+Check ($core99 -match 'function\s+_startMemCycle\s*\(') `
+    '99.11: _startMemCycle() shared helper defined in ui-core.js (QA-DUP-3)'
+Check ([regex]::Matches($core99, 'MEMORY CYCLE COMPLETE').Count -eq 1) `
+    '99.12: "MEMORY CYCLE COMPLETE" literal appears exactly once in ui-core.js (mem-cycle body deduped)'
+Check ([regex]::Matches($core99, '_startUptimeClock\b').Count -ge 3) `
+    '99.13: _startUptimeClock referenced >=3x in ui-core.js (1 definition + both call sites use the helper)'
+Check ($saves99 -match 'function\s+listLocalSaves\s*\(') `
+    '99.14: listLocalSaves() moved into ui-saves.js -- co-located with slot schema (QA-DUP-2)'
+Check ($saves99 -match 'function\s+listLocalSaves[\s\S]*?_slotKey\s*\(') `
+    '99.15: listLocalSaves() reads slots via _slotKey() -- single slot-key source (QA-DUP-2)'
+Check ($account99 -notmatch 'function\s+listLocalSaves\s*\(') `
+    '99.16: listLocalSaves() no longer defined in ui-account.js (moved out -- single definition)'
 
 # ===========================================================
 # Results

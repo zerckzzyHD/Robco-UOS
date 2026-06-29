@@ -249,21 +249,12 @@ function addSquadMember() {
 // Internal representation: ticks (integer). 240 ticks = 1 in-game day.
 // 1 tick = 6 minutes. 10 ticks = 1 hour.
 //
-// ticksToGameTime(t)  → internal 'D1 14:00' format (legacy, used internally)
 // formatGameTime(t)   → Fallout-style 'Wednesday, 10.23.81, 1:40 AM' (display)
 // getGameDate()       → 'OCT 19, 2281' (calendar date only)
-// gameTimeToTicks()   → inverse: D/H/M → ticks (used by time input handler)
+// calendarToTicks()   → inverse: calendar date/time → ticks (time input handler)
 //
 // Design: All display-facing code uses formatGameTime(). Internal logic and
 // save/persistence remain tick-based. Shared by FNV and FO3 via gameContext.
-
-function ticksToGameTime(t) {
-  // Internal format — kept for backward compatibility (log exports, any future consumers).
-  let day = Math.floor(t / 240) + 1;
-  let hr = Math.floor((t % 240) / 10);
-  let mn = (t % 10) * 6;
-  return `D${day} ${String(hr).padStart(2, '0')}:${String(mn).padStart(2, '0')}`;
-}
 
 // ── CALENDAR DATE (G7) ────────────────────────────────────────────
 // Computes the absolute in-universe calendar from ticks + gameContext.
@@ -351,11 +342,6 @@ function renderGameDate() {
   const timeEl = document.getElementById('gameTimeDisplay');
   if (timeEl)
     timeEl.textContent = formatGameTime((typeof state !== 'undefined' && state.ticks) || 0);
-}
-
-// Minute resolution snaps to nearest tick boundary (floor to multiple of 6).
-function gameTimeToTicks(day, hour, min) {
-  return (day - 1) * 240 + hour * 10 + Math.floor(min / 6);
 }
 
 // ── calendarToTicks() — C11: Calendar Date Editor ────────────────────

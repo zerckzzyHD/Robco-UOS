@@ -96,7 +96,6 @@ export default [
         fetchAuthorizedModels: 'readonly',
         lookupItemInDb: 'readonly',
         getAmmoCalibers: 'readonly',
-        gameTimeToTicks: 'readonly',
         expandPanelForCategory: 'readonly',
         closeModal: 'readonly',
         tradeItem: 'readonly',
@@ -198,7 +197,6 @@ export default [
         _craftGetHave: 'readonly',
         // Time system (js/ui.js)
         formatGameTime: 'readonly',
-        ticksToGameTime: 'readonly',
         _resolveGameDateTime: 'readonly',
         getGameDate: 'readonly',
         renderGameDate: 'readonly',

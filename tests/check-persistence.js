@@ -1753,17 +1753,18 @@ header('Meta / Runner Parity');
     'Suite 96',
     'Suite 97',
     'Suite 98',
+    'Suite 99',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-98)' +
+    'JS runner contains all gate-guard suites (22-41, 49-99)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-98)' +
+    'PS runner contains all gate-guard suites (22-41, 49-99)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -10137,6 +10138,92 @@ header('Suite 98 — Project-root cleanliness (Protocol 41)');
     junkDirs.length === 0,
     'Project root has no stray tool directories (e.g. .yoke/) — Protocol 41' +
       (junkDirs.length ? ' — found: ' + junkDirs.join(', ') : '')
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 99 — WU-B7 dead-code purge + duplication consolidation (16 tests)
+//  Locks the removals so a refactor can't silently re-introduce the dead
+//  code, and proves the consolidated helpers stayed consolidated. Each
+//  removed symbol had zero call sites at purge time (grep-verified); each
+//  consolidation reuses one shared helper / one slot-schema source.
+// ══════════════════════════════════════════════════════════════
+header('Suite 99 — WU-B7 dead-code purge + duplication consolidation');
+{
+  const audio99 = readFile('js/ui-audio.js');
+  const render99 = readFile('js/ui-render.js');
+  const api99 = readFile('js/api.js');
+  const core99 = readFile('js/ui-core.js');
+  const saves99 = readFile('js/ui-saves.js');
+  const account99 = readFile('js/ui-account.js');
+  const eslint99 = readFile('eslint.config.mjs');
+
+  // ── Dead-code purge (must stay absent) ──
+  assert(
+    !/\bshowDeltaGhost\b/.test(audio99),
+    '99.1: showDeltaGhost() removed from ui-audio.js (QA-DEAD-1 — zero call sites)'
+  );
+  assert(
+    !/\bticksToGameTime\b/.test(render99),
+    '99.2: ticksToGameTime() removed from ui-render.js (QA-DEAD-4 — zero call sites)'
+  );
+  assert(
+    !/\bgameTimeToTicks\b/.test(render99),
+    '99.3: gameTimeToTicks() removed from ui-render.js (QA-DEAD-5 — zero call sites, wrong comment)'
+  );
+  assert(
+    !/\b_cleanKey\b/.test(api99),
+    '99.4: _cleanKey removed from api.js (QA-DEAD-3 — computed then discarded)'
+  );
+  assert(
+    !/\b_gcV\b/.test(api99) && !/state\.gameContext\s*=\s*gcV/.test(api99),
+    '99.5: dead commented gameContext assignment + unused _gcV parse removed from api.js (QA-DEAD-8)'
+  );
+  assert(
+    !/_inputHistory\s*=\s*\[\s*\]/.test(core99),
+    '99.6: unused _inputHistory array removed from ui-core.js (QA-DEAD-2)'
+  );
+  assert(
+    /\b_inputHistoryIdx\b/.test(core99),
+    '99.7: _inputHistoryIdx nav cursor retained — Up/Down history nav still wired (no behavior change)'
+  );
+  assert(
+    !/\btargetDT\b/.test(core99),
+    '99.8: targetDT=0 binding removed/inlined in showVATSOverlay (QA-DEAD-6)'
+  );
+  assert(
+    !/\bticksToGameTime\b/.test(eslint99) && !/\bgameTimeToTicks\b/.test(eslint99),
+    '99.9: ticksToGameTime + gameTimeToTicks globals removed from eslint.config.mjs'
+  );
+
+  // ── Duplication consolidation (shared helpers / single source) ──
+  assert(
+    /function\s+_startUptimeClock\s*\(/.test(core99),
+    '99.10: _startUptimeClock() shared helper defined in ui-core.js (QA-DUP-4)'
+  );
+  assert(
+    /function\s+_startMemCycle\s*\(/.test(core99),
+    '99.11: _startMemCycle() shared helper defined in ui-core.js (QA-DUP-3)'
+  );
+  assert(
+    (core99.match(/MEMORY CYCLE COMPLETE/g) || []).length === 1,
+    '99.12: "MEMORY CYCLE COMPLETE" literal appears exactly once in ui-core.js (mem-cycle body deduped)'
+  );
+  assert(
+    (core99.match(/_startUptimeClock\b/g) || []).length >= 3,
+    '99.13: _startUptimeClock referenced >=3x in ui-core.js (1 definition + both call sites use the helper)'
+  );
+  assert(
+    /function\s+listLocalSaves\s*\(/.test(saves99),
+    '99.14: listLocalSaves() moved into ui-saves.js — co-located with slot schema (QA-DUP-2)'
+  );
+  assert(
+    /function\s+listLocalSaves[\s\S]*?_slotKey\s*\(/.test(saves99),
+    '99.15: listLocalSaves() reads slots via _slotKey() — single slot-key source (QA-DUP-2)'
+  );
+  assert(
+    !/function\s+listLocalSaves\s*\(/.test(account99),
+    '99.16: listLocalSaves() no longer defined in ui-account.js (moved out — single definition)'
   );
 }
 
