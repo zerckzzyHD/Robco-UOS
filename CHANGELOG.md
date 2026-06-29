@@ -1,7 +1,12 @@
-﻿## [Unreleased]<!-- Tests: 1118/1118 | Cache: robco-terminal-v2.6.0-r5 -->
+﻿## [Unreleased]<!-- Tests: 1122/1122 | Cache: robco-terminal-v2.6.0-r6 -->
 
 ### Fixed
 
+- Fixed config labels (GAME:, PLAYSTYLE:, PLAYTHROUGH TYPE:) wrapping to a second line on narrow screens — they now stay inline at all viewport widths.
+- Fixed map cell names being cut off mid-word with a trailing underscore artifact — names now wrap to a second line, or truncate cleanly with an ellipsis, and the full name is always accessible in the tooltip.
+- Fixed the map region [?] collectible badge rendering as a vertical stack of characters when space was tight — the badge now stays on one line in both grid and zoomed map views.
+- Fixed inventory type tags ([WEAPON], [ARMOR], etc.) stacking vertically when the row was narrow — they are now pinned to their natural inline width and never wrap.
+- Fixed the USE button in the inventory row taking too much width and squeezing the item name to a few characters per line — USE is now compact and the item name fills the remaining row space. The USE button also has a proper 44px tap target height on mobile.
 - Restored corrupted em-dashes, en-dashes, and multiplication signs throughout the changelog history — entries going back to v1.3.0 had double-encoded symbols from a prior PowerShell write. No user-facing behavior was affected, but the in-app changelog viewer was showing garbled characters.
 - Extended the UTF-8 corruption guard to also cover doc files (CHANGELOG.md, README.md, ARCHITECTURE.md) — the guard previously only checked source files, so corrupted symbols in docs would slip past the build gate undetected. This is now closed: any future mojibake in these files fails the build immediately.
 

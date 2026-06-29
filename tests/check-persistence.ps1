@@ -971,11 +971,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84','Suite 85','Suite 86','Suite 87','Suite 88','Suite 89','Suite 90','Suite 91')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84','Suite 85','Suite 86','Suite 87','Suite 88','Suite 89','Suite 90','Suite 91','Suite 92')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-91)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-91)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-92)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-92)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -5379,6 +5379,31 @@ Check ($loadUIBody91ps.Contains('renderAccount(); // always')) `
 # 91.8  renderSavesList() always called -- localStorage/cloud not covered by state slice
 Check ($loadUIBody91ps.Contains('renderSavesList(); // always')) `
     'GATE-DIRTY-8: renderSavesList() called unconditionally in loadUI() (localStorage/cloud not in state slice)'
+
+# ===========================================================
+# Suite 92 -- VERTICAL-BROKEN-TEXT ANTI-RECURRENCE GUARDS (4 tests)
+# ===========================================================
+Sep "Suite 92 -- VERTICAL-BROKEN-TEXT ANTI-RECURRENCE GUARDS"
+# Protocol 13 + Protocol 36b escape-ratchet: closes the "element squeezed
+# to ~0 width wraps one glyph per line" bug class (WU-C7/C9/C10).
+$css92ps = [System.IO.File]::ReadAllText((Join-Path $Root 'css/terminal.css'), [System.Text.Encoding]::UTF8)
+$uiRender92ps = [System.IO.File]::ReadAllText((Join-Path $Root 'js/ui-render.js'), [System.Text.Encoding]::UTF8)
+
+# 92.1  .tag class carries white-space: nowrap in terminal.css
+Check ([System.Text.RegularExpressions.Regex]::IsMatch($css92ps, '\.tag\s*\{[^}]*white-space:\s*nowrap')) `
+    'GATE-NOWRAP-1: .tag class has white-space: nowrap in terminal.css (inventory type-tags must not wrap)'
+
+# 92.2  .badge class carries white-space: nowrap in terminal.css
+Check ([System.Text.RegularExpressions.Regex]::IsMatch($css92ps, '\.badge\s*\{[^}]*white-space:\s*nowrap')) `
+    'GATE-NOWRAP-2: .badge class has white-space: nowrap in terminal.css (map [?] badges must not wrap)'
+
+# 92.3  inventory type-tag uses .tag class in ui-render.js
+Check ($uiRender92ps.Contains('class="tag"')) `
+    'GATE-NOWRAP-3: inventory type-tag span uses class="tag" in ui-render.js'
+
+# 92.4  map collectible badge uses .badge class in ui-render.js
+Check ($uiRender92ps.Contains('map-collectible-badge badge')) `
+    'GATE-NOWRAP-4: map-collectible-badge span includes badge class in ui-render.js'
 
 # ===========================================================
 # Results

@@ -1639,17 +1639,18 @@ header('Meta / Runner Parity');
     'Suite 89',
     'Suite 90',
     'Suite 91',
+    'Suite 92',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-91)' +
+    'JS runner contains all gate-guard suites (22-41, 49-92)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-91)' +
+    'PS runner contains all gate-guard suites (22-41, 49-92)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -9071,6 +9072,40 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   assert(
     loadUIBody91.includes('renderSavesList(); // always'),
     'GATE-DIRTY-8: renderSavesList() called unconditionally in loadUI() (localStorage/cloud not in state slice)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 92 — VERTICAL-BROKEN-TEXT ANTI-RECURRENCE GUARDS (4 tests)
+// ══════════════════════════════════════════════════════════════
+{
+  // Protocol 13 + Protocol 36b escape-ratchet: closes the "element squeezed
+  // to ~0 width wraps one glyph per line" bug class (WU-C7/C9/C10).
+  const css92 = fs.readFileSync(path.join(__dirname, '../css/terminal.css'), 'utf8');
+  const uiRender92 = fs.readFileSync(path.join(__dirname, '../js/ui-render.js'), 'utf8');
+
+  // 92.1  .tag class carries white-space: nowrap in terminal.css
+  assert(
+    /\.tag\s*\{[^}]*white-space:\s*nowrap/.test(css92),
+    'GATE-NOWRAP-1: .tag class has white-space: nowrap in terminal.css (inventory type-tags must not wrap)'
+  );
+
+  // 92.2  .badge class carries white-space: nowrap in terminal.css
+  assert(
+    /\.badge\s*\{[^}]*white-space:\s*nowrap/.test(css92),
+    'GATE-NOWRAP-2: .badge class has white-space: nowrap in terminal.css (map [?] badges must not wrap)'
+  );
+
+  // 92.3  inventory type-tag uses .tag class in ui-render.js
+  assert(
+    uiRender92.includes('class="tag"'),
+    'GATE-NOWRAP-3: inventory type-tag span uses class="tag" in ui-render.js'
+  );
+
+  // 92.4  map collectible badge uses .badge class in ui-render.js
+  assert(
+    uiRender92.includes('map-collectible-badge badge'),
+    'GATE-NOWRAP-4: map-collectible-badge span includes badge class in ui-render.js'
   );
 }
 

@@ -151,6 +151,32 @@ body {
 .optics-label {
   white-space: nowrap;
 }
+/* WU-C7: config labels (GAME:, PLAYSTYLE:, etc.) must not wrap in narrow flex rows */
+.cfg-label {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+/* WU-C9/C10: shared inline-nowrap class for inventory type-tags and map [?] badges */
+.tag {
+  display: inline-block;
+  white-space: nowrap;
+  font-size: 9px;
+  opacity: 0.7;
+  margin-right: 3px;
+  flex-shrink: 0;
+}
+.badge {
+  display: inline-block;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+/* WU-C10: inventory item name — fills remaining flex space so USE/tag/X stay compact */
+.inv-name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
 .special-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -1519,6 +1545,9 @@ body.sync-complete {
   margin-right: 3px;
   opacity: 0.7;
   transition: opacity 0.15s;
+  min-height: 44px;
+  width: auto;
+  flex-shrink: 0;
 }
 .use-btn:hover {
   opacity: 1;
@@ -1618,20 +1647,26 @@ body.sync-complete {
   pointer-events: none;
 }
 .map-cell-name {
-  display: block;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   font-size: 8px;
   letter-spacing: 0.2px;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
   max-width: 100%;
   opacity: 0.8;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  line-height: 1.2;
 }
 .map-cell-pip {
   display: block;
   font-size: 9px;
   color: var(--robco-alert);
   line-height: 1;
+  white-space: nowrap;
 }
 
 /* ── Zone Detail View (v2.0.1) ─────────────────────────── */
@@ -1674,6 +1709,8 @@ body.sync-complete {
   font-size: 9px;
   color: var(--robco-alert);
   margin-left: 3px;
+  white-space: nowrap;
+  display: inline-block;
 }
 
 /* ── Map Legend & Toggle (v2.0.1) ───────────────────────── */

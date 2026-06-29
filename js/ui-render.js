@@ -100,8 +100,8 @@ function renderInventory() {
   lst.innerHTML = displayItems
     .map(it => {
       const cat = (it.type || 'misc').toLowerCase();
-      const typeTag = `<span style="font-size:9px;opacity:0.7;margin-right:3px;color:${typeColors[cat] || 'inherit'};">[${cat.toUpperCase()}]</span>`;
-      return `<li><button class="use-btn" data-use="${it._origIdx}" title="Quick-use: send [USE] ${escapeHtml(it.name)}">USE</button>${typeTag}<span>${parseInt(it.qty) || 0}x ${escapeHtml(it.name)} (${parseFloat(it.wgt) || 0} lb${parseInt(it.val) ? ' · ' + parseInt(it.val) + 'c' : ''})</span> <button class="delete-btn" data-idx="${it._origIdx}">X</button></li>`;
+      const typeTag = `<span class="tag" style="color:${typeColors[cat] || 'inherit'};">[${cat.toUpperCase()}]</span>`;
+      return `<li><button class="use-btn" data-use="${it._origIdx}" title="Quick-use: send [USE] ${escapeHtml(it.name)}">USE</button>${typeTag}<span class="inv-name">${parseInt(it.qty) || 0}x ${escapeHtml(it.name)} (${parseFloat(it.wgt) || 0} lb${parseInt(it.val) ? ' · ' + parseInt(it.val) + 'c' : ''})</span><button class="delete-btn" data-idx="${it._origIdx}">X</button></li>`;
     })
     .join('');
   lst.onclick = e => {
@@ -1326,7 +1326,7 @@ function renderWorldMap() {
     }
 
     const zoneBadge = zoneHasUncollectedCollectible(activeZone)
-      ? `<span class="map-collectible-badge">[?]</span>`
+      ? `<span class="map-collectible-badge badge">[?]</span>`
       : '';
     let html = `
       <div class="map-detail-header">
