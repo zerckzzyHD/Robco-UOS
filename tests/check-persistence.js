@@ -551,14 +551,15 @@ assert(
 header('Registry structural integrity');
 
 const registrySource = readFile('js/reg_nv.js');
+const registryCoreSource = readFile('js/registry-core.js');
 
 // 8.1 FALLOUT_REGISTRY global declaration must exist
 assert(/const\s+FALLOUT_REGISTRY\s*=/.test(registrySource), 'FALLOUT_REGISTRY global is declared');
 
-// 8.2 registrySearch function must be declared
+// 8.2 registrySearch function must be declared in registry-core.js (extracted from reg_nv.js, WU-B11)
 assert(
-  /function\s+registrySearch\s*\(/.test(registrySource),
-  'registrySearch() function is declared'
+  /function\s+registrySearch\s*\(/.test(registryCoreSource),
+  'registrySearch() function is declared in registry-core.js'
 );
 
 // 8.3 All 5 required category keys must be present
@@ -572,12 +573,15 @@ for (const cat of REQUIRED_CATEGORIES) {
 
 // 8.4 registrySearch must enforce min query length of 2 chars
 assert(
-  /query\.length\s*<\s*2|length\s*<\s*2/.test(registrySource),
+  /query\.length\s*<\s*2|length\s*<\s*2/.test(registryCoreSource),
   'registrySearch() enforces minimum query length of 2'
 );
 
 // 8.5 registrySearch must cap results at 7
-assert(/slice\s*\(\s*0\s*,\s*7\s*\)/.test(registrySource), 'registrySearch() caps results at 7');
+assert(
+  /slice\s*\(\s*0\s*,\s*7\s*\)/.test(registryCoreSource),
+  'registrySearch() caps results at 7'
+);
 
 // 8.6 Source of truth attribution must be present
 assert(
@@ -1640,17 +1644,18 @@ header('Meta / Runner Parity');
     'Suite 90',
     'Suite 91',
     'Suite 92',
+    'Suite 93',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-92)' +
+    'JS runner contains all gate-guard suites (22-41, 49-93)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-92)' +
+    'PS runner contains all gate-guard suites (22-41, 49-93)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -2162,6 +2167,7 @@ const stateSrc35 = readFile('js/state.js');
 const uiSrc35 = readFile('js/ui-core.js');
 const cssSrc35 = readFile('css/terminal.css');
 const regNvSrc35 = readFile('js/reg_nv.js');
+const regCoreSrc35 = readFile('js/registry-core.js');
 
 // 35.1 campaign_notes capped to 200 after auto-log pushes in api.js (P7-14)
 assert(
@@ -2200,10 +2206,10 @@ assert(
   );
 }
 
-// 35.6 registrySearch has _registrySearchCache memoization in reg_nv.js (P7-13)
+// 35.6 registrySearch has _registrySearchCache memoization in registry-core.js (P7-13)
 assert(
-  /_registrySearchCache/.test(regNvSrc35),
-  'registrySearch has _registrySearchCache memoization in reg_nv.js (P7-13)'
+  /_registrySearchCache/.test(regCoreSrc35),
+  'registrySearch has _registrySearchCache memoization in registry-core.js (P7-13)'
 );
 
 // ══════════════════════════════════════════════════════════════
@@ -9107,6 +9113,84 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     uiRender92.includes('map-collectible-badge badge'),
     'GATE-NOWRAP-4: map-collectible-badge span includes badge class in ui-render.js'
   );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 93 — FO3 AUTOCOMPLETE GUARD (8 tests)
+//  Protocol 13 + 36b: registrySearch lives in always-loaded
+//  registry-core.js so FO3 campaigns have working autocomplete.
+//  WU-B11 root cause: fn was only in reg_nv.js; boot loads only
+//  one reg file per game → FO3 had registrySearch=undefined.
+// ══════════════════════════════════════════════════════════════
+header('Suite 93 — FO3 Autocomplete Guard');
+{
+  const rc93 = readFile('js/registry-core.js');
+  const swSrc93 = readFile('sw.js');
+  const indexSrc93 = readFile('index.html');
+  const nvSrc93 = readFile('js/reg_nv.js');
+
+  // 93.1  registry-core.js file exists (readFile exits if absent)
+  assert(rc93.length > 0, 'registry-core.js file exists on disk');
+
+  // 93.2  registry-core.js is listed in sw.js ASSETS
+  assert(
+    swSrc93.includes('./js/registry-core.js'),
+    'registry-core.js is listed in sw.js ASSETS (service worker will cache it)'
+  );
+
+  // 93.3  registry-core.js defines registrySearch function
+  assert(
+    /function\s+registrySearch\s*\(/.test(rc93),
+    'registry-core.js defines registrySearch() function'
+  );
+
+  // 93.4  registry-core.js reads FALLOUT_REGISTRY[category] — game-agnostic
+  assert(
+    rc93.includes('FALLOUT_REGISTRY[category]'),
+    'registry-core.js reads FALLOUT_REGISTRY[category] — driven by active game registry, no literals'
+  );
+
+  // 93.5  reg_nv.js does NOT define registrySearch (moved to registry-core.js — no duplicate)
+  assert(
+    !/function\s+registrySearch\s*\(/.test(nvSrc93),
+    'reg_nv.js does NOT define registrySearch() — function extracted to registry-core.js'
+  );
+
+  // 93.6  FO3 boot path in index.html includes registry-core.js after reg_fo3.js
+  {
+    const fo3Idx = indexSrc93.indexOf("'js/reg_fo3.js'");
+    const rcNearFo3 =
+      fo3Idx >= 0 && indexSrc93.slice(fo3Idx, fo3Idx + 200).includes("'js/registry-core.js'");
+    assert(rcNearFo3, 'FO3 boot path in index.html includes registry-core.js after reg_fo3.js');
+  }
+
+  // 93.7  FNV boot path in index.html includes registry-core.js after reg_nv.js
+  {
+    const nvIdx = indexSrc93.indexOf("'js/reg_nv.js'");
+    const rcNearNv =
+      nvIdx >= 0 && indexSrc93.slice(nvIdx, nvIdx + 200).includes("'js/registry-core.js'");
+    assert(rcNearNv, 'FNV boot path in index.html includes registry-core.js after reg_nv.js');
+  }
+
+  // 93.8  Behavioral: registrySearch executed against FO3 registry returns FO3 quests.
+  //       Verifies the extracted function reads FALLOUT_REGISTRY dynamically (game-agnostic).
+  {
+    const fo3Src93 = readFile('js/reg_fo3.js');
+    let fo3SearchResult = [];
+    try {
+      const FR93 = new Function(fo3Src93 + '\nreturn FALLOUT_REGISTRY;')();
+      if (FR93) {
+        const fn93 = new Function('FALLOUT_REGISTRY', rc93 + '\nreturn registrySearch;')(FR93);
+        fo3SearchResult = fn93('quests', 'galaxy');
+      }
+    } catch (err) {
+      fo3SearchResult = [];
+    }
+    assert(
+      fo3SearchResult.length > 0 && fo3SearchResult.some(r => /galaxy/i.test(r.name)),
+      'FO3-context behavioral: registrySearch("quests","galaxy") returns Galaxy News Radio from FO3 registry'
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

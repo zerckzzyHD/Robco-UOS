@@ -475,6 +475,7 @@ function initRegistryAutocomplete() {
   function wireInput(inputId, category) {
     var el = document.getElementById(inputId);
     if (!el) return;
+    if (typeof registrySearch !== 'function') return;
 
     el.addEventListener('input', function () {
       clearTimeout(_acTimer);

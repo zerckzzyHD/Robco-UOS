@@ -304,16 +304,17 @@ Check ($apiSrc -imatch 'legacy.*flat.*key|flat.*key.*fallback') "autoImportState
 # ===========================================================
 Sep "Suite 8 -- Registry structural integrity"
 $regSrc = Read-Src "js/reg_nv.js"
+$regCoreSrc = Read-Src "js/registry-core.js"
 
 Check ($regSrc -match 'const FALLOUT_REGISTRY')           "FALLOUT_REGISTRY global is declared"
-Check ($regSrc -match 'function registrySearch')           "registrySearch() function is declared"
+Check ($regCoreSrc -match 'function registrySearch')       "registrySearch() function is declared in registry-core.js"
 Check ($regSrc -match "quests\s*:")                        "FALLOUT_REGISTRY.quests category key exists"
 Check ($regSrc -match "items\s*:")                         "FALLOUT_REGISTRY.items category key exists"
 Check ($regSrc -match "perks\s*:")                         "FALLOUT_REGISTRY.perks category key exists"
 Check ($regSrc -match "locations\s*:")                     "FALLOUT_REGISTRY.locations category key exists"
 Check ($regSrc -match "companions\s*:")                    "FALLOUT_REGISTRY.companions category key exists"
-Check ($regSrc -match '\.length\s*<\s*2')                  "registrySearch() enforces minimum query length of 2"
-Check ($regSrc -match '\.slice\(0,\s*7\)')                 "registrySearch() caps results at 7"
+Check ($regCoreSrc -match '\.length\s*<\s*2')              "registrySearch() enforces minimum query length of 2"
+Check ($regCoreSrc -match '\.slice\(0,\s*7\)')             "registrySearch() caps results at 7"
 Check ($regSrc -match 'fallout\.wiki')                     "reg_nv.js contains fallout.wiki attribution comment"
 Check ($regSrc -match "version\s*:\s*'[\d\.]+'")          "FALLOUT_REGISTRY.version is declared with semver string"
 # Strip block + inline comments before checking forbidden references (mirror Node Suite 8.8).
@@ -971,7 +972,7 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84','Suite 85','Suite 86','Suite 87','Suite 88','Suite 89','Suite 90','Suite 91','Suite 92')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84','Suite 85','Suite 86','Suite 87','Suite 88','Suite 89','Suite 90','Suite 91','Suite 92','Suite 93')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
 Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-92)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
@@ -1241,6 +1242,7 @@ $stateSrc35  = Read-Src 'js/state.js'
 $uiSrc35     = Read-Src 'js/ui-core.js'
 $cssSrc35    = Read-Src 'css/terminal.css'
 $regNvSrc35  = Read-Src 'js/reg_nv.js'
+$regCoreSrc35 = Read-Src 'js/registry-core.js'
 
 # 35.1 campaign_notes capped to 200 after auto-log pushes in api.js (P7-14)
 $capCount35 = ([regex]::Matches($apiSrc35, 'campaign_notes\.length\s*>\s*200')).Count
@@ -1263,8 +1265,8 @@ $blIdx35 = $uiSrc35.IndexOf("addEventListener('beforeunload'")
 $blSnippet35 = if ($blIdx35 -ge 0) { $uiSrc35.Substring($blIdx35, [Math]::Min(350, $uiSrc35.Length - $blIdx35)) } else { '' }
 Check ($blSnippet35.Contains('robco_v8') -and (-not $blSnippet35.Contains('robco_v7'))) "beforeunload flush writes robco_v8, not robco_v7 (P7-8)"
 
-# 35.6 registrySearch has _registrySearchCache memoization in reg_nv.js (P7-13)
-Check ([bool]($regNvSrc35 -match '_registrySearchCache')) 'registrySearch has _registrySearchCache memoization in reg_nv.js (P7-13)'
+# 35.6 registrySearch has _registrySearchCache memoization in registry-core.js (P7-13)
+Check ([bool]($regCoreSrc35 -match '_registrySearchCache')) 'registrySearch has _registrySearchCache memoization in registry-core.js (P7-13)'
 
 # ===========================================================
 # Suite 36 -- Keyboard Shortcuts Group ([?] menu discoverability)
@@ -5404,6 +5406,54 @@ Check ($uiRender92ps.Contains('class="tag"')) `
 # 92.4  map collectible badge uses .badge class in ui-render.js
 Check ($uiRender92ps.Contains('map-collectible-badge badge')) `
     'GATE-NOWRAP-4: map-collectible-badge span includes badge class in ui-render.js'
+
+
+# ===========================================================
+# Suite 93 -- FO3 AUTOCOMPLETE GUARD (8 tests)
+# Protocol 13 + 36b: registrySearch lives in always-loaded
+# registry-core.js so FO3 campaigns have working autocomplete.
+# WU-B11 root cause: fn was only in reg_nv.js; boot loads only
+# one reg file per game -- FO3 had registrySearch=undefined.
+# ===========================================================
+Sep "Suite 93 -- FO3 Autocomplete Guard"
+$rc93ps = [System.IO.File]::ReadAllText((Join-Path $Root 'js/registry-core.js'), [System.Text.Encoding]::UTF8)
+$sw93ps = [System.IO.File]::ReadAllText((Join-Path $Root 'sw.js'), [System.Text.Encoding]::UTF8)
+$idx93ps = [System.IO.File]::ReadAllText((Join-Path $Root 'index.html'), [System.Text.Encoding]::UTF8)
+$nv93ps = [System.IO.File]::ReadAllText((Join-Path $Root 'js/reg_nv.js'), [System.Text.Encoding]::UTF8)
+$fo393ps = [System.IO.File]::ReadAllText((Join-Path $Root 'js/reg_fo3.js'), [System.Text.Encoding]::UTF8)
+
+# 93.1  registry-core.js file exists (ReadAllText throws if absent)
+Check ($rc93ps.Length -gt 0) 'registry-core.js file exists on disk'
+
+# 93.2  registry-core.js is listed in sw.js ASSETS
+Check ($sw93ps.Contains('./js/registry-core.js')) `
+    'registry-core.js is listed in sw.js ASSETS (service worker will cache it)'
+
+# 93.3  registry-core.js defines registrySearch function
+Check ([System.Text.RegularExpressions.Regex]::IsMatch($rc93ps, 'function\s+registrySearch\s*\(')) `
+    'registry-core.js defines registrySearch() function'
+
+# 93.4  registry-core.js reads FALLOUT_REGISTRY[category] (game-agnostic)
+Check ($rc93ps.Contains('FALLOUT_REGISTRY[category]')) `
+    'registry-core.js reads FALLOUT_REGISTRY[category] -- driven by active game registry, no literals'
+
+# 93.5  reg_nv.js does NOT define registrySearch (moved to registry-core.js)
+Check (-not [System.Text.RegularExpressions.Regex]::IsMatch($nv93ps, 'function\s+registrySearch\s*\(')) `
+    'reg_nv.js does NOT define registrySearch() -- function extracted to registry-core.js'
+
+# 93.6  FO3 boot path in index.html includes registry-core.js after reg_fo3.js
+$fo3Idx93ps = $idx93ps.IndexOf("'js/reg_fo3.js'")
+$rcNearFo393ps = ($fo3Idx93ps -ge 0) -and $idx93ps.Substring($fo3Idx93ps, [Math]::Min(200, $idx93ps.Length - $fo3Idx93ps)).Contains("'js/registry-core.js'")
+Check $rcNearFo393ps "FO3 boot path in index.html includes registry-core.js after reg_fo3.js"
+
+# 93.7  FNV boot path in index.html includes registry-core.js after reg_nv.js
+$nvIdx93ps = $idx93ps.IndexOf("'js/reg_nv.js'")
+$rcNearNv93ps = ($nvIdx93ps -ge 0) -and $idx93ps.Substring($nvIdx93ps, [Math]::Min(200, $idx93ps.Length - $nvIdx93ps)).Contains("'js/registry-core.js'")
+Check $rcNearNv93ps "FNV boot path in index.html includes registry-core.js after reg_nv.js"
+
+# 93.8  Behavioral: FO3 registry has Galaxy News Radio quest (FO3 autocomplete data present)
+Check ($fo393ps.Contains("'Galaxy News Radio'") -or $fo393ps.Contains('"Galaxy News Radio"')) `
+    "FO3-context behavioral: reg_fo3.js FALLOUT_REGISTRY.quests contains Galaxy News Radio (FO3 data present + game-agnostic fn reads it)"
 
 # ===========================================================
 # Results

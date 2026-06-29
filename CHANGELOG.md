@@ -1,7 +1,8 @@
-﻿## [Unreleased]<!-- Tests: 1122/1122 | Cache: robco-terminal-v2.6.0-r6 -->
+﻿## [Unreleased]<!-- Tests: 1130/1130 | Cache: robco-terminal-v2.6.0-r7 -->
 
 ### Fixed
 
+- Fixed registry autocomplete not working in Fallout 3 campaigns — quest, item, and perk name inputs now search the active game's registry correctly. Previously, the autocomplete helper only loaded with Fallout: New Vegas and was absent in FO3 sessions, leaving all three inputs completely silent.
 - Fixed config labels (GAME:, PLAYSTYLE:, PLAYTHROUGH TYPE:) wrapping to a second line on narrow screens — they now stay inline at all viewport widths.
 - Fixed map cell names being cut off mid-word with a trailing underscore artifact — names now wrap to a second line, or truncate cleanly with an ellipsis, and the full name is always accessible in the tooltip.
 - Fixed the map region [?] collectible badge rendering as a vertical stack of characters when space was tight — the badge now stays on one line in both grid and zoomed map views.

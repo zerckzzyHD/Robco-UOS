@@ -1,4 +1,4 @@
-/* exported FALLOUT_REGISTRY, registrySearch */
+/* exported FALLOUT_REGISTRY */
 // ── FALLOUT 3 DATA REGISTRY ──────────────────────────────────────────────────
 // Canonical reference data for autocomplete and validation.
 // Source: Independent Fallout Wiki (https://fallout.wiki) — CC-BY-SA 3.0
