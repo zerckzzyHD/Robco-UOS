@@ -1649,17 +1649,18 @@ header('Meta / Runner Parity');
     'Suite 95',
     'Suite 96',
     'Suite 97',
+    'Suite 98',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-97)' +
+    'JS runner contains all gate-guard suites (22-41, 49-98)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-97)' +
+    'PS runner contains all gate-guard suites (22-41, 49-98)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -9523,6 +9524,39 @@ header('Suite 97 — CHANGELOG category-heading integrity');
     badCats.length === 0,
     'CHANGELOG.md: all category headings are recognized (Added/Changed/Deprecated/Removed/Fixed/Security/Improved/Under the Hood)' +
       (badCats.length ? ' — unknown: ' + badCats.join(', ') : '')
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 98 — Project-root cleanliness (Protocol 41) (2 tests)
+//  Flags leftover/junk that reappears at the project root so the end-of-task
+//  cleanup sweep can't silently regress. The gate only FLAGS (fails) — it never
+//  auto-deletes. Tracked files and the gitignored planning/ folder are untouched.
+// ══════════════════════════════════════════════════════════════
+header('Suite 98 — Project-root cleanliness (Protocol 41)');
+{
+  const rootEntries98 = fs.readdirSync(ROOT, { withFileTypes: true });
+
+  // 98.1  No junk-extension / scratch files at the project root.
+  const JUNK_FILE = /(\.(bak|old|tmp|orig|log|zip|swp|swo)$|~$|^repro\.|^_diag)/i;
+  const junkFiles = rootEntries98
+    .filter(e => e.isFile() && JUNK_FILE.test(e.name))
+    .map(e => e.name);
+  assert(
+    junkFiles.length === 0,
+    'Project root has no junk/scratch files (*.bak/*.old/*.tmp/*.orig/*.log/*.zip/*~/repro.*/_diag*) — Protocol 41' +
+      (junkFiles.length ? ' — found: ' + junkFiles.join(', ') : '')
+  );
+
+  // 98.2  No stray/abandoned tool directories at the project root.
+  const JUNK_DIRS = ['.yoke'];
+  const junkDirs = rootEntries98
+    .filter(e => e.isDirectory() && JUNK_DIRS.includes(e.name))
+    .map(e => e.name);
+  assert(
+    junkDirs.length === 0,
+    'Project root has no stray tool directories (e.g. .yoke/) — Protocol 41' +
+      (junkDirs.length ? ' — found: ' + junkDirs.join(', ') : '')
   );
 }
 

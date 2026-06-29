@@ -30,6 +30,9 @@ npm-debug.log*
 
 # Local planning artifacts — never committed/pushed/deployed
 # These are AI-agent research and design docs generated during the planning chain.
+# They live in planning/ (the whole folder is ignored); the filename patterns
+# below stay as a belt-and-suspenders guard in case any are kept/created elsewhere.
+planning/
 MASTER_PLAN.md
 PARALLELIZATION_PLAN.md
 HOUSE_STANDARD.md

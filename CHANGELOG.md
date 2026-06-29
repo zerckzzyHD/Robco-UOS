@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1158/1158 | Cache: robco-terminal-v2.6.0-r9 -->
+﻿## [Unreleased]<!-- Tests: 1160/1160 | Cache: robco-terminal-v2.6.0-r9 -->
 
 ### Added
 
@@ -26,6 +26,7 @@
 
 ### Under the Hood
 
+- Tidied the project folder: the internal planning/research documents were moved into a dedicated `planning/` folder (kept private, never published), an empty leftover tool folder was removed, and a new standing rule (Protocol 41) plus a build check now flag stray junk files so the workspace stays clean going forward. No effect on the app itself.
 - Refreshed the in-browser test page (`tests/test.html`) so it once again matches how the app actually loads and imports saves — it had drifted badly and would have failed if run. It now executes the real import logic across 10 suites (field import, factions, skills, collections, clamping, registry-validated trackers, save-file sanitising, and the save-load path), and it now runs automatically in the build gate so it can never silently fall out of date again. Added a new project rule (Protocol 40) and a build check (Suite 96) that keep it in sync going forward.
 - Added a build check that fails if any single version block in the changelog repeats a category heading (two `### Fixed` under one version, etc.), so the changelog keeps exactly one heading per category.
 - Added Suite 95 (7 regression tests) permanently guarding the save-load fix above: the exit-save flush and debounced save are both gated by the new load-in-progress flag, each of the three load paths sets that flag before reloading, the working game-switch path keeps its own guard, and a behavioral test imports a save container and asserts the loaded state reflects the file.

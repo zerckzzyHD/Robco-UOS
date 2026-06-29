@@ -972,11 +972,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84','Suite 85','Suite 86','Suite 87','Suite 88','Suite 89','Suite 90','Suite 91','Suite 92','Suite 93','Suite 94','Suite 95','Suite 96','Suite 97')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84','Suite 85','Suite 86','Suite 87','Suite 88','Suite 89','Suite 90','Suite 91','Suite 92','Suite 93','Suite 94','Suite 95','Suite 96','Suite 97','Suite 98')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-97)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-97)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-98)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-98)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -5655,6 +5655,27 @@ foreach ($b in $blocks97) {
 }
 Check ($badCats97.Count -eq 0) `
     ('CHANGELOG.md: all category headings are recognized (Added/Changed/Deprecated/Removed/Fixed/Security/Improved/Under the Hood)' + $(if ($badCats97.Count) { ' -- unknown: ' + ($badCats97 -join ', ') } else { '' }))
+
+# ===========================================================
+# Suite 98 -- Project-root cleanliness (Protocol 41) (2 tests)
+# Flags leftover/junk that reappears at the project root so the end-of-task
+# cleanup sweep can't silently regress. The gate only FLAGS (fails) -- it never
+# auto-deletes. Tracked files and the gitignored planning/ folder are untouched.
+# ===========================================================
+Sep "Suite 98 -- Project-root cleanliness (Protocol 41)"
+$rootFiles98 = [System.IO.Directory]::GetFiles($Root) | ForEach-Object { [System.IO.Path]::GetFileName($_) }
+$rootDirs98 = [System.IO.Directory]::GetDirectories($Root) | ForEach-Object { [System.IO.Path]::GetFileName($_) }
+
+# 98.1  No junk-extension / scratch files at the project root.
+$junkFiles98 = @($rootFiles98 | Where-Object { $_ -match '(\.(bak|old|tmp|orig|log|zip|swp|swo)$|~$|^repro\.|^_diag)' })
+Check ($junkFiles98.Count -eq 0) `
+    ('Project root has no junk/scratch files (*.bak/*.old/*.tmp/*.orig/*.log/*.zip/*~/repro.*/_diag*) -- Protocol 41' + $(if ($junkFiles98.Count) { ' -- found: ' + ($junkFiles98 -join ', ') } else { '' }))
+
+# 98.2  No stray/abandoned tool directories at the project root.
+$junkDirNames98 = @('.yoke')
+$junkDirs98 = @($rootDirs98 | Where-Object { $junkDirNames98 -contains $_ })
+Check ($junkDirs98.Count -eq 0) `
+    ('Project root has no stray tool directories (e.g. .yoke/) -- Protocol 41' + $(if ($junkDirs98.Count) { ' -- found: ' + ($junkDirs98 -join ', ') } else { '' }))
 
 # ===========================================================
 # Results
