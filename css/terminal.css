@@ -156,6 +156,22 @@ body {
   white-space: nowrap;
   flex-shrink: 0;
 }
+/* WU-C14: the COMPLETE RNG toggle + its warning banner must STACK (label on its
+   own full-width row above the warning) at every width — desktop matches mobile.
+   The base .input-group is a space-between ROW, so on desktop the banner sat
+   beside the label and crushed the label column to ~0 width, wrapping
+   "COMPLETE RNG" one character per line. Forcing column + stretch (overriding
+   align-items:center) gives the label a full-width row; nowrap + a min-width
+   floor are the same squeeze-proof treatment as WU-C7/C9/C10/C12 so the label
+   can never wrap per-character again. */
+.rng-mode-group {
+  flex-direction: column;
+  align-items: stretch;
+}
+.rng-mode-group > label {
+  white-space: nowrap;
+  min-width: 0;
+}
 /* WU-C9/C10: shared inline-nowrap class for inventory type-tags and map [?] badges */
 .tag {
   display: inline-block;

@@ -9821,13 +9821,14 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 92 — VERTICAL-BROKEN-TEXT ANTI-RECURRENCE GUARDS (5 tests)
+//  Suite 92 — VERTICAL-BROKEN-TEXT ANTI-RECURRENCE GUARDS (7 tests)
 // ══════════════════════════════════════════════════════════════
 {
   // Protocol 13 + Protocol 36b escape-ratchet: closes the "element squeezed
-  // to ~0 width wraps one glyph per line" bug class (WU-C7/C9/C10).
+  // to ~0 width wraps one glyph per line" bug class (WU-C7/C9/C10/C12/C14).
   const css92 = fs.readFileSync(path.join(__dirname, '../css/terminal.css'), 'utf8');
   const uiRender92 = fs.readFileSync(path.join(__dirname, '../js/ui-render.js'), 'utf8');
+  const html92 = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
 
   // 92.1  .tag class carries white-space: nowrap in terminal.css
   assert(
@@ -9857,6 +9858,22 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   assert(
     /\.macro-buttons\s+button\s*\{[^}]*white-space:\s*nowrap/.test(css92),
     'GATE-NOWRAP-5: .macro-buttons button has white-space: nowrap in terminal.css (macro command buttons must not wrap)'
+  );
+
+  // 92.6  WU-C14: the COMPLETE RNG label carries white-space: nowrap so it can
+  //       never wrap one character per line when squeezed beside its warning.
+  assert(
+    /\.rng-mode-group\s*>\s*label\s*\{[^}]*white-space:\s*nowrap/.test(css92),
+    'GATE-NOWRAP-6: .rng-mode-group > label has white-space: nowrap (COMPLETE RNG label must not wrap per-character)'
+  );
+
+  // 92.7  WU-C14: the COMPLETE RNG group stacks as a column (label on its own
+  //       full-width row above the warning, desktop matches mobile) and the
+  //       class hook is applied in index.html.
+  assert(
+    /\.rng-mode-group\s*\{[^}]*flex-direction:\s*column/.test(css92) &&
+      /class="input-group rng-mode-group"/.test(html92),
+    'GATE-NOWRAP-7: .rng-mode-group forces column stacking (label above warning) + class applied to the Complete RNG group in index.html'
   );
 }
 

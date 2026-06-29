@@ -5650,13 +5650,14 @@ Check ($loadUIBody91ps.Contains('renderSavesList(); // always')) `
     'GATE-DIRTY-8: renderSavesList() called unconditionally in loadUI() (localStorage/cloud not in state slice)'
 
 # ===========================================================
-# Suite 92 -- VERTICAL-BROKEN-TEXT ANTI-RECURRENCE GUARDS (5 tests)
+# Suite 92 -- VERTICAL-BROKEN-TEXT ANTI-RECURRENCE GUARDS (7 tests)
 # ===========================================================
 Sep "Suite 92 -- VERTICAL-BROKEN-TEXT ANTI-RECURRENCE GUARDS"
 # Protocol 13 + Protocol 36b escape-ratchet: closes the "element squeezed
-# to ~0 width wraps one glyph per line" bug class (WU-C7/C9/C10).
+# to ~0 width wraps one glyph per line" bug class (WU-C7/C9/C10/C12/C14).
 $css92ps = [System.IO.File]::ReadAllText((Join-Path $Root 'css/terminal.css'), [System.Text.Encoding]::UTF8)
 $uiRender92ps = [System.IO.File]::ReadAllText((Join-Path $Root 'js/ui-render.js'), [System.Text.Encoding]::UTF8)
+$html92ps = [System.IO.File]::ReadAllText((Join-Path $Root 'index.html'), [System.Text.Encoding]::UTF8)
 
 # 92.1  .tag class carries white-space: nowrap in terminal.css
 Check ([System.Text.RegularExpressions.Regex]::IsMatch($css92ps, '\.tag\s*\{[^}]*white-space:\s*nowrap')) `
@@ -5677,6 +5678,17 @@ Check ($uiRender92ps.Contains('map-collectible-badge badge')) `
 # 92.5  .macro-buttons button carries white-space: nowrap (WU-C12 device-wrap fix guard)
 Check ([System.Text.RegularExpressions.Regex]::IsMatch($css92ps, '\.macro-buttons\s+button\s*\{[^}]*white-space:\s*nowrap')) `
     'GATE-NOWRAP-5: .macro-buttons button has white-space: nowrap in terminal.css (macro command buttons must not wrap)'
+
+# 92.6  WU-C14: the COMPLETE RNG label carries white-space: nowrap so it can
+#       never wrap one character per line when squeezed beside its warning.
+Check ([System.Text.RegularExpressions.Regex]::IsMatch($css92ps, '\.rng-mode-group\s*>\s*label\s*\{[^}]*white-space:\s*nowrap')) `
+    'GATE-NOWRAP-6: .rng-mode-group > label has white-space: nowrap (COMPLETE RNG label must not wrap per-character)'
+
+# 92.7  WU-C14: the COMPLETE RNG group stacks as a column (label on its own
+#       full-width row above the warning) and the class hook is applied.
+Check (([System.Text.RegularExpressions.Regex]::IsMatch($css92ps, '\.rng-mode-group\s*\{[^}]*flex-direction:\s*column')) -and `
+       ($html92ps.Contains('class="input-group rng-mode-group"'))) `
+    'GATE-NOWRAP-7: .rng-mode-group forces column stacking (label above warning) + class applied to the Complete RNG group in index.html'
 
 
 # ===========================================================
