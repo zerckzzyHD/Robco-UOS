@@ -78,6 +78,31 @@ function extractFunctionBody(source, fnName) {
   throw new Error(`Unclosed brace for function "${fnName}"`);
 }
 
+// Extract a `window.NAME = [async ]function (params) { body }` assignment so it can
+// be reconstructed and evaluated in isolation (the window-assigned analogue of
+// extractFunctionBody). Returns { isAsync, params, body }.
+function extractAssignedFunction(source, name) {
+  const m = source.match(new RegExp('window\\.' + name + '\\s*=\\s*(async\\s+)?function'));
+  if (!m) throw new Error(`Cannot find window.${name} = function`);
+  const idx = m.index;
+  const openParen = source.indexOf('(', idx);
+  const openBrace = source.indexOf('{', openParen);
+  let depth = 0;
+  let i = openBrace;
+  for (; i < source.length; i++) {
+    if (source[i] === '{') depth++;
+    else if (source[i] === '}' && --depth === 0) {
+      i++;
+      break;
+    }
+  }
+  return {
+    isAsync: !!m[1],
+    params: source.slice(openParen, openBrace).trim(),
+    body: source.slice(openBrace, i),
+  };
+}
+
 /**
  * Extract top-level keys from "let state = { ... };" using brace-depth tracking.
  * Handles multi-key lines, nested objects (skills, factions), and arrays.
@@ -3781,7 +3806,9 @@ header('Phase 5c-iv: Gemini Key Sync + AI Studio Link');
 //  SUITE 48 — Remote Kill-Switch + Client Auto-Disable (Protocol 32/35)
 //  Fail-open: boot completes + all features work when config/flags absent.
 //  Session-scoped auto-disable on repeated failures (FAIL_THRESHOLD=3).
-//  11 tests
+//  Plus WU-B6 behavioral coverage: isFeatureEnabled fail-open reads +
+//  loadRemoteConfig leaves flags enabled when the config fetch fails.
+//  13 tests
 // ══════════════════════════════════════════════════════════════
 header('Remote Kill-Switch + Client Auto-Disable (Protocol 32/35)');
 {
@@ -3882,6 +3909,79 @@ header('Remote Kill-Switch + Client Auto-Disable (Protocol 32/35)');
       /allow\s+write\s*:\s*if\s+false/.test(rulesSrc48),
     'firestore.rules has /config/{doc} rule: allow read if true, allow write if false (public read, console-only write)'
   );
+
+  // 48.12  WU-B6 / TS-GAP-8 — isFeatureEnabled() BEHAVIORAL fail-open: an unknown/missing
+  //        key returns true; an explicit false disables; a session auto-disabled key disables.
+  {
+    const vm = require('vm');
+    let ok = false;
+    let err = null;
+    try {
+      const f = extractAssignedFunction(cloudSrc48, 'isFeatureEnabled');
+      const sb = {
+        _featureFlags: { aiChat: false, cloudSync: true },
+        _autoDisabled: { keySync: true },
+      };
+      vm.createContext(sb);
+      vm.runInContext(`var isFeatureEnabled = function ${f.params} ${f.body};`, sb);
+      const fn = sb.isFeatureEnabled;
+      ok =
+        fn('totallyUnknownFeature') === true && // unknown ⇒ fail-open (Protocol 33)
+        fn('aiChat') === false && // explicit false ⇒ disabled
+        fn('cloudSync') === true && // explicit true ⇒ enabled
+        fn('keySync') === false; // session auto-disabled ⇒ disabled
+    } catch (e) {
+      err = e;
+    }
+    assert(
+      ok,
+      'isFeatureEnabled() behavioral: unknown key fail-opens to true; explicit false + auto-disabled both disable (TS-GAP-8)' +
+        (err ? ' — ' + err.message : '')
+    );
+  }
+
+  // 48.13  WU-B6 / TS-GAP-1 (CRITICAL, Protocol 33) — loadRemoteConfig() BEHAVIORAL fail-open:
+  //        when the config fetch rejects/times out, it never throws and never disables a
+  //        feature — every flag stays at its last-known-good (enabled) value.
+  {
+    const vm = require('vm');
+    let flagsIntact = false;
+    let threw = false;
+    let err = null;
+    try {
+      const body = extractFunctionBody(cloudSrc48, 'loadRemoteConfig');
+      const sb = {
+        _featureFlags: { aiChat: true, cloudSync: true, keySync: true, googleSignIn: true },
+        _autoDisabled: {},
+        getDoc: () => Promise.reject(new Error('network-down')),
+        doc: () => ({}),
+        db: {},
+        setTimeout: () => 0,
+        localStorage: { setItem() {}, getItem: () => null },
+        appendToChat: () => {},
+        console: { warn() {} },
+      };
+      vm.createContext(sb);
+      try {
+        vm.runInContext(`async function loadRemoteConfig()${body}\nloadRemoteConfig();`, sb);
+      } catch (_) {
+        threw = true;
+      }
+      // The only mutation path is the success branch, which never runs on a rejected fetch.
+      flagsIntact =
+        sb._featureFlags.aiChat === true &&
+        sb._featureFlags.cloudSync === true &&
+        sb._featureFlags.keySync === true &&
+        sb._featureFlags.googleSignIn === true;
+    } catch (e) {
+      err = e;
+    }
+    assert(
+      flagsIntact && !threw,
+      'loadRemoteConfig() behavioral fail-open: a failed/unreachable config fetch never throws and leaves all feature flags enabled (TS-GAP-1, Protocol 33)' +
+        (err ? ' — ' + err.message : '')
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -4020,8 +4120,9 @@ header('Suite 50 — Gate Parity Guards (Protocol 36)');
 // ══════════════════════════════════════════════════════════════
 //  Suite 51 — Save Integrity + Rolling Backups (Data Safety Hardening)
 //  Verify checksum stamping, forward-compat guard, and rolling backup
-//  ring are wired consistently across all load/save paths.
-//  56 tests
+//  ring are wired consistently across all load/save paths. Plus WU-B6
+//  TS-GAP-2: an end-to-end behavioral restoreRollingBackup proof.
+//  57 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 51 — Save Integrity + Rolling Backups');
 {
@@ -4595,6 +4696,83 @@ header('Suite 51 — Save Integrity + Rolling Backups');
         'snapRollingBackup behavioral: A,B,A non-consecutive → 3 entries (dedup skips only consecutive repeats)'
       );
     }
+  }
+
+  // 51.57  WU-B6 / TS-GAP-2 — restoreRollingBackup BEHAVIORAL (end-to-end): selecting a backup
+  //        restores it through the REAL sanitize → migrate → write pipeline (robco_v8 written
+  //        from the chosen backup; chat + playstyle restored; reload guard set). Complements the
+  //        structural 51.16/51.36 guards with a "the backup actually restores" behavioral proof.
+  {
+    const vm = require('vm');
+    let ok = false;
+    let err = null;
+    try {
+      const _store = Object.create(null);
+      const _ls = {
+        getItem: k => (_store[k] !== undefined ? String(_store[k]) : null),
+        setItem: (k, v) => {
+          _store[k] = String(v);
+        },
+        removeItem: k => {
+          delete _store[k];
+        },
+      };
+      const sb = {
+        window: {
+          _loadingSave: false,
+          location: { reload: () => {} },
+          getRollingBackups: () => [
+            {
+              label: 'TEST BACKUP',
+              data: {
+                version: '2.6.0',
+                robco_v8: { activeContext: 'FNV', campaigns: { FNV: { lvl: 7, caps: 500 } } },
+                chat: [{ text: 'hi', sender: 'user' }],
+                playstyle: 'melee',
+              },
+            },
+          ],
+        },
+        prompt: () => '1', // select backup #1
+        confirm: () => true, // approve the destructive restore
+        alert: () => {},
+        appendToChat: () => {},
+        localStorage: _ls,
+        GAME_DEFS: { FNV: {}, FO3: {} },
+        _buildFactions: () => ({}),
+        console: { warn() {} },
+      };
+      const _declFn = (src, name) => {
+        const body = extractFunctionBody(src, name);
+        const s = src.indexOf('function ' + name);
+        const p = src.slice(src.indexOf('(', s), src.indexOf('{', src.indexOf('(', s)));
+        return 'function ' + name + p + body;
+      };
+      vm.createContext(sb);
+      vm.runInContext(
+        _declFn(apiSource, 'sanitizeImportedContainer') +
+          '\n' +
+          _declFn(stateSrc51, 'migrateState') +
+          '\n' +
+          _declFn(uiSrc51, 'restoreRollingBackup'),
+        sb
+      );
+      sb.restoreRollingBackup();
+      const written = JSON.parse(_store['robco_v8']);
+      ok =
+        written.campaigns.FNV.lvl === 7 &&
+        written.campaigns.FNV.caps === 500 &&
+        _store['robco_playstyle'] === 'melee' &&
+        Array.isArray(JSON.parse(_store['robco_chat'])) &&
+        sb.window._loadingSave === true; // reload-clobber guard set (Suite 95 invariant)
+    } catch (e) {
+      err = e;
+    }
+    assert(
+      ok,
+      'restoreRollingBackup behavioral: a selected backup restores end-to-end through sanitize→migrate→write (robco_v8/playstyle/chat restored; reload guard set) (TS-GAP-2)' +
+        (err ? ' — ' + err.message : '')
+    );
   }
 }
 

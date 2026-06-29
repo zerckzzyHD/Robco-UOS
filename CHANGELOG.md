@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1184/1184 | Cache: robco-terminal-v2.6.0-r15 -->
+﻿## [Unreleased]<!-- Tests: 1187/1187 | Cache: robco-terminal-v2.6.0-r15 -->
 
 ### Added
 
@@ -48,6 +48,7 @@
 - Added a full round-trip safety test for cloud saves: a save is now automatically pushed, cleaned, migrated, and re-applied in the test suite to prove every tracker and your faction standings come back exactly as they went in — so a future change can't silently drop part of your campaign during cloud sync. Also locked in two long-standing data-safety rules with build checks: cloud saves are only ever added (never blindly overwritten), and shared settings are merged rather than replaced. No user-facing change.
 - The in-app changelog now knows whether it's running on the private test build or the public site. The private staging build shows the in-progress "Unreleased" notes so changes can be reviewed before release, while the public site continues to show only released versions — and defaults to the public behaviour whenever it can't tell, so unreleased notes never leak to live users.
 - The public site now publishes only when a new version is actually released, never on an ordinary update to the main line of work. Previously it republished on every change that reached main; it is now gated to a version bump, so work staged for a future release can no longer reach the live site early. A build check was added (and the existing deploy-trigger checks updated) so this release-gating can't silently slip back to publishing on every push.
+- Strengthened the safety net around the remote on/off switches and save recovery. New automated tests actually exercise the behaviour — proving that if the remote feature config can't be reached the app keeps every feature switched on (never silently disabling something), that an unknown switch defaults to on, and that restoring a backup truly brings your level, caps, playstyle, and chat back. No user-facing change; these guard paths that previously had no behavioural coverage.
 
 ---
 

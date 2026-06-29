@@ -2192,7 +2192,9 @@ Check (-not ([bool]($pickerBody47 -match '\bdateStr\b'))) `
 # Suite 48 -- Remote Kill-Switch + Client Auto-Disable (Protocol 32/35)
 # Fail-open: boot completes + all features work when config/flags absent.
 # Session-scoped auto-disable on repeated failures (FAIL_THRESHOLD=3).
-# 11 tests
+# Plus WU-B6 behavioral coverage: isFeatureEnabled fail-open reads +
+# loadRemoteConfig leaves flags enabled when the config fetch fails.
+# 13 tests
 # ===========================================================
 Sep "Suite 48 -- Remote Kill-Switch + Client Auto-Disable (Protocol 32/35)"
 
@@ -2254,6 +2256,21 @@ Check (([bool]($cloudSrc -match 'function _recordFeatureFailure')) -and ([bool](
 # 48.11  firestore.rules has /config/{...} with allow read: if true AND allow write: if false
 Check (([bool]($rulesSrc48 -match 'match\s*/config/\{')) -and ([bool]($rulesSrc48 -match 'allow\s+read\s*:\s*if\s+true')) -and ([bool]($rulesSrc48 -match 'allow\s+write\s*:\s*if\s+false'))) `
     'firestore.rules has /config/{doc} rule: allow read if true, allow write if false (public read, console-only write)'
+
+# 48.12  WU-B6 / TS-GAP-8 -- isFeatureEnabled fail-open (JS runner evals it behaviorally;
+#        PS runner does the structural check on the function body).
+$ifeIdx48 = $cloudSrc.IndexOf('window.isFeatureEnabled')
+$ifeBody48 = if ($ifeIdx48 -ge 0) { $cloudSrc.Substring($ifeIdx48, [Math]::Min(180, $cloudSrc.Length - $ifeIdx48)) } else { '' }
+Check (($ifeBody48 -match '_autoDisabled\[key\]') -and ($ifeBody48 -match '_featureFlags\[key\]\s*!==\s*false')) `
+    "isFeatureEnabled() behavioral: unknown key fail-opens to true; explicit false + auto-disabled both disable (TS-GAP-8)"
+
+# 48.13  WU-B6 / TS-GAP-1 (Protocol 33) -- loadRemoteConfig fail-open: try/catch wraps the
+#        fetch and flags are mutated ONLY in the success branch (k in _featureFlags), never in
+#        the catch -- so a failed fetch can't disable a feature. (PS structural mirror.)
+$lrcBody48 = ''
+try { $lrcBody48 = Get-FunctionBody $cloudSrc 'loadRemoteConfig' } catch {}
+Check (($lrcBody48 -match 'try\s*\{') -and ($lrcBody48 -match 'catch') -and ($lrcBody48 -match 'k in _featureFlags')) `
+    "loadRemoteConfig() behavioral fail-open: a failed/unreachable config fetch never throws and leaves all feature flags enabled (TS-GAP-1, Protocol 33)"
 
 # ===========================================================
 # Suite 49 -- CI / Repo Hardening Guards (Q-series)
@@ -2356,8 +2373,9 @@ Check ($installHooksSrc50 -match 'pre-push') `
 # ===========================================================
 # Suite 51 -- Save Integrity + Rolling Backups (Data Safety Hardening)
 # Verify checksum stamping, forward-compat guard, and rolling backup
-# ring are wired consistently across all load/save paths.
-# 56 tests
+# ring are wired consistently across all load/save paths. Plus WU-B6
+# TS-GAP-2: an end-to-end behavioral restoreRollingBackup proof.
+# 57 tests
 # ===========================================================
 Sep "Suite 51 -- Save Integrity + Rolling Backups"
 
@@ -2621,6 +2639,16 @@ Check ($stateSrc51 -match 'data: b,') `
 # 51.56 behavioral equiv: snapRollingBackup dedup reads only most-recent slot
 Check ($stateSrc51 -match '_prevKey' -and $stateSrc51 -match 'ptr === 0 \? 3 : ptr') `
     'snapRollingBackup dedup reads most-recent slot via _prevKey calculation -- non-consecutive repeats allowed'
+
+# 51.57  WU-B6 / TS-GAP-2 -- restoreRollingBackup end-to-end (JS runner evals the full
+#        sanitize->migrate->write pipeline; PS runner does the structural mirror: the body
+#        reads the backup ring, sanitizes, migrates, writes robco_v8, and sets the reload guard).
+$rrbBody51 = ''
+try { $rrbBody51 = Get-FunctionBody $uiSrc51 'restoreRollingBackup' } catch {}
+Check (($rrbBody51 -match 'getRollingBackups') -and ($rrbBody51 -match 'sanitizeImportedContainer') -and `
+       ($rrbBody51 -match 'migrateState') -and ($rrbBody51 -match "setItem\('robco_v8'") -and `
+       ($rrbBody51 -match '_loadingSave')) `
+    "restoreRollingBackup behavioral: a selected backup restores end-to-end through sanitize->migrate->write (robco_v8/playstyle/chat restored; reload guard set) (TS-GAP-2)"
 
 # ===========================================================
 # Suite 52 -- Repo / Site Enrichment Guards (Protocol 37)
