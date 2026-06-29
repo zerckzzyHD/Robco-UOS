@@ -77,6 +77,8 @@ Run this after every test addition or removal. Every hit must show the new count
 
 **Changelog versioning model:** Per-push test-count and cache-rev updates go on the current `## [Unreleased]` section header, **never** on a released version's entry (e.g. `v2.6.0`, `v2.0.1`). Released entries are frozen at the values that were true at their release and must not be modified retroactively.
 
+**Chronological ordering:** `[Unreleased]` entries are kept in chronological order within each category, earliest first (ascending), appended as work lands. Preserve the Keep-a-Changelog category grouping (one `### Added` / `### Changed` / `### Fixed` / `### Under the Hood` heading each, in that standard order) — but within each category, list bullets in the order the changes actually landed, oldest at the top. Use `git log` to settle true chronology when an entry's order is unclear.
+
 ---
 
 ## Protocol 3 — Source of Truth
