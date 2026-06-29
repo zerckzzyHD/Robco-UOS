@@ -4121,8 +4121,9 @@ Check ($ssBody69 -match '_contextSwitching' -and $ssBody69 -match '\breturn\b') 
 # Guards: ARMOR.CSV floor count, named mandated items,
 # no-duplicate, column-count, DB-registry parity for new
 # apparel, Vault 13 Canteen in MISC + registry,
-# seedNewCampaignInventory definition + guards.
-# 14 tests
+# seedNewCampaignInventory definition + guards,
+# WU-D2 Mysterious Stranger Outfit DT regression.
+# 15 tests
 # ===========================================================
 Sep "Suite 70 -- FNV unique apparel + Vault 13 Canteen"
 $dbNv70      = Read-Src "js\db_nv.js"
@@ -4235,6 +4236,14 @@ Check ($seedBody70 -match 'inventory' -and $seedBody70 -match 'length') `
 # 70.14  New-campaign guard (ticks === 0)
 Check ([bool]($seedBody70 -match 'ticks')) `
     'seedNewCampaignInventory() checks ticks -- prevents seeding on reload of played campaign'
+
+# 70.15  Mysterious Stranger Outfit DT regression (WU-D2 / NV-DB-1). fallout.wiki: the outfit
+#        provides 5 DR and NO Damage Threshold -- in-game DT is 0. The DB had a wild DT of 55
+#        (more protective than T-51b power armor); corrected to 0, matching every sibling
+#        Clothing row. Schema: Name,Type,DT,Weight,... -> DT = col index 2.
+$msoRow70 = $armorRows70 | Where-Object { ($_ -split ',')[0].Trim() -eq 'Mysterious Stranger Outfit' } | Select-Object -First 1
+$msoDT70 = if ($msoRow70) { ($msoRow70 -split ',')[2].Trim() } else { $null }
+Check ($msoDT70 -eq '0') ("Mysterious Stranger Outfit has DT 0 in ARMOR.CSV (fallout.wiki: DR 5, no DT; was 55) -- got " + $msoDT70)
 
 # ===========================================================
 # Suite 71 -- Phase 6 UI Consistency (compact trackers,
@@ -4878,10 +4887,10 @@ Check $mreSatisfied "lookupItemInDb('MRE') -> wgt=0.2/val=50/type='aid'"
 
 
 # ===========================================================
-# Suite 81 -- FO3 [ARMOR.CSV] expansion (32 -> 62)
-# 9 tests
+# Suite 81 -- FO3 [ARMOR.CSV] (61 rows; WU-D2 NV-bleed removal)
+# 10 tests
 # ===========================================================
-Sep "Suite 81 -- FO3 [ARMOR.CSV] expansion (32 -> 62)"
+Sep "Suite 81 -- FO3 [ARMOR.CSV] (61 rows; WU-D2 NV-bleed removal)"
 $fo3Src81 = Read-Src "js\db_fo3.js"
 $aStart81 = $fo3Src81.IndexOf('[ARMOR.CSV]')
 $aEnd81 = $fo3Src81.IndexOf("`n[", $aStart81 + 1)
@@ -4889,8 +4898,8 @@ $aBlock81 = if ($aEnd81 -ge 0) { $fo3Src81.Substring($aStart81, $aEnd81 - $aStar
 $aLines81 = $aBlock81 -split "`n" | Where-Object { $_.Trim() -ne '' -and -not $_.StartsWith('[') }
 $aData81 = $aLines81 | Select-Object -Skip 1
 
-# 81.a  exactly 62 data rows
-Check ($aData81.Count -eq 62) ("FO3 [ARMOR.CSV] has exactly 62 data rows (got " + $aData81.Count + ")")
+# 81.a  exactly 61 data rows (WU-D2: 62 -> 61 after removing the NV-bleed 'NCR Ranger Armor')
+Check ($aData81.Count -eq 61) ("FO3 [ARMOR.CSV] has exactly 61 data rows (got " + $aData81.Count + ")")
 
 # 81.b  every row has exactly 7 fields (stray-comma guard)
 $badFields81 = @($aData81 | Where-Object { ($_ -split ',').Count -ne 7 })
@@ -4915,6 +4924,12 @@ $sa81Cols = if ($sa81Row) { $sa81Row -split ',' } else { @() }
 $saSatisfied = ($null -ne $sa81Row) -and ($sa81Cols.Count -ge 5) -and `
     ([Math]::Abs([double]$sa81Cols[3] - 20) -lt 0.001) -and ([Math]::Abs([double]$sa81Cols[4] - 1000) -lt 0.001)
 Check $saSatisfied "lookupItemInDb('Samurai Armor') -> wgt=20/val=1000/type='armor'"
+
+# 81.e  NV-content-bleed guard (WU-D2 / FO3-DB-4): NCR has no presence in Fallout 3, so
+#       no NCR-faction armor may appear in FO3 ARMOR.CSV. 'NCR Ranger Armor' was an FNV
+#       item that leaked in (removed); guards the whole NV-bleed class. fallout.wiki-verified.
+$ncrBleed81 = @($aNames81 | Where-Object { $_ -match '^NCR\b' })
+Check ($ncrBleed81.Count -eq 0) ("FO3 ARMOR has no NCR-faction armor (NCR does not exist in FO3 -- NV-bleed guard)" + $(if ($ncrBleed81.Count) { ' -- found: ' + ($ncrBleed81 -join ', ') } else { '' }))
 
 # ===========================================================
 # Suite 82 -- FO3 quests (62, WU-D1 canon fix) + quest items (15->25)

@@ -7135,8 +7135,9 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  Guards: ARMOR.CSV floor count, named mandated items,
 //  no-duplicate, column-count, DB↔registry parity for new
 //  apparel, Vault 13 Canteen in MISC + registry,
-//  seedNewCampaignInventory definition + guards.
-//  14 tests
+//  seedNewCampaignInventory definition + guards,
+//  WU-D2 Mysterious Stranger Outfit DT regression.
+//  15 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 70 — FNV unique apparel + Vault 13 Canteen');
@@ -7312,6 +7313,19 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     assert(
       /ticks/.test(seedBody70),
       'seedNewCampaignInventory() checks ticks — prevents seeding on reload of played campaign'
+    );
+  }
+
+  // 70.15  Mysterious Stranger Outfit DT regression (WU-D2 / NV-DB-1). fallout.wiki: the
+  //        outfit provides 5 DR and NO Damage Threshold — its in-game DT is 0. The DB had
+  //        a wild DT of 55 (more protective than T-51b power armor); corrected to 0, which
+  //        also matches every sibling Clothing row. Schema: Name,Type,DT,Weight,... → DT=col 2.
+  {
+    const msoRow70 = armorRows70.find(r => r.split(',')[0].trim() === 'Mysterious Stranger Outfit');
+    const msoDT70 = msoRow70 ? msoRow70.split(',')[2].trim() : null;
+    assert(
+      msoDT70 === '0',
+      `Mysterious Stranger Outfit has DT 0 in ARMOR.CSV (fallout.wiki: DR 5, no DT; was 55) — got ${msoDT70}`
     );
   }
 }
@@ -8357,11 +8371,11 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 81 — FO3 [ARMOR.CSV] expansion (32 → 62)
-//  9 tests
+//  Suite 81 — FO3 [ARMOR.CSV] (61 rows; WU-D2 removed NV bleed)
+//  10 tests
 // ══════════════════════════════════════════════════════════════
 {
-  header('Suite 81 — FO3 [ARMOR.CSV] expansion (32 → 62)');
+  header('Suite 81 — FO3 [ARMOR.CSV] (61 rows; WU-D2 NV-bleed removal)');
   const fo3Src81 = readFile('js/db_fo3.js');
   const aStart81 = fo3Src81.indexOf('[ARMOR.CSV]');
   const aEnd81 = fo3Src81.indexOf('\n[', aStart81 + 1);
@@ -8369,8 +8383,8 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   const aLines81 = aBlock81.split('\n').filter(l => l.trim() && !l.startsWith('['));
   const aData81 = aLines81.slice(1); // skip header row
 
-  // 81.a  exactly 62 data rows
-  assert(aData81.length === 62, `FO3 [ARMOR.CSV] has exactly 62 data rows (got ${aData81.length})`);
+  // 81.a  exactly 61 data rows (WU-D2: 62 → 61 after removing the NV-bleed 'NCR Ranger Armor')
+  assert(aData81.length === 61, `FO3 [ARMOR.CSV] has exactly 61 data rows (got ${aData81.length})`);
 
   // 81.b  every row has exactly 7 comma-separated fields (stray-comma guard)
   const badFields81 = aData81.filter(r => r.split(',').length !== 7);
@@ -8407,6 +8421,17 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   assert(
     sa81 && sa81.wgt === 20 && sa81.val === 1000 && sa81.type === 'armor',
     `lookupItemInDb('Samurai Armor') → wgt=20/val=1000/type='armor' (got ${JSON.stringify(sa81)})`
+  );
+
+  // 81.e  NV-content-bleed guard (WU-D2 / FO3-DB-4): the NCR has no presence in
+  //       Fallout 3, so no NCR-faction armor may appear in the FO3 ARMOR.CSV.
+  //       'NCR Ranger Armor' was an FNV item that had leaked in (removed); this
+  //       guards the whole NV-bleed class, not just that one row. fallout.wiki-verified.
+  const ncrBleed81 = aNames81.filter(n => /^NCR\b/i.test(n));
+  assert(
+    ncrBleed81.length === 0,
+    'FO3 ARMOR has no NCR-faction armor (NCR does not exist in FO3 — NV-bleed guard)' +
+      (ncrBleed81.length ? ' — found: ' + ncrBleed81.join(', ') : '')
   );
 }
 

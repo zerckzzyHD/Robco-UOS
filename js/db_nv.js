@@ -348,7 +348,7 @@ Dean's Tuxedo,Clothing,0,2,6,Speech +5,—
 Father Elijah's Robes,Clothing,2,2,6,BOS Faction Disguise,—
 Followers Lab Coat,Clothing,0,2,16,Medicine +10 / Science +10,—
 General Oliver's Uniform,Clothing,0,1,0,Charisma +2 / AP +20,—
-Mysterious Stranger Outfit,Clothing,55,3,40,None,—
+Mysterious Stranger Outfit,Clothing,0,3,40,None,—
 Naughty Nightwear,Clothing,0,1,200,Speech +10 / Luck +1,—
 President Kimball's Suit,Clothing,0,2,5,Speech +5,—
 RobCo Jumpsuit,Clothing,0,1,6,Repair +5,—

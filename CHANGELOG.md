@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1247/1247 | Cache: robco-terminal-v2.6.0-r24 -->
+﻿## [Unreleased]<!-- Tests: 1249/1249 | Cache: robco-terminal-v2.6.0-r25 -->
 
 ### Added
 
@@ -29,6 +29,7 @@
 - Fixed the deep startup hum playing at the wrong moment. The power-on drone is meant to rumble as the boot screen runs, but browsers won't let any sound play until you first tap or press a key — so if you didn't touch anything during boot, the hum was sitting in wait and would fire awkwardly later, the first time you tapped a menu mid-session. Now the drone only plays if boot is still in progress when you first interact; if boot already finished, it's quietly dropped instead of surfacing detached. The hum is part of the startup or doesn't play at all.
 - Fixed the "COMPLETE RNG" label in the campaign settings collapsing into a vertical stack of single letters on desktop once its warning notice appeared beside it. The label and its warning now stack — label on its own full-width row directly above the warning — at every screen size, matching how it already looked on phones.
 - Corrected two Fallout 3 quest-log entries that weren't real quests. "Fires of Anchorage" (which doesn't exist in the game) and a duplicate "Strictly Business (Paradise Falls)" (the real quest is just "Strictly Business") have been removed, so the FO3 quest autocomplete no longer suggests fake quests. Also fixed the world map labelling two different regions both as "Vault 92" — the southeastern one is now correctly named "Bethesda Ruins". All corrections verified against the Fallout wiki.
+- Corrected two item-database errors so the AI gets accurate stats. The "NCR Ranger Armor" — a New Vegas item that had leaked into the Fallout 3 database (the NCR doesn't exist in Fallout 3) — has been removed from FO3. And the Mysterious Stranger Outfit, which was mistakenly recorded as more protective than power armor, now shows its correct value (it offers almost no damage protection). Both verified against the Fallout wiki.
 
 ### Changed
 

@@ -164,7 +164,6 @@ Metal Armor,Medium,15,30,700,None,50%
 Combat Armor,Medium,20,25,900,None,50%
 Talon Combat Armor,Medium,20,25,1000,None,50%
 Merc Troublemaker Outfit,Light,0,3,90,None,50%
-NCR Ranger Armor,Medium,20,25,800,None,50%
 Outcast Power Armor,Heavy,38,45,11000,+1 STR / +25 Rad Resist,50%
 T-45d Power Armor,Heavy,38,45,6000,+2 STR,50%
 T-51b Power Armor,Heavy,50,45,11000,+2 STR / +25 Rad Resist,50%
