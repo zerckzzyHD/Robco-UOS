@@ -824,10 +824,24 @@ function _updatePanelBadges() {
             ).length
           : 0,
     },
-    { h2text: '> SKILL BOOKS', count: (state.skillBooks || []).length },
-    { h2text: '> SKILL MAGAZINES', count: (state.magazines || []).length },
+    {
+      h2text: '> SKILL BOOKS',
+      count: (state.skillBooks || []).length,
+      total:
+        typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.skillBooks)
+          ? FALLOUT_REGISTRY.skillBooks.length
+          : 0,
+    },
+    {
+      h2text: '> SKILL MAGAZINES',
+      count: (state.magazines || []).length,
+      total:
+        typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.magazines)
+          ? FALLOUT_REGISTRY.magazines.length
+          : 0,
+    },
   ];
-  badges.forEach(({ h2text, count }) => {
+  badges.forEach(({ h2text, count, total }) => {
     // Find the h2 with exactly this text (case-insensitive prefix match)
     const h2 = Array.from(document.querySelectorAll('.panel h2')).find(el =>
       el.textContent.trim().startsWith(h2text)
@@ -840,7 +854,7 @@ function _updatePanelBadges() {
     if (count > 0) {
       const badge = document.createElement('span');
       badge.className = 'panel-badge';
-      badge.textContent = count;
+      badge.textContent = total ? `${count}/${total}` : count;
       h2.appendChild(badge);
     }
   });

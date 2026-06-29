@@ -580,7 +580,7 @@
             <ul class="inventory-list" id="invList"></ul>
 
             <!-- 3b. AMMO RESERVES — nested sub-panel -->
-            <details class="sub-panel" id="ammoSubPanel">
+            <details class="sub-panel" id="ammoSubPanel" data-sub-id="ammo_reserves">
               <summary>
                 <h3>> AMMO RESERVES</h3>
               </summary>
@@ -1107,7 +1107,12 @@
             </div>
 
             <!-- Campaign Status Panel (v2.0.1) -->
-            <details class="panel" id="campaignStatusPanel" style="margin-bottom: 10px">
+            <details
+              class="sub-panel"
+              id="campaignStatusPanel"
+              data-sub-id="campaign_status"
+              style="margin-bottom: 10px"
+            >
               <summary class="config-summary" style="font-size: 12px; opacity: 0.85">
                 CAMPAIGN STATUS
               </summary>
@@ -1120,7 +1125,7 @@
             </details>
 
             <!-- Crossroads Record (v2.0.1) -->
-            <details style="margin-bottom: 10px">
+            <details class="sub-panel" data-sub-id="crossroads_record" style="margin-bottom: 10px">
               <summary class="config-summary" style="font-size: 12px; opacity: 0.85">
                 CROSSROADS RECORD
               </summary>
@@ -1143,7 +1148,7 @@
             </details>
 
             <!-- Timeline Panel Shell -->
-            <details style="margin-bottom: 10px">
+            <details class="sub-panel" data-sub-id="projected_timeline" style="margin-bottom: 10px">
               <summary class="config-summary" style="font-size: 12px; opacity: 0.85">
                 PROJECTED TIMELINE
               </summary>
@@ -1307,7 +1312,7 @@
               </select>
             </div>
 
-            <details id="audioSystemsDetails" style="margin-top: 10px">
+            <details id="audioSystemsDetails" class="sub-panel" data-sub-id="audio_systems">
               <summary class="config-summary" style="color: var(--robco-alert); font-size: 13px">
                 AUDIO SYSTEMS
               </summary>

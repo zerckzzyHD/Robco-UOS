@@ -5165,6 +5165,64 @@ $sdBody87  = if ($sdStart87 -ge 0) { $apiSrc87.Substring($sdStart87, $sdEnd87 - 
 Check (($sdBody87 -match 'magazines') -and ($sdBody87 -match 'FNV')) "getSystemDirective() references magazines in FNV-only context (Protocol 4 AI contract)"
 
 # ===========================================================
+# Suite 88 -- GATE-UI: UI consistency structural guards (8 tests)
+# ===========================================================
+Sep "Suite 88 -- GATE-UI: UI consistency structural guards"
+
+$uiRenderSrc88 = Read-Src "js/ui-render.js"
+$uiCoreSrc88   = Read-Src "js/ui-core.js"
+$idxSrc88      = Read-Src "index.html"
+$cssSrc88      = Read-Src "css/terminal.css"
+
+# 88.1  Every details.panel (not sub-panel) in index.html has summary > h2 starting with ">" or "&gt;"
+$panelTagsAll88 = [regex]::Matches($idxSrc88, '<details[^>]*class="[^"]*\bpanel\b[^"]*"[^>]*>')
+$panelTags88    = $panelTagsAll88 | Where-Object { $_.Value -notmatch 'sub-panel' }
+$panelH2Fail88 = 0
+foreach ($m in $panelTags88) {
+    $chunk = $idxSrc88.Substring($m.Index, [Math]::Min(600, $idxSrc88.Length - $m.Index))
+    if (-not ($chunk -match '<summary[^>]*>\s*<h2[^>]*>\s*(&gt;|>)')) { $panelH2Fail88++ }
+}
+Check ($panelTags88.Count -gt 0 -and $panelH2Fail88 -eq 0) "GATE-UI-1: every details.panel in index.html has <summary><h2> starting with '>' (panel heading standard)"
+
+# 88.2  Every details.sub-panel in index.html has data-sub-id
+$subPanelTags88 = [regex]::Matches($idxSrc88, '<details[^>]*class="[^"]*\bsub-panel\b[^"]*"[^>]*>')
+$subPanelMissing88 = ($subPanelTags88 | Where-Object { $_.Value -notmatch 'data-sub-id' }).Count
+Check ($subPanelTags88.Count -gt 0 -and $subPanelMissing88 -eq 0) "GATE-UI-2: every details.sub-panel in index.html has data-sub-id ($subPanelMissing88 missing)"
+
+# 88.3  No <span onclick="toggle..."> tracker pattern in ui-render.js
+$spanToggle88 = [regex]::Matches($uiRenderSrc88, '<span[^>]+onclick="toggle(Collectible|LincolnItem|Trait|SkillBook|Magazine)')
+Check ($spanToggle88.Count -eq 0) "GATE-UI-3: tracker toggles use <button>, not <span onclick='toggle...'> (found $($spanToggle88.Count) span-onclick patterns)"
+
+# 88.4  All 5 tracker render functions use .tracker-row class
+$trackerFns88 = @('renderCollectibles','renderLincolnMemorabilia','renderTraits','renderSkillBooks','renderMagazines')
+$trackerRowFail88 = 0
+foreach ($fn in $trackerFns88) {
+    $start88 = $uiRenderSrc88.IndexOf("function $fn(")
+    $end88   = $uiRenderSrc88.IndexOf("`nfunction ", $start88 + 1)
+    $body88  = if ($start88 -ge 0) { $uiRenderSrc88.Substring($start88, $end88 - $start88) } else { "" }
+    if (-not ($body88 -match 'tracker-row')) { $trackerRowFail88++ }
+}
+Check ($trackerRowFail88 -eq 0) "GATE-UI-4: all 5 tracker render functions use .tracker-row class (not raw inline div style)"
+
+# 88.5  renderFactionRep MINOR FACTIONS details has class="sub-panel" and data-sub-id="minor_factions"
+$rfStart88 = $uiRenderSrc88.IndexOf('function renderFactionRep()')
+$rfEnd88   = $uiRenderSrc88.IndexOf("`nfunction ", $rfStart88 + 1)
+$rfBody88  = if ($rfStart88 -ge 0) { $uiRenderSrc88.Substring($rfStart88, $rfEnd88 - $rfStart88) } else { "" }
+Check (($rfBody88 -match 'class="sub-panel"') -and ($rfBody88 -match 'data-sub-id="minor_factions"')) "GATE-UI-5: renderFactionRep() MINOR FACTIONS has class='sub-panel' and data-sub-id='minor_factions'"
+
+# 88.6  renderFactionRep helper text says ±5 not ±50
+Check (($rfBody88 -match [regex]::Escape('±5')) -and -not ($rfBody88 -match [regex]::Escape('±50'))) "GATE-UI-6: renderFactionRep() faction label says ±5 not ±50 (faction button increment is 5)"
+
+# 88.7  _updatePanelBadges has total-aware [n/total] format for SKILL BOOKS and SKILL MAGAZINES
+$badgesStart88 = $uiCoreSrc88.IndexOf('function _updatePanelBadges()')
+$badgesEnd88   = $uiCoreSrc88.IndexOf("`nfunction ", $badgesStart88 + 1)
+$badgesBody88  = if ($badgesStart88 -ge 0) { $uiCoreSrc88.Substring($badgesStart88, $badgesEnd88 - $badgesStart88) } else { "" }
+Check (($badgesBody88 -match 'SKILL BOOKS') -and ($badgesBody88 -match 'SKILL MAGAZINES') -and ($badgesBody88 -match 'total')) "GATE-UI-7: _updatePanelBadges() has total-aware [n/total] badge format for SKILL BOOKS and SKILL MAGAZINES"
+
+# 88.8  terminal.css defines button.tracker-toggle class (keyboard-accessible tracker button)
+Check ([bool]($cssSrc88 -match 'button\.tracker-toggle')) "GATE-UI-8: terminal.css defines button.tracker-toggle class (keyboard-accessible tracker button per Protocol 17)"
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

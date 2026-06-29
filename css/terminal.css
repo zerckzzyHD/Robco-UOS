@@ -1997,3 +1997,43 @@ details[open] > summary.config-summary::after {
   overflow-wrap: anywhere;
   word-break: break-word;
 }
+
+/* ── Tracker rows (compact registry-backed lists) ──────────────── */
+.tracker-row {
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+/* Keyboard-accessible tracker toggle; ≥28px tap target per Protocol 17 */
+button.tracker-toggle {
+  display: inline-flex;
+  align-items: center;
+  width: auto;
+  min-height: 28px;
+  min-width: 44px;
+  padding: 0 2px;
+  background: transparent;
+  border: none;
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  margin-right: 4px;
+  margin-top: 0;
+  flex-shrink: 0;
+}
+button.tracker-toggle--active {
+  color: var(--robco-green);
+}
+button.tracker-toggle--inactive {
+  opacity: 0.5;
+}
+.tracker-meta {
+  font-size: 10px;
+  opacity: 0.6;
+}

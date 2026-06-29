@@ -692,7 +692,7 @@ function renderCollectibles() {
 
   acquiredDefs.forEach(d => {
     const safeName = escapeHtml(d.name);
-    html += `<div style="font-size:11px;letter-spacing:0.5px;margin-bottom:2px;"><span style="color:var(--robco-green);cursor:pointer;" onclick="toggleCollectible('${safeName}')" title="Click to mark MISSING">[ACQUIRED]</span> ${escapeHtml(d.name.toUpperCase())}</div>`;
+    html += `<div class="tracker-row"><button class="tracker-toggle tracker-toggle--active" onclick="toggleCollectible('${safeName}')" aria-label="Mark ${safeName} missing">[ACQUIRED]</button> ${escapeHtml(d.name.toUpperCase())}</div>`;
   });
 
   if (acquiredDefs.length > 0 && missingDefs.length > 0) {
@@ -703,9 +703,9 @@ function renderCollectibles() {
   missingDefs.forEach(d => {
     const safeName = escapeHtml(d.name);
     const locHint = d.location
-      ? ` &mdash; <span style="opacity:0.5;font-size:10px;">LOC: ${escapeHtml(d.location)}</span>`
+      ? ` &mdash; <span class="tracker-meta">LOC: ${escapeHtml(d.location)}</span>`
       : '';
-    html += `<div style="font-size:11px;letter-spacing:0.5px;margin-bottom:2px;opacity:0.75;"><span style="opacity:0.6;cursor:pointer;" onclick="toggleCollectible('${safeName}')" title="Click to mark ACQUIRED">[MISSING]</span> ${escapeHtml(d.name.toUpperCase())}${locHint}</div>`;
+    html += `<div class="tracker-row" style="opacity:0.75;"><button class="tracker-toggle tracker-toggle--inactive" onclick="toggleCollectible('${safeName}')" aria-label="Mark ${safeName} acquired">[MISSING]</button> ${escapeHtml(d.name.toUpperCase())}${locHint}</div>`;
   });
 
   container.innerHTML = html;
@@ -763,8 +763,8 @@ function renderLincolnMemorabilia() {
     const disp = items[d.name];
     const isFound = !!disp;
     if (isFound) {
-      html += `<div style="font-size:11px;letter-spacing:0.5px;margin-bottom:2px;">`;
-      html += `<span style="color:var(--robco-green);cursor:pointer;" data-lname="${safeName}" onclick="toggleLincolnItem(this.dataset.lname)" title="Click to mark missing">[ACQUIRED]</span> `;
+      html += `<div class="tracker-row">`;
+      html += `<button class="tracker-toggle tracker-toggle--active" data-lname="${safeName}" onclick="toggleLincolnItem(this.dataset.lname)" aria-label="Mark ${escapeHtml(d.name)} missing">[ACQUIRED]</button> `;
       html += `${escapeHtml(d.name.toUpperCase())} `;
       html += `<select data-lname="${safeName}" onchange="setLincolnDisposition(this.dataset.lname,this.value)" style="font-size:11px;background:transparent;color:inherit;border:1px solid var(--robco-green);min-height:28px;cursor:pointer;">`;
       const opts = [
@@ -786,10 +786,10 @@ function renderLincolnMemorabilia() {
       html += `</div>`;
     } else {
       const locHint = d.location
-        ? ` &mdash; <span style="opacity:0.5;font-size:10px;">LOC: ${escapeHtml(d.location)}</span>`
+        ? ` &mdash; <span class="tracker-meta">LOC: ${escapeHtml(d.location)}</span>`
         : '';
-      html += `<div style="font-size:11px;letter-spacing:0.5px;margin-bottom:2px;opacity:0.75;">`;
-      html += `<span style="opacity:0.6;cursor:pointer;" data-lname="${safeName}" onclick="toggleLincolnItem(this.dataset.lname)" title="Click to mark acquired">[MISSING]</span> `;
+      html += `<div class="tracker-row" style="opacity:0.75;">`;
+      html += `<button class="tracker-toggle tracker-toggle--inactive" data-lname="${safeName}" onclick="toggleLincolnItem(this.dataset.lname)" aria-label="Mark ${escapeHtml(d.name)} acquired">[MISSING]</button> `;
       html += `${escapeHtml(d.name.toUpperCase())}${locHint}`;
       html += `</div>`;
     }
@@ -855,15 +855,15 @@ function renderTraits() {
     const isSel = selected.includes(d.name);
     const dlcBadge =
       d.dlc === 'owb' ? ' <span style="font-size:9px;opacity:0.5;">[OWB]</span>' : '';
-    const effectSpan = `<span style="font-size:10px;opacity:0.6;"> &mdash; ${escapeHtml(d.effect)}</span>`;
+    const effectSpan = `<span class="tracker-meta"> &mdash; ${escapeHtml(d.effect)}</span>`;
     if (isSel) {
-      html += `<div style="font-size:11px;letter-spacing:0.5px;margin-bottom:2px;">`;
-      html += `<span style="color:var(--robco-green);cursor:pointer;margin-right:4px;" onclick="toggleTrait('${safeName}')" title="Deselect">[SEL]</span>`;
+      html += `<div class="tracker-row">`;
+      html += `<button class="tracker-toggle tracker-toggle--active" onclick="toggleTrait('${safeName}')" aria-label="Deselect trait ${safeName}">[SEL]</button>`;
       html += `<strong>${escapeHtml(d.name.toUpperCase())}${dlcBadge}</strong>${effectSpan}`;
       html += `</div>`;
     } else {
-      html += `<div style="font-size:11px;letter-spacing:0.5px;margin-bottom:2px;opacity:0.7;">`;
-      html += `<span style="opacity:0.5;cursor:pointer;margin-right:4px;" onclick="toggleTrait('${safeName}')" title="Select">[---]</span>`;
+      html += `<div class="tracker-row" style="opacity:0.7;">`;
+      html += `<button class="tracker-toggle tracker-toggle--inactive" onclick="toggleTrait('${safeName}')" aria-label="Select trait ${safeName}">[---]</button>`;
       html += `${escapeHtml(d.name.toUpperCase())}${dlcBadge}${effectSpan}`;
       html += `</div>`;
     }
@@ -922,16 +922,16 @@ function renderSkillBooks() {
     const safeName = escapeHtml(d.name);
     const skillLabel = escapeHtml((d.skill || '').replace(/_/g, ' ').toUpperCase());
     const tag = isRead
-      ? `<span style="color:var(--robco-green);cursor:pointer;margin-right:4px;" onclick="toggleSkillBook('${safeName}')" title="Mark unread">[READ]</span>`
-      : `<span style="opacity:0.5;cursor:pointer;margin-right:4px;" onclick="toggleSkillBook('${safeName}')" title="Mark read">[----]</span>`;
+      ? `<button class="tracker-toggle tracker-toggle--active" onclick="toggleSkillBook('${safeName}')" aria-label="Mark ${safeName} unread">[READ]</button>`
+      : `<button class="tracker-toggle tracker-toggle--inactive" onclick="toggleSkillBook('${safeName}')" aria-label="Mark ${safeName} read">[----]</button>`;
     const nameHtml = isRead
       ? `<strong>${escapeHtml(d.name.toUpperCase())}</strong>`
       : escapeHtml(d.name.toUpperCase());
     return (
-      `<div style="font-size:11px;letter-spacing:0.5px;margin-bottom:2px;${isRead ? '' : 'opacity:0.7;'}">` +
+      `<div class="tracker-row"${isRead ? '' : ' style="opacity:0.7;"'}>` +
       tag +
       nameHtml +
-      ` <span style="font-size:10px;opacity:0.6;">&mdash; ${skillLabel}</span>` +
+      ` <span class="tracker-meta">&mdash; ${skillLabel}</span>` +
       `</div>`
     );
   };
@@ -1007,16 +1007,16 @@ function renderMagazines() {
         ? '(Critical Chance)'
         : `(boosts ${escapeHtml((d.skill || '').replace(/_/g, ' ').toUpperCase())})`;
     const tag = isRead
-      ? `<span style="color:var(--robco-green);cursor:pointer;margin-right:4px;" data-name="${safeAttr}" onclick="toggleMagazine(this.dataset.name)" title="Mark unread">[READ]</span>`
-      : `<span style="opacity:0.5;cursor:pointer;margin-right:4px;" data-name="${safeAttr}" onclick="toggleMagazine(this.dataset.name)" title="Mark read">[----]</span>`;
+      ? `<button class="tracker-toggle tracker-toggle--active" data-name="${safeAttr}" onclick="toggleMagazine(this.dataset.name)" aria-label="Mark ${safeAttr} unread">[READ]</button>`
+      : `<button class="tracker-toggle tracker-toggle--inactive" data-name="${safeAttr}" onclick="toggleMagazine(this.dataset.name)" aria-label="Mark ${safeAttr} read">[----]</button>`;
     const nameHtml = isRead
       ? `<strong>${escapeHtml(d.name.toUpperCase())}</strong>`
       : escapeHtml(d.name.toUpperCase());
     return (
-      `<div style="font-size:11px;letter-spacing:0.5px;margin-bottom:2px;${isRead ? '' : 'opacity:0.7;'}">` +
+      `<div class="tracker-row"${isRead ? '' : ' style="opacity:0.7;"'}>` +
       tag +
       nameHtml +
-      ` <span style="font-size:10px;opacity:0.6;">&mdash; ${skillDisplay}</span>` +
+      ` <span class="tracker-meta">&mdash; ${skillDisplay}</span>` +
       `</div>`
     );
   };
@@ -1535,17 +1535,22 @@ function renderFactionRep() {
   const major = getFactionRegistry().filter(f => f.tier === 'major');
   const minor = getFactionRegistry().filter(f => f.tier === 'minor');
 
-  // Bug fix: save the open state of the minor-factions <details> panel
-  // before replacing innerHTML, so clicking F+/F-/I+/I- doesn't collapse it.
-  const minorDetails = container.querySelector('details');
+  // Save open state from DOM (re-render collapse fix) and localStorage (reload persistence)
+  const minorDetails = container.querySelector('details[data-sub-id="minor_factions"]');
   const minorWasOpen = minorDetails ? minorDetails.open : false;
+  let minorPersisted = false;
+  try {
+    const ps = JSON.parse(localStorage.getItem('robco_panel_state') || '{}');
+    if (typeof ps['minor_factions'] === 'boolean') minorPersisted = ps['minor_factions'];
+  } catch (_) {}
+  const minorOpen = minorWasOpen || minorPersisted;
 
   container.innerHTML = `
-    <div style="font-size:9px;opacity:0.45;margin-bottom:4px;letter-spacing:0.5px;">F+/F- = Fame ±50 &nbsp; I+/I- = Infamy ±50 &nbsp; BAR = F/(F+I) ratio</div>
+    <div style="font-size:9px;opacity:0.45;margin-bottom:4px;letter-spacing:0.5px;">F+/F- = Fame ±5 &nbsp; I+/I- = Infamy ±5 &nbsp; BAR = F/(F+I) ratio</div>
     <div class="faction-grid">
       ${major.map(factionCard).join('')}
     </div>
-    <details style="margin-top:6px;">
+    <details class="sub-panel" data-sub-id="minor_factions"${minorOpen ? ' open' : ''}>
       <summary class="config-summary" style="font-size:11px;opacity:0.6;padding:2px 0;">MINOR FACTIONS</summary>
       <div class="faction-grid" style="margin-top:5px;">
         ${minor.map(factionCard).join('')}
@@ -1553,11 +1558,16 @@ function renderFactionRep() {
     </details>
   `;
 
-  // Restore open state after re-render
-  if (minorWasOpen) {
-    const newDetails = container.querySelector('details');
-    if (newDetails) newDetails.open = true;
-  }
+  // Wire sub-panel persistence for minor factions
+  container.querySelectorAll('details[data-sub-id]').forEach(d => {
+    d.addEventListener('toggle', () => {
+      try {
+        const p = JSON.parse(localStorage.getItem('robco_panel_state') || '{}');
+        p[d.dataset.subId] = d.open;
+        localStorage.setItem('robco_panel_state', JSON.stringify(p));
+      } catch (_) {}
+    });
+  });
 }
 
 // ── G4: EXPANDED KARMA SYSTEM (FO3) ─────────────────────────────

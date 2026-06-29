@@ -8750,6 +8750,101 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 88 — GATE-UI: UI consistency structural guards (8 tests)
+// ══════════════════════════════════════════════════════════════
+{
+  const uiRenderSrc88 = fs.readFileSync(path.join(__dirname, '../js/ui-render.js'), 'utf8');
+  const uiCoreSrc88 = fs.readFileSync(path.join(__dirname, '../js/ui-core.js'), 'utf8');
+  const idxSrc88 = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
+  const cssSrc88 = fs.readFileSync(path.join(__dirname, '../css/terminal.css'), 'utf8');
+
+  // 88.1  Every details.panel (not sub-panel) in index.html has a summary > h2 starting with ">" or "&gt;"
+  const panelDetails88 = [...idxSrc88.matchAll(/<details[^>]*class="[^"]*\bpanel\b[^"]*"[^>]*>/g)]
+    .filter(m => !/sub-panel/.test(m[0])) // exclude sub-panels (class="sub-panel")
+    .map(m => idxSrc88.slice(m.index, m.index + 600));
+  const panelH2ok88 = panelDetails88.every(chunk =>
+    /<summary[^>]*>\s*<h2[^>]*>\s*(&gt;|>)/.test(chunk)
+  );
+  assert(
+    panelDetails88.length > 0 && panelH2ok88,
+    'GATE-UI-1: every details.panel in index.html has <summary><h2> starting with ">" (panel heading standard)'
+  );
+
+  // 88.2  Every details.sub-panel in index.html has data-sub-id
+  const subPanelMatches88 = [
+    ...idxSrc88.matchAll(/<details[^>]*class="[^"]*\bsub-panel\b[^"]*"[^>]*>/g),
+  ].map(m => m[0]);
+  const subPanelMissingId88 = subPanelMatches88.filter(tag => !/data-sub-id/.test(tag));
+  assert(
+    subPanelMatches88.length > 0 && subPanelMissingId88.length === 0,
+    `GATE-UI-2: every details.sub-panel in index.html has data-sub-id (${subPanelMissingId88.length} missing)`
+  );
+
+  // 88.3  No <span onclick="toggle..."> tracker pattern in ui-render.js (tracker fns use button)
+  const spanToggleMatches88 = [
+    ...uiRenderSrc88.matchAll(
+      /<span[^>]+onclick="toggle(Collectible|LincolnItem|Trait|SkillBook|Magazine)/g
+    ),
+  ];
+  assert(
+    spanToggleMatches88.length === 0,
+    `GATE-UI-3: tracker toggles use <button>, not <span onclick="toggle..."> (found ${spanToggleMatches88.length} span-onclick patterns)`
+  );
+
+  // 88.4  renderCollectibles, renderLincolnMemorabilia, renderTraits, renderSkillBooks, renderMagazines
+  //       all use .tracker-row class (not raw inline font-size/letter-spacing div style)
+  const trackerFns88 = [
+    'renderCollectibles',
+    'renderLincolnMemorabilia',
+    'renderTraits',
+    'renderSkillBooks',
+    'renderMagazines',
+  ];
+  const trackerFnBodies88 = trackerFns88.map(fn => {
+    const start = uiRenderSrc88.indexOf(`function ${fn}(`);
+    const end = uiRenderSrc88.indexOf('\nfunction ', start + 1);
+    return start >= 0 ? uiRenderSrc88.slice(start, end) : '';
+  });
+  const allUseTrackerRow88 = trackerFnBodies88.every(body => /tracker-row/.test(body));
+  assert(
+    allUseTrackerRow88,
+    'GATE-UI-4: all 5 tracker render functions use .tracker-row class (not raw inline div style)'
+  );
+
+  // 88.5  renderFactionRep MINOR FACTIONS details has class="sub-panel" and data-sub-id
+  const rfStart88 = uiRenderSrc88.indexOf('function renderFactionRep()');
+  const rfEnd88 = uiRenderSrc88.indexOf('\nfunction ', rfStart88 + 1);
+  const rfBody88 = rfStart88 >= 0 ? uiRenderSrc88.slice(rfStart88, rfEnd88) : '';
+  assert(
+    /class="sub-panel"/.test(rfBody88) && /data-sub-id="minor_factions"/.test(rfBody88),
+    'GATE-UI-5: renderFactionRep() MINOR FACTIONS details has class="sub-panel" and data-sub-id="minor_factions"'
+  );
+
+  // 88.6  renderFactionRep helper text says ±5 not ±50
+  assert(
+    /±5/.test(rfBody88) && !/±50/.test(rfBody88),
+    'GATE-UI-6: renderFactionRep() faction label says ±5 not ±50 (faction button increment is 5)'
+  );
+
+  // 88.7  _updatePanelBadges has total-aware [n/total] format for SKILL BOOKS and SKILL MAGAZINES
+  const badgesStart88 = uiCoreSrc88.indexOf('function _updatePanelBadges()');
+  const badgesEnd88 = uiCoreSrc88.indexOf('\nfunction ', badgesStart88 + 1);
+  const badgesBody88 = badgesStart88 >= 0 ? uiCoreSrc88.slice(badgesStart88, badgesEnd88) : '';
+  assert(
+    /SKILL BOOKS/.test(badgesBody88) &&
+      /SKILL MAGAZINES/.test(badgesBody88) &&
+      /total/.test(badgesBody88),
+    'GATE-UI-7: _updatePanelBadges() has total-aware [n/total] badge format for SKILL BOOKS and SKILL MAGAZINES'
+  );
+
+  // 88.8  terminal.css defines .tracker-toggle class (keyboard-accessible tracker button)
+  assert(
+    /button\.tracker-toggle/.test(cssSrc88),
+    'GATE-UI-8: terminal.css defines button.tracker-toggle class (keyboard-accessible tracker button per Protocol 17)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 console.log('\n══════════════════════════════════════════════════════════════\n');
