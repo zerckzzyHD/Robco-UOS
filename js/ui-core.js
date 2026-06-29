@@ -824,6 +824,7 @@ function changePlaystyle(style) {
     }
   }
   localStorage.setItem('robco_playstyle', style);
+  if (typeof window._invalidateCommCache === 'function') window._invalidateCommCache();
 }
 
 function onGameContextChange(ctx) {

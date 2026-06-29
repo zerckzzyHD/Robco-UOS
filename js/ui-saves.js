@@ -171,6 +171,7 @@ function loadFromSlot(slotNum) {
     if (env.chat && Array.isArray(env.chat)) restoreChatHistory(env.chat);
     if (env.playstyle) {
       localStorage.setItem('robco_playstyle', env.playstyle);
+      if (typeof window._invalidateCommCache === 'function') window._invalidateCommCache();
       let el = document.getElementById('playstyleInput');
       if (el) el.value = env.playstyle;
     }

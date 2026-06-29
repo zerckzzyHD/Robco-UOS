@@ -1378,7 +1378,7 @@ assert(/id="vatsCalcBtn"/.test(htmlSource), 'V.A.T.S. CALCULATOR button exists (
 // ══════════════════════════════════════════════════════════════
 //  SUITE 23 — Prohibited Patterns (Group 2)
 //  Static checks that banned patterns haven't crept back in.
-//  6 tests
+//  8 tests
 // ══════════════════════════════════════════════════════════════
 header('Prohibited Patterns');
 // 23.1 No innerHTML += in ui.js (render functions must use map().join('') bulk assignment)
@@ -1412,6 +1412,36 @@ assert(!/innerHTML\s*\+=/.test(uiSource), 'ui.js has no innerHTML += (O(n²) re-
     withLs.length === 0,
     'No audio function body reads localStorage.getItem directly' +
       (withLs.length ? ' — offenders: ' + withLs.map(f => f.name).join(', ') : '')
+  );
+}
+
+// 23.2b GH-3: getSystemDirective() runs on every AI message — it must read playstyle
+// from the in-memory comm cache (_commGet), never localStorage.getItem directly (WU-B3).
+{
+  let body = '';
+  try {
+    body = extractFunctionBody(apiSource, 'getSystemDirective');
+  } catch (e) {
+    fail(`Cannot extract getSystemDirective: ${e.message}`);
+  }
+  assert(
+    !/localStorage\.getItem/.test(body),
+    'getSystemDirective() contains no localStorage.getItem — reads from comm cache (GH-3 hot-path guard)'
+  );
+}
+
+// 23.2c GH-3: transmitMessage() runs on every AI message — Gemini key/model must come
+// from the in-memory comm cache (_commGet), never localStorage.getItem directly (WU-B3).
+{
+  let body = '';
+  try {
+    body = extractFunctionBody(apiSource, 'transmitMessage');
+  } catch (e) {
+    fail(`Cannot extract transmitMessage: ${e.message}`);
+  }
+  assert(
+    !/localStorage\.getItem/.test(body),
+    'transmitMessage() contains no localStorage.getItem — reads from comm cache (GH-3 hot-path guard)'
   );
 }
 

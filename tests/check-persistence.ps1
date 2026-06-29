@@ -856,7 +856,7 @@ Check ([bool]($htmlSrc -match 'id="vatsCalcBtn"'))  "V.A.T.S. CALCULATOR button 
 # ===========================================================
 # Suite 23 -- Prohibited Patterns (Group 2)
 # Static checks that banned patterns haven't crept back in.
-# 6 tests
+# 8 tests
 # ===========================================================
 Sep "Suite 23 -- Prohibited Patterns"
 
@@ -883,6 +883,18 @@ foreach ($am in $audioMatches) {
     } catch {}
 }
 Check ($audioFnOffenders.Count -eq 0) ("No audio function reads localStorage.getItem directly" + $(if ($audioFnOffenders.Count) { " -- offenders: " + ($audioFnOffenders -join ", ") } else { "" }))
+
+# 23.2b GH-3: getSystemDirective() runs on every AI message -- must read playstyle from
+# the in-memory comm cache (_commGet), never localStorage.getItem directly (WU-B3).
+$gsdBody = Get-FunctionBody $apiSrc 'getSystemDirective'
+Check (-not ($gsdBody -match 'localStorage\.getItem')) `
+    "getSystemDirective() contains no localStorage.getItem -- reads from comm cache (GH-3 hot-path guard)"
+
+# 23.2c GH-3: transmitMessage() runs on every AI message -- Gemini key/model must come from
+# the in-memory comm cache (_commGet), never localStorage.getItem directly (WU-B3).
+$txBody = Get-FunctionBody $apiSrc 'transmitMessage'
+Check (-not ($txBody -match 'localStorage\.getItem')) `
+    "transmitMessage() contains no localStorage.getItem -- reads from comm cache (GH-3 hot-path guard)"
 
 # 23.3 autoImportState() uses explicit field mapping, not recursive Object.keys transform
 Check (-not ([bool]([regex]::Match($importBody, 'Object\.keys\s*\(\s*parsed\s*\)\.forEach').Success))) `

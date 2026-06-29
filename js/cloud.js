@@ -579,6 +579,7 @@ async function loadGeminiKeyFromCloud() {
       const data = docSnap.data();
       if (data.key) {
         localStorage.setItem('robco_gemini_key', data.key);
+        if (typeof window._invalidateCommCache === 'function') window._invalidateCommCache();
         const input = document.getElementById('apiKeyInput');
         if (input) input.value = data.key;
         if (data.model) {

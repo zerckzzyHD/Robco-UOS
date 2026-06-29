@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1170/1170 | Cache: robco-terminal-v2.6.0-r12 -->
+﻿## [Unreleased]<!-- Tests: 1172/1172 | Cache: robco-terminal-v2.6.0-r13 -->
 
 ### Added
 
@@ -43,6 +43,7 @@
 - Hardened the save-on-exit safeguard with two new locked-in checks: one proves a guarded reload keeps freshly-loaded data and an unguarded one would lose it (the "save then reload" footgun), the other ensures the safeguard can't be accidentally reordered out of effect. Added a standing rule (Protocol 42) that any flaw found while testing must be fixed and covered by a test in the same commit rather than worked around. No user-facing change — current save/load already behaves correctly.
 - The AI engine list (the model dropdown populated after validating your Google AI Studio key) is now built in a single pass instead of one slow DOM update per model, removing an inefficient pattern that re-parsed the whole list on every entry. No visible change — the same engines appear in the same order. The build gate was also tightened so this inefficient pattern can no longer slip back into any served code.
 - Hardened how AI engine names are shown in the model dropdown against malformed or hostile text. The model name — whether typed by you, restored from a synced key, or returned by Google's model list — is now safely escaped before it is displayed, closing a potential cross-site-scripting hole. No visible change for normal model names; the build gate now also fails if any externally-sourced value is ever placed into the page without escaping it first.
+- The AI now reads your playstyle and engine settings from memory instead of re-fetching them from browser storage on every single message. These values are cached the first time they're needed and refreshed whenever you change them, so each AI request does a little less work. Behavior is unchanged — the AI still uses your current playstyle, key, and model — and the build gate now guards these frequently-run paths against slipping back to direct storage reads.
 
 ---
 

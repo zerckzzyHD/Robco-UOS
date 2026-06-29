@@ -1,7 +1,27 @@
 /* global playQuestCompleteSound, playQuestFailSound, playFactionThresholdSound */
+// ── AI comm-config cache (QA-PROHIB-4/5) ─────────────────────────────────────
+// getSystemDirective() and transmitMessage() run on every AI message. Reading
+// playstyle / Gemini key / Gemini model straight from localStorage on each call
+// is the synchronous-storage-read hot-path pattern the Prohibited Patterns rule
+// bans. Cache them in-memory, populated lazily from localStorage on first read.
+// Every live (non-reload) path that writes one of these keys calls
+// _invalidateCommCache() so the next read re-pulls the fresh value; reload-based
+// load paths wipe the cache implicitly. Behavior is identical — same value, no
+// extra storage hits.
+const _commCache = {};
+function _commGet(field, lsKey) {
+  if (!(field in _commCache)) _commCache[field] = localStorage.getItem(lsKey);
+  return _commCache[field];
+}
+window._invalidateCommCache = function () {
+  delete _commCache.playstyle;
+  delete _commCache.geminiKey;
+  delete _commCache.geminiModel;
+};
+
 // THE MASTER SYSTEM PROMPT (Consolidated BRAIN.md)
 function getSystemDirective() {
-  let playstyle = localStorage.getItem('robco_playstyle') || 'any';
+  let playstyle = _commGet('playstyle', 'robco_playstyle') || 'any';
   let constraintStr =
     'Tactical Constraint: COURIER MAY USE ANY WEAPON OR PLAYSTYLE. All final S.P.E.C.I.A.L. attributes are structurally hard-capped between 1 and 10.';
   if (playstyle === 'melee') {
@@ -282,6 +302,7 @@ function saveApiKeySilent() {
   localStorage.setItem('robco_gemini_key', key);
   let model = document.getElementById('apiModelInput').value;
   if (model && !model.includes('Awaiting')) localStorage.setItem('robco_gemini_model', model);
+  if (typeof window._invalidateCommCache === 'function') window._invalidateCommCache();
   if (typeof window.saveGeminiKeyToCloud === 'function') {
     window.saveGeminiKeyToCloud(key, localStorage.getItem('robco_gemini_model') || '');
   }
@@ -1055,8 +1076,8 @@ async function transmitMessage() {
     return;
   }
 
-  let rawKey = localStorage.getItem('robco_gemini_key');
-  let selectedModel = localStorage.getItem('robco_gemini_model');
+  let rawKey = _commGet('geminiKey', 'robco_gemini_key');
+  let selectedModel = _commGet('geminiModel', 'robco_gemini_model');
   if (!rawKey) {
     appendToChat(
       `> ⚠ FATAL EXCEPTION AT 0x${Math.floor(Math.random() * 0xffff)
