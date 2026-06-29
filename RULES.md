@@ -74,7 +74,7 @@ Select-String -Path "RULES.md","CLAUDE.md","README.md","ARCHITECTURE.md","CHANGE
 
 Run this after every test addition or removal. Every hit must show the new count **except** the frozen released-version entry in `CHANGELOG.md` (e.g. `v2.0.1` shows its release-day count of 258 — that is intentional and correct).
 
-**Changelog versioning model:** Per-push test-count and cache-rev updates go on the current `## [v2.5.0] — Unreleased` section header, **never** on a released version's entry (e.g. `v2.0.1`). Released entries are frozen at the values that were true at their release and must not be modified retroactively.
+**Changelog versioning model:** Per-push test-count and cache-rev updates go on the current `## [Unreleased]` section header, **never** on a released version's entry (e.g. `v2.6.0`, `v2.0.1`). Released entries are frozen at the values that were true at their release and must not be modified retroactively.
 
 ---
 

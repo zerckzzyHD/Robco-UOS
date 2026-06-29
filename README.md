@@ -393,7 +393,7 @@ Key milestones:
 
 </details>
 
-### Current State (v2.5.0)
+### Current State (v2.6.0)
 
 The project is a **production-quality browser application** with:
 
