@@ -1754,17 +1754,18 @@ header('Meta / Runner Parity');
     'Suite 97',
     'Suite 98',
     'Suite 99',
+    'Suite 100',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-99)' +
+    'JS runner contains all gate-guard suites (22-41, 49-100)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-99)' +
+    'PS runner contains all gate-guard suites (22-41, 49-100)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -10300,6 +10301,44 @@ header('Suite 99 — WU-B7 dead-code purge + duplication consolidation');
   assert(
     !/function\s+listLocalSaves\s*\(/.test(account99),
     '99.16: listLocalSaves() no longer defined in ui-account.js (moved out — single definition)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 100 — Staging build output guards (Cloudflare Pages) (4 tests)
+//  The staging PWA registers a service worker at root scope. A service-worker
+//  script fetch that returns a 3xx redirect cannot be registered/updated —
+//  browsers reject it ("The script resource is behind a redirect, which is
+//  disallowed"). cf-staging-build.mjs emits a _redirects file pinning sw.js +
+//  manifest.json to a direct 200 serve so Cloudflare's path canonicalization can
+//  never redirect them. These guards lock that emission + sw.js-at-root.
+// ══════════════════════════════════════════════════════════════
+header('Suite 100 — Staging build output guards (Cloudflare Pages)');
+{
+  const cfSrc100 = readFile('scripts/cf-staging-build.mjs');
+
+  // 100.1 The staging build emits a Cloudflare _redirects file into the output.
+  assert(
+    /writeFileSync\(\s*join\(\s*OUT\s*,\s*['"]_redirects['"]\s*\)/.test(cfSrc100),
+    '100.1: cf-staging-build.mjs writes a _redirects file into the staging output (dist-staging)'
+  );
+
+  // 100.2 _redirects pins /sw.js to a direct 200 (no redirect) — the SW-update fix.
+  assert(
+    /\/sw\.js\s+\/sw\.js\s+200/.test(cfSrc100),
+    '100.2: staging _redirects pins /sw.js to a direct 200 serve (service worker never behind a redirect)'
+  );
+
+  // 100.3 _redirects pins /manifest.json to a direct 200 as well (PWA control file).
+  assert(
+    /\/manifest\.json\s+\/manifest\.json\s+200/.test(cfSrc100),
+    '100.3: staging _redirects pins /manifest.json to a direct 200 serve (no redirect)'
+  );
+
+  // 100.4 sw.js is staged at the served root so the SW registers at root scope.
+  assert(
+    /FILES\s*=\s*\[[^\]]*'sw\.js'/.test(cfSrc100),
+    '100.4: cf-staging-build.mjs stages sw.js at the served root (root-scope SW registration)'
   );
 }
 

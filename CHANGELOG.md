@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1207/1207 | Cache: robco-terminal-v2.6.0-r17 -->
+﻿## [Unreleased]<!-- Tests: 1211/1211 | Cache: robco-terminal-v2.6.0-r17 -->
 
 ### Added
 
@@ -24,6 +24,7 @@
 - Inactive tab buttons now have higher contrast — opacity raised from 55% to 75%, which brings all six optics colour themes above the WCAG AA 3:1 contrast ratio for interface controls.
 - Loading a saved game now actually loads it. Importing a save file, restoring a backup, or loading a cloud save would appear to do nothing — the terminal kept showing your current data instead of the loaded save. The newly-loaded data was being written correctly, but a routine "save on exit" step was firing during the reload and silently overwriting it with your old data first. All three load paths — IMPORT SAVE, RESTORE BACKUP, and cloud load — now load correctly, including older and reconstructed saves.
 - Fixed the in-app System Changelog showing "CHANGELOG NOT FOUND" on the private test build. The changelog page was the only screen that loaded its content over the network each time it opened, with no local copy to fall back on — so any hiccup fetching it left the page blank with that error. The changelog is now stored alongside the rest of the app so it opens instantly and reliably, even offline, on both the test build and the public site.
+- Fixed the private test build failing to update its offline engine with an "ASYNC FAULT — failed to update a ServiceWorker… the script resource is behind a redirect" error. The test host was quietly redirecting the request for the app's background updater instead of serving it directly, and browsers refuse to install an updater that arrives via a redirect — so the test PWA could get stuck on an old version. The test build now tells the host to serve that file (and the app manifest) straight through with no redirect, so updates install cleanly. The public site was never affected.
 
 ### Under the Hood
 

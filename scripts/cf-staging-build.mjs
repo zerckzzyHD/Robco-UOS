@@ -83,6 +83,25 @@ const html = readFileSync(join(OUT, 'index.html'), 'utf8')
   );
 writeFileSync(join(OUT, 'index.html'), html, 'utf8');
 
+// 6. Cloudflare Pages _redirects — pin the service worker + PWA control files to a
+//    DIRECT 200 serve so Cloudflare never returns them behind a 3xx redirect. A
+//    service worker whose script fetch is redirected cannot be registered or
+//    updated — the browser rejects it with "The script resource is behind a
+//    redirect, which is disallowed", which breaks SW updates on the staging PWA.
+//    Cloudflare Pages can 3xx-canonicalize root paths; an explicit `200` (rewrite)
+//    rule overrides that and serves the asset directly at the same URL. GitHub
+//    Pages (production) serves these directly and ignores _redirects, so this is
+//    staging-only (emitted into dist-staging, never the repo served set).
+const REDIRECTS = [
+  '# Pin PWA control files to a direct 200 serve -- never behind a redirect.',
+  '# A redirected service-worker script cannot be registered/updated (browsers',
+  '# forbid it): "The script resource is behind a redirect, which is disallowed".',
+  '/sw.js /sw.js 200',
+  '/manifest.json /manifest.json 200',
+  '',
+].join('\n');
+writeFileSync(join(OUT, '_redirects'), REDIRECTS, 'utf8');
+
 const count = readdirSync(OUT).length;
 console.log(
   `[cf-staging-build] staged ${count} top-level entries into dist-staging/ — manifest → "${manifest.name}"`

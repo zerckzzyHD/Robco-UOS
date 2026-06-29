@@ -1010,7 +1010,7 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84','Suite 85','Suite 86','Suite 87','Suite 88','Suite 89','Suite 90','Suite 91','Suite 92','Suite 93','Suite 94','Suite 95','Suite 96','Suite 97','Suite 98','Suite 99')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84','Suite 85','Suite 86','Suite 87','Suite 88','Suite 89','Suite 90','Suite 91','Suite 92','Suite 93','Suite 94','Suite 95','Suite 96','Suite 97','Suite 98','Suite 99','Suite 100')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
 Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-99)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
@@ -5952,6 +5952,32 @@ Check ($saves99 -match 'function\s+listLocalSaves[\s\S]*?_slotKey\s*\(') `
     '99.15: listLocalSaves() reads slots via _slotKey() -- single slot-key source (QA-DUP-2)'
 Check ($account99 -notmatch 'function\s+listLocalSaves\s*\(') `
     '99.16: listLocalSaves() no longer defined in ui-account.js (moved out -- single definition)'
+
+# ===========================================================
+# Suite 100 -- Staging build output guards (Cloudflare Pages) (4 tests)
+# A service-worker script fetch that returns a 3xx redirect cannot be
+# registered/updated (browsers reject it). cf-staging-build.mjs emits a
+# _redirects file pinning sw.js + manifest.json to a direct 200 serve so
+# Cloudflare's path canonicalization can never redirect them.
+# ===========================================================
+Sep "Suite 100 -- Staging build output guards (Cloudflare Pages)"
+$cfSrc100 = Read-Src "scripts/cf-staging-build.mjs"
+
+# 100.1 The staging build emits a Cloudflare _redirects file into the output.
+Check ([bool]($cfSrc100 -match "writeFileSync\(\s*join\(\s*OUT\s*,\s*['""]_redirects['""]\s*\)")) `
+    '100.1: cf-staging-build.mjs writes a _redirects file into the staging output (dist-staging)'
+
+# 100.2 _redirects pins /sw.js to a direct 200 (no redirect) -- the SW-update fix.
+Check ([bool]($cfSrc100 -match '/sw\.js\s+/sw\.js\s+200')) `
+    '100.2: staging _redirects pins /sw.js to a direct 200 serve (service worker never behind a redirect)'
+
+# 100.3 _redirects pins /manifest.json to a direct 200 as well (PWA control file).
+Check ([bool]($cfSrc100 -match '/manifest\.json\s+/manifest\.json\s+200')) `
+    '100.3: staging _redirects pins /manifest.json to a direct 200 serve (no redirect)'
+
+# 100.4 sw.js is staged at the served root so the SW registers at root scope.
+Check ([bool]($cfSrc100 -match "FILES\s*=\s*\[[^\]]*'sw\.js'")) `
+    '100.4: cf-staging-build.mjs stages sw.js at the served root (root-scope SW registration)'
 
 # ===========================================================
 # Results
