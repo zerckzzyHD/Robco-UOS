@@ -27,3 +27,13 @@ repomix-output.*
 # Logs
 *.log
 npm-debug.log*
+
+# Local planning artifacts — never committed/pushed/deployed
+# These are AI-agent research and design docs generated during the planning chain.
+MASTER_PLAN.md
+PARALLELIZATION_PLAN.md
+HOUSE_STANDARD.md
+DETERMINISTIC_FEATURES.md
+*_AUDIT.md
+*_SLATE.md
+*_DESIGN.md
