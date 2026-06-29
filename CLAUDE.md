@@ -258,6 +258,17 @@ Every version block follows the same seven rules:
 
 Rule 7 governs only the rewrite of EXISTING entries; it does not restrict versioning. The user may always manually instruct a version bump (e.g. 'bump version' or 'make this 2.1.0'), which follows Protocol 2's semver rules and creates a new version block in the changelog.
 
+### Environment-aware in-app changelog viewer (Protocol 43 dev/prod split)
+
+The in-app changelog viewer is **environment-aware**, mirroring the dev/prod branch split (Protocol 43). This **supersedes** any earlier "the viewer never renders `[Unreleased]` anywhere" wording:
+
+- **Production** (GitHub Pages — `zerckzzyhd.github.io/Robco-UOS/`, built from `main`): the viewer shows **only the latest RELEASED version** and **never renders the `[Unreleased]` section**. Public users must never see unreleased work.
+- **Dev / staging** (Cloudflare Pages — `robco-uos-dev.pages.dev`, built from `dev`; plus local `localhost`/`127.0.0.1`): the viewer **does render `[Unreleased]`** so the owner can review unreleased work while testing the staging build.
+
+**Detection is fail-safe — default to production.** The viewer treats production behavior (hide `[Unreleased]`) as the default and only reveals `[Unreleased]` when a **positive staging signal** is present. The robust signal is a **build-injected staging flag**: `scripts/cf-staging-build.mjs` stamps the staged `index.html` with an explicit staging marker (e.g. `<meta name="robco-env" content="staging">` or `window.__ROBCO_ENV__ = 'staging'`) that the production build (`deploy.yml`) never emits — so an absent, unknown, or stale-cached environment always falls back to hiding `[Unreleased]` and can never leak it to prod. Hostname (`*.pages.dev`, `localhost`) is an acceptable *secondary* signal, but the injected flag is primary because it cannot be spoofed by a renamed host or a stale cache.
+
+`[Unreleased]` always **stays in `CHANGELOG.md`** (the working draft); only its *rendering* is gated. The implementation and a both-runners guard (assert prod-mode hides `[Unreleased]` **and** dev-mode shows it) ship in **WU-C11**, not as part of this rule.
+
 ---
 
 ## Protocol 22 — Extend Before Creating
