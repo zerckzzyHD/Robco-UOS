@@ -1635,17 +1635,19 @@ header('Meta / Runner Parity');
     'Suite 85',
     'Suite 86',
     'Suite 87',
+    'Suite 88',
+    'Suite 89',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-87)' +
+    'JS runner contains all gate-guard suites (22-41, 49-89)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-87)' +
+    'PS runner contains all gate-guard suites (22-41, 49-89)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -6596,15 +6598,15 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     'seedNewCampaignInventory() is defined in ui-core.js'
   );
 
-  // 70.12  FNV guard: function returns early if ctx !== 'FNV'
+  // 70.12  GAME_DEFS-driven seed: function reads seedInventory from GAME_DEFS (Protocol 38)
   {
     let seedBody70 = '';
     try {
       seedBody70 = extractFunctionBody(uiCore70, 'seedNewCampaignInventory');
     } catch (_) {}
     assert(
-      /ctx\s*!==\s*['"]FNV['"]/.test(seedBody70),
-      'seedNewCampaignInventory() has FNV guard (ctx !== "FNV") — prevents canteen leaking to FO3'
+      /GAME_DEFS/.test(seedBody70),
+      'seedNewCampaignInventory() reads seedInventory from GAME_DEFS — game-agnostic seed dispatch (Protocol 38)'
     );
   }
 
@@ -8841,6 +8843,125 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   assert(
     /button\.tracker-toggle/.test(cssSrc88),
     'GATE-UI-8: terminal.css defines button.tracker-toggle class (keyboard-accessible tracker button per Protocol 17)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 89 — GATE-AGNOSTIC: game-agnostic refactor guards (12 tests)
+// ══════════════════════════════════════════════════════════════
+{
+  const apiSrc89 = fs.readFileSync(path.join(__dirname, '../js/api.js'), 'utf8');
+  const uiCore89 = fs.readFileSync(path.join(__dirname, '../js/ui-core.js'), 'utf8');
+  const stateSrc89 = fs.readFileSync(path.join(__dirname, '../js/state.js'), 'utf8');
+  const htmlSrc89 = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
+  const rulesSrc89 = fs.readFileSync(path.join(__dirname, '../RULES.md'), 'utf8');
+
+  // 89.1  api.js: no two-game coercion pattern (=== 'FO3' ? 'FO3' : 'FNV')
+  assert(
+    !/=== 'FO3' \? 'FO3' : 'FNV'/.test(apiSrc89),
+    "GATE-AGNOSTIC-1: api.js has no two-game coercion pattern (=== 'FO3' ? 'FO3' : 'FNV') — GA-2 fixed"
+  );
+
+  // 89.2  _nativeCrossroads uses getFactionRegistry() (GA-4 positive guard)
+  {
+    let crossBody89 = '';
+    try {
+      crossBody89 = extractFunctionBody(apiSrc89, '_nativeCrossroads');
+    } catch (_) {}
+    assert(
+      /getFactionRegistry/.test(crossBody89),
+      'GATE-AGNOSTIC-2: _nativeCrossroads() uses getFactionRegistry() for faction keys — GA-4 data-driven'
+    );
+  }
+
+  // 89.3  _nativeCrossroads has no hardcoded 'enclave' faction key literal (GA-4 negative guard)
+  {
+    let crossBody89 = '';
+    try {
+      crossBody89 = extractFunctionBody(apiSrc89, '_nativeCrossroads');
+    } catch (_) {}
+    assert(
+      !/'enclave'/.test(crossBody89),
+      "GATE-AGNOSTIC-3: _nativeCrossroads() has no hardcoded 'enclave' faction key — GA-4 hardcoded array removed"
+    );
+  }
+
+  // 89.4  index.html: no two-game coercion in boot script (GA-2 fixed)
+  assert(
+    !/=== 'FO3' \? 'FO3' : 'FNV'/.test(htmlSrc89),
+    'GATE-AGNOSTIC-4: index.html has no two-game coercion pattern in boot script — GA-2 fixed'
+  );
+
+  // 89.5  ui-core.js: no two-game coercion pattern (GA-2 clean)
+  assert(
+    !/=== 'FO3' \? 'FO3' : 'FNV'/.test(uiCore89),
+    'GATE-AGNOSTIC-5: ui-core.js has no two-game coercion pattern — GA-2 clean'
+  );
+
+  // 89.6  onGameContextChange uses !GAME_DEFS[ctx] guard (GA-3 fixed)
+  {
+    let ctxBody89 = '';
+    try {
+      ctxBody89 = extractFunctionBody(uiCore89, 'onGameContextChange');
+    } catch (_) {}
+    assert(
+      /!GAME_DEFS\[ctx\]/.test(ctxBody89),
+      'GATE-AGNOSTIC-6: onGameContextChange() uses !GAME_DEFS[ctx] guard — GA-3 fixed, no literal allowlist'
+    );
+  }
+
+  // 89.7  seedNewCampaignInventory does NOT have ctx !== 'FNV' early-return (GA-6 regression guard)
+  {
+    let seedBody89 = '';
+    try {
+      seedBody89 = extractFunctionBody(uiCore89, 'seedNewCampaignInventory');
+    } catch (_) {}
+    assert(
+      !/ctx\s*!==\s*['"]FNV['"]/.test(seedBody89),
+      "GATE-AGNOSTIC-7: seedNewCampaignInventory() has no ctx !== 'FNV' guard — GA-6 regression (canteen is now GAME_DEFS-driven)"
+    );
+  }
+
+  // 89.8  seedNewCampaignInventory references GAME_DEFS (GA-6 positive guard)
+  {
+    let seedBody89 = '';
+    try {
+      seedBody89 = extractFunctionBody(uiCore89, 'seedNewCampaignInventory');
+    } catch (_) {}
+    assert(
+      /GAME_DEFS/.test(seedBody89),
+      'GATE-AGNOSTIC-8: seedNewCampaignInventory() reads seedInventory from GAME_DEFS — GA-6 data-driven seed'
+    );
+  }
+
+  // 89.9  wipeTerminal uses Object.values(GAME_DEFS) for context hint messages (GA-8 fixed)
+  {
+    let wipeBody89 = '';
+    try {
+      wipeBody89 = extractFunctionBody(uiCore89, 'wipeTerminal');
+    } catch (_) {}
+    assert(
+      /Object\.values\(GAME_DEFS\)/.test(wipeBody89),
+      'GATE-AGNOSTIC-9: wipeTerminal() uses Object.values(GAME_DEFS) for context hints — GA-8 data-driven messages'
+    );
+  }
+
+  // 89.10  GAME_DEFS.FNV has seedInventory (GA-6 data added)
+  assert(
+    /FNV[\s\S]{0,400}seedInventory/.test(stateSrc89),
+    'GATE-AGNOSTIC-10: GAME_DEFS.FNV has seedInventory array — GA-6 seed data in state.js'
+  );
+
+  // 89.11  GAME_DEFS.FO3 has seedInventory (GA-6 data added)
+  assert(
+    /FO3[\s\S]{0,400}seedInventory/.test(stateSrc89),
+    'GATE-AGNOSTIC-11: GAME_DEFS.FO3 has seedInventory array — GA-6 seed data in state.js'
+  );
+
+  // 89.12  RULES.md contains Protocol 38 (game-agnostic codification)
+  assert(
+    /Protocol 38/.test(rulesSrc89),
+    'GATE-AGNOSTIC-12: RULES.md contains Protocol 38 (game-agnostic feature code)'
   );
 }
 

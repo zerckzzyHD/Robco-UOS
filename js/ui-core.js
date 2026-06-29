@@ -782,7 +782,7 @@ function changePlaystyle(style) {
 }
 
 function onGameContextChange(ctx) {
-  if (ctx !== 'FNV' && ctx !== 'FO3') return;
+  if (!GAME_DEFS[ctx]) return;
   if (!window.robco_v8) window.robco_v8 = { activeContext: 'FNV', campaigns: {} };
   window.robco_v8.campaigns[state.gameContext] = JSON.parse(JSON.stringify(state));
   window.robco_v8.activeContext = ctx;
@@ -1311,11 +1311,12 @@ function updateKarmaUI() {
 }
 
 function seedNewCampaignInventory(ctx) {
-  if (ctx !== 'FNV') return;
+  const seedItems = (GAME_DEFS[ctx] || GAME_DEFS.FNV).seedInventory || [];
+  if (seedItems.length === 0) return;
   if ((state.inventory || []).length !== 0) return;
   if ((state.ticks || 0) !== 0) return;
   state.inventory = state.inventory || [];
-  state.inventory.push({ name: 'Vault 13 Canteen', qty: 1, wgt: 1, val: 2, type: 'aid' });
+  seedItems.forEach(item => state.inventory.push({ ...item }));
 }
 
 const SKILL_LABELS = {
@@ -1929,8 +1930,9 @@ function wipeTerminal() {
   // Show context selection prompt in chat
   appendToChat('> TERMINAL WIPED. INITIATING NEW CAMPAIGN...', 'sys', true);
   appendToChat('> SELECT GAME CONTEXT:', 'sys', true);
-  appendToChat('> Type [CONTEXT: FNV] for Fallout: New Vegas', 'sys', true);
-  appendToChat('> Type [CONTEXT: FO3] for Fallout 3', 'sys', true);
+  Object.values(GAME_DEFS).forEach(d => {
+    appendToChat(`> Type [CONTEXT: ${d.id}] for ${d.label}`, 'sys', true);
+  });
   appendToChat('> Or the AI will detect your game automatically.', 'sys', true);
 }
 

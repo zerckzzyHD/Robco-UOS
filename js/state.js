@@ -232,6 +232,7 @@ const GAME_DEFS = {
     collectibleLabel: 'SNOW GLOBES',
     hasTraits: true,
     hasMagazines: true,
+    seedInventory: [{ name: 'Vault 13 Canteen', qty: 1, wgt: 1, val: 2, type: 'aid' }],
     calendar: { startMonth: 9, startDay: 19, startYear: 2281, epochWeekday: 0 },
     ai: {
       skillSystemText:
@@ -255,6 +256,7 @@ const GAME_DEFS = {
     usesKarmaCenter: true,
     collectibleLabel: 'BOBBLEHEADS',
     tracksLincoln: true,
+    seedInventory: [],
     calendar: { startMonth: 7, startDay: 17, startYear: 2277, epochWeekday: 3 },
     ai: {
       skillSystemText:

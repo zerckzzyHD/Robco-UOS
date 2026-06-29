@@ -1911,7 +1911,7 @@
         try {
           var v8 = JSON.parse(localStorage.getItem('robco_v8') || '{}');
           var v7 = JSON.parse(localStorage.getItem('robco_v7') || '{}');
-          ctx = (v8.activeContext || v7.gameContext) === 'FO3' ? 'FO3' : 'FNV';
+          ctx = v8.activeContext || v7.gameContext || 'FNV';
         } catch (e) {
           ctx = 'FNV';
         }

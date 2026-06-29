@@ -1,4 +1,11 @@
-﻿## [Unreleased]<!-- Tests: 1086/1086 | Cache: robco-terminal-v2.6.0-r2 -->
+﻿## [Unreleased]<!-- Tests: 1098/1098 | Cache: robco-terminal-v2.6.0-r3 -->
+
+### Under the Hood
+
+- The Vault 13 Canteen seed item is now defined in game data rather than hard-coded into the new-campaign logic — so it seeds for New Vegas but not Fallout 3 automatically, without any special-casing.
+- Context-switching and faction lookups now use game definitions data instead of hard-coded lists of game names, making it easier to add new games in the future.
+- Added Protocol 38 (game-agnostic feature code rule) to the engineering guide.
+- Added Suite 89 (12 regression tests) guarding the game-agnostic refactors above.
 
 ---
 

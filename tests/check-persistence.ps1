@@ -971,11 +971,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84','Suite 85','Suite 86','Suite 87')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84','Suite 85','Suite 86','Suite 87','Suite 88','Suite 89')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-87)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-87)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-89)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-89)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -3984,9 +3984,9 @@ Check ([bool]($uiCore70 -match 'function\s+seedNewCampaignInventory\s*\(')) `
 $seedMatch70 = [regex]::Match($uiCore70, '(?s)function seedNewCampaignInventory\s*\([^)]*\)\s*\{(.*?)\n\}')
 $seedBody70  = if ($seedMatch70.Success) { $seedMatch70.Groups[1].Value } else { '' }
 
-# 70.12  FNV guard: function returns early if ctx !== 'FNV'
-Check ([bool]($seedBody70 -match "ctx\s*!==\s*['""]FNV['""]")) `
-    'seedNewCampaignInventory() has FNV guard (ctx !== "FNV") -- prevents canteen leaking to FO3'
+# 70.12  GAME_DEFS-driven seed: function reads seedInventory from GAME_DEFS (Protocol 38)
+Check ([bool]($seedBody70 -match 'GAME_DEFS')) `
+    'seedNewCampaignInventory() reads seedInventory from GAME_DEFS -- game-agnostic seed dispatch (Protocol 38)'
 
 # 70.13  Empty-inventory guard
 Check ($seedBody70 -match 'inventory' -and $seedBody70 -match 'length') `
@@ -5221,6 +5221,79 @@ Check (($badgesBody88 -match 'SKILL BOOKS') -and ($badgesBody88 -match 'SKILL MA
 
 # 88.8  terminal.css defines button.tracker-toggle class (keyboard-accessible tracker button)
 Check ([bool]($cssSrc88 -match 'button\.tracker-toggle')) "GATE-UI-8: terminal.css defines button.tracker-toggle class (keyboard-accessible tracker button per Protocol 17)"
+
+# ===========================================================
+# Suite 89 -- GATE-AGNOSTIC: game-agnostic refactor guards (12 tests)
+# ===========================================================
+Sep "Suite 89 -- GATE-AGNOSTIC: game-agnostic refactor guards"
+
+$apiSrc89    = Read-Src "js/api.js"
+$uiCore89    = Read-Src "js/ui-core.js"
+$stateSrc89  = Read-Src "js/state.js"
+$htmlSrc89   = Read-Src "index.html"
+$rulesSrc89  = Read-Src "RULES.md"
+
+# 89.1  api.js: no two-game coercion pattern
+Check (-not ($apiSrc89 -match [regex]::Escape("=== 'FO3' ? 'FO3' : 'FNV'"))) `
+    "GATE-AGNOSTIC-1: api.js has no two-game coercion pattern (=== 'FO3' ? 'FO3' : 'FNV') -- GA-2 fixed"
+
+# 89.2  _nativeCrossroads uses getFactionRegistry() (GA-4 positive guard)
+$crossStart89 = $apiSrc89.IndexOf('function _nativeCrossroads()')
+$crossEnd89   = $apiSrc89.IndexOf("`nfunction ", $crossStart89 + 1)
+$crossBody89  = if ($crossStart89 -ge 0 -and $crossEnd89 -gt $crossStart89) { $apiSrc89.Substring($crossStart89, $crossEnd89 - $crossStart89) } else { '' }
+Check ([bool]($crossBody89 -match 'getFactionRegistry')) `
+    'GATE-AGNOSTIC-2: _nativeCrossroads() uses getFactionRegistry() for faction keys -- GA-4 data-driven'
+
+# 89.3  _nativeCrossroads has no hardcoded 'enclave' faction key (GA-4 negative guard)
+Check (-not ($crossBody89 -match "'enclave'")) `
+    "GATE-AGNOSTIC-3: _nativeCrossroads() has no hardcoded 'enclave' faction key -- GA-4 hardcoded array removed"
+
+# 89.4  index.html: no two-game coercion in boot script (GA-2 fixed)
+Check (-not ($htmlSrc89 -match [regex]::Escape("=== 'FO3' ? 'FO3' : 'FNV'"))) `
+    "GATE-AGNOSTIC-4: index.html has no two-game coercion pattern in boot script -- GA-2 fixed"
+
+# 89.5  ui-core.js: no two-game coercion pattern (GA-2 clean)
+Check (-not ($uiCore89 -match [regex]::Escape("=== 'FO3' ? 'FO3' : 'FNV'"))) `
+    "GATE-AGNOSTIC-5: ui-core.js has no two-game coercion pattern -- GA-2 clean"
+
+# 89.6  onGameContextChange uses !GAME_DEFS[ctx] guard (GA-3 fixed)
+$ctxStart89 = $uiCore89.IndexOf('function onGameContextChange(')
+$ctxEnd89   = $uiCore89.IndexOf("`nfunction ", $ctxStart89 + 1)
+$ctxBody89  = if ($ctxStart89 -ge 0 -and $ctxEnd89 -gt $ctxStart89) { $uiCore89.Substring($ctxStart89, $ctxEnd89 - $ctxStart89) } else { '' }
+Check ([bool]($ctxBody89 -match '!GAME_DEFS\[ctx\]')) `
+    'GATE-AGNOSTIC-6: onGameContextChange() uses !GAME_DEFS[ctx] guard -- GA-3 fixed, no literal allowlist'
+
+# 89.7  seedNewCampaignInventory does NOT have ctx !== 'FNV' guard (GA-6 regression guard)
+$seedStart89 = $uiCore89.IndexOf('function seedNewCampaignInventory(')
+$seedEnd89   = $uiCore89.IndexOf("`nfunction ", $seedStart89 + 1)
+$seedBody89  = if ($seedStart89 -ge 0 -and $seedEnd89 -gt $seedStart89) { $uiCore89.Substring($seedStart89, $seedEnd89 - $seedStart89) } else { '' }
+Check (-not ($seedBody89 -match "ctx\s*!==\s*['""]FNV['""]")) `
+    "GATE-AGNOSTIC-7: seedNewCampaignInventory() has no ctx !== 'FNV' guard -- GA-6 regression (canteen is now GAME_DEFS-driven)"
+
+# 89.8  seedNewCampaignInventory references GAME_DEFS (GA-6 positive guard)
+Check ([bool]($seedBody89 -match 'GAME_DEFS')) `
+    'GATE-AGNOSTIC-8: seedNewCampaignInventory() reads seedInventory from GAME_DEFS -- GA-6 data-driven seed'
+
+# 89.9  wipeTerminal uses Object.values(GAME_DEFS) for context hints (GA-8 fixed)
+$wipeStart89 = $uiCore89.IndexOf('function wipeTerminal(')
+$wipeEnd89   = $uiCore89.IndexOf("`nfunction ", $wipeStart89 + 1)
+# wipeTerminal is the last function in ui-core.js — use end-of-file if no next function found
+$wipeBodyLen89 = if ($wipeEnd89 -gt $wipeStart89) { $wipeEnd89 - $wipeStart89 } else { $uiCore89.Length - $wipeStart89 }
+$wipeBody89  = if ($wipeStart89 -ge 0) { $uiCore89.Substring($wipeStart89, $wipeBodyLen89) } else { '' }
+Check ([bool]($wipeBody89 -match 'Object\.values\(GAME_DEFS\)')) `
+    'GATE-AGNOSTIC-9: wipeTerminal() uses Object.values(GAME_DEFS) for context hints -- GA-8 data-driven messages'
+
+# 89.10  GAME_DEFS.FNV has seedInventory (GA-6 data added)
+Check ([bool]($stateSrc89 -match '(?s)FNV.{0,400}seedInventory')) `
+    'GATE-AGNOSTIC-10: GAME_DEFS.FNV has seedInventory array -- GA-6 seed data in state.js'
+
+# 89.11  GAME_DEFS.FO3 has seedInventory (GA-6 data added)
+Check ([bool]($stateSrc89 -match '(?s)FO3.{0,400}seedInventory')) `
+    'GATE-AGNOSTIC-11: GAME_DEFS.FO3 has seedInventory array -- GA-6 seed data in state.js'
+
+# 89.12  RULES.md contains Protocol 38 (game-agnostic codification)
+Check ([bool]($rulesSrc89 -match 'Protocol 38')) `
+    'GATE-AGNOSTIC-12: RULES.md contains Protocol 38 (game-agnostic feature code)'
 
 # ===========================================================
 # Results
