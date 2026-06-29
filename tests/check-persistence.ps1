@@ -1010,7 +1010,7 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84','Suite 85','Suite 86','Suite 87','Suite 88','Suite 89','Suite 90','Suite 91','Suite 92','Suite 93','Suite 94','Suite 95','Suite 96','Suite 97','Suite 98','Suite 99','Suite 100','Suite 101')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84','Suite 85','Suite 86','Suite 87','Suite 88','Suite 89','Suite 90','Suite 91','Suite 92','Suite 93','Suite 94','Suite 95','Suite 96','Suite 97','Suite 98','Suite 99','Suite 100','Suite 101','Suite 102')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
 Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-99)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
@@ -6034,6 +6034,59 @@ Check ([bool](-not ($cloud101 -match '(^|[^.\w])state\.gameContext'))) `
     '101.7: cloud.js no longer reads the global state.gameContext directly (Protocol 23 boundary restored)'
 Check ([bool]((-not ($cloud101 -match 'JSON\.stringify\(\s*state\s*\)')) -and ($cloud101 -match 'snapshotActiveCampaign\s*\('))) `
     '101.8: cloud.js no longer serializes the global state directly -- routes through snapshotActiveCampaign()'
+
+# ===========================================================
+# Suite 102 -- WU-B10 boot-drone autoplay timing (6 tests)
+# The browser autoplay policy blocks audio before the first user gesture, so the
+# boot drone is armed to the first click/key. The bug: it fired on the user's
+# first interaction WHENEVER it happened -- including a mid-session menu tap long
+# after boot finished, playing detached. Fix: a `_bootActive` window flag --
+# runBootSequence opens it before arming the drone and closes it at completion;
+# the armed gesture only plays while boot is still active, otherwise the stale
+# drone is suppressed. These guards lock the gate against the detached-drone bug.
+# ===========================================================
+Sep "Suite 102 -- WU-B10 boot-drone autoplay timing"
+$audio102 = Read-Src "js/ui-audio.js"
+$bootSeq102 = ''
+$firstInteract102 = ''
+$bootDrone102 = ''
+try { $bootSeq102 = Get-FunctionBody $audio102 'runBootSequence' } catch {}
+try { $firstInteract102 = Get-FunctionBody $audio102 '_onFirstInteract' } catch {}
+try { $bootDrone102 = Get-FunctionBody $audio102 'playBootDrone' } catch {}
+
+# 102.1 the boot-window flag exists, default false
+Check ([bool]($audio102 -match 'let\s+_bootActive\s*=\s*false')) `
+    '102.1: ui-audio.js declares the `_bootActive` boot-window flag (default false)'
+
+# 102.2 runBootSequence opens the window (_bootActive = true) BEFORE arming the drone
+$trueIdx102 = $bootSeq102.IndexOf('_bootActive = true')
+$droneIdx102 = $bootSeq102.IndexOf('playBootDrone(')
+Check ($trueIdx102 -ge 0 -and $droneIdx102 -ge 0 -and $trueIdx102 -lt $droneIdx102) `
+    '102.2: runBootSequence sets _bootActive = true before playBootDrone() (boot window opens before the drone is armed)'
+
+# 102.3 runBootSequence closes the window (_bootActive = false) at completion
+Check ([bool]($bootSeq102 -match '_bootActive\s*=\s*false')) `
+    '102.3: runBootSequence sets _bootActive = false at boot completion (boot window closes)'
+
+# 102.4 the armed first-gesture handler SUPPRESSES the drone when boot already
+#       finished -- the `!_bootActive` guard precedes the _tryDrone() call.
+$guardIdx102 = $firstInteract102.IndexOf('_bootActive')
+$playIdx102 = $firstInteract102.IndexOf('_tryDrone')
+Check ([bool](($firstInteract102 -match 'if\s*\(\s*!_bootActive\s*\)\s*return') -and $guardIdx102 -ge 0 -and $playIdx102 -ge 0 -and $guardIdx102 -lt $playIdx102)) `
+    '102.4: _onFirstInteract returns early on !_bootActive before _tryDrone() (stale drone suppressed post-boot)'
+
+# 102.5 the drone is still armed to the first user gesture (autoplay-policy-safe
+#       trigger preserved -- click + keydown listeners not regressed away).
+Check ([bool](($bootDrone102 -match "addEventListener\(\s*'click',\s*_onFirstInteract") -and ($bootDrone102 -match "addEventListener\(\s*'keydown',\s*_onFirstInteract"))) `
+    '102.5: playBootDrone still arms the drone to the first click/keydown gesture (autoplay-policy-safe trigger intact)'
+
+# 102.6 Structural twin of the JS behavioral gate replica: the source must encode
+#       the suppress-before-play ordering (the !_bootActive guard returns before
+#       the _tryDrone() call) -- the only way the post-boot first gesture can be
+#       suppressed while the boot-active gesture still plays. (JS runner runs the
+#       behavioral decision replica; PS asserts the ordered source contract.)
+Check ([bool](($firstInteract102 -match '!_bootActive') -and $guardIdx102 -ge 0 -and $playIdx102 -ge 0 -and $guardIdx102 -lt $playIdx102)) `
+    '102.6: boot-active first gesture plays the drone exactly once; post-boot first gesture suppresses it (no detached drone)'
 
 # ===========================================================
 # Results

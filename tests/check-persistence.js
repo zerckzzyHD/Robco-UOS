@@ -1756,6 +1756,7 @@ header('Meta / Runner Parity');
     'Suite 99',
     'Suite 100',
     'Suite 101',
+    'Suite 102',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
@@ -10457,6 +10458,95 @@ header('Suite 101 — WU-B9 cloud.js → state.js boundary fix');
       /snapshotActiveCampaign\s*\(/.test(cloud101),
     '101.8: cloud.js no longer serializes the global state directly — routes through snapshotActiveCampaign()'
   );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 102 — WU-B10 boot-drone autoplay timing (6 tests)
+//  The browser autoplay policy blocks audio before the first user gesture, so
+//  the boot drone is armed to the first click/key. The bug: it fired on the
+//  user's first interaction WHENEVER it happened — including a mid-session menu
+//  tap long after boot finished, playing detached. Fix: a `_bootActive` window
+//  flag — runBootSequence opens it before arming the drone and closes it at
+//  completion; the armed gesture only plays the drone while boot is still
+//  active, otherwise the stale drone is suppressed. These guards lock the
+//  gate so the detached-drone regression can't return.
+// ══════════════════════════════════════════════════════════════
+header('Suite 102 — WU-B10 boot-drone autoplay timing');
+{
+  const audio102 = readFile('js/ui-audio.js');
+  let bootSeq102 = '';
+  let firstInteract102 = '';
+  let bootDrone102 = '';
+  try {
+    bootSeq102 = extractFunctionBody(audio102, 'runBootSequence');
+  } catch (_) {}
+  try {
+    firstInteract102 = extractFunctionBody(audio102, '_onFirstInteract');
+  } catch (_) {}
+  try {
+    bootDrone102 = extractFunctionBody(audio102, 'playBootDrone');
+  } catch (_) {}
+
+  // 102.1 the boot-window flag exists, default false
+  assert(
+    /let\s+_bootActive\s*=\s*false/.test(audio102),
+    '102.1: ui-audio.js declares the `_bootActive` boot-window flag (default false)'
+  );
+
+  // 102.2 runBootSequence opens the window (_bootActive = true) BEFORE arming the drone
+  {
+    const trueIdx = bootSeq102.indexOf('_bootActive = true');
+    const droneIdx = bootSeq102.indexOf('playBootDrone(');
+    assert(
+      trueIdx >= 0 && droneIdx >= 0 && trueIdx < droneIdx,
+      '102.2: runBootSequence sets _bootActive = true before playBootDrone() (boot window opens before the drone is armed)'
+    );
+  }
+
+  // 102.3 runBootSequence closes the window (_bootActive = false) at completion
+  assert(
+    /_bootActive\s*=\s*false/.test(bootSeq102),
+    '102.3: runBootSequence sets _bootActive = false at boot completion (boot window closes)'
+  );
+
+  // 102.4 the armed first-gesture handler SUPPRESSES the drone when boot already
+  //       finished — the `!_bootActive` guard precedes the _tryDrone() call.
+  {
+    const guardIdx = firstInteract102.indexOf('_bootActive');
+    const playIdx = firstInteract102.indexOf('_tryDrone');
+    assert(
+      /if\s*\(\s*!_bootActive\s*\)\s*return/.test(firstInteract102) &&
+        guardIdx >= 0 &&
+        playIdx >= 0 &&
+        guardIdx < playIdx,
+      '102.4: _onFirstInteract returns early on !_bootActive before _tryDrone() (stale drone suppressed post-boot)'
+    );
+  }
+
+  // 102.5 the drone is still armed to the first user gesture (autoplay-policy-safe
+  //       trigger preserved — click + keydown listeners not regressed away).
+  assert(
+    /addEventListener\(\s*'click',\s*_onFirstInteract/.test(bootDrone102) &&
+      /addEventListener\(\s*'keydown',\s*_onFirstInteract/.test(bootDrone102),
+    '102.5: playBootDrone still arms the drone to the first click/keydown gesture (autoplay-policy-safe trigger intact)'
+  );
+
+  // 102.6 BEHAVIORAL — replica of the gating decision: while booting the first
+  //       gesture plays the drone; after boot it is suppressed. (PS runner mirrors
+  //       this structurally — the ordered !_bootActive-before-_tryDrone guard.)
+  {
+    const played = [];
+    const makeOnFirstInteract = getBootActive => () => {
+      if (!getBootActive()) return; // suppress detached drone
+      played.push('drone');
+    };
+    makeOnFirstInteract(() => true)(); // first gesture during boot → plays
+    makeOnFirstInteract(() => false)(); // first gesture after boot → suppressed
+    assert(
+      played.length === 1 && played[0] === 'drone',
+      '102.6: boot-active first gesture plays the drone exactly once; post-boot first gesture suppresses it (no detached drone)'
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

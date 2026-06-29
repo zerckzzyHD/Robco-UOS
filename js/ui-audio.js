@@ -519,8 +519,16 @@ function playPanelClick() {
 
 // ── H4: BOOT SEQUENCE DRONE ─────────────────────────────────────
 // On boot: a startup drone ramping from 30Hz → 60Hz over 2s, then decaying.
-// Mimics CRT power-on. Fires once at boot before user gesture, so audioCtx
-// might not exist — use setTimeout to attempt after first user touch.
+// Mimics CRT power-on. The browser autoplay policy blocks audio before the
+// first user gesture, and boot runs before any interaction — so the drone is
+// armed to the first click/key.
+//
+// WU-B10: the armed gesture only plays the drone IF boot is still in progress
+// (`_bootActive`). If the user's first interaction lands AFTER boot already
+// finished, the stale drone is suppressed — it never fires detached on a later
+// mid-session menu tap. Net: the drone plays as part of boot, or not at all.
+let _bootActive = false; // true only between runBootSequence start and completion
+
 function playBootDrone() {
   if (AudioSettings.masterMute) return;
   if (AudioSettings.bootDrone) return;
@@ -547,11 +555,13 @@ function playBootDrone() {
     osc.stop(audioCtx.currentTime + 3.1);
   }
   // First user interaction triggers audioCtx creation; boot runs before it.
-  // Wire to first click/key so drone plays immediately on interaction.
+  // Wire to first click/key, but only play the drone if boot is STILL active —
+  // a first interaction after boot completed suppresses the stale drone (WU-B10).
   function _onFirstInteract() {
-    _tryDrone();
     document.removeEventListener('click', _onFirstInteract);
     document.removeEventListener('keydown', _onFirstInteract);
+    if (!_bootActive) return; // boot already finished → suppress detached drone
+    _tryDrone();
   }
   document.addEventListener('click', _onFirstInteract, { once: true });
   document.addEventListener('keydown', _onFirstInteract, { once: true });
@@ -642,6 +652,7 @@ function runBootSequence(onComplete) {
     return;
   }
   const bootLines = document.getElementById('bootLines');
+  _bootActive = true; // WU-B10: open the boot window — drone may play on first gesture
   playBootDrone(); // H4: boot sequence drone
   const lines = [
     '> ROBCO INDUSTRIES (TM) UNIFIED OPERATING SYSTEM',
@@ -665,6 +676,7 @@ function runBootSequence(onComplete) {
         bootScreen.classList.add('boot-fade-out');
         setTimeout(() => {
           bootScreen.style.display = 'none';
+          _bootActive = false; // WU-B10: boot window closed — suppress any stale drone
           if (onComplete) onComplete();
         }, 400);
       }, 200);
