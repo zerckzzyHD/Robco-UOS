@@ -473,6 +473,24 @@ A flaw, gap, or footgun discovered **while testing or verifying** — not only o
 
 ---
 
+## Protocol 43 — Dev-Branch Workflow / Release Gating
+
+**Branch model.** All unreleased work — every commit and every push — goes to **`dev`**. **`main` is release-only:** it receives changes **solely** through a `dev → main` merge performed at a version release (an `APP_VERSION` bump per Protocol 2). Nothing lands on `main` except releases. Production (GitHub Pages) deploys from `main`; the private staging site (Cloudflare Pages) builds from `dev`.
+
+**Same bar on both branches — there is no "looser" branch.** Every existing rule and protocol applies **identically on `dev`** as on `main`. `dev` is held to the same standard as `main` in every respect. In particular, on **every** `dev` commit and push:
+
+- The **full pre-commit / pre-push gate** runs and must pass exactly as on `main`: ESLint with **zero** errors/warnings, Prettier clean, **both** test runners (`tests/check-persistence.js` + `tests/check-persistence.ps1`) green and **at parity** (identical suites, per-suite counts, and 1165 total), plus the push-boundary browser checks — boot-smoke, render-check, the a11y baseline-diff, and the `tests/test.html` runtime audit.
+- **Protocol 1** (bump `CACHE_NAME` when a served/precached file changes) applies.
+- **Protocol 2 / 2a** (docs updated + test-count and suite-count synced across every location) applies.
+- **Protocol 38** (game-agnostic feature code), **39** (UTF-8 source integrity), **41** (end-of-task cleanup sweep), **42** (fix flaws found during testing/verification in the same commit), and the **Protocol 36b** escape-ratchet all apply.
+- Every other protocol (13 regression test, 14 AI-contract safety, 15 runner parity, 19 batch-before-push, 20 static source-invariant guards, etc.) applies unchanged.
+
+**Changelog discipline on `dev`.** The `CHANGELOG.md` **chronological ordering convention is explicitly followed on `dev`**: within each category heading (Added / Fixed / Changed / Improved / Under the Hood), entries are ordered **earliest-first** — the oldest change sits at the top of its category and the newest is appended at the bottom. The **`[Unreleased]`** block is maintained on `dev` in this earliest-first order throughout development. At the `dev → main` version release, the accumulated `[Unreleased]` block **consolidates into the dated release version block** (entries preserving their earliest-first order within each category), and a fresh empty `[Unreleased]` block opens for the next cycle.
+
+**Why:** Separating "pushed" from "released" keeps unreleased work off the public production site while a private staging build stays continuously live for real-device testing. Holding `dev` to the identical gate guarantees that whatever merges to `main` at release time has already cleared the full bar — the release merge promotes already-verified work rather than triggering a re-validation crunch.
+
+---
+
 ## Protocol UI-1 — Panel Heading Standard
 
 Every `<details class="panel">` in `index.html` must have `<summary><h2>> HEADING</h2></summary>` — the `>` glyph is mandatory. Sub-panels (`class="sub-panel"`) use `<summary><h3>> HEADING</h3>` instead. Never put prose or config summaries directly in a `.panel` summary without an `h2`.
