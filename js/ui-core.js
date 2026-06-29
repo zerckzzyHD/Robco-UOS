@@ -2,6 +2,23 @@ let attachedImageData = null;
 let attachedImageMimeType = null;
 let _invFilter = 'all';
 
+// ── RENDER SIGNATURE CACHE (WU-A3) ────────────────────────────
+// Tracks the last-rendered state slice per panel. Module scope means the
+// object is empty on every page load, so the first loadUI() always does a
+// full render. Context switches call window.location.reload(), which clears
+// it naturally. _isDirty() returns true (and updates the sig) when a panel's
+// slice changed; false when it's unchanged (skip the DOM rebuild).
+const _renderSig = {};
+function _clearRenderCache() {
+  Object.keys(_renderSig).forEach(k => delete _renderSig[k]);
+}
+function _isDirty(key, slice) {
+  const sig = JSON.stringify(slice);
+  if (_renderSig[key] === sig) return false;
+  _renderSig[key] = sig;
+  return true;
+}
+
 // ── AUDIO SETTINGS CACHE ──────────────────────────────────────
 // Read mute prefs once at startup — avoids localStorage reads on every audio tick
 const AudioSettings = {
@@ -1351,7 +1368,7 @@ function renderSkills() {
 
 function loadUI() {
   seedNewCampaignInventory(state.gameContext);
-  renderSkills();
+  if (_isDirty('skills', { sk: state.skills, ctx: state.gameContext })) renderSkills();
   document.getElementById('stat_lvl').value = state.lvl;
   document.getElementById('stat_xp').value = state.xp;
   document.getElementById('stat_hp_cur').value = state.hpCur;
@@ -1402,28 +1419,68 @@ function loadUI() {
     }
   });
   updateKarmaUI();
-  renderInventory();
-  renderAmmo();
-  renderSquad();
-  renderStatus();
-  renderCampaignNotes();
-  renderFactionRep();
-  renderPerks();
-  renderQuests();
-  renderSessionStats();
-  renderEquipped();
-  renderCollectibles();
-  renderLincolnMemorabilia();
-  renderTraits();
-  renderSkillBooks();
-  renderMagazines();
-  renderCraft();
-  renderGameDate();
-  renderWorldMap(); // G6: Regional Zone Map
-  renderKarmaCenter(); // G4: FO3 Karma Center
-  renderCampaignStatus(); // v2.0.1: Campaign Status + Crossroads Record
-  renderAccount();
-  renderSavesList();
+  if (_isDirty('inv', { inv: state.inventory, f: _invFilter })) renderInventory();
+  if (_isDirty('ammo', state.ammo)) renderAmmo();
+  if (_isDirty('squad', state.squad)) renderSquad();
+  if (_isDirty('status', state.status)) renderStatus();
+  if (_isDirty('notes', state.campaign_notes)) renderCampaignNotes();
+  if (_isDirty('factions', state.factions)) renderFactionRep();
+  if (_isDirty('perks', state.perks)) renderPerks();
+  if (_isDirty('quests', state.quests)) renderQuests();
+  if (
+    _isDirty('sessionstats', {
+      st: state.stats,
+      col: state.collectibles,
+      ticks: state.ticks,
+      lh: state.locationHistory,
+    })
+  )
+    renderSessionStats();
+  if (_isDirty('equipped', state.equipped)) renderEquipped();
+  if (_isDirty('collectibles', { col: state.collectibles, ctx: state.gameContext }))
+    renderCollectibles();
+  if (_isDirty('lincoln', { li: state.lincolnItems, ctx: state.gameContext }))
+    renderLincolnMemorabilia();
+  if (_isDirty('traits', { tr: state.traits, ctx: state.gameContext })) renderTraits();
+  if (_isDirty('skillbooks', { sb: state.skillBooks, ctx: state.gameContext })) renderSkillBooks();
+  if (_isDirty('magazines', { mg: state.magazines, ctx: state.gameContext })) renderMagazines();
+  if (
+    _isDirty('craft', {
+      inv: state.inventory,
+      ammo: state.ammo,
+      sk: state.skills,
+      ctx: state.gameContext,
+    })
+  )
+    renderCraft();
+  if (_isDirty('gamedate', { ticks: state.ticks, ctx: state.gameContext })) renderGameDate();
+  // G6: Regional Zone Map — skip when DATA tab is not active (B-P1: map work is invisible off-tab;
+  // switchTab('data') at ui-core.js:891 re-renders when the user switches to it).
+  if (document.getElementById('tab-btn-data')?.classList.contains('active')) {
+    if (
+      _isDirty('worldmap', {
+        lh: state.locationHistory,
+        col: state.collectibles,
+        loc: state.loc,
+        mv: state.mapView,
+        li: state.lincolnItems,
+        ctx: state.gameContext,
+      })
+    )
+      renderWorldMap();
+  }
+  if (_isDirty('karma', { k: state.karma, ctx: state.gameContext })) renderKarmaCenter(); // G4: FO3 Karma Center
+  if (
+    _isDirty('campstatus', {
+      q: state.quests,
+      f: state.factions,
+      s: state.status,
+      n: state.campaign_notes,
+    })
+  )
+    renderCampaignStatus(); // v2.0.1: Campaign Status + Crossroads Record
+  renderAccount(); // always — reads Firebase auth state, not covered by state slice
+  renderSavesList(); // always — reads localStorage/cloud saves, not covered by state slice
   _updateContextPanels(); // G4: switch faction/karma panel visibility
   // C5/C11: Restore CAMPG dropdowns from state
   {

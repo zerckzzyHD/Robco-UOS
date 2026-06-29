@@ -1638,17 +1638,18 @@ header('Meta / Runner Parity');
     'Suite 88',
     'Suite 89',
     'Suite 90',
+    'Suite 91',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-90)' +
+    'JS runner contains all gate-guard suites (22-41, 49-91)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-90)' +
+    'PS runner contains all gate-guard suites (22-41, 49-91)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -8993,6 +8994,68 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
       `GATE-CORRUPT-${i + 1}: ${label} has no U+FFFD or \\u00E2\\u20AC/\\u00E2\\u2013 mojibake (double-encoded UTF-8 from PowerShell write)`
     );
   });
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 91 — loadUI DIRTY-CHECK / TARGETED RE-RENDER GUARDS (8 tests)
+// ══════════════════════════════════════════════════════════════
+{
+  // Protocol 13 regression guards for WU-A3 (loadUI dirty-check).
+  // Static assertions — no DOM required.
+  const uiCore91 = fs.readFileSync(path.join(__dirname, '../js/ui-core.js'), 'utf8');
+
+  // 91.1  _renderSig module-level cache exists
+  assert(
+    uiCore91.includes('const _renderSig = {}'),
+    'GATE-DIRTY-1: _renderSig module-level cache declared in ui-core.js'
+  );
+
+  // 91.2  _isDirty helper function exists
+  assert(
+    uiCore91.includes('function _isDirty('),
+    'GATE-DIRTY-2: _isDirty() helper defined in ui-core.js'
+  );
+
+  // 91.3  _clearRenderCache function exists (explicit force-render path)
+  assert(
+    uiCore91.includes('function _clearRenderCache()'),
+    'GATE-DIRTY-3: _clearRenderCache() defined in ui-core.js (force-render path)'
+  );
+
+  // Extract loadUI body for scoped assertions (~8000 chars covers the full ~130-line function)
+  const loadUIStart91 = uiCore91.indexOf('function loadUI()');
+  assert(loadUIStart91 !== -1, 'GATE-DIRTY-4a: loadUI() function found in ui-core.js');
+  const loadUIBody91 = uiCore91.slice(loadUIStart91, loadUIStart91 + 8000);
+
+  // 91.4  _isDirty is wired inside loadUI — at least one dirty-check is active
+  assert(
+    loadUIBody91.includes("_isDirty('inv'"),
+    "GATE-DIRTY-4: _isDirty('inv') called inside loadUI() — dirty-check is wired"
+  );
+
+  // 91.5  renderWorldMap is guarded by DATA tab check in loadUI (B-P1)
+  assert(
+    loadUIBody91.includes('tab-btn-data') && loadUIBody91.includes('renderWorldMap'),
+    'GATE-DIRTY-5: renderWorldMap guarded by tab-btn-data check in loadUI() (B-P1)'
+  );
+
+  // 91.6  renderWorldMap is NOT called unconditionally in loadUI (B-P1 regression guard)
+  assert(
+    !loadUIBody91.includes('renderWorldMap(); // G6'),
+    'GATE-DIRTY-6: renderWorldMap() not called unconditionally in loadUI() (B-P1 regression guard)'
+  );
+
+  // 91.7  renderAccount() always called — auth state not covered by state slice
+  assert(
+    loadUIBody91.includes('renderAccount(); // always'),
+    'GATE-DIRTY-7: renderAccount() called unconditionally in loadUI() (auth state not in state slice)'
+  );
+
+  // 91.8  renderSavesList() always called — localStorage/cloud not covered by state slice
+  assert(
+    loadUIBody91.includes('renderSavesList(); // always'),
+    'GATE-DIRTY-8: renderSavesList() called unconditionally in loadUI() (localStorage/cloud not in state slice)'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════
