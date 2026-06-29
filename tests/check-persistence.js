@@ -1645,17 +1645,18 @@ header('Meta / Runner Parity');
     'Suite 91',
     'Suite 92',
     'Suite 93',
+    'Suite 94',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-93)' +
+    'JS runner contains all gate-guard suites (22-41, 49-94)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-93)' +
+    'PS runner contains all gate-guard suites (22-41, 49-94)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -2243,7 +2244,7 @@ header('Keyboard Shortcuts Group');
   // 36.3 Global keydown listener calls closeModal() on Escape
   {
     const kdIdx = uiSrc36.indexOf("document.addEventListener('keydown'");
-    const kdSnippet = kdIdx >= 0 ? uiSrc36.slice(kdIdx, kdIdx + 2000) : '';
+    const kdSnippet = kdIdx >= 0 ? uiSrc36.slice(kdIdx, kdIdx + 4000) : '';
     assert(
       /Escape/.test(kdSnippet) && /closeModal/.test(kdSnippet),
       "Global keydown listener handles 'Escape' → closeModal() (Esc closes dialog)"
@@ -9082,7 +9083,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 92 — VERTICAL-BROKEN-TEXT ANTI-RECURRENCE GUARDS (4 tests)
+//  Suite 92 — VERTICAL-BROKEN-TEXT ANTI-RECURRENCE GUARDS (5 tests)
 // ══════════════════════════════════════════════════════════════
 {
   // Protocol 13 + Protocol 36b escape-ratchet: closes the "element squeezed
@@ -9112,6 +9113,12 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   assert(
     uiRender92.includes('map-collectible-badge badge'),
     'GATE-NOWRAP-4: map-collectible-badge span includes badge class in ui-render.js'
+  );
+
+  // 92.5  .macro-buttons button carries white-space: nowrap (WU-C12 device-wrap fix guard)
+  assert(
+    /\.macro-buttons\s+button\s*\{[^}]*white-space:\s*nowrap/.test(css92),
+    'GATE-NOWRAP-5: .macro-buttons button has white-space: nowrap in terminal.css (macro command buttons must not wrap)'
   );
 }
 
@@ -9191,6 +9198,79 @@ header('Suite 93 — FO3 Autocomplete Guard');
       'FO3-context behavioral: registrySearch("quests","galaxy") returns Galaxy News Radio from FO3 registry'
     );
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 94 — ACCESSIBILITY GUARDS (10 tests)
+//  WCAG 2.1 AA: focus-visible indicators, prefers-reduced-motion
+//  (seizure-hazard flicker freeze), aria-live chat region, and
+//  sysModal dialog ARIA semantics. A-1/A-S4/A-7/A-S1 spec items.
+// ══════════════════════════════════════════════════════════════
+header('Suite 94 — Accessibility Guards');
+{
+  const css94 = fs.readFileSync(path.join(__dirname, '../css/terminal.css'), 'utf8');
+  const idx94 = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
+  const uiCore94 = fs.readFileSync(path.join(__dirname, '../js/ui-core.js'), 'utf8');
+
+  // 94.1  :focus-visible rule exists in terminal.css (WCAG 2.4.7 — keyboard focus ring)
+  assert(
+    css94.includes(':focus-visible'),
+    'GATE-A11Y-1: terminal.css contains :focus-visible rule (keyboard focus indicator — WCAG 2.4.7)'
+  );
+
+  // 94.2  prefers-reduced-motion block exists in terminal.css (WCAG 2.3.1 — seizure hazard)
+  assert(
+    css94.includes('prefers-reduced-motion'),
+    'GATE-A11Y-2: terminal.css contains prefers-reduced-motion media query (seizure-safe animation freeze)'
+  );
+
+  // 94.3  reduced-motion block uses 0.01ms animation-duration (not 0s — avoids animationend skip bug)
+  assert(
+    css94.includes('animation-duration: 0.01ms'),
+    'GATE-A11Y-3: prefers-reduced-motion block uses animation-duration: 0.01ms !important (not 0s — avoids animationend skip bug)'
+  );
+
+  // 94.4  reduced-motion block sets animation-iteration-count: 1 (stops infinite flicker loops)
+  assert(
+    css94.includes('animation-iteration-count: 1'),
+    'GATE-A11Y-4: prefers-reduced-motion block sets animation-iteration-count: 1 !important (stops infinite flicker loops)'
+  );
+
+  // 94.5  .crt-overlay appears inside prefers-reduced-motion block (static scanline look preserved)
+  assert(
+    /prefers-reduced-motion\s*:\s*reduce\b[\s\S]*?\.crt-overlay/.test(css94),
+    'GATE-A11Y-5: .crt-overlay has opacity restore inside prefers-reduced-motion block (static scanline preserved)'
+  );
+
+  // 94.6  chatDisplay has aria-live="polite" (screen reader live region)
+  assert(
+    idx94.includes('aria-live="polite"'),
+    'GATE-A11Y-6: #chatDisplay has aria-live="polite" in index.html (screen reader chat updates)'
+  );
+
+  // 94.7  chatDisplay has aria-atomic="false" (per-message SR announcement, not full re-read)
+  assert(
+    idx94.includes('aria-atomic="false"'),
+    'GATE-A11Y-7: #chatDisplay has aria-atomic="false" in index.html (per-message SR announcement)'
+  );
+
+  // 94.8  sysModal has role="dialog" (accessible dialog semantics)
+  assert(
+    idx94.includes('role="dialog"'),
+    'GATE-A11Y-8: #sysModal has role="dialog" in index.html (modal dialog semantics for AT)'
+  );
+
+  // 94.9  sysModal has aria-modal="true" (background content inert for AT)
+  assert(
+    idx94.includes('aria-modal="true"'),
+    'GATE-A11Y-9: #sysModal has aria-modal="true" in index.html (background content inert for AT)'
+  );
+
+  // 94.10  _openSysModal helper defined in ui-core.js (focus-trap entrypoint + focus restore)
+  assert(
+    /function\s+_openSysModal\s*\(/.test(uiCore94),
+    'GATE-A11Y-10: _openSysModal() helper defined in ui-core.js (focus management + Tab-trap entrypoint)'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════

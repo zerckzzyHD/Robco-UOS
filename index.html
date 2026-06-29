@@ -81,7 +81,13 @@
 
     <div class="crt-overlay"></div>
 
-    <div id="sysModal" class="modal-overlay">
+    <div
+      id="sysModal"
+      class="modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modalTitle"
+    >
       <div class="modal-box">
         <div class="modal-title" id="modalTitle">> SYSTEM POP-UP</div>
         <div class="modal-content" id="modalContent">Content goes here...</div>
@@ -500,21 +506,61 @@
             <div class="input-group">
               <label>HEAD:</label>
               <div style="display: flex; width: 165px; justify-content: center">
-                <button id="btn_l_hd" class="limb-ok" onclick="toggleLimb('hd')">[████] OK</button>
+                <button
+                  id="btn_l_hd"
+                  class="limb-ok"
+                  onclick="toggleLimb('hd')"
+                  aria-pressed="false"
+                  aria-label="Head: OK"
+                >
+                  [████] OK
+                </button>
               </div>
             </div>
             <div class="input-group">
               <label>ARMS (L/R):</label>
               <div style="display: flex; gap: 5px">
-                <button id="btn_l_la" class="limb-ok" onclick="toggleLimb('la')">[████] OK</button>
-                <button id="btn_l_ra" class="limb-ok" onclick="toggleLimb('ra')">[████] OK</button>
+                <button
+                  id="btn_l_la"
+                  class="limb-ok"
+                  onclick="toggleLimb('la')"
+                  aria-pressed="false"
+                  aria-label="Left Arm: OK"
+                >
+                  [████] OK
+                </button>
+                <button
+                  id="btn_l_ra"
+                  class="limb-ok"
+                  onclick="toggleLimb('ra')"
+                  aria-pressed="false"
+                  aria-label="Right Arm: OK"
+                >
+                  [████] OK
+                </button>
               </div>
             </div>
             <div class="input-group" style="margin-top: 4px">
               <label>LEGS (L/R):</label>
               <div style="display: flex; gap: 5px">
-                <button id="btn_l_ll" class="limb-ok" onclick="toggleLimb('ll')">[████] OK</button>
-                <button id="btn_l_rl" class="limb-ok" onclick="toggleLimb('rl')">[████] OK</button>
+                <button
+                  id="btn_l_ll"
+                  class="limb-ok"
+                  onclick="toggleLimb('ll')"
+                  aria-pressed="false"
+                  aria-label="Left Leg: OK"
+                >
+                  [████] OK
+                </button>
+                <button
+                  id="btn_l_rl"
+                  class="limb-ok"
+                  onclick="toggleLimb('rl')"
+                  aria-pressed="false"
+                  aria-label="Right Leg: OK"
+                >
+                  [████] OK
+                </button>
               </div>
             </div>
           </details>
@@ -1748,7 +1794,12 @@
               </button>
             </div>
 
-            <div id="chatDisplay" style="margin-top: 10px"></div>
+            <div
+              id="chatDisplay"
+              aria-live="polite"
+              aria-atomic="false"
+              style="margin-top: 10px"
+            ></div>
 
             <div style="display: flex; flex-direction: column; align-items: center; width: 100%">
               <div

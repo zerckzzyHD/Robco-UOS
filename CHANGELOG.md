@@ -1,4 +1,24 @@
-﻿## [Unreleased]<!-- Tests: 1130/1130 | Cache: robco-terminal-v2.6.0-r7 -->
+﻿## [Unreleased]<!-- Tests: 1141/1141 | Cache: robco-terminal-v2.6.0-r8 -->
+
+### Added
+
+- Keyboard focus rings now appear on every interactive element — buttons, inputs, tabs, toggle switches, and expandable panels all show a green glow outline when you navigate with the keyboard. Mouse users see no change; focus rings only appear on keyboard or programmatic focus (`:focus-visible`).
+- All CRT flicker and scanline animations are now paused for users who have "reduce motion" enabled in their operating system — both the 6.7 Hz flicker and the faster 10 Hz variant exceed the WCAG seizure-risk threshold of 3 Hz, so they now freeze to a static scanline image when the motion preference is set.
+
+### Fixed
+
+- Fixed the [THREAT], [VATS], [TRADE], and [LOOT] macro buttons word-wrapping mid-label on narrow screens — they now stay as a single line at all viewport widths.
+- Screen readers now hear each new chat message as it arrives — the chat history panel is a live region (`aria-live`) so assistive technology announces AI and player messages immediately without the user having to navigate to the chat area.
+- The system modal (changelog, help, [LOGS], command reference) now has proper dialog semantics for assistive technology — it announces itself as a dialog, traps Tab focus inside while open, closes on Esc, and returns focus to the element that opened it when dismissed.
+- Inventory USE and delete buttons now have descriptive labels for screen readers (e.g. "Use item: Combat Shotgun" and "Remove Combat Shotgun from inventory") instead of bare "USE" and "X" text.
+- Faction reputation buttons now have descriptive labels (e.g. "Fame +5 for NCR") instead of the single-character "F+" / "F-" / "I+" / "I-" labels that were invisible to screen readers.
+- Limb condition buttons now announce their current state to screen readers — each button says "Head: OK" or "Right Arm: Crippled" and reports its toggle state, so users navigating by keyboard or AT always know which limbs are injured without looking at the visual bar.
+- Inactive tab buttons now have higher contrast — opacity raised from 55% to 75%, which brings all six optics colour themes above the WCAG AA 3:1 contrast ratio for interface controls.
+
+### Under the Hood
+
+- Added Suite 94 (10 regression tests) permanently guarding the accessibility changes above: `:focus-visible` CSS rule present, `prefers-reduced-motion` block with correct freeze parameters, `aria-live` on the chat display, `role=dialog`/`aria-modal` on the system modal, and the `_openSysModal()` focus-management helper.
+- Extended Suite 92 with a test for the macro-button nowrap guard (now 5 tests total).
 
 ### Fixed
 

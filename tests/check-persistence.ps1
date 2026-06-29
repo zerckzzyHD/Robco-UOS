@@ -972,11 +972,11 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84','Suite 85','Suite 86','Suite 87','Suite 88','Suite 89','Suite 90','Suite 91','Suite 92','Suite 93')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84','Suite 85','Suite 86','Suite 87','Suite 88','Suite 89','Suite 90','Suite 91','Suite 92','Suite 93','Suite 94')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
-Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-92)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
-Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-92)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-94)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
+Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-94)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
 $changelogSrc28 = Read-Src "CHANGELOG.md"
 $countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
 $canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
@@ -1290,7 +1290,7 @@ Check ($kbCount36 -ge 6) "KEYBOARD SHORTCUTS group has >=6 entries (found $kbCou
 
 # 36.3 Global keydown listener calls closeModal() on Escape
 $kdIdx36 = $uiSrc36.IndexOf("document.addEventListener('keydown'")
-$kdSnippet36 = if ($kdIdx36 -ge 0) { $uiSrc36.Substring($kdIdx36, [Math]::Min(2000, $uiSrc36.Length - $kdIdx36)) } else { '' }
+$kdSnippet36 = if ($kdIdx36 -ge 0) { $uiSrc36.Substring($kdIdx36, [Math]::Min(4000, $uiSrc36.Length - $kdIdx36)) } else { '' }
 Check (($kdSnippet36 -match 'Escape') -and ($kdSnippet36 -match 'closeModal')) "Global keydown listener handles 'Escape' -> closeModal() (Esc closes dialog)"
 
 # 36.4 closeModal() function exists in ui.js
@@ -5383,7 +5383,7 @@ Check ($loadUIBody91ps.Contains('renderSavesList(); // always')) `
     'GATE-DIRTY-8: renderSavesList() called unconditionally in loadUI() (localStorage/cloud not in state slice)'
 
 # ===========================================================
-# Suite 92 -- VERTICAL-BROKEN-TEXT ANTI-RECURRENCE GUARDS (4 tests)
+# Suite 92 -- VERTICAL-BROKEN-TEXT ANTI-RECURRENCE GUARDS (5 tests)
 # ===========================================================
 Sep "Suite 92 -- VERTICAL-BROKEN-TEXT ANTI-RECURRENCE GUARDS"
 # Protocol 13 + Protocol 36b escape-ratchet: closes the "element squeezed
@@ -5406,6 +5406,10 @@ Check ($uiRender92ps.Contains('class="tag"')) `
 # 92.4  map collectible badge uses .badge class in ui-render.js
 Check ($uiRender92ps.Contains('map-collectible-badge badge')) `
     'GATE-NOWRAP-4: map-collectible-badge span includes badge class in ui-render.js'
+
+# 92.5  .macro-buttons button carries white-space: nowrap (WU-C12 device-wrap fix guard)
+Check ([System.Text.RegularExpressions.Regex]::IsMatch($css92ps, '\.macro-buttons\s+button\s*\{[^}]*white-space:\s*nowrap')) `
+    'GATE-NOWRAP-5: .macro-buttons button has white-space: nowrap in terminal.css (macro command buttons must not wrap)'
 
 
 # ===========================================================
@@ -5454,6 +5458,57 @@ Check $rcNearNv93ps "FNV boot path in index.html includes registry-core.js after
 # 93.8  Behavioral: FO3 registry has Galaxy News Radio quest (FO3 autocomplete data present)
 Check ($fo393ps.Contains("'Galaxy News Radio'") -or $fo393ps.Contains('"Galaxy News Radio"')) `
     "FO3-context behavioral: reg_fo3.js FALLOUT_REGISTRY.quests contains Galaxy News Radio (FO3 data present + game-agnostic fn reads it)"
+
+# ===========================================================
+# Suite 94 -- ACCESSIBILITY GUARDS (10 tests)
+# WCAG 2.1 AA: focus-visible indicators, prefers-reduced-motion
+# (seizure-hazard flicker freeze), aria-live chat region, and
+# sysModal dialog ARIA semantics. A-1/A-S4/A-7/A-S1 spec items.
+# ===========================================================
+Sep "Suite 94 -- Accessibility Guards"
+$css94ps = [System.IO.File]::ReadAllText((Join-Path $Root 'css/terminal.css'), [System.Text.Encoding]::UTF8)
+$idx94ps = [System.IO.File]::ReadAllText((Join-Path $Root 'index.html'), [System.Text.Encoding]::UTF8)
+$uiCore94ps = [System.IO.File]::ReadAllText((Join-Path $Root 'js/ui-core.js'), [System.Text.Encoding]::UTF8)
+
+# 94.1  :focus-visible rule exists in terminal.css (WCAG 2.4.7)
+Check ($css94ps.Contains(':focus-visible')) `
+    'GATE-A11Y-1: terminal.css contains :focus-visible rule (keyboard focus indicator -- WCAG 2.4.7)'
+
+# 94.2  prefers-reduced-motion block exists in terminal.css (WCAG 2.3.1)
+Check ($css94ps.Contains('prefers-reduced-motion')) `
+    'GATE-A11Y-2: terminal.css contains prefers-reduced-motion media query (seizure-safe animation freeze)'
+
+# 94.3  reduced-motion block uses 0.01ms animation-duration
+Check ($css94ps.Contains('animation-duration: 0.01ms')) `
+    'GATE-A11Y-3: prefers-reduced-motion block uses animation-duration: 0.01ms !important (not 0s -- avoids animationend skip bug)'
+
+# 94.4  reduced-motion block sets animation-iteration-count: 1
+Check ($css94ps.Contains('animation-iteration-count: 1')) `
+    'GATE-A11Y-4: prefers-reduced-motion block sets animation-iteration-count: 1 !important (stops infinite flicker loops)'
+
+# 94.5  .crt-overlay inside prefers-reduced-motion block
+Check ([System.Text.RegularExpressions.Regex]::IsMatch($css94ps, 'prefers-reduced-motion\s*:\s*reduce\b[\s\S]*?\.crt-overlay', [System.Text.RegularExpressions.RegexOptions]::Singleline)) `
+    'GATE-A11Y-5: .crt-overlay has opacity restore inside prefers-reduced-motion block (static scanline preserved)'
+
+# 94.6  chatDisplay has aria-live="polite"
+Check ($idx94ps.Contains('aria-live="polite"')) `
+    'GATE-A11Y-6: #chatDisplay has aria-live="polite" in index.html (screen reader chat updates)'
+
+# 94.7  chatDisplay has aria-atomic="false"
+Check ($idx94ps.Contains('aria-atomic="false"')) `
+    'GATE-A11Y-7: #chatDisplay has aria-atomic="false" in index.html (per-message SR announcement)'
+
+# 94.8  sysModal has role="dialog"
+Check ($idx94ps.Contains('role="dialog"')) `
+    'GATE-A11Y-8: #sysModal has role="dialog" in index.html (modal dialog semantics for AT)'
+
+# 94.9  sysModal has aria-modal="true"
+Check ($idx94ps.Contains('aria-modal="true"')) `
+    'GATE-A11Y-9: #sysModal has aria-modal="true" in index.html (background content inert for AT)'
+
+# 94.10  _openSysModal helper defined in ui-core.js
+Check ([System.Text.RegularExpressions.Regex]::IsMatch($uiCore94ps, 'function\s+_openSysModal\s*\(')) `
+    'GATE-A11Y-10: _openSysModal() helper defined in ui-core.js (focus management + Tab-trap entrypoint)'
 
 # ===========================================================
 # Results

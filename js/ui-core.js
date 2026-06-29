@@ -42,6 +42,7 @@ const AudioSettings = {
 // Local-only diagnostic log — never transmitted. Cap 50 entries × 300 chars ≈ 15 KB max.
 const ERROR_LOG_KEY = 'robco_error_log';
 const ERROR_LOG_CAP = 50;
+let _sysModalTrigger = null;
 function _recordError(type, msg) {
   try {
     const log = JSON.parse(localStorage.getItem(ERROR_LOG_KEY) || '[]');
@@ -477,6 +478,29 @@ window.onload = function () {
         }
       }
     }
+    if (e.key === 'Tab') {
+      var trapModal = document.getElementById('sysModal');
+      if (trapModal && trapModal.style.display !== 'none') {
+        var focusableEls = Array.from(
+          trapModal.querySelectorAll(
+            'button:not([disabled]),[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
+          )
+        ).filter(function (el) {
+          return el.offsetParent !== null;
+        });
+        if (focusableEls.length > 0) {
+          var first = focusableEls[0];
+          var last = focusableEls[focusableEls.length - 1];
+          if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      }
+    }
     if (e.key === 'Escape') {
       const modal = document.getElementById('sysModal');
       if (modal && modal.style.display !== 'none') closeModal();
@@ -504,7 +528,7 @@ window.onload = function () {
             .trim();
           document.getElementById('modalTitle').innerText = `> PATCH NOTES: ${APP_VERSION}`;
           document.getElementById('modalContent').innerText = display;
-          document.getElementById('sysModal').style.display = 'flex';
+          _openSysModal();
         })
         .catch(e => console.error('Could not load changelog'));
     }
@@ -1024,17 +1048,29 @@ function showFullChangelog() {
       document.getElementById('modalContent').innerText = text
         .replace(/<!--[\s\S]*?-->/g, '')
         .trim();
-      document.getElementById('sysModal').style.display = 'flex';
+      _openSysModal();
     })
     .catch(() => {
       document.getElementById('modalTitle').innerText = '> SYSTEM CHANGELOG';
       document.getElementById('modalContent').innerText = '> [SYS-ALERT: CHANGELOG NOT FOUND]';
-      document.getElementById('sysModal').style.display = 'flex';
+      _openSysModal();
     });
 }
 
+function _openSysModal() {
+  _sysModalTrigger = document.activeElement || null;
+  var modal = document.getElementById('sysModal');
+  if (!modal) return;
+  modal.style.display = 'flex';
+  var closeBtn = modal.querySelector('.close-btn');
+  if (closeBtn) closeBtn.focus();
+}
 function closeModal() {
   document.getElementById('sysModal').style.display = 'none';
+  if (_sysModalTrigger && typeof _sysModalTrigger.focus === 'function') {
+    _sysModalTrigger.focus();
+  }
+  _sysModalTrigger = null;
 }
 
 function showErrorLog() {
@@ -1075,7 +1111,7 @@ function showErrorLog() {
       '\');showErrorLog()">' +
       'CLEAR LOGS</button></div>';
   }
-  modal.style.display = 'flex';
+  _openSysModal();
 }
 
 // ── G1: V.A.T.S. TACTICAL OVERLAY ────────────────────────────────
@@ -1171,7 +1207,7 @@ USE [VATS] COMMAND FOR CONTEXT-AWARE COMBAT ANALYSIS.
 </b>
 </div>`;
 
-  modal.style.display = 'flex';
+  _openSysModal();
 }
 
 const COMMAND_REGISTRY = [
@@ -1274,7 +1310,7 @@ function showHelpModal() {
         '</div>'
     ).join('') +
     '</div><p style="font-size:9px;opacity:0.6;margin-top:8px;">Type any command in the Comm-Link input to execute.</p>';
-  modal.style.display = 'flex';
+  _openSysModal();
 }
 function capStatMax(el) {
   const n = parseInt(el.value, 10);
@@ -1407,16 +1443,20 @@ function loadUI() {
     if (el) el.value = state.skills && state.skills[sk] !== undefined ? state.skills[sk] : 15;
   });
   // All limbs including head
+  var _limbNames = { la: 'Left Arm', ra: 'Right Arm', ll: 'Left Leg', rl: 'Right Leg', hd: 'Head' };
   ['la', 'ra', 'll', 'rl', 'hd'].forEach(k => {
     let btn = document.getElementById('btn_l_' + k);
     if (!btn) return;
-    if (state[k] === 'OK') {
+    const isCrippled = state[k] !== 'OK';
+    if (!isCrippled) {
       btn.className = 'limb-ok';
       btn.innerText = '[██████] OK';
     } else {
       btn.className = 'limb-crip limb-glitch';
       btn.innerText = '[░░░░░░] CRIP';
     }
+    btn.setAttribute('aria-pressed', isCrippled ? 'true' : 'false');
+    btn.setAttribute('aria-label', (_limbNames[k] || k) + ': ' + (isCrippled ? 'Crippled' : 'OK'));
   });
   updateKarmaUI();
   if (_isDirty('inv', { inv: state.inventory, f: _invFilter })) renderInventory();
@@ -1857,7 +1897,8 @@ function appendToChat(text, sender, isHistoryLoad = false) {
   // Build safe HTML once — escapes first, then applies formatting
   const fullHtml = escapeAndFormat(text);
 
-  if (sender === 'ai' && !isHistoryLoad) {
+  const _prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (sender === 'ai' && !isHistoryLoad && !_prefersReduced) {
     // Typewriter: reveal plain text with textContent (no parse cost, no XSS risk),
     // then swap to fully formatted innerHTML only once at animation end.
     const plainText = String(text)

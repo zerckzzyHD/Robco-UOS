@@ -101,7 +101,7 @@ function renderInventory() {
     .map(it => {
       const cat = (it.type || 'misc').toLowerCase();
       const typeTag = `<span class="tag" style="color:${typeColors[cat] || 'inherit'};">[${cat.toUpperCase()}]</span>`;
-      return `<li><button class="use-btn" data-use="${it._origIdx}" title="Quick-use: send [USE] ${escapeHtml(it.name)}">USE</button>${typeTag}<span class="inv-name">${parseInt(it.qty) || 0}x ${escapeHtml(it.name)} (${parseFloat(it.wgt) || 0} lb${parseInt(it.val) ? ' · ' + parseInt(it.val) + 'c' : ''})</span><button class="delete-btn" data-idx="${it._origIdx}">X</button></li>`;
+      return `<li><button class="use-btn" data-use="${it._origIdx}" title="Quick-use: send [USE] ${escapeHtml(it.name)}" aria-label="Use item: ${escapeHtml(it.name)}">USE</button>${typeTag}<span class="inv-name">${parseInt(it.qty) || 0}x ${escapeHtml(it.name)} (${parseFloat(it.wgt) || 0} lb${parseInt(it.val) ? ' · ' + parseInt(it.val) + 'c' : ''})</span><button class="delete-btn" data-idx="${it._origIdx}" aria-label="Remove ${escapeHtml(it.name)} from inventory">X</button></li>`;
     })
     .join('');
   lst.onclick = e => {
@@ -1524,10 +1524,10 @@ function renderFactionRep() {
       <span class="faction-card-counts">F:${famVal} / I:${infamyVal}</span>
       ${barHtml}
       <div class="faction-card-btns">
-        <button class="faction-btn faction-btn--fame" title="Fame +5" onclick="adjustFaction('${f.key}','fame',5)">F+</button>
-        <button class="faction-btn faction-btn--fame" title="Fame -5" onclick="adjustFaction('${f.key}','fame',-5)">F-</button>
-        <button class="faction-btn faction-btn--infamy" title="Infamy +5" onclick="adjustFaction('${f.key}','infamy',5)">I+</button>
-        <button class="faction-btn faction-btn--infamy" title="Infamy -5" onclick="adjustFaction('${f.key}','infamy',-5)">I-</button>
+        <button class="faction-btn faction-btn--fame" aria-label="Fame +5 for ${escapeHtml(f.name)}" onclick="adjustFaction('${f.key}','fame',5)">F+</button>
+        <button class="faction-btn faction-btn--fame" aria-label="Fame -5 for ${escapeHtml(f.name)}" onclick="adjustFaction('${f.key}','fame',-5)">F-</button>
+        <button class="faction-btn faction-btn--infamy" aria-label="Infamy +5 for ${escapeHtml(f.name)}" onclick="adjustFaction('${f.key}','infamy',5)">I+</button>
+        <button class="faction-btn faction-btn--infamy" aria-label="Infamy -5 for ${escapeHtml(f.name)}" onclick="adjustFaction('${f.key}','infamy',-5)">I-</button>
       </div>
     </div>`;
   }
