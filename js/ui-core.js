@@ -1482,6 +1482,67 @@ function showHelpModal() {
     '</div><p style="font-size:9px;opacity:0.6;margin-top:8px;">Type any command in the Comm-Link input to execute.</p>';
   _openSysModal();
 }
+
+// SAVE & DATA field manual — diegetic, game-agnostic copy (Protocol 38: no
+// game-specific literals; describes the save mechanics generically). Each save
+// action exposed by the SAVE MENU is documented here so the "?" affordance can
+// explain the whole panel. Rendered into the shared sysModal so it inherits the
+// WU-C4 focus-trap + ARIA dialog semantics for free.
+const SAVE_HELP = [
+  {
+    cmd: 'EXPORT SAVE',
+    desc: 'Writes your entire campaign to a downloadable archive file kept on your own device — your offline insurance against data loss. Store it anywhere.',
+  },
+  {
+    cmd: 'IMPORT SAVE',
+    desc: 'Loads a previously exported archive back into the terminal, automatically upgrading older archives to the current save format.',
+  },
+  {
+    cmd: 'RESTORE BACKUP',
+    desc: 'The terminal keeps several automatic rolling snapshots of recent states. Restore rewinds to the most recent intact snapshot if a save ever goes wrong.',
+  },
+  {
+    cmd: 'SAVE SLOTS (A / B / C)',
+    desc: 'Three named local slots held in this browser for quick save and load — no file needed. Saving to a slot overwrites only that slot.',
+  },
+  {
+    cmd: 'SAVE TO CLOUD',
+    desc: 'Signed-in operators only: uploads the current campaign to your private cloud vault as a new, additive entry. Existing cloud saves are never overwritten.',
+  },
+  {
+    cmd: 'SYNC LOCAL SLOTS → CLOUD',
+    desc: 'Pushes the local slots held in this browser up to your cloud vault in a single operation, so they are available on your other devices.',
+  },
+  {
+    cmd: 'LOAD FROM CLOUD',
+    desc: 'Pick any entry from the saves list to pull it back down. You are always asked to confirm before a loaded save replaces your current one.',
+  },
+  {
+    cmd: 'AUTO-SAVE',
+    desc: 'Your progress is written to this browser continuously in the background. These tools are for backups, transfers between devices, and recovery.',
+  },
+];
+
+function showSaveHelpModal() {
+  const modal = document.getElementById('sysModal');
+  const title = document.getElementById('modalTitle');
+  const content = document.getElementById('modalContent');
+  if (!modal || !title || !content) return;
+  title.innerText = '> SAVE & DATA — FIELD MANUAL';
+  content.innerHTML =
+    '<div class="cmd-registry">' +
+    SAVE_HELP.map(
+      c =>
+        '<div class="cmd-card"><span class="cmd-name">' +
+        escapeHtml(c.cmd) +
+        '</span><span class="cmd-desc">' +
+        escapeHtml(c.desc) +
+        '</span></div>'
+    ).join('') +
+    '</div>';
+  _openSysModal();
+}
+
 function capStatMax(el) {
   const n = parseInt(el.value, 10);
   if (!isNaN(n) && n > 10) el.value = '10';

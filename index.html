@@ -1652,8 +1652,24 @@
               class="input-group"
               style="margin-top: 15px; border-top: 1px dashed var(--robco-blue); padding-top: 10px"
             >
-              <div style="font-size: 10px; opacity: 0.55; margin-bottom: 5px; letter-spacing: 1px">
-                ALL SAVES
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  margin-bottom: 5px;
+                "
+              >
+                <div style="font-size: 10px; opacity: 0.55; letter-spacing: 1px">ALL SAVES</div>
+                <button
+                  class="action-btn btn-sm"
+                  onclick="showSaveHelpModal()"
+                  aria-label="Open save menu help"
+                  title="Save menu help"
+                  style="border-color: var(--robco-blue); color: var(--robco-blue)"
+                >
+                  [?]
+                </button>
               </div>
               <div id="savesListBody" style="font-size: 12px; margin-bottom: 4px"></div>
               <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px">

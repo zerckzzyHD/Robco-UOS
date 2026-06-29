@@ -1,9 +1,10 @@
-﻿## [Unreleased]<!-- Tests: 1236/1236 | Cache: robco-terminal-v2.6.0-r21 -->
+﻿## [Unreleased]<!-- Tests: 1243/1243 | Cache: robco-terminal-v2.6.0-r22 -->
 
 ### Added
 
 - Keyboard focus rings now appear on every interactive element — buttons, inputs, tabs, toggle switches, and expandable panels all show a green glow outline when you navigate with the keyboard. Mouse users see no change; focus rings only appear on keyboard or programmatic focus (`:focus-visible`).
 - All CRT flicker and scanline animations are now paused for users who have "reduce motion" enabled in their operating system — both the 6.7 Hz flicker and the faster 10 Hz variant exceed the WCAG seizure-risk threshold of 3 Hz, so they now freeze to a static scanline image when the motion preference is set.
+- Added a "?" help button to the save menu that opens a plain-language field manual for every save tool — Export Save, Import Save, Restore Backup, the A/B/C save slots, saving to and loading from the cloud, and how auto-save works. Tap it any time you're unsure what a save control does. The help opens in the standard pop-up, so it traps keyboard focus, closes on Escape, and returns focus to the button when dismissed.
 
 ### Fixed
 

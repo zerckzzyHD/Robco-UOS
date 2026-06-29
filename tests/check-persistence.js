@@ -1757,6 +1757,7 @@ header('Meta / Runner Parity');
     'Suite 100',
     'Suite 101',
     'Suite 102',
+    'Suite 103',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
@@ -10624,6 +10625,83 @@ header('Suite 102 — WU-B10 boot-drone autoplay timing');
     assert(
       played.length === 1 && played[0] === 'drone',
       '102.6: boot-active first gesture plays the drone exactly once; post-boot first gesture suppresses it (no detached drone)'
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 103 — WU-C13 SAVE MENU "?" help affordance (7 tests)
+//  A diegetic "?" button in the save panel header opens a help modal explaining
+//  each save action. Reuses the shared sysModal entry point (_openSysModal,
+//  WU-C4) so it inherits the focus-trap + ARIA dialog semantics. Game-agnostic
+//  copy (Protocol 38). These guards lock the affordance + its coverage.
+// ══════════════════════════════════════════════════════════════
+header('Suite 103 — WU-C13 SAVE MENU "?" help affordance');
+{
+  const uiCore103 = readFile('js/ui-core.js');
+  // The save-menu "?" button tag (attributes span lines; [^>] matches newlines).
+  const btnTag103 = (htmlSource.match(/<button\b[^>]*showSaveHelpModal[^>]*>/) || [''])[0];
+  let helpBody103 = '';
+  try {
+    helpBody103 = extractFunctionBody(uiCore103, 'showSaveHelpModal');
+  } catch (_) {}
+
+  // 103.1 the SAVE MENU "?" button exists and wires to showSaveHelpModal()
+  assert(
+    /onclick="showSaveHelpModal\(\)"/.test(htmlSource) && btnTag103 !== '',
+    '103.1: SAVE MENU "?" button present in index.html with onclick="showSaveHelpModal()"'
+  );
+
+  // 103.2 the button has a descriptive aria-label (not a bare "[?]" for AT)
+  assert(
+    /aria-label="[^"]+"/.test(btnTag103),
+    '103.2: save-menu "?" button has a descriptive aria-label (screen-reader operable)'
+  );
+
+  // 103.3 ≥28px tap target via the shared .btn-sm hook (Protocol 17)
+  assert(
+    /\bbtn-sm\b/.test(btnTag103),
+    '103.3: save-menu "?" button uses .btn-sm (≥28px min tap target — Protocol 17)'
+  );
+
+  // 103.4 showSaveHelpModal defined and reuses _openSysModal (WU-C4 focus-trap + ARIA)
+  assert(
+    /function showSaveHelpModal\s*\(/.test(uiCore103) &&
+      /_openSysModal\s*\(\s*\)/.test(helpBody103),
+    '103.4: showSaveHelpModal() defined and opens via _openSysModal() (inherits WU-C4 focus-trap + ARIA dialog)'
+  );
+
+  // 103.5 the help documents every save action the SAVE MENU exposes
+  {
+    const saveHelp103 = (uiCore103.match(/const SAVE_HELP\s*=\s*\[[\s\S]*?\n\];/) || [''])[0];
+    const documents = [
+      'EXPORT SAVE',
+      'IMPORT SAVE',
+      'RESTORE BACKUP',
+      'SAVE SLOTS',
+      'SAVE TO CLOUD',
+      'LOAD FROM CLOUD',
+    ];
+    const missing103 = documents.filter(d => !saveHelp103.includes(d));
+    assert(
+      saveHelp103 !== '' && missing103.length === 0,
+      '103.5: SAVE_HELP documents every save action (export/import/restore/slots/cloud push+pull)' +
+        (missing103.length ? ' — missing: ' + missing103.join(', ') : '')
+    );
+  }
+
+  // 103.6 help text is escaped before innerHTML injection (XSS safety, Protocol 24)
+  assert(
+    /escapeHtml\(c\.cmd\)/.test(helpBody103) && /escapeHtml\(c\.desc\)/.test(helpBody103),
+    '103.6: showSaveHelpModal() escapes help text via escapeHtml() before innerHTML injection'
+  );
+
+  // 103.7 game-agnostic (Protocol 38): no game-specific literals in the help copy
+  {
+    const saveHelp103b = (uiCore103.match(/const SAVE_HELP\s*=\s*\[[\s\S]*?\n\];/) || [''])[0];
+    assert(
+      !/\bFNV\b|\bFO3\b|Fallout|New Vegas|Vault-Tec/.test(saveHelp103b),
+      '103.7: SAVE_HELP copy is game-agnostic — no FNV/FO3/Fallout/New Vegas literals (Protocol 38)'
     );
   }
 }
