@@ -1637,17 +1637,18 @@ header('Meta / Runner Parity');
     'Suite 87',
     'Suite 88',
     'Suite 89',
+    'Suite 90',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-89)' +
+    'JS runner contains all gate-guard suites (22-41, 49-90)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-89)' +
+    'PS runner contains all gate-guard suites (22-41, 49-90)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -8963,6 +8964,35 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     /Protocol 38/.test(rulesSrc89),
     'GATE-AGNOSTIC-12: RULES.md contains Protocol 38 (game-agnostic feature code)'
   );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 90 — UTF-8 CORRUPTION GUARD: no symbol double-encoding (8 tests)
+// ══════════════════════════════════════════════════════════════
+{
+  // Detect double-encoding caused by reading UTF-8 as Windows-1252 then re-encoding.
+  // â€ is the first two chars of any double-encoded E2-80-xx UTF-8 sequence
+  // (em-dash, en-dash, curly quotes, etc.). â– covers E2-96-xx box-drawing
+  // (U+25B2 triangle, U+2588 full-block, etc.). � is the replacement character.
+  const MOJIBAKE90 = /�|â€|â–/;
+  const srcFiles90 = [
+    '../js/api.js',
+    '../js/state.js',
+    '../js/ui-core.js',
+    '../js/ui-render.js',
+    '../js/ui-saves.js',
+    '../js/ui-audio.js',
+    '../js/ui-account.js',
+    '../index.html',
+  ];
+  srcFiles90.forEach((rel, i) => {
+    const label = rel.replace('../', '');
+    const src = fs.readFileSync(path.join(__dirname, rel), 'utf8');
+    assert(
+      !MOJIBAKE90.test(src),
+      `GATE-CORRUPT-${i + 1}: ${label} has no U+FFFD or \\u00E2\\u20AC/\\u00E2\\u2013 mojibake (double-encoded UTF-8 from PowerShell write)`
+    );
+  });
 }
 
 // ══════════════════════════════════════════════════════════════

@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1098/1098 | Cache: robco-terminal-v2.6.0-r3 -->
+﻿## [Unreleased]<!-- Tests: 1106/1106 | Cache: robco-terminal-v2.6.0-r4 -->
 
 ### Under the Hood
 
@@ -6,6 +6,8 @@
 - Context-switching and faction lookups now use game definitions data instead of hard-coded lists of game names, making it easier to add new games in the future.
 - Added Protocol 38 (game-agnostic feature code rule) to the engineering guide.
 - Added Suite 89 (12 regression tests) guarding the game-agnostic refactors above.
+- Fixed symbol corruption in the AI system directive introduced during that edit: em-dashes, arrows, and special characters were double-encoded due to a PowerShell Latin-1 write. All source files are now verified clean.
+- Added Suite 90 (8 regression tests) that permanently guard against UTF-8 double-encoding — the gate now fails if any source file contains the U+FFFD replacement character or the â€/â– mojibake sequences that indicate a corrupted PowerShell write.
 
 ---
 
