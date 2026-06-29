@@ -1647,17 +1647,18 @@ header('Meta / Runner Parity');
     'Suite 93',
     'Suite 94',
     'Suite 95',
+    'Suite 96',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-95)' +
+    'JS runner contains all gate-guard suites (22-41, 49-96)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
   assert(
     psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-95)' +
+    'PS runner contains all gate-guard suites (22-41, 49-96)' +
       (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
   );
 
@@ -9379,6 +9380,85 @@ header('Suite 95 — Save-Load Reload Guard (import clobber regression)');
     } else {
       fail('95.7: behavioral import round-trip — sanitizeImportedContainer could not be evaluated');
     }
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 96 — test.html RUNTIME MIRROR PARITY (8 tests)
+//  Protocol 40: the browser-side runtime audit (tests/test.html) must stay in
+//  sync with the live import contract and the canonical runners. These guards
+//  fail if test.html drifts — wrong boot chain, stale dead stubs, a suite-count
+//  that no longer matches reality, or the headless runner being removed from the
+//  gate. Combined with the executed audit (tests/test-html-check.mjs in the gate),
+//  test.html can no longer silently rot.
+// ══════════════════════════════════════════════════════════════
+header('Suite 96 — test.html Runtime Mirror Parity');
+{
+  const th = readFile('tests/test.html');
+  const gate96 = readFile('scripts/gate.js');
+
+  // 96.1  test.html exists and is the runtime persistence audit
+  assert(
+    /PERSISTENCE AUDIT/i.test(th) && /autoImportState/.test(th),
+    '96.1: tests/test.html is the runtime persistence audit (executes autoImportState)'
+  );
+
+  // 96.2  test.html loads the current FNV boot chain in order (db → state → reg → registry-core → api)
+  {
+    const chain = ['db_nv.js', 'state.js', 'reg_nv.js', 'registry-core.js', 'api.js'];
+    const missing = chain.filter(f => !th.includes('../js/' + f));
+    assert(
+      missing.length === 0,
+      '96.2: test.html loads the current boot chain (db_nv, state, reg_nv, registry-core, api)' +
+        (missing.length ? ' — missing: ' + missing.join(', ') : '')
+    );
+  }
+
+  // 96.3  declared "Suites: N" marker matches the actual number of section() calls
+  {
+    const declared = th.match(/Suites:\s*(\d+)/);
+    // Count section('...') CALLS only — exclude the `function section(` definition.
+    const actual = (th.match(/section\('/g) || []).length;
+    assert(
+      declared && parseInt(declared[1], 10) === actual,
+      `96.3: test.html "Suites: N" marker matches actual section() count` +
+        (declared ? ` (declared ${declared[1]}, actual ${actual})` : ' (marker missing)')
+    );
+  }
+
+  // 96.4  exercises the current import-contract entry points
+  assert(
+    /autoImportState/.test(th) && /sanitizeImportedContainer/.test(th),
+    '96.4: test.html exercises autoImportState + sanitizeImportedContainer (current import contract)'
+  );
+
+  // 96.5  game-agnostic — uses the context-aware getters, not hardcoded registries (Protocol 38)
+  assert(
+    /getFactionRegistry\(\)/.test(th) && /getSkillKeys\(\)/.test(th) && /GAME_DEFS/.test(th),
+    '96.5: test.html uses getFactionRegistry()/getSkillKeys()/GAME_DEFS (game-agnostic, Protocol 38)'
+  );
+
+  // 96.6  no stale dead references (old stubs removed in the r10 refresh must not return)
+  assert(
+    !/renderSkillMatrix|updateKarmaUI/.test(th),
+    '96.6: test.html has no stale dead stubs (renderSkillMatrix / updateKarmaUI removed)'
+  );
+
+  // 96.7  the headless runner exists AND the gate invokes it
+  assert(
+    fs.existsSync(path.join(__dirname, 'test-html-check.mjs')) &&
+      /test-html-check\.mjs/.test(gate96),
+    '96.7: tests/test-html-check.mjs exists and scripts/gate.js runs it (test.html executed in gate)'
+  );
+
+  // 96.8  Protocol 40 is codified in RULES.md and CLAUDE.md
+  {
+    const rules96 = readFile('RULES.md');
+    const claude96 = readFile('CLAUDE.md');
+    assert(
+      /Protocol 40/.test(rules96) && /Protocol 40/.test(claude96),
+      '96.8: Protocol 40 (test.html sync) present in RULES.md and CLAUDE.md'
+    );
   }
 }
 

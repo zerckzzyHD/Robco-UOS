@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1148/1148 | Cache: robco-terminal-v2.6.0-r9 -->
+﻿## [Unreleased]<!-- Tests: 1156/1156 | Cache: robco-terminal-v2.6.0-r9 -->
 
 ### Fixed
 
@@ -21,6 +21,7 @@
 
 ### Under the Hood
 
+- Refreshed the in-browser test page (`tests/test.html`) so it once again matches how the app actually loads and imports saves — it had drifted badly and would have failed if run. It now executes the real import logic across 10 suites (field import, factions, skills, collections, clamping, registry-validated trackers, save-file sanitising, and the save-load path), and it now runs automatically in the build gate so it can never silently fall out of date again. Added a new project rule (Protocol 40) and a build check (Suite 96) that keep it in sync going forward.
 - Added Suite 95 (7 regression tests) permanently guarding the save-load fix above: the exit-save flush and debounced save are both gated by the new load-in-progress flag, each of the three load paths sets that flag before reloading, the working game-switch path keeps its own guard, and a behavioral test imports a save container and asserts the loaded state reflects the file.
 - Added Suite 94 (10 regression tests) permanently guarding the accessibility changes above: `:focus-visible` CSS rule present, `prefers-reduced-motion` block with correct freeze parameters, `aria-live` on the chat display, `role=dialog`/`aria-modal` on the system modal, and the `_openSysModal()` focus-management helper.
 - Extended Suite 92 with a test for the macro-button nowrap guard (now 5 tests total).

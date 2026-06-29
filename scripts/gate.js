@@ -7,7 +7,7 @@
  *   npm run gate       — full gate (lint + format + tests + browser checks)
  *   npm run gate:fast  — fast gate (lint + format + tests; browser checks skipped)
  *
- * Steps (full; --fast skips steps 5-8):
+ * Steps (full; --fast skips steps 5-9):
  *   1. ESLint (--max-warnings 0)
  *   2. Prettier format check
  *   3. Persistence audit — Node runner
@@ -16,6 +16,7 @@
  *   6. Boot smoke test (HTTP)                     ← skipped by --fast
  *   7. Render check (360px & 412px)               ← skipped by --fast
  *   8. A11y check (axe serious/critical baseline) ← skipped by --fast
+ *   9. Runtime audit — test.html headless         ← skipped by --fast
  */
 'use strict';
 
@@ -124,6 +125,11 @@ if (!fast) {
 
   // ── 8. A11y check ─────────────────────────────────────────────────────────────
   run('A11y (axe serious/critical)', 'node tests/a11y-check.mjs');
+
+  // ── 9. Browser-side persistence audit (test.html) ─────────────────────────────
+  // Executes tests/test.html headless and asserts every suite passes + the
+  // declared suite count matches reality (Protocol 40 — keeps test.html in sync).
+  run('Runtime audit (test.html)', 'node tests/test-html-check.mjs');
 }
 
 console.log(

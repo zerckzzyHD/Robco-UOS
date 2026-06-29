@@ -269,6 +269,7 @@ export default [
       'tests/render-check.mjs',
       'tests/boot-smoke.mjs',
       'tests/a11y-check.mjs',
+      'tests/test-html-check.mjs',
       'tests/_diag*.mjs',
     ],
   },

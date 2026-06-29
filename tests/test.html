@@ -2,22 +2,32 @@
 <!--
     RobCo Persistence Audit — tests/test.html
     ==========================================
-    Runtime round-trip test. Loads the actual source JS, sets every state field
-    to a non-default value, serialises it, resets to defaults, imports it back,
-    and verifies every field survived unchanged.
+    BROWSER-SIDE RUNTIME MIRROR of the canonical static runners
+    (tests/check-persistence.js + tests/check-persistence.ps1).
 
-    Open this file in a browser. No server needed, no install needed.
-    Automatically discovers all state keys from Object.keys(state).
-    If a new field is added to state but not handled by autoImportState(),
-    that field's test will show FAIL.
+    Where the canonical runners statically analyse the source, this page
+    actually EXECUTES the live import contract in a real browser: it loads the
+    same boot chain the app loads (db → state → reg → registry-core → api),
+    drives autoImportState() / sanitizeImportedContainer() with realistic
+    payloads, and asserts the resulting state matches the CURRENT contract
+    (status tick-down, squad/inventory normalisation, registry validation,
+    SPECIAL/skill clamping, the v8 container + boot-merge used by IMPORT SAVE).
+
+    Open this file in a browser — no server, no install needed. It is also
+    executed headless in the gate via tests/test-html-check.mjs, which asserts
+    every suite passes and that the declared suite count below stays in sync.
+
+    KEEP IN SYNC — Protocol 40: whenever the import contract, the state schema,
+    or the canonical suites change, update this file in the SAME commit and bump
+    the suite count marker. The gate fails on drift.
+
+    Suites: 10
 -->
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>RobCo — Persistence Audit</title>
+    <title>RobCo — Persistence Audit (Runtime)</title>
     <style>
-      @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
-
       *,
       *::before,
       *::after {
@@ -32,13 +42,12 @@
         --amber: #f0a500;
         --dim: rgba(20, 253, 206, 0.4);
         --bg: #010a07;
-        --panel: rgba(0, 30, 15, 0.9);
       }
 
       body {
         background: var(--bg);
         color: var(--green);
-        font-family: 'Share Tech Mono', monospace;
+        font-family: 'Share Tech Mono', 'Consolas', monospace;
         font-size: 13px;
         padding: 24px;
         line-height: 1.6;
@@ -99,6 +108,7 @@
         font-size: 11px;
         opacity: 0.55;
         margin-left: 56px;
+        color: var(--amber);
       }
 
       #summary {
@@ -126,57 +136,54 @@
       }
     </style>
 
-    <!-- ═══════════════════════════════════════════════════════
-         MOCKS — must load before state.js / api.js
-         These stub the ui.js globals that autoImportState()
-         calls internally. They are intentional no-ops.
-    ════════════════════════════════════════════════════════ -->
+    <!-- ============================================================
+         MOCKS — must load before the boot chain.
+         Stub the ui-*.js globals that autoImportState() calls so the
+         import contract runs without the full UI. Intentional no-ops.
+    ============================================================= -->
     <script>
       window.chatHistory = [];
       window.CHAT_MAX = 200;
       window._chatSaveTimer = null;
 
-      // UI functions called by autoImportState — stubbed as no-ops
+      // UI / audio functions called by autoImportState — stubbed as no-ops.
+      // (Keep this list aligned with the external calls inside autoImportState.)
       window.loadUI = function () {};
       window.appendToChat = function () {};
-      window.triggerPhosphorGhost = function () {};
-      window.updateMath = function () {};
-      window.renderInventory = function () {};
-      window.renderSquad = function () {};
-      window.renderStatus = function () {};
-      window.renderCampaignNotes = function () {};
-      window.renderFactionRep = function () {};
-      window.updateKarmaUI = function () {};
-      window.renderSkillMatrix = function () {};
-      window.setGeigerRate = function () {};
-      window.startTinnitus = function () {};
-      window.stopTinnitus = function () {};
+      window.expandPanelForCategory = function () {};
+      window.playLevelUpJingle = function () {};
+      window.playQuestCompleteSound = function () {};
+      window.playQuestFailSound = function () {};
+      window.playFactionThresholdSound = function () {};
+      window.playSyncTone = function () {};
 
-      // Stub syncStateFromDom so exportSaveFile doesn't break on missing DOM
-      // The test builds the export payload manually instead.
+      // exportSaveFile / saveState sync from the DOM — stubbed; tests build
+      // payloads directly rather than reading form fields.
       window.syncStateFromDom = function () {};
     </script>
 
-    <!-- Source files — same ones the live site uses -->
+    <!-- Boot chain — same files, same order as the live FNV boot in index.html:
+         db → state → reg → registry-core, then api. -->
+    <script src="../js/db_nv.js"></script>
     <script src="../js/state.js"></script>
+    <script src="../js/reg_nv.js"></script>
+    <script src="../js/registry-core.js"></script>
     <script src="../js/api.js"></script>
   </head>
   <body>
-    <h1>[ROBCO U.O.S. — PERSISTENCE AUDIT]</h1>
+    <h1>[ROBCO U.O.S. — PERSISTENCE AUDIT / RUNTIME]</h1>
     <div class="subtitle">
-      Runtime round-trip test. Discovers state keys automatically from Object.keys(state).
+      Executes the live import contract (autoImportState + sanitizeImportedContainer) and asserts
+      the resulting state. Browser-side mirror of tests/check-persistence.{js,ps1}.
     </div>
 
     <div id="output"></div>
     <div id="summary"></div>
 
     <div class="note">
-      How this test catches new fields automatically:<br />
-      1. Reads Object.keys(state) — every field the live app stores.<br />
-      2. Serialises the full state, resets to defaults, calls autoImportState().<br />
-      3. Compares each key before and after. Missing handler in autoImportState() → FAIL.<br />
-      <br />
-      For static analysis (no browser needed): run tests\check-persistence.ps1
+      For static analysis (no browser needed): run tests/check-persistence.js or
+      tests/check-persistence.ps1.<br />
+      This page is run headless in the gate by tests/test-html-check.mjs.
     </div>
 
     <script>
@@ -186,21 +193,21 @@
       const out = document.getElementById('output');
       let passed = 0;
       let failed = 0;
+      let suiteCount = 0;
 
       function section(title) {
+        suiteCount++;
         const h = document.createElement('div');
         h.className = 'section-header';
         h.textContent = `── ${title}`;
         out.appendChild(h);
       }
 
-      function row(ok, label, detail) {
+      function assert(ok, label, detail) {
         const d = document.createElement('div');
         d.className = `row ${ok ? 'pass' : 'fail'}`;
-        d.innerHTML = `
-        <span class="badge">[${ok ? 'PASS' : 'FAIL'}]</span>
-        <span class="label">${label}</span>
-    `;
+        d.innerHTML = `<span class="badge">[${ok ? 'PASS' : 'FAIL'}]</span><span class="label"></span>`;
+        d.querySelector('.label').textContent = label;
         out.appendChild(d);
         if (!ok && detail) {
           const dd = document.createElement('div');
@@ -211,208 +218,429 @@
         ok ? passed++ : failed++;
       }
 
-      function assert(ok, label, detail) {
-        row(ok, label, detail);
+      const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+      // Reset live state to pristine defaults before each import scenario.
+      function resetState() {
+        Object.keys(state).forEach(k => delete state[k]);
+        Object.assign(state, JSON.parse(JSON.stringify(window._defaultState)));
       }
 
-      // ── Deep equal check ───────────────────────────────────────────
-      function deepEqual(a, b) {
-        return JSON.stringify(a) === JSON.stringify(b);
-      }
+      try {
+        // ══════════════════════════════════════════════════════════════
+        //  Suite 0 — Discovery & API surface (new-field tripwire)
+        // ══════════════════════════════════════════════════════════════
+        section('Suite 0 — Discovery & API surface');
 
-      // ── Clone and reset ────────────────────────────────────────────
-      function resetStateToDefaults() {
-        state.lvl = 1;
-        state.xp = 0;
-        state.hpCur = 100;
-        state.hpMax = 100;
-        state.s = 5;
-        state.p = 5;
-        state.e = 5;
-        state.c = 5;
-        state.i = 5;
-        state.a = 5;
-        state.l = 5;
-        state.caps = 0;
-        state.loc = 'Goodsprings';
-        state.rads = 0;
-        state.karma = 0;
+        assert(typeof autoImportState === 'function', 'autoImportState() is available');
+        assert(
+          typeof sanitizeImportedContainer === 'function',
+          'sanitizeImportedContainer() is available'
+        );
+        assert(
+          typeof getFactionRegistry === 'function' && typeof getSkillKeys === 'function',
+          'game-agnostic getters getFactionRegistry() / getSkillKeys() are available'
+        );
+        assert(
+          typeof GAME_DEFS === 'object' && GAME_DEFS.FNV && GAME_DEFS.FO3,
+          `GAME_DEFS loaded with games: [ ${Object.keys(GAME_DEFS).join(', ')} ]`
+        );
+        assert(
+          typeof FALLOUT_REGISTRY === 'object' && Array.isArray(FALLOUT_REGISTRY.collectibles),
+          'FALLOUT_REGISTRY loaded (per-game reg file present)'
+        );
+
+        // New-field tripwire: every discovered state key must be KNOWN to this test.
+        // A new field added to state.js that is not listed here fails the suite,
+        // forcing the dev to wire + test it (the test.html analogue of Protocol 4).
+        const KNOWN_KEYS = new Set([
+          'lvl',
+          'xp',
+          'hpCur',
+          'hpMax',
+          's',
+          'p',
+          'e',
+          'c',
+          'i',
+          'a',
+          'l',
+          'caps',
+          'loc',
+          'rads',
+          'karma',
+          'ticks',
+          'la',
+          'ra',
+          'll',
+          'rl',
+          'hd',
+          'factions',
+          'skills',
+          'status',
+          'inventory',
+          'squad',
+          'campaign_notes',
+          'perks',
+          'quests',
+          'equipped',
+          'ammo',
+          'stats',
+          'locationHistory',
+          'gameContext',
+          'collectibles',
+          'lincolnItems',
+          'traits',
+          'skillBooks',
+          'magazines',
+          'campaignMode',
+          'playthroughType',
+          'mapView',
+        ]);
+        const discovered = Object.keys(state);
+        const unknown = discovered.filter(k => !KNOWN_KEYS.has(k));
+        assert(
+          unknown.length === 0,
+          `all ${discovered.length} discovered state keys are known to this test`,
+          unknown.length ? `UNKNOWN (add to KNOWN_KEYS + cover it): ${unknown.join(', ')}` : null
+        );
+
+        // ══════════════════════════════════════════════════════════════
+        //  Suite 1 — Scalar fields round-trip through autoImportState
+        // ══════════════════════════════════════════════════════════════
+        section('Suite 1 — Scalar field import');
+
+        resetState();
+        autoImportState(
+          JSON.stringify({
+            lvl: 15,
+            xp: 7500,
+            hpCur: 63,
+            hpMax: 130,
+            s: 8,
+            p: 6,
+            e: 9,
+            c: 4,
+            i: 7,
+            a: 9,
+            l: 3,
+            caps: 8421,
+            loc: 'Boulder City',
+            rads: 420,
+            karma: -200,
+            ticks: 960,
+            la: 'CRIPPLED',
+            ra: 'OK',
+            ll: 'OK',
+            rl: 'CRIPPLED',
+            hd: 'CRIPPLED',
+          })
+        );
+        const scalarExpect = {
+          lvl: 15,
+          xp: 7500,
+          hpCur: 63,
+          hpMax: 130,
+          s: 8,
+          p: 6,
+          e: 9,
+          c: 4,
+          i: 7,
+          a: 9,
+          l: 3,
+          caps: 8421,
+          loc: 'Boulder City',
+          rads: 420,
+          karma: -200,
+          ticks: 960,
+          la: 'CRIPPLED',
+          ra: 'OK',
+          ll: 'OK',
+          rl: 'CRIPPLED',
+          hd: 'CRIPPLED',
+        };
+        Object.keys(scalarExpect).forEach(k => {
+          assert(
+            state[k] === scalarExpect[k],
+            `state.${k} = ${scalarExpect[k]}`,
+            `Got ${state[k]}`
+          );
+        });
+
+        // ══════════════════════════════════════════════════════════════
+        //  Suite 2 — Factions (game-agnostic via getFactionRegistry)
+        // ══════════════════════════════════════════════════════════════
+        section('Suite 2 — Faction reputation import');
+
+        resetState();
+        const facReg = getFactionRegistry();
+        const facPayload = {};
+        facReg.forEach((f, idx) => {
+          facPayload[f.key] = { fame: (idx + 1) * 15, infamy: (idx + 1) * 7 };
+        });
+        autoImportState(JSON.stringify({ factions: facPayload }));
+        facReg.forEach((f, idx) => {
+          const exp = { fame: (idx + 1) * 15, infamy: (idx + 1) * 7 };
+          assert(
+            eq(state.factions[f.key], exp),
+            `factions.${f.key} fame=${exp.fame} infamy=${exp.infamy}`,
+            `Got ${JSON.stringify(state.factions[f.key])}`
+          );
+        });
+
+        // ══════════════════════════════════════════════════════════════
+        //  Suite 3 — Skills (game-agnostic via getSkillKeys)
+        // ══════════════════════════════════════════════════════════════
+        section('Suite 3 — Skill import');
+
+        resetState();
+        const skillKeys = getSkillKeys();
+        const skillPayload = {};
+        skillKeys.forEach((sk, idx) => {
+          skillPayload[sk] = 20 + idx * 4;
+        });
+        autoImportState(JSON.stringify({ skills: skillPayload }));
+        skillKeys.forEach((sk, idx) => {
+          const exp = 20 + idx * 4;
+          assert(state.skills[sk] === exp, `skills.${sk} = ${exp}`, `Got ${state.skills[sk]}`);
+        });
+
+        // ══════════════════════════════════════════════════════════════
+        //  Suite 4 — Collection fields (current normalised shapes)
+        // ══════════════════════════════════════════════════════════════
+        section('Suite 4 — Collections (inventory / squad / perks / quests / notes / ammo)');
+
+        resetState();
+        autoImportState(
+          JSON.stringify({
+            inventory: [
+              { name: 'Plasma Rifle', qty: 1, wgt: 5, val: 3800, type: 'weapon' },
+              { name: 'Stimpak', qty: 8, wgt: 0.5, val: 75, type: 'aid' },
+            ],
+            squad: [
+              { name: 'Boone', hp: 80, hpMax: 100, ammo: 30, condition: 'Good', weapon: null },
+            ],
+            perks: [{ name: 'Toughness', rank: 2, level_taken: 6 }],
+            quests: [
+              {
+                name: 'Ring-a-Ding-Ding!',
+                status: 'active',
+                objective: 'Find Benny',
+                factions: null,
+              },
+            ],
+            campaign_notes: ['Left Goodsprings.', 'Benny sighted in New Vegas.'],
+            ammo: { '5.56mm': 120, '10mm': 45 },
+            equipped: { weapon: 'Plasma Rifle', armor: 'Combat Armor', headgear: null },
+          })
+        );
+        assert(
+          state.inventory.length === 2 &&
+            eq(state.inventory[0], {
+              name: 'Plasma Rifle',
+              qty: 1,
+              wgt: 5,
+              val: 3800,
+              type: 'weapon',
+            }),
+          'inventory normalised to { name, qty, wgt, val, type }',
+          JSON.stringify(state.inventory[0])
+        );
+        assert(
+          state.squad.length === 1 &&
+            state.squad[0].name === 'Boone' &&
+            state.squad[0].weapon === null &&
+            state.squad[0].condition === 'Good',
+          'squad normalised (name/hp/hpMax/ammo/condition/weapon)',
+          JSON.stringify(state.squad[0])
+        );
+        assert(
+          eq(state.perks[0], { name: 'Toughness', rank: 2, level_taken: 6 }),
+          'perks normalised to { name, rank, level_taken }',
+          JSON.stringify(state.perks[0])
+        );
+        assert(
+          state.quests[0].name === 'Ring-a-Ding-Ding!' && state.quests[0].status === 'active',
+          'quests normalised to { name, status, objective, factions }',
+          JSON.stringify(state.quests[0])
+        );
+        assert(
+          eq(state.campaign_notes, ['Left Goodsprings.', 'Benny sighted in New Vegas.']),
+          'campaign_notes preserved'
+        );
+        assert(
+          eq(state.ammo, { '5.56mm': 120, '10mm': 45 }),
+          'ammo object preserved',
+          JSON.stringify(state.ammo)
+        );
+        assert(
+          eq(state.equipped, { weapon: 'Plasma Rifle', armor: 'Combat Armor', headgear: null }),
+          'equipped slots preserved (null headgear via "key in obj")',
+          JSON.stringify(state.equipped)
+        );
+
+        // ══════════════════════════════════════════════════════════════
+        //  Suite 5 — Boundary clamping in autoImportState
+        // ══════════════════════════════════════════════════════════════
+        section('Suite 5 — Boundary clamping');
+
+        resetState();
+        autoImportState(
+          JSON.stringify({
+            s: 15, // SPECIAL clamps to 1..10
+            p: -1,
+            skills: { barter: 150, sneak: -5 }, // skills clamp 0..100
+            factions: { ncr: { fame: -50, infamy: -10 } }, // fame/infamy clamp >= 0
+          })
+        );
+        assert(state.s === 10, `SPECIAL upper clamp: s=${state.s} (max 10)`);
+        assert(state.p === 1, `SPECIAL lower clamp: p=${state.p} (min 1)`);
+        assert(state.skills.barter === 100, `skill upper clamp: barter=${state.skills.barter}`);
+        assert(state.skills.sneak === 0, `skill lower clamp: sneak=${state.skills.sneak}`);
+        assert(
+          state.factions.ncr.fame === 0 && state.factions.ncr.infamy === 0,
+          `faction fame/infamy clamped >= 0`,
+          JSON.stringify(state.factions.ncr)
+        );
+
+        // ══════════════════════════════════════════════════════════════
+        //  Suite 6 — Registry-validated trackers (Protocol 24)
+        // ══════════════════════════════════════════════════════════════
+        section('Suite 6 — Registry-validated trackers');
+
+        resetState();
+        autoImportState(
+          JSON.stringify({
+            collectibles: ['Goodsprings', 'NOT_A_REAL_GLOBE', 'Goodsprings'], // invalid + dup dropped
+            traits: ['Built to Destroy', 'FAKE TRAIT'],
+            skillBooks: ['Tales of a Junktown Jerky Vendor', 'Made-Up Book'],
+            magazines: ['Boxing Times', 'Fake Mag'],
+          })
+        );
+        assert(
+          eq(state.collectibles, ['Goodsprings']),
+          'collectibles: invalid + duplicate filtered out',
+          JSON.stringify(state.collectibles)
+        );
+        assert(
+          eq(state.traits, ['Built to Destroy']),
+          'traits: only registry names kept',
+          JSON.stringify(state.traits)
+        );
+        assert(
+          eq(state.skillBooks, ['Tales of a Junktown Jerky Vendor']),
+          'skillBooks: only registry names kept',
+          JSON.stringify(state.skillBooks)
+        );
+        assert(
+          eq(state.magazines, ['Boxing Times']),
+          'magazines: only registry names kept',
+          JSON.stringify(state.magazines)
+        );
+
+        // ══════════════════════════════════════════════════════════════
+        //  Suite 7 — Import side-effects (current contract behaviour)
+        // ══════════════════════════════════════════════════════════════
+        section('Suite 7 — Import side-effects (tick-down / location history)');
+
+        // Permanent effects (ticks: 0) survive; timed effects tick down and expire.
+        resetState();
         state.ticks = 0;
-        state.la = 'OK';
-        state.ra = 'OK';
-        state.ll = 'OK';
-        state.rl = 'OK';
-        state.hd = 'OK';
-        state.status = [];
-        state.inventory = [];
-        state.squad = [];
-        state.campaign_notes = [];
-        FACTION_REGISTRY.forEach(f => {
-          state.factions[f.key] = { fame: 0, infamy: 0 };
-        });
-        SKILL_KEYS.forEach(sk => {
-          state.skills[sk] = 15;
-        });
-      }
-
-      // ══════════════════════════════════════════════════════════════
-      //  SUITE 0 — Discovery
-      // ══════════════════════════════════════════════════════════════
-      section('Suite 0 — Auto-discovery');
-
-      const discoveredKeys = Object.keys(state);
-      assert(
-        discoveredKeys.length > 0,
-        `Discovered ${discoveredKeys.length} top-level state keys: [ ${discoveredKeys.join(', ')} ]`
-      );
-      assert(
-        typeof FACTION_REGISTRY !== 'undefined' && FACTION_REGISTRY.length > 0,
-        `FACTION_REGISTRY loaded with ${typeof FACTION_REGISTRY !== 'undefined' ? FACTION_REGISTRY.length : 0} factions`
-      );
-      assert(
-        typeof SKILL_KEYS !== 'undefined' && SKILL_KEYS.length > 0,
-        `SKILL_KEYS loaded with ${typeof SKILL_KEYS !== 'undefined' ? SKILL_KEYS.length : 0} skills`
-      );
-      assert(typeof autoImportState === 'function', 'autoImportState() is available');
-
-      // ══════════════════════════════════════════════════════════════
-      //  SUITE 1 — Round-trip: every state key survives export/import
-      // ══════════════════════════════════════════════════════════════
-      section('Suite 1 — Full round-trip (every field)');
-
-      // Populate state with non-default, distinct values
-      state.lvl = 15;
-      state.xp = 7500;
-      state.hpCur = 63;
-      state.hpMax = 130;
-      state.s = 8;
-      state.p = 6;
-      state.e = 9;
-      state.c = 4;
-      state.i = 7;
-      state.a = 9;
-      state.l = 3;
-      state.caps = 8421;
-      state.loc = 'Boulder City';
-      state.rads = 420;
-      state.karma = -200;
-      state.ticks = 960;
-      state.la = 'CRIPPLED';
-      state.ra = 'OK';
-      state.ll = 'OK';
-      state.rl = 'CRIPPLED';
-      state.hd = 'CRIPPLED';
-
-      FACTION_REGISTRY.forEach((f, idx) => {
-        state.factions[f.key] = { fame: (idx + 1) * 15, infamy: (idx + 1) * 7 };
-      });
-      SKILL_KEYS.forEach((sk, idx) => {
-        state.skills[sk] = 20 + idx * 4;
-      });
-
-      state.status = [
-        { name: 'Hydra', ticks: 5, type: 'BUFF' },
-        { name: 'Crippled', ticks: 0, type: 'DEBUFF' },
-      ];
-      state.inventory = [
-        { name: '10mm Pistol', qty: 1, weight: 2.5, value: 200 },
-        { name: 'Stimpak', qty: 8, weight: 0.5, value: 75 },
-      ];
-      state.squad = [{ name: 'Boone', hp: 80, hpMax: 100, ammo: 30, condition: 'OK' }];
-      state.campaign_notes = ['Completed Goodsprings quest.', 'Benny sighted in New Vegas.'];
-
-      // Snapshot before
-      const before = JSON.parse(JSON.stringify(state));
-
-      // Simulate the v1.6.3 export envelope (same logic as exportSaveFile)
-      const envelope = { version: '1.6.3', state: JSON.parse(JSON.stringify(state)) };
-
-      // Reset to defaults
-      resetStateToDefaults();
-
-      // Import
-      autoImportState(JSON.stringify(envelope.state));
-
-      // Compare every discovered key
-      for (const key of discoveredKeys) {
-        const exp = before[key];
-        const got = state[key];
-        const ok = deepEqual(exp, got);
-        assert(
-          ok,
-          `state.${key}`,
-          ok
-            ? null
-            : `Expected: ${JSON.stringify(exp).slice(0, 80)}  Got: ${JSON.stringify(got).slice(0, 80)}`
+        autoImportState(
+          JSON.stringify({
+            ticks: 5,
+            status: [
+              { name: 'Rad Resistance', ticks: 0, type: 'BUFF' }, // permanent — kept
+              { name: 'Hydra', ticks: 3, type: 'BUFF' }, // 3 - 5 elapsed -> expires
+            ],
+          })
         );
-      }
-
-      // ══════════════════════════════════════════════════════════════
-      //  SUITE 2 — All 14 FACTION_REGISTRY keys preserved
-      // ══════════════════════════════════════════════════════════════
-      section('Suite 2 — Individual faction keys (FACTION_REGISTRY)');
-
-      FACTION_REGISTRY.forEach((f, idx) => {
-        const expected = { fame: (idx + 1) * 15, infamy: (idx + 1) * 7 };
-        const actual = state.factions[f.key];
         assert(
-          deepEqual(expected, actual),
-          `factions.${f.key}  fame=${expected.fame} infamy=${expected.infamy}`,
-          actual ? `Got fame=${actual.fame} infamy=${actual.infamy}` : 'Key missing entirely'
+          state.status.length === 1 && state.status[0].name === 'Rad Resistance',
+          'status: permanent effect kept, timed effect ticked down to expiry',
+          JSON.stringify(state.status)
         );
-      });
 
-      // ══════════════════════════════════════════════════════════════
-      //  SUITE 3 — All 13 SKILL_KEYS preserved
-      // ══════════════════════════════════════════════════════════════
-      section('Suite 3 — Individual skill keys (SKILL_KEYS)');
+        // locationHistory is auto-tracked when loc changes on import.
+        resetState();
+        autoImportState(JSON.stringify({ loc: 'Primm' }));
+        assert(
+          Array.isArray(state.locationHistory) && state.locationHistory.includes('Primm'),
+          'locationHistory records a changed location',
+          JSON.stringify(state.locationHistory)
+        );
 
-      SKILL_KEYS.forEach((sk, idx) => {
-        const expected = 20 + idx * 4;
-        const actual = state.skills[sk];
-        assert(expected === actual, `skills.${sk}  = ${expected}`, `Got ${actual}`);
-      });
+        // ══════════════════════════════════════════════════════════════
+        //  Suite 8 — sanitizeImportedContainer + boot-merge (IMPORT SAVE path)
+        // ══════════════════════════════════════════════════════════════
+        section('Suite 8 — v8 container sanitise + boot-merge');
 
-      // ══════════════════════════════════════════════════════════════
-      //  SUITE 4 — Array fields survive with correct contents
-      // ══════════════════════════════════════════════════════════════
-      section('Suite 4 — Array fields');
+        // The container as it appears inside a current-version export file.
+        const container = {
+          activeContext: 'FNV',
+          campaigns: {
+            FNV: {
+              lvl: 42,
+              caps: 9999,
+              loc: 'New Vegas Strip',
+              la: 'crippled', // sanitiser upper-cases limb whitelist
+              inventory: [{ name: "Programmer's Rifle", qty: 1, wgt: '3.5', val: '100' }],
+              status: [{ name: 'Bonus', ticks: 2, type: 'weird' }], // type coerced to BUFF
+            },
+          },
+        };
+        const sanitized = sanitizeImportedContainer(container);
+        const camp = sanitized.campaigns.FNV;
+        assert(
+          camp.lvl === 42 && camp.caps === 9999,
+          'numeric fields type-coerced',
+          JSON.stringify({ lvl: camp.lvl, caps: camp.caps })
+        );
+        assert(camp.la === 'CRIPPLED', 'limb value whitelisted/upper-cased', camp.la);
+        assert(
+          camp.inventory[0].wgt === 3.5 &&
+            camp.inventory[0].val === 100 &&
+            camp.inventory[0].name === "Programmer's Rifle",
+          'inventory wgt/val coerced; apostrophe preserved (no HTML-escape)',
+          JSON.stringify(camp.inventory[0])
+        );
+        assert(
+          camp.status[0].type === 'BUFF',
+          'status type coerced to whitelist',
+          camp.status[0].type
+        );
 
-      assert(
-        state.status.length === 2 && state.status[0].name === 'Hydra',
-        `state.status  (${state.status.length} entries)`
-      );
-      assert(
-        state.inventory.length === 2 && state.inventory[1].name === 'Stimpak',
-        `state.inventory  (${state.inventory.length} entries)`
-      );
-      assert(
-        state.squad.length === 1 && state.squad[0].name === 'Boone',
-        `state.squad  (${state.squad.length} entries)`
-      );
-      assert(
-        state.campaign_notes.length === 2 && state.campaign_notes[1].includes('Benny'),
-        `state.campaign_notes  (${state.campaign_notes.length} entries)`
-      );
+        // Boot-merge: state = { ...defaults, ...campaigns[activeContext] } (ui-core.js boot).
+        const stored = JSON.parse(JSON.stringify(sanitized));
+        const merged = {
+          ...JSON.parse(JSON.stringify(window._defaultState)),
+          ...stored.campaigns[stored.activeContext],
+        };
+        assert(
+          merged.lvl === 42 && merged.caps === 9999 && merged.loc === 'New Vegas Strip',
+          'boot-merge yields the imported campaign (loaded state reflects the file)',
+          JSON.stringify({ lvl: merged.lvl, caps: merged.caps, loc: merged.loc })
+        );
 
-      // ══════════════════════════════════════════════════════════════
-      //  SUITE 5 — Boundary / clamping
-      // ══════════════════════════════════════════════════════════════
-      section('Suite 5 — Boundary clamping in autoImportState');
+        // ══════════════════════════════════════════════════════════════
+        //  Suite 9 — Game-agnostic dispatch (no hardcoded game literals)
+        // ══════════════════════════════════════════════════════════════
+        section('Suite 9 — Game-agnostic registry dispatch');
 
-      autoImportState(
-        JSON.stringify({
-          s: 15,
-          p: -1, // SPECIAL: should clamp 1–10
-          hpCur: 9999, // should clamp to hpMax
-          skills: { barter: 150, sneak: -5 }, // skills: clamp 0–100
-        })
-      );
-
-      assert(state.s <= 10 && state.s >= 1, `SPECIAL clamped: s=${state.s} (max 10)`);
-      assert(state.p <= 10 && state.p >= 1, `SPECIAL clamped: p=${state.p} (min 1)`);
-      assert(state.skills.barter <= 100, `skill clamped: barter=${state.skills.barter} (max 100)`);
-      assert(state.skills.sneak >= 0, `skill clamped: sneak=${state.skills.sneak} (min 0)`);
+        const savedCtx = state.gameContext;
+        Object.values(GAME_DEFS).forEach(def => {
+          state.gameContext = def.id;
+          const sk = getSkillKeys();
+          const fac = getFactionRegistry();
+          assert(
+            sk === def.skillKeys && fac === def.factions && sk.length > 0 && fac.length > 0,
+            `${def.id}: getSkillKeys()/getFactionRegistry() resolve to GAME_DEFS.${def.id} (${sk.length} skills, ${fac.length} factions)`
+          );
+        });
+        state.gameContext = savedCtx;
+      } catch (err) {
+        assert(false, 'FATAL: audit threw an exception', String((err && err.stack) || err));
+      }
 
       // ══════════════════════════════════════════════════════════════
       //  Summary
@@ -420,11 +648,15 @@
       const summary = document.getElementById('summary');
       if (failed === 0) {
         summary.className = 'all-pass';
-        summary.textContent = `ALL ${passed} TESTS PASSED — persistence fully verified.`;
+        summary.textContent = `ALL ${passed} TESTS PASSED across ${suiteCount} suites — persistence contract verified.`;
       } else {
         summary.className = 'has-fail';
-        summary.textContent = `${failed} TEST(S) FAILED  (${passed} passed) — fields marked [FAIL] are not persisted by autoImportState().`;
+        summary.textContent = `${failed} TEST(S) FAILED (${passed} passed, ${suiteCount} suites) — import contract drift detected.`;
       }
+      // Machine-readable markers for the headless gate runner (test-html-check.mjs).
+      summary.setAttribute('data-passed', String(passed));
+      summary.setAttribute('data-failed', String(failed));
+      summary.setAttribute('data-suites', String(suiteCount));
     </script>
   </body>
 </html>
