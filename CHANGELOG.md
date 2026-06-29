@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1176/1176 | Cache: robco-terminal-v2.6.0-r14 -->
+﻿## [Unreleased]<!-- Tests: 1181/1181 | Cache: robco-terminal-v2.6.0-r15 -->
 
 ### Added
 
@@ -46,6 +46,7 @@
 - The AI now reads your playstyle and engine settings from memory instead of re-fetching them from browser storage on every single message. These values are cached the first time they're needed and refreshed whenever you change them, so each AI request does a little less work. Behavior is unchanged — the AI still uses your current playstyle, key, and model — and the build gate now guards these frequently-run paths against slipping back to direct storage reads.
 - Loading a save or pulling from the cloud now cleans up more of your data on the way in. The collectible, trait, skill-book, skill-magazine, and Lincoln-memorabilia trackers, plus faction reputation values, are now defensively checked and corrected when a save is imported — stray or malformed entries are dropped or normalised so a hand-edited or corrupted file can't carry bad data into your campaign. No change for normal saves. A new project rule makes this automatic for any tracker added in the future.
 - Added a full round-trip safety test for cloud saves: a save is now automatically pushed, cleaned, migrated, and re-applied in the test suite to prove every tracker and your faction standings come back exactly as they went in — so a future change can't silently drop part of your campaign during cloud sync. Also locked in two long-standing data-safety rules with build checks: cloud saves are only ever added (never blindly overwritten), and shared settings are merged rather than replaced. No user-facing change.
+- The in-app changelog now knows whether it's running on the private test build or the public site. The private staging build shows the in-progress "Unreleased" notes so changes can be reviewed before release, while the public site continues to show only released versions — and defaults to the public behaviour whenever it can't tell, so unreleased notes never leak to live users.
 
 ---
 

@@ -5777,7 +5777,7 @@ header('Suite 61 — Mobile Layout Overflow Guards');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 62 — Changelog viewer guards
-//  2 tests
+//  7 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 62 — Changelog viewer guards');
 {
@@ -5794,6 +5794,79 @@ header('Suite 62 — Changelog viewer guards');
     /replace\(.*<!--/.test(uiCoreSrc62),
     'Changelog viewer strips HTML comments (<!-- --> pattern)'
   );
+
+  // 62.3 WU-C11 env-aware: _isStagingEnv() defined, fail-safe-defaults to production
+  //      (returns false), and reads the robco-env marker + *.pages.dev hostname signal.
+  assert(
+    /function _isStagingEnv\s*\(/.test(uiCoreSrc62) &&
+      /meta\[name="robco-env"\]/.test(uiCoreSrc62) &&
+      /pages\\?\.dev/.test(uiCoreSrc62) &&
+      /return false/.test(uiCoreSrc62),
+    '_isStagingEnv() defined with robco-env marker + *.pages.dev signal + fail-safe production default (WU-C11)'
+  );
+
+  // 62.4 WU-C11 env-aware: _visibleChangelog() defined and BOTH viewers route through the
+  //      env gate (boot-time viewer + showFullChangelog use _visibleChangelog/_isStagingEnv).
+  {
+    let fullBody = '';
+    try {
+      fullBody = extractFunctionBody(uiCoreSrc62, 'showFullChangelog');
+    } catch (_) {}
+    assert(
+      /function _visibleChangelog\s*\(/.test(uiCoreSrc62) &&
+        /_visibleChangelog\s*\(\s*text\s*,\s*_isStagingEnv\(\)\s*\)/.test(fullBody),
+      'showFullChangelog() routes through _visibleChangelog(text, _isStagingEnv()) (WU-C11 env gate)'
+    );
+    assert(
+      (uiCoreSrc62.match(/_visibleChangelog\(\s*text\s*,\s*_isStagingEnv\(\)\s*\)/g) || [])
+        .length >= 2,
+      'Both viewers (boot-time + showFullChangelog) call _visibleChangelog(text, _isStagingEnv()) (env gate on both)'
+    );
+  }
+
+  // 62.5 WU-C11 env-aware BEHAVIORAL (both sides): _visibleChangelog strips [Unreleased] in
+  //      production AND keeps it in staging — evaluated against a sample changelog.
+  {
+    let ok = false;
+    let err = null;
+    try {
+      const body = extractFunctionBody(uiCoreSrc62, '_visibleChangelog');
+      const s = uiCoreSrc62.indexOf('function _visibleChangelog');
+      const params = uiCoreSrc62.slice(
+        uiCoreSrc62.indexOf('(', s),
+        uiCoreSrc62.indexOf('{', uiCoreSrc62.indexOf('(', s))
+      );
+      const fn = eval(`(function _visibleChangelog${params}${body})`);
+      const sample =
+        '## [Unreleased]<!-- Tests: 1/1 -->\n\n### Added\n- new thing\n\n---\n\n## [v2.6.0] — Foo\n\n### Added\n- old thing\n';
+      const prod = fn(sample, false);
+      const staging = fn(sample, true);
+      ok =
+        !/##\s*\[Unreleased\]/.test(prod) &&
+        /##\s*\[v2\.6\.0\]/.test(prod) &&
+        /##\s*\[Unreleased\]/.test(staging) &&
+        /##\s*\[v2\.6\.0\]/.test(staging);
+    } catch (e) {
+      err = e;
+    }
+    assert(
+      ok,
+      'env-aware viewer: production hides [Unreleased] AND staging shows it (WU-C11 both-sides behavioral)' +
+        (err ? ' — ' + err.message : '')
+    );
+  }
+
+  // 62.6 WU-C11 env-aware: cf-staging-build.mjs injects the robco-env staging marker, and the
+  //      committed (production) index.html carries NO marker (so prod defaults to hiding it).
+  {
+    const cfStaging = readFile('scripts/cf-staging-build.mjs');
+    assert(
+      /robco-env/.test(cfStaging) &&
+        /content="staging"/.test(cfStaging) &&
+        !/robco-env/.test(htmlSource),
+      'cf-staging-build.mjs injects the robco-env="staging" marker; prod index.html has none (fail-safe)'
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

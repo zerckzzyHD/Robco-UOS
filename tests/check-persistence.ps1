@@ -3409,7 +3409,7 @@ Check ([bool]($mobileSlice61 -match 'overflow-x\s*:\s*clip')) `
 
 # ===========================================================
 # Suite 62 -- Changelog viewer guards
-# 2 tests
+# 7 tests
 # ===========================================================
 Sep "Suite 62 -- Changelog viewer guards"
 $uiCoreSrc62 = Read-Src "js/ui-core.js"
@@ -3421,6 +3421,41 @@ Check ([bool]($uiCoreSrc62 -match 'sections\.find')) `
 # 62.2 Viewer strips HTML comments
 Check ([bool]($uiCoreSrc62 -match 'replace\(.*<!--')) `
     'Changelog viewer strips HTML comments (<!-- --> pattern)'
+
+# 62.3 WU-C11 env-aware: _isStagingEnv() defined, fail-safe-defaults to production
+#      (returns false), and reads the robco-env marker + *.pages.dev hostname signal.
+Check (($uiCoreSrc62 -match 'function _isStagingEnv\s*\(') -and `
+       ($uiCoreSrc62 -match 'meta\[name="robco-env"\]') -and `
+       ($uiCoreSrc62 -match 'pages\\?\.dev') -and `
+       ($uiCoreSrc62 -match 'return false')) `
+    "_isStagingEnv() defined with robco-env marker + *.pages.dev signal + fail-safe production default (WU-C11)"
+
+# 62.4a WU-C11 env-aware: showFullChangelog routes through _visibleChangelog(text, _isStagingEnv()).
+$fullBody62 = ''
+try { $fullBody62 = Get-FunctionBody $uiCoreSrc62 'showFullChangelog' } catch {}
+Check (($uiCoreSrc62 -match 'function _visibleChangelog\s*\(') -and `
+       ($fullBody62 -match '_visibleChangelog\s*\(\s*text\s*,\s*_isStagingEnv\(\)\s*\)')) `
+    "showFullChangelog() routes through _visibleChangelog(text, _isStagingEnv()) (WU-C11 env gate)"
+
+# 62.4b WU-C11 env-aware: BOTH viewers (boot-time + showFullChangelog) call the env gate.
+$vcCalls62 = ([regex]::Matches($uiCoreSrc62, '_visibleChangelog\(\s*text\s*,\s*_isStagingEnv\(\)\s*\)')).Count
+Check ($vcCalls62 -ge 2) `
+    "Both viewers (boot-time + showFullChangelog) call _visibleChangelog(text, _isStagingEnv()) (env gate on both)"
+
+# 62.5 WU-C11 env-aware (both sides, structural mirror of the JS behavioral): _visibleChangelog
+#      returns full text for staging and filters out [Unreleased] for production.
+$vcBody62 = ''
+try { $vcBody62 = Get-FunctionBody $uiCoreSrc62 '_visibleChangelog' } catch {}
+Check (($vcBody62 -match 'if\s*\(\s*isStaging\s*\)\s*return text') -and `
+       ($vcBody62 -match 'Unreleased') -and `
+       ($vcBody62 -match 'filter')) `
+    "env-aware viewer: production hides [Unreleased] AND staging shows it (WU-C11 both-sides)"
+
+# 62.6 WU-C11 env-aware: cf-staging-build.mjs injects the robco-env staging marker, and the
+#      committed (production) index.html carries NO marker (so prod defaults to hiding it).
+$cfStaging62 = Read-Src "scripts/cf-staging-build.mjs"
+Check (($cfStaging62 -match 'robco-env') -and ($cfStaging62 -match 'content="staging"') -and -not ($htmlSrc -match 'robco-env')) `
+    "cf-staging-build.mjs injects the robco-env=staging marker; prod index.html has none (fail-safe)"
 
 # ===========================================================
 # Suite 63 -- Save/Cloud UI consolidation guards (Phase 6 Task 7)

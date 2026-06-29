@@ -67,10 +67,20 @@ writeFileSync(join(OUT, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\
 // 5. Point the page <link rel="icon"> at the dev icon (favicon/tab).
 //    apple-touch-icon is left as the prod PNG (iOS ignores SVG touch icons); the
 //    "[DEV]" label under the home-screen icon is what distinguishes the install.
-const html = readFileSync(join(OUT, 'index.html'), 'utf8').replace(
-  '<link rel="icon" type="image/png" href="icon.png" />',
-  '<link rel="icon" type="image/svg+xml" href="icon-dev.svg" />'
-);
+//
+//    Also inject the staging environment marker (WU-C11): the in-app changelog
+//    viewer reads <meta name="robco-env" content="staging"> to render the
+//    [Unreleased] section. Production (deploy.yml) never emits this marker, so
+//    prod defaults to hiding [Unreleased]. CSP-safe (a meta tag, not a script).
+const html = readFileSync(join(OUT, 'index.html'), 'utf8')
+  .replace(
+    '<link rel="icon" type="image/png" href="icon.png" />',
+    '<link rel="icon" type="image/svg+xml" href="icon-dev.svg" />'
+  )
+  .replace(
+    '<meta charset="UTF-8" />',
+    '<meta charset="UTF-8" />\n    <meta name="robco-env" content="staging" />'
+  );
 writeFileSync(join(OUT, 'index.html'), html, 'utf8');
 
 const count = readdirSync(OUT).length;

@@ -520,9 +520,12 @@ window.onload = function () {
       fetch('CHANGELOG.md')
         .then(r => r.text())
         .then(text => {
-          const sections = text.split(/\r?\n(?=## \[)/);
+          // Env-aware: production sees only released versions (latest first);
+          // staging/dev sees [Unreleased] at the top (WU-C11).
+          const visible = _visibleChangelog(text, _isStagingEnv());
+          const sections = visible.split(/\r?\n(?=## \[)/);
           const released =
-            sections.find(s => /^## \[v\d+\.\d+/.test(s.trimStart())) || sections[0] || text;
+            sections.find(s => /^## \[/.test(s.trimStart())) || sections[0] || visible;
           const display = released
             .replace(/<!--[\s\S]*?-->/g, '')
             .replace(/^## /, '')
@@ -1045,12 +1048,43 @@ function expandPanelForCategory(categoryKey) {
   }
 }
 
+// ── Environment detection (Protocol 43 / WU-C11 env-aware changelog) ─────────
+// Staging/dev shows the changelog's [Unreleased] section so the owner can review
+// unreleased work; production hides it. FAIL-SAFE: any uncertainty defaults to
+// production, so unreleased work can never leak to the public site. Primary
+// signal = the <meta name="robco-env" content="staging"> marker that
+// scripts/cf-staging-build.mjs injects into the staged build (prod never emits
+// it); hostname (Cloudflare *.pages.dev + localhost) is a secondary signal.
+function _isStagingEnv() {
+  try {
+    const m = document.querySelector('meta[name="robco-env"]');
+    if (m && m.getAttribute('content') === 'staging') return true;
+    if (typeof window !== 'undefined' && window.__ROBCO_ENV__ === 'staging') return true;
+    const h = (typeof location !== 'undefined' && location.hostname) || '';
+    if (h === 'localhost' || h === '127.0.0.1' || /\.pages\.dev$/.test(h)) return true;
+  } catch (_) {
+    /* fall through to production default */
+  }
+  return false; // production default — never leak [Unreleased]
+}
+
+// Returns the changelog markdown to render for the given environment. Production
+// strips the [Unreleased] section entirely; staging/dev keeps it (rendered in
+// source order — earliest-first within each category, per the changelog convention).
+function _visibleChangelog(text, isStaging) {
+  if (isStaging) return text;
+  return text
+    .split(/\r?\n(?=## \[)/)
+    .filter(s => !/^## \[Unreleased\]/.test(s.trimStart()))
+    .join('\n');
+}
+
 function showFullChangelog() {
   fetch('CHANGELOG.md')
     .then(r => r.text())
     .then(text => {
       document.getElementById('modalTitle').innerText = '> SYSTEM CHANGELOG — ALL VERSIONS';
-      document.getElementById('modalContent').innerText = text
+      document.getElementById('modalContent').innerText = _visibleChangelog(text, _isStagingEnv())
         .replace(/<!--[\s\S]*?-->/g, '')
         .trim();
       _openSysModal();
