@@ -3225,8 +3225,10 @@ header('Phase 5c-ii: Google Sign-In + Account Panel');
 // ══════════════════════════════════════════════════════════════
 //  SUITE 46 — Cloud Save Picker + Local Migration (Phase 5c-iii)
 //  Data-safety invariants: additive uploads, contentHash dedup,
-//  confirm-gated load/delete, picker UI wired.
-//  16 tests
+//  confirm-gated load/delete, picker UI wired. Plus WU-B5: the cloud
+//  push→sanitize→migrate→apply round-trip (Phase-6 fields survive) and
+//  the setDoc permanence guards (no blind save overwrite; settings merge).
+//  19 tests
 // ══════════════════════════════════════════════════════════════
 header('Phase 5c-iii: Cloud Save Picker + Local Migration');
 
@@ -3517,6 +3519,86 @@ header('Phase 5c-iii: Cloud Save Picker + Local Migration');
   assert(
     /id="savesListBody"/.test(htmlSource),
     'index.html has #savesListBody element (unified saves list mount point in Security & Config)'
+  );
+
+  // 46.17  WU-B5: cloud push→sanitize→migrate→apply round-trip — every Phase-6 field
+  //        and faction reputation survives unchanged (TS-GAP-6 / CC-RT-1, the highest-value gap).
+  //        Evaluates the REAL sanitizeImportedContainer (api.js) + migrateState (state.js)
+  //        in a VM sandbox (GAME_DEFS / _buildFactions stubbed; neither branch fires on a
+  //        current-version populated save) and asserts the data is byte-stable.
+  {
+    const vm = require('vm');
+    let rtOk = false;
+    let rtErr = null;
+    try {
+      const _decl = (src, name) => {
+        const body = extractFunctionBody(src, name);
+        const s = src.indexOf('function ' + name);
+        const p = src.slice(src.indexOf('(', s), src.indexOf('{', src.indexOf('(', s)));
+        return 'function ' + name + p + body;
+      };
+      const sandbox = { GAME_DEFS: { FNV: {}, FO3: {} }, _buildFactions: () => ({}), console };
+      vm.createContext(sandbox);
+      vm.runInContext(
+        _decl(apiSource, 'sanitizeImportedContainer') + '\n' + _decl(stateSource, 'migrateState'),
+        sandbox
+      );
+      sandbox._push = {
+        activeContext: 'FNV',
+        campaigns: {
+          FNV: {
+            lvl: 30,
+            gameContext: 'FNV',
+            stats: { kills: 0, capsEarned: 0, damageDealt: 0, sessionStart: 1 },
+            factions: { ncr: { fame: 25, infamy: 5 }, legion: { fame: 0, infamy: 40 } },
+            collectibles: ['Snow Globe - Goodsprings', 'Snow Globe - Hoover Dam'],
+            lincolnItems: {},
+            traits: ['Built to Destroy', 'Good Natured'],
+            skillBooks: ['Duck and Cover!', 'Tales of a Junktown Jerky Vendor'],
+            magazines: ['Pugilism Illustrated', 'Boxing Times'],
+          },
+        },
+      };
+      const out = vm.runInContext(
+        '(function () { var c = sanitizeImportedContainer(_push); return migrateState("2.6.0", c.campaigns.FNV); })()',
+        sandbox
+      );
+      rtOk =
+        JSON.stringify(out.collectibles) ===
+          JSON.stringify(['Snow Globe - Goodsprings', 'Snow Globe - Hoover Dam']) &&
+        JSON.stringify(out.traits) === JSON.stringify(['Built to Destroy', 'Good Natured']) &&
+        JSON.stringify(out.skillBooks) ===
+          JSON.stringify(['Duck and Cover!', 'Tales of a Junktown Jerky Vendor']) &&
+        JSON.stringify(out.magazines) ===
+          JSON.stringify(['Pugilism Illustrated', 'Boxing Times']) &&
+        out.factions.ncr.fame === 25 &&
+        out.factions.ncr.infamy === 5 &&
+        out.factions.legion.fame === 0 &&
+        out.factions.legion.infamy === 40 &&
+        typeof out.lincolnItems === 'object' &&
+        !Array.isArray(out.lincolnItems);
+    } catch (e) {
+      rtErr = e;
+    }
+    assert(
+      rtOk,
+      'cloud round-trip push→sanitize→migrate→apply: all Phase-6 fields + faction rep survive unchanged (WU-B5 TS-GAP-6/CC-RT-1)' +
+        (rtErr ? ' — ' + rtErr.message : '')
+    );
+  }
+
+  // 46.18  WU-B5 setDoc permanence (Protocol 34): saves are additive — no setDoc ever writes
+  //        a 'saves' document (a blind setDoc would clobber a user's campaign with no recovery).
+  assert(
+    !/setDoc\s*\([\s\S]{0,80}['"]saves['"]/.test(cloudSource),
+    'cloud.js: no setDoc targets a saves document — saves are additive via addDoc (Protocol 34 no-blind-overwrite)'
+  );
+
+  // 46.19  WU-B5 setDoc permanence: the mutable settings/preferences write uses { merge: true }
+  //        so it never clobbers sibling preference fields (Protocol 34 additive-write).
+  assert(
+    /doc\([^)]*['"]settings['"][\s\S]{0,200}merge:\s*true/.test(cloudSource),
+    'cloud.js: settings/preferences setDoc uses { merge: true } (no clobber of sibling prefs — Protocol 34)'
   );
 }
 

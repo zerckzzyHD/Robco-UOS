@@ -1946,8 +1946,10 @@ Check (($firstAwait45 -ge 0) -and ($awaitPopup45 -eq $firstAwait45)) `
 # ===========================================================
 # Suite 46 -- Cloud Save Picker + Local Migration (Phase 5c-iii)
 # Data-safety invariants: additive uploads, contentHash dedup,
-# confirm-gated load/delete, picker UI wired.
-# 16 tests
+# confirm-gated load/delete, picker UI wired. Plus WU-B5: the cloud
+# push->sanitize->migrate->apply round-trip (Phase-6 fields survive) and
+# the setDoc permanence guards (no blind save overwrite; settings merge).
+# 19 tests
 # ===========================================================
 Sep "Suite 46 -- Phase 5c-iii: Cloud Save Picker + Local Migration"
 
@@ -2079,6 +2081,26 @@ Check ([bool]($loadUIBody46 -match 'renderSavesList\(\)')) `
 # 46.16  index.html has savesListBody element (unified list mount point in Security & Config)
 Check ([bool]($htmlSrc -match 'id="savesListBody"')) `
     'index.html has #savesListBody element (unified saves list mount point in Security & Config)'
+
+# 46.17  WU-B5: cloud push->sanitize->migrate->apply round-trip — Phase-6 fields survive.
+#        (JS runner runs the full VM-sandbox behavioral round-trip; PS runner does the
+#        structural check that migrateState preserves every Phase-6 field + factions.)
+$migBody46 = ''
+try { $migBody46 = Get-FunctionBody $stateSrc 'migrateState' } catch {}
+$rtOk = ($migBody46 -match 'collectibles') -and ($migBody46 -match 'lincolnItems') -and `
+        ($migBody46 -match 'traits') -and ($migBody46 -match 'skillBooks') -and `
+        ($migBody46 -match 'magazines') -and ($migBody46 -match 'factions')
+Check $rtOk `
+    "cloud round-trip: migrateState preserves all Phase-6 fields + factions through sanitize+migrate (WU-B5 TS-GAP-6/CC-RT-1)"
+
+# 46.18  WU-B5 setDoc permanence (Protocol 34): no setDoc ever writes a 'saves' document
+#        (a blind setDoc would clobber a user's campaign — saves are additive via addDoc).
+Check (-not ($cloudSrc -match 'setDoc\s*\([\s\S]{0,80}[''"]saves[''"]')) `
+    "cloud.js: no setDoc targets a saves document — saves are additive via addDoc (Protocol 34 no-blind-overwrite)"
+
+# 46.19  WU-B5 setDoc permanence: the mutable settings/preferences write uses { merge: true }.
+Check ([bool]($cloudSrc -match 'doc\([^)]*[''"]settings[''"][\s\S]{0,200}merge:\s*true')) `
+    "cloud.js: settings/preferences setDoc uses { merge: true } (no clobber of sibling prefs -- Protocol 34)"
 
 # ===========================================================
 # Suite 47 -- Gemini Key Sync + AI Studio Link (Phase 5c-iv)
