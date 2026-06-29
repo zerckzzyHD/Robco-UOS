@@ -7708,8 +7708,9 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  SUITE 74 — Collectibles Map Coord Guards (Change 1)
 //  gridRow/gridCol on every FNV/FO3 collectible + lincoln entry,
 //  cells match existing zones[], coord-based badge source guard,
-//  regression: no name-based badge logic, lincoln check present.
-//  11 tests
+//  regression: no name-based badge logic, lincoln check present,
+//  WU-D1 unique FO3 zone-name guard.
+//  12 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 74 — Collectibles Map Coord Guards');
@@ -7881,6 +7882,30 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     const block = m ? m[1] : '';
     const count = (block.match(/\bname\s*:/g) || []).length;
     assert(count === 20, `reg_fo3.js: FO3 collectibles count unchanged = 20 (found ${count})`);
+  }
+
+  // 74.12  All FO3 zones[] have unique names (WU-D1 / FO3-REG-1). Two zones both named
+  //        'Vault 92' mislabeled the southeast map region; a zone is identified by a
+  //        name + gridRow + gridCol + locations:[] triple, so this matches zone entries
+  //        only (collectibles use singular 'location:'). A duplicate zone name labels
+  //        the wrong cell on the world map — fail the gate if it recurs.
+  {
+    const zoneNames74 = [
+      ...fo3RegSrc74.matchAll(
+        /name:\s*'([^']+)',\s*gridRow:\s*\d+,\s*gridCol:\s*\d+,\s*locations:/g
+      ),
+    ].map(m => m[1]);
+    const seen74 = new Set();
+    const dupZones74 = [];
+    for (const n of zoneNames74) {
+      if (seen74.has(n)) dupZones74.push(n);
+      seen74.add(n);
+    }
+    assert(
+      zoneNames74.length > 0 && dupZones74.length === 0,
+      'reg_fo3.js: all FO3 zones[] have unique names (no duplicate world-map region labels)' +
+        (dupZones74.length ? ' — dup: ' + dupZones74.join(', ') : '')
+    );
   }
 }
 
@@ -8386,11 +8411,11 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 82 — FO3 quests expansion (44→64) + quest items (15→25)
-//  13 tests
+//  Suite 82 — FO3 quests (62 after WU-D1 canon fix) + quest items (15→25)
+//  14 tests
 // ══════════════════════════════════════════════════════════════
 {
-  header('Suite 82 — FO3 quests expansion (44→64) + quest items (15→25)');
+  header('Suite 82 — FO3 quests (62, WU-D1 canon fix) + quest items (15→25)');
   const fo3Src82 = readFile('js/reg_fo3.js');
 
   // Extract quests array block
@@ -8398,13 +8423,25 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   const qEnd82 = fo3Src82.indexOf('\n  ],', qStart82);
   const qBlock82 = fo3Src82.slice(qStart82, qEnd82 === -1 ? fo3Src82.length : qEnd82);
 
-  // 82.a  exactly 64 entries — count by dlc: (handles multi-line objects)
+  // 82.a  exactly 62 entries — count by dlc: (handles multi-line objects).
+  //       WU-D1 canon fix: 64 → 62 (removed non-canon 'Fires of Anchorage' + fabricated
+  //       duplicate 'Strictly Business (Paradise Falls)', both verified against fallout.wiki).
   const qCount82 = (qBlock82.match(/\bdlc:/g) || []).length;
-  assert(qCount82 === 64, `FO3 quests has exactly 64 entries (got ${qCount82})`);
+  assert(qCount82 === 62, `FO3 quests has exactly 62 entries (got ${qCount82})`);
 
   // 82.b  dedup guard — exactly 1 'Strictly Business'
   const sbCount82 = (qBlock82.match(/name:\s*'Strictly Business'/g) || []).length;
   assert(sbCount82 === 1, `FO3 quests has exactly 1 'Strictly Business' entry (got ${sbCount82})`);
+
+  // 82.f  WU-D1 canon-removal regression guard: the two non-canon quests stay gone.
+  //       'Fires of Anchorage' does not exist in FO3 (real Operation: Anchorage quests are
+  //       Aiding the Outcasts / The Guns of Anchorage / Paving the Way / Operation: Anchorage!);
+  //       'Strictly Business (Paradise Falls)' is a fabricated duplicate of the real
+  //       'Strictly Business'. Both verified non-canon against fallout.wiki (Protocol 3).
+  assert(
+    !/Fires of Anchorage/.test(qBlock82) && !/Strictly Business \(Paradise Falls\)/.test(qBlock82),
+    "FO3 quests: non-canon 'Fires of Anchorage' + fabricated 'Strictly Business (Paradise Falls)' stay removed (WU-D1)"
+  );
 
   // 82.c  DLC sentinels with correct dlc value
   assert(

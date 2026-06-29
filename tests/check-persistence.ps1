@@ -4482,8 +4482,9 @@ Check ([bool]($stateSrc73 -match 'getSkillKeys\s*\(\s*\)')) `
 # Suite 74 -- Collectibles Map Coord Guards (Change 1)
 # gridRow/gridCol on every FNV/FO3 collectible + lincoln entry,
 # cells match existing zones[], coord-based badge source guard,
-# regression: no name-based badge logic, lincoln check present.
-# 11 tests
+# regression: no name-based badge logic, lincoln check present,
+# WU-D1 unique FO3 zone-name guard.
+# 12 tests
 # ===========================================================
 Sep "Suite 74 -- Collectibles Map Coord Guards"
 $nvRegSrc74   = Read-Src "js\reg_nv.js"
@@ -4558,6 +4559,13 @@ Check ($nvCollectCount74 -eq 7) "reg_nv.js: FNV collectibles count unchanged = 7
 # 74.11  FO3 collectibles count unchanged = 20
 $fo3CollectCount74 = ([regex]::Matches($fo3CollectBlock74, '\bname\s*:')).Count
 Check ($fo3CollectCount74 -eq 20) "reg_fo3.js: FO3 collectibles count unchanged = 20 (found $fo3CollectCount74)"
+
+# 74.12  All FO3 zones[] have unique names (WU-D1 / FO3-REG-1) -- a duplicate zone name
+#        mislabels the world-map region (the two 'Vault 92' cells). Matches zone entries
+#        only (name + gridRow + gridCol + locations:[]).
+$zoneNames74 = [regex]::Matches($fo3RegSrc74, "name:\s*'([^']+)',\s*gridRow:\s*\d+,\s*gridCol:\s*\d+,\s*locations:") | ForEach-Object { $_.Groups[1].Value }
+$dupZones74 = @($zoneNames74 | Group-Object | Where-Object { $_.Count -gt 1 } | ForEach-Object { $_.Name })
+Check (($zoneNames74.Count -gt 0) -and ($dupZones74.Count -eq 0)) ("reg_fo3.js: all FO3 zones[] have unique names (no duplicate world-map region labels)" + $(if ($dupZones74.Count) { ' -- dup: ' + ($dupZones74 -join ', ') } else { '' }))
 
 # ===========================================================
 # Suite 75 -- Registry items[] No-Duplicate-Names Guard
@@ -4909,22 +4917,29 @@ $saSatisfied = ($null -ne $sa81Row) -and ($sa81Cols.Count -ge 5) -and `
 Check $saSatisfied "lookupItemInDb('Samurai Armor') -> wgt=20/val=1000/type='armor'"
 
 # ===========================================================
-# Suite 82 -- FO3 quests expansion (44->64) + quest items (15->25)
-# 13 tests
+# Suite 82 -- FO3 quests (62, WU-D1 canon fix) + quest items (15->25)
+# 14 tests
 # ===========================================================
-Sep "Suite 82 -- FO3 quests expansion (44->64) + quest items (15->25)"
+Sep "Suite 82 -- FO3 quests (62, WU-D1 canon fix) + quest items (15->25)"
 $fo3Src82 = Read-Src "js\reg_fo3.js"
 $qStart82 = $fo3Src82.IndexOf("  quests: [")
 $qEnd82 = $fo3Src82.IndexOf("`n  ],", $qStart82)
 $qBlock82 = if ($qEnd82 -ge 0) { $fo3Src82.Substring($qStart82, $qEnd82 - $qStart82) } else { $fo3Src82.Substring($qStart82) }
 
-# 82.a  exactly 64 entries -- count by dlc: (handles multi-line objects)
+# 82.a  exactly 62 entries -- count by dlc: (handles multi-line objects).
+#       WU-D1 canon fix: 64 -> 62 (removed non-canon 'Fires of Anchorage' + fabricated
+#       duplicate 'Strictly Business (Paradise Falls)', both verified against fallout.wiki).
 $qCount82 = ([regex]::Matches($qBlock82, 'dlc:')).Count
-Check ($qCount82 -eq 64) ("FO3 quests has exactly 64 entries (got " + $qCount82 + ")")
+Check ($qCount82 -eq 62) ("FO3 quests has exactly 62 entries (got " + $qCount82 + ")")
 
 # 82.b  dedup guard -- exactly 1 'Strictly Business'
 $sbCount82 = ([regex]::Matches($qBlock82, "name:\s*'Strictly Business'")).Count
 Check ($sbCount82 -eq 1) ("FO3 quests has exactly 1 'Strictly Business' entry (got " + $sbCount82 + ")")
+
+# 82.f  WU-D1 canon-removal regression guard: the two non-canon quests stay gone
+#       (both verified non-canon against fallout.wiki -- Protocol 3).
+$canonRemoved82 = (-not ($qBlock82 -match 'Fires of Anchorage')) -and (-not ($qBlock82 -match 'Strictly Business \(Paradise Falls\)'))
+Check $canonRemoved82 "FO3 quests: non-canon 'Fires of Anchorage' + fabricated 'Strictly Business (Paradise Falls)' stay removed (WU-D1)"
 
 # 82.c  DLC sentinels with correct dlc value
 Check ($qBlock82.Contains("name: 'Operation: Anchorage!'") -and $qBlock82.Contains("dlc: 'Operation: Anchorage'")) `

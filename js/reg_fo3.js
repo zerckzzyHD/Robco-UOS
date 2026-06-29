@@ -56,10 +56,8 @@ const FALLOUT_REGISTRY = {
     { name: "Jiggs' Loot", type: 'side', dlc: null },
     { name: 'Searching for Cheryl', type: 'side', dlc: null },
     { name: 'I Want to Drink Your Blood', type: 'side', dlc: null },
-    { name: 'Strictly Business (Paradise Falls)', type: 'side', dlc: null },
     { name: "Lincoln's Profit Margins", type: 'side', dlc: null },
     { name: "Lesko's Journal", type: 'side', dlc: null },
-    { name: 'Fires of Anchorage', type: 'side', dlc: null },
 
     // ── Companion ──────────────────────────────────────────────────────
     { name: 'Dogmeat Quest (no name)', type: 'companion', dlc: null },
@@ -949,7 +947,7 @@ const FALLOUT_REGISTRY = {
       locations: ['Dunwich Building', 'Dunwich Company HQ', 'Forsaken Dunwich'],
     },
     {
-      name: 'Vault 92',
+      name: 'Bethesda Ruins',
       gridRow: 6,
       gridCol: 4,
       locations: ['Vault 92 South', 'Calverton', 'Bethesda Ruins'],
