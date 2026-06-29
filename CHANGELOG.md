@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1211/1211 | Cache: robco-terminal-v2.6.0-r17 -->
+﻿## [Unreleased]<!-- Tests: 1214/1214 | Cache: robco-terminal-v2.6.0-r18 -->
 
 ### Added
 
@@ -52,6 +52,7 @@
 - The public site now publishes only when a new version is actually released, never on an ordinary update to the main line of work. Previously it republished on every change that reached main; it is now gated to a version bump, so work staged for a future release can no longer reach the live site early. A build check was added (and the existing deploy-trigger checks updated) so this release-gating can't silently slip back to publishing on every push.
 - Strengthened the safety net around the remote on/off switches and save recovery. New automated tests actually exercise the behaviour — proving that if the remote feature config can't be reached the app keeps every feature switched on (never silently disabling something), that an unknown switch defaults to on, and that restoring a backup truly brings your level, caps, playstyle, and chat back. No user-facing change; these guard paths that previously had no behavioural coverage.
 - Cleaned up a handful of dead and duplicated code paths with no change to how the app behaves: removed several functions and variables that were written but never used (an unused stat-ghost effect, two unused time-conversion helpers, a couple of leftover throwaway values, and a permanently-disabled commented-out line), and merged copy-pasted logic into single shared helpers — the uptime clock and memory-cycle timers, and the local save-list reader, are now each defined once instead of twice. Added Suite 99 (16 regression tests) that locks the removals so the dead code can't quietly creep back and proves the merged helpers stay merged.
+- Merged the Skill Books and Skill Magazines panels onto one shared renderer. The two panels were built from nearly identical copy-pasted code; they now share a single helper that draws the READ/UNREAD lists, remembers which sections you've collapsed, and wires up each toggle. Both panels look and behave exactly as before — this just means a future read-tracker (or a fix to these two) is written and maintained in one place instead of two. Added regression tests that lock the shared renderer and prove both panels still route through it.
 
 ---
 

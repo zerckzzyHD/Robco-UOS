@@ -8853,8 +8853,9 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  Suite 85 — Skill Books Tracker (FNV+FO3, Protocol 4)
 //  registry count/skills, sentinel checks, state default/migrate,
 //  autoImportState validation, getSystemDirective, render wiring,
-//  index.html container, READ/UNREAD sub-panel structural guards.
-//  23 tests
+//  index.html container, READ/UNREAD sub-panel structural guards,
+//  WU-B8 shared _renderReadTracker consolidation guards.
+//  26 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 85 — Skill Books Tracker (FNV+FO3, Protocol 4)');
@@ -9068,16 +9069,20 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     );
   }
 
-  // 85.19  renderSkillBooks wires toggle events on dynamic sub-panels after innerHTML
+  // 85.19  Collapse persistence is wired in the shared _renderReadTracker helper,
+  //        and renderSkillBooks delegates to it (WU-B8 consolidation).
   {
-    let renderSBBody85c = '';
+    let helperBody85c = '';
+    let sbWrap85c = '';
     try {
-      renderSBBody85c = extractFunctionBody(uiRenderSrc85, 'renderSkillBooks');
+      helperBody85c = extractFunctionBody(uiRenderSrc85, '_renderReadTracker');
+      sbWrap85c = extractFunctionBody(uiRenderSrc85, 'renderSkillBooks');
     } catch (_) {}
     assert(
-      /querySelectorAll/.test(renderSBBody85c) &&
-        /addEventListener\s*\(\s*'toggle'/.test(renderSBBody85c),
-      "renderSkillBooks() wires 'toggle' event listeners on dynamic sub-panels (collapse persistence)"
+      /querySelectorAll/.test(helperBody85c) &&
+        /addEventListener\s*\(\s*'toggle'/.test(helperBody85c) &&
+        /_renderReadTracker\s*\(/.test(sbWrap85c),
+      "_renderReadTracker wires 'toggle' collapse persistence, and renderSkillBooks delegates to it"
     );
   }
 
@@ -9087,16 +9092,20 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     'index.html: old static skillBooksSubPanel removed — READ/UNREAD sub-panels are dynamic (Protocol 20)'
   );
 
-  // 85.21  renderSkillBooks splits by read.includes / !read.includes (behavioral correctness guard)
+  // 85.21  The shared helper splits by read.includes / !read.includes, and
+  //        renderSkillBooks delegates to it (WU-B8 consolidation, behavioral correctness).
   {
-    let renderSBBody85d = '';
+    let helperBody85d = '';
+    let sbWrap85d = '';
     try {
-      renderSBBody85d = extractFunctionBody(uiRenderSrc85, 'renderSkillBooks');
+      helperBody85d = extractFunctionBody(uiRenderSrc85, '_renderReadTracker');
+      sbWrap85d = extractFunctionBody(uiRenderSrc85, 'renderSkillBooks');
     } catch (_) {}
     assert(
-      /read\.includes\(d\.name\)/.test(renderSBBody85d) &&
-        /!read\.includes\(d\.name\)/.test(renderSBBody85d),
-      'renderSkillBooks() splits by read.includes(d.name) for READ list and !read.includes for UNREAD list'
+      /read\.includes\(d\.name\)/.test(helperBody85d) &&
+        /!read\.includes\(d\.name\)/.test(helperBody85d) &&
+        /_renderReadTracker\s*\(/.test(sbWrap85d),
+      '_renderReadTracker splits by read.includes(d.name)/!read.includes for READ/UNREAD, and renderSkillBooks delegates to it'
     );
   }
 
@@ -9121,6 +9130,43 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     assert(
       /ALL BOOKS READ/.test(renderSBBody85f),
       'renderSkillBooks() has "ALL BOOKS READ" empty state for empty UNREAD list'
+    );
+  }
+
+  // ── WU-B8 consolidation guards (QA-DUP-1) ──
+  // 85.24  Shared _renderReadTracker(opts) helper is defined in ui-render.js.
+  assert(
+    /function _renderReadTracker\s*\(/.test(uiRenderSrc85),
+    '85.24: shared _renderReadTracker(opts) helper is defined in ui-render.js (WU-B8 dedup)'
+  );
+
+  // 85.25  BOTH read-trackers delegate to the shared helper (single source of row logic).
+  {
+    let sb85 = '';
+    let mag85 = '';
+    try {
+      sb85 = extractFunctionBody(uiRenderSrc85, 'renderSkillBooks');
+      mag85 = extractFunctionBody(uiRenderSrc85, 'renderMagazines');
+    } catch (_) {}
+    assert(
+      /_renderReadTracker\s*\(/.test(sb85) && /_renderReadTracker\s*\(/.test(mag85),
+      '85.25: renderSkillBooks AND renderMagazines both delegate to _renderReadTracker (no duplicated render logic)'
+    );
+  }
+
+  // 85.26  The shared helper carries the full row/sub-panel contract in one place.
+  {
+    let helper85 = '';
+    try {
+      helper85 = extractFunctionBody(uiRenderSrc85, '_renderReadTracker');
+    } catch (_) {}
+    assert(
+      /tracker-row/.test(helper85) &&
+        /class="sub-panel" data-sub-id="\$\{opts\.subIdRead\}/.test(helper85) &&
+        /class="sub-panel" data-sub-id="\$\{opts\.subIdUnread\}/.test(helper85) &&
+        /tracker-toggle/.test(helper85) &&
+        /opts\.meta\(d\)/.test(helper85),
+      '85.26: _renderReadTracker carries the shared contract — .tracker-row, READ/UNREAD sub-panels (data-sub-id), .tracker-toggle, opts.meta(d)'
     );
   }
 }
@@ -9303,12 +9349,20 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     "renderMagazines() references 'magazines_unread' sub-panel data-sub-id"
   );
 
-  // 87.19  wires toggle persistence via querySelectorAll + addEventListener
-  assert(
-    /querySelectorAll/.test(renderMagBody87) &&
-      /addEventListener\s*\(\s*'toggle'/.test(renderMagBody87),
-    "renderMagazines() wires toggle events via querySelectorAll + addEventListener('toggle')"
-  );
+  // 87.19  toggle persistence is wired in the shared _renderReadTracker helper,
+  //        and renderMagazines delegates to it (WU-B8 consolidation).
+  {
+    let helperBody87 = '';
+    try {
+      helperBody87 = extractFunctionBody(uiRenderSrc87, '_renderReadTracker');
+    } catch (_) {}
+    assert(
+      /querySelectorAll/.test(helperBody87) &&
+        /addEventListener\s*\(\s*'toggle'/.test(helperBody87) &&
+        /_renderReadTracker\s*\(/.test(renderMagBody87),
+      '_renderReadTracker wires toggle persistence, and renderMagazines delegates to it'
+    );
+  }
 
   // 87.20  NO MAGAZINES READ empty state
   assert(
@@ -9392,24 +9446,23 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     `GATE-UI-3: tracker toggles use <button>, not <span onclick="toggle..."> (found ${spanToggleMatches88.length} span-onclick patterns)`
   );
 
-  // 88.4  renderCollectibles, renderLincolnMemorabilia, renderTraits, renderSkillBooks, renderMagazines
-  //       all use .tracker-row class (not raw inline font-size/letter-spacing div style)
-  const trackerFns88 = [
-    'renderCollectibles',
-    'renderLincolnMemorabilia',
-    'renderTraits',
-    'renderSkillBooks',
-    'renderMagazines',
-  ];
-  const trackerFnBodies88 = trackerFns88.map(fn => {
+  // 88.4  All tracker renderers use the .tracker-row class. Three render rows
+  //       inline (renderCollectibles/renderLincolnMemorabilia/renderTraits); the
+  //       two read-trackers (renderSkillBooks/renderMagazines) delegate to the
+  //       shared _renderReadTracker, which itself carries .tracker-row (WU-B8).
+  const body88 = fn => {
     const start = uiRenderSrc88.indexOf(`function ${fn}(`);
     const end = uiRenderSrc88.indexOf('\nfunction ', start + 1);
     return start >= 0 ? uiRenderSrc88.slice(start, end) : '';
-  });
-  const allUseTrackerRow88 = trackerFnBodies88.every(body => /tracker-row/.test(body));
+  };
+  const inlineTrackers88 = ['renderCollectibles', 'renderLincolnMemorabilia', 'renderTraits'];
+  const delegatingTrackers88 = ['renderSkillBooks', 'renderMagazines'];
+  const inlineOk88 = inlineTrackers88.every(fn => /tracker-row/.test(body88(fn)));
+  const delegateOk88 = delegatingTrackers88.every(fn => /_renderReadTracker\s*\(/.test(body88(fn)));
+  const helperRow88 = /tracker-row/.test(body88('_renderReadTracker'));
   assert(
-    allUseTrackerRow88,
-    'GATE-UI-4: all 5 tracker render functions use .tracker-row class (not raw inline div style)'
+    inlineOk88 && delegateOk88 && helperRow88,
+    'GATE-UI-4: all 5 tracker renderers use .tracker-row (3 inline + 2 via shared _renderReadTracker which carries it)'
   );
 
   // 88.5  renderFactionRep MINOR FACTIONS details has class="sub-panel" and data-sub-id

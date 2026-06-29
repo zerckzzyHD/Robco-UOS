@@ -5108,8 +5108,8 @@ Check (-not $doCraftBody84.Contains('state.skills')) "Soft skill: doCraft body d
 Check ($uiRSrc84.Contains('function _craftGetHave(')) "_craftGetHave() helper defined in js/ui-render.js"
 
 # ===========================================================
-# Suite 85 -- Skill Books Tracker (FNV+FO3, Protocol 4)
-# 23 tests
+# Suite 85 -- Skill Books Tracker (FNV+FO3, Protocol 4) + WU-B8 _renderReadTracker guards
+# 26 tests
 # ===========================================================
 Sep "Suite 85 -- Skill Books Tracker (FNV+FO3, Protocol 4)"
 $nvRegSrc85 = Get-Content 'js/reg_nv.js' -Raw
@@ -5196,25 +5196,39 @@ Check ($idxSrc85 -match 'id="skillBooksDisplay"') 'index.html has #skillBooksDis
 # 85.17  renderSkillBooks source has skill_books_read sub-panel marker
 $renderSBBody85 = ''
 try { $renderSBBody85 = Get-FunctionBody $uiRenderSrc85 'renderSkillBooks' } catch {}
+$helperBody85 = ''
+try { $helperBody85 = Get-FunctionBody $uiRenderSrc85 '_renderReadTracker' } catch {}
+$renderMagBody85 = ''
+try { $renderMagBody85 = Get-FunctionBody $uiRenderSrc85 'renderMagazines' } catch {}
 Check ($renderSBBody85.Contains('skill_books_read')) "renderSkillBooks() references skill_books_read sub-panel data-sub-id (READ/UNREAD split)"
 
 # 85.18  renderSkillBooks source has skill_books_unread sub-panel marker
 Check ($renderSBBody85.Contains('skill_books_unread')) "renderSkillBooks() references skill_books_unread sub-panel data-sub-id (READ/UNREAD split)"
 
-# 85.19  renderSkillBooks wires toggle events on dynamic sub-panels after innerHTML
-Check ($renderSBBody85.Contains('querySelectorAll') -and ($renderSBBody85 -match "addEventListener\s*\(\s*'toggle'")) "renderSkillBooks() wires 'toggle' event listeners on dynamic sub-panels (collapse persistence)"
+# 85.19  Collapse persistence is wired in the shared _renderReadTracker helper, and renderSkillBooks delegates to it (WU-B8).
+Check ($helperBody85.Contains('querySelectorAll') -and ($helperBody85 -match "addEventListener\s*\(\s*'toggle'") -and ($renderSBBody85 -match '_renderReadTracker\s*\(')) "_renderReadTracker wires 'toggle' collapse persistence, and renderSkillBooks delegates to it"
 
 # 85.20  Old static skillBooksSubPanel removed from index.html (Protocol 20 regression guard)
 Check (-not ($idxSrc85 -match 'id="skillBooksSubPanel"')) 'index.html: old static skillBooksSubPanel removed -- READ/UNREAD sub-panels are dynamic (Protocol 20)'
 
-# 85.21  renderSkillBooks splits by read.includes / !read.includes (behavioral correctness guard)
-Check ($renderSBBody85.Contains('read.includes(d.name)') -and ($renderSBBody85 -match '!read\.includes')) "renderSkillBooks() splits by read.includes(d.name) for READ list and !read.includes for UNREAD list"
+# 85.21  The shared helper splits by read.includes / !read.includes, and renderSkillBooks delegates to it (WU-B8).
+Check ($helperBody85.Contains('read.includes(d.name)') -and ($helperBody85 -match '!read\.includes') -and ($renderSBBody85 -match '_renderReadTracker\s*\(')) "_renderReadTracker splits by read.includes(d.name)/!read.includes for READ/UNREAD, and renderSkillBooks delegates to it"
 
 # 85.22  "NO BOOKS READ" empty state present in renderSkillBooks source
 Check ($renderSBBody85.Contains('NO BOOKS READ')) "renderSkillBooks() has 'NO BOOKS READ' empty state for empty READ list"
 
 # 85.23  "ALL BOOKS READ" empty state present in renderSkillBooks source
 Check ($renderSBBody85.Contains('ALL BOOKS READ')) "renderSkillBooks() has 'ALL BOOKS READ' empty state for empty UNREAD list"
+
+# -- WU-B8 consolidation guards (QA-DUP-1) --
+# 85.24  Shared _renderReadTracker(opts) helper is defined in ui-render.js.
+Check ([bool]($uiRenderSrc85 -match 'function _renderReadTracker\s*\(')) "85.24: shared _renderReadTracker(opts) helper is defined in ui-render.js (WU-B8 dedup)"
+
+# 85.25  BOTH read-trackers delegate to the shared helper (single source of row logic).
+Check (($renderSBBody85 -match '_renderReadTracker\s*\(') -and ($renderMagBody85 -match '_renderReadTracker\s*\(')) "85.25: renderSkillBooks AND renderMagazines both delegate to _renderReadTracker (no duplicated render logic)"
+
+# 85.26  The shared helper carries the full row/sub-panel contract in one place.
+Check ($helperBody85.Contains('tracker-row') -and ($helperBody85 -match 'class="sub-panel" data-sub-id="\$\{opts\.subIdRead\}') -and ($helperBody85 -match 'class="sub-panel" data-sub-id="\$\{opts\.subIdUnread\}') -and $helperBody85.Contains('tracker-toggle') -and ($helperBody85 -match 'opts\.meta\(d\)')) "85.26: _renderReadTracker carries the shared contract -- .tracker-row, READ/UNREAD sub-panels (data-sub-id), .tracker-toggle, opts.meta(d)"
 
 
 # ===========================================================
@@ -5317,6 +5331,8 @@ Check ([bool]($apiSrc87 -match 'state\.magazines\s*=\s*raw\.filter')) "autoImpor
 $rmStart87 = $uiRenderSrc87.IndexOf('function renderMagazines()')
 $rmNext87  = $uiRenderSrc87.IndexOf("`nfunction ", $rmStart87 + 1)
 $renderMagBody87 = if ($rmStart87 -ge 0) { $uiRenderSrc87.Substring($rmStart87, $rmNext87 - $rmStart87) } else { "" }
+$helperBody87 = ''
+try { $helperBody87 = Get-FunctionBody $uiRenderSrc87 '_renderReadTracker' } catch {}
 
 # 87.16  renderMagazines() defined
 Check ($rmStart87 -ge 0) "renderMagazines() is defined in js/ui-render.js"
@@ -5327,8 +5343,8 @@ Check ([bool]($renderMagBody87 -match 'magazines_read')) "renderMagazines() refe
 # 87.18  references magazines_unread sub-panel
 Check ([bool]($renderMagBody87 -match 'magazines_unread')) "renderMagazines() references 'magazines_unread' sub-panel data-sub-id"
 
-# 87.19  wires toggle persistence via querySelectorAll + addEventListener
-Check (($renderMagBody87 -match 'querySelectorAll') -and ($renderMagBody87 -match "addEventListener\('toggle'")) "renderMagazines() wires toggle events via querySelectorAll + addEventListener('toggle')"
+# 87.19  toggle persistence is wired in the shared _renderReadTracker helper, and renderMagazines delegates to it (WU-B8).
+Check (($helperBody87 -match 'querySelectorAll') -and ($helperBody87 -match "addEventListener\s*\(\s*'toggle'") -and ($renderMagBody87 -match '_renderReadTracker\s*\(')) "_renderReadTracker wires toggle persistence, and renderMagazines delegates to it"
 
 # 87.20  NO MAGAZINES READ empty state
 Check ([bool]($renderMagBody87 -match 'NO MAGAZINES READ')) "renderMagazines() has 'NO MAGAZINES READ' empty state"
@@ -5380,16 +5396,20 @@ Check ($subPanelTags88.Count -gt 0 -and $subPanelMissing88 -eq 0) "GATE-UI-2: ev
 $spanToggle88 = [regex]::Matches($uiRenderSrc88, '<span[^>]+onclick="toggle(Collectible|LincolnItem|Trait|SkillBook|Magazine)')
 Check ($spanToggle88.Count -eq 0) "GATE-UI-3: tracker toggles use <button>, not <span onclick='toggle...'> (found $($spanToggle88.Count) span-onclick patterns)"
 
-# 88.4  All 5 tracker render functions use .tracker-row class
-$trackerFns88 = @('renderCollectibles','renderLincolnMemorabilia','renderTraits','renderSkillBooks','renderMagazines')
-$trackerRowFail88 = 0
-foreach ($fn in $trackerFns88) {
-    $start88 = $uiRenderSrc88.IndexOf("function $fn(")
-    $end88   = $uiRenderSrc88.IndexOf("`nfunction ", $start88 + 1)
-    $body88  = if ($start88 -ge 0) { $uiRenderSrc88.Substring($start88, $end88 - $start88) } else { "" }
-    if (-not ($body88 -match 'tracker-row')) { $trackerRowFail88++ }
+# 88.4  All tracker renderers use .tracker-row. Three inline; the two read-trackers
+#       (renderSkillBooks/renderMagazines) delegate to the shared _renderReadTracker,
+#       which itself carries .tracker-row (WU-B8 consolidation).
+function Get-Body88($fn) {
+    $start = $uiRenderSrc88.IndexOf("function $fn(")
+    $end   = $uiRenderSrc88.IndexOf("`nfunction ", $start + 1)
+    if ($start -ge 0) { $uiRenderSrc88.Substring($start, $end - $start) } else { "" }
 }
-Check ($trackerRowFail88 -eq 0) "GATE-UI-4: all 5 tracker render functions use .tracker-row class (not raw inline div style)"
+$inlineTrackers88 = @('renderCollectibles','renderLincolnMemorabilia','renderTraits')
+$delegatingTrackers88 = @('renderSkillBooks','renderMagazines')
+$inlineOk88 = ($inlineTrackers88 | ForEach-Object { (Get-Body88 $_) -match 'tracker-row' }) -notcontains $false
+$delegateOk88 = ($delegatingTrackers88 | ForEach-Object { (Get-Body88 $_) -match '_renderReadTracker\s*\(' }) -notcontains $false
+$helperRow88 = (Get-Body88 '_renderReadTracker') -match 'tracker-row'
+Check ($inlineOk88 -and $delegateOk88 -and $helperRow88) "GATE-UI-4: all 5 tracker renderers use .tracker-row (3 inline + 2 via shared _renderReadTracker which carries it)"
 
 # 88.5  renderFactionRep MINOR FACTIONS details has class="sub-panel" and data-sub-id="minor_factions"
 $rfStart88 = $uiRenderSrc88.IndexOf('function renderFactionRep()')

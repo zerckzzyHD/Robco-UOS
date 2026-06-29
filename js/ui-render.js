@@ -886,14 +886,34 @@ function toggleTrait(name) {
   saveState();
 }
 
-function renderSkillBooks() {
-  const container = document.getElementById('skillBooksDisplay');
+// ── Shared READ/UNREAD tracker renderer (QA-DUP-1 / WU-B8) ──────────
+// Drives the Skill Books and Skill Magazines panels (and any future binary
+// read-tracker) from one config object so the row markup, READ/UNREAD
+// sub-panel split, empty states, and collapse-persistence live in exactly
+// one place. Fully data-driven — no game literals (Protocol 38).
+//
+// opts: {
+//   containerId,                // required: where the sub-panels mount
+//   panelId?, visible?,         // optional: hide panelId when visible() is false
+//   defs,                       // registry array of {name, skill}
+//   read,                       // state array of read names
+//   subIdRead, subIdUnread,     // data-sub-id keys (persistence)
+//   toggleFn,                   // name of the global toggle function
+//   meta,                       // (d) => inner HTML for the .tracker-meta span
+//   emptyRead, emptyUnread,     // empty-state strings
+// }
+function _renderReadTracker(opts) {
+  const container = document.getElementById(opts.containerId);
   if (!container) return;
-  const defs =
-    typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.skillBooks)
-      ? FALLOUT_REGISTRY.skillBooks
-      : [];
-  const read = Array.isArray(state.skillBooks) ? state.skillBooks : [];
+  const panel = opts.panelId ? document.getElementById(opts.panelId) : null;
+  if (typeof opts.visible === 'function' && !opts.visible()) {
+    if (panel) panel.style.display = 'none';
+    return;
+  }
+  if (panel) panel.style.display = '';
+
+  const defs = Array.isArray(opts.defs) ? opts.defs : [];
+  const read = Array.isArray(opts.read) ? opts.read : [];
   const readDefs = defs.filter(d => read.includes(d.name));
   const unreadDefs = defs.filter(d => !read.includes(d.name));
 
@@ -901,15 +921,14 @@ function renderSkillBooks() {
   try {
     ps = JSON.parse(localStorage.getItem('robco_panel_state') || '{}');
   } catch (_) {}
-  const readOpen = ps['skill_books_read'] !== false;
-  const unreadOpen = ps['skill_books_unread'] !== false;
+  const readOpen = ps[opts.subIdRead] !== false;
+  const unreadOpen = ps[opts.subIdUnread] !== false;
 
   const rowHtml = (d, isRead) => {
-    const safeName = escapeHtml(d.name);
-    const skillLabel = escapeHtml((d.skill || '').replace(/_/g, ' ').toUpperCase());
+    const safeAttr = escapeHtml(d.name);
     const tag = isRead
-      ? `<button class="tracker-toggle tracker-toggle--active" onclick="toggleSkillBook('${safeName}')" aria-label="Mark ${safeName} unread">[READ]</button>`
-      : `<button class="tracker-toggle tracker-toggle--inactive" onclick="toggleSkillBook('${safeName}')" aria-label="Mark ${safeName} read">[----]</button>`;
+      ? `<button class="tracker-toggle tracker-toggle--active" data-name="${safeAttr}" onclick="${opts.toggleFn}(this.dataset.name)" aria-label="Mark ${safeAttr} unread">[READ]</button>`
+      : `<button class="tracker-toggle tracker-toggle--inactive" data-name="${safeAttr}" onclick="${opts.toggleFn}(this.dataset.name)" aria-label="Mark ${safeAttr} read">[----]</button>`;
     const nameHtml = isRead
       ? `<strong>${escapeHtml(d.name.toUpperCase())}</strong>`
       : escapeHtml(d.name.toUpperCase());
@@ -917,24 +936,24 @@ function renderSkillBooks() {
       `<div class="tracker-row"${isRead ? '' : ' style="opacity:0.7;"'}>` +
       tag +
       nameHtml +
-      ` <span class="tracker-meta">&mdash; ${skillLabel}</span>` +
+      ` <span class="tracker-meta">&mdash; ${opts.meta(d)}</span>` +
       `</div>`
     );
   };
 
   const readRows = readDefs.length
     ? readDefs.map(d => rowHtml(d, true)).join('')
-    : `<div style="font-size:11px;opacity:0.5;padding:2px 0 4px;">NO BOOKS READ</div>`;
+    : `<div style="font-size:11px;opacity:0.5;padding:2px 0 4px;">${opts.emptyRead}</div>`;
   const unreadRows = unreadDefs.length
     ? unreadDefs.map(d => rowHtml(d, false)).join('')
-    : `<div style="font-size:11px;opacity:0.5;padding:2px 0 4px;">ALL BOOKS READ</div>`;
+    : `<div style="font-size:11px;opacity:0.5;padding:2px 0 4px;">${opts.emptyUnread}</div>`;
 
   container.innerHTML =
-    `<details class="sub-panel" data-sub-id="skill_books_read"${readOpen ? ' open' : ''}>` +
+    `<details class="sub-panel" data-sub-id="${opts.subIdRead}"${readOpen ? ' open' : ''}>` +
     `<summary><h3>&gt; READ [${readDefs.length}]</h3></summary>` +
     readRows +
     `</details>` +
-    `<details class="sub-panel" data-sub-id="skill_books_unread"${unreadOpen ? ' open' : ''}>` +
+    `<details class="sub-panel" data-sub-id="${opts.subIdUnread}"${unreadOpen ? ' open' : ''}>` +
     `<summary><h3>&gt; UNREAD [${unreadDefs.length}]</h3></summary>` +
     unreadRows +
     `</details>`;
@@ -947,6 +966,23 @@ function renderSkillBooks() {
         localStorage.setItem('robco_panel_state', JSON.stringify(p));
       } catch (_) {}
     });
+  });
+}
+
+function renderSkillBooks() {
+  _renderReadTracker({
+    containerId: 'skillBooksDisplay',
+    defs:
+      typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.skillBooks)
+        ? FALLOUT_REGISTRY.skillBooks
+        : [],
+    read: Array.isArray(state.skillBooks) ? state.skillBooks : [],
+    subIdRead: 'skill_books_read',
+    subIdUnread: 'skill_books_unread',
+    toggleFn: 'toggleSkillBook',
+    meta: d => escapeHtml((d.skill || '').replace(/_/g, ' ').toUpperCase()),
+    emptyRead: 'NO BOOKS READ',
+    emptyUnread: 'ALL BOOKS READ',
   });
 }
 
@@ -963,75 +999,24 @@ function toggleSkillBook(name) {
 }
 
 function renderMagazines() {
-  const panel = document.getElementById('magazinesPanel');
-  const container = document.getElementById('magazinesDisplay');
-  if (!container) return;
-  if (!_activeDef().hasMagazines) {
-    if (panel) panel.style.display = 'none';
-    return;
-  }
-  if (panel) panel.style.display = '';
-  const defs =
-    typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.magazines)
-      ? FALLOUT_REGISTRY.magazines
-      : [];
-  const read = Array.isArray(state.magazines) ? state.magazines : [];
-  const readDefs = defs.filter(d => read.includes(d.name));
-  const unreadDefs = defs.filter(d => !read.includes(d.name));
-
-  let ps = {};
-  try {
-    ps = JSON.parse(localStorage.getItem('robco_panel_state') || '{}');
-  } catch (_) {}
-  const readOpen = ps['magazines_read'] !== false;
-  const unreadOpen = ps['magazines_unread'] !== false;
-
-  const rowHtml = (d, isRead) => {
-    const safeAttr = escapeHtml(d.name);
-    const skillDisplay =
+  _renderReadTracker({
+    containerId: 'magazinesDisplay',
+    panelId: 'magazinesPanel',
+    visible: () => !!_activeDef().hasMagazines,
+    defs:
+      typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.magazines)
+        ? FALLOUT_REGISTRY.magazines
+        : [],
+    read: Array.isArray(state.magazines) ? state.magazines : [],
+    subIdRead: 'magazines_read',
+    subIdUnread: 'magazines_unread',
+    toggleFn: 'toggleMagazine',
+    meta: d =>
       d.skill === 'Critical Chance'
         ? '(Critical Chance)'
-        : `(boosts ${escapeHtml((d.skill || '').replace(/_/g, ' ').toUpperCase())})`;
-    const tag = isRead
-      ? `<button class="tracker-toggle tracker-toggle--active" data-name="${safeAttr}" onclick="toggleMagazine(this.dataset.name)" aria-label="Mark ${safeAttr} unread">[READ]</button>`
-      : `<button class="tracker-toggle tracker-toggle--inactive" data-name="${safeAttr}" onclick="toggleMagazine(this.dataset.name)" aria-label="Mark ${safeAttr} read">[----]</button>`;
-    const nameHtml = isRead
-      ? `<strong>${escapeHtml(d.name.toUpperCase())}</strong>`
-      : escapeHtml(d.name.toUpperCase());
-    return (
-      `<div class="tracker-row"${isRead ? '' : ' style="opacity:0.7;"'}>` +
-      tag +
-      nameHtml +
-      ` <span class="tracker-meta">&mdash; ${skillDisplay}</span>` +
-      `</div>`
-    );
-  };
-
-  const readRows = readDefs.length
-    ? readDefs.map(d => rowHtml(d, true)).join('')
-    : `<div style="font-size:11px;opacity:0.5;padding:2px 0 4px;">NO MAGAZINES READ</div>`;
-  const unreadRows = unreadDefs.length
-    ? unreadDefs.map(d => rowHtml(d, false)).join('')
-    : `<div style="font-size:11px;opacity:0.5;padding:2px 0 4px;">ALL MAGAZINES READ</div>`;
-
-  container.innerHTML =
-    `<details class="sub-panel" data-sub-id="magazines_read"${readOpen ? ' open' : ''}>` +
-    `<summary><h3>&gt; READ [${readDefs.length}]</h3></summary>` +
-    readRows +
-    `</details>` +
-    `<details class="sub-panel" data-sub-id="magazines_unread"${unreadOpen ? ' open' : ''}>` +
-    `<summary><h3>&gt; UNREAD [${unreadDefs.length}]</h3></summary>` +
-    unreadRows +
-    `</details>`;
-
-  container.querySelectorAll('details[data-sub-id]').forEach(d => {
-    d.addEventListener('toggle', () => {
-      try {
-        const p = JSON.parse(localStorage.getItem('robco_panel_state') || '{}');
-        p[d.dataset.subId] = d.open;
-        localStorage.setItem('robco_panel_state', JSON.stringify(p));
-      } catch (_) {}
-    });
+        : `(boosts ${escapeHtml((d.skill || '').replace(/_/g, ' ').toUpperCase())})`,
+    emptyRead: 'NO MAGAZINES READ',
+    emptyUnread: 'ALL MAGAZINES READ',
   });
 }
 
