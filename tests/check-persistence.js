@@ -6001,7 +6001,7 @@ header('Suite 61 — Mobile Layout Overflow Guards');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 62 — Changelog viewer guards
-//  7 tests
+//  11 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 62 — Changelog viewer guards');
 {
@@ -6089,6 +6089,82 @@ header('Suite 62 — Changelog viewer guards');
         /content="staging"/.test(cfStaging) &&
         !/robco-env/.test(htmlSource),
       'cf-staging-build.mjs injects the robco-env="staging" marker; prod index.html has none (fail-safe)'
+    );
+  }
+
+  // ── Runtime-fetched-asset publish/precache invariant (staging CHANGELOG fix) ──
+  // The in-app viewer fetches CHANGELOG.md at runtime. If a local asset the app
+  // fetches isn't published to BOTH the staging build (cf-staging-build.mjs) AND
+  // production (deploy.yml), it 404s on that environment — and because the SW does
+  // not precache it, the runtime fetch has no fallback and rejects with "CHANGELOG
+  // NOT FOUND". These four guards lock every runtime-fetched local asset into all
+  // three publish/precache sets so this class can't recur (Protocol 36b/42).
+  {
+    const jsAll62 = [
+      'js/ui-core.js',
+      'js/api.js',
+      'js/ui-render.js',
+      'js/ui-saves.js',
+      'js/ui-account.js',
+      'js/ui-audio.js',
+      'js/state.js',
+      'js/cloud.js',
+      'js/registry-core.js',
+      'js/reg_nv.js',
+      'js/reg_fo3.js',
+      'js/db_nv.js',
+      'js/db_fo3.js',
+    ]
+      .filter(f => fs.existsSync(path.join(ROOT, f)))
+      .map(f => readFile(f))
+      .join('\n');
+    // Discover same-origin (non-http) string literals passed to fetch().
+    const localFetched62 = [
+      ...new Set(
+        [...jsAll62.matchAll(/fetch\(\s*['"`]([^'"`]+)['"`]/g)]
+          .map(m => m[1])
+          .filter(u => !/^https?:/i.test(u) && !u.startsWith('//'))
+      ),
+    ];
+
+    // 62.7 Sentinel: the scan is not silently empty (a broken regex must not make
+    //      62.8–62.10 pass vacuously) — CHANGELOG.md is a known runtime-fetched asset.
+    assert(
+      localFetched62.includes('CHANGELOG.md'),
+      'Runtime-fetched local-asset scan finds CHANGELOG.md (sentinel — scan not silently empty)'
+    );
+
+    // 62.8 Staging build publishes every runtime-fetched local asset.
+    const cfStaging62b = readFile('scripts/cf-staging-build.mjs');
+    const stagingMissing62 = localFetched62.filter(f => !cfStaging62b.includes(f));
+    assert(
+      stagingMissing62.length === 0,
+      'Every runtime-fetched local asset is in cf-staging-build.mjs (staging publishes it)' +
+        (stagingMissing62.length ? ' — missing: ' + stagingMissing62.join(', ') : '')
+    );
+
+    // 62.9 Production deploy publishes every runtime-fetched local asset.
+    const deployYml62 = fs.existsSync(path.join(ROOT, '.github/workflows/deploy.yml'))
+      ? readFile('.github/workflows/deploy.yml')
+      : '';
+    const prodMissing62 = localFetched62.filter(f => !deployYml62.includes(f));
+    assert(
+      deployYml62 === '' || prodMissing62.length === 0,
+      'Every runtime-fetched local asset is copied by deploy.yml (prod publishes it)' +
+        (prodMissing62.length ? ' — missing: ' + prodMissing62.join(', ') : '')
+    );
+
+    // 62.10 SW precaches every runtime-fetched local asset (cache-first — removes the
+    //       runtime-network single point of failure behind the staging "NOT FOUND" bug).
+    const swSrc62 = readFile('sw.js');
+    const precacheMissing62 = localFetched62.filter(
+      f =>
+        !(swSrc62.includes(`'./${f}'`) || swSrc62.includes(`'${f}'`) || swSrc62.includes(`./${f}`))
+    );
+    assert(
+      precacheMissing62.length === 0,
+      'Every runtime-fetched local asset is precached in sw.js (cache-first, no runtime-network SPOF)' +
+        (precacheMissing62.length ? ' — missing: ' + precacheMissing62.join(', ') : '')
     );
   }
 }

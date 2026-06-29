@@ -4,7 +4,7 @@
 // Changing this string is the ONLY thing that triggers the "REBOOT TERMINAL" update
 // prompt for users who already have the site cached. Forgetting to bump means cached
 // users silently run the old UI until they manually clear their browser cache.
-const CACHE_NAME = 'robco-terminal-v2.6.0-r16';
+const CACHE_NAME = 'robco-terminal-v2.6.0-r17';
 const ASSETS = [
   './',
   './index.html',
@@ -36,7 +36,21 @@ self.addEventListener('install', event => {
   // update prompt fires and the postMessage(SKIP_WAITING) is silently dropped.
   // The SW must wait here; skipWaiting() is triggered explicitly by the main
   // thread via the 'message' listener below once the user accepts the prompt.
-  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)));
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(cache =>
+      // Core assets are all-or-nothing — install fails if any are missing.
+      cache.addAll(ASSETS).then(() =>
+        // CHANGELOG.md is fetched at runtime by the in-app changelog viewer and is
+        // the ONLY local asset the app fetches over the network. Precache it
+        // best-effort so the viewer is served cache-first and never depends on a
+        // live network fetch that can reject — the staging "CHANGELOG NOT FOUND"
+        // failure mode. Non-fatal by design: a miss here leaves the SW installed
+        // and the viewer falls back to its runtime fetch exactly as before, so
+        // this can never make install worse than not precaching it at all.
+        cache.add('./CHANGELOG.md').catch(() => {})
+      )
+    )
+  );
 });
 
 self.addEventListener('activate', event => {

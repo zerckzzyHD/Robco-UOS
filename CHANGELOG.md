@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1203/1203 | Cache: robco-terminal-v2.6.0-r16 -->
+﻿## [Unreleased]<!-- Tests: 1207/1207 | Cache: robco-terminal-v2.6.0-r17 -->
 
 ### Added
 
@@ -23,6 +23,7 @@
 - Limb condition buttons now announce their current state to screen readers — each button says "Head: OK" or "Right Arm: Crippled" and reports its toggle state, so users navigating by keyboard or AT always know which limbs are injured without looking at the visual bar.
 - Inactive tab buttons now have higher contrast — opacity raised from 55% to 75%, which brings all six optics colour themes above the WCAG AA 3:1 contrast ratio for interface controls.
 - Loading a saved game now actually loads it. Importing a save file, restoring a backup, or loading a cloud save would appear to do nothing — the terminal kept showing your current data instead of the loaded save. The newly-loaded data was being written correctly, but a routine "save on exit" step was firing during the reload and silently overwriting it with your old data first. All three load paths — IMPORT SAVE, RESTORE BACKUP, and cloud load — now load correctly, including older and reconstructed saves.
+- Fixed the in-app System Changelog showing "CHANGELOG NOT FOUND" on the private test build. The changelog page was the only screen that loaded its content over the network each time it opened, with no local copy to fall back on — so any hiccup fetching it left the page blank with that error. The changelog is now stored alongside the rest of the app so it opens instantly and reliably, even offline, on both the test build and the public site.
 
 ### Under the Hood
 

@@ -3451,7 +3451,7 @@ Check ([bool]($mobileSlice61 -match 'overflow-x\s*:\s*clip')) `
 
 # ===========================================================
 # Suite 62 -- Changelog viewer guards
-# 7 tests
+# 11 tests
 # ===========================================================
 Sep "Suite 62 -- Changelog viewer guards"
 $uiCoreSrc62 = Read-Src "js/ui-core.js"
@@ -3498,6 +3498,39 @@ Check (($vcBody62 -match 'if\s*\(\s*isStaging\s*\)\s*return text') -and `
 $cfStaging62 = Read-Src "scripts/cf-staging-build.mjs"
 Check (($cfStaging62 -match 'robco-env') -and ($cfStaging62 -match 'content="staging"') -and -not ($htmlSrc -match 'robco-env')) `
     "cf-staging-build.mjs injects the robco-env=staging marker; prod index.html has none (fail-safe)"
+
+# -- Runtime-fetched-asset publish/precache invariant (staging CHANGELOG fix) --
+# The in-app viewer fetches CHANGELOG.md at runtime. A local asset the app fetches
+# that isn't published to BOTH staging (cf-staging-build.mjs) AND prod (deploy.yml)
+# 404s on that environment, and because the SW does not precache it the runtime
+# fetch has no fallback and rejects with "CHANGELOG NOT FOUND". These four guards
+# lock every runtime-fetched local asset into all three publish/precache sets.
+$jsFiles62 = @('js/ui-core.js', 'js/api.js', 'js/ui-render.js', 'js/ui-saves.js', 'js/ui-account.js', 'js/ui-audio.js', 'js/state.js', 'js/cloud.js', 'js/registry-core.js', 'js/reg_nv.js', 'js/reg_fo3.js', 'js/db_nv.js', 'js/db_fo3.js')
+$jsAll62 = ($jsFiles62 | Where-Object { Test-Path (Join-Path $Root $_) } | ForEach-Object { Read-Src $_ }) -join "`n"
+$rx62 = "fetch\(\s*['`"``]([^'`"``]+)['`"``]"
+$localFetched62 = @([regex]::Matches($jsAll62, $rx62) | ForEach-Object { $_.Groups[1].Value } | Where-Object { $_ -notmatch '^https?:' -and -not $_.StartsWith('//') } | Select-Object -Unique)
+
+# 62.7 Sentinel: scan is not silently empty (a broken regex must not make 62.8-62.10 pass vacuously).
+Check ($localFetched62 -contains 'CHANGELOG.md') `
+    'Runtime-fetched local-asset scan finds CHANGELOG.md (sentinel -- scan not silently empty)'
+
+# 62.8 Staging build publishes every runtime-fetched local asset.
+$stagingMissing62 = @($localFetched62 | Where-Object { -not $cfStaging62.Contains($_) })
+Check ($stagingMissing62.Count -eq 0) `
+    ('Every runtime-fetched local asset is in cf-staging-build.mjs (staging publishes it)' + $(if ($stagingMissing62.Count) { ' -- missing: ' + ($stagingMissing62 -join ', ') } else { '' }))
+
+# 62.9 Production deploy publishes every runtime-fetched local asset.
+$deployPath62 = Join-Path $Root '.github/workflows/deploy.yml'
+$deployYml62 = if (Test-Path $deployPath62) { Get-Content $deployPath62 -Raw } else { '' }
+$prodMissing62 = @($localFetched62 | Where-Object { -not $deployYml62.Contains($_) })
+Check (($deployYml62 -eq '') -or ($prodMissing62.Count -eq 0)) `
+    ('Every runtime-fetched local asset is copied by deploy.yml (prod publishes it)' + $(if ($prodMissing62.Count) { ' -- missing: ' + ($prodMissing62 -join ', ') } else { '' }))
+
+# 62.10 SW precaches every runtime-fetched local asset (cache-first -- removes the runtime-network SPOF).
+$swSrc62 = Read-Src 'sw.js'
+$precacheMissing62 = @($localFetched62 | Where-Object { -not ($swSrc62.Contains("'./$_'") -or $swSrc62.Contains("'$_'") -or $swSrc62.Contains("./$_")) })
+Check ($precacheMissing62.Count -eq 0) `
+    ('Every runtime-fetched local asset is precached in sw.js (cache-first, no runtime-network SPOF)' + $(if ($precacheMissing62.Count) { ' -- missing: ' + ($precacheMissing62 -join ', ') } else { '' }))
 
 # ===========================================================
 # Suite 63 -- Save/Cloud UI consolidation guards (Phase 6 Task 7)
