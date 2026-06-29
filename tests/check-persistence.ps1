@@ -2897,11 +2897,11 @@ Check ([bool]($htmlSrc55 -match 'img-src[^;]*blob:')) `
     "CSP img-src contains blob: (canvas/screenshot-preview images -- Protocol 20 guard)"
 
 # ===========================================================
-# Suite 56 -- UI Module Split Guards + Boot-Loader Migration
+# Suite 56 -- UI Module Split Guards + Boot-Loader Migration (35 tests)
 # Protocol-20 static guards: each ui-*.js must exist, appear
 # in sw.js ASSETS, and be wired in index.html before api.js.
 # Also guards the document.write -> createElement migration.
-# 34 tests
+# 35 tests
 # ===========================================================
 Sep "Suite 56 -- UI Module Split Guards"
 $htmlSrc56 = $htmlSrc55  # reuse (same index.html read above)
@@ -3049,6 +3049,11 @@ Check ([bool]($htmlSrc56 -match "'FNV'" -or $htmlSrc56 -match '"FNV"')) `
 # 56.34 Boot loader handles 'FO3' context
 Check ([bool]($htmlSrc56 -match "'FO3'" -or $htmlSrc56 -match '"FO3"')) `
     "boot loader handles 'FO3' context (switches to FO3 db + reg when activeContext is FO3)"
+
+# 56.35 Boot loader selects data files via the GAME_FILES manifest with a
+#       GAME_FILES.FNV fail-safe (WU-A5 -- no hardcoded per-game ternary).
+Check ([bool](($htmlSrc56 -match 'GAME_FILES\s*=\s*\{') -and ($htmlSrc56 -match 'GAME_FILES\[\s*ctx\s*\]\s*\|\|\s*GAME_FILES\.FNV'))) `
+    'boot loader uses GAME_FILES manifest keyed by context with GAME_FILES.FNV fail-safe (WU-A5 boot manifest)'
 
 # ===========================================================
 # Suite 57 -- PWA App Shortcuts Guards
@@ -5225,7 +5230,7 @@ Check (($badgesBody88 -match 'SKILL BOOKS') -and ($badgesBody88 -match 'SKILL MA
 Check ([bool]($cssSrc88 -match 'button\.tracker-toggle')) "GATE-UI-8: terminal.css defines button.tracker-toggle class (keyboard-accessible tracker button per Protocol 17)"
 
 # ===========================================================
-# Suite 89 -- GATE-AGNOSTIC: game-agnostic refactor guards (12 tests)
+# Suite 89 -- GATE-AGNOSTIC: game-agnostic refactor guards (14 tests)
 # ===========================================================
 Sep "Suite 89 -- GATE-AGNOSTIC: game-agnostic refactor guards"
 
@@ -5296,6 +5301,15 @@ Check ([bool]($stateSrc89 -match '(?s)FO3.{0,400}seedInventory')) `
 # 89.12  RULES.md contains Protocol 38 (game-agnostic codification)
 Check ([bool]($rulesSrc89 -match 'Protocol 38')) `
     'GATE-AGNOSTIC-12: RULES.md contains Protocol 38 (game-agnostic feature code)'
+
+# 89.13  index.html: boot data-file selection is the sanctioned GAME_FILES manifest
+#        (WU-A5 / GA-1) -- keyed by context with a GAME_FILES.FNV fail-safe, not a ternary.
+Check ([bool](($htmlSrc89 -match 'GAME_FILES\s*=\s*\{[\s\S]*FNV[\s\S]*FO3[\s\S]*\}') -and ($htmlSrc89 -match 'GAME_FILES\[\s*ctx\s*\]\s*\|\|\s*GAME_FILES\.FNV'))) `
+    'GATE-AGNOSTIC-13: index.html boot loader uses the sanctioned GAME_FILES manifest with GAME_FILES.FNV fail-safe (WU-A5, GA-1)'
+
+# 89.14  index.html: the old hardcoded per-game boot ternary is gone (GA-1 fixed)
+Check (-not ($htmlSrc89 -match "ctx\s*===\s*'FO3'\s*\?")) `
+    "GATE-AGNOSTIC-14: index.html boot loader has no hardcoded ctx === 'FO3' ? per-game file ternary -- GA-1 fixed (WU-A5)"
 
 # ===========================================================
 # Suite 90 -- UTF-8 CORRUPTION GUARD: no symbol double-encoding (11 tests)

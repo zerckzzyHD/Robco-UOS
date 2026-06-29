@@ -168,7 +168,7 @@ All sounds respect a master mute toggle and individual per-system mute controls.
 | **Cloud**       | Firebase Firestore            | Cross-device save synchronization         |
 | **PWA**         | Service Worker + Manifest     | Installable offline-capable app           |
 | **Dev Tooling** | ESLint + Prettier + Vite      | Linting, formatting, dev server           |
-| **Testing**     | PowerShell persistence audit  | 1160-test pre-commit gate                 |
+| **Testing**     | PowerShell persistence audit  | 1163-test pre-commit gate                 |
 
 ### File Structure
 
@@ -188,8 +188,8 @@ All sounds respect a master mute toggle and individual per-system mute controls.
 │   └── database.js         Game CSV data (~170 weapons, ~68 armors, ~45 chems) + lookupItemInDb()
 ├── sw.js                   Service Worker (cache-first, same-origin only)
 ├── tests/
-│   ├── check-persistence.ps1  Pre-commit 1160-test persistence audit (PowerShell)
-│   └── check-persistence.js   Pre-commit 1160-test persistence audit (Node)
+│   ├── check-persistence.ps1  Pre-commit 1163-test persistence audit (PowerShell)
+│   └── check-persistence.js   Pre-commit 1163-test persistence audit (Node)
 ├── ARCHITECTURE.md         Full system dependency map & patterns
 ├── changelog.txt           Complete version history (v1.1.7 → present)
 ├── icon.png                PWA icon
@@ -342,7 +342,7 @@ Every audio function must check `AudioSettings.masterMute` and its specific mute
 npm run lint        ← catch bugs
 npm run format      ← enforce style
 git add -A
-git commit          ← cache-bump guard runs first, then persistence audit (1160 tests)
+git commit          ← cache-bump guard runs first, then persistence audit (1163 tests)
 git push origin main
 ```
 
@@ -398,7 +398,7 @@ Key milestones:
 The project is a **production-quality browser application** with:
 
 - 34 tracked state fields across 5 structured systems
-- 1160-test automated persistence audit (DOM binding, Protocol 4 enforcement, migrateState mock execution, reputation 2D matrix, CRUD function existence, CAMPG tab DOM binding, campaignMode + playthroughType Protocol 4, render contracts, CSS invariants, SW invariants, structural integrity, detail-current dedup guard, gate guards for critical UI controls, prohibited patterns, protocol completeness, AI contract lock, architectural boundaries, assets completeness, CSS hygiene guards, DB↔registry weapon parity, weapon mods CSV + registry parity, native command router, GAME_DEFS structural integrity, anonymous auth + security rules + XSS coercion fix, no-double-escape behavioral regression, Gemini key sync security guards, remote kill-switch + client auto-disable guards, CI/repo hardening guards, gate commit/push split + powershell fallback guards, save integrity checksum + rolling backup + forward-compat guard, AI key resilience + Tri-Node schema validation, prompt-injection hardening + input caps + quota warning, CSP origin guards + Firebase SDK pin, UI module split guards, mobile layout overflow guards, save/cloud UI consolidation guards, SPECIAL stats editable commit-on-blur guards, blocking update modal guards, FO3 Lincoln memorabilia tracker guards, FNV Traits tracker + trait name filter guards, FNV location database expansion guards, Phase 6 UI consistency guards, location datalist bleed fix + update-modal whitespace guards, skills panel game-aware render guards, registry no-duplicate-item guard, autoImportState hardening guards, FO3 location database expansion guards, CHEMS.CSV consumables expansion guards, FO3 [ARMOR.CSV] expansion guards, FO3 quests expansion + quest items expansion guards, crafting recipe + breakdown registry data guards, craft panel compact recipe/scrap picker guards, skill books tracker READ/UNREAD split guards, maskable shortcut icons + OPTICS label wrap, NV Skill Magazines tracker, UI consistency structural guards (Suite 88: 8 tests), game-agnostic refactor guards + Protocol 38 (Suite 89: 12 tests), loadUI dirty-check / targeted re-render guards (Suite 91: 9 tests))
+- 1163-test automated persistence audit (DOM binding, Protocol 4 enforcement, migrateState mock execution, reputation 2D matrix, CRUD function existence, CAMPG tab DOM binding, campaignMode + playthroughType Protocol 4, render contracts, CSS invariants, SW invariants, structural integrity, detail-current dedup guard, gate guards for critical UI controls, prohibited patterns, protocol completeness, AI contract lock, architectural boundaries, assets completeness, CSS hygiene guards, DB↔registry weapon parity, weapon mods CSV + registry parity, native command router, GAME_DEFS structural integrity, anonymous auth + security rules + XSS coercion fix, no-double-escape behavioral regression, Gemini key sync security guards, remote kill-switch + client auto-disable guards, CI/repo hardening guards, gate commit/push split + powershell fallback guards, save integrity checksum + rolling backup + forward-compat guard, AI key resilience + Tri-Node schema validation, prompt-injection hardening + input caps + quota warning, CSP origin guards + Firebase SDK pin, UI module split guards, mobile layout overflow guards, save/cloud UI consolidation guards, SPECIAL stats editable commit-on-blur guards, blocking update modal guards, FO3 Lincoln memorabilia tracker guards, FNV Traits tracker + trait name filter guards, FNV location database expansion guards, Phase 6 UI consistency guards, location datalist bleed fix + update-modal whitespace guards, skills panel game-aware render guards, registry no-duplicate-item guard, autoImportState hardening guards, FO3 location database expansion guards, CHEMS.CSV consumables expansion guards, FO3 [ARMOR.CSV] expansion guards, FO3 quests expansion + quest items expansion guards, crafting recipe + breakdown registry data guards, craft panel compact recipe/scrap picker guards, skill books tracker READ/UNREAD split guards, maskable shortcut icons + OPTICS label wrap, NV Skill Magazines tracker, UI consistency structural guards (Suite 88: 8 tests), game-agnostic refactor guards + Protocol 38 (Suite 89: 14 tests), loadUI dirty-check / targeted re-render guards (Suite 91: 9 tests))
 - 14-faction reputation network
 - 13-skill character sheet
 - Full save/load/export/import/cloud sync/undo pipeline

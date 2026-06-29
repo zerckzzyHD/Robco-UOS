@@ -4871,7 +4871,7 @@ header('Suite 55 — CSP Stage 1 Origin Guards + Firebase Pin');
 //  Protocol-20 static guards: each ui-*.js must exist, appear
 //  in sw.js ASSETS, and be wired in index.html before api.js.
 //  Also guards the document.write → createElement migration.
-// 34 tests
+//  35 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 56 — UI Module Split Guards');
 {
@@ -5113,6 +5113,14 @@ header('Suite 56 — UI Module Split Guards');
   assert(
     /'FO3'/.test(htmlSource56) || /"FO3"/.test(htmlSource56),
     "boot loader handles 'FO3' context (switches to FO3 db + reg when activeContext is FO3)"
+  );
+
+  // 56.35 Boot loader selects data files via the GAME_FILES manifest with a
+  //       GAME_FILES.FNV fail-safe (WU-A5 — no hardcoded per-game ternary).
+  assert(
+    /GAME_FILES\s*=\s*\{/.test(htmlSource56) &&
+      /GAME_FILES\[\s*ctx\s*\]\s*\|\|\s*GAME_FILES\.FNV/.test(htmlSource56),
+    'boot loader uses GAME_FILES manifest keyed by context with GAME_FILES.FNV fail-safe (WU-A5 boot manifest)'
   );
 }
 
@@ -8861,7 +8869,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 89 — GATE-AGNOSTIC: game-agnostic refactor guards (12 tests)
+//  Suite 89 — GATE-AGNOSTIC: game-agnostic refactor guards (14 tests)
 // ══════════════════════════════════════════════════════════════
 {
   const apiSrc89 = fs.readFileSync(path.join(__dirname, '../js/api.js'), 'utf8');
@@ -8976,6 +8984,20 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   assert(
     /Protocol 38/.test(rulesSrc89),
     'GATE-AGNOSTIC-12: RULES.md contains Protocol 38 (game-agnostic feature code)'
+  );
+
+  // 89.13  index.html: boot data-file selection is the sanctioned GAME_FILES manifest
+  //        (WU-A5 / GA-1) — keyed by context with a GAME_FILES.FNV fail-safe, not a ternary.
+  assert(
+    /GAME_FILES\s*=\s*\{[\s\S]*FNV[\s\S]*FO3[\s\S]*\}/.test(htmlSrc89) &&
+      /GAME_FILES\[\s*ctx\s*\]\s*\|\|\s*GAME_FILES\.FNV/.test(htmlSrc89),
+    'GATE-AGNOSTIC-13: index.html boot loader uses the sanctioned GAME_FILES manifest with GAME_FILES.FNV fail-safe (WU-A5, GA-1)'
+  );
+
+  // 89.14  index.html: the old hardcoded per-game boot ternary is gone (GA-1 fixed)
+  assert(
+    !/ctx\s*===\s*'FO3'\s*\?/.test(htmlSrc89),
+    "GATE-AGNOSTIC-14: index.html boot loader has no hardcoded ctx === 'FO3' ? per-game file ternary — GA-1 fixed (WU-A5)"
   );
 }
 

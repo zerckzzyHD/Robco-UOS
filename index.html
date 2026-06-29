@@ -1971,10 +1971,17 @@
           ctx = 'FNV';
         }
 
-        var bootScripts =
-          ctx === 'FO3'
-            ? ['js/db_fo3.js', 'js/state.js', 'js/reg_fo3.js', 'js/registry-core.js']
-            : ['js/db_nv.js', 'js/state.js', 'js/reg_nv.js', 'js/registry-core.js'];
+        // Boot manifest (WU-A5) — the ONE sanctioned game→files map (Protocol 38).
+        // Must live here, before state.js/GAME_DEFS, because it selects the very
+        // files that DEFINE GAME_DEFS — so it cannot live inside GAME_DEFS itself.
+        // Adding a game = one manifest line + its two data files (db_XX + reg_XX);
+        // no boot-loader code edit. Per-entry order is db → state → reg → registry-core
+        // (script.async = false preserves it). Unknown/absent ctx → FNV fail-safe.
+        var GAME_FILES = {
+          FNV: ['js/db_nv.js', 'js/state.js', 'js/reg_nv.js', 'js/registry-core.js'],
+          FO3: ['js/db_fo3.js', 'js/state.js', 'js/reg_fo3.js', 'js/registry-core.js'],
+        };
+        var bootScripts = GAME_FILES[ctx] || GAME_FILES.FNV;
 
         bootScripts.forEach(function (src) {
           var s = document.createElement('script');

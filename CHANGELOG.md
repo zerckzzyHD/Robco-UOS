@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1160/1160 | Cache: robco-terminal-v2.6.0-r9 -->
+﻿## [Unreleased]<!-- Tests: 1163/1163 | Cache: robco-terminal-v2.6.0-r10 -->
 
 ### Added
 
@@ -26,6 +26,7 @@
 
 ### Under the Hood
 
+- Reworked how the terminal picks which game's data to load at startup: a single game→files manifest now drives it, so adding a future Fallout title takes one line plus its two data files instead of editing boot logic. No change to how the app loads or behaves for New Vegas or Fallout 3.
 - Tidied the project folder: the internal planning/research documents were moved into a dedicated `planning/` folder (kept private, never published), an empty leftover tool folder was removed, and a new standing rule (Protocol 41) plus a build check now flag stray junk files so the workspace stays clean going forward. No effect on the app itself.
 - Refreshed the in-browser test page (`tests/test.html`) so it once again matches how the app actually loads and imports saves — it had drifted badly and would have failed if run. It now executes the real import logic across 10 suites (field import, factions, skills, collections, clamping, registry-validated trackers, save-file sanitising, and the save-load path), and it now runs automatically in the build gate so it can never silently fall out of date again. Added a new project rule (Protocol 40) and a build check (Suite 96) that keep it in sync going forward.
 - Added a build check that fails if any single version block in the changelog repeats a category heading (two `### Fixed` under one version, etc.), so the changelog keeps exactly one heading per category.
