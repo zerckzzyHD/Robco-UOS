@@ -9,6 +9,7 @@ node_modules/
 # Build output
 dist/
 _site/
+dist-staging/
 
 # OS files
 .DS_Store

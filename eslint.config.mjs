@@ -264,6 +264,8 @@ export default [
     ignores: [
       'node_modules/',
       'dist/',
+      'dist-staging/',
+      '_site/',
       '*.min.js',
       'eslint.config.mjs',
       'tests/render-check.mjs',
@@ -271,6 +273,7 @@ export default [
       'tests/a11y-check.mjs',
       'tests/test-html-check.mjs',
       'tests/_diag*.mjs',
+      'scripts/cf-staging-build.mjs',
     ],
   },
 ];
