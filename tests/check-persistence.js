@@ -2906,7 +2906,7 @@ header('GAME_DEFS Structural Integrity (Phase 5b)');
 //  SUITE 44 — Anonymous Auth + Security Rules + XSS Coercion Fix (Phase 5c-i)
 //  Closed P0 hole: auth-gated Firestore paths, per-uid rules, App Check gate,
 //  and XSS bypass via cloud pull routed through sanitizeImportedContainer.
-//  12 tests
+//  13 tests
 // ══════════════════════════════════════════════════════════════
 header('Phase 5c-i: Auth + Rules + XSS Fix');
 
@@ -3026,6 +3026,49 @@ header('Phase 5c-i: Auth + Rules + XSS Fix');
           _i0.name === "Programmer's Rifle" &&
           _q1.name === '<script>alert(1)</script>',
         'sanitizeImportedContainer: apostrophe/ampersand survive as raw strings; <script> stored literal (no HTML encoding at storage layer)'
+      );
+
+      // 44.13  WU-B4: Phase-6 array fields + faction fame/infamy are sanitized.
+      const _tc2 = {
+        activeContext: 'FNV',
+        campaigns: {
+          FNV: {
+            collectibles: ['Snow Globe - Goodsprings', null, 42],
+            traits: ['Built to Destroy', null],
+            skillBooks: ['Duck and Cover!'],
+            magazines: ['Pugilism Illustrated'],
+            lincolnItems: {
+              "Lincoln's Hat": 'other',
+              "Lincoln's Voice": 'hannibal',
+              'Civil War Draft': 'bogus',
+            },
+            factions: {
+              ncr: { fame: '15', infamy: -3, rep: 7 },
+              legion: 'broken',
+            },
+          },
+        },
+      };
+      const _r2 = _testSanitize(_tc2);
+      const _c2 = _r2.campaigns.FNV;
+      assert(
+        _c2.collectibles.length === 2 &&
+          _c2.collectibles.every(x => typeof x === 'string') &&
+          _c2.collectibles[1] === '42' &&
+          _c2.traits.length === 1 &&
+          typeof _c2.traits[0] === 'string' &&
+          _c2.skillBooks[0] === 'Duck and Cover!' &&
+          _c2.magazines[0] === 'Pugilism Illustrated' &&
+          _c2.lincolnItems["Lincoln's Hat"] === 'found' &&
+          _c2.lincolnItems["Lincoln's Voice"] === 'hannibal' &&
+          _c2.lincolnItems['Civil War Draft'] === 'found' &&
+          _c2.factions.ncr.fame === 15 &&
+          _c2.factions.ncr.infamy === 0 &&
+          _c2.factions.ncr.rep === 7 &&
+          typeof _c2.factions.legion === 'object' &&
+          _c2.factions.legion.fame === 0 &&
+          _c2.factions.legion.infamy === 0,
+        'sanitizeImportedContainer: Phase-6 lists coerced (nulls dropped → strings), Lincoln dispositions whitelisted, faction fame/infamy → non-negative ints (WU-B4)'
       );
     } else {
       fail(

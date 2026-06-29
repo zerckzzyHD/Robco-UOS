@@ -1766,7 +1766,7 @@ Check ([bool]($skBody43 -match '_activeDef')) `
 # Suite 44 -- Anonymous Auth + Security Rules + XSS Coercion Fix (Phase 5c-i)
 # Closed P0 hole: auth-gated Firestore paths, per-uid rules, App Check gate,
 # and XSS bypass via cloud pull routed through sanitizeImportedContainer.
-# 12 tests
+# 13 tests
 # ===========================================================
 Sep "Suite 44 -- Phase 5c-i: Auth + Rules + XSS Fix"
 
@@ -1831,6 +1831,16 @@ $noHtmlEsc44 = ($sanBody44.Length -gt 100) -and
                ($sanBody44 -match 'parseInt|_str\(')
 Check $noHtmlEsc44 `
     'sanitizeImportedContainer body: no HTML escape sequences, has type coercion (no double-escape at storage layer)'
+
+# 44.13  WU-B4: sanitizeImportedContainer covers Phase-6 array fields + faction fame/infamy.
+#        (JS runner runs the full behavioral eval; PS runner does the structural check.)
+$b4ok = ($sanBody44 -match 'collectibles') -and ($sanBody44 -match 'traits') -and `
+        ($sanBody44 -match 'skillBooks') -and ($sanBody44 -match 'magazines') -and `
+        ($sanBody44 -match 'lincolnItems') -and ($sanBody44 -match 'factions') -and `
+        ($sanBody44 -match 'fame') -and ($sanBody44 -match 'infamy') -and `
+        ($sanBody44 -match 'Math\.max\(0')
+Check $b4ok `
+    "sanitizeImportedContainer covers Phase-6 fields (collectibles/traits/skillBooks/magazines/lincolnItems) + coerces faction fame/infamy to non-negative ints (WU-B4)"
 
 # ===========================================================
 # Suite 45 -- Google Sign-In + Account Panel (Phase 5c-ii)

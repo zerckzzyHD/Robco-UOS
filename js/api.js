@@ -391,6 +391,41 @@ function sanitizeImportedContainer(container) {
         armor: o.equipped.armor != null ? _str(o.equipped.armor) : null,
         headgear: o.equipped.headgear != null ? _str(o.equipped.headgear) : null,
       };
+    // Phase-6 trackers — string[] lists (collectibles/traits/skillBooks/magazines):
+    // drop null/undefined entries and coerce each to a string (defensive for imported data).
+    ['collectibles', 'traits', 'skillBooks', 'magazines'].forEach(k => {
+      if (Array.isArray(o[k])) o[k] = o[k].filter(n => n != null).map(_str);
+    });
+    // Lincoln memorabilia (FO3) — map of artifact name → disposition. Coerce keys to
+    // strings and whitelist dispositions (legacy 'other' → 'found'; unknown → 'found').
+    if (o.lincolnItems && typeof o.lincolnItems === 'object' && !Array.isArray(o.lincolnItems)) {
+      const _disp = ['found', 'hannibal', 'leroy', 'washington'];
+      const li = {};
+      Object.keys(o.lincolnItems).forEach(k => {
+        let d = String(o.lincolnItems[k] == null ? '' : o.lincolnItems[k]).toLowerCase();
+        if (d === 'other') d = 'found';
+        li[_str(k)] = _disp.includes(d) ? d : 'found';
+      });
+      o.lincolnItems = li;
+    }
+    // Faction reputation — fame/infamy are non-negative integers; preserve any other
+    // per-faction fields and rebuild a missing/non-object entry as a zeroed pair.
+    if (o.factions && typeof o.factions === 'object' && !Array.isArray(o.factions)) {
+      const f = {};
+      Object.keys(o.factions).forEach(k => {
+        const fac = o.factions[k];
+        if (fac && typeof fac === 'object' && !Array.isArray(fac)) {
+          f[k] = {
+            ...fac,
+            fame: Math.max(0, parseInt(fac.fame) || 0),
+            infamy: Math.max(0, parseInt(fac.infamy) || 0),
+          };
+        } else {
+          f[k] = { fame: 0, infamy: 0 };
+        }
+      });
+      o.factions = f;
+    }
     return o;
   }
 

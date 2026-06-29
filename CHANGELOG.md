@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1172/1172 | Cache: robco-terminal-v2.6.0-r13 -->
+﻿## [Unreleased]<!-- Tests: 1173/1173 | Cache: robco-terminal-v2.6.0-r14 -->
 
 ### Added
 
@@ -44,6 +44,7 @@
 - The AI engine list (the model dropdown populated after validating your Google AI Studio key) is now built in a single pass instead of one slow DOM update per model, removing an inefficient pattern that re-parsed the whole list on every entry. No visible change — the same engines appear in the same order. The build gate was also tightened so this inefficient pattern can no longer slip back into any served code.
 - Hardened how AI engine names are shown in the model dropdown against malformed or hostile text. The model name — whether typed by you, restored from a synced key, or returned by Google's model list — is now safely escaped before it is displayed, closing a potential cross-site-scripting hole. No visible change for normal model names; the build gate now also fails if any externally-sourced value is ever placed into the page without escaping it first.
 - The AI now reads your playstyle and engine settings from memory instead of re-fetching them from browser storage on every single message. These values are cached the first time they're needed and refreshed whenever you change them, so each AI request does a little less work. Behavior is unchanged — the AI still uses your current playstyle, key, and model — and the build gate now guards these frequently-run paths against slipping back to direct storage reads.
+- Loading a save or pulling from the cloud now cleans up more of your data on the way in. The collectible, trait, skill-book, skill-magazine, and Lincoln-memorabilia trackers, plus faction reputation values, are now defensively checked and corrected when a save is imported — stray or malformed entries are dropped or normalised so a hand-edited or corrupted file can't carry bad data into your campaign. No change for normal saves. A new project rule makes this automatic for any tracker added in the future.
 
 ---
 

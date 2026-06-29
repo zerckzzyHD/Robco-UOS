@@ -586,6 +586,12 @@
               la: 'crippled', // sanitiser upper-cases limb whitelist
               inventory: [{ name: "Programmer's Rifle", qty: 1, wgt: '3.5', val: '100' }],
               status: [{ name: 'Bonus', ticks: 2, type: 'weird' }], // type coerced to BUFF
+              collectibles: ['Snow Globe - Goodsprings', null, 42], // nulls dropped, coerced to strings
+              traits: ['Built to Destroy', null],
+              skillBooks: ['Duck and Cover!'],
+              magazines: ['Pugilism Illustrated'],
+              lincolnItems: { "Lincoln's Hat": 'other', 'Bad Item': 'bogus' }, // 'other'→found, unknown→found
+              factions: { ncr: { fame: '15', infamy: -3, rep: 7 } }, // fame/infamy → non-negative ints
             },
           },
         };
@@ -608,6 +614,29 @@
           camp.status[0].type === 'BUFF',
           'status type coerced to whitelist',
           camp.status[0].type
+        );
+        // WU-B4: Phase-6 array fields + faction fame/infamy sanitised in the container layer.
+        assert(
+          camp.collectibles.length === 2 &&
+            camp.collectibles.every(x => typeof x === 'string') &&
+            camp.traits.length === 1 &&
+            camp.skillBooks[0] === 'Duck and Cover!' &&
+            camp.magazines[0] === 'Pugilism Illustrated',
+          'Phase-6 lists coerced (nulls dropped → strings)',
+          JSON.stringify(camp.collectibles)
+        );
+        assert(
+          camp.lincolnItems["Lincoln's Hat"] === 'found' &&
+            camp.lincolnItems['Bad Item'] === 'found',
+          'Lincoln dispositions whitelisted (other/unknown → found)',
+          JSON.stringify(camp.lincolnItems)
+        );
+        assert(
+          camp.factions.ncr.fame === 15 &&
+            camp.factions.ncr.infamy === 0 &&
+            camp.factions.ncr.rep === 7,
+          'faction fame/infamy coerced to non-negative ints; other fields preserved',
+          JSON.stringify(camp.factions.ncr)
         );
 
         // Boot-merge: state = { ...defaults, ...campaigns[activeContext] } (ui-core.js boot).
