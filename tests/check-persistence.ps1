@@ -3451,14 +3451,18 @@ Check ([bool]($mobileSlice61 -match 'overflow-x\s*:\s*clip')) `
 
 # ===========================================================
 # Suite 62 -- Changelog viewer guards
-# 11 tests
+# 19 tests
 # ===========================================================
 Sep "Suite 62 -- Changelog viewer guards"
 $uiCoreSrc62 = Read-Src "js/ui-core.js"
 
-# 62.1 Boot-time viewer skips [Unreleased] -- uses sections.find() to select first versioned section
-Check ([bool]($uiCoreSrc62 -match 'sections\.find')) `
-    'Changelog boot-time viewer uses .find() to skip [Unreleased] and select first versioned section'
+# 62.1 Both changelog viewers route through the structured renderer
+#      (_showChangelogModal) -- the boot-time PATCH NOTES viewer no longer dumps
+#      raw innerText (WU-C11 glow-up).
+Check (($uiCoreSrc62 -match 'function _showChangelogModal\s*\(') -and `
+       ($uiCoreSrc62 -match '_showChangelogModal\(\s*visible\s*,') -and `
+       ($uiCoreSrc62 -match 'PATCH NOTES')) `
+    'Boot-time changelog viewer routes through the structured _showChangelogModal renderer (WU-C11)'
 
 # 62.2 Viewer strips HTML comments
 Check ([bool]($uiCoreSrc62 -match 'replace\(.*<!--')) `
@@ -3531,6 +3535,55 @@ $swSrc62 = Read-Src 'sw.js'
 $precacheMissing62 = @($localFetched62 | Where-Object { -not ($swSrc62.Contains("'./$_'") -or $swSrc62.Contains("'$_'") -or $swSrc62.Contains("./$_")) })
 Check ($precacheMissing62.Count -eq 0) `
     ('Every runtime-fetched local asset is precached in sw.js (cache-first, no runtime-network SPOF)' + $(if ($precacheMissing62.Count) { ' -- missing: ' + ($precacheMissing62 -join ', ') } else { '' }))
+
+# -- WU-C11 part (c): the changelog viewer visual glow-up structure guards --
+$cssSrc62 = Read-Src "css/terminal.css"
+$parseBody62 = ''
+$showBody62 = ''
+try { $parseBody62 = Get-FunctionBody $uiCoreSrc62 '_parseChangelog' } catch {}
+try { $showBody62 = Get-FunctionBody $uiCoreSrc62 '_showChangelogModal' } catch {}
+
+# 62.11 structured renderer + parser both defined
+Check (($uiCoreSrc62 -match 'function _parseChangelog\s*\(') -and `
+       ($uiCoreSrc62 -match 'function _showChangelogModal\s*\(')) `
+    '62.11: _parseChangelog() + _showChangelogModal() structured changelog renderer defined (WU-C11)'
+
+# 62.12 (1) ONE version at a time + a version <select> DROPDOWN
+Check ([bool]($showBody62 -match '<select id="changelogVersionSelect"')) `
+    '62.12: viewer builds a version <select id="changelogVersionSelect"> dropdown (one version at a time)'
+
+# 62.13 (2) collapsible category <details> sections
+Check (($showBody62 -match '<details class="changelog-cat"') -and ($showBody62 -match "idx === 0 \? ' open'")) `
+    '62.13: viewer builds collapsible category <details class="changelog-cat"> (first open, rest collapsed)'
+
+# 62.14 (3) diegetic "FIRMWARE REVISION LOG" framing + the four core category tags
+Check (($showBody62 -match 'FIRMWARE REVISION LOG') -and `
+       ($uiCoreSrc62 -match '\[\+\] ADDED') -and `
+       ($uiCoreSrc62 -match '\[\*\] FIXED') -and `
+       ($uiCoreSrc62 -match '\[~\] CHANGED') -and `
+       ($uiCoreSrc62 -match '\[-\] REMOVED')) `
+    '62.14: diegetic FIRMWARE REVISION LOG framing + [+] ADDED / [*] FIXED / [~] CHANGED / [-] REMOVED tags'
+
+# 62.15 entry text is escaped before innerHTML injection (XSS safety, Protocol 24)
+Check (($showBody62 -match 'escapeHtml\(e\)') -and ($showBody62 -match 'escapeHtml\(c\.tag\)')) `
+    '62.15: changelog entry + category-tag text run through escapeHtml() before innerHTML injection'
+
+# 62.16 SOURCE ORDER preserved -- no reverse()/sort() in the parse or render path
+Check ((-not ($parseBody62 -match '\.reverse\(')) -and (-not ($parseBody62 -match '\.sort\(')) -and `
+       (-not ($showBody62 -match '\.reverse\(')) -and (-not ($showBody62 -match '\.sort\('))) `
+    '62.16: changelog parse/render never reverse() or sort() entries -- source/document order preserved (WU-C11 invariant)'
+
+# 62.17 dropdown wired via addEventListener('change') (no inline on* handler)
+Check (($showBody62 -match 'addEventListener\(\s*''change''') -and (-not ($showBody62 -match '<select[^>]*onchange='))) `
+    "62.17: version dropdown wired via addEventListener('change') (re-render), no inline onchange handler"
+
+# 62.18 (4) ~700px reading column CSS + changelog-wide modal mode + close cleanup
+$closeBody62 = ''
+try { $closeBody62 = Get-FunctionBody $uiCoreSrc62 'closeModal' } catch {}
+Check (($cssSrc62 -match '\.changelog-viewer\s*\{[^}]*max-width:\s*700px') -and `
+       ($cssSrc62 -match '\.modal-box\.changelog-wide') -and `
+       ($closeBody62 -match 'classList\.remove\(''changelog-wide''\)')) `
+    '62.18: ~700px reading-column CSS (.changelog-viewer max-width:700px) + changelog-wide modal mode + closeModal cleanup'
 
 # ===========================================================
 # Suite 63 -- Save/Cloud UI consolidation guards (Phase 6 Task 7)

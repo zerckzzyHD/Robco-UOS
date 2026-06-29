@@ -529,18 +529,10 @@ window.onload = function () {
         .then(r => r.text())
         .then(text => {
           // Env-aware: production sees only released versions (latest first);
-          // staging/dev sees [Unreleased] at the top (WU-C11).
+          // staging/dev sees [Unreleased] at the top (WU-C11). The structured
+          // viewer defaults to the most-recent visible version (the first block).
           const visible = _visibleChangelog(text, _isStagingEnv());
-          const sections = visible.split(/\r?\n(?=## \[)/);
-          const released =
-            sections.find(s => /^## \[/.test(s.trimStart())) || sections[0] || visible;
-          const display = released
-            .replace(/<!--[\s\S]*?-->/g, '')
-            .replace(/^## /, '')
-            .trim();
-          document.getElementById('modalTitle').innerText = `> PATCH NOTES: ${APP_VERSION}`;
-          document.getElementById('modalContent').innerText = display;
-          _openSysModal();
+          _showChangelogModal(visible, `> PATCH NOTES: ${APP_VERSION}`);
         })
         .catch(e => console.error('Could not load changelog'));
     }
@@ -1071,15 +1063,159 @@ function _visibleChangelog(text, isStaging) {
     .join('\n');
 }
 
+// ── WU-C11 changelog viewer glow-up ──────────────────────────────────────────
+// Diegetic "FIRMWARE REVISION LOG" framing: each Keep-a-Changelog category maps
+// to a HOUSE_STANDARD tag. Unknown categories fall back to a generic tag.
+const _CHANGELOG_CAT_TAGS = {
+  added: '[+] ADDED',
+  fixed: '[*] FIXED',
+  changed: '[~] CHANGED',
+  removed: '[-] REMOVED',
+  improved: '[^] IMPROVED',
+  'under the hood': '[#] UNDER THE HOOD',
+};
+function _changelogCatTag(name) {
+  const key = String(name || '')
+    .trim()
+    .toLowerCase();
+  return _CHANGELOG_CAT_TAGS[key] || '[>] ' + key.toUpperCase();
+}
+
+// Parse changelog markdown into version blocks → categories → entries.
+// SOURCE ORDER IS PRESERVED at every level: version blocks, categories within a
+// version, and entries within a category are pushed in document order — there is
+// no .reverse()/.sort() anywhere, so the on-site log reads exactly as authored
+// (earliest-first within each category, per the CHANGELOG convention). The date
+// is lifted from the version header's <!-- Date: … --> comment before comments
+// are stripped for display.
+function _parseChangelog(text) {
+  const blocks = String(text)
+    .split(/\r?\n(?=## \[)/)
+    .filter(b => /^\s*## \[/.test(b));
+  return blocks.map(block => {
+    const headerLine = block.split(/\r?\n/)[0] || '';
+    const dateM = headerLine.match(/Date:\s*([0-9]{4}-[0-9]{2}-[0-9]{2})/);
+    const date = dateM ? dateM[1] : '';
+    const labelRaw = headerLine
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .replace(/^\s*##\s*/, '')
+      .trim();
+    const verM = labelRaw.match(/^\[([^\]]+)\]/);
+    const version = verM ? verM[1] : labelRaw;
+    const titleM = labelRaw.match(/\]\s*[—–-]\s*(.+)$/);
+    const title = titleM ? titleM[1].trim() : '';
+    const body = block
+      .split(/\r?\n/)
+      .slice(1)
+      .join('\n')
+      .replace(/<!--[\s\S]*?-->/g, '');
+    const categories = [];
+    for (const cb of body.split(/\r?\n(?=### )/)) {
+      const cm = cb.match(/^\s*###\s*(.+)/);
+      if (!cm) continue;
+      const catName = cm[1].trim();
+      const entries = [];
+      for (const ln of cb.split(/\r?\n/)) {
+        const em = ln.match(/^\s*-\s+(.*\S)\s*$/);
+        if (em) entries.push(em[1]); // document order — no reverse, no sort
+      }
+      if (entries.length) {
+        categories.push({ name: catName, tag: _changelogCatTag(catName), entries });
+      }
+    }
+    return { version, title, date, categories };
+  });
+}
+
+// Render the structured, decluttered changelog into the shared sysModal: a
+// version <select> dropdown (one version shown at a time, most-recent default),
+// collapsible category <details> (first open, rest collapsed), diegetic tags and
+// "> " bullets, capped to a ~700px reading column on desktop (see terminal.css).
+// `text` is ALREADY env-filtered by the caller via _visibleChangelog().
+function _showChangelogModal(text, title) {
+  const content = document.getElementById('modalContent');
+  document.getElementById('modalTitle').innerText = title;
+  const versions = _parseChangelog(text);
+  if (!versions.length) {
+    content.innerHTML =
+      '<div class="changelog-viewer"><p class="changelog-empty">&gt; [SYS-ALERT: NO REVISION DATA]</p></div>';
+    _openSysModal();
+    return;
+  }
+  const renderCats = v => {
+    const cats = v.categories
+      .map((c, idx) => {
+        const items = c.entries.map(e => '<li>&gt; ' + escapeHtml(e) + '</li>').join('');
+        return (
+          '<details class="changelog-cat"' +
+          (idx === 0 ? ' open' : '') +
+          '><summary><span class="changelog-cat-tag">' +
+          escapeHtml(c.tag) +
+          '</span><span class="changelog-cat-count"> · ' +
+          c.entries.length +
+          '</span></summary><ul class="changelog-entries">' +
+          items +
+          '</ul></details>'
+        );
+      })
+      .join('');
+    return cats || '<p class="changelog-empty">&gt; (no entries logged)</p>';
+  };
+  const metaText = v =>
+    '> FIRMWARE REVISION ' +
+    v.version +
+    (v.date ? ' · ' + v.date : '') +
+    (v.title ? ' · ' + v.title : '');
+  const opts = versions
+    .map(
+      v =>
+        '<option value="' +
+        escapeHtml(v.version) +
+        '">' +
+        escapeHtml(v.version + (v.date ? ' — ' + v.date : '')) +
+        '</option>'
+    )
+    .join('');
+  const first = versions[0];
+  content.innerHTML =
+    '<div class="changelog-viewer">' +
+    '<div class="changelog-firmware-head">FIRMWARE REVISION LOG</div>' +
+    '<div class="changelog-ver-row"><label class="changelog-ver-label" for="changelogVersionSelect">&gt; REVISION:</label>' +
+    '<select id="changelogVersionSelect" class="changelog-ver-select">' +
+    opts +
+    '</select></div>' +
+    '<div class="changelog-meta" id="changelogMeta">' +
+    escapeHtml(metaText(first)) +
+    '</div>' +
+    '<div class="changelog-cats" id="changelogCats">' +
+    renderCats(first) +
+    '</div></div>';
+  const box = document.querySelector('#sysModal .modal-box');
+  if (box) box.classList.add('changelog-wide');
+  // Wire the dropdown to swap only the body + meta — the <select> element itself
+  // persists across changes (no inline on* handler; addEventListener keeps it
+  // out of the inline-handler integrity surface).
+  const selEl = document.getElementById('changelogVersionSelect');
+  if (selEl) {
+    selEl.addEventListener('change', () => {
+      const v = versions.find(x => x.version === selEl.value) || versions[0];
+      const catsEl = document.getElementById('changelogCats');
+      const metaEl = document.getElementById('changelogMeta');
+      if (catsEl) catsEl.innerHTML = renderCats(v);
+      if (metaEl) metaEl.textContent = metaText(v);
+    });
+  }
+  _openSysModal();
+}
+
 function showFullChangelog() {
   fetch('CHANGELOG.md')
     .then(r => r.text())
     .then(text => {
-      document.getElementById('modalTitle').innerText = '> SYSTEM CHANGELOG — ALL VERSIONS';
-      document.getElementById('modalContent').innerText = _visibleChangelog(text, _isStagingEnv())
-        .replace(/<!--[\s\S]*?-->/g, '')
-        .trim();
-      _openSysModal();
+      // Env gate first (prod hides [Unreleased], staging shows it), then render
+      // the structured viewer over the already-filtered markdown.
+      const visible = _visibleChangelog(text, _isStagingEnv());
+      _showChangelogModal(visible, '> FIRMWARE REVISION LOG');
     })
     .catch(() => {
       document.getElementById('modalTitle').innerText = '> SYSTEM CHANGELOG';
@@ -1097,7 +1233,12 @@ function _openSysModal() {
   if (closeBtn) closeBtn.focus();
 }
 function closeModal() {
-  document.getElementById('sysModal').style.display = 'none';
+  const modal = document.getElementById('sysModal');
+  modal.style.display = 'none';
+  // Drop the changelog-only wide reading-column mode so the next modal (LOGS,
+  // command reference, etc.) renders at the normal width (WU-C11).
+  const box = modal.querySelector('.modal-box');
+  if (box) box.classList.remove('changelog-wide');
   if (_sysModalTrigger && typeof _sysModalTrigger.focus === 'function') {
     _sysModalTrigger.focus();
   }

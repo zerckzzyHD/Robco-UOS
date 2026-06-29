@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1228/1228 | Cache: robco-terminal-v2.6.0-r20 -->
+﻿## [Unreleased]<!-- Tests: 1236/1236 | Cache: robco-terminal-v2.6.0-r21 -->
 
 ### Added
 
@@ -26,6 +26,10 @@
 - Fixed the in-app System Changelog showing "CHANGELOG NOT FOUND" on the private test build. The changelog page was the only screen that loaded its content over the network each time it opened, with no local copy to fall back on — so any hiccup fetching it left the page blank with that error. The changelog is now stored alongside the rest of the app so it opens instantly and reliably, even offline, on both the test build and the public site.
 - Fixed the private test build failing to update its offline engine with an "ASYNC FAULT — failed to update a ServiceWorker… the script resource is behind a redirect" error. The test host was quietly redirecting the request for the app's background updater instead of serving it directly, and browsers refuse to install an updater that arrives via a redirect — so the test PWA could get stuck on an old version. The test build now tells the host to serve that file (and the app manifest) straight through with no redirect, so updates install cleanly. The public site was never affected.
 - Fixed the deep startup hum playing at the wrong moment. The power-on drone is meant to rumble as the boot screen runs, but browsers won't let any sound play until you first tap or press a key — so if you didn't touch anything during boot, the hum was sitting in wait and would fire awkwardly later, the first time you tapped a menu mid-session. Now the drone only plays if boot is still in progress when you first interact; if boot already finished, it's quietly dropped instead of surfacing detached. The hum is part of the startup or doesn't play at all.
+
+### Changed
+
+- The in-app changelog viewer has been completely redesigned from a single cluttered wall of text into a clean, readable "FIRMWARE REVISION LOG". You now see one version at a time with a dropdown to jump to any past release; each version's notes are grouped into collapsible sections (Added, Fixed, Changed, Removed) with the newest section open and the rest tucked away; entries are tagged and bulleted in the terminal's voice; and on a wide screen the text is held to a comfortable centred reading column instead of stretching edge to edge, while phones get full width with comfortable spacing. The private test build still shows in-progress "Unreleased" notes; the public site still shows only released versions.
 
 ### Under the Hood
 

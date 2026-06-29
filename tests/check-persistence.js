@@ -6004,16 +6004,20 @@ header('Suite 61 — Mobile Layout Overflow Guards');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 62 — Changelog viewer guards
-//  11 tests
+//  19 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 62 — Changelog viewer guards');
 {
   const uiCoreSrc62 = readFile('js/ui-core.js');
 
-  // 62.1 Boot-time viewer skips [Unreleased] — uses sections.find() to select first versioned section
+  // 62.1 Both changelog viewers route through the structured renderer
+  //      (_showChangelogModal) — the boot-time PATCH NOTES viewer no longer dumps
+  //      raw innerText (WU-C11 glow-up). The boot viewer's fetch().then passes the
+  //      env-filtered text into _showChangelogModal.
   assert(
-    /sections\.find/.test(uiCoreSrc62),
-    'Changelog boot-time viewer uses .find() to skip [Unreleased] and select first versioned section'
+    /function _showChangelogModal\s*\(/.test(uiCoreSrc62) &&
+      /_showChangelogModal\(\s*visible\s*,\s*`> PATCH NOTES/.test(uiCoreSrc62),
+    'Boot-time changelog viewer routes through the structured _showChangelogModal renderer (WU-C11)'
   );
 
   // 62.2 Viewer strips HTML comments
@@ -6168,6 +6172,81 @@ header('Suite 62 — Changelog viewer guards');
       precacheMissing62.length === 0,
       'Every runtime-fetched local asset is precached in sw.js (cache-first, no runtime-network SPOF)' +
         (precacheMissing62.length ? ' — missing: ' + precacheMissing62.join(', ') : '')
+    );
+  }
+
+  // ── WU-C11 part (c): the changelog viewer visual glow-up structure guards ──
+  const cssSrc62 = readFile('css/terminal.css');
+  let parseBody62 = '';
+  let showBody62 = '';
+  try {
+    parseBody62 = extractFunctionBody(uiCoreSrc62, '_parseChangelog');
+  } catch (_) {}
+  try {
+    showBody62 = extractFunctionBody(uiCoreSrc62, '_showChangelogModal');
+  } catch (_) {}
+
+  // 62.11 structured renderer + parser both defined
+  assert(
+    /function _parseChangelog\s*\(/.test(uiCoreSrc62) &&
+      /function _showChangelogModal\s*\(/.test(uiCoreSrc62),
+    '62.11: _parseChangelog() + _showChangelogModal() structured changelog renderer defined (WU-C11)'
+  );
+
+  // 62.12 (1) ONE version at a time + a version <select> DROPDOWN
+  assert(
+    /<select id="changelogVersionSelect"/.test(showBody62),
+    '62.12: viewer builds a version <select id="changelogVersionSelect"> dropdown (one version at a time)'
+  );
+
+  // 62.13 (2) collapsible category <details> sections
+  assert(
+    /<details class="changelog-cat"/.test(showBody62) && /idx === 0 \? ' open'/.test(showBody62),
+    '62.13: viewer builds collapsible category <details class="changelog-cat"> (first open, rest collapsed)'
+  );
+
+  // 62.14 (3) diegetic "FIRMWARE REVISION LOG" framing + the four core category tags
+  assert(
+    /FIRMWARE REVISION LOG/.test(showBody62) &&
+      /\[\+\] ADDED/.test(uiCoreSrc62) &&
+      /\[\*\] FIXED/.test(uiCoreSrc62) &&
+      /\[~\] CHANGED/.test(uiCoreSrc62) &&
+      /\[-\] REMOVED/.test(uiCoreSrc62),
+    '62.14: diegetic FIRMWARE REVISION LOG framing + [+] ADDED / [*] FIXED / [~] CHANGED / [-] REMOVED tags'
+  );
+
+  // 62.15 entry text is escaped before innerHTML injection (XSS safety, Protocol 24)
+  assert(
+    /escapeHtml\(e\)/.test(showBody62) && /escapeHtml\(c\.tag\)/.test(showBody62),
+    '62.15: changelog entry + category-tag text run through escapeHtml() before innerHTML injection'
+  );
+
+  // 62.16 SOURCE ORDER preserved — no reverse()/sort() in the parse or render path
+  assert(
+    !/\.reverse\(/.test(parseBody62) &&
+      !/\.sort\(/.test(parseBody62) &&
+      !/\.reverse\(/.test(showBody62) &&
+      !/\.sort\(/.test(showBody62),
+    '62.16: changelog parse/render never reverse() or sort() entries — source/document order preserved (WU-C11 invariant)'
+  );
+
+  // 62.17 dropdown wired via addEventListener('change') (no inline on* handler)
+  assert(
+    /addEventListener\(\s*'change'/.test(showBody62) && !/<select[^>]*onchange=/.test(showBody62),
+    "62.17: version dropdown wired via addEventListener('change') (re-render), no inline onchange handler"
+  );
+
+  // 62.18 (4) ~700px reading column CSS + changelog-wide modal mode + close cleanup
+  {
+    let closeBody62 = '';
+    try {
+      closeBody62 = extractFunctionBody(uiCoreSrc62, 'closeModal');
+    } catch (_) {}
+    assert(
+      /\.changelog-viewer\s*\{[^}]*max-width:\s*700px/.test(cssSrc62) &&
+        /\.modal-box\.changelog-wide/.test(cssSrc62) &&
+        /classList\.remove\('changelog-wide'\)/.test(closeBody62),
+      '62.18: ~700px reading-column CSS (.changelog-viewer max-width:700px) + changelog-wide modal mode + closeModal cleanup'
     );
   }
 }

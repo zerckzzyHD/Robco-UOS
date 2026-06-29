@@ -637,6 +637,113 @@ details.sub-panel[open] > summary h3::after {
   width: 100%;
 }
 
+/* ── WU-C11 Changelog viewer ("FIRMWARE REVISION LOG") ──────────── */
+/* Changelog-only wide mode: a comfortable ~700px reading column on desktop,
+   never edge-to-edge; capped to the viewport on mobile so it can't overflow. */
+.modal-box.changelog-wide {
+  max-width: min(740px, 94vw);
+}
+.changelog-viewer {
+  width: 100%;
+  max-width: 700px;
+  margin: 0 auto;
+  white-space: normal; /* override .modal-content pre-wrap for structured HTML */
+}
+.changelog-firmware-head {
+  font-size: 13px;
+  letter-spacing: 2px;
+  color: var(--robco-green);
+  opacity: 0.85;
+  border-bottom: 1px dashed rgba(var(--robco-green-rgb), 0.5);
+  padding-bottom: 6px;
+  margin-bottom: 10px;
+}
+.changelog-ver-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.changelog-ver-label {
+  font-size: 13px;
+  letter-spacing: 1px;
+  opacity: 0.85;
+  white-space: nowrap;
+}
+.changelog-ver-select {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 32px;
+  font-family: inherit;
+  font-size: 16px; /* ≥16px: no iOS focus-zoom (Protocol 17) */
+  color: var(--robco-green);
+  background: rgba(var(--robco-green-rgb), 0.08);
+  border: 1px solid var(--robco-green);
+  padding: 4px 8px;
+}
+.changelog-meta {
+  font-size: 12px;
+  opacity: 0.75;
+  margin-bottom: 12px;
+  overflow-wrap: anywhere;
+}
+.changelog-cat {
+  border-top: 1px dashed rgba(var(--robco-green-rgb), 0.35);
+  padding: 6px 0;
+}
+.changelog-cat > summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+  padding: 4px 0;
+  min-height: 28px; /* ≥28px tap target (Protocol 17) */
+}
+.changelog-cat > summary::-webkit-details-marker {
+  display: none;
+}
+.changelog-cat-tag {
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: var(--robco-green);
+  white-space: nowrap;
+}
+.changelog-cat-count {
+  font-size: 12px;
+  opacity: 0.85; /* ≥AA contrast on the dark modal bg (axe-verified) */
+}
+.changelog-cat > summary::after {
+  content: ' [+]';
+  float: right;
+  font-family: monospace;
+  font-size: 12px;
+  opacity: 0.7;
+}
+.changelog-cat[open] > summary::after {
+  content: ' [-]';
+}
+.changelog-entries {
+  list-style: none;
+  margin: 6px 0 4px 0;
+  padding: 0;
+}
+.changelog-entries li {
+  margin: 0 0 8px 0;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.changelog-empty {
+  opacity: 0.85; /* ≥AA contrast on the dark modal bg */
+  font-style: italic;
+}
+@media (max-width: 600px) {
+  .changelog-viewer {
+    max-width: 100%;
+  }
+}
+
 /* ── Command Registry Card Grid ─────────────────────────────── */
 .cmd-registry {
   display: grid;
