@@ -5296,7 +5296,7 @@ Check ([bool]($rulesSrc89 -match 'Protocol 38')) `
     'GATE-AGNOSTIC-12: RULES.md contains Protocol 38 (game-agnostic feature code)'
 
 # ===========================================================
-# Suite 90 -- UTF-8 CORRUPTION GUARD: no symbol double-encoding (8 tests)
+# Suite 90 -- UTF-8 CORRUPTION GUARD: no symbol double-encoding (11 tests)
 # ===========================================================
 Sep "Suite 90 -- UTF-8 CORRUPTION GUARD: no symbol double-encoding"
 # Detect double-encoding from PowerShell Latin-1 read + UTF-8 write.
@@ -5315,16 +5315,28 @@ $srcPairs90 = @(
     @{ File = 'js/ui-saves.js';   Label = 'GATE-CORRUPT-5' },
     @{ File = 'js/ui-audio.js';   Label = 'GATE-CORRUPT-6' },
     @{ File = 'js/ui-account.js'; Label = 'GATE-CORRUPT-7' },
-    @{ File = 'index.html';       Label = 'GATE-CORRUPT-8' }
+    @{ File = 'index.html';       Label = 'GATE-CORRUPT-8' },
+    @{ File = 'README.md';        Label = 'GATE-CORRUPT-9' },
+    @{ File = 'ARCHITECTURE.md';  Label = 'GATE-CORRUPT-10' }
 )
 foreach ($pair90 in $srcPairs90) {
     $content90 = [System.IO.File]::ReadAllText((Join-Path $Root $pair90.File), [System.Text.Encoding]::UTF8)
     $corrupt90 = $content90.Contains($rfChar90) -or $content90.Contains($mojiA90) -or $content90.Contains($mojiB90)
     Check (-not $corrupt90) "$($pair90.Label): $($pair90.File) has no U+FFFD or mojibake double-encoding (PowerShell UTF-8 write guard)"
 }
+# CHANGELOG.md: uses FULL 3-char sequence check only -- the 2-char prefix would
+# false-positive on the intentional documentation examples in line 10 (Protocol 39).
+$changelog90ps   = [System.IO.File]::ReadAllText((Join-Path $Root 'CHANGELOG.md'), [System.Text.Encoding]::UTF8)
+$emCorrupt90     = ([char]0x00E2).ToString() + ([char]0x20AC).ToString() + ([char]0x201D).ToString()
+$enCorrupt90     = ([char]0x00E2).ToString() + ([char]0x20AC).ToString() + ([char]0x201C).ToString()
+$mulCorrupt90    = ([char]0x00C3).ToString() + ([char]0x2014).ToString()
+$rfChar90doc     = ([char]0xFFFD).ToString()
+$clBad = $changelog90ps.Contains($emCorrupt90) -or $changelog90ps.Contains($enCorrupt90) -or `
+         $changelog90ps.Contains($mulCorrupt90) -or $changelog90ps.Contains($rfChar90doc)
+Check (-not $clBad) 'GATE-CORRUPT-11: CHANGELOG.md has no full-sequence mojibake (em/en-dash, multiplication sign double-encoding from PowerShell write)'
 
 # ===========================================================
-# Suite 91 -- loadUI DIRTY-CHECK / TARGETED RE-RENDER GUARDS (8 tests)
+# Suite 91 -- loadUI DIRTY-CHECK / TARGETED RE-RENDER GUARDS (9 tests)
 # ===========================================================
 Sep "Suite 91 -- loadUI DIRTY-CHECK / TARGETED RE-RENDER GUARDS"
 # Protocol 13 regression guards for WU-A3 (loadUI dirty-check).

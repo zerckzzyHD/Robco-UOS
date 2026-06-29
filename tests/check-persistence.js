@@ -8968,7 +8968,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 90 — UTF-8 CORRUPTION GUARD: no symbol double-encoding (8 tests)
+//  Suite 90 — UTF-8 CORRUPTION GUARD: no symbol double-encoding (11 tests)
 // ══════════════════════════════════════════════════════════════
 {
   // Detect double-encoding caused by reading UTF-8 as Windows-1252 then re-encoding.
@@ -8985,6 +8985,8 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     '../js/ui-audio.js',
     '../js/ui-account.js',
     '../index.html',
+    '../README.md',
+    '../ARCHITECTURE.md',
   ];
   srcFiles90.forEach((rel, i) => {
     const label = rel.replace('../', '');
@@ -8994,10 +8996,24 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
       `GATE-CORRUPT-${i + 1}: ${label} has no U+FFFD or \\u00E2\\u20AC/\\u00E2\\u2013 mojibake (double-encoded UTF-8 from PowerShell write)`
     );
   });
+  // CHANGELOG.md: uses FULL 3-char sequence check only — the 2-char prefix would
+  // false-positive on the intentional documentation examples in line 10 (Protocol 39).
+  const changelog90 = fs.readFileSync(path.join(__dirname, '../CHANGELOG.md'), 'utf8');
+  const emDashCorrupt90 = String.fromCharCode(0x00e2, 0x20ac, 0x201d); // double-encoded —
+  const enDashCorrupt90 = String.fromCharCode(0x00e2, 0x20ac, 0x201c); // double-encoded –
+  const mulSignCorrupt90 = String.fromCharCode(0x00c3, 0x2014); // double-encoded ×
+  const rfChar90doc = String.fromCharCode(0xfffd); // U+FFFD
+  assert(
+    !changelog90.includes(emDashCorrupt90) &&
+      !changelog90.includes(enDashCorrupt90) &&
+      !changelog90.includes(mulSignCorrupt90) &&
+      !changelog90.includes(rfChar90doc),
+    'GATE-CORRUPT-11: CHANGELOG.md has no full-sequence mojibake (em/en-dash, multiplication sign double-encoding from PowerShell write)'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 91 — loadUI DIRTY-CHECK / TARGETED RE-RENDER GUARDS (8 tests)
+//  Suite 91 — loadUI DIRTY-CHECK / TARGETED RE-RENDER GUARDS (9 tests)
 // ══════════════════════════════════════════════════════════════
 {
   // Protocol 13 regression guards for WU-A3 (loadUI dirty-check).
