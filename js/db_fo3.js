@@ -518,6 +518,77 @@ function lookupWeaponStats(name) {
   return best;
 }
 
+// ── WU-N2: VENDOR + TRADE-CATALOG LOOKUPS ─────────────────────────────────
+// getVendors() — vendor roster from VENDORS.CSV ({name, location, baseCaps, faction}).
+// baseCaps is the vendor's purse (caps cap for what it can pay when buying from you).
+let _vendorCache = null;
+function getVendors() {
+  if (_vendorCache) return _vendorCache;
+  _vendorCache = [];
+  const start = databaseCSVs.indexOf('[VENDORS.CSV]');
+  if (start !== -1) {
+    const nextSection = databaseCSVs.indexOf('\n[', start + 13);
+    const block = databaseCSVs.substring(start, nextSection === -1 ? undefined : nextSection);
+    const lines = block.split('\n').filter(l => l.trim() && !l.startsWith('['));
+    const h = (lines[0] || '').split(',');
+    const ni = h.indexOf('Vendor_Name');
+    const li = h.indexOf('Location');
+    const ci = h.indexOf('Base_Caps');
+    const fi = h.indexOf('Faction');
+    for (let i = 1; i < lines.length; i++) {
+      const c = lines[i].split(',');
+      const name = (c[ni] || '').trim();
+      if (!name) continue;
+      _vendorCache.push({
+        name,
+        location: li >= 0 ? (c[li] || '').trim() : '',
+        baseCaps: ci >= 0 ? parseInt(c[ci]) || 0 : 0,
+        faction: fi >= 0 ? (c[fi] || '').trim() : '',
+      });
+    }
+  }
+  return _vendorCache;
+}
+
+// getTradeCatalog() — the deterministic vendor catalog: every priced item in the DB
+// ({name, value, type}), deduped + sorted. WU-N2 uses the FULL item DB as stock
+// (per-vendor VENDOR_STOCK is deferred to Round 2 — WU-D4d).
+let _tradeCatalogCache = null;
+function getTradeCatalog() {
+  if (_tradeCatalogCache) return _tradeCatalogCache;
+  const tables = [
+    ['[WEAPONS.CSV]', 'Weapon_Name', 'Value', 'weapon'],
+    ['[ARMOR.CSV]', 'Name', 'Value', 'armor'],
+    ['[CHEMS.CSV]', 'Name', 'Value', 'aid'],
+    ['[MISC.CSV]', 'Name', 'Value', 'misc'],
+  ];
+  const out = [];
+  const seen = new Set();
+  for (const [header, nameCol, valCol, type] of tables) {
+    const start = databaseCSVs.indexOf(header);
+    if (start === -1) continue;
+    const nextSection = databaseCSVs.indexOf('\n[', start + header.length);
+    const block = databaseCSVs.substring(start, nextSection === -1 ? undefined : nextSection);
+    const lines = block.split('\n').filter(l => l.trim() && !l.startsWith('['));
+    const h = (lines[0] || '').split(',');
+    const ni = h.indexOf(nameCol);
+    const vi = h.indexOf(valCol);
+    if (ni === -1) continue;
+    for (let i = 1; i < lines.length; i++) {
+      const c = lines[i].split(',');
+      const name = (c[ni] || '').trim();
+      if (!name) continue;
+      const key = name.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ name, value: vi >= 0 ? parseFloat(c[vi]) || 0 : 0, type });
+    }
+  }
+  out.sort((a, b) => a.name.localeCompare(b.name));
+  _tradeCatalogCache = out;
+  return out;
+}
+
 // ── AMMO CALIBER LIST ─────────────────────────────────────────────────────────
 function getAmmoCalibers() {
   const start = databaseCSVs.indexOf('[AMMO.CSV]');

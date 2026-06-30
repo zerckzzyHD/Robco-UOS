@@ -762,9 +762,13 @@ $tradeBlock = if ($tradeStart -ge 0 -and $tradeEnd -gt $tradeStart) { $apiSrc.Su
 Check ($tradeBlock -notmatch 'onclick\s*=\s*[''"`]\s*tradeItem\s*\(') `
     "Trade modal does not use inline onclick=""tradeItem(...)"" (XSS-2 guard)"
 
-# 21.4 Trade modal uses addEventListener for click binding
-Check ($tradeBlock -match "addEventListener\s*\(\s*['""]click['""]") `
-    "Trade modal binds click via addEventListener (XSS-2 guard)"
+# 21.4 Native TRADE list is XSS-safe (WU-N2 retired the AI TRADE modal): item names are
+# escaped and routed via a data attribute, never interpolated raw into the onclick.
+$renSrc214 = Read-Src "js/ui-render.js"
+$buyBody214 = ''
+try { $buyBody214 = Get-FunctionBody $renSrc214 'renderTradeBuyList' } catch {}
+Check (($buyBody214 -match 'escapeHtml\(it\.name\)') -and ($buyBody214 -match 'data-tname=') -and ($buyBody214 -match 'this\.dataset\.tname')) `
+    "Native TRADE buy list escapes item names + routes via data-tname (XSS-2 guard)"
 
 # 21.5 autoImportState() coerces inventory qty with parseInt and wgt with parseFloat
 Check ([bool]([regex]::Match($importBody21, 'parseInt\s*\(\s*it\.qty\s*\)').Success) -and
@@ -848,7 +852,7 @@ Check ([bool]($htmlSrc -match "onclick=""macroCommand\('\[PAD: RIGHT\]'\)""")) "
 # Macro buttons
 Check ([bool]($htmlSrc -match "onclick=""macroCommand\('\[THREAT\]'\)"""))    "THREAT macro button wired"
 Check ([bool]($htmlSrc -match "onclick=""macroCommand\('\[VATS SIM\]'\)"""))  "VATS SIM macro button wired"
-Check ([bool]($htmlSrc -match "onclick=""macroCommand\('\[TRADE\]'\)"""))     "TRADE macro button wired"
+Check ([bool]($htmlSrc -match "onclick=""expandPanelForCategory\('trade'\)"""))     "TRADE macro button opens the native barter panel (WU-N2)"
 Check ([bool]($htmlSrc -match "onclick=""macroCommand\('\[LOOT\]'\)"""))      "LOOT macro button wired"
 # V.A.T.S. Calculator
 Check ([bool]($htmlSrc -match 'id="vatsCalcBtn"'))  "V.A.T.S. CALCULATOR button exists (id=vatsCalcBtn)"
@@ -1010,7 +1014,7 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84','Suite 85','Suite 86','Suite 87','Suite 88','Suite 89','Suite 90','Suite 91','Suite 92','Suite 93','Suite 94','Suite 95','Suite 96','Suite 97','Suite 98','Suite 99','Suite 100','Suite 101','Suite 102','Suite 103','Suite 104','Suite 105')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84','Suite 85','Suite 86','Suite 87','Suite 88','Suite 89','Suite 90','Suite 91','Suite 92','Suite 93','Suite 94','Suite 95','Suite 96','Suite 97','Suite 98','Suite 99','Suite 100','Suite 101','Suite 102','Suite 103','Suite 104','Suite 105','Suite 106')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
 Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-99)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
@@ -6432,6 +6436,99 @@ Check (($dbnv105 -match 'function lookupWeaponStats\s*\(') -and ($dbfo3105 -matc
 # 105.18 read-only -- no state writes
 Check ((-not ($vatsBody105 -match 'saveState\s*\(')) -and (-not ($vatsBody105 -match 'pushToCloud\s*\('))) `
     '105.18: recomputeVATS() is read-only (no saveState/pushToCloud writes)'
+
+# ===========================================================
+# Suite 106 -- WU-N2 TRADE native barter terminal (18 tests)
+# Deterministic, offline barter terminal consuming the WU-D4b coefficients
+# (GAME_DEFS[ctx].barter). Locks: db catalog/vendor lookups, price math + canon invariants
+# (buy >= value, sell < buy), additive + confirm-gated mutation (Protocol 34), the caps-revert
+# regression fix (#c_caps mirror -- Protocol 42), the retired AI TRADE modal, and panel wiring.
+# ===========================================================
+Sep "Suite 106 -- WU-N2 TRADE native barter terminal"
+$ren106 = Read-Src "js/ui-render.js"
+$dbnv106 = Read-Src "js/db_nv.js"
+$dbfo3106 = Read-Src "js/db_fo3.js"
+$api106 = Read-Src "js/api.js"
+$core106 = Read-Src "js/ui-core.js"
+$css106 = Read-Src "css/terminal.css"
+$st106 = Read-Src "js/state.js"
+$doBuyBody = ''
+$doSellBody = ''
+try { $doBuyBody = Get-FunctionBody $ren106 'doBuy' } catch {}
+try { $doSellBody = Get-FunctionBody $ren106 'doSell' } catch {}
+
+# 106.1 vendor + catalog lookups in BOTH db runners
+Check (($dbnv106 -match 'function getVendors\s*\(') -and ($dbnv106 -match 'function getTradeCatalog\s*\(') -and ($dbfo3106 -match 'function getVendors\s*\(') -and ($dbfo3106 -match 'function getTradeCatalog\s*\(')) `
+    '106.1: getVendors() + getTradeCatalog() defined in both db_nv.js and db_fo3.js'
+# 106.2 all TRADE entry points defined
+$tradeFns106 = @('renderTrade', 'renderTradeBuyList', 'renderTradeSellList', 'setTradeVendor', 'doBuy', 'doSell')
+$tradeMissing106 = @($tradeFns106 | Where-Object { -not ($ren106 -match ('function ' + $_ + '\s*\(')) })
+Check ($tradeMissing106.Count -eq 0) `
+    '106.2: renderTrade/renderTradeBuyList/renderTradeSellList/setTradeVendor/doBuy/doSell defined'
+# 106.3 price helpers read GAME_DEFS barter coefficients
+$coefBody106 = ''
+try { $coefBody106 = Get-FunctionBody $ren106 '_tradeBarterCoef' } catch {}
+Check (($ren106 -match 'function _tradeBuyPrice\s*\(') -and ($ren106 -match 'function _tradeSellPrice\s*\(') -and ($coefBody106 -match '\.barter\b') -and ($coefBody106 -match 'getGameContext|GAME_DEFS')) `
+    '106.3: _tradeBuyPrice/_tradeSellPrice read GAME_DEFS[ctx].barter (Protocol 38)'
+# 106.4/106.5 BEHAVIORAL canon invariants from parsed coefficients (both games)
+$fo3At106 = $st106.IndexOf('FO3: {')
+$fnvSlice106 = if ($fo3At106 -gt 0) { $st106.Substring($st106.IndexOf('FNV: {'), $fo3At106 - $st106.IndexOf('FNV: {')) } else { '' }
+$fo3Slice106 = if ($fo3At106 -gt 0) { $st106.Substring($fo3At106) } else { '' }
+function Test-BarterCanon106([string]$slice) {
+    $bb = [double]::Parse([regex]::Match($slice, 'buyBase\s*:\s*([\d.]+)').Groups[1].Value, [System.Globalization.CultureInfo]::InvariantCulture)
+    $sb = [double]::Parse([regex]::Match($slice, 'sellBase\s*:\s*([\d.]+)').Groups[1].Value, [System.Globalization.CultureInfo]::InvariantCulture)
+    $sl = [double]::Parse([regex]::Match($slice, 'slopePerPoint\s*:\s*([\d.]+)').Groups[1].Value, [System.Globalization.CultureInfo]::InvariantCulture)
+    foreach ($b in 0, 25, 50, 75, 100) {
+        $v = 100
+        $buy = [math]::Max(1, [math]::Round($v * ($bb - $sl * $b)))
+        $sell = [math]::Max(0, [math]::Round($v * ($sb + $sl * $b)))
+        if ($buy -lt $v) { return $false }
+        if ($sell -ge $buy) { return $false }
+        if ($sell -lt 0) { return $false }
+    }
+    return $true
+}
+Check (Test-BarterCanon106 $fnvSlice106) '106.4: CANON -- FNV buy >= value and sell < buy across barter 0..100'
+Check (Test-BarterCanon106 $fo3Slice106) '106.5: CANON -- FO3 buy >= value and sell < buy across barter 0..100'
+# 106.6 buy floored at 1, sell clamped >= 0, both rounded
+Check (($ren106 -match 'Math\.max\(\s*1,\s*Math\.round') -and ($ren106 -match 'Math\.max\(\s*0,\s*Math\.round')) `
+    '106.6: buy price floored at 1 (Math.max(1, round)) and sell clamped >= 0 (Math.max(0, round))'
+# 106.7 Protocol 34 additive
+Check (($doBuyBody -match 'state\.inventory\.push\(') -and ($doBuyBody -match '\.qty\s*=\s*\(?.*qty')) `
+    '106.7: doBuy is additive -- pushes new item or increments existing qty (Protocol 34)'
+# 106.8 confirm-gated
+Check (($doBuyBody -match 'confirm\(') -and ($doSellBody -match 'confirm\(')) `
+    '106.8: doBuy and doSell are confirm-gated (Protocol 34)'
+# 106.9 doSell splices + clamps
+Check (($doSellBody -match 'splice\(') -and ($doSellBody -match 'it\.qty\s*<=\s*0')) `
+    '106.9: doSell decrements qty and splices the item at <= 0 (clamp >= 0)'
+# 106.10 caps mutation
+Check (($doBuyBody -match 'state\.caps\s*=\s*caps\s*-\s*price') -and ($doSellBody -match 'state\.caps\s*=\s*caps\s*\+\s*price')) `
+    '106.10: doBuy sets caps = caps - price; doSell sets caps = caps + price'
+# 106.11 CAPS-REVERT REGRESSION (Protocol 42)
+Check (($doBuyBody -match 'c_caps') -and ($doSellBody -match 'c_caps')) `
+    '106.11: doBuy + doSell write new caps to #c_caps so saveState()/syncStateFromDom does not revert it (Protocol 42)'
+# 106.12 no auto-cloud-push
+Check ((-not ($doBuyBody -match 'pushToCloud\s*\(')) -and (-not ($doSellBody -match 'pushToCloud\s*\('))) `
+    '106.12: neither doBuy nor doSell auto-pushes to cloud (manual sync only)'
+# 106.13 AI TRADE modal render branch retired
+Check (-not ($api106 -match "mType\s*===\s*'TRADE'")) `
+    "106.13: the AI TRADE modal render branch (mType === 'TRADE') is removed from api.js"
+# 106.14 AI no longer emits TRADE modal + dead tradeItem removed
+Check ((-not ($api106 -match 'array of item objects.*vendor')) -and (-not ($core106 -match 'function tradeItem\s*\('))) `
+    '106.14: getSystemDirective no longer defines a TRADE modal shape; dead tradeItem() removed from ui-core.js'
+# 106.15 TRADE panel + sub-panels present
+Check (($htmlSrc -match 'id="tradePanel"') -and ($htmlSrc -match '&gt;\s*BARTER UPLINK') -and ($htmlSrc -match 'data-sub-id="trade_buy"') -and ($htmlSrc -match 'data-sub-id="trade_sell"')) `
+    '106.15: #tradePanel with BARTER UPLINK h2 + trade_buy/trade_sell sub-panels (data-sub-id) present'
+# 106.16 [TRADE] macro button repointed
+Check (($htmlSrc -match "expandPanelForCategory\('trade'\)") -and (-not ($htmlSrc -match "macroCommand\('\[TRADE\]'\)"))) `
+    "106.16: [TRADE] button opens the native panel (expandPanelForCategory('trade')), not macroCommand('[TRADE]')"
+# 106.17 expandPanelForCategory routes trade + loadUI renders it
+Check (($core106 -match "trade:\s*'inv'") -and ($core106 -match "trade:\s*'>\s*BARTER UPLINK'") -and ($core106 -match 'renderTrade\(\)')) `
+    "106.17: expandPanelForCategory maps trade->inv + '> BARTER UPLINK'; loadUI calls renderTrade()"
+# 106.18 CSS overflow guard
+Check (($css106 -match '\.trade-row\b') -and ($css106 -match '\.trade-name[\s\S]{0,80}min-width:\s*0')) `
+    '106.18: terminal.css .trade-row + .trade-name min-width:0 (no horizontal overflow at 360px)'
 
 # ===========================================================
 # Results

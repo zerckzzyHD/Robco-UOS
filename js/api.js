@@ -69,12 +69,11 @@ Data Fallback: If databases drop from memory, output a ⚙️ [SYS-ALERT: DATA C
 - You MUST format your entire response as a SINGLE, valid JSON object containing up to three nodes: "narrative", "state", and "modal".
 - The "narrative" node MUST be an ARRAY OF STRINGS.
 - The "state" node MUST mirror the uploaded state structure, including the "squad" array.
-- The "modal" node is triggered ONLY WHEN THE USER ASKS FOR A MENU, ROADMAP, STATS, [TRADE], [GPS], [TIMELINE], OR LEVEL UP. Do NOT draw ASCII Unicode boxes (┌─┐) in the narrative array for these.
-- You must include a "type" field in the modal node (e.g. "TEXT", "GPS", "TRADE").
+- The "modal" node is triggered ONLY WHEN THE USER ASKS FOR A MENU, ROADMAP, STATS, [GPS], [TIMELINE], OR LEVEL UP. Do NOT draw ASCII Unicode boxes (┌─┐) in the narrative array for these. (TRADE/barter is a native offline terminal — never emit a TRADE modal.)
+- You must include a "type" field in the modal node (e.g. "TEXT", "GPS").
 - For [TIMELINE], output modal type "TEXT" with title "PROJECTED TIMELINE".
 - If type is "TEXT", "content" is an array of strings.
 - If type is "GPS", "content" must be a 2D array of strings representing the grid (e.g. [["[ ]","[X]"],["[S]","[ ]"]]).
-- If type is "TRADE", "content" must be an array of item objects: {"name": "Stimpak", "price": 50, "qty": 3, "vendor": true}. Set vendor: false for Courier's items.
 
 Example Schema:
 {
@@ -1289,25 +1288,9 @@ async function transmitMessage() {
                 });
                 gridMap.appendChild(rowDiv);
               });
-            } else if (mType === 'TRADE') {
-              mContent.innerHTML =
-                '<div class="trade-window"><div class="trade-col" id="tradeVendor"><h3>> VENDOR</h3></div><div class="trade-col" id="tradeCourier"><h3>> COURIER</h3></div></div>';
-              let items = Array.isArray(parsedNode.modal.content) ? parsedNode.modal.content : [];
-              items.forEach(item => {
-                let div = document.createElement('div');
-                div.className = 'trade-item';
-                let span = document.createElement('span');
-                span.textContent = `${item.qty}x ${item.name} (${item.price}c)`;
-                let btn = document.createElement('button');
-                btn.className = 'action-btn';
-                btn.setAttribute('style', 'width:auto; padding:2px 5px;');
-                btn.textContent = item.vendor ? 'BUY' : 'SELL';
-                btn.addEventListener('click', () => tradeItem(item.name, item.price, item.vendor));
-                div.appendChild(span);
-                div.appendChild(btn);
-                if (item.vendor) document.getElementById('tradeVendor').appendChild(div);
-                else document.getElementById('tradeCourier').appendChild(div);
-              });
+              // WU-N2: the AI TRADE modal was retired — barter is now a native offline
+              // terminal (BARTER UPLINK panel, INV tab). Any stray TRADE modal falls through
+              // to the default TEXT render below.
             } else {
               mContent.innerText = Array.isArray(parsedNode.modal.content)
                 ? parsedNode.modal.content.join('\n')

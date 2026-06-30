@@ -1222,15 +1222,19 @@ assert(
   );
 }
 
-// 21.4 Trade modal uses addEventListener for click binding
+// 21.4 Native TRADE list is XSS-safe (WU-N2 retired the AI TRADE modal): item names are
+// escaped and routed via a data attribute, never interpolated raw into the onclick.
 {
-  const tradeStart = apiSource.indexOf("mType === 'TRADE'");
-  const tradeEnd = apiSource.indexOf('} else {', tradeStart);
-  const tradeBlock =
-    tradeStart !== -1 && tradeEnd !== -1 ? apiSource.slice(tradeStart, tradeEnd) : '';
+  const renSrc214 = readFile('js/ui-render.js');
+  let buyBody214 = '';
+  try {
+    buyBody214 = extractFunctionBody(renSrc214, 'renderTradeBuyList');
+  } catch (_) {}
   assert(
-    /addEventListener\s*\(\s*['"]click['"]/.test(tradeBlock),
-    'Trade modal binds click via addEventListener (XSS-2 guard)'
+    /escapeHtml\(it\.name\)/.test(buyBody214) &&
+      /data-tname=/.test(buyBody214) &&
+      /this\.dataset\.tname/.test(buyBody214),
+    'Native TRADE buy list escapes item names + routes via data-tname (XSS-2 guard)'
   );
 }
 
@@ -1395,7 +1399,10 @@ assert(
 // Macro buttons
 assert(/onclick="macroCommand\('\[THREAT\]'\)"/.test(htmlSource), 'THREAT macro button wired');
 assert(/onclick="macroCommand\('\[VATS SIM\]'\)"/.test(htmlSource), 'VATS SIM macro button wired');
-assert(/onclick="macroCommand\('\[TRADE\]'\)"/.test(htmlSource), 'TRADE macro button wired');
+assert(
+  /onclick="expandPanelForCategory\('trade'\)"/.test(htmlSource),
+  'TRADE macro button opens the native barter panel (WU-N2)'
+);
 assert(/onclick="macroCommand\('\[LOOT\]'\)"/.test(htmlSource), 'LOOT macro button wired');
 // V.A.T.S. Calculator
 assert(/id="vatsCalcBtn"/.test(htmlSource), 'V.A.T.S. CALCULATOR button exists (id=vatsCalcBtn)');
@@ -1760,6 +1767,7 @@ header('Meta / Runner Parity');
     'Suite 103',
     'Suite 104',
     'Suite 105',
+    'Suite 106',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
@@ -11078,6 +11086,174 @@ header('Suite 105 — WU-N1 VATS native calculator');
   assert(
     !/saveState\s*\(/.test(vatsBody) && !/pushToCloud\s*\(/.test(vatsBody),
     '105.18: recomputeVATS() is read-only (no saveState/pushToCloud writes)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 106 — WU-N2 TRADE native barter terminal (18 tests)
+//  The deterministic, offline barter terminal consuming the WU-D4b coefficients
+//  (GAME_DEFS[ctx].barter). Locks: db catalog/vendor lookups, the price math + its
+//  canon invariants (buy ≥ value, sell < buy), additive + confirm-gated mutation
+//  (Protocol 34), the caps-revert regression fix (#c_caps mirror — Protocol 42), the
+//  retired AI TRADE modal path, and the panel wiring.
+// ══════════════════════════════════════════════════════════════
+header('Suite 106 — WU-N2 TRADE native barter terminal');
+{
+  const ren106 = readFile('js/ui-render.js');
+  const dbnv106 = readFile('js/db_nv.js');
+  const dbfo3106 = readFile('js/db_fo3.js');
+  const api106 = readFile('js/api.js');
+  const core106 = readFile('js/ui-core.js');
+  const html106 = htmlSource;
+  const css106 = readFile('css/terminal.css');
+  const st106 = readFile('js/state.js');
+  let doBuyBody = '';
+  let doSellBody = '';
+  try {
+    doBuyBody = extractFunctionBody(ren106, 'doBuy');
+  } catch (_) {}
+  try {
+    doSellBody = extractFunctionBody(ren106, 'doSell');
+  } catch (_) {}
+
+  // 106.1 vendor + catalog lookups in BOTH db runners
+  assert(
+    /function getVendors\s*\(/.test(dbnv106) &&
+      /function getTradeCatalog\s*\(/.test(dbnv106) &&
+      /function getVendors\s*\(/.test(dbfo3106) &&
+      /function getTradeCatalog\s*\(/.test(dbfo3106),
+    '106.1: getVendors() + getTradeCatalog() defined in both db_nv.js and db_fo3.js'
+  );
+  // 106.2 all TRADE entry points defined in ui-render.js
+  assert(
+    [
+      'renderTrade',
+      'renderTradeBuyList',
+      'renderTradeSellList',
+      'setTradeVendor',
+      'doBuy',
+      'doSell',
+    ].every(f => new RegExp('function ' + f + '\\s*\\(').test(ren106)),
+    '106.2: renderTrade/renderTradeBuyList/renderTradeSellList/setTradeVendor/doBuy/doSell defined'
+  );
+  // 106.3 price helpers read the GAME_DEFS barter coefficients (game-agnostic, Protocol 38)
+  {
+    let coefBody = '';
+    try {
+      coefBody = extractFunctionBody(ren106, '_tradeBarterCoef');
+    } catch (_) {}
+    assert(
+      /function _tradeBuyPrice\s*\(/.test(ren106) &&
+        /function _tradeSellPrice\s*\(/.test(ren106) &&
+        /\.barter\b/.test(coefBody) &&
+        /getGameContext|GAME_DEFS/.test(coefBody),
+      '106.3: _tradeBuyPrice/_tradeSellPrice read GAME_DEFS[ctx].barter (Protocol 38)'
+    );
+  }
+  // 106.4/106.5 BEHAVIORAL canon invariants using the parsed coefficients (both games)
+  {
+    const fo3At = st106.indexOf('FO3: {');
+    const fnvSlice = fo3At > 0 ? st106.slice(st106.indexOf('FNV: {'), fo3At) : '';
+    const fo3Slice = fo3At > 0 ? st106.slice(fo3At) : '';
+    const num = (slice, key) => {
+      const m = slice.match(new RegExp(key + '\\s*:\\s*(-?[\\d.]+)'));
+      return m ? parseFloat(m[1]) : NaN;
+    };
+    const checkGame = slice => {
+      const buyBase = num(slice, 'buyBase');
+      const sellBase = num(slice, 'sellBase');
+      const slope = num(slice, 'slopePerPoint');
+      const buy = (v, b) => Math.max(1, Math.round(v * (buyBase - slope * b)));
+      const sell = (v, b) => Math.max(0, Math.round(v * (sellBase + slope * b)));
+      let ok = true;
+      for (const b of [0, 25, 50, 75, 100]) {
+        const v = 100;
+        if (buy(v, b) < v) ok = false; // buy never below item value
+        if (sell(v, b) >= buy(v, b)) ok = false; // positive vendor margin
+        if (sell(v, b) < 0) ok = false;
+      }
+      return ok;
+    };
+    assert(
+      checkGame(fnvSlice),
+      '106.4: CANON — FNV buy ≥ value and sell < buy across barter 0..100'
+    );
+    assert(
+      checkGame(fo3Slice),
+      '106.5: CANON — FO3 buy ≥ value and sell < buy across barter 0..100'
+    );
+  }
+  // 106.6 buy floored at 1 cap, sell clamped ≥ 0, both rounded
+  assert(
+    /Math\.max\(\s*1,\s*Math\.round/.test(ren106) && /Math\.max\(\s*0,\s*Math\.round/.test(ren106),
+    '106.6: buy price floored at 1 (Math.max(1, round)) and sell clamped ≥ 0 (Math.max(0, round))'
+  );
+  // 106.7 Protocol 34 additive: doBuy adds to inventory (push / qty++), never blind-overwrites the array
+  assert(
+    /state\.inventory\.push\(/.test(doBuyBody) && /\.qty\s*=\s*\(?.*qty/.test(doBuyBody),
+    '106.7: doBuy is additive — pushes new item or increments existing qty (Protocol 34)'
+  );
+  // 106.8 confirm-gated (Protocol 34) — both doBuy and doSell
+  assert(
+    /confirm\(/.test(doBuyBody) && /confirm\(/.test(doSellBody),
+    '106.8: doBuy and doSell are confirm-gated (Protocol 34)'
+  );
+  // 106.9 doSell decrements then splices at ≤0 (clamp, no negative qty)
+  assert(
+    /splice\(/.test(doSellBody) && /it\.qty\s*<=\s*0/.test(doSellBody),
+    '106.9: doSell decrements qty and splices the item at ≤ 0 (clamp ≥ 0)'
+  );
+  // 106.10 caps mutation: buy subtracts, sell adds
+  assert(
+    /state\.caps\s*=\s*caps\s*-\s*price/.test(doBuyBody) &&
+      /state\.caps\s*=\s*caps\s*\+\s*price/.test(doSellBody),
+    '106.10: doBuy sets caps = caps − price; doSell sets caps = caps + price'
+  );
+  // 106.11 CAPS-REVERT REGRESSION (Protocol 42): both mirror new caps to #c_caps (saveState sync source)
+  assert(
+    /c_caps/.test(doBuyBody) && /c_caps/.test(doSellBody),
+    '106.11: doBuy + doSell write new caps to #c_caps so saveState()/syncStateFromDom does not revert it (Protocol 42)'
+  );
+  // 106.12 no auto-cloud-push from either transaction
+  assert(
+    !/pushToCloud\s*\(/.test(doBuyBody) && !/pushToCloud\s*\(/.test(doSellBody),
+    '106.12: neither doBuy nor doSell auto-pushes to cloud (manual sync only)'
+  );
+  // 106.13 AI TRADE modal render branch retired
+  assert(
+    !/mType\s*===\s*'TRADE'/.test(api106),
+    "106.13: the AI TRADE modal render branch (mType === 'TRADE') is removed from api.js"
+  );
+  // 106.14 AI no longer instructed to emit TRADE modals + dead tradeItem() removed
+  assert(
+    !/array of item objects.*vendor/.test(api106) && !/function tradeItem\s*\(/.test(core106),
+    '106.14: getSystemDirective no longer defines a TRADE modal shape; dead tradeItem() removed from ui-core.js'
+  );
+  // 106.15 TRADE panel + sub-panels present in index.html
+  assert(
+    /id="tradePanel"/.test(html106) &&
+      /&gt;\s*BARTER UPLINK/.test(html106) &&
+      /data-sub-id="trade_buy"/.test(html106) &&
+      /data-sub-id="trade_sell"/.test(html106),
+    '106.15: #tradePanel with BARTER UPLINK h2 + trade_buy/trade_sell sub-panels (data-sub-id) present'
+  );
+  // 106.16 [TRADE] macro button repointed to the native panel (not the AI macro)
+  assert(
+    /expandPanelForCategory\('trade'\)/.test(html106) &&
+      !/macroCommand\('\[TRADE\]'\)/.test(html106),
+    "106.16: [TRADE] button opens the native panel (expandPanelForCategory('trade')), not macroCommand('[TRADE]')"
+  );
+  // 106.17 expandPanelForCategory routes 'trade' + loadUI renders it
+  assert(
+    /trade:\s*'inv'/.test(core106) &&
+      /trade:\s*'>\s*BARTER UPLINK'/.test(core106) &&
+      /renderTrade\(\)/.test(core106),
+    "106.17: expandPanelForCategory maps trade→inv + '> BARTER UPLINK'; loadUI calls renderTrade()"
+  );
+  // 106.18 CSS overflow guard — .trade-row name flexes with min-width:0 (Protocol 17/mobile)
+  assert(
+    /\.trade-row\b/.test(css106) && /\.trade-name[\s\S]{0,80}min-width:\s*0/.test(css106),
+    '106.18: terminal.css .trade-row + .trade-name min-width:0 (no horizontal overflow at 360px)'
   );
 }
 

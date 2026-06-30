@@ -752,6 +752,41 @@
             </details>
           </details>
 
+          <!-- TRADE / BARTER UPLINK (INV tab) -->
+          <details class="panel" data-tab="inv" id="tradePanel">
+            <summary>
+              <h2>&gt; BARTER UPLINK</h2>
+            </summary>
+            <div id="tradeHeader">
+              <span class="empty-state">No vendor data.</span>
+            </div>
+            <details class="sub-panel" data-sub-id="trade_buy" open>
+              <summary>
+                <h3>&gt; VENDOR STOCK</h3>
+              </summary>
+              <input
+                type="text"
+                id="tradeBuySearch"
+                placeholder="Search vendor stock…"
+                aria-label="Search vendor stock"
+                maxlength="60"
+                oninput="renderTradeBuyList()"
+                style="width: 100%; font-size: 16px; min-height: 28px; margin-bottom: 4px"
+              />
+              <div id="tradeBuyList">
+                <span class="empty-state">No catalog loaded.</span>
+              </div>
+            </details>
+            <details class="sub-panel" data-sub-id="trade_sell">
+              <summary>
+                <h3>&gt; COURIER INVENTORY</h3>
+              </summary>
+              <div id="tradeSellList">
+                <span class="empty-state">Courier inventory empty.</span>
+              </div>
+            </details>
+          </details>
+
           <details class="panel" data-tab="stat">
             <summary>
               <h2>> SKILL MATRIX</h2>
@@ -1932,8 +1967,9 @@
                 </button>
                 <button
                   class="action-btn"
-                  style="margin: 0; color: var(--robco-blue); border-color: var(--robco-blue)"
-                  onclick="macroCommand('[TRADE]')"
+                  style="margin: 0; color: var(--robco-green); border-color: var(--robco-green)"
+                  onclick="expandPanelForCategory('trade')"
+                  aria-label="Open the native barter terminal"
                 >
                   [TRADE]
                 </button>

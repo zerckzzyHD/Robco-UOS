@@ -989,6 +989,7 @@ function expandPanelForCategory(categoryKey) {
     equipped: 'inv',
     collectibles: 'inv',
     craft: 'inv',
+    trade: 'inv',
     skillBooks: 'stat',
     magazines: 'stat',
   };
@@ -1006,6 +1007,7 @@ function expandPanelForCategory(categoryKey) {
     equipped: '> EQUIPPED',
     collectibles: '> COLLECTIBLES',
     craft: '> CRAFTING',
+    trade: '> BARTER UPLINK',
     skillBooks: '> SKILL BOOKS',
     magazines: '> SKILL MAGAZINES',
   };
@@ -1490,7 +1492,7 @@ const COMMAND_REGISTRY = [
       { cmd: '[SYNC: data]', desc: 'Batch state update via string.' },
       { cmd: '[BIND: X, DIR]', desc: 'Assign gear to D-Pad vectors.' },
       { cmd: '[PAD: DIR]', desc: 'Auto-execute 8-way hotkeys.' },
-      { cmd: '[TRADE: X] / [TD]', desc: 'Live barter math & updates.' },
+      { cmd: '[TRADE]', desc: 'Native barter terminal (INV tab) — offline.' },
       { cmd: '[STASH: Loc] / [-FULL]', desc: 'Network inventory sum/full.' },
       { cmd: '[EXCESS] / [-FULL]', desc: 'Jury Rig & weight triage.' },
       { cmd: '[CURRENCY]', desc: 'Weightless Wealth exchange.' },
@@ -1816,6 +1818,15 @@ function loadUI() {
     })
   )
     renderCraft();
+  if (
+    _isDirty('trade', {
+      caps: state.caps,
+      inv: state.inventory,
+      barter: state.skills && state.skills.barter,
+      ctx: state.gameContext,
+    })
+  )
+    renderTrade();
   if (_isDirty('gamedate', { ticks: state.ticks, ctx: state.gameContext })) renderGameDate();
   // G6: Regional Zone Map — skip when DATA tab is not active (B-P1: map work is invisible off-tab;
   // switchTab('data') at ui-core.js:891 re-renders when the user switches to it).
@@ -2274,13 +2285,6 @@ function macroCommand(actionStr) {
   }
 
   document.getElementById('chatInput').value = `> ${finalCmd}`;
-  transmitMessage();
-}
-
-function tradeItem(name, price, isVendor) {
-  let macro = isVendor ? `[BUY] ${name}` : `[SELL] ${name}`;
-  document.getElementById('chatInput').value = `> ${macro}`;
-  closeModal();
   transmitMessage();
 }
 

@@ -867,29 +867,26 @@ details.sub-panel[open] > summary h3::after {
   align-items: center;
   justify-content: center;
 }
-.trade-window {
+/* WU-N2: native BARTER UPLINK rows. flex + min-width:0 on the name keeps long item
+   names from forcing horizontal overflow at 360px (Protocol 17/mobile baseline). */
+.trade-row {
   display: flex;
-  gap: 15px;
-  margin-top: 10px;
-}
-.trade-col {
-  flex: 1;
-  border: 1px dashed var(--robco-green);
-  padding: 5px;
-}
-.trade-col h3 {
-  margin-top: 0;
-  border-bottom: 1px solid var(--robco-green);
-  padding-bottom: 5px;
-  font-size: 14px;
-}
-.trade-item {
-  display: flex;
-  justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid rgba(var(--robco-green-rgb), 0.2);
-  padding: 4px 0;
-  font-size: 13px;
+  gap: 6px;
+  padding: 1px 0;
+  font-size: 11px;
+}
+.trade-row .trade-name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.trade-row .trade-price {
+  white-space: nowrap;
+  opacity: 0.85;
+}
+.trade-row .trade-btn {
+  flex-shrink: 0;
 }
 .vats-scanning::after {
   content: '';

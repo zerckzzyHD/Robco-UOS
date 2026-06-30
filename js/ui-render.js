@@ -1908,6 +1908,213 @@ function doScrap(bdIdx) {
     appendToChat(`> [SCRAP] Scrapped ${qty}× ${breakdown.item} → ${yieldStr}.`, 'sys');
 }
 
+// ── WU-N2: TRADE — native barter terminal ────────────────────────────────
+// Deterministic, offline, no AI. Prices come from the WU-D4b barter coefficients
+// in GAME_DEFS[ctx].barter (game-agnostic, Protocol 38):
+//   buyMult  = buyBase  − slopePerPoint × barter   (1.55 → 1.10 over barter 0→100)
+//   sellMult = sellBase + slopePerPoint × barter   (0.45 → 0.90 over barter 0→100)
+// buy price always ≥ item value (buyMult ≥ 1.10) and sell < buy (vendor margin) by
+// construction — the canon ranges Suite 104 locked. Mutations are additive + confirm-gated
+// (Protocol 34); never auto-pushed to cloud. WU-N2 stock = the full item DB catalog
+// (per-vendor VENDOR_STOCK deferred to Round 2 / WU-D4d).
+let _tradeVendorIdx = 0;
+
+function _tradeBarterCoef() {
+  const ctx = typeof getGameContext === 'function' ? getGameContext() : 'FNV';
+  const def = (typeof GAME_DEFS !== 'undefined' && (GAME_DEFS[ctx] || GAME_DEFS.FNV)) || {};
+  return def.barter || { buyBase: 1.55, sellBase: 0.45, slopePerPoint: 0.0045 };
+}
+function _tradeBarterSkill() {
+  return Math.max(0, Math.min(100, (state.skills && state.skills.barter) || 0));
+}
+// Buy price = round(value × (buyBase − slope×barter)), floored at 1 cap.
+function _tradeBuyPrice(value) {
+  const c = _tradeBarterCoef();
+  return Math.max(
+    1,
+    Math.round((value || 0) * (c.buyBase - c.slopePerPoint * _tradeBarterSkill()))
+  );
+}
+// Sell price = round(value × (sellBase + slope×barter)), clamped ≥ 0.
+function _tradeSellPrice(value) {
+  const c = _tradeBarterCoef();
+  return Math.max(
+    0,
+    Math.round((value || 0) * (c.sellBase + c.slopePerPoint * _tradeBarterSkill()))
+  );
+}
+
+function setTradeVendor(idx) {
+  _tradeVendorIdx = parseInt(idx) || 0;
+  renderTrade();
+}
+
+function renderTrade() {
+  const header = document.getElementById('tradeHeader');
+  if (!header) return;
+  const vendors = typeof getVendors === 'function' ? getVendors() : [];
+  const buyList = document.getElementById('tradeBuyList');
+  const sellList = document.getElementById('tradeSellList');
+  if (!vendors.length) {
+    header.innerHTML = '<span class="empty-state">No vendor data for this game.</span>';
+    if (buyList) buyList.innerHTML = '';
+    if (sellList) sellList.innerHTML = '';
+    return;
+  }
+  if (_tradeVendorIdx < 0 || _tradeVendorIdx >= vendors.length) _tradeVendorIdx = 0;
+  const v = vendors[_tradeVendorIdx];
+  const caps = state.caps || 0;
+  const opts = vendors
+    .map(
+      (vd, i) =>
+        `<option value="${i}"${i === _tradeVendorIdx ? ' selected' : ''}>${escapeHtml(vd.name)}${vd.location ? ' — ' + escapeHtml(vd.location) : ''}</option>`
+    )
+    .join('');
+  header.innerHTML =
+    `<select id="tradeVendorSelect" aria-label="Select vendor" onchange="setTradeVendor(this.value)" style="width:100%;font-size:16px;min-height:28px;margin-bottom:4px;">${opts}</select>` +
+    `<div style="font-size:11px;display:flex;flex-wrap:wrap;gap:10px;">` +
+    `<span>CAPS: <b>${caps}</b></span>` +
+    `<span>VENDOR PURSE: <b>${v.baseCaps}</b></span>` +
+    `<span>BARTER: <b>${_tradeBarterSkill()}</b></span>` +
+    `</div>`;
+  renderTradeBuyList();
+  renderTradeSellList();
+}
+
+function renderTradeBuyList() {
+  const list = document.getElementById('tradeBuyList');
+  if (!list) return;
+  const searchEl = document.getElementById('tradeBuySearch');
+  const q = (searchEl ? searchEl.value : '').toLowerCase().trim();
+  const catalog = typeof getTradeCatalog === 'function' ? getTradeCatalog() : [];
+  const caps = state.caps || 0;
+  const MAX = 40;
+  const all = q ? catalog.filter(it => it.name.toLowerCase().includes(q)) : catalog;
+  const shown = all.slice(0, MAX);
+  if (!shown.length) {
+    list.innerHTML = '<span class="empty-state">No catalog item matches.</span>';
+    return;
+  }
+  list.innerHTML =
+    shown
+      .map(it => {
+        const price = _tradeBuyPrice(it.value);
+        const afford = caps >= price;
+        return (
+          `<div class="trade-row"><span class="trade-name">${escapeHtml(it.name)}</span>` +
+          `<span class="trade-price">${price}c</span>` +
+          `<button class="btn-sm action-btn trade-btn" data-tname="${escapeHtml(it.name)}" onclick="doBuy(this.dataset.tname)" aria-label="Buy ${escapeHtml(it.name)} for ${price} caps"${afford ? '' : ' style="opacity:0.45;"'}>BUY</button></div>`
+        );
+      })
+      .join('') +
+    (all.length > MAX
+      ? `<div class="empty-state" style="font-size:9px;">+${all.length - MAX} more — refine search</div>`
+      : '');
+}
+
+function renderTradeSellList() {
+  const list = document.getElementById('tradeSellList');
+  if (!list) return;
+  const vendors = typeof getVendors === 'function' ? getVendors() : [];
+  const purse = vendors[_tradeVendorIdx] ? vendors[_tradeVendorIdx].baseCaps : 0;
+  const inv = state.inventory || [];
+  if (!inv.length) {
+    list.innerHTML =
+      '<span class="empty-state">Courier inventory empty. (Ammo is not priced by the DB.)</span>';
+    return;
+  }
+  list.innerHTML = inv
+    .map(it => {
+      const db = typeof lookupItemInDb === 'function' ? lookupItemInDb(it.name) : null;
+      const val = (it.val != null ? it.val : db ? db.val : 0) || 0;
+      const price = _tradeSellPrice(val);
+      const canPay = purse >= price;
+      return (
+        `<div class="trade-row"><span class="trade-name">${escapeHtml(it.name)} ×${it.qty || 1}</span>` +
+        `<span class="trade-price">${price}c</span>` +
+        `<button class="btn-sm action-btn trade-btn" data-tname="${escapeHtml(it.name)}" onclick="doSell(this.dataset.tname)" aria-label="Sell ${escapeHtml(it.name)} for ${price} caps"${canPay ? '' : ' style="opacity:0.45;"'}>SELL</button></div>`
+      );
+    })
+    .join('');
+}
+
+function doBuy(name) {
+  const catalog = typeof getTradeCatalog === 'function' ? getTradeCatalog() : [];
+  const item = catalog.find(i => i.name.toLowerCase() === String(name).toLowerCase());
+  if (!item) return;
+  const price = _tradeBuyPrice(item.value);
+  const caps = state.caps || 0;
+  if (caps < price) {
+    if (typeof appendToChat === 'function')
+      appendToChat(
+        `> [TRADE] ⚠ INSUFFICIENT CAPS — ${item.name} costs ${price}c, you have ${caps}c.`,
+        'sys'
+      );
+    return;
+  }
+  if (!confirm(`Buy ${item.name} for ${price} caps?\n\nCaps: ${caps} → ${caps - price}`)) return;
+  state.caps = caps - price;
+  // Mirror to the #c_caps field — it is the sync source-of-truth that saveState() reads back
+  // via syncStateFromDom(); without this the deduction is reverted on the next save (WU-N2 fix).
+  const _capsBuyEl = document.getElementById('c_caps');
+  if (_capsBuyEl) _capsBuyEl.value = state.caps;
+  const db = typeof lookupItemInDb === 'function' ? lookupItemInDb(item.name) : null;
+  if (!state.inventory) state.inventory = [];
+  const ex = state.inventory.find(i => i.name.toLowerCase() === item.name.toLowerCase());
+  if (ex) {
+    ex.qty = (ex.qty || 1) + 1;
+  } else {
+    state.inventory.push({
+      name: item.name,
+      qty: 1,
+      wgt: db ? db.wgt : 0,
+      val: db ? db.val : item.value,
+      type: db ? db.type : item.type,
+    });
+  }
+  if (typeof renderInventory === 'function') renderInventory();
+  if (typeof updateMath === 'function') updateMath();
+  renderTrade();
+  saveState();
+  if (typeof appendToChat === 'function')
+    appendToChat(`> [TRADE] Bought ${item.name} for ${price}c. Caps: ${state.caps}.`, 'sys');
+}
+
+function doSell(name) {
+  const idx = (state.inventory || []).findIndex(
+    i => i.name.toLowerCase() === String(name).toLowerCase()
+  );
+  if (idx === -1) return;
+  const it = state.inventory[idx];
+  const db = typeof lookupItemInDb === 'function' ? lookupItemInDb(it.name) : null;
+  const val = (it.val != null ? it.val : db ? db.val : 0) || 0;
+  const price = _tradeSellPrice(val);
+  const vendors = typeof getVendors === 'function' ? getVendors() : [];
+  const purse = vendors[_tradeVendorIdx] ? vendors[_tradeVendorIdx].baseCaps : 0;
+  if (purse < price) {
+    if (typeof appendToChat === 'function')
+      appendToChat(
+        `> [TRADE] ⚠ VENDOR CANNOT AFFORD — ${it.name} sells for ${price}c, vendor purse is ${purse}c.`,
+        'sys'
+      );
+    return;
+  }
+  const caps = state.caps || 0;
+  if (!confirm(`Sell ${it.name} for ${price} caps?\n\nCaps: ${caps} → ${caps + price}`)) return;
+  state.caps = caps + price;
+  // Mirror to the #c_caps field (sync source-of-truth) so the gain survives saveState (WU-N2 fix).
+  const _capsSellEl = document.getElementById('c_caps');
+  if (_capsSellEl) _capsSellEl.value = state.caps;
+  it.qty = (it.qty || 1) - 1;
+  if (it.qty <= 0) state.inventory.splice(idx, 1);
+  if (typeof renderInventory === 'function') renderInventory();
+  if (typeof updateMath === 'function') updateMath();
+  renderTrade();
+  saveState();
+  if (typeof appendToChat === 'function')
+    appendToChat(`> [TRADE] Sold ${it.name} for ${price}c. Caps: ${state.caps}.`, 'sys');
+}
+
 // Switch faction/karma panels based on game context (called from loadUI).
 function _updateContextPanels() {
   const usesKarmaCenter = _activeDef().usesKarmaCenter;
