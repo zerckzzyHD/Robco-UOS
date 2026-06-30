@@ -7665,9 +7665,9 @@ $failContrast124 = @($themeMatches124 | Where-Object { $_.Groups[5].Value -eq 't
 Check (($failContrast124.Count -eq 0) -and ($safeKeys124.Count -ge 1)) `
     '124.7: every contrastSafe:true theme meets WCAG AA >=4.5:1 vs the page background'
 
-# 124.8  changeOpticsColor is table-driven (no hardcoded if/else palette chain)
-Check (($changeFn124 -match '_applyThemeVars\(color\)') -and ($changeFn124 -match "localStorage\.setItem\('robco_optics'") -and (-not ($changeFn124 -match 'else if \(color ===')) -and ($applyFn124 -match 'THEMES\[key\]')) `
-    '124.8: changeOpticsColor delegates to table-driven _applyThemeVars (THEMES lookup); the old if/else palette chain is gone'
+# 124.8  changeOpticsColor is table-driven AND persists to the PER-GAME optic key
+Check (($changeFn124 -match '_applyThemeVars\(color\)') -and ($changeFn124 -match 'localStorage\.setItem\(_opticStorageKey\(\)') -and (-not ($changeFn124 -match 'else if \(color ===')) -and ($applyFn124 -match 'THEMES\[key\]')) `
+    '124.8: changeOpticsColor delegates to table-driven _applyThemeVars and persists to the per-game _opticStorageKey()'
 
 # 124.9  ui-saves dropped the duplicated fgMap palette and reads THEMES
 Check ((-not ($saves124 -match 'const fgMap = \{')) -and ($saves124 -match 'THEMES\[optics\]')) `
@@ -7681,8 +7681,8 @@ Check (($resolveFn124 -match '_activeDef\(\)\.theme') -and ($resolveFn124 -match
 $fnvTheme124 = [regex]::Match($state124, '(?s)FNV:[\s\S]*?theme:\s*\{([\s\S]*?)\}').Groups[1].Value
 $shapeOk124 = $true
 foreach ($f in @('defaultOptics', 'framing', 'pipBoyModel', 'bootFlavor', 'saveLabel')) { if (-not $fnvTheme124.Contains($f + ':')) { $shapeOk124 = $false } }
-Check (($core124 -match 'applyDefaultOptics\(\)') -and ($core124 -match '_applyThemeVars\(color\)') -and $shapeOk124) `
-    '124.11: ui-core boot applies explicit pick else applyDefaultOptics(); GAME_DEFS.theme carries the full shape (WU-T3 seam)'
+Check (($core124 -match '_resolveOptic\(\)') -and ($core124 -match '_applyThemeVars\(_optic\)') -and ($core124 -match '_updateOpticsDefaultLabel\(\)') -and $shapeOk124) `
+    '124.11: ui-core boot resolves the per-game optic (_resolveOptic) + applies it + updates the (Default) label; GAME_DEFS.theme carries the full shape (WU-T3 seam)'
 
 # 124.12  the pre-paint inline head script + the OPTICS picker both cover green3 (flash-free)
 Check (($html124 -match '<option value="green3">') -and ($html124 -match "color === 'green3'") -and ($html124.Contains("'#4fb05a'"))) `
@@ -7899,6 +7899,55 @@ Check (($core129.Contains("window.matchMedia('(min-width: 1000px) and (hover: ho
 $desktopBlock129 = [regex]::Match($css129, '(?s)@media \(min-width: 1000px\)[^{]*\{([\s\S]*?\n\})').Groups[1].Value
 Check (($desktopBlock129 -match 'grid-template-columns:\s*380px 1fr') -and ($desktopBlock129 -match 'overflow:\s*hidden')) `
     '129.4: the gated desktop block still defines the two-column 380px 1fr shell with body overflow:hidden (desktop preserved)'
+
+# ===========================================================
+# Suite 130 -- per-game optics + dynamic (Default) label (8 tests)
+# Item 4: the OPTICS picker dynamically tags the ACTIVE game's default optic "(Default)".
+# Item 5: the chosen optic persists PER GAME (robco_optic_<ctx>): per-game pick -> game
+# default -> green. Game-agnostic / N-game scalable. (PS mirror of JS 130.)
+# ===========================================================
+Sep "Suite 130 -- per-game optics + dynamic (Default) label"
+$audio130 = Read-Src "js/ui-audio.js"
+$core130  = Read-Src "js/ui-core.js"
+$html130  = Read-Src "index.html"
+$saves130 = Read-Src "js/ui-saves.js"
+$keyFn130 = [regex]::Match($audio130, '(?s)function _opticStorageKey\([\s\S]*?\n\}').Value
+$resolveOpticFn130 = [regex]::Match($audio130, '(?s)function _resolveOptic\(\)[\s\S]*?\n\}').Value
+$changeFn130 = [regex]::Match($audio130, '(?s)function changeOpticsColor\([\s\S]*?\n\}').Value
+$labelFn130 = [regex]::Match($audio130, '(?s)function _updateOpticsDefaultLabel\(\)[\s\S]*?\n\}').Value
+
+# 130.1  per-game storage key is game-agnostic -- robco_optic_<ctx> via getGameContext()
+Check (($audio130 -match 'function _opticStorageKey\(') -and ($keyFn130 -match "'robco_optic_' \+ ") -and ($keyFn130 -match 'getGameContext\(\)')) `
+    '130.1: _opticStorageKey() returns robco_optic_<ctx> keyed by getGameContext() (game-agnostic per-game key)'
+
+# 130.2  changeOpticsColor persists to the PER-GAME key, not the legacy global
+Check (($changeFn130 -match 'localStorage\.setItem\(_opticStorageKey\(\), color\)') -and (-not ($changeFn130 -match "setItem\('robco_optics'"))) `
+    '130.2: changeOpticsColor persists the pick to the per-game _opticStorageKey() (not the global robco_optics)'
+
+# 130.3  resolution order: per-game pick -> (one-time legacy migration) -> game default
+Check (($resolveOpticFn130 -match '_opticStorageKey\(\)') -and ($resolveOpticFn130 -match "getItem\('robco_optics'\)") -and ($resolveOpticFn130 -match "removeItem\('robco_optics'\)") -and ($resolveOpticFn130 -match '_resolveDefaultOptics\(\)')) `
+    '130.3: _resolveOptic = per-game pick -> migrate+retire legacy global -> _resolveDefaultOptics (default -> green)'
+
+# 130.4  boot resolves + applies the per-game optic, syncs the picker, updates the label
+Check (($core130 -match '_resolveOptic\(\)') -and ($core130 -match '_applyThemeVars\(_optic\)') -and ($core130 -match 'opticsColorInput') -and ($core130 -match '_updateOpticsDefaultLabel\(\)')) `
+    '130.4: ui-core boot applies _resolveOptic(), sets the picker value, and calls _updateOpticsDefaultLabel()'
+
+# 130.5  dynamic "(Default)" label tags the option matching the active game's default optic
+Check (($labelFn130 -match '_resolveDefaultOptics\(\)') -and ($labelFn130 -match 'opt\.value === def') -and ($labelFn130 -match '\(Default\)') -and ($labelFn130 -match '\.replace\(')) `
+    '130.5: _updateOpticsDefaultLabel tags the option whose value === _resolveDefaultOptics() with "(Default)" and strips it from the rest'
+
+# 130.6  index.html: green option carries NO static "(Default)"; head pre-paint reads per-game key
+Check (($html130 -match '<option value="green">RobCo Green</option>') -and (-not ($html130 -match '<option value="green">[^<]*\(Default\)')) -and ($html130 -match "'robco_optic_' \+ _ctx0")) `
+    '130.6: the static "(Default)" is gone from the markup (JS adds it dynamically); the head pre-paint script reads robco_optic_<ctx>'
+
+# 130.7  game-agnostic / N-game scalable -- no two-game hardcode (only the sanctioned || FNV fallback)
+$opticCode130 = $keyFn130 + $resolveOpticFn130 + $changeFn130 + $labelFn130
+Check ((-not ($opticCode130 -match '\bFO3\b')) -and (-not ($opticCode130 -match "===\s*'FNV'")) -and ($keyFn130 -match "'robco_optic_' \+ ")) `
+    '130.7: per-game optic persistence/resolution is game-agnostic -- keyed by gameContext, no two-game hardcode (a new game needs zero theming-code change)'
+
+# 130.8  ui-saves export reads the per-game resolved optic, not the global key
+Check (($saves130 -match '_resolveOptic\(\)') -and (-not ($saves130 -match "getItem\('robco_optics'\)"))) `
+    '130.8: ui-saves export reads the per-game resolved optic (_resolveOptic), not the global robco_optics'
 
 # ===========================================================
 # Results

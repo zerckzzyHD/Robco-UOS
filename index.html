@@ -18,8 +18,17 @@
     />
     <link rel="stylesheet" href="css/terminal.css" />
     <script>
-      if (localStorage.getItem('robco_optics')) {
-        let color = localStorage.getItem('robco_optics');
+      // Pre-paint optic apply (flash-free) — read THIS game's per-game pick (robco_optic_<ctx>,
+      // ctx from robco_v8.activeContext) with a fallback to the legacy site-wide key. Runs before
+      // the modules load, so it can only read localStorage (game-agnostic: keyed by ctx).
+      var _ctx0 = 'FNV';
+      try {
+        _ctx0 = JSON.parse(localStorage.getItem('robco_v8') || '{}').activeContext || 'FNV';
+      } catch (e) {}
+      var _optic0 =
+        localStorage.getItem('robco_optic_' + _ctx0) || localStorage.getItem('robco_optics');
+      if (_optic0) {
+        let color = _optic0;
         let root = document.documentElement;
         if (color === 'amber') {
           root.style.setProperty('--robco-green-rgb', '255, 182, 66');
@@ -1459,7 +1468,7 @@
                 "
                 onchange="changeOpticsColor(this.value)"
               >
-                <option value="green">RobCo Green (Default)</option>
+                <option value="green">RobCo Green</option>
                 <option value="green3">Pip-Boy Green</option>
                 <option value="amber">New Vegas Amber</option>
                 <option value="blue">Vault-Tec Blue</option>

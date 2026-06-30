@@ -584,20 +584,16 @@ window.onload = function () {
     });
   });
 
-  // WU-T1: optics resolution — explicit user pick (robco_optics) wins; otherwise apply the
-  // active game's per-game default (FNV = RobCo green, FO3 = duller Pip-Boy green). A game
-  // switch reloads (onGameContextChange), so a player with no explicit pick re-resolves to
-  // the new game's default here.
-  if (localStorage.getItem('robco_optics')) {
-    let color = localStorage.getItem('robco_optics');
-    const sel = document.getElementById('opticsColorInput');
-    if (sel) sel.value = color;
-    _applyThemeVars(color);
-  } else {
-    applyDefaultOptics();
-    const sel = document.getElementById('opticsColorInput');
-    if (sel) sel.value = _resolveDefaultOptics();
-  }
+  // Per-game optics resolution — resolve THIS game's optic (its own remembered pick
+  // robco_optic_<ctx> → the game's default optic → green) and apply it. A game switch reloads
+  // (onGameContextChange), so each game re-resolves to its own remembered optic / default here.
+  // Then sync the picker's selected value + the dynamic "(Default)" tag (which marks the active
+  // game's default optic) to the active game.
+  const _optic = _resolveOptic();
+  _applyThemeVars(_optic);
+  const _opticSel = document.getElementById('opticsColorInput');
+  if (_opticSel) _opticSel.value = _optic;
+  _updateOpticsDefaultLabel();
 
   if (localStorage.getItem('robco_sfx_muted') === 'true') {
     let el = document.getElementById('muteTypingToggle');

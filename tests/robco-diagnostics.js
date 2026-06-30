@@ -13538,13 +13538,13 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       (failContrast124.length ? ' — FAIL: ' + failContrast124.join(', ') : '')
   );
 
-  // 124.8  changeOpticsColor is table-driven (no hardcoded if/else palette chain)
+  // 124.8  changeOpticsColor is table-driven AND persists to the PER-GAME optic key
   assert(
     /_applyThemeVars\(color\)/.test(changeFn124) &&
-      /localStorage\.setItem\('robco_optics'/.test(changeFn124) &&
+      /localStorage\.setItem\(_opticStorageKey\(\)/.test(changeFn124) &&
       !/else if \(color ===/.test(changeFn124) &&
       /THEMES\[key\]/.test(applyFn124),
-    '124.8: changeOpticsColor delegates to table-driven _applyThemeVars (THEMES lookup); the old if/else palette chain is gone'
+    '124.8: changeOpticsColor delegates to table-driven _applyThemeVars and persists to the per-game _opticStorageKey()'
   );
 
   // 124.9  ui-saves dropped the duplicated fgMap palette and reads THEMES (Protocol 22)
@@ -13562,14 +13562,16 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '124.10: _resolveDefaultOptics reads _activeDef().theme.defaultOptics with a green fallback, no game literal (Protocol 38)'
   );
 
-  // 124.11  boot applies explicit pick → else per-game default; theme shape carries the T3 seam
+  // 124.11  boot resolves the per-game optic + applies it + syncs the dynamic label; theme
+  //         shape carries the T3 seam
   assert(
-    /applyDefaultOptics\(\)/.test(core124) &&
-      /_applyThemeVars\(color\)/.test(core124) &&
+    /_resolveOptic\(\)/.test(core124) &&
+      /_applyThemeVars\(_optic\)/.test(core124) &&
+      /_updateOpticsDefaultLabel\(\)/.test(core124) &&
       ['defaultOptics', 'framing', 'pipBoyModel', 'bootFlavor', 'saveLabel'].every(f =>
         fnvTheme124.includes(f + ':')
       ),
-    '124.11: ui-core boot applies explicit pick else applyDefaultOptics(); GAME_DEFS.theme carries the full {defaultOptics,framing,pipBoyModel,bootFlavor,saveLabel} shape (WU-T3 seam)'
+    '124.11: ui-core boot resolves the per-game optic (_resolveOptic) + applies it + updates the (Default) label; GAME_DEFS.theme carries the full shape (WU-T3 seam)'
   );
 
   // 124.12  the pre-paint inline head script + the OPTICS picker both cover green3 (flash-free)
@@ -13966,6 +13968,95 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     /grid-template-columns:\s*380px 1fr/.test(desktopBlock129) &&
       /overflow:\s*hidden/.test(desktopBlock129),
     '129.4: the gated desktop block still defines the two-column 380px 1fr shell with body overflow:hidden (desktop preserved)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 130 — per-game optic persistence + dynamic "(Default)" label
+//  Item 4: the OPTICS picker dynamically tags the ACTIVE game's default optic "(Default)".
+//  Item 5: the chosen optic persists PER GAME (robco_optic_<ctx>), resolved per-game pick →
+//  game default → green. Both are game-agnostic / N-game scalable (keyed by gameContext) —
+//  adding a game needs ZERO theming-code change.
+//  8 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 130 — per-game optics + dynamic (Default) label');
+  const audio130 = readFile('js/ui-audio.js');
+  const core130 = readFile('js/ui-core.js');
+  const html130 = readFile('index.html');
+  const saves130 = readFile('js/ui-saves.js');
+  const keyFn130 = (audio130.match(/function _opticStorageKey\([\s\S]*?\n\}/) || [''])[0];
+  const resolveOpticFn130 = (audio130.match(/function _resolveOptic\(\)[\s\S]*?\n\}/) || [''])[0];
+  const changeFn130 = (audio130.match(/function changeOpticsColor\([\s\S]*?\n\}/) || [''])[0];
+  const labelFn130 = (audio130.match(/function _updateOpticsDefaultLabel\(\)[\s\S]*?\n\}/) || [
+    '',
+  ])[0];
+
+  // 130.1  per-game storage key is game-agnostic — robco_optic_<ctx> via getGameContext()
+  assert(
+    /function _opticStorageKey\(/.test(audio130) &&
+      /'robco_optic_' \+ /.test(keyFn130) &&
+      /getGameContext\(\)/.test(keyFn130),
+    '130.1: _opticStorageKey() returns robco_optic_<ctx> keyed by getGameContext() (game-agnostic per-game key)'
+  );
+
+  // 130.2  changeOpticsColor persists to the PER-GAME key, not the legacy global
+  assert(
+    /localStorage\.setItem\(_opticStorageKey\(\), color\)/.test(changeFn130) &&
+      !/setItem\('robco_optics'/.test(changeFn130),
+    '130.2: changeOpticsColor persists the pick to the per-game _opticStorageKey() (not the global robco_optics)'
+  );
+
+  // 130.3  resolution order: per-game pick → (one-time legacy migration) → game default
+  assert(
+    /_opticStorageKey\(\)/.test(resolveOpticFn130) &&
+      /getItem\('robco_optics'\)/.test(resolveOpticFn130) &&
+      /removeItem\('robco_optics'\)/.test(resolveOpticFn130) &&
+      /_resolveDefaultOptics\(\)/.test(resolveOpticFn130),
+    '130.3: _resolveOptic = per-game pick → migrate+retire legacy global → _resolveDefaultOptics (default → green)'
+  );
+
+  // 130.4  boot resolves + applies the per-game optic, syncs the picker, updates the label
+  assert(
+    /_resolveOptic\(\)/.test(core130) &&
+      /_applyThemeVars\(_optic\)/.test(core130) &&
+      /opticsColorInput/.test(core130) &&
+      /_updateOpticsDefaultLabel\(\)/.test(core130),
+    '130.4: ui-core boot applies _resolveOptic(), sets the picker value, and calls _updateOpticsDefaultLabel()'
+  );
+
+  // 130.5  dynamic "(Default)" label tags the option matching the active game's default optic
+  assert(
+    /_resolveDefaultOptics\(\)/.test(labelFn130) &&
+      /opt\.value === def/.test(labelFn130) &&
+      /\(Default\)/.test(labelFn130) &&
+      /\.replace\(/.test(labelFn130),
+    '130.5: _updateOpticsDefaultLabel tags the option whose value === _resolveDefaultOptics() with "(Default)" and strips it from the rest'
+  );
+
+  // 130.6  index.html: the green option carries NO static "(Default)"; the pre-paint head
+  //        script reads the per-game key
+  assert(
+    /<option value="green">RobCo Green<\/option>/.test(html130) &&
+      !/<option value="green">[^<]*\(Default\)/.test(html130) &&
+      /'robco_optic_' \+ _ctx0/.test(html130),
+    '130.6: the static "(Default)" is gone from the markup (JS adds it dynamically); the head pre-paint script reads robco_optic_<ctx>'
+  );
+
+  // 130.7  game-agnostic / N-game scalable — no two-game hardcode in the optic code; the only
+  //        FNV is the sanctioned `|| 'FNV'` absence fallback. A new game drops in via data.
+  const opticCode130 = keyFn130 + resolveOpticFn130 + changeFn130 + labelFn130;
+  assert(
+    !/\bFO3\b/.test(opticCode130) &&
+      !/===\s*'FNV'/.test(opticCode130) &&
+      /'robco_optic_' \+ /.test(keyFn130),
+    '130.7: per-game optic persistence/resolution is game-agnostic — keyed by gameContext, no two-game hardcode (a new game needs zero theming-code change)'
+  );
+
+  // 130.8  ui-saves export reads the per-game resolved optic, not the global key
+  assert(
+    /_resolveOptic\(\)/.test(saves130) && !/getItem\('robco_optics'\)/.test(saves130),
+    '130.8: ui-saves export reads the per-game resolved optic (_resolveOptic), not the global robco_optics'
   );
 }
 

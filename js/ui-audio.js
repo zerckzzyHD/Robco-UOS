@@ -420,16 +420,59 @@ function _resolveDefaultOptics() {
   return 'green';
 }
 
-// Apply the active game's default optic without persisting it as an explicit pick (so a
-// later game switch re-resolves to that game's default). Used by the boot path.
-function applyDefaultOptics() {
-  _applyThemeVars(_resolveDefaultOptics());
+// Per-game optic storage key — game-agnostic, keyed by the active gameContext so EVERY game
+// (FNV, FO3, and any future game) remembers its own optic independently. Adding a game needs
+// ZERO theming-code change: a new ctx just uses its own `robco_optic_<ctx>` key + its
+// GAME_DEFS[ctx].theme.defaultOptics. No game literal here (Protocol 38).
+function _opticStorageKey(ctx) {
+  const c = ctx || (typeof getGameContext === 'function' ? getGameContext() : 'FNV');
+  return 'robco_optic_' + c;
 }
 
-// Explicit user pick (the OPTICS <select>): apply + persist as the user's standing choice.
+// Resolve the optic to apply for the ACTIVE game: this game's remembered manual pick
+// (robco_optic_<ctx>) → the game's default (GAME_DEFS[ctx].theme.defaultOptics) → canon green.
+// Migrates a legacy site-wide pick (robco_optics) into this game's key once, then retires it,
+// so existing users keep their colour for the game they're on while the other game starts at
+// its own default. Game-agnostic.
+function _resolveOptic() {
+  try {
+    const key = _opticStorageKey();
+    let saved = localStorage.getItem(key);
+    if (!saved) {
+      const legacy = localStorage.getItem('robco_optics');
+      if (legacy && typeof THEMES !== 'undefined' && THEMES[legacy]) {
+        localStorage.setItem(key, legacy);
+        localStorage.removeItem('robco_optics');
+        saved = legacy;
+      }
+    }
+    if (saved && typeof THEMES !== 'undefined' && THEMES[saved]) return saved;
+  } catch (_) {
+    /* storage unavailable — fall through to the game default */
+  }
+  return _resolveDefaultOptics();
+}
+
+// Dynamic "(Default)" label — tag whichever OPTICS <select> option matches the ACTIVE game's
+// default optic (GAME_DEFS[ctx].theme.defaultOptics), stripping the tag from all the others.
+// Data-driven + game-agnostic: a new game's default option is labelled with no code change.
+function _updateOpticsDefaultLabel() {
+  const sel = document.getElementById('opticsColorInput');
+  if (!sel) return;
+  const def = _resolveDefaultOptics();
+  Array.from(sel.options).forEach(opt => {
+    const base = opt.textContent.replace(/\s*\(Default\)\s*$/, '');
+    opt.textContent = opt.value === def ? base + ' (Default)' : base;
+  });
+}
+
+// Explicit user pick (the OPTICS <select>): apply + persist as THIS GAME's standing choice
+// (per-game key), so each game remembers its own optic independently.
 function changeOpticsColor(color) {
   _applyThemeVars(color);
-  localStorage.setItem('robco_optics', color);
+  try {
+    localStorage.setItem(_opticStorageKey(), color);
+  } catch (_) {}
 }
 
 function toggleAudio(key, isMuted) {
