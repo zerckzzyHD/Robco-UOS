@@ -1028,6 +1028,89 @@ details.sub-panel[open] > summary h3::after {
   white-space: nowrap;
   flex-shrink: 0;
 }
+/* WU-N5: native BIO-SCAN advisory. min-width:0 + overflow-wrap keep long advisory
+   lines from forcing horizontal overflow at 360px (Protocol 17/mobile). */
+.bio-card {
+  font-size: 12px;
+  line-height: 1.55;
+}
+.bio-vitals {
+  margin-bottom: 8px;
+}
+.bio-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.bio-label {
+  color: var(--robco-dim);
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+.bio-val {
+  color: var(--robco-green);
+  font-weight: bold;
+  text-align: right;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.bio-hp--critical {
+  color: var(--robco-alert);
+}
+.bio-hp--wounded {
+  color: #ffb000;
+}
+.bio-limbs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px 14px;
+  border-top: 1px dashed var(--robco-dim);
+  padding-top: 6px;
+  margin-bottom: 6px;
+}
+.bio-limb {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.bio-limb-name {
+  color: var(--robco-dim);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.bio-limb-state {
+  font-weight: bold;
+  flex-shrink: 0;
+}
+.bio-limb-state--ok {
+  color: var(--robco-green);
+}
+.bio-limb-state--crippled {
+  color: var(--robco-alert);
+}
+.bio-advisories {
+  border-top: 1px dashed var(--robco-dim);
+  padding-top: 6px;
+}
+.bio-advisory {
+  color: var(--robco-green);
+  margin-bottom: 3px;
+  overflow-wrap: anywhere;
+}
+.bio-advisory--addiction,
+.bio-advisory--rad {
+  color: #ffb000;
+}
+.bio-advisory--limb,
+.bio-advisory--hp {
+  color: var(--robco-alert);
+}
+.bio-nominal {
+  color: var(--robco-green);
+  letter-spacing: 0.5px;
+}
 .vats-scanning::after {
   content: '';
   position: absolute;

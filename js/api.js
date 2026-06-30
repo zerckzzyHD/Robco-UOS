@@ -115,7 +115,7 @@ Telemetry Lock: FORBIDDEN from inventing narrative outcomes, combat damage, or i
 ### **Operational Matrix**
 [A] Bio-Dynamics & Combat Systems
 Consumable Purge: Upon consumption of ANY item, execute a -1 deduction from the backpack memory array.
-Trauma Systems: Track RAD thresholds and crippled limbs via [BIO-SCAN].
+Trauma Systems: Apply RAD thresholds and crippled-limb effects in the state node during play. The [BIO-SCAN] advisory (limb / HP / radiation / addiction medical readout) is handled by the native deterministic BIO-SCAN terminal (state + CHEMS.CSV, computed offline) — do NOT produce a BIO-SCAN modal or medical advisory; defer to the local calculator.
 
 [B] Economy, Logistics & Progression
 Visual Upload Override: Execute > [VISUAL UPLOAD: CATEGORY] on a screenshot. You MUST update ONLY the parsed category. You are STRICTLY FORBIDDEN from deleting un-pictured items from other categories (e.g., if uploading Weapons, do NOT delete Armor or Junk).
@@ -966,6 +966,10 @@ const NATIVE_COMMAND_ROUTER = {
   CONSULT: topic => renderConsult(topic),
   '[CONSULT]': topic => renderConsult(topic),
   '[CON]': topic => renderConsult(topic),
+  // WU-N5: BIO-SCAN is a fully-deterministic native medical advisory (limb states +
+  // HP% + radiation + addiction risk, computed offline from state + CHEMS). No AI.
+  '[BIO-SCAN]': () => renderBioScan(),
+  '[BIO]': () => renderBioScan(),
 };
 
 function _routeNativeCommand(userText) {

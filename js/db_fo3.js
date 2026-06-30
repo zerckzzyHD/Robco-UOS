@@ -460,6 +460,44 @@ function lookupItemInDb(name) {
   return best;
 }
 
+// ── WU-N5: CHEMS TABLE (BIO-SCAN advisory) ────────────────────────────────
+// Returns the active game's CHEMS.CSV rows with the addiction columns that
+// lookupItemInDb() does not expose (Addiction_Risk / Addiction_Debuff / Effect /
+// Chem_Family). Read-only, parsed once and cached. Game-agnostic: reads whatever
+// databaseCSVs the active game loaded (Protocol 38) — the same parse exists in
+// db_nv.js so the BIO-SCAN terminal works in either context with no logic change.
+let _chemsTableCache = null;
+function getChemsTable() {
+  if (_chemsTableCache) return _chemsTableCache;
+  _chemsTableCache = [];
+  const start = databaseCSVs.indexOf('[CHEMS.CSV]');
+  if (start === -1) return _chemsTableCache;
+  const nextSection = databaseCSVs.indexOf('\n[', start + 11);
+  const block = databaseCSVs.substring(start, nextSection === -1 ? undefined : nextSection);
+  const lines = block.split('\n').filter(l => l.trim() && !l.startsWith('['));
+  if (lines.length < 2) return _chemsTableCache;
+  const headers = lines[0].split(',').map(h => h.trim());
+  const ni = headers.indexOf('Name');
+  const ei = headers.indexOf('Effect');
+  const ari = headers.indexOf('Addiction_Risk');
+  const adi = headers.indexOf('Addiction_Debuff');
+  const fi = headers.indexOf('Chem_Family');
+  if (ni === -1) return _chemsTableCache;
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(',');
+    const name = (cols[ni] || '').trim();
+    if (!name) continue;
+    _chemsTableCache.push({
+      name,
+      effect: ei >= 0 ? (cols[ei] || '').trim() : '',
+      addictionRisk: ari >= 0 ? (cols[ari] || '').trim() : '',
+      addictionDebuff: adi >= 0 ? (cols[adi] || '').trim() : '',
+      family: fi >= 0 ? (cols[fi] || '').trim() : '',
+    });
+  }
+  return _chemsTableCache;
+}
+
 // ── WU-N1: WEAPON COMBAT-STAT LOOKUP ──────────────────────────────────────
 // Returns the full WEAPONS.CSV combat row for a weapon name (fields beyond the
 // {wgt,val,type} that lookupItemInDb() exposes) — used by the V.A.T.S. AP-strike

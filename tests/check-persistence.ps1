@@ -1014,7 +1014,7 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84','Suite 85','Suite 86','Suite 87','Suite 88','Suite 89','Suite 90','Suite 91','Suite 92','Suite 93','Suite 94','Suite 95','Suite 96','Suite 97','Suite 98','Suite 99','Suite 100','Suite 101','Suite 102','Suite 103','Suite 104','Suite 105','Suite 106','Suite 107','Suite 108')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84','Suite 85','Suite 86','Suite 87','Suite 88','Suite 89','Suite 90','Suite 91','Suite 92','Suite 93','Suite 94','Suite 95','Suite 96','Suite 97','Suite 98','Suite 99','Suite 100','Suite 101','Suite 102','Suite 103','Suite 104','Suite 105','Suite 106','Suite 107','Suite 108','Suite 109')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
 Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-99)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
@@ -6666,6 +6666,72 @@ Check (($css108 -match '\.consult-card\b') -and ($css108 -match '\.consult-hit-n
 # 108.13 shared modal entry point
 Check ($consultBody -match '_openSysModal') `
     '108.13: renderConsult opens via _openSysModal() (shared modal -- ARIA/focus consistency)'
+
+# ===========================================================
+# Suite 109 -- WU-N5 BIO-SCAN native medical advisory (13 tests)
+# Deterministic limb/HP/radiation/addiction advisory from state + CHEMS, routed
+# through NATIVE_COMMAND_ROUTER, offline + read-only + no AI. Locks router wiring,
+# the compute core (structural mirror of the JS behavioral eval), AI-path
+# retirement, read-only, XSS escaping, Protocol-38 agnosticism, discoverability.
+# NOTE: source slices + -cmatch (not Get-FunctionBody / case-insensitive -match)
+# to avoid the template-literal over-capture + case-fold pitfalls (WU-N4 Protocol-42).
+# ===========================================================
+Sep "Suite 109 -- WU-N5 BIO-SCAN native medical advisory"
+$ren109 = Read-Src "js/ui-render.js"
+$api109 = Read-Src "js/api.js"
+$core109 = Read-Src "js/ui-core.js"
+$css109 = Read-Src "css/terminal.css"
+$html109 = Read-Src "index.html"
+$dbnv109 = Read-Src "js/db_nv.js"
+$dbfo3109 = Read-Src "js/db_fo3.js"
+$routerBlock109 = [regex]::Match($api109, 'const NATIVE_COMMAND_ROUTER\s*=\s*\{[\s\S]*?\n\};').Value
+$rs109 = $ren109.IndexOf('const _BIO_LIMBS')
+$re109 = $ren109.IndexOf('function renderBioScan')
+$bioRegion109 = if (($rs109 -ge 0) -and ($re109 -gt $rs109)) { $ren109.Substring($rs109, $re109 - $rs109) } else { '' }
+$be109 = $ren109.IndexOf('function _updateContextPanels')
+$bioScanBody109 = if (($re109 -ge 0) -and ($be109 -gt $re109)) { $ren109.Substring($re109, $be109 - $re109) } else { '' }
+
+# 109.1 renderBioScan + the pure compute core both defined
+Check (($ren109 -match 'function renderBioScan\s*\(') -and ($ren109 -match 'function _bioScanCompute\s*\(')) `
+    '109.1: renderBioScan() + _bioScanCompute() defined in ui-render.js'
+# 109.2 getChemsTable defined in BOTH db files (game-agnostic parity)
+Check (($dbnv109 -match 'function getChemsTable\s*\(') -and ($dbfo3109 -match 'function getChemsTable\s*\(')) `
+    '109.2: getChemsTable() defined in BOTH db_nv.js and db_fo3.js (works in either game context)'
+# 109.3 router wires [BIO-SCAN] + [BIO] -> renderBioScan
+Check (($routerBlock109 -match "\[BIO-SCAN\]'\s*:\s*[^\n]*renderBioScan") -and ($routerBlock109 -match "\[BIO\]'\s*:\s*[^\n]*renderBioScan")) `
+    "109.3: NATIVE_COMMAND_ROUTER routes '[BIO-SCAN]' + '[BIO]' -> renderBioScan (native, no AI)"
+# 109.4 data-driven addiction source
+Check ($bioScanBody109 -match 'getChemsTable\s*\(') `
+    '109.4: renderBioScan sources chem/addiction data via getChemsTable() (data-driven)'
+# 109.5 structural mirror of the JS behavioral eval -- the compute encodes every
+#       advisory branch (limb/HP/rad/addiction) + the HP tier logic.
+Check (($bioRegion109 -cmatch 'CRIPPLED') -and ($bioRegion109 -cmatch 'CRITICAL') -and ($bioRegion109 -cmatch 'WOUNDED') -and ($bioRegion109 -cmatch 'ADDICTION RISK') -and ($bioRegion109 -cmatch 'RADIATION') -and ($bioRegion109 -cmatch "kind: 'limb'") -and ($bioRegion109 -cmatch "kind: 'addiction'")) `
+    '109.5: _bioScanCompute encodes the crippled/critical/wounded/rad/addiction advisory branches (structural mirror of the JS behavioral eval)'
+# 109.6 read-only
+Check ((-not ($bioScanBody109 -match 'saveState\s*\(')) -and (-not ($bioScanBody109 -match 'pushToCloud')) -and (-not ($bioScanBody109 -match 'state\.\w+\s*=[^=]'))) `
+    '109.6: renderBioScan is read-only (no saveState/pushToCloud/state writes)'
+# 109.7 XSS-safe escaping
+Check (($bioScanBody109 -match 'escapeHtml\(a\.text\)') -and ($bioScanBody109 -match 'escapeHtml\(l\.label\)')) `
+    '109.7: renderBioScan escapes advisory + limb text via escapeHtml() before innerHTML'
+# 109.8 game-agnostic (Protocol 38) -- no game/item literals in the compute core
+Check (($bioRegion109 -ne '') -and (-not ($bioRegion109 -cmatch '\bFNV\b|\bFO3\b|Fallout|New Vegas')) -and (-not ($bioRegion109 -match "['""]Stimpak['""]|['""]RadAway['""]|['""]Med-X['""]"))) `
+    '109.8: _bioScanCompute carries no FNV/FO3/Fallout or hardcoded chem-name literals (Protocol 38 -- data-driven)'
+# 109.9 AI-path retirement
+Check (($api109 -match 'do NOT produce a BIO-SCAN modal') -and (-not ($api109 -match 'Track RAD thresholds and crippled limbs via \[BIO-SCAN\]'))) `
+    '109.9: getSystemDirective retires the AI BIO-SCAN path (defers to the native calculator)'
+# 109.10 discoverable
+$cmdReg109 = [regex]::Match($core109, 'const COMMAND_REGISTRY\s*=\s*\[[\s\S]*?\n\];').Value
+Check ($cmdReg109 -match 'BIO-SCAN') '109.10: COMMAND_REGISTRY lists a BIO-SCAN entry (discoverability)'
+# 109.11 CSS overflow guard
+Check (($css109 -match '\.bio-card\b') -and ($css109 -match '\.bio-limb-name[\s\S]{0,80}min-width:\s*0')) `
+    '109.11: terminal.css .bio-card + .bio-limb-name min-width:0 (no horizontal overflow at 360px)'
+# 109.12 shared modal entry point
+Check ($bioScanBody109 -match '_openSysModal') `
+    '109.12: renderBioScan opens via _openSysModal() (shared modal -- ARIA/focus consistency)'
+# 109.13 RUN BIO-SCAN button affordance
+$bioBtn109 = [regex]::Match($html109, '<button\b[^>]*renderBioScan\(\)[^>]*>').Value
+Check (($html109 -match 'onclick="renderBioScan\(\)"') -and ($bioBtn109 -match 'aria-label="[^"]+"')) `
+    '109.13: index.html has a RUN BIO-SCAN button wired to renderBioScan() with an aria-label'
 
 # ===========================================================
 # Results

@@ -1770,6 +1770,7 @@ header('Meta / Runner Parity');
     'Suite 106',
     'Suite 107',
     'Suite 108',
+    'Suite 109',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
@@ -11491,6 +11492,171 @@ header('Suite 108 — WU-N4 CONSULT native databank lookup');
     /_openSysModal/.test(consultBody),
     '108.13: renderConsult opens via _openSysModal() (shared modal — ARIA/focus consistency)'
   );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 109 — WU-N5 BIO-SCAN native medical advisory (13 tests)
+//  `> [BIO-SCAN]` (+ [BIO]) routed through NATIVE_COMMAND_ROUTER to a deterministic,
+//  offline, read-only limb/HP/radiation/addiction advisory computed from state +
+//  CHEMS. Locks: router wiring, the pure compute core (behavioral), the AI-path
+//  retirement, read-only-ness, XSS-safe escaping, Protocol-38 agnosticism (med
+//  items sourced from data, getChemsTable in BOTH db files), discoverability + CSS.
+// ══════════════════════════════════════════════════════════════
+header('Suite 109 — WU-N5 BIO-SCAN native medical advisory');
+{
+  const ren109 = readFile('js/ui-render.js');
+  const api109 = readFile('js/api.js');
+  const core109 = readFile('js/ui-core.js');
+  const css109 = readFile('css/terminal.css');
+  const html109 = readFile('index.html');
+  const dbnv109 = readFile('js/db_nv.js');
+  const dbfo3109 = readFile('js/db_fo3.js');
+  const routerBlock109 = (api109.match(/const NATIVE_COMMAND_ROUTER\s*=\s*\{[\s\S]*?\n\};/) || [
+    '',
+  ])[0];
+  // Stable source slice of the BIO-SCAN core (from the limb table to renderBioScan).
+  const bioRegionStart = ren109.indexOf('const _BIO_LIMBS');
+  const bioRegionEnd = ren109.indexOf('function renderBioScan');
+  const bioRegion =
+    bioRegionStart >= 0 && bioRegionEnd > bioRegionStart
+      ? ren109.slice(bioRegionStart, bioRegionEnd)
+      : '';
+  let bioScanBody = '';
+  try {
+    bioScanBody = extractFunctionBody(ren109, 'renderBioScan');
+  } catch (_) {}
+
+  // 109.1 renderBioScan + the pure compute core both defined
+  assert(
+    /function renderBioScan\s*\(/.test(ren109) && /function _bioScanCompute\s*\(/.test(ren109),
+    '109.1: renderBioScan() + _bioScanCompute() defined in ui-render.js'
+  );
+
+  // 109.2 getChemsTable defined in BOTH db files (game-agnostic parity — Protocol 38)
+  assert(
+    /function getChemsTable\s*\(/.test(dbnv109) && /function getChemsTable\s*\(/.test(dbfo3109),
+    '109.2: getChemsTable() defined in BOTH db_nv.js and db_fo3.js (works in either game context)'
+  );
+
+  // 109.3 router wires [BIO-SCAN] + [BIO] → renderBioScan (native, not AI)
+  assert(
+    /\[BIO-SCAN\]'\s*:\s*[^\n]*renderBioScan/.test(routerBlock109) &&
+      /\[BIO\]'\s*:\s*[^\n]*renderBioScan/.test(routerBlock109),
+    "109.3: NATIVE_COMMAND_ROUTER routes '[BIO-SCAN]' + '[BIO]' → renderBioScan (native, no AI)"
+  );
+
+  // 109.4 reuses getChemsTable as the addiction data source (not a hardcoded list)
+  assert(
+    /getChemsTable\s*\(/.test(bioScanBody),
+    '109.4: renderBioScan sources chem/addiction data via getChemsTable() (data-driven)'
+  );
+
+  // 109.5 BEHAVIORAL — the pure core computes the right advisories. JS evaluates the
+  //       extracted core directly; the PS runner asserts the same branches structurally.
+  {
+    let ok = false;
+    let err = null;
+    try {
+      const fn = new Function(bioRegion + '\n return _bioScanCompute;')();
+      const chems = [
+        { name: 'Stimpak', effect: 'Restore HP', addictionRisk: '0%', family: 'Medicine' },
+        { name: 'RadAway', effect: 'Remove 150 Rads', addictionRisk: '0%', family: 'Medicine' },
+        { name: 'Med-X', effect: '+25 DR', addictionRisk: '25%', family: 'Med-X' },
+      ];
+      const hurt = fn(
+        {
+          limbs: { hd: 'OK', la: 'OK', ra: 'OK', ll: 'OK', rl: 'CRIPPLED' },
+          hpCur: 20,
+          hpMax: 100,
+          rads: 450,
+          status: [{ name: 'Med-X', ticks: 3, type: 'DEBUFF' }],
+        },
+        chems
+      );
+      const texts = hurt.advisories.map(a => a.kind + '|' + a.text);
+      const healthy = fn(
+        {
+          limbs: { hd: 'OK', la: 'OK', ra: 'OK', ll: 'OK', rl: 'OK' },
+          hpCur: 100,
+          hpMax: 100,
+          rads: 0,
+          status: [],
+        },
+        chems
+      );
+      ok =
+        hurt.hpTier === 'CRITICAL' &&
+        hurt.crippled.length === 1 &&
+        texts.some(t => /^limb\|RIGHT LEG CRIPPLED — STIMPAK ADVISED$/.test(t)) &&
+        texts.some(t => /^rad\|RADIATION ADVANCED \(450 RADS\) — RADAWAY ADVISED$/.test(t)) &&
+        texts.some(t => /^addiction\|ADDICTION RISK: MED-X \(active\)/.test(t)) &&
+        healthy.advisories.length === 0 &&
+        healthy.hpTier === 'STABLE';
+    } catch (e) {
+      err = e;
+    }
+    assert(
+      ok,
+      '109.5: _bioScanCompute behavioral — crippled/critical/rad/addiction advisories computed (med items sourced from data); healthy → nominal' +
+        (err ? ' — ' + err.message : '')
+    );
+  }
+
+  // 109.6 read-only — renderBioScan never writes state / saves / cloud
+  assert(
+    !/saveState\s*\(|pushToCloud|state\.\w+\s*=[^=]/.test(bioScanBody),
+    '109.6: renderBioScan is read-only (no saveState/pushToCloud/state writes)'
+  );
+
+  // 109.7 XSS-safe — advisory + limb text escaped before innerHTML
+  assert(
+    /escapeHtml\(a\.text\)/.test(bioScanBody) && /escapeHtml\(l\.label\)/.test(bioScanBody),
+    '109.7: renderBioScan escapes advisory + limb text via escapeHtml() before innerHTML'
+  );
+
+  // 109.8 game-agnostic (Protocol 38): the compute core carries no game/item literals —
+  //       med items are derived from the CHEMS effect text, never hardcoded.
+  assert(
+    bioRegion !== '' &&
+      !/\bFNV\b|\bFO3\b|Fallout|New Vegas/.test(bioRegion) &&
+      !/['"]Stimpak['"]|['"]RadAway['"]|['"]Med-X['"]/.test(bioRegion),
+    '109.8: _bioScanCompute carries no FNV/FO3/Fallout or hardcoded chem-name literals (Protocol 38 — data-driven)'
+  );
+
+  // 109.9 AI-path retirement — the system directive defers BIO-SCAN to the native
+  //       calculator and no longer tells the AI to own [BIO-SCAN] trauma tracking.
+  assert(
+    /do NOT produce a BIO-SCAN modal/.test(api109) &&
+      !/Track RAD thresholds and crippled limbs via \[BIO-SCAN\]/.test(api109),
+    '109.9: getSystemDirective retires the AI BIO-SCAN path (defers to the native calculator)'
+  );
+
+  // 109.10 discoverable in the command reference
+  assert(
+    /BIO-SCAN/.test((core109.match(/const COMMAND_REGISTRY\s*=\s*\[[\s\S]*?\n\];/) || [''])[0]),
+    '109.10: COMMAND_REGISTRY lists a BIO-SCAN entry (discoverability)'
+  );
+
+  // 109.11 CSS overflow guard — .bio-card + .bio-limb-name min-width:0 (Protocol 17/mobile)
+  assert(
+    /\.bio-card\b/.test(css109) && /\.bio-limb-name[\s\S]{0,80}min-width:\s*0/.test(css109),
+    '109.11: terminal.css .bio-card + .bio-limb-name min-width:0 (no horizontal overflow at 360px)'
+  );
+
+  // 109.12 reuses the shared modal entry point (consistent dialog semantics)
+  assert(
+    /_openSysModal/.test(bioScanBody),
+    '109.12: renderBioScan opens via _openSysModal() (shared modal — ARIA/focus consistency)'
+  );
+
+  // 109.13 a discoverable UI affordance — the RUN BIO-SCAN button wired to renderBioScan
+  {
+    const btnTag109 = (html109.match(/<button\b[^>]*renderBioScan\(\)[^>]*>/) || [''])[0];
+    assert(
+      /onclick="renderBioScan\(\)"/.test(html109) && /aria-label="[^"]+"/.test(btnTag109),
+      '109.13: index.html has a RUN BIO-SCAN button wired to renderBioScan() with an aria-label'
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

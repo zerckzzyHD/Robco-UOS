@@ -2361,6 +2361,150 @@ function renderConsult(topic) {
     appendToChat(`> [CONSULT] Databank record retrieved for "${q}".`, 'sys');
 }
 
+// ── WU-N5: BIO-SCAN — native medical advisory ────────────────────────────
+// `> [BIO-SCAN]` → deterministic limb/HP/radiation/addiction readout computed
+// entirely from `state` (limbs, hpCur/hpMax, rads, status) cross-referenced with
+// the active game's CHEMS data. Pure local rules, read-only, offline, no AI.
+// Game-agnostic (Protocol 38): limb labels are generic anatomy and the recommended
+// med items are sourced from getChemsTable() — never hardcoded game item names.
+// All advisory text is escaped before it reaches innerHTML (XSS-safe).
+const _BIO_LIMBS = [
+  { key: 'hd', label: 'HEAD' },
+  { key: 'la', label: 'LEFT ARM' },
+  { key: 'ra', label: 'RIGHT ARM' },
+  { key: 'll', label: 'LEFT LEG' },
+  { key: 'rl', label: 'RIGHT LEG' },
+];
+
+// A chem carries addiction risk when its Addiction_Risk column is a non-zero
+// percentage (e.g. "25%") — not blank, "None", or "0%".
+function _bioChemHasRisk(c) {
+  const r = String((c && c.addictionRisk) || '')
+    .trim()
+    .toLowerCase();
+  return r !== '' && r !== 'none' && !/^0%?$/.test(r);
+}
+
+// Pure deterministic core — takes a read-only state snapshot + the CHEMS table and
+// returns the structured advisory. Kept side-effect-free so it is unit-testable.
+function _bioScanCompute(snap, chems) {
+  snap = snap || {};
+  chems = Array.isArray(chems) ? chems : [];
+  const limbStates = snap.limbs || {};
+  const limbs = _BIO_LIMBS.map(l => ({
+    key: l.key,
+    label: l.label,
+    crippled: String(limbStates[l.key] || 'OK').toUpperCase() === 'CRIPPLED',
+  }));
+  const crippled = limbs.filter(l => l.crippled).map(l => l.label);
+
+  const hpMax = Math.max(1, Number(snap.hpMax) || 1);
+  const hpCur = Math.max(0, Number(snap.hpCur) || 0);
+  const hpPct = Math.round((hpCur / hpMax) * 100);
+  const hpTier = hpPct < 25 ? 'CRITICAL' : hpPct < 60 ? 'WOUNDED' : 'STABLE';
+
+  const rads = Math.max(0, Number(snap.rads) || 0);
+  const radTier =
+    rads >= 600 ? 'SEVERE' : rads >= 400 ? 'ADVANCED' : rads >= 200 ? 'MINOR' : 'NONE';
+
+  // Recommended med items, sourced from the active game's CHEMS data (Protocol 3 —
+  // data is authority). A healer restores HP; a rad-remover clears radiation.
+  const healer = (
+    chems.find(c => /restore/i.test(c.effect) && /hp/i.test(c.effect) && !/rad/i.test(c.effect)) ||
+    {}
+  ).name;
+  const radRemover = (chems.find(c => /remove/i.test(c.effect) && /rad/i.test(c.effect)) || {})
+    .name;
+  const healName = healer ? healer.toUpperCase() + ' ADVISED' : 'MEDICAL ATTENTION ADVISED';
+  const radName = radRemover ? radRemover.toUpperCase() + ' ADVISED' : 'DECONTAMINATION ADVISED';
+
+  const advisories = [];
+  crippled.forEach(label =>
+    advisories.push({ kind: 'limb', text: label + ' CRIPPLED — ' + healName })
+  );
+  if (hpTier === 'CRITICAL') {
+    advisories.push({ kind: 'hp', text: 'HP CRITICAL (' + hpPct + '%) — ' + healName });
+  } else if (hpTier === 'WOUNDED') {
+    advisories.push({ kind: 'hp', text: 'HP LOW (' + hpPct + '%) — ' + healName });
+  }
+  if (radTier !== 'NONE') {
+    advisories.push({
+      kind: 'rad',
+      text: 'RADIATION ' + radTier + ' (' + rads + ' RADS) — ' + radName,
+    });
+  }
+  // Addiction risk: any active status effect that matches an addictive chem.
+  const seen = new Set();
+  (Array.isArray(snap.status) ? snap.status : []).forEach(eff => {
+    const en = String((eff && eff.name) || '').toLowerCase();
+    if (!en) return;
+    chems.forEach(c => {
+      if (!_bioChemHasRisk(c)) return;
+      const cn = c.name.toLowerCase();
+      const fam = (c.family || '').toLowerCase();
+      if ((en.includes(cn) || (fam && en.includes(fam))) && !seen.has(cn)) {
+        seen.add(cn);
+        advisories.push({
+          kind: 'addiction',
+          text: 'ADDICTION RISK: ' + c.name.toUpperCase() + ' (active) — ' + c.addictionRisk,
+        });
+      }
+    });
+  });
+
+  return { hpCur, hpMax, hpPct, hpTier, rads, radTier, limbs, crippled, advisories };
+}
+
+function renderBioScan() {
+  const modal = document.getElementById('sysModal');
+  const title = document.getElementById('modalTitle');
+  const content = document.getElementById('modalContent');
+  if (!modal || !title || !content) return;
+  title.innerText = '> BIO-SCAN ADVISORY';
+
+  const chems = typeof getChemsTable === 'function' ? getChemsTable() : [];
+  const snap = {
+    limbs: { hd: state.hd, la: state.la, ra: state.ra, ll: state.ll, rl: state.rl },
+    hpCur: state.hpCur,
+    hpMax: state.hpMax,
+    rads: state.rads,
+    status: state.status,
+  };
+  const r = _bioScanCompute(snap, chems);
+
+  let html = '<div class="bio-card">';
+  html += '<div class="bio-vitals">';
+  html += `<div class="bio-row"><span class="bio-label">HP</span><span class="bio-val bio-hp--${r.hpTier.toLowerCase()}">${r.hpCur} / ${r.hpMax} (${r.hpPct}%) ${r.hpTier}</span></div>`;
+  html += `<div class="bio-row"><span class="bio-label">RADIATION</span><span class="bio-val">${r.rads} RADS${r.radTier !== 'NONE' ? ' — ' + r.radTier : ''}</span></div>`;
+  html += '</div>';
+
+  html += '<div class="bio-limbs">';
+  r.limbs.forEach(l => {
+    html +=
+      `<div class="bio-limb"><span class="bio-limb-name">${escapeHtml(l.label)}</span>` +
+      `<span class="bio-limb-state bio-limb-state--${l.crippled ? 'crippled' : 'ok'}">${l.crippled ? 'CRIPPLED' : 'OK'}</span></div>`;
+  });
+  html += '</div>';
+
+  html += '<div class="bio-advisories">';
+  if (r.advisories.length === 0) {
+    html += '<div class="bio-nominal">ALL SYSTEMS NOMINAL — NO INTERVENTION ADVISED</div>';
+  } else {
+    r.advisories.forEach(a => {
+      html += `<div class="bio-advisory bio-advisory--${a.kind}">&#9658; ${escapeHtml(a.text)}</div>`;
+    });
+  }
+  html += '</div></div>';
+
+  content.innerHTML = html;
+  if (typeof _openSysModal === 'function') _openSysModal();
+  if (typeof appendToChat === 'function')
+    appendToChat(
+      `> [BIO-SCAN] ${r.crippled.length} limb(s) crippled, HP ${r.hpPct}% — ${r.advisories.length} advisor${r.advisories.length === 1 ? 'y' : 'ies'}.`,
+      'sys'
+    );
+}
+
 // Switch faction/karma panels based on game context (called from loadUI).
 function _updateContextPanels() {
   const usesKarmaCenter = _activeDef().usesKarmaCenter;

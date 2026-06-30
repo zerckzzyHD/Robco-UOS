@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1334/1334 | Cache: robco-terminal-v2.6.0-r30 -->
+﻿## [Unreleased]<!-- Tests: 1347/1347 | Cache: robco-terminal-v2.6.0-r31 -->
 
 ### Added
 
@@ -7,6 +7,7 @@
 - Added a "?" help button to the save menu that opens a plain-language field manual for every save tool — Export Save, Import Save, Restore Backup, the A/B/C save slots, saving to and loading from the cloud, and how auto-save works. Tap it any time you're unsure what a save control does. The help opens in the standard pop-up, so it traps keyboard focus, closes on Escape, and returns focus to the button when dismissed.
 - Added a BARTER UPLINK trading terminal (INV tab, also reachable from the [TRADE] button) — a fully offline barter screen that no longer needs the AI. Pick a vendor, search their stock to buy, or sell from your own pack. Prices are real Fallout barter math driven by your Barter skill: the higher your Barter, the less you pay and the more you're paid (buy prices run from 1.55× an item's value down to 1.10× as Barter climbs 0→100; sell prices rise from 0.45× to 0.90×), and a vendor only pays up to the caps in its purse. Buying and selling update your caps and inventory instantly behind a confirm prompt, and never auto-sync to the cloud. Works entirely offline with no AI call.
 - Added a CONSULT databank lookup — type `> CONSULT <topic>` (or `> [CONSULT] <topic>`) in the Comm-Link to look up any item, perk, quest, location, companion, or creature from the game's own data, instantly and offline. It shows matching records grouped by kind, plus key stats when the topic is a concrete item, weapon, or creature (weight/value, damage, or HP/DT and weakness). If nothing matches it plainly says "NO ENTRY IN DATABANK" rather than making something up. No AI is involved.
+- Added a BIO-SCAN medical advisory — a "RUN BIO-SCAN ADVISORY" button in the Bio-Scan & Limb Status panel (also `> [BIO-SCAN]` in the Comm-Link) reads out your current condition and what to do about it: a health readout (STABLE / WOUNDED / CRITICAL), radiation level, an OK/CRIPPLED state for all five limbs, and plain advisories — crippled limbs and low health recommend the right healing item, high radiation recommends a rad-removing item, and any active addiction is flagged with its risk. The recommended items are read from the game's own chem data (so it names the correct items in any campaign), and the whole readout is computed offline with no AI.
 
 ### Fixed
 
