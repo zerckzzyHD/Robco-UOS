@@ -2252,6 +2252,115 @@ function renderThreat(target) {
     );
 }
 
+// ── WU-N4: CONSULT — native databank lookup ──────────────────────────────
+// `> CONSULT <topic>` → exact local records from FALLOUT_REGISTRY (items/perks/quests/
+// locations/companions via registrySearch) + DB stat cross-reference (lookupItemInDb /
+// lookupWeaponStats / lookupBestiaryEntry). Deterministic, offline, read-only, no AI.
+// Shows NO ENTRY IN DATABANK when nothing matches (Protocol 3 — never invents records).
+// Game-agnostic (Protocol 38): FALLOUT_REGISTRY + databaseCSVs are the active game's data.
+// The user topic is always run through escapeHtml before it reaches innerHTML (XSS-safe).
+const _CONSULT_CATS = [
+  { key: 'items', label: 'ITEMS' },
+  { key: 'perks', label: 'PERKS' },
+  { key: 'quests', label: 'QUESTS' },
+  { key: 'locations', label: 'LOCATIONS' },
+  { key: 'companions', label: 'COMPANIONS' },
+];
+
+function _consultDetail(cat, e) {
+  if (cat === 'quests') return [e.type, e.dlc].filter(Boolean).join(' · ');
+  if (cat === 'perks') return [e.type, e.level ? 'Lvl ' + e.level : ''].filter(Boolean).join(' · ');
+  if (cat === 'companions') return e.location || e.fullName || '';
+  return e.type || '';
+}
+
+function renderConsult(topic) {
+  const modal = document.getElementById('sysModal');
+  const title = document.getElementById('modalTitle');
+  const content = document.getElementById('modalContent');
+  if (!modal || !title || !content) return;
+  title.innerText = '> DATABANK QUERY';
+
+  const q = (topic || '').trim();
+  if (!q) {
+    content.innerHTML =
+      '<pre class="consult-empty" style="white-space:pre-wrap;font-family:inherit;margin:0;color:var(--robco-dim);">SPECIFY A QUERY — e.g. &gt; CONSULT Deathclaw</pre>';
+    if (typeof _openSysModal === 'function') _openSysModal();
+    if (typeof appendToChat === 'function') appendToChat('> [CONSULT] No query specified.', 'sys');
+    return;
+  }
+
+  // Registry hits across every category (active game's FALLOUT_REGISTRY).
+  const groups = [];
+  if (typeof registrySearch === 'function') {
+    for (const c of _CONSULT_CATS) {
+      const hits = registrySearch(c.key, q) || [];
+      if (hits.length) groups.push({ key: c.key, label: c.label, hits: hits.slice(0, 5) });
+    }
+  }
+
+  // DB stat cross-reference.
+  const creature = typeof lookupBestiaryEntry === 'function' ? lookupBestiaryEntry(q) : null;
+  const weapon = typeof lookupWeaponStats === 'function' ? lookupWeaponStats(q) : null;
+  const dbItem = typeof lookupItemInDb === 'function' ? lookupItemInDb(q) : null;
+
+  if (groups.length === 0 && !creature && !weapon && !dbItem) {
+    content.innerHTML =
+      '<pre class="consult-empty" style="white-space:pre-wrap;font-family:inherit;margin:0;color:var(--robco-dim);">NO ENTRY IN DATABANK: ' +
+      escapeHtml(q) +
+      '</pre>';
+    if (typeof _openSysModal === 'function') _openSysModal();
+    if (typeof appendToChat === 'function')
+      appendToChat(`> [CONSULT] No databank entry found for "${q}".`, 'sys');
+    return;
+  }
+
+  let html = '<div class="consult-card">';
+  html += `<div class="consult-query">QUERY: ${escapeHtml(q)}</div>`;
+
+  const statRows = [];
+  if (creature) {
+    statRows.push(['CREATURE', escapeHtml(creature.name)]);
+    statRows.push(['HP / DT', `${creature.hp} / ${creature.dt}`]);
+    if (creature.weakness && String(creature.weakness).toLowerCase() !== 'none')
+      statRows.push(['WEAKNESS', escapeHtml(creature.weakness)]);
+  }
+  if (weapon) {
+    statRows.push(['WEAPON', escapeHtml(weapon.name)]);
+    statRows.push(['DMG / APS', `${weapon.baseDamage} / ${weapon.aps}`]);
+    if (weapon.ammoType) statRows.push(['AMMO', escapeHtml(weapon.ammoType)]);
+  }
+  if (dbItem && !weapon && !creature) {
+    statRows.push(['TYPE', escapeHtml(String(dbItem.type || 'misc'))]);
+    statRows.push(['WEIGHT / VALUE', `${dbItem.wgt} / ${dbItem.val}`]);
+  }
+  if (statRows.length) {
+    html += '<div class="consult-stats">';
+    statRows.forEach(r => {
+      html += `<div class="consult-row"><span class="consult-label">${r[0]}</span><span class="consult-val">${r[1]}</span></div>`;
+    });
+    html += '</div>';
+  }
+
+  groups.forEach(g => {
+    html += `<div class="consult-group"><div class="consult-cat">${g.label}</div>`;
+    g.hits.forEach(e => {
+      const d = _consultDetail(g.key, e);
+      html +=
+        `<div class="consult-hit"><span class="consult-hit-name">${escapeHtml(e.name)}</span>` +
+        (d ? `<span class="consult-hit-meta">${escapeHtml(d)}</span>` : '') +
+        '</div>';
+    });
+    html += '</div>';
+  });
+
+  html += '</div>';
+  content.innerHTML = html;
+  if (typeof _openSysModal === 'function') _openSysModal();
+  if (typeof appendToChat === 'function')
+    appendToChat(`> [CONSULT] Databank record retrieved for "${q}".`, 'sys');
+}
+
 // Switch faction/karma panels based on game context (called from loadUI).
 function _updateContextPanels() {
   const usesKarmaCenter = _activeDef().usesKarmaCenter;

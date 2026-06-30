@@ -98,6 +98,7 @@ export default [
         lookupWeaponStats: 'readonly',
         lookupBestiaryEntry: 'readonly',
         renderThreat: 'readonly',
+        renderConsult: 'readonly',
         _openSysModal: 'readonly',
         _vatsIsMelee: 'readonly',
         getGameContext: 'readonly',

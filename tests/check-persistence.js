@@ -1769,6 +1769,7 @@ header('Meta / Runner Parity');
     'Suite 105',
     'Suite 106',
     'Suite 107',
+    'Suite 108',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
@@ -11383,6 +11384,113 @@ header('Suite 107 — WU-N3 THREAT native bestiary + TTK');
       `107.16: no weapon → hasWeapon false + ttk null (got ${r4.hasWeapon}/${r4.ttk})`
     );
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 108 — WU-N4 CONSULT native databank lookup (13 tests)
+//  `> CONSULT <topic>` (+ [CONSULT] / [CON]) routed through NATIVE_COMMAND_ROUTER to a
+//  deterministic, offline, read-only registry+DB lookup. Locks: the router wiring, the
+//  registry/DB cross-reference, the NO-ENTRY path (Protocol 3 — never invents), XSS-safe
+//  topic escaping, read-only-ness, Protocol-38 agnosticism, discoverability + CSS overflow.
+// ══════════════════════════════════════════════════════════════
+header('Suite 108 — WU-N4 CONSULT native databank lookup');
+{
+  const ren108 = readFile('js/ui-render.js');
+  const api108 = readFile('js/api.js');
+  const core108 = readFile('js/ui-core.js');
+  const css108 = readFile('css/terminal.css');
+  let consultBody = '';
+  try {
+    consultBody = extractFunctionBody(ren108, 'renderConsult');
+  } catch (_) {}
+  // The NATIVE_COMMAND_ROUTER literal block.
+  const routerBlock = (api108.match(/const NATIVE_COMMAND_ROUTER\s*=\s*\{[\s\S]*?\n\};/) || [
+    '',
+  ])[0];
+
+  // 108.1 renderConsult defined
+  assert(
+    /function renderConsult\s*\(/.test(ren108),
+    '108.1: renderConsult() defined in ui-render.js'
+  );
+  // 108.2 router wires all three CONSULT tokens → renderConsult
+  assert(
+    /(^|\s|')CONSULT'?\s*:\s*\w*\s*=>?\s*[^\n]*renderConsult/.test(routerBlock) &&
+      /\[CONSULT\]'\s*:\s*[^\n]*renderConsult/.test(routerBlock) &&
+      /\[CON\]'\s*:\s*[^\n]*renderConsult/.test(routerBlock),
+    '108.2: NATIVE_COMMAND_ROUTER routes CONSULT + [CONSULT] + [CON] to renderConsult()'
+  );
+  // 108.3 unbracketed CONSULT key present so `> CONSULT x` routes (router matches token start)
+  assert(
+    /\bCONSULT:\s*\w+\s*=>/.test(routerBlock) || /\bCONSULT:\s*topic\s*=>/.test(routerBlock),
+    '108.3: an unbracketed CONSULT router key exists (so `> CONSULT <topic>` routes natively)'
+  );
+  // 108.4 registry search across all five categories (game-agnostic via registrySearch)
+  assert(
+    /registrySearch/.test(consultBody) &&
+      /'items'/.test(ren108) &&
+      /'perks'/.test(ren108) &&
+      /'quests'/.test(ren108) &&
+      /'locations'/.test(ren108) &&
+      /'companions'/.test(ren108),
+    '108.4: renderConsult searches the registry (registrySearch) across items/perks/quests/locations/companions'
+  );
+  // 108.5 DB stat cross-reference
+  assert(
+    /lookupItemInDb/.test(consultBody) &&
+      /lookupBestiaryEntry/.test(consultBody) &&
+      /lookupWeaponStats/.test(consultBody),
+    '108.5: renderConsult cross-references lookupItemInDb + lookupBestiaryEntry + lookupWeaponStats'
+  );
+  // 108.6 NO-ENTRY path (Protocol 3 — never invents)
+  assert(
+    /NO ENTRY IN DATABANK/.test(consultBody),
+    '108.6: renderConsult shows NO ENTRY IN DATABANK when nothing matches (Protocol 3)'
+  );
+  // 108.7 XSS — user topic escaped before innerHTML (query line + NO-ENTRY both escape q)
+  assert(
+    /escapeHtml\(q\)/.test(consultBody),
+    '108.7: renderConsult escapes the user topic via escapeHtml(q) before innerHTML (XSS-safe)'
+  );
+  // 108.8 registry hit names + meta are escaped too
+  assert(
+    /escapeHtml\(e\.name\)/.test(consultBody),
+    '108.8: renderConsult escapes registry hit names (escapeHtml(e.name))'
+  );
+  // 108.9 read-only — no state writes
+  assert(
+    !/saveState\s*\(/.test(consultBody) &&
+      !/pushToCloud\s*\(/.test(consultBody) &&
+      !/\bstate\.\w+\s*=/.test(consultBody),
+    '108.9: renderConsult is read-only (no saveState/pushToCloud/state writes)'
+  );
+  // 108.10 game-agnostic (Protocol 38) — no FNV/FO3/Fallout literals in the consult code.
+  // Use a stable source slice (from the _CONSULT_CATS decl to the next function) rather than
+  // brace-counted body extraction, which diverges between runners on template-literal-heavy code.
+  {
+    const cs = ren108.indexOf('const _CONSULT_CATS');
+    const ce = ren108.indexOf('function _updateContextPanels');
+    const region = cs >= 0 && ce > cs ? ren108.slice(cs, ce) : '';
+    assert(
+      region !== '' && !/\bFNV\b|\bFO3\b|Fallout|New Vegas/.test(region),
+      '108.10: renderConsult/_consultDetail carry no FNV/FO3/Fallout literals (Protocol 38 — registry-driven)'
+    );
+  }
+  // 108.11 discoverable in the command reference
+  assert(
+    /CONSULT/.test((core108.match(/const COMMAND_REGISTRY\s*=\s*\[[\s\S]*?\n\];/) || [''])[0]),
+    '108.11: COMMAND_REGISTRY lists a CONSULT entry (discoverability)'
+  );
+  // 108.12 CSS overflow guard — .consult-* with min-width:0 (Protocol 17/mobile)
+  assert(
+    /\.consult-card\b/.test(css108) && /\.consult-hit-name[\s\S]{0,80}min-width:\s*0/.test(css108),
+    '108.12: terminal.css .consult-card + .consult-hit-name min-width:0 (no horizontal overflow at 360px)'
+  );
+  // 108.13 reuses the shared modal entry point (consistent dialog semantics)
+  assert(
+    /_openSysModal/.test(consultBody),
+    '108.13: renderConsult opens via _openSysModal() (shared modal — ARIA/focus consistency)'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════

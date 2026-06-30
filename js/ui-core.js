@@ -1522,6 +1522,7 @@ const COMMAND_REGISTRY = [
   {
     group: 'NARRATIVE & DIRECTIVES',
     cmds: [
+      { cmd: 'CONSULT <topic>', desc: 'Native databank lookup — offline.' },
       { cmd: '[CROSSROADS]', desc: 'Butterfly-effect lockouts.' },
       { cmd: '[COMM LINK]', desc: 'NPC persona override. (SEVER)' },
       { cmd: '[PAUSE]', desc: 'Master Directive (Page One).' },

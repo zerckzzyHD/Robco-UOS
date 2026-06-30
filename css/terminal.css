@@ -967,6 +967,67 @@ details.sub-panel[open] > summary h3::after {
   color: var(--robco-dim);
   font-style: italic;
 }
+/* WU-N4: native CONSULT databank result. min-width:0 + overflow-wrap keep long
+   record names from forcing horizontal overflow at 360px (Protocol 17/mobile). */
+.consult-card {
+  font-size: 12px;
+  line-height: 1.55;
+}
+.consult-query {
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  color: var(--robco-green);
+  border-bottom: 1px solid var(--robco-dim);
+  padding-bottom: 4px;
+  margin-bottom: 8px;
+  overflow-wrap: anywhere;
+}
+.consult-stats {
+  margin-bottom: 8px;
+}
+.consult-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.consult-label {
+  color: var(--robco-dim);
+  letter-spacing: 0.5px;
+}
+.consult-val {
+  color: var(--robco-green);
+  font-weight: bold;
+  overflow-wrap: anywhere;
+}
+.consult-group {
+  border-top: 1px dashed var(--robco-dim);
+  padding-top: 5px;
+  margin-top: 5px;
+}
+.consult-cat {
+  color: var(--robco-dim);
+  letter-spacing: 1px;
+  font-size: 10px;
+  margin-bottom: 2px;
+}
+.consult-hit {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.consult-hit-name {
+  color: var(--robco-green);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.consult-hit-meta {
+  color: var(--robco-dim);
+  font-size: 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
 .vats-scanning::after {
   content: '';
   position: absolute;

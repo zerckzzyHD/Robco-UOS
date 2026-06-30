@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1321/1321 | Cache: robco-terminal-v2.6.0-r29 -->
+﻿## [Unreleased]<!-- Tests: 1334/1334 | Cache: robco-terminal-v2.6.0-r30 -->
 
 ### Added
 
@@ -6,6 +6,7 @@
 - All CRT flicker and scanline animations are now paused for users who have "reduce motion" enabled in their operating system — both the 6.7 Hz flicker and the faster 10 Hz variant exceed the WCAG seizure-risk threshold of 3 Hz, so they now freeze to a static scanline image when the motion preference is set.
 - Added a "?" help button to the save menu that opens a plain-language field manual for every save tool — Export Save, Import Save, Restore Backup, the A/B/C save slots, saving to and loading from the cloud, and how auto-save works. Tap it any time you're unsure what a save control does. The help opens in the standard pop-up, so it traps keyboard focus, closes on Escape, and returns focus to the button when dismissed.
 - Added a BARTER UPLINK trading terminal (INV tab, also reachable from the [TRADE] button) — a fully offline barter screen that no longer needs the AI. Pick a vendor, search their stock to buy, or sell from your own pack. Prices are real Fallout barter math driven by your Barter skill: the higher your Barter, the less you pay and the more you're paid (buy prices run from 1.55× an item's value down to 1.10× as Barter climbs 0→100; sell prices rise from 0.45× to 0.90×), and a vendor only pays up to the caps in its purse. Buying and selling update your caps and inventory instantly behind a confirm prompt, and never auto-sync to the cloud. Works entirely offline with no AI call.
+- Added a CONSULT databank lookup — type `> CONSULT <topic>` (or `> [CONSULT] <topic>`) in the Comm-Link to look up any item, perk, quest, location, companion, or creature from the game's own data, instantly and offline. It shows matching records grouped by kind, plus key stats when the topic is a concrete item, weapon, or creature (weight/value, damage, or HP/DT and weakness). If nothing matches it plainly says "NO ENTRY IN DATABANK" rather than making something up. No AI is involved.
 
 ### Fixed
 

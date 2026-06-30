@@ -1014,7 +1014,7 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84','Suite 85','Suite 86','Suite 87','Suite 88','Suite 89','Suite 90','Suite 91','Suite 92','Suite 93','Suite 94','Suite 95','Suite 96','Suite 97','Suite 98','Suite 99','Suite 100','Suite 101','Suite 102','Suite 103','Suite 104','Suite 105','Suite 106')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84','Suite 85','Suite 86','Suite 87','Suite 88','Suite 89','Suite 90','Suite 91','Suite 92','Suite 93','Suite 94','Suite 95','Suite 96','Suite 97','Suite 98','Suite 99','Suite 100','Suite 101','Suite 102','Suite 103','Suite 104','Suite 105','Suite 106','Suite 107','Suite 108')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
 Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-99)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
@@ -6605,6 +6605,67 @@ Check ($r3_107.ammoBurn -eq 6) `
 $r4_107 = Get-Threat107 50 5 0 0 1 $false
 Check ((-not $r4_107.hasWeapon) -and ($null -eq $r4_107.ttk)) `
     '107.16: no weapon -> hasWeapon false + ttk null'
+
+# ===========================================================
+# Suite 108 -- WU-N4 CONSULT native databank lookup (13 tests)
+# `> CONSULT <topic>` (+ [CONSULT] / [CON]) routed through NATIVE_COMMAND_ROUTER to a
+# deterministic, offline, read-only registry+DB lookup. Locks router wiring, registry/DB
+# cross-reference, the NO-ENTRY path (Protocol 3), XSS-safe topic escaping, read-only-ness,
+# Protocol-38 agnosticism, discoverability + CSS overflow guard.
+# ===========================================================
+Sep "Suite 108 -- WU-N4 CONSULT native databank lookup"
+$ren108 = Read-Src "js/ui-render.js"
+$api108 = Read-Src "js/api.js"
+$core108 = Read-Src "js/ui-core.js"
+$css108 = Read-Src "css/terminal.css"
+$consultBody = ''
+try { $consultBody = Get-FunctionBody $ren108 'renderConsult' } catch {}
+$routerBlock = [regex]::Match($api108, 'const NATIVE_COMMAND_ROUTER\s*=\s*\{[\s\S]*?\n\};').Value
+
+# 108.1 renderConsult defined
+Check ($ren108 -match 'function renderConsult\s*\(') '108.1: renderConsult() defined in ui-render.js'
+# 108.2 router wires all three CONSULT tokens
+Check (($routerBlock -match "(^|\s|')CONSULT'?\s*:\s*\w*\s*=>?\s*[^\n]*renderConsult") -and ($routerBlock -match "\[CONSULT\]'\s*:\s*[^\n]*renderConsult") -and ($routerBlock -match "\[CON\]'\s*:\s*[^\n]*renderConsult")) `
+    '108.2: NATIVE_COMMAND_ROUTER routes CONSULT + [CONSULT] + [CON] to renderConsult()'
+# 108.3 unbracketed CONSULT key present
+Check (($routerBlock -match '\bCONSULT:\s*\w+\s*=>') -or ($routerBlock -match '\bCONSULT:\s*topic\s*=>')) `
+    '108.3: an unbracketed CONSULT router key exists (so `> CONSULT <topic>` routes natively)'
+# 108.4 registry search across all five categories
+Check (($consultBody -match 'registrySearch') -and ($ren108 -match "'items'") -and ($ren108 -match "'perks'") -and ($ren108 -match "'quests'") -and ($ren108 -match "'locations'") -and ($ren108 -match "'companions'")) `
+    '108.4: renderConsult searches the registry (registrySearch) across items/perks/quests/locations/companions'
+# 108.5 DB stat cross-reference
+Check (($consultBody -match 'lookupItemInDb') -and ($consultBody -match 'lookupBestiaryEntry') -and ($consultBody -match 'lookupWeaponStats')) `
+    '108.5: renderConsult cross-references lookupItemInDb + lookupBestiaryEntry + lookupWeaponStats'
+# 108.6 NO-ENTRY path
+Check ($consultBody -match 'NO ENTRY IN DATABANK') `
+    '108.6: renderConsult shows NO ENTRY IN DATABANK when nothing matches (Protocol 3)'
+# 108.7 XSS escape of topic
+Check ($consultBody -match 'escapeHtml\(q\)') `
+    '108.7: renderConsult escapes the user topic via escapeHtml(q) before innerHTML (XSS-safe)'
+# 108.8 escape hit names
+Check ($consultBody -match 'escapeHtml\(e\.name\)') `
+    '108.8: renderConsult escapes registry hit names (escapeHtml(e.name))'
+# 108.9 read-only
+Check ((-not ($consultBody -match 'saveState\s*\(')) -and (-not ($consultBody -match 'pushToCloud\s*\(')) -and (-not ($consultBody -match '\bstate\.\w+\s*='))) `
+    '108.9: renderConsult is read-only (no saveState/pushToCloud/state writes)'
+# 108.10 game-agnostic -- stable source slice (avoids brace-counted body extraction that
+# diverges between runners on template-literal-heavy code)
+$cs108 = $ren108.IndexOf('const _CONSULT_CATS')
+$ce108 = $ren108.IndexOf('function _updateContextPanels')
+$region108 = if (($cs108 -ge 0) -and ($ce108 -gt $cs108)) { $ren108.Substring($cs108, $ce108 - $cs108) } else { '' }
+# -cmatch (case-sensitive) mirrors Node's case-sensitive regex: the sanctioned uppercase
+# FALLOUT_REGISTRY API is allowed; only human-readable Fallout/New Vegas/FNV/FO3 literals are banned.
+Check (($region108 -ne '') -and (-not ($region108 -cmatch '\bFNV\b|\bFO3\b|Fallout|New Vegas'))) `
+    '108.10: renderConsult/_consultDetail carry no FNV/FO3/Fallout literals (Protocol 38 -- registry-driven)'
+# 108.11 discoverable
+$cmdReg108 = [regex]::Match($core108, 'const COMMAND_REGISTRY\s*=\s*\[[\s\S]*?\n\];').Value
+Check ($cmdReg108 -match 'CONSULT') '108.11: COMMAND_REGISTRY lists a CONSULT entry (discoverability)'
+# 108.12 CSS overflow guard
+Check (($css108 -match '\.consult-card\b') -and ($css108 -match '\.consult-hit-name[\s\S]{0,80}min-width:\s*0')) `
+    '108.12: terminal.css .consult-card + .consult-hit-name min-width:0 (no horizontal overflow at 360px)'
+# 108.13 shared modal entry point
+Check ($consultBody -match '_openSysModal') `
+    '108.13: renderConsult opens via _openSysModal() (shared modal -- ARIA/focus consistency)'
 
 # ===========================================================
 # Results

@@ -960,6 +960,12 @@ const NATIVE_COMMAND_ROUTER = {
   // never computes time-to-kill. The argument is the target enemy name.
   '[THREAT]': target => renderThreat(target),
   '[TH]': target => renderThreat(target),
+  // WU-N4: CONSULT is a fully-deterministic native databank lookup (registry +
+  // databaseCSVs). The argument is the topic. Supports `> CONSULT x`, `> [CONSULT] x`,
+  // and the short `> [CON] x`. No AI in the default path.
+  CONSULT: topic => renderConsult(topic),
+  '[CONSULT]': topic => renderConsult(topic),
+  '[CON]': topic => renderConsult(topic),
 };
 
 function _routeNativeCommand(userText) {
