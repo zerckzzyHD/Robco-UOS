@@ -8,7 +8,7 @@
 
 .NOTES
     Run from project root:
-        powershell -ExecutionPolicy Bypass -File tests\check-persistence.ps1
+        powershell -ExecutionPolicy Bypass -File tests\robco-diagnostics.ps1
 
     See bottom of file for git pre-commit hook setup.
 #>
@@ -114,7 +114,7 @@ Write-Host ("  [ " + ($stateKeys -join ', ') + " ]") -ForegroundColor DarkCyan
 # Suite 0 -- Parser sanity
 # ===========================================================
 Sep "Suite 0 -- Parser sanity (guards against test regression)"
-# Mirror of Node KNOWN_KEYS (check-persistence.js Suite 0): the 27 legacy keys.
+# Mirror of Node KNOWN_KEYS (robco-diagnostics.js Suite 0): the 27 legacy keys.
 # Newer fields (locationHistory, gameContext, collectibles) are still fully covered
 # by Suite 1 (autoImportState auto-discovery) and Suite 11 (migration enforcement),
 # which iterate ALL discovered stateKeys — so this guard list stays at the 27.
@@ -1015,8 +1015,8 @@ Check ($missingFiles27.Count -eq 0) ("All sw.js ASSETS entries exist on disk" + 
 Sep "Suite 28 -- Meta / Runner Parity"
 # NOTE: source-level Check/assert counts cannot reliably track runtime test counts
 # because loops multiply results at runtime. Parity is enforced structurally.
-$jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
-$psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
+$jsRunnerSrc28 = Read-Src "tests/robco-diagnostics.js"
+$psRunnerSrc28 = Read-Src "tests/robco-diagnostics.ps1"
 $GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84','Suite 85','Suite 86','Suite 87','Suite 88','Suite 89','Suite 90','Suite 91','Suite 92','Suite 93','Suite 94','Suite 95','Suite 96','Suite 97','Suite 98','Suite 99','Suite 100','Suite 101','Suite 102','Suite 103','Suite 104','Suite 105','Suite 106','Suite 107','Suite 108','Suite 109','Suite 110','Suite 111')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
@@ -1108,7 +1108,7 @@ Check (-not ($ciSrc31 -match '\(106 tests\)')) `
     'ci.yml does not contain stale "(106 tests)" label (Phase 1c update)'
 # 31.2 gate.js runs PowerShell persistence runner + ci.yml calls npm run gate
 $gateSrc31 = Read-Src 'scripts/gate.js'
-Check (($gateSrc31 -match 'check-persistence\.ps1') -and ($ciSrc31 -match 'npm run gate')) `
+Check (($gateSrc31 -match 'robco-diagnostics\.ps1') -and ($ciSrc31 -match 'npm run gate')) `
     'gate.js runs PowerShell persistence runner and ci.yml calls npm run gate (Protocol 15 parity)'
 # 31.3 gate.js includes render-check + ci.yml calls npm run gate
 Check (($gateSrc31 -match 'render-check') -and ($ciSrc31 -match 'npm run gate')) `
@@ -7837,6 +7837,43 @@ Check (-not (($t3region127 + $headerRegion127) -match 'New Vegas|Mojave|\bFNV\b|
     '127.8: the boot-injection + save-header consuming code is game-agnostic (strings sourced only from GAME_DEFS theme)'
 
 # ===========================================================
+# Suite 128 -- WU-REN runner-rename escape-ratchet (Protocol 36b) (5 tests)
+# The runners were renamed to tests/robco-diagnostics.{js,ps1}. Fails the gate if ANY stale
+# reference to the legacy runner name reappears anywhere -- code, scripts, hooks, CI, docs.
+# (The forbidden literal is assembled at runtime so this file never self-matches.)
+# (PS mirror of JS 128.)
+# ===========================================================
+Sep "Suite 128 -- WU-REN runner-rename escape-ratchet"
+$legacy128 = 'check-' + 'persistence'
+function Exists128($rel) { Test-Path (Join-Path $Root $rel) }
+function ReadIf128($rel) { if (Exists128 $rel) { Get-Content (Join-Path $Root $rel) -Raw } else { '' } }
+
+# 128.1  the renamed runners exist under the RobCo-themed names
+Check ((Exists128 'tests/robco-diagnostics.js') -and (Exists128 'tests/robco-diagnostics.ps1')) `
+    '128.1: tests/robco-diagnostics.js + tests/robco-diagnostics.ps1 both exist (runners renamed)'
+
+# 128.2  the legacy-named runner files are gone (git mv, not copy)
+Check ((-not (Exists128 ('tests/' + $legacy128 + '.js'))) -and (-not (Exists128 ('tests/' + $legacy128 + '.ps1')))) `
+    '128.2: the legacy-named runner files no longer exist on disk (renamed, not duplicated)'
+
+# 128.3  escape-ratchet: ZERO stale legacy-name references anywhere in the reference set
+$scanList128 = @('package.json', 'scripts/gate.js', 'scripts/pre-commit', 'scripts/pre-push', 'scripts/install-hooks.js', 'tests/test.html', 'tests/run-tests.bat', 'tests/robco-diagnostics.js', 'tests/robco-diagnostics.ps1', '.github/workflows/nightly-tests.yml', '.github/workflows/ci.yml', 'README.md', 'ARCHITECTURE.md', 'CHANGELOG.md', 'RULES.md', 'CLAUDE.md')
+$offenders128 = @($scanList128 | Where-Object { (ReadIf128 $_).Contains($legacy128) })
+Check ($offenders128.Count -eq 0) `
+    ('128.3: no stale legacy test-runner-name reference remains in code/scripts/CI/docs' + $(if ($offenders128.Count) { ' -- OFFENDERS: ' + ($offenders128 -join ', ') } else { '' }))
+
+# 128.4  the runtime invocations were actually repointed to the new names
+$gate128 = ReadIf128 'scripts/gate.js'
+$pkg128 = ReadIf128 'package.json'
+$nightly128 = ReadIf128 '.github/workflows/nightly-tests.yml'
+Check (($gate128 -match 'node tests/robco-diagnostics\.js') -and ($gate128 -match 'robco-diagnostics\.ps1') -and ($pkg128 -match 'tests/robco-diagnostics\.js') -and ($nightly128 -match 'tests/robco-diagnostics\.(js|ps1)')) `
+    '128.4: gate.js, package.json, and nightly-tests.yml all invoke the renamed runners'
+
+# 128.5  gate.js still pairs BOTH runners (parity invocation intact under the new names)
+Check (($gate128 -match 'robco-diagnostics\.js') -and ($gate128 -match 'robco-diagnostics\.ps1')) `
+    '128.5: scripts/gate.js references both robco-diagnostics.js and robco-diagnostics.ps1 (dual-runner gate intact)'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"
@@ -7862,7 +7899,7 @@ if ($script:Failed -eq 0) {
 
       cat > .git/hooks/pre-commit << 'EOF'
       #!/bin/sh
-      powershell -ExecutionPolicy Bypass -File tests/check-persistence.ps1
+      powershell -ExecutionPolicy Bypass -File tests/robco-diagnostics.ps1
       if [ $? -ne 0 ]; then
         echo ""
         echo "Commit blocked: persistence audit failed."

@@ -52,7 +52,7 @@ run('ESLint (--max-warnings 0)', 'npx eslint . --max-warnings 0');
 run('Prettier (format check)', 'npx prettier --check .');
 
 // ── 3. Node persistence audit ─────────────────────────────────────────────────
-run('Persistence audit (Node)', 'node tests/check-persistence.js');
+run('Persistence audit (Node)', 'node tests/robco-diagnostics.js');
 
 // ── 4. PowerShell persistence audit + parity ─────────────────────────────────
 // Probe for pwsh (PowerShell Core) first; fall back to powershell (Windows PS 5.1).
@@ -68,13 +68,13 @@ const psBin =
 if (psBin) {
   const psFileCmd =
     psBin === 'pwsh'
-      ? 'pwsh -File tests/check-persistence.ps1'
-      : 'powershell -ExecutionPolicy Bypass -File tests/check-persistence.ps1';
+      ? 'pwsh -File tests/robco-diagnostics.ps1'
+      : 'powershell -ExecutionPolicy Bypass -File tests/robco-diagnostics.ps1';
 
   run('Persistence audit (PowerShell)', psFileCmd);
 
   console.log('\n[gate] Runner parity check');
-  const nodeOut = capture('node tests/check-persistence.js');
+  const nodeOut = capture('node tests/robco-diagnostics.js');
   const psOut = capture(psFileCmd);
   // ANSI codes wrap lines, not words — /ALL N TESTS/ matches even in colored output
   const nodeTotal = (nodeOut.stdout + nodeOut.stderr).match(/ALL (\d+) TESTS/)?.[1];

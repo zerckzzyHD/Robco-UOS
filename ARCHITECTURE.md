@@ -60,8 +60,8 @@
 │   └── database.js     ~25KB CSV data (~170 weapons, ~68 armors, ~45 chems) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── check-persistence.ps1   28KB    1526-test pre-commit audit
-│   ├── check-persistence.js    36KB    1526-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    1531-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    1531-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -235,7 +235,7 @@ persistence audit will block the commit if any step is missed:
 3. **api.js** — Add import handling in `autoImportState()` so AI responses update the field
 4. _(If applicable)_ **ui.js** — Add rendering in the appropriate `render*()` function
 
-The pre-commit hook (`tests/check-persistence.ps1`) auto-discovers all keys in `state.js`
+The pre-commit hook (`tests/robco-diagnostics.ps1`) auto-discovers all keys in `state.js`
 and verifies that every key appears in `autoImportState()`.
 
 ---
@@ -765,7 +765,7 @@ graph TD
 
     J[sw.js] -->|cache-first| A
 
-    K[tests/check-persistence.ps1] -.-|validates| B
+    K[tests/robco-diagnostics.ps1] -.-|validates| B
     K -.-|validates| C
     K -.-|validates| D
     K -.-|validates| H
@@ -952,7 +952,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1526-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1531-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

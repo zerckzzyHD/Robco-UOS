@@ -10,7 +10,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "dev": "vite",
-    "test": "node tests/check-persistence.js",
+    "test": "node tests/robco-diagnostics.js",
     "gate": "node scripts/gate.js",
     "gate:fast": "node scripts/gate.js --fast",
     "prepare": "node scripts/install-hooks.js",

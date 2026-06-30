@@ -3,7 +3,7 @@
     RobCo Persistence Audit — tests/test.html
     ==========================================
     BROWSER-SIDE RUNTIME MIRROR of the canonical static runners
-    (tests/check-persistence.js + tests/check-persistence.ps1).
+    (tests/robco-diagnostics.js + tests/robco-diagnostics.ps1).
 
     Where the canonical runners statically analyse the source, this page
     actually EXECUTES the live import contract in a real browser: it loads the
@@ -174,15 +174,15 @@
     <h1>[ROBCO U.O.S. — PERSISTENCE AUDIT / RUNTIME]</h1>
     <div class="subtitle">
       Executes the live import contract (autoImportState + sanitizeImportedContainer) and asserts
-      the resulting state. Browser-side mirror of tests/check-persistence.{js,ps1}.
+      the resulting state. Browser-side mirror of tests/robco-diagnostics.{js,ps1}.
     </div>
 
     <div id="output"></div>
     <div id="summary"></div>
 
     <div class="note">
-      For static analysis (no browser needed): run tests/check-persistence.js or
-      tests/check-persistence.ps1.<br />
+      For static analysis (no browser needed): run tests/robco-diagnostics.js or
+      tests/robco-diagnostics.ps1.<br />
       This page is run headless in the gate by tests/test-html-check.mjs.
     </div>
 

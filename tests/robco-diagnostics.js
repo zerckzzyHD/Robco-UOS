@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * RobCo Persistence Audit — tests/check-persistence.js
+ * RobCo Persistence Audit — tests/robco-diagnostics.js
  *
  * AUTO-DISCOVERS every field in state.js and verifies it is handled by:
  *   - autoImportState() in api.js  (AI sync, file import, cloud pull)
@@ -11,7 +11,7 @@
  * If a new field is added to `state` but NOT wired into autoImportState(),
  * this script will exit with code 1 and name the missing field.
  *
- * Run:       node tests/check-persistence.js
+ * Run:       node tests/robco-diagnostics.js
  * Auto-run:  install as .git/hooks/pre-commit  (see README at bottom)
  *
  * Requires:  Node.js (any version). Zero npm dependencies.
@@ -1693,8 +1693,8 @@ header('Assets Completeness');
 // ══════════════════════════════════════════════════════════════
 header('Meta / Runner Parity');
 {
-  const jsRunner = readFile('tests/check-persistence.js');
-  const psRunner = readFile('tests/check-persistence.ps1');
+  const jsRunner = readFile('tests/robco-diagnostics.js');
+  const psRunner = readFile('tests/robco-diagnostics.ps1');
 
   // Structural parity: both runners must contain every gate-guard suite marker (22-40).
   // A missing marker means a suite was added to one runner but not ported to the other.
@@ -1947,7 +1947,7 @@ header('CI/CD Automation Guards');
   const gateSrc = readFile('scripts/gate.js');
   const ciSource = readFile('.github/workflows/ci.yml');
   assert(
-    /check-persistence\.ps1/.test(gateSrc) && /npm run gate/.test(ciSource),
+    /robco-diagnostics\.ps1/.test(gateSrc) && /npm run gate/.test(ciSource),
     'gate.js runs PowerShell persistence runner and ci.yml calls npm run gate (Protocol 15 parity)'
   );
 }
@@ -13840,6 +13840,89 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 128 — WU-REN test-runner rename escape-ratchet (Protocol 36b)
+//  The runners were renamed to tests/robco-diagnostics.{js,ps1}. This guard fails the
+//  gate if ANY stale reference to the legacy runner name reappears anywhere — code,
+//  scripts, hooks, CI, or docs — so the rename can never silently regress.
+//  (The forbidden literal is assembled at runtime so this guard file never self-matches.)
+//  5 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 128 — WU-REN runner-rename escape-ratchet');
+  const _legacy = 'check-' + 'persistence'; // assembled so this source carries no literal match
+  const _exists = rel => {
+    try {
+      return fs.existsSync(path.join(ROOT, rel));
+    } catch (_) {
+      return false;
+    }
+  };
+  const _readIf = rel => {
+    try {
+      return _exists(rel) ? fs.readFileSync(path.join(ROOT, rel), 'utf8') : '';
+    } catch (_) {
+      return '';
+    }
+  };
+
+  // 128.1  the renamed runners exist under the RobCo-themed names
+  assert(
+    _exists('tests/robco-diagnostics.js') && _exists('tests/robco-diagnostics.ps1'),
+    '128.1: tests/robco-diagnostics.js + tests/robco-diagnostics.ps1 both exist (runners renamed)'
+  );
+
+  // 128.2  the legacy-named runner files are gone (git mv, not copy)
+  assert(
+    !_exists('tests/' + _legacy + '.js') && !_exists('tests/' + _legacy + '.ps1'),
+    '128.2: the legacy-named runner files no longer exist on disk (renamed, not duplicated)'
+  );
+
+  // 128.3  escape-ratchet: ZERO stale legacy-name references anywhere in the reference set
+  const scanList = [
+    'package.json',
+    'scripts/gate.js',
+    'scripts/pre-commit',
+    'scripts/pre-push',
+    'scripts/install-hooks.js',
+    'tests/test.html',
+    'tests/run-tests.bat',
+    'tests/robco-diagnostics.js',
+    'tests/robco-diagnostics.ps1',
+    '.github/workflows/nightly-tests.yml',
+    '.github/workflows/ci.yml',
+    'README.md',
+    'ARCHITECTURE.md',
+    'CHANGELOG.md',
+    'RULES.md',
+    'CLAUDE.md',
+  ];
+  const offenders = scanList.filter(f => _readIf(f).includes(_legacy));
+  assert(
+    offenders.length === 0,
+    '128.3: no stale legacy test-runner-name reference remains in code/scripts/CI/docs' +
+      (offenders.length ? ' — OFFENDERS: ' + offenders.join(', ') : '')
+  );
+
+  // 128.4  the runtime invocations were actually repointed to the new names
+  const gate128 = _readIf('scripts/gate.js');
+  const pkg128 = _readIf('package.json');
+  const nightly128 = _readIf('.github/workflows/nightly-tests.yml');
+  assert(
+    /node tests\/robco-diagnostics\.js/.test(gate128) &&
+      /robco-diagnostics\.ps1/.test(gate128) &&
+      /tests\/robco-diagnostics\.js/.test(pkg128) &&
+      /tests\/robco-diagnostics\.(js|ps1)/.test(nightly128),
+    '128.4: gate.js, package.json, and nightly-tests.yml all invoke the renamed runners'
+  );
+
+  // 128.5  gate.js still pairs BOTH runners (parity invocation intact under the new names)
+  assert(
+    /robco-diagnostics\.js/.test(gate128) && /robco-diagnostics\.ps1/.test(gate128),
+    '128.5: scripts/gate.js references both robco-diagnostics.js and robco-diagnostics.ps1 (dual-runner gate intact)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 console.log('\n══════════════════════════════════════════════════════════════\n');
@@ -13865,7 +13948,7 @@ if (failed === 0) {
  *
  *       node -e "
  *         const fs = require('fs');
- *         const hook = '#!/bin/sh\nnode tests/check-persistence.js\n';
+ *         const hook = '#!/bin/sh\nnode tests/robco-diagnostics.js\n';
  *         fs.mkdirSync('.git/hooks', {recursive:true});
  *         fs.writeFileSync('.git/hooks/pre-commit', hook);
  *         fs.chmodSync('.git/hooks/pre-commit', 0o755);

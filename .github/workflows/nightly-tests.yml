@@ -34,17 +34,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Node runner (tests/check-persistence.js)
+      - name: Node runner (tests/robco-diagnostics.js)
         id: node_runner
         continue-on-error: true
-        run: node tests/check-persistence.js
+        run: node tests/robco-diagnostics.js
 
-      - name: PowerShell runner (tests/check-persistence.ps1)
+      - name: PowerShell runner (tests/robco-diagnostics.ps1)
         id: ps_runner
         continue-on-error: true
         # pwsh (PowerShell Core) is preinstalled on ubuntu-latest - the same
         # invocation the local gate uses (scripts/gate.js).
-        run: pwsh -File tests/check-persistence.ps1
+        run: pwsh -File tests/robco-diagnostics.ps1
 
       - name: Report results + fail if either runner failed
         run: |
@@ -55,8 +55,8 @@ jobs:
             echo ""
             echo "| Runner | Result |"
             echo "| ------ | ------ |"
-            echo "| Node - tests/check-persistence.js | $NODE |"
-            echo "| PowerShell - tests/check-persistence.ps1 | $PS |"
+            echo "| Node - tests/robco-diagnostics.js | $NODE |"
+            echo "| PowerShell - tests/robco-diagnostics.ps1 | $PS |"
           } >> "$GITHUB_STEP_SUMMARY"
           if [ "$NODE" != 'success' ] || [ "$PS" != 'success' ]; then
             echo "::error::Nightly tests FAILED - Node: $NODE, PowerShell: $PS"
