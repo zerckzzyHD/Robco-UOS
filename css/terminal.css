@@ -2248,6 +2248,33 @@ body.sync-complete {
 .map-detail-row--visited {
   opacity: 0.65;
 }
+/* WU-F11: the location name flexes so the LOG VISIT button + status align right */
+.map-detail-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* WU-F11: native "mark visited" button — width:auto overrides the global button{width:100%};
+   min-height keeps a >=28px tap target (Protocol 17) */
+.map-mark-visited {
+  flex: 0 0 auto;
+  width: auto;
+  margin: 0;
+  padding: 2px 6px;
+  min-height: 28px;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  background: transparent;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.4);
+  color: var(--robco-green);
+  cursor: pointer;
+}
+.map-mark-visited:hover,
+.map-mark-visited:focus-visible {
+  border-color: var(--robco-green);
+  background: rgba(var(--robco-green-rgb), 0.1);
+}
 .map-collectible-badge {
   font-size: 9px;
   color: var(--robco-alert);

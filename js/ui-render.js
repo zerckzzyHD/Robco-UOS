@@ -1209,6 +1209,19 @@ function _mapAbbrev(name) {
   return _MAP_ABBREV[name] || name;
 }
 
+// WU-F11: native "mark visited" — flags a WORLD GRID location as discovered directly from
+// the map, with NO AI (never routes to the Director). Add-only: routes through the single-
+// source recordLocationVisit() helper (state.js), which is permanent + dedup'd, so the
+// CURRENT / VISITED / UNKNOWN status can never desync — matching the fog-of-war model (there
+// is no un-mark). Persists locally via saveState (cloud stays manual) and re-renders so the
+// row flips [UNKNOWN] → [VISITED]. Game-agnostic (Protocol 38): operates on the loc string.
+function markLocationVisited(loc) {
+  if (!loc) return;
+  recordLocationVisit(loc);
+  if (typeof saveState === 'function') saveState();
+  renderWorldMap();
+}
+
 function renderWorldMap() {
   const display = document.getElementById('worldMapDisplay');
   if (!display) return;
@@ -1341,9 +1354,22 @@ function renderWorldMap() {
           rowCls += ' map-detail-row--visited';
         }
 
+        // WU-F11: native "mark visited" affordance — only on undiscovered rows (not the
+        // current location, not already visited). Add-only: tapping LOG VISIT flags the place
+        // as discovered (permanent, no un-mark) directly, with NO AI.
+        const markBtn =
+          isYou || wasVisited
+            ? ''
+            : `<button class="map-mark-visited" data-loc="${escapeHtml(
+                loc
+              )}" onclick="markLocationVisited(this.dataset.loc)" aria-label="Mark ${escapeHtml(
+                loc
+              )} as visited">LOG VISIT</button>`;
+
         html += `
           <div class="${rowCls}">
-            <span>- ${escapeHtml(loc)}</span>
+            <span class="map-detail-name">- ${escapeHtml(loc)}</span>
+            ${markBtn}
             <span style="font-size:9px;white-space:nowrap;">${statusText}</span>
           </div>
         `;

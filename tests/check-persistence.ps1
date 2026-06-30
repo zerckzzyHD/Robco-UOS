@@ -7714,6 +7714,52 @@ Check (-not (($sessFn125 + $panel125) -match 'New Vegas|Mojave|\bFNV\b|\bFO3\b|C
     '125.8: the merged campaign readout is game-agnostic (no FNV/FO3/location literals)'
 
 # ===========================================================
+# Suite 126 -- WU-F11 native mark-visited map control (8 tests)
+# A per-row LOG VISIT button on the WORLD GRID flags a location discovered directly,
+# add-only (no un-mark), via the single-source recordLocationVisit() helper with NO AI.
+# Accessible (<button>, aria-label, >=28px tap target), game-agnostic. (PS mirror of JS 126.)
+# ===========================================================
+Sep "Suite 126 -- WU-F11 native mark-visited map control"
+$render126 = Read-Src "js/ui-render.js"
+$state126  = Read-Src "js/state.js"
+$css126    = Read-Src "css/terminal.css"
+$markFn126 = [regex]::Match($render126, '(?s)function markLocationVisited\(loc\)[\s\S]*?\n\}').Value
+$recFn126  = [regex]::Match($state126, '(?s)function recordLocationVisit\([\s\S]*?\n\}').Value
+$markCss126 = [regex]::Match($css126, '(?s)\.map-mark-visited\s*\{[\s\S]*?\}').Value
+
+# 126.1  the handler exists and routes through the single-source helper -> persist -> re-render
+Check (($render126 -match 'function markLocationVisited\(loc\)') -and ($markFn126 -match 'recordLocationVisit\(loc\)') -and ($markFn126 -match 'saveState\(\)') -and ($markFn126 -match 'renderWorldMap\(\)')) `
+    '126.1: markLocationVisited() calls recordLocationVisit(loc) -> saveState() -> renderWorldMap()'
+
+# 126.2  NO AI -- the handler does no network/Director call
+Check (-not ($markFn126 -match 'fetch\(|XMLHttpRequest|transmitMessage\(|generativelanguage|gemini')) `
+    '126.2: markLocationVisited makes no AI/network call (native, offline)'
+
+# 126.3  add-only -- recordLocationVisit only appends (push + dedup, never removes); no un-mark
+Check (($recFn126 -match '\.push\(') -and (-not ($recFn126 -match '\.splice\(|removeLocation|forgetLocation')) -and (-not (($render126 + $state126) -match 'forgetLocationVisit|unmarkLocation|removeLocationVisit'))) `
+    '126.3: mark-visited is add-only -- recordLocationVisit appends+dedups, no un-mark/forget helper exists'
+
+# 126.4  a real LOG VISIT <button> per row, wired via an escaped data-loc (apostrophe-safe)
+Check (($render126 -match 'class="map-mark-visited"') -and ($render126 -match 'onclick="markLocationVisited\(this\.dataset\.loc\)"') -and ($render126 -match 'data-loc="\$\{escapeHtml\(') -and ($render126 -match 'LOG VISIT</button>')) `
+    '126.4: each WORLD GRID row renders a LOG VISIT <button> wired to markLocationVisited via an escaped data-loc'
+
+# 126.5  accessible label -- literal aria-label (UI-3)
+Check (($render126 -match 'aria-label="Mark \$\{escapeHtml\(') -and ($render126 -match 'as visited"')) `
+    '126.5: the LOG VISIT button carries a literal aria-label ("Mark <loc> as visited")'
+
+# 126.6  add-only gating -- button suppressed on current + already-visited rows
+Check ($render126 -match "isYou \|\| wasVisited\s*\?\s*''") `
+    '126.6: the LOG VISIT button only appears on undiscovered rows (suppressed when current or already visited)'
+
+# 126.7  >=28px tap target + width:auto override (Protocol 17 / UI-5)
+Check (($markCss126.Length -gt 0) -and ($markCss126 -match 'min-height:\s*28px') -and ($markCss126 -match 'width:\s*auto')) `
+    '126.7: .map-mark-visited has a >=28px tap target (min-height) and width:auto (overrides global button width)'
+
+# 126.8  game-agnostic (Protocol 38) -- no game literal in the handler
+Check (-not ($markFn126 -match 'New Vegas|Mojave|\bFNV\b|\bFO3\b|Capital Wasteland|Vault 101')) `
+    '126.8: markLocationVisited is game-agnostic (operates on the loc string, no game literals)'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1505/1505 | Cache: robco-terminal-v2.6.0-r56 -->
+﻿## [Unreleased]<!-- Tests: 1513/1513 | Cache: robco-terminal-v2.6.0-r57 -->
 
 ### Added
 
@@ -21,6 +21,7 @@
 - The boot-up sequence now has a bit more character. The very first time you ever power on the terminal it runs a longer "cold start" self-test — a RETROS BIOS banner and a counting memory check — while every normal launch after that stays quick and terse. And once in a while, on any launch, the terminal boots in a rare "degraded tube" mode: the screen flickers like a cold CRT warming up and the self-test stutters before it locks in. It's deliberately uncommon, and the flicker automatically holds still if you've asked your device to reduce motion. Purely cosmetic — every boot still lands you in the same terminal. Works in either game, offline with no AI.
 - Added a TERMLINK command console — a single launcher for every offline subsystem. Tap the "TERMLINK CONSOLE" button in the Comm-Link (or type `> [TERMLINK]`, or the short `> [TL]`) and a ROBCO TERMLINK menu opens listing all six built-in tools — V.A.T.S. targeting, threat assessment, the barter uplink, databank consult, bio-scan, and salvage intake — each with a one-line description. Pick one and it opens that tool straight away. It's a shortcut surface over the features you already have: every option runs the same built-in routine with no AI call, so the whole console works offline. Works the same in either game.
 - Each game now has its own terminal colour. A Fallout: New Vegas campaign boots in the classic bright RobCo green, while a Fallout 3 campaign boots in a distinct, duller "Pip-Boy" green — so the two games feel different at a glance. Switching games applies that game's colour automatically. You can still override it any time from the OPTICS picker (which now also offers the new Pip-Boy green as a choice for either game), and any colour you pick by hand sticks across both games. All the existing colour options work exactly as before; only the per-game default is new. Works entirely offline with no AI.
+- You can now mark a place as visited straight from the WORLD GRID map. Open a region on the map and any location you haven't been to yet shows a "LOG VISIT" button next to it; tap it and that location flips from [UNKNOWN] to [VISITED] and stays that way. Previously a place only counted as discovered once you actually travelled there (or the story moved you), so there was no way to record somewhere you'd been on your own — now there is. It's a one-way mark (in keeping with the map's "once discovered, always discovered" behaviour), it's saved on your device, and it never contacts the AI.
 
 ### Fixed
 

@@ -13613,6 +13613,83 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 126 — WU-F11 native "mark visited" map control
+//  A per-row LOG VISIT button on the WORLD GRID flags a location discovered directly,
+//  add-only (no un-mark), routed through the single-source recordLocationVisit() helper
+//  with NO AI. Accessible (<button>, aria-label, ≥28px tap target), game-agnostic.
+//  8 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 126 — WU-F11 native mark-visited map control');
+  const render126 = readFile('js/ui-render.js');
+  const state126 = readFile('js/state.js');
+  const css126 = readFile('css/terminal.css');
+  const markFn126 = (render126.match(/function markLocationVisited\(loc\)[\s\S]*?\n\}/) || [''])[0];
+  const recFn126 = (state126.match(/function recordLocationVisit\([\s\S]*?\n\}/) || [''])[0];
+  const markCss126 = (css126.match(/\.map-mark-visited\s*\{[\s\S]*?\}/) || [''])[0];
+
+  // 126.1  the handler exists and routes through the single-source helper → persist → re-render
+  assert(
+    /function markLocationVisited\(loc\)/.test(render126) &&
+      /recordLocationVisit\(loc\)/.test(markFn126) &&
+      /saveState\(\)/.test(markFn126) &&
+      /renderWorldMap\(\)/.test(markFn126),
+    '126.1: markLocationVisited() calls recordLocationVisit(loc) → saveState() → renderWorldMap()'
+  );
+
+  // 126.2  NO AI — the handler does no network/Director call
+  assert(
+    !/fetch\(|XMLHttpRequest|transmitMessage\(|generativelanguage|gemini/i.test(markFn126),
+    '126.2: markLocationVisited makes no AI/network call (native, offline)'
+  );
+
+  // 126.3  add-only — recordLocationVisit only appends (push + dedup, never removes); there is
+  //         no un-mark / forget helper anywhere (owner: add-only, permanent fog-of-war)
+  assert(
+    /\.push\(/.test(recFn126) &&
+      !/\.splice\(|removeLocation|forgetLocation/.test(recFn126) &&
+      !/forgetLocationVisit|unmarkLocation|removeLocationVisit/.test(render126 + state126),
+    '126.3: mark-visited is add-only — recordLocationVisit appends+dedups, no un-mark/forget helper exists'
+  );
+
+  // 126.4  a real LOG VISIT <button> is rendered per row, wired to markLocationVisited via an
+  //         escaped data-loc (apostrophe-safe), not a <span onclick>
+  assert(
+    /class="map-mark-visited"/.test(render126) &&
+      /onclick="markLocationVisited\(this\.dataset\.loc\)"/.test(render126) &&
+      /data-loc="\$\{escapeHtml\(/.test(render126) &&
+      /LOG VISIT<\/button>/.test(render126),
+    '126.4: each WORLD GRID row renders a LOG VISIT <button> wired to markLocationVisited via an escaped data-loc'
+  );
+
+  // 126.5  accessible label — literal aria-label (UI-3), not diegetic
+  assert(
+    /aria-label="Mark \$\{escapeHtml\(/.test(render126) && /as visited"/.test(render126),
+    '126.5: the LOG VISIT button carries a literal aria-label ("Mark <loc> as visited")'
+  );
+
+  // 126.6  add-only gating — the button is suppressed on the current + already-visited rows
+  assert(
+    /isYou \|\| wasVisited\s*\?\s*''/.test(render126),
+    '126.6: the LOG VISIT button only appears on undiscovered rows (suppressed when current or already visited)'
+  );
+
+  // 126.7  ≥28px tap target + width:auto override (Protocol 17 / UI-5)
+  assert(
+    markCss126.length > 0 &&
+      /min-height:\s*28px/.test(markCss126) &&
+      /width:\s*auto/.test(markCss126),
+    '126.7: .map-mark-visited has a ≥28px tap target (min-height) and width:auto (overrides global button width)'
+  );
+
+  // 126.8  game-agnostic (Protocol 38) — no game literal in the handler
+  assert(
+    !/New Vegas|Mojave|\bFNV\b|\bFO3\b|Capital Wasteland|Vault 101/i.test(markFn126),
+    '126.8: markLocationVisited is game-agnostic (operates on the loc string, no game literals)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 console.log('\n══════════════════════════════════════════════════════════════\n');
