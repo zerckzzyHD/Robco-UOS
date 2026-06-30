@@ -993,9 +993,109 @@ const NATIVE_COMMAND_ROUTER = {
   '[VATS]': () => showVATSOverlay(),
 };
 
+// WU-HF2: precise-pointer probe (mouse/trackpad, not touch). Used to decide whether to
+// re-focus the Comm-Link after a native command — a touch device must not be re-focused
+// or the soft keyboard re-pops over the result. Fail-safe: if matchMedia is unavailable,
+// assume a precise pointer so desktop behavior is never lost (only touch needs the gate).
+function _isPrecisePointer() {
+  try {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return true;
+    return window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+  } catch (_) {
+    return true;
+  }
+}
+
+// ── WU-HF3: TERMLINK panel navigation ────────────────────────────
+// Typing a panel's name or a common alias in the Comm-Link opens that panel NATIVELY
+// (zero AI) via expandPanelForCategory, before any Director-Link (Gemini) call. The
+// values are expandPanelForCategory category keys. Matching is EXACT on the whole
+// trimmed input, so "consult deathclaw" still falls through to the native CONSULT
+// databank lookup while a bare "consult" / "databank" / "lookup" opens the DATABANK
+// panel on the DATA tab (owner directive). Game-agnostic (Protocol 38): aliases name UI
+// panels, never game data — a new game needs no change here. Guarded by Suite 123.
+const PANEL_NAV_ALIASES = {
+  inv: 'inventory',
+  inventory: 'inventory',
+  items: 'inventory',
+  item: 'inventory',
+  backpack: 'inventory',
+  pack: 'inventory',
+  stats: 'special',
+  stat: 'special',
+  special: 'special',
+  character: 'special',
+  char: 'special',
+  biometrics: 'special',
+  skills: 'skills',
+  skill: 'skills',
+  perks: 'perks',
+  perk: 'perks',
+  quests: 'quests',
+  quest: 'quests',
+  journal: 'quests',
+  faction: 'factions',
+  factions: 'factions',
+  rep: 'factions',
+  reputation: 'factions',
+  standing: 'factions',
+  map: 'map',
+  world: 'map',
+  locations: 'map',
+  location: 'map',
+  craft: 'craft',
+  crafting: 'craft',
+  workbench: 'craft',
+  trade: 'trade',
+  barter: 'trade',
+  shop: 'trade',
+  vendor: 'trade',
+  store: 'trade',
+  status: 'status',
+  effects: 'status',
+  effect: 'status',
+  bio: 'bio',
+  health: 'bio',
+  limbs: 'bio',
+  limb: 'bio',
+  hp: 'bio',
+  log: 'log',
+  overseer: 'log',
+  uptime: 'log',
+  config: 'config',
+  settings: 'config',
+  setup: 'config',
+  databank: 'databank',
+  lookup: 'databank',
+  consult: 'databank',
+  codex: 'databank',
+  encyclopedia: 'databank',
+};
+
+// Resolve a whole-input panel alias and open it natively. Returns true if it handled the
+// input (so the router stops before the AI). Exact whole-input match only — a trailing
+// argument (e.g. "consult deathclaw") is intentionally NOT matched so the command router
+// can still run the native lookup. Closes any open modal first so the panel owns focus.
+function _routePanelNav(raw) {
+  if (typeof expandPanelForCategory !== 'function') return false;
+  const key = String(raw || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+  const cat = PANEL_NAV_ALIASES[key];
+  if (!cat) return false;
+  if (typeof closeModal === 'function') closeModal();
+  expandPanelForCategory(cat);
+  return true;
+}
+
 function _routeNativeCommand(userText) {
   const raw = userText.trim().replace(/^>\s*/, '');
   const upper = raw.toUpperCase();
+  // WU-HF3: native panel navigation runs FIRST — a whole-input panel alias opens the
+  // panel offline. Exact-match only, so "consult deathclaw" still reaches the CONSULT
+  // databank lookup below while a bare "consult" opens the DATABANK panel (owner directive).
+  if (_routePanelNav(raw)) return true;
   for (const [cmd, handler] of Object.entries(NATIVE_COMMAND_ROUTER)) {
     if (upper === cmd || upper.startsWith(cmd + ' ') || upper.startsWith(cmd + '\t')) {
       // Pass the original-case argument (text after the command token) to the
@@ -1228,7 +1328,13 @@ async function transmitMessage() {
 
   // Native command router — intercepts deterministic commands before any network call
   if (!attachedImageData && _routeNativeCommand(userText)) {
-    document.getElementById('chatInput').focus();
+    // WU-HF2: only re-focus the Comm-Link on a precise-pointer (mouse) device. On a
+    // touch device this focus re-popped the soft keyboard the instant a native command
+    // (TERMLINK, VATS, panel navigation, …) opened its modal/panel — the keyboard
+    // slid up over the result. Gating on the same (hover:hover)+(pointer:fine) signal
+    // used by the desktop shell keeps the "keep typing commands" convenience on desktop
+    // while leaving the keyboard down on phones until the user taps the field.
+    if (_isPrecisePointer()) document.getElementById('chatInput').focus();
     return;
   }
 

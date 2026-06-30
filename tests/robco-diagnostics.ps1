@@ -3468,7 +3468,7 @@ Check ([bool]($mobileSlice61 -match 'overflow-x\s*:\s*clip')) `
 
 # ===========================================================
 # Suite 62 -- Changelog viewer guards
-# 23 tests
+# 25 tests
 # ===========================================================
 Sep "Suite 62 -- Changelog viewer guards"
 $uiCoreSrc62 = Read-Src "js/ui-core.js"
@@ -3628,6 +3628,17 @@ Check (($showBody62 -match "idx === 0 \? ' open' : ''") -and ($showBody62 -match
 # scrolls internally via .modal-content, CLOSE pinned via flex), no 360/412 overflow.
 Check (($wideRule62 -match 'height:\s*min\(85vh') -and ($wideRule62 -match 'max-height:\s*min\(85vh') -and ($wideRule62 -match 'box-sizing:\s*border-box')) `
     '62.22: .modal-box.changelog-wide locks an explicit height (min(85vh,...)) + box-sizing:border-box -- collapse/expand keeps box dimensions constant; content scrolls internally, CLOSE pinned, no 360/412 overflow (WU-C15 follow-up)'
+
+# 62.23 WU-HF: the viewer renders the post-release ### Hotfix category like every other
+# category -- _CHANGELOG_CAT_TAGS carries an explicit hotfix tag (not the generic fallback).
+$tagsBlock62 = [regex]::Match($uiCoreSrc62, "(?s)const _CHANGELOG_CAT_TAGS = \{[\s\S]*?\n\};").Value
+Check ($tagsBlock62 -match "hotfix:\s*'[^']+'") `
+    "62.23: _CHANGELOG_CAT_TAGS includes an explicit 'hotfix' tag so the in-app viewer renders the ### Hotfix category like Added/Fixed/etc. (WU-HF)"
+# 62.24 the hotfix tag resolves to a first-class tag, not the generic '[>] HOTFIX' fallback
+# (PS behavioral twin of the JS vm test -- same outcome, parsed from the tag table).
+$hotfixTag62 = [regex]::Match($tagsBlock62, "hotfix:\s*'([^']+)'").Groups[1].Value
+Check (($hotfixTag62.Length -gt 0) -and ($hotfixTag62 -ne '[>] HOTFIX')) `
+    '62.24: _changelogCatTag("Hotfix") returns the explicit first-class hotfix tag, not the generic fallback (WU-HF)'
 
 # ===========================================================
 # Suite 63 -- Save/Cloud UI consolidation guards (Phase 6 Task 7)
@@ -6062,7 +6073,7 @@ Check ($rules96.Contains('Protocol 40') -and $claude96.Contains('Protocol 40')) 
 # ===========================================================
 Sep "Suite 97 -- CHANGELOG category-heading integrity"
 $cl97 = [System.IO.File]::ReadAllText((Join-Path $Root 'CHANGELOG.md'), [System.Text.Encoding]::UTF8)
-$validCats97 = @('Added', 'Changed', 'Deprecated', 'Removed', 'Fixed', 'Security', 'Improved', 'Under the Hood')
+$validCats97 = @('Added', 'Changed', 'Deprecated', 'Removed', 'Fixed', 'Security', 'Improved', 'Hotfix', 'Under the Hood')
 # Split into version blocks on top-level "## [" headers; collect "### Category" per block.
 $blocks97 = New-Object System.Collections.Generic.List[object]
 $cur97 = $null
@@ -6093,7 +6104,7 @@ foreach ($b in $blocks97) {
     foreach ($c in $b.cats) { if ($validCats97 -notcontains $c) { $badCats97.Add($b.header + ' -> "' + $c + '"') } }
 }
 Check ($badCats97.Count -eq 0) `
-    ('CHANGELOG.md: all category headings are recognized (Added/Changed/Deprecated/Removed/Fixed/Security/Improved/Under the Hood)' + $(if ($badCats97.Count) { ' -- unknown: ' + ($badCats97 -join ', ') } else { '' }))
+    ('CHANGELOG.md: all category headings are recognized (Added/Changed/Deprecated/Removed/Fixed/Security/Improved/Hotfix/Under the Hood)' + $(if ($badCats97.Count) { ' -- unknown: ' + ($badCats97 -join ', ') } else { '' }))
 
 # ===========================================================
 # Suite 98 -- Project-root cleanliness (Protocol 41) (2 tests)
@@ -6549,7 +6560,7 @@ Check ($missingNat105.Count -eq 0) `
     '105.21: all router-driven natives (THREAT/CONSULT/BIO-SCAN/LOOT/VATS) have a NATIVE_COMMAND_ROUTER entry (native end-to-end, no AI fall-through)'
 
 # ===========================================================
-# Suite 106 -- WU-N2 TRADE native barter terminal (20 tests)
+# Suite 106 -- WU-N2 TRADE native barter terminal (22 tests)
 # Deterministic, offline barter terminal consuming the WU-D4b coefficients
 # (GAME_DEFS[ctx].barter). Locks: db catalog/vendor lookups, price math + canon invariants
 # (buy >= value, sell < buy), additive + confirm-gated mutation (Protocol 34), the caps-revert
@@ -6650,6 +6661,17 @@ Check (($setBody106 -match '_renderTradeStats\(\)') -and ($setBody106 -match 're
 # 106.20 purse line is its own #tradeStats mount updated by a single helper
 Check (($ren106 -match 'function _renderTradeStats\s*\(') -and ($ren106 -match 'id="tradeStats"') -and ($ren106 -match 'VENDOR PURSE')) `
     '106.20: renderTrade() mounts a #tradeStats line and _renderTradeStats() is the single purse/caps/barter updater'
+
+# 106.21 WU-HF1 [TRADE]-does-nothing fix: expandPanelForCategory opens the matched panel AND
+# scrolls it into view (without the reveal, BARTER UPLINK opened off-screen below the fold).
+$expandBody106 = ''
+try { $expandBody106 = Get-FunctionBody $core106 'expandPanelForCategory' } catch {}
+Check (($expandBody106 -match "setAttribute\(\s*'open'") -and ($expandBody106 -match 'scrollIntoView\(')) `
+    '106.21: expandPanelForCategory opens the matched panel AND scrolls it into view (WU-HF1 [TRADE]-does-nothing reveal fix)'
+
+# 106.22 END-TO-END button->panel-open chain (not just renderTrade)
+Check (($htmlSrc -match "onclick=`"expandPanelForCategory\('trade'\)`"") -and ($core106 -match "trade:\s*'inv'") -and ($core106 -match "trade:\s*'>\s*BARTER UPLINK'")) `
+    "106.22: [TRADE] button onclick -> expandPanelForCategory('trade') -> maps trade->inv + '> BARTER UPLINK' (button->panel-open end-to-end)"
 
 # ===========================================================
 # Suite 107 -- WU-N3 THREAT native bestiary + TTK (17 tests)
@@ -7532,10 +7554,13 @@ Check (($bootLines122 -match 'APP_VERSION') -and (($pick122 + $bootLines122) -no
     '122.8: the boot-flavor strings are game-agnostic (no FNV/FO3/Fallout/location literals) and version via APP_VERSION'
 
 # ===========================================================
-# Suite 123 -- WU-F9 TERMLINK Command Console (9 tests)
-# The last Phase-F unit: a native, deterministic launcher surface that routes the
-# offline subsystems through NATIVE_COMMAND_ROUTER (or the documented BARTER panel).
-# Guards console <-> router consistency, offline (0 AI), game-agnostic, XSS-safe.
+# Suite 123 -- WU-F9 TERMLINK Command Console + WU-HF2/HF3 hotfixes (19 tests)
+# The Phase-F launcher surface that routes the offline subsystems through
+# NATIVE_COMMAND_ROUTER (or the documented BARTER panel). Guards console <-> router
+# consistency, offline (0 AI), game-agnostic, XSS-safe. Also locks the v2.7.0 hotfixes:
+# WU-HF2 (no soft-keyboard pop -- precise-pointer gated re-focus) and WU-HF3 (typed panel
+# navigation -- whole-input panel alias opens that panel natively, consult/databank/lookup
+# -> DATABANK panel, "consult <topic>" still runs the native lookup).
 # (PS mirror of JS 123.)
 # ===========================================================
 Sep "Suite 123 -- WU-F9 TERMLINK Command Console"
@@ -7591,6 +7616,64 @@ Check (($consoleArr123 + $showFn123 + $launchFn123) -notmatch 'New Vegas|Mojave|
 # 123.9  discoverable affordances: #termlinkBtn routes natively, registry advertises it, console CSS present
 Check (($html123 -match "(?s)id=`"termlinkBtn`"[\s\S]*?macroCommand\('\[TERMLINK\]'\)") -and ($html123 -match 'aria-label="Open the TERMLINK command console') -and ($core123 -match '\[TERMLINK\] / \[TL\]') -and ($css123 -match '\.termlink-grid') -and ($css123 -match '\.termlink-entry')) `
     '123.9: #termlinkBtn routes [TERMLINK] natively + has aria-label, COMMAND_REGISTRY advertises it, console CSS present'
+
+# -- WU-HF2 + WU-HF3 hotfixes (folded into v2.7.0) --------------------------------
+$aliasBlock123 = [regex]::Match($api123, "(?s)const PANEL_NAV_ALIASES = \{[\s\S]*?\n\};").Value
+$aliasMap123 = @{}
+foreach ($m in [regex]::Matches($aliasBlock123, "(\w+):\s*'([^']+)'")) { $aliasMap123[$m.Groups[1].Value] = $m.Groups[2].Value }
+$aliasVals123 = @($aliasMap123.Values)
+$panelNavBody123 = ''
+try { $panelNavBody123 = Get-FunctionBody $api123 '_routePanelNav' } catch {}
+$routerBody123 = ''
+try { $routerBody123 = Get-FunctionBody $api123 '_routeNativeCommand' } catch {}
+$transmitBody123 = ''
+try { $transmitBody123 = Get-FunctionBody $api123 'transmitMessage' } catch {}
+
+# 123.10 WU-HF2: the post-native-command Comm-Link re-focus is precise-pointer gated (no touch keyboard pop)
+Check (($api123 -match 'function _isPrecisePointer\s*\(') -and ($api123 -match 'hover: hover[\s\S]*?pointer: fine') -and ($transmitBody123 -match "_isPrecisePointer\(\)\s*\)\s*document\.getElementById\('chatInput'\)\.focus\(\)")) `
+    '123.10: WU-HF2 -- transmitMessage gates the post-command chatInput.focus() behind _isPrecisePointer() (no touch keyboard pop)'
+
+# 123.11 WU-HF3: PANEL_NAV_ALIASES map exists with a healthy set of aliases
+Check (($aliasBlock123.Length -gt 0) -and ($aliasMap123.Count -ge 30)) `
+    '123.11: PANEL_NAV_ALIASES map defined with >=30 alias entries'
+
+# 123.12 _routePanelNav defined AND runs FIRST in _routeNativeCommand (native, before the AI)
+Check (($api123 -match 'function _routePanelNav\s*\(') -and ($routerBody123 -match '_routePanelNav\(raw\)') -and ($routerBody123.IndexOf('_routePanelNav(raw)') -ge 0) -and ($routerBody123.IndexOf('_routePanelNav(raw)') -lt $routerBody123.IndexOf('NATIVE_COMMAND_ROUTER'))) `
+    '123.12: _routePanelNav() defined and called in _routeNativeCommand BEFORE the command loop (routes natively, before AI)'
+
+# 123.13 covers every required panel category (the alias VALUES include them all)
+$required123 = @('inventory', 'special', 'skills', 'perks', 'quests', 'factions', 'map', 'craft', 'trade', 'status', 'bio', 'log', 'config', 'databank')
+$missing123 = @($required123 | Where-Object { $aliasVals123 -notcontains $_ })
+Check ($missing123.Count -eq 0) `
+    ('123.13: PANEL_NAV_ALIASES covers every required panel category' + $(if ($missing123.Count) { ' -- MISSING: ' + ($missing123 -join ', ') } else { '' }))
+
+# 123.14 the common nicknames resolve to the correct category
+$pairs123 = @(@('inv', 'inventory'), @('items', 'inventory'), @('stats', 'special'), @('character', 'special'), @('journal', 'quests'), @('rep', 'factions'), @('reputation', 'factions'), @('world', 'map'), @('workbench', 'craft'), @('barter', 'trade'), @('limbs', 'bio'), @('overseer', 'log'), @('settings', 'config'))
+$bad123 = @($pairs123 | Where-Object { $aliasMap123[$_[0]] -ne $_[1] })
+Check ($bad123.Count -eq 0) `
+    ('123.14: panel-nav nicknames resolve to the right category' + $(if ($bad123.Count) { ' -- WRONG: ' + (($bad123 | ForEach-Object { $_[0] }) -join ', ') } else { '' }))
+
+# 123.15 OWNER DIRECTIVE: consult / databank / lookup all open the DATABANK panel (not the AI/modal)
+Check (($aliasMap123['consult'] -eq 'databank') -and ($aliasMap123['databank'] -eq 'databank') -and ($aliasMap123['lookup'] -eq 'databank')) `
+    '123.15: consult/databank/lookup -> DATABANK panel (owner directive -- not the AI CONSULT modal)'
+
+# 123.16 expandPanelForCategory maps the new WU-HF3 categories to a tab + h2 prefix
+$expandBody123 = ''
+try { $expandBody123 = Get-FunctionBody $core123 'expandPanelForCategory' } catch {}
+Check (($expandBody123 -match "special:\s*'stat'") -and ($expandBody123 -match "special:\s*'>\s*BIO-METRICS'") -and ($expandBody123 -match "skills:\s*'>\s*SKILL MATRIX'") -and ($expandBody123 -match "bio:\s*'>\s*BIO-SCAN'") -and ($expandBody123 -match "map:\s*'>\s*WORLD MAP'") -and ($expandBody123 -match "databank:\s*'>\s*DATABANK'") -and ($expandBody123 -match "config:\s*'campg'") -and ($expandBody123 -match "config:\s*'>\s*CAMPAIGN CONFIGURATION'")) `
+    '123.16: expandPanelForCategory maps the new panel-nav categories (special/skills/bio/map/databank/config) to a tab + h2'
+
+# 123.17 EXACT whole-input match: _routePanelNav does a direct map lookup (no includes/startsWith/indexOf)
+Check (($panelNavBody123 -match 'PANEL_NAV_ALIASES\[\s*key\s*\]') -and ($panelNavBody123 -notmatch '\.includes\(|\.startsWith\(|\.indexOf\(')) `
+    '123.17: _routePanelNav uses an exact whole-input map lookup (no substring match) so "consult <topic>" still reaches the native lookup'
+
+# 123.18 game-agnostic (Protocol 38): the panel-nav block names UI panels, never game data
+Check (($aliasBlock123 + $panelNavBody123) -notmatch 'New Vegas|Mojave|Fallout|\bFNV\b|\bFO3\b|Vault 101|Capital Wasteland|Courier|Deathclaw') `
+    '123.18: PANEL_NAV_ALIASES + _routePanelNav are game-agnostic (no FNV/FO3/Fallout/location literals -- Protocol 38)'
+
+# 123.19 the CONSULT->DATABANK target panel actually exists on the DATA tab
+Check (($html123 -match 'id="databankPanel"') -and ($html123 -match 'data-tab="data"[^>]*id="databankPanel"|id="databankPanel"[^>]*data-tab="data"') -and ($html123 -match 'DATABANK</h2>')) `
+    '123.19: #databankPanel (DATABANK h2, data-tab="data") exists as the consult/databank/lookup target'
 
 # ===========================================================
 # Suite 124 -- WU-T1 per-game theming + AA contrast (12 tests)

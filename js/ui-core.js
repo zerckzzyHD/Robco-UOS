@@ -1293,6 +1293,15 @@ function expandPanelForCategory(categoryKey) {
     trade: 'inv',
     skillBooks: 'stat',
     magazines: 'stat',
+    // WU-HF3 panel navigation — additional categories reachable by typing a panel
+    // name/alias in the Comm-Link (see PANEL_NAV_ALIASES in api.js).
+    special: 'stat',
+    skills: 'stat',
+    bio: 'stat',
+    map: 'data',
+    log: 'data',
+    databank: 'data',
+    config: 'campg',
   };
   if (tabMap[categoryKey]) switchTab(tabMap[categoryKey]);
 
@@ -1311,6 +1320,14 @@ function expandPanelForCategory(categoryKey) {
     trade: '> BARTER UPLINK',
     skillBooks: '> SKILL BOOKS',
     magazines: '> SKILL MAGAZINES',
+    // WU-HF3 panel navigation targets (h2 prefixes, matched via startsWith)
+    special: '> BIO-METRICS',
+    skills: '> SKILL MATRIX',
+    bio: '> BIO-SCAN',
+    map: '> WORLD MAP',
+    log: "> OVERSEER'S LOG",
+    databank: '> DATABANK',
+    config: '> CAMPAIGN CONFIGURATION',
   };
   const target = map[categoryKey];
   if (!target) return;
@@ -1332,6 +1349,24 @@ function expandPanelForCategory(categoryKey) {
   if (categoryKey === 'ammo') {
     const subPanel = document.getElementById('ammoSubPanel');
     if (subPanel && !subPanel.open) subPanel.setAttribute('open', '');
+  }
+  // WU-HF1: bring the opened panel into view. Without this, opening a panel that sits
+  // below the fold (e.g. BARTER UPLINK is beneath BACKPACK/EQUIPPED/AMMO/CRAFTING on the
+  // INV tab) silently switched tabs with the panel off-screen — the [TRADE] tap "did
+  // nothing". scrollIntoView walks up to whatever actually scrolls (the document on
+  // mobile, the column in the desktop shell). A requestAnimationFrame lets the tab-switch
+  // layout settle first; behavior:'auto' is instant and reduced-motion-safe.
+  const summaryEl = details ? details.querySelector('summary') : null;
+  if (summaryEl && typeof summaryEl.scrollIntoView === 'function') {
+    const _reveal = () => {
+      try {
+        summaryEl.scrollIntoView({ block: 'start', behavior: 'auto' });
+      } catch (_) {
+        /* scrollIntoView unsupported — non-fatal */
+      }
+    };
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(_reveal);
+    else _reveal();
   }
 }
 
@@ -1375,6 +1410,7 @@ const _CHANGELOG_CAT_TAGS = {
   changed: '[~] CHANGED',
   removed: '[-] REMOVED',
   improved: '[^] IMPROVED',
+  hotfix: '[!] HOTFIX',
   'under the hood': '[#] UNDER THE HOOD',
 };
 function _changelogCatTag(name) {

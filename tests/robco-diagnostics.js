@@ -6048,7 +6048,7 @@ header('Suite 61 — Mobile Layout Overflow Guards');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 62 — Changelog viewer guards
-//  23 tests
+//  25 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 62 — Changelog viewer guards');
 {
@@ -6349,6 +6349,36 @@ header('Suite 62 — Changelog viewer guards');
       /box-sizing:\s*border-box/.test(wideRule62),
     '62.22: .modal-box.changelog-wide locks an explicit height (min(85vh,…)) + box-sizing:border-box — collapse/expand keeps box dimensions constant; content scrolls internally, CLOSE pinned, no 360/412 overflow (WU-C15 follow-up)'
   );
+  // 62.23 WU-HF: the viewer renders the post-release `### Hotfix` category like every other
+  // category — _CHANGELOG_CAT_TAGS carries an explicit hotfix tag (not the generic fallback).
+  {
+    const tagsBlock62 = (uiCoreSrc62.match(/const _CHANGELOG_CAT_TAGS = \{([\s\S]*?)\n\};/) || [
+      '',
+      '',
+    ])[1];
+    assert(
+      /hotfix:\s*'[^']+'/.test(tagsBlock62),
+      "62.23: _CHANGELOG_CAT_TAGS includes an explicit 'hotfix' tag so the in-app viewer renders the ### Hotfix category like Added/Fixed/etc. (WU-HF)"
+    );
+  }
+  // 62.24 BEHAVIORAL: _changelogCatTag('Hotfix') resolves to the explicit hotfix tag, not the
+  // generic '[>] HOTFIX' fallback — proving a ### Hotfix heading parses + tags as a first-class
+  // category. Evaluated by reconstructing the helper + its tag table in a vm.
+  {
+    const tagsBlock62b = (uiCoreSrc62.match(/const _CHANGELOG_CAT_TAGS = \{[\s\S]*?\n\};/) || [
+      '',
+    ])[0];
+    const fn62b = (uiCoreSrc62.match(/function _changelogCatTag\([\s\S]*?\n\}/) || [''])[0];
+    const vm = require('vm');
+    let tag62 = '';
+    try {
+      tag62 = vm.runInNewContext(tagsBlock62b + '\n' + fn62b + "\n_changelogCatTag('Hotfix');", {});
+    } catch (_) {}
+    assert(
+      typeof tag62 === 'string' && tag62.length > 0 && tag62 !== '[>] HOTFIX',
+      '62.24: _changelogCatTag("Hotfix") returns the explicit first-class hotfix tag, not the generic fallback (WU-HF)'
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -10569,6 +10599,7 @@ header('Suite 97 — CHANGELOG category-heading integrity');
     'Fixed',
     'Security',
     'Improved',
+    'Hotfix', // post-release fix folded into a shipped version's block (RULES.md hotfix model)
     'Under the Hood',
   ];
   // Split into version blocks on top-level `## [` headers.
@@ -10608,7 +10639,7 @@ header('Suite 97 — CHANGELOG category-heading integrity');
   });
   assert(
     badCats.length === 0,
-    'CHANGELOG.md: all category headings are recognized (Added/Changed/Deprecated/Removed/Fixed/Security/Improved/Under the Hood)' +
+    'CHANGELOG.md: all category headings are recognized (Added/Changed/Deprecated/Removed/Fixed/Security/Improved/Hotfix/Under the Hood)' +
       (badCats.length ? ' — unknown: ' + badCats.join(', ') : '')
   );
 }
@@ -11323,7 +11354,7 @@ header('Suite 105 — WU-N1 VATS native calculator');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 106 — WU-N2 TRADE native barter terminal (20 tests)
+//  Suite 106 — WU-N2 TRADE native barter terminal (22 tests)
 //  The deterministic, offline barter terminal consuming the WU-D4b coefficients
 //  (GAME_DEFS[ctx].barter). Locks: db catalog/vendor lookups, the price math + its
 //  canon invariants (buy ≥ value, sell < buy), additive + confirm-gated mutation
@@ -11512,6 +11543,29 @@ header('Suite 106 — WU-N2 TRADE native barter terminal');
       /id="tradeStats"/.test(ren106) &&
       /VENDOR PURSE/.test(ren106),
     '106.20: renderTrade() mounts a #tradeStats line and _renderTradeStats() is the single purse/caps/barter updater'
+  );
+  // 106.21 WU-HF1 [TRADE]-does-nothing fix: expandPanelForCategory opens the matched panel
+  // (setAttribute('open','')) AND reveals it via scrollIntoView. Without the reveal, opening
+  // BARTER UPLINK (which sits below BACKPACK/EQUIPPED/AMMO/CRAFTING on the INV tab) left the
+  // panel off-screen, so the [TRADE] tap silently switched tabs with nothing visible.
+  {
+    let expandBody106 = '';
+    try {
+      expandBody106 = extractFunctionBody(core106, 'expandPanelForCategory');
+    } catch (_) {}
+    assert(
+      /setAttribute\(\s*'open'/.test(expandBody106) && /scrollIntoView\(/.test(expandBody106),
+      '106.21: expandPanelForCategory opens the matched panel AND scrolls it into view (WU-HF1 [TRADE]-does-nothing reveal fix)'
+    );
+  }
+  // 106.22 END-TO-END button→panel-open chain (not just renderTrade): the [TRADE] button's
+  // onclick calls expandPanelForCategory('trade'), and that function maps 'trade' to the
+  // '> BARTER UPLINK' panel on the INV tab — so a tap reliably opens AND reveals the panel.
+  assert(
+    /onclick="expandPanelForCategory\('trade'\)"/.test(html106) &&
+      /trade:\s*'inv'/.test(core106) &&
+      /trade:\s*'>\s*BARTER UPLINK'/.test(core106),
+    "106.22: [TRADE] button onclick → expandPanelForCategory('trade') → maps trade→inv + '> BARTER UPLINK' (button→panel-open end-to-end)"
   );
 }
 
@@ -13320,12 +13374,16 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  SUITE 123 — WU-F9 TERMLINK Command Console
-//  The last Phase-F unit: a native, deterministic launcher surface that routes the
-//  offline subsystems through NATIVE_COMMAND_ROUTER (or the documented BARTER panel).
-//  Guards the console ↔ router consistency so it can't advertise a dead subsystem,
-//  stays offline (0 AI), game-agnostic (Protocol 38), and XSS-safe.
-//  9 tests
+//  SUITE 123 — WU-F9 TERMLINK Command Console + WU-HF2/HF3 hotfixes
+//  The Phase-F launcher surface that routes the offline subsystems through
+//  NATIVE_COMMAND_ROUTER (or the documented BARTER panel). Guards the console ↔ router
+//  consistency so it can't advertise a dead subsystem, stays offline (0 AI),
+//  game-agnostic (Protocol 38), and XSS-safe. Also locks the v2.7.0 hotfixes: WU-HF2
+//  (no soft-keyboard pop — the post-command Comm-Link re-focus is precise-pointer gated)
+//  and WU-HF3 (typed panel navigation — a whole-input panel alias opens that panel
+//  natively, consult/databank/lookup → the DATABANK panel, "consult <topic>" still runs
+//  the native lookup).
+//  19 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 123 — WU-F9 TERMLINK Command Console');
@@ -13416,6 +13474,151 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       /\.termlink-grid\b/.test(css123) &&
       /\.termlink-entry\b/.test(css123),
     '123.9: #termlinkBtn routes [TERMLINK] natively + has aria-label, COMMAND_REGISTRY advertises it, console CSS present'
+  );
+
+  // ── WU-HF2 + WU-HF3 hotfixes (folded into v2.7.0) ───────────────────────────
+  const aliasBlock123 = (api123.match(/const PANEL_NAV_ALIASES = \{([\s\S]*?)\n\};/) || [
+    '',
+    '',
+  ])[1];
+  const aliasVals123 = [...aliasBlock123.matchAll(/:\s*'([^']+)'/g)].map(m => m[1]);
+  let panelNavBody123 = '';
+  let routerBody123 = '';
+  let transmitBody123 = '';
+  try {
+    panelNavBody123 = extractFunctionBody(api123, '_routePanelNav');
+  } catch (_) {}
+  try {
+    routerBody123 = extractFunctionBody(api123, '_routeNativeCommand');
+  } catch (_) {}
+  try {
+    transmitBody123 = extractFunctionBody(api123, 'transmitMessage');
+  } catch (_) {}
+  const aliasMap123 = {};
+  for (const m of aliasBlock123.matchAll(/(\w+|'[^']+'):\s*'([^']+)'/g)) {
+    aliasMap123[m[1].replace(/'/g, '')] = m[2];
+  }
+
+  // 123.10 WU-HF2: the post-native-command Comm-Link re-focus is gated behind a precise-pointer
+  // probe so a native command (TERMLINK/VATS/panel-nav) never re-pops the soft keyboard on touch.
+  assert(
+    /function _isPrecisePointer\s*\(/.test(api123) &&
+      /hover: hover[\s\S]*?pointer: fine/.test(api123) &&
+      /_isPrecisePointer\(\)\s*\)\s*document\.getElementById\('chatInput'\)\.focus\(\)/.test(
+        transmitBody123
+      ),
+    '123.10: WU-HF2 — transmitMessage gates the post-command chatInput.focus() behind _isPrecisePointer() (no touch keyboard pop)'
+  );
+  // 123.11 WU-HF3: the PANEL_NAV_ALIASES map exists with a healthy set of aliases
+  assert(
+    aliasBlock123.length > 0 && Object.keys(aliasMap123).length >= 30,
+    '123.11: PANEL_NAV_ALIASES map defined with ≥30 alias entries (' +
+      Object.keys(aliasMap123).length +
+      ')'
+  );
+  // 123.12 _routePanelNav defined AND runs FIRST in _routeNativeCommand (native, before the AI)
+  assert(
+    /function _routePanelNav\s*\(/.test(api123) &&
+      /_routePanelNav\(raw\)/.test(routerBody123) &&
+      routerBody123.indexOf('_routePanelNav(raw)') < routerBody123.indexOf('NATIVE_COMMAND_ROUTER'),
+    '123.12: _routePanelNav() defined and called in _routeNativeCommand BEFORE the command loop (routes natively, before AI)'
+  );
+  // 123.13 covers every required panel category (the alias VALUES include them all)
+  {
+    const required123 = [
+      'inventory',
+      'special',
+      'skills',
+      'perks',
+      'quests',
+      'factions',
+      'map',
+      'craft',
+      'trade',
+      'status',
+      'bio',
+      'log',
+      'config',
+      'databank',
+    ];
+    const missing123 = required123.filter(c => !aliasVals123.includes(c));
+    assert(
+      missing123.length === 0,
+      '123.13: PANEL_NAV_ALIASES covers every required panel category' +
+        (missing123.length ? ' — MISSING: ' + missing123.join(', ') : '')
+    );
+  }
+  // 123.14 the common nicknames resolve to the correct category
+  {
+    const pairs123 = [
+      ['inv', 'inventory'],
+      ['items', 'inventory'],
+      ['stats', 'special'],
+      ['character', 'special'],
+      ['journal', 'quests'],
+      ['rep', 'factions'],
+      ['reputation', 'factions'],
+      ['world', 'map'],
+      ['workbench', 'craft'],
+      ['barter', 'trade'],
+      ['limbs', 'bio'],
+      ['overseer', 'log'],
+      ['settings', 'config'],
+    ];
+    const bad123 = pairs123.filter(([a, c]) => aliasMap123[a] !== c);
+    assert(
+      bad123.length === 0,
+      '123.14: panel-nav nicknames resolve to the right category' +
+        (bad123.length ? ' — WRONG: ' + bad123.map(p => p[0]).join(', ') : '')
+    );
+  }
+  // 123.15 OWNER DIRECTIVE: consult / databank / lookup all open the DATABANK panel (not the AI/modal)
+  assert(
+    aliasMap123['consult'] === 'databank' &&
+      aliasMap123['databank'] === 'databank' &&
+      aliasMap123['lookup'] === 'databank',
+    '123.15: consult/databank/lookup → DATABANK panel (owner directive — not the AI CONSULT modal)'
+  );
+  // 123.16 expandPanelForCategory maps the new WU-HF3 categories to a tab + h2 prefix
+  {
+    let expandBody123 = '';
+    try {
+      expandBody123 = extractFunctionBody(uiCore123, 'expandPanelForCategory');
+    } catch (_) {}
+    assert(
+      /special:\s*'stat'/.test(expandBody123) &&
+        /special:\s*'>\s*BIO-METRICS'/.test(expandBody123) &&
+        /skills:\s*'>\s*SKILL MATRIX'/.test(expandBody123) &&
+        /bio:\s*'>\s*BIO-SCAN'/.test(expandBody123) &&
+        /map:\s*'>\s*WORLD MAP'/.test(expandBody123) &&
+        /databank:\s*'>\s*DATABANK'/.test(expandBody123) &&
+        /config:\s*'campg'/.test(expandBody123) &&
+        /config:\s*'>\s*CAMPAIGN CONFIGURATION'/.test(expandBody123),
+      '123.16: expandPanelForCategory maps the new panel-nav categories (special/skills/bio/map/databank/config) to a tab + h2'
+    );
+  }
+  // 123.17 EXACT whole-input match: _routePanelNav does a direct map lookup (no includes/startsWith/
+  // indexOf), so "consult deathclaw" still falls through to the native CONSULT lookup.
+  assert(
+    /PANEL_NAV_ALIASES\[\s*key\s*\]/.test(panelNavBody123) &&
+      !/\.includes\(|\.startsWith\(|\.indexOf\(/.test(panelNavBody123),
+    '123.17: _routePanelNav uses an exact whole-input map lookup (no substring match) so "consult <topic>" still reaches the native lookup'
+  );
+  // 123.18 game-agnostic (Protocol 38): the panel-nav block names UI panels, never game data
+  assert(
+    !/New Vegas|Mojave|Fallout|\bFNV\b|\bFO3\b|Vault 101|Capital Wasteland|Courier|Deathclaw/i.test(
+      aliasBlock123 + panelNavBody123
+    ),
+    '123.18: PANEL_NAV_ALIASES + _routePanelNav are game-agnostic (no FNV/FO3/Fallout/location literals — Protocol 38)'
+  );
+  // 123.19 the CONSULT→DATABANK target panel actually exists on the DATA tab
+  assert(
+    /id="databankPanel"/.test(html123) &&
+      /data-tab="data"[^>]*id="databankPanel"|id="databankPanel"[^>]*data-tab="data"/.test(
+        html123
+      ) &&
+      /DATABANK<\/h2>/.test(html123),
+    '123.19: #databankPanel (DATABANK h2, data-tab="data") exists as the consult/databank/lookup target'
   );
 }
 
