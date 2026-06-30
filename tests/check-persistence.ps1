@@ -3464,7 +3464,7 @@ Check ([bool]($mobileSlice61 -match 'overflow-x\s*:\s*clip')) `
 
 # ===========================================================
 # Suite 62 -- Changelog viewer guards
-# 19 tests
+# 22 tests
 # ===========================================================
 Sep "Suite 62 -- Changelog viewer guards"
 $uiCoreSrc62 = Read-Src "js/ui-core.js"
@@ -3603,6 +3603,22 @@ Check (($cssSrc62 -match '\.changelog-viewer\s*\{[^}]*max-width:\s*700px') -and 
        ($cssSrc62 -match '\.modal-box\.changelog-wide') -and `
        ($closeBody62 -match 'classList\.remove\(''changelog-wide''\)')) `
     '62.18: ~700px reading-column CSS (.changelog-viewer max-width:700px) + changelog-wide modal mode + closeModal cleanup'
+
+# ── WU-C15: consistent width + defaults + expand/collapse-all toggle ──────────
+$wideRule62 = [regex]::Match($cssSrc62, '\.modal-box\.changelog-wide\s*\{([^}]*)\}').Groups[1].Value
+# 62.19 LOCKED WIDTH -- explicit (non-max) width so collapse/expand changes height only
+Check (($wideRule62 -match '(?<!max-)width:\s*min\(740px') -and ($wideRule62 -match 'max-width:\s*min\(740px')) `
+    '62.19: .modal-box.changelog-wide locks an explicit width (not just max-width) -- collapse/expand changes height only (WU-C15)'
+# 62.20 EXPAND/COLLAPSE-ALL toggle -- rendered, styled, wired via addEventListener (no inline), sets .open on every category
+Check (($showBody62 -match 'id="changelogToggleAll"') -and `
+       ($cssSrc62 -match '\.changelog-toggle-all\b') -and `
+       ($showBody62 -match 'addEventListener\(\s*''click''') -and `
+       ($showBody62 -match 'd\.open\s*=\s*open') -and `
+       (-not ($showBody62 -match 'changelogToggleAll[^>]*onclick='))) `
+    '62.20: expand/collapse-all toggle present + CSS + wired via addEventListener(click) (no inline handler), sets .open on every category (WU-C15)'
+# 62.21 DEFAULT-OPEN-NEWEST preserved + toggle exposes both states
+Check (($showBody62 -match "idx === 0 \? ' open' : ''") -and ($showBody62 -match 'EXPAND ALL') -and ($showBody62 -match 'COLLAPSE ALL')) `
+    '62.21: default-open-newest preserved (only idx 0 / newest category open) + toggle exposes EXPAND ALL / COLLAPSE ALL (WU-C15)'
 
 # ===========================================================
 # Suite 63 -- Save/Cloud UI consolidation guards (Phase 6 Task 7)

@@ -6043,7 +6043,7 @@ header('Suite 61 — Mobile Layout Overflow Guards');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 62 — Changelog viewer guards
-//  19 tests
+//  22 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 62 — Changelog viewer guards');
 {
@@ -6304,6 +6304,33 @@ header('Suite 62 — Changelog viewer guards');
       '62.18: ~700px reading-column CSS (.changelog-viewer max-width:700px) + changelog-wide modal mode + closeModal cleanup'
     );
   }
+
+  // ── WU-C15: consistent width + defaults + expand/collapse-all toggle ──────────
+  const wideRule62 = (cssSrc62.match(/\.modal-box\.changelog-wide\s*\{([^}]*)\}/) || ['', ''])[1];
+  // 62.19 LOCKED WIDTH — changelog-wide has an explicit (non-max) width so collapsing a
+  // category changes height only, never width (no narrow box when all collapsed).
+  assert(
+    /(?<!max-)width:\s*min\(740px/.test(wideRule62) && /max-width:\s*min\(740px/.test(wideRule62),
+    '62.19: .modal-box.changelog-wide locks an explicit width (not just max-width) — collapse/expand changes height only (WU-C15)'
+  );
+  // 62.20 EXPAND/COLLAPSE-ALL toggle — control rendered, styled, wired via addEventListener
+  // (no inline handler), and its click sets .open on every category <details>.
+  assert(
+    /id="changelogToggleAll"/.test(showBody62) &&
+      /\.changelog-toggle-all\b/.test(cssSrc62) &&
+      /addEventListener\(\s*'click'/.test(showBody62) &&
+      /d\.open\s*=\s*open/.test(showBody62) &&
+      !/changelogToggleAll[^>]*onclick=/.test(showBody62),
+    '62.20: expand/collapse-all toggle present + CSS + wired via addEventListener(click) (no inline handler), sets .open on every category (WU-C15)'
+  );
+  // 62.21 DEFAULT-OPEN-NEWEST preserved — only the first/newest category opens by default;
+  // the toggle exposes both EXPAND ALL / COLLAPSE ALL states (label tracks live state).
+  assert(
+    /idx === 0 \? ' open' : ''/.test(showBody62) &&
+      /EXPAND ALL/.test(showBody62) &&
+      /COLLAPSE ALL/.test(showBody62),
+    '62.21: default-open-newest preserved (only idx 0 / newest category open) + toggle exposes EXPAND ALL / COLLAPSE ALL (WU-C15)'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════

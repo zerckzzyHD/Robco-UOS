@@ -1189,11 +1189,43 @@ function _showChangelogModal(text, title) {
     '<div class="changelog-meta" id="changelogMeta">' +
     escapeHtml(metaText(first)) +
     '</div>' +
+    '<div class="changelog-controls">' +
+    '<button type="button" id="changelogToggleAll" class="changelog-toggle-all" ' +
+    'aria-label="Expand or collapse all changelog sections">&gt; EXPAND ALL</button>' +
+    '</div>' +
     '<div class="changelog-cats" id="changelogCats">' +
     renderCats(first) +
     '</div></div>';
   const box = document.querySelector('#sysModal .modal-box');
   if (box) box.classList.add('changelog-wide');
+  // WU-C15: expand/collapse-all toggle. Operates on the category <details> of the
+  // currently-rendered version. The label reflects live state and re-syncs after a
+  // version swap. Wired via addEventListener (no inline on* handler — keeps it out of
+  // the inline-handler integrity surface, Suite 59).
+  const toggleBtn = document.getElementById('changelogToggleAll');
+  const _catsAllOpen = () => {
+    const cats = content.querySelectorAll('.changelog-cat');
+    return cats.length > 0 && Array.from(cats).every(d => d.open);
+  };
+  const _syncToggleLabel = () => {
+    if (toggleBtn) toggleBtn.textContent = _catsAllOpen() ? '> COLLAPSE ALL' : '> EXPAND ALL';
+  };
+  const _wireCatToggles = () => {
+    content
+      .querySelectorAll('.changelog-cat')
+      .forEach(d => d.addEventListener('toggle', _syncToggleLabel));
+  };
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', () => {
+      const open = !_catsAllOpen();
+      content.querySelectorAll('.changelog-cat').forEach(d => {
+        d.open = open;
+      });
+      _syncToggleLabel();
+    });
+  }
+  _wireCatToggles();
+  _syncToggleLabel();
   // Wire the dropdown to swap only the body + meta — the <select> element itself
   // persists across changes (no inline on* handler; addEventListener keeps it
   // out of the inline-handler integrity surface).
@@ -1205,6 +1237,8 @@ function _showChangelogModal(text, title) {
       const metaEl = document.getElementById('changelogMeta');
       if (catsEl) catsEl.innerHTML = renderCats(v);
       if (metaEl) metaEl.textContent = metaText(v);
+      _wireCatToggles(); // re-wire the freshly-rendered <details> (idx 0 open, rest closed)
+      _syncToggleLabel();
     });
   }
   _openSysModal();

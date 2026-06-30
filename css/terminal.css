@@ -657,7 +657,32 @@ details.sub-panel[open] > summary h3::after {
 /* Changelog-only wide mode: a comfortable ~700px reading column on desktop,
    never edge-to-edge; capped to the viewport on mobile so it can't overflow. */
 .modal-box.changelog-wide {
+  /* WU-C15: LOCK the width to the expanded size at every breakpoint. Without an
+     explicit width the flex box shrink-to-fits its content, so collapsing all
+     categories produced a narrow box. A fixed width makes collapse/expand change
+     HEIGHT ONLY. On mobile this is the same full-width-minus-margin (94vw) the
+     expanded state already uses. */
+  width: min(740px, 94vw);
   max-width: min(740px, 94vw);
+}
+/* WU-C15: expand/collapse-all toggle control row at the top of the viewer. */
+.changelog-controls {
+  margin-bottom: 12px;
+}
+.changelog-toggle-all {
+  width: auto; /* override global button { width: 100% } */
+  min-height: 28px; /* ≥28px tap target (Protocol 17) */
+  font-family: inherit;
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: var(--robco-green);
+  background: rgba(var(--robco-green-rgb), 0.08);
+  border: 1px solid var(--robco-green);
+  padding: 4px 12px;
+  cursor: pointer;
+}
+.changelog-toggle-all:hover {
+  background: rgba(var(--robco-green-rgb), 0.16);
 }
 .changelog-viewer {
   width: 100%;
