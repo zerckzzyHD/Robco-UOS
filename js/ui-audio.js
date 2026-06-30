@@ -922,7 +922,7 @@ function stopHeartbeat() {
 // a CSS animation, so the global prefers-reduced-motion block neutralises it for
 // motion-sensitive users (CR-1) while the degraded POST text still shows.
 // Overridable for tests/verification via `window.__robcoBootFlavor`.
-const DEGRADED_BOOT_CHANCE = 0.08; // rare degraded-tube boot — rolled on EVERY boot
+const DEGRADED_BOOT_CHANCE = 0.01; // rare degraded-tube boot (~1 in 100) — rolled on EVERY boot
 
 function _pickBootFlavor() {
   const forced = (typeof window !== 'undefined' && window.__robcoBootFlavor) || null;
