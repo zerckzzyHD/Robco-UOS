@@ -7257,6 +7257,50 @@ Check (($html117 -match 'id="ejectHolotapeBtn"') -and ($html117 -match 'onclick=
     '117.8: #ejectHolotapeBtn diegetic button wires onclick=ejectHolotape() with a descriptive aria-label'
 
 # ===========================================================
+# Suite 118 -- WU-F4 Pending-Directives Tally (Badging API) (8 tests)
+# Posts the active-quest count on the installed icon while backgrounded, clears it
+# when the terminal is open. Feature-detected, graceful no-op when unsupported,
+# reuses the QUEST LOG count. Game-agnostic, offline, no AI.
+# (PS mirror of JS Suite 118.)
+# ===========================================================
+Sep "Suite 118 -- WU-F4 Pending-Directives Tally (Badge)"
+$uiCore118   = Read-Src "js/ui-core.js"
+$manifest118 = Read-Src "manifest.json"
+$badgeFn118 = [regex]::Match($uiCore118, '(?s)function _updateAppBadge\([\s\S]*?\n\}').Value
+
+# 118.1  feature-detect both Badging API entry points before any use
+Check (($uiCore118 -match 'function _badgeSupported\(\)') -and ($uiCore118 -match "typeof navigator\.setAppBadge === 'function'") -and ($uiCore118 -match "typeof navigator\.clearAppBadge === 'function'")) `
+    '118.1: _badgeSupported() feature-detects navigator.setAppBadge + clearAppBadge before any use'
+
+# 118.2  pending-directives count = active quests, shared with the QUEST LOG badge (Protocol 22)
+Check (($uiCore118 -match 'function _pendingDirectivesCount\(\)') -and ($uiCore118 -match "state\.quests \|\| \[\]\)\.filter\(q => q\.status === 'active' \|\| !q\.status\)") -and ($uiCore118 -match "h2text: '> QUEST LOG',\s*count: _pendingDirectivesCount\(\)")) `
+    '118.2: _pendingDirectivesCount() (active quests) is the single source reused by the QUEST LOG panel badge'
+
+# 118.3  graceful no-op: badge update returns early when the API is unavailable
+Check ($badgeFn118 -match 'if \(!_badgeSupported\(\)\) return') `
+    '118.3: _updateAppBadge() returns early (graceful no-op) when the Badging API is unavailable'
+
+# 118.4  sets the tally while hidden, clears while visible; wrapped in try/catch
+Check (($badgeFn118 -match "document\.visibilityState === 'hidden'") -and ($badgeFn118 -match 'navigator\.setAppBadge\(n\)') -and ($badgeFn118 -match 'navigator\.clearAppBadge\(\)') -and ($badgeFn118 -match 'try\s*\{') -and ($badgeFn118 -match 'catch')) `
+    '118.4: _updateAppBadge() posts the count when hidden + clears when visible, inside try/catch (never throws)'
+
+# 118.5  async badge-promise rejection is swallowed (never an unhandled rejection)
+Check (($badgeFn118 -match "typeof p\.catch === 'function'") -and ($badgeFn118 -match 'p\.catch\(\(\) => \{\}\)')) `
+    '118.5: a rejecting setAppBadge/clearAppBadge promise is caught (no unhandled rejection)'
+
+# 118.6  zero pending -> clears the badge (no stale count)
+Check ($badgeFn118 -match 'n > 0 \? navigator\.setAppBadge\(n\) : navigator\.clearAppBadge\(\)') `
+    '118.6: zero pending directives clears the app badge (no stale count left on the icon)'
+
+# 118.7  wired into render (_updatePanelBadges) + a visibilitychange listener
+Check (($uiCore118 -match '_updateAppBadge\(\); // WU-F4') -and ($uiCore118 -match "addEventListener\('visibilitychange', _updateAppBadge\)")) `
+    '118.7: _updateAppBadge() is called from _updatePanelBadges (render) and on visibilitychange'
+
+# 118.8  manifest declares the installed-PWA badge prerequisite (display: standalone)
+Check ($manifest118 -match '"display":\s*"standalone"') `
+    '118.8: manifest.json keeps display:standalone -- the installed-PWA prerequisite for app badges'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

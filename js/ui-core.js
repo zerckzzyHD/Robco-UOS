@@ -914,6 +914,43 @@ function onGameContextChange(ctx) {
 
 // ── CAMPAIGN LOG EXPORT ────────────────────────────────────────
 // format: 'txt' (default), 'html' (#41), 'md' (#27)
+// ── WU-F4 PENDING-DIRECTIVES TALLY (Badging API) ──────────────────────────
+// Posts the count of unresolved directives — active quests — on the installed
+// terminal icon while the app is backgrounded, and clears it the moment the
+// terminal is open ("directives seen"). Free, offline, no AI, game-agnostic
+// (Protocol 38) — reads only state.quests, carries no game literal. Ambient: no
+// toast/notification, no settings toggle, no state field. Graceful no-op on any
+// browser without the Badging API (desktop Firefox/Safari, non-installed tabs);
+// every call is wrapped so a missing/rejecting Badge API can never break the app.
+function _badgeSupported() {
+  return (
+    typeof navigator !== 'undefined' &&
+    typeof navigator.setAppBadge === 'function' &&
+    typeof navigator.clearAppBadge === 'function'
+  );
+}
+// Unresolved directives = active quests (status 'active' or unset). The single
+// source for both the QUEST LOG panel badge and the app-icon badge (Protocol 22).
+function _pendingDirectivesCount() {
+  return (state.quests || []).filter(q => q.status === 'active' || !q.status).length;
+}
+function _updateAppBadge() {
+  if (!_badgeSupported()) return; // graceful no-op where the Badging API is absent
+  try {
+    // While the terminal is open the user is reading their directives, so the
+    // ambient icon badge stays clear; it only posts the tally once backgrounded.
+    const hidden = typeof document !== 'undefined' && document.visibilityState === 'hidden';
+    const n = hidden ? _pendingDirectivesCount() : 0;
+    const p = n > 0 ? navigator.setAppBadge(n) : navigator.clearAppBadge();
+    if (p && typeof p.catch === 'function') p.catch(() => {}); // swallow async rejects
+  } catch (_) {
+    /* never throw on a badge update */
+  }
+}
+// Re-evaluate the icon badge on every visibility transition: post the tally when
+// the terminal is hidden, clear it when reopened ("clears on open").
+document.addEventListener('visibilitychange', _updateAppBadge);
+
 function _updatePanelBadges() {
   const badges = [
     { h2text: '> PERKS', count: (state.perks || []).length },
@@ -929,7 +966,7 @@ function _updatePanelBadges() {
     { h2text: '> CAMPAIGN NOTES', count: (state.campaign_notes || []).length },
     {
       h2text: '> QUEST LOG',
-      count: (state.quests || []).filter(q => q.status === 'active' || !q.status).length,
+      count: _pendingDirectivesCount(),
     },
     {
       h2text: '> COLLECTIBLES',
@@ -978,6 +1015,7 @@ function _updatePanelBadges() {
       h2.appendChild(badge);
     }
   });
+  _updateAppBadge(); // WU-F4: keep the installed-icon pending-directives tally in sync
 }
 
 // ── AUTO-EXPAND PANEL (#31) ──────────────────────────────────────────

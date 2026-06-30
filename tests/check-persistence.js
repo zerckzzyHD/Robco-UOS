@@ -12737,6 +12737,82 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 118 — WU-F4 Pending-Directives Tally (Badging API)
+//  Posts the active-quest count on the installed icon while backgrounded, clears
+//  it when the terminal is open. Feature-detected, graceful no-op when unsupported,
+//  reuses the QUEST LOG count. Game-agnostic, offline, no AI. (Phase F)
+//  8 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 118 — WU-F4 Pending-Directives Tally (Badge)');
+  const uiCore118 = readFile('js/ui-core.js');
+  const manifest118 = readFile('manifest.json');
+  let badgeFn = '';
+  try {
+    badgeFn = extractFunctionBody(uiCore118, '_updateAppBadge');
+  } catch (_) {}
+
+  // 118.1  feature-detect both Badging API entry points before any use
+  assert(
+    /function _badgeSupported\(\)/.test(uiCore118) &&
+      /typeof navigator\.setAppBadge === 'function'/.test(uiCore118) &&
+      /typeof navigator\.clearAppBadge === 'function'/.test(uiCore118),
+    '118.1: _badgeSupported() feature-detects navigator.setAppBadge + clearAppBadge before any use'
+  );
+
+  // 118.2  pending-directives count = active quests, shared with the QUEST LOG badge (Protocol 22)
+  assert(
+    /function _pendingDirectivesCount\(\)/.test(uiCore118) &&
+      /state\.quests \|\| \[\]\)\.filter\(q => q\.status === 'active' \|\| !q\.status\)/.test(
+        uiCore118
+      ) &&
+      /h2text: '> QUEST LOG',\s*count: _pendingDirectivesCount\(\)/.test(uiCore118),
+    '118.2: _pendingDirectivesCount() (active quests) is the single source reused by the QUEST LOG panel badge'
+  );
+
+  // 118.3  graceful no-op: badge update returns early when the API is unavailable
+  assert(
+    /if \(!_badgeSupported\(\)\) return/.test(badgeFn),
+    '118.3: _updateAppBadge() returns early (graceful no-op) when the Badging API is unavailable'
+  );
+
+  // 118.4  sets the tally while hidden, clears while visible; wrapped in try/catch
+  assert(
+    /document\.visibilityState === 'hidden'/.test(badgeFn) &&
+      /navigator\.setAppBadge\(n\)/.test(badgeFn) &&
+      /navigator\.clearAppBadge\(\)/.test(badgeFn) &&
+      /try\s*\{/.test(badgeFn) &&
+      /catch/.test(badgeFn),
+    '118.4: _updateAppBadge() posts the count when hidden + clears when visible, inside try/catch (never throws)'
+  );
+
+  // 118.5  async badge-promise rejection is swallowed (never an unhandled rejection)
+  assert(
+    /typeof p\.catch === 'function'/.test(badgeFn) && /p\.catch\(\(\) => \{\}\)/.test(badgeFn),
+    '118.5: a rejecting setAppBadge/clearAppBadge promise is caught (no unhandled rejection)'
+  );
+
+  // 118.6  zero pending → clears the badge (no stale count)
+  assert(
+    /n > 0 \? navigator\.setAppBadge\(n\) : navigator\.clearAppBadge\(\)/.test(badgeFn),
+    '118.6: zero pending directives clears the app badge (no stale count left on the icon)'
+  );
+
+  // 118.7  wired into render (_updatePanelBadges) + a visibilitychange listener
+  assert(
+    /_updateAppBadge\(\); \/\/ WU-F4/.test(uiCore118) &&
+      /addEventListener\('visibilitychange', _updateAppBadge\)/.test(uiCore118),
+    '118.7: _updateAppBadge() is called from _updatePanelBadges (render) and on visibilitychange'
+  );
+
+  // 118.8  manifest declares the installed-PWA badge prerequisite (display: standalone)
+  assert(
+    /"display":\s*"standalone"/.test(manifest118),
+    '118.8: manifest.json keeps display:standalone — the installed-PWA prerequisite for app badges'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 console.log('\n══════════════════════════════════════════════════════════════\n');
