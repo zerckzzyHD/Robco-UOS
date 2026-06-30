@@ -1313,6 +1313,53 @@ details.sub-panel[open] > summary h3::after {
   pointer-events: none;
 }
 
+/* ─── WU-F6: Degraded-Tube Cold-Start Boot ─────────────────────
+   A rare flickery "cold CRT warming up" boot variant. The flicker is a pure CSS
+   animation, so the global prefers-reduced-motion block (animation-duration:
+   0.01ms !important on *) neutralises it for motion-sensitive users — the
+   degraded boot still shows its POST lines, just without the unstable flicker.
+   The chromatic-aberration text-shadow is static (not an animation), so the
+   "degraded tube" look persists even under reduced motion. */
+@keyframes boot-degraded-flicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  8% {
+    opacity: 0.35;
+  }
+  11% {
+    opacity: 0.9;
+  }
+  20% {
+    opacity: 0.55;
+  }
+  23% {
+    opacity: 1;
+  }
+  56% {
+    opacity: 0.7;
+  }
+  59% {
+    opacity: 1;
+  }
+  71% {
+    opacity: 0.4;
+  }
+  74% {
+    opacity: 0.95;
+  }
+}
+#bootScreen.boot-degraded {
+  animation: boot-degraded-flicker 1.6s steps(60) infinite;
+}
+#bootScreen.boot-degraded #bootLines {
+  text-shadow:
+    0 0 2px var(--robco-green),
+    1px 0 0 rgba(255, 0, 0, 0.25),
+    -1px 0 0 rgba(0, 120, 255, 0.2);
+}
+
 /* ─── Phosphor Ghost ──────────────────────────────────────────── */
 @keyframes phosphor-ghost {
   0% {

@@ -7456,6 +7456,54 @@ Check (($html121 -match 'id="radioToggle"') -and ($html121 -match 'for="radioTog
     '121.8: the radio has #radioToggle + label[for] + #radioStatus, and the synth carries no game-specific station literals (game-agnostic)'
 
 # ===========================================================
+# Suite 122 -- WU-F6 Cold-Start / Degraded-Tube Boot (8 tests)
+# runBootSequence picks a boot flavor: normal (warm), cold (first-ever POST, gated
+# once by robco_booted_before), or a RARE degraded "cold tube" variant that rolls
+# on ANY boot (NOT first-boot-gated -- owner pref). Honors reduced-motion, leaves
+# the normal boot unchanged. Game-agnostic, offline, no AI. (PS mirror of JS 122.)
+# ===========================================================
+Sep "Suite 122 -- WU-F6 Cold-Start / Degraded-Tube Boot"
+$uiAudio122 = Read-Src "js/ui-audio.js"
+$css122     = Read-Src "css/terminal.css"
+$pick122      = [regex]::Match($uiAudio122, '(?s)function _pickBootFlavor\([\s\S]*?\n\}').Value
+$bootLines122 = [regex]::Match($uiAudio122, '(?s)function _bootLinesFor\([\s\S]*?\n\}').Value
+$runBoot122   = [regex]::Match($uiAudio122, '(?s)function runBootSequence\([\s\S]*?\n\}').Value
+
+# 122.1  the degraded variant exists: rare random roll + degraded POST lines + boot-degraded class
+Check (($uiAudio122 -match 'const DEGRADED_BOOT_CHANCE = 0?\.\d+') -and ($pick122 -match "Math\.random\(\) < DEGRADED_BOOT_CHANCE\) return 'degraded'") -and ($bootLines122 -match 'CRT TUBE COLD|WARMING UP') -and ($runBoot122 -match "classList\.add\('boot-degraded'\)")) `
+    '122.1: a rare degraded boot exists -- a DEGRADED_BOOT_CHANCE Math.random() roll, degraded POST lines, and a #bootScreen.boot-degraded class'
+
+# 122.2  CRITICAL: degraded roll is NOT first-boot-gated -- evaluated BEFORE the robco_booted_before check
+$degIdx122 = $pick122.IndexOf("return 'degraded'")
+$fbIdx122  = $pick122.IndexOf('robco_booted_before')
+Check (($degIdx122 -ge 0) -and ($fbIdx122 -ge 0) -and ($degIdx122 -lt $fbIdx122) -and ($pick122 -match "return 'cold'")) `
+    '122.2: the degraded roll runs BEFORE the robco_booted_before first-boot gate -- degraded can trigger on ANY boot, not just first launch (owner pref)'
+
+# 122.3  cold first-power-on POST: RETROS BIOS + counting memory test, gated once by the flag
+Check (($bootLines122 -match 'RETROS BIOS') -and ($bootLines122 -match 'MEMORY TEST') -and ($pick122 -match "!localStorage\.getItem\('robco_booted_before'\)") -and ($runBoot122 -match "localStorage\.setItem\('robco_booted_before', 'true'\)")) `
+    '122.3: the first-ever cold POST (RETROS BIOS + memory test) is gated once by robco_booted_before, which runBootSequence sets'
+
+# 122.4  normal warm boot UNCHANGED: canonical lines + 120ms interval + fade/_bootActive
+Check (($bootLines122 -match '64K RAM SYSTEM') -and ($bootLines122 -match 'SECURE LINK ESTABLISHED\. BOOTING\.\.\.') -and ($runBoot122 -match '(?s)setInterval\([\s\S]*?\}, 120\)') -and ($runBoot122 -match "classList\.add\('boot-fade-out'\)") -and ($runBoot122 -match '_bootActive = true') -and ($runBoot122 -match '_bootActive = false')) `
+    '122.4: normal warm boot is unaffected -- canonical lines, 120ms cadence, boot-fade-out, and the WU-B10 _bootActive window all preserved'
+
+# 122.5  reduced-motion honored: flicker is a CSS animation neutralised by the prefers-reduced-motion block
+Check (($css122 -match '@keyframes boot-degraded-flicker') -and ($css122 -match '(?s)#bootScreen\.boot-degraded\s*\{[\s\S]*?animation:\s*boot-degraded-flicker') -and ($css122 -match '@media \(prefers-reduced-motion: reduce\)') -and ($css122 -match 'animation-duration:\s*0\.01ms\s*!important')) `
+    '122.5: the degraded flicker is a CSS @keyframes animation, neutralised by the global prefers-reduced-motion block (CR-1)'
+
+# 122.6  test/override hook: window.__robcoBootFlavor forces a flavor (used for verification)
+Check (($pick122 -match 'window\.__robcoBootFlavor') -and ($pick122 -match "forced === 'normal' \|\| forced === 'cold' \|\| forced === 'degraded'")) `
+    '122.6: _pickBootFlavor honors a window.__robcoBootFlavor override (normal|cold|degraded) for deterministic verification'
+
+# 122.7  runBootSequence still no-ops safely when the boot screen is absent (no regression)
+Check (($runBoot122 -match "const bootScreen = document\.getElementById\('bootScreen'\)") -and ($runBoot122 -match 'if \(!bootScreen\)') -and ($runBoot122 -match 'if \(onComplete\) onComplete\(\)')) `
+    '122.7: runBootSequence still guards on a missing #bootScreen and always calls onComplete (boot never wedges)'
+
+# 122.8  game-agnostic (Protocol 38): boot flavor code carries no game literals, uses APP_VERSION
+Check (($bootLines122 -match 'APP_VERSION') -and (($pick122 + $bootLines122) -notmatch 'New Vegas|Mojave|Fallout|\bFNV\b|\bFO3\b|Vault 101|Capital Wasteland')) `
+    '122.8: the boot-flavor strings are game-agnostic (no FNV/FO3/Fallout/location literals) and version via APP_VERSION'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

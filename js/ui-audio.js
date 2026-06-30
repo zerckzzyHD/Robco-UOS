@@ -908,6 +908,76 @@ function stopHeartbeat() {
   }
 }
 
+// ── WU-F6 COLD-START / DEGRADED-TUBE BOOT ─────────────────────────────────
+// runBootSequence renders one of three diegetic POST "flavors":
+//   • 'normal'   — the terse warm boot (unchanged 8-line sequence).
+//   • 'cold'     — the first-ever power-on: a longer POST with a RETROS BIOS
+//                  banner + a counting memory test. Runs at most once, gated by
+//                  the localStorage `robco_booted_before` flag.
+//   • 'degraded' — a RARE "cold CRT tube warming up" variant with a flickery,
+//                  re-stabilising POST. Per the owner's explicit preference this
+//                  is NOT first-boot-gated: it rolls on EVERY boot at a low
+//                  probability, so the degraded tube can surface any time.
+// Pure JS/CSS, game-agnostic (Protocol 38), free, offline, no AI. The flicker is
+// a CSS animation, so the global prefers-reduced-motion block neutralises it for
+// motion-sensitive users (CR-1) while the degraded POST text still shows.
+// Overridable for tests/verification via `window.__robcoBootFlavor`.
+const DEGRADED_BOOT_CHANCE = 0.08; // rare degraded-tube boot — rolled on EVERY boot
+
+function _pickBootFlavor() {
+  const forced = (typeof window !== 'undefined' && window.__robcoBootFlavor) || null;
+  if (forced === 'normal' || forced === 'cold' || forced === 'degraded') return forced;
+  // Degraded variant first — deliberately NOT gated to the first boot (owner pref).
+  if (Math.random() < DEGRADED_BOOT_CHANCE) return 'degraded';
+  // First-ever power-on → the longer cold-start POST (once only).
+  if (typeof localStorage !== 'undefined' && !localStorage.getItem('robco_booted_before')) {
+    return 'cold';
+  }
+  return 'normal';
+}
+
+function _bootLinesFor(flavor) {
+  const ver = '> LOADING U.O.S. v' + APP_VERSION + '.........';
+  if (flavor === 'cold') {
+    return [
+      '> ROBCO INDUSTRIES (TM) UNIFIED OPERATING SYSTEM',
+      '> COPYRIGHT 2075-2077 ROBCO INDUSTRIES',
+      '> ─────────────────────────────────────────────',
+      '> RETROS BIOS v3.14 — COLD START DETECTED',
+      '> PERFORMING FULL POWER-ON SELF TEST...',
+      '> MEMORY TEST: 016K · 032K · 048K · 064K ...... [OK]',
+      '> 64K RAM SYSTEM   |   38911 BYTES FREE',
+      '> CMOS CHECKSUM................ [OK]',
+      '> HARDWARE DIAGNOSTICS.......... [OK]',
+      ver,
+      '> SECURE LINK ESTABLISHED. BOOTING...',
+    ];
+  }
+  if (flavor === 'degraded') {
+    return [
+      '> ROBCO INDUSTRIES (TM) UNIFIED OPERATING SYSTEM',
+      '> ░▒▓ CRT TUBE COLD — WARMING UP ▓▒░',
+      '> SIGNAL UNSTABLE...... RE-STABILISING SWEEP',
+      '> MEMORY CHECK........ [RETRY] ........ [OK]',
+      '> HARDWARE DIAGNOSTICS.......... [OK]',
+      '> PHOSPHOR ALIGNMENT RESTORED',
+      ver,
+      '> SECURE LINK ESTABLISHED. BOOTING...',
+    ];
+  }
+  // 'normal' (warm boot) — unchanged from the original sequence
+  return [
+    '> ROBCO INDUSTRIES (TM) UNIFIED OPERATING SYSTEM',
+    '> COPYRIGHT 2075-2077 ROBCO INDUSTRIES',
+    '> ─────────────────────────────────────────────',
+    '> 64K RAM SYSTEM   |   38911 BYTES FREE',
+    '> MEMORY CHECK.................. [OK]',
+    '> HARDWARE DIAGNOSTICS.......... [OK]',
+    ver,
+    '> SECURE LINK ESTABLISHED. BOOTING...',
+  ];
+}
+
 function runBootSequence(onComplete) {
   const bootScreen = document.getElementById('bootScreen');
   if (!bootScreen) {
@@ -917,16 +987,15 @@ function runBootSequence(onComplete) {
   const bootLines = document.getElementById('bootLines');
   _bootActive = true; // WU-B10: open the boot window — drone may play on first gesture
   playBootDrone(); // H4: boot sequence drone
-  const lines = [
-    '> ROBCO INDUSTRIES (TM) UNIFIED OPERATING SYSTEM',
-    '> COPYRIGHT 2075-2077 ROBCO INDUSTRIES',
-    '> ─────────────────────────────────────────────',
-    '> 64K RAM SYSTEM   |   38911 BYTES FREE',
-    '> MEMORY CHECK.................. [OK]',
-    '> HARDWARE DIAGNOSTICS.......... [OK]',
-    '> LOADING U.O.S. v' + APP_VERSION + '.........',
-    '> SECURE LINK ESTABLISHED. BOOTING...',
-  ];
+  const flavor = _pickBootFlavor();
+  // Record that the unit has booted so the first-power-on 'cold' POST never repeats.
+  try {
+    localStorage.setItem('robco_booted_before', 'true');
+  } catch (_) {
+    /* private mode / quota — fall through, worst case the cold POST repeats */
+  }
+  if (flavor === 'degraded') bootScreen.classList.add('boot-degraded');
+  const lines = _bootLinesFor(flavor);
   let i = 0;
   const iv = setInterval(() => {
     if (i < lines.length) {
@@ -939,6 +1008,7 @@ function runBootSequence(onComplete) {
         bootScreen.classList.add('boot-fade-out');
         setTimeout(() => {
           bootScreen.style.display = 'none';
+          bootScreen.classList.remove('boot-degraded'); // hygiene for any re-entry
           _bootActive = false; // WU-B10: boot window closed — suppress any stale drone
           if (onComplete) onComplete();
         }, 400);

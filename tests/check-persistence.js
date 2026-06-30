@@ -13160,6 +13160,108 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 122 — WU-F6 Cold-Start / Degraded-Tube Boot
+//  runBootSequence picks a boot flavor: normal (warm), cold (first-ever POST,
+//  gated once by robco_booted_before), or a RARE degraded "cold tube" variant
+//  that rolls on ANY boot (NOT first-boot-gated — owner pref). Honors reduced-
+//  motion, leaves the normal boot unchanged. Game-agnostic, offline, no AI.
+//  8 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 122 — WU-F6 Cold-Start / Degraded-Tube Boot');
+  const uiAudio122 = readFile('js/ui-audio.js');
+  const css122 = readFile('css/terminal.css');
+  let pick122 = '';
+  let bootLines122 = '';
+  let runBoot122 = '';
+  try {
+    pick122 = extractFunctionBody(uiAudio122, '_pickBootFlavor');
+  } catch (_) {}
+  try {
+    bootLines122 = extractFunctionBody(uiAudio122, '_bootLinesFor');
+  } catch (_) {}
+  try {
+    runBoot122 = extractFunctionBody(uiAudio122, 'runBootSequence');
+  } catch (_) {}
+
+  // 122.1  the degraded variant exists: a rare random roll + degraded POST lines + a boot-degraded class
+  assert(
+    /const DEGRADED_BOOT_CHANCE = 0?\.\d+/.test(uiAudio122) &&
+      /Math\.random\(\) < DEGRADED_BOOT_CHANCE\) return 'degraded'/.test(pick122) &&
+      /CRT TUBE COLD|WARMING UP/.test(bootLines122) &&
+      /classList\.add\('boot-degraded'\)/.test(runBoot122),
+    '122.1: a rare degraded boot exists — a DEGRADED_BOOT_CHANCE Math.random() roll, degraded POST lines, and a #bootScreen.boot-degraded class'
+  );
+
+  // 122.2  CRITICAL: the degraded roll is NOT first-boot-gated — it is evaluated BEFORE the
+  //        robco_booted_before first-power-on check, so it can surface on ANY boot.
+  {
+    const degradedIdx = pick122.indexOf("return 'degraded'");
+    const firstBootIdx = pick122.indexOf('robco_booted_before');
+    assert(
+      degradedIdx > -1 &&
+        firstBootIdx > -1 &&
+        degradedIdx < firstBootIdx &&
+        /return 'cold'/.test(pick122),
+      '122.2: the degraded roll runs BEFORE the robco_booted_before first-boot gate — degraded can trigger on ANY boot, not just first launch (owner pref)'
+    );
+  }
+
+  // 122.3  cold first-power-on POST: RETROS BIOS + counting memory test, gated once by the flag
+  assert(
+    /RETROS BIOS/.test(bootLines122) &&
+      /MEMORY TEST/.test(bootLines122) &&
+      /!localStorage\.getItem\('robco_booted_before'\)/.test(pick122) &&
+      /localStorage\.setItem\('robco_booted_before', 'true'\)/.test(runBoot122),
+    '122.3: the first-ever cold POST (RETROS BIOS + memory test) is gated once by robco_booted_before, which runBootSequence sets'
+  );
+
+  // 122.4  normal (warm) boot is UNCHANGED: the canonical 8 lines + same 120ms interval + fade/_bootActive
+  assert(
+    /64K RAM SYSTEM/.test(bootLines122) &&
+      /SECURE LINK ESTABLISHED\. BOOTING\.\.\./.test(bootLines122) &&
+      /setInterval\([\s\S]*?\}, 120\)/.test(runBoot122) &&
+      /classList\.add\('boot-fade-out'\)/.test(runBoot122) &&
+      /_bootActive = true/.test(runBoot122) &&
+      /_bootActive = false/.test(runBoot122),
+    '122.4: normal warm boot is unaffected — canonical lines, 120ms cadence, boot-fade-out, and the WU-B10 _bootActive window all preserved'
+  );
+
+  // 122.5  reduced-motion honored: the flicker is a CSS animation neutralised by the prefers-reduced-motion block
+  assert(
+    /@keyframes boot-degraded-flicker/.test(css122) &&
+      /#bootScreen\.boot-degraded\s*\{[\s\S]*?animation:\s*boot-degraded-flicker/.test(css122) &&
+      /@media \(prefers-reduced-motion: reduce\)/.test(css122) &&
+      /animation-duration:\s*0\.01ms\s*!important/.test(css122),
+    '122.5: the degraded flicker is a CSS @keyframes animation, neutralised by the global prefers-reduced-motion block (CR-1)'
+  );
+
+  // 122.6  test/override hook: window.__robcoBootFlavor forces a flavor (used for verification)
+  assert(
+    /window\.__robcoBootFlavor/.test(pick122) &&
+      /forced === 'normal' \|\| forced === 'cold' \|\| forced === 'degraded'/.test(pick122),
+    '122.6: _pickBootFlavor honors a window.__robcoBootFlavor override (normal|cold|degraded) for deterministic verification'
+  );
+
+  // 122.7  runBootSequence still no-ops safely when the boot screen is absent (no regression)
+  assert(
+    /const bootScreen = document\.getElementById\('bootScreen'\)/.test(runBoot122) &&
+      /if \(!bootScreen\)/.test(runBoot122) &&
+      /if \(onComplete\) onComplete\(\)/.test(runBoot122),
+    '122.7: runBootSequence still guards on a missing #bootScreen and always calls onComplete (boot never wedges)'
+  );
+
+  // 122.8  game-agnostic (Protocol 38): boot flavor code carries no game literals, uses APP_VERSION
+  assert(
+    /APP_VERSION/.test(bootLines122) &&
+      !/New Vegas|Mojave|Fallout|\bFNV\b|\bFO3\b|Vault 101|Capital Wasteland/i.test(
+        pick122 + bootLines122
+      ),
+    '122.8: the boot-flavor strings are game-agnostic (no FNV/FO3/Fallout/location literals) and version via APP_VERSION'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 console.log('\n══════════════════════════════════════════════════════════════\n');
