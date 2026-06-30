@@ -2115,6 +2115,143 @@ function doSell(name) {
     appendToChat(`> [TRADE] Sold ${it.name} for ${price}c. Caps: ${state.caps}.`, 'sys');
 }
 
+// ── WU-N3: THREAT — native bestiary assessment + TTK ──────────────────────
+// Pure combat math (no DOM) so the gate can unit-test it. Read-only. Floors
+// avoid divide-by-zero / negative effective damage when DT meets/exceeds output.
+//   weaponDPS   = baseDamage × aps
+//   TTK         = ceil(HP / max(1, weaponDPS − DT))                 (seconds)
+//   shotsToKill = ceil(HP / max(1, baseDamage − DT))                (hits)
+//   ammoBurn    = shotsToKill × ammoPerAttack   (WU-D4c coefficient; default 1)
+function _threatCompute(enemy, weapon, ammoPerAttack) {
+  const hp = Math.max(0, Number(enemy && enemy.hp) || 0);
+  const dt = Math.max(0, Number(enemy && enemy.dt) || 0);
+  if (!weapon) {
+    return {
+      hasWeapon: false,
+      hp,
+      dt,
+      ttk: null,
+      shotsToKill: null,
+      ammoBurn: null,
+      weaponDPS: 0,
+      effectiveDPS: 0,
+      perShot: 0,
+    };
+  }
+  const baseDamage = Math.max(0, Number(weapon.baseDamage) || 0);
+  const aps = Math.max(0, Number(weapon.aps) || 0);
+  const perAttack = Math.max(1, Number(ammoPerAttack) || 1);
+  const weaponDPS = baseDamage * aps;
+  const effectiveDPS = Math.max(1, weaponDPS - dt);
+  const perShot = Math.max(1, baseDamage - dt);
+  const ttk = Math.ceil(hp / effectiveDPS);
+  const shotsToKill = Math.ceil(hp / perShot);
+  const ammoBurn = shotsToKill * perAttack;
+  return {
+    hasWeapon: true,
+    hp,
+    dt,
+    baseDamage,
+    aps,
+    perAttack,
+    weaponDPS,
+    effectiveDPS,
+    perShot,
+    ttk,
+    shotsToKill,
+    ammoBurn,
+  };
+}
+
+// renderThreat — native THREAT ASSESSMENT modal. BESTIARY.CSV lookup on the
+// typed target → enemy stat card + TTK + ammo-burn vs the equipped weapon +
+// weakness highlight. NO ENTRY IN BESTIARY when absent (Protocol 3 — never
+// invent). Game-agnostic: ammoPerAttack comes from GAME_DEFS (Protocol 38).
+function renderThreat(target) {
+  const modal = document.getElementById('sysModal');
+  const title = document.getElementById('modalTitle');
+  const content = document.getElementById('modalContent');
+  if (!modal || !title || !content) return;
+  title.innerText = '> THREAT ASSESSMENT';
+
+  const q = (target || '').trim();
+  const enemy = q && typeof lookupBestiaryEntry === 'function' ? lookupBestiaryEntry(q) : null;
+
+  if (!enemy) {
+    content.innerHTML =
+      '<pre class="threat-empty" style="white-space:pre-wrap;font-family:inherit;margin:0;color:var(--robco-dim);">' +
+      (q
+        ? 'NO ENTRY IN BESTIARY: ' + escapeHtml(q)
+        : 'SPECIFY A TARGET — e.g. &gt; [THREAT] Deathclaw') +
+      '</pre>';
+    if (typeof _openSysModal === 'function') _openSysModal();
+    if (typeof appendToChat === 'function')
+      appendToChat(
+        '> [THREAT] ' + (q ? 'No bestiary entry found for that target.' : 'No target specified.'),
+        'sys'
+      );
+    return;
+  }
+
+  const weaponName = (state.equipped && state.equipped.weapon) || null;
+  const weapon =
+    weaponName && typeof lookupWeaponStats === 'function' ? lookupWeaponStats(weaponName) : null;
+  const ctx = typeof getGameContext === 'function' ? getGameContext() : state.gameContext || 'FNV';
+  const def = (window.GAME_DEFS && (GAME_DEFS[ctx] || GAME_DEFS.FNV)) || {};
+  const ammoPerAttack = typeof def.ammoPerAttack === 'number' ? def.ammoPerAttack : 1;
+  const m = _threatCompute(enemy, weapon, ammoPerAttack);
+
+  const row = (label, value) =>
+    `<div class="threat-row"><span class="threat-label">${label}</span><span class="threat-val">${value}</span></div>`;
+  const weak = enemy.weakness && enemy.weakness.toLowerCase() !== 'none' ? enemy.weakness : null;
+
+  let html = '<div class="threat-card">';
+  html += `<div class="threat-name">${escapeHtml(enemy.name)}</div>`;
+  html += '<div class="threat-stats">';
+  html += row('HP', String(enemy.hp));
+  html += row('DT', String(enemy.dt));
+  html += row('BASE DMG', String(enemy.baseDamage));
+  html += row('ATK RATE', enemy.attackRate + '/s');
+  if (enemy.attackType) html += row('ATK TYPE', escapeHtml(enemy.attackType));
+  if (enemy.resistances && enemy.resistances.toLowerCase() !== 'none')
+    html += row('RESIST', escapeHtml(enemy.resistances));
+  html += '</div>';
+
+  html += weak
+    ? `<div class="threat-weakness">&#9668; WEAKNESS: ${escapeHtml(weak)} &#9658;</div>`
+    : '<div class="threat-weakness threat-weakness--none">NO RECORDED WEAKNESS</div>';
+
+  html += '<div class="threat-calc">';
+  if (m.hasWeapon) {
+    // Canonical melee-scope rule (reuse _vatsIsMelee): melee/unarmed weapons burn
+    // no ammo, so report strikes-to-kill instead of an ammo-burn round count.
+    const isMelee =
+      typeof _vatsIsMelee === 'function'
+        ? _vatsIsMelee(weapon)
+        : !weapon.ammoType || weapon.ammoType.toLowerCase() === 'none';
+    html += `<div class="threat-ttk">TIME TO NEUTRALIZE: ${m.ttk}s</div>`;
+    if (isMelee) {
+      html += `<div class="threat-ammo">HITS TO NEUTRALIZE: ${m.shotsToKill} strike${m.shotsToKill === 1 ? '' : 's'} (melee &mdash; no ammo)</div>`;
+    } else {
+      html += `<div class="threat-ammo">AMMO BURN EST.: ${m.ammoBurn} round${m.ammoBurn === 1 ? '' : 's'} (${m.shotsToKill} hit${m.shotsToKill === 1 ? '' : 's'})</div>`;
+      const at = (weapon.ammoType || '').trim();
+      if (at) html += `<div class="threat-weapon">AMMO TYPE: ${escapeHtml(at)}</div>`;
+    }
+    html += `<div class="threat-weapon">VS ${escapeHtml(weapon.name)} &mdash; DPS ${Math.round(m.weaponDPS)} / EFF ${Math.round(m.effectiveDPS)} after DT</div>`;
+  } else {
+    html += '<div class="threat-note">EQUIP A WEAPON FOR TTK + AMMO-BURN ESTIMATE.</div>';
+  }
+  html += '</div></div>';
+
+  content.innerHTML = html;
+  if (typeof _openSysModal === 'function') _openSysModal();
+  if (typeof appendToChat === 'function')
+    appendToChat(
+      `> [THREAT] ${enemy.name} assessed${m.hasWeapon ? ` — TTK ${m.ttk}s, ${m.ammoBurn} rounds` : ''}.`,
+      'sys'
+    );
+}
+
 // Switch faction/karma panels based on game context (called from loadUI).
 function _updateContextPanels() {
   const usesKarmaCenter = _activeDef().usesKarmaCenter;

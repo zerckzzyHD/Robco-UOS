@@ -6531,6 +6531,82 @@ Check (($css106 -match '\.trade-row\b') -and ($css106 -match '\.trade-name[\s\S]
     '106.18: terminal.css .trade-row + .trade-name min-width:0 (no horizontal overflow at 360px)'
 
 # ===========================================================
+# Suite 107 -- WU-N3 THREAT native bestiary + TTK (17 tests)
+# Deterministic offline THREAT assessment: BESTIARY.CSV lookup -> enemy card +
+# TTK = ceil(HP / max(1, weaponDPS - DT)) + ammo-burn (WU-D4c coefficient) +
+# weakness highlight. Routed natively (the AI TTK directive is retired). The math
+# is verified by a PowerShell re-implementation (behavioral twin of the JS vm test);
+# the melee-scope rule (_vatsIsMelee) labels strikes vs rounds.
+# ===========================================================
+Sep "Suite 107 -- WU-N3 THREAT native bestiary + TTK"
+$ren107 = Read-Src "js/ui-render.js"
+$dbnv107 = Read-Src "js/db_nv.js"
+$dbfo3107 = Read-Src "js/db_fo3.js"
+$api107 = Read-Src "js/api.js"
+$threatBody107 = ''
+try { $threatBody107 = Get-FunctionBody $ren107 'renderThreat' } catch {}
+
+# 107.1 / 107.2 lookupBestiaryEntry mirrored in both game db runners (Protocol 38)
+Check ([bool]($dbnv107 -match 'function lookupBestiaryEntry\b')) `
+    '107.1: lookupBestiaryEntry() defined in db_nv.js (BESTIARY.CSV lookup)'
+Check ([bool]($dbfo3107 -match 'function lookupBestiaryEntry\b')) `
+    '107.2: lookupBestiaryEntry() defined in db_fo3.js (game-agnostic, mirrored)'
+# 107.3 / 107.4 render + pure math defined
+Check ([bool]($ren107 -match 'function renderThreat\b')) `
+    '107.3: renderThreat() defined in ui-render.js (THREAT ASSESSMENT modal)'
+Check ([bool]($ren107 -match 'function _threatCompute\b')) `
+    '107.4: _threatCompute() pure math helper defined in ui-render.js'
+# 107.5 / 107.6 native router entries -- THREAT routed BEFORE the AI (the retirement)
+Check ([bool]($api107 -match "'\[THREAT\]':\s*\w+\s*=>\s*renderThreat")) `
+    "107.5: NATIVE_COMMAND_ROUTER routes '[THREAT]' -> renderThreat (native, not AI)"
+Check ([bool]($api107 -match "'\[TH\]':\s*\w+\s*=>\s*renderThreat")) `
+    "107.6: NATIVE_COMMAND_ROUTER routes '[TH]' -> renderThreat (shorthand)"
+# 107.7 _routeNativeCommand forwards the typed target to the handler
+Check ([bool]($api107 -match 'handler\(\s*raw\.slice\(cmd\.length\)\.trim\(\)\s*\)')) `
+    '107.7: _routeNativeCommand passes the target argument to the handler (renderThreat receives the enemy name)'
+# 107.8a / 107.8b AI THREAT path retired -- legacy directive gone; native defer note present
+Check (-not ($api107 -match 'Run predictive loops via databases\.\s*Calculate Squad DPS')) `
+    '107.8a: legacy AI "Tactical TTK: run predictive loops" directive removed (AI THREAT path retired)'
+Check ([bool]($api107 -match 'native deterministic THREAT terminal')) `
+    '107.8b: system directive defers THREAT/TTK to the native terminal (do-not-compute note)'
+# 107.9 Protocol 3 -- NO ENTRY IN BESTIARY when absent
+Check ([bool]($ren107 -match 'NO ENTRY IN BESTIARY')) `
+    '107.9: renderThreat emits "NO ENTRY IN BESTIARY" for an unknown target (Protocol 3 -- never invent)'
+# 107.10 game-agnostic ammo coefficient (Protocol 38 -- no two-game literal coercion)
+Check (([bool]($threatBody107 -match 'ammoPerAttack')) -and ([bool]($threatBody107 -match 'GAME_DEFS')) -and (-not ($threatBody107 -match "===\s*'FO3'\s*\?\s*'FO3'\s*:\s*'FNV'"))) `
+    '107.10: renderThreat reads ammoPerAttack from GAME_DEFS (game-agnostic -- no two-game coercion, Protocol 38)'
+# 107.11 reuses the canonical melee-scope helper (Protocol 22)
+Check ([bool]($ren107 -match '_vatsIsMelee\(')) `
+    '107.11: renderThreat reuses _vatsIsMelee for the melee-scope rule (strikes vs rounds -- Protocol 22)'
+
+# -- Behavioral: PowerShell re-implementation of _threatCompute (twin of the JS vm test) --
+function Get-Threat107($hp, $dt, $baseDamage, $aps, $apa, $hasWeapon) {
+    $hp = [math]::Max(0, $hp); $dt = [math]::Max(0, $dt)
+    if (-not $hasWeapon) { return @{ hasWeapon = $false; ttk = $null; ammoBurn = $null } }
+    $perAttack = [math]::Max(1, $apa)
+    $weaponDPS = $baseDamage * $aps
+    $effDPS = [math]::Max([double]1, [double]($weaponDPS - $dt))
+    $perShot = [math]::Max([double]1, [double]($baseDamage - $dt))
+    $ttk = [math]::Ceiling($hp / $effDPS)
+    $shots = [math]::Ceiling($hp / $perShot)
+    return @{ hasWeapon = $true; ttk = $ttk; ammoBurn = ($shots * $perAttack) }
+}
+$r1_107 = Get-Threat107 75 4 60 1.1 1 $true
+Check ($r1_107.ttk -eq 2) `
+    '107.12: TTK = ceil(HP/max(1,DPS-DT)) = 2 for HP75/DT4 vs 66 DPS'
+Check ($r1_107.ammoBurn -eq 2) `
+    '107.13: ammo-burn = shotsToKill x ammoPerAttack = 2'
+$r2_107 = Get-Threat107 100 1000 10 1 1 $true
+Check (($r2_107.ttk -eq 100) -and ($r2_107.ammoBurn -eq 100)) `
+    '107.14: DT>=output floors effective dmg at 1 -> TTK 100 / ammo 100'
+$r3_107 = Get-Threat107 30 0 10 1 2 $true
+Check ($r3_107.ammoBurn -eq 6) `
+    '107.15: ammoPerAttack coefficient applied -- 3 shots x 2 = 6'
+$r4_107 = Get-Threat107 50 5 0 0 1 $false
+Check ((-not $r4_107.hasWeapon) -and ($null -eq $r4_107.ttk)) `
+    '107.16: no weapon -> hasWeapon false + ttk null'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

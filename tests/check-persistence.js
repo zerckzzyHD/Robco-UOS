@@ -1768,6 +1768,7 @@ header('Meta / Runner Parity');
     'Suite 104',
     'Suite 105',
     'Suite 106',
+    'Suite 107',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
@@ -11255,6 +11256,133 @@ header('Suite 106 — WU-N2 TRADE native barter terminal');
     /\.trade-row\b/.test(css106) && /\.trade-name[\s\S]{0,80}min-width:\s*0/.test(css106),
     '106.18: terminal.css .trade-row + .trade-name min-width:0 (no horizontal overflow at 360px)'
   );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 107 — WU-N3 THREAT native bestiary + TTK (17 tests)
+//  Deterministic offline THREAT assessment: BESTIARY.CSV lookup → enemy card +
+//  TTK = ceil(HP / max(1, weaponDPS − DT)) + ammo-burn (WU-D4c coefficient) +
+//  weakness highlight. Routed natively (the AI TTK directive is retired). The math
+//  is behaviorally verified in a vm; the melee-scope rule (_vatsIsMelee) labels
+//  strikes vs rounds.
+// ══════════════════════════════════════════════════════════════
+header('Suite 107 — WU-N3 THREAT native bestiary + TTK');
+{
+  const renSrc107 = readFile('js/ui-render.js');
+
+  // 107.1 / 107.2  lookupBestiaryEntry mirrored in both game db runners (Protocol 38)
+  assert(
+    /function lookupBestiaryEntry\b/.test(dbSource),
+    '107.1: lookupBestiaryEntry() defined in db_nv.js (BESTIARY.CSV lookup)'
+  );
+  assert(
+    /function lookupBestiaryEntry\b/.test(dbFo3Source),
+    '107.2: lookupBestiaryEntry() defined in db_fo3.js (game-agnostic, mirrored)'
+  );
+
+  // 107.3 / 107.4  render + pure math defined
+  assert(
+    /function renderThreat\b/.test(renSrc107),
+    '107.3: renderThreat() defined in ui-render.js (THREAT ASSESSMENT modal)'
+  );
+  assert(
+    /function _threatCompute\b/.test(renSrc107),
+    '107.4: _threatCompute() pure math helper defined in ui-render.js'
+  );
+
+  // 107.5 / 107.6  native router entries — THREAT routed BEFORE the AI (the retirement)
+  const routerStart = apiSource.indexOf('const NATIVE_COMMAND_ROUTER');
+  const routerBlock = apiSource.slice(routerStart, apiSource.indexOf('};', routerStart) + 2);
+  assert(
+    /'\[THREAT\]':\s*\w+\s*=>\s*renderThreat/.test(routerBlock),
+    "107.5: NATIVE_COMMAND_ROUTER routes '[THREAT]' → renderThreat (native, not AI)"
+  );
+  assert(
+    /'\[TH\]':\s*\w+\s*=>\s*renderThreat/.test(routerBlock),
+    "107.6: NATIVE_COMMAND_ROUTER routes '[TH]' → renderThreat (shorthand)"
+  );
+
+  // 107.7  _routeNativeCommand forwards the typed target to the handler
+  assert(
+    /handler\(\s*raw\.slice\(cmd\.length\)\.trim\(\)\s*\)/.test(apiSource),
+    '107.7: _routeNativeCommand passes the target argument to the handler (renderThreat receives the enemy name)'
+  );
+
+  // 107.8a / 107.8b  AI THREAT path retired — legacy predictive-loop directive gone; native defer note present
+  assert(
+    !/Run predictive loops via databases\.\s*Calculate Squad DPS/.test(apiSource),
+    '107.8a: legacy AI "Tactical TTK: run predictive loops" directive removed (AI THREAT path retired)'
+  );
+  assert(
+    /native deterministic THREAT terminal/.test(apiSource),
+    '107.8b: system directive defers THREAT/TTK to the native terminal (do-not-compute note)'
+  );
+
+  // 107.9  Protocol 3 — refuse to invent: NO ENTRY IN BESTIARY when absent
+  assert(
+    /NO ENTRY IN BESTIARY/.test(renSrc107),
+    '107.9: renderThreat emits "NO ENTRY IN BESTIARY" for an unknown target (Protocol 3 — never invent)'
+  );
+
+  // 107.10  game-agnostic ammo coefficient (Protocol 38 — no two-game literal coercion)
+  const renThreatBody = (renSrc107.match(/function renderThreat\([\s\S]*?\n\}/) || [''])[0];
+  assert(
+    /\bammoPerAttack\b/.test(renThreatBody) &&
+      /GAME_DEFS/.test(renThreatBody) &&
+      !/===\s*'FO3'\s*\?\s*'FO3'\s*:\s*'FNV'/.test(renThreatBody),
+    '107.10: renderThreat reads ammoPerAttack from GAME_DEFS (game-agnostic — no two-game coercion, Protocol 38)'
+  );
+
+  // 107.11  reuses the canonical melee-scope helper (Protocol 22)
+  assert(
+    /_vatsIsMelee\(/.test(renSrc107),
+    '107.11: renderThreat reuses _vatsIsMelee for the melee-scope rule (strikes vs rounds — Protocol 22)'
+  );
+
+  // ── Behavioral: run _threatCompute in an isolated vm and assert the exact math ──
+  const vm = require('vm');
+  const fnMatch107 = renSrc107.match(/function _threatCompute\([\s\S]*?\n\}/);
+  if (!fnMatch107) {
+    fail('107.x: could not extract _threatCompute from ui-render.js');
+  } else {
+    const sb = {};
+    vm.createContext(sb);
+    vm.runInContext(fnMatch107[0], sb);
+    const tc = sb._threatCompute;
+
+    // 107.12 / 107.13  TTK = ceil(HP/max(1,DPS−DT)); ammoBurn = shotsToKill × ammoPerAttack
+    //   HP75/DT4 vs 60dmg×1.1aps = 66 DPS → eff 62, TTK ceil(75/62)=2; perShot 56 → 2 shots
+    const r1 = tc({ hp: 75, dt: 4 }, { baseDamage: 60, aps: 1.1 }, 1);
+    assert(
+      r1.ttk === 2,
+      `107.12: TTK = ceil(HP/max(1,DPS−DT)) = 2 for HP75/DT4 vs 66 DPS (got ${r1.ttk})`
+    );
+    assert(
+      r1.ammoBurn === 2,
+      `107.13: ammo-burn = shotsToKill × ammoPerAttack = 2 (got ${r1.ammoBurn})`
+    );
+
+    // 107.14  DT ≥ output floors effective damage at 1 (no divide-by-zero / negative)
+    const r2 = tc({ hp: 100, dt: 1000 }, { baseDamage: 10, aps: 1 }, 1);
+    assert(
+      r2.ttk === 100 && r2.ammoBurn === 100,
+      `107.14: DT≥output floors effective dmg at 1 → TTK 100 / ammo 100 (got ${r2.ttk}/${r2.ammoBurn})`
+    );
+
+    // 107.15  WU-D4c coefficient is actually consumed — ammoPerAttack=2 doubles the burn
+    const r3 = tc({ hp: 30, dt: 0 }, { baseDamage: 10, aps: 1 }, 2);
+    assert(
+      r3.ammoBurn === 6,
+      `107.15: ammoPerAttack coefficient applied — 3 shots × 2 = 6 (got ${r3.ammoBurn})`
+    );
+
+    // 107.16  no equipped weapon → graceful, no TTK fabricated
+    const r4 = tc({ hp: 50, dt: 5 }, null, 1);
+    assert(
+      r4.hasWeapon === false && r4.ttk === null,
+      `107.16: no weapon → hasWeapon false + ttk null (got ${r4.hasWeapon}/${r4.ttk})`
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

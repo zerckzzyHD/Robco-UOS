@@ -888,6 +888,85 @@ details.sub-panel[open] > summary h3::after {
 .trade-row .trade-btn {
   flex-shrink: 0;
 }
+/* WU-N3: THREAT ASSESSMENT card (native bestiary + TTK). minmax(0,1fr) + overflow-wrap
+   keep long enemy/weapon names from forcing horizontal overflow at 360px. */
+.threat-card {
+  font-size: 12px;
+  line-height: 1.55;
+}
+.threat-name {
+  font-size: 15px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  color: var(--robco-green);
+  border-bottom: 1px solid var(--robco-dim);
+  padding-bottom: 4px;
+  margin-bottom: 8px;
+  overflow-wrap: anywhere;
+}
+.threat-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px 14px;
+  margin-bottom: 6px;
+}
+.threat-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.threat-label {
+  color: var(--robco-dim);
+  letter-spacing: 0.5px;
+}
+.threat-val {
+  color: var(--robco-green);
+  font-weight: bold;
+  overflow-wrap: anywhere;
+}
+.threat-weakness {
+  margin: 8px 0;
+  padding: 4px 8px;
+  text-align: center;
+  letter-spacing: 1px;
+  font-weight: bold;
+  color: #010a07;
+  background: #ffb000;
+  border-radius: 2px;
+  overflow-wrap: anywhere;
+}
+.threat-weakness--none {
+  color: var(--robco-dim);
+  background: transparent;
+  letter-spacing: 0.5px;
+  font-weight: normal;
+}
+.threat-calc {
+  border-top: 1px dashed var(--robco-dim);
+  padding-top: 6px;
+  margin-top: 6px;
+}
+.threat-ttk {
+  font-size: 14px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  color: var(--robco-green);
+}
+.threat-ammo {
+  color: var(--robco-green);
+  margin-top: 2px;
+}
+.threat-weapon {
+  color: var(--robco-dim);
+  font-size: 11px;
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+}
+.threat-note {
+  color: var(--robco-dim);
+  font-style: italic;
+}
 .vats-scanning::after {
   content: '';
   position: absolute;

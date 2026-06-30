@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1304/1304 | Cache: robco-terminal-v2.6.0-r28 -->
+﻿## [Unreleased]<!-- Tests: 1321/1321 | Cache: robco-terminal-v2.6.0-r29 -->
 
 ### Added
 
@@ -37,6 +37,7 @@
 
 - The in-app changelog viewer has been completely redesigned from a single cluttered wall of text into a clean, readable "FIRMWARE REVISION LOG". You now see one version at a time with a dropdown to jump to any past release; each version's notes are grouped into collapsible sections (Added, Fixed, Changed, Removed) with the newest section open and the rest tucked away; entries are tagged and bulleted in the terminal's voice; and on a wide screen the text is held to a comfortable centred reading column instead of stretching edge to edge, while phones get full width with comfortable spacing. The private test build still shows in-progress "Unreleased" notes; the public site still shows only released versions.
 - The V.A.T.S. CALCULATOR is now a fully offline, deterministic tool — it no longer defers to the AI ("actual outcome determined by AI" is gone). It reads your equipped weapon, SPECIAL, skills, and active chem buffs and shows: an estimated hit chance per body part, your V.A.T.S. critical-hit bonus (+5% in New Vegas, +15% in Fallout 3), and — for melee and unarmed weapons — an exact AP-strike optimiser showing how many strikes your Action Point pool affords, damage per strike after the target's damage threshold, damage-per-AP, and the best body part to target. A new TARGET DT field lets you enter the enemy's armour to see effective damage. Hit chance for ranged weapons stays a clearly-labelled estimate (the exact per-weapon spread isn't published game data), while the melee/AP and damage maths are exact. Works entirely offline with no AI call.
+- The THREAT ASSESSMENT is now a fully offline, deterministic tool — it no longer asks the AI to size up an enemy. Type a target (e.g. "> [THREAT] Deathclaw") and the terminal looks the creature up in its bestiary and shows a stat card — health, damage threshold, attack damage and rate, attack type, resistances — and highlights the creature's weakness. Against your equipped weapon it then estimates TIME TO NEUTRALIZE (roughly how many seconds to bring it down) and AMMO BURN (how many rounds it will take — or strikes, for a melee weapon). If the creature isn't in the bestiary it says so plainly rather than inventing stats. Works entirely offline with no AI call.
 
 ### Under the Hood
 

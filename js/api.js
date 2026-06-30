@@ -124,7 +124,7 @@ Financial Metrics: Run Economy Sync using live Barter skills. Strictly enforce V
 ### **ROBCO_DEV_MANUAL.TXT (System Math & Logic Base)**
 - Skill Point Math: Base points = 10 + (INT / 2).
 - Quadratic XP Scaling: Boundaries = 25 * (Target_Level^2) + 125 * (Target_Level) - 150.
-- Tactical TTK: Run predictive loops via databases. Calculate Squad DPS vs Target DT. Apply Stealth (-S) Multiplier for unmitigated opening strike damage. Apply 2 free enemy hits if target is [RANGED].
+- Tactical TTK / THREAT: handled by the native deterministic THREAT terminal (BESTIARY.CSV lookup + TTK/ammo-burn math, computed offline). Do NOT compute or narrate time-to-kill or a THREAT modal — defer to the local calculator.
 
 ### **Skill System**
 ${GAME_DEFS[ctx].ai.skillSystemText}
@@ -956,13 +956,20 @@ const NATIVE_COMMAND_ROUTER = {
   '[LOGS]': () => showErrorLog(),
   '[CROSSROADS]': () => _nativeCrossroads(),
   '[SLEEP]': () => _nativeSleep(),
+  // WU-N3: THREAT is a fully-deterministic native bestiary/TTK terminal — the AI
+  // never computes time-to-kill. The argument is the target enemy name.
+  '[THREAT]': target => renderThreat(target),
+  '[TH]': target => renderThreat(target),
 };
 
 function _routeNativeCommand(userText) {
-  const upper = userText.toUpperCase().trim().replace(/^>\s*/, '');
+  const raw = userText.trim().replace(/^>\s*/, '');
+  const upper = raw.toUpperCase();
   for (const [cmd, handler] of Object.entries(NATIVE_COMMAND_ROUTER)) {
     if (upper === cmd || upper.startsWith(cmd + ' ') || upper.startsWith(cmd + '\t')) {
-      handler();
+      // Pass the original-case argument (text after the command token) to the
+      // handler; arg-less native commands simply ignore the extra parameter.
+      handler(raw.slice(cmd.length).trim());
       return true;
     }
   }

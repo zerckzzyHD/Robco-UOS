@@ -518,6 +518,64 @@ function lookupWeaponStats(name) {
   return best;
 }
 
+// ── WU-N3: BESTIARY COMBAT-STAT LOOKUP ────────────────────────────────────
+// Returns the BESTIARY.CSV row for an enemy name (hp/dt/baseDamage/attackRate/
+// weakness/resistances) — used by the native THREAT assessment (TTK + ammo-burn).
+// Exact match first, then longest-substring fuzzy fallback (mirrors lookupItemInDb
+// / lookupWeaponStats). Returns null if the name isn't a known foe (Protocol 3:
+// the caller shows NO ENTRY IN BESTIARY rather than inventing stats).
+let _bestiaryCache = null;
+function lookupBestiaryEntry(name) {
+  if (!name) return null;
+  if (!_bestiaryCache) {
+    _bestiaryCache = new Map();
+    const start = databaseCSVs.indexOf('[BESTIARY.CSV]');
+    if (start !== -1) {
+      const nextSection = databaseCSVs.indexOf('\n[', start + 14);
+      const block = databaseCSVs.substring(start, nextSection === -1 ? undefined : nextSection);
+      const lines = block.split('\n').filter(l => l.trim() && !l.startsWith('['));
+      const h = (lines[0] || '').split(',');
+      const ix = n => h.indexOf(n);
+      const iName = ix('Name');
+      const numCols = {
+        dt: ix('DT'),
+        hp: ix('HP'),
+        baseDamage: ix('Base_Damage'),
+        attackRate: ix('Attack_Rate'),
+        xpYield: ix('XP_Yield'),
+      };
+      const iWeak = ix('Weakness_Weapon');
+      const iResist = ix('Resistances');
+      const iAttackType = ix('Attack_Type');
+      for (let i = 1; i < lines.length; i++) {
+        const c = lines[i].split(',');
+        const nm = (c[iName] || '').trim();
+        if (!nm) continue;
+        const entry = { name: nm };
+        for (const [k, idx] of Object.entries(numCols))
+          entry[k] = idx >= 0 ? parseFloat(c[idx]) || 0 : 0;
+        entry.weakness = iWeak >= 0 ? (c[iWeak] || '').trim() : '';
+        entry.resistances = iResist >= 0 ? (c[iResist] || '').trim() : '';
+        entry.attackType = iAttackType >= 0 ? (c[iAttackType] || '').trim() : '';
+        _bestiaryCache.set(nm.toLowerCase(), entry);
+      }
+    }
+  }
+  const key = name.toLowerCase().trim();
+  const exact = _bestiaryCache.get(key);
+  if (exact) return exact;
+  if (key.length < 3) return null;
+  let best = null;
+  let bestLen = 0;
+  for (const [k, v] of _bestiaryCache) {
+    if ((k.includes(key) || key.includes(k)) && k.length > bestLen) {
+      best = v;
+      bestLen = k.length;
+    }
+  }
+  return best;
+}
+
 // ── WU-N2: VENDOR + TRADE-CATALOG LOOKUPS ─────────────────────────────────
 // getVendors() — vendor roster from VENDORS.CSV ({name, location, baseCaps, faction}).
 // baseCaps is the vendor's purse (caps cap for what it can pay when buying from you).

@@ -1480,7 +1480,7 @@ const COMMAND_REGISTRY = [
     cmds: [
       { cmd: '[VATS SIM] / [VS]', desc: 'Melee/Unarmed AP strike optimizer.' },
       { cmd: '[VVATS]', desc: 'Analyze screenshot for hit %.' },
-      { cmd: '[THREAT] / [TH]', desc: 'Squad TTK & ammo burn calc.' },
+      { cmd: '[THREAT] / [TH]', desc: 'Native bestiary TTK & ammo-burn.' },
       { cmd: '[TACTICS] / [TA]', desc: 'Multi-companion combat guide.' },
       { cmd: '[BIO-SCAN]', desc: 'Limb evaluation & med routing.' },
     ],
