@@ -888,6 +888,47 @@ details.sub-panel[open] > summary h3::after {
 .trade-row .trade-btn {
   flex-shrink: 0;
 }
+/* WU-N6: LOOT salvage terminal. minmax via min-width:0 + overflow-wrap keep long
+   item names from forcing horizontal overflow at 360px. */
+.loot-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.loot-qty-label {
+  font-size: 11px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.loot-list {
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.loot-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 0;
+  font-size: 11px;
+}
+.loot-row .loot-name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.loot-row .loot-val {
+  white-space: nowrap;
+  opacity: 0.85;
+}
+.loot-row .loot-btn {
+  flex-shrink: 0;
+}
+.loot-hint {
+  font-size: 9px;
+  opacity: 0.6;
+  margin-top: 6px;
+}
 /* WU-N3: THREAT ASSESSMENT card (native bestiary + TTK). minmax(0,1fr) + overflow-wrap
    keep long enemy/weapon names from forcing horizontal overflow at 360px. */
 .threat-card {

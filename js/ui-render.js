@@ -2115,6 +2115,108 @@ function doSell(name) {
     appendToChat(`> [TRADE] Sold ${it.name} for ${price}c. Caps: ${state.caps}.`, 'sys');
 }
 
+// ── WU-N6: LOOT — deterministic add/value (hybrid) ────────────────────────
+// A native "add salvaged loot to inventory" terminal. Pick any priced item from
+// the active game's DB catalog (getTradeCatalog — weapons/armor/chems/misc), set a
+// quantity, and ADD it: the item is pushed ADDITIVELY to state.inventory[]
+// (find-or-increment), its weight/value/type read from the DB (lookupItemInDb — the
+// Value column). The add/value math is fully deterministic — no AI. Each ADD is
+// confirm-gated (Protocol 34). The generative drop-table (what a defeated enemy
+// drops) is deferred; only the deterministic add/value is in scope here. Game-agnostic
+// (Protocol 38): getTradeCatalog/lookupItemInDb read the active game's databaseCSVs.
+// All user-/data-derived text runs through escapeHtml before innerHTML (XSS-safe).
+
+// Pure additive merge — deterministic loot math, unit-testable (no DOM, no state).
+// Returns a NEW inventory array with `qty` of the item added (find-or-increment);
+// weight/value/type sourced from the DB row, falling back to the catalog entry.
+function _lootAdd(inventory, item, qty, db) {
+  const inv = Array.isArray(inventory) ? inventory.map(i => ({ ...i })) : [];
+  const n = Math.max(1, Math.floor(Number(qty) || 1));
+  const ex = inv.find(i => String(i.name).toLowerCase() === String(item.name).toLowerCase());
+  if (ex) {
+    ex.qty = (ex.qty || 1) + n;
+  } else {
+    inv.push({
+      name: item.name,
+      qty: n,
+      wgt: db ? db.wgt : 0,
+      val: db && db.val != null ? db.val : item.value,
+      type: db ? db.type : item.type,
+    });
+  }
+  return inv;
+}
+
+function renderLoot(arg) {
+  const modal = document.getElementById('sysModal');
+  const title = document.getElementById('modalTitle');
+  const content = document.getElementById('modalContent');
+  if (!modal || !title || !content) return;
+  title.innerText = '> SALVAGE / LOOT';
+  const pre = (arg || '').trim();
+  content.innerHTML =
+    '<div class="loot-controls">' +
+    `<input type="text" id="lootSearch" placeholder="Search items…" aria-label="Search loot items" oninput="renderLootList()" value="${escapeHtml(pre)}" style="flex:1;min-width:0;font-size:16px;min-height:28px;" />` +
+    '<label class="loot-qty-label">QTY <input type="number" id="lootQty" value="1" min="1" max="999" aria-label="Quantity to add" style="width:56px;font-size:16px;min-height:28px;" /></label>' +
+    '</div>' +
+    '<div id="lootList" class="loot-list"></div>' +
+    '<div class="loot-hint">Values from the active database. Adds are additive and confirm-gated.</div>';
+  renderLootList();
+  if (typeof _openSysModal === 'function') _openSysModal();
+}
+
+function renderLootList() {
+  const list = document.getElementById('lootList');
+  if (!list) return;
+  const searchEl = document.getElementById('lootSearch');
+  const q = (searchEl ? searchEl.value : '').toLowerCase().trim();
+  const catalog = typeof getTradeCatalog === 'function' ? getTradeCatalog() : [];
+  const MAX = 40;
+  const all = q ? catalog.filter(it => it.name.toLowerCase().includes(q)) : catalog;
+  const shown = all.slice(0, MAX);
+  if (!shown.length) {
+    list.innerHTML = '<span class="empty-state">No catalog item matches.</span>';
+    return;
+  }
+  list.innerHTML =
+    shown
+      .map(it => {
+        const val = Math.max(0, Math.round(Number(it.value) || 0));
+        return (
+          `<div class="loot-row"><span class="loot-name">${escapeHtml(it.name)}</span>` +
+          `<span class="loot-val">${val}c</span>` +
+          `<button class="btn-sm action-btn loot-btn" data-lname="${escapeHtml(it.name)}" onclick="doLoot(this.dataset.lname)" aria-label="Add ${escapeHtml(it.name)} to inventory">ADD</button></div>`
+        );
+      })
+      .join('') +
+    (all.length > MAX
+      ? `<div class="empty-state" style="font-size:9px;">+${all.length - MAX} more — refine search</div>`
+      : '');
+}
+
+function doLoot(name) {
+  const catalog = typeof getTradeCatalog === 'function' ? getTradeCatalog() : [];
+  const item = catalog.find(i => i.name.toLowerCase() === String(name).toLowerCase());
+  if (!item) return;
+  const qtyEl = document.getElementById('lootQty');
+  let qty = qtyEl ? parseInt(qtyEl.value, 10) : 1;
+  if (!Number.isFinite(qty) || qty < 1) qty = 1;
+  if (qty > 999) qty = 999;
+  const db = typeof lookupItemInDb === 'function' ? lookupItemInDb(item.name) : null;
+  const unitVal = Math.max(0, Math.round(Number(db && db.val != null ? db.val : item.value) || 0));
+  if (!confirm(`Add ${qty}× ${item.name} (${unitVal}c each) to inventory?`)) return;
+  state.inventory = _lootAdd(state.inventory, item, qty, db);
+  if (typeof renderInventory === 'function') renderInventory();
+  if (typeof updateMath === 'function') updateMath();
+  renderLootList();
+  saveState();
+  if (typeof appendToChat === 'function')
+    appendToChat(
+      `> [LOOT] Added ${qty}× ${item.name} (${unitVal * qty}c total) to inventory.`,
+      'sys'
+    );
+}
+
 // ── WU-N3: THREAT — native bestiary assessment + TTK ──────────────────────
 // Pure combat math (no DOM) so the gate can unit-test it. Read-only. Floors
 // avoid divide-by-zero / negative effective damage when DT meets/exceeds output.

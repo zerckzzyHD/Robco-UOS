@@ -1493,6 +1493,7 @@ const COMMAND_REGISTRY = [
       { cmd: '[BIND: X, DIR]', desc: 'Assign gear to D-Pad vectors.' },
       { cmd: '[PAD: DIR]', desc: 'Auto-execute 8-way hotkeys.' },
       { cmd: '[TRADE]', desc: 'Native barter terminal (INV tab) — offline.' },
+      { cmd: '[LOOT]', desc: 'Native salvage terminal — add DB items at value.' },
       { cmd: '[STASH: Loc] / [-FULL]', desc: 'Network inventory sum/full.' },
       { cmd: '[EXCESS] / [-FULL]', desc: 'Jury Rig & weight triage.' },
       { cmd: '[CURRENCY]', desc: 'Weightless Wealth exchange.' },

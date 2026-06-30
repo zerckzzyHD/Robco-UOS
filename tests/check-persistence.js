@@ -1210,15 +1210,21 @@ assert(
   );
 }
 
-// 21.3 Trade modal does NOT embed raw item.name in an inline onclick attribute
+// 21.3 Native TRADE sell list is XSS-safe (WU-N2 retired the AI TRADE modal; the dead
+// `mType === 'TRADE'` source dependency that made this guard vacuous — and threw in the PS
+// runner — was removed under Protocol 42). Item names are escaped and routed via a data
+// attribute, never interpolated raw into the onclick. Complements 21.4 (the buy list).
 {
-  const tradeStart = apiSource.indexOf("mType === 'TRADE'");
-  const tradeEnd = apiSource.indexOf('} else {', tradeStart);
-  const tradeBlock =
-    tradeStart !== -1 && tradeEnd !== -1 ? apiSource.slice(tradeStart, tradeEnd) : '';
+  const renSrc213 = readFile('js/ui-render.js');
+  let sellBody213 = '';
+  try {
+    sellBody213 = extractFunctionBody(renSrc213, 'renderTradeSellList');
+  } catch (_) {}
   assert(
-    !/onclick\s*=\s*[`'"]\s*tradeItem\s*\(/.test(tradeBlock),
-    'Trade modal does not use inline onclick="tradeItem(...)" (XSS-2 guard)'
+    /escapeHtml\(it\.name\)/.test(sellBody213) &&
+      /data-tname=/.test(sellBody213) &&
+      /this\.dataset\.tname/.test(sellBody213),
+    'Native TRADE sell list escapes item names + routes via data-tname (XSS-2 guard)'
   );
 }
 
@@ -1403,7 +1409,10 @@ assert(
   /onclick="expandPanelForCategory\('trade'\)"/.test(htmlSource),
   'TRADE macro button opens the native barter panel (WU-N2)'
 );
-assert(/onclick="macroCommand\('\[LOOT\]'\)"/.test(htmlSource), 'LOOT macro button wired');
+assert(
+  /onclick="renderLoot\(\)"/.test(htmlSource),
+  'LOOT button opens the native salvage terminal (WU-N6)'
+);
 // V.A.T.S. Calculator
 assert(/id="vatsCalcBtn"/.test(htmlSource), 'V.A.T.S. CALCULATOR button exists (id=vatsCalcBtn)');
 
@@ -1771,6 +1780,7 @@ header('Meta / Runner Parity');
     'Suite 107',
     'Suite 108',
     'Suite 109',
+    'Suite 110',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
@@ -11655,6 +11665,165 @@ header('Suite 109 — WU-N5 BIO-SCAN native medical advisory');
     assert(
       /onclick="renderBioScan\(\)"/.test(html109) && /aria-label="[^"]+"/.test(btnTag109),
       '109.13: index.html has a RUN BIO-SCAN button wired to renderBioScan() with an aria-label'
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 110 — WU-N6 LOOT native add/value terminal (13 tests)
+//  `> [LOOT]` (+ [LT]) routed through NATIVE_COMMAND_ROUTER to a deterministic,
+//  offline salvage terminal: pick a DB-catalog item, ADD it additively to
+//  state.inventory[] at its DB value, confirm-gated. Locks: router wiring, the
+//  pure additive merge core (behavioral), confirm-gate + additive-only writes,
+//  DB value sourcing, AI-path retirement, XSS-safe escaping, Protocol-38
+//  agnosticism (getTradeCatalog/lookupItemInDb), discoverability + CSS overflow.
+// ══════════════════════════════════════════════════════════════
+header('Suite 110 — WU-N6 LOOT native add/value terminal');
+{
+  const ren110 = readFile('js/ui-render.js');
+  const api110 = readFile('js/api.js');
+  const core110 = readFile('js/ui-core.js');
+  const css110 = readFile('css/terminal.css');
+  const html110 = readFile('index.html');
+  const routerBlock110 = (api110.match(/const NATIVE_COMMAND_ROUTER\s*=\s*\{[\s\S]*?\n\};/) || [
+    '',
+  ])[0];
+  // Stable source slice of the LOOT core (the pure helper through doLoot).
+  const lootRegionStart = ren110.indexOf('function _lootAdd');
+  const lootRegionEnd = ren110.indexOf('// ── WU-N3: THREAT');
+  const lootRegion =
+    lootRegionStart >= 0 && lootRegionEnd > lootRegionStart
+      ? ren110.slice(lootRegionStart, lootRegionEnd)
+      : '';
+  let doLootBody = '';
+  let lootAddBody = '';
+  try {
+    doLootBody = extractFunctionBody(ren110, 'doLoot');
+  } catch (_) {}
+  try {
+    lootAddBody = extractFunctionBody(ren110, '_lootAdd');
+  } catch (_) {}
+
+  // 110.1 renderLoot + renderLootList + doLoot + the pure core all defined
+  assert(
+    /function renderLoot\s*\(/.test(ren110) &&
+      /function renderLootList\s*\(/.test(ren110) &&
+      /function doLoot\s*\(/.test(ren110) &&
+      /function _lootAdd\s*\(/.test(ren110),
+    '110.1: renderLoot() + renderLootList() + doLoot() + _lootAdd() defined in ui-render.js'
+  );
+
+  // 110.2 LOOT sources items from the shared DB catalog (getTradeCatalog), not a hardcoded list
+  assert(
+    /getTradeCatalog\s*\(/.test(doLootBody) &&
+      /getTradeCatalog\s*\(/.test(extractFunctionBody(ren110, 'renderLootList')),
+    '110.2: LOOT sources items via getTradeCatalog() (deterministic DB catalog — reuse, not a new list)'
+  );
+
+  // 110.3 router wires [LOOT] + [LT] → renderLoot (native, not AI)
+  assert(
+    /\[LOOT\]'\s*:\s*[^\n]*renderLoot/.test(routerBlock110) &&
+      /\[LT\]'\s*:\s*[^\n]*renderLoot/.test(routerBlock110),
+    "110.3: NATIVE_COMMAND_ROUTER routes '[LOOT]' + '[LT]' → renderLoot (native, no AI)"
+  );
+
+  // 110.4 value sourced from the DB (lookupItemInDb Value column), not invented
+  assert(
+    /lookupItemInDb\s*\(/.test(doLootBody) && /db\.val/.test(lootAddBody),
+    '110.4: loot value/weight sourced from lookupItemInDb (DB Value column), not invented'
+  );
+
+  // 110.5 BEHAVIORAL — the pure additive merge core. JS evaluates the extracted core
+  //       directly; the PS runner asserts the same branches structurally.
+  {
+    let ok = false;
+    let err = null;
+    try {
+      const fn = new Function(lootRegion + '\n return _lootAdd;')();
+      const item = { name: 'Stimpak', value: 999, type: 'aid' };
+      const db = { wgt: 1, val: 50, type: 'aid' };
+      // Add to an empty inventory → new entry, qty + DB value/weight/type.
+      const inv1 = fn([], item, 3, db);
+      // Additive: adding the same item again increments qty (no duplicate row).
+      const inv2 = fn(inv1, { name: 'stimpak', value: 999, type: 'aid' }, 2, db);
+      // Bad qty floors to 1 (deterministic guard).
+      const inv3 = fn([], item, 'xyz', db);
+      ok =
+        inv1.length === 1 &&
+        inv1[0].qty === 3 &&
+        inv1[0].val === 50 && // DB value, NOT the catalog's 999
+        inv1[0].wgt === 1 &&
+        inv1[0].type === 'aid' &&
+        inv2.length === 1 && // still one row (case-insensitive merge)
+        inv2[0].qty === 5 && // 3 + 2 additive
+        inv3[0].qty === 1; // non-numeric qty → 1
+    } catch (e) {
+      err = e;
+    }
+    assert(
+      ok,
+      '110.5: _lootAdd behavioral — additive find-or-increment merge, DB value sourced, qty floored to ≥1' +
+        (err ? ' — ' + err.message : '')
+    );
+  }
+
+  // 110.6 confirm-gated (Protocol 34) — doLoot returns before mutating unless confirmed
+  assert(
+    /if\s*\(\s*!confirm\([\s\S]{0,160}\)\s*\)\s*return/.test(doLootBody),
+    '110.6: doLoot is confirm-gated (Protocol 34 — no add without explicit confirmation)'
+  );
+
+  // 110.7 additive-only — doLoot never deletes/overwrites inventory wholesale; it persists via saveState
+  assert(
+    /_lootAdd\(/.test(doLootBody) &&
+      /saveState\s*\(\s*\)/.test(doLootBody) &&
+      !/state\.inventory\s*=\s*\[\]/.test(doLootBody),
+    '110.7: doLoot is additive (merges via _lootAdd) + persists via saveState (no wholesale inventory reset)'
+  );
+
+  // 110.8 game-agnostic (Protocol 38): the LOOT core carries no game/item literals
+  assert(
+    lootRegion !== '' &&
+      !/\bFNV\b|\bFO3\b|Fallout|New Vegas/.test(lootRegion) &&
+      !/['"]Stimpak['"]|['"]Nuka['"]/.test(lootRegion),
+    '110.8: the LOOT core carries no FNV/FO3/Fallout or hardcoded item-name literals (Protocol 38)'
+  );
+
+  // 110.9 AI-path retirement — the directive defers LOOT add/value to the native terminal
+  assert(
+    /native deterministic offline tool[\s\S]{0,80}LOOT|LOOT[\s\S]{0,120}native deterministic offline tool/.test(
+      api110
+    ) && /do NOT emit a LOOT picker\/modal or compute item values/.test(api110),
+    '110.9: getSystemDirective retires the AI LOOT path (defers add/value to the native terminal)'
+  );
+
+  // 110.10 discoverable in the command reference
+  assert(
+    /\[LOOT\]/.test((core110.match(/const COMMAND_REGISTRY\s*=\s*\[[\s\S]*?\n\];/) || [''])[0]),
+    '110.10: COMMAND_REGISTRY lists a [LOOT] entry (discoverability)'
+  );
+
+  // 110.11 CSS overflow guard — .loot-row + .loot-name min-width:0 (Protocol 17/mobile)
+  assert(
+    /\.loot-row\b/.test(css110) &&
+      /\.loot-row\s+\.loot-name[\s\S]{0,80}min-width:\s*0/.test(css110),
+    '110.11: terminal.css .loot-row + .loot-name min-width:0 (no horizontal overflow at 360px)'
+  );
+
+  // 110.12 XSS-safe — item names + search input escaped before innerHTML
+  assert(
+    /escapeHtml\(it\.name\)/.test(ren110) && /escapeHtml\(pre\)/.test(ren110),
+    '110.12: LOOT escapes item names + the search prefill via escapeHtml() before innerHTML'
+  );
+
+  // 110.13 a discoverable UI affordance — the [LOOT] button wired to renderLoot() + reuses the modal
+  {
+    const btnTag110 = (html110.match(/<button\b[^>]*renderLoot\(\)[^>]*>/) || [''])[0];
+    assert(
+      /onclick="renderLoot\(\)"/.test(html110) &&
+        /aria-label="[^"]+"/.test(btnTag110) &&
+        /_openSysModal/.test(extractFunctionBody(ren110, 'renderLoot')),
+      '110.13: index.html [LOOT] button wired to renderLoot() with an aria-label; opens via _openSysModal (shared modal)'
     );
   }
 }

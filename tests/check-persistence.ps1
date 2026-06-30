@@ -755,12 +755,15 @@ Check ($renderSquadBody -match 'parseInt\s*\(\s*member\.hp\s*\)' -and
        $renderSquadBody -match 'parseInt\s*\(\s*member\.ammo\s*\)') `
     "renderSquad() coerces hp, hpMax, ammo with parseInt before innerHTML (XSS-1 guard)"
 
-# 21.3 Trade modal does NOT embed raw item.name in an inline onclick attribute
-$tradeStart = $apiSrc.IndexOf("mType === 'TRADE'")
-$tradeEnd   = $apiSrc.IndexOf("} else {", $tradeStart)
-$tradeBlock = if ($tradeStart -ge 0 -and $tradeEnd -gt $tradeStart) { $apiSrc.Substring($tradeStart, $tradeEnd - $tradeStart) } else { '' }
-Check ($tradeBlock -notmatch 'onclick\s*=\s*[''"`]\s*tradeItem\s*\(') `
-    "Trade modal does not use inline onclick=""tradeItem(...)"" (XSS-2 guard)"
+# 21.3 Native TRADE sell list is XSS-safe (WU-N2 retired the AI TRADE modal; the dead
+# `mType === 'TRADE'` source dependency that made this guard vacuous -- and threw an
+# IndexOf(-1) exception here -- was removed under Protocol 42). Item names are escaped and
+# routed via a data attribute, never interpolated raw into the onclick. Complements 21.4.
+$renSrc213 = Read-Src "js/ui-render.js"
+$sellBody213 = ''
+try { $sellBody213 = Get-FunctionBody $renSrc213 'renderTradeSellList' } catch {}
+Check (($sellBody213 -match 'escapeHtml\(it\.name\)') -and ($sellBody213 -match 'data-tname=') -and ($sellBody213 -match 'this\.dataset\.tname')) `
+    "Native TRADE sell list escapes item names + routes via data-tname (XSS-2 guard)"
 
 # 21.4 Native TRADE list is XSS-safe (WU-N2 retired the AI TRADE modal): item names are
 # escaped and routed via a data attribute, never interpolated raw into the onclick.
@@ -853,7 +856,7 @@ Check ([bool]($htmlSrc -match "onclick=""macroCommand\('\[PAD: RIGHT\]'\)""")) "
 Check ([bool]($htmlSrc -match "onclick=""macroCommand\('\[THREAT\]'\)"""))    "THREAT macro button wired"
 Check ([bool]($htmlSrc -match "onclick=""macroCommand\('\[VATS SIM\]'\)"""))  "VATS SIM macro button wired"
 Check ([bool]($htmlSrc -match "onclick=""expandPanelForCategory\('trade'\)"""))     "TRADE macro button opens the native barter panel (WU-N2)"
-Check ([bool]($htmlSrc -match "onclick=""macroCommand\('\[LOOT\]'\)"""))      "LOOT macro button wired"
+Check ([bool]($htmlSrc -match "onclick=""renderLoot\(\)"""))      "LOOT button opens the native salvage terminal (WU-N6)"
 # V.A.T.S. Calculator
 Check ([bool]($htmlSrc -match 'id="vatsCalcBtn"'))  "V.A.T.S. CALCULATOR button exists (id=vatsCalcBtn)"
 
@@ -1014,7 +1017,7 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84','Suite 85','Suite 86','Suite 87','Suite 88','Suite 89','Suite 90','Suite 91','Suite 92','Suite 93','Suite 94','Suite 95','Suite 96','Suite 97','Suite 98','Suite 99','Suite 100','Suite 101','Suite 102','Suite 103','Suite 104','Suite 105','Suite 106','Suite 107','Suite 108','Suite 109')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84','Suite 85','Suite 86','Suite 87','Suite 88','Suite 89','Suite 90','Suite 91','Suite 92','Suite 93','Suite 94','Suite 95','Suite 96','Suite 97','Suite 98','Suite 99','Suite 100','Suite 101','Suite 102','Suite 103','Suite 104','Suite 105','Suite 106','Suite 107','Suite 108','Suite 109','Suite 110')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
 Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-99)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
@@ -6732,6 +6735,72 @@ Check ($bioScanBody109 -match '_openSysModal') `
 $bioBtn109 = [regex]::Match($html109, '<button\b[^>]*renderBioScan\(\)[^>]*>').Value
 Check (($html109 -match 'onclick="renderBioScan\(\)"') -and ($bioBtn109 -match 'aria-label="[^"]+"')) `
     '109.13: index.html has a RUN BIO-SCAN button wired to renderBioScan() with an aria-label'
+
+# ===========================================================
+# Suite 110 -- WU-N6 LOOT native add/value terminal (13 tests)
+# Deterministic salvage terminal: pick a DB-catalog item, ADD it additively to
+# state.inventory[] at its DB value, confirm-gated, routed through
+# NATIVE_COMMAND_ROUTER, offline + no AI for the math. Locks router wiring, the
+# pure additive merge core (structural mirror of the JS behavioral eval), confirm
+# gate + additive-only writes, DB value sourcing, AI-path retirement, XSS escaping,
+# Protocol-38 agnosticism, discoverability + CSS overflow.
+# NOTE: source slices + -cmatch (not Get-FunctionBody / case-insensitive -match)
+# to avoid the template-literal over-capture + case-fold pitfalls (Protocol-42).
+# ===========================================================
+Sep "Suite 110 -- WU-N6 LOOT native add/value terminal"
+$ren110 = Read-Src "js/ui-render.js"
+$api110 = Read-Src "js/api.js"
+$core110 = Read-Src "js/ui-core.js"
+$css110 = Read-Src "css/terminal.css"
+$html110 = Read-Src "index.html"
+$routerBlock110 = [regex]::Match($api110, 'const NATIVE_COMMAND_ROUTER\s*=\s*\{[\s\S]*?\n\};').Value
+$ls110 = $ren110.IndexOf('function _lootAdd')
+$le110 = $ren110.IndexOf('// -- WU-N3: THREAT')
+if ($le110 -lt 0) { $le110 = $ren110.IndexOf('function _threatCompute') }
+$lootRegion110 = if (($ls110 -ge 0) -and ($le110 -gt $ls110)) { $ren110.Substring($ls110, $le110 - $ls110) } else { '' }
+$ds110 = $ren110.IndexOf('function doLoot')
+$doLootBody110 = if (($ds110 -ge 0) -and ($le110 -gt $ds110)) { $ren110.Substring($ds110, $le110 - $ds110) } else { '' }
+
+# 110.1 renderLoot + renderLootList + doLoot + the pure core all defined
+Check (($ren110 -match 'function renderLoot\s*\(') -and ($ren110 -match 'function renderLootList\s*\(') -and ($ren110 -match 'function doLoot\s*\(') -and ($ren110 -match 'function _lootAdd\s*\(')) `
+    '110.1: renderLoot() + renderLootList() + doLoot() + _lootAdd() defined in ui-render.js'
+# 110.2 sources items from the shared DB catalog (getTradeCatalog)
+Check ($lootRegion110 -match 'getTradeCatalog\s*\(') `
+    '110.2: LOOT sources items via getTradeCatalog() (deterministic DB catalog -- reuse, not a new list)'
+# 110.3 router wires [LOOT] + [LT] -> renderLoot
+Check (($routerBlock110 -match "\[LOOT\]'\s*:\s*[^\n]*renderLoot") -and ($routerBlock110 -match "\[LT\]'\s*:\s*[^\n]*renderLoot")) `
+    "110.3: NATIVE_COMMAND_ROUTER routes '[LOOT]' + '[LT]' -> renderLoot (native, no AI)"
+# 110.4 value sourced from the DB (lookupItemInDb Value column)
+Check (($doLootBody110 -match 'lookupItemInDb\s*\(') -and ($lootRegion110 -match 'db\.val')) `
+    '110.4: loot value/weight sourced from lookupItemInDb (DB Value column), not invented'
+# 110.5 structural mirror of the JS behavioral eval -- the additive merge core
+Check (($lootRegion110 -cmatch 'ex\.qty') -and ($lootRegion110 -match '\.find\(') -and ($lootRegion110 -match 'toLowerCase\(\)') -and ($lootRegion110 -match 'db\.val != null') -and ($lootRegion110 -match 'Math\.max\(1')) `
+    '110.5: _lootAdd encodes the additive find-or-increment merge + DB value sourcing + qty floor (structural mirror of the JS behavioral eval)'
+# 110.6 confirm-gated (Protocol 34)
+Check ($doLootBody110 -match 'if\s*\(\s*!confirm\([\s\S]{0,160}\)\s*\)\s*return') `
+    '110.6: doLoot is confirm-gated (Protocol 34 -- no add without explicit confirmation)'
+# 110.7 additive-only + persists via saveState, no wholesale reset
+Check (($doLootBody110 -match '_lootAdd\(') -and ($doLootBody110 -match 'saveState\s*\(\s*\)') -and (-not ($doLootBody110 -match 'state\.inventory\s*=\s*\[\]'))) `
+    '110.7: doLoot is additive (merges via _lootAdd) + persists via saveState (no wholesale inventory reset)'
+# 110.8 game-agnostic (Protocol 38) -- no game/item literals in the LOOT core
+Check (($lootRegion110 -ne '') -and (-not ($lootRegion110 -cmatch '\bFNV\b|\bFO3\b|Fallout|New Vegas')) -and (-not ($lootRegion110 -match "['""]Stimpak['""]|['""]Nuka['""]"))) `
+    '110.8: the LOOT core carries no FNV/FO3/Fallout or hardcoded item-name literals (Protocol 38)'
+# 110.9 AI-path retirement
+Check (($api110 -match 'native deterministic offline tool') -and ($api110 -match 'do NOT emit a LOOT picker/modal or compute item values')) `
+    '110.9: getSystemDirective retires the AI LOOT path (defers add/value to the native terminal)'
+# 110.10 discoverable
+$cmdReg110 = [regex]::Match($core110, 'const COMMAND_REGISTRY\s*=\s*\[[\s\S]*?\n\];').Value
+Check ($cmdReg110 -match '\[LOOT\]') '110.10: COMMAND_REGISTRY lists a [LOOT] entry (discoverability)'
+# 110.11 CSS overflow guard
+Check (($css110 -match '\.loot-row\b') -and ($css110 -match '\.loot-row\s+\.loot-name[\s\S]{0,80}min-width:\s*0')) `
+    '110.11: terminal.css .loot-row + .loot-name min-width:0 (no horizontal overflow at 360px)'
+# 110.12 XSS-safe escaping
+Check (($ren110 -match 'escapeHtml\(it\.name\)') -and ($ren110 -match 'escapeHtml\(pre\)')) `
+    '110.12: LOOT escapes item names + the search prefill via escapeHtml() before innerHTML'
+# 110.13 [LOOT] button affordance + shared modal
+$lootBtn110 = [regex]::Match($html110, '<button\b[^>]*renderLoot\(\)[^>]*>').Value
+Check (($html110 -match 'onclick="renderLoot\(\)"') -and ($lootBtn110 -match 'aria-label="[^"]+"') -and ($lootRegion110 -match '_openSysModal')) `
+    '110.13: index.html [LOOT] button wired to renderLoot() with an aria-label; opens via _openSysModal (shared modal)'
 
 # ===========================================================
 # Results

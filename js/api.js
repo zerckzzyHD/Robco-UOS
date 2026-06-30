@@ -125,6 +125,7 @@ Financial Metrics: Run Economy Sync using live Barter skills. Strictly enforce V
 - Skill Point Math: Base points = 10 + (INT / 2).
 - Quadratic XP Scaling: Boundaries = 25 * (Target_Level^2) + 125 * (Target_Level) - 150.
 - Tactical TTK / THREAT: handled by the native deterministic THREAT terminal (BESTIARY.CSV lookup + TTK/ammo-burn math, computed offline). Do NOT compute or narrate time-to-kill or a THREAT modal — defer to the local calculator.
+- LOOT add/value: the [LOOT] terminal (add a DB item to inventory at its Database Value) is a native deterministic offline tool — do NOT emit a LOOT picker/modal or compute item values; defer to the local calculator. Free-text looting during play still returns the updated inventory array per the persistence rule above.
 
 ### **Skill System**
 ${GAME_DEFS[ctx].ai.skillSystemText}
@@ -970,6 +971,11 @@ const NATIVE_COMMAND_ROUTER = {
   // HP% + radiation + addiction risk, computed offline from state + CHEMS). No AI.
   '[BIO-SCAN]': () => renderBioScan(),
   '[BIO]': () => renderBioScan(),
+  // WU-N6: LOOT is a native deterministic add/value terminal — pick an item from the
+  // DB catalog and additively add it to inventory at its DB value (confirm-gated). The
+  // AI never computes loot values or draws a loot UI. The optional arg pre-fills search.
+  '[LOOT]': arg => renderLoot(arg),
+  '[LT]': arg => renderLoot(arg),
 };
 
 function _routeNativeCommand(userText) {
