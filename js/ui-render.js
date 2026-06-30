@@ -87,13 +87,13 @@ function renderInventory() {
   if (displayItems.length === 0) {
     const label =
       _invFilter === 'all'
-        ? 'inventory items'
+        ? 'INVENTORY ITEMS'
         : _invFilter === 'armor'
-          ? 'apparel'
+          ? 'APPAREL'
           : _invFilter === 'ammo'
-            ? 'ammo — see AMMO RESERVES below'
-            : _invFilter + ' items';
-    lst.innerHTML = emptyState('No ' + label);
+            ? 'AMMO — SEE AMMO RESERVES BELOW'
+            : _invFilter.toUpperCase() + ' ITEMS';
+    lst.innerHTML = emptyState('NO ' + label);
     lst.onclick = null;
     return;
   }
@@ -127,7 +127,7 @@ function renderAmmo() {
   const ammoObj = state.ammo || {};
   const entries = Object.entries(ammoObj).filter(([, count]) => count > 0);
   if (entries.length === 0) {
-    ammoDiv.innerHTML = emptyState('No ammo tracked');
+    ammoDiv.innerHTML = emptyState('NO AMMO TRACKED');
     return;
   }
   // Sort alphabetically by caliber name
@@ -171,7 +171,7 @@ function renderSquad() {
   const squadDiv = document.getElementById('squadList');
   if (!squadDiv) return;
   if (!state.squad || state.squad.length === 0) {
-    squadDiv.innerHTML = emptyState('No active companions');
+    squadDiv.innerHTML = emptyState('NO ACTIVE COMPANIONS');
     return;
   }
   squadDiv.innerHTML = state.squad
@@ -419,7 +419,7 @@ function renderStatus() {
   const statusDiv = document.getElementById('statusList');
   if (!statusDiv) return;
   if (!state.status || state.status.length === 0) {
-    statusDiv.innerHTML = emptyState('No active effects');
+    statusDiv.innerHTML = emptyState('NO ACTIVE EFFECTS');
     return;
   }
   statusDiv.innerHTML = state.status
@@ -523,7 +523,7 @@ function renderPerks() {
   const perksDiv = document.getElementById('perksList');
   if (!perksDiv) return;
   if (!state.perks || state.perks.length === 0) {
-    perksDiv.innerHTML = emptyState('No perks acquired');
+    perksDiv.innerHTML = emptyState('NO PERKS ON FILE');
     return;
   }
   perksDiv.innerHTML =
@@ -569,7 +569,7 @@ function renderQuests() {
   const questsDiv = document.getElementById('questsList');
   if (!questsDiv) return;
   if (!state.quests || state.quests.length === 0) {
-    questsDiv.innerHTML = emptyState('No active quests');
+    questsDiv.innerHTML = emptyState('NO ACTIVE DIRECTIVES');
     return;
   }
   const statusColors = {
@@ -1036,7 +1036,7 @@ function renderCampaignNotes() {
   const notesDiv = document.getElementById('campaignNotesList');
   if (!notesDiv) return;
   if (!state.campaign_notes || state.campaign_notes.length === 0) {
-    notesDiv.innerHTML = emptyState('No notes recorded');
+    notesDiv.innerHTML = emptyState('NO ENTRIES IN MEMORY');
     return;
   }
   notesDiv.innerHTML =
@@ -1151,7 +1151,7 @@ function renderCampaignStatus() {
 
     if (autoLogs.length === 0) {
       crossroads.innerHTML = emptyState(
-        'No decisions recorded — crossroads events will appear here'
+        'NO DECISIONS RECORDED — CROSSROADS EVENTS WILL APPEAR HERE'
       );
     } else {
       crossroads.innerHTML = autoLogs

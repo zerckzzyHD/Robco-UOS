@@ -1125,7 +1125,7 @@ async function transmitMessage() {
 
   if (typeof window.isFeatureEnabled === 'function' && !window.isFeatureEnabled('aiChat')) {
     appendToChat(
-      '> AI LINK TEMPORARILY DISABLED BY OPERATOR — local terminal still fully usable.',
+      '> DIRECTOR LINK TEMPORARILY DISABLED BY OPERATOR — LOCAL TERMINAL FULLY USABLE.',
       'sys'
     );
     return;
@@ -1262,7 +1262,7 @@ async function transmitMessage() {
       const parsedNode = JSON.parse(aiText);
       if (!_validateTriNode(parsedNode)) {
         appendToChat(
-          '> ⚠ [SYS] AI returned an unexpected response format — nothing was changed. Please try again.',
+          '> ⚠ [SYS-ALERT] DIRECTOR LINK RETURNED MALFORMED TELEMETRY — NOTHING APPLIED.',
           'sys'
         );
       } else {
@@ -1362,10 +1362,7 @@ async function transmitMessage() {
         // Auth failure — never retry; key must be re-entered
         transmitMessage._retryCount = 0;
         transmitMessage._inRetry = false;
-        appendToChat(
-          '> ⚠ AI KEY REJECTED — Your Gemini key was refused. Re-enter it in the API KEY field.',
-          'sys'
-        );
+        appendToChat('> ⚠ DIRECTOR ACCESS KEY REJECTED — RE-ENTER ACCESS KEY.', 'sys');
       } else if (_code === 429) {
         // Rate limit / quota — bounded exponential backoff
         const _attempt = (transmitMessage._retryCount || 0) + 1;
@@ -1393,10 +1390,10 @@ async function transmitMessage() {
           if (typeof window._recordFeatureFailure === 'function')
             window._recordFeatureFailure(
               'aiChat',
-              '>> AI LINK PAUSED after repeated errors. Reload to retry. <<'
+              '>> DIRECTOR LINK PAUSED — REPEATED FAULTS. REBOOT TO RETRY. <<'
             );
           appendToChat(
-            '> ⚠ RATE LIMIT / QUOTA EXCEEDED — You have reached your Gemini API quota. Wait and try again later.',
+            '> ⚠ RATE LIMIT / QUOTA EXCEEDED — DIRECTOR LINK QUOTA REACHED. AWAIT QUOTA RESET.',
             'sys'
           );
         }
@@ -1428,7 +1425,7 @@ async function transmitMessage() {
           if (typeof window._recordFeatureFailure === 'function')
             window._recordFeatureFailure(
               'aiChat',
-              '>> AI LINK PAUSED after repeated errors. Reload to retry. <<'
+              '>> DIRECTOR LINK PAUSED — REPEATED FAULTS. REBOOT TO RETRY. <<'
             );
           appendToChat(
             `> ⚠ FATAL EXCEPTION AT 0x${Math.floor(Math.random() * 0xffff)

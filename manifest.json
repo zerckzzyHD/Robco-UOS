@@ -1,7 +1,7 @@
 {
   "name": "RobCo U.O.S.",
   "short_name": "RobCo",
-  "description": "RobCo Industries Unified Operating System — Fallout: New Vegas tactical companion terminal.",
+  "description": "RobCo Industries Unified Operating System — wasteland survival TERMINAL.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
@@ -27,7 +27,7 @@
     {
       "name": "Comm-Link",
       "short_name": "Comm-Link",
-      "description": "Open the AI Comm-Link chat",
+      "description": "ACCESS COMM-LINK TELEMETRY",
       "url": "./#go=comm",
       "icons": [
         {
@@ -41,7 +41,7 @@
     {
       "name": "Inventory",
       "short_name": "Inventory",
-      "description": "Open the Inventory tab",
+      "description": "ACCESS BACKPACK INVENTORY",
       "url": "./#go=inv",
       "icons": [
         {
@@ -55,7 +55,7 @@
     {
       "name": "Stats",
       "short_name": "Stats",
-      "description": "Open the S.P.E.C.I.A.L. / Stats tab",
+      "description": "ACCESS S.P.E.C.I.A.L. / BIO-METRICS",
       "url": "./#go=stat",
       "icons": [
         {
@@ -69,7 +69,7 @@
     {
       "name": "New Campaign",
       "short_name": "New Campaign",
-      "description": "Wipe terminal and start a new campaign (confirmation required)",
+      "description": "PURGE TERMINAL — BEGIN NEW CAMPAIGN (CONFIRMATION REQUIRED)",
       "url": "./#go=new",
       "icons": [
         {

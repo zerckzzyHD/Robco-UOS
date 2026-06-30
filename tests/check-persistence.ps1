@@ -1017,7 +1017,7 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84','Suite 85','Suite 86','Suite 87','Suite 88','Suite 89','Suite 90','Suite 91','Suite 92','Suite 93','Suite 94','Suite 95','Suite 96','Suite 97','Suite 98','Suite 99','Suite 100','Suite 101','Suite 102','Suite 103','Suite 104','Suite 105','Suite 106','Suite 107','Suite 108','Suite 109','Suite 110')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84','Suite 85','Suite 86','Suite 87','Suite 88','Suite 89','Suite 90','Suite 91','Suite 92','Suite 93','Suite 94','Suite 95','Suite 96','Suite 97','Suite 98','Suite 99','Suite 100','Suite 101','Suite 102','Suite 103','Suite 104','Suite 105','Suite 106','Suite 107','Suite 108','Suite 109','Suite 110','Suite 111')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
 Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-99)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
@@ -6836,6 +6836,64 @@ Check (($ren110 -match 'escapeHtml\(it\.name\)') -and ($ren110 -match 'escapeHtm
 $lootBtn110 = [regex]::Match($html110, '<button\b[^>]*renderLoot\(\)[^>]*>').Value
 Check (($html110 -match 'onclick="renderLoot\(\)"') -and ($lootBtn110 -match 'aria-label="[^"]+"') -and ($lootRegion110 -match '_openSysModal')) `
     '110.13: index.html [LOOT] button wired to renderLoot() with an aria-label; opens via _openSysModal (shared modal)'
+
+# ===========================================================
+# Suite 111 -- WU-E1 diegetic terminology / voice standards (11 tests)
+# Locks the HOUSE_STANDARD terminology pass: ALL-CAPS content
+# placeholders + empty-states, game-agnostic out-of-frame manifest
+# copy, DIRECTOR (not "AI"/"Gemini") narrative-error voice, and the
+# UPLINK auth framing. Static guards (PS mirror of JS Suite 111).
+# ===========================================================
+Sep "Suite 111 -- WU-E1 diegetic terminology / voice standards"
+$html111 = Read-Src "index.html"
+$api111  = Read-Src "js/api.js"
+$acct111 = Read-Src "js/ui-account.js"
+$mani111 = (Read-Src "manifest.json" | ConvertFrom-Json)
+
+# 111.1 every content-input placeholder is ALL-CAPS (no lowercase) -- MN-6 (case-sensitive)
+Check (-not ($html111 -cmatch 'placeholder="[^"]*[a-z][^"]*"')) `
+    '111.1: index.html has no lower-case placeholder= on any content input (ALL-CAPS terminal register, MN-6)'
+
+# 111.2 every static .empty-state span is ALL-CAPS -- MN-7 (case-sensitive)
+Check (-not ($html111 -cmatch 'empty-state">[^<]*[a-z]')) `
+    '111.2: index.html .empty-state spans are ALL-CAPS canon empty-state voice (MN-7)'
+
+# 111.3 manifest description is game-agnostic out-of-frame (Protocol 38) -- MJ-4
+Check (($mani111.description) -and ($mani111.description.Length -gt 0) -and -not ($mani111.description -imatch 'Fallout|New Vegas')) `
+    '111.3: manifest.json description names no real game title (Fallout/New Vegas) -- game-agnostic out-of-frame (MJ-4/Protocol 38)'
+
+# 111.4 manifest shortcut descriptions carry no modern-web phrasing / "AI" leak -- MJ-4
+$bad111 = @($mani111.shortcuts | Where-Object { (-not $_.description) -or ($_.description -cmatch 'Open the|\bAI\b') })
+Check (($mani111.shortcuts.Count -gt 0) -and ($bad111.Count -eq 0)) `
+    '111.4: manifest shortcut descriptions are diegetic -- no "Open the ..." / "AI" modern-web tells (MJ-4)'
+
+# 111.5 narrative AI/Gemini "tells" are gone from api.js Courier-facing errors -- MJ-5/MN-9
+Check ((-not ($api111 -match 'AI KEY REJECTED')) -and (-not ($api111 -match 'AI LINK PAUSED')) -and (-not ($api111 -match 'AI returned an unexpected')) -and (-not ($api111 -match 'AI LINK TEMPORARILY DISABLED'))) `
+    '111.5: api.js narrative errors no longer leak "AI"/"Gemini" to the Courier (MJ-5/MN-9)'
+
+# 111.6 DIRECTOR voice is present in the reframed api.js errors -- MJ-5
+Check (($api111 -match 'DIRECTOR ACCESS KEY REJECTED') -and ($api111 -match 'DIRECTOR LINK RETURNED MALFORMED TELEMETRY') -and ($api111 -match 'DIRECTOR LINK PAUSED')) `
+    '111.6: api.js error narrative uses the in-world DIRECTOR LINK / DIRECTOR ACCESS KEY voice (MJ-5)'
+
+# 111.7 auth panel copy drops modern "sign in" vocabulary -- MJ-2
+Check ((-not ($acct111 -match 'NOT SIGNED IN')) -and (-not ($acct111 -match 'SIGN IN WITH GOOGLE')) -and (-not ($acct111 -match '> SIGN OUT<'))) `
+    '111.7: ui-account.js auth copy carries no "SIGN IN"/"SIGNED IN"/"SIGN OUT" modern-web display strings (MJ-2)'
+
+# 111.8 auth panel copy uses the UPLINK framing -- MJ-2
+Check (($acct111 -match 'UPLINK OFFLINE') -and ($acct111 -match 'ESTABLISH GOOGLE UPLINK') -and ($acct111 -match 'UPLINK ACTIVE') -and ($acct111 -match 'SEVER UPLINK')) `
+    '111.8: ui-account.js auth panel uses the UPLINK framing (OFFLINE / ESTABLISH / ACTIVE / SEVER) (MJ-2)'
+
+# 111.9 cloud-archive system states use canon voice -- MJ-3
+Check ((-not ($acct111 -match 'Loading saves')) -and (-not ($acct111 -match 'No saves found')) -and ($acct111 -match 'RETRIEVING ARCHIVES') -and ($acct111 -match 'NO ARCHIVES ON FILE')) `
+    '111.9: ui-account.js cloud-archive states use RETRIEVING ARCHIVES / NO ARCHIVES ON FILE canon voice (MJ-3)'
+
+# 111.10 update modal uses the FIRMWARE voice -- PO-10
+Check ((-not ($html111 -match 'new version of RobCo')) -and (-not ($html111 -match 'Reboot to load')) -and ($html111 -match 'FIRMWARE UPDATE STAGED')) `
+    '111.10: index.html update modal uses FIRMWARE UPDATE STAGED -- REBOOT voice (PO-10)'
+
+# 111.11 image-upload control uses VISUAL UPLOAD, not "ATTACH" -- MN-8
+Check ((-not ($html111 -match 'ATTACH VISUAL DATA')) -and ($html111 -match 'VISUAL UPLOAD')) `
+    '111.11: index.html optic-scan control uses > VISUAL UPLOAD, not "ATTACH" (MN-8)'
 
 # ===========================================================
 # Results

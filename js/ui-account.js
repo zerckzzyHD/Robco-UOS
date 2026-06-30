@@ -12,19 +12,19 @@ function renderAccount() {
   if (acct.isAnonymous || !acct.uid) {
     if (typeof window.isFeatureEnabled === 'function' && !window.isFeatureEnabled('googleSignIn')) {
       body.innerHTML =
-        '<div style="font-size:11px;opacity:0.7;margin-bottom:8px;">NOT SIGNED IN — saves are local only.</div>' +
-        '<div style="font-size:11px;opacity:0.5;padding:6px 0;">SIGN-IN TEMPORARILY UNAVAILABLE — local saves active.</div>';
+        '<div style="font-size:11px;opacity:0.7;margin-bottom:8px;">UPLINK OFFLINE — ARCHIVES STORED LOCALLY</div>' +
+        '<div style="font-size:11px;opacity:0.5;padding:6px 0;">UPLINK TEMPORARILY UNAVAILABLE — LOCAL ARCHIVES ACTIVE.</div>';
     } else {
       body.innerHTML =
-        '<div style="font-size:11px;opacity:0.7;margin-bottom:8px;">NOT SIGNED IN — saves are local only.</div>' +
+        '<div style="font-size:11px;opacity:0.7;margin-bottom:8px;">UPLINK OFFLINE — ARCHIVES STORED LOCALLY</div>' +
         '<button class="action-btn" style="width:100%" onclick="if(window.signInWithGoogle)window.signInWithGoogle()">' +
-        '> SIGN IN WITH GOOGLE (SYNC ACROSS DEVICES)</button>';
+        '> ESTABLISH GOOGLE UPLINK — SYNC TELEMETRY ACROSS TERMINALS</button>';
     }
   } else {
     const name = acct.displayName ? escapeHtml(acct.displayName) : '';
     const email = acct.email ? escapeHtml(acct.email) : '';
     body.innerHTML =
-      '<div style="font-size:11px;margin-bottom:4px;">SIGNED IN</div>' +
+      '<div style="font-size:11px;margin-bottom:4px;">UPLINK ACTIVE</div>' +
       (name
         ? '<div style="font-size:11px;opacity:0.85;margin-bottom:2px;">' + name + '</div>'
         : '') +
@@ -32,7 +32,7 @@ function renderAccount() {
         ? '<div style="font-size:11px;opacity:0.6;margin-bottom:8px;">' + email + '</div>'
         : '') +
       '<button class="action-btn" style="width:100%" onclick="if(window.signOutAccount)window.signOutAccount()">' +
-      '> SIGN OUT</button>';
+      '> SEVER UPLINK</button>';
   }
 }
 
@@ -61,17 +61,17 @@ async function renderSavesList() {
 
   let cloudSaves = [];
   if (isSignedIn && typeof window.listCloudSaves === 'function') {
-    body.innerHTML = emptyState('Loading saves...');
+    body.innerHTML = emptyState('RETRIEVING ARCHIVES…');
     try {
       cloudSaves = await window.listCloudSaves();
     } catch (_) {
-      body.innerHTML = emptyState('Failed to load cloud saves');
+      body.innerHTML = emptyState('⚠ ARCHIVE LINK FAILED');
       return;
     }
   }
 
   if (!localSaves.length && !cloudSaves.length) {
-    body.innerHTML = emptyState('No saves found.');
+    body.innerHTML = emptyState('NO ARCHIVES ON FILE');
     return;
   }
 

@@ -1781,6 +1781,7 @@ header('Meta / Runner Parity');
     'Suite 108',
     'Suite 109',
     'Suite 110',
+    'Suite 111',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
@@ -11904,6 +11905,111 @@ header('Suite 110 — WU-N6 LOOT native add/value terminal');
       '110.13: index.html [LOOT] button wired to renderLoot() with an aria-label; opens via _openSysModal (shared modal)'
     );
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 111 — WU-E1 diegetic terminology / voice standards (11 tests)
+//  Locks the HOUSE_STANDARD terminology pass: ALL-CAPS content
+//  placeholders + empty-states, game-agnostic out-of-frame manifest
+//  copy, DIRECTOR (not "AI"/"Gemini") narrative-error voice, and the
+//  UPLINK auth framing. Static guards — fail the gate if a modern-web
+//  "tell" regresses back into a Courier-facing surface.
+// ══════════════════════════════════════════════════════════════
+header('Suite 111 — WU-E1 diegetic terminology / voice standards');
+{
+  const html111 = readFile('index.html');
+  const api111 = readFile('js/api.js');
+  const acct111 = readFile('js/ui-account.js');
+  const manifest111 = JSON.parse(readFile('manifest.json'));
+
+  // 111.1 every content-input placeholder is ALL-CAPS (no lowercase letters) — MN-6
+  assert(
+    !/placeholder="[^"]*[a-z][^"]*"/.test(html111),
+    '111.1: index.html has no lower-case placeholder= on any content input (ALL-CAPS terminal register, MN-6)'
+  );
+
+  // 111.2 every static .empty-state span is ALL-CAPS — MN-7
+  assert(
+    !/empty-state">[^<]*[a-z]/.test(html111),
+    '111.2: index.html .empty-state spans are ALL-CAPS canon empty-state voice (MN-7)'
+  );
+
+  // 111.3 manifest description is game-agnostic out-of-frame (Protocol 38) — MJ-4
+  assert(
+    typeof manifest111.description === 'string' &&
+      manifest111.description.length > 0 &&
+      !/Fallout|New Vegas/i.test(manifest111.description),
+    '111.3: manifest.json description names no real game title (Fallout/New Vegas) — game-agnostic out-of-frame (MJ-4/Protocol 38)'
+  );
+
+  // 111.4 manifest shortcut descriptions carry no modern-web phrasing / "AI" leak — MJ-4
+  {
+    const sc111 = Array.isArray(manifest111.shortcuts) ? manifest111.shortcuts : [];
+    const bad111 = sc111.filter(
+      s => typeof s.description !== 'string' || /Open the|\bAI\b/.test(s.description)
+    );
+    assert(
+      sc111.length > 0 && bad111.length === 0,
+      '111.4: manifest shortcut descriptions are diegetic — no "Open the …" / "AI" modern-web tells (MJ-4)'
+    );
+  }
+
+  // 111.5 narrative AI/Gemini "tells" are gone from api.js Courier-facing errors — MJ-5/MN-9
+  assert(
+    !/AI KEY REJECTED/.test(api111) &&
+      !/AI LINK PAUSED/.test(api111) &&
+      !/AI returned an unexpected/.test(api111) &&
+      !/AI LINK TEMPORARILY DISABLED/.test(api111),
+    '111.5: api.js narrative errors no longer leak "AI"/"Gemini" to the Courier (MJ-5/MN-9)'
+  );
+
+  // 111.6 DIRECTOR voice is present in the reframed api.js errors — MJ-5
+  assert(
+    /DIRECTOR ACCESS KEY REJECTED/.test(api111) &&
+      /DIRECTOR LINK RETURNED MALFORMED TELEMETRY/.test(api111) &&
+      /DIRECTOR LINK PAUSED/.test(api111),
+    '111.6: api.js error narrative uses the in-world DIRECTOR LINK / DIRECTOR ACCESS KEY voice (MJ-5)'
+  );
+
+  // 111.7 auth panel copy drops modern "sign in" vocabulary — MJ-2
+  assert(
+    !/NOT SIGNED IN/.test(acct111) &&
+      !/SIGN IN WITH GOOGLE/.test(acct111) &&
+      !/> SIGN OUT</.test(acct111),
+    '111.7: ui-account.js auth copy carries no "SIGN IN"/"SIGNED IN"/"SIGN OUT" modern-web display strings (MJ-2)'
+  );
+
+  // 111.8 auth panel copy uses the UPLINK framing — MJ-2
+  assert(
+    /UPLINK OFFLINE/.test(acct111) &&
+      /ESTABLISH GOOGLE UPLINK/.test(acct111) &&
+      /UPLINK ACTIVE/.test(acct111) &&
+      /SEVER UPLINK/.test(acct111),
+    '111.8: ui-account.js auth panel uses the UPLINK framing (OFFLINE / ESTABLISH / ACTIVE / SEVER) (MJ-2)'
+  );
+
+  // 111.9 cloud-archive system states use canon voice — MJ-3
+  assert(
+    !/Loading saves/.test(acct111) &&
+      !/No saves found/.test(acct111) &&
+      /RETRIEVING ARCHIVES/.test(acct111) &&
+      /NO ARCHIVES ON FILE/.test(acct111),
+    '111.9: ui-account.js cloud-archive states use RETRIEVING ARCHIVES… / NO ARCHIVES ON FILE canon voice (MJ-3)'
+  );
+
+  // 111.10 update modal uses the FIRMWARE voice — PO-10
+  assert(
+    !/new version of RobCo/.test(html111) &&
+      !/Reboot to load/.test(html111) &&
+      /FIRMWARE UPDATE STAGED/.test(html111),
+    '111.10: index.html update modal uses FIRMWARE UPDATE STAGED — REBOOT voice (PO-10)'
+  );
+
+  // 111.11 image-upload control uses VISUAL UPLOAD, not "ATTACH" — MN-8
+  assert(
+    !/ATTACH VISUAL DATA/.test(html111) && /VISUAL UPLOAD/.test(html111),
+    '111.11: index.html optic-scan control uses > VISUAL UPLOAD, not "ATTACH" (MN-8)'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════

@@ -70,7 +70,7 @@
       <div class="modal-box">
         <div class="modal-title" id="updateModalTitle">&gt; &#x26A0; TERMINAL UPDATE REQUIRED</div>
         <!-- prettier-ignore -->
-        <div class="modal-content" id="updateModalMsg">A new version of RobCo U.O.S. is ready. Reboot to load it &mdash; the terminal must update to continue.</div>
+        <div class="modal-content" id="updateModalMsg">FIRMWARE UPDATE STAGED &mdash; REBOOT REQUIRED TO APPLY.</div>
         <button id="updateRebootBtn" class="blue-btn">&gt; REBOOT TERMINAL</button>
       </div>
     </div>
@@ -654,7 +654,7 @@
                   type="text"
                   id="newAmmoType"
                   list="ammoCalibers"
-                  placeholder="Caliber (e.g. 5.56mm)"
+                  placeholder="CALIBER (E.G. 5.56MM)"
                   maxlength="40"
                   style="flex: 1; min-width: 100px"
                   autocomplete="off"
@@ -663,7 +663,7 @@
                 <input
                   type="number"
                   id="newAmmoCount"
-                  placeholder="Qty"
+                  placeholder="QTY"
                   min="0"
                   style="width: 50px"
                 />
@@ -681,22 +681,22 @@
               <input
                 type="text"
                 id="newItemName"
-                placeholder="Item Name"
+                placeholder="ITEM DESIGNATION"
                 maxlength="80"
                 style="flex-grow: 1; min-width: 80px"
               />
-              <input type="number" id="newItemQty" placeholder="Qty" min="1" style="width: 48px" />
+              <input type="number" id="newItemQty" placeholder="QTY" min="1" style="width: 48px" />
               <input
                 type="number"
                 id="newItemWeight"
-                placeholder="lbs"
+                placeholder="WT (LBS)"
                 min="0"
                 style="width: 52px"
               />
               <input
                 type="number"
                 id="newItemValue"
-                placeholder="val"
+                placeholder="VAL"
                 min="0"
                 style="width: 52px"
               />
@@ -726,7 +726,7 @@
                 <h3>&gt; COLLECTIBLES LIST</h3>
               </summary>
               <div id="collectiblesDisplay">
-                <span class="empty-state">No collectibles loaded</span>
+                <span class="empty-state">ARCHIVE EMPTY</span>
               </div>
             </details>
             <!-- Lincoln Memorabilia sub-tracker (FO3 only — shown/hidden by renderLincolnMemorabilia()) -->
@@ -749,14 +749,14 @@
               <h2>&gt; CRAFTING</h2>
             </summary>
             <div id="craftRecipeList">
-              <span class="empty-state">No recipes loaded</span>
+              <span class="empty-state">NO ENTRIES IN MEMORY</span>
             </div>
             <details class="sub-panel" data-sub-id="craft_breakdown">
               <summary>
                 <h3>&gt; SCRAP / BREAKDOWN</h3>
               </summary>
               <div id="craftScrapList">
-                <span class="empty-state">No matching items in inventory.</span>
+                <span class="empty-state">NO MATCHING ENTRIES</span>
               </div>
             </details>
           </details>
@@ -767,7 +767,7 @@
               <h2>&gt; BARTER UPLINK</h2>
             </summary>
             <div id="tradeHeader">
-              <span class="empty-state">No vendor data.</span>
+              <span class="empty-state">NO VENDOR DATA</span>
             </div>
             <details class="sub-panel" data-sub-id="trade_buy" open>
               <summary>
@@ -776,14 +776,14 @@
               <input
                 type="text"
                 id="tradeBuySearch"
-                placeholder="Search vendor stock…"
+                placeholder="SEARCH VENDOR STOCK…"
                 aria-label="Search vendor stock"
                 maxlength="60"
                 oninput="renderTradeBuyList()"
                 style="width: 100%; font-size: 16px; min-height: 28px; margin-bottom: 4px"
               />
               <div id="tradeBuyList">
-                <span class="empty-state">No catalog loaded.</span>
+                <span class="empty-state">NO CATALOG LOADED</span>
               </div>
             </details>
             <details class="sub-panel" data-sub-id="trade_sell">
@@ -791,7 +791,7 @@
                 <h3>&gt; COURIER INVENTORY</h3>
               </summary>
               <div id="tradeSellList">
-                <span class="empty-state">Courier inventory empty.</span>
+                <span class="empty-state">COURIER INVENTORY EMPTY</span>
               </div>
             </details>
           </details>
@@ -823,7 +823,7 @@
           <details class="panel" data-tab="data">
             <summary><h2>> QUEST LOG</h2></summary>
             <div id="questsList">
-              <span class="empty-state">No active quests</span>
+              <span class="empty-state">NO ACTIVE DIRECTIVES</span>
             </div>
             <div
               class="panel-form"
@@ -832,7 +832,7 @@
               <input
                 type="text"
                 id="newQuestName"
-                placeholder="Quest Name"
+                placeholder="QUEST"
                 maxlength="100"
                 style="flex: 1; min-width: 100px"
               />
@@ -845,7 +845,7 @@
             <input
               type="text"
               id="newQuestObjective"
-              placeholder="Current objective (optional)"
+              placeholder="OBJECTIVE (OPTIONAL)"
               style="width: 100%; margin-top: 4px"
             />
             <button class="action-btn" onclick="addQuest()" style="margin-top: 4px">
@@ -857,7 +857,7 @@
           <details class="panel" data-tab="stat">
             <summary><h2>> PERKS</h2></summary>
             <div id="perksList">
-              <span class="empty-state">No perks acquired</span>
+              <span class="empty-state">NO PERKS ON FILE</span>
             </div>
             <div
               class="panel-form"
@@ -866,14 +866,14 @@
               <input
                 type="text"
                 id="newPerkName"
-                placeholder="Perk Name"
+                placeholder="PERK"
                 maxlength="80"
                 style="flex: 1; min-width: 100px"
               />
               <input
                 type="number"
                 id="newPerkRank"
-                placeholder="Rank"
+                placeholder="RANK"
                 min="1"
                 max="5"
                 style="width: 58px"
@@ -881,7 +881,7 @@
               <input
                 type="number"
                 id="newPerkLevel"
-                placeholder="Lvl"
+                placeholder="LVL"
                 min="0"
                 style="width: 46px"
               />
@@ -902,7 +902,7 @@
               <input
                 type="text"
                 id="traitFilter"
-                placeholder="Filter traits..."
+                placeholder="FILTER TRAITS…"
                 maxlength="80"
                 oninput="renderTraits()"
                 style="width: 100%; box-sizing: border-box; margin-bottom: 4px; font-size: 16px"
@@ -917,7 +917,7 @@
               <h2>> STATUS EFFECTS</h2>
             </summary>
             <div id="statusList">
-              <span class="empty-state">No active effects</span>
+              <span class="empty-state">NO ACTIVE EFFECTS</span>
             </div>
             <div class="panel-form">
               <select
@@ -952,7 +952,7 @@
               <input
                 type="number"
                 id="newStatusTicks"
-                placeholder="Ticks"
+                placeholder="TICKS"
                 style="flex: 1; width: 50px"
               />
               <select
@@ -1037,13 +1037,13 @@
               <h2>> CAMPAIGN NOTES</h2>
             </summary>
             <div id="campaignNotesList">
-              <span class="empty-state">No notes recorded</span>
+              <span class="empty-state">NO ENTRIES IN MEMORY</span>
             </div>
             <div class="panel-form">
               <input
                 type="text"
                 id="newCampaignNote"
-                placeholder="Enter tactical note..."
+                placeholder="ENTER TACTICAL NOTE…"
                 maxlength="5000"
                 style="flex: 1"
                 onkeydown="if (event.key === 'Enter') addCampaignNote();"
@@ -1236,7 +1236,7 @@
                 "
               >
                 <span style="opacity: 0.45"
-                  >No decisions recorded — crossroads events will appear here</span
+                  >NO DECISIONS RECORDED — CROSSROADS EVENTS WILL APPEAR HERE</span
                 >
               </div>
             </details>
@@ -1259,7 +1259,7 @@
                 "
               >
                 <span style="opacity: 0.45"
-                  >No timeline generated — use the [TIMELINE] command in COMM-LINK</span
+                  >NO TIMELINE GENERATED — USE THE [TIMELINE] COMMAND IN COMM-LINK</span
                 >
               </div>
             </details>
@@ -1306,7 +1306,7 @@
               <h2>> ACCOUNT</h2>
             </summary>
             <div id="accountBody" style="font-size: 12px">
-              <span class="empty-state">Initializing...</span>
+              <span class="empty-state">INITIALIZING…</span>
             </div>
             <div style="font-size: 11px; opacity: 0.5; margin-top: 6px">
               Manage saves in Security &amp; Configuration below.
@@ -1324,7 +1324,7 @@
               <input
                 type="password"
                 id="apiKeyInput"
-                placeholder="Paste Gemini Key Here..."
+                placeholder="PASTE GEMINI KEY HERE…"
                 maxlength="200"
                 style="width: 100%; border-color: var(--robco-alert); color: var(--robco-alert)"
                 oninput="saveApiKeySilent()"
@@ -1880,7 +1880,7 @@
                   border-color: var(--robco-blue);
                 "
               >
-                [ + ATTACH VISUAL DATA ]
+                [ > VISUAL UPLOAD ]
               </button>
             </div>
             <input
@@ -1894,7 +1894,7 @@
             <textarea
               id="chatInput"
               maxlength="4000"
-              placeholder="Enter command or action (e.g. '> [THREAT] Geckos')..."
+              placeholder="ENTER COMMAND OR ACTION (E.G. '> [THREAT] GECKOS')…"
               style="border-color: var(--robco-blue); color: var(--robco-blue)"
               onkeydown="
                 if (event.ctrlKey && event.key === 'Enter') {
@@ -1947,7 +1947,7 @@
                 <input
                   type="text"
                   id="macroTarget"
-                  placeholder="Target / Item..."
+                  placeholder="TARGET / ITEM…"
                   style="
                     border-color: var(--robco-blue);
                     color: var(--robco-blue);
