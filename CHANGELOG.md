@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1398/1398 | Cache: robco-terminal-v2.6.0-r42 -->
+﻿## [Unreleased]<!-- Tests: 1405/1405 | Cache: robco-terminal-v2.6.0-r43 -->
 
 ### Added
 
@@ -52,6 +52,7 @@
 - Polished the changelog viewer so it no longer jumps around. The window now stays a fixed, comfortable width whether the sections are open or closed — opening and closing a section only changes the height, never the width, so it no longer shrinks to a narrow box when everything is collapsed (on phones it stays full-width). It opens with the newest section expanded and the rest tucked away, and a new "EXPAND ALL / COLLAPSE ALL" button at the top lets you open or close every section at once.
 - All six macro commands — VATS, THREAT, TRADE, CONSULT, BIO-SCAN, and LOOT — now run entirely as offline, deterministic native tools with no AI call. Every one of them reads the game's own data and computes its result on-device, instantly: the V.A.T.S. hit/crit/AP maths, the THREAT bestiary stat card and time-to-neutralize, the TRADE barter terminal, the CONSULT databank lookup, the BIO-SCAN medical advisory, and the LOOT salvage picker all work with no network and no AI. None of these six ever contacts the AI anymore — they are fully usable offline and give the same answer every time. (Each tool is detailed in its own note in the Added and Changed sections above.)
 - The changelog viewer now keeps a completely constant size as you open and close its sections. The earlier fix already locked the width; now the height is locked too (capped to fit your screen), so expanding or collapsing categories no longer makes the window grow tall or shrink short — the box stays exactly the same size, the notes scroll inside it, and the CLOSE button stays pinned at the bottom. It feels rock-steady whether one section or every section is open, on desktop and phones alike.
+- Brought the in-terminal command reference (the COMM-LINK COMMAND REGISTRY, opened with the "?" / `[FEATURES]`) back in line with what the terminal actually does. The six offline tools — V.A.T.S., THREAT, TRADE, CONSULT, BIO-SCAN and LOOT — are now grouped together under a clear "NATIVE TERMINALS — OFFLINE, NO AI" heading with accurate descriptions and all their shortcuts, and `[FEATURES]` itself is now listed. A pile of commands that no longer exist were removed so the menu only shows things that actually work — the old screenshot-V.A.T.S., the AI "tactics/stash/excess/currency/audit/timer/squad/travel-cluster/casino/comm-link/archive" macros, the chained `&&` / quiet / stealth flags, and the obsolete pause/page entries. The reference is now kept honest automatically so it can't silently drift out of date again.
 
 ### Under the Hood
 

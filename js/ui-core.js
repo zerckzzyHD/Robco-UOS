@@ -1508,62 +1508,62 @@ ${apSection}
 ranged hit-% is an estimate (per-weapon spread is not in canon data). Read-only.</span>`;
 }
 
+// WU-E3: the command registry is kept in lock-step with reality — every entry
+// resolves to a NATIVE_COMMAND_ROUTER token (api.js), a live panel/UI control, an
+// AI-directive-defined command (getSystemDirective), or a keyboard handler. The six
+// deterministic NATIVE TERMINALS run fully offline with no AI call. Retired AI macros
+// (the old screenshot-V.A.T.S., [TACTICS], [CURRENCY], [AUDIT], [STASH]/[EXCESS],
+// [SYNC], [TRAVEL CLUSTER], [CASINO], [COMM LINK], [PAUSE], [PAGE 2/3], [ARCHIVE],
+// chained &&/-Q/-S flags, etc.) were removed because they no longer resolve anywhere.
+// Suite 113 guards this registry ↔ router ↔ help consistency so it can't drift again.
 const COMMAND_REGISTRY = [
   {
-    group: 'TACTICAL & COMBAT',
+    group: 'NATIVE TERMINALS — OFFLINE, NO AI',
     cmds: [
-      { cmd: '[VATS SIM] / [VS]', desc: 'Melee/Unarmed AP strike optimizer.' },
-      { cmd: '[VVATS]', desc: 'Analyze screenshot for hit %.' },
-      { cmd: '[THREAT] / [TH]', desc: 'Native bestiary TTK & ammo-burn.' },
-      { cmd: '[TACTICS] / [TA]', desc: 'Multi-companion combat guide.' },
-      { cmd: '[BIO-SCAN]', desc: 'Limb evaluation & med routing.' },
+      {
+        cmd: '[VATS SIM] / [VS] / [VATS]',
+        desc: 'V.A.T.S. calculator — hit %, crit bonus & melee/unarmed AP-strike plan. Offline.',
+      },
+      {
+        cmd: '[THREAT] / [TH]',
+        desc: 'Bestiary stat card + time-to-neutralize & ammo/strike burn. Offline.',
+      },
+      {
+        cmd: '[TRADE]',
+        desc: 'Barter terminal (INV tab) — buy/sell at your Barter-skill prices. Offline.',
+      },
+      {
+        cmd: 'CONSULT <topic> / [CON]',
+        desc: 'Databank lookup — items, perks, quests, locations, creatures. Offline.',
+      },
+      {
+        cmd: '[BIO-SCAN] / [BIO]',
+        desc: 'Medical advisory — limb, HP, radiation & addiction readout. Offline.',
+      },
+      {
+        cmd: '[LOOT] / [LT]',
+        desc: 'Salvage terminal — add a database item to your pack at its value. Offline.',
+      },
     ],
   },
   {
-    group: 'INVENTORY & ECONOMY',
+    group: 'INVENTORY & PROGRESSION',
     cmds: [
-      { cmd: '[VISUAL UPLOAD:X]', desc: 'Parse screenshot (Wpn/App/Msc).' },
-      { cmd: '[SYNC: data]', desc: 'Batch state update via string.' },
-      { cmd: '[BIND: X, DIR]', desc: 'Assign gear to D-Pad vectors.' },
-      { cmd: '[PAD: DIR]', desc: 'Auto-execute 8-way hotkeys.' },
-      { cmd: '[TRADE]', desc: 'Native barter terminal (INV tab) — offline.' },
-      { cmd: '[LOOT]', desc: 'Native salvage terminal — add DB items at value.' },
-      { cmd: '[STASH: Loc] / [-FULL]', desc: 'Network inventory sum/full.' },
-      { cmd: '[EXCESS] / [-FULL]', desc: 'Jury Rig & weight triage.' },
-      { cmd: '[CURRENCY]', desc: 'Weightless Wealth exchange.' },
-      { cmd: '[CRAFT]', desc: 'Consume ingredients to build.' },
-      { cmd: '[AUDIT]', desc: 'Stash value for liquidation.' },
-    ],
-  },
-  {
-    group: 'CHARACTER & BIO-STATUS',
-    cmds: [
-      { cmd: '[TIMER/CHEM] / [CH]', desc: 'Buff ticks & addictions.' },
-      { cmd: '[SQUAD]', desc: 'Squad loadouts & 150lb weight.' },
-      { cmd: '[ROADMAP]', desc: 'Perks to Cap; implant overlap.' },
+      { cmd: '[CRAFT]', desc: 'Consume ingredients to build (craft panel).' },
+      { cmd: '[VISUAL UPLOAD: X]', desc: 'Parse a screenshot into inventory (Wpn / App / Msc).' },
+      { cmd: '[BIND: X, DIR]', desc: 'Assign gear to a D-Pad vector.' },
+      { cmd: '[PAD: DIR]', desc: 'Fire a D-Pad hotkey (the ◄ ▲ ▼ ► buttons).' },
+      { cmd: '[ROADMAP]', desc: 'Perk roadmap toward your build goals.' },
     ],
   },
   {
     group: 'NAVIGATION & WORLD STATE',
     cmds: [
-      { cmd: '[GPS/MAP]', desc: 'Localized geographic compass.' },
-      { cmd: '[TRAVEL CLUSTER] / [TC]', desc: 'Group active quest nodes.' },
-      { cmd: '[WAIT: X Hrs]', desc: 'Advance clock & restock.' },
-      { cmd: '[SLEEP]', desc: 'Advance 8 Hrs, heal HP/Limbs.' },
+      { cmd: '[GPS] / [MAP]', desc: 'Localized geographic compass grid.' },
+      { cmd: '[WAIT: X Hrs]', desc: 'Advance the clock by X hours; restock.' },
+      { cmd: '[SLEEP]', desc: 'Advance 8 hours; heal HP & limbs. Offline.' },
       { cmd: '[TIMELINE]', desc: 'Projected narrative timeline.' },
-      { cmd: '[CASINO]', desc: 'Blackjack strategy via LUCK.' },
-    ],
-  },
-  {
-    group: 'NARRATIVE & DIRECTIVES',
-    cmds: [
-      { cmd: 'CONSULT <topic>', desc: 'Native databank lookup — offline.' },
-      { cmd: '[CROSSROADS]', desc: 'Butterfly-effect lockouts.' },
-      { cmd: '[COMM LINK]', desc: 'NPC persona override. (SEVER)' },
-      { cmd: '[PAUSE]', desc: 'Master Directive (Page One).' },
-      { cmd: '[PAGE 2/3]', desc: 'Dynamic routes & alignment.' },
-      { cmd: '[ARCHIVE]', desc: '3 most recent story choices.' },
-      { cmd: '&& / -Q / -S', desc: 'Chain cmds, Quiet, Stealth.' },
+      { cmd: '[CROSSROADS]', desc: 'Point-of-no-return / butterfly-effect check. Offline.' },
     ],
   },
   {
@@ -1580,7 +1580,10 @@ const COMMAND_REGISTRY = [
   },
   {
     group: 'SYSTEM',
-    cmds: [{ cmd: '[LOGS]', desc: 'Show client error log (local-only).' }],
+    cmds: [
+      { cmd: '[FEATURES]', desc: 'Show this command registry.' },
+      { cmd: '[LOGS]', desc: 'Show client error log (local-only).' },
+    ],
   },
 ];
 

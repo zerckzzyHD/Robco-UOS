@@ -7025,6 +7025,57 @@ Check (($ubCount -eq 1) -and ($fo3Count -eq 1) -and $ubInTpl) `
     '112.7: each banner appears exactly once and only inside its <template> (no active, rendered banner outside a template)'
 
 # ===========================================================
+# Suite 113 -- WU-E3 FEATURES / command-reference consistency (7 tests)
+# Locks COMMAND_REGISTRY (ui-core.js) <-> NATIVE_COMMAND_ROUTER (api.js) <-> the
+# [FEATURES] help modal so the command reference can't drift: every native terminal
+# is advertised, retired AI macros stay gone. (PS mirror of JS Suite 113.)
+# ===========================================================
+Sep "Suite 113 -- WU-E3 FEATURES / command-reference consistency"
+$uiCore113 = Read-Src "js/ui-core.js"
+$api113    = Read-Src "js/api.js"
+$registry113 = [regex]::Match($uiCore113, 'const COMMAND_REGISTRY = \[([\s\S]*?)\n\];').Groups[1].Value
+$router113   = [regex]::Match($api113, 'const NATIVE_COMMAND_ROUTER = \{([\s\S]*?)\n\};').Groups[1].Value
+
+$NATIVES113 = @('[VATS SIM]','[THREAT]','[TRADE]','CONSULT','[BIO-SCAN]','[LOOT]')
+$ROUTER_NATIVES113 = @('[VATS SIM]','[THREAT]','[BIO-SCAN]','[LOOT]','[CONSULT]')
+$RETIRED113 = @('[VVATS]','[TACTICS]','[SYNC:','[STASH','[EXCESS]','[CURRENCY]','[AUDIT]','[TIMER/CHEM]','[SQUAD]','[TRAVEL CLUSTER]','[CASINO]','[COMM LINK]','[PAUSE]','[PAGE 2','[ARCHIVE]')
+
+# 113.1  registry parsed + NATIVE TERMINALS group marked OFFLINE / NO AI
+Check (($registry113.Length -gt 0) -and ($registry113 -match 'NATIVE TERMINALS[^'']*OFFLINE[^'']*NO AI')) `
+    '113.1: COMMAND_REGISTRY has a "NATIVE TERMINALS -- OFFLINE, NO AI" group (six deterministic terminals surfaced together)'
+
+# 113.2  all six native terminals advertised
+$natOk113 = $true; foreach ($t in $NATIVES113) { if (-not $registry113.Contains($t)) { $natOk113 = $false } }
+Check $natOk113 `
+    '113.2: COMMAND_REGISTRY advertises all six native terminals (VATS/THREAT/TRADE/CONSULT/BIO-SCAN/LOOT)'
+
+# 113.3  each native entry marked Offline (>=6 occurrences)
+Check (([regex]::Matches($registry113, 'Offline\.')).Count -ge 6) `
+    '113.3: every native terminal entry is marked "Offline." in COMMAND_REGISTRY (no stale AI descriptions)'
+
+# 113.4  router<->help consistency: every router-native resolves in router AND appears in help
+$rnOk113 = $true
+foreach ($t in $ROUTER_NATIVES113) {
+  $bare = $t -replace '[\[\]]',''
+  if (-not ($router113.Contains("'" + $t + "'") -and $registry113.Contains($bare))) { $rnOk113 = $false }
+}
+Check $rnOk113 `
+    '113.4: every router-native token (VATS SIM/THREAT/BIO-SCAN/LOOT/CONSULT) resolves in NATIVE_COMMAND_ROUTER AND appears in COMMAND_REGISTRY'
+
+# 113.5  [FEATURES] -> showHelpModal, and showHelpModal renders COMMAND_REGISTRY
+Check (($api113 -match "'\[FEATURES\]':\s*\(\)\s*=>\s*showHelpModal\(\)") -and ($uiCore113 -match 'function showHelpModal\(\)[\s\S]*COMMAND_REGISTRY\.map')) `
+    '113.5: [FEATURES] -> showHelpModal in NATIVE_COMMAND_ROUTER, and showHelpModal renders COMMAND_REGISTRY'
+
+# 113.6  no retired AI macro present in the help registry
+$leaked113 = @(); foreach ($t in $RETIRED113) { if ($registry113.Contains($t)) { $leaked113 += $t } }
+Check ($leaked113.Count -eq 0) `
+    ('113.6: no retired AI macro present in COMMAND_REGISTRY (' + $(if ($leaked113.Count) { 'LEAKED: ' + ($leaked113 -join ', ') } else { 'all retired tokens absent' }) + ')')
+
+# 113.7  TRADE advertised as the PANEL, correctly NOT a router token
+Check ($registry113.Contains('[TRADE]') -and (-not $router113.Contains("'[TRADE]'"))) `
+    '113.7: [TRADE] is advertised in help as the native barter PANEL and is correctly NOT a NATIVE_COMMAND_ROUTER token'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

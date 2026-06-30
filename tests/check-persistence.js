@@ -12282,6 +12282,100 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 113 — WU-E3 FEATURES / command-reference consistency
+//  Locks COMMAND_REGISTRY (ui-core.js) ↔ NATIVE_COMMAND_ROUTER (api.js) ↔ the
+//  [FEATURES] help modal so the in-app command reference can't drift from reality:
+//  every native terminal is advertised, retired AI macros stay gone.
+//  7 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 113 — WU-E3 FEATURES / command-reference consistency');
+  const uiCore113 = readFile('js/ui-core.js');
+  const api113 = readFile('js/api.js');
+  const registry113 = (uiCore113.match(/const COMMAND_REGISTRY = \[([\s\S]*?)\n\];/) || [
+    '',
+    '',
+  ])[1];
+  const router113 = (api113.match(/const NATIVE_COMMAND_ROUTER = \{([\s\S]*?)\n\};/) || [
+    '',
+    '',
+  ])[1];
+
+  // The six deterministic native terminals (primary tokens as shown in help).
+  const NATIVES = ['[VATS SIM]', '[THREAT]', '[TRADE]', 'CONSULT', '[BIO-SCAN]', '[LOOT]'];
+  // Native tokens that MUST resolve through the router (TRADE is the panel exception).
+  const ROUTER_NATIVES = ['[VATS SIM]', '[THREAT]', '[BIO-SCAN]', '[LOOT]', '[CONSULT]'];
+  // Retired AI macros — must NOT reappear in the help registry.
+  const RETIRED = [
+    '[VVATS]',
+    '[TACTICS]',
+    '[SYNC:',
+    '[STASH',
+    '[EXCESS]',
+    '[CURRENCY]',
+    '[AUDIT]',
+    '[TIMER/CHEM]',
+    '[SQUAD]',
+    '[TRAVEL CLUSTER]',
+    '[CASINO]',
+    '[COMM LINK]',
+    '[PAUSE]',
+    '[PAGE 2',
+    '[ARCHIVE]',
+  ];
+
+  // 113.1  registry parsed + a dedicated NATIVE TERMINALS group marked OFFLINE / NO AI
+  assert(
+    registry113.length > 0 && /NATIVE TERMINALS[^']*OFFLINE[^']*NO AI/.test(registry113),
+    '113.1: COMMAND_REGISTRY has a "NATIVE TERMINALS — OFFLINE, NO AI" group (six deterministic terminals surfaced together)'
+  );
+
+  // 113.2  all six native terminals are advertised in the help registry
+  assert(
+    NATIVES.every(t => registry113.includes(t)),
+    '113.2: COMMAND_REGISTRY advertises all six native terminals (VATS/THREAT/TRADE/CONSULT/BIO-SCAN/LOOT)'
+  );
+
+  // 113.3  each native terminal entry is explicitly marked Offline (no stale AI wording)
+  assert(
+    (registry113.match(/Offline\./g) || []).length >= 6,
+    '113.3: every native terminal entry is marked "Offline." in COMMAND_REGISTRY (no stale AI descriptions)'
+  );
+
+  // 113.4  router↔help consistency: every router-native token the help advertises actually
+  //        resolves in NATIVE_COMMAND_ROUTER (so help can't advertise a dead native).
+  assert(
+    ROUTER_NATIVES.every(
+      t => router113.includes("'" + t + "'") && registry113.includes(t.replace(/[[\]]/g, ''))
+    ),
+    '113.4: every router-native token (VATS SIM/THREAT/BIO-SCAN/LOOT/CONSULT) resolves in NATIVE_COMMAND_ROUTER AND appears in COMMAND_REGISTRY'
+  );
+
+  // 113.5  [FEATURES] routes to showHelpModal, and showHelpModal renders COMMAND_REGISTRY
+  assert(
+    /'\[FEATURES\]':\s*\(\)\s*=>\s*showHelpModal\(\)/.test(api113) &&
+      /function showHelpModal\(\)[\s\S]*COMMAND_REGISTRY\.map/.test(uiCore113),
+    '113.5: [FEATURES] → showHelpModal in NATIVE_COMMAND_ROUTER, and showHelpModal renders COMMAND_REGISTRY'
+  );
+
+  // 113.6  no retired AI macro reappears in the help registry
+  const leaked113 = RETIRED.filter(t => registry113.includes(t));
+  assert(
+    leaked113.length === 0,
+    '113.6: no retired AI macro present in COMMAND_REGISTRY (' +
+      (leaked113.length ? 'LEAKED: ' + leaked113.join(', ') : 'all retired tokens absent') +
+      ')'
+  );
+
+  // 113.7  TRADE is advertised but is NOT a router token (it is the BARTER UPLINK panel) —
+  //        guards the documented panel-vs-router split so the help stays accurate.
+  assert(
+    registry113.includes('[TRADE]') && !router113.includes("'[TRADE]'"),
+    '113.7: [TRADE] is advertised in help as the native barter PANEL and is correctly NOT a NATIVE_COMMAND_ROUTER token'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 console.log('\n══════════════════════════════════════════════════════════════\n');
