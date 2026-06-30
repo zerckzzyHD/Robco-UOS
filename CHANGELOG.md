@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1543/1543 | Cache: robco-terminal-v2.6.0-r61 -->
+﻿## [Unreleased]<!-- Tests: 1543/1543 | Cache: robco-terminal-v2.6.0-r62 -->
 
 ### Added
 
@@ -108,6 +108,7 @@
 - Converted two dormant on-screen banners into clean, reusable templates instead of leaving them as dead code or deleting them. The firmware-update strip and the per-profile "data systems not yet active" notice are now stored as disabled banner templates — markup the page parses but never displays on its own — that can be switched back on in a single step if a future notice needs them. No visible change: both stay hidden by default, and the app renders exactly as before. Added Suite 112 (7 regression tests) that fail the build if either template is deleted or stops being disabled-by-default, locking in the "keep dead banners as reusable templates, never remove them" rule.
 - Renamed the internal diagnostics test runners to a RobCo-themed name (`tests/robco-diagnostics.js` and `.ps1`), echoing the boot sequence's "HARDWARE DIAGNOSTICS [OK]". This is a purely mechanical, developer-only rename with no user-facing effect: every reference — the build gate, the npm scripts, the git hooks, the CI workflows, and the docs — moved in lockstep, the file history was preserved, and both runners still run at full parity. A new build guard fails the build if any stale reference to the old runner name ever reappears anywhere in the repo.
 - Added live GitHub Actions status badges (Deploy Staging, CI, Nightly Tests) to the top of the README so the build, test, and deploy state is visible at a glance. Repo-facing only — no effect on the app.
+- Bumped the cache revision to verify the auto-update prompt — an intentional version-only deploy (no other changes) so a build already on the previous revision sees the "REBOOT TERMINAL" prompt on reopen, without clearing data.
 
 ---
 
