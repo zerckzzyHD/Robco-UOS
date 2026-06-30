@@ -1871,6 +1871,7 @@ const COMMAND_REGISTRY = [
   {
     group: 'SYSTEM',
     cmds: [
+      { cmd: '[TERMLINK] / [TL]', desc: 'Command console — launch any offline subsystem.' },
       { cmd: '[FEATURES]', desc: 'Show this command registry.' },
       { cmd: '[LOGS]', desc: 'Show client error log (local-only).' },
     ],

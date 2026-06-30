@@ -13262,6 +13262,106 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 123 — WU-F9 TERMLINK Command Console
+//  The last Phase-F unit: a native, deterministic launcher surface that routes the
+//  offline subsystems through NATIVE_COMMAND_ROUTER (or the documented BARTER panel).
+//  Guards the console ↔ router consistency so it can't advertise a dead subsystem,
+//  stays offline (0 AI), game-agnostic (Protocol 38), and XSS-safe.
+//  9 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 123 — WU-F9 TERMLINK Command Console');
+  const api123 = readFile('js/api.js');
+  const uiCore123 = readFile('js/ui-core.js');
+  const html123 = readFile('index.html');
+  const css123 = readFile('css/terminal.css');
+  const router123 = (api123.match(/const NATIVE_COMMAND_ROUTER = \{([\s\S]*?)\n\};/) || [
+    '',
+    '',
+  ])[1];
+  const consoleArr123 = (api123.match(/const TERMLINK_CONSOLE = \[([\s\S]*?)\n\];/) || ['', ''])[1];
+  const showFn123 = (api123.match(
+    /function showTermlinkConsole\(\)[\s\S]*?_openSysModal\(\);\s*\n\}/
+  ) || [''])[0];
+  const launchFn123 = (api123.match(/function _termlinkLaunch\([\s\S]*?\n\}/) || [''])[0];
+  const consoleTokens123 = [...consoleArr123.matchAll(/token:\s*'([^']+)'/g)].map(m => m[1]);
+
+  // 123.1  [TERMLINK] / [TL] / bare TERMLINK all route to showTermlinkConsole in the native router
+  assert(
+    /'\[TERMLINK\]':\s*\(\)\s*=>\s*showTermlinkConsole\(\)/.test(router123) &&
+      /'\[TL\]':\s*\(\)\s*=>\s*showTermlinkConsole\(\)/.test(router123) &&
+      /\bTERMLINK:\s*\(\)\s*=>\s*showTermlinkConsole\(\)/.test(router123),
+    '123.1: NATIVE_COMMAND_ROUTER routes [TERMLINK], [TL] and bare TERMLINK to showTermlinkConsole()'
+  );
+
+  // 123.2  showTermlinkConsole defined and opens via _openSysModal (WU-C4 focus-trap + ARIA dialog)
+  assert(
+    showFn123.length > 0 && /_openSysModal\(\)/.test(showFn123),
+    '123.2: showTermlinkConsole() is defined and opens the console via _openSysModal (focus-trap + ARIA)'
+  );
+
+  // 123.3  the console manifest exists with the six offline subsystem entries
+  assert(
+    consoleArr123.length > 0 && consoleTokens123.length >= 6,
+    '123.3: TERMLINK_CONSOLE lists at least six subsystem entries (' + consoleTokens123.length + ')'
+  );
+
+  // 123.4  router-drift guard: every router-backed console token resolves in NATIVE_COMMAND_ROUTER;
+  //        [TRADE] is the documented panel exception (panel:true, intentionally NOT a router token).
+  const tradePanel123 = /\{[^}]*token:\s*'\[TRADE\]'[^}]*panel:\s*true[^}]*\}/.test(consoleArr123);
+  const drift123 = consoleTokens123.filter(
+    t => t !== '[TRADE]' && !router123.includes("'" + t + "'")
+  );
+  assert(
+    drift123.length === 0 && tradePanel123 && !router123.includes("'[TRADE]'"),
+    '123.4: every router-backed TERMLINK token resolves in NATIVE_COMMAND_ROUTER; [TRADE] is the panel exception' +
+      (drift123.length ? ' — DRIFT: ' + drift123.join(', ') : '')
+  );
+
+  // 123.5  _termlinkLaunch routes router tokens through _routeNativeCommand and the panel via the trade panel
+  assert(
+    launchFn123.length > 0 &&
+      /_routeNativeCommand\(token\)/.test(launchFn123) &&
+      /expandPanelForCategory\('trade'\)/.test(launchFn123) &&
+      /closeModal\(\)/.test(launchFn123),
+    '123.5: _termlinkLaunch() routes native tokens via _routeNativeCommand, opens BARTER via the trade panel, closes the console first'
+  );
+
+  // 123.6  offline / zero-AI: neither the console nor the launcher does network I/O or AI calls
+  assert(
+    !/fetch\(|XMLHttpRequest|transmitMessage\(|generativelanguage|gemini/i.test(
+      showFn123 + launchFn123
+    ),
+    '123.6: showTermlinkConsole + _termlinkLaunch make no network/AI call (routes natively, fully offline)'
+  );
+
+  // 123.7  XSS-safe: rendered token/label/blurb run through escapeHtml
+  assert(
+    (showFn123.match(/escapeHtml\(/g) || []).length >= 3,
+    '123.7: showTermlinkConsole escapes rendered token/label/blurb via escapeHtml (XSS-safe)'
+  );
+
+  // 123.8  game-agnostic (Protocol 38): the TERMLINK block carries no game literals
+  assert(
+    !/New Vegas|Mojave|Fallout|\bFNV\b|\bFO3\b|Vault 101|Capital Wasteland|Courier/i.test(
+      consoleArr123 + showFn123 + launchFn123
+    ),
+    '123.8: the TERMLINK console block is game-agnostic (no FNV/FO3/Fallout/location literals)'
+  );
+
+  // 123.9  discoverable affordances: #termlinkBtn in index.html routes natively, registry advertises it,
+  //        and the console has overflow-safe styling
+  assert(
+    /id="termlinkBtn"[\s\S]*?macroCommand\('\[TERMLINK\]'\)/.test(html123) &&
+      /aria-label="Open the TERMLINK command console/.test(html123) &&
+      /\[TERMLINK\] \/ \[TL\]/.test(uiCore123) &&
+      /\.termlink-grid\b/.test(css123) &&
+      /\.termlink-entry\b/.test(css123),
+    '123.9: #termlinkBtn routes [TERMLINK] natively + has aria-label, COMMAND_REGISTRY advertises it, console CSS present'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 console.log('\n══════════════════════════════════════════════════════════════\n');

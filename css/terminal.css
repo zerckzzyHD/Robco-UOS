@@ -837,6 +837,60 @@ details.sub-panel[open] > summary h3::after {
   font-size: 10px;
 }
 
+/* WU-F9: TERMLINK Command Console — native subsystem launcher surface */
+.termlink-greeting {
+  font-size: 10px;
+  letter-spacing: 1px;
+  line-height: 1.5;
+  opacity: 0.6;
+  margin: 0 0 10px;
+  white-space: normal;
+  word-break: break-word;
+}
+.termlink-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+  white-space: normal;
+}
+.termlink-entry {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 8px 10px;
+  text-align: left;
+  background: transparent;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.4);
+  color: var(--robco-green);
+  cursor: pointer;
+}
+.termlink-entry:hover,
+.termlink-entry:focus-visible {
+  border-color: var(--robco-green);
+  background: rgba(var(--robco-green-rgb), 0.08);
+}
+.termlink-token {
+  font-weight: bold;
+  font-size: 11px;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+.termlink-label {
+  font-size: 11px;
+  opacity: 0.85;
+  overflow-wrap: anywhere;
+}
+.termlink-blurb {
+  font-size: 10px;
+  opacity: 0.55;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 /* Tactical Command Dashboard */
 .tactical-dashboard {
   display: grid;

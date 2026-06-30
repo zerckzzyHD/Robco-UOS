@@ -7504,6 +7504,67 @@ Check (($bootLines122 -match 'APP_VERSION') -and (($pick122 + $bootLines122) -no
     '122.8: the boot-flavor strings are game-agnostic (no FNV/FO3/Fallout/location literals) and version via APP_VERSION'
 
 # ===========================================================
+# Suite 123 -- WU-F9 TERMLINK Command Console (9 tests)
+# The last Phase-F unit: a native, deterministic launcher surface that routes the
+# offline subsystems through NATIVE_COMMAND_ROUTER (or the documented BARTER panel).
+# Guards console <-> router consistency, offline (0 AI), game-agnostic, XSS-safe.
+# (PS mirror of JS 123.)
+# ===========================================================
+Sep "Suite 123 -- WU-F9 TERMLINK Command Console"
+$api123  = Read-Src "js/api.js"
+$core123 = Read-Src "js/ui-core.js"
+$html123 = Read-Src "index.html"
+$css123  = Read-Src "css/terminal.css"
+$router123     = [regex]::Match($api123, '(?s)const NATIVE_COMMAND_ROUTER = \{[\s\S]*?\n\};').Value
+$consoleArr123 = [regex]::Match($api123, '(?s)const TERMLINK_CONSOLE = \[[\s\S]*?\n\];').Value
+$showFn123     = [regex]::Match($api123, '(?s)function showTermlinkConsole\(\)[\s\S]*?_openSysModal\(\);\s*\n\}').Value
+$launchFn123   = [regex]::Match($api123, '(?s)function _termlinkLaunch\([\s\S]*?\n\}').Value
+$tokCount123   = ([regex]::Matches($consoleArr123, "token:\s*'[^']+'")).Count
+
+# 123.1  [TERMLINK] / [TL] / bare TERMLINK all route to showTermlinkConsole in the native router
+Check (($router123 -match "'\[TERMLINK\]':\s*\(\)\s*=>\s*showTermlinkConsole\(\)") -and ($router123 -match "'\[TL\]':\s*\(\)\s*=>\s*showTermlinkConsole\(\)") -and ($router123 -match '\bTERMLINK:\s*\(\)\s*=>\s*showTermlinkConsole\(\)')) `
+    '123.1: NATIVE_COMMAND_ROUTER routes [TERMLINK], [TL] and bare TERMLINK to showTermlinkConsole()'
+
+# 123.2  showTermlinkConsole defined and opens via _openSysModal (WU-C4 focus-trap + ARIA dialog)
+Check (($showFn123.Length -gt 0) -and ($showFn123 -match '_openSysModal\(\)')) `
+    '123.2: showTermlinkConsole() is defined and opens the console via _openSysModal (focus-trap + ARIA)'
+
+# 123.3  the console manifest exists with the six offline subsystem entries
+Check (($consoleArr123.Length -gt 0) -and ($tokCount123 -ge 6)) `
+    '123.3: TERMLINK_CONSOLE lists at least six subsystem entries'
+
+# 123.4  router-drift guard: every router-backed console token resolves in NATIVE_COMMAND_ROUTER;
+#        [TRADE] is the documented panel exception (panel:true, intentionally NOT a router token).
+$rbOk123 = $true
+foreach ($t in @('[VATS SIM]', '[THREAT]', '[CONSULT]', '[BIO-SCAN]', '[LOOT]')) {
+    if (-not $router123.Contains("'$t'")) { $rbOk123 = $false }
+    if (-not $consoleArr123.Contains($t)) { $rbOk123 = $false }
+}
+$tradePanel123 = $consoleArr123 -match "(?s)\{[^}]*token:\s*'\[TRADE\]'[^}]*panel:\s*true[^}]*\}"
+Check ($rbOk123 -and $tradePanel123 -and (-not $router123.Contains("'[TRADE]'"))) `
+    '123.4: every router-backed TERMLINK token resolves in NATIVE_COMMAND_ROUTER; [TRADE] is the panel exception'
+
+# 123.5  _termlinkLaunch routes router tokens through _routeNativeCommand and the panel via the trade panel
+Check (($launchFn123.Length -gt 0) -and ($launchFn123 -match '_routeNativeCommand\(token\)') -and ($launchFn123 -match "expandPanelForCategory\('trade'\)") -and ($launchFn123 -match 'closeModal\(\)')) `
+    '123.5: _termlinkLaunch() routes native tokens via _routeNativeCommand, opens BARTER via the trade panel, closes the console first'
+
+# 123.6  offline / zero-AI: neither the console nor the launcher does network I/O or AI calls
+Check (($showFn123 + $launchFn123) -notmatch 'fetch\(|XMLHttpRequest|transmitMessage\(|generativelanguage|gemini') `
+    '123.6: showTermlinkConsole + _termlinkLaunch make no network/AI call (routes natively, fully offline)'
+
+# 123.7  XSS-safe: rendered token/label/blurb run through escapeHtml
+Check ((([regex]::Matches($showFn123, 'escapeHtml\(')).Count) -ge 3) `
+    '123.7: showTermlinkConsole escapes rendered token/label/blurb via escapeHtml (XSS-safe)'
+
+# 123.8  game-agnostic (Protocol 38): the TERMLINK block carries no game literals
+Check (($consoleArr123 + $showFn123 + $launchFn123) -notmatch 'New Vegas|Mojave|Fallout|\bFNV\b|\bFO3\b|Vault 101|Capital Wasteland|Courier') `
+    '123.8: the TERMLINK console block is game-agnostic (no FNV/FO3/Fallout/location literals)'
+
+# 123.9  discoverable affordances: #termlinkBtn routes natively, registry advertises it, console CSS present
+Check (($html123 -match "(?s)id=`"termlinkBtn`"[\s\S]*?macroCommand\('\[TERMLINK\]'\)") -and ($html123 -match 'aria-label="Open the TERMLINK command console') -and ($core123 -match '\[TERMLINK\] / \[TL\]') -and ($css123 -match '\.termlink-grid') -and ($css123 -match '\.termlink-entry')) `
+    '123.9: #termlinkBtn routes [TERMLINK] natively + has aria-label, COMMAND_REGISTRY advertises it, console CSS present'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

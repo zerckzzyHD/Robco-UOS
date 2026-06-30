@@ -954,6 +954,13 @@ function autoImportState(jsonString) {
 const NATIVE_COMMAND_ROUTER = {
   '[FEATURES]': () => showHelpModal(),
   '[LOGS]': () => showErrorLog(),
+  // WU-F9: TERMLINK Command Console — a native, deterministic launcher surface for the
+  // offline subsystems. Each console entry routes through THIS router (or the documented
+  // BARTER panel), so the console is a true "native command surface" — zero AI, works
+  // offline. Aliases: `> [TERMLINK]`, the short `> [TL]`, and the bare `> TERMLINK`.
+  '[TERMLINK]': () => showTermlinkConsole(),
+  '[TL]': () => showTermlinkConsole(),
+  TERMLINK: () => showTermlinkConsole(),
   '[CROSSROADS]': () => _nativeCrossroads(),
   '[SLEEP]': () => _nativeSleep(),
   // WU-N3: THREAT is a fully-deterministic native bestiary/TTK terminal — the AI
@@ -1102,6 +1109,100 @@ function _nativeWait(hours) {
   // loadUI() pushes state→DOM (ticks) before saveState() reads DOM back
   if (typeof loadUI === 'function') loadUI();
   if (typeof saveState === 'function') saveState();
+}
+
+// ── WU-F9: TERMLINK Command Console ──────────────────────────────
+// A native, deterministic launcher for the offline subsystems. Every entry is a
+// SUBSYSTEM COMMAND TOKEN that resolves through NATIVE_COMMAND_ROUTER (or the
+// documented BARTER panel) — no AI, no network, fully offline. The list holds
+// command tokens, NOT game data, so it is game-agnostic (Protocol 38) — a new game
+// needs no change here. Guarded against router drift by Suite 123 (both runners).
+const TERMLINK_CONSOLE = [
+  {
+    token: '[VATS SIM]',
+    label: 'V.A.T.S. TARGETING',
+    blurb: 'Hit %, crit bonus and the melee/unarmed AP-strike plan.',
+  },
+  {
+    token: '[THREAT]',
+    label: 'THREAT ASSESSMENT',
+    blurb: 'Bestiary stat card with time-to-neutralize and ammo burn.',
+  },
+  {
+    token: '[TRADE]',
+    label: 'BARTER UPLINK',
+    blurb: 'Buy and sell at your Barter-skill prices.',
+    panel: true,
+  },
+  {
+    token: '[CONSULT]',
+    label: 'DATABANK CONSULT',
+    blurb: 'Look up items, perks, quests, locations and creatures.',
+  },
+  {
+    token: '[BIO-SCAN]',
+    label: 'BIO-SCAN ADVISORY',
+    blurb: 'Limb, HP, radiation and addiction medical readout.',
+  },
+  {
+    token: '[LOOT]',
+    label: 'SALVAGE INTAKE',
+    blurb: 'Add a catalogued item to your pack at its value.',
+  },
+];
+
+// Launch a TERMLINK console entry. Router-backed tokens go through the SAME native
+// router used by typed Comm-Link input (zero AI); the documented BARTER exception
+// opens its INV-tab panel. The console modal closes first so the target surface owns
+// the shared sysModal.
+function _termlinkLaunch(token, isPanel) {
+  if (typeof closeModal === 'function') closeModal();
+  if (isPanel) {
+    if (typeof switchTab === 'function') switchTab('inv');
+    if (typeof expandPanelForCategory === 'function') expandPanelForCategory('trade');
+    return;
+  }
+  _routeNativeCommand(token);
+}
+
+function showTermlinkConsole() {
+  const modal = document.getElementById('sysModal');
+  const title = document.getElementById('modalTitle');
+  const content = document.getElementById('modalContent');
+  if (!modal || !title || !content) return;
+  title.innerText = '> ROBCO TERMLINK PROTOCOL';
+  const cards = TERMLINK_CONSOLE.map(e => {
+    const panelArg = e.panel ? ', true' : '';
+    return (
+      '<button type="button" class="termlink-entry" ' +
+      'onclick="_termlinkLaunch(\'' +
+      escapeHtml(e.token) +
+      "'" +
+      panelArg +
+      ')" ' +
+      'aria-label="Engage ' +
+      escapeHtml(e.label) +
+      ' subsystem">' +
+      '<span class="termlink-token">' +
+      escapeHtml(e.token) +
+      '</span>' +
+      '<span class="termlink-label">' +
+      escapeHtml(e.label) +
+      '</span>' +
+      '<span class="termlink-blurb">' +
+      escapeHtml(e.blurb) +
+      '</span>' +
+      '</button>'
+    );
+  }).join('');
+  content.innerHTML =
+    '<p class="termlink-greeting">ROBCO INDUSTRIES (TM) TERMLINK<br>' +
+    'DETERMINISTIC SUBSYSTEMS — OFFLINE, NO DIRECTOR LINK<br>' +
+    'SELECT A SUBROUTINE TO ENGAGE:</p>' +
+    '<div class="termlink-grid">' +
+    cards +
+    '</div>';
+  _openSysModal();
 }
 
 async function transmitMessage() {
