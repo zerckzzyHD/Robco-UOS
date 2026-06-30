@@ -44,6 +44,15 @@ async function renderSavesList() {
   const body = document.getElementById('savesListBody');
   if (!body) return;
 
+  // WU-T3: per-game save-manager identity header — saveLabel from GAME_DEFS[ctx].theme,
+  // data-driven (Protocol 38; a new game just supplies the string). Fail-safe to a generic
+  // label, escaped, diegetic. Prepended to the archive list (and the empty state).
+  const _saveTheme = (typeof _activeDef === 'function' && _activeDef().theme) || {};
+  const _archiveHeader =
+    '<div class="saves-archive-header">&gt; ' +
+    escapeHtml(String(_saveTheme.saveLabel || 'CAMPAIGN ARCHIVE').toUpperCase()) +
+    '</div>';
+
   const acct =
     typeof window.getAccountState === 'function'
       ? window.getAccountState()
@@ -71,7 +80,7 @@ async function renderSavesList() {
   }
 
   if (!localSaves.length && !cloudSaves.length) {
-    body.innerHTML = emptyState('NO ARCHIVES ON FILE');
+    body.innerHTML = _archiveHeader + emptyState('NO ARCHIVES ON FILE');
     return;
   }
 
@@ -124,7 +133,7 @@ async function renderSavesList() {
     );
   }
 
-  body.innerHTML = rows.join('');
+  body.innerHTML = _archiveHeader + rows.join('');
 }
 
 function undoLastSync() {

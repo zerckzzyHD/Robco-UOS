@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1513/1513 | Cache: robco-terminal-v2.6.0-r57 -->
+﻿## [Unreleased]<!-- Tests: 1521/1521 | Cache: robco-terminal-v2.6.0-r58 -->
 
 ### Added
 
@@ -22,6 +22,7 @@
 - Added a TERMLINK command console — a single launcher for every offline subsystem. Tap the "TERMLINK CONSOLE" button in the Comm-Link (or type `> [TERMLINK]`, or the short `> [TL]`) and a ROBCO TERMLINK menu opens listing all six built-in tools — V.A.T.S. targeting, threat assessment, the barter uplink, databank consult, bio-scan, and salvage intake — each with a one-line description. Pick one and it opens that tool straight away. It's a shortcut surface over the features you already have: every option runs the same built-in routine with no AI call, so the whole console works offline. Works the same in either game.
 - Each game now has its own terminal colour. A Fallout: New Vegas campaign boots in the classic bright RobCo green, while a Fallout 3 campaign boots in a distinct, duller "Pip-Boy" green — so the two games feel different at a glance. Switching games applies that game's colour automatically. You can still override it any time from the OPTICS picker (which now also offers the new Pip-Boy green as a choice for either game), and any colour you pick by hand sticks across both games. All the existing colour options work exactly as before; only the per-game default is new. Works entirely offline with no AI.
 - You can now mark a place as visited straight from the WORLD GRID map. Open a region on the map and any location you haven't been to yet shows a "LOG VISIT" button next to it; tap it and that location flips from [UNKNOWN] to [VISITED] and stays that way. Previously a place only counted as discovered once you actually travelled there (or the story moved you), so there was no way to record somewhere you'd been on your own — now there is. It's a one-way mark (in keeping with the map's "once discovered, always discovered" behaviour), it's saved on your device, and it never contacts the AI.
+- Each game now carries its own identity in the boot screen and the save manager. When the terminal powers on it shows a line naming your Pip-Boy and region — "PIP-BOY 3000 — MOJAVE WASTELAND UPLINK" for New Vegas, "PIP-BOY 3000 — CAPITAL WASTELAND UPLINK" for Fallout 3 — and the SAVE menu's archive list is now headed with a matching banner ("LUCKY 38 TELEMETRY — MOJAVE ARCHIVE" vs "VAULT-TEC ARCHIVE — CAPITAL WASTELAND"). It's flavour only — no change to how booting or saving works — and the cold-start and rare "degraded tube" boot sequences are untouched. The identity text is drawn from each game's profile, so it costs nothing and works entirely offline.
 
 ### Fixed
 

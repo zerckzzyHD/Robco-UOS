@@ -995,6 +995,15 @@ function runBootSequence(onComplete) {
   }
   if (flavor === 'degraded') bootScreen.classList.add('boot-degraded');
   const lines = _bootLinesFor(flavor);
+  // WU-T3: per-game identity line (Pip-Boy model + wasteland uplink) sourced from
+  // GAME_DEFS[ctx].theme — data-driven (Protocol 38), so a new game just adds strings. Injected
+  // here, AFTER _bootLinesFor, so it shows uniformly for every boot flavor (normal/cold/degraded)
+  // without touching the WU-F6 POST content. Fail-safe to generic text if the theme is absent.
+  const _t3theme = (typeof _activeDef === 'function' && _activeDef().theme) || {};
+  const _t3model = String(_t3theme.pipBoyModel || 'PIP-BOY').toUpperCase();
+  const _t3flavor = String(_t3theme.bootFlavor || 'WASTELAND UPLINK').toUpperCase();
+  // Place it just before the final "SECURE LINK ESTABLISHED…" line.
+  lines.splice(Math.max(0, lines.length - 1), 0, '> ' + _t3model + ' — ' + _t3flavor);
   let i = 0;
   const iv = setInterval(() => {
     if (i < lines.length) {

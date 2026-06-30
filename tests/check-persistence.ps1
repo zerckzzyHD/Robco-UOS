@@ -7760,6 +7760,59 @@ Check (-not ($markFn126 -match 'New Vegas|Mojave|\bFNV\b|\bFO3\b|Capital Wastela
     '126.8: markLocationVisited is game-agnostic (operates on the loc string, no game literals)'
 
 # ===========================================================
+# Suite 127 -- WU-T3 per-game identity strings + save header (8 tests)
+# Boot shows the active game's Pip-Boy model + wasteland uplink; the save manager shows its
+# saveLabel -- all from GAME_DEFS[ctx].theme (Protocol 38). The identity line is injected
+# flavor-independently so WU-F6 cold/degraded boot is intact. (PS mirror of JS 127.)
+# ===========================================================
+function Grab127($block, $k) {
+    $m = [regex]::Match($block, ($k + ":\s*'([^']+)'"))
+    if ($m.Success) { $m.Groups[1].Value } else { '' }
+}
+Sep "Suite 127 -- WU-T3 per-game identity strings + save header"
+$state127   = Read-Src "js/state.js"
+$audio127   = Read-Src "js/ui-audio.js"
+$account127 = Read-Src "js/ui-account.js"
+$css127     = Read-Src "css/terminal.css"
+$fnvTheme127 = [regex]::Match($state127, '(?s)FNV:[\s\S]*?theme:\s*\{([\s\S]*?)\}').Groups[1].Value
+$fo3Theme127 = [regex]::Match($state127, '(?s)FO3:[\s\S]*?theme:\s*\{([\s\S]*?)\}').Groups[1].Value
+$blf127 = [regex]::Match($audio127, '(?s)function _bootLinesFor\(flavor\)[\s\S]*?\n\}').Value
+$t3region127 = [regex]::Match($audio127, '(?s)WU-T3:[\s\S]*?lines\.splice\([^\n]*\);').Value
+$headerRegion127 = [regex]::Match($account127, '(?s)const _archiveHeader =[\s\S]*?''</div>'';').Value
+
+# 127.1  both games declare non-empty bootFlavor + pipBoyModel + saveLabel
+Check ((Grab127 $fnvTheme127 'bootFlavor') -and (Grab127 $fnvTheme127 'pipBoyModel') -and (Grab127 $fnvTheme127 'saveLabel') -and (Grab127 $fo3Theme127 'bootFlavor') -and (Grab127 $fo3Theme127 'pipBoyModel') -and (Grab127 $fo3Theme127 'saveLabel')) `
+    '127.1: GAME_DEFS.FNV.theme and FO3.theme each declare non-empty bootFlavor, pipBoyModel, and saveLabel'
+
+# 127.2  per-game DISTINCT identity -- FNV != FO3 for boot flavor and save label
+Check (((Grab127 $fnvTheme127 'saveLabel') -ne (Grab127 $fo3Theme127 'saveLabel')) -and ((Grab127 $fnvTheme127 'bootFlavor') -ne (Grab127 $fo3Theme127 'bootFlavor'))) `
+    '127.2: FNV and FO3 have distinct saveLabel and bootFlavor identity strings (the games differ at a glance)'
+
+# 127.3  runBootSequence injects the identity line from the active game's theme (data-driven)
+Check (($t3region127 -match '_activeDef\(\)\.theme') -and ($t3region127 -match 'pipBoyModel') -and ($t3region127 -match 'bootFlavor') -and ($t3region127 -match 'lines\.splice\(')) `
+    '127.3: runBootSequence reads _activeDef().theme (pipBoyModel + bootFlavor) and splices the identity line into the boot output'
+
+# 127.4  the identity line is FLAVOR-INDEPENDENT -- injected in runBootSequence, NOT in _bootLinesFor
+Check (($t3region127.Length -gt 0) -and ($blf127.Length -gt 0) -and (-not ($blf127 -match 'theme|bootFlavor|pipBoyModel|_activeDef'))) `
+    '127.4: the identity line is injected after _bootLinesFor (flavor-independent); _bootLinesFor itself carries no theme/identity code'
+
+# 127.5  WU-F6 boot NOT regressed -- the three flavor POSTs + _bootActive window + onComplete intact
+Check (($blf127 -match 'RETROS BIOS') -and ($blf127 -match 'CRT TUBE COLD') -and ($blf127 -match '64K RAM SYSTEM') -and ($audio127 -match '_bootActive = true') -and ($audio127 -match '_bootActive = false') -and ($audio127 -match 'if \(onComplete\) onComplete\(\)')) `
+    '127.5: the cold/degraded/normal boot POSTs + the _bootActive window + onComplete are preserved (no WU-F6/B10 regression)'
+
+# 127.6  the save manager header consumes theme.saveLabel (escaped) + the CSS class exists
+Check (($account127 -match '_activeDef\(\)\.theme') -and ($headerRegion127 -match 'saveLabel') -and ($headerRegion127 -match 'escapeHtml\(') -and ($account127 -match 'saves-archive-header') -and ($css127 -match '\.saves-archive-header\s*\{')) `
+    '127.6: renderSavesList renders a per-game header from theme.saveLabel (escaped) into .saves-archive-header'
+
+# 127.7  fail-safe -- boot line and save header fall back to generic text if theme strings absent
+Check (($audio127 -match "pipBoyModel \|\| 'PIP-BOY'") -and ($audio127 -match "bootFlavor \|\| 'WASTELAND UPLINK'") -and ($account127 -match "saveLabel \|\| 'CAMPAIGN ARCHIVE'")) `
+    '127.7: the boot identity line and the save header both fail-safe to a generic label when theme strings are missing'
+
+# 127.8  game-agnostic (Protocol 38) -- the consuming code carries no game literal
+Check (-not (($t3region127 + $headerRegion127) -match 'New Vegas|Mojave|\bFNV\b|\bFO3\b|Capital Wasteland|Vault-Tec|Lucky 38')) `
+    '127.8: the boot-injection + save-header consuming code is game-agnostic (strings sourced only from GAME_DEFS theme)'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

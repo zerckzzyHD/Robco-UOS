@@ -837,6 +837,19 @@ details.sub-panel[open] > summary h3::after {
   font-size: 10px;
 }
 
+/* WU-T3: per-game save-manager identity header (saveLabel from GAME_DEFS theme) */
+.saves-archive-header {
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: var(--robco-green);
+  opacity: 0.75;
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px dashed rgba(var(--robco-green-rgb), 0.25);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 /* WU-F10: OVERSEER'S LOG section dividers (device telemetry vs campaign log) */
 .overseer-section-label {
   font-size: 9px;

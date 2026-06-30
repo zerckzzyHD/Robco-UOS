@@ -13690,6 +13690,103 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 127 — WU-T3 per-game identity strings + native save header
+//  The boot sequence shows the active game's Pip-Boy model + wasteland uplink, and the
+//  save manager shows its saveLabel — all sourced from GAME_DEFS[ctx].theme (Protocol 38).
+//  The identity line is injected flavor-independently so WU-F6 cold/degraded boot is intact.
+//  8 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 127 — WU-T3 per-game identity strings + save header');
+  const state127 = readFile('js/state.js');
+  const audio127 = readFile('js/ui-audio.js');
+  const account127 = readFile('js/ui-account.js');
+  const css127 = readFile('css/terminal.css');
+  const fnvTheme127 = (state127.match(/FNV:[\s\S]*?theme:\s*\{([\s\S]*?)\}/) || ['', ''])[1];
+  const fo3Theme127 = (state127.match(/FO3:[\s\S]*?theme:\s*\{([\s\S]*?)\}/) || ['', ''])[1];
+  const grab127 = (block, k) => (block.match(new RegExp(k + ":\\s*'([^']+)'")) || [])[1] || '';
+  const blf127 = (audio127.match(/function _bootLinesFor\(flavor\)[\s\S]*?\n\}/) || [''])[0];
+  const t3region127 = (audio127.match(/WU-T3:[\s\S]*?lines\.splice\([^\n]*\);/) || [''])[0];
+  const headerRegion127 = (account127.match(/const _archiveHeader =[\s\S]*?'<\/div>';/) || [''])[0];
+
+  // 127.1  both games declare non-empty bootFlavor + pipBoyModel + saveLabel identity strings
+  assert(
+    grab127(fnvTheme127, 'bootFlavor') &&
+      grab127(fnvTheme127, 'pipBoyModel') &&
+      grab127(fnvTheme127, 'saveLabel') &&
+      grab127(fo3Theme127, 'bootFlavor') &&
+      grab127(fo3Theme127, 'pipBoyModel') &&
+      grab127(fo3Theme127, 'saveLabel'),
+    '127.1: GAME_DEFS.FNV.theme and FO3.theme each declare non-empty bootFlavor, pipBoyModel, and saveLabel'
+  );
+
+  // 127.2  per-game DISTINCT identity — FNV ≠ FO3 for the boot flavor and the save label
+  assert(
+    grab127(fnvTheme127, 'saveLabel') !== grab127(fo3Theme127, 'saveLabel') &&
+      grab127(fnvTheme127, 'bootFlavor') !== grab127(fo3Theme127, 'bootFlavor'),
+    '127.2: FNV and FO3 have distinct saveLabel and bootFlavor identity strings (the games differ at a glance)'
+  );
+
+  // 127.3  runBootSequence injects the identity line from the active game's theme (data-driven)
+  assert(
+    /_activeDef\(\)\.theme/.test(t3region127) &&
+      /pipBoyModel/.test(t3region127) &&
+      /bootFlavor/.test(t3region127) &&
+      /lines\.splice\(/.test(t3region127),
+    '127.3: runBootSequence reads _activeDef().theme (pipBoyModel + bootFlavor) and splices the identity line into the boot output'
+  );
+
+  // 127.4  the identity line is FLAVOR-INDEPENDENT — injected in runBootSequence, NOT inside
+  //        _bootLinesFor (so it shows for every flavor and can't break the WU-F6 POST content)
+  assert(
+    t3region127.length > 0 &&
+      blf127.length > 0 &&
+      !/theme|bootFlavor|pipBoyModel|_activeDef/.test(blf127),
+    '127.4: the identity line is injected after _bootLinesFor (flavor-independent); _bootLinesFor itself carries no theme/identity code'
+  );
+
+  // 127.5  WU-F6 boot NOT regressed — the three flavor POSTs + the WU-B10 _bootActive window
+  //        and onComplete are all still intact
+  assert(
+    /RETROS BIOS/.test(blf127) &&
+      /CRT TUBE COLD/.test(blf127) &&
+      /64K RAM SYSTEM/.test(blf127) &&
+      /_bootActive = true/.test(audio127) &&
+      /_bootActive = false/.test(audio127) &&
+      /if \(onComplete\) onComplete\(\)/.test(audio127),
+    '127.5: the cold/degraded/normal boot POSTs + the _bootActive window + onComplete are preserved (no WU-F6/B10 regression)'
+  );
+
+  // 127.6  the save manager header consumes theme.saveLabel (escaped) + the CSS class exists
+  assert(
+    /_activeDef\(\)\.theme/.test(account127) &&
+      /saveLabel/.test(headerRegion127) &&
+      /escapeHtml\(/.test(headerRegion127) &&
+      /saves-archive-header/.test(account127) &&
+      /\.saves-archive-header\s*\{/.test(css127),
+    '127.6: renderSavesList renders a per-game header from theme.saveLabel (escaped) into .saves-archive-header'
+  );
+
+  // 127.7  fail-safe — both the boot line and the save header fall back to generic text if the
+  //        theme strings are absent (a brand-new/legacy context never shows a broken header)
+  assert(
+    /pipBoyModel \|\| 'PIP-BOY'/.test(audio127) &&
+      /bootFlavor \|\| 'WASTELAND UPLINK'/.test(audio127) &&
+      /saveLabel \|\| 'CAMPAIGN ARCHIVE'/.test(account127),
+    '127.7: the boot identity line and the save header both fail-safe to a generic label when theme strings are missing'
+  );
+
+  // 127.8  game-agnostic (Protocol 38) — the CONSUMING code carries no game literal; the
+  //        identity comes only from GAME_DEFS (the sanctioned game-specific data block)
+  assert(
+    !/New Vegas|Mojave|\bFNV\b|\bFO3\b|Capital Wasteland|Vault-Tec|Lucky 38/i.test(
+      t3region127 + headerRegion127
+    ),
+    '127.8: the boot-injection + save-header consuming code is game-agnostic (strings sourced only from GAME_DEFS theme)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 console.log('\n══════════════════════════════════════════════════════════════\n');
