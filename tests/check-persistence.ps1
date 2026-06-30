@@ -3769,7 +3769,8 @@ Check ([bool]($syncBody64 -match 'Math\.max\s*\(\s*1,\s*Math\.min\s*\(\s*10,' -o
 # Suite 65 -- Blocking Update Modal (Phase 6 Task 2)
 # #updateModal replaces #updateBanner; full-screen blocking dialog;
 # focus trap, Esc blocked, fail-safe, &&controller regression guards.
-# 12 tests
+# Case C already-installing-worker prompt fix + idempotency guard.
+# 13 tests
 # ===========================================================
 Sep "Suite 65 -- Blocking Update Modal"
 $uiCoreSrc65 = Read-Src "js\ui-core.js"
@@ -3826,6 +3827,14 @@ Check (-not ($uiCoreSrc65 -match 'updateModal')) `
 $cssSrc65 = Read-Src "css\terminal.css"
 Check ([bool]($cssSrc65 -match '(?s)#updateModalMsg[\s\S]{0,100}text-align\s*:\s*left')) `
     '#updateModalMsg has text-align:left in terminal.css (update modal message body is flush-left, not centered)'
+
+# 65.13  Case C: registration handles a worker ALREADY installing at register()-resolve
+#        time (browser fires automatic on-navigation update check before the updatefound
+#        listener attaches -> Case B misses it, reg.waiting still null -> Case A misses it).
+#        _watch(reg.installing) closes the race; _updatePromptShown one-shot guard prevents
+#        Case A/B/C double-firing for the same update.
+Check ([bool](($htmlSrc -match 'function\s+_watch\s*\(') -and ($htmlSrc -match 'if\s*\(\s*reg\.installing\s*\)') -and ($htmlSrc -match '_updatePromptShown'))) `
+    'Case C: registration watches an already-installing worker via _watch(reg.installing) + one-shot _updatePromptShown idempotency guard (popup-race fix intact)'
 
 # ===========================================================
 # Suite 66 -- FO3 Lincoln Memorabilia Tracker (Phase 6 Task 4)

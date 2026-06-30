@@ -6564,7 +6564,8 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  SUITE 65 — Blocking Update Modal (Phase 6 Task 2)
 //  #updateModal replaces #updateBanner; full-screen blocking dialog;
 //  focus trap, Esc blocked, fail-safe, &&controller regression guards.
-//  12 tests
+//  Case C already-installing-worker prompt fix + idempotency guard.
+//  13 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Blocking Update Modal');
@@ -6647,6 +6648,19 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   assert(
     /#updateModalMsg[\s\S]{0,100}text-align\s*:\s*left/.test(cssSrc65),
     '#updateModalMsg has text-align:left in terminal.css (update modal message body is flush-left, not centered)'
+  );
+
+  // 65.13  Case C: registration handles a worker ALREADY installing at register()-resolve
+  //        time (the browser's automatic on-navigation update check fires updatefound
+  //        before the listener attaches → Case B misses it, reg.waiting still null →
+  //        Case A misses it). _watch(reg.installing) closes the race so the prompt is
+  //        not silently skipped on the load that detects the deploy. Idempotency guard
+  //        (_updatePromptShown) prevents Case A/B/C double-firing for the same update.
+  assert(
+    /function\s+_watch\s*\(/.test(htmlSource) &&
+      /if\s*\(\s*reg\.installing\s*\)/.test(htmlSource) &&
+      /_updatePromptShown/.test(htmlSource),
+    'Case C: registration watches an already-installing worker via _watch(reg.installing) + one-shot _updatePromptShown idempotency guard (popup-race fix intact)'
   );
 }
 

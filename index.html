@@ -2118,6 +2118,7 @@
 
         // Send SKIP_WAITING to the given waiting worker, then wait for
         // controllerchange (fired when it activates) to reload the page.
+        let _updatePromptShown = false; // one-shot guard: Case A/B/C can all resolve for the same update
         function _triggerUpdate(worker) {
           const modal = document.getElementById('updateModal');
           const btn = document.getElementById('updateRebootBtn');
@@ -2125,6 +2126,10 @@
             worker.postMessage({ type: 'SKIP_WAITING' });
             return;
           } // fail-safe: no UI → auto-update
+          // Idempotent: never re-show the modal or re-bind the keydown listener if
+          // a sibling branch (waiting / installing / updatefound) already fired.
+          if (_updatePromptShown) return;
+          _updatePromptShown = true;
           modal.style.display = 'flex';
           btn.focus();
           let rebooting = false;
@@ -2154,6 +2159,23 @@
           });
         }
 
+        // Watch a pending worker to its 'installed' state, then prompt — but only
+        // when an old SW already controls this page (fresh first-install has no
+        // prior version to update FROM, so it must stay silent). Shared by the
+        // "already-installing" (Case C) and "future updatefound" (Case B) paths.
+        function _watch(worker) {
+          if (!worker) return;
+          if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+            _triggerUpdate(worker);
+            return;
+          }
+          worker.addEventListener('statechange', () => {
+            if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+              _triggerUpdate(worker);
+            }
+          });
+        }
+
         navigator.serviceWorker.register('sw.js').then(reg => {
           // Force an update check on every page load and hourly thereafter.
           reg.update();
@@ -2166,14 +2188,22 @@
             _triggerUpdate(reg.waiting);
           }
 
+          // Case C: a new SW is ALREADY installing at the moment register() resolves.
+          // The browser fires an automatic update check on navigation (and reg.update()
+          // above adds another), so the new worker frequently begins installing before
+          // this callback runs and before the updatefound listener below is attached —
+          // meaning that updatefound already fired and Case B never hears it, while
+          // reg.waiting is still null. Without this branch the prompt is silently
+          // missed on the very load that detects the deploy, surfacing only on a later
+          // reload. _watch attaches statechange to the in-flight worker so it prompts
+          // the moment it reaches 'installed'.
+          if (reg.installing) {
+            _watch(reg.installing);
+          }
+
           // Case B: new SW found and reaches 'installed' while this page is open.
           reg.addEventListener('updatefound', () => {
-            const newWorker = reg.installing;
-            newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                _triggerUpdate(newWorker);
-              }
-            });
+            _watch(reg.installing);
           });
         });
       }
