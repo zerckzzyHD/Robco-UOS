@@ -6,16 +6,10 @@ function exportCampaignLog(format = 'txt') {
 
   if (format === 'html') {
     // #41 HTML Campaign Log Export — green-on-black styled HTML matching current optics
+    // WU-T1: read the export foreground from the single-source THEMES table (no duplicate
+    // palette). Falls back to the canon RobCo green for an unknown/legacy optic key.
     const optics = localStorage.getItem('robco_optics') || 'green';
-    const fgMap = {
-      green: '#14fdce',
-      amber: '#ffb642',
-      blue: '#42cbf5',
-      legion: '#ff4040',
-      ghoul: '#7dff5f',
-      neon: '#c084fc',
-    };
-    const fg = fgMap[optics] || '#14fdce';
+    const fg = ((typeof THEMES !== 'undefined' && THEMES[optics]) || { hex: '#14fdce' }).hex;
     let rows = chatHistory
       .map(msg => {
         let clean = msg.text

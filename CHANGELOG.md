@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1485/1485 | Cache: robco-terminal-v2.6.0-r54 -->
+﻿## [Unreleased]<!-- Tests: 1497/1497 | Cache: robco-terminal-v2.6.0-r55 -->
 
 ### Added
 
@@ -20,6 +20,7 @@
 - Added a PIP-BOY RADIO toggle (in the Audio Systems panel, under Security & Configuration) that plays an ambient retrofuturist station — a soft bed of static, a warm drifting carrier tone, and a slow trickle of gentle synthesized beeps. The whole station is generated live in your browser, so it adds zero download size and contains no copyrighted music. It's off by default; flip it on and the station fades in. It respects Master Mute (and resumes when you un-mute if it was playing), and it only ever starts on a tap or keypress so it never autoplays. Works in either game, entirely offline with no AI.
 - The boot-up sequence now has a bit more character. The very first time you ever power on the terminal it runs a longer "cold start" self-test — a RETROS BIOS banner and a counting memory check — while every normal launch after that stays quick and terse. And once in a while, on any launch, the terminal boots in a rare "degraded tube" mode: the screen flickers like a cold CRT warming up and the self-test stutters before it locks in. It's deliberately uncommon, and the flicker automatically holds still if you've asked your device to reduce motion. Purely cosmetic — every boot still lands you in the same terminal. Works in either game, offline with no AI.
 - Added a TERMLINK command console — a single launcher for every offline subsystem. Tap the "TERMLINK CONSOLE" button in the Comm-Link (or type `> [TERMLINK]`, or the short `> [TL]`) and a ROBCO TERMLINK menu opens listing all six built-in tools — V.A.T.S. targeting, threat assessment, the barter uplink, databank consult, bio-scan, and salvage intake — each with a one-line description. Pick one and it opens that tool straight away. It's a shortcut surface over the features you already have: every option runs the same built-in routine with no AI call, so the whole console works offline. Works the same in either game.
+- Each game now has its own terminal colour. A Fallout: New Vegas campaign boots in the classic bright RobCo green, while a Fallout 3 campaign boots in a distinct, duller "Pip-Boy" green — so the two games feel different at a glance. Switching games applies that game's colour automatically. You can still override it any time from the OPTICS picker (which now also offers the new Pip-Boy green as a choice for either game), and any colour you pick by hand sticks across both games. All the existing colour options work exactly as before; only the per-game default is new. Works entirely offline with no AI.
 
 ### Fixed
 

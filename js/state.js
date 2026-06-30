@@ -222,10 +222,84 @@ const SKILL_KEYS_FO3 = [
 // Aggregates faction lists, skill keys, calendar epochs, labels,
 // and AI directive text into one entry per game. Adding a 3rd game
 // requires only a new entry here + two data files (db_XX.js / reg_XX.js).
+// ── WU-T1: data-driven optics palette (single source of truth) ─────────────────
+// ONE read-only table replacing the old hardcoded if/else chain in changeOpticsColor
+// (ui-audio.js) and the duplicated fgMap (ui-saves.js) — Protocol 22. Each entry holds
+// the raw RGB triplet + display hex + the dark companion (for text-on-accent) + a
+// diegetic label + a contrastSafe flag. `glow`/`refresh` are DERIVED from `rgb` at apply
+// time (single source — never stored, never drifts). `robco` green (#14fdce) is the canon
+// New Vegas terminal colour and the fallback default; `green3` is Fallout 3's classic,
+// duller Capital-Wasteland green. Game-agnostic (Protocol 38): these are colour keys, not
+// game data — a new game just points its theme.defaultOptics at one of these (or adds a
+// row). contrastSafe:false entries (legion/neon) are manual-only and never a per-game
+// default — Suite 124 enforces AA ≥4.5:1 for every contrastSafe:true colour.
+const THEMES = {
+  green: {
+    rgb: '20, 253, 206',
+    hex: '#14fdce',
+    dark: '#021c14',
+    label: 'ROBCO GREEN',
+    contrastSafe: true,
+  },
+  amber: {
+    rgb: '255, 182, 66',
+    hex: '#ffb642',
+    dark: '#2e1d03',
+    label: 'NEW VEGAS AMBER',
+    contrastSafe: true,
+  },
+  blue: {
+    rgb: '66, 203, 245',
+    hex: '#42cbf5',
+    dark: '#03202e',
+    label: 'VAULT-TEC BLUE',
+    contrastSafe: true,
+  },
+  ghoul: {
+    rgb: '125, 255, 95',
+    hex: '#7dff5f',
+    dark: '#0a1e03',
+    label: 'GHOUL GREEN',
+    contrastSafe: true,
+  },
+  green3: {
+    rgb: '79, 176, 90',
+    hex: '#4fb05a',
+    dark: '#07210b',
+    label: 'PIP-BOY GREEN',
+    contrastSafe: true,
+  },
+  legion: {
+    rgb: '255, 64, 64',
+    hex: '#ff4040',
+    dark: '#2a0000',
+    label: 'LEGION RED',
+    contrastSafe: false,
+  },
+  neon: {
+    rgb: '192, 132, 252',
+    hex: '#c084fc',
+    dark: '#1a0329',
+    label: 'NEON VIOLET',
+    contrastSafe: false,
+  },
+};
+window.THEMES = THEMES;
+
 const GAME_DEFS = {
   FNV: {
     id: 'FNV',
     label: 'Fallout: New Vegas',
+    // WU-T1: per-game theme — defaultOptics resolves the boot/context optic colour when the
+    // user has made no explicit pick (FNV = the canon RobCo green). The identity strings
+    // (framing/pipBoyModel/bootFlavor/saveLabel) are the data seam consumed by WU-T3.
+    theme: {
+      defaultOptics: 'green',
+      framing: 'vegas',
+      pipBoyModel: 'Pip-Boy 3000',
+      bootFlavor: 'MOJAVE WASTELAND UPLINK',
+      saveLabel: 'COURIER ARCHIVE',
+    },
     factions: FACTION_REGISTRY,
     skillKeys: SKILL_KEYS,
     // WU-N1 GA-10: the combat-skill set VATS draws from (weapon-damage skills only).
@@ -309,6 +383,15 @@ const GAME_DEFS = {
   FO3: {
     id: 'FO3',
     label: 'Fallout 3',
+    // WU-T1: per-game theme — FO3 defaults to the classic, duller Capital-Wasteland green
+    // (green3), visibly distinct from FNV's brighter RobCo green. Identity strings = WU-T3 seam.
+    theme: {
+      defaultOptics: 'green3',
+      framing: 'capital',
+      pipBoyModel: 'Pip-Boy 3000',
+      bootFlavor: 'CAPITAL WASTELAND UPLINK',
+      saveLabel: 'WANDERER ARCHIVE',
+    },
     factions: FACTION_REGISTRY_FO3,
     skillKeys: SKILL_KEYS_FO3,
     // WU-N1 GA-10 (LIVE BUG FIX): FO3 splits firearms into small_guns + big_guns. The old

@@ -45,6 +45,13 @@
           root.style.setProperty('--robco-glow', '0 0 6px rgba(125, 255, 95, 0.6)');
           root.style.setProperty('--robco-dark', '#0a1e03');
           root.style.setProperty('--robco-refresh', 'rgba(125, 255, 95, 0.12)');
+        } else if (color === 'green3') {
+          // WU-T1: FO3 Pip-Boy green (pre-paint copy of THEMES.green3 — modules load later)
+          root.style.setProperty('--robco-green-rgb', '79, 176, 90');
+          root.style.setProperty('--robco-green', '#4fb05a');
+          root.style.setProperty('--robco-glow', '0 0 6px rgba(79, 176, 90, 0.6)');
+          root.style.setProperty('--robco-dark', '#07210b');
+          root.style.setProperty('--robco-refresh', 'rgba(79, 176, 90, 0.12)');
         } else if (color === 'neon') {
           root.style.setProperty('--robco-green-rgb', '192, 132, 252');
           root.style.setProperty('--robco-green', '#c084fc');
@@ -1455,6 +1462,7 @@
                 onchange="changeOpticsColor(this.value)"
               >
                 <option value="green">RobCo Green (Default)</option>
+                <option value="green3">Pip-Boy Green</option>
                 <option value="amber">New Vegas Amber</option>
                 <option value="blue">Vault-Tec Blue</option>
                 <option value="legion">Legion Red</option>

@@ -391,45 +391,44 @@ function playSyncTone() {
   setTimeout(() => document.body.classList.remove('sync-complete'), 450);
 }
 
-function changeOpticsColor(color) {
-  let root = document.documentElement;
-  if (color === 'amber') {
-    root.style.setProperty('--robco-green-rgb', '255, 182, 66');
-    root.style.setProperty('--robco-green', '#ffb642');
-    root.style.setProperty('--robco-glow', '0 0 6px rgba(255, 182, 66, 0.6)');
-    root.style.setProperty('--robco-dark', '#2e1d03');
-    root.style.setProperty('--robco-refresh', 'rgba(255, 182, 66, 0.12)');
-  } else if (color === 'blue') {
-    root.style.setProperty('--robco-green-rgb', '66, 203, 245');
-    root.style.setProperty('--robco-green', '#42cbf5');
-    root.style.setProperty('--robco-glow', '0 0 6px rgba(66, 203, 245, 0.6)');
-    root.style.setProperty('--robco-dark', '#03202e');
-    root.style.setProperty('--robco-refresh', 'rgba(66, 203, 245, 0.12)');
-  } else if (color === 'legion') {
-    root.style.setProperty('--robco-green-rgb', '255, 64, 64');
-    root.style.setProperty('--robco-green', '#ff4040');
-    root.style.setProperty('--robco-glow', '0 0 6px rgba(255, 64, 64, 0.6)');
-    root.style.setProperty('--robco-dark', '#2a0000');
-    root.style.setProperty('--robco-refresh', 'rgba(255, 64, 64, 0.12)');
-  } else if (color === 'ghoul') {
-    root.style.setProperty('--robco-green-rgb', '125, 255, 95');
-    root.style.setProperty('--robco-green', '#7dff5f');
-    root.style.setProperty('--robco-glow', '0 0 6px rgba(125, 255, 95, 0.6)');
-    root.style.setProperty('--robco-dark', '#0a1e03');
-    root.style.setProperty('--robco-refresh', 'rgba(125, 255, 95, 0.12)');
-  } else if (color === 'neon') {
-    root.style.setProperty('--robco-green-rgb', '192, 132, 252');
-    root.style.setProperty('--robco-green', '#c084fc');
-    root.style.setProperty('--robco-glow', '0 0 6px rgba(192, 132, 252, 0.6)');
-    root.style.setProperty('--robco-dark', '#1a0329');
-    root.style.setProperty('--robco-refresh', 'rgba(192, 132, 252, 0.12)');
-  } else {
-    root.style.setProperty('--robco-green-rgb', '20, 253, 206');
-    root.style.setProperty('--robco-green', '#14fdce');
-    root.style.setProperty('--robco-glow', '0 0 6px rgba(var(--robco-green-rgb), 0.6)');
-    root.style.setProperty('--robco-dark', '#021c14');
-    root.style.setProperty('--robco-refresh', 'rgba(var(--robco-green-rgb), 0.12)');
+// WU-T1: table-driven optics. Applies the five --robco-* CSS vars for a THEMES key
+// (glow + refresh derived from the rgb triplet — single source, never drifts). Apply-only;
+// does NOT persist, so the per-game default path can apply without recording an explicit pick.
+function _applyThemeVars(key) {
+  const t = (typeof THEMES !== 'undefined' && (THEMES[key] || THEMES.green)) || null;
+  if (!t) return;
+  const root = document.documentElement;
+  root.style.setProperty('--robco-green-rgb', t.rgb);
+  root.style.setProperty('--robco-green', t.hex);
+  root.style.setProperty('--robco-glow', `0 0 6px rgba(${t.rgb}, 0.6)`);
+  root.style.setProperty('--robco-dark', t.dark);
+  root.style.setProperty('--robco-refresh', `rgba(${t.rgb}, 0.12)`);
+}
+
+// Resolution order (WU-T1): explicit pick (robco_optics) is handled by the caller; this
+// returns the active game's default optic → falls back to the canon RobCo green. Reads
+// _activeDef().theme.defaultOptics — no game literal (Protocol 38); a new game supplies its own.
+function _resolveDefaultOptics() {
+  try {
+    const t = typeof _activeDef === 'function' ? _activeDef().theme : null;
+    if (t && t.defaultOptics && typeof THEMES !== 'undefined' && THEMES[t.defaultOptics]) {
+      return t.defaultOptics;
+    }
+  } catch (e) {
+    /* fall through to the canon green default */
   }
+  return 'green';
+}
+
+// Apply the active game's default optic without persisting it as an explicit pick (so a
+// later game switch re-resolves to that game's default). Used by the boot path.
+function applyDefaultOptics() {
+  _applyThemeVars(_resolveDefaultOptics());
+}
+
+// Explicit user pick (the OPTICS <select>): apply + persist as the user's standing choice.
+function changeOpticsColor(color) {
+  _applyThemeVars(color);
   localStorage.setItem('robco_optics', color);
 }
 

@@ -1216,9 +1216,13 @@ Check (-not [bool]($cssSrc33 -match 'rgba\(20,\s*253,\s*206,')) 'No hardcoded rg
 $rgbHtml33 = ([regex]::Matches($htmlSrc33, "setProperty\('--robco-green-rgb'")).Count
 Check ($rgbHtml33 -ge 5) "index.html optics script sets --robco-green-rgb in >=5 branches (found $rgbHtml33) (P1-1)"
 
-# 33.4 --robco-green-rgb set in changeOpticsColor() branches in ui.js (>=6 calls)
-$rgbUi33 = ([regex]::Matches($uiSrc, "setProperty\('--robco-green-rgb'")).Count
-Check ($rgbUi33 -ge 6) "changeOpticsColor() sets --robco-green-rgb in >=6 branches (found $rgbUi33) (P1-1)"
+# 33.4 WU-T1: optics palette is now table-driven (P1-1, repointed) -- THEMES table covers
+#      >=6 colours AND changeOpticsColor delegates to the single table-driven applier.
+$state33d = Read-Src "js/state.js"
+$audio33d = Read-Src "js/ui-audio.js"
+$themesBlock33d = [regex]::Match($state33d, '(?s)const THEMES = \{[\s\S]*?\n\};').Value
+$colourCount33 = ([regex]::Matches($themesBlock33d, "rgb:\s*'")).Count
+Check (($colourCount33 -ge 6) -and ($audio33d -match '_applyThemeVars\(color\)') -and ($audio33d -match 'THEMES\[key\]')) "THEMES table covers >=6 optic colours (found $colourCount33); changeOpticsColor is table-driven via _applyThemeVars (P1-1, WU-T1)"
 
 # 33.5 .empty-state CSS class defined in terminal.css
 Check ([bool]($cssSrc33 -match '\.empty-state\s*\{')) '.empty-state CSS class defined in terminal.css (P1-2)'
@@ -7563,6 +7567,102 @@ Check (($consoleArr123 + $showFn123 + $launchFn123) -notmatch 'New Vegas|Mojave|
 # 123.9  discoverable affordances: #termlinkBtn routes natively, registry advertises it, console CSS present
 Check (($html123 -match "(?s)id=`"termlinkBtn`"[\s\S]*?macroCommand\('\[TERMLINK\]'\)") -and ($html123 -match 'aria-label="Open the TERMLINK command console') -and ($core123 -match '\[TERMLINK\] / \[TL\]') -and ($css123 -match '\.termlink-grid') -and ($css123 -match '\.termlink-entry')) `
     '123.9: #termlinkBtn routes [TERMLINK] natively + has aria-label, COMMAND_REGISTRY advertises it, console CSS present'
+
+# ===========================================================
+# Suite 124 -- WU-T1 per-game theming + AA contrast (12 tests)
+# Data-driven optics: ONE THEMES table (state.js) replaces the if/else palette in
+# changeOpticsColor (ui-audio) and the duplicated fgMap (ui-saves); each GAME_DEFS entry
+# declares theme.defaultOptics resolved via _activeDef() (no game literal); a real WCAG
+# relative-luminance computation enforces AA >=4.5:1 for every contrastSafe default.
+# (PS mirror of JS 124.)
+# ===========================================================
+function Get-RelLum124([string]$hex) {
+    $m = $hex.TrimStart('#')
+    $lin = @(0, 2, 4) | ForEach-Object {
+        $c = [Convert]::ToInt32($m.Substring($_, 2), 16) / 255.0
+        if ($c -le 0.03928) { $c / 12.92 } else { [Math]::Pow((($c + 0.055) / 1.055), 2.4) }
+    }
+    return 0.2126 * $lin[0] + 0.7152 * $lin[1] + 0.0722 * $lin[2]
+}
+function Get-Contrast124([string]$h1, [string]$h2) {
+    $a = Get-RelLum124 $h1
+    $b = Get-RelLum124 $h2
+    $hi = [Math]::Max($a, $b)
+    $lo = [Math]::Min($a, $b)
+    return ($hi + 0.05) / ($lo + 0.05)
+}
+Sep "Suite 124 -- WU-T1 per-game theming + AA contrast"
+$state124 = Read-Src "js/state.js"
+$audio124 = Read-Src "js/ui-audio.js"
+$saves124 = Read-Src "js/ui-saves.js"
+$core124  = Read-Src "js/ui-core.js"
+$html124  = Read-Src "index.html"
+$themesBlock124 = [regex]::Match($state124, '(?s)const THEMES = \{[\s\S]*?\n\};').Value
+$themeMatches124 = [regex]::Matches($themesBlock124, "(\w+):\s*\{\s*rgb:\s*'([^']+)',\s*hex:\s*'(#[0-9a-fA-F]{6})',\s*dark:\s*'(#[0-9a-fA-F]{6})',\s*label:\s*'[^']+',\s*contrastSafe:\s*(true|false),?\s*\}")
+$themeKeys124 = @($themeMatches124 | ForEach-Object { $_.Groups[1].Value })
+$safeKeys124 = @($themeMatches124 | Where-Object { $_.Groups[5].Value -eq 'true' } | ForEach-Object { $_.Groups[1].Value })
+$themeDefaults124 = @([regex]::Matches($state124, "theme:\s*\{\s*defaultOptics:\s*'(\w+)'") | ForEach-Object { $_.Groups[1].Value })
+$fnvDef124 = [regex]::Match($state124, "(?s)FNV:[\s\S]*?theme:\s*\{\s*defaultOptics:\s*'(\w+)'").Groups[1].Value
+$fo3Def124 = [regex]::Match($state124, "(?s)FO3:[\s\S]*?theme:\s*\{\s*defaultOptics:\s*'(\w+)'").Groups[1].Value
+$changeFn124  = [regex]::Match($audio124, '(?s)function changeOpticsColor\([\s\S]*?\n\}').Value
+$applyFn124   = [regex]::Match($audio124, '(?s)function _applyThemeVars\([\s\S]*?\n\}').Value
+$resolveFn124 = [regex]::Match($audio124, '(?s)function _resolveDefaultOptics\([\s\S]*?\n\}').Value
+
+# 124.1  THEMES single-source table exists, window-exposed, has the canon + FO3 greens
+Check (($state124 -match 'const THEMES = \{') -and ($state124 -match 'window\.THEMES = THEMES') -and ($themeKeys124.Count -ge 7) -and ($themeKeys124 -contains 'green') -and ($themeKeys124 -contains 'green3')) `
+    '124.1: THEMES table defined + window-exposed with >=7 entries incl. green & green3'
+
+# 124.2  every THEMES entry parsed with the full {rgb,hex,dark,label,contrastSafe} shape
+Check ($themeMatches124.Count -ge 7) `
+    '124.2: every THEMES entry has the {rgb,hex,dark,label,contrastSafe} shape'
+
+# 124.3  canon NV green is #14fdce; FO3 green3 is a visibly DISTINCT green
+$greenHex124 = ($themeMatches124 | Where-Object { $_.Groups[1].Value -eq 'green' } | Select-Object -First 1).Groups[3].Value
+$green3Hex124 = ($themeMatches124 | Where-Object { $_.Groups[1].Value -eq 'green3' } | Select-Object -First 1).Groups[3].Value
+Check (($greenHex124.ToLower() -eq '#14fdce') -and ($green3Hex124) -and ($green3Hex124.ToLower() -ne '#14fdce')) `
+    '124.3: THEMES.green = #14fdce (canon NV green) and THEMES.green3 is a distinct green'
+
+# 124.4  per-game defaults: FNV -> green, FO3 -> green3
+Check (($fnvDef124 -eq 'green') -and ($fo3Def124 -eq 'green3')) `
+    '124.4: GAME_DEFS.FNV.theme.defaultOptics="green" and FO3="green3" (per-game default optics)'
+
+# 124.5  data-driven completeness: every GAME_DEFS theme.defaultOptics exists in THEMES
+$missingDefaults124 = @($themeDefaults124 | Where-Object { $themeKeys124 -notcontains $_ })
+Check (($themeDefaults124.Count -ge 2) -and ($missingDefaults124.Count -eq 0)) `
+    '124.5: every GAME_DEFS theme.defaultOptics resolves to a THEMES entry'
+
+# 124.6  every per-game default points at a contrastSafe:true theme
+$unsafeDefaults124 = @($themeDefaults124 | Where-Object { $safeKeys124 -notcontains $_ })
+Check ($unsafeDefaults124.Count -eq 0) `
+    '124.6: every per-game default optic is contrastSafe:true'
+
+# 124.7  WCAG AA: every contrastSafe:true theme computes >=4.5:1 against the page bg
+$failContrast124 = @($themeMatches124 | Where-Object { $_.Groups[5].Value -eq 'true' } | Where-Object { (Get-Contrast124 $_.Groups[3].Value '#010a07') -lt 4.5 })
+Check (($failContrast124.Count -eq 0) -and ($safeKeys124.Count -ge 1)) `
+    '124.7: every contrastSafe:true theme meets WCAG AA >=4.5:1 vs the page background'
+
+# 124.8  changeOpticsColor is table-driven (no hardcoded if/else palette chain)
+Check (($changeFn124 -match '_applyThemeVars\(color\)') -and ($changeFn124 -match "localStorage\.setItem\('robco_optics'") -and (-not ($changeFn124 -match 'else if \(color ===')) -and ($applyFn124 -match 'THEMES\[key\]')) `
+    '124.8: changeOpticsColor delegates to table-driven _applyThemeVars (THEMES lookup); the old if/else palette chain is gone'
+
+# 124.9  ui-saves dropped the duplicated fgMap palette and reads THEMES
+Check ((-not ($saves124 -match 'const fgMap = \{')) -and ($saves124 -match 'THEMES\[optics\]')) `
+    '124.9: ui-saves.js dropped the duplicate fgMap and reads the export colour from THEMES'
+
+# 124.10  per-game resolver reads _activeDef().theme.defaultOptics, green fallback, agnostic
+Check (($resolveFn124 -match '_activeDef\(\)\.theme') -and ($resolveFn124 -match "return 'green'") -and (-not (($resolveFn124 + $applyFn124 + $changeFn124) -match '\bFNV\b|\bFO3\b'))) `
+    '124.10: _resolveDefaultOptics reads _activeDef().theme.defaultOptics with a green fallback, no game literal (Protocol 38)'
+
+# 124.11  boot applies explicit pick -> else per-game default; theme shape carries the T3 seam
+$fnvTheme124 = [regex]::Match($state124, '(?s)FNV:[\s\S]*?theme:\s*\{([\s\S]*?)\}').Groups[1].Value
+$shapeOk124 = $true
+foreach ($f in @('defaultOptics', 'framing', 'pipBoyModel', 'bootFlavor', 'saveLabel')) { if (-not $fnvTheme124.Contains($f + ':')) { $shapeOk124 = $false } }
+Check (($core124 -match 'applyDefaultOptics\(\)') -and ($core124 -match '_applyThemeVars\(color\)') -and $shapeOk124) `
+    '124.11: ui-core boot applies explicit pick else applyDefaultOptics(); GAME_DEFS.theme carries the full shape (WU-T3 seam)'
+
+# 124.12  the pre-paint inline head script + the OPTICS picker both cover green3 (flash-free)
+Check (($html124 -match '<option value="green3">') -and ($html124 -match "color === 'green3'") -and ($html124.Contains("'#4fb05a'"))) `
+    '124.12: index.html exposes the green3 optic option AND the pre-paint head script applies it (no flash on explicit pick)'
 
 # ===========================================================
 # Results

@@ -578,10 +578,19 @@ window.onload = function () {
     });
   });
 
+  // WU-T1: optics resolution — explicit user pick (robco_optics) wins; otherwise apply the
+  // active game's per-game default (FNV = RobCo green, FO3 = duller Pip-Boy green). A game
+  // switch reloads (onGameContextChange), so a player with no explicit pick re-resolves to
+  // the new game's default here.
   if (localStorage.getItem('robco_optics')) {
     let color = localStorage.getItem('robco_optics');
-    document.getElementById('opticsColorInput').value = color;
-    changeOpticsColor(color);
+    const sel = document.getElementById('opticsColorInput');
+    if (sel) sel.value = color;
+    _applyThemeVars(color);
+  } else {
+    applyDefaultOptics();
+    const sel = document.getElementById('opticsColorInput');
+    if (sel) sel.value = _resolveDefaultOptics();
   }
 
   if (localStorage.getItem('robco_sfx_muted') === 'true') {

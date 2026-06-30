@@ -2186,12 +2186,17 @@ header('Phase 2b Guards');
   );
 }
 
-// 33.4 --robco-green-rgb set in changeOpticsColor() branches in ui.js (≥6 calls)
+// 33.4 WU-T1: optics palette is now table-driven — the old ≥6 if/else branch count is
+//      replaced by "the THEMES table covers ≥6 colours AND changeOpticsColor delegates to the
+//      single table-driven applier" (P1-1, repointed for the WU-T1 refactor).
 {
-  const rgbCount = (uiSource.match(/setProperty\(['"]--robco-green-rgb['"]/g) || []).length;
+  const state33d = readFile('js/state.js');
+  const audio33d = readFile('js/ui-audio.js');
+  const themesBlock33d = (state33d.match(/const THEMES = \{([\s\S]*?)\n\};/) || ['', ''])[1];
+  const colourCount = (themesBlock33d.match(/rgb:\s*'/g) || []).length;
   assert(
-    rgbCount >= 6,
-    `changeOpticsColor() sets --robco-green-rgb in ≥6 branches (found ${rgbCount}) (P1-1)`
+    colourCount >= 6 && /_applyThemeVars\(color\)/.test(audio33d) && /THEMES\[key\]/.test(audio33d),
+    `THEMES table covers ≥6 optic colours (found ${colourCount}); changeOpticsColor is table-driven via _applyThemeVars (P1-1, WU-T1)`
   );
 }
 
@@ -13358,6 +13363,168 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       /\.termlink-grid\b/.test(css123) &&
       /\.termlink-entry\b/.test(css123),
     '123.9: #termlinkBtn routes [TERMLINK] natively + has aria-label, COMMAND_REGISTRY advertises it, console CSS present'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 124 — WU-T1 per-game theming (THEMES table + GAME_DEFS.theme + AA contrast)
+//  Data-driven optics: ONE THEMES table (state.js) replaces the if/else palette in
+//  changeOpticsColor (ui-audio) and the duplicated fgMap (ui-saves); each GAME_DEFS entry
+//  declares theme.defaultOptics resolved via _activeDef() (no game literal); a real WCAG
+//  relative-luminance computation enforces AA ≥4.5:1 for every contrastSafe default.
+//  12 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 124 — WU-T1 per-game theming + AA contrast');
+  const state124 = readFile('js/state.js');
+  const audio124 = readFile('js/ui-audio.js');
+  const saves124 = readFile('js/ui-saves.js');
+  const core124 = readFile('js/ui-core.js');
+  const html124 = readFile('index.html');
+
+  // Real WCAG 2.x relative-luminance + contrast-ratio (sRGB). Self-improving guard: a new
+  // theme with illegible contrast fails the gate before it can ship.
+  const _lum124 = hex => {
+    const m = hex.replace('#', '');
+    const ch = i => {
+      const c = parseInt(m.slice(i, i + 2), 16) / 255;
+      return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    };
+    return 0.2126 * ch(0) + 0.7152 * ch(2) + 0.0722 * ch(4);
+  };
+  const _contrast124 = (h1, h2) => {
+    const a = _lum124(h1);
+    const b = _lum124(h2);
+    return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  };
+  const BG124 = '#010a07'; // the terminal page background
+
+  const themesBlock124 = (state124.match(/const THEMES = \{([\s\S]*?)\n\};/) || ['', ''])[1];
+  const themeEntries124 = [
+    ...themesBlock124.matchAll(
+      /(\w+):\s*\{\s*rgb:\s*'([^']+)',\s*hex:\s*'(#[0-9a-fA-F]{6})',\s*dark:\s*'(#[0-9a-fA-F]{6})',\s*label:\s*'[^']+',\s*contrastSafe:\s*(true|false),?\s*\}/g
+    ),
+  ].map(m => ({ key: m[1], rgb: m[2], hex: m[3], dark: m[4], safe: m[5] === 'true' }));
+  const themeKeys124 = themeEntries124.map(t => t.key);
+  const themeDefaults124 = [...state124.matchAll(/theme:\s*\{\s*defaultOptics:\s*'(\w+)'/g)].map(
+    m => m[1]
+  );
+  const fnvTheme124 = (state124.match(/FNV:[\s\S]*?theme:\s*\{([\s\S]*?)\}/) || ['', ''])[1];
+  const fo3Def124 = (state124.match(/FO3:[\s\S]*?theme:\s*\{\s*defaultOptics:\s*'(\w+)'/) || [])[1];
+  const fnvDef124 = (state124.match(/FNV:[\s\S]*?theme:\s*\{\s*defaultOptics:\s*'(\w+)'/) || [])[1];
+  const changeFn124 = (audio124.match(/function changeOpticsColor\([\s\S]*?\n\}/) || [''])[0];
+  const applyFn124 = (audio124.match(/function _applyThemeVars\([\s\S]*?\n\}/) || [''])[0];
+  const resolveFn124 = (audio124.match(/function _resolveDefaultOptics\([\s\S]*?\n\}/) || [''])[0];
+
+  // 124.1  THEMES single-source table exists, is window-exposed, has the canon + FO3 greens
+  assert(
+    /const THEMES = \{/.test(state124) &&
+      /window\.THEMES = THEMES/.test(state124) &&
+      themeKeys124.length >= 7 &&
+      themeKeys124.includes('green') &&
+      themeKeys124.includes('green3'),
+    '124.1: THEMES table defined + window-exposed with ≥7 entries incl. green & green3 (' +
+      themeKeys124.length +
+      ')'
+  );
+
+  // 124.2  every THEMES entry parsed with the full shape {rgb,hex,dark,label,contrastSafe}
+  assert(
+    themeEntries124.length === themeKeys124.length && themeEntries124.length >= 7,
+    '124.2: every THEMES entry has the {rgb,hex,dark,label,contrastSafe} shape (' +
+      themeEntries124.length +
+      ' parsed)'
+  );
+
+  // 124.3  canon NV green is #14fdce; FO3 green3 is a visibly DISTINCT green (different hex)
+  const green124 = themeEntries124.find(t => t.key === 'green');
+  const green3_124 = themeEntries124.find(t => t.key === 'green3');
+  assert(
+    green124 &&
+      green124.hex.toLowerCase() === '#14fdce' &&
+      green3_124 &&
+      green3_124.hex.toLowerCase() !== '#14fdce',
+    '124.3: THEMES.green = #14fdce (canon NV green) and THEMES.green3 is a distinct green (' +
+      (green3_124 ? green3_124.hex : '?') +
+      ')'
+  );
+
+  // 124.4  per-game defaults: FNV → green (RobCo green), FO3 → green3 (duller Pip-Boy green)
+  assert(
+    fnvDef124 === 'green' && fo3Def124 === 'green3',
+    '124.4: GAME_DEFS.FNV.theme.defaultOptics="green" and FO3="green3" (per-game default optics)'
+  );
+
+  // 124.5  data-driven completeness: every GAME_DEFS theme.defaultOptics exists in THEMES
+  const missingDefaults124 = themeDefaults124.filter(d => !themeKeys124.includes(d));
+  assert(
+    themeDefaults124.length >= 2 && missingDefaults124.length === 0,
+    '124.5: every GAME_DEFS theme.defaultOptics resolves to a THEMES entry' +
+      (missingDefaults124.length ? ' — MISSING: ' + missingDefaults124.join(', ') : '')
+  );
+
+  // 124.6  every per-game default points at a contrastSafe:true theme (no illegible default)
+  const unsafeDefaults124 = themeDefaults124.filter(d => {
+    const t = themeEntries124.find(e => e.key === d);
+    return !t || !t.safe;
+  });
+  assert(
+    unsafeDefaults124.length === 0,
+    '124.6: every per-game default optic is contrastSafe:true' +
+      (unsafeDefaults124.length ? ' — UNSAFE: ' + unsafeDefaults124.join(', ') : '')
+  );
+
+  // 124.7  WCAG AA: every contrastSafe:true theme computes ≥4.5:1 against the page bg
+  const failContrast124 = themeEntries124
+    .filter(t => t.safe)
+    .filter(t => _contrast124(t.hex, BG124) < 4.5)
+    .map(t => `${t.key}(${_contrast124(t.hex, BG124).toFixed(2)}:1)`);
+  assert(
+    failContrast124.length === 0 && themeEntries124.some(t => t.safe),
+    '124.7: every contrastSafe:true theme meets WCAG AA ≥4.5:1 vs the page background' +
+      (failContrast124.length ? ' — FAIL: ' + failContrast124.join(', ') : '')
+  );
+
+  // 124.8  changeOpticsColor is table-driven (no hardcoded if/else palette chain)
+  assert(
+    /_applyThemeVars\(color\)/.test(changeFn124) &&
+      /localStorage\.setItem\('robco_optics'/.test(changeFn124) &&
+      !/else if \(color ===/.test(changeFn124) &&
+      /THEMES\[key\]/.test(applyFn124),
+    '124.8: changeOpticsColor delegates to table-driven _applyThemeVars (THEMES lookup); the old if/else palette chain is gone'
+  );
+
+  // 124.9  ui-saves dropped the duplicated fgMap palette and reads THEMES (Protocol 22)
+  assert(
+    !/const fgMap = \{/.test(saves124) && /THEMES\[optics\]/.test(saves124),
+    '124.9: ui-saves.js dropped the duplicate fgMap and reads the export colour from THEMES'
+  );
+
+  // 124.10  per-game resolver reads _activeDef().theme.defaultOptics with a green fallback,
+  //         game-agnostic (Protocol 38 — no FNV/FO3 literal in the optics apply/resolve code)
+  assert(
+    /_activeDef\(\)\.theme/.test(resolveFn124) &&
+      /return 'green'/.test(resolveFn124) &&
+      !/\bFNV\b|\bFO3\b/.test(resolveFn124 + applyFn124 + changeFn124),
+    '124.10: _resolveDefaultOptics reads _activeDef().theme.defaultOptics with a green fallback, no game literal (Protocol 38)'
+  );
+
+  // 124.11  boot applies explicit pick → else per-game default; theme shape carries the T3 seam
+  assert(
+    /applyDefaultOptics\(\)/.test(core124) &&
+      /_applyThemeVars\(color\)/.test(core124) &&
+      ['defaultOptics', 'framing', 'pipBoyModel', 'bootFlavor', 'saveLabel'].every(f =>
+        fnvTheme124.includes(f + ':')
+      ),
+    '124.11: ui-core boot applies explicit pick else applyDefaultOptics(); GAME_DEFS.theme carries the full {defaultOptics,framing,pipBoyModel,bootFlavor,saveLabel} shape (WU-T3 seam)'
+  );
+
+  // 124.12  the pre-paint inline head script + the OPTICS picker both cover green3 (flash-free)
+  assert(
+    /<option value="green3">/.test(html124) &&
+      /color === 'green3'/.test(html124) &&
+      html124.includes("'#4fb05a'"),
+    '124.12: index.html exposes the green3 optic option AND the pre-paint head script applies it (no flash on explicit pick)'
   );
 }
 
