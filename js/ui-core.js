@@ -236,6 +236,41 @@ document.addEventListener('visibilitychange', () => {
 });
 window.addEventListener('pagehide', _flushOverseerLog);
 
+// ── WU-F8: HIGH-LUMEN OPTICS (high-contrast mode) ─────────────
+// Manual companion to the OS prefers-contrast: more media query — both apply
+// the same AA+ high-contrast CSS (see terminal.css). The toggle adds/removes
+// the `high-lumen` class on <html> (matching the early-paint boot script) and
+// persists as a localStorage device preference (NOT campaign state — no
+// Protocol-4 path), mirroring the wake-lock toggle. Pure CSS effect, game-
+// agnostic: it layers over whatever optics colour is active. No web API, so
+// there is nothing to feature-detect — it is always available.
+const HIGH_LUMEN_KEY = 'robco_high_lumen';
+function isHighLumenEnabled() {
+  return localStorage.getItem(HIGH_LUMEN_KEY) === 'true';
+}
+function _applyHighLumen(on) {
+  document.documentElement.classList.toggle('high-lumen', !!on);
+}
+function _updateHighLumenUI() {
+  const note = document.getElementById('highLumenStatus');
+  if (!note) return;
+  note.textContent = isHighLumenEnabled()
+    ? '> PHOSPHOR DRIVE BOOSTED — MAXIMUM CONTRAST'
+    : '> STANDARD OPTICS — AMBIENT CONTRAST';
+}
+function toggleHighLumen(enabled) {
+  localStorage.setItem(HIGH_LUMEN_KEY, enabled ? 'true' : 'false');
+  _applyHighLumen(enabled);
+  _updateHighLumenUI();
+}
+function initHighLumen() {
+  const toggle = document.getElementById('highLumenToggle');
+  const enabled = isHighLumenEnabled();
+  if (toggle) toggle.checked = enabled;
+  _applyHighLumen(enabled);
+  _updateHighLumenUI();
+}
+
 // ── CLIENT ERROR RING-BUFFER ──────────────────────────────────
 // Local-only diagnostic log — never transmitted. Cap 50 entries × 300 chars ≈ 15 KB max.
 const ERROR_LOG_KEY = 'robco_error_log';
@@ -399,6 +434,7 @@ window.onload = function () {
   initWakeLock(); // WU-F1: restore the Sustained Power Cell (Screen Wake Lock) preference
   initHaptic(); // WU-F2: restore the Haptic Solenoid (Vibration) preference
   initOverseerLog(); // WU-F7: start the Overseer's Log session clock + bump boot count (once)
+  initHighLumen(); // WU-F8: restore the High-Lumen Optics (max-contrast) preference
 
   // H1: Rotary Dial Click — fire on any <details> panel toggle inside uiPanel
   const _uiPanel = document.getElementById('uiPanel');

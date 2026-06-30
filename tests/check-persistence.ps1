@@ -7351,6 +7351,61 @@ Check (($html119 -match 'id="overseerLogPanel"') -and ($html119 -match '<details
     '119.8: OVERSEER''S LOG is a DATA-tab .panel (summary>h2 with ">") with #overseerLogDisplay + a local-only note, and is game-agnostic (no FNV/FO3/Fallout literals)'
 
 # ===========================================================
+# Suite 120 -- WU-F8 High-Lumen Optics (high-contrast mode) (8 tests)
+# An AA+ contrast/legibility boost framed as driving the phosphor harder:
+# activated by a manual OPTICS toggle (html.high-lumen, a localStorage device
+# pref) AND the OS prefers-contrast: more media query -- both applying the same
+# pure-CSS boosts. Game-agnostic, no AI. (PS mirror of JS Suite 120.)
+# ===========================================================
+Sep "Suite 120 -- WU-F8 High-Lumen Optics (high-contrast)"
+$css120    = Read-Src "css/terminal.css"
+$uiCore120 = Read-Src "js/ui-core.js"
+$html120   = Read-Src "index.html"
+$mStart120 = $css120.IndexOf('html.high-lumen body')
+$pStart120 = $css120.IndexOf('@media (prefers-contrast: more) {', [Math]::Max(0, $mStart120))
+$addEnd120 = $css120.IndexOf('/* Add-row form')
+$manualBlock120 = if ($mStart120 -ge 0 -and $pStart120 -gt $mStart120) { $css120.Substring($mStart120, $pStart120 - $mStart120) } else { '' }
+$prefBlock120   = if ($pStart120 -ge 0 -and $addEnd120 -gt $pStart120) { $css120.Substring($pStart120, $addEnd120 - $pStart120) } else { '' }
+$tog120 = [regex]::Match($uiCore120, '(?s)function toggleHighLumen\([\s\S]*?\n\}').Value
+$app120 = [regex]::Match($uiCore120, '(?s)function _applyHighLumen\([\s\S]*?\n\}').Value
+$ini120 = [regex]::Match($uiCore120, '(?s)function initHighLumen\([\s\S]*?\n\}').Value
+$hlStart120 = $html120.IndexOf('highLumenToggle')
+$hlEnd120 = $html120.IndexOf('highLumenStatus')
+$hlSlice120 = if ($hlStart120 -ge 0 -and $hlEnd120 -gt $hlStart120) { $html120.Substring([Math]::Max(0,$hlStart120-200), ($hlEnd120 + 200) - [Math]::Max(0,$hlStart120-200)) } else { '' }
+
+# 120.1  both activation paths exist -- manual class AND OS media query
+Check (($css120 -match 'html\.high-lumen body\s*\{') -and ($css120 -match '@media \(prefers-contrast: more\)\s*\{') -and ($manualBlock120.Length -gt 0) -and ($prefBlock120.Length -gt 0)) `
+    '120.1: high-contrast is reachable two ways -- manual html.high-lumen rules AND an @media (prefers-contrast: more) block'
+
+# 120.2  high-contrast core in BOTH paths: pure-black background + glow halo removed
+Check (($manualBlock120 -match 'background-color: #000') -and ($manualBlock120 -match '--robco-glow: none') -and ($prefBlock120 -match 'background-color: #000') -and ($prefBlock120 -match '--robco-glow: none')) `
+    '120.2: both paths force a pure-black (#000) background and remove the glow halo (--robco-glow: none) for maximum text contrast'
+
+# 120.3  AA+ win -- dimmed/secondary surfaces lifted to opacity:1 in BOTH paths
+Check (($manualBlock120 -match '\.tracker-toggle--inactive,') -and ($manualBlock120 -match '\.list-row-prefix,') -and ($manualBlock120 -match 'opacity: 1 !important') -and ($prefBlock120 -match '\.tracker-toggle--inactive,') -and ($prefBlock120 -match 'opacity: 1 !important')) `
+    '120.3: both paths lift dimmed surfaces (inactive tabs, list prefixes, inactive toggles, tracker-meta, filter buttons, empty-states) to opacity:1 -- the measurable contrast gain'
+
+# 120.4  scanline/refresh CRT veil dropped to opacity 0.12 in BOTH paths
+Check (($manualBlock120 -match '\.crt-overlay,') -and ($manualBlock120 -match 'opacity: 0\.12') -and ($prefBlock120 -match '\.crt-overlay,') -and ($prefBlock120 -match 'opacity: 0\.12')) `
+    '120.4: both paths drop the scanline + refresh-bar overlay to opacity 0.12 so the CRT veil no longer dims text'
+
+# 120.5  manual toggle persisted as a localStorage device preference (not campaign state)
+Check (($uiCore120 -match "const HIGH_LUMEN_KEY = 'robco_high_lumen'") -and ($uiCore120 -match 'function isHighLumenEnabled\(\)') -and ($uiCore120 -match "localStorage\.getItem\(HIGH_LUMEN_KEY\)\s*===\s*'true'")) `
+    '120.5: HIGH_LUMEN_KEY + isHighLumenEnabled() persist the toggle as a localStorage device preference (not campaign state)'
+
+# 120.6  toggle persists + flips the html.high-lumen class; #highLumenToggle onchange wires to it
+Check (($tog120 -match 'localStorage\.setItem\(HIGH_LUMEN_KEY') -and ($tog120 -match '_applyHighLumen\(') -and ($app120 -match "documentElement\.classList\.toggle\('high-lumen'") -and ($html120 -match 'onchange="toggleHighLumen\(this\.checked\)"')) `
+    "120.6: toggleHighLumen persists the pref and _applyHighLumen toggles the 'high-lumen' class on <html>; #highLumenToggle onchange wires to it"
+
+# 120.7  init restores the pref + reflects to the checkbox + boot wiring + early-paint (no flash)
+Check (($ini120 -match 'toggle\.checked = enabled') -and ($ini120 -match '_applyHighLumen\(enabled\)') -and ($uiCore120 -match 'initHighLumen\(\); // WU-F8') -and ($html120 -match "robco_high_lumen'\) === 'true'") -and ($html120 -match "document\.documentElement\.classList\.add\('high-lumen'\)")) `
+    '120.7: initHighLumen() restores the pref to the checkbox + applies it, is wired into boot, and the inline head script applies high-lumen before first paint (no contrast flash)'
+
+# 120.8  accessible toggle UI: checkbox + label[for] + status note, game-agnostic
+Check (($html120 -match 'id="highLumenToggle"') -and ($html120 -match 'for="highLumenToggle"') -and ($html120 -match 'id="highLumenStatus"') -and ($html120 -match 'HIGH-LUMEN OPTICS') -and ($hlSlice120 -notmatch '\bFNV\b|\bFO3\b|Fallout')) `
+    '120.8: the HIGH-LUMEN toggle has #highLumenToggle + label[for] + #highLumenStatus note and is game-agnostic (no FNV/FO3/Fallout literals)'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

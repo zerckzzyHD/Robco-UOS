@@ -53,6 +53,10 @@
           root.style.setProperty('--robco-refresh', 'rgba(192, 132, 252, 0.12)');
         }
       }
+      // WU-F8: apply High-Lumen Optics before first paint (no contrast flash)
+      if (localStorage.getItem('robco_high_lumen') === 'true') {
+        document.documentElement.classList.add('high-lumen');
+      }
     </script>
   </head>
 
@@ -1458,6 +1462,29 @@
                 <option value="neon">Neon Purple</option>
               </select>
             </div>
+
+            <!-- WU-F8: High-Lumen Optics — manual high-contrast (AA+) toggle -->
+            <div class="audio-row" style="margin-top: 10px">
+              <input
+                type="checkbox"
+                id="highLumenToggle"
+                onchange="toggleHighLumen(this.checked)"
+                style="width: auto; accent-color: var(--robco-alert)"
+              />
+              <label for="highLumenToggle" style="color: var(--robco-alert); font-size: 12px"
+                >HIGH-LUMEN OPTICS (MAX CONTRAST)</label
+              >
+            </div>
+            <span
+              id="highLumenStatus"
+              style="
+                display: block;
+                color: var(--robco-alert);
+                font-size: 10px;
+                opacity: 0.7;
+                margin-top: 2px;
+              "
+            ></span>
 
             <details id="audioSystemsDetails" class="sub-panel" data-sub-id="audio_systems">
               <summary class="config-summary" style="color: var(--robco-alert); font-size: 13px">

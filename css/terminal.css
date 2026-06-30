@@ -2468,6 +2468,69 @@ summary.config-summary:focus-visible {
   }
 }
 
+/* ── WU-F8: HIGH-LUMEN OPTICS (AA+ contrast mode) ──────────────
+   An accessibility/legibility boost framed in-world as driving the
+   phosphor harder. It maximises text-vs-background contrast: a pure-black
+   background, no glow halo (sharper glyph edges), every dimmed/secondary
+   surface lifted to full opacity, and the scanline/refresh veil dropped
+   to a whisper. Pure CSS, game-agnostic — it layers over whatever optics
+   colour (--robco-green token) is active, so it works in every theme and
+   every game. Activated TWO ways, both applying the identical boosts:
+     1. the manual OPTICS toggle  → html.high-lumen  (localStorage pref)
+     2. the OS preference         → @media (prefers-contrast: more)
+   The two blocks below are intentional mirrors — keep them in lock-step. */
+html.high-lumen body {
+  background-color: #000;
+  text-shadow: none;
+}
+html.high-lumen {
+  --robco-dark: #000;
+  --robco-glow: none;
+}
+html.high-lumen .tab-btn,
+html.high-lumen .list-row-prefix,
+html.high-lumen .tracker-toggle--inactive,
+html.high-lumen .tracker-meta,
+html.high-lumen .inv-filter-btn,
+html.high-lumen .empty-state {
+  opacity: 1 !important;
+}
+html.high-lumen .crt-overlay,
+html.high-lumen .crt-overlay::after {
+  opacity: 0.12;
+}
+html.high-lumen .panel,
+html.high-lumen .sub-panel {
+  border-color: var(--robco-green);
+}
+
+@media (prefers-contrast: more) {
+  body {
+    background-color: #000;
+    text-shadow: none;
+  }
+  :root {
+    --robco-dark: #000;
+    --robco-glow: none;
+  }
+  .tab-btn,
+  .list-row-prefix,
+  .tracker-toggle--inactive,
+  .tracker-meta,
+  .inv-filter-btn,
+  .empty-state {
+    opacity: 1 !important;
+  }
+  .crt-overlay,
+  .crt-overlay::after {
+    opacity: 0.12;
+  }
+  .panel,
+  .sub-panel {
+    border-color: var(--robco-green);
+  }
+}
+
 /* Add-row form: flex row below each panel's list */
 .panel-form {
   display: flex;

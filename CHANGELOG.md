@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1452/1452 | Cache: robco-terminal-v2.6.0-r49 -->
+﻿## [Unreleased]<!-- Tests: 1460/1460 | Cache: robco-terminal-v2.6.0-r50 -->
 
 ### Added
 
@@ -16,6 +16,7 @@
 - Added an EJECT HOLOTAPE button (next to "Download Campaign Log", under Security & Configuration) that hands your comm-link transcript straight to your device's share sheet — so on a phone you can fire it off to Messages, email, Notes, or any app in one tap. If your device can't bring up a share sheet, it quietly copies the transcript to your clipboard instead, and if even that's unavailable it falls back to saving the transcript as a text file. Cancelling the share sheet just closes it, nothing else happens. Works offline with no AI.
 - The installed terminal app icon now shows a small count badge of your unresolved directives — your active quests — while the app is in the background, and clears it the moment you open the terminal (you've seen them). It's an ambient nudge with no pop-ups or notifications. On phones and desktops that support app-icon badges it appears automatically once the app is installed to your home screen; everywhere else it simply does nothing. Works offline with no AI.
 - Added an OVERSEER'S LOG panel on the DATA tab — a maintenance read-out of how long you've spent in the terminal: your current session uptime (ticking live), your longest single session, total power-on time across every visit, and how many times you've booted the terminal. It's quiet flavour that builds over time, stored only on your own device — nothing is ever uploaded or synced. Works entirely offline with no AI.
+- Added a HIGH-LUMEN OPTICS toggle (next to the OPTICS colour picker, under Security & Configuration) — a high-contrast display mode for easier reading in bright rooms or for low vision. Flip it on and the terminal drops to a pure-black background, drops the soft phosphor glow for sharper text, lifts every dimmed label to full strength, and quietens the scanline overlay — all while keeping whatever optics colour you've chosen. It also turns on automatically if your operating system already asks for higher contrast, so it respects that preference out of the box. Your choice is remembered on this device and applies the instant the terminal opens. Works in either game, entirely offline with no AI.
 
 ### Fixed
 

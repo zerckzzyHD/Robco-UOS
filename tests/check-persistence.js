@@ -12937,6 +12937,126 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 120 — WU-F8 High-Lumen Optics (high-contrast mode)
+//  An AA+ contrast/legibility boost framed as driving the phosphor harder:
+//  activated by a manual OPTICS toggle (html.high-lumen, a localStorage device
+//  pref) AND the OS prefers-contrast: more media query — both applying the same
+//  pure-CSS boosts (pure-black bg, glow removed, dimmed surfaces lifted, scanline
+//  veil dropped). Game-agnostic (layers over any optics colour), no AI. (Phase F)
+//  8 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 120 — WU-F8 High-Lumen Optics (high-contrast)');
+  const css120 = readFile('css/terminal.css');
+  const uiCore120 = readFile('js/ui-core.js');
+  const html120 = htmlSource;
+  // Slice each activation path so we can assert the boosts live in BOTH.
+  const manualBlock120 = css120.slice(
+    css120.indexOf('html.high-lumen body'),
+    css120.indexOf('@media (prefers-contrast: more) {', css120.indexOf('html.high-lumen body'))
+  );
+  const prefBlock120 = css120.slice(
+    css120.indexOf('@media (prefers-contrast: more) {', css120.indexOf('html.high-lumen body')),
+    css120.indexOf('/* Add-row form')
+  );
+
+  // 120.1  both activation paths exist — the manual class AND the OS media query
+  assert(
+    /html\.high-lumen body\s*\{/.test(css120) &&
+      /@media \(prefers-contrast: more\)\s*\{/.test(css120) &&
+      manualBlock120.length > 0 &&
+      prefBlock120.length > 0,
+    '120.1: high-contrast is reachable two ways — manual html.high-lumen rules AND an @media (prefers-contrast: more) block'
+  );
+
+  // 120.2  high-contrast core in BOTH paths: pure-black background + glow halo removed
+  assert(
+    /background-color: #000/.test(manualBlock120) &&
+      /--robco-glow: none/.test(manualBlock120) &&
+      /background-color: #000/.test(prefBlock120) &&
+      /--robco-glow: none/.test(prefBlock120),
+    '120.2: both paths force a pure-black (#000) background and remove the glow halo (--robco-glow: none) for maximum text contrast'
+  );
+
+  // 120.3  the AA+ win — every dimmed/secondary surface lifted to full opacity in BOTH paths
+  assert(
+    /\.tracker-toggle--inactive,/.test(manualBlock120) &&
+      /\.list-row-prefix,/.test(manualBlock120) &&
+      /opacity: 1 !important/.test(manualBlock120) &&
+      /\.tracker-toggle--inactive,/.test(prefBlock120) &&
+      /opacity: 1 !important/.test(prefBlock120),
+    '120.3: both paths lift dimmed surfaces (inactive tabs, list prefixes, inactive toggles, tracker-meta, filter buttons, empty-states) to opacity:1 — the measurable contrast gain'
+  );
+
+  // 120.4  scanline/refresh CRT veil dropped (it visibly lowers text contrast) in BOTH paths
+  assert(
+    /\.crt-overlay,\s*\n\s*html\.high-lumen \.crt-overlay::after\s*\{\s*\n\s*opacity: 0\.12/.test(
+      manualBlock120
+    ) && /\.crt-overlay,[\s\S]*?opacity: 0\.12/.test(prefBlock120),
+    '120.4: both paths drop the scanline + refresh-bar overlay to opacity 0.12 so the CRT veil no longer dims text'
+  );
+
+  // 120.5  manual toggle persisted as a localStorage device preference (not campaign state)
+  assert(
+    /const HIGH_LUMEN_KEY = 'robco_high_lumen'/.test(uiCore120) &&
+      /function isHighLumenEnabled\(\)/.test(uiCore120) &&
+      /localStorage\.getItem\(HIGH_LUMEN_KEY\)\s*===\s*'true'/.test(uiCore120),
+    '120.5: HIGH_LUMEN_KEY + isHighLumenEnabled() persist the toggle as a localStorage device preference (not campaign state)'
+  );
+
+  // 120.6  toggle persists + flips the html.high-lumen class; #highLumenToggle onchange wires to it
+  {
+    let tog = '',
+      app = '';
+    try {
+      tog = extractFunctionBody(uiCore120, 'toggleHighLumen');
+    } catch (_) {}
+    try {
+      app = extractFunctionBody(uiCore120, '_applyHighLumen');
+    } catch (_) {}
+    assert(
+      /localStorage\.setItem\(HIGH_LUMEN_KEY/.test(tog) &&
+        /_applyHighLumen\(/.test(tog) &&
+        /documentElement\.classList\.toggle\('high-lumen'/.test(app) &&
+        /onchange="toggleHighLumen\(this\.checked\)"/.test(html120),
+      "120.6: toggleHighLumen persists the pref and _applyHighLumen toggles the 'high-lumen' class on <html>; #highLumenToggle onchange wires to it"
+    );
+  }
+
+  // 120.7  init restores the pref + reflects to the checkbox + boot wiring + early-paint (no flash)
+  {
+    let ini = '';
+    try {
+      ini = extractFunctionBody(uiCore120, 'initHighLumen');
+    } catch (_) {}
+    assert(
+      /toggle\.checked = enabled/.test(ini) &&
+        /_applyHighLumen\(enabled\)/.test(ini) &&
+        /initHighLumen\(\); \/\/ WU-F8/.test(uiCore120) &&
+        /robco_high_lumen'\) === 'true'\)\s*\{\s*\n\s*document\.documentElement\.classList\.add\('high-lumen'\)/.test(
+          html120
+        ),
+      '120.7: initHighLumen() restores the pref to the checkbox + applies it, is wired into boot, and the inline head script applies high-lumen before first paint (no contrast flash)'
+    );
+  }
+
+  // 120.8  accessible toggle UI: checkbox + label[for] + status note, game-agnostic
+  assert(
+    /id="highLumenToggle"/.test(html120) &&
+      /for="highLumenToggle"/.test(html120) &&
+      /id="highLumenStatus"/.test(html120) &&
+      /HIGH-LUMEN OPTICS/.test(html120) &&
+      !/\bFNV\b|\bFO3\b|Fallout/.test(
+        html120.slice(
+          html120.indexOf('highLumenToggle') - 200,
+          html120.indexOf('highLumenStatus') + 200
+        )
+      ),
+    '120.8: the HIGH-LUMEN toggle has #highLumenToggle + label[for] + #highLumenStatus note and is game-agnostic (no FNV/FO3/Fallout literals)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 console.log('\n══════════════════════════════════════════════════════════════\n');
