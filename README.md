@@ -8,6 +8,10 @@
 
 _An AI-powered tactical companion terminal for Fallout: New Vegas_
 
+[![Deploy Staging](https://github.com/zerckzzyHD/Robco-UOS/actions/workflows/deploy-staging.yml/badge.svg)](https://github.com/zerckzzyHD/Robco-UOS/actions/workflows/deploy-staging.yml)
+[![CI](https://github.com/zerckzzyHD/Robco-UOS/actions/workflows/ci.yml/badge.svg)](https://github.com/zerckzzyHD/Robco-UOS/actions/workflows/ci.yml)
+[![Nightly Tests](https://github.com/zerckzzyHD/Robco-UOS/actions/workflows/nightly-tests.yml/badge.svg)](https://github.com/zerckzzyHD/Robco-UOS/actions/workflows/nightly-tests.yml)
+
 ![Version](https://img.shields.io/github/v/release/zerckzzyHD/Robco-UOS?style=flat-square&label=version&color=14fdce&labelColor=010a07)
 ![CI](https://img.shields.io/github/actions/workflow/status/zerckzzyHD/Robco-UOS/ci.yml?style=flat-square&label=CI&labelColor=010a07)
 ![Deploy](https://img.shields.io/github/actions/workflow/status/zerckzzyHD/Robco-UOS/deploy.yml?style=flat-square&label=deploy&labelColor=010a07)
