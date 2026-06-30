@@ -1730,7 +1730,14 @@ body.thermal-load .panel {
   background: rgba(28, 14, 4, 0.55) !important;
 }
 
-@media (min-width: 1000px) {
+/* Desktop app-shell layout (fixed-height, two-column, non-scrolling). Gated on a fine
+   pointer + hover so it can ONLY apply to a real mouse-driven desktop — never a touch
+   phone/tablet. This makes the breakpoint robust against a first-paint layout-viewport
+   race (Protocol 42): on rare first-loads after a service-worker update a standalone PWA
+   could momentarily settle with a desktop-width (>=1000px) layout viewport, applying this
+   PC shell on a phone until a manual reload. With the pointer/hover gate a touch device
+   (pointer:coarse, hover:none) keeps the mobile layout regardless of any width mis-measure. */
+@media (min-width: 1000px) and (hover: hover) and (pointer: fine) {
   body {
     padding: 20px;
     height: 100vh;

@@ -13923,6 +13923,53 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 129 — first-load desktop-layout guard (Protocol 42)
+//  The desktop app-shell (fixed-height two-column) must be gated on a fine pointer +
+//  hover so a touch phone can NEVER boot into the PC layout, even if a first-paint
+//  layout-viewport race momentarily reports ≥1000px. The JS panel-open default must use
+//  the same matchMedia gate, not a raw window.innerWidth read.
+//  4 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 129 — first-load desktop-layout pointer/hover gate');
+  const css129 = readFile('css/terminal.css');
+  const core129 = readFile('js/ui-core.js');
+  const GATE = '(min-width: 1000px) and (hover: hover) and (pointer: fine)';
+
+  // 129.1  the desktop app-shell media query carries the pointer/hover gate
+  assert(
+    css129.includes('@media ' + GATE),
+    '129.1: the desktop layout @media is gated on (min-width:1000px) and (hover:hover) and (pointer:fine)'
+  );
+
+  // 129.2  no UNGATED `@media (min-width: 1000px)` remains — the ungated query was the bug
+  //        (a phone with a mis-measured wide viewport would match it and get the PC shell)
+  assert(
+    !/@media\s*\(min-width:\s*1000px\)\s*\{/.test(css129),
+    '129.2: no ungated `@media (min-width: 1000px) {` remains in terminal.css (desktop shell is pointer/hover-gated)'
+  );
+
+  // 129.3  the JS panel-open default uses the same matchMedia gate, not raw window.innerWidth
+  assert(
+    core129.includes("window.matchMedia('" + GATE + "')") &&
+      !/window\.innerWidth\s*>=\s*1000/.test(core129),
+    '129.3: ui-core panel default-open uses matchMedia(gated query); the raw window.innerWidth >= 1000 read is gone'
+  );
+
+  // 129.4  the desktop shell still exists inside the gated block (the fixed-height,
+  //        overflow-hidden PC layout is preserved for actual desktops — no over-correction)
+  const desktopBlock129 = (css129.match(/@media \(min-width: 1000px\)[^{]*\{([\s\S]*?\n\})/) || [
+    '',
+    '',
+  ])[1];
+  assert(
+    /grid-template-columns:\s*380px 1fr/.test(desktopBlock129) &&
+      /overflow:\s*hidden/.test(desktopBlock129),
+    '129.4: the gated desktop block still defines the two-column 380px 1fr shell with body overflow:hidden (desktop preserved)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 console.log('\n══════════════════════════════════════════════════════════════\n');

@@ -7874,6 +7874,33 @@ Check (($gate128 -match 'robco-diagnostics\.js') -and ($gate128 -match 'robco-di
     '128.5: scripts/gate.js references both robco-diagnostics.js and robco-diagnostics.ps1 (dual-runner gate intact)'
 
 # ===========================================================
+# Suite 129 -- first-load desktop-layout pointer/hover gate (Protocol 42) (4 tests)
+# The desktop app-shell must be gated on a fine pointer + hover so a touch phone can
+# NEVER boot into the PC layout, even if a first-paint viewport race reports >=1000px.
+# (PS mirror of JS 129.)
+# ===========================================================
+Sep "Suite 129 -- first-load desktop-layout pointer/hover gate"
+$css129 = Read-Src "css/terminal.css"
+$core129 = Read-Src "js/ui-core.js"
+
+# 129.1  the desktop app-shell media query carries the pointer/hover gate
+Check ($css129.Contains('@media (min-width: 1000px) and (hover: hover) and (pointer: fine)')) `
+    '129.1: the desktop layout @media is gated on (min-width:1000px) and (hover:hover) and (pointer:fine)'
+
+# 129.2  no UNGATED `@media (min-width: 1000px)` remains -- the ungated query was the bug
+Check (-not ($css129 -match '@media\s*\(min-width:\s*1000px\)\s*\{')) `
+    '129.2: no ungated `@media (min-width: 1000px) {` remains in terminal.css (desktop shell is pointer/hover-gated)'
+
+# 129.3  the JS panel-open default uses the same matchMedia gate, not raw window.innerWidth
+Check (($core129.Contains("window.matchMedia('(min-width: 1000px) and (hover: hover) and (pointer: fine)')")) -and (-not ($core129 -match 'window\.innerWidth\s*>=\s*1000'))) `
+    '129.3: ui-core panel default-open uses matchMedia(gated query); the raw window.innerWidth >= 1000 read is gone'
+
+# 129.4  the desktop shell still exists inside the gated block (desktop preserved)
+$desktopBlock129 = [regex]::Match($css129, '(?s)@media \(min-width: 1000px\)[^{]*\{([\s\S]*?\n\})').Groups[1].Value
+Check (($desktopBlock129 -match 'grid-template-columns:\s*380px 1fr') -and ($desktopBlock129 -match 'overflow:\s*hidden')) `
+    '129.4: the gated desktop block still defines the two-column 380px 1fr shell with body overflow:hidden (desktop preserved)'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

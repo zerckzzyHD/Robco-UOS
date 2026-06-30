@@ -547,7 +547,13 @@ window.onload = function () {
     if (savedPanelState && savedPanelState[id] !== undefined) {
       if (savedPanelState[id]) d.setAttribute('open', '');
       else d.removeAttribute('open');
-    } else if (window.innerWidth >= 1000) {
+    } else if (
+      window.matchMedia('(min-width: 1000px) and (hover: hover) and (pointer: fine)').matches
+    ) {
+      // Default-open panels only on a real mouse-driven desktop — same gate as the desktop
+      // CSS shell. matchMedia (not raw innerWidth) is viewport-aware + robust to a first-paint
+      // width race, so a touch phone never boots into the desktop "all panels open" state
+      // even if window.innerWidth momentarily mis-reports >=1000 (Protocol 42).
       d.setAttribute('open', '');
     }
     d.addEventListener('toggle', () => {
