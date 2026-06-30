@@ -1010,7 +1010,7 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84','Suite 85','Suite 86','Suite 87','Suite 88','Suite 89','Suite 90','Suite 91','Suite 92','Suite 93','Suite 94','Suite 95','Suite 96','Suite 97','Suite 98','Suite 99','Suite 100','Suite 101','Suite 102','Suite 103')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84','Suite 85','Suite 86','Suite 87','Suite 88','Suite 89','Suite 90','Suite 91','Suite 92','Suite 93','Suite 94','Suite 95','Suite 96','Suite 97','Suite 98','Suite 99','Suite 100','Suite 101','Suite 102','Suite 103','Suite 104')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
 Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-99)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
@@ -6226,6 +6226,114 @@ Check (($helpBody103 -match 'escapeHtml\(c\.cmd\)') -and ($helpBody103 -match 'e
 # 103.7 game-agnostic (Protocol 38): no game-specific literals in the help copy
 Check (-not ($saveHelp103 -match '\bFNV\b|\bFO3\b|Fallout|New Vegas|Vault-Tec')) `
     '103.7: SAVE_HELP copy is game-agnostic -- no FNV/FO3/Fallout/New Vegas literals (Protocol 38)'
+
+# ===========================================================
+# Suite 104 -- WU-D4 deterministic-feature coefficients (fallout.wiki-verified) (19 tests)
+# Locks the canon coefficients that feed the Phase-N native calculators
+# (WU-N1 VATS / WU-N2 TRADE / WU-N3 THREAT). Sources (Protocol 3, fallout.wiki):
+#   * Barter buy/sell -- "Barter (Fallout: New Vegas)" / "Barter (Fallout 3)":
+#       buy = round(value * (1.55 - 0.0045*barter) * mod), sell = round(value * (0.45 + 0.0045*barter) * mod)
+#   * VATS crit bonus + clamp -- "Vault-Tec Assisted Targeting System": FNV +5%, FO3 +15%, cap 95%
+#   * ammo-per-attack default 1 (one round per trigger pull; Full Auto burns at Attacks_Per_Second)
+# The per-weapon ranged spread/falloff is an honest, unsourceable gap
+# (WU-D4a-RANGED-GAP) -- guarded as a Protocol-3 flag, never fabricated.
+# ===========================================================
+Sep "Suite 104 -- WU-D4 deterministic-feature coefficients (fallout.wiki-verified)"
+$stateSrc104 = Read-Src "js/state.js"
+$fnvAt104 = $stateSrc104.IndexOf('FNV: {')
+$fo3At104 = $stateSrc104.IndexOf('FO3: {')
+$fnvSlice104 = if ($fo3At104 -gt 0) { $stateSrc104.Substring($fnvAt104, $fo3At104 - $fnvAt104) } else { '' }
+$fo3Slice104 = if ($fo3At104 -gt 0) { $stateSrc104.Substring($fo3At104) } else { '' }
+function Get-Num104([string]$slice, [string]$key) {
+    $m = [regex]::Match($slice, ($key + '\s*:\s*(-?[\d.]+)'))
+    if ($m.Success) { return [double]::Parse($m.Groups[1].Value, [System.Globalization.CultureInfo]::InvariantCulture) }
+    return [double]::NaN
+}
+function Near104([double]$a, [double]$b) { return ([math]::Abs($a - $b) -lt 1e-9) }
+
+# -- WU-D4b barter --
+$fnvBuy = Get-Num104 $fnvSlice104 'buyBase'
+$fnvSell = Get-Num104 $fnvSlice104 'sellBase'
+$fnvSlope = Get-Num104 $fnvSlice104 'slopePerPoint'
+$fo3Buy = Get-Num104 $fo3Slice104 'buyBase'
+$fo3Sell = Get-Num104 $fo3Slice104 'sellBase'
+$fo3Slope = Get-Num104 $fo3Slice104 'slopePerPoint'
+
+# 104.1 FNV barter coefficients present
+Check ((-not [double]::IsNaN($fnvBuy)) -and (-not [double]::IsNaN($fnvSell)) -and (-not [double]::IsNaN($fnvSlope))) `
+    '104.1: GAME_DEFS.FNV.barter declares buyBase + sellBase + slopePerPoint'
+# 104.2 FNV buyBase = 1.55 (fallout.wiki)
+Check (Near104 $fnvBuy 1.55) '104.2: FNV barter buyBase === 1.55 (fallout.wiki)'
+# 104.3 FNV sellBase = 0.45 (fallout.wiki)
+Check (Near104 $fnvSell 0.45) '104.3: FNV barter sellBase === 0.45 (fallout.wiki)'
+# 104.4 FNV slope = 0.0045 (= 9/2000)
+Check (Near104 $fnvSlope 0.0045) '104.4: FNV barter slopePerPoint === 0.0045 (= 9/2000)'
+# 104.5 FO3 barter identical
+Check ((Near104 $fo3Buy 1.55) -and (Near104 $fo3Sell 0.45) -and (Near104 $fo3Slope 0.0045)) `
+    '104.5: FO3 barter coefficients identical (1.55 / 0.45 / 0.0045) -- same engine'
+# 104.6 CANON: buy never below value -- buyMult(100) >= 1.0, base <= 1.55
+$fnvBuy100 = $fnvBuy - $fnvSlope * 100
+$fo3Buy100 = $fo3Buy - $fo3Slope * 100
+Check (($fnvBuy100 -ge 1.0) -and ($fnvBuy -le 1.55) -and ($fo3Buy100 -ge 1.0) -and ($fo3Buy -le 1.55)) `
+    ('104.6: CANON -- buy multiplier stays in [1.0, 1.55] (never buy below value); buyMult@100 FNV=' + $fnvBuy100.ToString('0.000') + ' FO3=' + $fo3Buy100.ToString('0.000'))
+# 104.7 CANON: positive vendor margin (tightest at barter 100)
+$fnvGap104 = ($fnvBuy - $fnvSlope * 100) - ($fnvSell + $fnvSlope * 100)
+$fo3Gap104 = ($fo3Buy - $fo3Slope * 100) - ($fo3Sell + $fo3Slope * 100)
+Check (($fnvGap104 -gt 0) -and ($fo3Gap104 -gt 0)) `
+    ('104.7: CANON -- vendor margin positive (sellMult < buyMult) at barter 100; gap FNV=' + $fnvGap104.ToString('0.000') + ' FO3=' + $fo3Gap104.ToString('0.000'))
+# 104.8 CANON: sell multiplier in [0.45, 0.90]
+$fnvSellHi = $fnvSell + $fnvSlope * 100
+$fo3SellHi = $fo3Sell + $fo3Slope * 100
+Check (($fnvSell -ge 0.45) -and ($fnvSellHi -le 0.9) -and ($fo3Sell -ge 0.45) -and ($fo3SellHi -le 0.9)) `
+    ('104.8: CANON -- sell multiplier in [0.45, 0.90]; sellMult@100 FNV=' + $fnvSellHi.ToString('0.000') + ' FO3=' + $fo3SellHi.ToString('0.000'))
+
+# -- WU-D4a VATS --
+$fnvCrit = Get-Num104 $fnvSlice104 'critBonus'
+$fo3Crit = Get-Num104 $fo3Slice104 'critBonus'
+$fnvMin = Get-Num104 $fnvSlice104 'hitChanceMin'
+$fnvMax = Get-Num104 $fnvSlice104 'hitChanceMax'
+$fnvFloor = Get-Num104 $fnvSlice104 'skillSpreadFloor'
+$fnvCeil = Get-Num104 $fnvSlice104 'skillSpreadCeil'
+$fo3Min = Get-Num104 $fo3Slice104 'hitChanceMin'
+$fo3Max = Get-Num104 $fo3Slice104 'hitChanceMax'
+$fo3Floor = Get-Num104 $fo3Slice104 'skillSpreadFloor'
+$fo3Ceil = Get-Num104 $fo3Slice104 'skillSpreadCeil'
+
+# 104.9 FNV vats sub-object present
+Check ((-not [double]::IsNaN($fnvCrit)) -and (-not [double]::IsNaN($fnvMin)) -and (-not [double]::IsNaN($fnvMax)) -and (-not [double]::IsNaN($fnvFloor)) -and (-not [double]::IsNaN($fnvCeil))) `
+    '104.9: GAME_DEFS.FNV.vats declares critBonus + hitChanceMin/Max + skillSpreadFloor/Ceil'
+# 104.10 FNV crit = 0.05
+Check (Near104 $fnvCrit 0.05) '104.10: FNV VATS critBonus === 0.05 (+5%, fallout.wiki)'
+# 104.11 FO3 crit = 0.15
+Check (Near104 $fo3Crit 0.15) '104.11: FO3 VATS critBonus === 0.15 (+15%, fallout.wiki)'
+# 104.12 CANON: FO3 > FNV, both in (0, 0.20]
+Check (($fo3Crit -gt $fnvCrit) -and ($fnvCrit -gt 0) -and ($fnvCrit -le 0.2) -and ($fo3Crit -gt 0) -and ($fo3Crit -le 0.2)) `
+    '104.12: CANON -- FO3 critBonus > FNV critBonus, both within (0, 0.20]'
+# 104.13 cap = 95 both
+Check ((Near104 $fnvMax 95) -and (Near104 $fo3Max 95)) `
+    '104.13: VATS hitChanceMax === 95 for both games (documented cap)'
+# 104.14 floor = 5 and floor < cap both
+Check ((Near104 $fnvMin 5) -and (Near104 $fo3Min 5) -and ($fnvMin -lt $fnvMax) -and ($fo3Min -lt $fo3Max)) `
+    '104.14: VATS hitChanceMin === 5 and min < max for both games'
+# 104.15 skill-spread breakpoints 50/100 both
+Check ((Near104 $fnvFloor 50) -and (Near104 $fnvCeil 100) -and (Near104 $fo3Floor 50) -and (Near104 $fo3Ceil 100)) `
+    '104.15: VATS skillSpreadFloor === 50 and skillSpreadCeil === 100 for both games'
+
+# -- WU-D4c ammo-per-attack --
+$fnvAmmo = Get-Num104 $fnvSlice104 'ammoPerAttack'
+$fo3Ammo = Get-Num104 $fo3Slice104 'ammoPerAttack'
+# 104.16 FNV ammoPerAttack = 1
+Check (Near104 $fnvAmmo 1) '104.16: GAME_DEFS.FNV.ammoPerAttack === 1 (default round/attack)'
+# 104.17 FO3 ammoPerAttack = 1
+Check (Near104 $fo3Ammo 1) '104.17: GAME_DEFS.FO3.ammoPerAttack === 1 (default round/attack)'
+# 104.18 CANON: ammoPerAttack positive integer both
+Check ((($fnvAmmo -eq [math]::Floor($fnvAmmo)) -and ($fnvAmmo -ge 1)) -and (($fo3Ammo -eq [math]::Floor($fo3Ammo)) -and ($fo3Ammo -ge 1))) `
+    '104.18: CANON -- ammoPerAttack is a positive integer (>= 1) for both games'
+
+# -- WU-D4a-RANGED-GAP flag (Protocol 3 -- must not be silently dropped) --
+# 104.19 the honest "ranged hit-% not sourceable" flag is documented in both game entries
+Check (($fnvSlice104.Contains('WU-D4a-RANGED-GAP')) -and ($fo3Slice104.Contains('WU-D4a-RANGED-GAP'))) `
+    '104.19: WU-D4a-RANGED-GAP flag documented in both GAME_DEFS entries (Protocol 3 -- exact ranged hit-% is not sourceable)'
 
 # ===========================================================
 # Results

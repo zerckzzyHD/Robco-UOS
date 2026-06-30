@@ -1758,6 +1758,7 @@ header('Meta / Runner Parity');
     'Suite 101',
     'Suite 102',
     'Suite 103',
+    'Suite 104',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
@@ -10783,6 +10784,150 @@ header('Suite 103 — WU-C13 SAVE MENU "?" help affordance');
       '103.7: SAVE_HELP copy is game-agnostic — no FNV/FO3/Fallout/New Vegas literals (Protocol 38)'
     );
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 104 — WU-D4 deterministic-feature coefficients (fallout.wiki-verified) (19 tests)
+//  Locks the canon coefficients that feed the Phase-N native calculators
+//  (WU-N1 VATS / WU-N2 TRADE / WU-N3 THREAT). Sources (Protocol 3, fallout.wiki):
+//    • Barter buy/sell — "Barter (Fallout: New Vegas)" / "Barter (Fallout 3)":
+//        buy  = round(value × (1.55 − 0.0045×barter) × mod),  sell = round(value × (0.45 + 0.0045×barter) × mod)
+//    • VATS crit bonus + clamp — "Vault-Tec Assisted Targeting System": FNV +5%, FO3 +15%, cap 95%
+//    • ammo-per-attack default 1 (one round per trigger pull; Full Auto burns at Attacks_Per_Second)
+//  The per-weapon ranged spread/falloff is an honest, unsourceable gap
+//  (WU-D4a-RANGED-GAP) — guarded as a Protocol-3 flag, never fabricated.
+// ══════════════════════════════════════════════════════════════
+header('Suite 104 — WU-D4 deterministic-feature coefficients (fallout.wiki-verified)');
+{
+  const stateSrc104 = readFile('js/state.js');
+  // Slice GAME_DEFS into per-game regions (both games define barter/vats/ammoPerAttack).
+  const fo3At104 = stateSrc104.indexOf('FO3: {');
+  const fnvSlice104 =
+    fo3At104 > 0 ? stateSrc104.slice(stateSrc104.indexOf('FNV: {'), fo3At104) : '';
+  const fo3Slice104 = fo3At104 > 0 ? stateSrc104.slice(fo3At104) : '';
+  // num(slice, key) → numeric literal of `key: <number>` within a slice, or NaN.
+  const num104 = (slice, key) => {
+    const m = slice.match(new RegExp(key + '\\s*:\\s*(-?[\\d.]+)'));
+    return m ? parseFloat(m[1]) : NaN;
+  };
+  const near104 = (a, b) => Math.abs(a - b) < 1e-9;
+
+  // ── WU-D4b barter ──
+  const fnvBuy = num104(fnvSlice104, 'buyBase'),
+    fnvSell = num104(fnvSlice104, 'sellBase'),
+    fnvSlope = num104(fnvSlice104, 'slopePerPoint');
+  const fo3Buy = num104(fo3Slice104, 'buyBase'),
+    fo3Sell = num104(fo3Slice104, 'sellBase'),
+    fo3Slope = num104(fo3Slice104, 'slopePerPoint');
+
+  // 104.1 FNV barter coefficients present
+  assert(
+    !isNaN(fnvBuy) && !isNaN(fnvSell) && !isNaN(fnvSlope),
+    '104.1: GAME_DEFS.FNV.barter declares buyBase + sellBase + slopePerPoint'
+  );
+  // 104.2 FNV buyBase = 1.55 (fallout.wiki)
+  assert(near104(fnvBuy, 1.55), '104.2: FNV barter buyBase === 1.55 (fallout.wiki)');
+  // 104.3 FNV sellBase = 0.45 (fallout.wiki)
+  assert(near104(fnvSell, 0.45), '104.3: FNV barter sellBase === 0.45 (fallout.wiki)');
+  // 104.4 FNV slope = 0.0045 (= 9/2000, fallout.wiki FNV)
+  assert(near104(fnvSlope, 0.0045), '104.4: FNV barter slopePerPoint === 0.0045 (= 9/2000)');
+  // 104.5 FO3 barter identical to FNV (= (Barter/100)×0.45 = 0.0045/pt)
+  assert(
+    near104(fo3Buy, 1.55) && near104(fo3Sell, 0.45) && near104(fo3Slope, 0.0045),
+    '104.5: FO3 barter coefficients identical (1.55 / 0.45 / 0.0045) — same engine'
+  );
+  // 104.6 CANON RANGE: buy price is never below item value — buyMult(barter=100) >= 1.0, base <= 1.55
+  {
+    const fnvBuy100 = fnvBuy - fnvSlope * 100;
+    const fo3Buy100 = fo3Buy - fo3Slope * 100;
+    assert(
+      fnvBuy100 >= 1.0 && fnvBuy <= 1.55 && fo3Buy100 >= 1.0 && fo3Buy <= 1.55,
+      `104.6: CANON — buy multiplier stays in [1.0, 1.55] (never buy below value); buyMult@100 FNV=${fnvBuy100.toFixed(3)} FO3=${fo3Buy100.toFixed(3)}`
+    );
+  }
+  // 104.7 CANON RANGE: positive vendor margin — sellMult < buyMult at every barter (tightest at 100)
+  {
+    const fnvGap = fnvBuy - fnvSlope * 100 - (fnvSell + fnvSlope * 100);
+    const fo3Gap = fo3Buy - fo3Slope * 100 - (fo3Sell + fo3Slope * 100);
+    assert(
+      fnvGap > 0 && fo3Gap > 0,
+      `104.7: CANON — vendor margin positive (sellMult < buyMult) at barter 100; gap FNV=${fnvGap.toFixed(3)} FO3=${fo3Gap.toFixed(3)}`
+    );
+  }
+  // 104.8 CANON RANGE: sell multiplier stays within [0.45, 0.90] over barter 0..100
+  {
+    const fnvSellHi = fnvSell + fnvSlope * 100;
+    const fo3SellHi = fo3Sell + fo3Slope * 100;
+    assert(
+      fnvSell >= 0.45 && fnvSellHi <= 0.9 && fo3Sell >= 0.45 && fo3SellHi <= 0.9,
+      `104.8: CANON — sell multiplier in [0.45, 0.90]; sellMult@100 FNV=${fnvSellHi.toFixed(3)} FO3=${fo3SellHi.toFixed(3)}`
+    );
+  }
+
+  // ── WU-D4a VATS ──
+  const fnvCrit = num104(fnvSlice104, 'critBonus'),
+    fo3Crit = num104(fo3Slice104, 'critBonus');
+  const fnvMin = num104(fnvSlice104, 'hitChanceMin'),
+    fnvMax = num104(fnvSlice104, 'hitChanceMax'),
+    fnvFloor = num104(fnvSlice104, 'skillSpreadFloor'),
+    fnvCeil = num104(fnvSlice104, 'skillSpreadCeil');
+  const fo3Min = num104(fo3Slice104, 'hitChanceMin'),
+    fo3Max = num104(fo3Slice104, 'hitChanceMax'),
+    fo3Floor = num104(fo3Slice104, 'skillSpreadFloor'),
+    fo3Ceil = num104(fo3Slice104, 'skillSpreadCeil');
+
+  // 104.9 FNV vats sub-object present (crit + clamp + skill-spread breakpoints)
+  assert(
+    !isNaN(fnvCrit) && !isNaN(fnvMin) && !isNaN(fnvMax) && !isNaN(fnvFloor) && !isNaN(fnvCeil),
+    '104.9: GAME_DEFS.FNV.vats declares critBonus + hitChanceMin/Max + skillSpreadFloor/Ceil'
+  );
+  // 104.10 FNV crit bonus = 0.05 (fallout.wiki: +5%)
+  assert(near104(fnvCrit, 0.05), '104.10: FNV VATS critBonus === 0.05 (+5%, fallout.wiki)');
+  // 104.11 FO3 crit bonus = 0.15 (fallout.wiki: +15%)
+  assert(near104(fo3Crit, 0.15), '104.11: FO3 VATS critBonus === 0.15 (+15%, fallout.wiki)');
+  // 104.12 CANON RANGE: per-game difference real (FO3 > FNV) and both in (0, 0.20]
+  assert(
+    fo3Crit > fnvCrit && fnvCrit > 0 && fnvCrit <= 0.2 && fo3Crit > 0 && fo3Crit <= 0.2,
+    '104.12: CANON — FO3 critBonus > FNV critBonus, both within (0, 0.20]'
+  );
+  // 104.13 hit-chance cap = 95 (both, fallout.wiki)
+  assert(
+    near104(fnvMax, 95) && near104(fo3Max, 95),
+    '104.13: VATS hitChanceMax === 95 for both games (documented cap)'
+  );
+  // 104.14 hit-chance floor = 5 and floor < cap (both)
+  assert(
+    near104(fnvMin, 5) && near104(fo3Min, 5) && fnvMin < fnvMax && fo3Min < fo3Max,
+    '104.14: VATS hitChanceMin === 5 and min < max for both games'
+  );
+  // 104.15 skill-spread breakpoints 50/100 (both)
+  assert(
+    near104(fnvFloor, 50) &&
+      near104(fnvCeil, 100) &&
+      near104(fo3Floor, 50) &&
+      near104(fo3Ceil, 100),
+    '104.15: VATS skillSpreadFloor === 50 and skillSpreadCeil === 100 for both games'
+  );
+
+  // ── WU-D4c ammo-per-attack ──
+  const fnvAmmo = num104(fnvSlice104, 'ammoPerAttack'),
+    fo3Ammo = num104(fo3Slice104, 'ammoPerAttack');
+  // 104.16 FNV ammoPerAttack default = 1
+  assert(near104(fnvAmmo, 1), '104.16: GAME_DEFS.FNV.ammoPerAttack === 1 (default round/attack)');
+  // 104.17 FO3 ammoPerAttack default = 1
+  assert(near104(fo3Ammo, 1), '104.17: GAME_DEFS.FO3.ammoPerAttack === 1 (default round/attack)');
+  // 104.18 CANON RANGE: ammoPerAttack is a positive integer (both)
+  assert(
+    Number.isInteger(fnvAmmo) && fnvAmmo >= 1 && Number.isInteger(fo3Ammo) && fo3Ammo >= 1,
+    '104.18: CANON — ammoPerAttack is a positive integer (>= 1) for both games'
+  );
+
+  // ── WU-D4a-RANGED-GAP flag (Protocol 3 — must not be silently dropped) ──
+  // 104.19 the honest "ranged hit-% not sourceable" flag is documented in both game entries
+  assert(
+    fnvSlice104.includes('WU-D4a-RANGED-GAP') && fo3Slice104.includes('WU-D4a-RANGED-GAP'),
+    '104.19: WU-D4a-RANGED-GAP flag documented in both GAME_DEFS entries (Protocol 3 — exact ranged hit-% is not sourceable)'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════

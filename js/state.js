@@ -234,6 +234,41 @@ const GAME_DEFS = {
     hasMagazines: true,
     seedInventory: [{ name: 'Vault 13 Canteen', qty: 1, wgt: 1, val: 2, type: 'aid' }],
     calendar: { startMonth: 9, startDay: 19, startYear: 2281, epochWeekday: 0 },
+    // ── WU-D4 deterministic-feature coefficients (fallout.wiki-verified, Protocol 3) ──
+    // Feed the Phase-N native calculators (WU-N1 VATS / WU-N2 TRADE / WU-N3 THREAT);
+    // they are NOT used yet. Guarded by Suite 104. See planning/DETERMINISTIC_FEATURES.md §3.
+    barter: {
+      // Buy  = round(value × (buyBase  − slopePerPoint×barter) × mod) → mult 1.55→1.10 as barter 0→100
+      // Sell = round(value × (sellBase + slopePerPoint×barter) × mod) → mult 0.45→0.90 as barter 0→100
+      // Source: fallout.wiki "Barter (Fallout: New Vegas)" — slope 9/2000 = 0.0045.
+      // (Modifier defaults to 1.0; reputation/vendor discounts apply it at the feature layer.)
+      buyBase: 1.55,
+      sellBase: 0.45,
+      slopePerPoint: 0.0045,
+    },
+    vats: {
+      // VATS critical-hit-chance bonus: FNV +5%. Source: fallout.wiki "Vault-Tec Assisted
+      // Targeting System" ("...in Fallout: New Vegas this was reduced to a +5% boost").
+      critBonus: 0.05,
+      // Hit-% clamp. 95 is the documented practical VATS cap (hit = ChanceToHit − rand(1..100));
+      // 5 is the engine/UX floor. Source: fallout.wiki VATS.
+      hitChanceMin: 5,
+      hitChanceMax: 95,
+      // Weapon skill governs ranged spread only between skill 50 and 100 (below 50 = max
+      // spread, at 100 = min spread). Source: fallout.wiki "Weapons spread" / VATS.
+      skillSpreadFloor: 50,
+      skillSpreadCeil: 100,
+      // WU-D4a-RANGED-GAP (Protocol 3 FLAG — do not silently drop): per-weapon BASE SPREAD
+      // (degrees) and RANGE/DAM-falloff are NOT columns in WEAPONS.CSV and fallout.wiki does
+      // not tabulate them as a per-weapon coefficient set, so an EXACT ranged hit-% is not
+      // sourceable. The Phase-N ranged overlay must stay an ESTIMATE built from
+      // skillSpreadFloor/Ceil + this clamp; the melee/unarmed AP-strike path is already exact
+      // from the existing schema. Tracked under WU-D4a / WU-N1 in planning/MASTER_PLAN.md.
+    },
+    // WU-D4c: ammo consumed per single attack. Default 1 — exact for single-projectile
+    // weapons; "Full Auto" weapons burn at the schema's Attacks_Per_Second, so no per-weapon
+    // ammo column is needed. Source: fallout.wiki weapon mechanics (1 round per trigger pull).
+    ammoPerAttack: 1,
     ai: {
       skillSystemText:
         'state.skills tracks 13 skills (0-100 each): barter, energy_weapons, explosives, guns, lockpick, medicine, melee_weapons, repair, science, sneak, speech, survival, unarmed.',
@@ -258,6 +293,31 @@ const GAME_DEFS = {
     tracksLincoln: true,
     seedInventory: [],
     calendar: { startMonth: 7, startDay: 17, startYear: 2277, epochWeekday: 3 },
+    // ── WU-D4 deterministic-feature coefficients (fallout.wiki-verified, Protocol 3) ──
+    // Feed the Phase-N native calculators; not used yet. Guarded by Suite 104.
+    barter: {
+      // Same engine as FNV. Source: fallout.wiki "Barter (Fallout 3)" expresses the slope as
+      // (Barter/100)×0.45 = 0.0045/pt — numerically identical to FNV's 9/2000. Buy 1.55→1.10,
+      // sell 0.45→0.90 across barter 0→100. (Modifier defaults to 1.0.)
+      buyBase: 1.55,
+      sellBase: 0.45,
+      slopePerPoint: 0.0045,
+    },
+    vats: {
+      // VATS critical-hit-chance bonus: FO3 +15% (the per-game difference vs FNV's +5%).
+      // Source: fallout.wiki VATS ("In Fallout 3, when using V.A.T.S., a +15% critical hit
+      // chance is added").
+      critBonus: 0.15,
+      hitChanceMin: 5,
+      hitChanceMax: 95,
+      skillSpreadFloor: 50,
+      skillSpreadCeil: 100,
+      // WU-D4a-RANGED-GAP (Protocol 3 FLAG): exact ranged hit-% not sourceable — per-weapon
+      // base spread / range falloff absent from schema and fallout.wiki. Ranged overlay stays
+      // an ESTIMATE; melee/AP-strike is exact. See WU-D4a / WU-N1 in planning/MASTER_PLAN.md.
+    },
+    // WU-D4c: ammo per single attack — default 1 (Full Auto burns at Attacks_Per_Second).
+    ammoPerAttack: 1,
     ai: {
       skillSystemText:
         'state.skills tracks 13 skills (0-100 each): barter, big_guns, energy_weapons, explosives, lockpick, medicine, melee_weapons, repair, science, small_guns, sneak, speech, unarmed.',
