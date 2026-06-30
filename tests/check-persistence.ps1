@@ -6976,6 +6976,50 @@ Check ((-not ($html111 -match 'ATTACH VISUAL DATA')) -and ($html111 -match 'VISU
     '111.11: index.html optic-scan control uses > VISUAL UPLOAD, not "ATTACH" (MN-8)'
 
 # ===========================================================
+# Suite 112 -- WU-E2 reusable disabled banner templates (7 tests)
+# Owner override: #updateBanner + fo3WarningBanner are KEPT as inert,
+# reusable <template> banners -- NEVER deleted. Guards they still EXIST
+# and are disabled-by-default (wrapped in <template>, so the browser
+# parses but never renders/activates them on their own).
+# (PS mirror of JS Suite 112.)
+# ===========================================================
+Sep "Suite 112 -- WU-E2 reusable disabled banner templates"
+$html112 = Read-Src "index.html"
+$css112  = Read-Src "css/terminal.css"
+
+# 112.1  #updateBannerTemplate <template> still EXISTS (not deleted)
+Check ([bool]($html112 -match '<template id="updateBannerTemplate">')) `
+    '112.1: #updateBannerTemplate <template> exists in index.html (update banner kept as template -- never deleted)'
+
+# 112.2  the update banner markup lives INSIDE that template (disabled by default -- inert)
+Check ([bool]($html112 -match '(?s)<template id="updateBannerTemplate">[\s\S]*?class="update-banner"[\s\S]*?</template>')) `
+    '112.2: .update-banner markup is wrapped in #updateBannerTemplate (disabled-by-default -- <template> never renders on its own)'
+
+# 112.3  the .update-banner style rule is PRESERVED in terminal.css (style not deleted)
+Check ([bool]($css112 -match '\.update-banner\s*\{')) `
+    '112.3: .update-banner CSS rule preserved in terminal.css (reusable banner style kept)'
+
+# 112.4  #fo3WarningBannerTemplate <template> still EXISTS (not deleted)
+Check ([bool]($html112 -match '<template id="fo3WarningBannerTemplate">')) `
+    '112.4: #fo3WarningBannerTemplate <template> exists in index.html (FO3 warning banner kept as template -- never deleted)'
+
+# 112.5  the #fo3WarningBanner div lives INSIDE that template AND is display:none
+Check ([bool]($html112 -match '(?s)<template id="fo3WarningBannerTemplate">[\s\S]*?id="fo3WarningBanner"[^>]*style="[^"]*display:\s*none[\s\S]*?</template>')) `
+    '112.5: #fo3WarningBanner is wrapped in its template and carries display:none (disabled-by-default)'
+
+# 112.6  the .fo3-warning-banner style rule is PRESERVED in terminal.css (style not deleted)
+Check ([bool]($css112 -match '\.fo3-warning-banner\s*\{')) `
+    '112.6: .fo3-warning-banner CSS rule preserved in terminal.css (reusable banner style kept)'
+
+# 112.7  neither banner is ACTIVE outside a <template> -- each handle appears exactly once,
+#        only inside its template, so nothing renders by default.
+$ubCount  = ([regex]::Matches($html112, 'class="update-banner"')).Count
+$fo3Count = ([regex]::Matches($html112, 'id="fo3WarningBanner"')).Count
+$ubInTpl  = [bool]($html112 -match '(?s)<template id="updateBannerTemplate">[\s\S]*?class="update-banner"[\s\S]*?</template>')
+Check (($ubCount -eq 1) -and ($fo3Count -eq 1) -and $ubInTpl) `
+    '112.7: each banner appears exactly once and only inside its <template> (no active, rendered banner outside a template)'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

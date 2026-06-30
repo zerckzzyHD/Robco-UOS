@@ -12201,6 +12201,74 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 112 — WU-E2 reusable disabled banner templates
+//  Owner override: #updateBanner + fo3WarningBanner are KEPT as inert,
+//  reusable <template> banners — NEVER deleted. Guards they still EXIST
+//  and are disabled-by-default (wrapped in <template>, so the browser
+//  parses but never renders/activates them on their own).
+//  7 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('WU-E2 reusable disabled banner templates');
+  const cssSrc112 = readFile('css/terminal.css');
+
+  // 112.1  #updateBannerTemplate <template> still EXISTS (not deleted)
+  assert(
+    /<template id="updateBannerTemplate">/.test(htmlSource),
+    '112.1: #updateBannerTemplate <template> exists in index.html (update banner kept as template — never deleted)'
+  );
+
+  // 112.2  the update banner markup lives INSIDE that template (disabled by default — inert)
+  assert(
+    /<template id="updateBannerTemplate">[\s\S]*?class="update-banner"[\s\S]*?<\/template>/.test(
+      htmlSource
+    ),
+    '112.2: .update-banner markup is wrapped in #updateBannerTemplate (disabled-by-default — <template> never renders on its own)'
+  );
+
+  // 112.3  the .update-banner style rule is PRESERVED in terminal.css (style not deleted)
+  assert(
+    /\.update-banner\s*\{/.test(cssSrc112),
+    '112.3: .update-banner CSS rule preserved in terminal.css (reusable banner style kept)'
+  );
+
+  // 112.4  #fo3WarningBannerTemplate <template> still EXISTS (not deleted)
+  assert(
+    /<template id="fo3WarningBannerTemplate">/.test(htmlSource),
+    '112.4: #fo3WarningBannerTemplate <template> exists in index.html (FO3 warning banner kept as template — never deleted)'
+  );
+
+  // 112.5  the #fo3WarningBanner div lives INSIDE that template AND is display:none
+  //        (disabled-by-default both ways: inert <template> + explicit display:none)
+  assert(
+    /<template id="fo3WarningBannerTemplate">[\s\S]*?id="fo3WarningBanner"[^>]*style="[^"]*display:\s*none[\s\S]*?<\/template>/.test(
+      htmlSource
+    ),
+    '112.5: #fo3WarningBanner is wrapped in its template and carries display:none (disabled-by-default)'
+  );
+
+  // 112.6  the .fo3-warning-banner style rule is PRESERVED in terminal.css (style not deleted)
+  assert(
+    /\.fo3-warning-banner\s*\{/.test(cssSrc112),
+    '112.6: .fo3-warning-banner CSS rule preserved in terminal.css (reusable banner style kept)'
+  );
+
+  // 112.7  neither banner is ACTIVE outside a <template> — the only occurrences of the
+  //        banner handles are inside template blocks, so nothing renders by default.
+  const _activeUpdateBanner = /class="update-banner"/g.test(htmlSource)
+    ? (htmlSource.match(/class="update-banner"/g) || []).length === 1 &&
+      /<template id="updateBannerTemplate">[\s\S]*?class="update-banner"[\s\S]*?<\/template>/.test(
+        htmlSource
+      )
+    : false;
+  const _fo3Once = (htmlSource.match(/id="fo3WarningBanner"/g) || []).length === 1;
+  assert(
+    _activeUpdateBanner && _fo3Once,
+    '112.7: each banner appears exactly once and only inside its <template> (no active, rendered banner outside a template)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 console.log('\n══════════════════════════════════════════════════════════════\n');

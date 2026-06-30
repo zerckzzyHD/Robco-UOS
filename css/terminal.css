@@ -2331,10 +2331,14 @@ body.sync-complete {
   }
 }
 
-/* ─── SW Update Banner ────────────────────────────────────────── */
-/* Fixed amber strip shown when a new service-worker version is waiting.
+/* ─── SW Update Banner (reusable template — WU-E2) ─────────────── */
+/* Fixed amber strip for a "firmware update staged" / feature notice.
+   INTENTIONAL TEMPLATE, NEVER DELETE: the active update path is the blocking
+   #updateModal; this class styles the lighter-weight banner held inert inside
+   #updateBannerTemplate (a <template>, so disabled by default). Class selector
+   (not an id) keeps it reusable for any future instantiated banner.
    Uses position:fixed so it never contributes to document overflow. */
-#updateBanner {
+.update-banner {
   position: fixed;
   top: 0;
   left: 0;

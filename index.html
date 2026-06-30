@@ -74,6 +74,37 @@
         <button id="updateRebootBtn" class="blue-btn">&gt; REBOOT TERMINAL</button>
       </div>
     </div>
+
+    <!-- ════════════════════════════════════════════════════════════════════
+         REUSABLE DISABLED BANNER TEMPLATES (WU-E2) — INTENTIONAL, NEVER DELETE.
+         Each banner lives inside a <template>, whose content the browser parses
+         but does NOT render or activate — so a template can never show on its
+         own (disabled by default). To re-enable a banner, clone its content into
+         the DOM and wire it, e.g.:
+           const f = document.getElementById('updateBannerTemplate').content.cloneNode(true);
+           document.body.prepend(f); // then set text / wire the tap-to-reboot click
+         Kept as the standard pattern for future "firmware update" /
+         "feature-not-available" notices so banner markup isn't re-invented.
+         Game-agnostic (Protocol 38) — no game/version literals in the copy.
+         ════════════════════════════════════════════════════════════════════ -->
+    <template id="updateBannerTemplate">
+      <!-- Non-blocking firmware/update strip (amber, fixed top). The ACTIVE
+           update path is the blocking #updateModal above; this is the lighter
+           alternative kept for future non-blocking notices. -->
+      <div class="update-banner" role="alert">
+        &gt; FIRMWARE UPDATE STAGED &mdash; TAP TO REBOOT
+      </div>
+    </template>
+    <template id="fo3WarningBannerTemplate">
+      <!-- "Data systems not yet active for this profile" notice. Parameterize by
+           editing the message when a profile's data set is incomplete. Carries
+           display:none so it stays disabled even if cloned without further wiring. -->
+      <div id="fo3WarningBanner" class="fo3-warning-banner" style="display: none">
+        &#9888; DATA SYSTEMS NOT YET ACTIVE FOR THIS PROFILE. NARRATIVE AND TRACKING REMAIN IN THE
+        DEFAULT PROFILE UNTIL THE DATA SET IS ENABLED.
+      </div>
+    </template>
+
     <div id="bootScreen">
       <div id="bootLines"></div>
       <span id="bootCursor">_</span>
@@ -1113,12 +1144,8 @@
                 <option value="FNV">Fallout: New Vegas</option>
                 <option value="FO3">Fallout 3</option>
               </select>
-              <!-- fo3WarningBanner: kept for future FO3 status indicator use — not active in v2.0.0
-              <div id="fo3WarningBanner" class="fo3-warning-banner" style="display: none">
-                &#9888; FO3 DATA SYSTEMS NOT YET ACTIVE. Narrative and tracking remain in FNV mode
-                until v2.0.0.
-              </div>
-              -->
+              <!-- fo3WarningBanner moved to #fo3WarningBannerTemplate (top of body, WU-E2):
+                   a reusable disabled banner template. Clone it here to re-enable. -->
             </div>
 
             <!-- Playstyle -->

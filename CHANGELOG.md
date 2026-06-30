@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1390/1390 | Cache: robco-terminal-v2.6.0-r40 -->
+﻿## [Unreleased]<!-- Tests: 1397/1397 | Cache: robco-terminal-v2.6.0-r41 -->
 
 ### Added
 
@@ -86,6 +86,7 @@
 - Automated the private test-build (staging) deploys. The internal preview site that mirrors in-progress work had to be pushed by hand each time, so it kept falling behind; it now rebuilds and redeploys automatically on every update to the development branch. This only touches the private staging preview — the public site is never affected, and nothing is released or tagged.
 - Restored the on-screen "DEV BUILD" badge on the private test build. The amber badge that marks the staging preview as a development build had quietly gone missing when staging switched to automatic deploys — the automatic build renamed the installed app and swapped its icon, but no longer stamped the visible on-screen badge. The badge is back, and the staging build now also gets its own cache version so the restored badge actually reaches devices that already had the page open. The public site is guaranteed never to show it. A build check was added so the badge can't silently vanish from staging — or accidentally leak onto the public site — again.
 - Added Suite 111 (11 regression tests) that locks the in-world terminology standard in place — the build now fails if a content input placeholder, an empty-state message, the account or cloud-archive copy, the update notice, or an assistant error message regresses to modern-web wording, or if the install/shortcut text ever names the real game again.
+- Converted two dormant on-screen banners into clean, reusable templates instead of leaving them as dead code or deleting them. The firmware-update strip and the per-profile "data systems not yet active" notice are now stored as disabled banner templates — markup the page parses but never displays on its own — that can be switched back on in a single step if a future notice needs them. No visible change: both stay hidden by default, and the app renders exactly as before. Added Suite 112 (7 regression tests) that fail the build if either template is deleted or stops being disabled-by-default, locking in the "keep dead banners as reusable templates, never remove them" rule.
 
 ---
 
