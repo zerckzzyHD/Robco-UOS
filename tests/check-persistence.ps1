@@ -6686,7 +6686,7 @@ Check ((-not $r4_107.hasWeapon) -and ($null -eq $r4_107.ttk)) `
     '107.16: no weapon -> hasWeapon false + ttk null'
 
 # ===========================================================
-# Suite 108 -- WU-N4 CONSULT native databank lookup (13 tests)
+# Suite 108 -- WU-N4 CONSULT native databank lookup (15 tests)
 # `> CONSULT <topic>` (+ [CONSULT] / [CON]) routed through NATIVE_COMMAND_ROUTER to a
 # deterministic, offline, read-only registry+DB lookup. Locks router wiring, registry/DB
 # cross-reference, the NO-ENTRY path (Protocol 3), XSS-safe topic escaping, read-only-ness,
@@ -6745,6 +6745,16 @@ Check (($css108 -match '\.consult-card\b') -and ($css108 -match '\.consult-hit-n
 # 108.13 shared modal entry point
 Check ($consultBody -match '_openSysModal') `
     '108.13: renderConsult opens via _openSysModal() (shared modal -- ARIA/focus consistency)'
+
+# ── WU-N4b: CONSULT macro button (option A) ──────────────────────────────────
+$html108 = Read-Src "index.html"
+$consultBtn108 = [regex]::Match($html108, '<button[^>]*id="consultBtn"[\s\S]*?</button>').Value
+# 108.14 discoverable CONSULT button wired to macroCommand('[CONSULT]') + aria-label + #macroTarget topic input
+Check (($html108 -match 'id="consultBtn"') -and ($consultBtn108 -match 'onclick="macroCommand\(''\[CONSULT\]''\)"') -and ($consultBtn108 -match 'aria-label="[^"]+"') -and ($html108 -match 'id="macroTarget"')) `
+    "108.14: index.html CONSULT macro button (#consultBtn) -> macroCommand('[CONSULT]') with aria-label, reusing #macroTarget topic input (WU-N4b option A)"
+# 108.15 native end-to-end: [CONSULT] is a NATIVE_COMMAND_ROUTER entry -> renderConsult (not macroCommand->AI)
+Check ($routerBlock -match "'\[CONSULT\]':\s*topic\s*=>\s*renderConsult\(topic\)") `
+    '108.15: [CONSULT] routes via NATIVE_COMMAND_ROUTER -> renderConsult -- the CONSULT button is native, never falls through to the AI (WU-N4b)'
 
 # ===========================================================
 # Suite 109 -- WU-N5 BIO-SCAN native medical advisory (13 tests)

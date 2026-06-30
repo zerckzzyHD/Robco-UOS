@@ -11558,7 +11558,7 @@ header('Suite 107 — WU-N3 THREAT native bestiary + TTK');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 108 — WU-N4 CONSULT native databank lookup (13 tests)
+//  Suite 108 — WU-N4 CONSULT native databank lookup (15 tests)
 //  `> CONSULT <topic>` (+ [CONSULT] / [CON]) routed through NATIVE_COMMAND_ROUTER to a
 //  deterministic, offline, read-only registry+DB lookup. Locks: the router wiring, the
 //  registry/DB cross-reference, the NO-ENTRY path (Protocol 3 — never invents), XSS-safe
@@ -11661,6 +11661,25 @@ header('Suite 108 — WU-N4 CONSULT native databank lookup');
   assert(
     /_openSysModal/.test(consultBody),
     '108.13: renderConsult opens via _openSysModal() (shared modal — ARIA/focus consistency)'
+  );
+
+  // ── WU-N4b: CONSULT macro button (option A) ──────────────────────────────────
+  const html108 = readFile('index.html');
+  const consultBtn108 = (html108.match(/<button[^>]*id="consultBtn"[\s\S]*?<\/button>/) || [''])[0];
+  // 108.14 a discoverable CONSULT button wired to macroCommand('[CONSULT]'), with an
+  // aria-label, reusing the shared #macroTarget topic input (THREAT macro-target pattern).
+  assert(
+    /id="consultBtn"/.test(html108) &&
+      /onclick="macroCommand\('\[CONSULT\]'\)"/.test(consultBtn108) &&
+      /aria-label="[^"]+"/.test(consultBtn108) &&
+      /id="macroTarget"/.test(html108),
+    "108.14: index.html CONSULT macro button (#consultBtn) → macroCommand('[CONSULT]') with aria-label, reusing #macroTarget topic input (WU-N4b option A)"
+  );
+  // 108.15 native end-to-end: [CONSULT] is a NATIVE_COMMAND_ROUTER entry → renderConsult, so
+  // the button's macroCommand('[CONSULT]') is intercepted before any AI call (not macroCommand→AI).
+  assert(
+    /'\[CONSULT\]':\s*topic\s*=>\s*renderConsult\(topic\)/.test(routerBlock),
+    '108.15: [CONSULT] routes via NATIVE_COMMAND_ROUTER → renderConsult — the CONSULT button is native, never falls through to the AI (WU-N4b)'
   );
 }
 
