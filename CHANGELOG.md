@@ -1,10 +1,12 @@
-﻿## [Unreleased]<!-- Tests: 1557/1557 | Cache: robco-terminal-v2.7.0-r3 -->
+﻿## [Unreleased]<!-- Tests: 1557/1557 | Cache: robco-terminal-v2.7.0-r4 -->
 
 ---
 
-## [v2.7.0] — Native Systems & Two Wastelands<!-- Date: 2026-06-30 | Tests: 1557/1557 | Cache: robco-terminal-v2.7.0-r3 -->
+## [v2.7.0] — Native Systems & Two Wastelands<!-- Date: 2026-06-30 | Tests: 1557/1557 | Cache: robco-terminal-v2.7.0-r4 -->
 
 ### Hotfix
+
+- Tuned the HIGH-LUMEN OPTICS high-contrast mode so its CRT scanline/refresh overlay is slightly more present (a touch more retro CRT feel) while text stays just as crisp and legible. Normal display mode is unchanged.
 
 - Fixed the [TRADE] button appearing to do nothing. Tapping [TRADE] now reliably opens the BARTER UPLINK trading panel and brings it roughly to the centre of the screen — previously the panel opened correctly but was left off-screen below the other inventory panels, so it looked like the button did nothing. (A first pass scrolled it to the very top edge; it now centres in the viewport with the panel header comfortably in view.)
 - Fixed the TERMLINK console popping up your phone's on-screen keyboard. Opening the console (or running any built-in command) no longer steals focus to the typing field on touch devices, so the keyboard stays down until you actually tap the field. On a desktop the cursor still returns to the command line so you can keep typing.

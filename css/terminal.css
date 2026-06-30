@@ -2659,7 +2659,7 @@ html.high-lumen .empty-state {
 }
 html.high-lumen .crt-overlay,
 html.high-lumen .crt-overlay::after {
-  opacity: 0.12;
+  opacity: 0.2;
 }
 html.high-lumen .panel,
 html.high-lumen .sub-panel {
@@ -2685,7 +2685,7 @@ html.high-lumen .sub-panel {
   }
   .crt-overlay,
   .crt-overlay::after {
-    opacity: 0.12;
+    opacity: 0.2;
   }
   .panel,
   .sub-panel {

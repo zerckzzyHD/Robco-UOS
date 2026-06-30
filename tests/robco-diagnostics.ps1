@@ -7436,9 +7436,9 @@ Check (($manualBlock120 -match 'background-color: #000') -and ($manualBlock120 -
 Check (($manualBlock120 -match '\.tracker-toggle--inactive,') -and ($manualBlock120 -match '\.list-row-prefix,') -and ($manualBlock120 -match 'opacity: 1 !important') -and ($prefBlock120 -match '\.tracker-toggle--inactive,') -and ($prefBlock120 -match 'opacity: 1 !important')) `
     '120.3: both paths lift dimmed surfaces (inactive tabs, list prefixes, inactive toggles, tracker-meta, filter buttons, empty-states) to opacity:1 -- the measurable contrast gain'
 
-# 120.4  scanline/refresh CRT veil dropped to opacity 0.12 in BOTH paths
-Check (($manualBlock120 -match '\.crt-overlay,') -and ($manualBlock120 -match 'opacity: 0\.12') -and ($prefBlock120 -match '\.crt-overlay,') -and ($prefBlock120 -match 'opacity: 0\.12')) `
-    '120.4: both paths drop the scanline + refresh-bar overlay to opacity 0.12 so the CRT veil no longer dims text'
+# 120.4  scanline/refresh CRT veil set to opacity 0.2 in BOTH paths (r4: 0.12 -> 0.2, more CRT presence, text still legible)
+Check (($manualBlock120 -match '\.crt-overlay,') -and ($manualBlock120 -match 'opacity: 0\.2\b') -and ($prefBlock120 -match '\.crt-overlay,') -and ($prefBlock120 -match 'opacity: 0\.2\b')) `
+    '120.4: both paths set the scanline + refresh-bar overlay to opacity 0.2 (r4 -- a touch more CRT presence, text still legible)'
 
 # 120.5  manual toggle persisted as a localStorage device preference (not campaign state)
 Check (($uiCore120 -match "const HIGH_LUMEN_KEY = 'robco_high_lumen'") -and ($uiCore120 -match 'function isHighLumenEnabled\(\)') -and ($uiCore120 -match "localStorage\.getItem\(HIGH_LUMEN_KEY\)\s*===\s*'true'")) `
