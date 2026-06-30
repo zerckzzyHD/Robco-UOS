@@ -9,6 +9,89 @@ function ensureAudioCtx() {
   if (audioCtx.state === 'suspended') audioCtx.resume();
   return audioCtx;
 }
+
+// ── WU-F2 HAPTIC SOLENOID (Vibration API) ─────────────────────────────────
+// Brief chassis buzz on key events (level-up, faction-threshold alert, critical
+// HP) via navigator.vibrate. Free, offline, no AI, game-agnostic (Protocol 38)
+// — operates only on the device's vibration motor, carries no game data.
+// Opt-in (default OFF — battery/annoyance-safe), persisted as a localStorage
+// device preference (NOT campaign state — so no Protocol-4 save/sync path),
+// mirroring the WU-F1 Sustained Power Cell pattern. Three graceful fallbacks:
+//   1. Feature-detect — silent no-op where navigator.vibrate is unavailable
+//      (desktop/iOS Safari); the toggle is disabled and the panel says so.
+//   2. Respect prefers-reduced-motion — never vibrates when the user has
+//      reduced motion set (Protocol 17 / Phase-C a11y).
+//   3. Any vibrate() throw is swallowed so haptics can never break the terminal.
+const HAPTIC_KEY = 'robco_haptic_enabled';
+const HAPTIC_PATTERNS = {
+  tick: 15, // generic key-clack / transmit tick
+  alert: [40, 30, 40], // ⚠ faction threshold / sys-alert
+  levelup: [20, 30, 25, 30, 60], // level-up rising pulse
+  lowhealth: [60, 40, 60], // critical-HP warning
+};
+function _hapticSupported() {
+  return typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function';
+}
+function _hapticReducedMotion() {
+  return (
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
+}
+function isHapticEnabled() {
+  return localStorage.getItem(HAPTIC_KEY) === 'true';
+}
+// Core fire helper. Accepts a named pattern key or a raw vibrate() argument.
+// Returns true only if a real vibration was actually dispatched.
+function triggerHaptic(pattern) {
+  if (!_hapticSupported()) return false; // 1. graceful no-op where unsupported
+  if (!isHapticEnabled()) return false; // opt-in device preference
+  if (_hapticReducedMotion()) return false; // 2. a11y: respect reduced motion
+  const p = HAPTIC_PATTERNS[pattern] !== undefined ? HAPTIC_PATTERNS[pattern] : pattern;
+  try {
+    navigator.vibrate(p);
+  } catch (_) {
+    return false; // 3. never throw out of a haptic call
+  }
+  return true;
+}
+function _updateHapticUI() {
+  const note = document.getElementById('hapticStatus');
+  if (!note) return;
+  if (!_hapticSupported()) {
+    note.textContent = '> SOLENOID UNAVAILABLE ON THIS UNIT';
+    return;
+  }
+  if (_hapticReducedMotion()) {
+    note.textContent = '> SOLENOID HELD — REDUCED-MOTION ACTIVE';
+    return;
+  }
+  note.textContent = isHapticEnabled()
+    ? '> SOLENOID ARMED — CHASSIS PULSES ON ALERTS'
+    : '> SOLENOID IDLE — NO CHASSIS FEEDBACK';
+}
+function toggleHaptic(enabled) {
+  localStorage.setItem(HAPTIC_KEY, enabled ? 'true' : 'false');
+  // Confirmation buzz on enable so the user feels it works immediately.
+  if (enabled) triggerHaptic('tick');
+  _updateHapticUI();
+}
+function initHaptic() {
+  const toggle = document.getElementById('hapticToggle');
+  if (!_hapticSupported()) {
+    // Graceful fallback: disable the control, surface the unsupported state.
+    if (toggle) {
+      toggle.checked = false;
+      toggle.disabled = true;
+    }
+    _updateHapticUI();
+    return;
+  }
+  if (toggle) toggle.checked = isHapticEnabled();
+  _updateHapticUI();
+}
+
 function playClack() {
   if (AudioSettings.masterMute || AudioSettings.typing) return;
   ensureAudioCtx();

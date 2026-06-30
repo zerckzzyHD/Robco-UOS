@@ -1713,6 +1713,27 @@
                   "
                   >&gt; POWER CELL IDLE &mdash; DISPLAY MAY DIM</span
                 >
+                <div class="audio-row">
+                  <input
+                    type="checkbox"
+                    id="hapticToggle"
+                    onchange="toggleHaptic(this.checked)"
+                    style="width: auto; accent-color: var(--robco-alert)"
+                  />
+                  <label for="hapticToggle" style="color: var(--robco-alert); font-size: 12px"
+                    >HAPTIC SOLENOID (CHASSIS FEEDBACK)</label
+                  >
+                </div>
+                <span
+                  id="hapticStatus"
+                  style="
+                    color: var(--robco-alert);
+                    font-size: 10px;
+                    opacity: 0.75;
+                    padding-left: 4px;
+                  "
+                  >&gt; SOLENOID IDLE &mdash; NO CHASSIS FEEDBACK</span
+                >
               </div>
             </details>
 

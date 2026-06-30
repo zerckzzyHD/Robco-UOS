@@ -459,6 +459,7 @@ function autoImportState(jsonString) {
     // H3: Level Up Jingle — fire when lvl increases
     if (lvlV !== undefined && state.lvl > _prevLvl && typeof playLevelUpJingle === 'function') {
       playLevelUpJingle();
+      if (typeof triggerHaptic === 'function') triggerHaptic('levelup'); // WU-F2 haptic
     }
     const xpV = _g(parsed, 'xp');
     if (xpV !== undefined) state.xp = parseInt(xpV);
@@ -770,11 +771,13 @@ function autoImportState(jsonString) {
             true
           );
           if (typeof playFactionThresholdSound === 'function') playFactionThresholdSound(false);
+          if (typeof triggerHaptic === 'function') triggerHaptic('alert'); // WU-F2 haptic
         }
         // Alert on Idolized threshold crossing
         if (prevNet < 750 && curNet >= 750) {
           appendToChat(`> ★ [FACTION ALERT] ${fname}: STATUS ELEVATED TO IDOLIZED.`, 'sys', true);
           if (typeof playFactionThresholdSound === 'function') playFactionThresholdSound(true);
+          if (typeof triggerHaptic === 'function') triggerHaptic('alert'); // WU-F2 haptic
         }
       });
     }

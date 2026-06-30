@@ -12560,6 +12560,105 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 116 — WU-F2 Haptic Solenoid (Vibration API)
+//  Brief chassis buzz on key events: feature-detected, opt-in localStorage device
+//  preference (default OFF), graceful no-op when navigator.vibrate is unavailable,
+//  and SUPPRESSED under prefers-reduced-motion. Game-agnostic, offline, no AI. (Phase F)
+//  8 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 116 — WU-F2 Haptic Solenoid (Vibration)');
+  const uiAudio116 = readFile('js/ui-audio.js');
+  const uiCore116 = readFile('js/ui-core.js');
+  const api116 = readFile('js/api.js');
+  const html116 = htmlSource;
+
+  // 116.1  preference constant + getter (localStorage-backed device setting, not state)
+  assert(
+    /const HAPTIC_KEY = 'robco_haptic_enabled'/.test(uiAudio116) &&
+      /function isHapticEnabled\(\)/.test(uiAudio116) &&
+      /localStorage\.getItem\(HAPTIC_KEY\)\s*===\s*'true'/.test(uiAudio116),
+    '116.1: HAPTIC_KEY + isHapticEnabled() persist the toggle as an opt-in (default OFF) localStorage device preference'
+  );
+
+  // 116.2  feature-detect before use (graceful — no crash on unsupported browsers)
+  assert(
+    /function _hapticSupported\(\)/.test(uiAudio116) &&
+      /typeof navigator\.vibrate === 'function'/.test(uiAudio116),
+    '116.2: _hapticSupported() feature-detects navigator.vibrate before any use'
+  );
+
+  // 116.3  reduced-motion detector uses the prefers-reduced-motion media query
+  assert(
+    /function _hapticReducedMotion\(\)/.test(uiAudio116) &&
+      /matchMedia\(['"]\(prefers-reduced-motion: reduce\)['"]\)/.test(uiAudio116),
+    '116.3: _hapticReducedMotion() reads the prefers-reduced-motion media query'
+  );
+
+  // 116.4  core fire helper: guards on unsupported / not-enabled / reduced-motion; vibrate in try/catch
+  {
+    let trg = '';
+    try {
+      trg = extractFunctionBody(uiAudio116, 'triggerHaptic');
+    } catch (_) {}
+    assert(
+      /if \(!_hapticSupported\(\)\) return false/.test(trg) &&
+        /if \(!isHapticEnabled\(\)\) return false/.test(trg) &&
+        /if \(_hapticReducedMotion\(\)\) return false/.test(trg) &&
+        /navigator\.vibrate\(/.test(trg) &&
+        /try\s*\{/.test(trg) &&
+        /catch/.test(trg),
+      '116.4: triggerHaptic() no-ops when unsupported, when the pref is off, AND when reduced-motion is set; vibrate() is wrapped in try/catch'
+    );
+  }
+
+  // 116.5  toggle persists the pref + confirmation buzz; wired via onchange
+  {
+    let tog = '';
+    try {
+      tog = extractFunctionBody(uiAudio116, 'toggleHaptic');
+    } catch (_) {}
+    assert(
+      /localStorage\.setItem\(HAPTIC_KEY/.test(tog) &&
+        /triggerHaptic\(/.test(tog) &&
+        /onchange="toggleHaptic\(this\.checked\)"/.test(html116),
+      '116.5: toggleHaptic persists the pref + fires a confirmation buzz; #hapticToggle onchange wires to it'
+    );
+  }
+
+  // 116.6  graceful fallback — initHaptic disables the control when unsupported + boot-wired
+  {
+    let ini = '';
+    try {
+      ini = extractFunctionBody(uiAudio116, 'initHaptic');
+    } catch (_) {}
+    assert(
+      /!_hapticSupported\(\)/.test(ini) &&
+        /toggle\.disabled = true/.test(ini) &&
+        /initHaptic\(\);/.test(uiCore116),
+      '116.6: initHaptic() disables the toggle (graceful fallback) when Vibration is unavailable and is called from boot'
+    );
+  }
+
+  // 116.7  fire points wired at the key events (level-up, faction alert, critical HP)
+  assert(
+    /triggerHaptic\('levelup'\)/.test(api116) &&
+      /triggerHaptic\('alert'\)/.test(api116) &&
+      /triggerHaptic\('lowhealth'\)/.test(uiCore116),
+    '116.7: triggerHaptic fires on level-up + faction-threshold alert (api.js) and the critical-HP crossing (ui-core.js)'
+  );
+
+  // 116.8  POWER MANAGEMENT sub-panel present + accessible toggle + status note
+  assert(
+    /data-sub-id="power_systems"/.test(html116) &&
+      /id="hapticToggle"/.test(html116) &&
+      /id="hapticStatus"/.test(html116) &&
+      /for="hapticToggle"/.test(html116),
+    '116.8: POWER MANAGEMENT sub-panel has #hapticToggle + label[for] + #hapticStatus note'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 console.log('\n══════════════════════════════════════════════════════════════\n');

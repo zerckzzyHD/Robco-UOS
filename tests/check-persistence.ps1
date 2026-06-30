@@ -7165,6 +7165,54 @@ Check (($html115 -match 'data-sub-id="power_systems"') -and ($html115 -match 'PO
     '115.8: POWER MANAGEMENT sub-panel (data-sub-id) has #wakeLockToggle + label[for] + #wakeLockStatus note'
 
 # ===========================================================
+# Suite 116 -- WU-F2 Haptic Solenoid (Vibration API) (8 tests)
+# Brief chassis buzz on key events: feature-detected, opt-in localStorage device
+# preference (default OFF), graceful no-op when navigator.vibrate is unavailable,
+# and SUPPRESSED under prefers-reduced-motion. Game-agnostic, offline, no AI.
+# (PS mirror of JS Suite 116.)
+# ===========================================================
+Sep "Suite 116 -- WU-F2 Haptic Solenoid (Vibration)"
+$uiAudio116 = Read-Src "js/ui-audio.js"
+$uiCore116  = Read-Src "js/ui-core.js"
+$api116     = Read-Src "js/api.js"
+$html116    = Read-Src "index.html"
+$trg116 = [regex]::Match($uiAudio116, '(?s)function triggerHaptic\([\s\S]*?\n\}').Value
+$tog116 = [regex]::Match($uiAudio116, '(?s)function toggleHaptic\([\s\S]*?\n\}').Value
+$ini116 = [regex]::Match($uiAudio116, '(?s)function initHaptic\([\s\S]*?\n\}').Value
+
+# 116.1  preference constant + getter (opt-in localStorage device setting, not state)
+Check (($uiAudio116 -match "const HAPTIC_KEY = 'robco_haptic_enabled'") -and ($uiAudio116 -match 'function isHapticEnabled\(\)') -and ($uiAudio116 -match "localStorage\.getItem\(HAPTIC_KEY\)\s*===\s*'true'")) `
+    '116.1: HAPTIC_KEY + isHapticEnabled() persist the toggle as an opt-in (default OFF) localStorage device preference'
+
+# 116.2  feature-detect before use
+Check (($uiAudio116 -match 'function _hapticSupported\(\)') -and ($uiAudio116 -match "typeof navigator\.vibrate === 'function'")) `
+    '116.2: _hapticSupported() feature-detects navigator.vibrate before any use'
+
+# 116.3  reduced-motion detector uses the prefers-reduced-motion media query
+Check (($uiAudio116 -match 'function _hapticReducedMotion\(\)') -and ($uiAudio116 -match "matchMedia\(['""]\(prefers-reduced-motion: reduce\)['""]\)")) `
+    '116.3: _hapticReducedMotion() reads the prefers-reduced-motion media query'
+
+# 116.4  core fire helper guards on unsupported / not-enabled / reduced-motion; vibrate in try/catch
+Check (($trg116 -match 'if \(!_hapticSupported\(\)\) return false') -and ($trg116 -match 'if \(!isHapticEnabled\(\)\) return false') -and ($trg116 -match 'if \(_hapticReducedMotion\(\)\) return false') -and ($trg116 -match 'navigator\.vibrate\(') -and ($trg116 -match 'try\s*\{') -and ($trg116 -match 'catch')) `
+    '116.4: triggerHaptic() no-ops when unsupported, when the pref is off, AND when reduced-motion is set; vibrate() is wrapped in try/catch'
+
+# 116.5  toggle persists the pref + confirmation buzz; wired via onchange
+Check (($tog116 -match 'localStorage\.setItem\(HAPTIC_KEY') -and ($tog116 -match 'triggerHaptic\(') -and ($html116 -match 'onchange="toggleHaptic\(this\.checked\)"')) `
+    '116.5: toggleHaptic persists the pref + fires a confirmation buzz; #hapticToggle onchange wires to it'
+
+# 116.6  graceful fallback -- initHaptic disables the control when unsupported + boot-wired
+Check (($ini116 -match '!_hapticSupported\(\)') -and ($ini116 -match 'toggle\.disabled = true') -and ($uiCore116 -match 'initHaptic\(\);')) `
+    '116.6: initHaptic() disables the toggle (graceful fallback) when Vibration is unavailable and is called from boot'
+
+# 116.7  fire points wired at the key events (level-up, faction alert, critical HP)
+Check (($api116 -match "triggerHaptic\('levelup'\)") -and ($api116 -match "triggerHaptic\('alert'\)") -and ($uiCore116 -match "triggerHaptic\('lowhealth'\)")) `
+    '116.7: triggerHaptic fires on level-up + faction-threshold alert (api.js) and the critical-HP crossing (ui-core.js)'
+
+# 116.8  POWER MANAGEMENT sub-panel + accessible toggle + status note
+Check (($html116 -match 'data-sub-id="power_systems"') -and ($html116 -match 'id="hapticToggle"') -and ($html116 -match 'id="hapticStatus"') -and ($html116 -match 'for="hapticToggle"')) `
+    '116.8: POWER MANAGEMENT sub-panel has #hapticToggle + label[for] + #hapticStatus note'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

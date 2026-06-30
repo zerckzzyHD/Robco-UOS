@@ -284,6 +284,7 @@ window.onload = function () {
   initAmmoDatalist();
   initLocationDatalist();
   initWakeLock(); // WU-F1: restore the Sustained Power Cell (Screen Wake Lock) preference
+  initHaptic(); // WU-F2: restore the Haptic Solenoid (Vibration) preference
 
   // H1: Rotary Dial Click — fire on any <details> panel toggle inside uiPanel
   const _uiPanel = document.getElementById('uiPanel');
@@ -2124,6 +2125,8 @@ function updateMath() {
       void document.body.offsetWidth;
       document.body.classList.add('crit-hp-flash');
       setTimeout(() => document.body.classList.remove('crit-hp-flash'), 750);
+      // WU-F2: one-shot chassis buzz on the critical-HP crossing (mirrors the flash)
+      if (typeof triggerHaptic === 'function') triggerHaptic('lowhealth');
     }
     _lastHpPct = pct;
     // H4: Low Health Heartbeat — start when HP < 25%, stop when >= 25%
