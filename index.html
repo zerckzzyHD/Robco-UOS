@@ -2282,6 +2282,37 @@
     <script>
       // PWA Service Worker Registration & Auto-Update
       if ('serviceWorker' in navigator) {
+        // ── Persistent "has a SW ever controlled this page?" flag ──────────────────
+        // ROOT CAUSE (installed standalone PWA): the update prompt was gated SOLELY on the
+        // LIVE navigator.serviceWorker.controller reference. In an installed/standalone PWA
+        // that reference can be null on a launch even when an active+waiting SW exists, so
+        // BOTH gates suppressed the prompt and a freshly-deployed update was never surfaced.
+        // Fix: record permanently (localStorage) that a SW has controlled this page. The very
+        // first install has no prior version to update FROM (must stay silent); after that, a
+        // waiting worker is a genuine update even if the live controller is momentarily null.
+        const SW_INSTALLED_FLAG = 'robco_sw_installed';
+        function _hasInstalledBefore() {
+          try {
+            return localStorage.getItem(SW_INSTALLED_FLAG) === 'true';
+          } catch (_) {
+            return false;
+          }
+        }
+        function _markInstalled() {
+          try {
+            localStorage.setItem(SW_INSTALLED_FLAG, 'true');
+          } catch (_) {}
+        }
+        if (navigator.serviceWorker.controller) _markInstalled();
+
+        // A waiting/installed worker is a genuine UPDATE (not a first install) iff a SW has
+        // controlled this page before, OR the live controller is present (kept as a fallback
+        // so the original boot-safety signal still participates). First-ever install -> both
+        // false -> the prompt stays silent, exactly as before.
+        function _isGenuineUpdate() {
+          return _hasInstalledBefore() || !!navigator.serviceWorker.controller;
+        }
+
         // Capture controller state synchronously at page-load time.
         // hadController = false on first install (no previous SW) so the
         // controllerchange that fires when the brand-new SW activates does NOT
@@ -2291,6 +2322,7 @@
         const hadController = !!navigator.serviceWorker.controller;
         let refreshing = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
+          _markInstalled(); // a SW now controls the page — remember it permanently
           if (refreshing || !hadController) return;
           refreshing = true;
           window.location.reload();
@@ -2345,18 +2377,49 @@
         // "already-installing" (Case C) and "future updatefound" (Case B) paths.
         function _watch(worker) {
           if (!worker) return;
-          if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+          if (worker.state === 'installed' && _isGenuineUpdate()) {
             _triggerUpdate(worker);
             return;
           }
           worker.addEventListener('statechange', () => {
-            if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+            if (worker.state === 'installed' && _isGenuineUpdate()) {
               _triggerUpdate(worker);
             }
           });
         }
 
+        // ── Focus / visibility re-check (the standalone-PWA fix) ───────────────────
+        // An installed PWA is frequently RESUMED, not reloaded, when the user reopens it:
+        // register().then + updatefound never re-fire, and the hourly setInterval below is
+        // suspended while the app is backgrounded. So a SW deployed while the app was away is
+        // never detected on the load the user actually sees — which is why the prompt "never
+        // fired" in the installed PWA. On every return-to-visible and window focus we actively
+        // re-check: surface any already-waiting worker immediately (no network), then run
+        // reg.update() to detect a fresh sw.js and surface the result. Throttled so focus
+        // thrashing cannot hammer the network; a failed/redirected update() never throws.
+        let _reg = null;
+        let _lastUpdateCheck = 0;
+        function _surfaceWaiting() {
+          if (_reg && _reg.waiting && _isGenuineUpdate()) _triggerUpdate(_reg.waiting);
+        }
+        function _recheckForUpdate() {
+          if (!_reg) return;
+          _surfaceWaiting(); // cheap: surface an already-waiting worker right away
+          const now = Date.now();
+          if (now - _lastUpdateCheck < 30000) return; // throttle network update() to once per 30s
+          _lastUpdateCheck = now;
+          Promise.resolve()
+            .then(() => _reg.update())
+            .then(() => _surfaceWaiting())
+            .catch(() => {}); // a failed/redirected update check must never throw
+        }
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') _recheckForUpdate();
+        });
+        window.addEventListener('focus', _recheckForUpdate);
+
         navigator.serviceWorker.register('sw.js').then(reg => {
+          _reg = reg;
           // Force an update check on every page load and hourly thereafter.
           reg.update();
           setInterval(() => reg.update(), 60 * 60 * 1000);
@@ -2364,7 +2427,7 @@
           // Case A: new SW already installed and waiting when this page loaded.
           // This happens when the user had the tab open while the SW downloaded
           // in the background, or when the prompt was dismissed without reloading.
-          if (reg.waiting && navigator.serviceWorker.controller) {
+          if (reg.waiting && _isGenuineUpdate()) {
             _triggerUpdate(reg.waiting);
           }
 

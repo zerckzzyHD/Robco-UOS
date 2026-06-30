@@ -6581,9 +6581,9 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 // ══════════════════════════════════════════════════════════════
 //  SUITE 65 — Blocking Update Modal (Phase 6 Task 2)
 //  #updateModal replaces #updateBanner; full-screen blocking dialog;
-//  focus trap, Esc blocked, fail-safe, &&controller regression guards.
-//  Case C already-installing-worker prompt fix + idempotency guard.
-//  13 tests
+//  focus trap, Esc blocked, fail-safe, robust _isGenuineUpdate() gate.
+//  Case C already-installing fix + idempotency + WU-SW2 focus/visibility re-check.
+//  18 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Blocking Update Modal');
@@ -6637,16 +6637,17 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     '_triggerUpdate blocks Escape key + preventDefault (modal cannot be dismissed — must reboot)'
   );
 
-  // 65.8  Case A call site still gates on navigator.serviceWorker.controller (boot-safety regression guard)
+  // 65.8  Case A is gated on the robust _isGenuineUpdate() (WU-SW2 — replaces the controller-only
+  //        gate that suppressed the prompt in a standalone PWA where controller can be null)
   assert(
-    /reg\.waiting\s*&&\s*navigator\.serviceWorker\.controller/.test(htmlSource),
-    'Case A: _triggerUpdate called only when reg.waiting && navigator.serviceWorker.controller (boot-safety guard intact)'
+    /reg\.waiting\s*&&\s*_isGenuineUpdate\(\)/.test(htmlSource),
+    'Case A: _triggerUpdate called only when reg.waiting && _isGenuineUpdate() (robust boot-safety gate)'
   );
 
-  // 65.9  Case B call site still gates on navigator.serviceWorker.controller
+  // 65.9  Case B / _watch is gated on the robust _isGenuineUpdate()
   assert(
-    /state\s*===\s*'installed'\s*&&\s*navigator\.serviceWorker\.controller/.test(htmlSource),
-    "Case B: _triggerUpdate called only when state==='installed' && navigator.serviceWorker.controller (boot-safety guard intact)"
+    /state\s*===\s*'installed'\s*&&\s*_isGenuineUpdate\(\)/.test(htmlSource),
+    "Case B: _triggerUpdate called only when state==='installed' && _isGenuineUpdate() (robust boot-safety gate)"
   );
 
   // 65.10  _triggerUpdate has fail-safe: missing DOM → auto SKIP_WAITING (no silent hang)
@@ -6679,6 +6680,58 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
       /if\s*\(\s*reg\.installing\s*\)/.test(htmlSource) &&
       /_updatePromptShown/.test(htmlSource),
     'Case C: registration watches an already-installing worker via _watch(reg.installing) + one-shot _updatePromptShown idempotency guard (popup-race fix intact)'
+  );
+
+  // ── WU-SW2: standalone-PWA update-prompt robustness (root-cause + focus re-check) ──
+  // 65.14  the boot-safety gate is the robust _isGenuineUpdate() — has-installed-before flag
+  //        OR the live controller (controller kept as a fallback, no longer the SOLE gate)
+  assert(
+    /function _isGenuineUpdate\(\)\s*\{[\s\S]*?_hasInstalledBefore\(\)[\s\S]*?\|\|[\s\S]*?navigator\.serviceWorker\.controller[\s\S]*?\}/.test(
+      htmlSource
+    ),
+    '65.14: _isGenuineUpdate() = _hasInstalledBefore() || navigator.serviceWorker.controller (persistent-flag primary, controller fallback)'
+  );
+
+  // 65.15  a persistent install flag records that a SW has controlled the page (set when a
+  //        controller is present AND on controllerchange) so a returning PWA knows it is an
+  //        UPDATE even when the live controller reference is momentarily null
+  assert(
+    /SW_INSTALLED_FLAG\s*=\s*'robco_sw_installed'/.test(htmlSource) &&
+      /function _markInstalled\(\)[\s\S]*?localStorage\.setItem\(SW_INSTALLED_FLAG/.test(
+        htmlSource
+      ) &&
+      /'controllerchange',\s*\(\)\s*=>\s*\{\s*_markInstalled\(\)/.test(htmlSource),
+    '65.15: persistent robco_sw_installed flag set via _markInstalled() (on controller present + on controllerchange)'
+  );
+
+  // 65.16  the focus/visibility re-check is wired — visibilitychange(visible) + window focus
+  //        both re-check for a waiting SW (the fix for the resumed-not-reloaded standalone PWA)
+  assert(
+    /addEventListener\('visibilitychange'/.test(htmlSource) &&
+      /visibilityState === 'visible'/.test(htmlSource) &&
+      /addEventListener\('focus',\s*_recheckForUpdate\)/.test(htmlSource),
+    '65.16: visibilitychange (becoming visible) + window focus both call _recheckForUpdate (catches a waiting SW when the installed PWA is reopened)'
+  );
+
+  // 65.17  the re-check runs reg.update(), is throttled (≤1 / 30s), and never throws on a
+  //        failed/redirected update check
+  assert(
+    /function _recheckForUpdate\(\)/.test(htmlSource) &&
+      /_reg\.update\(\)/.test(htmlSource) &&
+      /_lastUpdateCheck/.test(htmlSource) &&
+      /30000/.test(htmlSource) &&
+      /\.catch\(\(\)\s*=>\s*\{\}\)/.test(htmlSource),
+    '65.17: _recheckForUpdate runs reg.update(), throttles to once per 30000ms, and swallows update() errors (no throw)'
+  );
+
+  // 65.18  the re-check SURFACES a waiting worker via _triggerUpdate(_reg.waiting), gated on
+  //        _isGenuineUpdate() — so a waiting SW prompts on the next focus even if every
+  //        install-time event (Case A/B/C) was missed
+  assert(
+    /function _surfaceWaiting\(\)[\s\S]*?_reg\.waiting\s*&&\s*_isGenuineUpdate\(\)[\s\S]*?_triggerUpdate\(_reg\.waiting\)/.test(
+      htmlSource
+    ),
+    '65.18: _surfaceWaiting() fires _triggerUpdate(_reg.waiting) when a waiting worker exists and _isGenuineUpdate() (prompt surfaces on next focus regardless of missed install events)'
   );
 }
 
