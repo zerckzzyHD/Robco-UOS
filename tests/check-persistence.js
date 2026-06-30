@@ -6137,6 +6137,22 @@ header('Suite 62 — Changelog viewer guards');
     );
   }
 
+  // 62.6b WU-C13: cf-staging-build.mjs stamps the visible "DEV BUILD" badge into the
+  //       staged index.html (injected before </body>) plus a "-dev" CACHE_NAME suffix so
+  //       the badge reaches already-cached devices; the committed (production) index.html
+  //       carries NO badge — the staging build is the only thing that shows it.
+  {
+    const cfStaging62c = readFile('scripts/cf-staging-build.mjs');
+    assert(
+      /DEV BUILD/.test(cfStaging62c) &&
+        /position:fixed/.test(cfStaging62c) &&
+        /'<\/body>'/.test(cfStaging62c) &&
+        /\+ '-dev'/.test(cfStaging62c) &&
+        !/DEV BUILD/.test(htmlSource),
+      'cf-staging-build.mjs injects the visible "DEV BUILD" badge + "-dev" cache suffix; prod index.html has none (staging-only)'
+    );
+  }
+
   // ── Runtime-fetched-asset publish/precache invariant (staging CHANGELOG fix) ──
   // The in-app viewer fetches CHANGELOG.md at runtime. If a local asset the app
   // fetches isn't published to BOTH the staging build (cf-staging-build.mjs) AND

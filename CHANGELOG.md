@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1364/1364 | Cache: robco-terminal-v2.6.0-r33 -->
+﻿## [Unreleased]<!-- Tests: 1365/1365 | Cache: robco-terminal-v2.6.0-r33 -->
 
 ### Added
 
@@ -76,6 +76,7 @@
 - Retired the old AI-driven trade screen in favour of the new offline barter terminal, removing the AI prompt path and a now-unused helper. While building the new terminal a caps-loss bug was caught and fixed before release: buying or selling updated your caps in memory but not in the caps field the save system reads back, so a save could quietly restore your pre-trade caps — the terminal now keeps both in sync so purchases and sales always stick. Added Suite 106 (18 regression tests) covering the price math (including that you never buy below an item's value and a vendor always keeps a margin), the add-only/confirm-gated transactions, the caps-sync fix, and the retired AI path.
 - Added a nightly automated test run. On top of the checks that already run before every push, GitHub now re-runs the test suite once a night (and on demand) against the development branch, using both the Node and PowerShell test runners, and reports a clear pass/fail for each in the run summary. It only runs tests — it never deploys or releases anything — so it's a safety net that catches any environment-specific or time-based failure between pushes without changing what ships.
 - Automated the private test-build (staging) deploys. The internal preview site that mirrors in-progress work had to be pushed by hand each time, so it kept falling behind; it now rebuilds and redeploys automatically on every update to the development branch. This only touches the private staging preview — the public site is never affected, and nothing is released or tagged.
+- Restored the on-screen "DEV BUILD" badge on the private test build. The amber badge that marks the staging preview as a development build had quietly gone missing when staging switched to automatic deploys — the automatic build renamed the installed app and swapped its icon, but no longer stamped the visible on-screen badge. The badge is back, and the staging build now also gets its own cache version so the restored badge actually reaches devices that already had the page open. The public site is guaranteed never to show it. A build check was added so the badge can't silently vanish from staging — or accidentally leak onto the public site — again.
 
 ---
 

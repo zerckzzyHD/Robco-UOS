@@ -3516,6 +3516,12 @@ $cfStaging62 = Read-Src "scripts/cf-staging-build.mjs"
 Check (($cfStaging62 -match 'robco-env') -and ($cfStaging62 -match 'content="staging"') -and -not ($htmlSrc -match 'robco-env')) `
     "cf-staging-build.mjs injects the robco-env=staging marker; prod index.html has none (fail-safe)"
 
+# 62.6b WU-C13: cf-staging-build.mjs stamps the visible "DEV BUILD" badge into the staged
+#       index.html (before </body>) plus a "-dev" CACHE_NAME suffix so it reaches cached
+#       devices; the committed (production) index.html carries NO badge (staging-only).
+Check (($cfStaging62 -match 'DEV BUILD') -and ($cfStaging62 -match 'position:fixed') -and ($cfStaging62 -match "'</body>'") -and ($cfStaging62 -match "\+ '-dev'") -and -not ($htmlSrc -match 'DEV BUILD')) `
+    "cf-staging-build.mjs injects the visible 'DEV BUILD' badge + '-dev' cache suffix; prod index.html has none (staging-only)"
+
 # -- Runtime-fetched-asset publish/precache invariant (staging CHANGELOG fix) --
 # The in-app viewer fetches CHANGELOG.md at runtime. A local asset the app fetches
 # that isn't published to BOTH staging (cf-staging-build.mjs) AND prod (deploy.yml)

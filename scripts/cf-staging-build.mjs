@@ -64,15 +64,23 @@ manifest.icons = [
 ];
 writeFileSync(join(OUT, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n', 'utf8');
 
-// 5. Point the page <link rel="icon"> at the dev icon (favicon/tab).
-//    apple-touch-icon is left as the prod PNG (iOS ignores SVG touch icons); the
-//    "[DEV]" label under the home-screen icon is what distinguishes the install.
-//
-//    Also inject the staging environment marker (WU-C11): the in-app changelog
-//    viewer reads <meta name="robco-env" content="staging"> to render the
-//    [Unreleased] section. Production (deploy.yml) never emits this marker, so
-//    prod defaults to hiding [Unreleased]. CSP-safe (a meta tag, not a script).
-const html = readFileSync(join(OUT, 'index.html'), 'utf8')
+// 5. Rewrite the staged index.html (staging-only — never the repo/prod copy):
+//    a) point <link rel="icon"> at the dev SVG icon (favicon/tab); apple-touch-icon
+//       stays the prod PNG (iOS ignores SVG touch icons);
+//    b) inject the WU-C11 staging marker <meta name="robco-env" content="staging">
+//       so the in-app changelog viewer shows the [Unreleased] section (prod never
+//       emits it, so prod hides [Unreleased]); CSP-safe (a meta tag, not a script);
+//    c) stamp the visible on-screen "DEV BUILD" badge (fixed top-right, amber,
+//       pointer-events:none) so a running staging build is unmistakable at a glance.
+//       This is distinct from the "[DEV]" PWA name + dev icon (which only show on the
+//       home screen / browser tab). Production NEVER gets this badge — it is injected
+//       into the staged copy only, so the repo's index.html stays badge-free.
+const DEV_BADGE =
+  '<div style="position:fixed;top:0;right:0;z-index:2147483647;background:#ff9100;' +
+  'color:#000;font:bold 11px ui-monospace,monospace;letter-spacing:1px;padding:3px 9px;' +
+  'border-bottom-left-radius:7px;pointer-events:none;box-shadow:0 0 10px rgba(255,145,0,.7)">' +
+  'DEV BUILD</div>';
+let html = readFileSync(join(OUT, 'index.html'), 'utf8')
   .replace(
     '<link rel="icon" type="image/png" href="icon.png" />',
     '<link rel="icon" type="image/svg+xml" href="icon-dev.svg" />'
@@ -81,7 +89,22 @@ const html = readFileSync(join(OUT, 'index.html'), 'utf8')
     '<meta charset="UTF-8" />',
     '<meta charset="UTF-8" />\n    <meta name="robco-env" content="staging" />'
   );
+if (!html.includes('>DEV BUILD<')) {
+  html = html.replace('</body>', DEV_BADGE + '\n  </body>');
+}
 writeFileSync(join(OUT, 'index.html'), html, 'utf8');
+
+// 5b. Bump the STAGED CACHE_NAME with a -dev suffix so the badge (and any other
+//     staging-only difference) reliably reaches already-cached devices: the SW is
+//     cache-first, so an unchanged CACHE_NAME would keep serving the old, badge-less
+//     shell. This edits only the staged copy — the repo's CACHE_NAME (Protocol 1) is
+//     untouched, and production keeps the bare rev.
+const swPath = join(OUT, 'sw.js');
+const swSrc = readFileSync(swPath, 'utf8').replace(
+  /const CACHE_NAME = '([^']+)';/,
+  (m, name) => `const CACHE_NAME = '${name.includes('-dev') ? name : name + '-dev'}';`
+);
+writeFileSync(swPath, swSrc, 'utf8');
 
 // 6. Cloudflare Pages _redirects — pin the service worker + PWA control files to a
 //    DIRECT 200 serve so Cloudflare never returns them behind a 3xx redirect. A
