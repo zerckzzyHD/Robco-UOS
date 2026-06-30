@@ -11545,17 +11545,19 @@ header('Suite 106 — WU-N2 TRADE native barter terminal');
     '106.20: renderTrade() mounts a #tradeStats line and _renderTradeStats() is the single purse/caps/barter updater'
   );
   // 106.21 WU-HF1 [TRADE]-does-nothing fix: expandPanelForCategory opens the matched panel
-  // (setAttribute('open','')) AND reveals it via scrollIntoView. Without the reveal, opening
-  // BARTER UPLINK (which sits below BACKPACK/EQUIPPED/AMMO/CRAFTING on the INV tab) left the
-  // panel off-screen, so the [TRADE] tap silently switched tabs with nothing visible.
+  // (setAttribute('open','')) AND reveals it via scrollIntoView with block:'center' (r3 —
+  // owner: CENTER the panel in the viewport, not pinned to the very top). Without the reveal,
+  // opening BARTER UPLINK (which sits below BACKPACK/EQUIPPED/AMMO/CRAFTING on the INV tab)
+  // left the panel off-screen, so the [TRADE] tap silently switched tabs with nothing visible.
   {
     let expandBody106 = '';
     try {
       expandBody106 = extractFunctionBody(core106, 'expandPanelForCategory');
     } catch (_) {}
     assert(
-      /setAttribute\(\s*'open'/.test(expandBody106) && /scrollIntoView\(/.test(expandBody106),
-      '106.21: expandPanelForCategory opens the matched panel AND scrolls it into view (WU-HF1 [TRADE]-does-nothing reveal fix)'
+      /setAttribute\(\s*'open'/.test(expandBody106) &&
+        /scrollIntoView\(\s*\{[^}]*block:\s*'center'/.test(expandBody106),
+      "106.21: expandPanelForCategory opens the matched panel AND centers it via scrollIntoView({ block: 'center' }) (WU-HF1 r3 [TRADE] reveal + centering fix)"
     );
   }
   // 106.22 END-TO-END button→panel-open chain (not just renderTrade): the [TRADE] button's

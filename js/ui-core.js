@@ -1355,12 +1355,22 @@ function expandPanelForCategory(categoryKey) {
   // INV tab) silently switched tabs with the panel off-screen — the [TRADE] tap "did
   // nothing". scrollIntoView walks up to whatever actually scrolls (the document on
   // mobile, the column in the desktop shell). A requestAnimationFrame lets the tab-switch
-  // layout settle first; behavior:'auto' is instant and reduced-motion-safe.
+  // layout settle first.
+  //
+  // r3: CENTER the opened panel in the viewport instead of pinning it to the very top
+  // (owner: it felt jammed at the top edge). We center the SUMMARY (the small header), not
+  // the whole details box — for a panel taller than the viewport, centering the full box
+  // would push its header off-screen; centering the header keeps it comfortably visible
+  // with the panel's content flowing below it. block:'center' does the centering; when the
+  // panel is near the page bottom the scroller centers it as far as its range allows.
+  // behavior:'auto' (instant) is deliberate: it is reliable on every scroller (a 'smooth'
+  // scrollIntoView is a silent no-op on some document scrollers, which would regress the
+  // reveal to "nothing happened") and is inherently reduced-motion-safe (no animation).
   const summaryEl = details ? details.querySelector('summary') : null;
   if (summaryEl && typeof summaryEl.scrollIntoView === 'function') {
     const _reveal = () => {
       try {
-        summaryEl.scrollIntoView({ block: 'start', behavior: 'auto' });
+        summaryEl.scrollIntoView({ block: 'center', behavior: 'auto' });
       } catch (_) {
         /* scrollIntoView unsupported — non-fatal */
       }

@@ -6663,11 +6663,12 @@ Check (($ren106 -match 'function _renderTradeStats\s*\(') -and ($ren106 -match '
     '106.20: renderTrade() mounts a #tradeStats line and _renderTradeStats() is the single purse/caps/barter updater'
 
 # 106.21 WU-HF1 [TRADE]-does-nothing fix: expandPanelForCategory opens the matched panel AND
-# scrolls it into view (without the reveal, BARTER UPLINK opened off-screen below the fold).
+# centers it via scrollIntoView({ block: 'center' }) (r3 -- owner: center the panel, not pin it
+# to the very top). Without the reveal, BARTER UPLINK opened off-screen below the fold.
 $expandBody106 = ''
 try { $expandBody106 = Get-FunctionBody $core106 'expandPanelForCategory' } catch {}
-Check (($expandBody106 -match "setAttribute\(\s*'open'") -and ($expandBody106 -match 'scrollIntoView\(')) `
-    '106.21: expandPanelForCategory opens the matched panel AND scrolls it into view (WU-HF1 [TRADE]-does-nothing reveal fix)'
+Check (($expandBody106 -match "setAttribute\(\s*'open'") -and ($expandBody106 -match "scrollIntoView\(\s*\{[^}]*block:\s*'center'")) `
+    "106.21: expandPanelForCategory opens the matched panel AND centers it via scrollIntoView({ block: 'center' }) (WU-HF1 r3 [TRADE] reveal + centering fix)"
 
 # 106.22 END-TO-END button->panel-open chain (not just renderTrade)
 Check (($htmlSrc -match "onclick=`"expandPanelForCategory\('trade'\)`"") -and ($core106 -match "trade:\s*'inv'") -and ($core106 -match "trade:\s*'>\s*BARTER UPLINK'")) `
