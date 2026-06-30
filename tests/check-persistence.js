@@ -11558,7 +11558,7 @@ header('Suite 107 — WU-N3 THREAT native bestiary + TTK');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 108 — WU-N4 CONSULT native databank lookup (15 tests)
+//  Suite 108 — WU-N4 CONSULT native databank lookup (18 tests)
 //  `> CONSULT <topic>` (+ [CONSULT] / [CON]) routed through NATIVE_COMMAND_ROUTER to a
 //  deterministic, offline, read-only registry+DB lookup. Locks: the router wiring, the
 //  registry/DB cross-reference, the NO-ENTRY path (Protocol 3 — never invents), XSS-safe
@@ -11570,9 +11570,17 @@ header('Suite 108 — WU-N4 CONSULT native databank lookup');
   const api108 = readFile('js/api.js');
   const core108 = readFile('js/ui-core.js');
   const css108 = readFile('css/terminal.css');
+  // The CONSULT engine spans renderConsult + the shared _consultSearch / _consultRenderHTML
+  // core (WU-N4b option C, Protocol 22). Concatenate so the engine-level checks (108.4–108.9,
+  // 108.13) verify the behavior wherever it lives across the split.
   let consultBody = '';
   try {
-    consultBody = extractFunctionBody(ren108, 'renderConsult');
+    consultBody =
+      extractFunctionBody(ren108, 'renderConsult') +
+      '\n' +
+      extractFunctionBody(ren108, '_consultSearch') +
+      '\n' +
+      extractFunctionBody(ren108, '_consultRenderHTML');
   } catch (_) {}
   // The NATIVE_COMMAND_ROUTER literal block.
   const routerBlock = (api108.match(/const NATIVE_COMMAND_ROUTER\s*=\s*\{[\s\S]*?\n\};/) || [
@@ -11618,10 +11626,10 @@ header('Suite 108 — WU-N4 CONSULT native databank lookup');
     /NO ENTRY IN DATABANK/.test(consultBody),
     '108.6: renderConsult shows NO ENTRY IN DATABANK when nothing matches (Protocol 3)'
   );
-  // 108.7 XSS — user topic escaped before innerHTML (query line + NO-ENTRY both escape q)
+  // 108.7 XSS — user topic escaped before innerHTML (query line + NO-ENTRY both escape it)
   assert(
-    /escapeHtml\(q\)/.test(consultBody),
-    '108.7: renderConsult escapes the user topic via escapeHtml(q) before innerHTML (XSS-safe)'
+    /escapeHtml\(res\.q\)/.test(consultBody) || /escapeHtml\(q\)/.test(consultBody),
+    '108.7: the CONSULT engine escapes the user topic via escapeHtml() before innerHTML (XSS-safe)'
   );
   // 108.8 registry hit names + meta are escaped too
   assert(
@@ -11680,6 +11688,72 @@ header('Suite 108 — WU-N4 CONSULT native databank lookup');
   assert(
     /'\[CONSULT\]':\s*topic\s*=>\s*renderConsult\(topic\)/.test(routerBlock),
     '108.15: [CONSULT] routes via NATIVE_COMMAND_ROUTER → renderConsult — the CONSULT button is native, never falls through to the AI (WU-N4b)'
+  );
+
+  // ── WU-N4b option C: DATABANK panel (DATA tab) sharing the CONSULT engine ─────
+  const databankPanel108 = (html108.match(
+    /<details class="panel"[^>]*id="databankPanel"[\s\S]*?<\/details>/
+  ) || [''])[0];
+  const renderDbBody = (() => {
+    try {
+      return extractFunctionBody(ren108, 'renderDatabankPanel');
+    } catch (_) {
+      return '';
+    }
+  })();
+  const renderConsultBody = (() => {
+    try {
+      return extractFunctionBody(ren108, 'renderConsult');
+    } catch (_) {
+      return '';
+    }
+  })();
+  const consultRenderHtmlBody = (() => {
+    try {
+      return extractFunctionBody(ren108, '_consultRenderHTML');
+    } catch (_) {
+      return '';
+    }
+  })();
+
+  // 108.16 DATABANK panel present (DATA tab) — Protocol 5 + UI-1 heading + accessible
+  // #databankSearch (oninput→renderDatabankPanel) + #databankResults; renderDatabankPanel
+  // defined in ui-render.js AND called from loadUI in ui-core.js.
+  assert(
+    /<details class="panel"[^>]*id="databankPanel"/.test(html108) &&
+      /data-tab="data"/.test(databankPanel108) &&
+      /<summary><h2>[^<]*DATABANK<\/h2>/.test(databankPanel108) &&
+      /id="databankSearch"[\s\S]*?oninput="renderDatabankPanel\(\)"/.test(databankPanel108) &&
+      /aria-label="[^"]+"/.test(databankPanel108) &&
+      /id="databankResults"/.test(databankPanel108) &&
+      /function renderDatabankPanel\s*\(/.test(ren108) &&
+      /renderDatabankPanel\(\)/.test(core108),
+    '108.16: DATABANK panel (DATA tab) — <details class="panel"> + UI-1 heading + accessible #databankSearch (oninput→renderDatabankPanel) + #databankResults; renderDatabankPanel() defined + called from loadUI (WU-N4b option C, Protocol 5)'
+  );
+  // 108.17 shared CONSULT engine (Protocol 22) — both renderConsult + renderDatabankPanel
+  // route through _consultSearch + _consultRenderHTML; the consult-card markup lives ONLY in
+  // the shared renderer (not duplicated in either entry point).
+  assert(
+    /function _consultSearch\s*\(/.test(ren108) &&
+      /function _consultRenderHTML\s*\(/.test(ren108) &&
+      /_consultSearch\(/.test(renderConsultBody) &&
+      /_consultRenderHTML\(/.test(renderConsultBody) &&
+      /_consultSearch\(/.test(renderDbBody) &&
+      /_consultRenderHTML\(/.test(renderDbBody) &&
+      /consult-card/.test(consultRenderHtmlBody) &&
+      !/consult-card/.test(renderConsultBody) &&
+      !/consult-card/.test(renderDbBody),
+    '108.17: shared CONSULT engine (Protocol 22) — renderConsult + renderDatabankPanel both route through _consultSearch + _consultRenderHTML; the consult-card markup lives only in the shared renderer (no duplication)'
+  );
+  // 108.18 DATABANK panel is read-only + offline — renderDatabankPanel reads #databankSearch,
+  // writes #databankResults, and never calls fetch/transmitMessage/appendToChat (no AI route).
+  assert(
+    /databankSearch/.test(renderDbBody) &&
+      /databankResults/.test(renderDbBody) &&
+      !/fetch\(/.test(renderDbBody) &&
+      !/transmitMessage/.test(renderDbBody) &&
+      !/appendToChat/.test(renderDbBody),
+    '108.18: DATABANK panel is read-only + offline — renderDatabankPanel reads #databankSearch, writes #databankResults, never calls fetch/transmitMessage/appendToChat (no AI route, WU-N4b option C)'
   );
 }
 

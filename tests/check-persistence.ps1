@@ -6686,7 +6686,7 @@ Check ((-not $r4_107.hasWeapon) -and ($null -eq $r4_107.ttk)) `
     '107.16: no weapon -> hasWeapon false + ttk null'
 
 # ===========================================================
-# Suite 108 -- WU-N4 CONSULT native databank lookup (15 tests)
+# Suite 108 -- WU-N4 CONSULT native databank lookup (18 tests)
 # `> CONSULT <topic>` (+ [CONSULT] / [CON]) routed through NATIVE_COMMAND_ROUTER to a
 # deterministic, offline, read-only registry+DB lookup. Locks router wiring, registry/DB
 # cross-reference, the NO-ENTRY path (Protocol 3), XSS-safe topic escaping, read-only-ness,
@@ -6697,8 +6697,10 @@ $ren108 = Read-Src "js/ui-render.js"
 $api108 = Read-Src "js/api.js"
 $core108 = Read-Src "js/ui-core.js"
 $css108 = Read-Src "css/terminal.css"
+# CONSULT engine spans renderConsult + the shared _consultSearch / _consultRenderHTML core
+# (WU-N4b option C, Protocol 22) -- concatenate so engine-level checks find the behavior wherever it lives.
 $consultBody = ''
-try { $consultBody = Get-FunctionBody $ren108 'renderConsult' } catch {}
+try { $consultBody = (Get-FunctionBody $ren108 'renderConsult') + "`n" + (Get-FunctionBody $ren108 '_consultSearch') + "`n" + (Get-FunctionBody $ren108 '_consultRenderHTML') } catch {}
 $routerBlock = [regex]::Match($api108, 'const NATIVE_COMMAND_ROUTER\s*=\s*\{[\s\S]*?\n\};').Value
 
 # 108.1 renderConsult defined
@@ -6719,8 +6721,8 @@ Check (($consultBody -match 'lookupItemInDb') -and ($consultBody -match 'lookupB
 Check ($consultBody -match 'NO ENTRY IN DATABANK') `
     '108.6: renderConsult shows NO ENTRY IN DATABANK when nothing matches (Protocol 3)'
 # 108.7 XSS escape of topic
-Check ($consultBody -match 'escapeHtml\(q\)') `
-    '108.7: renderConsult escapes the user topic via escapeHtml(q) before innerHTML (XSS-safe)'
+Check (($consultBody -match 'escapeHtml\(res\.q\)') -or ($consultBody -match 'escapeHtml\(q\)')) `
+    '108.7: the CONSULT engine escapes the user topic via escapeHtml() before innerHTML (XSS-safe)'
 # 108.8 escape hit names
 Check ($consultBody -match 'escapeHtml\(e\.name\)') `
     '108.8: renderConsult escapes registry hit names (escapeHtml(e.name))'
@@ -6755,6 +6757,24 @@ Check (($html108 -match 'id="consultBtn"') -and ($consultBtn108 -match 'onclick=
 # 108.15 native end-to-end: [CONSULT] is a NATIVE_COMMAND_ROUTER entry -> renderConsult (not macroCommand->AI)
 Check ($routerBlock -match "'\[CONSULT\]':\s*topic\s*=>\s*renderConsult\(topic\)") `
     '108.15: [CONSULT] routes via NATIVE_COMMAND_ROUTER -> renderConsult -- the CONSULT button is native, never falls through to the AI (WU-N4b)'
+
+# ── WU-N4b option C: DATABANK panel (DATA tab) sharing the CONSULT engine ─────
+$databankPanel108 = [regex]::Match($html108, '<details class="panel"[^>]*id="databankPanel"[\s\S]*?</details>').Value
+$renderDbBody = ''
+try { $renderDbBody = Get-FunctionBody $ren108 'renderDatabankPanel' } catch {}
+$renderConsultBody = ''
+try { $renderConsultBody = Get-FunctionBody $ren108 'renderConsult' } catch {}
+$consultRenderHtmlBody = ''
+try { $consultRenderHtmlBody = Get-FunctionBody $ren108 '_consultRenderHTML' } catch {}
+# 108.16 DATABANK panel present (DATA tab) + Protocol 5 wiring + render fn called from loadUI
+Check (($html108 -match '<details class="panel"[^>]*id="databankPanel"') -and ($databankPanel108 -match 'data-tab="data"') -and ($databankPanel108 -match '<summary><h2>[^<]*DATABANK</h2>') -and ($databankPanel108 -match 'id="databankSearch"[\s\S]*?oninput="renderDatabankPanel\(\)"') -and ($databankPanel108 -match 'aria-label="[^"]+"') -and ($databankPanel108 -match 'id="databankResults"') -and ($ren108 -match 'function renderDatabankPanel\s*\(') -and ($core108 -match 'renderDatabankPanel\(\)')) `
+    '108.16: DATABANK panel (DATA tab) -- <details class="panel"> + UI-1 heading + accessible #databankSearch (oninput->renderDatabankPanel) + #databankResults; renderDatabankPanel() defined + called from loadUI (WU-N4b option C, Protocol 5)'
+# 108.17 shared CONSULT engine (Protocol 22) -- both renderers route through the shared core; no duplicated card markup
+Check (($ren108 -match 'function _consultSearch\s*\(') -and ($ren108 -match 'function _consultRenderHTML\s*\(') -and ($renderConsultBody -match '_consultSearch\(') -and ($renderConsultBody -match '_consultRenderHTML\(') -and ($renderDbBody -match '_consultSearch\(') -and ($renderDbBody -match '_consultRenderHTML\(') -and ($consultRenderHtmlBody -match 'consult-card') -and (-not ($renderConsultBody -match 'consult-card')) -and (-not ($renderDbBody -match 'consult-card'))) `
+    '108.17: shared CONSULT engine (Protocol 22) -- renderConsult + renderDatabankPanel both route through _consultSearch + _consultRenderHTML; the consult-card markup lives only in the shared renderer (no duplication)'
+# 108.18 DATABANK panel is read-only + offline (no AI route)
+Check (($renderDbBody -match 'databankSearch') -and ($renderDbBody -match 'databankResults') -and (-not ($renderDbBody -match 'fetch\(')) -and (-not ($renderDbBody -match 'transmitMessage')) -and (-not ($renderDbBody -match 'appendToChat'))) `
+    '108.18: DATABANK panel is read-only + offline -- renderDatabankPanel reads #databankSearch, writes #databankResults, never calls fetch/transmitMessage/appendToChat (no AI route, WU-N4b option C)'
 
 # ===========================================================
 # Suite 109 -- WU-N5 BIO-SCAN native medical advisory (13 tests)

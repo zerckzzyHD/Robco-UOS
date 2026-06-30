@@ -853,6 +853,21 @@
             </button>
           </details>
 
+          <!-- DATABANK (WU-N4b option C — persistent inline CONSULT panel) -->
+          <details class="panel" data-tab="data" id="databankPanel">
+            <summary><h2>> DATABANK</h2></summary>
+            <input
+              type="text"
+              id="databankSearch"
+              placeholder="SEARCH DATABANK…"
+              maxlength="100"
+              aria-label="Search the databank for an item, perk, quest, location, companion, or creature"
+              oninput="renderDatabankPanel()"
+              style="width: 100%; margin-bottom: 6px; font-size: 16px"
+            />
+            <div id="databankResults"></div>
+          </details>
+
           <!-- 6. PERKS -->
           <details class="panel" data-tab="stat">
             <summary><h2>> PERKS</h2></summary>

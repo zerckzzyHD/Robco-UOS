@@ -100,6 +100,7 @@ export default [
         getChemsTable: 'readonly',
         renderThreat: 'readonly',
         renderConsult: 'readonly',
+        renderDatabankPanel: 'readonly',
         renderBioScan: 'readonly',
         _openSysModal: 'readonly',
         _vatsIsMelee: 'readonly',

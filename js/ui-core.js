@@ -1825,6 +1825,9 @@ function loadUI() {
   if (_isDirty('squad', state.squad)) renderSquad();
   if (_isDirty('status', state.status)) renderStatus();
   if (_isDirty('notes', state.campaign_notes)) renderCampaignNotes();
+  // DATABANK panel (WU-N4b option C) is input-driven, not state-driven — re-render its
+  // results for the current search each loadUI so the panel stays in sync (read-only, cheap).
+  if (typeof renderDatabankPanel === 'function') renderDatabankPanel();
   if (_isDirty('factions', state.factions)) renderFactionRep();
   if (_isDirty('perks', state.perks)) renderPerks();
   if (_isDirty('quests', state.quests)) renderQuests();

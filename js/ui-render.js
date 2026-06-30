@@ -2391,23 +2391,22 @@ function _consultDetail(cat, e) {
   return e.type || '';
 }
 
-function renderConsult(topic) {
-  const modal = document.getElementById('sysModal');
-  const title = document.getElementById('modalTitle');
-  const content = document.getElementById('modalContent');
-  if (!modal || !title || !content) return;
-  title.innerText = '> DATABANK QUERY';
-
+// Shared CONSULT engine (Protocol 22) — pure search core consumed by BOTH the
+// CONSULT modal (renderConsult) and the persistent DATABANK panel
+// (renderDatabankPanel). No DOM, no side effects: registry hits across every
+// category (active game's FALLOUT_REGISTRY) + DB stat cross-reference.
+function _consultSearch(topic) {
   const q = (topic || '').trim();
-  if (!q) {
-    content.innerHTML =
-      '<pre class="consult-empty" style="white-space:pre-wrap;font-family:inherit;margin:0;color:var(--robco-dim);">SPECIFY A QUERY — e.g. &gt; CONSULT Deathclaw</pre>';
-    if (typeof _openSysModal === 'function') _openSysModal();
-    if (typeof appendToChat === 'function') appendToChat('> [CONSULT] No query specified.', 'sys');
-    return;
-  }
-
-  // Registry hits across every category (active game's FALLOUT_REGISTRY).
+  if (!q)
+    return {
+      q: '',
+      noQuery: true,
+      empty: true,
+      groups: [],
+      creature: null,
+      weapon: null,
+      dbItem: null,
+    };
   const groups = [];
   if (typeof registrySearch === 'function') {
     for (const c of _CONSULT_CATS) {
@@ -2415,41 +2414,41 @@ function renderConsult(topic) {
       if (hits.length) groups.push({ key: c.key, label: c.label, hits: hits.slice(0, 5) });
     }
   }
-
-  // DB stat cross-reference.
   const creature = typeof lookupBestiaryEntry === 'function' ? lookupBestiaryEntry(q) : null;
   const weapon = typeof lookupWeaponStats === 'function' ? lookupWeaponStats(q) : null;
   const dbItem = typeof lookupItemInDb === 'function' ? lookupItemInDb(q) : null;
+  const empty = groups.length === 0 && !creature && !weapon && !dbItem;
+  return { q, noQuery: false, empty, groups, creature, weapon, dbItem };
+}
 
-  if (groups.length === 0 && !creature && !weapon && !dbItem) {
-    content.innerHTML =
-      '<pre class="consult-empty" style="white-space:pre-wrap;font-family:inherit;margin:0;color:var(--robco-dim);">NO ENTRY IN DATABANK: ' +
-      escapeHtml(q) +
-      '</pre>';
-    if (typeof _openSysModal === 'function') _openSysModal();
-    if (typeof appendToChat === 'function')
-      appendToChat(`> [CONSULT] No databank entry found for "${q}".`, 'sys');
-    return;
-  }
+// Shared CONSULT renderer (Protocol 22) — builds the escaped DATABANK result HTML
+// string from a _consultSearch() result. Used by both the modal and the panel.
+function _consultRenderHTML(res) {
+  const pre = msg =>
+    '<pre class="consult-empty" style="white-space:pre-wrap;font-family:inherit;margin:0;color:var(--robco-dim);">' +
+    msg +
+    '</pre>';
+  if (res.noQuery) return pre('SPECIFY A QUERY — e.g. &gt; CONSULT Deathclaw');
+  if (res.empty) return pre('NO ENTRY IN DATABANK: ' + escapeHtml(res.q));
 
   let html = '<div class="consult-card">';
-  html += `<div class="consult-query">QUERY: ${escapeHtml(q)}</div>`;
+  html += `<div class="consult-query">QUERY: ${escapeHtml(res.q)}</div>`;
 
   const statRows = [];
-  if (creature) {
-    statRows.push(['CREATURE', escapeHtml(creature.name)]);
-    statRows.push(['HP / DT', `${creature.hp} / ${creature.dt}`]);
-    if (creature.weakness && String(creature.weakness).toLowerCase() !== 'none')
-      statRows.push(['WEAKNESS', escapeHtml(creature.weakness)]);
+  if (res.creature) {
+    statRows.push(['CREATURE', escapeHtml(res.creature.name)]);
+    statRows.push(['HP / DT', `${res.creature.hp} / ${res.creature.dt}`]);
+    if (res.creature.weakness && String(res.creature.weakness).toLowerCase() !== 'none')
+      statRows.push(['WEAKNESS', escapeHtml(res.creature.weakness)]);
   }
-  if (weapon) {
-    statRows.push(['WEAPON', escapeHtml(weapon.name)]);
-    statRows.push(['DMG / APS', `${weapon.baseDamage} / ${weapon.aps}`]);
-    if (weapon.ammoType) statRows.push(['AMMO', escapeHtml(weapon.ammoType)]);
+  if (res.weapon) {
+    statRows.push(['WEAPON', escapeHtml(res.weapon.name)]);
+    statRows.push(['DMG / APS', `${res.weapon.baseDamage} / ${res.weapon.aps}`]);
+    if (res.weapon.ammoType) statRows.push(['AMMO', escapeHtml(res.weapon.ammoType)]);
   }
-  if (dbItem && !weapon && !creature) {
-    statRows.push(['TYPE', escapeHtml(String(dbItem.type || 'misc'))]);
-    statRows.push(['WEIGHT / VALUE', `${dbItem.wgt} / ${dbItem.val}`]);
+  if (res.dbItem && !res.weapon && !res.creature) {
+    statRows.push(['TYPE', escapeHtml(String(res.dbItem.type || 'misc'))]);
+    statRows.push(['WEIGHT / VALUE', `${res.dbItem.wgt} / ${res.dbItem.val}`]);
   }
   if (statRows.length) {
     html += '<div class="consult-stats">';
@@ -2459,7 +2458,7 @@ function renderConsult(topic) {
     html += '</div>';
   }
 
-  groups.forEach(g => {
+  res.groups.forEach(g => {
     html += `<div class="consult-group"><div class="consult-cat">${g.label}</div>`;
     g.hits.forEach(e => {
       const d = _consultDetail(g.key, e);
@@ -2472,10 +2471,36 @@ function renderConsult(topic) {
   });
 
   html += '</div>';
-  content.innerHTML = html;
+  return html;
+}
+
+// CONSULT modal path (macro button / native router) — one-off lookup in the shared
+// sysModal. Same engine as the DATABANK panel, rendered into the modal.
+function renderConsult(topic) {
+  const modal = document.getElementById('sysModal');
+  const title = document.getElementById('modalTitle');
+  const content = document.getElementById('modalContent');
+  if (!modal || !title || !content) return;
+  title.innerText = '> DATABANK QUERY';
+  const res = _consultSearch(topic);
+  content.innerHTML = _consultRenderHTML(res);
   if (typeof _openSysModal === 'function') _openSysModal();
-  if (typeof appendToChat === 'function')
-    appendToChat(`> [CONSULT] Databank record retrieved for "${q}".`, 'sys');
+  if (typeof appendToChat === 'function') {
+    if (res.noQuery) appendToChat('> [CONSULT] No query specified.', 'sys');
+    else if (res.empty) appendToChat(`> [CONSULT] No databank entry found for "${res.q}".`, 'sys');
+    else appendToChat(`> [CONSULT] Databank record retrieved for "${res.q}".`, 'sys');
+  }
+}
+
+// DATABANK panel path (DATA tab) — persistent inline lookup. Reads #databankSearch
+// and renders the SAME shared CONSULT engine into #databankResults, so the user can
+// leave the panel open and keep searching without reopening a modal. Read-only, no AI.
+function renderDatabankPanel() {
+  const out = document.getElementById('databankResults');
+  if (!out) return;
+  const inp = document.getElementById('databankSearch');
+  const res = _consultSearch(inp ? inp.value : '');
+  out.innerHTML = _consultRenderHTML(res);
 }
 
 // ── WU-N5: BIO-SCAN — native medical advisory ────────────────────────────

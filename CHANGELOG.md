@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1386/1386 | Cache: robco-terminal-v2.6.0-r38 -->
+﻿## [Unreleased]<!-- Tests: 1389/1389 | Cache: robco-terminal-v2.6.0-r39 -->
 
 ### Added
 
@@ -10,6 +10,7 @@
 - Added a BIO-SCAN medical advisory — a "RUN BIO-SCAN ADVISORY" button in the Bio-Scan & Limb Status panel (also `> [BIO-SCAN]` in the Comm-Link) reads out your current condition and what to do about it: a health readout (STABLE / WOUNDED / CRITICAL), radiation level, an OK/CRIPPLED state for all five limbs, and plain advisories — crippled limbs and low health recommend the right healing item, high radiation recommends a rad-removing item, and any active addiction is flagged with its risk. The recommended items are read from the game's own chem data (so it names the correct items in any campaign), and the whole readout is computed offline with no AI.
 - Added a LOOT salvage terminal — the `[LOOT]` button in the Comm-Link (also `> [LOOT]`) opens a quick "add loot to inventory" picker: search the game's item database, set a quantity, and add any item straight to your pack at its database value. Adds are additive (adding an item you already carry just bumps the count) and ask for confirmation first, and everything — the values, the math — is computed offline with no AI. Works the same in either game.
 - Added a CONSULT button to the Comm-Link macro row (next to THREAT, VATS, TRADE, and LOOT) so the databank lookup is now one tap away. Type a topic in the target field, tap CONSULT, and it opens the offline databank instantly — the same lookup as the typed `> CONSULT` command, with no AI involved.
+- Added a persistent DATABANK panel on the DATA tab with its own always-there search box. Type a topic and the grouped results (items, perks, quests, locations, companions, creatures, plus key stats) appear right there in the panel — keep it open and keep searching without reopening anything. It's the same offline databank as the CONSULT button and command, just inline for quick reference. No AI involved.
 
 ### Fixed
 
