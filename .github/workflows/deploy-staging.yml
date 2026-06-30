@@ -1,0 +1,55 @@
+name: Deploy Staging (Cloudflare Pages)
+
+# Auto-deploys the dev branch to the PRIVATE Cloudflare Pages staging site on
+# every push to dev (and on demand). STAGING ONLY: this never touches production
+# (GitHub Pages), never tags, never releases. It fixes the "staging is frozen"
+# problem - the project is a direct-upload Pages project that can't be
+# Git-connected, so this Action runs the same build + deploy the owner ran by hand.
+#
+# Requires one repo secret: CLOUDFLARE_API_TOKEN (Cloudflare Pages:Edit on this
+# account). If the secret is absent the deploy is SKIPPED with a warning (the job
+# still succeeds), so this workflow is safe to land before the secret is set.
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Only the latest dev push needs to reach staging.
+concurrency:
+  group: cf-staging-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy-staging:
+    name: Build + deploy dev to Cloudflare Pages staging
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout dev
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+
+      - name: Build staging bundle (served files + [DEV] manifest + _redirects)
+        # cf-staging-build.mjs uses only Node built-ins - no npm install needed.
+        run: node scripts/cf-staging-build.mjs
+
+      - name: Deploy to Cloudflare Pages (staging)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: c89063a03a708175fc29b0487543dfcf
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::warning::CLOUDFLARE_API_TOKEN secret is not set - skipping staging deploy."
+            echo "::warning::Add it in repo Settings > Secrets and variables > Actions to enable auto-deploy."
+            exit 0
+          fi
+          npx --yes wrangler@4 pages deploy dist-staging \
+            --project-name robco-uos-dev \
+            --branch dev \
+            --commit-dirty=true
