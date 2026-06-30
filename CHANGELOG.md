@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1412/1412 | Cache: robco-terminal-v2.6.0-r44 -->
+﻿## [Unreleased]<!-- Tests: 1420/1420 | Cache: robco-terminal-v2.6.0-r45 -->
 
 ### Added
 
@@ -11,6 +11,7 @@
 - Added a LOOT salvage terminal — the `[LOOT]` button in the Comm-Link (also `> [LOOT]`) opens a quick "add loot to inventory" picker: search the game's item database, set a quantity, and add any item straight to your pack at its database value. Adds are additive (adding an item you already carry just bumps the count) and ask for confirmation first, and everything — the values, the math — is computed offline with no AI. Works the same in either game.
 - Added a CONSULT button to the Comm-Link macro row (next to THREAT, VATS, TRADE, and LOOT) so the databank lookup is now one tap away. Type a topic in the target field, tap CONSULT, and it opens the offline databank instantly — the same lookup as the typed `> CONSULT` command, with no AI involved.
 - Added a persistent DATABANK panel on the DATA tab with its own always-there search box. Type a topic and the grouped results (items, perks, quests, locations, companions, creatures, plus key stats) appear right there in the panel — keep it open and keep searching without reopening anything. It's the same offline databank as the CONSULT button and command, just inline for quick reference. No AI involved.
+- Added a SUSTAINED POWER CELL option (POWER MANAGEMENT, under Security & Configuration) that keeps your screen from dimming or sleeping while the terminal is open — handy for reading on a phone without tapping every few seconds. It's off by default to save battery; flip it on and the display stays lit, and the terminal re-asserts it automatically if you switch away and come back. On devices or browsers that don't support keeping the screen awake, the toggle politely disables itself and says so. Works offline with no AI.
 
 ### Fixed
 

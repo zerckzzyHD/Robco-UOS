@@ -38,6 +38,91 @@ const AudioSettings = {
   masterMute: localStorage.getItem('robco_master_muted') === 'true',
 };
 
+// ── WU-F1 SUSTAINED POWER CELL (Screen Wake Lock) ─────────────────────────
+// Keeps the display lit while the terminal is active, using the Screen Wake Lock
+// API. Free, offline, no AI, game-agnostic (Protocol 38) — operates only on the
+// device screen. Opt-in (default OFF, battery-safe), persisted as a localStorage
+// device preference (NOT campaign state — so no Protocol-4 save/sync path). Mirrors
+// the audio-toggle pattern. Graceful fallback: on browsers without the API the
+// toggle is disabled and the panel says so; acquire/release failures are swallowed
+// so a missing/blocked lock can never break the terminal.
+const WAKE_LOCK_KEY = 'robco_wakelock_enabled';
+let _wakeLockSentinel = null;
+function _wakeLockSupported() {
+  return (
+    typeof navigator !== 'undefined' &&
+    'wakeLock' in navigator &&
+    !!navigator.wakeLock &&
+    typeof navigator.wakeLock.request === 'function'
+  );
+}
+function isWakeLockEnabled() {
+  return localStorage.getItem(WAKE_LOCK_KEY) === 'true';
+}
+async function _acquireWakeLock() {
+  if (!_wakeLockSupported() || _wakeLockSentinel) return false;
+  try {
+    _wakeLockSentinel = await navigator.wakeLock.request('screen');
+    // The OS auto-releases on tab hide; clear our handle so visibilitychange re-acquires.
+    _wakeLockSentinel.addEventListener('release', () => {
+      _wakeLockSentinel = null;
+      _updateWakeLockUI();
+    });
+    _updateWakeLockUI();
+    return true;
+  } catch (_) {
+    _wakeLockSentinel = null; // NotAllowedError / not visible — fail soft, retried on visibility
+    return false;
+  }
+}
+async function _releaseWakeLock() {
+  try {
+    if (_wakeLockSentinel) await _wakeLockSentinel.release();
+  } catch (_) {
+    /* never throw on release */
+  }
+  _wakeLockSentinel = null;
+}
+function _updateWakeLockUI() {
+  const note = document.getElementById('wakeLockStatus');
+  if (!note) return;
+  if (!_wakeLockSupported()) {
+    note.textContent = '> POWER CELL UNAVAILABLE ON THIS UNIT';
+    return;
+  }
+  note.textContent = isWakeLockEnabled()
+    ? '> DISPLAY SUSTAINED — SCREEN STAYS LIT'
+    : '> POWER CELL IDLE — DISPLAY MAY DIM';
+}
+async function toggleWakeLock(enabled) {
+  localStorage.setItem(WAKE_LOCK_KEY, enabled ? 'true' : 'false');
+  if (enabled) await _acquireWakeLock();
+  else await _releaseWakeLock();
+  _updateWakeLockUI();
+}
+function initWakeLock() {
+  const toggle = document.getElementById('wakeLockToggle');
+  if (!_wakeLockSupported()) {
+    // Graceful fallback: disable the control, surface the unsupported state.
+    if (toggle) {
+      toggle.checked = false;
+      toggle.disabled = true;
+    }
+    _updateWakeLockUI();
+    return;
+  }
+  const enabled = isWakeLockEnabled();
+  if (toggle) toggle.checked = enabled;
+  if (enabled) _acquireWakeLock();
+  _updateWakeLockUI();
+}
+// Re-acquire when the tab becomes visible again (the OS releases the lock on hide).
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && isWakeLockEnabled() && !_wakeLockSentinel) {
+    _acquireWakeLock();
+  }
+});
+
 // ── CLIENT ERROR RING-BUFFER ──────────────────────────────────
 // Local-only diagnostic log — never transmitted. Cap 50 entries × 300 chars ≈ 15 KB max.
 const ERROR_LOG_KEY = 'robco_error_log';
@@ -198,6 +283,7 @@ window.onload = function () {
   initRegistryAutocomplete();
   initAmmoDatalist();
   initLocationDatalist();
+  initWakeLock(); // WU-F1: restore the Sustained Power Cell (Screen Wake Lock) preference
 
   // H1: Rotary Dial Click — fire on any <details> panel toggle inside uiPanel
   const _uiPanel = document.getElementById('uiPanel');

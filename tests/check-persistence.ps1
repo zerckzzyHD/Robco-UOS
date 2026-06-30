@@ -7119,6 +7119,52 @@ Check ((-not ($apiSrc114 -match 'locationHistory\s*=\s*[^;]*slice\(-?\d+\)')) -a
     '114.7: no destructive cap (locationHistory = ...slice(-N)) anywhere -- discovered locations are never un-discovered'
 
 # ===========================================================
+# Suite 115 -- WU-F1 Sustained Power Cell (Screen Wake Lock) (8 tests)
+# Keep-display-lit toggle: feature-detected, graceful fallback when unsupported,
+# re-acquire on visibilitychange, release on toggle-off, persisted as a localStorage
+# device preference. Game-agnostic, offline, no AI. (PS mirror of JS Suite 115.)
+# ===========================================================
+Sep "Suite 115 -- WU-F1 Sustained Power Cell (Wake Lock)"
+$uiCore115 = Read-Src "js/ui-core.js"
+$html115   = Read-Src "index.html"
+$acq115 = [regex]::Match($uiCore115, '(?s)async function _acquireWakeLock\([\s\S]*?\n\}').Value
+$tog115 = [regex]::Match($uiCore115, '(?s)async function toggleWakeLock\([\s\S]*?\n\}').Value
+$ini115 = [regex]::Match($uiCore115, '(?s)function initWakeLock\([\s\S]*?\n\}').Value
+$rel115 = [regex]::Match($uiCore115, '(?s)async function _releaseWakeLock\([\s\S]*?\n\}').Value
+
+# 115.1  preference constant + getter
+Check (($uiCore115 -match "const WAKE_LOCK_KEY = 'robco_wakelock_enabled'") -and ($uiCore115 -match 'function isWakeLockEnabled\(\)') -and ($uiCore115 -match 'localStorage\.getItem\(WAKE_LOCK_KEY\)')) `
+    '115.1: WAKE_LOCK_KEY + isWakeLockEnabled() persist the toggle as a localStorage device preference'
+
+# 115.2  feature-detect before use
+Check (($uiCore115 -match 'function _wakeLockSupported\(\)') -and ($uiCore115 -match "'wakeLock' in navigator") -and ($uiCore115 -match 'navigator\.wakeLock\.request')) `
+    '115.2: _wakeLockSupported() feature-detects the Screen Wake Lock API before any use'
+
+# 115.3  acquire requests 'screen' guarded + try/catch
+Check (($acq115 -match "navigator\.wakeLock\.request\('screen'\)") -and ($acq115 -match 'try\s*\{') -and ($acq115 -match 'catch') -and ($acq115 -match '_wakeLockSupported\(\)')) `
+    "115.3: _acquireWakeLock() requests a 'screen' lock guarded by _wakeLockSupported() inside try/catch (acquire failures never throw)"
+
+# 115.4  toggle persists + acquires/releases; wired via onchange
+Check (($tog115 -match 'localStorage\.setItem\(WAKE_LOCK_KEY') -and ($tog115 -match '_acquireWakeLock\(\)') -and ($tog115 -match '_releaseWakeLock\(\)') -and ($html115 -match 'onchange="toggleWakeLock\(this\.checked\)"')) `
+    '115.4: toggleWakeLock persists the pref + acquires/releases; #wakeLockToggle onchange wires to it'
+
+# 115.5  re-acquire on visibilitychange
+Check (($uiCore115 -match "addEventListener\('visibilitychange'") -and ($uiCore115 -match "document\.visibilityState === 'visible'") -and ($uiCore115 -match 'isWakeLockEnabled\(\)') -and ($uiCore115 -match '_acquireWakeLock\(\)')) `
+    '115.5: a visibilitychange listener re-acquires the lock when the tab becomes visible and the pref is on'
+
+# 115.6  graceful fallback -- initWakeLock disables the control when unsupported
+Check (($ini115 -match '!_wakeLockSupported\(\)') -and ($ini115 -match 'toggle\.disabled = true')) `
+    '115.6: initWakeLock() disables the toggle (graceful fallback) when the Wake Lock API is unavailable'
+
+# 115.7  release never throws + initWakeLock wired into boot
+Check (($rel115 -match '_wakeLockSentinel\.release\(\)') -and ($rel115 -match 'try\s*\{') -and ($rel115 -match 'catch') -and ($uiCore115 -match 'initWakeLock\(\);')) `
+    '115.7: _releaseWakeLock() releases inside try/catch (never throws) and initWakeLock() is called from boot'
+
+# 115.8  POWER MANAGEMENT sub-panel + accessible toggle + status note + data-sub-id
+Check (($html115 -match 'data-sub-id="power_systems"') -and ($html115 -match 'POWER MANAGEMENT') -and ($html115 -match 'id="wakeLockToggle"') -and ($html115 -match 'id="wakeLockStatus"') -and ($html115 -match 'for="wakeLockToggle"')) `
+    '115.8: POWER MANAGEMENT sub-panel (data-sub-id) has #wakeLockToggle + label[for] + #wakeLockStatus note'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

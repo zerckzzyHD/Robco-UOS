@@ -1678,6 +1678,44 @@
               </div>
             </details>
 
+            <details class="sub-panel" data-sub-id="power_systems">
+              <summary class="config-summary" style="color: var(--robco-alert); font-size: 13px">
+                POWER MANAGEMENT
+              </summary>
+              <div
+                style="
+                  margin-top: 8px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                  padding-left: 4px;
+                  border-left: 1px dashed var(--robco-alert);
+                "
+              >
+                <div class="audio-row">
+                  <input
+                    type="checkbox"
+                    id="wakeLockToggle"
+                    onchange="toggleWakeLock(this.checked)"
+                    style="width: auto; accent-color: var(--robco-alert)"
+                  />
+                  <label for="wakeLockToggle" style="color: var(--robco-alert); font-size: 12px"
+                    >SUSTAINED POWER CELL (KEEP DISPLAY LIT)</label
+                  >
+                </div>
+                <span
+                  id="wakeLockStatus"
+                  style="
+                    color: var(--robco-alert);
+                    font-size: 10px;
+                    opacity: 0.75;
+                    padding-left: 4px;
+                  "
+                  >&gt; POWER CELL IDLE &mdash; DISPLAY MAY DIM</span
+                >
+              </div>
+            </details>
+
             <div class="input-group" style="margin-top: 5px">
               <button
                 class="action-btn"

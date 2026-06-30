@@ -12455,6 +12455,111 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 115 — WU-F1 Sustained Power Cell (Screen Wake Lock)
+//  Keep-display-lit toggle: feature-detected, graceful fallback when unsupported,
+//  re-acquire on visibilitychange, release on toggle-off, persisted as a localStorage
+//  device preference. Game-agnostic, offline, no AI. (Phase F)
+//  8 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 115 — WU-F1 Sustained Power Cell (Wake Lock)');
+  const uiCore115 = readFile('js/ui-core.js');
+  const html115 = htmlSource;
+
+  // 115.1  preference constant + getter (localStorage-backed device setting, not state)
+  assert(
+    /const WAKE_LOCK_KEY = 'robco_wakelock_enabled'/.test(uiCore115) &&
+      /function isWakeLockEnabled\(\)/.test(uiCore115) &&
+      /localStorage\.getItem\(WAKE_LOCK_KEY\)/.test(uiCore115),
+    '115.1: WAKE_LOCK_KEY + isWakeLockEnabled() persist the toggle as a localStorage device preference'
+  );
+
+  // 115.2  feature-detect before use (graceful — no crash on unsupported browsers)
+  assert(
+    /function _wakeLockSupported\(\)/.test(uiCore115) &&
+      /'wakeLock' in navigator/.test(uiCore115) &&
+      /navigator\.wakeLock\.request/.test(uiCore115),
+    '115.2: _wakeLockSupported() feature-detects the Screen Wake Lock API before any use'
+  );
+
+  // 115.3  acquire uses navigator.wakeLock.request('screen') inside try/catch (fail-soft)
+  {
+    let acq = '';
+    try {
+      acq = extractFunctionBody(uiCore115, '_acquireWakeLock');
+    } catch (_) {}
+    assert(
+      /navigator\.wakeLock\.request\('screen'\)/.test(acq) &&
+        /try\s*\{/.test(acq) &&
+        /catch/.test(acq) &&
+        /_wakeLockSupported\(\)/.test(acq),
+      "115.3: _acquireWakeLock() requests a 'screen' lock guarded by _wakeLockSupported() inside try/catch (acquire failures never throw)"
+    );
+  }
+
+  // 115.4  toggle persists + acquires when on, releases when off; wired via onchange
+  {
+    let tog = '';
+    try {
+      tog = extractFunctionBody(uiCore115, 'toggleWakeLock');
+    } catch (_) {}
+    assert(
+      /localStorage\.setItem\(WAKE_LOCK_KEY/.test(tog) &&
+        /_acquireWakeLock\(\)/.test(tog) &&
+        /_releaseWakeLock\(\)/.test(tog) &&
+        /onchange="toggleWakeLock\(this\.checked\)"/.test(html115),
+      '115.4: toggleWakeLock persists the pref + acquires/releases; #wakeLockToggle onchange wires to it'
+    );
+  }
+
+  // 115.5  re-acquire on visibilitychange (OS releases the lock when the tab hides)
+  assert(
+    /addEventListener\('visibilitychange'/.test(uiCore115) &&
+      /document\.visibilityState === 'visible'/.test(uiCore115) &&
+      /isWakeLockEnabled\(\)/.test(uiCore115) &&
+      /_acquireWakeLock\(\)/.test(uiCore115),
+    '115.5: a visibilitychange listener re-acquires the lock when the tab becomes visible and the pref is on'
+  );
+
+  // 115.6  graceful fallback — initWakeLock disables the control when unsupported
+  {
+    let ini = '';
+    try {
+      ini = extractFunctionBody(uiCore115, 'initWakeLock');
+    } catch (_) {}
+    assert(
+      /!_wakeLockSupported\(\)/.test(ini) && /toggle\.disabled = true/.test(ini),
+      '115.6: initWakeLock() disables the toggle (graceful fallback) when the Wake Lock API is unavailable'
+    );
+  }
+
+  // 115.7  release path never throws + initWakeLock wired into boot
+  {
+    let rel = '';
+    try {
+      rel = extractFunctionBody(uiCore115, '_releaseWakeLock');
+    } catch (_) {}
+    assert(
+      /_wakeLockSentinel\.release\(\)/.test(rel) &&
+        /try\s*\{/.test(rel) &&
+        /catch/.test(rel) &&
+        /initWakeLock\(\);/.test(uiCore115),
+      '115.7: _releaseWakeLock() releases inside try/catch (never throws) and initWakeLock() is called from boot'
+    );
+  }
+
+  // 115.8  POWER MANAGEMENT sub-panel present + accessible toggle + status note + data-sub-id
+  assert(
+    /data-sub-id="power_systems"/.test(html115) &&
+      /POWER MANAGEMENT/.test(html115) &&
+      /id="wakeLockToggle"/.test(html115) &&
+      /id="wakeLockStatus"/.test(html115) &&
+      /for="wakeLockToggle"/.test(html115),
+    '115.8: POWER MANAGEMENT sub-panel (data-sub-id) has #wakeLockToggle + label[for] + #wakeLockStatus note'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 console.log('\n══════════════════════════════════════════════════════════════\n');
