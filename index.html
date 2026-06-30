@@ -1522,6 +1522,29 @@
                     >MASTER MUTE (ALL AUDIO)</label
                   >
                 </div>
+                <!-- WU-F5: Pip-Boy Radio — zero-byte synthesized station bed (a PLAY toggle, not a mute) -->
+                <div class="audio-row">
+                  <input
+                    type="checkbox"
+                    id="radioToggle"
+                    onchange="toggleRadio(this.checked)"
+                    style="width: auto; accent-color: var(--robco-alert)"
+                  />
+                  <label for="radioToggle" style="color: var(--robco-alert); font-size: 12px"
+                    >PIP-BOY RADIO (SYNTHESIZED STATION)</label
+                  >
+                </div>
+                <span
+                  id="radioStatus"
+                  style="
+                    display: block;
+                    color: var(--robco-alert);
+                    font-size: 10px;
+                    opacity: 0.7;
+                    margin: -2px 0 4px 0;
+                  "
+                  >&gt; RADIO OFFLINE &mdash; NO CARRIER</span
+                >
                 <div class="audio-row">
                   <input
                     type="checkbox"

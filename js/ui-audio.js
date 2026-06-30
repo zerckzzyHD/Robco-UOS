@@ -502,6 +502,7 @@ function toggleMasterMute(isMuted) {
     }
     _geigerCurrentRate = -1;
     stopTinnitus();
+    stopRadio(); // WU-F5: silence the radio under master mute (pref preserved)
     if (crtHumGain) {
       crtHumGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
     }
@@ -512,7 +513,186 @@ function toggleMasterMute(isMuted) {
     if (crtHumGain && !AudioSettings.hum) {
       crtHumGain.gain.linearRampToValueAtTime(0.007, audioCtx.currentTime + 0.3);
     }
+    if (AudioSettings.radio) startRadio(); // WU-F5: resume the radio if it was on
   }
+  _updateRadioUI();
+}
+
+// ── WU-F5 PIP-BOY RADIO (synthesized — zero-byte WebAudio station) ──────────
+// A procedural retrofuturist station bed: a low broadband static hiss + a warm
+// drifting carrier hum + a slow, randomly-evolving sequence of synthesized tonal
+// motifs/beeps. FULLY GENERATED via WebAudio — no audio files (zero cache cost),
+// IP-safe (no copyrighted music). Free, offline, no AI, game-agnostic (Protocol
+// 38 — carries no game data). Opt-in player (default OFF), persisted as the
+// localStorage device preference `robco_radio_on`.
+//
+// Protocol 7: reuses ensureAudioCtx()/audioCtx, respects AudioSettings.masterMute,
+// and owns the AudioSettings.radio guard. NOTE — unlike the sibling audio toggles
+// (which are MUTE flags, true = silenced, routed through toggleAudio's keyMap),
+// the radio is an explicit PLAYER: AudioSettings.radio uses ON semantics (true =
+// playing) and has its own toggleRadio() handler, so it is deliberately NOT added
+// to the toggleAudio mute keyMap (adding it there would invert its meaning).
+// Autoplay-policy-safe: only ever started from a user gesture — the toggle click,
+// or a one-shot first-interaction arm when restoring a saved "on" preference.
+const RADIO_KEY = 'robco_radio_on';
+let radioNodes = null; // { masterGain, staticSrc, carrier, lfo } while playing
+let radioMotifTimeout = null;
+let _radioArmed = false; // a one-shot first-gesture start is pending
+
+function _radioPlaying() {
+  return !!radioNodes;
+}
+function isRadioOn() {
+  return localStorage.getItem(RADIO_KEY) === 'true';
+}
+
+// Schedule the next short tonal motif/beep over the static bed, then re-arm.
+function _radioScheduleMotif() {
+  if (!radioNodes || !audioCtx) return;
+  const now = audioCtx.currentTime;
+  const notes = [220, 261.63, 329.63, 392, 493.88]; // warm retro pentatonic
+  const f = notes[Math.floor(Math.random() * notes.length)];
+  const osc = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  osc.type = Math.random() < 0.5 ? 'triangle' : 'sine';
+  osc.frequency.setValueAtTime(f, now);
+  g.gain.setValueAtTime(0.0001, now);
+  g.gain.linearRampToValueAtTime(0.05, now + 0.06);
+  g.gain.exponentialRampToValueAtTime(0.0001, now + 0.5);
+  osc.connect(g);
+  g.connect(radioNodes.masterGain);
+  osc.start(now);
+  osc.stop(now + 0.55);
+  radioMotifTimeout = setTimeout(_radioScheduleMotif, 1400 + Math.random() * 3000);
+}
+
+function startRadio() {
+  // Guards: already playing, master-muted, or the radio pref is off → no-op.
+  if (radioNodes || AudioSettings.masterMute || !AudioSettings.radio) return;
+  ensureAudioCtx();
+  const masterGain = audioCtx.createGain();
+  masterGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+  masterGain.gain.linearRampToValueAtTime(0.5, audioCtx.currentTime + 0.6); // fade in
+  // Broadband static bed — a looping noise buffer through a bandpass.
+  const noiseBuf = audioCtx.createBuffer(1, audioCtx.sampleRate * 2, audioCtx.sampleRate);
+  const nd = noiseBuf.getChannelData(0);
+  for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+  const staticSrc = audioCtx.createBufferSource();
+  staticSrc.buffer = noiseBuf;
+  staticSrc.loop = true;
+  const staticFilter = audioCtx.createBiquadFilter();
+  staticFilter.type = 'bandpass';
+  staticFilter.frequency.value = 1400;
+  staticFilter.Q.value = 0.6;
+  const staticGain = audioCtx.createGain();
+  staticGain.gain.value = 0.05;
+  staticSrc.connect(staticFilter);
+  staticFilter.connect(staticGain);
+  staticGain.connect(masterGain);
+  // Warm carrier hum, slowly detuned by a sub-audio LFO (retrofuturist drift).
+  const carrier = audioCtx.createOscillator();
+  const carrierGain = audioCtx.createGain();
+  carrier.type = 'sine';
+  carrier.frequency.value = 110;
+  carrierGain.gain.value = 0.025;
+  const lfo = audioCtx.createOscillator();
+  const lfoGain = audioCtx.createGain();
+  lfo.type = 'sine';
+  lfo.frequency.value = 0.13;
+  lfoGain.gain.value = 6;
+  lfo.connect(lfoGain);
+  lfoGain.connect(carrier.frequency);
+  carrier.connect(carrierGain);
+  carrierGain.connect(masterGain);
+  masterGain.connect(audioCtx.destination);
+  staticSrc.start();
+  carrier.start();
+  lfo.start();
+  radioNodes = { masterGain, staticSrc, carrier, lfo };
+  _radioScheduleMotif();
+  _updateRadioUI();
+}
+
+function stopRadio() {
+  if (radioMotifTimeout) {
+    clearTimeout(radioMotifTimeout);
+    radioMotifTimeout = null;
+  }
+  if (radioNodes && audioCtx) {
+    const nodes = radioNodes;
+    try {
+      nodes.masterGain.gain.cancelScheduledValues(audioCtx.currentTime);
+      nodes.masterGain.gain.linearRampToValueAtTime(0.0001, audioCtx.currentTime + 0.3);
+    } catch (e) {
+      /* ignore */
+    }
+    setTimeout(() => {
+      ['staticSrc', 'carrier', 'lfo'].forEach(k => {
+        try {
+          nodes[k].stop();
+        } catch (e) {
+          /* already stopped */
+        }
+        try {
+          nodes[k].disconnect();
+        } catch (e) {
+          /* ignore */
+        }
+      });
+      try {
+        nodes.masterGain.disconnect();
+      } catch (e) {
+        /* ignore */
+      }
+    }, 350);
+  }
+  radioNodes = null;
+  _updateRadioUI();
+}
+
+function _updateRadioUI() {
+  const note = document.getElementById('radioStatus');
+  if (!note) return;
+  if (AudioSettings.masterMute) {
+    note.textContent = '> RADIO SILENCED — MASTER AUDIO MUTED';
+    return;
+  }
+  note.textContent = _radioPlaying()
+    ? '> RECEIVING — STATION CARRIER LOCKED'
+    : '> RADIO OFFLINE — NO CARRIER';
+}
+
+// User-facing play/stop toggle (diegetic `> PIP-BOY RADIO`). Persists the device
+// preference and starts/stops the station. The onchange fires from a real click,
+// satisfying the autoplay policy.
+function toggleRadio(on) {
+  localStorage.setItem(RADIO_KEY, on ? 'true' : 'false');
+  AudioSettings.radio = on;
+  if (on) startRadio();
+  else stopRadio();
+  _updateRadioUI();
+}
+
+// Boot restore. The saved preference cannot auto-start audio (no gesture yet), so
+// when it is "on" we arm a one-shot first-interaction starter (mirrors the boot
+// drone). The checkbox reflects the saved preference immediately.
+function initRadio() {
+  AudioSettings.radio = isRadioOn();
+  const toggle = document.getElementById('radioToggle');
+  if (toggle) toggle.checked = AudioSettings.radio;
+  if (AudioSettings.radio && !radioNodes && !_radioArmed) {
+    _radioArmed = true;
+    const _armStart = () => {
+      document.removeEventListener('click', _armStart);
+      document.removeEventListener('keydown', _armStart);
+      _radioArmed = false;
+      if (AudioSettings.radio && !AudioSettings.masterMute) startRadio();
+      _updateRadioUI();
+    };
+    document.addEventListener('click', _armStart, { once: true });
+    document.addEventListener('keydown', _armStart, { once: true });
+  }
+  _updateRadioUI();
 }
 
 // ── QUEST COMPLETE CHIME ────────────────────────────────────

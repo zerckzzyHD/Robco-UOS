@@ -13057,6 +13057,109 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 121 — WU-F5 Pip-Boy Radio (synthesized — zero-byte WebAudio)
+//  A procedural station bed (static + carrier + tonal motifs), fully generated
+//  via WebAudio (no audio files). Opt-in player, respects masterMute, autoplay-
+//  safe. Game-agnostic, offline, no AI. (Phase F, Protocol 7)
+//  8 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 121 — WU-F5 Pip-Boy Radio (synthesized)');
+  const uiAudio121 = readFile('js/ui-audio.js');
+  const uiCore121 = readFile('js/ui-core.js');
+  const html121 = htmlSource;
+  let start121 = '';
+  let toggle121 = '';
+  let init121 = '';
+  let motif121 = '';
+  try {
+    start121 = extractFunctionBody(uiAudio121, 'startRadio');
+  } catch (_) {}
+  try {
+    toggle121 = extractFunctionBody(uiAudio121, 'toggleRadio');
+  } catch (_) {}
+  try {
+    init121 = extractFunctionBody(uiAudio121, 'initRadio');
+  } catch (_) {}
+  try {
+    motif121 = extractFunctionBody(uiAudio121, '_radioScheduleMotif');
+  } catch (_) {}
+
+  // 121.1  zero-byte synth: built from WebAudio nodes, NOT an <audio>/Audio()/fetch of a file
+  assert(
+    /audioCtx\.createBufferSource\(\)/.test(start121) &&
+      /audioCtx\.createOscillator\(\)/.test(start121) &&
+      /ensureAudioCtx\(\)/.test(start121) &&
+      !/new Audio\(|\.mp3|\.ogg|\.wav|<audio/i.test(uiAudio121),
+    '121.1: the radio is fully synthesized via WebAudio (buffer/oscillator nodes), with no audio file (no <audio>/Audio()/.mp3/.ogg/.wav)'
+  );
+
+  // 121.2  Protocol 7 guards: masterMute + the AudioSettings.radio (ON) guard, reuses ensureAudioCtx
+  assert(
+    /if \(radioNodes \|\| AudioSettings\.masterMute \|\| !AudioSettings\.radio\) return/.test(
+      start121
+    ),
+    '121.2: startRadio() guards on masterMute + the AudioSettings.radio ON-pref (and no double-start) before building any node'
+  );
+
+  // 121.3  AudioSettings.radio key initialised from localStorage robco_radio_on (ON semantics, opt-in)
+  assert(
+    /radio: localStorage\.getItem\('robco_radio_on'\) === 'true'/.test(uiCore121) &&
+      /const RADIO_KEY = 'robco_radio_on'/.test(uiAudio121),
+    "121.3: AudioSettings.radio is seeded from localStorage 'robco_radio_on' (opt-in ON-semantics device preference)"
+  );
+
+  // 121.4  toggle persists the pref, flips the cache, and starts/stops; wired via onchange
+  assert(
+    /localStorage\.setItem\(RADIO_KEY/.test(toggle121) &&
+      /AudioSettings\.radio = on/.test(toggle121) &&
+      /startRadio\(\)/.test(toggle121) &&
+      /stopRadio\(\)/.test(toggle121) &&
+      /onchange="toggleRadio\(this\.checked\)"/.test(html121),
+    '121.4: toggleRadio persists robco_radio_on + starts/stops the station; #radioToggle onchange wires to it'
+  );
+
+  // 121.5  masterMute integration: stops under master mute, resumes when un-muted if the pref is on
+  assert(
+    /stopRadio\(\); \/\/ WU-F5/.test(uiAudio121) &&
+      /if \(AudioSettings\.radio\) startRadio\(\); \/\/ WU-F5/.test(uiAudio121),
+    '121.5: master mute stops the radio (pref preserved) and un-mute resumes it when AudioSettings.radio is on'
+  );
+
+  // 121.6  autoplay-safe restore: a saved "on" pref arms a one-shot first-gesture start (no auto-play)
+  assert(
+    /_radioArmed = true/.test(init121) &&
+      /addEventListener\('click', _armStart, \{ once: true \}\)/.test(init121) &&
+      /addEventListener\('keydown', _armStart, \{ once: true \}\)/.test(init121) &&
+      /startRadio\(\)/.test(init121),
+    '121.6: initRadio() restores a saved "on" pref via a one-shot first-gesture arm (autoplay-policy-safe), and is wired into boot'
+  );
+
+  // 121.7  the looping static bed + the slow tonal-motif scheduler are both present
+  assert(
+    /staticSrc\.loop = true/.test(start121) &&
+      /_radioScheduleMotif\(\)/.test(start121) &&
+      /setTimeout\(_radioScheduleMotif/.test(motif121) &&
+      /initRadio\(\); \/\/ WU-F5/.test(uiCore121),
+    '121.7: a looping static bed + a self-rescheduling tonal-motif generator drive the station, and initRadio is called from boot'
+  );
+
+  // 121.8  diegetic toggle + status note, game-agnostic (Protocol 38 — no FNV/FO3/Fallout literals)
+  assert(
+    /id="radioToggle"/.test(html121) &&
+      /for="radioToggle"/.test(html121) &&
+      /id="radioStatus"/.test(html121) &&
+      !/Galaxy News|New Vegas|Mojave|Radio New Vegas|FNV|FO3/i.test(
+        uiAudio121.slice(
+          uiAudio121.indexOf('PIP-BOY RADIO'),
+          uiAudio121.indexOf('QUEST COMPLETE CHIME')
+        )
+      ),
+    '121.8: the radio has #radioToggle + label[for] + #radioStatus, and the synth carries no game-specific station literals (game-agnostic)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 console.log('\n══════════════════════════════════════════════════════════════\n');

@@ -127,6 +127,7 @@ export default [
         playLevelUpJingle: 'readonly',
         triggerHaptic: 'readonly', // WU-F2 Haptic Solenoid (ui-audio.js)
         initHaptic: 'readonly', // WU-F2 Haptic Solenoid (ui-audio.js)
+        initRadio: 'readonly', // WU-F5 Pip-Boy Radio (ui-audio.js)
         startHeartbeat: 'readonly',
         stopHeartbeat: 'readonly',
         playBootDrone: 'readonly',

@@ -60,8 +60,8 @@
 │   └── database.js     ~25KB CSV data (~170 weapons, ~68 armors, ~45 chems) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── check-persistence.ps1   28KB    1460-test pre-commit audit
-│   ├── check-persistence.js    36KB    1460-test Node runner (parity with .ps1)
+│   ├── check-persistence.ps1   28KB    1468-test pre-commit audit
+│   ├── check-persistence.js    36KB    1468-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -710,29 +710,30 @@ The grid highlights **only zones with score ≥ 50** to prevent coincidental sub
 
 ## Settings & localStorage Keys
 
-| Key                     | Type      | Used By  | Description                                                                      |
-| ----------------------- | --------- | -------- | -------------------------------------------------------------------------------- |
-| `robco_v7`              | JSON      | state.js | Full game state                                                                  |
-| `robco_chat`            | JSON      | ui.js    | Chat history (up to 200 messages)                                                |
-| `robco_gemini_key`      | string    | api.js   | Gemini API key                                                                   |
-| `robco_gemini_model`    | string    | api.js   | Selected model name                                                              |
-| `robco_courier_id`      | string    | cloud.js | Cloud sync identifier                                                            |
-| `robco_optics`          | string    | ui.js    | Color theme name                                                                 |
-| `robco_playstyle`       | string    | api.js   | "any" or "melee"                                                                 |
-| `robco_panel_state`     | JSON      | ui.js    | Panel open/closed memory                                                         |
-| `robco_version`         | string    | ui.js    | Last seen version (triggers changelog)                                           |
-| `robco_sfx_muted`       | bool      | ui.js    | Typing sound mute                                                                |
-| `robco_hum_muted`       | bool      | ui.js    | CRT hum mute                                                                     |
-| `robco_geiger_muted`    | bool      | ui.js    | Geiger counter mute                                                              |
-| `robco_tinnitus_muted`  | bool      | ui.js    | Tinnitus mute                                                                    |
-| `robco_ambient_muted`   | bool      | ui.js    | Limb SFX mute                                                                    |
-| `robco_wake_muted`      | bool      | ui.js    | Tab-return wake tone mute                                                        |
-| `robco_master_muted`    | bool      | ui.js    | Global audio kill switch                                                         |
-| `robco_typer_speed`     | float     | ui.js    | Typewriter speed multiplier                                                      |
-| `robco_last_cloud_push` | timestamp | cloud.js | Conflict detection                                                               |
-| `robco_active_tab`      | string    | ui.js    | Last active tab (`'stat'`/`'inv'`/`'data'`/`'campg'`)                            |
-| `robco_playstyle_type`  | string    | state.js | _(deprecated C5)_ Legacy key migrated into `state.playthroughType` on first load |
-| `robco_slot_1/2/3`      | JSON      | ui.js    | Save slots A/B/C                                                                 |
+| Key                     | Type      | Used By     | Description                                                                      |
+| ----------------------- | --------- | ----------- | -------------------------------------------------------------------------------- |
+| `robco_v7`              | JSON      | state.js    | Full game state                                                                  |
+| `robco_chat`            | JSON      | ui.js       | Chat history (up to 200 messages)                                                |
+| `robco_gemini_key`      | string    | api.js      | Gemini API key                                                                   |
+| `robco_gemini_model`    | string    | api.js      | Selected model name                                                              |
+| `robco_courier_id`      | string    | cloud.js    | Cloud sync identifier                                                            |
+| `robco_optics`          | string    | ui.js       | Color theme name                                                                 |
+| `robco_playstyle`       | string    | api.js      | "any" or "melee"                                                                 |
+| `robco_panel_state`     | JSON      | ui.js       | Panel open/closed memory                                                         |
+| `robco_version`         | string    | ui.js       | Last seen version (triggers changelog)                                           |
+| `robco_sfx_muted`       | bool      | ui.js       | Typing sound mute                                                                |
+| `robco_hum_muted`       | bool      | ui.js       | CRT hum mute                                                                     |
+| `robco_geiger_muted`    | bool      | ui.js       | Geiger counter mute                                                              |
+| `robco_tinnitus_muted`  | bool      | ui.js       | Tinnitus mute                                                                    |
+| `robco_ambient_muted`   | bool      | ui.js       | Limb SFX mute                                                                    |
+| `robco_wake_muted`      | bool      | ui.js       | Tab-return wake tone mute                                                        |
+| `robco_master_muted`    | bool      | ui.js       | Global audio kill switch                                                         |
+| `robco_radio_on`        | bool      | ui-audio.js | Pip-Boy Radio ON state (WU-F5 — ON-semantics player, not a mute; opt-in)         |
+| `robco_typer_speed`     | float     | ui.js       | Typewriter speed multiplier                                                      |
+| `robco_last_cloud_push` | timestamp | cloud.js    | Conflict detection                                                               |
+| `robco_active_tab`      | string    | ui.js       | Last active tab (`'stat'`/`'inv'`/`'data'`/`'campg'`)                            |
+| `robco_playstyle_type`  | string    | state.js    | _(deprecated C5)_ Legacy key migrated into `state.playthroughType` on first load |
+| `robco_slot_1/2/3`      | JSON      | ui.js       | Save slots A/B/C                                                                 |
 
 ---
 
@@ -950,7 +951,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1460-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1468-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

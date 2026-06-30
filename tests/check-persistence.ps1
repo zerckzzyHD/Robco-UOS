@@ -7406,6 +7406,56 @@ Check (($html120 -match 'id="highLumenToggle"') -and ($html120 -match 'for="high
     '120.8: the HIGH-LUMEN toggle has #highLumenToggle + label[for] + #highLumenStatus note and is game-agnostic (no FNV/FO3/Fallout literals)'
 
 # ===========================================================
+# Suite 121 -- WU-F5 Pip-Boy Radio (synthesized -- zero-byte WebAudio) (8 tests)
+# A procedural station bed (static + carrier + tonal motifs), fully generated via
+# WebAudio (no audio files). Opt-in player, respects masterMute, autoplay-safe.
+# Game-agnostic, offline, no AI. (PS mirror of JS Suite 121.)
+# ===========================================================
+Sep "Suite 121 -- WU-F5 Pip-Boy Radio (synthesized)"
+$uiAudio121 = Read-Src "js/ui-audio.js"
+$uiCore121  = Read-Src "js/ui-core.js"
+$html121    = Read-Src "index.html"
+$start121  = [regex]::Match($uiAudio121, '(?s)function startRadio\([\s\S]*?\n\}').Value
+$toggle121 = [regex]::Match($uiAudio121, '(?s)function toggleRadio\([\s\S]*?\n\}').Value
+$init121   = [regex]::Match($uiAudio121, '(?s)function initRadio\([\s\S]*?\n\}').Value
+$motif121  = [regex]::Match($uiAudio121, '(?s)function _radioScheduleMotif\([\s\S]*?\n\}').Value
+$idxA121 = $uiAudio121.IndexOf('PIP-BOY RADIO')
+$idxB121 = $uiAudio121.IndexOf('QUEST COMPLETE CHIME')
+$radioSlice121 = if ($idxA121 -ge 0 -and $idxB121 -gt $idxA121) { $uiAudio121.Substring($idxA121, $idxB121 - $idxA121) } else { $uiAudio121 }
+
+# 121.1  zero-byte synth: WebAudio nodes, NOT an <audio>/Audio()/file fetch
+Check (($start121 -match 'audioCtx\.createBufferSource\(\)') -and ($start121 -match 'audioCtx\.createOscillator\(\)') -and ($start121 -match 'ensureAudioCtx\(\)') -and ($uiAudio121 -notmatch 'new Audio\(|\.mp3|\.ogg|\.wav|<audio')) `
+    '121.1: the radio is fully synthesized via WebAudio (buffer/oscillator nodes), with no audio file (no <audio>/Audio()/.mp3/.ogg/.wav)'
+
+# 121.2  Protocol 7 guards: masterMute + AudioSettings.radio (ON) + no double-start
+Check ($start121 -match 'if \(radioNodes \|\| AudioSettings\.masterMute \|\| !AudioSettings\.radio\) return') `
+    '121.2: startRadio() guards on masterMute + the AudioSettings.radio ON-pref (and no double-start) before building any node'
+
+# 121.3  AudioSettings.radio seeded from localStorage robco_radio_on (ON semantics, opt-in)
+Check (($uiCore121 -match "radio: localStorage\.getItem\('robco_radio_on'\) === 'true'") -and ($uiAudio121 -match "const RADIO_KEY = 'robco_radio_on'")) `
+    "121.3: AudioSettings.radio is seeded from localStorage 'robco_radio_on' (opt-in ON-semantics device preference)"
+
+# 121.4  toggle persists pref + flips cache + starts/stops; wired via onchange
+Check (($toggle121 -match 'localStorage\.setItem\(RADIO_KEY') -and ($toggle121 -match 'AudioSettings\.radio = on') -and ($toggle121 -match 'startRadio\(\)') -and ($toggle121 -match 'stopRadio\(\)') -and ($html121 -match 'onchange="toggleRadio\(this\.checked\)"')) `
+    '121.4: toggleRadio persists robco_radio_on + starts/stops the station; #radioToggle onchange wires to it'
+
+# 121.5  masterMute integration: stop under mute, resume on un-mute if pref on
+Check (($uiAudio121 -match 'stopRadio\(\); // WU-F5') -and ($uiAudio121 -match 'if \(AudioSettings\.radio\) startRadio\(\); // WU-F5')) `
+    '121.5: master mute stops the radio (pref preserved) and un-mute resumes it when AudioSettings.radio is on'
+
+# 121.6  autoplay-safe restore: saved "on" arms a one-shot first-gesture start
+Check (($init121 -match '_radioArmed = true') -and ($init121 -match "addEventListener\('click', _armStart, \{ once: true \}\)") -and ($init121 -match "addEventListener\('keydown', _armStart, \{ once: true \}\)") -and ($init121 -match 'startRadio\(\)')) `
+    '121.6: initRadio() restores a saved "on" pref via a one-shot first-gesture arm (autoplay-policy-safe), and is wired into boot'
+
+# 121.7  looping static bed + self-rescheduling motif generator + boot wiring
+Check (($start121 -match 'staticSrc\.loop = true') -and ($start121 -match '_radioScheduleMotif\(\)') -and ($motif121 -match 'setTimeout\(_radioScheduleMotif') -and ($uiCore121 -match 'initRadio\(\); // WU-F5')) `
+    '121.7: a looping static bed + a self-rescheduling tonal-motif generator drive the station, and initRadio is called from boot'
+
+# 121.8  diegetic toggle + status note, game-agnostic (no station literals)
+Check (($html121 -match 'id="radioToggle"') -and ($html121 -match 'for="radioToggle"') -and ($html121 -match 'id="radioStatus"') -and ($radioSlice121 -notmatch 'Galaxy News|New Vegas|Mojave|Radio New Vegas|\bFNV\b|\bFO3\b')) `
+    '121.8: the radio has #radioToggle + label[for] + #radioStatus, and the synth carries no game-specific station literals (game-agnostic)'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

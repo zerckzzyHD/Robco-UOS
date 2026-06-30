@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1460/1460 | Cache: robco-terminal-v2.6.0-r50 -->
+﻿## [Unreleased]<!-- Tests: 1468/1468 | Cache: robco-terminal-v2.6.0-r51 -->
 
 ### Added
 
@@ -17,6 +17,7 @@
 - The installed terminal app icon now shows a small count badge of your unresolved directives — your active quests — while the app is in the background, and clears it the moment you open the terminal (you've seen them). It's an ambient nudge with no pop-ups or notifications. On phones and desktops that support app-icon badges it appears automatically once the app is installed to your home screen; everywhere else it simply does nothing. Works offline with no AI.
 - Added an OVERSEER'S LOG panel on the DATA tab — a maintenance read-out of how long you've spent in the terminal: your current session uptime (ticking live), your longest single session, total power-on time across every visit, and how many times you've booted the terminal. It's quiet flavour that builds over time, stored only on your own device — nothing is ever uploaded or synced. Works entirely offline with no AI.
 - Added a HIGH-LUMEN OPTICS toggle (next to the OPTICS colour picker, under Security & Configuration) — a high-contrast display mode for easier reading in bright rooms or for low vision. Flip it on and the terminal drops to a pure-black background, drops the soft phosphor glow for sharper text, lifts every dimmed label to full strength, and quietens the scanline overlay — all while keeping whatever optics colour you've chosen. It also turns on automatically if your operating system already asks for higher contrast, so it respects that preference out of the box. Your choice is remembered on this device and applies the instant the terminal opens. Works in either game, entirely offline with no AI.
+- Added a PIP-BOY RADIO toggle (in the Audio Systems panel, under Security & Configuration) that plays an ambient retrofuturist station — a soft bed of static, a warm drifting carrier tone, and a slow trickle of gentle synthesized beeps. The whole station is generated live in your browser, so it adds zero download size and contains no copyrighted music. It's off by default; flip it on and the station fades in. It respects Master Mute (and resumes when you un-mute if it was playing), and it only ever starts on a tap or keypress so it never autoplays. Works in either game, entirely offline with no AI.
 
 ### Fixed
 

@@ -35,6 +35,10 @@ const AudioSettings = {
   questComplete: localStorage.getItem('robco_questcomplete_muted') === 'true', // quest complete chime
   questFail: localStorage.getItem('robco_questfail_muted') === 'true', // quest fail tone
   factionThreshold: localStorage.getItem('robco_factionthreshold_muted') === 'true', // faction standing alert
+  // WU-F5 Pip-Boy Radio: ON semantics (true = playing), NOT a mute flag. Default
+  // OFF (opt-in). initRadio() does the autoplay-safe first-gesture restore at boot;
+  // this initialiser just reflects the saved preference into the cache.
+  radio: localStorage.getItem('robco_radio_on') === 'true',
   masterMute: localStorage.getItem('robco_master_muted') === 'true',
 };
 
@@ -435,6 +439,7 @@ window.onload = function () {
   initHaptic(); // WU-F2: restore the Haptic Solenoid (Vibration) preference
   initOverseerLog(); // WU-F7: start the Overseer's Log session clock + bump boot count (once)
   initHighLumen(); // WU-F8: restore the High-Lumen Optics (max-contrast) preference
+  initRadio(); // WU-F5: restore the Pip-Boy Radio preference (autoplay-safe first-gesture arm)
 
   // H1: Rotary Dial Click — fire on any <details> panel toggle inside uiPanel
   const _uiPanel = document.getElementById('uiPanel');
