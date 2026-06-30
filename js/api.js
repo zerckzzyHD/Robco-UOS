@@ -98,10 +98,10 @@ Example Schema:
     "stats": {"kills": 1, "capsEarned": 50, "damageDealt": 120}
   },
   "modal": {
-    "title": "SYSTEM FEATURES",
+    "title": "PROJECTED TIMELINE",
     "type": "TEXT",
     "content": [
-      "> [VATS SIM] / [VS] : Opt. Melee/Unarmed AP strikes."
+      "> +1 DAY: Courier expected at Primm."
     ]
   }
 }
@@ -126,6 +126,7 @@ Financial Metrics: Run Economy Sync using live Barter skills. Strictly enforce V
 - Quadratic XP Scaling: Boundaries = 25 * (Target_Level^2) + 125 * (Target_Level) - 150.
 - Tactical TTK / THREAT: handled by the native deterministic THREAT terminal (BESTIARY.CSV lookup + TTK/ammo-burn math, computed offline). Do NOT compute or narrate time-to-kill or a THREAT modal — defer to the local calculator.
 - LOOT add/value: the [LOOT] terminal (add a DB item to inventory at its Database Value) is a native deterministic offline tool — do NOT emit a LOOT picker/modal or compute item values; defer to the local calculator. Free-text looting during play still returns the updated inventory array per the persistence rule above.
+- V.A.T.S. accuracy / AP-strike simulation: the [VATS SIM] / [VS] terminal is a native deterministic offline calculator (equipped weapon + SPECIAL + skills + GAME_DEFS V.A.T.S. coefficients, computed offline). Do NOT compute or narrate a V.A.T.S. hit-chance, AP-strike plan, or modal — defer to the local calculator.
 
 ### **Skill System**
 ${GAME_DEFS[ctx].ai.skillSystemText}
@@ -976,6 +977,15 @@ const NATIVE_COMMAND_ROUTER = {
   // AI never computes loot values or draws a loot UI. The optional arg pre-fills search.
   '[LOOT]': arg => renderLoot(arg),
   '[LT]': arg => renderLoot(arg),
+  // WU-N1: V.A.T.S. is a fully-deterministic native calculator (equipped weapon skill/AP
+  // from WEAPONS.CSV + SPECIAL + GAME_DEFS[ctx].vats coefficients + melee/unarmed AP-strike
+  // optimizer, computed offline). The AI never computes hit-% or an outcome. The [VATS] macro
+  // button (→ macroCommand('[VATS SIM]')) and the [VATS SIM]/[VS] tokens route to the native
+  // overlay here instead of falling through to the AI (VATS-still-AI retirement). Any typed
+  // target arg is ignored — V.A.T.S. operates on the equipped weapon + body regions.
+  '[VATS SIM]': () => showVATSOverlay(),
+  '[VS]': () => showVATSOverlay(),
+  '[VATS]': () => showVATSOverlay(),
 };
 
 function _routeNativeCommand(userText) {

@@ -6378,7 +6378,7 @@ Check (($fnvSlice104.Contains('WU-D4a-RANGED-GAP')) -and ($fo3Slice104.Contains(
     '104.19: WU-D4a-RANGED-GAP flag documented in both GAME_DEFS entries (Protocol 3 -- exact ranged hit-% is not sourceable)'
 
 # ===========================================================
-# Suite 105 -- WU-N1 VATS native calculator (18 tests)
+# Suite 105 -- WU-N1 VATS native calculator (21 tests)
 # Deterministic V.A.T.S. calc (showVATSOverlay/recomputeVATS) consuming the WU-D4a
 # coefficients (crit bonus + hit-% clamp) and the WU-N1 GAME_DEFS additions (combatSkills,
 # vats.regions, vats.apBase/apPerAgility -- canon AP formula). Locks the GA-10 FO3 big_guns
@@ -6474,6 +6474,21 @@ Check (($dbnv105 -match 'function lookupWeaponStats\s*\(') -and ($dbfo3105 -matc
 # 105.18 read-only -- no state writes
 Check ((-not ($vatsBody105 -match 'saveState\s*\(')) -and (-not ($vatsBody105 -match 'pushToCloud\s*\('))) `
     '105.18: recomputeVATS() is read-only (no saveState/pushToCloud writes)'
+
+# ── VATS-still-AI retirement (Protocol 42) ──────────────────────────────────
+$api105 = Read-Src "js/api.js"
+$routerBody105 = [regex]::Match($api105, 'const NATIVE_COMMAND_ROUTER\s*=\s*\{[\s\S]*?\};').Value
+# 105.19 [VATS SIM]/[VS]/[VATS] route to the native overlay, NOT the AI
+Check (($routerBody105 -match "'\[VATS SIM\]':\s*\(\)\s*=>\s*showVATSOverlay\(\)") -and ($routerBody105 -match "'\[VS\]':\s*\(\)\s*=>\s*showVATSOverlay\(\)") -and ($routerBody105 -match "'\[VATS\]':\s*\(\)\s*=>\s*showVATSOverlay\(\)")) `
+    '105.19: NATIVE_COMMAND_ROUTER routes [VATS SIM]/[VS]/[VATS] -> showVATSOverlay() (native, no AI -- VATS-still-AI fix, Protocol 42)'
+# 105.20 AI V.A.T.S. path retired in getSystemDirective
+Check ((-not ($api105 -match '\[VS\]\s*:\s*Opt\.')) -and ($api105 -match 'V\.A\.T\.S\. accuracy / AP-strike simulation:[\s\S]*?defer to the local calculator')) `
+    '105.20: AI V.A.T.S. path retired -- getSystemDirective no longer advertises a [VATS SIM] AI feature and defers V.A.T.S. to the native calculator'
+# 105.21 all router-driven natives have a NATIVE_COMMAND_ROUTER entry
+$nativeToks105 = @('[THREAT]','[CONSULT]','[BIO-SCAN]','[LOOT]','[VATS SIM]')
+$missingNat105 = @($nativeToks105 | Where-Object { -not $routerBody105.Contains("'" + $_ + "'") })
+Check ($missingNat105.Count -eq 0) `
+    '105.21: all router-driven natives (THREAT/CONSULT/BIO-SCAN/LOOT/VATS) have a NATIVE_COMMAND_ROUTER entry (native end-to-end, no AI fall-through)'
 
 # ===========================================================
 # Suite 106 -- WU-N2 TRADE native barter terminal (20 tests)

@@ -11032,7 +11032,7 @@ header('Suite 104 — WU-D4 deterministic-feature coefficients (fallout.wiki-ver
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 105 — WU-N1 VATS native calculator (18 tests)
+//  Suite 105 — WU-N1 VATS native calculator (21 tests)
 //  The deterministic V.A.T.S. calc (showVATSOverlay/recomputeVATS) consuming the
 //  WU-D4a coefficients (crit bonus + hit-% clamp) and the WU-N1 GAME_DEFS additions
 //  (combatSkills, vats.regions, vats.apBase/apPerAgility — canon AP formula). Locks:
@@ -11178,6 +11178,35 @@ header('Suite 105 — WU-N1 VATS native calculator');
   assert(
     !/saveState\s*\(/.test(vatsBody) && !/pushToCloud\s*\(/.test(vatsBody),
     '105.18: recomputeVATS() is read-only (no saveState/pushToCloud writes)'
+  );
+  // ── VATS-still-AI retirement (Protocol 42) ───────────────────────────────────
+  const api105 = readFile('js/api.js');
+  const routerBody105 = (api105.match(/const NATIVE_COMMAND_ROUTER\s*=\s*\{[\s\S]*?\n\};/) || [
+    '',
+  ])[0];
+  // 105.19 the [VATS SIM]/[VS]/[VATS] tokens route to the native overlay — NOT the AI.
+  assert(
+    /'\[VATS SIM\]':\s*\(\)\s*=>\s*showVATSOverlay\(\)/.test(routerBody105) &&
+      /'\[VS\]':\s*\(\)\s*=>\s*showVATSOverlay\(\)/.test(routerBody105) &&
+      /'\[VATS\]':\s*\(\)\s*=>\s*showVATSOverlay\(\)/.test(routerBody105),
+    '105.19: NATIVE_COMMAND_ROUTER routes [VATS SIM]/[VS]/[VATS] → showVATSOverlay() (native, no AI — VATS-still-AI fix, Protocol 42)'
+  );
+  // 105.20 the AI V.A.T.S. path is retired in getSystemDirective: the old "[VATS SIM] / [VS] :
+  // Opt." advertisement is gone, replaced by a defer-to-native note (mirrors THREAT/BIO-SCAN/LOOT).
+  assert(
+    !/\[VS\]\s*:\s*Opt\./.test(api105) &&
+      /V\.A\.T\.S\. accuracy \/ AP-strike simulation:[\s\S]*?defer to the local calculator/i.test(
+        api105
+      ),
+    '105.20: AI V.A.T.S. path retired — getSystemDirective no longer advertises a [VATS SIM] AI feature and defers V.A.T.S. to the native calculator'
+  );
+  // 105.21 cross-cut: every command-driven native (THREAT/CONSULT/BIO-SCAN/LOOT/VATS) has a
+  // NATIVE_COMMAND_ROUTER entry — each is intercepted natively end-to-end, none reach the AI.
+  assert(
+    ['[THREAT]', '[CONSULT]', '[BIO-SCAN]', '[LOOT]', '[VATS SIM]'].every(tok =>
+      routerBody105.includes("'" + tok + "'")
+    ),
+    '105.21: all router-driven natives (THREAT/CONSULT/BIO-SCAN/LOOT/VATS) have a NATIVE_COMMAND_ROUTER entry (native end-to-end, no AI fall-through)'
   );
 }
 

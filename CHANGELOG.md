@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1378/1378 | Cache: robco-terminal-v2.6.0-r35 -->
+﻿## [Unreleased]<!-- Tests: 1381/1381 | Cache: robco-terminal-v2.6.0-r36 -->
 
 ### Added
 
@@ -38,6 +38,7 @@
 - Removed a fabricated Fallout 3 weapon ("O'cta Brain") that isn't a real in-game item, so it no longer appears in autocomplete or feeds bogus stats to the AI. Also corrected the 1st Recon Assault and Survival armours (Boone's armour) to their real damage threshold of 15 (they were recorded as 22). Both verified against the Fallout wiki.
 - Completed the Fallout 3 Operation: Anchorage quest list by adding the two real quests that were missing — "The Guns of Anchorage" and "Paving the Way" — so the add-on now lists all four of its quests. And corrected a made-up map location ("Vault 92 South") to the real "Bethesda Offices East", where the Lockpick bobblehead is actually found. All verified against the Fallout wiki.
 - Fixed the BARTER UPLINK trading screen not updating when you switch vendors. Choosing a different vendor from the dropdown now correctly refreshes that vendor's purse (the caps it can pay you) and the buy and sell lists, instead of leaving the previous vendor's details on screen. The dropdown was being rebuilt at the exact moment you changed it, which on some devices left the old vendor showing — the screen now updates in place.
+- Fixed the V.A.T.S. button still calling the AI instead of the built-in calculator. Invoking V.A.T.S. — from the [VATS] button or by typing the command — now always opens the offline V.A.T.S. calculator (hit chance, crit bonus, and the melee/unarmed AP-strike optimiser) and never contacts the AI, matching how THREAT, TRADE, CONSULT, BIO-SCAN, and LOOT already work. The AI is no longer told it can produce a V.A.T.S. result, so it can't intercept the command anymore.
 
 ### Changed
 
