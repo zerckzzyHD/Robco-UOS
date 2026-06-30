@@ -11182,7 +11182,7 @@ header('Suite 105 — WU-N1 VATS native calculator');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 106 — WU-N2 TRADE native barter terminal (18 tests)
+//  Suite 106 — WU-N2 TRADE native barter terminal (20 tests)
 //  The deterministic, offline barter terminal consuming the WU-D4b coefficients
 //  (GAME_DEFS[ctx].barter). Locks: db catalog/vendor lookups, the price math + its
 //  canon invariants (buy ≥ value, sell < buy), additive + confirm-gated mutation
@@ -11346,6 +11346,31 @@ header('Suite 106 — WU-N2 TRADE native barter terminal');
   assert(
     /\.trade-row\b/.test(css106) && /\.trade-name[\s\S]{0,80}min-width:\s*0/.test(css106),
     '106.18: terminal.css .trade-row + .trade-name min-width:0 (no horizontal overflow at 360px)'
+  );
+  // 106.19 vendor-switch regression (Protocol 42) — changing the vendor <select> re-renders
+  // the purse line + buy/sell lists WITHOUT calling renderTrade() (which would rebuild the
+  // <select> mid-change-event — the element-self-replacement that left the purse/list stale
+  // on real devices). setTradeVendor must update in place via _renderTradeStats + both lists.
+  {
+    let setBody106 = '';
+    try {
+      setBody106 = extractFunctionBody(ren106, 'setTradeVendor');
+    } catch (_) {}
+    assert(
+      /_renderTradeStats\(\)/.test(setBody106) &&
+        /renderTradeBuyList\(\)/.test(setBody106) &&
+        /renderTradeSellList\(\)/.test(setBody106) &&
+        !/renderTrade\(\)/.test(setBody106),
+      '106.19: setTradeVendor() re-renders purse + buy/sell lists in place and never calls renderTrade() (no <select> rebuild mid-change — WU-N2 vendor-switch fix, Protocol 42)'
+    );
+  }
+  // 106.20 the purse line is its own mount (#tradeStats) updated by a single helper, so a
+  // vendor switch touches only the stats line + lists, never the <select>.
+  assert(
+    /function _renderTradeStats\s*\(/.test(ren106) &&
+      /id="tradeStats"/.test(ren106) &&
+      /VENDOR PURSE/.test(ren106),
+    '106.20: renderTrade() mounts a #tradeStats line and _renderTradeStats() is the single purse/caps/barter updater'
   );
 }
 

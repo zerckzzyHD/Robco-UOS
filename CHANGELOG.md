@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1376/1376 | Cache: robco-terminal-v2.6.0-r34 -->
+﻿## [Unreleased]<!-- Tests: 1378/1378 | Cache: robco-terminal-v2.6.0-r35 -->
 
 ### Added
 
@@ -37,6 +37,7 @@
 - Fixed Big Guns being invisible to the V.A.T.S. calculator in Fallout 3 campaigns. The calculator only ever recognised the New Vegas weapon skills, so a Fallout 3 character built around Big Guns (miniguns, the Fat Man, flamers) was never considered when picking the relevant combat skill. Fallout 3's full weapon-skill set — including Big Guns — is now used.
 - Removed a fabricated Fallout 3 weapon ("O'cta Brain") that isn't a real in-game item, so it no longer appears in autocomplete or feeds bogus stats to the AI. Also corrected the 1st Recon Assault and Survival armours (Boone's armour) to their real damage threshold of 15 (they were recorded as 22). Both verified against the Fallout wiki.
 - Completed the Fallout 3 Operation: Anchorage quest list by adding the two real quests that were missing — "The Guns of Anchorage" and "Paving the Way" — so the add-on now lists all four of its quests. And corrected a made-up map location ("Vault 92 South") to the real "Bethesda Offices East", where the Lockpick bobblehead is actually found. All verified against the Fallout wiki.
+- Fixed the BARTER UPLINK trading screen not updating when you switch vendors. Choosing a different vendor from the dropdown now correctly refreshes that vendor's purse (the caps it can pay you) and the buy and sell lists, instead of leaving the previous vendor's details on screen. The dropdown was being rebuilt at the exact moment you changed it, which on some devices left the old vendor showing — the screen now updates in place.
 
 ### Changed
 

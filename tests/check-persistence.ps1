@@ -6476,7 +6476,7 @@ Check ((-not ($vatsBody105 -match 'saveState\s*\(')) -and (-not ($vatsBody105 -m
     '105.18: recomputeVATS() is read-only (no saveState/pushToCloud writes)'
 
 # ===========================================================
-# Suite 106 -- WU-N2 TRADE native barter terminal (18 tests)
+# Suite 106 -- WU-N2 TRADE native barter terminal (20 tests)
 # Deterministic, offline barter terminal consuming the WU-D4b coefficients
 # (GAME_DEFS[ctx].barter). Locks: db catalog/vendor lookups, price math + canon invariants
 # (buy >= value, sell < buy), additive + confirm-gated mutation (Protocol 34), the caps-revert
@@ -6567,6 +6567,16 @@ Check (($core106 -match "trade:\s*'inv'") -and ($core106 -match "trade:\s*'>\s*B
 # 106.18 CSS overflow guard
 Check (($css106 -match '\.trade-row\b') -and ($css106 -match '\.trade-name[\s\S]{0,80}min-width:\s*0')) `
     '106.18: terminal.css .trade-row + .trade-name min-width:0 (no horizontal overflow at 360px)'
+
+# 106.19 vendor-switch regression (Protocol 42) — setTradeVendor re-renders in place, never renderTrade()
+$setBody106 = ''
+try { $setBody106 = Get-FunctionBody $ren106 'setTradeVendor' } catch {}
+Check (($setBody106 -match '_renderTradeStats\(\)') -and ($setBody106 -match 'renderTradeBuyList\(\)') -and ($setBody106 -match 'renderTradeSellList\(\)') -and -not ($setBody106 -match 'renderTrade\(\)')) `
+    '106.19: setTradeVendor() re-renders purse + buy/sell lists in place and never calls renderTrade() (no <select> rebuild mid-change -- WU-N2 vendor-switch fix, Protocol 42)'
+
+# 106.20 purse line is its own #tradeStats mount updated by a single helper
+Check (($ren106 -match 'function _renderTradeStats\s*\(') -and ($ren106 -match 'id="tradeStats"') -and ($ren106 -match 'VENDOR PURSE')) `
+    '106.20: renderTrade() mounts a #tradeStats line and _renderTradeStats() is the single purse/caps/barter updater'
 
 # ===========================================================
 # Suite 107 -- WU-N3 THREAT native bestiary + TTK (17 tests)

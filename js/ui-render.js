@@ -1946,7 +1946,27 @@ function _tradeSellPrice(value) {
 
 function setTradeVendor(idx) {
   _tradeVendorIdx = parseInt(idx) || 0;
-  renderTrade();
+  const vendors = typeof getVendors === 'function' ? getVendors() : [];
+  if (_tradeVendorIdx < 0 || _tradeVendorIdx >= vendors.length) _tradeVendorIdx = 0;
+  // Update the purse line + buy/sell lists for the newly-selected vendor WITHOUT
+  // rebuilding the vendor <select> — it is mid-change-event, and replacing the element
+  // that is dispatching its own change left the purse/lists stale on real devices (WU-N2 fix).
+  _renderTradeStats();
+  renderTradeBuyList();
+  renderTradeSellList();
+}
+
+// Updates only the CAPS / VENDOR PURSE / BARTER line (#tradeStats) for the active vendor —
+// split out so a vendor switch never rebuilds the <select> mid-change (see setTradeVendor).
+function _renderTradeStats() {
+  const stats = document.getElementById('tradeStats');
+  if (!stats) return;
+  const vendors = typeof getVendors === 'function' ? getVendors() : [];
+  const v = vendors[_tradeVendorIdx];
+  stats.innerHTML =
+    `<span>CAPS: <b>${state.caps || 0}</b></span>` +
+    `<span>VENDOR PURSE: <b>${v ? v.baseCaps : 0}</b></span>` +
+    `<span>BARTER: <b>${_tradeBarterSkill()}</b></span>`;
 }
 
 function renderTrade() {
@@ -1962,8 +1982,6 @@ function renderTrade() {
     return;
   }
   if (_tradeVendorIdx < 0 || _tradeVendorIdx >= vendors.length) _tradeVendorIdx = 0;
-  const v = vendors[_tradeVendorIdx];
-  const caps = state.caps || 0;
   const opts = vendors
     .map(
       (vd, i) =>
@@ -1972,11 +1990,8 @@ function renderTrade() {
     .join('');
   header.innerHTML =
     `<select id="tradeVendorSelect" aria-label="Select vendor" onchange="setTradeVendor(this.value)" style="width:100%;font-size:16px;min-height:28px;margin-bottom:4px;">${opts}</select>` +
-    `<div style="font-size:11px;display:flex;flex-wrap:wrap;gap:10px;">` +
-    `<span>CAPS: <b>${caps}</b></span>` +
-    `<span>VENDOR PURSE: <b>${v.baseCaps}</b></span>` +
-    `<span>BARTER: <b>${_tradeBarterSkill()}</b></span>` +
-    `</div>`;
+    `<div id="tradeStats" style="font-size:11px;display:flex;flex-wrap:wrap;gap:10px;"></div>`;
+  _renderTradeStats();
   renderTradeBuyList();
   renderTradeSellList();
 }
