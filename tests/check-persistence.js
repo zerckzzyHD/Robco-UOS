@@ -13529,6 +13529,90 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 125 — WU-F10 Session Statistics merged into the OVERSEER'S LOG panel
+//  The standalone SESSION STATISTICS panel is retired; its campaign readout (kills,
+//  caps, damage, campaign play-time, location visits) now lives in the OVERSEER'S LOG
+//  panel beside the device telemetry, with the two time metrics clearly distinguished.
+//  8 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 125 — WU-F10 session stats merged into OVERSEER LOG');
+  const html125 = readFile('index.html');
+  const render125 = readFile('js/ui-render.js');
+  const core125 = readFile('js/ui-core.js');
+  const saves125 = readFile('js/ui-saves.js');
+  const panel125 = (html125.match(/id="overseerLogPanel"[\s\S]*?<\/details>/) || [''])[0];
+  const sessFn125 = (render125.match(/function renderSessionStats\(\)[\s\S]*?\n\}/) || [''])[0];
+  const overFn125 = (core125.match(/function renderOverseerLog\(\)[\s\S]*?\n\}/) || [''])[0];
+  const resetFn125 = (saves125.match(/function resetSessionStats\(\)[\s\S]*?\n\}/) || [''])[0];
+
+  // 125.1  the standalone SESSION STATISTICS panel is retired entirely
+  assert(
+    !/SESSION STATISTICS/.test(html125),
+    '125.1: the standalone "SESSION STATISTICS" panel is removed from index.html'
+  );
+
+  // 125.2  the campaign-stats container is merged INTO the Overseer's Log panel
+  assert(
+    /id="overseerLogPanel"/.test(html125) &&
+      panel125.includes('id="overseerLogDisplay"') &&
+      panel125.includes('id="sessionStatsList"'),
+    '125.2: #sessionStatsList (campaign stats) now lives inside #overseerLogPanel beside the device telemetry'
+  );
+
+  // 125.3  no duplicate campaign-stats container survived the merge
+  assert(
+    (html125.match(/id="sessionStatsList"/g) || []).length === 1,
+    '125.3: exactly one #sessionStatsList remains (no leftover duplicate panel)'
+  );
+
+  // 125.4  campaign readout shows all the owner-confirmed stats incl. campaign play-time
+  assert(
+    /state\.stats/.test(sessFn125) &&
+      /KILLS/.test(sessFn125) &&
+      /CAPS EARNED/.test(sessFn125) &&
+      /DMG DEALT/.test(sessFn125) &&
+      /CAMPAIGN TIME/.test(sessFn125) &&
+      /LOCATION VISITS/.test(sessFn125) &&
+      /locationHistory/.test(sessFn125),
+    '125.4: renderSessionStats shows kills, caps earned, dmg dealt, CAMPAIGN TIME, and the LOCATION VISITS count'
+  );
+
+  // 125.5  device telemetry is preserved in the same panel
+  assert(
+    /CURRENT UPTIME/.test(overFn125) &&
+      /BOOT COUNT/.test(overFn125) &&
+      /TOTAL POWER-ON/.test(overFn125),
+    '125.5: renderOverseerLog still shows device telemetry (CURRENT UPTIME / TOTAL POWER-ON / BOOT COUNT)'
+  );
+
+  // 125.6  the two time notions are distinctly labelled — campaign play-time vs device uptime
+  assert(
+    panel125.includes('UNIT TELEMETRY') &&
+      panel125.includes('CAMPAIGN LOG') &&
+      /CAMPAIGN TIME/.test(sessFn125) &&
+      /CURRENT UPTIME/.test(overFn125),
+    '125.6: campaign play-time (CAMPAIGN TIME) and device uptime (CURRENT UPTIME) sit under clearly labelled UNIT TELEMETRY / CAMPAIGN LOG sections'
+  );
+
+  // 125.7  RESET CAMPAIGN STATS is wired to resetSessionStats, which clears state.stats + re-renders
+  assert(
+    /onclick="resetSessionStats\(\)"/.test(panel125) &&
+      /RESET CAMPAIGN STATS/.test(panel125) &&
+      /state\.stats = \{/.test(resetFn125) &&
+      /renderSessionStats\(\)/.test(resetFn125),
+    '125.7: the RESET CAMPAIGN STATS button calls resetSessionStats(), which resets state.stats and re-renders'
+  );
+
+  // 125.8  game-agnostic (Protocol 38) — no game literals in the merged readout
+  //        (FALLOUT_REGISTRY is the sanctioned API, so bare "Fallout" is intentionally not matched)
+  assert(
+    !/New Vegas|Mojave|\bFNV\b|\bFO3\b|Capital Wasteland|Vault 101/i.test(sessFn125 + panel125),
+    '125.8: the merged campaign readout is game-agnostic (no FNV/FO3/location literals)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 console.log('\n══════════════════════════════════════════════════════════════\n');

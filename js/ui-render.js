@@ -619,7 +619,7 @@ function renderSessionStats() {
             <span style="opacity:0.65;">KILLS</span><span>${s.kills || 0}</span>
             <span style="opacity:0.65;">CAPS EARNED</span><span>${s.capsEarned || 0}</span>
             <span style="opacity:0.65;">DMG DEALT</span><span>${s.damageDealt || 0}</span>
-            <span style="opacity:0.65;">SESSION TIME</span><span>${elapsed}m</span>
+            <span style="opacity:0.65;">CAMPAIGN TIME</span><span>${elapsed}m</span>
             <span style="opacity:0.65;">TICKS</span><span>${state.ticks || 0}</span>
             <span style="opacity:0.65;">LOCATION VISITS</span><span>${(state.locationHistory || []).length}</span>
             ${collectLine}

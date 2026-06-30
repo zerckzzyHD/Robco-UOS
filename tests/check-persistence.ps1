@@ -7665,6 +7665,55 @@ Check (($html124 -match '<option value="green3">') -and ($html124 -match "color 
     '124.12: index.html exposes the green3 optic option AND the pre-paint head script applies it (no flash on explicit pick)'
 
 # ===========================================================
+# Suite 125 -- WU-F10 session stats merged into OVERSEER LOG (8 tests)
+# Standalone SESSION STATISTICS panel retired; its campaign readout (kills, caps,
+# damage, campaign play-time, location visits) merged into OVERSEER'S LOG beside the
+# device telemetry, both time metrics clearly distinguished. (PS mirror of JS 125.)
+# ===========================================================
+Sep "Suite 125 -- WU-F10 session stats merged into OVERSEER LOG"
+$html125   = Read-Src "index.html"
+$render125 = Read-Src "js/ui-render.js"
+$core125   = Read-Src "js/ui-core.js"
+$saves125  = Read-Src "js/ui-saves.js"
+$panel125 = [regex]::Match($html125, '(?s)id="overseerLogPanel"[\s\S]*?</details>').Value
+$sessFn125 = [regex]::Match($render125, '(?s)function renderSessionStats\(\)[\s\S]*?\n\}').Value
+$overFn125 = [regex]::Match($core125, '(?s)function renderOverseerLog\(\)[\s\S]*?\n\}').Value
+$resetFn125 = [regex]::Match($saves125, '(?s)function resetSessionStats\(\)[\s\S]*?\n\}').Value
+
+# 125.1  the standalone SESSION STATISTICS panel is retired entirely
+Check (-not ($html125 -match 'SESSION STATISTICS')) `
+    '125.1: the standalone "SESSION STATISTICS" panel is removed from index.html'
+
+# 125.2  the campaign-stats container is merged INTO the Overseer's Log panel
+Check (($html125 -match 'id="overseerLogPanel"') -and ($panel125.Contains('id="overseerLogDisplay"')) -and ($panel125.Contains('id="sessionStatsList"'))) `
+    '125.2: #sessionStatsList (campaign stats) now lives inside #overseerLogPanel beside the device telemetry'
+
+# 125.3  no duplicate campaign-stats container survived the merge
+$sslCount125 = ([regex]::Matches($html125, 'id="sessionStatsList"')).Count
+Check ($sslCount125 -eq 1) `
+    '125.3: exactly one #sessionStatsList remains (no leftover duplicate panel)'
+
+# 125.4  campaign readout shows all the owner-confirmed stats incl. campaign play-time
+Check (($sessFn125 -match 'state\.stats') -and ($sessFn125 -match 'KILLS') -and ($sessFn125 -match 'CAPS EARNED') -and ($sessFn125 -match 'DMG DEALT') -and ($sessFn125 -match 'CAMPAIGN TIME') -and ($sessFn125 -match 'LOCATION VISITS') -and ($sessFn125 -match 'locationHistory')) `
+    '125.4: renderSessionStats shows kills, caps earned, dmg dealt, CAMPAIGN TIME, and the LOCATION VISITS count'
+
+# 125.5  device telemetry is preserved in the same panel
+Check (($overFn125 -match 'CURRENT UPTIME') -and ($overFn125 -match 'BOOT COUNT') -and ($overFn125 -match 'TOTAL POWER-ON')) `
+    '125.5: renderOverseerLog still shows device telemetry (CURRENT UPTIME / TOTAL POWER-ON / BOOT COUNT)'
+
+# 125.6  the two time notions are distinctly labelled -- campaign play-time vs device uptime
+Check (($panel125.Contains('UNIT TELEMETRY')) -and ($panel125.Contains('CAMPAIGN LOG')) -and ($sessFn125 -match 'CAMPAIGN TIME') -and ($overFn125 -match 'CURRENT UPTIME')) `
+    '125.6: campaign play-time (CAMPAIGN TIME) and device uptime (CURRENT UPTIME) sit under clearly labelled UNIT TELEMETRY / CAMPAIGN LOG sections'
+
+# 125.7  RESET CAMPAIGN STATS is wired to resetSessionStats, which clears state.stats + re-renders
+Check (($panel125 -match 'onclick="resetSessionStats\(\)"') -and ($panel125 -match 'RESET CAMPAIGN STATS') -and ($resetFn125 -match 'state\.stats = \{') -and ($resetFn125 -match 'renderSessionStats\(\)')) `
+    '125.7: the RESET CAMPAIGN STATS button calls resetSessionStats(), which resets state.stats and re-renders'
+
+# 125.8  game-agnostic (Protocol 38) -- no game literals in the merged readout
+Check (-not (($sessFn125 + $panel125) -match 'New Vegas|Mojave|\bFNV\b|\bFO3\b|Capital Wasteland|Vault 101')) `
+    '125.8: the merged campaign readout is game-agnostic (no FNV/FO3/location literals)'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

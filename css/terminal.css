@@ -837,6 +837,20 @@ details.sub-panel[open] > summary h3::after {
   font-size: 10px;
 }
 
+/* WU-F10: OVERSEER'S LOG section dividers (device telemetry vs campaign log) */
+.overseer-section-label {
+  font-size: 9px;
+  letter-spacing: 1px;
+  opacity: 0.55;
+  margin: 8px 0 4px;
+  padding-bottom: 3px;
+  border-bottom: 1px dashed rgba(var(--robco-green-rgb), 0.25);
+  white-space: nowrap;
+}
+.overseer-section-label:first-child {
+  margin-top: 0;
+}
+
 /* WU-F9: TERMLINK Command Console — native subsystem launcher surface */
 .termlink-greeting {
   font-size: 10px;

@@ -1115,27 +1115,25 @@
             </div>
           </details>
 
-          <!-- 11. SESSION STATISTICS -->
-          <details class="panel" data-tab="data">
-            <summary><h2>> SESSION STATISTICS</h2></summary>
+          <!-- 11. OVERSEER'S LOG (WU-F7 device telemetry + WU-F10 merged campaign stats) -->
+          <details class="panel" data-tab="data" id="overseerLogPanel">
+            <summary><h2>&gt; OVERSEER'S LOG</h2></summary>
+            <div class="overseer-section-label">&gt; UNIT TELEMETRY — THIS DEVICE</div>
+            <div id="overseerLogDisplay">
+              <span class="empty-state">NO MAINTENANCE TELEMETRY ON RECORD</span>
+            </div>
+            <div class="overseer-section-label">&gt; CAMPAIGN LOG — THIS COURIER</div>
             <div id="sessionStatsList"></div>
             <button
               class="action-btn"
               onclick="resetSessionStats()"
               style="margin-top: 6px; font-size: 10px"
+              aria-label="Reset campaign statistics (kills, caps earned, damage dealt, campaign time)"
             >
-              RESET SESSION
+              RESET CAMPAIGN STATS
             </button>
-          </details>
-
-          <!-- 11c. OVERSEER'S LOG (WU-F7) — local device telemetry -->
-          <details class="panel" data-tab="data" id="overseerLogPanel">
-            <summary><h2>&gt; OVERSEER'S LOG</h2></summary>
-            <div id="overseerLogDisplay">
-              <span class="empty-state">NO MAINTENANCE TELEMETRY ON RECORD</span>
-            </div>
             <span style="display: block; margin-top: 6px; font-size: 10px; opacity: 0.5">
-              &gt; MAINTENANCE TELEMETRY — STORED LOCALLY ON THIS UNIT
+              &gt; DEVICE TELEMETRY STORED LOCALLY ON THIS UNIT
             </span>
           </details>
 
