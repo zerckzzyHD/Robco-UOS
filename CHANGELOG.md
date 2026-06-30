@@ -1,4 +1,8 @@
-﻿## [Unreleased]<!-- Tests: 1543/1543 | Cache: robco-terminal-v2.6.0-r62 -->
+﻿## [Unreleased]<!-- Tests: 1543/1543 | Cache: robco-terminal-v2.7.0-r1 -->
+
+---
+
+## [v2.7.0] — Native Systems & Two Wastelands<!-- Date: 2026-06-30 | Tests: 1543/1543 | Cache: robco-terminal-v2.7.0-r1 -->
 
 ### Added
 

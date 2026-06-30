@@ -52,6 +52,8 @@ After every meaningful commit, update these files **in the same commit:**
 
 **`manifest.json` version discipline:** The PWA `name` field must never include a hardcoded version number — it is intentionally version-less (`"name": "RobCo U.O.S."`). If a version string is ever added back, it must be kept in sync with `APP_VERSION` on every bump. The `short_name` is `"RobCo"` and is also version-less.
 
+**README Currency (strengthens Protocol 2's README clause — owner):** `README.md` must stay a **holistically accurate** picture of what the site actually IS — not merely the test-count/feature-table numbers. Whenever a change makes the README's description, feature list, supported games, architecture, file structure, script load order, version, or Current-State inaccurate, fix those sections **in the same commit**. The comprehensive holistic rewrite lands at the release (WU-VER) so it reflects the final shipped state; every prior unit keeps the README from drifting in the meantime.
+
 ### Protocol 2a — Test Count Sync
 
 Whenever tests are **added or removed**, update the hardcoded count in **every** location below in the **same commit** as the test change. No deferred updates.

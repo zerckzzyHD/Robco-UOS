@@ -284,7 +284,7 @@ window.saveCurrentToCloud = async function () {
     const now = Date.now();
     await addDoc(col, {
       schema: 2,
-      version: window.APP_VERSION || '2.6.0',
+      version: window.APP_VERSION || '2.7.0',
       savedAt: now,
       updatedAt: now,
       label: finalLabel,
@@ -426,7 +426,7 @@ window.syncLocalSavesToCloud = async function () {
     try {
       await addDoc(col, {
         schema: 2,
-        version: window.APP_VERSION || '2.6.0',
+        version: window.APP_VERSION || '2.7.0',
         savedAt: now,
         updatedAt: now,
         label: ls.label,

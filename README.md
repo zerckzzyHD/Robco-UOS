@@ -1,4 +1,4 @@
-﻿<div align="center">
+<div align="center">
 
 <img src="icon.png" alt="RobCo U.O.S." width="120" />
 
@@ -6,15 +6,13 @@
 
 ### **Unified Operating System**
 
-_An AI-powered tactical companion terminal for Fallout: New Vegas_
+_An AI-powered tactical companion terminal for Fallout: New Vegas **and** Fallout 3_
 
 [![Deploy Staging](https://github.com/zerckzzyHD/Robco-UOS/actions/workflows/deploy-staging.yml/badge.svg)](https://github.com/zerckzzyHD/Robco-UOS/actions/workflows/deploy-staging.yml)
 [![CI](https://github.com/zerckzzyHD/Robco-UOS/actions/workflows/ci.yml/badge.svg)](https://github.com/zerckzzyHD/Robco-UOS/actions/workflows/ci.yml)
 [![Nightly Tests](https://github.com/zerckzzyHD/Robco-UOS/actions/workflows/nightly-tests.yml/badge.svg)](https://github.com/zerckzzyHD/Robco-UOS/actions/workflows/nightly-tests.yml)
 
 ![Version](https://img.shields.io/github/v/release/zerckzzyHD/Robco-UOS?style=flat-square&label=version&color=14fdce&labelColor=010a07)
-![CI](https://img.shields.io/github/actions/workflow/status/zerckzzyHD/Robco-UOS/ci.yml?style=flat-square&label=CI&labelColor=010a07)
-![Deploy](https://img.shields.io/github/actions/workflow/status/zerckzzyHD/Robco-UOS/deploy.yml?style=flat-square&label=deploy&labelColor=010a07)
 ![License](https://img.shields.io/badge/license-ISC-14fdce?style=flat-square&labelColor=010a07)
 ![JavaScript](https://img.shields.io/badge/javascript-ES2022-14fdce?style=flat-square&logo=javascript&logoColor=14fdce&labelColor=010a07)
 ![HTML5](https://img.shields.io/badge/html5-semantic-14fdce?style=flat-square&logo=html5&logoColor=14fdce&labelColor=010a07)
@@ -23,10 +21,12 @@ _An AI-powered tactical companion terminal for Fallout: New Vegas_
 ![Firebase](https://img.shields.io/badge/firebase-cloud_sync-14fdce?style=flat-square&logo=firebase&logoColor=14fdce&labelColor=010a07)
 ![Gemini](https://img.shields.io/badge/gemini-AI_engine-14fdce?style=flat-square&logo=google&logoColor=14fdce&labelColor=010a07)
 
-**A full CRT terminal emulation that connects directly to the Gemini API,**
-**turning a browser tab into a living, breathing Pip-Boy companion.**
+**A full CRT terminal emulation that turns a browser tab into a living Pip-Boy companion —**
+**now with two Wastelands, an offline native toolset, and an AI Director that's optional, not required.**
 
 [Live Demo](https://zerckzzyHD.github.io/Robco-UOS/) · [Features](#-features) · [Architecture](#-architecture) · [Getting Started](#-getting-started) · [Development](#-development) · [Project History](#-project-history)
+
+**Current version: 2.7.0 — "Native Systems & Two Wastelands"**
 
 ---
 
@@ -34,128 +34,101 @@ _An AI-powered tactical companion terminal for Fallout: New Vegas_
 
 ## What Is This?
 
-RobCo U.O.S. is a standalone web application that functions as a real-time tactical companion for Fallout: New Vegas playthroughs. It connects directly to the Google Gemini API and acts as an AI game master — tracking your character state, running combat math from authentic game databases, managing inventory and faction reputation, and narrating your adventure through a fully immersive CRT terminal interface.
+RobCo U.O.S. is a standalone, browser-native web application that acts as a real-time tactical companion for **Fallout: New Vegas** and **Fallout 3** playthroughs. It tracks your character, inventory, factions, quests, and world state inside a fully immersive CRT terminal, and — when you want it — connects to the Google Gemini API to act as an AI game master that narrates your adventure and updates your sheet through strict, validated JSON.
 
-It started as a Google Gemini Gem (chat preset) and evolved into a complete browser-native application with its own state management, save system, cloud sync, procedural audio engine, and PWA installation support.
+It began as a Google Gemini Gem (a chat preset) and grew into a complete application with its own state engine, save system, cloud sync, procedural audio, and PWA install support.
 
-**This is not a chatbot skin.** It is a structured game engine where the AI is locked into strict JSON output, every stat is mathematically validated, and the terminal itself physically reacts to your character's condition.
+**This is not a chatbot skin.** It is a structured game engine where the AI is locked into JSON output and every value is validated before it touches your campaign — and where the heaviest, most-used tools (combat math, barter, threat assessment, lookups, medical advisories, looting) now run **entirely offline with no AI call at all**. The terminal itself physically reacts to your character's condition.
+
+### Two games, one engine
+
+Both games are first-class and fully data-driven. A single `GAME_DEFS` table plus per-game data files (`reg_nv`/`reg_fo3`, `db_nv`/`db_fo3`) drive everything — factions, skills, registries, databases, collectibles, theming, identity. New Vegas and Fallout 3 each get their own registries, bestiary, item data, default terminal colour, boot identity, and save-manager banner. Adding a future Fallout title is a data drop-in (a `GAME_DEFS` entry + its two data files), not a code rewrite.
 
 ---
 
 ## ✦ Features
 
-### 🎮 Character & Combat Systems
+### 🛠️ Native Offline Tools (no AI, deterministic, free)
 
-| System                 | Description                                                                    |
-| ---------------------- | ------------------------------------------------------------------------------ |
-| **S.P.E.C.I.A.L.**     | All 7 attributes tracked and synced, hard-clamped 1–10                         |
-| **13 Skills**          | Barter through Unarmed — used for speech checks, crafting gates, VATS accuracy |
-| **Limb Tracking**      | 5 limbs (head, arms, legs) with cripple/restore states and unique trauma audio |
-| **Perk System**        | Tracked with rank and level taken, awarded every 2 levels                      |
-| **Quest Log**          | Active/complete/failed quests with objectives and faction associations         |
-| **Session Statistics** | Kills, caps earned, damage dealt, session timer                                |
-| **Equipped Items**     | Weapon, armor, headgear tracked and displayed                                  |
+Six in-terminal tools compute their results **on-device from the game's own data** — zero network, zero AI, the same answer every time. Reachable from the Comm-Link macro buttons, typed commands, or the TERMLINK console.
 
-### 💰 Inventory & Economy
+| Tool                      | What it does                                                                                                                                                 |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **V.A.T.S.**              | Hit-% per body part, crit bonus (+5% NV / +15% FO3), and an exact melee/unarmed AP-strike optimiser; reads the equipped weapon + SPECIAL + a TARGET DT input |
+| **THREAT**                | Bestiary stat card for any creature + estimated time-to-neutralize and ammo/strike burn against your equipped weapon                                         |
+| **TRADE** (BARTER UPLINK) | Full offline barter terminal — buy/sell at real Fallout Barter-skill prices, confirm-gated, never auto-syncs                                                 |
+| **CONSULT**               | Databank lookup across items, perks, quests, locations, companions, and creatures, with key stats; says so plainly if nothing matches                        |
+| **BIO-SCAN**              | Medical advisory — HP tier, radiation, per-limb OK/CRIPPLED, addiction flags, and the right healing/rad/cure items (sourced from the game's own chem data)   |
+| **LOOT**                  | Salvage intake — search the item database and add anything to your pack at its canonical value (additive + confirm-gated)                                    |
 
-| System             | Description                                                                            |
-| ------------------ | -------------------------------------------------------------------------------------- |
-| **Full Inventory** | Name, quantity, weight, value, and category (weapon/armor/aid/ammo/misc)               |
-| **Ammo Reserves**  | Track ammo counts by caliber type — auto-updated by AI, editable manually              |
-| **Carry Weight**   | Real-time calculation: `150 + (STR × 10)` with UI deformation at capacity              |
-| **Item Quick-Use** | One-tap `[USE]` buttons on every inventory row                                         |
-| **Category Tags**  | Color-coded `[TYPE]` badges per item                                                   |
-| **Token Triage**   | Inventory payload is stripped from AI calls when not needed, saving ~1,500 tokens/turn |
+A **TERMLINK command console** launches all six from one menu; a `[FEATURES]` command registry lists every command the terminal supports and is kept honest by the build gate.
 
-### 🏛️ Faction & Reputation
+### 📟 Device Capabilities
 
-| System                   | Description                                                        |
-| ------------------------ | ------------------------------------------------------------------ |
-| **14 Factions**          | 6 major + 8 minor, each with independent fame/infamy tracking      |
-| **Standing Labels**      | Idolized → Vilified with color-coded display                       |
-| **Auto-Logging**         | Faction changes automatically appended to campaign notes           |
-| **Consequence Triggers** | Alerts when crossing Vilified (-500) or Idolized (+750) thresholds |
+Nine progressive capabilities, each with a graceful fallback when the device/browser doesn't support it:
 
-### 🤖 AI Integration
+- **Sustained Power Cell** — Screen Wake Lock (keep the display awake while reading)
+- **Haptic Solenoid** — Vibration feedback on level-up, faction flips, and critical HP (honours reduced-motion)
+- **Eject Holotape** — Web Share of your comm-link transcript (falls back to clipboard, then file)
+- **Pending-Directives Tally** — app-icon Badging with your unresolved-quest count
+- **Pip-Boy Radio** — a zero-byte, fully synthesized ambient station (WebAudio)
+- **Cold-Start / Degraded-Tube Boot** — a first-ever full POST plus a rare (~1 in 100) glitchy boot variant, reduced-motion-safe
+- **Overseer's Log** — local device telemetry (uptime, longest session, total power-on, boot count) merged with your campaign statistics
+- **High-Lumen Optics** — a high-contrast display mode (auto-on under `prefers-contrast`)
+- **TERMLINK Console** — the native command surface above
 
-| System                 | Description                                                                      |
-| ---------------------- | -------------------------------------------------------------------------------- |
-| **Gemini API**         | Direct connection via API key (stored locally, never exposed)                    |
-| **Tri-Node JSON**      | AI locked into `{narrative, state, modal}` structured output                     |
-| **Database Injection** | Weapons, armor, bestiary, chems, recipes, vendors CSVs injected only when needed |
-| **State Diff Display** | Every AI sync shows a `[DELTA]` of what changed                                  |
-| **Auto-Retry**         | One silent retry on transient 500/502/503 errors                                 |
-| **45s Timeout**        | AbortController with cancel button during API calls                              |
-| **Model Selection**    | Auto-fetches available Gemini models from your API key                           |
+### 🎮 Character, Combat & World
 
-### 💾 Save System
+| System               | Description                                                                                                                 |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| **S.P.E.C.I.A.L.**   | All 7 attributes, editable and hard-clamped 1–10                                                                            |
+| **Skills**           | Per-game skill sets (NV's 13 incl. Guns/Survival; FO3's incl. Small Guns/Big Guns)                                          |
+| **Limb Tracking**    | 5 limbs with cripple/restore states and unique trauma audio                                                                 |
+| **Perks & Quests**   | Perk log (rank + level taken); quest log with objectives, status, and DLC tagging                                           |
+| **Factions**         | Per-game reputation networks with fame/infamy, standing labels, and threshold alerts                                        |
+| **World Grid Map**   | Region map with fog-of-war discovery, collectible markers, zoom, and a native "LOG VISIT" mark-visited control              |
+| **Trackers**         | Collectibles (snow globes / bobbleheads), FO3 Lincoln memorabilia, NV traits, skill books (READ/UNREAD), NV skill magazines |
+| **Crafting**         | Recipe + breakdown registry with a batch craft/scrap panel (workbench/campfire/recycling)                                   |
+| **Inventory & Ammo** | Categorised inventory, per-caliber ammo reserves, carry weight `150 + STR×10`, one-tap USE                                  |
 
-| System                | Description                                                                 |
-| --------------------- | --------------------------------------------------------------------------- |
-| **Auto-Save**         | Debounced localStorage write (500ms) on every state change                  |
-| **3 Save Slots**      | Named slots A/B/C with full envelope (state + chat + playstyle + timestamp) |
-| **File Export**       | Download `.json` save files as physical backups                             |
-| **File Import**       | Upload saves with automatic version migration                               |
-| **Cloud Sync**        | Firebase Firestore push/pull with timestamp conflict detection              |
-| **Version Migration** | `migrateState()` chain upgrades any save from any version                   |
-| **Quota Detection**   | Warns when localStorage is full instead of silently failing                 |
-| **Undo**              | One-click rollback of the last AI sync (full state snapshot)                |
+### 🎨 Per-Game Theming
 
-### 🔊 Procedural Audio Engine
+- **Per-game default optic** — New Vegas boots in the bright RobCo green; Fallout 3 in a distinct, duller Pip-Boy green (both WCAG-AA contrast-verified). Driven by `GAME_DEFS[ctx].theme`.
+- **Dynamic "(Default)" label** — the OPTICS picker tags the active game's default colour.
+- **Per-game optic memory** — each game remembers its own chosen colour independently (keyed by game context; a 3rd game needs no code change).
+- **Per-game identity** — a boot identity line (e.g. "PIP-BOY 3000 — MOJAVE WASTELAND UPLINK") and a save-manager banner per game.
+- All colour options (RobCo Green, Pip-Boy Green, Amber, Vault-Tec Blue, Legion Red, Ghoul Green, Neon Violet) are selectable in either game.
 
-Every sound is synthesized in real-time via the Web Audio API. **No audio files exist in this project.**
+### 🤖 The AI Director (optional)
 
-| Sound               | Trigger                     | Implementation                                               |
-| ------------------- | --------------------------- | ------------------------------------------------------------ |
-| **Keyboard Clicks** | Every typewriter character  | Square wave, 100-150Hz, 50ms                                 |
-| **Geiger Counter**  | Rads ≥ 200                  | Poisson-distributed white noise bursts                       |
-| **Tinnitus**        | Rads ≥ 600 or crippled head | 5200Hz sine with periodic swells                             |
-| **CRT Hum**         | Always on                   | 60Hz sine with LFO modulation                                |
-| **Limb Cripple**    | Toggling a limb to CRIPPLED | Arm: sawtooth clang / Leg: sine thud / Head: triangle + ring |
-| **Limb Restore**    | Healing a limb              | Ascending arpeggio 440→880→1760Hz                            |
-| **Wake Tone**       | Returning from tab standby  | Square wave 220→440→880Hz                                    |
-| **Sync Tone**       | After AI state update       | Two-note sine confirmation                                   |
+| System                 | Description                                                                                                                     |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| **Gemini API**         | Direct connection via your API key (stored locally, never exposed)                                                              |
+| **Tri-Node JSON**      | The Director is locked to `{narrative, state, modal}` structured output (`application/json`)                                    |
+| **Validated import**   | `autoImportState()` explicitly field-maps + validates every value before it persists — the AI is never the sole source of truth |
+| **Database injection** | Per-game weapons/armor/bestiary/chems/recipes/vendors CSVs are injected into the directive                                      |
+| **Resilience**         | Bounded auto-retry with backoff, clear auth-error messaging, prompt-injection hardening, input caps                             |
+| **Fully optional**     | The six native tools and the whole UI work with no key and no network                                                           |
 
-All sounds respect a master mute toggle and individual per-system mute controls. Audio settings are cached in memory at startup to avoid localStorage reads on audio hot paths.
+### 💾 Saves & Cloud
+
+- **Auto-save** (debounced localStorage), **A/B/C slots**, **file export/import** with version migration, **rolling backups** with FNV-1a checksums.
+- **Cloud sync** via Firebase Firestore — additive writes only (never a blind overwrite), confirm-gated destructive actions, Google sign-in (popup-only), anonymous boot, and a Gemini-key sync option.
+- **Remote kill-switch** — a fail-open feature-flag config that can disable a networked feature remotely, always defaulting to last-known-good / features-enabled so it can never black-screen the app.
+
+### ♿ Accessibility & PWA
+
+- Keyboard `:focus-visible` rings, full `prefers-reduced-motion` freeze (CRT flicker/scanlines), `aria-live` chat, `role="dialog"` focus-trapped modals, AA-contrast tab states, and descriptive labels on every control (inventory, faction, limb buttons).
+- Installable PWA (iOS / Android / desktop), offline-capable (cache-first Service Worker), with a **reliable "REBOOT TERMINAL" auto-update flow** — a focus/visibility re-check plus a durable "has-updated-before" record surface a waiting update even in an installed standalone PWA.
+- Touch-first responsive layout (verified at 360 px / 412 px, no horizontal overflow); the desktop two-column shell is gated to real mouse/hover devices so a phone never boots the desktop layout.
+
+### 🔊 Procedural Audio
+
+Every sound is synthesized live via the Web Audio API — **no audio files ship in this project.** Typewriter clicks, Geiger counter (rads ≥ 200), tinnitus (rads ≥ 600 / crippled head), CRT hum, limb-trauma/restore tones, wake/sync tones, the boot drone, and the Pip-Boy Radio station. All respect a master mute + per-source toggles, read from an in-memory cache (never localStorage on hot paths).
 
 ### 🖥️ Terminal Immersion
 
-<details>
-<summary><b>Visual Effects</b></summary>
-
-- **CRT Scanlines** — Repeating gradient overlay with opacity flicker animation
-- **Phosphor Persistence** — Ghost glow on stat fields after AI updates
-- **Thermal Load** — Background shifts from teal to amber while API is processing
-- **Day/Night Cycle** — Blue tint applied during in-game night hours (20:00–06:00)
-- **Radiation Interference** — Screen tearing escalates with rad level (200 → 600 → 1000)
-- **Carry Weight Deformation** — UI panel sags and jitters at encumbrance thresholds
-- **Limb Trauma Glitches** — Crippled limb buttons periodically blink and blur
-- **Karma Flash** — Screen-edge glow (green/red) on ≥50 karma change
-- **Critical HP Flash** — Red background pulse when HP drops below 25%
-- **Stat Delta Ghosts** — Old values rise and fade from changed stat fields
-
-</details>
-
-<details>
-<summary><b>Terminal Features</b></summary>
-
-- **Boot Sequence** — Cold-boot animation with memory check on every page load
-- **Tab Standby** — Terminal dims on tab switch; ascending wake tone on return
-- **Session Uptime Clock** — Live HH:MM:SS counter in the header
-- **Memory Cycle** — Screen flicker + "64K STABLE" log every 15 minutes
-- **6 Color Themes** — RobCo Green, New Vegas Amber, Vault-Tec Blue, Legion Red, Ghoul Green, Neon Purple
-- **Typewriter Speed** — Adjustable 0.25×–3× with context-aware velocity (combat = fast, rest = slow)
-- **Narrative Formatting** — Bold rendering, skill check indicators with pass/fail marks
-- **Session Resume Briefing** — Status summary appended to chat on load
-
-</details>
-
-### 📱 Progressive Web App
-
-- Installable on iOS, Android, and desktop via the browser install prompt
-- Offline-capable with Service Worker cache-first strategy
-- Automatic update detection with "REBOOT TERMINAL" prompt on new versions
-- Portrait-optimized mobile layout with collapsible panels
+CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Director is thinking, day/night cycle, radiation interference, carry-weight deformation, limb-trauma glitches, karma/critical-HP flashes, a live uptime clock, a periodic memory-cycle flicker, and the redesigned in-app **FIRMWARE REVISION LOG** changelog viewer (environment-aware: staging shows in-progress notes, production shows only released versions).
 
 ---
 
@@ -163,102 +136,73 @@ All sounds respect a master mute toggle and individual per-system mute controls.
 
 ### Technology Stack
 
-| Layer           | Technology                    | Purpose                                   |
-| --------------- | ----------------------------- | ----------------------------------------- |
-| **Frontend**    | Vanilla HTML5 / CSS3 / ES2022 | Zero-framework browser-native app         |
-| **Styling**     | CSS Custom Properties         | Dynamic theming via `--robco-*` variables |
-| **Audio**       | Web Audio API                 | Procedural synthesis — no audio files     |
-| **AI**          | Google Gemini API             | Structured JSON game engine               |
-| **Cloud**       | Firebase Firestore            | Cross-device save synchronization         |
-| **PWA**         | Service Worker + Manifest     | Installable offline-capable app           |
-| **Dev Tooling** | ESLint + Prettier + Vite      | Linting, formatting, dev server           |
-| **Testing**     | PowerShell persistence audit  | 1543-test pre-commit gate                 |
+| Layer           | Technology                                       | Purpose                                                      |
+| --------------- | ------------------------------------------------ | ------------------------------------------------------------ |
+| **Frontend**    | Vanilla HTML5 / CSS3 / ES2022                    | Zero-framework, browser-native (global-scope script tags)    |
+| **Styling**     | CSS Custom Properties                            | Dynamic theming via `--robco-*` variables                    |
+| **Audio**       | Web Audio API                                    | Procedural synthesis — no audio files                        |
+| **AI**          | Google Gemini API                                | Optional structured-JSON game master                         |
+| **Cloud**       | Firebase Auth + Firestore                        | Cross-device save sync, sign-in, remote feature flags        |
+| **PWA**         | Service Worker + Manifest                        | Installable, offline-capable, reliable auto-update           |
+| **Hosting**     | GitHub Pages (prod) + Cloudflare Pages (staging) | Release-gated production; auto-deployed staging              |
+| **Dev Tooling** | ESLint + Prettier + Vite                         | Linting, formatting, dev server                              |
+| **Testing**     | Node + PowerShell + Playwright                   | 1543-test gate at parity + boot-smoke / render / a11y checks |
+
+### Per-game data system
+
+`GAME_DEFS` (in `state.js`) declares each game's factions, skills, collectible label, theme, calculator coefficients, and seed inventory. `_activeDef()` returns the active game's config; a one-line `GAME_FILES` boot manifest in `index.html` selects which per-game data files to load. Feature code reads `GAME_DEFS[ctx]` rather than hardcoding game literals (Protocol 38), so the engine scales to N games by data alone.
 
 ### File Structure
 
 ```
-├── index.html              DOM structure + inline event handlers
-├── css/terminal.css        All styling, animations, CRT effects
+├── index.html              DOM, inline handlers, GAME_FILES boot manifest, SW registration
+├── css/terminal.css        All styling, CRT effects, responsive + reduced-motion layers
 ├── js/
-│   ├── state.js            State definition, persistence, migration
-│   ├── registry.js         Read-only Fallout Data Registry (~280 items, 130 quests, 110 perks, 120 locations)
-│   ├── api.js              System directive, AI import, API communication
-│   ├── ui-audio.js         Audio engine (geiger, tinnitus, CRT hum, boot/level-up sounds)
-│   ├── ui-render.js        All render* functions, CRUD helpers, faction/map/time utilities
-│   ├── ui-saves.js         Save slots, file import/export, rolling backups, registry autocomplete
-│   ├── ui-account.js       Account panel, cloud save picker, undo-sync
-│   ├── ui-core.js          Core UI lifecycle, appendToChat, loadUI, updateMath
-│   ├── cloud.js            Firebase push/pull (ES module)
-│   └── database.js         Game CSV data (~170 weapons, ~68 armors, ~45 chems) + lookupItemInDb()
-├── sw.js                   Service Worker (cache-first, same-origin only)
+│   ├── db_nv.js            FNV game CSV data + lookups
+│   ├── db_fo3.js           FO3 game CSV data + lookups
+│   ├── state.js            State, persistence, migration, GAME_DEFS, THEMES, _activeDef()
+│   ├── reg_nv.js           FNV Fallout Data Registry (read-only)
+│   ├── reg_fo3.js          FO3 Fallout Data Registry (read-only)
+│   ├── registry-core.js    Shared registrySearch() (game-agnostic, both contexts)
+│   ├── ui-audio.js         Audio engine, boot sequence, optics (THEMES table)
+│   ├── ui-render.js        render*() functions, CRUD helpers, map/faction/time utilities
+│   ├── ui-saves.js         Save slots, file import/export, rolling backups, autocomplete
+│   ├── ui-account.js       Account/UPLINK panel, cloud save picker, save-manager header
+│   ├── ui-core.js          UI lifecycle, COMMAND_REGISTRY, native command surfaces, badges
+│   ├── api.js              System directive, NATIVE_COMMAND_ROUTER, autoImportState, transmit
+│   └── cloud.js            Firebase auth + Firestore push/pull + remote config (ES module)
+├── sw.js                   Service Worker (cache-first, atomic precache, reliable update)
+├── manifest.json           PWA manifest (version-less name + app shortcuts)
 ├── tests/
-│   ├── robco-diagnostics.ps1  Pre-commit 1543-test persistence audit (PowerShell)
-│   └── robco-diagnostics.js   Pre-commit 1543-test persistence audit (Node)
+│   ├── robco-diagnostics.js   Node persistence/structure audit (1543 tests, 130 suites)
+│   ├── robco-diagnostics.ps1  PowerShell mirror (parity-locked)
+│   ├── test.html              Browser-side runtime import-contract audit
+│   └── *.mjs                  Playwright boot-smoke / render-check / a11y-baseline
+├── scripts/gate.js         The full local gate (lint, format, both runners, browser checks)
 ├── ARCHITECTURE.md         Full system dependency map & patterns
-├── changelog.txt           Complete version history (v1.1.7 → present)
-├── icon.png                PWA icon
-└── manifest.json           PWA manifest
+├── CHANGELOG.md            Version history (in-app FIRMWARE REVISION LOG reads this)
+└── icon.png                PWA icon
 ```
 
 ### Script Load Order
 
-Scripts are loaded as `<script>` tags in strict order. All globals are shared via the window scope:
+Global-scope `<script>` tags load in strict order (per-game db/reg pair is chosen by the boot manifest):
 
 ```
-1. state.js      →  state, chatHistory, APP_VERSION, saveState, migrateState
-2. database.js   →  databaseCSVs, lookupItemInDb
-3. registry.js   →  FALLOUT_REGISTRY, registrySearch
-4. ui-audio.js   →  AudioSettings, audioCtx, all audio functions
-5. ui-render.js  →  all render*() functions, CRUD helpers, faction/map/time utilities
-6. ui-saves.js   →  saveToSlot, loadFromSlot, handleFileUpload, initRegistryAutocomplete
-7. ui-account.js →  renderAccount, renderCloudSavePicker, undoLastSync
-8. ui-core.js    →  appendToChat, loadUI, updateMath, COMMAND_REGISTRY
-9. api.js        →  autoImportState, transmitMessage, fetchAuthorizedModels
-10. cloud.js     →  window.pushToCloud, window.pullFromCloud (ES module)
+1. db_nv.js / db_fo3.js  →  databaseCSVs, lookupItemInDb (active game)
+2. state.js              →  state, APP_VERSION, GAME_DEFS, THEMES, saveState, migrateState
+3. reg_nv.js / reg_fo3.js→  FALLOUT_REGISTRY (active game, read-only)
+4. registry-core.js      →  registrySearch (shared, game-agnostic)
+5. ui-audio.js           →  AudioSettings, audio + boot + optics functions
+6. ui-render.js          →  render*() functions, CRUD helpers, map/faction/time
+7. ui-saves.js           →  save slots, file import/export, autocomplete
+8. ui-account.js         →  renderAccount, renderSavesList, undoLastSync
+9. ui-core.js            →  appendToChat, loadUI, updateMath, COMMAND_REGISTRY
+10. api.js               →  autoImportState, transmitMessage, NATIVE_COMMAND_ROUTER
+11. cloud.js             →  window.pushToCloud / pullFromCloud (ES module)
 ```
 
-### Persistence Architecture
-
-```
-                    ┌─────────────────┐
-                    │   User / AI     │
-                    └────────┬────────┘
-                             │
-                    ┌────────▼────────┐
-                    │  syncStateFromDom│  ← reads DOM inputs into state
-                    └────────┬────────┘
-                             │
-              ┌──────────────┼──────────────┐
-              │              │              │
-     ┌────────▼───┐  ┌──────▼──────┐  ┌────▼────────┐
-     │ saveState  │  │ exportSave  │  │ pushToCloud  │
-     │ (localStorage)│ (JSON file) │  │ (Firestore)  │
-     └────────────┘  └─────────────┘  └──────────────┘
-
-              ┌──────────────┼──────────────┐
-              │              │              │
-     ┌────────▼───┐  ┌──────▼──────┐  ┌────▼────────┐
-     │ onload     │  │ fileUpload  │  │ pullFromCloud│
-     │ (localStorage)│ (JSON file) │  │ (Firestore)  │
-     └──────┬─────┘  └──────┬──────┘  └──────┬──────┘
-            │               │                │
-            └───────────────┼────────────────┘
-                            │
-                   ┌────────▼────────┐
-                   │  migrateState   │  ← upgrades old save formats
-                   └────────┬────────┘
-                            │
-                   ┌────────▼────────┐
-                   │    loadUI()     │  ← pushes state → DOM
-                   └─────────────────┘
-```
-
-### Testing & Quality Gates
-
-**Commits are blocked if any test fails.** Additional tooling:
-
-- **ESLint** — Static analysis catching undefined variables and unreachable code
-- **Prettier** — Consistent formatting across all files
+`ARCHITECTURE.md` is the canonical deep reference (persistence lifecycle, audio chain, boundaries, and add-a-field/audio/panel checklists).
 
 ---
 
@@ -266,50 +210,36 @@ Scripts are loaded as `<script>` tags in strict order. All globals are shared vi
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) v18+ (for dev tooling only — not required for production)
-- A [Google Gemini API key](https://aistudio.google.com/apikey)
+- [Node.js](https://nodejs.org/) v18+ (dev tooling only — not required to run the app)
+- A [Google Gemini API key](https://aistudio.google.com/apikey) — **optional**; the native tools and the whole terminal work without one
 
 ### Installation
 
 ```bash
-# Clone the repository
 git clone https://github.com/zerckzzyHD/Robco-UOS.git
 cd Robco-UOS
-
-# Install dev dependencies
-npm install
+npm install        # dev dependencies (ESLint, Prettier, Vite, Playwright)
 ```
 
 ### Local Development
 
 ```bash
-# Start the Vite dev server with hot reload
-npm run dev
+npm run dev        # Vite dev server with hot reload (typically http://localhost:5173)
 ```
-
-Open the URL shown in your terminal (typically `http://localhost:5173`).
-
-### Production Deployment
-
-This is a **static site** — no build step required.
-
-**GitHub Pages** is deployed automatically on every push to `main` via GitHub Actions.
-The live site is available at: **https://zerckzzyHD.github.io/Robco-UOS/**
-
-You can also deploy to any other static host:
-
-- **Netlify** — Drag and drop the folder, or connect the GitHub repo
-- **Vercel** — Import the repository
-- **Any HTTP server** — Just serve the files
 
 ### First Run
 
-1. Open the terminal in your browser
-2. Wait for the boot sequence to complete
-3. Paste your Gemini API key in the Configuration panel
-4. Click **VALIDATE KEY & FETCH ENGINES**
-5. Select a model from the dropdown
-6. Start playing — type commands or free-form text in the Comm-Link
+1. Open the terminal and let the boot sequence finish.
+2. Pick your game (New Vegas or Fallout 3).
+3. _(Optional)_ Paste a Gemini key in Configuration → **VALIDATE KEY & FETCH ENGINES**, then pick a model — only needed for the AI Director.
+4. Start playing: type commands or free text in the Comm-Link, or use the native tools (TERMLINK, VATS, TRADE, THREAT, CONSULT, BIO-SCAN, LOOT) with no key at all.
+
+### Hosting & Release Flow
+
+This is a **static site** — no build step to run it.
+
+- **Production:** GitHub Pages at **https://zerckzzyHD.github.io/Robco-UOS/**, built from `main` and **release-gated** — it publishes only on a version release.
+- **Staging:** a private Cloudflare Pages build from `dev` (`robco-uos-dev.pages.dev`) for real-device testing, auto-deployed on every dev push and stamped as a DEV BUILD.
 
 ---
 
@@ -318,36 +248,26 @@ You can also deploy to any other static host:
 ### Available Scripts
 
 ```bash
-npm run lint      # ESLint static analysis
-npm run format    # Prettier auto-formatting
-npm run dev       # Vite dev server with hot reload
+npm run lint        # ESLint (zero warnings)
+npm run format      # Prettier
+npm run dev         # Vite dev server
+npm run gate        # FULL gate: lint + format + both runners + boot-smoke + render + a11y + test.html
+npm run gate:fast   # Fast subset run by the pre-commit hook
 ```
 
-### Adding a New State Field
+### Quality Gate
 
-> See [ARCHITECTURE.md](ARCHITECTURE.md#adding-a-new-state-field-checklist) for the full checklist.
+Commits and pushes are blocked unless the gate is green. The pre-commit hook runs the fast subset (lint, format, **both** test runners at parity); the pre-push hook + CI run the full gate (adds Playwright boot-smoke, a 360/412 render-check, an accessibility baseline-diff, and the `test.html` runtime audit). A `CACHE_NAME` bump is required whenever a served file changes, and the test count is kept in sync across every doc in the same commit.
 
-1. Add to `let state = { ... }` in `state.js`
-2. Add migration in `migrateState()` in `state.js`
-3. Add import handling in `autoImportState()` in `api.js`
-4. Update `getSystemDirective()` schema if the AI should return it
-5. Add UI rendering if needed in `ui.js`
-6. Commit — the pre-commit audit will verify coverage
+### Commit Workflow (dev-branch model)
 
-### Adding a New Audio Source
-
-> See [ARCHITECTURE.md](ARCHITECTURE.md#adding-a-new-audio-source-checklist) for the full checklist.
-
-Every audio function must check `AudioSettings.masterMute` and its specific mute toggle before playing. The `AudioSettings` cache is initialized once at startup — never read `localStorage` in audio hot paths.
-
-### Commit Workflow
+All unreleased work goes to **`dev`**; **`main` is release-only**. Each commit keeps docs + the 1543-test count in sync and bumps `CACHE_NAME` when a served file changes.
 
 ```
-npm run lint        ← catch bugs
-npm run format      ← enforce style
+npm run lint && npm run format
 git add -A
-git commit          ← cache-bump guard runs first, then persistence audit (1543 tests)
-git push origin main
+git commit          # pre-commit: cache-bump guard, then fast gate (both runners)
+git push origin dev # pre-push: full gate (+ Playwright + a11y + test.html)
 ```
 
 ---
@@ -359,74 +279,46 @@ git push origin main
 
 ### Phase 1 — The Gemini Gem (v1.0 – v1.3)
 
-RobCo U.O.S. began as a **Google Gemini Gem** — a system prompt preset that turned the Gemini chat interface into a Fallout: New Vegas game master. All state was tracked in the AI's context window using ASCII art and text formatting.
-
-Key milestones:
-
-- **v1.1.7** — Architecture split: dev manual moved to external knowledge files
-- **v1.2.0** — Token compression: ASCII footers replaced with minified JSON
-- **v1.3.0** — Core math hardcoded: XP scaling, carry weight, skill formulas
-- **v1.3.9** — Mobile geometry overhaul with Unicode box-drawing characters
+Began as a **Google Gemini Gem** — a system prompt that turned the Gemini chat into a Fallout: New Vegas game master, with all state tracked in the AI's context window via ASCII art.
 
 ### Phase 2 — The Web Application (v1.4 – v1.5)
 
-The project evolved from a chat preset into a standalone browser application with its own state management and API integration.
-
-Key milestones:
-
-- **v1.4.7** — State offloaded from AI context to browser-side JavaScript
-- **v1.5.0** — Native Gemini API integration (no more copy-pasting JSON)
-- **v1.5.5** — Tri-Node JSON architecture, campaign notes, modals
-- **v1.5.6** — Modular architecture: monolith split into 5 JS files
-- **v1.5.8** — PWA integration with Service Worker
+Evolved into a standalone browser app: state offloaded to JavaScript, native Gemini API integration, the Tri-Node JSON contract, a modular file split, and PWA integration.
 
 ### Phase 3 — The Living Machine (v1.6)
 
-The terminal became an immersive experience with procedural audio, visual effects, and comprehensive character tracking.
+Procedural audio, CRT visual effects, the 14-faction network, the save envelope + cloud sync, the quest log, and the wiki-sourced Fallout Data Registry + combat database.
 
-Key milestones:
+### Phase 4 — Two Wastelands & Self-Reliance (v2.0 – v2.7)
 
-- **v1.6.0** — Playstyle toggle, PWA deep integration, CRT visual overhaul
-- **v1.6.1** — Procedural Geiger counter, tinnitus, CRT hum, limb trauma audio
-- **v1.6.2** — Skill matrix, status effects, campaign notes, undo system
-- **v1.6.3** — 14-faction network, save envelope format, cloud sync envelope
-- **v1.6.4** — Quest log, equipped tracking, save slots, session stats, 48 features
-- **v1.6.5** — Fallout Data Registry fully populated: 130 quests, 110+ perks, 120 locations, 10 companions, ~280 items (wiki-sourced). Perk autocomplete wired.
-- **v1.6.6** — THREAT database remediation: [TH] shorthand fixed, [THREAT] inventory context, all 9 CSV tables fully expanded, QUEST_ITEMS table added, databaseCSVs moved to systemInstruction.
-- **v1.6.7** — Modernization pass: dead code removal (getRelevantDbContext, macros), CSV full expansion (~170 weapons, ~68 armors, ~45 chems), Ammo Reserves panel (renderAmmo/addAmmo/removeAmmo), DB-backed autoImportState weight normalization, APP_VERSION 1.6.7.
+The browser-native era: a second game (**Fallout 3**) added as a first-class, fully data-driven context; the six heavy tools (VATS, TRADE, THREAT, CONSULT, BIO-SCAN, LOOT) converted to **offline native calculators**; nine device capabilities; per-game theming + identity; a comprehensive accessibility pass; cloud auth + a remote kill-switch; a hardened PWA auto-update flow; and a self-improving test gate.
 
 </details>
 
-### Current State (v2.6.0)
+### Current State (v2.7.0)
 
-The project is a **production-quality browser application** with:
+A **production-quality, two-game browser application** with:
 
-- 34 tracked state fields across 5 structured systems
-- 1543-test automated persistence audit (DOM binding, Protocol 4 enforcement, migrateState mock execution, reputation 2D matrix, CRUD function existence, CAMPG tab DOM binding, campaignMode + playthroughType Protocol 4, render contracts, CSS invariants, SW invariants, structural integrity, detail-current dedup guard, gate guards for critical UI controls, prohibited patterns, protocol completeness, AI contract lock, architectural boundaries, assets completeness, CSS hygiene guards, DB↔registry weapon parity, weapon mods CSV + registry parity, native command router, GAME_DEFS structural integrity, anonymous auth + security rules + XSS coercion fix, no-double-escape behavioral regression, Gemini key sync security guards, remote kill-switch + client auto-disable guards, CI/repo hardening guards, gate commit/push split + powershell fallback guards, save integrity checksum + rolling backup + forward-compat guard, AI key resilience + Tri-Node schema validation, prompt-injection hardening + input caps + quota warning, CSP origin guards + Firebase SDK pin, UI module split guards, mobile layout overflow guards, save/cloud UI consolidation guards, SPECIAL stats editable commit-on-blur guards, blocking update modal guards, FO3 Lincoln memorabilia tracker guards, FNV Traits tracker + trait name filter guards, FNV location database expansion guards, Phase 6 UI consistency guards, location datalist bleed fix + update-modal whitespace guards, skills panel game-aware render guards, registry no-duplicate-item guard, autoImportState hardening guards, FO3 location database expansion guards, CHEMS.CSV consumables expansion guards, FO3 [ARMOR.CSV] expansion guards, FO3 quests expansion + quest items expansion guards, crafting recipe + breakdown registry data guards, craft panel compact recipe/scrap picker guards, skill books tracker READ/UNREAD split guards, maskable shortcut icons + OPTICS label wrap, NV Skill Magazines tracker, UI consistency structural guards (Suite 88: 8 tests), game-agnostic refactor guards + Protocol 38 (Suite 89: 14 tests), loadUI dirty-check / targeted re-render guards (Suite 91: 9 tests), cloud.js → state.js boundary fix guards (Suite 101: 8 tests), boot-drone autoplay-timing guards (Suite 102: 6 tests), save-menu "?" help affordance guards (Suite 103: 7 tests))
-- 14-faction reputation network
-- 13-skill character sheet
-- Full save/load/export/import/cloud sync/undo pipeline
-- 11 procedural audio sources
-- 6 color themes
-- 3 save slots
-- Installable PWA with offline support and **reliable auto-update flow** — a `CACHE_NAME` bump now reliably surfaces the "REBOOT TERMINAL" prompt and reloads on accept (fixed: `skipWaiting()` in `install` was silently breaking the accept path)
-- Responsive phone layout — `@media (max-width: 480px)` reflows panels, wraps the boot/header text and tab bar, caps number inputs and shrinks limb buttons, and flexes text inputs so nothing overflows or truncates (verified at 360 px and 412 px); World Map shows compact 4×4 core view on mobile with FULL MAP toggle, square cells via `aspect-ratio: 1/1`, and re-renders on panel open (panel-closed measurement fallback fixed)
-- **Fallout Data Registry** — 130 quests · ~110 perks · ~120 locations · 10 companions · ~280 items (all wiki-sourced, CC-BY-SA 4.0)
-- **Registry Autocomplete** — live CRT-styled dropdown on Quest Name, Item Name, and Perk Name inputs (keyboard + click)
-- **Combat Database** — 9 CSV tables: 66 enemies · ~170 weapons · 47 ammo subtypes · ~68 armors · ~45 chems · 18 misc items · 10 recipes · 19 quest items · 14 vendors (all wiki-sourced)
-- **Ammo Reserves Panel** — track ammo counts per caliber, manually added or AI-updated, with badge count and auto-expand on AI sync
-- **DB-backed weight normalization** — `lookupItemInDb()` auto-corrects 0-weight items on every AI sync using canonical CSV data
-- **Reliable DB injection** — databaseCSVs always present in systemInstruction (guaranteed model attention, no long-session drift)
+- **Both Fallout: New Vegas and Fallout 3** as fully data-driven game contexts (`GAME_DEFS`, per-game registries/databases/theming/identity)
+- **Six native offline tools** (V.A.T.S., TRADE, THREAT, CONSULT, BIO-SCAN, LOOT) — deterministic, no AI, plus a TERMLINK console and a self-checked command registry
+- **Nine device capabilities** (Wake Lock, Vibration, Web Share, Badging, Pip-Boy Radio, cold-start/degraded boot, Overseer's Log, High-Lumen Optics, TERMLINK)
+- **Per-game theming** — per-game default optic, dynamic "(Default)" label, per-game colour memory, per-game boot/save identity
+- **Full character/world systems** — SPECIAL, per-game skills, limbs, perks, quests, factions, world-grid map with mark-visited, and trackers (collectibles, Lincoln memorabilia, traits, skill books, magazines) + a crafting panel
+- **Optional AI Director** — Tri-Node JSON, validated import, resilient + prompt-injection-hardened
+- **Saves & cloud** — auto-save, A/B/C slots, export/import + migration, rolling checksummed backups, additive Firestore sync, Google sign-in, remote kill-switch
+- **Accessibility + PWA** — focus rings, reduced-motion, live regions, dialog focus traps, AA contrast; installable, offline, reliable auto-update; touch-first responsive
+- **Wiki-sourced data** — per-game Fallout Data Registries + combat databases (weapons, armor, bestiary, chems, recipes, vendors, quest items), all from the Independent Fallout Wiki
+- **A self-improving gate** — **1543 tests across 130 suites**, mirrored in the Node and PowerShell runners at exact parity, plus Playwright boot-smoke / render-check / a11y baseline and a `test.html` runtime audit; CI + a nightly run back it up
 
 ---
 
 ## 🗂 Additional Documentation
 
-| Document                           | Description                                                                                                                              |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | System dependency map, persistence lifecycle, audio chain, historical lessons, and checklists for adding state fields, audio, and panels |
-| [PRIVACY.md](PRIVACY.md)           | Plain-English privacy policy — what data is stored, where, and how to delete it                                                          |
-| [changelog.txt](changelog.txt)     | Complete version history from v1.1.7 to present                                                                                          |
+| Document                           | Description                                                                                   |
+| ---------------------------------- | --------------------------------------------------------------------------------------------- |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | System dependency map, persistence lifecycle, audio chain, boundaries, and add-a-X checklists |
+| [PRIVACY.md](PRIVACY.md)           | Plain-English privacy policy — what is stored, where, and how to delete it                    |
+| [CHANGELOG.md](CHANGELOG.md)       | Full version history (also read by the in-app FIRMWARE REVISION LOG viewer)                   |
 
 ---
 
