@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1397/1397 | Cache: robco-terminal-v2.6.0-r41 -->
+﻿## [Unreleased]<!-- Tests: 1398/1398 | Cache: robco-terminal-v2.6.0-r42 -->
 
 ### Added
 
@@ -51,6 +51,7 @@
 - Gave the whole interface one consistent in-world terminal voice. Input prompts and "nothing here" messages are now uppercase and terse (for example "RETRIEVING ARCHIVES…", "NO ACTIVE DIRECTIVES", "ARCHIVE EMPTY"); the account panel speaks in "UPLINK" terms rather than "sign in / signed in"; the update notice reads "FIRMWARE UPDATE STAGED — REBOOT REQUIRED TO APPLY"; the optic-scan control reads "VISUAL UPLOAD"; and the assistant's own error messages no longer call themselves "the AI" or name the underlying service — they now speak as the in-world DIRECTOR LINK (for example a rejected key reads "DIRECTOR ACCESS KEY REJECTED"). The install prompt and app shortcuts also drop the real game name so they read as a generic wasteland terminal. Only the wording changed — the sign-in mechanism itself, your key-entry field, and every screen-reader label are exactly as before.
 - Polished the changelog viewer so it no longer jumps around. The window now stays a fixed, comfortable width whether the sections are open or closed — opening and closing a section only changes the height, never the width, so it no longer shrinks to a narrow box when everything is collapsed (on phones it stays full-width). It opens with the newest section expanded and the rest tucked away, and a new "EXPAND ALL / COLLAPSE ALL" button at the top lets you open or close every section at once.
 - All six macro commands — VATS, THREAT, TRADE, CONSULT, BIO-SCAN, and LOOT — now run entirely as offline, deterministic native tools with no AI call. Every one of them reads the game's own data and computes its result on-device, instantly: the V.A.T.S. hit/crit/AP maths, the THREAT bestiary stat card and time-to-neutralize, the TRADE barter terminal, the CONSULT databank lookup, the BIO-SCAN medical advisory, and the LOOT salvage picker all work with no network and no AI. None of these six ever contacts the AI anymore — they are fully usable offline and give the same answer every time. (Each tool is detailed in its own note in the Added and Changed sections above.)
+- The changelog viewer now keeps a completely constant size as you open and close its sections. The earlier fix already locked the width; now the height is locked too (capped to fit your screen), so expanding or collapsing categories no longer makes the window grow tall or shrink short — the box stays exactly the same size, the notes scroll inside it, and the CLOSE button stays pinned at the bottom. It feels rock-steady whether one section or every section is open, on desktop and phones alike.
 
 ### Under the Hood
 

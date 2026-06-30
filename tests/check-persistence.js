@@ -6043,7 +6043,7 @@ header('Suite 61 — Mobile Layout Overflow Guards');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 62 — Changelog viewer guards
-//  22 tests
+//  23 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 62 — Changelog viewer guards');
 {
@@ -6330,6 +6330,19 @@ header('Suite 62 — Changelog viewer guards');
       /EXPAND ALL/.test(showBody62) &&
       /COLLAPSE ALL/.test(showBody62),
     '62.21: default-open-newest preserved (only idx 0 / newest category open) + toggle exposes EXPAND ALL / COLLAPSE ALL (WU-C15)'
+  );
+  // 62.22 LOCKED HEIGHT (WU-C15 follow-up) — changelog-wide pins an explicit height
+  // capped to the viewport so collapsing/expanding categories changes NOTHING about
+  // the box dimensions (the flex column no longer shrink-to-fits its content). The
+  // base .modal-box already gives .modal-content overflow-y:auto + flex-grow:1 (scrolls
+  // internally) and .close-btn stays the last flex child (pinned at the bottom).
+  // box-sizing:border-box makes the locked width/height the TOTAL footprint so
+  // min(740px,94vw) can't overflow the viewport at 360/412.
+  assert(
+    /height:\s*min\(85vh/.test(wideRule62) &&
+      /max-height:\s*min\(85vh/.test(wideRule62) &&
+      /box-sizing:\s*border-box/.test(wideRule62),
+    '62.22: .modal-box.changelog-wide locks an explicit height (min(85vh,…)) + box-sizing:border-box — collapse/expand keeps box dimensions constant; content scrolls internally, CLOSE pinned, no 360/412 overflow (WU-C15 follow-up)'
   );
 }
 

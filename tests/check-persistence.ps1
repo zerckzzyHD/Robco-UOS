@@ -3464,7 +3464,7 @@ Check ([bool]($mobileSlice61 -match 'overflow-x\s*:\s*clip')) `
 
 # ===========================================================
 # Suite 62 -- Changelog viewer guards
-# 22 tests
+# 23 tests
 # ===========================================================
 Sep "Suite 62 -- Changelog viewer guards"
 $uiCoreSrc62 = Read-Src "js/ui-core.js"
@@ -3619,6 +3619,11 @@ Check (($showBody62 -match 'id="changelogToggleAll"') -and `
 # 62.21 DEFAULT-OPEN-NEWEST preserved + toggle exposes both states
 Check (($showBody62 -match "idx === 0 \? ' open' : ''") -and ($showBody62 -match 'EXPAND ALL') -and ($showBody62 -match 'COLLAPSE ALL')) `
     '62.21: default-open-newest preserved (only idx 0 / newest category open) + toggle exposes EXPAND ALL / COLLAPSE ALL (WU-C15)'
+# 62.22 LOCKED HEIGHT (WU-C15 follow-up) -- explicit height capped to the viewport +
+# box-sizing:border-box so collapse/expand keeps the box dimensions constant (content
+# scrolls internally via .modal-content, CLOSE pinned via flex), no 360/412 overflow.
+Check (($wideRule62 -match 'height:\s*min\(85vh') -and ($wideRule62 -match 'max-height:\s*min\(85vh') -and ($wideRule62 -match 'box-sizing:\s*border-box')) `
+    '62.22: .modal-box.changelog-wide locks an explicit height (min(85vh,...)) + box-sizing:border-box -- collapse/expand keeps box dimensions constant; content scrolls internally, CLOSE pinned, no 360/412 overflow (WU-C15 follow-up)'
 
 # ===========================================================
 # Suite 63 -- Save/Cloud UI consolidation guards (Phase 6 Task 7)

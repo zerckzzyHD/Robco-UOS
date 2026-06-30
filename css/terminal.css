@@ -660,10 +660,24 @@ details.sub-panel[open] > summary h3::after {
   /* WU-C15: LOCK the width to the expanded size at every breakpoint. Without an
      explicit width the flex box shrink-to-fits its content, so collapsing all
      categories produced a narrow box. A fixed width makes collapse/expand change
-     HEIGHT ONLY. On mobile this is the same full-width-minus-margin (94vw) the
+     WIDTH never. On mobile this is the same full-width-minus-margin (94vw) the
      expanded state already uses. */
   width: min(740px, 94vw);
   max-width: min(740px, 94vw);
+  /* WU-C15 follow-up: LOCK the HEIGHT too. Without a fixed height the flex column
+     shrink-to-fits its content, so collapsing all categories produced a short box
+     and expanding produced a tall one. Pinning the height (capped to the viewport)
+     makes the box dimensions CONSTANT regardless of how many <details> are open:
+     .modal-content (flex-grow:1; overflow-y:auto) fills the space and scrolls
+     internally, while the .close-btn stays pinned at the bottom of the flex column.
+     min(85vh, 820px) keeps it viewport-safe on short screens and avoids an
+     oversized empty box on very tall monitors. box-sizing:border-box makes the
+     locked width/height the TOTAL footprint (incl. the 20px padding + 2px border),
+     so min(740px,94vw) can never exceed the viewport at narrow widths (no overflow
+     at 360/412) and the height cap is exact. */
+  box-sizing: border-box;
+  height: min(85vh, 820px);
+  max-height: min(85vh, 820px);
 }
 /* WU-C15: expand/collapse-all toggle control row at the top of the viewer. */
 .changelog-controls {
