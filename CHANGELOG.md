@@ -9,6 +9,7 @@
 - Fixed the [TRADE] button appearing to do nothing. Tapping [TRADE] now reliably opens the BARTER UPLINK trading panel and scrolls it into view — previously the panel opened correctly but was left off-screen below the other inventory panels, so it looked like the button did nothing.
 - Fixed the TERMLINK console popping up your phone's on-screen keyboard. Opening the console (or running any built-in command) no longer steals focus to the typing field on touch devices, so the keyboard stays down until you actually tap the field. On a desktop the cursor still returns to the command line so you can keep typing.
 - Added quick panel navigation from the Comm-Link. Type a panel's name or a common nickname — "inventory" (or "inv"/"items"), "stats", "skills", "perks", "quests" (or "journal"), "factions" (or "rep"), "map" (or "world"), "crafting" (or "workbench"), "barter" (or "trade"), "status", "health" (or "limbs"), "log" (or "overseer"), "settings", or "databank" (or "consult"/"lookup") — and that panel opens instantly, offline, with no AI. Anything that doesn't match a panel still goes to the Director Link as before, so a full "consult deathclaw" lookup keeps working.
+- Documentation correction (README only, no app change): clarified how the game database reaches the AI. The active game's full data tables are sent to the AI as a dedicated, separate part of the system instruction on every message (not folded into the directive text), and the same data also powers the offline native tools through local lookups.
 
 ### Added
 

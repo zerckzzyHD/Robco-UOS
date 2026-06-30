@@ -101,14 +101,14 @@ Nine progressive capabilities, each with a graceful fallback when the device/bro
 
 ### 🤖 The AI Director (optional)
 
-| System                 | Description                                                                                                                     |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| **Gemini API**         | Direct connection via your API key (stored locally, never exposed)                                                              |
-| **Tri-Node JSON**      | The Director is locked to `{narrative, state, modal}` structured output (`application/json`)                                    |
-| **Validated import**   | `autoImportState()` explicitly field-maps + validates every value before it persists — the AI is never the sole source of truth |
-| **Database injection** | Per-game weapons/armor/bestiary/chems/recipes/vendors CSVs are injected into the directive                                      |
-| **Resilience**         | Bounded auto-retry with backoff, clear auth-error messaging, prompt-injection hardening, input caps                             |
-| **Fully optional**     | The six native tools and the whole UI work with no key and no network                                                           |
+| System                 | Description                                                                                                                                                                                                                                                         |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Gemini API**         | Direct connection via your API key (stored locally, never exposed)                                                                                                                                                                                                  |
+| **Tri-Node JSON**      | The Director is locked to `{narrative, state, modal}` structured output (`application/json`)                                                                                                                                                                        |
+| **Validated import**   | `autoImportState()` explicitly field-maps + validates every value before it persists — the AI is never the sole source of truth                                                                                                                                     |
+| **Database injection** | The active game's full weapons/armor/bestiary/chems/recipes/vendors CSVs are sent to the AI on every message as a dedicated part of the system instruction (alongside the directive). The same per-game data also powers the native offline tools via local lookups |
+| **Resilience**         | Bounded auto-retry with backoff, clear auth-error messaging, prompt-injection hardening, input caps                                                                                                                                                                 |
+| **Fully optional**     | The six native tools and the whole UI work with no key and no network                                                                                                                                                                                               |
 
 ### 💾 Saves & Cloud
 
