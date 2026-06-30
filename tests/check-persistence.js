@@ -12813,6 +12813,130 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 119 — WU-F7 Overseer's Maintenance Log
+//  Local device telemetry (boot count, total power-on, longest session, live
+//  uptime) surfaced as a DATA-tab read-out. Persisted as a localStorage device
+//  stat (NOT campaign state — no Protocol-4 path), reuses the session clock, no
+//  web API, no AI, no network, game-agnostic. (Phase F)
+//  8 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header("Suite 119 — WU-F7 Overseer's Maintenance Log");
+  const uiCore119 = readFile('js/ui-core.js');
+  const html119 = htmlSource;
+
+  // 119.1  telemetry store constant + tolerant reader (localStorage device stat, not state)
+  {
+    let rd = '';
+    try {
+      rd = extractFunctionBody(uiCore119, '_readOverseerLog');
+    } catch (_) {}
+    assert(
+      /const OVERSEER_LOG_KEY = 'robco_overseer_log'/.test(uiCore119) &&
+        /function _readOverseerLog\(\)/.test(uiCore119) &&
+        /localStorage\.getItem\(OVERSEER_LOG_KEY\)/.test(rd) &&
+        /catch/.test(rd) &&
+        /bootCount: 0, totalPowerOnMs: 0, longestSessionMs: 0/.test(rd),
+      '119.1: OVERSEER_LOG_KEY + _readOverseerLog() back the log with a localStorage device stat and return zeroes on parse failure (never throws)'
+    );
+  }
+
+  // 119.2  writer is wrapped so a quota / disabled store can never throw
+  {
+    let wr = '';
+    try {
+      wr = extractFunctionBody(uiCore119, '_writeOverseerLog');
+    } catch (_) {}
+    assert(
+      /localStorage\.setItem\(OVERSEER_LOG_KEY/.test(wr) && /try\s*\{/.test(wr) && /catch/.test(wr),
+      '119.2: _writeOverseerLog() persists inside try/catch — a quota-full or disabled store never throws'
+    );
+  }
+
+  // 119.3  boot increments the count exactly once + starts the session clock + wired into boot
+  {
+    let ini = '';
+    try {
+      ini = extractFunctionBody(uiCore119, 'initOverseerLog');
+    } catch (_) {}
+    assert(
+      /if \(_overseerBooted\)/.test(ini) &&
+        /_overseerBooted = true/.test(ini) &&
+        /o\.bootCount \+= 1/.test(ini) &&
+        /_overseerSessionStart = Date\.now\(\)/.test(ini) &&
+        /initOverseerLog\(\); \/\/ WU-F7/.test(uiCore119),
+      '119.3: initOverseerLog() bumps bootCount once (guarded by _overseerBooted), starts the session clock, and is called from boot'
+    );
+  }
+
+  // 119.4  flush is idempotent: total recomputed from the boot-time base (no double-count) + longest tracked
+  {
+    let fl = '';
+    try {
+      fl = extractFunctionBody(uiCore119, '_flushOverseerLog');
+    } catch (_) {}
+    assert(
+      /o\.totalPowerOnMs = _overseerBaseMs \+ session/.test(fl) &&
+        /if \(session > o\.longestSessionMs\) o\.longestSessionMs = session/.test(fl) &&
+        /_overseerBaseMs = o\.totalPowerOnMs/.test(uiCore119),
+      '119.4: _flushOverseerLog() recomputes total from _overseerBaseMs + session (idempotent, no double-count) and tracks the longest session'
+    );
+  }
+
+  // 119.5  read-out renders all four telemetry lines into #overseerLogDisplay
+  {
+    let rn = '';
+    try {
+      rn = extractFunctionBody(uiCore119, 'renderOverseerLog');
+    } catch (_) {}
+    assert(
+      /getElementById\('overseerLogDisplay'\)/.test(rn) &&
+        /CURRENT UPTIME/.test(rn) &&
+        /LONGEST SESSION/.test(rn) &&
+        /TOTAL POWER-ON/.test(rn) &&
+        /BOOT COUNT/.test(rn) &&
+        /function _fmtOverseerDuration\(/.test(uiCore119),
+      '119.5: renderOverseerLog() renders CURRENT UPTIME / LONGEST SESSION / TOTAL POWER-ON / BOOT COUNT into #overseerLogDisplay via _fmtOverseerDuration'
+    );
+  }
+
+  // 119.6  totals survive a closed tab — flush wired to visibilitychange-hidden + pagehide (no special API)
+  assert(
+    /if \(document\.hidden\) _flushOverseerLog\(\)/.test(uiCore119) &&
+      /addEventListener\('pagehide', _flushOverseerLog\)/.test(uiCore119),
+    '119.6: _flushOverseerLog() fires on visibilitychange-hidden and pagehide so power-on totals survive a closed tab'
+  );
+
+  // 119.7  read-out stays fresh — renderOverseerLog called from loadUI + a periodic flush timer
+  {
+    let ini7 = '';
+    try {
+      ini7 = extractFunctionBody(uiCore119, 'initOverseerLog');
+    } catch (_) {}
+    assert(
+      /renderOverseerLog\(\); \/\/ WU-F7/.test(uiCore119) && /setInterval\(/.test(ini7),
+      '119.7: renderOverseerLog() is called from loadUI and a periodic flush timer keeps the live read-out current'
+    );
+  }
+
+  // 119.8  OVERSEER'S LOG panel: DATA-tab .panel + summary>h2 with ">" + display mount + local-only note, game-agnostic
+  assert(
+    /id="overseerLogPanel"/.test(html119) &&
+      /<details class="panel" data-tab="data" id="overseerLogPanel">/.test(html119) &&
+      /<summary><h2>&gt; OVERSEER'S LOG<\/h2><\/summary>/.test(html119) &&
+      /id="overseerLogDisplay"/.test(html119) &&
+      /STORED LOCALLY ON THIS UNIT/.test(html119) &&
+      !/\bFNV\b|\bFO3\b|Fallout/.test(
+        html119.slice(
+          html119.indexOf('overseerLogPanel'),
+          html119.indexOf('overseerLogPanel') + 600
+        )
+      ),
+    '119.8: OVERSEER\'S LOG is a DATA-tab .panel (summary>h2 with ">") with #overseerLogDisplay + a local-only note, and is game-agnostic (no FNV/FO3/Fallout literals)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 console.log('\n══════════════════════════════════════════════════════════════\n');

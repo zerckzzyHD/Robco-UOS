@@ -123,6 +123,119 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
+// ── WU-F7: OVERSEER'S MAINTENANCE LOG ─────────────────────────
+// Local-only device telemetry surfaced as the Overseer's maintenance log: boot
+// count, total power-on time, longest single session, and live current uptime.
+// Reuses the existing session clock (sessionStart). Persisted as a localStorage
+// device stat (NOT campaign state — so no Protocol-4 save/sync path), mirroring
+// the wake-lock preference above. No web API, no AI, no network, game-agnostic.
+// Never throws: read/write are wrapped so a missing or quota-full store degrades
+// to zeroes and can never break the terminal.
+const OVERSEER_LOG_KEY = 'robco_overseer_log';
+let _overseerBaseMs = 0; // total power-on accumulated BEFORE this session
+let _overseerSessionStart = 0; // Date.now() when this session's logging began
+let _overseerFlushTimer = null;
+let _overseerBooted = false;
+function _readOverseerLog() {
+  const num = v => (typeof v === 'number' && isFinite(v) && v >= 0 ? v : 0);
+  try {
+    const o = JSON.parse(localStorage.getItem(OVERSEER_LOG_KEY) || '{}');
+    return {
+      bootCount: num(o.bootCount),
+      totalPowerOnMs: num(o.totalPowerOnMs),
+      longestSessionMs: num(o.longestSessionMs),
+      firstBoot: num(o.firstBoot),
+    };
+  } catch (_) {
+    return { bootCount: 0, totalPowerOnMs: 0, longestSessionMs: 0, firstBoot: 0 };
+  }
+}
+function _writeOverseerLog(o) {
+  try {
+    localStorage.setItem(OVERSEER_LOG_KEY, JSON.stringify(o));
+  } catch (_) {
+    /* quota / disabled storage — never let telemetry throw */
+  }
+}
+function _overseerSessionMs() {
+  return _overseerSessionStart ? Math.max(0, Date.now() - _overseerSessionStart) : 0;
+}
+// Idempotent: recomputes the running total from the boot-time base each call, so a
+// double-fire (interval + visibilitychange + pagehide) can never double-count.
+function _flushOverseerLog() {
+  const o = _readOverseerLog();
+  const session = _overseerSessionMs();
+  o.totalPowerOnMs = _overseerBaseMs + session;
+  if (session > o.longestSessionMs) o.longestSessionMs = session;
+  _writeOverseerLog(o);
+  return o;
+}
+function _fmtOverseerDuration(ms) {
+  const totalSec = Math.floor(Math.max(0, ms) / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  if (h >= 24) return `${Math.floor(h / 24)}d ${String(h % 24).padStart(2, '0')}h`;
+  if (h > 0) return `${h}h ${String(m).padStart(2, '0')}m`;
+  if (m > 0) return `${m}m ${String(s).padStart(2, '0')}s`;
+  return `${s}s`;
+}
+function renderOverseerLog() {
+  const el = document.getElementById('overseerLogDisplay');
+  if (!el) return;
+  const o = _readOverseerLog();
+  const session = _overseerSessionMs();
+  const total = _overseerBaseMs + session;
+  const longest = Math.max(o.longestSessionMs, session);
+  const hours = total / 3600000;
+  const hoursStr = hours >= 10 ? hours.toFixed(0) : hours.toFixed(1);
+  el.innerHTML =
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;font-size:11px;">' +
+    '<span style="opacity:0.65;">CURRENT UPTIME</span><span>' +
+    _fmtOverseerDuration(session) +
+    '</span>' +
+    '<span style="opacity:0.65;">LONGEST SESSION</span><span>' +
+    _fmtOverseerDuration(longest) +
+    '</span>' +
+    '<span style="opacity:0.65;">TOTAL POWER-ON</span><span>' +
+    hoursStr +
+    'h</span>' +
+    '<span style="opacity:0.65;">BOOT COUNT</span><span>' +
+    o.bootCount +
+    '</span>' +
+    '</div>';
+}
+function initOverseerLog() {
+  // Boot-count increments exactly once per page load (window.onload), even though
+  // renderOverseerLog() is re-run from loadUI on every tab switch.
+  if (_overseerBooted) {
+    renderOverseerLog();
+    return;
+  }
+  _overseerBooted = true;
+  const o = _readOverseerLog();
+  _overseerBaseMs = o.totalPowerOnMs;
+  if (!o.firstBoot) o.firstBoot = Date.now();
+  o.bootCount += 1;
+  _writeOverseerLog(o);
+  _overseerSessionStart = Date.now();
+  // Periodic flush (30s) so a crash / forced close loses at most one interval of
+  // power-on time, and the live read-out stays fresh while the panel sits open.
+  if (!_overseerFlushTimer) {
+    _overseerFlushTimer = setInterval(() => {
+      _flushOverseerLog();
+      renderOverseerLog();
+    }, 30000);
+  }
+  renderOverseerLog();
+}
+// Persist the running totals on tab-hide / close so they survive a closed tab —
+// standard lifecycle events only (no special API); fail-soft if it can't write.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) _flushOverseerLog();
+});
+window.addEventListener('pagehide', _flushOverseerLog);
+
 // ── CLIENT ERROR RING-BUFFER ──────────────────────────────────
 // Local-only diagnostic log — never transmitted. Cap 50 entries × 300 chars ≈ 15 KB max.
 const ERROR_LOG_KEY = 'robco_error_log';
@@ -285,6 +398,7 @@ window.onload = function () {
   initLocationDatalist();
   initWakeLock(); // WU-F1: restore the Sustained Power Cell (Screen Wake Lock) preference
   initHaptic(); // WU-F2: restore the Haptic Solenoid (Vibration) preference
+  initOverseerLog(); // WU-F7: start the Overseer's Log session clock + bump boot count (once)
 
   // H1: Rotary Dial Click — fire on any <details> panel toggle inside uiPanel
   const _uiPanel = document.getElementById('uiPanel');
@@ -2032,6 +2146,7 @@ function loadUI() {
     renderCampaignStatus(); // v2.0.1: Campaign Status + Crossroads Record
   renderAccount(); // always — reads Firebase auth state, not covered by state slice
   renderSavesList(); // always — reads localStorage/cloud saves, not covered by state slice
+  if (typeof renderOverseerLog === 'function') renderOverseerLog(); // WU-F7: local device telemetry, not a state slice
   _updateContextPanels(); // G4: switch faction/karma panel visibility
   // C5/C11: Restore CAMPG dropdowns from state
   {

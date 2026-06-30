@@ -7301,6 +7301,56 @@ Check ($manifest118 -match '"display":\s*"standalone"') `
     '118.8: manifest.json keeps display:standalone -- the installed-PWA prerequisite for app badges'
 
 # ===========================================================
+# Suite 119 -- WU-F7 Overseer's Maintenance Log (8 tests)
+# Local device telemetry (boot count, total power-on, longest session, live uptime)
+# surfaced as a DATA-tab read-out. Persisted as a localStorage device stat (NOT
+# campaign state -- no Protocol-4 path), reuses the session clock, no web API, no
+# AI, no network, game-agnostic. (PS mirror of JS Suite 119.)
+# ===========================================================
+Sep "Suite 119 -- WU-F7 Overseer's Maintenance Log"
+$uiCore119 = Read-Src "js/ui-core.js"
+$html119   = Read-Src "index.html"
+$rd119  = [regex]::Match($uiCore119, '(?s)function _readOverseerLog\([\s\S]*?\n\}').Value
+$wr119  = [regex]::Match($uiCore119, '(?s)function _writeOverseerLog\([\s\S]*?\n\}').Value
+$ini119 = [regex]::Match($uiCore119, '(?s)function initOverseerLog\([\s\S]*?\n\}').Value
+$fl119  = [regex]::Match($uiCore119, '(?s)function _flushOverseerLog\([\s\S]*?\n\}').Value
+$rn119  = [regex]::Match($uiCore119, '(?s)function renderOverseerLog\([\s\S]*?\n\}').Value
+$ovIdx119 = $html119.IndexOf('overseerLogPanel')
+$ovSlice119 = if ($ovIdx119 -ge 0) { $html119.Substring($ovIdx119, [Math]::Min(600, $html119.Length - $ovIdx119)) } else { '' }
+
+# 119.1  telemetry store constant + tolerant reader (localStorage device stat, not state)
+Check (($uiCore119 -match "const OVERSEER_LOG_KEY = 'robco_overseer_log'") -and ($uiCore119 -match 'function _readOverseerLog\(\)') -and ($rd119 -match 'localStorage\.getItem\(OVERSEER_LOG_KEY\)') -and ($rd119 -match 'catch') -and ($rd119 -match 'bootCount: 0, totalPowerOnMs: 0, longestSessionMs: 0')) `
+    '119.1: OVERSEER_LOG_KEY + _readOverseerLog() back the log with a localStorage device stat and return zeroes on parse failure (never throws)'
+
+# 119.2  writer wrapped so a quota / disabled store can never throw
+Check (($wr119 -match 'localStorage\.setItem\(OVERSEER_LOG_KEY') -and ($wr119 -match 'try\s*\{') -and ($wr119 -match 'catch')) `
+    '119.2: _writeOverseerLog() persists inside try/catch -- a quota-full or disabled store never throws'
+
+# 119.3  boot increments the count once + starts the session clock + wired into boot
+Check (($ini119 -match 'if \(_overseerBooted\)') -and ($ini119 -match '_overseerBooted = true') -and ($ini119 -match 'o\.bootCount \+= 1') -and ($ini119 -match '_overseerSessionStart = Date\.now\(\)') -and ($uiCore119 -match 'initOverseerLog\(\); // WU-F7')) `
+    '119.3: initOverseerLog() bumps bootCount once (guarded by _overseerBooted), starts the session clock, and is called from boot'
+
+# 119.4  flush idempotent: total recomputed from boot-time base (no double-count) + longest tracked
+Check (($fl119 -match 'o\.totalPowerOnMs = _overseerBaseMs \+ session') -and ($fl119 -match 'if \(session > o\.longestSessionMs\) o\.longestSessionMs = session') -and ($uiCore119 -match '_overseerBaseMs = o\.totalPowerOnMs')) `
+    '119.4: _flushOverseerLog() recomputes total from _overseerBaseMs + session (idempotent, no double-count) and tracks the longest session'
+
+# 119.5  read-out renders all four telemetry lines into #overseerLogDisplay
+Check (($rn119 -match "getElementById\('overseerLogDisplay'\)") -and ($rn119 -match 'CURRENT UPTIME') -and ($rn119 -match 'LONGEST SESSION') -and ($rn119 -match 'TOTAL POWER-ON') -and ($rn119 -match 'BOOT COUNT') -and ($uiCore119 -match 'function _fmtOverseerDuration\(')) `
+    '119.5: renderOverseerLog() renders CURRENT UPTIME / LONGEST SESSION / TOTAL POWER-ON / BOOT COUNT into #overseerLogDisplay via _fmtOverseerDuration'
+
+# 119.6  totals survive a closed tab -- flush wired to visibilitychange-hidden + pagehide
+Check (($uiCore119 -match 'if \(document\.hidden\) _flushOverseerLog\(\)') -and ($uiCore119 -match "addEventListener\('pagehide', _flushOverseerLog\)")) `
+    '119.6: _flushOverseerLog() fires on visibilitychange-hidden and pagehide so power-on totals survive a closed tab'
+
+# 119.7  read-out stays fresh -- renderOverseerLog called from loadUI + a periodic flush timer
+Check (($uiCore119 -match 'renderOverseerLog\(\); // WU-F7') -and ($ini119 -match 'setInterval\(')) `
+    '119.7: renderOverseerLog() is called from loadUI and a periodic flush timer keeps the live read-out current'
+
+# 119.8  OVERSEER'S LOG panel: DATA-tab .panel + summary>h2 with ">" + display mount + local-only note, game-agnostic
+Check (($html119 -match 'id="overseerLogPanel"') -and ($html119 -match '<details class="panel" data-tab="data" id="overseerLogPanel">') -and ($html119 -match '<summary><h2>&gt; OVERSEER''S LOG</h2></summary>') -and ($html119 -match 'id="overseerLogDisplay"') -and ($html119 -match 'STORED LOCALLY ON THIS UNIT') -and ($ovSlice119 -notmatch '\bFNV\b|\bFO3\b|Fallout')) `
+    '119.8: OVERSEER''S LOG is a DATA-tab .panel (summary>h2 with ">") with #overseerLogDisplay + a local-only note, and is game-agnostic (no FNV/FO3/Fallout literals)'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

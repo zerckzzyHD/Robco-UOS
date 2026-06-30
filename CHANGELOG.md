@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1444/1444 | Cache: robco-terminal-v2.6.0-r48 -->
+﻿## [Unreleased]<!-- Tests: 1452/1452 | Cache: robco-terminal-v2.6.0-r49 -->
 
 ### Added
 
@@ -15,6 +15,7 @@
 - Added a HAPTIC SOLENOID option (POWER MANAGEMENT, right below the power cell) that gives your phone a brief buzz on key moments — a short pulse on level-up, a sharp double-buzz when a faction's view of you flips to Vilified or Idolized, and a warning buzz the moment your health drops into the critical zone. It's off by default; flip it on and you'll feel a quick confirmation tap. On phones that support vibration it just works; on desktops and devices without a vibration motor the toggle disables itself and says so. It also stays silent if you've turned on your system's "reduce motion" setting, so it never fights your accessibility preferences. Works offline with no AI.
 - Added an EJECT HOLOTAPE button (next to "Download Campaign Log", under Security & Configuration) that hands your comm-link transcript straight to your device's share sheet — so on a phone you can fire it off to Messages, email, Notes, or any app in one tap. If your device can't bring up a share sheet, it quietly copies the transcript to your clipboard instead, and if even that's unavailable it falls back to saving the transcript as a text file. Cancelling the share sheet just closes it, nothing else happens. Works offline with no AI.
 - The installed terminal app icon now shows a small count badge of your unresolved directives — your active quests — while the app is in the background, and clears it the moment you open the terminal (you've seen them). It's an ambient nudge with no pop-ups or notifications. On phones and desktops that support app-icon badges it appears automatically once the app is installed to your home screen; everywhere else it simply does nothing. Works offline with no AI.
+- Added an OVERSEER'S LOG panel on the DATA tab — a maintenance read-out of how long you've spent in the terminal: your current session uptime (ticking live), your longest single session, total power-on time across every visit, and how many times you've booted the terminal. It's quiet flavour that builds over time, stored only on your own device — nothing is ever uploaded or synced. Works entirely offline with no AI.
 
 ### Fixed
 
