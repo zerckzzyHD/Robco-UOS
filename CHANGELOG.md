@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1268/1268 | Cache: robco-terminal-v2.6.0-r26 -->
+﻿## [Unreleased]<!-- Tests: 1286/1286 | Cache: robco-terminal-v2.6.0-r27 -->
 
 ### Added
 
@@ -30,10 +30,12 @@
 - Fixed the "COMPLETE RNG" label in the campaign settings collapsing into a vertical stack of single letters on desktop once its warning notice appeared beside it. The label and its warning now stack — label on its own full-width row directly above the warning — at every screen size, matching how it already looked on phones.
 - Corrected two Fallout 3 quest-log entries that weren't real quests. "Fires of Anchorage" (which doesn't exist in the game) and a duplicate "Strictly Business (Paradise Falls)" (the real quest is just "Strictly Business") have been removed, so the FO3 quest autocomplete no longer suggests fake quests. Also fixed the world map labelling two different regions both as "Vault 92" — the southeastern one is now correctly named "Bethesda Ruins". All corrections verified against the Fallout wiki.
 - Corrected two item-database errors so the AI gets accurate stats. The "NCR Ranger Armor" — a New Vegas item that had leaked into the Fallout 3 database (the NCR doesn't exist in Fallout 3) — has been removed from FO3. And the Mysterious Stranger Outfit, which was mistakenly recorded as more protective than power armor, now shows its correct value (it offers almost no damage protection). Both verified against the Fallout wiki.
+- Fixed Big Guns being invisible to the V.A.T.S. calculator in Fallout 3 campaigns. The calculator only ever recognised the New Vegas weapon skills, so a Fallout 3 character built around Big Guns (miniguns, the Fat Man, flamers) was never considered when picking the relevant combat skill. Fallout 3's full weapon-skill set — including Big Guns — is now used.
 
 ### Changed
 
 - The in-app changelog viewer has been completely redesigned from a single cluttered wall of text into a clean, readable "FIRMWARE REVISION LOG". You now see one version at a time with a dropdown to jump to any past release; each version's notes are grouped into collapsible sections (Added, Fixed, Changed, Removed) with the newest section open and the rest tucked away; entries are tagged and bulleted in the terminal's voice; and on a wide screen the text is held to a comfortable centred reading column instead of stretching edge to edge, while phones get full width with comfortable spacing. The private test build still shows in-progress "Unreleased" notes; the public site still shows only released versions.
+- The V.A.T.S. CALCULATOR is now a fully offline, deterministic tool — it no longer defers to the AI ("actual outcome determined by AI" is gone). It reads your equipped weapon, SPECIAL, skills, and active chem buffs and shows: an estimated hit chance per body part, your V.A.T.S. critical-hit bonus (+5% in New Vegas, +15% in Fallout 3), and — for melee and unarmed weapons — an exact AP-strike optimiser showing how many strikes your Action Point pool affords, damage per strike after the target's damage threshold, damage-per-AP, and the best body part to target. A new TARGET DT field lets you enter the enemy's armour to see effective damage. Hit chance for ranged weapons stays a clearly-labelled estimate (the exact per-weapon spread isn't published game data), while the melee/AP and damage maths are exact. Works entirely offline with no AI call.
 
 ### Under the Hood
 

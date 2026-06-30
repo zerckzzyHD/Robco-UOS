@@ -228,6 +228,10 @@ const GAME_DEFS = {
     label: 'Fallout: New Vegas',
     factions: FACTION_REGISTRY,
     skillKeys: SKILL_KEYS,
+    // WU-N1 GA-10: the combat-skill set VATS draws from (weapon-damage skills only).
+    // Game-agnostic (Protocol 38) — VATS filters getSkillKeys() by this list instead of a
+    // hardcoded `{guns,…}` object. FNV folds heavy weapons into `guns` (no big_guns).
+    combatSkills: ['guns', 'energy_weapons', 'explosives', 'melee_weapons', 'unarmed'],
     usesKarmaCenter: false,
     collectibleLabel: 'SNOW GLOBES',
     hasTraits: true,
@@ -258,6 +262,25 @@ const GAME_DEFS = {
       // spread, at 100 = min spread). Source: fallout.wiki "Weapons spread" / VATS.
       skillSpreadFloor: 50,
       skillSpreadCeil: 100,
+      // WU-N1: base Action-Point pool = apBase + apPerAgility × Agility. FNV uses ×3
+      // (cap 95 at AGI 10). Source: fallout.wiki "Action Points". Perk/chem/item AP not
+      // modeled — the AP-strike optimizer labels this the BASE pool.
+      apBase: 65,
+      apPerAgility: 3,
+      // WU-N1 GA-7: per-region hit modifier + VATS queue AP cost. Moved verbatim from the
+      // old hardcoded showVATSOverlay table so VATS is game-agnostic (Protocol 38); a new
+      // game supplies its own. `mod` feeds the ESTIMATED hit-% (see RANGED-GAP); `ap` is the
+      // per-region queue cost used by the AP-strike optimizer.
+      regions: [
+        { name: 'HEAD', mod: -40, ap: 5 },
+        { name: 'TORSO', mod: 0, ap: 4 },
+        { name: 'L. ARM', mod: -20, ap: 3 },
+        { name: 'R. ARM', mod: -20, ap: 3 },
+        { name: 'L. LEG', mod: -25, ap: 4 },
+        { name: 'R. LEG', mod: -25, ap: 4 },
+        { name: 'EYES', mod: -60, ap: 6 },
+        { name: 'GROIN', mod: -30, ap: 4 },
+      ],
       // WU-D4a-RANGED-GAP (Protocol 3 FLAG — do not silently drop): per-weapon BASE SPREAD
       // (degrees) and RANGE/DAM-falloff are NOT columns in WEAPONS.CSV and fallout.wiki does
       // not tabulate them as a per-weapon coefficient set, so an EXACT ranged hit-% is not
@@ -288,6 +311,18 @@ const GAME_DEFS = {
     label: 'Fallout 3',
     factions: FACTION_REGISTRY_FO3,
     skillKeys: SKILL_KEYS_FO3,
+    // WU-N1 GA-10 (LIVE BUG FIX): FO3 splits firearms into small_guns + big_guns. The old
+    // hardcoded VATS skill object used FNV's `guns` and patched `small_guns` but OMITTED
+    // `big_guns` entirely — making FO3 Big Guns invisible to VATS. Driving the set from this
+    // list (Protocol 38) restores big_guns. Guarded by Suite 105.
+    combatSkills: [
+      'small_guns',
+      'big_guns',
+      'energy_weapons',
+      'explosives',
+      'melee_weapons',
+      'unarmed',
+    ],
     usesKarmaCenter: true,
     collectibleLabel: 'BOBBLEHEADS',
     tracksLincoln: true,
@@ -312,6 +347,21 @@ const GAME_DEFS = {
       hitChanceMax: 95,
       skillSpreadFloor: 50,
       skillSpreadCeil: 100,
+      // WU-N1: base AP pool = apBase + apPerAgility × Agility. FO3 uses ×2 (vs FNV ×3).
+      // Source: fallout.wiki "Action Points". Perk/chem/item AP not modeled (BASE pool).
+      apBase: 65,
+      apPerAgility: 2,
+      // WU-N1 GA-7: per-region hit modifier + queue AP cost (game-agnostic, Protocol 38).
+      regions: [
+        { name: 'HEAD', mod: -40, ap: 5 },
+        { name: 'TORSO', mod: 0, ap: 4 },
+        { name: 'L. ARM', mod: -20, ap: 3 },
+        { name: 'R. ARM', mod: -20, ap: 3 },
+        { name: 'L. LEG', mod: -25, ap: 4 },
+        { name: 'R. LEG', mod: -25, ap: 4 },
+        { name: 'EYES', mod: -60, ap: 6 },
+        { name: 'GROIN', mod: -30, ap: 4 },
+      ],
       // WU-D4a-RANGED-GAP (Protocol 3 FLAG): exact ranged hit-% not sourceable — per-weapon
       // base spread / range falloff absent from schema and fallout.wiki. Ranged overlay stays
       // an ESTIMATE; melee/AP-strike is exact. See WU-D4a / WU-N1 in planning/MASTER_PLAN.md.

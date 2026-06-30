@@ -805,6 +805,64 @@ function lookupItemInDb(name) {
   return best;
 }
 
+// ── WU-N1: WEAPON COMBAT-STAT LOOKUP ──────────────────────────────────────
+// Returns the full WEAPONS.CSV combat row for a weapon name (fields beyond the
+// {wgt,val,type} that lookupItemInDb() exposes) — used by the V.A.T.S. AP-strike
+// optimizer (and later by THREAT/TTK). Exact match first, then longest-substring
+// fuzzy fallback (mirrors lookupItemInDb). Returns null if the name isn't a weapon.
+let _weaponStatCache = null;
+function lookupWeaponStats(name) {
+  if (!name) return null;
+  if (!_weaponStatCache) {
+    _weaponStatCache = new Map();
+    const start = databaseCSVs.indexOf('[WEAPONS.CSV]');
+    if (start !== -1) {
+      const nextSection = databaseCSVs.indexOf('\n[', start + 13);
+      const block = databaseCSVs.substring(start, nextSection === -1 ? undefined : nextSection);
+      const lines = block.split('\n').filter(l => l.trim() && !l.startsWith('['));
+      const h = (lines[0] || '').split(',');
+      const ix = n => h.indexOf(n);
+      const iName = ix('Weapon_Name');
+      const cols = {
+        baseDamage: ix('Base_Damage'),
+        critDamage: ix('Crit_Damage'),
+        critMult: ix('Crit_Multiplier'),
+        aps: ix('Attacks_Per_Second'),
+        reqUnarmed: ix('Req_Unarmed'),
+        reqStr: ix('Req_STR'),
+        reach: ix('Reach'),
+        specialAttackAP: ix('Special_Attack_AP'),
+      };
+      const iRules = ix('Special_Rules');
+      const iAmmo = ix('Ammo_Type');
+      for (let i = 1; i < lines.length; i++) {
+        const c = lines[i].split(',');
+        const wn = (c[iName] || '').trim();
+        if (!wn) continue;
+        const entry = { name: wn };
+        for (const [k, idx] of Object.entries(cols))
+          entry[k] = idx >= 0 ? parseFloat(c[idx]) || 0 : 0;
+        entry.specialRules = iRules >= 0 ? (c[iRules] || '').trim() : '';
+        entry.ammoType = iAmmo >= 0 ? (c[iAmmo] || '').trim() : '';
+        _weaponStatCache.set(wn.toLowerCase(), entry);
+      }
+    }
+  }
+  const key = name.toLowerCase().trim();
+  const exact = _weaponStatCache.get(key);
+  if (exact) return exact;
+  if (key.length < 3) return null;
+  let best = null;
+  let bestLen = 0;
+  for (const [k, v] of _weaponStatCache) {
+    if ((k.includes(key) || key.includes(k)) && k.length > bestLen) {
+      best = v;
+      bestLen = k.length;
+    }
+  }
+  return best;
+}
+
 // ── AMMO CALIBER LIST ─────────────────────────────────────────────────────
 // Returns a sorted, deduplicated array of caliber strings from AMMO.CSV.
 // Used to populate the #ammoCalibers datalist for the Ammo Reserves panel.

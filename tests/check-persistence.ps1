@@ -1010,7 +1010,7 @@ Sep "Suite 28 -- Meta / Runner Parity"
 # because loops multiply results at runtime. Parity is enforced structurally.
 $jsRunnerSrc28 = Read-Src "tests/check-persistence.js"
 $psRunnerSrc28 = Read-Src "tests/check-persistence.ps1"
-$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84','Suite 85','Suite 86','Suite 87','Suite 88','Suite 89','Suite 90','Suite 91','Suite 92','Suite 93','Suite 94','Suite 95','Suite 96','Suite 97','Suite 98','Suite 99','Suite 100','Suite 101','Suite 102','Suite 103','Suite 104')
+$GATE_SUITES = @('Suite 22','Suite 23','Suite 24','Suite 25','Suite 26','Suite 27','Suite 28','Suite 29','Suite 30','Suite 31','Suite 32','Suite 33','Suite 34','Suite 35','Suite 36','Suite 37','Suite 38','Suite 39','Suite 40','Suite 41','Suite 49','Suite 50','Suite 51','Suite 52','Suite 53','Suite 54','Suite 55','Suite 56','Suite 57','Suite 58','Suite 59','Suite 60','Suite 61','Suite 62','Suite 63','Suite 64','Suite 65','Suite 66','Suite 67','Suite 68','Suite 69','Suite 70','Suite 71','Suite 72','Suite 73','Suite 74','Suite 75','Suite 76','Suite 77','Suite 78','Suite 79','Suite 80','Suite 81','Suite 82','Suite 83','Suite 84','Suite 85','Suite 86','Suite 87','Suite 88','Suite 89','Suite 90','Suite 91','Suite 92','Suite 93','Suite 94','Suite 95','Suite 96','Suite 97','Suite 98','Suite 99','Suite 100','Suite 101','Suite 102','Suite 103','Suite 104','Suite 105')
 $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
 Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-99)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
@@ -6047,8 +6047,8 @@ Check ($core99 -notmatch '_inputHistory\s*=\s*\[\s*\]') `
     '99.6: unused _inputHistory array removed from ui-core.js (QA-DEAD-2)'
 Check ($core99 -match '\b_inputHistoryIdx\b') `
     '99.7: _inputHistoryIdx nav cursor retained -- Up/Down history nav still wired (no behavior change)'
-Check ($core99 -notmatch '\btargetDT\b') `
-    '99.8: targetDT=0 binding removed/inlined in showVATSOverlay (QA-DEAD-6)'
+Check ($core99 -notmatch 'targetDT\s*=\s*0\b') `
+    '99.8: dead `targetDT = 0` constant removed (QA-DEAD-6) -- WU-N1 wires a real, used targetDT input (see Suite 105.16)'
 Check (($eslint99 -notmatch '\bticksToGameTime\b') -and ($eslint99 -notmatch '\bgameTimeToTicks\b')) `
     '99.9: ticksToGameTime + gameTimeToTicks globals removed from eslint.config.mjs'
 
@@ -6334,6 +6334,104 @@ Check ((($fnvAmmo -eq [math]::Floor($fnvAmmo)) -and ($fnvAmmo -ge 1)) -and (($fo
 # 104.19 the honest "ranged hit-% not sourceable" flag is documented in both game entries
 Check (($fnvSlice104.Contains('WU-D4a-RANGED-GAP')) -and ($fo3Slice104.Contains('WU-D4a-RANGED-GAP'))) `
     '104.19: WU-D4a-RANGED-GAP flag documented in both GAME_DEFS entries (Protocol 3 -- exact ranged hit-% is not sourceable)'
+
+# ===========================================================
+# Suite 105 -- WU-N1 VATS native calculator (18 tests)
+# Deterministic V.A.T.S. calc (showVATSOverlay/recomputeVATS) consuming the WU-D4a
+# coefficients (crit bonus + hit-% clamp) and the WU-N1 GAME_DEFS additions (combatSkills,
+# vats.regions, vats.apBase/apPerAgility -- canon AP formula). Locks the GA-10 FO3 big_guns
+# live-bug fix, the melee-scope gate shape (1.6), the dropped AI-deferral label, the real
+# targetDT input, read-only-ness, and Protocol-38 agnosticism.
+# ===========================================================
+Sep "Suite 105 -- WU-N1 VATS native calculator"
+$st105 = Read-Src "js/state.js"
+$ui105 = Read-Src "js/ui-core.js"
+$dbnv105 = Read-Src "js/db_nv.js"
+$dbfo3105 = Read-Src "js/db_fo3.js"
+$fo3At105 = $st105.IndexOf('FO3: {')
+$fnv105 = if ($fo3At105 -gt 0) { $st105.Substring($st105.IndexOf('FNV: {'), $fo3At105 - $st105.IndexOf('FNV: {')) } else { '' }
+$fo3105 = if ($fo3At105 -gt 0) { $st105.Substring($fo3At105) } else { '' }
+function Get-Arr105([string]$slice, [string]$key) {
+    $m = [regex]::Match($slice, ($key + '\s*:\s*\[([^\]]*)\]'))
+    if ($m.Success) { return $m.Groups[1].Value }
+    return ''
+}
+$fnvCombat105 = Get-Arr105 $fnv105 'combatSkills'
+$fo3Combat105 = Get-Arr105 $fo3105 'combatSkills'
+$vatsBody105 = ''
+try { $vatsBody105 = Get-FunctionBody $ui105 'recomputeVATS' } catch {}
+
+# 105.1 FNV combatSkills present with firearm + melee + unarmed
+Check (($fnvCombat105 -match 'guns') -and ($fnvCombat105 -match 'melee_weapons') -and ($fnvCombat105 -match 'unarmed')) `
+    '105.1: GAME_DEFS.FNV.combatSkills includes guns + melee_weapons + unarmed'
+# 105.2 GA-10 live-bug regression: FO3 combatSkills includes big_guns + small_guns
+Check (($fo3Combat105 -match 'big_guns') -and ($fo3Combat105 -match 'small_guns')) `
+    "105.2: GA-10 -- GAME_DEFS.FO3.combatSkills includes 'big_guns' (live-bug fix) + 'small_guns'"
+# 105.3 FO3 combat set does NOT collapse to FNV 'guns'
+Check (-not ($fo3Combat105 -match "['""]guns['""]")) `
+    "105.3: FO3 combatSkills does not contain FNV's 'guns' (uses small_guns/big_guns -- no two-game collapse)"
+# 105.4 every combatSkills key is a valid skillKey in its game
+$fnvSK105 = [regex]::Match($st105, 'const SKILL_KEYS\s*=\s*\[([^\]]+)\]').Groups[1].Value
+$fo3SK105 = [regex]::Match($st105, 'const SKILL_KEYS_FO3\s*=\s*\[([^\]]+)\]').Groups[1].Value
+$toKeys105 = { param($s) ([regex]::Matches($s, "'([a-z_]+)'") | ForEach-Object { $_.Groups[1].Value }) }
+$fnvBad105 = @(& $toKeys105 $fnvCombat105 | Where-Object { -not $fnvSK105.Contains("'$_'") })
+$fo3Bad105 = @(& $toKeys105 $fo3Combat105 | Where-Object { -not $fo3SK105.Contains("'$_'") })
+Check (($fnvBad105.Count -eq 0) -and ($fo3Bad105.Count -eq 0)) `
+    '105.4: every combatSkills key is a valid skillKey in its game'
+# 105.5 FNV AP formula 65 + 3xAGI
+Check (([regex]::Match($fnv105, 'apBase\s*:\s*(\d+)').Groups[1].Value -eq '65') -and ([regex]::Match($fnv105, 'apPerAgility\s*:\s*(\d+)').Groups[1].Value -eq '3')) `
+    '105.5: FNV vats apBase === 65 and apPerAgility === 3 (fallout.wiki)'
+# 105.6 FO3 AP formula 65 + 2xAGI
+Check (([regex]::Match($fo3105, 'apBase\s*:\s*(\d+)').Groups[1].Value -eq '65') -and ([regex]::Match($fo3105, 'apPerAgility\s*:\s*(\d+)').Groups[1].Value -eq '2')) `
+    '105.6: FO3 vats apBase === 65 and apPerAgility === 2 (fallout.wiki)'
+# 105.7 CANON AP pool computed from parsed coefficients at AGI 10
+$fnvAp10_105 = [int][regex]::Match($fnv105, 'apBase\s*:\s*(\d+)').Groups[1].Value + [int][regex]::Match($fnv105, 'apPerAgility\s*:\s*(\d+)').Groups[1].Value * 10
+$fo3Ap10_105 = [int][regex]::Match($fo3105, 'apBase\s*:\s*(\d+)').Groups[1].Value + [int][regex]::Match($fo3105, 'apPerAgility\s*:\s*(\d+)').Groups[1].Value * 10
+Check (($fnvAp10_105 -eq 95) -and ($fo3Ap10_105 -eq 85)) `
+    '105.7: CANON -- AP pool at AGI 10 = 95 (FNV) / 85 (FO3) from parsed coefficients'
+# 105.8 both games declare a non-empty vats.regions {name,mod,ap} table
+function Test-Regions105([string]$slice) {
+    $m = [regex]::Match($slice, 'regions\s*:\s*\[([\s\S]*?)\]')
+    if (-not $m.Success) { return $false }
+    $cells = [regex]::Matches($m.Groups[1].Value, '\{[^}]*\}')
+    if ($cells.Count -lt 6) { return $false }
+    foreach ($c in $cells) {
+        if (-not (($c.Value -match 'name\s*:') -and ($c.Value -match 'mod\s*:') -and ($c.Value -match 'ap\s*:'))) { return $false }
+    }
+    return $true
+}
+Check ((Test-Regions105 $fnv105) -and (Test-Regions105 $fo3105)) `
+    '105.8: FNV + FO3 vats.regions are non-empty {name,mod,ap} tables'
+# 105.9 calculator entry points defined
+Check (($ui105 -match 'function showVATSOverlay\s*\(') -and ($ui105 -match 'function recomputeVATS\s*\(')) `
+    '105.9: showVATSOverlay() and recomputeVATS() are defined in ui-core.js'
+# 105.10 hit-% clamp from GAME_DEFS
+Check (($vatsBody105 -match 'hitChanceMin') -and ($vatsBody105 -match 'hitChanceMax')) `
+    '105.10: recomputeVATS() reads hitChanceMin/hitChanceMax from GAME_DEFS (WU-D4a clamp)'
+# 105.11 crit bonus from GAME_DEFS
+Check ($vatsBody105 -match 'critBonus') `
+    '105.11: recomputeVATS() uses critBonus from GAME_DEFS (WU-D4a per-game coefficient)'
+# 105.12 AP pool from canon coefficients
+Check (($vatsBody105 -match 'apBase') -and ($vatsBody105 -match 'apPerAgi')) `
+    '105.12: recomputeVATS() derives the AP pool from apBase + apPerAgility (canon formula)'
+# 105.13 regions read from GAME_DEFS, not re-hardcoded
+Check (($vatsBody105 -match '\.regions\b') -and (-not ($ui105 -match 'mod:\s*-40'))) `
+    '105.13: recomputeVATS() reads vats.regions from GAME_DEFS -- no hardcoded region table in ui-core.js (GA-7)'
+# 105.14 melee-scope gate shape (1.6)
+Check ($vatsBody105 -match "playstyle\s*===\s*'melee'\s*\|\|\s*weaponIsMelee") `
+    '105.14: melee-scope gate is playstyle===melee || weaponIsMelee (1.6 -- never mode alone)'
+# 105.15 AI-deferral label dropped
+Check (-not ($ui105 -match 'DETERMINED BY AI')) `
+    '105.15: the "ACTUAL OUTCOME DETERMINED BY AI" deferral label is removed'
+# 105.16 dead targetDT=0 gone; real input wired
+Check ((-not ($ui105 -match 'targetDT\s*=\s*0\b')) -and ($ui105 -match 'id="vatsTargetDT"') -and ($ui105 -match 'oninput="recomputeVATS\(\)"')) `
+    '105.16: dead targetDT=0 removed; real #vatsTargetDT input wired to recomputeVATS() (QA-DEAD-6)'
+# 105.17 lookupWeaponStats in both db runners
+Check (($dbnv105 -match 'function lookupWeaponStats\s*\(') -and ($dbfo3105 -match 'function lookupWeaponStats\s*\(')) `
+    '105.17: lookupWeaponStats() defined in both db_nv.js and db_fo3.js'
+# 105.18 read-only -- no state writes
+Check ((-not ($vatsBody105 -match 'saveState\s*\(')) -and (-not ($vatsBody105 -match 'pushToCloud\s*\('))) `
+    '105.18: recomputeVATS() is read-only (no saveState/pushToCloud writes)'
 
 # ===========================================================
 # Results

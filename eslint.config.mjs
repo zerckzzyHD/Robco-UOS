@@ -95,6 +95,8 @@ export default [
         transmitMessage: 'readonly',
         fetchAuthorizedModels: 'readonly',
         lookupItemInDb: 'readonly',
+        lookupWeaponStats: 'readonly',
+        getGameContext: 'readonly',
         getAmmoCalibers: 'readonly',
         expandPanelForCategory: 'readonly',
         closeModal: 'readonly',

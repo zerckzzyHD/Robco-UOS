@@ -1286,98 +1286,190 @@ function showErrorLog() {
   _openSysModal();
 }
 
-// ── G1: V.A.T.S. TACTICAL OVERLAY ────────────────────────────────
-// Reads state (PER, AGI, weapon skill, chem boosts) and target DT from inputs.
-// Outputs estimated hit % per body region. Read-only — no state writes.
-// Clearly labeled ESTIMATED. Also constructs a [VATS] AI prompt payload.
-// Formula: BASE_CHANCE = (Perception * 2) + (Agility * 1.5) + (WeaponSkill / 3)
-//          Adjusted by region modifier and target DT.
-//          Clamped to 5-95%. Labeled ESTIMATED throughout.
+// ── WU-N1: V.A.T.S. NATIVE CALCULATOR ────────────────────────────
+// Fully deterministic, offline, read-only — no AI. Two parts:
+//   • HIT PROBABILITY table — an ESTIMATE (per-region modifier + clamp). The exact
+//     ranged hit-% is NOT canon-sourceable (WU-D4a-RANGED-GAP: per-weapon spread/range
+//     falloff are absent from WEAPONS.CSV and fallout.wiki), so it is labeled ESTIMATE.
+//   • AP-STRIKE OPTIMIZER — exact from the equipped weapon's Base_Damage / Special_Attack_AP
+//     and the canon AP pool (apBase + apPerAgility × AGI); shows strikes affordable, damage
+//     per strike (after target DT), damage-per-AP, and the optimal region.
+// All per-game data (crit bonus, hit-% clamp, AP formula, region table, combat-skill set)
+// comes from GAME_DEFS[ctx] — game-agnostic (Protocol 38). See planning/MASTER_PLAN.md WU-N1.
+
+// _vatsResolveSkill — pick the weapon's combat skill. Melee/unarmed is EXACT (read from the
+// weapon row); ranged falls back to the best of the game's ranged combat skills because the
+// schema has no per-weapon skill column (WU-D4a-RANGED-GAP). Filters GAME_DEFS[ctx].combatSkills
+// through getSkillKeys() so a 3rd game just supplies its own set — and FO3 big_guns is now
+// included (GA-10 live-bug fix; the old hardcoded object omitted it).
+function _vatsResolveSkill(stats, def, skills) {
+  const keys = (typeof getSkillKeys === 'function' && getSkillKeys()) || [];
+  const combat = (def.combatSkills || []).filter(k => keys.includes(k));
+  if (stats) {
+    const noAmmo = !stats.ammoType || stats.ammoType.toLowerCase() === 'none';
+    if ((stats.reqUnarmed || 0) > 0 && combat.includes('unarmed')) {
+      return { name: 'unarmed', value: skills.unarmed || 0, exact: true };
+    }
+    if (noAmmo && combat.includes('melee_weapons')) {
+      return { name: 'melee_weapons', value: skills.melee_weapons || 0, exact: true };
+    }
+  }
+  // Ranged (or nothing equipped): estimate via the best ranged combat skill.
+  const pool = stats ? combat.filter(k => k !== 'melee_weapons' && k !== 'unarmed') : combat;
+  const candidates = pool.length ? pool : combat;
+  let name = candidates[0] || 'guns';
+  let value = skills[name] || 0;
+  candidates.forEach(k => {
+    const v = skills[k] || 0;
+    if (v > value) {
+      value = v;
+      name = k;
+    }
+  });
+  return { name, value, exact: false };
+}
+
+// _vatsIsMelee — canonical melee-scope classification of a weapon row (§1.6): a weapon is
+// melee/unarmed when it consumes no ammo (Ammo_Type None/blank) or requires Unarmed.
+function _vatsIsMelee(stats) {
+  if (!stats) return false;
+  const noAmmo = !stats.ammoType || stats.ammoType.toLowerCase() === 'none';
+  return noAmmo || (stats.reqUnarmed || 0) > 0;
+}
+
 function showVATSOverlay() {
   const modal = document.getElementById('sysModal');
   const title = document.getElementById('modalTitle');
   const content = document.getElementById('modalContent');
   if (!modal || !title || !content) return;
 
-  // Read SPECIAL from DOM
+  title.innerText = '> V.A.T.S. TACTICAL CALCULATOR';
+  content.innerHTML = `
+<div style="font-family:inherit;font-size:11px;line-height:1.7;">
+  <div style="margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+    <label for="vatsTargetDT" style="font-size:11px;letter-spacing:0.5px;">TARGET DT (damage threshold):</label>
+    <input id="vatsTargetDT" type="number" min="0" max="200" value="0" step="1" inputmode="numeric"
+      aria-label="Target damage threshold"
+      oninput="recomputeVATS()"
+      style="font-size:16px;min-height:28px;width:84px;background:#000;color:inherit;border:1px solid var(--robco-green,#14fdce);padding:2px 6px;" />
+  </div>
+  <div id="vatsResult" aria-live="polite" aria-atomic="true" style="white-space:pre-wrap;font-family:inherit;"></div>
+</div>`;
+
+  recomputeVATS();
+  _openSysModal();
+}
+
+// recomputeVATS — recompute and render the V.A.T.S. table from live state + the TARGET DT
+// input. Read-only. Safe to call repeatedly (the DT input's oninput).
+function recomputeVATS() {
+  const out = document.getElementById('vatsResult');
+  if (!out) return;
+
+  const ctx = typeof getGameContext === 'function' ? getGameContext() : 'FNV';
+  const def = (window.GAME_DEFS && GAME_DEFS[ctx]) || (window.GAME_DEFS && GAME_DEFS.FNV) || {};
+  const v = def.vats || {};
+  const hitMin = typeof v.hitChanceMin === 'number' ? v.hitChanceMin : 5;
+  const hitMax = typeof v.hitChanceMax === 'number' ? v.hitChanceMax : 95;
+  const critBonus = typeof v.critBonus === 'number' ? v.critBonus : 0.05;
+  const apBase = typeof v.apBase === 'number' ? v.apBase : 65;
+  const apPerAgi = typeof v.apPerAgility === 'number' ? v.apPerAgility : 3;
+  const regions =
+    Array.isArray(v.regions) && v.regions.length ? v.regions : [{ name: 'TORSO', mod: 0, ap: 4 }];
+
   const per = parseInt((document.getElementById('s_p') || {}).value) || 5;
   const agi = parseInt((document.getElementById('s_a') || {}).value) || 5;
+  const apPool = apBase + apPerAgi * agi;
 
-  // Active weapon skill: check state.equipped.weapon against skill matrix
-  // Or just use best combat skill from state.skills
   const skills = state.skills || {};
-  const combatSkills = {
-    guns: skills.guns || skills.small_guns || 0,
-    energy_weapons: skills.energy_weapons || 0,
-    melee_weapons: skills.melee_weapons || 0,
-    sneak: skills.sneak || 0,
-    explosives: skills.explosives || 0,
-  };
-  const activeSkill = Math.max(...Object.values(combatSkills));
-  const activeSkillName =
-    Object.keys(combatSkills).find(k => combatSkills[k] === activeSkill) || 'guns';
+  const playstyle = localStorage.getItem('robco_playstyle') || 'any';
+  const weaponName = (state.equipped && state.equipped.weapon) || null;
+  const stats =
+    weaponName && typeof lookupWeaponStats === 'function' ? lookupWeaponStats(weaponName) : null;
+  const weaponIsMelee = _vatsIsMelee(stats);
+  // Canonical melee-scope gate (§1.6) — NEVER mode alone.
+  const meleeScope = playstyle === 'melee' || weaponIsMelee;
 
-  // Chem boost: any active BUFF with ticks > 0 that matches combat skill
+  const sk = _vatsResolveSkill(stats, def, skills);
+
+  // Chem boost — active combat BUFFs count as a skill-equivalent bonus (existing heuristic).
   let chemBonus = 0;
   (state.status || []).forEach(eff => {
-    if (eff.type === 'BUFF' && (eff.ticks || 0) > 0) {
-      const name = (eff.name || '').toLowerCase();
+    if (eff && eff.type === 'BUFF' && (eff.ticks || 0) > 0) {
+      const n = (eff.name || '').toLowerCase();
       if (
-        name.includes('gun') ||
-        name.includes('weapon') ||
-        name.includes('combat') ||
-        name.includes('turbo') ||
-        name.includes('psycho')
+        n.includes('gun') ||
+        n.includes('weapon') ||
+        n.includes('combat') ||
+        n.includes('turbo') ||
+        n.includes('psycho')
       ) {
-        chemBonus += 10; // +10 skill equivalent per active combat buff
+        chemBonus += 10;
       }
     }
   });
 
-  // Base chance calculation (intentionally approximate).
-  // Target DT is fixed at 0 here (no DT term) — the AI [VATS] command handles DT specifics.
-  const base = per * 2 + agi * 1.5 + (activeSkill + chemBonus) / 3;
+  const targetDT = Math.max(
+    0,
+    parseInt((document.getElementById('vatsTargetDT') || {}).value) || 0
+  );
 
-  // Body region modifiers (FNV standard)
-  const regions = [
-    { name: 'HEAD', mod: -40, ap: 5 },
-    { name: 'TORSO', mod: 0, ap: 4 },
-    { name: 'L. ARM', mod: -20, ap: 3 },
-    { name: 'R. ARM', mod: -20, ap: 3 },
-    { name: 'L. LEG', mod: -25, ap: 4 },
-    { name: 'R. LEG', mod: -25, ap: 4 },
-    { name: 'EYES', mod: -60, ap: 6 },
-    { name: 'GROIN', mod: -30, ap: 4 },
-  ];
+  // Base hit-% estimate (per-region modifier applied below). Clamp from GAME_DEFS (WU-D4a).
+  const base = per * 2 + agi * 1.5 + (sk.value + chemBonus) / 3;
+  const clamp = pct => Math.min(hitMax, Math.max(hitMin, Math.round(pct)));
 
-  const rows = regions
+  const hitRows = regions
     .map(r => {
-      const pct = Math.min(95, Math.max(5, Math.round(base + r.mod)));
+      const pct = clamp(base + (r.mod || 0));
       const bar = '#'.repeat(Math.floor(pct / 10)).padEnd(10, '·');
-      return `${r.name.padEnd(8)} [${bar}] ${pct}% EST. &nbsp; AP:${r.ap}`;
+      return `  ${r.name.padEnd(7)} [${bar}] ${String(pct).padStart(3)}% EST`;
     })
     .join('\n');
 
-  const chemStr = chemBonus > 0 ? ` (+${chemBonus} CHEM BOOST)` : '';
+  // AP-strike optimizer (exact when a weapon is equipped). effDmg = Base_Damage − target DT.
+  let apSection;
+  if (stats) {
+    const effDmg = Math.max(1, Math.round((stats.baseDamage || 0) - targetDT));
+    let bestRegion = null;
+    let bestDpa = -1;
+    const apRows = regions
+      .map(r => {
+        const ap = r.ap || 1;
+        const strikes = Math.floor(apPool / ap);
+        const dpa = effDmg / ap;
+        if (dpa > bestDpa) {
+          bestDpa = dpa;
+          bestRegion = r.name;
+        }
+        return `  ${r.name.padEnd(7)} AP:${String(ap).padStart(2)}  STRIKES:${String(strikes).padStart(2)}  DMG/AP:${dpa.toFixed(1)}  BURST:${strikes * effDmg}`;
+      })
+      .join('\n');
+    apSection =
+      `  WEAPON: ${escapeHtml(stats.name)}  (${weaponIsMelee ? 'MELEE/UNARMED — EXACT' : 'RANGED'})\n` +
+      `  BASE DMG:${stats.baseDamage}  − DT:${targetDT}  = EFF DMG:${effDmg}  |  AP POOL:${apPool} (base)\n\n` +
+      apRows +
+      `\n\n  OPTIMAL (dmg/AP): ${bestRegion}`;
+  } else {
+    apSection = '  Equip a weapon (INV → equip) for exact AP-strike & damage math.';
+  }
 
-  title.innerText = '> V.A.T.S. TACTICAL OVERLAY — ESTIMATED ONLY';
-  content.innerHTML = `
-<div style="font-family:inherit;font-size:11px;line-height:1.8;white-space:pre;">
-<b>INPUTS</b>
-  PER:${per}  AGI:${agi}  SKILL:${activeSkillName.toUpperCase()} ${activeSkill}${chemStr}
-  TARGET DT: 0 (update via AI [VATS] command for specifics)
+  const chemStr = chemBonus > 0 ? `  (+${chemBonus} CHEM)` : '';
+  const skillLabel = `${sk.name.replace(/_/g, ' ').toUpperCase()} ${sk.value}${sk.exact ? '' : ' (est.)'}`;
+  const critPct = Math.round(critBonus * 100);
 
-<b>HIT PROBABILITIES — ESTIMATED</b>
-  ${rows.split('\n').join('\n  ')}
+  out.innerHTML = `<b>INPUTS</b>
+  PER:${per}  AGI:${agi}  SKILL:${skillLabel}${chemStr}
+  PLAYSTYLE:${playstyle.toUpperCase()}  MELEE-SCOPE:${meleeScope ? 'YES' : 'NO'}
+  VATS CRIT BONUS: +${critPct}% (${ctx})
 
-<b style="opacity:0.6;font-size:10px;">
-ACCURACY ESTIMATES BASED ON SIMPLIFIED FORMULA.
-ACTUAL OUTCOME DETERMINED BY AI RESOLUTION.
-USE [VATS] COMMAND FOR CONTEXT-AWARE COMBAT ANALYSIS.
-</b>
-</div>`;
+<b>HIT PROBABILITY — ESTIMATE</b>
+${hitRows}
 
-  _openSysModal();
+<b>AP-STRIKE OPTIMIZER${meleeScope ? '  ◄ MELEE' : ''}</b>
+${apSection}
+
+<span style="opacity:0.6;font-size:10px;">DETERMINISTIC — NO AI. Melee/unarmed AP-strike &amp; damage are exact;
+ranged hit-% is an estimate (per-weapon spread is not in canon data). Read-only.</span>`;
 }
 
 const COMMAND_REGISTRY = [

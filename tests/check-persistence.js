@@ -1759,6 +1759,7 @@ header('Meta / Runner Parity');
     'Suite 102',
     'Suite 103',
     'Suite 104',
+    'Suite 105',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
   const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
@@ -10480,8 +10481,8 @@ header('Suite 99 — WU-B7 dead-code purge + duplication consolidation');
     '99.7: _inputHistoryIdx nav cursor retained — Up/Down history nav still wired (no behavior change)'
   );
   assert(
-    !/\btargetDT\b/.test(core99),
-    '99.8: targetDT=0 binding removed/inlined in showVATSOverlay (QA-DEAD-6)'
+    !/targetDT\s*=\s*0\b/.test(core99),
+    '99.8: dead `targetDT = 0` constant removed (QA-DEAD-6) — WU-N1 wires a real, used targetDT input (see Suite 105.16)'
   );
   assert(
     !/\bticksToGameTime\b/.test(eslint99) && !/\bgameTimeToTicks\b/.test(eslint99),
@@ -10927,6 +10928,156 @@ header('Suite 104 — WU-D4 deterministic-feature coefficients (fallout.wiki-ver
   assert(
     fnvSlice104.includes('WU-D4a-RANGED-GAP') && fo3Slice104.includes('WU-D4a-RANGED-GAP'),
     '104.19: WU-D4a-RANGED-GAP flag documented in both GAME_DEFS entries (Protocol 3 — exact ranged hit-% is not sourceable)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 105 — WU-N1 VATS native calculator (18 tests)
+//  The deterministic V.A.T.S. calc (showVATSOverlay/recomputeVATS) consuming the
+//  WU-D4a coefficients (crit bonus + hit-% clamp) and the WU-N1 GAME_DEFS additions
+//  (combatSkills, vats.regions, vats.apBase/apPerAgility — canon AP formula). Locks:
+//  the GA-10 FO3 big_guns live-bug fix, the §1.6 melee-scope gate shape, the dropped
+//  AI-deferral label, the real targetDT input, read-only-ness, and Protocol-38 agnosticism.
+// ══════════════════════════════════════════════════════════════
+header('Suite 105 — WU-N1 VATS native calculator');
+{
+  const st105 = readFile('js/state.js');
+  const ui105 = readFile('js/ui-core.js');
+  const dbnv105 = readFile('js/db_nv.js');
+  const dbfo3105 = readFile('js/db_fo3.js');
+  const fo3At = st105.indexOf('FO3: {');
+  const fnv105 = fo3At > 0 ? st105.slice(st105.indexOf('FNV: {'), fo3At) : '';
+  const fo3105 = fo3At > 0 ? st105.slice(fo3At) : '';
+  const arr105 = (slice, key) => {
+    const m = slice.match(new RegExp(key + '\\s*:\\s*\\[([^\\]]*)\\]'));
+    return m ? m[1] : '';
+  };
+  const numIn = (slice, key) => {
+    const m = slice.match(new RegExp(key + '\\s*:\\s*(-?[\\d.]+)'));
+    return m ? parseFloat(m[1]) : NaN;
+  };
+  const fnvCombat = arr105(fnv105, 'combatSkills');
+  const fo3Combat = arr105(fo3105, 'combatSkills');
+  let vatsBody = '';
+  try {
+    vatsBody = extractFunctionBody(ui105, 'recomputeVATS');
+  } catch (_) {}
+
+  // 105.1 FNV combatSkills present with the firearm + melee + unarmed weapon skills
+  assert(
+    /guns/.test(fnvCombat) && /melee_weapons/.test(fnvCombat) && /unarmed/.test(fnvCombat),
+    '105.1: GAME_DEFS.FNV.combatSkills includes guns + melee_weapons + unarmed'
+  );
+  // 105.2 GA-10 LIVE-BUG REGRESSION: FO3 combatSkills includes big_guns (was omitted) + small_guns
+  assert(
+    /big_guns/.test(fo3Combat) && /small_guns/.test(fo3Combat),
+    "105.2: GA-10 — GAME_DEFS.FO3.combatSkills includes 'big_guns' (live-bug fix) + 'small_guns'"
+  );
+  // 105.3 FO3 combat set does NOT collapse to FNV's 'guns' (agnostic split, Protocol 38)
+  assert(
+    !/['"]guns['"]/.test(fo3Combat),
+    "105.3: FO3 combatSkills does not contain FNV's 'guns' (uses small_guns/big_guns — no two-game collapse)"
+  );
+  // 105.4 every combatSkills key is a real skill key in that game's skillKeys
+  {
+    const fnvSkillKeys = (st105.match(/const SKILL_KEYS\s*=\s*\[([^\]]+)\]/) || ['', ''])[1];
+    const fo3SkillKeys = (st105.match(/const SKILL_KEYS_FO3\s*=\s*\[([^\]]+)\]/) || ['', ''])[1];
+    const toKeys = s => (s.match(/'([a-z_]+)'/g) || []).map(x => x.replace(/'/g, ''));
+    const fnvBad = toKeys(fnvCombat).filter(k => !fnvSkillKeys.includes(`'${k}'`));
+    const fo3Bad = toKeys(fo3Combat).filter(k => !fo3SkillKeys.includes(`'${k}'`));
+    assert(
+      fnvBad.length === 0 && fo3Bad.length === 0,
+      '105.4: every combatSkills key is a valid skillKey in its game' +
+        (fnvBad.length || fo3Bad.length ? ` — stray FNV:[${fnvBad}] FO3:[${fo3Bad}]` : '')
+    );
+  }
+  // 105.5 FNV AP formula = 65 + 3×AGI (fallout.wiki "Action Points")
+  assert(
+    numIn(fnv105, 'apBase') === 65 && numIn(fnv105, 'apPerAgility') === 3,
+    '105.5: FNV vats apBase === 65 and apPerAgility === 3 (fallout.wiki)'
+  );
+  // 105.6 FO3 AP formula = 65 + 2×AGI (per-game difference, fallout.wiki)
+  assert(
+    numIn(fo3105, 'apBase') === 65 && numIn(fo3105, 'apPerAgility') === 2,
+    '105.6: FO3 vats apBase === 65 and apPerAgility === 2 (fallout.wiki)'
+  );
+  // 105.7 CANON: AP pool computed from the parsed coefficients = 95 (FNV) / 85 (FO3) at AGI 10
+  {
+    const fnvAp10 = numIn(fnv105, 'apBase') + numIn(fnv105, 'apPerAgility') * 10;
+    const fo3Ap10 = numIn(fo3105, 'apBase') + numIn(fo3105, 'apPerAgility') * 10;
+    assert(
+      fnvAp10 === 95 && fo3Ap10 === 85,
+      `105.7: CANON — AP pool at AGI 10 = ${fnvAp10} (FNV, expect 95) / ${fo3Ap10} (FO3, expect 85)`
+    );
+  }
+  // 105.8 both games declare a non-empty vats.regions table with name+mod+ap shape
+  {
+    const regOk = slice => {
+      const m = slice.match(/regions\s*:\s*\[([\s\S]*?)\]/);
+      if (!m) return false;
+      const cells = m[1].match(/\{[^}]*\}/g) || [];
+      return (
+        cells.length >= 6 &&
+        cells.every(c => /name\s*:/.test(c) && /mod\s*:/.test(c) && /ap\s*:/.test(c))
+      );
+    };
+    assert(
+      regOk(fnv105) && regOk(fo3105),
+      '105.8: FNV + FO3 vats.regions are non-empty {name,mod,ap} tables'
+    );
+  }
+  // 105.9 the calculator entry points are defined
+  assert(
+    /function showVATSOverlay\s*\(/.test(ui105) && /function recomputeVATS\s*\(/.test(ui105),
+    '105.9: showVATSOverlay() and recomputeVATS() are defined in ui-core.js'
+  );
+  // 105.10 hit-% clamp comes from GAME_DEFS (hitChanceMin/Max), not hardcoded 5/95
+  assert(
+    /hitChanceMin/.test(vatsBody) && /hitChanceMax/.test(vatsBody),
+    '105.10: recomputeVATS() reads hitChanceMin/hitChanceMax from GAME_DEFS (WU-D4a clamp)'
+  );
+  // 105.11 VATS crit bonus comes from the GAME_DEFS coefficient
+  assert(
+    /critBonus/.test(vatsBody),
+    '105.11: recomputeVATS() uses critBonus from GAME_DEFS (WU-D4a per-game coefficient)'
+  );
+  // 105.12 AP pool derived from the canon coefficients
+  assert(
+    /apBase/.test(vatsBody) && /apPerAgi/.test(vatsBody),
+    '105.12: recomputeVATS() derives the AP pool from apBase + apPerAgility (canon formula)'
+  );
+  // 105.13 region table read from GAME_DEFS, not re-hardcoded in ui-core
+  assert(
+    /\.regions\b/.test(vatsBody) && !/mod:\s*-40/.test(ui105),
+    '105.13: recomputeVATS() reads vats.regions from GAME_DEFS — no hardcoded region table in ui-core.js (GA-7)'
+  );
+  // 105.14 MELEE-SCOPE gate shape (§1.6) — playstyle==='melee' || weaponIsMelee, never mode alone
+  assert(
+    /playstyle\s*===\s*'melee'\s*\|\|\s*weaponIsMelee/.test(vatsBody),
+    "105.14: melee-scope gate is `playstyle === 'melee' || weaponIsMelee` (§1.6 — never mode alone)"
+  );
+  // 105.15 AI-deferral label dropped (no "DETERMINED BY AI" anywhere in ui-core)
+  assert(
+    !/DETERMINED BY AI/.test(ui105),
+    '105.15: the "ACTUAL OUTCOME DETERMINED BY AI" deferral label is removed'
+  );
+  // 105.16 dead `targetDT = 0` constant gone; a real #vatsTargetDT input wired to recompute
+  assert(
+    !/targetDT\s*=\s*0\b/.test(ui105) &&
+      /id="vatsTargetDT"/.test(ui105) &&
+      /oninput="recomputeVATS\(\)"/.test(ui105),
+    '105.16: dead targetDT=0 removed; real #vatsTargetDT input wired to recomputeVATS() (QA-DEAD-6)'
+  );
+  // 105.17 lookupWeaponStats defined in BOTH db runners (parity)
+  assert(
+    /function lookupWeaponStats\s*\(/.test(dbnv105) &&
+      /function lookupWeaponStats\s*\(/.test(dbfo3105),
+    '105.17: lookupWeaponStats() defined in both db_nv.js and db_fo3.js'
+  );
+  // 105.18 read-only — the calc never writes state (no saveState/pushToCloud in the body)
+  assert(
+    !/saveState\s*\(/.test(vatsBody) && !/pushToCloud\s*\(/.test(vatsBody),
+    '105.18: recomputeVATS() is read-only (no saveState/pushToCloud writes)'
   );
 }
 
