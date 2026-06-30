@@ -565,6 +565,24 @@ function syncStateFromDom() {
   });
 }
 
+// Fog-of-war map discovery: record a location as discovered the moment it is (or was)
+// the Courier's current location. Deduplicated (case-insensitive) and PERMANENT — once
+// a place is discovered it stays discovered, so the world map shows [VISITED] for it
+// forever after, never reverting to [UNKNOWN]. Both the manual location-change path
+// (onLocationChange) and the AI import path (autoImportState) route through this single
+// helper so the map's CURRENT / VISITED / UNKNOWN status can never desync from reality.
+// Game-agnostic (Protocol 38): operates on the location string only — no game literals.
+// Does NOT save or push to cloud; the caller persists via saveState (cloud stays manual).
+function recordLocationVisit(locName) {
+  const loc = (locName == null ? '' : String(locName)).trim();
+  if (!loc) return;
+  if (!Array.isArray(state.locationHistory)) state.locationHistory = [];
+  const lower = loc.toLowerCase();
+  if (!state.locationHistory.some(l => String(l || '').toLowerCase() === lower)) {
+    state.locationHistory.push(loc);
+  }
+}
+
 let _lastSaveStr = null;
 function saveState() {
   syncStateFromDom();

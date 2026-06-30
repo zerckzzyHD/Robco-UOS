@@ -12376,6 +12376,85 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 114 — Map location discovery persistence (fog-of-war)
+//  A location stays [VISITED] once the Courier has been there — both the manual
+//  location-change path and the AI import path record it via the shared
+//  recordLocationVisit() helper (deduped, permanent), and renderWorldMap reads
+//  locationHistory for CURRENT / VISITED / UNKNOWN status. (Protocol 42 map fix)
+//  7 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 114 — Map location discovery persistence');
+  const stateSrc114 = readFile('js/state.js');
+  const apiSrc114 = readFile('js/api.js');
+  const uiCoreSrc114 = readFile('js/ui-core.js');
+  const uiRenderSrc114 = readFile('js/ui-render.js');
+  const recordBody114 = (stateSrc114.match(/function recordLocationVisit\([\s\S]*?\n\}/) || [
+    '',
+  ])[0];
+
+  // 114.1  shared helper recordLocationVisit() defined in state.js (Protocol 22/23)
+  assert(
+    /function recordLocationVisit\(/.test(stateSrc114),
+    '114.1: recordLocationVisit() helper defined in state.js (single source for map-discovery recording)'
+  );
+
+  // 114.2  helper dedups case-insensitively AND is permanent (no destructive cap)
+  assert(
+    /toLowerCase\(\)/.test(recordBody114) &&
+      /\.some\(/.test(recordBody114) &&
+      /state\.locationHistory\.push\(/.test(recordBody114) &&
+      !/slice\(-?\d+\)/.test(recordBody114),
+    '114.2: recordLocationVisit dedups case-insensitively and never truncates (permanent fog-of-war discovery)'
+  );
+
+  // 114.3  manual path: onLocationChange records the LEFT + NEW location via the helper
+  {
+    let olcBody114 = '';
+    try {
+      olcBody114 = extractFunctionBody(uiCoreSrc114, 'onLocationChange');
+    } catch (_) {}
+    assert(
+      /const prevLoc = state\.loc/.test(olcBody114) &&
+        (olcBody114.match(/recordLocationVisit\(/g) || []).length >= 2 &&
+        /recordLocationVisit\(prevLoc\)/.test(olcBody114),
+      '114.3: onLocationChange records the previous + new location via recordLocationVisit (manual move keeps the left location discovered)'
+    );
+  }
+
+  // 114.4  AI path: autoImportState routes location history through the shared helper,
+  //        and the old inline push + 10-entry slice truncation is gone.
+  assert(
+    /recordLocationVisit\(locV\)/.test(apiSrc114) &&
+      !/state\.locationHistory\.push\(/.test(apiSrc114) &&
+      !/state\.locationHistory\.slice\(/.test(apiSrc114),
+    '114.4: autoImportState records visits via recordLocationVisit() (no inline push / no slice(-10) truncation)'
+  );
+
+  // 114.5  renderWorldMap exposes all three statuses from locationHistory
+  assert(
+    /state\.locationHistory/.test(uiRenderSrc114) &&
+      /\[CURRENT\]/.test(uiRenderSrc114) &&
+      /\[VISITED\]/.test(uiRenderSrc114) &&
+      /\[UNKNOWN\]/.test(uiRenderSrc114),
+    '114.5: renderWorldMap renders [CURRENT] / [VISITED] / [UNKNOWN] driven by state.locationHistory'
+  );
+
+  // 114.6  sanitizeImportedContainer coerces locationHistory (Protocol 4 born-compliance)
+  assert(
+    /'collectibles', 'traits', 'skillBooks', 'magazines', 'locationHistory'/.test(apiSrc114),
+    '114.6: sanitizeImportedContainer coerces locationHistory as a string[] on cloud-pull / file-import (Protocol 4)'
+  );
+
+  // 114.7  permanence guard — no destructive 10-cap on locationHistory survives anywhere
+  assert(
+    !/locationHistory\s*=\s*[^;]*slice\(-?\d+\)/.test(apiSrc114) &&
+      !/locationHistory\s*=\s*[^;]*slice\(-?\d+\)/.test(stateSrc114),
+    '114.7: no destructive cap (locationHistory = …slice(-N)) anywhere — discovered locations are never un-discovered'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 console.log('\n══════════════════════════════════════════════════════════════\n');

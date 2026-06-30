@@ -969,6 +969,16 @@ function routeLaunchShortcut() {
 // Called by #stat_loc onchange: persists the new location and re-renders so the
 // current-zone highlight updates. View preference (state.mapView) is kept as-is.
 function onLocationChange() {
+  // Fog-of-war: the place we're leaving stays discovered, and the new place becomes
+  // discovered too — so the previous location shows [VISITED] (not [UNKNOWN]) once the
+  // Courier moves on. Capture the old location BEFORE syncStateFromDom() overwrites
+  // state.loc with the new #stat_loc value, then record both via the shared helper.
+  // saveState() persists the updated locationHistory in the same (debounced) write;
+  // cloud sync stays manual (no auto-push).
+  const prevLoc = state.loc;
+  syncStateFromDom();
+  recordLocationVisit(prevLoc);
+  recordLocationVisit(state.loc);
   saveState();
   renderWorldMap();
 }

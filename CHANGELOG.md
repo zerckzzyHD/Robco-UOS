@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1405/1405 | Cache: robco-terminal-v2.6.0-r43 -->
+﻿## [Unreleased]<!-- Tests: 1412/1412 | Cache: robco-terminal-v2.6.0-r44 -->
 
 ### Added
 
@@ -42,6 +42,7 @@
 - Fixed the BARTER UPLINK trading screen not updating when you switch vendors. Choosing a different vendor from the dropdown now correctly refreshes that vendor's purse (the caps it can pay you) and the buy and sell lists, instead of leaving the previous vendor's details on screen. The dropdown was being rebuilt at the exact moment you changed it, which on some devices left the old vendor showing — the screen now updates in place.
 - Fixed the V.A.T.S. button still calling the AI instead of the built-in calculator. Invoking V.A.T.S. — from the [VATS] button or by typing the command — now always opens the offline V.A.T.S. calculator (hit chance, crit bonus, and the melee/unarmed AP-strike optimiser) and never contacts the AI, matching how THREAT, TRADE, CONSULT, BIO-SCAN, and LOOT already work. The AI is no longer told it can produce a V.A.T.S. result, so it can't intercept the command anymore.
 - Fixed the "REBOOT TERMINAL" update prompt sometimes not appearing after a new version was deployed. When the terminal checked for an update as the page loaded, a freshly-downloaded version could finish installing in a brief window that the prompt logic wasn't watching — so the update sat ready in the background with no prompt, surfacing only on a later reload (or, if you cleared site data in between, not at all). The terminal now watches for a pending update in every state it can be in when the page opens, so each newly-deployed version reliably shows the REBOOT TERMINAL prompt. Brand-new first-time installs correctly stay silent, since there is no older version to update from.
+- Fixed the world map forgetting where you've been. When you moved from one location to another, the place you left flipped back to "UNKNOWN" instead of staying discovered — only the AI could mark somewhere visited, so changing your location by hand never recorded it. Now, true to Fallout fog-of-war, anywhere you've been stays "VISITED" permanently: your current location shows "CURRENT", every place you've visited shows "VISITED", and only spots you've genuinely never been read "UNKNOWN". Discovery survives a reload, and the map can no longer quietly forget older locations.
 
 ### Changed
 

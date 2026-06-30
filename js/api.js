@@ -391,9 +391,9 @@ function sanitizeImportedContainer(container) {
         armor: o.equipped.armor != null ? _str(o.equipped.armor) : null,
         headgear: o.equipped.headgear != null ? _str(o.equipped.headgear) : null,
       };
-    // Phase-6 trackers — string[] lists (collectibles/traits/skillBooks/magazines):
+    // String[] lists (Phase-6 trackers + locationHistory map-discovery set):
     // drop null/undefined entries and coerce each to a string (defensive for imported data).
-    ['collectibles', 'traits', 'skillBooks', 'magazines'].forEach(k => {
+    ['collectibles', 'traits', 'skillBooks', 'magazines', 'locationHistory'].forEach(k => {
       if (Array.isArray(o[k])) o[k] = o[k].filter(n => n != null).map(_str);
     });
     // Lincoln memorabilia (FO3) — map of artifact name → disposition. Coerce keys to
@@ -779,20 +779,15 @@ function autoImportState(jsonString) {
       });
     }
 
-    // ── LOCATION HISTORY (#5) ────────────────────────────────────
-    // Track the last 10 distinct locations visited. Stored in state.locationHistory.
-    if (
-      locV !== undefined &&
-      locV !== (JSON.parse(window._lastStateBeforeSync || '{}').loc || '')
-    ) {
-      if (!state.locationHistory) state.locationHistory = [];
-      // Add new location if it differs from last recorded
-      const last = state.locationHistory[state.locationHistory.length - 1];
-      if (locV !== last) {
-        state.locationHistory.push(locV);
-        if (state.locationHistory.length > 10)
-          state.locationHistory = state.locationHistory.slice(-10);
-      }
+    // ── LOCATION HISTORY — fog-of-war discovery (deduped, permanent) ──
+    // Record both the location being LEFT and the new current into state.locationHistory
+    // via the shared state.js helper, so any place that was ever current stays discovered
+    // ([VISITED]) on the world map. Routing the AI path through recordLocationVisit() keeps
+    // state.locationHistory in lock-step with the manual onLocationChange() path (no desync,
+    // no 10-entry truncation that would silently un-discover older locations).
+    if (locV !== undefined) {
+      recordLocationVisit(JSON.parse(window._lastStateBeforeSync || '{}').loc || '');
+      recordLocationVisit(locV);
     }
 
     // ── GAME CONTEXT (v2.0) ────────────────────────────────────

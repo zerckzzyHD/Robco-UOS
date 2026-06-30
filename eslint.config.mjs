@@ -89,6 +89,7 @@ export default [
         autoImportState: 'readonly',
         sanitizeImportedContainer: 'readonly',
         syncStateFromDom: 'readonly',
+        recordLocationVisit: 'readonly',
         generateSyncPayload: 'readonly',
         restoreChatHistory: 'readonly',
         chatHistory: 'writable',

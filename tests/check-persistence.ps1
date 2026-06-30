@@ -7076,6 +7076,49 @@ Check ($registry113.Contains('[TRADE]') -and (-not $router113.Contains("'[TRADE]
     '113.7: [TRADE] is advertised in help as the native barter PANEL and is correctly NOT a NATIVE_COMMAND_ROUTER token'
 
 # ===========================================================
+# Suite 114 -- Map location discovery persistence (fog-of-war) (7 tests)
+# A location stays [VISITED] once visited -- both the manual location-change path and
+# the AI import path record it via the shared recordLocationVisit() helper (deduped,
+# permanent); renderWorldMap reads locationHistory for CURRENT/VISITED/UNKNOWN.
+# (Protocol 42 map fix. PS mirror of JS Suite 114.)
+# ===========================================================
+Sep "Suite 114 -- Map location discovery persistence"
+$stateSrc114  = Read-Src "js/state.js"
+$apiSrc114    = Read-Src "js/api.js"
+$uiCoreSrc114 = Read-Src "js/ui-core.js"
+$uiRender114  = Read-Src "js/ui-render.js"
+$recordBody114 = [regex]::Match($stateSrc114, '(?s)function recordLocationVisit\([\s\S]*?\n\}').Value
+$olcBody114    = [regex]::Match($uiCoreSrc114, '(?s)function onLocationChange\(\)[\s\S]*?\n\}').Value
+
+# 114.1  shared helper recordLocationVisit() defined in state.js
+Check ([bool]($stateSrc114 -match 'function recordLocationVisit\(')) `
+    '114.1: recordLocationVisit() helper defined in state.js (single source for map-discovery recording)'
+
+# 114.2  helper dedups case-insensitively AND is permanent (no destructive cap)
+Check (($recordBody114 -match 'toLowerCase\(\)') -and ($recordBody114 -match '\.some\(') -and ($recordBody114 -match 'state\.locationHistory\.push\(') -and (-not ($recordBody114 -match 'slice\(-?\d+\)'))) `
+    '114.2: recordLocationVisit dedups case-insensitively and never truncates (permanent fog-of-war discovery)'
+
+# 114.3  manual path: onLocationChange records the LEFT + NEW location via the helper
+Check (($olcBody114 -match 'const prevLoc = state\.loc') -and (([regex]::Matches($olcBody114, 'recordLocationVisit\(')).Count -ge 2) -and ($olcBody114 -match 'recordLocationVisit\(prevLoc\)')) `
+    '114.3: onLocationChange records the previous + new location via recordLocationVisit (manual move keeps the left location discovered)'
+
+# 114.4  AI path routes through the helper; old inline push + slice truncation gone
+Check (($apiSrc114 -match 'recordLocationVisit\(locV\)') -and (-not ($apiSrc114 -match 'state\.locationHistory\.push\(')) -and (-not ($apiSrc114 -match 'state\.locationHistory\.slice\('))) `
+    '114.4: autoImportState records visits via recordLocationVisit() (no inline push / no slice(-10) truncation)'
+
+# 114.5  renderWorldMap exposes all three statuses from locationHistory
+Check (($uiRender114 -match 'state\.locationHistory') -and ($uiRender114 -match '\[CURRENT\]') -and ($uiRender114 -match '\[VISITED\]') -and ($uiRender114 -match '\[UNKNOWN\]')) `
+    '114.5: renderWorldMap renders [CURRENT] / [VISITED] / [UNKNOWN] driven by state.locationHistory'
+
+# 114.6  sanitizeImportedContainer coerces locationHistory (Protocol 4)
+Check ([bool]($apiSrc114 -match "'collectibles', 'traits', 'skillBooks', 'magazines', 'locationHistory'")) `
+    '114.6: sanitizeImportedContainer coerces locationHistory as a string[] on cloud-pull / file-import (Protocol 4)'
+
+# 114.7  permanence guard -- no destructive 10-cap on locationHistory anywhere
+Check ((-not ($apiSrc114 -match 'locationHistory\s*=\s*[^;]*slice\(-?\d+\)')) -and (-not ($stateSrc114 -match 'locationHistory\s*=\s*[^;]*slice\(-?\d+\)'))) `
+    '114.7: no destructive cap (locationHistory = ...slice(-N)) anywhere -- discovered locations are never un-discovered'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"
