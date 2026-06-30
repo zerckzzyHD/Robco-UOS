@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1360/1360 | Cache: robco-terminal-v2.6.0-r32 -->
+﻿## [Unreleased]<!-- Tests: 1364/1364 | Cache: robco-terminal-v2.6.0-r33 -->
 
 ### Added
 
@@ -35,6 +35,8 @@
 - Corrected two Fallout 3 quest-log entries that weren't real quests. "Fires of Anchorage" (which doesn't exist in the game) and a duplicate "Strictly Business (Paradise Falls)" (the real quest is just "Strictly Business") have been removed, so the FO3 quest autocomplete no longer suggests fake quests. Also fixed the world map labelling two different regions both as "Vault 92" — the southeastern one is now correctly named "Bethesda Ruins". All corrections verified against the Fallout wiki.
 - Corrected two item-database errors so the AI gets accurate stats. The "NCR Ranger Armor" — a New Vegas item that had leaked into the Fallout 3 database (the NCR doesn't exist in Fallout 3) — has been removed from FO3. And the Mysterious Stranger Outfit, which was mistakenly recorded as more protective than power armor, now shows its correct value (it offers almost no damage protection). Both verified against the Fallout wiki.
 - Fixed Big Guns being invisible to the V.A.T.S. calculator in Fallout 3 campaigns. The calculator only ever recognised the New Vegas weapon skills, so a Fallout 3 character built around Big Guns (miniguns, the Fat Man, flamers) was never considered when picking the relevant combat skill. Fallout 3's full weapon-skill set — including Big Guns — is now used.
+- Removed a fabricated Fallout 3 weapon ("O'cta Brain") that isn't a real in-game item, so it no longer appears in autocomplete or feeds bogus stats to the AI. Also corrected the 1st Recon Assault and Survival armours (Boone's armour) to their real damage threshold of 15 (they were recorded as 22). Both verified against the Fallout wiki.
+- Completed the Fallout 3 Operation: Anchorage quest list by adding the two real quests that were missing — "The Guns of Anchorage" and "Paving the Way" — so the add-on now lists all four of its quests. And corrected a made-up map location ("Vault 92 South") to the real "Bethesda Offices East", where the Lockpick bobblehead is actually found. All verified against the Fallout wiki.
 
 ### Changed
 

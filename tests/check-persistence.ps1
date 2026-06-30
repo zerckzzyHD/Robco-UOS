@@ -1407,7 +1407,8 @@ Check ($updateMathBody37.Contains('saveState()') -and $updateMathBody37.Contains
 # Every FALLOUT_REGISTRY weapon-type entry must have an exact-name
 # match in [WEAPONS.CSV], and every WEAPONS.CSV row must have a
 # registry entry. Guards against future drift in either direction.
-# 4 tests
+# Plus WU-D6 O'cta Brain canon-removal regression guard.
+# 5 tests
 # ===========================================================
 Sep "Suite 38 -- DB<->Registry Weapon Parity"
 
@@ -1468,6 +1469,11 @@ Check ([string]::IsNullOrEmpty($miss383)) "FO3: all registry weapons exist in WE
 # 38.4 FO3: every WEAPONS.CSV row exists in registry
 $miss384 = ($dbW383 | Where-Object { -not $regW383.Contains($_) }) -join ', '
 Check ([string]::IsNullOrEmpty($miss384)) "FO3: all WEAPONS.CSV rows exist in registry (missing: $(if ($miss384) { $miss384 } else { 'none' }))"
+
+# 38.5 WU-D6 canon-removal regression guard: "O'cta Brain" has no fallout.wiki match
+#      (fabricated/garbled, owner-confirmed) and stays removed from BOTH the FO3 WEAPONS.CSV
+#      and the FO3 registry (removing from only one would break 38.3/38.4 parity). Protocol 3.
+Check ((-not ($dbFo3_38 -match 'cta Brain')) -and (-not ($regFo3_38 -match 'cta Brain'))) "FO3: fabricated weapon ""O'cta Brain"" stays removed from WEAPONS.CSV + registry (WU-D6)"
 
 # ===========================================================
 # Suite 39 -- Ammo Token Split (Energy Cell / MFC / ECP)
@@ -4129,8 +4135,8 @@ Check ($ssBody69 -match '_contextSwitching' -and $ssBody69 -match '\breturn\b') 
 # no-duplicate, column-count, DB-registry parity for new
 # apparel, Vault 13 Canteen in MISC + registry,
 # seedNewCampaignInventory definition + guards,
-# WU-D2 Mysterious Stranger Outfit DT regression.
-# 15 tests
+# WU-D2 Mysterious Stranger Outfit DT + WU-D6 1st Recon DT regressions.
+# 16 tests
 # ===========================================================
 Sep "Suite 70 -- FNV unique apparel + Vault 13 Canteen"
 $dbNv70      = Read-Src "js\db_nv.js"
@@ -4251,6 +4257,15 @@ Check ([bool]($seedBody70 -match 'ticks')) `
 $msoRow70 = $armorRows70 | Where-Object { ($_ -split ',')[0].Trim() -eq 'Mysterious Stranger Outfit' } | Select-Object -First 1
 $msoDT70 = if ($msoRow70) { ($msoRow70 -split ',')[2].Trim() } else { $null }
 Check ($msoDT70 -eq '0') ("Mysterious Stranger Outfit has DT 0 in ARMOR.CSV (fallout.wiki: DR 5, no DT; was 55) -- got " + $msoDT70)
+
+# 70.16  1st Recon Assault/Survival Armor DT regression (WU-D6). fallout.wiki infoboxes: both
+#        are "weightless DT 15 armor" exclusive to Boone. The DB had DT 22; corrected to 15
+#        (Type stays Heavy -- already canon-correct, WU-D2). Schema DT = col index 2.
+$assaultRow70 = $armorRows70 | Where-Object { ($_ -split ',')[0].Trim() -eq '1st Recon Assault Armor' } | Select-Object -First 1
+$survivalRow70 = $armorRows70 | Where-Object { ($_ -split ',')[0].Trim() -eq '1st Recon Survival Armor' } | Select-Object -First 1
+$assaultDT70 = if ($assaultRow70) { ($assaultRow70 -split ',')[2].Trim() } else { $null }
+$survivalDT70 = if ($survivalRow70) { ($survivalRow70 -split ',')[2].Trim() } else { $null }
+Check (($assaultDT70 -eq '15') -and ($survivalDT70 -eq '15')) ("1st Recon Assault + Survival Armor have DT 15 (fallout.wiki infobox; was 22) -- got assault=" + $assaultDT70 + ", survival=" + $survivalDT70)
 
 # ===========================================================
 # Suite 71 -- Phase 6 UI Consistency (compact trackers,
@@ -4499,8 +4514,8 @@ Check ([bool]($stateSrc73 -match 'getSkillKeys\s*\(\s*\)')) `
 # gridRow/gridCol on every FNV/FO3 collectible + lincoln entry,
 # cells match existing zones[], coord-based badge source guard,
 # regression: no name-based badge logic, lincoln check present,
-# WU-D1 unique FO3 zone-name guard.
-# 12 tests
+# WU-D1 unique FO3 zone-name guard, WU-D5 'Vault 92 South' fix.
+# 13 tests
 # ===========================================================
 Sep "Suite 74 -- Collectibles Map Coord Guards"
 $nvRegSrc74   = Read-Src "js\reg_nv.js"
@@ -4582,6 +4597,11 @@ Check ($fo3CollectCount74 -eq 20) "reg_fo3.js: FO3 collectibles count unchanged 
 $zoneNames74 = [regex]::Matches($fo3RegSrc74, "name:\s*'([^']+)',\s*gridRow:\s*\d+,\s*gridCol:\s*\d+,\s*locations:") | ForEach-Object { $_.Groups[1].Value }
 $dupZones74 = @($zoneNames74 | Group-Object | Where-Object { $_.Count -gt 1 } | ForEach-Object { $_.Name })
 Check (($zoneNames74.Count -gt 0) -and ($dupZones74.Count -eq 0)) ("reg_fo3.js: all FO3 zones[] have unique names (no duplicate world-map region labels)" + $(if ($dupZones74.Count) { ' -- dup: ' + ($dupZones74 -join ', ') } else { '' }))
+
+# 74.13  WU-D5 location-canon guard: the fabricated 'Vault 92 South' marker (the real Vault 92
+#        is the far-NW cell) stays removed, replaced by the real 'Bethesda Offices East' --
+#        where the Lockpick bobblehead sits -- in the Bethesda Ruins (6,4) zone. Protocol 3.
+Check ((-not ($fo3RegSrc74 -match 'Vault 92 South')) -and ($fo3RegSrc74 -match "'Bethesda Offices East'")) "reg_fo3.js: fabricated 'Vault 92 South' replaced by real 'Bethesda Offices East' in the Bethesda Ruins zone (WU-D5)"
 
 # ===========================================================
 # Suite 75 -- Registry items[] No-Duplicate-Names Guard
@@ -4939,20 +4959,21 @@ $ncrBleed81 = @($aNames81 | Where-Object { $_ -match '^NCR\b' })
 Check ($ncrBleed81.Count -eq 0) ("FO3 ARMOR has no NCR-faction armor (NCR does not exist in FO3 -- NV-bleed guard)" + $(if ($ncrBleed81.Count) { ' -- found: ' + ($ncrBleed81 -join ', ') } else { '' }))
 
 # ===========================================================
-# Suite 82 -- FO3 quests (62, WU-D1 canon fix) + quest items (15->25)
-# 14 tests
+# Suite 82 -- FO3 quests (64, WU-D1 canon fix + WU-D5 Anchorage completeness) + quest items (15->25)
+# 15 tests
 # ===========================================================
-Sep "Suite 82 -- FO3 quests (62, WU-D1 canon fix) + quest items (15->25)"
+Sep "Suite 82 -- FO3 quests (64) + quest items (15->25)"
 $fo3Src82 = Read-Src "js\reg_fo3.js"
 $qStart82 = $fo3Src82.IndexOf("  quests: [")
 $qEnd82 = $fo3Src82.IndexOf("`n  ],", $qStart82)
 $qBlock82 = if ($qEnd82 -ge 0) { $fo3Src82.Substring($qStart82, $qEnd82 - $qStart82) } else { $fo3Src82.Substring($qStart82) }
 
-# 82.a  exactly 62 entries -- count by dlc: (handles multi-line objects).
-#       WU-D1 canon fix: 64 -> 62 (removed non-canon 'Fires of Anchorage' + fabricated
-#       duplicate 'Strictly Business (Paradise Falls)', both verified against fallout.wiki).
+# 82.a  exactly 64 entries -- count by dlc: (handles multi-line objects).
+#       WU-D1: 64 -> 62 (removed non-canon 'Fires of Anchorage' + fabricated
+#       'Strictly Business (Paradise Falls)'). WU-D5: 62 -> 64 by ADDING the two REAL missing
+#       Operation: Anchorage quests ('The Guns of Anchorage' + 'Paving the Way'). fallout.wiki.
 $qCount82 = ([regex]::Matches($qBlock82, 'dlc:')).Count
-Check ($qCount82 -eq 62) ("FO3 quests has exactly 62 entries (got " + $qCount82 + ")")
+Check ($qCount82 -eq 64) ("FO3 quests has exactly 64 entries (got " + $qCount82 + ")")
 
 # 82.b  dedup guard -- exactly 1 'Strictly Business'
 $sbCount82 = ([regex]::Matches($qBlock82, "name:\s*'Strictly Business'")).Count
@@ -4962,6 +4983,14 @@ Check ($sbCount82 -eq 1) ("FO3 quests has exactly 1 'Strictly Business' entry (g
 #       (both verified non-canon against fallout.wiki -- Protocol 3).
 $canonRemoved82 = (-not ($qBlock82 -match 'Fires of Anchorage')) -and (-not ($qBlock82 -match 'Strictly Business \(Paradise Falls\)'))
 Check $canonRemoved82 "FO3 quests: non-canon 'Fires of Anchorage' + fabricated 'Strictly Business (Paradise Falls)' stay removed (WU-D1)"
+
+# 82.g  WU-D5 per-add-on completeness guard: the Operation: Anchorage add-on has EXACTLY its
+#       4 canon quests -- Aiding the Outcasts (side) + The Guns of Anchorage / Paving the Way /
+#       Operation: Anchorage! (main). Catches the "missing real DLC quest" class. Protocol 3.
+$anchorageCount82 = ([regex]::Matches($qBlock82, "dlc:\s*'Operation: Anchorage'")).Count
+$anchorageQuests82 = @('Aiding the Outcasts', 'The Guns of Anchorage', 'Paving the Way', 'Operation: Anchorage!')
+$missingAnch82 = @($anchorageQuests82 | Where-Object { -not $qBlock82.Contains("name: '$_'") })
+Check (($anchorageCount82 -eq 4) -and ($missingAnch82.Count -eq 0)) ("Operation: Anchorage add-on has exactly its 4 canon quests (count " + $anchorageCount82 + $(if ($missingAnch82.Count) { ', missing: ' + ($missingAnch82 -join ', ') } else { '' }) + ') -- WU-D5')
 
 # 82.c  DLC sentinels with correct dlc value
 Check ($qBlock82.Contains("name: 'Operation: Anchorage!'") -and $qBlock82.Contains("dlc: 'Operation: Anchorage'")) `

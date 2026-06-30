@@ -70,6 +70,8 @@ const FALLOUT_REGISTRY = {
 
     // ── DLC: Operation Anchorage ──────────────────────────────────────
     { name: 'Aiding the Outcasts', type: 'side', dlc: 'Operation: Anchorage' },
+    { name: 'The Guns of Anchorage', type: 'main', dlc: 'Operation: Anchorage' },
+    { name: 'Paving the Way', type: 'main', dlc: 'Operation: Anchorage' },
     { name: 'Operation: Anchorage!', type: 'main', dlc: 'Operation: Anchorage' },
 
     // ── DLC: The Pitt ─────────────────────────────────────────────────
@@ -166,7 +168,6 @@ const FALLOUT_REGISTRY = {
     { name: 'Nail Board', type: 'weapon' },
     { name: 'Board of Education', type: 'weapon' },
     { name: 'Bumper Sword', type: 'weapon' },
-    { name: "O'cta Brain", type: 'weapon' },
     // ── MELEE: Bladed ─────────────────────────────────────────────────
     { name: 'Combat Knife', type: 'weapon' },
     { name: 'Switchblade', type: 'weapon' },
@@ -950,7 +951,7 @@ const FALLOUT_REGISTRY = {
       name: 'Bethesda Ruins',
       gridRow: 6,
       gridCol: 4,
-      locations: ['Vault 92 South', 'Calverton', 'Bethesda Ruins'],
+      locations: ['Bethesda Offices East', 'Calverton', 'Bethesda Ruins'],
     },
     {
       name: 'Seneca Station',

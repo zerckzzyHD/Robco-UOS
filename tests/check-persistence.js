@@ -2505,7 +2505,8 @@ header('Render Fan-out (P7-1)');
 //  Every FALLOUT_REGISTRY weapon-type entry must have an exact-name
 //  match in [WEAPONS.CSV], and every WEAPONS.CSV row must have a
 //  registry entry. Guards against future drift in either direction.
-//  4 tests
+//  Plus WU-D6 O'cta Brain canon-removal regression guard.
+//  5 tests
 // ══════════════════════════════════════════════════════════════
 header('DB↔Registry Weapon Parity');
 {
@@ -2585,6 +2586,19 @@ header('DB↔Registry Weapon Parity');
     assert(
       missing.length === 0,
       `FO3: all WEAPONS.CSV rows exist in registry (missing: ${missing.join(', ') || 'none'})`
+    );
+  }
+
+  // 38.5 WU-D6 canon-removal regression guard: "O'cta Brain" has no fallout.wiki match
+  //      (fabricated/garbled, owner-confirmed) and stays removed from BOTH the FO3
+  //      WEAPONS.CSV and the FO3 registry. Removing it from only one file would break the
+  //      38.3/38.4 parity guards; this pins it gone in both. fallout.wiki-verified (Protocol 3).
+  {
+    const dbFo3 = readFile('js/db_fo3.js');
+    const regFo3 = readFile('js/reg_fo3.js');
+    assert(
+      !/cta Brain/.test(dbFo3) && !/cta Brain/.test(regFo3),
+      'FO3: fabricated weapon "O\'cta Brain" stays removed from WEAPONS.CSV + registry (WU-D6)'
     );
   }
 }
@@ -7159,8 +7173,8 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  no-duplicate, column-count, DB↔registry parity for new
 //  apparel, Vault 13 Canteen in MISC + registry,
 //  seedNewCampaignInventory definition + guards,
-//  WU-D2 Mysterious Stranger Outfit DT regression.
-//  15 tests
+//  WU-D2 Mysterious Stranger Outfit DT + WU-D6 1st Recon DT regressions.
+//  16 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 70 — FNV unique apparel + Vault 13 Canteen');
@@ -7349,6 +7363,22 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     assert(
       msoDT70 === '0',
       `Mysterious Stranger Outfit has DT 0 in ARMOR.CSV (fallout.wiki: DR 5, no DT; was 55) — got ${msoDT70}`
+    );
+  }
+
+  // 70.16  1st Recon Assault/Survival Armor DT regression (WU-D6). fallout.wiki infoboxes:
+  //        both are "weightless DT 15 armor" exclusive to Boone. The DB had DT 22; corrected
+  //        to 15 (Type stays Heavy — that was already canon-correct, WU-D2). Schema DT = col 2.
+  {
+    const dt70 = name => {
+      const row = armorRows70.find(r => r.split(',')[0].trim() === name);
+      return row ? row.split(',')[2].trim() : null;
+    };
+    const assaultDT70 = dt70('1st Recon Assault Armor');
+    const survivalDT70 = dt70('1st Recon Survival Armor');
+    assert(
+      assaultDT70 === '15' && survivalDT70 === '15',
+      `1st Recon Assault + Survival Armor have DT 15 (fallout.wiki infobox; was 22) — got assault=${assaultDT70}, survival=${survivalDT70}`
     );
   }
 }
@@ -7746,8 +7776,8 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  gridRow/gridCol on every FNV/FO3 collectible + lincoln entry,
 //  cells match existing zones[], coord-based badge source guard,
 //  regression: no name-based badge logic, lincoln check present,
-//  WU-D1 unique FO3 zone-name guard.
-//  12 tests
+//  WU-D1 unique FO3 zone-name guard, WU-D5 'Vault 92 South' fix.
+//  13 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 74 — Collectibles Map Coord Guards');
@@ -7944,6 +7974,15 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
         (dupZones74.length ? ' — dup: ' + dupZones74.join(', ') : '')
     );
   }
+
+  // 74.13  WU-D5 location-canon guard: the fabricated 'Vault 92 South' marker (the real
+  //        Vault 92 is the far-NW cell) stays removed, replaced by the real 'Bethesda
+  //        Offices East' — where the Lockpick bobblehead actually sits — in the Bethesda
+  //        Ruins (6,4) zone. fallout.wiki-verified (Protocol 3).
+  assert(
+    !/Vault 92 South/.test(fo3RegSrc74) && /'Bethesda Offices East'/.test(fo3RegSrc74),
+    "reg_fo3.js: fabricated 'Vault 92 South' replaced by real 'Bethesda Offices East' in the Bethesda Ruins zone (WU-D5)"
+  );
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -8459,11 +8498,11 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 82 — FO3 quests (62 after WU-D1 canon fix) + quest items (15→25)
-//  14 tests
+//  Suite 82 — FO3 quests (64, WU-D1 canon fix + WU-D5 Anchorage completeness) + quest items (15→25)
+//  15 tests
 // ══════════════════════════════════════════════════════════════
 {
-  header('Suite 82 — FO3 quests (62, WU-D1 canon fix) + quest items (15→25)');
+  header('Suite 82 — FO3 quests (64) + quest items (15→25)');
   const fo3Src82 = readFile('js/reg_fo3.js');
 
   // Extract quests array block
@@ -8471,11 +8510,13 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   const qEnd82 = fo3Src82.indexOf('\n  ],', qStart82);
   const qBlock82 = fo3Src82.slice(qStart82, qEnd82 === -1 ? fo3Src82.length : qEnd82);
 
-  // 82.a  exactly 62 entries — count by dlc: (handles multi-line objects).
+  // 82.a  exactly 64 entries — count by dlc: (handles multi-line objects).
   //       WU-D1 canon fix: 64 → 62 (removed non-canon 'Fires of Anchorage' + fabricated
-  //       duplicate 'Strictly Business (Paradise Falls)', both verified against fallout.wiki).
+  //       duplicate 'Strictly Business (Paradise Falls)'). WU-D5: 62 → 64 by ADDING the two
+  //       REAL missing Operation: Anchorage quests ('The Guns of Anchorage' + 'Paving the
+  //       Way'). All verified against fallout.wiki (Protocol 3).
   const qCount82 = (qBlock82.match(/\bdlc:/g) || []).length;
-  assert(qCount82 === 62, `FO3 quests has exactly 62 entries (got ${qCount82})`);
+  assert(qCount82 === 64, `FO3 quests has exactly 64 entries (got ${qCount82})`);
 
   // 82.b  dedup guard — exactly 1 'Strictly Business'
   const sbCount82 = (qBlock82.match(/name:\s*'Strictly Business'/g) || []).length;
@@ -8490,6 +8531,27 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     !/Fires of Anchorage/.test(qBlock82) && !/Strictly Business \(Paradise Falls\)/.test(qBlock82),
     "FO3 quests: non-canon 'Fires of Anchorage' + fabricated 'Strictly Business (Paradise Falls)' stay removed (WU-D1)"
   );
+
+  // 82.g  WU-D5 per-add-on completeness guard: the Operation: Anchorage add-on has EXACTLY
+  //       its 4 canon quests — Aiding the Outcasts (side) + The Guns of Anchorage / Paving
+  //       the Way / Operation: Anchorage! (main). Catches the "missing real DLC quest" class
+  //       (the two middle quests were absent until WU-D5). fallout.wiki-verified (Protocol 3).
+  {
+    const anchorageCount82 = (qBlock82.match(/dlc:\s*'Operation: Anchorage'/g) || []).length;
+    const ANCHORAGE_QUESTS_82 = [
+      'Aiding the Outcasts',
+      'The Guns of Anchorage',
+      'Paving the Way',
+      'Operation: Anchorage!',
+    ];
+    const missingAnch82 = ANCHORAGE_QUESTS_82.filter(n => !qBlock82.includes(`name: '${n}'`));
+    assert(
+      anchorageCount82 === 4 && missingAnch82.length === 0,
+      `Operation: Anchorage add-on has exactly its 4 canon quests (count ${anchorageCount82}` +
+        (missingAnch82.length ? `, missing: ${missingAnch82.join(', ')}` : '') +
+        ') — WU-D5'
+    );
+  }
 
   // 82.c  DLC sentinels with correct dlc value
   assert(

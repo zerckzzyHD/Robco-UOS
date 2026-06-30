@@ -62,7 +62,6 @@ Alien Blaster,100,200,2.0,1.5,0.5,8000,0,0,0,0,None,Alien Power Cell
 Firelance,90,180,2.0,1.5,2,10000,0,0,0,0,None,Alien Power Cell
 Jingwei's Shocksword,20,40,2.0,2.0,4,3000,0,4,0.9,30,EMP,None
 The Mauler,80,80,1.0,1.1,5,4000,75,7,0.7,40,None,None
-O'cta Brain,25,25,1.0,1.3,4,1500,0,5,0.8,30,Knockback,None
 Stabhappy,30,30,2.0,2.5,1,3500,0,0,0.6,25,None,None
 Dart Gun,1,1,1.0,1.5,3,250,0,2,0,0,Cripple Legs,Dart
 Deathclaw Gauntlet,60,60,1.0,1.1,1,5000,75,7,0.7,45,None,None

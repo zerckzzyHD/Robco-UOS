@@ -310,8 +310,8 @@ NCR Ranger Combat Armor,Medium,20,30,7500,None,50%
 Recon Armor,Medium,15,20,3500,None,50%
 Riot Gear,Medium,18,26,5000,+1 PER,50%
 Van Graff Combat Armor,Medium,18,25,5000,None,50%
-1st Recon Assault Armor,Heavy,22,30,5000,+5 Guns,50%
-1st Recon Survival Armor,Heavy,22,30,5500,+5 Survival / +5 Medicine,50%
+1st Recon Assault Armor,Heavy,15,30,5000,+5 Guns,50%
+1st Recon Survival Armor,Heavy,15,30,5500,+5 Survival / +5 Medicine,50%
 Brotherhood T-51b Power Armor,Heavy,25,40,5200,+1 STR / +25 Rad Resist,50%
 Gecko-Backed Metal Armor,Medium,14,32,600,None,50%
 Legate's Armor,Heavy,28,40,15000,+5 Melee / +5 Unarmed,50%
