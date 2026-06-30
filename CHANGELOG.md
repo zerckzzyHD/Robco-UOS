@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1428/1428 | Cache: robco-terminal-v2.6.0-r46 -->
+﻿## [Unreleased]<!-- Tests: 1436/1436 | Cache: robco-terminal-v2.6.0-r47 -->
 
 ### Added
 
@@ -13,6 +13,7 @@
 - Added a persistent DATABANK panel on the DATA tab with its own always-there search box. Type a topic and the grouped results (items, perks, quests, locations, companions, creatures, plus key stats) appear right there in the panel — keep it open and keep searching without reopening anything. It's the same offline databank as the CONSULT button and command, just inline for quick reference. No AI involved.
 - Added a SUSTAINED POWER CELL option (POWER MANAGEMENT, under Security & Configuration) that keeps your screen from dimming or sleeping while the terminal is open — handy for reading on a phone without tapping every few seconds. It's off by default to save battery; flip it on and the display stays lit, and the terminal re-asserts it automatically if you switch away and come back. On devices or browsers that don't support keeping the screen awake, the toggle politely disables itself and says so. Works offline with no AI.
 - Added a HAPTIC SOLENOID option (POWER MANAGEMENT, right below the power cell) that gives your phone a brief buzz on key moments — a short pulse on level-up, a sharp double-buzz when a faction's view of you flips to Vilified or Idolized, and a warning buzz the moment your health drops into the critical zone. It's off by default; flip it on and you'll feel a quick confirmation tap. On phones that support vibration it just works; on desktops and devices without a vibration motor the toggle disables itself and says so. It also stays silent if you've turned on your system's "reduce motion" setting, so it never fights your accessibility preferences. Works offline with no AI.
+- Added an EJECT HOLOTAPE button (next to "Download Campaign Log", under Security & Configuration) that hands your comm-link transcript straight to your device's share sheet — so on a phone you can fire it off to Messages, email, Notes, or any app in one tap. If your device can't bring up a share sheet, it quietly copies the transcript to your clipboard instead, and if even that's unavailable it falls back to saving the transcript as a text file. Cancelling the share sheet just closes it, nothing else happens. Works offline with no AI.
 
 ### Fixed
 

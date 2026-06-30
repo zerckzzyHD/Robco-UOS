@@ -12659,6 +12659,84 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 117 — WU-F3 Eject Holotape (Web Share API)
+//  Ejects the comm-link log as a holotape transcript via navigator.share, with a
+//  three-tier graceful fallback (share → clipboard → download). Feature-detected,
+//  reuses _buildHolotapeText() formatting. Game-agnostic, offline, no AI. (Phase F)
+//  8 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 117 — WU-F3 Eject Holotape (Web Share)');
+  const saves117 = readFile('js/ui-saves.js');
+  const html117 = htmlSource;
+  let eject117 = '';
+  try {
+    eject117 = extractFunctionBody(saves117, 'ejectHolotape');
+  } catch (_) {}
+
+  // 117.1  shared text builder extracted + reused by the .txt export (Protocol 22)
+  assert(
+    /function _buildHolotapeText\(\)/.test(saves117) &&
+      /_downloadBlob\(_buildHolotapeText\(\), 'text\/plain'/.test(saves117),
+    '117.1: _buildHolotapeText() is the single transcript builder, reused by the .txt export path (no duplication)'
+  );
+
+  // 117.2  Web Share feature-detect before use (graceful — no crash where unsupported)
+  assert(
+    /function _shareSupported\(\)/.test(saves117) &&
+      /typeof navigator\.share === 'function'/.test(saves117),
+    '117.2: _shareSupported() feature-detects navigator.share before any use'
+  );
+
+  // 117.3  clipboard fallback is also feature-detected
+  assert(
+    /function _clipboardSupported\(\)/.test(saves117) &&
+      /navigator\.clipboard/.test(saves117) &&
+      /typeof navigator\.clipboard\.writeText === 'function'/.test(saves117),
+    '117.3: _clipboardSupported() feature-detects navigator.clipboard.writeText before the clipboard fallback'
+  );
+
+  // 117.4  tier 1 — navigator.share with the holotape text, inside try/catch
+  assert(
+    /_shareSupported\(\)/.test(eject117) &&
+      /await navigator\.share\(\{[^}]*text/.test(eject117) &&
+      /try\s*\{/.test(eject117) &&
+      /catch/.test(eject117),
+    '117.4: ejectHolotape() shares the transcript via navigator.share({text}) guarded by _shareSupported() inside try/catch'
+  );
+
+  // 117.5  a user-dismissed share sheet (AbortError) is honoured — not treated as failure
+  assert(
+    /AbortError/.test(eject117) && /err\.name === 'AbortError'/.test(eject117),
+    '117.5: a dismissed share sheet (AbortError) returns silently and does NOT fall through to clipboard/download'
+  );
+
+  // 117.6  tier 2 + tier 3 fallbacks present: clipboard copy then file download
+  assert(
+    /_clipboardSupported\(\)/.test(eject117) &&
+      /navigator\.clipboard\.writeText\(text\)/.test(eject117) &&
+      /_downloadBlob\(text, 'text\/plain'/.test(eject117),
+    '117.6: graceful fallback chain — clipboard copy (tier 2) then _downloadBlob file eject (tier 3) when share is unavailable'
+  );
+
+  // 117.7  empty-log guard — nothing to eject
+  assert(
+    /!chatHistory \|\| chatHistory\.length === 0/.test(eject117) &&
+      /NOTHING TO EJECT/.test(eject117),
+    '117.7: ejectHolotape() refuses on an empty comm-link log (NOTHING TO EJECT)'
+  );
+
+  // 117.8  diegetic trigger button wired with an accessible label
+  assert(
+    /id="ejectHolotapeBtn"/.test(html117) &&
+      /onclick="ejectHolotape\(\)"/.test(html117) &&
+      /aria-label="[^"]*[Hh]olotape[^"]*"/.test(html117) &&
+      /EJECT HOLOTAPE/.test(html117),
+    '117.8: #ejectHolotapeBtn diegetic button wires onclick=ejectHolotape() with a descriptive aria-label'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 console.log('\n══════════════════════════════════════════════════════════════\n');

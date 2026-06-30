@@ -58,6 +58,12 @@ function exportCampaignLog(format = 'txt') {
   }
 
   // Default: plain text (original behavior)
+  _downloadBlob(_buildHolotapeText(), 'text/plain', 'robco_campaign_log.txt');
+}
+
+// Builds the plain-text "holotape transcript" of the comm-link log. Shared by the
+// .txt export (download) path and WU-F3 EJECT HOLOTAPE (Web Share) — Protocol 22.
+function _buildHolotapeText() {
   let logStr = '=========================================================\n';
   logStr += '         ROBCO INDUSTRIES UNIFIED OPERATING SYSTEM\n';
   logStr += '                 AFTER-ACTION CAMPAIGN LOG\n';
@@ -71,7 +77,64 @@ function exportCampaignLog(format = 'txt') {
     else if (msg.sender === 'sys') logStr += `[SYSTEM]: ${cleanText}\n\n`;
     else logStr += `[DATABANK]: ${cleanText}\n\n`;
   });
-  _downloadBlob(logStr, 'text/plain', 'robco_campaign_log.txt');
+  return logStr;
+}
+
+// ── WU-F3 EJECT HOLOTAPE (Web Share API) ──────────────────────────────────
+// Ejects the comm-link log as a "holotape transcript" to the OS share sheet via
+// the Web Share API. Free, offline, no AI, game-agnostic (Protocol 38) — it only
+// hands plain text to the device's own share UI; carries no game literal. Reuses
+// the existing _buildHolotapeText() formatting (Protocol 22). Three-tier graceful
+// fallback so it always does *something* useful:
+//   1. navigator.share({text}) — native OS share sheet (mobile + some desktops).
+//      A user-dismissed sheet (AbortError) is silent — NOT treated as a failure.
+//   2. navigator.clipboard.writeText — copy the transcript for manual transmit.
+//   3. _downloadBlob — eject the transcript as a local .txt file (the export path).
+// Every tier is wrapped so a missing/blocked API can never break the terminal.
+function _shareSupported() {
+  return typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+}
+function _clipboardSupported() {
+  return (
+    typeof navigator !== 'undefined' &&
+    !!navigator.clipboard &&
+    typeof navigator.clipboard.writeText === 'function'
+  );
+}
+async function ejectHolotape() {
+  if (!chatHistory || chatHistory.length === 0) {
+    alert('> ERROR: COMM-LINK LOGS EMPTY. NOTHING TO EJECT.');
+    return;
+  }
+  const text = _buildHolotapeText();
+  // Tier 1 — native share sheet
+  if (_shareSupported()) {
+    try {
+      await navigator.share({ title: 'RobCo U.O.S. — Holotape Transcript', text });
+      return; // shared successfully
+    } catch (err) {
+      // User dismissed the share sheet — honour the cancel, do not fall through.
+      if (err && err.name === 'AbortError') return;
+      // Any other share failure falls through to the clipboard tier.
+    }
+  }
+  // Tier 2 — clipboard copy
+  if (_clipboardSupported()) {
+    try {
+      await navigator.clipboard.writeText(text);
+      if (typeof appendToChat === 'function') {
+        appendToChat('> HOLOTAPE TRANSCRIPT COPIED TO CLIPBOARD — TRANSMIT MANUALLY.', 'sys', true);
+      }
+      return;
+    } catch (_) {
+      // Clipboard blocked (permissions/insecure context) — fall through to download.
+    }
+  }
+  // Tier 3 — eject to a local file (always available)
+  _downloadBlob(text, 'text/plain', 'robco_holotape_transcript.txt');
+  if (typeof appendToChat === 'function') {
+    appendToChat('> HOLOTAPE EJECTED TO LOCAL STORAGE — SHARE SHEET UNAVAILABLE.', 'sys', true);
+  }
 }
 
 function _downloadBlob(content, mimeType, filename) {

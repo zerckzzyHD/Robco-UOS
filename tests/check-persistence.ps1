@@ -7213,6 +7213,50 @@ Check (($html116 -match 'data-sub-id="power_systems"') -and ($html116 -match 'id
     '116.8: POWER MANAGEMENT sub-panel has #hapticToggle + label[for] + #hapticStatus note'
 
 # ===========================================================
+# Suite 117 -- WU-F3 Eject Holotape (Web Share API) (8 tests)
+# Ejects the comm-link log as a holotape transcript via navigator.share, with a
+# three-tier graceful fallback (share -> clipboard -> download). Feature-detected,
+# reuses _buildHolotapeText() formatting. Game-agnostic, offline, no AI.
+# (PS mirror of JS Suite 117.)
+# ===========================================================
+Sep "Suite 117 -- WU-F3 Eject Holotape (Web Share)"
+$saves117 = Read-Src "js/ui-saves.js"
+$html117  = Read-Src "index.html"
+$eject117 = [regex]::Match($saves117, '(?s)async function ejectHolotape\([\s\S]*?\n\}').Value
+
+# 117.1  shared text builder extracted + reused by the .txt export (Protocol 22)
+Check (($saves117 -match 'function _buildHolotapeText\(\)') -and ($saves117 -match "_downloadBlob\(_buildHolotapeText\(\), 'text/plain'")) `
+    '117.1: _buildHolotapeText() is the single transcript builder, reused by the .txt export path (no duplication)'
+
+# 117.2  Web Share feature-detect before use
+Check (($saves117 -match 'function _shareSupported\(\)') -and ($saves117 -match "typeof navigator\.share === 'function'")) `
+    '117.2: _shareSupported() feature-detects navigator.share before any use'
+
+# 117.3  clipboard fallback is also feature-detected
+Check (($saves117 -match 'function _clipboardSupported\(\)') -and ($saves117 -match 'navigator\.clipboard') -and ($saves117 -match "typeof navigator\.clipboard\.writeText === 'function'")) `
+    '117.3: _clipboardSupported() feature-detects navigator.clipboard.writeText before the clipboard fallback'
+
+# 117.4  tier 1 -- navigator.share with the holotape text, inside try/catch
+Check (($eject117 -match '_shareSupported\(\)') -and ($eject117 -match 'await navigator\.share\(\{[^}]*text') -and ($eject117 -match 'try\s*\{') -and ($eject117 -match 'catch')) `
+    '117.4: ejectHolotape() shares the transcript via navigator.share({text}) guarded by _shareSupported() inside try/catch'
+
+# 117.5  a user-dismissed share sheet (AbortError) is honoured -- not treated as failure
+Check (($eject117 -match 'AbortError') -and ($eject117 -match "err\.name === 'AbortError'")) `
+    '117.5: a dismissed share sheet (AbortError) returns silently and does NOT fall through to clipboard/download'
+
+# 117.6  tier 2 + tier 3 fallbacks present: clipboard copy then file download
+Check (($eject117 -match '_clipboardSupported\(\)') -and ($eject117 -match 'navigator\.clipboard\.writeText\(text\)') -and ($eject117 -match "_downloadBlob\(text, 'text/plain'")) `
+    '117.6: graceful fallback chain -- clipboard copy (tier 2) then _downloadBlob file eject (tier 3) when share is unavailable'
+
+# 117.7  empty-log guard -- nothing to eject
+Check (($eject117 -match '!chatHistory \|\| chatHistory\.length === 0') -and ($eject117 -match 'NOTHING TO EJECT')) `
+    '117.7: ejectHolotape() refuses on an empty comm-link log (NOTHING TO EJECT)'
+
+# 117.8  diegetic trigger button wired with an accessible label
+Check (($html117 -match 'id="ejectHolotapeBtn"') -and ($html117 -match 'onclick="ejectHolotape\(\)"') -and ($html117 -match 'aria-label="[^"]*[Hh]olotape[^"]*"') -and ($html117 -match 'EJECT HOLOTAPE')) `
+    '117.8: #ejectHolotapeBtn diegetic button wires onclick=ejectHolotape() with a descriptive aria-label'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"
