@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1557/1557 | Cache: robco-terminal-v2.7.0-r7 -->
+﻿## [Unreleased]<!-- Tests: 1557/1557 | Cache: robco-terminal-v2.7.0-r8 -->
 
 ### Under the Hood
 
@@ -10,6 +10,7 @@
 - Tidied up the Node test runner. Many of its checks were long, near-identical lines that each looked for one text pattern in a source file; dozens of these repeated the same boilerplate over and over. Runs of these look-alike checks are now written as compact data tables driven by one small shared helper, so each check is a single short row instead of a spelled-out line. Every check runs exactly as before — the runner produces byte-for-byte identical output, the same 1557 tests with the same names, order, and results — this only shrinks and simplifies the runner's own source. The PowerShell runner is deliberately left untouched as the independent second check. Internal tooling only.
 - Wired up the terminal's bot-protection layer (Firebase App Check with reCAPTCHA v3) with its real public site key so the protection can activate. This uses only a public site identifier that is meant to ship inside the app — no secret is involved — and, as before, the app stays fully usable even if the protection layer is unreachable. No visible change to the app.
 - Made the bot-protection layer testable on the developer's own machine and the private staging site by enabling a development-only debug token there — this lets the protection be exercised without a live challenge during testing. It is strictly limited to the local and staging addresses and is never switched on for the public production site. Also corrected some stale developer notes in the same area that no longer described how the protection actually starts up. No visible change to the app.
+- Corrected the bot-protection layer's public site key so it now activates with the intended key. The correct key had been mistakenly placed in an internal on/off check while the layer was still running with an old, wrong key; the two were swapped back into their proper places. As before, this involves only a public site identifier and the app stays fully usable if the protection layer is ever unreachable. No visible change to the app.
 
 ---
 

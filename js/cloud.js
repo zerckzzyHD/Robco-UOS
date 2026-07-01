@@ -35,7 +35,7 @@ import {
 // key differs from the unconfigured sentinel checked in the init guard below.
 // Init is wrapped in try/catch, so if App Check or the network is unavailable the
 // app stays fully functional.
-const RECAPTCHA_V3_SITE_KEY = '6LdEhzctAAAAAKPi-QarEVtKnkJd6q9CJxYA6NDt';
+const RECAPTCHA_V3_SITE_KEY = '6LcViz8tAAAAAJCNGKgkkHC70TF-iwkQKuuEu7Bb';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyCm4Pdxn9kC2dUU-Od_hYhUvPugjLMYfCA',
@@ -125,7 +125,7 @@ window.isFeatureEnabled = function (key) {
 // App Check — non-fatal. Initializes whenever a real site key is configured (i.e. the
 // key is not the unconfigured sentinel); any failure is caught so the app never breaks.
 try {
-  if (RECAPTCHA_V3_SITE_KEY !== '6LcViz8tAAAAAJCNGKgkkHC70TF-iwkQKuuEu7Bb') {
+  if (RECAPTCHA_V3_SITE_KEY !== 'REPLACE_WITH_RECAPTCHA_SITE_KEY') {
     // Dev/staging only: enable an App Check debug token so localhost and the Cloudflare
     // (*.pages.dev) staging build can obtain App Check tokens without a live reCAPTCHA
     // challenge. The client then prints a debug-token UUID to the console, which is
