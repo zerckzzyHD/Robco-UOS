@@ -13103,13 +13103,13 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   );
 
   // 120.4  scanline/refresh CRT veil lowered (it visibly dims text contrast) in BOTH paths —
-  // r4 bumped 0.12 → 0.2 for a touch more CRT presence while keeping text legible; both the
-  // manual .high-lumen block and the @media (prefers-contrast: more) block stay in sync.
+  // r4 bumped 0.12 → 0.2, then r5 bumped 0.2 → 0.5 for a stronger retro CRT texture while keeping
+  // text legible; both the manual .high-lumen block and the @media (prefers-contrast: more) block stay in sync.
   assert(
-    /\.crt-overlay,\s*\n\s*html\.high-lumen \.crt-overlay::after\s*\{\s*\n\s*opacity: 0\.2\b/.test(
+    /\.crt-overlay,\s*\n\s*html\.high-lumen \.crt-overlay::after\s*\{\s*\n\s*opacity: 0\.5\b/.test(
       manualBlock120
-    ) && /\.crt-overlay,[\s\S]*?opacity: 0\.2\b/.test(prefBlock120),
-    '120.4: both paths set the scanline + refresh-bar overlay to opacity 0.2 (r4 — a touch more CRT presence, text still legible)'
+    ) && /\.crt-overlay,[\s\S]*?opacity: 0\.5\b/.test(prefBlock120),
+    '120.4: both paths set the scanline + refresh-bar overlay to opacity 0.5 (r5 — a stronger CRT texture, text still legible)'
   );
 
   // 120.5  manual toggle persisted as a localStorage device preference (not campaign state)
