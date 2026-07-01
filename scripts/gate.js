@@ -6,8 +6,14 @@
  * Called via:
  *   npm run gate       — full gate (lint + format + tests + browser checks)
  *   npm run gate:fast  — fast gate (lint + format + tests; browser checks skipped)
+ *   npm run gate:iter  — OPT-IN iteration pre-check ONLY (lint changed files +
+ *                        format + Node runner). Skips the PowerShell mirror,
+ *                        parity, and every browser check for fast inner-loop
+ *                        feedback. NOT a substitute for the commit gate
+ *                        (gate:fast) or the push gate (gate): it is never run by
+ *                        a git hook or CI, so it cannot satisfy either boundary.
  *
- * Steps (full; --fast skips steps 5-9):
+ * Steps (full; --fast skips steps 5-9; --iter takes the separate fast path):
  *   1. ESLint (--max-warnings 0)
  *   2. Prettier format check
  *   3. Persistence audit — Node runner
@@ -28,6 +34,9 @@ const os = require('os');
 const ROOT = path.join(__dirname, '..');
 const isCI = !!process.env.CI;
 const fast = process.argv.includes('--fast');
+// Opt-in iteration pre-check (audit #3). NOT a commit/push gate — see the --iter
+// block below. Never wired into a git hook or CI; it cannot satisfy either gate.
+const iter = process.argv.includes('--iter');
 
 // Synchronous sleep (no dependency, no extra process) — used only to poll for
 // the shared browser server's endpoint file while gate.js stays synchronous.
@@ -125,6 +134,61 @@ function runCapture(label, cmd) {
     process.exit(result.status || 1);
   }
   return (result.stdout || '') + (result.stderr || '');
+}
+
+// Changed .js/.mjs files vs HEAD (staged, unstaged, and untracked) — used only
+// by the --iter pre-check to lint what changed. Returns [] on any failure, which
+// makes the caller fall back to a full lint.
+function changedLintFiles() {
+  try {
+    const tracked = spawnSync('git diff --name-only --diff-filter=ACMR HEAD', {
+      cwd: ROOT,
+      shell: true,
+      encoding: 'utf8',
+    });
+    const untracked = spawnSync('git ls-files --others --exclude-standard', {
+      cwd: ROOT,
+      shell: true,
+      encoding: 'utf8',
+    });
+    const lines = ((tracked.stdout || '') + '\n' + (untracked.stdout || ''))
+      .split(/\r?\n/)
+      .map(s => s.trim())
+      .filter(Boolean);
+    return [...new Set(lines)].filter(f => /\.(js|mjs)$/.test(f) && !f.includes('node_modules/'));
+  } catch {
+    return [];
+  }
+}
+
+// ── Iteration pre-check (--iter, audit #3) ────────────────────────────────────
+// A deliberately-thin, fast inner-loop check. It is OPT-IN and is never invoked
+// by a git hook or CI, so it can never stand in for the commit gate (gate:fast)
+// or the push gate (gate) — both of those run the full runner set unchanged.
+if (iter) {
+  console.log('\n[gate] ITERATION PRE-CHECK (--iter) — fast inner-loop feedback ONLY.');
+  console.log('[gate] Does NOT replace the commit gate (npm run gate:fast) or the');
+  console.log('[gate] push gate (npm run gate). Commit still runs both test runners;');
+  console.log('[gate] push still runs both runners + every browser check.\n');
+
+  const changed = changedLintFiles();
+  if (changed.length) {
+    const fileArgs = changed.map(f => `"${f}"`).join(' ');
+    run(
+      `ESLint (${changed.length} changed file(s), --max-warnings 0)`,
+      `npx eslint ${fileArgs} --max-warnings 0 --no-warn-ignored`
+    );
+  } else {
+    run('ESLint (--max-warnings 0)', 'npx eslint . --max-warnings 0');
+  }
+
+  run('Prettier (format check)', 'npx prettier --check .');
+  run('Persistence audit (Node)', 'node tests/robco-diagnostics.js');
+
+  console.log(
+    '\n[GATE] Iteration pre-check passed — NOT a commit/push gate. Run `npm run gate` before pushing.\n'
+  );
+  process.exit(0);
 }
 
 // ── 1. ESLint ─────────────────────────────────────────────────────────────────

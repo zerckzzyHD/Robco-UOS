@@ -253,6 +253,7 @@ npm run format      # Prettier
 npm run dev         # Vite dev server
 npm run gate        # FULL gate: lint + format + both runners + boot-smoke + render + a11y + test.html
 npm run gate:fast   # Fast subset run by the pre-commit hook
+npm run gate:iter   # OPT-IN iteration pre-check (lint changed + format + Node runner); never a commit/push gate
 ```
 
 ### Quality Gate
