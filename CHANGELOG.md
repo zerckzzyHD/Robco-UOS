@@ -3,6 +3,7 @@
 ### Under the Hood
 
 - Slimmed the bundled full-repo AI context snapshot. It no longer includes the PowerShell test runner, which is a full coverage mirror of the Node test runner that stays in the snapshot — this roughly halves the snapshot's test-runner bulk with no loss of code or coverage context. The two test runners themselves are unchanged and still run in full: the PowerShell runner stays hand-authored as an independent second check rather than being auto-generated from the Node one. Internal tooling only; nothing about the app or its behaviour changes.
+- Made the pre-push/CI test gate a little faster by removing wasted work. The gate used to run both the Node and PowerShell test suites, then immediately run both of them a second time just to read back the final "all tests passed" count for the cross-check that the two agree. It now reads that count from the first run, so each suite runs once instead of twice. The safety guarantee is identical — both suites still run in full and must still agree on the exact same total — the gate just stops paying for it twice. Internal tooling only.
 
 ---
 

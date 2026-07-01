@@ -36,13 +36,20 @@ function run(label, cmd) {
   }
 }
 
-function capture(cmd) {
-  return spawnSync(cmd, {
-    cwd: ROOT,
-    stdio: ['inherit', 'pipe', 'pipe'],
-    shell: true,
-    encoding: 'utf8',
-  });
+// Like run(), but captures stdout/stderr (while still echoing them) and returns
+// the combined text. Used for the two persistence runners so the parity check
+// can read their "ALL N TESTS" totals from THIS run's output instead of
+// re-executing both runners a second time (audit #4 — kills the double-run).
+function runCapture(label, cmd) {
+  console.log(`\n[gate] ${label}`);
+  const result = spawnSync(cmd, { cwd: ROOT, shell: true, encoding: 'utf8' });
+  if (result.stdout) process.stdout.write(result.stdout);
+  if (result.stderr) process.stderr.write(result.stderr);
+  if (result.status !== 0) {
+    console.error(`\n[GATE FAIL] ${label} — exit ${result.status}`);
+    process.exit(result.status || 1);
+  }
+  return (result.stdout || '') + (result.stderr || '');
 }
 
 // ── 1. ESLint ─────────────────────────────────────────────────────────────────
@@ -52,7 +59,7 @@ run('ESLint (--max-warnings 0)', 'npx eslint . --max-warnings 0');
 run('Prettier (format check)', 'npx prettier --check .');
 
 // ── 3. Node persistence audit ─────────────────────────────────────────────────
-run('Persistence audit (Node)', 'node tests/robco-diagnostics.js');
+const nodeAuditOut = runCapture('Persistence audit (Node)', 'node tests/robco-diagnostics.js');
 
 // ── 4. PowerShell persistence audit + parity ─────────────────────────────────
 // Probe for pwsh (PowerShell Core) first; fall back to powershell (Windows PS 5.1).
@@ -71,14 +78,14 @@ if (psBin) {
       ? 'pwsh -File tests/robco-diagnostics.ps1'
       : 'powershell -ExecutionPolicy Bypass -File tests/robco-diagnostics.ps1';
 
-  run('Persistence audit (PowerShell)', psFileCmd);
+  const psAuditOut = runCapture('Persistence audit (PowerShell)', psFileCmd);
 
   console.log('\n[gate] Runner parity check');
-  const nodeOut = capture('node tests/robco-diagnostics.js');
-  const psOut = capture(psFileCmd);
-  // ANSI codes wrap lines, not words — /ALL N TESTS/ matches even in colored output
-  const nodeTotal = (nodeOut.stdout + nodeOut.stderr).match(/ALL (\d+) TESTS/)?.[1];
-  const psTotal = (psOut.stdout + psOut.stderr).match(/ALL (\d+) TESTS/)?.[1];
+  // Read the totals from the runs we ALREADY did in steps 3 & 4 — no second
+  // execution of either runner (audit #4). ANSI codes wrap lines, not words,
+  // so /ALL N TESTS/ matches even in colored output.
+  const nodeTotal = nodeAuditOut.match(/ALL (\d+) TESTS/)?.[1];
+  const psTotal = psAuditOut.match(/ALL (\d+) TESTS/)?.[1];
   if (!nodeTotal || !psTotal || nodeTotal !== psTotal) {
     console.error(
       `[GATE FAIL] Runner parity broken: Node=${nodeTotal} PS=${psTotal} (Protocol 15)`
