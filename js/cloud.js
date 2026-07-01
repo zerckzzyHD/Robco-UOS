@@ -29,10 +29,12 @@ import {
 } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-app-check.js';
 
 // ── App Check reCAPTCHA v3 site key ─────────────────────────────────────────
-// IMPORTANT: Replace this placeholder with the real key from the Firebase console
-// (App Check → Register App → reCAPTCHA v3) before pushing to production.
-// App Check initialization is skipped while this placeholder string is present,
-// so the app stays fully functional without the real key configured.
+// Public reCAPTCHA v3 SITE key — safe to ship in client source (it is a public
+// identifier, exactly like the Firebase web apiKey below; the private reCAPTCHA
+// SECRET key is never placed here). App Check initializes at boot whenever this
+// key differs from the unconfigured sentinel checked in the init guard below.
+// Init is wrapped in try/catch, so if App Check or the network is unavailable the
+// app stays fully functional.
 const RECAPTCHA_V3_SITE_KEY = '6LdEhzctAAAAAKPi-QarEVtKnkJd6q9CJxYA6NDt';
 
 const firebaseConfig = {
@@ -120,9 +122,22 @@ window.isFeatureEnabled = function (key) {
   return _featureFlags[key] !== false;
 };
 
-// App Check — non-fatal; skipped until real site key is configured
+// App Check — non-fatal. Initializes whenever a real site key is configured (i.e. the
+// key is not the unconfigured sentinel); any failure is caught so the app never breaks.
 try {
   if (RECAPTCHA_V3_SITE_KEY !== '6LcViz8tAAAAAJCNGKgkkHC70TF-iwkQKuuEu7Bb') {
+    // Dev/staging only: enable an App Check debug token so localhost and the Cloudflare
+    // (*.pages.dev) staging build can obtain App Check tokens without a live reCAPTCHA
+    // challenge. The client then prints a debug-token UUID to the console, which is
+    // registered once in Firebase console → App Check → Manage debug tokens. This guard
+    // is a strict no-op in production (GitHub Pages) — the flag is never set there.
+    if (
+      location.hostname === 'localhost' ||
+      location.hostname === '127.0.0.1' ||
+      location.hostname.endsWith('.pages.dev')
+    ) {
+      self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+    }
     initializeAppCheck(app, {
       provider: new ReCaptchaV3Provider(RECAPTCHA_V3_SITE_KEY),
       isTokenAutoRefreshEnabled: true,
