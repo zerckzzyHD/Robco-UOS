@@ -1,5 +1,9 @@
 ﻿## [Unreleased]<!-- Tests: 1557/1557 | Cache: robco-terminal-v2.7.0-r4 -->
 
+### Under the Hood
+
+- Slimmed the bundled full-repo AI context snapshot. It no longer includes the PowerShell test runner, which is a full coverage mirror of the Node test runner that stays in the snapshot — this roughly halves the snapshot's test-runner bulk with no loss of code or coverage context. The two test runners themselves are unchanged and still run in full: the PowerShell runner stays hand-authored as an independent second check rather than being auto-generated from the Node one. Internal tooling only; nothing about the app or its behaviour changes.
+
 ---
 
 ## [v2.7.0] — Native Systems & Two Wastelands<!-- Date: 2026-06-30 | Tests: 1557/1557 | Cache: robco-terminal-v2.7.0-r4 -->
