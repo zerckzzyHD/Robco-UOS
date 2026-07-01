@@ -106,7 +106,7 @@ Requires changes in **4 files minimum.** The pre-commit audit will block if any 
 - [ ] Add a sanitize entry in `sanitizeImportedContainer()` in `api.js` if the field is an array/object/typed value (born-compliant — every new typed state field is coerced on the cloud-pull / file-import path in its own commit)
 - [ ] State the field's cloud-sync path in the commit — serialized-whole fields ride the save automatically; a dedicated Firestore doc needs its own additive/merge write (→ Protocol 34 cloud-sync determination)
 - [ ] Update `getSystemDirective()` schema in `api.js` (if AI should return it)
-- [ ] Add `render*()` in `ui.js` + call from `loadUI()` (if it needs a UI panel)
+- [ ] Add `render*()` in `ui-render.js` + call from `loadUI()` in `ui-core.js` (if it needs a UI panel)
 - [ ] Add `<details class="panel">` block in `index.html` (if it needs a panel)
 - [ ] Bump `CACHE_NAME` in `sw.js` → Protocol 1
 - [ ] Run `npm run lint` and `npm run format`
@@ -118,11 +118,11 @@ Requires changes in **4 files minimum.** The pre-commit audit will block if any 
 ## Protocol 5 — Adding a New UI Panel
 
 - [ ] Add `<details class="panel">` block in `index.html`
-- [ ] Create `render*()` function in `ui.js`
-- [ ] Call `render*()` from `loadUI()` in `ui.js`
-- [ ] If it shows a count: add entry to `_updatePanelBadges()` in `ui.js`
-- [ ] If AI changes should auto-expand it: add key to `expandPanelForCategory()` map in `ui.js`
-- [ ] If it has a text input with autocomplete: call `wireInput()` in `initRegistryAutocomplete()` in `ui.js`
+- [ ] Create `render*()` function in `ui-render.js`
+- [ ] Call `render*()` from `loadUI()` in `ui-core.js`
+- [ ] If it shows a count: add entry to `_updatePanelBadges()` in `ui-core.js`
+- [ ] If AI changes should auto-expand it: add key to `expandPanelForCategory()` map in `ui-core.js`
+- [ ] If it has a text input with autocomplete: call `wireInput()` in `initRegistryAutocomplete()` in `ui-saves.js`
 - [ ] Bump `CACHE_NAME` → Protocol 1
 - [ ] Lint, format, commit (1557 tests) → Protocol 2
 
@@ -131,22 +131,22 @@ Requires changes in **4 files minimum.** The pre-commit audit will block if any 
 ## Protocol 6 — Adding a Registry Autocomplete Input
 
 1. Add `<input type="text" id="newXxxName" ...>` in `index.html`
-2. In `initRegistryAutocomplete()` in `ui.js`, add: `wireInput('newXxxName', 'category');`
-3. If the category is new, add it to `FALLOUT_REGISTRY` in `registry.js`
-4. Create `addXxx()` function in `ui.js` mirroring `addPerk()` / `addQuest()` pattern
+2. In `initRegistryAutocomplete()` in `ui-saves.js`, add: `wireInput('newXxxName', 'category');`
+3. If the category is new, add it to `FALLOUT_REGISTRY` in the per-game data files (`reg_nv.js` / `reg_fo3.js`)
+4. Create `addXxx()` function in `ui-render.js` mirroring `addPerk()` / `addQuest()` pattern
 5. Bump `CACHE_NAME` → Protocol 1
 
 ---
 
 ## Protocol 7 — Adding a New Audio Source
 
-- [ ] Create function in `ui.js` using existing `audioCtx` via `ensureAudioCtx()`
+- [ ] Create function in `ui-audio.js` using existing `audioCtx` via `ensureAudioCtx()`
 - [ ] First guard: `if (AudioSettings.masterMute) return;`
 - [ ] Second guard: `if (AudioSettings.<key>) return;`
-- [ ] Add key to `AudioSettings` init block at top of `ui.js`
+- [ ] Add key to `AudioSettings` init block in `ui-core.js`
 - [ ] Add checkbox toggle in `index.html` inside the Audio Systems details panel
-- [ ] Add localStorage key to `toggleAudio()` keyMap in `ui.js`
-- [ ] Add key to `toggleMasterMute()` un-mute restore logic in `ui.js`
+- [ ] Add localStorage key to `toggleAudio()` keyMap in `ui-audio.js`
+- [ ] Add key to `toggleMasterMute()` un-mute restore logic in `ui-audio.js`
 - [ ] Add new setting to the Settings table in `ARCHITECTURE.md`
 - [ ] Bump `CACHE_NAME` → Protocol 1
 
@@ -184,7 +184,7 @@ Dispatch reports must be formatted for mobile reading: lead with a one-line summ
 
 ## Protocol 10 — UI Verification
 
-Any change touching `index.html`, `css/`, or render JS (`ui.js` `render*` functions) must be verified by actually **rendering** the affected UI at **360px, 412px, and ≥1000px (desktop)** before it is considered done — never from headless width measurements alone. Confirm no horizontal page overflow (`document.documentElement.scrollWidth === window.innerWidth`), the component looks correct, and desktop is unchanged.
+Any change touching `index.html`, `css/`, or render JS (`ui-render.js` `render*` functions) must be verified by actually **rendering** the affected UI at **360px, 412px, and ≥1000px (desktop)** before it is considered done — never from headless width measurements alone. Confirm no horizontal page overflow (`document.documentElement.scrollWidth === window.innerWidth`), the component looks correct, and desktop is unchanged.
 
 The definitive verification step is `tests/render-check.mjs` — a Playwright render-check that loads the page at 360px and 412px and asserts no horizontal overflow and no focus-zoom. Run it outside the 1106-test pre-commit gate whenever map or mobile layout changes land. It is the only check that catches real pixel/overflow regressions.
 
@@ -289,7 +289,7 @@ Before introducing any new manager, service, renderer, helper, component, or sta
 
 ## Protocol 23 — Architectural Boundaries
 
-Respect the established layering (script load order: database → state → registry → ui → api → cloud). Rendering only renders; `state.js` owns state; `registry.js` is read-only and never touches state; `api.js` handles AI + import; `cloud.js` handles sync. Systems communicate only through established functions/interfaces — render code must not write saves, registry must not mutate state, etc.
+Respect the established layering (script load order: database → state → registry → ui → api → cloud). Rendering only renders; `state.js` owns state; the registry (`registry-core.js` + `reg_nv.js` / `reg_fo3.js`) is read-only and never touches state; `api.js` handles AI + import; `cloud.js` handles sync. Systems communicate only through established functions/interfaces — render code must not write saves, registry must not mutate state, etc.
 
 ---
 
@@ -578,9 +578,9 @@ Every interactive element that the user can click to change state must be a `<bu
 
 **Script load order** (global scope, not modules):
 
-1. `js/database.js` → `databaseCSVs`, `lookupItemInDb()`
-2. `js/state.js` → `state`, `APP_VERSION`, `FACTION_REGISTRY`, `SKILL_KEYS`, `saveState()`, `migrateState()`
-3. `js/registry.js` → `FALLOUT_REGISTRY`, `registrySearch()` (read-only, never touches state)
+1. `js/db_nv.js` / `js/db_fo3.js` → `databaseCSVs`, `lookupItemInDb()` (per-game CSV data; the active file is picked by the `GAME_FILES` manifest in `index.html`, FNV fail-safe)
+2. `js/state.js` → `state`, `APP_VERSION`, `GAME_DEFS`, `FACTION_REGISTRY`, `SKILL_KEYS`, `saveState()`, `migrateState()`
+3. `js/reg_nv.js` / `js/reg_fo3.js` + `js/registry-core.js` → `FALLOUT_REGISTRY` (per-game data), `registrySearch()` (read-only engine, never touches state)
 4. `js/ui-audio.js` → all audio functions (`audioCtx`, geiger/tinnitus/CRT hum, limb/wake/boot/level-up sounds, `runBootSequence`, `triggerPhosphorGhost`, `changeOpticsColor`)
 5. `js/ui-render.js` → all `render*()` functions, CRUD helpers (`addItem`/`delItem`/`addAmmo`/etc.), faction utilities (`FACTION_THRESHOLDS`, `getFactionStanding`, `adjustFaction`), game-time helpers, map helpers, `_updateContextPanels`
 6. `js/ui-saves.js` → save slots, file import/export, rolling backups, registry autocomplete (`initRegistryAutocomplete`, `wireInput`), ammo datalist

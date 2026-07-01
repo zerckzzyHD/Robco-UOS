@@ -1,6 +1,6 @@
 # Private / AI-agent files — keep off GitHub
-CLAUDE.md
-RULES.md
+# NOTE: CLAUDE.md and RULES.md are intentionally tracked — the test gate reads them
+# (test-count / Protocol 38 / Protocol 40 guards), so they must stay in the repo.
 .claude/
 
 # Dependencies

@@ -56,8 +56,11 @@
 │   ├── ui-account.js   ~3KB   Account panel, cloud save picker, undo-sync
 │   ├── ui-core.js      ~43KB  Core UI lifecycle, appendToChat, loadUI, updateMath
 │   ├── cloud.js        3.6KB  Firebase push/pull (ES module)
-│   ├── registry.js     ~36KB  Read-only Fallout Data Registry + registrySearch()
-│   └── database.js     ~25KB CSV data (~170 weapons, ~68 armors, ~45 chems) + lookupItemInDb()
+│   ├── registry-core.js ~3KB  Read-only registry engine — FALLOUT_REGISTRY + registrySearch()
+│   ├── reg_nv.js       ~87KB  FNV registry data (perks/quests/locations/collectibles/traits/magazines)
+│   ├── reg_fo3.js      ~46KB  FO3 registry data (perks/quests/locations/bobbleheads/Lincoln memorabilia)
+│   ├── db_nv.js        ~54KB  FNV CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
+│   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
 │   ├── robco-diagnostics.ps1   28KB    1557-test pre-commit audit
@@ -82,12 +85,14 @@
 Scripts are loaded via `<script>` tags in `index.html` in this exact order:
 
 ```
-1. js/database.js   → defines: databaseCSVs, lookupItemInDb
-2. js/state.js      → defines: state, chatHistory, APP_VERSION, FACTION_REGISTRY,
+   ── Per-game boot manifest (GAME_FILES in index.html; order preserved via script.async = false) ──
+1. js/db_nv.js / js/db_fo3.js → defines: databaseCSVs, lookupItemInDb (game-specific CSV data;
+                       the active pair is selected by the GAME_FILES manifest, FNV fail-safe)
+2. js/state.js      → defines: state, chatHistory, APP_VERSION, GAME_DEFS, FACTION_REGISTRY,
                        SKILL_KEYS, saveState, syncStateFromDom, generateSyncPayload,
-                       exportSaveFile, migrateState, gameTimeToTicks (via ui.js)
-3. js/registry.js   → defines: FALLOUT_REGISTRY (read-only reference data),
-                       registrySearch() (autocomplete search function)
+                       exportSaveFile, migrateState (game-time helpers live in ui-render.js)
+3. js/reg_nv.js / js/reg_fo3.js + js/registry-core.js → defines: FALLOUT_REGISTRY
+                       (read-only game data) + registrySearch() (autocomplete search engine)
 4. js/ui-audio.js   → defines: audioCtx, all audio functions (geiger/tinnitus/CRT hum,
                        limb/wake/boot/level-up sounds, runBootSequence,
                        triggerPhosphorGhost, changeOpticsColor)
@@ -117,22 +122,22 @@ its exports to `window.*` for the other scripts to call.
 
 **Firebase SDK loading:** `cloud.js` imports the Firebase SDK from version-pinned gstatic CDN URLs (`https://www.gstatic.com/firebasejs/12.15.0/...`). The version pin is the primary supply-chain mitigation — updates are always deliberate, never floating to `latest`. SRI (`integrity=`) cannot be applied to ES module `import` statements in JavaScript source (no HTML element to attach the attribute to), so the pin is the only available guard. **Self-hosting was evaluated and deferred (v2.0.1-r65):** all App Check and reCAPTCHA calls must still reach gstatic/google, so self-hosting the SDK removes zero CSP origins and gains nothing for the current zero-build-step architecture. Revisit only if Firebase ships a bundleable single-origin SDK or the project adopts a build step.
 
-**Auth (Phase 5c-i/ii):** `cloud.js` signs in anonymously on every boot (non-fatal; app stays usable offline). Firebase Auth is tracked via `onAuthStateChanged`; the current `uid` routes all Firestore reads/writes to `users/{uid}/saves/main`. Phase 5c-ii adds Google sign-in: `window.signInWithGoogle()` links the anonymous session to a Google account via popup on all platforms (redirect was removed — iOS/Android storage partitioning blocked the cross-origin iframe used to retrieve the credential, so `getRedirectResult` always returned null on mobile); `window.signOutAccount()` signs out then re-signs in anonymously; `getRedirectResult` is still called at boot to drain any in-flight redirect from a previously cached client before the anon-fallback guard runs; and `auth/credential-already-in-use` collisions fall back to `signInWithCredential`. Boot sequence is a single sequential async IIFE: `await getRedirectResult` → `await authStateReady` → anon fallback if no user. The ACCOUNT panel in the Data tab (`renderAccount()` in ui.js, `#accountPanel` in index.html) shows sign-in status and the sign-in/sign-out button. Push to production is gated on the owner enabling the Google provider in the Firebase console.
+**Auth (Phase 5c-i/ii):** `cloud.js` signs in anonymously on every boot (non-fatal; app stays usable offline). Firebase Auth is tracked via `onAuthStateChanged`; the current `uid` routes all Firestore reads/writes to `users/{uid}/saves/main`. Phase 5c-ii adds Google sign-in: `window.signInWithGoogle()` links the anonymous session to a Google account via popup on all platforms (redirect was removed — iOS/Android storage partitioning blocked the cross-origin iframe used to retrieve the credential, so `getRedirectResult` always returned null on mobile); `window.signOutAccount()` signs out then re-signs in anonymously; `getRedirectResult` is still called at boot to drain any in-flight redirect from a previously cached client before the anon-fallback guard runs; and `auth/credential-already-in-use` collisions fall back to `signInWithCredential`. Boot sequence is a single sequential async IIFE: `await getRedirectResult` → `await authStateReady` → anon fallback if no user. The ACCOUNT panel in the Data tab (`renderAccount()` in ui-account.js, `#accountPanel` in index.html) shows sign-in status and the sign-in/sign-out button. Push to production is gated on the owner enabling the Google provider in the Firebase console.
 
 **Content Security Policy (CSP Stage 2 — enforcing):** The `<meta http-equiv="Content-Security-Policy">` in `index.html` is now in enforcing mode. It was run in report-only mode for Stage 1 and confirmed clean (boot + Firebase + auth + Firestore produced zero violations) before the flip. **`'unsafe-inline'` is intentionally retained** in `script-src` and `style-src`: the app has ~148 inline event handlers, and per CSP Level 2+ a `sha256-` or `nonce-` token in `script-src` silently disables `unsafe-inline`, breaking all of them. Guard 55.10 (tripwire: `'unsafe-inline'` still present) and 55.11 (tripwire: no `sha256-`/`nonce-` token) enforce this invariant. `img-src` includes `blob:` to cover canvas and screenshot-preview images. The suite-55 and suite-30 guards enforce that the enforcing policy is present and report-only is absent.
 
 ---
 
-## Fallout Data Registry (`js/registry.js`)
+## Fallout Data Registry (`js/registry-core.js` + `js/reg_nv.js` / `js/reg_fo3.js`)
 
-Added in v1.6.5. Read-only canonical Fallout: New Vegas reference data for autocomplete and future validation.
+Added in v1.6.5. Read-only canonical Fallout reference data for autocomplete and future validation. The registry is now split: `js/registry-core.js` holds the read-only search engine (`FALLOUT_REGISTRY` accessor + `registrySearch()`), and the per-game data lives in `js/reg_nv.js` (FNV) and `js/reg_fo3.js` (FO3) — the active data file is chosen by the `GAME_FILES` manifest in `index.html`.
 
 ### Key Properties
 
 - **Source of truth:** [Independent Fallout Wiki](https://fallout.wiki) — CC-BY-SA 4.0
 - **NOT state:** Does not touch `state`, `localStorage`, cloud sync, undo, or the persistence audit.
 - **Read-only:** Defined once at startup. Never mutated.
-- **Single file, no build step:** Consistent with the project's zero-toolchain philosophy.
+- **No build step:** Consistent with the project's zero-toolchain philosophy — a shared core engine plus one data file per game, loaded directly as `<script>` tags.
 
 ### Global: `FALLOUT_REGISTRY`
 
@@ -164,24 +169,24 @@ const FALLOUT_REGISTRY = {
 - No fuzzy matching — deterministic, predictable
 - Callers are responsible for debouncing
 
-### What `registry.js` does NOT do
+### What the registry does NOT do
 
-- Does not replace `database.js` (combat/trade CSV data — different concern)
+- Does not replace the CSV databases (`db_nv.js` / `db_fo3.js` — combat/trade CSV data, a different concern)
 - Does not replace `FACTION_REGISTRY` in `state.js` (drives state structure)
 - Does not replace `SKILL_KEYS` in `state.js` (drives state structure)
 - Does not add fields to `state` — registry data is never persisted
 
 ### Locked Decisions (see architecture_review.md)
 
-| Decision         | Value                                                 |
-| ---------------- | ----------------------------------------------------- |
-| Global name      | `FALLOUT_REGISTRY`                                    |
-| File name        | `js/registry.js`                                      |
-| Category keys    | `quests`, `items`, `perks`, `locations`, `companions` |
-| Search function  | `registrySearch(category, query)`                     |
-| Max results      | 7                                                     |
-| Min query length | 2 chars                                               |
-| Keywords         | Deferred                                              |
+| Decision         | Value                                                    |
+| ---------------- | -------------------------------------------------------- |
+| Global name      | `FALLOUT_REGISTRY`                                       |
+| File name        | `js/registry-core.js` + `js/reg_nv.js` / `js/reg_fo3.js` |
+| Category keys    | `quests`, `items`, `perks`, `locations`, `companions`    |
+| Search function  | `registrySearch(category, query)`                        |
+| Max results      | 7                                                        |
+| Min query length | 2 chars                                                  |
+| Keywords         | Deferred                                                 |
 
 ---
 
@@ -233,7 +238,7 @@ persistence audit will block the commit if any step is missed:
 1. **state.js** — Add the field to `let state = { ... }` with its default value
 2. **state.js** — Add migration in `migrateState()` for older saves: `if (!s.newField) s.newField = default;`
 3. **api.js** — Add import handling in `autoImportState()` so AI responses update the field
-4. _(If applicable)_ **ui.js** — Add rendering in the appropriate `render*()` function
+4. _(If applicable)_ **ui-render.js** — Add rendering in the appropriate `render*()` function
 
 The pre-commit hook (`tests/robco-diagnostics.ps1`) auto-discovers all keys in `state.js`
 and verifies that every key appears in `autoImportState()`.
@@ -247,9 +252,9 @@ Added in C3 (v2.0). A 4th top-level tab alongside STAT, INV, and DATA.
 ### Tab Architecture
 
 ```
-TAB_NAMES = ['stat', 'inv', 'data', 'campg']   // declared in ui.js
+TAB_NAMES = ['stat', 'inv', 'data', 'campg']   // declared in ui-core.js
 
-switchTab(tab)                                   // ui.js
+switchTab(tab)                                   // ui-core.js
   → adds/removes .active class on [data-tab="{tab}"] panels
   → updates [data-tab="{tab}"] button active state
   → persists to localStorage('robco_active_tab')
@@ -278,7 +283,7 @@ CAMPG (`id="campgPanel"`, `data-tab="campg"`) is the authority for all campaign 
 
 ## Registry Autocomplete System
 
-Added in v1.6.5. A singleton `AutocompletePanel` (`#acPanel`) wired to text inputs in `ui.js`.
+Added in v1.6.5. A singleton autocomplete panel (`#acPanel`) wired to text inputs in `ui-saves.js`.
 
 ### Architecture
 
@@ -299,9 +304,9 @@ initRegistryAutocomplete()  ← called once in window.onload
 ### Adding a new autocomplete-backed input
 
 1. Add `<input type="text" id="newXxxName" ...>` in **index.html**
-2. In `initRegistryAutocomplete()` in **ui.js**, add: `wireInput('newXxxName', 'category');`
-3. If the category is new, add it to `FALLOUT_REGISTRY` in **registry.js**
-4. If it has an add action, create `addXxx()` in **ui.js** mirroring `addPerk()`
+2. In `initRegistryAutocomplete()` in **ui-saves.js**, add: `wireInput('newXxxName', 'category');`
+3. If the category is new, add it to `FALLOUT_REGISTRY` in the per-game data files (**reg_nv.js** / **reg_fo3.js**)
+4. If it has an add action, create `addXxx()` in **ui-render.js** mirroring `addPerk()`
 
 ---
 
@@ -316,7 +321,7 @@ User interaction / AI sync
   → beforeunload handler        // Flushes pending save immediately on tab close
 ```
 
-### Load Flow (window.onload in ui.js)
+### Load Flow (window.onload in ui-core.js)
 
 ```
 localStorage.getItem('robco_v7')
@@ -335,7 +340,7 @@ syncStateFromDom()
   → JSON.stringify → data URI → download
 ```
 
-### Import Flow (handleFileUpload in ui.js)
+### Import Flow (handleFileUpload in ui-saves.js)
 
 ```
 FileReader → JSON.parse
@@ -368,7 +373,7 @@ getDoc(firestore)
   → Restore playstyle
 ```
 
-### Save Slots (saveToSlot / loadFromSlot in ui.js)
+### Save Slots (saveToSlot / loadFromSlot in ui-saves.js)
 
 ```
 3 slots: robco_slot_1, robco_slot_2, robco_slot_3
@@ -453,7 +458,7 @@ JSON string → parse
 All audio is procedurally synthesized via the Web Audio API. **No audio files exist.**
 
 ```
-audioCtx (single AudioContext, created at module load in ui.js)
+audioCtx (single AudioContext, created at module load in ui-audio.js)
   ├── playClack()           — Typing sound (square wave, 100-150Hz, 50ms)
   ├── playGeigerClick()     — Radiation Geiger (white noise, bandpass 2200Hz, 3ms)
   ├── scheduleGeiger(rate)  — Poisson-distributed click scheduler
@@ -477,7 +482,7 @@ if (AudioSettings.masterMute) return;   // Global kill switch
 if (AudioSettings.<specific>) return;   // Per-system toggle
 ```
 
-### AudioSettings Cache (ui.js line 6-14)
+### AudioSettings Cache (ui-core.js)
 
 ```javascript
 const AudioSettings = {
@@ -494,7 +499,7 @@ const AudioSettings = {
 Read once at startup. Updated in-memory by `toggleAudio()` and `toggleMasterMute()`.
 **Never call localStorage.getItem() in an audio hot path.**
 
-### Change Guards (ui.js line 17-18)
+### Change Guards (ui-core.js)
 
 ```javascript
 let _lastRads = -1,
@@ -508,7 +513,7 @@ preventing redundant oscillator creation on every keystroke.
 
 ## UI Rendering Pipeline
 
-### Entry Point: `loadUI()` (ui.js)
+### Entry Point: `loadUI()` (ui-core.js)
 
 Called after any state change. Pushes state → DOM, then calls all render functions:
 
@@ -583,13 +588,13 @@ FACTION_REGISTRY = [
 ];
 ```
 
-### Standing Calculation (ui.js)
+### Standing Calculation (ui-render.js)
 
 Canonical FNV 2D fame/infamy matrix. Fame and infamy are independent axes.
 Per-faction thresholds sourced from GECK `GetReputationThreshold` documentation (fallout.wiki).
 
 ```javascript
-// FACTION_THRESHOLDS (ui.js) — GECK-sourced, per-faction
+// FACTION_THRESHOLDS (ui-render.js) — GECK-sourced, per-faction
 const FACTION_THRESHOLDS = {
   ncr: { t1: 4, t2: 20, t3: 50, t4: 80 }, // t4 = Idolized/Vilified threshold
   legion: { t1: 4, t2: 25, t3: 50, t4: 100 },
@@ -658,7 +663,7 @@ Before `autoImportState()` applies any changes:
 window._lastStateBeforeSync = JSON.stringify(state);
 ```
 
-### Restore (undoLastSync in ui.js)
+### Restore (undoLastSync in ui-account.js)
 
 ```javascript
 let prev = JSON.parse(window._lastStateBeforeSync);
@@ -674,7 +679,7 @@ The undo button appears after every sync and hides after use.
 
 ## World Map (G6)
 
-`renderWorldMap()` in `ui.js` — a registry-driven CSS grid that shows the Mojave as a 4×4 or 6×6 zone grid.
+`renderWorldMap()` in `ui-render.js` — a registry-driven CSS grid that shows the Mojave as a 4×4 or 6×6 zone grid.
 
 ### Size: state-driven, not viewport-measured
 
@@ -713,28 +718,28 @@ The grid highlights **only zones with score ≥ 50** to prevent coincidental sub
 | Key                     | Type      | Used By     | Description                                                                                        |
 | ----------------------- | --------- | ----------- | -------------------------------------------------------------------------------------------------- |
 | `robco_v7`              | JSON      | state.js    | Full game state                                                                                    |
-| `robco_chat`            | JSON      | ui.js       | Chat history (up to 200 messages)                                                                  |
+| `robco_chat`            | JSON      | ui-core.js  | Chat history (up to 200 messages)                                                                  |
 | `robco_gemini_key`      | string    | api.js      | Gemini API key                                                                                     |
 | `robco_gemini_model`    | string    | api.js      | Selected model name                                                                                |
 | `robco_courier_id`      | string    | cloud.js    | Cloud sync identifier                                                                              |
-| `robco_optics`          | string    | ui.js       | Color theme name                                                                                   |
+| `robco_optics`          | string    | ui-audio.js | Color theme name (legacy global; per-game keys are `robco_optic_<ctx>`)                            |
 | `robco_playstyle`       | string    | api.js      | "any" or "melee"                                                                                   |
-| `robco_panel_state`     | JSON      | ui.js       | Panel open/closed memory                                                                           |
-| `robco_version`         | string    | ui.js       | Last seen version (triggers changelog)                                                             |
-| `robco_sfx_muted`       | bool      | ui.js       | Typing sound mute                                                                                  |
-| `robco_hum_muted`       | bool      | ui.js       | CRT hum mute                                                                                       |
-| `robco_geiger_muted`    | bool      | ui.js       | Geiger counter mute                                                                                |
-| `robco_tinnitus_muted`  | bool      | ui.js       | Tinnitus mute                                                                                      |
-| `robco_ambient_muted`   | bool      | ui.js       | Limb SFX mute                                                                                      |
-| `robco_wake_muted`      | bool      | ui.js       | Tab-return wake tone mute                                                                          |
-| `robco_master_muted`    | bool      | ui.js       | Global audio kill switch                                                                           |
+| `robco_panel_state`     | JSON      | ui-core.js  | Panel open/closed memory                                                                           |
+| `robco_version`         | string    | ui-core.js  | Last seen version (triggers changelog)                                                             |
+| `robco_sfx_muted`       | bool      | ui-audio.js | Typing sound mute                                                                                  |
+| `robco_hum_muted`       | bool      | ui-audio.js | CRT hum mute                                                                                       |
+| `robco_geiger_muted`    | bool      | ui-audio.js | Geiger counter mute                                                                                |
+| `robco_tinnitus_muted`  | bool      | ui-audio.js | Tinnitus mute                                                                                      |
+| `robco_ambient_muted`   | bool      | ui-audio.js | Limb SFX mute                                                                                      |
+| `robco_wake_muted`      | bool      | ui-audio.js | Tab-return wake tone mute                                                                          |
+| `robco_master_muted`    | bool      | ui-audio.js | Global audio kill switch                                                                           |
 | `robco_radio_on`        | bool      | ui-audio.js | Pip-Boy Radio ON state (WU-F5 — ON-semantics player, not a mute; opt-in)                           |
 | `robco_booted_before`   | bool      | ui-audio.js | First-power-on flag (WU-F6 — gates the one-time cold-start POST; degraded boot is NOT gated by it) |
-| `robco_typer_speed`     | float     | ui.js       | Typewriter speed multiplier                                                                        |
+| `robco_typer_speed`     | float     | ui-core.js  | Typewriter speed multiplier                                                                        |
 | `robco_last_cloud_push` | timestamp | cloud.js    | Conflict detection                                                                                 |
-| `robco_active_tab`      | string    | ui.js       | Last active tab (`'stat'`/`'inv'`/`'data'`/`'campg'`)                                              |
+| `robco_active_tab`      | string    | ui-core.js  | Last active tab (`'stat'`/`'inv'`/`'data'`/`'campg'`)                                              |
 | `robco_playstyle_type`  | string    | state.js    | _(deprecated C5)_ Legacy key migrated into `state.playthroughType` on first load                   |
-| `robco_slot_1/2/3`      | JSON      | ui.js       | Save slots A/B/C                                                                                   |
+| `robco_slot_1/2/3`      | JSON      | ui-saves.js | Save slots A/B/C                                                                                   |
 
 ---
 
@@ -744,8 +749,8 @@ The grid highlights **only zones with score ≥ 50** to prevent coincidental sub
 graph TD
     A[index.html DOM] --> B[state.js]
     B --> C[api.js]
-    B --> D[ui.js]
-    B --> E[database.js]
+    B --> D[ui-*.js]
+    B --> E[db_nv.js / db_fo3.js]
 
     C --> |autoImportState| D
     C --> |databaseCSVs injection| E
@@ -770,7 +775,7 @@ graph TD
     K -.-|validates| D
     K -.-|validates| H
 
-    L[js/registry.js] -->|registrySearch| D
+    L[js/registry-core.js] -->|registrySearch| D
 ```
 
 ### Critical Paths (modify with extreme care)
@@ -947,7 +952,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] Add migration in `migrateState()` in **state.js**: `if (!s.field) s.field = default;`
 - [ ] Add import handling in `autoImportState()` in **api.js**
 - [ ] If the AI should return it: update `getSystemDirective()` schema in **api.js**
-- [ ] If it needs UI: add `render*()` function in **ui.js** and call from `loadUI()`
+- [ ] If it needs UI: add `render*()` function in **ui-render.js** and call it from `loadUI()` in **ui-core.js**
 - [ ] If it needs a panel: add `<details class="panel">` in **index.html**
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
@@ -961,12 +966,12 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 
 ## Adding a New Audio Source (Checklist)
 
-- [ ] Create function in **ui.js** using the existing `audioCtx`
+- [ ] Create function in **ui-audio.js** using the existing `audioCtx`
 - [ ] Add `if (AudioSettings.masterMute) return;` as the first line
 - [ ] Add a specific mute check: `if (AudioSettings.<key>) return;`
-- [ ] Add the mute key to `AudioSettings` initialization (line 6-14 of ui.js)
+- [ ] Add the mute key to `AudioSettings` initialization in **ui-core.js**
 - [ ] Add a checkbox toggle in **index.html** (in the Audio Systems panel)
-- [ ] Add the localStorage key to `toggleAudio()`'s `keyMap` in **ui.js**
+- [ ] Add the localStorage key to `toggleAudio()`'s `keyMap` in **ui-audio.js**
 - [ ] Add the localStorage key to `toggleMasterMute()`'s un-mute logic
 - [ ] Add the new localStorage key to the [Settings table](#settings--localstorage-keys)
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix
@@ -978,10 +983,10 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 ## Adding a New UI Panel (Checklist)
 
 - [ ] Add `<details class="panel">` block in **index.html**
-- [ ] Create `render*()` function in **ui.js**
-- [ ] Call `render*()` from `loadUI()` in **ui.js**
-- [ ] If it shows a count: add to `_updatePanelBadges()` in **ui.js**
-- [ ] If AI changes should auto-expand it: add to `expandPanelForCategory()` map in **ui.js**
+- [ ] Create `render*()` function in **ui-render.js**
+- [ ] Call `render*()` from `loadUI()` in **ui-core.js**
+- [ ] If it shows a count: add to `_updatePanelBadges()` in **ui-core.js**
+- [ ] If AI changes should auto-expand it: add to `expandPanelForCategory()` map in **ui-core.js**
 - [ ] If it has a text input for adding items: call `wireInput()` in `initRegistryAutocomplete()`
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix
 - [ ] Panel memory (#35) works automatically via the `details.panel` selector

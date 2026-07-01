@@ -5,3 +5,9 @@ package-lock.json
 *.min.css
 scripts/rollback.sh
 scripts/pre-commit
+
+# Private AI-agent guides — tracked (the test gate reads them) but hand-authored,
+# not Prettier-managed. They were formerly skipped via .gitignore; keep them skipped
+# here now that they are un-ignored so Prettier does not churn their tables.
+CLAUDE.md
+RULES.md
