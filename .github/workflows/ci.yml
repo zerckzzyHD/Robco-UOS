@@ -3,8 +3,13 @@ name: CI
 on:
   push:
     branches: [main, dev]
+  # Gate PRs into dev (feature branches — not covered by the push trigger above).
+  # A dev→main release PR is intentionally NOT re-gated: its head SHA was already
+  # gated by the push to dev, and it is gated again by the push trigger on merge to
+  # main, so a pull_request run on it is pure duplicate work (audit #10b). Normal
+  # push gating for both branches is unchanged.
   pull_request:
-    branches: [main, dev]
+    branches: [dev]
 
 permissions:
   contents: read
