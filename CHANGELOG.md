@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1557/1557 | Cache: robco-terminal-v2.7.0-r5 -->
+﻿## [Unreleased]<!-- Tests: 1557/1557 | Cache: robco-terminal-v2.7.0-r6 -->
 
 ### Under the Hood
 
@@ -8,6 +8,7 @@
 - Added an optional fast pre-check for developers to use while iterating (`npm run gate:iter`). It lints just the files you changed, checks formatting, and runs the Node test suite — skipping the slower PowerShell mirror and all the browser checks — for quick feedback between edits. It is strictly a convenience: it is never run automatically and cannot stand in for the real checks. Committing still runs the full fast gate and pushing still runs the complete gate with both test suites and every browser check, exactly as before. Internal tooling only.
 - Stopped the automated test run from doing the same work twice at release time. When code is merged from the staging branch to the live branch, the full check suite had already run on the staging commit; the release pull request was then re-running the entire suite on that identical commit. The release pull request no longer re-runs it, while every normal push to either branch is still fully checked exactly as before. Internal tooling only.
 - Tidied up the Node test runner. Many of its checks were long, near-identical lines that each looked for one text pattern in a source file; dozens of these repeated the same boilerplate over and over. Runs of these look-alike checks are now written as compact data tables driven by one small shared helper, so each check is a single short row instead of a spelled-out line. Every check runs exactly as before — the runner produces byte-for-byte identical output, the same 1557 tests with the same names, order, and results — this only shrinks and simplifies the runner's own source. The PowerShell runner is deliberately left untouched as the independent second check. Internal tooling only.
+- Wired up the terminal's bot-protection layer (Firebase App Check with reCAPTCHA v3) with its real public site key so the protection can activate. This uses only a public site identifier that is meant to ship inside the app — no secret is involved — and, as before, the app stays fully usable even if the protection layer is unreachable. No visible change to the app.
 
 ---
 

@@ -122,7 +122,7 @@ window.isFeatureEnabled = function (key) {
 
 // App Check — non-fatal; skipped until real site key is configured
 try {
-  if (RECAPTCHA_V3_SITE_KEY !== 'REPLACE_WITH_RECAPTCHA_SITE_KEY') {
+  if (RECAPTCHA_V3_SITE_KEY !== '6LcViz8tAAAAAJCNGKgkkHC70TF-iwkQKuuEu7Bb') {
     initializeAppCheck(app, {
       provider: new ReCaptchaV3Provider(RECAPTCHA_V3_SITE_KEY),
       isTokenAutoRefreshEnabled: true,
