@@ -41,6 +41,22 @@ function fail(msg) {
 function assert(ok, msg) {
   ok ? pass(msg) : fail(msg);
 }
+
+// ── Static-guard table driver (token-audit #11) ────────────────
+// Collapses the repetitive string-match guards into compact data tables.
+// Each row: [pattern, msg] or [pattern, msg, NEG].
+//   pattern — a RegExp → matched with pattern.test(src); a string → src.includes(pattern).
+//   NEG     — invert polarity: assert the pattern is ABSENT.
+// Behaviour is identical to the longhand assert(src.includes(...)) /
+// assert(/re/.test(src)) forms it replaces, so runner output is unchanged.
+const NEG = true;
+function guards(src, rows) {
+  for (const row of rows) {
+    const pattern = row[0];
+    const present = pattern instanceof RegExp ? pattern.test(src) : src.includes(pattern);
+    assert(row[2] ? !present : present, row[1]);
+  }
+}
 function header(title) {
   console.log(`\n── ${title} ${'─'.repeat(Math.max(0, 50 - title.length))}`);
 }
@@ -350,15 +366,14 @@ try {
 //  Verifies new CRUD functions were added to ui.js.
 // ══════════════════════════════════════════════════════════════
 header('C2 CRUD Functions');
-assert(/function removePerk\b/.test(uiSource), 'removePerk() function exists in ui.js');
-assert(
-  /function toggleCollectible\b/.test(uiSource),
-  'toggleCollectible() function exists in ui.js'
-);
-assert(
-  /COMM-LINK COMMAND REGISTRY/.test(uiSource),
-  'showHelpModal() contains expanded command registry (COMM-LINK COMMAND REGISTRY)'
-);
+guards(uiSource, [
+  [/function removePerk\b/, 'removePerk() function exists in ui.js'],
+  [/function toggleCollectible\b/, 'toggleCollectible() function exists in ui.js'],
+  [
+    /COMM-LINK COMMAND REGISTRY/,
+    'showHelpModal() contains expanded command registry (COMM-LINK COMMAND REGISTRY)',
+  ],
+]);
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 2d — C3 CAMPG Tab (C3)
@@ -366,23 +381,13 @@ assert(
 // ══════════════════════════════════════════════════════════════
 header('C3 CAMPG Tab');
 const htmlSource = readFile('index.html');
-assert(
-  /id="tab-btn-campg"/.test(htmlSource),
-  'CAMPG tab button exists in index.html (id="tab-btn-campg")'
-);
-assert(/id="campgPanel"/.test(htmlSource), 'CAMPG panel exists in index.html (id="campgPanel")');
-assert(
-  /id="gameContextSelect"/.test(htmlSource),
-  'Game context select exists in index.html (id="gameContextSelect")'
-);
-assert(
-  /id="fo3WarningBanner"/.test(htmlSource),
-  'FO3 warning banner exists in index.html (id="fo3WarningBanner")'
-);
-assert(
-  /id="timelineDisplay"/.test(htmlSource),
-  'Timeline display shell exists in index.html (id="timelineDisplay")'
-);
+guards(htmlSource, [
+  [/id="tab-btn-campg"/, 'CAMPG tab button exists in index.html (id="tab-btn-campg")'],
+  [/id="campgPanel"/, 'CAMPG panel exists in index.html (id="campgPanel")'],
+  [/id="gameContextSelect"/, 'Game context select exists in index.html (id="gameContextSelect")'],
+  [/id="fo3WarningBanner"/, 'FO3 warning banner exists in index.html (id="fo3WarningBanner")'],
+  [/id="timelineDisplay"/, 'Timeline display shell exists in index.html (id="timelineDisplay")'],
+]);
 assert(
   /function onGameContextChange\b/.test(uiSource),
   'onGameContextChange() function exists in ui.js'
@@ -396,23 +401,19 @@ assert(/TAB_NAMES.*campg/.test(uiSource), "TAB_NAMES includes 'campg' in ui.js")
 // ══════════════════════════════════════════════════════════════
 header('C4 campaignMode + C5 playthroughType Protocol 4');
 // Protocol 4 location 1: default value in let state = { ... }
-assert(
-  /campaignMode\s*:\s*'standard'/.test(stateSource),
-  "state.campaignMode default 'standard' exists in state.js"
-);
-assert(
-  /playthroughType\s*:\s*'standard'/.test(stateSource),
-  "state.playthroughType default 'standard' exists in state.js"
-);
-// Protocol 4 location 2: migration guard in migrateState()
-assert(
-  /s\.campaignMode/.test(stateSource),
-  'state.campaignMode migration guard exists in migrateState() in state.js'
-);
-assert(
-  /s\.playthroughType/.test(stateSource),
-  'state.playthroughType migration guard exists in migrateState() in state.js'
-);
+guards(stateSource, [
+  [/campaignMode\s*:\s*'standard'/, "state.campaignMode default 'standard' exists in state.js"],
+  [
+    /playthroughType\s*:\s*'standard'/,
+    "state.playthroughType default 'standard' exists in state.js",
+  ],
+  // Protocol 4 location 2: migration guard in migrateState()
+  [/s\.campaignMode/, 'state.campaignMode migration guard exists in migrateState() in state.js'],
+  [
+    /s\.playthroughType/,
+    'state.playthroughType migration guard exists in migrateState() in state.js',
+  ],
+]);
 // Protocol 4 location 3: import handling in autoImportState()
 assert(
   /CAMPAIGN MODE/.test(apiSource) && /cmV/.test(apiSource),
@@ -430,24 +431,21 @@ assert(
   'getSystemDirective() reads state.playthroughType in api.js'
 );
 // C4-fix: Playthrough Type is now a separate <select> (NOT campaignModeSelect)
-assert(
-  /id="playthroughTypeSelect"/.test(htmlSource),
-  'Playthrough Type select exists in index.html (id="playthroughTypeSelect")'
-);
-assert(
-  !/id="campaignModeSelect"/.test(htmlSource),
-  'Old merged select (id="campaignModeSelect") has been removed from index.html'
-);
-// C4-fix: Complete RNG is now a separate checkbox
-assert(
-  /id="completeRngToggle"/.test(htmlSource),
-  'Complete RNG checkbox exists in index.html (id="completeRngToggle")'
-);
-// RNG banner still present
-assert(
-  /id="rngModeBanner"/.test(htmlSource),
-  'RNG mode banner exists in index.html (id="rngModeBanner")'
-);
+guards(htmlSource, [
+  [
+    /id="playthroughTypeSelect"/,
+    'Playthrough Type select exists in index.html (id="playthroughTypeSelect")',
+  ],
+  [
+    /id="campaignModeSelect"/,
+    'Old merged select (id="campaignModeSelect") has been removed from index.html',
+    NEG,
+  ],
+  // C4-fix: Complete RNG is now a separate checkbox
+  [/id="completeRngToggle"/, 'Complete RNG checkbox exists in index.html (id="completeRngToggle")'],
+  // RNG banner still present
+  [/id="rngModeBanner"/, 'RNG mode banner exists in index.html (id="rngModeBanner")'],
+]);
 // ui.js: both handlers present
 assert(
   /function onPlaythroughTypeChange\b/.test(uiSource),
@@ -511,10 +509,12 @@ try {
   fail(`Cannot extract exportSaveFile: ${e.message}`);
 }
 
-assert(/robco_v8\s*:\s*window\.robco_v8\b/.test(exportBody), 'serialises full robco_v8 container');
-assert(/chat\s*:\s*chatHistory/.test(exportBody), 'includes chat history');
-assert(/playstyle/.test(exportBody), 'includes playstyle');
-assert(/version/.test(exportBody), 'includes version tag (envelope detection)');
+guards(exportBody, [
+  [/robco_v8\s*:\s*window\.robco_v8\b/, 'serialises full robco_v8 container'],
+  [/chat\s*:\s*chatHistory/, 'includes chat history'],
+  [/playstyle/, 'includes playstyle'],
+  [/version/, 'includes version tag (envelope detection)'],
+]);
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 5 — File import (ui.js handleFileUpload)
@@ -531,20 +531,21 @@ assert(
   /parsed\.version/.test(fileImportBody) && /parsed\.state/.test(fileImportBody),
   'detects v1.6.3+ envelope format'
 );
-assert(/restoreChatHistory/.test(fileImportBody), 'restores chat history');
-assert(/parsed\.playstyle/.test(fileImportBody), 'restores playstyle');
-assert(/autoImportState/.test(fileImportBody), 'calls autoImportState() for game state');
+guards(fileImportBody, [
+  [/restoreChatHistory/, 'restores chat history'],
+  [/parsed\.playstyle/, 'restores playstyle'],
+  [/autoImportState/, 'calls autoImportState() for game state'],
+]);
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 6 — Cloud sync (cloud.js)
 // ══════════════════════════════════════════════════════════════
 header('cloud.js push / pull');
-assert(
-  /robco_v8\s*:\s*window\.robco_v8/.test(cloudSource),
-  'saveCurrentToCloud() serialises full robco_v8 container'
-);
-assert(/robco_chat/.test(cloudSource), 'cloud.js reads and writes chat history (robco_chat key)');
-assert(/playstyle/.test(cloudSource), 'cloud.js includes playstyle in cloud saves');
+guards(cloudSource, [
+  [/robco_v8\s*:\s*window\.robco_v8/, 'saveCurrentToCloud() serialises full robco_v8 container'],
+  [/robco_chat/, 'cloud.js reads and writes chat history (robco_chat key)'],
+  [/playstyle/, 'cloud.js includes playstyle in cloud saves'],
+]);
 assert(
   /data\.robco_v8/.test(cloudSource) && /data\.version/.test(cloudSource),
   'loadCloudSave() checks robco_v8 container and handles version for migration'
@@ -689,9 +690,11 @@ assert(
 const dbCode = dbSource
   .replace(/\/\*[\s\S]*?\*\//g, '') // strip block comments
   .replace(/\/\/[^\r\n]*/g, ''); // strip line comments
-assert(!/\bstate\b/.test(dbCode), 'db_nv.js does not reference state (pure reference data)');
-assert(!/localStorage/.test(dbCode), 'db_nv.js does not reference localStorage');
-assert(!/chatHistory/.test(dbCode), 'db_nv.js does not reference chatHistory');
+guards(dbCode, [
+  [/\bstate\b/, 'db_nv.js does not reference state (pure reference data)', NEG],
+  [/localStorage/, 'db_nv.js does not reference localStorage', NEG],
+  [/chatHistory/, 'db_nv.js does not reference chatHistory', NEG],
+]);
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 10 — DOM ID Binding (syncStateFromDom)
@@ -872,18 +875,22 @@ assert(
   'renderWorldMap contains map-cell, map-cell-name, map-cell-pip class references'
 );
 // Reload-size guard: size is state-driven, no width measurement (Protocol 8 plan)
-assert(
-  /state\.mapView/.test(renderWorldMapBody),
-  'renderWorldMap reads state.mapView (state-driven size, not viewport measurement)'
-);
-assert(
-  !/window\.innerWidth/.test(renderWorldMapBody),
-  'renderWorldMap size path has no window.innerWidth (measurement removed)'
-);
-assert(
-  !/dataset\.mapFull/.test(renderWorldMapBody),
-  'renderWorldMap size path has no dataset.mapFull (ephemeral flag removed)'
-);
+guards(renderWorldMapBody, [
+  [
+    /state\.mapView/,
+    'renderWorldMap reads state.mapView (state-driven size, not viewport measurement)',
+  ],
+  [
+    /window\.innerWidth/,
+    'renderWorldMap size path has no window.innerWidth (measurement removed)',
+    NEG,
+  ],
+  [
+    /dataset\.mapFull/,
+    'renderWorldMap size path has no dataset.mapFull (ephemeral flag removed)',
+    NEG,
+  ],
+]);
 try {
   const setMapViewBody = extractFunctionBody(uiSource, 'setMapView');
   assert(/state\.mapView/.test(setMapViewBody), 'setMapView() writes state.mapView');
@@ -913,12 +920,11 @@ const buttonRule = (cssSourceStripped.match(/^button\s*\{[^}]*\}/m) || [''])[0];
 assert(/width\s*:\s*auto/.test(factionBtnRule), '.faction-btn has width:auto');
 assert(/display\s*:\s*flex/.test(factionBtnRule), '.faction-btn uses display:flex');
 assert(/flex-wrap/.test(factionCardBtnsRule), '.faction-card-btns has flex-wrap');
-assert(/min-width\s*:\s*0/.test(mapCellRule), '.map-cell has min-width:0');
-assert(/overflow\s*:\s*hidden/.test(mapCellRule), '.map-cell has overflow:hidden');
-assert(
-  /(min-height|aspect-ratio)/.test(mapCellRule),
-  '.map-cell has height floor (min-height or aspect-ratio)'
-);
+guards(mapCellRule, [
+  [/min-width\s*:\s*0/, '.map-cell has min-width:0'],
+  [/overflow\s*:\s*hidden/, '.map-cell has overflow:hidden'],
+  [/(min-height|aspect-ratio)/, '.map-cell has height floor (min-height or aspect-ratio)'],
+]);
 assert(
   /@media[^{]*480px[\s\S]{0,2000}max-width\s*:\s*56px/.test(cssSource),
   '@media max-width:480px has max-width:56px for number inputs'
@@ -1024,31 +1030,27 @@ assert(
 //  11 tests
 // ══════════════════════════════════════════════════════════════
 header('Structural Integrity (Protocol 20)');
-assert(
-  /function _updatePanelBadges\b/.test(uiSource),
-  '_updatePanelBadges() function exists in ui.js'
-);
-assert(
-  /function expandPanelForCategory\b/.test(uiSource),
-  'expandPanelForCategory() function exists in ui.js'
-);
-assert(/function renderWorldMap\b/.test(uiSource), 'renderWorldMap() function exists in ui.js');
-assert(/function renderFactionRep\b/.test(uiSource), 'renderFactionRep() function exists in ui.js');
-assert(/renderWorldMap\(\)/.test(uiSource), 'renderWorldMap() is called in ui.js');
-assert(/renderFactionRep\(\)/.test(uiSource), 'renderFactionRep() is called in ui.js');
-assert(/id="worldMapPanel"/.test(indexHtml), 'worldMapPanel panel exists in index.html');
-assert(/id="worldMapDisplay"/.test(indexHtml), 'worldMapDisplay element exists in index.html');
-assert(/id="factionContainer"/.test(indexHtml), 'factionContainer element exists in index.html');
-assert(
-  /id="transmitBtn"/.test(indexHtml),
-  'transmitBtn send button exists in index.html (Protocol 13 — regression guard)'
-);
-assert(
-  /<button[^>]*onclick="transmitMessage\(\)"[^>]*id="transmitBtn"|<button[^>]*id="transmitBtn"[^>]*onclick="transmitMessage\(\)"/.test(
-    indexHtml
-  ),
-  'transmitBtn is wired to transmitMessage() (Protocol 13 — send-button regression guard)'
-);
+guards(uiSource, [
+  [/function _updatePanelBadges\b/, '_updatePanelBadges() function exists in ui.js'],
+  [/function expandPanelForCategory\b/, 'expandPanelForCategory() function exists in ui.js'],
+  [/function renderWorldMap\b/, 'renderWorldMap() function exists in ui.js'],
+  [/function renderFactionRep\b/, 'renderFactionRep() function exists in ui.js'],
+  [/renderWorldMap\(\)/, 'renderWorldMap() is called in ui.js'],
+  [/renderFactionRep\(\)/, 'renderFactionRep() is called in ui.js'],
+]);
+guards(indexHtml, [
+  [/id="worldMapPanel"/, 'worldMapPanel panel exists in index.html'],
+  [/id="worldMapDisplay"/, 'worldMapDisplay element exists in index.html'],
+  [/id="factionContainer"/, 'factionContainer element exists in index.html'],
+  [
+    /id="transmitBtn"/,
+    'transmitBtn send button exists in index.html (Protocol 13 — regression guard)',
+  ],
+  [
+    /<button[^>]*onclick="transmitMessage\(\)"[^>]*id="transmitBtn"|<button[^>]*id="transmitBtn"[^>]*onclick="transmitMessage\(\)"/,
+    'transmitBtn is wired to transmitMessage() (Protocol 13 — send-button regression guard)',
+  ],
+]);
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 18 — Detail-Current Dedup Guard (Protocol 27)
@@ -1132,9 +1134,11 @@ assert(
 
 // 19.6–19.8 db_fo3.js must NOT reference state, localStorage, or chatHistory
 const dbFo3Code = dbFo3Source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\r\n]*/g, '');
-assert(!/\bstate\b/.test(dbFo3Code), 'db_fo3.js does not reference state (pure reference data)');
-assert(!/localStorage/.test(dbFo3Code), 'db_fo3.js does not reference localStorage');
-assert(!/chatHistory/.test(dbFo3Code), 'db_fo3.js does not reference chatHistory');
+guards(dbFo3Code, [
+  [/\bstate\b/, 'db_fo3.js does not reference state (pure reference data)', NEG],
+  [/localStorage/, 'db_fo3.js does not reference localStorage', NEG],
+  [/chatHistory/, 'db_fo3.js does not reference chatHistory', NEG],
+]);
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 20 — CSV column-count integrity
@@ -1332,89 +1336,59 @@ assert(
 // ══════════════════════════════════════════════════════════════
 header('Critical Feature Presence');
 // Tab buttons
-assert(
-  /onclick="switchTab\('stat'\)"/.test(htmlSource),
-  "STAT tab button wired (switchTab('stat'))"
-);
-assert(/onclick="switchTab\('inv'\)"/.test(htmlSource), "INV tab button wired (switchTab('inv'))");
-assert(
-  /onclick="switchTab\('data'\)"/.test(htmlSource),
-  "DATA tab button wired (switchTab('data'))"
-);
-assert(
-  /onclick="switchTab\('campg'\)"/.test(htmlSource),
-  "CAMPG tab button wired (switchTab('campg'))"
-);
-// Add buttons
-assert(/onclick="addItem\(\)"/.test(htmlSource), 'Add Item button wired (addItem())');
-assert(/onclick="addAmmo\(\)"/.test(htmlSource), 'Add Ammo button wired (addAmmo())');
-assert(/onclick="addPerk\(\)"/.test(htmlSource), 'Add Perk button wired (addPerk())');
-assert(/onclick="addQuest\(\)"/.test(htmlSource), 'Add Quest button wired (addQuest())');
-assert(
-  /onclick="addCampaignNote\(\)"/.test(htmlSource),
-  'Add Note button wired (addCampaignNote())'
-);
-assert(
-  /onclick="addSquadMember\(\)"/.test(htmlSource),
-  'Add Squad button wired (addSquadMember())'
-);
-// Save / Load slots A B C
-assert(/onclick="saveToSlot\(1\)"/.test(htmlSource), 'Save slot A wired (saveToSlot(1))');
-assert(/onclick="saveToSlot\(2\)"/.test(htmlSource), 'Save slot B wired (saveToSlot(2))');
-assert(/onclick="saveToSlot\(3\)"/.test(htmlSource), 'Save slot C wired (saveToSlot(3))');
-assert(/onclick="loadFromSlot\(1\)"/.test(htmlSource), 'Load slot A wired (loadFromSlot(1))');
-assert(/onclick="loadFromSlot\(2\)"/.test(htmlSource), 'Load slot B wired (loadFromSlot(2))');
-assert(/onclick="loadFromSlot\(3\)"/.test(htmlSource), 'Load slot C wired (loadFromSlot(3))');
-// Export / Import
-assert(
-  /onclick="exportSaveFile\(\)"/.test(htmlSource),
-  'Export save button wired (exportSaveFile())'
-);
-assert(
-  /onchange="handleFileUpload\(event\)"/.test(htmlSource),
-  'Import save input wired (handleFileUpload(event))'
-);
-// Cloud sync
-assert(
-  /id="btnSaveToCloud"/.test(htmlSource),
-  'Save to Cloud button exists (id=btnSaveToCloud — replaces btnCloudPush)'
-);
-assert(
-  !/id="courierIdInput"/.test(htmlSource),
-  'Vestigial courier ID input is absent (id=courierIdInput removed in Phase 6)'
-);
-// Validate Key
-assert(/id="btnFetchModels"/.test(htmlSource), 'Validate Key button exists (id=btnFetchModels)');
-// D-pad
-assert(
-  /onclick="macroCommand\('\[PAD: UP\]'\)"/.test(htmlSource),
-  "D-pad UP wired (macroCommand('[PAD: UP]'))"
-);
-assert(
-  /onclick="macroCommand\('\[PAD: DOWN\]'\)"/.test(htmlSource),
-  "D-pad DOWN wired (macroCommand('[PAD: DOWN]'))"
-);
-assert(
-  /onclick="macroCommand\('\[PAD: LEFT\]'\)"/.test(htmlSource),
-  "D-pad LEFT wired (macroCommand('[PAD: LEFT]'))"
-);
-assert(
-  /onclick="macroCommand\('\[PAD: RIGHT\]'\)"/.test(htmlSource),
-  "D-pad RIGHT wired (macroCommand('[PAD: RIGHT]'))"
-);
-// Macro buttons
-assert(/onclick="macroCommand\('\[THREAT\]'\)"/.test(htmlSource), 'THREAT macro button wired');
-assert(/onclick="macroCommand\('\[VATS SIM\]'\)"/.test(htmlSource), 'VATS SIM macro button wired');
-assert(
-  /onclick="expandPanelForCategory\('trade'\)"/.test(htmlSource),
-  'TRADE macro button opens the native barter panel (WU-N2)'
-);
-assert(
-  /onclick="renderLoot\(\)"/.test(htmlSource),
-  'LOOT button opens the native salvage terminal (WU-N6)'
-);
-// V.A.T.S. Calculator
-assert(/id="vatsCalcBtn"/.test(htmlSource), 'V.A.T.S. CALCULATOR button exists (id=vatsCalcBtn)');
+guards(htmlSource, [
+  [/onclick="switchTab\('stat'\)"/, "STAT tab button wired (switchTab('stat'))"],
+  [/onclick="switchTab\('inv'\)"/, "INV tab button wired (switchTab('inv'))"],
+  [/onclick="switchTab\('data'\)"/, "DATA tab button wired (switchTab('data'))"],
+  [/onclick="switchTab\('campg'\)"/, "CAMPG tab button wired (switchTab('campg'))"],
+  // Add buttons
+  [/onclick="addItem\(\)"/, 'Add Item button wired (addItem())'],
+  [/onclick="addAmmo\(\)"/, 'Add Ammo button wired (addAmmo())'],
+  [/onclick="addPerk\(\)"/, 'Add Perk button wired (addPerk())'],
+  [/onclick="addQuest\(\)"/, 'Add Quest button wired (addQuest())'],
+  [/onclick="addCampaignNote\(\)"/, 'Add Note button wired (addCampaignNote())'],
+  [/onclick="addSquadMember\(\)"/, 'Add Squad button wired (addSquadMember())'],
+  // Save / Load slots A B C
+  [/onclick="saveToSlot\(1\)"/, 'Save slot A wired (saveToSlot(1))'],
+  [/onclick="saveToSlot\(2\)"/, 'Save slot B wired (saveToSlot(2))'],
+  [/onclick="saveToSlot\(3\)"/, 'Save slot C wired (saveToSlot(3))'],
+  [/onclick="loadFromSlot\(1\)"/, 'Load slot A wired (loadFromSlot(1))'],
+  [/onclick="loadFromSlot\(2\)"/, 'Load slot B wired (loadFromSlot(2))'],
+  [/onclick="loadFromSlot\(3\)"/, 'Load slot C wired (loadFromSlot(3))'],
+  // Export / Import
+  [/onclick="exportSaveFile\(\)"/, 'Export save button wired (exportSaveFile())'],
+  [/onchange="handleFileUpload\(event\)"/, 'Import save input wired (handleFileUpload(event))'],
+  // Cloud sync
+  [
+    /id="btnSaveToCloud"/,
+    'Save to Cloud button exists (id=btnSaveToCloud — replaces btnCloudPush)',
+  ],
+  [
+    /id="courierIdInput"/,
+    'Vestigial courier ID input is absent (id=courierIdInput removed in Phase 6)',
+    NEG,
+  ],
+  // Validate Key
+  [/id="btnFetchModels"/, 'Validate Key button exists (id=btnFetchModels)'],
+  // D-pad
+  [/onclick="macroCommand\('\[PAD: UP\]'\)"/, "D-pad UP wired (macroCommand('[PAD: UP]'))"],
+  [/onclick="macroCommand\('\[PAD: DOWN\]'\)"/, "D-pad DOWN wired (macroCommand('[PAD: DOWN]'))"],
+  [/onclick="macroCommand\('\[PAD: LEFT\]'\)"/, "D-pad LEFT wired (macroCommand('[PAD: LEFT]'))"],
+  [
+    /onclick="macroCommand\('\[PAD: RIGHT\]'\)"/,
+    "D-pad RIGHT wired (macroCommand('[PAD: RIGHT]'))",
+  ],
+  // Macro buttons
+  [/onclick="macroCommand\('\[THREAT\]'\)"/, 'THREAT macro button wired'],
+  [/onclick="macroCommand\('\[VATS SIM\]'\)"/, 'VATS SIM macro button wired'],
+  [
+    /onclick="expandPanelForCategory\('trade'\)"/,
+    'TRADE macro button opens the native barter panel (WU-N2)',
+  ],
+  [/onclick="renderLoot\(\)"/, 'LOOT button opens the native salvage terminal (WU-N6)'],
+  // V.A.T.S. Calculator
+  [/id="vatsCalcBtn"/, 'V.A.T.S. CALCULATOR button exists (id=vatsCalcBtn)'],
+]);
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 23 — Prohibited Patterns (Group 2)
@@ -1633,12 +1607,11 @@ header('Architectural Boundaries — reg_fo3.js purity');
 {
   const regFo3Source = readFile('js/reg_fo3.js');
   const regFo3Code = regFo3Source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\r\n]*/g, '');
-  assert(
-    !/\bstate\b/.test(regFo3Code),
-    'reg_fo3.js does not reference state (pure reference data)'
-  );
-  assert(!/localStorage/.test(regFo3Code), 'reg_fo3.js does not reference localStorage (in code)');
-  assert(!/chatHistory/.test(regFo3Code), 'reg_fo3.js does not reference chatHistory (in code)');
+  guards(regFo3Code, [
+    [/\bstate\b/, 'reg_fo3.js does not reference state (pure reference data)', NEG],
+    [/localStorage/, 'reg_fo3.js does not reference localStorage (in code)', NEG],
+    [/chatHistory/, 'reg_fo3.js does not reference chatHistory (in code)', NEG],
+  ]);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1887,22 +1860,25 @@ assert(
 header('Phase 1b Guards');
 
 // 30.1 #chatInput textarea has maxlength attribute
-assert(
-  /id="chatInput"[\s\S]{0,300}maxlength/.test(htmlSource),
-  '#chatInput textarea has maxlength attribute (Phase 1b input cap guard)'
-);
+guards(htmlSource, [
+  [
+    /id="chatInput"[\s\S]{0,300}maxlength/,
+    '#chatInput textarea has maxlength attribute (Phase 1b input cap guard)',
+  ],
 
-// 30.2a Enforcing CSP present in index.html (http-equiv must be exactly "Content-Security-Policy")
-assert(
-  /http-equiv="Content-Security-Policy"/.test(htmlSource),
-  'index.html contains enforcing Content-Security-Policy meta (CSP Stage 2 — not report-only)'
-);
+  // 30.2a Enforcing CSP present in index.html (http-equiv must be exactly "Content-Security-Policy")
+  [
+    /http-equiv="Content-Security-Policy"/,
+    'index.html contains enforcing Content-Security-Policy meta (CSP Stage 2 — not report-only)',
+  ],
 
-// 30.2b Report-Only CSP absent — regression guard: flip back to passive is caught
-assert(
-  !/Content-Security-Policy-Report-Only/.test(htmlSource),
-  'index.html does NOT contain Content-Security-Policy-Report-Only (CSP Stage 2 regression guard)'
-);
+  // 30.2b Report-Only CSP absent — regression guard: flip back to passive is caught
+  [
+    /Content-Security-Policy-Report-Only/,
+    'index.html does NOT contain Content-Security-Policy-Report-Only (CSP Stage 2 regression guard)',
+    NEG,
+  ],
+]);
 
 // 30.3 Pre-commit hook enforces monotonic rev increase
 {
@@ -2713,22 +2689,21 @@ assert(
 }
 
 // 40.3  Inventory filter bar element exists in index.html
-assert(
-  /id="invFilterBar"/.test(htmlSource),
-  'id="invFilterBar" element exists in index.html (inventory category filter bar)'
-);
+guards(htmlSource, [
+  [
+    /id="invFilterBar"/,
+    'id="invFilterBar" element exists in index.html (inventory category filter bar)',
+  ],
 
-// 40.4  Filter bar contains a button for the 'mod' category
-assert(
-  /data-filter="mod"/.test(htmlSource),
-  'index.html filter bar has data-filter="mod" button (Mods category filter)'
-);
+  // 40.4  Filter bar contains a button for the 'mod' category
+  [
+    /data-filter="mod"/,
+    'index.html filter bar has data-filter="mod" button (Mods category filter)',
+  ],
 
-// 40.5  'mod' option exists in the #newItemType select in index.html
-assert(
-  /value="mod"/.test(htmlSource),
-  '#newItemType select contains value="mod" option (Phase 4d-i mod type)'
-);
+  // 40.5  'mod' option exists in the #newItemType select in index.html
+  [/value="mod"/, '#newItemType select contains value="mod" option (Phase 4d-i mod type)'],
+]);
 
 // 40.6  renderInventory() in ui.js references _invFilter (honours category filter)
 {
@@ -2852,19 +2827,18 @@ header('Native Command Router (Phase 5a)');
   const apiSrc42 = readFile('js/api.js');
 
   // 42.1  NATIVE_COMMAND_ROUTER object is defined in api.js
-  assert(
-    apiSrc42.includes('const NATIVE_COMMAND_ROUTER'),
-    'api.js defines NATIVE_COMMAND_ROUTER object'
-  );
+  guards(apiSrc42, [
+    ['const NATIVE_COMMAND_ROUTER', 'api.js defines NATIVE_COMMAND_ROUTER object'],
 
-  // 42.2  [FEATURES] is a key in NATIVE_COMMAND_ROUTER
-  assert(/'\[FEATURES\]'\s*:/.test(apiSrc42), 'NATIVE_COMMAND_ROUTER has [FEATURES] handler');
+    // 42.2  [FEATURES] is a key in NATIVE_COMMAND_ROUTER
+    [/'\[FEATURES\]'\s*:/, 'NATIVE_COMMAND_ROUTER has [FEATURES] handler'],
 
-  // 42.3  [CROSSROADS] is a key in NATIVE_COMMAND_ROUTER
-  assert(/'\[CROSSROADS\]'\s*:/.test(apiSrc42), 'NATIVE_COMMAND_ROUTER has [CROSSROADS] handler');
+    // 42.3  [CROSSROADS] is a key in NATIVE_COMMAND_ROUTER
+    [/'\[CROSSROADS\]'\s*:/, 'NATIVE_COMMAND_ROUTER has [CROSSROADS] handler'],
 
-  // 42.4  [SLEEP] is a key in NATIVE_COMMAND_ROUTER
-  assert(/'\[SLEEP\]'\s*:/.test(apiSrc42), 'NATIVE_COMMAND_ROUTER has [SLEEP] handler');
+    // 42.4  [SLEEP] is a key in NATIVE_COMMAND_ROUTER
+    [/'\[SLEEP\]'\s*:/, 'NATIVE_COMMAND_ROUTER has [SLEEP] handler'],
+  ]);
 
   // 42.5  transmitMessage() calls _routeNativeCommand before the Gemini fetch
   {
@@ -2954,22 +2928,18 @@ header('GAME_DEFS Structural Integrity (Phase 5b)');
   const stateSrc43 = readFile('js/state.js');
 
   // 43.1  state.js declares const GAME_DEFS = {
-  assert(
-    /const GAME_DEFS\s*=\s*\{/.test(stateSrc43),
-    'state.js declares const GAME_DEFS = { ... }'
-  );
+  guards(stateSrc43, [
+    [/const GAME_DEFS\s*=\s*\{/, 'state.js declares const GAME_DEFS = { ... }'],
 
-  // 43.2  window.GAME_DEFS exposed on the global object
-  assert(
-    /window\.GAME_DEFS\s*=\s*GAME_DEFS/.test(stateSrc43),
-    'state.js assigns window.GAME_DEFS = GAME_DEFS (global exposure)'
-  );
+    // 43.2  window.GAME_DEFS exposed on the global object
+    [
+      /window\.GAME_DEFS\s*=\s*GAME_DEFS/,
+      'state.js assigns window.GAME_DEFS = GAME_DEFS (global exposure)',
+    ],
 
-  // 43.3  _activeDef() helper function defined in state.js
-  assert(
-    /function _activeDef\s*\(/.test(stateSrc43),
-    'state.js defines _activeDef() TDZ-safe helper'
-  );
+    // 43.3  _activeDef() helper function defined in state.js
+    [/function _activeDef\s*\(/, 'state.js defines _activeDef() TDZ-safe helper'],
+  ]);
 
   // 43.4  GAME_DEFS has FNV and FO3 top-level keys
   assert(
@@ -3206,32 +3176,29 @@ header('Phase 5c-ii: Google Sign-In + Account Panel');
 
 {
   // 45.1  cloud.js imports GoogleAuthProvider
-  assert(
-    /GoogleAuthProvider/.test(cloudSource),
-    'cloud.js references GoogleAuthProvider (Google auth import)'
-  );
+  guards(cloudSource, [
+    [/GoogleAuthProvider/, 'cloud.js references GoogleAuthProvider (Google auth import)'],
 
-  // 45.2  cloud.js references linkWithPopup (desktop sign-in flow)
-  assert(
-    /linkWithPopup/.test(cloudSource),
-    'cloud.js references linkWithPopup (desktop Google sign-in flow)'
-  );
+    // 45.2  cloud.js references linkWithPopup (desktop sign-in flow)
+    [/linkWithPopup/, 'cloud.js references linkWithPopup (desktop Google sign-in flow)'],
 
-  // 45.3  cloud.js does NOT import or call linkWithRedirect (popup-only mobile fix — redirect broke
-  //        on iOS/Chrome due to third-party storage partitioning blocking getRedirectResult)
-  assert(
-    !/linkWithRedirect/.test(cloudSource),
-    'cloud.js does not reference linkWithRedirect (popup-only fix: redirect path removed)'
-  );
+    // 45.3  cloud.js does NOT import or call linkWithRedirect (popup-only mobile fix — redirect broke
+    //        on iOS/Chrome due to third-party storage partitioning blocking getRedirectResult)
+    [
+      /linkWithRedirect/,
+      'cloud.js does not reference linkWithRedirect (popup-only fix: redirect path removed)',
+      NEG,
+    ],
 
-  // 45.4  cloud.js references getRedirectResult (completes mobile redirect on boot)
-  assert(
-    /getRedirectResult/.test(cloudSource),
-    'cloud.js references getRedirectResult (boot-time mobile redirect completion)'
-  );
+    // 45.4  cloud.js references getRedirectResult (completes mobile redirect on boot)
+    [
+      /getRedirectResult/,
+      'cloud.js references getRedirectResult (boot-time mobile redirect completion)',
+    ],
 
-  // 45.5  cloud.js references signOut (account sign-out function)
-  assert(/\bsignOut\b/.test(cloudSource), 'cloud.js references signOut (account sign-out)');
+    // 45.5  cloud.js references signOut (account sign-out function)
+    [/\bsignOut\b/, 'cloud.js references signOut (account sign-out)'],
+  ]);
 
   // 45.6  cloud.js sign-out path re-signs-in anonymously (signOut + signInAnonymously together)
   {
@@ -4186,22 +4153,21 @@ header('Suite 51 — Save Integrity + Rolling Backups');
   );
 
   // 51.2  verifySaveEnvelope exists in state.js
-  assert(
-    stateSrc51.includes('window.verifySaveEnvelope'),
-    'state.js defines window.verifySaveEnvelope (integrity + forward-compat check)'
-  );
+  guards(stateSrc51, [
+    [
+      'window.verifySaveEnvelope',
+      'state.js defines window.verifySaveEnvelope (integrity + forward-compat check)',
+    ],
 
-  // 51.3  snapRollingBackup exists in state.js
-  assert(
-    stateSrc51.includes('window.snapRollingBackup'),
-    'state.js defines window.snapRollingBackup (rolling backup ring)'
-  );
+    // 51.3  snapRollingBackup exists in state.js
+    ['window.snapRollingBackup', 'state.js defines window.snapRollingBackup (rolling backup ring)'],
 
-  // 51.4  getRollingBackups exists in state.js
-  assert(
-    stateSrc51.includes('window.getRollingBackups'),
-    'state.js defines window.getRollingBackups (backup listing helper)'
-  );
+    // 51.4  getRollingBackups exists in state.js
+    [
+      'window.getRollingBackups',
+      'state.js defines window.getRollingBackups (backup listing helper)',
+    ],
+  ]);
 
   // 51.5  verifySaveEnvelope returns 'legacy' when checksum is absent
   assert(
@@ -5196,28 +5162,30 @@ header('Suite 54 — Prompt-Injection Hardening, Input Caps, Quota Warning');
   }
 
   // 54.8  #newItemName has a maxlength attribute in index.html
-  assert(
-    /id="newItemName"[\s\S]{0,200}maxlength="/.test(htmlSource54),
-    '#newItemName has a maxlength attribute in index.html (item name length capped)'
-  );
+  guards(htmlSource54, [
+    [
+      /id="newItemName"[\s\S]{0,200}maxlength="/,
+      '#newItemName has a maxlength attribute in index.html (item name length capped)',
+    ],
 
-  // 54.9  #newQuestName has a maxlength attribute in index.html
-  assert(
-    /id="newQuestName"[\s\S]{0,200}maxlength="/.test(htmlSource54),
-    '#newQuestName has a maxlength attribute in index.html (quest name length capped)'
-  );
+    // 54.9  #newQuestName has a maxlength attribute in index.html
+    [
+      /id="newQuestName"[\s\S]{0,200}maxlength="/,
+      '#newQuestName has a maxlength attribute in index.html (quest name length capped)',
+    ],
 
-  // 54.10  #newPerkName has a maxlength attribute in index.html
-  assert(
-    /id="newPerkName"[\s\S]{0,200}maxlength="/.test(htmlSource54),
-    '#newPerkName has a maxlength attribute in index.html (perk name length capped)'
-  );
+    // 54.10  #newPerkName has a maxlength attribute in index.html
+    [
+      /id="newPerkName"[\s\S]{0,200}maxlength="/,
+      '#newPerkName has a maxlength attribute in index.html (perk name length capped)',
+    ],
 
-  // 54.11  #newCampaignNote has a maxlength attribute in index.html
-  assert(
-    /id="newCampaignNote"[\s\S]{0,200}maxlength="/.test(htmlSource54),
-    '#newCampaignNote has a maxlength attribute in index.html (campaign note length capped)'
-  );
+    // 54.11  #newCampaignNote has a maxlength attribute in index.html
+    [
+      /id="newCampaignNote"[\s\S]{0,200}maxlength="/,
+      '#newCampaignNote has a maxlength attribute in index.html (campaign note length capped)',
+    ],
+  ]);
 
   // 54.12  transmitMessage() has a JS length guard checking userText.length
   assert(
@@ -5250,65 +5218,67 @@ header('Suite 55 — CSP Stage 1 Origin Guards + Firebase Pin');
   const cloudSrc55 = readFile('js/cloud.js');
 
   // 55.1 generativelanguage.googleapis.com present in CSP (Gemini API)
-  assert(
-    /generativelanguage\.googleapis\.com/.test(htmlSource55),
-    'CSP contains generativelanguage.googleapis.com (Gemini API origin — Protocol 20 guard)'
-  );
+  guards(htmlSource55, [
+    [
+      /generativelanguage\.googleapis\.com/,
+      'CSP contains generativelanguage.googleapis.com (Gemini API origin — Protocol 20 guard)',
+    ],
 
-  // 55.2 identitytoolkit.googleapis.com present in CSP (Firebase Auth)
-  assert(
-    /identitytoolkit\.googleapis\.com/.test(htmlSource55),
-    'CSP contains identitytoolkit.googleapis.com (Firebase Auth origin — Protocol 20 guard)'
-  );
+    // 55.2 identitytoolkit.googleapis.com present in CSP (Firebase Auth)
+    [
+      /identitytoolkit\.googleapis\.com/,
+      'CSP contains identitytoolkit.googleapis.com (Firebase Auth origin — Protocol 20 guard)',
+    ],
 
-  // 55.3 securetoken.googleapis.com present in CSP (Firebase token refresh)
-  assert(
-    /securetoken\.googleapis\.com/.test(htmlSource55),
-    'CSP contains securetoken.googleapis.com (Firebase token refresh — Protocol 20 guard)'
-  );
+    // 55.3 securetoken.googleapis.com present in CSP (Firebase token refresh)
+    [
+      /securetoken\.googleapis\.com/,
+      'CSP contains securetoken.googleapis.com (Firebase token refresh — Protocol 20 guard)',
+    ],
 
-  // 55.4 firestore.googleapis.com present in CSP (Firestore)
-  assert(
-    /firestore\.googleapis\.com/.test(htmlSource55),
-    'CSP contains firestore.googleapis.com (Firestore origin — Protocol 20 guard)'
-  );
+    // 55.4 firestore.googleapis.com present in CSP (Firestore)
+    [
+      /firestore\.googleapis\.com/,
+      'CSP contains firestore.googleapis.com (Firestore origin — Protocol 20 guard)',
+    ],
 
-  // 55.5 apis.google.com present in CSP (Google Sign-In popup + Firebase SDK)
-  assert(
-    /apis\.google\.com/.test(htmlSource55),
-    'CSP contains apis.google.com (Google Sign-In + Firebase SDK origin — Protocol 20 guard)'
-  );
+    // 55.5 apis.google.com present in CSP (Google Sign-In popup + Firebase SDK)
+    [
+      /apis\.google\.com/,
+      'CSP contains apis.google.com (Google Sign-In + Firebase SDK origin — Protocol 20 guard)',
+    ],
 
-  // 55.6 nv-overlord.firebaseapp.com present in CSP (Firebase hosting + auth handler)
-  assert(
-    /nv-overlord\.firebaseapp\.com/.test(htmlSource55),
-    'CSP contains nv-overlord.firebaseapp.com (Firebase hosting + auth handler — Protocol 20 guard)'
-  );
+    // 55.6 nv-overlord.firebaseapp.com present in CSP (Firebase hosting + auth handler)
+    [
+      /nv-overlord\.firebaseapp\.com/,
+      'CSP contains nv-overlord.firebaseapp.com (Firebase hosting + auth handler — Protocol 20 guard)',
+    ],
 
-  // 55.7 object-src 'none' present in CSP (blocks plugin content)
-  assert(
-    /object-src\s+'none'/.test(htmlSource55),
-    "CSP contains object-src 'none' (blocks plugin content — Protocol 20 guard)"
-  );
+    // 55.7 object-src 'none' present in CSP (blocks plugin content)
+    [
+      /object-src\s+'none'/,
+      "CSP contains object-src 'none' (blocks plugin content — Protocol 20 guard)",
+    ],
 
-  // 55.8 base-uri 'none' present in CSP (blocks base-tag injection)
-  assert(
-    /base-uri\s+'none'/.test(htmlSource55),
-    "CSP contains base-uri 'none' (blocks base-tag injection — Protocol 20 guard)"
-  );
+    // 55.8 base-uri 'none' present in CSP (blocks base-tag injection)
+    [
+      /base-uri\s+'none'/,
+      "CSP contains base-uri 'none' (blocks base-tag injection — Protocol 20 guard)",
+    ],
 
-  // 55.9 frame-ancestors 'none' present in CSP (prevents clickjacking)
-  assert(
-    /frame-ancestors\s+'none'/.test(htmlSource55),
-    "CSP contains frame-ancestors 'none' (prevents clickjacking — Protocol 20 guard)"
-  );
+    // 55.9 frame-ancestors 'none' present in CSP (prevents clickjacking)
+    [
+      /frame-ancestors\s+'none'/,
+      "CSP contains frame-ancestors 'none' (prevents clickjacking — Protocol 20 guard)",
+    ],
 
-  // 55.10 Tripwire: script-src still contains 'unsafe-inline'
-  // (~148 inline event handlers require this; must not be silently dropped)
-  assert(
-    /script-src[^;]*'unsafe-inline'/.test(htmlSource55),
-    "CSP script-src contains 'unsafe-inline' (tripwire: required for ~148 inline handlers)"
-  );
+    // 55.10 Tripwire: script-src still contains 'unsafe-inline'
+    // (~148 inline event handlers require this; must not be silently dropped)
+    [
+      /script-src[^;]*'unsafe-inline'/,
+      "CSP script-src contains 'unsafe-inline' (tripwire: required for ~148 inline handlers)",
+    ],
+  ]);
 
   // 55.11 Tripwire: script-src contains NO sha256- or nonce- token
   // CSP level 2+: a hash/nonce in script-src disables unsafe-inline, silently breaking all inline handlers
@@ -5512,70 +5482,51 @@ header('Suite 56 — UI Module Split Guards');
 
   // ── Boot-loader migration guards (56.22–56.34) ────────────
   // 56.22 document.write is gone from index.html (headline regression guard)
-  assert(
-    !/document\.write/.test(htmlSource56),
-    'index.html contains no document.write (boot-loader migration guard)'
-  );
+  guards(htmlSource56, [
+    [/document\.write/, 'index.html contains no document.write (boot-loader migration guard)', NEG],
 
-  // 56.23 Boot loader uses createElement('script') for dynamic injection
-  assert(
-    /createElement\(['"]script['"]\)/.test(htmlSource56),
-    "boot loader uses document.createElement('script') (dynamic injection guard)"
-  );
+    // 56.23 Boot loader uses createElement('script') for dynamic injection
+    [
+      /createElement\(['"]script['"]\)/,
+      "boot loader uses document.createElement('script') (dynamic injection guard)",
+    ],
 
-  // 56.24 Boot loader uses .appendChild() to insert scripts
-  assert(
-    /\.appendChild\(/.test(htmlSource56),
-    'boot loader uses .appendChild() to inject scripts into <head> (dynamic injection guard)'
-  );
+    // 56.24 Boot loader uses .appendChild() to insert scripts
+    [
+      /\.appendChild\(/,
+      'boot loader uses .appendChild() to inject scripts into <head> (dynamic injection guard)',
+    ],
 
-  // 56.25 Boot loader sets .async = false to preserve db→state→reg order
-  assert(
-    /\.async\s*=\s*false/.test(htmlSource56),
-    'boot loader sets script.async = false (preserves db→state→reg load order)'
-  );
+    // 56.25 Boot loader sets .async = false to preserve db→state→reg order
+    [
+      /\.async\s*=\s*false/,
+      'boot loader sets script.async = false (preserves db→state→reg load order)',
+    ],
 
-  // 56.26 Boot loader references js/db_nv.js (FNV database)
-  assert(
-    /js\/db_nv\.js/.test(htmlSource56),
-    'boot loader references js/db_nv.js (FNV database path present)'
-  );
+    // 56.26 Boot loader references js/db_nv.js (FNV database)
+    [/js\/db_nv\.js/, 'boot loader references js/db_nv.js (FNV database path present)'],
 
-  // 56.27 Boot loader references js/db_fo3.js (FO3 database)
-  assert(
-    /js\/db_fo3\.js/.test(htmlSource56),
-    'boot loader references js/db_fo3.js (FO3 database path present)'
-  );
+    // 56.27 Boot loader references js/db_fo3.js (FO3 database)
+    [/js\/db_fo3\.js/, 'boot loader references js/db_fo3.js (FO3 database path present)'],
 
-  // 56.28 Boot loader references js/state.js (shared state module)
-  assert(
-    /js\/state\.js/.test(htmlSource56),
-    'boot loader references js/state.js (shared state module path present)'
-  );
+    // 56.28 Boot loader references js/state.js (shared state module)
+    [/js\/state\.js/, 'boot loader references js/state.js (shared state module path present)'],
 
-  // 56.29 Boot loader references js/reg_nv.js (FNV registry)
-  assert(
-    /js\/reg_nv\.js/.test(htmlSource56),
-    'boot loader references js/reg_nv.js (FNV registry path present)'
-  );
+    // 56.29 Boot loader references js/reg_nv.js (FNV registry)
+    [/js\/reg_nv\.js/, 'boot loader references js/reg_nv.js (FNV registry path present)'],
 
-  // 56.30 Boot loader references js/reg_fo3.js (FO3 registry)
-  assert(
-    /js\/reg_fo3\.js/.test(htmlSource56),
-    'boot loader references js/reg_fo3.js (FO3 registry path present)'
-  );
+    // 56.30 Boot loader references js/reg_fo3.js (FO3 registry)
+    [/js\/reg_fo3\.js/, 'boot loader references js/reg_fo3.js (FO3 registry path present)'],
 
-  // 56.31 Boot loader reads activeContext (primary context selector)
-  assert(
-    /activeContext/.test(htmlSource56),
-    'boot loader reads activeContext (primary game-context selector)'
-  );
+    // 56.31 Boot loader reads activeContext (primary context selector)
+    [/activeContext/, 'boot loader reads activeContext (primary game-context selector)'],
 
-  // 56.32 Boot loader has try/catch for fail-safe LocalStorage access
-  assert(
-    /try\s*\{/.test(htmlSource56),
-    'boot loader has try { ... } catch (fail-safe: corrupt LocalStorage → FNV default)'
-  );
+    // 56.32 Boot loader has try/catch for fail-safe LocalStorage access
+    [
+      /try\s*\{/,
+      'boot loader has try { ... } catch (fail-safe: corrupt LocalStorage → FNV default)',
+    ],
+  ]);
 
   // 56.33 Boot loader has 'FNV' as the fail-safe default
   assert(
@@ -6511,22 +6462,18 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     } catch (_) {}
 
     // 64.4  1–10 clamp on commit only
-    assert(
-      /Math\.max\s*\(\s*1,\s*Math\.min\s*\(\s*10,/.test(commitStatBody),
-      'commitStat clamps value to 1–10 on commit (Math.max/min guard)'
-    );
+    guards(commitStatBody, [
+      [
+        /Math\.max\s*\(\s*1,\s*Math\.min\s*\(\s*10,/,
+        'commitStat clamps value to 1–10 on commit (Math.max/min guard)',
+      ],
 
-    // 64.5  calls updateMath() for downstream recalcs
-    assert(
-      /updateMath\s*\(\s*\)/.test(commitStatBody),
-      'commitStat calls updateMath() to trigger downstream recalcs'
-    );
+      // 64.5  calls updateMath() for downstream recalcs
+      [/updateMath\s*\(\s*\)/, 'commitStat calls updateMath() to trigger downstream recalcs'],
 
-    // 64.6  calls saveState() to persist
-    assert(
-      /saveState\s*\(\s*\)/.test(commitStatBody),
-      'commitStat calls saveState() to debounce-persist the new value'
-    );
+      // 64.6  calls saveState() to persist
+      [/saveState\s*\(\s*\)/, 'commitStat calls saveState() to debounce-persist the new value'],
+    ]);
 
     // 64.7  isNaN guard reverts to prior state value (not a hard 1)
     assert(
@@ -6620,28 +6567,30 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   const uiCoreSrc65 = readFile('js/ui-core.js');
 
   // 65.1  #updateModal exists in index.html (replaced #updateBanner)
-  assert(
-    /id="updateModal"/.test(htmlSource),
-    'id="updateModal" exists in index.html (blocking modal replaced updateBanner)'
-  );
+  guards(htmlSource, [
+    [
+      /id="updateModal"/,
+      'id="updateModal" exists in index.html (blocking modal replaced updateBanner)',
+    ],
 
-  // 65.2  #updateModal has role="dialog"
-  assert(
-    /id="updateModal"[\s\S]{0,400}role="dialog"/.test(htmlSource),
-    '#updateModal has role="dialog" (accessible dialog semantics)'
-  );
+    // 65.2  #updateModal has role="dialog"
+    [
+      /id="updateModal"[\s\S]{0,400}role="dialog"/,
+      '#updateModal has role="dialog" (accessible dialog semantics)',
+    ],
 
-  // 65.3  #updateModal has aria-modal="true"
-  assert(
-    /id="updateModal"[\s\S]{0,400}aria-modal="true"/.test(htmlSource),
-    '#updateModal has aria-modal="true" (marks background inert for screen readers)'
-  );
+    // 65.3  #updateModal has aria-modal="true"
+    [
+      /id="updateModal"[\s\S]{0,400}aria-modal="true"/,
+      '#updateModal has aria-modal="true" (marks background inert for screen readers)',
+    ],
 
-  // 65.4  #updateModal has aria-labelledby
-  assert(
-    /id="updateModal"[\s\S]{0,400}aria-labelledby/.test(htmlSource),
-    '#updateModal has aria-labelledby attribute (screen-reader accessible label)'
-  );
+    // 65.4  #updateModal has aria-labelledby
+    [
+      /id="updateModal"[\s\S]{0,400}aria-labelledby/,
+      '#updateModal has aria-labelledby attribute (screen-reader accessible label)',
+    ],
+  ]);
 
   // 65.5–65.7: _triggerUpdate body checks
   let triggerBody65 = '';
@@ -6650,22 +6599,21 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   } catch (_) {}
 
   // 65.5  _triggerUpdate moves focus to the reboot button
-  assert(
-    /\.focus\s*\(\s*\)/.test(triggerBody65),
-    '_triggerUpdate calls btn.focus() to move keyboard focus into the modal'
-  );
+  guards(triggerBody65, [
+    [/\.focus\s*\(\s*\)/, '_triggerUpdate calls btn.focus() to move keyboard focus into the modal'],
 
-  // 65.6  _triggerUpdate traps Tab (focus trap — single focusable element)
-  assert(
-    /e\.key\s*===\s*'Tab'[\s\S]{0,60}preventDefault/.test(triggerBody65),
-    '_triggerUpdate traps Tab key + preventDefault (focus trap — single focusable)'
-  );
+    // 65.6  _triggerUpdate traps Tab (focus trap — single focusable element)
+    [
+      /e\.key\s*===\s*'Tab'[\s\S]{0,60}preventDefault/,
+      '_triggerUpdate traps Tab key + preventDefault (focus trap — single focusable)',
+    ],
 
-  // 65.7  _triggerUpdate blocks Escape (mandatory — no dismiss path)
-  assert(
-    /e\.key\s*===\s*'Escape'[\s\S]{0,60}preventDefault/.test(triggerBody65),
-    '_triggerUpdate blocks Escape key + preventDefault (modal cannot be dismissed — must reboot)'
-  );
+    // 65.7  _triggerUpdate blocks Escape (mandatory — no dismiss path)
+    [
+      /e\.key\s*===\s*'Escape'[\s\S]{0,60}preventDefault/,
+      '_triggerUpdate blocks Escape key + preventDefault (modal cannot be dismissed — must reboot)',
+    ],
+  ]);
 
   // 65.8  Case A is gated on the robust _isGenuineUpdate() (WU-SW2 — replaces the controller-only
   //        gate that suppressed the prompt in a standalone PWA where controller can be null)
@@ -7182,34 +7130,36 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   );
 
   // 68.2  "Jean Sky Diving" present (seed example)
-  assert(
-    /name:\s*'Jean Sky Diving'/.test(locBlock68),
-    '"Jean Sky Diving" is in FALLOUT_REGISTRY.locations (fallout.wiki verified)'
-  );
+  guards(locBlock68, [
+    [
+      /name:\s*'Jean Sky Diving'/,
+      '"Jean Sky Diving" is in FALLOUT_REGISTRY.locations (fallout.wiki verified)',
+    ],
 
-  // 68.3  "Jack Rabbit Springs" present (seed example)
-  assert(
-    /name:\s*'Jack Rabbit Springs'/.test(locBlock68),
-    '"Jack Rabbit Springs" is in FALLOUT_REGISTRY.locations (fallout.wiki verified)'
-  );
+    // 68.3  "Jack Rabbit Springs" present (seed example)
+    [
+      /name:\s*'Jack Rabbit Springs'/,
+      '"Jack Rabbit Springs" is in FALLOUT_REGISTRY.locations (fallout.wiki verified)',
+    ],
 
-  // 68.4  "Powder Ganger Camp South" present (seed example)
-  assert(
-    /name:\s*'Powder Ganger Camp South'/.test(locBlock68),
-    '"Powder Ganger Camp South" is in FALLOUT_REGISTRY.locations (fallout.wiki verified)'
-  );
+    // 68.4  "Powder Ganger Camp South" present (seed example)
+    [
+      /name:\s*'Powder Ganger Camp South'/,
+      '"Powder Ganger Camp South" is in FALLOUT_REGISTRY.locations (fallout.wiki verified)',
+    ],
 
-  // 68.5  "Wolfhorn Ranch" now in registry (was zone-only before this task)
-  assert(
-    /name:\s*'Wolfhorn Ranch'/.test(locBlock68),
-    '"Wolfhorn Ranch" is in FALLOUT_REGISTRY.locations (promoted from zone-only)'
-  );
+    // 68.5  "Wolfhorn Ranch" now in registry (was zone-only before this task)
+    [
+      /name:\s*'Wolfhorn Ranch'/,
+      '"Wolfhorn Ranch" is in FALLOUT_REGISTRY.locations (promoted from zone-only)',
+    ],
 
-  // 68.6  "Ivanpah Dry Lake" now in registry (was zone-only before this task)
-  assert(
-    /name:\s*'Ivanpah Dry Lake'/.test(locBlock68),
-    '"Ivanpah Dry Lake" is in FALLOUT_REGISTRY.locations (promoted from zone-only)'
-  );
+    // 68.6  "Ivanpah Dry Lake" now in registry (was zone-only before this task)
+    [
+      /name:\s*'Ivanpah Dry Lake'/,
+      '"Ivanpah Dry Lake" is in FALLOUT_REGISTRY.locations (promoted from zone-only)',
+    ],
+  ]);
 
   // 68.7  All location entries use a valid type from the 9 approved types
   {
@@ -7563,24 +7513,24 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   const cssSrc71 = readFile('css/terminal.css');
 
   // 71.1  #traitsSection is a <details> element (collapsible sub-panel)
-  assert(
-    /<details[^>]+id="traitsSection"/.test(htmlSrc71),
-    'index.html: #traitsSection is a <details> element (collapsible sub-panel, not a plain div)'
-  );
+  guards(htmlSrc71, [
+    [
+      /<details[^>]+id="traitsSection"/,
+      'index.html: #traitsSection is a <details> element (collapsible sub-panel, not a plain div)',
+    ],
 
-  // 71.2  #traitsSection has class="sub-panel"
-  assert(
-    /<details[^>]*class="sub-panel"[^>]*id="traitsSection"|<details[^>]*id="traitsSection"[^>]*class="sub-panel"/.test(
-      htmlSrc71
-    ),
-    'index.html: #traitsSection has class="sub-panel"'
-  );
+    // 71.2  #traitsSection has class="sub-panel"
+    [
+      /<details[^>]*class="sub-panel"[^>]*id="traitsSection"|<details[^>]*id="traitsSection"[^>]*class="sub-panel"/,
+      'index.html: #traitsSection has class="sub-panel"',
+    ],
 
-  // 71.3  #traitsSection has data-sub-id attribute (persistence key)
-  assert(
-    /id="traitsSection"[^>]*data-sub-id|data-sub-id[^>]*id="traitsSection"/.test(htmlSrc71),
-    'index.html: #traitsSection has data-sub-id attribute for persistence'
-  );
+    // 71.3  #traitsSection has data-sub-id attribute (persistence key)
+    [
+      /id="traitsSection"[^>]*data-sub-id|data-sub-id[^>]*id="traitsSection"/,
+      'index.html: #traitsSection has data-sub-id attribute for persistence',
+    ],
+  ]);
 
   // 71.4  renderTraits() compact: effect is an inline <span>, not a block <div>
   {
@@ -7598,46 +7548,39 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   }
 
   // 71.5  #collectiblesSubPanel exists in index.html
-  assert(
-    /id="collectiblesSubPanel"/.test(htmlSrc71),
-    'index.html has #collectiblesSubPanel (collectibles list sub-tracker)'
-  );
+  guards(htmlSrc71, [
+    [
+      /id="collectiblesSubPanel"/,
+      'index.html has #collectiblesSubPanel (collectibles list sub-tracker)',
+    ],
 
-  // 71.6  #collectiblesSubPanel has class="sub-panel"
-  assert(
-    /<details[^>]*class="sub-panel"[^>]*id="collectiblesSubPanel"|<details[^>]*id="collectiblesSubPanel"[^>]*class="sub-panel"/.test(
-      htmlSrc71
-    ),
-    'index.html: #collectiblesSubPanel has class="sub-panel"'
-  );
+    // 71.6  #collectiblesSubPanel has class="sub-panel"
+    [
+      /<details[^>]*class="sub-panel"[^>]*id="collectiblesSubPanel"|<details[^>]*id="collectiblesSubPanel"[^>]*class="sub-panel"/,
+      'index.html: #collectiblesSubPanel has class="sub-panel"',
+    ],
 
-  // 71.7  #collectiblesSubPanel has data-sub-id attribute
-  assert(
-    /id="collectiblesSubPanel"[^>]*data-sub-id|data-sub-id[^>]*id="collectiblesSubPanel"/.test(
-      htmlSrc71
-    ),
-    'index.html: #collectiblesSubPanel has data-sub-id attribute for persistence'
-  );
+    // 71.7  #collectiblesSubPanel has data-sub-id attribute
+    [
+      /id="collectiblesSubPanel"[^>]*data-sub-id|data-sub-id[^>]*id="collectiblesSubPanel"/,
+      'index.html: #collectiblesSubPanel has data-sub-id attribute for persistence',
+    ],
 
-  // 71.8  #lincolnSubPanel exists in index.html
-  assert(
-    /id="lincolnSubPanel"/.test(htmlSrc71),
-    'index.html has #lincolnSubPanel (Lincoln Memorabilia sub-tracker)'
-  );
+    // 71.8  #lincolnSubPanel exists in index.html
+    [/id="lincolnSubPanel"/, 'index.html has #lincolnSubPanel (Lincoln Memorabilia sub-tracker)'],
 
-  // 71.9  #lincolnSubPanel has class="sub-panel"
-  assert(
-    /<details[^>]*class="sub-panel"[^>]*id="lincolnSubPanel"|<details[^>]*id="lincolnSubPanel"[^>]*class="sub-panel"/.test(
-      htmlSrc71
-    ),
-    'index.html: #lincolnSubPanel has class="sub-panel"'
-  );
+    // 71.9  #lincolnSubPanel has class="sub-panel"
+    [
+      /<details[^>]*class="sub-panel"[^>]*id="lincolnSubPanel"|<details[^>]*id="lincolnSubPanel"[^>]*class="sub-panel"/,
+      'index.html: #lincolnSubPanel has class="sub-panel"',
+    ],
 
-  // 71.10  #lincolnSubPanel has data-sub-id attribute
-  assert(
-    /id="lincolnSubPanel"[^>]*data-sub-id|data-sub-id[^>]*id="lincolnSubPanel"/.test(htmlSrc71),
-    'index.html: #lincolnSubPanel has data-sub-id attribute for persistence'
-  );
+    // 71.10  #lincolnSubPanel has data-sub-id attribute
+    [
+      /id="lincolnSubPanel"[^>]*data-sub-id|data-sub-id[^>]*id="lincolnSubPanel"/,
+      'index.html: #lincolnSubPanel has data-sub-id attribute for persistence',
+    ],
+  ]);
 
   // 71.11  Sub-panel persistence in ui-core.js: reads robco_panel_state for data-sub-id elements
   assert(
@@ -7769,24 +7712,25 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   const cssSrc72 = readFile('css/terminal.css');
 
   // 72.1  Static nv_locations datalist is gone from index.html
-  assert(
-    !/id="nv_locations"/.test(htmlSrc72),
-    'index.html: static id="nv_locations" datalist removed (was FNV-only, caused context bleed into FO3)'
-  );
+  guards(htmlSrc72, [
+    [
+      /id="nv_locations"/,
+      'index.html: static id="nv_locations" datalist removed (was FNV-only, caused context bleed into FO3)',
+      NEG,
+    ],
 
-  // 72.2  #stat_loc now points to locationOptions
-  assert(
-    /id="stat_loc"[^>]*list="locationOptions"|list="locationOptions"[^>]*id="stat_loc"/.test(
-      htmlSrc72
-    ),
-    'index.html: #stat_loc input has list="locationOptions" (dynamic datalist)'
-  );
+    // 72.2  #stat_loc now points to locationOptions
+    [
+      /id="stat_loc"[^>]*list="locationOptions"|list="locationOptions"[^>]*id="stat_loc"/,
+      'index.html: #stat_loc input has list="locationOptions" (dynamic datalist)',
+    ],
 
-  // 72.3  #locationOptions datalist exists and is empty in HTML
-  assert(
-    /<datalist\s[^>]*id="locationOptions"[^>]*>\s*<\/datalist>/.test(htmlSrc72),
-    'index.html: #locationOptions datalist exists and is empty (populated dynamically by initLocationDatalist)'
-  );
+    // 72.3  #locationOptions datalist exists and is empty in HTML
+    [
+      /<datalist\s[^>]*id="locationOptions"[^>]*>\s*<\/datalist>/,
+      'index.html: #locationOptions datalist exists and is empty (populated dynamically by initLocationDatalist)',
+    ],
+  ]);
 
   // 72.4  initLocationDatalist is defined in ui-saves.js, reads FALLOUT_REGISTRY.locations, uses escapeHtml
   assert(
@@ -7833,28 +7777,33 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   const stateSrc73 = readFile('js/state.js');
 
   // 73.1  #skillsGrid container exists in index.html
-  assert(
-    /id="skillsGrid"/.test(htmlSrc73),
-    'index.html: #skillsGrid container exists (empty div populated dynamically by renderSkills)'
-  );
+  guards(htmlSrc73, [
+    [
+      /id="skillsGrid"/,
+      'index.html: #skillsGrid container exists (empty div populated dynamically by renderSkills)',
+    ],
 
-  // 73.2  #skillsGrid is empty in HTML — no static .skill-row children
-  assert(
-    !/id="skillsGrid"[^>]*>[\s\S]*?<div[^>]*class="skill-row"/.test(htmlSrc73),
-    'index.html: #skillsGrid has no static .skill-row children — grid is empty in HTML, populated dynamically per game'
-  );
+    // 73.2  #skillsGrid is empty in HTML — no static .skill-row children
+    [
+      /id="skillsGrid"[^>]*>[\s\S]*?<div[^>]*class="skill-row"/,
+      'index.html: #skillsGrid has no static .skill-row children — grid is empty in HTML, populated dynamically per game',
+      NEG,
+    ],
 
-  // 73.3  No hardcoded id="sk_guns" (FNV-only skill bleed regression guard)
-  assert(
-    !/id="sk_guns"/.test(htmlSrc73),
-    'index.html: no hardcoded id="sk_guns" — FNV-only Guns skill must not appear as static HTML (bleed regression guard)'
-  );
+    // 73.3  No hardcoded id="sk_guns" (FNV-only skill bleed regression guard)
+    [
+      /id="sk_guns"/,
+      'index.html: no hardcoded id="sk_guns" — FNV-only Guns skill must not appear as static HTML (bleed regression guard)',
+      NEG,
+    ],
 
-  // 73.4  No hardcoded id="sk_survival" (FNV-only skill bleed regression guard)
-  assert(
-    !/id="sk_survival"/.test(htmlSrc73),
-    'index.html: no hardcoded id="sk_survival" — FNV-only Survival skill must not appear as static HTML (bleed regression guard)'
-  );
+    // 73.4  No hardcoded id="sk_survival" (FNV-only skill bleed regression guard)
+    [
+      /id="sk_survival"/,
+      'index.html: no hardcoded id="sk_survival" — FNV-only Survival skill must not appear as static HTML (bleed regression guard)',
+      NEG,
+    ],
+  ]);
 
   // 73.5  renderSkills() is defined in ui-core.js
   assert(
@@ -7867,22 +7816,18 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     const m = /function renderSkills\s*\([^)]*\)\s*\{([\s\S]*?)\n\}/.exec(uiCoreSrc73);
     return m ? m[1] : '';
   })();
-  assert(
-    /getSkillKeys\s*\(\s*\)/.test(renderSkillsBody73),
-    'renderSkills() calls getSkillKeys() to build per-game skill rows'
-  );
+  guards(renderSkillsBody73, [
+    [/getSkillKeys\s*\(\s*\)/, 'renderSkills() calls getSkillKeys() to build per-game skill rows'],
 
-  // 73.7  renderSkills() uses SKILL_LABELS for human-readable display names
-  assert(
-    /SKILL_LABELS/.test(renderSkillsBody73),
-    'renderSkills() uses SKILL_LABELS to look up human-readable skill names'
-  );
+    // 73.7  renderSkills() uses SKILL_LABELS for human-readable display names
+    [/SKILL_LABELS/, 'renderSkills() uses SKILL_LABELS to look up human-readable skill names'],
 
-  // 73.8  renderSkills() escapes label text with escapeHtml (XSS safety)
-  assert(
-    /escapeHtml/.test(renderSkillsBody73),
-    'renderSkills() runs label text through escapeHtml() (XSS safety on skill names)'
-  );
+    // 73.8  renderSkills() escapes label text with escapeHtml (XSS safety)
+    [
+      /escapeHtml/,
+      'renderSkills() runs label text through escapeHtml() (XSS safety on skill names)',
+    ],
+  ]);
 
   // 73.9  renderSkills() is called from loadUI()
   assert(
@@ -8459,11 +8404,13 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 
   // 78.3–78.7  sentinel names present
   const vNames = vData.map(l => l.split(',')[0].trim());
-  assert(vNames.includes('Gloria Van Graff'), "VENDORS.CSV contains 'Gloria Van Graff'");
-  assert(vNames.includes('Joshua Graham'), "VENDORS.CSV contains 'Joshua Graham'");
-  assert(vNames.includes('Doctor Usanagi'), "VENDORS.CSV contains 'Doctor Usanagi'");
-  assert(vNames.includes('Quartermaster Bardon'), "VENDORS.CSV contains 'Quartermaster Bardon'");
-  assert(vNames.includes('Street Vendor'), "VENDORS.CSV contains 'Street Vendor'");
+  guards(vNames, [
+    ['Gloria Van Graff', "VENDORS.CSV contains 'Gloria Van Graff'"],
+    ['Joshua Graham', "VENDORS.CSV contains 'Joshua Graham'"],
+    ['Doctor Usanagi', "VENDORS.CSV contains 'Doctor Usanagi'"],
+    ['Quartermaster Bardon', "VENDORS.CSV contains 'Quartermaster Bardon'"],
+    ['Street Vendor', "VENDORS.CSV contains 'Street Vendor'"],
+  ]);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -8510,29 +8457,19 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   );
 
   // 79.4–79.8  sentinel names (DLC worldspaces + expansion entries)
-  assert(/name:\s*'The Pitt'/.test(locBlock79), "FO3 locations contains 'The Pitt' (DLC)");
-  assert(
-    /name:\s*'Point Lookout'/.test(locBlock79),
-    "FO3 locations contains 'Point Lookout' (DLC)"
-  );
-  assert(
-    /name:\s*'Mothership Zeta'/.test(locBlock79),
-    "FO3 locations contains 'Mothership Zeta' (DLC)"
-  );
-  assert(/name:\s*'Andale'/.test(locBlock79), "FO3 locations contains 'Andale'");
-  assert(/name:\s*'Vault 106'/.test(locBlock79), "FO3 locations contains 'Vault 106'");
+  guards(locBlock79, [
+    [/name:\s*'The Pitt'/, "FO3 locations contains 'The Pitt' (DLC)"],
+    [/name:\s*'Point Lookout'/, "FO3 locations contains 'Point Lookout' (DLC)"],
+    [/name:\s*'Mothership Zeta'/, "FO3 locations contains 'Mothership Zeta' (DLC)"],
+    [/name:\s*'Andale'/, "FO3 locations contains 'Andale'"],
+    [/name:\s*'Vault 106'/, "FO3 locations contains 'Vault 106'"],
 
-  // 79.9  typo entry removed
-  assert(
-    !/name:\s*'Georgtown West'/.test(locBlock79),
-    "FO3 locations has NO 'Georgtown West' entry (typo removed)"
-  );
+    // 79.9  typo entry removed
+    [/name:\s*'Georgtown West'/, "FO3 locations has NO 'Georgtown West' entry (typo removed)", NEG],
 
-  // 79.10  corrected spelling present
-  assert(
-    /name:\s*'Georgetown West'/.test(locBlock79),
-    "FO3 locations contains 'Georgetown West' (typo fixed)"
-  );
+    // 79.10  corrected spelling present
+    [/name:\s*'Georgetown West'/, "FO3 locations contains 'Georgetown West' (typo fixed)"],
+  ]);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -8560,11 +8497,13 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 
   // 80.c  sentinel names present
   const cNames80 = cData80.map(r => r.split(',')[0].trim());
-  assert(cNames80.includes('Cram'), "CHEMS contains 'Cram'");
-  assert(cNames80.includes('Sunset Sarsaparilla'), "CHEMS contains 'Sunset Sarsaparilla'");
-  assert(cNames80.includes('Rebound'), "CHEMS contains 'Rebound'");
-  assert(cNames80.includes('Wasteland Omelet'), "CHEMS contains 'Wasteland Omelet'");
-  assert(cNames80.includes('Sierra Madre Martini'), "CHEMS contains 'Sierra Madre Martini'");
+  guards(cNames80, [
+    ['Cram', "CHEMS contains 'Cram'"],
+    ['Sunset Sarsaparilla', "CHEMS contains 'Sunset Sarsaparilla'"],
+    ['Rebound', "CHEMS contains 'Rebound'"],
+    ['Wasteland Omelet', "CHEMS contains 'Wasteland Omelet'"],
+    ['Sierra Madre Martini', "CHEMS contains 'Sierra Madre Martini'"],
+  ]);
 
   // 80.d  lookupItemInDb column-mapping spot-checks
   //   CHEMS columns: Name(0), Effect(1), Duration(2), Addiction_Risk(3),
@@ -8616,11 +8555,13 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 
   // 81.c  sentinel names present
   const aNames81 = aData81.map(r => r.split(',')[0].trim());
-  assert(aNames81.includes('Combat Helmet'), "FO3 ARMOR contains 'Combat Helmet'");
-  assert(aNames81.includes('Samurai Armor'), "FO3 ARMOR contains 'Samurai Armor'");
-  assert(aNames81.includes('T-51b Power Helmet'), "FO3 ARMOR contains 'T-51b Power Helmet'");
-  assert(aNames81.includes('Ghoul Mask'), "FO3 ARMOR contains 'Ghoul Mask'");
-  assert(aNames81.includes('Composite Recon Armor'), "FO3 ARMOR contains 'Composite Recon Armor'");
+  guards(aNames81, [
+    ['Combat Helmet', "FO3 ARMOR contains 'Combat Helmet'"],
+    ['Samurai Armor', "FO3 ARMOR contains 'Samurai Armor'"],
+    ['T-51b Power Helmet', "FO3 ARMOR contains 'T-51b Power Helmet'"],
+    ['Ghoul Mask', "FO3 ARMOR contains 'Ghoul Mask'"],
+    ['Composite Recon Armor', "FO3 ARMOR contains 'Composite Recon Armor'"],
+  ]);
 
   // 81.d  lookupItemInDb column-mapping spot-checks (header-resolved: Name=0, Weight=3, Value=4)
   const armorMap81 = aData81.reduce((m, row) => {
@@ -8764,9 +8705,11 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 
   // 82.h  sentinel names present
   const qiNames82 = qiData82.map(r => r.split(',')[0].trim());
-  assert(qiNames82.includes('Steel Ingot'), "QUEST_ITEMS contains 'Steel Ingot'");
-  assert(qiNames82.includes('Krivbeknih'), "QUEST_ITEMS contains 'Krivbeknih'");
-  assert(qiNames82.includes('Cryo Key'), "QUEST_ITEMS contains 'Cryo Key'");
+  guards(qiNames82, [
+    ['Steel Ingot', "QUEST_ITEMS contains 'Steel Ingot'"],
+    ['Krivbeknih', "QUEST_ITEMS contains 'Krivbeknih'"],
+    ['Cryo Key', "QUEST_ITEMS contains 'Cryo Key'"],
+  ]);
 
   // 82.i  lookupItemInDb spot-check: Steel Ingot → wgt=1, type='misc' (no val col)
   // QUEST_ITEMS columns: Name(0), Associated_Quest(1), Tradeable(2), Special_Property(3), Weight(4)
@@ -8895,16 +8838,15 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   );
 
   // 83.l  NV sentinel: 'Stimpak'
-  assert(nvRecBlock83.includes("name: 'Stimpak'"), "NV recipes contain 'Stimpak'");
+  guards(nvRecBlock83, [
+    ["name: 'Stimpak'", "NV recipes contain 'Stimpak'"],
 
-  // 83.m  NV sentinel: 'Weapon Repair Kit'
-  assert(
-    nvRecBlock83.includes("name: 'Weapon Repair Kit'"),
-    "NV recipes contain 'Weapon Repair Kit'"
-  );
+    // 83.m  NV sentinel: 'Weapon Repair Kit'
+    ["name: 'Weapon Repair Kit'", "NV recipes contain 'Weapon Repair Kit'"],
 
-  // 83.n  NV sentinel: 'Bottlecap Mine'
-  assert(nvRecBlock83.includes("name: 'Bottlecap Mine'"), "NV recipes contain 'Bottlecap Mine'");
+    // 83.n  NV sentinel: 'Bottlecap Mine'
+    ["name: 'Bottlecap Mine'", "NV recipes contain 'Bottlecap Mine'"],
+  ]);
 
   // 83.o  FO3 sentinels
   assert(
@@ -8927,13 +8869,15 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 
   // ── Structural ───────────────────────────────────────────────────────────
   // 84.a  renderCraft defined in ui-render.js
-  assert(uiRSrc84.includes('function renderCraft('), 'renderCraft() defined in js/ui-render.js');
+  guards(uiRSrc84, [
+    ['function renderCraft(', 'renderCraft() defined in js/ui-render.js'],
 
-  // 84.b  doCraft defined in ui-render.js
-  assert(uiRSrc84.includes('function doCraft('), 'doCraft() defined in js/ui-render.js');
+    // 84.b  doCraft defined in ui-render.js
+    ['function doCraft(', 'doCraft() defined in js/ui-render.js'],
 
-  // 84.c  doScrap defined in ui-render.js
-  assert(uiRSrc84.includes('function doScrap('), 'doScrap() defined in js/ui-render.js');
+    // 84.c  doScrap defined in ui-render.js
+    ['function doScrap(', 'doScrap() defined in js/ui-render.js'],
+  ]);
 
   // 84.d  #craftPanel in index.html
   assert(idxSrc84.includes('id="craftPanel"'), '#craftPanel element present in index.html');
@@ -8987,25 +8931,24 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 
   // ── Picker structure guards ──────────────────────────────────────────────
   // 84.u  renderCraft builds craftRecipeSelect
-  assert(
-    uiRSrc84.includes('craftRecipeSelect'),
-    'renderCraft() builds <select id="craftRecipeSelect"> (recipe picker)'
-  );
+  guards(uiRSrc84, [
+    ['craftRecipeSelect', 'renderCraft() builds <select id="craftRecipeSelect"> (recipe picker)'],
 
-  // 84.v  renderCraft builds <optgroup> elements for station grouping
-  assert(uiRSrc84.includes('<optgroup'), 'renderCraft() builds <optgroup> for station grouping');
+    // 84.v  renderCraft builds <optgroup> elements for station grouping
+    ['<optgroup', 'renderCraft() builds <optgroup> for station grouping'],
 
-  // 84.w  renderCraftCard defined in ui-render.js
-  assert(
-    uiRSrc84.includes('function renderCraftCard('),
-    'renderCraftCard() defined in js/ui-render.js (recipe detail card renderer)'
-  );
+    // 84.w  renderCraftCard defined in ui-render.js
+    [
+      'function renderCraftCard(',
+      'renderCraftCard() defined in js/ui-render.js (recipe detail card renderer)',
+    ],
 
-  // 84.x  renderCraft builds scrapItemSelect
-  assert(
-    uiRSrc84.includes('scrapItemSelect'),
-    'renderCraft() builds <select id="scrapItemSelect"> for scrap/breakdown picker'
-  );
+    // 84.x  renderCraft builds scrapItemSelect
+    [
+      'scrapItemSelect',
+      'renderCraft() builds <select id="scrapItemSelect"> for scrap/breakdown picker',
+    ],
+  ]);
 
   // ── Behavioral sandbox ───────────────────────────────────────────────────
   {
@@ -9697,25 +9640,27 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   );
 
   // 87.12  autoImportState handles 'magazines'
-  assert(
-    /_g\(parsed,\s*'magazines'\)/.test(apiSrc87),
-    "autoImportState() handles 'magazines' field (_g extraction present)"
-  );
+  guards(apiSrc87, [
+    [
+      /_g\(parsed,\s*'magazines'\)/,
+      "autoImportState() handles 'magazines' field (_g extraction present)",
+    ],
 
-  // 87.13  magazines import uses magazines-specific registry Set
-  assert(/magNames/.test(apiSrc87), 'autoImportState magazines block uses magNames registry Set');
+    // 87.13  magazines import uses magazines-specific registry Set
+    [/magNames/, 'autoImportState magazines block uses magNames registry Set'],
 
-  // 87.14  magazines import filters against registry
-  assert(
-    /magNames\.has\(m\)/.test(apiSrc87),
-    'autoImportState magazines block filters to registry names (magNames.has(m))'
-  );
+    // 87.14  magazines import filters against registry
+    [
+      /magNames\.has\(m\)/,
+      'autoImportState magazines block filters to registry names (magNames.has(m))',
+    ],
 
-  // 87.15  magazines import dedups
-  assert(
-    /state\.magazines\s*=\s*raw\.filter/.test(apiSrc87),
-    'autoImportState assigns state.magazines from registry-filtered dedup (state.magazines = raw.filter)'
-  );
+    // 87.15  magazines import dedups
+    [
+      /state\.magazines\s*=\s*raw\.filter/,
+      'autoImportState assigns state.magazines from registry-filtered dedup (state.magazines = raw.filter)',
+    ],
+  ]);
 
   // Extract renderMagazines body for structural checks
   const rmStart87 = uiRenderSrc87.indexOf('function renderMagazines()');
@@ -10073,22 +10018,18 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   const uiCore91 = fs.readFileSync(path.join(__dirname, '../js/ui-core.js'), 'utf8');
 
   // 91.1  _renderSig module-level cache exists
-  assert(
-    uiCore91.includes('const _renderSig = {}'),
-    'GATE-DIRTY-1: _renderSig module-level cache declared in ui-core.js'
-  );
+  guards(uiCore91, [
+    ['const _renderSig = {}', 'GATE-DIRTY-1: _renderSig module-level cache declared in ui-core.js'],
 
-  // 91.2  _isDirty helper function exists
-  assert(
-    uiCore91.includes('function _isDirty('),
-    'GATE-DIRTY-2: _isDirty() helper defined in ui-core.js'
-  );
+    // 91.2  _isDirty helper function exists
+    ['function _isDirty(', 'GATE-DIRTY-2: _isDirty() helper defined in ui-core.js'],
 
-  // 91.3  _clearRenderCache function exists (explicit force-render path)
-  assert(
-    uiCore91.includes('function _clearRenderCache()'),
-    'GATE-DIRTY-3: _clearRenderCache() defined in ui-core.js (force-render path)'
-  );
+    // 91.3  _clearRenderCache function exists (explicit force-render path)
+    [
+      'function _clearRenderCache()',
+      'GATE-DIRTY-3: _clearRenderCache() defined in ui-core.js (force-render path)',
+    ],
+  ]);
 
   // Extract loadUI body for scoped assertions (~8000 chars covers the full ~130-line function)
   const loadUIStart91 = uiCore91.indexOf('function loadUI()');
@@ -10108,22 +10049,25 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   );
 
   // 91.6  renderWorldMap is NOT called unconditionally in loadUI (B-P1 regression guard)
-  assert(
-    !loadUIBody91.includes('renderWorldMap(); // G6'),
-    'GATE-DIRTY-6: renderWorldMap() not called unconditionally in loadUI() (B-P1 regression guard)'
-  );
+  guards(loadUIBody91, [
+    [
+      'renderWorldMap(); // G6',
+      'GATE-DIRTY-6: renderWorldMap() not called unconditionally in loadUI() (B-P1 regression guard)',
+      NEG,
+    ],
 
-  // 91.7  renderAccount() always called — auth state not covered by state slice
-  assert(
-    loadUIBody91.includes('renderAccount(); // always'),
-    'GATE-DIRTY-7: renderAccount() called unconditionally in loadUI() (auth state not in state slice)'
-  );
+    // 91.7  renderAccount() always called — auth state not covered by state slice
+    [
+      'renderAccount(); // always',
+      'GATE-DIRTY-7: renderAccount() called unconditionally in loadUI() (auth state not in state slice)',
+    ],
 
-  // 91.8  renderSavesList() always called — localStorage/cloud not covered by state slice
-  assert(
-    loadUIBody91.includes('renderSavesList(); // always'),
-    'GATE-DIRTY-8: renderSavesList() called unconditionally in loadUI() (localStorage/cloud not in state slice)'
-  );
+    // 91.8  renderSavesList() always called — localStorage/cloud not covered by state slice
+    [
+      'renderSavesList(); // always',
+      'GATE-DIRTY-8: renderSavesList() called unconditionally in loadUI() (localStorage/cloud not in state slice)',
+    ],
+  ]);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -10274,58 +10218,62 @@ header('Suite 94 — Accessibility Guards');
   const uiCore94 = fs.readFileSync(path.join(__dirname, '../js/ui-core.js'), 'utf8');
 
   // 94.1  :focus-visible rule exists in terminal.css (WCAG 2.4.7 — keyboard focus ring)
-  assert(
-    css94.includes(':focus-visible'),
-    'GATE-A11Y-1: terminal.css contains :focus-visible rule (keyboard focus indicator — WCAG 2.4.7)'
-  );
+  guards(css94, [
+    [
+      ':focus-visible',
+      'GATE-A11Y-1: terminal.css contains :focus-visible rule (keyboard focus indicator — WCAG 2.4.7)',
+    ],
 
-  // 94.2  prefers-reduced-motion block exists in terminal.css (WCAG 2.3.1 — seizure hazard)
-  assert(
-    css94.includes('prefers-reduced-motion'),
-    'GATE-A11Y-2: terminal.css contains prefers-reduced-motion media query (seizure-safe animation freeze)'
-  );
+    // 94.2  prefers-reduced-motion block exists in terminal.css (WCAG 2.3.1 — seizure hazard)
+    [
+      'prefers-reduced-motion',
+      'GATE-A11Y-2: terminal.css contains prefers-reduced-motion media query (seizure-safe animation freeze)',
+    ],
 
-  // 94.3  reduced-motion block uses 0.01ms animation-duration (not 0s — avoids animationend skip bug)
-  assert(
-    css94.includes('animation-duration: 0.01ms'),
-    'GATE-A11Y-3: prefers-reduced-motion block uses animation-duration: 0.01ms !important (not 0s — avoids animationend skip bug)'
-  );
+    // 94.3  reduced-motion block uses 0.01ms animation-duration (not 0s — avoids animationend skip bug)
+    [
+      'animation-duration: 0.01ms',
+      'GATE-A11Y-3: prefers-reduced-motion block uses animation-duration: 0.01ms !important (not 0s — avoids animationend skip bug)',
+    ],
 
-  // 94.4  reduced-motion block sets animation-iteration-count: 1 (stops infinite flicker loops)
-  assert(
-    css94.includes('animation-iteration-count: 1'),
-    'GATE-A11Y-4: prefers-reduced-motion block sets animation-iteration-count: 1 !important (stops infinite flicker loops)'
-  );
+    // 94.4  reduced-motion block sets animation-iteration-count: 1 (stops infinite flicker loops)
+    [
+      'animation-iteration-count: 1',
+      'GATE-A11Y-4: prefers-reduced-motion block sets animation-iteration-count: 1 !important (stops infinite flicker loops)',
+    ],
 
-  // 94.5  .crt-overlay appears inside prefers-reduced-motion block (static scanline look preserved)
-  assert(
-    /prefers-reduced-motion\s*:\s*reduce\b[\s\S]*?\.crt-overlay/.test(css94),
-    'GATE-A11Y-5: .crt-overlay has opacity restore inside prefers-reduced-motion block (static scanline preserved)'
-  );
+    // 94.5  .crt-overlay appears inside prefers-reduced-motion block (static scanline look preserved)
+    [
+      /prefers-reduced-motion\s*:\s*reduce\b[\s\S]*?\.crt-overlay/,
+      'GATE-A11Y-5: .crt-overlay has opacity restore inside prefers-reduced-motion block (static scanline preserved)',
+    ],
+  ]);
 
   // 94.6  chatDisplay has aria-live="polite" (screen reader live region)
-  assert(
-    idx94.includes('aria-live="polite"'),
-    'GATE-A11Y-6: #chatDisplay has aria-live="polite" in index.html (screen reader chat updates)'
-  );
+  guards(idx94, [
+    [
+      'aria-live="polite"',
+      'GATE-A11Y-6: #chatDisplay has aria-live="polite" in index.html (screen reader chat updates)',
+    ],
 
-  // 94.7  chatDisplay has aria-atomic="false" (per-message SR announcement, not full re-read)
-  assert(
-    idx94.includes('aria-atomic="false"'),
-    'GATE-A11Y-7: #chatDisplay has aria-atomic="false" in index.html (per-message SR announcement)'
-  );
+    // 94.7  chatDisplay has aria-atomic="false" (per-message SR announcement, not full re-read)
+    [
+      'aria-atomic="false"',
+      'GATE-A11Y-7: #chatDisplay has aria-atomic="false" in index.html (per-message SR announcement)',
+    ],
 
-  // 94.8  sysModal has role="dialog" (accessible dialog semantics)
-  assert(
-    idx94.includes('role="dialog"'),
-    'GATE-A11Y-8: #sysModal has role="dialog" in index.html (modal dialog semantics for AT)'
-  );
+    // 94.8  sysModal has role="dialog" (accessible dialog semantics)
+    [
+      'role="dialog"',
+      'GATE-A11Y-8: #sysModal has role="dialog" in index.html (modal dialog semantics for AT)',
+    ],
 
-  // 94.9  sysModal has aria-modal="true" (background content inert for AT)
-  assert(
-    idx94.includes('aria-modal="true"'),
-    'GATE-A11Y-9: #sysModal has aria-modal="true" in index.html (background content inert for AT)'
-  );
+    // 94.9  sysModal has aria-modal="true" (background content inert for AT)
+    [
+      'aria-modal="true"',
+      'GATE-A11Y-9: #sysModal has aria-modal="true" in index.html (background content inert for AT)',
+    ],
+  ]);
 
   // 94.10  _openSysModal helper defined in ui-core.js (focus-trap entrypoint + focus restore)
   assert(
@@ -10715,18 +10663,22 @@ header('Suite 99 — WU-B7 dead-code purge + duplication consolidation');
     !/\b_gcV\b/.test(api99) && !/state\.gameContext\s*=\s*gcV/.test(api99),
     '99.5: dead commented gameContext assignment + unused _gcV parse removed from api.js (QA-DEAD-8)'
   );
-  assert(
-    !/_inputHistory\s*=\s*\[\s*\]/.test(core99),
-    '99.6: unused _inputHistory array removed from ui-core.js (QA-DEAD-2)'
-  );
-  assert(
-    /\b_inputHistoryIdx\b/.test(core99),
-    '99.7: _inputHistoryIdx nav cursor retained — Up/Down history nav still wired (no behavior change)'
-  );
-  assert(
-    !/targetDT\s*=\s*0\b/.test(core99),
-    '99.8: dead `targetDT = 0` constant removed (QA-DEAD-6) — WU-N1 wires a real, used targetDT input (see Suite 105.16)'
-  );
+  guards(core99, [
+    [
+      /_inputHistory\s*=\s*\[\s*\]/,
+      '99.6: unused _inputHistory array removed from ui-core.js (QA-DEAD-2)',
+      NEG,
+    ],
+    [
+      /\b_inputHistoryIdx\b/,
+      '99.7: _inputHistoryIdx nav cursor retained — Up/Down history nav still wired (no behavior change)',
+    ],
+    [
+      /targetDT\s*=\s*0\b/,
+      '99.8: dead `targetDT = 0` constant removed (QA-DEAD-6) — WU-N1 wires a real, used targetDT input (see Suite 105.16)',
+      NEG,
+    ],
+  ]);
   assert(
     !/\bticksToGameTime\b/.test(eslint99) && !/\bgameTimeToTicks\b/.test(eslint99),
     '99.9: ticksToGameTime + gameTimeToTicks globals removed from eslint.config.mjs'
@@ -10777,28 +10729,30 @@ header('Suite 100 — Staging build output guards (Cloudflare Pages)');
   const cfSrc100 = readFile('scripts/cf-staging-build.mjs');
 
   // 100.1 The staging build emits a Cloudflare _redirects file into the output.
-  assert(
-    /writeFileSync\(\s*join\(\s*OUT\s*,\s*['"]_redirects['"]\s*\)/.test(cfSrc100),
-    '100.1: cf-staging-build.mjs writes a _redirects file into the staging output (dist-staging)'
-  );
+  guards(cfSrc100, [
+    [
+      /writeFileSync\(\s*join\(\s*OUT\s*,\s*['"]_redirects['"]\s*\)/,
+      '100.1: cf-staging-build.mjs writes a _redirects file into the staging output (dist-staging)',
+    ],
 
-  // 100.2 _redirects pins /sw.js to a direct 200 (no redirect) — the SW-update fix.
-  assert(
-    /\/sw\.js\s+\/sw\.js\s+200/.test(cfSrc100),
-    '100.2: staging _redirects pins /sw.js to a direct 200 serve (service worker never behind a redirect)'
-  );
+    // 100.2 _redirects pins /sw.js to a direct 200 (no redirect) — the SW-update fix.
+    [
+      /\/sw\.js\s+\/sw\.js\s+200/,
+      '100.2: staging _redirects pins /sw.js to a direct 200 serve (service worker never behind a redirect)',
+    ],
 
-  // 100.3 _redirects pins /manifest.json to a direct 200 as well (PWA control file).
-  assert(
-    /\/manifest\.json\s+\/manifest\.json\s+200/.test(cfSrc100),
-    '100.3: staging _redirects pins /manifest.json to a direct 200 serve (no redirect)'
-  );
+    // 100.3 _redirects pins /manifest.json to a direct 200 as well (PWA control file).
+    [
+      /\/manifest\.json\s+\/manifest\.json\s+200/,
+      '100.3: staging _redirects pins /manifest.json to a direct 200 serve (no redirect)',
+    ],
 
-  // 100.4 sw.js is staged at the served root so the SW registers at root scope.
-  assert(
-    /FILES\s*=\s*\[[^\]]*'sw\.js'/.test(cfSrc100),
-    '100.4: cf-staging-build.mjs stages sw.js at the served root (root-scope SW registration)'
-  );
+    // 100.4 sw.js is staged at the served root so the SW registers at root scope.
+    [
+      /FILES\s*=\s*\[[^\]]*'sw\.js'/,
+      '100.4: cf-staging-build.mjs stages sw.js at the served root (root-scope SW registration)',
+    ],
+  ]);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -11616,20 +11570,23 @@ header('Suite 107 — WU-N3 THREAT native bestiary + TTK');
   );
 
   // 107.7  _routeNativeCommand forwards the typed target to the handler
-  assert(
-    /handler\(\s*raw\.slice\(cmd\.length\)\.trim\(\)\s*\)/.test(apiSource),
-    '107.7: _routeNativeCommand passes the target argument to the handler (renderThreat receives the enemy name)'
-  );
+  guards(apiSource, [
+    [
+      /handler\(\s*raw\.slice\(cmd\.length\)\.trim\(\)\s*\)/,
+      '107.7: _routeNativeCommand passes the target argument to the handler (renderThreat receives the enemy name)',
+    ],
 
-  // 107.8a / 107.8b  AI THREAT path retired — legacy predictive-loop directive gone; native defer note present
-  assert(
-    !/Run predictive loops via databases\.\s*Calculate Squad DPS/.test(apiSource),
-    '107.8a: legacy AI "Tactical TTK: run predictive loops" directive removed (AI THREAT path retired)'
-  );
-  assert(
-    /native deterministic THREAT terminal/.test(apiSource),
-    '107.8b: system directive defers THREAT/TTK to the native terminal (do-not-compute note)'
-  );
+    // 107.8a / 107.8b  AI THREAT path retired — legacy predictive-loop directive gone; native defer note present
+    [
+      /Run predictive loops via databases\.\s*Calculate Squad DPS/,
+      '107.8a: legacy AI "Tactical TTK: run predictive loops" directive removed (AI THREAT path retired)',
+      NEG,
+    ],
+    [
+      /native deterministic THREAT terminal/,
+      '107.8b: system directive defers THREAT/TTK to the native terminal (do-not-compute note)',
+    ],
+  ]);
 
   // 107.9  Protocol 3 — refuse to invent: NO ENTRY IN BESTIARY when absent
   assert(
