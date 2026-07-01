@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1557/1557 | Cache: robco-terminal-v2.7.0-r8 -->
+﻿## [Unreleased]<!-- Tests: 1557/1557 | Cache: robco-terminal-v2.7.0-r9 -->
 
 ### Under the Hood
 
@@ -11,6 +11,7 @@
 - Wired up the terminal's bot-protection layer (Firebase App Check with reCAPTCHA v3) with its real public site key so the protection can activate. This uses only a public site identifier that is meant to ship inside the app — no secret is involved — and, as before, the app stays fully usable even if the protection layer is unreachable. No visible change to the app.
 - Made the bot-protection layer testable on the developer's own machine and the private staging site by enabling a development-only debug token there — this lets the protection be exercised without a live challenge during testing. It is strictly limited to the local and staging addresses and is never switched on for the public production site. Also corrected some stale developer notes in the same area that no longer described how the protection actually starts up. No visible change to the app.
 - Corrected the bot-protection layer's public site key so it now activates with the intended key. The correct key had been mistakenly placed in an internal on/off check while the layer was still running with an old, wrong key; the two were swapped back into their proper places. As before, this involves only a public site identifier and the app stays fully usable if the protection layer is ever unreachable. No visible change to the app.
+- Narrowed the bot-protection layer's development-only debug token to the developer's own machine (localhost). The private staging site now uses the same real reCAPTCHA verification as the live production site, so it exercises the protection exactly the way real users will rather than relying on a per-browser test token. The public production site was never affected. No visible change to the app.
 
 ---
 

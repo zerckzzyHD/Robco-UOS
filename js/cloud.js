@@ -126,16 +126,13 @@ window.isFeatureEnabled = function (key) {
 // key is not the unconfigured sentinel); any failure is caught so the app never breaks.
 try {
   if (RECAPTCHA_V3_SITE_KEY !== 'REPLACE_WITH_RECAPTCHA_SITE_KEY') {
-    // Dev/staging only: enable an App Check debug token so localhost and the Cloudflare
-    // (*.pages.dev) staging build can obtain App Check tokens without a live reCAPTCHA
-    // challenge. The client then prints a debug-token UUID to the console, which is
-    // registered once in Firebase console → App Check → Manage debug tokens. This guard
-    // is a strict no-op in production (GitHub Pages) — the flag is never set there.
-    if (
-      location.hostname === 'localhost' ||
-      location.hostname === '127.0.0.1' ||
-      location.hostname.endsWith('.pages.dev')
-    ) {
+    // Local dev only: enable an App Check debug token so localhost can obtain App Check
+    // tokens without a live reCAPTCHA challenge. The client then prints a debug-token UUID
+    // to the console, which is registered once in Firebase console → App Check → Manage
+    // debug tokens. The Cloudflare (*.pages.dev) staging build and production (GitHub Pages)
+    // both use the normal reCAPTCHA v3 attestation — the flag is never set there, so both
+    // verify robustly under App Check enforcement. This guard is a strict no-op off localhost.
+    if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
       self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
     }
     initializeAppCheck(app, {
