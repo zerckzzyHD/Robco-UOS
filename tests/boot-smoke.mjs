@@ -16,7 +16,7 @@
  * Requires: npx playwright install chromium
  */
 
-import { chromium } from 'playwright';
+import { acquireBrowser } from './browser-shared.mjs';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import fs from 'fs';
@@ -102,7 +102,7 @@ function isExpectedNoise(text) {
   return false;
 }
 
-const browser = await chromium.launch();
+const browser = await acquireBrowser();
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 const page = await ctx.newPage();
 

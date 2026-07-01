@@ -301,6 +301,8 @@ export default [
       'tests/boot-smoke.mjs',
       'tests/a11y-check.mjs',
       'tests/test-html-check.mjs',
+      'tests/browser-server.mjs',
+      'tests/browser-shared.mjs',
       'tests/_diag*.mjs',
       'scripts/cf-staging-build.mjs',
     ],

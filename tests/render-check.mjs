@@ -14,7 +14,7 @@
  *           npx playwright install chromium
  */
 
-import { chromium } from 'playwright';
+import { acquireBrowser } from './browser-shared.mjs';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import fs from 'fs';
@@ -41,7 +41,7 @@ function fail(msg) {
   failed++;
 }
 
-const browser = await chromium.launch();
+const browser = await acquireBrowser();
 
 for (const vp of VIEWPORTS) {
   const ctx = await browser.newContext({ viewport: vp });

@@ -20,12 +20,87 @@
  */
 'use strict';
 
-const { spawnSync } = require('child_process');
+const { spawnSync, spawn } = require('child_process');
 const path = require('path');
+const fs = require('fs');
+const os = require('os');
 
 const ROOT = path.join(__dirname, '..');
 const isCI = !!process.env.CI;
 const fast = process.argv.includes('--fast');
+
+// Synchronous sleep (no dependency, no extra process) — used only to poll for
+// the shared browser server's endpoint file while gate.js stays synchronous.
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+// ── Shared Chromium (audit #8) ────────────────────────────────────────────────
+// Launch ONE Chromium (tests/browser-server.mjs) that the four browser checks
+// connect to via PW_WS_ENDPOINT, instead of each cold-launching its own.
+let _sharedBrowserChild = null;
+let _endpointFile = null;
+
+function startSharedBrowser() {
+  _endpointFile = path.join(os.tmpdir(), `robco-pw-endpoint-${process.pid}.txt`);
+  try {
+    fs.rmSync(_endpointFile, { force: true });
+  } catch {
+    /* nothing to remove */
+  }
+  const child = spawn('node', ['tests/browser-server.mjs', _endpointFile], {
+    cwd: ROOT,
+    stdio: ['pipe', 'inherit', 'inherit'], // hold the child's stdin so it exits with us
+  });
+  child.on('error', () => {});
+  // Poll for the endpoint file (browser ready). Up to ~30s.
+  let endpoint = null;
+  for (let i = 0; i < 300; i++) {
+    if (child.exitCode !== null) break; // server died before publishing
+    try {
+      const txt = fs.readFileSync(_endpointFile, 'utf8').trim();
+      if (txt.startsWith('ws://') || txt.startsWith('wss://')) {
+        endpoint = txt;
+        break;
+      }
+    } catch {
+      /* not written yet */
+    }
+    sleepSync(100);
+  }
+  if (!endpoint) {
+    try {
+      child.kill();
+    } catch {
+      /* already gone */
+    }
+    return false;
+  }
+  _sharedBrowserChild = child;
+  process.env.PW_WS_ENDPOINT = endpoint;
+  process.on('exit', stopSharedBrowser); // guarantee teardown on any exit path
+  return true;
+}
+
+function stopSharedBrowser() {
+  if (_sharedBrowserChild) {
+    try {
+      _sharedBrowserChild.kill();
+    } catch {
+      /* already gone */
+    }
+    _sharedBrowserChild = null;
+  }
+  delete process.env.PW_WS_ENDPOINT;
+  if (_endpointFile) {
+    try {
+      fs.rmSync(_endpointFile, { force: true });
+    } catch {
+      /* already gone */
+    }
+    _endpointFile = null;
+  }
+}
 
 function run(label, cmd) {
   console.log(`\n[gate] ${label}`);
@@ -124,6 +199,16 @@ if (!fast) {
   }
   console.log('  Chromium found.');
 
+  // Launch ONE shared Chromium for all four browser checks below (audit #8).
+  // Each check connects to it via PW_WS_ENDPOINT; if the shared launch fails for
+  // any reason, they fall back to launching their own — identical assertions.
+  const sharedOk = startSharedBrowser();
+  console.log(
+    sharedOk
+      ? '\n[gate] Shared Chromium launched — the four browser checks reuse one browser.'
+      : '\n[gate] Shared Chromium unavailable — each browser check launches its own (fallback).'
+  );
+
   // ── 6. Boot smoke ─────────────────────────────────────────────────────────────
   run('Boot smoke (HTTP)', 'node tests/boot-smoke.mjs');
 
@@ -137,6 +222,8 @@ if (!fast) {
   // Executes tests/test.html headless and asserts every suite passes + the
   // declared suite count matches reality (Protocol 40 — keeps test.html in sync).
   run('Runtime audit (test.html)', 'node tests/test-html-check.mjs');
+
+  stopSharedBrowser();
 }
 
 console.log(
