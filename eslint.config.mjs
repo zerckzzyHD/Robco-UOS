@@ -72,6 +72,7 @@ export default [
         // Project cross-file globals (shared via <script> tags)
         state: 'writable',
         APP_VERSION: 'readonly',
+        MetaStore: 'readonly', // U5 device-preference key/value store (js/state.js)
         FACTION_REGISTRY: 'readonly',
         FACTION_REGISTRY_FO3: 'readonly',
         SKILL_KEYS: 'readonly',

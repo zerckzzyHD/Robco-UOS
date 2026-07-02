@@ -40,7 +40,7 @@ function _hapticReducedMotion() {
   );
 }
 function isHapticEnabled() {
-  return localStorage.getItem(HAPTIC_KEY) === 'true';
+  return MetaStore.get(HAPTIC_KEY) === 'true';
 }
 // Core fire helper. Accepts a named pattern key or a raw vibrate() argument.
 // Returns true only if a real vibration was actually dispatched.
@@ -72,7 +72,7 @@ function _updateHapticUI() {
     : '> SOLENOID IDLE — NO CHASSIS FEEDBACK';
 }
 function toggleHaptic(enabled) {
-  localStorage.setItem(HAPTIC_KEY, enabled ? 'true' : 'false');
+  MetaStore.set(HAPTIC_KEY, enabled ? 'true' : 'false');
   // Confirmation buzz on enable so the user feels it works immediately.
   if (enabled) triggerHaptic('tick');
   _updateHapticUI();
@@ -437,12 +437,12 @@ function _opticStorageKey(ctx) {
 function _resolveOptic() {
   try {
     const key = _opticStorageKey();
-    let saved = localStorage.getItem(key);
+    let saved = MetaStore.get(key);
     if (!saved) {
-      const legacy = localStorage.getItem('robco_optics');
+      const legacy = MetaStore.get('robco_optics');
       if (legacy && typeof THEMES !== 'undefined' && THEMES[legacy]) {
-        localStorage.setItem(key, legacy);
-        localStorage.removeItem('robco_optics');
+        MetaStore.set(key, legacy);
+        MetaStore.remove('robco_optics');
         saved = legacy;
       }
     }
@@ -470,13 +470,11 @@ function _updateOpticsDefaultLabel() {
 // (per-game key), so each game remembers its own optic independently.
 function changeOpticsColor(color) {
   _applyThemeVars(color);
-  try {
-    localStorage.setItem(_opticStorageKey(), color);
-  } catch (_) {}
+  MetaStore.set(_opticStorageKey(), color);
 }
 
 function toggleAudio(key, isMuted) {
-  localStorage.setItem(key, isMuted);
+  MetaStore.set(key, isMuted);
   // Keep in-memory cache in sync so audio functions don't need localStorage reads
   const keyMap = {
     robco_sfx_muted: 'typing',
@@ -534,7 +532,7 @@ function toggleAudio(key, isMuted) {
 
 // ── MASTER MUTE ────────────────────────────────────────────
 function toggleMasterMute(isMuted) {
-  localStorage.setItem('robco_master_muted', isMuted);
+  MetaStore.set('robco_master_muted', isMuted);
   AudioSettings.masterMute = isMuted;
   if (isMuted) {
     geigerRunning = false;
@@ -585,7 +583,7 @@ function _radioPlaying() {
   return !!radioNodes;
 }
 function isRadioOn() {
-  return localStorage.getItem(RADIO_KEY) === 'true';
+  return MetaStore.get(RADIO_KEY) === 'true';
 }
 
 // Schedule the next short tonal motif/beep over the static bed, then re-arm.
@@ -708,7 +706,7 @@ function _updateRadioUI() {
 // preference and starts/stops the station. The onchange fires from a real click,
 // satisfying the autoplay policy.
 function toggleRadio(on) {
-  localStorage.setItem(RADIO_KEY, on ? 'true' : 'false');
+  MetaStore.set(RADIO_KEY, on ? 'true' : 'false');
   AudioSettings.radio = on;
   if (on) startRadio();
   else stopRadio();
@@ -972,7 +970,7 @@ function _pickBootFlavor() {
   // Degraded variant first — deliberately NOT gated to the first boot (owner pref).
   if (Math.random() < DEGRADED_BOOT_CHANCE) return 'degraded';
   // First-ever power-on → the longer cold-start POST (once only).
-  if (typeof localStorage !== 'undefined' && !localStorage.getItem('robco_booted_before')) {
+  if (!MetaStore.get('robco_booted_before')) {
     return 'cold';
   }
   return 'normal';
@@ -1031,11 +1029,9 @@ function runBootSequence(onComplete) {
   playBootDrone(); // H4: boot sequence drone
   const flavor = _pickBootFlavor();
   // Record that the unit has booted so the first-power-on 'cold' POST never repeats.
-  try {
-    localStorage.setItem('robco_booted_before', 'true');
-  } catch (_) {
-    /* private mode / quota — fall through, worst case the cold POST repeats */
-  }
+  // MetaStore.set never throws (private mode / quota fails soft — worst case the
+  // cold POST repeats).
+  MetaStore.set('robco_booted_before', 'true');
   if (flavor === 'degraded') bootScreen.classList.add('boot-degraded');
   const lines = _bootLinesFor(flavor);
   // WU-T3: per-game identity line (Pip-Boy model + wasteland uplink) sourced from

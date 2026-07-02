@@ -21,6 +21,10 @@
       // Pre-paint optic apply (flash-free) — read THIS game's per-game pick (robco_optic_<ctx>,
       // ctx from robco_v8.activeContext) with a fallback to the legacy site-wide key. Runs before
       // the modules load, so it can only read localStorage (game-agnostic: keyed by ctx).
+      // Sanctioned MetaStore exception (U5/Protocol 23): MetaStore lives in state.js, which
+      // hasn't loaded yet at this point in the boot sequence — bare localStorage is unavoidable
+      // here. Every other read/write of these same keys elsewhere in js/*.js goes through
+      // MetaStore.
       var _ctx0 = 'FNV';
       try {
         _ctx0 = JSON.parse(localStorage.getItem('robco_v8') || '{}').activeContext || 'FNV';
@@ -1740,7 +1744,7 @@
                     value="1"
                     style="flex: 1; accent-color: var(--robco-alert)"
                     oninput="
-                      localStorage.setItem('robco_typer_speed', this.value);
+                      MetaStore.set('robco_typer_speed', this.value);
                       document.getElementById('typerSpeedVal').textContent =
                         parseFloat(this.value).toFixed(2) + '&#215;';
                     "
@@ -2301,16 +2305,10 @@
         // waiting worker is a genuine update even if the live controller is momentarily null.
         const SW_INSTALLED_FLAG = 'robco_sw_installed';
         function _hasInstalledBefore() {
-          try {
-            return localStorage.getItem(SW_INSTALLED_FLAG) === 'true';
-          } catch (_) {
-            return false;
-          }
+          return MetaStore.get(SW_INSTALLED_FLAG) === 'true';
         }
         function _markInstalled() {
-          try {
-            localStorage.setItem(SW_INSTALLED_FLAG, 'true');
-          } catch (_) {}
+          MetaStore.set(SW_INSTALLED_FLAG, 'true');
         }
         if (navigator.serviceWorker.controller) _markInstalled();
 

@@ -2283,9 +2283,9 @@ Check (-not ([bool]($cloudSrc -match 'await\s+loadRemoteConfig'))) `
 Check (([bool]($cloudSrc -match 'window\.isFeatureEnabled\s*=')) -and ([bool]($cloudSrc -match '!==\s*false'))) `
     "window.isFeatureEnabled defined and uses !== false pattern (unknown/missing keys return true -- fail-open)"
 
-# 48.7  LKG key robco_feature_flags is both read from and written to localStorage
-Check (([bool]($cloudSrc -match 'robco_feature_flags')) -and ([bool]($cloudSrc -match "localStorage\.setItem\s*\(\s*'robco_feature_flags")) -and ([bool]($cloudSrc -match "localStorage\.getItem\s*\(\s*'robco_feature_flags"))) `
-    "cloud.js reads and writes 'robco_feature_flags' localStorage key (last-known-good persistence)"
+# 48.7  LKG key robco_feature_flags is both read from and written to via MetaStore (U5)
+Check (([bool]($cloudSrc -match 'robco_feature_flags')) -and ([bool]($cloudSrc -match "window\.MetaStore\.set\s*\(\s*'robco_feature_flags")) -and ([bool]($cloudSrc -match "window\.MetaStore\.get\s*\(\s*'robco_feature_flags"))) `
+    "cloud.js reads and writes 'robco_feature_flags' via MetaStore (last-known-good persistence)"
 
 # 48.8  transmitMessage in api.js references isFeatureEnabled with 'aiChat'
 Check (([bool]($apiSrc -match 'isFeatureEnabled')) -and ([bool]($apiSrc -match "'aiChat'"))) `
@@ -3896,7 +3896,7 @@ Check ([bool]($htmlSrc -match '(?s)function _isGenuineUpdate\(\)\s*\{[\s\S]*?_ha
 
 # 65.15  a persistent install flag records that a SW has controlled the page (set when a
 #        controller is present AND on controllerchange)
-Check ([bool](($htmlSrc -match "SW_INSTALLED_FLAG\s*=\s*'robco_sw_installed'") -and ($htmlSrc -match '(?s)function _markInstalled\(\)[\s\S]*?localStorage\.setItem\(SW_INSTALLED_FLAG') -and ($htmlSrc -match "'controllerchange',\s*\(\)\s*=>\s*\{\s*_markInstalled\(\)"))) `
+Check ([bool](($htmlSrc -match "SW_INSTALLED_FLAG\s*=\s*'robco_sw_installed'") -and ($htmlSrc -match '(?s)function _markInstalled\(\)[\s\S]*?MetaStore\.set\(SW_INSTALLED_FLAG') -and ($htmlSrc -match "'controllerchange',\s*\(\)\s*=>\s*\{\s*_markInstalled\(\)"))) `
     '65.15: persistent robco_sw_installed flag set via _markInstalled() (on controller present + on controllerchange)'
 
 # 65.16  the focus/visibility re-check is wired -- visibilitychange(visible) + window focus
@@ -4456,7 +4456,7 @@ Check (-not ($htmlSrc71 -match '<details[^>]*id="lincolnSubPanel"[^>]*\sopen[\s>
     'index.html: #lincolnSubPanel has no "open" attribute -- defaults to collapsed'
 
 # 71.15  Fail-safe: sub-panel persistence uses JSON.parse with '{}' fallback
-Check ([bool]($uiCoreSrc71 -match "JSON\.parse\s*\(\s*localStorage\.getItem\s*\(\s*['""]robco_panel_state['""]\s*\)\s*\|\|\s*'\{\}'")) `
+Check ([bool]($uiCoreSrc71 -match "JSON\.parse\s*\(\s*MetaStore\.get\s*\(\s*['""]robco_panel_state['""]\s*\)\s*\|\|\s*'\{\}'")) `
     "ui-core.js sub-panel persistence uses JSON.parse(... || '{}') fail-safe"
 
 # 71.16  Lincoln compact: margin-bottom:2px (not 4px) in renderLincolnMemorabilia
@@ -7234,7 +7234,7 @@ $ini115 = [regex]::Match($uiCore115, '(?s)function initWakeLock\([\s\S]*?\n\}').
 $rel115 = [regex]::Match($uiCore115, '(?s)async function _releaseWakeLock\([\s\S]*?\n\}').Value
 
 # 115.1  preference constant + getter
-Check (($uiCore115 -match "const WAKE_LOCK_KEY = 'robco_wakelock_enabled'") -and ($uiCore115 -match 'function isWakeLockEnabled\(\)') -and ($uiCore115 -match 'localStorage\.getItem\(WAKE_LOCK_KEY\)')) `
+Check (($uiCore115 -match "const WAKE_LOCK_KEY = 'robco_wakelock_enabled'") -and ($uiCore115 -match 'function isWakeLockEnabled\(\)') -and ($uiCore115 -match 'MetaStore\.get\(WAKE_LOCK_KEY\)')) `
     '115.1: WAKE_LOCK_KEY + isWakeLockEnabled() persist the toggle as a localStorage device preference'
 
 # 115.2  feature-detect before use
@@ -7246,7 +7246,7 @@ Check (($acq115 -match "navigator\.wakeLock\.request\('screen'\)") -and ($acq115
     "115.3: _acquireWakeLock() requests a 'screen' lock guarded by _wakeLockSupported() inside try/catch (acquire failures never throw)"
 
 # 115.4  toggle persists + acquires/releases; wired via onchange
-Check (($tog115 -match 'localStorage\.setItem\(WAKE_LOCK_KEY') -and ($tog115 -match '_acquireWakeLock\(\)') -and ($tog115 -match '_releaseWakeLock\(\)') -and ($html115 -match 'onchange="toggleWakeLock\(this\.checked\)"')) `
+Check (($tog115 -match 'MetaStore\.set\(WAKE_LOCK_KEY') -and ($tog115 -match '_acquireWakeLock\(\)') -and ($tog115 -match '_releaseWakeLock\(\)') -and ($html115 -match 'onchange="toggleWakeLock\(this\.checked\)"')) `
     '115.4: toggleWakeLock persists the pref + acquires/releases; #wakeLockToggle onchange wires to it'
 
 # 115.5  re-acquire on visibilitychange
@@ -7282,7 +7282,7 @@ $tog116 = [regex]::Match($uiAudio116, '(?s)function toggleHaptic\([\s\S]*?\n\}')
 $ini116 = [regex]::Match($uiAudio116, '(?s)function initHaptic\([\s\S]*?\n\}').Value
 
 # 116.1  preference constant + getter (opt-in localStorage device setting, not state)
-Check (($uiAudio116 -match "const HAPTIC_KEY = 'robco_haptic_enabled'") -and ($uiAudio116 -match 'function isHapticEnabled\(\)') -and ($uiAudio116 -match "localStorage\.getItem\(HAPTIC_KEY\)\s*===\s*'true'")) `
+Check (($uiAudio116 -match "const HAPTIC_KEY = 'robco_haptic_enabled'") -and ($uiAudio116 -match 'function isHapticEnabled\(\)') -and ($uiAudio116 -match "MetaStore\.get\(HAPTIC_KEY\)\s*===\s*'true'")) `
     '116.1: HAPTIC_KEY + isHapticEnabled() persist the toggle as an opt-in (default OFF) localStorage device preference'
 
 # 116.2  feature-detect before use
@@ -7298,7 +7298,7 @@ Check (($trg116 -match 'if \(!_hapticSupported\(\)\) return false') -and ($trg11
     '116.4: triggerHaptic() no-ops when unsupported, when the pref is off, AND when reduced-motion is set; vibrate() is wrapped in try/catch'
 
 # 116.5  toggle persists the pref + confirmation buzz; wired via onchange
-Check (($tog116 -match 'localStorage\.setItem\(HAPTIC_KEY') -and ($tog116 -match 'triggerHaptic\(') -and ($html116 -match 'onchange="toggleHaptic\(this\.checked\)"')) `
+Check (($tog116 -match 'MetaStore\.set\(HAPTIC_KEY') -and ($tog116 -match 'triggerHaptic\(') -and ($html116 -match 'onchange="toggleHaptic\(this\.checked\)"')) `
     '116.5: toggleHaptic persists the pref + fires a confirmation buzz; #hapticToggle onchange wires to it'
 
 # 116.6  graceful fallback -- initHaptic disables the control when unsupported + boot-wired
@@ -7420,11 +7420,11 @@ $ovIdx119 = $html119.IndexOf('overseerLogPanel')
 $ovSlice119 = if ($ovIdx119 -ge 0) { $html119.Substring($ovIdx119, [Math]::Min(600, $html119.Length - $ovIdx119)) } else { '' }
 
 # 119.1  telemetry store constant + tolerant reader (localStorage device stat, not state)
-Check (($uiCore119 -match "const OVERSEER_LOG_KEY = 'robco_overseer_log'") -and ($uiCore119 -match 'function _readOverseerLog\(\)') -and ($rd119 -match 'localStorage\.getItem\(OVERSEER_LOG_KEY\)') -and ($rd119 -match 'catch') -and ($rd119 -match 'bootCount: 0, totalPowerOnMs: 0, longestSessionMs: 0')) `
+Check (($uiCore119 -match "const OVERSEER_LOG_KEY = 'robco_overseer_log'") -and ($uiCore119 -match 'function _readOverseerLog\(\)') -and ($rd119 -match 'MetaStore\.get\(OVERSEER_LOG_KEY\)') -and ($rd119 -match 'catch') -and ($rd119 -match 'bootCount: 0, totalPowerOnMs: 0, longestSessionMs: 0')) `
     '119.1: OVERSEER_LOG_KEY + _readOverseerLog() back the log with a localStorage device stat and return zeroes on parse failure (never throws)'
 
 # 119.2  writer wrapped so a quota / disabled store can never throw
-Check (($wr119 -match 'localStorage\.setItem\(OVERSEER_LOG_KEY') -and ($wr119 -match 'try\s*\{') -and ($wr119 -match 'catch')) `
+Check (($wr119 -match 'MetaStore\.set\(OVERSEER_LOG_KEY') -and ($wr119 -match 'try\s*\{') -and ($wr119 -match 'catch')) `
     '119.2: _writeOverseerLog() persists inside try/catch -- a quota-full or disabled store never throws'
 
 # 119.3  boot increments the count once + starts the session clock + wired into boot
@@ -7491,11 +7491,11 @@ Check (($manualBlock120 -match '\.crt-overlay,') -and ($manualBlock120 -match 'o
     '120.4: both paths set the scanline + refresh-bar overlay to opacity 0.5 (r5 -- a stronger CRT texture, text still legible)'
 
 # 120.5  manual toggle persisted as a localStorage device preference (not campaign state)
-Check (($uiCore120 -match "const HIGH_LUMEN_KEY = 'robco_high_lumen'") -and ($uiCore120 -match 'function isHighLumenEnabled\(\)') -and ($uiCore120 -match "localStorage\.getItem\(HIGH_LUMEN_KEY\)\s*===\s*'true'")) `
+Check (($uiCore120 -match "const HIGH_LUMEN_KEY = 'robco_high_lumen'") -and ($uiCore120 -match 'function isHighLumenEnabled\(\)') -and ($uiCore120 -match "MetaStore\.get\(HIGH_LUMEN_KEY\)\s*===\s*'true'")) `
     '120.5: HIGH_LUMEN_KEY + isHighLumenEnabled() persist the toggle as a localStorage device preference (not campaign state)'
 
 # 120.6  toggle persists + flips the html.high-lumen class; #highLumenToggle onchange wires to it
-Check (($tog120 -match 'localStorage\.setItem\(HIGH_LUMEN_KEY') -and ($tog120 -match '_applyHighLumen\(') -and ($app120 -match "documentElement\.classList\.toggle\('high-lumen'") -and ($html120 -match 'onchange="toggleHighLumen\(this\.checked\)"')) `
+Check (($tog120 -match 'MetaStore\.set\(HIGH_LUMEN_KEY') -and ($tog120 -match '_applyHighLumen\(') -and ($app120 -match "documentElement\.classList\.toggle\('high-lumen'") -and ($html120 -match 'onchange="toggleHighLumen\(this\.checked\)"')) `
     "120.6: toggleHighLumen persists the pref and _applyHighLumen toggles the 'high-lumen' class on <html>; #highLumenToggle onchange wires to it"
 
 # 120.7  init restores the pref + reflects to the checkbox + boot wiring + early-paint (no flash)
@@ -7533,11 +7533,11 @@ Check ($start121 -match 'if \(radioNodes \|\| AudioSettings\.masterMute \|\| !Au
     '121.2: startRadio() guards on masterMute + the AudioSettings.radio ON-pref (and no double-start) before building any node'
 
 # 121.3  AudioSettings.radio seeded from localStorage robco_radio_on (ON semantics, opt-in)
-Check (($uiCore121 -match "radio: localStorage\.getItem\('robco_radio_on'\) === 'true'") -and ($uiAudio121 -match "const RADIO_KEY = 'robco_radio_on'")) `
+Check (($uiCore121 -match "radio: MetaStore\.get\('robco_radio_on'\) === 'true'") -and ($uiAudio121 -match "const RADIO_KEY = 'robco_radio_on'")) `
     "121.3: AudioSettings.radio is seeded from localStorage 'robco_radio_on' (opt-in ON-semantics device preference)"
 
 # 121.4  toggle persists pref + flips cache + starts/stops; wired via onchange
-Check (($toggle121 -match 'localStorage\.setItem\(RADIO_KEY') -and ($toggle121 -match 'AudioSettings\.radio = on') -and ($toggle121 -match 'startRadio\(\)') -and ($toggle121 -match 'stopRadio\(\)') -and ($html121 -match 'onchange="toggleRadio\(this\.checked\)"')) `
+Check (($toggle121 -match 'MetaStore\.set\(RADIO_KEY') -and ($toggle121 -match 'AudioSettings\.radio = on') -and ($toggle121 -match 'startRadio\(\)') -and ($toggle121 -match 'stopRadio\(\)') -and ($html121 -match 'onchange="toggleRadio\(this\.checked\)"')) `
     '121.4: toggleRadio persists robco_radio_on + starts/stops the station; #radioToggle onchange wires to it'
 
 # 121.5  masterMute integration: stop under mute, resume on un-mute if pref on
@@ -7581,7 +7581,7 @@ Check (($degIdx122 -ge 0) -and ($fbIdx122 -ge 0) -and ($degIdx122 -lt $fbIdx122)
     '122.2: the degraded roll runs BEFORE the robco_booted_before first-boot gate -- degraded can trigger on ANY boot, not just first launch (owner pref)'
 
 # 122.3  cold first-power-on POST: RETROS BIOS + counting memory test, gated once by the flag
-Check (($bootLines122 -match 'RETROS BIOS') -and ($bootLines122 -match 'MEMORY TEST') -and ($pick122 -match "!localStorage\.getItem\('robco_booted_before'\)") -and ($runBoot122 -match "localStorage\.setItem\('robco_booted_before', 'true'\)")) `
+Check (($bootLines122 -match 'RETROS BIOS') -and ($bootLines122 -match 'MEMORY TEST') -and ($pick122 -match "!MetaStore\.get\('robco_booted_before'\)") -and ($runBoot122 -match "MetaStore\.set\('robco_booted_before', 'true'\)")) `
     '122.3: the first-ever cold POST (RETROS BIOS + memory test) is gated once by robco_booted_before, which runBootSequence sets'
 
 # 122.4  normal warm boot UNCHANGED: canonical lines + 120ms interval + fade/_bootActive
@@ -7800,7 +7800,7 @@ Check (($failContrast124.Count -eq 0) -and ($safeKeys124.Count -ge 1)) `
     '124.7: every contrastSafe:true theme meets WCAG AA >=4.5:1 vs the page background'
 
 # 124.8  changeOpticsColor is table-driven AND persists to the PER-GAME optic key
-Check (($changeFn124 -match '_applyThemeVars\(color\)') -and ($changeFn124 -match 'localStorage\.setItem\(_opticStorageKey\(\)') -and (-not ($changeFn124 -match 'else if \(color ===')) -and ($applyFn124 -match 'THEMES\[key\]')) `
+Check (($changeFn124 -match '_applyThemeVars\(color\)') -and ($changeFn124 -match 'MetaStore\.set\(_opticStorageKey\(\)') -and (-not ($changeFn124 -match 'else if \(color ===')) -and ($applyFn124 -match 'THEMES\[key\]')) `
     '124.8: changeOpticsColor delegates to table-driven _applyThemeVars and persists to the per-game _opticStorageKey()'
 
 # 124.9  ui-saves dropped the duplicated fgMap palette and reads THEMES
@@ -8055,11 +8055,11 @@ Check (($audio130 -match 'function _opticStorageKey\(') -and ($keyFn130 -match "
     '130.1: _opticStorageKey() returns robco_optic_<ctx> keyed by getGameContext() (game-agnostic per-game key)'
 
 # 130.2  changeOpticsColor persists to the PER-GAME key, not the legacy global
-Check (($changeFn130 -match 'localStorage\.setItem\(_opticStorageKey\(\), color\)') -and (-not ($changeFn130 -match "setItem\('robco_optics'"))) `
+Check (($changeFn130 -match 'MetaStore\.set\(_opticStorageKey\(\), color\)') -and (-not ($changeFn130 -match "setItem\('robco_optics'"))) `
     '130.2: changeOpticsColor persists the pick to the per-game _opticStorageKey() (not the global robco_optics)'
 
 # 130.3  resolution order: per-game pick -> (one-time legacy migration) -> game default
-Check (($resolveOpticFn130 -match '_opticStorageKey\(\)') -and ($resolveOpticFn130 -match "getItem\('robco_optics'\)") -and ($resolveOpticFn130 -match "removeItem\('robco_optics'\)") -and ($resolveOpticFn130 -match '_resolveDefaultOptics\(\)')) `
+Check (($resolveOpticFn130 -match '_opticStorageKey\(\)') -and ($resolveOpticFn130 -match "MetaStore\.get\('robco_optics'\)") -and ($resolveOpticFn130 -match "MetaStore\.remove\('robco_optics'\)") -and ($resolveOpticFn130 -match '_resolveDefaultOptics\(\)')) `
     '130.3: _resolveOptic = per-game pick -> migrate+retire legacy global -> _resolveDefaultOptics (default -> green)'
 
 # 130.4  boot resolves + applies the per-game optic, syncs the picker, updates the label
@@ -8500,6 +8500,119 @@ console.log('RESULT:' + results.map(r => r ? '1' : '0').join(''));
 } catch {
     foreach ($lbl in $labels133) { Fail "$lbl  (harness error: $_)" }
 }
+
+# ===========================================================
+# Suite 134 -- U6: MetaStore boundary-gate (Step 2 / v2.8.0 Phase 0). U5
+# introduced MetaStore (js/state.js) as the single choke point for every
+# robco_* localStorage key that is a DEVICE PREFERENCE, as opposed to
+# CAMPAIGN/SAVE data (robco_v8/v7/chat/playstyle/playstyle_type, save slots,
+# rolling backups, cloud-push bookkeeping), which is a separate store and
+# must never be read/written through MetaStore (Protocol 23). Makes that
+# boundary structural: manifest purity, has()/get()/set()/remove() behavior
+# (shelled to node, mirrors the Suite 133 pattern), and static guards that no
+# served code crosses the boundary either direction.
+# 8 tests
+# ===========================================================
+Sep "Suite 134 -- U6 MetaStore boundary gate"
+
+$campaignKeys134 = @('robco_v8', 'robco_v7', 'robco_chat', 'robco_playstyle', 'robco_playstyle_type', 'robco_slot_', 'robco_backup_', 'robco_last_cloud_push')
+
+# 134.1  structural: MetaStore + META_MANIFEST declared with the full accessor surface
+Check (($stateSrc -match 'const META_MANIFEST\s*=\s*\{') -and ($stateSrc -match 'const MetaStore\s*=\s*\{') -and ($stateSrc -match 'has\(key\)') -and ($stateSrc -match 'get\(key\)') -and ($stateSrc -match 'set\(key,\s*val\)') -and ($stateSrc -match 'remove\(key\)') -and ($stateSrc -match 'window\.MetaStore\s*=\s*MetaStore')) `
+    '134.1: js/state.js declares META_MANIFEST + MetaStore (get/set/remove/has/keys) and exposes window.MetaStore'
+
+# 134.2  purity: no campaign/save key is registered in the device-preference manifest
+$manifestBlock134 = [regex]::Match($stateSrc, '(?s)const META_MANIFEST\s*=\s*\{[\s\S]*?\n\};').Value
+$leaked134 = $campaignKeys134 | Where-Object { $manifestBlock134 -match [regex]::Escape($_) }
+Check ($manifestBlock134.Length -gt 0 -and $leaked134.Count -eq 0) `
+    ('134.2: META_MANIFEST registers zero campaign/save keys (robco_v8/v7/chat/playstyle/playstyle_type/slot/backup/last_cloud_push)' + $(if ($leaked134.Count) { ' -- leaked: ' + ($leaked134 -join ', ') } else { '' }))
+
+# 134.3-134.5  behavioral: has()/get()/set()/remove() correctness, shelled to node
+$labels134 = @(
+    '134.3: MetaStore.has() is true for a registered device key and the per-game optic family, false for every campaign key',
+    '134.4: MetaStore.set()/get()/remove() round-trip correctly against localStorage',
+    '134.5: MetaStore.get/set/remove never throw when localStorage itself throws (quota/private-mode fail-soft)'
+)
+try {
+    $nodeCheck134 = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCheck134) {
+        $statePathNode134 = (Join-Path $Root "js/state.js").Replace('\', '/')
+        $testScript134 = @"
+const fs = require('fs');
+const vm = require('vm');
+const stateSource = fs.readFileSync('$statePathNode134', 'utf8');
+const sandbox = { window: {}, document: { getElementById: () => null } };
+vm.createContext(sandbox);
+vm.runInContext(stateSource, sandbox);
+const results = [];
+const campaignKeys = ['robco_v8','robco_v7','robco_chat','robco_playstyle','robco_playstyle_type','robco_slot_1','robco_backup_1','robco_last_cloud_push'];
+try {
+  const posHas = ['robco_gemini_key', 'robco_optic_FNV'].every(k => vm.runInContext('MetaStore.has(' + JSON.stringify(k) + ')', sandbox) === true);
+  const negHas = campaignKeys.every(k => vm.runInContext('MetaStore.has(' + JSON.stringify(k) + ')', sandbox) === false);
+  results.push(posHas && negHas);
+} catch (e) { results.push(false); }
+try {
+  const store = {};
+  sandbox.localStorage = {
+    getItem: k => Object.prototype.hasOwnProperty.call(store, k) ? store[k] : null,
+    setItem: (k, v) => { store[k] = String(v); },
+    removeItem: k => { delete store[k]; },
+  };
+  vm.runInContext("MetaStore.set('robco_high_lumen', 'true')", sandbox);
+  const readBack = vm.runInContext("MetaStore.get('robco_high_lumen')", sandbox);
+  vm.runInContext("MetaStore.remove('robco_high_lumen')", sandbox);
+  const afterRemove = vm.runInContext("MetaStore.get('robco_high_lumen')", sandbox);
+  results.push(readBack === 'true' && afterRemove === null);
+} catch (e) { results.push(false); }
+try {
+  sandbox.localStorage = {
+    getItem: () => { throw new Error('QuotaExceededError'); },
+    setItem: () => { throw new Error('QuotaExceededError'); },
+    removeItem: () => { throw new Error('QuotaExceededError'); },
+  };
+  const getResult = vm.runInContext("MetaStore.get('robco_haptic_enabled')", sandbox);
+  vm.runInContext("MetaStore.set('robco_haptic_enabled', 'true')", sandbox);
+  vm.runInContext("MetaStore.remove('robco_haptic_enabled')", sandbox);
+  results.push(getResult === null);
+} catch (e) { results.push(false); }
+console.log('RESULT:' + results.map(r => r ? '1' : '0').join(''));
+"@
+        $out134 = ($testScript134 | node 2>&1 | Out-String)
+        $rm134 = [regex]::Match($out134, 'RESULT:([01]{3})')
+        if ($rm134.Success) {
+            $bits134 = $rm134.Groups[1].Value
+            for ($bi = 0; $bi -lt 3; $bi++) { Check ($bits134.Substring($bi, 1) -eq '1') $labels134[$bi] }
+        } else {
+            $err134 = if ([string]::IsNullOrWhiteSpace($out134)) { "No output from node" } else { $out134.Trim() }
+            foreach ($lbl in $labels134) { Fail "$lbl  (runtime error: $err134)" }
+        }
+    } else {
+        foreach ($lbl in $labels134) { Fail "$lbl  (node not found)" }
+    }
+} catch {
+    foreach ($lbl in $labels134) { Fail "$lbl  (harness error: $_)" }
+}
+
+# 134.6  static: no served code ever passes a campaign/save key to MetaStore
+$servedJs134 = $uiSrc + "`n" + $apiSrc + "`n" + $cloudSrc
+Check (-not ($servedJs134 -match "MetaStore\.(get|set|remove)\(\s*['""]robco_(v8|v7|chat|playstyle(_type)?|slot_|backup_|last_cloud_push)")) `
+    '134.6: no MetaStore.get/set/remove call site anywhere passes a campaign/save key'
+
+# 134.7  static: the sanctioned index.html pre-paint exception sits before the first js/*.js <script> tag
+$firstScriptIdx134 = $htmlSrc.IndexOf('<script src="js/')
+$preheadBlock134 = $htmlSrc.Substring(0, [Math]::Max(0, $firstScriptIdx134))
+$restOfDoc134 = if ($firstScriptIdx134 -ge 0) { $htmlSrc.Substring($firstScriptIdx134) } else { $htmlSrc }
+$rawDeviceKeyRe134 = "localStorage\.getItem\(\s*['""]robco_(optic_|optics|high_lumen)"
+$preheadHits134 = [regex]::Matches($preheadBlock134, $rawDeviceKeyRe134).Count
+$restHits134 = [regex]::Matches($restOfDoc134, $rawDeviceKeyRe134).Count
+Check (($firstScriptIdx134 -gt -1) -and ($preheadHits134 -gt 0) -and ($restHits134 -eq 0)) `
+    '134.7: the sanctioned pre-paint bare-localStorage device-key reads in index.html sit strictly before the first js/*.js <script> tag (MetaStore is unavailable there)'
+
+# 134.8  static: every served JS file reaches device-preference keys/constants ONLY through MetaStore
+$deviceTokens134 = @('robco_gemini_key','robco_gemini_key_sync','robco_gemini_model','robco_sfx_muted','robco_hum_muted','robco_geiger_muted','robco_tinnitus_muted','robco_ambient_muted','robco_wake_muted','robco_panelclick_muted','robco_bootdrone_muted','robco_levelup_muted','robco_heartbeat_muted','robco_questcomplete_muted','robco_questfail_muted','robco_factionthreshold_muted','robco_master_muted','RADIO_KEY','WAKE_LOCK_KEY','HAPTIC_KEY','HIGH_LUMEN_KEY','OVERSEER_LOG_KEY','ERROR_LOG_KEY','robco_panel_state','robco_active_tab','robco_typer_speed','robco_version','robco_booted_before','robco_feature_flags','robco_sw_installed')
+$offenders134 = $deviceTokens134 | Where-Object { $servedJs134 -match ("localStorage\.(getItem|setItem|removeItem)\(\s*['\""]?" + $_) }
+Check ($offenders134.Count -eq 0) `
+    ('134.8: no served JS (ui/api/cloud) reads/writes a registered device-preference key via raw localStorage -- MetaStore is the only path' + $(if ($offenders134.Count) { ' -- offenders: ' + ($offenders134 -join ', ') } else { '' }))
 
 # ===========================================================
 # Results

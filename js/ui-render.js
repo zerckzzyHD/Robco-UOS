@@ -919,7 +919,7 @@ function _renderReadTracker(opts) {
 
   let ps = {};
   try {
-    ps = JSON.parse(localStorage.getItem('robco_panel_state') || '{}');
+    ps = JSON.parse(MetaStore.get('robco_panel_state') || '{}');
   } catch (_) {}
   const readOpen = ps[opts.subIdRead] !== false;
   const unreadOpen = ps[opts.subIdUnread] !== false;
@@ -961,9 +961,9 @@ function _renderReadTracker(opts) {
   container.querySelectorAll('details[data-sub-id]').forEach(d => {
     d.addEventListener('toggle', () => {
       try {
-        const p = JSON.parse(localStorage.getItem('robco_panel_state') || '{}');
+        const p = JSON.parse(MetaStore.get('robco_panel_state') || '{}');
         p[d.dataset.subId] = d.open;
-        localStorage.setItem('robco_panel_state', JSON.stringify(p));
+        MetaStore.set('robco_panel_state', JSON.stringify(p));
       } catch (_) {}
     });
   });
@@ -1537,7 +1537,7 @@ function renderFactionRep() {
   const minorWasOpen = minorDetails ? minorDetails.open : false;
   let minorPersisted = false;
   try {
-    const ps = JSON.parse(localStorage.getItem('robco_panel_state') || '{}');
+    const ps = JSON.parse(MetaStore.get('robco_panel_state') || '{}');
     if (typeof ps['minor_factions'] === 'boolean') minorPersisted = ps['minor_factions'];
   } catch (_) {}
   const minorOpen = minorWasOpen || minorPersisted;
@@ -1559,9 +1559,9 @@ function renderFactionRep() {
   container.querySelectorAll('details[data-sub-id]').forEach(d => {
     d.addEventListener('toggle', () => {
       try {
-        const p = JSON.parse(localStorage.getItem('robco_panel_state') || '{}');
+        const p = JSON.parse(MetaStore.get('robco_panel_state') || '{}');
         p[d.dataset.subId] = d.open;
-        localStorage.setItem('robco_panel_state', JSON.stringify(p));
+        MetaStore.set('robco_panel_state', JSON.stringify(p));
       } catch (_) {}
     });
   });

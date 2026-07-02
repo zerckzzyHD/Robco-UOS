@@ -22,24 +22,24 @@ function _isDirty(key, slice) {
 // ── AUDIO SETTINGS CACHE ──────────────────────────────────────
 // Read mute prefs once at startup — avoids localStorage reads on every audio tick
 const AudioSettings = {
-  typing: localStorage.getItem('robco_sfx_muted') === 'true',
-  hum: localStorage.getItem('robco_hum_muted') === 'true',
-  geiger: localStorage.getItem('robco_geiger_muted') === 'true',
-  tinnitus: localStorage.getItem('robco_tinnitus_muted') === 'true',
-  ambient: localStorage.getItem('robco_ambient_muted') === 'true',
-  wake: localStorage.getItem('robco_wake_muted') === 'true',
-  panelClick: localStorage.getItem('robco_panelclick_muted') === 'true', // H1: rotary dial clicks
-  bootDrone: localStorage.getItem('robco_bootdrone_muted') === 'true', // H4-bonus: boot drone
-  levelUp: localStorage.getItem('robco_levelup_muted') === 'true', // H3: level up jingle
-  heartbeat: localStorage.getItem('robco_heartbeat_muted') === 'true', // H4: low health heartbeat
-  questComplete: localStorage.getItem('robco_questcomplete_muted') === 'true', // quest complete chime
-  questFail: localStorage.getItem('robco_questfail_muted') === 'true', // quest fail tone
-  factionThreshold: localStorage.getItem('robco_factionthreshold_muted') === 'true', // faction standing alert
+  typing: MetaStore.get('robco_sfx_muted') === 'true',
+  hum: MetaStore.get('robco_hum_muted') === 'true',
+  geiger: MetaStore.get('robco_geiger_muted') === 'true',
+  tinnitus: MetaStore.get('robco_tinnitus_muted') === 'true',
+  ambient: MetaStore.get('robco_ambient_muted') === 'true',
+  wake: MetaStore.get('robco_wake_muted') === 'true',
+  panelClick: MetaStore.get('robco_panelclick_muted') === 'true', // H1: rotary dial clicks
+  bootDrone: MetaStore.get('robco_bootdrone_muted') === 'true', // H4-bonus: boot drone
+  levelUp: MetaStore.get('robco_levelup_muted') === 'true', // H3: level up jingle
+  heartbeat: MetaStore.get('robco_heartbeat_muted') === 'true', // H4: low health heartbeat
+  questComplete: MetaStore.get('robco_questcomplete_muted') === 'true', // quest complete chime
+  questFail: MetaStore.get('robco_questfail_muted') === 'true', // quest fail tone
+  factionThreshold: MetaStore.get('robco_factionthreshold_muted') === 'true', // faction standing alert
   // WU-F5 Pip-Boy Radio: ON semantics (true = playing), NOT a mute flag. Default
   // OFF (opt-in). initRadio() does the autoplay-safe first-gesture restore at boot;
   // this initialiser just reflects the saved preference into the cache.
-  radio: localStorage.getItem('robco_radio_on') === 'true',
-  masterMute: localStorage.getItem('robco_master_muted') === 'true',
+  radio: MetaStore.get('robco_radio_on') === 'true',
+  masterMute: MetaStore.get('robco_master_muted') === 'true',
 };
 
 // ── WU-F1 SUSTAINED POWER CELL (Screen Wake Lock) ─────────────────────────
@@ -61,7 +61,7 @@ function _wakeLockSupported() {
   );
 }
 function isWakeLockEnabled() {
-  return localStorage.getItem(WAKE_LOCK_KEY) === 'true';
+  return MetaStore.get(WAKE_LOCK_KEY) === 'true';
 }
 async function _acquireWakeLock() {
   if (!_wakeLockSupported() || _wakeLockSentinel) return false;
@@ -99,7 +99,7 @@ function _updateWakeLockUI() {
     : '> POWER CELL IDLE — DISPLAY MAY DIM';
 }
 async function toggleWakeLock(enabled) {
-  localStorage.setItem(WAKE_LOCK_KEY, enabled ? 'true' : 'false');
+  MetaStore.set(WAKE_LOCK_KEY, enabled ? 'true' : 'false');
   if (enabled) await _acquireWakeLock();
   else await _releaseWakeLock();
   _updateWakeLockUI();
@@ -143,7 +143,7 @@ let _overseerBooted = false;
 function _readOverseerLog() {
   const num = v => (typeof v === 'number' && isFinite(v) && v >= 0 ? v : 0);
   try {
-    const o = JSON.parse(localStorage.getItem(OVERSEER_LOG_KEY) || '{}');
+    const o = JSON.parse(MetaStore.get(OVERSEER_LOG_KEY) || '{}');
     return {
       bootCount: num(o.bootCount),
       totalPowerOnMs: num(o.totalPowerOnMs),
@@ -156,7 +156,7 @@ function _readOverseerLog() {
 }
 function _writeOverseerLog(o) {
   try {
-    localStorage.setItem(OVERSEER_LOG_KEY, JSON.stringify(o));
+    MetaStore.set(OVERSEER_LOG_KEY, JSON.stringify(o));
   } catch (_) {
     /* quota / disabled storage — never let telemetry throw */
   }
@@ -250,7 +250,7 @@ window.addEventListener('pagehide', _flushOverseerLog);
 // there is nothing to feature-detect — it is always available.
 const HIGH_LUMEN_KEY = 'robco_high_lumen';
 function isHighLumenEnabled() {
-  return localStorage.getItem(HIGH_LUMEN_KEY) === 'true';
+  return MetaStore.get(HIGH_LUMEN_KEY) === 'true';
 }
 function _applyHighLumen(on) {
   document.documentElement.classList.toggle('high-lumen', !!on);
@@ -263,7 +263,7 @@ function _updateHighLumenUI() {
     : '> STANDARD OPTICS — AMBIENT CONTRAST';
 }
 function toggleHighLumen(enabled) {
-  localStorage.setItem(HIGH_LUMEN_KEY, enabled ? 'true' : 'false');
+  MetaStore.set(HIGH_LUMEN_KEY, enabled ? 'true' : 'false');
   _applyHighLumen(enabled);
   _updateHighLumenUI();
 }
@@ -282,10 +282,10 @@ const ERROR_LOG_CAP = 50;
 let _sysModalTrigger = null;
 function _recordError(type, msg) {
   try {
-    const log = JSON.parse(localStorage.getItem(ERROR_LOG_KEY) || '[]');
+    const log = JSON.parse(MetaStore.get(ERROR_LOG_KEY) || '[]');
     log.push({ t: Date.now(), type, msg: String(msg).slice(0, 300) });
     while (log.length > ERROR_LOG_CAP) log.shift();
-    localStorage.setItem(ERROR_LOG_KEY, JSON.stringify(log));
+    MetaStore.set(ERROR_LOG_KEY, JSON.stringify(log));
   } catch (_) {} // never let logging throw
 }
 
@@ -490,15 +490,15 @@ function _hydrateStateFromStorage() {
 }
 
 function _restoreApiKeyAndChatHistory() {
-  if (localStorage.getItem('robco_gemini_key')) {
-    document.getElementById('apiKeyInput').value = localStorage.getItem('robco_gemini_key');
+  if (MetaStore.get('robco_gemini_key')) {
+    document.getElementById('apiKeyInput').value = MetaStore.get('robco_gemini_key');
   }
-  if (localStorage.getItem('robco_gemini_key_sync') === 'true') {
+  if (MetaStore.get('robco_gemini_key_sync') === 'true') {
     const syncEl = document.getElementById('geminiKeySyncToggle');
     if (syncEl) syncEl.checked = true;
   }
-  if (localStorage.getItem('robco_gemini_model')) {
-    let savedModel = localStorage.getItem('robco_gemini_model');
+  if (MetaStore.get('robco_gemini_model')) {
+    let savedModel = MetaStore.get('robco_gemini_model');
     const safeModel = escapeHtml(savedModel);
     document.getElementById('apiModelInput').innerHTML =
       `<option value="${safeModel}">${safeModel} (Secured)</option>`;
@@ -543,7 +543,7 @@ function _wireStandby() {
 function _wirePanelPersistence() {
   // #35 Panel Memory — restore previously open/closed panel states
   // On desktop, default-open still applies if no saved state exists
-  const savedPanelState = JSON.parse(localStorage.getItem('robco_panel_state') || 'null');
+  const savedPanelState = JSON.parse(MetaStore.get('robco_panel_state') || 'null');
   const panelEls = Array.from(document.querySelectorAll('details.panel'));
   panelEls.forEach((d, idx) => {
     const id =
@@ -569,9 +569,9 @@ function _wirePanelPersistence() {
       d.setAttribute('open', '');
     }
     d.addEventListener('toggle', () => {
-      const ps = JSON.parse(localStorage.getItem('robco_panel_state') || '{}');
+      const ps = JSON.parse(MetaStore.get('robco_panel_state') || '{}');
       ps[id] = d.open;
-      localStorage.setItem('robco_panel_state', JSON.stringify(ps));
+      MetaStore.set('robco_panel_state', JSON.stringify(ps));
       if (d.id === 'worldMapPanel' && d.open && typeof renderWorldMap === 'function')
         renderWorldMap();
     });
@@ -589,9 +589,9 @@ function _wirePanelPersistence() {
     // Default: no 'open' (collapsed) — new sub-trackers start closed until user expands
     d.addEventListener('toggle', () => {
       try {
-        const ps = JSON.parse(localStorage.getItem('robco_panel_state') || '{}');
+        const ps = JSON.parse(MetaStore.get('robco_panel_state') || '{}');
         ps[id] = d.open;
-        localStorage.setItem('robco_panel_state', JSON.stringify(ps));
+        MetaStore.set('robco_panel_state', JSON.stringify(ps));
       } catch (_) {}
     });
   });
@@ -611,49 +611,49 @@ function _restoreOpticsPreference() {
 }
 
 function _restoreDevicePrefs() {
-  if (localStorage.getItem('robco_sfx_muted') === 'true') {
+  if (MetaStore.get('robco_sfx_muted') === 'true') {
     let el = document.getElementById('muteTypingToggle');
     if (el) el.checked = true;
   }
-  if (localStorage.getItem('robco_hum_muted') === 'true') {
+  if (MetaStore.get('robco_hum_muted') === 'true') {
     let el = document.getElementById('muteHumToggle');
     if (el) el.checked = true;
   }
-  if (localStorage.getItem('robco_geiger_muted') === 'true') {
+  if (MetaStore.get('robco_geiger_muted') === 'true') {
     let el = document.getElementById('muteGeigerToggle');
     if (el) el.checked = true;
   }
-  if (localStorage.getItem('robco_tinnitus_muted') === 'true') {
+  if (MetaStore.get('robco_tinnitus_muted') === 'true') {
     let el = document.getElementById('muteTinnitusToggle');
     if (el) el.checked = true;
   }
-  if (localStorage.getItem('robco_ambient_muted') === 'true') {
+  if (MetaStore.get('robco_ambient_muted') === 'true') {
     let el = document.getElementById('muteLimbToggle');
     if (el) el.checked = true;
   }
-  if (localStorage.getItem('robco_wake_muted') === 'true') {
+  if (MetaStore.get('robco_wake_muted') === 'true') {
     let el = document.getElementById('muteWakeToggle');
     if (el) el.checked = true;
   }
-  if (localStorage.getItem('robco_questcomplete_muted') === 'true') {
+  if (MetaStore.get('robco_questcomplete_muted') === 'true') {
     let el = document.getElementById('muteQuestCompleteToggle');
     if (el) el.checked = true;
   }
-  if (localStorage.getItem('robco_questfail_muted') === 'true') {
+  if (MetaStore.get('robco_questfail_muted') === 'true') {
     let el = document.getElementById('muteQuestFailToggle');
     if (el) el.checked = true;
   }
-  if (localStorage.getItem('robco_factionthreshold_muted') === 'true') {
+  if (MetaStore.get('robco_factionthreshold_muted') === 'true') {
     let el = document.getElementById('muteFactionThresholdToggle');
     if (el) el.checked = true;
   }
   // Master mute restore
-  if (localStorage.getItem('robco_master_muted') === 'true') {
+  if (MetaStore.get('robco_master_muted') === 'true') {
     let el = document.getElementById('masterMuteToggle');
     if (el) el.checked = true;
   }
   // Silently refresh model list 2s after boot if key is present
-  if (localStorage.getItem('robco_gemini_key')) {
+  if (MetaStore.get('robco_gemini_key')) {
     setTimeout(() => {
       try {
         fetchAuthorizedModels(true);
@@ -701,7 +701,7 @@ function _restoreDevicePrefs() {
 
   // #34 Typewriter Speed — restore slider + label on load
   {
-    const savedSpeed = parseFloat(localStorage.getItem('robco_typer_speed') || '1');
+    const savedSpeed = parseFloat(MetaStore.get('robco_typer_speed') || '1');
     const slider = document.getElementById('typerSpeedSlider');
     const label = document.getElementById('typerSpeedVal');
     if (slider) slider.value = savedSpeed;
@@ -722,10 +722,10 @@ function _wireKeyboardShortcuts() {
           if (target.open) target.removeAttribute('open');
           else target.setAttribute('open', '');
           // persist new state
-          const ps = JSON.parse(localStorage.getItem('robco_panel_state') || '{}');
+          const ps = JSON.parse(MetaStore.get('robco_panel_state') || '{}');
           if (target.dataset.panelId) {
             ps[target.dataset.panelId] = target.open;
-            localStorage.setItem('robco_panel_state', JSON.stringify(ps));
+            MetaStore.set('robco_panel_state', JSON.stringify(ps));
           }
         }
       } else if (e.key === '/') {
@@ -791,8 +791,8 @@ function _wireKeyboardShortcuts() {
 function _runBootSequenceAndBriefing() {
   // Defer changelog display until after boot sequence completes
   let needsChangelog = false;
-  if (localStorage.getItem('robco_version') !== APP_VERSION) {
-    localStorage.setItem('robco_version', APP_VERSION);
+  if (MetaStore.get('robco_version') !== APP_VERSION) {
+    MetaStore.set('robco_version', APP_VERSION);
     needsChangelog = true;
   }
 
@@ -1261,9 +1261,7 @@ function switchTab(tab) {
     if (btn) btn.classList.toggle('active', t === tab);
   });
   // Store active tab so page reload restores it
-  try {
-    localStorage.setItem('robco_active_tab', tab);
-  } catch (_) {}
+  MetaStore.set('robco_active_tab', tab);
   // Re-render world map when switching to the DATA tab so it measures real panel width
   if (tab === 'data' && typeof renderWorldMap === 'function') renderWorldMap();
 }
@@ -1271,10 +1269,8 @@ function switchTab(tab) {
 // Initialize tab on page load (restores last used tab, defaults to 'stat')
 function initTabs() {
   let tab = 'stat';
-  try {
-    const saved = localStorage.getItem('robco_active_tab');
-    if (saved && TAB_NAMES.includes(saved)) tab = saved;
-  } catch (_) {}
+  const saved = MetaStore.get('robco_active_tab');
+  if (saved && TAB_NAMES.includes(saved)) tab = saved;
   switchTab(tab);
 }
 
@@ -1392,10 +1388,10 @@ function expandPanelForCategory(categoryKey) {
   if (details && !details.open) {
     details.setAttribute('open', '');
     // Persist the newly opened state
-    const ps = JSON.parse(localStorage.getItem('robco_panel_state') || '{}');
+    const ps = JSON.parse(MetaStore.get('robco_panel_state') || '{}');
     if (details.dataset.panelId) {
       ps[details.dataset.panelId] = true;
-      localStorage.setItem('robco_panel_state', JSON.stringify(ps));
+      MetaStore.set('robco_panel_state', JSON.stringify(ps));
     }
   }
   // For ammo, also open the nested ammo sub-panel
@@ -1681,6 +1677,10 @@ function closeModal() {
   _sysModalTrigger = null;
 }
 
+function _clearErrorLog() {
+  MetaStore.remove(ERROR_LOG_KEY);
+  showErrorLog();
+}
 function showErrorLog() {
   const modal = document.getElementById('sysModal');
   const title = document.getElementById('modalTitle');
@@ -1689,7 +1689,7 @@ function showErrorLog() {
   title.innerText = '> CLIENT ERROR LOG';
   let log = [];
   try {
-    log = JSON.parse(localStorage.getItem(ERROR_LOG_KEY) || '[]');
+    log = JSON.parse(MetaStore.get(ERROR_LOG_KEY) || '[]');
   } catch (_) {}
   if (log.length === 0) {
     content.innerHTML = '<pre style="color:var(--robco-dim)">No errors recorded.</pre>';
@@ -1714,9 +1714,7 @@ function showErrorLog() {
       '<div style="font-size:11px">' +
       rows +
       '<button class="action-btn" style="margin-top:6px;font-size:10px" ' +
-      'onclick="localStorage.removeItem(\'' +
-      ERROR_LOG_KEY +
-      '\');showErrorLog()">' +
+      'onclick="_clearErrorLog()">' +
       'CLEAR LOGS</button></div>';
   }
   _openSysModal();
@@ -2659,7 +2657,7 @@ function escapeAndFormat(text) {
 
 function getTypewriterSpeed(text) {
   // #34 Typewriter Speed Control: user-set multiplier (0.25×–2×) stored in localStorage
-  const speedMult = parseFloat(localStorage.getItem('robco_typer_speed') || '1');
+  const speedMult = parseFloat(MetaStore.get('robco_typer_speed') || '1');
   let base;
   if (/\b(dead|fatal|crit|ambush|explosion|killed|bleeding|dying)\b/i.test(text)) base = 2;
   else if (/\b(rest|wait|camp|safe|sleep|heal|recover)\b/i.test(text)) base = 40;

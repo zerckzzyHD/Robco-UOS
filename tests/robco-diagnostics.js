@@ -3930,12 +3930,12 @@ header('Remote Kill-Switch + Client Auto-Disable (Protocol 32/35)');
     'window.isFeatureEnabled defined and uses !== false pattern (unknown/missing keys return true — fail-open)'
   );
 
-  // 48.7  LKG key robco_feature_flags is both read from and written to localStorage
+  // 48.7  LKG key robco_feature_flags is both read from and written to via MetaStore (U5)
   assert(
     /robco_feature_flags/.test(cloudSrc48) &&
-      /localStorage\.setItem\s*\(\s*['"]robco_feature_flags/.test(cloudSrc48) &&
-      /localStorage\.getItem\s*\(\s*['"]robco_feature_flags/.test(cloudSrc48),
-    "cloud.js reads and writes 'robco_feature_flags' localStorage key (last-known-good persistence)"
+      /window\.MetaStore\.set\s*\(\s*['"]robco_feature_flags/.test(cloudSrc48) &&
+      /window\.MetaStore\.get\s*\(\s*['"]robco_feature_flags/.test(cloudSrc48),
+    "cloud.js reads and writes 'robco_feature_flags' via MetaStore (last-known-good persistence)"
   );
 
   // 48.8  transmitMessage in api.js references isFeatureEnabled with 'aiChat'
@@ -6716,9 +6716,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   //        UPDATE even when the live controller reference is momentarily null
   assert(
     /SW_INSTALLED_FLAG\s*=\s*'robco_sw_installed'/.test(htmlSource) &&
-      /function _markInstalled\(\)[\s\S]*?localStorage\.setItem\(SW_INSTALLED_FLAG/.test(
-        htmlSource
-      ) &&
+      /function _markInstalled\(\)[\s\S]*?MetaStore\.set\(SW_INSTALLED_FLAG/.test(htmlSource) &&
       /'controllerchange',\s*\(\)\s*=>\s*\{\s*_markInstalled\(\)/.test(htmlSource),
     '65.15: persistent robco_sw_installed flag set via _markInstalled() (on controller present + on controllerchange)'
   );
@@ -7651,9 +7649,9 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     'index.html: #lincolnSubPanel has no "open" attribute — defaults to collapsed'
   );
 
-  // 71.15  Fail-safe: sub-panel persistence uses JSON.parse with '{}' fallback
+  // 71.15  Fail-safe: sub-panel persistence uses JSON.parse with '{}' fallback (routed via MetaStore)
   assert(
-    /JSON\.parse\s*\(\s*localStorage\.getItem\s*\(\s*['"]robco_panel_state['"]\s*\)\s*\|\|\s*'\{\}'/.test(
+    /JSON\.parse\s*\(\s*MetaStore\.get\s*\(\s*['"]robco_panel_state['"]\s*\)\s*\|\|\s*'\{\}'/.test(
       uiCoreSrc71
     ),
     "ui-core.js sub-panel persistence uses JSON.parse(...|| '{}') fail-safe"
@@ -12610,7 +12608,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   assert(
     /const WAKE_LOCK_KEY = 'robco_wakelock_enabled'/.test(uiCore115) &&
       /function isWakeLockEnabled\(\)/.test(uiCore115) &&
-      /localStorage\.getItem\(WAKE_LOCK_KEY\)/.test(uiCore115),
+      /MetaStore\.get\(WAKE_LOCK_KEY\)/.test(uiCore115),
     '115.1: WAKE_LOCK_KEY + isWakeLockEnabled() persist the toggle as a localStorage device preference'
   );
 
@@ -12644,7 +12642,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       tog = extractFunctionBody(uiCore115, 'toggleWakeLock');
     } catch (_) {}
     assert(
-      /localStorage\.setItem\(WAKE_LOCK_KEY/.test(tog) &&
+      /MetaStore\.set\(WAKE_LOCK_KEY/.test(tog) &&
         /_acquireWakeLock\(\)/.test(tog) &&
         /_releaseWakeLock\(\)/.test(tog) &&
         /onchange="toggleWakeLock\(this\.checked\)"/.test(html115),
@@ -12717,7 +12715,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   assert(
     /const HAPTIC_KEY = 'robco_haptic_enabled'/.test(uiAudio116) &&
       /function isHapticEnabled\(\)/.test(uiAudio116) &&
-      /localStorage\.getItem\(HAPTIC_KEY\)\s*===\s*'true'/.test(uiAudio116),
+      /MetaStore\.get\(HAPTIC_KEY\)\s*===\s*'true'/.test(uiAudio116),
     '116.1: HAPTIC_KEY + isHapticEnabled() persist the toggle as an opt-in (default OFF) localStorage device preference'
   );
 
@@ -12759,7 +12757,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       tog = extractFunctionBody(uiAudio116, 'toggleHaptic');
     } catch (_) {}
     assert(
-      /localStorage\.setItem\(HAPTIC_KEY/.test(tog) &&
+      /MetaStore\.set\(HAPTIC_KEY/.test(tog) &&
         /triggerHaptic\(/.test(tog) &&
         /onchange="toggleHaptic\(this\.checked\)"/.test(html116),
       '116.5: toggleHaptic persists the pref + fires a confirmation buzz; #hapticToggle onchange wires to it'
@@ -12974,7 +12972,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     assert(
       /const OVERSEER_LOG_KEY = 'robco_overseer_log'/.test(uiCore119) &&
         /function _readOverseerLog\(\)/.test(uiCore119) &&
-        /localStorage\.getItem\(OVERSEER_LOG_KEY\)/.test(rd) &&
+        /MetaStore\.get\(OVERSEER_LOG_KEY\)/.test(rd) &&
         /catch/.test(rd) &&
         /bootCount: 0, totalPowerOnMs: 0, longestSessionMs: 0/.test(rd),
       '119.1: OVERSEER_LOG_KEY + _readOverseerLog() back the log with a localStorage device stat and return zeroes on parse failure (never throws)'
@@ -12988,7 +12986,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       wr = extractFunctionBody(uiCore119, '_writeOverseerLog');
     } catch (_) {}
     assert(
-      /localStorage\.setItem\(OVERSEER_LOG_KEY/.test(wr) && /try\s*\{/.test(wr) && /catch/.test(wr),
+      /MetaStore\.set\(OVERSEER_LOG_KEY/.test(wr) && /try\s*\{/.test(wr) && /catch/.test(wr),
       '119.2: _writeOverseerLog() persists inside try/catch — a quota-full or disabled store never throws'
     );
   }
@@ -13142,7 +13140,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   assert(
     /const HIGH_LUMEN_KEY = 'robco_high_lumen'/.test(uiCore120) &&
       /function isHighLumenEnabled\(\)/.test(uiCore120) &&
-      /localStorage\.getItem\(HIGH_LUMEN_KEY\)\s*===\s*'true'/.test(uiCore120),
+      /MetaStore\.get\(HIGH_LUMEN_KEY\)\s*===\s*'true'/.test(uiCore120),
     '120.5: HIGH_LUMEN_KEY + isHighLumenEnabled() persist the toggle as a localStorage device preference (not campaign state)'
   );
 
@@ -13157,7 +13155,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       app = extractFunctionBody(uiCore120, '_applyHighLumen');
     } catch (_) {}
     assert(
-      /localStorage\.setItem\(HIGH_LUMEN_KEY/.test(tog) &&
+      /MetaStore\.set\(HIGH_LUMEN_KEY/.test(tog) &&
         /_applyHighLumen\(/.test(tog) &&
         /documentElement\.classList\.toggle\('high-lumen'/.test(app) &&
         /onchange="toggleHighLumen\(this\.checked\)"/.test(html120),
@@ -13246,14 +13244,14 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
   // 121.3  AudioSettings.radio key initialised from localStorage robco_radio_on (ON semantics, opt-in)
   assert(
-    /radio: localStorage\.getItem\('robco_radio_on'\) === 'true'/.test(uiCore121) &&
+    /radio: MetaStore\.get\('robco_radio_on'\) === 'true'/.test(uiCore121) &&
       /const RADIO_KEY = 'robco_radio_on'/.test(uiAudio121),
     "121.3: AudioSettings.radio is seeded from localStorage 'robco_radio_on' (opt-in ON-semantics device preference)"
   );
 
   // 121.4  toggle persists the pref, flips the cache, and starts/stops; wired via onchange
   assert(
-    /localStorage\.setItem\(RADIO_KEY/.test(toggle121) &&
+    /MetaStore\.set\(RADIO_KEY/.test(toggle121) &&
       /AudioSettings\.radio = on/.test(toggle121) &&
       /startRadio\(\)/.test(toggle121) &&
       /stopRadio\(\)/.test(toggle121) &&
@@ -13353,8 +13351,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   assert(
     /RETROS BIOS/.test(bootLines122) &&
       /MEMORY TEST/.test(bootLines122) &&
-      /!localStorage\.getItem\('robco_booted_before'\)/.test(pick122) &&
-      /localStorage\.setItem\('robco_booted_before', 'true'\)/.test(runBoot122),
+      /!MetaStore\.get\('robco_booted_before'\)/.test(pick122) &&
+      /MetaStore\.set\('robco_booted_before', 'true'\)/.test(runBoot122),
     '122.3: the first-ever cold POST (RETROS BIOS + memory test) is gated once by robco_booted_before, which runBootSequence sets'
   );
 
@@ -13774,7 +13772,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   // 124.8  changeOpticsColor is table-driven AND persists to the PER-GAME optic key
   assert(
     /_applyThemeVars\(color\)/.test(changeFn124) &&
-      /localStorage\.setItem\(_opticStorageKey\(\)/.test(changeFn124) &&
+      /MetaStore\.set\(_opticStorageKey\(\)/.test(changeFn124) &&
       !/else if \(color ===/.test(changeFn124) &&
       /THEMES\[key\]/.test(applyFn124),
     '124.8: changeOpticsColor delegates to table-driven _applyThemeVars and persists to the per-game _opticStorageKey()'
@@ -14235,7 +14233,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
   // 130.2  changeOpticsColor persists to the PER-GAME key, not the legacy global
   assert(
-    /localStorage\.setItem\(_opticStorageKey\(\), color\)/.test(changeFn130) &&
+    /MetaStore\.set\(_opticStorageKey\(\), color\)/.test(changeFn130) &&
       !/setItem\('robco_optics'/.test(changeFn130),
     '130.2: changeOpticsColor persists the pick to the per-game _opticStorageKey() (not the global robco_optics)'
   );
@@ -14243,8 +14241,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   // 130.3  resolution order: per-game pick → (one-time legacy migration) → game default
   assert(
     /_opticStorageKey\(\)/.test(resolveOpticFn130) &&
-      /getItem\('robco_optics'\)/.test(resolveOpticFn130) &&
-      /removeItem\('robco_optics'\)/.test(resolveOpticFn130) &&
+      /MetaStore\.get\('robco_optics'\)/.test(resolveOpticFn130) &&
+      /MetaStore\.remove\('robco_optics'\)/.test(resolveOpticFn130) &&
       /_resolveDefaultOptics\(\)/.test(resolveOpticFn130),
     '130.3: _resolveOptic = per-game pick → migrate+retire legacy global → _resolveDefaultOptics (default → green)'
   );
@@ -14981,6 +14979,235 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       return c.length === 1 && c[0] === harness133.realCollectible133;
     }
   );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 134 — U6: MetaStore boundary-gate (Step 2 / v2.8.0 Phase 0).
+//  U5 introduced MetaStore (js/state.js) as the single choke point for every
+//  robco_* localStorage key that is a DEVICE PREFERENCE (audio mutes, optics,
+//  power, haptics, UI layout, telemetry) — as opposed to CAMPAIGN/SAVE data
+//  (robco_v8/robco_v7/robco_chat/robco_playstyle/robco_playstyle_type, save
+//  slots, rolling backups, cloud-push bookkeeping), which is a separate store
+//  and must never be read/written through MetaStore (Protocol 23). This suite
+//  makes that two-store boundary STRUCTURAL: the manifest is proven (by
+//  actually executing state.js in a VM, not just grepping) to contain no
+//  campaign key, MetaStore.has()/get()/set()/remove() behave correctly and
+//  never throw even when the underlying store does, no served code passes a
+//  campaign key to MetaStore, and no served code bypasses MetaStore to touch
+//  a registered device key directly (the only sanctioned exception — the
+//  index.html pre-paint scripts that run before state.js loads — is proven
+//  to sit strictly before the first js/*.js <script> tag).
+//  8 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 134 — U6 MetaStore boundary gate');
+
+  const vm = require('vm');
+  const CAMPAIGN_KEYS_134 = [
+    'robco_v8',
+    'robco_v7',
+    'robco_chat',
+    'robco_playstyle',
+    'robco_playstyle_type',
+    'robco_slot_1',
+    'robco_backup_1',
+    'robco_last_cloud_push',
+  ];
+
+  let meta134 = null;
+  let metaErr134 = null;
+  try {
+    const sandbox = { window: {}, document: { getElementById: () => null } };
+    vm.createContext(sandbox);
+    vm.runInContext(stateSource, sandbox);
+    const manifestKeys134 = vm.runInContext('Object.keys(META_MANIFEST)', sandbox);
+    meta134 = { sandbox, manifestKeys134 };
+  } catch (e) {
+    metaErr134 = e;
+  }
+
+  // 134.1  structural: MetaStore + META_MANIFEST are declared in state.js with the
+  //        full accessor surface, and exposed as the single global choke point.
+  assert(
+    /const META_MANIFEST\s*=\s*\{/.test(stateSource) &&
+      /const MetaStore\s*=\s*\{/.test(stateSource) &&
+      /has\(key\)/.test(stateSource) &&
+      /get\(key\)/.test(stateSource) &&
+      /set\(key,\s*val\)/.test(stateSource) &&
+      /remove\(key\)/.test(stateSource) &&
+      /window\.MetaStore\s*=\s*MetaStore/.test(stateSource),
+    '134.1: js/state.js declares META_MANIFEST + MetaStore (get/set/remove/has/keys) and exposes window.MetaStore'
+  );
+
+  // 134.2  purity: no campaign/save key is registered in the device-preference manifest
+  {
+    const leaked = meta134
+      ? meta134.manifestKeys134.filter(k => CAMPAIGN_KEYS_134.some(c => k.indexOf(c) === 0))
+      : ['<harness error>'];
+    assert(
+      meta134 !== null && leaked.length === 0,
+      '134.2: META_MANIFEST registers zero campaign/save keys (robco_v8/v7/chat/playstyle/playstyle_type/slot/backup/last_cloud_push)' +
+        (leaked.length ? ' — leaked: ' + leaked.join(', ') : '') +
+        (metaErr134 ? ` (harness error: ${metaErr134.message})` : '')
+    );
+  }
+
+  // 134.3  behavioral: has() is true for a registered key and the one dynamic family
+  //        (per-game optic), false for every campaign key
+  {
+    let ok = false;
+    try {
+      const checks = ['robco_gemini_key', 'robco_optic_FNV']
+        .map(k => vm.runInContext(`MetaStore.has(${JSON.stringify(k)})`, meta134.sandbox) === true)
+        .concat(
+          CAMPAIGN_KEYS_134.map(
+            k => vm.runInContext(`MetaStore.has(${JSON.stringify(k)})`, meta134.sandbox) === false
+          )
+        );
+      ok = checks.every(Boolean);
+    } catch (e) {
+      fail(`134.3 harness error: ${e.message}`);
+    }
+    assert(
+      meta134 !== null && ok,
+      '134.3: MetaStore.has() is true for a registered device key and the per-game optic family, false for every campaign key'
+    );
+  }
+
+  // 134.4  behavioral: set()/get() round-trip through a mocked localStorage
+  {
+    let ok = false;
+    try {
+      const store = {};
+      meta134.sandbox.localStorage = {
+        getItem: k => (Object.prototype.hasOwnProperty.call(store, k) ? store[k] : null),
+        setItem: (k, v) => {
+          store[k] = String(v);
+        },
+        removeItem: k => {
+          delete store[k];
+        },
+      };
+      vm.runInContext(`MetaStore.set('robco_high_lumen', 'true')`, meta134.sandbox);
+      const readBack = vm.runInContext(`MetaStore.get('robco_high_lumen')`, meta134.sandbox);
+      vm.runInContext(`MetaStore.remove('robco_high_lumen')`, meta134.sandbox);
+      const afterRemove = vm.runInContext(`MetaStore.get('robco_high_lumen')`, meta134.sandbox);
+      ok = readBack === 'true' && afterRemove === null;
+    } catch (e) {
+      fail(`134.4 harness error: ${e.message}`);
+    }
+    assert(
+      meta134 !== null && ok,
+      '134.4: MetaStore.set()/get()/remove() round-trip correctly against localStorage'
+    );
+  }
+
+  // 134.5  behavioral: a throwing localStorage (quota-exceeded / private-mode) never
+  //        escapes MetaStore.get/set/remove — device prefs must fail soft
+  {
+    let ok = false;
+    try {
+      const throwing = {
+        getItem: () => {
+          throw new Error('QuotaExceededError');
+        },
+        setItem: () => {
+          throw new Error('QuotaExceededError');
+        },
+        removeItem: () => {
+          throw new Error('QuotaExceededError');
+        },
+      };
+      meta134.sandbox.localStorage = throwing;
+      const getResult = vm.runInContext(`MetaStore.get('robco_haptic_enabled')`, meta134.sandbox);
+      vm.runInContext(`MetaStore.set('robco_haptic_enabled', 'true')`, meta134.sandbox); // must not throw
+      vm.runInContext(`MetaStore.remove('robco_haptic_enabled')`, meta134.sandbox); // must not throw
+      ok = getResult === null;
+    } catch (e) {
+      // ok stays false — a throw here means MetaStore let the exception escape
+    }
+    assert(
+      meta134 !== null && ok,
+      '134.5: MetaStore.get/set/remove never throw when localStorage itself throws (quota/private-mode fail-soft)'
+    );
+  }
+
+  // 134.6  static: no served code ever passes a campaign/save key to MetaStore —
+  //        the device store never touches campaign state (Protocol 23)
+  {
+    const servedJs134 = uiSource + '\n' + apiSource + '\n' + cloudSource;
+    const leakRe =
+      /MetaStore\.(get|set|remove)\(\s*['"]robco_(v8|v7|chat|playstyle(_type)?|slot_|backup_|last_cloud_push)/;
+    assert(
+      !leakRe.test(servedJs134),
+      '134.6: no MetaStore.get/set/remove call site anywhere passes a campaign/save key'
+    );
+  }
+
+  // 134.7  static: the sanctioned index.html pre-paint exception (bare localStorage
+  //        reads of robco_optic_/robco_optics/robco_high_lumen before state.js has
+  //        loaded) sits strictly before the first js/*.js <script> tag — the only
+  //        reason it may bypass MetaStore
+  {
+    const firstScriptIdx134 = htmlSource.indexOf('<script src="js/');
+    const preheadBlock134 = htmlSource.slice(0, firstScriptIdx134);
+    const rawDeviceKeyRe134 = /localStorage\.getItem\(\s*['"]robco_(optic_|optics|high_lumen)/g;
+    const preheadHits134 = (preheadBlock134.match(rawDeviceKeyRe134) || []).length;
+    const restOfDoc134 = htmlSource.slice(firstScriptIdx134);
+    const restHits134 = (restOfDoc134.match(rawDeviceKeyRe134) || []).length;
+    assert(
+      firstScriptIdx134 > -1 && preheadHits134 > 0 && restHits134 === 0,
+      '134.7: the sanctioned pre-paint bare-localStorage device-key reads in index.html sit strictly before the first js/*.js <script> tag (MetaStore is unavailable there)'
+    );
+  }
+
+  // 134.8  static: every served JS file reaches these device-preference keys/constants
+  //        ONLY through MetaStore — no raw localStorage call site has crept back in
+  {
+    const deviceTokens134 = [
+      'robco_gemini_key',
+      'robco_gemini_key_sync',
+      'robco_gemini_model',
+      'robco_sfx_muted',
+      'robco_hum_muted',
+      'robco_geiger_muted',
+      'robco_tinnitus_muted',
+      'robco_ambient_muted',
+      'robco_wake_muted',
+      'robco_panelclick_muted',
+      'robco_bootdrone_muted',
+      'robco_levelup_muted',
+      'robco_heartbeat_muted',
+      'robco_questcomplete_muted',
+      'robco_questfail_muted',
+      'robco_factionthreshold_muted',
+      'robco_master_muted',
+      'RADIO_KEY',
+      'WAKE_LOCK_KEY',
+      'HAPTIC_KEY',
+      'HIGH_LUMEN_KEY',
+      'OVERSEER_LOG_KEY',
+      'ERROR_LOG_KEY',
+      'robco_panel_state',
+      'robco_active_tab',
+      'robco_typer_speed',
+      'robco_version',
+      'robco_booted_before',
+      'robco_feature_flags',
+      'robco_sw_installed',
+    ];
+    const servedJs134b = uiSource + '\n' + apiSource + '\n' + cloudSource;
+    const offenders134 = deviceTokens134.filter(tok =>
+      new RegExp('localStorage\\.(getItem|setItem|removeItem)\\(\\s*[\'"]?' + tok).test(
+        servedJs134b
+      )
+    );
+    assert(
+      offenders134.length === 0,
+      '134.8: no served JS (ui/api/cloud) reads/writes a registered device-preference key via raw localStorage — MetaStore is the only path' +
+        (offenders134.length ? ' — offenders: ' + offenders134.join(', ') : '')
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

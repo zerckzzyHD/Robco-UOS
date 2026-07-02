@@ -10,7 +10,11 @@
 // extra storage hits.
 const _commCache = {};
 function _commGet(field, lsKey) {
-  if (!(field in _commCache)) _commCache[field] = localStorage.getItem(lsKey);
+  // Route through MetaStore for registered device-preference keys (geminiKey/
+  // geminiModel); campaign keys (playstyle) are not in the manifest and stay on
+  // the direct localStorage path — MetaStore.has() is the boundary (Protocol 23).
+  if (!(field in _commCache))
+    _commCache[field] = MetaStore.has(lsKey) ? MetaStore.get(lsKey) : localStorage.getItem(lsKey);
   return _commCache[field];
 }
 window._invalidateCommCache = function () {
@@ -344,12 +348,12 @@ async function fetchAuthorizedModels(silent = false) {
 
 function saveApiKeySilent() {
   const key = document.getElementById('apiKeyInput').value.trim();
-  localStorage.setItem('robco_gemini_key', key);
+  MetaStore.set('robco_gemini_key', key);
   let model = document.getElementById('apiModelInput').value;
-  if (model && !model.includes('Awaiting')) localStorage.setItem('robco_gemini_model', model);
+  if (model && !model.includes('Awaiting')) MetaStore.set('robco_gemini_model', model);
   if (typeof window._invalidateCommCache === 'function') window._invalidateCommCache();
   if (typeof window.saveGeminiKeyToCloud === 'function') {
-    window.saveGeminiKeyToCloud(key, localStorage.getItem('robco_gemini_model') || '');
+    window.saveGeminiKeyToCloud(key, MetaStore.get('robco_gemini_model') || '');
   }
 }
 

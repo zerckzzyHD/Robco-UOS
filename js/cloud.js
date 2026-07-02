@@ -61,7 +61,11 @@ let _featureFlags = {
   saveMigration: true,
 };
 try {
-  const _lkgRaw = localStorage.getItem('robco_feature_flags');
+  // cloud.js is the one ES module in the boot chain; cross-file globals from the
+  // classic scripts (state.js et al.) are always read via window.X here (matching
+  // window.computeSaveChecksum/window.getGameContext), never bare, for module-
+  // scope safety.
+  const _lkgRaw = window.MetaStore.get('robco_feature_flags');
   if (_lkgRaw) {
     const _lkg = JSON.parse(_lkgRaw);
     if (_lkg && typeof _lkg === 'object') {
@@ -97,9 +101,7 @@ async function loadRemoteConfig() {
         Object.keys(data.features).forEach(k => {
           if (k in _featureFlags) _featureFlags[k] = data.features[k] !== false;
         });
-        try {
-          localStorage.setItem('robco_feature_flags', JSON.stringify(_featureFlags));
-        } catch (_) {}
+        window.MetaStore.set('robco_feature_flags', JSON.stringify(_featureFlags));
       }
       if (data.message && typeof data.message === 'string' && data.message.trim()) {
         if (typeof appendToChat === 'function') appendToChat('> [OPERATOR] ' + data.message, 'sys');
@@ -580,21 +582,21 @@ window.deleteCloudSave = async function (docId) {
 async function loadGeminiKeyFromCloud() {
   if (!window.isFeatureEnabled('keySync')) return;
   if (!_currentUser || _currentUser.isAnonymous) return;
-  if (localStorage.getItem('robco_gemini_key_sync') !== 'true') return;
+  if (window.MetaStore.get('robco_gemini_key_sync') !== 'true') return;
   if (!_currentUid) return;
-  const localKey = localStorage.getItem('robco_gemini_key');
+  const localKey = window.MetaStore.get('robco_gemini_key');
   if (localKey) return; // local key already present — no need to pull
   try {
     const docSnap = await getDoc(doc(db, 'users', _currentUid, 'secrets', 'gemini'));
     if (docSnap.exists()) {
       const data = docSnap.data();
       if (data.key) {
-        localStorage.setItem('robco_gemini_key', data.key);
+        window.MetaStore.set('robco_gemini_key', data.key);
         if (typeof window._invalidateCommCache === 'function') window._invalidateCommCache();
         const input = document.getElementById('apiKeyInput');
         if (input) input.value = data.key;
         if (data.model) {
-          localStorage.setItem('robco_gemini_model', data.model);
+          window.MetaStore.set('robco_gemini_model', data.model);
           const modelInput = document.getElementById('apiModelInput');
           if (modelInput) {
             const safeModel = escapeHtml(data.model);
@@ -611,7 +613,7 @@ async function loadGeminiKeyFromCloud() {
 window.saveGeminiKeyToCloud = async function (key, model) {
   if (!window.isFeatureEnabled('keySync')) return;
   if (!_currentUser || _currentUser.isAnonymous) return; // never sync for anonymous users
-  if (localStorage.getItem('robco_gemini_key_sync') !== 'true') return; // only sync when toggle ON
+  if (window.MetaStore.get('robco_gemini_key_sync') !== 'true') return; // only sync when toggle ON
   if (!_currentUid) return;
   try {
     await setDoc(doc(db, 'users', _currentUid, 'secrets', 'gemini'), {
@@ -631,7 +633,7 @@ window.saveGeminiKeyToCloud = async function (key, model) {
 // remains in Firestore until the user explicitly deletes their account data).
 window.setGeminiKeySync = async function (checked) {
   if (!window.isFeatureEnabled('keySync')) return;
-  localStorage.setItem('robco_gemini_key_sync', checked ? 'true' : 'false');
+  window.MetaStore.set('robco_gemini_key_sync', checked ? 'true' : 'false');
   if (_currentUser && !_currentUser.isAnonymous && _currentUid) {
     try {
       await setDoc(
@@ -644,8 +646,8 @@ window.setGeminiKeySync = async function (checked) {
     }
   }
   if (checked) {
-    const key = localStorage.getItem('robco_gemini_key');
-    const model = localStorage.getItem('robco_gemini_model') || '';
+    const key = window.MetaStore.get('robco_gemini_key');
+    const model = window.MetaStore.get('robco_gemini_model') || '';
     if (key) window.saveGeminiKeyToCloud(key, model);
   }
 };

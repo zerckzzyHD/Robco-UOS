@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1612/1612 | Cache: robco-terminal-v2.7.0-r12 -->
+﻿## [Unreleased]<!-- Tests: 1620/1620 | Cache: robco-terminal-v2.7.0-r13 -->
 
 ### Fixed
 
@@ -20,6 +20,7 @@
 - Tidied up the developer documentation and one housekeeping setting. Removed an old one-off design-review note that nothing referenced and that had gone stale, corrected the developer and architecture guides where they still pointed at source files that have since been split into smaller per-area and per-game files, and fixed a repository setting that mislabelled two always-kept developer guides as excluded when they must stay in the project (the automated checks read them). Documentation and internal tooling only — no visible change to the app.
 - Restructured how the app's startup routine is organized internally, breaking one large block of startup code into smaller, clearly-named steps that each handle one part of booting up (restoring your saved campaign, restoring your device settings, wiring up keyboard shortcuts, and so on) — still run in the exact same order as before. This is purely an internal reorganization to make the startup code easier to maintain safely going forward; a full mobile and desktop check confirmed the app still starts up cleanly with no black screen, no errors, and no visible change to how anything looks or behaves.
 - Added a much deeper automatic check for the code that applies the AI's updates to your character sheet: it now actually runs that code against dozens of unusual and deliberately broken inputs — garbage text, extremely long values, more items than normal, and a few security-style edge cases — to confirm it always handles them safely without ever corrupting your saved data. This is also what caught the data-safety gap noted above. Also tightened the release checklist so it compares every individual group of checks between the two test runners, not just the overall total, catching a kind of drift a matching grand total alone could hide. Internal tooling only.
+- Reorganized how the app stores your device settings — sound mute switches, screen color, screen-stays-on toggle, typing speed, and similar preferences — so they all now go through one consistent internal pathway instead of being read and written from dozens of separate places. Also added a dedicated check confirming these device settings can never mix with your campaign save data. This is purely an internal cleanup: every existing preference keeps its current value, and nothing about how the app looks or behaves has changed.
 
 ---
 

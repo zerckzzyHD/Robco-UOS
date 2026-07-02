@@ -2,6 +2,95 @@
 const APP_VERSION = '2.7.0';
 window.APP_VERSION = APP_VERSION;
 
+// ── METASTORE — device-preference key/value store (Protocol 23 boundary) ────
+// A single choke point for every localStorage key that describes THIS DEVICE's
+// preferences (audio mutes, optics, power, haptics, UI layout, telemetry) —
+// as distinct from campaign/save data (robco_v8, robco_v7, chat, playstyle,
+// save slots, rolling backups, cloud-push bookkeeping), which is CAMPAIGN
+// STATE and is never registered here or written through this accessor (the
+// U6 boundary-gate suite guards the separation). Registering a key in
+// META_MANIFEST is what makes it a "device preference" — the manifest is the
+// boundary, not a convention. Behavior-preserving: same keys, same string
+// values, same defaults as the direct localStorage calls it replaces — a
+// call-site consolidation, not a storage-format change. This is the one choke
+// point a future IndexedDB swap (or Hardware Life) needs to only touch once.
+const META_MANIFEST = {
+  robco_gemini_key: { type: 'string', default: '', owner: 'api.js' },
+  robco_gemini_key_sync: { type: 'bool', default: false, owner: 'cloud.js' },
+  robco_gemini_model: { type: 'string', default: '', owner: 'api.js' },
+  robco_sfx_muted: { type: 'bool', default: false, owner: 'ui-audio.js' },
+  robco_hum_muted: { type: 'bool', default: false, owner: 'ui-audio.js' },
+  robco_geiger_muted: { type: 'bool', default: false, owner: 'ui-audio.js' },
+  robco_tinnitus_muted: { type: 'bool', default: false, owner: 'ui-audio.js' },
+  robco_ambient_muted: { type: 'bool', default: false, owner: 'ui-audio.js' },
+  robco_wake_muted: { type: 'bool', default: false, owner: 'ui-audio.js' },
+  robco_panelclick_muted: { type: 'bool', default: false, owner: 'ui-audio.js' },
+  robco_bootdrone_muted: { type: 'bool', default: false, owner: 'ui-audio.js' },
+  robco_levelup_muted: { type: 'bool', default: false, owner: 'ui-audio.js' },
+  robco_heartbeat_muted: { type: 'bool', default: false, owner: 'ui-audio.js' },
+  robco_questcomplete_muted: { type: 'bool', default: false, owner: 'ui-audio.js' },
+  robco_questfail_muted: { type: 'bool', default: false, owner: 'ui-audio.js' },
+  robco_factionthreshold_muted: { type: 'bool', default: false, owner: 'ui-audio.js' },
+  robco_master_muted: { type: 'bool', default: false, owner: 'ui-audio.js' },
+  robco_radio_on: { type: 'bool', default: false, owner: 'ui-audio.js' },
+  robco_wakelock_enabled: { type: 'bool', default: false, owner: 'ui-core.js' },
+  robco_haptic_enabled: { type: 'bool', default: false, owner: 'ui-audio.js' },
+  robco_high_lumen: { type: 'bool', default: false, owner: 'ui-core.js' },
+  robco_overseer_log: { type: 'json', default: '{}', owner: 'ui-core.js' },
+  robco_error_log: { type: 'json', default: '[]', owner: 'ui-core.js' },
+  robco_panel_state: { type: 'json', default: '{}', owner: 'ui-core.js' },
+  robco_active_tab: { type: 'string', default: 'stat', owner: 'ui-core.js' },
+  robco_typer_speed: { type: 'float', default: '1', owner: 'ui-core.js' },
+  robco_version: { type: 'string', default: '', owner: 'ui-core.js' },
+  robco_optics: {
+    type: 'string',
+    default: null,
+    owner: 'ui-audio.js',
+    deprecated: 'legacy site-wide pick, migrated into robco_optic_<ctx> then retired',
+  },
+  robco_optic_: {
+    type: 'string',
+    default: null,
+    owner: 'ui-audio.js',
+    family: true, // dynamic per-game key: robco_optic_<ctx>, e.g. robco_optic_FNV
+  },
+  robco_booted_before: { type: 'bool', default: false, owner: 'ui-audio.js' },
+  robco_feature_flags: { type: 'json', default: '{}', owner: 'cloud.js' },
+  robco_sw_installed: { type: 'bool', default: false, owner: 'index.html' },
+};
+const MetaStore = {
+  // True for a registered device-preference key — an exact manifest entry, or
+  // (for the one dynamic family, the per-game optic key) a prefix match
+  // against a manifest entry flagged `family: true`.
+  has(key) {
+    if (Object.prototype.hasOwnProperty.call(META_MANIFEST, key)) return true;
+    return Object.keys(META_MANIFEST).some(k => META_MANIFEST[k].family && key.indexOf(k) === 0);
+  },
+  get(key) {
+    try {
+      return localStorage.getItem(key);
+    } catch (_) {
+      return null;
+    }
+  },
+  set(key, val) {
+    try {
+      localStorage.setItem(key, val);
+    } catch (_) {
+      /* quota / private-mode — a device-preference write must never throw */
+    }
+  },
+  remove(key) {
+    try {
+      localStorage.removeItem(key);
+    } catch (_) {}
+  },
+  keys() {
+    return Object.keys(META_MANIFEST);
+  },
+};
+window.MetaStore = MetaStore;
+
 // ── SAVE INTEGRITY + ROLLING BACKUP HELPERS ──────────────────────
 // FNV-1a 32-bit hash over a string (same algorithm as cloud.js _contentHash)
 function _fnv1a32(str) {
