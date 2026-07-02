@@ -86,9 +86,8 @@ Data Fallback: If databases drop from memory, output a ⚙️ [SYS-ALERT: DATA C
 - You MUST format your entire response as a SINGLE, valid JSON object containing up to three nodes: "narrative", "state", and "modal".
 - The "narrative" node MUST be an ARRAY OF STRINGS.
 - The "state" node MUST mirror the uploaded state structure, including the "squad" array.
-- The "modal" node is triggered ONLY WHEN THE USER ASKS FOR A MENU, ROADMAP, STATS, [GPS], [TIMELINE], OR LEVEL UP. Do NOT draw ASCII Unicode boxes (┌─┐) in the narrative array for these. (TRADE/barter is a native offline terminal — never emit a TRADE modal.)
+- The "modal" node is triggered ONLY WHEN THE USER ASKS FOR A MENU, ROADMAP, STATS, [GPS], OR LEVEL UP. Do NOT draw ASCII Unicode boxes (┌─┐) in the narrative array for these. (TRADE/barter is a native offline terminal — never emit a TRADE modal.)
 - You must include a "type" field in the modal node (e.g. "TEXT", "GPS").
-- For [TIMELINE], output modal type "TEXT" with title "PROJECTED TIMELINE".
 - If type is "TEXT", "content" is an array of strings.
 - If type is "GPS", "content" must be a 2D array of strings representing the grid (e.g. [["[ ]","[X]"],["[S]","[ ]"]]).
 
@@ -115,10 +114,10 @@ Example Schema:
     "stats": {"kills": 1, "capsEarned": 50, "damageDealt": 120}
   },
   "modal": {
-    "title": "PROJECTED TIMELINE",
+    "title": "PERK ROADMAP",
     "type": "TEXT",
     "content": [
-      "> +1 DAY: Courier expected at Primm."
+      "> LVL 8: Cowboy (weapon damage +25% pistols/revolvers/rifles)."
     ]
   }
 }`;
@@ -1557,60 +1556,51 @@ async function transmitMessage() {
         );
       } else {
         if (parsedNode.modal && parsedNode.modal.title) {
-          if (parsedNode.modal.title.includes('PROJECTED TIMELINE')) {
-            let tDisplay = document.getElementById('timelineDisplay');
-            if (tDisplay) {
-              tDisplay.innerHTML = Array.isArray(parsedNode.modal.content)
-                ? parsedNode.modal.content.join('<br>')
-                : parsedNode.modal.content;
-            }
-          } else {
-            document.getElementById('modalTitle').innerText = '> ' + parsedNode.modal.title;
-            let mContent = document.getElementById('modalContent');
-            let mType = parsedNode.modal.type || 'TEXT';
+          document.getElementById('modalTitle').innerText = '> ' + parsedNode.modal.title;
+          let mContent = document.getElementById('modalContent');
+          let mType = parsedNode.modal.type || 'TEXT';
 
-            if (mType === 'GPS') {
-              mContent.innerHTML = '<div class="modal-grid-map"></div>';
-              let gridMap = mContent.querySelector('.modal-grid-map');
-              let rows = Array.isArray(parsedNode.modal.content) ? parsedNode.modal.content : [];
-              rows.forEach(row => {
-                let rowDiv = document.createElement('div');
-                rowDiv.className = 'grid-row';
-                let cells = Array.isArray(row) ? row : [row];
-                cells.forEach(cell => {
-                  let cellDiv = document.createElement('div');
-                  cellDiv.className = 'grid-cell';
-                  cellDiv.innerText = cell;
-                  let cleanCell = cell.replace(/\[|\]/g, '').trim();
-                  if (
-                    cleanCell !== '' &&
-                    cleanCell !== 'X' &&
-                    cleanCell !== '█' &&
-                    cleanCell !== '@' &&
-                    cleanCell !== 'O' &&
-                    cleanCell.length > 0
-                  ) {
-                    cellDiv.style.cursor = 'pointer';
-                    cellDiv.onclick = () => {
-                      document.getElementById('chatInput').value = `> MOVE TO ${cleanCell}`;
-                      closeModal();
-                      transmitMessage();
-                    };
-                  }
-                  rowDiv.appendChild(cellDiv);
-                });
-                gridMap.appendChild(rowDiv);
+          if (mType === 'GPS') {
+            mContent.innerHTML = '<div class="modal-grid-map"></div>';
+            let gridMap = mContent.querySelector('.modal-grid-map');
+            let rows = Array.isArray(parsedNode.modal.content) ? parsedNode.modal.content : [];
+            rows.forEach(row => {
+              let rowDiv = document.createElement('div');
+              rowDiv.className = 'grid-row';
+              let cells = Array.isArray(row) ? row : [row];
+              cells.forEach(cell => {
+                let cellDiv = document.createElement('div');
+                cellDiv.className = 'grid-cell';
+                cellDiv.innerText = cell;
+                let cleanCell = cell.replace(/\[|\]/g, '').trim();
+                if (
+                  cleanCell !== '' &&
+                  cleanCell !== 'X' &&
+                  cleanCell !== '█' &&
+                  cleanCell !== '@' &&
+                  cleanCell !== 'O' &&
+                  cleanCell.length > 0
+                ) {
+                  cellDiv.style.cursor = 'pointer';
+                  cellDiv.onclick = () => {
+                    document.getElementById('chatInput').value = `> MOVE TO ${cleanCell}`;
+                    closeModal();
+                    transmitMessage();
+                  };
+                }
+                rowDiv.appendChild(cellDiv);
               });
-              // WU-N2: the AI TRADE modal was retired — barter is now a native offline
-              // terminal (BARTER UPLINK panel, INV tab). Any stray TRADE modal falls through
-              // to the default TEXT render below.
-            } else {
-              mContent.innerText = Array.isArray(parsedNode.modal.content)
-                ? parsedNode.modal.content.join('\n')
-                : parsedNode.modal.content;
-            }
-            document.getElementById('sysModal').style.display = 'flex';
+              gridMap.appendChild(rowDiv);
+            });
+            // WU-N2: the AI TRADE modal was retired — barter is now a native offline
+            // terminal (BARTER UPLINK panel, INV tab). Any stray TRADE modal falls through
+            // to the default TEXT render below.
+          } else {
+            mContent.innerText = Array.isArray(parsedNode.modal.content)
+              ? parsedNode.modal.content.join('\n')
+              : parsedNode.modal.content;
           }
+          document.getElementById('sysModal').style.display = 'flex';
         }
 
         let narrativeContent =

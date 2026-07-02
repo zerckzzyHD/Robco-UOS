@@ -459,6 +459,42 @@ function lookupItemInDb(name) {
   return best;
 }
 
+// ── U9-4: QUEST ITEM DETAIL (CONSULT reserved-column surfacing) ───────────
+// Returns the QUEST_ITEMS.CSV columns that lookupItemInDb() does not expose
+// (Associated_Quest / Special_Property) — authored data that previously had
+// no consumer. Read-only, parsed once and cached. Game-agnostic: reads
+// whatever databaseCSVs the active game loaded (Protocol 38); the same parse
+// exists in db_nv.js.
+let _questItemCache = null;
+function getQuestItemDetail(name) {
+  if (!name) return null;
+  if (!_questItemCache) {
+    _questItemCache = new Map();
+    const start = databaseCSVs.indexOf('[QUEST_ITEMS.CSV]');
+    if (start !== -1) {
+      const nextSection = databaseCSVs.indexOf('\n[', start + 18);
+      const block = databaseCSVs.substring(start, nextSection === -1 ? undefined : nextSection);
+      const lines = block.split('\n').filter(l => l.trim() && !l.startsWith('['));
+      const h = (lines[0] || '').split(',');
+      const ix = n => h.indexOf(n);
+      const iName = ix('Name');
+      const iQuest = ix('Associated_Quest');
+      const iProp = ix('Special_Property');
+      for (let i = 1; i < lines.length; i++) {
+        const c = lines[i].split(',');
+        const nm = (c[iName] || '').trim();
+        if (!nm) continue;
+        _questItemCache.set(nm.toLowerCase(), {
+          name: nm,
+          associatedQuest: iQuest >= 0 ? (c[iQuest] || '').trim() : '',
+          specialProperty: iProp >= 0 ? (c[iProp] || '').trim() : '',
+        });
+      }
+    }
+  }
+  return _questItemCache.get(name.toLowerCase().trim()) || null;
+}
+
 // ── WU-N5: CHEMS TABLE (BIO-SCAN advisory) ────────────────────────────────
 // Returns the active game's CHEMS.CSV rows with the addiction columns that
 // lookupItemInDb() does not expose (Addiction_Risk / Addiction_Debuff / Effect /

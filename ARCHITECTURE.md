@@ -63,8 +63,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    1636-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    1636-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    1648-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    1648-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -483,6 +483,46 @@ JSON string → parse
   → Auto-expand changed panels (#31)
   → Show undo button
 ```
+
+### Native-Input-Path Audit (Player Authority — Step 2 Phase 0 U10)
+
+**Principle:** the AI is never the sole source of truth for durable state (Protocol 24). Every
+field `autoImportState()` can write must also have a NATIVE input/edit path — the player must
+never be stuck depending on the AI to create, correct, or initialize a value.
+
+Audited every `state.X` write inside `autoImportState()` (`js/api.js`) against the app's native
+UI/CRUD surface:
+
+| Field(s)                                                                | Native path                                                                                                                                                                                | Status                                                                                                                                                    |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lvl`/`xp`/`hpCur`/`hpMax`/`caps`/`loc`/`karma`/`rads`/`ticks`          | `stat_*`/`c_caps`/calendar+time inputs → `syncStateFromDom()`                                                                                                                              | OK                                                                                                                                                        |
+| `s`/`p`/`e`/`c`/`i`/`a`/`l` (SPECIAL)                                   | `s_*` inputs → `commitStat()`                                                                                                                                                              | OK                                                                                                                                                        |
+| `la`/`ra`/`ll`/`rl`/`hd` (limbs)                                        | `toggleLimb()` buttons                                                                                                                                                                     | OK                                                                                                                                                        |
+| `skills`                                                                | `sk_*` inputs → `syncStateFromDom()`                                                                                                                                                       | OK                                                                                                                                                        |
+| `factions[key].{fame,infamy}`                                           | `adjustFaction()` ±5 buttons                                                                                                                                                               | OK                                                                                                                                                        |
+| `status`                                                                | `addStatusEffect()` / `removeStatusEffect()`                                                                                                                                               | OK                                                                                                                                                        |
+| `inventory`                                                             | `addItem()` / `delItem()`                                                                                                                                                                  | OK                                                                                                                                                        |
+| `ammo`                                                                  | `addAmmo()` / `delAmmo()`                                                                                                                                                                  | OK                                                                                                                                                        |
+| `squad` (name/hp/weapon/ammo/condition)                                 | `addSquadMember()` / `removeSquadMember()`                                                                                                                                                 | OK                                                                                                                                                        |
+| `squad[].affinity`                                                      | **was AI-write-only** — no native control existed                                                                                                                                          | **FIXED (U10):** `adjustAffinity()` ±5 buttons, always rendered per squad row (previously the affinity bar was invisible until the AI happened to set it) |
+| `campaign_notes`                                                        | `addCampaignNote()`                                                                                                                                                                        | OK                                                                                                                                                        |
+| `perks`                                                                 | `addPerk()` / `removePerk()`                                                                                                                                                               | OK                                                                                                                                                        |
+| `quests`                                                                | `addQuest()` / `removeQuest()`                                                                                                                                                             | OK                                                                                                                                                        |
+| `collectibles` / `lincolnItems` / `traits` / `skillBooks` / `magazines` | dedicated tracker toggles (`toggleCollectible`/`setLincolnDisposition`/`toggleTrait`/skill-book+magazine toggles)                                                                          | OK                                                                                                                                                        |
+| `locationHistory`                                                       | `markLocationVisited()` (WU-F11) + automatic on location change                                                                                                                            | OK                                                                                                                                                        |
+| `campaignMode` / `playthroughType` / `mapView`                          | CAMPG dropdowns are authoritative; `autoImportState()` only accepts these on the shared file-import/cloud-pull round-trip — the AI system directive never instructs the model to emit them | OK (not actually AI-driven in practice)                                                                                                                   |
+| `equipped.{weapon,armor,headgear}`                                      | **none** — `renderEquipped()` is read-only, no setter UI anywhere                                                                                                                          | **GAP — not fixed in U10** (out of the scoped "affinity" fix; flagged for a future unit)                                                                  |
+| `stats.{kills,capsEarned,damageDealt}`                                  | delta-accumulated by the AI; native path is `resetSessionStats()` (zero all three) only, no per-field edit                                                                                 | Acceptable — scorekeeping/flavor telemetry, not a mechanical-authority field                                                                              |
+| `gameContext`                                                           | intentionally **never** read from AI responses (prevents cross-campaign corruption); native `gameContextSelect` dropdown only                                                              | OK (by design)                                                                                                                                            |
+
+**U10 fix landed:** squad/companion affinity now has native `[+]`/`[-]` buttons on every squad row
+(`adjustAffinity()`, `js/ui-render.js`), clamped 0–100, always visible (defaults an unset member to
+0% instead of hiding the bar). `addSquadMember()` now seeds `affinity: 0` for newly-added members.
+
+**Known gap (documented, not fixed this unit):** `state.equipped` has no native setter — a courier's
+tracked weapon/armor/headgear can currently only be set by the AI. Scoped out of U10 (which fixed the
+one violation the unit named — affinity); worth a dedicated small unit later (an "equip from inventory"
+action on each inventory row would close it using the same pattern as the other CRUD helpers above).
 
 ---
 
@@ -1072,7 +1112,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1636-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1648-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

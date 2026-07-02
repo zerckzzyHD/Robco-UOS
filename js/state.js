@@ -465,6 +465,11 @@ const GAME_DEFS = {
     collectibleLabel: 'SNOW GLOBES',
     hasTraits: true,
     hasMagazines: true,
+    // U9-5: FNV has a [WEAPON_MODS.CSV] table (db_nv.js) and weapon-mod items are
+    // craftable/lootable; FO3 has no weapon-mod system or data at all — gates the
+    // inventory "Mods" filter button so it doesn't advertise a category that can
+    // never have entries in FO3 (reverse Protocol-38 leak).
+    hasWeaponMods: true,
     seedInventory: [{ name: 'Vault 13 Canteen', qty: 1, wgt: 1, val: 2, type: 'aid' }],
     calendar: { startMonth: 9, startDay: 19, startYear: 2281, epochWeekday: 0 },
     // ── WU-D4 deterministic-feature coefficients (fallout.wiki-verified, Protocol 3) ──
@@ -578,6 +583,7 @@ Update state.magazines when the Courier reads a skill magazine. Include only nam
     usesKarmaCenter: true,
     collectibleLabel: 'BOBBLEHEADS',
     tracksLincoln: true,
+    hasWeaponMods: false,
     seedInventory: [],
     calendar: { startMonth: 7, startDay: 17, startYear: 2277, epochWeekday: 3 },
     // ── WU-D4 deterministic-feature coefficients (fallout.wiki-verified, Protocol 3) ──

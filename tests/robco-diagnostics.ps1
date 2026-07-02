@@ -246,7 +246,6 @@ Check ([bool]($htmlSrc -match 'id="tab-btn-campg"')) 'CAMPG tab button exists in
 Check ([bool]($htmlSrc -match 'id="campgPanel"')) 'CAMPG panel exists in index.html (id="campgPanel")'
 Check ([bool]($htmlSrc -match 'id="gameContextSelect"')) 'Game context select exists in index.html (id="gameContextSelect")'
 Check ([bool]($htmlSrc -match 'id="fo3WarningBanner"')) 'FO3 warning banner exists in index.html (id="fo3WarningBanner")'
-Check ([bool]($htmlSrc -match 'id="timelineDisplay"')) 'Timeline display shell exists in index.html (id="timelineDisplay")'
 Check ([bool]($uiSrc -match 'function onGameContextChange\b')) "onGameContextChange() function exists in ui.js"
 Check ([bool]($uiSrc -match 'TAB_NAMES.*campg')) "TAB_NAMES includes 'campg' in ui.js"
 
@@ -7141,7 +7140,7 @@ $router113   = [regex]::Match($api113, 'const NATIVE_COMMAND_ROUTER = \{([\s\S]*
 
 $NATIVES113 = @('[VATS SIM]','[THREAT]','[TRADE]','CONSULT','[BIO-SCAN]','[LOOT]')
 $ROUTER_NATIVES113 = @('[VATS SIM]','[THREAT]','[BIO-SCAN]','[LOOT]','[CONSULT]')
-$RETIRED113 = @('[VVATS]','[TACTICS]','[SYNC:','[STASH','[EXCESS]','[CURRENCY]','[AUDIT]','[TIMER/CHEM]','[SQUAD]','[TRAVEL CLUSTER]','[CASINO]','[COMM LINK]','[PAUSE]','[PAGE 2','[ARCHIVE]')
+$RETIRED113 = @('[VVATS]','[TACTICS]','[SYNC:','[STASH','[EXCESS]','[CURRENCY]','[AUDIT]','[TIMER/CHEM]','[SQUAD]','[TRAVEL CLUSTER]','[CASINO]','[COMM LINK]','[PAUSE]','[PAGE 2','[ARCHIVE]','[TIMELINE]')
 
 # 113.1  registry parsed + NATIVE TERMINALS group marked OFFLINE / NO AI
 Check (($registry113.Length -gt 0) -and ($registry113 -match 'NATIVE TERMINALS[^'']*OFFLINE[^'']*NO AI')) `
@@ -7855,17 +7854,17 @@ $sslCount125 = ([regex]::Matches($html125, 'id="sessionStatsList"')).Count
 Check ($sslCount125 -eq 1) `
     '125.3: exactly one #sessionStatsList remains (no leftover duplicate panel)'
 
-# 125.4  campaign readout shows all the owner-confirmed stats incl. campaign play-time
-Check (($sessFn125 -match 'state\.stats') -and ($sessFn125 -match 'KILLS') -and ($sessFn125 -match 'CAPS EARNED') -and ($sessFn125 -match 'DMG DEALT') -and ($sessFn125 -match 'CAMPAIGN TIME') -and ($sessFn125 -match 'LOCATION VISITS') -and ($sessFn125 -match 'locationHistory')) `
-    '125.4: renderSessionStats shows kills, caps earned, dmg dealt, CAMPAIGN TIME, and the LOCATION VISITS count'
+# 125.4  campaign readout shows all the owner-confirmed stats incl. session duration
+Check (($sessFn125 -match 'state\.stats') -and ($sessFn125 -match 'KILLS') -and ($sessFn125 -match 'CAPS EARNED') -and ($sessFn125 -match 'DMG DEALT') -and ($sessFn125 -match 'CURRENT SITTING') -and ($sessFn125 -match 'LOCATION VISITS') -and ($sessFn125 -match 'locationHistory')) `
+    '125.4: renderSessionStats shows kills, caps earned, dmg dealt, CURRENT SITTING, and the LOCATION VISITS count'
 
 # 125.5  device telemetry is preserved in the same panel
 Check (($overFn125 -match 'CURRENT UPTIME') -and ($overFn125 -match 'BOOT COUNT') -and ($overFn125 -match 'TOTAL POWER-ON')) `
     '125.5: renderOverseerLog still shows device telemetry (CURRENT UPTIME / TOTAL POWER-ON / BOOT COUNT)'
 
-# 125.6  the two time notions are distinctly labelled -- campaign play-time vs device uptime
-Check (($panel125.Contains('UNIT TELEMETRY')) -and ($panel125.Contains('CAMPAIGN LOG')) -and ($sessFn125 -match 'CAMPAIGN TIME') -and ($overFn125 -match 'CURRENT UPTIME')) `
-    '125.6: campaign play-time (CAMPAIGN TIME) and device uptime (CURRENT UPTIME) sit under clearly labelled UNIT TELEMETRY / CAMPAIGN LOG sections'
+# 125.6  the two time notions are distinctly labelled -- session duration vs device uptime
+Check (($panel125.Contains('UNIT TELEMETRY')) -and ($panel125.Contains('CAMPAIGN LOG')) -and ($sessFn125 -match 'CURRENT SITTING') -and ($overFn125 -match 'CURRENT UPTIME')) `
+    '125.6: session duration (CURRENT SITTING) and device uptime (CURRENT UPTIME) sit under clearly labelled UNIT TELEMETRY / CAMPAIGN LOG sections'
 
 # 125.7  RESET CAMPAIGN STATS is wired to resetSessionStats, which clears state.stats + re-renders
 Check (($panel125 -match 'onclick="resetSessionStats\(\)"') -and ($panel125 -match 'RESET CAMPAIGN STATS') -and ($resetFn125 -match 'state\.stats = \{') -and ($resetFn125 -match 'renderSessionStats\(\)')) `
@@ -8196,17 +8195,17 @@ const sandbox = {
 vm.createContext(sandbox);
 vm.runInContext(allFnSrc + '\nthis.getSystemDirective = getSystemDirective;', sandbox);
 const matrix = [
-  { ctx: 'FNV', ps: undefined, pt: undefined, cm: undefined, sha256: '43ba2269826e0ca98a7b5bc48838ae7653f71048bcdd390e648bfc0cf2bdd6c3' },
-  { ctx: 'FNV', ps: 'melee',   pt: undefined, cm: undefined, sha256: '35c46ce000bc91317519d4101cb98a1a28faa62d3d325b6037287860f1e09070' },
-  { ctx: 'FNV', ps: undefined, pt: 'minmaxed', cm: undefined, sha256: '00ea973101a6d4f2e9e8cc60ef7ea8d117b52f4015f41e7fa74b2de6a67438c0' },
-  { ctx: 'FNV', ps: undefined, pt: 'completionist', cm: undefined, sha256: '84b338539b93308cdda12a0263b00aa3d8eacb99f898121a3935e956a43398c8' },
-  { ctx: 'FNV', ps: undefined, pt: 'casual', cm: undefined, sha256: '1b1a56e86215fdc1329adce6529ddb634e0b6ed39563e5cd993f926feaf2c983' },
-  { ctx: 'FNV', ps: undefined, pt: 'speedrun', cm: undefined, sha256: 'e1b08e6c0854b93c2036e060f34f96cb001c7c34a545e3da26b0ea071ab02c04' },
-  { ctx: 'FNV', ps: undefined, pt: undefined, cm: 'rng', sha256: '60d1770a7c8883ddaeedc4605b13fb242479984b2a5dcdd37476a859fc5e375b' },
-  { ctx: 'FNV', ps: undefined, pt: undefined, cm: 'rng-locked', sha256: 'd5a3fab25a2cbe2d930971500b1463aef7452ed6c6cd05d8f1b9485a19409414' },
-  { ctx: 'FNV', ps: 'melee', pt: 'minmaxed', cm: 'rng-locked', sha256: 'eda0fd7b3af855271468383da715e087201f1510b640c4256e323188d97f5fcd' },
-  { ctx: 'FO3', ps: undefined, pt: undefined, cm: undefined, sha256: 'a777dc3f306881d5c7b0369ab784b2a6904033afe695e5c2da5ad14f96f8a550' },
-  { ctx: 'FO3', ps: 'melee', pt: undefined, cm: 'rng-locked', sha256: '7ed0b0fed3d66e81a1b9fcc58561f1285dfc71231eb606968bba45562a9abc65' },
+  { ctx: 'FNV', ps: undefined, pt: undefined, cm: undefined, sha256: 'ede29d0a8b2892b1f7962730467f24aa143a7284278e2aa7db8e3f7e5e08ec39' },
+  { ctx: 'FNV', ps: 'melee',   pt: undefined, cm: undefined, sha256: '68455f8ca104cde06703e9a3a849492d658d44a45bddc1730c1f73b124fe9736' },
+  { ctx: 'FNV', ps: undefined, pt: 'minmaxed', cm: undefined, sha256: '8368aab7620742cc14a000425a55b176120fa4085a61693bcbefb0ac88b2b1dc' },
+  { ctx: 'FNV', ps: undefined, pt: 'completionist', cm: undefined, sha256: 'bcf934e2dea2c8c5dd91dc57db11b7fddc8d1d82d323d4c414ab49063cffde27' },
+  { ctx: 'FNV', ps: undefined, pt: 'casual', cm: undefined, sha256: '481d2b9e2a4541b2eb80ea73890c448aba25ebd83979e3845efa4ad68b666621' },
+  { ctx: 'FNV', ps: undefined, pt: 'speedrun', cm: undefined, sha256: 'f7cea26ec145b7fa1540aca6be010a825db7c82cf3a9d7874e18df52adf9a0ba' },
+  { ctx: 'FNV', ps: undefined, pt: undefined, cm: 'rng', sha256: '1c015a880abfc1654d4372fcac4d5081adfa20833ef2baede2aa539ad5f98556' },
+  { ctx: 'FNV', ps: undefined, pt: undefined, cm: 'rng-locked', sha256: 'e55ab9da48e0c41107252724fa9360c29affd3ed80cbd497b429d84588159106' },
+  { ctx: 'FNV', ps: 'melee', pt: 'minmaxed', cm: 'rng-locked', sha256: '17028953718ce184cdd1e309de0406a24882a9b2ace0dc89976e18ca4e45c2a6' },
+  { ctx: 'FO3', ps: undefined, pt: undefined, cm: undefined, sha256: 'a6a2ec157fff83fd142a0ba2ece1d6d133213e6cf2b45be9011a11f8b7dd946a' },
+  { ctx: 'FO3', ps: 'melee', pt: undefined, cm: 'rng-locked', sha256: '1bacfa4696b96d35aba0d566b58f5ec4ec3c4f654e1f073d36198c17cb5b4e89' },
 ];
 const bits = matrix.map(m => {
   try {
@@ -8844,6 +8843,124 @@ Check (
     ($coreCheck135.total -eq $coreCheck135.inside) -and ($coreCheck135.total -gt 0) -and
     ($apiCheck135.total -eq $apiCheck135.inside) -and ($apiCheck135.total -gt 0)
 ) '135.16: every RobcoEvents.on() call in ui-audio.js/ui-core.js/api.js sits inside its _wire*EventBusSubscribers() function -- none at bare top level (the U7 boot-order regression)'
+
+# ===========================================================
+# Suite 136 -- Step 2 (v2.8.0) Phase 0 U9/U10: cheap connector sweep +
+# native-input-path audit (13 tests). Mirrors JS Suite 136.
+# ===========================================================
+Sep "Suite 136 -- Step 2 Phase 0 U9/U10 connector sweep + affinity fix"
+$html136   = Read-Src "index.html"
+$api136    = Read-Src "js/api.js"
+$core136   = Read-Src "js/ui-core.js"
+$render136 = Read-Src "js/ui-render.js"
+$css136    = Read-Src "css/terminal.css"
+$dbNv136   = Read-Src "js/db_nv.js"
+$dbFo3136  = Read-Src "js/db_fo3.js"
+
+# 136.1  U9-1: the Projected Timeline stub is fully retired
+Check (
+    (-not ($html136 -match 'id="timelineDisplay"')) -and
+    (-not ($html136 -match 'PROJECTED TIMELINE')) -and
+    (-not ($core136 -match '\[TIMELINE\]')) -and
+    (-not ($api136 -match '\[TIMELINE\]')) -and
+    (-not ($api136 -match 'PROJECTED TIMELINE'))
+) '136.1: the Projected Timeline stub is fully retired -- index.html shell, COMMAND_REGISTRY entry, and AI directive references are all gone'
+
+# 136.2  U9-2: CURRENT SITTING readout (human-formatted, derived from stats.sessionStart)
+$sessFn136 = [regex]::Match($render136, '(?s)function renderSessionStats\(\)[\s\S]*?\n\}').Value
+Check (
+    ($sessFn136 -match 'CURRENT SITTING') -and
+    ($sessFn136 -match '_fmtOverseerDuration') -and
+    ($sessFn136 -match 's\.sessionStart') -and
+    (-not ($sessFn136 -match 'CAMPAIGN TIME'))
+) '136.2: renderSessionStats() shows a CURRENT SITTING readout formatted via _fmtOverseerDuration, derived from stats.sessionStart'
+
+# 136.3  U9-3: THREAT ammo-reserve advisory (reuses craft-panel lookup, Protocol 22)
+$threatFn136 = [regex]::Match($render136, '(?s)function renderThreat\(target\)[\s\S]*?\n\}').Value
+Check (
+    ($threatFn136 -match '_craftGetHave') -and
+    ($threatFn136 -match 'INSUFFICIENT RESERVES') -and
+    ($threatFn136 -match 'RESERVES SUFFICIENT') -and
+    ($threatFn136 -match 'threat-ammo-advisory') -and
+    ($css136 -match '\.threat-ammo-advisory\s*\{') -and
+    ($css136 -match '\.threat-ammo-advisory--low\s*\{')
+) '136.3: renderThreat() shows an ammo-reserve advisory (INSUFFICIENT/SUFFICIENT RESERVES) backed by CSS classes'
+
+# 136.4  U9-4: CONSULT now searches the tracker registries too, and
+# _consultDetail() handles their distinct shapes
+$consultCatKeys136 = @("'collectibles'", "'skillBooks'", "'magazines'", "'traits'", "'lincolnMemorabilia'")
+$consultCatsOk136 = $true
+foreach ($ck136 in $consultCatKeys136) { if (-not $render136.Contains("key: $ck136")) { $consultCatsOk136 = $false } }
+Check (
+    $consultCatsOk136 -and
+    ($render136 -match "cat === 'collectibles' \|\| cat === 'lincolnMemorabilia'") -and
+    ($render136 -match "cat === 'skillBooks' \|\| cat === 'magazines'") -and
+    ($render136 -match "cat === 'traits'")
+) '136.4: _CONSULT_CATS includes collectibles/skillBooks/magazines/traits/lincolnMemorabilia, and _consultDetail() renders their detail text'
+
+# 136.5  U9-4: getQuestItemDetail() (QUEST_ITEMS.CSV reserved columns) in both db
+# runners, wired into CONSULT; BESTIARY xpYield now surfaced
+Check (
+    ($dbNv136 -match 'function getQuestItemDetail\(name\)') -and
+    ($dbFo3136 -match 'function getQuestItemDetail\(name\)') -and
+    ($dbNv136 -match 'Associated_Quest') -and
+    ($dbNv136 -match 'Special_Property') -and
+    ($render136 -match 'getQuestItemDetail') -and
+    ($render136 -match 'res\.questItem') -and
+    ($render136 -match 'res\.creature\.xpYield')
+) '136.5: getQuestItemDetail() (Associated_Quest/Special_Property) exists in both db runners and is wired into CONSULT; BESTIARY xpYield is now surfaced'
+
+# 136.6  U9-5: GAME_DEFS.hasWeaponMods -- true for FNV, false for FO3
+Check (
+    ($stateSrc -match 'hasWeaponMods:\s*true') -and ($stateSrc -match 'hasWeaponMods:\s*false')
+) '136.6: GAME_DEFS.FNV.hasWeaponMods === true and GAME_DEFS.FO3.hasWeaponMods === false'
+
+# 136.7  U9-5: the inventory Mods filter is gated by hasWeaponMods in _updateContextPanels()
+$ctxPanelsFn136 = [regex]::Match($render136, '(?s)function _updateContextPanels\(\)[\s\S]*?\n\}').Value
+Check (
+    ($html136 -match 'id="invFilterMods"') -and
+    ($render136 -match "_activeDef\(\)\.hasWeaponMods") -and
+    ($render136 -match "getElementById\('invFilterMods'\)") -and
+    ($ctxPanelsFn136 -match "setInvFilter\('all'\)")
+) '136.7: the inventory Mods filter button is hidden per-game via _updateContextPanels() + GAME_DEFS.hasWeaponMods, with a fail-safe reset off the mod filter'
+
+# 136.8  U10: adjustAffinity(idx, delta) -- clamps 0-100, persists + re-renders
+$adjFn136 = [regex]::Match($render136, '(?s)function adjustAffinity\(idx, delta\)[\s\S]*?\n\}').Value
+Check (
+    ($adjFn136 -match 'Math\.max\(0, Math\.min\(100,') -and
+    ($adjFn136 -match 'state\.squad\[idx\]\.affinity') -and
+    ($adjFn136 -match 'saveState\(\)') -and
+    ($adjFn136 -match 'renderSquad\(\)')
+) '136.8: adjustAffinity(idx, delta) exists, clamps 0-100, and persists + re-renders'
+
+# 136.9  U10: native [+]/[-] affinity buttons always rendered on every squad row
+$squadFn136 = [regex]::Match($render136, '(?s)function renderSquad\(\)[\s\S]*?\n\}').Value
+Check (
+    ($squadFn136 -match 'adjustAffinity\(\$\{i\},5\)') -and
+    ($squadFn136 -match 'adjustAffinity\(\$\{i\},-5\)') -and
+    ($squadFn136 -match 'aria-label="Affinity \+5 for') -and
+    ($squadFn136 -match 'aria-label="Affinity -5 for') -and
+    (-not ($squadFn136 -match 'member\.affinity !== undefined'))
+) '136.9: renderSquad() always renders the [+]/[-] affinity buttons (real <button>s with aria-labels), not gated behind member.affinity being pre-set'
+
+# 136.10  U10: newly-added squad members seed affinity: 0
+$addSquadFn136 = [regex]::Match($render136, '(?s)function addSquadMember\(\)[\s\S]*?\n\}').Value
+Check ($addSquadFn136 -match 'affinity:\s*0,') '136.10: addSquadMember() seeds affinity: 0 for newly-added companions'
+
+# 136.11  Escape-ratchet: [TIMELINE] registered in Suite 113's RETIRED-macro list
+Check ($RETIRED113 -contains '[TIMELINE]') '136.11: [TIMELINE] is registered in the Suite 113 RETIRED-macro list (self-referential escape-ratchet guard)'
+
+# 136.12  Game-agnostic (Protocol 38): weapon-mods gate is data-driven, not a ctx literal
+Check (
+    (-not ($render136 -match "ctx === 'FO3' \?.*hasWeaponMods")) -and
+    (-not ($render136 -match "ctx === 'FNV' \?.*hasWeaponMods"))
+) '136.12: the weapon-mods gate is data-driven via GAME_DEFS, not a hardcoded ctx literal ternary'
+
+# 136.13  UTF-8 integrity (Protocol 39) spot-check
+Check (
+    ($render136.Contains([char]0x26A0 + ' INSUFFICIENT RESERVES')) -and
+    (-not ($render136 -match 'â€|â–|�'))
+) '136.13: the THREAT ammo-advisory glyph is clean UTF-8 (no double-encoding, no replacement chars)'
 
 # ===========================================================
 # Results

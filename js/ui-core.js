@@ -1966,7 +1966,6 @@ const COMMAND_REGISTRY = [
       { cmd: '[GPS] / [MAP]', desc: 'Localized geographic compass grid.' },
       { cmd: '[WAIT: X Hrs]', desc: 'Advance the clock by X hours; restock.' },
       { cmd: '[SLEEP]', desc: 'Advance 8 hours; heal HP & limbs. Offline.' },
-      { cmd: '[TIMELINE]', desc: 'Projected narrative timeline.' },
       { cmd: '[CROSSROADS]', desc: 'Point-of-no-return / butterfly-effect check. Offline.' },
     ],
   },

@@ -666,6 +666,7 @@
                 Aid
               </button>
               <button
+                id="invFilterMods"
                 class="btn-sm action-btn inv-filter-btn"
                 data-filter="mod"
                 onclick="setInvFilter('mod')"
@@ -1141,7 +1142,7 @@
               class="action-btn"
               onclick="resetSessionStats()"
               style="margin-top: 6px; font-size: 10px"
-              aria-label="Reset campaign statistics (kills, caps earned, damage dealt, campaign time)"
+              aria-label="Reset campaign statistics (kills, caps earned, damage dealt, current sitting duration)"
             >
               RESET CAMPAIGN STATS
             </button>
@@ -1312,29 +1313,6 @@
               >
                 <span style="opacity: 0.45"
                   >NO DECISIONS RECORDED — CROSSROADS EVENTS WILL APPEAR HERE</span
-                >
-              </div>
-            </details>
-
-            <!-- Timeline Panel Shell -->
-            <details class="sub-panel" data-sub-id="projected_timeline" style="margin-bottom: 10px">
-              <summary class="config-summary" style="font-size: 12px; opacity: 0.85">
-                PROJECTED TIMELINE
-              </summary>
-              <div
-                id="timelineDisplay"
-                style="
-                  margin-top: 8px;
-                  font-size: 10px;
-                  opacity: 0.7;
-                  line-height: 1.6;
-                  padding-left: 4px;
-                  border-left: 1px dashed var(--robco-green);
-                  min-height: 32px;
-                "
-              >
-                <span style="opacity: 0.45"
-                  >NO TIMELINE GENERATED — USE THE [TIMELINE] COMMAND IN COMM-LINK</span
                 >
               </div>
             </details>

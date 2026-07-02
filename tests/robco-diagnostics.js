@@ -415,7 +415,6 @@ guards(htmlSource, [
   [/id="campgPanel"/, 'CAMPG panel exists in index.html (id="campgPanel")'],
   [/id="gameContextSelect"/, 'Game context select exists in index.html (id="gameContextSelect")'],
   [/id="fo3WarningBanner"/, 'FO3 warning banner exists in index.html (id="fo3WarningBanner")'],
-  [/id="timelineDisplay"/, 'Timeline display shell exists in index.html (id="timelineDisplay")'],
 ]);
 assert(
   /function onGameContextChange\b/.test(uiSource),
@@ -12463,6 +12462,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '[PAUSE]',
     '[PAGE 2',
     '[ARCHIVE]',
+    '[TIMELINE]', // U9-1: Projected Timeline stub retired (Step 2 Phase 0)
   ];
 
   // 113.1  registry parsed + a dedicated NATIVE TERMINALS group marked OFFLINE / NO AI
@@ -13857,16 +13857,16 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '125.3: exactly one #sessionStatsList remains (no leftover duplicate panel)'
   );
 
-  // 125.4  campaign readout shows all the owner-confirmed stats incl. campaign play-time
+  // 125.4  campaign readout shows all the owner-confirmed stats incl. session duration
   assert(
     /state\.stats/.test(sessFn125) &&
       /KILLS/.test(sessFn125) &&
       /CAPS EARNED/.test(sessFn125) &&
       /DMG DEALT/.test(sessFn125) &&
-      /CAMPAIGN TIME/.test(sessFn125) &&
+      /CURRENT SITTING/.test(sessFn125) &&
       /LOCATION VISITS/.test(sessFn125) &&
       /locationHistory/.test(sessFn125),
-    '125.4: renderSessionStats shows kills, caps earned, dmg dealt, CAMPAIGN TIME, and the LOCATION VISITS count'
+    '125.4: renderSessionStats shows kills, caps earned, dmg dealt, CURRENT SITTING, and the LOCATION VISITS count'
   );
 
   // 125.5  device telemetry is preserved in the same panel
@@ -13877,13 +13877,13 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '125.5: renderOverseerLog still shows device telemetry (CURRENT UPTIME / TOTAL POWER-ON / BOOT COUNT)'
   );
 
-  // 125.6  the two time notions are distinctly labelled — campaign play-time vs device uptime
+  // 125.6  the two time notions are distinctly labelled — session duration vs device uptime
   assert(
     panel125.includes('UNIT TELEMETRY') &&
       panel125.includes('CAMPAIGN LOG') &&
-      /CAMPAIGN TIME/.test(sessFn125) &&
+      /CURRENT SITTING/.test(sessFn125) &&
       /CURRENT UPTIME/.test(overFn125),
-    '125.6: campaign play-time (CAMPAIGN TIME) and device uptime (CURRENT UPTIME) sit under clearly labelled UNIT TELEMETRY / CAMPAIGN LOG sections'
+    '125.6: session duration (CURRENT SITTING) and device uptime (CURRENT UPTIME) sit under clearly labelled UNIT TELEMETRY / CAMPAIGN LOG sections'
   );
 
   // 125.7  RESET CAMPAIGN STATS is wired to resetSessionStats, which clears state.stats + re-renders
@@ -14383,77 +14383,77 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         ps: undefined,
         pt: undefined,
         cm: undefined,
-        sha256: '43ba2269826e0ca98a7b5bc48838ae7653f71048bcdd390e648bfc0cf2bdd6c3',
+        sha256: 'ede29d0a8b2892b1f7962730467f24aa143a7284278e2aa7db8e3f7e5e08ec39',
       },
       {
         ctx: 'FNV',
         ps: 'melee',
         pt: undefined,
         cm: undefined,
-        sha256: '35c46ce000bc91317519d4101cb98a1a28faa62d3d325b6037287860f1e09070',
+        sha256: '68455f8ca104cde06703e9a3a849492d658d44a45bddc1730c1f73b124fe9736',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'minmaxed',
         cm: undefined,
-        sha256: '00ea973101a6d4f2e9e8cc60ef7ea8d117b52f4015f41e7fa74b2de6a67438c0',
+        sha256: '8368aab7620742cc14a000425a55b176120fa4085a61693bcbefb0ac88b2b1dc',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'completionist',
         cm: undefined,
-        sha256: '84b338539b93308cdda12a0263b00aa3d8eacb99f898121a3935e956a43398c8',
+        sha256: 'bcf934e2dea2c8c5dd91dc57db11b7fddc8d1d82d323d4c414ab49063cffde27',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'casual',
         cm: undefined,
-        sha256: '1b1a56e86215fdc1329adce6529ddb634e0b6ed39563e5cd993f926feaf2c983',
+        sha256: '481d2b9e2a4541b2eb80ea73890c448aba25ebd83979e3845efa4ad68b666621',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'speedrun',
         cm: undefined,
-        sha256: 'e1b08e6c0854b93c2036e060f34f96cb001c7c34a545e3da26b0ea071ab02c04',
+        sha256: 'f7cea26ec145b7fa1540aca6be010a825db7c82cf3a9d7874e18df52adf9a0ba',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: undefined,
         cm: 'rng',
-        sha256: '60d1770a7c8883ddaeedc4605b13fb242479984b2a5dcdd37476a859fc5e375b',
+        sha256: '1c015a880abfc1654d4372fcac4d5081adfa20833ef2baede2aa539ad5f98556',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: undefined,
         cm: 'rng-locked',
-        sha256: 'd5a3fab25a2cbe2d930971500b1463aef7452ed6c6cd05d8f1b9485a19409414',
+        sha256: 'e55ab9da48e0c41107252724fa9360c29affd3ed80cbd497b429d84588159106',
       },
       {
         ctx: 'FNV',
         ps: 'melee',
         pt: 'minmaxed',
         cm: 'rng-locked',
-        sha256: 'eda0fd7b3af855271468383da715e087201f1510b640c4256e323188d97f5fcd',
+        sha256: '17028953718ce184cdd1e309de0406a24882a9b2ace0dc89976e18ca4e45c2a6',
       },
       {
         ctx: 'FO3',
         ps: undefined,
         pt: undefined,
         cm: undefined,
-        sha256: 'a777dc3f306881d5c7b0369ab784b2a6904033afe695e5c2da5ad14f96f8a550',
+        sha256: 'a6a2ec157fff83fd142a0ba2ece1d6d133213e6cf2b45be9011a11f8b7dd946a',
       },
       {
         ctx: 'FO3',
         ps: 'melee',
         pt: undefined,
         cm: 'rng-locked',
-        sha256: '7ed0b0fed3d66e81a1b9fcc58561f1285dfc71231eb606968bba45562a9abc65',
+        sha256: '1bacfa4696b96d35aba0d566b58f5ec4ec3c4f654e1f073d36198c17cb5b4e89',
       },
     ];
 
@@ -15550,6 +15550,188 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       '135.16: every RobcoEvents.on() call in ui-audio.js/ui-core.js/api.js sits inside its _wire*EventBusSubscribers() function — none at bare top level (the U7 boot-order regression)'
     );
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 136 — Step 2 (v2.8.0) Phase 0 U9/U10: cheap connector sweep +
+//  native-input-path audit. Retires the dead Projected Timeline stub; renames
+//  the campaign-time readout to CURRENT SITTING (human-formatted via
+//  _fmtOverseerDuration); adds a THREAT ammo-reserve advisory; extends CONSULT
+//  to search the tracker registries + surface previously-unconsumed DB columns
+//  (QUEST_ITEMS Associated_Quest/Special_Property, BESTIARY XP_Yield); adds a
+//  GAME_DEFS.hasWeaponMods flag that hides the inventory "Mods" filter on FO3
+//  (reverse Protocol-38 leak — FO3 has no weapon-mod data at all); and closes
+//  the one live player-authority violation the U10 audit found — squad
+//  affinity was AI-write-only, now has native [+]/[-] buttons.
+//  13 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 136 — Step 2 Phase 0 U9/U10 connector sweep + affinity fix');
+  const html136 = readFile('index.html');
+  const api136 = readFile('js/api.js');
+  const uiCore136 = readFile('js/ui-core.js');
+  const uiRender136 = readFile('js/ui-render.js');
+  const css136 = readFile('css/terminal.css');
+  const dbNv136 = readFile('js/db_nv.js');
+  const dbFo3136 = readFile('js/db_fo3.js');
+
+  // 136.1  U9-1: the Projected Timeline stub is fully retired — no shell, no
+  //        command, no directive references, no stray modal-consumer branch.
+  assert(
+    !/id="timelineDisplay"/.test(html136) &&
+      !/PROJECTED TIMELINE/.test(html136) &&
+      !/\[TIMELINE\]/.test(uiCore136) &&
+      !/\[TIMELINE\]/.test(api136) &&
+      !/PROJECTED TIMELINE/.test(api136),
+    '136.1: the Projected Timeline stub is fully retired — index.html shell, COMMAND_REGISTRY entry, and AI directive references are all gone'
+  );
+
+  // 136.2  U9-2: the campaign readout surfaces a human-formatted CURRENT
+  //        SITTING duration (derived from stats.sessionStart via
+  //        _fmtOverseerDuration), replacing the old raw-minutes CAMPAIGN TIME.
+  {
+    const sessFn136 = (uiRender136.match(/function renderSessionStats\(\)[\s\S]*?\n\}/) || [''])[0];
+    assert(
+      /CURRENT SITTING/.test(sessFn136) &&
+        /_fmtOverseerDuration/.test(sessFn136) &&
+        /s\.sessionStart/.test(sessFn136) &&
+        !/CAMPAIGN TIME/.test(sessFn136),
+      '136.2: renderSessionStats() shows a CURRENT SITTING readout formatted via _fmtOverseerDuration, derived from stats.sessionStart'
+    );
+  }
+
+  // 136.3  U9-3: THREAT surfaces an ammo-reserve advisory comparing the
+  //        projected ammoBurn against actual state.ammo reserves (reusing the
+  //        craft-panel's case-insensitive lookup — Protocol 22).
+  {
+    const threatFn136 = (uiRender136.match(/function renderThreat\(target\)[\s\S]*?\n\}/) || [
+      '',
+    ])[0];
+    assert(
+      /_craftGetHave/.test(threatFn136) &&
+        /INSUFFICIENT RESERVES/.test(threatFn136) &&
+        /RESERVES SUFFICIENT/.test(threatFn136) &&
+        /threat-ammo-advisory/.test(threatFn136) &&
+        /\.threat-ammo-advisory\s*\{/.test(css136) &&
+        /\.threat-ammo-advisory--low\s*\{/.test(css136),
+      '136.3: renderThreat() shows an ammo-reserve advisory (INSUFFICIENT/SUFFICIENT RESERVES) backed by CSS classes'
+    );
+  }
+
+  // 136.4  U9-4: CONSULT now searches the tracker registries too, and
+  //        _consultDetail() handles their distinct shapes.
+  assert(
+    ["'collectibles'", "'skillBooks'", "'magazines'", "'traits'", "'lincolnMemorabilia'"].every(k =>
+      uiRender136.includes(`key: ${k}`)
+    ) &&
+      /cat === 'collectibles' \|\| cat === 'lincolnMemorabilia'/.test(uiRender136) &&
+      /cat === 'skillBooks' \|\| cat === 'magazines'/.test(uiRender136) &&
+      /cat === 'traits'/.test(uiRender136),
+    '136.4: _CONSULT_CATS includes collectibles/skillBooks/magazines/traits/lincolnMemorabilia, and _consultDetail() renders their detail text'
+  );
+
+  // 136.5  U9-4: CONSULT surfaces previously-unconsumed DB columns — a new
+  //        getQuestItemDetail() accessor (QUEST_ITEMS.CSV Associated_Quest /
+  //        Special_Property, mirroring the getChemsTable() pattern) exists in
+  //        BOTH db_nv.js and db_fo3.js (Protocol 15 parity), is wired into
+  //        _consultSearch()/_consultRenderHTML(), and BESTIARY's already-parsed
+  //        xpYield (previously computed but never displayed anywhere) is shown.
+  assert(
+    /function getQuestItemDetail\(name\)/.test(dbNv136) &&
+      /function getQuestItemDetail\(name\)/.test(dbFo3136) &&
+      /Associated_Quest/.test(dbNv136) &&
+      /Special_Property/.test(dbNv136) &&
+      /getQuestItemDetail/.test(uiRender136) &&
+      /res\.questItem/.test(uiRender136) &&
+      /res\.creature\.xpYield/.test(uiRender136),
+    '136.5: getQuestItemDetail() (Associated_Quest/Special_Property) exists in both db runners and is wired into CONSULT; BESTIARY xpYield is now surfaced'
+  );
+
+  // 136.6  U9-5: GAME_DEFS.hasWeaponMods — true for FNV (has WEAPON_MODS.CSV +
+  //        craftable mods), false for FO3 (no weapon-mod system/data at all).
+  assert(
+    /hasWeaponMods:\s*true/.test(stateSource) && /hasWeaponMods:\s*false/.test(stateSource),
+    '136.6: GAME_DEFS.FNV.hasWeaponMods === true and GAME_DEFS.FO3.hasWeaponMods === false'
+  );
+
+  // 136.7  U9-5: the inventory "Mods" filter button is gated by hasWeaponMods
+  //        in _updateContextPanels() (called from loadUI on every game-context
+  //        switch), and resets an active "mod" filter back to "all" if hidden
+  //        so FO3 can never be stranded on an unreachable filter.
+  assert(
+    /id="invFilterMods"/.test(html136) &&
+      /_activeDef\(\)\.hasWeaponMods/.test(uiRender136) &&
+      /getElementById\('invFilterMods'\)/.test(uiRender136) &&
+      /setInvFilter\('all'\)/.test(
+        (uiRender136.match(/function _updateContextPanels\(\)[\s\S]*?\n\}/) || [''])[0]
+      ),
+    '136.7: the inventory Mods filter button is hidden per-game via _updateContextPanels() + GAME_DEFS.hasWeaponMods, with a fail-safe reset off the mod filter'
+  );
+
+  // 136.8  U10: squad affinity — was AI-write-only (autoImportState only); now
+  //        has native [+]/[-] buttons on every squad row, clamped 0-100.
+  {
+    const adjFn136 = (uiRender136.match(/function adjustAffinity\(idx, delta\)[\s\S]*?\n\}/) || [
+      '',
+    ])[0];
+    assert(
+      /Math\.max\(0, Math\.min\(100,/.test(adjFn136) &&
+        /state\.squad\[idx\]\.affinity/.test(adjFn136) &&
+        /saveState\(\)/.test(adjFn136) &&
+        /renderSquad\(\)/.test(adjFn136),
+      '136.8: adjustAffinity(idx, delta) exists, clamps 0-100, and persists + re-renders'
+    );
+  }
+
+  // 136.9  U10: the affinity buttons are wired into renderSquad() as real
+  //        <button> elements (Protocol UI-5) with descriptive aria-labels
+  //        (Protocol UI-3), always rendered (not gated on affinity being set).
+  {
+    const squadFn136 = (uiRender136.match(/function renderSquad\(\)[\s\S]*?\n\}/) || [''])[0];
+    assert(
+      /adjustAffinity\(\$\{i\},5\)/.test(squadFn136) &&
+        /adjustAffinity\(\$\{i\},-5\)/.test(squadFn136) &&
+        /aria-label="Affinity \+5 for/.test(squadFn136) &&
+        /aria-label="Affinity -5 for/.test(squadFn136) &&
+        !/member\.affinity !== undefined/.test(squadFn136),
+      '136.9: renderSquad() always renders the [+]/[-] affinity buttons (real <button>s with aria-labels), not gated behind member.affinity being pre-set'
+    );
+  }
+
+  // 136.10  U10: newly-added squad members seed affinity: 0 (so the bar/buttons
+  //         are meaningful immediately, not left undefined until first nudge).
+  assert(
+    /affinity:\s*0,/.test(
+      (uiRender136.match(/function addSquadMember\(\)[\s\S]*?\n\}/) || [''])[0]
+    ),
+    '136.10: addSquadMember() seeds affinity: 0 for newly-added companions'
+  );
+
+  // 136.11  Escape-ratchet (Protocol 36b): [TIMELINE] is registered in Suite
+  //         113's RETIRED-macro list so a future regression is caught
+  //         structurally, not just by this suite's own presence checks.
+  assert(
+    /const RETIRED = \[[\s\S]*?'\[TIMELINE\]'[\s\S]*?\]/.test(
+      readFile('tests/robco-diagnostics.js')
+    ),
+    '136.11: [TIMELINE] is registered in the Suite 113 RETIRED-macro list (self-referential escape-ratchet guard)'
+  );
+
+  // 136.12  Game-agnostic (Protocol 38): none of the U9/U10 additions introduce
+  //         a hardcoded two-game literal coercion — gating routes through
+  //         GAME_DEFS/_activeDef(), never a bare ctx === 'FNV'/'FO3' ternary.
+  assert(
+    !/ctx === 'FO3' \? .*hasWeaponMods/.test(uiRender136) &&
+      !/ctx === 'FNV' \? .*hasWeaponMods/.test(uiRender136),
+    '136.12: the weapon-mods gate is data-driven via GAME_DEFS, not a hardcoded ctx literal ternary'
+  );
+
+  // 136.13  UTF-8 integrity (Protocol 39) spot-check: the new advisory/consult
+  //         text renders the ⚠ glyph correctly (not a mojibake double-encoding).
+  assert(
+    uiRender136.includes('⚠ INSUFFICIENT RESERVES') && !/â€|â–|�/.test(uiRender136),
+    '136.13: the THREAT ammo-advisory glyph is clean UTF-8 (no double-encoding, no replacement chars)'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════

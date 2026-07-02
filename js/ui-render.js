@@ -179,20 +179,21 @@ function renderSquad() {
       const hpRatio = member.hp / (member.hpMax || 100);
       const pBars = Math.ceil(hpRatio * 10);
       const barStr = '['.padEnd(pBars + 1, '\u2588').padEnd(11, '\u2591') + ']';
-      // #11 Companion Affinity: render affinity bar if present
-      let affinityStr = '';
-      if (member.affinity !== undefined) {
-        const aff = Math.min(100, Math.max(0, parseInt(member.affinity) || 0));
-        const affBars = Math.round(aff / 10);
-        const affBar = '['.padEnd(affBars + 1, '\u25a0').padEnd(11, '\u25a1') + ']';
-        const affColor =
-          aff >= 75
-            ? 'var(--robco-green)'
-            : aff >= 40
-              ? 'var(--robco-alert)'
-              : 'var(--robco-danger)';
-        affinityStr = `<div style="font-size:10px;margin-top:2px;color:${affColor};">AFF: ${affBar} ${aff}%</div>`;
-      }
+      // #11 Companion Affinity \u2014 U10: always rendered with native [+]/[-] nudge
+      // buttons (previously AI-write-only via autoImportState; the affinity bar
+      // stayed invisible until the AI happened to set it, with no player-facing
+      // way to ever initialize it). Missing affinity defaults to 0, same fallback
+      // adjustAffinity() uses.
+      const aff = Math.min(100, Math.max(0, parseInt(member.affinity) || 0));
+      const affBars = Math.round(aff / 10);
+      const affBar = '['.padEnd(affBars + 1, '\u25a0').padEnd(11, '\u25a1') + ']';
+      const affColor =
+        aff >= 75 ? 'var(--robco-green)' : aff >= 40 ? 'var(--robco-alert)' : 'var(--robco-danger)';
+      const affinityStr = `<div style="font-size:10px;margin-top:2px;display:flex;align-items:center;gap:6px;">
+                <span style="color:${affColor};">AFF: ${affBar} ${aff}%</span>
+                <button class="faction-btn" aria-label="Affinity +5 for ${escapeHtml(member.name)}" onclick="adjustAffinity(${i},5)">+</button>
+                <button class="faction-btn" aria-label="Affinity -5 for ${escapeHtml(member.name)}" onclick="adjustAffinity(${i},-5)">-</button>
+            </div>`;
       return `<div style="margin-bottom: 5px; border-bottom: 1px dashed rgba(var(--robco-green-rgb), 0.3); padding-bottom: 4px;">
             <div style="font-weight:bold;display:flex;justify-content:space-between;align-items:center;">
                 <span>${barStr} ${escapeHtml(member.name)}</span>
@@ -218,6 +219,17 @@ function removeSquadMember(idx) {
   }
 }
 
+// U10 (FP-AI-5/FP-FEAT-3): native affinity control \u2014 companion affinity was
+// previously AI-write-only (autoImportState, api.js). Nudges by delta, clamped
+// 0-100, defaulting an unset member.affinity to 0 (mirrors the render fallback).
+function adjustAffinity(idx, delta) {
+  if (!state.squad || !state.squad[idx]) return;
+  const cur = Math.max(0, Math.min(100, parseInt(state.squad[idx].affinity) || 0));
+  state.squad[idx].affinity = Math.max(0, Math.min(100, cur + delta));
+  saveState();
+  renderSquad();
+}
+
 function addSquadMember() {
   const nameInput = document.getElementById('newSquadName');
   if (!nameInput || !nameInput.value.trim()) return;
@@ -237,6 +249,7 @@ function addSquadMember() {
     weapon: 'Unarmed',
     ammo: 0,
     condition: 'OK',
+    affinity: 0,
   });
 
   nameInput.value = '';
@@ -602,7 +615,11 @@ function renderSessionStats() {
   const statsDiv = document.getElementById('sessionStatsList');
   if (!statsDiv) return;
   const s = state.stats || {};
-  const elapsed = Math.round((Date.now() - (s.sessionStart || Date.now())) / 60000);
+  const sittingMs = Date.now() - (s.sessionStart || Date.now());
+  const sittingStr =
+    typeof _fmtOverseerDuration === 'function'
+      ? _fmtOverseerDuration(sittingMs)
+      : `${Math.round(sittingMs / 60000)}m`;
   // I2: Collectibles count for session stats
   const collectDefs =
     typeof FALLOUT_REGISTRY !== 'undefined' && FALLOUT_REGISTRY.collectibles
@@ -619,7 +636,7 @@ function renderSessionStats() {
             <span style="opacity:0.65;">KILLS</span><span>${s.kills || 0}</span>
             <span style="opacity:0.65;">CAPS EARNED</span><span>${s.capsEarned || 0}</span>
             <span style="opacity:0.65;">DMG DEALT</span><span>${s.damageDealt || 0}</span>
-            <span style="opacity:0.65;">CAMPAIGN TIME</span><span>${elapsed}m</span>
+            <span style="opacity:0.65;">CURRENT SITTING</span><span>${sittingStr}</span>
             <span style="opacity:0.65;">TICKS</span><span>${state.ticks || 0}</span>
             <span style="opacity:0.65;">LOCATION VISITS</span><span>${(state.locationHistory || []).length}</span>
             ${collectLine}
@@ -2383,7 +2400,16 @@ function renderThreat(target) {
     } else {
       html += `<div class="threat-ammo">AMMO BURN EST.: ${m.ammoBurn} round${m.ammoBurn === 1 ? '' : 's'} (${m.shotsToKill} hit${m.shotsToKill === 1 ? '' : 's'})</div>`;
       const at = (weapon.ammoType || '').trim();
-      if (at) html += `<div class="threat-weapon">AMMO TYPE: ${escapeHtml(at)}</div>`;
+      if (at) {
+        html += `<div class="threat-weapon">AMMO TYPE: ${escapeHtml(at)}</div>`;
+        // Reserve check: compare the projected burn against ammo actually on hand
+        // (Protocol 22 — reuses the craft-panel case-insensitive lookup).
+        const reserve = typeof _craftGetHave === 'function' ? _craftGetHave(at) : null;
+        if (reserve !== null) {
+          const short = reserve < m.ammoBurn;
+          html += `<div class="threat-ammo-advisory${short ? ' threat-ammo-advisory--low' : ''}">${short ? '⚠ INSUFFICIENT RESERVES' : 'RESERVES SUFFICIENT'}: ${reserve}/${m.ammoBurn} ${escapeHtml(at)} on hand</div>`;
+        }
+      }
     }
     html += `<div class="threat-weapon">VS ${escapeHtml(weapon.name)} &mdash; DPS ${Math.round(m.weaponDPS)} / EFF ${Math.round(m.effectiveDPS)} after DT</div>`;
   } else {
@@ -2407,18 +2433,31 @@ function renderThreat(target) {
 // Shows NO ENTRY IN DATABANK when nothing matches (Protocol 3 — never invents records).
 // Game-agnostic (Protocol 38): FALLOUT_REGISTRY + databaseCSVs are the active game's data.
 // The user topic is always run through escapeHtml before it reaches innerHTML (XSS-safe).
+// U9-4: extended to also search the tracker registries (collectibles/skillBooks/
+// magazines/traits/lincolnMemorabilia). registrySearch() already no-ops on a
+// category absent from the active game's FALLOUT_REGISTRY (Protocol 38 — no
+// per-game branching needed here; FNV lacks lincolnMemorabilia, FO3 lacks
+// traits/magazines, and both cases just yield zero hits for that category).
 const _CONSULT_CATS = [
   { key: 'items', label: 'ITEMS' },
   { key: 'perks', label: 'PERKS' },
   { key: 'quests', label: 'QUESTS' },
   { key: 'locations', label: 'LOCATIONS' },
   { key: 'companions', label: 'COMPANIONS' },
+  { key: 'collectibles', label: 'COLLECTIBLES' },
+  { key: 'skillBooks', label: 'SKILL BOOKS' },
+  { key: 'magazines', label: 'SKILL MAGAZINES' },
+  { key: 'traits', label: 'TRAITS' },
+  { key: 'lincolnMemorabilia', label: 'LINCOLN MEMORABILIA' },
 ];
 
 function _consultDetail(cat, e) {
   if (cat === 'quests') return [e.type, e.dlc].filter(Boolean).join(' · ');
   if (cat === 'perks') return [e.type, e.level ? 'Lvl ' + e.level : ''].filter(Boolean).join(' · ');
   if (cat === 'companions') return e.location || e.fullName || '';
+  if (cat === 'collectibles' || cat === 'lincolnMemorabilia') return e.location || '';
+  if (cat === 'skillBooks' || cat === 'magazines') return e.skill ? 'Skill: ' + e.skill : '';
+  if (cat === 'traits') return e.effect || '';
   return e.type || '';
 }
 
@@ -2437,6 +2476,7 @@ function _consultSearch(topic) {
       creature: null,
       weapon: null,
       dbItem: null,
+      questItem: null,
     };
   const groups = [];
   if (typeof registrySearch === 'function') {
@@ -2448,8 +2488,11 @@ function _consultSearch(topic) {
   const creature = typeof lookupBestiaryEntry === 'function' ? lookupBestiaryEntry(q) : null;
   const weapon = typeof lookupWeaponStats === 'function' ? lookupWeaponStats(q) : null;
   const dbItem = typeof lookupItemInDb === 'function' ? lookupItemInDb(q) : null;
-  const empty = groups.length === 0 && !creature && !weapon && !dbItem;
-  return { q, noQuery: false, empty, groups, creature, weapon, dbItem };
+  // U9-4: surface the QUEST_ITEMS.CSV Associated_Quest/Special_Property columns
+  // lookupItemInDb() doesn't expose (Protocol 22 — same accessor pattern as getChemsTable).
+  const questItem = typeof getQuestItemDetail === 'function' ? getQuestItemDetail(q) : null;
+  const empty = groups.length === 0 && !creature && !weapon && !dbItem && !questItem;
+  return { q, noQuery: false, empty, groups, creature, weapon, dbItem, questItem };
 }
 
 // Shared CONSULT renderer (Protocol 22) — builds the escaped DATABANK result HTML
@@ -2471,6 +2514,8 @@ function _consultRenderHTML(res) {
     statRows.push(['HP / DT', `${res.creature.hp} / ${res.creature.dt}`]);
     if (res.creature.weakness && String(res.creature.weakness).toLowerCase() !== 'none')
       statRows.push(['WEAKNESS', escapeHtml(res.creature.weakness)]);
+    // U9-4: XP_Yield is parsed by lookupBestiaryEntry() but was never surfaced anywhere.
+    if (res.creature.xpYield) statRows.push(['XP YIELD', String(res.creature.xpYield)]);
   }
   if (res.weapon) {
     statRows.push(['WEAPON', escapeHtml(res.weapon.name)]);
@@ -2480,6 +2525,14 @@ function _consultRenderHTML(res) {
   if (res.dbItem && !res.weapon && !res.creature) {
     statRows.push(['TYPE', escapeHtml(String(res.dbItem.type || 'misc'))]);
     statRows.push(['WEIGHT / VALUE', `${res.dbItem.wgt} / ${res.dbItem.val}`]);
+  }
+  // U9-4: QUEST_ITEMS.CSV Associated_Quest/Special_Property — authored data that
+  // previously had no consumer anywhere in the app.
+  if (res.questItem) {
+    if (res.questItem.associatedQuest)
+      statRows.push(['ASSOCIATED QUEST', escapeHtml(res.questItem.associatedQuest)]);
+    if (res.questItem.specialProperty)
+      statRows.push(['SPECIAL PROPERTY', escapeHtml(res.questItem.specialProperty)]);
   }
   if (statRows.length) {
     html += '<div class="consult-stats">';
@@ -2690,5 +2743,15 @@ function _updateContextPanels() {
   if (karmaPanel) {
     // Only show if on stat tab and FO3 mode; otherwise hide
     karmaPanel.style.display = usesKarmaCenter ? '' : 'none';
+  }
+  // U9-5: FO3 has no weapon-mod system/data — hide the inventory "Mods" filter so
+  // it never advertises a category that can never have entries (Protocol 38 reverse leak).
+  const hasWeaponMods = _activeDef().hasWeaponMods;
+  const modsFilterBtn = document.getElementById('invFilterMods');
+  if (modsFilterBtn) {
+    modsFilterBtn.style.display = hasWeaponMods ? '' : 'none';
+    if (!hasWeaponMods && typeof _invFilter !== 'undefined' && _invFilter === 'mod') {
+      setInvFilter('all');
+    }
   }
 }

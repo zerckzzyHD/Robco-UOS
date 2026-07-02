@@ -1,13 +1,25 @@
-﻿## [Unreleased]<!-- Tests: 1636/1636 | Cache: robco-terminal-v2.7.0-r14 -->
+﻿## [Unreleased]<!-- Tests: 1648/1648 | Cache: robco-terminal-v2.7.0-r15 -->
+
+### Added
+
+- THREAT assessments now warn you outright when the ammo a fight would burn is more than you're actually carrying, instead of leaving you to do the math yourself.
+- Added inline buttons to nudge a companion's rapport with you up or down directly from their squad card — previously the only way to see or change it was to wait on the AI.
+
+### Changed
+
+- Removed the unused Projected Timeline feature and its command. It never had a way to be filled in on its own and always showed "no timeline generated."
 
 ### Fixed
 
 - Closed a rare data-safety gap where certain unusual or corrupted responses from the AI could silently turn one of your character's core stats into an invalid, unusable value instead of being safely ignored. Your character sheet can no longer be corrupted this way.
 - Fixed faction reputation alerts never appearing in Fallout 3 campaigns. Crossing into Vilified or Idolized standing with any faction now reliably shows the on-screen alert and its confirmation tone/vibration in both games — previously the alert only recognized New Vegas faction names, so Fallout 3 campaigns silently never triggered it no matter how hostile or beloved a faction became.
+- Fixed the inventory filter bar offering a "Mods" filter in Fallout 3 campaigns, where weapon mods don't exist and that filter could never show anything.
 
 ### Improved
 
 - Your campaign log now also records level-ups, newly-found collectibles, crafting and scrapping, buying and selling, and resting — not just faction changes, quest updates, and new locations. Open CROSSROADS ANALYSIS (or your exported campaign log) to see the fuller history.
+- Your current-session time readout now shows a friendlier format (like "2h 15m") instead of a raw minute count.
+- The databank lookup now also searches your collectibles, skill books, magazines, traits, and Lincoln memorabilia trackers, and surfaces a couple of previously-hidden details when it finds a match — like a quest item's story purpose or a creature's experience yield.
 
 ### Under the Hood
 

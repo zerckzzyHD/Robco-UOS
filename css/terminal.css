@@ -1124,6 +1124,16 @@ details.sub-panel[open] > summary h3::after {
   margin-top: 2px;
   overflow-wrap: anywhere;
 }
+.threat-ammo-advisory {
+  font-size: 11px;
+  margin-top: 2px;
+  color: var(--robco-green);
+  overflow-wrap: anywhere;
+}
+.threat-ammo-advisory--low {
+  color: var(--robco-danger);
+  font-weight: bold;
+}
 .threat-note {
   color: var(--robco-dim);
   font-style: italic;

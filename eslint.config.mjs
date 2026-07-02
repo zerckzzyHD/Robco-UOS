@@ -104,6 +104,7 @@ export default [
         lookupWeaponStats: 'readonly',
         lookupBestiaryEntry: 'readonly',
         getChemsTable: 'readonly',
+        getQuestItemDetail: 'readonly', // U9-4 CONSULT reserved-column surfacing (js/db_nv.js or js/db_fo3.js)
         renderThreat: 'readonly',
         renderConsult: 'readonly',
         renderDatabankPanel: 'readonly',
@@ -202,6 +203,7 @@ export default [
         showErrorLog: 'readonly',
         updateMath: 'readonly',
         wipeTerminal: 'readonly',
+        _fmtOverseerDuration: 'readonly', // WU-F7 duration formatter, reused by U9-2 CURRENT SITTING (js/ui-core.js)
         attachedImageData: 'writable',
         attachedImageMimeType: 'writable',
         _buildFactions: 'readonly',
