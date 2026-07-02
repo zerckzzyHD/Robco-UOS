@@ -216,6 +216,16 @@
     transition('OFF');
   }
 
+  // Read-only introspection — a plain-data snapshot of every registered observer
+  // (id/states/tier/cadenceMs only; never the onTick/onEnter/onExit closures).
+  // Consumed by the staging-only Test Console (js/test-console.js); safe to call
+  // from anywhere, never mutates the registry.
+  function listObservers() {
+    return _observers.map(function (o) {
+      return { id: o.id, states: o.states.slice(), tier: o.tier, cadenceMs: o.cadenceMs };
+    });
+  }
+
   // start — begin the single heartbeat + wire the lifecycle signal listeners.
   // Called ONCE from initAmbientRuntime() (window.onload), never at parse time.
   function start() {
@@ -250,6 +260,7 @@
     noteActivity: noteActivity,
     shutdown: shutdown,
     start: start,
+    listObservers: listObservers,
     _beat: _beat, // exposed for the deterministic behavioral test (tests/test.html)
     _ticks: 0, // demo-observer counter — in-memory, user-invisible, writes nothing
   };

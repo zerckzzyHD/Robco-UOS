@@ -122,6 +122,7 @@ export default [
         // Step 2 Phase 2 A1 — Ambient Runtime (js/runtime.js): lifecycle state machine + observer scheduler
         AmbientRuntime: 'readonly',
         initAmbientRuntime: 'readonly',
+        initTestConsole: 'readonly', // staging/dev-only Test Console (js/test-console.js)
         getAmmoCalibers: 'readonly',
         getVendors: 'readonly',
         getTradeCatalog: 'readonly',

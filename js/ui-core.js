@@ -1112,6 +1112,7 @@ window.onload = async function () {
     _wireRotaryDialClick();
     _wireStandby();
     initAmbientRuntime(); // A1: Ambient Runtime — additive state machine + observer scheduler (parallel to standby; owns no timers yet)
+    initTestConsole(); // staging/dev-only Test Console — no-ops (stays hidden) on production
     _wirePanelPersistence();
     _restoreOpticsPreference();
     _restoreDevicePrefs();

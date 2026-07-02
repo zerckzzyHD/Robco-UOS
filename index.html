@@ -129,6 +129,62 @@
       </div>
     </template>
 
+    <!-- ════════════════════════════════════════════════════════════════════
+         TEST CONSOLE (Step 2 · Phase 2) — STAGING/DEV ONLY, NEVER ON PRODUCTION.
+         Lives inert inside a <template> (WU-E2 pattern, same as the banners
+         above) so it can never render even by accident. js/test-console.js
+         clones it into #testConsoleMount ONLY when _isStagingEnv() (ui-core.js,
+         Protocol 43/WU-C11) returns true — the same fail-safe-to-hidden env
+         gate the changelog viewer uses to hide [Unreleased] on production.
+         A live inspector + trigger panel for the Ambient Runtime (js/runtime.js):
+         current state, forced state transitions, the Immersion dial, and the
+         registered-observer list — so Phase-2 ambient features are testable
+         without waiting on real idle/standby timers. Reads/writes NOTHING
+         durable to the campaign (runtime state is in-memory; the Immersion
+         tier is the existing device pref, same as the real dial). See
+         js/test-console.js for the extension point where a future ambient
+         feature (broadcasts, weather, boot flavors, etc.) adds its own trigger.
+         ════════════════════════════════════════════════════════════════════ -->
+    <template id="testConsoleTemplate">
+      <details class="panel" id="testConsolePanel" style="margin: 8px">
+        <summary><h2>&gt; TEST CONSOLE (DEV)</h2></summary>
+        <p style="font-size: 10px">
+          Staging/dev environments only &mdash; never shown on the live site. Triggers in-memory
+          runtime states and the device Immersion tier only; no campaign data is read or written
+          here.
+        </p>
+        <div class="input-group" style="flex-direction: column; align-items: stretch">
+          <label class="optics-label">RUNTIME STATE</label>
+          <span id="testConsoleState" aria-live="polite">&mdash;</span>
+        </div>
+        <div class="input-group" style="flex-direction: column; align-items: stretch">
+          <label class="optics-label">FORCE TRANSITION</label>
+          <div id="testConsoleTransitions" style="display: flex; flex-wrap: wrap; gap: 6px"></div>
+        </div>
+        <div class="input-group" style="flex-direction: column; align-items: stretch">
+          <label class="optics-label" for="testConsoleImmersionSelect">IMMERSION TIER</label>
+          <select
+            id="testConsoleImmersionSelect"
+            aria-label="Set the Immersion tier from the test console"
+            style="width: 100%; font-size: 16px"
+          >
+            <option value="full">Full</option>
+            <option value="balanced">Balanced</option>
+            <option value="minimal">Minimal</option>
+          </select>
+        </div>
+        <div class="input-group" style="flex-direction: column; align-items: stretch">
+          <label class="optics-label">REGISTERED OBSERVERS</label>
+          <div id="testConsoleObservers" style="font-size: 10px">&mdash;</div>
+        </div>
+        <!-- EXTENSION POINT: a future ambient feature (broadcasts, weather, boot
+             flavors, etc.) adds one more trigger button here, wired in
+             js/test-console.js — call the feature's existing entry point,
+             never write campaign state, never bypass a confirm gate. -->
+      </details>
+    </template>
+    <div id="testConsoleMount"></div>
+
     <div id="bootScreen">
       <div id="bootLines"></div>
       <span id="bootCursor">_</span>
@@ -2343,6 +2399,7 @@
     <script src="js/ui-account.js"></script>
     <script src="js/runtime.js"></script>
     <script src="js/ui-core.js"></script>
+    <script src="js/test-console.js"></script>
     <script src="js/api.js"></script>
     <script type="module" src="js/cloud.js"></script>
 

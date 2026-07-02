@@ -10317,6 +10317,127 @@ Check (
 ) '148.7: the migrated uptime/mem-cycle/overseer observer bodies never write the campaign save (robco_v8 / saveState / eventLog / _logEvent) -- device + DOM only (atmosphere/save boundary)'
 
 # ===========================================================
+# Suite 149 -- Test Console: staging/dev-only developer panel (13 tests).
+# Mirrors JS Suite 149. A live inspector + trigger panel for the Ambient
+# Runtime, gated behind the EXACT SAME env signal the changelog viewer (Suite
+# 62 / WU-C11) uses to hide [Unreleased] on production: _isStagingEnv(), never
+# a re-implementation. Fail-safe to HIDDEN -- any uncertainty defaults to
+# production behavior. The panel markup lives inert inside a <template> (the
+# WU-E2 disabled-banner pattern) so it can never render by accident. Writes
+# NOTHING durable to the campaign (runtime state + the existing Immersion
+# device pref only). 149.8's both-sides proof is a STRUCTURAL mirror of the JS
+# eval-based behavioral test (PowerShell has no JS eval) -- same convention as
+# Suite 62.5.
+# ===========================================================
+Sep "Suite 149 -- Test Console: staging/dev-only developer panel"
+$testConsole149 = Read-Src "js/test-console.js"
+$sw149 = Read-Src "sw.js"
+$index149 = Read-Src "index.html"
+$uiCore149 = Read-Src "js/ui-core.js"
+$runtime149 = Read-Src "js/runtime.js"
+$initTestConsoleBody149 = Get-FunctionBody $testConsole149 'initTestConsole'
+$isStagingBody149 = Get-FunctionBody $testConsole149 '_isStaging'
+
+# 149.1  js/test-console.js exists on disk (new served file)
+Check (
+    Test-Path (Join-Path $Root "js/test-console.js")
+) '149.1: js/test-console.js exists on disk (Test Console new served file)'
+
+# 149.2  ./js/test-console.js is precached in sw.js ASSETS
+Check (
+    $sw149 -match "'\./js/test-console\.js'"
+) "149.2: './js/test-console.js' is listed in sw.js ASSETS (PWA precaches the console)"
+
+# 149.3  index.html loads test-console.js AFTER ui-core.js and before api.js
+Check (
+    ($index149 -match '<script src="js/test-console\.js"></script>') -and
+    ($index149.IndexOf('<script src="js/ui-core.js"></script>') -lt $index149.IndexOf('<script src="js/test-console.js"></script>')) -and
+    ($index149.IndexOf('<script src="js/test-console.js"></script>') -lt $index149.IndexOf('<script src="js/api.js"></script>'))
+) '149.3: index.html loads js/test-console.js as a static tag ordered after js/ui-core.js and before js/api.js'
+
+# 149.4  the panel markup lives inert inside <template id="testConsoleTemplate">
+#        (WU-E2 disabled-by-default pattern) with a separate mount point outside it
+Check (
+    ($index149 -match '<template id="testConsoleTemplate">') -and
+    ($index149 -match 'id="testConsolePanel"') -and
+    ($index149 -match 'id="testConsoleTransitions"') -and
+    ($index149 -match 'id="testConsoleImmersionSelect"') -and
+    ($index149 -match 'id="testConsoleObservers"') -and
+    ($index149 -match '<div id="testConsoleMount"></div>')
+) '149.4: index.html carries the inert <template id="testConsoleTemplate"> (panel/transitions/immersion-select/observers) plus a separate #testConsoleMount clone target'
+
+# 149.5  window.onload calls initTestConsole() after initAmbientRuntime()
+Check (
+    $uiCore149 -match '(?s)initAmbientRuntime\(\);.*?initTestConsole\(\);'
+) '149.5: window.onload calls initTestConsole() after initAmbientRuntime() (the runtime must exist first)'
+
+# 149.6  initTestConsole() gates on _isStaging() as its very first statement --
+#        fail-safe-to-hidden, mirroring the WU-C11 changelog env gate -- and is
+#        wrapped so a console failure can never break boot.
+Check (
+    ($initTestConsoleBody149 -match "(?s)^\{\s*try\s*\{\s*\n\s*if \(!_isStaging\(\)\) return;") -and
+    ($initTestConsoleBody149 -match '\} catch \(_\) \{')
+) '149.6: initTestConsole() returns immediately unless _isStaging() is true (fail-safe-to-hidden, checked first) and is wrapped in try/catch'
+
+# 149.7  _isStaging() REUSES ui-core.js's _isStagingEnv() verbatim -- no
+#        re-implementation of the env-detection logic (Protocol 22) -- and
+#        fails OPEN (returns false = hidden) on any throw or missing function.
+Check (
+    ($isStagingBody149 -match "typeof window\._isStagingEnv === 'function' \? window\._isStagingEnv\(\) : false") -and
+    ($isStagingBody149 -match '(?s)catch \(_\) \{\s*return false;') -and
+    (-not ($testConsole149 -match 'meta\[name="robco-env"\]')) -and
+    (-not ($testConsole149 -match 'pages\.dev'))
+) '149.7: _isStaging() calls window._isStagingEnv() verbatim (no re-implemented env-detection logic) and fails open to false (hidden) on any uncertainty'
+
+# 149.8  BOTH-SIDES (structural mirror of the JS eval-based behavioral proof --
+#        PowerShell has no JS eval, same convention as Suite 62.5): the ternary
+#        guarantees true only propagates when _isStagingEnv() itself returns
+#        true, and the catch guarantees any throw resolves to false (hidden).
+Check (
+    ($isStagingBody149 -match "\? window\._isStagingEnv\(\) : false") -and
+    ($isStagingBody149 -match '(?s)try \{.*catch \(_\) \{\s*return false;')
+) 'env-aware Test Console: hidden (false) when the staging signal is missing/throws/false, shown (true) only when it is genuinely true (both-sides structural mirror)'
+
+# 149.9  HARD atmosphere/save boundary: test-console.js never writes the
+#        campaign save -- no saveState, no robco_v8, no eventLog/_logEvent,
+#        no direct localStorage (device prefs route through the reused
+#        onImmersionChange/getImmersionTier setters, never a raw write here).
+Check (
+    -not ($testConsole149 -match 'saveState|robco_v8|_logEvent|\beventLog\b|localStorage\.')
+) '149.9: test-console.js never calls saveState / touches robco_v8 / localStorage / eventLog / _logEvent (device + in-memory only -- Phase-2 prime invariant #1)'
+
+# 149.10  the Immersion-tier control REUSES the real dial's own setter
+#         (onImmersionChange/getImmersionTier) rather than re-implementing
+#         setImmersionTier persistence, and keeps the real #immersionSelect in sync.
+Check (
+    ($testConsole149 -match 'window\.onImmersionChange\(sel\.value\)') -and
+    ($testConsole149 -match 'window\.getImmersionTier\(\)') -and
+    ($testConsole149 -match "getElementById\('immersionSelect'\)") -and
+    (-not ($testConsole149 -match 'setImmersionTier'))
+) "149.10: the console reuses the real dial's own onImmersionChange()/getImmersionTier() (Protocol 22) and mirrors the real #immersionSelect -- never a parallel setImmersionTier call"
+
+# 149.11  runtime.js exposes a READ-ONLY observer introspection API --
+#         listObservers() returns plain data (id/states/tier/cadenceMs) only,
+#         never the onTick/onEnter/onExit closures -- consumed by the console.
+Check (
+    ($runtime149 -match 'function listObservers\(\)') -and
+    ($runtime149 -match 'listObservers:\s*listObservers') -and
+    ($runtime149 -match '_observers\.map\(function \(o\) \{') -and
+    ($runtime149 -match 'return \{ id: o\.id, states: o\.states\.slice\(\), tier: o\.tier, cadenceMs: o\.cadenceMs \};')
+) '149.11: AmbientRuntime.listObservers() is a read-only introspection API -- a plain-data map (id/states/tier/cadenceMs), never the onTick/onEnter/onExit closures'
+
+# 149.12  dynamic content (state names, observer ids/states/tier/cadence) is
+#         escaped before being written into innerHTML (XSS-safe)
+Check (
+    ([regex]::Matches($testConsole149, 'escapeHtml\(')).Count -ge 5
+) '149.12: transition-button labels and the observer read-out run every dynamic value through escapeHtml() before innerHTML (XSS-safe)'
+
+# 149.13  game-agnostic (Protocol 38): pure dev-tooling, no game literals
+Check (
+    -not ($testConsole149 -match 'FNV|FO3|New Vegas|Fallout 3')
+) '149.13: the Test Console is game-agnostic (no FNV/FO3/game-title literals -- pure dev tooling)'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

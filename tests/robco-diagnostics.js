@@ -17605,6 +17605,190 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 149 — Test Console: staging/dev-only developer panel (13 tests)
+// ──────────────────────────────────────────────────────────────
+//  A live inspector + trigger panel for the Ambient Runtime (js/runtime.js),
+//  gated behind the EXACT SAME env signal the changelog viewer (Suite 62 /
+//  WU-C11) uses to hide [Unreleased] on production: _isStagingEnv(), never a
+//  re-implementation. Fail-safe to HIDDEN — any uncertainty defaults to
+//  production behavior. The panel markup lives inert inside a <template>
+//  (the WU-E2 disabled-banner pattern) so it can never render by accident.
+//  Writes NOTHING durable to the campaign (runtime state + the existing
+//  Immersion device pref only).
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 149 — Test Console: staging/dev-only developer panel');
+  const testConsole149 = readFile('js/test-console.js');
+  const sw149 = readFile('sw.js');
+  const index149 = readFile('index.html');
+  const uiCore149 = readFile('js/ui-core.js');
+  const runtime149 = readFile('js/runtime.js');
+  const initTestConsoleBody149 = extractFunctionBody(testConsole149, 'initTestConsole');
+  const isStagingBody149 = extractFunctionBody(testConsole149, '_isStaging');
+
+  // 149.1  js/test-console.js exists on disk (new served file)
+  assert(
+    fs.existsSync(path.join(ROOT, 'js/test-console.js')),
+    '149.1: js/test-console.js exists on disk (Test Console new served file)'
+  );
+
+  // 149.2  ./js/test-console.js is precached in sw.js ASSETS
+  assert(
+    /'\.\/js\/test-console\.js'/.test(sw149),
+    "149.2: './js/test-console.js' is listed in sw.js ASSETS (PWA precaches the console)"
+  );
+
+  // 149.3  index.html loads test-console.js AFTER ui-core.js (needs _isStagingEnv)
+  //        and before api.js, consistent with the static sibling tags
+  assert(
+    /<script src="js\/test-console\.js"><\/script>/.test(index149) &&
+      index149.indexOf('<script src="js/ui-core.js"></script>') <
+        index149.indexOf('<script src="js/test-console.js"></script>') &&
+      index149.indexOf('<script src="js/test-console.js"></script>') <
+        index149.indexOf('<script src="js/api.js"></script>'),
+    '149.3: index.html loads js/test-console.js as a static tag ordered after js/ui-core.js and before js/api.js'
+  );
+
+  // 149.4  the panel markup lives inert inside <template id="testConsoleTemplate">
+  //        (WU-E2 disabled-by-default pattern) with a separate mount point outside it
+  assert(
+    /<template id="testConsoleTemplate">/.test(index149) &&
+      /id="testConsolePanel"/.test(index149) &&
+      /id="testConsoleTransitions"/.test(index149) &&
+      /id="testConsoleImmersionSelect"/.test(index149) &&
+      /id="testConsoleObservers"/.test(index149) &&
+      /<div id="testConsoleMount"><\/div>/.test(index149),
+    '149.4: index.html carries the inert <template id="testConsoleTemplate"> (panel/transitions/immersion-select/observers) plus a separate #testConsoleMount clone target'
+  );
+
+  // 149.5  window.onload calls initTestConsole() after initAmbientRuntime()
+  assert(
+    /initAmbientRuntime\(\);[\s\S]*?initTestConsole\(\);/.test(uiCore149),
+    '149.5: window.onload calls initTestConsole() after initAmbientRuntime() (the runtime must exist first)'
+  );
+
+  // 149.6  initTestConsole() gates on _isStaging() as its very first statement —
+  //        fail-safe-to-hidden, mirroring the WU-C11 changelog env gate — and is
+  //        wrapped so a console failure can never break boot.
+  assert(
+    /^\{\s*try\s*\{\s*\n\s*if \(!_isStaging\(\)\) return;/.test(initTestConsoleBody149) &&
+      /\} catch \(_\) \{/.test(initTestConsoleBody149),
+    '149.6: initTestConsole() returns immediately unless _isStaging() is true (fail-safe-to-hidden, checked first) and is wrapped in try/catch'
+  );
+
+  // 149.7  _isStaging() REUSES ui-core.js's _isStagingEnv() verbatim — no
+  //        re-implementation of the env-detection logic (Protocol 22) — and
+  //        fails OPEN (returns false = hidden) on any throw or missing function.
+  assert(
+    /typeof window\._isStagingEnv === 'function' \? window\._isStagingEnv\(\) : false/.test(
+      isStagingBody149
+    ) &&
+      /catch \(_\) \{\s*return false;/.test(isStagingBody149) &&
+      !/meta\[name="robco-env"\]/.test(testConsole149) &&
+      !/pages\.dev/.test(testConsole149),
+    '149.7: _isStaging() calls window._isStagingEnv() verbatim (no re-implemented env-detection logic) and fails open to false (hidden) on any uncertainty'
+  );
+
+  // 149.8  BEHAVIORAL (both sides): _isStaging() returns false when
+  //        window._isStagingEnv is missing/throws, and only returns true when it
+  //        genuinely returns true — mirrors the Suite 62.5 eval-based technique.
+  //        NOTE: `window` must be a locally-scoped `const` in the SAME block as
+  //        the `eval(...)` call — a direct eval closes over its call-site's
+  //        lexical scope, so each scenario re-evals the function fresh.
+  {
+    let ok = false;
+    let err = null;
+    try {
+      const params = testConsole149.slice(
+        testConsole149.indexOf('(', testConsole149.indexOf('function _isStaging')),
+        testConsole149.indexOf('{', testConsole149.indexOf('function _isStaging'))
+      );
+      const src = `(function _isStaging${params}${isStagingBody149})`;
+      // `window` below is read only by the eval()'d closure, which ESLint
+      // cannot trace statically — `void window` marks it deliberately used.
+      const missing = (() => {
+        const window = {};
+        void window;
+        return eval(src)();
+      })();
+      const throwing = (() => {
+        const window = {
+          _isStagingEnv: () => {
+            throw new Error('boom');
+          },
+        };
+        void window;
+        return eval(src)();
+      })();
+      const falseSignal = (() => {
+        const window = { _isStagingEnv: () => false };
+        void window;
+        return eval(src)();
+      })();
+      const trueSignal = (() => {
+        const window = { _isStagingEnv: () => true };
+        void window;
+        return eval(src)();
+      })();
+      ok = missing === false && throwing === false && falseSignal === false && trueSignal === true;
+    } catch (e) {
+      err = e;
+    }
+    assert(
+      ok,
+      'env-aware Test Console: hidden (false) when the staging signal is missing/throws/false, shown (true) only when it is genuinely true (both-sides behavioral)' +
+        (err ? ' — ' + err.message : '')
+    );
+  }
+
+  // 149.9  HARD atmosphere/save boundary: test-console.js never writes the
+  //        campaign save — no saveState, no robco_v8, no eventLog/_logEvent,
+  //        no direct localStorage (device prefs route through the reused
+  //        onImmersionChange/getImmersionTier setters, never a raw write here).
+  assert(
+    !/saveState|robco_v8|_logEvent|\beventLog\b|localStorage\./.test(testConsole149),
+    '149.9: test-console.js never calls saveState / touches robco_v8 / localStorage / eventLog / _logEvent (device + in-memory only — Phase-2 prime invariant #1)'
+  );
+
+  // 149.10  the Immersion-tier control REUSES the real dial's own setter
+  //         (onImmersionChange/getImmersionTier) rather than re-implementing
+  //         setImmersionTier persistence, and keeps the real #immersionSelect in sync.
+  assert(
+    /window\.onImmersionChange\(sel\.value\)/.test(testConsole149) &&
+      /window\.getImmersionTier\(\)/.test(testConsole149) &&
+      /getElementById\('immersionSelect'\)/.test(testConsole149) &&
+      !/setImmersionTier/.test(testConsole149),
+    "149.10: the console reuses the real dial's own onImmersionChange()/getImmersionTier() (Protocol 22) and mirrors the real #immersionSelect — never a parallel setImmersionTier call"
+  );
+
+  // 149.11  runtime.js exposes a READ-ONLY observer introspection API —
+  //         listObservers() returns plain data (id/states/tier/cadenceMs) only,
+  //         never the onTick/onEnter/onExit closures — consumed by the console.
+  assert(
+    /function listObservers\(\)/.test(runtime149) &&
+      /listObservers:\s*listObservers/.test(runtime149) &&
+      /_observers\.map\(function \(o\) \{/.test(runtime149) &&
+      /return \{ id: o\.id, states: o\.states\.slice\(\), tier: o\.tier, cadenceMs: o\.cadenceMs \};/.test(
+        runtime149
+      ),
+    '149.11: AmbientRuntime.listObservers() is a read-only introspection API — a plain-data map (id/states/tier/cadenceMs), never the onTick/onEnter/onExit closures'
+  );
+
+  // 149.12  dynamic content (state names, observer ids/states/tier/cadence) is
+  //         escaped before being written into innerHTML (XSS-safe)
+  assert(
+    (testConsole149.match(/escapeHtml\(/g) || []).length >= 5,
+    '149.12: transition-button labels and the observer read-out run every dynamic value through escapeHtml() before innerHTML (XSS-safe)'
+  );
+
+  // 149.13  game-agnostic (Protocol 38): pure dev-tooling, no game literals
+  assert(
+    !/FNV|FO3|New Vegas|Fallout 3/.test(testConsole149),
+    '149.13: the Test Console is game-agnostic (no FNV/FO3/game-title literals — pure dev tooling)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail

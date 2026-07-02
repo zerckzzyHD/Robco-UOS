@@ -57,6 +57,7 @@
 │   ├── ui-account.js   ~3KB   Account panel, cloud save picker, undo-sync
 │   ├── runtime.js      ~9KB   Ambient Runtime — lifecycle state machine + one heartbeat + observer registry (Phase 2 A1)
 │   ├── ui-core.js      ~43KB  Core UI lifecycle, appendToChat, loadUI, updateMath
+│   ├── test-console.js ~5KB   Test Console — staging/dev-only Ambient Runtime inspector (Phase 2, never on production)
 │   ├── cloud.js        3.6KB  Firebase push/pull (ES module)
 │   ├── registry-core.js ~3KB  Read-only registry engine — FALLOUT_REGISTRY + registrySearch()
 │   ├── reg_nv.js       ~87KB  FNV registry data (perks/quests/locations/collectibles/traits/magazines)
@@ -65,8 +66,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    1787-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    1787-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    1800-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    1800-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -227,8 +228,10 @@ Scripts are loaded via `<script>` tags in `index.html` in this exact order:
 8. js/runtime.js    → defines: window.AmbientRuntime, window.initAmbientRuntime
                        (loaded before ui-core.js; top level defines only — see Ambient Runtime below)
 9. js/ui-core.js    → defines: AudioSettings, appendToChat, loadUI, updateMath, etc.
-10. js/api.js       → defines: autoImportState, transmitMessage, fetchAuthorizedModels
-11. js/cloud.js     → loaded as <script type="module"> (ES import from Firebase CDN)
+10. js/test-console.js → defines: window.initTestConsole (loaded after ui-core.js — needs
+                       _isStagingEnv; staging/dev-only, no-ops on production — see Test Console below)
+11. js/api.js       → defines: autoImportState, transmitMessage, fetchAuthorizedModels
+12. js/cloud.js     → loaded as <script type="module"> (ES import from Firebase CDN)
                        attaches: window.pushToCloud, window.pullFromCloud
 ```
 
@@ -273,6 +276,24 @@ Behavior is identical at every immersion tier. If the runtime fails to start, th
 **Hard atmosphere/save boundary (Phase-2 prime invariant #1).** `runtime.js` writes **nothing durable to the campaign** — it never persists the save, mutates a campaign field, appends to the Terminal Record, or touches raw local storage. State is ephemeral / in-memory; any device pref would go through MetaStore only (A1 stores none). Gate-guarded by Suite 146 (negative grep) + the Suite 18 behavioral no-write assertion in `tests/test.html`.
 
 **Boot-order lesson (U7).** `runtime.js`'s top level only **defines** `window.AmbientRuntime` / `window.initAmbientRuntime` (inside an IIFE). Every cross-file read (`immersionAllows`, `RobcoEvents`) happens **inside** `initAmbientRuntime()` — a named `window.onload` boot phase called from `ui-core.js` **after** `_wireStandby()` — never at parse time, because `runtime.js` can be parsed before the shared state module has loaded. Structural guards: Suite 146 (both runners); behavioral proof (state machine + observer gating + live dial): Suite 18 in `tests/test.html`.
+
+**Read-only observer introspection.** `AmbientRuntime.listObservers()` returns a plain-data snapshot of every registered observer (`{id, states, tier, cadenceMs}` only — never the `onTick`/`onEnter`/`onExit` closures), for tooling that needs to inspect what's wired without touching the registry. Consumed by the Test Console below.
+
+---
+
+## Test Console (`js/test-console.js` — Step 2 · Phase 2, staging/dev-only)
+
+A live inspector + trigger panel for the Ambient Runtime, built to keep pace with the accumulating Phase-2 ambient features (UPLINK, Hardware Life, etc. — each future feature adds one more trigger here). **Never appears on production** — gated behind the exact same environment signal the changelog viewer (Suite 62 / WU-C11) uses to hide `[Unreleased]`: `_isStagingEnv()` (`ui-core.js`, Protocol 43), reused verbatim rather than re-implemented. Fail-safe to **HIDDEN**: any uncertainty (the function missing, a throw, an unrecognized host) defaults to production behavior.
+
+**Inert-by-default markup (the WU-E2 pattern).** The panel's HTML lives inside `<template id="testConsoleTemplate">` in `index.html` — a `<template>`'s content is parsed but never rendered or activated, so it cannot appear even if the JS gate were somehow bypassed. `initTestConsole()` (a named `window.onload` boot phase, called after `initAmbientRuntime()`) only clones the template into `#testConsoleMount` when `_isStagingEnv()` returns `true`; on production it is a no-op.
+
+**Surfaces (v1):** the live `AmbientRuntime.getState()` readout (refreshed via its own runtime observer, tier `'minimal'` so it is never dial-muted — a dev tool, not atmosphere); one force-transition `<button>` per canonical state (`AmbientRuntime.transition()` / `shutdown()`); an Immersion-tier `<select>` that reuses the real dial's own `onImmersionChange()`/`getImmersionTier()` setters and mirrors the real `#immersionSelect` in Security & Configuration; and a read-out of every registered observer via `AmbientRuntime.listObservers()`.
+
+**Hard atmosphere/save boundary.** Identical invariant to the runtime itself: the console touches ONLY in-memory Ambient Runtime state and the Immersion device pref (MetaStore) — it never reads or writes the campaign save, stats, or event log, and triggers nothing automatically (every action is an explicit developer button/select). Gate-guarded (Suite 149.9).
+
+**Extension point.** Each future ambient feature (broadcasts, weather, boot flavors, etc.) adds one more trigger control inside `#testConsoleTemplate`'s body (`index.html`) and wires it in `js/test-console.js` alongside `_renderTransitionButtons`/`_wireImmersionSelect` — calling the feature's existing entry point directly, never bypassing a confirm gate.
+
+Guarded by Suite 149 (both runners: staging-gate fail-safe both-sides, no-durable-write boundary, template inert-by-default, reused env signal) + Suite 19 in `tests/test.html` (real-browser fail-safe-to-hidden proof + `listObservers()` behavioral proof).
 
 ---
 
@@ -1380,7 +1401,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1787-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1800-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

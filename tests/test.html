@@ -21,7 +21,7 @@
     or the canonical suites change, update this file in the SAME commit and bump
     the suite count marker. The gate fails on drift.
 
-    Suites: 19
+    Suites: 20
 -->
 <html lang="en">
   <head>
@@ -172,6 +172,7 @@
     <script src="../js/registry-core.js"></script>
     <script src="../js/api.js"></script>
     <script src="../js/runtime.js"></script>
+    <script src="../js/test-console.js"></script>
   </head>
   <body>
     <h1>[ROBCO U.O.S. — PERSISTENCE AUDIT / RUNTIME]</h1>
@@ -1592,6 +1593,76 @@
           else MetaStore.set('robco_immersion', _prevTier18);
         } catch (err) {
           assert(false, 'FATAL: A1 Ambient Runtime suite threw', String((err && err.stack) || err));
+        }
+
+        // ── Suite 19 — Test Console (staging/dev-only) fail-safe + runtime
+        //    introspection (behavioral, real browser) ──────────────────────────
+        // This page never loads ui-core.js (no DOM to host it), so
+        // window._isStagingEnv is undefined here and #testConsoleMount /
+        // #testConsoleTemplate don't exist either — exactly the fail-safe
+        // "uncertain signal" case production also hits. initTestConsole() must
+        // still run cleanly with ZERO DOM or campaign side effects. The
+        // "staging shows / production hides" both-sides proof lives in the
+        // Node runners (extraction + eval of _isStaging(), mirroring the
+        // Suite 62.5 changelog-viewer technique) since it needs a mocked
+        // window._isStagingEnv this page's real environment doesn't have.
+        try {
+          section('Suite 19 — Test Console (staging/dev-only) fail-safe + runtime introspection');
+          const _ls19 = localStorage.getItem('robco_v8'); // snapshot for the no-write boundary
+
+          // 1) initTestConsole() is defined and callable with no environment signal.
+          assert(
+            typeof window.initTestConsole === 'function',
+            'window.initTestConsole is defined (js/test-console.js loaded)'
+          );
+
+          // 2) With no _isStagingEnv and no template/mount DOM present, calling it
+          //    never throws and mounts NOTHING — the fail-safe-to-hidden path.
+          let threw = null;
+          try {
+            window.initTestConsole();
+          } catch (err) {
+            threw = err;
+          }
+          assert(
+            threw === null && !document.getElementById('testConsolePanel'),
+            'initTestConsole() never throws and mounts no panel when the staging signal is absent (fail-safe to hidden)' +
+              (threw ? ' — ' + String(threw.message || threw) : '')
+          );
+
+          // 3) No durable campaign write occurred (robco_v8 unchanged).
+          assert(
+            localStorage.getItem('robco_v8') === _ls19,
+            'initTestConsole() wrote nothing to the campaign save (robco_v8 unchanged) — atmosphere/save boundary'
+          );
+
+          // 4) AmbientRuntime.listObservers() — real behavioral proof of the
+          //    read-only introspection API the console's observer read-out uses.
+          const RT19 = window.AmbientRuntime;
+          const before19 = RT19.listObservers().length;
+          const unreg19 = RT19.register({
+            id: 'suite19-probe',
+            cadenceMs: 1234,
+            states: ['ACTIVE'],
+            tier: 'balanced',
+            onTick: () => {},
+          });
+          const list19 = RT19.listObservers();
+          const found19 = list19.find(o => o.id === 'suite19-probe');
+          unreg19();
+          const after19 = RT19.listObservers().length;
+          assert(
+            list19.length === before19 + 1 &&
+              found19 &&
+              eq(found19.states, ['ACTIVE']) &&
+              found19.tier === 'balanced' &&
+              found19.cadenceMs === 1234 &&
+              typeof found19.onTick === 'undefined' &&
+              after19 === before19,
+            'listObservers() returns a plain-data snapshot (id/states/tier/cadenceMs, no onTick closure) that reflects register()/unregister() live'
+          );
+        } catch (err) {
+          assert(false, 'FATAL: Test Console suite threw', String((err && err.stack) || err));
         }
 
         // ── Summary ──────────────────────────────────────────────────────────
