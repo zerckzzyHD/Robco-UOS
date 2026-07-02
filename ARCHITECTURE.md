@@ -48,6 +48,7 @@
 ├── index.html          ~55KB  DOM structure + all inline event handlers
 ├── css/terminal.css    ~16KB  All styling, animations, CRT effects
 ├── js/
+│   ├── idb.js          ~4KB   Async IndexedDB durability engine — window.IdbStore, two object stores (meta/campaign)
 │   ├── state.js        7.6KB  State definition, persistence, migration
 │   ├── api.js          36.5KB System directive, autoImportState, transmitMessage
 │   ├── ui-audio.js     ~16KB  Audio engine (geiger, tinnitus, CRT hum, boot/level-up sounds)
@@ -63,8 +64,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    1662-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    1662-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    1674-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    1674-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -85,6 +86,14 @@
 Scripts are loaded via `<script>` tags in `index.html` in this exact order:
 
 ```
+   ── Static durability engine (index.html, before the boot manifest) ──
+0. js/idb.js        → defines: window.IdbStore (async IndexedDB KV engine; two object stores
+                       'meta' + 'campaign' so the two-store boundary is structural in IndexedDB).
+                       Step 2 · Phase 1 · P1 durability shadow: MetaStore's set/remove mirror
+                       device-pref writes here fire-and-forget; localStorage stays the sole READ
+                       authority. No-ops if IndexedDB is unavailable/blocked/quota-full — the app
+                       is byte-identical without it (migration-safety). Loaded before state.js so
+                       MetaStore's write-through has window.IdbStore.
    ── Per-game boot manifest (GAME_FILES in index.html; order preserved via script.async = false) ──
 1. js/db_nv.js / js/db_fo3.js → defines: databaseCSVs, lookupItemInDb (game-specific CSV data;
                        the active pair is selected by the GAME_FILES manifest, FNV fail-safe)
@@ -1202,7 +1211,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1662-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1674-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

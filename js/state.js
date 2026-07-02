@@ -58,6 +58,23 @@ const META_MANIFEST = {
   robco_feature_flags: { type: 'json', default: '{}', owner: 'cloud.js' },
   robco_sw_installed: { type: 'bool', default: false, owner: 'index.html' },
 };
+// Fire-and-forget write-through of a device-pref op to IndexedDB's 'meta' store
+// (Step 2 · Phase 1 · P1). The ONLY seam through which MetaStore touches IdbStore
+// — campaign keys never route here (two-store boundary). Swallows a synchronous
+// throw AND a rejected promise so a failing/absent shadow can never surface to a
+// device-pref write (localStorage stays authoritative). No-ops when idb.js has
+// not loaded. Always targets 'meta'; never 'campaign'.
+function _idbShadow(op, key, val) {
+  try {
+    if (typeof window === 'undefined' || !window.IdbStore) return;
+    const p =
+      op === 'set' ? window.IdbStore.set('meta', key, val) : window.IdbStore.remove('meta', key);
+    if (p && typeof p.catch === 'function') p.catch(() => {});
+  } catch (_) {
+    /* the durability shadow must never break a device-preference write */
+  }
+}
+
 const MetaStore = {
   // True for a registered device-preference key — an exact manifest entry, or
   // (for the one dynamic family, the per-game optic key) a prefix match
@@ -79,11 +96,18 @@ const MetaStore = {
     } catch (_) {
       /* quota / private-mode — a device-preference write must never throw */
     }
+    // P1 durability shadow (Step 2 · Phase 1): fire-and-forget mirror of this
+    // device-pref write to IndexedDB's 'meta' store. localStorage above stays
+    // the sole authority — this is never awaited and its result is never read
+    // in P1. If IdbStore is absent or the write fails it silently no-ops, so the
+    // app is byte-identical to a build without idb.js (migration-safety).
+    _idbShadow('set', key, val);
   },
   remove(key) {
     try {
       localStorage.removeItem(key);
     } catch (_) {}
+    _idbShadow('remove', key);
   },
   keys() {
     return Object.keys(META_MANIFEST);

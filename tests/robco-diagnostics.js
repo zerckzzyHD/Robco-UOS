@@ -16165,10 +16165,139 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 138 — Step 2 (v2.8.0) Phase 1 P1: IndexedDB durability shadow +
+//  write-through. New js/idb.js provides an async Promise-returning KV engine
+//  over IndexedDB with TWO object stores ('meta'/'campaign') so the Protocol 23
+//  two-store boundary is structural in IndexedDB, not just localStorage. It is
+//  written through the single MetaStore choke point (js/state.js) as a fire-and-
+//  forget mirror of every device-pref write. READS STAY 100% ON localStorage —
+//  nothing reads IdbStore in P1, so if IndexedDB is absent/blocked/quota-full/
+//  slow/corrupt the shadow no-ops and the app is byte-identical (migration-
+//  safety). These are structural guards; the REAL IndexedDB behavioral proof
+//  (round-trip + fail-safe) runs in tests/test.html (Protocol 40 — the browser
+//  is the only runner with a native IndexedDB). 12 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 138 — P1 IndexedDB durability shadow + write-through');
+  const idb138 = readFile('js/idb.js');
+  const state138 = readFile('js/state.js');
+  const sw138 = readFile('sw.js');
+  const html138 = readFile('index.html');
+
+  // 138.1  js/idb.js exists, is an IIFE, and publishes window.IdbStore
+  assert(
+    /\(function \(\)\s*\{/.test(idb138) && /window\.IdbStore = IdbStore/.test(idb138),
+    '138.1: js/idb.js is an IIFE that publishes window.IdbStore'
+  );
+
+  // 138.2  the new served module is precached in sw.js ASSETS (Suite 49 sibling)
+  assert(/['"]\.\/js\/idb\.js['"]/.test(sw138), '138.2: js/idb.js is precached in sw.js ASSETS');
+
+  // 138.3  idb.js loads BEFORE state.js (which calls it) and before the boot
+  //         loader that injects state.js — a static tag ahead of everything
+  {
+    const iIdb = html138.indexOf('js/idb.js');
+    const iState = html138.indexOf('js/state.js');
+    const iLoader = html138.indexOf('GAME_FILES');
+    assert(
+      iIdb > -1 && iState > -1 && iLoader > -1 && iIdb < iState && iIdb < iLoader,
+      '138.3: index.html loads js/idb.js before state.js and before the GAME_FILES boot loader'
+    );
+  }
+
+  // 138.4  the IdbStore API surface is complete (get/set/remove/keys/getAll +
+  //         the available readiness flag)
+  assert(
+    /\bset\(store, key, value\)/.test(idb138) &&
+      /\bget\(store, key\)/.test(idb138) &&
+      /\bremove\(store, key\)/.test(idb138) &&
+      /\bkeys\(store\)/.test(idb138) &&
+      /\bgetAll\(store\)/.test(idb138) &&
+      /get available\(\)/.test(idb138),
+    '138.4: IdbStore exposes set/get/remove/keys/getAll + the available flag'
+  );
+
+  // 138.5  TWO object stores ('meta' + 'campaign') are created — the two-store
+  //         boundary (Protocol 23 / FP-PER-4) is structural in IndexedDB too
+  assert(
+    /const STORES = \[\s*'meta',\s*'campaign'\s*\]/.test(idb138) &&
+      /createObjectStore\(name\)/.test(idb138),
+    "138.5: idb.js creates both 'meta' and 'campaign' object stores (two-store boundary in IDB)"
+  );
+
+  // 138.6  WRITE-THROUGH: MetaStore.set and MetaStore.remove both mirror to the
+  //         shadow via the single _idbShadow seam
+  assert(
+    /function _idbShadow\(/.test(state138) &&
+      /_idbShadow\('set', key, val\)/.test(state138) &&
+      /_idbShadow\('remove', key\)/.test(state138),
+    '138.6: MetaStore.set/remove route the write-through through the single _idbShadow('
+  );
+
+  // 138.7  NO READ FLIP: MetaStore.get still reads localStorage only and never
+  //         consults the shadow — read authority is unchanged in P1
+  {
+    const getBody138 = (/get\(key\)\s*\{([\s\S]*?)\}\s*catch/.exec(state138) || [])[1] || '';
+    assert(
+      /localStorage\.getItem\(key\)/.test(getBody138) && !/IdbStore|_idbShadow/.test(getBody138),
+      '138.7: MetaStore.get reads localStorage only — no IdbStore read flip (read authority unchanged)'
+    );
+  }
+
+  // 138.8  checksums REUSE window.computeSaveChecksum — no second hash impl
+  //         (Protocol 22); the FNV seed lives in state.js, never duplicated here
+  assert(
+    /window\.computeSaveChecksum\(/.test(idb138) && !/0x811c9dc5/.test(idb138),
+    '138.8: idb.js reuses window.computeSaveChecksum (no duplicate hash implementation)'
+  );
+
+  // 138.9  FAIL-SAFE: a feature-detect factory returns null when IndexedDB is
+  //         unavailable and the open path resolves(null) instead of throwing
+  assert(
+    /function _idbFactory\(/.test(idb138) && /resolve\(null\)/.test(idb138),
+    '138.9: idb.js feature-detects IndexedDB and degrades to a null (no-op) handle when absent'
+  );
+
+  // 138.10  RESOLVE-SOFT: engine ops resolve to a fallback on error (never
+  //          reject), and the write-through swallows a rejected shadow promise
+  assert(
+    /resolve\(fallback\)/.test(idb138) && /\.catch\(\(\)\s*=>\s*\{\}\)/.test(state138),
+    '138.10: idb.js ops resolve-soft on error and _idbShadow swallows a rejected shadow promise'
+  );
+
+  // 138.11  BOUNDARY: idb.js carries no campaign-key literal, and the shadow
+  //          only ever targets the 'meta' store (never 'campaign')
+  assert(
+    !/robco_v8|robco_slot|robco_backup|robco_chat|robco_playstyle|robco_v7|robco_last_cloud_push/.test(
+      idb138
+    ) &&
+      /window\.IdbStore\.set\('meta'/.test(state138) &&
+      /window\.IdbStore\.remove\('meta'/.test(state138) &&
+      !/_idbShadow[\s\S]*'campaign'/.test(state138),
+    "138.11: no campaign-key literal in idb.js; the write-through targets only the 'meta' store"
+  );
+
+  // 138.12  game-agnostic (Protocol 38): a pure KV engine — zero game literals
+  assert(
+    !/FNV|FO3|Fallout|New Vegas|Mojave|Capital Wasteland/.test(idb138),
+    '138.12: idb.js is game-agnostic (no FNV/FO3/Fallout literals — a pure key/value engine)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail
 // before printing totals — the runner body above is otherwise synchronous.
+// Re-emit the Suite 137 header first (Protocol 42, harness-only): the deferred
+// proof prints its single result line HERE, at the end of output — which, once
+// Suite 138 became the last synchronous suite, fell under Suite 138's header and
+// made the per-suite parity parser (scripts/gate.js) miscount it (Node 138 = 13
+// vs PowerShell 12; Node 137 = 13 vs 14). The parser sums counts across repeated
+// headers for the same suite number and keeps the first-seen title, so re-emitting
+// Suite 137's exact header re-attributes the deferred line to Suite 137 and
+// restores parity. Any future suite added after 137 would have hit the same trap.
+header('Suite 137 — Step 2 Phase 0 U11/U12 hygiene ledgers + modal consolidation');
 Promise.all(_pendingAsync)
   .catch(e => {
     fail('Unhandled error in an async suite: ' + (e && e.message));

@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1662/1662 | Cache: robco-terminal-v2.7.0-r16 -->
+﻿## [Unreleased]<!-- Tests: 1674/1674 | Cache: robco-terminal-v2.7.0-r17 -->
 
 ### Added
 
@@ -42,6 +42,7 @@
 - Reworked how the terminal reacts to key moments in your campaign — leveling up, a faction's standing crossing a threshold, your health dropping into the critical zone — so these are now announced through one small internal messaging system that other parts of the app can listen to, instead of each moment triggering its sound, vibration, or log entry directly inline. This is what made the Fallout 3 faction-alert fix and the expanded campaign log above possible without duplicating logic; the existing reactions to these moments (the level-up jingle, the critical-health flash and buzz, the faction alert chime) are unchanged. Internal reorganization only.
 - Documented exactly where the two supported games' reference data differs — separating gaps that are simply how each game's card is built (like the trait system, which only one of the two games has) from genuine content gaps still worth filling in later, and noting which recorded-but-currently-unused data columns are reserved for a future feature versus safe to retire. Also confirmed the skills panel degrades safely for any future game with no skill system at all. Documentation only — no visible change to the app.
 - Consolidated the confirmation and pop-up windows used throughout the app onto one shared internal system, replacing the browser's native popup boxes with the in-terminal ones described above. Every confirmation still gates the same actions the same way — nothing you can do or undo has changed, only how it's presented.
+- Began the groundwork for moving the terminal's saved data off the browser's small, fixed-size storage onto a larger, more durable storage system (IndexedDB). This first step adds the new storage engine and quietly keeps a durable backup copy of your device settings in it, while those settings continue to be read and written exactly as before — nothing you see or do changes, and if the new storage is ever unavailable the app runs identically to today. The new storage keeps your device settings and your campaign saves in two separate compartments from the start, and later steps will move your campaign saves and backups across and begin reading from it. Internal foundation only.
 
 ---
 

@@ -9170,6 +9170,98 @@ Check (
 ) '137.14: window.prompt() sites (cloud.js label input, ui-saves.js backup picker) remain -- explicitly out of U12 scope, not silently dropped'
 
 # ===========================================================
+# Suite 138 -- Step 2 (v2.8.0) Phase 1 P1: IndexedDB durability shadow +
+# write-through (12 tests). Mirrors JS Suite 138. New js/idb.js is an async
+# Promise-returning KV engine over IndexedDB with two object stores
+# ('meta'/'campaign') so the Protocol 23 two-store boundary is structural in
+# IndexedDB too. It is written through the single MetaStore choke point as a
+# fire-and-forget mirror of every device-pref write; READS STAY 100% ON
+# localStorage (no read flip in P1). These are structural guards -- the REAL
+# IndexedDB behavioral proof (round-trip + fail-safe) runs in tests/test.html
+# (Protocol 40 -- the browser is the only runner with a native IndexedDB).
+# ===========================================================
+Sep "Suite 138 -- P1 IndexedDB durability shadow + write-through"
+$idb138   = Read-Src "js/idb.js"
+$state138 = Read-Src "js/state.js"
+$sw138    = Read-Src "sw.js"
+$html138  = Read-Src "index.html"
+
+# 138.1  js/idb.js is an IIFE that publishes window.IdbStore
+Check (
+    ($idb138 -match '\(function \(\)\s*\{') -and ($idb138 -match 'window\.IdbStore = IdbStore')
+) '138.1: js/idb.js is an IIFE that publishes window.IdbStore'
+
+# 138.2  the new served module is precached in sw.js ASSETS (Suite 49 sibling)
+Check ($sw138 -match '\./js/idb\.js') '138.2: js/idb.js is precached in sw.js ASSETS'
+
+# 138.3  idb.js loads before state.js (which calls it) and before the boot loader
+$iIdb138    = $html138.IndexOf('js/idb.js')
+$iState138  = $html138.IndexOf('js/state.js')
+$iLoader138 = $html138.IndexOf('GAME_FILES')
+Check (
+    ($iIdb138 -gt -1) -and ($iState138 -gt -1) -and ($iLoader138 -gt -1) -and
+    ($iIdb138 -lt $iState138) -and ($iIdb138 -lt $iLoader138)
+) '138.3: index.html loads js/idb.js before state.js and before the GAME_FILES boot loader'
+
+# 138.4  the IdbStore API surface is complete
+Check (
+    ($idb138 -match 'set\(store, key, value\)') -and
+    ($idb138 -match 'get\(store, key\)') -and
+    ($idb138 -match 'remove\(store, key\)') -and
+    ($idb138 -match 'keys\(store\)') -and
+    ($idb138 -match 'getAll\(store\)') -and
+    ($idb138 -match 'get available\(\)')
+) '138.4: IdbStore exposes set/get/remove/keys/getAll + the available flag'
+
+# 138.5  two object stores ('meta' + 'campaign') -- two-store boundary in IDB
+Check (
+    ($idb138 -match "const STORES = \[\s*'meta',\s*'campaign'\s*\]") -and
+    ($idb138 -match 'createObjectStore\(name\)')
+) "138.5: idb.js creates both 'meta' and 'campaign' object stores (two-store boundary in IDB)"
+
+# 138.6  WRITE-THROUGH: MetaStore.set/remove mirror via the single _idbShadow seam
+Check (
+    ($state138 -match 'function _idbShadow\(') -and
+    ($state138 -match "_idbShadow\('set', key, val\)") -and
+    ($state138 -match "_idbShadow\('remove', key\)")
+) '138.6: MetaStore.set/remove route the write-through through the single _idbShadow('
+
+# 138.7  NO READ FLIP: MetaStore.get reads localStorage only
+$getBody138 = ''
+if ($state138 -match 'get\(key\)\s*\{([\s\S]*?)\}\s*catch') { $getBody138 = $matches[1] }
+Check (
+    ($getBody138 -match 'localStorage\.getItem\(key\)') -and (-not ($getBody138 -match 'IdbStore|_idbShadow'))
+) '138.7: MetaStore.get reads localStorage only -- no IdbStore read flip (read authority unchanged)'
+
+# 138.8  checksums REUSE window.computeSaveChecksum -- no second hash (Protocol 22)
+Check (
+    ($idb138 -match 'window\.computeSaveChecksum\(') -and (-not ($idb138 -match '0x811c9dc5'))
+) '138.8: idb.js reuses window.computeSaveChecksum (no duplicate hash implementation)'
+
+# 138.9  FAIL-SAFE: feature-detect factory + resolve(null) instead of throwing
+Check (
+    ($idb138 -match 'function _idbFactory\(') -and ($idb138 -match 'resolve\(null\)')
+) '138.9: idb.js feature-detects IndexedDB and degrades to a null (no-op) handle when absent'
+
+# 138.10  RESOLVE-SOFT: ops resolve to a fallback; write-through swallows rejection
+Check (
+    ($idb138 -match 'resolve\(fallback\)') -and ($state138 -match '\.catch\(\(\)\s*=>\s*\{\}\)')
+) '138.10: idb.js ops resolve-soft on error and _idbShadow swallows a rejected shadow promise'
+
+# 138.11  BOUNDARY: no campaign-key literal in idb.js; shadow targets only 'meta'
+Check (
+    (-not ($idb138 -match 'robco_v8|robco_slot|robco_backup|robco_chat|robco_playstyle|robco_v7|robco_last_cloud_push')) -and
+    ($state138 -match "window\.IdbStore\.set\('meta'") -and
+    ($state138 -match "window\.IdbStore\.remove\('meta'") -and
+    (-not ($state138 -match "_idbShadow[\s\S]*'campaign'"))
+) "138.11: no campaign-key literal in idb.js; the write-through targets only the 'meta' store"
+
+# 138.12  game-agnostic (Protocol 38): a pure KV engine -- zero game literals
+Check (
+    -not ($idb138 -match 'FNV|FO3|Fallout|New Vegas|Mojave|Capital Wasteland')
+) '138.12: idb.js is game-agnostic (no FNV/FO3/Fallout literals -- a pure key/value engine)'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

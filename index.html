@@ -2215,6 +2215,11 @@
       </div>
     </div>
 
+    <!-- IndexedDB durability engine (Step 2 · Phase 1 · P1). Loaded as a static
+         classic script BEFORE the boot loader below, so window.IdbStore exists
+         before state.js (injected by the loader) first calls it. Its absence is
+         harmless — MetaStore's write-through no-ops when IdbStore is undefined. -->
+    <script src="js/idb.js"></script>
     <script>
       // Context-conditional boot loader — replaces the legacy write-based script injector.
       // Injects exactly ONE db + ONE reg + shared state.js, chosen by activeContext, as

@@ -21,7 +21,7 @@
     or the canonical suites change, update this file in the SAME commit and bump
     the suite count marker. The gate fails on drift.
 
-    Suites: 10
+    Suites: 11
 -->
 <html lang="en">
   <head>
@@ -163,7 +163,9 @@
     </script>
 
     <!-- Boot chain — same files, same order as the live FNV boot in index.html:
-         db → state → reg → registry-core, then api. -->
+         idb → db → state → reg → registry-core, then api. idb.js loads before
+         state.js so MetaStore's P1 write-through has window.IdbStore. -->
+    <script src="../js/idb.js"></script>
     <script src="../js/db_nv.js"></script>
     <script src="../js/state.js"></script>
     <script src="../js/reg_nv.js"></script>
@@ -672,20 +674,98 @@
       }
 
       // ══════════════════════════════════════════════════════════════
-      //  Summary
+      //  Suite 10 (async) + Summary — the P1 IndexedDB behavioral proof needs
+      //  await, so it runs in an async runner that writes the summary only after
+      //  it settles (test-html-check.mjs waits for data-failed to appear).
       // ══════════════════════════════════════════════════════════════
-      const summary = document.getElementById('summary');
-      if (failed === 0) {
-        summary.className = 'all-pass';
-        summary.textContent = `ALL ${passed} TESTS PASSED across ${suiteCount} suites — persistence contract verified.`;
-      } else {
-        summary.className = 'has-fail';
-        summary.textContent = `${failed} TEST(S) FAILED (${passed} passed, ${suiteCount} suites) — import contract drift detected.`;
-      }
-      // Machine-readable markers for the headless gate runner (test-html-check.mjs).
-      summary.setAttribute('data-passed', String(passed));
-      summary.setAttribute('data-failed', String(failed));
-      summary.setAttribute('data-suites', String(suiteCount));
+      (async function () {
+        // ── Suite 10 — P1 IndexedDB durability shadow (REAL IndexedDB) ────────
+        // This is the behavioral half of canonical Suite 138: Chromium has a
+        // native IndexedDB (Node/PowerShell do not), so this proves the real
+        // round-trip, the no-read-flip invariant, the two-store boundary, and
+        // fail-safe resolve-soft behavior — not just the source shape.
+        try {
+          section('Suite 10 — P1 IndexedDB durability shadow (real IndexedDB)');
+
+          const wait = ms => new Promise(r => setTimeout(r, ms));
+          // Poll IdbStore.get until it matches (write-through is fire-and-forget).
+          async function eventually(store, key, want, tries = 60) {
+            for (let i = 0; i < tries; i++) {
+              if ((await window.IdbStore.get(store, key)) === want) return true;
+              await wait(10);
+            }
+            return false;
+          }
+
+          assert(
+            typeof window.IdbStore === 'object' && window.IdbStore !== null,
+            'IdbStore is published on window'
+          );
+          assert(await window.IdbStore.ready(), 'IdbStore opens a real IndexedDB in the browser');
+
+          // 1) Engine round-trip on the 'meta' store.
+          const rtOk = await window.IdbStore.set('meta', '__rt_probe__', 'engine-rt');
+          assert(
+            rtOk === true && (await window.IdbStore.get('meta', '__rt_probe__')) === 'engine-rt',
+            'engine round-trip: IdbStore.set then get returns the stored value'
+          );
+
+          // 2) Write-through: a MetaStore.set mirrors into the 'meta' store.
+          MetaStore.set('__wt_probe__', 'through-value');
+          assert(
+            await eventually('meta', '__wt_probe__', 'through-value'),
+            'write-through: MetaStore.set mirrors the value into IndexedDB (meta store)'
+          );
+
+          // 3) NO READ FLIP: seed IDB only, leave localStorage empty — MetaStore.get
+          //    must return the localStorage value (null), never the IDB value.
+          await window.IdbStore.set('meta', '__flip_probe__', 'IDB_ONLY');
+          try {
+            localStorage.removeItem('__flip_probe__');
+          } catch (_) {}
+          assert(
+            MetaStore.get('__flip_probe__') === null,
+            'no read flip: MetaStore.get reads localStorage only (ignores an IDB-only value)'
+          );
+
+          // 4) TWO-STORE BOUNDARY: the device write never touched the campaign store.
+          assert(
+            (await window.IdbStore.get('campaign', '__wt_probe__')) === null &&
+              (await window.IdbStore.keys('campaign')).length === 0,
+            "two-store boundary: the device write-through never wrote the 'campaign' store"
+          );
+
+          // 5) FAIL-SAFE resolve-soft: a missing key returns null, collections
+          //    return arrays — no op ever rejects.
+          const missing = await window.IdbStore.get('meta', '__does_not_exist__');
+          const allKeys = await window.IdbStore.keys('meta');
+          assert(
+            missing === null && Array.isArray(allKeys),
+            'resolve-soft: missing get returns null and keys() returns an array (no rejection)'
+          );
+
+          // Tidy up the probes (never awaited elsewhere).
+          window.IdbStore.remove('meta', '__rt_probe__');
+          window.IdbStore.remove('meta', '__wt_probe__');
+          window.IdbStore.remove('meta', '__flip_probe__');
+        } catch (err) {
+          assert(false, 'FATAL: IDB behavioral suite threw', String((err && err.stack) || err));
+        }
+
+        // ── Summary ──────────────────────────────────────────────────────────
+        const summary = document.getElementById('summary');
+        if (failed === 0) {
+          summary.className = 'all-pass';
+          summary.textContent = `ALL ${passed} TESTS PASSED across ${suiteCount} suites — persistence contract verified.`;
+        } else {
+          summary.className = 'has-fail';
+          summary.textContent = `${failed} TEST(S) FAILED (${passed} passed, ${suiteCount} suites) — import contract drift detected.`;
+        }
+        // Machine-readable markers for the headless gate runner (test-html-check.mjs).
+        summary.setAttribute('data-passed', String(passed));
+        summary.setAttribute('data-failed', String(failed));
+        summary.setAttribute('data-suites', String(suiteCount));
+      })();
     </script>
   </body>
 </html>
