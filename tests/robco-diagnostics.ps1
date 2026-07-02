@@ -10144,7 +10144,7 @@ Check (
 Check (
     ($uiCore146 -match 'initAmbientRuntime\(\);') -and
     ($uiCore146.IndexOf('_wireStandby();') -lt $uiCore146.IndexOf('initAmbientRuntime();'))
-) '146.11: window.onload calls initAmbientRuntime() (after _wireStandby -- additive; the old standby/timers are untouched)'
+) '146.11: window.onload calls initAmbientRuntime() after _wireStandby (so the STANDBY observer is registered before the runtime starts)'
 
 # 146.12  HARD atmosphere/save boundary: runtime.js writes NOTHING durable to the campaign
 Check (
@@ -10167,6 +10167,69 @@ Check (
 Check (
     -not ($runtime146 -match 'FNV|FO3|Fallout|New Vegas|Mojave|Capital Wasteland')
 ) '146.14: the A1 Ambient Runtime is game-agnostic (no game literals -- pure lifecycle logic)'
+
+# ===========================================================
+# Suite 147 -- Step 2 (v2.8.0) Phase 2 A2.1: Standby machine -> runtime observer (7 tests).
+# Mirrors JS Suite 147. The tab-standby dim + audio ducking is migrated off its own
+# blur/focus/visibilitychange listeners onto the Ambient Runtime's STANDBY state:
+# _wireStandby now registers ONE coordinator observer (states ['STANDBY'], tier
+# 'minimal') whose onEnter/onExit are the unchanged enterStandby/exitStandby. The
+# runtime (A1) owns the blur/focus/visibility -> STANDBY/ACTIVE transitions, so the
+# old direct listeners are retired (no double-wiring, no double-dim). Behavior-
+# identical at every tier (standby is essential feedback -> tier 'minimal').
+# ===========================================================
+Sep "Suite 147 -- A2.1 standby machine migrated onto the Ambient Runtime (STANDBY observer)"
+$uiCore147 = Read-Src "js/ui-core.js"
+$wireStandbyBody147 = Get-FunctionBody $uiCore147 '_wireStandby'
+$enterBody147 = Get-FunctionBody $uiCore147 'enterStandby'
+$exitBody147 = Get-FunctionBody $uiCore147 'exitStandby'
+
+# 147.1  _wireStandby registers a runtime observer with id 'standby'
+Check (
+    ($wireStandbyBody147 -match 'AmbientRuntime\.register\(\{') -and
+    ($wireStandbyBody147 -match "id:\s*'standby'")
+) "147.1: _wireStandby registers an AmbientRuntime observer (id 'standby') -- standby is now runtime-driven"
+
+# 147.2  the standby observer runs in STANDBY at tier 'minimal' (essential -- never quiets)
+Check (
+    ($wireStandbyBody147 -match "states:\s*\['STANDBY'\]") -and
+    ($wireStandbyBody147 -match "tier:\s*'minimal'")
+) "147.2: the standby observer declares states ['STANDBY'] and tier 'minimal' (essential feedback, never dial-quieted)"
+
+# 147.3  its lifecycle hooks are the unchanged enterStandby / exitStandby
+Check (
+    ($wireStandbyBody147 -match 'onEnter:\s*enterStandby') -and
+    ($wireStandbyBody147 -match 'onExit:\s*exitStandby')
+) '147.3: the standby observer folds enterStandby/exitStandby into the runtime STANDBY on-enter/on-exit'
+
+# 147.4  the OLD direct blur/focus/visibilitychange listeners are retired from _wireStandby
+Check (
+    (-not ($wireStandbyBody147 -match "addEventListener\(\s*'blur'")) -and
+    (-not ($wireStandbyBody147 -match "addEventListener\(\s*'focus'")) -and
+    (-not ($wireStandbyBody147 -match "addEventListener\(\s*'visibilitychange'"))
+) '147.4: _wireStandby no longer wires blur/focus/visibilitychange directly (retired -- the runtime drives STANDBY/ACTIVE)'
+
+# 147.5  enterStandby still ducks the standby loops (uptime + memory-cycle intervals + audio heartbeat)
+Check (
+    ($enterBody147 -match 'clearInterval\(_uptimeInterval\)') -and
+    ($enterBody147 -match 'clearInterval\(_memCycleInterval\)') -and
+    ($enterBody147 -match 'stopHeartbeat\(\)')
+) '147.5: enterStandby still clears the uptime + memory-cycle intervals and stops the audio heartbeat on standby'
+
+# 147.6  exitStandby still restores on wake (wake tone, un-dim, resume clocks, updateMath)
+Check (
+    ($exitBody147 -match 'playWakeTone\(\)') -and
+    ($exitBody147 -match "classList\.remove\('standby'\)") -and
+    ($exitBody147 -match '_startUptimeClock\(\)') -and
+    ($exitBody147 -match '_startMemCycle\(\)') -and
+    ($exitBody147 -match 'updateMath\(\)')
+) '147.6: exitStandby still plays the wake tone, un-dims, restarts the clocks, and re-syncs updateMath on wake'
+
+# 147.7  enterStandby/exitStandby keep their idempotency guard
+Check (
+    ($enterBody147 -match 'if \(_standbyActive\) return;') -and
+    ($exitBody147 -match 'if \(!_standbyActive\) return;')
+) '147.7: enterStandby/exitStandby retain the _standbyActive idempotency guard (no double-dim even if called twice)'
 
 # ===========================================================
 # Results

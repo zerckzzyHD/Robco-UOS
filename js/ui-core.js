@@ -664,16 +664,26 @@ function _wireRotaryDialClick() {
 }
 
 function _wireStandby() {
-  // ── TAB STANDBY MODE ───────────────────────────────────────────
-  // enterStandby/exitStandby are shared so blur+visibilitychange
-  // can both fire without doubling the wake tone or log message.
-  // blur fires while the tab is still compositing — best chance to see the dim on tab-out
-  window.addEventListener('blur', enterStandby);
-  window.addEventListener('focus', exitStandby);
-  // visibilitychange is the reliable fallback (keyboard tab-switch, mobile, etc.)
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) enterStandby();
-    else exitStandby();
+  // ── TAB STANDBY MODE — driven by the Ambient Runtime (Phase 2 A2) ──────────
+  // A1 made the runtime own the blur / focus / visibilitychange → STANDBY / ACTIVE
+  // transitions. A2 folds the standby dim + audio ducking (formerly wired to those
+  // events directly) into the runtime's STANDBY on-enter / on-exit as a single
+  // coordinator observer — so the runtime is the ONE lifecycle driver and the old
+  // direct blur/focus/visibilitychange listeners are retired (no double-wiring, no
+  // double-dim). enterStandby / exitStandby are unchanged and keep their own
+  // idempotency guard (belt-and-suspenders; the runtime already single-fires
+  // onEnter/onExit per STANDBY crossing).
+  //
+  // tier 'minimal': standby response is ESSENTIAL feedback — the terminal must
+  // visibly/audibly react to tab-out/in at every immersion level — so it never
+  // quiets. (onEnter/onExit are lifecycle hooks and are not tier-gated regardless;
+  // 'minimal' documents the intent.)
+  AmbientRuntime.register({
+    id: 'standby',
+    states: ['STANDBY'],
+    tier: 'minimal',
+    onEnter: enterStandby,
+    onExit: exitStandby,
   });
 }
 

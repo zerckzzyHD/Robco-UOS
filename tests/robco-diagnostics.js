@@ -17387,11 +17387,13 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   );
 
   // 146.11  wired into boot: ui-core.js window.onload calls initAmbientRuntime()
-  //         (right after _wireStandby — additive, parallel to the old standby)
+  //         AFTER _wireStandby — load-bearing since A2: _wireStandby registers the
+  //         STANDBY coordinator observer, which must exist before the runtime's
+  //         heartbeat/transitions start in initAmbientRuntime().
   assert(
     /initAmbientRuntime\(\);/.test(uiCore146) &&
       uiCore146.indexOf('_wireStandby();') < uiCore146.indexOf('initAmbientRuntime();'),
-    '146.11: window.onload calls initAmbientRuntime() (after _wireStandby — additive; the old standby/timers are untouched)'
+    '146.11: window.onload calls initAmbientRuntime() after _wireStandby (so the STANDBY observer is registered before the runtime starts)'
   );
 
   // 146.12  HARD atmosphere/save boundary (Phase-2 prime invariant #1): runtime.js
@@ -17420,6 +17422,81 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   assert(
     !/FNV|FO3|Fallout|New Vegas|Mojave|Capital Wasteland/.test(runtime146),
     '146.14: the A1 Ambient Runtime is game-agnostic (no game literals — pure lifecycle logic)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 147 — Step 2 (v2.8.0) Phase 2 A2.1: Standby machine → runtime observer (7 tests)
+// ──────────────────────────────────────────────────────────────
+//  The tab-standby dim + audio ducking is migrated off its own blur/focus/
+//  visibilitychange listeners onto the Ambient Runtime's STANDBY state: _wireStandby
+//  now registers ONE coordinator observer (states ['STANDBY'], tier 'minimal') whose
+//  onEnter/onExit are the unchanged enterStandby/exitStandby. The runtime (A1) owns
+//  the blur/focus/visibility → STANDBY/ACTIVE transitions, so the old direct
+//  listeners are retired (no double-wiring, no double-dim). Behavior-identical at
+//  every tier (standby is essential feedback → tier 'minimal', never quiets).
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 147 — A2.1 standby machine migrated onto the Ambient Runtime (STANDBY observer)');
+  const uiCore147 = readFile('js/ui-core.js');
+  const wireStandbyBody147 = extractFunctionBody(uiCore147, '_wireStandby');
+  const enterBody147 = extractFunctionBody(uiCore147, 'enterStandby');
+  const exitBody147 = extractFunctionBody(uiCore147, 'exitStandby');
+
+  // 147.1  _wireStandby registers a runtime observer with id 'standby'
+  assert(
+    /AmbientRuntime\.register\(\{/.test(wireStandbyBody147) &&
+      /id:\s*'standby'/.test(wireStandbyBody147),
+    "147.1: _wireStandby registers an AmbientRuntime observer (id 'standby') — standby is now runtime-driven"
+  );
+
+  // 147.2  the standby observer runs in the STANDBY state at tier 'minimal' (essential — never quiets)
+  assert(
+    /states:\s*\['STANDBY'\]/.test(wireStandbyBody147) &&
+      /tier:\s*'minimal'/.test(wireStandbyBody147),
+    "147.2: the standby observer declares states ['STANDBY'] and tier 'minimal' (essential feedback, never dial-quieted)"
+  );
+
+  // 147.3  its lifecycle hooks are the unchanged enterStandby / exitStandby
+  assert(
+    /onEnter:\s*enterStandby/.test(wireStandbyBody147) &&
+      /onExit:\s*exitStandby/.test(wireStandbyBody147),
+    '147.3: the standby observer folds enterStandby/exitStandby into the runtime STANDBY on-enter/on-exit'
+  );
+
+  // 147.4  the OLD direct blur/focus/visibilitychange listeners are retired from
+  //        _wireStandby (the runtime owns those transitions now — no double-wiring)
+  assert(
+    !/addEventListener\(\s*'blur'/.test(wireStandbyBody147) &&
+      !/addEventListener\(\s*'focus'/.test(wireStandbyBody147) &&
+      !/addEventListener\(\s*'visibilitychange'/.test(wireStandbyBody147),
+    '147.4: _wireStandby no longer wires blur/focus/visibilitychange directly (retired — the runtime drives STANDBY/ACTIVE)'
+  );
+
+  // 147.5  enterStandby still ducks the standby loops (uptime + memory-cycle intervals + audio heartbeat)
+  assert(
+    /clearInterval\(_uptimeInterval\)/.test(enterBody147) &&
+      /clearInterval\(_memCycleInterval\)/.test(enterBody147) &&
+      /stopHeartbeat\(\)/.test(enterBody147),
+    '147.5: enterStandby still clears the uptime + memory-cycle intervals and stops the audio heartbeat on standby'
+  );
+
+  // 147.6  exitStandby still restores on wake (wake tone, un-dim, resume clocks, updateMath)
+  assert(
+    /playWakeTone\(\)/.test(exitBody147) &&
+      /classList\.remove\('standby'\)/.test(exitBody147) &&
+      /_startUptimeClock\(\)/.test(exitBody147) &&
+      /_startMemCycle\(\)/.test(exitBody147) &&
+      /updateMath\(\)/.test(exitBody147),
+    '147.6: exitStandby still plays the wake tone, un-dims, restarts the clocks, and re-syncs updateMath on wake'
+  );
+
+  // 147.7  enterStandby/exitStandby keep their idempotency guard (belt-and-suspenders
+  //        over the runtime's own single-fire-per-crossing guarantee)
+  assert(
+    /if \(_standbyActive\) return;/.test(enterBody147) &&
+      /if \(!_standbyActive\) return;/.test(exitBody147),
+    '147.7: enterStandby/exitStandby retain the _standbyActive idempotency guard (no double-dim even if called twice)'
   );
 }
 
