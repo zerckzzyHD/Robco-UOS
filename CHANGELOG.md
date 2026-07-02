@@ -23,7 +23,7 @@
 
 ### Improved
 
-- Your campaign log now also records level-ups, newly-found collectibles, crafting and scrapping, buying and selling, and resting — not just faction changes, quest updates, and new locations. Open CROSSROADS ANALYSIS (or your exported campaign log) to see the fuller history.
+- Your campaign's event history now also records level-ups, newly-found collectibles, crafting and scrapping, buying and selling, and resting — not just faction changes, quest updates, and new locations. Open CROSSROADS RECORD to see the fuller history, or INCIDENT LOG for just the milestones.
 - Your current-session time readout now shows a friendlier format (like "2h 15m") instead of a raw minute count.
 - The databank lookup now also searches your collectibles, skill books, magazines, traits, and Lincoln memorabilia trackers, and surfaces a couple of previously-hidden details when it finds a match — like a quest item's story purpose or a creature's experience yield.
 - Confirmation prompts and status messages — save/load warnings, cloud sync results, crafting and trading confirmations, and more — now appear as in-terminal pop-ups that match the rest of the interface, instead of your browser's plain "OK/Cancel" dialog boxes.
