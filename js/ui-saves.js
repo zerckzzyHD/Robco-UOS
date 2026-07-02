@@ -530,6 +530,11 @@ function handleFileUpload(event) {
   reader.onload = async function (e) {
     try {
       const parsed = JSON.parse(e.target.result);
+      if (parsed.bundle === true) {
+        // P6 full-backup bundle — its own confirm-gated whole-history restore.
+        await importBundle(parsed);
+        return;
+      }
       if (parsed.robco_v8) {
         // v8 Container payload — integrity check + rolling backup before applying
         if (typeof window.verifySaveEnvelope === 'function') {
@@ -552,14 +557,9 @@ function handleFileUpload(event) {
           }
         }
         if (typeof window.snapRollingBackup === 'function') window.snapRollingBackup();
-        const _sanitized =
-          typeof sanitizeImportedContainer === 'function'
-            ? sanitizeImportedContainer(parsed.robco_v8)
-            : parsed.robco_v8;
-        localStorage.setItem('robco_v8', JSON.stringify(_sanitized));
-        if (parsed.chat && Array.isArray(parsed.chat))
-          localStorage.setItem('robco_chat', JSON.stringify(parsed.chat));
-        if (parsed.playstyle) localStorage.setItem('robco_playstyle', parsed.playstyle);
+        // Shared container-write core (state.js) — reused by the P6 bundle import
+        // (Protocol 22 — one container-apply path).
+        window._writeImportedContainer(parsed);
         // Guard the impending reload's beforeunload flush so stale in-memory state
         // can't overwrite the robco_v8 we just imported (clobber regression).
         window._loadingSave = true;
@@ -591,6 +591,88 @@ function handleFileUpload(event) {
     }
   };
   reader.readAsText(file);
+}
+
+// ── FULL BACKUP BUNDLE (P6) — UI layer ───────────────────────────────
+// exportFullBundle writes the whole-history bundle (state.js buildFullBundle) to a
+// file on a DELIBERATE button press. importBundle restores it — DESTRUCTIVE, so it
+// is confirm-gated (Protocol 34) and rejects a bad-shape / bad-checksum / (with
+// confirm) future-version bundle with a clear in-terminal error and NO partial
+// apply. The actual storage restore routes through state.js applyBundleData →
+// _writeImportedContainer, the SAME container-apply path handleFileUpload uses
+// (Protocol 22). Bundle metadata shown in the modal is escaped via confirmAction's
+// per-line escapeHtml. Game-agnostic (Protocol 38).
+async function exportFullBundle() {
+  if (typeof window.buildFullBundle !== 'function') return;
+  const bundle = await window.buildFullBundle();
+  _downloadBlob(
+    JSON.stringify(bundle, null, 2),
+    'application/json',
+    'robco_full_backup_' + new Date().toISOString().split('T')[0] + '.json'
+  );
+  appendToChat(
+    '> [BUNDLE] Full backup exported (' +
+      (bundle.slots ? bundle.slots.length : 0) +
+      ' slot(s), ' +
+      (bundle.backups ? bundle.backups.length : 0) +
+      ' backup(s)).',
+    'sys',
+    true
+  );
+}
+
+async function importBundle(parsed) {
+  const _bad = msg => {
+    if (typeof openModal === 'function') openModal({ title: '> IMPORT FULL BACKUP', body: msg });
+  };
+  // 1) SHAPE — reject anything that isn't a well-formed bundle (no partial apply).
+  if (typeof window.isValidBundleShape !== 'function' || !window.isValidBundleShape(parsed)) {
+    _bad('&#9888; NOT A VALID FULL BACKUP FILE. No changes were made.');
+    return;
+  }
+  // 2) FUTURE VERSION — reuse verifySaveEnvelope's version logic (confirm to force).
+  if (typeof window.verifySaveEnvelope === 'function') {
+    const vi = window.verifySaveEnvelope(parsed);
+    if (vi.status === 'future_version') {
+      const ok = await confirmAction({
+        title: '> VERSION MISMATCH',
+        warning: `This backup was made on a newer version of RobCo (v${vi.version}).\nYour app is on v${APP_VERSION}.\n\nRestoring may cause data loss — update the app first.\n\nForce-restore anyway?`,
+        confirmLabel: 'FORCE-RESTORE',
+      });
+      if (!ok) return;
+    }
+  }
+  // 3) CHECKSUM — reject a bundle whose integrity seal doesn't verify (no apply).
+  if (typeof window.verifyBundleChecksum !== 'function' || !window.verifyBundleChecksum(parsed)) {
+    _bad(
+      '&#9888; BACKUP FAILED ITS INTEGRITY CHECK. It may be corrupt or was edited outside the app. No changes were made.'
+    );
+    return;
+  }
+  // 4) CONFIRM — destructive whole-history restore (Protocol 34).
+  const _exp = parsed.exportedAt ? new Date(parsed.exportedAt).toLocaleString() : 'unknown';
+  const ok = await confirmAction({
+    title: '> IMPORT FULL BACKUP',
+    warning: `Restore your ENTIRE history from this backup?\n\nExported: ${_exp}\nContains ${parsed.slots.length} save slot(s) plus your live campaign.\n\nThis REPLACES your current campaign and overwrites saved slots. A rolling backup of your current state is taken first, so it can be undone.`,
+    confirmLabel: 'RESTORE ALL',
+  });
+  if (!ok) return;
+  // 5) APPLY — snap the current state as the undo point FIRST, then restore all
+  //    storage via the shared data-layer path (state.js applyBundleData).
+  try {
+    if (typeof window.snapRollingBackup === 'function') window.snapRollingBackup();
+    await window.applyBundleData(parsed);
+    // Guard the impending reload's beforeunload flush (clobber regression).
+    window._loadingSave = true;
+    if (typeof openModal === 'function')
+      openModal({
+        title: '> IMPORT FULL BACKUP',
+        body: 'FULL BACKUP RESTORED. REBOOTING SYSTEM...',
+      });
+    setTimeout(() => window.location.reload(), 2000);
+  } catch (_) {
+    appendToChat('> [SYS-ALERT: FULL BACKUP RESTORE FAILED]', 'sys');
+  }
 }
 
 function triggerImageUpload() {

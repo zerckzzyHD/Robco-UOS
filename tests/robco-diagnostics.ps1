@@ -6052,9 +6052,13 @@ Check ([System.Text.RegularExpressions.Regex]::IsMatch($fn956, '_contextSwitchin
 #       sanitizeImportedContainer(parsed.robco_v8) into robco_v8, and the boot
 #       merge reads campaigns[activeContext] back into state. (JS runner runs the
 #       full behavioral eval; PS runner asserts the round-trip wiring structurally.)
+#       P6 (Step 2 Phase 1): the sanitize+setItem moved into the shared
+#       _writeImportedContainer core (state.js); handleFileUpload calls it.
 $fn957 = Get-FunctionBody $saves95 'handleFileUpload'
-$rt957 = ([System.Text.RegularExpressions.Regex]::IsMatch($fn957, "sanitizeImportedContainer\(parsed\.robco_v8\)") -and `
-          [System.Text.RegularExpressions.Regex]::IsMatch($fn957, "localStorage\.setItem\('robco_v8'") -and `
+$writeCore957 = Get-FunctionBody $state95 '_writeImportedContainer'
+$rt957 = ([System.Text.RegularExpressions.Regex]::IsMatch($writeCore957, "sanitizeImportedContainer\(parsed\.robco_v8\)") -and `
+          [System.Text.RegularExpressions.Regex]::IsMatch($writeCore957, "localStorage\.setItem\('robco_v8'") -and `
+          [System.Text.RegularExpressions.Regex]::IsMatch($fn957, "_writeImportedContainer\(parsed\)") -and `
           [System.Text.RegularExpressions.Regex]::IsMatch($uiCore95, "campaigns\[window\.robco_v8\.activeContext\]"))
 Check $rt957 `
     '95.7: imported save container round-trips through sanitize + boot merge -- loaded state reflects the file (lvl/caps/loc/inventory)'
@@ -9133,6 +9137,8 @@ $gatedSites137 = @(
     # _applySlotEnvelope core (Protocol 22); restoreSlotVersion is a new gated path.
     @{ File = 'ui-saves.js'; Src = $saves137; Fn = '_applySlotEnvelope'; Window = $false },
     @{ File = 'ui-saves.js'; Src = $saves137; Fn = 'restoreSlotVersion'; Window = $false },
+    # P6: importBundle is a new destructive whole-history restore path.
+    @{ File = 'ui-saves.js'; Src = $saves137; Fn = 'importBundle'; Window = $false },
     @{ File = 'ui-saves.js'; Src = $saves137; Fn = 'restoreRollingBackup'; Window = $false },
     @{ File = 'ui-saves.js'; Src = $saves137; Fn = 'handleFileUpload'; Window = $false },
     @{ File = 'cloud.js'; Src = $cloud137; Fn = 'loadCloudSave'; Window = $true },
@@ -9693,6 +9699,130 @@ Check (
 Check (
     -not (($readVers142 + $pushVers142 + $restoreVer142 + $viewVer142) -match 'FNV|FO3|Fallout|New Vegas|Mojave|Capital Wasteland')
 ) '142.12: the P5 version-history code is game-agnostic (no game literals)'
+
+# ===========================================================
+# Suite 143 -- Step 2 (v2.8.0) Phase 1 P6: Full backup bundle (13 tests). Mirrors
+# JS Suite 143. Export the ENTIRE local history (live container + every save slot
+# with its P5 version ring + rolling-backup ring + chat + playstyle) to one
+# portable version-stamped + checksummed file, and import it back. Import is
+# DESTRUCTIVE -> confirm-gated (Protocol 34); the container restore routes through
+# the SAME _writeImportedContainer core handleFileUpload uses (Protocol 22); a
+# bad-shape / bad-checksum bundle is rejected with NO partial apply. Bundle carries
+# campaign/save data ONLY -- device prefs ('meta' store) excluded (Protocol 23).
+# The real-IndexedDB round-trip is proven in tests/test.html (Suite 15).
+# ===========================================================
+Sep "Suite 143 -- P6 full backup bundle (export/import whole history)"
+$state143     = Read-Src "js/state.js"
+$uiSaves143   = Read-Src "js/ui-saves.js"
+$indexHtml143 = Read-Src "index.html"
+$buildBody143     = Get-FunctionBody $state143 'buildFullBundle'
+$verifyCkBody143  = Get-FunctionBody $state143 'verifyBundleChecksum'
+$applyBody143     = Get-FunctionBody $state143 'applyBundleData'
+$writeContainer143 = Get-FunctionBody $state143 '_writeImportedContainer'
+$exportBody143    = Get-FunctionBody $uiSaves143 'exportFullBundle'
+$importBody143    = Get-FunctionBody $uiSaves143 'importBundle'
+$uploadBody143    = Get-FunctionBody $uiSaves143 'handleFileUpload'
+
+# 143.1  the bundle data-layer API is defined + exposed on window
+Check (
+    ($state143 -match 'async function buildFullBundle\s*\(') -and
+    ($state143 -match 'window\.buildFullBundle = buildFullBundle') -and
+    ($state143 -match 'function verifyBundleChecksum\s*\(') -and
+    ($state143 -match 'window\.verifyBundleChecksum = verifyBundleChecksum') -and
+    ($state143 -match 'function isValidBundleShape\s*\(') -and
+    ($state143 -match 'function _writeImportedContainer\s*\(') -and
+    ($state143 -match 'async function applyBundleData\s*\(') -and
+    ($state143 -match 'window\.applyBundleData = applyBundleData')
+) '143.1: state.js defines + exposes buildFullBundle / verifyBundleChecksum / isValidBundleShape / _writeImportedContainer / applyBundleData'
+
+# 143.2  the envelope is stamped + checksummed with the SHARED helper (Protocol 22)
+Check (
+    ($buildBody143 -match 'bundle: true') -and
+    ($buildBody143 -match 'bundleVersion:') -and
+    ($buildBody143 -match 'schemaVersion: APP_VERSION') -and
+    ($buildBody143 -match 'window\.computeSaveChecksum\(')
+) '143.2: the bundle envelope is version-stamped and checksummed via computeSaveChecksum (Protocol 22 -- no forked hash)'
+
+# 143.3  buildFullBundle gathers the whole history
+Check (
+    ($buildBody143 -match 'robco_v8: _v8') -and
+    ($buildBody143 -match 'readSlotVersions\(n\)') -and
+    ($buildBody143 -match 'versions:') -and
+    ($buildBody143 -match 'getRollingBackupsAsync\(\)') -and
+    ($buildBody143 -match 'slots,') -and
+    ($buildBody143 -match 'backups,')
+) '143.3: buildFullBundle gathers the live container + every slot (with its P5 version ring) + the rolling-backup ring + chat + playstyle'
+
+# 143.4  BOUNDARY: the bundle is campaign/save data only -- no device 'meta' store
+Check (
+    (-not ($buildBody143 -match "'meta'")) -and
+    (-not ($buildBody143 -match 'MetaStore')) -and
+    (-not ($applyBody143 -match "'meta'")) -and
+    (-not ($applyBody143 -match 'MetaStore'))
+) "143.4: the bundle excludes device prefs -- buildFullBundle/applyBundleData never touch the 'meta' store / MetaStore (two-store boundary, Protocol 23)"
+
+# 143.5  verifyBundleChecksum recomputes over the same fields + requires a match
+Check (
+    ($verifyCkBody143 -match 'window\.computeSaveChecksum\(') -and
+    ($verifyCkBody143 -match 'robco_v8: parsed\.robco_v8, slots: parsed\.slots, backups: parsed\.backups') -and
+    ($verifyCkBody143 -match 'if \(!parsed \|\| !parsed\.checksum\) return false;') -and
+    ($verifyCkBody143 -match 'expected === parsed\.checksum')
+) '143.5: verifyBundleChecksum recomputes over {robco_v8,slots,backups}+chat+playstyle and returns true only when a seal is present and matches'
+
+# 143.6  isValidBundleShape requires the discriminator + container + both arrays
+Check (
+    ($state143 -match 'parsed\.bundle === true') -and
+    ($state143 -match 'Array\.isArray\(parsed\.slots\)') -and
+    ($state143 -match 'Array\.isArray\(parsed\.backups\)')
+) '143.6: isValidBundleShape requires bundle===true + a robco_v8 container + slots[]/backups[] arrays'
+
+# 143.7  Protocol 22: handleFileUpload routes through the SHARED container core
+Check (
+    ($writeContainer143 -match 'sanitizeImportedContainer\(parsed\.robco_v8\)') -and
+    ($uploadBody143 -match 'window\._writeImportedContainer\(parsed\)') -and
+    (-not ($uploadBody143 -match '_sanitized'))
+) '143.7: handleFileUpload restores its container via the shared _writeImportedContainer core (Protocol 22 -- one container-apply path)'
+
+# 143.8  applyBundleData restores slots VERBATIM (checksum-preserving) + rings
+Check (
+    ($applyBody143 -match "_coldWriteObj\('robco_slot_' \+ s\.n, 'slot_' \+ s\.n, s\.envelope\)") -and
+    ($applyBody143 -match "IdbStore\.set\('campaign', 'slot_' \+ s\.n \+ '_versions', s\.versions\)") -and
+    (-not ($applyBody143 -match 'migrateState\('))
+) '143.8: applyBundleData restores each slot envelope VERBATIM (preserving its checksum) + its version ring to the campaign store -- no per-slot mutation'
+
+# 143.9  UNDO SAFETY: snap BEFORE apply; live ring never overwritten
+Check (
+    ($importBody143 -match 'window\.snapRollingBackup\(\)') -and
+    ($importBody143.IndexOf('window.snapRollingBackup()') -lt $importBody143.IndexOf('await window.applyBundleData(')) -and
+    (-not ($applyBody143 -match 'robco_backup_'))
+) '143.9: importBundle takes a rolling backup (undo point) BEFORE applyBundleData, which never overwrites the live rolling-backup ring'
+
+# 143.10  import is confirm-gated AND validates shape+checksum before any apply
+Check (
+    ($importBody143 -match "confirmLabel: 'RESTORE ALL'") -and
+    ($importBody143 -match 'isValidBundleShape\(parsed\)') -and
+    ($importBody143 -match 'verifyBundleChecksum\(parsed\)') -and
+    ($importBody143.IndexOf('isValidBundleShape') -lt $importBody143.IndexOf('applyBundleData')) -and
+    ($importBody143.IndexOf('verifyBundleChecksum') -lt $importBody143.IndexOf('applyBundleData'))
+) '143.10: importBundle is confirm-gated (RESTORE ALL) and validates shape + checksum BEFORE any apply (bad bundle -> reject, no partial apply)'
+
+# 143.11  handleFileUpload auto-detects a bundle and routes it to importBundle
+Check (
+    ($uploadBody143 -match 'parsed\.bundle === true') -and
+    ($uploadBody143 -match 'await importBundle\(parsed\)')
+) '143.11: handleFileUpload detects a full-backup bundle (parsed.bundle===true) and routes it to importBundle'
+
+# 143.12  export is a DELIBERATE user action via _downloadBlob + index.html button
+Check (
+    ($exportBody143 -match '_downloadBlob\(') -and
+    ($exportBody143 -match 'window\.buildFullBundle\(\)') -and
+    ($indexHtml143 -match 'onclick="exportFullBundle\(\)"')
+) '143.12: exportFullBundle writes the file via _downloadBlob on a deliberate index.html button press (user-initiated, not automatic)'
+
+# 143.13  game-agnostic (Protocol 38): the P6 code has no game literals
+Check (
+    -not (($buildBody143 + $verifyCkBody143 + $applyBody143 + $exportBody143 + $importBody143) -match 'FNV|FO3|Fallout|New Vegas|Mojave|Capital Wasteland')
+) '143.13: the P6 full-backup bundle code is game-agnostic (no game literals)'
 
 # ===========================================================
 # Results

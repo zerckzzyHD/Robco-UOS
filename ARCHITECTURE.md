@@ -64,8 +64,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    1724-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    1724-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    1737-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    1737-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -138,6 +138,28 @@ Scripts are loaded via `<script>` tags in `index.html` in this exact order:
    verifySaveEnvelope integrity check + snapRollingBackup-before-apply + migrateState). FAIL-SAFE:
    no IndexedDB → readSlotVersions returns [], no VER affordance, and save/load is byte-identical to
    pre-P5. Two-store boundary held (version data is campaign data → 'campaign' store only).
+
+   P6 (full backup bundle, js/state.js data layer + js/ui-saves.js UI): EXPORT FULL BACKUP writes the
+   user's ENTIRE local history to one portable file — the live campaign container (robco_v8) + every
+   save slot (each with its P5 version ring) + the rolling-backup ring + chat + playstyle. The
+   envelope is version-stamped and checksummed with the SAME computeSaveChecksum helper as every other
+   save (Protocol 22 — no forked hash); the checksum covers {robco_v8, slots, backups} + chat +
+   playstyle. The bundle carries campaign/save data ONLY — device prefs (the 'meta' store / MetaStore
+   keys) are deliberately EXCLUDED, so the two-store boundary holds (Protocol 23). buildFullBundle /
+   verifyBundleChecksum / isValidBundleShape / _writeImportedContainer / applyBundleData are the
+   data-layer functions (state.js); exportFullBundle / importBundle are the UI wrappers (ui-saves.js).
+   IMPORT: handleFileUpload auto-detects a bundle (parsed.bundle === true) and routes it to
+   importBundle, which is DESTRUCTIVE → confirm-gated (Protocol 34, "RESTORE ALL"). It rejects a
+   bad-shape or bad-checksum bundle up front with a clear in-terminal error and NO partial apply; a
+   future-version bundle prompts a force-restore confirm (reusing verifySaveEnvelope). On apply it takes
+   a rolling backup of the CURRENT state first (the undo point), then restores the live container via
+   the shared _writeImportedContainer core (the SAME path handleFileUpload uses) and rewrites each save
+   slot VERBATIM (preserving each envelope's own checksum so a later normal load still verifies) with
+   its version ring. The bundle's rolling-backup ring is exported for completeness but is NOT
+   re-injected over the live 3-slot ring on import — that ring must hold the fresh undo snapshot, and it
+   is a device-local ephemeral safety net, not primary portable data. FAIL-SAFE: export reads through
+   the IDB-primary accessors, so with no IndexedDB it simply exports whatever localStorage holds
+   (version rings empty), and import degrades to localStorage writes.
    ── Per-game boot manifest (GAME_FILES in index.html; order preserved via script.async = false) ──
 1. js/db_nv.js / js/db_fo3.js → defines: databaseCSVs, lookupItemInDb (game-specific CSV data;
                        the active pair is selected by the GAME_FILES manifest, FNV fail-safe)
@@ -1285,7 +1307,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1724-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1737-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

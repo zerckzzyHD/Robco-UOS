@@ -16139,6 +16139,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       // there; restoreSlotVersion adds a new destructive path with its own gate.
       ['ui-saves.js', uiSaves137, '_applySlotEnvelope', extractFunctionBody],
       ['ui-saves.js', uiSaves137, 'restoreSlotVersion', extractFunctionBody],
+      // P6: importBundle is a new destructive whole-history restore path.
+      ['ui-saves.js', uiSaves137, 'importBundle', extractFunctionBody],
       ['ui-saves.js', uiSaves137, 'restoreRollingBackup', extractFunctionBody],
       ['ui-saves.js', uiSaves137, 'handleFileUpload', extractFunctionBody],
       ['cloud.js', cloud137, 'loadCloudSave', extractWindowFnBody137],
@@ -16843,6 +16845,158 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       readVers142 + pushVers142 + restoreVerBody142 + viewVerBody142
     ),
     '142.12: the P5 version-history code is game-agnostic (no game literals)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 143 — Step 2 (v2.8.0) Phase 1 P6: Full backup bundle — export the
+//  user's ENTIRE local history (live campaign container + every save slot with
+//  its P5 version ring + the rolling-backup ring + chat + playstyle) to one
+//  portable, version-stamped + checksummed file, and import it back. Import is
+//  DESTRUCTIVE → confirm-gated (Protocol 34); the container restore routes through
+//  the SAME _writeImportedContainer core handleFileUpload uses (Protocol 22); a
+//  bad-shape / bad-checksum bundle is rejected with NO partial apply. The bundle
+//  carries campaign/save data ONLY — device prefs ('meta' store) are excluded, so
+//  the two-store boundary holds (Protocol 23). Data-layer fns (buildFullBundle /
+//  verify / applyBundleData) live in state.js so the real-IndexedDB round-trip is
+//  proven in tests/test.html (Suite 15). 13 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 143 — P6 full backup bundle (export/import whole history)');
+  const state143 = readFile('js/state.js');
+  const uiSaves143 = readFile('js/ui-saves.js');
+  const indexHtml143 = readFile('index.html');
+  const buildBody143 = extractFunctionBody(state143, 'buildFullBundle');
+  const verifyCkBody143 = extractFunctionBody(state143, 'verifyBundleChecksum');
+  const applyBody143 = extractFunctionBody(state143, 'applyBundleData');
+  const writeContainerBody143 = extractFunctionBody(state143, '_writeImportedContainer');
+  const exportBody143 = extractFunctionBody(uiSaves143, 'exportFullBundle');
+  const importBody143 = extractFunctionBody(uiSaves143, 'importBundle');
+  const uploadBody143 = extractFunctionBody(uiSaves143, 'handleFileUpload');
+
+  // 143.1  the bundle data-layer API is defined + exposed on window
+  assert(
+    /async function buildFullBundle\s*\(/.test(state143) &&
+      /window\.buildFullBundle = buildFullBundle/.test(state143) &&
+      /function verifyBundleChecksum\s*\(/.test(state143) &&
+      /window\.verifyBundleChecksum = verifyBundleChecksum/.test(state143) &&
+      /function isValidBundleShape\s*\(/.test(state143) &&
+      /function _writeImportedContainer\s*\(/.test(state143) &&
+      /async function applyBundleData\s*\(/.test(state143) &&
+      /window\.applyBundleData = applyBundleData/.test(state143),
+    '143.1: state.js defines + exposes buildFullBundle / verifyBundleChecksum / isValidBundleShape / _writeImportedContainer / applyBundleData'
+  );
+
+  // 143.2  the envelope is stamped + checksummed with the SHARED helper (Protocol 22)
+  assert(
+    /bundle: true/.test(buildBody143) &&
+      /bundleVersion:/.test(buildBody143) &&
+      /schemaVersion: APP_VERSION/.test(buildBody143) &&
+      /window\.computeSaveChecksum\(/.test(buildBody143),
+    '143.2: the bundle envelope is version-stamped and checksummed via computeSaveChecksum (Protocol 22 — no forked hash)'
+  );
+
+  // 143.3  buildFullBundle gathers the whole history (container + slots+versions +
+  //        backups + chat + playstyle)
+  assert(
+    /robco_v8: _v8/.test(buildBody143) &&
+      /readSlotVersions\(n\)/.test(buildBody143) &&
+      /versions:/.test(buildBody143) &&
+      /getRollingBackupsAsync\(\)/.test(buildBody143) &&
+      /slots,/.test(buildBody143) &&
+      /backups,/.test(buildBody143),
+    '143.3: buildFullBundle gathers the live container + every slot (with its P5 version ring) + the rolling-backup ring + chat + playstyle'
+  );
+
+  // 143.4  BOUNDARY: the bundle is campaign/save data only — no device 'meta' store
+  assert(
+    !/'meta'/.test(buildBody143) &&
+      !/MetaStore/.test(buildBody143) &&
+      !/'meta'/.test(applyBody143) &&
+      !/MetaStore/.test(applyBody143),
+    "143.4: the bundle excludes device prefs — buildFullBundle/applyBundleData never touch the 'meta' store / MetaStore (two-store boundary, Protocol 23)"
+  );
+
+  // 143.5  verifyBundleChecksum recomputes over the same fields + requires a match
+  assert(
+    /window\.computeSaveChecksum\(/.test(verifyCkBody143) &&
+      /robco_v8: parsed\.robco_v8, slots: parsed\.slots, backups: parsed\.backups/.test(
+        verifyCkBody143
+      ) &&
+      /if \(!parsed \|\| !parsed\.checksum\) return false;/.test(verifyCkBody143) &&
+      /expected === parsed\.checksum/.test(verifyCkBody143),
+    '143.5: verifyBundleChecksum recomputes over {robco_v8,slots,backups}+chat+playstyle and returns true only when a seal is present and matches'
+  );
+
+  // 143.6  isValidBundleShape requires the discriminator + container + both arrays
+  assert(
+    /parsed\.bundle === true/.test(state143) &&
+      /Array\.isArray\(parsed\.slots\)/.test(state143) &&
+      /Array\.isArray\(parsed\.backups\)/.test(state143),
+    '143.6: isValidBundleShape requires bundle===true + a robco_v8 container + slots[]/backups[] arrays'
+  );
+
+  // 143.7  Protocol 22: handleFileUpload's single-save container restore routes
+  //        through the SHARED _writeImportedContainer core (not an inline copy)
+  assert(
+    /sanitizeImportedContainer\(parsed\.robco_v8\)/.test(writeContainerBody143) &&
+      /window\._writeImportedContainer\(parsed\)/.test(uploadBody143) &&
+      !/_sanitized/.test(uploadBody143),
+    '143.7: handleFileUpload restores its container via the shared _writeImportedContainer core (Protocol 22 — one container-apply path)'
+  );
+
+  // 143.8  applyBundleData restores slots VERBATIM (checksum-preserving) + rings
+  assert(
+    /_coldWriteObj\('robco_slot_' \+ s\.n, 'slot_' \+ s\.n, s\.envelope\)/.test(applyBody143) &&
+      /IdbStore\.set\('campaign', 'slot_' \+ s\.n \+ '_versions', s\.versions\)/.test(
+        applyBody143
+      ) &&
+      !/migrateState\(/.test(applyBody143),
+    '143.8: applyBundleData restores each slot envelope VERBATIM (preserving its checksum) + its version ring to the campaign store — no per-slot mutation'
+  );
+
+  // 143.9  UNDO SAFETY: importBundle snaps a rolling backup BEFORE applying, and
+  //        applyBundleData does NOT re-inject the bundle ring over the live ring
+  assert(
+    /window\.snapRollingBackup\(\)/.test(importBody143) &&
+      importBody143.indexOf('window.snapRollingBackup()') <
+        importBody143.indexOf('await window.applyBundleData(') &&
+      !/robco_backup_/.test(applyBody143),
+    '143.9: importBundle takes a rolling backup (undo point) BEFORE applyBundleData, which never overwrites the live rolling-backup ring'
+  );
+
+  // 143.10  import is confirm-gated AND rejects bad shape / bad checksum with no apply
+  assert(
+    /confirmLabel: 'RESTORE ALL'/.test(importBody143) &&
+      /isValidBundleShape\(parsed\)/.test(importBody143) &&
+      /verifyBundleChecksum\(parsed\)/.test(importBody143) &&
+      importBody143.indexOf('isValidBundleShape') < importBody143.indexOf('applyBundleData') &&
+      importBody143.indexOf('verifyBundleChecksum') < importBody143.indexOf('applyBundleData'),
+    '143.10: importBundle is confirm-gated (RESTORE ALL) and validates shape + checksum BEFORE any apply (bad bundle → reject, no partial apply)'
+  );
+
+  // 143.11  handleFileUpload auto-detects a bundle and routes it to importBundle
+  assert(
+    /parsed\.bundle === true/.test(uploadBody143) &&
+      /await importBundle\(parsed\)/.test(uploadBody143),
+    '143.11: handleFileUpload detects a full-backup bundle (parsed.bundle===true) and routes it to importBundle'
+  );
+
+  // 143.12  export is a DELIBERATE user action: writes a file via _downloadBlob,
+  //         triggered by an index.html button (not automatic)
+  assert(
+    /_downloadBlob\(/.test(exportBody143) &&
+      /window\.buildFullBundle\(\)/.test(exportBody143) &&
+      /onclick="exportFullBundle\(\)"/.test(indexHtml143),
+    '143.12: exportFullBundle writes the file via _downloadBlob on a deliberate index.html button press (user-initiated, not automatic)'
+  );
+
+  // 143.13  game-agnostic (Protocol 38): the P6 code has no game literals
+  assert(
+    !/FNV|FO3|Fallout|New Vegas|Mojave|Capital Wasteland/.test(
+      buildBody143 + verifyCkBody143 + applyBody143 + exportBody143 + importBody143
+    ),
+    '143.13: the P6 full-backup bundle code is game-agnostic (no game literals)'
   );
 }
 

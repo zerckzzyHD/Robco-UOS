@@ -1193,6 +1193,152 @@ function exportSaveFile(slotName = null) {
   dl.click();
 }
 
+// ── FULL BACKUP BUNDLE (Step 2 · Phase 1 · P6) — data layer ──────────────────
+// One portable file holding the user's ENTIRE local history: the live campaign
+// container (robco_v8) + every save slot (each with its P5 version ring) + the
+// rolling-backup ring + chat + playstyle. Deliberately EXCLUDES device prefs (the
+// 'meta' store / MetaStore keys) — the bundle is campaign/save data ONLY, so the
+// two-store boundary (Protocol 23) holds. The envelope is version-stamped and
+// checksummed with the SAME helper every other save uses (computeSaveChecksum,
+// Protocol 22 — no forked hash). These functions are the DATA layer (gather /
+// verify / restore); the ui-saves.js wrappers own the download button, the confirm
+// gate, and the reload. Game-agnostic (Protocol 38): plain campaign/save data, no
+// game literals. Fail-safe: reads go through the IDB-primary cold-store accessors,
+// so with no IndexedDB the bundle simply carries whatever localStorage holds
+// (version rings empty), and restore degrades to localStorage.
+
+// Async: gather the full-backup bundle object (no download / no UI). The checksum
+// covers the container + slots + backups + chat + playstyle. Never throws.
+async function buildFullBundle() {
+  // Best-effort capture of the latest live state before snapshotting — guarded so
+  // an export can never crash if the DOM/form fields aren't present (falls back to
+  // the already-built window.robco_v8). Never throws.
+  try {
+    if (typeof syncStateFromDom === 'function') syncStateFromDom();
+    if (typeof snapshotActiveCampaign === 'function') snapshotActiveCampaign();
+  } catch (_) {}
+  const _v8 = window.robco_v8 || null;
+  const _playstyle = localStorage.getItem('robco_playstyle') || 'any';
+  const _chat = Array.isArray(chatHistory) ? chatHistory : [];
+
+  const slots = [];
+  for (let n = 1; n <= 3; n++) {
+    let env = null;
+    try {
+      env = await _coldReadObj('robco_slot_' + n, 'slot_' + n);
+    } catch (_) {}
+    if (!env) continue;
+    let versions = [];
+    try {
+      versions = await readSlotVersions(n);
+    } catch (_) {}
+    slots.push({ n, envelope: env, versions: Array.isArray(versions) ? versions : [] });
+  }
+
+  let backups = [];
+  try {
+    backups = (await window.getRollingBackupsAsync()).map(b => ({
+      key: b.key,
+      timestamp: b.timestamp,
+      data: b.data,
+    }));
+  } catch (_) {}
+
+  const bundle = {
+    bundle: true,
+    bundleVersion: 1,
+    version: APP_VERSION,
+    schemaVersion: APP_VERSION,
+    exportedAt: Date.now(),
+    robco_v8: _v8,
+    chat: _chat,
+    playstyle: _playstyle,
+    slots,
+    backups,
+  };
+  if (typeof window.computeSaveChecksum === 'function') {
+    bundle.checksum = window.computeSaveChecksum(
+      { robco_v8: _v8, slots, backups },
+      _chat,
+      _playstyle
+    );
+  }
+  return bundle;
+}
+window.buildFullBundle = buildFullBundle;
+
+// Recompute the bundle checksum over the SAME fields buildFullBundle hashed and
+// compare (reuse computeSaveChecksum — Protocol 22). Returns true ONLY if a seal
+// is present and matches; a missing or mismatched seal → false → reject the import.
+function verifyBundleChecksum(parsed) {
+  if (typeof window.computeSaveChecksum !== 'function') return false;
+  if (!parsed || !parsed.checksum) return false;
+  const expected = window.computeSaveChecksum(
+    { robco_v8: parsed.robco_v8, slots: parsed.slots, backups: parsed.backups },
+    parsed.chat || [],
+    parsed.playstyle || ''
+  );
+  return expected === parsed.checksum;
+}
+window.verifyBundleChecksum = verifyBundleChecksum;
+
+// Shape guard: a well-formed bundle carries the discriminator + a container + the
+// two arrays. Anything else is rejected before any write (no partial apply).
+function isValidBundleShape(parsed) {
+  return !!(
+    parsed &&
+    parsed.bundle === true &&
+    parsed.robco_v8 &&
+    Array.isArray(parsed.slots) &&
+    Array.isArray(parsed.backups)
+  );
+}
+window.isValidBundleShape = isValidBundleShape;
+
+// Shared container-write core (sanitize → persist robco_v8/chat/playstyle). Boot
+// re-migrates on the following reload, exactly as the single-save import path does.
+// Reused by ui-saves.js handleFileUpload (single-save import) AND applyBundleData
+// (full-backup import) — Protocol 22, ONE container-apply path, no parallel copy.
+function _writeImportedContainer(parsed) {
+  const _sanitized =
+    typeof sanitizeImportedContainer === 'function'
+      ? sanitizeImportedContainer(parsed.robco_v8)
+      : parsed.robco_v8;
+  localStorage.setItem('robco_v8', JSON.stringify(_sanitized));
+  if (parsed.chat && Array.isArray(parsed.chat))
+    localStorage.setItem('robco_chat', JSON.stringify(parsed.chat));
+  if (parsed.playstyle) localStorage.setItem('robco_playstyle', parsed.playstyle);
+}
+window._writeImportedContainer = _writeImportedContainer;
+
+// Async: restore ALL storage from an ALREADY-VERIFIED bundle — the live container
+// (via the shared _writeImportedContainer core) + every save slot VERBATIM (so each
+// envelope keeps its own checksum and still verifies on a later normal load) with
+// its P5 version ring. The pre-apply snapRollingBackup (undo point) is the CALLER's
+// responsibility. The bundle's rolling-backup ring is intentionally NOT re-injected
+// into the live 3-slot ring — that ring must hold the caller's fresh undo snapshot,
+// and it is a device-local ephemeral safety net, not primary portable data (it is
+// still preserved inside the exported file). Never throws.
+async function applyBundleData(parsed) {
+  window._writeImportedContainer(parsed);
+  for (const s of parsed.slots) {
+    if (!s || typeof s.n !== 'number' || s.n < 1 || s.n > 3 || !s.envelope) continue;
+    try {
+      await _coldWriteObj('robco_slot_' + s.n, 'slot_' + s.n, s.envelope);
+    } catch (_) {
+      try {
+        localStorage.setItem('robco_slot_' + s.n, JSON.stringify(s.envelope));
+      } catch (_) {}
+    }
+    if (window.IdbStore && Array.isArray(s.versions) && s.versions.length) {
+      try {
+        await window.IdbStore.set('campaign', 'slot_' + s.n + '_versions', s.versions);
+      } catch (_) {}
+    }
+  }
+}
+window.applyBundleData = applyBundleData;
+
 // ── SAVE VERSION MIGRATION (#16) ─────────────────────────────────
 // Chain of migrations applied whenever a save from an older version is loaded.
 // Add a new entry for each version that changes state structure.

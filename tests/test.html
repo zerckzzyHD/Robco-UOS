@@ -21,7 +21,7 @@
     or the canonical suites change, update this file in the SAME commit and bump
     the suite count marker. The gate fails on drift.
 
-    Suites: 15
+    Suites: 16
 -->
 <html lang="en">
   <head>
@@ -1152,6 +1152,101 @@
           await window.IdbStore.remove('campaign', 'slot_9_versions');
         } catch (err) {
           assert(false, 'FATAL: P5 version-history suite threw', String((err && err.stack) || err));
+        }
+
+        // ── Suite 15 — P6 full backup bundle (REAL IndexedDB) ─────────────────
+        // Proves the whole-history bundle round-trips through the browser's native
+        // IndexedDB using the real state.js data layer (buildFullBundle /
+        // verifyBundleChecksum / isValidBundleShape / applyBundleData) + the real
+        // api.js sanitizeImportedContainer: gather → checksum verify → tamper-reject
+        // → restore, with the slot restored VERBATIM and its version ring intact.
+        try {
+          section('Suite 15 — P6 full backup bundle (real IndexedDB)');
+
+          // Seed a slot + version ring + a live container.
+          await window.IdbStore.remove('campaign', 'slot_2');
+          await window.IdbStore.remove('campaign', 'slot_2_versions');
+          localStorage.removeItem('robco_slot_2');
+          localStorage.setItem(
+            'robco_v8',
+            JSON.stringify({ activeContext: 'FNV', campaigns: { FNV: { lvl: 50 } } })
+          );
+          window.robco_v8 = JSON.parse(localStorage.getItem('robco_v8'));
+          localStorage.setItem('robco_playstyle', 'combat');
+          const slotEnv15 = {
+            version: '2.7.0',
+            schemaVersion: '2.7.0',
+            state: { lvl: 20, gameContext: 'FNV' },
+            chat: [],
+            playstyle: 'any',
+            savedAt: 2000,
+            slotName: 'SLOT B',
+            gameContext: 'FNV',
+          };
+          await window._coldWriteObj('robco_slot_2', 'slot_2', slotEnv15);
+          await window.pushSlotVersion(2, {
+            ...slotEnv15,
+            savedAt: 1500,
+            state: { lvl: 19, gameContext: 'FNV' },
+          });
+
+          // 1) BUILD: buildFullBundle gathers container + the slot (with its ring) + checksum.
+          const bundle15 = await window.buildFullBundle();
+          const s2 = bundle15.slots.find(s => s.n === 2);
+          assert(
+            bundle15.bundle === true &&
+              !!bundle15.checksum &&
+              !!s2 &&
+              s2.envelope.state.lvl === 20 &&
+              s2.versions.length === 1,
+            'build: buildFullBundle gathers the live container + the slot with its P5 version ring + a checksum (real IDB reads)'
+          );
+
+          // 2) VERIFY + TAMPER: a clean bundle verifies; a mutated one is rejected.
+          const tampered15 = JSON.parse(JSON.stringify(bundle15));
+          tampered15.slots[tampered15.slots.findIndex(s => s.n === 2)].envelope.state.lvl = 999;
+          assert(
+            window.verifyBundleChecksum(bundle15) === true &&
+              window.verifyBundleChecksum(tampered15) === false &&
+              window.isValidBundleShape(bundle15) === true &&
+              window.isValidBundleShape({ nope: 1 }) === false,
+            'verify: a clean bundle passes checksum + shape; a tampered bundle and a malformed object are both rejected'
+          );
+
+          // 3) RESTORE ROUND-TRIP: clear the slot, applyBundleData, re-read from IDB.
+          await window.IdbStore.remove('campaign', 'slot_2');
+          await window.IdbStore.remove('campaign', 'slot_2_versions');
+          localStorage.removeItem('robco_slot_2');
+          await window.applyBundleData(bundle15);
+          const restored2 = await window._coldReadObj('robco_slot_2', 'slot_2');
+          const restoredRing = await window.readSlotVersions(2);
+          assert(
+            restored2 &&
+              restored2.state.lvl === 20 &&
+              JSON.stringify(restored2) === JSON.stringify(slotEnv15) &&
+              restoredRing.length === 1 &&
+              restoredRing[0].state.lvl === 19,
+            'restore: applyBundleData rewrites the slot VERBATIM (checksum-preserving) and restores its version ring to IndexedDB'
+          );
+
+          // 4) TWO-STORE BOUNDARY: nothing bundle-related leaks into the 'meta' store.
+          const metaLeak15 = await window.IdbStore.get('meta', 'slot_2');
+          const metaRingLeak15 = await window.IdbStore.get('meta', 'slot_2_versions');
+          assert(
+            metaLeak15 === null && metaRingLeak15 === null,
+            "two-store boundary: bundle restore never writes campaign/save data into the device 'meta' store"
+          );
+
+          // Tidy up.
+          await window.IdbStore.remove('campaign', 'slot_2');
+          await window.IdbStore.remove('campaign', 'slot_2_versions');
+          localStorage.removeItem('robco_slot_2');
+        } catch (err) {
+          assert(
+            false,
+            'FATAL: P6 full-backup bundle suite threw',
+            String((err && err.stack) || err)
+          );
         }
 
         // ── Summary ──────────────────────────────────────────────────────────

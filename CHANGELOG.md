@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1724/1724 | Cache: robco-terminal-v2.7.0-r21 -->
+﻿## [Unreleased]<!-- Tests: 1737/1737 | Cache: robco-terminal-v2.7.0-r22 -->
 
 ### Added
 
@@ -6,6 +6,7 @@
 - THREAT assessments now warn you outright when the ammo a fight would burn is more than you're actually carrying, instead of leaving you to do the math yourself.
 - Added inline buttons to nudge a companion's rapport with you up or down directly from their squad card — previously the only way to see or change it was to wait on the AI.
 - Save slots now keep a short history of earlier saves. Each time you overwrite a slot, its previous contents are kept — up to five earlier versions per slot — so a save you didn't mean to replace isn't gone. A "VER" button appears next to a slot that has earlier versions; tap it to see the list with the date and time each was saved, and restore any one. Restoring is confirm-gated and takes a safety backup of your current campaign first, so it can be undone. Version history uses the terminal's larger local storage, so it doesn't crowd out anything else, and if your browser doesn't support that storage the feature simply isn't offered and saving works exactly as before.
+- Added a one-file "EXPORT FULL BACKUP" that saves your ENTIRE history — your live campaign, all three save slots (including each slot's version history), and your automatic backups — into a single portable file you can keep or move to another device. To restore it, use IMPORT SAVE and pick the backup file: the terminal recognizes it automatically, asks you to confirm (since it replaces your current campaign), takes a safety backup of your current state first, and only proceeds if the file passes an integrity check — a corrupted or edited backup is refused with a clear message and nothing is changed. IMPORT SAVE still accepts a single save file too; it just handles both now.
 
 ### Changed
 
