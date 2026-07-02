@@ -10498,18 +10498,25 @@ Check (
 # cleans up unconditionally (no leaked class). shutdown-crt's states include
 # OFF so its one-shot animation trigger survives the internal SHUTDOWN->OFF
 # cascade (shutdown() fires both synchronously) without re-firing. A
-# companion fix in exitStandby() (A2, unchanged otherwise) skips the delayed
-# wake tone/audio ramp/chat line when the runtime has moved on to
-# SHUTDOWN/OFF by the time it fires (a genuine power-down, not a wake) --
-# found while verifying this unit (Protocol 42). Pure CSS + classList
-# toggles; the atmosphere/save boundary and Protocol 38 (game-agnostic) are
-# gate-guarded below.
+# companion fix in exitStandby() (A2, unchanged otherwise) closes a race
+# found while verifying this unit (Protocol 42): the wake sequence (tone +
+# audio ramp + chat line) must fire ONLY on a genuine return to active use,
+# never on a power-down -- and a shutdown can land either as a direct
+# STANDBY->SHUTDOWN edge OR partway through the 650ms wake window that
+# already started. Rather than a single up-front check (which only catches
+# the direct edge), the shared _isShuttingDown() helper is re-checked at EACH
+# half's own fire time: once synchronously before the tone, again inside the
+# setTimeout before the ramp/chat/geiger-resync -- so either half
+# independently no-ops the moment it discovers the terminal is powering
+# down, closing both races. Pure CSS + classList toggles; the atmosphere/
+# save boundary and Protocol 38 (game-agnostic) are gate-guarded below.
 # ===========================================================
 Sep "Suite 150 -- A3 IDLE/STANDBY/SHUTDOWN ambient experiences"
 $uiCore150 = Read-Src "js/ui-core.js"
 $css150 = Read-Src "css/terminal.css"
 $wireAmbient150 = Get-FunctionBody $uiCore150 '_wireAmbientExperiences'
 $exitStandbyBody150 = Get-FunctionBody $uiCore150 'exitStandby'
+$isShuttingDownBody150 = Get-FunctionBody $uiCore150 '_isShuttingDown'
 
 # 150.1  _wireAmbientExperiences() is wired into window.onload after
 #        _wireStandby() and before initAmbientRuntime() (registration order)
@@ -10550,22 +10557,24 @@ Check (
     ($wireAmbient150 -match "classList\.remove\('rt-shutdown', 'rt-shutdown-plain'\)")
 ) "150.4: shutdown-crt observer (states ['SHUTDOWN','OFF'], tier 'full') force-clears any lingering idle/standby flourish, then adds the full-flourish or plain-cut class per immersionAllows('full'); onExit removes both on leaving the set"
 
-# 150.5  exitStandby() skips the wake tone/delayed audio-ramp/chat-line
-#        entirely when the runtime has moved to SHUTDOWN/OFF by the time
-#        this onExit runs (a power-down, not a wake) -- guard sits BEFORE
-#        playWakeTone(), so it also suppresses the immediate tone, not just
-#        the delayed setTimeout body.
+# 150.5  _isShuttingDown() is the single SHUTDOWN/OFF check, and exitStandby()
+#        re-checks it at EACH half's own fire time: once synchronously BEFORE
+#        playWakeTone() (that half's fire time is now), and again as the
+#        FIRST statement inside the setTimeout body (that half's fire time is
+#        650ms later) -- not just a single up-front check, which would only
+#        catch a direct STANDBY->SHUTDOWN edge and miss a shutdown landing
+#        mid-window after the tone already played.
 Check (
-    ($exitStandbyBody150 -match "AmbientRuntime\.getState\(\) === 'SHUTDOWN' \|\| AmbientRuntime\.getState\(\) === 'OFF'") -and
-    ($exitStandbyBody150 -match 'if \(_shuttingDown\) return;') -and
-    ($exitStandbyBody150.IndexOf('if (_shuttingDown) return;') -lt $exitStandbyBody150.IndexOf('playWakeTone();'))
-) '150.5: exitStandby() checks AmbientRuntime.getState() for SHUTDOWN/OFF and returns BEFORE playWakeTone() -- a shutdown-triggered standby-exit fires no wake tone, no audio ramp, no "COURIER RETURNED" chat line'
+    ($isShuttingDownBody150 -match "AmbientRuntime\.getState\(\) === 'SHUTDOWN' \|\| AmbientRuntime\.getState\(\) === 'OFF'") -and
+    ($exitStandbyBody150 -match "(?s)if \(_isShuttingDown\(\)\) return;.*?playWakeTone\(\);") -and
+    ($exitStandbyBody150 -match "(?s)setTimeout\(\(\) => \{\s*\n(?:\s*//.*\n)*\s*if \(_isShuttingDown\(\)\) return;")
+) "150.5: _isShuttingDown() is re-checked at each half's own fire time in exitStandby() -- synchronously before playWakeTone(), and again as the first statement inside the delayed setTimeout body -- so a shutdown landing either as a direct edge OR mid-window both no-op their half of the wake sequence"
 
 # 150.6  HARD atmosphere/save boundary (Phase-2 prime invariant #1): none of
 #        the new A3 code writes anything durable to the campaign
 Check (
-    -not (($wireAmbient150 + $exitStandbyBody150) -match 'saveState|robco_v8|_logEvent|\beventLog\b|localStorage\.(set|get)Item')
-) '150.6: _wireAmbientExperiences() and the updated exitStandby() never call saveState / touch robco_v8 / localStorage / eventLog / _logEvent (device+in-memory+DOM classList only)'
+    -not (($wireAmbient150 + $exitStandbyBody150 + $isShuttingDownBody150) -match 'saveState|robco_v8|_logEvent|\beventLog\b|localStorage\.(set|get)Item')
+) '150.6: _wireAmbientExperiences(), exitStandby(), and _isShuttingDown() never call saveState / touch robco_v8 / localStorage / eventLog / _logEvent (device+in-memory+DOM classList only)'
 
 # 150.7  CSS: every new body class is defined, standby-deep uses ::before
 #        (not ::after, which body.standby already owns for its diegetic
@@ -10602,8 +10611,27 @@ Check (
 
 # 150.9  game-agnostic (Protocol 38): pure lifecycle/CSS atmosphere, no game literals
 Check (
-    -not (($wireAmbient150 + $exitStandbyBody150) -match 'FNV|FO3|Fallout|New Vegas|Mojave|Capital Wasteland')
+    -not (($wireAmbient150 + $exitStandbyBody150 + $isShuttingDownBody150) -match 'FNV|FO3|Fallout|New Vegas|Mojave|Capital Wasteland')
 ) '150.9: the A3 ambient experiences are game-agnostic (no game literals -- pure lifecycle/CSS atmosphere)'
+
+# 150.10  STRUCTURAL MIRROR of the JS behavioral vm-sandbox proof (PowerShell
+#         has no JS execution sandbox -- same convention as Suite 149.8): the
+#         three scenarios the JS side actually EXECUTES are locked here as
+#         source-shape guards instead -- (a) the direct-edge guard sits before
+#         playWakeTone() [confirmed by 150.5 above]; (b) the normal-wake body
+#         (tone + chat line + updateMath) is completely unchanged/unguarded
+#         other than the two _isShuttingDown() checks; (c) the mid-window
+#         guard is the FIRST statement inside the setTimeout, before ANY of
+#         the ramp/chat/updateMath side effects, so a state change during the
+#         650ms delay is caught before any of them run.
+Check (
+    ($exitStandbyBody150 -match "playWakeTone\(\);") -and
+    ($exitStandbyBody150 -match "appendToChat\('> COURIER RETURNED\. SYNCHRONIZING TELEMETRY\.\.\.', 'sys', true\);") -and
+    ($exitStandbyBody150 -match "updateMath\(\);") -and
+    ($exitStandbyBody150 -match "(?s)setTimeout\(\(\) => \{\s*\n(?:\s*//.*\n)*\s*if \(_isShuttingDown\(\)\) return;\s*\n\s*document\.body\.classList\.remove\('standby'\);") -and
+    ($exitStandbyBody150.IndexOf('if (_isShuttingDown()) return;') -lt $exitStandbyBody150.LastIndexOf('if (_isShuttingDown()) return;')) -and
+    (([regex]::Matches($exitStandbyBody150, 'if \(_isShuttingDown\(\)\) return;')).Count -eq 2)
+) "150.10: structural mirror of the JS behavioral proof -- exactly two _isShuttingDown() checks exist (one before the tone, one as the first statement inside the setTimeout, strictly before classList.remove/chat/updateMath), and the normal-wake body (tone/chat line/updateMath) is otherwise unchanged"
 
 # ===========================================================
 # Results

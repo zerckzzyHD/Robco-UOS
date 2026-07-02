@@ -427,22 +427,39 @@ function enterStandby() {
   stopHeartbeat();
 }
 
+// A3 (Protocol 42): the standby "wake" sequence (tone + audio ramp + the
+// "COURIER RETURNED" chat line) is a return-to-active-use behavior — it must
+// fire ONLY when the terminal is genuinely coming back, never on a power-down.
+// STANDBY→SHUTDOWN is a legal runtime edge (forced via the Test Console
+// today), but a shutdown could also land AFTER a normal wake has already
+// started (mid-way through the 650ms window below). Rather than checking
+// once up front — which only catches the direct STANDBY→SHUTDOWN edge and
+// misses a shutdown landing during the delay — each half of the wake
+// sequence re-checks the runtime state at that HALF's own fire time: once,
+// synchronously, right before the tone (its fire time is now); again inside
+// the setTimeout, right before the ramp/chat/geiger-resync (its fire time is
+// 650ms later). Either check no-oping is enough on its own to stop the whole
+// sequence from completing — this is deliberately more robust than trying to
+// cancel the pending timer from elsewhere.
+function _isShuttingDown() {
+  return (
+    typeof AmbientRuntime !== 'undefined' &&
+    (AmbientRuntime.getState() === 'SHUTDOWN' || AmbientRuntime.getState() === 'OFF')
+  );
+}
+
 function exitStandby() {
   if (!_standbyActive) return;
   _standbyActive = false;
-  // A3: STANDBY→SHUTDOWN is a legal edge (forced via the Test Console today).
-  // By the time this onExit fires, the runtime's _state already flipped to the
-  // NEW state (transition() sets it before dispatching onExit/onEnter), so if
-  // we're headed to SHUTDOWN/OFF this exit is a power-down, not a wake — skip
-  // the wake tone/audio ramp/"COURIER RETURNED" chat line entirely (the
-  // shutdown-crt observer's own onEnter already force-clears the standby
-  // class, so nothing is left stuck).
-  const _shuttingDown =
-    typeof AmbientRuntime !== 'undefined' &&
-    (AmbientRuntime.getState() === 'SHUTDOWN' || AmbientRuntime.getState() === 'OFF');
-  if (_shuttingDown) return;
+  if (_isShuttingDown()) return; // fire time for the tone is now — skip it too
   playWakeTone();
   setTimeout(() => {
+    // Re-check AT THIS ACTION'S OWN FIRE TIME: a shutdown that landed sometime
+    // during the 650ms window (after the tone already played above) still
+    // must not surface the ramp/chat/geiger-resync — the shutdown-crt
+    // observer's own onEnter already force-clears the standby class, so
+    // nothing is left stuck either way.
+    if (_isShuttingDown()) return;
     document.body.classList.remove('standby');
     if (crtHumGain) {
       crtHumGain.gain.cancelScheduledValues(audioCtx.currentTime);

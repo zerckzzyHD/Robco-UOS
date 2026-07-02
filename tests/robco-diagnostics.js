@@ -17858,11 +17858,18 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  shutdown-crt's states include OFF so its one-shot animation trigger
 //  survives the internal SHUTDOWN→OFF cascade (shutdown() fires both
 //  synchronously) without re-firing. A companion fix in exitStandby() (A2,
-//  unchanged otherwise) skips the delayed wake tone/audio ramp/chat line
-//  when the runtime has moved on to SHUTDOWN/OFF by the time it fires (a
-//  genuine power-down, not a wake) — found while verifying this unit
-//  (Protocol 42). Pure CSS + classList toggles; the atmosphere/save boundary
-//  and Protocol 38 (game-agnostic) are gate-guarded below.
+//  unchanged otherwise) closes a race found while verifying this unit
+//  (Protocol 42): the wake sequence (tone + audio ramp + chat line) must
+//  fire ONLY on a genuine return to active use, never on a power-down — and
+//  a shutdown can land either as a direct STANDBY→SHUTDOWN edge OR partway
+//  through the 650ms wake window that already started. Rather than a single
+//  up-front check (which only catches the direct edge), the shared
+//  _isShuttingDown() helper is re-checked at EACH half's own fire time: once
+//  synchronously before the tone, again inside the setTimeout before the
+//  ramp/chat/geiger-resync — so either half independently no-ops the moment
+//  it discovers the terminal is powering down, closing both races. Pure CSS
+//  + classList toggles; the atmosphere/save boundary and Protocol 38
+//  (game-agnostic) are gate-guarded below.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 150 — A3 IDLE/STANDBY/SHUTDOWN ambient experiences');
@@ -17870,6 +17877,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   const css150 = readFile('css/terminal.css');
   const wireAmbient150 = extractFunctionBody(uiCore150, '_wireAmbientExperiences');
   const exitStandbyBody150 = extractFunctionBody(uiCore150, 'exitStandby');
+  const isShuttingDownBody150 = extractFunctionBody(uiCore150, '_isShuttingDown');
 
   // 150.1  _wireAmbientExperiences() is wired into window.onload after
   //        _wireStandby() and before initAmbientRuntime() (registration order)
@@ -17920,28 +17928,31 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     "150.4: shutdown-crt observer (states ['SHUTDOWN','OFF'], tier 'full') force-clears any lingering idle/standby flourish, then adds the full-flourish or plain-cut class per immersionAllows('full'); onExit removes both on leaving the set"
   );
 
-  // 150.5  exitStandby() skips the wake tone/delayed audio-ramp/chat-line
-  //        entirely when the runtime has moved to SHUTDOWN/OFF by the time
-  //        this onExit runs (a power-down, not a wake) — guard sits BEFORE
-  //        playWakeTone(), so it also suppresses the immediate tone, not just
-  //        the delayed setTimeout body.
+  // 150.5  _isShuttingDown() is the single SHUTDOWN/OFF check, and exitStandby()
+  //        re-checks it at EACH half's own fire time: once synchronously
+  //        BEFORE playWakeTone() (that half's fire time is now), and again as
+  //        the FIRST statement inside the setTimeout body (that half's fire
+  //        time is 650ms later) — not just a single up-front check, which
+  //        would only catch a direct STANDBY→SHUTDOWN edge and miss a
+  //        shutdown landing mid-window after the tone already played.
   assert(
     /AmbientRuntime\.getState\(\) === 'SHUTDOWN' \|\| AmbientRuntime\.getState\(\) === 'OFF'/.test(
-      exitStandbyBody150
+      isShuttingDownBody150
     ) &&
-      /if \(_shuttingDown\) return;/.test(exitStandbyBody150) &&
-      exitStandbyBody150.indexOf('if (_shuttingDown) return;') <
-        exitStandbyBody150.indexOf('playWakeTone();'),
-    '150.5: exitStandby() checks AmbientRuntime.getState() for SHUTDOWN/OFF and returns BEFORE playWakeTone() — a shutdown-triggered standby-exit fires no wake tone, no audio ramp, no "COURIER RETURNED" chat line'
+      /if \(_isShuttingDown\(\)\) return;[\s\S]*?playWakeTone\(\);/.test(exitStandbyBody150) &&
+      /setTimeout\(\(\) => \{\s*\n(?:\s*\/\/.*\n)*\s*if \(_isShuttingDown\(\)\) return;/.test(
+        exitStandbyBody150
+      ),
+    "150.5: _isShuttingDown() is re-checked at each half's own fire time in exitStandby() — synchronously before playWakeTone(), and again as the first statement inside the delayed setTimeout body — so a shutdown landing either as a direct edge OR mid-window both no-op their half of the wake sequence"
   );
 
   // 150.6  HARD atmosphere/save boundary (Phase-2 prime invariant #1): none of
   //        the new A3 code writes anything durable to the campaign
   assert(
     !/saveState|robco_v8|_logEvent|\beventLog\b|localStorage\.(set|get)Item/.test(
-      wireAmbient150 + exitStandbyBody150
+      wireAmbient150 + exitStandbyBody150 + isShuttingDownBody150
     ),
-    '150.6: _wireAmbientExperiences() and the updated exitStandby() never call saveState / touch robco_v8 / localStorage / eventLog / _logEvent (device+in-memory+DOM classList only)'
+    '150.6: _wireAmbientExperiences(), exitStandby(), and _isShuttingDown() never call saveState / touch robco_v8 / localStorage / eventLog / _logEvent (device+in-memory+DOM classList only)'
   );
 
   // 150.7  CSS: every new body class is defined, standby-deep uses ::before
@@ -17983,9 +17994,128 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
   // 150.9  game-agnostic (Protocol 38): pure lifecycle/CSS atmosphere, no game literals
   assert(
-    !/FNV|FO3|Fallout|New Vegas|Mojave|Capital Wasteland/.test(wireAmbient150 + exitStandbyBody150),
+    !/FNV|FO3|Fallout|New Vegas|Mojave|Capital Wasteland/.test(
+      wireAmbient150 + exitStandbyBody150 + isShuttingDownBody150
+    ),
     '150.9: the A3 ambient experiences are game-agnostic (no game literals — pure lifecycle/CSS atmosphere)'
   );
+
+  // 150.10  BEHAVIORAL — the real enterStandby()/exitStandby()/_isShuttingDown()
+  //         bodies, executed against a synthetic DOM in a Node vm sandbox (not
+  //         just a structural grep), with setTimeout mocked to run synchronously
+  //         (avoiding a real 650ms wait / the Suite 137.6 deferred-async trap):
+  //           (a) direct STANDBY→SHUTDOWN: no wake tone, no chat line;
+  //           (b) normal STANDBY→ACTIVE wake: tone fires AND the chat line +
+  //               updateMath fire, completely unchanged from before this fix;
+  //           (c) the race this fix specifically closes — state is ACTIVE when
+  //               exitStandby() is called (tone fires), but flips to SHUTDOWN
+  //               DURING the 650ms window before the delayed half runs: the
+  //               chat line/updateMath must NOT fire even though the tone already did.
+  {
+    const vm150 = require('vm');
+    function declareFn150(src, name) {
+      const nameIdx = src.indexOf('function ' + name);
+      const parenIdx = src.indexOf('(', nameIdx);
+      const braceIdx = src.indexOf('{', parenIdx);
+      const params = src.slice(parenIdx, braceIdx);
+      return 'function ' + name + params + extractFunctionBody(src, name);
+    }
+    const src150 =
+      'var _standbyActive = false;\n' +
+      declareFn150(uiCore150, '_isShuttingDown') +
+      '\n' +
+      declareFn150(uiCore150, 'enterStandby') +
+      '\n' +
+      declareFn150(uiCore150, 'exitStandby');
+
+    function runScenario150(finalState, midWindowState) {
+      const calls = { tone: 0, chat: [], updateMath: 0, geiger: [] };
+      const sb = {
+        console: { warn() {} },
+        AmbientRuntime: {
+          _s: 'STANDBY',
+          getState() {
+            return this._s;
+          },
+        },
+        document: {
+          body: {
+            classList: {
+              _set: new Set(['standby']),
+              add(c) {
+                this._set.add(c);
+              },
+              remove(c) {
+                this._set.delete(c);
+              },
+              contains(c) {
+                return this._set.has(c);
+              },
+            },
+          },
+          getElementById: () => ({ value: '0' }),
+        },
+        geigerRunning: true,
+        geigerTimeout: null,
+        _geigerCurrentRate: 0,
+        crtHumGain: null,
+        audioCtx: null,
+        stopHeartbeat() {},
+        playWakeTone() {
+          calls.tone++;
+        },
+        appendToChat(text) {
+          calls.chat.push(text);
+        },
+        setGeigerRate(r) {
+          calls.geiger.push(r);
+        },
+        updateMath() {
+          calls.updateMath++;
+        },
+        // Mock setTimeout: runs synchronously (no real 650ms wait), but first
+        // lets the caller flip AmbientRuntime state — simulating "time passed
+        // and the state changed before this half's fire time" (scenario c).
+        setTimeout(fn) {
+          if (midWindowState) sb.AmbientRuntime._s = midWindowState;
+          fn();
+        },
+      };
+      vm150.createContext(sb);
+      vm150.runInContext(src150, sb);
+      sb._standbyActive = true;
+      sb.AmbientRuntime._s = finalState;
+      sb.exitStandby();
+      return calls;
+    }
+
+    let a150 = null,
+      b150 = null,
+      c150 = null,
+      err150 = null;
+    try {
+      a150 = runScenario150('SHUTDOWN', null); // direct STANDBY→SHUTDOWN
+      b150 = runScenario150('ACTIVE', null); // normal wake
+      c150 = runScenario150('ACTIVE', 'SHUTDOWN'); // shutdown lands mid-window
+    } catch (e) {
+      err150 = e;
+    }
+    assert(
+      !err150 &&
+        a150.tone === 0 &&
+        a150.chat.length === 0 &&
+        a150.updateMath === 0 &&
+        b150.tone === 1 &&
+        b150.chat.length === 1 &&
+        b150.chat[0].includes('COURIER RETURNED') &&
+        b150.updateMath === 1 &&
+        c150.tone === 1 &&
+        c150.chat.length === 0 &&
+        c150.updateMath === 0,
+      'exitStandby() behavioral: a direct STANDBY→SHUTDOWN plays no tone and no chat line; a normal STANDBY→ACTIVE wake plays the tone AND the chat line/updateMath, unchanged; a shutdown landing DURING the 650ms window still plays the tone (already fired) but suppresses the chat line/updateMath (the race this fix closes)' +
+        (err150 ? ' — ' + err150.message : '')
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

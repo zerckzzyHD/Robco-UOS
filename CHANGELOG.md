@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1812/1812 | Cache: robco-terminal-v2.7.0-r31 -->
+﻿## [Unreleased]<!-- Tests: 1813/1813 | Cache: robco-terminal-v2.7.0-r32 -->
 
 ### Added
 
@@ -58,7 +58,7 @@
 - Moved three of the terminal's background timers — the on-screen uptime clock, the periodic "memory cycle" flash, and the behind-the-scenes power-on-hours bookkeeping — onto the same living-machine engine, so they are all scheduled from one place instead of running their own separate loops. They behave exactly as before: the uptime clock and power-on log are baseline readouts that always run, and the memory-cycle flash is ambient flavour that shows at Full and Balanced immersion and stays quiet at Minimal (unchanged from before). They pause and resume around tab-standby with the same timing as they always did. Internal reorganization only; no visible change.
 - Began building the developer/debug console that a future hacking minigame is planned to let you unlock in the live game — for now it only ever appears on the private staging build used for testing, never on the live site. It shows what the terminal's new "living machine" engine is doing in real time and lets a developer manually step it through its states while testing new atmospheric features as they're built. It is purely a testing aid today: it never touches your campaign, save, or stats, and a player on the real site will never see any trace of it until that future unlock exists.
 - Fixed the developer/debug console's manual state-forcing buttons — previously only one of the seven actually did anything, since they tried to move the engine through the same real-world-only transitions it uses during normal play. Every button can now force the engine directly into any state for testing, with no change to how the engine behaves for real users.
-- Fixed a rough edge in the "living machine" engine's tab-standby handling, found while testing the new power-down behaviour above: if a shutdown ever happened right after the terminal went into standby, it would still play the "welcome back" tone and chat message a moment later, even though the terminal had moved on to powering down. That sequence isn't reachable in normal play yet, but it's now guarded against for when it is. Internal only.
+- Fixed a rough edge in the "living machine" engine's tab-standby handling, found while testing the new power-down behaviour above: the "welcome back" tone and chat message are meant to play only when you're genuinely returning to the terminal, never when it's powering down — but a shutdown landing right at the start of that return, or partway through the brief moment it takes to fully re-sync, could still let one or both slip through. Both cases are now guarded against directly. That sequence isn't reachable in normal play yet, but it's fixed for when it is. Internal only.
 
 ---
 
