@@ -59,6 +59,11 @@ let _featureFlags = {
   aiChat: true,
   keySync: true,
   saveMigration: true,
+  // P7: retry a USER-INITIATED manual cloud push that failed while offline. Default
+  // enabled (fail-open, Protocol 33); with it off, a manual push behaves exactly as
+  // today (fails/no-ops offline, nothing queued). The remote /config/flags doc can
+  // flip features.offlineQueue to disable it live (Protocol 32/35).
+  offlineQueue: true,
 };
 try {
   // cloud.js is the one ES module in the boot chain; cross-file globals from the
@@ -156,7 +161,13 @@ onAuthStateChanged(auth, user => {
   _currentUser = user || null;
   if (typeof window.renderAccount === 'function') window.renderAccount();
   if (typeof window.renderSavesList === 'function') window.renderSavesList();
-  if (user && !user.isAnonymous) loadGeminiKeyFromCloud();
+  if (user && !user.isAnonymous) {
+    loadGeminiKeyFromCloud();
+    // P7: a signed-in user may have pushes queued from an earlier offline session —
+    // retry them now (retry-only; never an auto-push of un-pushed state). flushCloudQueue
+    // is a hoisted module fn defined below; it no-ops if the queue is empty or offline.
+    flushCloudQueue();
+  }
 });
 
 // Boot: drain any in-flight redirect first, then establish anonymous baseline.
@@ -256,6 +267,80 @@ window.getAccountState = function () {
   };
 };
 
+// Build the cloud-save payload from the CURRENT live campaign (snapshot + hash).
+// Boundary: never read the global `state` directly from this module — go through
+// the sanctioned state.js accessor (Protocol 23). snapshotActiveCampaign() flushes
+// the live state into window.robco_v8 under the active game context. `uid` is
+// stamped so a queued push is scoped to the account that created it (auth-change
+// safety at flush time). Only ever called from saveCurrentToCloud (manual button).
+function _buildSavePayload(label) {
+  window.snapshotActiveCampaign();
+  localStorage.setItem('robco_v8', JSON.stringify(window.robco_v8));
+  const chatRaw = localStorage.getItem('robco_chat');
+  const chat = chatRaw ? JSON.parse(chatRaw) : [];
+  const playstyle = localStorage.getItem('robco_playstyle') || 'any';
+  const contentHash =
+    typeof window.computeSaveChecksum === 'function'
+      ? window.computeSaveChecksum(window.robco_v8, chat, playstyle)
+      : '';
+  return {
+    label,
+    gameContext: window.robco_v8.activeContext,
+    contentHash,
+    robco_v8: window.robco_v8,
+    chat,
+    playstyle,
+    uid: _currentUid,
+    queuedAt: Date.now(),
+  };
+}
+
+// The SINGLE additive cloud-save uploader (Protocol 22/34) — used by BOTH the
+// direct manual push and the offline-queue flush, so there is one uploader, never a
+// forked second one. Dedups against the user's existing saves by contentHash and,
+// if new, addDoc's it (ADDITIVE — never setDoc/overwrite). Returns 'duplicate' if
+// an identical save already exists, else 'ok'. Throws on a real network failure
+// (the caller decides whether to queue it). Assumes the caller already verified
+// cloudSync enabled + signed-in non-anonymous.
+async function _uploadSaveDoc(payload) {
+  const col = collection(db, 'users', _currentUid, 'saves');
+  let existingDocs = [];
+  try {
+    const snap = await getDocs(col);
+    snap.forEach(d => existingDocs.push(d.data()));
+  } catch (_) {}
+  if (payload.contentHash && existingDocs.some(d => d.contentHash === payload.contentHash)) {
+    return 'duplicate';
+  }
+  const now = Date.now();
+  await addDoc(col, {
+    schema: 2,
+    version: window.APP_VERSION || '2.7.0',
+    savedAt: now,
+    updatedAt: now,
+    label: payload.label,
+    gameContext: payload.gameContext,
+    contentHash: payload.contentHash,
+    robco_v8: payload.robco_v8,
+    chat: payload.chat,
+    playstyle: payload.playstyle,
+  });
+  return 'ok';
+}
+
+// Recognise a connectivity/network failure (vs a permission/logic error) so ONLY a
+// genuine offline failure is queued for retry.
+function _isOfflineError(e) {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return true;
+  const code = (e && e.code) || '';
+  const msg = ((e && e.message) || '').toLowerCase();
+  return (
+    code === 'unavailable' ||
+    code === 'auth/network-request-failed' ||
+    /network|offline|unavailable|failed to fetch/.test(msg)
+  );
+}
+
 window.saveCurrentToCloud = async function () {
   if (!window.isFeatureEnabled('cloudSync')) {
     if (typeof openModal === 'function')
@@ -274,66 +359,130 @@ window.saveCurrentToCloud = async function () {
   const finalLabel = (labelInput && labelInput.trim()) || new Date().toLocaleDateString();
   const btn = document.getElementById('btnSaveToCloud');
   if (btn) btn.innerText = '> SAVING...';
+  const payload = _buildSavePayload(finalLabel);
+  // OFFLINE (pre-check): the user pressed the button while offline. If the queue is
+  // enabled, defer THEIR push (never a push they didn't initiate) and flush it when
+  // connectivity returns; if disabled, fall through to today's behavior below.
+  if (
+    window.isFeatureEnabled('offlineQueue') &&
+    typeof navigator !== 'undefined' &&
+    navigator.onLine === false
+  ) {
+    const queued = await window.enqueueCloudPush(payload);
+    if (btn) btn.innerText = '> SAVE CURRENT TO CLOUD';
+    if (typeof openModal === 'function')
+      openModal({
+        title: '> SAVE TO CLOUD',
+        body: queued
+          ? 'OFFLINE — SAVE QUEUED. It will upload automatically when you reconnect.'
+          : 'OFFLINE — cloud save could not be queued on this device.',
+      });
+    return;
+  }
   try {
-    // Boundary: never read the global `state` directly from this module — go through
-    // the sanctioned state.js accessor (Protocol 23). snapshotActiveCampaign() flushes
-    // the live state into window.robco_v8 under the active game context and returns it.
-    window.snapshotActiveCampaign();
-    localStorage.setItem('robco_v8', JSON.stringify(window.robco_v8));
-    const chatRaw = localStorage.getItem('robco_chat');
-    const chat = chatRaw ? JSON.parse(chatRaw) : [];
-    const playstyle = localStorage.getItem('robco_playstyle') || 'any';
-    const ctx = window.robco_v8.activeContext;
-    const contentHash =
-      typeof window.computeSaveChecksum === 'function'
-        ? window.computeSaveChecksum(window.robco_v8, chat, playstyle)
-        : '';
-    // Dedup: skip if identical save already exists in cloud
-    const col = collection(db, 'users', _currentUid, 'saves');
-    let existingDocs = [];
-    try {
-      const snap = await getDocs(col);
-      snap.forEach(d => existingDocs.push(d.data()));
-    } catch (_) {}
-    if (contentHash && existingDocs.some(d => d.contentHash === contentHash)) {
+    const res = await _uploadSaveDoc(payload);
+    if (res === 'duplicate') {
       if (typeof openModal === 'function')
         openModal({
           title: '> SAVE TO CLOUD',
           body: 'IDENTICAL SAVE ALREADY IN CLOUD — no new save created.',
         });
-      if (btn) btn.innerText = '> SAVE CURRENT TO CLOUD';
       return;
     }
-    const now = Date.now();
-    await addDoc(col, {
-      schema: 2,
-      version: window.APP_VERSION || '2.7.0',
-      savedAt: now,
-      updatedAt: now,
-      label: finalLabel,
-      gameContext: ctx,
-      contentHash,
-      robco_v8: window.robco_v8,
-      chat,
-      playstyle,
-    });
-    localStorage.setItem('robco_last_cloud_push', now.toString());
+    localStorage.setItem('robco_last_cloud_push', Date.now().toString());
     if (typeof playSyncTone === 'function') playSyncTone();
     if (typeof openModal === 'function')
       openModal({ title: '> SAVE TO CLOUD', body: 'SAVED TO CLOUD: "' + finalLabel + '"' });
     if (typeof window.renderSavesList === 'function') window.renderSavesList();
   } catch (e) {
     console.error('saveCurrentToCloud failed:', e);
-    _recordFeatureFailure(
-      'cloudSync',
-      '>> CLOUD SYNC PAUSED after repeated errors — using local saves. Reload to retry. <<'
-    );
-    if (typeof openModal === 'function')
-      openModal({ title: '> SAVE TO CLOUD', body: 'CLOUD NETWORK FAILURE' });
+    // A genuine connectivity failure mid-push → queue THIS user-initiated push for
+    // retry (kill-switch-gated). Any other error → today's behavior (record + modal).
+    if (window.isFeatureEnabled('offlineQueue') && _isOfflineError(e)) {
+      const queued = await window.enqueueCloudPush(payload);
+      if (typeof openModal === 'function')
+        openModal({
+          title: '> SAVE TO CLOUD',
+          body: queued
+            ? 'NETWORK UNAVAILABLE — SAVE QUEUED. It will upload automatically when you reconnect.'
+            : 'CLOUD NETWORK FAILURE',
+        });
+    } else {
+      _recordFeatureFailure(
+        'cloudSync',
+        '>> CLOUD SYNC PAUSED after repeated errors — using local saves. Reload to retry. <<'
+      );
+      if (typeof openModal === 'function')
+        openModal({ title: '> SAVE TO CLOUD', body: 'CLOUD NETWORK FAILURE' });
+    }
   } finally {
     if (btn) btn.innerText = '> SAVE CURRENT TO CLOUD';
   }
 };
+
+// ── OFFLINE CLOUD-PUSH QUEUE FLUSH (P7) ──────────────────────────────────────
+// Retries the user-initiated pushes queued while offline (state.js data layer),
+// using the SAME additive _uploadSaveDoc path (Protocol 22/34). Triggered by the
+// browser 'online' event and on sign-in — NEVER by a save/state change (cloud sync
+// stays manual-only). Every guard the manual button applies still holds: killed
+// flag → no-op; signed-out/anonymous → no-op; offline → no-op. Items are uid-scoped
+// so a different account signing in never flushes the previous user's queued pushes.
+// An item that uploads ('ok') or is already in the cloud ('duplicate') is dropped
+// from the queue; a network failure stops the flush and leaves the rest queued
+// (bounded retry) — never lost, never duplicated (the contentHash dedup in
+// _uploadSaveDoc). Reentrancy-guarded for this tab.
+let _flushingQueue = false;
+async function flushCloudQueue() {
+  if (!window.isFeatureEnabled('offlineQueue') || !window.isFeatureEnabled('cloudSync')) return;
+  if (!_currentUid || !_currentUser || _currentUser.isAnonymous) return; // auth guard
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+  if (_flushingQueue) return;
+  _flushingQueue = true;
+  try {
+    const queue = await window.readCloudQueue();
+    if (!queue.length) return;
+    const remaining = [];
+    let flushed = 0;
+    let stopped = false;
+    for (const item of queue) {
+      // Keep (don't send) another account's queued pushes and anything after a
+      // network stop — bounded retry, never lost.
+      if (stopped || !item || item.uid !== _currentUid) {
+        remaining.push(item);
+        continue;
+      }
+      try {
+        await _uploadSaveDoc(item); // 'ok' or 'duplicate' → done, not re-queued
+        flushed++;
+      } catch (_) {
+        remaining.push(item);
+        stopped = true; // network down again — stop, keep this + the rest
+      }
+    }
+    if (remaining.length !== queue.length) await window.writeCloudQueue(remaining);
+    if (flushed > 0) {
+      if (typeof playSyncTone === 'function') playSyncTone();
+      if (typeof appendToChat === 'function')
+        appendToChat(
+          '> [CLOUD] ' + flushed + ' queued save(s) uploaded on reconnect.',
+          'sys',
+          true
+        );
+      if (typeof window.renderSavesList === 'function') window.renderSavesList();
+    }
+  } finally {
+    _flushingQueue = false;
+  }
+}
+window.flushCloudQueue = flushCloudQueue;
+
+// Flush the offline queue the moment connectivity returns (retry-only — never an
+// auto-push of un-pushed state). Guarded + no-op when nothing is queued.
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => {
+    flushCloudQueue();
+  });
+}
 
 // ── contentHash: reuse the global computeSaveChecksum helper from state.js ─
 // (Protocol 22: extend existing rather than duplicate)

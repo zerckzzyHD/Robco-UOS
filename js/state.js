@@ -562,6 +562,70 @@ async function pushSlotVersion(n, priorEnv) {
 }
 window.pushSlotVersion = pushSlotVersion;
 
+// ── OFFLINE CLOUD-PUSH QUEUE (per-device) — Step 2 · Phase 1 · P7 (data layer) ──
+// A bounded, device-local queue of USER-INITIATED cloud pushes that could not be
+// sent because the device was offline / the network failed. It exists ONLY to
+// retry a push the user ALREADY chose (the manual SAVE TO CLOUD button) once
+// connectivity returns — it NEVER enqueues on a state/stat change, so cloud sync
+// stays manual-only (Prohibited Patterns). Lives IDB-ONLY in the 'campaign' object
+// store (key cloud_queue) because each item carries a campaign save payload
+// (robco_v8 + chat) — boundary-correct (Protocol 23), never the 'meta' device
+// store. Bounded (CLOUD_QUEUE_CAP) + deduped by contentHash so the same push queued
+// twice can't multiply. Survives reload. FAIL-SAFE: no IndexedDB → the queue can't
+// persist, so enqueue no-ops and a manual push degrades to exactly today's behavior.
+// Game-agnostic (Protocol 38). Never throws. The FLUSH orchestration (auth/online
+// guards, the additive re-push) lives in cloud.js; this is only the storage layer.
+const CLOUD_QUEUE_CAP = 20;
+const CLOUD_QUEUE_IDB_KEY = 'cloud_queue';
+
+// Async: the pending-push queue (oldest first), or [] when IndexedDB is
+// unavailable / empty / on any error. Never throws.
+async function readCloudQueue() {
+  try {
+    if (!window.IdbStore) return [];
+    const q = await window.IdbStore.get('campaign', CLOUD_QUEUE_IDB_KEY);
+    return Array.isArray(q) ? q : [];
+  } catch (_) {
+    return [];
+  }
+}
+window.readCloudQueue = readCloudQueue;
+
+// Async: append a user-initiated push (oldest-first), DEDUPED by contentHash (the
+// same push queued twice is a no-op) and bounded to CLOUD_QUEUE_CAP (drops the
+// oldest when full). No-op when IndexedDB is unavailable or the item is falsy.
+// Returns true if the item is now queued (or was already present), false if it
+// could not be persisted. Never throws.
+async function enqueueCloudPush(item) {
+  try {
+    if (!window.IdbStore || !item) return false;
+    const q = await readCloudQueue();
+    if (item.contentHash && q.some(x => x && x.contentHash === item.contentHash)) return true;
+    q.push(item);
+    return (
+      (await window.IdbStore.set('campaign', CLOUD_QUEUE_IDB_KEY, q.slice(-CLOUD_QUEUE_CAP))) ===
+      true
+    );
+  } catch (_) {
+    return false;
+  }
+}
+window.enqueueCloudPush = enqueueCloudPush;
+
+// Async: replace the queue with `arr` (bounded to CLOUD_QUEUE_CAP) — used by the
+// flush to persist the remaining (failed / other-user) items in one write. No-op /
+// never throws when IndexedDB is unavailable.
+async function writeCloudQueue(arr) {
+  try {
+    if (!window.IdbStore) return false;
+    const next = Array.isArray(arr) ? arr.slice(-CLOUD_QUEUE_CAP) : [];
+    return (await window.IdbStore.set('campaign', CLOUD_QUEUE_IDB_KEY, next)) === true;
+  } catch (_) {
+    return false;
+  }
+}
+window.writeCloudQueue = writeCloudQueue;
+
 // ── FACTION REGISTRY ─────────────────────────────────────────────
 const FACTION_REGISTRY = [
   { key: 'ncr', name: 'NCR', tier: 'major' },

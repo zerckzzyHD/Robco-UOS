@@ -21,7 +21,7 @@
     or the canonical suites change, update this file in the SAME commit and bump
     the suite count marker. The gate fails on drift.
 
-    Suites: 16
+    Suites: 17
 -->
 <html lang="en">
   <head>
@@ -1245,6 +1245,89 @@
           assert(
             false,
             'FATAL: P6 full-backup bundle suite threw',
+            String((err && err.stack) || err)
+          );
+        }
+
+        // ── Suite 16 — P7 offline cloud-push queue storage (REAL IndexedDB) ───
+        // Proves the device-local queue's storage layer round-trips through the
+        // browser's native IndexedDB using the real state.js accessors
+        // (readCloudQueue / enqueueCloudPush / writeCloudQueue): enqueue+read,
+        // contentHash dedup, the CLOUD_QUEUE_CAP bound, replace-write, the two-store
+        // boundary (never 'meta'), and the fail-safe (no IDB → [] / false / no-op).
+        // The flush orchestration lives in cloud.js (not loaded here) and is covered
+        // structurally by the canonical runners' Suite 144.
+        try {
+          section('Suite 16 — P7 offline cloud-push queue storage (real IndexedDB)');
+          const mkItem = (h, uid) => ({
+            label: 'S' + h,
+            contentHash: h,
+            uid: uid || 'userA',
+            robco_v8: { x: h },
+            chat: [],
+            playstyle: 'any',
+            gameContext: 'FNV',
+          });
+          await window.IdbStore.remove('campaign', 'cloud_queue');
+
+          // 1) ENQUEUE + READ + DEDUP: two distinct queue; a repeat contentHash no-ops.
+          await window.enqueueCloudPush(mkItem('aaa'));
+          await window.enqueueCloudPush(mkItem('bbb'));
+          await window.enqueueCloudPush(mkItem('aaa'));
+          const q1 = await window.readCloudQueue();
+          assert(
+            q1.length === 2 && q1[0].contentHash === 'aaa' && q1[1].contentHash === 'bbb',
+            'enqueue+read+dedup: distinct pushes queue oldest-first; the same push queued twice is deduped by contentHash'
+          );
+
+          // 2) BOUND: 25 distinct pushes retain only the newest CLOUD_QUEUE_CAP (20).
+          await window.IdbStore.remove('campaign', 'cloud_queue');
+          for (let i = 0; i < 25; i++) await window.enqueueCloudPush(mkItem('h' + i));
+          const q2 = await window.readCloudQueue();
+          assert(
+            q2.length === 20 && q2[0].contentHash === 'h5' && q2[19].contentHash === 'h24',
+            'bounded: the queue caps at CLOUD_QUEUE_CAP (20), dropping the oldest pending pushes'
+          );
+
+          // 3) REPLACE-WRITE: writeCloudQueue swaps the whole queue (flush persists remaining).
+          await window.writeCloudQueue([mkItem('z1'), mkItem('z2')]);
+          const q3 = await window.readCloudQueue();
+          assert(
+            q3.length === 2 && q3[0].contentHash === 'z1' && q3[1].contentHash === 'z2',
+            'writeCloudQueue replaces the queue wholesale (used by the flush to persist the remaining items)'
+          );
+
+          // 4) TWO-STORE BOUNDARY: the queue never lands in the device 'meta' store.
+          const metaLeak16 = await window.IdbStore.get('meta', 'cloud_queue');
+          assert(
+            metaLeak16 === null,
+            "two-store boundary: the cloud-push queue lives in the 'campaign' store only, never the device 'meta' store"
+          );
+
+          // 5) FAIL-SAFE: with IndexedDB removed, read → [], enqueue/write → false, no throw.
+          const realIdb16 = window.IdbStore;
+          window.IdbStore = undefined;
+          let failSafe16 = false;
+          try {
+            const r = await window.readCloudQueue();
+            const e = await window.enqueueCloudPush(mkItem('x'));
+            const w = await window.writeCloudQueue([mkItem('x')]);
+            failSafe16 = Array.isArray(r) && r.length === 0 && e === false && w === false;
+          } catch (_) {
+            failSafe16 = false;
+          }
+          window.IdbStore = realIdb16;
+          assert(
+            failSafe16,
+            'fail-safe: with IndexedDB unavailable, the queue accessors return [] / false and never throw (a manual push degrades to today)'
+          );
+
+          // Tidy up.
+          await window.IdbStore.remove('campaign', 'cloud_queue');
+        } catch (err) {
+          assert(
+            false,
+            'FATAL: P7 cloud-queue storage suite threw',
             String((err && err.stack) || err)
           );
         }

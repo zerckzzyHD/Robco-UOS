@@ -64,8 +64,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    1737-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    1737-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    1749-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    1749-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -160,6 +160,28 @@ Scripts are loaded via `<script>` tags in `index.html` in this exact order:
    is a device-local ephemeral safety net, not primary portable data. FAIL-SAFE: export reads through
    the IDB-primary accessors, so with no IndexedDB it simply exports whatever localStorage holds
    (version rings empty), and import degrades to localStorage writes.
+
+   P7 (offline cloud-push queue, js/state.js data layer + js/cloud.js orchestration): resilience for a
+   USER-INITIATED manual cloud push ONLY — it NEVER auto-pushes on a state/stat change (cloud sync
+   stays manual-only; guarded by Suite 23.4/23.5 + Suite 144.11). When the user taps SAVE TO CLOUD
+   while offline (navigator.onLine === false) or the push fails with a connectivity error
+   (_isOfflineError), THAT push is enqueued and flushed automatically when connectivity returns — the
+   only thing that becomes automatic is the RETRY of an action the user already chose. The queue is
+   device-local, bounded (CLOUD_QUEUE_CAP), deduped by contentHash (the same push queued twice can't
+   multiply), and lives IDB-ONLY in the 'campaign' object store (key cloud_queue) because each item
+   carries a campaign save payload — boundary-correct (Protocol 23), never the 'meta' device store.
+   Data layer (state.js): readCloudQueue / enqueueCloudPush / writeCloudQueue. Orchestration (cloud.js):
+   a single additive uploader _uploadSaveDoc (addDoc — never setDoc; Protocol 22/34) is reused by BOTH
+   the direct manual push and flushCloudQueue, so there is one uploader. flushCloudQueue is triggered by
+   the browser 'online' event and on sign-in (onAuthStateChanged) — never by a save path — and applies
+   every guard the manual button uses: the offlineQueue kill-switch flag (Protocol 32/33, remotely
+   disable-able via /config/flags), a non-anonymous auth check, an online check, a per-tab reentrancy
+   flag, and uid-scoping (a queued push is stamped with the account that created it, so a different
+   account signing in never flushes the previous user's queue). An item that uploads or is already in
+   the cloud (contentHash duplicate) is dropped from the queue; a network failure stops the flush and
+   re-persists the remaining items (bounded retry — never lost, never duplicated). FAIL-SAFE: no
+   IndexedDB / kill-switch off → the queue isn't offered and a manual push behaves exactly as today
+   (fails/no-ops offline). Airplane-mode operation is unaffected.
    ── Per-game boot manifest (GAME_FILES in index.html; order preserved via script.async = false) ──
 1. js/db_nv.js / js/db_fo3.js → defines: databaseCSVs, lookupItemInDb (game-specific CSV data;
                        the active pair is selected by the GAME_FILES manifest, FNV fail-safe)
@@ -1307,7 +1329,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1737-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1749-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

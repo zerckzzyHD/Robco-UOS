@@ -3700,21 +3700,23 @@ $cloudSrc63 = Read-Src "js/cloud.js"
 Check ([bool]($cloudSrc63 -match 'window\.saveCurrentToCloud\s*=')) `
     'cloud.js defines window.saveCurrentToCloud (replaces pushToCloud)'
 
-# 63.2  saveCurrentToCloud uses addDoc (additive) and not setDoc (Protocol 34).
-#       Window widened from 2000 (Step 2 Phase 0 U12 -- openModal() call sites
-#       replacing alert() pushed addDoc( further from the function start).
-$scIdx63 = $cloudSrc63.IndexOf('saveCurrentToCloud')
-$scSlice63 = if ($scIdx63 -ge 0) { $cloudSrc63.Substring($scIdx63, [Math]::Min(2800, $cloudSrc63.Length - $scIdx63)) } else { '' }
-Check (([bool]($scSlice63 -match '\baddDoc\b')) -and -not ([bool]($scSlice63 -match '\bsetDoc\b'))) `
-    'saveCurrentToCloud uses addDoc (additive) and not setDoc (Protocol 34 -- no blind overwrite)'
+# 63.2  the cloud SAVE write is additive -- addDoc, not setDoc (Protocol 34).
+#       P7 (Step 2 Phase 1) extracted the write into the shared _uploadSaveDoc
+#       uploader (reused by the manual push AND the offline-queue flush).
+$uploadBody63 = Get-FunctionBody $cloudSrc63 '_uploadSaveDoc'
+Check (([bool]($uploadBody63 -match '\baddDoc\b')) -and -not ([bool]($uploadBody63 -match '\bsetDoc\b'))) `
+    'cloud save write uses addDoc (additive) and not setDoc -- _uploadSaveDoc (Protocol 34 -- no blind overwrite)'
 
-# 63.3  saveCurrentToCloud guards anonymous users
+# 63.3  saveCurrentToCloud guards anonymous users (anchor on the assignment so a
+#       helper comment mentioning the name doesn't shift the window -- P7 refactor)
+$scIdx63 = $cloudSrc63.IndexOf('window.saveCurrentToCloud')
+$scSlice63 = if ($scIdx63 -ge 0) { $cloudSrc63.Substring($scIdx63, [Math]::Min(2000, $cloudSrc63.Length - $scIdx63)) } else { '' }
 Check ([bool]($scSlice63 -match 'isAnonymous')) `
     'saveCurrentToCloud has isAnonymous guard (cannot save to cloud when not signed in)'
 
-# 63.4  saveCurrentToCloud deduplicates by contentHash
-Check ([bool]($scSlice63 -match 'contentHash')) `
-    'saveCurrentToCloud deduplicates by contentHash (prevents duplicate cloud saves)'
+# 63.4  the cloud save deduplicates by contentHash (now in the shared uploader)
+Check ([bool]($uploadBody63 -match 'contentHash')) `
+    'cloud save deduplicates by contentHash (prevents duplicate cloud saves) -- _uploadSaveDoc'
 
 # 63.5  renderSavesList() defined in ui.js (unified local+cloud list)
 Check (([bool]($uiSrc -match 'async function renderSavesList\s*\(')) -or ([bool]($uiSrc -match 'function renderSavesList\s*\('))) `
@@ -9823,6 +9825,130 @@ Check (
 Check (
     -not (($buildBody143 + $verifyCkBody143 + $applyBody143 + $exportBody143 + $importBody143) -match 'FNV|FO3|Fallout|New Vegas|Mojave|Capital Wasteland')
 ) '143.13: the P6 full-backup bundle code is game-agnostic (no game literals)'
+
+# ===========================================================
+# Suite 144 -- Step 2 (v2.8.0) Phase 1 P7: Offline cloud-push queue (12 tests).
+# Mirrors JS Suite 144. Resilience for a USER-INITIATED manual cloud push ONLY --
+# NEVER an auto-push on a state/stat change (cloud sync stays manual-only). A push
+# the user pressed while offline / that failed on network is enqueued (device-local,
+# IDB 'campaign' store, bounded + contentHash-deduped) and flushed on reconnect via
+# the SAME additive addDoc uploader (_uploadSaveDoc; Protocol 22/34), gated by the
+# offlineQueue kill-switch flag (Protocol 32/33) + every manual-button auth guard.
+# The storage round-trip is proven live in tests/test.html (Suite 16).
+# ===========================================================
+Sep "Suite 144 -- P7 offline cloud-push queue (manual-push resilience)"
+$state144 = Read-Src "js/state.js"
+$cloud144 = Read-Src "js/cloud.js"
+$uiCore144 = Read-Src "js/ui-core.js"
+$api144 = Read-Src "js/api.js"
+$readQ144 = Get-FunctionBody $state144 'readCloudQueue'
+$enqQ144 = Get-FunctionBody $state144 'enqueueCloudPush'
+$writeQ144 = Get-FunctionBody $state144 'writeCloudQueue'
+$saveStateBody144 = Get-FunctionBody $state144 'saveState'
+$flushBody144 = Get-FunctionBody $cloud144 'flushCloudQueue'
+$uploadBody144 = Get-FunctionBody $cloud144 '_uploadSaveDoc'
+$updateMathBody144 = Get-FunctionBody $uiCore144 'updateMath'
+$autoImportBody144 = Get-FunctionBody $api144 'autoImportState'
+# saveCurrentToCloud is a window-assignment expression -- brace-match from it.
+$scStart144 = $cloud144.IndexOf('window.saveCurrentToCloud =')
+$saveCloudBody144 = ''
+if ($scStart144 -ge 0) {
+    $b = $cloud144.IndexOf('{', $scStart144); $d = 0
+    for ($j = $b; $j -lt $cloud144.Length; $j++) {
+        if ($cloud144[$j] -eq '{') { $d++ } elseif ($cloud144[$j] -eq '}') { $d--; if ($d -eq 0) { $saveCloudBody144 = $cloud144.Substring($b, $j - $b + 1); break } }
+    }
+}
+
+# 144.1  the queue data-layer API is defined + exposed on window
+Check (
+    ($state144 -match 'const CLOUD_QUEUE_CAP =') -and
+    ($state144 -match 'const CLOUD_QUEUE_IDB_KEY =') -and
+    ($state144 -match 'async function readCloudQueue\s*\(') -and
+    ($state144 -match 'window\.readCloudQueue = readCloudQueue') -and
+    ($state144 -match 'async function enqueueCloudPush\s*\(') -and
+    ($state144 -match 'window\.enqueueCloudPush = enqueueCloudPush') -and
+    ($state144 -match 'async function writeCloudQueue\s*\(') -and
+    ($state144 -match 'window\.writeCloudQueue = writeCloudQueue')
+) '144.1: state.js defines CLOUD_QUEUE_CAP/CLOUD_QUEUE_IDB_KEY + exposes readCloudQueue / enqueueCloudPush / writeCloudQueue'
+
+# 144.2  BOUNDARY: the queue uses the 'campaign' store only, never 'meta'
+Check (
+    ($readQ144 -match "'campaign'") -and ($enqQ144 -match "'campaign'") -and ($writeQ144 -match "'campaign'") -and
+    (-not ($readQ144 -match "'meta'")) -and (-not ($enqQ144 -match "'meta'")) -and (-not ($writeQ144 -match "'meta'"))
+) "144.2: the cloud-push queue uses the 'campaign' object store only, never 'meta' (two-store boundary -- the payload is campaign save data)"
+
+# 144.3  enqueue dedups by contentHash + is bounded (slice to CLOUD_QUEUE_CAP)
+Check (
+    ($enqQ144 -match 'x\.contentHash === item\.contentHash') -and
+    ($enqQ144 -match '\.slice\(-CLOUD_QUEUE_CAP\)')
+) '144.3: enqueueCloudPush dedups by contentHash (same push twice is a no-op) and caps the queue at CLOUD_QUEUE_CAP'
+
+# 144.4  FAIL-SAFE: the accessors guard on window.IdbStore and never throw
+Check (
+    ($readQ144 -match 'if \(!window\.IdbStore\) return \[\];') -and
+    ($readQ144 -match 'catch \(_\) \{\s*return \[\];') -and
+    ($enqQ144 -match 'if \(!window\.IdbStore \|\| !item\) return false;') -and
+    ($enqQ144 -match 'catch \(_\) \{\s*return false;')
+) '144.4: the queue accessors guard on window.IdbStore and are wrapped so they never throw (fail-safe -> [] / false)'
+
+# 144.5  kill-switch: offlineQueue flag registered + gates the enqueue + flush
+Check (
+    ($cloud144 -match 'offlineQueue: true') -and
+    ($saveCloudBody144 -match "isFeatureEnabled\('offlineQueue'\)") -and
+    ($flushBody144 -match "isFeatureEnabled\('offlineQueue'\)")
+) "144.5: cloud.js registers the offlineQueue kill-switch flag (default enabled) and gates both enqueue and flush on isFeatureEnabled('offlineQueue') (Protocol 32/33)"
+
+# 144.6  Protocol 22/34: ONE additive uploader used by BOTH push + flush
+Check (
+    ($cloud144 -match 'async function _uploadSaveDoc\s*\(') -and
+    ($uploadBody144 -match 'addDoc\(') -and
+    (-not ($uploadBody144 -match 'setDoc\(')) -and
+    ($saveCloudBody144 -match '_uploadSaveDoc\(') -and
+    ($flushBody144 -match '_uploadSaveDoc\(')
+) '144.6: a single additive uploader _uploadSaveDoc (addDoc, never setDoc -- Protocol 34) is reused by BOTH saveCurrentToCloud and flushCloudQueue (Protocol 22 -- no forked uploader)'
+
+# 144.7  enqueue happens ONLY on offline / network-fail, ONLY in the manual push
+Check (
+    ($saveCloudBody144 -match 'navigator\.onLine === false') -and
+    ($saveCloudBody144 -match '_isOfflineError\(e\)') -and
+    ($saveCloudBody144 -match 'enqueueCloudPush\(payload\)') -and
+    (-not ($flushBody144 -match 'enqueueCloudPush'))
+) '144.7: saveCurrentToCloud enqueues only on an offline/network failure of the user-pressed push; the flush never enqueues (retry-only)'
+
+# 144.8  flush guards: kill-switch + auth (non-anonymous) + online + reentrancy + uid-scope
+Check (
+    ($flushBody144 -match '_currentUser\.isAnonymous') -and
+    ($flushBody144 -match 'navigator\.onLine === false') -and
+    ($flushBody144 -match '_flushingQueue') -and
+    ($flushBody144 -match 'item\.uid !== _currentUid')
+) '144.8: flushCloudQueue is guarded by cloudSync/offlineQueue + a non-anonymous auth check + online + a reentrancy flag, and is uid-scoped (only the current account queued pushes flush)'
+
+# 144.9  flush drops sent/duplicate items, keeps failed ones (bounded retry)
+Check (
+    ($flushBody144 -match 'remaining\.push\(item\)') -and
+    ($flushBody144 -match 'stopped = true') -and
+    ($flushBody144 -match 'writeCloudQueue\(remaining\)') -and
+    ($uploadBody144 -match 'contentHash')
+) '144.9: flushCloudQueue drops uploaded/duplicate items and re-persists the remaining (failed) ones -- bounded retry, never lost, never duplicated (contentHash dedup in _uploadSaveDoc)'
+
+# 144.10  flush is triggered by connectivity return + sign-in -- NEVER a save path
+Check (
+    ($cloud144 -match "addEventListener\('online',") -and
+    ($cloud144 -match 'flushCloudQueue\(\)') -and
+    ($cloud144 -match 'onAuthStateChanged')
+) "144.10: the flush is wired to the 'online' connectivity event and to sign-in (onAuthStateChanged), not to any save/state-change path"
+
+# 144.11  NEVER-AUTO-PUSH invariant (extends Suite 23.4/23.5)
+Check (
+    (-not ($saveStateBody144 -match 'enqueueCloudPush|flushCloudQueue|saveCurrentToCloud|_uploadSaveDoc')) -and
+    (-not ($updateMathBody144 -match 'enqueueCloudPush|flushCloudQueue|_uploadSaveDoc')) -and
+    (-not ($autoImportBody144 -match 'enqueueCloudPush|flushCloudQueue|saveCurrentToCloud|_uploadSaveDoc'))
+) '144.11: never-auto-push -- saveState / updateMath / autoImportState never enqueue, flush, or push to the cloud (cloud sync stays manual-only)'
+
+# 144.12  game-agnostic (Protocol 38): the queue + flush code has no game literals
+Check (
+    -not (($readQ144 + $enqQ144 + $writeQ144 + $flushBody144 + $uploadBody144) -match 'FNV|FO3|Fallout|New Vegas|Mojave|Capital Wasteland')
+) '144.12: the P7 queue + flush code is game-agnostic (no game literals)'
 
 # ===========================================================
 # Results

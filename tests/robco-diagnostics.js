@@ -6438,21 +6438,24 @@ header('Suite 63 — Save/Cloud UI consolidation guards');
     'cloud.js defines window.saveCurrentToCloud (replaces pushToCloud)'
   );
 
-  // 63.2  saveCurrentToCloud uses addDoc (additive) and not setDoc (Protocol 34).
-  //       Window widened from 2000 (Step 2 Phase 0 U12 — openModal() call sites
-  //       replacing alert() pushed addDoc( further from the function start).
+  // 63.2  the cloud SAVE write is additive — addDoc, not setDoc (Protocol 34).
+  //       P7 (Step 2 Phase 1) extracted the write into the shared _uploadSaveDoc
+  //       uploader (reused by the manual push AND the offline-queue flush).
   {
-    const scIdx = cloudSrc63.indexOf('saveCurrentToCloud');
-    const scSlice = scIdx >= 0 ? cloudSrc63.slice(scIdx, scIdx + 2800) : '';
+    let uploadBody63 = '';
+    try {
+      uploadBody63 = extractFunctionBody(cloudSrc63, '_uploadSaveDoc');
+    } catch (_) {}
     assert(
-      /\baddDoc\b/.test(scSlice) && !/\bsetDoc\b/.test(scSlice),
-      'saveCurrentToCloud uses addDoc (additive) and not setDoc (Protocol 34 — no blind overwrite)'
+      /\baddDoc\b/.test(uploadBody63) && !/\bsetDoc\b/.test(uploadBody63),
+      'cloud save write uses addDoc (additive) and not setDoc — _uploadSaveDoc (Protocol 34 — no blind overwrite)'
     );
   }
 
-  // 63.3  saveCurrentToCloud guards anonymous users
+  // 63.3  saveCurrentToCloud guards anonymous users (anchor on the assignment so a
+  //       helper comment mentioning the name doesn't shift the window — P7 refactor)
   {
-    const scIdx = cloudSrc63.indexOf('saveCurrentToCloud');
+    const scIdx = cloudSrc63.indexOf('window.saveCurrentToCloud');
     const scSlice = scIdx >= 0 ? cloudSrc63.slice(scIdx, scIdx + 2000) : '';
     assert(
       /isAnonymous/.test(scSlice),
@@ -6460,13 +6463,15 @@ header('Suite 63 — Save/Cloud UI consolidation guards');
     );
   }
 
-  // 63.4  saveCurrentToCloud deduplicates by contentHash
+  // 63.4  the cloud save deduplicates by contentHash (now in the shared uploader)
   {
-    const scIdx = cloudSrc63.indexOf('saveCurrentToCloud');
-    const scSlice = scIdx >= 0 ? cloudSrc63.slice(scIdx, scIdx + 2000) : '';
+    let uploadBody634 = '';
+    try {
+      uploadBody634 = extractFunctionBody(cloudSrc63, '_uploadSaveDoc');
+    } catch (_) {}
     assert(
-      /contentHash/.test(scSlice),
-      'saveCurrentToCloud deduplicates by contentHash (prevents duplicate cloud saves)'
+      /contentHash/.test(uploadBody634),
+      'cloud save deduplicates by contentHash (prevents duplicate cloud saves) — _uploadSaveDoc'
     );
   }
 
@@ -16997,6 +17002,161 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       buildBody143 + verifyCkBody143 + applyBody143 + exportBody143 + importBody143
     ),
     '143.13: the P6 full-backup bundle code is game-agnostic (no game literals)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 144 — Step 2 (v2.8.0) Phase 1 P7: Offline cloud-push queue. Resilience
+//  for a USER-INITIATED manual cloud push ONLY — it NEVER auto-pushes on a
+//  state/stat change (cloud sync stays manual-only). When the user taps SAVE TO
+//  CLOUD while offline / the push fails on network, THAT push is enqueued (device-
+//  local, IDB 'campaign' store, bounded + contentHash-deduped) and flushed
+//  automatically when connectivity returns — via the SAME additive addDoc uploader
+//  (_uploadSaveDoc; Protocol 22/34), gated by the offlineQueue kill-switch flag
+//  (Protocol 32/33) and every auth guard the manual button uses. The storage layer
+//  round-trip is proven live in tests/test.html (Suite 16); this suite guards the
+//  wiring + the never-auto-push invariant. 12 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 144 — P7 offline cloud-push queue (manual-push resilience)');
+  const state144 = readFile('js/state.js');
+  const cloud144 = readFile('js/cloud.js');
+  const readQ144 = extractFunctionBody(state144, 'readCloudQueue');
+  const enqQ144 = extractFunctionBody(state144, 'enqueueCloudPush');
+  const writeQ144 = extractFunctionBody(state144, 'writeCloudQueue');
+  const saveStateBody144 = extractFunctionBody(state144, 'saveState');
+  const flushBody144 = extractFunctionBody(cloud144, 'flushCloudQueue');
+  const uploadBody144 = extractFunctionBody(cloud144, '_uploadSaveDoc');
+  // saveCurrentToCloud is a window-assignment expression — brace-match from it.
+  const _winFn144 = (src, name) => {
+    const i = src.indexOf('window.' + name + ' =');
+    if (i === -1) return '';
+    const b = src.indexOf('{', i);
+    let d = 0;
+    for (let j = b; j < src.length; j++) {
+      if (src[j] === '{') d++;
+      else if (src[j] === '}' && --d === 0) return src.slice(b, j + 1);
+    }
+    return '';
+  };
+  const saveCloudBody144 = _winFn144(cloud144, 'saveCurrentToCloud');
+  const uiSource144 = readFile('js/ui-core.js');
+  const apiSource144 = readFile('js/api.js');
+
+  // 144.1  the queue data-layer API is defined + exposed on window
+  assert(
+    /const CLOUD_QUEUE_CAP =/.test(state144) &&
+      /const CLOUD_QUEUE_IDB_KEY =/.test(state144) &&
+      /async function readCloudQueue\s*\(/.test(state144) &&
+      /window\.readCloudQueue = readCloudQueue/.test(state144) &&
+      /async function enqueueCloudPush\s*\(/.test(state144) &&
+      /window\.enqueueCloudPush = enqueueCloudPush/.test(state144) &&
+      /async function writeCloudQueue\s*\(/.test(state144) &&
+      /window\.writeCloudQueue = writeCloudQueue/.test(state144),
+    '144.1: state.js defines CLOUD_QUEUE_CAP/CLOUD_QUEUE_IDB_KEY + exposes readCloudQueue / enqueueCloudPush / writeCloudQueue'
+  );
+
+  // 144.2  BOUNDARY: the queue uses the 'campaign' store only, never 'meta'
+  assert(
+    /'campaign'/.test(readQ144) &&
+      /'campaign'/.test(enqQ144) &&
+      /'campaign'/.test(writeQ144) &&
+      !/'meta'/.test(readQ144) &&
+      !/'meta'/.test(enqQ144) &&
+      !/'meta'/.test(writeQ144),
+    "144.2: the cloud-push queue uses the 'campaign' object store only, never 'meta' (two-store boundary — the payload is campaign save data)"
+  );
+
+  // 144.3  enqueue dedups by contentHash + is bounded (slice to CLOUD_QUEUE_CAP)
+  assert(
+    /x\.contentHash === item\.contentHash/.test(enqQ144) &&
+      /\.slice\(-CLOUD_QUEUE_CAP\)/.test(enqQ144),
+    '144.3: enqueueCloudPush dedups by contentHash (same push twice is a no-op) and caps the queue at CLOUD_QUEUE_CAP'
+  );
+
+  // 144.4  FAIL-SAFE: the accessors guard on window.IdbStore and never throw
+  assert(
+    /if \(!window\.IdbStore\) return \[\];/.test(readQ144) &&
+      /catch \(_\) \{\s*return \[\];/.test(readQ144) &&
+      /if \(!window\.IdbStore \|\| !item\) return false;/.test(enqQ144) &&
+      /catch \(_\) \{\s*return false;/.test(enqQ144),
+    '144.4: the queue accessors guard on window.IdbStore and are wrapped so they never throw (fail-safe → [] / false)'
+  );
+
+  // 144.5  kill-switch: offlineQueue flag registered + gates the enqueue + flush
+  assert(
+    /offlineQueue: true/.test(cloud144) &&
+      /isFeatureEnabled\('offlineQueue'\)/.test(saveCloudBody144) &&
+      /isFeatureEnabled\('offlineQueue'\)/.test(flushBody144),
+    "144.5: cloud.js registers the offlineQueue kill-switch flag (default enabled) and gates both enqueue and flush on isFeatureEnabled('offlineQueue') (Protocol 32/33)"
+  );
+
+  // 144.6  Protocol 22/34: ONE additive uploader used by BOTH push + flush
+  assert(
+    /async function _uploadSaveDoc\s*\(/.test(cloud144) &&
+      /addDoc\(/.test(uploadBody144) &&
+      !/setDoc\(/.test(uploadBody144) &&
+      /_uploadSaveDoc\(/.test(saveCloudBody144) &&
+      /_uploadSaveDoc\(/.test(flushBody144),
+    '144.6: a single additive uploader _uploadSaveDoc (addDoc, never setDoc — Protocol 34) is reused by BOTH saveCurrentToCloud and flushCloudQueue (Protocol 22 — no forked uploader)'
+  );
+
+  // 144.7  enqueue happens ONLY on offline / network-fail, ONLY in the manual push
+  assert(
+    /navigator\.onLine === false/.test(saveCloudBody144) &&
+      /_isOfflineError\(e\)/.test(saveCloudBody144) &&
+      /enqueueCloudPush\(payload\)/.test(saveCloudBody144) &&
+      !/enqueueCloudPush/.test(flushBody144),
+    '144.7: saveCurrentToCloud enqueues only on an offline/network failure of the user-pressed push; the flush never enqueues (retry-only)'
+  );
+
+  // 144.8  flush guards: kill-switch + auth (non-anonymous) + online + reentrancy +
+  //        uid-scope (a different account never flushes the previous user's queue)
+  assert(
+    /_currentUser\.isAnonymous/.test(flushBody144) &&
+      /navigator\.onLine === false/.test(flushBody144) &&
+      /_flushingQueue/.test(flushBody144) &&
+      /item\.uid !== _currentUid/.test(flushBody144),
+    '144.8: flushCloudQueue is guarded by cloudSync/offlineQueue + a non-anonymous auth check + online + a reentrancy flag, and is uid-scoped (only the current account’s queued pushes flush)'
+  );
+
+  // 144.9  flush drops sent/duplicate items, keeps failed ones (bounded retry — no
+  //        loss, no cloud duplicate: the contentHash dedup lives in _uploadSaveDoc)
+  assert(
+    /remaining\.push\(item\)/.test(flushBody144) &&
+      /stopped = true/.test(flushBody144) &&
+      /writeCloudQueue\(remaining\)/.test(flushBody144) &&
+      /contentHash/.test(uploadBody144),
+    '144.9: flushCloudQueue drops uploaded/duplicate items and re-persists the remaining (failed) ones — bounded retry, never lost, never duplicated (contentHash dedup in _uploadSaveDoc)'
+  );
+
+  // 144.10  flush is triggered by connectivity return + sign-in — NEVER a save path
+  assert(
+    /addEventListener\('online',/.test(cloud144) &&
+      /flushCloudQueue\(\)/.test(cloud144) &&
+      /onAuthStateChanged/.test(cloud144),
+    "144.10: the flush is wired to the 'online' connectivity event and to sign-in (onAuthStateChanged), not to any save/state-change path"
+  );
+
+  // 144.11  NEVER-AUTO-PUSH invariant (extends Suite 23.4/23.5): no save/state path
+  //         touches the queue or the cloud uploader
+  assert(
+    !/enqueueCloudPush|flushCloudQueue|saveCurrentToCloud|_uploadSaveDoc/.test(saveStateBody144) &&
+      !/enqueueCloudPush|flushCloudQueue|_uploadSaveDoc/.test(
+        extractFunctionBody(uiSource144, 'updateMath')
+      ) &&
+      !/enqueueCloudPush|flushCloudQueue|saveCurrentToCloud|_uploadSaveDoc/.test(
+        extractFunctionBody(apiSource144, 'autoImportState')
+      ),
+    '144.11: never-auto-push — saveState / updateMath / autoImportState never enqueue, flush, or push to the cloud (cloud sync stays manual-only)'
+  );
+
+  // 144.12  game-agnostic (Protocol 38): the queue + flush code has no game literals
+  assert(
+    !/FNV|FO3|Fallout|New Vegas|Mojave|Capital Wasteland/.test(
+      readQ144 + enqQ144 + writeQ144 + flushBody144 + uploadBody144
+    ),
+    '144.12: the P7 queue + flush code is game-agnostic (no game literals)'
   );
 }
 
