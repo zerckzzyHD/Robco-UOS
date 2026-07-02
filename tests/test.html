@@ -21,7 +21,7 @@
     or the canonical suites change, update this file in the SAME commit and bump
     the suite count marker. The gate fails on drift.
 
-    Suites: 17
+    Suites: 18
 -->
 <html lang="en">
   <head>
@@ -1330,6 +1330,78 @@
             'FATAL: P7 cloud-queue storage suite threw',
             String((err && err.stack) || err)
           );
+        }
+
+        // ── Suite 17 — P8 global immersion dial (device pref + gate helper) ───
+        // Exercises the REAL state.js gate helpers (getImmersionTier /
+        // immersionAllows / setImmersionTier) against the live MetaStore: the pref
+        // round-trips, the tier thresholds are correct, an unknown value/requirement
+        // fails safe, and — the key boundary — the pref is a DEVICE key (MetaStore),
+        // never a campaign `state` field (so it can't ride the save/cloud).
+        try {
+          section('Suite 17 — P8 global immersion dial (device pref + gate helper)');
+          const _prevImm = MetaStore.get('robco_immersion');
+
+          // 1) DEFAULT + ROUND-TRIP: absent → 'full'; set persists + reads back.
+          MetaStore.remove('robco_immersion');
+          const def = window.getImmersionTier();
+          window.setImmersionTier('balanced');
+          const rt = window.getImmersionTier();
+          assert(
+            def === 'full' && rt === 'balanced',
+            "round-trip: getImmersionTier defaults to 'full' when unset and reflects a setImmersionTier write"
+          );
+
+          // 2) THRESHOLDS: immersionAllows is a correct rank compare at each level.
+          window.setImmersionTier('minimal');
+          const minRow = [
+            window.immersionAllows('minimal'),
+            window.immersionAllows('balanced'),
+            window.immersionAllows('full'),
+          ];
+          window.setImmersionTier('balanced');
+          const balRow = [
+            window.immersionAllows('minimal'),
+            window.immersionAllows('balanced'),
+            window.immersionAllows('full'),
+          ];
+          window.setImmersionTier('full');
+          const fullRow = [
+            window.immersionAllows('minimal'),
+            window.immersionAllows('balanced'),
+            window.immersionAllows('full'),
+          ];
+          assert(
+            eq(minRow, [true, false, false]) &&
+              eq(balRow, [true, true, false]) &&
+              eq(fullRow, [true, true, true]),
+            'thresholds: immersionAllows(required) = rank(current) >= rank(required) at minimal / balanced / full'
+          );
+
+          // 3) FAIL-SAFE: an unknown level coerces to 'full'; an unknown requirement fails open.
+          window.setImmersionTier('nonsense');
+          const coerced = window.getImmersionTier();
+          window.setImmersionTier('minimal');
+          const unknownReq = window.immersionAllows('bogus');
+          assert(
+            coerced === 'full' && unknownReq === true,
+            "fail-safe: an unknown level coerces to 'full'; an unrecognised requirement fails open (true)"
+          );
+
+          // 4) BOUNDARY: the dial is a DEVICE pref (MetaStore) — never a campaign state field.
+          window.setImmersionTier('balanced');
+          const inMeta = MetaStore.get('robco_immersion') === 'balanced';
+          const notInState = !('robco_immersion' in state) && !('immersion' in state);
+          assert(
+            inMeta && notInState,
+            "two-store boundary: robco_immersion lives in MetaStore (device pref) and never appears in campaign `state` (so it can't ride the save/cloud)"
+          );
+
+          // Restore whatever was there before (leave no side effect for later suites).
+          if (_prevImm === null || _prevImm === undefined) MetaStore.remove('robco_immersion');
+          else MetaStore.set('robco_immersion', _prevImm);
+        } catch (err) {
+          assert(false, 'FATAL: P8 immersion-dial suite threw', String((err && err.stack) || err));
         }
 
         // ── Summary ──────────────────────────────────────────────────────────

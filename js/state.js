@@ -36,6 +36,7 @@ const META_MANIFEST = {
   robco_wakelock_enabled: { type: 'bool', default: false, owner: 'ui-core.js' },
   robco_haptic_enabled: { type: 'bool', default: false, owner: 'ui-audio.js' },
   robco_high_lumen: { type: 'bool', default: false, owner: 'ui-core.js' },
+  robco_immersion: { type: 'string', default: 'full', owner: 'state.js' },
   robco_overseer_log: { type: 'json', default: '{}', owner: 'ui-core.js' },
   robco_error_log: { type: 'json', default: '[]', owner: 'ui-core.js' },
   robco_panel_state: { type: 'json', default: '{}', owner: 'ui-core.js' },
@@ -114,6 +115,54 @@ const MetaStore = {
   },
 };
 window.MetaStore = MetaStore;
+
+// ── GLOBAL IMMERSION DIAL (Full / Balanced / Minimal) — Step 2 · Phase 1 · P8 ──
+// One device-level control governing HOW MUCH of the atmosphere/immersion layer is
+// switched on. It is a DEVICE PREFERENCE (MetaStore key robco_immersion), NOT
+// campaign state — it never rides the campaign save/cloud, exactly like the audio
+// mutes and optics (two-store boundary, Protocol 23). This is a BORN-COMPLIANT SEAM:
+// the gate helpers below are what the ~10 ambient/atmosphere consumers (Ambient
+// Runtime, radio, weather, idle behaviors, …) will read in Phase 2 to decide whether
+// to run. Those consumers do NOT exist yet — this unit ONLY establishes the control +
+// pref + helper cleanly. Game-agnostic (Protocol 38): a pure level, no game data.
+//
+// GATE-HELPER API (the seam Phase 2 subscribes to):
+//   window.getImmersionTier()        → 'full' | 'balanced' | 'minimal' (fail-safe to 'full')
+//   window.immersionAllows(required) → does a feature that requires `required` run now?
+//                                      true iff rank(current) >= rank(required)
+//   window.setImmersionTier(tier)    → persist the chosen level (validated; MetaStore only)
+//
+// Tiers ascend: minimal(0) < balanced(1) < full(2). A feature declares the MINIMUM
+// level at which it runs. At 'full' everything runs (today's behavior — the DEFAULT);
+// 'balanced' drops full-only features; 'minimal' keeps only baseline (minimal-tier)
+// atmosphere. Default 'full' preserves current behavior exactly.
+const IMMERSION_KEY = 'robco_immersion';
+const IMMERSION_TIERS = ['minimal', 'balanced', 'full']; // index = rank (ascending)
+
+function getImmersionTier() {
+  const v = MetaStore.get(IMMERSION_KEY);
+  return IMMERSION_TIERS.indexOf(v) !== -1 ? v : 'full';
+}
+window.getImmersionTier = getImmersionTier;
+
+// A feature requiring `requiredTier` runs when the current level's rank is at least
+// that tier's rank. An unrecognised requirement fails OPEN (returns true) so a typo in
+// a future consumer can never silently suppress it. Never throws.
+function immersionAllows(requiredTier) {
+  const req = IMMERSION_TIERS.indexOf(requiredTier);
+  if (req === -1) return true;
+  return IMMERSION_TIERS.indexOf(getImmersionTier()) >= req;
+}
+window.immersionAllows = immersionAllows;
+
+// Persist the chosen level (device pref only — MetaStore, never campaign state). An
+// unknown value is coerced to the safe default 'full'. Returns the stored level.
+function setImmersionTier(tier) {
+  const t = IMMERSION_TIERS.indexOf(tier) !== -1 ? tier : 'full';
+  MetaStore.set(IMMERSION_KEY, t);
+  return t;
+}
+window.setImmersionTier = setImmersionTier;
 
 // ── ROBCO EVENTS — OS event bus for terminal/game state crossings ───────────
 // A tiny synchronous pub/sub: emit(event, payload) calls every handler

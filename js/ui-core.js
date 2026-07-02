@@ -275,6 +275,31 @@ function initHighLumen() {
   _updateHighLumenUI();
 }
 
+// ── GLOBAL IMMERSION DIAL — UI (P8) ──────────────────────────────
+// The gate helpers + pref live in state.js (getImmersionTier / immersionAllows /
+// setImmersionTier — the seam Phase 2 consumers read). This is only the DOM control:
+// the <select> value, the status readout, and the boot restore. No campaign state.
+function _updateImmersionUI() {
+  const note = document.getElementById('immersionStatus');
+  if (!note) return;
+  const tier = typeof getImmersionTier === 'function' ? getImmersionTier() : 'full';
+  note.textContent =
+    tier === 'full'
+      ? '> FULL IMMERSION — all ambient systems active'
+      : tier === 'balanced'
+        ? '> BALANCED — reduced ambient activity'
+        : '> MINIMAL — ambient systems quiet';
+}
+function onImmersionChange(value) {
+  if (typeof setImmersionTier === 'function') setImmersionTier(value);
+  _updateImmersionUI();
+}
+function initImmersion() {
+  const sel = document.getElementById('immersionSelect');
+  if (sel && typeof getImmersionTier === 'function') sel.value = getImmersionTier();
+  _updateImmersionUI();
+}
+
 // ── CLIENT ERROR RING-BUFFER ──────────────────────────────────
 // Local-only diagnostic log — never transmitted. Cap 50 entries × 300 chars ≈ 15 KB max.
 const ERROR_LOG_KEY = 'robco_error_log';
@@ -368,6 +393,13 @@ function _startUptimeClock() {
 function _startMemCycle() {
   if (_memCycleInterval) return;
   _memCycleInterval = setInterval(() => {
+    // P8 proof-of-seam: the periodic "memory cycle" flash is pure atmosphere, so it
+    // respects the Immersion dial — it requires at least 'balanced', so it runs at
+    // Full/Balanced and goes quiet at Minimal. At the default 'full' this is a no-op
+    // (today's behavior preserved). This is the ONE existing ambient consumer wired to
+    // the seam as a demonstration; the rest arrive in Phase 2. Fail-open if the helper
+    // is somehow unavailable (never suppress on a missing gate).
+    if (typeof window.immersionAllows === 'function' && !window.immersionAllows('balanced')) return;
     appendToChat('> MEMORY CYCLE COMPLETE. 64K STABLE.', 'sys', true);
     document.body.style.filter = 'brightness(0.35)';
     setTimeout(() => {
@@ -1049,6 +1081,7 @@ window.onload = async function () {
     initHaptic(); // WU-F2: restore the Haptic Solenoid (Vibration) preference
     initOverseerLog(); // WU-F7: start the Overseer's Log session clock + bump boot count (once)
     initHighLumen(); // WU-F8: restore the High-Lumen Optics (max-contrast) preference
+    initImmersion(); // P8: restore the Global Immersion dial (Full/Balanced/Minimal) device pref
     initRadio(); // WU-F5: restore the Pip-Boy Radio preference (autoplay-safe first-gesture arm)
     _wireRotaryDialClick();
     _wireStandby();

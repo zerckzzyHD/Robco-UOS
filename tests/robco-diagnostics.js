@@ -14677,11 +14677,14 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     );
 
     // 132.5  window.onload stays a slim composition (regression guard against
-    //        logic drifting back into the monolith instead of into a named seam)
+    //        logic drifting back into the monolith instead of into a named seam).
+    //        Threshold has headroom for new named init/phase calls (e.g. P8
+    //        initImmersion()) — the guard catches a monolith (hundreds of lines),
+    //        not the natural growth of the named-call list.
     const onloadLineCount = onloadBody132.split('\n').length;
     assert(
-      onloadLineCount < 40,
-      `window.onload body stays a slim named-call composition (${onloadLineCount} lines, expected < 40)`
+      onloadLineCount < 45,
+      `window.onload body stays a slim named-call composition (${onloadLineCount} lines, expected < 45)`
     );
 
     // 132.6  initTabs() still called directly in window.onload (not wrapped —
@@ -17157,6 +17160,116 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       readQ144 + enqQ144 + writeQ144 + flushBody144 + uploadBody144
     ),
     '144.12: the P7 queue + flush code is game-agnostic (no game literals)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 145 — Step 2 (v2.8.0) Phase 1 P8: Global Immersion dial (Full/Balanced/
+//  Minimal). ONE device-level control governing how much of the atmosphere layer
+//  runs. It is a DEVICE PREFERENCE (MetaStore key robco_immersion) — NOT campaign
+//  state (never rides the save/cloud; two-store boundary, Protocol 23). This is a
+//  BORN-COMPLIANT SEAM: the gate helpers (getImmersionTier / immersionAllows /
+//  setImmersionTier, state.js) are what the ~10 ambient consumers subscribe to in
+//  Phase 2 — those consumers do NOT exist yet. Default 'full' preserves today's
+//  behavior. The ONE existing ambient behavior wired as a proof-of-seam is the
+//  periodic memory-cycle flash (_startMemCycle). The pref round-trip + thresholds
+//  are proven live in tests/test.html (Suite 17). 10 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 145 — P8 global immersion dial (Full/Balanced/Minimal)');
+  const state145 = readFile('js/state.js');
+  const uiCore145 = readFile('js/ui-core.js');
+  const indexHtml145 = readFile('index.html');
+  const getTierBody145 = extractFunctionBody(state145, 'getImmersionTier');
+  const allowsBody145 = extractFunctionBody(state145, 'immersionAllows');
+  const setTierBody145 = extractFunctionBody(state145, 'setImmersionTier');
+  const memCycleBody145 = extractFunctionBody(uiCore145, '_startMemCycle');
+  const initImmBody145 = extractFunctionBody(uiCore145, 'initImmersion');
+
+  // 145.1  robco_immersion is registered as a DEVICE pref in META_MANIFEST (default 'full')
+  assert(
+    /robco_immersion:\s*\{[^}]*type:\s*'string'[^}]*default:\s*'full'/.test(state145),
+    "145.1: state.js registers robco_immersion in META_MANIFEST as a device pref (type string, default 'full')"
+  );
+
+  // 145.2  the gate-helper API is defined + exposed on window
+  assert(
+    /const IMMERSION_KEY = 'robco_immersion'/.test(state145) &&
+      /const IMMERSION_TIERS = \['minimal', 'balanced', 'full'\]/.test(state145) &&
+      /function getImmersionTier\s*\(/.test(state145) &&
+      /window\.getImmersionTier = getImmersionTier/.test(state145) &&
+      /function immersionAllows\s*\(/.test(state145) &&
+      /window\.immersionAllows = immersionAllows/.test(state145) &&
+      /function setImmersionTier\s*\(/.test(state145) &&
+      /window\.setImmersionTier = setImmersionTier/.test(state145),
+    '145.2: state.js defines IMMERSION_KEY/IMMERSION_TIERS + exposes getImmersionTier / immersionAllows / setImmersionTier'
+  );
+
+  // 145.3  getImmersionTier reads MetaStore + fail-safe default 'full' (unknown → full)
+  assert(
+    /MetaStore\.get\(IMMERSION_KEY\)/.test(getTierBody145) &&
+      /IMMERSION_TIERS\.indexOf\(v\) !== -1 \? v : 'full'/.test(getTierBody145),
+    "145.3: getImmersionTier reads the MetaStore device key and fails safe to 'full' for an unknown/absent value"
+  );
+
+  // 145.4  immersionAllows is a rank compare; an unknown requirement fails OPEN
+  assert(
+    /IMMERSION_TIERS\.indexOf\(requiredTier\)/.test(allowsBody145) &&
+      /if \(req === -1\) return true;/.test(allowsBody145) &&
+      /IMMERSION_TIERS\.indexOf\(getImmersionTier\(\)\) >= req/.test(allowsBody145),
+    '145.4: immersionAllows(required) returns rank(current) >= rank(required); an unrecognised requirement fails open (returns true)'
+  );
+
+  // 145.5  setImmersionTier validates (unknown → 'full') and writes ONLY MetaStore
+  assert(
+    /IMMERSION_TIERS\.indexOf\(tier\) !== -1 \? tier : 'full'/.test(setTierBody145) &&
+      /MetaStore\.set\(IMMERSION_KEY, t\)/.test(setTierBody145),
+    "145.5: setImmersionTier coerces an unknown level to 'full' and persists via MetaStore (device pref)"
+  );
+
+  // 145.6  BOUNDARY: the dial is a DEVICE pref — the helpers never touch campaign `state`
+  assert(
+    !/\bstate\./.test(getTierBody145 + allowsBody145 + setTierBody145) &&
+      !/localStorage/.test(getTierBody145 + allowsBody145 + setTierBody145),
+    '145.6: the immersion helpers never read/write campaign state or raw localStorage — device pref only, through MetaStore (two-store boundary)'
+  );
+
+  // 145.7  ui-core.js has the DOM control + boot restore, wired into boot
+  assert(
+    /function _updateImmersionUI\s*\(/.test(uiCore145) &&
+      /function onImmersionChange\s*\(/.test(uiCore145) &&
+      /function initImmersion\s*\(/.test(uiCore145) &&
+      /getImmersionTier\(\)/.test(initImmBody145) &&
+      /initImmersion\(\);/.test(uiCore145),
+    '145.7: ui-core.js defines _updateImmersionUI / onImmersionChange / initImmersion, and initImmersion() is called from boot (restores the saved level)'
+  );
+
+  // 145.8  index.html has the accessible <select> control (3 levels) + status readout
+  assert(
+    /id="immersionSelect"/.test(indexHtml145) &&
+      /onchange="onImmersionChange\(this\.value\)"/.test(indexHtml145) &&
+      /aria-label="Ambient immersion level/.test(indexHtml145) &&
+      /font-size:\s*16px/.test(indexHtml145) &&
+      /value="full"/.test(indexHtml145) &&
+      /value="balanced"/.test(indexHtml145) &&
+      /value="minimal"/.test(indexHtml145) &&
+      /id="immersionStatus"/.test(indexHtml145),
+    '145.8: index.html has #immersionSelect (Full/Balanced/Minimal) with onImmersionChange + aria-label + 16px font + #immersionStatus (Protocol UI-5/17)'
+  );
+
+  // 145.9  proof-of-seam: an EXISTING ambient behavior (memory-cycle flash) respects
+  //        the dial via immersionAllows — the seam works end-to-end
+  assert(
+    /immersionAllows\('balanced'\)/.test(memCycleBody145) && /return;/.test(memCycleBody145),
+    '145.9: the memory-cycle atmosphere (_startMemCycle) is gated on immersionAllows (proof-of-seam — one existing ambient consumer already respects the dial)'
+  );
+
+  // 145.10  game-agnostic (Protocol 38): the dial code has no game literals
+  assert(
+    !/FNV|FO3|Fallout|New Vegas|Mojave|Capital Wasteland/.test(
+      getTierBody145 + allowsBody145 + setTierBody145 + initImmBody145
+    ),
+    '145.10: the P8 immersion-dial code is game-agnostic (no game literals)'
   );
 }
 

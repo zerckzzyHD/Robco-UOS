@@ -115,6 +115,10 @@ export default [
         confirmAction: 'readonly', // Step 2 Phase 0 U12 diegetic confirm() replacement (ui-core.js)
         _vatsIsMelee: 'readonly',
         getGameContext: 'readonly',
+        // P8 Global Immersion dial — gate helpers + pref live in state.js, the UI in ui-core.js
+        getImmersionTier: 'readonly',
+        immersionAllows: 'readonly',
+        setImmersionTier: 'readonly',
         getAmmoCalibers: 'readonly',
         getVendors: 'readonly',
         getTradeCatalog: 'readonly',

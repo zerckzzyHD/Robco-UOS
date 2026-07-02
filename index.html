@@ -1506,6 +1506,39 @@
               "
             ></span>
 
+            <!-- P8: Global Immersion dial — device-level atmosphere control (Full/Balanced/Minimal) -->
+            <div class="input-group" style="margin-top: 10px">
+              <label class="optics-label" for="immersionSelect" style="color: var(--robco-alert)"
+                >IMMERSION:</label
+              >
+              <select
+                id="immersionSelect"
+                onchange="onImmersionChange(this.value)"
+                aria-label="Ambient immersion level — how much atmosphere the terminal runs"
+                style="
+                  width: 100%;
+                  font-size: 16px;
+                  border-color: var(--robco-alert);
+                  background: rgba(0, 0, 0, 0.8);
+                  color: var(--robco-alert);
+                "
+              >
+                <option value="full">Full — all ambient systems</option>
+                <option value="balanced">Balanced — reduced ambience</option>
+                <option value="minimal">Minimal — quiet</option>
+              </select>
+            </div>
+            <span
+              id="immersionStatus"
+              style="
+                display: block;
+                color: var(--robco-alert);
+                font-size: 10px;
+                opacity: 0.7;
+                margin-top: 2px;
+              "
+            ></span>
+
             <details id="audioSystemsDetails" class="sub-panel" data-sub-id="audio_systems">
               <summary class="config-summary" style="color: var(--robco-alert); font-size: 13px">
                 AUDIO SYSTEMS

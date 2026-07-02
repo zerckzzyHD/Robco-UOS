@@ -64,8 +64,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    1749-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    1749-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    1759-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    1759-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -182,6 +182,25 @@ Scripts are loaded via `<script>` tags in `index.html` in this exact order:
    re-persists the remaining items (bounded retry — never lost, never duplicated). FAIL-SAFE: no
    IndexedDB / kill-switch off → the queue isn't offered and a manual push behaves exactly as today
    (fails/no-ops offline). Airplane-mode operation is unaffected.
+
+   P8 (Global Immersion dial, js/state.js gate helpers + js/ui-core.js UI): ONE device-level control
+   governing how much of the atmosphere/immersion layer runs — Full / Balanced / Minimal. It is a
+   DEVICE PREFERENCE (MetaStore key robco_immersion, registered in META_MANIFEST, default 'full') —
+   NOT campaign state, so it never rides the campaign save/cloud (two-store boundary, Protocol 23),
+   exactly like the audio mutes and optics. This is a BORN-COMPLIANT SEAM (roadmap J-6): the gate
+   helpers are what the ~10 ambient consumers (Ambient Runtime, radio, weather, idle behaviors, …)
+   will subscribe to in Phase 2 — those consumers do NOT exist yet; P8 only establishes the control +
+   pref + helper. GATE-HELPER API (state.js, on window): getImmersionTier() → 'full'|'balanced'|
+   'minimal' (fail-safe to 'full'); immersionAllows(requiredTier) → true iff rank(current) >=
+   rank(requiredTier) (tiers ascend minimal<balanced<full; an unknown requirement fails open);
+   setImmersionTier(tier) → persist the validated level (MetaStore only). A feature declares the
+   MINIMUM level at which it runs. Default 'full' = everything runs = today's behavior. The DOM control
+   (a Full/Balanced/Minimal <select> in Security & Configuration + a status readout + the boot restore
+   via initImmersion) lives in ui-core.js. PROOF-OF-SEAM: the periodic memory-cycle flash
+   (_startMemCycle, ui-core.js) is the one existing ambient behavior wired to the dial — it requires
+   'balanced', so it runs at Full/Balanced and goes quiet at Minimal (a no-op at the default). Game-
+   agnostic (Protocol 38). No pre-paint apply is needed (the dial gates ambient behaviors, not the base
+   visual palette), so a normal boot restore suffices.
    ── Per-game boot manifest (GAME_FILES in index.html; order preserved via script.async = false) ──
 1. js/db_nv.js / js/db_fo3.js → defines: databaseCSVs, lookupItemInDb (game-specific CSV data;
                        the active pair is selected by the GAME_FILES manifest, FNV fail-safe)
@@ -1329,7 +1348,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1749-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1759-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

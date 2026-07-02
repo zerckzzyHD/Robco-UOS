@@ -8332,8 +8332,10 @@ for ($ci = 1; $ci -lt $callIdxs132.Count; $ci++) {
 }
 Check $inOrder132 'window.onload calls the 12 boot-phase functions in the original, order-preserving sequence'
 
+# Threshold has headroom for new named init/phase calls (e.g. P8 initImmersion()) --
+# the guard catches a monolith (hundreds of lines), not the named-call list growing.
 $onloadLineCount132 = ($onloadBody132 -split "`n").Count
-Check ($onloadLineCount132 -lt 40) "window.onload body stays a slim named-call composition ($onloadLineCount132 lines, expected < 40)"
+Check ($onloadLineCount132 -lt 45) "window.onload body stays a slim named-call composition ($onloadLineCount132 lines, expected < 45)"
 
 Check ($onloadBody132 -match [regex]::Escape('initTabs()')) 'window.onload still calls initTabs() directly (Suite 57.9 boot-order guard depends on this literal call)'
 
@@ -9949,6 +9951,100 @@ Check (
 Check (
     -not (($readQ144 + $enqQ144 + $writeQ144 + $flushBody144 + $uploadBody144) -match 'FNV|FO3|Fallout|New Vegas|Mojave|Capital Wasteland')
 ) '144.12: the P7 queue + flush code is game-agnostic (no game literals)'
+
+# ===========================================================
+# Suite 145 -- Step 2 (v2.8.0) Phase 1 P8: Global Immersion dial (10 tests).
+# Mirrors JS Suite 145. ONE device-level control (Full/Balanced/Minimal) for how
+# much of the atmosphere layer runs. DEVICE PREFERENCE (MetaStore robco_immersion) --
+# NOT campaign state (never rides the save/cloud; Protocol 23). Born-compliant seam:
+# getImmersionTier / immersionAllows / setImmersionTier (state.js) are what the ~10
+# Phase-2 ambient consumers subscribe to; default 'full' preserves today's behavior.
+# The memory-cycle flash is the one existing consumer wired as proof-of-seam. The
+# pref round-trip + thresholds are proven live in tests/test.html (Suite 17).
+# ===========================================================
+Sep "Suite 145 -- P8 global immersion dial (Full/Balanced/Minimal)"
+$state145 = Read-Src "js/state.js"
+$uiCore145 = Read-Src "js/ui-core.js"
+$indexHtml145 = Read-Src "index.html"
+$getTierBody145 = Get-FunctionBody $state145 'getImmersionTier'
+$allowsBody145 = Get-FunctionBody $state145 'immersionAllows'
+$setTierBody145 = Get-FunctionBody $state145 'setImmersionTier'
+$memCycleBody145 = Get-FunctionBody $uiCore145 '_startMemCycle'
+$initImmBody145 = Get-FunctionBody $uiCore145 'initImmersion'
+
+# 145.1  robco_immersion registered as a DEVICE pref in META_MANIFEST (default 'full')
+Check (
+    $state145 -match "robco_immersion:\s*\{[^}]*type:\s*'string'[^}]*default:\s*'full'"
+) "145.1: state.js registers robco_immersion in META_MANIFEST as a device pref (type string, default 'full')"
+
+# 145.2  the gate-helper API is defined + exposed on window
+Check (
+    ($state145 -match "const IMMERSION_KEY = 'robco_immersion'") -and
+    ($state145 -match "const IMMERSION_TIERS = \['minimal', 'balanced', 'full'\]") -and
+    ($state145 -match 'function getImmersionTier\s*\(') -and
+    ($state145 -match 'window\.getImmersionTier = getImmersionTier') -and
+    ($state145 -match 'function immersionAllows\s*\(') -and
+    ($state145 -match 'window\.immersionAllows = immersionAllows') -and
+    ($state145 -match 'function setImmersionTier\s*\(') -and
+    ($state145 -match 'window\.setImmersionTier = setImmersionTier')
+) '145.2: state.js defines IMMERSION_KEY/IMMERSION_TIERS + exposes getImmersionTier / immersionAllows / setImmersionTier'
+
+# 145.3  getImmersionTier reads MetaStore + fail-safe default 'full'
+Check (
+    ($getTierBody145 -match 'MetaStore\.get\(IMMERSION_KEY\)') -and
+    ($getTierBody145 -match "IMMERSION_TIERS\.indexOf\(v\) !== -1 \? v : 'full'")
+) "145.3: getImmersionTier reads the MetaStore device key and fails safe to 'full' for an unknown/absent value"
+
+# 145.4  immersionAllows is a rank compare; an unknown requirement fails OPEN
+Check (
+    ($allowsBody145 -match 'IMMERSION_TIERS\.indexOf\(requiredTier\)') -and
+    ($allowsBody145 -match 'if \(req === -1\) return true;') -and
+    ($allowsBody145 -match 'IMMERSION_TIERS\.indexOf\(getImmersionTier\(\)\) >= req')
+) '145.4: immersionAllows(required) returns rank(current) >= rank(required); an unrecognised requirement fails open (returns true)'
+
+# 145.5  setImmersionTier validates (unknown -> 'full') and writes ONLY MetaStore
+Check (
+    ($setTierBody145 -match "IMMERSION_TIERS\.indexOf\(tier\) !== -1 \? tier : 'full'") -and
+    ($setTierBody145 -match 'MetaStore\.set\(IMMERSION_KEY, t\)')
+) "145.5: setImmersionTier coerces an unknown level to 'full' and persists via MetaStore (device pref)"
+
+# 145.6  BOUNDARY: the dial is a DEVICE pref -- the helpers never touch campaign state
+Check (
+    (-not (($getTierBody145 + $allowsBody145 + $setTierBody145) -match '\bstate\.')) -and
+    (-not (($getTierBody145 + $allowsBody145 + $setTierBody145) -match 'localStorage'))
+) '145.6: the immersion helpers never read/write campaign state or raw localStorage -- device pref only, through MetaStore (two-store boundary)'
+
+# 145.7  ui-core.js has the DOM control + boot restore, wired into boot
+Check (
+    ($uiCore145 -match 'function _updateImmersionUI\s*\(') -and
+    ($uiCore145 -match 'function onImmersionChange\s*\(') -and
+    ($uiCore145 -match 'function initImmersion\s*\(') -and
+    ($initImmBody145 -match 'getImmersionTier\(\)') -and
+    ($uiCore145 -match 'initImmersion\(\);')
+) '145.7: ui-core.js defines _updateImmersionUI / onImmersionChange / initImmersion, and initImmersion() is called from boot (restores the saved level)'
+
+# 145.8  index.html has the accessible <select> control (3 levels) + status readout
+Check (
+    ($indexHtml145 -match 'id="immersionSelect"') -and
+    ($indexHtml145 -match 'onchange="onImmersionChange\(this\.value\)"') -and
+    ($indexHtml145 -match 'aria-label="Ambient immersion level') -and
+    ($indexHtml145 -match 'font-size:\s*16px') -and
+    ($indexHtml145 -match 'value="full"') -and
+    ($indexHtml145 -match 'value="balanced"') -and
+    ($indexHtml145 -match 'value="minimal"') -and
+    ($indexHtml145 -match 'id="immersionStatus"')
+) '145.8: index.html has #immersionSelect (Full/Balanced/Minimal) with onImmersionChange + aria-label + 16px font + #immersionStatus (Protocol UI-5/17)'
+
+# 145.9  proof-of-seam: memory-cycle flash respects the dial via immersionAllows
+Check (
+    ($memCycleBody145 -match "immersionAllows\('balanced'\)") -and
+    ($memCycleBody145 -match 'return;')
+) '145.9: the memory-cycle atmosphere (_startMemCycle) is gated on immersionAllows (proof-of-seam -- one existing ambient consumer already respects the dial)'
+
+# 145.10  game-agnostic (Protocol 38): the dial code has no game literals
+Check (
+    -not (($getTierBody145 + $allowsBody145 + $setTierBody145 + $initImmBody145) -match 'FNV|FO3|Fallout|New Vegas|Mojave|Capital Wasteland')
+) '145.10: the P8 immersion-dial code is game-agnostic (no game literals)'
 
 # ===========================================================
 # Results
