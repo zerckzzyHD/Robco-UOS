@@ -1326,12 +1326,35 @@ function _routeQuickLog(userText) {
   return false;
 }
 
+// Comma-separated multi-action quick-log routing (Step 2 Phase 2 B1 upgrade):
+// splits on commas and routes EACH segment through _routeQuickLog()
+// independently, so one line — "killed 3 raiders, +50 caps, arrived Novac,
+// rep ncr up" — applies ALL of them, not just the first. A message with no
+// comma is just one segment, so single-action input behaves exactly as
+// before. Returns { anyMatched, anyUnmatched } so the caller can show ONE
+// collated hint instead of spamming one per unrecognized segment.
+function _routeQuickLogMulti(userText) {
+  const segments = userText
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+  let anyMatched = false;
+  let anyUnmatched = false;
+  segments.forEach(seg => {
+    if (_routeQuickLog(seg)) anyMatched = true;
+    else anyUnmatched = true;
+  });
+  return { anyMatched, anyUnmatched };
+}
+
 // The ONE choke point for a message submitted while TERMINAL mode is in effect
 // (persisted mode, or a one-off `/`/`@` override targeting it). Runs every
-// existing native command first (so `[TOKEN]` commands keep working exactly as
-// today), then quick-log patterns, then — if neither matched — shows a gentle
-// hint instead of silently doing nothing. NEVER calls the AI (no fetch, no
-// Director Link) — TERMINAL mode is offline by design.
+// existing native command first, on the WHOLE, unsplit line (so `[TOKEN]`
+// commands keep working exactly as today — a token's own arguments are never
+// comma-split), then comma-separated quick-log patterns, then — if nothing
+// matched at all — shows a gentle hint instead of silently doing nothing.
+// NEVER calls the AI (no fetch, no Director Link) — TERMINAL mode is offline
+// by design.
 async function transmitTerminal(overrideText) {
   const inputEl = document.getElementById('chatInput');
   const userText = (typeof overrideText === 'string' ? overrideText : inputEl.value).trim();
@@ -1352,8 +1375,15 @@ async function transmitTerminal(overrideText) {
     if (_isPrecisePointer()) document.getElementById('chatInput').focus();
     return;
   }
-  if (_routeQuickLog(userText)) {
+  const { anyMatched, anyUnmatched } = _routeQuickLogMulti(userText);
+  if (anyMatched) {
     if (_isPrecisePointer()) document.getElementById('chatInput').focus();
+    if (anyUnmatched) {
+      appendToChat(
+        "> [TERM] Part of that line wasn't recognized — see [FEATURES] for the full command list.",
+        'sys'
+      );
+    }
     return;
   }
   appendToChat(
@@ -1364,21 +1394,30 @@ async function transmitTerminal(overrideText) {
 window.transmitTerminal = transmitTerminal;
 
 // Resolve which mode THIS message submits through: the persisted device pref,
-// or a one-off override when the RAW (untrimmed) input's FIRST character is
-// `/` or `@`. These are FIXED targets, not relative to the persisted mode —
-// `/` always means "just this once, TERMINAL/native" and `@` always means
-// "just this once, OVERSEER/AI", from either starting mode (owner-locked
-// spec fix — a prior revision routed both to "whichever mode I'm not in",
-// which made them redundant). Supports both "/msg" (no space) and "/ msg"
-// (exactly one space stripped); a `/` or `@` anywhere else in the input is
-// left as literal text. Never mutates the persisted mode.
+// or a one-off override. Precedence (owner-locked spec):
+//   1. A leading `/` (first character only, untrimmed) sends the WHOLE rest
+//      of the message to TERMINAL/native — unchanged from before. A `@`
+//      appearing anywhere after a leading `/` is literal terminal text (the
+//      `/` branch returns before the `@` scan below ever runs).
+//   2. Otherwise, a `@` ANYWHERE in the message is an inline "ping the AI":
+//      everything AFTER the FIRST `@` is sent to OVERSEER/AI; everything
+//      BEFORE it is dropped (not sent). This supersedes the earlier
+//      first-character-only `@` — it now works mid-line, not just as a prefix.
+//   3. Otherwise, the persisted pill mode is used as-is.
+// Both `/` and `@` tolerate one optional space right after the symbol
+// ("/msg"/"/ msg", "@msg"/"@ msg"). Never mutates the persisted mode.
 function _resolveCommandInput(raw) {
   const persisted = typeof getInputMode === 'function' ? getInputMode() : 'overseer';
-  const first = raw.charAt(0);
-  if (first === '/' || first === '@') {
+  if (raw.charAt(0) === '/') {
     let rest = raw.slice(1);
     if (rest.charAt(0) === ' ') rest = rest.slice(1);
-    return { mode: first === '/' ? 'terminal' : 'overseer', text: rest, override: true };
+    return { mode: 'terminal', text: rest, override: true };
+  }
+  const atIdx = raw.indexOf('@');
+  if (atIdx !== -1) {
+    let text = raw.slice(atIdx + 1);
+    if (text.charAt(0) === ' ') text = text.slice(1);
+    return { mode: 'overseer', text, override: true };
   }
   return { mode: persisted, text: raw, override: false };
 }
@@ -1413,23 +1452,102 @@ window.submitCommandInput = submitCommandInput;
 // there). Suppressed entirely when the message would resolve to OVERSEER, so
 // free-text AI narration is never cluttered with command suggestions. Surfaces
 // matching NATIVE_COMMAND_ROUTER tokens plus the quick-log verb stubs above.
+// Content-aware quick-log autocomplete (Step 2 Phase 2 B1 upgrade): once the
+// (post-prefix) input matches a known quick-log verb's lead-in, suggest
+// registry/DB CONTENT for the next token instead of re-suggesting verbs —
+// "killed de" -> creature names starting with "de"; "arrived "/"at " ->
+// location names; "rep " -> faction keys, then "rep <key> " -> up/down.
+// Game-agnostic (Protocol 38): every name list comes from the ACTIVE game's
+// registries/DB (getBestiaryNames/FALLOUT_REGISTRY.locations/
+// getFactionRegistry), never a hardcoded name. `lead` is whatever of `text`
+// precedes the partial content token, so the caller can splice a full
+// replacement value; returns null when no verb lead-in matches (the caller
+// then falls back to the plain verb/token suggestions).
+function _quickLogContentSuggestions(text) {
+  let m = text.match(/^rep\s+(\S+)\s+(\S*)$/i);
+  if (m) {
+    const reg = typeof getFactionRegistry === 'function' ? getFactionRegistry() : [];
+    const match = reg.find(f => f.key.toLowerCase() === m[1].toLowerCase());
+    if (match) {
+      const partial = m[2].toLowerCase();
+      const lead = text.slice(0, text.length - m[2].length);
+      return ['up', 'down']
+        .filter(d => d.startsWith(partial))
+        .map(d => ({ name: lead + d, type: 'Quick-log: adjust faction reputation' }));
+    }
+  }
+  m = text.match(/^rep\s+(\S*)$/i);
+  if (m) {
+    const partial = m[1].toLowerCase();
+    const reg = typeof getFactionRegistry === 'function' ? getFactionRegistry() : [];
+    const lead = text.slice(0, text.length - m[1].length);
+    return reg
+      .filter(f => f.key.toLowerCase().startsWith(partial))
+      .slice(0, 8)
+      .map(f => ({ name: lead + f.key + ' ', type: f.name }));
+  }
+  m = text.match(/^(?:arrived(?:\s+at)?|at)\s+(.*)$/i);
+  if (m) {
+    const partial = m[1].toLowerCase();
+    const names =
+      typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.locations)
+        ? FALLOUT_REGISTRY.locations.map(l => l.name)
+        : [];
+    const lead = text.slice(0, text.length - m[1].length);
+    return names
+      .filter(n => n.toLowerCase().startsWith(partial))
+      .slice(0, 8)
+      .map(n => ({ name: lead + n, type: 'location' }));
+  }
+  m = text.match(/^killed?\s+(?:\d+\s+)?(.*)$/i);
+  if (m) {
+    const partial = m[1].toLowerCase();
+    const names = typeof getBestiaryNames === 'function' ? getBestiaryNames() : [];
+    const lead = text.slice(0, text.length - m[1].length);
+    return names
+      .filter(n => n.toLowerCase().startsWith(partial))
+      .slice(0, 8)
+      .map(n => ({ name: lead + n, type: 'creature' }));
+  }
+  return null;
+}
+
+// Autocomplete source for #chatInput in TERMINAL mode (extends the shared
+// registry-autocomplete singleton in ui-saves.js, Protocol 22 — see wireInput()
+// there). Suppressed entirely when the message would resolve to OVERSEER, so
+// free-text AI narration is never cluttered with command suggestions. Once a
+// quick-log verb lead-in is recognized, surfaces registry/DB CONTENT for the
+// next token (_quickLogContentSuggestions); otherwise surfaces matching
+// NATIVE_COMMAND_ROUTER tokens plus the quick-log verb stubs. Every suggestion
+// preserves whatever `/` override prefix was stripped by the resolver, so
+// selecting one never silently drops the user's explicit one-off override.
 function _commandSuggestions(rawQuery) {
   if (typeof _resolveCommandInput !== 'function') return [];
-  const resolved = _resolveCommandInput(String(rawQuery || ''));
+  const rawStr = String(rawQuery || '');
+  const resolved = _resolveCommandInput(rawStr);
   if (resolved.mode !== 'terminal') return [];
-  const q = resolved.text.trim().toLowerCase();
+  const prefix = rawStr.slice(0, rawStr.length - resolved.text.length);
+  const text = resolved.text;
+  const q = text.trim().toLowerCase();
   if (q.length < 2) return [];
+
+  const contentSuggestions = _quickLogContentSuggestions(text);
+  if (contentSuggestions) {
+    return contentSuggestions.map(s => ({ name: prefix + s.name, type: s.type }));
+  }
+
   const plain = s =>
     String(s)
       .replace(/[^a-z0-9 ]/gi, '')
       .toLowerCase();
   const out = [];
   Object.keys(NATIVE_COMMAND_ROUTER).forEach(cmd => {
-    if (plain(cmd).indexOf(q) !== -1) out.push({ name: cmd + ' ', type: 'native command' });
+    if (plain(cmd).indexOf(q) !== -1)
+      out.push({ name: prefix + cmd + ' ', type: 'native command' });
   });
   QUICK_LOG_PATTERNS.forEach(p => {
     if (plain(p.hint).indexOf(q) !== -1 || p.tag.toLowerCase().indexOf(q) !== -1) {
-      out.push({ name: p.stub, type: p.tag });
+      out.push({ name: prefix + p.stub, type: p.tag });
     }
   });
   return out.slice(0, 8);

@@ -18187,17 +18187,18 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '151.5: transmitMessage(overrideText) — an optional param; called with no args it reads #chatInput exactly as before'
   );
 
-  // 151.6  transmitTerminal(): native commands first (muscle memory), then
-  //        quick-log, else a hint — and it NEVER calls the AI (no fetch, no
-  //        Director-Link payload assembly)
+  // 151.6  transmitTerminal(): native commands first on the WHOLE unsplit
+  //        line (muscle memory — a [TOKEN]'s own args are never comma-split),
+  //        then comma-separated quick-log routing, else a hint — and it NEVER
+  //        calls the AI (no fetch, no Director-Link payload assembly)
   {
     const transmitTerminalBody151 = extractFunctionBody(apiSrc151, 'transmitTerminal');
     assert(
       /_routeNativeCommand\(userText\)/.test(transmitTerminalBody151) &&
-        /_routeQuickLog\(userText\)/.test(transmitTerminalBody151) &&
+        /_routeQuickLogMulti\(userText\)/.test(transmitTerminalBody151) &&
         /UNRECOGNIZED/.test(transmitTerminalBody151) &&
         !/fetch\(|generateSyncPayload|getSystemDirective/.test(transmitTerminalBody151),
-      '151.6: transmitTerminal() tries _routeNativeCommand() then _routeQuickLog(), else shows an UNRECOGNIZED hint; never calls fetch/generateSyncPayload/getSystemDirective (no AI)'
+      '151.6: transmitTerminal() tries _routeNativeCommand() on the whole line then _routeQuickLogMulti(), else shows an UNRECOGNIZED hint; never calls fetch/generateSyncPayload/getSystemDirective (no AI)'
     );
   }
 
@@ -18214,19 +18215,22 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     );
   }
 
-  // 151.8  _resolveCommandInput(): first-char-only `/`/`@`, both spacing
-  //        variants, FIXED targets (not relative to the persisted mode) —
-  //        structural shape. Owner fix: `/` always targets 'terminal' and `@`
-  //        always targets 'overseer', regardless of getInputMode().
+  // 151.8  _resolveCommandInput(): leading `/` (first-char-only, whole line ->
+  //        terminal) takes precedence over an INLINE `@` (anywhere in the
+  //        line -> overseer, text after the first `@` only), both tolerate
+  //        one optional leading space, and neither is otherInputMode(persisted)
+  //        (the upgrade retiring the old first-char-only relative `@`).
   {
     const resolveBody151 = extractFunctionBody(apiSrc151, '_resolveCommandInput');
     assert(
-      /const first = raw\.charAt\(0\);/.test(resolveBody151) &&
-        /first === '\/' \|\| first === '@'/.test(resolveBody151) &&
+      /raw\.charAt\(0\) === '\/'/.test(resolveBody151) &&
         /rest\.charAt\(0\) === ' '/.test(resolveBody151) &&
-        /mode: first === '\/' \? 'terminal' : 'overseer'/.test(resolveBody151) &&
+        /mode: 'terminal'/.test(resolveBody151) &&
+        /const atIdx = raw\.indexOf\('@'\);/.test(resolveBody151) &&
+        /text\.charAt\(0\) === ' '/.test(resolveBody151) &&
+        /mode: 'overseer'/.test(resolveBody151) &&
         !/otherInputMode\(persisted\)/.test(resolveBody151),
-      "151.8: _resolveCommandInput() checks raw.charAt(0) (untrimmed — first-char-only), accepts `/` and `@`, strips exactly one leading space, and targets a FIXED mode ('/' -> terminal, '@' -> overseer) — never otherInputMode(persisted)"
+      "151.8: _resolveCommandInput() checks a leading `/` first (whole line -> terminal), then an INLINE `@` anywhere (raw.indexOf('@'), everything after -> overseer), both stripping one optional leading space — never otherInputMode(persisted)"
     );
   }
 
@@ -18265,17 +18269,19 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   );
 
   // 151.12  COMMAND_REGISTRY documents the mode system so it is discoverable
-  //         via [FEATURES] — the pill, both override prefixes, and all four
-  //         quick-log verbs
+  //         via [FEATURES] — the pill, both override prefixes (the inline
+  //         `@` anywhere upgrade), the comma multi-action syntax, and all
+  //         four quick-log verbs
   assert(
     /group:\s*'COMMAND-LINE MODE'/.test(uiCoreSrc151) &&
       /'\/message'/.test(uiCoreSrc151) &&
-      /'@message'/.test(uiCoreSrc151) &&
+      /'text @message'/.test(uiCoreSrc151) &&
       /'killed <target>'/.test(uiCoreSrc151) &&
       /'\+N caps \/ -N caps'/.test(uiCoreSrc151) &&
       /'arrived <location>'/.test(uiCoreSrc151) &&
-      /'rep <faction> up\/down'/.test(uiCoreSrc151),
-    '151.12: COMMAND_REGISTRY has a COMMAND-LINE MODE group documenting the pill, /message, @message, and all four quick-log verbs'
+      /'rep <faction> up\/down'/.test(uiCoreSrc151) &&
+      /'action, action, action'/.test(uiCoreSrc151),
+    '151.12: COMMAND_REGISTRY has a COMMAND-LINE MODE group documenting the pill, /message, the inline "text @message" ping, the comma multi-action syntax, and all four quick-log verbs'
   );
 
   // 151.13  wireInput() is generalized to accept a function resolver — the
@@ -18326,12 +18332,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   );
 
   // 151.17  BEHAVIORAL — the real _resolveCommandInput() body, executed in a
-  //         Node vm sandbox against mocked getInputMode: proves `/` and `@`
-  //         are FIXED targets (owner fix), not relative to the persisted mode —
-  //         `/msg`/`/ msg` always resolve to 'terminal' and `@msg`/`@ msg`
-  //         always resolve to 'overseer', from EITHER starting persisted mode;
-  //         a `/` NOT at position 0 is left as literal text with the persisted
-  //         mode unaffected; no prefix uses the persisted mode as-is.
+  //         Node vm sandbox against mocked getInputMode. Proves the upgraded
+  //         precedence: a leading `/` (whole line -> terminal) is checked
+  //         FIRST and wins over any later `@` in the same line (literal); an
+  //         inline `@` ANYWHERE (not just position 0) drops everything before
+  //         it and sends only the text after -> overseer; both still tolerate
+  //         one optional leading space; no prefix uses the persisted mode.
   {
     const vm151 = require('vm');
     function declareFn151(src, name) {
@@ -18358,16 +18364,18 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       r5 = null,
       r6 = null,
       r7 = null,
-      r8 = null;
+      r8 = null,
+      r9 = null;
     try {
-      r1 = runResolve151('overseer', '/killed deathclaw'); // '/' from OVERSEER -> terminal
-      r2 = runResolve151('terminal', '/ killed deathclaw'); // '/' from TERMINAL -> still terminal (fixed, not a no-op toggle)
-      r3 = runResolve151('terminal', '@narrate this'); // '@' from TERMINAL -> overseer
-      r4 = runResolve151('overseer', '@ narrate this'); // '@' from OVERSEER -> still overseer (fixed, not a no-op toggle)
-      r5 = runResolve151('overseer', 'hello / world'); // '/' not at position 0 -> literal text, persisted mode unaffected
-      r6 = runResolve151('overseer', 'killed deathclaw'); // no prefix -> persisted mode
-      r7 = runResolve151('terminal', 'killed deathclaw'); // no prefix -> persisted mode (the other one)
-      r8 = runResolve151('overseer', '/ '); // prefix + single space + empty text -> still resolves, empty text
+      r1 = runResolve151('overseer', '/killed deathclaw'); // leading '/' -> terminal, whole line
+      r2 = runResolve151('terminal', '/ killed deathclaw'); // leading '/' space variant -> terminal
+      r3 = runResolve151('terminal', 'hey @claude do something'); // inline '@' mid-line -> overseer, text-before-@ DROPPED
+      r4 = runResolve151('overseer', 'hey @ claude do something'); // inline '@' + space variant -> overseer, dropped prefix
+      r5 = runResolve151('terminal', '@narrate this'); // leading '@' (still "anywhere", atIdx===0) -> overseer
+      r6 = runResolve151('overseer', '/kill @something'); // leading '/' wins -> terminal, the LATER '@' stays literal text
+      r7 = runResolve151('overseer', 'killed deathclaw'); // no '/' no '@' -> persisted mode (overseer)
+      r8 = runResolve151('terminal', 'killed deathclaw'); // no '/' no '@' -> persisted mode (terminal, the other one)
+      r9 = runResolve151('overseer', 'note: user@example.com is my email'); // FIRST '@' wins, everything before it dropped
     } catch (e) {
       err151 = e;
     }
@@ -18380,32 +18388,39 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         r2.text === 'killed deathclaw' &&
         r2.override === true &&
         r3.mode === 'overseer' &&
-        r3.text === 'narrate this' &&
+        r3.text === 'claude do something' &&
         r3.override === true &&
         r4.mode === 'overseer' &&
-        r4.text === 'narrate this' &&
+        r4.text === 'claude do something' &&
         r4.override === true &&
         r5.mode === 'overseer' &&
-        r5.text === 'hello / world' &&
-        r5.override === false &&
-        r6.mode === 'overseer' &&
-        r6.text === 'killed deathclaw' &&
-        r6.override === false &&
-        r7.mode === 'terminal' &&
+        r5.text === 'narrate this' &&
+        r5.override === true &&
+        r6.mode === 'terminal' &&
+        r6.text === 'kill @something' &&
+        r6.override === true &&
+        r7.mode === 'overseer' &&
         r7.text === 'killed deathclaw' &&
         r7.override === false &&
         r8.mode === 'terminal' &&
-        r8.text === '' &&
-        r8.override === true,
-      '_resolveCommandInput() behavioral: `/` ALWAYS targets terminal and `@` ALWAYS targets overseer, from either starting persisted mode (fixed targets, not a relative toggle); "/msg"/"/ msg" and "@msg"/"@ msg" strip identically; a `/` not at position 0 is literal text with the persisted mode unaffected; no prefix uses the persisted mode as-is' +
+        r8.text === 'killed deathclaw' &&
+        r8.override === false &&
+        r9.mode === 'overseer' &&
+        r9.text === 'example.com is my email' &&
+        r9.override === true,
+      '_resolveCommandInput() behavioral: a leading `/` always wins (whole line -> terminal, a later `@` stays literal); an inline `@` ANYWHERE drops the text before it and sends only the text after -> overseer (both space variants tolerated); the FIRST `@` is the one that counts; no prefix uses the persisted mode as-is' +
         (err151 ? ' — ' + err151.message : '')
     );
   }
 
-  // 151.18  Protocol 1 — CACHE_NAME bumped for this served-file change
+  // 151.18  Protocol 1 — CACHE_NAME is a well-formed, current revision string.
+  //         (The exact -rN value is asserted once, in the LATEST suite to
+  //         touch a served file — currently Suite 153.9 — rather than
+  //         duplicated/hardcoded here too, which would go stale on every
+  //         later served-file commit.)
   assert(
-    /const CACHE_NAME = 'robco-terminal-v2\.7\.0-r34';/.test(readFile('sw.js')),
-    '151.18: CACHE_NAME bumped (index.html/js/css touched by the Command-Line MODE system)'
+    /const CACHE_NAME = 'robco-terminal-v2\.7\.0-r\d+';/.test(readFile('sw.js')),
+    '151.18: CACHE_NAME is a well-formed robco-terminal-v2.7.0-rN revision string (Protocol 1)'
   );
 }
 
@@ -18568,6 +18583,263 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         (err152 ? ' — ' + err152.message : '')
     );
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 153 — Command-Line MODE upgrades: inline `@` ping, comma
+//  multi-action quick-log, content-aware autocomplete
+//  (Step 2 Phase 2 B1 follow-up)
+//  9 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header(
+    'Suite 153 — Command-Line MODE upgrades: inline @, comma multi-action, content autocomplete'
+  );
+  const apiSrc153 = readFile('js/api.js');
+  const dbNvSrc153 = readFile('js/db_nv.js');
+  const dbFo3Src153 = readFile('js/db_fo3.js');
+
+  // 153.1  _routeQuickLogMulti(): splits on commas, trims + drops empty
+  //        segments, routes EACH through the unchanged single-segment
+  //        _routeQuickLog(), and returns {anyMatched, anyUnmatched}
+  {
+    const multiBody153 = extractFunctionBody(apiSrc153, '_routeQuickLogMulti');
+    assert(
+      /userText\s*\n\s*\.split\(','\)/.test(multiBody153) &&
+        /\.map\(s => s\.trim\(\)\)/.test(multiBody153) &&
+        /\.filter\(Boolean\)/.test(multiBody153) &&
+        /if \(_routeQuickLog\(seg\)\) anyMatched = true;/.test(multiBody153) &&
+        /else anyUnmatched = true;/.test(multiBody153) &&
+        /return \{ anyMatched, anyUnmatched \};/.test(multiBody153),
+      '153.1: _routeQuickLogMulti() splits on commas, trims and drops empty segments, routes each through _routeQuickLog(), and returns {anyMatched, anyUnmatched}'
+    );
+  }
+
+  // 153.2  transmitTerminal() collates ONE combined hint when some (but not
+  //        all) segments are unrecognized — never one hint per segment
+  {
+    const transmitTerminalBody153 = extractFunctionBody(apiSrc153, 'transmitTerminal');
+    assert(
+      /const \{ anyMatched, anyUnmatched \} = _routeQuickLogMulti\(userText\);/.test(
+        transmitTerminalBody153
+      ) &&
+        /if \(anyMatched\)/.test(transmitTerminalBody153) &&
+        /if \(anyUnmatched\)/.test(transmitTerminalBody153) &&
+        /wasn.{1,2}t recognized/.test(transmitTerminalBody153),
+      '153.2: transmitTerminal() shows ONE collated "part of that line wasn\'t recognized" hint only when anyMatched && anyUnmatched — never spammed per segment'
+    );
+  }
+
+  // 153.3  BEHAVIORAL — the real _routeQuickLogMulti() body, executed in a
+  //        Node vm sandbox against a spy _routeQuickLog: proves the 4-action
+  //        comma line is split into exactly 4 trimmed segments, each routed
+  //        independently (in order), and the aggregate flags are correct.
+  {
+    const vm153a = require('vm');
+    function declareFn153a(src, name) {
+      const nameIdx = src.indexOf('function ' + name);
+      const parenIdx = src.indexOf('(', nameIdx);
+      const braceIdx = src.indexOf('{', parenIdx);
+      const params = src.slice(parenIdx, braceIdx);
+      return 'function ' + name + params + extractFunctionBody(src, name);
+    }
+    const src153a = declareFn153a(apiSrc153, '_routeQuickLogMulti');
+
+    function runMulti153(userText, knownSegments) {
+      const calls = [];
+      const sb = {
+        _routeQuickLog: seg => {
+          calls.push(seg);
+          return knownSegments.indexOf(seg) !== -1;
+        },
+      };
+      vm153a.createContext(sb);
+      vm153a.runInContext(src153a, sb);
+      const result = sb._routeQuickLogMulti(userText);
+      return { calls, result };
+    }
+
+    let err153a = null,
+      allMatched153 = null,
+      partial153 = null,
+      single153 = null;
+    try {
+      allMatched153 = runMulti153('killed 3 raiders, +50 caps, arrived Novac, rep ncr up', [
+        'killed 3 raiders',
+        '+50 caps',
+        'arrived Novac',
+        'rep ncr up',
+      ]);
+      partial153 = runMulti153('killed 3 raiders, gibberish xyz', ['killed 3 raiders']);
+      single153 = runMulti153('  +50 caps  ', ['+50 caps']);
+    } catch (e) {
+      err153a = e;
+    }
+    assert(
+      !err153a &&
+        allMatched153.calls.length === 4 &&
+        allMatched153.calls[0] === 'killed 3 raiders' &&
+        allMatched153.calls[1] === '+50 caps' &&
+        allMatched153.calls[2] === 'arrived Novac' &&
+        allMatched153.calls[3] === 'rep ncr up' &&
+        allMatched153.result.anyMatched === true &&
+        allMatched153.result.anyUnmatched === false &&
+        partial153.calls.length === 2 &&
+        partial153.result.anyMatched === true &&
+        partial153.result.anyUnmatched === true &&
+        single153.calls.length === 1 &&
+        single153.calls[0] === '+50 caps' &&
+        single153.result.anyMatched === true &&
+        single153.result.anyUnmatched === false,
+      '_routeQuickLogMulti() behavioral: a 4-action comma line is split into exactly 4 trimmed segments and routed to _routeQuickLog() independently, in order (all four update: kill/caps/location/faction); a mixed matched+unmatched line sets both flags; a single (comma-less) segment behaves exactly as a plain quick-log line, trimmed' +
+        (err153a ? ' — ' + err153a.message : '')
+    );
+  }
+
+  // 153.4  getBestiaryNames() defined in BOTH db runners (Protocol 15 parity),
+  //        reuses the SAME lazy cache lookupBestiaryEntry() builds (Protocol
+  //        22 — no second CSV parse)
+  assert(
+    /function _ensureBestiaryCache\(\)/.test(dbNvSrc153) &&
+      /function getBestiaryNames\(\)/.test(dbNvSrc153) &&
+      /_ensureBestiaryCache\(\);\s*\n\s*return Array\.from\(_bestiaryCache\.values\(\)\)\.map\(e => e\.name\);/.test(
+        dbNvSrc153
+      ) &&
+      /function _ensureBestiaryCache\(\)/.test(dbFo3Src153) &&
+      /function getBestiaryNames\(\)/.test(dbFo3Src153),
+    '153.4: getBestiaryNames() is defined in both db_nv.js and db_fo3.js, reusing the same lazy _bestiaryCache lookupBestiaryEntry() builds (no second CSV parse)'
+  );
+
+  // 153.5  lookupBestiaryEntry() itself is unchanged behaviorally — still
+  //        routes through _ensureBestiaryCache() (Protocol 42: a refactor
+  //        must not alter the function it extracts from)
+  assert(
+    /function lookupBestiaryEntry\(name\) \{\s*\n\s*if \(!name\) return null;\s*\n\s*_ensureBestiaryCache\(\);/.test(
+      dbNvSrc153
+    ),
+    '153.5: lookupBestiaryEntry() still guards on !name then calls _ensureBestiaryCache() — the extraction preserved its exact behavior'
+  );
+
+  // 153.6  _quickLogContentSuggestions(): recognizes all three verb lead-ins
+  //        (kill/location/faction) plus the faction-then-direction follow-up,
+  //        reading from the ACTIVE game's registries/DB (game-agnostic,
+  //        Protocol 38) — never a hardcoded name list
+  {
+    const contentBody153 = extractFunctionBody(apiSrc153, '_quickLogContentSuggestions');
+    assert(
+      /rep\\s\+\(\\S\+\)\\s\+\(\\S\*\)\$/.test(contentBody153) &&
+        /rep\\s\+\(\\S\*\)\$/.test(contentBody153) &&
+        /arrived\(\?:\\s\+at\)\?\|at\)\\s\+\(\.\*\)\$/.test(contentBody153) &&
+        /killed\?\\s\+\(\?:\\d\+\\s\+\)\?\(\.\*\)\$/.test(contentBody153) &&
+        /getFactionRegistry\(\)/.test(contentBody153) &&
+        /FALLOUT_REGISTRY\.locations/.test(contentBody153) &&
+        /getBestiaryNames\(\)/.test(contentBody153) &&
+        !/\bFNV\b|\bFO3\b|Fallout|New Vegas|Mojave|Capital Wasteland/.test(contentBody153),
+      '153.6: _quickLogContentSuggestions() recognizes rep+direction, rep+key, arrived/at+location, and killed+creature lead-ins, reading names ONLY from getFactionRegistry()/FALLOUT_REGISTRY.locations/getBestiaryNames() — game-agnostic, no hardcoded name list'
+    );
+  }
+
+  // 153.7  _commandSuggestions() tries content suggestions FIRST and, when
+  //        present, preserves whatever prefix _resolveCommandInput() stripped
+  //        (e.g. a `/` override) so picking a suggestion never drops it
+  {
+    const suggestBody153 = extractFunctionBody(apiSrc153, '_commandSuggestions');
+    assert(
+      /const prefix = rawStr\.slice\(0, rawStr\.length - resolved\.text\.length\);/.test(
+        suggestBody153
+      ) &&
+        /const contentSuggestions = _quickLogContentSuggestions\(text\);/.test(suggestBody153) &&
+        /return contentSuggestions\.map\(s => \(\{ name: prefix \+ s\.name, type: s\.type \}\)\);/.test(
+          suggestBody153
+        ) &&
+        /out\.push\(\{ name: prefix \+ cmd \+ ' ', type: 'native command' \}\)/.test(
+          suggestBody153
+        ) &&
+        /out\.push\(\{ name: prefix \+ p\.stub, type: p\.tag \}\)/.test(suggestBody153),
+      '153.7: _commandSuggestions() tries content suggestions first, and every suggestion (content or verb/token) is prefixed with whatever the resolver stripped, so a `/` override survives picking a suggestion'
+    );
+  }
+
+  // 153.8  BEHAVIORAL — the real _quickLogContentSuggestions() body, executed
+  //        in a Node vm sandbox against small fixture registries: proves
+  //        "killed de" surfaces a matching creature, "arrived no" a matching
+  //        location, "rep nc" a matching faction key, and "rep ncr u" the
+  //        up/down follow-up — each keyed off the SAME mocked registry
+  //        accessor the game-agnostic guard (153.6) confirms is the only
+  //        source.
+  {
+    const vm153b = require('vm');
+    function declareFn153b(src, name) {
+      const nameIdx = src.indexOf('function ' + name);
+      const parenIdx = src.indexOf('(', nameIdx);
+      const braceIdx = src.indexOf('{', parenIdx);
+      const params = src.slice(parenIdx, braceIdx);
+      return 'function ' + name + params + extractFunctionBody(src, name);
+    }
+    const src153b = declareFn153b(apiSrc153, '_quickLogContentSuggestions');
+
+    function runContent153(text, fixtures) {
+      const sb = {
+        getFactionRegistry: () => fixtures.factions || [],
+        FALLOUT_REGISTRY: { locations: fixtures.locations || [] },
+        getBestiaryNames: () => fixtures.creatures || [],
+      };
+      vm153b.createContext(sb);
+      vm153b.runInContext(src153b, sb);
+      return sb._quickLogContentSuggestions(text);
+    }
+
+    let err153b = null,
+      killRes153 = null,
+      locRes153 = null,
+      factionRes153 = null,
+      dirRes153 = null,
+      noneRes153 = null;
+    try {
+      killRes153 = runContent153('killed de', {
+        creatures: ['Deathclaw', 'Radroach', 'Bloatfly'],
+      });
+      locRes153 = runContent153('arrived no', {
+        locations: [{ name: 'Novac' }, { name: 'New Vegas' }, { name: 'Goodsprings' }],
+      });
+      factionRes153 = runContent153('rep nc', {
+        factions: [
+          { key: 'ncr', name: 'NCR' },
+          { key: 'legion', name: 'Legion' },
+        ],
+      });
+      dirRes153 = runContent153('rep ncr u', {
+        factions: [{ key: 'ncr', name: 'NCR' }],
+      });
+      noneRes153 = runContent153('hello world', {});
+    } catch (e) {
+      err153b = e;
+    }
+    assert(
+      !err153b &&
+        Array.isArray(killRes153) &&
+        killRes153.length === 1 &&
+        killRes153[0].name === 'killed Deathclaw' &&
+        Array.isArray(locRes153) &&
+        locRes153.length === 1 &&
+        locRes153[0].name === 'arrived Novac' &&
+        Array.isArray(factionRes153) &&
+        factionRes153.length === 1 &&
+        factionRes153[0].name === 'rep ncr ' &&
+        Array.isArray(dirRes153) &&
+        dirRes153.length === 1 &&
+        dirRes153[0].name === 'rep ncr up' &&
+        noneRes153 === null,
+      '_quickLogContentSuggestions() behavioral: "killed de" -> "killed Deathclaw" (bestiary); "arrived no" -> "arrived Novac" (location registry); "rep nc" -> "rep ncr " (faction registry); "rep ncr u" -> "rep ncr up" (direction follow-up); plain text with no verb lead-in -> null' +
+        (err153b ? ' — ' + err153b.message : '')
+    );
+  }
+
+  // 153.9  Protocol 1 — CACHE_NAME bumped for this served-file change
+  assert(
+    /const CACHE_NAME = 'robco-terminal-v2\.7\.0-r35';/.test(readFile('sw.js')),
+    '153.9: CACHE_NAME bumped (js/api.js, js/db_nv.js, js/db_fo3.js, js/ui-core.js touched by the Command-Line MODE upgrades)'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════

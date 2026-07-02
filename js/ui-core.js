@@ -2364,10 +2364,16 @@ function _updateModeHint() {
   const hint = document.getElementById('modeHintPopup');
   const input = document.getElementById('chatInput');
   if (!hint || !input) return;
-  const raw = input.value;
-  const first = raw.charAt(0);
-  if ((first === '/' || first === '@') && typeof _resolveCommandInput === 'function') {
-    const resolved = _resolveCommandInput(raw);
+  if (typeof _resolveCommandInput !== 'function') {
+    hint.style.display = 'none';
+    return;
+  }
+  // resolved.override is true for a leading `/` (whole-line -> TERMINAL) OR a
+  // `@` appearing anywhere (inline ping -> OVERSEER) — the resolver is the
+  // single source of both WHETHER an override is active and WHERE it targets,
+  // so the hint can never drift from what submitCommandInput() will do.
+  const resolved = _resolveCommandInput(input.value);
+  if (resolved.override) {
     hint.textContent = '→ ' + _modeLabel(resolved.mode);
     hint.style.display = 'block';
   } else {
@@ -2407,7 +2413,10 @@ const COMMAND_REGISTRY = [
         desc: 'Tap the pill above the input to swap between TERMINAL (native + quick-log, offline) and OVERSEER (AI narrator).',
       },
       { cmd: '/message', desc: 'One-off: send just this message to TERMINAL, regardless of mode.' },
-      { cmd: '@message', desc: 'One-off: send just this message to OVERSEER, regardless of mode.' },
+      {
+        cmd: 'text @message',
+        desc: 'Anywhere in a line, @ pings OVERSEER with just the text after it — the text before is dropped.',
+      },
       {
         cmd: 'killed <target>',
         desc: 'Quick-log (TERMINAL): record a kill in the Terminal Record. Offline.',
@@ -2420,6 +2429,10 @@ const COMMAND_REGISTRY = [
       {
         cmd: 'rep <faction> up/down',
         desc: "Quick-log (TERMINAL): nudge a faction's reputation +/-5. Offline.",
+      },
+      {
+        cmd: 'action, action, action',
+        desc: 'Quick-log (TERMINAL): comma-separate multiple actions on one line to apply them all.',
       },
     ],
   },

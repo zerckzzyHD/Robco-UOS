@@ -66,8 +66,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    1841-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    1841-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    1850-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    1850-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -862,10 +862,12 @@ MetaStore-backed via `getInputMode()`/`setInputMode()`/`otherInputMode()` in
 ```
 [TRANSMIT PROTOCOL] click / Ctrl+Enter → submitCommandInput()   // the ONE choke point
   → attachedImageData present?  → transmitMessage()             // AI is the only visual-analysis path
-  → _resolveCommandInput(raw)                                    // persisted mode, or a one-off / @ override
-      raw.charAt(0) === '/'  → target = 'terminal' (FIXED, regardless of persisted mode); strip the prefix + one optional space
-      raw.charAt(0) === '@'  → target = 'overseer' (FIXED, regardless of persisted mode); strip the prefix + one optional space
-      otherwise               → target = persisted mode; text unchanged
+  → _resolveCommandInput(raw)                                    // persisted mode, or an override — precedence:
+      raw.charAt(0) === '/'   → target = 'terminal' (whole line); strip the prefix + one optional space
+      raw.indexOf('@') !== -1 → target = 'overseer'; text = everything AFTER the FIRST '@' (text before it dropped);
+                                 strip one optional space right after '@'. Checked ONLY if no leading '/' —
+                                 a '/'-prefixed line's later '@' is literal terminal text.
+      otherwise                → target = persisted mode; text unchanged
   → target === 'terminal' ? transmitTerminal(text) : transmitMessage(text)
 ```
 
@@ -874,9 +876,16 @@ MetaStore-backed via `getInputMode()`/`setInputMode()`/`otherInputMode()` in
   it still runs `_routeNativeCommand()` first, so every `[TOKEN]` command keeps working, before
   falling through to the Gemini call).
 - **TERMINAL mode** — `transmitTerminal(overrideText)` (`api.js`) never calls the AI. It tries
-  `_routeNativeCommand()` first (same native router, same muscle memory), then `_routeQuickLog()`
-  — a small pattern table (`QUICK_LOG_PATTERNS`) matching natural one-liners onto **existing**
-  native setters, never a forked duplicate:
+  `_routeNativeCommand()` first, on the **whole, unsplit** line (a `[TOKEN]`'s own arguments are
+  never comma-split — muscle memory preserved exactly), then `_routeQuickLogMulti()`.
+- **Comma-separated multi-action quick-log** — `_routeQuickLogMulti(userText)` splits on commas,
+  trims each segment, and routes every segment through `_routeQuickLog()` **independently**, so one
+  line — `killed 3 raiders, +50 caps, arrived Novac, rep ncr up` — applies **all four** actions, not
+  just the first. A message with no comma is simply one segment, so single-action input is
+  unchanged. It collates to ONE combined `[TERM]` hint if any segment goes unrecognized (never one
+  hint per segment) as long as at least one segment matched. `_routeQuickLog()` itself (single
+  segment) is unchanged — the pattern table (`QUICK_LOG_PATTERNS`) still matches natural one-liners
+  onto **existing** native setters, never a forked duplicate:
   - `killed <target>` / `killed N <target>` → `_logEvent('kill', …)` (Terminal Record)
   - `+N caps` / `-N caps` → mutates `state.caps`, mirrors `#c_caps` (the same WU-N2 idiom
     `doBuy`/`doSell` use so the change survives the next `saveState()`)
@@ -886,16 +895,29 @@ MetaStore-backed via `getInputMode()`/`setInputMode()`/`otherInputMode()` in
     `getFactionRegistry()` (game-agnostic, Protocol 38) — an unknown faction key falls through
     Anything matching neither shows a gentle `[TERM] UNRECOGNIZED` hint pointing at `[FEATURES]`
     instead of silently doing nothing.
-- **The `/`/`@` override hint** (`#modeHintPopup`) is an inline reveal (not a floating overlay,
-  to guarantee no 360/412px overflow) shown the moment the raw input's first character is `/`
-  or `@`, naming the mode the message will actually go to.
-- **Autocomplete** — `wireInput()` (`js/ui-saves.js`, the shared `#acPanel` singleton documented
-  under "Registry Autocomplete System" below) now accepts a resolver **function** in addition to
-  a registry category string; `#chatInput` is wired to `_commandSuggestions()` (`api.js`), which
-  returns `[]` whenever the message would resolve to OVERSEER and otherwise surfaces matching
-  `NATIVE_COMMAND_ROUTER` tokens plus the quick-log verb stubs.
-- Documented in `COMMAND_REGISTRY`'s new `COMMAND-LINE MODE` group (`ui-core.js`), so `[FEATURES]`
-  always shows the pill, both override prefixes, and all four quick-log verbs.
+- **The `/`/`@` override hint** (`#modeHintPopup`) is an inline reveal (not a floating overlay, to
+  guarantee no 360/412px overflow), driven directly by `_resolveCommandInput(input.value).override`
+  — shown whenever a leading `/` OR an inline `@` (anywhere) is present, naming the mode the message
+  will actually go to. Single source of truth: the hint can never disagree with what
+  `submitCommandInput()` will actually do.
+- **Content-aware autocomplete** — `_commandSuggestions()` (`api.js`) first checks
+  `_quickLogContentSuggestions(text)`: once the (post-prefix) input matches a recognized quick-log
+  verb's lead-in, it suggests registry/DB **content** for the next token instead of re-suggesting
+  verbs — `killed de` → creature names from `getBestiaryNames()` (`db_nv.js`/`db_fo3.js`, a thin
+  enumerator over the same lazy cache `lookupBestiaryEntry()` already builds — Protocol 22, no
+  second CSV parse); `arrived `/`at ` → `FALLOUT_REGISTRY.locations` names; `rep ` → faction keys
+  from `getFactionRegistry()`, then `rep <key> ` → `up`/`down`. Every list is read from the
+  **active** game's registry/DB (game-agnostic, Protocol 38) — a new game needs no autocomplete
+  code change. Falls back to the plain native-token/quick-log-verb suggestions (unchanged) when no
+  verb lead-in matches. Every suggestion preserves whatever prefix `_resolveCommandInput` stripped
+  (e.g. a `/` override), so picking one never silently drops the user's explicit override.
+  `wireInput()` (`js/ui-saves.js`, the shared `#acPanel` singleton documented under "Registry
+  Autocomplete System" below) accepts this resolver **function** in addition to a registry category
+  string; `#chatInput` is wired to `_commandSuggestions()`, which returns `[]` whenever the message
+  would resolve to OVERSEER.
+- Documented in `COMMAND_REGISTRY`'s `COMMAND-LINE MODE` group (`ui-core.js`), so `[FEATURES]`
+  always shows the pill, both override prefixes, the comma multi-action syntax, and all four
+  quick-log verbs.
 
 ---
 
@@ -1486,7 +1508,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1841-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1850-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

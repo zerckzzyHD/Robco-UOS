@@ -104,6 +104,7 @@ export default [
         lookupItemInDb: 'readonly',
         lookupWeaponStats: 'readonly',
         lookupBestiaryEntry: 'readonly',
+        getBestiaryNames: 'readonly', // content-aware quick-log autocomplete source (js/db_nv.js / js/db_fo3.js)
         getChemsTable: 'readonly',
         getQuestItemDetail: 'readonly', // U9-4 CONSULT reserved-column surfacing (js/db_nv.js or js/db_fo3.js)
         renderThreat: 'readonly',

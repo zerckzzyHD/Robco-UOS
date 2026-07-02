@@ -10691,16 +10691,17 @@ Check (
     ($apiSrc151 -match "const userText = \(typeof overrideText === 'string' \? overrideText : inputEl\.value\)\.trim\(\);")
 ) "151.5: transmitMessage(overrideText) -- an optional param; called with no args it reads #chatInput exactly as before"
 
-# 151.6  transmitTerminal(): native commands first (muscle memory), then
-#        quick-log, else a hint -- and it NEVER calls the AI (no fetch, no
-#        Director-Link payload assembly)
+# 151.6  transmitTerminal(): native commands first on the WHOLE unsplit line
+#        (muscle memory -- a [TOKEN]'s own args are never comma-split), then
+#        comma-separated quick-log routing, else a hint -- and it NEVER calls
+#        the AI (no fetch, no Director-Link payload assembly)
 $transmitTerminalBody151 = Get-FunctionBody $apiSrc151 'transmitTerminal'
 Check (
     ($transmitTerminalBody151 -match "_routeNativeCommand\(userText\)") -and
-    ($transmitTerminalBody151 -match "_routeQuickLog\(userText\)") -and
+    ($transmitTerminalBody151 -match "_routeQuickLogMulti\(userText\)") -and
     ($transmitTerminalBody151 -match "UNRECOGNIZED") -and
     (-not ($transmitTerminalBody151 -match "fetch\(|generateSyncPayload|getSystemDirective"))
-) '151.6: transmitTerminal() tries _routeNativeCommand() then _routeQuickLog(), else shows an UNRECOGNIZED hint; never calls fetch/generateSyncPayload/getSystemDirective (no AI)'
+) '151.6: transmitTerminal() tries _routeNativeCommand() on the whole line then _routeQuickLogMulti(), else shows an UNRECOGNIZED hint; never calls fetch/generateSyncPayload/getSystemDirective (no AI)'
 
 # 151.7  submitCommandInput(): an attached image always forces the AI path
 #        (transmitMessage()) regardless of the resolved mode -- TERMINAL has
@@ -10711,18 +10712,21 @@ Check (
     ($submitBody151 -match "resolved\.mode === 'terminal'")
 ) "151.7: submitCommandInput() routes an attached image straight to transmitMessage() (AI), before checking the resolved mode"
 
-# 151.8  _resolveCommandInput(): first-char-only `/`/`@`, both spacing
-#        variants, FIXED targets (not relative to the persisted mode) --
-#        structural shape. Owner fix: `/` always targets 'terminal' and `@`
-#        always targets 'overseer', regardless of getInputMode().
+# 151.8  _resolveCommandInput(): leading `/` (first-char-only, whole line ->
+#        terminal) takes precedence over an INLINE `@` (anywhere in the line
+#        -> overseer, text after the first `@` only), both tolerate one
+#        optional leading space, and neither is otherInputMode(persisted)
+#        (the upgrade retiring the old first-char-only relative `@`).
 $resolveBody151 = Get-FunctionBody $apiSrc151 '_resolveCommandInput'
 Check (
-    ($resolveBody151 -match "const first = raw\.charAt\(0\);") -and
-    ($resolveBody151 -match "first === '/' \|\| first === '@'") -and
+    ($resolveBody151 -match "raw\.charAt\(0\) === '/'") -and
     ($resolveBody151 -match "rest\.charAt\(0\) === ' '") -and
-    ($resolveBody151 -match "mode: first === '/' \? 'terminal' : 'overseer'") -and
+    ($resolveBody151 -match "mode: 'terminal'") -and
+    ($resolveBody151 -match "const atIdx = raw\.indexOf\('@'\);") -and
+    ($resolveBody151 -match "text\.charAt\(0\) === ' '") -and
+    ($resolveBody151 -match "mode: 'overseer'") -and
     (-not ($resolveBody151 -match "otherInputMode\(persisted\)"))
-) "151.8: _resolveCommandInput() checks raw.charAt(0) (untrimmed -- first-char-only), accepts ``/`` and ``@``, strips exactly one leading space, and targets a FIXED mode ('/' -> terminal, '@' -> overseer) -- never otherInputMode(persisted)"
+) "151.8: _resolveCommandInput() checks a leading ``/`` first (whole line -> terminal), then an INLINE ``@`` anywhere (raw.indexOf('@'), everything after -> overseer), both stripping one optional leading space -- never otherInputMode(persisted)"
 
 # 151.9  QUICK_LOG_PATTERNS: all four quick-log verbs present with the
 #        expected regex anchors
@@ -10756,17 +10760,19 @@ Check (
 ) '151.11: _quickLogFaction returns false on an unknown faction key (falls through to the TERMINAL "unrecognized" hint, never invents a faction)'
 
 # 151.12  COMMAND_REGISTRY documents the mode system so it is discoverable
-#         via [FEATURES] -- the pill, both override prefixes, and all four
+#         via [FEATURES] -- the pill, both override prefixes (the inline `@`
+#         anywhere upgrade), the comma multi-action syntax, and all four
 #         quick-log verbs
 Check (
     ($uiCoreSrc151 -match "group:\s*'COMMAND-LINE MODE'") -and
     ($uiCoreSrc151 -match "'/message'") -and
-    ($uiCoreSrc151 -match "'@message'") -and
+    ($uiCoreSrc151 -match "'text @message'") -and
     ($uiCoreSrc151 -match "'killed <target>'") -and
     ($uiCoreSrc151 -match "'\+N caps / -N caps'") -and
     ($uiCoreSrc151 -match "'arrived <location>'") -and
-    ($uiCoreSrc151 -match "'rep <faction> up/down'")
-) "151.12: COMMAND_REGISTRY has a COMMAND-LINE MODE group documenting the pill, /message, @message, and all four quick-log verbs"
+    ($uiCoreSrc151 -match "'rep <faction> up/down'") -and
+    ($uiCoreSrc151 -match "'action, action, action'")
+) "151.12: COMMAND_REGISTRY has a COMMAND-LINE MODE group documenting the pill, /message, the inline `"text @message`" ping, the comma multi-action syntax, and all four quick-log verbs"
 
 # 151.13  wireInput() is generalized to accept a function resolver -- the
 #         three existing registry-category call sites are UNCHANGED
@@ -10809,28 +10815,34 @@ Check (
 
 # 151.17  STRUCTURAL MIRROR of the JS behavioral vm-sandbox proof (PowerShell
 #         has no JS execution sandbox -- same convention as Suite 149.8/150.10):
-#         the resolver's source SHAPE proves the same properties the JS side
-#         actually EXECUTES -- untrimmed first-char check (so a `/`/`@` NOT at
-#         position 0 cannot match), both `/` and `@` accepted, exactly one
-#         leading space stripped (not all whitespace, which would also strip
-#         a deliberate second space), and -- the owner fix -- the target is a
-#         FIXED literal mode name keyed off the prefix character itself
-#         ('/' -> terminal, '@' -> overseer), never otherInputMode(persisted)
+#         the resolver's source SHAPE proves the upgraded precedence -- a
+#         leading `/` (untrimmed raw.charAt(0), first-char-only) is checked
+#         and returned FIRST, so it always wins over any later `@`; the `@`
+#         scan (raw.indexOf) only runs when no leading `/` matched, and finds
+#         `@` ANYWHERE (not just position 0); both strip exactly one leading
+#         space (not all whitespace); neither branch is otherInputMode(persisted)
 #         (which would make the target relative to the starting mode).
 Check (
-    ($resolveBody151 -match "raw\.charAt\(0\)") -and
+    ($resolveBody151 -match "raw\.charAt\(0\) === '/'") -and
     ($resolveBody151 -match "raw\.slice\(1\)") -and
     ($resolveBody151 -match "rest\.slice\(1\)") -and
     (-not ($resolveBody151 -match "raw\.trim\(\)\.charAt\(0\)")) -and
     (-not ($resolveBody151 -match "\.replace\(/\^\\s\*/")) -and
-    ($resolveBody151 -match "mode: first === '/' \? 'terminal' : 'overseer'") -and
+    ($resolveBody151 -match "mode: 'terminal'") -and
+    ($resolveBody151 -match "const atIdx = raw\.indexOf\('@'\);") -and
+    ($resolveBody151 -match "raw\.slice\(atIdx \+ 1\)") -and
+    ($resolveBody151 -match "mode: 'overseer'") -and
+    ($resolveBody151.IndexOf("raw.charAt(0) === '/'") -lt $resolveBody151.IndexOf("raw.indexOf('@')")) -and
     (-not ($resolveBody151 -match "otherInputMode\(persisted\)"))
-) "151.17: structural mirror of the JS behavioral proof -- the resolver checks the UNTRIMMED raw.charAt(0) (first-char-only, no leading-whitespace tolerance), strips exactly one character then one optional space (never a run of whitespace), and always targets a FIXED mode keyed off the prefix character -- never otherInputMode(persisted)"
+) "151.17: structural mirror of the JS behavioral proof -- the leading-`/` branch (untrimmed raw.charAt(0), first-char-only) is checked and returned BEFORE the inline `@` scan (raw.indexOf, anywhere in the line), both strip exactly one leading space, and neither targets otherInputMode(persisted)"
 
-# 151.18  Protocol 1 -- CACHE_NAME bumped for this served-file change
+# 151.18  Protocol 1 -- CACHE_NAME is a well-formed, current revision string.
+#         (The exact -rN value is asserted once, in the LATEST suite to touch
+#         a served file -- currently Suite 153.9 -- rather than duplicated/
+#         hardcoded here too, which would go stale on every later commit.)
 Check (
-    (Read-Src "sw.js") -match "const CACHE_NAME = 'robco-terminal-v2\.7\.0-r34';"
-) "151.18: CACHE_NAME bumped (index.html/js/css touched by the Command-Line MODE system)"
+    (Read-Src "sw.js") -match "const CACHE_NAME = 'robco-terminal-v2\.7\.0-r\d+';"
+) "151.18: CACHE_NAME is a well-formed robco-terminal-v2.7.0-rN revision string (Protocol 1)"
 
 # ===========================================================
 # Suite 152 -- Shutdown/OFF power-on affordance (Protocol 42 fix)
@@ -10930,6 +10942,116 @@ Check (
     ($powerOnBody152.IndexOf("AmbientRuntime.transition('OFF')") -ge 0) -and
     ($powerOnBody152.IndexOf("AmbientRuntime.transition('OFF')") -lt $powerOnBody152.IndexOf("AmbientRuntime.transition('COLD_BOOT')"))
 ) "152.9: structural mirror -- exactly two transition() call sites exist (the conditional OFF branch and the unconditional COLD_BOOT call), with transition('OFF') appearing BEFORE transition('COLD_BOOT'), matching the two-hop-from-SHUTDOWN / one-hop-from-OFF behavior the JS vm sandbox executes"
+
+# ===========================================================
+# Suite 153 -- Command-Line MODE upgrades: inline `@` ping, comma
+# multi-action quick-log, content-aware autocomplete (9 tests).
+# Mirrors JS Suite 153. Step 2 Phase 2 B1 follow-up.
+# ===========================================================
+Sep "Suite 153 -- Command-Line MODE upgrades: inline @, comma multi-action, content autocomplete"
+$apiSrc153 = Read-Src "js/api.js"
+$dbNvSrc153 = Read-Src "js/db_nv.js"
+$dbFo3Src153 = Read-Src "js/db_fo3.js"
+
+# 153.1  _routeQuickLogMulti(): splits on commas, trims + drops empty
+#        segments, routes EACH through the unchanged single-segment
+#        _routeQuickLog(), and returns {anyMatched, anyUnmatched}
+$multiBody153 = Get-FunctionBody $apiSrc153 '_routeQuickLogMulti'
+Check (
+    ($multiBody153 -match "(?s)userText\s*\n\s*\.split\(','\)") -and
+    ($multiBody153 -match "\.map\(s => s\.trim\(\)\)") -and
+    ($multiBody153 -match "\.filter\(Boolean\)") -and
+    ($multiBody153 -match "if \(_routeQuickLog\(seg\)\) anyMatched = true;") -and
+    ($multiBody153 -match "else anyUnmatched = true;") -and
+    ($multiBody153 -match "return \{ anyMatched, anyUnmatched \};")
+) '153.1: _routeQuickLogMulti() splits on commas, trims and drops empty segments, routes each through _routeQuickLog(), and returns {anyMatched, anyUnmatched}'
+
+# 153.2  transmitTerminal() collates ONE combined hint when some (but not
+#        all) segments are unrecognized -- never one hint per segment
+$transmitTerminalBody153 = Get-FunctionBody $apiSrc153 'transmitTerminal'
+Check (
+    ($transmitTerminalBody153 -match "const \{ anyMatched, anyUnmatched \} = _routeQuickLogMulti\(userText\);") -and
+    ($transmitTerminalBody153 -match "if \(anyMatched\)") -and
+    ($transmitTerminalBody153 -match "if \(anyUnmatched\)") -and
+    ($transmitTerminalBody153 -match "wasn.{1,2}t recognized")
+) "153.2: transmitTerminal() shows ONE collated `"part of that line wasn't recognized`" hint only when anyMatched && anyUnmatched -- never spammed per segment"
+
+# 153.3  STRUCTURAL MIRROR of the JS behavioral vm-sandbox proof (PowerShell
+#        has no JS execution sandbox): the split/trim/filter chain runs in
+#        that exact ORDER (split -> map trim -> filter Boolean) before the
+#        per-segment forEach, and _routeQuickLog is called with the SEGMENT
+#        variable (never the whole unsplit userText) -- proving each of the
+#        4 comma-separated actions is routed independently, in order.
+Check (
+    ($multiBody153.IndexOf(".split(',')") -lt $multiBody153.IndexOf(".map(s => s.trim())")) -and
+    ($multiBody153.IndexOf(".map(s => s.trim())") -lt $multiBody153.IndexOf(".filter(Boolean)")) -and
+    ($multiBody153 -match "segments\.forEach\(seg => \{") -and
+    (-not ($multiBody153 -match "_routeQuickLog\(userText\)"))
+) "153.3: structural mirror -- the split -> trim -> filter(Boolean) chain runs in that order, and segments.forEach() routes each SEGMENT (never the whole unsplit userText) through _routeQuickLog() independently, matching the 4-action-line behavior the JS vm sandbox executes"
+
+# 153.4  getBestiaryNames() defined in BOTH db runners (Protocol 15 parity),
+#        reuses the SAME lazy cache lookupBestiaryEntry() builds (Protocol
+#        22 -- no second CSV parse)
+Check (
+    ($dbNvSrc153 -match "function _ensureBestiaryCache\(\)") -and
+    ($dbNvSrc153 -match "function getBestiaryNames\(\)") -and
+    ($dbNvSrc153 -match "(?s)_ensureBestiaryCache\(\);\s*\n\s*return Array\.from\(_bestiaryCache\.values\(\)\)\.map\(e => e\.name\);") -and
+    ($dbFo3Src153 -match "function _ensureBestiaryCache\(\)") -and
+    ($dbFo3Src153 -match "function getBestiaryNames\(\)")
+) '153.4: getBestiaryNames() is defined in both db_nv.js and db_fo3.js, reusing the same lazy _bestiaryCache lookupBestiaryEntry() builds (no second CSV parse)'
+
+# 153.5  lookupBestiaryEntry() itself is unchanged behaviorally -- still
+#        routes through _ensureBestiaryCache() (Protocol 42: a refactor must
+#        not alter the function it extracts from)
+Check (
+    ($dbNvSrc153 -match "(?s)function lookupBestiaryEntry\(name\) \{\s*\n\s*if \(!name\) return null;\s*\n\s*_ensureBestiaryCache\(\);")
+) '153.5: lookupBestiaryEntry() still guards on !name then calls _ensureBestiaryCache() -- the extraction preserved its exact behavior'
+
+# 153.6  _quickLogContentSuggestions(): recognizes all three verb lead-ins
+#        (kill/location/faction) plus the faction-then-direction follow-up,
+#        reading from the ACTIVE game's registries/DB (game-agnostic,
+#        Protocol 38) -- never a hardcoded name list
+$contentBody153 = Get-FunctionBody $apiSrc153 '_quickLogContentSuggestions'
+Check (
+    ($contentBody153 -match "rep\\s\+\(\\S\+\)\\s\+\(\\S\*\)\$") -and
+    ($contentBody153 -match "rep\\s\+\(\\S\*\)\$") -and
+    ($contentBody153 -match "arrived\(\?:\\s\+at\)\?\|at\)\\s\+\(\.\*\)\$") -and
+    ($contentBody153 -match "killed\?\\s\+\(\?:\\d\+\\s\+\)\?\(\.\*\)\$") -and
+    ($contentBody153 -match "getFactionRegistry\(\)") -and
+    ($contentBody153 -match "FALLOUT_REGISTRY\.locations") -and
+    ($contentBody153 -match "getBestiaryNames\(\)") -and
+    (-not ($contentBody153 -cmatch "\bFNV\b|\bFO3\b|Fallout|New Vegas|Mojave|Capital Wasteland"))
+) '153.6: _quickLogContentSuggestions() recognizes rep+direction, rep+key, arrived/at+location, and killed+creature lead-ins, reading names ONLY from getFactionRegistry()/FALLOUT_REGISTRY.locations/getBestiaryNames() -- game-agnostic, no hardcoded name list'
+
+# 153.7  _commandSuggestions() tries content suggestions FIRST and, when
+#        present, preserves whatever prefix _resolveCommandInput() stripped
+#        (e.g. a `/` override) so picking a suggestion never drops it
+$suggestBody153 = Get-FunctionBody $apiSrc153 '_commandSuggestions'
+Check (
+    ($suggestBody153 -match "const prefix = rawStr\.slice\(0, rawStr\.length - resolved\.text\.length\);") -and
+    ($suggestBody153 -match "const contentSuggestions = _quickLogContentSuggestions\(text\);") -and
+    ($suggestBody153 -match "return contentSuggestions\.map\(s => \(\{ name: prefix \+ s\.name, type: s\.type \}\)\);") -and
+    ($suggestBody153 -match "out\.push\(\{ name: prefix \+ cmd \+ ' ', type: 'native command' \}\)") -and
+    ($suggestBody153 -match "out\.push\(\{ name: prefix \+ p\.stub, type: p\.tag \}\)")
+) "153.7: _commandSuggestions() tries content suggestions first, and every suggestion (content or verb/token) is prefixed with whatever the resolver stripped, so a ``/`` override survives picking a suggestion"
+
+# 153.8  STRUCTURAL MIRROR of the JS behavioral vm-sandbox proof: each
+#        lead-in's filter predicate matches on a lower-cased startsWith
+#        against the partial token (the same shape the JS side actually
+#        EXECUTES against fixture registries to prove "killed de" ->
+#        deathclaw, "arrived no" -> Novac, "rep nc" -> ncr, "rep ncr u" -> up).
+Check (
+    ($contentBody153 -match "n\.toLowerCase\(\)\.startsWith\(partial\)") -and
+    ($contentBody153 -match "f\.key\.toLowerCase\(\)\.startsWith\(partial\)") -and
+    ($contentBody153 -match "\['up', 'down'\]") -and
+    ($contentBody153 -match "\.filter\(d => d\.startsWith\(partial\)\)") -and
+    ($contentBody153 -match "f\.key\.toLowerCase\(\) === m\[1\]\.toLowerCase\(\)")
+) "153.8: structural mirror -- every content-suggestion lead-in filters on a lower-cased startsWith(partial) against the matching registry field (location/creature names, faction keys) or the up/down literal set, matching the fixture-driven behavior the JS vm sandbox executes"
+
+# 153.9  Protocol 1 -- CACHE_NAME bumped for this served-file change
+Check (
+    (Read-Src "sw.js") -match "const CACHE_NAME = 'robco-terminal-v2\.7\.0-r35';"
+) "153.9: CACHE_NAME bumped (js/api.js, js/db_nv.js, js/db_fo3.js, js/ui-core.js touched by the Command-Line MODE upgrades)"
 
 # ===========================================================
 # Results
