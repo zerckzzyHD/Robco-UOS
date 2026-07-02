@@ -10057,7 +10057,7 @@ Check (
 ) '145.10: the P8 immersion-dial code is game-agnostic (no game literals)'
 
 # ===========================================================
-# Suite 146 -- Step 2 (v2.8.0) Phase 2 A1: Ambient Runtime core (14 tests).
+# Suite 146 -- Step 2 (v2.8.0) Phase 2 A1: Ambient Runtime core (15 tests).
 # Mirrors JS Suite 146. The one heartbeat + observer registry + central dial
 # enforcement, ADDITIVE: A1 tracks the canonical terminal state (OFF->COLD_BOOT->
 # READY->ACTIVE->IDLE->STANDBY->SHUTDOWN) in PARALLEL with the existing standby/
@@ -10177,6 +10177,23 @@ Check (
 Check (
     -not ($runtime146 -match 'FNV|FO3|Fallout|New Vegas|Mojave|Capital Wasteland')
 ) '146.14: the A1 Ambient Runtime is game-agnostic (no game literals -- pure lifecycle logic)'
+
+# 146.15  forceState() TEST-ONLY escape hatch: transition(to, opts) accepts an
+#         opts.force flag that bypasses the LEGAL adjacency check (unknown-target
+#         + idempotent guards still apply, unchanged), forceState(to) is the sole
+#         caller of that flag, is exposed on window.AmbientRuntime, and no
+#         production call site anywhere in the file passes force:true (the
+#         validated transition(to) -- every real caller -- keeps enforcing LEGAL
+#         edges unchanged). Guards the RobCo U.O.S. Test Console fix where only
+#         an adjacent-state button worked.
+Check (
+    ($runtime146 -match 'function transition\(to, opts\)') -and
+    ($transitionBody146 -match 'var force = !!\(opts && opts\.force\);') -and
+    ($transitionBody146 -match 'if \(!force && !\(LEGAL\[from\] && LEGAL\[from\]\.indexOf\(to\) !== -1\)\) return false;') -and
+    ($runtime146 -match 'function forceState\(to\) \{\s*return transition\(to, \{ force: true \}\);\s*\}') -and
+    ($runtime146 -match 'forceState:\s*forceState') -and
+    ([regex]::Matches($runtime146, 'force:\s*true').Count -eq 1)
+) '146.15: transition(to, opts.force) bypasses the LEGAL adjacency map only via forceState(to) (exposed on AmbientRuntime); exactly one force:true call site in the whole file -- no production path forces a state, and the validated transition(to) keeps enforcing LEGAL edges unchanged'
 
 # ===========================================================
 # Suite 147 -- Step 2 (v2.8.0) Phase 2 A2.1: Standby machine -> runtime observer (7 tests).
@@ -10317,7 +10334,7 @@ Check (
 ) '148.7: the migrated uptime/mem-cycle/overseer observer bodies never write the campaign save (robco_v8 / saveState / eventLog / _logEvent) -- device + DOM only (atmosphere/save boundary)'
 
 # ===========================================================
-# Suite 149 -- Developer Console: the ONE canonical dev/debug console (14 tests).
+# Suite 149 -- Developer Console: the ONE canonical dev/debug console (15 tests).
 # Mirrors JS Suite 149. A live inspector + trigger panel for the Ambient
 # Runtime. This IS the canonical developer/debug console the roadmap's
 # hacking minigame will later unlock in normal builds -- not a throwaway test
@@ -10453,6 +10470,20 @@ Check (
     ($testConsole149 -match 'MINIGAME-UNLOCK SEAM') -and
     ($testConsole149 -match 'canonical dev/debug console')
 ) "149.14: _devConsoleUnlocked() carries a documented MINIGAME-UNLOCK SEAM comment marking it as the one hook a future hacking minigame will flip -- this is the canonical console, not a throwaway test panel"
+
+# 149.15  ALL 7 transition buttons (including SHUTDOWN) route through
+#         AmbientRuntime.forceState() so every button can force ANY state --
+#         not just a LEGAL neighbor of the current state (the bug this unit
+#         fixes: previously only an adjacent-state button did anything, since
+#         the buttons called the validated transition() directly). The old
+#         SHUTDOWN-only special case (calling AmbientRuntime.shutdown(), which
+#         always lands on OFF, never on SHUTDOWN itself) is retired.
+Check (
+    ($testConsole149 -match 'window\.AmbientRuntime\.forceState\(target\)') -and
+    (-not ($testConsole149 -match "target === 'SHUTDOWN'")) -and
+    (-not ($testConsole149 -match 'window\.AmbientRuntime\.shutdown\(\)')) -and
+    ($testConsole149 -match "typeof window\.AmbientRuntime\.transition === 'function'")
+) '149.15: every transition button routes through AmbientRuntime.forceState(target) (bypassing the LEGAL adjacency map), with a graceful transition() fallback for older runtime builds -- the retired SHUTDOWN-only special case is gone, so all 7 buttons force their state live'
 
 # ===========================================================
 # Results

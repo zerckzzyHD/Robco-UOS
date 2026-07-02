@@ -96,8 +96,13 @@
       btn.addEventListener('click', function () {
         var target = btn.getAttribute('data-test-transition');
         try {
-          if (target === 'SHUTDOWN' && typeof window.AmbientRuntime.shutdown === 'function') {
-            window.AmbientRuntime.shutdown();
+          // The console must be able to force ANY state to exercise the ambient
+          // behaviors in each one, so every button routes through the FORCE path
+          // (bypasses the LEGAL adjacency map) rather than the validated
+          // transition() a real caller would use — this is a debug tool, not a
+          // simulation of legal player-driven flow.
+          if (typeof window.AmbientRuntime.forceState === 'function') {
+            window.AmbientRuntime.forceState(target);
           } else if (typeof window.AmbientRuntime.transition === 'function') {
             window.AmbientRuntime.transition(target);
           }

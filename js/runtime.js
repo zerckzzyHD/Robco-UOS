@@ -41,6 +41,8 @@
 
   // Legal transition adjacency. Any edge NOT listed here is a no-op — an illegal
   // edge never throws, never mutates state, and never fires onEnter/onExit.
+  // (The TEST-ONLY forceState() escape hatch below bypasses this map; normal
+  // transition(to) calls always enforce it unchanged.)
   var LEGAL = {
     OFF: ['COLD_BOOT', 'SHUTDOWN'],
     COLD_BOOT: ['READY', 'STANDBY', 'SHUTDOWN'],
@@ -124,11 +126,18 @@
   // transition — validated + idempotent. Fires per-observer onExit(from)/onEnter(to)
   // for observers whose state-set boundary is crossed, then emits runtime.state.
   // Returns true iff the state actually changed.
-  function transition(to) {
+  //   opts.force — TEST-ONLY escape hatch (used by forceState() below) that
+  //   bypasses the LEGAL adjacency check so any known, different state is
+  //   directly reachable. The unknown-target and idempotent (to===from) guards
+  //   still apply, and the full onExit/onEnter/_lastTick/emit machinery still
+  //   runs — forcing a state genuinely exercises it. Normal callers (no opts,
+  //   e.g. every production/runtime call site) are byte-identical to before.
+  function transition(to, opts) {
     if (RUNTIME_STATES.indexOf(to) === -1) return false; // unknown target — ignore
     var from = _state;
     if (to === from) return false; // idempotent — no-op, no events
-    if (!(LEGAL[from] && LEGAL[from].indexOf(to) !== -1)) return false; // illegal edge
+    var force = !!(opts && opts.force);
+    if (!force && !(LEGAL[from] && LEGAL[from].indexOf(to) !== -1)) return false; // illegal edge
     _state = to;
     for (var i = 0; i < _observers.length; i++) {
       var o = _observers[i];
@@ -216,6 +225,18 @@
     transition('OFF');
   }
 
+  // forceState — TEST-ONLY escape hatch for the staging-only Test Console
+  // (js/test-console.js): forces the runtime directly into ANY known state,
+  // bypassing the LEGAL adjacency map that governs real transition(to) calls,
+  // while still running the identical onExit/onEnter/_lastTick/emit machinery
+  // (so forcing a state genuinely exercises its observers). The unknown-target
+  // and idempotent (to===from) guards still apply. Never called by any
+  // production code path — the normal transition(to) (no opts) keeps
+  // enforcing LEGAL edges unchanged.
+  function forceState(to) {
+    return transition(to, { force: true });
+  }
+
   // Read-only introspection — a plain-data snapshot of every registered observer
   // (id/states/tier/cadenceMs only; never the onTick/onEnter/onExit closures).
   // Consumed by the staging-only Test Console (js/test-console.js); safe to call
@@ -259,6 +280,7 @@
     transition: transition,
     noteActivity: noteActivity,
     shutdown: shutdown,
+    forceState: forceState,
     start: start,
     listObservers: listObservers,
     _beat: _beat, // exposed for the deterministic behavioral test (tests/test.html)

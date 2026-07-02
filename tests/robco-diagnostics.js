@@ -17288,7 +17288,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 146 — Step 2 (v2.8.0) Phase 2 A1: Ambient Runtime core (14 tests)
+//  Suite 146 — Step 2 (v2.8.0) Phase 2 A1: Ambient Runtime core (15 tests)
 // ──────────────────────────────────────────────────────────────
 //  The one heartbeat + observer registry + central dial enforcement, ADDITIVE:
 //  A1 tracks the canonical terminal state (OFF→COLD_BOOT→READY→ACTIVE→IDLE→
@@ -17436,6 +17436,28 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   assert(
     !/FNV|FO3|Fallout|New Vegas|Mojave|Capital Wasteland/.test(runtime146),
     '146.14: the A1 Ambient Runtime is game-agnostic (no game literals — pure lifecycle logic)'
+  );
+
+  // 146.15  forceState() TEST-ONLY escape hatch: transition(to, opts) accepts an
+  //         opts.force flag that bypasses the LEGAL adjacency check (unknown-target
+  //         + idempotent guards still apply, unchanged), forceState(to) is the sole
+  //         caller of that flag, is exposed on window.AmbientRuntime, and no
+  //         production call site anywhere in the file passes force:true (the
+  //         validated transition(to) — every real caller — keeps enforcing LEGAL
+  //         edges unchanged). Guards the RobCo U.O.S. Test Console fix where only
+  //         an adjacent-state button worked.
+  assert(
+    /function transition\(to, opts\)/.test(runtime146) &&
+      /var force = !!\(opts && opts\.force\);/.test(transitionBody146) &&
+      /if \(!force && !\(LEGAL\[from\] && LEGAL\[from\]\.indexOf\(to\) !== -1\)\) return false;/.test(
+        transitionBody146
+      ) &&
+      /function forceState\(to\) \{\s*return transition\(to, \{ force: true \}\);\s*\}/.test(
+        runtime146
+      ) &&
+      /forceState:\s*forceState/.test(runtime146) &&
+      (runtime146.match(/force:\s*true/g) || []).length === 1,
+    '146.15: transition(to, opts.force) bypasses the LEGAL adjacency map only via forceState(to) (exposed on AmbientRuntime); exactly one force:true call site in the whole file — no production path forces a state, and the validated transition(to) keeps enforcing LEGAL edges unchanged'
   );
 }
 
@@ -17605,7 +17627,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 149 — Developer Console: the ONE canonical dev/debug console (14 tests)
+//  Suite 149 — Developer Console: the ONE canonical dev/debug console (15 tests)
 // ──────────────────────────────────────────────────────────────
 //  A live inspector + trigger panel for the Ambient Runtime (js/runtime.js).
 //  This IS the canonical developer/debug console the roadmap's hacking
@@ -17803,6 +17825,21 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     /MINIGAME-UNLOCK SEAM/.test(testConsole149) &&
       /canonical dev\/debug console/.test(testConsole149),
     '149.14: _devConsoleUnlocked() carries a documented MINIGAME-UNLOCK SEAM comment marking it as the one hook a future hacking minigame will flip — this is the canonical console, not a throwaway test panel'
+  );
+
+  // 149.15  ALL 7 transition buttons (including SHUTDOWN) route through
+  //         AmbientRuntime.forceState() so every button can force ANY state —
+  //         not just a LEGAL neighbor of the current state (the bug this unit
+  //         fixes: previously only an adjacent-state button did anything,
+  //         since the buttons called the validated transition() directly).
+  //         The old SHUTDOWN-only special case (calling AmbientRuntime.shutdown(),
+  //         which always lands on OFF, never on SHUTDOWN itself) is retired.
+  assert(
+    /window\.AmbientRuntime\.forceState\(target\)/.test(testConsole149) &&
+      !/target === 'SHUTDOWN'/.test(testConsole149) &&
+      !/window\.AmbientRuntime\.shutdown\(\)/.test(testConsole149) &&
+      /typeof window\.AmbientRuntime\.transition === 'function'/.test(testConsole149),
+    '149.15: every transition button routes through AmbientRuntime.forceState(target) (bypassing the LEGAL adjacency map), with a graceful transition() fallback for older runtime builds — the retired SHUTDOWN-only special case is gone, so all 7 buttons force their state live'
   );
 }
 
