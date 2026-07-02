@@ -430,6 +430,17 @@ function enterStandby() {
 function exitStandby() {
   if (!_standbyActive) return;
   _standbyActive = false;
+  // A3: STANDBY→SHUTDOWN is a legal edge (forced via the Test Console today).
+  // By the time this onExit fires, the runtime's _state already flipped to the
+  // NEW state (transition() sets it before dispatching onExit/onEnter), so if
+  // we're headed to SHUTDOWN/OFF this exit is a power-down, not a wake — skip
+  // the wake tone/audio ramp/"COURIER RETURNED" chat line entirely (the
+  // shutdown-crt observer's own onEnter already force-clears the standby
+  // class, so nothing is left stuck).
+  const _shuttingDown =
+    typeof AmbientRuntime !== 'undefined' &&
+    (AmbientRuntime.getState() === 'SHUTDOWN' || AmbientRuntime.getState() === 'OFF');
+  if (_shuttingDown) return;
   playWakeTone();
   setTimeout(() => {
     document.body.classList.remove('standby');
@@ -682,6 +693,78 @@ function _wireStandby() {
     tier: 'minimal',
     onEnter: enterStandby,
     onExit: exitStandby,
+  });
+}
+
+// ── A3: IDLE / STANDBY / SHUTDOWN AMBIENT EXPERIENCES ──────────────────────
+// The showcase consumers of the runtime states, layered on top of the A2
+// standby machine + timers (unchanged). Pure CSS-class toggles driven by
+// onEnter/onExit — the runtime does NOT tier-gate onEnter/onExit itself
+// (only onTick, re-checked every beat — see runtime.js's _beat()), so each
+// one-shot lifecycle hook below checks immersionAllows() itself, the same
+// convention _wireStandby documents for its own 'minimal' tier. Writes
+// NOTHING durable to the campaign anywhere here (Phase-2 invariant #1) —
+// body classList toggles only, never state/saveState/eventLog.
+function _wireAmbientExperiences() {
+  // IDLE — phosphor-preservation screensaver flourish (a gentle dim + a small
+  // diegetic corner note). tier 'balanced': quiet at Minimal, on at Balanced/
+  // Full. Reverts the instant any interaction fires (noteActivity() already
+  // transitions IDLE→ACTIVE, crossing this observer's onExit).
+  AmbientRuntime.register({
+    id: 'idle-phosphor',
+    states: ['IDLE'],
+    tier: 'balanced',
+    onEnter: () => {
+      if (typeof immersionAllows === 'function' && !immersionAllows('balanced')) return;
+      document.body.classList.add('rt-idle');
+    },
+    onExit: () => document.body.classList.remove('rt-idle'),
+  });
+
+  // STANDBY (deepen) — an ADDITIONAL flourish layered over the A2 essential
+  // dim (which stays tier 'minimal', unchanged, in _wireStandby above). tier
+  // 'balanced': the essential .standby dim/text never quiets; this extra
+  // vignette pulse does, at Minimal.
+  AmbientRuntime.register({
+    id: 'standby-deepen',
+    states: ['STANDBY'],
+    tier: 'balanced',
+    onEnter: () => {
+      if (typeof immersionAllows === 'function' && !immersionAllows('balanced')) return;
+      document.body.classList.add('standby-deep');
+    },
+    onExit: () => document.body.classList.remove('standby-deep'),
+  });
+
+  // SHUTDOWN — a proper CRT power-down. tier 'full': the dramatic collapse-
+  // to-a-dot flourish only at Full; Balanced/Minimal degrade to a plain
+  // instant cut (rt-shutdown-plain) — the terminal is never left in a broken
+  // half-state at any tier.
+  //
+  // states includes OFF so the visual PERSISTS across the internal
+  // SHUTDOWN→OFF cascade (AmbientRuntime.shutdown() fires both transitions
+  // back-to-back, synchronously): onEnter only fires crossing INTO this
+  // observer's state set (not on the internal SHUTDOWN→OFF hop, since both
+  // states are members), so the animation triggers exactly once and holds
+  // until the terminal is cold-booted again (onExit fires only on leaving
+  // this set, e.g. OFF→COLD_BOOT).
+  //
+  // Any lingering standby/idle flourish loses to a genuine shutdown — cleared
+  // unconditionally here (including the A2 essential 'standby' class itself,
+  // bypassing its own delayed wake-fade so the power-down reads cleanly; see
+  // exitStandby()'s _shuttingDown guard for the matching audio/chat suppression).
+  AmbientRuntime.register({
+    id: 'shutdown-crt',
+    states: ['SHUTDOWN', 'OFF'],
+    tier: 'full',
+    onEnter: () => {
+      document.body.classList.remove('rt-idle', 'standby-deep', 'standby');
+      const full = typeof immersionAllows === 'function' ? immersionAllows('full') : true;
+      document.body.classList.add(full ? 'rt-shutdown' : 'rt-shutdown-plain');
+    },
+    onExit: () => {
+      document.body.classList.remove('rt-shutdown', 'rt-shutdown-plain');
+    },
   });
 }
 
@@ -1111,6 +1194,7 @@ window.onload = async function () {
     initRadio(); // WU-F5: restore the Pip-Boy Radio preference (autoplay-safe first-gesture arm)
     _wireRotaryDialClick();
     _wireStandby();
+    _wireAmbientExperiences(); // A3: IDLE/STANDBY-deepen/SHUTDOWN dial-gated ambient observers
     initAmbientRuntime(); // A1: Ambient Runtime — additive state machine + observer scheduler (parallel to standby; owns no timers yet)
     initTestConsole(); // staging/dev-only Test Console — no-ops (stays hidden) on production
     _wirePanelPersistence();

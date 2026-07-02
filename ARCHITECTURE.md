@@ -66,8 +66,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    1803-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    1803-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    1812-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    1812-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -273,6 +273,16 @@ its exports to `window.*` for the other scripts to call.
   Two runtime refinements make this byte-identical: `register()` seeds `_lastTick` to `now()` (a `cadenceMs>0` observer first fires one full cadence later, like `setInterval`), and `transition()` restarts an observer's cadence clock when it **re-enters** its state set (so a paused-then-resumed observer behaves exactly like a `setInterval` cleared on standby and freshly restarted on wake). Guarded by Suite 148 (both runners) + the `tests/test.html` parity assertion.
 
 Behavior is identical at every immersion tier. If the runtime fails to start, the app is byte-identical to today. Still self-scheduling and NOT yet runtime observers: geiger (Poisson, rads-driven), radio + tinnitus (randomized, game-state/user driven), and the audio heartbeat (HP-driven) — these keep their own scheduling; the standby coordinator pauses/resumes the ones that were standby-coupled.
+
+**A3 — the IDLE/STANDBY/SHUTDOWN ambient experiences (showcase consumers).** `_wireAmbientExperiences()` (`ui-core.js`, called from `window.onload` right after `_wireStandby()`) registers three dial-gated observers, layered on top of the A2 machinery above (unchanged). The runtime does **not** tier-gate `onEnter`/`onExit` itself (only `onTick` is re-checked every beat), so each of these checks `immersionAllows()` itself before toggling its body class, matching the convention `_wireStandby` already documents for its own `'minimal'`-tier observer:
+
+- **idle-phosphor** — `states:['IDLE']`, `tier:'balanced'`. A gentle phosphor-preservation dim (`body.rt-idle`: `.container` brightness reduced, a small pulsing "REDUCING PHOSPHOR WEAR" corner note) — understated, since the tab is still focused and pointer events are left alone (a click both wakes AND registers, unlike STANDBY). Reverts the instant any interaction fires (`noteActivity()` already transitions `IDLE→ACTIVE`, crossing this observer's `onExit`, which unconditionally cleans up).
+- **standby-deepen** — `states:['STANDBY']`, `tier:'balanced'`. An **additional** flourish layered OVER the A2 essential dim (`body.standby`, unchanged, `tier:'minimal'` — never quiets): a slow breathing vignette pulse (`body.standby-deep`, using `::before` so it coexists with `body.standby`'s own `::after` diegetic text without clobbering it). Silent at Minimal; the essential dim still shows.
+- **shutdown-crt** — `states:['SHUTDOWN','OFF']`, `tier:'full'`. A proper CRT power-down: the classic collapse-to-a-line-then-dot flourish (`body.rt-shutdown`) at Full immersion, degrading to a plain instant cut (`body.rt-shutdown-plain`) at Balanced/Minimal — the terminal is never left in a broken half-state at any tier. `states` deliberately includes **both** `SHUTDOWN` and `OFF`: `AmbientRuntime.shutdown()` fires the `SHUTDOWN→OFF` cascade synchronously (back-to-back `transition()` calls), and `onEnter`/`onExit` only fire when crossing the observer's state-set _boundary_ — since both states are members, the one-shot animation trigger survives that internal hop without re-firing, and holds until the terminal is cold-booted again (`onExit` fires only on leaving the set, e.g. `OFF→COLD_BOOT`). `onEnter` also force-clears any lingering `rt-idle`/`standby-deep`/`standby` class first, so a genuine shutdown always visually wins over anything else — its full-screen cover sits at a higher z-index (100001) than `#bootScreen` (100000) for the same reason.
+
+  A companion fix (found while verifying this unit, Protocol 42): `exitStandby()` (A2, otherwise unchanged) now checks `AmbientRuntime.getState()` and returns immediately — before `playWakeTone()` — when the runtime has already moved to `SHUTDOWN`/`OFF` by the time this `onExit` runs (since `transition()` flips `_state` before dispatching observer callbacks, that check reflects the _new_ state). Without this guard, a `STANDBY→SHUTDOWN` edge (reachable via the Test Console today) would still play the wake tone immediately and, 650ms later, ramp audio back up and append `"COURIER RETURNED. SYNCHRONIZING TELEMETRY..."` to chat — spurious feedback for a terminal that just powered down, not woke up.
+
+  Every new `@keyframes` animation (`idle-breathe`, `standby-breathe`, `crt-power-off`, `shutdown-cover`, `shutdown-cover-plain`) is a plain `animation:` declaration, so the existing global `prefers-reduced-motion` block (`animation-duration:0.01ms` + `iteration-count:1` on `*`) neutralises all of them to their static/instant final frame — no bespoke per-class override needed. No durable writes anywhere (body classList toggles only). Guarded by Suite 150 (both runners).
 
 **Hard atmosphere/save boundary (Phase-2 prime invariant #1).** `runtime.js` writes **nothing durable to the campaign** — it never persists the save, mutates a campaign field, appends to the Terminal Record, or touches raw local storage. State is ephemeral / in-memory; any device pref would go through MetaStore only (A1 stores none). Gate-guarded by Suite 146 (negative grep) + the Suite 18 behavioral no-write assertion in `tests/test.html`.
 
@@ -1407,7 +1417,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1803-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1812-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

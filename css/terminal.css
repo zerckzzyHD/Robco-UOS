@@ -1748,6 +1748,139 @@ body.standby .header h1 {
   animation-play-state: paused;
 }
 
+/* ── A3: Ambient Runtime experiences (IDLE / STANDBY deepen / SHUTDOWN) ──
+   Step 2 (v2.8.0) Phase 2 A3. Each is a dial-gated AmbientRuntime observer
+   (js/ui-core.js: _wireAmbientExperiences) that toggles a body class on
+   state entry/exit — pure CSS, no durable writes anywhere. Every animation
+   below is neutralised by the global prefers-reduced-motion block further
+   down (animation-duration:0.01ms + iteration-count:1 on *), which freezes
+   each keyframe to its resting/final frame instead of playing it out — the
+   required static/instant fallback for motion-sensitive users. */
+
+/* IDLE — phosphor-preservation screensaver flourish (tier 'balanced'). A
+   gentle dim, understated — NOT the full standby blackout (the tab is still
+   focused; the player just hasn't touched anything in a while), so pointer
+   events are left alone (unlike standby, a click both wakes AND registers).
+   Reverts instantly on any interaction (noteActivity() transitions IDLE→ACTIVE,
+   crossing this observer's onExit). */
+body.rt-idle .container {
+  filter: brightness(0.82);
+  transition: filter 1.4s ease;
+}
+body.rt-idle::after {
+  content: '> REDUCING PHOSPHOR WEAR';
+  position: fixed;
+  bottom: 10px;
+  right: 14px;
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+  letter-spacing: 1px;
+  white-space: nowrap;
+  color: var(--robco-green);
+  text-shadow: var(--robco-glow);
+  z-index: 9990;
+  pointer-events: none;
+  animation: idle-breathe 4s ease-in-out infinite;
+}
+@keyframes idle-breathe {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* STANDBY (deepen) — an ADDITIONAL flourish layered OVER the A2 essential dim
+   (body.standby above, unchanged, tier 'minimal' — never quiets). This one is
+   tier 'balanced': a slow "breathing" vignette pulse, silent at Minimal. Uses
+   ::before (not ::after, which body.standby already owns for its diegetic
+   text) so both classes' pseudo-elements coexist without conflict. */
+body.standby-deep::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 99998;
+  background: radial-gradient(circle at center, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.55) 100%);
+  animation: standby-breathe 6s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes standby-breathe {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+/* SHUTDOWN — a proper CRT power-down. tier 'full': the classic collapse-to-
+   a-line-then-dot flourish (rt-shutdown). Balanced/Minimal degrade to a
+   plain, brief fade to black (rt-shutdown-plain) — still functionally "off",
+   no theatrics, never a broken half-state. Both cover the ENTIRE viewport
+   above everything — including #bootScreen, modals, and the standby overlay
+   — since a genuine shutdown wins over any other visual (js/ui-core.js's
+   shutdown-crt observer also force-clears any lingering idle/standby class
+   first, so nothing else bleeds through underneath). */
+body.rt-shutdown .container {
+  animation: crt-power-off 0.7s ease-in forwards;
+  transform-origin: center;
+}
+body.rt-shutdown::after,
+body.rt-shutdown-plain::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 100001;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+}
+body.rt-shutdown::after {
+  animation: shutdown-cover 0.7s ease-in forwards;
+}
+body.rt-shutdown-plain::after {
+  animation: shutdown-cover-plain 0.3s ease-in forwards;
+}
+@keyframes crt-power-off {
+  0% {
+    transform: scaleY(1) scaleX(1);
+    filter: brightness(1);
+  }
+  60% {
+    transform: scaleY(0.006) scaleX(1);
+    filter: brightness(3);
+  }
+  85% {
+    transform: scaleY(0.006) scaleX(0.01);
+    filter: brightness(3);
+  }
+  100% {
+    transform: scaleY(0.006) scaleX(0.01);
+    opacity: 0;
+    filter: brightness(0);
+  }
+}
+@keyframes shutdown-cover {
+  0%,
+  85% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes shutdown-cover-plain {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
 /* ── Thermal Ambient Shift ─────────────────────────────────────── */
 body {
   transition: background-color 0.8s ease;

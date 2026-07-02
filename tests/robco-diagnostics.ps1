@@ -10486,6 +10486,126 @@ Check (
 ) '149.15: every transition button routes through AmbientRuntime.forceState(target) (bypassing the LEGAL adjacency map), with a graceful transition() fallback for older runtime builds -- the retired SHUTDOWN-only special case is gone, so all 7 buttons force their state live'
 
 # ===========================================================
+# Suite 150 -- Step 2 (v2.8.0) Phase 2 A3: IDLE/STANDBY/SHUTDOWN ambient
+# experiences (9 tests). Mirrors JS Suite 150. The showcase consumers of the
+# runtime states: _wireAmbientExperiences() (ui-core.js) registers three
+# dial-gated observers -- idle-phosphor (tier balanced), standby-deepen (tier
+# balanced, layered OVER the A2 essential 'minimal'-tier dim, unchanged), and
+# shutdown-crt (tier full, degrading to a plain instant cut below Full).
+# onEnter/onExit are NOT tier-gated by the runtime itself (only onTick is --
+# see runtime.js's _beat()), so each observer's onEnter checks
+# immersionAllows() itself before toggling its body class; onExit always
+# cleans up unconditionally (no leaked class). shutdown-crt's states include
+# OFF so its one-shot animation trigger survives the internal SHUTDOWN->OFF
+# cascade (shutdown() fires both synchronously) without re-firing. A
+# companion fix in exitStandby() (A2, unchanged otherwise) skips the delayed
+# wake tone/audio ramp/chat line when the runtime has moved on to
+# SHUTDOWN/OFF by the time it fires (a genuine power-down, not a wake) --
+# found while verifying this unit (Protocol 42). Pure CSS + classList
+# toggles; the atmosphere/save boundary and Protocol 38 (game-agnostic) are
+# gate-guarded below.
+# ===========================================================
+Sep "Suite 150 -- A3 IDLE/STANDBY/SHUTDOWN ambient experiences"
+$uiCore150 = Read-Src "js/ui-core.js"
+$css150 = Read-Src "css/terminal.css"
+$wireAmbient150 = Get-FunctionBody $uiCore150 '_wireAmbientExperiences'
+$exitStandbyBody150 = Get-FunctionBody $uiCore150 'exitStandby'
+
+# 150.1  _wireAmbientExperiences() is wired into window.onload after
+#        _wireStandby() and before initAmbientRuntime() (registration order)
+Check (
+    $uiCore150 -match '(?s)_wireStandby\(\);.*?_wireAmbientExperiences\(\);.*?initAmbientRuntime\(\);'
+) '150.1: window.onload calls _wireAmbientExperiences() after _wireStandby() and before initAmbientRuntime()'
+
+# 150.2  idle-phosphor observer: states ['IDLE'], tier 'balanced', gates its
+#        own onEnter on immersionAllows('balanced'), onExit always cleans up
+Check (
+    ($wireAmbient150 -match "id:\s*'idle-phosphor'") -and
+    ($wireAmbient150 -match "states:\s*\['IDLE'\]") -and
+    ($wireAmbient150 -match "tier:\s*'balanced'") -and
+    ($wireAmbient150 -match "(?s)if \(typeof immersionAllows === 'function' && !immersionAllows\('balanced'\)\) return;\s*\n\s*document\.body\.classList\.add\('rt-idle'\);") -and
+    ($wireAmbient150 -match "onExit:\s*\(\)\s*=>\s*document\.body\.classList\.remove\('rt-idle'\)")
+) "150.2: idle-phosphor observer (states ['IDLE'], tier 'balanced') gates onEnter's 'rt-idle' class add on immersionAllows('balanced'); onExit unconditionally removes it"
+
+# 150.3  standby-deepen observer: states ['STANDBY'], tier 'balanced', same
+#        gate-on-enter/unconditional-exit pattern, layered over the A2 dim
+Check (
+    ($wireAmbient150 -match "id:\s*'standby-deepen'") -and
+    ($wireAmbient150 -match "states:\s*\['STANDBY'\]") -and
+    (([regex]::Matches($wireAmbient150, "tier:\s*'balanced'")).Count -eq 2) -and
+    ($wireAmbient150 -match "document\.body\.classList\.add\('standby-deep'\)") -and
+    ($wireAmbient150 -match "onExit:\s*\(\)\s*=>\s*document\.body\.classList\.remove\('standby-deep'\)")
+) "150.3: standby-deepen observer (states ['STANDBY'], tier 'balanced') adds/removes 'standby-deep' as an ADDITIONAL flourish over the unchanged tier-'minimal' A2 dim"
+
+# 150.4  shutdown-crt observer: states include BOTH 'SHUTDOWN' and 'OFF' (so
+#        the one-shot animation survives the internal SHUTDOWN->OFF cascade),
+#        tier 'full', force-clears any lingering idle/standby class first,
+#        and picks the full-flourish vs plain-cut class via immersionAllows('full')
+Check (
+    ($wireAmbient150 -match "id:\s*'shutdown-crt'") -and
+    ($wireAmbient150 -match "states:\s*\['SHUTDOWN',\s*'OFF'\]") -and
+    ($wireAmbient150 -match "tier:\s*'full'") -and
+    ($wireAmbient150 -match "classList\.remove\('rt-idle', 'standby-deep', 'standby'\)") -and
+    ($wireAmbient150 -match "classList\.add\(full \? 'rt-shutdown' : 'rt-shutdown-plain'\)") -and
+    ($wireAmbient150 -match "classList\.remove\('rt-shutdown', 'rt-shutdown-plain'\)")
+) "150.4: shutdown-crt observer (states ['SHUTDOWN','OFF'], tier 'full') force-clears any lingering idle/standby flourish, then adds the full-flourish or plain-cut class per immersionAllows('full'); onExit removes both on leaving the set"
+
+# 150.5  exitStandby() skips the wake tone/delayed audio-ramp/chat-line
+#        entirely when the runtime has moved to SHUTDOWN/OFF by the time
+#        this onExit runs (a power-down, not a wake) -- guard sits BEFORE
+#        playWakeTone(), so it also suppresses the immediate tone, not just
+#        the delayed setTimeout body.
+Check (
+    ($exitStandbyBody150 -match "AmbientRuntime\.getState\(\) === 'SHUTDOWN' \|\| AmbientRuntime\.getState\(\) === 'OFF'") -and
+    ($exitStandbyBody150 -match 'if \(_shuttingDown\) return;') -and
+    ($exitStandbyBody150.IndexOf('if (_shuttingDown) return;') -lt $exitStandbyBody150.IndexOf('playWakeTone();'))
+) '150.5: exitStandby() checks AmbientRuntime.getState() for SHUTDOWN/OFF and returns BEFORE playWakeTone() -- a shutdown-triggered standby-exit fires no wake tone, no audio ramp, no "COURIER RETURNED" chat line'
+
+# 150.6  HARD atmosphere/save boundary (Phase-2 prime invariant #1): none of
+#        the new A3 code writes anything durable to the campaign
+Check (
+    -not (($wireAmbient150 + $exitStandbyBody150) -match 'saveState|robco_v8|_logEvent|\beventLog\b|localStorage\.(set|get)Item')
+) '150.6: _wireAmbientExperiences() and the updated exitStandby() never call saveState / touch robco_v8 / localStorage / eventLog / _logEvent (device+in-memory+DOM classList only)'
+
+# 150.7  CSS: every new body class is defined, standby-deep uses ::before
+#        (not ::after, which body.standby already owns for its diegetic
+#        text) so the two coexist without clobbering each other, and the
+#        SHUTDOWN cover's z-index exceeds #bootScreen's so a genuine
+#        shutdown always wins visually over any other overlay
+Check (
+    ($css150 -match 'body\.rt-idle \.container') -and
+    ($css150 -match 'body\.rt-idle::after') -and
+    ($css150 -match 'body\.standby-deep::before') -and
+    (-not ($css150 -match 'body\.standby-deep::after')) -and
+    ($css150 -match 'body\.rt-shutdown \.container') -and
+    ($css150 -match "(?s)body\.rt-shutdown::after,\s*\n\s*body\.rt-shutdown-plain::after") -and
+    ($css150 -match '(?s)#bootScreen\s*\{.*?z-index:\s*100000;') -and
+    ($css150 -match "(?s)body\.rt-shutdown::after,\s*\n\s*body\.rt-shutdown-plain::after\s*\{.*?z-index:\s*100001;")
+) "150.7: terminal.css defines rt-idle/standby-deep/rt-shutdown(-plain); standby-deep uses ::before (never ::after, which body.standby owns) so the two dims coexist; the shutdown cover's z-index (100001) exceeds #bootScreen's (100000) so shutdown always wins visually"
+
+# 150.8  reduced-motion: every new keyframe animation is a plain `animation:`
+#        declaration (caught by the existing blanket * prefers-reduced-motion
+#        rule -- no bespoke per-class reduced-motion override was added, since
+#        none is needed)
+Check (
+    ($css150 -match '@keyframes idle-breathe') -and
+    ($css150 -match '@keyframes standby-breathe') -and
+    ($css150 -match '@keyframes crt-power-off') -and
+    ($css150 -match '@keyframes shutdown-cover \{') -and
+    ($css150 -match '@keyframes shutdown-cover-plain') -and
+    ($css150 -match 'animation: idle-breathe') -and
+    ($css150 -match 'animation: standby-breathe') -and
+    ($css150 -match 'animation: crt-power-off') -and
+    ($css150 -match 'animation: shutdown-cover ') -and
+    ($css150 -match 'animation: shutdown-cover-plain')
+) '150.8: every A3 keyframe (idle-breathe/standby-breathe/crt-power-off/shutdown-cover/shutdown-cover-plain) is applied via a plain `animation:` declaration, so the existing global prefers-reduced-motion block (animation-duration:0.01ms + iteration-count:1 on *) neutralises all of them to their static/instant final frame -- no bespoke override needed'
+
+# 150.9  game-agnostic (Protocol 38): pure lifecycle/CSS atmosphere, no game literals
+Check (
+    -not (($wireAmbient150 + $exitStandbyBody150) -match 'FNV|FO3|Fallout|New Vegas|Mojave|Capital Wasteland')
+) '150.9: the A3 ambient experiences are game-agnostic (no game literals -- pure lifecycle/CSS atmosphere)'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"
