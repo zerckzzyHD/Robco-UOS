@@ -64,8 +64,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    1712-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    1712-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    1724-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    1724-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -125,6 +125,19 @@ Scripts are loaded via `<script>` tags in `index.html` in this exact order:
    an interrupted run resumes safely and union reads find every save regardless of progress.
    Two-store boundary held: cold store uses ONLY the 'campaign' object store; device prefs (P1/P2)
    stay in 'meta'.
+
+   P5 (save version history, js/state.js accessors + js/ui-saves.js UI): each save slot retains up
+   to SLOT_VERSION_CAP (5) prior revisions in the 'campaign' object store under key
+   slot_<n>_versions (an array, newest-first) — IDB-ONLY (never mirrored to localStorage) so it
+   rides the P3 IndexedDB headroom and can never consume the ~5MB localStorage ceiling. saveToSlot
+   captures the slot's PRIOR contents (via _coldReadObj) with pushSlotVersion BEFORE overwriting;
+   readSlotVersions returns the ring newest-first. The saves list (renderSavesList) shows a VER
+   button only when IndexedDB is present AND the slot has ≥1 revision; viewSlotVersions lists them
+   in the shared modal and restoreSlotVersion restores one — DESTRUCTIVE → confirm-gated (Protocol
+   34), routed through the SAME _applySlotEnvelope core loadFromSlot uses (Protocol 22:
+   verifySaveEnvelope integrity check + snapRollingBackup-before-apply + migrateState). FAIL-SAFE:
+   no IndexedDB → readSlotVersions returns [], no VER affordance, and save/load is byte-identical to
+   pre-P5. Two-store boundary held (version data is campaign data → 'campaign' store only).
    ── Per-game boot manifest (GAME_FILES in index.html; order preserved via script.async = false) ──
 1. js/db_nv.js / js/db_fo3.js → defines: databaseCSVs, lookupItemInDb (game-specific CSV data;
                        the active pair is selected by the GAME_FILES manifest, FNV fail-safe)
@@ -1272,7 +1285,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1712-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1724-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

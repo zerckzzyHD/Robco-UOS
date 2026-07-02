@@ -517,6 +517,51 @@ window.getRollingBackupsAsync = async function () {
   return results.sort((a, b) => b.timestamp - a.timestamp);
 };
 
+// ── SAVE VERSION HISTORY (per-slot revision ring) — Step 2 · Phase 1 · P5 ──
+// Each save slot retains up to SLOT_VERSION_CAP prior revisions so a user can view
+// and restore an earlier save of that slot. The ring lives IDB-ONLY, in the
+// 'campaign' object store under key `slot_<n>_versions` (an array, newest-first) —
+// it deliberately rides the IndexedDB headroom the cold-store now has (P3) and is
+// NEVER mirrored to localStorage, so version history can never consume the ~5MB
+// localStorage ceiling. FAIL-SAFE: if IndexedDB is unavailable the ring is simply
+// never written or offered, and normal save/load is byte-identical to today — no
+// version history is worse than the pre-P5 behavior in any way. Two-store boundary
+// (Protocol 23): version data is campaign data → 'campaign' store only, never
+// 'meta'. Game-agnostic (Protocol 38): a plain envelope array, no game literals.
+const SLOT_VERSION_CAP = 5;
+function _slotVersionsIdbKey(n) {
+  return 'slot_' + n + '_versions';
+}
+
+// Async: the retained prior-revision array for a slot, newest-first. Returns []
+// when IndexedDB is unavailable, the key is empty, or anything throws — a caller
+// that gets [] simply offers no version history. Never throws.
+async function readSlotVersions(n) {
+  try {
+    if (!window.IdbStore) return [];
+    const arr = await window.IdbStore.get('campaign', _slotVersionsIdbKey(n));
+    return Array.isArray(arr) ? arr : [];
+  } catch (_) {
+    return [];
+  }
+}
+window.readSlotVersions = readSlotVersions;
+
+// Async: push a slot's PRIOR envelope onto its revision ring (newest-first),
+// capped at SLOT_VERSION_CAP. IDB-only + additive: it never touches the live slot
+// (slot_<n>) — only the separate versions key. No-op when IndexedDB is
+// unavailable or the prior envelope is falsy (first save into an empty slot keeps
+// no version). Never throws.
+async function pushSlotVersion(n, priorEnv) {
+  try {
+    if (!window.IdbStore || !priorEnv) return;
+    const arr = await readSlotVersions(n);
+    arr.unshift(priorEnv);
+    await window.IdbStore.set('campaign', _slotVersionsIdbKey(n), arr.slice(0, SLOT_VERSION_CAP));
+  } catch (_) {}
+}
+window.pushSlotVersion = pushSlotVersion;
+
 // ── FACTION REGISTRY ─────────────────────────────────────────────
 const FACTION_REGISTRY = [
   { key: 'ncr', name: 'NCR', tier: 'major' },

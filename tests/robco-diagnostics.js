@@ -4269,31 +4269,42 @@ header('Suite 51 — Save Integrity + Rolling Backups');
     );
   }
 
-  // 51.10  loadFromSlot calls verifySaveEnvelope before applying state
+  // 51.10  the slot-load path runs the integrity check before applying state.
+  //        P5 (Step 2 Phase 1) extracted loadFromSlot's verify→snap→migrate→apply
+  //        body into the shared _applySlotEnvelope core (Protocol 22 — reused by
+  //        restoreSlotVersion). The invariant is unchanged: loadFromSlot must route
+  //        through that core, and the core must verify the envelope.
   {
     let loadSlotBody51 = '';
+    let applyCoreBody51 = '';
     try {
       loadSlotBody51 = extractFunctionBody(uiSrc51, 'loadFromSlot');
+      applyCoreBody51 = extractFunctionBody(uiSrc51, '_applySlotEnvelope');
     } catch (e) {
-      fail('Cannot extract loadFromSlot: ' + e.message);
+      fail('Cannot extract loadFromSlot / _applySlotEnvelope: ' + e.message);
     }
     assert(
-      loadSlotBody51.includes('verifySaveEnvelope'),
-      'loadFromSlot calls verifySaveEnvelope (integrity check before slot load)'
+      loadSlotBody51.includes('_applySlotEnvelope') &&
+        applyCoreBody51.includes('verifySaveEnvelope'),
+      'slot-load path runs verifySaveEnvelope (integrity check) — loadFromSlot → _applySlotEnvelope core'
     );
   }
 
-  // 51.11  loadFromSlot calls snapRollingBackup before applying state
+  // 51.11  the slot-load path snapshots a rolling backup before applying state —
+  //        also in the shared _applySlotEnvelope core (P5).
   {
     let loadSlotBody51b = '';
+    let applyCoreBody51b = '';
     try {
       loadSlotBody51b = extractFunctionBody(uiSrc51, 'loadFromSlot');
+      applyCoreBody51b = extractFunctionBody(uiSrc51, '_applySlotEnvelope');
     } catch (e) {
-      fail('Cannot extract loadFromSlot: ' + e.message);
+      fail('Cannot extract loadFromSlot / _applySlotEnvelope: ' + e.message);
     }
     assert(
-      loadSlotBody51b.includes('snapRollingBackup'),
-      'loadFromSlot calls snapRollingBackup (rolling backup before slot load)'
+      loadSlotBody51b.includes('_applySlotEnvelope') &&
+        applyCoreBody51b.includes('snapRollingBackup'),
+      'slot-load path snapshots a rolling backup — loadFromSlot → _applySlotEnvelope core'
     );
   }
 
@@ -16123,7 +16134,11 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       ['ui-render.js', uiRender137, 'doBuy', extractFunctionBody],
       ['ui-render.js', uiRender137, 'doSell', extractFunctionBody],
       ['ui-render.js', uiRender137, 'doLoot', extractFunctionBody],
-      ['ui-saves.js', uiSaves137, 'loadFromSlot', extractFunctionBody],
+      // P5 (Step 2 Phase 1): loadFromSlot's verify/context confirm gates moved into
+      // the shared _applySlotEnvelope apply core (Protocol 22) — the gate now lives
+      // there; restoreSlotVersion adds a new destructive path with its own gate.
+      ['ui-saves.js', uiSaves137, '_applySlotEnvelope', extractFunctionBody],
+      ['ui-saves.js', uiSaves137, 'restoreSlotVersion', extractFunctionBody],
       ['ui-saves.js', uiSaves137, 'restoreRollingBackup', extractFunctionBody],
       ['ui-saves.js', uiSaves137, 'handleFileUpload', extractFunctionBody],
       ['cloud.js', cloud137, 'loadCloudSave', extractWindowFnBody137],
@@ -16700,6 +16715,134 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       logEventBody + migrateEvBody + inferBody141
     ),
     '141.12: the Terminal Record writer/migration/inference are game-agnostic (no game literals)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 142 — Step 2 (v2.8.0) Phase 1 P5: Save version history — a per-slot
+//  revision ring. Each save slot retains up to SLOT_VERSION_CAP prior revisions
+//  in the IDB 'campaign' store (key slot_<n>_versions), IDB-ONLY so it rides the
+//  P3 IndexedDB headroom and never consumes the localStorage ceiling. saveToSlot
+//  captures the slot's PRIOR contents before overwriting; the user can view + (
+//  destructively, confirm-gated) restore any revision through the SAME
+//  _applySlotEnvelope core loadFromSlot uses (Protocol 22). Fail-safe: no IDB →
+//  no version history offered, save/load byte-identical to pre-P5. Structural
+//  guards here; the real-IndexedDB behavioral proof lives in tests/test.html
+//  (Suite 14 — Node/PowerShell have no IndexedDB). 12 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 142 — P5 save version history (per-slot revision ring)');
+  const state142 = readFile('js/state.js');
+  const uiSaves142 = readFile('js/ui-saves.js');
+  const uiAcct142 = readFile('js/ui-account.js');
+  const readVers142 = extractFunctionBody(state142, 'readSlotVersions');
+  const pushVers142 = extractFunctionBody(state142, 'pushSlotVersion');
+  const saveBody142 = extractFunctionBody(uiSaves142, 'saveToSlot');
+  const applyBody142 = extractFunctionBody(uiSaves142, '_applySlotEnvelope');
+  const restoreVerBody142 = extractFunctionBody(uiSaves142, 'restoreSlotVersion');
+  const viewVerBody142 = extractFunctionBody(uiSaves142, 'viewSlotVersions');
+
+  // 142.1  the version-ring API is defined + exposed on window
+  assert(
+    /function _slotVersionsIdbKey\s*\(/.test(state142) &&
+      /const SLOT_VERSION_CAP =/.test(state142) &&
+      /async function readSlotVersions\s*\(/.test(state142) &&
+      /window\.readSlotVersions = readSlotVersions/.test(state142) &&
+      /async function pushSlotVersion\s*\(/.test(state142) &&
+      /window\.pushSlotVersion = pushSlotVersion/.test(state142),
+    '142.1: state.js defines SLOT_VERSION_CAP + _slotVersionsIdbKey and exposes window.readSlotVersions / window.pushSlotVersion'
+  );
+
+  // 142.2  TWO-STORE BOUNDARY: the version ring uses the 'campaign' store only
+  assert(
+    /'campaign'/.test(readVers142) &&
+      /'campaign'/.test(pushVers142) &&
+      !/'meta'/.test(readVers142) &&
+      !/'meta'/.test(pushVers142),
+    "142.2: the version ring uses the 'campaign' object store only, never 'meta' (two-store boundary — Protocol 23)"
+  );
+
+  // 142.3  pushSlotVersion is newest-first (unshift) + bounded (slice to cap)
+  assert(
+    /\.unshift\(priorEnv\)/.test(pushVers142) && /\.slice\(0, SLOT_VERSION_CAP\)/.test(pushVers142),
+    '142.3: pushSlotVersion prepends newest-first (unshift) and caps the ring at SLOT_VERSION_CAP (slice) — bounded'
+  );
+
+  // 142.4  FAIL-SAFE: both accessors guard on window.IdbStore and never throw
+  assert(
+    /if \(!window\.IdbStore\) return \[\];/.test(readVers142) &&
+      /catch \(_\) \{\s*return \[\];/.test(readVers142) &&
+      /if \(!window\.IdbStore \|\| !priorEnv\) return;/.test(pushVers142) &&
+      /try \{/.test(pushVers142) &&
+      /catch \(_\) \{\}/.test(pushVers142),
+    '142.4: readSlotVersions / pushSlotVersion guard on window.IdbStore and are wrapped so they never throw (fail-safe → [] / no-op)'
+  );
+
+  // 142.5  IDB-ONLY: the version ring is never mirrored to localStorage
+  assert(
+    !/localStorage/.test(readVers142) && !/localStorage/.test(pushVers142),
+    '142.5: the version ring is IDB-only — never written to localStorage (rides IDB headroom, never the ~5MB ceiling)'
+  );
+
+  // 142.6  saveToSlot captures the PRIOR envelope via pushSlotVersion BEFORE the
+  //        new write (capture-before-overwrite ordering)
+  assert(
+    /await window\.pushSlotVersion\(slotNum, _prior\)/.test(saveBody142) &&
+      saveBody142.indexOf('pushSlotVersion') < saveBody142.indexOf('_coldWriteObj'),
+    '142.6: saveToSlot captures the slot’s prior contents via pushSlotVersion BEFORE overwriting it (capture-before-overwrite)'
+  );
+
+  // 142.7  Protocol 22 — ONE apply core: _applySlotEnvelope is called by BOTH
+  //        loadFromSlot AND restoreSlotVersion (no parallel restore implementation)
+  assert(
+    /async function _applySlotEnvelope\s*\(/.test(uiSaves142) &&
+      /_applySlotEnvelope\(env, slotNum\)/.test(extractFunctionBody(uiSaves142, 'loadFromSlot')) &&
+      /_applySlotEnvelope\(env, slotNum, \{ verb: 'version restored' \}\)/.test(restoreVerBody142),
+    '142.7: loadFromSlot and restoreSlotVersion both apply through the SHARED _applySlotEnvelope core (Protocol 22 — no parallel restore path)'
+  );
+
+  // 142.8  the apply core routes through the same integrity + backup + migrate
+  //        path as loadFromSlot (verifySaveEnvelope, snapRollingBackup, migrateState)
+  assert(
+    /verifySaveEnvelope\(env\)/.test(applyBody142) &&
+      /snapRollingBackup\(\)/.test(applyBody142) &&
+      /migrateState\(env\.version/.test(applyBody142),
+    '142.8: _applySlotEnvelope verifies the envelope, snapshots a rolling backup before applying, and migrates state (same path as loadFromSlot)'
+  );
+
+  // 142.9  restoreSlotVersion is confirm-gated BEFORE applying (destructive → P34)
+  assert(
+    /await confirmAction\(\{/.test(restoreVerBody142) &&
+      /confirmLabel: 'RESTORE VERSION'/.test(restoreVerBody142) &&
+      /if \(!ok\) return;/.test(restoreVerBody142) &&
+      restoreVerBody142.indexOf('confirmAction') < restoreVerBody142.indexOf('_applySlotEnvelope'),
+    '142.9: restoreSlotVersion is confirm-gated (confirmAction) BEFORE the apply core — destructive restore honors Protocol 34'
+  );
+
+  // 142.10  viewSlotVersions renders via the shared modal + escapes every dynamic
+  //         field (XSS-safe, bounded)
+  assert(
+    /openModal\(\{/.test(viewVerBody142) &&
+      /escapeHtml\(/.test(viewVerBody142) &&
+      /restoreSlotVersion\(/.test(viewVerBody142),
+    '142.10: viewSlotVersions renders through openModal, escapes dynamic fields (escapeHtml), and wires per-row restoreSlotVersion'
+  );
+
+  // 142.11  FAIL-SAFE AFFORDANCE: the VERS button is offered only when IdbStore
+  //         is present + the slot has versions; renderSavesList calls viewSlotVersions
+  assert(
+    /window\.IdbStore && typeof window\.readSlotVersions === 'function'/.test(uiAcct142) &&
+      /versionCounts\[/.test(uiAcct142) &&
+      /viewSlotVersions\(/.test(uiAcct142),
+    '142.11: renderSavesList offers the version-history affordance only when IndexedDB is present and the slot has revisions (fail-safe)'
+  );
+
+  // 142.12  game-agnostic (Protocol 38): the P5 code carries no game literals
+  assert(
+    !/FNV|FO3|Fallout|New Vegas|Mojave|Capital Wasteland/.test(
+      readVers142 + pushVers142 + restoreVerBody142 + viewVerBody142
+    ),
+    '142.12: the P5 version-history code is game-agnostic (no game literals)'
   );
 }
 

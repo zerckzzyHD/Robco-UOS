@@ -91,6 +91,21 @@ async function renderSavesList() {
     localSaves.sort((a, b) => (a.n || 0) - (b.n || 0));
   }
 
+  // P5: per-slot version-history availability. The VERS affordance is offered ONLY
+  // when IndexedDB is present AND that slot has ≥1 retained prior revision — so no
+  // IDB means no button and save/load is unchanged (fail-safe). Computed before the
+  // single innerHTML paint below, so rows render complete with no flash.
+  const versionCounts = {};
+  if (window.IdbStore && typeof window.readSlotVersions === 'function') {
+    for (const s of localSaves) {
+      if (!s.isSlot) continue;
+      try {
+        const vs = await window.readSlotVersions(s.n);
+        if (vs.length) versionCounts[s.n] = vs.length;
+      } catch (_) {}
+    }
+  }
+
   let cloudSaves = [];
   if (isSignedIn && typeof window.listCloudSaves === 'function') {
     body.innerHTML = emptyState('RETRIEVING ARCHIVES…');
@@ -117,9 +132,20 @@ async function renderSavesList() {
         escapeHtml(ls.label) +
         '</span>' +
         (ls.isSlot
-          ? '<span style="flex-shrink:0;"><button class="btn-sm" onclick="loadFromSlot(' +
+          ? '<span style="flex-shrink:0;display:flex;gap:2px;">' +
+            '<button class="btn-sm" onclick="loadFromSlot(' +
             ls.n +
-            ')">LOAD</button></span>'
+            ')">LOAD</button>' +
+            (versionCounts[ls.n]
+              ? '<button class="btn-sm" onclick="viewSlotVersions(' +
+                ls.n +
+                ')" aria-label="View saved version history for ' +
+                escapeHtml(String(ls.label)) +
+                '">VER ' +
+                versionCounts[ls.n] +
+                '</button>'
+              : '') +
+            '</span>'
           : '') +
         '</div>'
     );

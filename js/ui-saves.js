@@ -199,6 +199,19 @@ function listLocalSaves() {
 // slot too large for localStorage is now saved instead of lost (ceiling relief).
 async function saveToSlot(slotNum) {
   syncStateFromDom();
+  // P5: capture the slot's CURRENT contents as a retained prior revision BEFORE it
+  // is overwritten (per-slot version ring, IDB-only — rides the P3 IndexedDB
+  // headroom, never the localStorage ceiling). Best-effort + fail-safe: no IDB or
+  // an empty slot → nothing captured and the save below is byte-identical to today.
+  if (window.IdbStore && typeof window.pushSlotVersion === 'function') {
+    try {
+      const _prior =
+        typeof window._coldReadObj === 'function'
+          ? await window._coldReadObj(_slotKey(slotNum), 'slot_' + slotNum)
+          : null;
+      if (_prior) await window.pushSlotVersion(slotNum, _prior);
+    } catch (_) {}
+  }
   const _slotState = JSON.parse(JSON.stringify(state));
   const _slotChat = chatHistory.slice(-200);
   const _slotPlaystyle = localStorage.getItem('robco_playstyle') || 'any';
@@ -258,58 +271,140 @@ async function loadFromSlot(slotNum) {
     return;
   }
   try {
-    // Integrity + forward-compat check before applying
-    if (typeof window.verifySaveEnvelope === 'function') {
-      const integrity = window.verifySaveEnvelope(env);
-      if (integrity.status === 'future_version') {
-        const ok = await confirmAction({
-          title: '> VERSION MISMATCH',
-          warning: `This save was made on a newer version of RobCo (v${integrity.version}).\nYour app is on v${APP_VERSION}.\n\nLoading may cause data loss — update the app first.\n\nForce-load anyway?`,
-          confirmLabel: 'FORCE-LOAD',
-        });
-        if (!ok) return;
-      } else if (integrity.status === 'checksum_mismatch') {
-        const ok = await confirmAction({
-          title: '> SAVE INTEGRITY WARNING',
-          warning:
-            'This save may be corrupt or was edited outside the app.\n\nLoad anyway? (Data may be incomplete or incorrect.)',
-          confirmLabel: 'LOAD ANYWAY',
-        });
-        if (!ok) return;
-      }
-    }
-    // F5: Warn on gameContext mismatch between slot and current session
-    const slotCtx = env.gameContext || env.state?.gameContext || 'FNV';
-    const curCtx = state.gameContext || 'FNV';
-    if (slotCtx !== curCtx) {
-      const ok = await confirmAction({
-        title: '> CONTEXT MISMATCH',
-        warning: `This save is a ${slotCtx} campaign.\nYou are currently in ${curCtx} mode.\n\nLoading will switch to ${slotCtx}. Continue?`,
-        confirmLabel: 'SWITCH & LOAD',
-      });
-      if (!ok) return;
-    }
-    // Snapshot current state as rolling backup before replacing
-    if (typeof window.snapRollingBackup === 'function') window.snapRollingBackup();
-    if (typeof migrateState === 'function')
-      env.state = migrateState(env.version || '1.0', env.state);
-    state = { ...state, ...env.state };
-    if (env.chat && Array.isArray(env.chat)) restoreChatHistory(env.chat);
-    if (env.playstyle) {
-      localStorage.setItem('robco_playstyle', env.playstyle);
-      if (typeof window._invalidateCommCache === 'function') window._invalidateCommCache();
-      let el = document.getElementById('playstyleInput');
-      if (el) el.value = env.playstyle;
-    }
-    loadUI();
-    const ts = env.savedAt ? new Date(env.savedAt).toLocaleString() : 'unknown';
-    const ctx = slotCtx;
-    appendToChat(`> [LOAD] ${_slotLabel(slotNum)} [${ctx}] restored. Saved: ${ts}`, 'sys', true);
-    const statusEl = document.getElementById('slotStatus');
-    if (statusEl) statusEl.textContent = `${_slotLabel(slotNum)} [${ctx}] loaded (saved: ${ts})`;
+    await _applySlotEnvelope(env, slotNum);
   } catch (e) {
     appendToChat('> [ERROR] Save slot corrupted or unreadable.', 'sys', true);
   }
+}
+
+// _applySlotEnvelope(env, slotNum, opts) — the SHARED verify → context-check →
+// snap → migrate → apply → loadUI core for a slot-shaped save envelope. Extracted
+// verbatim from loadFromSlot so that loadFromSlot AND restoreSlotVersion (P5) run
+// the EXACT same state-replacing path (Protocol 22 — one apply implementation, no
+// parallel copy). Returns true when applied, false if the user cancelled at an
+// integrity or context confirm gate (matching loadFromSlot's original early
+// returns — nothing ran after the apply block, so behavior is unchanged). The
+// optional opts.verb customises only the closing status wording.
+async function _applySlotEnvelope(env, slotNum, opts) {
+  opts = opts || {};
+  // Integrity + forward-compat check before applying
+  if (typeof window.verifySaveEnvelope === 'function') {
+    const integrity = window.verifySaveEnvelope(env);
+    if (integrity.status === 'future_version') {
+      const ok = await confirmAction({
+        title: '> VERSION MISMATCH',
+        warning: `This save was made on a newer version of RobCo (v${integrity.version}).\nYour app is on v${APP_VERSION}.\n\nLoading may cause data loss — update the app first.\n\nForce-load anyway?`,
+        confirmLabel: 'FORCE-LOAD',
+      });
+      if (!ok) return false;
+    } else if (integrity.status === 'checksum_mismatch') {
+      const ok = await confirmAction({
+        title: '> SAVE INTEGRITY WARNING',
+        warning:
+          'This save may be corrupt or was edited outside the app.\n\nLoad anyway? (Data may be incomplete or incorrect.)',
+        confirmLabel: 'LOAD ANYWAY',
+      });
+      if (!ok) return false;
+    }
+  }
+  // F5: Warn on gameContext mismatch between slot and current session
+  const slotCtx = env.gameContext || env.state?.gameContext || 'FNV';
+  const curCtx = state.gameContext || 'FNV';
+  if (slotCtx !== curCtx) {
+    const ok = await confirmAction({
+      title: '> CONTEXT MISMATCH',
+      warning: `This save is a ${slotCtx} campaign.\nYou are currently in ${curCtx} mode.\n\nLoading will switch to ${slotCtx}. Continue?`,
+      confirmLabel: 'SWITCH & LOAD',
+    });
+    if (!ok) return false;
+  }
+  // Snapshot current state as rolling backup before replacing
+  if (typeof window.snapRollingBackup === 'function') window.snapRollingBackup();
+  if (typeof migrateState === 'function') env.state = migrateState(env.version || '1.0', env.state);
+  state = { ...state, ...env.state };
+  if (env.chat && Array.isArray(env.chat)) restoreChatHistory(env.chat);
+  if (env.playstyle) {
+    localStorage.setItem('robco_playstyle', env.playstyle);
+    if (typeof window._invalidateCommCache === 'function') window._invalidateCommCache();
+    let el = document.getElementById('playstyleInput');
+    if (el) el.value = env.playstyle;
+  }
+  loadUI();
+  const ts = env.savedAt ? new Date(env.savedAt).toLocaleString() : 'unknown';
+  const ctx = slotCtx;
+  const verb = opts.verb || 'restored';
+  appendToChat(`> [LOAD] ${_slotLabel(slotNum)} [${ctx}] ${verb}. Saved: ${ts}`, 'sys', true);
+  const statusEl = document.getElementById('slotStatus');
+  if (statusEl) statusEl.textContent = `${_slotLabel(slotNum)} [${ctx}] loaded (saved: ${ts})`;
+  return true;
+}
+
+// ── SAVE VERSION HISTORY VIEWER + RESTORE (P5) ───────────────────────
+// viewSlotVersions() lists a slot's retained prior revisions in the shared modal;
+// each row RESTORES that revision. IDB-only + fail-safe — never offered when
+// IndexedDB is absent (readSlotVersions returns []). Restoring a prior version is
+// DESTRUCTIVE to the live campaign → confirm-gated (Protocol 34) and routed through
+// the SAME _applySlotEnvelope core as loadFromSlot (verifySaveEnvelope integrity
+// check + snapRollingBackup-before-apply + migrateState). Bounded render (cap
+// SLOT_VERSION_CAP), single innerHTML (no flash), escapeHtml on every dynamic
+// field. Game-agnostic (Protocol 38) — labels come from the envelope, no literals.
+async function viewSlotVersions(slotNum) {
+  if (typeof window.readSlotVersions !== 'function' || typeof openModal !== 'function') return;
+  const versions = await window.readSlotVersions(slotNum);
+  if (!versions.length) {
+    openModal({
+      title: '> VERSION HISTORY — ' + _slotLabel(slotNum),
+      body: '<div style="opacity:0.6;font-size:11px;">NO PRIOR VERSIONS ON FILE</div>',
+    });
+    return;
+  }
+  const rows = versions
+    .map((v, i) => {
+      const ts = v && v.savedAt ? new Date(v.savedAt).toLocaleString() : 'unknown';
+      const ctx = String((v && (v.gameContext || (v.state && v.state.gameContext))) || '');
+      return (
+        '<div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;">' +
+        '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;">' +
+        escapeHtml(i + 1 + '. ' + ts + (ctx ? ' [' + ctx + ']' : '')) +
+        '</span>' +
+        '<span style="flex-shrink:0;"><button class="btn-sm" onclick="restoreSlotVersion(' +
+        slotNum +
+        ',' +
+        i +
+        ')" aria-label="Restore this saved version of ' +
+        escapeHtml(_slotLabel(slotNum)) +
+        '">RESTORE</button></span>' +
+        '</div>'
+      );
+    })
+    .join('');
+  openModal({
+    title: '> VERSION HISTORY — ' + _slotLabel(slotNum),
+    body: '<div>' + rows + '</div>',
+  });
+}
+
+async function restoreSlotVersion(slotNum, index) {
+  if (typeof window.readSlotVersions !== 'function') return;
+  const versions = await window.readSlotVersions(slotNum);
+  const env = versions[index];
+  if (!env) {
+    appendToChat('> [LOAD] That version is no longer available.', 'sys', true);
+    return;
+  }
+  const ts = env.savedAt ? new Date(env.savedAt).toLocaleString() : 'unknown';
+  const ok = await confirmAction({
+    title: '> RESTORE VERSION',
+    warning: `Restore ${_slotLabel(slotNum)} to the version saved ${ts}?\n\nThis REPLACES your current campaign state. A rolling backup of the current state is taken first, so this can be undone.`,
+    confirmLabel: 'RESTORE VERSION',
+  });
+  if (!ok) return;
+  try {
+    await _applySlotEnvelope(env, slotNum, { verb: 'version restored' });
+  } catch (_) {
+    appendToChat('> [ERROR] Version restore failed — data unreadable.', 'sys', true);
+  }
+  if (typeof renderSavesList === 'function') renderSavesList();
 }
 
 // ── QUEST LOG HELPERS (#1) ──────────────────────────────────────────

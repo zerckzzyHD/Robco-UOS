@@ -21,7 +21,7 @@
     or the canonical suites change, update this file in the SAME commit and bump
     the suite count marker. The gate fails on drift.
 
-    Suites: 14
+    Suites: 15
 -->
 <html lang="en">
   <head>
@@ -1079,6 +1079,79 @@
           );
         } catch (err) {
           assert(false, 'FATAL: P4 Terminal Record suite threw', String((err && err.stack) || err));
+        }
+
+        // ── Suite 14 — P5 save version history (REAL IndexedDB) ───────────────
+        // Node/PowerShell have no IndexedDB, so the real per-slot revision-ring
+        // behavior is proven HERE against the browser's native IndexedDB and the
+        // real state.js accessors (readSlotVersions / pushSlotVersion): a push→read
+        // round-trip, newest-first ordering, the SLOT_VERSION_CAP bound, the
+        // two-store boundary (versions never land in 'meta'), the IDB-only invariant
+        // (never mirrored to localStorage), and the fail-safe (no IDB → [] / no-op,
+        // never throws).
+        try {
+          section('Suite 14 — P5 save version history (real IndexedDB)');
+          const env14 = t => ({ savedAt: t, slotName: 'PROBE', state: { lvl: t } });
+
+          // Clean slate for a probe slot.
+          await window.IdbStore.remove('campaign', 'slot_9_versions');
+
+          // 1) ROUND-TRIP + NEWEST-FIRST: three pushes surface newest-first.
+          await window.pushSlotVersion(9, env14(100));
+          await window.pushSlotVersion(9, env14(200));
+          await window.pushSlotVersion(9, env14(300));
+          const ring = await window.readSlotVersions(9);
+          assert(
+            ring.length === 3 &&
+              ring[0].savedAt === 300 &&
+              ring[1].savedAt === 200 &&
+              ring[2].savedAt === 100,
+            'round-trip + newest-first: pushSlotVersion prepends and readSlotVersions returns the ring newest-first'
+          );
+
+          // 2) CAP: pushing beyond SLOT_VERSION_CAP keeps only the newest cap.
+          for (let t = 400; t <= 900; t += 100) await window.pushSlotVersion(9, env14(t));
+          const capped = await window.readSlotVersions(9);
+          assert(
+            capped.length === 5 && capped[0].savedAt === 900 && capped[4].savedAt === 500,
+            'bounded ring: the revision ring is capped at SLOT_VERSION_CAP (5), retaining the newest revisions'
+          );
+
+          // 3) TWO-STORE BOUNDARY: the versions key never appears in the 'meta' store.
+          const metaLeak14 = await window.IdbStore.get('meta', 'slot_9_versions');
+          assert(
+            metaLeak14 === null,
+            "two-store boundary: the version ring key never appears in the device 'meta' store"
+          );
+
+          // 4) IDB-ONLY: the versions key is never mirrored to localStorage.
+          assert(
+            localStorage.getItem('slot_9_versions') === null &&
+              localStorage.getItem('robco_slot_9_versions') === null,
+            'IDB-only: the version ring is never written to localStorage (rides IDB headroom, not the ceiling)'
+          );
+
+          // 5) FAIL-SAFE: with IndexedDB removed, read → [] and push no-ops, no throw.
+          const realIdb14 = window.IdbStore;
+          window.IdbStore = undefined;
+          let failSafe14 = false;
+          try {
+            const r = await window.readSlotVersions(9);
+            await window.pushSlotVersion(9, env14(1)); // must no-op, not throw
+            failSafe14 = Array.isArray(r) && r.length === 0;
+          } catch (_) {
+            failSafe14 = false;
+          }
+          window.IdbStore = realIdb14;
+          assert(
+            failSafe14,
+            'fail-safe: with IndexedDB unavailable, readSlotVersions returns [] and pushSlotVersion no-ops without throwing'
+          );
+
+          // Tidy up.
+          await window.IdbStore.remove('campaign', 'slot_9_versions');
+        } catch (err) {
+          assert(false, 'FATAL: P5 version-history suite threw', String((err && err.stack) || err));
         }
 
         // ── Summary ──────────────────────────────────────────────────────────

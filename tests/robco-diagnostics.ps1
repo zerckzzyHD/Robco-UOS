@@ -2481,14 +2481,18 @@ $saveSlotBody51 = Get-FnBody51 $uiSrc51 'saveToSlot'
 Check ($saveSlotBody51 -match 'schemaVersion' -and $saveSlotBody51 -match 'checksum') `
     "saveToSlot stamps schemaVersion and checksum on slot envelope"
 
-# 51.10  loadFromSlot calls verifySaveEnvelope
+# 51.10  the slot-load path runs the integrity check before applying state.
+# P5 (Step 2 Phase 1) extracted loadFromSlot's verify->snap->migrate->apply body into
+# the shared _applySlotEnvelope core (Protocol 22 -- reused by restoreSlotVersion).
 $loadSlotBody51 = Get-FnBody51 $uiSrc51 'loadFromSlot'
-Check ($loadSlotBody51 -match 'verifySaveEnvelope') `
-    "loadFromSlot calls verifySaveEnvelope (integrity check before slot load)"
+$applyCoreBody51 = Get-FnBody51 $uiSrc51 '_applySlotEnvelope'
+Check (($loadSlotBody51 -match '_applySlotEnvelope') -and ($applyCoreBody51 -match 'verifySaveEnvelope')) `
+    "slot-load path runs verifySaveEnvelope (integrity check) -- loadFromSlot -> _applySlotEnvelope core"
 
-# 51.11  loadFromSlot calls snapRollingBackup
-Check ($loadSlotBody51 -match 'snapRollingBackup') `
-    "loadFromSlot calls snapRollingBackup (rolling backup before slot load)"
+# 51.11  the slot-load path snapshots a rolling backup before applying state --
+# also in the shared _applySlotEnvelope core (P5).
+Check (($loadSlotBody51 -match '_applySlotEnvelope') -and ($applyCoreBody51 -match 'snapRollingBackup')) `
+    "slot-load path snapshots a rolling backup -- loadFromSlot -> _applySlotEnvelope core"
 
 # 51.12  handleFileUpload calls verifySaveEnvelope
 $uploadBody51 = Get-FnBody51 $uiSrc51 'handleFileUpload'
@@ -9125,7 +9129,10 @@ $gatedSites137 = @(
     @{ File = 'ui-render.js'; Src = $render137; Fn = 'doBuy'; Window = $false },
     @{ File = 'ui-render.js'; Src = $render137; Fn = 'doSell'; Window = $false },
     @{ File = 'ui-render.js'; Src = $render137; Fn = 'doLoot'; Window = $false },
-    @{ File = 'ui-saves.js'; Src = $saves137; Fn = 'loadFromSlot'; Window = $false },
+    # P5 (Step 2 Phase 1): loadFromSlot's confirm gates moved into the shared
+    # _applySlotEnvelope core (Protocol 22); restoreSlotVersion is a new gated path.
+    @{ File = 'ui-saves.js'; Src = $saves137; Fn = '_applySlotEnvelope'; Window = $false },
+    @{ File = 'ui-saves.js'; Src = $saves137; Fn = 'restoreSlotVersion'; Window = $false },
     @{ File = 'ui-saves.js'; Src = $saves137; Fn = 'restoreRollingBackup'; Window = $false },
     @{ File = 'ui-saves.js'; Src = $saves137; Fn = 'handleFileUpload'; Window = $false },
     @{ File = 'cloud.js'; Src = $cloud137; Fn = 'loadCloudSave'; Window = $true },
@@ -9575,6 +9582,117 @@ Check (
 Check (
     -not (($logEventBody + $migrateEvBody + $inferBody141) -match 'FNV|FO3|Fallout|New Vegas|Mojave|Capital Wasteland')
 ) '141.12: the Terminal Record writer/migration/inference are game-agnostic (no game literals)'
+
+# ===========================================================
+# Suite 142 -- Step 2 (v2.8.0) Phase 1 P5: Save version history -- a per-slot
+# revision ring (12 tests). Mirrors JS Suite 142. Each save slot retains up to
+# SLOT_VERSION_CAP prior revisions in the IDB 'campaign' store (key
+# slot_<n>_versions), IDB-ONLY so it rides the P3 IndexedDB headroom and never
+# consumes the localStorage ceiling. saveToSlot captures the slot's PRIOR contents
+# before overwriting; the user can view + (destructively, confirm-gated) restore
+# any revision through the SAME _applySlotEnvelope core loadFromSlot uses
+# (Protocol 22). Fail-safe: no IDB -> no version history offered, save/load
+# byte-identical to pre-P5. Structural guards here; the real-IndexedDB behavioral
+# proof lives in tests/test.html (Suite 14 -- PowerShell has no IndexedDB).
+# ===========================================================
+Sep "Suite 142 -- P5 save version history (per-slot revision ring)"
+$state142    = Read-Src "js/state.js"
+$uiSaves142  = Read-Src "js/ui-saves.js"
+$uiAcct142   = Read-Src "js/ui-account.js"
+$readVers142     = Get-FunctionBody $state142 'readSlotVersions'
+$pushVers142     = Get-FunctionBody $state142 'pushSlotVersion'
+$saveBody142     = Get-FunctionBody $uiSaves142 'saveToSlot'
+$applyBody142    = Get-FunctionBody $uiSaves142 '_applySlotEnvelope'
+$restoreVer142   = Get-FunctionBody $uiSaves142 'restoreSlotVersion'
+$viewVer142      = Get-FunctionBody $uiSaves142 'viewSlotVersions'
+$loadBody142     = Get-FunctionBody $uiSaves142 'loadFromSlot'
+
+# 142.1  the version-ring API is defined + exposed on window
+Check (
+    ($state142 -match 'function _slotVersionsIdbKey\s*\(') -and
+    ($state142 -match 'const SLOT_VERSION_CAP =') -and
+    ($state142 -match 'async function readSlotVersions\s*\(') -and
+    ($state142 -match 'window\.readSlotVersions = readSlotVersions') -and
+    ($state142 -match 'async function pushSlotVersion\s*\(') -and
+    ($state142 -match 'window\.pushSlotVersion = pushSlotVersion')
+) '142.1: state.js defines SLOT_VERSION_CAP + _slotVersionsIdbKey and exposes window.readSlotVersions / window.pushSlotVersion'
+
+# 142.2  TWO-STORE BOUNDARY: the version ring uses the 'campaign' store only
+Check (
+    ($readVers142 -match "'campaign'") -and
+    ($pushVers142 -match "'campaign'") -and
+    (-not ($readVers142 -match "'meta'")) -and
+    (-not ($pushVers142 -match "'meta'"))
+) "142.2: the version ring uses the 'campaign' object store only, never 'meta' (two-store boundary -- Protocol 23)"
+
+# 142.3  pushSlotVersion is newest-first (unshift) + bounded (slice to cap)
+Check (
+    ($pushVers142 -match '\.unshift\(priorEnv\)') -and
+    ($pushVers142 -match '\.slice\(0, SLOT_VERSION_CAP\)')
+) '142.3: pushSlotVersion prepends newest-first (unshift) and caps the ring at SLOT_VERSION_CAP (slice) -- bounded'
+
+# 142.4  FAIL-SAFE: both accessors guard on window.IdbStore and never throw
+Check (
+    ($readVers142 -match 'if \(!window\.IdbStore\) return \[\]') -and
+    ($readVers142 -match 'catch \(_\) \{\s*return \[\]') -and
+    ($pushVers142 -match 'if \(!window\.IdbStore \|\| !priorEnv\) return;') -and
+    ($pushVers142 -match 'try \{') -and
+    ($pushVers142 -match 'catch \(_\) \{\}')
+) '142.4: readSlotVersions / pushSlotVersion guard on window.IdbStore and are wrapped so they never throw (fail-safe -> [] / no-op)'
+
+# 142.5  IDB-ONLY: the version ring is never mirrored to localStorage
+Check (
+    (-not ($readVers142 -match 'localStorage')) -and
+    (-not ($pushVers142 -match 'localStorage'))
+) '142.5: the version ring is IDB-only -- never written to localStorage (rides IDB headroom, never the ~5MB ceiling)'
+
+# 142.6  saveToSlot captures the PRIOR envelope via pushSlotVersion BEFORE the write
+Check (
+    ($saveBody142 -match 'await window\.pushSlotVersion\(slotNum, _prior\)') -and
+    ($saveBody142.IndexOf('pushSlotVersion') -lt $saveBody142.IndexOf('_coldWriteObj'))
+) '142.6: saveToSlot captures the slot prior contents via pushSlotVersion BEFORE overwriting it (capture-before-overwrite)'
+
+# 142.7  Protocol 22 -- ONE apply core: _applySlotEnvelope called by BOTH
+#         loadFromSlot AND restoreSlotVersion (no parallel restore implementation)
+Check (
+    ($uiSaves142 -match 'async function _applySlotEnvelope\s*\(') -and
+    ($loadBody142 -match '_applySlotEnvelope\(env, slotNum\)') -and
+    ($restoreVer142 -match "_applySlotEnvelope\(env, slotNum, \{ verb: 'version restored' \}\)")
+) '142.7: loadFromSlot and restoreSlotVersion both apply through the SHARED _applySlotEnvelope core (Protocol 22 -- no parallel restore path)'
+
+# 142.8  the apply core routes through the same integrity + backup + migrate path
+Check (
+    ($applyBody142 -match 'verifySaveEnvelope\(env\)') -and
+    ($applyBody142 -match 'snapRollingBackup\(\)') -and
+    ($applyBody142 -match 'migrateState\(env\.version')
+) '142.8: _applySlotEnvelope verifies the envelope, snapshots a rolling backup before applying, and migrates state (same path as loadFromSlot)'
+
+# 142.9  restoreSlotVersion is confirm-gated BEFORE applying (destructive -> P34)
+Check (
+    ($restoreVer142 -match 'await confirmAction\(\{') -and
+    ($restoreVer142 -match "confirmLabel: 'RESTORE VERSION'") -and
+    ($restoreVer142 -match 'if \(!ok\) return;') -and
+    ($restoreVer142.IndexOf('confirmAction') -lt $restoreVer142.IndexOf('_applySlotEnvelope'))
+) '142.9: restoreSlotVersion is confirm-gated (confirmAction) BEFORE the apply core -- destructive restore honors Protocol 34'
+
+# 142.10  viewSlotVersions renders via the shared modal + escapes dynamic fields
+Check (
+    ($viewVer142 -match 'openModal\(\{') -and
+    ($viewVer142 -match 'escapeHtml\(') -and
+    ($viewVer142 -match 'restoreSlotVersion\(')
+) '142.10: viewSlotVersions renders through openModal, escapes dynamic fields (escapeHtml), and wires per-row restoreSlotVersion'
+
+# 142.11  FAIL-SAFE AFFORDANCE: VERS button only when IdbStore present + versions
+Check (
+    ($uiAcct142 -match "window\.IdbStore && typeof window\.readSlotVersions === 'function'") -and
+    ($uiAcct142 -match 'versionCounts\[') -and
+    ($uiAcct142 -match 'viewSlotVersions\(')
+) '142.11: renderSavesList offers the version-history affordance only when IndexedDB is present and the slot has revisions (fail-safe)'
+
+# 142.12  game-agnostic (Protocol 38): the P5 code carries no game literals
+Check (
+    -not (($readVers142 + $pushVers142 + $restoreVer142 + $viewVer142) -match 'FNV|FO3|Fallout|New Vegas|Mojave|Capital Wasteland')
+) '142.12: the P5 version-history code is game-agnostic (no game literals)'
 
 # ===========================================================
 # Results
