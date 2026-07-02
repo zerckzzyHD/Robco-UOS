@@ -2337,6 +2337,37 @@ body.sync-complete {
   font-size: 11px;
 }
 
+/* ─── Command-Line MODE — pill + hint (Step 2 Phase 2 B1) ────────────── */
+/* .action-btn.btn-sm already supplies width:auto + min-height/width:28px
+   (Protocol 17 tap target); this layer only adds the pill shape + per-mode
+   color and prevents the label from ever wrapping (Suite 92 pattern). */
+.mode-pill {
+  border-radius: 12px;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+.mode-pill--terminal {
+  border-color: var(--robco-green);
+  color: var(--robco-green);
+}
+.mode-pill--overseer {
+  border-color: var(--robco-blue);
+  color: var(--robco-blue);
+}
+/* Inline reveal (not a floating overlay) so it can never overflow at
+   360/412px — it simply occupies its own row while `/` or `@` is typed. */
+.mode-hint {
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  opacity: 0.8;
+  color: var(--robco-alert);
+  margin: 2px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* ─── G6: World Map [YOU] Marker ─────────────────────── */
 @keyframes map-blink {
   0%,

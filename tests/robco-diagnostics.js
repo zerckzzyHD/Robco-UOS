@@ -1079,8 +1079,11 @@ guards(indexHtml, [
     'transmitBtn send button exists in index.html (Protocol 13 — regression guard)',
   ],
   [
-    /<button[^>]*onclick="transmitMessage\(\)"[^>]*id="transmitBtn"|<button[^>]*id="transmitBtn"[^>]*onclick="transmitMessage\(\)"/,
-    'transmitBtn is wired to transmitMessage() (Protocol 13 — send-button regression guard)',
+    /<button[^>]*onclick="submitCommandInput\(\)"[^>]*id="transmitBtn"|<button[^>]*id="transmitBtn"[^>]*onclick="submitCommandInput\(\)"/,
+    // Step 2 Phase 2 B1: transmitBtn now routes through submitCommandInput() —
+    // the Command-Line MODE resolver — which calls transmitMessage() itself on
+    // the OVERSEER path (Suite 151.4/151.5 guard the resolver + no-arg parity).
+    'transmitBtn is wired to submitCommandInput() (Protocol 13 — send-button regression guard, updated for B1)',
   ],
 ]);
 
@@ -18116,6 +18119,282 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         (err150 ? ' — ' + err150.message : '')
     );
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 151 — Step 2 (v2.8.0) Phase 2 B1: Command-Line MODE system
+//  The inline mode pill (TERMINAL/OVERSEER) in the Comm-Link input, the
+//  one-off `/`/`@` override prefixes, quick-log routing (killed/caps/
+//  arrived/rep) onto existing native setters, and a TERMINAL-mode
+//  autocomplete extension of the shared registry-autocomplete singleton.
+//  18 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 151 — Step 2 Phase 2 B1: Command-Line MODE system');
+  const stateSrc151 = readFile('js/state.js');
+  const apiSrc151 = readFile('js/api.js');
+  const uiCoreSrc151 = readFile('js/ui-core.js');
+  const uiSavesSrc151 = readFile('js/ui-saves.js');
+  const htmlSrc151 = readFile('index.html');
+  const cssSrc151 = readFile('css/terminal.css');
+
+  // 151.1  robco_input_mode is registered as a DEVICE PREFERENCE (MetaStore),
+  //        never campaign state — same two-store boundary as robco_immersion.
+  assert(
+    /robco_input_mode:\s*\{\s*type:\s*'string',\s*default:\s*'overseer',\s*owner:\s*'state\.js'\s*\}/.test(
+      stateSrc151
+    ),
+    "151.1: robco_input_mode is registered in META_MANIFEST as a device pref (default 'overseer')"
+  );
+
+  // 151.2  get/set/other accessors defined in state.js, mirroring the
+  //        Immersion-dial pattern exactly (Protocol 22)
+  assert(
+    /function getInputMode\(\)/.test(stateSrc151) &&
+      /function setInputMode\(mode\)/.test(stateSrc151) &&
+      /function otherInputMode\(mode\)/.test(stateSrc151) &&
+      /MetaStore\.get\(INPUT_MODE_KEY\)/.test(stateSrc151) &&
+      /MetaStore\.set\(INPUT_MODE_KEY, m\)/.test(stateSrc151),
+    '151.2: getInputMode/setInputMode/otherInputMode defined in state.js and round-trip through MetaStore only'
+  );
+
+  // 151.3  the pill is a real <button> (Protocol UI-5) with a diegetic
+  //        aria-label, and the hint reveal element exists
+  assert(
+    /<button\s[^>]*id="modePill"[^>]*class="action-btn btn-sm mode-pill mode-pill--overseer"[^>]*onclick="toggleInputMode\(\)"[^>]*aria-label="[^"]+"/.test(
+      htmlSrc151
+    ) && /<div id="modeHintPopup" class="mode-hint"/.test(htmlSrc151),
+    '151.3: #modePill is a real <button> (action-btn btn-sm mode-pill) with onclick + aria-label; #modeHintPopup exists'
+  );
+
+  // 151.4  the pill and the Ctrl+Enter/[TRANSMIT] paths route through the ONE
+  //        new choke point, submitCommandInput() — the direct transmitMessage()
+  //        call sites are gone from index.html (moved behind the resolver)
+  assert(
+    /onclick="submitCommandInput\(\)"/.test(htmlSrc151) &&
+      /submitCommandInput\(\);\s*\n\s*\}/.test(htmlSrc151) &&
+      !/onclick="transmitMessage\(\)"/.test(htmlSrc151),
+    '151.4: [TRANSMIT PROTOCOL] and Ctrl+Enter both call submitCommandInput(); no direct transmitMessage() call site remains in index.html'
+  );
+
+  // 151.5  transmitMessage() gained an OPTIONAL overrideText param — additive,
+  //        no-arg behavior (every existing call site) is unchanged
+  assert(
+    /async function transmitMessage\(overrideText\)/.test(apiSrc151) &&
+      /const userText = \(typeof overrideText === 'string' \? overrideText : inputEl\.value\)\.trim\(\);/.test(
+        apiSrc151
+      ),
+    '151.5: transmitMessage(overrideText) — an optional param; called with no args it reads #chatInput exactly as before'
+  );
+
+  // 151.6  transmitTerminal(): native commands first (muscle memory), then
+  //        quick-log, else a hint — and it NEVER calls the AI (no fetch, no
+  //        Director-Link payload assembly)
+  {
+    const transmitTerminalBody151 = extractFunctionBody(apiSrc151, 'transmitTerminal');
+    assert(
+      /_routeNativeCommand\(userText\)/.test(transmitTerminalBody151) &&
+        /_routeQuickLog\(userText\)/.test(transmitTerminalBody151) &&
+        /UNRECOGNIZED/.test(transmitTerminalBody151) &&
+        !/fetch\(|generateSyncPayload|getSystemDirective/.test(transmitTerminalBody151),
+      '151.6: transmitTerminal() tries _routeNativeCommand() then _routeQuickLog(), else shows an UNRECOGNIZED hint; never calls fetch/generateSyncPayload/getSystemDirective (no AI)'
+    );
+  }
+
+  // 151.7  submitCommandInput(): an attached image always forces the AI path
+  //        (transmitMessage()) regardless of the resolved mode — TERMINAL has
+  //        no visual-analysis equivalent
+  {
+    const submitBody151 = extractFunctionBody(apiSrc151, 'submitCommandInput');
+    assert(
+      /if \(attachedImageData\) \{\s*\n\s*transmitMessage\(\);\s*\n\s*return;\s*\n\s*\}/.test(
+        submitBody151
+      ) && /resolved\.mode === 'terminal'/.test(submitBody151),
+      '151.7: submitCommandInput() routes an attached image straight to transmitMessage() (AI), before checking the resolved mode'
+    );
+  }
+
+  // 151.8  _resolveCommandInput(): first-char-only `/`/`@`, both spacing
+  //        variants, targets otherInputMode() — structural shape
+  {
+    const resolveBody151 = extractFunctionBody(apiSrc151, '_resolveCommandInput');
+    assert(
+      /const first = raw\.charAt\(0\);/.test(resolveBody151) &&
+        /first === '\/' \|\| first === '@'/.test(resolveBody151) &&
+        /rest\.charAt\(0\) === ' '/.test(resolveBody151) &&
+        /otherInputMode\(persisted\)/.test(resolveBody151),
+      '151.8: _resolveCommandInput() checks raw.charAt(0) (untrimmed — first-char-only), accepts `/` and `@`, strips exactly one leading space, and targets otherInputMode(persisted)'
+    );
+  }
+
+  // 151.9  QUICK_LOG_PATTERNS: all four quick-log verbs present with the
+  //        expected regex anchors
+  assert(
+    /id:\s*'kill',\s*\n\s*re:\s*\/\^killed\?\\s\+/.test(apiSrc151) &&
+      /id:\s*'caps',\s*\n\s*re:\s*\/\^\(\[\+-\]\)/.test(apiSrc151) &&
+      /id:\s*'location',\s*\n\s*re:\s*\/\^\(\?:arrived/.test(apiSrc151) &&
+      /id:\s*'faction',\s*\n\s*re:\s*\/\^rep\\s\+/.test(apiSrc151),
+    '151.9: QUICK_LOG_PATTERNS defines kill/caps/location/faction with the documented regex shapes'
+  );
+
+  // 151.10  quick-log handlers REUSE existing native setters — none are forked
+  //         (Protocol 22): kill writes through _logEvent, caps mirrors #c_caps
+  //         before saveState (the WU-N2 idiom), location calls the shared
+  //         markLocationVisited(), faction calls the shared adjustFaction()
+  //         gated on getFactionRegistry()
+  assert(
+    /_logEvent\('kill', text\)/.test(apiSrc151) &&
+      /document\.getElementById\('c_caps'\)/.test(
+        extractFunctionBody(apiSrc151, '_quickLogCaps')
+      ) &&
+      /markLocationVisited\(loc\)/.test(apiSrc151) &&
+      /adjustFaction\(match\.key, field, 5\)/.test(apiSrc151) &&
+      /getFactionRegistry\(\)/.test(extractFunctionBody(apiSrc151, '_quickLogFaction')),
+    '151.10: quick-log handlers reuse _logEvent/markLocationVisited/adjustFaction/getFactionRegistry — no forked duplicate logic'
+  );
+
+  // 151.11  the faction quick-log falls through (returns false) on an unknown
+  //         key, rather than blindly creating one — the caller then shows the
+  //         "unrecognized" hint instead of silently mutating an invented faction
+  assert(
+    /if \(!match\) return false;/.test(extractFunctionBody(apiSrc151, '_quickLogFaction')),
+    '151.11: _quickLogFaction returns false on an unknown faction key (falls through to the TERMINAL "unrecognized" hint, never invents a faction)'
+  );
+
+  // 151.12  COMMAND_REGISTRY documents the mode system so it is discoverable
+  //         via [FEATURES] — the pill, both override prefixes, and all four
+  //         quick-log verbs
+  assert(
+    /group:\s*'COMMAND-LINE MODE'/.test(uiCoreSrc151) &&
+      /'\/message'/.test(uiCoreSrc151) &&
+      /'@message'/.test(uiCoreSrc151) &&
+      /'killed <target>'/.test(uiCoreSrc151) &&
+      /'\+N caps \/ -N caps'/.test(uiCoreSrc151) &&
+      /'arrived <location>'/.test(uiCoreSrc151) &&
+      /'rep <faction> up\/down'/.test(uiCoreSrc151),
+    '151.12: COMMAND_REGISTRY has a COMMAND-LINE MODE group documenting the pill, /message, @message, and all four quick-log verbs'
+  );
+
+  // 151.13  wireInput() is generalized to accept a function resolver — the
+  //         three existing registry-category call sites are UNCHANGED
+  //         (backward-compatible), and #chatInput is wired to _commandSuggestions
+  assert(
+    /function wireInput\(inputId, categoryOrFn\)/.test(uiSavesSrc151) &&
+      /var isFn = typeof categoryOrFn === 'function';/.test(uiSavesSrc151) &&
+      /wireInput\('newQuestName', 'quests'\);/.test(uiSavesSrc151) &&
+      /wireInput\('newItemName', 'items'\);/.test(uiSavesSrc151) &&
+      /wireInput\('newPerkName', 'perks'\);/.test(uiSavesSrc151) &&
+      /wireInput\('chatInput', _commandSuggestions\);/.test(uiSavesSrc151),
+    '151.13: wireInput(inputId, categoryOrFn) accepts a function; the 3 existing registry-category calls are untouched; #chatInput is newly wired to _commandSuggestions'
+  );
+
+  // 151.14  _commandSuggestions() is suppressed entirely (returns []) unless
+  //         the message resolves to TERMINAL — no AI-mode suggestion clutter
+  assert(
+    /if \(resolved\.mode !== 'terminal'\) return \[\];/.test(
+      extractFunctionBody(apiSrc151, '_commandSuggestions')
+    ),
+    '151.14: _commandSuggestions() returns [] whenever the message would resolve to OVERSEER'
+  );
+
+  // 151.15  CSS: the pill/hint classes exist, reuse .action-btn.btn-sm sizing
+  //         (≥28px tap target, Protocol 17) rather than a bespoke min-height,
+  //         and never wrap (Suite 92 anti-recurrence pattern)
+  const modePillBlock151 = (cssSrc151.match(/\.mode-pill\s*\{[^}]*\}/) || [''])[0];
+  assert(
+    /white-space:\s*nowrap;/.test(modePillBlock151) &&
+      /\.mode-pill--terminal\s*\{/.test(cssSrc151) &&
+      /\.mode-pill--overseer\s*\{/.test(cssSrc151) &&
+      /\.mode-hint\s*\{[^}]*white-space:\s*nowrap;/.test(cssSrc151) &&
+      !/min-height/.test(modePillBlock151),
+    '151.15: .mode-pill/.mode-pill--terminal/.mode-pill--overseer/.mode-hint are defined, both nowrap; .mode-pill has no bespoke min-height (inherits the ≥28px tap target from .action-btn.btn-sm)'
+  );
+
+  // 151.16  game-agnostic (Protocol 38): the new B1 code carries no hardcoded
+  //         game literals — faction validation routes through the registry
+  const b1Combined151 =
+    extractFunctionBody(apiSrc151, 'transmitTerminal') +
+    extractFunctionBody(apiSrc151, '_quickLogFaction') +
+    extractFunctionBody(apiSrc151, '_resolveCommandInput') +
+    extractFunctionBody(uiCoreSrc151, '_renderModePill');
+  assert(
+    !/\bFNV\b|\bFO3\b|Fallout|New Vegas|Mojave|Capital Wasteland/.test(b1Combined151),
+    '151.16: the Command-Line MODE system is game-agnostic — no hardcoded game literals (faction quick-log validates via getFactionRegistry())'
+  );
+
+  // 151.17  BEHAVIORAL — the real _resolveCommandInput() body, executed in a
+  //         Node vm sandbox against mocked getInputMode/otherInputMode: proves
+  //         `/msg` and `/ msg` both strip to the same text and target the
+  //         OTHER mode; `@msg`/`@ msg` identical; a `/` NOT at position 0 is
+  //         left as literal text with the persisted mode unaffected.
+  {
+    const vm151 = require('vm');
+    function declareFn151(src, name) {
+      const nameIdx = src.indexOf('function ' + name);
+      const parenIdx = src.indexOf('(', nameIdx);
+      const braceIdx = src.indexOf('{', parenIdx);
+      const params = src.slice(parenIdx, braceIdx);
+      return 'function ' + name + params + extractFunctionBody(src, name);
+    }
+    const src151 = declareFn151(apiSrc151, '_resolveCommandInput');
+
+    function runResolve151(mode, raw) {
+      const sb = {
+        getInputMode: () => mode,
+        otherInputMode: m => (m === 'terminal' ? 'overseer' : 'terminal'),
+      };
+      vm151.createContext(sb);
+      vm151.runInContext(src151, sb);
+      return sb._resolveCommandInput(raw);
+    }
+
+    let err151 = null,
+      r1 = null,
+      r2 = null,
+      r3 = null,
+      r4 = null,
+      r5 = null,
+      r6 = null;
+    try {
+      r1 = runResolve151('overseer', '/killed deathclaw');
+      r2 = runResolve151('overseer', '/ killed deathclaw');
+      r3 = runResolve151('terminal', '@narrate this');
+      r4 = runResolve151('terminal', '@ narrate this');
+      r5 = runResolve151('overseer', 'hello / world');
+      r6 = runResolve151('overseer', 'killed deathclaw');
+    } catch (e) {
+      err151 = e;
+    }
+    assert(
+      !err151 &&
+        r1.mode === 'terminal' &&
+        r1.text === 'killed deathclaw' &&
+        r1.override === true &&
+        r2.mode === 'terminal' &&
+        r2.text === 'killed deathclaw' &&
+        r2.override === true &&
+        r3.mode === 'overseer' &&
+        r3.text === 'narrate this' &&
+        r3.override === true &&
+        r4.mode === 'overseer' &&
+        r4.text === 'narrate this' &&
+        r4.override === true &&
+        r5.mode === 'overseer' &&
+        r5.text === 'hello / world' &&
+        r5.override === false &&
+        r6.mode === 'overseer' &&
+        r6.text === 'killed deathclaw' &&
+        r6.override === false,
+      '_resolveCommandInput() behavioral: "/msg" and "/ msg" both strip to identical text and target the other mode; "@msg"/"@ msg" identical; a `/` not at position 0 is left as literal text with the persisted mode unaffected' +
+        (err151 ? ' — ' + err151.message : '')
+    );
+  }
+
+  // 151.18  Protocol 1 — CACHE_NAME bumped for this served-file change
+  assert(
+    /const CACHE_NAME = 'robco-terminal-v2\.7\.0-r33';/.test(readFile('sw.js')),
+    '151.18: CACHE_NAME bumped to r33 (index.html/js/css touched by the Command-Line MODE system)'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════

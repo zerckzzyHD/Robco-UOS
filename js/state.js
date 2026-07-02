@@ -37,6 +37,7 @@ const META_MANIFEST = {
   robco_haptic_enabled: { type: 'bool', default: false, owner: 'ui-audio.js' },
   robco_high_lumen: { type: 'bool', default: false, owner: 'ui-core.js' },
   robco_immersion: { type: 'string', default: 'full', owner: 'state.js' },
+  robco_input_mode: { type: 'string', default: 'overseer', owner: 'state.js' },
   robco_overseer_log: { type: 'json', default: '{}', owner: 'ui-core.js' },
   robco_error_log: { type: 'json', default: '[]', owner: 'ui-core.js' },
   robco_panel_state: { type: 'json', default: '{}', owner: 'ui-core.js' },
@@ -163,6 +164,39 @@ function setImmersionTier(tier) {
   return t;
 }
 window.setImmersionTier = setImmersionTier;
+
+// ── COMMAND-LINE MODE — device pref (Step 2 · Phase 2 · B1) ─────────────────
+// Which of the two Comm-Link input modes is currently selected: 'terminal'
+// (native commands + quick-log routing, no AI) or 'overseer' (today's AI
+// narrator behavior, unchanged). A DEVICE PREFERENCE (MetaStore key
+// robco_input_mode) — never campaign state, exactly like the Immersion dial
+// above (two-store boundary, Protocol 23). Default 'overseer' preserves
+// today's only-existing behavior for anyone who has never touched the pill.
+const INPUT_MODE_KEY = 'robco_input_mode';
+const INPUT_MODES = ['overseer', 'terminal'];
+
+function getInputMode() {
+  const v = MetaStore.get(INPUT_MODE_KEY);
+  return INPUT_MODES.indexOf(v) !== -1 ? v : 'overseer';
+}
+window.getInputMode = getInputMode;
+
+// Persist the chosen mode (device pref only — MetaStore, never campaign state).
+// An unknown value is coerced to the safe default 'overseer'. Returns the stored mode.
+function setInputMode(mode) {
+  const m = INPUT_MODES.indexOf(mode) !== -1 ? mode : 'overseer';
+  MetaStore.set(INPUT_MODE_KEY, m);
+  return m;
+}
+window.setInputMode = setInputMode;
+
+// The other of the two modes — the target of a one-off `/` or `@` override
+// and of the pill tap. Only two modes exist today, so this is a simple flip;
+// an unrecognised input still resolves to a valid mode (fails toward 'overseer').
+function otherInputMode(mode) {
+  return mode === 'terminal' ? 'overseer' : 'terminal';
+}
+window.otherInputMode = otherInputMode;
 
 // ── ROBCO EVENTS — OS event bus for terminal/game state crossings ───────────
 // A tiny synchronous pub/sub: emit(event, payload) calls every handler

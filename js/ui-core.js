@@ -952,6 +952,11 @@ function _restoreDevicePrefs() {
     if (slider) slider.value = savedSpeed;
     if (label) label.textContent = savedSpeed.toFixed(2) + '\u00d7';
   }
+
+  // Command-Line MODE (Step 2 Phase 2 B1): restore the pill/placeholder from
+  // the persisted device pref and wire the `/`/`@` hint reveal.
+  _renderModePill();
+  _wireModeHint();
 }
 
 function _wireKeyboardShortcuts() {
@@ -2280,6 +2285,87 @@ ${apSection}
 ranged hit-% is an estimate (per-weapon spread is not in canon data). Read-only.</span>`;
 }
 
+// ── COMMAND-LINE MODE — pill UI + placeholder + hint (Step 2 · Phase 2 · B1) ──
+// The inline mode pill inside the Comm-Link input toolbar (#modePill) plus the
+// per-mode placeholder text and the "/`/`@` override" hint reveal. Device-pref
+// backed (getInputMode/setInputMode/otherInputMode, js/state.js) — never
+// campaign state, so it does NOT reset on a new campaign (same as optics,
+// immersion, and every other MetaStore-backed device preference).
+function _modeLabel(mode) {
+  return mode === 'terminal' ? 'TERMINAL' : 'OVERSEER';
+}
+
+function _modePlaceholder(mode) {
+  return mode === 'terminal'
+    ? "TERM> ENTER A COMMAND OR QUICK-LOG (E.G. 'KILLED DEATHCLAW')…"
+    : "AI> ENTER COMMAND OR ACTION (E.G. '> [THREAT] GECKOS')…";
+}
+
+function _renderModePill() {
+  const pill = document.getElementById('modePill');
+  const input = document.getElementById('chatInput');
+  const mode = typeof getInputMode === 'function' ? getInputMode() : 'overseer';
+  if (pill) {
+    pill.textContent = _modeLabel(mode);
+    pill.className = 'action-btn btn-sm mode-pill mode-pill--' + mode;
+    pill.setAttribute(
+      'aria-label',
+      'Command input mode: ' +
+        _modeLabel(mode) +
+        '. Tap to switch to ' +
+        _modeLabel(otherInputMode(mode)) +
+        '.'
+    );
+  }
+  if (input) input.placeholder = _modePlaceholder(mode);
+}
+
+// Tapping the pill swaps the PERSISTED mode (device pref) — distinct from the
+// one-off `/`/`@` override, which never touches this persisted value.
+function toggleInputMode() {
+  const mode = typeof getInputMode === 'function' ? getInputMode() : 'overseer';
+  setInputMode(otherInputMode(mode));
+  _renderModePill();
+  _updateModeHint();
+  if (typeof playPanelClick === 'function') playPanelClick();
+}
+window.toggleInputMode = toggleInputMode;
+
+// Shows "→ sending to X" the moment #chatInput's raw value starts with `/` or
+// `@` (first character only — matches the override-detection rule exactly).
+// Implemented as a plain inline reveal (not a floating overlay) so it can never
+// overflow at 360/412px — it just occupies its own row when visible.
+function _updateModeHint() {
+  const hint = document.getElementById('modeHintPopup');
+  const input = document.getElementById('chatInput');
+  if (!hint || !input) return;
+  const raw = input.value;
+  const first = raw.charAt(0);
+  if (first === '/' || first === '@') {
+    const mode = typeof getInputMode === 'function' ? getInputMode() : 'overseer';
+    const target = typeof otherInputMode === 'function' ? otherInputMode(mode) : 'overseer';
+    hint.textContent = '→ sending to ' + _modeLabel(target);
+    hint.style.display = 'block';
+  } else {
+    hint.style.display = 'none';
+  }
+}
+window._updateModeHint = _updateModeHint;
+
+function _hideModeHint() {
+  const hint = document.getElementById('modeHintPopup');
+  if (hint) hint.style.display = 'none';
+}
+window._hideModeHint = _hideModeHint;
+
+// One-time wiring for the hint reveal (the pill itself is restored/rendered by
+// _restoreDevicePrefs(); the chat autocomplete extension is wired inside
+// initRegistryAutocomplete() in ui-saves.js — Protocol 22, same singleton).
+function _wireModeHint() {
+  const input = document.getElementById('chatInput');
+  if (input) input.addEventListener('input', _updateModeHint);
+}
+
 // WU-E3: the command registry is kept in lock-step with reality — every entry
 // resolves to a NATIVE_COMMAND_ROUTER token (api.js), a live panel/UI control, an
 // AI-directive-defined command (getSystemDirective), or a keyboard handler. The six
@@ -2289,6 +2375,30 @@ ranged hit-% is an estimate (per-weapon spread is not in canon data). Read-only.
 // chained &&/-Q/-S flags, etc.) were removed because they no longer resolve anywhere.
 // Suite 113 guards this registry ↔ router ↔ help consistency so it can't drift again.
 const COMMAND_REGISTRY = [
+  {
+    group: 'COMMAND-LINE MODE',
+    cmds: [
+      {
+        cmd: '[MODE PILL]',
+        desc: 'Tap the pill above the input to swap between TERMINAL (native + quick-log, offline) and OVERSEER (AI narrator).',
+      },
+      { cmd: '/message', desc: 'One-off: send just this message to the OTHER mode.' },
+      { cmd: '@message', desc: 'One-off: same as / — send just this message to the OTHER mode.' },
+      {
+        cmd: 'killed <target>',
+        desc: 'Quick-log (TERMINAL): record a kill in the Terminal Record. Offline.',
+      },
+      { cmd: '+N caps / -N caps', desc: 'Quick-log (TERMINAL): adjust your caps. Offline.' },
+      {
+        cmd: 'arrived <location>',
+        desc: 'Quick-log (TERMINAL): record a location as visited. Offline.',
+      },
+      {
+        cmd: 'rep <faction> up/down',
+        desc: "Quick-log (TERMINAL): nudge a faction's reputation +/-5. Offline.",
+      },
+    ],
+  },
   {
     group: 'NATIVE TERMINALS — OFFLINE, NO AI',
     cmds: [

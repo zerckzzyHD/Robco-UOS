@@ -66,8 +66,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    1813-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    1813-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    1831-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    1831-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -831,6 +831,52 @@ action on each inventory row would close it using the same pattern as the other 
 
 ---
 
+## Command-Line MODE (`js/api.js` + `js/ui-core.js` — Step 2 · Phase 2 · B1)
+
+A single mode pill (`#modePill`, in the Comm-Link input toolbar) chooses which of two
+paths the Comm-Link input takes on submit — a device preference (`robco_input_mode`,
+MetaStore-backed via `getInputMode()`/`setInputMode()`/`otherInputMode()` in
+`state.js`, default `'overseer'`), never campaign state.
+
+```
+[TRANSMIT PROTOCOL] click / Ctrl+Enter → submitCommandInput()   // the ONE choke point
+  → attachedImageData present?  → transmitMessage()             // AI is the only visual-analysis path
+  → _resolveCommandInput(raw)                                    // persisted mode, or a one-off / @ override
+      raw.charAt(0) === '/' or '@'  → target = otherInputMode(persisted); strip the prefix + one optional space
+      otherwise                    → target = persisted mode; text unchanged
+  → target === 'terminal' ? transmitTerminal(text) : transmitMessage(text)
+```
+
+- **OVERSEER mode** — `transmitMessage(overrideText)` is unchanged from before B1 except for the
+  new optional parameter (every pre-B1 call site passes no argument and behaves byte-identically —
+  it still runs `_routeNativeCommand()` first, so every `[TOKEN]` command keeps working, before
+  falling through to the Gemini call).
+- **TERMINAL mode** — `transmitTerminal(overrideText)` (`api.js`) never calls the AI. It tries
+  `_routeNativeCommand()` first (same native router, same muscle memory), then `_routeQuickLog()`
+  — a small pattern table (`QUICK_LOG_PATTERNS`) matching natural one-liners onto **existing**
+  native setters, never a forked duplicate:
+  - `killed <target>` / `killed N <target>` → `_logEvent('kill', …)` (Terminal Record)
+  - `+N caps` / `-N caps` → mutates `state.caps`, mirrors `#c_caps` (the same WU-N2 idiom
+    `doBuy`/`doSell` use so the change survives the next `saveState()`)
+  - `arrived <location>` / `at <location>` → `markLocationVisited()` (the single-source helper,
+    unchanged)
+  - `rep <faction> up|down` → `adjustFaction(key, 'fame'|'infamy', 5)`, validated against
+    `getFactionRegistry()` (game-agnostic, Protocol 38) — an unknown faction key falls through
+    Anything matching neither shows a gentle `[TERM] UNRECOGNIZED` hint pointing at `[FEATURES]`
+    instead of silently doing nothing.
+- **The `/`/`@` override hint** (`#modeHintPopup`) is an inline reveal (not a floating overlay,
+  to guarantee no 360/412px overflow) shown the moment the raw input's first character is `/`
+  or `@`, naming the mode the message will actually go to.
+- **Autocomplete** — `wireInput()` (`js/ui-saves.js`, the shared `#acPanel` singleton documented
+  under "Registry Autocomplete System" below) now accepts a resolver **function** in addition to
+  a registry category string; `#chatInput` is wired to `_commandSuggestions()` (`api.js`), which
+  returns `[]` whenever the message would resolve to OVERSEER and otherwise surfaces matching
+  `NATIVE_COMMAND_ROUTER` tokens plus the quick-log verb stubs.
+- Documented in `COMMAND_REGISTRY`'s new `COMMAND-LINE MODE` group (`ui-core.js`), so `[FEATURES]`
+  always shows the pill, both override prefixes, and all four quick-log verbs.
+
+---
+
 ## Audio System
 
 ### Architecture
@@ -1148,7 +1194,7 @@ Two separate stores, kept apart on purpose (Protocol 23 boundary, locked structu
 
 ### MetaStore — device preferences (`js/state.js`)
 
-`MetaStore.get(key)` / `.set(key, val)` / `.remove(key)` / `.has(key)` / `.keys()` is the single choke point for every `robco_*` key that describes **this device's** preferences — never campaign data. A registered-key `META_MANIFEST` (31 keys) is the boundary: a key is a "device preference" if and only if it is listed there. Every read/write of these keys across `js/ui-audio.js` / `js/ui-render.js` / `js/ui-core.js` / `js/api.js` / `js/cloud.js` routes through `MetaStore` (never bare `localStorage`). The one sanctioned exception is the two `index.html` `<head>` pre-paint scripts (flash-free optics + high-lumen), which run before `state.js` — and therefore `MetaStore` — has loaded; Suite 134.7 proves they sit strictly before the first `js/*.js` `<script>` tag.
+`MetaStore.get(key)` / `.set(key, val)` / `.remove(key)` / `.has(key)` / `.keys()` is the single choke point for every `robco_*` key that describes **this device's** preferences — never campaign data. A registered-key `META_MANIFEST` (32 keys) is the boundary: a key is a "device preference" if and only if it is listed there. Every read/write of these keys across `js/ui-audio.js` / `js/ui-render.js` / `js/ui-core.js` / `js/api.js` / `js/cloud.js` routes through `MetaStore` (never bare `localStorage`). The one sanctioned exception is the two `index.html` `<head>` pre-paint scripts (flash-free optics + high-lumen), which run before `state.js` — and therefore `MetaStore` — has loaded; Suite 134.7 proves they sit strictly before the first `js/*.js` `<script>` tag.
 
 | Key                            | Type   | Owner       | Description                                                                         |
 | ------------------------------ | ------ | ----------- | ----------------------------------------------------------------------------------- |
@@ -1184,6 +1230,7 @@ Two separate stores, kept apart on purpose (Protocol 23 boundary, locked structu
 | `robco_booted_before`          | bool   | ui-audio.js | First-power-on flag (WU-F6 — gates the one-time cold-start POST)                    |
 | `robco_feature_flags`          | JSON   | cloud.js    | Last-known-good cache of the remote kill-switch config                              |
 | `robco_sw_installed`           | bool   | index.html  | Records that a service worker has ever controlled the page                          |
+| `robco_input_mode`             | string | state.js    | Command-Line MODE pill selection (`'overseer'`/`'terminal'`, B1)                    |
 
 ### Campaign/save store — NOT MetaStore
 
@@ -1417,7 +1464,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1813-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1831-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

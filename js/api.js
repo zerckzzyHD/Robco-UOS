@@ -1214,6 +1214,225 @@ function _routeNativeCommand(userText) {
   return false;
 }
 
+// ── COMMAND-LINE MODE — quick-log routing (Step 2 · Phase 2 · B1) ───────────
+// Natural one-liners typed in TERMINAL mode that route straight to an existing
+// native tracker/logger — no menus, no AI. Each handler REUSES the established
+// setter (adjustFaction / markLocationVisited / _logEvent / the #c_caps mirror
+// idiom) — none of it is forked (Protocol 22). Game-agnostic (Protocol 38): the
+// faction pattern validates the key against getFactionRegistry(), never a
+// hardcoded faction list, so a new game needs no change here. A handler returns
+// false (rather than true) when the SHAPE matched but the content didn't resolve
+// to anything real (e.g. an unknown faction key) — that falls through to the
+// TERMINAL "unrecognized" hint instead of silently doing nothing.
+function _quickLogKill(count, target) {
+  const label = String(target || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!label) return false;
+  const text = count > 1 ? `Killed ${count} ${label}` : `Killed ${label}`;
+  _logEvent('kill', text);
+  saveState();
+  appendToChat(`> [TERM] Logged: ${text}`, 'sys');
+  return true;
+}
+
+function _quickLogCaps(delta) {
+  if (!delta) return false;
+  const cur = state.caps || 0;
+  state.caps = Math.max(0, cur + delta);
+  // Mirror to #c_caps — the sync source-of-truth saveState() reads back via
+  // syncStateFromDom(); without this the change is reverted on the next save
+  // (the same WU-N2 fix doBuy/doSell rely on).
+  const capsEl = document.getElementById('c_caps');
+  if (capsEl) capsEl.value = state.caps;
+  _logEvent('caps', `Caps ${delta >= 0 ? '+' : ''}${delta} → ${state.caps}`);
+  if (typeof updateMath === 'function') updateMath();
+  saveState();
+  appendToChat(`> [TERM] Caps ${delta >= 0 ? '+' : ''}${delta}. Caps: ${state.caps}.`, 'sys');
+  return true;
+}
+
+function _quickLogLocation(name) {
+  const loc = String(name || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!loc) return false;
+  markLocationVisited(loc); // records history + saveState() + renderWorldMap() (single source)
+  appendToChat(`> [TERM] Location recorded: ${loc}`, 'sys');
+  return true;
+}
+
+function _quickLogFaction(key, dir) {
+  const reg = typeof getFactionRegistry === 'function' ? getFactionRegistry() : [];
+  const match = reg.find(f => f.key.toLowerCase() === String(key || '').toLowerCase());
+  if (!match) return false; // unknown faction key — fall through to the unrecognized hint
+  const field = dir === 'up' ? 'fame' : 'infamy';
+  adjustFaction(match.key, field, 5); // ±5 — matches the F+/F-/I+/I- card buttons (Suite 88)
+  appendToChat(`> [TERM] ${match.name} ${field} +5 (rep ${dir}).`, 'sys');
+  return true;
+}
+
+const QUICK_LOG_PATTERNS = [
+  {
+    id: 'kill',
+    re: /^killed?\s+(?:(\d+)\s+)?(.+)$/i,
+    stub: 'killed ',
+    hint: 'killed <target>',
+    tag: 'Quick-log: record a kill',
+    handler: m => _quickLogKill(m[1] ? parseInt(m[1], 10) : 1, m[2]),
+  },
+  {
+    id: 'caps',
+    re: /^([+-])\s*(\d+)\s*caps?$/i,
+    stub: '+50 caps',
+    hint: '+/-N caps',
+    tag: 'Quick-log: gain/spend caps',
+    handler: m => _quickLogCaps(m[1] === '-' ? -parseInt(m[2], 10) : parseInt(m[2], 10)),
+  },
+  {
+    id: 'location',
+    re: /^(?:arrived(?:\s+at)?|at)\s+(.+)$/i,
+    stub: 'arrived ',
+    hint: 'arrived <location>',
+    tag: 'Quick-log: record a location',
+    handler: m => _quickLogLocation(m[1]),
+  },
+  {
+    id: 'faction',
+    re: /^rep\s+(\S+)\s+(up|down)$/i,
+    stub: 'rep ',
+    hint: 'rep <faction> up/down',
+    tag: 'Quick-log: adjust faction reputation',
+    handler: m => _quickLogFaction(m[1], m[2].toLowerCase()),
+  },
+];
+window.QUICK_LOG_PATTERNS = QUICK_LOG_PATTERNS;
+
+// Strip the same optional "> " prompt convention the native router tolerates
+// (kept as its own helper rather than touching _routeNativeCommand's existing
+// line, so that function's tested behavior stays byte-identical).
+function _stripPrompt(text) {
+  return String(text || '')
+    .trim()
+    .replace(/^>\s*/, '');
+}
+
+function _routeQuickLog(userText) {
+  const raw = _stripPrompt(userText);
+  for (const p of QUICK_LOG_PATTERNS) {
+    const m = raw.match(p.re);
+    if (m) return p.handler(m) !== false;
+  }
+  return false;
+}
+
+// The ONE choke point for a message submitted while TERMINAL mode is in effect
+// (persisted mode, or a one-off `/`/`@` override targeting it). Runs every
+// existing native command first (so `[TOKEN]` commands keep working exactly as
+// today), then quick-log patterns, then — if neither matched — shows a gentle
+// hint instead of silently doing nothing. NEVER calls the AI (no fetch, no
+// Director Link) — TERMINAL mode is offline by design.
+async function transmitTerminal(overrideText) {
+  const inputEl = document.getElementById('chatInput');
+  const userText = (typeof overrideText === 'string' ? overrideText : inputEl.value).trim();
+  if (!userText) return;
+
+  if (userText.length > 4000) {
+    appendToChat(
+      '> [SYS] INPUT TOO LONG — maximum 4,000 characters per message. Please shorten and try again.',
+      'sys'
+    );
+    return;
+  }
+
+  appendToChat(`> ${userText}`, 'user');
+  inputEl.value = '';
+
+  if (_routeNativeCommand(userText)) {
+    if (_isPrecisePointer()) document.getElementById('chatInput').focus();
+    return;
+  }
+  if (_routeQuickLog(userText)) {
+    if (_isPrecisePointer()) document.getElementById('chatInput').focus();
+    return;
+  }
+  appendToChat(
+    '> [TERM] UNRECOGNIZED — did you mean a native command (see [FEATURES]) or a quick-log entry like "killed <target>", "+50 caps", "arrived <location>", or "rep <faction> up/down"?',
+    'sys'
+  );
+}
+window.transmitTerminal = transmitTerminal;
+
+// Resolve which mode THIS message submits through: the persisted device pref,
+// or a one-off override when the RAW (untrimmed) input's FIRST character is
+// `/` or `@` — both accepted, both mean "send this one message to whichever
+// mode I'm not currently in." Supports both "/msg" (no space) and "/ msg"
+// (exactly one space stripped); a `/` or `@` anywhere else in the input is
+// left as literal text. Never mutates the persisted mode.
+function _resolveCommandInput(raw) {
+  const persisted = typeof getInputMode === 'function' ? getInputMode() : 'overseer';
+  const first = raw.charAt(0);
+  if (first === '/' || first === '@') {
+    let rest = raw.slice(1);
+    if (rest.charAt(0) === ' ') rest = rest.slice(1);
+    return { mode: otherInputMode(persisted), text: rest, override: true };
+  }
+  return { mode: persisted, text: raw, override: false };
+}
+window._resolveCommandInput = _resolveCommandInput;
+
+// The ONE entry point index.html calls (the [ > TRANSMIT PROTOCOL ] button and
+// the textarea's Ctrl+Enter handler) — replaces the former direct
+// transmitMessage() call. A visual upload has no TERMINAL/native equivalent
+// (image analysis needs the AI), so an attached image always goes through
+// OVERSEER regardless of the resolved mode — identical to today's behavior.
+function submitCommandInput() {
+  const inputEl = document.getElementById('chatInput');
+  if (!inputEl) return;
+  const raw = inputEl.value;
+  if (!raw.trim() && !attachedImageData) return;
+  if (typeof _hideModeHint === 'function') _hideModeHint();
+  if (attachedImageData) {
+    transmitMessage();
+    return;
+  }
+  const resolved = _resolveCommandInput(raw);
+  if (resolved.mode === 'terminal') {
+    transmitTerminal(resolved.text);
+  } else {
+    transmitMessage(resolved.text);
+  }
+}
+window.submitCommandInput = submitCommandInput;
+
+// Autocomplete source for #chatInput in TERMINAL mode (extends the shared
+// registry-autocomplete singleton in ui-saves.js, Protocol 22 — see wireInput()
+// there). Suppressed entirely when the message would resolve to OVERSEER, so
+// free-text AI narration is never cluttered with command suggestions. Surfaces
+// matching NATIVE_COMMAND_ROUTER tokens plus the quick-log verb stubs above.
+function _commandSuggestions(rawQuery) {
+  if (typeof _resolveCommandInput !== 'function') return [];
+  const resolved = _resolveCommandInput(String(rawQuery || ''));
+  if (resolved.mode !== 'terminal') return [];
+  const q = resolved.text.trim().toLowerCase();
+  if (q.length < 2) return [];
+  const plain = s =>
+    String(s)
+      .replace(/[^a-z0-9 ]/gi, '')
+      .toLowerCase();
+  const out = [];
+  Object.keys(NATIVE_COMMAND_ROUTER).forEach(cmd => {
+    if (plain(cmd).indexOf(q) !== -1) out.push({ name: cmd + ' ', type: 'native command' });
+  });
+  QUICK_LOG_PATTERNS.forEach(p => {
+    if (plain(p.hint).indexOf(q) !== -1 || p.tag.toLowerCase().indexOf(q) !== -1) {
+      out.push({ name: p.stub, type: p.tag });
+    }
+  });
+  return out.slice(0, 8);
+}
+window._commandSuggestions = _commandSuggestions;
+
 function _nativeCrossroads() {
   const factions = (state && state.factions) || {};
   const quests = (state && state.quests) || [];
@@ -1408,12 +1627,17 @@ function showTermlinkConsole() {
   if (typeof openModal === 'function') openModal();
 }
 
-async function transmitMessage() {
+// overrideText (Step 2 Phase 2 B1): when the Command-Line MODE resolver hands this
+// ONE message to OVERSEER (persisted TERMINAL mode + a one-off `/` or `@` override),
+// it passes the already-prefix-stripped text here instead of re-reading #chatInput.
+// Called with no argument (every existing call site), behavior is byte-identical
+// to before B1 — this is a pure additive parameter.
+async function transmitMessage(overrideText) {
   if (!transmitMessage._inRetry) transmitMessage._retryCount = 0;
   transmitMessage._inRetry = false;
 
   const inputEl = document.getElementById('chatInput');
-  const userText = inputEl.value.trim();
+  const userText = (typeof overrideText === 'string' ? overrideText : inputEl.value).trim();
   if (!userText && !attachedImageData) return;
 
   // Length guard: reject pathological input before any network call

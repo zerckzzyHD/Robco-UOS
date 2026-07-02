@@ -119,6 +119,14 @@ export default [
         getImmersionTier: 'readonly',
         immersionAllows: 'readonly',
         setImmersionTier: 'readonly',
+        // Step 2 Phase 2 B1 — Command-Line MODE: device-pref accessors (js/state.js),
+        // quick-log autocomplete source (js/api.js), quick-log setter reuse (js/ui-render.js)
+        getInputMode: 'readonly',
+        setInputMode: 'readonly',
+        otherInputMode: 'readonly',
+        _commandSuggestions: 'readonly',
+        _hideModeHint: 'readonly',
+        markLocationVisited: 'readonly',
         // Step 2 Phase 2 A1 — Ambient Runtime (js/runtime.js): lifecycle state machine + observer scheduler
         AmbientRuntime: 'readonly',
         initAmbientRuntime: 'readonly',

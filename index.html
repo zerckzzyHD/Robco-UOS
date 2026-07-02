@@ -2195,11 +2195,12 @@
               onkeydown="
                 if (event.ctrlKey && event.key === 'Enter') {
                   event.preventDefault();
-                  transmitMessage();
+                  submitCommandInput();
                 }
               "
               oninput="updateTokenBudget()"
             ></textarea>
+            <div id="modeHintPopup" class="mode-hint" style="display: none"></div>
             <div
               style="
                 display: flex;
@@ -2209,7 +2210,17 @@
                 margin-bottom: 2px;
               "
             >
-              <button class="action-btn btn-sm" onclick="showHelpModal()">[?]</button>
+              <div style="display: flex; align-items: center; gap: 4px">
+                <button
+                  id="modePill"
+                  class="action-btn btn-sm mode-pill mode-pill--overseer"
+                  onclick="toggleInputMode()"
+                  aria-label="Command input mode: OVERSEER. Tap to switch to TERMINAL."
+                >
+                  OVERSEER
+                </button>
+                <button class="action-btn btn-sm" onclick="showHelpModal()">[?]</button>
+              </div>
               <div
                 id="tokenBudgetDisplay"
                 style="font-size: 9px; opacity: 0.5; color: var(--robco-blue); text-align: right"
@@ -2333,7 +2344,7 @@
                 </button>
               </div>
             </div>
-            <button onclick="transmitMessage()" class="blue-btn" id="transmitBtn">
+            <button onclick="submitCommandInput()" class="blue-btn" id="transmitBtn">
               &gt; TRANSMIT PROTOCOL
             </button>
           </div>

@@ -800,10 +800,19 @@ function initRegistryAutocomplete() {
     _acActiveIdx = idx;
   }
 
-  function wireInput(inputId, category) {
+  // categoryOrFn: a registry category string (existing behavior, unchanged —
+  // results come from registrySearch(category, q)) OR a resolver function
+  // (Step 2 Phase 2 B1 — results come from fn(q) instead; used to wire
+  // #chatInput to _commandSuggestions in api.js without a second singleton).
+  function wireInput(inputId, categoryOrFn) {
     var el = document.getElementById(inputId);
     if (!el) return;
-    if (typeof registrySearch !== 'function') return;
+    var isFn = typeof categoryOrFn === 'function';
+    if (!isFn && typeof registrySearch !== 'function') return;
+
+    function fetchResults(q) {
+      return isFn ? categoryOrFn(q) || [] : registrySearch(categoryOrFn, q);
+    }
 
     el.addEventListener('input', function () {
       clearTimeout(_acTimer);
@@ -814,8 +823,7 @@ function initRegistryAutocomplete() {
       }
       _acCurrentInput = el;
       _acTimer = setTimeout(function () {
-        var results = registrySearch(category, q);
-        acRender(results, el);
+        acRender(fetchResults(q), el);
       }, 150);
     });
 
@@ -850,7 +858,7 @@ function initRegistryAutocomplete() {
       var q = el.value;
       if (q.length >= 2) {
         _acCurrentInput = el;
-        var results = registrySearch(category, q);
+        var results = fetchResults(q);
         if (results.length) acRender(results, el);
       }
     });
@@ -860,6 +868,11 @@ function initRegistryAutocomplete() {
   wireInput('newQuestName', 'quests');
   wireInput('newItemName', 'items');
   wireInput('newPerkName', 'perks');
+  // Step 2 Phase 2 B1: TERMINAL-mode command/quick-log suggestions for the
+  // Comm-Link input (suppressed entirely when the message resolves to OVERSEER).
+  if (typeof _commandSuggestions === 'function') {
+    wireInput('chatInput', _commandSuggestions);
+  }
 
   // Reposition on scroll/resize so the panel doesn't orphan
   window.addEventListener(

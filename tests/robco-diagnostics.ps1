@@ -622,7 +622,10 @@ Check ($htmlSrc -match 'id="worldMapPanel"')             'worldMapPanel panel ex
 Check ($htmlSrc -match 'id="worldMapDisplay"')           'worldMapDisplay element exists in index.html'
 Check ($htmlSrc -match 'id="factionContainer"')          'factionContainer element exists in index.html'
 Check ($htmlSrc -match 'id="transmitBtn"')               'transmitBtn send button exists in index.html (Protocol 13 -- regression guard)'
-Check ([bool]([regex]::Match($htmlSrc, '<button[^>]*onclick="transmitMessage\(\)"[^>]*id="transmitBtn"|<button[^>]*id="transmitBtn"[^>]*onclick="transmitMessage\(\)"').Success)) 'transmitBtn is wired to transmitMessage() (Protocol 13 -- send-button regression guard)'
+# Step 2 Phase 2 B1: transmitBtn now routes through submitCommandInput() -- the
+# Command-Line MODE resolver -- which calls transmitMessage() itself on the
+# OVERSEER path (Suite 151.4/151.5 guard the resolver + no-arg parity).
+Check ([bool]([regex]::Match($htmlSrc, '<button[^>]*onclick="submitCommandInput\(\)"[^>]*id="transmitBtn"|<button[^>]*id="transmitBtn"[^>]*onclick="submitCommandInput\(\)"').Success)) 'transmitBtn is wired to submitCommandInput() (Protocol 13 -- send-button regression guard, updated for B1)'
 
 # ===========================================================
 # Suite 18 -- Detail-Current Dedup Guard (Protocol 27)
@@ -10632,6 +10635,196 @@ Check (
     ($exitStandbyBody150.IndexOf('if (_isShuttingDown()) return;') -lt $exitStandbyBody150.LastIndexOf('if (_isShuttingDown()) return;')) -and
     (([regex]::Matches($exitStandbyBody150, 'if \(_isShuttingDown\(\)\) return;')).Count -eq 2)
 ) "150.10: structural mirror of the JS behavioral proof -- exactly two _isShuttingDown() checks exist (one before the tone, one as the first statement inside the setTimeout, strictly before classList.remove/chat/updateMath), and the normal-wake body (tone/chat line/updateMath) is otherwise unchanged"
+
+# ===========================================================
+# Suite 151 -- Step 2 (v2.8.0) Phase 2 B1: Command-Line MODE system
+# (18 tests). Mirrors JS Suite 151. The inline mode pill (TERMINAL/
+# OVERSEER) in the Comm-Link input, the one-off `/`/`@` override
+# prefixes, quick-log routing (killed/caps/arrived/rep) onto existing
+# native setters, and a TERMINAL-mode autocomplete extension of the
+# shared registry-autocomplete singleton.
+# ===========================================================
+Sep "Suite 151 -- Step 2 Phase 2 B1: Command-Line MODE system"
+$stateSrc151 = Read-Src "js/state.js"
+$apiSrc151 = Read-Src "js/api.js"
+$uiCoreSrc151 = Read-Src "js/ui-core.js"
+$uiSavesSrc151 = Read-Src "js/ui-saves.js"
+$htmlSrc151 = Read-Src "index.html"
+$cssSrc151 = Read-Src "css/terminal.css"
+
+# 151.1  robco_input_mode is registered as a DEVICE PREFERENCE (MetaStore),
+#        never campaign state -- same two-store boundary as robco_immersion.
+Check (
+    $stateSrc151 -match "robco_input_mode:\s*\{\s*type:\s*'string',\s*default:\s*'overseer',\s*owner:\s*'state\.js'\s*\}"
+) "151.1: robco_input_mode is registered in META_MANIFEST as a device pref (default 'overseer')"
+
+# 151.2  get/set/other accessors defined in state.js, mirroring the
+#        Immersion-dial pattern exactly (Protocol 22)
+Check (
+    ($stateSrc151 -match "function getInputMode\(\)") -and
+    ($stateSrc151 -match "function setInputMode\(mode\)") -and
+    ($stateSrc151 -match "function otherInputMode\(mode\)") -and
+    ($stateSrc151 -match "MetaStore\.get\(INPUT_MODE_KEY\)") -and
+    ($stateSrc151 -match "MetaStore\.set\(INPUT_MODE_KEY, m\)")
+) "151.2: getInputMode/setInputMode/otherInputMode defined in state.js and round-trip through MetaStore only"
+
+# 151.3  the pill is a real <button> (Protocol UI-5) with a diegetic
+#        aria-label, and the hint reveal element exists
+Check (
+    ($htmlSrc151 -match '<button\s[^>]*id="modePill"[^>]*class="action-btn btn-sm mode-pill mode-pill--overseer"[^>]*onclick="toggleInputMode\(\)"[^>]*aria-label="[^"]+"') -and
+    ($htmlSrc151 -match '<div id="modeHintPopup" class="mode-hint"')
+) '151.3: #modePill is a real <button> (action-btn btn-sm mode-pill) with onclick + aria-label; #modeHintPopup exists'
+
+# 151.4  the pill and the Ctrl+Enter/[TRANSMIT] paths route through the ONE
+#        new choke point, submitCommandInput() -- the direct transmitMessage()
+#        call sites are gone from index.html (moved behind the resolver)
+Check (
+    ($htmlSrc151 -match 'onclick="submitCommandInput\(\)"') -and
+    ($htmlSrc151 -match "(?s)submitCommandInput\(\);\s*\n\s*\}") -and
+    (-not ($htmlSrc151 -match 'onclick="transmitMessage\(\)"'))
+) '151.4: [TRANSMIT PROTOCOL] and Ctrl+Enter both call submitCommandInput(); no direct transmitMessage() call site remains in index.html'
+
+# 151.5  transmitMessage() gained an OPTIONAL overrideText param -- additive,
+#        no-arg behavior (every existing call site) is unchanged
+Check (
+    ($apiSrc151 -match "async function transmitMessage\(overrideText\)") -and
+    ($apiSrc151 -match "const userText = \(typeof overrideText === 'string' \? overrideText : inputEl\.value\)\.trim\(\);")
+) "151.5: transmitMessage(overrideText) -- an optional param; called with no args it reads #chatInput exactly as before"
+
+# 151.6  transmitTerminal(): native commands first (muscle memory), then
+#        quick-log, else a hint -- and it NEVER calls the AI (no fetch, no
+#        Director-Link payload assembly)
+$transmitTerminalBody151 = Get-FunctionBody $apiSrc151 'transmitTerminal'
+Check (
+    ($transmitTerminalBody151 -match "_routeNativeCommand\(userText\)") -and
+    ($transmitTerminalBody151 -match "_routeQuickLog\(userText\)") -and
+    ($transmitTerminalBody151 -match "UNRECOGNIZED") -and
+    (-not ($transmitTerminalBody151 -match "fetch\(|generateSyncPayload|getSystemDirective"))
+) '151.6: transmitTerminal() tries _routeNativeCommand() then _routeQuickLog(), else shows an UNRECOGNIZED hint; never calls fetch/generateSyncPayload/getSystemDirective (no AI)'
+
+# 151.7  submitCommandInput(): an attached image always forces the AI path
+#        (transmitMessage()) regardless of the resolved mode -- TERMINAL has
+#        no visual-analysis equivalent
+$submitBody151 = Get-FunctionBody $apiSrc151 'submitCommandInput'
+Check (
+    ($submitBody151 -match "(?s)if \(attachedImageData\) \{\s*\n\s*transmitMessage\(\);\s*\n\s*return;\s*\n\s*\}") -and
+    ($submitBody151 -match "resolved\.mode === 'terminal'")
+) "151.7: submitCommandInput() routes an attached image straight to transmitMessage() (AI), before checking the resolved mode"
+
+# 151.8  _resolveCommandInput(): first-char-only `/`/`@`, both spacing
+#        variants, targets otherInputMode() -- structural shape
+$resolveBody151 = Get-FunctionBody $apiSrc151 '_resolveCommandInput'
+Check (
+    ($resolveBody151 -match "const first = raw\.charAt\(0\);") -and
+    ($resolveBody151 -match "first === '/' \|\| first === '@'") -and
+    ($resolveBody151 -match "rest\.charAt\(0\) === ' '") -and
+    ($resolveBody151 -match "otherInputMode\(persisted\)")
+) "151.8: _resolveCommandInput() checks raw.charAt(0) (untrimmed -- first-char-only), accepts `/` and `@`, strips exactly one leading space, and targets otherInputMode(persisted)"
+
+# 151.9  QUICK_LOG_PATTERNS: all four quick-log verbs present with the
+#        expected regex anchors
+Check (
+    ($apiSrc151 -match "(?s)id:\s*'kill',\s*\n\s*re:\s*/\^killed\?\\s\+") -and
+    ($apiSrc151 -match "(?s)id:\s*'caps',\s*\n\s*re:\s*/\^\(\[\+-\]\)") -and
+    ($apiSrc151 -match "(?s)id:\s*'location',\s*\n\s*re:\s*/\^\(\?:arrived") -and
+    ($apiSrc151 -match "(?s)id:\s*'faction',\s*\n\s*re:\s*/\^rep\\s\+")
+) "151.9: QUICK_LOG_PATTERNS defines kill/caps/location/faction with the documented regex shapes"
+
+# 151.10  quick-log handlers REUSE existing native setters -- none are forked
+#         (Protocol 22): kill writes through _logEvent, caps mirrors #c_caps
+#         before saveState (the WU-N2 idiom), location calls the shared
+#         markLocationVisited(), faction calls the shared adjustFaction()
+#         gated on getFactionRegistry()
+$quickLogCapsBody151 = Get-FunctionBody $apiSrc151 '_quickLogCaps'
+$quickLogFactionBody151 = Get-FunctionBody $apiSrc151 '_quickLogFaction'
+Check (
+    ($apiSrc151 -match "_logEvent\('kill', text\)") -and
+    ($quickLogCapsBody151 -match "document\.getElementById\('c_caps'\)") -and
+    ($apiSrc151 -match "markLocationVisited\(loc\)") -and
+    ($apiSrc151 -match "adjustFaction\(match\.key, field, 5\)") -and
+    ($quickLogFactionBody151 -match "getFactionRegistry\(\)")
+) "151.10: quick-log handlers reuse _logEvent/markLocationVisited/adjustFaction/getFactionRegistry -- no forked duplicate logic"
+
+# 151.11  the faction quick-log falls through (returns false) on an unknown
+#         key, rather than blindly creating one -- the caller then shows the
+#         "unrecognized" hint instead of silently mutating an invented faction
+Check (
+    $quickLogFactionBody151 -match "if \(!match\) return false;"
+) '151.11: _quickLogFaction returns false on an unknown faction key (falls through to the TERMINAL "unrecognized" hint, never invents a faction)'
+
+# 151.12  COMMAND_REGISTRY documents the mode system so it is discoverable
+#         via [FEATURES] -- the pill, both override prefixes, and all four
+#         quick-log verbs
+Check (
+    ($uiCoreSrc151 -match "group:\s*'COMMAND-LINE MODE'") -and
+    ($uiCoreSrc151 -match "'/message'") -and
+    ($uiCoreSrc151 -match "'@message'") -and
+    ($uiCoreSrc151 -match "'killed <target>'") -and
+    ($uiCoreSrc151 -match "'\+N caps / -N caps'") -and
+    ($uiCoreSrc151 -match "'arrived <location>'") -and
+    ($uiCoreSrc151 -match "'rep <faction> up/down'")
+) "151.12: COMMAND_REGISTRY has a COMMAND-LINE MODE group documenting the pill, /message, @message, and all four quick-log verbs"
+
+# 151.13  wireInput() is generalized to accept a function resolver -- the
+#         three existing registry-category call sites are UNCHANGED
+#         (backward-compatible), and #chatInput is wired to _commandSuggestions
+Check (
+    ($uiSavesSrc151 -match "function wireInput\(inputId, categoryOrFn\)") -and
+    ($uiSavesSrc151 -match "var isFn = typeof categoryOrFn === 'function';") -and
+    ($uiSavesSrc151 -match "wireInput\('newQuestName', 'quests'\);") -and
+    ($uiSavesSrc151 -match "wireInput\('newItemName', 'items'\);") -and
+    ($uiSavesSrc151 -match "wireInput\('newPerkName', 'perks'\);") -and
+    ($uiSavesSrc151 -match "wireInput\('chatInput', _commandSuggestions\);")
+) "151.13: wireInput(inputId, categoryOrFn) accepts a function; the 3 existing registry-category calls are untouched; #chatInput is newly wired to _commandSuggestions"
+
+# 151.14  _commandSuggestions() is suppressed entirely (returns []) unless
+#         the message resolves to TERMINAL -- no AI-mode suggestion clutter
+$commandSuggestionsBody151 = Get-FunctionBody $apiSrc151 '_commandSuggestions'
+Check (
+    $commandSuggestionsBody151 -match "if \(resolved\.mode !== 'terminal'\) return \[\];"
+) "151.14: _commandSuggestions() returns [] whenever the message would resolve to OVERSEER"
+
+# 151.15  CSS: the pill/hint classes exist, reuse .action-btn.btn-sm sizing
+#         (>=28px tap target, Protocol 17) rather than a bespoke min-height,
+#         and never wrap (Suite 92 anti-recurrence pattern)
+$modePillBlock151 = [regex]::Match($cssSrc151, '\.mode-pill\s*\{[^}]*\}').Value
+Check (
+    ($modePillBlock151 -match "white-space:\s*nowrap;") -and
+    ($cssSrc151 -match "\.mode-pill--terminal\s*\{") -and
+    ($cssSrc151 -match "\.mode-pill--overseer\s*\{") -and
+    ($cssSrc151 -match "(?s)\.mode-hint\s*\{[^}]*white-space:\s*nowrap;") -and
+    (-not ($modePillBlock151 -match "min-height"))
+) "151.15: .mode-pill/.mode-pill--terminal/.mode-pill--overseer/.mode-hint are defined, both nowrap; .mode-pill has no bespoke min-height (inherits the >=28px tap target from .action-btn.btn-sm)"
+
+# 151.16  game-agnostic (Protocol 38): the new B1 code carries no hardcoded
+#         game literals -- faction validation routes through the registry
+$renderModePillBody151 = Get-FunctionBody $uiCoreSrc151 '_renderModePill'
+$b1Combined151 = $transmitTerminalBody151 + $quickLogFactionBody151 + $resolveBody151 + $renderModePillBody151
+Check (
+    -not ($b1Combined151 -match "\bFNV\b|\bFO3\b|Fallout|New Vegas|Mojave|Capital Wasteland")
+) "151.16: the Command-Line MODE system is game-agnostic -- no hardcoded game literals (faction quick-log validates via getFactionRegistry())"
+
+# 151.17  STRUCTURAL MIRROR of the JS behavioral vm-sandbox proof (PowerShell
+#         has no JS execution sandbox -- same convention as Suite 149.8/150.10):
+#         the resolver's source SHAPE proves the same four properties the JS
+#         side actually EXECUTES -- untrimmed first-char check (so a `/`/`@`
+#         NOT at position 0 cannot match), both `/` and `@` accepted, exactly
+#         one leading space stripped (not all whitespace, which would also
+#         strip a deliberate second space), and the target is always
+#         otherInputMode(persisted), never a literal mode name.
+Check (
+    ($resolveBody151 -match "raw\.charAt\(0\)") -and
+    ($resolveBody151 -match "raw\.slice\(1\)") -and
+    ($resolveBody151 -match "rest\.slice\(1\)") -and
+    (-not ($resolveBody151 -match "raw\.trim\(\)\.charAt\(0\)")) -and
+    (-not ($resolveBody151 -match "\.replace\(/\^\\s\*/")) -and
+    (([regex]::Matches($resolveBody151, "otherInputMode\(persisted\)")).Count -ge 1)
+) "151.17: structural mirror of the JS behavioral proof -- the resolver checks the UNTRIMMED raw.charAt(0) (first-char-only, no leading-whitespace tolerance), strips exactly one character then one optional space (never a run of whitespace), and always targets otherInputMode(persisted)"
+
+# 151.18  Protocol 1 -- CACHE_NAME bumped for this served-file change
+Check (
+    (Read-Src "sw.js") -match "const CACHE_NAME = 'robco-terminal-v2\.7\.0-r33';"
+) "151.18: CACHE_NAME bumped to r33 (index.html/js/css touched by the Command-Line MODE system)"
 
 # ===========================================================
 # Results
