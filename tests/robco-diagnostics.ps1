@@ -10317,26 +10317,32 @@ Check (
 ) '148.7: the migrated uptime/mem-cycle/overseer observer bodies never write the campaign save (robco_v8 / saveState / eventLog / _logEvent) -- device + DOM only (atmosphere/save boundary)'
 
 # ===========================================================
-# Suite 149 -- Test Console: staging/dev-only developer panel (13 tests).
+# Suite 149 -- Developer Console: the ONE canonical dev/debug console (14 tests).
 # Mirrors JS Suite 149. A live inspector + trigger panel for the Ambient
-# Runtime, gated behind the EXACT SAME env signal the changelog viewer (Suite
-# 62 / WU-C11) uses to hide [Unreleased] on production: _isStagingEnv(), never
-# a re-implementation. Fail-safe to HIDDEN -- any uncertainty defaults to
-# production behavior. The panel markup lives inert inside a <template> (the
-# WU-E2 disabled-banner pattern) so it can never render by accident. Writes
-# NOTHING durable to the campaign (runtime state + the existing Immersion
-# device pref only). 149.8's both-sides proof is a STRUCTURAL mirror of the JS
-# eval-based behavioral test (PowerShell has no JS eval) -- same convention as
-# Suite 62.5.
+# Runtime. This IS the canonical developer/debug console the roadmap's
+# hacking minigame will later unlock in normal builds -- not a throwaway test
+# panel. Visibility is centralized in ONE gate, _devConsoleUnlocked(): today
+# it delegates verbatim to the EXACT SAME env signal the changelog viewer
+# (Suite 62 / WU-C11) uses to hide [Unreleased] on production --
+# _isStagingEnv(), never re-implemented -- so dev/staging builds skip the
+# hack entirely. Fail-safe to HIDDEN -- any uncertainty defaults to
+# production behavior. On production it stays false until a future
+# minigame-unlock check is added to that same one function (the seam is
+# documented in a comment right on it). The panel markup lives inert inside a
+# <template> (the WU-E2 disabled-banner pattern) so it can never render by
+# accident. Writes NOTHING durable to the campaign (runtime state + the
+# existing Immersion device pref only). 149.8's both-sides proof is a
+# STRUCTURAL mirror of the JS eval-based behavioral test (PowerShell has no
+# JS eval) -- same convention as Suite 62.5.
 # ===========================================================
-Sep "Suite 149 -- Test Console: staging/dev-only developer panel"
+Sep "Suite 149 -- Developer Console: the ONE canonical dev/debug console"
 $testConsole149 = Read-Src "js/test-console.js"
 $sw149 = Read-Src "sw.js"
 $index149 = Read-Src "index.html"
 $uiCore149 = Read-Src "js/ui-core.js"
 $runtime149 = Read-Src "js/runtime.js"
 $initTestConsoleBody149 = Get-FunctionBody $testConsole149 'initTestConsole'
-$isStagingBody149 = Get-FunctionBody $testConsole149 '_isStaging'
+$isStagingBody149 = Get-FunctionBody $testConsole149 '_devConsoleUnlocked'
 
 # 149.1  js/test-console.js exists on disk (new served file)
 Check (
@@ -10371,23 +10377,26 @@ Check (
     $uiCore149 -match '(?s)initAmbientRuntime\(\);.*?initTestConsole\(\);'
 ) '149.5: window.onload calls initTestConsole() after initAmbientRuntime() (the runtime must exist first)'
 
-# 149.6  initTestConsole() gates on _isStaging() as its very first statement --
-#        fail-safe-to-hidden, mirroring the WU-C11 changelog env gate -- and is
-#        wrapped so a console failure can never break boot.
+# 149.6  initTestConsole() gates on _devConsoleUnlocked() as its very first
+#        statement -- fail-safe-to-hidden, mirroring the WU-C11 changelog env
+#        gate -- and is wrapped so a console failure can never break boot.
 Check (
-    ($initTestConsoleBody149 -match "(?s)^\{\s*try\s*\{\s*\n\s*if \(!_isStaging\(\)\) return;") -and
+    ($initTestConsoleBody149 -match "(?s)^\{\s*try\s*\{\s*\n\s*if \(!_devConsoleUnlocked\(\)\) return;") -and
     ($initTestConsoleBody149 -match '\} catch \(_\) \{')
-) '149.6: initTestConsole() returns immediately unless _isStaging() is true (fail-safe-to-hidden, checked first) and is wrapped in try/catch'
+) '149.6: initTestConsole() returns immediately unless _devConsoleUnlocked() is true (fail-safe-to-hidden, checked first) and is wrapped in try/catch'
 
-# 149.7  _isStaging() REUSES ui-core.js's _isStagingEnv() verbatim -- no
-#        re-implementation of the env-detection logic (Protocol 22) -- and
-#        fails OPEN (returns false = hidden) on any throw or missing function.
+# 149.7  _devConsoleUnlocked() is the ONE canonical gate (Protocol 22 -- not
+#        several re-derived checks) and today REUSES ui-core.js's
+#        _isStagingEnv() verbatim -- no re-implementation of the
+#        env-detection logic -- failing OPEN (false = hidden) on any throw or
+#        missing function. The minigame-unlock seam is documented right on
+#        the function so a future unlock check has one obvious home.
 Check (
     ($isStagingBody149 -match "typeof window\._isStagingEnv === 'function' \? window\._isStagingEnv\(\) : false") -and
     ($isStagingBody149 -match '(?s)catch \(_\) \{\s*return false;') -and
     (-not ($testConsole149 -match 'meta\[name="robco-env"\]')) -and
     (-not ($testConsole149 -match 'pages\.dev'))
-) '149.7: _isStaging() calls window._isStagingEnv() verbatim (no re-implemented env-detection logic) and fails open to false (hidden) on any uncertainty'
+) '149.7: _devConsoleUnlocked() calls window._isStagingEnv() verbatim (no re-implemented env-detection logic) and fails open to false (hidden) on any uncertainty'
 
 # 149.8  BOTH-SIDES (structural mirror of the JS eval-based behavioral proof --
 #        PowerShell has no JS eval, same convention as Suite 62.5): the ternary
@@ -10396,7 +10405,7 @@ Check (
 Check (
     ($isStagingBody149 -match "\? window\._isStagingEnv\(\) : false") -and
     ($isStagingBody149 -match '(?s)try \{.*catch \(_\) \{\s*return false;')
-) 'env-aware Test Console: hidden (false) when the staging signal is missing/throws/false, shown (true) only when it is genuinely true (both-sides structural mirror)'
+) 'env-aware Developer Console: hidden (false) when the staging signal is missing/throws/false, shown (true) only when it is genuinely true (both-sides structural mirror)'
 
 # 149.9  HARD atmosphere/save boundary: test-console.js never writes the
 #        campaign save -- no saveState, no robco_v8, no eventLog/_logEvent,
@@ -10435,7 +10444,15 @@ Check (
 # 149.13  game-agnostic (Protocol 38): pure dev-tooling, no game literals
 Check (
     -not ($testConsole149 -match 'FNV|FO3|New Vegas|Fallout 3')
-) '149.13: the Test Console is game-agnostic (no FNV/FO3/game-title literals -- pure dev tooling)'
+) '149.13: the Developer Console is game-agnostic (no FNV/FO3/game-title literals -- pure dev tooling)'
+
+# 149.14  the minigame-unlock seam is documented on _devConsoleUnlocked()
+#         itself, so a future refactor can't silently lose the one place a
+#         hacking-minigame unlock check is meant to be added.
+Check (
+    ($testConsole149 -match 'MINIGAME-UNLOCK SEAM') -and
+    ($testConsole149 -match 'canonical dev/debug console')
+) "149.14: _devConsoleUnlocked() carries a documented MINIGAME-UNLOCK SEAM comment marking it as the one hook a future hacking minigame will flip -- this is the canonical console, not a throwaway test panel"
 
 # ===========================================================
 # Results

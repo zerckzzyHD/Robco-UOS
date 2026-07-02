@@ -1595,19 +1595,19 @@
           assert(false, 'FATAL: A1 Ambient Runtime suite threw', String((err && err.stack) || err));
         }
 
-        // ── Suite 19 — Test Console (staging/dev-only) fail-safe + runtime
-        //    introspection (behavioral, real browser) ──────────────────────────
+        // ── Suite 19 — Developer Console (the canonical dev/debug console)
+        //    fail-safe + runtime introspection (behavioral, real browser) ──────
         // This page never loads ui-core.js (no DOM to host it), so
         // window._isStagingEnv is undefined here and #testConsoleMount /
         // #testConsoleTemplate don't exist either — exactly the fail-safe
         // "uncertain signal" case production also hits. initTestConsole() must
         // still run cleanly with ZERO DOM or campaign side effects. The
         // "staging shows / production hides" both-sides proof lives in the
-        // Node runners (extraction + eval of _isStaging(), mirroring the
-        // Suite 62.5 changelog-viewer technique) since it needs a mocked
+        // Node runners (extraction + eval of _devConsoleUnlocked(), mirroring
+        // the Suite 62.5 changelog-viewer technique) since it needs a mocked
         // window._isStagingEnv this page's real environment doesn't have.
         try {
-          section('Suite 19 — Test Console (staging/dev-only) fail-safe + runtime introspection');
+          section('Suite 19 — Developer Console fail-safe + runtime introspection');
           const _ls19 = localStorage.getItem('robco_v8'); // snapshot for the no-write boundary
 
           // 1) initTestConsole() is defined and callable with no environment signal.
@@ -1662,7 +1662,7 @@
             'listObservers() returns a plain-data snapshot (id/states/tier/cadenceMs, no onTick closure) that reflects register()/unregister() live'
           );
         } catch (err) {
-          assert(false, 'FATAL: Test Console suite threw', String((err && err.stack) || err));
+          assert(false, 'FATAL: Developer Console suite threw', String((err && err.stack) || err));
         }
 
         // ── Summary ──────────────────────────────────────────────────────────

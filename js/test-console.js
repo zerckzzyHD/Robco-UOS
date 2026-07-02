@@ -1,18 +1,28 @@
-// ── TEST CONSOLE — staging/dev-only developer panel (Step 2 · Phase 2) ─────────
+// ── DEVELOPER CONSOLE — the ONE canonical dev/debug console (Step 2 · Phase 2) ─
 //
 // A live inspector + trigger panel for the Ambient Runtime (js/runtime.js) so
 // the accumulating Phase-2 ambient features are testable without waiting on
 // real idle/standby timers on a real device.
 //
-// ── STAGING-ONLY, FAIL-SAFE TO HIDDEN ─────────────────────────────────────────
-// Gated behind the EXACT SAME env signal the changelog viewer uses to hide its
-// [Unreleased] section on production (_isStagingEnv(), ui-core.js, Protocol
-// 43/WU-C11): the staging marker that scripts/cf-staging-build.mjs stamps into
-// the staged build, with the local/Cloudflare-staging hostname as a secondary
-// signal. Any uncertainty (function missing, a throw, an unrecognized host)
-// defaults to HIDDEN — a production player must never see this panel. The
-// markup itself lives inert inside <template id="testConsoleTemplate">
-// (index.html, the WU-E2 pattern) so it cannot render even if this gate were
+// ── THIS IS THE CANONICAL CONSOLE, NOT A THROWAWAY TEST PANEL ─────────────────
+// This panel IS the one developer/debug console the roadmap's hacking minigame
+// will later unlock in normal builds — there is no separate "real" console to
+// build later. Visibility is centralized in ONE gate, `_devConsoleUnlocked()`
+// below: today it is true only on a dev/staging build (so dev builds skip the
+// hack entirely); on production it is false until the future minigame flips it.
+// Nothing else in this file (or any future caller) may re-derive visibility —
+// every check goes through that one function (Protocol 22).
+//
+// ── FAIL-SAFE TO HIDDEN ───────────────────────────────────────────────────────
+// `_devConsoleUnlocked()`'s staging path reuses the EXACT SAME env signal the
+// changelog viewer uses to hide its [Unreleased] section on production
+// (_isStagingEnv(), ui-core.js, Protocol 43/WU-C11): the staging marker that
+// scripts/cf-staging-build.mjs stamps into the staged build, with the
+// local/Cloudflare-staging hostname as a secondary signal. Any uncertainty
+// (function missing, a throw, an unrecognized host) defaults to HIDDEN — a
+// production player must never see this panel until they've actually earned it.
+// The markup itself also lives inert inside <template id="testConsoleTemplate">
+// (index.html, the WU-E2 pattern) so it cannot render even if the gate were
 // somehow bypassed — it only enters the DOM when initTestConsole() explicitly
 // clones it in.
 //
@@ -37,9 +47,19 @@
 
   var _refreshUnregister = null;
 
-  // _isStaging — reuses ui-core.js's _isStagingEnv() verbatim (Protocol 22).
+  // _devConsoleUnlocked — THE canonical, single gate for this console's
+  // visibility (Protocol 22 — one gate, not several re-derived checks).
+  //   TODAY: true only on a dev/staging build (delegates verbatim to
+  //   ui-core.js's _isStagingEnv(), never re-implemented) — dev builds skip
+  //   the hack entirely.
+  //   MINIGAME-UNLOCK SEAM: this exact function is what the future in-game
+  //   hacking minigame will also flip to true on a production build once the
+  //   player solves it (e.g. by additionally checking a persisted unlock
+  //   flag this function reads) — the console it unlocks IS this one, not a
+  //   separate panel. When that lands, add the unlock-flag check here and
+  //   nowhere else.
   // Fails OPEN to false (hidden) on any uncertainty — never leak to production.
-  function _isStaging() {
+  function _devConsoleUnlocked() {
     try {
       return typeof window._isStagingEnv === 'function' ? window._isStagingEnv() : false;
     } catch (_) {
@@ -170,11 +190,11 @@
   }
 
   // initTestConsole — the named window.onload boot phase (called from ui-core.js).
-  // Does ABSOLUTELY NOTHING unless _isStaging() returns true. Wrapped so a
-  // console failure can never break boot.
+  // Does ABSOLUTELY NOTHING unless _devConsoleUnlocked() returns true. Wrapped
+  // so a console failure can never break boot.
   function initTestConsole() {
     try {
-      if (!_isStaging()) return; // production default — the console never mounts
+      if (!_devConsoleUnlocked()) return; // production default — the console never mounts
       var panel = _mountConsole();
       if (!panel) return;
       _renderTransitionButtons(panel);

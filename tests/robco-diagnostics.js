@@ -17605,26 +17605,32 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 149 — Test Console: staging/dev-only developer panel (13 tests)
+//  Suite 149 — Developer Console: the ONE canonical dev/debug console (14 tests)
 // ──────────────────────────────────────────────────────────────
-//  A live inspector + trigger panel for the Ambient Runtime (js/runtime.js),
-//  gated behind the EXACT SAME env signal the changelog viewer (Suite 62 /
-//  WU-C11) uses to hide [Unreleased] on production: _isStagingEnv(), never a
-//  re-implementation. Fail-safe to HIDDEN — any uncertainty defaults to
-//  production behavior. The panel markup lives inert inside a <template>
-//  (the WU-E2 disabled-banner pattern) so it can never render by accident.
-//  Writes NOTHING durable to the campaign (runtime state + the existing
-//  Immersion device pref only).
+//  A live inspector + trigger panel for the Ambient Runtime (js/runtime.js).
+//  This IS the canonical developer/debug console the roadmap's hacking
+//  minigame will later unlock in normal builds — not a throwaway test panel.
+//  Visibility is centralized in ONE gate, _devConsoleUnlocked(): today it
+//  delegates verbatim to the EXACT SAME env signal the changelog viewer
+//  (Suite 62 / WU-C11) uses to hide [Unreleased] on production —
+//  _isStagingEnv(), never re-implemented — so dev/staging builds skip the
+//  hack entirely. Fail-safe to HIDDEN — any uncertainty defaults to
+//  production behavior. On production it stays false until a future
+//  minigame-unlock check is added to that same one function (the seam is
+//  documented in a comment right on it). The panel markup lives inert inside
+//  a <template> (the WU-E2 disabled-banner pattern) so it can never render
+//  by accident. Writes NOTHING durable to the campaign (runtime state + the
+//  existing Immersion device pref only).
 // ══════════════════════════════════════════════════════════════
 {
-  header('Suite 149 — Test Console: staging/dev-only developer panel');
+  header('Suite 149 — Developer Console: the ONE canonical dev/debug console');
   const testConsole149 = readFile('js/test-console.js');
   const sw149 = readFile('sw.js');
   const index149 = readFile('index.html');
   const uiCore149 = readFile('js/ui-core.js');
   const runtime149 = readFile('js/runtime.js');
   const initTestConsoleBody149 = extractFunctionBody(testConsole149, 'initTestConsole');
-  const isStagingBody149 = extractFunctionBody(testConsole149, '_isStaging');
+  const isStagingBody149 = extractFunctionBody(testConsole149, '_devConsoleUnlocked');
 
   // 149.1  js/test-console.js exists on disk (new served file)
   assert(
@@ -17667,18 +17673,21 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '149.5: window.onload calls initTestConsole() after initAmbientRuntime() (the runtime must exist first)'
   );
 
-  // 149.6  initTestConsole() gates on _isStaging() as its very first statement —
-  //        fail-safe-to-hidden, mirroring the WU-C11 changelog env gate — and is
-  //        wrapped so a console failure can never break boot.
+  // 149.6  initTestConsole() gates on _devConsoleUnlocked() as its very first
+  //        statement — fail-safe-to-hidden, mirroring the WU-C11 changelog env
+  //        gate — and is wrapped so a console failure can never break boot.
   assert(
-    /^\{\s*try\s*\{\s*\n\s*if \(!_isStaging\(\)\) return;/.test(initTestConsoleBody149) &&
+    /^\{\s*try\s*\{\s*\n\s*if \(!_devConsoleUnlocked\(\)\) return;/.test(initTestConsoleBody149) &&
       /\} catch \(_\) \{/.test(initTestConsoleBody149),
-    '149.6: initTestConsole() returns immediately unless _isStaging() is true (fail-safe-to-hidden, checked first) and is wrapped in try/catch'
+    '149.6: initTestConsole() returns immediately unless _devConsoleUnlocked() is true (fail-safe-to-hidden, checked first) and is wrapped in try/catch'
   );
 
-  // 149.7  _isStaging() REUSES ui-core.js's _isStagingEnv() verbatim — no
-  //        re-implementation of the env-detection logic (Protocol 22) — and
-  //        fails OPEN (returns false = hidden) on any throw or missing function.
+  // 149.7  _devConsoleUnlocked() is the ONE canonical gate (Protocol 22 — not
+  //        several re-derived checks) and today REUSES ui-core.js's
+  //        _isStagingEnv() verbatim — no re-implementation of the
+  //        env-detection logic — failing OPEN (false = hidden) on any throw
+  //        or missing function. The minigame-unlock seam is documented right
+  //        on the function so a future unlock check has one obvious home.
   assert(
     /typeof window\._isStagingEnv === 'function' \? window\._isStagingEnv\(\) : false/.test(
       isStagingBody149
@@ -17686,10 +17695,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       /catch \(_\) \{\s*return false;/.test(isStagingBody149) &&
       !/meta\[name="robco-env"\]/.test(testConsole149) &&
       !/pages\.dev/.test(testConsole149),
-    '149.7: _isStaging() calls window._isStagingEnv() verbatim (no re-implemented env-detection logic) and fails open to false (hidden) on any uncertainty'
+    '149.7: _devConsoleUnlocked() calls window._isStagingEnv() verbatim (no re-implemented env-detection logic) and fails open to false (hidden) on any uncertainty'
   );
 
-  // 149.8  BEHAVIORAL (both sides): _isStaging() returns false when
+  // 149.8  BEHAVIORAL (both sides): _devConsoleUnlocked() returns false when
   //        window._isStagingEnv is missing/throws, and only returns true when it
   //        genuinely returns true — mirrors the Suite 62.5 eval-based technique.
   //        NOTE: `window` must be a locally-scoped `const` in the SAME block as
@@ -17700,10 +17709,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     let err = null;
     try {
       const params = testConsole149.slice(
-        testConsole149.indexOf('(', testConsole149.indexOf('function _isStaging')),
-        testConsole149.indexOf('{', testConsole149.indexOf('function _isStaging'))
+        testConsole149.indexOf('(', testConsole149.indexOf('function _devConsoleUnlocked')),
+        testConsole149.indexOf('{', testConsole149.indexOf('function _devConsoleUnlocked'))
       );
-      const src = `(function _isStaging${params}${isStagingBody149})`;
+      const src = `(function _devConsoleUnlocked${params}${isStagingBody149})`;
       // `window` below is read only by the eval()'d closure, which ESLint
       // cannot trace statically — `void window` marks it deliberately used.
       const missing = (() => {
@@ -17736,7 +17745,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     }
     assert(
       ok,
-      'env-aware Test Console: hidden (false) when the staging signal is missing/throws/false, shown (true) only when it is genuinely true (both-sides behavioral)' +
+      'env-aware Developer Console: hidden (false) when the staging signal is missing/throws/false, shown (true) only when it is genuinely true (both-sides behavioral)' +
         (err ? ' — ' + err.message : '')
     );
   }
@@ -17784,7 +17793,16 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   // 149.13  game-agnostic (Protocol 38): pure dev-tooling, no game literals
   assert(
     !/FNV|FO3|New Vegas|Fallout 3/.test(testConsole149),
-    '149.13: the Test Console is game-agnostic (no FNV/FO3/game-title literals — pure dev tooling)'
+    '149.13: the Developer Console is game-agnostic (no FNV/FO3/game-title literals — pure dev tooling)'
+  );
+
+  // 149.14  the minigame-unlock seam is documented on _devConsoleUnlocked()
+  //         itself, so a future refactor can't silently lose the one place a
+  //         hacking-minigame unlock check is meant to be added.
+  assert(
+    /MINIGAME-UNLOCK SEAM/.test(testConsole149) &&
+      /canonical dev\/debug console/.test(testConsole149),
+    '149.14: _devConsoleUnlocked() carries a documented MINIGAME-UNLOCK SEAM comment marking it as the one hook a future hacking minigame will flip — this is the canonical console, not a throwaway test panel'
   );
 }
 
