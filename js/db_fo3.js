@@ -2,6 +2,33 @@
 // v2.0.0: Base game weapons, armor, chems, enemies, recipes, quest items, vendors.
 // databaseCSVs is injected via systemInstruction in api.js for guaranteed model attention.
 // Same structure as db_nv.js — loaded in place of it when state.gameContext === 'FO3'.
+//
+// ── RESERVED-COLUMN REGISTER (Step 2 Phase 0 U11 / FP-DATA-8) ──────────────
+// Columns below are authored (fallout.wiki-sourced) but have no current code
+// consumer — never read by any lookup*()/get*() accessor, or parsed but never
+// rendered downstream. Each is tagged with its intended future consumer, or
+// PARKED if none is scoped yet. Full evidence in ARCHITECTURE.md → "Per-Game
+// Data Parity & Reserved-Column Ledger". These are reserved, not dead — do
+// not delete as "unused" unless marked PARKED-FOR-REMOVAL. (No WEAPON_MODS.CSV
+// table exists in this file — FO3 has no weapon-mod system, a GENUINE gap.)
+//   WEAPONS.CSV      Crit_Damage/Crit_Multiplier      → PARKED (no crit calculator built)
+//                     Req_Unarmed/Req_STR/Reach        → PARKED (VATS v2 melee/STR gating)
+//                     Special_Attack_AP/Special_Rules  → PARKED (per-weapon VATS AP variance;
+//                       same unsourceable-precision gap as WU-D4a-RANGED-GAP, Suite 104)
+//   AMMO.CSV          DMG_Multiplier/DT_Modifier       → PARKED (per-subtype ammo effects)
+//                     Condition_Degradation             → PARKED (weapon-condition system)
+//   ARMOR.CSV         Type/DT/Effects/Min_CND_Threshold → PARKED — no lookupArmorStats()
+//                       sibling to lookupWeaponStats()/lookupBestiaryEntry() exists; DT is
+//                       the highest-priority target (armor DT is looked up nowhere today)
+//   CHEMS.CSV         Duration                          → PARKED (BIO-SCAN expiry countdown)
+//   RECIPES.CSV       ALL COLUMNS                        → PARKED-FOR-REMOVAL — doCraft/doScrap
+//                       read reg_fo3.js recipes[] instead; this table has zero consumers
+//                       (not merely reserved — Protocol 22 duplicate-source flag)
+//   QUEST_ITEMS.CSV   Tradeable                          → PARKED (TRADE v2 quest-item filter)
+//   VENDORS.CSV       Repair_Skill                        → PARKED (vendor repair action)
+//                     Restock_Days/Accepted_Currencies    → target: TRADE v2 (FP-DATA-8)
+//   BESTIARY.CSV      Perception/Speed_Factor              → target: v2.9.0 ENCOUNTER +
+//                       BESTIARY BROWSER (FP-GP-4)
 const databaseCSVs = `
 [WEAPONS.CSV]
 Weapon_Name,Base_Damage,Crit_Damage,Crit_Multiplier,Attacks_Per_Second,Weight,Value,Req_Unarmed,Req_STR,Reach,Special_Attack_AP,Special_Rules,Ammo_Type

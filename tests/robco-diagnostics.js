@@ -26,6 +26,10 @@ const ROOT = path.join(__dirname, '..');
 // ── Terminal helpers ───────────────────────────────────────────
 let passed = 0,
   failed = 0;
+// Promises any suite needs resolved before RESULTS prints/exits (the runner
+// body below is otherwise fully synchronous CommonJS — no top-level await).
+// Suite 137.6's confirmAction() behavioral proof is the sole current user.
+const _pendingAsync = [];
 const green = s => `\x1b[32m${s}\x1b[0m`;
 const red = s => `\x1b[31m${s}\x1b[0m`;
 const dim = s => `\x1b[2m${s}\x1b[0m`;
@@ -3535,7 +3539,8 @@ header('Phase 5c-iii: Cloud Save Picker + Local Migration');
     );
   }
 
-  // 46.10  loadCloudSave is gated behind confirm()
+  // 46.10  loadCloudSave is gated behind confirmAction() (Step 2 Phase 0 U12: diegetic
+  //        confirmAction() replaces the blocking confirm())
   {
     const loadBody46 = (() => {
       const idx = cloudSource.indexOf('window.loadCloudSave');
@@ -3551,8 +3556,8 @@ header('Phase 5c-iii: Cloud Save Picker + Local Migration');
       return '';
     })();
     assert(
-      /\bconfirm\b/.test(loadBody46),
-      'loadCloudSave is gated behind confirm() — never auto-loads (data-safety)'
+      /\bconfirmAction\b/.test(loadBody46),
+      'loadCloudSave is gated behind confirmAction() — never auto-loads (data-safety)'
     );
   }
 
@@ -3577,7 +3582,8 @@ header('Phase 5c-iii: Cloud Save Picker + Local Migration');
     );
   }
 
-  // 46.12  deleteCloudSave is confirm-gated (explicit user action required)
+  // 46.12  deleteCloudSave is confirmAction-gated (explicit user action required;
+  //        Step 2 Phase 0 U12: diegetic confirmAction() replaces the blocking confirm())
   {
     const delBody46 = (() => {
       const idx = cloudSource.indexOf('window.deleteCloudSave');
@@ -3593,8 +3599,8 @@ header('Phase 5c-iii: Cloud Save Picker + Local Migration');
       return '';
     })();
     assert(
-      /\bconfirm\b/.test(delBody46),
-      'deleteCloudSave is confirm-gated (explicit confirmation before deleting cloud save)'
+      /\bconfirmAction\b/.test(delBody46),
+      'deleteCloudSave is confirmAction-gated (explicit confirmation before deleting cloud save)'
     );
   }
 
@@ -4323,13 +4329,15 @@ header('Suite 51 — Save Integrity + Rolling Backups');
     'cloud.js calls verifySaveEnvelope on cloud load paths (integrity check)'
   );
 
-  // 51.16  restoreRollingBackup exists in ui.js and routes through sanitizeImportedContainer + migrateState
+  // 51.16  restoreRollingBackup routes through sanitizeImportedContainer + migrateState
+  //        (Protocol 34) — via its _restoreBackupApply core (Step 2 Phase 0 U12 split
+  //        the confirm gate from the apply step)
   {
     let restoreBody51 = '';
     try {
-      restoreBody51 = extractFunctionBody(uiSrc51, 'restoreRollingBackup');
+      restoreBody51 = extractFunctionBody(uiSrc51, '_restoreBackupApply');
     } catch (e) {
-      fail('Cannot extract restoreRollingBackup: ' + e.message);
+      fail('Cannot extract _restoreBackupApply: ' + e.message);
     }
     assert(
       restoreBody51.includes('sanitizeImportedContainer') && restoreBody51.includes('migrateState'),
@@ -4371,7 +4379,8 @@ header('Suite 51 — Save Integrity + Rolling Backups');
     'cloud.js: _contentHash removed (Protocol 22 — dedup uses shared window.computeSaveChecksum in state.js)'
   );
 
-  // 51.36  restoreRollingBackup is confirm-gated (Protocol 34 — destructive op)
+  // 51.36  restoreRollingBackup is confirmAction-gated (Protocol 34 — destructive op;
+  //        Step 2 Phase 0 U12: diegetic confirmAction() replaces the blocking confirm())
   {
     let restoreBody51c = '';
     try {
@@ -4380,8 +4389,8 @@ header('Suite 51 — Save Integrity + Rolling Backups');
       fail('Cannot extract restoreRollingBackup for confirm check: ' + e.message);
     }
     assert(
-      restoreBody51c.includes('confirm('),
-      'restoreRollingBackup is confirm-gated (Protocol 34 — destructive state replacement requires user confirmation)'
+      restoreBody51c.includes('confirmAction('),
+      'restoreRollingBackup is confirmAction-gated (Protocol 34 — destructive state replacement requires user confirmation)'
     );
   }
 
@@ -4794,13 +4803,21 @@ header('Suite 51 — Save Integrity + Rolling Backups');
         localStorage: _ls,
         GAME_DEFS: { FNV: {}, FO3: {} },
         _buildFactions: () => ({}),
+        setTimeout: fn => fn(), // U12: _restoreBackupApply schedules the post-restore reload
         console: { warn() {} },
       };
       const _declFn = (src, name) => {
         const body = extractFunctionBody(src, name);
-        const s = src.indexOf('function ' + name);
-        const p = src.slice(src.indexOf('(', s), src.indexOf('{', src.indexOf('(', s)));
-        return 'function ' + name + p + body;
+        let s = src.indexOf('function ' + name);
+        // Preserve a preceding "async " (Step 2 Phase 0 U12 — restoreRollingBackup
+        // became async for confirmAction(); irrelevant here since this test now
+        // calls the synchronous _restoreBackupApply core directly, but keep the
+        // helper correct for any future async extraction).
+        if (s >= 6 && src.slice(s - 6, s) === 'async ') s -= 6;
+        const fnKw = src.slice(s, s + 5) === 'async' ? 'async function' : 'function';
+        const parenStart = src.indexOf('(', s);
+        const p = src.slice(parenStart, src.indexOf('{', parenStart));
+        return fnKw + ' ' + name + p + body;
       };
       vm.createContext(sb);
       vm.runInContext(
@@ -4808,10 +4825,14 @@ header('Suite 51 — Save Integrity + Rolling Backups');
           '\n' +
           _declFn(stateSrc51, 'migrateState') +
           '\n' +
-          _declFn(uiSrc51, 'restoreRollingBackup'),
+          _declFn(uiSrc51, '_restoreBackupApply'),
         sb
       );
-      sb.restoreRollingBackup();
+      // U12: restoreRollingBackup() is now async (awaits confirmAction() before
+      // restoring) — exercise the synchronous sanitize→migrate→write core directly,
+      // which is what this test actually verifies (TS-GAP-2), rather than mocking
+      // the confirm dialog.
+      sb._restoreBackupApply(sb.window.getRollingBackups()[0]);
       const written = JSON.parse(_store['robco_v8']);
       ok =
         written.campaigns.FNV.lvl === 7 &&
@@ -5662,15 +5683,19 @@ header('Suite 57 — PWA App Shortcuts Guards');
     );
   }
 
-  // 57.7  New Campaign routes to wipeTerminal, and wipeTerminal still has >=2 confirm() calls
+  // 57.7  New Campaign routes to wipeTerminal, and wipeTerminal still gates on >=2
+  //       confirmAction() calls (Step 2 Phase 0 U12 replaced the blocking confirm()
+  //       with the diegetic confirmAction() — the double-confirm GATE COUNT invariant
+  //       is preserved, only the underlying mechanism changed)
   assert(
     /new\s*:\s*\(\s*\)\s*=>\s*wipeTerminal\s*\(/.test(uiCoreSrc57),
     "SHORTCUT_ROUTES 'new' key routes to wipeTerminal()"
   );
-  const confirmCount57 = (uiCoreSrc57.match(/\bconfirm\s*\(/g) || []).length;
+  const wipeBody57 = extractFunctionBody(uiCoreSrc57, 'wipeTerminal');
+  const confirmCount57 = (wipeBody57.match(/\bconfirmAction\s*\(/g) || []).length;
   assert(
     confirmCount57 >= 2,
-    `wipeTerminal still has >=2 confirm() calls (found ${confirmCount57}) — double-confirm gate intact`
+    `wipeTerminal still has >=2 confirmAction() calls (found ${confirmCount57}) — double-confirm gate intact`
   );
 
   // 57.8  Tab routes reuse switchTab for inv, stat, data
@@ -6389,10 +6414,12 @@ header('Suite 63 — Save/Cloud UI consolidation guards');
     'cloud.js defines window.saveCurrentToCloud (replaces pushToCloud)'
   );
 
-  // 63.2  saveCurrentToCloud uses addDoc (additive) and not setDoc (Protocol 34)
+  // 63.2  saveCurrentToCloud uses addDoc (additive) and not setDoc (Protocol 34).
+  //       Window widened from 2000 (Step 2 Phase 0 U12 — openModal() call sites
+  //       replacing alert() pushed addDoc( further from the function start).
   {
     const scIdx = cloudSrc63.indexOf('saveCurrentToCloud');
-    const scSlice = scIdx >= 0 ? cloudSrc63.slice(scIdx, scIdx + 2000) : '';
+    const scSlice = scIdx >= 0 ? cloudSrc63.slice(scIdx, scIdx + 2800) : '';
     assert(
       /\baddDoc\b/.test(scSlice) && !/\bsetDoc\b/.test(scSlice),
       'saveCurrentToCloud uses addDoc (additive) and not setDoc (Protocol 34 — no blind overwrite)'
@@ -8967,11 +8994,11 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
       ')'
   );
 
-  // 84.j  confirm( gate in doCraft
-  assert(doCraftBody84.includes('confirm('), 'confirm() gate present in doCraft body');
+  // 84.j  confirmAction( gate in doCraft (Step 2 Phase 0 U12: diegetic replacement for confirm())
+  assert(doCraftBody84.includes('confirmAction('), 'confirmAction() gate present in doCraft body');
 
-  // 84.k  confirm( gate in doScrap
-  assert(doScrapBody84.includes('confirm('), 'confirm() gate present in doScrap body');
+  // 84.k  confirmAction( gate in doScrap (Step 2 Phase 0 U12)
+  assert(doScrapBody84.includes('confirmAction('), 'confirmAction() gate present in doScrap body');
 
   // ── Picker structure guards ──────────────────────────────────────────────
   // 84.u  renderCraft builds craftRecipeSelect
@@ -8999,8 +9026,12 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     const vm84 = require('vm');
 
     function getFullFn84(src, name) {
-      const idx = src.indexOf(`function ${name}`);
+      let idx = src.indexOf(`function ${name}`);
       if (idx === -1) return `function ${name}() {}`;
+      // Preserve a preceding "async " so an extracted async function keeps its
+      // await expressions valid when re-declared standalone in the sandbox
+      // (Step 2 Phase 0 U12 — doCraft/doScrap became async for confirmAction()).
+      if (idx >= 6 && src.slice(idx - 6, idx) === 'async ') idx -= 6;
       let i = src.indexOf('{', idx);
       if (i === -1) return `function ${name}() {}`;
       let depth = 0;
@@ -9016,7 +9047,11 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
       getFullFn84(uiRSrc84, '_craftGetHave'),
       getFullFn84(uiRSrc84, '_craftConsume'),
       getFullFn84(uiRSrc84, 'craftSetMax'),
+      getFullFn84(uiRSrc84, '_craftPrepare'),
+      getFullFn84(uiRSrc84, '_craftApply'),
       getFullFn84(uiRSrc84, 'doCraft'),
+      getFullFn84(uiRSrc84, '_scrapPrepare'),
+      getFullFn84(uiRSrc84, '_scrapApply'),
       getFullFn84(uiRSrc84, 'doScrap'),
     ].join('\n');
 
@@ -9087,7 +9122,12 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
         true,
         { craftQty_0: 1 }
       );
-      sb.doCraft(0);
+      // U12: doCraft is now async (awaits confirmAction()) — exercise the
+      // synchronous prepare/apply core directly instead of the confirm gate.
+      {
+        const prep = sb._craftPrepare(0);
+        sb._craftApply(prep.recipe, prep.qty, prep.outputQty);
+      }
       const wrk = sb.state.inventory.find(i => i.name === 'Weapon Repair Kit');
       assert(wrk && wrk.qty === 1, 'Craft success: Weapon Repair Kit (qty=1) added to inventory');
     }
@@ -9104,7 +9144,10 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
         true,
         { craftQty_0: 1 }
       );
-      sb.doCraft(0);
+      {
+        const prep = sb._craftPrepare(0);
+        sb._craftApply(prep.recipe, prep.qty, prep.outputQty);
+      }
       const metal = sb.state.inventory.find(i => i.name === 'Scrap Metal');
       assert(
         !metal,
@@ -9145,7 +9188,10 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
         true,
         { craftQty_1: 1 }
       );
-      sb.doCraft(1);
+      {
+        const prep = sb._craftPrepare(1);
+        sb._craftApply(prep.recipe, prep.qty, prep.outputQty);
+      }
       assert(
         sb.state.ammo['Energy Cell'] === 4 &&
           !sb.state.inventory.find(i => i.name === 'Energy Cell'),
@@ -9165,7 +9211,10 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
         true,
         { craftQty_0: 2 }
       );
-      sb.doCraft(0);
+      {
+        const prep = sb._craftPrepare(0);
+        sb._craftApply(prep.recipe, prep.qty, prep.outputQty);
+      }
       const wrk = sb.state.inventory.find(i => i.name === 'Weapon Repair Kit');
       assert(wrk && wrk.qty === 2, 'Batch craft 2×: produces 2× output (WRK qty=2)');
     }
@@ -9179,7 +9228,10 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
         true,
         { scrapQty_0: 2 }
       );
-      sb.doScrap(0);
+      {
+        const prep = sb._scrapPrepare(0);
+        sb._scrapApply(prep.breakdown, prep.qty, prep.yieldStr);
+      }
       const round = sb.state.inventory.find(i => i.name === '.44 Magnum Round');
       const casing = sb.state.inventory.find(i => i.name === 'Case, .44 Magnum');
       assert(
@@ -9215,7 +9267,10 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
         true,
         { craftQty_0: 1 }
       );
-      sb.doCraft(0);
+      {
+        const prep = sb._craftPrepare(0);
+        sb._craftApply(prep.recipe, prep.qty, prep.outputQty);
+      }
       const wrk = sb.state.inventory.find(i => i.name === 'Weapon Repair Kit');
       assert(
         wrk && wrk.qty === 1,
@@ -10389,9 +10444,11 @@ header('Suite 95 — Save-Load Reload Guard (import clobber regression)');
     );
   }
 
-  // 95.4  restoreRollingBackup sets _loadingSave before its reload
+  // 95.4  restoreRollingBackup (via its _restoreBackupApply core — Step 2 Phase 0
+  //       U12 split the confirm gate from the apply step) sets _loadingSave before
+  //       its reload
   {
-    const fn = extractFunctionBody(saves95, 'restoreRollingBackup');
+    const fn = extractFunctionBody(saves95, '_restoreBackupApply');
     assert(
       /_loadingSave\s*=\s*true[\s\S]*?location\.reload\(\)/.test(fn),
       '95.4: restoreRollingBackup sets window._loadingSave = true before location.reload() (backup restore survives unload flush)'
@@ -11011,11 +11068,11 @@ header('Suite 103 — WU-C13 SAVE MENU "?" help affordance');
     '103.3: save-menu "?" button uses .btn-sm (≥28px min tap target — Protocol 17)'
   );
 
-  // 103.4 showSaveHelpModal defined and reuses _openSysModal (WU-C4 focus-trap + ARIA)
+  // 103.4 showSaveHelpModal defined and reuses openModal (Step 2 Phase 0 U12 consolidated
+  //       driver; opens the same #sysModal, so it still inherits the WU-C4 focus-trap + ARIA)
   assert(
-    /function showSaveHelpModal\s*\(/.test(uiCore103) &&
-      /_openSysModal\s*\(\s*\)/.test(helpBody103),
-    '103.4: showSaveHelpModal() defined and opens via _openSysModal() (inherits WU-C4 focus-trap + ARIA dialog)'
+    /function showSaveHelpModal\s*\(/.test(uiCore103) && /openModal\s*\(\s*\)/.test(helpBody103),
+    '103.4: showSaveHelpModal() defined and opens via openModal() (U12 driver; inherits WU-C4 focus-trap + ARIA dialog)'
   );
 
   // 103.5 the help documents every save action the SAVE MENU exposes
@@ -11480,10 +11537,11 @@ header('Suite 106 — WU-N2 TRADE native barter terminal');
     /state\.inventory\.push\(/.test(doBuyBody) && /\.qty\s*=\s*\(?.*qty/.test(doBuyBody),
     '106.7: doBuy is additive — pushes new item or increments existing qty (Protocol 34)'
   );
-  // 106.8 confirm-gated (Protocol 34) — both doBuy and doSell
+  // 106.8 confirm-gated (Protocol 34) — both doBuy and doSell (Step 2 Phase 0 U12:
+  //       diegetic confirmAction() replaces the blocking confirm())
   assert(
-    /confirm\(/.test(doBuyBody) && /confirm\(/.test(doSellBody),
-    '106.8: doBuy and doSell are confirm-gated (Protocol 34)'
+    /confirmAction\(/.test(doBuyBody) && /confirmAction\(/.test(doSellBody),
+    '106.8: doBuy and doSell are confirmAction-gated (Protocol 34)'
   );
   // 106.9 doSell decrements then splices at ≤0 (clamp, no negative qty)
   assert(
@@ -11832,10 +11890,11 @@ header('Suite 108 — WU-N4 CONSULT native databank lookup');
     /\.consult-card\b/.test(css108) && /\.consult-hit-name[\s\S]{0,80}min-width:\s*0/.test(css108),
     '108.12: terminal.css .consult-card + .consult-hit-name min-width:0 (no horizontal overflow at 360px)'
   );
-  // 108.13 reuses the shared modal entry point (consistent dialog semantics)
+  // 108.13 reuses the shared modal entry point (consistent dialog semantics; Step 2
+  //        Phase 0 U12 consolidated this + siblings under the openModal() driver)
   assert(
-    /_openSysModal/.test(consultBody),
-    '108.13: renderConsult opens via _openSysModal() (shared modal — ARIA/focus consistency)'
+    /openModal/.test(consultBody),
+    '108.13: renderConsult opens via openModal() (U12 driver — shared modal ARIA/focus consistency)'
   );
 
   // ── WU-N4b: CONSULT macro button (option A) ──────────────────────────────────
@@ -12073,10 +12132,11 @@ header('Suite 109 — WU-N5 BIO-SCAN native medical advisory');
     '109.11: terminal.css .bio-card + .bio-limb-name min-width:0 (no horizontal overflow at 360px)'
   );
 
-  // 109.12 reuses the shared modal entry point (consistent dialog semantics)
+  // 109.12 reuses the shared modal entry point (consistent dialog semantics; Step 2
+  //        Phase 0 U12 consolidated this + siblings under the openModal() driver)
   assert(
-    /_openSysModal/.test(bioScanBody),
-    '109.12: renderBioScan opens via _openSysModal() (shared modal — ARIA/focus consistency)'
+    /openModal/.test(bioScanBody),
+    '109.12: renderBioScan opens via openModal() (U12 driver — shared modal ARIA/focus consistency)'
   );
 
   // 109.13 a discoverable UI affordance — the RUN BIO-SCAN button wired to renderBioScan
@@ -12187,10 +12247,12 @@ header('Suite 110 — WU-N6 LOOT native add/value terminal');
     );
   }
 
-  // 110.6 confirm-gated (Protocol 34) — doLoot returns before mutating unless confirmed
+  // 110.6 confirm-gated (Protocol 34) — doLoot awaits confirmAction() and returns before
+  //       mutating unless confirmed (Step 2 Phase 0 U12: diegetic replacement for confirm())
   assert(
-    /if\s*\(\s*!confirm\([\s\S]{0,160}\)\s*\)\s*return/.test(doLootBody),
-    '110.6: doLoot is confirm-gated (Protocol 34 — no add without explicit confirmation)'
+    /await\s+confirmAction\([\s\S]{0,220}\)/.test(doLootBody) &&
+      /if\s*\(\s*!ok\s*\)\s*return/.test(doLootBody),
+    '110.6: doLoot is confirmAction-gated (Protocol 34 — no add without explicit confirmation)'
   );
 
   // 110.7 additive-only — doLoot never deletes/overwrites inventory wholesale; it persists via saveState
@@ -12242,8 +12304,9 @@ header('Suite 110 — WU-N6 LOOT native add/value terminal');
     assert(
       /onclick="renderLoot\(\)"/.test(html110) &&
         /aria-label="[^"]+"/.test(btnTag110) &&
-        /_openSysModal/.test(extractFunctionBody(ren110, 'renderLoot')),
-      '110.13: index.html [LOOT] button wired to renderLoot() with an aria-label; opens via _openSysModal (shared modal)'
+        /openModal/.test(extractFunctionBody(ren110, 'renderLoot')),
+      // Step 2 Phase 0 U12: renderLoot opens via the consolidated openModal() driver
+      '110.13: index.html [LOOT] button wired to renderLoot() with an aria-label; opens via openModal() (U12 driver — shared modal)'
     );
   }
 }
@@ -13430,7 +13493,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   ])[1];
   const consoleArr123 = (api123.match(/const TERMLINK_CONSOLE = \[([\s\S]*?)\n\];/) || ['', ''])[1];
   const showFn123 = (api123.match(
-    /function showTermlinkConsole\(\)[\s\S]*?_openSysModal\(\);\s*\n\}/
+    /function showTermlinkConsole\(\)[\s\S]*?openModal\(\);\s*\n\}/
   ) || [''])[0];
   const launchFn123 = (api123.match(/function _termlinkLaunch\([\s\S]*?\n\}/) || [''])[0];
   const consoleTokens123 = [...consoleArr123.matchAll(/token:\s*'([^']+)'/g)].map(m => m[1]);
@@ -13443,10 +13506,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '123.1: NATIVE_COMMAND_ROUTER routes [TERMLINK], [TL] and bare TERMLINK to showTermlinkConsole()'
   );
 
-  // 123.2  showTermlinkConsole defined and opens via _openSysModal (WU-C4 focus-trap + ARIA dialog)
+  // 123.2  showTermlinkConsole defined and opens via openModal (Step 2 Phase 0 U12
+  //        consolidated driver; opens the same #sysModal, still inherits the WU-C4
+  //        focus-trap + ARIA dialog semantics)
   assert(
-    showFn123.length > 0 && /_openSysModal\(\)/.test(showFn123),
-    '123.2: showTermlinkConsole() is defined and opens the console via _openSysModal (focus-trap + ARIA)'
+    showFn123.length > 0 && /openModal\(\)/.test(showFn123),
+    '123.2: showTermlinkConsole() is defined and opens the console via openModal() (U12 driver — focus-trap + ARIA)'
   );
 
   // 123.3  the console manifest exists with the six offline subsystem entries
@@ -15418,21 +15483,25 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
   // ── U8 auto-log expansion (static) ─────────────────────────────────────────
 
-  // 135.12  the 5 new U8 emit points are present at their real call sites
+  // 135.12  the 5 new U8 emit points are present at their real call sites. Step 2
+  //         Phase 0 U12 split doCraft/doScrap into an async confirm gate + a
+  //         synchronous _craftApply/_scrapApply mutation core (so a VM-sandboxed
+  //         behavioral test can exercise the mutation without mocking
+  //         confirmAction()) — the emit call now lives in the *Apply core.
   assert(
     /function toggleCollectible[\s\S]{0,400}RobcoEvents\.emit\(\s*'collectible\.acquired'/.test(
       uiRenderSrc135
     ) &&
-      /function doCraft[\s\S]{0,2500}RobcoEvents\.emit\(\s*'craft\.completed'/.test(
+      /function _craftApply[\s\S]{0,2500}RobcoEvents\.emit\(\s*'craft\.completed'/.test(
         uiRenderSrc135
       ) &&
-      /function doScrap[\s\S]{0,2500}RobcoEvents\.emit\(\s*'craft\.scrapped'/.test(
+      /function _scrapApply[\s\S]{0,2500}RobcoEvents\.emit\(\s*'craft\.scrapped'/.test(
         uiRenderSrc135
       ) &&
       /function doBuy[\s\S]{0,2500}RobcoEvents\.emit\(\s*'trade\.bought'/.test(uiRenderSrc135) &&
       /function doSell[\s\S]{0,2500}RobcoEvents\.emit\(\s*'trade\.sold'/.test(uiRenderSrc135) &&
       /function _nativeSleep[\s\S]{0,600}RobcoEvents\.emit\(\s*'sleep\.completed'/.test(apiSource),
-    '135.12: U8 emit points present — toggleCollectible/doCraft/doScrap/doBuy/doSell (ui-render.js) and _nativeSleep (api.js)'
+    '135.12: U8 emit points present — toggleCollectible/doCraft(→_craftApply)/doScrap(→_scrapApply)/doBuy/doSell (ui-render.js) and _nativeSleep (api.js)'
   );
 
   // 135.13  state.js registers an auto-log subscriber for level.up + every U8 event
@@ -15735,19 +15804,392 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 137 — Step 2 (v2.8.0) Phase 0 U11/U12: hygiene ledgers + modal
+//  consolidation. U11: the per-game data parity ledger, reserved-column
+//  register, and skill-less (FO4) degradation audit are committed into
+//  ARCHITECTURE.md + the db_nv.js/db_fo3.js headers. U12: the ~50 blocking
+//  alert()/confirm() sites across js/*.js are purged in favor of one
+//  consolidated openModal() driver (D-2/FP-SYS-8) and a diegetic, Promise-based
+//  confirmAction() helper (FP-SYS-10) — every destructive confirm gate now
+//  awaits confirmAction() instead of blocking on confirm(); doCraft/doScrap/
+//  restoreRollingBackup were split into an async confirm-gate wrapper + a
+//  synchronous *Apply mutation core so the gate and the mutation can each be
+//  tested independently. A real Promise-resolution behavioral proof (137.6)
+//  runs confirmAction() against a minimal synthetic DOM in a Node vm sandbox.
+//  14 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 137 — Step 2 Phase 0 U11/U12 hygiene ledgers + modal consolidation');
+  const arch137 = readFile('ARCHITECTURE.md');
+  const dbNv137 = readFile('js/db_nv.js');
+  const dbFo3137 = readFile('js/db_fo3.js');
+  const uiCore137 = readFile('js/ui-core.js');
+  const uiRender137 = readFile('js/ui-render.js');
+  const uiSaves137 = readFile('js/ui-saves.js');
+  const cloud137 = readFile('js/cloud.js');
+  const api137 = readFile('js/api.js');
+  const state137 = readFile('js/state.js');
+
+  // 137.1  U11: the per-game data parity ledger is committed in ARCHITECTURE.md,
+  //        with every row labeled GENUINE or GAP (never left ambiguous)
+  assert(
+    /Parity ledger — per-game data asymmetry/.test(arch137) &&
+      /\*\*GENUINE\*\*/.test(arch137) &&
+      /\*\*GAP\*\*/.test(arch137),
+    '137.1: ARCHITECTURE.md carries the U11 per-game data parity ledger with GENUINE/GAP verdicts'
+  );
+
+  // 137.2  U11: the reserved-column register is committed (ARCHITECTURE.md +
+  //        both db file headers, same commit — Protocol 2a discipline)
+  assert(
+    /Reserved-column register/.test(arch137) &&
+      /RESERVED-COLUMN REGISTER/.test(dbNv137) &&
+      /RESERVED-COLUMN REGISTER/.test(dbFo3137) &&
+      /PARKED-FOR-REMOVAL/.test(dbNv137) &&
+      /PARKED-FOR-REMOVAL/.test(dbFo3137),
+    '137.2: reserved-column register is committed in ARCHITECTURE.md AND both db_nv.js/db_fo3.js headers'
+  );
+
+  // 137.3  U11: the skill-less (FO4) degradation audit is committed, and states
+  //        the hard requirement for the future GAME_DEFS.FO4 entry
+  assert(
+    /Skill-less \(FO4-class\) degradation audit/.test(arch137) && /skillKeys:\s*\[\]/.test(arch137),
+    '137.3: ARCHITECTURE.md carries the U11 skill-less audit + the skillKeys:[] requirement for a future FO4 entry'
+  );
+
+  // 137.4  U12: openModal() and confirmAction() are both defined in ui-core.js —
+  //        the one consolidated driver + the diegetic confirm() replacement
+  assert(
+    /function openModal\s*\(/.test(uiCore137) && /function confirmAction\s*\(/.test(uiCore137),
+    '137.4: openModal() and confirmAction() are both defined in ui-core.js'
+  );
+
+  // 137.5  U12: confirmAction() is Promise-based (matches confirm()'s boolean
+  //        contract asynchronously) and every non-confirm exit (CANCEL, the
+  //        modal's own CLOSE button, Escape) resolves false via one shared path
+  {
+    const confirmActionBody137 = extractFunctionBody(uiCore137, 'confirmAction');
+    assert(
+      /new Promise\(/.test(confirmActionBody137) &&
+        /onClose:\s*\(\)\s*=>\s*settle\(false\)/.test(confirmActionBody137) &&
+        /settle\(true\)/.test(confirmActionBody137),
+      '137.5: confirmAction() is Promise-based; CONFIRM resolves true, every other exit (CANCEL/CLOSE/Escape) resolves false via the shared onClose path'
+    );
+  }
+
+  // 137.6  BEHAVIORAL — confirmAction() actually resolves true on a CONFIRM
+  //        click and false on a CANCEL click, exercised against a minimal
+  //        synthetic DOM in a Node vm sandbox (not just a structural grep).
+  //        Deferred: the vm sandbox's confirmAction() returns a real Promise,
+  //        and this runner body is otherwise synchronous CommonJS (no top-level
+  //        await), so the proof is pushed onto _pendingAsync and awaited once,
+  //        just before RESULTS prints, rather than raced against a bare
+  //        Promise.resolve().then() microtask hop (which is not guaranteed to
+  //        run before process.exit() — a harness-only footgun caught in this
+  //        same commit and fixed here per Protocol 42, not worked around).
+  _pendingAsync.push(
+    (async () => {
+      const vm137 = require('vm');
+      let yesResult = null;
+      let noResult = null;
+      let closeResult = null;
+      let err137 = null;
+      try {
+        function makeFakeDom() {
+          const registry = new Map();
+          function makeEl(id) {
+            const listeners = {};
+            const el = {
+              id,
+              _html: '',
+              style: {},
+              classList: {
+                add() {},
+                remove() {},
+                toggle() {},
+                contains: () => false,
+              },
+              focus() {},
+              addEventListener(type, fn) {
+                (listeners[type] = listeners[type] || []).push(fn);
+              },
+              _fire(type) {
+                (listeners[type] || []).forEach(fn => fn({}));
+              },
+              querySelector(sel) {
+                if (sel === '.modal-box') return makeElCached('__modalBox');
+                if (sel === '.close-btn') return makeElCached('__closeBtn');
+                return null;
+              },
+              get innerHTML() {
+                return this._html;
+              },
+              set innerHTML(html) {
+                this._html = html;
+                // Register a stub element for every id="..." the assigned markup
+                // declares, mirroring real innerHTML parsing closely enough for
+                // getElementById() lookups + click() simulation to work.
+                const re = /id="([^"]+)"/g;
+                let m;
+                while ((m = re.exec(html))) makeElCached(m[1]);
+              },
+              set innerText(v) {
+                this._html = String(v);
+              },
+              get innerText() {
+                return this._html;
+              },
+            };
+            return el;
+          }
+          function makeElCached(id) {
+            if (!registry.has(id)) registry.set(id, makeEl(id));
+            return registry.get(id);
+          }
+          makeElCached('sysModal').style.display = 'none';
+          makeElCached('modalTitle');
+          makeElCached('modalContent');
+          return {
+            activeElement: null,
+            getElementById: id => registry.get(id) || null,
+          };
+        }
+
+        // Reconstructs a full, standalone "function name(params) { body }" text
+        // for redeclaration in the sandbox (extractFunctionBody() alone only
+        // returns the brace-matched body, not the name/param-list prefix).
+        function declareFn137(src, name) {
+          const nameIdx = src.indexOf('function ' + name);
+          const parenIdx = src.indexOf('(', nameIdx);
+          const braceIdx = src.indexOf('{', parenIdx);
+          const params = src.slice(parenIdx, braceIdx);
+          return 'function ' + name + params + extractFunctionBody(src, name);
+        }
+
+        const src137 =
+          'let _sysModalTrigger = null;\nlet _modalCloseCallback = null;\n' +
+          declareFn137(uiCore137, 'escapeHtml') +
+          '\n' +
+          declareFn137(uiCore137, '_openSysModal') +
+          '\n' +
+          declareFn137(uiCore137, 'openModal') +
+          '\n' +
+          declareFn137(uiCore137, 'closeModal') +
+          '\n' +
+          declareFn137(uiCore137, 'confirmAction');
+
+        // Case 1: CONFIRM clicked → resolves true
+        {
+          const sb = { document: null, console: { warn() {} } };
+          sb.document = makeFakeDom();
+          vm137.createContext(sb);
+          vm137.runInContext(src137, sb);
+          const p = sb.confirmAction({ title: '> T', warning: 'W', confirmLabel: 'YES' });
+          sb.document.getElementById('modalConfirmYes')._fire('click');
+          yesResult = await p;
+        }
+        // Case 2: CANCEL clicked → resolves false
+        {
+          const sb = { document: null, console: { warn() {} } };
+          sb.document = makeFakeDom();
+          vm137.createContext(sb);
+          vm137.runInContext(src137, sb);
+          const p = sb.confirmAction({ title: '> T', warning: 'W' });
+          sb.document.getElementById('modalConfirmNo')._fire('click');
+          noResult = await p;
+        }
+        // Case 3: dismissed via closeModal() directly (CLOSE button / Escape path) → resolves false
+        {
+          const sb = { document: null, console: { warn() {} } };
+          sb.document = makeFakeDom();
+          vm137.createContext(sb);
+          vm137.runInContext(src137, sb);
+          const p = sb.confirmAction({ title: '> T', warning: 'W' });
+          sb.closeModal();
+          closeResult = await p;
+        }
+      } catch (e) {
+        err137 = e;
+      }
+      assert(
+        yesResult === true && noResult === false && closeResult === false && !err137,
+        'confirmAction() behavioral: CONFIRM click resolves true; CANCEL click and closeModal() (Escape/CLOSE path) both resolve false' +
+          (err137 ? ' — ' + err137.message : '')
+      );
+    })()
+  );
+
+  // 137.7  U12: openModal() is the single entry point — no OTHER function calls
+  //        the low-level _openSysModal() primitive directly (every caller routes
+  //        through openModal(), which is the only permitted _openSysModal() call
+  //        site). Every occurrence of the substring "_openSysModal(" in the file
+  //        must be one of exactly two: the function's own declaration
+  //        ("function _openSysModal() {") or the single call inside openModal().
+  {
+    const allOccurrences137 = uiCore137.match(/_openSysModal\s*\(/g) || [];
+    const declOrCallOnly137 =
+      /function\s+_openSysModal\s*\(/.test(uiCore137) &&
+      new RegExp('openModal\\s*\\([\\s\\S]{0,400}_openSysModal\\s*\\(\\s*\\)').test(uiCore137);
+    assert(
+      allOccurrences137.length === 2 && declOrCallOnly137,
+      '137.7: no function outside openModal() calls the low-level _openSysModal() primitive directly (single consolidated driver)'
+    );
+  }
+
+  // 137.8  U12: exactly one Tab-key focus-trap targets #sysModal (in
+  //        _wireKeyboardShortcuts) — the index.html firmware-update dialog
+  //        keeps its own separate, deliberately-different trap (Suite 65),
+  //        not duplicated a second time anywhere in ui-core.js
+  assert(
+    (uiCore137.match(/getElementById\(\s*'sysModal'\s*\)[\s\S]{0,200}querySelectorAll\(/g) || [])
+      .length === 1,
+    '137.8: exactly one focus-trap implementation targets #sysModal in ui-core.js (single driver, D-2)'
+  );
+
+  // 137.9  U12: no raw alert( or confirm( call remains in any served js/*.js file
+  //        (Protocol 36b escape-ratchet — comments/prose mentioning "confirm()"
+  //        are stripped first so explanatory doc comments don't false-positive)
+  {
+    const stripComments = src => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+    const servedJsFiles137 = [
+      ['js/api.js', api137],
+      ['js/state.js', state137],
+      ['js/ui-core.js', uiCore137],
+      ['js/ui-render.js', uiRender137],
+      ['js/ui-saves.js', uiSaves137],
+      ['js/cloud.js', cloud137],
+    ];
+    const offenders = [];
+    for (const [name, src] of servedJsFiles137) {
+      const clean = stripComments(src);
+      if (/\balert\s*\(/.test(clean)) offenders.push(name + ' (alert)');
+      if (/\bconfirm\s*\(/.test(clean)) offenders.push(name + ' (confirm)');
+    }
+    assert(
+      offenders.length === 0,
+      'no raw alert(/confirm( call remains in served js/*.js (Step 2 Phase 0 U12 purge)' +
+        (offenders.length ? ' — found: ' + offenders.join(', ') : '')
+    );
+  }
+
+  // 137.10  U12: every destructive/confirm-gated path awaits confirmAction()
+  //         instead of blocking on confirm() (Protocol 34 — data-safety confirm
+  //         gates preserved through the sync→async migration)
+  {
+    // cloud.js declares its confirm-gated functions as anonymous expressions
+    // (`window.loadCloudSave = async function (docId) { ... }`), not named
+    // declarations, so extractFunctionBody()'s `function <name>` search can't
+    // find them — brace-match from the assignment instead.
+    function extractWindowFnBody137(src, name) {
+      const assignIdx = src.indexOf('window.' + name + ' =');
+      if (assignIdx === -1) return '';
+      const braceIdx = src.indexOf('{', assignIdx);
+      if (braceIdx === -1) return '';
+      let depth = 0;
+      for (let i = braceIdx; i < src.length; i++) {
+        if (src[i] === '{') depth++;
+        else if (src[i] === '}' && --depth === 0) return src.slice(braceIdx, i + 1);
+      }
+      return '';
+    }
+    const gatedSites137 = [
+      ['ui-core.js', uiCore137, 'wipeTerminal', extractFunctionBody],
+      ['ui-core.js', uiCore137, 'clearChat', extractFunctionBody],
+      ['ui-render.js', uiRender137, 'doCraft', extractFunctionBody],
+      ['ui-render.js', uiRender137, 'doScrap', extractFunctionBody],
+      ['ui-render.js', uiRender137, 'doBuy', extractFunctionBody],
+      ['ui-render.js', uiRender137, 'doSell', extractFunctionBody],
+      ['ui-render.js', uiRender137, 'doLoot', extractFunctionBody],
+      ['ui-saves.js', uiSaves137, 'loadFromSlot', extractFunctionBody],
+      ['ui-saves.js', uiSaves137, 'restoreRollingBackup', extractFunctionBody],
+      ['ui-saves.js', uiSaves137, 'handleFileUpload', extractFunctionBody],
+      ['cloud.js', cloud137, 'loadCloudSave', extractWindowFnBody137],
+      ['cloud.js', cloud137, 'deleteCloudSave', extractWindowFnBody137],
+    ];
+    const missing = [];
+    for (const [file, src, fn, extractor] of gatedSites137) {
+      let body = '';
+      try {
+        body = extractor(src, fn);
+      } catch (_) {}
+      if (!/confirmAction\s*\(/.test(body)) missing.push(`${file}:${fn}`);
+    }
+    assert(
+      missing.length === 0,
+      'every destructive path awaits confirmAction() (Protocol 34 gate preserved)' +
+        (missing.length ? ' — missing in: ' + missing.join(', ') : '')
+    );
+  }
+
+  // 137.11  U12: doCraft/doScrap were split into an async confirm-gate wrapper +
+  //         a synchronous *Apply mutation core (so the mutation is directly
+  //         testable without mocking confirmAction()) — both halves exist
+  assert(
+    /function _craftPrepare\s*\(/.test(uiRender137) &&
+      /function _craftApply\s*\(/.test(uiRender137) &&
+      /function _scrapPrepare\s*\(/.test(uiRender137) &&
+      /function _scrapApply\s*\(/.test(uiRender137) &&
+      /_craftApply\(/.test(extractFunctionBody(uiRender137, 'doCraft')) &&
+      /_scrapApply\(/.test(extractFunctionBody(uiRender137, 'doScrap')),
+    '137.11: doCraft/doScrap split into confirm-gate wrapper + synchronous _craftApply/_scrapApply mutation core'
+  );
+
+  // 137.12  U12: restoreRollingBackup was split the same way (confirm-gate
+  //         wrapper + _restoreBackupApply mutation core)
+  assert(
+    /function _restoreBackupApply\s*\(/.test(uiSaves137) &&
+      /_restoreBackupApply\(/.test(extractFunctionBody(uiSaves137, 'restoreRollingBackup')),
+    '137.12: restoreRollingBackup split into confirm-gate wrapper + _restoreBackupApply mutation core'
+  );
+
+  // 137.13  U12: the index.html firmware-update dialog is untouched by the
+  //         purge — it keeps its own bespoke confirm()-free (Escape-blocking)
+  //         trap and is explicitly NOT folded into openModal() (Suite 65 already
+  //         guards its internals; this just confirms the two systems stay separate)
+  {
+    const html137 = readFile('index.html');
+    const triggerBody137 = extractFunctionBody(html137, '_triggerUpdate');
+    assert(
+      !/openModal\s*\(/.test(triggerBody137) && !/confirmAction\s*\(/.test(triggerBody137),
+      '137.13: index.html _triggerUpdate (the blocking firmware-update dialog) is NOT folded into openModal()/confirmAction() — stays a deliberate separate exception (Suite 65)'
+    );
+  }
+
+  // 137.14  U12: window.prompt() sites are explicitly out of scope for this
+  //         purge (task scope was alert()/confirm() only) and remain untouched —
+  //         guards against a future accidental removal being mistaken for scope
+  assert(
+    /\bprompt\s*\(/.test(cloud137) && /\bprompt\s*\(/.test(uiSaves137),
+    '137.14: window.prompt() sites (cloud.js label input, ui-saves.js backup picker) remain — explicitly out of U12 scope, not silently dropped'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
-console.log('\n══════════════════════════════════════════════════════════════\n');
-if (failed === 0) {
-  console.log(green(`  ALL ${passed} TESTS PASSED — persistence fully verified.`));
-  console.log(dim('  Every state field is covered by autoImportState, export, and cloud sync.\n'));
-  process.exit(0);
-} else {
-  console.error(red(`  ${failed} TEST(S) FAILED  (${passed} passed)`));
-  console.error(red('  Fields marked ✗ are missing from autoImportState() or the save envelope.'));
-  console.error(dim('  Add them to autoImportState() in js/api.js then re-run.\n'));
-  process.exit(1);
-}
+// Wait for any pending async proofs (Suite 137.6) to record their pass/fail
+// before printing totals — the runner body above is otherwise synchronous.
+Promise.all(_pendingAsync)
+  .catch(e => {
+    fail('Unhandled error in an async suite: ' + (e && e.message));
+  })
+  .then(() => {
+    console.log('\n══════════════════════════════════════════════════════════════\n');
+    if (failed === 0) {
+      console.log(green(`  ALL ${passed} TESTS PASSED — persistence fully verified.`));
+      console.log(
+        dim('  Every state field is covered by autoImportState, export, and cloud sync.\n')
+      );
+      process.exit(0);
+    } else {
+      console.error(red(`  ${failed} TEST(S) FAILED  (${passed} passed)`));
+      console.error(
+        red('  Fields marked ✗ are missing from autoImportState() or the save envelope.')
+      );
+      console.error(dim('  Add them to autoImportState() in js/api.js then re-run.\n'));
+      process.exit(1);
+    }
+  });
 
 /*
  * ──────────────────────────────────────────────────────────────

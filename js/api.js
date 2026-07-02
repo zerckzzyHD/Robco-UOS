@@ -272,7 +272,7 @@ function _validateTriNode(parsed) {
 async function fetchAuthorizedModels(silent = false) {
   let rawKey = document.getElementById('apiKeyInput').value.trim();
   if (!rawKey) {
-    alert('Please paste an API Key first.');
+    openModal({ title: '> KEY VALIDATION', body: 'Please paste an API Key first.' });
     return;
   }
   const btn = document.getElementById('btnFetchModels');
@@ -284,7 +284,10 @@ async function fetchAuthorizedModels(silent = false) {
     });
     if (response.status === 401 || response.status === 403) {
       if (!silent)
-        alert('>> KEY REJECTED — Invalid or unauthorized API key. Verify it in Google AI Studio.');
+        openModal({
+          title: '> KEY VALIDATION',
+          body: '>> KEY REJECTED — Invalid or unauthorized API key. Verify it in Google AI Studio.',
+        });
       return;
     }
     if (!response.ok) {
@@ -302,9 +305,10 @@ async function fetchAuthorizedModels(silent = false) {
       }
       if (_isKeyErr) {
         if (!silent)
-          alert(
-            '>> KEY REJECTED — Invalid or unauthorized API key. Verify it in Google AI Studio.'
-          );
+          openModal({
+            title: '> KEY VALIDATION',
+            body: '>> KEY REJECTED — Invalid or unauthorized API key. Verify it in Google AI Studio.',
+          });
         return;
       }
       throw new Error(`HTTP ${response.status}`);
@@ -335,11 +339,11 @@ async function fetchAuthorizedModels(silent = false) {
     // Single assignment (map().join('')) — avoids the O(n²) DOM re-parse of append-in-loop (Protocol: Prohibited Patterns)
     selectEl.innerHTML = optionsHtml;
     if (added > 0) {
-      if (!silent) alert(`>> ACCESS GRANTED <<`);
+      if (!silent) openModal({ title: '> KEY VALIDATION', body: '>> ACCESS GRANTED <<' });
       saveApiKeySilent();
     }
   } catch (e) {
-    if (!silent) alert('>> NETWORK FAILURE.');
+    if (!silent) openModal({ title: '> KEY VALIDATION', body: '>> NETWORK FAILURE.' });
   } finally {
     btn.innerText = '> 1. VALIDATE KEY & FETCH ENGINES';
   }
@@ -1376,7 +1380,7 @@ function showTermlinkConsole() {
     '<div class="termlink-grid">' +
     cards +
     '</div>';
-  _openSysModal();
+  if (typeof openModal === 'function') openModal();
 }
 
 async function transmitMessage() {

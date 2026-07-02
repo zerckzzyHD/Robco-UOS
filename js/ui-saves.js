@@ -1,6 +1,7 @@
 function exportCampaignLog(format = 'txt') {
   if (!chatHistory || chatHistory.length === 0) {
-    alert('> ERROR: COMM-LINK LOGS EMPTY.');
+    if (typeof openModal === 'function')
+      openModal({ title: '> EXPORT LOG', body: 'ERROR: COMM-LINK LOGS EMPTY.' });
     return;
   }
 
@@ -98,7 +99,11 @@ function _clipboardSupported() {
 }
 async function ejectHolotape() {
   if (!chatHistory || chatHistory.length === 0) {
-    alert('> ERROR: COMM-LINK LOGS EMPTY. NOTHING TO EJECT.');
+    if (typeof openModal === 'function')
+      openModal({
+        title: '> EJECT HOLOTAPE',
+        body: 'ERROR: COMM-LINK LOGS EMPTY. NOTHING TO EJECT.',
+      });
     return;
   }
   const text = _buildHolotapeText();
@@ -218,7 +223,7 @@ function saveToSlot(slotNum) {
   }
 }
 
-function loadFromSlot(slotNum) {
+async function loadFromSlot(slotNum) {
   const raw = localStorage.getItem(_slotKey(slotNum));
   if (!raw) {
     appendToChat(`> [LOAD] ${_slotLabel(slotNum)} is empty.`, 'sys', true);
@@ -230,28 +235,31 @@ function loadFromSlot(slotNum) {
     if (typeof window.verifySaveEnvelope === 'function') {
       const integrity = window.verifySaveEnvelope(env);
       if (integrity.status === 'future_version') {
-        if (
-          !confirm(
-            `> VERSION MISMATCH\n\nThis save was made on a newer version of RobCo (v${integrity.version}).\nYour app is on v${APP_VERSION}.\n\nLoading may cause data loss — update the app first.\n\nForce-load anyway?`
-          )
-        )
-          return;
+        const ok = await confirmAction({
+          title: '> VERSION MISMATCH',
+          warning: `This save was made on a newer version of RobCo (v${integrity.version}).\nYour app is on v${APP_VERSION}.\n\nLoading may cause data loss — update the app first.\n\nForce-load anyway?`,
+          confirmLabel: 'FORCE-LOAD',
+        });
+        if (!ok) return;
       } else if (integrity.status === 'checksum_mismatch') {
-        if (
-          !confirm(
-            '> SAVE INTEGRITY WARNING\n\nThis save may be corrupt or was edited outside the app.\n\nLoad anyway? (Data may be incomplete or incorrect.)'
-          )
-        )
-          return;
+        const ok = await confirmAction({
+          title: '> SAVE INTEGRITY WARNING',
+          warning:
+            'This save may be corrupt or was edited outside the app.\n\nLoad anyway? (Data may be incomplete or incorrect.)',
+          confirmLabel: 'LOAD ANYWAY',
+        });
+        if (!ok) return;
       }
     }
     // F5: Warn on gameContext mismatch between slot and current session
     const slotCtx = env.gameContext || env.state?.gameContext || 'FNV';
     const curCtx = state.gameContext || 'FNV';
     if (slotCtx !== curCtx) {
-      const ok = confirm(
-        `> CONTEXT MISMATCH\n\nThis save is a ${slotCtx} campaign.\nYou are currently in ${curCtx} mode.\n\nLoading will switch to ${slotCtx}. Continue?`
-      );
+      const ok = await confirmAction({
+        title: '> CONTEXT MISMATCH',
+        warning: `This save is a ${slotCtx} campaign.\nYou are currently in ${curCtx} mode.\n\nLoading will switch to ${slotCtx}. Continue?`,
+        confirmLabel: 'SWITCH & LOAD',
+      });
       if (!ok) return;
     }
     // Snapshot current state as rolling backup before replacing
@@ -324,11 +332,12 @@ function triggerFileInput() {
 // ── RESTORE ROLLING BACKUP ─────────────────────────────────────────
 // Presents the rolling backup ring and lets the user restore one — confirm-gated,
 // routed through sanitizeImportedContainer + migrateState (Protocol 34).
-function restoreRollingBackup() {
+async function restoreRollingBackup() {
   if (typeof window.getRollingBackups !== 'function') return;
   const backups = window.getRollingBackups();
   if (!backups.length) {
-    alert('>> NO BACKUP SAVES AVAILABLE <<');
+    if (typeof openModal === 'function')
+      openModal({ title: '> RESTORE BACKUP', body: 'NO BACKUP SAVES AVAILABLE' });
     return;
   }
   const listStr = backups.map((b, i) => `${i + 1}. ${b.label}`).join('\n');
@@ -338,16 +347,24 @@ function restoreRollingBackup() {
   if (!choice) return;
   const n = parseInt(choice);
   if (isNaN(n) || n < 1 || n > backups.length) {
-    alert('>> INVALID SELECTION <<');
+    if (typeof openModal === 'function')
+      openModal({ title: '> RESTORE BACKUP', body: 'INVALID SELECTION' });
     return;
   }
   const backup = backups[n - 1];
-  if (
-    !confirm(
-      `>> RESTORE BACKUP FROM ${backup.label}?\n\nThis replaces your current campaign state.`
-    )
-  )
-    return;
+  const ok = await confirmAction({
+    title: '> RESTORE BACKUP',
+    warning: `Restore backup from ${backup.label}?\n\nThis replaces your current campaign state.`,
+    confirmLabel: 'RESTORE',
+  });
+  if (!ok) return;
+  _restoreBackupApply(backup);
+}
+
+// _restoreBackupApply(backup) — the synchronous sanitize → migrate → write core,
+// separated from the confirm gate so it is directly testable without mocking
+// confirmAction() (Step 2 Phase 0 U12 split — mirrors _craftPrepare/_craftApply).
+function _restoreBackupApply(backup) {
   try {
     const data = backup.data;
     const sanitized =
@@ -365,8 +382,9 @@ function restoreRollingBackup() {
     if (data.playstyle) localStorage.setItem('robco_playstyle', data.playstyle);
     // Guard the impending reload's beforeunload flush (clobber regression).
     window._loadingSave = true;
-    alert('>> BACKUP RESTORED. REBOOTING SYSTEM... <<');
-    window.location.reload();
+    if (typeof openModal === 'function')
+      openModal({ title: '> RESTORE BACKUP', body: 'BACKUP RESTORED. REBOOTING SYSTEM...' });
+    setTimeout(() => window.location.reload(), 2000);
   } catch (_) {
     appendToChat('> [SYS-ALERT: BACKUP RESTORE FAILED]', 'sys');
   }
@@ -385,7 +403,7 @@ function handleFileUpload(event) {
   const file = event.target.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = function (e) {
+  reader.onload = async function (e) {
     try {
       const parsed = JSON.parse(e.target.result);
       if (parsed.robco_v8) {
@@ -393,19 +411,20 @@ function handleFileUpload(event) {
         if (typeof window.verifySaveEnvelope === 'function') {
           const _fi = window.verifySaveEnvelope(parsed);
           if (_fi.status === 'future_version') {
-            if (
-              !confirm(
-                `> VERSION MISMATCH\n\nThis save was made on a newer version of RobCo (v${_fi.version}).\nYour app is on v${APP_VERSION}.\n\nLoading may cause data loss — update the app first.\n\nForce-load anyway?`
-              )
-            )
-              return;
+            const ok = await confirmAction({
+              title: '> VERSION MISMATCH',
+              warning: `This save was made on a newer version of RobCo (v${_fi.version}).\nYour app is on v${APP_VERSION}.\n\nLoading may cause data loss — update the app first.\n\nForce-load anyway?`,
+              confirmLabel: 'FORCE-LOAD',
+            });
+            if (!ok) return;
           } else if (_fi.status === 'checksum_mismatch') {
-            if (
-              !confirm(
-                '> SAVE INTEGRITY WARNING\n\nThis save may be corrupt or was edited outside the app.\n\nLoad anyway? (Data may be incomplete or incorrect.)'
-              )
-            )
-              return;
+            const ok = await confirmAction({
+              title: '> SAVE INTEGRITY WARNING',
+              warning:
+                'This save may be corrupt or was edited outside the app.\n\nLoad anyway? (Data may be incomplete or incorrect.)',
+              confirmLabel: 'LOAD ANYWAY',
+            });
+            if (!ok) return;
           }
         }
         if (typeof window.snapRollingBackup === 'function') window.snapRollingBackup();
@@ -420,8 +439,12 @@ function handleFileUpload(event) {
         // Guard the impending reload's beforeunload flush so stale in-memory state
         // can't overwrite the robco_v8 we just imported (clobber regression).
         window._loadingSave = true;
-        alert('>> HARD BACKUP RESTORED SUCCESSFULLY. REBOOTING SYSTEM... <<');
-        window.location.reload();
+        if (typeof openModal === 'function')
+          openModal({
+            title: '> IMPORT SAVE',
+            body: 'HARD BACKUP RESTORED SUCCESSFULLY. REBOOTING SYSTEM...',
+          });
+        setTimeout(() => window.location.reload(), 2000);
       } else if (parsed.version && parsed.state) {
         // Envelope format (v1.6.3+): contains state, chat, playstyle
         autoImportState(JSON.stringify(parsed.state));
@@ -431,11 +454,13 @@ function handleFileUpload(event) {
           let el = document.getElementById('playstyleInput');
           if (el) el.value = parsed.playstyle;
         }
-        alert('>> LEGACY BACKUP RESTORED SUCCESSFULLY <<');
+        if (typeof openModal === 'function')
+          openModal({ title: '> IMPORT SAVE', body: 'LEGACY BACKUP RESTORED SUCCESSFULLY' });
       } else {
         // Legacy: bare state JSON
         autoImportState(e.target.result);
-        alert('>> LEGACY BACKUP RESTORED SUCCESSFULLY <<');
+        if (typeof openModal === 'function')
+          openModal({ title: '> IMPORT SAVE', body: 'LEGACY BACKUP RESTORED SUCCESSFULLY' });
       }
     } catch (err) {
       appendToChat('> [SYS-ALERT: SAVE FILE CORRUPTED OR UNREADABLE]', 'sys');

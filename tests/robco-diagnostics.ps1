@@ -2080,7 +2080,8 @@ Check (-not ([bool]($syncBody46 -match 'localStorage\.setItem')) -and -not ([boo
 Check (([bool]($syncBody46 -match 'localOriginId')) -and ([bool]($syncBody46 -match 'contentHash'))) `
     'syncLocalSavesToCloud dedup checks localOriginId AND contentHash (idempotent re-sync)'
 
-# 46.10  loadCloudSave is gated behind confirm()
+# 46.10  loadCloudSave is gated behind confirmAction() (Step 2 Phase 0 U12: diegetic
+#        confirmAction() replaces the blocking confirm())
 $loadIdx46 = $cloudSrc.IndexOf('window.loadCloudSave')
 $loadBody46 = ''
 if ($loadIdx46 -ge 0) {
@@ -2092,14 +2093,14 @@ if ($loadIdx46 -ge 0) {
         $lI++
     }
 }
-Check ([bool]($loadBody46 -match '\bconfirm\b')) `
-    'loadCloudSave is gated behind confirm() — never auto-loads (data-safety)'
+Check ([bool]($loadBody46 -match '\bconfirmAction\b')) `
+    'loadCloudSave is gated behind confirmAction() — never auto-loads (data-safety)'
 
 # 46.11  loadCloudSave routes through sanitizeImportedContainer AND migrateState
 Check (([bool]($loadBody46 -match 'sanitizeImportedContainer')) -and ([bool]($loadBody46 -match 'migrateState'))) `
     'loadCloudSave routes through sanitizeImportedContainer AND migrateState (hardened load path)'
 
-# 46.12  deleteCloudSave is confirm-gated
+# 46.12  deleteCloudSave is confirmAction-gated (Step 2 Phase 0 U12)
 $delIdx46 = $cloudSrc.IndexOf('window.deleteCloudSave')
 $delBody46 = ''
 if ($delIdx46 -ge 0) {
@@ -2111,8 +2112,8 @@ if ($delIdx46 -ge 0) {
         $dI++
     }
 }
-Check ([bool]($delBody46 -match '\bconfirm\b')) `
-    'deleteCloudSave is confirm-gated (explicit confirmation before deleting cloud save)'
+Check ([bool]($delBody46 -match '\bconfirmAction\b')) `
+    'deleteCloudSave is confirmAction-gated (explicit confirmation before deleting cloud save)'
 
 # 46.13  renameCloudSave uses updateDoc (label-only update — not a new doc or overwrite)
 $renIdx46 = $cloudSrc.IndexOf('window.renameCloudSave')
@@ -2506,8 +2507,12 @@ Check ($cloudSrc51 -match 'verifySaveEnvelope') `
     "cloud.js calls verifySaveEnvelope on cloud load paths (integrity check)"
 
 # 51.16  restoreRollingBackup routes through sanitizeImportedContainer + migrateState
+#        (Protocol 34) -- via its _restoreBackupApply core (Step 2 Phase 0 U12 split the
+#        confirm gate from the apply step). $restoreBody51 stays bound to
+#        restoreRollingBackup itself for the later 51.36 confirmAction-gate check.
 $restoreBody51 = Get-FnBody51 $uiSrc51 'restoreRollingBackup'
-Check ($restoreBody51 -match 'sanitizeImportedContainer' -and $restoreBody51 -match 'migrateState') `
+$restoreApplyBody51 = Get-FnBody51 $uiSrc51 '_restoreBackupApply'
+Check ($restoreApplyBody51 -match 'sanitizeImportedContainer' -and $restoreApplyBody51 -match 'migrateState') `
     "restoreRollingBackup routes through sanitizeImportedContainer + migrateState (Protocol 34)"
 
 # 51.17  index.html has RESTORE BACKUP button calling restoreRollingBackup
@@ -2593,9 +2598,9 @@ Check ($uiSrc51 -match 'getRollingBackups' -and
 Check (-not ($cloudSrc51 -match 'function _contentHash')) `
     'cloud.js: _contentHash removed (Protocol 22 -- dedup uses shared window.computeSaveChecksum in state.js)'
 
-# 51.36  restoreRollingBackup is confirm-gated (Protocol 34)
-Check ($restoreBody51 -match 'confirm\(') `
-    'restoreRollingBackup is confirm-gated (Protocol 34 -- destructive state replacement requires user confirmation)'
+# 51.36  restoreRollingBackup is confirmAction-gated (Protocol 34; Step 2 Phase 0 U12)
+Check ($restoreBody51 -match 'confirmAction\(') `
+    'restoreRollingBackup is confirmAction-gated (Protocol 34 -- destructive state replacement requires user confirmation)'
 
 # 51.37  snapRollingBackup stores timestamp: Date.now() in each backup entry
 Check ($stateSrc51 -match 'timestamp: Date\.now\(\)') `
@@ -2688,13 +2693,16 @@ Check ($stateSrc51 -match '_prevKey' -and $stateSrc51 -match 'ptr === 0 \? 3 : p
     'snapRollingBackup dedup reads most-recent slot via _prevKey calculation -- non-consecutive repeats allowed'
 
 # 51.57  WU-B6 / TS-GAP-2 -- restoreRollingBackup end-to-end (JS runner evals the full
-#        sanitize->migrate->write pipeline; PS runner does the structural mirror: the body
-#        reads the backup ring, sanitizes, migrates, writes robco_v8, and sets the reload guard).
+#        sanitize->migrate->write pipeline; PS runner does the structural mirror). Step 2
+#        Phase 0 U12 split the confirm gate (restoreRollingBackup, now async) from the
+#        sanitize->migrate->write core (_restoreBackupApply) -- check each half.
 $rrbBody51 = ''
 try { $rrbBody51 = Get-FunctionBody $uiSrc51 'restoreRollingBackup' } catch {}
-Check (($rrbBody51 -match 'getRollingBackups') -and ($rrbBody51 -match 'sanitizeImportedContainer') -and `
-       ($rrbBody51 -match 'migrateState') -and ($rrbBody51 -match "setItem\('robco_v8'") -and `
-       ($rrbBody51 -match '_loadingSave')) `
+$rbaBody51 = ''
+try { $rbaBody51 = Get-FunctionBody $uiSrc51 '_restoreBackupApply' } catch {}
+Check (($rrbBody51 -match 'getRollingBackups') -and ($rrbBody51 -match '_restoreBackupApply\(') -and `
+       ($rbaBody51 -match 'sanitizeImportedContainer') -and ($rbaBody51 -match 'migrateState') -and `
+       ($rbaBody51 -match "setItem\('robco_v8'") -and ($rbaBody51 -match '_loadingSave')) `
     "restoreRollingBackup behavioral: a selected backup restores end-to-end through sanitize->migrate->write (robco_v8/playstyle/chat restored; reload guard set) (TS-GAP-2)"
 
 # ===========================================================
@@ -3272,10 +3280,13 @@ Check (-not ($fnBody57 -match '\beval\b') -and -not ($fnBody57 -match '\.innerHT
 Check ([bool]($uiCoreSrc57 -match "new\s*:\s*\(\s*\)\s*=>\s*wipeTerminal\s*\(")) `
     "SHORTCUT_ROUTES 'new' key routes to wipeTerminal()"
 
-# 57.7b wipeTerminal still has >=2 confirm() calls (double-confirm gate regression guard)
-$confirmCount57 = ([regex]::Matches($uiCoreSrc57, '\bconfirm\s*\(')).Count
+# 57.7b wipeTerminal still gates on >=2 confirmAction() calls (Step 2 Phase 0 U12
+#       replaced the blocking confirm() with the diegetic confirmAction() -- the
+#       double-confirm GATE COUNT invariant is preserved, only the mechanism changed)
+$wipeBody57 = Get-FunctionBody $uiCoreSrc57 'wipeTerminal'
+$confirmCount57 = ([regex]::Matches($wipeBody57, '\bconfirmAction\s*\(')).Count
 Check ($confirmCount57 -ge 2) `
-    ("wipeTerminal still has >=2 confirm() calls (found $confirmCount57) -- double-confirm gate intact")
+    ("wipeTerminal still has >=2 confirmAction() calls (found $confirmCount57) -- double-confirm gate intact")
 
 # 57.8 Tab routes reuse switchTab for inv, stat, data
 Check ([bool]($uiCoreSrc57 -match "inv\s*:\s*\(\s*\)\s*=>\s*switchTab\s*\(\s*[`"']inv[`"']\s*\)") `
@@ -3684,9 +3695,11 @@ $cloudSrc63 = Read-Src "js/cloud.js"
 Check ([bool]($cloudSrc63 -match 'window\.saveCurrentToCloud\s*=')) `
     'cloud.js defines window.saveCurrentToCloud (replaces pushToCloud)'
 
-# 63.2  saveCurrentToCloud uses addDoc (additive) and not setDoc (Protocol 34)
+# 63.2  saveCurrentToCloud uses addDoc (additive) and not setDoc (Protocol 34).
+#       Window widened from 2000 (Step 2 Phase 0 U12 -- openModal() call sites
+#       replacing alert() pushed addDoc( further from the function start).
 $scIdx63 = $cloudSrc63.IndexOf('saveCurrentToCloud')
-$scSlice63 = if ($scIdx63 -ge 0) { $cloudSrc63.Substring($scIdx63, [Math]::Min(2000, $cloudSrc63.Length - $scIdx63)) } else { '' }
+$scSlice63 = if ($scIdx63 -ge 0) { $cloudSrc63.Substring($scIdx63, [Math]::Min(2800, $cloudSrc63.Length - $scIdx63)) } else { '' }
 Check (([bool]($scSlice63 -match '\baddDoc\b')) -and -not ([bool]($scSlice63 -match '\bsetDoc\b'))) `
     'saveCurrentToCloud uses addDoc (additive) and not setDoc (Protocol 34 -- no blind overwrite)'
 
@@ -5288,14 +5301,20 @@ Check ($expandBody84.Contains("craft: 'inv'") -and $expandBody84.Contains("craft
 # 84.i  NO-CLOUD guard: doCraft + doScrap bodies have no cloud write calls
 $doCraftBody84 = Get-FnBody84 $uiRSrc84 'doCraft'
 $doScrapBody84 = Get-FnBody84 $uiRSrc84 'doScrap'
+# Step 2 Phase 0 U12: doCraft/doScrap became async confirm-gate wrappers; the
+# mutation logic (ammo routing, ingredient-qty math, yield distribution) moved
+# into the synchronous _craftApply/_scrapApply core -- later checks that assert
+# on that logic read these bodies instead.
+$craftApplyBody84 = Get-FnBody84 $uiRSrc84 '_craftApply'
+$scrapApplyBody84 = Get-FnBody84 $uiRSrc84 '_scrapApply'
 $cloudHit84 = @('pushToCloud','addDoc','setDoc','writeBatch') | Where-Object { $doCraftBody84.Contains($_) -or $doScrapBody84.Contains($_) }
 Check ($cloudHit84.Count -eq 0) ("NO-CLOUD guard: doCraft/doScrap have no cloud write calls (got: " + $(if ($cloudHit84.Count) { $cloudHit84 -join ',' } else { 'none' }) + ")")
 
-# 84.j  confirm( gate in doCraft
-Check ($doCraftBody84.Contains('confirm(')) "confirm() gate present in doCraft body"
+# 84.j  confirmAction( gate in doCraft (Step 2 Phase 0 U12: diegetic replacement for confirm())
+Check ($doCraftBody84.Contains('confirmAction(')) "confirmAction() gate present in doCraft body"
 
-# 84.k  confirm( gate in doScrap
-Check ($doScrapBody84.Contains('confirm(')) "confirm() gate present in doScrap body"
+# 84.k  confirmAction( gate in doScrap (Step 2 Phase 0 U12)
+Check ($doScrapBody84.Contains('confirmAction(')) "confirmAction() gate present in doScrap body"
 
 # 84.u  renderCraft builds craftRecipeSelect
 Check ($uiRSrc84.Contains('craftRecipeSelect')) 'renderCraft() builds <select id="craftRecipeSelect"> (recipe picker)'
@@ -5319,14 +5338,14 @@ Check ($craftConsumeBody84.Contains('splice(idx, 1)')) "_craftConsume removes ze
 # 84.n  _craftConsume clamps at 0 (never-negative guard)
 Check ($craftConsumeBody84.Contains('Math.max(0,')) "_craftConsume uses Math.max(0, ...) clamp (never-negative)"
 
-# 84.o  doCraft body has ammo-output routing
-Check ($doCraftBody84.Contains('output.ammo')) "doCraft body has ammo-output routing (output.ammo)"
+# 84.o  doCraft (via _craftApply) has ammo-output routing
+Check ($craftApplyBody84.Contains('output.ammo')) "doCraft body has ammo-output routing (output.ammo)"
 
-# 84.p  doCraft body multiplies ingredient qty by batch qty
-Check ($doCraftBody84.Contains('ing.qty * qty')) "doCraft body multiplies ingredient qty by batch qty"
+# 84.p  doCraft (via _craftApply) multiplies ingredient qty by batch qty
+Check ($craftApplyBody84.Contains('ing.qty * qty')) "doCraft body multiplies ingredient qty by batch qty"
 
-# 84.q  doScrap body adds yields via forEach
-Check ($doScrapBody84.Contains('breakdown.yields.forEach')) "doScrap body adds yields via breakdown.yields.forEach"
+# 84.q  doScrap (via _scrapApply) adds yields via forEach
+Check ($scrapApplyBody84.Contains('breakdown.yields.forEach')) "doScrap body adds yields via breakdown.yields.forEach"
 
 # 84.r  doScrap body has insufficient-qty guard
 Check ($doScrapBody84.Contains('have < qty')) "doScrap body has insufficient-qty guard (have < qty)"
@@ -6009,8 +6028,9 @@ $fn953 = Get-FunctionBody $saves95 'handleFileUpload'
 Check ([System.Text.RegularExpressions.Regex]::IsMatch($fn953, '_loadingSave\s*=\s*true[\s\S]*?location\.reload\(\)')) `
     '95.3: handleFileUpload sets window._loadingSave = true before location.reload() (import survives unload flush)'
 
-# 95.4  restoreRollingBackup sets _loadingSave before its reload
-$fn954 = Get-FunctionBody $saves95 'restoreRollingBackup'
+# 95.4  restoreRollingBackup (via its _restoreBackupApply core -- Step 2 Phase 0 U12
+#       split the confirm gate from the apply step) sets _loadingSave before its reload
+$fn954 = Get-FunctionBody $saves95 '_restoreBackupApply'
 Check ([System.Text.RegularExpressions.Regex]::IsMatch($fn954, '_loadingSave\s*=\s*true[\s\S]*?location\.reload\(\)')) `
     '95.4: restoreRollingBackup sets window._loadingSave = true before location.reload() (backup restore survives unload flush)'
 
@@ -6370,9 +6390,9 @@ Check ([bool]($btnTag103 -match 'aria-label="[^"]+"')) `
 Check ([bool]($btnTag103 -match '\bbtn-sm\b')) `
     '103.3: save-menu "?" button uses .btn-sm (>=28px min tap target -- Protocol 17)'
 
-# 103.4 showSaveHelpModal defined and reuses _openSysModal (WU-C4 focus-trap + ARIA)
-Check (($uiCore103 -match 'function showSaveHelpModal\s*\(') -and ($helpBody103 -match '_openSysModal\s*\(\s*\)')) `
-    '103.4: showSaveHelpModal() defined and opens via _openSysModal() (inherits WU-C4 focus-trap + ARIA dialog)'
+# 103.4 showSaveHelpModal defined and reuses openModal (Step 2 Phase 0 U12 consolidated driver)
+Check (($uiCore103 -match 'function showSaveHelpModal\s*\(') -and ($helpBody103 -match 'openModal\s*\(\s*\)')) `
+    '103.4: showSaveHelpModal() defined and opens via openModal() (U12 driver -- inherits WU-C4 focus-trap + ARIA dialog)'
 
 # 103.5 the help documents every save action the SAVE MENU exposes
 $saveHelp103 = [regex]::Match($uiCore103, 'const SAVE_HELP\s*=\s*\[[\s\S]*?\n\];').Value
@@ -6669,9 +6689,9 @@ Check (($ren106 -match 'Math\.max\(\s*1,\s*Math\.round') -and ($ren106 -match 'M
 # 106.7 Protocol 34 additive
 Check (($doBuyBody -match 'state\.inventory\.push\(') -and ($doBuyBody -match '\.qty\s*=\s*\(?.*qty')) `
     '106.7: doBuy is additive -- pushes new item or increments existing qty (Protocol 34)'
-# 106.8 confirm-gated
-Check (($doBuyBody -match 'confirm\(') -and ($doSellBody -match 'confirm\(')) `
-    '106.8: doBuy and doSell are confirm-gated (Protocol 34)'
+# 106.8 confirm-gated (Step 2 Phase 0 U12: diegetic confirmAction() replaces confirm())
+Check (($doBuyBody -match 'confirmAction\(') -and ($doSellBody -match 'confirmAction\(')) `
+    '106.8: doBuy and doSell are confirmAction-gated (Protocol 34)'
 # 106.9 doSell splices + clamps
 Check (($doSellBody -match 'splice\(') -and ($doSellBody -match 'it\.qty\s*<=\s*0')) `
     '106.9: doSell decrements qty and splices the item at <= 0 (clamp >= 0)'
@@ -6860,9 +6880,9 @@ Check ($cmdReg108 -match 'CONSULT') '108.11: COMMAND_REGISTRY lists a CONSULT en
 # 108.12 CSS overflow guard
 Check (($css108 -match '\.consult-card\b') -and ($css108 -match '\.consult-hit-name[\s\S]{0,80}min-width:\s*0')) `
     '108.12: terminal.css .consult-card + .consult-hit-name min-width:0 (no horizontal overflow at 360px)'
-# 108.13 shared modal entry point
-Check ($consultBody -match '_openSysModal') `
-    '108.13: renderConsult opens via _openSysModal() (shared modal -- ARIA/focus consistency)'
+# 108.13 shared modal entry point (Step 2 Phase 0 U12 consolidated driver)
+Check ($consultBody -match 'openModal') `
+    '108.13: renderConsult opens via openModal() (U12 driver -- shared modal ARIA/focus consistency)'
 
 # ── WU-N4b: CONSULT macro button (option A) ──────────────────────────────────
 $html108 = Read-Src "index.html"
@@ -6950,9 +6970,9 @@ Check ($cmdReg109 -match 'BIO-SCAN') '109.10: COMMAND_REGISTRY lists a BIO-SCAN 
 # 109.11 CSS overflow guard
 Check (($css109 -match '\.bio-card\b') -and ($css109 -match '\.bio-limb-name[\s\S]{0,80}min-width:\s*0')) `
     '109.11: terminal.css .bio-card + .bio-limb-name min-width:0 (no horizontal overflow at 360px)'
-# 109.12 shared modal entry point
-Check ($bioScanBody109 -match '_openSysModal') `
-    '109.12: renderBioScan opens via _openSysModal() (shared modal -- ARIA/focus consistency)'
+# 109.12 shared modal entry point (Step 2 Phase 0 U12 consolidated driver)
+Check ($bioScanBody109 -match 'openModal') `
+    '109.12: renderBioScan opens via openModal() (U12 driver -- shared modal ARIA/focus consistency)'
 # 109.13 RUN BIO-SCAN button affordance
 $bioBtn109 = [regex]::Match($html109, '<button\b[^>]*renderBioScan\(\)[^>]*>').Value
 Check (($html109 -match 'onclick="renderBioScan\(\)"') -and ($bioBtn109 -match 'aria-label="[^"]+"')) `
@@ -6998,9 +7018,9 @@ Check (($doLootBody110 -match 'lookupItemInDb\s*\(') -and ($lootRegion110 -match
 # 110.5 structural mirror of the JS behavioral eval -- the additive merge core
 Check (($lootRegion110 -cmatch 'ex\.qty') -and ($lootRegion110 -match '\.find\(') -and ($lootRegion110 -match 'toLowerCase\(\)') -and ($lootRegion110 -match 'db\.val != null') -and ($lootRegion110 -match 'Math\.max\(1')) `
     '110.5: _lootAdd encodes the additive find-or-increment merge + DB value sourcing + qty floor (structural mirror of the JS behavioral eval)'
-# 110.6 confirm-gated (Protocol 34)
-Check ($doLootBody110 -match 'if\s*\(\s*!confirm\([\s\S]{0,160}\)\s*\)\s*return') `
-    '110.6: doLoot is confirm-gated (Protocol 34 -- no add without explicit confirmation)'
+# 110.6 confirm-gated (Protocol 34; Step 2 Phase 0 U12: diegetic confirmAction() replaces confirm())
+Check (($doLootBody110 -match 'await\s+confirmAction\([\s\S]{0,220}\)') -and ($doLootBody110 -match 'if\s*\(\s*!ok\s*\)\s*return')) `
+    '110.6: doLoot is confirmAction-gated (Protocol 34 -- no add without explicit confirmation)'
 # 110.7 additive-only + persists via saveState, no wholesale reset
 Check (($doLootBody110 -match '_lootAdd\(') -and ($doLootBody110 -match 'saveState\s*\(\s*\)') -and (-not ($doLootBody110 -match 'state\.inventory\s*=\s*\[\]'))) `
     '110.7: doLoot is additive (merges via _lootAdd) + persists via saveState (no wholesale inventory reset)'
@@ -7021,8 +7041,8 @@ Check (($ren110 -match 'escapeHtml\(it\.name\)') -and ($ren110 -match 'escapeHtm
     '110.12: LOOT escapes item names + the search prefill via escapeHtml() before innerHTML'
 # 110.13 [LOOT] button affordance + shared modal
 $lootBtn110 = [regex]::Match($html110, '<button\b[^>]*renderLoot\(\)[^>]*>').Value
-Check (($html110 -match 'onclick="renderLoot\(\)"') -and ($lootBtn110 -match 'aria-label="[^"]+"') -and ($lootRegion110 -match '_openSysModal')) `
-    '110.13: index.html [LOOT] button wired to renderLoot() with an aria-label; opens via _openSysModal (shared modal)'
+Check (($html110 -match 'onclick="renderLoot\(\)"') -and ($lootBtn110 -match 'aria-label="[^"]+"') -and ($lootRegion110 -match 'openModal')) `
+    '110.13: index.html [LOOT] button wired to renderLoot() with an aria-label; opens via openModal() (U12 driver -- shared modal)'
 
 # ===========================================================
 # Suite 111 -- WU-E1 diegetic terminology / voice standards (11 tests)
@@ -7624,7 +7644,7 @@ $html123 = Read-Src "index.html"
 $css123  = Read-Src "css/terminal.css"
 $router123     = [regex]::Match($api123, '(?s)const NATIVE_COMMAND_ROUTER = \{[\s\S]*?\n\};').Value
 $consoleArr123 = [regex]::Match($api123, '(?s)const TERMLINK_CONSOLE = \[[\s\S]*?\n\];').Value
-$showFn123     = [regex]::Match($api123, '(?s)function showTermlinkConsole\(\)[\s\S]*?_openSysModal\(\);\s*\n\}').Value
+$showFn123     = [regex]::Match($api123, '(?s)function showTermlinkConsole\(\)[\s\S]*?openModal\(\);\s*\n\}').Value
 $launchFn123   = [regex]::Match($api123, '(?s)function _termlinkLaunch\([\s\S]*?\n\}').Value
 $tokCount123   = ([regex]::Matches($consoleArr123, "token:\s*'[^']+'")).Count
 
@@ -7632,9 +7652,9 @@ $tokCount123   = ([regex]::Matches($consoleArr123, "token:\s*'[^']+'")).Count
 Check (($router123 -match "'\[TERMLINK\]':\s*\(\)\s*=>\s*showTermlinkConsole\(\)") -and ($router123 -match "'\[TL\]':\s*\(\)\s*=>\s*showTermlinkConsole\(\)") -and ($router123 -match '\bTERMLINK:\s*\(\)\s*=>\s*showTermlinkConsole\(\)')) `
     '123.1: NATIVE_COMMAND_ROUTER routes [TERMLINK], [TL] and bare TERMLINK to showTermlinkConsole()'
 
-# 123.2  showTermlinkConsole defined and opens via _openSysModal (WU-C4 focus-trap + ARIA dialog)
-Check (($showFn123.Length -gt 0) -and ($showFn123 -match '_openSysModal\(\)')) `
-    '123.2: showTermlinkConsole() is defined and opens the console via _openSysModal (focus-trap + ARIA)'
+# 123.2  showTermlinkConsole defined and opens via openModal (Step 2 Phase 0 U12 consolidated driver)
+Check (($showFn123.Length -gt 0) -and ($showFn123 -match 'openModal\(\)')) `
+    '123.2: showTermlinkConsole() is defined and opens the console via openModal() (U12 driver -- focus-trap + ARIA)'
 
 # 123.3  the console manifest exists with the six offline subsystem entries
 Check (($consoleArr123.Length -gt 0) -and ($tokCount123 -ge 6)) `
@@ -8741,7 +8761,19 @@ try { // 135.14
 } catch (e) { results.push(false); }
 console.log('RESULT:' + results.map(r => r ? '1' : '0').join(''));
 "@
-        $out135 = ($testScript135 | node 2>&1 | Out-String)
+        # Write to a temp file rather than piping through stdin -- a pipe through
+        # `| node` was observed to occasionally corrupt/truncate this heredoc when
+        # run deep into a long PowerShell session (a harness-only flake, not a
+        # product defect -- proven by running the identical script in isolation,
+        # which always passes; Protocol 42 fix, keeps the check but removes the
+        # unreliable transport).
+        $tmpScript135 = [System.IO.Path]::GetTempFileName() + '.js'
+        [System.IO.File]::WriteAllText($tmpScript135, $testScript135, [System.Text.Encoding]::UTF8)
+        try {
+            $out135 = (node $tmpScript135 2>&1 | Out-String)
+        } finally {
+            Remove-Item -Path $tmpScript135 -Force -ErrorAction SilentlyContinue
+        }
         $rm135 = [regex]::Match($out135, 'RESULT:([01]{7})')
         if ($rm135.Success) {
             $bits135 = $rm135.Groups[1].Value
@@ -8775,15 +8807,17 @@ Check (($apiSrc -match "RobcoEvents\.emit\(\s*'level\.up'") -and ($apiSrc -match
 Check ($uiCoreSrc135 -match "RobcoEvents\.emit\(\s*'hp\.critical'") `
     "135.11: updateMath()'s HP-critical detector emits 'hp.critical' through RobcoEvents"
 
-# 135.12  the 5 new U8 emit points are present at their real call sites
+# 135.12  the 5 new U8 emit points are present at their real call sites. Step 2 Phase 0
+#         U12 split doCraft/doScrap into an async confirm gate + a synchronous
+#         _craftApply/_scrapApply mutation core -- the emit call now lives in the *Apply core.
 Check (
     ($uiRenderSrc135 -match "(?s)function toggleCollectible[\s\S]{0,400}RobcoEvents\.emit\(\s*'collectible\.acquired'") -and
-    ($uiRenderSrc135 -match "(?s)function doCraft[\s\S]{0,2500}RobcoEvents\.emit\(\s*'craft\.completed'") -and
-    ($uiRenderSrc135 -match "(?s)function doScrap[\s\S]{0,2500}RobcoEvents\.emit\(\s*'craft\.scrapped'") -and
+    ($uiRenderSrc135 -match "(?s)function _craftApply[\s\S]{0,2500}RobcoEvents\.emit\(\s*'craft\.completed'") -and
+    ($uiRenderSrc135 -match "(?s)function _scrapApply[\s\S]{0,2500}RobcoEvents\.emit\(\s*'craft\.scrapped'") -and
     ($uiRenderSrc135 -match "(?s)function doBuy[\s\S]{0,2500}RobcoEvents\.emit\(\s*'trade\.bought'") -and
     ($uiRenderSrc135 -match "(?s)function doSell[\s\S]{0,2500}RobcoEvents\.emit\(\s*'trade\.sold'") -and
     ($apiSrc -match "(?s)function _nativeSleep[\s\S]{0,600}RobcoEvents\.emit\(\s*'sleep\.completed'")
-) '135.12: U8 emit points present -- toggleCollectible/doCraft/doScrap/doBuy/doSell (ui-render.js) and _nativeSleep (api.js)'
+) '135.12: U8 emit points present -- toggleCollectible/doCraft(->_craftApply)/doScrap(->_scrapApply)/doBuy/doSell (ui-render.js) and _nativeSleep (api.js)'
 
 # 135.13  state.js registers an auto-log subscriber for level.up + every U8 event
 $autoLogEvents135 = @('level.up', 'collectible.acquired', 'craft.completed', 'craft.scrapped', 'trade.bought', 'trade.sold', 'sleep.completed')
@@ -8961,6 +8995,179 @@ Check (
     ($render136.Contains([char]0x26A0 + ' INSUFFICIENT RESERVES')) -and
     (-not ($render136 -match 'â€|â–|�'))
 ) '136.13: the THREAT ammo-advisory glyph is clean UTF-8 (no double-encoding, no replacement chars)'
+
+# ===========================================================
+# Suite 137 -- Step 2 (v2.8.0) Phase 0 U11/U12: hygiene ledgers + modal
+# consolidation (14 tests). Mirrors JS Suite 137. The JS runner's 137.6 is a
+# TRUE behavioral proof (executes confirmAction() in a Node vm sandbox against
+# a synthetic DOM and asserts the resolved boolean); this PS1 mirror does the
+# structural analogue everywhere else in this file already does for
+# JS-vm-only behavioral suites -- it checks confirmAction()'s body shape
+# (Promise + resolve(true) on CONFIRM + the shared onClose->resolve(false)
+# path) rather than re-executing it.
+# ===========================================================
+Sep "Suite 137 -- Step 2 Phase 0 U11/U12 hygiene ledgers + modal consolidation"
+$arch137     = Read-Src "ARCHITECTURE.md"
+$dbNv137     = Read-Src "js/db_nv.js"
+$dbFo3137    = Read-Src "js/db_fo3.js"
+$core137     = Read-Src "js/ui-core.js"
+$render137   = Read-Src "js/ui-render.js"
+$saves137    = Read-Src "js/ui-saves.js"
+$cloud137    = Read-Src "js/cloud.js"
+$api137      = Read-Src "js/api.js"
+$state137    = Read-Src "js/state.js"
+
+# 137.1  U11: per-game data parity ledger, every row GENUINE or GAP
+Check (
+    ($arch137 -match 'Parity ledger') -and
+    ($arch137 -match 'per-game data asymmetry') -and
+    ($arch137 -match '\*\*GENUINE\*\*') -and
+    ($arch137 -match '\*\*GAP\*\*')
+) '137.1: ARCHITECTURE.md carries the U11 per-game data parity ledger with GENUINE/GAP verdicts'
+
+# 137.2  U11: reserved-column register (ARCHITECTURE.md + both db headers)
+Check (
+    ($arch137 -match 'Reserved-column register') -and
+    ($dbNv137 -match 'RESERVED-COLUMN REGISTER') -and
+    ($dbFo3137 -match 'RESERVED-COLUMN REGISTER') -and
+    ($dbNv137 -match 'PARKED-FOR-REMOVAL') -and
+    ($dbFo3137 -match 'PARKED-FOR-REMOVAL')
+) '137.2: reserved-column register is committed in ARCHITECTURE.md AND both db_nv.js/db_fo3.js headers'
+
+# 137.3  U11: skill-less (FO4) degradation audit + the skillKeys:[] requirement
+Check (
+    ($arch137 -match 'Skill-less \(FO4-class\) degradation audit') -and
+    ($arch137 -match 'skillKeys:\s*\[\]')
+) '137.3: ARCHITECTURE.md carries the U11 skill-less audit + the skillKeys:[] requirement for a future FO4 entry'
+
+# 137.4  U12: openModal() and confirmAction() both defined in ui-core.js
+Check (
+    ($core137 -match 'function openModal\s*\(') -and ($core137 -match 'function confirmAction\s*\(')
+) '137.4: openModal() and confirmAction() are both defined in ui-core.js'
+
+# 137.5  U12: confirmAction() is Promise-based; CONFIRM resolves true, every
+#        other exit resolves false via the shared onClose path
+$confirmActionBody137 = Get-FunctionBody $core137 'confirmAction'
+Check (
+    ($confirmActionBody137 -match 'new Promise\(') -and
+    ($confirmActionBody137 -match 'onClose:\s*\(\)\s*=>\s*settle\(false\)') -and
+    ($confirmActionBody137 -match 'settle\(true\)')
+) '137.5: confirmAction() is Promise-based; CONFIRM resolves true, every other exit (CANCEL/CLOSE/Escape) resolves false via the shared onClose path'
+
+# 137.6  BEHAVIORAL (structural mirror -- see file header note above; the JS
+#        runner actually executes confirmAction() in a vm sandbox and drives
+#        real CONFIRM/CANCEL/close clicks). Mirrors the same shape 137.5
+#        checks plus the settle() single-resolution guard (idempotent --
+#        a second settle() call after Yes cannot flip the result to false).
+Check (
+    ($confirmActionBody137 -match 'if\s*\(\s*resolved\s*\)\s*return') -and
+    ($confirmActionBody137 -match 'resolved\s*=\s*true') -and
+    ($confirmActionBody137 -match "getElementById\('modalConfirmYes'\)") -and
+    ($confirmActionBody137 -match "getElementById\('modalConfirmNo'\)")
+) 'confirmAction() behavioral (structural mirror): settle() is single-resolution-guarded; both CONFIRM and CANCEL buttons are wired (see JS runner for the real behavioral proof)'
+
+# 137.7  U12: openModal() is the single entry point -- exactly two occurrences
+#        of "_openSysModal(" exist: the declaration and the one call inside openModal()
+$occCount137 = ([regex]::Matches($core137, '_openSysModal\s*\(')).Count
+$declOrCallOnly137 = ($core137 -match 'function\s+_openSysModal\s*\(') -and `
+    ($core137 -match 'openModal\s*\([\s\S]{0,400}_openSysModal\s*\(\s*\)')
+Check (($occCount137 -eq 2) -and $declOrCallOnly137) `
+    '137.7: no function outside openModal() calls the low-level _openSysModal() primitive directly (single consolidated driver)'
+
+# 137.8  U12: exactly one Tab-key focus-trap targets #sysModal in ui-core.js
+$trapMatches137 = [regex]::Matches($core137, "getElementById\(\s*'sysModal'\s*\)[\s\S]{0,200}querySelectorAll\(")
+Check ($trapMatches137.Count -eq 1) `
+    '137.8: exactly one focus-trap implementation targets #sysModal in ui-core.js (single driver, D-2)'
+
+# 137.9  U12: no raw alert( or confirm( call remains in any served js/*.js file
+#        (comments stripped first so explanatory doc comments don't false-positive)
+function Strip-Comments137($src) {
+    $noBlock = [regex]::Replace($src, '(?s)/\*.*?\*/', '')
+    return [regex]::Replace($noBlock, '//[^\r\n]*', '')
+}
+$servedFiles137 = @(
+    @{ Name = 'js/api.js'; Src = $api137 },
+    @{ Name = 'js/state.js'; Src = $state137 },
+    @{ Name = 'js/ui-core.js'; Src = $core137 },
+    @{ Name = 'js/ui-render.js'; Src = $render137 },
+    @{ Name = 'js/ui-saves.js'; Src = $saves137 },
+    @{ Name = 'js/cloud.js'; Src = $cloud137 }
+)
+$offenders137 = @()
+foreach ($f in $servedFiles137) {
+    $clean = Strip-Comments137 $f.Src
+    if ($clean -match '\balert\s*\(') { $offenders137 += ($f.Name + ' (alert)') }
+    if ($clean -match '\bconfirm\s*\(') { $offenders137 += ($f.Name + ' (confirm)') }
+}
+Check ($offenders137.Count -eq 0) `
+    ('no raw alert(/confirm( call remains in served js/*.js (Step 2 Phase 0 U12 purge)' + $(if ($offenders137.Count) { ' -- found: ' + ($offenders137 -join ', ') } else { '' }))
+
+# 137.10  U12: every destructive/confirm-gated path awaits confirmAction()
+function Get-WindowFnBody137($src, $name) {
+    $assignIdx = $src.IndexOf("window.$name =")
+    if ($assignIdx -lt 0) { return '' }
+    $braceIdx = $src.IndexOf('{', $assignIdx)
+    if ($braceIdx -lt 0) { return '' }
+    $depth = 0; $i = $braceIdx
+    while ($i -lt $src.Length) {
+        if ($src[$i] -eq '{') { $depth++ }
+        elseif ($src[$i] -eq '}') { $depth--; if ($depth -eq 0) { return $src.Substring($braceIdx, $i - $braceIdx + 1) } }
+        $i++
+    }
+    return ''
+}
+$gatedSites137 = @(
+    @{ File = 'ui-core.js'; Src = $core137; Fn = 'wipeTerminal'; Window = $false },
+    @{ File = 'ui-core.js'; Src = $core137; Fn = 'clearChat'; Window = $false },
+    @{ File = 'ui-render.js'; Src = $render137; Fn = 'doCraft'; Window = $false },
+    @{ File = 'ui-render.js'; Src = $render137; Fn = 'doScrap'; Window = $false },
+    @{ File = 'ui-render.js'; Src = $render137; Fn = 'doBuy'; Window = $false },
+    @{ File = 'ui-render.js'; Src = $render137; Fn = 'doSell'; Window = $false },
+    @{ File = 'ui-render.js'; Src = $render137; Fn = 'doLoot'; Window = $false },
+    @{ File = 'ui-saves.js'; Src = $saves137; Fn = 'loadFromSlot'; Window = $false },
+    @{ File = 'ui-saves.js'; Src = $saves137; Fn = 'restoreRollingBackup'; Window = $false },
+    @{ File = 'ui-saves.js'; Src = $saves137; Fn = 'handleFileUpload'; Window = $false },
+    @{ File = 'cloud.js'; Src = $cloud137; Fn = 'loadCloudSave'; Window = $true },
+    @{ File = 'cloud.js'; Src = $cloud137; Fn = 'deleteCloudSave'; Window = $true }
+)
+$missing137 = @()
+foreach ($g in $gatedSites137) {
+    $body = if ($g.Window) { Get-WindowFnBody137 $g.Src $g.Fn } else { Get-FunctionBody $g.Src $g.Fn }
+    if (-not ($body -match 'confirmAction\s*\(')) { $missing137 += ($g.File + ':' + $g.Fn) }
+}
+Check ($missing137.Count -eq 0) `
+    ('every destructive path awaits confirmAction() (Protocol 34 gate preserved)' + $(if ($missing137.Count) { ' -- missing in: ' + ($missing137 -join ', ') } else { '' }))
+
+# 137.11  U12: doCraft/doScrap split into confirm-gate wrapper + synchronous
+#         _craftApply/_scrapApply mutation core
+Check (
+    ($render137 -match 'function _craftPrepare\s*\(') -and
+    ($render137 -match 'function _craftApply\s*\(') -and
+    ($render137 -match 'function _scrapPrepare\s*\(') -and
+    ($render137 -match 'function _scrapApply\s*\(') -and
+    ((Get-FunctionBody $render137 'doCraft') -match '_craftApply\(') -and
+    ((Get-FunctionBody $render137 'doScrap') -match '_scrapApply\(')
+) '137.11: doCraft/doScrap split into confirm-gate wrapper + synchronous _craftApply/_scrapApply mutation core'
+
+# 137.12  U12: restoreRollingBackup split into confirm-gate wrapper +
+#         _restoreBackupApply mutation core
+Check (
+    ($saves137 -match 'function _restoreBackupApply\s*\(') -and
+    ((Get-FunctionBody $saves137 'restoreRollingBackup') -match '_restoreBackupApply\(')
+) '137.12: restoreRollingBackup split into confirm-gate wrapper + _restoreBackupApply mutation core'
+
+# 137.13  U12: the firmware-update dialog (_triggerUpdate) stays separate --
+#         not folded into openModal()/confirmAction() (Suite 65 exception)
+$html137 = Read-Src "index.html"
+$triggerBody137 = Get-FunctionBody $html137 '_triggerUpdate'
+Check (
+    (-not ($triggerBody137 -match 'openModal\s*\(')) -and (-not ($triggerBody137 -match 'confirmAction\s*\('))
+) '137.13: index.html _triggerUpdate (the blocking firmware-update dialog) is NOT folded into openModal()/confirmAction() -- stays a deliberate separate exception (Suite 65)'
+
+# 137.14  U12: window.prompt() sites remain -- explicitly out of scope
+Check (
+    ($cloud137 -match '\bprompt\s*\(') -and ($saves137 -match '\bprompt\s*\(')
+) '137.14: window.prompt() sites (cloud.js label input, ui-saves.js backup picker) remain -- explicitly out of U12 scope, not silently dropped'
 
 # ===========================================================
 # Results

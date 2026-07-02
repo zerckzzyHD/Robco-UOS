@@ -890,8 +890,11 @@ function saveState() {
             'sys',
             true
           );
-        } else {
-          alert('> STORAGE QUOTA EXCEEDED: Export save file to free space.');
+        } else if (typeof openModal === 'function') {
+          openModal({
+            title: '> SYS-ALERT',
+            body: 'STORAGE QUOTA EXCEEDED: Export save file to free space.',
+          });
         }
       }
     }

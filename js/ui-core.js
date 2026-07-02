@@ -280,6 +280,10 @@ function initHighLumen() {
 const ERROR_LOG_KEY = 'robco_error_log';
 const ERROR_LOG_CAP = 50;
 let _sysModalTrigger = null;
+// Step 2 Phase 0 U12 (FP-SYS-8): callback fired the next time the shared #sysModal
+// closes (any path — CLOSE button, Escape, or a confirmAction() Yes/No click). Set
+// by openModal({onClose}) / confirmAction(); consumed once by closeModal().
+let _modalCloseCallback = null;
 function _recordError(type, msg) {
   try {
     const log = JSON.parse(MetaStore.get(ERROR_LOG_KEY) || '[]');
@@ -1114,9 +1118,10 @@ function changePlaystyle(style) {
   if (style === 'melee') {
     let stateStr = JSON.stringify(state).toLowerCase();
     if (stateStr.includes('educated') || stateStr.includes('dead weight')) {
-      alert(
-        '>> CANNOT SWAP TO MELEE ONLY: Save state contains restricted perks (Educated/Dead Weight).'
-      );
+      openModal({
+        title: '> PLAYSTYLE',
+        body: '>> CANNOT SWAP TO MELEE ONLY: Save state contains restricted perks (Educated/Dead Weight).',
+      });
       document.getElementById('playstyleInput').value =
         localStorage.getItem('robco_playstyle') || 'any';
       return;
@@ -1543,7 +1548,7 @@ function _showChangelogModal(text, title) {
   if (!versions.length) {
     content.innerHTML =
       '<div class="changelog-viewer"><p class="changelog-empty">&gt; [SYS-ALERT: NO REVISION DATA]</p></div>';
-    _openSysModal();
+    openModal();
     return;
   }
   const renderCats = v => {
@@ -1643,7 +1648,7 @@ function _showChangelogModal(text, title) {
       _syncToggleLabel();
     });
   }
-  _openSysModal();
+  openModal();
 }
 
 function showFullChangelog() {
@@ -1658,7 +1663,7 @@ function showFullChangelog() {
     .catch(() => {
       document.getElementById('modalTitle').innerText = '> SYSTEM CHANGELOG';
       document.getElementById('modalContent').innerText = '> [SYS-ALERT: CHANGELOG NOT FOUND]';
-      _openSysModal();
+      openModal();
     });
 }
 
@@ -1670,6 +1675,39 @@ function _openSysModal() {
   var closeBtn = modal.querySelector('.close-btn');
   if (closeBtn) closeBtn.focus();
 }
+
+// openModal({title, body, wide, onClose}) — Step 2 Phase 0 U12 (FP-SYS-8): the
+// single consolidated driver for the shared #sysModal. Every feature that opens
+// the system modal calls this — either bare (the caller already wrote
+// modalTitle/modalContent directly, matching the pre-U12 call shape) or with
+// {title, body} to have this function do the content-setting too. All callers
+// share the ONE focus-trap implementation already wired in _wireKeyboardShortcuts()
+// (Tab-cycle + Escape-close) — that part of D-2 was already unified pre-U12; this
+// adds the single named entry point + the optional onClose hook confirmAction()
+// needs. The index.html firmware-update dialog (_triggerUpdate) is a deliberate,
+// separately tested exception (Suite 65) — a non-dismissable blocking modal that
+// must never share this dismissable driver's Esc/close semantics, so it is not
+// folded in here.
+function openModal(opts) {
+  opts = opts || {};
+  const modal = document.getElementById('sysModal');
+  if (!modal) return;
+  if (opts.title !== undefined) {
+    const t = document.getElementById('modalTitle');
+    if (t) t.innerText = opts.title;
+  }
+  if (opts.body !== undefined) {
+    const c = document.getElementById('modalContent');
+    if (c) c.innerHTML = opts.body;
+  }
+  if (opts.wide !== undefined) {
+    const box = modal.querySelector('.modal-box');
+    if (box) box.classList.toggle('changelog-wide', !!opts.wide);
+  }
+  _modalCloseCallback = typeof opts.onClose === 'function' ? opts.onClose : null;
+  _openSysModal();
+}
+
 function closeModal() {
   const modal = document.getElementById('sysModal');
   modal.style.display = 'none';
@@ -1681,6 +1719,68 @@ function closeModal() {
     _sysModalTrigger.focus();
   }
   _sysModalTrigger = null;
+  const cb = _modalCloseCallback;
+  _modalCloseCallback = null;
+  if (cb) cb();
+}
+
+// confirmAction({title, warning, confirmLabel, cancelLabel}) — Step 2 Phase 0 U12
+// (FP-SYS-10): the diegetic replacement for the blocking browser confirm(). Returns
+// a Promise<boolean> — true only if the CONFIRM button is explicitly clicked; every
+// other exit (CANCEL button, the modal's own CLOSE button, or Escape) resolves
+// false, exactly matching confirm()'s "anything but OK means cancel" contract so
+// call sites that do `if (!(await confirmAction(...))) return;` behave identically
+// to the old `if (!confirm(...)) return;` guard. Built on openModal()'s onClose
+// hook: the CANCEL button, the CLOSE button, and Escape all funnel through the
+// same closeModal() → onClose path, so there is exactly one resolution path for
+// every non-confirm exit (no duplicated cancel logic to drift out of sync).
+function confirmAction(opts) {
+  opts = opts || {};
+  return new Promise(resolve => {
+    let resolved = false;
+    const settle = val => {
+      if (resolved) return;
+      resolved = true;
+      resolve(val);
+    };
+    const warningHtml = String(opts.warning || 'Are you sure?')
+      .split('\n')
+      .map(line => '<p>' + escapeHtml(line) + '</p>')
+      .join('');
+    const confirmLabel = opts.confirmLabel || 'CONFIRM';
+    const cancelLabel = opts.cancelLabel || 'CANCEL';
+    const body =
+      '<div class="modal-confirm-body">' +
+      warningHtml +
+      '</div>' +
+      '<div class="modal-confirm-actions">' +
+      '<button type="button" id="modalConfirmYes" class="blue-btn">[ ' +
+      escapeHtml(confirmLabel) +
+      ' ]</button>' +
+      '<button type="button" id="modalConfirmNo" class="blue-btn">[ ' +
+      escapeHtml(cancelLabel) +
+      ' ]</button>' +
+      '</div>';
+    openModal({
+      title: opts.title || '> CONFIRM ACTION',
+      body,
+      onClose: () => settle(false),
+    });
+    const yesBtn = document.getElementById('modalConfirmYes');
+    const noBtn = document.getElementById('modalConfirmNo');
+    if (yesBtn)
+      yesBtn.addEventListener('click', () => {
+        settle(true);
+        closeModal();
+      });
+    if (noBtn)
+      noBtn.addEventListener('click', () => {
+        closeModal();
+      });
+    // Default focus on CANCEL — mirrors the safe default for a destructive-leaning
+    // confirmation dialog (an accidental Enter/Space never fires the confirm path).
+    if (noBtn) noBtn.focus();
+  });
 }
 
 function _clearErrorLog() {
@@ -1723,7 +1823,7 @@ function showErrorLog() {
       'onclick="_clearErrorLog()">' +
       'CLEAR LOGS</button></div>';
   }
-  _openSysModal();
+  openModal();
 }
 
 // ── WU-N1: V.A.T.S. NATIVE CALCULATOR ────────────────────────────
@@ -1797,7 +1897,7 @@ function showVATSOverlay() {
 </div>`;
 
   recomputeVATS();
-  _openSysModal();
+  openModal();
 }
 
 // recomputeVATS — recompute and render the V.A.T.S. table from live state + the TARGET DT
@@ -2017,7 +2117,7 @@ function showHelpModal() {
         '</div>'
     ).join('') +
     '</div><p style="font-size:9px;opacity:0.6;margin-top:8px;">Type any command in the Comm-Link input to execute.</p>';
-  _openSysModal();
+  openModal();
 }
 
 // SAVE & DATA field manual — diegetic, game-agnostic copy (Protocol 38: no
@@ -2077,7 +2177,7 @@ function showSaveHelpModal() {
         '</span></div>'
     ).join('') +
     '</div>';
-  _openSysModal();
+  openModal();
 }
 
 function capStatMax(el) {
@@ -2750,8 +2850,13 @@ function macroCommand(actionStr) {
   transmitMessage();
 }
 
-function clearChat() {
-  if (confirm('Purge Comm-Link history? This cannot be undone.')) {
+async function clearChat() {
+  const ok = await confirmAction({
+    title: '> PURGE COMM-LINK',
+    warning: 'Purge Comm-Link history? This cannot be undone.',
+    confirmLabel: 'PURGE',
+  });
+  if (ok) {
     chatHistory = [];
     localStorage.removeItem('robco_chat');
     document.getElementById('chatDisplay').innerHTML = '';
@@ -2762,19 +2867,20 @@ function clearChat() {
 // ── F6: WIPE TERMINAL — NEW CAMPAIGN ────────────────────────────────
 // Double-confirmation wipe: resets state to defaults, clears chat history,
 // re-presents game context selection screen.
-function wipeTerminal() {
-  if (
-    !confirm(
-      '> WIPE TERMINAL\n\nThis will erase ALL Courier data:\n- SPECIAL / Skills / Perks / Quests\n- Inventory / Factions / Status Effects\n- Campaign Notes / Collectibles / Squad\n- Chat History / Session Statistics\n\nSave slots are preserved.\n\nThis CANNOT be undone. Continue?'
-    )
-  )
-    return;
-  if (
-    !confirm(
-      '> FINAL CONFIRMATION\n\nAre you absolutely certain?\nType OK to confirm terminal wipe.\n\nThis will destroy all unsaved progress.'
-    )
-  )
-    return;
+async function wipeTerminal() {
+  const gate1 = await confirmAction({
+    title: '> WIPE TERMINAL',
+    warning:
+      'This will erase ALL Courier data:\n- SPECIAL / Skills / Perks / Quests\n- Inventory / Factions / Status Effects\n- Campaign Notes / Collectibles / Squad\n- Chat History / Session Statistics\n\nSave slots are preserved.\n\nThis CANNOT be undone. Continue?',
+    confirmLabel: 'CONTINUE',
+  });
+  if (!gate1) return;
+  const gate2 = await confirmAction({
+    title: '> FINAL CONFIRMATION',
+    warning: 'Are you absolutely certain?\n\nThis will destroy all unsaved progress.',
+    confirmLabel: 'WIPE TERMINAL',
+  });
+  if (!gate2) return;
 
   // Reset state to defaults (preserves gameContext selection from boot)
   const wasRngArmed = state.campaignMode === 'rng';

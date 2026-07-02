@@ -110,6 +110,8 @@ export default [
         renderDatabankPanel: 'readonly',
         renderBioScan: 'readonly',
         _openSysModal: 'readonly',
+        openModal: 'readonly', // Step 2 Phase 0 U12 consolidated modal driver (ui-core.js)
+        confirmAction: 'readonly', // Step 2 Phase 0 U12 diegetic confirm() replacement (ui-core.js)
         _vatsIsMelee: 'readonly',
         getGameContext: 'readonly',
         getAmmoCalibers: 'readonly',
@@ -293,6 +295,9 @@ export default [
         playSyncTone: 'readonly',
         state: 'writable',
         APP_VERSION: 'readonly',
+        // ui-core.js globals (Step 2 Phase 0 U12 modal driver)
+        openModal: 'readonly',
+        confirmAction: 'readonly',
       },
     },
   },

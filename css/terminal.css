@@ -653,6 +653,25 @@ details.sub-panel[open] > summary h3::after {
   width: 100%;
 }
 
+/* ── Step 2 Phase 0 U12: confirmAction() diegetic confirm dialog ──── */
+.modal-confirm-body {
+  white-space: normal; /* override .modal-content pre-wrap for structured <p> text */
+}
+.modal-confirm-body p {
+  margin: 0 0 6px 0;
+}
+.modal-confirm-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.modal-confirm-actions button {
+  flex: 1 1 auto;
+  min-width: 120px;
+  min-height: 28px; /* ≥28px tap target (Protocol 17) */
+}
+
 /* ── WU-C11 Changelog viewer ("FIRMWARE REVISION LOG") ──────────── */
 /* Changelog-only wide mode: a comfortable ~700px reading column on desktop,
    never edge-to-edge; capped to the viewport on mobile so it can't overflow. */

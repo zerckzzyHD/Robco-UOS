@@ -1839,36 +1839,29 @@ function renderCraft() {
   }
 }
 
-function doCraft(recipeIdx) {
+// _craftPrepare(recipeIdx) — pure lookup/validation step shared by doCraft() and
+// tests: resolves the recipe + requested qty + missing-ingredient check without
+// mutating anything. Returns null if the recipe index is invalid.
+function _craftPrepare(recipeIdx) {
   const recipes =
     typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.recipes)
       ? FALLOUT_REGISTRY.recipes
       : [];
   const recipe = recipes[recipeIdx];
-  if (!recipe) return;
+  if (!recipe) return null;
 
   const qtyEl = document.getElementById('craftQty_' + recipeIdx);
   const qty = Math.max(1, parseInt(qtyEl ? qtyEl.value : '1') || 1);
-
   const missing = recipe.ingredients.filter(ing => _craftGetHave(ing.item) < ing.qty * qty);
-  if (missing.length > 0) {
-    if (typeof appendToChat === 'function')
-      appendToChat(
-        '> [CRAFT] FAILED — Missing: ' + missing.map(i => i.item).join(', ') + '.',
-        'sys'
-      );
-    return;
-  }
-
   const consumeList = recipe.ingredients.map(ing => `${ing.qty * qty}× ${ing.item}`).join(', ');
   const outputQty = recipe.output.qty * qty;
-  if (
-    !confirm(
-      `Craft ${qty}× ${recipe.name}?\n\nConsumes: ${consumeList}\nProduces: ${outputQty}× ${recipe.output.item}`
-    )
-  )
-    return;
+  return { recipe, qty, missing, consumeList, outputQty };
+}
 
+// _craftApply(recipe, qty, outputQty) — the synchronous mutation core (consume
+// ingredients, add output), separated from the confirm gate so it is directly
+// testable without mocking confirmAction() (Step 2 Phase 0 U12 split).
+function _craftApply(recipe, qty, outputQty) {
   recipe.ingredients.forEach(ing => _craftConsume(ing.item, ing.qty * qty));
 
   if (recipe.output.ammo) {
@@ -1904,27 +1897,50 @@ function doCraft(recipeIdx) {
     appendToChat(`> [CRAFT] Built ${qty}× ${recipe.name}.`, 'sys');
 }
 
-function doScrap(bdIdx) {
+async function doCraft(recipeIdx) {
+  const prep = _craftPrepare(recipeIdx);
+  if (!prep) return;
+  const { recipe, qty, missing, consumeList, outputQty } = prep;
+
+  if (missing.length > 0) {
+    if (typeof appendToChat === 'function')
+      appendToChat(
+        '> [CRAFT] FAILED — Missing: ' + missing.map(i => i.item).join(', ') + '.',
+        'sys'
+      );
+    return;
+  }
+
+  const ok = await confirmAction({
+    title: '> CONFIRM CRAFT',
+    warning: `Craft ${qty}× ${recipe.name}?\n\nConsumes: ${consumeList}\nProduces: ${outputQty}× ${recipe.output.item}`,
+    confirmLabel: 'CRAFT',
+  });
+  if (!ok) return;
+
+  _craftApply(recipe, qty, outputQty);
+}
+
+// _scrapPrepare(bdIdx) — pure lookup/validation step shared by doScrap() and
+// tests (Step 2 Phase 0 U12 split — mirrors _craftPrepare).
+function _scrapPrepare(bdIdx) {
   const breakdowns =
     typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.breakdowns)
       ? FALLOUT_REGISTRY.breakdowns
       : [];
   const breakdown = breakdowns[bdIdx];
-  if (!breakdown) return;
+  if (!breakdown) return null;
 
   const qtyEl = document.getElementById('scrapQty_' + bdIdx);
   const qty = Math.max(1, parseInt(qtyEl ? qtyEl.value : '1') || 1);
   const have = _craftGetHave(breakdown.item);
-
-  if (have < qty) {
-    if (typeof appendToChat === 'function')
-      appendToChat(`> [SCRAP] FAILED — Need ${qty}× ${breakdown.item}, have ${have}.`, 'sys');
-    return;
-  }
-
   const yieldStr = breakdown.yields.map(y => `${y.qty * qty}× ${y.item}`).join(', ');
-  if (!confirm(`Scrap ${qty}× ${breakdown.item}?\n\nProduces: ${yieldStr}`)) return;
+  return { breakdown, qty, have, yieldStr };
+}
 
+// _scrapApply(breakdown, qty, yieldStr) — the synchronous mutation core, separated
+// from the confirm gate so it is directly testable (Step 2 Phase 0 U12 split).
+function _scrapApply(breakdown, qty, yieldStr) {
   _craftConsume(breakdown.item, qty);
 
   breakdown.yields.forEach(y => {
@@ -1952,6 +1968,27 @@ function doScrap(bdIdx) {
   RobcoEvents.emit('craft.scrapped', { name: breakdown.item, qty }); // U8 auto-log
   if (typeof appendToChat === 'function')
     appendToChat(`> [SCRAP] Scrapped ${qty}× ${breakdown.item} → ${yieldStr}.`, 'sys');
+}
+
+async function doScrap(bdIdx) {
+  const prep = _scrapPrepare(bdIdx);
+  if (!prep) return;
+  const { breakdown, qty, have, yieldStr } = prep;
+
+  if (have < qty) {
+    if (typeof appendToChat === 'function')
+      appendToChat(`> [SCRAP] FAILED — Need ${qty}× ${breakdown.item}, have ${have}.`, 'sys');
+    return;
+  }
+
+  const ok = await confirmAction({
+    title: '> CONFIRM SCRAP',
+    warning: `Scrap ${qty}× ${breakdown.item}?\n\nProduces: ${yieldStr}`,
+    confirmLabel: 'SCRAP',
+  });
+  if (!ok) return;
+
+  _scrapApply(breakdown, qty, yieldStr);
 }
 
 // ── WU-N2: TRADE — native barter terminal ────────────────────────────────
@@ -2099,7 +2136,7 @@ function renderTradeSellList() {
     .join('');
 }
 
-function doBuy(name) {
+async function doBuy(name) {
   const catalog = typeof getTradeCatalog === 'function' ? getTradeCatalog() : [];
   const item = catalog.find(i => i.name.toLowerCase() === String(name).toLowerCase());
   if (!item) return;
@@ -2113,7 +2150,12 @@ function doBuy(name) {
       );
     return;
   }
-  if (!confirm(`Buy ${item.name} for ${price} caps?\n\nCaps: ${caps} → ${caps - price}`)) return;
+  const ok = await confirmAction({
+    title: '> CONFIRM PURCHASE',
+    warning: `Buy ${item.name} for ${price} caps?\n\nCaps: ${caps} → ${caps - price}`,
+    confirmLabel: 'BUY',
+  });
+  if (!ok) return;
   state.caps = caps - price;
   // Mirror to the #c_caps field — it is the sync source-of-truth that saveState() reads back
   // via syncStateFromDom(); without this the deduction is reverted on the next save (WU-N2 fix).
@@ -2142,7 +2184,7 @@ function doBuy(name) {
     appendToChat(`> [TRADE] Bought ${item.name} for ${price}c. Caps: ${state.caps}.`, 'sys');
 }
 
-function doSell(name) {
+async function doSell(name) {
   const idx = (state.inventory || []).findIndex(
     i => i.name.toLowerCase() === String(name).toLowerCase()
   );
@@ -2162,7 +2204,12 @@ function doSell(name) {
     return;
   }
   const caps = state.caps || 0;
-  if (!confirm(`Sell ${it.name} for ${price} caps?\n\nCaps: ${caps} → ${caps + price}`)) return;
+  const ok = await confirmAction({
+    title: '> CONFIRM SALE',
+    warning: `Sell ${it.name} for ${price} caps?\n\nCaps: ${caps} → ${caps + price}`,
+    confirmLabel: 'SELL',
+  });
+  if (!ok) return;
   state.caps = caps + price;
   // Mirror to the #c_caps field (sync source-of-truth) so the gain survives saveState (WU-N2 fix).
   const _capsSellEl = document.getElementById('c_caps');
@@ -2225,7 +2272,7 @@ function renderLoot(arg) {
     '<div id="lootList" class="loot-list"></div>' +
     '<div class="loot-hint">Values from the active database. Adds are additive and confirm-gated.</div>';
   renderLootList();
-  if (typeof _openSysModal === 'function') _openSysModal();
+  if (typeof openModal === 'function') openModal();
 }
 
 function renderLootList() {
@@ -2257,7 +2304,7 @@ function renderLootList() {
       : '');
 }
 
-function doLoot(name) {
+async function doLoot(name) {
   const catalog = typeof getTradeCatalog === 'function' ? getTradeCatalog() : [];
   const item = catalog.find(i => i.name.toLowerCase() === String(name).toLowerCase());
   if (!item) return;
@@ -2267,7 +2314,12 @@ function doLoot(name) {
   if (qty > 999) qty = 999;
   const db = typeof lookupItemInDb === 'function' ? lookupItemInDb(item.name) : null;
   const unitVal = Math.max(0, Math.round(Number(db && db.val != null ? db.val : item.value) || 0));
-  if (!confirm(`Add ${qty}× ${item.name} (${unitVal}c each) to inventory?`)) return;
+  const ok = await confirmAction({
+    title: '> CONFIRM ADD',
+    warning: `Add ${qty}× ${item.name} (${unitVal}c each) to inventory?`,
+    confirmLabel: 'ADD',
+  });
+  if (!ok) return;
   state.inventory = _lootAdd(state.inventory, item, qty, db);
   if (typeof renderInventory === 'function') renderInventory();
   if (typeof updateMath === 'function') updateMath();
@@ -2349,7 +2401,7 @@ function renderThreat(target) {
         ? 'NO ENTRY IN BESTIARY: ' + escapeHtml(q)
         : 'SPECIFY A TARGET — e.g. &gt; [THREAT] Deathclaw') +
       '</pre>';
-    if (typeof _openSysModal === 'function') _openSysModal();
+    if (typeof openModal === 'function') openModal();
     if (typeof appendToChat === 'function')
       appendToChat(
         '> [THREAT] ' + (q ? 'No bestiary entry found for that target.' : 'No target specified.'),
@@ -2418,7 +2470,7 @@ function renderThreat(target) {
   html += '</div></div>';
 
   content.innerHTML = html;
-  if (typeof _openSysModal === 'function') _openSysModal();
+  if (typeof openModal === 'function') openModal();
   if (typeof appendToChat === 'function')
     appendToChat(
       `> [THREAT] ${enemy.name} assessed${m.hasWeapon ? ` — TTK ${m.ttk}s, ${m.ammoBurn} rounds` : ''}.`,
@@ -2568,7 +2620,7 @@ function renderConsult(topic) {
   title.innerText = '> DATABANK QUERY';
   const res = _consultSearch(topic);
   content.innerHTML = _consultRenderHTML(res);
-  if (typeof _openSysModal === 'function') _openSysModal();
+  if (typeof openModal === 'function') openModal();
   if (typeof appendToChat === 'function') {
     if (res.noQuery) appendToChat('> [CONSULT] No query specified.', 'sys');
     else if (res.empty) appendToChat(`> [CONSULT] No databank entry found for "${res.q}".`, 'sys');
@@ -2723,7 +2775,7 @@ function renderBioScan() {
   html += '</div></div>';
 
   content.innerHTML = html;
-  if (typeof _openSysModal === 'function') _openSysModal();
+  if (typeof openModal === 'function') openModal();
   if (typeof appendToChat === 'function')
     appendToChat(
       `> [BIO-SCAN] ${r.crippled.length} limb(s) crippled, HP ${r.hpPct}% — ${r.advisories.length} advisor${r.advisories.length === 1 ? 'y' : 'ies'}.`,

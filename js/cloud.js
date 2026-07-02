@@ -258,11 +258,16 @@ window.getAccountState = function () {
 
 window.saveCurrentToCloud = async function () {
   if (!window.isFeatureEnabled('cloudSync')) {
-    alert('>> CLOUD SYNC TEMPORARILY UNAVAILABLE — saves remain local <<');
+    if (typeof openModal === 'function')
+      openModal({
+        title: '> SAVE TO CLOUD',
+        body: 'CLOUD SYNC TEMPORARILY UNAVAILABLE — saves remain local',
+      });
     return;
   }
   if (!_currentUid || !_currentUser || _currentUser.isAnonymous) {
-    alert('>> SIGN IN WITH GOOGLE TO SAVE TO CLOUD <<');
+    if (typeof openModal === 'function')
+      openModal({ title: '> SAVE TO CLOUD', body: 'SIGN IN WITH GOOGLE TO SAVE TO CLOUD' });
     return;
   }
   const labelInput = prompt("Save name (leave blank to use today's date):");
@@ -291,7 +296,11 @@ window.saveCurrentToCloud = async function () {
       snap.forEach(d => existingDocs.push(d.data()));
     } catch (_) {}
     if (contentHash && existingDocs.some(d => d.contentHash === contentHash)) {
-      alert('>> IDENTICAL SAVE ALREADY IN CLOUD — no new save created. <<');
+      if (typeof openModal === 'function')
+        openModal({
+          title: '> SAVE TO CLOUD',
+          body: 'IDENTICAL SAVE ALREADY IN CLOUD — no new save created.',
+        });
       if (btn) btn.innerText = '> SAVE CURRENT TO CLOUD';
       return;
     }
@@ -310,7 +319,8 @@ window.saveCurrentToCloud = async function () {
     });
     localStorage.setItem('robco_last_cloud_push', now.toString());
     if (typeof playSyncTone === 'function') playSyncTone();
-    alert('>> SAVED TO CLOUD: "' + finalLabel + '" <<');
+    if (typeof openModal === 'function')
+      openModal({ title: '> SAVE TO CLOUD', body: 'SAVED TO CLOUD: "' + finalLabel + '"' });
     if (typeof window.renderSavesList === 'function') window.renderSavesList();
   } catch (e) {
     console.error('saveCurrentToCloud failed:', e);
@@ -318,7 +328,8 @@ window.saveCurrentToCloud = async function () {
       'cloudSync',
       '>> CLOUD SYNC PAUSED after repeated errors — using local saves. Reload to retry. <<'
     );
-    alert('>> CLOUD NETWORK FAILURE <<');
+    if (typeof openModal === 'function')
+      openModal({ title: '> SAVE TO CLOUD', body: 'CLOUD NETWORK FAILURE' });
   } finally {
     if (btn) btn.innerText = '> SAVE CURRENT TO CLOUD';
   }
@@ -355,11 +366,13 @@ window.listCloudSaves = async function () {
 // so re-syncing creates no duplicates. Never touches localStorage.
 window.syncLocalSavesToCloud = async function () {
   if (!window.isFeatureEnabled('saveMigration')) {
-    alert('>> SAVE SYNC TEMPORARILY UNAVAILABLE <<');
+    if (typeof openModal === 'function')
+      openModal({ title: '> SYNC TO CLOUD', body: 'SAVE SYNC TEMPORARILY UNAVAILABLE' });
     return;
   }
   if (!_currentUid) {
-    alert('>> NOT SIGNED IN — please sign in to sync saves <<');
+    if (typeof openModal === 'function')
+      openModal({ title: '> SYNC TO CLOUD', body: 'NOT SIGNED IN — please sign in to sync saves' });
     return;
   }
 
@@ -410,7 +423,8 @@ window.syncLocalSavesToCloud = async function () {
   }
 
   if (localSaves.length === 0) {
-    alert('>> NO LOCAL SAVES FOUND <<');
+    if (typeof openModal === 'function')
+      openModal({ title: '> SYNC TO CLOUD', body: 'NO LOCAL SAVES FOUND' });
     return;
   }
 
@@ -457,7 +471,11 @@ window.syncLocalSavesToCloud = async function () {
     }
   }
 
-  alert('» SYNC COMPLETE — ' + uploaded + ' uploaded, ' + skipped + ' already synced «');
+  if (typeof openModal === 'function')
+    openModal({
+      title: '> SYNC TO CLOUD',
+      body: 'SYNC COMPLETE — ' + uploaded + ' uploaded, ' + skipped + ' already synced',
+    });
   if (typeof window.renderSavesList === 'function') window.renderSavesList();
 };
 
@@ -466,17 +484,27 @@ window.syncLocalSavesToCloud = async function () {
 // NEVER auto-loads; always requires explicit user confirmation.
 window.loadCloudSave = async function (docId) {
   if (!window.isFeatureEnabled('cloudSync')) {
-    alert('>> CLOUD SYNC TEMPORARILY UNAVAILABLE — saves remain local <<');
+    if (typeof openModal === 'function')
+      openModal({
+        title: '> LOAD CLOUD SAVE',
+        body: 'CLOUD SYNC TEMPORARILY UNAVAILABLE — saves remain local',
+      });
     return;
   }
   if (!_currentUid) return;
-  if (!confirm('>> LOAD CLOUD SAVE?\nThis replaces your current in-app campaign — continue?'))
-    return;
+  if (typeof confirmAction !== 'function') return;
+  const gate1 = await confirmAction({
+    title: '> LOAD CLOUD SAVE',
+    warning: 'This replaces your current in-app campaign — continue?',
+    confirmLabel: 'LOAD',
+  });
+  if (!gate1) return;
   try {
     const docRef = doc(db, 'users', _currentUid, 'saves', docId);
     const docSnap = await getDoc(docRef);
     if (!docSnap.exists()) {
-      alert('>> SAVE NOT FOUND <<');
+      if (typeof openModal === 'function')
+        openModal({ title: '> LOAD CLOUD SAVE', body: 'SAVE NOT FOUND' });
       return;
     }
     const data = docSnap.data();
@@ -487,35 +515,37 @@ window.loadCloudSave = async function (docId) {
       if (localTime > cloudTime && cloudTime > 0) {
         const cloudDate = new Date(cloudTime).toLocaleString();
         const localDate = new Date(localTime).toLocaleString();
-        if (
-          !confirm(
-            `>> NOTE: You have a more recent local save.\nThis cloud save: ${cloudDate}\nLast local push: ${localDate}\n\nLoad the older cloud save anyway?`
-          )
-        )
-          return;
+        const gate2 = await confirmAction({
+          title: '> OLDER SAVE',
+          warning: `You have a more recent local save.\nThis cloud save: ${cloudDate}\nLast local push: ${localDate}\n\nLoad the older cloud save anyway?`,
+          confirmLabel: 'LOAD ANYWAY',
+        });
+        if (!gate2) return;
       }
     }
     if (!data.robco_v8) {
-      alert('>> SAVE FORMAT NOT SUPPORTED <<');
+      if (typeof openModal === 'function')
+        openModal({ title: '> LOAD CLOUD SAVE', body: 'SAVE FORMAT NOT SUPPORTED' });
       return;
     }
     // Integrity + forward-compat check before applying cloud picker load
     if (typeof window.verifySaveEnvelope === 'function') {
       const _lcIntegrity = window.verifySaveEnvelope(data);
       if (_lcIntegrity.status === 'future_version') {
-        if (
-          !confirm(
-            `> VERSION MISMATCH\n\nThis cloud save was made on a newer version of RobCo (v${_lcIntegrity.version}).\nYour app is on v${window.APP_VERSION}.\n\nLoading may cause data loss — update the app first.\n\nForce-load anyway?`
-          )
-        )
-          return;
+        const gate3 = await confirmAction({
+          title: '> VERSION MISMATCH',
+          warning: `This cloud save was made on a newer version of RobCo (v${_lcIntegrity.version}).\nYour app is on v${window.APP_VERSION}.\n\nLoading may cause data loss — update the app first.\n\nForce-load anyway?`,
+          confirmLabel: 'FORCE-LOAD',
+        });
+        if (!gate3) return;
       } else if (_lcIntegrity.status === 'checksum_mismatch') {
-        if (
-          !confirm(
-            '> CLOUD SAVE INTEGRITY WARNING\n\nThis cloud save may be corrupt or was modified outside the app.\n\nLoad anyway? (Data may be incomplete or incorrect.)'
-          )
-        )
-          return;
+        const gate4 = await confirmAction({
+          title: '> CLOUD SAVE INTEGRITY WARNING',
+          warning:
+            'This cloud save may be corrupt or was modified outside the app.\n\nLoad anyway? (Data may be incomplete or incorrect.)',
+          confirmLabel: 'LOAD ANYWAY',
+        });
+        if (!gate4) return;
       }
     }
     // Rolling backup: snapshot current state before replacing
@@ -537,11 +567,13 @@ window.loadCloudSave = async function (docId) {
     if (data.playstyle) localStorage.setItem('robco_playstyle', data.playstyle);
     // Guard the impending reload's beforeunload flush (clobber regression).
     window._loadingSave = true;
-    alert('>> CLOUD SAVE RESTORED. REBOOTING SYSTEM... <<');
-    window.location.reload();
+    if (typeof openModal === 'function')
+      openModal({ title: '> LOAD CLOUD SAVE', body: 'CLOUD SAVE RESTORED. REBOOTING SYSTEM...' });
+    setTimeout(() => window.location.reload(), 2000);
   } catch (e) {
     console.warn('loadCloudSave failed (non-fatal):', e);
-    alert('>> CLOUD NETWORK FAILURE <<');
+    if (typeof openModal === 'function')
+      openModal({ title: '> LOAD CLOUD SAVE', body: 'CLOUD NETWORK FAILURE' });
   }
 };
 
@@ -557,7 +589,8 @@ window.renameCloudSave = async function (docId, newLabel) {
     if (typeof window.renderSavesList === 'function') window.renderSavesList();
   } catch (e) {
     console.warn('renameCloudSave failed (non-fatal):', e);
-    alert('>> RENAME FAILED — NETWORK ERROR <<');
+    if (typeof openModal === 'function')
+      openModal({ title: '> RENAME CLOUD SAVE', body: 'RENAME FAILED — NETWORK ERROR' });
   }
 };
 
@@ -565,13 +598,20 @@ window.renameCloudSave = async function (docId, newLabel) {
 window.deleteCloudSave = async function (docId) {
   if (!window.isFeatureEnabled('cloudSync')) return;
   if (!_currentUid) return;
-  if (!confirm('>> PERMANENTLY DELETE this cloud save?\nThis cannot be undone.')) return;
+  if (typeof confirmAction !== 'function') return;
+  const ok = await confirmAction({
+    title: '> DELETE CLOUD SAVE',
+    warning: 'Permanently delete this cloud save?\n\nThis cannot be undone.',
+    confirmLabel: 'DELETE',
+  });
+  if (!ok) return;
   try {
     await deleteDoc(doc(db, 'users', _currentUid, 'saves', docId));
     if (typeof window.renderSavesList === 'function') window.renderSavesList();
   } catch (e) {
     console.warn('deleteCloudSave failed (non-fatal):', e);
-    alert('>> DELETE FAILED — NETWORK ERROR <<');
+    if (typeof openModal === 'function')
+      openModal({ title: '> DELETE CLOUD SAVE', body: 'DELETE FAILED — NETWORK ERROR' });
   }
 };
 

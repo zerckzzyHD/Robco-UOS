@@ -63,8 +63,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    1648-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    1648-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    1662-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    1662-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -187,6 +187,96 @@ const FALLOUT_REGISTRY = {
 | Max results      | 7                                                        |
 | Min query length | 2 chars                                                  |
 | Keywords         | Deferred                                                 |
+
+---
+
+## Per-Game Data Parity & Reserved-Column Ledger (Step 2 Phase 0 U11)
+
+Docs-only hygiene unit (FP-DATA-1 / FP-DATA-8 / FP-EXP-2). Makes the per-game data
+asymmetries and the DB's authored-but-unconsumed columns legible instead of ambiguous,
+and locks the skill-less (FO4-class) degradation contract before a third game is authored.
+No code behavior changes; counts below were measured directly against the live source
+files at commit time (superseding earlier audit-doc estimates where they had drifted).
+
+### Parity ledger — per-game data asymmetry (gap vs genuine)
+
+| Category                        | FNV                        | FO3                    | Verdict                                                                                                            |
+| ------------------------------- | -------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Weapons (`WEAPONS.CSV`)         | 192                        | 115                    | **GAP** — FO3 base+DLC roster is thinner; enrichment pass warranted                                                |
+| Armor (`ARMOR.CSV`)             | 103                        | 61                     | **GAP** — FO3 DLC + variant coverage thin                                                                          |
+| Chems (`CHEMS.CSV`)             | 76                         | 33                     | **GAP**                                                                                                            |
+| Ammo (`AMMO.CSV`)               | 56                         | 24                     | **GAP** — FO3 genuinely has fewer calibers, but not this few                                                       |
+| Vendors (`VENDORS.CSV`)         | 39                         | 8                      | **GAP** — not near-parity as previously estimated; FO3 vendor roster needs an enrichment pass                      |
+| Quest items (`QUEST_ITEMS.CSV`) | 19                         | 25                     | **GENUINE** — near parity, FO3 slightly ahead                                                                      |
+| Bestiary (`BESTIARY.CSV`)       | 66                         | 66                     | **GENUINE** — parity (guarded by Suite 79-adjacent structural checks)                                              |
+| Weapon mods                     | 111 (`WEAPON_MODS.CSV`)    | 0                      | **GENUINE** — FO3 has no weapon-mod system; UI's MODS filter is hidden per-game via `GAME_DEFS.hasWeaponMods` (U9) |
+| Quests (registry)               | 154 (OWB only)             | 64 (all 5 DLCs)        | **FNV GAP** — DM/HH/LR quest content missing; FO3's registry is the _complete_ one here                            |
+| Perks (registry)                | 146                        | 62                     | Mixed — FNV+DLC genuinely has more content, but also a partial **GAP**                                             |
+| Items (registry)                | 511                        | 186                    | **GAP**                                                                                                            |
+| Locations (registry)            | 108                        | 90                     | **GENUINE** — near parity                                                                                          |
+| Companions (registry)           | 8                          | 8                      | **GENUINE** — parity (resolves the prior "verify FNV ≥ 8" open item)                                               |
+| Collectibles (registry)         | 7 (snow globes)            | 20 (bobbleheads)       | **GENUINE** — reflects the source games' own collectible-count design                                              |
+| Traits / Skill Magazines        | present (16 / 14)          | —                      | **GENUINE** — FNV-only mechanic (guarded: Suite 67, Suite 87)                                                      |
+| Lincoln Memorabilia             | —                          | present (9)            | **GENUINE** — FO3-only mechanic (guarded: Suite 66)                                                                |
+| Craft recipes (registry)        | 25 recipes + 12 breakdowns | 7 workbench schematics | **GENUINE** — reflects each game's own crafting-system design (Suite 83)                                           |
+
+**Reading:** FO3 is data-thinner across weapons/armor/chems/ammo/vendors/items, while FNV is
+quest-content-thinner (missing three DLC's worth of registry quests). "Each game feels like its
+own native terminal" fails quietly wherever one game's DATABANK/CONSULT/TRADE answers meaningfully
+fewer queries than the other. Closing the GAP rows is enrichment work (fallout.wiki sourcing,
+Protocol 3), not a code change — flagged here so it isn't re-discovered and re-litigated by a
+future audit.
+
+### Reserved-column register
+
+Every `js/db_nv.js` / `js/db_fo3.js` CSV table carries a matching header comment (same content,
+kept at parity between the two files). Full per-column detail lives there; summary below.
+Authored-but-unconsumed columns fall into two buckets:
+
+- **PARKED** — no unit currently scoped to read it; an intended future consumer is named so the
+  data isn't silently re-audited as "why is this weight tracked."
+- **PARKED-FOR-REMOVAL** — no consumer AND no plausible future one, because a competing data
+  source already serves the same purpose (a genuine duplication, not a reserved seam).
+
+| Table                        | Unconsumed column(s)                         | Disposition                                                                                                                                                                                                                              |
+| ---------------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `WEAPONS.CSV`                | `Crit_Damage`, `Crit_Multiplier`             | PARKED — no crit-chance calculator exists yet                                                                                                                                                                                            |
+| `WEAPONS.CSV`                | `Req_Unarmed`, `Req_STR`, `Reach`            | PARKED — target: VATS v2 melee/strength gating                                                                                                                                                                                           |
+| `WEAPONS.CSV`                | `Special_Attack_AP`, `Special_Rules`         | PARKED — target: per-weapon VATS AP-cost variance (same unsourceable-precision gap the WU-D4a-RANGED-GAP note already flags, Suite 104)                                                                                                  |
+| `AMMO.CSV`                   | `DMG_Multiplier`, `DT_Modifier`              | PARKED — target: per-ammo-subtype effect modeling in VATS/THREAT                                                                                                                                                                         |
+| `AMMO.CSV`                   | `Condition_Degradation`                      | PARKED — target: a weapon-condition wear system (unbuilt)                                                                                                                                                                                |
+| `ARMOR.CSV`                  | `Type`, `DT`, `Effects`, `Min_CND_Threshold` | PARKED — no `lookupArmorStats()` sibling to `lookupWeaponStats()`/`lookupBestiaryEntry()` exists; **`DT` is the single highest-priority target** — equipped-armor DT is not looked up anywhere in the app today                          |
+| `CHEMS.CSV`                  | `Duration`                                   | PARKED — target: a BIO-SCAN expiry countdown for active buffs/debuffs                                                                                                                                                                    |
+| `RECIPES.CSV`                | **all 5 columns**, both games                | **PARKED-FOR-REMOVAL** — `doCraft`/`doScrap` read `reg_nv.js`/`reg_fo3.js` `recipes[]`/`breakdowns[]` instead; this CSV table has zero consumers anywhere in the code (a genuine Protocol-22 duplicate data source, not a reserved seam) |
+| `QUEST_ITEMS.CSV`            | `Tradeable`                                  | PARKED — target: a TRADE-panel filter for sellable quest items                                                                                                                                                                           |
+| `VENDORS.CSV`                | `Repair_Skill`                               | PARKED — target: a vendor repair action                                                                                                                                                                                                  |
+| `VENDORS.CSV`                | `Restock_Days`, `Accepted_Currencies`        | Named target: TRADE v2 (per the original audit's own example)                                                                                                                                                                            |
+| `WEAPON_MODS.CSV` (FNV only) | `Effect`                                     | PARKED — target: an equipped-mod effect readout on the weapon detail / CONSULT lookup                                                                                                                                                    |
+| `BESTIARY.CSV`               | `Perception`, `Speed_Factor`                 | Named target: v2.9.0 ENCOUNTER + the BESTIARY BROWSER (FP-GP-4)                                                                                                                                                                          |
+
+### Skill-less (FO4-class) degradation audit
+
+FO4 has no traditional SPECIAL-skill system, so every `getSkillKeys()` consumer must degrade
+cleanly to an empty array rather than assume at least one skill exists. Audited every call site
+(`js/api.js`, `js/state.js`, `js/ui-core.js`, `js/ui-render.js`) that invokes `getSkillKeys()`:
+
+| Call site                                                        | Behavior on `getSkillKeys() === []`                                                                                                            |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `renderSkills()` (ui-core.js) — `.map().join('')`                | Renders an empty `#skillsGrid` — no crash. Cosmetic gap: no "NO SKILL SYSTEM" empty-state message (acceptable for now; not a functional break) |
+| `loadUI()` skill-sync loop (ui-core.js) — `.forEach()`           | No-ops cleanly                                                                                                                                 |
+| `syncStateFromDom()` (state.js) — `.forEach()`                   | No-ops cleanly; any stray AI-sent skill data is simply never written                                                                           |
+| `autoImportState()` skill mapping (api.js) — `.forEach()`        | No-ops cleanly; same effect                                                                                                                    |
+| Skill-check highlight regex handler (ui-core.js) — `.includes()` | Always `false` — `[SkillName N]` inline markup never highlights, never throws                                                                  |
+| Buff→skill name-matching (ui-render.js) — `.map()`/`.forEach()`  | No-ops cleanly                                                                                                                                 |
+| `expandPanelForCategory`-adjacent guard (ui-core.js)             | Already explicitly defensive: `(typeof getSkillKeys === 'function' && getSkillKeys()) \|\| []`                                                 |
+
+**Finding:** every consumer already degrades safely to `[]` — no code changes required for
+Phase 0. The one **hard requirement for the future FO4 `GAME_DEFS` entry** (v3.0.0, FP-EXP-1):
+it must explicitly declare `skillKeys: []` — **never omit the field** — because `_activeDef()`
+(`state.js`) returns `GAME_DEFS[ctx].skillKeys` with no further fallback, and an omitted field
+would make `getSkillKeys()` return `undefined`, which every `.forEach()`/`.map()`/`.includes()`
+call site above would throw on. This single rule (`skillKeys: []`, not absent) is what makes
+FO4 "data + declared stretches" for the skill system specifically.
 
 ---
 
@@ -1112,7 +1202,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1648-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1662-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

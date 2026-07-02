@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1648/1648 | Cache: robco-terminal-v2.7.0-r15 -->
+﻿## [Unreleased]<!-- Tests: 1662/1662 | Cache: robco-terminal-v2.7.0-r16 -->
 
 ### Added
 
@@ -20,6 +20,7 @@
 - Your campaign log now also records level-ups, newly-found collectibles, crafting and scrapping, buying and selling, and resting — not just faction changes, quest updates, and new locations. Open CROSSROADS ANALYSIS (or your exported campaign log) to see the fuller history.
 - Your current-session time readout now shows a friendlier format (like "2h 15m") instead of a raw minute count.
 - The databank lookup now also searches your collectibles, skill books, magazines, traits, and Lincoln memorabilia trackers, and surfaces a couple of previously-hidden details when it finds a match — like a quest item's story purpose or a creature's experience yield.
+- Confirmation prompts and status messages — save/load warnings, cloud sync results, crafting and trading confirmations, and more — now appear as in-terminal pop-ups that match the rest of the interface, instead of your browser's plain "OK/Cancel" dialog boxes.
 
 ### Under the Hood
 
@@ -39,6 +40,8 @@
 - Added a much deeper automatic check for the code that applies the AI's updates to your character sheet: it now actually runs that code against dozens of unusual and deliberately broken inputs — garbage text, extremely long values, more items than normal, and a few security-style edge cases — to confirm it always handles them safely without ever corrupting your saved data. This is also what caught the data-safety gap noted above. Also tightened the release checklist so it compares every individual group of checks between the two test runners, not just the overall total, catching a kind of drift a matching grand total alone could hide. Internal tooling only.
 - Reorganized how the app stores your device settings — sound mute switches, screen color, screen-stays-on toggle, typing speed, and similar preferences — so they all now go through one consistent internal pathway instead of being read and written from dozens of separate places. Also added a dedicated check confirming these device settings can never mix with your campaign save data. This is purely an internal cleanup: every existing preference keeps its current value, and nothing about how the app looks or behaves has changed.
 - Reworked how the terminal reacts to key moments in your campaign — leveling up, a faction's standing crossing a threshold, your health dropping into the critical zone — so these are now announced through one small internal messaging system that other parts of the app can listen to, instead of each moment triggering its sound, vibration, or log entry directly inline. This is what made the Fallout 3 faction-alert fix and the expanded campaign log above possible without duplicating logic; the existing reactions to these moments (the level-up jingle, the critical-health flash and buzz, the faction alert chime) are unchanged. Internal reorganization only.
+- Documented exactly where the two supported games' reference data differs — separating gaps that are simply how each game's card is built (like the trait system, which only one of the two games has) from genuine content gaps still worth filling in later, and noting which recorded-but-currently-unused data columns are reserved for a future feature versus safe to retire. Also confirmed the skills panel degrades safely for any future game with no skill system at all. Documentation only — no visible change to the app.
+- Consolidated the confirmation and pop-up windows used throughout the app onto one shared internal system, replacing the browser's native popup boxes with the in-terminal ones described above. Every confirmation still gates the same actions the same way — nothing you can do or undo has changed, only how it's presented.
 
 ---
 
