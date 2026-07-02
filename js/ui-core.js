@@ -418,6 +418,103 @@ function exitStandby() {
 
 // ── BOOT PHASE FUNCTIONS (called in order from window.onload) ───
 
+// ── P2: DEVICE-PREF BOOT HYDRATION / RECONCILIATION (Step 2 · Phase 1) ───────
+// The first read path to consult IndexedDB. On boot, reconcile the device-pref
+// ('meta') store against localStorage BEFORE the rest of boot reads any pref.
+//
+// AUTHORITY RULE — localStorage is the source of record. When localStorage HAS a
+// device key, it wins; IndexedDB never overwrites a present localStorage value.
+// The one exception (the durability payoff) is RECOVERY: a device key IndexedDB
+// has but localStorage is MISSING is restored to localStorage, so a preference
+// survives a localStorage clear/eviction that IndexedDB outlived — and only if
+// the record's stored checksum still verifies (a corrupt IDB record is skipped,
+// never restored). In the other direction, BACKFILL mirrors any device key
+// localStorage has but IDB lacks (e.g. a pre-P1 preference) into IDB so the
+// shadow becomes complete — IDB-only, never touching localStorage. Campaign data
+// is untouched: P2 reconciles only the 'meta' store (the 'campaign' store stays
+// for a later unit). Game-agnostic (Protocol 38) — operates on keys/values only.
+async function _reconcileMetaFromIdb() {
+  if (typeof window === 'undefined' || !window.IdbStore) return { recovered: 0, backfilled: 0 };
+  let idbKeys;
+  try {
+    idbKeys = await window.IdbStore.keys('meta');
+  } catch (_) {
+    return { recovered: 0, backfilled: 0 };
+  }
+  if (!Array.isArray(idbKeys)) idbKeys = [];
+  const idbSet = new Set(idbKeys);
+  let recovered = 0;
+  let backfilled = 0;
+
+  // Direction 1 — RECOVERY (IDB → localStorage, only when localStorage is missing).
+  // Gated on MetaStore.has so ONLY registered device keys are ever restored —
+  // symmetric with backfill, so a stray non-device key in the 'meta' store could
+  // never be resurrected into localStorage (defense-in-depth two-store boundary).
+  for (const key of idbKeys) {
+    if (!MetaStore.has(key)) continue; // registered device keys only
+    let lsV = null;
+    try {
+      lsV = localStorage.getItem(key);
+    } catch (_) {}
+    if (lsV !== null) continue; // localStorage present → localStorage wins
+    let rec = null;
+    try {
+      rec = await window.IdbStore.getRaw('meta', key);
+    } catch (_) {}
+    if (!rec || typeof rec.value !== 'string') continue;
+    // Integrity gate: never restore a corrupt IDB record.
+    if (
+      rec.checksum &&
+      typeof window.computeSaveChecksum === 'function' &&
+      window.computeSaveChecksum(rec.value, [], '') !== rec.checksum
+    ) {
+      continue;
+    }
+    // MetaStore.set restores localStorage AND re-shadows to IDB (idempotent).
+    MetaStore.set(key, rec.value);
+    recovered++;
+  }
+
+  // Direction 2 — BACKFILL (localStorage → IDB, only when IDB lacks the key).
+  // Restricted to REGISTERED device keys (MetaStore.has) so a campaign key can
+  // never leak into the 'meta' store (two-store boundary).
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key || idbSet.has(key) || !MetaStore.has(key)) continue;
+      let v = null;
+      try {
+        v = localStorage.getItem(key);
+      } catch (_) {}
+      if (v === null) continue;
+      const p = window.IdbStore.set('meta', key, v); // IDB-only; never writes localStorage
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+      backfilled++;
+    }
+  } catch (_) {}
+
+  return { recovered, backfilled };
+}
+
+// Awaited boot phase. BOUNDED so a slow/hung IndexedDB can never delay boot:
+// normal boots resolve in ~0ms (idb.js opened the connection at page-parse time,
+// long before onload), and a pathological hang is capped at _META_HYDRATE_BUDGET_MS,
+// after which boot proceeds on localStorage exactly as today (fail-safe default —
+// a still-pending reconciliation may finish harmlessly in the background). Never
+// rejects; if IdbStore is absent it resolves immediately (byte-identical boot).
+const _META_HYDRATE_BUDGET_MS = 1000;
+function _hydrateMetaFromIdb() {
+  try {
+    if (typeof window === 'undefined' || !window.IdbStore) return Promise.resolve();
+    return Promise.race([
+      _reconcileMetaFromIdb().catch(() => {}),
+      new Promise(resolve => setTimeout(resolve, _META_HYDRATE_BUDGET_MS)),
+    ]);
+  } catch (_) {
+    return Promise.resolve();
+  }
+}
+
 function _hydrateStateFromStorage() {
   // Snapshot current state as rolling backup before any boot migration (Protocol: Rolling Backups)
   if (typeof window.snapRollingBackup === 'function') window.snapRollingBackup();
@@ -925,39 +1022,43 @@ function _wireUnloadFlush() {
   });
 }
 
-window.onload = function () {
-  // U7: wire the OS Event Bus subscribers first — state.js (which defines
-  // RobcoEvents) is guaranteed loaded by onload, unlike at each file's own
-  // top-level parse time (see the boot-loader comment in index.html).
-  _wireCoreEventBusSubscribers();
-  _wireAudioEventBusSubscribers();
-  _wireApiEventBusSubscribers();
-  _hydrateStateFromStorage();
-  _restoreApiKeyAndChatHistory();
-  loadUI();
-  initTabs(); // Phase 4: restore active tab (defaults to 'stat' on first load)
-  setupHpBarInteraction();
-  setupXpBarInteraction(); // C11: XP bar click-drag (mirrors HP bar, within current level range)
-  startCrtHum();
-  initRegistryAutocomplete();
-  initAmmoDatalist();
-  initLocationDatalist();
-  initWakeLock(); // WU-F1: restore the Sustained Power Cell (Screen Wake Lock) preference
-  initHaptic(); // WU-F2: restore the Haptic Solenoid (Vibration) preference
-  initOverseerLog(); // WU-F7: start the Overseer's Log session clock + bump boot count (once)
-  initHighLumen(); // WU-F8: restore the High-Lumen Optics (max-contrast) preference
-  initRadio(); // WU-F5: restore the Pip-Boy Radio preference (autoplay-safe first-gesture arm)
-  _wireRotaryDialClick();
-  _wireStandby();
-  _wirePanelPersistence();
-  _restoreOpticsPreference();
-  _restoreDevicePrefs();
-  _wireKeyboardShortcuts();
-  _runBootSequenceAndBriefing();
-  _startAmbientTimers();
-  _wireInputHistoryNav();
-  _wireUnloadFlush();
-  routeLaunchShortcut(); // PWA shortcut deep-link routing — must run last, after initTabs
+window.onload = async function () {
+  try {
+    // U7: wire the OS Event Bus subscribers first (RobcoEvents is guaranteed loaded by onload).
+    _wireCoreEventBusSubscribers();
+    _wireAudioEventBusSubscribers();
+    _wireApiEventBusSubscribers();
+    // P2: reconcile device prefs from IndexedDB (bounded + fail-safe) BEFORE the rest of boot reads them.
+    await _hydrateMetaFromIdb();
+    _hydrateStateFromStorage();
+    _restoreApiKeyAndChatHistory();
+    loadUI();
+    initTabs(); // Phase 4: restore active tab (defaults to 'stat' on first load)
+    setupHpBarInteraction();
+    setupXpBarInteraction(); // C11: XP bar click-drag (mirrors HP bar, within current level range)
+    startCrtHum();
+    initRegistryAutocomplete();
+    initAmmoDatalist();
+    initLocationDatalist();
+    initWakeLock(); // WU-F1: restore the Sustained Power Cell (Screen Wake Lock) preference
+    initHaptic(); // WU-F2: restore the Haptic Solenoid (Vibration) preference
+    initOverseerLog(); // WU-F7: start the Overseer's Log session clock + bump boot count (once)
+    initHighLumen(); // WU-F8: restore the High-Lumen Optics (max-contrast) preference
+    initRadio(); // WU-F5: restore the Pip-Boy Radio preference (autoplay-safe first-gesture arm)
+    _wireRotaryDialClick();
+    _wireStandby();
+    _wirePanelPersistence();
+    _restoreOpticsPreference();
+    _restoreDevicePrefs();
+    _wireKeyboardShortcuts();
+    _runBootSequenceAndBriefing();
+    _startAmbientTimers();
+    _wireInputHistoryNav();
+    _wireUnloadFlush();
+    routeLaunchShortcut(); // PWA shortcut deep-link routing — must run last, after initTabs
+  } catch (e) {
+    console.error('[RobCo] boot failed:', e);
+  }
 };
 
 function setupHpBarInteraction() {

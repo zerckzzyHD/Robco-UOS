@@ -156,6 +156,14 @@
     get(store, key) {
       return _request(store, 'readonly', os => os.get(key), null).then(_unwrap);
     },
+    // Like get(), but returns the full durable envelope { value, schemaVersion,
+    // checksum, mt } instead of the bare value — so a consumer (P2 boot
+    // reconciliation) can verify the checksum before trusting an IDB-only value.
+    getRaw(store, key) {
+      return _request(store, 'readonly', os => os.get(key), null).then(rec =>
+        rec && typeof rec === 'object' && 'value' in rec ? rec : null
+      );
+    },
     remove(store, key) {
       return _request(store, 'readwrite', os => os.delete(key), false).then(() => true);
     },

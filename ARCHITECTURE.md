@@ -64,8 +64,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    1674-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    1674-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    1686-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    1686-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -93,7 +93,21 @@ Scripts are loaded via `<script>` tags in `index.html` in this exact order:
                        device-pref writes here fire-and-forget; localStorage stays the sole READ
                        authority. No-ops if IndexedDB is unavailable/blocked/quota-full — the app
                        is byte-identical without it (migration-safety). Loaded before state.js so
-                       MetaStore's write-through has window.IdbStore.
+                       MetaStore's write-through has window.IdbStore. getRaw() returns the full
+                       { value, schemaVersion, checksum, mt } envelope for P2's checksum verify.
+
+   P2 (device-pref boot hydration/reconciliation, js/ui-core.js): window.onload is `async` and
+   `await`s _hydrateMetaFromIdb() BEFORE the rest of boot reads any device preference. It
+   reconciles the 'meta' store against localStorage under a strict AUTHORITY RULE — localStorage is
+   the source of record: a present localStorage value always wins; the sole exception is RECOVERY
+   (a registered device key IndexedDB has but localStorage is MISSING is restored, and only if its
+   stored checksum re-verifies — corrupt records are skipped). BACKFILL mirrors any registered
+   device key localStorage has but IDB lacks into IDB (IDB-only). Both directions are gated on
+   MetaStore.has() so only registered device keys are ever touched (two-store boundary; the
+   'campaign' store is untouched — reserved for a later unit). The await is BOUNDED
+   (Promise.race vs _META_HYDRATE_BUDGET_MS): normal boots resolve in ~0ms (the connection opened
+   at page-parse time), and a slow/hung IndexedDB is capped so boot proceeds on localStorage
+   exactly as today (fail-safe — never hangs, never black-screens).
    ── Per-game boot manifest (GAME_FILES in index.html; order preserved via script.async = false) ──
 1. js/db_nv.js / js/db_fo3.js → defines: databaseCSVs, lookupItemInDb (game-specific CSV data;
                        the active pair is selected by the GAME_FILES manifest, FNV fail-safe)
@@ -1211,7 +1225,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1674-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1686-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

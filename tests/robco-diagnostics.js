@@ -14622,7 +14622,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   // 132.3  window.onload calls every boot-phase function
   {
     let onloadBody132 = '';
-    const olIdx = uiCoreSrc132.indexOf('window.onload = function () {');
+    const olIdx = uiCoreSrc132.indexOf('window.onload = async function () {');
     if (olIdx !== -1) {
       const braceStart = uiCoreSrc132.indexOf('{', olIdx);
       let depth = 0,
@@ -14668,7 +14668,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //        window.onload's own declaration, not re-declared inside it (the seam
   //        that lets _startAmbientTimers() reach _startUptimeClock/_startMemCycle)
   {
-    const onloadDeclIdx132 = uiCoreSrc132.indexOf('window.onload = function () {');
+    const onloadDeclIdx132 = uiCoreSrc132.indexOf('window.onload = async function () {');
     const sharedVars132 = [
       '_standbyActive',
       '_uptimeInterval',
@@ -14688,7 +14688,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   // 132.8  _startUptimeClock/_startMemCycle/enterStandby/exitStandby are module-scope
   //        function declarations (declared before window.onload, not nested inside it)
   {
-    const onloadDeclIdx132b = uiCoreSrc132.indexOf('window.onload = function () {');
+    const onloadDeclIdx132b = uiCoreSrc132.indexOf('window.onload = async function () {');
     const sharedFns132 = ['_startUptimeClock', '_startMemCycle', 'enterStandby', 'exitStandby'];
     assert(
       sharedFns132.every(n => {
@@ -15563,7 +15563,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //         named wiring function, and window.onload calls all three
   {
     let onloadBody135 = '';
-    const olIdx135 = uiCoreSrc135.indexOf('window.onload = function () {');
+    const olIdx135 = uiCoreSrc135.indexOf('window.onload = async function () {');
     if (olIdx135 !== -1) {
       const braceStart135 = uiCoreSrc135.indexOf('{', olIdx135);
       let depth135 = 0,
@@ -16281,6 +16281,152 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   assert(
     !/FNV|FO3|Fallout|New Vegas|Mojave|Capital Wasteland/.test(idb138),
     '138.12: idb.js is game-agnostic (no FNV/FO3/Fallout literals — a pure key/value engine)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 139 — Step 2 (v2.8.0) Phase 1 P2: device-pref boot hydration +
+//  reconciliation. The FIRST read path to consult IndexedDB. window.onload
+//  becomes async and awaits _hydrateMetaFromIdb() BEFORE the rest of boot reads
+//  device prefs. AUTHORITY RULE: localStorage is the source of record — it wins
+//  whenever it HAS a key; the one exception is RECOVERY (restore a key IDB has
+//  but localStorage is MISSING, only if its checksum re-verifies). BACKFILL
+//  mirrors localStorage-only device keys into IDB (IDB-only). The await is
+//  BOUNDED (Promise.race vs a budget) so a slow/hung IndexedDB can never hang
+//  boot; if IdbStore is absent it resolves immediately (byte-identical boot).
+//  Only the 'meta' store is touched (two-store boundary). Structural guards
+//  here; the REAL IndexedDB recovery/backfill/no-flip/corrupt-skip behavioral
+//  proof runs in tests/test.html (Protocol 40). 12 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 139 — P2 device-pref boot hydration + reconciliation');
+  const uiCore139 = readFile('js/ui-core.js');
+  const idb139 = readFile('js/idb.js');
+  const reconcile139 = extractFunctionBody(uiCore139, '_reconcileMetaFromIdb');
+  const hydrate139 = extractFunctionBody(uiCore139, '_hydrateMetaFromIdb');
+  // window.onload body (brace-matched from the async declaration)
+  let onload139 = '';
+  {
+    const oi = uiCore139.indexOf('window.onload = async function () {');
+    if (oi !== -1) {
+      const b = uiCore139.indexOf('{', oi);
+      let d = 0;
+      for (let i = b; i < uiCore139.length; i++) {
+        if (uiCore139[i] === '{') d++;
+        else if (uiCore139[i] === '}' && --d === 0) {
+          onload139 = uiCore139.slice(b, i + 1);
+          break;
+        }
+      }
+    }
+  }
+
+  // 139.1  both the awaited boot phase and its reconciliation core are defined
+  assert(
+    /async function _reconcileMetaFromIdb\s*\(/.test(uiCore139) &&
+      /function _hydrateMetaFromIdb\s*\(/.test(uiCore139),
+    '139.1: ui-core.js defines _reconcileMetaFromIdb() (core) and _hydrateMetaFromIdb() (awaited boot phase)'
+  );
+
+  // 139.2  window.onload is async and awaits the hydration (async-before-sync boot)
+  assert(
+    /window\.onload = async function \(\) \{/.test(uiCore139) &&
+      /await _hydrateMetaFromIdb\(\)/.test(onload139),
+    '139.2: window.onload is async and awaits _hydrateMetaFromIdb() (async-before-sync boot)'
+  );
+
+  // 139.3  the awaited hydration runs BEFORE every device-pref consumer in boot
+  {
+    const iHydrate = onload139.indexOf('await _hydrateMetaFromIdb()');
+    const consumers = [
+      '_restoreApiKeyAndChatHistory()',
+      '_restoreOpticsPreference()',
+      '_restoreDevicePrefs()',
+    ];
+    assert(
+      iHydrate > -1 && consumers.every(c => onload139.indexOf(c) > iHydrate),
+      '139.3: the awaited hydration runs before every device-pref consumer (API key / optics / device prefs)'
+    );
+  }
+
+  // 139.4  BOUNDED await — a Promise.race against a timeout budget guards a hung
+  //         IndexedDB so boot can never hang
+  assert(
+    /_META_HYDRATE_BUDGET_MS/.test(uiCore139) &&
+      /Promise\.race\(/.test(hydrate139) &&
+      /setTimeout\(resolve, _META_HYDRATE_BUDGET_MS\)/.test(hydrate139),
+    '139.4: _hydrateMetaFromIdb() bounds the await (Promise.race vs _META_HYDRATE_BUDGET_MS) — a hung IDB never hangs boot'
+  );
+
+  // 139.5  AUTHORITY / RECOVERY: localStorage-present wins (skip); recovery
+  //         (restore via MetaStore.set) fires only when localStorage is MISSING
+  assert(
+    /if \(lsV !== null\) continue;/.test(reconcile139) &&
+      /MetaStore\.set\(key, rec\.value\)/.test(reconcile139),
+    '139.5: recovery restores localStorage from IDB only when localStorage is missing (localStorage-present wins)'
+  );
+
+  // 139.6  CORRUPT-DATA FAIL-SAFE: a recovered value is trusted only if its
+  //         stored checksum re-verifies (mismatch → skip, never restore)
+  assert(
+    /computeSaveChecksum\(rec\.value, \[\], ''\) !== rec\.checksum/.test(reconcile139) &&
+      /getRaw\('meta', key\)/.test(reconcile139),
+    '139.6: reconciliation verifies the IDB record checksum (via getRaw) before restoring — corrupt records are skipped'
+  );
+
+  // 139.7  IdbStore.getRaw exists and returns the checksum-bearing envelope
+  assert(
+    /getRaw\(store, key\)/.test(idb139) && /'value' in rec \? rec : null/.test(idb139),
+    '139.7: IdbStore.getRaw() returns the full { value, checksum, ... } envelope (enables the checksum verify)'
+  );
+
+  // 139.8  BACKFILL is restricted to registered device keys (MetaStore.has) and
+  //         is IDB-only (never writes localStorage) — the shadow-completeness path
+  assert(
+    /!MetaStore\.has\(key\)\) continue;/.test(reconcile139) &&
+      /IdbStore\.set\('meta', key, v\)/.test(reconcile139),
+    '139.8: backfill is gated on MetaStore.has (registered device keys only) and writes IDB only, never localStorage'
+  );
+
+  // 139.9  TWO-STORE BOUNDARY: reconciliation targets only 'meta', never
+  //         'campaign', and carries no campaign-key literal
+  assert(
+    !/'campaign'/.test(reconcile139) &&
+      !/robco_v8|robco_slot|robco_backup|robco_chat|robco_playstyle|robco_v7/.test(reconcile139) &&
+      /keys\('meta'\)/.test(reconcile139),
+    "139.9: reconciliation touches only the 'meta' store — no 'campaign' store, no campaign-key literal (two-store boundary)"
+  );
+
+  // 139.10  FAIL-SAFE: _hydrateMetaFromIdb guards on window.IdbStore and resolves
+  //          immediately when it is absent (byte-identical boot); never rejects
+  assert(
+    /!window\.IdbStore\) return Promise\.resolve\(\)/.test(hydrate139) &&
+      /\.catch\(\(\) => \{\}\)/.test(hydrate139),
+    '139.10: _hydrateMetaFromIdb() resolves immediately when IdbStore is absent and never rejects (fail-safe boot)'
+  );
+
+  // 139.11  Phase-0 boot invariants preserved: window.onload still calls every
+  //          load-bearing phase (no phase dropped by the async wrapper) and the
+  //          WU-B10 _bootActive window still lives in _runBootSequenceAndBriefing
+  {
+    const stillCalled = [
+      '_hydrateStateFromStorage()',
+      '_restoreApiKeyAndChatHistory()',
+      '_runBootSequenceAndBriefing()',
+      '_wireUnloadFlush()',
+      'routeLaunchShortcut()',
+    ];
+    const bootSeq139 = extractFunctionBody(uiCore139, '_runBootSequenceAndBriefing');
+    assert(
+      stillCalled.every(c => onload139.includes(c)) && /runBootSequence\(/.test(bootSeq139),
+      '139.11: no boot phase dropped by the async wrapper; _runBootSequenceAndBriefing still invokes runBootSequence (WU-B10 boot window intact)'
+    );
+  }
+
+  // 139.12  game-agnostic (Protocol 38): the reconcile/hydrate path has no game literals
+  assert(
+    !/FNV|FO3|Fallout|New Vegas|Mojave|Capital Wasteland/.test(reconcile139 + hydrate139),
+    '139.12: the P2 reconciliation/hydration path is game-agnostic (no game literals)'
   );
 }
 

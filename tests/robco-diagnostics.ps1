@@ -8294,7 +8294,7 @@ Check $noDupPhases132 'every boot-phase function is declared exactly once (no du
 # 132.3/132.4/132.5/132.6  window.onload's own body: calls every phase fn, in order,
 # stays slim, and still calls initTabs() directly (Suite 57.9 depends on that literal)
 $onloadBody132 = ''
-$olIdx132 = $uiCoreSrc132.IndexOf('window.onload = function () {')
+$olIdx132 = $uiCoreSrc132.IndexOf('window.onload = async function () {')
 if ($olIdx132 -ge 0) {
     $braceStart132 = $uiCoreSrc132.IndexOf('{', $olIdx132)
     $depth132 = 0
@@ -8327,7 +8327,7 @@ Check ($onloadLineCount132 -lt 40) "window.onload body stays a slim named-call c
 Check ($onloadBody132 -match [regex]::Escape('initTabs()')) 'window.onload still calls initTabs() directly (Suite 57.9 boot-order guard depends on this literal call)'
 
 # 132.7  standby shared state is declared once at true module scope, before window.onload
-$onloadDeclIdx132 = $uiCoreSrc132.IndexOf('window.onload = function () {')
+$onloadDeclIdx132 = $uiCoreSrc132.IndexOf('window.onload = async function () {')
 $sharedVars132 = @('_standbyActive', '_uptimeInterval', '_memCycleInterval', 'sessionStart')
 $sharedVarsOk132 = $true
 foreach ($v in $sharedVars132) {
@@ -8839,7 +8839,7 @@ Check ($missingSub135.Count -eq 0) `
 
 # 135.15  structural: each cross-file subscriber registration is wrapped in a
 #         named wiring function, and window.onload calls all three
-$onloadIdx135 = $uiCoreSrc135.IndexOf('window.onload = function () {')
+$onloadIdx135 = $uiCoreSrc135.IndexOf('window.onload = async function () {')
 $onloadBody135 = ''
 if ($onloadIdx135 -ge 0) {
     $braceStart135 = $uiCoreSrc135.IndexOf('{', $onloadIdx135)
@@ -9260,6 +9260,117 @@ Check (
 Check (
     -not ($idb138 -match 'FNV|FO3|Fallout|New Vegas|Mojave|Capital Wasteland')
 ) '138.12: idb.js is game-agnostic (no FNV/FO3/Fallout literals -- a pure key/value engine)'
+
+# ===========================================================
+# Suite 139 -- Step 2 (v2.8.0) Phase 1 P2: device-pref boot hydration +
+# reconciliation (12 tests). Mirrors JS Suite 139. window.onload becomes async
+# and awaits _hydrateMetaFromIdb() BEFORE the rest of boot reads device prefs.
+# AUTHORITY RULE: localStorage is the source of record -- it wins when present;
+# the one exception is RECOVERY (restore a key IDB has but localStorage is
+# MISSING, only if its checksum re-verifies). BACKFILL mirrors localStorage-only
+# device keys into IDB. The await is BOUNDED (Promise.race vs a budget) so a
+# hung IndexedDB never hangs boot. Only the 'meta' store is touched. Structural
+# guards here; the REAL IndexedDB behavioral proof runs in tests/test.html
+# (Protocol 40 -- the browser is the only runner with a native IndexedDB).
+# ===========================================================
+Sep "Suite 139 -- P2 device-pref boot hydration + reconciliation"
+$uiCore139   = Read-Src "js/ui-core.js"
+$idb139      = Read-Src "js/idb.js"
+$reconcile139 = Get-FunctionBody $uiCore139 '_reconcileMetaFromIdb'
+$hydrate139   = Get-FunctionBody $uiCore139 '_hydrateMetaFromIdb'
+
+# window.onload body (brace-matched from the async declaration)
+$onload139 = ''
+$olStart139 = $uiCore139.IndexOf('window.onload = async function () {')
+if ($olStart139 -ge 0) {
+    $bStart139 = $uiCore139.IndexOf('{', $olStart139)
+    $depth139 = 0
+    $i139 = $bStart139
+    while ($i139 -lt $uiCore139.Length) {
+        $ch139 = $uiCore139[$i139]
+        if ($ch139 -eq '{') { $depth139++ }
+        elseif ($ch139 -eq '}') { $depth139--; if ($depth139 -eq 0) { break } }
+        $i139++
+    }
+    $onload139 = $uiCore139.Substring($bStart139, $i139 - $bStart139 + 1)
+}
+
+# 139.1  both the awaited boot phase and its reconciliation core are defined
+Check (
+    ($uiCore139 -match 'async function _reconcileMetaFromIdb\s*\(') -and
+    ($uiCore139 -match 'function _hydrateMetaFromIdb\s*\(')
+) '139.1: ui-core.js defines _reconcileMetaFromIdb() (core) and _hydrateMetaFromIdb() (awaited boot phase)'
+
+# 139.2  window.onload is async and awaits the hydration (async-before-sync boot)
+Check (
+    ($uiCore139 -match 'window\.onload = async function \(\) \{') -and
+    ($onload139 -match 'await _hydrateMetaFromIdb\(\)')
+) '139.2: window.onload is async and awaits _hydrateMetaFromIdb() (async-before-sync boot)'
+
+# 139.3  the awaited hydration runs BEFORE every device-pref consumer in boot
+$iHydrate139 = $onload139.IndexOf('await _hydrateMetaFromIdb()')
+Check (
+    ($iHydrate139 -ge 0) -and
+    ($onload139.IndexOf('_restoreApiKeyAndChatHistory()') -gt $iHydrate139) -and
+    ($onload139.IndexOf('_restoreOpticsPreference()') -gt $iHydrate139) -and
+    ($onload139.IndexOf('_restoreDevicePrefs()') -gt $iHydrate139)
+) '139.3: the awaited hydration runs before every device-pref consumer (API key / optics / device prefs)'
+
+# 139.4  BOUNDED await -- Promise.race against a timeout budget guards a hung IDB
+Check (
+    ($uiCore139 -match '_META_HYDRATE_BUDGET_MS') -and
+    ($hydrate139 -match 'Promise\.race\(') -and
+    ($hydrate139 -match 'setTimeout\(resolve, _META_HYDRATE_BUDGET_MS\)')
+) '139.4: _hydrateMetaFromIdb() bounds the await (Promise.race vs _META_HYDRATE_BUDGET_MS) -- a hung IDB never hangs boot'
+
+# 139.5  AUTHORITY / RECOVERY: localStorage-present wins; recovery only when missing
+Check (
+    ($reconcile139 -match 'if \(lsV !== null\) continue;') -and
+    ($reconcile139 -match 'MetaStore\.set\(key, rec\.value\)')
+) '139.5: recovery restores localStorage from IDB only when localStorage is missing (localStorage-present wins)'
+
+# 139.6  CORRUPT-DATA FAIL-SAFE: verify checksum before restoring (mismatch -> skip)
+Check (
+    ($reconcile139 -match "computeSaveChecksum\(rec\.value, \[\], ''\) !== rec\.checksum") -and
+    ($reconcile139 -match "getRaw\('meta', key\)")
+) '139.6: reconciliation verifies the IDB record checksum (via getRaw) before restoring -- corrupt records are skipped'
+
+# 139.7  IdbStore.getRaw exists and returns the checksum-bearing envelope
+Check (
+    ($idb139 -match 'getRaw\(store, key\)') -and ($idb139 -match "'value' in rec \? rec : null")
+) '139.7: IdbStore.getRaw() returns the full { value, checksum, ... } envelope (enables the checksum verify)'
+
+# 139.8  BACKFILL restricted to registered device keys + IDB-only (never localStorage)
+Check (
+    ($reconcile139 -match '!MetaStore\.has\(key\)\) continue;') -and
+    ($reconcile139 -match "IdbStore\.set\('meta', key, v\)")
+) '139.8: backfill is gated on MetaStore.has (registered device keys only) and writes IDB only, never localStorage'
+
+# 139.9  TWO-STORE BOUNDARY: only 'meta', never 'campaign', no campaign-key literal
+Check (
+    (-not ($reconcile139 -match "'campaign'")) -and
+    (-not ($reconcile139 -match 'robco_v8|robco_slot|robco_backup|robco_chat|robco_playstyle|robco_v7')) -and
+    ($reconcile139 -match "keys\('meta'\)")
+) "139.9: reconciliation touches only the 'meta' store -- no 'campaign' store, no campaign-key literal (two-store boundary)"
+
+# 139.10  FAIL-SAFE: resolves immediately when IdbStore absent; never rejects
+Check (
+    ($hydrate139 -match '!window\.IdbStore\) return Promise\.resolve\(\)') -and
+    ($hydrate139 -match '\.catch\(\(\) => \{\}\)')
+) '139.10: _hydrateMetaFromIdb() resolves immediately when IdbStore is absent and never rejects (fail-safe boot)'
+
+# 139.11  Phase-0 boot invariants preserved: no phase dropped; boot sequence intact
+$bootSeq139 = Get-FunctionBody $uiCore139 '_runBootSequenceAndBriefing'
+$stillCalled139 = @('_hydrateStateFromStorage()', '_restoreApiKeyAndChatHistory()', '_runBootSequenceAndBriefing()', '_wireUnloadFlush()', 'routeLaunchShortcut()')
+$allCalled139 = (@($stillCalled139 | Where-Object { -not $onload139.Contains($_) }).Count -eq 0)
+Check (
+    $allCalled139 -and ($bootSeq139 -match 'runBootSequence\(')
+) '139.11: no boot phase dropped by the async wrapper; _runBootSequenceAndBriefing still invokes runBootSequence (WU-B10 boot window intact)'
+
+# 139.12  game-agnostic (Protocol 38): the reconcile/hydrate path has no game literals
+Check (
+    -not (($reconcile139 + $hydrate139) -match 'FNV|FO3|Fallout|New Vegas|Mojave|Capital Wasteland')
+) '139.12: the P2 reconciliation/hydration path is game-agnostic (no game literals)'
 
 # ===========================================================
 # Results

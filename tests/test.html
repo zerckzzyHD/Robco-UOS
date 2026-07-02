@@ -21,7 +21,7 @@
     or the canonical suites change, update this file in the SAME commit and bump
     the suite count marker. The gate fails on drift.
 
-    Suites: 11
+    Suites: 12
 -->
 <html lang="en">
   <head>
@@ -750,6 +750,132 @@
           window.IdbStore.remove('meta', '__flip_probe__');
         } catch (err) {
           assert(false, 'FATAL: IDB behavioral suite threw', String((err && err.stack) || err));
+        }
+
+        // ── Suite 11 — P2 device-pref boot reconciliation (REAL IndexedDB) ────
+        // The behavioral half of canonical Suite 139. The real reconcile lives in
+        // js/ui-core.js, which test.html cannot load without its full app DOM (it
+        // would fire window.onload against a page that lacks the app shell). So
+        // this drives a behavioral TWIN with the EXACT reconciliation logic
+        // against real IndexedDB + the real IdbStore / MetaStore / checksum
+        // primitives (all loaded), proving: RECOVERY (restore when localStorage
+        // missing), localStorage-present WINS (no overwrite), CORRUPT records are
+        // skipped (checksum gate), BACKFILL (localStorage-only device key mirrored
+        // to IDB), and the two-store boundary (campaign store untouched). Probe
+        // keys use the registered robco_optic_ device-key family so MetaStore.has
+        // is true without touching a real singleton preference.
+        try {
+          section('Suite 11 — P2 device-pref boot reconciliation (real IndexedDB)');
+
+          // Write a raw envelope (bypassing IdbStore.set) so we can plant a
+          // deliberately CORRUPT record whose checksum will not verify.
+          function putRawMeta(key, record) {
+            return new Promise(resolve => {
+              const req = indexedDB.open('robco-uos', 1);
+              req.onsuccess = e => {
+                const db = e.target.result;
+                const tx = db.transaction('meta', 'readwrite');
+                tx.objectStore('meta').put(record, key);
+                tx.oncomplete = () => resolve(true);
+                tx.onerror = () => resolve(false);
+              };
+              req.onerror = () => resolve(false);
+            });
+          }
+
+          // Behavioral twin — byte-for-byte the js/ui-core.js _reconcileMetaFromIdb
+          // logic, exercised against the real loaded primitives.
+          async function reconcileMetaTwin() {
+            const idbKeys = (await window.IdbStore.keys('meta')) || [];
+            const idbSet = new Set(idbKeys);
+            let recovered = 0;
+            let backfilled = 0;
+            for (const key of idbKeys) {
+              if (!MetaStore.has(key)) continue;
+              if (localStorage.getItem(key) !== null) continue;
+              const rec = await window.IdbStore.getRaw('meta', key);
+              if (!rec || typeof rec.value !== 'string') continue;
+              if (rec.checksum && computeSaveChecksum(rec.value, [], '') !== rec.checksum) continue;
+              MetaStore.set(key, rec.value);
+              recovered++;
+            }
+            for (let i = 0; i < localStorage.length; i++) {
+              const key = localStorage.key(i);
+              if (!key || idbSet.has(key) || !MetaStore.has(key)) continue;
+              const v = localStorage.getItem(key);
+              if (v !== null) {
+                window.IdbStore.set('meta', key, v);
+                backfilled++;
+              }
+            }
+            return { recovered, backfilled };
+          }
+
+          // 1) RECOVERY: IDB has a valid record, localStorage is missing it → restore.
+          localStorage.removeItem('robco_optic_ZZTEST');
+          await window.IdbStore.set('meta', 'robco_optic_ZZTEST', 'recovered-green');
+          await reconcileMetaTwin();
+          assert(
+            localStorage.getItem('robco_optic_ZZTEST') === 'recovered-green',
+            'recovery: a device key IDB has but localStorage lacks is restored to localStorage'
+          );
+
+          // 2) NO OVERWRITE: localStorage present → localStorage wins over a differing IDB value.
+          localStorage.setItem('robco_optic_YYTEST', 'ls-wins');
+          await window.IdbStore.set('meta', 'robco_optic_YYTEST', 'idb-value');
+          await reconcileMetaTwin();
+          assert(
+            localStorage.getItem('robco_optic_YYTEST') === 'ls-wins',
+            'no overwrite: a present localStorage value wins over a differing IndexedDB value'
+          );
+
+          // 3) CORRUPT SKIP: an IDB record whose checksum does not verify is never restored.
+          localStorage.removeItem('robco_optic_CORRUPT');
+          await putRawMeta('robco_optic_CORRUPT', {
+            value: 'corrupt-val',
+            schemaVersion: '',
+            checksum: '0badc0de',
+            mt: 1,
+          });
+          await reconcileMetaTwin();
+          assert(
+            localStorage.getItem('robco_optic_CORRUPT') === null,
+            'corrupt skip: a checksum-mismatched IDB record is not restored (integrity gate)'
+          );
+
+          // 4) BACKFILL: a registered device key localStorage has but IDB lacks is mirrored to IDB.
+          await window.IdbStore.remove('meta', 'robco_optic_BACKFILL');
+          localStorage.setItem('robco_optic_BACKFILL', 'from-ls');
+          await reconcileMetaTwin();
+          // write-through/backfill is fire-and-forget — poll until it lands.
+          let backfilled = false;
+          for (let i = 0; i < 60; i++) {
+            if ((await window.IdbStore.get('meta', 'robco_optic_BACKFILL')) === 'from-ls') {
+              backfilled = true;
+              break;
+            }
+            await new Promise(r => setTimeout(r, 10));
+          }
+          assert(
+            backfilled,
+            'backfill: a localStorage-only registered device key is mirrored into IndexedDB'
+          );
+
+          // 5) TWO-STORE BOUNDARY: none of the recovered/backfilled keys touched the campaign store.
+          const campZ = await window.IdbStore.get('campaign', 'robco_optic_ZZTEST');
+          const campB = await window.IdbStore.get('campaign', 'robco_optic_BACKFILL');
+          assert(
+            campZ === null && campB === null,
+            'two-store boundary: reconciliation never wrote device keys into the campaign store'
+          );
+
+          // Tidy up.
+          ['ZZTEST', 'YYTEST', 'CORRUPT', 'BACKFILL'].forEach(s => {
+            localStorage.removeItem('robco_optic_' + s);
+            window.IdbStore.remove('meta', 'robco_optic_' + s);
+          });
+        } catch (err) {
+          assert(false, 'FATAL: P2 reconciliation suite threw', String((err && err.stack) || err));
         }
 
         // ── Summary ──────────────────────────────────────────────────────────

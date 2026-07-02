@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1674/1674 | Cache: robco-terminal-v2.7.0-r17 -->
+﻿## [Unreleased]<!-- Tests: 1686/1686 | Cache: robco-terminal-v2.7.0-r18 -->
 
 ### Added
 
@@ -43,6 +43,7 @@
 - Documented exactly where the two supported games' reference data differs — separating gaps that are simply how each game's card is built (like the trait system, which only one of the two games has) from genuine content gaps still worth filling in later, and noting which recorded-but-currently-unused data columns are reserved for a future feature versus safe to retire. Also confirmed the skills panel degrades safely for any future game with no skill system at all. Documentation only — no visible change to the app.
 - Consolidated the confirmation and pop-up windows used throughout the app onto one shared internal system, replacing the browser's native popup boxes with the in-terminal ones described above. Every confirmation still gates the same actions the same way — nothing you can do or undo has changed, only how it's presented.
 - Began the groundwork for moving the terminal's saved data off the browser's small, fixed-size storage onto a larger, more durable storage system (IndexedDB). This first step adds the new storage engine and quietly keeps a durable backup copy of your device settings in it, while those settings continue to be read and written exactly as before — nothing you see or do changes, and if the new storage is ever unavailable the app runs identically to today. The new storage keeps your device settings and your campaign saves in two separate compartments from the start, and later steps will move your campaign saves and backups across and begin reading from it. Internal foundation only.
+- Made your device settings self-healing. On startup the terminal now cross-checks its durable backup copy against the browser's main storage: if a preference (a sound toggle, screen colour, typing speed, and the like) went missing from the browser's storage — for example because the browser cleared or evicted it — but still survives in the durable backup, it is quietly restored, so your settings ride out a storage hiccup that would previously have reset them. The browser's storage stays the authority: a setting that is still present is never overwritten, and a backup copy is only trusted if its integrity check passes. This check is strictly bounded so it can never slow down or hang startup — if the durable storage is unavailable or slow, the terminal boots exactly as it does today. Your campaign saves are untouched by this step. Internal only — no visible change unless a lost setting is being restored.
 
 ---
 
