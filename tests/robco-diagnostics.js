@@ -2364,10 +2364,12 @@ const cssSrc35 = readFile('css/terminal.css');
 const regNvSrc35 = readFile('js/reg_nv.js');
 const regCoreSrc35 = readFile('js/registry-core.js');
 
-// 35.1 campaign_notes capped to 200 after auto-log pushes in api.js (P7-14)
+// 35.1 campaign_notes capped to 200 via the single _logCampaignEvent() helper
+//      (P7-14; U7 consolidated the two duplicated push+cap sites in api.js)
 assert(
-  (apiSrc35.match(/campaign_notes\.length\s*>\s*200/g) || []).length >= 2,
-  'campaign_notes capped to 200 after auto-log pushes in api.js (P7-14)'
+  /state\.campaign_notes\.length\s*>\s*200/.test(stateSrc35) &&
+    (apiSrc35.match(/_logCampaignEvent\(/g) || []).length >= 2,
+  'campaign_notes capped to 200 via the single _logCampaignEvent() helper (state.js); api.js auto-log sites route through it (P7-14, consolidated U7)'
 );
 
 // 35.2 saveState has a dirty-check: skips write when _saveStr === _lastSaveStr (P7-6)
@@ -9067,6 +9069,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
         updateMath: () => {},
         lookupItemInDb: () => null,
         SKILL_LABELS: { repair: 'Repair' },
+        RobcoEvents: { emit: () => {} }, // U7 — doCraft/doScrap emit craft.completed/craft.scrapped
       };
       vm84.createContext(sb);
       vm84.runInContext(craftCode84, sb);
@@ -12778,12 +12781,14 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     );
   }
 
-  // 116.7  fire points wired at the key events (level-up, faction alert, critical HP)
+  // 116.7  fire points wired at the key events — level-up + faction-threshold alert
+  //        are RobcoEvents subscribers in ui-audio.js (U7); critical HP stays a
+  //        RobcoEvents subscriber in ui-core.js (both were inline before U7)
   assert(
-    /triggerHaptic\('levelup'\)/.test(api116) &&
+    /triggerHaptic\('levelup'\)/.test(uiAudio116) &&
       /triggerHaptic\('alert'\)/.test(api116) &&
       /triggerHaptic\('lowhealth'\)/.test(uiCore116),
-    '116.7: triggerHaptic fires on level-up + faction-threshold alert (api.js) and the critical-HP crossing (ui-core.js)'
+    '116.7: triggerHaptic fires on level-up (ui-audio.js RobcoEvents subscriber) + faction-threshold alert (api.js RobcoEvents subscriber) + the critical-HP crossing (ui-core.js RobcoEvents subscriber)'
   );
 
   // 116.8  POWER MANAGEMENT sub-panel present + accessible toggle + status note
@@ -15206,6 +15211,343 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       offenders134.length === 0,
       '134.8: no served JS (ui/api/cloud) reads/writes a registered device-preference key via raw localStorage — MetaStore is the only path' +
         (offenders134.length ? ' — offenders: ' + offenders134.join(', ') : '')
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 135 — U7/U8: OS event bus + faction-threshold Protocol-38 fix +
+//  auto-log expansion (Step 2 / v2.8.0 Phase 0)
+//
+//  U7 added a tiny synchronous pub/sub (RobcoEvents.on/emit, js/state.js) and
+//  re-pointed the 3 previously-inline state-crossing detectors (level-up,
+//  faction-threshold, HP-critical) to emit through it instead of each acting
+//  inline. The faction-threshold detector's hardcoded FNV-only key array
+//  (['ncr','legion','house','bos','boomers','khans']) — which meant FO3
+//  campaigns never fired a threshold alert at all — is replaced by
+//  getFactionRegistry() (game-agnostic, Protocol 38). U8 expands auto-logging
+//  (previously factions/quests/locations only) to level-ups, collectible
+//  acquisitions, crafts, trades, and sleeps, routed through the same bus and
+//  written via the single _logCampaignEvent() helper (state.js). Also locks the
+//  Protocol 42 boot-order fix: each cross-file RobcoEvents.on() registration is
+//  wrapped in a named _wire*EventBusSubscribers() function called from
+//  window.onload, since a bare top-level call in a static <script> file could
+//  execute before state.js (dynamically, context-conditionally loaded) had run.
+//  16 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 135 — U7/U8 OS event bus + faction-agnostic fix + auto-log');
+
+  const uiRenderSrc135 = readFile('js/ui-render.js');
+  const uiCoreSrc135 = readFile('js/ui-core.js');
+
+  // 135.1  structural: state.js declares the bus (on/emit) and exposes it globally
+  assert(
+    /const RobcoEvents\s*=\s*\(\(\)\s*=>\s*\{/.test(stateSource) &&
+      /function on\(event, fn\)/.test(stateSource) &&
+      /function emit\(event, payload\)/.test(stateSource) &&
+      /window\.RobcoEvents\s*=\s*RobcoEvents/.test(stateSource),
+    '135.1: js/state.js declares RobcoEvents (on/emit) and exposes window.RobcoEvents'
+  );
+
+  // ── Behavioral bus tests (VM) ────────────────────────────────────────────
+  const vm135 = require('vm');
+  function makeBusSandbox135() {
+    const sandbox = { window: {}, document: { getElementById: () => null } };
+    vm135.createContext(sandbox);
+    vm135.runInContext(stateSource, sandbox);
+    return sandbox;
+  }
+
+  // 135.2  emit → subscribe fires: a single on() + a single emit() calls the
+  //        handler exactly once with the emitted payload
+  {
+    let ok = false;
+    try {
+      const sb = makeBusSandbox135();
+      sb.calls = [];
+      vm135.runInContext("RobcoEvents.on('t.event', p => { calls.push(p); })", sb);
+      vm135.runInContext("RobcoEvents.emit('t.event', { x: 1 })", sb);
+      ok = sb.calls.length === 1 && sb.calls[0].x === 1;
+    } catch (e) {
+      fail(`135.2 harness error: ${e.message}`);
+    }
+    assert(ok, '135.2: RobcoEvents.on() + emit() calls the handler exactly once with the payload');
+  }
+
+  // 135.3  no double-fire: two emits call a single handler twice, not four times
+  {
+    let ok = false;
+    try {
+      const sb = makeBusSandbox135();
+      sb.calls = [];
+      vm135.runInContext("RobcoEvents.on('t.event', p => { calls.push(p); })", sb);
+      vm135.runInContext("RobcoEvents.emit('t.event', 1)", sb);
+      vm135.runInContext("RobcoEvents.emit('t.event', 2)", sb);
+      ok = sb.calls.length === 2 && sb.calls[0] === 1 && sb.calls[1] === 2;
+    } catch (e) {
+      fail(`135.3 harness error: ${e.message}`);
+    }
+    assert(ok, '135.3: no double-fire — N emits call a single-registered handler exactly N times');
+  }
+
+  // 135.4  multiple independent subscribers to the same event each fire once per emit
+  {
+    let ok = false;
+    try {
+      const sb = makeBusSandbox135();
+      sb.a = 0;
+      sb.b = 0;
+      vm135.runInContext("RobcoEvents.on('t.event', () => { a++; })", sb);
+      vm135.runInContext("RobcoEvents.on('t.event', () => { b++; })", sb);
+      vm135.runInContext("RobcoEvents.emit('t.event')", sb);
+      ok = sb.a === 1 && sb.b === 1;
+    } catch (e) {
+      fail(`135.4 harness error: ${e.message}`);
+    }
+    assert(ok, '135.4: multiple subscribers to the same event each fire exactly once per emit');
+  }
+
+  // 135.5  a throwing handler is swallowed — does not break other handlers or escape emit()
+  {
+    let ok = false;
+    try {
+      const sb = makeBusSandbox135();
+      sb.b = 0;
+      vm135.runInContext("RobcoEvents.on('t.event', () => { throw new Error('boom'); })", sb);
+      vm135.runInContext("RobcoEvents.on('t.event', () => { b++; })", sb);
+      vm135.runInContext("RobcoEvents.emit('t.event')", sb);
+      ok = sb.b === 1;
+    } catch (e) {
+      // ok stays false — a throw escaping emit() is exactly what must never happen
+    }
+    assert(
+      ok,
+      '135.5: a throwing listener never escapes emit() and never blocks the other listeners'
+    );
+  }
+
+  // 135.6  emitting an event with zero subscribers does not throw
+  {
+    let ok = false;
+    try {
+      const sb = makeBusSandbox135();
+      vm135.runInContext("RobcoEvents.emit('nobody.listens', { x: 1 })", sb);
+      ok = true;
+    } catch (e) {
+      // ok stays false
+    }
+    assert(ok, '135.6: emit() on an event with no subscribers does not throw');
+  }
+
+  // ── Faction-threshold Protocol-38 fix (static + behavioral) ──────────────
+
+  // 135.7  negative guard: the old FNV-hardcoded faction-key array is gone
+  //        (an assignment form, not just the identifier — so this doesn't
+  //        false-positive on the explanatory comment describing the old code)
+  assert(
+    !/majorFactionKeys/.test(apiSource) && !/=\s*\['ncr',\s*'legion'/.test(apiSource),
+    "135.7: api.js no longer hardcodes a FNV-only faction-key array (majorFactionKeys = ['ncr',...]) — U7 Protocol-38 fix"
+  );
+
+  // 135.8  positive guard: the faction-threshold detector reads getFactionRegistry()
+  assert(
+    /VILIFIED_NET[\s\S]{0,300}getFactionRegistry\(\)\.forEach/.test(apiSource),
+    '135.8: the faction-threshold detector iterates getFactionRegistry() — game-agnostic, not a hardcoded key list'
+  );
+
+  // 135.9  behavioral: an FO3-only faction key (never in the old hardcoded FNV
+  //        array) crossing the Vilified threshold fires 'faction.threshold' —
+  //        proof the fix actually works for FO3, not just that the literal is gone
+  {
+    let ok = false;
+    let err = null;
+    try {
+      const sandbox = {
+        window: {},
+        document: { getElementById: () => null },
+        console: { error: () => {}, log: () => {}, warn: () => {} },
+        loadUI: () => {},
+        appendToChat: () => {},
+        expandPanelForCategory: () => {},
+      };
+      vm135.createContext(sandbox);
+      vm135.runInContext(stateSource, sandbox);
+      const autoImportBody135 =
+        'function autoImportState(jsonString)' + extractFunctionBody(apiSource, 'autoImportState');
+      vm135.runInContext(autoImportBody135 + '\nthis.autoImportState = autoImportState;', sandbox);
+      sandbox.captured = null;
+      vm135.runInContext("RobcoEvents.on('faction.threshold', p => { captured = p; })", sandbox);
+      // Talon Company ('talon') is FO3-only and was never in the old FNV array.
+      vm135.runInContext(
+        "state = { gameContext: 'FO3', ticks: 0, campaign_notes: [], factions: { talon: { fame: 0, infamy: 0 } } };",
+        sandbox
+      );
+      sandbox.window._lastStateBeforeSync = JSON.stringify({
+        factions: { talon: { fame: 0, infamy: 400 } }, // net -400 (above Vilified)
+      });
+      sandbox.autoImportState(
+        JSON.stringify({ factions: { talon: { fame: 0, infamy: 600 } } }) // net -600 (crosses Vilified)
+      );
+      const captured = vm135.runInContext('captured', sandbox);
+      ok = !!captured && captured.key === 'talon' && captured.direction === 'vilified';
+    } catch (e) {
+      err = e;
+    }
+    assert(
+      ok,
+      "135.9: an FO3-only faction ('talon', never in the old FNV-hardcoded array) crossing Vilified fires 'faction.threshold' — the Protocol-38 fix works behaviorally" +
+        (err ? ` (harness error: ${err.message})` : '')
+    );
+  }
+
+  // ── U7 detector migration (static) ────────────────────────────────────────
+
+  // 135.10  level-up and faction-threshold detectors in api.js emit through the bus
+  assert(
+    /RobcoEvents\.emit\(\s*'level\.up'/.test(apiSource) &&
+      /RobcoEvents\.emit\(\s*'faction\.threshold'/.test(apiSource),
+    "135.10: autoImportState()'s level-up and faction-threshold detectors emit 'level.up' / 'faction.threshold' through RobcoEvents"
+  );
+
+  // 135.11  HP-critical detector in ui-core.js emits through the bus
+  assert(
+    /RobcoEvents\.emit\(\s*'hp\.critical'/.test(uiCoreSrc135),
+    "135.11: updateMath()'s HP-critical detector emits 'hp.critical' through RobcoEvents"
+  );
+
+  // ── U8 auto-log expansion (static) ─────────────────────────────────────────
+
+  // 135.12  the 5 new U8 emit points are present at their real call sites
+  assert(
+    /function toggleCollectible[\s\S]{0,400}RobcoEvents\.emit\(\s*'collectible\.acquired'/.test(
+      uiRenderSrc135
+    ) &&
+      /function doCraft[\s\S]{0,2500}RobcoEvents\.emit\(\s*'craft\.completed'/.test(
+        uiRenderSrc135
+      ) &&
+      /function doScrap[\s\S]{0,2500}RobcoEvents\.emit\(\s*'craft\.scrapped'/.test(
+        uiRenderSrc135
+      ) &&
+      /function doBuy[\s\S]{0,2500}RobcoEvents\.emit\(\s*'trade\.bought'/.test(uiRenderSrc135) &&
+      /function doSell[\s\S]{0,2500}RobcoEvents\.emit\(\s*'trade\.sold'/.test(uiRenderSrc135) &&
+      /function _nativeSleep[\s\S]{0,600}RobcoEvents\.emit\(\s*'sleep\.completed'/.test(apiSource),
+    '135.12: U8 emit points present — toggleCollectible/doCraft/doScrap/doBuy/doSell (ui-render.js) and _nativeSleep (api.js)'
+  );
+
+  // 135.13  state.js registers an auto-log subscriber for level.up + every U8 event
+  assert(
+    [
+      'level.up',
+      'collectible.acquired',
+      'craft.completed',
+      'craft.scrapped',
+      'trade.bought',
+      'trade.sold',
+      'sleep.completed',
+    ].every(ev =>
+      new RegExp(`RobcoEvents\\.on\\(\\s*'${ev.replace('.', '\\.')}'`).test(stateSource)
+    ),
+    '135.13: state.js subscribes to level.up + all 6 U8 action events for auto-logging'
+  );
+
+  // 135.14  behavioral: emitting 'level.up' through the real state.js bus appends
+  //         a campaign_notes entry via the real _logCampaignEvent() subscriber
+  {
+    let ok = false;
+    try {
+      const sb = makeBusSandbox135();
+      vm135.runInContext(
+        "state = { ticks: 5, campaign_notes: [] }; RobcoEvents.emit('level.up', { oldLvl: 3, newLvl: 4 });",
+        sb
+      );
+      const notes = vm135.runInContext('state.campaign_notes', sb);
+      ok =
+        Array.isArray(notes) &&
+        notes.length === 1 &&
+        /Level Up: 3 → 4/.test(notes[0]) &&
+        /\[T5\]/.test(notes[0]);
+    } catch (e) {
+      fail(`135.14 harness error: ${e.message}`);
+    }
+    assert(
+      ok,
+      "135.14: emitting 'level.up' through the real RobcoEvents bus appends a [T#] Level Up campaign_notes entry via the real _logCampaignEvent() subscriber"
+    );
+  }
+
+  // ── Boot-order regression (Protocol 42) ───────────────────────────────────
+  // Discovered live: ui-audio.js/ui-core.js/api.js are static <script> tags that
+  // CAN execute before state.js (which defines RobcoEvents) finishes its dynamic,
+  // context-conditional load (js/db_nv.js / state.js / js/reg_nv.js / registry-core.js
+  // are injected via document.createElement('script'), per the boot-loader comment
+  // in index.html — "Static ui-*/api/cloud tags below ... may parse first"). A
+  // bare top-level RobcoEvents.on(...) call in any of those 3 files threw
+  // "RobcoEvents is not defined" on some boots (confirmed via the Playwright
+  // boot-smoke check, a real shipped-code path — not a harness artifact). Fixed
+  // by wrapping each cross-file subscriber registration in a named
+  // _wire*EventBusSubscribers() function called from window.onload, once
+  // state.js is guaranteed to have run.
+  const uiAudioSrc135 = readFile('js/ui-audio.js');
+
+  // 135.15  structural: each cross-file subscriber registration is wrapped in a
+  //         named wiring function, and window.onload calls all three
+  {
+    let onloadBody135 = '';
+    const olIdx135 = uiCoreSrc135.indexOf('window.onload = function () {');
+    if (olIdx135 !== -1) {
+      const braceStart135 = uiCoreSrc135.indexOf('{', olIdx135);
+      let depth135 = 0,
+        i135 = braceStart135;
+      for (; i135 < uiCoreSrc135.length; i135++) {
+        if (uiCoreSrc135[i135] === '{') depth135++;
+        else if (uiCoreSrc135[i135] === '}' && --depth135 === 0) break;
+      }
+      onloadBody135 = uiCoreSrc135.slice(braceStart135, i135 + 1);
+    }
+    assert(
+      /function _wireAudioEventBusSubscribers\(\)\s*\{[\s\S]*?RobcoEvents\.on\(/.test(
+        uiAudioSrc135
+      ) &&
+        /function _wireCoreEventBusSubscribers\(\)\s*\{[\s\S]*?RobcoEvents\.on\(/.test(
+          uiCoreSrc135
+        ) &&
+        /function _wireApiEventBusSubscribers\(\)\s*\{[\s\S]*?RobcoEvents\.on\(/.test(apiSource) &&
+        [
+          '_wireCoreEventBusSubscribers',
+          '_wireAudioEventBusSubscribers',
+          '_wireApiEventBusSubscribers',
+        ].every(n => onloadBody135.includes(n + '()')),
+      '135.15: the level.up/hp.critical/faction.threshold cross-file RobcoEvents.on() registrations are each wrapped in a named _wire*EventBusSubscribers() function, and window.onload calls all three'
+    );
+  }
+
+  // 135.16  negative guard: no RobcoEvents.on() call escapes its wiring function
+  //         in ui-audio.js / ui-core.js / api.js — i.e. no bare top-level
+  //         registration has crept back in (the exact shape of the boot-order bug)
+  {
+    function onCallsInsideWiringFn(src, fnName) {
+      let body;
+      try {
+        body = extractFunctionBody(src, fnName);
+      } catch (_) {
+        return { total: -1, inside: -2 }; // force mismatch → fail
+      }
+      const total = (src.match(/RobcoEvents\.on\(\s*['"]/g) || []).length;
+      const inside = (body.match(/RobcoEvents\.on\(\s*['"]/g) || []).length;
+      return { total, inside };
+    }
+    const audioCheck135 = onCallsInsideWiringFn(uiAudioSrc135, '_wireAudioEventBusSubscribers');
+    const coreCheck135 = onCallsInsideWiringFn(uiCoreSrc135, '_wireCoreEventBusSubscribers');
+    const apiCheck135 = onCallsInsideWiringFn(apiSource, '_wireApiEventBusSubscribers');
+    assert(
+      audioCheck135.total === audioCheck135.inside &&
+        coreCheck135.total === coreCheck135.inside &&
+        apiCheck135.total === apiCheck135.inside &&
+        audioCheck135.total > 0 &&
+        coreCheck135.total > 0 &&
+        apiCheck135.total > 0,
+      '135.16: every RobcoEvents.on() call in ui-audio.js/ui-core.js/api.js sits inside its _wire*EventBusSubscribers() function — none at bare top level (the U7 boot-order regression)'
     );
   }
 }

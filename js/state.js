@@ -91,6 +91,72 @@ const MetaStore = {
 };
 window.MetaStore = MetaStore;
 
+// ── ROBCO EVENTS — OS event bus for terminal/game state crossings ───────────
+// A tiny synchronous pub/sub: emit(event, payload) calls every handler
+// registered via on(event, fn), in registration order. This decouples STATE
+// CROSSING DETECTION (faction threshold, HP critical, level-up, and the
+// U8 notable-action points — collectible/craft/trade/sleep) from the code
+// that REACTS to them (sound, haptic, chat message, auto-log) — a detector
+// emits a fact once; any number of consumers subscribe instead of each
+// re-implementing the same crossing check inline (Protocol 22). A handler
+// that throws is caught and swallowed so one bad listener can never break
+// the emitter or any other listener (the emitter itself must never throw).
+const RobcoEvents = (() => {
+  const handlers = {};
+  function on(event, fn) {
+    if (!handlers[event]) handlers[event] = [];
+    handlers[event].push(fn);
+  }
+  function emit(event, payload) {
+    (handlers[event] || []).forEach(fn => {
+      try {
+        fn(payload);
+      } catch (_) {
+        /* a listener failure must never break the emitter or other listeners */
+      }
+    });
+  }
+  return { on, emit };
+})();
+window.RobcoEvents = RobcoEvents;
+
+// ── CAMPAIGN-NOTE LOGGING — single append+cap helper for campaign_notes ─────
+// The one writer for the append-only campaign log (Protocol 22 — replaces the
+// duplicated "push then slice(-200)" pattern that used to live inline at each
+// call site). Used directly by the faction fame/infamy delta log and the
+// quest-status-change log, and by the auto-log RobcoEvents subscribers below.
+function _logCampaignEvent(text) {
+  if (!state.campaign_notes) state.campaign_notes = [];
+  state.campaign_notes.push(text);
+  if (state.campaign_notes.length > 200) state.campaign_notes = state.campaign_notes.slice(-200);
+}
+
+// ── AUTO-LOG SUBSCRIBERS — U8: expand auto-logging beyond factions/quests/locations ──
+// Each subscriber only writes to campaign_notes; the emit points (api.js,
+// ui-render.js, ui-core.js) own the sound/haptic/chat side effects for the
+// events they also use for those purposes (level.up, faction.threshold).
+RobcoEvents.on('level.up', p => {
+  _logCampaignEvent(`[T${state.ticks || 0}] Level Up: ${p.oldLvl} → ${p.newLvl}`);
+});
+RobcoEvents.on('collectible.acquired', p => {
+  _logCampaignEvent(`[T${state.ticks || 0}] Collectible found: ${p.name}`);
+});
+RobcoEvents.on('craft.completed', p => {
+  _logCampaignEvent(`[T${state.ticks || 0}] Crafted ${p.qty}× ${p.name}`);
+});
+RobcoEvents.on('craft.scrapped', p => {
+  _logCampaignEvent(`[T${state.ticks || 0}] Scrapped ${p.qty}× ${p.name}`);
+});
+RobcoEvents.on('trade.bought', p => {
+  _logCampaignEvent(`[T${state.ticks || 0}] Bought ${p.name} for ${p.price}c`);
+});
+RobcoEvents.on('trade.sold', p => {
+  _logCampaignEvent(`[T${state.ticks || 0}] Sold ${p.name} for ${p.price}c`);
+});
+RobcoEvents.on('sleep.completed', p => {
+  _logCampaignEvent(`[T${state.ticks || 0}] Rested 8 hours (+${p.ticksAdded} ticks)`);
+});
+
 // ── SAVE INTEGRITY + ROLLING BACKUP HELPERS ──────────────────────
 // FNV-1a 32-bit hash over a string (same algorithm as cloud.js _contentHash)
 function _fnv1a32(str) {

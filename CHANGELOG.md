@@ -1,8 +1,13 @@
-﻿## [Unreleased]<!-- Tests: 1620/1620 | Cache: robco-terminal-v2.7.0-r13 -->
+﻿## [Unreleased]<!-- Tests: 1636/1636 | Cache: robco-terminal-v2.7.0-r14 -->
 
 ### Fixed
 
 - Closed a rare data-safety gap where certain unusual or corrupted responses from the AI could silently turn one of your character's core stats into an invalid, unusable value instead of being safely ignored. Your character sheet can no longer be corrupted this way.
+- Fixed faction reputation alerts never appearing in Fallout 3 campaigns. Crossing into Vilified or Idolized standing with any faction now reliably shows the on-screen alert and its confirmation tone/vibration in both games — previously the alert only recognized New Vegas faction names, so Fallout 3 campaigns silently never triggered it no matter how hostile or beloved a faction became.
+
+### Improved
+
+- Your campaign log now also records level-ups, newly-found collectibles, crafting and scrapping, buying and selling, and resting — not just faction changes, quest updates, and new locations. Open CROSSROADS ANALYSIS (or your exported campaign log) to see the fuller history.
 
 ### Under the Hood
 
@@ -21,6 +26,7 @@
 - Restructured how the app's startup routine is organized internally, breaking one large block of startup code into smaller, clearly-named steps that each handle one part of booting up (restoring your saved campaign, restoring your device settings, wiring up keyboard shortcuts, and so on) — still run in the exact same order as before. This is purely an internal reorganization to make the startup code easier to maintain safely going forward; a full mobile and desktop check confirmed the app still starts up cleanly with no black screen, no errors, and no visible change to how anything looks or behaves.
 - Added a much deeper automatic check for the code that applies the AI's updates to your character sheet: it now actually runs that code against dozens of unusual and deliberately broken inputs — garbage text, extremely long values, more items than normal, and a few security-style edge cases — to confirm it always handles them safely without ever corrupting your saved data. This is also what caught the data-safety gap noted above. Also tightened the release checklist so it compares every individual group of checks between the two test runners, not just the overall total, catching a kind of drift a matching grand total alone could hide. Internal tooling only.
 - Reorganized how the app stores your device settings — sound mute switches, screen color, screen-stays-on toggle, typing speed, and similar preferences — so they all now go through one consistent internal pathway instead of being read and written from dozens of separate places. Also added a dedicated check confirming these device settings can never mix with your campaign save data. This is purely an internal cleanup: every existing preference keeps its current value, and nothing about how the app looks or behaves has changed.
+- Reworked how the terminal reacts to key moments in your campaign — leveling up, a faction's standing crossing a threshold, your health dropping into the critical zone — so these are now announced through one small internal messaging system that other parts of the app can listen to, instead of each moment triggering its sound, vibration, or log entry directly inline. This is what made the Fallout 3 faction-alert fix and the expanded campaign log above possible without duplicating logic; the existing reactions to these moments (the level-up jingle, the critical-health flash and buzz, the faction alert chime) are unchanged. Internal reorganization only.
 
 ---
 

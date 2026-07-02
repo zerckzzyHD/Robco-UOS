@@ -895,6 +895,20 @@ function playLevelUpJingle() {
   });
 }
 
+// U7: level-up is detected in autoImportState() (api.js) and emitted through
+// RobcoEvents — the jingle + haptic are a pure reaction, subscribed here. Wiring
+// is deferred to a function called from window.onload (ui-core.js), NOT run at
+// this file's top level — ui-audio.js is a static <script> tag that can execute
+// before state.js (which defines RobcoEvents) finishes its dynamic, context-
+// conditional load (see the boot-loader comment in index.html); a top-level
+// RobcoEvents.on(...) here would throw "RobcoEvents is not defined" on some boots.
+function _wireAudioEventBusSubscribers() {
+  RobcoEvents.on('level.up', () => {
+    playLevelUpJingle();
+    triggerHaptic('levelup'); // WU-F2 haptic
+  });
+}
+
 // ── H4: LOW HEALTH HEARTBEAT ─────────────────────────────────────
 // Activates when HP < 25% (checked in updateMath()).
 // Sine pulse ~1.2Hz. When concurrent with tinnitus (crippled head),

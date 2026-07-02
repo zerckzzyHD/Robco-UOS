@@ -922,6 +922,12 @@ function _wireUnloadFlush() {
 }
 
 window.onload = function () {
+  // U7: wire the OS Event Bus subscribers first — state.js (which defines
+  // RobcoEvents) is guaranteed loaded by onload, unlike at each file's own
+  // top-level parse time (see the boot-loader comment in index.html).
+  _wireCoreEventBusSubscribers();
+  _wireAudioEventBusSubscribers();
+  _wireApiEventBusSubscribers();
   _hydrateStateFromStorage();
   _restoreApiKeyAndChatHistory();
   loadUI();
@@ -2398,6 +2404,23 @@ let _lastRadThreshold = 0; // 0 / 200 / 400 / 600 / 1000
 let _lastGameHourBand = -1; // 0=night(20-5), 1=morning(6-11), 2=day(12-18), 3=evening(19)
 let _lastChemExpiry = new Set(); // names of chems we've already warned about
 
+// U7: HP-critical reaction (crit-hp-flash class + chassis buzz) — updateMath()
+// below only detects the >25%→≤25% crossing and emits; this is the subscriber.
+// Wiring is deferred to a function called from window.onload, NOT run at this
+// file's top level — ui-core.js is itself a static <script> tag that can execute
+// before state.js (which defines RobcoEvents) finishes its dynamic, context-
+// conditional load (see the boot-loader comment in index.html); a top-level
+// RobcoEvents.on(...) here would throw "RobcoEvents is not defined" on some boots.
+function _wireCoreEventBusSubscribers() {
+  RobcoEvents.on('hp.critical', () => {
+    document.body.classList.remove('crit-hp-flash');
+    void document.body.offsetWidth;
+    document.body.classList.add('crit-hp-flash');
+    setTimeout(() => document.body.classList.remove('crit-hp-flash'), 750);
+    if (typeof triggerHaptic === 'function') triggerHaptic('lowhealth'); // WU-F2 haptic
+  });
+}
+
 function updateMath() {
   let maxAp = 65 + state.a * 3;
   document.getElementById('display_ap').innerText = maxAp;
@@ -2422,14 +2445,10 @@ function updateMath() {
     if (pct > 60) hpFill.style.background = 'var(--robco-green)';
     else if (pct > 25) hpFill.style.background = 'var(--robco-alert)';
     else hpFill.style.background = 'var(--robco-danger)';
-    // Flash red when HP drops into critical territory
+    // Flash red when HP drops into critical territory — a state crossing,
+    // emitted through the bus (U7); the flash + haptic below is the subscriber.
     if (_lastHpPct !== null && _lastHpPct > 25 && pct <= 25) {
-      document.body.classList.remove('crit-hp-flash');
-      void document.body.offsetWidth;
-      document.body.classList.add('crit-hp-flash');
-      setTimeout(() => document.body.classList.remove('crit-hp-flash'), 750);
-      // WU-F2: one-shot chassis buzz on the critical-HP crossing (mirrors the flash)
-      if (typeof triggerHaptic === 'function') triggerHaptic('lowhealth');
+      RobcoEvents.emit('hp.critical', { pct });
     }
     _lastHpPct = pct;
     // H4: Low Health Heartbeat — start when HP < 25%, stop when >= 25%

@@ -705,6 +705,7 @@ function toggleCollectible(name) {
     state.collectibles.splice(idx, 1);
   } else {
     state.collectibles.push(name);
+    RobcoEvents.emit('collectible.acquired', { name }); // U8 auto-log
   }
   renderCollectibles();
   renderSessionStats();
@@ -1881,6 +1882,7 @@ function doCraft(recipeIdx) {
   if (typeof updateMath === 'function') updateMath();
   renderCraft();
   saveState();
+  RobcoEvents.emit('craft.completed', { name: recipe.output.item, qty: outputQty }); // U8 auto-log
   if (typeof appendToChat === 'function')
     appendToChat(`> [CRAFT] Built ${qty}× ${recipe.name}.`, 'sys');
 }
@@ -1930,6 +1932,7 @@ function doScrap(bdIdx) {
   if (typeof updateMath === 'function') updateMath();
   renderCraft();
   saveState();
+  RobcoEvents.emit('craft.scrapped', { name: breakdown.item, qty }); // U8 auto-log
   if (typeof appendToChat === 'function')
     appendToChat(`> [SCRAP] Scrapped ${qty}× ${breakdown.item} → ${yieldStr}.`, 'sys');
 }
@@ -2117,6 +2120,7 @@ function doBuy(name) {
   if (typeof updateMath === 'function') updateMath();
   renderTrade();
   saveState();
+  RobcoEvents.emit('trade.bought', { name: item.name, price }); // U8 auto-log
   if (typeof appendToChat === 'function')
     appendToChat(`> [TRADE] Bought ${item.name} for ${price}c. Caps: ${state.caps}.`, 'sys');
 }
@@ -2152,6 +2156,7 @@ function doSell(name) {
   if (typeof updateMath === 'function') updateMath();
   renderTrade();
   saveState();
+  RobcoEvents.emit('trade.sold', { name: it.name, price }); // U8 auto-log
   if (typeof appendToChat === 'function')
     appendToChat(`> [TRADE] Sold ${it.name} for ${price}c. Caps: ${state.caps}.`, 'sys');
 }

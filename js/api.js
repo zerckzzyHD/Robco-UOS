@@ -487,6 +487,29 @@ function sanitizeImportedContainer(container) {
   return out;
 }
 
+// U7: faction-threshold reaction (chat alert + sound + haptic) — the detector
+// inside autoImportState() below only detects the crossing and emits; this is
+// the one subscriber for it, unchanged from the code it replaces except for
+// being reachable from anywhere that emits 'faction.threshold', not just here.
+// Wiring is deferred to a function called from window.onload (ui-core.js), NOT
+// run at this file's top level — api.js is itself a static <script> tag that can
+// execute before state.js (which defines RobcoEvents) finishes its dynamic,
+// context-conditional load (see the boot-loader comment in index.html); a
+// top-level RobcoEvents.on(...) here would throw "RobcoEvents is not defined"
+// on some boots.
+function _wireApiEventBusSubscribers() {
+  RobcoEvents.on('faction.threshold', p => {
+    const msg =
+      p.direction === 'vilified'
+        ? `> ⚠ [FACTION ALERT] ${p.name}: STATUS DOWNGRADED TO VILIFIED. HOSTILE ENGAGEMENT EXPECTED.`
+        : `> ★ [FACTION ALERT] ${p.name}: STATUS ELEVATED TO IDOLIZED.`;
+    if (typeof appendToChat === 'function') appendToChat(msg, 'sys', true);
+    if (typeof playFactionThresholdSound === 'function')
+      playFactionThresholdSound(p.direction === 'idolized');
+    if (typeof triggerHaptic === 'function') triggerHaptic('alert'); // WU-F2 haptic
+  });
+}
+
 function autoImportState(jsonString) {
   try {
     // Snapshot current state for undo before applying changes
@@ -505,10 +528,11 @@ function autoImportState(jsonString) {
     const lvlV = _g(parsed, 'lvl');
     const _prevLvl = state.lvl; // H3: capture before update
     if (lvlV !== undefined) state.lvl = parseInt(lvlV) || 0;
-    // H3: Level Up Jingle — fire when lvl increases
-    if (lvlV !== undefined && state.lvl > _prevLvl && typeof playLevelUpJingle === 'function') {
-      playLevelUpJingle();
-      if (typeof triggerHaptic === 'function') triggerHaptic('levelup'); // WU-F2 haptic
+    // H3/U7: level-up is a state crossing — emit through the bus. The jingle,
+    // haptic, and (U8) campaign-note subscribers each decide independently
+    // whether to react; the detector here only detects.
+    if (lvlV !== undefined && state.lvl > _prevLvl) {
+      RobcoEvents.emit('level.up', { oldLvl: _prevLvl, newLvl: state.lvl });
     }
     const xpV = _g(parsed, 'xp');
     if (xpV !== undefined) state.xp = parseInt(xpV) || 0;
@@ -589,10 +613,7 @@ function autoImportState(jsonString) {
           let parts = [];
           if (fameDelta !== 0) parts.push(`fame ${fameDelta > 0 ? '+' : ''}${fameDelta}`);
           if (infamyDelta !== 0) parts.push(`infamy ${infamyDelta > 0 ? '+' : ''}${infamyDelta}`);
-          if (!state.campaign_notes) state.campaign_notes = [];
-          state.campaign_notes.push(`[T${state.ticks}] ${f.name}: ${parts.join(', ')}`);
-          if (state.campaign_notes.length > 200)
-            state.campaign_notes = state.campaign_notes.slice(-200);
+          _logCampaignEvent(`[T${state.ticks}] ${f.name}: ${parts.join(', ')}`);
         }
       });
     }
@@ -693,12 +714,9 @@ function autoImportState(jsonString) {
       state.quests.forEach(curr => {
         const prev = questsBefore.find(bq => bq.name.toLowerCase() === curr.name.toLowerCase());
         if (prev && prev.status !== curr.status) {
-          if (!state.campaign_notes) state.campaign_notes = [];
-          state.campaign_notes.push(
+          _logCampaignEvent(
             `[T${state.ticks || 0}] Quest: "${curr.name}" → ${curr.status.toUpperCase()}`
           );
-          if (state.campaign_notes.length > 200)
-            state.campaign_notes = state.campaign_notes.slice(-200);
           // Quest audio — fire appropriate tone on terminal
           const newStatus = curr.status.toUpperCase();
           if (
@@ -798,35 +816,42 @@ function autoImportState(jsonString) {
       });
     }
 
-    // ── FACTION CONSEQUENCE TRIGGERS (#4) ───────────────────────
-    // Check if any major faction just hit Vilified threshold. Alert the Courier.
+    // ── FACTION CONSEQUENCE TRIGGERS (#4 / U7) ───────────────────
+    // Check if any faction just crossed the Vilified or Idolized threshold and
+    // emit through the bus — the chat alert / sound / haptic reaction and the
+    // U8 campaign-note are each independent subscribers. Reads getFactionRegistry()
+    // (game-agnostic — every faction in the ACTIVE game, not a hand-picked FNV-only
+    // key list) instead of a hardcoded faction-key array — the U7 Protocol-38 fix:
+    // the old ['ncr','legion','house','bos','boomers','khans'] literal only ever
+    // matched FNV keys, so FO3 campaigns never fired a threshold alert at all.
     if (state.factions && typeof expandPanelForCategory === 'function') {
       const VILIFIED_NET = -500;
-      const majorFactionKeys = ['ncr', 'legion', 'house', 'bos', 'boomers', 'khans'];
       const prevFactions = JSON.parse(window._lastStateBeforeSync || '{}').factions || {};
-      majorFactionKeys.forEach(key => {
-        const cur = state.factions[key];
-        const prev = prevFactions[key];
+      getFactionRegistry().forEach(f => {
+        const cur = state.factions[f.key];
+        const prev = prevFactions[f.key];
         if (!cur || !prev) return;
         const curNet = (cur.fame || 0) - (cur.infamy || 0);
         const prevNet = (prev.fame || 0) - (prev.infamy || 0);
-        const fData = FACTION_REGISTRY.find(f => f.key === key);
-        const fname = fData ? fData.name : key.toUpperCase();
-        // Alert on Vilified threshold crossing
+        // Crossing into Vilified
         if (prevNet > VILIFIED_NET && curNet <= VILIFIED_NET) {
-          appendToChat(
-            `> ⚠ [FACTION ALERT] ${fname}: STATUS DOWNGRADED TO VILIFIED. HOSTILE ENGAGEMENT EXPECTED.`,
-            'sys',
-            true
-          );
-          if (typeof playFactionThresholdSound === 'function') playFactionThresholdSound(false);
-          if (typeof triggerHaptic === 'function') triggerHaptic('alert'); // WU-F2 haptic
+          RobcoEvents.emit('faction.threshold', {
+            key: f.key,
+            name: f.name,
+            direction: 'vilified',
+            curNet,
+            prevNet,
+          });
         }
-        // Alert on Idolized threshold crossing
+        // Crossing into Idolized
         if (prevNet < 750 && curNet >= 750) {
-          appendToChat(`> ★ [FACTION ALERT] ${fname}: STATUS ELEVATED TO IDOLIZED.`, 'sys', true);
-          if (typeof playFactionThresholdSound === 'function') playFactionThresholdSound(true);
-          if (typeof triggerHaptic === 'function') triggerHaptic('alert'); // WU-F2 haptic
+          RobcoEvents.emit('faction.threshold', {
+            key: f.key,
+            name: f.name,
+            direction: 'idolized',
+            curNet,
+            prevNet,
+          });
         }
       });
     }
@@ -1241,6 +1266,7 @@ function _nativeSleep() {
     `> [SLEEP] Courier rested 8 hours.\n> Ticks: ${oldTicks} → ${newTicks} (+80)\n> HP restored. All limbs healed.`,
     'sys'
   );
+  RobcoEvents.emit('sleep.completed', { ticksAdded: newTicks - oldTicks }); // U8 auto-log
   // loadUI() pushes state→DOM (ticks, hpCur, limbs) before saveState() reads DOM back
   if (typeof loadUI === 'function') loadUI();
   if (typeof saveState === 'function') saveState();

@@ -82,6 +82,8 @@ export default [
         _activeDef: 'readonly',
         getFactionRegistry: 'readonly',
         getSkillKeys: 'readonly',
+        RobcoEvents: 'readonly', // U7 OS event bus (js/state.js)
+        _logCampaignEvent: 'readonly', // U7/U8 campaign_notes append+cap helper (js/state.js)
         switchTab: 'readonly',
         initTabs: 'readonly',
         appendToChat: 'readonly',
@@ -96,6 +98,7 @@ export default [
         restoreChatHistory: 'readonly',
         chatHistory: 'writable',
         transmitMessage: 'readonly',
+        _wireApiEventBusSubscribers: 'readonly', // U7 OS event bus (api.js)
         fetchAuthorizedModels: 'readonly',
         lookupItemInDb: 'readonly',
         lookupWeaponStats: 'readonly',
@@ -130,6 +133,7 @@ export default [
         triggerHaptic: 'readonly', // WU-F2 Haptic Solenoid (ui-audio.js)
         initHaptic: 'readonly', // WU-F2 Haptic Solenoid (ui-audio.js)
         initRadio: 'readonly', // WU-F5 Pip-Boy Radio (ui-audio.js)
+        _wireAudioEventBusSubscribers: 'readonly', // U7 OS event bus (ui-audio.js)
         startHeartbeat: 'readonly',
         stopHeartbeat: 'readonly',
         playBootDrone: 'readonly',

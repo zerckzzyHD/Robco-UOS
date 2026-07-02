@@ -63,8 +63,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    1620-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    1620-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    1636-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    1636-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -678,13 +678,62 @@ Fame and infamy are independent and the display reflects this.
 ### Auto-Logging
 
 `autoImportState()` diffs faction values before/after each AI sync.
-Any change is auto-appended to `state.campaign_notes`:
+Any change is auto-appended to `state.campaign_notes` via `_logCampaignEvent()`
+(state.js — the single append+200-cap helper, Step 2 U7):
 `"[T{ticks}] {FactionName}: fame +N, infamy +N"`
+
+As of Step 2 (v2.8.0) Phase 0 U8, `_logCampaignEvent()` is also the target of
+auto-log subscribers on the OS Event Bus (see below) for level-ups, collectible
+acquisitions, crafts, trades, and sleeps — see [OS Event Bus](#os-event-bus-robcoevents).
 
 ### Consequence Triggers (#4)
 
-When a major faction crosses Vilified (-500 net) or Idolized (+750 net),
-a sys alert is appended to chat.
+When any faction (`getFactionRegistry()` — every faction in the active game,
+not a fixed subset) crosses Vilified (-500 net) or Idolized (+750 net), the
+detector in `autoImportState()` emits `'faction.threshold'` on the OS Event Bus;
+a subscriber in `api.js` appends the sys alert to chat and fires sound/haptic.
+Prior to Step 2 U7 this iterated a hardcoded FNV-only key array
+(`['ncr','legion','house','bos','boomers','khans']`), so FO3 campaigns never
+triggered the alert — a Protocol 38 leak, fixed by reading the game-agnostic
+registry instead.
+
+### OS Event Bus (RobcoEvents)
+
+`js/state.js` declares a tiny synchronous pub/sub, `RobcoEvents.on(event, fn)` /
+`RobcoEvents.emit(event, payload)`, added in Step 2 (v2.8.0) Phase 0 Unit 7. It
+decouples STATE CROSSING DETECTION from the code that reacts to it: a detector
+calls `emit()` once when it observes a crossing; any number of independent
+listeners `on()` it without the detector knowing who's listening. A throwing
+listener is caught and swallowed so it can never break the emitter or a sibling
+listener.
+
+Three previously-inline crossing detectors were migrated to emit through the
+bus (behavior preserved — only the wiring changed):
+
+| Event               | Detected in                  | Subscriber(s)                                               |
+| ------------------- | ---------------------------- | ----------------------------------------------------------- |
+| `level.up`          | `autoImportState()` (api.js) | `ui-audio.js` — jingle + haptic; `state.js` — campaign note |
+| `faction.threshold` | `autoImportState()` (api.js) | `api.js` — chat alert + sound + haptic                      |
+| `hp.critical`       | `updateMath()` (ui-core.js)  | `ui-core.js` — `crit-hp-flash` + haptic                     |
+
+Unit 8 added five new emit points for actions that previously went unlogged —
+`collectible.acquired` (`toggleCollectible`), `craft.completed` /
+`craft.scrapped` (`doCraft` / `doScrap`), `trade.bought` / `trade.sold`
+(`doBuy` / `doSell`), and `sleep.completed` (`_nativeSleep`) — each consumed
+by a `state.js` auto-log subscriber that writes to `state.campaign_notes` via
+`_logCampaignEvent()`.
+
+**Subscriber-wiring constraint:** `ui-audio.js`, `ui-core.js`, and `api.js` are
+static `<script>` tags that can execute **before** `state.js` — which is
+injected dynamically, context-conditionally (see [Script Load Order](#script-load-order--globals))
+— has finished loading, so a bare top-level `RobcoEvents.on(...)` call in any of
+those three files can throw `"RobcoEvents is not defined"`. Every cross-file
+subscriber registration is therefore wrapped in a named `_wire*EventBusSubscribers()`
+function (`_wireAudioEventBusSubscribers`, `_wireCoreEventBusSubscribers`,
+`_wireApiEventBusSubscribers`) and called from `window.onload`, once `state.js`
+is guaranteed to have run. `state.js`'s own auto-log subscribers are exempt —
+they run inside the same script that defines `RobcoEvents`, so no cross-file
+ordering hazard applies.
 
 ---
 
@@ -1023,7 +1072,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1620-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1636-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable
