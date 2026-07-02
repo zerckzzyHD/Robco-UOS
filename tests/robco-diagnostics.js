@@ -14502,6 +14502,153 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 132 — U2: window.onload boot decomposition (Step 2 / v2.8.0
+//  Phase 0). Structural guards that the ~568-line monolithic boot block was
+//  split into named, order-preserving phase functions with zero behavioral
+//  change: every phase function exists, window.onload calls all of them in
+//  the original source order, the shared standby timer state/functions moved
+//  to true module scope (not re-declared inside window.onload — the seam
+//  that made _startAmbientTimers() able to reach _startUptimeClock/
+//  _startMemCycle in the first place), and window.onload itself stays a
+//  slim composition instead of drifting back into a monolith.
+//  10 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 132 — U2 window.onload boot decomposition');
+  const uiCoreSrc132 = readFile('js/ui-core.js');
+
+  const bootPhaseFns132 = [
+    '_hydrateStateFromStorage',
+    '_restoreApiKeyAndChatHistory',
+    '_wireRotaryDialClick',
+    '_wireStandby',
+    '_wirePanelPersistence',
+    '_restoreOpticsPreference',
+    '_restoreDevicePrefs',
+    '_wireKeyboardShortcuts',
+    '_runBootSequenceAndBriefing',
+    '_startAmbientTimers',
+    '_wireInputHistoryNav',
+    '_wireUnloadFlush',
+  ];
+
+  // 132.1  every named boot-phase function is a real function declaration in ui-core.js
+  assert(
+    bootPhaseFns132.every(n => new RegExp(`function ${n}\\s*\\(\\)\\s*\\{`).test(uiCoreSrc132)),
+    'ui-core.js declares all 12 named boot-phase functions (U2 decomposition)'
+  );
+
+  // 132.2  each boot-phase function is declared exactly once (no duplicate seams)
+  assert(
+    bootPhaseFns132.every(
+      n => (uiCoreSrc132.match(new RegExp(`function ${n}\\s*\\(`, 'g')) || []).length === 1
+    ),
+    'every boot-phase function is declared exactly once (no duplicate decomposition seams)'
+  );
+
+  // 132.3  window.onload calls every boot-phase function
+  {
+    let onloadBody132 = '';
+    const olIdx = uiCoreSrc132.indexOf('window.onload = function () {');
+    if (olIdx !== -1) {
+      const braceStart = uiCoreSrc132.indexOf('{', olIdx);
+      let depth = 0,
+        i = braceStart;
+      for (; i < uiCoreSrc132.length; i++) {
+        if (uiCoreSrc132[i] === '{') depth++;
+        else if (uiCoreSrc132[i] === '}' && --depth === 0) break;
+      }
+      onloadBody132 = uiCoreSrc132.slice(braceStart, i + 1);
+    }
+    assert(
+      onloadBody132.length > 0 && bootPhaseFns132.every(n => onloadBody132.includes(n + '()')),
+      'window.onload calls every one of the 12 named boot-phase functions'
+    );
+
+    // 132.4  ...and calls them in the original source order (behavior-preserving —
+    //        no reordering of boot/lifecycle phases)
+    const callIdxs = bootPhaseFns132.map(n => onloadBody132.indexOf(n + '()'));
+    const inOrder = callIdxs.every((idx, i) => i === 0 || idx > callIdxs[i - 1]);
+    assert(
+      inOrder,
+      'window.onload calls the 12 boot-phase functions in the original, order-preserving sequence'
+    );
+
+    // 132.5  window.onload stays a slim composition (regression guard against
+    //        logic drifting back into the monolith instead of into a named seam)
+    const onloadLineCount = onloadBody132.split('\n').length;
+    assert(
+      onloadLineCount < 40,
+      `window.onload body stays a slim named-call composition (${onloadLineCount} lines, expected < 40)`
+    );
+
+    // 132.6  initTabs() still called directly in window.onload (not wrapped —
+    //        Suite 57.9's boot-order guard depends on this literal call site)
+    assert(
+      onloadBody132.includes('initTabs()'),
+      'window.onload still calls initTabs() directly (Suite 57.9 boot-order guard depends on this literal call)'
+    );
+  }
+
+  // 132.7  the standby shared state (_standbyActive/_uptimeInterval/_memCycleInterval/
+  //        sessionStart) is declared at true module scope — i.e. BEFORE
+  //        window.onload's own declaration, not re-declared inside it (the seam
+  //        that lets _startAmbientTimers() reach _startUptimeClock/_startMemCycle)
+  {
+    const onloadDeclIdx132 = uiCoreSrc132.indexOf('window.onload = function () {');
+    const sharedVars132 = [
+      '_standbyActive',
+      '_uptimeInterval',
+      '_memCycleInterval',
+      'sessionStart',
+    ];
+    assert(
+      onloadDeclIdx132 !== -1 &&
+        sharedVars132.every(v => {
+          const declIdx = uiCoreSrc132.indexOf(`let ${v} =`);
+          return declIdx !== -1 && declIdx < onloadDeclIdx132;
+        }),
+      'standby shared state (_standbyActive/_uptimeInterval/_memCycleInterval/sessionStart) is declared once at module scope, before window.onload'
+    );
+  }
+
+  // 132.8  _startUptimeClock/_startMemCycle/enterStandby/exitStandby are module-scope
+  //        function declarations (declared before window.onload, not nested inside it)
+  {
+    const onloadDeclIdx132b = uiCoreSrc132.indexOf('window.onload = function () {');
+    const sharedFns132 = ['_startUptimeClock', '_startMemCycle', 'enterStandby', 'exitStandby'];
+    assert(
+      sharedFns132.every(n => {
+        const declIdx = uiCoreSrc132.indexOf(`function ${n}(`);
+        return declIdx !== -1 && declIdx < onloadDeclIdx132b;
+      }),
+      '_startUptimeClock/_startMemCycle/enterStandby/exitStandby are module-scope functions declared before window.onload (not window.onload-local closures)'
+    );
+  }
+
+  // 132.9  _startAmbientTimers() re-arms sessionStart + both timer starters, matching
+  //        the original boot-time (not just standby-exit) timer kickoff
+  {
+    let ambientBody132 = '';
+    try {
+      ambientBody132 = extractFunctionBody(uiCoreSrc132, '_startAmbientTimers');
+    } catch (_) {}
+    assert(
+      /sessionStart\s*=\s*Date\.now\(\)/.test(ambientBody132) &&
+        /_startUptimeClock\(\)/.test(ambientBody132) &&
+        /_startMemCycle\(\)/.test(ambientBody132),
+      '_startAmbientTimers() sets sessionStart = Date.now() and starts both ambient timers (boot-time kickoff preserved)'
+    );
+  }
+
+  // 132.10  no stray second `window.onload =` assignment was introduced
+  assert(
+    (uiCoreSrc132.match(/window\.onload\s*=/g) || []).length === 1,
+    'exactly one window.onload assignment exists in ui-core.js'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 console.log('\n══════════════════════════════════════════════════════════════\n');

@@ -327,7 +327,94 @@ let _lastRads = -1,
 let _chatSaveTimer = null;
 const CHAT_MAX = 200; // max messages kept in memory; last 50 written to localStorage
 
-window.onload = function () {
+// ── BOOT SEQUENCE (window.onload) ──────────────────────────────
+// Decomposed into named, order-preserving phases (Step 2 Phase 0 U2). Each
+// function below is a straight extraction of one contiguous section of the
+// former monolithic window.onload body — no logic was added, removed, or
+// reordered. window.onload (bottom of this section) calls them in the exact
+// original source order; do not reorder without re-auditing every boot/
+// lifecycle entry path in planning/STEP2_PHASE0_PLAN.md.
+
+// ── STANDBY MODE SHARED STATE ──────────────────────────────────
+// Module-scope (not window.onload-local) because _wireStandby() defines
+// enter/exitStandby here while _startAmbientTimers() — called later in the
+// boot sequence, mirroring the original layout — starts the same timers.
+// Both must share one set of guards so blur+visibilitychange and the
+// initial boot-time start never stack a second interval (DUP-3/DUP-4).
+let _standbyActive = false;
+let _uptimeInterval = null;
+let _memCycleInterval = null;
+let sessionStart = 0;
+
+// Shared interval starters (DUP-3/DUP-4). Both the boot path and exitStandby()
+// restart these after standby clears them; the guard keeps a double-call from
+// ever stacking a second timer.
+function _startUptimeClock() {
+  if (_uptimeInterval) return;
+  _uptimeInterval = setInterval(() => {
+    let elapsed = Math.floor((Date.now() - sessionStart) / 1000);
+    let h = Math.floor(elapsed / 3600),
+      m = Math.floor((elapsed % 3600) / 60),
+      s = elapsed % 60;
+    let el = document.getElementById('uptimeClock');
+    if (el)
+      el.innerText = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }, 1000);
+}
+function _startMemCycle() {
+  if (_memCycleInterval) return;
+  _memCycleInterval = setInterval(() => {
+    appendToChat('> MEMORY CYCLE COMPLETE. 64K STABLE.', 'sys', true);
+    document.body.style.filter = 'brightness(0.35)';
+    setTimeout(() => {
+      document.body.style.filter = '';
+    }, 150);
+  }, 900000);
+}
+
+function enterStandby() {
+  if (_standbyActive) return;
+  _standbyActive = true;
+  document.body.classList.add('standby');
+  geigerRunning = false;
+  if (geigerTimeout) {
+    clearTimeout(geigerTimeout);
+    geigerTimeout = null;
+  }
+  _geigerCurrentRate = -1;
+  if (crtHumGain) {
+    crtHumGain.gain.cancelScheduledValues(audioCtx.currentTime);
+    crtHumGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5);
+  }
+  clearInterval(_uptimeInterval);
+  _uptimeInterval = null;
+  clearInterval(_memCycleInterval);
+  _memCycleInterval = null;
+  stopHeartbeat();
+}
+
+function exitStandby() {
+  if (!_standbyActive) return;
+  _standbyActive = false;
+  playWakeTone();
+  setTimeout(() => {
+    document.body.classList.remove('standby');
+    if (crtHumGain) {
+      crtHumGain.gain.cancelScheduledValues(audioCtx.currentTime);
+      crtHumGain.gain.linearRampToValueAtTime(0.007, audioCtx.currentTime + 0.5);
+    }
+    appendToChat('> COURIER RETURNED. SYNCHRONIZING TELEMETRY...', 'sys', true);
+    let _rads = parseInt(document.getElementById('stat_rads').value) || 0;
+    setGeigerRate(_rads >= 1000 ? 25 : _rads >= 600 ? 12 : _rads >= 200 ? 0.33 : 0);
+    _startUptimeClock();
+    _startMemCycle();
+    updateMath();
+  }, 650);
+}
+
+// ── BOOT PHASE FUNCTIONS (called in order from window.onload) ───
+
+function _hydrateStateFromStorage() {
   // Snapshot current state as rolling backup before any boot migration (Protocol: Rolling Backups)
   if (typeof window.snapRollingBackup === 'function') window.snapRollingBackup();
   let v8Str = localStorage.getItem('robco_v8');
@@ -400,7 +487,9 @@ window.onload = function () {
   getFactionRegistry().forEach(f => {
     if (!state.factions[f.key]) state.factions[f.key] = { fame: 0, infamy: 0 };
   });
+}
 
+function _restoreApiKeyAndChatHistory() {
   if (localStorage.getItem('robco_gemini_key')) {
     document.getElementById('apiKeyInput').value = localStorage.getItem('robco_gemini_key');
   }
@@ -427,99 +516,20 @@ window.onload = function () {
     localStorage.removeItem('robco_chat');
     appendToChat('> SYSTEM INITIALIZED. DIAGNOSTIC CORE ACTIVE...', 'sys', true);
   }
-  loadUI();
-  initTabs(); // Phase 4: restore active tab (defaults to 'stat' on first load)
-  setupHpBarInteraction();
-  setupXpBarInteraction(); // C11: XP bar click-drag (mirrors HP bar, within current level range)
-  startCrtHum();
-  initRegistryAutocomplete();
-  initAmmoDatalist();
-  initLocationDatalist();
-  initWakeLock(); // WU-F1: restore the Sustained Power Cell (Screen Wake Lock) preference
-  initHaptic(); // WU-F2: restore the Haptic Solenoid (Vibration) preference
-  initOverseerLog(); // WU-F7: start the Overseer's Log session clock + bump boot count (once)
-  initHighLumen(); // WU-F8: restore the High-Lumen Optics (max-contrast) preference
-  initRadio(); // WU-F5: restore the Pip-Boy Radio preference (autoplay-safe first-gesture arm)
+}
 
+function _wireRotaryDialClick() {
   // H1: Rotary Dial Click — fire on any <details> panel toggle inside uiPanel
   const _uiPanel = document.getElementById('uiPanel');
   if (_uiPanel) {
     _uiPanel.addEventListener('toggle', () => playPanelClick(), true);
   }
+}
 
+function _wireStandby() {
   // ── TAB STANDBY MODE ───────────────────────────────────────────
   // enterStandby/exitStandby are shared so blur+visibilitychange
   // can both fire without doubling the wake tone or log message.
-  let _standbyActive = false;
-  let _uptimeInterval = null;
-  let _memCycleInterval = null;
-
-  // Shared interval starters (DUP-3/DUP-4). Both the boot path and exitStandby()
-  // restart these after standby clears them; the guard keeps a double-call from
-  // ever stacking a second timer.
-  function _startUptimeClock() {
-    if (_uptimeInterval) return;
-    _uptimeInterval = setInterval(() => {
-      let elapsed = Math.floor((Date.now() - sessionStart) / 1000);
-      let h = Math.floor(elapsed / 3600),
-        m = Math.floor((elapsed % 3600) / 60),
-        s = elapsed % 60;
-      let el = document.getElementById('uptimeClock');
-      if (el)
-        el.innerText = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-    }, 1000);
-  }
-  function _startMemCycle() {
-    if (_memCycleInterval) return;
-    _memCycleInterval = setInterval(() => {
-      appendToChat('> MEMORY CYCLE COMPLETE. 64K STABLE.', 'sys', true);
-      document.body.style.filter = 'brightness(0.35)';
-      setTimeout(() => {
-        document.body.style.filter = '';
-      }, 150);
-    }, 900000);
-  }
-
-  function enterStandby() {
-    if (_standbyActive) return;
-    _standbyActive = true;
-    document.body.classList.add('standby');
-    geigerRunning = false;
-    if (geigerTimeout) {
-      clearTimeout(geigerTimeout);
-      geigerTimeout = null;
-    }
-    _geigerCurrentRate = -1;
-    if (crtHumGain) {
-      crtHumGain.gain.cancelScheduledValues(audioCtx.currentTime);
-      crtHumGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5);
-    }
-    clearInterval(_uptimeInterval);
-    _uptimeInterval = null;
-    clearInterval(_memCycleInterval);
-    _memCycleInterval = null;
-    stopHeartbeat();
-  }
-
-  function exitStandby() {
-    if (!_standbyActive) return;
-    _standbyActive = false;
-    playWakeTone();
-    setTimeout(() => {
-      document.body.classList.remove('standby');
-      if (crtHumGain) {
-        crtHumGain.gain.cancelScheduledValues(audioCtx.currentTime);
-        crtHumGain.gain.linearRampToValueAtTime(0.007, audioCtx.currentTime + 0.5);
-      }
-      appendToChat('> COURIER RETURNED. SYNCHRONIZING TELEMETRY...', 'sys', true);
-      let _rads = parseInt(document.getElementById('stat_rads').value) || 0;
-      setGeigerRate(_rads >= 1000 ? 25 : _rads >= 600 ? 12 : _rads >= 200 ? 0.33 : 0);
-      _startUptimeClock();
-      _startMemCycle();
-      updateMath();
-    }, 650);
-  }
-
   // blur fires while the tab is still compositing — best chance to see the dim on tab-out
   window.addEventListener('blur', enterStandby);
   window.addEventListener('focus', exitStandby);
@@ -528,7 +538,9 @@ window.onload = function () {
     if (document.hidden) enterStandby();
     else exitStandby();
   });
+}
 
+function _wirePanelPersistence() {
   // #35 Panel Memory — restore previously open/closed panel states
   // On desktop, default-open still applies if no saved state exists
   const savedPanelState = JSON.parse(localStorage.getItem('robco_panel_state') || 'null');
@@ -583,7 +595,9 @@ window.onload = function () {
       } catch (_) {}
     });
   });
+}
 
+function _restoreOpticsPreference() {
   // Per-game optics resolution — resolve THIS game's optic (its own remembered pick
   // robco_optic_<ctx> → the game's default optic → green) and apply it. A game switch reloads
   // (onGameContextChange), so each game re-resolves to its own remembered optic / default here.
@@ -594,7 +608,9 @@ window.onload = function () {
   const _opticSel = document.getElementById('opticsColorInput');
   if (_opticSel) _opticSel.value = _optic;
   _updateOpticsDefaultLabel();
+}
 
+function _restoreDevicePrefs() {
   if (localStorage.getItem('robco_sfx_muted') === 'true') {
     let el = document.getElementById('muteTypingToggle');
     if (el) el.checked = true;
@@ -691,7 +707,9 @@ window.onload = function () {
     if (slider) slider.value = savedSpeed;
     if (label) label.textContent = savedSpeed.toFixed(2) + '\u00d7';
   }
+}
 
+function _wireKeyboardShortcuts() {
   // #15 Keyboard Shortcuts — Ctrl+1–6 toggle first 6 panels, Ctrl+/ focus chat
   document.addEventListener('keydown', e => {
     if (e.ctrlKey && !e.shiftKey && !e.altKey) {
@@ -768,7 +786,9 @@ window.onload = function () {
       if (modal && modal.style.display !== 'none') closeModal();
     }
   });
+}
 
+function _runBootSequenceAndBriefing() {
   // Defer changelog display until after boot sequence completes
   let needsChangelog = false;
   if (localStorage.getItem('robco_version') !== APP_VERSION) {
@@ -847,12 +867,16 @@ window.onload = function () {
       if (undoBtn) undoBtn.style.display = 'block';
     }
   });
+}
 
+function _startAmbientTimers() {
   // Session Uptime Clock + Memory Cycle Event (every 15 minutes) — shared starters (DUP-3/4)
-  let sessionStart = Date.now();
+  sessionStart = Date.now();
   _startUptimeClock();
   _startMemCycle();
+}
 
+function _wireInputHistoryNav() {
   // #36 Input History — Up/Down arrows cycle through sent user commands
   // (history source is chatHistory filtered to user messages; _inputHistoryIdx is the nav cursor)
   let _inputHistoryIdx = -1;
@@ -879,7 +903,9 @@ window.onload = function () {
       }
     });
   }
+}
 
+function _wireUnloadFlush() {
   // Flush any pending debounced save immediately on tab close
   window.addEventListener('beforeunload', () => {
     clearTimeout(_saveTimer);
@@ -893,7 +919,34 @@ window.onload = function () {
     window.robco_v8.campaigns[window.robco_v8.activeContext] = JSON.parse(JSON.stringify(state));
     localStorage.setItem('robco_v8', JSON.stringify(window.robco_v8));
   });
+}
 
+window.onload = function () {
+  _hydrateStateFromStorage();
+  _restoreApiKeyAndChatHistory();
+  loadUI();
+  initTabs(); // Phase 4: restore active tab (defaults to 'stat' on first load)
+  setupHpBarInteraction();
+  setupXpBarInteraction(); // C11: XP bar click-drag (mirrors HP bar, within current level range)
+  startCrtHum();
+  initRegistryAutocomplete();
+  initAmmoDatalist();
+  initLocationDatalist();
+  initWakeLock(); // WU-F1: restore the Sustained Power Cell (Screen Wake Lock) preference
+  initHaptic(); // WU-F2: restore the Haptic Solenoid (Vibration) preference
+  initOverseerLog(); // WU-F7: start the Overseer's Log session clock + bump boot count (once)
+  initHighLumen(); // WU-F8: restore the High-Lumen Optics (max-contrast) preference
+  initRadio(); // WU-F5: restore the Pip-Boy Radio preference (autoplay-safe first-gesture arm)
+  _wireRotaryDialClick();
+  _wireStandby();
+  _wirePanelPersistence();
+  _restoreOpticsPreference();
+  _restoreDevicePrefs();
+  _wireKeyboardShortcuts();
+  _runBootSequenceAndBriefing();
+  _startAmbientTimers();
+  _wireInputHistoryNav();
+  _wireUnloadFlush();
   routeLaunchShortcut(); // PWA shortcut deep-link routing — must run last, after initTabs
 };
 

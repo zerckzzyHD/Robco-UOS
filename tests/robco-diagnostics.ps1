@@ -8232,6 +8232,109 @@ console.log('RESULT:' + bits.join(''));
 }
 
 # ===========================================================
+# Suite 132 -- U2: window.onload boot decomposition (Step 2 / v2.8.0
+# Phase 0). Structural guards that the ~568-line monolithic boot block was
+# split into named, order-preserving phase functions with zero behavioral
+# change: every phase function exists, window.onload calls all of them in
+# the original source order, the shared standby timer state/functions moved
+# to true module scope (not re-declared inside window.onload -- the seam
+# that made _startAmbientTimers() able to reach _startUptimeClock/
+# _startMemCycle in the first place), and window.onload itself stays a
+# slim composition instead of drifting back into a monolith.
+# 10 tests
+# ===========================================================
+Sep "Suite 132 -- U2 window.onload boot decomposition"
+$uiCoreSrc132 = Read-Src "js/ui-core.js"
+
+$bootPhaseFns132 = @(
+    '_hydrateStateFromStorage', '_restoreApiKeyAndChatHistory', '_wireRotaryDialClick',
+    '_wireStandby', '_wirePanelPersistence', '_restoreOpticsPreference',
+    '_restoreDevicePrefs', '_wireKeyboardShortcuts', '_runBootSequenceAndBriefing',
+    '_startAmbientTimers', '_wireInputHistoryNav', '_wireUnloadFlush'
+)
+
+# 132.1  every named boot-phase function is a real function declaration in ui-core.js
+$allPhasesDeclared132 = $true
+foreach ($n in $bootPhaseFns132) {
+    if (-not ($uiCoreSrc132 -match "function $n\s*\(\)\s*\{")) { $allPhasesDeclared132 = $false }
+}
+Check $allPhasesDeclared132 'ui-core.js declares all 12 named boot-phase functions (U2 decomposition)'
+
+# 132.2  each boot-phase function is declared exactly once (no duplicate seams)
+$noDupPhases132 = $true
+foreach ($n in $bootPhaseFns132) {
+    $cnt = [regex]::Matches($uiCoreSrc132, [regex]::Escape("function $n") + '\s*\(').Count
+    if ($cnt -ne 1) { $noDupPhases132 = $false }
+}
+Check $noDupPhases132 'every boot-phase function is declared exactly once (no duplicate decomposition seams)'
+
+# 132.3/132.4/132.5/132.6  window.onload's own body: calls every phase fn, in order,
+# stays slim, and still calls initTabs() directly (Suite 57.9 depends on that literal)
+$onloadBody132 = ''
+$olIdx132 = $uiCoreSrc132.IndexOf('window.onload = function () {')
+if ($olIdx132 -ge 0) {
+    $braceStart132 = $uiCoreSrc132.IndexOf('{', $olIdx132)
+    $depth132 = 0
+    $i132 = $braceStart132
+    while ($i132 -lt $uiCoreSrc132.Length) {
+        $ch132 = $uiCoreSrc132[$i132]
+        if ($ch132 -eq '{') { $depth132++ }
+        elseif ($ch132 -eq '}') { $depth132--; if ($depth132 -eq 0) { break } }
+        $i132++
+    }
+    $onloadBody132 = $uiCoreSrc132.Substring($braceStart132, $i132 - $braceStart132 + 1)
+}
+
+$allCalled132 = $true
+foreach ($n in $bootPhaseFns132) {
+    if ($onloadBody132 -notmatch [regex]::Escape("$n()")) { $allCalled132 = $false }
+}
+Check (($onloadBody132.Length -gt 0) -and $allCalled132) 'window.onload calls every one of the 12 named boot-phase functions'
+
+$callIdxs132 = $bootPhaseFns132 | ForEach-Object { $onloadBody132.IndexOf("$_()") }
+$inOrder132 = $true
+for ($ci = 1; $ci -lt $callIdxs132.Count; $ci++) {
+    if ($callIdxs132[$ci] -le $callIdxs132[$ci - 1]) { $inOrder132 = $false }
+}
+Check $inOrder132 'window.onload calls the 12 boot-phase functions in the original, order-preserving sequence'
+
+$onloadLineCount132 = ($onloadBody132 -split "`n").Count
+Check ($onloadLineCount132 -lt 40) "window.onload body stays a slim named-call composition ($onloadLineCount132 lines, expected < 40)"
+
+Check ($onloadBody132 -match [regex]::Escape('initTabs()')) 'window.onload still calls initTabs() directly (Suite 57.9 boot-order guard depends on this literal call)'
+
+# 132.7  standby shared state is declared once at true module scope, before window.onload
+$onloadDeclIdx132 = $uiCoreSrc132.IndexOf('window.onload = function () {')
+$sharedVars132 = @('_standbyActive', '_uptimeInterval', '_memCycleInterval', 'sessionStart')
+$sharedVarsOk132 = $true
+foreach ($v in $sharedVars132) {
+    $declIdx = $uiCoreSrc132.IndexOf("let $v =")
+    if ($declIdx -lt 0 -or $declIdx -ge $onloadDeclIdx132) { $sharedVarsOk132 = $false }
+}
+Check ($onloadDeclIdx132 -ge 0 -and $sharedVarsOk132) 'standby shared state (_standbyActive/_uptimeInterval/_memCycleInterval/sessionStart) is declared once at module scope, before window.onload'
+
+# 132.8  _startUptimeClock/_startMemCycle/enterStandby/exitStandby are module-scope
+#        function declarations (declared before window.onload, not nested inside it)
+$sharedFns132 = @('_startUptimeClock', '_startMemCycle', 'enterStandby', 'exitStandby')
+$sharedFnsOk132 = $true
+foreach ($n in $sharedFns132) {
+    $declIdx = $uiCoreSrc132.IndexOf("function $n(")
+    if ($declIdx -lt 0 -or $declIdx -ge $onloadDeclIdx132) { $sharedFnsOk132 = $false }
+}
+Check $sharedFnsOk132 '_startUptimeClock/_startMemCycle/enterStandby/exitStandby are module-scope functions declared before window.onload (not window.onload-local closures)'
+
+# 132.9  _startAmbientTimers() re-arms sessionStart + both timer starters, matching
+#        the original boot-time (not just standby-exit) timer kickoff
+$ambientBody132 = ''
+try { $ambientBody132 = Get-FunctionBody $uiCoreSrc132 '_startAmbientTimers' } catch {}
+Check (($ambientBody132 -match 'sessionStart\s*=\s*Date\.now\(\)') -and ($ambientBody132 -match '_startUptimeClock\(\)') -and ($ambientBody132 -match '_startMemCycle\(\)')) `
+    '_startAmbientTimers() sets sessionStart = Date.now() and starts both ambient timers (boot-time kickoff preserved)'
+
+# 132.10  no stray second `window.onload =` assignment was introduced
+$onloadAssignCount132 = [regex]::Matches($uiCoreSrc132, 'window\.onload\s*=').Count
+Check ($onloadAssignCount132 -eq 1) 'exactly one window.onload assignment exists in ui-core.js'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

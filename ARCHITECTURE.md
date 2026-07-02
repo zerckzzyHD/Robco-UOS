@@ -63,8 +63,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    1575-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    1575-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    1585-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    1585-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -331,6 +331,25 @@ localStorage.getItem('robco_v7')
   → faction migration (nf/ni/lf/li → state.factions)
   → loadUI()                              // Push state → DOM
 ```
+
+**`window.onload` composition (Step 2 Phase 0 / U2):** the former ~568-line
+monolithic boot block is now 12 named, order-preserving phase functions in
+`ui-core.js` (`_hydrateStateFromStorage`, `_restoreApiKeyAndChatHistory`,
+`_wireRotaryDialClick`, `_wireStandby`, `_wirePanelPersistence`,
+`_restoreOpticsPreference`, `_restoreDevicePrefs`, `_wireKeyboardShortcuts`,
+`_runBootSequenceAndBriefing`, `_startAmbientTimers`, `_wireInputHistoryNav`,
+`_wireUnloadFlush`), called from a slim `window.onload` in the exact original
+source order — zero logic added, removed, or reordered. The standby-mode
+shared state (`_standbyActive`/`_uptimeInterval`/`_memCycleInterval`/
+`sessionStart`) and its four functions (`_startUptimeClock`/`_startMemCycle`/
+`enterStandby`/`exitStandby`) moved to true module scope so `_wireStandby()`
+(listener wiring) and the later `_startAmbientTimers()` (boot-time timer
+kickoff) share one set of double-start guards, matching the original
+DUP-3/DUP-4 invariant. A static structural suite (Suite 132, both runners)
+guards the function list, the call order, the module-scope promotion, and
+that `window.onload` stays a slim composition; the decomposition was also
+verified live via the full Playwright gate (boot-smoke + 360/412 render-check)
+with zero console errors and no black screen.
 
 ### Export Flow (exportSaveFile in state.js)
 
@@ -973,7 +992,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1575-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1585-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

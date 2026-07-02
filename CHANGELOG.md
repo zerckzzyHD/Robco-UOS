@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1575/1575 | Cache: robco-terminal-v2.7.0-r10 -->
+﻿## [Unreleased]<!-- Tests: 1585/1585 | Cache: robco-terminal-v2.7.0-r11 -->
 
 ### Under the Hood
 
@@ -14,6 +14,7 @@
 - Corrected the bot-protection layer's public site key so it now activates with the intended key. The correct key had been mistakenly placed in an internal on/off check while the layer was still running with an old, wrong key; the two were swapped back into their proper places. As before, this involves only a public site identifier and the app stays fully usable if the protection layer is ever unreachable. No visible change to the app.
 - Narrowed the bot-protection layer's development-only debug token to the developer's own machine (localhost). The private staging site now uses the same real reCAPTCHA verification as the live production site, so it exercises the protection exactly the way real users will rather than relying on a per-browser test token. The public production site was never affected. No visible change to the app.
 - Tidied up the developer documentation and one housekeeping setting. Removed an old one-off design-review note that nothing referenced and that had gone stale, corrected the developer and architecture guides where they still pointed at source files that have since been split into smaller per-area and per-game files, and fixed a repository setting that mislabelled two always-kept developer guides as excluded when they must stay in the project (the automated checks read them). Documentation and internal tooling only — no visible change to the app.
+- Restructured how the app's startup routine is organized internally, breaking one large block of startup code into smaller, clearly-named steps that each handle one part of booting up (restoring your saved campaign, restoring your device settings, wiring up keyboard shortcuts, and so on) — still run in the exact same order as before. This is purely an internal reorganization to make the startup code easier to maintain safely going forward; a full mobile and desktop check confirmed the app still starts up cleanly with no black screen, no errors, and no visible change to how anything looks or behaves.
 
 ---
 
