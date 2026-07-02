@@ -1,4 +1,8 @@
-﻿## [Unreleased]<!-- Tests: 1585/1585 | Cache: robco-terminal-v2.7.0-r11 -->
+﻿## [Unreleased]<!-- Tests: 1612/1612 | Cache: robco-terminal-v2.7.0-r12 -->
+
+### Fixed
+
+- Closed a rare data-safety gap where certain unusual or corrupted responses from the AI could silently turn one of your character's core stats into an invalid, unusable value instead of being safely ignored. Your character sheet can no longer be corrupted this way.
 
 ### Under the Hood
 
@@ -15,6 +19,7 @@
 - Narrowed the bot-protection layer's development-only debug token to the developer's own machine (localhost). The private staging site now uses the same real reCAPTCHA verification as the live production site, so it exercises the protection exactly the way real users will rather than relying on a per-browser test token. The public production site was never affected. No visible change to the app.
 - Tidied up the developer documentation and one housekeeping setting. Removed an old one-off design-review note that nothing referenced and that had gone stale, corrected the developer and architecture guides where they still pointed at source files that have since been split into smaller per-area and per-game files, and fixed a repository setting that mislabelled two always-kept developer guides as excluded when they must stay in the project (the automated checks read them). Documentation and internal tooling only — no visible change to the app.
 - Restructured how the app's startup routine is organized internally, breaking one large block of startup code into smaller, clearly-named steps that each handle one part of booting up (restoring your saved campaign, restoring your device settings, wiring up keyboard shortcuts, and so on) — still run in the exact same order as before. This is purely an internal reorganization to make the startup code easier to maintain safely going forward; a full mobile and desktop check confirmed the app still starts up cleanly with no black screen, no errors, and no visible change to how anything looks or behaves.
+- Added a much deeper automatic check for the code that applies the AI's updates to your character sheet: it now actually runs that code against dozens of unusual and deliberately broken inputs — garbage text, extremely long values, more items than normal, and a few security-style edge cases — to confirm it always handles them safely without ever corrupting your saved data. This is also what caught the data-safety gap noted above. Also tightened the release checklist so it compares every individual group of checks between the two test runners, not just the overall total, catching a kind of drift a matching grand total alone could hide. Internal tooling only.
 
 ---
 

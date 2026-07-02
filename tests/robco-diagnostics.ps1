@@ -6351,7 +6351,7 @@ Check ([bool](($firstInteract102 -match '!_bootActive') -and $guardIdx102 -ge 0 
 # so it inherits the focus-trap + ARIA dialog semantics. Game-agnostic copy
 # (Protocol 38). These guards lock the affordance + its coverage.
 # ===========================================================
-Sep "Suite 103 -- WU-C13 SAVE MENU help affordance"
+Sep "Suite 103 -- WU-C13 SAVE MENU `"?`" help affordance"
 $uiCore103 = Read-Src "js/ui-core.js"
 $btnTag103 = [regex]::Match($htmlSrc, '<button\b[^>]*showSaveHelpModal[^>]*>').Value
 $helpBody103 = ''
@@ -8333,6 +8333,173 @@ Check (($ambientBody132 -match 'sessionStart\s*=\s*Date\.now\(\)') -and ($ambien
 # 132.10  no stray second `window.onload =` assignment was introduced
 $onloadAssignCount132 = [regex]::Matches($uiCoreSrc132, 'window\.onload\s*=').Count
 Check ($onloadAssignCount132 -eq 1) 'exactly one window.onload assignment exists in ui-core.js'
+
+# ===========================================================
+# Suite 133 -- U3: autoImportState() VM-sandbox behavioral test (Step 2 /
+# v2.8.0 Phase 0). Shells out to node (mirrors the Suite 131 pattern): a vm
+# sandbox loads the REAL js/state.js + js/reg_nv.js + the REAL
+# autoImportState() body extracted from js/api.js in one shared context, then
+# actually EXECUTES it against the same 27-case malformed / hostile /
+# oversized / wrong-typed / valid payload matrix as the JS runner. Also locks
+# the Protocol-42 fix landed in this commit: nine numeric fields in
+# autoImportState() (lvl/xp/hpCur/hpMax/s-p-e-c-i-a-l/caps/karma/rads/ticks)
+# previously did a bare parseInt(v) with no `|| 0` fallback -- a hostile or
+# malformed AI response could silently corrupt player state with NaN.
+# 27 tests
+# ===========================================================
+Sep "Suite 133 -- U3 autoImportState() VM-sandbox behavioral test"
+$labels133 = @(
+    "malformed truncated JSON: no throw, state unchanged",
+    "empty string payload: no throw, state unchanged",
+    "garbage non-JSON payload: no throw, state unchanged",
+    "null root payload: no throw, state unchanged",
+    "numeric root payload: no throw, state unchanged",
+    "string root payload: no throw, state unchanged",
+    "array root payload: no throw, state unchanged",
+    "boolean root payload: no throw, state unchanged",
+    "__proto__ pollution attempt does not pollute Object.prototype",
+    "constructor.prototype pollution attempt does not pollute Object.prototype",
+    "__proto__ inside a quest entry does not pollute prototype or leak into stored quest",
+    "script-tag-shaped string is stored as inert text, never executed",
+    "SQL-injection-shaped string passes through as opaque text",
+    "campaign_notes beyond 200 entries is capped at 200, newest kept",
+    "large inventory array (2000 items) processed without throwing",
+    "extremely long single string field does not crash the sync",
+    "factions payload as an array is ignored safely (stays a valid object)",
+    "skills payload as a string is ignored safely",
+    "equipped payload as an array is ignored safely",
+    "status payload as a non-array object is ignored safely",
+    "non-numeric SPECIAL stat value does not corrupt state with NaN (clamped 1-10)",
+    "non-numeric core numeric fields never resolve to NaN",
+    "garbage ticks value does not corrupt active status-effect countdown with NaN",
+    "well-formed partial payload updates only the included field",
+    "well-formed payload updates SPECIAL + factions + inventory correctly",
+    "SPECIAL values are clamped to 1-10 even for valid out-of-range numbers",
+    "collectibles are validated against the registry allow-list; unknown + dup entries dropped"
+)
+try {
+    $nodeCheck133 = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCheck133) {
+        $apiPathNode133 = (Join-Path $Root "js/api.js").Replace('\', '/')
+        $statePathNode133 = (Join-Path $Root "js/state.js").Replace('\', '/')
+        $regPathNode133 = (Join-Path $Root "js/reg_nv.js").Replace('\', '/')
+        $testScript133 = @"
+const fs = require('fs');
+const vm = require('vm');
+const apiSource = fs.readFileSync('$apiPathNode133', 'utf8');
+const stateSource = fs.readFileSync('$statePathNode133', 'utf8');
+const regSource = fs.readFileSync('$regPathNode133', 'utf8');
+function extractFunctionBody(source, fnName) {
+  const idx = source.indexOf('function ' + fnName);
+  const braceStart = source.indexOf('{', source.indexOf('(', idx));
+  let depth = 0, i = braceStart;
+  for (; i < source.length; i++) {
+    if (source[i] === '{') depth++;
+    else if (source[i] === '}' && --depth === 0) break;
+  }
+  return source.slice(braceStart, i + 1);
+}
+const sandbox = {
+  window: {}, document: { getElementById: () => null },
+  console: { error: () => {}, log: () => {}, warn: () => {} },
+  loadUI: () => {}, appendToChat: () => {}, expandPanelForCategory: () => {},
+};
+vm.createContext(sandbox);
+vm.runInContext(stateSource, sandbox);
+vm.runInContext(regSource, sandbox);
+const autoImportBody = 'function autoImportState(jsonString)' + extractFunctionBody(apiSource, 'autoImportState');
+vm.runInContext(autoImportBody + '\nthis.autoImportState = autoImportState;', sandbox);
+const defaultState = vm.runInContext('JSON.parse(JSON.stringify(state))', sandbox);
+const realCollectible = vm.runInContext('FALLOUT_REGISTRY.collectibles[0].name', sandbox);
+function resetState(overrides) {
+  const s = overrides ? Object.assign({}, defaultState, overrides) : defaultState;
+  vm.runInContext('state = ' + JSON.stringify(s) + ';', sandbox);
+}
+function liveState() { return vm.runInContext('state', sandbox); }
+function snapshotState() { return JSON.parse(JSON.stringify(liveState())); }
+function callThrows(payload) {
+  try { sandbox.autoImportState(payload); return false; } catch (_) { return true; }
+}
+const results = [];
+function t(setup, fn) {
+  try { resetState(setup); results.push(!!fn()); } catch (e) { results.push(false); }
+}
+t(undefined, () => { const b = snapshotState(); const threw = callThrows('{"lvl": 5,'); return !threw && JSON.stringify(snapshotState()) === JSON.stringify(b); });
+t(undefined, () => { const b = snapshotState(); const threw = callThrows(''); return !threw && JSON.stringify(snapshotState()) === JSON.stringify(b); });
+t(undefined, () => { const b = snapshotState(); const threw = callThrows('not json at all'); return !threw && JSON.stringify(snapshotState()) === JSON.stringify(b); });
+t(undefined, () => { const b = snapshotState(); const threw = callThrows('null'); return !threw && JSON.stringify(snapshotState()) === JSON.stringify(b); });
+t(undefined, () => { const b = snapshotState(); const threw = callThrows('42'); return !threw && JSON.stringify(snapshotState()) === JSON.stringify(b); });
+t(undefined, () => { const b = snapshotState(); const threw = callThrows('"just a string"'); return !threw && JSON.stringify(snapshotState()) === JSON.stringify(b); });
+t(undefined, () => { const b = snapshotState(); const threw = callThrows('[1,2,3]'); return !threw && JSON.stringify(snapshotState()) === JSON.stringify(b); });
+t(undefined, () => { const b = snapshotState(); const threw = callThrows('true'); return !threw && JSON.stringify(snapshotState()) === JSON.stringify(b); });
+t(undefined, () => { callThrows(JSON.stringify({ __proto__: { polluted133: 'yes' }, lvl: 7 })); return Object.prototype.polluted133 === undefined && liveState().lvl === 7; });
+t(undefined, () => { callThrows(JSON.stringify({ constructor: { prototype: { polluted2_133: 'yes' } } })); return Object.prototype.polluted2_133 === undefined; });
+t(undefined, () => {
+  callThrows(JSON.stringify({ quests: [{ __proto__: { polluted3_133: 'yes' }, name: 'Test Quest', status: 'active' }] }));
+  const q = liveState().quests[0];
+  return Object.prototype.polluted3_133 === undefined && q.name === 'Test Quest' && q.status === 'active' && !Object.prototype.hasOwnProperty.call(q, 'polluted3_133');
+});
+t(undefined, () => {
+  callThrows(JSON.stringify({ loc: '<script>window.__xss133=1</script>' }));
+  return liveState().loc === '<script>window.__xss133=1</script>' && sandbox.window.__xss133 === undefined;
+});
+t(undefined, () => { callThrows(JSON.stringify({ quests: [{ name: "'; DROP TABLE saves; --", status: 'active' }] })); return liveState().quests[0].name === "'; DROP TABLE saves; --"; });
+t(undefined, () => {
+  const notes = []; for (let i = 0; i < 250; i++) notes.push('note ' + i);
+  callThrows(JSON.stringify({ campaign_notes: notes }));
+  const cn = liveState().campaign_notes;
+  return cn.length === 200 && cn[cn.length - 1] === 'note 249';
+});
+t(undefined, () => {
+  const inv = []; for (let i = 0; i < 2000; i++) inv.push({ name: 'Item' + i, qty: 1, wgt: 1, val: 1, type: 'misc' });
+  const threw = callThrows(JSON.stringify({ inventory: inv }));
+  return !threw && liveState().inventory.length === 2000;
+});
+t(undefined, () => { const longStr = 'A'.repeat(100000); const threw = callThrows(JSON.stringify({ loc: longStr })); return !threw && liveState().loc.length === 100000; });
+t(undefined, () => { const b = snapshotState().factions; callThrows(JSON.stringify({ factions: ['ncr', 'legion'] })); return JSON.stringify(liveState().factions) === JSON.stringify(b); });
+t(undefined, () => { const b = snapshotState().skills; callThrows(JSON.stringify({ skills: 'guns:100' })); return JSON.stringify(liveState().skills) === JSON.stringify(b); });
+t(undefined, () => { const b = snapshotState().equipped; callThrows(JSON.stringify({ equipped: ['weapon'] })); return JSON.stringify(liveState().equipped) === JSON.stringify(b); });
+t(undefined, () => { const b = snapshotState().status; callThrows(JSON.stringify({ status: { foo: 'bar' } })); return JSON.stringify(liveState().status) === JSON.stringify(b); });
+t(undefined, () => { callThrows(JSON.stringify({ s: 'abc' })); const s = liveState().s; return !Number.isNaN(s) && s >= 1 && s <= 10; });
+t(undefined, () => {
+  callThrows(JSON.stringify({ lvl: 'x', xp: 'x', hpCur: 'x', hpMax: 'x', caps: 'x', karma: 'x', rads: 'x', ticks: 'x' }));
+  const st = liveState();
+  return ['lvl','xp','hpCur','hpMax','caps','karma','rads','ticks'].every(k => !Number.isNaN(st[k]));
+});
+t({ status: [{ name: 'Poisoned', ticks: 5, type: 'DEBUFF' }] }, () => {
+  callThrows(JSON.stringify({ ticks: 'garbage' }));
+  const eff = liveState().status.find(e => e.name === 'Poisoned');
+  return eff !== undefined && !Number.isNaN(eff.ticks);
+});
+t(undefined, () => { callThrows(JSON.stringify({ lvl: 5 })); const st = liveState(); return st.lvl === 5 && st.xp === defaultState.xp && st.caps === defaultState.caps; });
+t(undefined, () => {
+  callThrows(JSON.stringify({ s: 7, p: 6, e: 5, c: 4, i: 3, a: 2, l: 1, factions: { ncr: { fame: 10, infamy: 0 } }, inventory: [{ name: 'Stimpak', qty: 3, wgt: 0, val: 0, type: 'aid' }] }));
+  const st = liveState();
+  return st.s === 7 && st.l === 1 && st.factions.ncr.fame === 10 && st.inventory.length === 1 && st.inventory[0].name === 'Stimpak' && st.inventory[0].qty === 3;
+});
+t(undefined, () => { callThrows(JSON.stringify({ s: 99, p: -5 })); const st = liveState(); return st.s === 10 && st.p === 1; });
+t(undefined, () => {
+  callThrows(JSON.stringify({ collectibles: [realCollectible, 'Fake Item That Does Not Exist', realCollectible] }));
+  const c = liveState().collectibles;
+  return c.length === 1 && c[0] === realCollectible;
+});
+console.log('RESULT:' + results.map(r => r ? '1' : '0').join(''));
+"@
+        $out133 = ($testScript133 | node 2>&1 | Out-String)
+        $rm133 = [regex]::Match($out133, 'RESULT:([01]{27})')
+        if ($rm133.Success) {
+            $bits133 = $rm133.Groups[1].Value
+            for ($bi = 0; $bi -lt 27; $bi++) { Check ($bits133.Substring($bi, 1) -eq '1') $labels133[$bi] }
+        } else {
+            $err133 = if ([string]::IsNullOrWhiteSpace($out133)) { "No output from node" } else { $out133.Trim() }
+            foreach ($lbl in $labels133) { Fail "$lbl  (runtime error: $err133)" }
+        }
+    } else {
+        foreach ($lbl in $labels133) { Fail "$lbl  (node not found)" }
+    }
+} catch {
+    foreach ($lbl in $labels133) { Fail "$lbl  (harness error: $_)" }
+}
 
 # ===========================================================
 # Results

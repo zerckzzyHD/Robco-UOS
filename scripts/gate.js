@@ -120,6 +120,122 @@ function run(label, cmd) {
   }
 }
 
+// Per-suite parity (U3/S2-F5, Step 2 Phase 0 Unit 4). The total-only check
+// below this can't catch drift WITHIN a suite (e.g. one runner gains a test
+// and another loses one elsewhere, totals still match by coincidence — the
+// 173-vs-209 gap Protocol 15 exists to prevent). Walks each runner's own
+// captured output (generic header prefix: Node "── Title ─"; PowerShell
+// "-- Title --") into an ordered list of { title, count } sections, where
+// count is the number of PASS/FAIL result lines before the next header.
+//
+// Every suite header in the PowerShell runner is written "Suite N -- Title"
+// (Sep() always numbers). The Node runner only started literally embedding
+// "Suite N" in its header() text from Suite 49 onward — pre-existing suites
+// 1-48 use bare descriptive titles by long-standing historical convention
+// (predates this check; rewriting ~48 legacy header strings across both
+// 14k-line runners is out of scope here and not what drifted). So parity is
+// enforced at TWO tiers:
+//   1. STRICT, per-suite: every suite where Node's header explicitly states
+//      "Suite N" (currently 49+, which covers all Step 2 / Phase 0 work and
+//      everything added from here forward) must have an identical title
+//      (dash/arrow-style normalized — Node uses "—"/"→"/"±", PowerShell
+//      substitutes "--"/"->"/"+-" for the same glyphs by established
+//      convention) and an identical test count in both runners.
+//   2. AGGREGATE, for the legacy zone: suites 1-48 (unnumbered in Node) are
+//      summed on each side and compared as one total — coarser, but still
+//      catches gross drift in the legacy zone without demanding a historical
+//      rewrite unrelated to the current task.
+const ANSI_ESCAPE_RE = new RegExp(String.fromCharCode(27) + '\\[[0-9;]*m', 'g');
+const HEADER_RE = /^(?:──|--)\s+(.*)$/;
+const NUMBERED_RE = /^Suite\s+(\d+)\s*(?:—|--)\s*(.*)$/;
+
+function normalizeSuiteTitle(title) {
+  return title
+    .replace(/[─-]+\s*$/, '') // trailing decorative dash run
+    .replace(/→/g, '->')
+    .replace(/±/g, '+-')
+    .replace(/—/g, '--')
+    .trim();
+}
+
+// Returns { numbered: Map<num, {title, count}>, legacyTotal: number }
+function parseSections(output, resultLineRe) {
+  const clean = output.replace(ANSI_ESCAPE_RE, '');
+  const numbered = new Map();
+  let legacyTotal = 0;
+  let current = null; // { num: string|null, count: number }
+  const flush = () => {
+    if (!current) return;
+    if (current.num !== null) {
+      if (!numbered.has(current.num)) numbered.set(current.num, { title: current.title, count: 0 });
+      numbered.get(current.num).count += current.count;
+    } else {
+      legacyTotal += current.count;
+    }
+  };
+  for (const raw of clean.split(/\r?\n/)) {
+    const line = raw.trimEnd();
+    const hm = line.match(HEADER_RE);
+    if (hm) {
+      flush();
+      const rawTitle = hm[1].replace(/[─-]+\s*$/, '').trim();
+      const nm = rawTitle.match(NUMBERED_RE);
+      current = nm
+        ? { num: nm[1], title: normalizeSuiteTitle(nm[2]), count: 0 }
+        : { num: null, title: rawTitle, count: 0 };
+      continue;
+    }
+    if (current && resultLineRe.test(line)) current.count++;
+  }
+  flush();
+  return { numbered, legacyTotal };
+}
+
+function checkSuiteParity(nodeOut, psOut) {
+  const node = parseSections(nodeOut, /^\s*[✓✗]/);
+  const ps = parseSections(psOut, /^\s*\[(PASS|FAIL)\]/);
+  const problems = [];
+
+  // Tier 1 — strict, per-suite (every suite Node explicitly numbers).
+  const allNums = new Set([...node.numbered.keys(), ...ps.numbered.keys()]);
+  for (const num of [...allNums].sort((a, b) => Number(a) - Number(b))) {
+    const n = node.numbered.get(num);
+    const p = ps.numbered.get(num);
+    if (!n && p) continue; // PS numbers sections Node doesn't (legacy zone) — folded into aggregate below
+    if (n && !p) {
+      problems.push(
+        `Suite ${num}: present in Node runner ("${n.title}") but missing from PowerShell runner`
+      );
+    } else if (n && p && n.title !== p.title) {
+      problems.push(`Suite ${num}: title mismatch — Node "${n.title}" vs PowerShell "${p.title}"`);
+    } else if (n && p && n.count !== p.count) {
+      problems.push(
+        `Suite ${num} "${n.title}": count mismatch — Node ${n.count} vs PowerShell ${p.count}`
+      );
+    }
+  }
+
+  // Tier 2 — aggregate for the legacy (pre-49) unnumbered-in-Node zone. PS
+  // numbers everything, so its "legacy" total is every numbered suite Node
+  // has no entry for, plus its own unnumbered bucket (should be empty).
+  const psLegacyTotal =
+    ps.legacyTotal +
+    [...ps.numbered.entries()]
+      .filter(([num]) => !node.numbered.has(num))
+      .reduce((sum, [, v]) => sum + v.count, 0);
+  if (node.legacyTotal !== psLegacyTotal) {
+    problems.push(
+      `Legacy (pre-Suite-49, unnumbered-in-Node) zone aggregate mismatch: Node ${node.legacyTotal} vs PowerShell ${psLegacyTotal}`
+    );
+  }
+
+  return {
+    ok: problems.length === 0,
+    problems,
+    suiteCount: allNums.size,
+  };
+}
+
 // Like run(), but captures stdout/stderr (while still echoing them) and returns
 // the combined text. Used for the two persistence runners so the parity check
 // can read their "ALL N TESTS" totals from THIS run's output instead of
@@ -232,6 +348,17 @@ if (psBin) {
     process.exit(1);
   }
   console.log(`  Both runners agree: ${nodeTotal} tests`);
+
+  // Per-suite parity (U4/S2-F5) — the total above can hide drift within a
+  // suite (a test lost here, a test gained there, coincidentally matching
+  // totals). Compares suite-by-suite composition, not just the grand total.
+  const suiteParity = checkSuiteParity(nodeAuditOut, psAuditOut);
+  if (!suiteParity.ok) {
+    console.error(`\n[GATE FAIL] Per-suite runner parity broken (Protocol 15 / U4):`);
+    for (const p of suiteParity.problems) console.error(`  - ${p}`);
+    process.exit(1);
+  }
+  console.log(`  Per-suite parity holds: ${suiteParity.suiteCount} suites, identical composition`);
 } else if (isCI) {
   console.error('\n[GATE FAIL] pwsh not available in CI — required for parity check (Protocol 15)');
   process.exit(1);

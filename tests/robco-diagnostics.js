@@ -9789,6 +9789,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  Suite 88 — GATE-UI: UI consistency structural guards (8 tests)
 // ══════════════════════════════════════════════════════════════
 {
+  header('Suite 88 — GATE-UI: UI consistency structural guards');
   const uiRenderSrc88 = fs.readFileSync(path.join(__dirname, '../js/ui-render.js'), 'utf8');
   const uiCoreSrc88 = fs.readFileSync(path.join(__dirname, '../js/ui-core.js'), 'utf8');
   const idxSrc88 = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
@@ -9883,6 +9884,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  Suite 89 — GATE-AGNOSTIC: game-agnostic refactor guards (16 tests)
 // ══════════════════════════════════════════════════════════════
 {
+  header('Suite 89 — GATE-AGNOSTIC: game-agnostic refactor guards');
   const apiSrc89 = fs.readFileSync(path.join(__dirname, '../js/api.js'), 'utf8');
   const uiCore89 = fs.readFileSync(path.join(__dirname, '../js/ui-core.js'), 'utf8');
   const stateSrc89 = fs.readFileSync(path.join(__dirname, '../js/state.js'), 'utf8');
@@ -10032,6 +10034,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  Suite 90 — UTF-8 CORRUPTION GUARD: no symbol double-encoding (11 tests)
 // ══════════════════════════════════════════════════════════════
 {
+  header('Suite 90 — UTF-8 CORRUPTION GUARD: no symbol double-encoding');
   // Detect double-encoding caused by reading UTF-8 as Windows-1252 then re-encoding.
   // â€ is the first two chars of any double-encoded E2-80-xx UTF-8 sequence
   // (em-dash, en-dash, curly quotes, etc.). â– covers E2-96-xx box-drawing
@@ -10077,6 +10080,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  Suite 91 — loadUI DIRTY-CHECK / TARGETED RE-RENDER GUARDS (9 tests)
 // ══════════════════════════════════════════════════════════════
 {
+  header('Suite 91 — loadUI DIRTY-CHECK / TARGETED RE-RENDER GUARDS');
   // Protocol 13 regression guards for WU-A3 (loadUI dirty-check).
   // Static assertions — no DOM required.
   const uiCore91 = fs.readFileSync(path.join(__dirname, '../js/ui-core.js'), 'utf8');
@@ -10138,6 +10142,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  Suite 92 — VERTICAL-BROKEN-TEXT ANTI-RECURRENCE GUARDS (7 tests)
 // ══════════════════════════════════════════════════════════════
 {
+  header('Suite 92 — VERTICAL-BROKEN-TEXT ANTI-RECURRENCE GUARDS');
   // Protocol 13 + Protocol 36b escape-ratchet: closes the "element squeezed
   // to ~0 width wraps one glyph per line" bug class (WU-C7/C9/C10/C12/C14).
   const css92 = fs.readFileSync(path.join(__dirname, '../css/terminal.css'), 'utf8');
@@ -14645,6 +14650,336 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   assert(
     (uiCoreSrc132.match(/window\.onload\s*=/g) || []).length === 1,
     'exactly one window.onload assignment exists in ui-core.js'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 133 — U3: autoImportState() VM-sandbox behavioral test (Step 2 /
+//  v2.8.0 Phase 0). A Node vm sandbox loads the REAL js/state.js (state
+//  defaults, GAME_DEFS, getFactionRegistry/getSkillKeys/recordLocationVisit)
+//  and the REAL js/reg_nv.js (FALLOUT_REGISTRY) in one shared context, then
+//  injects the REAL autoImportState() body extracted from js/api.js and
+//  actually EXECUTES it — not a static grep — against a matrix of malformed,
+//  hostile/injection-shaped, oversized, wrong-typed, and valid Tri-Node
+//  payloads. Each case asserts a safe outcome: no throw escapes the caller,
+//  no prototype pollution, no recursive key transform, registry allow-lists
+//  hold, and numeric fields never resolve to NaN.
+//
+//  This suite also LOCKS the Protocol-42 fix landed in the same commit: nine
+//  numeric fields in autoImportState() (lvl/xp/hpCur/hpMax/s-p-e-c-i-a-l/
+//  caps/karma/rads/ticks) previously did a bare `parseInt(v)` with no `|| 0`
+//  fallback — unlike every sibling numeric coercion in this file, in
+//  sanitizeImportedContainer(), and in syncStateFromDom(). A hostile or
+//  malformed AI response (e.g. `{"s":"abc"}`) silently corrupted player state
+//  with NaN (discovered by actually running the function under this harness,
+//  not by inspection). Fixed by matching the established `|| 0` idiom.
+//  27 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 133 — U3 autoImportState() VM-sandbox behavioral test');
+
+  const vm = require('vm');
+  let harness133 = null;
+  let harnessErr133 = null;
+  try {
+    const sandbox = {
+      window: {},
+      document: { getElementById: () => null },
+      console: {
+        error: () => {},
+        log: () => {},
+        warn: () => {},
+      },
+      loadUI: () => {},
+      appendToChat: () => {},
+      expandPanelForCategory: () => {},
+    };
+    vm.createContext(sandbox);
+    vm.runInContext(stateSource, sandbox);
+    vm.runInContext(readFile('js/reg_nv.js'), sandbox);
+    const autoImportBody133 =
+      'function autoImportState(jsonString)' + extractFunctionBody(apiSource, 'autoImportState');
+    vm.runInContext(autoImportBody133 + '\nthis.autoImportState = autoImportState;', sandbox);
+    const defaultState133 = vm.runInContext('JSON.parse(JSON.stringify(state))', sandbox);
+    const realCollectible133 = vm.runInContext('FALLOUT_REGISTRY.collectibles[0].name', sandbox);
+    harness133 = { sandbox, defaultState133, realCollectible133 };
+  } catch (e) {
+    harnessErr133 = e;
+  }
+
+  function resetState133(overrides) {
+    const s = overrides
+      ? Object.assign({}, harness133.defaultState133, overrides)
+      : harness133.defaultState133;
+    vm.runInContext('state = ' + JSON.stringify(s) + ';', harness133.sandbox);
+  }
+  function liveState133() {
+    return vm.runInContext('state', harness133.sandbox);
+  }
+  function snapshotState133() {
+    return JSON.parse(JSON.stringify(liveState133()));
+  }
+  // Returns true if calling autoImportState with this payload threw past its
+  // own internal try/catch (i.e. escaped to the caller — never expected).
+  function callThrows133(payload) {
+    try {
+      harness133.sandbox.autoImportState(payload);
+      return false;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  function behavior133(label, setup, fn) {
+    if (!harness133) {
+      fail(`${label}  (harness error: ${harnessErr133 && harnessErr133.message})`);
+      return;
+    }
+    try {
+      resetState133(setup);
+      assert(fn(), label);
+    } catch (e) {
+      fail(`${label}  (runtime error: ${e.message})`);
+    }
+  }
+
+  // ── A. Malformed JSON (structurally invalid) ──────────────────────────
+  behavior133('malformed truncated JSON: no throw, state unchanged', undefined, () => {
+    const before = snapshotState133();
+    const threw = callThrows133('{"lvl": 5,');
+    return !threw && JSON.stringify(snapshotState133()) === JSON.stringify(before);
+  });
+  behavior133('empty string payload: no throw, state unchanged', undefined, () => {
+    const before = snapshotState133();
+    const threw = callThrows133('');
+    return !threw && JSON.stringify(snapshotState133()) === JSON.stringify(before);
+  });
+  behavior133('garbage non-JSON payload: no throw, state unchanged', undefined, () => {
+    const before = snapshotState133();
+    const threw = callThrows133('not json at all');
+    return !threw && JSON.stringify(snapshotState133()) === JSON.stringify(before);
+  });
+
+  // ── B. Wrong top-level type (valid JSON, non-object root) ─────────────
+  behavior133('null root payload: no throw, state unchanged', undefined, () => {
+    const before = snapshotState133();
+    const threw = callThrows133('null');
+    return !threw && JSON.stringify(snapshotState133()) === JSON.stringify(before);
+  });
+  behavior133('numeric root payload: no throw, state unchanged', undefined, () => {
+    const before = snapshotState133();
+    const threw = callThrows133('42');
+    return !threw && JSON.stringify(snapshotState133()) === JSON.stringify(before);
+  });
+  behavior133('string root payload: no throw, state unchanged', undefined, () => {
+    const before = snapshotState133();
+    const threw = callThrows133('"just a string"');
+    return !threw && JSON.stringify(snapshotState133()) === JSON.stringify(before);
+  });
+  behavior133('array root payload: no throw, state unchanged', undefined, () => {
+    const before = snapshotState133();
+    const threw = callThrows133('[1,2,3]');
+    return !threw && JSON.stringify(snapshotState133()) === JSON.stringify(before);
+  });
+  behavior133('boolean root payload: no throw, state unchanged', undefined, () => {
+    const before = snapshotState133();
+    const threw = callThrows133('true');
+    return !threw && JSON.stringify(snapshotState133()) === JSON.stringify(before);
+  });
+
+  // ── C. Hostile / injection-shaped payloads ────────────────────────────
+  behavior133('__proto__ pollution attempt does not pollute Object.prototype', undefined, () => {
+    callThrows133(JSON.stringify({ __proto__: { polluted133: 'yes' }, lvl: 7 }));
+    return Object.prototype.polluted133 === undefined && liveState133().lvl === 7;
+  });
+  behavior133(
+    'constructor.prototype pollution attempt does not pollute Object.prototype',
+    undefined,
+    () => {
+      callThrows133(JSON.stringify({ constructor: { prototype: { polluted2_133: 'yes' } } }));
+      return Object.prototype.polluted2_133 === undefined;
+    }
+  );
+  behavior133(
+    '__proto__ inside a quest entry does not pollute prototype or leak into stored quest',
+    undefined,
+    () => {
+      callThrows133(
+        JSON.stringify({
+          quests: [{ __proto__: { polluted3_133: 'yes' }, name: 'Test Quest', status: 'active' }],
+        })
+      );
+      const q = liveState133().quests[0];
+      return (
+        Object.prototype.polluted3_133 === undefined &&
+        q.name === 'Test Quest' &&
+        q.status === 'active' &&
+        !Object.prototype.hasOwnProperty.call(q, 'polluted3_133')
+      );
+    }
+  );
+  behavior133('script-tag-shaped string is stored as inert text, never executed', undefined, () => {
+    callThrows133(JSON.stringify({ loc: '<script>window.__xss133=1</script>' }));
+    return (
+      liveState133().loc === '<script>window.__xss133=1</script>' &&
+      harness133.sandbox.window.__xss133 === undefined
+    );
+  });
+  behavior133('SQL-injection-shaped string passes through as opaque text', undefined, () => {
+    callThrows133(
+      JSON.stringify({ quests: [{ name: "'; DROP TABLE saves; --", status: 'active' }] })
+    );
+    return liveState133().quests[0].name === "'; DROP TABLE saves; --";
+  });
+
+  // ── D. Oversized payloads ──────────────────────────────────────────────
+  behavior133('campaign_notes beyond 200 entries is capped at 200, newest kept', undefined, () => {
+    const notes = [];
+    for (let i = 0; i < 250; i++) notes.push('note ' + i);
+    callThrows133(JSON.stringify({ campaign_notes: notes }));
+    const cn = liveState133().campaign_notes;
+    return cn.length === 200 && cn[cn.length - 1] === 'note 249';
+  });
+  behavior133('large inventory array (2000 items) processed without throwing', undefined, () => {
+    const inv = [];
+    for (let i = 0; i < 2000; i++)
+      inv.push({ name: 'Item' + i, qty: 1, wgt: 1, val: 1, type: 'misc' });
+    const threw = callThrows133(JSON.stringify({ inventory: inv }));
+    return !threw && liveState133().inventory.length === 2000;
+  });
+  behavior133('extremely long single string field does not crash the sync', undefined, () => {
+    const longStr = 'A'.repeat(100000);
+    const threw = callThrows133(JSON.stringify({ loc: longStr }));
+    return !threw && liveState133().loc.length === 100000;
+  });
+
+  // ── E. Wrong-typed fields (type confusion, not malformed JSON) ─────────
+  behavior133(
+    'factions payload as an array is ignored safely (stays a valid object)',
+    undefined,
+    () => {
+      const before = snapshotState133().factions;
+      callThrows133(JSON.stringify({ factions: ['ncr', 'legion'] }));
+      return JSON.stringify(liveState133().factions) === JSON.stringify(before);
+    }
+  );
+  behavior133('skills payload as a string is ignored safely', undefined, () => {
+    const before = snapshotState133().skills;
+    callThrows133(JSON.stringify({ skills: 'guns:100' }));
+    return JSON.stringify(liveState133().skills) === JSON.stringify(before);
+  });
+  behavior133('equipped payload as an array is ignored safely', undefined, () => {
+    const before = snapshotState133().equipped;
+    callThrows133(JSON.stringify({ equipped: ['weapon'] }));
+    return JSON.stringify(liveState133().equipped) === JSON.stringify(before);
+  });
+  behavior133('status payload as a non-array object is ignored safely', undefined, () => {
+    const before = snapshotState133().status;
+    callThrows133(JSON.stringify({ status: { foo: 'bar' } }));
+    return JSON.stringify(liveState133().status) === JSON.stringify(before);
+  });
+
+  // ── F. Protocol-42 NaN-corruption regression (the fix landed this commit) ─
+  behavior133(
+    'non-numeric SPECIAL stat value does not corrupt state with NaN (clamped 1-10)',
+    undefined,
+    () => {
+      callThrows133(JSON.stringify({ s: 'abc' }));
+      const s = liveState133().s;
+      return !Number.isNaN(s) && s >= 1 && s <= 10;
+    }
+  );
+  behavior133('non-numeric core numeric fields never resolve to NaN', undefined, () => {
+    callThrows133(
+      JSON.stringify({
+        lvl: 'x',
+        xp: 'x',
+        hpCur: 'x',
+        hpMax: 'x',
+        caps: 'x',
+        karma: 'x',
+        rads: 'x',
+        ticks: 'x',
+      })
+    );
+    const st = liveState133();
+    return ['lvl', 'xp', 'hpCur', 'hpMax', 'caps', 'karma', 'rads', 'ticks'].every(
+      k => !Number.isNaN(st[k])
+    );
+  });
+  behavior133(
+    'garbage ticks value does not corrupt active status-effect countdown with NaN',
+    { status: [{ name: 'Poisoned', ticks: 5, type: 'DEBUFF' }] },
+    () => {
+      callThrows133(JSON.stringify({ ticks: 'garbage' }));
+      const eff = liveState133().status.find(e => e.name === 'Poisoned');
+      return eff !== undefined && !Number.isNaN(eff.ticks);
+    }
+  );
+
+  // ── G. Valid / partial payloads (positive path through the hardening) ──
+  behavior133('well-formed partial payload updates only the included field', undefined, () => {
+    callThrows133(JSON.stringify({ lvl: 5 }));
+    const st = liveState133();
+    return (
+      st.lvl === 5 &&
+      st.xp === harness133.defaultState133.xp &&
+      st.caps === harness133.defaultState133.caps
+    );
+  });
+  behavior133(
+    'well-formed payload updates SPECIAL + factions + inventory correctly',
+    undefined,
+    () => {
+      callThrows133(
+        JSON.stringify({
+          s: 7,
+          p: 6,
+          e: 5,
+          c: 4,
+          i: 3,
+          a: 2,
+          l: 1,
+          factions: { ncr: { fame: 10, infamy: 0 } },
+          inventory: [{ name: 'Stimpak', qty: 3, wgt: 0, val: 0, type: 'aid' }],
+        })
+      );
+      const st = liveState133();
+      return (
+        st.s === 7 &&
+        st.l === 1 &&
+        st.factions.ncr.fame === 10 &&
+        st.inventory.length === 1 &&
+        st.inventory[0].name === 'Stimpak' &&
+        st.inventory[0].qty === 3
+      );
+    }
+  );
+  behavior133(
+    'SPECIAL values are clamped to 1-10 even for valid out-of-range numbers',
+    undefined,
+    () => {
+      callThrows133(JSON.stringify({ s: 99, p: -5 }));
+      const st = liveState133();
+      return st.s === 10 && st.p === 1;
+    }
+  );
+  behavior133(
+    'collectibles are validated against the registry allow-list; unknown + dup entries dropped',
+    undefined,
+    () => {
+      callThrows133(
+        JSON.stringify({
+          collectibles: [
+            harness133.realCollectible133,
+            'Fake Item That Does Not Exist',
+            harness133.realCollectible133,
+          ],
+        })
+      );
+      const c = liveState133().collectibles;
+      return c.length === 1 && c[0] === harness133.realCollectible133;
+    }
   );
 }
 

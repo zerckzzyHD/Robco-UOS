@@ -500,14 +500,14 @@ function autoImportState(jsonString) {
           : undefined;
     const lvlV = _g(parsed, 'lvl');
     const _prevLvl = state.lvl; // H3: capture before update
-    if (lvlV !== undefined) state.lvl = parseInt(lvlV);
+    if (lvlV !== undefined) state.lvl = parseInt(lvlV) || 0;
     // H3: Level Up Jingle — fire when lvl increases
     if (lvlV !== undefined && state.lvl > _prevLvl && typeof playLevelUpJingle === 'function') {
       playLevelUpJingle();
       if (typeof triggerHaptic === 'function') triggerHaptic('levelup'); // WU-F2 haptic
     }
     const xpV = _g(parsed, 'xp');
-    if (xpV !== undefined) state.xp = parseInt(xpV);
+    if (xpV !== undefined) state.xp = parseInt(xpV) || 0;
     const hpCurV =
       parsed.hpCur !== undefined
         ? parsed.hpCur
@@ -520,22 +520,22 @@ function autoImportState(jsonString) {
         : parsed.hpmax !== undefined
           ? parsed.hpmax
           : undefined;
-    if (hpCurV !== undefined) state.hpCur = parseInt(hpCurV);
-    if (hpMaxV !== undefined) state.hpMax = parseInt(hpMaxV);
+    if (hpCurV !== undefined) state.hpCur = parseInt(hpCurV) || 0;
+    if (hpMaxV !== undefined) state.hpMax = parseInt(hpMaxV) || 0;
     ['s', 'p', 'e', 'c', 'i', 'a', 'l'].forEach(st => {
       const v = parsed[st] !== undefined ? parsed[st] : parsed[st.toUpperCase()];
-      if (v !== undefined) state[st] = Math.min(10, Math.max(1, parseInt(v)));
+      if (v !== undefined) state[st] = Math.min(10, Math.max(1, parseInt(v) || 0));
     });
     const capsV = _g(parsed, 'caps');
-    if (capsV !== undefined) state.caps = parseInt(capsV);
+    if (capsV !== undefined) state.caps = parseInt(capsV) || 0;
     const locV = parsed.loc !== undefined ? parsed.loc : parsed.location;
     if (locV !== undefined) state.loc = locV;
     const karmaV = _g(parsed, 'karma');
-    if (karmaV !== undefined) state.karma = parseInt(karmaV);
+    if (karmaV !== undefined) state.karma = parseInt(karmaV) || 0;
     const radsV = _g(parsed, 'rads');
-    if (radsV !== undefined) state.rads = parseInt(radsV);
+    if (radsV !== undefined) state.rads = parseInt(radsV) || 0;
     const ticksV = _g(parsed, 'ticks');
-    if (ticksV !== undefined) state.ticks = parseInt(ticksV);
+    if (ticksV !== undefined) state.ticks = parseInt(ticksV) || 0;
     // All five limbs including head
     ['la', 'ra', 'll', 'rl', 'hd'].forEach(limb => {
       const v = parsed[limb] !== undefined ? parsed[limb] : parsed[limb.toUpperCase()];
@@ -778,7 +778,7 @@ function autoImportState(jsonString) {
     if (state.status && state.status.length > 0) {
       const tickDelta =
         ticksV !== undefined
-          ? parseInt(ticksV) - (JSON.parse(window._lastStateBeforeSync || '{}').ticks || 0)
+          ? (parseInt(ticksV) || 0) - (JSON.parse(window._lastStateBeforeSync || '{}').ticks || 0)
           : 1;
       const elapsed = Math.max(1, tickDelta);
       state.status = state.status.filter(eff => {
