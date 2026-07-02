@@ -398,12 +398,21 @@ window.syncLocalSavesToCloud = async function () {
     } catch (_) {}
   }
 
-  // Slots 1-3
+  // Slots 1-3 — P3: IDB-primary union read so an oversized slot that lives only
+  // in IndexedDB also uploads to the cloud (falls back to localStorage).
   for (let n = 1; n <= 3; n++) {
-    const slotRaw = localStorage.getItem('robco_slot_' + n);
-    if (!slotRaw) continue;
+    let slot = null;
     try {
-      const slot = JSON.parse(slotRaw);
+      slot =
+        typeof window._coldReadObj === 'function'
+          ? await window._coldReadObj('robco_slot_' + n, 'slot_' + n)
+          : (function () {
+              const r = localStorage.getItem('robco_slot_' + n);
+              return r ? JSON.parse(r) : null;
+            })();
+    } catch (_) {}
+    if (!slot) continue;
+    try {
       const slotCtx = slot.gameContext || (slot.state && slot.state.gameContext) || 'FNV';
       const slotV8 = { activeContext: slotCtx, campaigns: {} };
       slotV8.campaigns[slotCtx] = slot.state || {};

@@ -1031,6 +1031,7 @@ window.onload = async function () {
     // P2: reconcile device prefs from IndexedDB (bounded + fail-safe) BEFORE the rest of boot reads them.
     await _hydrateMetaFromIdb();
     _hydrateStateFromStorage();
+    if (window._migrateColdStoreToIdb) window._migrateColdStoreToIdb(); // P3: fire-and-forget cold-store → IDB migration
     _restoreApiKeyAndChatHistory();
     loadUI();
     initTabs(); // Phase 4: restore active tab (defaults to 'stat' on first load)

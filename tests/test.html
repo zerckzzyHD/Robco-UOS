@@ -21,7 +21,7 @@
     or the canonical suites change, update this file in the SAME commit and bump
     the suite count marker. The gate fails on drift.
 
-    Suites: 12
+    Suites: 13
 -->
 <html lang="en">
   <head>
@@ -876,6 +876,114 @@
           });
         } catch (err) {
           assert(false, 'FATAL: P2 reconciliation suite threw', String((err && err.stack) || err));
+        }
+
+        // ── Suite 12 — P3 cold-store IDB-primary (REAL IndexedDB) ─────────────
+        // Real behavioral proof of the js/state.js cold-store accessors — all
+        // loaded here (unlike the P2 reconcile which lives in ui-core.js): drives
+        // _coldWriteObj / _coldReadObj / _migrateColdStoreToIdb / snapRollingBackup
+        // / getRollingBackupsAsync against the browser's native IndexedDB, proving
+        // round-trip, IDB-primary fallback (ceiling relief), newest-wins, additive
+        // idempotent migration, the two-store boundary, and the backup round-trip.
+        try {
+          section('Suite 12 — P3 cold-store IDB-primary (real IndexedDB)');
+          const env = t => ({
+            savedAt: t,
+            slotName: 'PROBE',
+            state: { lvl: t },
+            chat: [],
+            playstyle: 'any',
+          });
+
+          // 1) ROUND-TRIP: write cold-store → read back; IDB campaign holds it.
+          await window._coldWriteObj('robco_slot_probe', 'slot_probe', env(100));
+          const rt = await window._coldReadObj('robco_slot_probe', 'slot_probe');
+          const idbCopy = await window.IdbStore.get('campaign', 'slot_probe');
+          assert(
+            rt && rt.savedAt === 100 && idbCopy && idbCopy.savedAt === 100,
+            'round-trip: _coldWriteObj persists to the IDB campaign store and _coldReadObj reads it back'
+          );
+
+          // 2) CEILING RELIEF / FALLBACK: remove the localStorage mirror → still loads from IDB.
+          localStorage.removeItem('robco_slot_probe');
+          const fromIdb = await window._coldReadObj('robco_slot_probe', 'slot_probe');
+          assert(
+            fromIdb && fromIdb.savedAt === 100,
+            'IDB-primary fallback: a save survives localStorage removal and still loads from IndexedDB (ceiling relief)'
+          );
+
+          // 3) NEWEST-WINS: IDB newer → IDB wins; then localStorage newer → it wins.
+          await window.IdbStore.set('campaign', 'slot_probe', env(300));
+          localStorage.setItem('robco_slot_probe', JSON.stringify(env(200)));
+          const nw1 = await window._coldReadObj('robco_slot_probe', 'slot_probe');
+          localStorage.setItem('robco_slot_probe', JSON.stringify(env(500)));
+          const nw2 = await window._coldReadObj('robco_slot_probe', 'slot_probe');
+          assert(
+            nw1 && nw1.savedAt === 300 && nw2 && nw2.savedAt === 500,
+            'newest-wins: the newer of {IDB, localStorage} by savedAt is returned (IDB wins ties)'
+          );
+
+          // 4) MIGRATION: a localStorage-only slot is copied to IDB; idempotent; localStorage retained.
+          await window.IdbStore.remove('campaign', 'slot_2');
+          localStorage.setItem('robco_slot_2', JSON.stringify(env(42)));
+          await window._migrateColdStoreToIdb();
+          const migrated = await window.IdbStore.get('campaign', 'slot_2');
+          await window._migrateColdStoreToIdb(); // idempotent re-run
+          const stillThere = await window.IdbStore.get('campaign', 'slot_2');
+          assert(
+            migrated &&
+              migrated.savedAt === 42 &&
+              stillThere &&
+              stillThere.savedAt === 42 &&
+              localStorage.getItem('robco_slot_2') !== null,
+            'migration: a localStorage-only slot is copied to IDB, idempotently, and the localStorage copy is retained (additive)'
+          );
+
+          // 5) TWO-STORE BOUNDARY: a cold-store key never lands in the device 'meta' store.
+          const metaLeak = await window.IdbStore.get('meta', 'slot_probe');
+          assert(
+            metaLeak === null,
+            "two-store boundary: a cold-store key never appears in the device 'meta' store"
+          );
+
+          // 6) BACKUP round-trip: snapRollingBackup mirrors to IDB; getRollingBackupsAsync surfaces it.
+          localStorage.setItem(
+            'robco_v8',
+            JSON.stringify({ activeContext: 'FNV', campaigns: { FNV: { lvl: 9 } } })
+          );
+          ['robco_backup_1', 'robco_backup_2', 'robco_backup_3'].forEach(k =>
+            localStorage.removeItem(k)
+          );
+          await window.IdbStore.remove('campaign', 'backup_1');
+          localStorage.setItem('robco_backup_ptr', '0');
+          window.snapRollingBackup();
+          let backupInIdb = false;
+          for (let i = 0; i < 60; i++) {
+            if (await window.IdbStore.get('campaign', 'backup_1')) {
+              backupInIdb = true;
+              break;
+            }
+            await new Promise(r => setTimeout(r, 10));
+          }
+          const ring = await window.getRollingBackupsAsync();
+          assert(
+            backupInIdb && ring.length >= 1,
+            'backup round-trip: snapRollingBackup mirrors into IDB and getRollingBackupsAsync surfaces the union'
+          );
+
+          // Tidy up.
+          [
+            'robco_slot_probe',
+            'robco_slot_2',
+            'robco_backup_1',
+            'robco_backup_2',
+            'robco_backup_3',
+            'robco_backup_ptr',
+            'robco_v8',
+          ].forEach(k => localStorage.removeItem(k));
+          ['slot_probe', 'slot_2', 'backup_1'].forEach(k => window.IdbStore.remove('campaign', k));
+        } catch (err) {
+          assert(false, 'FATAL: P3 cold-store suite threw', String((err && err.stack) || err));
         }
 
         // ── Summary ──────────────────────────────────────────────────────────

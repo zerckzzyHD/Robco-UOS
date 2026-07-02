@@ -258,10 +258,103 @@ window.verifySaveEnvelope = function (envelope) {
   return { status: 'ok' };
 };
 
+// ── COLD-STORE ACCESSORS (save slots + rolling backups) — Step 2 · Phase 1 · P3 ──
+// Cold-store entries (save slots, rolling backups) live IDB-PRIMARY in the
+// 'campaign' object store (keys slot_<n> / backup_<n>), with localStorage
+// (robco_slot_<n> / robco_backup_<n>) kept as a synchronous MIRROR + FALLBACK.
+// IDB relieves the ~5MB localStorage ceiling: a save too large for localStorage
+// still persists to IDB, and a localStorage quota failure is no longer fatal.
+// P3 NEVER removes a localStorage copy (conservative — it stays a fallback); the
+// two stores diverge only under quota pressure (oversized → IDB-only). Reads take
+// the NEWER of {IDB, localStorage} by _coldStamp (IDB wins ties) so a partial
+// write can never surface a stale save. Two-store boundary (Protocol 23): cold
+// store uses the 'campaign' object store ONLY; device prefs stay in 'meta'.
+
+// Comparable recency stamp for a cold-store envelope (slots use savedAt,
+// rolling backups use timestamp).
+function _coldStamp(o) {
+  if (!o || typeof o !== 'object') return 0;
+  return Number(o.savedAt || o.timestamp || 0) || 0;
+}
+
+// Async: read the freshest parsed envelope for a cold-store entry across both
+// stores. IDB 'campaign' is primary; localStorage is the fallback/mirror; the
+// newer by _coldStamp wins (IDB wins ties). Returns the parsed object or null.
+// Never throws — a broken/absent IDB simply yields the localStorage copy.
+async function _coldReadObj(lsKey, idbKey) {
+  let lsObj = null;
+  try {
+    const raw = localStorage.getItem(lsKey);
+    if (raw) lsObj = JSON.parse(raw);
+  } catch (_) {}
+  let idbObj = null;
+  try {
+    if (window.IdbStore) idbObj = await window.IdbStore.get('campaign', idbKey);
+  } catch (_) {}
+  if (idbObj && lsObj) return _coldStamp(idbObj) >= _coldStamp(lsObj) ? idbObj : lsObj;
+  return idbObj || lsObj || null;
+}
+window._coldReadObj = _coldReadObj;
+
+// Async: durably write a cold-store envelope. IDB 'campaign' is the primary
+// (no ~5MB ceiling); localStorage is a best-effort mirror — a QuotaExceededError
+// there is NON-FATAL because the IDB copy is the durable home (this is the
+// ceiling relief). Returns true if at least one store accepted the write; the
+// caller reports success on that basis. Never throws.
+async function _coldWriteObj(lsKey, idbKey, obj) {
+  let idbOk = false;
+  try {
+    if (window.IdbStore) idbOk = (await window.IdbStore.set('campaign', idbKey, obj)) === true;
+  } catch (_) {}
+  let lsOk = false;
+  try {
+    localStorage.setItem(lsKey, JSON.stringify(obj));
+    lsOk = true;
+  } catch (_) {
+    /* quota / private-mode — non-fatal; the IDB copy is the durable home */
+  }
+  return idbOk || lsOk;
+}
+window._coldWriteObj = _coldWriteObj;
+
+// Fire-and-forget, idempotent migration of existing localStorage cold-store
+// entries into the IDB 'campaign' store. ADDITIVE ONLY — never removes the
+// localStorage copy (it stays a fallback) and never clobbers a NEWER IDB entry
+// (copies only when IDB lacks the key or localStorage is strictly newer by
+// _coldStamp). Idempotent + interruption-safe: re-running at every boot copies
+// only what is missing/older, so it never duplicates or drops a save, and union
+// reads (_coldReadObj) find every save regardless of how far it got. Never throws.
+async function _migrateColdStoreToIdb() {
+  if (!window.IdbStore) return;
+  const jobs = [];
+  for (let n = 1; n <= 3; n++) jobs.push(['robco_slot_' + n, 'slot_' + n]);
+  for (let n = 1; n <= 3; n++) jobs.push(['robco_backup_' + n, 'backup_' + n]);
+  for (const [lsKey, idbKey] of jobs) {
+    let lsObj = null;
+    try {
+      const raw = localStorage.getItem(lsKey);
+      if (raw) lsObj = JSON.parse(raw);
+    } catch (_) {}
+    if (!lsObj) continue;
+    let idbObj = null;
+    try {
+      idbObj = await window.IdbStore.get('campaign', idbKey);
+    } catch (_) {}
+    if (!idbObj || _coldStamp(lsObj) > _coldStamp(idbObj)) {
+      try {
+        await window.IdbStore.set('campaign', idbKey, lsObj);
+      } catch (_) {}
+    }
+  }
+}
+window._migrateColdStoreToIdb = _migrateColdStoreToIdb;
+
 // ── ROLLING BACKUPS ──────────────────────────────────────────────
 // Snapshot the current localStorage state into a ring of 3 backup slots
-// (robco_backup_1/2/3). Call before every user-initiated state-replacing load.
-// The ring pointer (robco_backup_ptr) tracks the next slot to overwrite.
+// (robco_backup_1/2/3), MIRRORED into the IDB 'campaign' store (backup_<n>) for
+// durability + ceiling relief (P3). Call before every user-initiated
+// state-replacing load. The ring pointer (robco_backup_ptr) tracks the next slot
+// to overwrite. Stays synchronous — the IDB mirror is fire-and-forget.
 window.snapRollingBackup = function () {
   let ptr = 0;
   try {
@@ -277,19 +370,27 @@ window.snapRollingBackup = function () {
       if (JSON.stringify(_prevSnap.robco_v8) === _curV8) return;
     }
   } catch (_) {}
-  let snap;
+  let snapObj, snap;
   try {
-    snap = JSON.stringify({
+    snapObj = {
       timestamp: Date.now(),
       robco_v8: JSON.parse(_curV8 || '{}'),
       chat: JSON.parse(localStorage.getItem('robco_chat') || '[]'),
       playstyle: localStorage.getItem('robco_playstyle') || 'any',
-    });
+    };
+    snap = JSON.stringify(snapObj);
   } catch (_) {
     return;
   }
-  const writeKey = 'robco_backup_' + (ptr + 1);
   const nextPtr = (ptr + 1) % 3;
+  // P3: mirror this ring slot into the IDB 'campaign' store — durable + ceiling-
+  // relieved (survives a localStorage quota drop). Fire-and-forget; the localStorage
+  // ring below stays the synchronous working store. IDB key mirrors the ls slot.
+  if (window.IdbStore) {
+    const _p = window.IdbStore.set('campaign', 'backup_' + (ptr + 1), snapObj);
+    if (_p && typeof _p.catch === 'function') _p.catch(() => {});
+  }
+  const writeKey = 'robco_backup_' + (ptr + 1);
   function _tryWrite() {
     localStorage.setItem(writeKey, snap);
     localStorage.setItem('robco_backup_ptr', String(nextPtr));
@@ -298,19 +399,21 @@ window.snapRollingBackup = function () {
     _tryWrite();
   } catch (e) {
     if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
-      // Drop the oldest remaining slot to free space, then retry
+      // Drop the oldest remaining localStorage slot to free space, then retry.
+      // Non-fatal even if this still fails: the IDB mirror above holds the backup.
       try {
         localStorage.removeItem('robco_backup_' + (nextPtr + 1));
         _tryWrite();
       } catch (_) {
-        console.warn('[RobCo] snapRollingBackup: quota exceeded, backup not saved');
+        console.warn('[RobCo] snapRollingBackup: localStorage quota exceeded (IDB copy retained)');
       }
     }
   }
 };
 
-// Returns an array of backup entries sorted newest-first.
-// Each entry: { key, timestamp, label, data }
+// Returns an array of backup entries sorted newest-first, read from the
+// localStorage ring (synchronous — used by UI gate checks that can't await).
+// Each entry: { key, timestamp, label, data }.
 window.getRollingBackups = function () {
   const results = [];
   for (let i = 1; i <= 3; i++) {
@@ -327,6 +430,27 @@ window.getRollingBackups = function () {
         });
       }
     } catch (_) {}
+  }
+  return results.sort((a, b) => b.timestamp - a.timestamp);
+};
+
+// Async: the IDB-PRIMARY union of the rolling-backup ring across the 'campaign'
+// store + localStorage (newest per slot wins, via _coldReadObj). Used by the
+// RESTORE path so an oversized backup that localStorage dropped under quota is
+// still restorable from IDB. The synchronous getRollingBackups() above remains
+// the localStorage-only quick check for UI gate/affordance visibility.
+window.getRollingBackupsAsync = async function () {
+  const results = [];
+  for (let i = 1; i <= 3; i++) {
+    const b = await _coldReadObj('robco_backup_' + i, 'backup_' + i);
+    if (b && b.timestamp) {
+      results.push({
+        key: 'robco_backup_' + i,
+        timestamp: b.timestamp,
+        label: new Date(b.timestamp).toLocaleString(),
+        data: b,
+      });
+    }
   }
   return results.sort((a, b) => b.timestamp - a.timestamp);
 };

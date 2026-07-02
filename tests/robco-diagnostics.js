@@ -4361,7 +4361,7 @@ header('Suite 51 — Save Integrity + Rolling Backups');
   assert(
     stateSrc51.includes('QuotaExceededError') &&
       /removeItem\s*\(/.test(stateSrc51) &&
-      /snapRollingBackup[\s\S]{0,1500}QuotaExceededError/.test(stateSrc51),
+      /snapRollingBackup[\s\S]{0,2500}QuotaExceededError/.test(stateSrc51),
     'snapRollingBackup handles QuotaExceededError gracefully (drop-oldest-retry, no crash)'
   );
 
@@ -16267,15 +16267,22 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
   // 138.11  BOUNDARY: idb.js carries no campaign-key literal, and the shadow
   //          only ever targets the 'meta' store (never 'campaign')
-  assert(
-    !/robco_v8|robco_slot|robco_backup|robco_chat|robco_playstyle|robco_v7|robco_last_cloud_push/.test(
-      idb138
-    ) &&
-      /window\.IdbStore\.set\('meta'/.test(state138) &&
-      /window\.IdbStore\.remove\('meta'/.test(state138) &&
-      !/_idbShadow[\s\S]*'campaign'/.test(state138),
-    "138.11: no campaign-key literal in idb.js; the write-through targets only the 'meta' store"
-  );
+  {
+    // Scope the "no 'campaign'" check to the _idbShadow FUNCTION BODY — P3 added
+    // legitimate 'campaign'-store writes elsewhere in state.js (cold-store), so a
+    // whole-file scan would false-positive. The device-pref write-through itself
+    // must still target only 'meta'.
+    const idbShadowBody138 = extractFunctionBody(state138, '_idbShadow');
+    assert(
+      !/robco_v8|robco_slot|robco_backup|robco_chat|robco_playstyle|robco_v7|robco_last_cloud_push/.test(
+        idb138
+      ) &&
+        /window\.IdbStore\.set\('meta'/.test(idbShadowBody138) &&
+        /window\.IdbStore\.remove\('meta'/.test(idbShadowBody138) &&
+        !/'campaign'/.test(idbShadowBody138),
+      "138.11: no campaign-key literal in idb.js; the device write-through (_idbShadow) targets only the 'meta' store"
+    );
+  }
 
   // 138.12  game-agnostic (Protocol 38): a pure KV engine — zero game literals
   assert(
@@ -16427,6 +16434,129 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   assert(
     !/FNV|FO3|Fallout|New Vegas|Mojave|Capital Wasteland/.test(reconcile139 + hydrate139),
     '139.12: the P2 reconciliation/hydration path is game-agnostic (no game literals)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 140 — Step 2 (v2.8.0) Phase 1 P3: cold-store (save slots + rolling
+//  backups) moved IDB-PRIMARY — the unit that relieves the ~5MB localStorage
+//  ceiling. Cold-store entries live in the IDB 'campaign' object store (keys
+//  slot_<n> / backup_<n>) with localStorage kept as a synchronous mirror +
+//  fallback. Writes go IDB-primary + best-effort localStorage (a quota failure
+//  is non-fatal — IDB is the durable home); reads take the NEWER of {IDB,
+//  localStorage} by _coldStamp (IDB wins ties). Migration is fire-and-forget,
+//  idempotent, additive-only (copies only when IDB is absent or localStorage is
+//  strictly newer; NEVER removes a localStorage copy). Two-store boundary: cold
+//  store uses ONLY the 'campaign' object store; device prefs stay in 'meta'.
+//  Structural guards here; the REAL IndexedDB migration/round-trip/fallback
+//  behavioral proof runs in tests/test.html (Protocol 40). 12 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 140 — P3 cold-store IDB-primary (save slots + rolling backups)');
+  const state140 = readFile('js/state.js');
+  const uiSaves140 = readFile('js/ui-saves.js');
+  const uiAcct140 = readFile('js/ui-account.js');
+  const cloud140 = readFile('js/cloud.js');
+  const uiCore140 = readFile('js/ui-core.js');
+  const coldRead140 = extractFunctionBody(state140, '_coldReadObj');
+  const coldWrite140 = extractFunctionBody(state140, '_coldWriteObj');
+  const migrate140 = extractFunctionBody(state140, '_migrateColdStoreToIdb');
+  const saveBody140 = extractFunctionBody(uiSaves140, 'saveToSlot');
+  const loadBody140 = extractFunctionBody(uiSaves140, 'loadFromSlot');
+  const restoreBody140 = extractFunctionBody(uiSaves140, 'restoreRollingBackup');
+
+  // 140.1  the cold-store accessors + migration are defined and exposed on window
+  assert(
+    /function _coldReadObj\s*\(/.test(state140) &&
+      /function _coldWriteObj\s*\(/.test(state140) &&
+      /function _coldStamp\s*\(/.test(state140) &&
+      /function _migrateColdStoreToIdb\s*\(/.test(state140) &&
+      /window\._coldReadObj =/.test(state140) &&
+      /window\._coldWriteObj =/.test(state140) &&
+      /window\._migrateColdStoreToIdb =/.test(state140),
+    '140.1: state.js defines + exposes _coldReadObj / _coldWriteObj / _coldStamp / _migrateColdStoreToIdb'
+  );
+
+  // 140.2  TWO-STORE BOUNDARY: cold-store accessors use the 'campaign' store only
+  assert(
+    /'campaign'/.test(coldRead140) &&
+      /'campaign'/.test(coldWrite140) &&
+      /'campaign'/.test(migrate140) &&
+      !/'meta'/.test(coldRead140) &&
+      !/'meta'/.test(coldWrite140) &&
+      !/'meta'/.test(migrate140),
+    "140.2: cold-store accessors use the 'campaign' object store only, never 'meta' (two-store boundary)"
+  );
+
+  // 140.3  saveToSlot is async and writes IDB-primary via _coldWriteObj
+  assert(
+    /async function saveToSlot/.test(uiSaves140) &&
+      /_coldWriteObj\(_slotKey\(slotNum\), 'slot_' \+ slotNum/.test(saveBody140),
+    '140.3: saveToSlot is async and writes IDB-primary via _coldWriteObj'
+  );
+
+  // 140.4  loadFromSlot reads IDB-primary via _coldReadObj with a localStorage fallback
+  assert(
+    /_coldReadObj\(_slotKey\(slotNum\), 'slot_' \+ slotNum\)/.test(loadBody140) &&
+      /localStorage\.getItem\(_slotKey\(slotNum\)\)/.test(loadBody140),
+    '140.4: loadFromSlot reads IDB-primary via _coldReadObj with a localStorage fallback'
+  );
+
+  // 140.5  snapRollingBackup mirrors the ring slot into the IDB 'campaign' store
+  assert(
+    /IdbStore\.set\('campaign', 'backup_' \+ \(ptr \+ 1\)/.test(state140),
+    "140.5: snapRollingBackup mirrors the backup into the IDB 'campaign' store (backup_<n>)"
+  );
+
+  // 140.6  getRollingBackupsAsync (union) exists + restore uses it; sync one stays
+  assert(
+    /window\.getRollingBackupsAsync = async function/.test(state140) &&
+      /await window\.getRollingBackupsAsync\(\)/.test(restoreBody140) &&
+      /window\.getRollingBackups = function/.test(state140),
+    '140.6: getRollingBackupsAsync (union) exists and restoreRollingBackup uses it; getRollingBackups stays synchronous'
+  );
+
+  // 140.7  NEWEST-WINS: _coldReadObj resolves divergence by _coldStamp (IDB ties)
+  assert(
+    /_coldStamp\(idbObj\) >= _coldStamp\(lsObj\)/.test(coldRead140),
+    '140.7: _coldReadObj resolves an IDB/localStorage divergence newest-wins by _coldStamp (IDB wins ties)'
+  );
+
+  // 140.8  MIGRATION is additive + idempotent + never removes localStorage
+  assert(
+    /!idbObj \|\| _coldStamp\(lsObj\) > _coldStamp\(idbObj\)/.test(migrate140) &&
+      !/removeItem/.test(migrate140) &&
+      !/removeItem/.test(coldWrite140),
+    '140.8: migration copies only when IDB is absent or localStorage is strictly newer (idempotent, additive-only — never removes localStorage)'
+  );
+
+  // 140.9  CEILING RELIEF / FAIL-SAFE: _coldWriteObj succeeds on either store
+  //         (a localStorage quota failure is non-fatal) + boot kicks the migration
+  assert(
+    /return idbOk \|\| lsOk;/.test(coldWrite140) &&
+      /catch \(_\) \{/.test(coldWrite140) &&
+      /_migrateColdStoreToIdb\(\)/.test(uiCore140),
+    '140.9: _coldWriteObj persists on either store (localStorage quota non-fatal — ceiling relief); boot fires the migration'
+  );
+
+  // 140.10  renderSavesList surfaces IDB-only save slots (oversized saves)
+  assert(
+    /IdbStore\.get\('campaign', 'slot_' \+ n\)/.test(uiAcct140),
+    '140.10: renderSavesList surfaces IDB-only save slots (oversized saves localStorage could not hold)'
+  );
+
+  // 140.11  cloud upload reads slots via the IDB-primary union
+  assert(
+    /_coldReadObj\('robco_slot_' \+ n, 'slot_' \+ n\)/.test(cloud140),
+    '140.11: cloud syncLocalSavesToCloud reads slots via the IDB-primary union (_coldReadObj)'
+  );
+
+  // 140.12  game-agnostic (Protocol 38): the cold-store path has no game literals
+  assert(
+    !/FNV|FO3|Fallout|New Vegas|Mojave|Capital Wasteland/.test(
+      coldRead140 + coldWrite140 + migrate140
+    ),
+    '140.12: the P3 cold-store accessors are game-agnostic (no game literals)'
   );
 }
 

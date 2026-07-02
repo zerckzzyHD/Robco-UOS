@@ -64,8 +64,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    1686-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    1686-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    1698-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    1698-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -108,6 +108,23 @@ Scripts are loaded via `<script>` tags in `index.html` in this exact order:
    (Promise.race vs _META_HYDRATE_BUDGET_MS): normal boots resolve in ~0ms (the connection opened
    at page-parse time), and a slow/hung IndexedDB is capped so boot proceeds on localStorage
    exactly as today (fail-safe — never hangs, never black-screens).
+
+   P3 (cold-store IDB-primary, js/state.js accessors): save slots + rolling backups live
+   IDB-PRIMARY in the 'campaign' object store (keys slot_<n> / backup_<n>) with localStorage
+   (robco_slot_<n> / robco_backup_<n>) kept as a synchronous MIRROR + FALLBACK — this is the ~5MB
+   ceiling relief (a save too large for localStorage still persists to IDB; a localStorage quota
+   failure is no longer fatal). `_coldWriteObj` writes IDB-primary + best-effort localStorage
+   (succeeds if EITHER store accepts it); `_coldReadObj` returns the NEWER of {IDB, localStorage}
+   by _coldStamp (savedAt/timestamp; IDB wins ties) so a partial-write divergence can never
+   surface a stale save. saveToSlot/loadFromSlot and the cloud slot-upload route through these;
+   snapRollingBackup mirrors each ring slot into IDB; restoreRollingBackup reads the IDB-primary
+   union via getRollingBackupsAsync (the sync getRollingBackups stays localStorage-only for UI
+   gate checks). `_migrateColdStoreToIdb` (fire-and-forget at boot) copies existing localStorage
+   cold-store into IDB — ADDITIVE + IDEMPOTENT: copies only when IDB is absent or localStorage is
+   strictly newer, and NEVER removes a localStorage copy (conservative — it stays a fallback), so
+   an interrupted run resumes safely and union reads find every save regardless of progress.
+   Two-store boundary held: cold store uses ONLY the 'campaign' object store; device prefs (P1/P2)
+   stay in 'meta'.
    ── Per-game boot manifest (GAME_FILES in index.html; order preserved via script.async = false) ──
 1. js/db_nv.js / js/db_fo3.js → defines: databaseCSVs, lookupItemInDb (game-specific CSV data;
                        the active pair is selected by the GAME_FILES manifest, FNV fail-safe)
@@ -1225,7 +1242,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1686-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1698-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

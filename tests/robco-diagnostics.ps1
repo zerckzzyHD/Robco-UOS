@@ -9248,13 +9248,16 @@ Check (
     ($idb138 -match 'resolve\(fallback\)') -and ($state138 -match '\.catch\(\(\)\s*=>\s*\{\}\)')
 ) '138.10: idb.js ops resolve-soft on error and _idbShadow swallows a rejected shadow promise'
 
-# 138.11  BOUNDARY: no campaign-key literal in idb.js; shadow targets only 'meta'
+# 138.11  BOUNDARY: no campaign-key literal in idb.js; the device write-through
+#         (_idbShadow body) targets only 'meta'. Scoped to _idbShadow because P3
+#         added legitimate 'campaign'-store writes elsewhere in state.js.
+$idbShadowBody138 = Get-FunctionBody $state138 '_idbShadow'
 Check (
     (-not ($idb138 -match 'robco_v8|robco_slot|robco_backup|robco_chat|robco_playstyle|robco_v7|robco_last_cloud_push')) -and
-    ($state138 -match "window\.IdbStore\.set\('meta'") -and
-    ($state138 -match "window\.IdbStore\.remove\('meta'") -and
-    (-not ($state138 -match "_idbShadow[\s\S]*'campaign'"))
-) "138.11: no campaign-key literal in idb.js; the write-through targets only the 'meta' store"
+    ($idbShadowBody138 -match "window\.IdbStore\.set\('meta'") -and
+    ($idbShadowBody138 -match "window\.IdbStore\.remove\('meta'") -and
+    (-not ($idbShadowBody138 -match "'campaign'"))
+) "138.11: no campaign-key literal in idb.js; the device write-through (_idbShadow) targets only the 'meta' store"
 
 # 138.12  game-agnostic (Protocol 38): a pure KV engine -- zero game literals
 Check (
@@ -9371,6 +9374,105 @@ Check (
 Check (
     -not (($reconcile139 + $hydrate139) -match 'FNV|FO3|Fallout|New Vegas|Mojave|Capital Wasteland')
 ) '139.12: the P2 reconciliation/hydration path is game-agnostic (no game literals)'
+
+# ===========================================================
+# Suite 140 -- Step 2 (v2.8.0) Phase 1 P3: cold-store (save slots + rolling
+# backups) moved IDB-PRIMARY (12 tests). Mirrors JS Suite 140. Cold-store lives
+# in the IDB 'campaign' object store (slot_<n> / backup_<n>) with localStorage as
+# a synchronous mirror + fallback. Writes go IDB-primary + best-effort
+# localStorage (a quota failure is non-fatal -- IDB is the durable home, the
+# ceiling relief); reads take the NEWER of {IDB, localStorage} by _coldStamp.
+# Migration is fire-and-forget, idempotent, additive-only (never removes a
+# localStorage copy). Two-store boundary: cold store uses 'campaign' only. The
+# REAL IndexedDB migration/round-trip/fallback proof runs in tests/test.html.
+# ===========================================================
+Sep "Suite 140 -- P3 cold-store IDB-primary (save slots + rolling backups)"
+$state140    = Read-Src "js/state.js"
+$uiSaves140  = Read-Src "js/ui-saves.js"
+$uiAcct140   = Read-Src "js/ui-account.js"
+$cloud140    = Read-Src "js/cloud.js"
+$uiCore140   = Read-Src "js/ui-core.js"
+$coldRead140    = Get-FunctionBody $state140 '_coldReadObj'
+$coldWrite140   = Get-FunctionBody $state140 '_coldWriteObj'
+$migrate140     = Get-FunctionBody $state140 '_migrateColdStoreToIdb'
+$saveBody140    = Get-FunctionBody $uiSaves140 'saveToSlot'
+$loadBody140    = Get-FunctionBody $uiSaves140 'loadFromSlot'
+$restoreBody140 = Get-FunctionBody $uiSaves140 'restoreRollingBackup'
+
+# 140.1  cold-store accessors + migration defined + exposed on window
+Check (
+    ($state140 -match 'function _coldReadObj\s*\(') -and
+    ($state140 -match 'function _coldWriteObj\s*\(') -and
+    ($state140 -match 'function _coldStamp\s*\(') -and
+    ($state140 -match 'function _migrateColdStoreToIdb\s*\(') -and
+    ($state140 -match 'window\._coldReadObj =') -and
+    ($state140 -match 'window\._coldWriteObj =') -and
+    ($state140 -match 'window\._migrateColdStoreToIdb =')
+) '140.1: state.js defines + exposes _coldReadObj / _coldWriteObj / _coldStamp / _migrateColdStoreToIdb'
+
+# 140.2  TWO-STORE BOUNDARY: cold-store accessors use 'campaign' only, never 'meta'
+Check (
+    ($coldRead140 -match "'campaign'") -and ($coldWrite140 -match "'campaign'") -and ($migrate140 -match "'campaign'") -and
+    (-not ($coldRead140 -match "'meta'")) -and (-not ($coldWrite140 -match "'meta'")) -and (-not ($migrate140 -match "'meta'"))
+) "140.2: cold-store accessors use the 'campaign' object store only, never 'meta' (two-store boundary)"
+
+# 140.3  saveToSlot async + IDB-primary via _coldWriteObj
+Check (
+    ($uiSaves140 -match 'async function saveToSlot') -and
+    ($saveBody140 -match "_coldWriteObj\(_slotKey\(slotNum\), 'slot_' \+ slotNum")
+) '140.3: saveToSlot is async and writes IDB-primary via _coldWriteObj'
+
+# 140.4  loadFromSlot IDB-primary via _coldReadObj + localStorage fallback
+Check (
+    ($loadBody140 -match "_coldReadObj\(_slotKey\(slotNum\), 'slot_' \+ slotNum\)") -and
+    ($loadBody140 -match 'localStorage\.getItem\(_slotKey\(slotNum\)\)')
+) '140.4: loadFromSlot reads IDB-primary via _coldReadObj with a localStorage fallback'
+
+# 140.5  snapRollingBackup mirrors the ring slot into the IDB 'campaign' store
+Check (
+    $state140 -match "IdbStore\.set\('campaign', 'backup_' \+ \(ptr \+ 1\)"
+) "140.5: snapRollingBackup mirrors the backup into the IDB 'campaign' store (backup_<n>)"
+
+# 140.6  getRollingBackupsAsync (union) + restore uses it; sync one stays
+Check (
+    ($state140 -match 'window\.getRollingBackupsAsync = async function') -and
+    ($restoreBody140 -match 'await window\.getRollingBackupsAsync\(\)') -and
+    ($state140 -match 'window\.getRollingBackups = function')
+) '140.6: getRollingBackupsAsync (union) exists and restoreRollingBackup uses it; getRollingBackups stays synchronous'
+
+# 140.7  NEWEST-WINS: _coldReadObj resolves divergence by _coldStamp (IDB ties)
+Check (
+    $coldRead140 -match '_coldStamp\(idbObj\) >= _coldStamp\(lsObj\)'
+) '140.7: _coldReadObj resolves an IDB/localStorage divergence newest-wins by _coldStamp (IDB wins ties)'
+
+# 140.8  MIGRATION additive + idempotent + never removes localStorage
+Check (
+    ($migrate140 -match '!idbObj \|\| _coldStamp\(lsObj\) > _coldStamp\(idbObj\)') -and
+    (-not ($migrate140 -match 'removeItem')) -and
+    (-not ($coldWrite140 -match 'removeItem'))
+) '140.8: migration copies only when IDB is absent or localStorage is strictly newer (idempotent, additive-only -- never removes localStorage)'
+
+# 140.9  CEILING RELIEF / FAIL-SAFE: write persists on either store + boot migration
+Check (
+    ($coldWrite140 -match 'return idbOk \|\| lsOk;') -and
+    ($coldWrite140 -match 'catch \(_\) \{') -and
+    ($uiCore140 -match '_migrateColdStoreToIdb\(\)')
+) '140.9: _coldWriteObj persists on either store (localStorage quota non-fatal -- ceiling relief); boot fires the migration'
+
+# 140.10  renderSavesList surfaces IDB-only save slots
+Check (
+    $uiAcct140 -match "IdbStore\.get\('campaign', 'slot_' \+ n\)"
+) '140.10: renderSavesList surfaces IDB-only save slots (oversized saves localStorage could not hold)'
+
+# 140.11  cloud upload reads slots via the IDB-primary union
+Check (
+    $cloud140 -match "_coldReadObj\('robco_slot_' \+ n, 'slot_' \+ n\)"
+) '140.11: cloud syncLocalSavesToCloud reads slots via the IDB-primary union (_coldReadObj)'
+
+# 140.12  game-agnostic (Protocol 38): the cold-store path has no game literals
+Check (
+    -not (($coldRead140 + $coldWrite140 + $migrate140) -match 'FNV|FO3|Fallout|New Vegas|Mojave|Capital Wasteland')
+) '140.12: the P3 cold-store accessors are game-agnostic (no game literals)'
 
 # ===========================================================
 # Results

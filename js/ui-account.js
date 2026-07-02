@@ -68,6 +68,29 @@ async function renderSavesList() {
 
   const localSaves = listLocalSaves();
 
+  // P3: supplement the localStorage list with any save slot that lives ONLY in
+  // IndexedDB (an oversized save localStorage couldn't hold). Runs before the
+  // single innerHTML paint below, so the list is complete with no flash of empty.
+  if (window.IdbStore) {
+    const haveN = new Set(localSaves.filter(s => s.isSlot).map(s => s.n));
+    for (let n = 1; n <= 3; n++) {
+      if (haveN.has(n)) continue;
+      try {
+        const slot = await window.IdbStore.get('campaign', 'slot_' + n);
+        if (slot && (slot.savedAt || slot.slotName)) {
+          const savedDate = slot.savedAt ? new Date(slot.savedAt).toLocaleDateString() : '';
+          localSaves.push({
+            id: 'slot_' + n,
+            label: (slot.slotName || 'Slot ' + n) + (savedDate ? ': ' + savedDate : ''),
+            isSlot: true,
+            n,
+          });
+        }
+      } catch (_) {}
+    }
+    localSaves.sort((a, b) => (a.n || 0) - (b.n || 0));
+  }
+
   let cloudSaves = [];
   if (isSignedIn && typeof window.listCloudSaves === 'function') {
     body.innerHTML = emptyState('RETRIEVING ARCHIVES…');

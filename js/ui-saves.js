@@ -193,7 +193,11 @@ function listLocalSaves() {
   return saves;
 }
 
-function saveToSlot(slotNum) {
+// P3: async — the slot is written IDB-PRIMARY (js/state.js _coldWriteObj: IDB
+// 'campaign' store, no ~5MB ceiling) with a best-effort localStorage mirror. A
+// localStorage quota failure is no longer fatal: the save persists to IDB, so a
+// slot too large for localStorage is now saved instead of lost (ceiling relief).
+async function saveToSlot(slotNum) {
   syncStateFromDom();
   const _slotState = JSON.parse(JSON.stringify(state));
   const _slotChat = chatHistory.slice(-200);
@@ -211,26 +215,49 @@ function saveToSlot(slotNum) {
   if (typeof window.computeSaveChecksum === 'function') {
     envelope.checksum = window.computeSaveChecksum(_slotState, _slotChat, _slotPlaystyle);
   }
-  try {
-    localStorage.setItem(_slotKey(slotNum), JSON.stringify(envelope));
+  const ok =
+    typeof window._coldWriteObj === 'function'
+      ? await window._coldWriteObj(_slotKey(slotNum), 'slot_' + slotNum, envelope)
+      : (function () {
+          try {
+            localStorage.setItem(_slotKey(slotNum), JSON.stringify(envelope));
+            return true;
+          } catch (_) {
+            return false;
+          }
+        })();
+  if (ok) {
     const el = document.getElementById('slotStatus');
     const ts = new Date(envelope.savedAt).toLocaleTimeString();
     const ctx = envelope.gameContext;
     if (el) el.textContent = `${_slotLabel(slotNum)} [${ctx}] saved at ${ts}`;
     appendToChat(`> [SAVE] ${_slotLabel(slotNum)} [${ctx}] written at ${ts}`, 'sys', true);
-  } catch (e) {
-    appendToChat('> [ERROR] Save slot write failed — storage quota exceeded.', 'sys', true);
+  } else {
+    appendToChat('> [ERROR] Save slot write failed — storage unavailable.', 'sys', true);
   }
 }
 
 async function loadFromSlot(slotNum) {
-  const raw = localStorage.getItem(_slotKey(slotNum));
-  if (!raw) {
+  // P3: IDB-PRIMARY read — the newer of {IDB 'campaign' slot, localStorage} wins
+  // (_coldReadObj), so an oversized slot saved only to IDB still loads, and a
+  // partial-write divergence can never surface a stale save.
+  let env =
+    typeof window._coldReadObj === 'function'
+      ? await window._coldReadObj(_slotKey(slotNum), 'slot_' + slotNum)
+      : null;
+  if (!env) {
+    const raw = localStorage.getItem(_slotKey(slotNum));
+    if (raw) {
+      try {
+        env = JSON.parse(raw);
+      } catch (_) {}
+    }
+  }
+  if (!env) {
     appendToChat(`> [LOAD] ${_slotLabel(slotNum)} is empty.`, 'sys', true);
     return;
   }
   try {
-    let env = JSON.parse(raw);
     // Integrity + forward-compat check before applying
     if (typeof window.verifySaveEnvelope === 'function') {
       const integrity = window.verifySaveEnvelope(env);
@@ -333,8 +360,10 @@ function triggerFileInput() {
 // Presents the rolling backup ring and lets the user restore one — confirm-gated,
 // routed through sanitizeImportedContainer + migrateState (Protocol 34).
 async function restoreRollingBackup() {
-  if (typeof window.getRollingBackups !== 'function') return;
-  const backups = window.getRollingBackups();
+  if (typeof window.getRollingBackupsAsync !== 'function') return;
+  // IDB-primary union — surfaces a backup that survives in IndexedDB even if the
+  // localStorage ring dropped it under quota (P3 ceiling relief).
+  const backups = await window.getRollingBackupsAsync();
   if (!backups.length) {
     if (typeof openModal === 'function')
       openModal({ title: '> RESTORE BACKUP', body: 'NO BACKUP SAVES AVAILABLE' });
