@@ -21,7 +21,7 @@
     or the canonical suites change, update this file in the SAME commit and bump
     the suite count marker. The gate fails on drift.
 
-    Suites: 13
+    Suites: 14
 -->
 <html lang="en">
   <head>
@@ -283,6 +283,7 @@
           'inventory',
           'squad',
           'campaign_notes',
+          'eventLog',
           'perks',
           'quests',
           'equipped',
@@ -467,8 +468,9 @@
           JSON.stringify(state.quests[0])
         );
         assert(
-          eq(state.campaign_notes, ['Left Goodsprings.', 'Benny sighted in New Vegas.']),
-          'campaign_notes preserved'
+          state.eventLog.some(e => e.text === 'Left Goodsprings.' && e.type === 'log') &&
+            state.eventLog.some(e => e.text === 'Benny sighted in New Vegas.'),
+          'P4: AI campaign_notes route to the eventLog as log events (manual notebook not overwritten)'
         );
         assert(
           eq(state.ammo, { '5.56mm': 120, '10mm': 45 }),
@@ -984,6 +986,99 @@
           ['slot_probe', 'slot_2', 'backup_1'].forEach(k => window.IdbStore.remove('campaign', k));
         } catch (err) {
           assert(false, 'FATAL: P3 cold-store suite threw', String((err && err.stack) || err));
+        }
+
+        // ── Suite 13 — P4 Terminal Record ([T#] migration + AI re-point) ──────
+        // Exercises the REAL migrateState / autoImportState / sanitizeImportedContainer
+        // (all loaded here) to prove: the [T#] split is non-lossy (auto-log moves
+        // to eventLog, manual notes stay), it is idempotent, the AI can no longer
+        // overwrite the manual notebook (its notes route to eventLog, deduped),
+        // and eventLog survives the sanitize round-trip.
+        try {
+          section('Suite 13 — P4 Terminal Record ([T#] migration + AI re-point)');
+
+          // 1) [T#] MIGRATION: mixed campaign_notes → auto-log MOVES to eventLog,
+          //    manual note STAYS. Manual-note preservation is the key invariant.
+          resetState();
+          state.eventLog = [];
+          state.campaign_notes = [
+            '[T5] Level Up: 3 → 4',
+            'my manual note',
+            '[T9] Quest: "Ghost People" → COMPLETE',
+          ];
+          migrateState('2.7.0', state);
+          assert(
+            state.eventLog.length === 2 &&
+              state.eventLog[0].type === 'level' &&
+              state.eventLog[0].t === 5 &&
+              state.eventLog[0].text === 'Level Up: 3 → 4' &&
+              state.eventLog[1].type === 'quest' &&
+              state.campaign_notes.length === 1 &&
+              state.campaign_notes[0] === 'my manual note',
+            '[T#] migration: auto-log strings move to eventLog (typed); the manual note stays in campaign_notes (non-lossy)'
+          );
+
+          // 2) IDEMPOTENT: re-running migrateState moves nothing more.
+          migrateState('2.7.0', state);
+          assert(
+            state.eventLog.length === 2 &&
+              state.campaign_notes.length === 1 &&
+              state.campaign_notes[0] === 'my manual note',
+            '[T#] migration is idempotent: a second migrateState pass moves no further entries'
+          );
+
+          // 3) AI RE-POINT: the AI cannot overwrite the manual notebook — its
+          //    campaign_notes route into eventLog as 'log' events.
+          resetState();
+          state.eventLog = [];
+          state.campaign_notes = ['keep me'];
+          window._lastStateBeforeSync = JSON.stringify(state);
+          autoImportState(JSON.stringify({ campaign_notes: ['event A', 'event B'] }));
+          assert(
+            state.campaign_notes.length === 1 &&
+              state.campaign_notes[0] === 'keep me' &&
+              state.eventLog.some(e => e.text === 'event A' && e.type === 'log') &&
+              state.eventLog.some(e => e.text === 'event B'),
+            'AI re-point: the AI notes land in eventLog and the manual notebook is NOT overwritten (player authority)'
+          );
+
+          // 4) AI DEDUP: resending overlapping notes does not duplicate history.
+          const beforeLen = state.eventLog.length;
+          window._lastStateBeforeSync = JSON.stringify(state);
+          autoImportState(JSON.stringify({ campaign_notes: ['event A', 'event C'] }));
+          const aCount = state.eventLog.filter(e => e.text === 'event A').length;
+          assert(
+            aCount === 1 &&
+              state.eventLog.length === beforeLen + 1 &&
+              state.eventLog.some(e => e.text === 'event C'),
+            'AI re-point dedup: a resent note is not duplicated; only the new note is appended'
+          );
+
+          // 5) SANITIZE round-trip: eventLog is coerced to typed records, malformed dropped.
+          const dirty = {
+            activeContext: 'FNV',
+            campaigns: {
+              FNV: {
+                eventLog: [
+                  { t: 7, rt: 0, type: 'faction', text: 'NCR: fame +5' },
+                  'not an object',
+                  { text: 'no type is fine' },
+                ],
+              },
+            },
+          };
+          const clean = sanitizeImportedContainer(dirty);
+          const el = clean.campaigns.FNV.eventLog;
+          assert(
+            Array.isArray(el) &&
+              el.length === 2 &&
+              el[0].type === 'faction' &&
+              el[0].t === 7 &&
+              el[1].type === 'log',
+            'sanitize: eventLog is coerced to typed {t,rt,type,text} records and malformed entries are dropped (Protocol 4)'
+          );
+        } catch (err) {
+          assert(false, 'FATAL: P4 Terminal Record suite threw', String((err && err.stack) || err));
         }
 
         // ── Summary ──────────────────────────────────────────────────────────

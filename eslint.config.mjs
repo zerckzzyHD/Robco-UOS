@@ -83,7 +83,8 @@ export default [
         getFactionRegistry: 'readonly',
         getSkillKeys: 'readonly',
         RobcoEvents: 'readonly', // U7 OS event bus (js/state.js)
-        _logCampaignEvent: 'readonly', // U7/U8 campaign_notes append+cap helper (js/state.js)
+        _logEvent: 'readonly', // P4 Terminal Record structured-event writer (js/state.js)
+        _migrateEventLog: 'readonly', // P4 [T#]→eventLog migration helper (js/state.js)
         switchTab: 'readonly',
         initTabs: 'readonly',
         appendToChat: 'readonly',

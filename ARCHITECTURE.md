@@ -64,8 +64,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    1698-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    1698-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    1712-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    1712-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -345,7 +345,8 @@ let state = {
   status: [],           // Active buffs/debuffs [{name, ticks, type}]
   inventory: [],        // Items [{name, qty, wgt, val, type}]
   squad: [],            // Companions [{name, hp, hpMax, weapon, ammo, condition, dt, affinity}]
-  campaign_notes: [],   // AI-written tactical notes (strings)
+  campaign_notes: [],   // P4: PURELY MANUAL user notebook (strings) — no longer AI-writable
+  eventLog: [],         // P4 Terminal Record: structured campaign history [{t,rt,type,text}] (code-authored)
   perks: [],            // [{name, rank, level_taken}]
   quests: [],           // [{name, status, objective, factions}]
 
@@ -544,6 +545,35 @@ Load calls: migrateState() → state merge → restoreChatHistory → loadUI
 6. Never silently drop unknown fields (spread operator preserves them)
 
 ---
+
+## Terminal Record (P4 — structured event log)
+
+`state.eventLog` is the ONE canonical campaign history: an append-only array of
+`{ t: ticks, rt: wallclock ms, type, text }` records, written by the single
+`_logEvent(type, text)` helper in `state.js` (Protocol 22) and capped at
+`EVENTLOG_CAP` (1000). The RobcoEvents auto-log subscribers (level-up, collectible,
+craft/scrap, trade, sleep) and the faction/quest loggers in `api.js` all emit
+through it. **`campaign_notes` is now a purely MANUAL, user-authored notebook** —
+`addCampaignNote()` writes it and it is never AI-overwritten.
+
+**Player authority:** eventLog is code-authored — `autoImportState()` never lets the
+AI write it directly. The AI's `campaign_notes` (its narrative event log) are routed
+into eventLog as deduped `type:'log'` events, and the manual notebook is left
+untouched.
+
+**`[T#]` migration (`_migrateEventLog`):** legacy `campaign_notes` held a mix of
+`[T#]`-prefixed auto-log strings and manual notes. The migration non-lossily SPLITS
+them — every `[T#]` string MOVES into eventLog (tick parsed, type inferred); every
+non-`[T#]` note STAYS in the notebook. It is idempotent (a re-run moves nothing) and
+runs from both `migrateState()` and the ui-core v8 boot fast-path (so existing v8
+saves migrate on load). A manual note is never lost.
+
+**Views** are cheap filters over the record: CROSSROADS RECORD (all recent events),
+INCIDENT LOG (milestone types only — level/faction/quest), and `_nativeCrossroads`
+(the CROSSROADS command). **Cloud-sync path:** serialized-whole via the campaign
+container (`robco_v8`) — eventLog rides the save/export/rolling-backup/cloud push and
+is coerced by `sanitizeImportedContainer()` → `migrateState()` on pull (Protocol 34);
+no dedicated Firestore doc.
 
 ## AI Integration Pipeline
 
@@ -1242,7 +1272,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1698-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1712-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

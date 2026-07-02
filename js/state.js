@@ -144,41 +144,103 @@ const RobcoEvents = (() => {
 })();
 window.RobcoEvents = RobcoEvents;
 
-// ── CAMPAIGN-NOTE LOGGING — single append+cap helper for campaign_notes ─────
-// The one writer for the append-only campaign log (Protocol 22 — replaces the
-// duplicated "push then slice(-200)" pattern that used to live inline at each
-// call site). Used directly by the faction fame/infamy delta log and the
-// quest-status-change log, and by the auto-log RobcoEvents subscribers below.
-function _logCampaignEvent(text) {
-  if (!state.campaign_notes) state.campaign_notes = [];
-  state.campaign_notes.push(text);
-  if (state.campaign_notes.length > 200) state.campaign_notes = state.campaign_notes.slice(-200);
+// ── TERMINAL RECORD — structured event log (Step 2 · Phase 1 · P4) ───────────
+// eventLog is the ONE canonical campaign history: an append-only array of
+// structured events { t: ticks, rt: wallclock ms, type, text }. It REPLACES the
+// old [T#]-prefixed strings that used to be pushed into campaign_notes — so
+// campaign_notes returns to being a PURELY MANUAL, user-authored notebook.
+// _logEvent is the single writer (Protocol 22), used by the RobcoEvents auto-log
+// subscribers below and by the faction/quest loggers in api.js. Player-authority:
+// these are factual event RECORDINGS emitted by code on detected state changes,
+// never AI authority over state. Views (Crossroads, Incident) are cheap filters
+// over this log. Rides the campaign container (robco_v8) → cloud/export/backup
+// via the serialized-whole path (Protocol 34); no dedicated Firestore doc.
+const EVENTLOG_CAP = 1000;
+function _logEvent(type, text) {
+  if (!Array.isArray(state.eventLog)) state.eventLog = [];
+  state.eventLog.push({
+    t: state.ticks || 0,
+    rt: Date.now(),
+    type: String(type),
+    text: String(text),
+  });
+  if (state.eventLog.length > EVENTLOG_CAP) state.eventLog = state.eventLog.slice(-EVENTLOG_CAP);
+}
+window._logEvent = _logEvent;
+
+// Infer an event type from a legacy [T#] auto-log string's text — used only by
+// the [T#]→eventLog migration to tag migrated records (defaults to 'log').
+function _inferEventType(text) {
+  const t = String(text || '');
+  if (/^Level Up/.test(t)) return 'level';
+  if (/^Collectible/.test(t)) return 'collectible';
+  if (/^Crafted/.test(t)) return 'craft';
+  if (/^Scrapped/.test(t)) return 'scrap';
+  if (/^Bought |^Sold /.test(t)) return 'trade';
+  if (/^Rested/.test(t)) return 'sleep';
+  if (/^Quest:/.test(t)) return 'quest';
+  if (/:\s*(fame|infamy)/.test(t)) return 'faction';
+  return 'log';
 }
 
-// ── AUTO-LOG SUBSCRIBERS — U8: expand auto-logging beyond factions/quests/locations ──
-// Each subscriber only writes to campaign_notes; the emit points (api.js,
-// ui-render.js, ui-core.js) own the sound/haptic/chat side effects for the
-// events they also use for those purposes (level.up, faction.threshold).
+// The [T#] MIGRATION — the one risky move of P4. campaign_notes historically held
+// a MIX of code auto-log events ([T#]-prefixed) and genuinely MANUAL user notes.
+// This SEPARATES them non-lossily: every [T#]-prefixed entry is MOVED into the
+// structured eventLog (parsing its tick + inferring its type); every non-[T#]
+// entry (a manual note, or the [LEGACY FACTION ARCHIVE] line) STAYS in
+// campaign_notes. Idempotent: after the split campaign_notes has no [T#] entries,
+// so a re-run moves nothing. A manual note is NEVER lost — non-[T#] entries are
+// never touched, and a [T#]-shaped entry (only ever produced by code) is moved,
+// not deleted (still visible in the Record). Runs from migrateState AND the v8
+// boot fast-path (which skips migrateState) so existing v8 saves migrate too.
+function _migrateEventLog(s) {
+  if (!s || typeof s !== 'object') return;
+  if (!Array.isArray(s.eventLog)) s.eventLog = [];
+  if (!Array.isArray(s.campaign_notes)) return;
+  const manual = [];
+  s.campaign_notes.forEach(n => {
+    const str = String(n == null ? '' : n);
+    const m = /^\[T(\d+)\]\s*(.*)$/.exec(str);
+    if (m) {
+      s.eventLog.push({
+        t: parseInt(m[1]) || 0,
+        rt: 0, // wall-clock unknown for a migrated legacy string
+        type: _inferEventType(m[2]),
+        text: m[2],
+      });
+    } else {
+      manual.push(n);
+    }
+  });
+  s.campaign_notes = manual;
+  if (s.eventLog.length > EVENTLOG_CAP) s.eventLog = s.eventLog.slice(-EVENTLOG_CAP);
+}
+window._migrateEventLog = _migrateEventLog;
+
+// ── AUTO-LOG SUBSCRIBERS — each emits a STRUCTURED event into the Terminal
+// Record (P4). The emit points (api.js, ui-render.js, ui-core.js) own the
+// sound/haptic/chat side effects for the events they also use for those purposes
+// (level.up, faction.threshold).
 RobcoEvents.on('level.up', p => {
-  _logCampaignEvent(`[T${state.ticks || 0}] Level Up: ${p.oldLvl} → ${p.newLvl}`);
+  _logEvent('level', `Level Up: ${p.oldLvl} → ${p.newLvl}`);
 });
 RobcoEvents.on('collectible.acquired', p => {
-  _logCampaignEvent(`[T${state.ticks || 0}] Collectible found: ${p.name}`);
+  _logEvent('collectible', `Collectible found: ${p.name}`);
 });
 RobcoEvents.on('craft.completed', p => {
-  _logCampaignEvent(`[T${state.ticks || 0}] Crafted ${p.qty}× ${p.name}`);
+  _logEvent('craft', `Crafted ${p.qty}× ${p.name}`);
 });
 RobcoEvents.on('craft.scrapped', p => {
-  _logCampaignEvent(`[T${state.ticks || 0}] Scrapped ${p.qty}× ${p.name}`);
+  _logEvent('scrap', `Scrapped ${p.qty}× ${p.name}`);
 });
 RobcoEvents.on('trade.bought', p => {
-  _logCampaignEvent(`[T${state.ticks || 0}] Bought ${p.name} for ${p.price}c`);
+  _logEvent('trade', `Bought ${p.name} for ${p.price}c`);
 });
 RobcoEvents.on('trade.sold', p => {
-  _logCampaignEvent(`[T${state.ticks || 0}] Sold ${p.name} for ${p.price}c`);
+  _logEvent('trade', `Sold ${p.name} for ${p.price}c`);
 });
 RobcoEvents.on('sleep.completed', p => {
-  _logCampaignEvent(`[T${state.ticks || 0}] Rested 8 hours (+${p.ticksAdded} ticks)`);
+  _logEvent('sleep', `Rested 8 hours (+${p.ticksAdded} ticks)`);
 });
 
 // ── SAVE INTEGRITY + ROLLING BACKUP HELPERS ──────────────────────
@@ -906,7 +968,8 @@ let state = {
   status: [],
   inventory: [],
   squad: [],
-  campaign_notes: [],
+  campaign_notes: [], // P4 purely-MANUAL user-authored notebook (auto-log moved to eventLog)
+  eventLog: [], // P4 Terminal Record structured campaign history (code-authored events)
   perks: [],
   quests: [],
   equipped: { weapon: null, armor: null, headgear: null },
@@ -1126,6 +1189,11 @@ function migrateState(version, s) {
   if (!Array.isArray(s.traits)) s.traits = [];
   if (!Array.isArray(s.skillBooks)) s.skillBooks = [];
   if (!Array.isArray(s.magazines)) s.magazines = [];
+  // P4 Terminal Record: ensure s.eventLog exists, then migrate legacy [T#]
+  // auto-log strings out of campaign_notes into it (manual notes stay put;
+  // idempotent, non-lossy — the split lives in _migrateEventLog).
+  if (!Array.isArray(s.eventLog)) s.eventLog = [];
+  _migrateEventLog(s);
   // C4-fix / C11: campaignMode has 3 states: 'standard' | 'rng' (armed) | 'rng-locked' (activated by wipe).
   if (s.campaignMode !== 'rng' && s.campaignMode !== 'rng-locked') s.campaignMode = 'standard';
   // C5: playthroughType — migrate from legacy localStorage key if not yet in state.

@@ -528,6 +528,10 @@ function _hydrateStateFromStorage() {
       let activeCampaign = window.robco_v8.campaigns[window.robco_v8.activeContext] || {};
       state = { ...state, ...activeCampaign };
       state.gameContext = window.robco_v8.activeContext;
+      // P4: the v8 fast-path skips migrateState, so run the Terminal Record
+      // [T#]→eventLog migration here too — existing v8 saves migrate on load
+      // (idempotent + non-lossy; leaves manual notes in campaign_notes).
+      if (typeof window._migrateEventLog === 'function') window._migrateEventLog(state);
       loadedOk = true;
     } catch (e) {
       console.error('[RobCo] Corrupt robco_v8 — quarantined, booting fresh:', e);
@@ -2498,9 +2502,10 @@ function loadUI() {
       f: state.factions,
       s: state.status,
       n: state.campaign_notes,
+      el: state.eventLog, // P4: Crossroads + Incident views read the Terminal Record
     })
   )
-    renderCampaignStatus(); // v2.0.1: Campaign Status + Crossroads Record
+    renderCampaignStatus(); // v2.0.1: Campaign Status + Crossroads Record + Incident Log
   renderAccount(); // always — reads Firebase auth state, not covered by state slice
   renderSavesList(); // always — reads localStorage/cloud saves, not covered by state slice
   if (typeof renderOverseerLog === 'function') renderOverseerLog(); // WU-F7: local device telemetry, not a state slice

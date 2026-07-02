@@ -2367,12 +2367,13 @@ const cssSrc35 = readFile('css/terminal.css');
 const regNvSrc35 = readFile('js/reg_nv.js');
 const regCoreSrc35 = readFile('js/registry-core.js');
 
-// 35.1 campaign_notes capped to 200 via the single _logCampaignEvent() helper
-//      (P7-14; U7 consolidated the two duplicated push+cap sites in api.js)
+// 35.1 P4: the Terminal Record eventLog is capped via the single _logEvent()
+//      writer (state.js); api.js auto-log sites (faction/quest/AI-notes) route
+//      through it. campaign_notes is now the un-capped MANUAL notebook.
 assert(
-  /state\.campaign_notes\.length\s*>\s*200/.test(stateSrc35) &&
-    (apiSrc35.match(/_logCampaignEvent\(/g) || []).length >= 2,
-  'campaign_notes capped to 200 via the single _logCampaignEvent() helper (state.js); api.js auto-log sites route through it (P7-14, consolidated U7)'
+  /state\.eventLog\.length\s*>\s*EVENTLOG_CAP/.test(stateSrc35) &&
+    (apiSrc35.match(/_logEvent\(/g) || []).length >= 2,
+  'eventLog capped via the single _logEvent() helper (state.js); api.js auto-log sites route through it (P4 Terminal Record)'
 );
 
 // 35.2 saveState has a dirty-check: skips write when _saveStr === _lastSaveStr (P7-6)
@@ -3671,7 +3672,14 @@ header('Phase 5c-iii: Cloud Save Picker + Local Migration');
       const sandbox = { GAME_DEFS: { FNV: {}, FO3: {} }, _buildFactions: () => ({}), console };
       vm.createContext(sandbox);
       vm.runInContext(
-        _decl(apiSource, 'sanitizeImportedContainer') + '\n' + _decl(stateSource, 'migrateState'),
+        'var EVENTLOG_CAP = 1000;\n' +
+          _decl(apiSource, 'sanitizeImportedContainer') +
+          '\n' +
+          _decl(stateSource, '_inferEventType') +
+          '\n' +
+          _decl(stateSource, '_migrateEventLog') +
+          '\n' +
+          _decl(stateSource, 'migrateState'),
         sandbox
       );
       sandbox._push = {
@@ -4821,7 +4829,12 @@ header('Suite 51 — Save Integrity + Rolling Backups');
       };
       vm.createContext(sb);
       vm.runInContext(
-        _declFn(apiSource, 'sanitizeImportedContainer') +
+        'var EVENTLOG_CAP = 1000;\n' +
+          _declFn(apiSource, 'sanitizeImportedContainer') +
+          '\n' +
+          _declFn(stateSrc51, '_inferEventType') +
+          '\n' +
+          _declFn(stateSrc51, '_migrateEventLog') +
           '\n' +
           _declFn(stateSrc51, 'migrateState') +
           '\n' +
@@ -14901,13 +14914,21 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   });
 
   // ── D. Oversized payloads ──────────────────────────────────────────────
-  behavior133('campaign_notes beyond 200 entries is capped at 200, newest kept', undefined, () => {
-    const notes = [];
-    for (let i = 0; i < 250; i++) notes.push('note ' + i);
-    callThrows133(JSON.stringify({ campaign_notes: notes }));
-    const cn = liveState133().campaign_notes;
-    return cn.length === 200 && cn[cn.length - 1] === 'note 249';
-  });
+  behavior133(
+    'P4: AI campaign_notes route to the eventLog (structured, capped), not the manual notebook',
+    undefined,
+    () => {
+      const notes = [];
+      for (let i = 0; i < 250; i++) notes.push('event ' + i);
+      callThrows133(JSON.stringify({ campaign_notes: notes }));
+      const st = liveState133();
+      return (
+        Array.isArray(st.eventLog) &&
+        st.eventLog.some(e => e && e.text === 'event 249' && e.type === 'log') &&
+        st.eventLog.length <= 1000
+      );
+    }
+  );
   behavior133('large inventory array (2000 items) processed without throwing', undefined, () => {
     const inv = [];
     for (let i = 0; i < 2000; i++)
@@ -15520,28 +15541,30 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '135.13: state.js subscribes to level.up + all 6 U8 action events for auto-logging'
   );
 
-  // 135.14  behavioral: emitting 'level.up' through the real state.js bus appends
-  //         a campaign_notes entry via the real _logCampaignEvent() subscriber
+  // 135.14  behavioral (P4): emitting 'level.up' through the real state.js bus
+  //         appends a STRUCTURED eventLog record via the real _logEvent() subscriber
+  //         ({t,type,text}), NOT a campaign_notes string.
   {
     let ok = false;
     try {
       const sb = makeBusSandbox135();
       vm135.runInContext(
-        "state = { ticks: 5, campaign_notes: [] }; RobcoEvents.emit('level.up', { oldLvl: 3, newLvl: 4 });",
+        "state = { ticks: 5, eventLog: [] }; RobcoEvents.emit('level.up', { oldLvl: 3, newLvl: 4 });",
         sb
       );
-      const notes = vm135.runInContext('state.campaign_notes', sb);
+      const log = vm135.runInContext('state.eventLog', sb);
       ok =
-        Array.isArray(notes) &&
-        notes.length === 1 &&
-        /Level Up: 3 → 4/.test(notes[0]) &&
-        /\[T5\]/.test(notes[0]);
+        Array.isArray(log) &&
+        log.length === 1 &&
+        log[0].type === 'level' &&
+        log[0].t === 5 &&
+        /Level Up: 3 → 4/.test(log[0].text);
     } catch (e) {
       fail(`135.14 harness error: ${e.message}`);
     }
     assert(
       ok,
-      "135.14: emitting 'level.up' through the real RobcoEvents bus appends a [T#] Level Up campaign_notes entry via the real _logCampaignEvent() subscriber"
+      "135.14: emitting 'level.up' through the real RobcoEvents bus appends a structured eventLog record (type=level, t=ticks) via the real _logEvent() subscriber"
     );
   }
 
@@ -16557,6 +16580,126 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       coldRead140 + coldWrite140 + migrate140
     ),
     '140.12: the P3 cold-store accessors are game-agnostic (no game literals)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 141 — Step 2 (v2.8.0) Phase 1 P4: Terminal Record — structured
+//  eventLog. eventLog is the ONE canonical campaign history: an append-only
+//  array of { t, rt, type, text } records written by the single _logEvent()
+//  helper (Protocol 22). campaign_notes returns to a PURELY MANUAL notebook.
+//  The [T#] migration (_migrateEventLog) non-lossily SPLITS legacy campaign_notes
+//  — [T#]-prefixed auto-log strings MOVE to eventLog; manual (non-[T#]) notes
+//  STAY. Player-authority: the AI can no longer overwrite the notebook — its
+//  campaign_notes route into eventLog (deduped 'log' events), and it can NEVER
+//  author eventLog directly. Crossroads + a new Incident view are cheap filters
+//  over the Record. eventLog rides the campaign container (robco_v8) →
+//  cloud/export/backup via the serialized-whole path (Protocol 34). 12 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 141 — P4 Terminal Record (structured eventLog + [T#] migration)');
+  const state141 = readFile('js/state.js');
+  const api141 = readFile('js/api.js');
+  const uiCore141 = readFile('js/ui-core.js');
+  const uiRender141 = readFile('js/ui-render.js');
+  const html141 = readFile('index.html');
+  const logEventBody = extractFunctionBody(state141, '_logEvent');
+  const migrateEvBody = extractFunctionBody(state141, '_migrateEventLog');
+  const inferBody141 = extractFunctionBody(state141, '_inferEventType');
+  const migrateStateBody141 = extractFunctionBody(state141, 'migrateState');
+  const addNoteBody141 = extractFunctionBody(uiRender141, 'addCampaignNote');
+
+  // 141.1  eventLog default present alongside campaign_notes (Protocol 4 default)
+  assert(
+    /eventLog: \[\]/.test(state141) && /campaign_notes: \[\]/.test(state141),
+    '141.1: state defaults include eventLog: [] (Terminal Record) alongside campaign_notes: []'
+  );
+
+  // 141.2  _logEvent is the single structured writer (t/rt/type/text + cap)
+  assert(
+    /function _logEvent\(type, text\)/.test(state141) &&
+      /state\.eventLog\.push\(/.test(logEventBody) &&
+      /type: String\(type\)/.test(logEventBody) &&
+      /text: String\(text\)/.test(logEventBody) &&
+      /EVENTLOG_CAP/.test(logEventBody),
+    '141.2: _logEvent() is the single writer — pushes a structured {t,rt,type,text} record, capped at EVENTLOG_CAP'
+  );
+
+  // 141.3  auto-log subscribers re-pointed to _logEvent; _logCampaignEvent retired
+  assert(
+    !/_logCampaignEvent/.test(state141) &&
+      !/_logCampaignEvent/.test(api141) &&
+      /RobcoEvents\.on\('level\.up'[\s\S]{0,120}_logEvent\('level'/.test(state141),
+    '141.3: the RobcoEvents auto-log subscribers write via _logEvent(); the old _logCampaignEvent is fully retired (state.js + api.js)'
+  );
+
+  // 141.4  the [T#] migration: MOVE [T#] strings to eventLog, KEEP manual notes
+  assert(
+    /function _migrateEventLog\(s\)/.test(state141) &&
+      /\^\\\[T\(\\d\+\)\\\]/.test(migrateEvBody) &&
+      /manual\.push\(n\)/.test(migrateEvBody) &&
+      /s\.campaign_notes = manual/.test(migrateEvBody) &&
+      /_inferEventType/.test(migrateEvBody),
+    '141.4: _migrateEventLog moves [T#]-prefixed auto-log strings into eventLog and leaves manual notes in campaign_notes (non-lossy split)'
+  );
+
+  // 141.5  migration runs from migrateState AND the v8 boot fast-path
+  assert(
+    /_migrateEventLog\(s\)/.test(migrateStateBody141) &&
+      /s\.eventLog\b/.test(migrateStateBody141) &&
+      /_migrateEventLog\(state\)/.test(uiCore141),
+    '141.5: migrateState and the ui-core v8 boot fast-path both run _migrateEventLog (existing v8 saves migrate too)'
+  );
+
+  // 141.6  sanitizeImportedContainer coerces eventLog to typed records (Protocol 4)
+  assert(
+    /o\.eventLog = o\.eventLog/.test(api141) &&
+      /type: _str\(e\.type \|\| 'log'\)/.test(api141) &&
+      /text: _str\(e\.text \|\| ''\)/.test(api141),
+    '141.6: sanitizeImportedContainer coerces eventLog into typed {t,rt,type,text} records (born-compliant, Protocol 4)'
+  );
+
+  // 141.7  AI re-point: no overwrite of the notebook; AI notes → eventLog, deduped
+  assert(
+    !/state\.campaign_notes = parsed\.campaign_notes/.test(api141) &&
+      /parsed\.campaign_notes[\s\S]{0,400}_logEvent\('log', text\)/.test(api141) &&
+      /_seenEvents/.test(api141),
+    "141.7: the AI no longer overwrites campaign_notes — its notes route to eventLog as deduped 'log' events (player authority)"
+  );
+
+  // 141.8  player-authority: the manual notebook stays user-editable
+  assert(
+    /state\.campaign_notes\.push/.test(addNoteBody141),
+    '141.8: addCampaignNote() still writes campaign_notes — the manual notebook stays fully user-editable'
+  );
+
+  // 141.9  Crossroads + Incident are views over the Record (read eventLog)
+  assert(
+    /state\.eventLog[\s\S]{0,80}\.slice\(-20\)/.test(uiRender141) &&
+      /incidentDisplay/.test(uiRender141) &&
+      /MILESTONES/.test(uiRender141) &&
+      /\(state && state\.eventLog\)/.test(api141),
+    '141.9: the Crossroads (all events) and Incident (milestone-filtered) views read state.eventLog; _nativeCrossroads reads it too'
+  );
+
+  // 141.10  the Incident Log sub-panel exists (Protocol UI-2: data-sub-id)
+  assert(
+    /id="incidentDisplay"/.test(html141) && /data-sub-id="incident_log"/.test(html141),
+    '141.10: index.html has the Incident Log sub-panel (#incidentDisplay + data-sub-id — Protocol UI-2)'
+  );
+
+  // 141.11  player-authority: the AI can NEVER author the Record directly
+  assert(
+    !/state\.eventLog = parsed\.eventLog/.test(api141) && !/parsed\.eventLog/.test(api141),
+    '141.11: autoImportState never lets the AI write eventLog directly — the Record is code-authored (player authority)'
+  );
+
+  // 141.12  game-agnostic (Protocol 38): the Record path has no game literals
+  assert(
+    !/FNV|FO3|Fallout|New Vegas|Mojave|Capital Wasteland/.test(
+      logEventBody + migrateEvBody + inferBody141
+    ),
+    '141.12: the Terminal Record writer/migration/inference are game-agnostic (no game literals)'
   );
 }
 

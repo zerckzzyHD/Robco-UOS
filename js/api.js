@@ -403,6 +403,21 @@ function sanitizeImportedContainer(container) {
     if (o.loc != null) o.loc = _str(o.loc);
     if (Array.isArray(o.campaign_notes))
       o.campaign_notes = o.campaign_notes.filter(n => n != null).map(_str);
+    // P4 Terminal Record: coerce eventLog to an array of {t,rt,type,text} records,
+    // dropping malformed entries and clamping fields (born-compliant — Protocol 4).
+    if (Array.isArray(o.eventLog)) {
+      o.eventLog = o.eventLog
+        .filter(e => e && typeof e === 'object' && !Array.isArray(e))
+        .map(e => ({
+          t: parseInt(e.t) || 0,
+          rt: parseInt(e.rt) || 0,
+          type: _str(e.type || 'log').slice(0, 40),
+          text: _str(e.text || '').slice(0, 5000),
+        }))
+        .slice(-1000);
+    } else if (o.eventLog !== undefined) {
+      o.eventLog = [];
+    }
     if (Array.isArray(o.quests))
       o.quests = o.quests.map(q => ({
         ...q,
@@ -605,7 +620,7 @@ function autoImportState(jsonString) {
     if (parsed.si !== undefined && state.factions) {
       state.factions.house.infamy = parseInt(parsed.si) || 0;
     }
-    // Auto-log faction changes to campaign_notes
+    // P4: auto-log faction changes as structured Terminal Record events
     if (state.factions && factionsBefore) {
       getFactionRegistry().forEach(f => {
         const old = factionsBefore[f.key] || { fame: 0, infamy: 0 };
@@ -616,7 +631,7 @@ function autoImportState(jsonString) {
           let parts = [];
           if (fameDelta !== 0) parts.push(`fame ${fameDelta > 0 ? '+' : ''}${fameDelta}`);
           if (infamyDelta !== 0) parts.push(`infamy ${infamyDelta > 0 ? '+' : ''}${infamyDelta}`);
-          _logCampaignEvent(`[T${state.ticks}] ${f.name}: ${parts.join(', ')}`);
+          _logEvent('faction', `${f.name}: ${parts.join(', ')}`);
         }
       });
     }
@@ -689,8 +704,20 @@ function autoImportState(jsonString) {
         affinity: m.affinity !== undefined ? parseInt(m.affinity) || 0 : undefined,
       }));
     }
+    // P4: the AI NO LONGER overwrites the manual notebook — campaign_notes is now
+    // purely user-owned (player authority). Any campaign_notes the AI returns are
+    // routed into the Terminal Record as structured 'log' events, deduped by text
+    // so the AI resending its array each turn can never duplicate history.
     if (parsed.campaign_notes && Array.isArray(parsed.campaign_notes)) {
-      state.campaign_notes = parsed.campaign_notes.slice(-200);
+      if (!Array.isArray(state.eventLog)) state.eventLog = [];
+      const _seenEvents = new Set(state.eventLog.map(e => e && e.text));
+      parsed.campaign_notes.forEach(n => {
+        const text = String(n == null ? '' : n).slice(0, 5000);
+        if (text && !_seenEvents.has(text)) {
+          _logEvent('log', text);
+          _seenEvents.add(text);
+        }
+      });
     }
     // Perks (v1.6.4+)
     if (parsed.perks && Array.isArray(parsed.perks)) {
@@ -717,9 +744,7 @@ function autoImportState(jsonString) {
       state.quests.forEach(curr => {
         const prev = questsBefore.find(bq => bq.name.toLowerCase() === curr.name.toLowerCase());
         if (prev && prev.status !== curr.status) {
-          _logCampaignEvent(
-            `[T${state.ticks || 0}] Quest: "${curr.name}" → ${curr.status.toUpperCase()}`
-          );
+          _logEvent('quest', `Quest: "${curr.name}" → ${curr.status.toUpperCase()}`);
           // Quest audio — fire appropriate tone on terminal
           const newStatus = curr.status.toUpperCase();
           if (
@@ -1192,7 +1217,6 @@ function _routeNativeCommand(userText) {
 function _nativeCrossroads() {
   const factions = (state && state.factions) || {};
   const quests = (state && state.quests) || [];
-  const notes = (state && state.campaign_notes) || [];
   const loc = (state && state.loc) || 'Unknown';
   const lines = [];
 
@@ -1236,11 +1260,12 @@ function _nativeCrossroads() {
 
   lines.push('');
   lines.push('--- CROSSROADS LOG ---');
-  const events = notes.filter(n => /^\[T\d+\]/.test(String(n))).slice(-5);
+  // P4: read the structured Terminal Record (eventLog), not campaign_notes.
+  const events = ((state && state.eventLog) || []).slice(-5);
   if (events.length === 0) {
     lines.push('No events recorded.');
   } else {
-    events.forEach(e => lines.push(String(e).slice(0, 55)));
+    events.forEach(e => lines.push(String((e && e.text) || '').slice(0, 55)));
   }
 
   const mTitle = document.getElementById('modalTitle');

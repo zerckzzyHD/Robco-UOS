@@ -1330,11 +1330,12 @@ $cssSrc35    = Read-Src 'css/terminal.css'
 $regNvSrc35  = Read-Src 'js/reg_nv.js'
 $regCoreSrc35 = Read-Src 'js/registry-core.js'
 
-# 35.1 campaign_notes capped to 200 via the single _logCampaignEvent() helper
-#      (P7-14; U7 consolidated the two duplicated push+cap sites in api.js)
-$logCallCount35 = ([regex]::Matches($apiSrc35, '_logCampaignEvent\(')).Count
-Check (($stateSrc35 -match 'state\.campaign_notes\.length\s*>\s*200') -and ($logCallCount35 -ge 2)) `
-    "campaign_notes capped to 200 via the single _logCampaignEvent() helper (state.js); api.js auto-log sites route through it (P7-14, consolidated U7)"
+# 35.1 P4: the Terminal Record eventLog is capped via the single _logEvent()
+#      writer (state.js); api.js auto-log sites route through it. campaign_notes
+#      is now the un-capped MANUAL notebook.
+$logCallCount35 = ([regex]::Matches($apiSrc35, '_logEvent\(')).Count
+Check (($stateSrc35 -match 'state\.eventLog\.length\s*>\s*EVENTLOG_CAP') -and ($logCallCount35 -ge 2)) `
+    "eventLog capped via the single _logEvent() helper (state.js); api.js auto-log sites route through it (P4 Terminal Record)"
 
 # 35.2 saveState dirty-check: _lastSaveStr declared and compared in state.js (P7-6)
 Check ([bool]($stateSrc35 -match '_lastSaveStr') -and [bool]($stateSrc35 -match '=== _lastSaveStr')) 'saveState dirty-check: _lastSaveStr declared and compared in state.js (P7-6)'
@@ -8385,7 +8386,7 @@ $labels133 = @(
     "__proto__ inside a quest entry does not pollute prototype or leak into stored quest",
     "script-tag-shaped string is stored as inert text, never executed",
     "SQL-injection-shaped string passes through as opaque text",
-    "campaign_notes beyond 200 entries is capped at 200, newest kept",
+    "P4: AI campaign_notes route to the eventLog (structured, capped), not the manual notebook",
     "large inventory array (2000 items) processed without throwing",
     "extremely long single string field does not crash the sync",
     "factions payload as an array is ignored safely (stays a valid object)",
@@ -8468,10 +8469,10 @@ t(undefined, () => {
 });
 t(undefined, () => { callThrows(JSON.stringify({ quests: [{ name: "'; DROP TABLE saves; --", status: 'active' }] })); return liveState().quests[0].name === "'; DROP TABLE saves; --"; });
 t(undefined, () => {
-  const notes = []; for (let i = 0; i < 250; i++) notes.push('note ' + i);
+  const notes = []; for (let i = 0; i < 250; i++) notes.push('event ' + i);
   callThrows(JSON.stringify({ campaign_notes: notes }));
-  const cn = liveState().campaign_notes;
-  return cn.length === 200 && cn[cn.length - 1] === 'note 249';
+  const st = liveState();
+  return Array.isArray(st.eventLog) && st.eventLog.some(e => e && e.text === 'event 249' && e.type === 'log') && st.eventLog.length <= 1000;
 });
 t(undefined, () => {
   const inv = []; for (let i = 0; i < 2000; i++) inv.push({ name: 'Item' + i, qty: 1, wgt: 1, val: 1, type: 'misc' });
@@ -8672,7 +8673,7 @@ $labels135 = @(
     '135.5: a throwing listener never escapes emit() and never blocks the other listeners',
     '135.6: emit() on an event with no subscribers does not throw',
     "135.9: an FO3-only faction ('talon', never in the old FNV-hardcoded array) crossing Vilified fires 'faction.threshold' -- the Protocol-38 fix works behaviorally",
-    '135.14: emitting level.up through the real RobcoEvents bus appends a [T#] Level Up campaign_notes entry via the real _logCampaignEvent() subscriber'
+    '135.14: emitting level.up through the real RobcoEvents bus appends a structured eventLog record (type=level, t=ticks) via the real _logEvent() subscriber'
 )
 try {
     $nodeCheck135 = Get-Command node -ErrorAction SilentlyContinue
@@ -8755,9 +8756,9 @@ try { // 135.9
 } catch (e) { results.push(false); }
 try { // 135.14
   const sb = busSandbox();
-  vm.runInContext("state = { ticks: 5, campaign_notes: [] }; RobcoEvents.emit('level.up', { oldLvl: 3, newLvl: 4 });", sb);
-  const notes = vm.runInContext('state.campaign_notes', sb);
-  results.push(Array.isArray(notes) && notes.length === 1 && /Level Up: 3 → 4/.test(notes[0]) && /\[T5\]/.test(notes[0]));
+  vm.runInContext("state = { ticks: 5, eventLog: [] }; RobcoEvents.emit('level.up', { oldLvl: 3, newLvl: 4 });", sb);
+  const log = vm.runInContext('state.eventLog', sb);
+  results.push(Array.isArray(log) && log.length === 1 && log[0].type === 'level' && log[0].t === 5 && /Level Up: 3 → 4/.test(log[0].text));
 } catch (e) { results.push(false); }
 console.log('RESULT:' + results.map(r => r ? '1' : '0').join(''));
 "@
@@ -9473,6 +9474,107 @@ Check (
 Check (
     -not (($coldRead140 + $coldWrite140 + $migrate140) -match 'FNV|FO3|Fallout|New Vegas|Mojave|Capital Wasteland')
 ) '140.12: the P3 cold-store accessors are game-agnostic (no game literals)'
+
+# ===========================================================
+# Suite 141 -- Step 2 (v2.8.0) Phase 1 P4: Terminal Record -- structured
+# eventLog (12 tests). Mirrors JS Suite 141. eventLog is the ONE canonical
+# campaign history ({t,rt,type,text} records via the single _logEvent() writer);
+# campaign_notes returns to a MANUAL notebook. The [T#] migration
+# (_migrateEventLog) non-lossily splits legacy campaign_notes -- [T#] auto-log
+# strings MOVE to eventLog, manual notes STAY. Player-authority: the AI can't
+# overwrite the notebook (its notes route to eventLog, deduped) and can never
+# author eventLog directly. Crossroads + Incident are views over the Record.
+# ===========================================================
+Sep "Suite 141 -- P4 Terminal Record (structured eventLog + [T#] migration)"
+$state141     = Read-Src "js/state.js"
+$api141       = Read-Src "js/api.js"
+$uiCore141    = Read-Src "js/ui-core.js"
+$uiRender141  = Read-Src "js/ui-render.js"
+$html141      = Read-Src "index.html"
+$logEventBody = Get-FunctionBody $state141 '_logEvent'
+$migrateEvBody = Get-FunctionBody $state141 '_migrateEventLog'
+$inferBody141 = Get-FunctionBody $state141 '_inferEventType'
+$migrateStateBody141 = Get-FunctionBody $state141 'migrateState'
+$addNoteBody141 = Get-FunctionBody $uiRender141 'addCampaignNote'
+
+# 141.1  eventLog default present alongside campaign_notes
+Check (
+    ($state141 -match 'eventLog: \[\]') -and ($state141 -match 'campaign_notes: \[\]')
+) '141.1: state defaults include eventLog: [] (Terminal Record) alongside campaign_notes: []'
+
+# 141.2  _logEvent is the single structured writer (t/rt/type/text + cap)
+Check (
+    ($state141 -match 'function _logEvent\(type, text\)') -and
+    ($logEventBody -match 'state\.eventLog\.push\(') -and
+    ($logEventBody -match 'type: String\(type\)') -and
+    ($logEventBody -match 'text: String\(text\)') -and
+    ($logEventBody -match 'EVENTLOG_CAP')
+) '141.2: _logEvent() is the single writer -- pushes a structured {t,rt,type,text} record, capped at EVENTLOG_CAP'
+
+# 141.3  auto-log subscribers re-pointed to _logEvent; _logCampaignEvent retired
+Check (
+    (-not ($state141 -match '_logCampaignEvent')) -and
+    (-not ($api141 -match '_logCampaignEvent')) -and
+    ($state141 -match "RobcoEvents\.on\('level\.up'[\s\S]{0,120}_logEvent\('level'")
+) '141.3: the RobcoEvents auto-log subscribers write via _logEvent(); the old _logCampaignEvent is fully retired (state.js + api.js)'
+
+# 141.4  the [T#] migration: MOVE [T#] strings to eventLog, KEEP manual notes
+Check (
+    ($state141 -match 'function _migrateEventLog\(s\)') -and
+    ($migrateEvBody -match 'T\(\\d\+\)') -and
+    ($migrateEvBody -match 'manual\.push\(n\)') -and
+    ($migrateEvBody -match 's\.campaign_notes = manual') -and
+    ($migrateEvBody -match '_inferEventType')
+) '141.4: _migrateEventLog moves [T#]-prefixed auto-log strings into eventLog and leaves manual notes in campaign_notes (non-lossy split)'
+
+# 141.5  migration runs from migrateState AND the v8 boot fast-path
+Check (
+    ($migrateStateBody141 -match '_migrateEventLog\(s\)') -and
+    ($migrateStateBody141 -match 's\.eventLog\b') -and
+    ($uiCore141 -match '_migrateEventLog\(state\)')
+) '141.5: migrateState and the ui-core v8 boot fast-path both run _migrateEventLog (existing v8 saves migrate too)'
+
+# 141.6  sanitizeImportedContainer coerces eventLog to typed records (Protocol 4)
+Check (
+    ($api141 -match 'o\.eventLog = o\.eventLog') -and
+    ($api141 -match "type: _str\(e\.type \|\| 'log'\)") -and
+    ($api141 -match "text: _str\(e\.text \|\| ''\)")
+) '141.6: sanitizeImportedContainer coerces eventLog into typed {t,rt,type,text} records (born-compliant, Protocol 4)'
+
+# 141.7  AI re-point: no overwrite of the notebook; AI notes -> eventLog, deduped
+Check (
+    (-not ($api141 -match 'state\.campaign_notes = parsed\.campaign_notes')) -and
+    ($api141 -match "parsed\.campaign_notes[\s\S]{0,400}_logEvent\('log', text\)") -and
+    ($api141 -match '_seenEvents')
+) "141.7: the AI no longer overwrites campaign_notes -- its notes route to eventLog as deduped 'log' events (player authority)"
+
+# 141.8  player-authority: the manual notebook stays user-editable
+Check (
+    $addNoteBody141 -match 'state\.campaign_notes\.push'
+) '141.8: addCampaignNote() still writes campaign_notes -- the manual notebook stays fully user-editable'
+
+# 141.9  Crossroads + Incident are views over the Record (read eventLog)
+Check (
+    ($uiRender141 -match 'state\.eventLog[\s\S]{0,80}\.slice\(-20\)') -and
+    ($uiRender141 -match 'incidentDisplay') -and
+    ($uiRender141 -match 'MILESTONES') -and
+    ($api141 -match '\(state && state\.eventLog\)')
+) '141.9: the Crossroads (all events) and Incident (milestone-filtered) views read state.eventLog; _nativeCrossroads reads it too'
+
+# 141.10  the Incident Log sub-panel exists (Protocol UI-2: data-sub-id)
+Check (
+    ($html141 -match 'id="incidentDisplay"') -and ($html141 -match 'data-sub-id="incident_log"')
+) '141.10: index.html has the Incident Log sub-panel (#incidentDisplay + data-sub-id -- Protocol UI-2)'
+
+# 141.11  player-authority: the AI can NEVER author the Record directly
+Check (
+    (-not ($api141 -match 'state\.eventLog = parsed\.eventLog')) -and (-not ($api141 -match 'parsed\.eventLog'))
+) '141.11: autoImportState never lets the AI write eventLog directly -- the Record is code-authored (player authority)'
+
+# 141.12  game-agnostic (Protocol 38): the Record path has no game literals
+Check (
+    -not (($logEventBody + $migrateEvBody + $inferBody141) -match 'FNV|FO3|Fallout|New Vegas|Mojave|Capital Wasteland')
+) '141.12: the Terminal Record writer/migration/inference are game-agnostic (no game literals)'
 
 # ===========================================================
 # Results

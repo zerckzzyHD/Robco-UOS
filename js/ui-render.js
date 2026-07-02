@@ -1087,6 +1087,13 @@ function addCampaignNote() {
   updateMath();
 }
 
+// P4: format a Terminal Record event { t, rt, type, text } as a display line,
+// preserving the diegetic [T<ticks>] prefix the Crossroads/Incident views show.
+function _recordLine(ev) {
+  if (!ev || typeof ev !== 'object') return String(ev == null ? '' : ev);
+  return `[T${ev.t || 0}] ${ev.text || ''}`;
+}
+
 // ── CAMPAIGN STATUS PANEL (v2.0.1) ───────────────────────────────
 // Reads existing state fields — no new state fields, no Protocol 4 required.
 // Displays: quest summary, top faction standings, active effects, and campaign notes count.
@@ -1151,31 +1158,50 @@ function renderCampaignStatus() {
       html += `<div style="font-size:9px;opacity:0.4;margin-bottom:6px;">No notable faction standings</div>`;
     }
 
-    // Recent campaign note count
-    const noteCount = (state.campaign_notes || []).length;
-    html += `<div style="font-size:9px;opacity:0.5;">${noteCount} campaign log entr${noteCount === 1 ? 'y' : 'ies'}</div>`;
+    // Terminal Record event count (P4)
+    const eventCount = (state.eventLog || []).length;
+    html += `<div style="font-size:9px;opacity:0.5;">${eventCount} event${eventCount === 1 ? '' : 's'} on record</div>`;
 
     display.innerHTML = html;
   }
 
-  // ── Crossroads Record ────────────────────────────────────
-  // Reads campaign_notes that were auto-logged by quest/faction transitions.
-  // Auto-logged entries start with [T<ticks>].
+  // ── Crossroads Record (P4) ───────────────────────────────
+  // Reads the structured Terminal Record (state.eventLog) — the canonical
+  // campaign history. Shows the most recent events across all types.
   if (crossroads) {
-    const autoLogs = (state.campaign_notes || [])
-      .filter(n => /^\[T\d+\]/.test(String(n)))
-      .slice(-20) // last 20 events
-      .reverse(); // newest first
-
-    if (autoLogs.length === 0) {
+    const recent = (state.eventLog || []).slice(-20).reverse(); // newest first
+    if (recent.length === 0) {
       crossroads.innerHTML = emptyState(
         'NO DECISIONS RECORDED — CROSSROADS EVENTS WILL APPEAR HERE'
       );
     } else {
-      crossroads.innerHTML = autoLogs
+      crossroads.innerHTML = recent
         .map(
-          note =>
-            `<div style="border-bottom:1px solid rgba(var(--robco-green-rgb),0.1);padding:4px 0;font-size:10px;opacity:0.75;">${escapeHtml(String(note))}</div>`
+          ev =>
+            `<div style="border-bottom:1px solid rgba(var(--robco-green-rgb),0.1);padding:4px 0;font-size:10px;opacity:0.75;">${escapeHtml(_recordLine(ev))}</div>`
+        )
+        .join('');
+    }
+  }
+
+  // ── Incident Log (P4) ────────────────────────────────────
+  // A milestone view over the Terminal Record: the "big moments" only
+  // (level-ups, faction standing shifts, quest outcomes) — the chatter
+  // (trades/crafts/sleeps) is filtered out, leaving the incidents that matter.
+  const incident = document.getElementById('incidentDisplay');
+  if (incident) {
+    const MILESTONES = ['level', 'faction', 'quest'];
+    const incidents = (state.eventLog || [])
+      .filter(ev => ev && MILESTONES.includes(ev.type))
+      .slice(-20)
+      .reverse();
+    if (incidents.length === 0) {
+      incident.innerHTML = emptyState('NO INCIDENTS ON RECORD — MILESTONES WILL APPEAR HERE');
+    } else {
+      incident.innerHTML = incidents
+        .map(
+          ev =>
+            `<div style="border-bottom:1px solid rgba(var(--robco-green-rgb),0.1);padding:4px 0;font-size:10px;opacity:0.75;">${escapeHtml(_recordLine(ev))}</div>`
         )
         .join('');
     }
