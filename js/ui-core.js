@@ -785,6 +785,27 @@ function _wireAmbientExperiences() {
   });
 }
 
+// Power-on affordance (Protocol 42 fix): the #powerOnBtn click handler. Owner
+// bug — forcing SHUTDOWN/OFF left a fully black screen with no visible way
+// back on. Recovers using ONLY legal transition() edges (never forceState(),
+// which is a documented TEST-ONLY escape hatch reserved for the staging
+// Developer Console — Suite 146.15 guards that no production path forces a
+// state): SHUTDOWN's only legal edge is OFF, and OFF's legal edges include
+// COLD_BOOT, so a SHUTDOWN-only force (e.g. the Test Console's individual
+// "SHUTDOWN" button) is walked through OFF first, then to COLD_BOOT — the
+// exact same sequence AmbientRuntime.shutdown() used to get IN, run in
+// reverse. Once COLD_BOOT is reached the shutdown-crt observer's onExit fires
+// (clearing rt-shutdown/rt-shutdown-plain, which — via the CSS rule above —
+// also hides this very button) and the runtime's own _beat() auto-advances
+// COLD_BOOT -> READY -> ACTIVE on the next heartbeat, exactly as it does on a
+// real page load, since the boot screen is already long gone.
+function _powerOnFromShutdown() {
+  if (typeof AmbientRuntime === 'undefined' || !AmbientRuntime) return;
+  if (AmbientRuntime.getState() === 'SHUTDOWN') AmbientRuntime.transition('OFF');
+  AmbientRuntime.transition('COLD_BOOT');
+}
+window._powerOnFromShutdown = _powerOnFromShutdown;
+
 function _wirePanelPersistence() {
   // #35 Panel Memory — restore previously open/closed panel states
   // On desktop, default-open still applies if no saved state exists
@@ -2331,20 +2352,23 @@ function toggleInputMode() {
 }
 window.toggleInputMode = toggleInputMode;
 
-// Shows "→ sending to X" the moment #chatInput's raw value starts with `/` or
-// `@` (first character only — matches the override-detection rule exactly).
-// Implemented as a plain inline reveal (not a floating overlay) so it can never
-// overflow at 360/412px — it just occupies its own row when visible.
+// Shows "→ TERMINAL" / "→ OVERSEER" the moment #chatInput's raw value starts
+// with `/` or `@` (first character only — matches the override-detection rule
+// exactly). Reuses _resolveCommandInput() (api.js) as the single source of the
+// actual routing target — `/` is FIXED to TERMINAL and `@` is FIXED to
+// OVERSEER regardless of the persisted mode — so the hint can never drift from
+// what submitCommandInput() will actually do. Implemented as a plain inline
+// reveal (not a floating overlay) so it can never overflow at 360/412px — it
+// just occupies its own row when visible.
 function _updateModeHint() {
   const hint = document.getElementById('modeHintPopup');
   const input = document.getElementById('chatInput');
   if (!hint || !input) return;
   const raw = input.value;
   const first = raw.charAt(0);
-  if (first === '/' || first === '@') {
-    const mode = typeof getInputMode === 'function' ? getInputMode() : 'overseer';
-    const target = typeof otherInputMode === 'function' ? otherInputMode(mode) : 'overseer';
-    hint.textContent = '→ sending to ' + _modeLabel(target);
+  if ((first === '/' || first === '@') && typeof _resolveCommandInput === 'function') {
+    const resolved = _resolveCommandInput(raw);
+    hint.textContent = '→ ' + _modeLabel(resolved.mode);
     hint.style.display = 'block';
   } else {
     hint.style.display = 'none';
@@ -2382,8 +2406,8 @@ const COMMAND_REGISTRY = [
         cmd: '[MODE PILL]',
         desc: 'Tap the pill above the input to swap between TERMINAL (native + quick-log, offline) and OVERSEER (AI narrator).',
       },
-      { cmd: '/message', desc: 'One-off: send just this message to the OTHER mode.' },
-      { cmd: '@message', desc: 'One-off: same as / — send just this message to the OTHER mode.' },
+      { cmd: '/message', desc: 'One-off: send just this message to TERMINAL, regardless of mode.' },
+      { cmd: '@message', desc: 'One-off: send just this message to OVERSEER, regardless of mode.' },
       {
         cmd: 'killed <target>',
         desc: 'Quick-log (TERMINAL): record a kill in the Terminal Record. Offline.',

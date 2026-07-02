@@ -66,8 +66,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    1831-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    1831-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    1841-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    1841-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -283,6 +283,27 @@ Behavior is identical at every immersion tier. If the runtime fails to start, th
   A companion fix (found while verifying this unit, then hardened further after review, Protocol 42): the standby "wake" sequence — the tone, the audio ramp, and the `"COURIER RETURNED. SYNCHRONIZING TELEMETRY..."` chat line — is a return-to-active-use behavior and must fire **only** on a genuine wake, never on a power-down. A shutdown can land two different ways relative to that sequence: as a **direct** `STANDBY→SHUTDOWN` edge (reachable via the Test Console today), or **mid-window** — after a normal wake has already started, but before its 650ms delayed half runs. A single check made once, up front, only catches the first case. Instead, the shared `_isShuttingDown()` helper (`AmbientRuntime.getState() === 'SHUTDOWN' || 'OFF'`) is re-checked at **each half's own fire time**: synchronously, right before `playWakeTone()` (that half's fire time is now — since `transition()` flips `_state` before dispatching observer callbacks, this reflects the state the exit is actually happening in), and again as the **first statement inside** the 650ms `setTimeout`, before the class removal / audio ramp / chat line / `updateMath()` (that half's fire time is later — closing the mid-window race a single up-front check would miss). Either half no-oping independently is sufficient; the `shutdown-crt` observer's own `onEnter` already force-clears the `standby` class regardless, so nothing is ever left stuck. A Node `vm`-sandbox behavioral proof (Suite 150.10) executes the real `enterStandby`/`exitStandby`/`_isShuttingDown` bodies against a synthetic DOM with a synchronous-mock `setTimeout`, proving all three scenarios: direct shutdown (no tone, no chat), a normal wake (tone + chat + `updateMath`, byte-identical to before this fix), and the mid-window race (tone already fired, chat/`updateMath` suppressed).
 
   Every new `@keyframes` animation (`idle-breathe`, `standby-breathe`, `crt-power-off`, `shutdown-cover`, `shutdown-cover-plain`) is a plain `animation:` declaration, so the existing global `prefers-reduced-motion` block (`animation-duration:0.01ms` + `iteration-count:1` on `*`) neutralises all of them to their static/instant final frame — no bespoke per-class override needed. No durable writes anywhere (body classList toggles only). Guarded by Suite 150 (both runners).
+
+  **Power-on affordance (Protocol 42 fix, Suite 152).** Owner bug: forcing SHUTDOWN/OFF left a
+  fully black screen with no visible way back on — the `.rt-shutdown(-plain)::after` cover has
+  `pointer-events:none` (clicks already reached whatever sat beneath it), but nothing was ever
+  drawn to show WHERE to click. `#powerOnBtn` (`index.html`, a real `<button>`, `▶ PRESS TO POWER
+ON`) fixes this: it is hidden by default and shown **only** via the SAME `body.rt-shutdown` /
+  `body.rt-shutdown-plain` classes the observer above already toggles (`body.rt-shutdown
+.power-on-btn { display: block; }` in `terminal.css` — Protocol 22, no separate JS visibility
+  bookkeeping that could drift), and sits at `z-index:100002`, above the cover's `100001`, so it is
+  always visible over the black overlay. Its click handler, `_powerOnFromShutdown()` (`ui-core.js`,
+  defined immediately after the `shutdown-crt` observer), recovers using **only legal**
+  `AmbientRuntime.transition()` edges — `SHUTDOWN`'s one legal edge is `OFF`, so a lone forced
+  `SHUTDOWN` (e.g. via the Test Console's individual "SHUTDOWN" button) is walked through `OFF`
+  first, then to `COLD_BOOT`; a plain `OFF` goes straight to `COLD_BOOT`. It never calls
+  `forceState()` (the documented TEST-ONLY escape hatch reserved for the staging Developer
+  Console — Suite 146.15 guards that no production path forces a state). Once `COLD_BOOT` is
+  reached, the `shutdown-crt` observer's `onExit` fires (clearing the shutdown classes, which also
+  hides `#powerOnBtn` again via the same CSS rule), and the runtime's own heartbeat auto-advances
+  `COLD_BOOT → READY → ACTIVE` exactly as it does on a real page load. A Node `vm`-sandbox
+  behavioral proof drives the real function against a minimal LEGAL-respecting mock, proving both
+  starting states (`SHUTDOWN`, `OFF`) converge on `COLD_BOOT`.
 
 **Hard atmosphere/save boundary (Phase-2 prime invariant #1).** `runtime.js` writes **nothing durable to the campaign** — it never persists the save, mutates a campaign field, appends to the Terminal Record, or touches raw local storage. State is ephemeral / in-memory; any device pref would go through MetaStore only (A1 stores none). Gate-guarded by Suite 146 (negative grep) + the Suite 18 behavioral no-write assertion in `tests/test.html`.
 
@@ -842,8 +863,9 @@ MetaStore-backed via `getInputMode()`/`setInputMode()`/`otherInputMode()` in
 [TRANSMIT PROTOCOL] click / Ctrl+Enter → submitCommandInput()   // the ONE choke point
   → attachedImageData present?  → transmitMessage()             // AI is the only visual-analysis path
   → _resolveCommandInput(raw)                                    // persisted mode, or a one-off / @ override
-      raw.charAt(0) === '/' or '@'  → target = otherInputMode(persisted); strip the prefix + one optional space
-      otherwise                    → target = persisted mode; text unchanged
+      raw.charAt(0) === '/'  → target = 'terminal' (FIXED, regardless of persisted mode); strip the prefix + one optional space
+      raw.charAt(0) === '@'  → target = 'overseer' (FIXED, regardless of persisted mode); strip the prefix + one optional space
+      otherwise               → target = persisted mode; text unchanged
   → target === 'terminal' ? transmitTerminal(text) : transmitMessage(text)
 ```
 
@@ -1464,7 +1486,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1831-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1841-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

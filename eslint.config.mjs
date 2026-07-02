@@ -126,6 +126,7 @@ export default [
         otherInputMode: 'readonly',
         _commandSuggestions: 'readonly',
         _hideModeHint: 'readonly',
+        _resolveCommandInput: 'readonly',
         markLocationVisited: 'readonly',
         // Step 2 Phase 2 A1 — Ambient Runtime (js/runtime.js): lifecycle state machine + observer scheduler
         AmbientRuntime: 'readonly',

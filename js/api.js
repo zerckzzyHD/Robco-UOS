@@ -1365,8 +1365,11 @@ window.transmitTerminal = transmitTerminal;
 
 // Resolve which mode THIS message submits through: the persisted device pref,
 // or a one-off override when the RAW (untrimmed) input's FIRST character is
-// `/` or `@` — both accepted, both mean "send this one message to whichever
-// mode I'm not currently in." Supports both "/msg" (no space) and "/ msg"
+// `/` or `@`. These are FIXED targets, not relative to the persisted mode —
+// `/` always means "just this once, TERMINAL/native" and `@` always means
+// "just this once, OVERSEER/AI", from either starting mode (owner-locked
+// spec fix — a prior revision routed both to "whichever mode I'm not in",
+// which made them redundant). Supports both "/msg" (no space) and "/ msg"
 // (exactly one space stripped); a `/` or `@` anywhere else in the input is
 // left as literal text. Never mutates the persisted mode.
 function _resolveCommandInput(raw) {
@@ -1375,7 +1378,7 @@ function _resolveCommandInput(raw) {
   if (first === '/' || first === '@') {
     let rest = raw.slice(1);
     if (rest.charAt(0) === ' ') rest = rest.slice(1);
-    return { mode: otherInputMode(persisted), text: rest, override: true };
+    return { mode: first === '/' ? 'terminal' : 'overseer', text: rest, override: true };
   }
   return { mode: persisted, text: raw, override: false };
 }

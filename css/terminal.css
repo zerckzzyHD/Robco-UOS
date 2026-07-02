@@ -1881,6 +1881,55 @@ body.rt-shutdown-plain::after {
   }
 }
 
+/* Power-on affordance (Protocol 42 fix) — hidden by default; the SAME body
+   classes the shutdown-crt observer already toggles (js/ui-core.js) drive its
+   visibility declaratively (Protocol 22 — no separate JS show/hide bookkeeping,
+   so it can never drift from the shutdown visual). z-index sits ABOVE the
+   shutdown cover (100001) so it is always visible over the black overlay —
+   the cover's own pointer-events:none means clicks were already reaching
+   whatever sits beneath it, this just makes the target visible + labeled.
+   >=28px tap target (Protocol 17); the pulse glow is neutralised by the
+   global prefers-reduced-motion block like every other CRT effect. */
+.power-on-btn {
+  display: none;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 100002;
+  width: auto;
+  min-height: 44px;
+  padding: 12px 24px;
+  background: transparent;
+  border: 2px solid var(--robco-green);
+  color: var(--robco-green);
+  font-family: inherit;
+  font-size: 14px;
+  letter-spacing: 1px;
+  white-space: nowrap;
+  cursor: pointer;
+  text-shadow: var(--robco-glow);
+  animation: power-on-glow 2s ease-in-out infinite;
+}
+.power-on-btn:hover,
+.power-on-btn:focus-visible {
+  background: var(--robco-green);
+  color: var(--robco-dark);
+}
+body.rt-shutdown .power-on-btn,
+body.rt-shutdown-plain .power-on-btn {
+  display: block;
+}
+@keyframes power-on-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 8px rgba(var(--robco-green-rgb), 0.4);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(var(--robco-green-rgb), 0.9);
+  }
+}
+
 /* ── Thermal Ambient Shift ─────────────────────────────────────── */
 body {
   transition: background-color 0.8s ease;

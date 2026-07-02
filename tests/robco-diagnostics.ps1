@@ -10712,14 +10712,17 @@ Check (
 ) "151.7: submitCommandInput() routes an attached image straight to transmitMessage() (AI), before checking the resolved mode"
 
 # 151.8  _resolveCommandInput(): first-char-only `/`/`@`, both spacing
-#        variants, targets otherInputMode() -- structural shape
+#        variants, FIXED targets (not relative to the persisted mode) --
+#        structural shape. Owner fix: `/` always targets 'terminal' and `@`
+#        always targets 'overseer', regardless of getInputMode().
 $resolveBody151 = Get-FunctionBody $apiSrc151 '_resolveCommandInput'
 Check (
     ($resolveBody151 -match "const first = raw\.charAt\(0\);") -and
     ($resolveBody151 -match "first === '/' \|\| first === '@'") -and
     ($resolveBody151 -match "rest\.charAt\(0\) === ' '") -and
-    ($resolveBody151 -match "otherInputMode\(persisted\)")
-) "151.8: _resolveCommandInput() checks raw.charAt(0) (untrimmed -- first-char-only), accepts `/` and `@`, strips exactly one leading space, and targets otherInputMode(persisted)"
+    ($resolveBody151 -match "mode: first === '/' \? 'terminal' : 'overseer'") -and
+    (-not ($resolveBody151 -match "otherInputMode\(persisted\)"))
+) "151.8: _resolveCommandInput() checks raw.charAt(0) (untrimmed -- first-char-only), accepts ``/`` and ``@``, strips exactly one leading space, and targets a FIXED mode ('/' -> terminal, '@' -> overseer) -- never otherInputMode(persisted)"
 
 # 151.9  QUICK_LOG_PATTERNS: all four quick-log verbs present with the
 #        expected regex anchors
@@ -10806,25 +10809,127 @@ Check (
 
 # 151.17  STRUCTURAL MIRROR of the JS behavioral vm-sandbox proof (PowerShell
 #         has no JS execution sandbox -- same convention as Suite 149.8/150.10):
-#         the resolver's source SHAPE proves the same four properties the JS
-#         side actually EXECUTES -- untrimmed first-char check (so a `/`/`@`
-#         NOT at position 0 cannot match), both `/` and `@` accepted, exactly
-#         one leading space stripped (not all whitespace, which would also
-#         strip a deliberate second space), and the target is always
-#         otherInputMode(persisted), never a literal mode name.
+#         the resolver's source SHAPE proves the same properties the JS side
+#         actually EXECUTES -- untrimmed first-char check (so a `/`/`@` NOT at
+#         position 0 cannot match), both `/` and `@` accepted, exactly one
+#         leading space stripped (not all whitespace, which would also strip
+#         a deliberate second space), and -- the owner fix -- the target is a
+#         FIXED literal mode name keyed off the prefix character itself
+#         ('/' -> terminal, '@' -> overseer), never otherInputMode(persisted)
+#         (which would make the target relative to the starting mode).
 Check (
     ($resolveBody151 -match "raw\.charAt\(0\)") -and
     ($resolveBody151 -match "raw\.slice\(1\)") -and
     ($resolveBody151 -match "rest\.slice\(1\)") -and
     (-not ($resolveBody151 -match "raw\.trim\(\)\.charAt\(0\)")) -and
     (-not ($resolveBody151 -match "\.replace\(/\^\\s\*/")) -and
-    (([regex]::Matches($resolveBody151, "otherInputMode\(persisted\)")).Count -ge 1)
-) "151.17: structural mirror of the JS behavioral proof -- the resolver checks the UNTRIMMED raw.charAt(0) (first-char-only, no leading-whitespace tolerance), strips exactly one character then one optional space (never a run of whitespace), and always targets otherInputMode(persisted)"
+    ($resolveBody151 -match "mode: first === '/' \? 'terminal' : 'overseer'") -and
+    (-not ($resolveBody151 -match "otherInputMode\(persisted\)"))
+) "151.17: structural mirror of the JS behavioral proof -- the resolver checks the UNTRIMMED raw.charAt(0) (first-char-only, no leading-whitespace tolerance), strips exactly one character then one optional space (never a run of whitespace), and always targets a FIXED mode keyed off the prefix character -- never otherInputMode(persisted)"
 
 # 151.18  Protocol 1 -- CACHE_NAME bumped for this served-file change
 Check (
-    (Read-Src "sw.js") -match "const CACHE_NAME = 'robco-terminal-v2\.7\.0-r33';"
-) "151.18: CACHE_NAME bumped to r33 (index.html/js/css touched by the Command-Line MODE system)"
+    (Read-Src "sw.js") -match "const CACHE_NAME = 'robco-terminal-v2\.7\.0-r34';"
+) "151.18: CACHE_NAME bumped (index.html/js/css touched by the Command-Line MODE system)"
+
+# ===========================================================
+# Suite 152 -- Shutdown/OFF power-on affordance (Protocol 42 fix)
+# (10 tests). Mirrors JS Suite 152. Owner bug: forcing SHUTDOWN/OFF
+# (A3 shutdown-crt observer) left a fully black screen with no visible
+# way back on. A diegetic #powerOnBtn, shown ONLY during SHUTDOWN/OFF
+# via the SAME body classes the observer already toggles, recovers
+# using legal transition() edges only (never forceState, the
+# documented TEST-ONLY escape hatch -- Suite 146.15 still guards that).
+# ===========================================================
+Sep "Suite 152 -- Shutdown/OFF power-on affordance (Protocol 42 fix)"
+$htmlSrc152 = Read-Src "index.html"
+$cssSrc152 = Read-Src "css/terminal.css"
+$uiCoreSrc152 = Read-Src "js/ui-core.js"
+$powerOnBody152 = Get-FunctionBody $uiCoreSrc152 '_powerOnFromShutdown'
+
+# 152.1  #powerOnBtn is a real <button> (Protocol UI-5) with a diegetic
+#        aria-label, wired to the recovery handler
+Check (
+    ($htmlSrc152 -match 'id="powerOnBtn"') -and
+    ($htmlSrc152 -match '<button[\s\S]{0,200}?>')
+) '152.1: #powerOnBtn is a real <button> wired to _powerOnFromShutdown() with a diegetic aria-label'
+Check (
+    ($htmlSrc152 -match 'id="powerOnBtn"') -and
+    ($htmlSrc152 -match 'onclick="_powerOnFromShutdown\(\)"') -and
+    ($htmlSrc152 -match 'aria-label="Power on the terminal"')
+) '152.1b: #powerOnBtn carries the onclick handler and a literal, descriptive aria-label'
+
+# 152.2  CSS: hidden by default, shown ONLY via the SAME body classes the
+#        shutdown-crt observer already toggles (Protocol 22 -- no separate
+#        JS visibility bookkeeping that could drift), sits ABOVE the
+#        shutdown cover's z-index (100001), and never wraps
+$powerOnBlock152 = [regex]::Match($cssSrc152, '\.power-on-btn\s*\{[^}]*\}').Value
+Check (
+    ($powerOnBlock152 -match "display:\s*none;") -and
+    ($powerOnBlock152 -match "z-index:\s*100002;") -and
+    ($powerOnBlock152 -match "white-space:\s*nowrap;") -and
+    ($cssSrc152 -match "(?s)body\.rt-shutdown \.power-on-btn,\s*\n\s*body\.rt-shutdown-plain \.power-on-btn\s*\{\s*\n\s*display:\s*block;")
+) '152.2: .power-on-btn is hidden by default, z-index 100002 (above the 100001 shutdown cover), never wraps, and is shown ONLY via body.rt-shutdown/body.rt-shutdown-plain (the observer-owned classes)'
+
+# 152.3  >=28px tap target (Protocol 17) -- min-height comfortably exceeds
+#        the floor, and width:auto (not the global button{width:100%})
+Check (
+    ($powerOnBlock152 -match "min-height:\s*44px;") -and
+    ($powerOnBlock152 -match "width:\s*auto;")
+) '152.3: .power-on-btn has an explicit min-height (44px, exceeding the >=28px Protocol 17 floor) and width:auto (overrides the global button{width:100%})'
+
+# 152.4  reduced-motion: the pulse glow is a plain `animation:` declaration,
+#        caught by the existing global prefers-reduced-motion block -- no
+#        bespoke override needed (same convention as every other CRT effect)
+Check (
+    ($cssSrc152 -match "@keyframes power-on-glow") -and
+    ($powerOnBlock152 -match "animation:\s*power-on-glow")
+) '152.4: the power-on-glow keyframe is applied via a plain `animation:` declaration, neutralised by the existing global prefers-reduced-motion block (animation-duration:0.01ms on *)'
+
+# 152.5  _powerOnFromShutdown() recovers using ONLY legal transition()
+#        edges -- SHUTDOWN's only legal edge is OFF, so a SHUTDOWN-only
+#        force state is walked through OFF first, then to COLD_BOOT.
+#        NEVER calls forceState() (the documented TEST-ONLY escape hatch).
+Check (
+    ($powerOnBody152 -match "if \(AmbientRuntime\.getState\(\) === 'SHUTDOWN'\) AmbientRuntime\.transition\('OFF'\);") -and
+    ($powerOnBody152 -match "AmbientRuntime\.transition\('COLD_BOOT'\);") -and
+    (-not ($powerOnBody152 -match "forceState"))
+) "152.5: _powerOnFromShutdown() walks SHUTDOWN -> OFF -> COLD_BOOT using ONLY legal transition() calls, never forceState() (production code must never bypass the LEGAL adjacency map -- Suite 146.15)"
+
+# 152.6  fail-safe: never throws if AmbientRuntime is unavailable
+Check (
+    $powerOnBody152 -match "typeof AmbientRuntime === 'undefined' \|\| !AmbientRuntime"
+) '152.6: _powerOnFromShutdown() guards on AmbientRuntime being available before calling into it'
+
+# 152.7  the click handler is exposed on window (index.html's inline
+#        onclick calls it) and lives beside the shutdown-crt observer
+#        (Protocol 22 -- co-located with the state it recovers from)
+Check (
+    ($uiCoreSrc152 -match "window\._powerOnFromShutdown = _powerOnFromShutdown;") -and
+    ($uiCoreSrc152 -match "(?s)id: 'shutdown-crt'.*?function _powerOnFromShutdown\(\)")
+) '152.7: _powerOnFromShutdown() is exposed on window and defined immediately after the shutdown-crt observer it recovers from'
+
+# 152.8  game-agnostic (Protocol 38) + no durable campaign write -- pure
+#        runtime-state/DOM recovery, same invariant as the rest of A3
+Check (
+    (-not ($powerOnBody152 -match "\bFNV\b|\bFO3\b|Fallout|New Vegas|Mojave|Capital Wasteland")) -and
+    (-not ($powerOnBody152 -match "saveState|robco_v8|_logEvent|\beventLog\b|localStorage\.(set|get)Item"))
+) '152.8: _powerOnFromShutdown() is game-agnostic and writes nothing durable to the campaign (runtime-state transition only)'
+
+# 152.9  STRUCTURAL MIRROR of the JS behavioral vm-sandbox proof (PowerShell
+#         has no JS execution sandbox -- same convention as Suite
+#         149.8/150.10/151.17): the recovery sequence's source SHAPE proves
+#         the properties the JS side actually EXECUTES -- exactly two
+#         transition() call sites exist, and the SHUTDOWN-only branch's
+#         transition('OFF') appears BEFORE the unconditional
+#         transition('COLD_BOOT') (so a SHUTDOWN start walks OFF then
+#         COLD_BOOT, in that order, while an OFF start reaches COLD_BOOT
+#         directly).
+Check (
+    (([regex]::Matches($powerOnBody152, "AmbientRuntime\.transition\(")).Count -eq 2) -and
+    ($powerOnBody152.IndexOf("AmbientRuntime.transition('OFF')") -ge 0) -and
+    ($powerOnBody152.IndexOf("AmbientRuntime.transition('OFF')") -lt $powerOnBody152.IndexOf("AmbientRuntime.transition('COLD_BOOT')"))
+) "152.9: structural mirror -- exactly two transition() call sites exist (the conditional OFF branch and the unconditional COLD_BOOT call), with transition('OFF') appearing BEFORE transition('COLD_BOOT'), matching the two-hop-from-SHUTDOWN / one-hop-from-OFF behavior the JS vm sandbox executes"
 
 # ===========================================================
 # Results

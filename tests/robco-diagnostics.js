@@ -18215,15 +18215,18 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   }
 
   // 151.8  _resolveCommandInput(): first-char-only `/`/`@`, both spacing
-  //        variants, targets otherInputMode() — structural shape
+  //        variants, FIXED targets (not relative to the persisted mode) —
+  //        structural shape. Owner fix: `/` always targets 'terminal' and `@`
+  //        always targets 'overseer', regardless of getInputMode().
   {
     const resolveBody151 = extractFunctionBody(apiSrc151, '_resolveCommandInput');
     assert(
       /const first = raw\.charAt\(0\);/.test(resolveBody151) &&
         /first === '\/' \|\| first === '@'/.test(resolveBody151) &&
         /rest\.charAt\(0\) === ' '/.test(resolveBody151) &&
-        /otherInputMode\(persisted\)/.test(resolveBody151),
-      '151.8: _resolveCommandInput() checks raw.charAt(0) (untrimmed — first-char-only), accepts `/` and `@`, strips exactly one leading space, and targets otherInputMode(persisted)'
+        /mode: first === '\/' \? 'terminal' : 'overseer'/.test(resolveBody151) &&
+        !/otherInputMode\(persisted\)/.test(resolveBody151),
+      "151.8: _resolveCommandInput() checks raw.charAt(0) (untrimmed — first-char-only), accepts `/` and `@`, strips exactly one leading space, and targets a FIXED mode ('/' -> terminal, '@' -> overseer) — never otherInputMode(persisted)"
     );
   }
 
@@ -18323,10 +18326,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   );
 
   // 151.17  BEHAVIORAL — the real _resolveCommandInput() body, executed in a
-  //         Node vm sandbox against mocked getInputMode/otherInputMode: proves
-  //         `/msg` and `/ msg` both strip to the same text and target the
-  //         OTHER mode; `@msg`/`@ msg` identical; a `/` NOT at position 0 is
-  //         left as literal text with the persisted mode unaffected.
+  //         Node vm sandbox against mocked getInputMode: proves `/` and `@`
+  //         are FIXED targets (owner fix), not relative to the persisted mode —
+  //         `/msg`/`/ msg` always resolve to 'terminal' and `@msg`/`@ msg`
+  //         always resolve to 'overseer', from EITHER starting persisted mode;
+  //         a `/` NOT at position 0 is left as literal text with the persisted
+  //         mode unaffected; no prefix uses the persisted mode as-is.
   {
     const vm151 = require('vm');
     function declareFn151(src, name) {
@@ -18339,10 +18344,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     const src151 = declareFn151(apiSrc151, '_resolveCommandInput');
 
     function runResolve151(mode, raw) {
-      const sb = {
-        getInputMode: () => mode,
-        otherInputMode: m => (m === 'terminal' ? 'overseer' : 'terminal'),
-      };
+      const sb = { getInputMode: () => mode };
       vm151.createContext(sb);
       vm151.runInContext(src151, sb);
       return sb._resolveCommandInput(raw);
@@ -18354,14 +18356,18 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       r3 = null,
       r4 = null,
       r5 = null,
-      r6 = null;
+      r6 = null,
+      r7 = null,
+      r8 = null;
     try {
-      r1 = runResolve151('overseer', '/killed deathclaw');
-      r2 = runResolve151('overseer', '/ killed deathclaw');
-      r3 = runResolve151('terminal', '@narrate this');
-      r4 = runResolve151('terminal', '@ narrate this');
-      r5 = runResolve151('overseer', 'hello / world');
-      r6 = runResolve151('overseer', 'killed deathclaw');
+      r1 = runResolve151('overseer', '/killed deathclaw'); // '/' from OVERSEER -> terminal
+      r2 = runResolve151('terminal', '/ killed deathclaw'); // '/' from TERMINAL -> still terminal (fixed, not a no-op toggle)
+      r3 = runResolve151('terminal', '@narrate this'); // '@' from TERMINAL -> overseer
+      r4 = runResolve151('overseer', '@ narrate this'); // '@' from OVERSEER -> still overseer (fixed, not a no-op toggle)
+      r5 = runResolve151('overseer', 'hello / world'); // '/' not at position 0 -> literal text, persisted mode unaffected
+      r6 = runResolve151('overseer', 'killed deathclaw'); // no prefix -> persisted mode
+      r7 = runResolve151('terminal', 'killed deathclaw'); // no prefix -> persisted mode (the other one)
+      r8 = runResolve151('overseer', '/ '); // prefix + single space + empty text -> still resolves, empty text
     } catch (e) {
       err151 = e;
     }
@@ -18384,17 +18390,184 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         r5.override === false &&
         r6.mode === 'overseer' &&
         r6.text === 'killed deathclaw' &&
-        r6.override === false,
-      '_resolveCommandInput() behavioral: "/msg" and "/ msg" both strip to identical text and target the other mode; "@msg"/"@ msg" identical; a `/` not at position 0 is left as literal text with the persisted mode unaffected' +
+        r6.override === false &&
+        r7.mode === 'terminal' &&
+        r7.text === 'killed deathclaw' &&
+        r7.override === false &&
+        r8.mode === 'terminal' &&
+        r8.text === '' &&
+        r8.override === true,
+      '_resolveCommandInput() behavioral: `/` ALWAYS targets terminal and `@` ALWAYS targets overseer, from either starting persisted mode (fixed targets, not a relative toggle); "/msg"/"/ msg" and "@msg"/"@ msg" strip identically; a `/` not at position 0 is literal text with the persisted mode unaffected; no prefix uses the persisted mode as-is' +
         (err151 ? ' — ' + err151.message : '')
     );
   }
 
   // 151.18  Protocol 1 — CACHE_NAME bumped for this served-file change
   assert(
-    /const CACHE_NAME = 'robco-terminal-v2\.7\.0-r33';/.test(readFile('sw.js')),
-    '151.18: CACHE_NAME bumped to r33 (index.html/js/css touched by the Command-Line MODE system)'
+    /const CACHE_NAME = 'robco-terminal-v2\.7\.0-r34';/.test(readFile('sw.js')),
+    '151.18: CACHE_NAME bumped (index.html/js/css touched by the Command-Line MODE system)'
   );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 152 — Shutdown/OFF power-on affordance (Protocol 42 fix)
+//  Owner bug: forcing SHUTDOWN/OFF (A3 shutdown-crt observer) left a fully
+//  black screen with no visible way back on. A diegetic #powerOnBtn, shown
+//  ONLY during SHUTDOWN/OFF via the SAME body classes the observer already
+//  toggles, recovers using legal transition() edges only (never forceState,
+//  the documented TEST-ONLY escape hatch — Suite 146.15 still guards that).
+//  10 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 152 — Shutdown/OFF power-on affordance (Protocol 42 fix)');
+  const htmlSrc152 = readFile('index.html');
+  const cssSrc152 = readFile('css/terminal.css');
+  const uiCoreSrc152 = readFile('js/ui-core.js');
+  const powerOnBody152 = extractFunctionBody(uiCoreSrc152, '_powerOnFromShutdown');
+
+  // 152.1  #powerOnBtn is a real <button> (Protocol UI-5) with a diegetic
+  //        aria-label, wired to the recovery handler
+  assert(
+    /<button\s[^>]*id="powerOnBtn"[^>]*class="power-on-btn"[^>]*onclick="_powerOnFromShutdown\(\)"[^>]*aria-label="[^"]+"/.test(
+      htmlSrc152
+    ) || /<button\s[^>]*id="powerOnBtn"[\s\S]{0,200}?>/.test(htmlSrc152),
+    '152.1: #powerOnBtn is a real <button> wired to _powerOnFromShutdown() with a diegetic aria-label'
+  );
+  assert(
+    /id="powerOnBtn"/.test(htmlSrc152) &&
+      /onclick="_powerOnFromShutdown\(\)"/.test(htmlSrc152) &&
+      /aria-label="Power on the terminal"/.test(htmlSrc152),
+    '152.1b: #powerOnBtn carries the onclick handler and a literal, descriptive aria-label'
+  );
+
+  // 152.2  CSS: hidden by default, shown ONLY via the SAME body classes the
+  //        shutdown-crt observer already toggles (Protocol 22 — no separate
+  //        JS visibility bookkeeping that could drift), sits ABOVE the
+  //        shutdown cover's z-index (100001), and never wraps
+  const powerOnBlock152 = (cssSrc152.match(/\.power-on-btn\s*\{[^}]*\}/) || [''])[0];
+  assert(
+    /display:\s*none;/.test(powerOnBlock152) &&
+      /z-index:\s*100002;/.test(powerOnBlock152) &&
+      /white-space:\s*nowrap;/.test(powerOnBlock152) &&
+      /body\.rt-shutdown \.power-on-btn,\s*\n\s*body\.rt-shutdown-plain \.power-on-btn\s*\{\s*\n\s*display:\s*block;/.test(
+        cssSrc152
+      ),
+    '152.2: .power-on-btn is hidden by default, z-index 100002 (above the 100001 shutdown cover), never wraps, and is shown ONLY via body.rt-shutdown/body.rt-shutdown-plain (the observer-owned classes)'
+  );
+
+  // 152.3  >=28px tap target (Protocol 17) — min-height comfortably exceeds
+  //        the floor, and width:auto (not the global button{width:100%})
+  assert(
+    /min-height:\s*44px;/.test(powerOnBlock152) && /width:\s*auto;/.test(powerOnBlock152),
+    '152.3: .power-on-btn has an explicit min-height (44px, exceeding the >=28px Protocol 17 floor) and width:auto (overrides the global button{width:100%})'
+  );
+
+  // 152.4  reduced-motion: the pulse glow is a plain `animation:` declaration,
+  //        caught by the existing global prefers-reduced-motion block — no
+  //        bespoke override needed (same convention as every other CRT effect)
+  assert(
+    /@keyframes power-on-glow/.test(cssSrc152) &&
+      /animation:\s*power-on-glow/.test(powerOnBlock152),
+    '152.4: the power-on-glow keyframe is applied via a plain `animation:` declaration, neutralised by the existing global prefers-reduced-motion block (animation-duration:0.01ms on *)'
+  );
+
+  // 152.5  _powerOnFromShutdown() recovers using ONLY legal transition()
+  //        edges — SHUTDOWN's only legal edge is OFF, so a SHUTDOWN-only
+  //        force state is walked through OFF first, then to COLD_BOOT.
+  //        NEVER calls forceState() (the documented TEST-ONLY escape hatch).
+  assert(
+    /if \(AmbientRuntime\.getState\(\) === 'SHUTDOWN'\) AmbientRuntime\.transition\('OFF'\);/.test(
+      powerOnBody152
+    ) &&
+      /AmbientRuntime\.transition\('COLD_BOOT'\);/.test(powerOnBody152) &&
+      !/forceState/.test(powerOnBody152),
+    '152.5: _powerOnFromShutdown() walks SHUTDOWN -> OFF -> COLD_BOOT using ONLY legal transition() calls, never forceState() (production code must never bypass the LEGAL adjacency map — Suite 146.15)'
+  );
+
+  // 152.6  fail-safe: never throws if AmbientRuntime is unavailable
+  assert(
+    /typeof AmbientRuntime === 'undefined' \|\| !AmbientRuntime/.test(powerOnBody152),
+    '152.6: _powerOnFromShutdown() guards on AmbientRuntime being available before calling into it'
+  );
+
+  // 152.7  the click handler is exposed on window (index.html's inline
+  //        onclick calls it) and lives beside the shutdown-crt observer
+  //        (Protocol 22 — co-located with the state it recovers from)
+  assert(
+    /window\._powerOnFromShutdown = _powerOnFromShutdown;/.test(uiCoreSrc152) &&
+      /id: 'shutdown-crt'[\s\S]*?function _powerOnFromShutdown\(\)/.test(uiCoreSrc152),
+    '152.7: _powerOnFromShutdown() is exposed on window and defined immediately after the shutdown-crt observer it recovers from'
+  );
+
+  // 152.8  game-agnostic (Protocol 38) + no durable campaign write — pure
+  //        runtime-state/DOM recovery, same invariant as the rest of A3
+  assert(
+    !/\bFNV\b|\bFO3\b|Fallout|New Vegas|Mojave|Capital Wasteland/.test(powerOnBody152) &&
+      !/saveState|robco_v8|_logEvent|\beventLog\b|localStorage\.(set|get)Item/.test(powerOnBody152),
+    '152.8: _powerOnFromShutdown() is game-agnostic and writes nothing durable to the campaign (runtime-state transition only)'
+  );
+
+  // 152.9  BEHAVIORAL — the real _powerOnFromShutdown() body, executed in a
+  //        Node vm sandbox against a minimal LEGAL-respecting mock
+  //        AmbientRuntime: proves BOTH starting states (a lone forced
+  //        SHUTDOWN, and the normal post-shutdown() OFF) converge on
+  //        COLD_BOOT, and that OFF is visited first when starting at SHUTDOWN
+  //        (the only legal edge out of it).
+  {
+    const vm152 = require('vm');
+    function declareFn152(src, name) {
+      const nameIdx = src.indexOf('function ' + name);
+      const parenIdx = src.indexOf('(', nameIdx);
+      const braceIdx = src.indexOf('{', parenIdx);
+      const params = src.slice(parenIdx, braceIdx);
+      return 'function ' + name + params + extractFunctionBody(src, name);
+    }
+    const src152 = declareFn152(uiCoreSrc152, '_powerOnFromShutdown');
+
+    function runPowerOn152(startState) {
+      const LEGAL = {
+        OFF: ['COLD_BOOT', 'SHUTDOWN'],
+        SHUTDOWN: ['OFF'],
+      };
+      const calls = [];
+      let state = startState;
+      const sb = {
+        AmbientRuntime: {
+          getState: () => state,
+          transition: to => {
+            calls.push(to);
+            if (LEGAL[state] && LEGAL[state].indexOf(to) !== -1) state = to;
+          },
+        },
+      };
+      vm152.createContext(sb);
+      vm152.runInContext(src152, sb);
+      sb._powerOnFromShutdown();
+      return { calls, finalState: state };
+    }
+
+    let err152 = null,
+      fromShutdown152 = null,
+      fromOff152 = null;
+    try {
+      fromShutdown152 = runPowerOn152('SHUTDOWN');
+      fromOff152 = runPowerOn152('OFF');
+    } catch (e) {
+      err152 = e;
+    }
+    assert(
+      !err152 &&
+        fromShutdown152.calls.length === 2 &&
+        fromShutdown152.calls[0] === 'OFF' &&
+        fromShutdown152.calls[1] === 'COLD_BOOT' &&
+        fromShutdown152.finalState === 'COLD_BOOT' &&
+        fromOff152.calls.length === 1 &&
+        fromOff152.calls[0] === 'COLD_BOOT' &&
+        fromOff152.finalState === 'COLD_BOOT',
+      '_powerOnFromShutdown() behavioral: starting at SHUTDOWN walks OFF then COLD_BOOT (two legal transitions); starting at OFF goes straight to COLD_BOOT (one legal transition); both converge on COLD_BOOT' +
+        (err152 ? ' — ' + err152.message : '')
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

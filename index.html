@@ -190,6 +190,19 @@
       <span id="bootCursor">_</span>
     </div>
 
+    <!-- Power-on affordance (Protocol 42 fix): visible ONLY while SHUTDOWN/OFF
+         (body.rt-shutdown / body.rt-shutdown-plain — see terminal.css), sitting
+         above the shutdown cover. Fixes the owner-reported blind-black-screen
+         bug — there was previously no visible way back on. -->
+    <button
+      id="powerOnBtn"
+      class="power-on-btn"
+      onclick="_powerOnFromShutdown()"
+      aria-label="Power on the terminal"
+    >
+      ▶ PRESS TO POWER ON
+    </button>
+
     <div class="crt-overlay"></div>
 
     <div
