@@ -46,6 +46,27 @@ function Get-FunctionBody($source, $fnName) {
     throw "Unclosed brace for '$fnName'"
 }
 
+# U1 (Step 2 Phase 0): getSystemDirective() was decomposed into 8 per-section
+# builder functions -- the AI directive TEXT now lives across all of them, not in
+# getSystemDirective()'s own (now-short, composition-only) body. Any test that
+# checks directive CONTENT (schema keys, tracker text, injection-resistance copy,
+# etc.) must search the concatenation of every builder body, not just
+# Get-FunctionBody $src 'getSystemDirective'. Tests that check getSystemDirective's
+# own logic (ctx resolution, no-localStorage-read, call count) keep using
+# Get-FunctionBody 'getSystemDirective' directly. Mirrors getDirectiveFullBody()
+# in tests/robco-diagnostics.js (Protocol 15 parity).
+$DIRECTIVE_BUILDER_NAMES = @(
+    'getSystemDirective', '_directiveConstraints', '_directivePersonaAndContract',
+    '_directiveCoreTracking', '_directiveSkills', '_directiveFactions',
+    '_directiveSystems', '_directiveTrackers', '_directiveInjectionBoundary'
+)
+function Get-DirectiveFullBody($src) {
+    $parts = foreach ($n in $DIRECTIVE_BUILDER_NAMES) {
+        try { Get-FunctionBody $src $n } catch { '' }
+    }
+    return ($parts -join "`n")
+}
+
 function Get-StateKeys($source) {
     $m = [regex]::Match($source, 'let state\s*=\s*\{')
     if (-not $m.Success) { throw "Cannot find 'let state = {' in state.js" }
@@ -964,9 +985,12 @@ Check ([bool]($apiSrc -match "responseMimeType\s*:\s*'application/json'")) "api.
 $sysDirBody25 = ''
 try { $sysDirBody25 = Get-FunctionBody $apiSrc 'getSystemDirective' } catch { Fail "Cannot extract getSystemDirective: $_" }
 Check ([bool]($sysDirBody25 -match 'state\.gameContext'))  "getSystemDirective() reads state.gameContext (FO3 switch)"
-Check ([bool]($sysDirBody25 -match "'narrative'|`"narrative`"")) "getSystemDirective() contains 'narrative' key (AI tri-node schema)"
-Check ([bool]($sysDirBody25 -match "'state'|`"state`""))         "getSystemDirective() contains 'state' key (AI tri-node schema)"
-Check ([bool]($sysDirBody25 -match "'modal'|`"modal`""))         "getSystemDirective() contains 'modal' key (AI tri-node schema)"
+# U1: the schema literals live in _directivePersonaAndContract() now -- check the
+# full composed directive body, not just getSystemDirective()'s own short body.
+$fullDirBody25 = Get-DirectiveFullBody $apiSrc
+Check ([bool]($fullDirBody25 -match "'narrative'|`"narrative`"")) "getSystemDirective() contains 'narrative' key (AI tri-node schema)"
+Check ([bool]($fullDirBody25 -match "'state'|`"state`""))         "getSystemDirective() contains 'state' key (AI tri-node schema)"
+Check ([bool]($fullDirBody25 -match "'modal'|`"modal`""))         "getSystemDirective() contains 'modal' key (AI tri-node schema)"
 
 # ===========================================================
 # Suite 26 -- Architectural Boundaries (Group 5)
@@ -1740,7 +1764,7 @@ Check ($waitLoadIdx -ge 0 -and $waitSaveIdx -ge 0 -and $waitLoadIdx -lt $waitSav
 # Suite 43 -- GAME_DEFS Structural Integrity (Phase 5b)
 # Aggregation layer: GAME_DEFS in state.js + _activeDef() helper.
 # Collapses FNV/FO3 ternaries into config lookups; zero behavior change.
-# 10 tests
+# 11 tests
 # ===========================================================
 Sep "Suite 43 -- GAME_DEFS Structural Integrity (Phase 5b)"
 $stateSrc43 = Read-Src 'js/state.js'
@@ -1766,6 +1790,11 @@ Check ([bool]($stateSrc43 -match 'skillSystemText\s*:') -and `
        [bool]($stateSrc43 -match 'factionSystemText\s*:') -and `
        [bool]($stateSrc43 -match 'irreversibleTriggers\s*:')) `
     'GAME_DEFS ai sub-object has skillSystemText, factionSystemText, irreversibleTriggers'
+
+# 43.5b  U1 (Step 2 Phase 0): GAME_DEFS ai sub-object also has trackerDirectives
+#        (the GA-5 retirement seam -- replaces the old inline per-game ternaries)
+Check ([bool]($stateSrc43 -match 'trackerDirectives\s*:')) `
+    'GAME_DEFS ai sub-object has trackerDirectives (U1 GA-5 retirement seam)'
 
 # 43.6  FNV calendar startYear = 2281
 Check ([bool]($stateSrc43 -match 'startYear\s*:\s*2281')) `
@@ -2885,7 +2914,9 @@ Sep "Suite 54 -- Prompt-Injection Hardening, Input Caps, Quota Warning"
 $apiSrc54  = Read-Src "js/api.js"
 $stateSrc54 = Read-Src "js/state.js"
 $htmlSrc54 = Read-Src "index.html"
-$gsdBody54 = Get-FunctionBody $apiSrc54 'getSystemDirective'
+# U1: the injection-resistance copy lives in _directiveInjectionBoundary() now --
+# check the full composed directive body, not getSystemDirective()'s own short body.
+$gsdBody54 = Get-DirectiveFullBody $apiSrc54
 $tmBody54  = Get-FunctionBody $apiSrc54 'transmitMessage'
 $saveStateFn54 = Get-FunctionBody $stateSrc54 'saveState'
 
@@ -3973,9 +4004,11 @@ Check ([bool]($htmlSrc -match 'id="lincolnMemorabiliaDisplay"')) `
     'index.html has #lincolnMemorabiliaDisplay container (Protocol 5 panel element)'
 
 # 66.17  getSystemDirective() mentions lincolnItems in FO3 context
+#  U1: the Lincoln tracker text is now data (GAME_DEFS.FO3.ai.trackerDirectives in
+#  state.js), read by _directiveTrackers() in api.js -- check both sources.
 $sdBody66 = ''
-try { $sdBody66 = Get-FunctionBody $apiSrc66 'getSystemDirective' } catch {}
-Check ([bool]($sdBody66 -match 'lincolnItems')) `
+try { $sdBody66 = Get-DirectiveFullBody $apiSrc66 } catch {}
+Check ([bool]($sdBody66 -match 'lincolnItems') -or [bool]($stateSrc66 -match 'lincolnItems')) `
     'getSystemDirective() references lincolnItems (Protocol 14 -- AI contract updated for new state field)'
 
 # 66.18  LINCOLN_VOCAB in api.js does NOT include 'other' (Change 2 regression guard)
@@ -4089,9 +4122,11 @@ Check ($perksIdx67 -ne -1 -and $traitsIdx67 -ne -1 -and $traitsIdx67 -gt $perksI
     'index.html: #traitsDisplay is inside the Perks panel (after #perksList); no standalone TRAITS <details class="panel"> -- distinct IDs preserved'
 
 # 67.17  getSystemDirective() references state.traits (Protocol 14)
+#  U1: the Traits tracker text is now data (GAME_DEFS.FNV.ai.trackerDirectives in
+#  state.js), read by _directiveTrackers() in api.js -- check both sources.
 $sdBody67 = ''
-try { $sdBody67 = Get-FunctionBody $apiSrc67 'getSystemDirective' } catch {}
-Check ([bool]($sdBody67 -match 'state\.traits')) `
+try { $sdBody67 = Get-DirectiveFullBody $apiSrc67 } catch {}
+Check ([bool]($sdBody67 -match 'state\.traits') -or [bool]($stateSrc67 -match 'state\.traits')) `
     'getSystemDirective() references state.traits (Protocol 14 -- AI contract updated for new state field)'
 
 # 67.18  index.html has #traitFilter input (trait name filter)
@@ -5372,8 +5407,10 @@ try { $importBody85 = Get-FunctionBody $apiSrc85 'autoImportState' } catch {}
 Check ($importBody85 -match 'skillBooks' -and $importBody85 -match 'FALLOUT_REGISTRY\.skillBooks' -and $importBody85 -match 'bookNames') "autoImportState() validates skillBooks array and filters against FALLOUT_REGISTRY.skillBooks names (Protocol 24)"
 
 # 85.13  getSystemDirective() mentions state.skillBooks (Protocol 14)
+# U1: the (unconditional, both-games) Skill Books text lives in
+# _directiveTrackers() now -- check the full composed directive body.
 $sdBody85 = ''
-try { $sdBody85 = Get-FunctionBody $apiSrc85 'getSystemDirective' } catch {}
+try { $sdBody85 = Get-DirectiveFullBody $apiSrc85 } catch {}
 Check ($sdBody85 -match 'state\.skillBooks') "getSystemDirective() references state.skillBooks (Protocol 14 -- AI contract updated)"
 
 # 85.14  renderSkillBooks() defined in ui-render.js
@@ -5556,9 +5593,10 @@ Check ([bool]($stateSrc87 -match 'hasMagazines\s*:\s*true')) "GAME_DEFS.FNV.hasM
 Check ([bool]($idxSrc87 -match 'id="magazinesDisplay"')) "index.html has #magazinesDisplay container for renderMagazines()"
 
 # 87.25  getSystemDirective references magazines in FNV-only context
-$sdStart87 = $apiSrc87.IndexOf('function getSystemDirective()')
-$sdEnd87   = $apiSrc87.IndexOf("`nfunction ", $sdStart87 + 1)
-$sdBody87  = if ($sdStart87 -ge 0) { $apiSrc87.Substring($sdStart87, $sdEnd87 - $sdStart87) } else { "" }
+#  U1: the Skill Magazines tracker text is now data
+#  (GAME_DEFS.FNV.ai.trackerDirectives in state.js), read by _directiveTrackers()
+#  in api.js -- the literal copy lives in state.js, not api.js, post-refactor.
+$sdBody87 = (Get-DirectiveFullBody $apiSrc87) + "`n" + $stateSrc87
 Check (($sdBody87 -match 'magazines') -and ($sdBody87 -match 'FNV')) "getSystemDirective() references magazines in FNV-only context (Protocol 4 AI contract)"
 
 # ===========================================================
@@ -5624,7 +5662,7 @@ Check (($badgesBody88 -match 'SKILL BOOKS') -and ($badgesBody88 -match 'SKILL MA
 Check ([bool]($cssSrc88 -match 'button\.tracker-toggle')) "GATE-UI-8: terminal.css defines button.tracker-toggle class (keyboard-accessible tracker button per Protocol 17)"
 
 # ===========================================================
-# Suite 89 -- GATE-AGNOSTIC: game-agnostic refactor guards (14 tests)
+# Suite 89 -- GATE-AGNOSTIC: game-agnostic refactor guards (16 tests)
 # ===========================================================
 Sep "Suite 89 -- GATE-AGNOSTIC: game-agnostic refactor guards"
 
@@ -5704,6 +5742,18 @@ Check ([bool](($htmlSrc89 -match 'GAME_FILES\s*=\s*\{[\s\S]*FNV[\s\S]*FO3[\s\S]*
 # 89.14  index.html: the old hardcoded per-game boot ternary is gone (GA-1 fixed)
 Check (-not ($htmlSrc89 -match "ctx\s*===\s*'FO3'\s*\?")) `
     "GATE-AGNOSTIC-14: index.html boot loader has no hardcoded ctx === 'FO3' ? per-game file ternary -- GA-1 fixed (WU-A5)"
+
+# 89.15  U1/GA-5 negative guard: api.js has no ctx === 'FO3'/'FNV' ? ternary anywhere
+#        (the old Lincoln/Traits/Magazines directive ternaries are fully retired).
+Check (-not ($apiSrc89 -match "ctx\s*===\s*'(FO3|FNV)'\s*\?")) `
+    "GATE-AGNOSTIC-15: api.js has no ctx === 'FO3'/'FNV' ? ternary anywhere -- GA-5 fixed (U1)"
+
+# 89.16  U1/GA-5 positive guard: GAME_DEFS[ctx].ai.trackerDirectives exists for both
+#        games and is the data source _directiveTrackers() reads from (not a literal).
+Check (([bool]($stateSrc89 -match '(?s)FNV:\s*\{.*?trackerDirectives\s*:')) -and `
+       ([bool]($stateSrc89 -match '(?s)FO3:\s*\{.*?trackerDirectives\s*:')) -and `
+       ([bool]($apiSrc89 -match [regex]::Escape("GAME_DEFS[ctx].ai && GAME_DEFS[ctx].ai.trackerDirectives")))) `
+    'GATE-AGNOSTIC-16: GAME_DEFS.FNV/.FO3.ai.trackerDirectives exist and _directiveTrackers() reads from them -- GA-5 data-driven trackers (U1)'
 
 # ===========================================================
 # Suite 90 -- UTF-8 CORRUPTION GUARD: no symbol double-encoding (11 tests)
@@ -8032,6 +8082,154 @@ Check ((-not ($opticCode130 -match '\bFO3\b')) -and (-not ($opticCode130 -match 
 # 130.8  ui-saves export reads the per-game resolved optic, not the global key
 Check (($saves130 -match '_resolveOptic\(\)') -and (-not ($saves130 -match "getItem\('robco_optics'\)"))) `
     '130.8: ui-saves export reads the per-game resolved optic (_resolveOptic), not the global robco_optics'
+
+# ===========================================================
+# Suite 131 -- U1: getSystemDirective() decomposition + GA-5 retirement
+# (Step 2 / v2.8.0 Phase 0). Structural guards that the directive is now
+# composed from named per-section builders, plus a Protocol 14 golden-master
+# behavioral test (shells out to node -- mirrors the Suite 12 pattern): the
+# REAL builders (extracted from js/api.js) + the REAL GAME_DEFS (loaded from
+# js/state.js) are evaluated across the same 11-point state matrix as the JS
+# runner and the SHA-256 of each assembled directive is asserted against the
+# pre-refactor golden hash -- proving byte-identical output.
+# 15 tests
+# ===========================================================
+Sep "Suite 131 -- U1 directive decomposition + GA-5 retirement (golden-master)"
+$apiSrc131 = Read-Src "js/api.js"
+$builderNames131 = @(
+    '_directiveConstraints', '_directivePersonaAndContract', '_directiveCoreTracking',
+    '_directiveSkills', '_directiveFactions', '_directiveSystems',
+    '_directiveTrackers', '_directiveInjectionBoundary'
+)
+
+# 131.1  every named per-section builder is a real function declaration in api.js
+$allBuildersDeclared131 = $true
+foreach ($n in $builderNames131) {
+    if (-not ($apiSrc131 -match "function $n\s*\(")) { $allBuildersDeclared131 = $false }
+}
+Check $allBuildersDeclared131 'api.js declares all 8 per-section directive builder functions (U1 decomposition)'
+
+# 131.2  getSystemDirective() composes the 7 top-level builders (not the old
+#        monolithic body). _directiveConstraints is called one level down, from
+#        inside _directivePersonaAndContract -- not directly from getSystemDirective.
+$sdBody131 = ''
+try { $sdBody131 = Get-FunctionBody $apiSrc131 'getSystemDirective' } catch {}
+$topLevelBuilders131 = $builderNames131 | Where-Object { $_ -ne '_directiveConstraints' }
+$allCalled131 = $true
+foreach ($n in $topLevelBuilders131) {
+    if ($sdBody131 -notmatch [regex]::Escape("$n(")) { $allCalled131 = $false }
+}
+Check $allCalled131 'getSystemDirective() calls every top-level per-section builder in its composition'
+
+# 131.3  getSystemDirective() still has exactly one real call site (the AI request
+#        payload in transmitMessage) -- matches the exact call-site text, not the
+#        declaration or the explanatory comments that also name the function.
+$realCallSites131 = [regex]::Matches($apiSrc131, [regex]::Escape('text: getSystemDirective()')).Count
+Check ($realCallSites131 -eq 1) "getSystemDirective() has exactly one real call site in api.js (found $realCallSites131) -- no runtime call-site change"
+
+# 131.4  Protocol 14: the Tri-Node schema literals survive inside the persona
+#        builder (narrative/state/modal node contract still intact post-refactor)
+$personaBody131 = ''
+try { $personaBody131 = Get-FunctionBody $apiSrc131 '_directivePersonaAndContract' } catch {}
+Check (($personaBody131 -match '"narrative"') -and ($personaBody131 -match '"state"') -and ($personaBody131 -match '"modal"')) `
+    'Protocol 14: _directivePersonaAndContract() retains the narrative/state/modal Tri-Node schema literals'
+
+# 131.5-131.15  Protocol 14 golden-master: the REAL builders + REAL GAME_DEFS,
+#  evaluated via node (vm sandbox), must reproduce the pre-refactor SHA-256 hash
+#  for the same 11-point state matrix as the JS runner (both games, every
+#  playthroughType branch, both playstyle branches, both campaignMode active
+#  states, and a combined-modifiers case).
+$goldenLabels131 = @(
+    "golden-master FNV ps=(unset) pt=(unset) cm=(unset): byte-identical to pre-refactor directive",
+    "golden-master FNV ps=melee pt=(unset) cm=(unset): byte-identical to pre-refactor directive",
+    "golden-master FNV ps=(unset) pt=minmaxed cm=(unset): byte-identical to pre-refactor directive",
+    "golden-master FNV ps=(unset) pt=completionist cm=(unset): byte-identical to pre-refactor directive",
+    "golden-master FNV ps=(unset) pt=casual cm=(unset): byte-identical to pre-refactor directive",
+    "golden-master FNV ps=(unset) pt=speedrun cm=(unset): byte-identical to pre-refactor directive",
+    "golden-master FNV ps=(unset) pt=(unset) cm=rng: byte-identical to pre-refactor directive",
+    "golden-master FNV ps=(unset) pt=(unset) cm=rng-locked: byte-identical to pre-refactor directive",
+    "golden-master FNV ps=melee pt=minmaxed cm=rng-locked: byte-identical to pre-refactor directive",
+    "golden-master FO3 ps=(unset) pt=(unset) cm=(unset): byte-identical to pre-refactor directive",
+    "golden-master FO3 ps=melee pt=(unset) cm=rng-locked: byte-identical to pre-refactor directive"
+)
+try {
+    $nodeCheck131 = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCheck131) {
+        $apiPathNode131 = (Join-Path $Root "js/api.js").Replace('\', '/')
+        $statePathNode131 = (Join-Path $Root "js/state.js").Replace('\', '/')
+        $testScript131 = @"
+const fs = require('fs');
+const vm = require('vm');
+const crypto = require('crypto');
+const apiSource = fs.readFileSync('$apiPathNode131', 'utf8');
+const stateSource = fs.readFileSync('$statePathNode131', 'utf8');
+function extractFunctionDecl(src, name) {
+  const idx = src.indexOf('function ' + name);
+  if (idx === -1) throw new Error('not found: ' + name);
+  const parenStart = src.indexOf('(', idx);
+  const braceStart = src.indexOf('{', parenStart);
+  let depth = 0, i = braceStart;
+  for (; i < src.length; i++) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) break; }
+  }
+  return src.slice(idx, i + 1);
+}
+const fnNames = [
+  '_directiveConstraints', '_directivePersonaAndContract', '_directiveCoreTracking',
+  '_directiveSkills', '_directiveFactions', '_directiveSystems',
+  '_directiveTrackers', '_directiveInjectionBoundary', 'getSystemDirective',
+];
+const allFnSrc = fnNames.map(n => extractFunctionDecl(apiSource, n)).join('\n\n');
+const stateSandbox = { window: {} };
+vm.createContext(stateSandbox);
+vm.runInContext(stateSource, stateSandbox);
+const sandbox = {
+  state: {}, GAME_DEFS: stateSandbox.window.GAME_DEFS,
+  APP_VERSION: stateSandbox.window.APP_VERSION || '2.7.0',
+  localStorage: { getItem: () => null }, _commGet: (f) => null, console,
+};
+vm.createContext(sandbox);
+vm.runInContext(allFnSrc + '\nthis.getSystemDirective = getSystemDirective;', sandbox);
+const matrix = [
+  { ctx: 'FNV', ps: undefined, pt: undefined, cm: undefined, sha256: '43ba2269826e0ca98a7b5bc48838ae7653f71048bcdd390e648bfc0cf2bdd6c3' },
+  { ctx: 'FNV', ps: 'melee',   pt: undefined, cm: undefined, sha256: '35c46ce000bc91317519d4101cb98a1a28faa62d3d325b6037287860f1e09070' },
+  { ctx: 'FNV', ps: undefined, pt: 'minmaxed', cm: undefined, sha256: '00ea973101a6d4f2e9e8cc60ef7ea8d117b52f4015f41e7fa74b2de6a67438c0' },
+  { ctx: 'FNV', ps: undefined, pt: 'completionist', cm: undefined, sha256: '84b338539b93308cdda12a0263b00aa3d8eacb99f898121a3935e956a43398c8' },
+  { ctx: 'FNV', ps: undefined, pt: 'casual', cm: undefined, sha256: '1b1a56e86215fdc1329adce6529ddb634e0b6ed39563e5cd993f926feaf2c983' },
+  { ctx: 'FNV', ps: undefined, pt: 'speedrun', cm: undefined, sha256: 'e1b08e6c0854b93c2036e060f34f96cb001c7c34a545e3da26b0ea071ab02c04' },
+  { ctx: 'FNV', ps: undefined, pt: undefined, cm: 'rng', sha256: '60d1770a7c8883ddaeedc4605b13fb242479984b2a5dcdd37476a859fc5e375b' },
+  { ctx: 'FNV', ps: undefined, pt: undefined, cm: 'rng-locked', sha256: 'd5a3fab25a2cbe2d930971500b1463aef7452ed6c6cd05d8f1b9485a19409414' },
+  { ctx: 'FNV', ps: 'melee', pt: 'minmaxed', cm: 'rng-locked', sha256: 'eda0fd7b3af855271468383da715e087201f1510b640c4256e323188d97f5fcd' },
+  { ctx: 'FO3', ps: undefined, pt: undefined, cm: undefined, sha256: 'a777dc3f306881d5c7b0369ab784b2a6904033afe695e5c2da5ad14f96f8a550' },
+  { ctx: 'FO3', ps: 'melee', pt: undefined, cm: 'rng-locked', sha256: '7ed0b0fed3d66e81a1b9fcc58561f1285dfc71231eb606968bba45562a9abc65' },
+];
+const bits = matrix.map(m => {
+  try {
+    sandbox._commGet = (f) => (f === 'playstyle' ? m.ps : null);
+    sandbox.state = { gameContext: m.ctx, playthroughType: m.pt, campaignMode: m.cm };
+    const out = sandbox.getSystemDirective.call(sandbox);
+    const hash = crypto.createHash('sha256').update(out).digest('hex');
+    return hash === m.sha256 ? '1' : '0';
+  } catch (e) { return '0'; }
+});
+console.log('RESULT:' + bits.join(''));
+"@
+        $out131 = ($testScript131 | node 2>&1 | Out-String)
+        $rm131 = [regex]::Match($out131, 'RESULT:([01]{11})')
+        if ($rm131.Success) {
+            $bits131 = $rm131.Groups[1].Value
+            for ($bi = 0; $bi -lt 11; $bi++) { Check ($bits131.Substring($bi, 1) -eq '1') $goldenLabels131[$bi] }
+        } else {
+            $err131 = if ([string]::IsNullOrWhiteSpace($out131)) { "No output from node" } else { $out131.Trim() }
+            foreach ($lbl in $goldenLabels131) { Fail "$lbl  (runtime error: $err131)" }
+        }
+    } else {
+        foreach ($lbl in $goldenLabels131) { Fail "$lbl  (node not found)" }
+    }
+} catch {
+    foreach ($lbl in $goldenLabels131) { Fail "$lbl  (harness error: $_)" }
+}
 
 # ===========================================================
 # Results

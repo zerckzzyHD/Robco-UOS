@@ -1,7 +1,7 @@
 ﻿# RobCo U.O.S. — System Architecture
 
 > **Version:** 2.7.0
-> **Last Updated:** 2026-06-30
+> **Last Updated:** 2026-07-01
 > **Purpose:** Living reference for any engineer (human or AI) working on this project.
 > This document maps every system, its dependencies, its persistence contract, and the
 > historical lessons that shaped it.
@@ -63,8 +63,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    1557-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    1557-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    1575-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    1575-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -418,6 +418,22 @@ User types command → chatInput
   → appendToChat(narrative, 'ai')            // Typewriter animation
   → autoImportState(parsedNode.state)         // Apply state changes
 ```
+
+**`getSystemDirective()` composition (Step 2 Phase 0 / U1):** the directive is
+assembled from 8 module-scope per-section builder functions in `api.js`
+(`_directivePersonaAndContract`, `_directiveCoreTracking`, `_directiveSkills`,
+`_directiveFactions`, `_directiveSystems`, `_directiveTrackers`,
+`_directiveInjectionBoundary`, plus the internal `_directiveConstraints` helper),
+composed via a single array-join in original section order. The per-game tracker
+text (FNV: Traits + Skill Magazines; FO3: Lincoln Memorabilia) is no longer an
+inline `ctx === 'FO3'/'FNV' ?` ternary — it is data-driven via
+`GAME_DEFS[ctx].ai.trackerDirectives` (`state.js`), read by `_directiveTrackers()`.
+A future game with no trackers supplies `trackerDirectives: ''` (or omits the
+field) — zero code changes to the builders. A Protocol 14 golden-master test
+(Suite 131, both runners) evaluates the real builders + real `GAME_DEFS` across
+an 11-point state matrix (both games × every playstyle/playthroughType/
+campaignMode branch) and asserts SHA-256 equality against the pre-refactor
+output, proving the decomposition is byte-identical.
 
 ### Inbound (autoImportState in api.js)
 
@@ -957,7 +973,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1557-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1575-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

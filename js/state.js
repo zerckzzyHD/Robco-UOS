@@ -378,6 +378,20 @@ const GAME_DEFS = {
 - Detonating Nipton bombs (NCR infamy spike — permanent reputation floor)
 - Completing "Ring-a-Ding-Ding!" (Benny becomes inaccessible after)
 - Any quest that permanently closes another quest branch (Lonesome Road choices, etc.)`,
+      // U1 (Step 2 Phase 0) GA-5 retirement: the AI-directive text for FNV's two
+      // trackers (Traits + Skill Magazines), consumed by _directiveTrackers() in
+      // api.js. The leading/trailing blank lines are intentional — they reproduce
+      // the exact whitespace the old FNV-conditional ternary chain produced (verified
+      // byte-identical by the Suite 131 golden-master test); do not "clean up".
+      trackerDirectives: `
+
+### **Traits Tracker (FNV only)**
+state.traits is a string[] of the Courier's chosen traits (normally max 2 at character creation; Old World Blues allows re-selection via the Sink).
+Update state.traits when the Courier gains, re-selects, or removes a trait. Include only names exactly as defined in the trait registry. Omit this field entirely for FO3.
+
+### **Skill Magazines Tracker (FNV only)**
+state.magazines is a string[] of skill magazine titles the Courier has read (each gives a temporary +10 skill boost, or Critical Chance for True Police Stories).
+Update state.magazines when the Courier reads a skill magazine. Include only names exactly as defined in the FNV magazine registry. Omit this field entirely for FO3.`,
     },
   },
   FO3: {
@@ -462,6 +476,18 @@ const GAME_DEFS = {
 - Destroying Megaton (permanent loss of town and Moira's full quest line)
 - Turning on the Purifier prematurely (activates endgame sequence)
 - Killing neutral/friendly NPCs with karma impacts above 50`,
+      // U1 (Step 2 Phase 0) GA-5 retirement: the AI-directive text for FO3's one
+      // tracker (Lincoln Memorabilia). The trailing blank lines are intentional —
+      // they reproduce the exact whitespace the old FO3-conditional ternary chain
+      // produced (verified byte-identical by the Suite 131 golden-master test);
+      // do not "clean up".
+      trackerDirectives: `### **Lincoln Memorabilia Tracker (FO3 only)**
+state.lincolnItems maps each collected Lincoln artifact name to its disposition: found (have it, undecided) | hannibal (gave/sold to Hannibal Hamlin, Temple of the Union) | leroy (sold to Leroy Walker, Lincoln Memorial) | washington (sold to Abraham Washington, Rivet City) | other (kept/dropped/sold to generic trader).
+Update state.lincolnItems when the Courier acquires or sells any Lincoln artifact. Omit this field entirely for FNV.
+
+
+
+`,
     },
   },
 };

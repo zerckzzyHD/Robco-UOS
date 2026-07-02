@@ -94,6 +94,35 @@ function extractFunctionBody(source, fnName) {
   throw new Error(`Unclosed brace for function "${fnName}"`);
 }
 
+// U1 (Step 2 Phase 0): getSystemDirective() was decomposed into 8 per-section
+// builder functions — the AI directive TEXT now lives across all of them, not in
+// getSystemDirective()'s own (now-short, composition-only) body. Any test that
+// checks directive CONTENT (schema keys, tracker text, injection-resistance
+// copy, etc.) must search the concatenation of every builder body, not just
+// extractFunctionBody(src, 'getSystemDirective'). Tests that check
+// getSystemDirective()'s own logic (ctx resolution, no-localStorage-read, call
+// count) should keep using extractFunctionBody('getSystemDirective') directly.
+const DIRECTIVE_BUILDER_NAMES = [
+  'getSystemDirective',
+  '_directiveConstraints',
+  '_directivePersonaAndContract',
+  '_directiveCoreTracking',
+  '_directiveSkills',
+  '_directiveFactions',
+  '_directiveSystems',
+  '_directiveTrackers',
+  '_directiveInjectionBoundary',
+];
+function getDirectiveFullBody(src) {
+  return DIRECTIVE_BUILDER_NAMES.map(n => {
+    try {
+      return extractFunctionBody(src, n);
+    } catch (_) {
+      return '';
+    }
+  }).join('\n');
+}
+
 // Extract a `window.NAME = [async ]function (params) { body }` assignment so it can
 // be reconstructed and evaluated in isolation (the window-assigned analogue of
 // extractFunctionBody). Returns { isAsync, params, body }.
@@ -1583,16 +1612,19 @@ assert(
     /state\.gameContext/.test(sysDirBody),
     'getSystemDirective() reads state.gameContext (FO3 switch)'
   );
+  // U1: the schema literals live in _directivePersonaAndContract() now — check the
+  // full composed directive body, not just getSystemDirective()'s own short body.
+  const fullDirBody25 = getDirectiveFullBody(apiSource);
   assert(
-    /'narrative'/.test(sysDirBody) || /"narrative"/.test(sysDirBody),
+    /'narrative'/.test(fullDirBody25) || /"narrative"/.test(fullDirBody25),
     "getSystemDirective() contains 'narrative' key (AI tri-node schema)"
   );
   assert(
-    /'state'/.test(sysDirBody) || /"state"/.test(sysDirBody),
+    /'state'/.test(fullDirBody25) || /"state"/.test(fullDirBody25),
     "getSystemDirective() contains 'state' key (AI tri-node schema)"
   );
   assert(
-    /'modal'/.test(sysDirBody) || /"modal"/.test(sysDirBody),
+    /'modal'/.test(fullDirBody25) || /"modal"/.test(fullDirBody25),
     "getSystemDirective() contains 'modal' key (AI tri-node schema)"
   );
 }
@@ -2921,7 +2953,7 @@ header('Native Command Router (Phase 5a)');
 //  SUITE 43 — GAME_DEFS Structural Integrity (Phase 5b)
 //  Aggregation layer: GAME_DEFS in state.js + _activeDef() helper.
 //  Collapses FNV/FO3 ternaries into config lookups; zero behavior change.
-//  10 tests
+//  11 tests
 // ══════════════════════════════════════════════════════════════
 header('GAME_DEFS Structural Integrity (Phase 5b)');
 {
@@ -2953,6 +2985,13 @@ header('GAME_DEFS Structural Integrity (Phase 5b)');
       /factionSystemText\s*:/.test(stateSrc43) &&
       /irreversibleTriggers\s*:/.test(stateSrc43),
     'GAME_DEFS ai sub-object has skillSystemText, factionSystemText, irreversibleTriggers'
+  );
+
+  // 43.5b  U1 (Step 2 Phase 0): GAME_DEFS ai sub-object also has trackerDirectives
+  //        (the GA-5 retirement seam — replaces the old inline per-game ternaries)
+  assert(
+    /trackerDirectives\s*:/.test(stateSrc43),
+    'GAME_DEFS ai sub-object has trackerDirectives (U1 GA-5 retirement seam)'
   );
 
   // 43.6  FNV calendar startYear = 2281
@@ -5109,7 +5148,9 @@ header('Suite 54 — Prompt-Injection Hardening, Input Caps, Quota Warning');
   const apiSrc54 = readFile('js/api.js');
   const stateSrc54 = readFile('js/state.js');
   const htmlSource54 = readFile('index.html');
-  const gsdBody54 = extractFunctionBody(apiSrc54, 'getSystemDirective');
+  // U1: the injection-resistance copy lives in _directiveInjectionBoundary() now —
+  // check the full composed directive body, not getSystemDirective()'s own short body.
+  const gsdBody54 = getDirectiveFullBody(apiSrc54);
   const tmBody54 = extractFunctionBody(apiSrc54, 'transmitMessage');
   const saveStateFn54 = extractFunctionBody(stateSrc54, 'saveState');
 
@@ -6876,13 +6917,15 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   );
 
   // 66.17  getSystemDirective() mentions lincolnItems in FO3 context
+  //  U1: the Lincoln tracker text is now data (GAME_DEFS.FO3.ai.trackerDirectives in
+  //  state.js), read by _directiveTrackers() in api.js — check both sources.
   {
     let sdBody = '';
     try {
-      sdBody = extractFunctionBody(apiSrc66, 'getSystemDirective');
+      sdBody = getDirectiveFullBody(apiSrc66);
     } catch (_) {}
     assert(
-      /lincolnItems/.test(sdBody),
+      /lincolnItems/.test(sdBody) || /lincolnItems/.test(stateSrc66),
       'getSystemDirective() references lincolnItems (Protocol 14 — AI contract updated for new state field)'
     );
   }
@@ -7076,13 +7119,15 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   }
 
   // 67.17  getSystemDirective() mentions traits (Protocol 14 — AI contract updated)
+  //  U1: the Traits tracker text is now data (GAME_DEFS.FNV.ai.trackerDirectives in
+  //  state.js), read by _directiveTrackers() in api.js — check both sources.
   {
     let sdBody67 = '';
     try {
-      sdBody67 = extractFunctionBody(apiSrc67, 'getSystemDirective');
+      sdBody67 = getDirectiveFullBody(apiSrc67);
     } catch (_) {}
     assert(
-      /state\.traits/.test(sdBody67),
+      /state\.traits/.test(sdBody67) || /state\.traits/.test(stateSrc67),
       'getSystemDirective() references state.traits (Protocol 14 — AI contract updated for new state field)'
     );
   }
@@ -9341,10 +9386,12 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   }
 
   // 85.13  getSystemDirective() mentions state.skillBooks (Protocol 14 — AI contract)
+  //  U1: the (unconditional, both-games) Skill Books text lives in
+  //  _directiveTrackers() now — check the full composed directive body.
   {
     let sdBody85 = '';
     try {
-      sdBody85 = extractFunctionBody(apiSrc85, 'getSystemDirective');
+      sdBody85 = getDirectiveFullBody(apiSrc85);
     } catch (_) {}
     assert(
       /state\.skillBooks/.test(sdBody85),
@@ -9728,9 +9775,10 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   );
 
   // 87.25  getSystemDirective references magazines in FNV-only context
-  const sdStart87 = apiSrc87.indexOf('function getSystemDirective()');
-  const sdEnd87 = apiSrc87.indexOf('\nfunction ', sdStart87 + 1);
-  const sdBody87 = sdStart87 >= 0 ? apiSrc87.slice(sdStart87, sdEnd87) : '';
+  //  U1: the Skill Magazines tracker text is now data
+  //  (GAME_DEFS.FNV.ai.trackerDirectives in state.js), read by _directiveTrackers()
+  //  in api.js — the literal copy lives in state.js, not api.js, post-refactor.
+  const sdBody87 = getDirectiveFullBody(apiSrc87) + '\n' + stateSrc87;
   assert(
     /magazines/.test(sdBody87) && /FNV/.test(sdBody87),
     'getSystemDirective() references magazines in FNV-only context (Protocol 4 AI contract)'
@@ -9832,7 +9880,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 89 — GATE-AGNOSTIC: game-agnostic refactor guards (14 tests)
+//  Suite 89 — GATE-AGNOSTIC: game-agnostic refactor guards (16 tests)
 // ══════════════════════════════════════════════════════════════
 {
   const apiSrc89 = fs.readFileSync(path.join(__dirname, '../js/api.js'), 'utf8');
@@ -9961,6 +10009,22 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   assert(
     !/ctx\s*===\s*'FO3'\s*\?/.test(htmlSrc89),
     "GATE-AGNOSTIC-14: index.html boot loader has no hardcoded ctx === 'FO3' ? per-game file ternary — GA-1 fixed (WU-A5)"
+  );
+
+  // 89.15  U1/GA-5 negative guard: api.js has no ctx === 'FO3'/'FNV' ? ternary anywhere
+  //        (the old Lincoln/Traits/Magazines directive ternaries are fully retired).
+  assert(
+    !/ctx\s*===\s*'(FO3|FNV)'\s*\?/.test(apiSrc89),
+    "GATE-AGNOSTIC-15: api.js has no ctx === 'FO3'/'FNV' ? ternary anywhere — GA-5 fixed (U1)"
+  );
+
+  // 89.16  U1/GA-5 positive guard: GAME_DEFS[ctx].ai.trackerDirectives exists for both
+  //        games and is the data source _directiveTrackers() reads from (not a literal).
+  assert(
+    /FNV:\s*\{[\s\S]*?trackerDirectives\s*:/.test(stateSrc89) &&
+      /FO3:\s*\{[\s\S]*?trackerDirectives\s*:/.test(stateSrc89) &&
+      /GAME_DEFS\[ctx\]\.ai\s*&&\s*GAME_DEFS\[ctx\]\.ai\.trackerDirectives/.test(apiSrc89),
+    'GATE-AGNOSTIC-16: GAME_DEFS.FNV/.FO3.ai.trackerDirectives exist and _directiveTrackers() reads from them — GA-5 data-driven trackers (U1)'
   );
 }
 
@@ -14222,6 +14286,219 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     /_resolveOptic\(\)/.test(saves130) && !/getItem\('robco_optics'\)/.test(saves130),
     '130.8: ui-saves export reads the per-game resolved optic (_resolveOptic), not the global robco_optics'
   );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 131 — U1: getSystemDirective() decomposition + GA-5 retirement
+//  (Step 2 / v2.8.0 Phase 0). Structural guards that the directive is now
+//  composed from named per-section builders, plus a Protocol 14 golden-master
+//  VM behavioral test: the REAL builders (extracted from js/api.js) + the REAL
+//  GAME_DEFS (loaded from js/state.js in a vm sandbox) are evaluated across an
+//  11-point state matrix (both games x every playstyle/playthroughType/
+//  campaignMode branch) and the SHA-256 of each assembled directive is asserted
+//  against the pre-refactor golden hash — proving byte-identical output.
+//  15 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 131 — U1 directive decomposition + GA-5 retirement (golden-master)');
+  const apiSrc131 = apiSource;
+
+  const builderNames131 = [
+    '_directiveConstraints',
+    '_directivePersonaAndContract',
+    '_directiveCoreTracking',
+    '_directiveSkills',
+    '_directiveFactions',
+    '_directiveSystems',
+    '_directiveTrackers',
+    '_directiveInjectionBoundary',
+  ];
+
+  // 131.1  every named per-section builder is a real function declaration in api.js
+  assert(
+    builderNames131.every(n => new RegExp(`function ${n}\\s*\\(`).test(apiSrc131)),
+    'api.js declares all 8 per-section directive builder functions (U1 decomposition)'
+  );
+
+  // 131.2  getSystemDirective() composes the 7 top-level builders (not the old
+  //        monolithic body). _directiveConstraints is called one level down, from
+  //        inside _directivePersonaAndContract — not directly from getSystemDirective.
+  {
+    let sdBody131 = '';
+    try {
+      sdBody131 = extractFunctionBody(apiSrc131, 'getSystemDirective');
+    } catch (_) {}
+    const topLevelBuilders131 = builderNames131.filter(n => n !== '_directiveConstraints');
+    assert(
+      topLevelBuilders131.every(n => sdBody131.includes(n + '(')),
+      'getSystemDirective() calls every top-level per-section builder in its composition'
+    );
+  }
+
+  // 131.3  getSystemDirective() still has exactly one real call site (the AI request
+  //        payload in transmitMessage) — no signature/call-site change from the
+  //        decomposition. Matches the exact call-site text, not the declaration or
+  //        the explanatory comments that also name the function.
+  {
+    const realCallSites131 = (apiSrc131.match(/text:\s*getSystemDirective\(\)/g) || []).length;
+    assert(
+      realCallSites131 === 1,
+      `getSystemDirective() has exactly one real call site in api.js (found ${realCallSites131}) — no runtime call-site change`
+    );
+  }
+
+  // 131.4  Protocol 14: the Tri-Node schema literals survive inside the persona
+  //        builder (narrative/state/modal node contract still intact post-refactor)
+  {
+    let personaBody131 = '';
+    try {
+      personaBody131 = extractFunctionBody(apiSrc131, '_directivePersonaAndContract');
+    } catch (_) {}
+    assert(
+      /"narrative"/.test(personaBody131) &&
+        /"state"/.test(personaBody131) &&
+        /"modal"/.test(personaBody131),
+      'Protocol 14: _directivePersonaAndContract() retains the narrative/state/modal Tri-Node schema literals'
+    );
+  }
+
+  // 131.5-131.13  Protocol 14 golden-master: the REAL builders + REAL GAME_DEFS,
+  //  evaluated in a vm sandbox, must reproduce the pre-refactor SHA-256 hash for
+  //  every state combination below (covers both games, every playthroughType
+  //  branch, both playstyle branches, both campaignMode active states, and a
+  //  combined-modifiers case). A mismatch means the refactor changed what the AI
+  //  is told — the exact regression this golden-master test exists to catch.
+  {
+    const GOLDEN_MATRIX = [
+      {
+        ctx: 'FNV',
+        ps: undefined,
+        pt: undefined,
+        cm: undefined,
+        sha256: '43ba2269826e0ca98a7b5bc48838ae7653f71048bcdd390e648bfc0cf2bdd6c3',
+      },
+      {
+        ctx: 'FNV',
+        ps: 'melee',
+        pt: undefined,
+        cm: undefined,
+        sha256: '35c46ce000bc91317519d4101cb98a1a28faa62d3d325b6037287860f1e09070',
+      },
+      {
+        ctx: 'FNV',
+        ps: undefined,
+        pt: 'minmaxed',
+        cm: undefined,
+        sha256: '00ea973101a6d4f2e9e8cc60ef7ea8d117b52f4015f41e7fa74b2de6a67438c0',
+      },
+      {
+        ctx: 'FNV',
+        ps: undefined,
+        pt: 'completionist',
+        cm: undefined,
+        sha256: '84b338539b93308cdda12a0263b00aa3d8eacb99f898121a3935e956a43398c8',
+      },
+      {
+        ctx: 'FNV',
+        ps: undefined,
+        pt: 'casual',
+        cm: undefined,
+        sha256: '1b1a56e86215fdc1329adce6529ddb634e0b6ed39563e5cd993f926feaf2c983',
+      },
+      {
+        ctx: 'FNV',
+        ps: undefined,
+        pt: 'speedrun',
+        cm: undefined,
+        sha256: 'e1b08e6c0854b93c2036e060f34f96cb001c7c34a545e3da26b0ea071ab02c04',
+      },
+      {
+        ctx: 'FNV',
+        ps: undefined,
+        pt: undefined,
+        cm: 'rng',
+        sha256: '60d1770a7c8883ddaeedc4605b13fb242479984b2a5dcdd37476a859fc5e375b',
+      },
+      {
+        ctx: 'FNV',
+        ps: undefined,
+        pt: undefined,
+        cm: 'rng-locked',
+        sha256: 'd5a3fab25a2cbe2d930971500b1463aef7452ed6c6cd05d8f1b9485a19409414',
+      },
+      {
+        ctx: 'FNV',
+        ps: 'melee',
+        pt: 'minmaxed',
+        cm: 'rng-locked',
+        sha256: 'eda0fd7b3af855271468383da715e087201f1510b640c4256e323188d97f5fcd',
+      },
+      {
+        ctx: 'FO3',
+        ps: undefined,
+        pt: undefined,
+        cm: undefined,
+        sha256: 'a777dc3f306881d5c7b0369ab784b2a6904033afe695e5c2da5ad14f96f8a550',
+      },
+      {
+        ctx: 'FO3',
+        ps: 'melee',
+        pt: undefined,
+        cm: 'rng-locked',
+        sha256: '7ed0b0fed3d66e81a1b9fcc58561f1285dfc71231eb606968bba45562a9abc65',
+      },
+    ];
+
+    const vm = require('vm');
+    const crypto = require('crypto');
+    let sandbox131 = null;
+    let harnessErr131 = null;
+    try {
+      const _declFull = (src, name) => {
+        const s = src.indexOf('function ' + name);
+        const p = src.slice(src.indexOf('(', s), src.indexOf('{', src.indexOf('(', s)));
+        return 'function ' + name + p + extractFunctionBody(src, name);
+      };
+      const allFnSrc131 = builderNames131
+        .concat(['getSystemDirective'])
+        .map(n => _declFull(apiSrc131, n))
+        .join('\n\n');
+
+      const stateSandbox131 = { window: {} };
+      vm.createContext(stateSandbox131);
+      vm.runInContext(stateSource, stateSandbox131);
+
+      sandbox131 = {
+        state: {},
+        GAME_DEFS: stateSandbox131.window.GAME_DEFS,
+        APP_VERSION: stateSandbox131.window.APP_VERSION || '2.7.0',
+        localStorage: { getItem: () => null },
+        _commGet: () => null,
+        console,
+      };
+      vm.createContext(sandbox131);
+      vm.runInContext(allFnSrc131 + '\nthis.getSystemDirective = getSystemDirective;', sandbox131);
+    } catch (e) {
+      harnessErr131 = e;
+    }
+
+    for (const m of GOLDEN_MATRIX) {
+      const label = `golden-master ${m.ctx} ps=${m.ps || '(unset)'} pt=${m.pt || '(unset)'} cm=${m.cm || '(unset)'}: byte-identical to pre-refactor directive`;
+      if (!sandbox131) {
+        fail(`${label}  (harness error: ${harnessErr131 && harnessErr131.message})`);
+        continue;
+      }
+      try {
+        sandbox131._commGet = field => (field === 'playstyle' ? m.ps : null);
+        sandbox131.state = { gameContext: m.ctx, playthroughType: m.pt, campaignMode: m.cm };
+        const out = sandbox131.getSystemDirective.call(sandbox131);
+        const hash = crypto.createHash('sha256').update(out).digest('hex');
+        assert(hash === m.sha256, label + (hash === m.sha256 ? '' : ` (got ${hash})`));
+      } catch (e) {
+        fail(`${label}  (runtime error: ${e.message})`);
+      }
+    }
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
