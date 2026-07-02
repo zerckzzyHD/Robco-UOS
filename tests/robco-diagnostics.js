@@ -17274,6 +17274,156 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 146 — Step 2 (v2.8.0) Phase 2 A1: Ambient Runtime core (14 tests)
+// ──────────────────────────────────────────────────────────────
+//  The one heartbeat + observer registry + central dial enforcement, ADDITIVE:
+//  A1 tracks the canonical terminal state (OFF→COLD_BOOT→READY→ACTIVE→IDLE→
+//  STANDBY→SHUTDOWN) in PARALLEL with the existing standby/timers, which stay
+//  untouched (A2 migrates them). Structural + boundary guards here; the state
+//  machine + observer gating + live dial gate are proven behaviorally in
+//  tests/test.html (Suite 18). Prime invariant #1 — the HARD atmosphere/save
+//  boundary — is gate-guarded by 146.12 (runtime.js writes nothing durable).
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 146 — A1 Ambient Runtime core (state machine + scheduler + observer registry)');
+  const runtime146 = readFile('js/runtime.js');
+  const sw146 = readFile('sw.js');
+  const index146 = readFile('index.html');
+  const uiCore146 = readFile('js/ui-core.js');
+  const transitionBody146 = extractFunctionBody(runtime146, 'transition');
+  const beatBody146 = extractFunctionBody(runtime146, '_beat');
+  const initRt146 = extractFunctionBody(runtime146, 'initAmbientRuntime');
+
+  // 146.1  js/runtime.js exists on disk (served file)
+  assert(
+    fs.existsSync(path.join(ROOT, 'js/runtime.js')),
+    '146.1: js/runtime.js exists on disk (A1 new served file)'
+  );
+
+  // 146.2  ./js/runtime.js is precached in sw.js ASSETS (Protocol 1 / Suite 49 completeness)
+  assert(
+    /'\.\/js\/runtime\.js'/.test(sw146),
+    "146.2: './js/runtime.js' is listed in sw.js ASSETS (PWA precaches the runtime)"
+  );
+
+  // 146.3  index.html loads runtime.js and orders it BEFORE ui-core.js (which calls
+  //        initAmbientRuntime()), consistent with the static sibling tags
+  assert(
+    /<script src="js\/runtime\.js"><\/script>/.test(index146) &&
+      index146.indexOf('js/runtime.js') < index146.indexOf('js/ui-core.js'),
+    '146.3: index.html loads js/runtime.js as a static tag ordered before js/ui-core.js'
+  );
+
+  // 146.4  window.AmbientRuntime exposes the full API surface
+  assert(
+    /window\.AmbientRuntime = AmbientRuntime/.test(runtime146) &&
+      /getState:\s*getState/.test(runtime146) &&
+      /register:\s*register/.test(runtime146) &&
+      /transition:\s*transition/.test(runtime146) &&
+      /shutdown:\s*shutdown/.test(runtime146) &&
+      /start:\s*start/.test(runtime146),
+    '146.4: runtime.js exposes window.AmbientRuntime with getState / register / transition / shutdown / start'
+  );
+
+  // 146.5  the canonical 7-state machine is present, in lifecycle order
+  assert(
+    /RUNTIME_STATES\s*=\s*\['OFF',\s*'COLD_BOOT',\s*'READY',\s*'ACTIVE',\s*'IDLE',\s*'STANDBY',\s*'SHUTDOWN'\]/.test(
+      runtime146
+    ),
+    '146.5: RUNTIME_STATES declares the canonical OFF→COLD_BOOT→READY→ACTIVE→IDLE→STANDBY→SHUTDOWN machine'
+  );
+
+  // 146.6  register() takes the documented observer spec and returns an unregister handle
+  assert(
+    /function register\(spec\)/.test(runtime146) &&
+      /spec\.cadenceMs/.test(runtime146) &&
+      /spec\.states/.test(runtime146) &&
+      /spec\.tier/.test(runtime146) &&
+      /spec\.onTick/.test(runtime146) &&
+      /spec\.onEnter/.test(runtime146) &&
+      /spec\.onExit/.test(runtime146) &&
+      /return function unregister\(\)/.test(runtime146),
+    '146.6: register({id,cadenceMs,states,tier,onTick,onEnter,onExit}) reads every spec field and returns an unregister() handle'
+  );
+
+  // 146.7  ONE heartbeat: a single setInterval scheduler + a per-observer try/catch
+  //        so one bad observer never breaks the beat or its siblings
+  assert(
+    (runtime146.match(/setInterval\(_beat,/g) || []).length === 1 &&
+      /o\.onTick\(\)/.test(beatBody146) &&
+      /try \{[\s\S]*o\.onTick\(\)[\s\S]*\} catch \(_\) \{/.test(beatBody146),
+    '146.7: one heartbeat (single setInterval(_beat)) runs every observer, each onTick wrapped in try/catch (one bad observer cannot break the beat)'
+  );
+
+  // 146.8  CENTRAL DIAL ENFORCEMENT: the runtime is the ONE place immersionAllows
+  //        is checked, re-evaluated live per beat, and it fails OPEN if unavailable
+  assert(
+    /immersionAllows/.test(runtime146) &&
+      /if \(!_allows\(o\.tier\)\) continue;/.test(beatBody146) &&
+      /typeof window\.immersionAllows === 'function' \? window\.immersionAllows\(tier\) : true/.test(
+        runtime146
+      ),
+    '146.8: the heartbeat gates every observer on _allows(tier) → immersionAllows (single enforcement point), re-evaluated live, failing open when unavailable'
+  );
+
+  // 146.9  transition() is validated (unknown target + illegal edge rejected) and
+  //        idempotent (to === from is a no-op)
+  assert(
+    /RUNTIME_STATES\.indexOf\(to\) === -1\) return false/.test(transitionBody146) &&
+      /if \(to === from\) return false/.test(transitionBody146) &&
+      /LEGAL\[from\] && LEGAL\[from\]\.indexOf\(to\) !== -1/.test(transitionBody146),
+    '146.9: transition() rejects an unknown target and an illegal edge, and is idempotent (to === from is a no-op)'
+  );
+
+  // 146.10  initAmbientRuntime() registers the ONE inert self-test observer and starts
+  assert(
+    /function initAmbientRuntime\(\)/.test(runtime146) &&
+      /window\.initAmbientRuntime = initAmbientRuntime/.test(runtime146) &&
+      /id:\s*'runtime-selftest'/.test(initRt146) &&
+      /tier:\s*'minimal'/.test(initRt146) &&
+      /states:\s*\['ACTIVE'\]/.test(initRt146) &&
+      /start\(\);/.test(initRt146),
+    "146.10: initAmbientRuntime() registers the inert 'runtime-selftest' observer (states ACTIVE, tier minimal) and starts the heartbeat"
+  );
+
+  // 146.11  wired into boot: ui-core.js window.onload calls initAmbientRuntime()
+  //         (right after _wireStandby — additive, parallel to the old standby)
+  assert(
+    /initAmbientRuntime\(\);/.test(uiCore146) &&
+      uiCore146.indexOf('_wireStandby();') < uiCore146.indexOf('initAmbientRuntime();'),
+    '146.11: window.onload calls initAmbientRuntime() (after _wireStandby — additive; the old standby/timers are untouched)'
+  );
+
+  // 146.12  HARD atmosphere/save boundary (Phase-2 prime invariant #1): runtime.js
+  //         writes NOTHING durable to the campaign — no saveState / robco_v8 /
+  //         eventLog / _logEvent / raw localStorage / campaign-state mutation
+  assert(
+    !/saveState/.test(runtime146) &&
+      !/robco_v8/.test(runtime146) &&
+      !/localStorage/.test(runtime146) &&
+      !/_logEvent/.test(runtime146) &&
+      !/eventLog/.test(runtime146) &&
+      !/\bstate\.[a-zA-Z_]/.test(runtime146),
+    '146.12: no-durable-write boundary — runtime.js never calls saveState / touches robco_v8 / localStorage / eventLog / _logEvent / campaign state (device+in-memory only)'
+  );
+
+  // 146.13  BOOT-ORDER (U7): the file is IIFE-wrapped and its cross-file reads are
+  //         typeof-guarded (fail-open), never a bare top-level call at parse time
+  assert(
+    /^\(function \(\) \{/m.test(runtime146) &&
+      /typeof window\.immersionAllows === 'function'/.test(runtime146) &&
+      /window\.RobcoEvents && typeof window\.RobcoEvents\.emit === 'function'/.test(runtime146),
+    '146.13: runtime.js top level only defines window.AmbientRuntime (IIFE-wrapped); every cross-file read (immersionAllows/RobcoEvents) is typeof-guarded and fails open (U7 boot-order lesson)'
+  );
+
+  // 146.14  game-agnostic (Protocol 38): pure lifecycle logic, no game literals
+  assert(
+    !/FNV|FO3|Fallout|New Vegas|Mojave|Capital Wasteland/.test(runtime146),
+    '146.14: the A1 Ambient Runtime is game-agnostic (no game literals — pure lifecycle logic)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail

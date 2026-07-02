@@ -21,7 +21,7 @@
     or the canonical suites change, update this file in the SAME commit and bump
     the suite count marker. The gate fails on drift.
 
-    Suites: 18
+    Suites: 19
 -->
 <html lang="en">
   <head>
@@ -171,6 +171,7 @@
     <script src="../js/reg_nv.js"></script>
     <script src="../js/registry-core.js"></script>
     <script src="../js/api.js"></script>
+    <script src="../js/runtime.js"></script>
   </head>
   <body>
     <h1>[ROBCO U.O.S. — PERSISTENCE AUDIT / RUNTIME]</h1>
@@ -1402,6 +1403,167 @@
           else MetaStore.set('robco_immersion', _prevImm);
         } catch (err) {
           assert(false, 'FATAL: P8 immersion-dial suite threw', String((err && err.stack) || err));
+        }
+
+        // ── Suite 18 — A1 Ambient Runtime (behavioral: state machine + observer
+        //    gating + LIVE dial enforcement) ────────────────────────────────────
+        // Drives window.AmbientRuntime directly (initAmbientRuntime is NOT called
+        // here — no ui-core — so there is no heartbeat/listener interference and the
+        // machine is exercised deterministically via transition() + _beat()).
+        try {
+          section('Suite 18 — A1 Ambient Runtime (state machine + observer gating + live dial)');
+          const RT = window.AmbientRuntime;
+          const _prevTier18 = MetaStore.get('robco_immersion');
+          const _ls18 = localStorage.getItem('robco_v8'); // snapshot for the no-write boundary
+
+          // 1) API surface + starts OFF with the 7 canonical states.
+          assert(
+            RT &&
+              typeof RT.getState === 'function' &&
+              typeof RT.register === 'function' &&
+              typeof RT.transition === 'function' &&
+              typeof RT.shutdown === 'function' &&
+              RT.getState() === 'OFF' &&
+              Array.isArray(RT.STATES) &&
+              RT.STATES.length === 7,
+            'API surface present; getState() starts OFF; 7 canonical states'
+          );
+
+          // 2) transition() walks OFF→COLD_BOOT→READY→ACTIVE, is idempotent, rejects illegal edges.
+          const okBoot = RT.transition('COLD_BOOT') && RT.getState() === 'COLD_BOOT';
+          const okReady = RT.transition('READY') && RT.getState() === 'READY';
+          const okActive = RT.transition('ACTIVE') && RT.getState() === 'ACTIVE';
+          const idempotent = RT.transition('ACTIVE') === false; // to === from → no-op
+          const illegal = RT.transition('COLD_BOOT') === false && RT.getState() === 'ACTIVE';
+          assert(
+            okBoot && okReady && okActive && idempotent && illegal,
+            'transition() walks OFF→COLD_BOOT→READY→ACTIVE, is idempotent (to===from), and rejects an illegal edge (ACTIVE→COLD_BOOT)'
+          );
+
+          // 3) an observer ticks only while the runtime is in one of its declared states.
+          window.setImmersionTier('full');
+          RT.noteActivity(); // keep ACTIVE (reset idle)
+          let tickA = 0;
+          const unregA = RT.register({
+            id: 't-active',
+            cadenceMs: 0,
+            states: ['ACTIVE'],
+            tier: 'minimal',
+            onTick: () => {
+              tickA++;
+            },
+          });
+          RT._beat();
+          const afterActive = tickA; // 1 — in ACTIVE
+          RT.transition('IDLE'); // ACTIVE→IDLE
+          RT._beat();
+          const afterIdle = tickA; // still 1 — not in IDLE
+          unregA();
+          assert(
+            afterActive === 1 && afterIdle === 1,
+            'an observer ticks only while the runtime is in one of its declared states (ACTIVE tick counts; IDLE beat does not)'
+          );
+
+          // 4) LIVE dial gate: at Minimal only minimal-tier observers tick; raising to Full
+          //    lets a balanced-tier observer tick on the very next beat (re-evaluated live).
+          RT.transition('ACTIVE'); // IDLE→ACTIVE
+          RT.noteActivity();
+          let tickMin = 0,
+            tickBal = 0;
+          const unregMin = RT.register({
+            id: 'd-min',
+            cadenceMs: 0,
+            states: ['ACTIVE'],
+            tier: 'minimal',
+            onTick: () => {
+              tickMin++;
+            },
+          });
+          const unregBal = RT.register({
+            id: 'd-bal',
+            cadenceMs: 0,
+            states: ['ACTIVE'],
+            tier: 'balanced',
+            onTick: () => {
+              tickBal++;
+            },
+          });
+          window.setImmersionTier('minimal');
+          RT._beat();
+          const minRow = [tickMin, tickBal]; // [1, 0]
+          window.setImmersionTier('full');
+          RT._beat();
+          const fullRow = [tickMin, tickBal]; // [2, 1]
+          unregMin();
+          unregBal();
+          assert(
+            eq(minRow, [1, 0]) && eq(fullRow, [2, 1]),
+            'dial gate enforced LIVE: at Minimal only the minimal-tier observer ticks; raising to Full lets the balanced-tier observer tick next beat'
+          );
+
+          // 5) onEnter(to)/onExit(from) fire when crossing into/out of an observer's state set.
+          let entered = null,
+            exited = null;
+          const unregE = RT.register({
+            id: 'e-test',
+            states: ['STANDBY'],
+            tier: 'minimal',
+            onEnter: to => {
+              entered = to;
+            },
+            onExit: from => {
+              exited = from;
+            },
+          });
+          RT.transition('STANDBY'); // ACTIVE→STANDBY — enters the set → onEnter
+          const enteredOk = entered === 'STANDBY';
+          RT.transition('ACTIVE'); // STANDBY→ACTIVE — leaves the set → onExit
+          const exitedOk = exited === 'STANDBY';
+          unregE();
+          assert(
+            enteredOk && exitedOk,
+            "onEnter(to)/onExit(from) fire when the runtime crosses into and out of an observer's state set"
+          );
+
+          // 6) unregister() removes an observer so it stops ticking.
+          let tickU = 0;
+          const unregU = RT.register({
+            id: 'u-test',
+            cadenceMs: 0,
+            states: ['ACTIVE'],
+            tier: 'minimal',
+            onTick: () => {
+              tickU++;
+            },
+          });
+          RT.noteActivity();
+          RT._beat();
+          const beforeUnreg = tickU; // 1
+          unregU();
+          RT._beat();
+          const afterUnreg = tickU; // still 1
+          assert(
+            beforeUnreg === 1 && afterUnreg === 1,
+            'unregister() removes an observer so it stops ticking'
+          );
+
+          // 7) shutdown() → OFF, and the whole A1 run wrote NOTHING durable to the campaign
+          //    (robco_v8 unchanged across the suite) — the hard atmosphere/save boundary.
+          RT.transition('ACTIVE');
+          RT.shutdown(); // ACTIVE→SHUTDOWN→OFF
+          const shutdownOk = RT.getState() === 'OFF';
+          const noWrite = localStorage.getItem('robco_v8') === _ls18;
+          assert(
+            shutdownOk && noWrite,
+            'shutdown() drives the machine to OFF, and driving the entire runtime never wrote the campaign save (robco_v8 unchanged) — atmosphere/save boundary'
+          );
+
+          // Restore the dial to whatever it was before this suite (no side effects).
+          if (_prevTier18 === null || _prevTier18 === undefined)
+            MetaStore.remove('robco_immersion');
+          else MetaStore.set('robco_immersion', _prevTier18);
+        } catch (err) {
+          assert(false, 'FATAL: A1 Ambient Runtime suite threw', String((err && err.stack) || err));
         }
 
         // ── Summary ──────────────────────────────────────────────────────────

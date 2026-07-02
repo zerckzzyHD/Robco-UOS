@@ -10047,6 +10047,128 @@ Check (
 ) '145.10: the P8 immersion-dial code is game-agnostic (no game literals)'
 
 # ===========================================================
+# Suite 146 -- Step 2 (v2.8.0) Phase 2 A1: Ambient Runtime core (14 tests).
+# Mirrors JS Suite 146. The one heartbeat + observer registry + central dial
+# enforcement, ADDITIVE: A1 tracks the canonical terminal state (OFF->COLD_BOOT->
+# READY->ACTIVE->IDLE->STANDBY->SHUTDOWN) in PARALLEL with the existing standby/
+# timers, which stay untouched (A2 migrates them). Structural + boundary guards
+# here; the state machine + observer gating + live dial gate are proven
+# behaviorally in tests/test.html (Suite 18). Prime invariant #1 -- the HARD
+# atmosphere/save boundary -- is gate-guarded by 146.12 (runtime.js writes
+# nothing durable).
+# ===========================================================
+Sep "Suite 146 -- A1 Ambient Runtime core (state machine + scheduler + observer registry)"
+$runtime146 = Read-Src "js/runtime.js"
+$sw146 = Read-Src "sw.js"
+$index146 = Read-Src "index.html"
+$uiCore146 = Read-Src "js/ui-core.js"
+$transitionBody146 = Get-FunctionBody $runtime146 'transition'
+$beatBody146 = Get-FunctionBody $runtime146 '_beat'
+$initRt146 = Get-FunctionBody $runtime146 'initAmbientRuntime'
+
+# 146.1  js/runtime.js exists on disk (served file)
+Check (
+    Test-Path (Join-Path $Root "js/runtime.js")
+) '146.1: js/runtime.js exists on disk (A1 new served file)'
+
+# 146.2  ./js/runtime.js is precached in sw.js ASSETS
+Check (
+    $sw146 -match "'\./js/runtime\.js'"
+) "146.2: './js/runtime.js' is listed in sw.js ASSETS (PWA precaches the runtime)"
+
+# 146.3  index.html loads runtime.js and orders it BEFORE ui-core.js
+Check (
+    ($index146 -match '<script src="js/runtime\.js"></script>') -and
+    ($index146.IndexOf('js/runtime.js') -lt $index146.IndexOf('js/ui-core.js'))
+) '146.3: index.html loads js/runtime.js as a static tag ordered before js/ui-core.js'
+
+# 146.4  window.AmbientRuntime exposes the full API surface
+Check (
+    ($runtime146 -match 'window\.AmbientRuntime = AmbientRuntime') -and
+    ($runtime146 -match 'getState:\s*getState') -and
+    ($runtime146 -match 'register:\s*register') -and
+    ($runtime146 -match 'transition:\s*transition') -and
+    ($runtime146 -match 'shutdown:\s*shutdown') -and
+    ($runtime146 -match 'start:\s*start')
+) '146.4: runtime.js exposes window.AmbientRuntime with getState / register / transition / shutdown / start'
+
+# 146.5  the canonical 7-state machine is present, in lifecycle order
+Check (
+    $runtime146 -match "RUNTIME_STATES\s*=\s*\['OFF',\s*'COLD_BOOT',\s*'READY',\s*'ACTIVE',\s*'IDLE',\s*'STANDBY',\s*'SHUTDOWN'\]"
+) '146.5: RUNTIME_STATES declares the canonical OFF->COLD_BOOT->READY->ACTIVE->IDLE->STANDBY->SHUTDOWN machine'
+
+# 146.6  register() takes the documented observer spec and returns an unregister handle
+Check (
+    ($runtime146 -match 'function register\(spec\)') -and
+    ($runtime146 -match 'spec\.cadenceMs') -and
+    ($runtime146 -match 'spec\.states') -and
+    ($runtime146 -match 'spec\.tier') -and
+    ($runtime146 -match 'spec\.onTick') -and
+    ($runtime146 -match 'spec\.onEnter') -and
+    ($runtime146 -match 'spec\.onExit') -and
+    ($runtime146 -match 'return function unregister\(\)')
+) '146.6: register({id,cadenceMs,states,tier,onTick,onEnter,onExit}) reads every spec field and returns an unregister() handle'
+
+# 146.7  ONE heartbeat: a single setInterval scheduler + a per-observer try/catch
+Check (
+    ([regex]::Matches($runtime146, 'setInterval\(_beat,').Count -eq 1) -and
+    ($beatBody146 -match 'o\.onTick\(\)') -and
+    ($beatBody146 -match '(?s)try \{.*o\.onTick\(\).*\} catch \(_\) \{')
+) '146.7: one heartbeat (single setInterval(_beat)) runs every observer, each onTick wrapped in try/catch (one bad observer cannot break the beat)'
+
+# 146.8  CENTRAL DIAL ENFORCEMENT: the ONE place immersionAllows is checked, live, fail-open
+Check (
+    ($runtime146 -match 'immersionAllows') -and
+    ($beatBody146 -match 'if \(!_allows\(o\.tier\)\) continue;') -and
+    ($runtime146 -match "typeof window\.immersionAllows === 'function' \? window\.immersionAllows\(tier\) : true")
+) '146.8: the heartbeat gates every observer on _allows(tier) -> immersionAllows (single enforcement point), re-evaluated live, failing open when unavailable'
+
+# 146.9  transition() is validated (unknown target + illegal edge rejected) and idempotent
+Check (
+    ($transitionBody146 -match 'RUNTIME_STATES\.indexOf\(to\) === -1\) return false') -and
+    ($transitionBody146 -match 'if \(to === from\) return false') -and
+    ($transitionBody146 -match 'LEGAL\[from\] && LEGAL\[from\]\.indexOf\(to\) !== -1')
+) '146.9: transition() rejects an unknown target and an illegal edge, and is idempotent (to === from is a no-op)'
+
+# 146.10  initAmbientRuntime() registers the ONE inert self-test observer and starts
+Check (
+    ($runtime146 -match 'function initAmbientRuntime\(\)') -and
+    ($runtime146 -match 'window\.initAmbientRuntime = initAmbientRuntime') -and
+    ($initRt146 -match "id:\s*'runtime-selftest'") -and
+    ($initRt146 -match "tier:\s*'minimal'") -and
+    ($initRt146 -match "states:\s*\['ACTIVE'\]") -and
+    ($initRt146 -match 'start\(\);')
+) "146.10: initAmbientRuntime() registers the inert 'runtime-selftest' observer (states ACTIVE, tier minimal) and starts the heartbeat"
+
+# 146.11  wired into boot: ui-core.js window.onload calls initAmbientRuntime() after _wireStandby
+Check (
+    ($uiCore146 -match 'initAmbientRuntime\(\);') -and
+    ($uiCore146.IndexOf('_wireStandby();') -lt $uiCore146.IndexOf('initAmbientRuntime();'))
+) '146.11: window.onload calls initAmbientRuntime() (after _wireStandby -- additive; the old standby/timers are untouched)'
+
+# 146.12  HARD atmosphere/save boundary: runtime.js writes NOTHING durable to the campaign
+Check (
+    (-not ($runtime146 -match 'saveState')) -and
+    (-not ($runtime146 -match 'robco_v8')) -and
+    (-not ($runtime146 -match 'localStorage')) -and
+    (-not ($runtime146 -match '_logEvent')) -and
+    (-not ($runtime146 -match 'eventLog')) -and
+    (-not ($runtime146 -match '\bstate\.[a-zA-Z_]'))
+) '146.12: no-durable-write boundary -- runtime.js never calls saveState / touches robco_v8 / localStorage / eventLog / _logEvent / campaign state (device+in-memory only)'
+
+# 146.13  BOOT-ORDER (U7): IIFE-wrapped; cross-file reads are typeof-guarded (fail-open)
+Check (
+    ($runtime146 -match '(?m)^\(function \(\) \{') -and
+    ($runtime146 -match "typeof window\.immersionAllows === 'function'") -and
+    ($runtime146 -match "window\.RobcoEvents && typeof window\.RobcoEvents\.emit === 'function'")
+) '146.13: runtime.js top level only defines window.AmbientRuntime (IIFE-wrapped); every cross-file read (immersionAllows/RobcoEvents) is typeof-guarded and fails open (U7 boot-order lesson)'
+
+# 146.14  game-agnostic (Protocol 38): pure lifecycle logic, no game literals
+Check (
+    -not ($runtime146 -match 'FNV|FO3|Fallout|New Vegas|Mojave|Capital Wasteland')
+) '146.14: the A1 Ambient Runtime is game-agnostic (no game literals -- pure lifecycle logic)'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

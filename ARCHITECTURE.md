@@ -55,6 +55,7 @@
 │   ├── ui-render.js    ~30KB  All render* functions, CRUD helpers, faction/map/time utilities
 │   ├── ui-saves.js     ~14KB  Save slots, file import/export, rolling backups, registry autocomplete
 │   ├── ui-account.js   ~3KB   Account panel, cloud save picker, undo-sync
+│   ├── runtime.js      ~9KB   Ambient Runtime — lifecycle state machine + one heartbeat + observer registry (Phase 2 A1)
 │   ├── ui-core.js      ~43KB  Core UI lifecycle, appendToChat, loadUI, updateMath
 │   ├── cloud.js        3.6KB  Firebase push/pull (ES module)
 │   ├── registry-core.js ~3KB  Read-only registry engine — FALLOUT_REGISTRY + registrySearch()
@@ -64,8 +65,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    1759-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    1759-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    1773-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    1773-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -223,9 +224,11 @@ Scripts are loaded via `<script>` tags in `index.html` in this exact order:
                        initRegistryAutocomplete (wireInput), initAmmoDatalist,
                        addQuest, triggerFileInput, triggerImageUpload
 7. js/ui-account.js → defines: renderAccount, renderCloudSavePicker, undoLastSync
-8. js/ui-core.js    → defines: AudioSettings, appendToChat, loadUI, updateMath, etc.
-9. js/api.js        → defines: autoImportState, transmitMessage, fetchAuthorizedModels
-10. js/cloud.js     → loaded as <script type="module"> (ES import from Firebase CDN)
+8. js/runtime.js    → defines: window.AmbientRuntime, window.initAmbientRuntime
+                       (loaded before ui-core.js; top level defines only — see Ambient Runtime below)
+9. js/ui-core.js    → defines: AudioSettings, appendToChat, loadUI, updateMath, etc.
+10. js/api.js       → defines: autoImportState, transmitMessage, fetchAuthorizedModels
+11. js/cloud.js     → loaded as <script type="module"> (ES import from Firebase CDN)
                        attaches: window.pushToCloud, window.pullFromCloud
 ```
 
@@ -241,6 +244,24 @@ its exports to `window.*` for the other scripts to call.
 **Auth (Phase 5c-i/ii):** `cloud.js` signs in anonymously on every boot (non-fatal; app stays usable offline). Firebase Auth is tracked via `onAuthStateChanged`; the current `uid` routes all Firestore reads/writes to `users/{uid}/saves/main`. Phase 5c-ii adds Google sign-in: `window.signInWithGoogle()` links the anonymous session to a Google account via popup on all platforms (redirect was removed — iOS/Android storage partitioning blocked the cross-origin iframe used to retrieve the credential, so `getRedirectResult` always returned null on mobile); `window.signOutAccount()` signs out then re-signs in anonymously; `getRedirectResult` is still called at boot to drain any in-flight redirect from a previously cached client before the anon-fallback guard runs; and `auth/credential-already-in-use` collisions fall back to `signInWithCredential`. Boot sequence is a single sequential async IIFE: `await getRedirectResult` → `await authStateReady` → anon fallback if no user. The ACCOUNT panel in the Data tab (`renderAccount()` in ui-account.js, `#accountPanel` in index.html) shows sign-in status and the sign-in/sign-out button. Push to production is gated on the owner enabling the Google provider in the Firebase console.
 
 **Content Security Policy (CSP Stage 2 — enforcing):** The `<meta http-equiv="Content-Security-Policy">` in `index.html` is now in enforcing mode. It was run in report-only mode for Stage 1 and confirmed clean (boot + Firebase + auth + Firestore produced zero violations) before the flip. **`'unsafe-inline'` is intentionally retained** in `script-src` and `style-src`: the app has ~148 inline event handlers, and per CSP Level 2+ a `sha256-` or `nonce-` token in `script-src` silently disables `unsafe-inline`, breaking all of them. Guard 55.10 (tripwire: `'unsafe-inline'` still present) and 55.11 (tripwire: no `sha256-`/`nonce-` token) enforce this invariant. `img-src` includes `blob:` to cover canvas and screenshot-preview images. The suite-55 and suite-30 guards enforce that the enforcing policy is present and report-only is absent.
+
+---
+
+## Ambient Runtime (`js/runtime.js` — Step 2 · Phase 2 · A1)
+
+`window.AmbientRuntime` is the OS-level lifecycle substrate for everything atmospheric: it owns **one canonical terminal state**, runs **one heartbeat**, and hosts an **observer registry**. Every ambient consumer (timers, UPLINK, hardware choreography, the attract/standby experiences) subscribes here rather than re-implementing its own tick or its own immersion-dial check.
+
+**Canonical state machine.** `RUNTIME_STATES = ['OFF','COLD_BOOT','READY','ACTIVE','IDLE','STANDBY','SHUTDOWN']`. `getState()` returns the current state; `transition(to)` is validated against a legal-edge table, idempotent (`to === from` is a no-op), and fires each observer's `onExit(from)`/`onEnter(to)` when the runtime crosses out of / into that observer's state set, then emits `RobcoEvents.emit('runtime.state', {from, to})`. Illegal edges are silent no-ops. Boot moves `OFF → COLD_BOOT`; once the boot screen clears the heartbeat advances `COLD_BOOT → READY → ACTIVE`; user interaction keeps `ACTIVE` and resets an idle timer (`ACTIVE → IDLE` after `IDLE_MS`); blur / `document.hidden` → `STANDBY`; focus / visible → `ACTIVE`; `shutdown()` → `SHUTDOWN → OFF`.
+
+**Observer registry.** `register({ id, cadenceMs, states, tier, onTick, onEnter, onExit })` returns an `unregister()` handle. Each heartbeat, an observer's `onTick` runs **iff** `states.includes(getState())` **and** `immersionAllows(tier)` **and** `cadenceMs` has elapsed since its last tick. Every callback is wrapped in `try/catch`, so one bad observer can never break the heartbeat or its siblings (the `RobcoEvents` listener-guard pattern).
+
+**Central dial enforcement (the ONE place).** The runtime is the single point where the Immersion dial (`immersionAllows`, `js/state.js`) is enforced — re-evaluated live every beat, so a dial change takes effect immediately. No ambient feature re-implements the gate. `immersionAllows` is `typeof`-guarded and fails **open** (never suppress on a missing gate).
+
+**A1 is purely additive.** A1 tracks state **in parallel** with the existing standby/timers in `ui-core.js`/`ui-audio.js`, which are left untouched (the migration onto the runtime is Chapter A2, one timer per commit). The only registered observer in A1 is an inert `runtime-selftest` that bumps an in-memory counter. If the runtime fails to start, the app is byte-identical to today.
+
+**Hard atmosphere/save boundary (Phase-2 prime invariant #1).** `runtime.js` writes **nothing durable to the campaign** — it never persists the save, mutates a campaign field, appends to the Terminal Record, or touches raw local storage. State is ephemeral / in-memory; any device pref would go through MetaStore only (A1 stores none). Gate-guarded by Suite 146 (negative grep) + the Suite 18 behavioral no-write assertion in `tests/test.html`.
+
+**Boot-order lesson (U7).** `runtime.js`'s top level only **defines** `window.AmbientRuntime` / `window.initAmbientRuntime` (inside an IIFE). Every cross-file read (`immersionAllows`, `RobcoEvents`) happens **inside** `initAmbientRuntime()` — a named `window.onload` boot phase called from `ui-core.js` **after** `_wireStandby()` — never at parse time, because `runtime.js` can be parsed before the shared state module has loaded. Structural guards: Suite 146 (both runners); behavioral proof (state machine + observer gating + live dial): Suite 18 in `tests/test.html`.
 
 ---
 
@@ -1348,7 +1369,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1759-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1773-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

@@ -119,6 +119,9 @@ export default [
         getImmersionTier: 'readonly',
         immersionAllows: 'readonly',
         setImmersionTier: 'readonly',
+        // Step 2 Phase 2 A1 — Ambient Runtime (js/runtime.js): lifecycle state machine + observer scheduler
+        AmbientRuntime: 'readonly',
+        initAmbientRuntime: 'readonly',
         getAmmoCalibers: 'readonly',
         getVendors: 'readonly',
         getTradeCatalog: 'readonly',

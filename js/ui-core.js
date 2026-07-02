@@ -1085,6 +1085,7 @@ window.onload = async function () {
     initRadio(); // WU-F5: restore the Pip-Boy Radio preference (autoplay-safe first-gesture arm)
     _wireRotaryDialClick();
     _wireStandby();
+    initAmbientRuntime(); // A1: Ambient Runtime — additive state machine + observer scheduler (parallel to standby; owns no timers yet)
     _wirePanelPersistence();
     _restoreOpticsPreference();
     _restoreDevicePrefs();
