@@ -108,7 +108,11 @@
       onTick: typeof spec.onTick === 'function' ? spec.onTick : null,
       onEnter: typeof spec.onEnter === 'function' ? spec.onEnter : null,
       onExit: typeof spec.onExit === 'function' ? spec.onExit : null,
-      _lastTick: -Infinity,
+      // Seed the cadence clock to NOW (not -Infinity) so a cadenceMs>0 observer first
+      // ticks one full cadence AFTER registration — matching a setInterval's first fire
+      // (a setInterval(fn, N) fires at +N, not at 0). cadenceMs:0 observers still fire
+      // every beat (now - now >= 0).
+      _lastTick: _now(),
     };
     _observers.push(obs);
     return function unregister() {
@@ -131,8 +135,16 @@
       var wasIn = o.states.indexOf(from) !== -1;
       var nowIn = o.states.indexOf(to) !== -1;
       try {
-        if (nowIn && !wasIn && o.onEnter) o.onEnter(to);
-        else if (wasIn && !nowIn && o.onExit) o.onExit(from);
+        if (nowIn && !wasIn) {
+          // Entering the observer's state set: restart its cadence clock so the first
+          // tick lands one full cadence after (re-)entry — this makes a paused-then-
+          // resumed observer behave exactly like a setInterval that was cleared on
+          // standby and freshly restarted on wake (byte-identical standby timing).
+          o._lastTick = _now();
+          if (o.onEnter) o.onEnter(to);
+        } else if (wasIn && !nowIn && o.onExit) {
+          o.onExit(from);
+        }
       } catch (_) {
         /* a bad observer callback never breaks the transition or its siblings */
       }

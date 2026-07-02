@@ -1340,10 +1340,12 @@ Check (($stateSrc35 -match 'state\.eventLog\.length\s*>\s*EVENTLOG_CAP') -and ($
 # 35.2 saveState dirty-check: _lastSaveStr declared and compared in state.js (P7-6)
 Check ([bool]($stateSrc35 -match '_lastSaveStr') -and [bool]($stateSrc35 -match '=== _lastSaveStr')) 'saveState dirty-check: _lastSaveStr declared and compared in state.js (P7-6)'
 
-# 35.3 enterStandby() clears _uptimeInterval on standby (P7-9)
-$enterStandbyBody35 = ''
-try { $enterStandbyBody35 = Get-FunctionBody $uiSrc35 'enterStandby' } catch {}
-Check ([bool]($enterStandbyBody35 -match 'clearInterval\(_uptimeInterval\)')) 'enterStandby() clears _uptimeInterval on standby (P7-9)'
+# 35.3 the uptime clock pauses on standby -- since A2 enforced by the Ambient Runtime:
+#      the uptime-clock observer runs only in the awake states (STANDBY excluded), so
+#      the runtime freezes it on tab-out (replaces enterStandby-clears-_uptimeInterval).
+$startAmbientBody35 = ''
+try { $startAmbientBody35 = Get-FunctionBody $uiSrc35 '_startAmbientTimers' } catch {}
+Check ([bool]($startAmbientBody35 -match "id:\s*'uptime-clock'[\s\S]*?states:\s*\['ACTIVE',\s*'IDLE'\]")) 'the uptime clock pauses on standby -- registered as a runtime observer in the awake states only, STANDBY excluded (P7-9, A2)'
 
 # 35.4 body.standby context has animation-play-state: paused in terminal.css (P7-9)
 $cssFlat35 = $cssSrc35 -replace "`n", ' '
@@ -6245,15 +6247,18 @@ Check ($core99 -notmatch 'targetDT\s*=\s*0\b') `
 Check (($eslint99 -notmatch '\bticksToGameTime\b') -and ($eslint99 -notmatch '\bgameTimeToTicks\b')) `
     '99.9: ticksToGameTime + gameTimeToTicks globals removed from eslint.config.mjs'
 
-# -- Duplication consolidation (shared helpers / single source) --
-Check ($core99 -match 'function\s+_startUptimeClock\s*\(') `
-    '99.10: _startUptimeClock() shared helper defined in ui-core.js (QA-DUP-4)'
-Check ($core99 -match 'function\s+_startMemCycle\s*\(') `
-    '99.11: _startMemCycle() shared helper defined in ui-core.js (QA-DUP-3)'
+# -- Duplication consolidation (single source) --
+# A2: uptime clock + memory-cycle flash are single-source Ambient Runtime observers
+# (registered once each in _startAmbientTimers) with tick logic in the single-definition
+# _tickUptimeClock / _tickMemCycle helpers -- the QA-DUP-3/DUP-4 intent, preserved.
+Check (([regex]::Matches($core99, "id: 'uptime-clock'").Count -eq 1) -and ($core99 -match 'function\s+_tickUptimeClock\s*\(')) `
+    '99.10: the uptime clock is a single-source runtime observer (id uptime-clock registered once) with its tick in _tickUptimeClock (QA-DUP-4)'
+Check (([regex]::Matches($core99, "id: 'mem-cycle'").Count -eq 1) -and ($core99 -match 'function\s+_tickMemCycle\s*\(')) `
+    '99.11: the memory-cycle flash is a single-source runtime observer (id mem-cycle registered once) with its tick in _tickMemCycle (QA-DUP-3)'
 Check ([regex]::Matches($core99, 'MEMORY CYCLE COMPLETE').Count -eq 1) `
     '99.12: "MEMORY CYCLE COMPLETE" literal appears exactly once in ui-core.js (mem-cycle body deduped)'
-Check ([regex]::Matches($core99, '_startUptimeClock\b').Count -ge 3) `
-    '99.13: _startUptimeClock referenced >=3x in ui-core.js (1 definition + both call sites use the helper)'
+Check ((-not ($core99 -match 'function\s+_startUptimeClock\s*\(')) -and (-not ($core99 -match 'function\s+_startMemCycle\s*\('))) `
+    '99.13: the old _startUptimeClock/_startMemCycle setInterval helpers are retired (migrated to runtime observers -- no parallel timer path)'
 Check ($saves99 -match 'function\s+listLocalSaves\s*\(') `
     '99.14: listLocalSaves() moved into ui-saves.js -- co-located with slot schema (QA-DUP-2)'
 Check ($saves99 -match 'function\s+listLocalSaves[\s\S]*?_slotKey\s*\(') `
@@ -7477,9 +7482,11 @@ Check (($rn119 -match "getElementById\('overseerLogDisplay'\)") -and ($rn119 -ma
 Check (($uiCore119 -match 'if \(document\.hidden\) _flushOverseerLog\(\)') -and ($uiCore119 -match "addEventListener\('pagehide', _flushOverseerLog\)")) `
     '119.6: _flushOverseerLog() fires on visibilitychange-hidden and pagehide so power-on totals survive a closed tab'
 
-# 119.7  read-out stays fresh -- renderOverseerLog called from loadUI + a periodic flush timer
-Check (($uiCore119 -match 'renderOverseerLog\(\); // WU-F7') -and ($ini119 -match 'setInterval\(')) `
-    '119.7: renderOverseerLog() is called from loadUI and a periodic flush timer keeps the live read-out current'
+# 119.7  read-out stays fresh -- renderOverseerLog from loadUI + a runtime flush observer
+# (A2: the flush is an Ambient Runtime observer id 'overseer-flush', not a setInterval;
+# it runs in all live states incl. STANDBY so power-on accounting keeps ticking blurred).
+Check (($uiCore119 -match 'renderOverseerLog\(\); // WU-F7') -and ($ini119 -match "id:\s*'overseer-flush'") -and ($ini119 -match '_flushOverseerLog\(\)')) `
+    '119.7: renderOverseerLog() is called from loadUI and a runtime overseer-flush observer keeps the live read-out + power-on total current'
 
 # 119.8  OVERSEER'S LOG panel: DATA-tab .panel + summary>h2 with ">" + display mount + local-only note, game-agnostic
 Check (($html119 -match 'id="overseerLogPanel"') -and ($html119 -match '<details class="panel" data-tab="data" id="overseerLogPanel">') -and ($html119 -match '<summary><h2>&gt; OVERSEER''S LOG</h2></summary>') -and ($html119 -match 'id="overseerLogDisplay"') -and ($html119 -match 'STORED LOCALLY ON THIS UNIT') -and ($ovSlice119 -notmatch '\bFNV\b|\bFO3\b|Fallout')) `
@@ -8339,32 +8346,35 @@ Check ($onloadLineCount132 -lt 45) "window.onload body stays a slim named-call c
 
 Check ($onloadBody132 -match [regex]::Escape('initTabs()')) 'window.onload still calls initTabs() directly (Suite 57.9 boot-order guard depends on this literal call)'
 
-# 132.7  standby shared state is declared once at true module scope, before window.onload
+# 132.7  standby/ambient shared state (_standbyActive/sessionStart) declared once at
+#        module scope, before window.onload. (A2 retired _uptimeInterval/_memCycleInterval
+#        -- those timers are now Ambient Runtime observers.)
 $onloadDeclIdx132 = $uiCoreSrc132.IndexOf('window.onload = async function () {')
-$sharedVars132 = @('_standbyActive', '_uptimeInterval', '_memCycleInterval', 'sessionStart')
+$sharedVars132 = @('_standbyActive', 'sessionStart')
 $sharedVarsOk132 = $true
 foreach ($v in $sharedVars132) {
     $declIdx = $uiCoreSrc132.IndexOf("let $v =")
     if ($declIdx -lt 0 -or $declIdx -ge $onloadDeclIdx132) { $sharedVarsOk132 = $false }
 }
-Check ($onloadDeclIdx132 -ge 0 -and $sharedVarsOk132) 'standby shared state (_standbyActive/_uptimeInterval/_memCycleInterval/sessionStart) is declared once at module scope, before window.onload'
+Check ($onloadDeclIdx132 -ge 0 -and $sharedVarsOk132) 'standby/ambient shared state (_standbyActive/sessionStart) is declared once at module scope, before window.onload'
 
-# 132.8  _startUptimeClock/_startMemCycle/enterStandby/exitStandby are module-scope
-#        function declarations (declared before window.onload, not nested inside it)
-$sharedFns132 = @('_startUptimeClock', '_startMemCycle', 'enterStandby', 'exitStandby')
+# 132.8  enterStandby/exitStandby + observer tick helpers (_tickUptimeClock/_tickMemCycle)
+#        are module-scope function declarations, before window.onload. (A2 retired
+#        _startUptimeClock/_startMemCycle in favor of the tick helpers.)
+$sharedFns132 = @('_tickUptimeClock', '_tickMemCycle', 'enterStandby', 'exitStandby')
 $sharedFnsOk132 = $true
 foreach ($n in $sharedFns132) {
     $declIdx = $uiCoreSrc132.IndexOf("function $n(")
     if ($declIdx -lt 0 -or $declIdx -ge $onloadDeclIdx132) { $sharedFnsOk132 = $false }
 }
-Check $sharedFnsOk132 '_startUptimeClock/_startMemCycle/enterStandby/exitStandby are module-scope functions declared before window.onload (not window.onload-local closures)'
+Check $sharedFnsOk132 '_tickUptimeClock/_tickMemCycle/enterStandby/exitStandby are module-scope functions declared before window.onload (not window.onload-local closures)'
 
-# 132.9  _startAmbientTimers() re-arms sessionStart + both timer starters, matching
-#        the original boot-time (not just standby-exit) timer kickoff
+# 132.9  _startAmbientTimers() sets sessionStart + registers the uptime-clock and mem-cycle
+#        runtime observers (A2: boot-time kickoff preserved, now via the Ambient Runtime)
 $ambientBody132 = ''
 try { $ambientBody132 = Get-FunctionBody $uiCoreSrc132 '_startAmbientTimers' } catch {}
-Check (($ambientBody132 -match 'sessionStart\s*=\s*Date\.now\(\)') -and ($ambientBody132 -match '_startUptimeClock\(\)') -and ($ambientBody132 -match '_startMemCycle\(\)')) `
-    '_startAmbientTimers() sets sessionStart = Date.now() and starts both ambient timers (boot-time kickoff preserved)'
+Check (($ambientBody132 -match 'sessionStart\s*=\s*Date\.now\(\)') -and ($ambientBody132 -match "id:\s*'uptime-clock'") -and ($ambientBody132 -match "id:\s*'mem-cycle'")) `
+    '_startAmbientTimers() sets sessionStart = Date.now() and registers the uptime-clock + mem-cycle runtime observers (boot-time kickoff preserved)'
 
 # 132.10  no stray second `window.onload =` assignment was introduced
 $onloadAssignCount132 = [regex]::Matches($uiCoreSrc132, 'window\.onload\s*=').Count
@@ -9969,7 +9979,7 @@ $indexHtml145 = Read-Src "index.html"
 $getTierBody145 = Get-FunctionBody $state145 'getImmersionTier'
 $allowsBody145 = Get-FunctionBody $state145 'immersionAllows'
 $setTierBody145 = Get-FunctionBody $state145 'setImmersionTier'
-$memCycleBody145 = Get-FunctionBody $uiCore145 '_startMemCycle'
+$memCycleReg145 = Get-FunctionBody $uiCore145 '_startAmbientTimers'
 $initImmBody145 = Get-FunctionBody $uiCore145 'initImmersion'
 
 # 145.1  robco_immersion registered as a DEVICE pref in META_MANIFEST (default 'full')
@@ -10035,11 +10045,11 @@ Check (
     ($indexHtml145 -match 'id="immersionStatus"')
 ) '145.8: index.html has #immersionSelect (Full/Balanced/Minimal) with onImmersionChange + aria-label + 16px font + #immersionStatus (Protocol UI-5/17)'
 
-# 145.9  proof-of-seam: memory-cycle flash respects the dial via immersionAllows
+# 145.9  proof-of-seam: memory-cycle flash respects the dial -- since A2 the gate is
+#        the runtime's tier check (mem-cycle observer registered at tier 'balanced').
 Check (
-    ($memCycleBody145 -match "immersionAllows\('balanced'\)") -and
-    ($memCycleBody145 -match 'return;')
-) '145.9: the memory-cycle atmosphere (_startMemCycle) is gated on immersionAllows (proof-of-seam -- one existing ambient consumer already respects the dial)'
+    $memCycleReg145 -match "id:\s*'mem-cycle'[\s\S]*?tier:\s*'balanced'"
+) "145.9: the memory-cycle flash is dial-gated by the runtime -- registered as a tier 'balanced' observer (Full/Balanced fire, Minimal silent; single enforcement point)"
 
 # 145.10  game-agnostic (Protocol 38): the dial code has no game literals
 Check (
@@ -10209,27 +10219,102 @@ Check (
     (-not ($wireStandbyBody147 -match "addEventListener\(\s*'visibilitychange'"))
 ) '147.4: _wireStandby no longer wires blur/focus/visibilitychange directly (retired -- the runtime drives STANDBY/ACTIVE)'
 
-# 147.5  enterStandby still ducks the standby loops (uptime + memory-cycle intervals + audio heartbeat)
+# 147.5  enterStandby still ducks the AUDIO on standby -- stops the self-scheduling geiger
+#        + audio heartbeat and ramps the CRT hum down. (A2 moved the uptime/memory-cycle
+#        interval management out: those observers auto-pause, so no interval is cleared.)
 Check (
-    ($enterBody147 -match 'clearInterval\(_uptimeInterval\)') -and
-    ($enterBody147 -match 'clearInterval\(_memCycleInterval\)') -and
-    ($enterBody147 -match 'stopHeartbeat\(\)')
-) '147.5: enterStandby still clears the uptime + memory-cycle intervals and stops the audio heartbeat on standby'
+    ($enterBody147 -match 'geigerRunning = false') -and
+    ($enterBody147 -match 'stopHeartbeat\(\)') -and
+    (-not ($enterBody147 -match 'clearInterval\('))
+) '147.5: enterStandby ducks the audio (stops geiger + heartbeat, hum-down) and no longer clears any interval (uptime/mem-cycle observers auto-pause)'
 
-# 147.6  exitStandby still restores on wake (wake tone, un-dim, resume clocks, updateMath)
+# 147.6  exitStandby still restores on wake (wake tone, un-dim, geiger resume, updateMath)
+#        but no longer manually restarts clocks (observers auto-resume on ACTIVE re-entry).
 Check (
     ($exitBody147 -match 'playWakeTone\(\)') -and
     ($exitBody147 -match "classList\.remove\('standby'\)") -and
-    ($exitBody147 -match '_startUptimeClock\(\)') -and
-    ($exitBody147 -match '_startMemCycle\(\)') -and
-    ($exitBody147 -match 'updateMath\(\)')
-) '147.6: exitStandby still plays the wake tone, un-dims, restarts the clocks, and re-syncs updateMath on wake'
+    ($exitBody147 -match 'setGeigerRate\(') -and
+    ($exitBody147 -match 'updateMath\(\)') -and
+    (-not ($exitBody147 -match '_startUptimeClock\(\)')) -and
+    (-not ($exitBody147 -match '_startMemCycle\(\)'))
+) '147.6: exitStandby plays the wake tone, un-dims, resumes geiger + re-syncs updateMath, and no longer manually restarts the clocks (observers auto-resume)'
 
 # 147.7  enterStandby/exitStandby keep their idempotency guard
 Check (
     ($enterBody147 -match 'if \(_standbyActive\) return;') -and
     ($exitBody147 -match 'if \(!_standbyActive\) return;')
 ) '147.7: enterStandby/exitStandby retain the _standbyActive idempotency guard (no double-dim even if called twice)'
+
+# ===========================================================
+# Suite 148 -- Step 2 (v2.8.0) Phase 2 A2.2: fixed-cadence timers -> runtime observers (7 tests).
+# Mirrors JS Suite 148. The three fixed-cadence loops -- uptime clock (1s), memory-cycle
+# flash (15min), overseer-log flush (30s) -- migrate off their setIntervals onto the
+# Ambient Runtime as observers. Two runtime refinements make it byte-identical: register()
+# seeds _lastTick to now (first tick one cadence later, like setInterval), and transition()
+# restarts an observer's cadence clock when it re-enters its state set (paused-then-resumed
+# behaves like a setInterval cleared on standby and restarted on wake). Tiers give the dial
+# teeth ONLY below default: uptime + overseer 'minimal' (never quiet), mem-cycle 'balanced'
+# (silent at Minimal). The migrated bodies write nothing durable to the campaign.
+# ===========================================================
+Sep "Suite 148 -- A2.2 uptime clock + memory cycle + overseer flush migrated to runtime observers"
+$runtime148 = Read-Src "js/runtime.js"
+$uiCore148 = Read-Src "js/ui-core.js"
+$registerBody148 = Get-FunctionBody $runtime148 'register'
+$transitionBody148 = Get-FunctionBody $runtime148 'transition'
+$startAmbient148 = Get-FunctionBody $uiCore148 '_startAmbientTimers'
+$initOverseer148 = Get-FunctionBody $uiCore148 'initOverseerLog'
+$tickUptime148 = Get-FunctionBody $uiCore148 '_tickUptimeClock'
+$tickMem148 = Get-FunctionBody $uiCore148 '_tickMemCycle'
+
+# 148.1  register() seeds _lastTick to now -- setInterval parity (no immediate first fire)
+Check (
+    $registerBody148 -match '_lastTick:\s*_now\(\)'
+) '148.1: register() seeds _lastTick to _now() so a cadenceMs>0 observer first ticks one full cadence after registration (setInterval parity, not an immediate fire)'
+
+# 148.2  transition() restarts the cadence clock on state-set entry (byte-identical wake)
+Check (
+    ($transitionBody148 -match 'nowIn && !wasIn') -and
+    ($transitionBody148 -match 'o\._lastTick = _now\(\)')
+) '148.2: transition() resets an observer _lastTick when it (re-)enters its state set -- cadence restarts on wake, matching the old clear-on-standby / restart-on-wake timing'
+
+# 148.3  uptime-clock observer: awake states only, tier minimal, 1s cadence
+Check (
+    ($startAmbient148 -match "id:\s*'uptime-clock'") -and
+    ($startAmbient148 -match "states:\s*\['ACTIVE',\s*'IDLE'\]") -and
+    ($startAmbient148 -match "tier:\s*'minimal'") -and
+    ($startAmbient148 -match 'cadenceMs:\s*1000')
+) "148.3: the uptime clock is a runtime observer (states ['ACTIVE','IDLE'], tier 'minimal', cadence 1000ms) -- pauses on standby, never dial-quieted"
+
+# 148.4  mem-cycle observer: awake states, tier balanced (dial teeth), 15-min cadence
+Check (
+    ($startAmbient148 -match "id:\s*'mem-cycle'") -and
+    ($startAmbient148 -match "tier:\s*'balanced'") -and
+    ($startAmbient148 -match 'cadenceMs:\s*900000')
+) "148.4: the memory-cycle flash is a runtime observer (tier 'balanced', cadence 900000ms) -- dial-gated by the runtime, silent at Minimal (its former immersionAllows('balanced') gate)"
+
+# 148.5  overseer-flush observer: runs in ALL live states incl. STANDBY, tier minimal, 30s
+Check (
+    ($initOverseer148 -match "id:\s*'overseer-flush'") -and
+    ($initOverseer148 -match "states:\s*\['READY',\s*'ACTIVE',\s*'IDLE',\s*'STANDBY'\]") -and
+    ($initOverseer148 -match "tier:\s*'minimal'") -and
+    ($initOverseer148 -match 'cadenceMs:\s*30000')
+) "148.5: the overseer flush is a runtime observer including STANDBY (power-on accounting keeps ticking while blurred), tier 'minimal', cadence 30000ms"
+
+# 148.6  the old standalone setInterval timers for these three are retired -- ui-core.js
+#        no longer calls setInterval at all (the runtime heartbeat is the one scheduler)
+Check (
+    (-not ($uiCore148 -match 'function\s+_startUptimeClock')) -and
+    (-not ($uiCore148 -match 'function\s+_startMemCycle')) -and
+    (-not ($uiCore148 -match '_overseerFlushTimer')) -and
+    ([regex]::Matches($uiCore148, 'setInterval\(').Count -eq 0)
+) '148.6: the standalone uptime/mem-cycle/overseer setIntervals are retired -- ui-core.js no longer calls setInterval (the runtime heartbeat is the single scheduler)'
+
+# 148.7  no-durable-write: the migrated observer bodies never write the campaign save
+Check (
+    (-not ($tickUptime148 -match 'saveState|robco_v8|_logEvent|\beventLog\b')) -and
+    (-not ($tickMem148 -match 'saveState|robco_v8|_logEvent|\beventLog\b')) -and
+    (-not ($initOverseer148 -match 'saveState|robco_v8|_logEvent|\beventLog\b'))
+) '148.7: the migrated uptime/mem-cycle/overseer observer bodies never write the campaign save (robco_v8 / saveState / eventLog / _logEvent) -- device + DOM only (atmosphere/save boundary)'
 
 # ===========================================================
 # Results

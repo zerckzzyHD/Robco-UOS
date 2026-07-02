@@ -138,7 +138,6 @@ document.addEventListener('visibilitychange', () => {
 const OVERSEER_LOG_KEY = 'robco_overseer_log';
 let _overseerBaseMs = 0; // total power-on accumulated BEFORE this session
 let _overseerSessionStart = 0; // Date.now() when this session's logging began
-let _overseerFlushTimer = null;
 let _overseerBooted = false;
 function _readOverseerLog() {
   const num = v => (typeof v === 'number' && isFinite(v) && v >= 0 ? v : 0);
@@ -225,12 +224,21 @@ function initOverseerLog() {
   _overseerSessionStart = Date.now();
   // Periodic flush (30s) so a crash / forced close loses at most one interval of
   // power-on time, and the live read-out stays fresh while the panel sits open.
-  if (!_overseerFlushTimer) {
-    _overseerFlushTimer = setInterval(() => {
+  // Phase 2 A2: this is now an Ambient Runtime observer instead of a standalone
+  // setInterval. It runs in ALL live states — INCLUDING STANDBY — because power-on
+  // accounting must keep ticking while the tab is blurred (matching the old
+  // never-cleared setInterval); tier 'minimal' so the dial never silences telemetry.
+  // Registered once (this boot-only path is guarded by _overseerBooted above).
+  AmbientRuntime.register({
+    id: 'overseer-flush',
+    states: ['READY', 'ACTIVE', 'IDLE', 'STANDBY'],
+    tier: 'minimal',
+    cadenceMs: 30000,
+    onTick: () => {
       _flushOverseerLog();
       renderOverseerLog();
-    }, 30000);
-  }
+    },
+  });
   renderOverseerLog();
 }
 // Persist the running totals on tab-hide / close so they survive a closed tab —
@@ -364,48 +372,39 @@ const CHAT_MAX = 200; // max messages kept in memory; last 50 written to localSt
 // original source order; do not reorder without re-auditing every boot/
 // lifecycle entry path in planning/STEP2_PHASE0_PLAN.md.
 
-// ── STANDBY MODE SHARED STATE ──────────────────────────────────
-// Module-scope (not window.onload-local) because _wireStandby() defines
-// enter/exitStandby here while _startAmbientTimers() — called later in the
-// boot sequence, mirroring the original layout — starts the same timers.
-// Both must share one set of guards so blur+visibilitychange and the
-// initial boot-time start never stack a second interval (DUP-3/DUP-4).
+// ── STANDBY MODE + AMBIENT-TIMER STATE ─────────────────────────
+// Module-scope because the standby coordinator (enterStandby/exitStandby) and the
+// ambient observers share `sessionStart`. Phase 2 A2 migrated the uptime clock and
+// memory-cycle flash off their own setIntervals onto the Ambient Runtime: they are
+// now runtime observers (registered in _startAmbientTimers) that tick only in the
+// awake states (['ACTIVE','IDLE']) — so the runtime pauses them on STANDBY and
+// restarts their cadence on wake automatically (byte-identical to the old
+// enterStandby-clears / exitStandby-restarts behavior), and their dial gate is the
+// runtime's tier check. enterStandby/exitStandby no longer manage those intervals.
 let _standbyActive = false;
-let _uptimeInterval = null;
-let _memCycleInterval = null;
 let sessionStart = 0;
 
-// Shared interval starters (DUP-3/DUP-4). Both the boot path and exitStandby()
-// restart these after standby clears them; the guard keeps a double-call from
-// ever stacking a second timer.
-function _startUptimeClock() {
-  if (_uptimeInterval) return;
-  _uptimeInterval = setInterval(() => {
-    let elapsed = Math.floor((Date.now() - sessionStart) / 1000);
-    let h = Math.floor(elapsed / 3600),
-      m = Math.floor((elapsed % 3600) / 60),
-      s = elapsed % 60;
-    let el = document.getElementById('uptimeClock');
-    if (el)
-      el.innerText = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-  }, 1000);
+// Uptime-clock observer tick: refresh the HH:MM:SS since-boot readout. tier 'minimal'
+// (baseline telemetry — never dial-quieted), cadence 1000ms, awake states only.
+function _tickUptimeClock() {
+  let elapsed = Math.floor((Date.now() - sessionStart) / 1000);
+  let h = Math.floor(elapsed / 3600),
+    m = Math.floor((elapsed % 3600) / 60),
+    s = elapsed % 60;
+  let el = document.getElementById('uptimeClock');
+  if (el)
+    el.innerText = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
-function _startMemCycle() {
-  if (_memCycleInterval) return;
-  _memCycleInterval = setInterval(() => {
-    // P8 proof-of-seam: the periodic "memory cycle" flash is pure atmosphere, so it
-    // respects the Immersion dial — it requires at least 'balanced', so it runs at
-    // Full/Balanced and goes quiet at Minimal. At the default 'full' this is a no-op
-    // (today's behavior preserved). This is the ONE existing ambient consumer wired to
-    // the seam as a demonstration; the rest arrive in Phase 2. Fail-open if the helper
-    // is somehow unavailable (never suppress on a missing gate).
-    if (typeof window.immersionAllows === 'function' && !window.immersionAllows('balanced')) return;
-    appendToChat('> MEMORY CYCLE COMPLETE. 64K STABLE.', 'sys', true);
-    document.body.style.filter = 'brightness(0.35)';
-    setTimeout(() => {
-      document.body.style.filter = '';
-    }, 150);
-  }, 900000);
+
+// Memory-cycle observer tick: the periodic ambient "memory cycle" flash. Registered
+// at tier 'balanced', so the RUNTIME enforces the Immersion dial (runs at Full/
+// Balanced, silent at Minimal) — the single enforcement point, no internal re-check.
+function _tickMemCycle() {
+  appendToChat('> MEMORY CYCLE COMPLETE. 64K STABLE.', 'sys', true);
+  document.body.style.filter = 'brightness(0.35)';
+  setTimeout(() => {
+    document.body.style.filter = '';
+  }, 150);
 }
 
 function enterStandby() {
@@ -422,10 +421,9 @@ function enterStandby() {
     crtHumGain.gain.cancelScheduledValues(audioCtx.currentTime);
     crtHumGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5);
   }
-  clearInterval(_uptimeInterval);
-  _uptimeInterval = null;
-  clearInterval(_memCycleInterval);
-  _memCycleInterval = null;
+  // The uptime + memory-cycle observers pause automatically (STANDBY ∉ their states);
+  // no manual interval clearing needed. Only the self-scheduling audio heartbeat has
+  // to be stopped explicitly here.
   stopHeartbeat();
 }
 
@@ -442,8 +440,8 @@ function exitStandby() {
     appendToChat('> COURIER RETURNED. SYNCHRONIZING TELEMETRY...', 'sys', true);
     let _rads = parseInt(document.getElementById('stat_rads').value) || 0;
     setGeigerRate(_rads >= 1000 ? 25 : _rads >= 600 ? 12 : _rads >= 200 ? 0.33 : 0);
-    _startUptimeClock();
-    _startMemCycle();
+    // The uptime + memory-cycle observers resume automatically on the ACTIVE re-entry
+    // (the runtime restarts their cadence clock), so no manual restart here.
     updateMath();
   }, 650);
 }
@@ -1017,10 +1015,28 @@ function _runBootSequenceAndBriefing() {
 }
 
 function _startAmbientTimers() {
-  // Session Uptime Clock + Memory Cycle Event (every 15 minutes) — shared starters (DUP-3/4)
+  // Session Uptime Clock + Memory Cycle Event — now Ambient Runtime observers (A2).
+  // Both tick only in the awake states (['ACTIVE','IDLE']), so the runtime pauses them
+  // on STANDBY and restarts their cadence on wake (replacing the old enterStandby /
+  // exitStandby interval management). The dial is enforced by each observer's tier:
+  // the uptime clock is baseline telemetry (tier 'minimal', never quiets); the
+  // memory-cycle flash is an ambient flourish (tier 'balanced', silent at Minimal —
+  // exactly matching its former immersionAllows('balanced') gate).
   sessionStart = Date.now();
-  _startUptimeClock();
-  _startMemCycle();
+  AmbientRuntime.register({
+    id: 'uptime-clock',
+    states: ['ACTIVE', 'IDLE'],
+    tier: 'minimal',
+    cadenceMs: 1000,
+    onTick: _tickUptimeClock,
+  });
+  AmbientRuntime.register({
+    id: 'mem-cycle',
+    states: ['ACTIVE', 'IDLE'],
+    tier: 'balanced',
+    cadenceMs: 900000,
+    onTick: _tickMemCycle,
+  });
 }
 
 function _wireInputHistoryNav() {

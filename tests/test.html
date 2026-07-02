@@ -1547,7 +1547,35 @@
             'unregister() removes an observer so it stops ticking'
           );
 
-          // 7) shutdown() → OFF, and the whole A1 run wrote NOTHING durable to the campaign
+          // 8) A2 setInterval parity: a cadenceMs>0 observer does NOT fire on the first
+          //    beat after registration (seeded _lastTick), nor on the first beat right
+          //    after (re-)entering its state (cadence restarts on entry) — matching a
+          //    freshly (re)started setInterval, so the migrated timers keep exact timing.
+          RT.transition('ACTIVE');
+          RT.noteActivity();
+          let tickP = 0;
+          const unregP = RT.register({
+            id: 'parity',
+            cadenceMs: 999999,
+            states: ['ACTIVE'],
+            tier: 'minimal',
+            onTick: () => {
+              tickP++;
+            },
+          });
+          RT._beat(); // registered while ACTIVE, ~0ms elapsed → no tick (seeded)
+          const afterReg = tickP; // 0
+          RT.transition('STANDBY'); // leave the observer's state set
+          RT.transition('ACTIVE'); // re-enter → cadence clock reset to now
+          RT._beat(); // ~0ms since re-entry → no tick (reset-on-entry)
+          const afterReentry = tickP; // 0
+          unregP();
+          assert(
+            afterReg === 0 && afterReentry === 0,
+            'setInterval parity: a cadence>0 observer does not fire immediately after registration or after re-entering its state (seeded _lastTick + reset-on-entry)'
+          );
+
+          // 9) shutdown() → OFF, and the whole A1 run wrote NOTHING durable to the campaign
           //    (robco_v8 unchanged across the suite) — the hard atmosphere/save boundary.
           RT.transition('ACTIVE');
           RT.shutdown(); // ACTIVE→SHUTDOWN→OFF

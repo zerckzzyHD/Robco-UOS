@@ -2382,12 +2382,15 @@ assert(
   'saveState dirty-check: _lastSaveStr declared and compared in state.js (P7-6)'
 );
 
-// 35.3 enterStandby() clears _uptimeInterval on standby (P7-9)
+// 35.3 the uptime clock pauses on standby — since A2 this is enforced by the Ambient
+//      Runtime: the uptime-clock observer runs only in the awake states (STANDBY ∉
+//      states), so the runtime freezes it on tab-out (replaces the old
+//      enterStandby-clears-_uptimeInterval behavior; same P7-9 outcome).
 {
-  const enterStandbyBody = extractFunctionBody(uiSrc35, 'enterStandby');
+  const startAmbientBody35 = extractFunctionBody(uiSrc35, '_startAmbientTimers');
   assert(
-    /clearInterval\(_uptimeInterval\)/.test(enterStandbyBody),
-    'enterStandby() clears _uptimeInterval on standby (P7-9)'
+    /id:\s*'uptime-clock'[\s\S]*?states:\s*\['ACTIVE',\s*'IDLE'\]/.test(startAmbientBody35),
+    'the uptime clock pauses on standby — registered as a runtime observer in the awake states only, STANDBY excluded (P7-9, A2)'
   );
 }
 
@@ -10839,22 +10842,29 @@ header('Suite 99 — WU-B7 dead-code purge + duplication consolidation');
     '99.9: ticksToGameTime + gameTimeToTicks globals removed from eslint.config.mjs'
   );
 
-  // ── Duplication consolidation (shared helpers / single source) ──
+  // ── Duplication consolidation (single source) ──
+  // A2: the uptime clock + memory-cycle flash are single-source Ambient Runtime
+  // observers now (registered exactly once each in _startAmbientTimers), with their
+  // tick logic in the single-definition _tickUptimeClock / _tickMemCycle helpers —
+  // the QA-DUP-3/DUP-4 anti-duplication intent, preserved under the new architecture.
   assert(
-    /function\s+_startUptimeClock\s*\(/.test(core99),
-    '99.10: _startUptimeClock() shared helper defined in ui-core.js (QA-DUP-4)'
+    (core99.match(/id: 'uptime-clock'/g) || []).length === 1 &&
+      /function\s+_tickUptimeClock\s*\(/.test(core99),
+    '99.10: the uptime clock is a single-source runtime observer (id uptime-clock registered once) with its tick in _tickUptimeClock (QA-DUP-4)'
   );
   assert(
-    /function\s+_startMemCycle\s*\(/.test(core99),
-    '99.11: _startMemCycle() shared helper defined in ui-core.js (QA-DUP-3)'
+    (core99.match(/id: 'mem-cycle'/g) || []).length === 1 &&
+      /function\s+_tickMemCycle\s*\(/.test(core99),
+    '99.11: the memory-cycle flash is a single-source runtime observer (id mem-cycle registered once) with its tick in _tickMemCycle (QA-DUP-3)'
   );
   assert(
     (core99.match(/MEMORY CYCLE COMPLETE/g) || []).length === 1,
     '99.12: "MEMORY CYCLE COMPLETE" literal appears exactly once in ui-core.js (mem-cycle body deduped)'
   );
   assert(
-    (core99.match(/_startUptimeClock\b/g) || []).length >= 3,
-    '99.13: _startUptimeClock referenced >=3x in ui-core.js (1 definition + both call sites use the helper)'
+    !/function\s+_startUptimeClock\s*\(/.test(core99) &&
+      !/function\s+_startMemCycle\s*\(/.test(core99),
+    '99.13: the old _startUptimeClock/_startMemCycle setInterval helpers are retired (migrated to runtime observers — no parallel timer path)'
   );
   assert(
     /function\s+listLocalSaves\s*\(/.test(saves99),
@@ -13142,15 +13152,20 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '119.6: _flushOverseerLog() fires on visibilitychange-hidden and pagehide so power-on totals survive a closed tab'
   );
 
-  // 119.7  read-out stays fresh — renderOverseerLog called from loadUI + a periodic flush timer
+  // 119.7  read-out stays fresh — renderOverseerLog called from loadUI + a periodic
+  //        flush. Since A2 the flush is an Ambient Runtime observer (id 'overseer-flush')
+  //        instead of a standalone setInterval; it runs in all live states (incl.
+  //        STANDBY) so power-on accounting keeps ticking while the tab is blurred.
   {
     let ini7 = '';
     try {
       ini7 = extractFunctionBody(uiCore119, 'initOverseerLog');
     } catch (_) {}
     assert(
-      /renderOverseerLog\(\); \/\/ WU-F7/.test(uiCore119) && /setInterval\(/.test(ini7),
-      '119.7: renderOverseerLog() is called from loadUI and a periodic flush timer keeps the live read-out current'
+      /renderOverseerLog\(\); \/\/ WU-F7/.test(uiCore119) &&
+        /id:\s*'overseer-flush'/.test(ini7) &&
+        /_flushOverseerLog\(\)/.test(ini7),
+      '119.7: renderOverseerLog() is called from loadUI and a runtime overseer-flush observer keeps the live read-out + power-on total current'
     );
   }
 
@@ -14695,44 +14710,41 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     );
   }
 
-  // 132.7  the standby shared state (_standbyActive/_uptimeInterval/_memCycleInterval/
-  //        sessionStart) is declared at true module scope — i.e. BEFORE
-  //        window.onload's own declaration, not re-declared inside it (the seam
-  //        that lets _startAmbientTimers() reach _startUptimeClock/_startMemCycle)
+  // 132.7  the standby + ambient-timer shared state (_standbyActive/sessionStart) is
+  //        declared at true module scope — BEFORE window.onload's own declaration,
+  //        not re-declared inside it. (A2 retired _uptimeInterval/_memCycleInterval —
+  //        those timers are now Ambient Runtime observers.)
   {
     const onloadDeclIdx132 = uiCoreSrc132.indexOf('window.onload = async function () {');
-    const sharedVars132 = [
-      '_standbyActive',
-      '_uptimeInterval',
-      '_memCycleInterval',
-      'sessionStart',
-    ];
+    const sharedVars132 = ['_standbyActive', 'sessionStart'];
     assert(
       onloadDeclIdx132 !== -1 &&
         sharedVars132.every(v => {
           const declIdx = uiCoreSrc132.indexOf(`let ${v} =`);
           return declIdx !== -1 && declIdx < onloadDeclIdx132;
         }),
-      'standby shared state (_standbyActive/_uptimeInterval/_memCycleInterval/sessionStart) is declared once at module scope, before window.onload'
+      'standby/ambient shared state (_standbyActive/sessionStart) is declared once at module scope, before window.onload'
     );
   }
 
-  // 132.8  _startUptimeClock/_startMemCycle/enterStandby/exitStandby are module-scope
-  //        function declarations (declared before window.onload, not nested inside it)
+  // 132.8  enterStandby/exitStandby + the observer tick helpers (_tickUptimeClock/
+  //        _tickMemCycle) are module-scope function declarations, before window.onload.
+  //        (A2 retired _startUptimeClock/_startMemCycle in favor of the tick helpers.)
   {
     const onloadDeclIdx132b = uiCoreSrc132.indexOf('window.onload = async function () {');
-    const sharedFns132 = ['_startUptimeClock', '_startMemCycle', 'enterStandby', 'exitStandby'];
+    const sharedFns132 = ['_tickUptimeClock', '_tickMemCycle', 'enterStandby', 'exitStandby'];
     assert(
       sharedFns132.every(n => {
         const declIdx = uiCoreSrc132.indexOf(`function ${n}(`);
         return declIdx !== -1 && declIdx < onloadDeclIdx132b;
       }),
-      '_startUptimeClock/_startMemCycle/enterStandby/exitStandby are module-scope functions declared before window.onload (not window.onload-local closures)'
+      '_tickUptimeClock/_tickMemCycle/enterStandby/exitStandby are module-scope functions declared before window.onload (not window.onload-local closures)'
     );
   }
 
-  // 132.9  _startAmbientTimers() re-arms sessionStart + both timer starters, matching
-  //        the original boot-time (not just standby-exit) timer kickoff
+  // 132.9  _startAmbientTimers() sets sessionStart + registers the uptime-clock and
+  //        mem-cycle runtime observers (A2: boot-time kickoff preserved, now via the
+  //        Ambient Runtime rather than raw setIntervals)
   {
     let ambientBody132 = '';
     try {
@@ -14740,9 +14752,9 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     } catch (_) {}
     assert(
       /sessionStart\s*=\s*Date\.now\(\)/.test(ambientBody132) &&
-        /_startUptimeClock\(\)/.test(ambientBody132) &&
-        /_startMemCycle\(\)/.test(ambientBody132),
-      '_startAmbientTimers() sets sessionStart = Date.now() and starts both ambient timers (boot-time kickoff preserved)'
+        /id:\s*'uptime-clock'/.test(ambientBody132) &&
+        /id:\s*'mem-cycle'/.test(ambientBody132),
+      '_startAmbientTimers() sets sessionStart = Date.now() and registers the uptime-clock + mem-cycle runtime observers (boot-time kickoff preserved)'
     );
   }
 
@@ -17183,7 +17195,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   const getTierBody145 = extractFunctionBody(state145, 'getImmersionTier');
   const allowsBody145 = extractFunctionBody(state145, 'immersionAllows');
   const setTierBody145 = extractFunctionBody(state145, 'setImmersionTier');
-  const memCycleBody145 = extractFunctionBody(uiCore145, '_startMemCycle');
+  const memCycleReg145 = extractFunctionBody(uiCore145, '_startAmbientTimers');
   const initImmBody145 = extractFunctionBody(uiCore145, 'initImmersion');
 
   // 145.1  robco_immersion is registered as a DEVICE pref in META_MANIFEST (default 'full')
@@ -17257,11 +17269,13 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '145.8: index.html has #immersionSelect (Full/Balanced/Minimal) with onImmersionChange + aria-label + 16px font + #immersionStatus (Protocol UI-5/17)'
   );
 
-  // 145.9  proof-of-seam: an EXISTING ambient behavior (memory-cycle flash) respects
-  //        the dial via immersionAllows — the seam works end-to-end
+  // 145.9  proof-of-seam: the memory-cycle flash respects the dial — since A2 the
+  //        gate is the Ambient Runtime's tier check: the mem-cycle observer is
+  //        registered at tier 'balanced' (runs at Full/Balanced, silent at Minimal),
+  //        the runtime being the single enforcement point (no internal re-check).
   assert(
-    /immersionAllows\('balanced'\)/.test(memCycleBody145) && /return;/.test(memCycleBody145),
-    '145.9: the memory-cycle atmosphere (_startMemCycle) is gated on immersionAllows (proof-of-seam — one existing ambient consumer already respects the dial)'
+    /id:\s*'mem-cycle'[\s\S]*?tier:\s*'balanced'/.test(memCycleReg145),
+    "145.9: the memory-cycle flash is dial-gated by the runtime — registered as a tier 'balanced' observer (Full/Balanced fire, Minimal silent; single enforcement point)"
   );
 
   // 145.10  game-agnostic (Protocol 38): the dial code has no game literals
@@ -17473,22 +17487,28 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '147.4: _wireStandby no longer wires blur/focus/visibilitychange directly (retired — the runtime drives STANDBY/ACTIVE)'
   );
 
-  // 147.5  enterStandby still ducks the standby loops (uptime + memory-cycle intervals + audio heartbeat)
+  // 147.5  enterStandby still ducks the AUDIO on standby — stops the self-scheduling
+  //        geiger + audio heartbeat and ramps the CRT hum down. (A2 moved the uptime/
+  //        memory-cycle interval management out: those observers auto-pause on STANDBY,
+  //        so enterStandby no longer clears any interval.)
   assert(
-    /clearInterval\(_uptimeInterval\)/.test(enterBody147) &&
-      /clearInterval\(_memCycleInterval\)/.test(enterBody147) &&
-      /stopHeartbeat\(\)/.test(enterBody147),
-    '147.5: enterStandby still clears the uptime + memory-cycle intervals and stops the audio heartbeat on standby'
+    /geigerRunning = false/.test(enterBody147) &&
+      /stopHeartbeat\(\)/.test(enterBody147) &&
+      !/clearInterval\(/.test(enterBody147),
+    '147.5: enterStandby ducks the audio (stops geiger + heartbeat, hum-down) and no longer clears any interval (uptime/mem-cycle observers auto-pause)'
   );
 
-  // 147.6  exitStandby still restores on wake (wake tone, un-dim, resume clocks, updateMath)
+  // 147.6  exitStandby still restores on wake (wake tone, un-dim, geiger resume,
+  //        updateMath) — but no longer manually restarts clocks (observers auto-resume
+  //        on the ACTIVE re-entry).
   assert(
     /playWakeTone\(\)/.test(exitBody147) &&
       /classList\.remove\('standby'\)/.test(exitBody147) &&
-      /_startUptimeClock\(\)/.test(exitBody147) &&
-      /_startMemCycle\(\)/.test(exitBody147) &&
-      /updateMath\(\)/.test(exitBody147),
-    '147.6: exitStandby still plays the wake tone, un-dims, restarts the clocks, and re-syncs updateMath on wake'
+      /setGeigerRate\(/.test(exitBody147) &&
+      /updateMath\(\)/.test(exitBody147) &&
+      !/_startUptimeClock\(\)/.test(exitBody147) &&
+      !/_startMemCycle\(\)/.test(exitBody147),
+    '147.6: exitStandby plays the wake tone, un-dims, resumes geiger + re-syncs updateMath, and no longer manually restarts the clocks (observers auto-resume)'
   );
 
   // 147.7  enterStandby/exitStandby keep their idempotency guard (belt-and-suspenders
@@ -17497,6 +17517,90 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     /if \(_standbyActive\) return;/.test(enterBody147) &&
       /if \(!_standbyActive\) return;/.test(exitBody147),
     '147.7: enterStandby/exitStandby retain the _standbyActive idempotency guard (no double-dim even if called twice)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 148 — Step 2 (v2.8.0) Phase 2 A2.2: fixed-cadence timers → runtime observers (7 tests)
+// ──────────────────────────────────────────────────────────────
+//  The three fixed-cadence loops — uptime clock (1s), memory-cycle flash (15min), and
+//  overseer-log flush (30s) — are migrated off their own setIntervals onto the Ambient
+//  Runtime as observers. Two runtime refinements make this byte-identical: register()
+//  seeds _lastTick to now (a cadenceMs>0 observer first ticks one cadence later, like
+//  setInterval), and transition() restarts an observer's cadence clock when it re-enters
+//  its state set (so a paused-then-resumed observer behaves exactly like a setInterval
+//  cleared on standby and freshly restarted on wake). Tiers give the dial teeth ONLY
+//  below default: uptime + overseer are 'minimal' (baseline telemetry, never quiet);
+//  the memory-cycle flash is 'balanced' (silent at Minimal — its former gate exactly).
+//  The migrated bodies write nothing durable to the campaign (atmosphere/save boundary).
+// ══════════════════════════════════════════════════════════════
+{
+  header(
+    'Suite 148 — A2.2 uptime clock + memory cycle + overseer flush migrated to runtime observers'
+  );
+  const runtime148 = readFile('js/runtime.js');
+  const uiCore148 = readFile('js/ui-core.js');
+  const registerBody148 = extractFunctionBody(runtime148, 'register');
+  const transitionBody148 = extractFunctionBody(runtime148, 'transition');
+  const startAmbient148 = extractFunctionBody(uiCore148, '_startAmbientTimers');
+  const initOverseer148 = extractFunctionBody(uiCore148, 'initOverseerLog');
+  const tickUptime148 = extractFunctionBody(uiCore148, '_tickUptimeClock');
+  const tickMem148 = extractFunctionBody(uiCore148, '_tickMemCycle');
+
+  // 148.1  register() seeds _lastTick to now — setInterval parity (no immediate first fire)
+  assert(
+    /_lastTick:\s*_now\(\)/.test(registerBody148),
+    '148.1: register() seeds _lastTick to _now() so a cadenceMs>0 observer first ticks one full cadence after registration (setInterval parity, not an immediate fire)'
+  );
+
+  // 148.2  transition() restarts the cadence clock on state-set entry (byte-identical wake)
+  assert(
+    /nowIn && !wasIn/.test(transitionBody148) && /o\._lastTick = _now\(\)/.test(transitionBody148),
+    '148.2: transition() resets an observer _lastTick when it (re-)enters its state set — cadence restarts on wake, matching the old clear-on-standby / restart-on-wake timing'
+  );
+
+  // 148.3  uptime-clock observer: awake states only, tier minimal, 1s cadence
+  assert(
+    /id:\s*'uptime-clock'/.test(startAmbient148) &&
+      /states:\s*\['ACTIVE',\s*'IDLE'\]/.test(startAmbient148) &&
+      /tier:\s*'minimal'/.test(startAmbient148) &&
+      /cadenceMs:\s*1000/.test(startAmbient148),
+    "148.3: the uptime clock is a runtime observer (states ['ACTIVE','IDLE'], tier 'minimal', cadence 1000ms) — pauses on standby, never dial-quieted"
+  );
+
+  // 148.4  mem-cycle observer: awake states, tier balanced (dial teeth), 15-min cadence
+  assert(
+    /id:\s*'mem-cycle'/.test(startAmbient148) &&
+      /tier:\s*'balanced'/.test(startAmbient148) &&
+      /cadenceMs:\s*900000/.test(startAmbient148),
+    "148.4: the memory-cycle flash is a runtime observer (tier 'balanced', cadence 900000ms) — dial-gated by the runtime, silent at Minimal (its former immersionAllows('balanced') gate)"
+  );
+
+  // 148.5  overseer-flush observer: runs in ALL live states incl. STANDBY, tier minimal, 30s
+  assert(
+    /id:\s*'overseer-flush'/.test(initOverseer148) &&
+      /states:\s*\['READY',\s*'ACTIVE',\s*'IDLE',\s*'STANDBY'\]/.test(initOverseer148) &&
+      /tier:\s*'minimal'/.test(initOverseer148) &&
+      /cadenceMs:\s*30000/.test(initOverseer148),
+    "148.5: the overseer flush is a runtime observer including STANDBY (power-on accounting keeps ticking while blurred), tier 'minimal', cadence 30000ms"
+  );
+
+  // 148.6  the old standalone setInterval timers for these three are retired — ui-core.js
+  //        no longer calls setInterval at all (the runtime heartbeat is the one scheduler)
+  assert(
+    !/function\s+_startUptimeClock/.test(uiCore148) &&
+      !/function\s+_startMemCycle/.test(uiCore148) &&
+      !/_overseerFlushTimer/.test(uiCore148) &&
+      (uiCore148.match(/setInterval\(/g) || []).length === 0,
+    '148.6: the standalone uptime/mem-cycle/overseer setIntervals are retired — ui-core.js no longer calls setInterval (the runtime heartbeat is the single scheduler)'
+  );
+
+  // 148.7  no-durable-write: the migrated observer bodies never write the campaign save
+  assert(
+    ![tickUptime148, tickMem148, initOverseer148].some(b =>
+      /saveState|robco_v8|_logEvent|\beventLog\b/.test(b)
+    ),
+    '148.7: the migrated uptime/mem-cycle/overseer observer bodies never write the campaign save (robco_v8 / saveState / eventLog / _logEvent) — device + DOM only (atmosphere/save boundary)'
   );
 }
 
