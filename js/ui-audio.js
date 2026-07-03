@@ -510,6 +510,26 @@ function _updateOpticsBoardStatus() {
 }
 window._updateOpticsBoardStatus = _updateOpticsBoardStatus;
 
+// Module Bay SLOT 05 status line (owner report fix): reflects the REAL AI Uplink
+// connection — a validated Gemini key + selected engine — instead of a hardcoded
+// NO CARRIER string. "Validated" reuses robco_gemini_validated_key (set only inside
+// fetchAuthorizedModels()'s live 200-response success path, api.js), never a bare
+// "a key string is present" check, so pasting garbage into the key field can't show a
+// false CARRIER ESTABLISHED. Pure presentation; reads MetaStore, writes nothing.
+function _updateUplinkBoardStatus() {
+  const note = document.getElementById('uplinkStatus');
+  if (!note) return;
+  const key = MetaStore.get('robco_gemini_key');
+  const validatedKey = MetaStore.get('robco_gemini_validated_key');
+  const model = MetaStore.get('robco_gemini_model');
+  if (key && model && validatedKey && validatedKey === key) {
+    note.textContent = '> CARRIER ESTABLISHED — UPLINK LOCKED · ' + String(model).toUpperCase();
+  } else {
+    note.textContent = '> NO CARRIER — TERMINAL FULLY OPERATIONAL OFFLINE';
+  }
+}
+window._updateUplinkBoardStatus = _updateUplinkBoardStatus;
+
 function toggleAudio(key, isMuted) {
   MetaStore.set(key, isMuted);
   // Keep in-memory cache in sync so audio functions don't need localStorage reads

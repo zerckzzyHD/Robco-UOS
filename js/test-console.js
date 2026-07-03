@@ -77,21 +77,33 @@
     return document.getElementById('testConsolePanel');
   }
 
+  // Owner report fix: COLD_BOOT/READY/ACTIVE are normal-operation states with no A3
+  // ambient observer of their own, so forcing them from here was a dead button (no
+  // visible effect). Only the four states that drive a visible A3 ambient experience
+  // (idle-phosphor/standby-deepen/shutdown-crt, Suite 150) stay as one-click force
+  // buttons — REBOOT and WAKE_TO_ACTIVE (below) replace the normal-op buttons.
+  var VISIBLE_EFFECT_STATES = ['IDLE', 'STANDBY', 'SHUTDOWN', 'OFF'];
+
   function _renderTransitionButtons(panel) {
     var wrap = panel.querySelector('#testConsoleTransitions');
     if (!wrap || !window.AmbientRuntime || !Array.isArray(window.AmbientRuntime.STATES)) return;
-    wrap.innerHTML = window.AmbientRuntime.STATES.map(function (s) {
-      var label = escapeHtml(s);
-      return (
-        '<button type="button" class="btn-sm" data-test-transition="' +
-        label +
-        '" aria-label="Force Ambient Runtime transition to ' +
-        label +
-        '">' +
-        label +
-        '</button>'
-      );
-    }).join('');
+    var states = window.AmbientRuntime.STATES.filter(function (s) {
+      return VISIBLE_EFFECT_STATES.indexOf(s) !== -1;
+    });
+    wrap.innerHTML = states
+      .map(function (s) {
+        var label = escapeHtml(s);
+        return (
+          '<button type="button" class="btn-sm" data-test-transition="' +
+          label +
+          '" aria-label="Force Ambient Runtime transition to ' +
+          label +
+          '">' +
+          label +
+          '</button>'
+        );
+      })
+      .join('');
     Array.prototype.forEach.call(wrap.querySelectorAll('[data-test-transition]'), function (btn) {
       btn.addEventListener('click', function () {
         var target = btn.getAttribute('data-test-transition');
@@ -112,6 +124,68 @@
         _refresh(panel);
       });
     });
+  }
+
+  // REBOOT replays the real boot sequence (runBootSequence, ui-audio.js) instead of
+  // forcing a state the runtime auto-advances through anyway with no visible effect.
+  // The boot screen is only ever hidden via style.display/classList (never removed from
+  // the DOM — ui-audio.js), so it must be explicitly reset before re-running the
+  // sequence, or it would replay invisibly behind display:none.
+  function _rebootFromConsole(panel) {
+    try {
+      var bootScreen = document.getElementById('bootScreen');
+      var bootLines = document.getElementById('bootLines');
+      if (bootScreen) {
+        bootScreen.style.display = '';
+        bootScreen.classList.remove('boot-fade-out', 'boot-degraded');
+      }
+      if (bootLines) bootLines.innerHTML = '';
+      if (typeof window.runBootSequence === 'function') window.runBootSequence();
+    } catch (_) {
+      /* a console failure must never break boot or leak to production */
+    }
+    _refresh(panel);
+  }
+
+  // WAKE -> ACTIVE is the one-click undo for the IDLE/STANDBY/SHUTDOWN/OFF force
+  // buttons above, so a tester is never stuck in a dimmed/shutdown visual state without
+  // reloading the page. Reuses the same forceState() path (Protocol 22), never a forked
+  // transition mechanism.
+  function _wakeToActive(panel) {
+    try {
+      if (window.AmbientRuntime && typeof window.AmbientRuntime.forceState === 'function') {
+        window.AmbientRuntime.forceState('ACTIVE');
+      }
+    } catch (_) {
+      /* a forced transition must never break the console */
+    }
+    _refresh(panel);
+  }
+
+  function _wireResetControls(panel) {
+    var wrap = panel.querySelector('#testConsoleTransitions');
+    if (!wrap) return;
+    var reboot = document.createElement('button');
+    reboot.type = 'button';
+    reboot.className = 'btn-sm';
+    reboot.setAttribute('data-test-reboot', '1');
+    reboot.setAttribute('aria-label', 'Replay the boot sequence');
+    reboot.textContent = 'REBOOT';
+    reboot.addEventListener('click', function () {
+      _rebootFromConsole(panel);
+    });
+    wrap.appendChild(reboot);
+
+    var wake = document.createElement('button');
+    wake.type = 'button';
+    wake.className = 'btn-sm';
+    wake.setAttribute('data-test-wake', '1');
+    wake.setAttribute('aria-label', 'Force Ambient Runtime back to ACTIVE');
+    wake.textContent = 'WAKE → ACTIVE';
+    wake.addEventListener('click', function () {
+      _wakeToActive(panel);
+    });
+    wrap.appendChild(wake);
   }
 
   function _wireImmersionSelect(panel) {
@@ -203,6 +277,7 @@
       var panel = _mountConsole();
       if (!panel) return;
       _renderTransitionButtons(panel);
+      _wireResetControls(panel);
       _wireImmersionSelect(panel);
       _wireLiveRefresh(panel);
       _refresh(panel);

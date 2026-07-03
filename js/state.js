@@ -18,6 +18,13 @@ const META_MANIFEST = {
   robco_gemini_key: { type: 'string', default: '', owner: 'api.js' },
   robco_gemini_key_sync: { type: 'bool', default: false, owner: 'cloud.js' },
   robco_gemini_model: { type: 'string', default: '', owner: 'api.js' },
+  // Owner report fix: the SLOT 05 AI Uplink status must reflect a REAL validated
+  // handshake, not merely "a key string is present" (saveApiKeySilent() mirrors
+  // robco_gemini_key on every keystroke, before any network round-trip). This holds
+  // the exact key string that LAST passed a live fetchAuthorizedModels() 200 response —
+  // if it no longer matches robco_gemini_key (the key was edited since), the uplink
+  // status falls back to NO CARRIER with no separate invalidation wiring needed.
+  robco_gemini_validated_key: { type: 'string', default: '', owner: 'api.js' },
   robco_sfx_muted: { type: 'bool', default: false, owner: 'ui-audio.js' },
   robco_hum_muted: { type: 'bool', default: false, owner: 'ui-audio.js' },
   robco_geiger_muted: { type: 'bool', default: false, owner: 'ui-audio.js' },
@@ -252,6 +259,13 @@ function _logEvent(type, text) {
     text: String(text),
   });
   if (state.eventLog.length > EVENTLOG_CAP) state.eventLog = state.eventLog.slice(-EVENTLOG_CAP);
+  // Live-render fix (owner report): _logEvent is the ONE writer for eventLog, so this is
+  // the single choke point (Protocol 22) to re-paint the CROSSROADS RECORD + INCIDENT LOG
+  // panels the instant any caller (quick-log kill/caps, faction/quest AI-delta logging,
+  // level-up/collectible/craft/scrap/trade/sleep auto-log subscribers) logs an event —
+  // previously those panels only caught up on the next incidental loadUI() (tab switch,
+  // sleep/wait, AI sync). Guarded because state.js loads before ui-render.js defines it.
+  if (typeof renderCampaignStatus === 'function') renderCampaignStatus();
 }
 window._logEvent = _logEvent;
 

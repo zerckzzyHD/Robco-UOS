@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1950/1950 | Cache: robco-terminal-v2.7.0-r40 -->
+﻿## [Unreleased]<!-- Tests: 1956/1956 | Cache: robco-terminal-v2.7.0-r41 -->
 
 ### Added
 
@@ -28,6 +28,10 @@
 - Fixed a case where powering the terminal fully down could leave the screen completely black with no way to bring it back — a clear "PRESS TO POWER ON" button now appears whenever the terminal is shut down, and tapping it fully restores the terminal to normal.
 - Fixed hard-to-read color names on the Module Bay's phosphor tube rack, which were rendering nearly invisible against their own dark background. Also fixed the Module Bay's Schematic View clipping some control text (like the phosphor tube picker showing "ROBCO GR…" instead of the full name), and fixed the maintenance tray's buttons staying pinned to the left with an empty gap when the app is already installed — they now re-center properly.
 - Fixed the Module Bay's sound board showing only the individually-muted channel chips as pulled when you ejected the whole board (master mute) — every channel now visibly reads as unplugged together while the board is out, and each one returns to its own on/off setting the moment you reseat it.
+- Fixed several places where recording something in TERMINAL mode changed your campaign but the screen didn't visibly catch up until you switched tabs or refreshed. Logging a kill or a caps change now updates the CROSSROADS RECORD and INCIDENT LOG right away, and "arrived <location>" now actually moves your current position on the WORLD MAP instead of only marking that place as visited.
+- Fixed the Module Bay's one-time service-hatch reveal popping open the moment the terminal loaded on a wider screen, before Security & Configuration had even been opened. That panel now starts closed by default, and the hatch only ever appears the first time you actually open it.
+- Fixed the AI Uplink board always reading "NO CARRIER" even after your Gemini key was validated and an engine selected. It now shows a clear "carrier established" status with your chosen engine once the handshake actually succeeds, and reverts automatically if you edit the key afterward.
+- Fixed a few places where a partial last row of controls stayed pinned to the left with an empty gap instead of centering — the sound board's channel chips, the phosphor tube color picker, and the Save/Sync-to-cloud buttons now all center a leftover row properly.
 
 ### Improved
 
@@ -69,6 +73,7 @@
 - Fixed the developer/debug console's manual state-forcing buttons — previously only one of the seven actually did anything, since they tried to move the engine through the same real-world-only transitions it uses during normal play. Every button can now force the engine directly into any state for testing, with no change to how the engine behaves for real users.
 - Fixed a rough edge in the "living machine" engine's tab-standby handling, found while testing the new power-down behaviour above: the "welcome back" tone and chat message are meant to play only when you're genuinely returning to the terminal, never when it's powering down — but a shutdown landing right at the start of that return, or partway through the brief moment it takes to fully re-sync, could still let one or both slip through. Both cases are now guarded against directly. That sequence isn't reachable in normal play yet, but it's fixed for when it is. Internal only.
 - Laid the first foundation stone for an upcoming visual overhaul: each supported game now carries a much richer internal "identity" profile (its device look, personality, boot style, and more) in one place, ready for future updates to build its new appearance from. New Vegas's profile is filled in with real design detail; Fallout 3's is a placeholder for now. A future third game (Fallout 4) also got a starter profile added purely to prove the system scales — it isn't selectable and changes nothing about the app today. This step changes nothing you can see or do; it's groundwork only, fully covered by new automated checks.
+- Replaced three of the developer console's manual test buttons that had no visible effect with two more useful ones — one that replays the boot sequence, and one that resets the engine straight back to normal operation. Developer/staging tooling only — never visible on the live site.
 
 ---
 

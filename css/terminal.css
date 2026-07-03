@@ -3736,6 +3736,9 @@ details.bay-board.tray .bay-slot-tag {
 .tube-rack {
   display: flex;
   flex-wrap: wrap;
+  /* FIX 4 (owner report — centering rule): centers a dangling incomplete last row of
+     tubes, same reusable flex+wrap+justify-content:center pattern as .bay-tools. */
+  justify-content: center;
   gap: 8px;
   margin-top: 8px;
 }
@@ -3805,14 +3808,22 @@ html.high-lumen .tube.seated .glass {
    (toggleAudio() call unchanged) — :not(:checked) (not muted = audible) reads
    as a SEATED chip, :checked (muted) reads as a PULLED chip. Storage format
    untouched. Replaces the B2a .bay-channel-list plain checkbox list. */
+/* FIX 4 (owner report — centering rule): a CSS Grid with auto-fill columns can't center
+   an incomplete last row (nth-child needs a FIXED column count, which auto-fill never
+   has at a responsive width) — flex + wrap + justify-content:center is the reusable
+   pattern this app already established for .bay-tools, applied here so the 13-chip
+   grid's dangling last row (1 or 2 chips) centers instead of left-aligning. */
 .chip-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 8px;
   margin: 10px 0;
 }
 .chip-wrap {
   position: relative;
+  flex: 1 1 96px;
+  max-width: 140px;
 }
 .chip-input {
   position: absolute;

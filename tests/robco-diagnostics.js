@@ -12662,7 +12662,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  location-change path and the AI import path record it via the shared
 //  recordLocationVisit() helper (deduped, permanent), and renderWorldMap reads
 //  locationHistory for CURRENT / VISITED / UNKNOWN status. (Protocol 42 map fix)
-//  7 tests
+//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 114 — Map location discovery persistence');
@@ -12733,6 +12733,28 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       !/locationHistory\s*=\s*[^;]*slice\(-?\d+\)/.test(stateSrc114),
     '114.7: no destructive cap (locationHistory = …slice(-N)) anywhere — discovered locations are never un-discovered'
   );
+
+  // 114.8  owner-reported live-update fix: the quick-log "arrived <location>" TERMINAL
+  //        verb sets the location as CURRENT (moves [CURRENT] on the WORLD MAP), not just
+  //        discovered — onLocationChange(overrideLoc) is the shared setter (Protocol 22),
+  //        never a forked quick-log-only path, and mirrors the value into #stat_loc BEFORE
+  //        syncStateFromDom() so the change survives the debounced save.
+  {
+    let olcBody114b = '';
+    try {
+      olcBody114b = extractFunctionBody(uiCoreSrc114, 'onLocationChange');
+    } catch (_) {}
+    assert(
+      /function onLocationChange\(overrideLoc\)/.test(uiCoreSrc114) &&
+        /getElementById\('stat_loc'\)/.test(olcBody114b) &&
+        /locEl\.value = overrideLoc/.test(olcBody114b) &&
+        /onLocationChange\(loc\)/.test(apiSrc114) &&
+        !/markLocationVisited\(loc\);/.test(
+          (apiSrc114.match(/function _quickLogLocation\([\s\S]*?\n\}/) || [''])[0]
+        ),
+      '114.8: quick-log "arrived <location>" sets loc as CURRENT via the shared onLocationChange(overrideLoc) setter, not just markLocationVisited (discovered-but-not-current)'
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -17674,7 +17696,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 149 — Developer Console: the ONE canonical dev/debug console (15 tests)
+//  Suite 149 — Developer Console: the ONE canonical dev/debug console (16 tests)
 // ──────────────────────────────────────────────────────────────
 //  A live inspector + trigger panel for the Ambient Runtime (js/runtime.js).
 //  This IS the canonical developer/debug console the roadmap's hacking
@@ -17874,19 +17896,41 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '149.14: _devConsoleUnlocked() carries a documented MINIGAME-UNLOCK SEAM comment marking it as the one hook a future hacking minigame will flip — this is the canonical console, not a throwaway test panel'
   );
 
-  // 149.15  ALL 7 transition buttons (including SHUTDOWN) route through
-  //         AmbientRuntime.forceState() so every button can force ANY state —
-  //         not just a LEGAL neighbor of the current state (the bug this unit
-  //         fixes: previously only an adjacent-state button did anything,
-  //         since the buttons called the validated transition() directly).
-  //         The old SHUTDOWN-only special case (calling AmbientRuntime.shutdown(),
-  //         which always lands on OFF, never on SHUTDOWN itself) is retired.
+  // 149.15  owner report fix: only the 4 states with a VISIBLE A3 ambient effect
+  //         (IDLE/STANDBY/SHUTDOWN/OFF) get a force button — COLD_BOOT/READY/ACTIVE
+  //         were dead buttons (normal-op states, no observer of their own) and are
+  //         filtered out. Every remaining button still routes through
+  //         AmbientRuntime.forceState() (bypassing the LEGAL adjacency map), with the
+  //         retired SHUTDOWN-only special case (AmbientRuntime.shutdown()) still gone.
   assert(
-    /window\.AmbientRuntime\.forceState\(target\)/.test(testConsole149) &&
+    /VISIBLE_EFFECT_STATES = \['IDLE', 'STANDBY', 'SHUTDOWN', 'OFF'\]/.test(testConsole149) &&
+      /VISIBLE_EFFECT_STATES\.indexOf\(s\) !== -1/.test(testConsole149) &&
+      /window\.AmbientRuntime\.forceState\(target\)/.test(testConsole149) &&
       !/target === 'SHUTDOWN'/.test(testConsole149) &&
       !/window\.AmbientRuntime\.shutdown\(\)/.test(testConsole149) &&
       /typeof window\.AmbientRuntime\.transition === 'function'/.test(testConsole149),
-    '149.15: every transition button routes through AmbientRuntime.forceState(target) (bypassing the LEGAL adjacency map), with a graceful transition() fallback for older runtime builds — the retired SHUTDOWN-only special case is gone, so all 7 buttons force their state live'
+    '149.15: only the 4 states with a visible A3 ambient effect (IDLE/STANDBY/SHUTDOWN/OFF) get a force button — COLD_BOOT/READY/ACTIVE (dead buttons, owner report) are filtered out; every remaining button still routes through AmbientRuntime.forceState(target), the retired SHUTDOWN-only special case stays gone'
+  );
+
+  // 149.16  owner report fix: REBOOT replays the real boot sequence (resetting the
+  //         boot screen's display/classList first, since it's hidden via style, never
+  //         removed from the DOM) and WAKE -> ACTIVE is the one-click undo for the
+  //         IDLE/STANDBY/SHUTDOWN/OFF force buttons — both replace the retired
+  //         COLD_BOOT/READY/ACTIVE buttons, and neither writes the campaign save.
+  const rebootFn149 = (testConsole149.match(
+    /function _rebootFromConsole\(panel\)[\s\S]*?\n {2}\}/
+  ) || [''])[0];
+  const wakeFn149 = (testConsole149.match(/function _wakeToActive\(panel\)[\s\S]*?\n {2}\}/) || [
+    '',
+  ])[0];
+  assert(
+    /bootScreen\.style\.display = ''/.test(rebootFn149) &&
+      /classList\.remove\('boot-fade-out', 'boot-degraded'\)/.test(rebootFn149) &&
+      /window\.runBootSequence === 'function'\) window\.runBootSequence\(\)/.test(rebootFn149) &&
+      /window\.AmbientRuntime\.forceState\('ACTIVE'\)/.test(wakeFn149) &&
+      /_wireResetControls\(panel\)/.test(testConsole149) &&
+      !/saveState|robco_v8|localStorage\./.test(rebootFn149 + wakeFn149),
+    '149.16: REBOOT resets the boot screen then replays window.runBootSequence(); WAKE → ACTIVE force-states back to ACTIVE (the undo for the IDLE/STANDBY/SHUTDOWN/OFF buttons); neither touches the campaign save (owner report fix)'
   );
 }
 
@@ -18291,17 +18335,18 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   // 151.10  quick-log handlers REUSE existing native setters — none are forked
   //         (Protocol 22): kill writes through _logEvent, caps mirrors #c_caps
   //         before saveState (the WU-N2 idiom), location calls the shared
-  //         markLocationVisited(), faction calls the shared adjustFaction()
-  //         gated on getFactionRegistry()
+  //         onLocationChange() (owner report fix: sets CURRENT location, not just
+  //         markLocationVisited's discovered-but-not-current mark), faction calls the
+  //         shared adjustFaction() gated on getFactionRegistry()
   assert(
     /_logEvent\('kill', text\)/.test(apiSrc151) &&
       /document\.getElementById\('c_caps'\)/.test(
         extractFunctionBody(apiSrc151, '_quickLogCaps')
       ) &&
-      /markLocationVisited\(loc\)/.test(apiSrc151) &&
+      /onLocationChange\(loc\)/.test(apiSrc151) &&
       /adjustFaction\(match\.key, field, 5\)/.test(apiSrc151) &&
       /getFactionRegistry\(\)/.test(extractFunctionBody(apiSrc151, '_quickLogFaction')),
-    '151.10: quick-log handlers reuse _logEvent/markLocationVisited/adjustFaction/getFactionRegistry — no forked duplicate logic'
+    '151.10: quick-log handlers reuse _logEvent/onLocationChange/adjustFaction/getFactionRegistry — no forked duplicate logic'
   );
 
   // 151.11  the faction quick-log falls through (returns false) on an unknown
@@ -18897,7 +18942,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  stored device prefs; every control still calls the setter it always
 //  called (Protocol 22/23) — zero new campaign state, zero AI involvement.
 //  The 13 SLOT-02 audio channels stay in their CURRENT (un-flipped) polarity
-//  this unit — B2b converts them to DIP chips. 21 tests.
+//  this unit — B2b converts them to DIP chips. 23 tests.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 154 — Step 2 Phase 2 B2a: Module Bay core reframe');
@@ -19125,19 +19170,25 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '154.15: SLOT 05 keeps its amber AI-uplink identity; SLOTs 01-04 do not (LOCKED-4)'
   );
 
-  // 154.16  initModuleBay() is wired from window.onload AFTER the boot-restore
-  //         functions it depends on (optics/audio/power/immersion prefs already
-  //         restored), so its combined status lines reflect real boot state
+  // 154.16  owner report fix: initModuleBay() is NO LONGER called unconditionally from
+  //         window.onload (that fired the first-visit hatch ceremony at page load,
+  //         before the Courier had touched anything) — it's wired instead to
+  //         securityConfigPanel's own toggle listener inside _wirePanelPersistence(),
+  //         so the ceremony only ever fires on a genuine user-initiated panel open.
   const onloadBody154 = (core154.match(/window\.onload = async function \(\) \{[\s\S]*?\n\};/) || [
     '',
   ])[0];
+  const panelPersistFn154 = (core154.match(
+    /function _wirePanelPersistence\(\)[\s\S]*?\n\}\n\nfunction/
+  ) || [''])[0];
   assert(
-    (() => {
-      const order = ['_restoreOpticsPreference', '_restoreDevicePrefs', 'initModuleBay'];
-      const idxs = order.map(fn => onloadBody154.indexOf(fn + '('));
-      return idxs.every(i => i !== -1) && idxs[0] < idxs[2] && idxs[1] < idxs[2];
-    })(),
-    '154.16: window.onload calls initModuleBay() after _restoreOpticsPreference()/_restoreDevicePrefs() (correct boot order)'
+    !/initModuleBay\(/.test(onloadBody154) &&
+      /_wirePanelPersistence\(\);/.test(onloadBody154) &&
+      /d\.id === 'securityConfigPanel' && d\.open && typeof initModuleBay === 'function'/.test(
+        panelPersistFn154
+      ) &&
+      /initModuleBay\(\);/.test(panelPersistFn154),
+    "154.16: initModuleBay() is wired to securityConfigPanel's own toggle event (inside _wirePanelPersistence()) instead of window.onload — the hatch ceremony never fires at page load (Protocol 42 fix)"
   );
 
   // 154.17  game-agnostic (Protocol 38) — no FNV/FO3/Fallout literals anywhere in
@@ -19213,6 +19264,39 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       ) &&
       /else renderModuleBay\(\)/.test(toggleSchemFn154),
     '154.21: renderModuleBay() re-syncs every boolean control’s .checked from MetaStore (closing the bay↔schematic drift a live browser test found), and toggleBaySchematic() re-syncs on switching back to the bay (Protocol 42 fix)'
+  );
+
+  // 154.22  owner report fix: the Security & Configuration panel has its own stable id
+  //         and defaults CLOSED absent a saved user choice on EVERY viewport (excluded
+  //         from the generic desktop-auto-open branch), so the hatch never shows before
+  //         the Courier has actually clicked the panel open.
+  assert(
+    /<details\s+id="securityConfigPanel"\s+class="panel"/.test(html154) &&
+      /id !== 'securityConfigPanel' &&\s*\n\s*window\.matchMedia\('\(min-width: 1000px\)/.test(
+        core154
+      ),
+    '154.22: #securityConfigPanel defaults closed on every viewport (excluded from the desktop auto-open branch) so the Module Bay hatch never shows at page load (owner report fix)'
+  );
+
+  // 154.23  owner report fix: SLOT 05's status line reflects a REAL validated Gemini
+  //         key + engine, not a hardcoded NO CARRIER string — reusing
+  //         robco_gemini_validated_key (set only inside fetchAuthorizedModels()'s live
+  //         200-response success path) rather than a bare "a key string exists" check,
+  //         wired live into renderModuleBay() and refreshed on every key edit.
+  const uplinkStatusFn154 = (audio154.match(
+    /function _updateUplinkBoardStatus\(\)[\s\S]*?\n\}/
+  ) || [''])[0];
+  const apiSrc154 = readFile('js/api.js');
+  assert(
+    /<p class="board-status alert" id="uplinkStatus">/.test(html154) &&
+      /robco_gemini_validated_key/.test(state154) &&
+      /getElementById\('uplinkStatus'\)/.test(uplinkStatusFn154) &&
+      /validatedKey === key/.test(uplinkStatusFn154) &&
+      /CARRIER ESTABLISHED/.test(uplinkStatusFn154) &&
+      /_updateUplinkBoardStatus === 'function'\) _updateUplinkBoardStatus\(\)/.test(core154) &&
+      /MetaStore\.set\('robco_gemini_validated_key', rawKey\)/.test(apiSrc154) &&
+      /_updateUplinkBoardStatus === 'function'\) _updateUplinkBoardStatus\(\)/.test(apiSrc154),
+    '154.23: SLOT 05 reflects the REAL AI Uplink connection (validated key + model) via _updateUplinkBoardStatus(), live-wired into renderModuleBay(), fetchAuthorizedModels() success, and every key edit — never a hardcoded NO CARRIER (owner report fix)'
   );
 }
 
@@ -20057,6 +20141,58 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   assert(
     !/class="header"/.test(htmlSource) && !/^\.header\s*\{/m.test(cssSource158),
     '158.18: the retired .header class/rule leaves no dead markup or CSS behind'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 159 — Owner bug-fix batch: eventLog live-render + centering rule
+//  Two cross-cutting fixes from a batch of owner-reported staging bugs that don't
+//  have a single natural home suite (the other three fixes in the same batch extend
+//  Suites 114/151/149/154 directly): (1) _logEvent() — the ONE writer for the
+//  Terminal Record (state.eventLog) — now re-paints the CROSSROADS RECORD + INCIDENT
+//  LOG panels the instant ANY caller logs an event, instead of only catching up on
+//  the next incidental loadUI() (tab switch, sleep/wait, AI sync); this single choke
+//  point covers kill/caps quick-logs, faction/quest AI-delta logging, and every
+//  level-up/collectible/craft/scrap/trade/sleep auto-log subscriber without touching
+//  each call site. (2) the centering rule: a CSS Grid with auto-fill columns can't
+//  center an incomplete last row (nth-child needs a FIXED column count, which
+//  auto-fill never has at a responsive width) — the 13-chip grid and the 7-tube
+//  phosphor rack both move to the reusable flex+wrap+justify-content:center pattern
+//  this app already established for .bay-tools, and the SAVE/cloud-sync button row
+//  gets the same treatment.
+//  2 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 159 — Owner bug-fix batch: eventLog live-render + centering rule');
+  const cssSource159 = readFile('css/terminal.css');
+  const logEventFn159 = (stateSource.match(/function _logEvent\(type, text\)[\s\S]*?\n\}/) || [
+    '',
+  ])[0];
+
+  // 159.1  _logEvent() is the single writer for state.eventLog (Protocol 22) — patching
+  //        it once re-renders CROSSROADS RECORD + INCIDENT LOG for every current AND
+  //        future caller, closing the owner-reported "doesn't live update, I have to
+  //        refresh" gap without touching every individual call site.
+  assert(
+    /typeof renderCampaignStatus === 'function'\) renderCampaignStatus\(\);/.test(logEventFn159),
+    '159.1: _logEvent() re-renders renderCampaignStatus() (CROSSROADS RECORD + INCIDENT LOG) after every append — the single choke point that fixes the live-update gap for every eventLog writer (owner report)'
+  );
+
+  // 159.2  the centering rule: .chip-grid + .tube-rack use the reusable
+  //        flex+wrap+justify-content:center pattern (never CSS Grid auto-fill, which
+  //        can't center a responsive incomplete last row), and the SAVE/cloud-sync
+  //        button row gets the same treatment.
+  const saveBtnIdx159 = htmlSource.indexOf('id="btnSaveToCloud"');
+  const saveBtnRowSlice159 = htmlSource.slice(Math.max(0, saveBtnIdx159 - 400), saveBtnIdx159);
+  assert(
+    /\.chip-grid \{[\s\S]{0,120}display:\s*flex;[\s\S]{0,120}justify-content:\s*center;/.test(
+      cssSource159
+    ) &&
+      !/\.chip-grid \{[\s\S]{0,120}display:\s*grid;/.test(cssSource159) &&
+      /\.tube-rack \{[\s\S]{0,300}justify-content:\s*center;/.test(cssSource159) &&
+      saveBtnIdx159 !== -1 &&
+      /justify-content:\s*center/.test(saveBtnRowSlice159),
+    '159.2: .chip-grid and .tube-rack use the reusable flex+wrap+justify-content:center pattern (not CSS Grid auto-fill) and the SAVE/cloud-sync button row is centered — an incomplete last row never left-aligns (owner report, centering rule)'
   );
 }
 

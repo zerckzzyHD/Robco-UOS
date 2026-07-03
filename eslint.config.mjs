@@ -212,6 +212,7 @@ export default [
         _seatOpticsTube: 'readonly',
         _updateOpticsBoardStatus: 'readonly',
         _updateSonicBoardStatus: 'readonly',
+        _updateUplinkBoardStatus: 'readonly',
         renderModuleBay: 'readonly',
         initModuleBay: 'readonly',
         releaseBayHatch: 'readonly',

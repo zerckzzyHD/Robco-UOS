@@ -502,6 +502,7 @@ function renderModuleBay() {
   if (hwSfxToggle) hwSfxToggle.checked = MetaStore.get('robco_hardwaresfx_muted') !== 'true';
   if (typeof _updateOpticsBoardStatus === 'function') _updateOpticsBoardStatus();
   if (typeof _updateSonicBoardStatus === 'function') _updateSonicBoardStatus();
+  if (typeof _updateUplinkBoardStatus === 'function') _updateUplinkBoardStatus();
   const schem = document.getElementById('baySchematic');
   if (schem && !schem.hidden) renderBaySchematic();
 }
@@ -1212,12 +1213,16 @@ function _wirePanelPersistence() {
       if (savedPanelState[id]) d.setAttribute('open', '');
       else d.removeAttribute('open');
     } else if (
+      id !== 'securityConfigPanel' &&
       window.matchMedia('(min-width: 1000px) and (hover: hover) and (pointer: fine)').matches
     ) {
       // Default-open panels only on a real mouse-driven desktop — same gate as the desktop
       // CSS shell. matchMedia (not raw innerWidth) is viewport-aware + robust to a first-paint
       // width race, so a touch phone never boots into the desktop "all panels open" state
       // even if window.innerWidth momentarily mis-reports >=1000 (Protocol 42).
+      // securityConfigPanel is excluded (owner report): the Module Bay's service-hatch
+      // ceremony must only fire on a genuine first user-initiated open, never at boot —
+      // this panel stays closed by default on every viewport absent a saved user choice.
       d.setAttribute('open', '');
     }
     d.addEventListener('toggle', () => {
@@ -1226,6 +1231,11 @@ function _wirePanelPersistence() {
       MetaStore.set('robco_panel_state', JSON.stringify(ps));
       if (d.id === 'worldMapPanel' && d.open && typeof renderWorldMap === 'function')
         renderWorldMap();
+      // Module Bay hatch ceremony (owner report): fires only on the panel's OWN toggle —
+      // never unconditionally at page load — so a Courier who has never opened Settings
+      // never sees the hatch until they actually click it open.
+      if (d.id === 'securityConfigPanel' && d.open && typeof initModuleBay === 'function')
+        initModuleBay();
     });
   });
 
@@ -1649,10 +1659,9 @@ window.onload = async function () {
     _wireAmbientExperiences(); // A3: IDLE/STANDBY-deepen/SHUTDOWN dial-gated ambient observers
     initAmbientRuntime(); // A1: Ambient Runtime — additive state machine + observer scheduler (parallel to standby; owns no timers yet)
     initTestConsole(); // staging/dev-only Test Console — no-ops (stays hidden) on production
-    _wirePanelPersistence();
+    _wirePanelPersistence(); // also wires the Module Bay hatch ceremony to securityConfigPanel's own first user-open (owner report — never at boot)
     _restoreOpticsPreference();
     _restoreDevicePrefs();
-    initModuleBay(); // Step 2 · Phase 2 · B2a: Module Bay hatch first-visit + status sync
     _wireKeyboardShortcuts();
     _runBootSequenceAndBriefing();
     _startAmbientTimers();
@@ -2170,9 +2179,15 @@ function routeLaunchShortcut() {
   action();
 }
 
-// Called by #stat_loc onchange: persists the new location and re-renders so the
-// current-zone highlight updates. View preference (state.mapView) is kept as-is.
-function onLocationChange() {
+// Called by #stat_loc onchange (no arg — reads the value the user just typed into the
+// input) AND by the quick-log "arrived <location>" TERMINAL verb (api.js, passes the new
+// location text explicitly since there's no onchange DOM event to read it from). One
+// function, not a forked quick-log-only setter (Protocol 22) — this is what makes
+// "arrived Primm" actually move [CURRENT] on the WORLD MAP instead of only adding Primm
+// to the visited list (the owner-reported live-update bug: quick-log used to call
+// markLocationVisited(), which records a discovery without ever changing state.loc).
+// View preference (state.mapView) is kept as-is.
+function onLocationChange(overrideLoc) {
   // Fog-of-war: the place we're leaving stays discovered, and the new place becomes
   // discovered too — so the previous location shows [VISITED] (not [UNKNOWN]) once the
   // Courier moves on. Capture the old location BEFORE syncStateFromDom() overwrites
@@ -2180,6 +2195,13 @@ function onLocationChange() {
   // saveState() persists the updated locationHistory in the same (debounced) write;
   // cloud sync stays manual (no auto-push).
   const prevLoc = state.loc;
+  if (overrideLoc) {
+    // Mirror the new value into #stat_loc BEFORE syncStateFromDom() reads it back — the
+    // same "mirror to DOM before saveState" idiom #c_caps uses (WU-N2), since
+    // syncStateFromDom() always re-reads state.loc from this element.
+    const locEl = document.getElementById('stat_loc');
+    if (locEl) locEl.value = overrideLoc;
+  }
   syncStateFromDom();
   recordLocationVisit(prevLoc);
   recordLocationVisit(state.loc);

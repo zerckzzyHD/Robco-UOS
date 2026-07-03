@@ -7238,7 +7238,7 @@ Check ($registry113.Contains('[TRADE]') -and (-not $router113.Contains("'[TRADE]
     '113.7: [TRADE] is advertised in help as the native barter PANEL and is correctly NOT a NATIVE_COMMAND_ROUTER token'
 
 # ===========================================================
-# Suite 114 -- Map location discovery persistence (fog-of-war) (7 tests)
+# Suite 114 -- Map location discovery persistence (fog-of-war) (8 tests)
 # A location stays [VISITED] once visited -- both the manual location-change path and
 # the AI import path record it via the shared recordLocationVisit() helper (deduped,
 # permanent); renderWorldMap reads locationHistory for CURRENT/VISITED/UNKNOWN.
@@ -7250,7 +7250,9 @@ $apiSrc114    = Read-Src "js/api.js"
 $uiCoreSrc114 = Read-Src "js/ui-core.js"
 $uiRender114  = Read-Src "js/ui-render.js"
 $recordBody114 = [regex]::Match($stateSrc114, '(?s)function recordLocationVisit\([\s\S]*?\n\}').Value
-$olcBody114    = [regex]::Match($uiCoreSrc114, '(?s)function onLocationChange\(\)[\s\S]*?\n\}').Value
+# (?s)function onLocationChange\([^)]*\) -- signature-agnostic (owner fix adds an
+# optional overrideLoc param), mirroring the JS runner's extractFunctionBody() helper.
+$olcBody114    = [regex]::Match($uiCoreSrc114, '(?s)function onLocationChange\([^)]*\)[\s\S]*?\n\}').Value
 
 # 114.1  shared helper recordLocationVisit() defined in state.js
 Check ([bool]($stateSrc114 -match 'function recordLocationVisit\(')) `
@@ -7279,6 +7281,13 @@ Check ([bool]($apiSrc114 -match "'collectibles', 'traits', 'skillBooks', 'magazi
 # 114.7  permanence guard -- no destructive 10-cap on locationHistory anywhere
 Check ((-not ($apiSrc114 -match 'locationHistory\s*=\s*[^;]*slice\(-?\d+\)')) -and (-not ($stateSrc114 -match 'locationHistory\s*=\s*[^;]*slice\(-?\d+\)'))) `
     '114.7: no destructive cap (locationHistory = ...slice(-N)) anywhere -- discovered locations are never un-discovered'
+
+# 114.8  owner-reported live-update fix: quick-log "arrived <location>" sets loc as
+#        CURRENT via the shared onLocationChange(overrideLoc) setter, not just
+#        markLocationVisited (discovered-but-not-current)
+$quickLogLocFn114 = [regex]::Match($apiSrc114, '(?s)function _quickLogLocation\([\s\S]*?\n\}').Value
+Check (($uiCoreSrc114 -match 'function onLocationChange\(overrideLoc\)') -and ($olcBody114 -match "getElementById\('stat_loc'\)") -and ($olcBody114 -match 'locEl\.value = overrideLoc') -and ($apiSrc114 -match 'onLocationChange\(loc\)') -and (-not ($quickLogLocFn114 -match 'markLocationVisited\(loc\);'))) `
+    '114.8: quick-log "arrived <location>" sets loc as CURRENT via the shared onLocationChange(overrideLoc) setter, not just markLocationVisited (discovered-but-not-current)'
 
 # ===========================================================
 # Suite 115 -- WU-F1 Sustained Power Cell (Screen Wake Lock) (8 tests)
@@ -10365,7 +10374,7 @@ Check (
 ) '148.7: the migrated uptime/mem-cycle/overseer observer bodies never write the campaign save (robco_v8 / saveState / eventLog / _logEvent) -- device + DOM only (atmosphere/save boundary)'
 
 # ===========================================================
-# Suite 149 -- Developer Console: the ONE canonical dev/debug console (15 tests).
+# Suite 149 -- Developer Console: the ONE canonical dev/debug console (16 tests).
 # Mirrors JS Suite 149. A live inspector + trigger panel for the Ambient
 # Runtime. This IS the canonical developer/debug console the roadmap's
 # hacking minigame will later unlock in normal builds -- not a throwaway test
@@ -10502,19 +10511,36 @@ Check (
     ($testConsole149 -match 'canonical dev/debug console')
 ) "149.14: _devConsoleUnlocked() carries a documented MINIGAME-UNLOCK SEAM comment marking it as the one hook a future hacking minigame will flip -- this is the canonical console, not a throwaway test panel"
 
-# 149.15  ALL 7 transition buttons (including SHUTDOWN) route through
-#         AmbientRuntime.forceState() so every button can force ANY state --
-#         not just a LEGAL neighbor of the current state (the bug this unit
-#         fixes: previously only an adjacent-state button did anything, since
-#         the buttons called the validated transition() directly). The old
-#         SHUTDOWN-only special case (calling AmbientRuntime.shutdown(), which
-#         always lands on OFF, never on SHUTDOWN itself) is retired.
+# 149.15  owner report fix: only the 4 states with a VISIBLE A3 ambient effect
+#         (IDLE/STANDBY/SHUTDOWN/OFF) get a force button -- COLD_BOOT/READY/ACTIVE
+#         were dead buttons (normal-op states, no observer of their own) and are
+#         filtered out. Every remaining button still routes through
+#         AmbientRuntime.forceState() (bypassing the LEGAL adjacency map), with the
+#         retired SHUTDOWN-only special case (AmbientRuntime.shutdown()) still gone.
 Check (
+    ($testConsole149 -match "VISIBLE_EFFECT_STATES = \['IDLE', 'STANDBY', 'SHUTDOWN', 'OFF'\]") -and
+    ($testConsole149 -match 'VISIBLE_EFFECT_STATES\.indexOf\(s\) !== -1') -and
     ($testConsole149 -match 'window\.AmbientRuntime\.forceState\(target\)') -and
     (-not ($testConsole149 -match "target === 'SHUTDOWN'")) -and
     (-not ($testConsole149 -match 'window\.AmbientRuntime\.shutdown\(\)')) -and
     ($testConsole149 -match "typeof window\.AmbientRuntime\.transition === 'function'")
-) '149.15: every transition button routes through AmbientRuntime.forceState(target) (bypassing the LEGAL adjacency map), with a graceful transition() fallback for older runtime builds -- the retired SHUTDOWN-only special case is gone, so all 7 buttons force their state live'
+) '149.15: only the 4 states with a visible A3 ambient effect (IDLE/STANDBY/SHUTDOWN/OFF) get a force button -- COLD_BOOT/READY/ACTIVE (dead buttons, owner report) are filtered out; every remaining button still routes through AmbientRuntime.forceState(target), the retired SHUTDOWN-only special case stays gone'
+
+# 149.16  owner report fix: REBOOT replays the real boot sequence (resetting the
+#         boot screen's display/classList first, since it's hidden via style, never
+#         removed from the DOM) and WAKE -> ACTIVE is the one-click undo for the
+#         IDLE/STANDBY/SHUTDOWN/OFF force buttons -- both replace the retired
+#         COLD_BOOT/READY/ACTIVE buttons, and neither writes the campaign save.
+$rebootFn149 = Get-FunctionBody $testConsole149 '_rebootFromConsole'
+$wakeFn149 = Get-FunctionBody $testConsole149 '_wakeToActive'
+Check (
+    ($rebootFn149 -match "bootScreen\.style\.display = ''") -and
+    ($rebootFn149 -match "classList\.remove\('boot-fade-out', 'boot-degraded'\)") -and
+    ($rebootFn149 -match "window\.runBootSequence === 'function'\) window\.runBootSequence\(\)") -and
+    ($wakeFn149 -match "window\.AmbientRuntime\.forceState\('ACTIVE'\)") -and
+    ($testConsole149 -match '_wireResetControls\(panel\)') -and
+    (-not (($rebootFn149 + $wakeFn149) -match 'saveState|robco_v8|localStorage\.'))
+) '149.16: REBOOT resets the boot screen then replays window.runBootSequence(); WAKE -> ACTIVE force-states back to ACTIVE (the undo for the IDLE/STANDBY/SHUTDOWN/OFF buttons); neither touches the campaign save (owner report fix)'
 
 # ===========================================================
 # Suite 150 -- Step 2 (v2.8.0) Phase 2 A3: IDLE/STANDBY/SHUTDOWN ambient
@@ -10768,17 +10794,18 @@ Check (
 # 151.10  quick-log handlers REUSE existing native setters -- none are forked
 #         (Protocol 22): kill writes through _logEvent, caps mirrors #c_caps
 #         before saveState (the WU-N2 idiom), location calls the shared
-#         markLocationVisited(), faction calls the shared adjustFaction()
-#         gated on getFactionRegistry()
+#         onLocationChange() (owner report fix: sets CURRENT location, not just
+#         markLocationVisited's discovered-but-not-current mark), faction calls the
+#         shared adjustFaction() gated on getFactionRegistry()
 $quickLogCapsBody151 = Get-FunctionBody $apiSrc151 '_quickLogCaps'
 $quickLogFactionBody151 = Get-FunctionBody $apiSrc151 '_quickLogFaction'
 Check (
     ($apiSrc151 -match "_logEvent\('kill', text\)") -and
     ($quickLogCapsBody151 -match "document\.getElementById\('c_caps'\)") -and
-    ($apiSrc151 -match "markLocationVisited\(loc\)") -and
+    ($apiSrc151 -match "onLocationChange\(loc\)") -and
     ($apiSrc151 -match "adjustFaction\(match\.key, field, 5\)") -and
     ($quickLogFactionBody151 -match "getFactionRegistry\(\)")
-) "151.10: quick-log handlers reuse _logEvent/markLocationVisited/adjustFaction/getFactionRegistry -- no forked duplicate logic"
+) "151.10: quick-log handlers reuse _logEvent/onLocationChange/adjustFaction/getFactionRegistry -- no forked duplicate logic"
 
 # 151.11  the faction quick-log falls through (returns false) on an unknown
 #         key, rather than blindly creating one -- the caller then shows the
@@ -11085,7 +11112,7 @@ Check (
 ) "153.9: CACHE_NAME is a well-formed robco-terminal-v2.7.0-rN revision string (Protocol 1)"
 
 # ===========================================================
-# Suite 154 -- Step 2 (v2.8.0) Phase 2 B2a: MODULE BAY core reframe (21 tests)
+# Suite 154 -- Step 2 (v2.8.0) Phase 2 B2a: MODULE BAY core reframe (23 tests)
 # The Security & Configuration panel reframed as installable hardware
 # (owner-approved mockup, Protocol 25 sanctioned exception). ONE-TRUTH MODEL:
 # the bay + the permanent Schematic View are both projections of the SAME
@@ -11263,19 +11290,21 @@ Check (
     (-not ($html154 -match '(?s)<h3 style="color: var\(--robco-alert\)">.{0,40}&gt; SLOT 0[1-4]'))
 ) "154.15: SLOT 05 keeps its amber AI-uplink identity; SLOTs 01-04 do not (LOCKED-4)"
 
-# 154.16  initModuleBay() is wired from window.onload AFTER the boot-restore
-#         functions it depends on (optics/audio/power/immersion prefs already
-#         restored), so its combined status lines reflect real boot state
+# 154.16  owner report fix: initModuleBay() is NO LONGER called unconditionally from
+#         window.onload (that fired the first-visit hatch ceremony at page load,
+#         before the Courier had touched anything) -- it's wired instead to
+#         securityConfigPanel's own toggle listener inside _wirePanelPersistence(),
+#         so the ceremony only ever fires on a genuine user-initiated panel open.
 $onloadIdx154 = $core154.IndexOf('window.onload = async function ()')
 $onloadEnd154 = $core154.IndexOf("`n};", $onloadIdx154)
 $onloadBody154 = $core154.Substring($onloadIdx154, $onloadEnd154 - $onloadIdx154)
-$idxOptics154 = $onloadBody154.IndexOf('_restoreOpticsPreference(')
-$idxPrefs154  = $onloadBody154.IndexOf('_restoreDevicePrefs(')
-$idxBay154    = $onloadBody154.IndexOf('initModuleBay(')
+$panelPersistFn154 = Get-FunctionBody $core154 '_wirePanelPersistence'
 Check (
-    ($idxOptics154 -ge 0) -and ($idxPrefs154 -ge 0) -and ($idxBay154 -ge 0) -and
-    ($idxOptics154 -lt $idxBay154) -and ($idxPrefs154 -lt $idxBay154)
-) "154.16: window.onload calls initModuleBay() after _restoreOpticsPreference()/_restoreDevicePrefs() (correct boot order)"
+    (-not ($onloadBody154 -match 'initModuleBay\(')) -and
+    ($onloadBody154 -match '_wirePanelPersistence\(\);') -and
+    ($panelPersistFn154 -match "d\.id === 'securityConfigPanel' && d\.open && typeof initModuleBay === 'function'") -and
+    ($panelPersistFn154 -match 'initModuleBay\(\);')
+) "154.16: initModuleBay() is wired to securityConfigPanel's own toggle event (inside _wirePanelPersistence()) instead of window.onload -- the hatch ceremony never fires at page load (Protocol 42 fix)"
 
 # 154.17  game-agnostic (Protocol 38) -- no FNV/FO3/Fallout literals anywhere in
 #         the Module Bay markup or its controller functions
@@ -11342,6 +11371,33 @@ Check (
     ($renderBayFn154b -match "el\.checked = MetaStore\.get\(BAY_CHECKBOX_SYNC_MAP\[id\]\) === 'true'") -and
     ($toggleSchemFn154b -match 'else renderModuleBay\(\)')
 ) "154.21: renderModuleBay() re-syncs every boolean control's .checked from MetaStore (closing the bay<->schematic drift a live browser test found), and toggleBaySchematic() re-syncs on switching back to the bay (Protocol 42 fix)"
+
+# 154.22  owner report fix: the Security & Configuration panel has its own stable id
+#         and defaults CLOSED absent a saved user choice on EVERY viewport (excluded
+#         from the generic desktop-auto-open branch), so the hatch never shows before
+#         the Courier has actually clicked the panel open.
+Check (
+    ($html154 -match '<details\s+id="securityConfigPanel"\s+class="panel"') -and
+    ($core154 -match "(?s)id !== 'securityConfigPanel' &&\s*\n\s*window\.matchMedia\('\(min-width: 1000px\)")
+) "154.22: #securityConfigPanel defaults closed on every viewport (excluded from the desktop auto-open branch) so the Module Bay hatch never shows at page load (owner report fix)"
+
+# 154.23  owner report fix: SLOT 05's status line reflects a REAL validated Gemini
+#         key + engine, not a hardcoded NO CARRIER string -- reusing
+#         robco_gemini_validated_key (set only inside fetchAuthorizedModels()'s live
+#         200-response success path) rather than a bare "a key string exists" check,
+#         wired live into renderModuleBay() and refreshed on every key edit.
+$uplinkStatusFn154 = Get-FunctionBody $audio154 '_updateUplinkBoardStatus'
+$apiSrc154 = Read-Src "js/api.js"
+Check (
+    ($html154 -match '<p class="board-status alert" id="uplinkStatus">') -and
+    ($state154 -match 'robco_gemini_validated_key') -and
+    ($uplinkStatusFn154 -match "getElementById\('uplinkStatus'\)") -and
+    ($uplinkStatusFn154 -match 'validatedKey === key') -and
+    ($uplinkStatusFn154 -match 'CARRIER ESTABLISHED') -and
+    ($core154 -match "_updateUplinkBoardStatus === 'function'\) _updateUplinkBoardStatus\(\)") -and
+    ($apiSrc154 -match "MetaStore\.set\('robco_gemini_validated_key', rawKey\)") -and
+    ($apiSrc154 -match "_updateUplinkBoardStatus === 'function'\) _updateUplinkBoardStatus\(\)")
+) "154.23: SLOT 05 reflects the REAL AI Uplink connection (validated key + model) via _updateUplinkBoardStatus(), live-wired into renderModuleBay(), fetchAuthorizedModels() success, and every key edit -- never a hardcoded NO CARRIER (owner report fix)"
 
 # ===========================================================
 # Suite 155 -- Step 2 (v2.7.0) Phase 2 B2b: Module Bay visual fidelity + fixes (16 tests)
@@ -11984,6 +12040,46 @@ Check (
 Check (
     (-not ($html158 -match 'class="header"')) -and (-not ($css158 -match '(?m)^\.header\s*\{'))
 ) "158.18: the retired .header class/rule leaves no dead markup or CSS behind"
+
+# ===========================================================
+# Suite 159 -- Owner bug-fix batch: eventLog live-render + centering rule (2 tests)
+# Two cross-cutting fixes from a batch of owner-reported staging bugs that don't have a
+# single natural home suite (the other three fixes in the same batch extend Suites
+# 114/151/149/154 directly): (1) _logEvent() -- the ONE writer for the Terminal Record
+# (state.eventLog) -- now re-paints CROSSROADS RECORD + INCIDENT LOG the instant ANY
+# caller logs an event. (2) the centering rule: the 13-chip grid and 7-tube phosphor
+# rack move to the reusable flex+wrap+justify-content:center pattern already
+# established by .bay-tools, and the SAVE/cloud-sync button row gets the same
+# treatment. Mirrors JS Suite 159.
+# ===========================================================
+Sep "Suite 159 -- Owner bug-fix batch: eventLog live-render + centering rule"
+$stateSrc159 = Read-Src "js/state.js"
+$htmlSrc159 = Read-Src "index.html"
+$cssSrc159 = Read-Src "css/terminal.css"
+$logEventFn159 = Get-FunctionBody $stateSrc159 '_logEvent'
+
+# 159.1  _logEvent() is the single writer for state.eventLog (Protocol 22) -- patching
+#        it once re-renders CROSSROADS RECORD + INCIDENT LOG for every current AND
+#        future caller, closing the owner-reported "doesn't live update, I have to
+#        refresh" gap without touching every individual call site.
+Check (
+    $logEventFn159 -match "typeof renderCampaignStatus === 'function'\) renderCampaignStatus\(\);"
+) "159.1: _logEvent() re-renders renderCampaignStatus() (CROSSROADS RECORD + INCIDENT LOG) after every append -- the single choke point that fixes the live-update gap for every eventLog writer (owner report)"
+
+# 159.2  the centering rule: .chip-grid + .tube-rack use the reusable
+#        flex+wrap+justify-content:center pattern (never CSS Grid auto-fill, which
+#        can't center a responsive incomplete last row), and the SAVE/cloud-sync
+#        button row gets the same treatment.
+$saveBtnIdx159 = $htmlSrc159.IndexOf('id="btnSaveToCloud"')
+$saveBtnRowStart159 = [Math]::Max(0, $saveBtnIdx159 - 400)
+$saveBtnRowSlice159 = $htmlSrc159.Substring($saveBtnRowStart159, $saveBtnIdx159 - $saveBtnRowStart159)
+Check (
+    ($cssSrc159 -match "(?s)\.chip-grid \{.{0,120}display:\s*flex;.{0,120}justify-content:\s*center;") -and
+    (-not ($cssSrc159 -match "(?s)\.chip-grid \{.{0,120}display:\s*grid;")) -and
+    ($cssSrc159 -match "(?s)\.tube-rack \{.{0,300}justify-content:\s*center;") -and
+    ($saveBtnIdx159 -ge 0) -and
+    ($saveBtnRowSlice159 -match 'justify-content:\s*center')
+) "159.2: .chip-grid and .tube-rack use the reusable flex+wrap+justify-content:center pattern (not CSS Grid auto-fill) and the SAVE/cloud-sync button row is centered -- an incomplete last row never left-aligns (owner report, centering rule)"
 
 # ===========================================================
 # Results

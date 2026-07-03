@@ -1543,7 +1543,11 @@
             </details>
 
             <!-- 13. SECURITY & CONFIGURATION -->
-            <details class="panel" style="border-color: var(--robco-alert)">
+            <details
+              id="securityConfigPanel"
+              class="panel"
+              style="border-color: var(--robco-alert)"
+            >
               <summary>
                 <h2 style="border-color: var(--robco-alert); color: var(--robco-alert)">
                   > SECURITY & CONFIGURATION
@@ -2158,7 +2162,7 @@
                       >
                         <option value="gemini-1.5-flash">Awaiting Server Link...</option>
                       </select>
-                      <p class="board-status alert">
+                      <p class="board-status alert" id="uplinkStatus">
                         &gt; NO CARRIER &mdash; TERMINAL FULLY OPERATIONAL OFFLINE
                       </p>
                     </details>
@@ -2256,7 +2260,15 @@
                   </button>
                 </div>
                 <div id="savesListBody" style="font-size: 12px; margin-bottom: 4px"></div>
-                <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px">
+                <div
+                  style="
+                    display: flex;
+                    gap: 6px;
+                    flex-wrap: wrap;
+                    justify-content: center;
+                    margin-top: 4px;
+                  "
+                >
                   <button
                     id="btnSaveToCloud"
                     class="action-btn"

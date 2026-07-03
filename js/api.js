@@ -341,6 +341,12 @@ async function fetchAuthorizedModels(silent = false) {
     if (added > 0) {
       if (!silent) openModal({ title: '> KEY VALIDATION', body: '>> ACCESS GRANTED <<' });
       saveApiKeySilent();
+      // Owner report fix: this is the ONE place a real live 200 response proves the key
+      // works — record which key string just passed, so SLOT 05's status can tell "a
+      // validated carrier" apart from "a key string was typed" (Protocol 22, reused by
+      // _updateUplinkBoardStatus() rather than a separate boolean that could desync).
+      MetaStore.set('robco_gemini_validated_key', rawKey);
+      if (typeof renderModuleBay === 'function') renderModuleBay();
     }
   } catch (e) {
     if (!silent) openModal({ title: '> KEY VALIDATION', body: '>> NETWORK FAILURE.' });
@@ -358,6 +364,9 @@ function saveApiKeySilent() {
   if (typeof window.saveGeminiKeyToCloud === 'function') {
     window.saveGeminiKeyToCloud(key, MetaStore.get('robco_gemini_model') || '');
   }
+  // Owner report fix: editing the key live-reverts SLOT 05 to NO CARRIER immediately
+  // (robco_gemini_validated_key no longer matches) — no manual refresh needed either way.
+  if (typeof _updateUplinkBoardStatus === 'function') _updateUplinkBoardStatus();
 }
 
 // Type-coerces and validates a robco_v8 container before writing to localStorage.
@@ -1257,7 +1266,12 @@ function _quickLogLocation(name) {
     .replace(/\s+/g, ' ')
     .trim();
   if (!loc) return false;
-  markLocationVisited(loc); // records history + saveState() + renderWorldMap() (single source)
+  // Owner-reported live-update fix: "arrived <location>" means the Courier is now THERE —
+  // it must set loc as the CURRENT location (moving [CURRENT] on the WORLD MAP), not just
+  // flag it as discovered. onLocationChange(loc) is the shared setter (ui-core.js) that
+  // also the #stat_loc onchange path uses — records prev+new via recordLocationVisit(),
+  // saveState(), renderWorldMap() (Protocol 22, no forked logic).
+  if (typeof onLocationChange === 'function') onLocationChange(loc);
   appendToChat(`> [TERM] Location recorded: ${loc}`, 'sys');
   return true;
 }
