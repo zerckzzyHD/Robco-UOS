@@ -1471,6 +1471,11 @@ let state = {
   campaignMode: 'standard', // 'standard' | 'rng' (armed) | 'rng-locked' (permanently active after wipe)
   playthroughType: 'standard', // 'standard' | 'minmaxed' | 'completionist' | 'casual' | 'speedrun'
   mapView: 'auto', // 'auto' | 'full' | 'core' — persisted map size preference; 'auto' and 'core' → 4×4 grid
+  // Quick-Draw Holster (Tool Deck unit) — native, player-authored gear quick-slots.
+  // Direction (lowercase) -> bound gear name (trimmed string) or null when empty.
+  // Player-authority (Protocol 24): never in getSystemDirective(), never mapped in
+  // autoImportState() — the AI cannot read or write a binding.
+  padBindings: { up: null, down: null, left: null, right: null },
   // DLC expansion adds entries to the registry only; no state schema change required
 };
 
@@ -1861,5 +1866,21 @@ function migrateState(version, s) {
   }
 
   delete s.macros; // v1.6.7: macros removed — D-Pad handles this natively
+
+  // Quick-Draw Holster: normalize padBindings to the fixed 4-key {up,down,left,right}
+  // shape, each a trimmed string or null. Drops any stray non-direction keys and
+  // rebuilds a missing/malformed (array/non-object) field to the all-empty default.
+  if (!s.padBindings || typeof s.padBindings !== 'object' || Array.isArray(s.padBindings)) {
+    s.padBindings = { up: null, down: null, left: null, right: null };
+  } else {
+    const _dirs = ['up', 'down', 'left', 'right'];
+    const pb = {};
+    _dirs.forEach(d => {
+      const v = s.padBindings[d];
+      pb[d] = typeof v === 'string' && v.trim() ? v.trim() : null;
+    });
+    s.padBindings = pb;
+  }
+
   return s;
 }

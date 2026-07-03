@@ -238,11 +238,6 @@ button.action-btn:hover {
   filter: brightness(1.1);
 }
 
-/* Macro command buttons ([THREAT]/[VATS]/[TRADE]/[LOOT]) — device-wrap fix (WU-C12) */
-.macro-buttons button {
-  white-space: nowrap;
-}
-
 .map-cell {
   border: 1px solid rgba(var(--robco-green-rgb), 0.2);
   cursor: pointer;
@@ -1024,19 +1019,6 @@ textarea {
   color: var(--bezel-wire);
 }
 
-/* DO-O follow-up — UPLINK command cluster (D-PAD + native command buttons),
-   tucked into a collapsible sub-panel (Protocol UI-1/UI-2) so the transcript
-   leads the mobile view; restyled amber to match the Director Uplink, not
-   the old blue/green boxy controls (Protocol 38 — --bezel-wire token only,
-   no game literal). Default-open on desktop / collapsed on mobile is set in
-   _wirePanelPersistence() (ui-core.js), not here. */
-.chat-panel details.uplink-tray {
-  border-top-color: rgba(var(--bezel-wire-rgb), 0.4);
-}
-.chat-panel details.uplink-tray > summary h3 {
-  color: var(--bezel-wire);
-}
-
 /* mobile carrier strip — the Overseer never fully leaves the screen.
    Hidden by default; the mobile media query below reveals it whenever
    the UPLINK subsystem is NOT the active one. Not position:fixed (the
@@ -1655,55 +1637,304 @@ details.sub-panel[open] > summary h3::after {
   overflow-wrap: anywhere;
 }
 
-/* Tactical Command Dashboard — amber/--bezel-wire (DO-O follow-up): this
-   cluster lives only inside the Director Uplink chat panel, restyled to
-   match it rather than the old blue boxy look (Protocol 38 — token only). */
-.tactical-dashboard {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  grid-template-areas:
-    'dpad input'
-    'dpad buttons';
-  gap: 5px 15px;
-  margin-top: 10px;
-  margin-bottom: 10px;
-  padding: 10px;
-  border: 1px dashed var(--bezel-wire);
-  background: rgba(0, 0, 0, 0.4);
+/* ══════════════════════════════════════════════════════════════════════
+   TOOL DECK + QUICK-DRAW HOLSTER (Design Overhaul command-cluster overhaul)
+   Replaces the old always-present/collapsible Tactical Command Dashboard.
+   Zero standing footprint: the ◈ deck-key (composer toolbar) raises this
+   in-glass bottom sheet. Anchored to .glass-frame (position:relative;
+   overflow:hidden — see that rule above), NOT .chat-panel/.col-right
+   (both scroll/clip and would mis-place an absolute bottom sheet).
+   --bezel-wire tokens only (Protocol 38 — no game literal). Deck-raise and
+   socket-pulse are plain `animation:` declarations so the existing global
+   prefers-reduced-motion block neutralizes them with no bespoke carve-out
+   (Protocol UI-9). ══════════════════════════════════════════════════════ */
+.composer-icon-btn.deck-key {
+  border-style: dashed;
+  position: relative;
 }
-.tactical-dashboard:has(details:not([open])) {
-  grid-template-areas:
-    'dpad input'
-    'buttons buttons';
-}
-.d-pad {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-}
-.d-pad button {
-  width: 35px;
-  height: 35px;
-  margin: 0;
-  padding: 0;
-  font-size: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-color: var(--bezel-wire);
-  color: var(--bezel-wire);
-}
-.d-pad button:hover {
+.composer-icon-btn.deck-key.open {
   background: var(--bezel-wire);
   color: #000;
 }
-.d-pad-row {
+.deck-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  background: rgba(0, 0, 0, 0.55);
+}
+.deck-scrim[hidden] {
+  display: none;
+}
+.tool-deck {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 6px;
+  z-index: 41;
+  border: 1px solid var(--bezel-wire);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(var(--bezel-wire-rgb), 0.05), transparent 30%), #050803;
+  box-shadow:
+    0 -6px 30px rgba(0, 0, 0, 0.8),
+    0 0 18px rgba(var(--bezel-wire-rgb), 0.15);
+  padding: 6px 12px 12px;
+  animation: deckUp 0.22s ease-out;
+  max-height: 92%;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(var(--bezel-wire-rgb), 0.4) transparent;
+}
+.tool-deck[hidden] {
+  display: none;
+}
+@keyframes deckUp {
+  from {
+    transform: translateY(18px);
+    opacity: 0.3;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+.deck-grip {
+  width: 44px;
+  height: 3px;
+  border-radius: 2px;
+  margin: 0 auto 6px;
+  background: rgba(var(--bezel-wire-rgb), 0.4);
+}
+.deck-head {
   display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--bezel-wire);
+  font-size: 10.5px;
+  letter-spacing: 2px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed rgba(var(--bezel-wire-rgb), 0.4);
+  margin-bottom: 9px;
+}
+.deck-head .dx {
+  margin-left: auto;
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  border-radius: 50%;
+  border: 1px solid rgba(var(--bezel-wire-rgb), 0.5);
+  background: transparent;
+  color: var(--bezel-wire);
+  font-size: 13px;
+  line-height: 1;
+  padding: 0;
+}
+.deck-head .dx:hover {
+  background: rgba(var(--bezel-wire-rgb), 0.15);
+}
+.deck-target {
+  width: 100%;
+  font-family: inherit;
+  font-size: 16px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(var(--bezel-wire-rgb), 0.55);
+  color: var(--bezel-wire);
+  padding: 7px 9px;
+  margin-bottom: 9px;
+}
+.deck-target::placeholder {
+  color: rgba(var(--bezel-wire-rgb), 0.35);
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+.tool-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 40px;
+  background: transparent;
+  border: 1px solid rgba(var(--bezel-wire-rgb), 0.3);
+  border-radius: 6px;
+  color: var(--bezel-wire);
+  padding: 5px 8px 5px 5px;
+  margin-bottom: 6px;
+  text-align: left;
+  text-transform: uppercase;
+}
+.tool-row:hover {
+  background: rgba(var(--bezel-wire-rgb), 0.1);
+  border-color: rgba(var(--bezel-wire-rgb), 0.6);
+}
+.tool-chip {
+  flex-shrink: 0;
+  min-width: 72px;
+  padding: 5px 7px;
+  border: 1px solid rgba(0, 0, 0, 0.75);
+  border-radius: 4px;
+  background: linear-gradient(180deg, #31352b, #1d201a 60%, #171a14);
+  box-shadow:
+    0 2px 0 #0c0e0a,
+    inset 0 1px 0 rgba(255, 255, 255, 0.09);
+  color: var(--bezel-wire);
+  font-size: 10.5px;
+  letter-spacing: 1.5px;
+  text-align: center;
+}
+.tool-row:active .tool-chip {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 #0c0e0a;
+}
+.tool-row span {
+  font-size: 8.5px;
+  letter-spacing: 1px;
+  opacity: 0.6;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.tool-row .uses-target {
+  margin-left: auto;
+  font-size: 7.5px;
+  letter-spacing: 1px;
+  border: 1px solid rgba(var(--bezel-wire-rgb), 0.35);
+  padding: 1px 5px;
+  opacity: 0.65;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-style: normal;
+}
+.holster {
+  border-top: 1px dashed rgba(var(--bezel-wire-rgb), 0.3);
+  margin-top: 4px;
+  padding-top: 8px;
+}
+.holster-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 8px;
+  letter-spacing: 2px;
+  color: rgba(var(--bezel-wire-rgb), 0.65);
+  margin-bottom: 7px;
+}
+.bind-key {
+  margin-left: auto;
+  min-height: 28px;
+  padding: 4px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.75);
+  border-radius: 4px;
+  background: linear-gradient(180deg, #31352b, #1d201a 60%, #171a14);
+  box-shadow:
+    0 2px 0 #0c0e0a,
+    inset 0 1px 0 rgba(255, 255, 255, 0.09);
+  color: rgba(214, 224, 200, 0.38);
+  font-size: 8px;
+  letter-spacing: 2px;
+  width: auto;
+}
+.bind-key:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 #0c0e0a;
+}
+.bind-key.armed {
+  color: var(--bezel-wire);
+  border-color: rgba(var(--bezel-wire-rgb), 0.6);
+  box-shadow:
+    0 2px 0 #0c0e0a,
+    0 0 10px rgba(var(--bezel-wire-rgb), 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.09);
+}
+.holster-rack {
+  display: flex;
+  gap: 6px;
+}
+.socket {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 46px;
+  padding: 4px 5px;
+  border: 1px solid rgba(0, 0, 0, 0.75);
+  border-radius: 6px;
+  background: linear-gradient(180deg, #31352b, #1d201a 60%, #171a14);
+  box-shadow:
+    0 3px 0 #0c0e0a,
+    inset 0 1px 0 rgba(255, 255, 255, 0.09);
+  color: rgba(214, 224, 200, 0.38);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  text-transform: uppercase;
+  transition:
+    transform 0.08s,
+    box-shadow 0.08s;
+  width: auto;
+}
+.socket:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #0c0e0a;
+}
+.socket-top {
+  display: flex;
+  align-items: center;
   gap: 4px;
 }
-/* .macro-actions styles removed for grid layout */
+.socket-dir {
+  font-size: 9px;
+  opacity: 0.6;
+}
+.socket-led {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #3a3d35;
+  border: 1px solid rgba(0, 0, 0, 0.6);
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.6);
+}
+.socket.bound {
+  color: var(--bezel-wire);
+  border-color: rgba(var(--bezel-wire-rgb), 0.35);
+}
+.socket.bound .socket-led {
+  background: var(--bezel-wire);
+  box-shadow: 0 0 7px var(--bezel-wire);
+}
+.socket-gear {
+  font-size: 7.5px;
+  letter-spacing: 0.5px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.socket:not(.bound) .socket-gear {
+  opacity: 0.45;
+  font-style: italic;
+}
+.holster.binding .socket {
+  border-style: dashed;
+  border-color: rgba(var(--bezel-wire-rgb), 0.65);
+  animation: socketPulse 1.2s infinite;
+}
+@keyframes socketPulse {
+  50% {
+    box-shadow:
+      0 3px 0 #0c0e0a,
+      0 0 12px rgba(var(--bezel-wire-rgb), 0.35);
+  }
+}
+.holster-hint {
+  font-size: 7.5px;
+  letter-spacing: 1px;
+  color: rgba(var(--bezel-wire-rgb), 0.75);
+  text-align: center;
+  margin-top: 6px;
+  min-height: 10px;
+}
+.holster-hint:empty {
+  display: none;
+}
 
 /* Phase 6 & 9 Modals and VATS */
 .modal-grid-map {

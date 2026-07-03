@@ -69,8 +69,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2028-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2028-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2063-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2063-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -931,6 +931,9 @@ let state = {
   collectibles: [],         // Collected item names (game-context-aware, flat string[])
   campaignMode: 'standard', // 'standard' | 'rng' — Complete RNG opt-in flag (binary; Protocol 4)
   playthroughType: 'standard', // 'standard' | 'minmaxed' | 'completionist' | 'casual' | 'speedrun' (Protocol 4)
+
+  // --- Design Overhaul: Tool Deck / Quick-Draw Holster ---
+  padBindings: { up: null, down: null, left: null, right: null }, // gear quick-slots — player-authored only, never AI-writable (Protocol 24)
 };
 ```
 
@@ -1247,6 +1250,7 @@ UI/CRUD surface:
 | `equipped.{weapon,armor,headgear}`                                      | **none** — `renderEquipped()` is read-only, no setter UI anywhere                                                                                                                          | **GAP — not fixed in U10** (out of the scoped "affinity" fix; flagged for a future unit)                                                                  |
 | `stats.{kills,capsEarned,damageDealt}`                                  | delta-accumulated by the AI; native path is `resetSessionStats()` (zero all three) only, no per-field edit                                                                                 | Acceptable — scorekeeping/flavor telemetry, not a mechanical-authority field                                                                              |
 | `gameContext`                                                           | intentionally **never** read from AI responses (prevents cross-campaign corruption); native `gameContextSelect` dropdown only                                                              | OK (by design)                                                                                                                                            |
+| `padBindings` (Quick-Draw Holster)                                      | intentionally **never** read from AI responses (player authority — Protocol 24); native `_nativePadBind()` via the Tool Deck's holster UI or a typed `[BIND: gear, DIR]` only              | OK (by design — the strongest case here, since `autoImportState()` has no read path for it at all)                                                        |
 
 **U10 fix landed:** squad/companion affinity now has native `[+]`/`[-]` buttons on every squad row
 (`adjustAffinity()`, `js/ui-render.js`), clamped 0–100, always visible (defaults an unset member to
@@ -1926,7 +1930,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2028-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2063-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

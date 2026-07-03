@@ -484,6 +484,23 @@ function sanitizeImportedContainer(container) {
       });
       o.lincolnItems = li;
     }
+    // Quick-Draw Holster — padBindings is a fixed 4-key map (direction -> gear name or
+    // null). Serialized-whole cloud-pull / file-import path (Protocol 34): rebuild the
+    // map on every pull, coercing each of the 4 keys to a trimmed string or null and
+    // dropping any extras. Player-authored only (Protocol 24) — the AI never writes this
+    // via autoImportState(), so this is the sole non-native normalization path.
+    {
+      const src =
+        o.padBindings && typeof o.padBindings === 'object' && !Array.isArray(o.padBindings)
+          ? o.padBindings
+          : {};
+      const pb = {};
+      ['up', 'down', 'left', 'right'].forEach(d => {
+        const v = src[d];
+        pb[d] = typeof v === 'string' && v.trim() ? v.trim() : null;
+      });
+      o.padBindings = pb;
+    }
     // Faction reputation — fame/infamy are non-negative integers; preserve any other
     // per-faction fields and rebuild a missing/non-object entry as a zeroed pair.
     if (o.factions && typeof o.factions === 'object' && !Array.isArray(o.factions)) {
@@ -1017,6 +1034,14 @@ function autoImportState(jsonString) {
     const mvV = _g(parsed, 'mapView');
     if (['auto', 'full', 'core'].includes(mvV)) state.mapView = mvV;
 
+    // padBindings (Quick-Draw Holster) — DELIBERATELY NOT MAPPED. Player-authority
+    // (Protocol 24): the Courier owns their own quick-slots, never the AI. The sole
+    // writer is the native bind flow (_nativePadBind, ui-core.js), reached via the
+    // holster UI or a typed [BIND: gear, DIR] — both intercepted in
+    // _routeNativeCommand() before Gemini ever sees the input. The parsed field for
+    // this key is never read anywhere in this function, so an AI response cannot
+    // alter it even if it tried.
+
     loadUI();
     appendToChat('> PIP-BOY DATA SYNCED WITH ROBCO MAINFRAME <<', 'sys', true);
 
@@ -1214,6 +1239,20 @@ function _routeNativeCommand(userText) {
       handler(raw.slice(cmd.length).trim());
       return true;
     }
+  }
+  // Quick-Draw Holster — [BIND: gear, DIR] / [PAD: DIR] are native, deterministic
+  // intercepts (mirroring [WAIT:] below): the only writer/reader of state.padBindings
+  // is _nativePadBind/_nativePadFire (ui-core.js). Neither ever reaches Gemini.
+  // BIND is checked first so a typed bind command can't be mistaken for a fire.
+  const bindMatch = userText.match(/\[BIND:\s*(.+?)\s*,\s*(UP|DOWN|LEFT|RIGHT)\s*\]/i);
+  if (bindMatch) {
+    _nativePadBind(bindMatch[1], bindMatch[2]);
+    return true;
+  }
+  const padMatch = userText.match(/\[PAD:\s*(UP|DOWN|LEFT|RIGHT)\s*\]/i);
+  if (padMatch) {
+    _nativePadFire(padMatch[1]);
+    return true;
   }
   const waitMatch = userText.match(/\[WAIT[:\s]+(\d+)\s*(?:HRS?|HOURS?)?\]/i);
   if (waitMatch) {

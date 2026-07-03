@@ -112,6 +112,8 @@ export default [
         renderConsult: 'readonly',
         renderDatabankPanel: 'readonly',
         renderBioScan: 'readonly',
+        _nativePadBind: 'readonly', // Tool Deck + Quick-Draw Holster (ui-core.js), called from _routeNativeCommand (api.js)
+        _nativePadFire: 'readonly', // Tool Deck + Quick-Draw Holster (ui-core.js), called from _routeNativeCommand (api.js)
         _openSysModal: 'readonly',
         openModal: 'readonly', // Step 2 Phase 0 U12 consolidated modal driver (ui-core.js)
         confirmAction: 'readonly', // Step 2 Phase 0 U12 diegetic confirm() replacement (ui-core.js)
@@ -149,6 +151,7 @@ export default [
         doSell: 'readonly',
         renderLoot: 'readonly',
         renderLootList: 'readonly',
+        renderHolster: 'readonly', // Tool Deck + Quick-Draw Holster (ui-render.js), called from ui-core.js
         doLoot: 'readonly',
         _lootAdd: 'readonly',
         expandPanelForCategory: 'readonly',

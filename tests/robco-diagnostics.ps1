@@ -882,18 +882,20 @@ Check ([bool]($htmlSrc -match 'id="btnSaveToCloud"'))      "Save to Cloud button
 Check (-not ([bool]($htmlSrc -match 'id="courierIdInput"'))) "Vestigial courier ID input is absent (id=courierIdInput removed in Phase 6)"
 # Validate Key
 Check ([bool]($htmlSrc -match 'id="btnFetchModels"'))  "Validate Key button exists (id=btnFetchModels)"
-# D-pad (single-quote chars inside double-quoted string require escaping as '' in PS)
-Check ([bool]($htmlSrc -match "onclick=""macroCommand\('\[PAD: UP\]'\)"""))    "D-pad UP wired (macroCommand('[PAD: UP]'))"
-Check ([bool]($htmlSrc -match "onclick=""macroCommand\('\[PAD: DOWN\]'\)"""))  "D-pad DOWN wired (macroCommand('[PAD: DOWN]'))"
-Check ([bool]($htmlSrc -match "onclick=""macroCommand\('\[PAD: LEFT\]'\)"""))  "D-pad LEFT wired (macroCommand('[PAD: LEFT]'))"
-Check ([bool]($htmlSrc -match "onclick=""macroCommand\('\[PAD: RIGHT\]'\)""")) "D-pad RIGHT wired (macroCommand('[PAD: RIGHT]'))"
-# Macro buttons
-Check ([bool]($htmlSrc -match "onclick=""macroCommand\('\[THREAT\]'\)"""))    "THREAT macro button wired"
-Check ([bool]($htmlSrc -match "onclick=""macroCommand\('\[VATS SIM\]'\)"""))  "VATS SIM macro button wired"
-Check ([bool]($htmlSrc -match "onclick=""expandPanelForCategory\('trade'\)"""))     "TRADE macro button opens the native barter panel (WU-N2)"
-Check ([bool]($htmlSrc -match "onclick=""renderLoot\(\)"""))      "LOOT button opens the native salvage terminal (WU-N6)"
-# V.A.T.S. Calculator
-Check ([bool]($htmlSrc -match 'id="vatsCalcBtn"'))  "V.A.T.S. CALCULATOR button exists (id=vatsCalcBtn)"
+# Tool Deck + Quick-Draw Holster (replaces the old always-present D-pad/macro-button
+# cluster) -- see Suite 164 for the full command-cluster-overhaul coverage.
+Check ([bool]($htmlSrc -match "id=""deckKey""[\s\S]*?onclick=""toggleToolDeck\(\)""")) "Tool Deck launcher key wired (id=deckKey, toggleToolDeck())"
+Check ([bool]($htmlSrc -match 'data-tool="THREAT"'))  "Tool Deck THREAT row present (data-tool=THREAT)"
+Check ([bool]($htmlSrc -match 'data-tool="VATS SIM"'))  "Tool Deck VATS row present (data-tool=""VATS SIM"")"
+Check ([bool]($htmlSrc -match 'data-tool="TRADE"'))  "Tool Deck TRADE row present (data-tool=TRADE, opens the native barter panel -- WU-N2)"
+Check ([bool]($htmlSrc -match 'data-tool="LOOT"'))  "Tool Deck LOOT row present (data-tool=LOOT, opens the native salvage terminal -- WU-N6)"
+Check ([bool]($htmlSrc -match 'class="socket" data-dir="UP"'))  "Quick-Draw Holster UP socket present (data-dir=UP)"
+Check ([bool]($htmlSrc -match 'data-dir="DOWN"'))  "Quick-Draw Holster DOWN socket present (data-dir=DOWN)"
+Check ([bool]($htmlSrc -match 'data-dir="LEFT"'))  "Quick-Draw Holster LEFT socket present (data-dir=LEFT)"
+Check ([bool]($htmlSrc -match 'data-dir="RIGHT"'))  "Quick-Draw Holster RIGHT socket present (data-dir=RIGHT)"
+# V.A.T.S. Calculator (deck row token -- button itself now lives in the deck, not
+# a standalone #vatsCalcBtn; see Suite 164 for the exact-removal guard)
+Check ([bool]($htmlSrc -match 'data-tool="VATS CALC"'))  "Tool Deck CALC row present (data-tool=""VATS CALC"")"
 
 # ===========================================================
 # Suite 23 -- Prohibited Patterns (Group 2)
@@ -5919,9 +5921,14 @@ Check ($uiRender92ps.Contains('class="tag"')) `
 Check ($uiRender92ps.Contains('map-collectible-badge badge')) `
     'GATE-NOWRAP-4: map-collectible-badge span includes badge class in ui-render.js'
 
-# 92.5  .macro-buttons button carries white-space: nowrap (WU-C12 device-wrap fix guard)
-Check ([System.Text.RegularExpressions.Regex]::IsMatch($css92ps, '\.macro-buttons\s+button\s*\{[^}]*white-space:\s*nowrap')) `
-    'GATE-NOWRAP-5: .macro-buttons button has white-space: nowrap in terminal.css (macro command buttons must not wrap)'
+# 92.5  device-wrap fix (WU-C12), carried forward to the Tool Deck rows (Suite
+#       164): .tool-row span / .tool-row .uses-target carry white-space: nowrap.
+#       The retired .macro-buttons button rule it originally guarded is gone.
+Check (
+    [System.Text.RegularExpressions.Regex]::IsMatch($css92ps, '\.tool-row\s+span\s*\{[^}]*white-space:\s*nowrap') -and
+    [System.Text.RegularExpressions.Regex]::IsMatch($css92ps, '\.tool-row\s+\.uses-target\s*\{[^}]*white-space:\s*nowrap') -and
+    -not [System.Text.RegularExpressions.Regex]::IsMatch($css92ps, '\.macro-buttons\s+button\s*\{')
+) 'GATE-NOWRAP-5: .tool-row span/.uses-target carry white-space: nowrap in terminal.css (device-wrap fix, carried forward from the retired .macro-buttons button rule to the Tool Deck)'
 
 # 92.6  WU-C14: the COMPLETE RNG label carries white-space: nowrap so it can
 #       never wrap one character per line when squeezed beside its warning.
@@ -6768,9 +6775,10 @@ Check ((-not ($api106 -match 'array of item objects.*vendor')) -and (-not ($core
 # 106.15 TRADE panel + sub-panels present
 Check (($htmlSrc -match 'id="tradePanel"') -and ($htmlSrc -match '&gt;\s*BARTER UPLINK') -and ($htmlSrc -match 'data-sub-id="trade_buy"') -and ($htmlSrc -match 'data-sub-id="trade_sell"')) `
     '106.15: #tradePanel with BARTER UPLINK h2 + trade_buy/trade_sell sub-panels (data-sub-id) present'
-# 106.16 [TRADE] macro button repointed
-Check (($htmlSrc -match "expandPanelForCategory\('trade'\)") -and (-not ($htmlSrc -match "macroCommand\('\[TRADE\]'\)"))) `
-    "106.16: [TRADE] button opens the native panel (expandPanelForCategory('trade')), not macroCommand('[TRADE]')"
+# 106.16 Tool Deck TRADE row (data-tool="TRADE") dispatches to the native panel
+# (ui-core.js's _wireToolDeck() switch-case), never the retired AI macro.
+Check (($htmlSrc -match 'data-tool="TRADE"') -and ($core106 -match "case 'TRADE':\s*expandPanelForCategory\('trade'\)") -and (-not ($htmlSrc -match "macroCommand\('\[TRADE\]'\)"))) `
+    "106.16: Tool Deck TRADE row (data-tool=TRADE) dispatches to expandPanelForCategory('trade') in _wireToolDeck(), not macroCommand('[TRADE]')"
 # 106.17 expandPanelForCategory routes trade + loadUI renders it
 Check (($core106 -match "trade:\s*'inv'") -and ($core106 -match "trade:\s*'>\s*BARTER UPLINK'") -and ($core106 -match 'renderTrade\(\)')) `
     "106.17: expandPanelForCategory maps trade->inv + '> BARTER UPLINK'; loadUI calls renderTrade()"
@@ -6796,9 +6804,9 @@ try { $expandBody106 = Get-FunctionBody $core106 'expandPanelForCategory' } catc
 Check (($expandBody106 -match "setAttribute\(\s*'open'") -and ($expandBody106 -match "scrollIntoView\(\s*\{[^}]*block:\s*'center'")) `
     "106.21: expandPanelForCategory opens the matched panel AND centers it via scrollIntoView({ block: 'center' }) (WU-HF1 r3 [TRADE] reveal + centering fix)"
 
-# 106.22 END-TO-END button->panel-open chain (not just renderTrade)
-Check (($htmlSrc -match "onclick=`"expandPanelForCategory\('trade'\)`"") -and ($core106 -match "trade:\s*'inv'") -and ($core106 -match "trade:\s*'>\s*BARTER UPLINK'")) `
-    "106.22: [TRADE] button onclick -> expandPanelForCategory('trade') -> maps trade->inv + '> BARTER UPLINK' (button->panel-open end-to-end)"
+# 106.22 END-TO-END row->panel-open chain (not just renderTrade)
+Check (($core106 -match "case 'TRADE':\s*expandPanelForCategory\('trade'\)") -and ($core106 -match "trade:\s*'inv'") -and ($core106 -match "trade:\s*'>\s*BARTER UPLINK'")) `
+    "106.22: Tool Deck TRADE row -> expandPanelForCategory('trade') -> maps trade->inv + '> BARTER UPLINK' (row->panel-open end-to-end)"
 
 # ===========================================================
 # Suite 107 -- WU-N3 THREAT native bestiary + TTK (17 tests)
@@ -6939,12 +6947,14 @@ Check (($css108 -match '\.consult-card\b') -and ($css108 -match '\.consult-hit-n
 Check ($consultBody -match 'openModal') `
     '108.13: renderConsult opens via openModal() (U12 driver -- shared modal ARIA/focus consistency)'
 
-# ── WU-N4b: CONSULT macro button (option A) ──────────────────────────────────
+# ── WU-N4b / Tool Deck: CONSULT deck row ──────────────────────────────────────
 $html108 = Read-Src "index.html"
-$consultBtn108 = [regex]::Match($html108, '<button[^>]*id="consultBtn"[\s\S]*?</button>').Value
-# 108.14 discoverable CONSULT button wired to macroCommand('[CONSULT]') + aria-label + #macroTarget topic input
-Check (($html108 -match 'id="consultBtn"') -and ($consultBtn108 -match 'onclick="macroCommand\(''\[CONSULT\]''\)"') -and ($consultBtn108 -match 'aria-label="[^"]+"') -and ($html108 -match 'id="macroTarget"')) `
-    "108.14: index.html CONSULT macro button (#consultBtn) -> macroCommand('[CONSULT]') with aria-label, reusing #macroTarget topic input (WU-N4b option A)"
+$consultRow108 = [regex]::Match($html108, '<button class="tool-row" data-tool="CONSULT">[\s\S]*?</button>').Value
+# 108.14 the CONSULT tool now lives in the Tool Deck as a row dispatched (in
+# ui-core.js's _wireToolDeck()) to macroCommand('[CONSULT]'), reusing the deck's
+# shared #deckTarget topic input (the #macroTarget/#consultBtn cluster is retired).
+Check (($html108 -match 'data-tool="CONSULT"') -and ($core108 -match "case 'CONSULT':\s*macroCommand\('\[CONSULT\]'\)") -and ($html108 -match 'id="deckTarget"') -and $consultRow108) `
+    "108.14: index.html Tool Deck CONSULT row (data-tool=CONSULT) -> ui-core.js _wireToolDeck() dispatches macroCommand('[CONSULT]'), reusing #deckTarget topic input"
 # 108.15 native end-to-end: [CONSULT] is a NATIVE_COMMAND_ROUTER entry -> renderConsult (not macroCommand->AI)
 Check ($routerBlock -match "'\[CONSULT\]':\s*topic\s*=>\s*renderConsult\(topic\)") `
     '108.15: [CONSULT] routes via NATIVE_COMMAND_ROUTER -> renderConsult -- the CONSULT button is native, never falls through to the AI (WU-N4b)'
@@ -7094,10 +7104,10 @@ Check (($css110 -match '\.loot-row\b') -and ($css110 -match '\.loot-row\s+\.loot
 # 110.12 XSS-safe escaping
 Check (($ren110 -match 'escapeHtml\(it\.name\)') -and ($ren110 -match 'escapeHtml\(pre\)')) `
     '110.12: LOOT escapes item names + the search prefill via escapeHtml() before innerHTML'
-# 110.13 [LOOT] button affordance + shared modal
-$lootBtn110 = [regex]::Match($html110, '<button\b[^>]*renderLoot\(\)[^>]*>').Value
-Check (($html110 -match 'onclick="renderLoot\(\)"') -and ($lootBtn110 -match 'aria-label="[^"]+"') -and ($lootRegion110 -match 'openModal')) `
-    '110.13: index.html [LOOT] button wired to renderLoot() with an aria-label; opens via openModal() (U12 driver -- shared modal)'
+# 110.13 Tool Deck LOOT row (data-tool="LOOT") dispatches to renderLoot() in
+# _wireToolDeck() + reuses the shared modal.
+Check (($html110 -match 'data-tool="LOOT"') -and ($core110 -match "case 'LOOT':\s*renderLoot\(val\)") -and ($lootRegion110 -match 'openModal')) `
+    '110.13: Tool Deck LOOT row (data-tool=LOOT) dispatches to renderLoot() in _wireToolDeck(); opens via openModal() (U12 driver -- shared modal)'
 
 # ===========================================================
 # Suite 111 -- WU-E1 diegetic terminology / voice standards (11 tests)
@@ -7755,9 +7765,11 @@ Check ((([regex]::Matches($showFn123, 'escapeHtml\(')).Count) -ge 3) `
 Check (($consoleArr123 + $showFn123 + $launchFn123) -notmatch 'New Vegas|Mojave|Fallout|\bFNV\b|\bFO3\b|Vault 101|Capital Wasteland|Courier') `
     '123.8: the TERMLINK console block is game-agnostic (no FNV/FO3/Fallout/location literals)'
 
-# 123.9  discoverable affordances: #termlinkBtn routes natively, registry advertises it, console CSS present
-Check (($html123 -match "(?s)id=`"termlinkBtn`"[\s\S]*?macroCommand\('\[TERMLINK\]'\)") -and ($html123 -match 'aria-label="Open the TERMLINK command console') -and ($core123 -match '\[TERMLINK\] / \[TL\]') -and ($css123 -match '\.termlink-grid') -and ($css123 -match '\.termlink-entry')) `
-    '123.9: #termlinkBtn routes [TERMLINK] natively + has aria-label, COMMAND_REGISTRY advertises it, console CSS present'
+# 123.9  Tool Deck unit: the on-screen #termlinkBtn is retired (the deck supersedes
+#        it -- TOOLDECK_PLAN.md decision 3) but TERMLINK stays fully typable: the
+#        router, COMMAND_REGISTRY entry, and console CSS are all unchanged.
+Check (($html123 -notmatch 'id="termlinkBtn"') -and ($core123 -match '\[TERMLINK\] / \[TL\]') -and ($css123 -match '\.termlink-grid') -and ($css123 -match '\.termlink-entry')) `
+    '123.9: #termlinkBtn is retired from index.html (Tool Deck supersedes it); [TERMLINK] stays typable -- COMMAND_REGISTRY advertises it, console CSS present'
 
 # -- WU-HF2 + WU-HF3 hotfixes (folded into v2.7.0) --------------------------------
 $aliasBlock123 = [regex]::Match($api123, "(?s)const PANEL_NAV_ALIASES = \{[\s\S]*?\n\};").Value
@@ -12519,82 +12531,51 @@ console.log('RESULT:' + (ok ? '1' : '0'));
     Fail "162.15: _overseerRestState() truth table  (harness error: $_)"
 }
 
-# 162.16  DO-O follow-up (owner mobile-density fix) -- the D-PAD + native
-#         command cluster is tucked into a collapsible sub-panel (Protocol
-#         UI-1/UI-2) so the transcript leads the mobile view, and every one
-#         of its controls keeps its exact onclick wiring (Protocol 22)
-# Balanced-tag scan, not the first '</details>' -- the D-PAD sub-cluster
-# nests its OWN <details>...</details> inside the tray, which would
-# otherwise truncate the block before the macro-buttons are reached.
-$trayOpen162 = $html162.IndexOf('<details class="sub-panel uplink-tray"')
-$trayBlock162 = ""
-if ($trayOpen162 -ge 0) {
-    $afterOpenTag162 = $html162.IndexOf('>', $trayOpen162) + 1
-    $tagMatches162 = [regex]::Matches($html162.Substring($afterOpenTag162), '<details\b|</details>')
-    $depth162 = 1
-    $end162 = -1
-    foreach ($tm in $tagMatches162) {
-        if ($tm.Value -eq '</details>') {
-            $depth162--
-            if ($depth162 -eq 0) { $end162 = $afterOpenTag162 + $tm.Index + $tm.Length; break }
-        } else {
-            $depth162++
-        }
-    }
-    if ($end162 -ge 0) { $trayBlock162 = $html162.Substring($trayOpen162, $end162 - $trayOpen162) }
-}
+# 162.16  Tool Deck unit (TOOLDECK_PLAN.md): the old always-present/
+#         collapsible D-PAD + native-command cluster (the uplink-tray
+#         sub-panel, .tactical-dashboard, #macroTarget) is retired entirely --
+#         replaced by the ◈ Tool Deck + Quick-Draw Holster (see Suite 164).
 Check (
-    ($trayBlock162 -match 'data-sub-id="uplinkCommandTray"') -and
-    ($trayBlock162.Contains('<summary><h3>&gt; COMMAND CLUSTER</h3></summary>'))
-) "162.16a: the command cluster is a details.sub-panel with data-sub-id=`"uplinkCommandTray`" and a <summary><h3>> HEADING</h3> (Protocol UI-1/UI-2)"
+    ($html162 -notmatch 'data-sub-id="uplinkCommandTray"') -and
+    ($html162 -notmatch 'class="tactical-dashboard"') -and
+    ($html162 -notmatch 'class="d-pad"') -and
+    ($html162 -notmatch 'id="macroTarget"') -and
+    ($html162 -notmatch 'class="macro-buttons"')
+) "162.16a: the old uplink-tray/tactical-dashboard/d-pad/#macroTarget/macro-buttons cluster is fully removed from index.html (superseded by the Tool Deck -- Suite 164)"
 
-$needles162 = @(
-    "macroCommand('[PAD: UP]')",
-    "macroCommand('[PAD: LEFT]')",
-    "macroCommand('[PAD: RIGHT]')",
-    "macroCommand('[PAD: DOWN]')",
-    "macroCommand('[THREAT]')",
-    "macroCommand('[VATS SIM]')",
-    "expandPanelForCategory('trade')",
-    "renderLoot()",
-    "macroCommand('[CONSULT]')",
-    "showVATSOverlay()",
-    "macroCommand('[TERMLINK]')"
-)
-$allFound162 = $true
-foreach ($n in $needles162) { if (-not $trayBlock162.Contains($n)) { $allFound162 = $false } }
 Check (
-    ($trayBlock162.Length -gt 0) -and $allFound162
-) "162.16b: every D-PAD/native-command button keeps its exact pre-existing onclick handler inside the new tray wrapper (no rewiring)"
+    ($html162 -notmatch "onclick=""macroCommand\('\[PAD: ")
+) "162.16b: no on-screen control calls macroCommand('[PAD: ...]') anymore -- the Quick-Draw Holster sockets call _nativePadFire()/_nativePadBind() directly (Suite 164)"
 
-# 162.17  _wirePanelPersistence() carries the one documented per-id exception:
-#         the tray defaults OPEN on a real desktop (matching its pre-existing
-#         always-visible behavior, zero added taps) and COLLAPSED on mobile
+# 162.17  _wirePanelPersistence() no longer carries the uplinkCommandTray
+#         per-id exception -- the tray it special-cased no longer exists.
 $wpp162 = Get-FunctionBody $core162 "_wirePanelPersistence"
 Check (
-    ($wpp162 -match "id === 'uplinkCommandTray'") -and
-    ($wpp162.Contains("matchMedia('(min-width: 1000px) and (hover: hover) and (pointer: fine)').matches"))
-) "162.17: _wirePanelPersistence() defaults the uplinkCommandTray sub-panel open on desktop (matchMedia gate) with no saved preference, leaving every other data-sub-id collapsed by default"
+    ($wpp162 -notmatch 'uplinkCommandTray')
+) "162.17: _wirePanelPersistence() no longer references uplinkCommandTray (the tray it special-cased is retired)"
 
-# 162.18  the cluster is restyled amber (--bezel-wire), not the old blue/green
-#         boxy controls, and the TRANSMIT background bug (a real visual defect
-#         found live during this unit's verification -- Protocol 42) is fixed
-$tacticalMatch162 = [regex]::Match($css162, '(?s)\.tactical-dashboard \{.*?\n\}')
-$tacticalRule162 = if ($tacticalMatch162.Success) { $tacticalMatch162.Value } else { "" }
-$dpadBtnMatch162 = [regex]::Match($css162, '(?s)\.d-pad button \{.*?\n\}')
-$dpadBtnRule162 = if ($dpadBtnMatch162.Success) { $dpadBtnMatch162.Value } else { "" }
+# 162.18  the Tool Deck + Quick-Draw Holster CSS is restyled amber
+#         (--bezel-wire), not the old blue/green boxy controls; the retired
+#         .tactical-dashboard/.d-pad rules are gone entirely (Protocol 42
+#         cleanup -- dead CSS is a stale-safeguard risk of its own)
+$toolDeckMatch162 = [regex]::Match($css162, '(?s)\.tool-deck \{.*?\n\}')
+$toolDeckRule162 = if ($toolDeckMatch162.Success) { $toolDeckMatch162.Value } else { "" }
+$socketMatch162 = [regex]::Match($css162, "(?s)`n\.socket \{.*?`n\}")
+$socketRule162 = if ($socketMatch162.Success) { $socketMatch162.Value } else { "" }
 Check (
-    ($tacticalRule162.Length -gt 0) -and ($tacticalRule162 -match 'border: 1px dashed var\(--bezel-wire\)') -and
-    ($dpadBtnRule162.Length -gt 0) -and ($dpadBtnRule162 -match 'border-color: var\(--bezel-wire\)') -and
-    ($tacticalRule162 -notmatch '--robco-blue') -and ($dpadBtnRule162 -notmatch '--robco-blue')
-) "162.18a: .tactical-dashboard and .d-pad button use --bezel-wire, not the old --robco-blue"
+    ($toolDeckRule162.Length -gt 0) -and ($toolDeckRule162 -match 'border: 1px solid var\(--bezel-wire\)') -and
+    ($socketRule162.Length -gt 0) -and
+    ($toolDeckRule162 -notmatch '--robco-blue') -and ($socketRule162 -notmatch '--robco-blue')
+) "162.18a: .tool-deck and .socket use --bezel-wire, not --robco-blue"
 
-$macroStart162 = $html162.IndexOf('class="macro-buttons"')
-$macroEnd162 = if ($macroStart162 -ge 0) { $html162.IndexOf('&gt; TERMLINK CONSOLE', $macroStart162) } else { -1 }
-$macroBlock162 = if (($macroStart162 -ge 0) -and ($macroEnd162 -ge 0)) { $html162.Substring($macroStart162, $macroEnd162 - $macroStart162) } else { "" }
 Check (
-    ($macroBlock162.Length -gt 0) -and ($macroBlock162 -notmatch '--robco-green')
-) "162.18b: the macro-buttons cluster (THREAT/VATS/TRADE/LOOT/CONSULT/VATS CALCULATOR/TERMLINK) carries no leftover --robco-green literal -- every button matches the amber Director Uplink aesthetic"
+    ($css162 -notmatch '\.tactical-dashboard \{') -and
+    ($css162 -notmatch '\.d-pad \{') -and
+    ($css162 -notmatch '\.d-pad button \{') -and
+    ($css162 -notmatch '\.d-pad-row \{') -and
+    ($css162 -notmatch '\.macro-buttons button \{') -and
+    ($css162 -notmatch 'details\.uplink-tray \{')
+) "162.18b: the retired .tactical-dashboard/.d-pad(+button/-row)/.macro-buttons button/.uplink-tray CSS rules are gone entirely -- no dead cluster CSS survives"
 
 Check (
     ($css162 -match "(?s)\.composer-icon-btn,\s*\n\.composer-send-btn,\s*\n\.icon-btn-round \{[^}]*border: 1px solid var\(--icon-btn-color, var\(--bezel-wire\)\);") -and
@@ -12629,9 +12610,10 @@ Check (
     ($composerBlock162 -match 'class="composer-input"') -and
     ($composerBlock162 -match 'class="composer-toolbar"') -and
     ($composerBlock162 -match 'id="tokenBudgetDisplay" class="composer-token-budget"') -and
+    ($composerBlock162 -match 'id="deckKey"') -and
     ($html162 -notmatch [regex]::Escape('[ &gt; VISUAL UPLOAD ]')) -and
     ($html162 -notmatch '&gt; TRANSMIT PROTOCOL')
-) "162.20: the composer contains the textarea (.composer-input) and a bottom toolbar (.composer-toolbar); the old standalone dashed VISUAL UPLOAD button and bottom TRANSMIT PROTOCOL button are both gone"
+) "162.20: the composer contains the textarea (.composer-input), a bottom toolbar (.composer-toolbar) with the ◈ Tool Deck launcher (#deckKey); the old standalone dashed VISUAL UPLOAD button and bottom TRANSMIT PROTOCOL button are both gone"
 
 # 162.20b  structural integration proof -- #chatDisplay and .composer are
 #          BOTH inside the SAME .transcript-card wrapper (the composer pill
@@ -13017,6 +12999,284 @@ $saveRowActionsCount163 = ([regex]::Matches($uiAcct163, 'class="save-row-actions
 Check (
     ($saveRowCount163 -eq 2) -and ($saveRowLabelCount163 -eq 2) -and ($saveRowActionsCount163 -eq 2)
 ) "163.15: renderSavesList() uses .save-row/.save-row-label/.save-row-actions for BOTH the local-slot and cloud-save row templates -- no separate inline-styled layout left behind for either"
+
+# ===========================================================
+# Suite 164 -- Tool Deck + Quick-Draw Holster + padBindings (Design Overhaul
+# command-cluster overhaul -- TOOLDECK_PLAN.md). Replaces the old always-
+# present/collapsible D-PAD + native-command cluster with a zero-standing-
+# footprint ◈ Tool Deck launcher key that raises a bottom-sheet TOOL DECK, and
+# redesigns the D-Pad into the Quick-Draw Holster -- four gear-vector sockets
+# driven by a NEW native state field, state.padBindings (Protocol 4), which
+# the AI can never read or write (Protocol 24/14). 27 tests
+# ===========================================================
+Sep "Suite 164 -- Tool Deck + Quick-Draw Holster + padBindings"
+
+# 164.1-2  static: state.js declares the default; _defaultState snapshots after it
+Check (
+    $stateSrc -match [regex]::Escape('padBindings: { up: null, down: null, left: null, right: null }')
+) "164.1: state.js declares the padBindings default { up: null, down: null, left: null, right: null }"
+Check (
+    $stateSrc.IndexOf('window._defaultState = JSON.parse(JSON.stringify(state));') -gt
+    $stateSrc.IndexOf('padBindings: { up: null, down: null, left: null, right: null }')
+) "164.2: window._defaultState is snapshotted AFTER the padBindings default is declared, so wipeTerminal() resets it too"
+
+# 164.3-13  behavioral proofs -- shells out to node (mirrors the Suite 133 pattern):
+# migrateState()/sanitizeImportedContainer() round-trip + Protocol-14 AI-blindness +
+# the real _nativePadBind()/_nativePadFire() (ui-core.js) execution.
+$labels164 = @(
+    "164.3: migrateState() normalizes a bogus (array) padBindings shape to the all-null {up,down,left,right} default",
+    "164.4: migrateState() adds the {up,down,left,right} default when padBindings is absent (older save)",
+    "164.5: migrateState() trims strings, coerces non-strings to null, and drops stray non-direction keys",
+    "164.6: sanitizeImportedContainer coerces padBindings to the fixed {up,down,left,right} string|null map, dropping extras (Protocol 34 cloud-pull/file-import path)",
+    "164.7: round-trip (Protocol 34) -- push (serialize) -> sanitize -> migrate -> apply preserves padBindings intact",
+    "164.8: Protocol 14 -- autoImportState() cannot alter padBindings even when the parsed AI response includes one (player-authority regression guard)",
+    "164.9: _nativePadBind() rejects an invalid direction (hint only, no state write)",
+    "164.10: _nativePadBind() rejects an empty gear name and does NOT clobber the existing binding",
+    "164.11: _nativePadBind() trims the gear name, writes state.padBindings[dir], and logs a sys line",
+    "164.12: _nativePadFire() on an empty socket hints toward BIND arrow-key and makes NO transmitMessage() call (no AI)",
+    "164.13: _nativePadFire() on a bound socket transmits a resolved ""Deploy <gear>"" action to the Director"
+)
+try {
+    $nodeCheck164 = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCheck164) {
+        $apiPathNode164 = (Join-Path $Root "js/api.js").Replace('\', '/')
+        $statePathNode164 = (Join-Path $Root "js/state.js").Replace('\', '/')
+        $regPathNode164 = (Join-Path $Root "js/reg_nv.js").Replace('\', '/')
+        $coreCoreNode164 = (Join-Path $Root "js/ui-core.js").Replace('\', '/')
+        $testScript164 = @"
+const fs = require('fs');
+const vm = require('vm');
+const apiSource = fs.readFileSync('$apiPathNode164', 'utf8');
+const stateSource = fs.readFileSync('$statePathNode164', 'utf8');
+const regSource = fs.readFileSync('$regPathNode164', 'utf8');
+const uiCoreSource = fs.readFileSync('$coreCoreNode164', 'utf8');
+function extractFunctionBody(source, fnName) {
+  const idx = source.indexOf('function ' + fnName);
+  const braceStart = source.indexOf('{', source.indexOf('(', idx));
+  let depth = 0, i = braceStart;
+  for (; i < source.length; i++) {
+    if (source[i] === '{') depth++;
+    else if (source[i] === '}' && --depth === 0) break;
+  }
+  return source.slice(braceStart, i + 1);
+}
+const results = [];
+const sandbox = { window: {}, console: { error: function(){}, log: function(){}, warn: function(){} } };
+vm.createContext(sandbox);
+vm.runInContext(stateSource, sandbox);
+vm.runInContext('var t1 = ' + JSON.stringify({ padBindings: ['not','an','object'] }) + '; migrateState("2.7.0", t1);', sandbox);
+const pb1 = vm.runInContext('t1.padBindings', sandbox);
+results.push(!!(pb1 && pb1.up === null && pb1.down === null && pb1.left === null && pb1.right === null));
+vm.runInContext('var t2 = {}; migrateState("2.7.0", t2);', sandbox);
+const pb2 = vm.runInContext('t2.padBindings', sandbox);
+results.push(!!(pb2 && Object.keys(pb2).sort().join(',') === 'down,left,right,up'));
+vm.runInContext('var t3 = ' + JSON.stringify({ padBindings: { up: '  Stimpak  ', down: 42, left: null, weird: 'Molotov' } }) + '; migrateState("2.7.0", t3);', sandbox);
+const pb3 = vm.runInContext('t3.padBindings', sandbox);
+results.push(!!(pb3.up === 'Stimpak' && pb3.down === null && pb3.left === null && pb3.right === null && !('weird' in pb3)));
+let testSanitize = null;
+try {
+  const fnBody = extractFunctionBody(apiSource, 'sanitizeImportedContainer');
+  const fnStart = apiSource.indexOf('function sanitizeImportedContainer');
+  const paramsStart = apiSource.indexOf('(', fnStart);
+  const paramsEnd = apiSource.indexOf('{', paramsStart);
+  const params = apiSource.slice(paramsStart, paramsEnd).trim();
+  testSanitize = eval('(function sanitizeImportedContainer' + params + fnBody + ')');
+} catch (e) {}
+if (testSanitize) {
+  const tc = { activeContext: 'FNV', campaigns: { FNV: { padBindings: { up: '  Stimpak  ', down: 42, left: null, weird: 'Molotov' } } } };
+  const pb4 = testSanitize(tc).campaigns.FNV.padBindings;
+  results.push(!!(pb4.up === 'Stimpak' && pb4.down === null && pb4.left === null && pb4.right === null && !('weird' in pb4)));
+  const pushed = { activeContext: 'FNV', campaigns: { FNV: { padBindings: { up: 'Stimpak', down: '.357 Magnum', left: null, right: null } } } };
+  const sanitized = testSanitize(pushed);
+  vm.runInContext('var t4 = ' + JSON.stringify(sanitized.campaigns.FNV) + '; migrateState("2.7.0", t4);', sandbox);
+  const pbFinal = vm.runInContext('t4.padBindings', sandbox);
+  results.push(!!(pbFinal.up === 'Stimpak' && pbFinal.down === '.357 Magnum' && pbFinal.left === null && pbFinal.right === null));
+} else {
+  results.push(false); results.push(false);
+}
+let harness = null;
+try {
+  const sandbox2 = {
+    window: {}, document: { getElementById: function(){ return null; } },
+    console: { error: function(){}, log: function(){}, warn: function(){} },
+    loadUI: function(){}, appendToChat: function(){}, expandPanelForCategory: function(){}, playSyncTone: function(){},
+  };
+  vm.createContext(sandbox2);
+  vm.runInContext(stateSource, sandbox2);
+  vm.runInContext(regSource, sandbox2);
+  const autoImportBody = 'function autoImportState(jsonString)' + extractFunctionBody(apiSource, 'autoImportState');
+  vm.runInContext(autoImportBody + '\nthis.autoImportState = autoImportState;', sandbox2);
+  harness = sandbox2;
+} catch (e) {}
+if (harness) {
+  vm.runInContext('state.padBindings = ' + JSON.stringify({ up: 'Stimpak', down: null, left: null, right: null }) + '; window._lastStateBeforeSync = JSON.stringify(state);', harness);
+  let threw = false;
+  try { harness.autoImportState(JSON.stringify({ padBindings: { up: 'AI-INJECTED', down: 'Nuka-Cola' } })); } catch (e) { threw = true; }
+  const after = vm.runInContext('state.padBindings', harness);
+  results.push(!threw && after.up === 'Stimpak' && after.down === null);
+} else {
+  results.push(false);
+}
+const chatLog = [];
+const transmitCalls = [];
+let h = null;
+try {
+  const sandbox3 = {
+    window: {}, console: { error: function(){}, log: function(){}, warn: function(){} },
+    state: { padBindings: { up: null, down: null, left: null, right: null } },
+    saveState: function(){}, renderHolster: function(){},
+    appendToChat: function(m){ chatLog.push(m); },
+    transmitMessage: function(m){ transmitCalls.push(m); },
+  };
+  vm.createContext(sandbox3);
+  const bindBody = 'function _nativePadBind(gear, dir)' + extractFunctionBody(uiCoreSource, '_nativePadBind');
+  const fireBody = 'function _nativePadFire(dir)' + extractFunctionBody(uiCoreSource, '_nativePadFire');
+  vm.runInContext(bindBody + '\n' + fireBody + '\nthis._nativePadBind=_nativePadBind; this._nativePadFire=_nativePadFire;', sandbox3);
+  h = sandbox3;
+} catch (e) {}
+if (h) {
+  h._nativePadBind('Stimpak', 'sideways');
+  results.push(h.state.padBindings.up === null && chatLog.some(function(m){ return /INVALID VECTOR/.test(m); }));
+  chatLog.length = 0;
+  h.state.padBindings.up = 'Stimpak';
+  h._nativePadBind('   ', 'up');
+  results.push(h.state.padBindings.up === 'Stimpak' && chatLog.some(function(m){ return /TARGET FIELD IS EMPTY/.test(m); }));
+  chatLog.length = 0;
+  h._nativePadBind('  .357 Magnum  ', 'DOWN');
+  results.push(h.state.padBindings.down === '.357 Magnum' && chatLog.some(function(m){ return /VECTOR HOLSTERED/.test(m); }));
+  chatLog.length = 0;
+  h._nativePadFire('left');
+  results.push(transmitCalls.length === 0 && chatLog.some(function(m){ return /SOCKET EMPTY/.test(m); }));
+  chatLog.length = 0;
+  h._nativePadFire('DOWN');
+  results.push(transmitCalls.length === 1 && transmitCalls[0] === 'Deploy .357 Magnum');
+} else {
+  for (let k = 0; k < 5; k++) results.push(false);
+}
+console.log('RESULT:' + results.map(function(r){ return r ? '1' : '0'; }).join(''));
+"@
+        $out164 = ($testScript164 | node 2>&1 | Out-String)
+        $rm164 = [regex]::Match($out164, 'RESULT:([01]{11})')
+        if ($rm164.Success) {
+            $bits164 = $rm164.Groups[1].Value
+            for ($bi164 = 0; $bi164 -lt 11; $bi164++) { Check ($bits164.Substring($bi164, 1) -eq '1') $labels164[$bi164] }
+        } else {
+            $err164 = if ([string]::IsNullOrWhiteSpace($out164)) { "No output from node" } else { $out164.Trim() }
+            foreach ($lbl in $labels164) { Fail "$lbl  (runtime error: $err164)" }
+        }
+    } else {
+        foreach ($lbl in $labels164) { Fail "$lbl  (node not found)" }
+    }
+} catch {
+    foreach ($lbl in $labels164) { Fail "$lbl  (harness error: $_)" }
+}
+
+# 164.14  static: _routeNativeCommand() intercepts [BIND:]/[PAD:] BEFORE [WAIT:]
+$routeFn164 = Get-FunctionBody $apiSrc "_routeNativeCommand"
+Check (
+    ($routeFn164 -match [regex]::Escape("userText.match(/\[BIND:")) -and
+    ($routeFn164 -match [regex]::Escape("_nativePadBind(bindMatch[1], bindMatch[2])")) -and
+    ($routeFn164 -match [regex]::Escape("userText.match(/\[PAD:")) -and
+    ($routeFn164 -match [regex]::Escape("_nativePadFire(padMatch[1])")) -and
+    ($routeFn164.IndexOf('bindMatch') -lt $routeFn164.IndexOf('padMatch')) -and
+    ($routeFn164.IndexOf('padMatch') -lt $routeFn164.IndexOf('waitMatch'))
+) "164.14: _routeNativeCommand() intercepts [BIND: gear, DIR] -> _nativePadBind and [PAD: DIR] -> _nativePadFire, checked BEFORE [WAIT:] -- the AI never sees either"
+
+# 164.15-16  markup: composer #deckKey + #toolDeck/.deck-scrim/#deckTarget
+Check (
+    ($htmlSrc -match "id=""deckKey""[\s\S]*?onclick=""toggleToolDeck\(\)""[\s\S]*?aria-label=""Open the native tool deck""") -and
+    ($htmlSrc -match 'class="composer-icon-btn deck-key"')
+) "164.15: composer #deckKey is present with onclick=toggleToolDeck(), a literal aria-label, and the .composer-icon-btn/.deck-key classes (>=28px via the shared rule)"
+Check (
+    ($htmlSrc -match 'id="toolDeck" role="dialog" aria-label="Native tool deck"') -and
+    ($htmlSrc -match 'class="deck-scrim" id="deckScrim"') -and
+    ($htmlSrc -match "class=""deck-target""\s*`n\s*id=""deckTarget""")
+) "164.16: #toolDeck[role=dialog], .deck-scrim, and #deckTarget (a text input) are present"
+
+# 164.17  six Tool Deck rows, each with a .tool-chip keycap
+$tools164 = @('THREAT', 'VATS SIM', 'TRADE', 'LOOT', 'CONSULT', 'VATS CALC')
+foreach ($tool164 in $tools164) {
+    $pat164 = 'data-tool="' + $tool164 + '">\s*\n\s*<b class="tool-chip">'
+    Check ($htmlSrc -match $pat164) "164.17: Tool Deck row for $tool164 present with a .tool-chip keycap"
+}
+
+# 164.18  the Quick-Draw Holster: four sockets, BIND key, hint
+Check (
+    ($htmlSrc -match 'class="socket" data-dir="UP"') -and
+    ($htmlSrc -match 'data-dir="LEFT"') -and
+    ($htmlSrc -match 'data-dir="RIGHT"') -and
+    ($htmlSrc -match 'data-dir="DOWN"') -and
+    ($htmlSrc -match 'id="bindKey"') -and
+    ($htmlSrc -match 'id="holsterHint" aria-live="polite"')
+) "164.18: the Quick-Draw Holster renders all four .socket[data-dir] sockets, the BIND arrow-key (#bindKey), and the live-region hint (#holsterHint)"
+
+# 164.19  every trace of the retired cluster is gone
+Check (
+    ($htmlSrc -notmatch 'class="tactical-dashboard"') -and
+    ($htmlSrc -notmatch 'class="d-pad"') -and
+    ($htmlSrc -notmatch 'id="macroTarget"') -and
+    ($htmlSrc -notmatch 'data-sub-id="uplinkCommandTray"') -and
+    ($htmlSrc -notmatch 'id="termlinkBtn"') -and
+    ($htmlSrc -notmatch "macroCommand\('\[PAD:")
+) "164.19: every trace of the retired cluster is gone from index.html -- no .tactical-dashboard, .d-pad, #macroTarget, uplinkCommandTray, #termlinkBtn, or macroCommand('[PAD: ...]')"
+
+# 164.20-21  CSS/motion: rules present, deckUp/socketPulse are plain animations, --bezel-wire only
+Check (
+    ($cssSrc -match [regex]::Escape('.tool-deck {') -and ($cssSrc -match 'animation: deckUp')) -and
+    ($cssSrc -match '@keyframes deckUp') -and
+    ($cssSrc -match "`n\.socket \{") -and
+    ($cssSrc -match [regex]::Escape('.tool-chip {')) -and
+    ($cssSrc -match [regex]::Escape('.holster {')) -and
+    ($cssSrc -match '@keyframes socketPulse')
+) "164.20: .tool-deck/.socket/.tool-chip/.holster CSS rules are present; the deck-raise (deckUp) and socket-pulse (socketPulse) motion verbs are plain @keyframes animations, neutralized for free by the existing global prefers-reduced-motion block (Protocol UI-9)"
+$toolDeckBlk164 = [regex]::Match($cssSrc, '(?s)\.tool-deck \{.{0,600}').Value
+$socketBlk164 = [regex]::Match($cssSrc, "(?s)`n\.socket \{.{0,600}").Value
+Check (
+    ($toolDeckBlk164 -notmatch '--robco-blue') -and ($socketBlk164 -notmatch '--robco-blue')
+) "164.21: the Tool Deck/Holster CSS uses --bezel-wire tokens, never a hardcoded --robco-blue game literal (Protocol 38)"
+
+# 164.22-27  wiring: functions defined, boot call, macroCommand retarget, registry, AI-contract comment
+Check (
+    ($uiSrc -match [regex]::Escape('function toggleToolDeck()')) -and
+    ($uiSrc -match [regex]::Escape('function openToolDeck()')) -and
+    ($uiSrc -match [regex]::Escape('function closeToolDeck()')) -and
+    ($uiSrc -match [regex]::Escape('function _wireToolDeck()')) -and
+    ($uiSrc -match [regex]::Escape('function _nativePadBind(gear, dir)')) -and
+    ($uiSrc -match [regex]::Escape('function _nativePadFire(dir)')) -and
+    ($uiSrc -match [regex]::Escape('function renderHolster()'))
+) "164.22: toggleToolDeck/openToolDeck/closeToolDeck/_wireToolDeck/_nativePadBind/_nativePadFire/renderHolster are all defined"
+$onloadIdx164 = $uiSrc.IndexOf('window.onload = async function () {')
+$onloadBody164 = ""
+if ($onloadIdx164 -ge 0) {
+    $braceStart164 = $uiSrc.IndexOf('{', $onloadIdx164)
+    $depth164 = 0
+    $ii164 = $braceStart164
+    while ($ii164 -lt $uiSrc.Length) {
+        if ($uiSrc[$ii164] -eq '{') { $depth164++ }
+        elseif ($uiSrc[$ii164] -eq '}') { $depth164--; if ($depth164 -eq 0) { break } }
+        $ii164++
+    }
+    $onloadBody164 = $uiSrc.Substring($braceStart164, $ii164 - $braceStart164 + 1)
+}
+Check (
+    ($onloadBody164.Length -gt 0) -and ($onloadBody164 -match [regex]::Escape('_wireToolDeck();'))
+) "164.23: window.onload calls _wireToolDeck() (registered as its own boot phase, alongside _wirePanelPersistence())"
+$macroCmdBody164 = Get-FunctionBody $uiSrc "macroCommand"
+Check (
+    ($macroCmdBody164 -match [regex]::Escape("getElementById('deckTarget')")) -and
+    ($macroCmdBody164 -notmatch [regex]::Escape("getElementById('macroTarget')")) -and
+    ($macroCmdBody164 -notmatch 'PAD:')
+) "164.24: macroCommand() reads the Tool Deck's #deckTarget (not the retired #macroTarget) and no longer special-cases PAD commands (the D-Pad no longer routes through it)"
+Check (
+    ($uiSrc -match "cmd: '\[BIND: X, DIR\]',\s*`n\s*desc: 'Quick-Draw Holster") -and
+    ($uiSrc -match "cmd: '\[PAD: DIR\]',\s*`n\s*desc: 'Quick-Draw Holster")
+) "164.25: COMMAND_REGISTRY describes [BIND: X, DIR] / [PAD: DIR] as the native offline Quick-Draw Holster (not the old ""D-Pad vector"" wording)"
+Check (
+    $apiSrc -match [regex]::Escape('padBindings (Quick-Draw Holster) — DELIBERATELY NOT MAPPED')
+) "164.26: autoImportState() carries an explicit documenting comment that padBindings is deliberately NOT mapped (player authority, Protocol 24)"
+Check (
+    $apiSrc -notmatch [regex]::Escape('parsed.padBindings')
+) "164.27: autoImportState() never references parsed.padBindings anywhere -- the AI has no path to write it"
 
 # ===========================================================
 # Results

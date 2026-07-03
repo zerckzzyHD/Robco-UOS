@@ -2493,6 +2493,15 @@
                       +
                     </button>
                     <button
+                      class="composer-icon-btn deck-key"
+                      id="deckKey"
+                      onclick="toggleToolDeck()"
+                      aria-label="Open the native tool deck"
+                      aria-expanded="false"
+                    >
+                      ◈
+                    </button>
+                    <button
                       id="modePill"
                       class="action-btn btn-sm mode-pill mode-pill--overseer"
                       onclick="toggleInputMode()"
@@ -2526,139 +2535,96 @@
                 accept="image/*"
                 onchange="handleImageSelection(event)"
               />
-
-              <!-- DO-O follow-up (owner mobile-density fix): the D-PAD + native command
-                   cluster is tucked into a collapsible sub-panel (Protocol UI-1/UI-2) so the
-                   Director transcript above leads the mobile view. Every control keeps its
-                   exact onclick wiring (Protocol 22 — only the container/styling changed).
-                   Default-open on desktop / default-collapsed on mobile is the documented
-                   `uplinkCommandTray` exception in _wirePanelPersistence() (ui-core.js). -->
-              <details class="sub-panel uplink-tray" data-sub-id="uplinkCommandTray">
-                <summary><h3>&gt; COMMAND CLUSTER</h3></summary>
-                <div class="tactical-dashboard">
-                  <details style="align-self: start; grid-area: dpad" open>
-                    <summary
-                      class="config-summary"
-                      style="
-                        font-size: 11px;
-                        margin-bottom: 5px;
-                        color: var(--bezel-wire);
-                        border-bottom: 1px dashed var(--bezel-wire);
-                        padding-bottom: 2px;
-                      "
-                    >
-                      D-PAD
-                    </summary>
-                    <div class="d-pad" style="margin-right: 15px">
-                      <button class="action-btn" onclick="macroCommand('[PAD: UP]')">▲</button>
-                      <div class="d-pad-row">
-                        <button class="action-btn" onclick="macroCommand('[PAD: LEFT]')">◄</button>
-                        <button class="action-btn" onclick="macroCommand('[PAD: RIGHT]')">►</button>
-                      </div>
-                      <button class="action-btn" onclick="macroCommand('[PAD: DOWN]')">▼</button>
-                    </div>
-                  </details>
-                  <div class="macro-actions" style="grid-area: input">
-                    <input
-                      type="text"
-                      id="macroTarget"
-                      placeholder="TARGET / ITEM…"
-                      style="
-                        border-color: var(--bezel-wire);
-                        color: var(--bezel-wire);
-                        width: 100%;
-                        margin-bottom: 5px;
-                      "
-                    />
-                  </div>
-                  <div
-                    class="macro-buttons"
-                    style="
-                      grid-area: buttons;
-                      display: grid;
-                      grid-template-columns: 1fr 1fr;
-                      gap: 5px;
-                    "
-                  >
-                    <button
-                      class="action-btn"
-                      style="margin: 0; color: var(--bezel-wire); border-color: var(--bezel-wire)"
-                      onclick="macroCommand('[THREAT]')"
-                    >
-                      [THREAT]
-                    </button>
-                    <button
-                      class="action-btn"
-                      style="margin: 0; color: var(--bezel-wire); border-color: var(--bezel-wire)"
-                      onclick="macroCommand('[VATS SIM]')"
-                    >
-                      [VATS]
-                    </button>
-                    <button
-                      class="action-btn"
-                      style="margin: 0; color: var(--bezel-wire); border-color: var(--bezel-wire)"
-                      onclick="expandPanelForCategory('trade')"
-                      aria-label="Open the native barter terminal"
-                    >
-                      [TRADE]
-                    </button>
-                    <button
-                      class="action-btn"
-                      style="margin: 0; color: var(--bezel-wire); border-color: var(--bezel-wire)"
-                      onclick="renderLoot()"
-                      aria-label="Open the native salvage / loot terminal"
-                    >
-                      [LOOT]
-                    </button>
-                    <button
-                      class="action-btn"
-                      id="consultBtn"
-                      style="
-                        margin: 0;
-                        color: var(--bezel-wire);
-                        border-color: var(--bezel-wire);
-                        grid-column: 1 / -1;
-                      "
-                      onclick="macroCommand('[CONSULT]')"
-                      aria-label="Look up a topic in the databank — enter a topic in the field above, then tap CONSULT"
-                    >
-                      [CONSULT]
-                    </button>
-                    <button
-                      class="action-btn"
-                      id="vatsCalcBtn"
-                      style="
-                        margin: 0;
-                        color: var(--bezel-wire);
-                        border-color: var(--bezel-wire);
-                        grid-column: 1 / -1;
-                        font-size: 10px;
-                        letter-spacing: 1.5px;
-                      "
-                      onclick="showVATSOverlay()"
-                    >
-                      V.A.T.S. CALCULATOR
-                    </button>
-                    <button
-                      class="action-btn"
-                      id="termlinkBtn"
-                      style="
-                        margin: 0;
-                        color: var(--bezel-wire);
-                        border-color: var(--bezel-wire);
-                        grid-column: 1 / -1;
-                        font-size: 10px;
-                        letter-spacing: 1.5px;
-                      "
-                      onclick="macroCommand('[TERMLINK]')"
-                      aria-label="Open the TERMLINK command console — launch any offline subsystem"
-                    >
-                      &gt; TERMLINK CONSOLE
-                    </button>
-                  </div>
-                </div>
-              </details>
             </div>
+          </div>
+        </div>
+
+        <!-- Tool Deck + Quick-Draw Holster (Design Overhaul command-cluster overhaul).
+             Anchored to .glass-frame (position:relative;overflow:hidden), NOT
+             .chat-panel/.col-right (both scroll/clip and would mis-place an absolute
+             bottom sheet — see terminal.css). Zero standing footprint at rest;
+             renderHolster() (ui-render.js) populates the four sockets from
+             state.padBindings on open and after every bind. Every tool row reuses its
+             EXISTING handler (Protocol 22) via _wireToolDeck() (ui-core.js) — never
+             forked. TERMLINK/CROSSROADS stay out of the deck (typable only). -->
+        <div class="deck-scrim" id="deckScrim" hidden></div>
+        <div class="tool-deck" id="toolDeck" role="dialog" aria-label="Native tool deck" hidden>
+          <div class="deck-grip" aria-hidden="true"></div>
+          <div class="deck-head">
+            ◈ TOOL DECK — NATIVE SUBROUTINES · OFFLINE
+            <button class="dx" id="deckClose" aria-label="Close the tool deck">✕</button>
+          </div>
+          <input
+            type="text"
+            class="deck-target"
+            id="deckTarget"
+            placeholder="TARGET / ITEM / TOPIC (OPTIONAL)…"
+            aria-label="Target, item, or topic for the tools below"
+          />
+          <button class="tool-row" data-tool="THREAT">
+            <b class="tool-chip">THREAT</b><span>hostile assessment — TTK vs target</span
+            ><i class="uses-target">USES TARGET</i>
+          </button>
+          <button class="tool-row" data-tool="VATS SIM">
+            <b class="tool-chip">VATS</b><span>V.A.T.S. strike simulator</span>
+          </button>
+          <button class="tool-row" data-tool="TRADE">
+            <b class="tool-chip">TRADE</b><span>barter uplink — buy / sell</span>
+          </button>
+          <button class="tool-row" data-tool="LOOT">
+            <b class="tool-chip">LOOT</b><span>salvage terminal — field pickups</span>
+          </button>
+          <button class="tool-row" data-tool="CONSULT">
+            <b class="tool-chip">CONSULT</b><span>databank lookup — items, quests, places</span
+            ><i class="uses-target">USES TOPIC</i>
+          </button>
+          <button class="tool-row" data-tool="VATS CALC">
+            <b class="tool-chip">CALC</b><span>V.A.T.S. calculator — AP &amp; hit-%</span>
+          </button>
+
+          <div class="holster">
+            <div class="holster-head">
+              QUICK-DRAW HOLSTER · GEAR VECTORS
+              <button
+                class="bind-key"
+                id="bindKey"
+                aria-label="Arm bind mode — assign the target field gear to a vector socket"
+                aria-pressed="false"
+              >
+                BIND ▸
+              </button>
+            </div>
+            <div class="holster-rack">
+              <button class="socket" data-dir="UP" aria-label="Gear vector up — empty socket">
+                <span class="socket-top"
+                  ><span class="socket-dir" aria-hidden="true">▲</span
+                  ><span class="socket-led" aria-hidden="true"></span
+                ></span>
+                <span class="socket-gear">EMPTY</span>
+              </button>
+              <button class="socket" data-dir="LEFT" aria-label="Gear vector left — empty socket">
+                <span class="socket-top"
+                  ><span class="socket-dir" aria-hidden="true">◄</span
+                  ><span class="socket-led" aria-hidden="true"></span
+                ></span>
+                <span class="socket-gear">EMPTY</span>
+              </button>
+              <button class="socket" data-dir="RIGHT" aria-label="Gear vector right — empty socket">
+                <span class="socket-top"
+                  ><span class="socket-dir" aria-hidden="true">►</span
+                  ><span class="socket-led" aria-hidden="true"></span
+                ></span>
+                <span class="socket-gear">EMPTY</span>
+              </button>
+              <button class="socket" data-dir="DOWN" aria-label="Gear vector down — empty socket">
+                <span class="socket-top"
+                  ><span class="socket-dir" aria-hidden="true">▼</span
+                  ><span class="socket-led" aria-hidden="true"></span
+                ></span>
+                <span class="socket-gear">EMPTY</span>
+              </button>
+            </div>
+            <div class="holster-hint" id="holsterHint" aria-live="polite"></div>
           </div>
         </div>
       </div>

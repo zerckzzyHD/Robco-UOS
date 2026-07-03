@@ -2283,6 +2283,36 @@ function _lootAdd(inventory, item, qty, db) {
   return inv;
 }
 
+// Quick-Draw Holster (Tool Deck unit) — renders the four gear-vector sockets from
+// state.padBindings. Idempotent + safe to call while the deck is hidden (the socket
+// elements exist in the DOM, just not visible). Gear names go through textContent /
+// setAttribute only (never innerHTML), so an arbitrary player-typed gear name has no
+// HTML-injection surface — no escapeHtml needed for this render path.
+function renderHolster() {
+  const DIRS = [
+    { dir: 'UP', glyph: 'up' },
+    { dir: 'LEFT', glyph: 'left' },
+    { dir: 'RIGHT', glyph: 'right' },
+    { dir: 'DOWN', glyph: 'down' },
+  ];
+  const pb = state.padBindings || {};
+  DIRS.forEach(({ dir, glyph }) => {
+    const socket = document.querySelector(`.socket[data-dir="${dir}"]`);
+    if (!socket) return;
+    const gear = pb[glyph];
+    const gearEl = socket.querySelector('.socket-gear');
+    if (gear) {
+      socket.classList.add('bound');
+      if (gearEl) gearEl.textContent = gear.toUpperCase();
+      socket.setAttribute('aria-label', `Fire gear vector ${glyph} — ${gear}`);
+    } else {
+      socket.classList.remove('bound');
+      if (gearEl) gearEl.textContent = 'EMPTY';
+      socket.setAttribute('aria-label', `Gear vector ${glyph} — empty socket`);
+    }
+  });
+}
+
 function renderLoot(arg) {
   const modal = document.getElementById('sysModal');
   const title = document.getElementById('modalTitle');

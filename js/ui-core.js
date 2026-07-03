@@ -1542,16 +1542,6 @@ function _wirePanelPersistence() {
     if (savedPanelState && savedPanelState[id] !== undefined) {
       if (savedPanelState[id]) d.setAttribute('open', '');
       else d.removeAttribute('open');
-    } else if (
-      id === 'uplinkCommandTray' &&
-      window.matchMedia('(min-width: 1000px) and (hover: hover) and (pointer: fine)').matches
-    ) {
-      // DO-O follow-up (owner mobile-density fix): the UPLINK command cluster (D-PAD +
-      // native command buttons) defaults OPEN on a real desktop — the same "always
-      // visible, zero added taps" behavior it had before this unit — but COLLAPSED on
-      // mobile so the Director transcript leads the view. The one documented per-id
-      // exception to the otherwise universal "new sub-trackers start closed" default.
-      d.setAttribute('open', '');
     }
     // Default: no 'open' (collapsed) — new sub-trackers start closed until user expands
     d.addEventListener('toggle', () => {
@@ -1967,6 +1957,7 @@ window.onload = async function () {
     initAmbientRuntime(); // A1: Ambient Runtime — additive state machine + observer scheduler (parallel to standby; owns no timers yet)
     initTestConsole(); // staging/dev-only Test Console — no-ops (stays hidden) on production
     _wirePanelPersistence(); // also wires the Module Bay hatch ceremony to securityConfigPanel's own first user-open (owner report — never at boot)
+    _wireToolDeck(); // Tool Deck + Quick-Draw Holster — deck/scrim/tool-row/socket/bind-key wiring
     _restoreOpticsPreference();
     _restoreDevicePrefs();
     _wireKeyboardShortcuts();
@@ -3401,8 +3392,14 @@ const COMMAND_REGISTRY = [
     cmds: [
       { cmd: '[CRAFT]', desc: 'Consume ingredients to build (craft panel).' },
       { cmd: '[VISUAL UPLOAD: X]', desc: 'Parse a screenshot into inventory (Wpn / App / Msc).' },
-      { cmd: '[BIND: X, DIR]', desc: 'Assign gear to a D-Pad vector.' },
-      { cmd: '[PAD: DIR]', desc: 'Fire a D-Pad hotkey (the ◄ ▲ ▼ ► buttons).' },
+      {
+        cmd: '[BIND: X, DIR]',
+        desc: 'Quick-Draw Holster — holster gear X to a vector socket. Offline.',
+      },
+      {
+        cmd: '[PAD: DIR]',
+        desc: 'Quick-Draw Holster — fire the gear holstered to that vector socket. Offline.',
+      },
       { cmd: '[ROADMAP]', desc: 'Perk roadmap toward your build goals.' },
     ],
   },
@@ -4205,16 +4202,202 @@ function appendToChat(text, sender, isHistoryLoad = false) {
 }
 
 function macroCommand(actionStr) {
-  let target = document.getElementById('macroTarget').value.trim();
+  // Tool Deck unit: reads the deck's shared target field (#deckTarget) instead of the
+  // retired #macroTarget. The D-Pad no longer routes through macroCommand() (the
+  // Quick-Draw Holster sockets call _nativePadFire()/_nativePadBind() directly), so the
+  // old "skip target if this is a PAD command" branch is dead and removed.
+  const targetEl = document.getElementById('deckTarget');
+  let target = targetEl ? targetEl.value.trim() : '';
   let finalCmd = actionStr;
 
-  // Append the target if present and it's not a D-PAD command
-  if (target && !actionStr.includes('PAD:')) {
+  if (target) {
     finalCmd = `${actionStr} ${target}`;
   }
 
   document.getElementById('chatInput').value = `> ${finalCmd}`;
   transmitMessage();
+}
+
+// ── TOOL DECK + QUICK-DRAW HOLSTER (Design Overhaul command-cluster overhaul) ──
+// The deck is a screen-local bottom-sheet anchored to .glass-frame — a distinct,
+// bespoke overlay surface, structurally different from the centered #sysModal
+// (Protocol 22/23: not a duplicate modal manager). Owner-approved redesign of the
+// command cluster (Protocol 25) — reuses every tool's existing handler unchanged.
+let _holsterBinding = false;
+
+function toggleToolDeck() {
+  const deck = document.getElementById('toolDeck');
+  if (!deck) return;
+  if (deck.hidden) openToolDeck();
+  else closeToolDeck();
+}
+
+function openToolDeck() {
+  const deck = document.getElementById('toolDeck');
+  const scrim = document.getElementById('deckScrim');
+  const key = document.getElementById('deckKey');
+  const target = document.getElementById('deckTarget');
+  if (!deck || !scrim || !key) return;
+  deck.hidden = false;
+  scrim.hidden = false;
+  key.classList.add('open');
+  key.setAttribute('aria-expanded', 'true');
+  if (typeof renderHolster === 'function') renderHolster();
+  if (target) target.focus();
+}
+
+function _disarmHolsterBind() {
+  _holsterBinding = false;
+  const holster = document.querySelector('.holster');
+  const bindKey = document.getElementById('bindKey');
+  const hint = document.getElementById('holsterHint');
+  if (holster) holster.classList.remove('binding');
+  if (bindKey) {
+    bindKey.classList.remove('armed');
+    bindKey.setAttribute('aria-pressed', 'false');
+  }
+  if (hint) hint.textContent = '';
+}
+
+function closeToolDeck() {
+  const deck = document.getElementById('toolDeck');
+  const scrim = document.getElementById('deckScrim');
+  const key = document.getElementById('deckKey');
+  if (!deck || !scrim || !key) return;
+  deck.hidden = true;
+  scrim.hidden = true;
+  key.classList.remove('open');
+  key.setAttribute('aria-expanded', 'false');
+  _disarmHolsterBind();
+  key.focus();
+}
+
+// Quick-Draw Holster — the sole writer of state.padBindings. Reached three ways
+// (socket BIND flow, typed [BIND: gear, DIR], and read-side _nativePadFire); the AI
+// never calls this (player-authority, Protocol 24 — see api.js autoImportState()).
+function _nativePadBind(gear, dir) {
+  const d = String(dir || '').toLowerCase();
+  if (!['up', 'down', 'left', 'right'].includes(d)) {
+    appendToChat('> ▸ INVALID VECTOR — USE UP, DOWN, LEFT, OR RIGHT', 'sys', true);
+    return;
+  }
+  const g = String(gear || '').trim();
+  if (!g) {
+    appendToChat('> ▸ TARGET FIELD IS EMPTY — TYPE THE GEAR TO HOLSTER FIRST', 'sys', true);
+    return;
+  }
+  state.padBindings[d] = g;
+  saveState();
+  if (typeof renderHolster === 'function') renderHolster();
+  appendToChat(
+    `> ▸ [BIND: ${g.toUpperCase()}, ${d.toUpperCase()}] — VECTOR HOLSTERED`,
+    'sys',
+    true
+  );
+}
+
+// Fires the gear holstered to a vector. An empty socket hints toward BIND ▸ and makes
+// no AI call; a bound socket hands the Director a resolved action — the app now knows
+// the gear name natively instead of the AI having to remember it.
+function _nativePadFire(dir) {
+  const d = String(dir || '').toLowerCase();
+  if (!['up', 'down', 'left', 'right'].includes(d)) {
+    appendToChat('> ▸ INVALID VECTOR — USE UP, DOWN, LEFT, OR RIGHT', 'sys', true);
+    return;
+  }
+  const gear = state.padBindings && state.padBindings[d];
+  if (!gear) {
+    appendToChat('> ▸ SOCKET EMPTY — HOLSTER GEAR FIRST (BIND ▸)', 'sys', true);
+    return;
+  }
+  transmitMessage(`Deploy ${gear}`);
+}
+
+// Boot-wired from window.onload alongside _wirePanelPersistence() (the tray it
+// replaces was wired there). Every listener here is addEventListener-based; only
+// #deckKey keeps its inline onclick (Suite 59 definition-anchored resolution).
+function _wireToolDeck() {
+  const key = document.getElementById('deckKey');
+  const deck = document.getElementById('toolDeck');
+  const scrim = document.getElementById('deckScrim');
+  const dx = document.getElementById('deckClose');
+  const bindKey = document.getElementById('bindKey');
+  if (!key || !deck || !scrim) return;
+
+  scrim.addEventListener('click', closeToolDeck);
+  if (dx) dx.addEventListener('click', closeToolDeck);
+  deck.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !deck.hidden) closeToolDeck();
+  });
+
+  deck.querySelectorAll('.tool-row[data-tool]').forEach(row => {
+    row.addEventListener('click', () => {
+      const targetEl = document.getElementById('deckTarget');
+      const val = targetEl ? targetEl.value.trim() : '';
+      switch (row.dataset.tool) {
+        case 'THREAT':
+          macroCommand('[THREAT]');
+          break;
+        case 'VATS SIM':
+          showVATSOverlay();
+          break;
+        case 'TRADE':
+          expandPanelForCategory('trade');
+          break;
+        case 'LOOT':
+          renderLoot(val);
+          break;
+        case 'CONSULT':
+          macroCommand('[CONSULT]');
+          break;
+        case 'VATS CALC':
+          showVATSOverlay();
+          break;
+      }
+      closeToolDeck();
+    });
+  });
+
+  if (bindKey) {
+    bindKey.addEventListener('click', () => {
+      _holsterBinding = !_holsterBinding;
+      const holster = document.querySelector('.holster');
+      const hint = document.getElementById('holsterHint');
+      if (holster) holster.classList.toggle('binding', _holsterBinding);
+      bindKey.classList.toggle('armed', _holsterBinding);
+      bindKey.setAttribute('aria-pressed', String(_holsterBinding));
+      if (hint) {
+        hint.textContent = _holsterBinding
+          ? 'TYPE GEAR IN THE TARGET FIELD, THEN TAP A SOCKET TO HOLSTER IT'
+          : '';
+      }
+      const targetEl = document.getElementById('deckTarget');
+      if (_holsterBinding && targetEl) targetEl.focus();
+    });
+  }
+
+  deck.querySelectorAll('.socket[data-dir]').forEach(socket => {
+    socket.addEventListener('click', () => {
+      const dir = socket.dataset.dir;
+      const targetEl = document.getElementById('deckTarget');
+      if (_holsterBinding) {
+        const gear = targetEl ? targetEl.value.trim() : '';
+        if (!gear) {
+          const hint = document.getElementById('holsterHint');
+          if (hint) hint.textContent = 'TARGET FIELD IS EMPTY — TYPE THE GEAR TO HOLSTER FIRST';
+          if (targetEl) targetEl.focus();
+          return;
+        }
+        _nativePadBind(gear, dir);
+        if (targetEl) targetEl.value = '';
+        _disarmHolsterBind();
+        return;
+      }
+      const bound = state.padBindings && state.padBindings[String(dir || '').toLowerCase()];
+      if (bound) closeToolDeck();
+      _nativePadFire(dir);
+    });
+  });
 }
 
 async function clearChat() {

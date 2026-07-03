@@ -21,7 +21,7 @@
     or the canonical suites change, update this file in the SAME commit and bump
     the suite count marker. The gate fails on drift.
 
-    Suites: 21
+    Suites: 22
 -->
 <html lang="en">
   <head>
@@ -301,6 +301,7 @@
           'campaignMode',
           'playthroughType',
           'mapView',
+          'padBindings',
         ]);
         const discovered = Object.keys(state);
         const unknown = discovered.filter(k => !KNOWN_KEYS.has(k));
@@ -598,6 +599,7 @@
               magazines: ['Pugilism Illustrated'],
               lincolnItems: { "Lincoln's Hat": 'other', 'Bad Item': 'bogus' }, // 'other'→found, unknown→found
               factions: { ncr: { fame: '15', infamy: -3, rep: 7 } }, // fame/infamy → non-negative ints
+              padBindings: { up: '  Stimpak  ', down: 42, left: null, weird: 'Molotov' }, // Quick-Draw Holster: trimmed string|null, extras dropped
             },
           },
         };
@@ -643,6 +645,18 @@
             camp.factions.ncr.rep === 7,
           'faction fame/infamy coerced to non-negative ints; other fields preserved',
           JSON.stringify(camp.factions.ncr)
+        );
+        // Quick-Draw Holster: padBindings rebuilt to the fixed 4-key {up,down,left,right}
+        // map — trimmed strings, non-string coerced to null, extras dropped, missing
+        // keys default null.
+        assert(
+          camp.padBindings.up === 'Stimpak' &&
+            camp.padBindings.down === null &&
+            camp.padBindings.left === null &&
+            camp.padBindings.right === null &&
+            !('weird' in camp.padBindings),
+          'padBindings sanitized to {up,down,left,right} string|null, extras dropped',
+          JSON.stringify(camp.padBindings)
         );
 
         // Boot-merge: state = { ...defaults, ...campaigns[activeContext] } (ui-core.js boot).
@@ -1089,6 +1103,59 @@
           );
         } catch (err) {
           assert(false, 'FATAL: P4 Terminal Record suite threw', String((err && err.stack) || err));
+        }
+
+        // ── Suite 13b — Quick-Draw Holster (padBindings) ───────────────────────
+        // Exercises the REAL migrateState()/autoImportState() against padBindings:
+        // a bogus (non-object) shape normalizes to the all-empty default, and an AI
+        // response can NEVER alter a binding (Protocol 24 player-authority + the
+        // Protocol 14 AI-contract regression this unit requires).
+        try {
+          section('Suite 13b — Quick-Draw Holster (padBindings)');
+
+          // 1) Bogus shape (array) normalizes to the {up,down,left,right} all-null default.
+          resetState();
+          state.padBindings = ['not', 'an', 'object'];
+          migrateState('2.7.0', state);
+          assert(
+            state.padBindings &&
+              state.padBindings.up === null &&
+              state.padBindings.down === null &&
+              state.padBindings.left === null &&
+              state.padBindings.right === null,
+            'migrateState: a bogus (array) padBindings normalizes to the all-null default',
+            JSON.stringify(state.padBindings)
+          );
+
+          // 2) Missing field (older save) is added by migration.
+          resetState();
+          delete state.padBindings;
+          migrateState('2.7.0', state);
+          assert(
+            state.padBindings &&
+              Object.keys(state.padBindings).sort().join(',') === 'down,left,right,up',
+            'migrateState: a save with no padBindings migrates to the 4-key all-null default'
+          );
+
+          // 3) Protocol 14: autoImportState NEVER writes padBindings, even when the
+          //    parsed AI response includes one — parsed.padBindings is never referenced.
+          resetState();
+          state.padBindings = { up: 'Stimpak', down: null, left: null, right: null };
+          window._lastStateBeforeSync = JSON.stringify(state);
+          autoImportState(
+            JSON.stringify({ padBindings: { up: 'AI-INJECTED', down: 'Nuka-Cola' } })
+          );
+          assert(
+            state.padBindings.up === 'Stimpak' && state.padBindings.down === null,
+            'Protocol 14: autoImportState cannot alter padBindings — the AI-authored payload is ignored (player authority)',
+            JSON.stringify(state.padBindings)
+          );
+        } catch (err) {
+          assert(
+            false,
+            'FATAL: Quick-Draw Holster (padBindings) suite threw',
+            String((err && err.stack) || err)
+          );
         }
 
         // ── Suite 14 — P5 save version history (REAL IndexedDB) ───────────────

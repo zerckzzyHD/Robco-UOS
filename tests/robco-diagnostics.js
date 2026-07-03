@@ -1426,24 +1426,29 @@ guards(htmlSource, [
   ],
   // Validate Key
   [/id="btnFetchModels"/, 'Validate Key button exists (id=btnFetchModels)'],
-  // D-pad
-  [/onclick="macroCommand\('\[PAD: UP\]'\)"/, "D-pad UP wired (macroCommand('[PAD: UP]'))"],
-  [/onclick="macroCommand\('\[PAD: DOWN\]'\)"/, "D-pad DOWN wired (macroCommand('[PAD: DOWN]'))"],
-  [/onclick="macroCommand\('\[PAD: LEFT\]'\)"/, "D-pad LEFT wired (macroCommand('[PAD: LEFT]'))"],
+  // Tool Deck + Quick-Draw Holster (replaces the old always-present D-pad/macro-button
+  // cluster) — see Suite 164 for the full command-cluster-overhaul coverage.
   [
-    /onclick="macroCommand\('\[PAD: RIGHT\]'\)"/,
-    "D-pad RIGHT wired (macroCommand('[PAD: RIGHT]'))",
+    /id="deckKey"[\s\S]*?onclick="toggleToolDeck\(\)"/,
+    'Tool Deck launcher key wired (id=deckKey, toggleToolDeck())',
   ],
-  // Macro buttons
-  [/onclick="macroCommand\('\[THREAT\]'\)"/, 'THREAT macro button wired'],
-  [/onclick="macroCommand\('\[VATS SIM\]'\)"/, 'VATS SIM macro button wired'],
+  [/data-tool="THREAT"/, 'Tool Deck THREAT row present (data-tool=THREAT)'],
+  [/data-tool="VATS SIM"/, 'Tool Deck VATS row present (data-tool="VATS SIM")'],
   [
-    /onclick="expandPanelForCategory\('trade'\)"/,
-    'TRADE macro button opens the native barter panel (WU-N2)',
+    /data-tool="TRADE"/,
+    'Tool Deck TRADE row present (data-tool=TRADE, opens the native barter panel — WU-N2)',
   ],
-  [/onclick="renderLoot\(\)"/, 'LOOT button opens the native salvage terminal (WU-N6)'],
-  // V.A.T.S. Calculator
-  [/id="vatsCalcBtn"/, 'V.A.T.S. CALCULATOR button exists (id=vatsCalcBtn)'],
+  [
+    /data-tool="LOOT"/,
+    'Tool Deck LOOT row present (data-tool=LOOT, opens the native salvage terminal — WU-N6)',
+  ],
+  [/class="socket" data-dir="UP"/, 'Quick-Draw Holster UP socket present (data-dir=UP)'],
+  [/data-dir="DOWN"/, 'Quick-Draw Holster DOWN socket present (data-dir=DOWN)'],
+  [/data-dir="LEFT"/, 'Quick-Draw Holster LEFT socket present (data-dir=LEFT)'],
+  [/data-dir="RIGHT"/, 'Quick-Draw Holster RIGHT socket present (data-dir=RIGHT)'],
+  // V.A.T.S. Calculator (deck row token — button itself now lives in the deck, not
+  // a standalone #vatsCalcBtn; see Suite 164 for the exact-removal guard)
+  [/data-tool="VATS CALC"/, 'Tool Deck CALC row present (data-tool="VATS CALC")'],
 ]);
 
 // ══════════════════════════════════════════════════════════════
@@ -10298,10 +10303,15 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     'GATE-NOWRAP-4: map-collectible-badge span includes badge class in ui-render.js'
   );
 
-  // 92.5  .macro-buttons button carries white-space: nowrap (WU-C12 device-wrap fix guard)
+  // 92.5  device-wrap fix (WU-C12), carried forward to the Tool Deck rows (Suite
+  //       164): .tool-row span / .tool-row .uses-target carry white-space: nowrap
+  //       so a deck row's description/tag never wraps mid-word on a narrow device.
+  //       The retired .macro-buttons button rule it originally guarded is gone.
   assert(
-    /\.macro-buttons\s+button\s*\{[^}]*white-space:\s*nowrap/.test(css92),
-    'GATE-NOWRAP-5: .macro-buttons button has white-space: nowrap in terminal.css (macro command buttons must not wrap)'
+    /\.tool-row\s+span\s*\{[^}]*white-space:\s*nowrap/.test(css92) &&
+      /\.tool-row\s+\.uses-target\s*\{[^}]*white-space:\s*nowrap/.test(css92) &&
+      !/\.macro-buttons\s+button\s*\{/.test(css92),
+    'GATE-NOWRAP-5: .tool-row span/.uses-target carry white-space: nowrap in terminal.css (device-wrap fix, carried forward from the retired .macro-buttons button rule to the Tool Deck)'
   );
 
   // 92.6  WU-C14: the COMPLETE RNG label carries white-space: nowrap so it can
@@ -11683,11 +11693,13 @@ header('Suite 106 — WU-N2 TRADE native barter terminal');
       /data-sub-id="trade_sell"/.test(html106),
     '106.15: #tradePanel with BARTER UPLINK h2 + trade_buy/trade_sell sub-panels (data-sub-id) present'
   );
-  // 106.16 [TRADE] macro button repointed to the native panel (not the AI macro)
+  // 106.16 Tool Deck TRADE row (data-tool="TRADE") dispatches to the native panel
+  // (ui-core.js's _wireToolDeck() switch-case), never the retired AI macro.
   assert(
-    /expandPanelForCategory\('trade'\)/.test(html106) &&
+    /data-tool="TRADE"/.test(html106) &&
+      /case 'TRADE':\s*expandPanelForCategory\('trade'\)/.test(core106) &&
       !/macroCommand\('\[TRADE\]'\)/.test(html106),
-    "106.16: [TRADE] button opens the native panel (expandPanelForCategory('trade')), not macroCommand('[TRADE]')"
+    "106.16: Tool Deck TRADE row (data-tool=TRADE) dispatches to expandPanelForCategory('trade') in _wireToolDeck(), not macroCommand('[TRADE]')"
   );
   // 106.17 expandPanelForCategory routes 'trade' + loadUI renders it
   assert(
@@ -11742,14 +11754,14 @@ header('Suite 106 — WU-N2 TRADE native barter terminal');
       "106.21: expandPanelForCategory opens the matched panel AND centers it via scrollIntoView({ block: 'center' }) (WU-HF1 r3 [TRADE] reveal + centering fix)"
     );
   }
-  // 106.22 END-TO-END button→panel-open chain (not just renderTrade): the [TRADE] button's
-  // onclick calls expandPanelForCategory('trade'), and that function maps 'trade' to the
-  // '> BARTER UPLINK' panel on the INV tab — so a tap reliably opens AND reveals the panel.
+  // 106.22 END-TO-END row→panel-open chain (not just renderTrade): the Tool Deck TRADE
+  // row dispatches to expandPanelForCategory('trade'), and that function maps 'trade' to
+  // the '> BARTER UPLINK' panel on the INV tab — so a tap reliably opens AND reveals it.
   assert(
-    /onclick="expandPanelForCategory\('trade'\)"/.test(html106) &&
+    /case 'TRADE':\s*expandPanelForCategory\('trade'\)/.test(core106) &&
       /trade:\s*'inv'/.test(core106) &&
       /trade:\s*'>\s*BARTER UPLINK'/.test(core106),
-    "106.22: [TRADE] button onclick → expandPanelForCategory('trade') → maps trade→inv + '> BARTER UPLINK' (button→panel-open end-to-end)"
+    "106.22: Tool Deck TRADE row → expandPanelForCategory('trade') → maps trade→inv + '> BARTER UPLINK' (row→panel-open end-to-end)"
   );
 }
 
@@ -11998,17 +12010,20 @@ header('Suite 108 — WU-N4 CONSULT native databank lookup');
     '108.13: renderConsult opens via openModal() (U12 driver — shared modal ARIA/focus consistency)'
   );
 
-  // ── WU-N4b: CONSULT macro button (option A) ──────────────────────────────────
+  // ── WU-N4b / Tool Deck: CONSULT deck row ──────────────────────────────────────
   const html108 = readFile('index.html');
-  const consultBtn108 = (html108.match(/<button[^>]*id="consultBtn"[\s\S]*?<\/button>/) || [''])[0];
-  // 108.14 a discoverable CONSULT button wired to macroCommand('[CONSULT]'), with an
-  // aria-label, reusing the shared #macroTarget topic input (THREAT macro-target pattern).
+  const consultRow108 = (html108.match(
+    /<button class="tool-row" data-tool="CONSULT">[\s\S]*?<\/button>/
+  ) || [''])[0];
+  // 108.14 the CONSULT tool now lives in the Tool Deck as a row dispatched (in
+  // ui-core.js's _wireToolDeck()) to macroCommand('[CONSULT]'), reusing the deck's
+  // shared #deckTarget topic input (the #macroTarget/#consultBtn cluster is retired).
   assert(
-    /id="consultBtn"/.test(html108) &&
-      /onclick="macroCommand\('\[CONSULT\]'\)"/.test(consultBtn108) &&
-      /aria-label="[^"]+"/.test(consultBtn108) &&
-      /id="macroTarget"/.test(html108),
-    "108.14: index.html CONSULT macro button (#consultBtn) → macroCommand('[CONSULT]') with aria-label, reusing #macroTarget topic input (WU-N4b option A)"
+    /data-tool="CONSULT"/.test(html108) &&
+      /case 'CONSULT':\s*macroCommand\('\[CONSULT\]'\)/.test(uiSource) &&
+      /id="deckTarget"/.test(html108) &&
+      consultRow108,
+    "108.14: index.html Tool Deck CONSULT row (data-tool=CONSULT) → ui-core.js _wireToolDeck() dispatches macroCommand('[CONSULT]'), reusing #deckTarget topic input"
   );
   // 108.15 native end-to-end: [CONSULT] is a NATIVE_COMMAND_ROUTER entry → renderConsult, so
   // the button's macroCommand('[CONSULT]') is intercepted before any AI call (not macroCommand→AI).
@@ -12399,17 +12414,15 @@ header('Suite 110 — WU-N6 LOOT native add/value terminal');
     '110.12: LOOT escapes item names + the search prefill via escapeHtml() before innerHTML'
   );
 
-  // 110.13 a discoverable UI affordance — the [LOOT] button wired to renderLoot() + reuses the modal
-  {
-    const btnTag110 = (html110.match(/<button\b[^>]*renderLoot\(\)[^>]*>/) || [''])[0];
-    assert(
-      /onclick="renderLoot\(\)"/.test(html110) &&
-        /aria-label="[^"]+"/.test(btnTag110) &&
-        /openModal/.test(extractFunctionBody(ren110, 'renderLoot')),
-      // Step 2 Phase 0 U12: renderLoot opens via the consolidated openModal() driver
-      '110.13: index.html [LOOT] button wired to renderLoot() with an aria-label; opens via openModal() (U12 driver — shared modal)'
-    );
-  }
+  // 110.13 a discoverable UI affordance — the Tool Deck LOOT row (data-tool="LOOT")
+  // dispatches to renderLoot() in _wireToolDeck() + reuses the shared modal.
+  assert(
+    /data-tool="LOOT"/.test(html110) &&
+      /case 'LOOT':\s*renderLoot\(val\)/.test(core110) &&
+      /openModal/.test(extractFunctionBody(ren110, 'renderLoot')),
+    // Step 2 Phase 0 U12: renderLoot opens via the consolidated openModal() driver
+    '110.13: Tool Deck LOOT row (data-tool=LOOT) dispatches to renderLoot() in _wireToolDeck(); opens via openModal() (U12 driver — shared modal)'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -13693,15 +13706,15 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '123.8: the TERMLINK console block is game-agnostic (no FNV/FO3/Fallout/location literals)'
   );
 
-  // 123.9  discoverable affordances: #termlinkBtn in index.html routes natively, registry advertises it,
-  //        and the console has overflow-safe styling
+  // 123.9  Tool Deck unit: the on-screen #termlinkBtn is retired (the deck supersedes
+  //        it — TOOLDECK_PLAN.md decision 3) but TERMLINK stays fully typable: the
+  //        router, COMMAND_REGISTRY entry, and console CSS are all unchanged.
   assert(
-    /id="termlinkBtn"[\s\S]*?macroCommand\('\[TERMLINK\]'\)/.test(html123) &&
-      /aria-label="Open the TERMLINK command console/.test(html123) &&
+    !/id="termlinkBtn"/.test(html123) &&
       /\[TERMLINK\] \/ \[TL\]/.test(uiCore123) &&
       /\.termlink-grid\b/.test(css123) &&
       /\.termlink-entry\b/.test(css123),
-    '123.9: #termlinkBtn routes [TERMLINK] natively + has aria-label, COMMAND_REGISTRY advertises it, console CSS present'
+    '123.9: #termlinkBtn is retired from index.html (Tool Deck supersedes it); [TERMLINK] stays typable — COMMAND_REGISTRY advertises it, console CSS present'
   );
 
   // ── WU-HF2 + WU-HF3 hotfixes (folded into v2.7.0) ───────────────────────────
@@ -20728,103 +20741,57 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     );
   }
 
-  // 162.16  DO-O follow-up (owner mobile-density fix) — the D-PAD + native
-  //         command cluster is tucked into a collapsible sub-panel (Protocol
-  //         UI-1/UI-2) so the transcript leads the mobile view, and every one
-  //         of its controls keeps its exact onclick wiring (Protocol 22 —
-  //         only the container/styling changed, never the behavior)
-  {
-    const trayOpen162 = htmlSource.indexOf('<details class="sub-panel uplink-tray"');
-    // Balanced-tag scan, not the first `</details>` — the D-PAD sub-cluster
-    // nests its OWN <details>...</details> inside the tray, which would
-    // otherwise truncate the block before the macro-buttons are reached.
-    let trayBlock162 = '';
-    if (trayOpen162 !== -1) {
-      const afterOpenTag162 = htmlSource.indexOf('>', trayOpen162) + 1;
-      const tagRe162 = /<details\b|<\/details>/g;
-      tagRe162.lastIndex = afterOpenTag162;
-      let depth162 = 1,
-        m162,
-        end162 = -1;
-      while ((m162 = tagRe162.exec(htmlSource))) {
-        if (m162[0] === '</details>') {
-          depth162--;
-          if (depth162 === 0) {
-            end162 = m162.index + m162[0].length;
-            break;
-          }
-        } else {
-          depth162++;
-        }
-      }
-      if (end162 !== -1) trayBlock162 = htmlSource.slice(trayOpen162, end162);
-    }
-    assert(
-      /data-sub-id="uplinkCommandTray"/.test(trayBlock162) &&
-        /<summary><h3>&gt; COMMAND CLUSTER<\/h3><\/summary>/.test(trayBlock162),
-      '162.16a: the command cluster is a details.sub-panel with data-sub-id="uplinkCommandTray" and a <summary><h3>> HEADING</h3> (Protocol UI-1/UI-2)'
-    );
-    assert(
-      trayBlock162.length > 0 &&
-        [
-          "macroCommand('[PAD: UP]')",
-          "macroCommand('[PAD: LEFT]')",
-          "macroCommand('[PAD: RIGHT]')",
-          "macroCommand('[PAD: DOWN]')",
-          "macroCommand('[THREAT]')",
-          "macroCommand('[VATS SIM]')",
-          "expandPanelForCategory('trade')",
-          'renderLoot()',
-          "macroCommand('[CONSULT]')",
-          'showVATSOverlay()',
-          "macroCommand('[TERMLINK]')",
-        ].every(needle => trayBlock162.includes(needle)),
-      '162.16b: every D-PAD/native-command button keeps its exact pre-existing onclick handler inside the new tray wrapper (no rewiring)'
-    );
-  }
+  // 162.16  Tool Deck unit (TOOLDECK_PLAN.md): the old always-present/
+  //         collapsible D-PAD + native-command cluster (the uplink-tray
+  //         sub-panel, .tactical-dashboard, #macroTarget) is retired
+  //         entirely — replaced by the ◈ Tool Deck + Quick-Draw Holster
+  //         (see Suite 164). Nothing of the old cluster survives.
+  assert(
+    !/data-sub-id="uplinkCommandTray"/.test(htmlSource) &&
+      !/class="tactical-dashboard"/.test(htmlSource) &&
+      !/class="d-pad"/.test(htmlSource) &&
+      !/id="macroTarget"/.test(htmlSource) &&
+      !/class="macro-buttons"/.test(htmlSource),
+    '162.16a: the old uplink-tray/tactical-dashboard/d-pad/#macroTarget/macro-buttons cluster is fully removed from index.html (superseded by the Tool Deck — Suite 164)'
+  );
+  assert(
+    !/onclick="macroCommand\('\[PAD: /.test(htmlSource),
+    "162.16b: no on-screen control calls macroCommand('[PAD: ...]') anymore — the Quick-Draw Holster sockets call _nativePadFire()/_nativePadBind() directly (Suite 164)"
+  );
 
-  // 162.17  _wirePanelPersistence() carries the one documented per-id
-  //         exception: the tray defaults OPEN on a real desktop (matching its
-  //         pre-existing always-visible behavior, zero added taps) and
-  //         COLLAPSED on mobile (Protocol UI-6 — the universal sub-panel
-  //         default stays "closed" for every other data-sub-id)
+  // 162.17  _wirePanelPersistence() no longer carries the uplinkCommandTray
+  //         per-id exception — the tray it special-cased no longer exists.
   {
     const wpp162 = extractFunctionBody(uiSource, '_wirePanelPersistence');
     assert(
-      /id === 'uplinkCommandTray'/.test(wpp162) &&
-        /matchMedia\('\(min-width: 1000px\) and \(hover: hover\) and \(pointer: fine\)'\)\.matches/.test(
-          wpp162
-        ),
-      '162.17: _wirePanelPersistence() defaults the uplinkCommandTray sub-panel open on desktop (matchMedia gate) with no saved preference, leaving every other data-sub-id collapsed by default'
+      !/uplinkCommandTray/.test(wpp162),
+      '162.17: _wirePanelPersistence() no longer references uplinkCommandTray (the tray it special-cased is retired)'
     );
   }
 
-  // 162.18  the cluster is restyled amber (--bezel-wire), not the old blue/
-  //         green boxy controls, and the TRANSMIT background bug (a real
-  //         visual defect found live during this unit's verification —
-  //         Protocol 42) is fixed
+  // 162.18  the Tool Deck + Quick-Draw Holster CSS is restyled amber
+  //         (--bezel-wire), not the old blue/green boxy controls; the retired
+  //         .tactical-dashboard/.d-pad rules are gone entirely (Protocol 42
+  //         cleanup — dead CSS is a stale-safeguard risk of its own)
   {
-    const tacticalRule162 = (cssSource.match(/\.tactical-dashboard \{[\s\S]*?\n\}/) || [''])[0];
-    const dpadBtnRule162 = (cssSource.match(/\.d-pad button \{[\s\S]*?\n\}/) || [''])[0];
+    const toolDeckRule162 = (cssSource.match(/\.tool-deck \{[\s\S]*?\n\}/) || [''])[0];
+    const socketRule162 = (cssSource.match(/\n\.socket \{[\s\S]*?\n\}/) || [''])[0];
     assert(
-      tacticalRule162.length > 0 &&
-        /border: 1px dashed var\(--bezel-wire\)/.test(tacticalRule162) &&
-        dpadBtnRule162.length > 0 &&
-        /border-color: var\(--bezel-wire\)/.test(dpadBtnRule162) &&
-        !/--robco-blue/.test(tacticalRule162) &&
-        !/--robco-blue/.test(dpadBtnRule162),
-      '162.18a: .tactical-dashboard and .d-pad button use --bezel-wire, not the old --robco-blue'
+      toolDeckRule162.length > 0 &&
+        /border: 1px solid var\(--bezel-wire\)/.test(toolDeckRule162) &&
+        socketRule162.length > 0 &&
+        !/--robco-blue/.test(toolDeckRule162) &&
+        !/--robco-blue/.test(socketRule162),
+      '162.18a: .tool-deck and .socket use --bezel-wire, not --robco-blue'
     );
-    const macroStart162 = htmlSource.indexOf('class="macro-buttons"');
-    const macroEnd162 =
-      macroStart162 === -1 ? -1 : htmlSource.indexOf('&gt; TERMLINK CONSOLE', macroStart162);
-    const macroButtonsBlock162 =
-      macroStart162 !== -1 && macroEnd162 !== -1
-        ? htmlSource.slice(macroStart162, macroEnd162)
-        : '';
     assert(
-      macroButtonsBlock162.length > 0 && !/--robco-green/.test(macroButtonsBlock162),
-      '162.18b: the macro-buttons cluster (THREAT/VATS/TRADE/LOOT/CONSULT/VATS CALCULATOR/TERMLINK) carries no leftover --robco-green literal — every button matches the amber Director Uplink aesthetic'
+      !/\.tactical-dashboard \{/.test(cssSource) &&
+        !/\.d-pad \{/.test(cssSource) &&
+        !/\.d-pad button \{/.test(cssSource) &&
+        !/\.d-pad-row \{/.test(cssSource) &&
+        !/\.macro-buttons button \{/.test(cssSource) &&
+        !/details\.uplink-tray \{/.test(cssSource),
+      '162.18b: the retired .tactical-dashboard/.d-pad(+button/-row)/.macro-buttons button/.uplink-tray CSS rules are gone entirely — no dead cluster CSS survives'
     );
     assert(
       /\.composer-icon-btn,\s*\n\.composer-send-btn,\s*\n\.icon-btn-round \{[^}]*border: 1px solid var\(--icon-btn-color, var\(--bezel-wire\)\);/.test(
@@ -20875,9 +20842,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       /class="composer-input"/.test(composerBlock162) &&
       /class="composer-toolbar"/.test(composerBlock162) &&
       /id="tokenBudgetDisplay" class="composer-token-budget"/.test(composerBlock162) &&
+      /id="deckKey"/.test(composerBlock162) &&
       !/\[ &gt; VISUAL UPLOAD \]/.test(htmlSource) &&
       !/&gt; TRANSMIT PROTOCOL/.test(htmlSource),
-    '162.20: the composer contains the textarea (.composer-input) and a bottom toolbar (.composer-toolbar); the old standalone dashed VISUAL UPLOAD button and bottom TRANSMIT PROTOCOL button are both gone'
+    '162.20: the composer contains the textarea (.composer-input), a bottom toolbar (.composer-toolbar) with the ◈ Tool Deck launcher (#deckKey); the old standalone dashed VISUAL UPLOAD button and bottom TRANSMIT PROTOCOL button are both gone'
   );
 
   // 162.20b  structural integration proof — #chatDisplay and .composer are
@@ -21371,6 +21339,396 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       '163.15: renderSavesList() uses .save-row/.save-row-label/.save-row-actions for BOTH the local-slot and cloud-save row templates — no separate inline-styled layout left behind for either'
     );
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 164 — Tool Deck + Quick-Draw Holster + padBindings
+//  (Design Overhaul command-cluster overhaul — TOOLDECK_PLAN.md). Replaces
+//  the old always-present/collapsible D-PAD + native-command cluster with a
+//  zero-standing-footprint ◈ launcher key that raises a bottom-sheet TOOL
+//  DECK, and redesigns the D-Pad into the Quick-Draw Holster — four gear-
+//  vector sockets driven by a NEW native state field, state.padBindings
+//  (Protocol 4), which the AI can never read or write (Protocol 24/14).
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 164 — Tool Deck + Quick-Draw Holster + padBindings');
+
+  // ── State field (Protocol 4) ─────────────────────────────────────────
+  assert(
+    /padBindings: \{ up: null, down: null, left: null, right: null \}/.test(stateSource),
+    '164.1: state.js declares the padBindings default { up: null, down: null, left: null, right: null }'
+  );
+  assert(
+    stateSource.indexOf('window._defaultState = JSON.parse(JSON.stringify(state));') >
+      stateSource.indexOf('padBindings: { up: null, down: null, left: null, right: null }'),
+    '164.2: window._defaultState is snapshotted AFTER the padBindings default is declared, so wipeTerminal() resets it too'
+  );
+
+  // ── Behavioral proofs (real execution, vm sandbox — mirrors Suite 133) ──
+  const vm164 = require('vm');
+  let mig164 = null,
+    migErr164 = null;
+  try {
+    const sandbox164 = { window: {}, console: { error() {}, log() {}, warn() {} } };
+    vm164.createContext(sandbox164);
+    vm164.runInContext(stateSource, sandbox164);
+    mig164 = sandbox164;
+  } catch (e) {
+    migErr164 = e;
+  }
+  if (mig164) {
+    vm164.runInContext(
+      'var t1 = ' +
+        JSON.stringify({ padBindings: ['not', 'an', 'object'] }) +
+        '; migrateState("2.7.0", t1);',
+      mig164
+    );
+    const afterBogus164 = vm164.runInContext('t1.padBindings', mig164);
+    assert(
+      afterBogus164 &&
+        afterBogus164.up === null &&
+        afterBogus164.down === null &&
+        afterBogus164.left === null &&
+        afterBogus164.right === null,
+      '164.3: migrateState() normalizes a bogus (array) padBindings shape to the all-null {up,down,left,right} default'
+    );
+
+    vm164.runInContext('var t2 = {}; migrateState("2.7.0", t2);', mig164);
+    const afterMissing164 = vm164.runInContext('t2.padBindings', mig164);
+    assert(
+      afterMissing164 && Object.keys(afterMissing164).sort().join(',') === 'down,left,right,up',
+      '164.4: migrateState() adds the {up,down,left,right} default when padBindings is absent (older save)'
+    );
+
+    vm164.runInContext(
+      'var t3 = ' +
+        JSON.stringify({
+          padBindings: { up: '  Stimpak  ', down: 42, left: null, weird: 'Molotov' },
+        }) +
+        '; migrateState("2.7.0", t3);',
+      mig164
+    );
+    const afterMixed164 = vm164.runInContext('t3.padBindings', mig164);
+    assert(
+      afterMixed164.up === 'Stimpak' &&
+        afterMixed164.down === null &&
+        afterMixed164.left === null &&
+        afterMixed164.right === null &&
+        !('weird' in afterMixed164),
+      '164.5: migrateState() trims strings, coerces non-strings to null, and drops stray non-direction keys'
+    );
+  } else {
+    fail('164.3-5: migrateState() padBindings harness failed to initialize (' + migErr164 + ')');
+  }
+
+  // sanitizeImportedContainer — pure function, eval-extracted (mirrors Suite 44.12)
+  let _testSanitize164 = null;
+  try {
+    const fnBody164 = extractFunctionBody(apiSource, 'sanitizeImportedContainer');
+    const fnStart164 = apiSource.indexOf('function sanitizeImportedContainer');
+    const paramsStart164 = apiSource.indexOf('(', fnStart164);
+    const paramsEnd164 = apiSource.indexOf('{', paramsStart164);
+    const params164 = apiSource.slice(paramsStart164, paramsEnd164).trim();
+    _testSanitize164 = eval(`(function sanitizeImportedContainer${params164}${fnBody164})`);
+  } catch (_) {}
+  if (_testSanitize164) {
+    const _tc164 = {
+      activeContext: 'FNV',
+      campaigns: {
+        FNV: { padBindings: { up: '  Stimpak  ', down: 42, left: null, weird: 'Molotov' } },
+      },
+    };
+    const pb164 = _testSanitize164(_tc164).campaigns.FNV.padBindings;
+    assert(
+      pb164.up === 'Stimpak' &&
+        pb164.down === null &&
+        pb164.left === null &&
+        pb164.right === null &&
+        !('weird' in pb164),
+      '164.6: sanitizeImportedContainer coerces padBindings to the fixed {up,down,left,right} string|null map, dropping extras (Protocol 34 cloud-pull/file-import path)'
+    );
+
+    // Round-trip (Protocol 34): push (serialize) → sanitize → migrate → apply.
+    const pushed164 = {
+      activeContext: 'FNV',
+      campaigns: {
+        FNV: { padBindings: { up: 'Stimpak', down: '.357 Magnum', left: null, right: null } },
+      },
+    };
+    const sanitized164 = _testSanitize164(pushed164);
+    if (mig164) {
+      vm164.runInContext(
+        'var t4 = ' + JSON.stringify(sanitized164.campaigns.FNV) + '; migrateState("2.7.0", t4);',
+        mig164
+      );
+      const final164 = vm164.runInContext('t4.padBindings', mig164);
+      assert(
+        final164.up === 'Stimpak' &&
+          final164.down === '.357 Magnum' &&
+          final164.left === null &&
+          final164.right === null,
+        '164.7: round-trip (Protocol 34) — push (serialize) → sanitize → migrate → apply preserves padBindings intact'
+      );
+    } else {
+      fail('164.7: round-trip test skipped — migrateState harness unavailable');
+    }
+  } else {
+    fail('164.6-7: sanitizeImportedContainer eval-extraction failed');
+  }
+
+  // Protocol 14 — autoImportState() can NEVER alter padBindings (player authority).
+  {
+    let harness164 = null,
+      harnessErr164 = null;
+    try {
+      const sandbox164b = {
+        window: {},
+        document: { getElementById: () => null },
+        console: { error() {}, log() {}, warn() {} },
+        loadUI: () => {},
+        appendToChat: () => {},
+        expandPanelForCategory: () => {},
+        playSyncTone: () => {},
+      };
+      vm164.createContext(sandbox164b);
+      vm164.runInContext(stateSource, sandbox164b);
+      vm164.runInContext(readFile('js/reg_nv.js'), sandbox164b);
+      const autoImportBody164 =
+        'function autoImportState(jsonString)' + extractFunctionBody(apiSource, 'autoImportState');
+      vm164.runInContext(
+        autoImportBody164 + '\nthis.autoImportState = autoImportState;',
+        sandbox164b
+      );
+      harness164 = sandbox164b;
+    } catch (e) {
+      harnessErr164 = e;
+    }
+    if (harness164) {
+      vm164.runInContext(
+        'state.padBindings = ' +
+          JSON.stringify({ up: 'Stimpak', down: null, left: null, right: null }) +
+          '; window._lastStateBeforeSync = JSON.stringify(state);',
+        harness164
+      );
+      let threw164 = false;
+      try {
+        harness164.autoImportState(
+          JSON.stringify({ padBindings: { up: 'AI-INJECTED', down: 'Nuka-Cola' } })
+        );
+      } catch (e) {
+        threw164 = true;
+      }
+      const afterAi164 = vm164.runInContext('state.padBindings', harness164);
+      assert(
+        !threw164 && afterAi164.up === 'Stimpak' && afterAi164.down === null,
+        '164.8: Protocol 14 — autoImportState() cannot alter padBindings even when the parsed AI response includes one (player-authority regression guard)'
+      );
+    } else {
+      fail('164.8: Protocol 14 harness failed to initialize (' + harnessErr164 + ')');
+    }
+  }
+
+  // _nativePadBind()/_nativePadFire() (ui-core.js) — real execution against a
+  // stubbed state/chat/transmit surface.
+  {
+    let harness164c = null,
+      harnessErr164c = null;
+    const chatLog164c = [];
+    const transmitCalls164c = [];
+    try {
+      const sandbox164c = {
+        window: {},
+        console: { error() {}, log() {}, warn() {} },
+        state: { padBindings: { up: null, down: null, left: null, right: null } },
+        saveState: () => {},
+        renderHolster: () => {},
+        appendToChat: msg => chatLog164c.push(msg),
+        transmitMessage: msg => transmitCalls164c.push(msg),
+      };
+      vm164.createContext(sandbox164c);
+      const bindBody164c =
+        'function _nativePadBind(gear, dir)' + extractFunctionBody(uiSource, '_nativePadBind');
+      const fireBody164c =
+        'function _nativePadFire(dir)' + extractFunctionBody(uiSource, '_nativePadFire');
+      vm164.runInContext(
+        bindBody164c +
+          '\n' +
+          fireBody164c +
+          '\nthis._nativePadBind=_nativePadBind; this._nativePadFire=_nativePadFire;',
+        sandbox164c
+      );
+      harness164c = sandbox164c;
+    } catch (e) {
+      harnessErr164c = e;
+    }
+    if (harness164c) {
+      harness164c._nativePadBind('Stimpak', 'sideways');
+      assert(
+        harness164c.state.padBindings.up === null &&
+          chatLog164c.some(m => /INVALID VECTOR/.test(m)),
+        '164.9: _nativePadBind() rejects an invalid direction (hint only, no state write)'
+      );
+      chatLog164c.length = 0;
+
+      harness164c.state.padBindings.up = 'Stimpak';
+      harness164c._nativePadBind('   ', 'up');
+      assert(
+        harness164c.state.padBindings.up === 'Stimpak' &&
+          chatLog164c.some(m => /TARGET FIELD IS EMPTY/.test(m)),
+        '164.10: _nativePadBind() rejects an empty gear name and does NOT clobber the existing binding'
+      );
+      chatLog164c.length = 0;
+
+      harness164c._nativePadBind('  .357 Magnum  ', 'DOWN');
+      assert(
+        harness164c.state.padBindings.down === '.357 Magnum' &&
+          chatLog164c.some(m => /VECTOR HOLSTERED/.test(m)),
+        '164.11: _nativePadBind() trims the gear name, writes state.padBindings[dir], and logs a sys line'
+      );
+      chatLog164c.length = 0;
+
+      harness164c._nativePadFire('left');
+      assert(
+        transmitCalls164c.length === 0 && chatLog164c.some(m => /SOCKET EMPTY/.test(m)),
+        '164.12: _nativePadFire() on an empty socket hints toward BIND ▸ and makes NO transmitMessage() call (no AI)'
+      );
+      chatLog164c.length = 0;
+
+      harness164c._nativePadFire('DOWN');
+      assert(
+        transmitCalls164c.length === 1 && transmitCalls164c[0] === 'Deploy .357 Magnum',
+        '164.13: _nativePadFire() on a bound socket transmits a resolved "Deploy <gear>" action to the Director'
+      );
+    } else {
+      fail(
+        '164.9-13: _nativePadBind/_nativePadFire harness failed to initialize (' +
+          harnessErr164c +
+          ')'
+      );
+    }
+  }
+
+  // Native command intercepts: [BIND: gear, DIR] / [PAD: DIR] mirror [WAIT:] —
+  // checked BEFORE it, so a typed command never falls through to the AI.
+  {
+    const routeFn164 = extractFunctionBody(apiSource, '_routeNativeCommand');
+    assert(
+      routeFn164.includes('userText.match(/\\[BIND:') &&
+        routeFn164.includes('_nativePadBind(bindMatch[1], bindMatch[2])') &&
+        routeFn164.includes('userText.match(/\\[PAD:') &&
+        routeFn164.includes('_nativePadFire(padMatch[1])') &&
+        routeFn164.indexOf('bindMatch') < routeFn164.indexOf('padMatch') &&
+        routeFn164.indexOf('padMatch') < routeFn164.indexOf('waitMatch'),
+      '164.14: _routeNativeCommand() intercepts [BIND: gear, DIR] → _nativePadBind and [PAD: DIR] → _nativePadFire, checked BEFORE [WAIT:] — the AI never sees either'
+    );
+  }
+
+  // ── Markup/DOM ────────────────────────────────────────────────────────
+  assert(
+    /id="deckKey"[\s\S]*?onclick="toggleToolDeck\(\)"[\s\S]*?aria-label="Open the native tool deck"/.test(
+      htmlSource
+    ) && /class="composer-icon-btn deck-key"/.test(htmlSource),
+    '164.15: composer #deckKey (◈) is present with onclick=toggleToolDeck(), a literal aria-label, and the .composer-icon-btn/.deck-key classes (≥28px via the shared rule)'
+  );
+  assert(
+    /id="toolDeck" role="dialog" aria-label="Native tool deck"/.test(htmlSource) &&
+      /class="deck-scrim" id="deckScrim"/.test(htmlSource) &&
+      /class="deck-target"\s*\n\s*id="deckTarget"/.test(htmlSource),
+    '164.16: #toolDeck[role=dialog], .deck-scrim, and #deckTarget (a text input) are present'
+  );
+  ['THREAT', 'VATS SIM', 'TRADE', 'LOOT', 'CONSULT', 'VATS CALC'].forEach(tool => {
+    const re = new RegExp(`data-tool="${tool}">\\s*\\n\\s*<b class="tool-chip">`);
+    assert(
+      re.test(htmlSource),
+      `164.17: Tool Deck row for ${tool} present with a .tool-chip keycap`
+    );
+  });
+  assert(
+    /class="socket" data-dir="UP"/.test(htmlSource) &&
+      /data-dir="LEFT"/.test(htmlSource) &&
+      /data-dir="RIGHT"/.test(htmlSource) &&
+      /data-dir="DOWN"/.test(htmlSource) &&
+      /id="bindKey"/.test(htmlSource) &&
+      /id="holsterHint" aria-live="polite"/.test(htmlSource),
+    '164.18: the Quick-Draw Holster renders all four .socket[data-dir] sockets, the BIND ▸ key (#bindKey), and the live-region hint (#holsterHint)'
+  );
+  assert(
+    !/class="tactical-dashboard"/.test(htmlSource) &&
+      !/class="d-pad"/.test(htmlSource) &&
+      !/id="macroTarget"/.test(htmlSource) &&
+      !/data-sub-id="uplinkCommandTray"/.test(htmlSource) &&
+      !/id="termlinkBtn"/.test(htmlSource) &&
+      !/macroCommand\('\[PAD:/.test(htmlSource),
+    "164.19: every trace of the retired cluster is gone from index.html — no .tactical-dashboard, .d-pad, #macroTarget, uplinkCommandTray, #termlinkBtn, or macroCommand('[PAD: ...]')"
+  );
+
+  // ── CSS/motion ────────────────────────────────────────────────────────
+  assert(
+    /\.tool-deck \{[\s\S]*?animation: deckUp/.test(cssSource) &&
+      /@keyframes deckUp/.test(cssSource) &&
+      /\n\.socket \{/.test(cssSource) &&
+      /\.tool-chip \{/.test(cssSource) &&
+      /\.holster \{/.test(cssSource) &&
+      /@keyframes socketPulse/.test(cssSource),
+    '164.20: .tool-deck/.socket/.tool-chip/.holster CSS rules are present; the deck-raise (deckUp) and socket-pulse (socketPulse) motion verbs are plain @keyframes animations, neutralized for free by the existing global prefers-reduced-motion block (Protocol UI-9)'
+  );
+  assert(
+    !/\.tool-deck \{[\s\S]{0,600}--robco-blue/.test(cssSource) &&
+      !/\n\.socket \{[\s\S]{0,600}--robco-blue/.test(cssSource),
+    '164.21: the Tool Deck/Holster CSS uses --bezel-wire tokens, never a hardcoded --robco-blue game literal (Protocol 38)'
+  );
+
+  // ── Wiring ────────────────────────────────────────────────────────────
+  assert(
+    /function toggleToolDeck\(\)/.test(uiSource) &&
+      /function openToolDeck\(\)/.test(uiSource) &&
+      /function closeToolDeck\(\)/.test(uiSource) &&
+      /function _wireToolDeck\(\)/.test(uiSource) &&
+      /function _nativePadBind\(gear, dir\)/.test(uiSource) &&
+      /function _nativePadFire\(dir\)/.test(uiSource) &&
+      /function renderHolster\(\)/.test(uiSource),
+    '164.22: toggleToolDeck/openToolDeck/closeToolDeck/_wireToolDeck/_nativePadBind/_nativePadFire/renderHolster are all defined'
+  );
+  {
+    let onloadBody164 = '';
+    const olIdx164 = uiSource.indexOf('window.onload = async function () {');
+    if (olIdx164 !== -1) {
+      const braceStart164 = uiSource.indexOf('{', olIdx164);
+      let depth = 0,
+        i = braceStart164;
+      for (; i < uiSource.length; i++) {
+        if (uiSource[i] === '{') depth++;
+        else if (uiSource[i] === '}' && --depth === 0) break;
+      }
+      onloadBody164 = uiSource.slice(braceStart164, i + 1);
+    }
+    assert(
+      onloadBody164.length > 0 && onloadBody164.includes('_wireToolDeck();'),
+      '164.23: window.onload calls _wireToolDeck() (registered as its own boot phase, alongside _wirePanelPersistence())'
+    );
+  }
+  {
+    const macroCmdBody164 = extractFunctionBody(uiSource, 'macroCommand');
+    assert(
+      macroCmdBody164.includes("getElementById('deckTarget')") &&
+        !macroCmdBody164.includes("getElementById('macroTarget')") &&
+        !macroCmdBody164.includes('PAD:'),
+      "164.24: macroCommand() reads the Tool Deck's #deckTarget (not the retired #macroTarget) and no longer special-cases PAD commands (the D-Pad no longer routes through it)"
+    );
+  }
+  assert(
+    /cmd: '\[BIND: X, DIR\]',\s*\n\s*desc: 'Quick-Draw Holster/.test(uiSource) &&
+      /cmd: '\[PAD: DIR\]',\s*\n\s*desc: 'Quick-Draw Holster/.test(uiSource),
+    '164.25: COMMAND_REGISTRY describes [BIND: X, DIR] / [PAD: DIR] as the native offline Quick-Draw Holster (not the old "D-Pad vector" wording)'
+  );
+  assert(
+    /padBindings \(Quick-Draw Holster\) — DELIBERATELY NOT MAPPED/.test(apiSource),
+    '164.26: autoImportState() carries an explicit documenting comment that padBindings is deliberately NOT mapped (player authority, Protocol 24)'
+  );
+  assert(
+    !/parsed\.padBindings/.test(apiSource),
+    '164.27: autoImportState() never references parsed.padBindings anywhere — the AI has no path to write it'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════
