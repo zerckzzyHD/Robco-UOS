@@ -377,6 +377,9 @@ function onImmersionChange(value) {
   if (typeof _logBaySvc === 'function') {
     _logBaySvc('ATMOSPHERIC GOVERNOR → ' + String(value).toUpperCase());
   }
+  // DO-O: a dial change can flip _scopeShouldAnimate() live — re-arm so the
+  // oscilloscope starts/stops animating immediately, not on the next state change.
+  if (typeof _armScopeLoop === 'function') _armScopeLoop();
 }
 
 // FIX 2 (owner request, B2c unit, best-effort): drag/slide-to-rotate for the
@@ -1172,6 +1175,298 @@ function _wireAmbientExperiences() {
   });
 }
 
+// ── DO-O: THE LIVING OVERSEER — DIRECTOR UPLINK (Protocol UI-10) ───────────
+// A presentation layer OVER the existing Comm-Link/AI pipeline (Protocol 22 —
+// appendToChat()/transmitMessage() are hooked, never forked). The oscilloscope
+// canvas reacts to the REAL AI lifecycle (thinking at the thermal-load window,
+// speaking during the typewriter, listening at rest, disabled/offline from the
+// key+flag+navigator.onLine signals). All per-game flavor text is read from
+// getIdentity().overseer (Protocol 38) with a generic fallback for a game that
+// hasn't authored one; trace colour is the existing --bezel-wire CSS token
+// (Protocol UI-7) — there is no JS colour branch anywhere in this block.
+// Writes NOTHING durable to the campaign: _scopeState is a transient module
+// var and the idle-blip observer below renders via appendToChat(...,true)
+// (never pushed to chatHistory/robco_chat).
+// ── DO-O START ──────────────────────────────────────────────────────────
+const OVERSEER_GENERIC_FALLBACK = {
+  title: 'COMM UPLINK',
+  relay: 'CARRIER LINK',
+  signalStrip: 'SIGNAL — · ENCRYPTION: TRI-NODE',
+  states: {
+    listening: '[ LISTENING ]',
+    thinking: '[ ESTABLISHING LINK ]',
+    speaking: '[ TRANSMITTING ]',
+    disabled: '[ NO CARRIER ]',
+    offline: '[ OFFLINE ]',
+  },
+};
+const OVERSEER_STATES = ['listening', 'thinking', 'speaking', 'disabled', 'offline'];
+
+function _overseerIdentity() {
+  const id = typeof getIdentity === 'function' ? getIdentity() : null;
+  return (id && id.overseer) || OVERSEER_GENERIC_FALLBACK;
+}
+
+let _scopeState = 'listening';
+let _scopeAnimHandle = null;
+let _scopeT = 0;
+let _scopeScratchUntil = 0;
+let _runtimeAwake = true;
+
+// _overseerRestState — PURE, vm-testable (Suite 162 behavioral test). Decides
+// the resting tag from the three live signals; never touches the DOM.
+function _overseerRestState({ hasKey, aiEnabled, online }) {
+  if (!online) return 'offline';
+  if (!hasKey || !aiEnabled) return 'disabled';
+  return 'listening';
+}
+window._overseerRestState = _overseerRestState; // exposed for api.js's finally hook + the Suite 162 behavioral test
+
+// _overseerRestSignals — reads the same key/flag/online signals transmitMessage()
+// itself gates on (api.js), so the scope's resting tag always matches reality.
+function _overseerRestSignals() {
+  const hasKey = !!(typeof MetaStore !== 'undefined' && MetaStore.get('robco_gemini_key'));
+  const aiEnabled =
+    typeof window.isFeatureEnabled !== 'function' || window.isFeatureEnabled('aiChat') !== false;
+  const online = typeof navigator === 'undefined' || navigator.onLine !== false;
+  return { hasKey, aiEnabled, online };
+}
+window._overseerRestSignals = _overseerRestSignals; // exposed for api.js's finally hook
+
+function _scopeShouldAnimate() {
+  const reduced =
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduced) return false;
+  if (typeof immersionAllows === 'function' && !immersionAllows('balanced')) return false;
+  if (!_runtimeAwake) return false;
+  if (typeof document !== 'undefined' && document.hidden) return false;
+  return true;
+}
+
+function _scopeColor() {
+  try {
+    return (
+      getComputedStyle(document.documentElement).getPropertyValue('--bezel-wire').trim() ||
+      '#ffb642'
+    );
+  } catch (_) {
+    return '#ffb642';
+  }
+}
+
+function _sizeOverseerScope(canvas) {
+  const r = canvas.getBoundingClientRect();
+  if (r.width === 0) return false;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.round(r.width * dpr);
+  canvas.height = Math.round(r.height * dpr);
+  return true;
+}
+
+function drawScope() {
+  const canvas = document.getElementById('overseerScope');
+  if (!canvas) return;
+  if (!canvas.width && !_sizeOverseerScope(canvas)) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const W = canvas.width,
+    H = canvas.height,
+    mid = H / 2;
+  const dpr = window.devicePixelRatio || 1;
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = 'rgba(20,253,206,0.10)';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < W; x += W / 12) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, H);
+    ctx.stroke();
+  }
+  for (let y = 0; y < H; y += H / 6) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(W, y);
+    ctx.stroke();
+  }
+  const color = _scopeColor();
+  ctx.strokeStyle = color;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 6 * dpr;
+  ctx.lineWidth = 1.6 * dpr;
+  ctx.beginPath();
+  const scratching = performance.now() < _scopeScratchUntil;
+  for (let x = 0; x <= W; x += 2) {
+    let y;
+    if (_scopeState === 'thinking') {
+      y =
+        mid +
+        (Math.sin(x * 0.09 + _scopeT * 3.1) + Math.sin(x * 0.23 - _scopeT * 4.7)) * H * 0.11 +
+        (Math.random() - 0.5) * H * 0.34;
+    } else if (_scopeState === 'speaking') {
+      const env = 0.55 + 0.45 * Math.sin(_scopeT * 6);
+      y =
+        mid + Math.sin(x * 0.045 + _scopeT * 5) * H * 0.26 * env + (Math.random() - 0.5) * H * 0.05;
+    } else if (_scopeState === 'disabled' || _scopeState === 'offline') {
+      y = mid + (Math.random() - 0.5) * H * 0.02;
+    } else {
+      // listening — gentle carrier sine, occasional NV-persona scratch burst
+      y =
+        mid +
+        Math.sin(x * 0.02 + _scopeT) * H * 0.14 +
+        Math.sin(x * 0.006 - _scopeT * 0.4) * H * 0.05 +
+        (Math.random() - 0.5) * H * (scratching ? 0.22 : 0.02);
+    }
+    if (x === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+}
+
+function _scopeLoop() {
+  _scopeT += 0.035;
+  if (_scopeState === 'listening' && Math.random() < 0.004) {
+    _scopeScratchUntil = performance.now() + 260 + Math.random() * 320;
+  }
+  drawScope();
+  if (_scopeShouldAnimate()) {
+    _scopeAnimHandle = requestAnimationFrame(_scopeLoop);
+  } else {
+    _scopeAnimHandle = null;
+  }
+}
+
+// _armScopeLoop — starts the rAF loop iff animation is currently allowed;
+// otherwise just paints the correct static frame for the current state
+// (reduced-motion / Minimal dial / standby / tab-hidden all degrade here).
+function _armScopeLoop() {
+  if (_scopeAnimHandle) return; // already running
+  if (!_scopeShouldAnimate()) {
+    drawScope();
+    return;
+  }
+  _scopeAnimHandle = requestAnimationFrame(_scopeLoop);
+}
+
+function getOverseerState() {
+  return _scopeState;
+}
+window.getOverseerState = getOverseerState;
+
+// setOverseerState(s) — the ONE state-setter. Always draws one frame
+// immediately (so reduced-motion/Minimal-dial users still see the correct
+// frame), then arms the loop iff animation is currently allowed.
+function setOverseerState(s) {
+  if (OVERSEER_STATES.indexOf(s) === -1) return;
+  _scopeState = s;
+  const ov = _overseerIdentity();
+  const tag = (ov.states && ov.states[s]) || OVERSEER_GENERIC_FALLBACK.states[s];
+  const tagEl = document.getElementById('scopeTag');
+  if (tagEl) {
+    tagEl.textContent = tag;
+    tagEl.classList.toggle('thinking', s === 'thinking');
+  }
+  const csEl = document.getElementById('csState');
+  if (csEl) csEl.textContent = tag;
+  drawScope();
+  _armScopeLoop();
+}
+window.setOverseerState = setOverseerState;
+
+// refreshOverseerCarrier — re-reads the per-game identity strings (title/
+// relay/status-strip) and, ONLY when the scope is genuinely at rest (never
+// mid-transaction), recomputes listening/disabled/offline from the live
+// key/flag/online signals. transmitMessage()'s own finally hook is the ONE
+// place that force-resets FROM 'thinking' (guarded there on
+// getOverseerState()==='thinking' — see api.js — since a blind reset here
+// would truncate a SPEAKING typewriter that starts asynchronously after
+// finally runs).
+function refreshOverseerCarrier() {
+  const ov = _overseerIdentity();
+  const titleEl = document.getElementById('ovsTitle');
+  if (titleEl) titleEl.textContent = ov.title;
+  const stripLabelEl = document.getElementById('carrierStripLabel');
+  if (stripLabelEl) stripLabelEl.textContent = ov.title;
+  const relayEl = document.getElementById('ovsRelay');
+  if (relayEl) relayEl.textContent = ov.relay;
+  const metaEl = document.getElementById('scopeStrip');
+  if (metaEl) metaEl.textContent = ov.signalStrip;
+  if (_scopeState === 'thinking' || _scopeState === 'speaking') {
+    drawScope();
+    return;
+  }
+  setOverseerState(_overseerRestState(_overseerRestSignals()));
+}
+window.refreshOverseerCarrier = refreshOverseerCarrier;
+
+// initOverseerScope — boot wiring (called once from window.onload, A3
+// precedent). Registers the runtime pause/resume observer + the dial-gated
+// idle-life blip observer, wires resize/online/offline/visibilitychange/
+// reduced-motion listeners, and paints the initial resting frame.
+function initOverseerScope() {
+  const canvas = document.getElementById('overseerScope');
+  if (!canvas) return;
+  _sizeOverseerScope(canvas);
+  refreshOverseerCarrier();
+
+  window.addEventListener('resize', () => {
+    _sizeOverseerScope(canvas);
+    drawScope();
+  });
+  window.addEventListener('online', refreshOverseerCarrier);
+  window.addEventListener('offline', refreshOverseerCarrier);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) _armScopeLoop();
+  });
+  if (typeof window.matchMedia === 'function') {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const onReducedMotionChange = () => setOverseerState(_scopeState);
+    if (typeof mq.addEventListener === 'function')
+      mq.addEventListener('change', onReducedMotionChange);
+  }
+
+  if (typeof AmbientRuntime !== 'undefined' && AmbientRuntime && AmbientRuntime.register) {
+    // Pause on real power-down (STANDBY/SHUTDOWN/OFF) — onEnter/onExit are NOT
+    // tier-gated by the runtime itself (A3 convention); the dial gate lives in
+    // _scopeShouldAnimate() via immersionAllows('balanced').
+    AmbientRuntime.register({
+      id: 'overseer-scope',
+      states: ['STANDBY', 'SHUTDOWN', 'OFF'],
+      onEnter: () => {
+        _runtimeAwake = false;
+        drawScope();
+      },
+      onExit: () => {
+        _runtimeAwake = true;
+        setOverseerState(_scopeState);
+      },
+    });
+
+    // Idle-life blips (owner-approved, locked decision): low-rate, dial-gated,
+    // NON-persisted device-template lines from identity.persona.blipBank —
+    // never AI output, never saved (appendToChat's isHistoryLoad=true keeps
+    // this out of chatHistory/robco_chat).
+    AmbientRuntime.register({
+      id: 'overseer-idle-blip',
+      states: ['ACTIVE', 'IDLE'],
+      tier: 'balanced',
+      cadenceMs: 35000,
+      onTick: () => {
+        if (_scopeState !== 'listening') return;
+        if (Math.random() > 0.6) return;
+        const id = typeof getIdentity === 'function' ? getIdentity() : null;
+        const bank = (id && id.persona && id.persona.blipBank) || [];
+        if (!bank.length) return;
+        const line = bank[Math.floor(Math.random() * bank.length)];
+        if (typeof appendToChat === 'function') appendToChat(line, 'sys', true);
+      },
+    });
+  }
+}
+window.initOverseerScope = initOverseerScope;
+// ── DO-O END ────────────────────────────────────────────────────────────
+
 // Power-on affordance (Protocol 42 fix): the #powerOnBtn click handler. Owner
 // bug — forcing SHUTDOWN/OFF left a fully black screen with no visible way
 // back on. Recovers using ONLY legal transition() edges (never forceState(),
@@ -1657,6 +1952,7 @@ window.onload = async function () {
     _wireRotaryDialClick();
     _wireStandby();
     _wireAmbientExperiences(); // A3: IDLE/STANDBY-deepen/SHUTDOWN dial-gated ambient observers
+    initOverseerScope(); // DO-O: the living Overseer (Director Uplink oscilloscope presence)
     initAmbientRuntime(); // A1: Ambient Runtime — additive state machine + observer scheduler (parallel to standby; owns no timers yet)
     initTestConsole(); // staging/dev-only Test Console — no-ops (stays hidden) on production
     _wirePanelPersistence(); // also wires the Module Bay hatch ceremony to securityConfigPanel's own first user-open (owner report — never at boot)
@@ -2038,6 +2334,9 @@ function _syncBezelNav(subsystem) {
   const lcd = document.getElementById('bezelTelemetry');
   if (lcd) lcd.textContent = _bezelTelemetryText(subsystem);
   MetaStore.set('robco_bezel_subsystem', subsystem);
+  // DO-O: the single choke point every subsystem change already routes through —
+  // drives the mobile UPLINK self-contained-view CSS (body[data-subsystem="uplink"]).
+  document.body.dataset.subsystem = subsystem;
 }
 
 function _bezelTelemetryText(subsystem) {
@@ -3802,6 +4101,8 @@ function appendToChat(text, sender, isHistoryLoad = false) {
 
   const _prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (sender === 'ai' && !isHistoryLoad && !_prefersReduced) {
+    // DO-O: the Director is TRANSMITTING for the duration of the typewriter.
+    if (typeof window.setOverseerState === 'function') window.setOverseerState('speaking');
     // Typewriter: reveal plain text with textContent (no parse cost, no XSS risk),
     // then swap to fully formatted innerHTML only once at animation end.
     const plainText = String(text)
@@ -3822,12 +4123,21 @@ function appendToChat(text, sender, isHistoryLoad = false) {
         // Animation complete — apply full safe HTML formatting
         msgDiv.innerHTML = fullHtml;
         chatBox.scrollTop = chatBox.scrollHeight;
+        // DO-O: the typewriter owns the SPEAKING → LISTENING reset (transmitMessage's
+        // finally hook only resets from 'thinking' — never truncates this).
+        if (typeof window.setOverseerState === 'function') window.setOverseerState('listening');
       }
     }
     typeWriter();
   } else {
     msgDiv.innerHTML = fullHtml;
     chatBox.scrollTop = chatBox.scrollHeight;
+    // DO-O: reduced-motion / isHistoryLoad-false instant branch — the reply
+    // is already fully delivered, so SPEAKING → LISTENING fires immediately.
+    if (sender === 'ai' && !isHistoryLoad && typeof window.setOverseerState === 'function') {
+      window.setOverseerState('speaking');
+      window.setOverseerState('listening');
+    }
   }
 
   if (!isHistoryLoad) {

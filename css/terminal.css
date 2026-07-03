@@ -821,6 +821,234 @@ textarea {
       pointer;
   }
 }
+/* ════════════════════════════════════════════════════════════════════
+   DO-O: THE LIVING OVERSEER — DIRECTOR UPLINK presence (Protocol UI-10).
+   A reskin OVER the existing Comm-Link (Protocol 22 — appendToChat()/
+   transmitMessage() are hooked, never forked). Amber/--bezel-wire is "the
+   wire" — the remote Director presence, distinct from the local phosphor
+   green (Protocol UI-7). Per-game flavor text is JS-filled from
+   getIdentity().overseer (Protocol 38); nothing here is game-literal.
+   ════════════════════════════════════════════════════════════════════ */
+.ovs-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-bottom: 4px;
+  border-bottom: 1px dashed rgba(var(--bezel-wire-rgb), 0.4);
+  color: var(--bezel-wire);
+  font-size: 12px;
+  letter-spacing: 1.5px;
+}
+.ovs-lamp {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--bezel-wire);
+  box-shadow: 0 0 8px var(--bezel-wire);
+  animation: rad-pulse 2.6s infinite;
+  flex-shrink: 0;
+}
+.ovs-carrier {
+  margin-left: auto;
+  font-size: 8.5px;
+  letter-spacing: 1px;
+  opacity: 0.7;
+}
+.ovs-purge-btn {
+  border-color: var(--bezel-wire) !important;
+  color: var(--bezel-wire) !important;
+}
+
+.scope-wrap {
+  position: relative;
+  padding: 8px 0 6px;
+}
+#overseerScope {
+  display: block;
+  width: 100%;
+  height: 120px;
+  background:
+    linear-gradient(rgba(var(--bezel-wire-rgb), 0.02), rgba(0, 0, 0, 0.35)),
+    var(--robco-screen-bg, #010a07);
+  border: 1px solid rgba(var(--bezel-wire-rgb), 0.45);
+}
+.scope-tag {
+  position: absolute;
+  top: 14px;
+  right: 10px;
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  color: var(--bezel-wire);
+  text-shadow: 0 0 6px rgba(var(--bezel-wire-rgb), 0.6);
+  background: rgba(0, 0, 0, 0.55);
+  padding: 2px 6px;
+  border: 1px solid rgba(var(--bezel-wire-rgb), 0.4);
+}
+.scope-tag.thinking {
+  animation: ovs-tag-blink 0.7s steps(2) infinite;
+}
+@keyframes ovs-tag-blink {
+  50% {
+    opacity: 0.35;
+  }
+}
+.scope-meta {
+  font-size: 8.5px;
+  letter-spacing: 1px;
+  opacity: 0.55;
+  color: var(--bezel-wire);
+  padding: 5px 1px 0;
+  overflow-wrap: break-word;
+}
+
+/* Transcript restyle — the `> ` prefix on user lines already exists in
+   appendToChat(); this only recolors the AI/sys lines to read as the
+   remote Director presence (amber/--bezel-wire) vs local phosphor. */
+.chat-panel .msg-ai {
+  color: var(--bezel-wire);
+  border-right: 2px solid var(--bezel-wire);
+}
+.chat-panel .msg-sys {
+  color: rgba(var(--bezel-wire-rgb), 0.6);
+}
+
+/* TRANSMIT control — amber/--bezel-wire, not the plain .blue-btn shared
+   elsewhere (REBOOT TERMINAL / CLOSE INTERFACE keep their own color). */
+.chat-panel #transmitBtn {
+  border-color: var(--bezel-wire) !important;
+  color: var(--bezel-wire) !important;
+}
+.chat-panel .mode-pill--overseer {
+  border-color: var(--bezel-wire);
+  color: var(--bezel-wire);
+}
+
+/* mobile carrier strip — the Overseer never fully leaves the screen.
+   Hidden by default; the mobile media query below reveals it whenever
+   the UPLINK subsystem is NOT the active one. Not position:fixed (the
+   DO-N Suite 160 containing-block caveat doesn't apply — it sits in the
+   normal flow at the top of the scrollable glass). */
+.carrier-strip {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  border: none;
+  border-bottom: 1px dashed rgba(var(--bezel-wire-rgb), 0.4);
+  border-radius: 0;
+  background: rgba(0, 0, 0, 0.4);
+  color: var(--bezel-wire);
+  text-shadow: 0 0 6px rgba(var(--bezel-wire-rgb), 0.5);
+  font-size: 9.5px;
+  letter-spacing: 1.5px;
+  text-transform: none;
+  min-height: 32px;
+}
+.carrier-strip .cs-state {
+  margin-left: auto;
+  opacity: 0.7;
+  font-size: 8.5px;
+}
+.mini-wave {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 14px;
+  flex-shrink: 0;
+}
+.mini-wave i {
+  width: 3px;
+  background: var(--bezel-wire);
+  box-shadow: 0 0 4px rgba(var(--bezel-wire-rgb), 0.7);
+  animation: ovs-mini-wave 1.6s ease-in-out infinite;
+}
+.mini-wave i:nth-child(1) {
+  height: 5px;
+  animation-delay: 0s;
+}
+.mini-wave i:nth-child(2) {
+  height: 10px;
+  animation-delay: 0.18s;
+}
+.mini-wave i:nth-child(3) {
+  height: 14px;
+  animation-delay: 0.36s;
+}
+.mini-wave i:nth-child(4) {
+  height: 8px;
+  animation-delay: 0.54s;
+}
+.mini-wave i:nth-child(5) {
+  height: 4px;
+  animation-delay: 0.72s;
+}
+@keyframes ovs-mini-wave {
+  50% {
+    transform: scaleY(0.35);
+  }
+}
+
+/* MOBILE (<1000px): UPLINK becomes a self-contained view (Protocol 10 —
+   fixes the "infinite scroll" problem: .col-right previously had no
+   data-tab, so it rendered permanently at full length below every other
+   subsystem). Every other subsystem hides .col-right and shows the
+   carrier strip instead — the Overseer never fully disappears. */
+@media (max-width: 999.98px) {
+  body[data-subsystem='uplink'] .container.machine {
+    height: 100vh;
+    max-height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  body[data-subsystem='uplink'] .glass-frame {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  body[data-subsystem='uplink'] .main-grid {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  body[data-subsystem='uplink'] .col-left {
+    display: none;
+  }
+  body[data-subsystem='uplink'] .col-right {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+  body[data-subsystem='uplink'] .panel.chat-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  body[data-subsystem='uplink'] #chatDisplay {
+    flex: 1 1 auto;
+    min-height: 90px;
+    overflow-y: auto;
+  }
+  body:not([data-subsystem='uplink']) .col-right {
+    display: none;
+  }
+  body:not([data-subsystem='uplink']) .carrier-strip {
+    display: flex;
+  }
+}
+/* Desktop needs no explicit override: .carrier-strip's base rule above is
+   display:none, and only the mobile query (max-width:999.98px) ever flips
+   it to display:flex — a desktop viewport never matches that query, so the
+   Director column there stays the only "always visible" presence. */
+
 /* Hidden panels (not in active tab) */
 .panel[data-tab] {
   display: none;

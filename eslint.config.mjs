@@ -42,6 +42,7 @@ export default [
         history: 'readonly',
         crypto: 'readonly',
         performance: 'readonly',
+        getComputedStyle: 'readonly',
         AbortController: 'readonly',
         TextEncoder: 'readonly',
         TextDecoder: 'readonly',

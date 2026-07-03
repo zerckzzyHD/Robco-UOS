@@ -1829,6 +1829,8 @@ async function transmitMessage(overrideText) {
   uiPanel.style.opacity = '0.5';
   document.body.classList.add('thermal-load');
   if (typeof startThermalLoad === 'function') startThermalLoad(); // H2
+  // DO-O: the Director is ESTABLISHING LINK for the duration of this request.
+  if (typeof window.setOverseerState === 'function') window.setOverseerState('thinking');
 
   let isVatsScanning = false;
   if (attachedImageData) {
@@ -2114,6 +2116,24 @@ async function transmitMessage(overrideText) {
     uiPanel.style.opacity = '1';
     if (typeof stopThermalLoad === 'function') stopThermalLoad(); // H2
     document.body.classList.remove('thermal-load');
+    // DO-O: reset to resting ONLY if still 'thinking' — a request that ended by
+    // successfully appending an AI reply already moved to 'speaking' (the async
+    // typewriter owns that reset itself); resetting blindly here would truncate it.
+    if (
+      typeof window.getOverseerState === 'function' &&
+      window.getOverseerState() === 'thinking' &&
+      typeof window.setOverseerState === 'function'
+    ) {
+      const _sig =
+        typeof window._overseerRestSignals === 'function'
+          ? window._overseerRestSignals()
+          : { hasKey: true, aiEnabled: true, online: true };
+      const _rest =
+        typeof window._overseerRestState === 'function'
+          ? window._overseerRestState(_sig)
+          : 'listening';
+      window.setOverseerState(_rest);
+    }
     if (typeof isVatsScanning !== 'undefined' && isVatsScanning) {
       isVatsScanning = false;
       document.getElementById('imagePreviewContainer').classList.remove('vats-scanning');

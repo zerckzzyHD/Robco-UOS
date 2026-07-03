@@ -11763,9 +11763,9 @@ $eslint157 = Read-Src "eslint.config.mjs"
 
 $labels157 = @(
     "js/state.js loads cleanly in a fresh VM sandbox",
-    "157.1.FNV: GAME_DEFS.FNV.identity carries every contract field (machine/material/structuralMode/theme/persona/ceremony/motionTexture/cursor/audio/voice/ambient)",
-    "157.1.FO3: GAME_DEFS.FO3.identity carries every contract field (machine/material/structuralMode/theme/persona/ceremony/motionTexture/cursor/audio/voice/ambient)",
-    "157.1.FO4: GAME_DEFS.FO4.identity carries every contract field (machine/material/structuralMode/theme/persona/ceremony/motionTexture/cursor/audio/voice/ambient)",
+    "157.1.FNV: GAME_DEFS.FNV.identity carries every contract field (machine/material/structuralMode/theme/persona/ceremony/motionTexture/cursor/audio/voice/ambient/overseer)",
+    "157.1.FO3: GAME_DEFS.FO3.identity carries every contract field (machine/material/structuralMode/theme/persona/ceremony/motionTexture/cursor/audio/voice/ambient/overseer)",
+    "157.1.FO4: GAME_DEFS.FO4.identity carries every contract field (machine/material/structuralMode/theme/persona/ceremony/motionTexture/cursor/audio/voice/ambient/overseer)",
     "157.2.FNV: GAME_DEFS.FNV.identity.theme === GAME_DEFS.FNV.theme (same object, zero drift possible)",
     "157.2.FO3: GAME_DEFS.FO3.identity.theme === GAME_DEFS.FO3.theme (same object, zero drift possible)",
     "157.2.FO4: GAME_DEFS.FO4.identity.theme === GAME_DEFS.FO4.theme (same object, zero drift possible)",
@@ -11798,7 +11798,7 @@ try {
 } catch (e) {
   results.push(false);
 }
-const CONTRACT = ['machine','material','structuralMode','theme','persona','ceremony','motionTexture','cursor','audio','voice','ambient'];
+const CONTRACT = ['machine','material','structuralMode','theme','persona','ceremony','motionTexture','cursor','audio','voice','ambient','overseer'];
 ['FNV','FO3','FO4'].forEach(ctx => {
   try {
     const id = GAME_DEFS[ctx] && GAME_DEFS[ctx].identity;
@@ -12293,6 +12293,201 @@ Check (
     ($replayHatchBody161 -notmatch "saveState") -and
     ($replayHatchBody161 -notmatch "pushToCloud")
 ) "161.10: _replayHatch() resets the same robco_bay_opened key ui-core.js's releaseBayHatch() sets, reopens #bayHatch, and touches no campaign state or the cloud"
+
+# ===========================================================
+# Suite 162 -- DO-O: the living Overseer (DIRECTOR UPLINK)
+# Reskins the Comm-Link into the mockup's Director Uplink: an oscilloscope
+# canvas driven by the REAL AI lifecycle (thinking at the transmitMessage
+# thermal-load window, speaking during the appendToChat typewriter,
+# listening/disabled/offline from the key+flag+navigator.onLine signals), a
+# per-game status strip/relay header sourced from a new identity.overseer
+# block (Protocol 38, extends the DO-K Suite 157 completeness contract), a
+# mobile carrier-strip + self-contained UPLINK view (fixes the .col-right
+# "infinite scroll" problem), reduced-motion/dial/standby gating, and zero
+# campaign-state writes. Never forks appendToChat()/transmitMessage()
+# (Protocol 22). 15 tests.
+# ===========================================================
+Sep "Suite 162 -- DO-O: the living Overseer (DIRECTOR UPLINK)"
+$html162  = Read-Src "index.html"
+$core162  = Read-Src "js/ui-core.js"
+$api162   = Read-Src "js/api.js"
+$css162   = Read-Src "css/terminal.css"
+$state162 = Read-Src "js/state.js"
+
+$ovsStart162 = $core162.IndexOf('DO-O START')
+$ovsEnd162 = $core162.IndexOf('DO-O END')
+$ovsBlock162 = if (($ovsStart162 -ge 0) -and ($ovsEnd162 -ge 0)) { $core162.Substring($ovsStart162, $ovsEnd162 - $ovsStart162) } else { "" }
+
+# 162.1  the canvas + status strip exist and are decorative; #chatDisplay
+#        keeps its pre-existing aria-live region (unregressed)
+Check ($html162 -match '<canvas id="overseerScope" aria-hidden="true"></canvas>') "162.1a: #overseerScope canvas exists and is aria-hidden (decorative)"
+Check ($html162 -match 'class="ovs-head"') "162.1b: .ovs-head (DIRECTOR UPLINK header) present"
+Check ($html162 -match 'class="scope-meta" id="scopeStrip"') "162.1c: .scope-meta status-strip present"
+Check ($html162 -match 'id="chatDisplay"[\s\S]{0,40}aria-live="polite"[\s\S]{0,40}aria-atomic="false"') "162.1d: #chatDisplay keeps aria-live=`"polite`"/aria-atomic=`"false`" (unregressed)"
+
+# 162.2  the state-machine API is defined in ui-core.js
+Check (
+    ($ovsBlock162.Length -gt 0) -and
+    ($ovsBlock162 -match 'function setOverseerState\(s\)') -and
+    ($ovsBlock162 -match 'function getOverseerState\(\)') -and
+    ($ovsBlock162 -match 'function _overseerRestState\(') -and
+    ($ovsBlock162 -match 'function initOverseerScope\(\)')
+) "162.2: setOverseerState/getOverseerState/_overseerRestState/initOverseerScope are all defined in the DO-O block of ui-core.js"
+
+# 162.3  OVERSEER_STATES enumerates all 5 states
+Check (
+    $ovsBlock162 -match "OVERSEER_STATES = \[\s*'listening',\s*'thinking',\s*'speaking',\s*'disabled',\s*'offline',?\s*\];"
+) "162.3: OVERSEER_STATES enumerates all 5 states (listening/thinking/speaking/disabled/offline)"
+
+# 162.4/162.5  transmitMessage() sets 'thinking' at the thermal-load window, and
+#        its finally block resets ONLY when the state is still 'thinking'
+$tm162 = Get-FunctionBody $api162 "transmitMessage"
+$thermalIdx162 = $tm162.IndexOf("document.body.classList.add('thermal-load')")
+$thinkingIdx162 = $tm162.IndexOf("window.setOverseerState('thinking')")
+Check (
+    ($thermalIdx162 -ge 0) -and ($thinkingIdx162 -ge 0) -and ($thinkingIdx162 -gt $thermalIdx162)
+) "162.4: transmitMessage() calls window.setOverseerState('thinking') at the thermal-load window"
+Check (
+    ($tm162 -match "getOverseerState\(\) === 'thinking'") -and ($tm162 -match 'finally')
+) "162.5: transmitMessage()'s finally block only resets the scope when getOverseerState() === 'thinking'"
+
+# 162.6  appendToChat() sets 'speaking' at the AI typewriter start and
+#        'listening' at completion, guarded on !isHistoryLoad in both branches
+$atc162 = Get-FunctionBody $core162 "appendToChat"
+Check (
+    ($atc162 -match "sender === 'ai' && !isHistoryLoad && !_prefersReduced") -and
+    ($atc162 -match "setOverseerState\('speaking'\)") -and
+    ($atc162 -match "setOverseerState\('listening'\)")
+) "162.6: appendToChat() sets 'speaking' at the AI typewriter start and 'listening' at completion, guarded on !isHistoryLoad"
+
+# 162.7  reduced-motion gates the rAF loop -- no unconditional requestAnimationFrame
+Check (
+    ($ovsBlock162 -match "_scopeShouldAnimate\(\)[\s\S]{0,300}matchMedia\('\(prefers-reduced-motion: reduce\)'\)") -and
+    ($ovsBlock162 -match "if \(_scopeShouldAnimate\(\)\) \{\s*_scopeAnimHandle = requestAnimationFrame\(_scopeLoop\);")
+) "162.7: _scopeShouldAnimate() reads matchMedia(prefers-reduced-motion) and gates every requestAnimationFrame call (no unconditional rAF)"
+
+# 162.8  runtime observer pauses on STANDBY/SHUTDOWN/OFF; the immersion dial
+#        gate lives in _scopeShouldAnimate() via immersionAllows('balanced')
+Check (
+    ($ovsBlock162 -match "id: 'overseer-scope'") -and
+    ($ovsBlock162 -match "states: \['STANDBY', 'SHUTDOWN', 'OFF'\]") -and
+    ($ovsBlock162 -match 'onEnter:') -and
+    ($ovsBlock162 -match 'onExit:') -and
+    ($ovsBlock162 -match "immersionAllows\('balanced'\)")
+) "162.8: the overseer-scope runtime observer pauses on ['STANDBY','SHUTDOWN','OFF'] with onEnter/onExit, and the dial gate (immersionAllows('balanced')) lives in _scopeShouldAnimate()"
+
+# 162.9  Protocol 38 -- no hardcoded NV literal in the DO-O block; strings are
+#        sourced from getIdentity().overseer with a generic fallback object
+Check (
+    ($ovsBlock162.Length -gt 0) -and
+    ($ovsBlock162 -notmatch 'Lucky 38') -and
+    ($ovsBlock162 -notmatch '0\.417') -and
+    ($ovsBlock162 -notmatch 'Mojave') -and
+    ($ovsBlock162 -match '_overseerIdentity\(\)') -and
+    ($ovsBlock162 -match 'getIdentity\(\)') -and
+    ($ovsBlock162 -match 'const OVERSEER_GENERIC_FALLBACK = \{')
+) "162.9: the DO-O block contains no hardcoded NV literal (Lucky 38/0.417/Mojave) -- every string is sourced from getIdentity().overseer, with a generic fallback object for a game that has not authored one"
+
+# 162.10  identity.overseer validates on FNV, FO3, and FO4 -- the DO-K Suite 157
+#         identity-completeness contract was extended to require it; spot-check
+#         the field shape here
+$overseerMatches162 = [regex]::Matches($state162, 'overseer: \{[\s\S]*?greeting:[\s\S]*?\},')
+$overseerAllOk162 = $true
+foreach ($m in $overseerMatches162) {
+    $b = $m.Value
+    if (-not (($b -match 'title:') -and ($b -match 'relay:') -and ($b -match 'signalStrip:') -and ($b -match 'states: \{'))) { $overseerAllOk162 = $false }
+}
+Check (
+    ($overseerMatches162.Count -eq 3) -and $overseerAllOk162
+) "162.10: identity.overseer is authored on all three GAME_DEFS entries (FNV/FO3/FO4) with title/relay/signalStrip/states -- Suite 157's identity contract now requires it (DO-K contract extension)"
+
+# 162.11  mobile: _syncBezelNav() -- the single choke point every subsystem
+#         change already routes through -- sets document.body.dataset.subsystem
+$syncBody162 = Get-FunctionBody $core162 "_syncBezelNav"
+Check (
+    $syncBody162 -match 'document\.body\.dataset\.subsystem = subsystem;'
+) "162.11: _syncBezelNav() sets document.body.dataset.subsystem -- the single choke point every subsystem change already routes through"
+
+# 162.12  the CSS gates the mobile UPLINK self-contained view + carrier-strip
+#         visibility off body[data-subsystem]
+Check (
+    ($css162 -match "body\[data-subsystem='uplink'\] \.col-right \{") -and
+    ($css162 -match "body:not\(\[data-subsystem='uplink'\]\) \.col-right \{") -and
+    ($css162 -match "body:not\(\[data-subsystem='uplink'\]\) \.carrier-strip \{")
+) "162.12: terminal.css gates the mobile UPLINK self-contained view + carrier-strip visibility off body[data-subsystem]"
+
+# 162.13  .carrier-strip is NOT position:fixed (Suite 160 containing-block
+#         caveat -- it sits in normal flow at the top of the scrollable glass)
+$carrierRuleMatch162 = [regex]::Match($css162, '(?m)^\.carrier-strip \{[\s\S]*?\n\}')
+$carrierRule162 = if ($carrierRuleMatch162.Success) { $carrierRuleMatch162.Value } else { "" }
+Check (
+    ($carrierRule162.Length -gt 0) -and ($carrierRule162 -notmatch 'position:\s*fixed')
+) "162.13: .carrier-strip is not position:fixed (Suite 160 containing-block caveat -- it sits in normal flow at the top of the scrollable glass)"
+
+# 162.14  save boundary -- no campaign-state write anywhere in the DO-O block;
+#         the idle-life blip path renders via appendToChat(..., true) (never
+#         persisted to chatHistory/robco_chat)
+Check (
+    ($ovsBlock162.Length -gt 0) -and
+    ($ovsBlock162 -notmatch 'saveState\(') -and
+    ($ovsBlock162 -notmatch 'robco_v8') -and
+    ($ovsBlock162 -notmatch '\bstate\.\w') -and
+    ($ovsBlock162 -match "appendToChat\(line, 'sys', true\)")
+) "162.14: the DO-O block writes nothing durable to the campaign (no saveState()/robco_v8/state.* write) and the idle-blip observer renders via appendToChat(line,'sys',true) -- never persisted"
+
+# 162.15  behavioral (shells out to node, Suite 157 precedent -- no native JS eval
+#         in PowerShell) -- the pure _overseerRestState({hasKey,aiEnabled,online})
+#         truth table, ACTUALLY EXECUTED against the real ui-core.js source
+try {
+    $nodeCheck162 = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCheck162) {
+        $corePathNode162 = (Join-Path $Root "js/ui-core.js").Replace('\', '/')
+        $testScript162 = @"
+const fs = require('fs');
+const src = fs.readFileSync('$corePathNode162', 'utf8');
+function extractFullFn(src, fnName) {
+  const idx = src.indexOf('function ' + fnName + '(');
+  if (idx === -1) return '';
+  const openParen = src.indexOf('(', idx);
+  let pd = 0, i = openParen;
+  for (; i < src.length; i++) {
+    if (src[i] === '(') pd++;
+    else if (src[i] === ')' && --pd === 0) { i++; break; }
+  }
+  const braceIdx = src.indexOf('{', i);
+  if (braceIdx === -1) return '';
+  let depth = 0;
+  for (let j = braceIdx; j < src.length; j++) {
+    if (src[j] === '{') depth++;
+    else if (src[j] === '}' && --depth === 0) return src.slice(idx, j + 1);
+  }
+  return '';
+}
+let ok = false;
+try {
+  const fn = new Function('return (' + extractFullFn(src, '_overseerRestState') + ')')();
+  ok = typeof fn === 'function' &&
+    fn({ hasKey: true, aiEnabled: true, online: true }) === 'listening' &&
+    fn({ hasKey: false, aiEnabled: true, online: true }) === 'disabled' &&
+    fn({ hasKey: true, aiEnabled: false, online: true }) === 'disabled' &&
+    fn({ hasKey: true, aiEnabled: true, online: false }) === 'offline';
+} catch (e) { ok = false; }
+console.log('RESULT:' + (ok ? '1' : '0'));
+"@
+        $out162 = ($testScript162 | node 2>&1 | Out-String)
+        $rm162 = [regex]::Match($out162, 'RESULT:([01])')
+        if ($rm162.Success) {
+            Check ($rm162.Groups[1].Value -eq '1') "162.15: _overseerRestState() truth table -- {key,flag-on,online}->listening, {no key}->disabled, {flag off}->disabled, {offline}->offline (behaviorally executed, not just statically asserted)"
+        } else {
+            $err162 = if ([string]::IsNullOrWhiteSpace($out162)) { "No output from node" } else { $out162.Trim() }
+            Fail "162.15: _overseerRestState() truth table  (runtime error: $err162)"
+        }
+    } else {
+        Fail "162.15: _overseerRestState() truth table  (node not found)"
+    }
+} catch {
+    Fail "162.15: _overseerRestState() truth table  (harness error: $_)"
+}
 
 # ===========================================================
 # Results

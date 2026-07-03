@@ -352,6 +352,21 @@
       <!-- The curved glass — CRT-frame chrome (curvature/vignette live on THIS
            frame only; never on the text inside .main-grid). -->
       <div class="glass-frame">
+        <!-- DO-O: mobile carrier strip — the Overseer never fully leaves the
+             screen even when another subsystem is open. Shown only via the
+             mobile media query (hidden whenever data-subsystem="uplink"); the
+             desktop media query force-hides it (the Director column there is
+             already always visible). Not position:fixed (Suite 160 caveat). -->
+        <button
+          class="carrier-strip"
+          id="carrierStrip"
+          onclick="selectSubsystem('uplink')"
+          aria-label="Open the Director uplink"
+        >
+          <span class="mini-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+          <span id="carrierStripLabel">DIRECTOR UPLINK</span>
+          <span class="cs-state" id="csState">[ LISTENING ]</span>
+        </button>
         <div class="main-grid">
           <div class="col-left" id="uiPanel">
             <!-- 1. BIO-METRICS (STAT tab) -->
@@ -2415,26 +2430,28 @@
           </div>
 
           <div class="col-right">
-            <div class="panel chat-panel" style="border-color: var(--robco-blue)">
-              <div
-                style="
-                  display: flex;
-                  justify-content: space-between;
-                  align-items: center;
-                  border-bottom: 1px solid var(--robco-blue);
-                  padding-bottom: 4px;
-                "
-              >
-                <h2 style="border: none; margin: 0; padding: 0; color: var(--robco-blue)">
-                  > ROBCO COMM-LINK
-                </h2>
+            <div class="panel chat-panel" style="border-color: var(--bezel-wire)">
+              <!-- DO-O: THE OVERSEER — DIRECTOR UPLINK presence. A reskin OVER the
+                   existing appendToChat()/transmitMessage() pipeline (Protocol 22 —
+                   never forked). Per-game flavor (title/relay/status strip/state
+                   tags) is read from getIdentity().overseer by OverseerScope
+                   (js/ui-core.js) — no literal game text lives here. -->
+              <div class="ovs-head">
+                <span class="ovs-lamp" aria-hidden="true"></span>
+                <span id="ovsTitle">DIRECTOR UPLINK</span>
+                <span class="ovs-carrier" id="ovsRelay">CARRIER LINK</span>
                 <button
                   onclick="clearChat()"
-                  class="action-btn btn-sm"
-                  style="border-color: var(--robco-blue); color: var(--robco-blue)"
+                  class="action-btn btn-sm ovs-purge-btn"
+                  aria-label="Purge Comm-Link history"
                 >
-                  [ PURGE LOGS ]
+                  [ PURGE ]
                 </button>
+              </div>
+              <div class="scope-wrap">
+                <canvas id="overseerScope" aria-hidden="true"></canvas>
+                <div class="scope-tag" id="scopeTag">[ LISTENING ]</div>
+                <div class="scope-meta" id="scopeStrip">SIGNAL — · ENCRYPTION: TRI-NODE</div>
               </div>
 
               <div
@@ -2459,8 +2476,8 @@
                     margin-top: 0;
                     margin-bottom: 5px;
                     border-style: dashed;
-                    color: var(--robco-blue);
-                    border-color: var(--robco-blue);
+                    color: var(--bezel-wire);
+                    border-color: var(--bezel-wire);
                   "
                 >
                   [ > VISUAL UPLOAD ]
@@ -2478,7 +2495,7 @@
                 id="chatInput"
                 maxlength="4000"
                 placeholder="ENTER COMMAND OR ACTION (E.G. '> [THREAT] GECKOS')…"
-                style="border-color: var(--robco-blue); color: var(--robco-blue)"
+                style="border-color: var(--bezel-wire); color: var(--bezel-wire)"
                 onkeydown="
                   if (event.ctrlKey && event.key === 'Enter') {
                     event.preventDefault();
@@ -2510,7 +2527,7 @@
                 </div>
                 <div
                   id="tokenBudgetDisplay"
-                  style="font-size: 9px; opacity: 0.5; color: var(--robco-blue); text-align: right"
+                  style="font-size: 9px; opacity: 0.5; color: var(--bezel-wire); text-align: right"
                 ></div>
               </div>
 
@@ -2521,8 +2538,8 @@
                     style="
                       font-size: 11px;
                       margin-bottom: 5px;
-                      color: var(--robco-blue);
-                      border-bottom: 1px dashed var(--robco-blue);
+                      color: var(--bezel-wire);
+                      border-bottom: 1px dashed var(--bezel-wire);
                       padding-bottom: 2px;
                     "
                   >
@@ -2543,8 +2560,8 @@
                     id="macroTarget"
                     placeholder="TARGET / ITEM…"
                     style="
-                      border-color: var(--robco-blue);
-                      color: var(--robco-blue);
+                      border-color: var(--bezel-wire);
+                      color: var(--bezel-wire);
                       width: 100%;
                       margin-bottom: 5px;
                     "
@@ -2561,14 +2578,14 @@
                 >
                   <button
                     class="action-btn"
-                    style="margin: 0; color: var(--robco-blue); border-color: var(--robco-blue)"
+                    style="margin: 0; color: var(--bezel-wire); border-color: var(--bezel-wire)"
                     onclick="macroCommand('[THREAT]')"
                   >
                     [THREAT]
                   </button>
                   <button
                     class="action-btn"
-                    style="margin: 0; color: var(--robco-blue); border-color: var(--robco-blue)"
+                    style="margin: 0; color: var(--bezel-wire); border-color: var(--bezel-wire)"
                     onclick="macroCommand('[VATS SIM]')"
                   >
                     [VATS]
@@ -2623,8 +2640,8 @@
                     id="termlinkBtn"
                     style="
                       margin: 0;
-                      color: var(--robco-blue);
-                      border-color: var(--robco-blue);
+                      color: var(--bezel-wire);
+                      border-color: var(--bezel-wire);
                       grid-column: 1 / -1;
                       font-size: 10px;
                       letter-spacing: 1.5px;

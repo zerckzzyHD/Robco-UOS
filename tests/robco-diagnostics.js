@@ -19788,6 +19788,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     'audio',
     'voice',
     'ambient',
+    'overseer', // DO-O: extends the DO-K identity-completeness contract (Suite 162 §7)
   ];
 
   // 157.1 — every GAME_DEFS entry (FNV, FO3, FO4 included) carries a complete identity contract
@@ -19797,7 +19798,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       const missing = CONTRACT157.filter(f => !id || id[f] === undefined || id[f] === null);
       assert(
         id && missing.length === 0,
-        `157.1.${ctx}: GAME_DEFS.${ctx}.identity carries every contract field (machine/material/structuralMode/theme/persona/ceremony/motionTexture/cursor/audio/voice/ambient)` +
+        `157.1.${ctx}: GAME_DEFS.${ctx}.identity carries every contract field (machine/material/structuralMode/theme/persona/ceremony/motionTexture/cursor/audio/voice/ambient/overseer)` +
           (missing.length ? ' — MISSING: ' + missing.join(', ') : '')
       );
     });
@@ -20458,6 +20459,232 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         !/saveState/.test(body) &&
         !/pushToCloud/.test(body),
       "161.10: _replayHatch() resets the same robco_bay_opened key ui-core.js's releaseBayHatch() sets, reopens #bayHatch, and touches no campaign state or the cloud"
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 162 — DO-O: the living Overseer (DIRECTOR UPLINK)
+//  Reskins the Comm-Link into the mockup's Director Uplink: an oscilloscope
+//  canvas driven by the REAL AI lifecycle (thinking at the transmitMessage
+//  thermal-load window, speaking during the appendToChat typewriter,
+//  listening/disabled/offline from the key+flag+navigator.onLine signals), a
+//  per-game status strip/relay header sourced from a new identity.overseer
+//  block (Protocol 38, extends the DO-K Suite 157 completeness contract), a
+//  mobile carrier-strip + self-contained UPLINK view (fixes the .col-right
+//  "infinite scroll" problem — it previously had no data-tab and rendered
+//  permanently at full length below every other subsystem), reduced-
+//  motion/dial/standby gating, and zero campaign-state writes. Never forks
+//  appendToChat()/transmitMessage() (Protocol 22). 15 tests.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 162 — DO-O: the living Overseer (DIRECTOR UPLINK)');
+
+  const ovsBlockStart162 = uiSource.indexOf('// ── DO-O START');
+  const ovsBlockEnd162 = uiSource.indexOf('// ── DO-O END');
+  const ovsBlock162 =
+    ovsBlockStart162 !== -1 && ovsBlockEnd162 !== -1
+      ? uiSource.slice(ovsBlockStart162, ovsBlockEnd162)
+      : '';
+
+  // 162.1  the canvas + status strip exist and are decorative; #chatDisplay
+  //        keeps its pre-existing aria-live region (unregressed)
+  guards(htmlSource, [
+    [
+      /<canvas id="overseerScope" aria-hidden="true"><\/canvas>/,
+      '162.1a: #overseerScope canvas exists and is aria-hidden (decorative)',
+    ],
+    [/class="ovs-head"/, '162.1b: .ovs-head (DIRECTOR UPLINK header) present'],
+    [/class="scope-meta" id="scopeStrip"/, '162.1c: .scope-meta status-strip present'],
+    [
+      /id="chatDisplay"[\s\S]{0,40}aria-live="polite"[\s\S]{0,40}aria-atomic="false"/,
+      '162.1d: #chatDisplay keeps aria-live="polite"/aria-atomic="false" (unregressed)',
+    ],
+  ]);
+
+  // 162.2  the state-machine API is defined in ui-core.js
+  assert(
+    ovsBlock162.length > 0 &&
+      /function setOverseerState\(s\)/.test(ovsBlock162) &&
+      /function getOverseerState\(\)/.test(ovsBlock162) &&
+      /function _overseerRestState\(/.test(ovsBlock162) &&
+      /function initOverseerScope\(\)/.test(ovsBlock162),
+    '162.2: setOverseerState/getOverseerState/_overseerRestState/initOverseerScope are all defined in the DO-O block of ui-core.js'
+  );
+
+  // 162.3  OVERSEER_STATES enumerates all 5 states
+  assert(
+    /OVERSEER_STATES = \[\s*'listening',\s*'thinking',\s*'speaking',\s*'disabled',\s*'offline',?\s*\];/.test(
+      ovsBlock162
+    ),
+    '162.3: OVERSEER_STATES enumerates all 5 states (listening/thinking/speaking/disabled/offline)'
+  );
+
+  // 162.4/162.5  transmitMessage() sets 'thinking' at the thermal-load window,
+  //        and its finally block resets ONLY when the state is still 'thinking'
+  //        (a blind reset would truncate a SPEAKING typewriter that starts
+  //        asynchronously after finally runs)
+  {
+    const tm162 = extractFunctionBody(apiSource, 'transmitMessage');
+    const thermalIdx = tm162.indexOf("document.body.classList.add('thermal-load')");
+    const thinkingIdx = tm162.indexOf("window.setOverseerState('thinking')");
+    assert(
+      thermalIdx !== -1 && thinkingIdx !== -1 && thinkingIdx > thermalIdx,
+      "162.4: transmitMessage() calls window.setOverseerState('thinking') at the thermal-load window"
+    );
+    assert(
+      /getOverseerState\(\) === 'thinking'/.test(tm162) && /finally/.test(tm162),
+      "162.5: transmitMessage()'s finally block only resets the scope when getOverseerState() === 'thinking'"
+    );
+  }
+
+  // 162.6  appendToChat() sets 'speaking' at the AI typewriter start and
+  //        'listening' at completion, guarded on !isHistoryLoad in both branches
+  {
+    const atc162 = extractFunctionBody(uiSource, 'appendToChat');
+    assert(
+      /sender === 'ai' && !isHistoryLoad && !_prefersReduced/.test(atc162) &&
+        /setOverseerState\('speaking'\)/.test(atc162) &&
+        /setOverseerState\('listening'\)/.test(atc162),
+      "162.6: appendToChat() sets 'speaking' at the AI typewriter start and 'listening' at completion, guarded on !isHistoryLoad"
+    );
+  }
+
+  // 162.7  reduced-motion gates the rAF loop — no unconditional requestAnimationFrame
+  assert(
+    /_scopeShouldAnimate\(\)[\s\S]{0,300}matchMedia\('\(prefers-reduced-motion: reduce\)'\)/.test(
+      ovsBlock162
+    ) &&
+      /if \(_scopeShouldAnimate\(\)\) \{\s*_scopeAnimHandle = requestAnimationFrame\(_scopeLoop\);/.test(
+        ovsBlock162
+      ),
+    '162.7: _scopeShouldAnimate() reads matchMedia(prefers-reduced-motion) and gates every requestAnimationFrame call (no unconditional rAF)'
+  );
+
+  // 162.8  runtime observer pauses on STANDBY/SHUTDOWN/OFF; the immersion dial
+  //        gate lives in _scopeShouldAnimate() via immersionAllows('balanced')
+  assert(
+    /id: 'overseer-scope'/.test(ovsBlock162) &&
+      /states: \['STANDBY', 'SHUTDOWN', 'OFF'\]/.test(ovsBlock162) &&
+      /onEnter:/.test(ovsBlock162) &&
+      /onExit:/.test(ovsBlock162) &&
+      /immersionAllows\('balanced'\)/.test(ovsBlock162),
+    "162.8: the overseer-scope runtime observer pauses on ['STANDBY','SHUTDOWN','OFF'] with onEnter/onExit, and the dial gate (immersionAllows('balanced')) lives in _scopeShouldAnimate()"
+  );
+
+  // 162.9  Protocol 38 — no hardcoded NV literal in the DO-O block; strings are
+  //        sourced from getIdentity().overseer with a generic fallback object
+  assert(
+    ovsBlock162.length > 0 &&
+      !/Lucky 38/.test(ovsBlock162) &&
+      !/0\.417/.test(ovsBlock162) &&
+      !/Mojave/.test(ovsBlock162) &&
+      /_overseerIdentity\(\)/.test(ovsBlock162) &&
+      /getIdentity\(\)/.test(ovsBlock162) &&
+      /const OVERSEER_GENERIC_FALLBACK = \{/.test(ovsBlock162),
+    '162.9: the DO-O block contains no hardcoded NV literal (Lucky 38/0.417/Mojave) — every string is sourced from getIdentity().overseer, with a generic fallback object for a game that has not authored one'
+  );
+
+  // 162.10  identity.overseer validates on FNV, FO3, and FO4 — the DO-K Suite
+  //         157 identity-completeness contract was extended to require it
+  //         (CONTRACT157 now includes 'overseer'); spot-check the field shape
+  {
+    const overseerBlocks162 = stateSource.match(/overseer: \{[\s\S]*?greeting:[\s\S]*?\},/g) || [];
+    assert(
+      overseerBlocks162.length === 3 &&
+        overseerBlocks162.every(
+          b =>
+            /title:/.test(b) && /relay:/.test(b) && /signalStrip:/.test(b) && /states: \{/.test(b)
+        ),
+      "162.10: identity.overseer is authored on all three GAME_DEFS entries (FNV/FO3/FO4) with title/relay/signalStrip/states — Suite 157's CONTRACT157 now requires it (DO-K contract extension)"
+    );
+  }
+
+  // 162.11  mobile: _syncBezelNav() — the single choke point every subsystem
+  //         change already routes through — sets document.body.dataset.subsystem
+  {
+    const syncBody162 = extractFunctionBody(uiSource, '_syncBezelNav');
+    assert(
+      /document\.body\.dataset\.subsystem = subsystem;/.test(syncBody162),
+      '162.11: _syncBezelNav() sets document.body.dataset.subsystem — the single choke point every subsystem change already routes through'
+    );
+  }
+
+  // 162.12  the CSS gates the mobile UPLINK self-contained view + carrier-strip
+  //         visibility off body[data-subsystem]
+  assert(
+    /body\[data-subsystem='uplink'\] \.col-right \{/.test(cssSource) &&
+      /body:not\(\[data-subsystem='uplink'\]\) \.col-right \{/.test(cssSource) &&
+      /body:not\(\[data-subsystem='uplink'\]\) \.carrier-strip \{/.test(cssSource),
+    '162.12: terminal.css gates the mobile UPLINK self-contained view + carrier-strip visibility off body[data-subsystem]'
+  );
+
+  // 162.13  .carrier-strip is NOT position:fixed (Suite 160 containing-block
+  //         caveat — it sits in normal flow at the top of the scrollable glass)
+  {
+    const carrierStripRule162 = (cssSource.match(/^\.carrier-strip \{[\s\S]*?\n\}/m) || [''])[0];
+    assert(
+      carrierStripRule162.length > 0 && !/position:\s*fixed/.test(carrierStripRule162),
+      '162.13: .carrier-strip is not position:fixed (Suite 160 containing-block caveat — it sits in normal flow at the top of the scrollable glass)'
+    );
+  }
+
+  // 162.14  save boundary — no campaign-state write anywhere in the DO-O block;
+  //         the idle-life blip path renders via appendToChat(..., true) (never
+  //         persisted to chatHistory/robco_chat)
+  assert(
+    ovsBlock162.length > 0 &&
+      !/saveState\(/.test(ovsBlock162) &&
+      !/robco_v8/.test(ovsBlock162) &&
+      !/\bstate\.\w/.test(ovsBlock162) &&
+      /appendToChat\(line, 'sys', true\)/.test(ovsBlock162),
+    "162.14: the DO-O block writes nothing durable to the campaign (no saveState()/robco_v8/state.* write) and the idle-blip observer renders via appendToChat(line,'sys',true) — never persisted"
+  );
+
+  // 162.15  behavioral (Node Function-eval, Suite 93/161 extractWindowFnBody
+  //         precedent) — the pure _overseerRestState({hasKey,aiEnabled,online})
+  //         truth table, actually EXECUTED rather than only statically asserted
+  {
+    function extractFullFn162(src, fnName) {
+      const idx = src.indexOf(`function ${fnName}(`);
+      if (idx === -1) return '';
+      // Skip past the (destructured) parameter list first — a bare indexOf('{')
+      // would stop at the `{ hasKey, aiEnabled, online }` parameter brace, not
+      // the function body's opening brace.
+      const openParen = src.indexOf('(', idx);
+      let pd = 0,
+        i = openParen;
+      for (; i < src.length; i++) {
+        if (src[i] === '(') pd++;
+        else if (src[i] === ')' && --pd === 0) {
+          i++;
+          break;
+        }
+      }
+      const braceIdx = src.indexOf('{', i);
+      if (braceIdx === -1) return '';
+      let depth = 0;
+      for (let j = braceIdx; j < src.length; j++) {
+        if (src[j] === '{') depth++;
+        else if (src[j] === '}' && --depth === 0) return src.slice(idx, j + 1);
+      }
+      return '';
+    }
+    let restFn162 = null;
+    try {
+      restFn162 = new Function(
+        'return (' + extractFullFn162(ovsBlock162, '_overseerRestState') + ')'
+      )();
+    } catch (_) {
+      /* restFn162 stays null — the assert below fails cleanly */
+    }
+    assert(
+      typeof restFn162 === 'function' &&
+        restFn162({ hasKey: true, aiEnabled: true, online: true }) === 'listening' &&
+        restFn162({ hasKey: false, aiEnabled: true, online: true }) === 'disabled' &&
+        restFn162({ hasKey: true, aiEnabled: false, online: true }) === 'disabled' &&
+        restFn162({ hasKey: true, aiEnabled: true, online: false }) === 'offline',
+      '162.15: _overseerRestState() truth table — {key,flag-on,online}→listening, {no key}→disabled, {flag off}→disabled, {offline}→offline (behaviorally executed, not just statically asserted)'
     );
   }
 }

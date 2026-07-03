@@ -15,6 +15,7 @@
 3. [Script Load Order & Globals](#script-load-order--globals)
    3a. [Per-Game Identity Block](#per-game-identity-block-game_defsctxidentity--design-overhaul-do-k)
    3b. [Bezel Chrome + Subsystem Nav](#bezel-chrome--subsystem-nav-indexhtml--csstermincalcss--jsui-corejs--design-overhaul-do-n)
+   3c. [Director Uplink — the Living Overseer](#director-uplink--the-living-overseer-jsui-corejs--jsapijs--csstermincalcss--design-overhaul-do-o)
 4. [State Architecture](#state-architecture)
 5. [Persistence Lifecycle](#persistence-lifecycle)
 6. [Save/Load/Sync Contract](#saveloadsync-contract)
@@ -68,8 +69,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    1972-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    1972-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    1990-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    1990-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -513,6 +514,7 @@ GAME_DEFS[ctx].identity = {
   audio:          { humFreq, humGrit, bootDrone, wakeTone, radioBed },  // -> future sonic-identity unit
   voice:          { emptyStates: {...}, loading: [...] },        // -> future empty/loading-voice unit
   ambient:        { broadcasts: [...], news: [...], weatherLabel },     // -> future living-world unit
+  overseer:       { title, relay, signalStrip, states: {...}, greeting },  // DO-O: Director Uplink presence (see below)
 };
 ```
 
@@ -552,11 +554,14 @@ existing optics/high-lumen reads — the one other sanctioned pre-`state.js` bar
 in `_restoreOpticsPreference()` once state is live, and in `onGameContextChange()` before the
 reload.
 
-**Zero behavior change (Protocol 26):** DO-K is pure data + one DOM attribute. Nothing reads
-`identity` yet — DO-N (bezel chrome), DO-O (Overseer presence), DO-C (cartridge-swap ceremony),
-DO-M (per-game machines), and DO-Q2–Q6 (motion/cursor/audio/voice/ambient) are the future
-consumers. No `state.<field>` / `saveState()` / `robco_v8` write exists anywhere in the unit.
-`APP_VERSION` stays 2.7.0 under `[Unreleased]` (cache-rev bump only). Guarded end-to-end by
+**Zero behavior change at DO-K itself (Protocol 26):** DO-K shipped as pure data + one DOM
+attribute, with `identity` read by no feature code yet. DO-N (bezel chrome, `--bezel-wire` +
+`data-game` cursor/casing text) and DO-O (Director Uplink, `identity.overseer` +
+`identity.persona.blipBank`) are the first real consumers — see their own sections below. DO-C
+(cartridge-swap ceremony), DO-M (per-game machines), and DO-Q2–Q6 (remaining motion/cursor/audio/
+voice/ambient facets) are still future consumers. No `state.<field>` / `saveState()` / `robco_v8`
+write exists anywhere in the identity block itself. `APP_VERSION` stays 2.7.0 under `[Unreleased]`
+(cache-rev bump only, current rev `-r44`). Guarded end-to-end by
 Suite 157 (both runners at parity) — a Node `vm`-sandbox behavioral test that loads the real
 `js/state.js` and proves the contract, the theme-alias reference equality, the `getIdentity()`
 fail-safe, and the FO4 designOnly guards, plus static structural guards on the three `data-game`
@@ -649,6 +654,106 @@ it), and (b) fixed the amber connector/vent-pin strips (`details.bay-board::afte
 the strip's actual responsive width evenly, leaving a stray thin partial pin at the end — to
 `background-repeat: round`, which rescales the tile so a whole number of pins always fits. Guarded
 by Suite 160 (both runners at parity, 6 tests).
+
+---
+
+## Director Uplink — the Living Overseer (`js/ui-core.js` + `js/api.js` + `css/terminal.css` — Design Overhaul DO-O)
+
+Reskins the Comm-Link (`.col-right`) into the mockup's **DIRECTOR UPLINK**: a phosphor
+oscilloscope `<canvas id="overseerScope">` whose waveform reacts to the **real** AI/chat
+lifecycle, a `.ovs-head`/`.scope-meta` status strip, and (on mobile) a self-contained UPLINK
+view that fixes the pre-DO-O "infinite scroll" problem. Protocol UI-10 (Overseer Presence) is
+adopted at this unit — see `CLAUDE.md`.
+
+**A reskin, not a fork (Protocol 22):** `appendToChat()` and `transmitMessage()` are the exact
+same functions as before, hooked at two points each — no parallel chat pipeline exists.
+
+**The state machine (`js/ui-core.js`, the "DO-O" block, co-located with the A3 ambient
+observers rather than a new served file):**
+
+| Function                                        | Role                                                                                                                                                                                                                                                                          |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `setOverseerState(s)` / `getOverseerState()`    | The one state setter/getter. `s` ∈ `listening/thinking/speaking/disabled/offline`. Every `setOverseerState()` call draws one frame immediately (so reduced-motion/Minimal-dial users still see the correct frame), then arms the rAF loop iff currently allowed.              |
+| `_overseerRestState({hasKey,aiEnabled,online})` | **Pure**, vm-testable. Decides the resting tag: offline → disabled → listening (in that priority).                                                                                                                                                                            |
+| `_overseerRestSignals()`                        | Reads the same key (`MetaStore.get('robco_gemini_key')`), flag (`isFeatureEnabled('aiChat')`), and `navigator.onLine` signals `transmitMessage()` itself gates on — the scope's resting tag always matches reality.                                                           |
+| `refreshOverseerCarrier()`                      | Re-reads `getIdentity().overseer` into the header/relay/status-strip text; recomputes the resting state **only** when not mid-transaction (never clobbers a genuine `thinking`/`speaking` in flight — e.g. an `online`/`offline` event firing mid-request).                   |
+| `initOverseerScope()`                           | Boot wiring — called once from `window.onload` (after `_wireAmbientExperiences()`). Sizes the canvas, paints the initial frame, wires `resize`/`online`/`offline`/`visibilitychange`/reduced-motion-change listeners, and registers the two `AmbientRuntime` observers below. |
+| `_scopeShouldAnimate()`                         | `!reducedMotion && immersionAllows('balanced') && _runtimeAwake && !document.hidden`. Re-checked every frame.                                                                                                                                                                 |
+
+**Hooked into the real lifecycle, not a demo timer:**
+
+- `js/api.js` `transmitMessage()`: `setOverseerState('thinking')` at the exact point the thermal-load
+  window opens (`document.body.classList.add('thermal-load')`), **after** the native-router/
+  feature-flag/no-key early-return gates — so a deterministic command (`[THREAT]`, TERMINAL mode)
+  never touches the scope. Its `finally` block resets **only if** `getOverseerState() === 'thinking'`
+  — critical, because a successful reply has already called `appendToChat(...,'ai')`, which kicks
+  off an **async** typewriter that owns its own reset to `listening`; a blind reset in `finally`
+  (which runs synchronously right after) would truncate a `speaking` frame that hasn't finished yet.
+- `js/ui-core.js` `appendToChat(text, sender, isHistoryLoad)`: sets `speaking` at the AI typewriter's
+  **start**, and `listening` at its **completion callback** — both guarded on `sender==='ai' &&
+!isHistoryLoad`, so replayed chat history on reload never touches the scope. The reduced-motion /
+  `isHistoryLoad`-false instant branch (no typewriter to wait on) fires `speaking` then immediately
+  `listening`.
+- Error/abort/429/5xx branches in `transmitMessage()` never call `appendToChat(...,'ai')` — they
+  append `'sys'` — so the scope stays `thinking` until `finally` resets it to the freshly-computed
+  resting state.
+
+**Runtime + dial gating (`AmbientRuntime`, A3 pattern):** `initOverseerScope()` registers an
+`overseer-scope` observer for `['STANDBY','SHUTDOWN','OFF']` — `onEnter` pauses the loop and
+paints a flat frame, `onExit` resumes at the current state's resting tag. `onEnter`/`onExit` are
+**not** tier-gated by the runtime itself (real power-down always pauses); the Immersion dial gate
+lives inside `_scopeShouldAnimate()` via `immersionAllows('balanced')` — at Minimal the scope
+shows a static frame, matching every other "balanced-tier" A3 observer.
+
+**Idle-life blips (owner-approved, locked decision):** a second, `tier:'balanced'`, `cadenceMs:
+35000` observer (`states:['ACTIVE','IDLE']`) occasionally renders one line from
+`getIdentity().persona.blipBank` via `appendToChat(line, 'sys', /*isHistoryLoad*/ true)` — the
+`true` flag means it renders but is **never** pushed to `chatHistory`/`robco_chat` (device-template
+flavor, not AI output, never persisted).
+
+**Per-game flavor — `identity.overseer` (Protocol 38, extends DO-K):**
+
+```js
+GAME_DEFS[ctx].identity.overseer = {
+  title, // panel heading, e.g. 'DIRECTOR UPLINK'
+  relay, // e.g. 'LUCKY 38 RELAY · 0.417 MHz'
+  signalStrip, // the SIGNAL/ENCRYPTION/VOX status-strip line
+  states: { listening, thinking, speaking, disabled, offline }, // the 5 scope-tag strings
+  greeting, // optional boot line (not yet wired to a consumer)
+};
+```
+
+NV is populated richly from the approved mockup; FO3 gets a sensible, visibly-distinct stub; FO4's
+design-only entry validates the same shape. A game with no `overseer` block (should one ever be
+added without it) falls back to a literal `OVERSEER_GENERIC_FALLBACK` object in `ui-core.js` — never
+another game's borrowed fiction. **Colour is deliberately NOT in `identity`** — the trace reads the
+existing `--bezel-wire` CSS custom property (`[data-game]`-scoped, DO-N), so there is no JS colour
+branch anywhere in this unit. Suite 157's `CONTRACT157` field list (DO-K's identity-completeness
+assertion) was extended to require `overseer` on all three games, folding this into the one
+existing completeness check rather than duplicating it.
+
+**Mobile — the self-contained UPLINK view (fixes the "infinite scroll" problem):** pre-DO-O,
+`.col-right` had no `data-tab`, so it rendered permanently at full length below every other
+subsystem on a phone. `_syncBezelNav(subsystem)` — already the single choke point every subsystem
+change routes through (hotkey, click, `#go=` deep-link, AI auto-expand) — now additionally sets
+`document.body.dataset.subsystem`. CSS in the existing mobile `@media (max-width: 999.98px)` block
+reads that attribute: `body[data-subsystem="uplink"]` bounds `.container.machine` to the viewport
+and turns `.col-right`/`.panel.chat-panel`/`#chatDisplay` into a flex column that scrolls
+internally (mirrors the pre-existing desktop `#chatDisplay{flex-grow:1;overflow-y:auto}` pattern —
+Protocol 22, not reinvented), while every other subsystem hides `.col-right` entirely and shows a
+`.carrier-strip` (mini CSS-keyframe waveform + the live scope tag) pinned at the top of the glass —
+the Overseer never fully leaves the screen, one tap away via `selectSubsystem('uplink')`. The strip
+is **not** `position: fixed` (the DO-N Suite 160 containing-block caveat doesn't apply here — it
+sits in normal flow at the top of the scrollable glass). Desktop is untouched: the Director column
+(`.col-right`) is already the permanently-visible wide track, and `data-subsystem` has no display
+effect there — UPLINK `[4]` still just pulses the column (`.overseer.attn`-equivalent — reuses the
+pre-existing focus/scroll behavior) and focuses `#chatInput`.
+
+**Save boundary clean (Protocol 26):** the entire DO-O block reads `state`/`getIdentity()` but
+never writes `saveState()` / `robco_v8` / `state.<field> =` anywhere — `_scopeState` is a transient
+module variable and the idle-blip observer's `appendToChat(...,true)` call is explicitly excluded
+from persistence. Guarded by Suite 162 (both runners at parity, 15 tests, including a Node
+`Function`-eval behavioral truth-table proof of `_overseerRestState()`).
 
 ---
 
@@ -1685,7 +1790,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1972-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1990-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

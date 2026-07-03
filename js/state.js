@@ -936,6 +936,24 @@ const GAME_DEFS = {
         news: ['> RADIO NEW VEGAS: A COURIER WAS SEEN LEAVING GOODSPRINGS…'],
         weatherLabel: 'MOJAVE RAD-STORM',
       },
+      // ── DO-O: the Director Uplink presence — panel heading/relay/status-strip/
+      // per-state tags read by OverseerScope (ui-core.js) via getIdentity().overseer.
+      // Populated richly from the approved mockup (nv-machine-mockup.html §3 +
+      // nv-machine-rationale.md). Colour is deliberately NOT here — the trace reads
+      // the existing --bezel-wire token (Protocol UI-7), never a JS colour branch.
+      overseer: {
+        title: 'DIRECTOR UPLINK',
+        relay: 'LUCKY 38 RELAY · 0.417 MHz',
+        signalStrip: 'SIGNAL ▂▄▆_ 72% · ENCRYPTION: TRI-NODE · VOX MODULE: NOT INSTALLED (OPT-IN)',
+        states: {
+          listening: '[ LISTENING ]',
+          thinking: '[ ESTABLISHING DIRECTOR LINK ]',
+          speaking: '[ TRANSMITTING ]',
+          disabled: '[ NO CARRIER ]',
+          offline: '[ OFFLINE ]',
+        },
+        greeting: '▸ EVENING, COURIER. The Director is on the wire. Transmit when ready.',
+      },
     },
     factions: FACTION_REGISTRY,
     skillKeys: SKILL_KEYS,
@@ -1101,6 +1119,22 @@ Update state.magazines when the Courier reads a skill magazine. Include only nam
         broadcasts: ['> [CAPITAL WASTELAND UPLINK] SIGNAL FROM THE RUINS — CARRIER HOLDING.'],
         news: ['> GALAXY NEWS RADIO: A WANDERER WAS SEEN LEAVING MEGATON…'],
         weatherLabel: 'CAPITAL WASTELAND RAD-STORM',
+      },
+      // ── DO-O: sensible Vault-Tec/GNR stub (FO3's real bezel/persona facets are
+      // authored from an approved mockup at DO-M) — validates + is visibly
+      // distinct from NV's so the N-game abstraction (Protocol 38) is proven.
+      overseer: {
+        title: 'OVERSEER UPLINK',
+        relay: 'GNR RELAY · 98.3 MHz',
+        signalStrip: 'SIGNAL — · ENCRYPTION: TRI-NODE · VOX MODULE: NOT INSTALLED (OPT-IN)',
+        states: {
+          listening: '[ LISTENING ]',
+          thinking: '[ QUERYING OVERSEER LINK ]',
+          speaking: '[ TRANSMITTING ]',
+          disabled: '[ NO CARRIER ]',
+          offline: '[ OFFLINE ]',
+        },
+        greeting: '▸ VAULT DWELLER, THE OVERSEER IS MONITORING. Transmit when ready.',
       },
     },
     factions: FACTION_REGISTRY_FO3,
@@ -1276,6 +1310,21 @@ Update state.lincolnItems when the Courier acquires or sells any Lincoln artifac
         broadcasts: ['> [COMMONWEALTH UPLINK] SIGNAL FROM THE COMMONWEALTH — CARRIER HOLDING.'],
         news: ['> DIAMOND CITY RADIO: A SOLE SURVIVOR WAS SEEN LEAVING SANCTUARY…'],
         weatherLabel: 'COMMONWEALTH RAD-STORM',
+      },
+      // ── DO-O: design-only stub — validates the contract; unreachable at
+      // runtime (designOnly: true), same as the rest of FO4's identity block.
+      overseer: {
+        title: 'DIRECTOR UPLINK',
+        relay: 'MARK IV RELAY · COMMONWEALTH BAND',
+        signalStrip: 'SIGNAL — · ENCRYPTION: TRI-NODE · VOX MODULE: NOT INSTALLED (OPT-IN)',
+        states: {
+          listening: '[ LISTENING ]',
+          thinking: '[ ESTABLISHING LINK ]',
+          speaking: '[ TRANSMITTING ]',
+          disabled: '[ NO CARRIER ]',
+          offline: '[ OFFLINE ]',
+        },
+        greeting: '▸ GENERAL, THE UPLINK IS READY. Transmit when ready.',
       },
     },
   },
