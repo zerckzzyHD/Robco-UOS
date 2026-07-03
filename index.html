@@ -182,6 +182,19 @@
           <label class="optics-label">REGISTERED OBSERVERS</label>
           <div id="testConsoleObservers" style="font-size: 10px">&mdash;</div>
         </div>
+        <div class="input-group" style="flex-direction: column; align-items: stretch">
+          <label class="optics-label">VIEW-ONCE CEREMONIES</label>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px">
+            <button
+              type="button"
+              class="btn-sm"
+              id="testConsoleReplayHatch"
+              aria-label="Reset the Module Bay hatch so it replays on next open"
+            >
+              REPLAY HATCH
+            </button>
+          </div>
+        </div>
         <!-- EXTENSION POINT: a future ambient feature (broadcasts, weather, boot
              flavors, etc.) adds one more trigger button here, wired in
              js/test-console.js — call the feature's existing entry point,

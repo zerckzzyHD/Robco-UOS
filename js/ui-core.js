@@ -3124,6 +3124,10 @@ function showHelpModal() {
 // WU-C4 focus-trap + ARIA dialog semantics for free.
 const SAVE_HELP = [
   {
+    cmd: 'OVERWRITE',
+    desc: 'On the ALL SAVES list, replaces that specific save — local slot or cloud — with your current campaign while keeping its existing name. You always confirm first, and a local overwrite keeps its prior contents recoverable in VERSION HISTORY.',
+  },
+  {
     cmd: 'EXPORT SAVE',
     desc: 'Writes your entire campaign to a downloadable archive file kept on your own device — your offline insurance against data loss. Store it anywhere.',
   },
@@ -3134,6 +3138,10 @@ const SAVE_HELP = [
   {
     cmd: 'RESTORE BACKUP',
     desc: 'The terminal keeps several automatic rolling snapshots of recent states. Restore rewinds to the most recent intact snapshot if a save ever goes wrong.',
+  },
+  {
+    cmd: 'EXPORT FULL BACKUP',
+    desc: 'Bundles EVERYTHING at once — your live campaign, all three save slots, and their version history — into a single downloadable file. IMPORT SAVE restores this bundle the same way it restores a single save; just pick the file.',
   },
   {
     cmd: 'SAVE SLOTS (A / B / C)',

@@ -136,6 +136,11 @@ async function renderSavesList() {
             '<button class="btn-sm" onclick="loadFromSlot(' +
             ls.n +
             ')">LOAD</button>' +
+            '<button class="btn-sm" onclick="confirmOverwriteSlot(' +
+            ls.n +
+            ')" aria-label="Overwrite ' +
+            escapeHtml(String(ls.label)) +
+            ' with your current campaign">OVERWRITE</button>' +
             (versionCounts[ls.n]
               ? '<button class="btn-sm" onclick="viewSlotVersions(' +
                 ls.n +
@@ -165,6 +170,11 @@ async function renderSavesList() {
         '<button class="btn-sm" onclick="window.loadCloudSave(\'' +
         docId +
         '\')">LOAD</button>' +
+        '<button class="btn-sm" onclick="window.overwriteCloudSave(\'' +
+        docId +
+        '\')" aria-label="Overwrite ' +
+        label +
+        ' with your current campaign">OVERWRITE</button>' +
         '<button class="btn-sm" onclick="(function(){var l=prompt(\'Rename:\');if(l)window.renameCloudSave(\'' +
         docId +
         '\',l);})()">NAME</button>' +

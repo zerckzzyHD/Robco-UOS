@@ -188,6 +188,36 @@
     wrap.appendChild(wake);
   }
 
+  // Owner report: the Module Bay's first-visit hatch ceremony (robco_bay_opened,
+  // ui-core.js) can only ever be SEEN once per device — there is no in-app way to
+  // re-trigger it for testing. REPLAY HATCH resets that device pref and puts the
+  // #bayHatch overlay itself back into its closed, pre-ceremony state so the next
+  // look at Security & Config replays it, without a page reload. Dev/staging-console
+  // only (Protocol 22 — reuses the exact same MetaStore key releaseBayHatch() sets,
+  // never a parallel flag); never touches campaign state.
+  function _replayHatch() {
+    try {
+      if (window.MetaStore && typeof window.MetaStore.remove === 'function') {
+        window.MetaStore.remove('robco_bay_opened');
+      }
+      var hatch = document.getElementById('bayHatch');
+      if (hatch) {
+        hatch.classList.remove('bay-hatch--open');
+        hatch.hidden = false;
+      }
+    } catch (_) {
+      /* a console failure must never break boot or leak to production */
+    }
+  }
+
+  function _wireReplayHatch(panel) {
+    var btn = panel.querySelector('#testConsoleReplayHatch');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      _replayHatch();
+    });
+  }
+
   function _wireImmersionSelect(panel) {
     var sel = panel.querySelector('#testConsoleImmersionSelect');
     if (!sel) return;
@@ -278,6 +308,7 @@
       if (!panel) return;
       _renderTransitionButtons(panel);
       _wireResetControls(panel);
+      _wireReplayHatch(panel);
       _wireImmersionSelect(panel);
       _wireLiveRefresh(panel);
       _refresh(panel);

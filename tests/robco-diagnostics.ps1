@@ -12143,6 +12143,158 @@ Check (
 ) "160.6: .chip-card::after uses background-repeat:round -- same stray-pin fix as details.bay-board::after"
 
 # ===========================================================
+# Suite 161 -- Owner batch: saves OVERWRITE + live-update sweep + save-help +
+# hatch replay (10 tests). Four owner reports fixed together: (1) no explicit
+# "overwrite this save" affordance existed for a local slot OR a cloud save
+# without a rename prompt -- confirmOverwriteSlot() (ui-saves.js) +
+# window.overwriteCloudSave (cloud.js) add one, confirm-gated, keeping the
+# existing name (cloud writes via updateDoc-by-id only, never setDoc --
+# Protocol 34); (2) the SAVES LIST's VER badge "doesn't live update, I have to
+# click LOAD before it updates" -- traced to saveToSlot() never calling
+# renderSavesList() itself (only loadUI(), called by a LOAD, did) -- fixed at
+# the one write path so both the pre-existing quicksave buttons AND the new
+# OVERWRITE control refresh the list immediately (Protocol 22); (3) the save
+# "?" field manual never described EXPORT FULL BACKUP -- SAVE_HELP gains it
+# plus an OVERWRITE entry; (4) the Module Bay's view-once hatch ceremony had no
+# way to replay for testing -- a REPLAY HATCH button in the (still gated/inert)
+# Test Console resets the exact same robco_bay_opened MetaStore key
+# releaseBayHatch() sets. Mirrors JS Suite 161.
+# ===========================================================
+Sep "Suite 161 -- Owner batch: saves OVERWRITE + live-update sweep + save-help + hatch replay"
+$uiAcct161 = Read-Src "js/ui-account.js"
+$uiSaves161 = Read-Src "js/ui-saves.js"
+$cloud161 = Read-Src "js/cloud.js"
+$uiCore161 = Read-Src "js/ui-core.js"
+$html161 = Read-Src "index.html"
+$testConsole161 = Read-Src "js/test-console.js"
+
+# Assignment-form extractor (`window.X = async function (...) { ... }`) --
+# Get-FunctionBody's `function <name>` search can't find these.
+function Get-WindowFnBody161($source, $fnName) {
+    $idx = $source.IndexOf("window.$fnName =")
+    if ($idx -lt 0) { return "" }
+    $start = $source.IndexOf('{', $idx)
+    if ($start -lt 0) { return "" }
+    $depth = 0
+    $i     = $start
+    while ($i -lt $source.Length) {
+        $ch = $source[$i]
+        if     ($ch -eq '{') { $depth++ }
+        elseif ($ch -eq '}') { $depth--; if ($depth -eq 0) { return $source.Substring($start, $i - $start + 1) } }
+        $i++
+    }
+    return ""
+}
+
+# 161.1  local slot rows: OVERWRITE sits between LOAD and the VER badge, with
+#        a literal, descriptive aria-label (Protocol UI-3)
+$loadIdx161 = $uiAcct161.IndexOf('loadFromSlot(')
+$overwriteIdx161 = $uiAcct161.IndexOf('confirmOverwriteSlot(')
+$verIdx161 = $uiAcct161.IndexOf('viewSlotVersions(')
+Check (
+    ($loadIdx161 -ge 0) -and ($overwriteIdx161 -ge 0) -and ($verIdx161 -ge 0) -and
+    ($loadIdx161 -lt $overwriteIdx161) -and ($overwriteIdx161 -lt $verIdx161) -and
+    ($uiAcct161 -match 'aria-label="Overwrite ')
+) "161.1: renderSavesList() renders a confirm-gated OVERWRITE control on each local slot row, positioned between LOAD and the VER badge, with a descriptive aria-label"
+
+# 161.2  cloud rows: OVERWRITE sits between LOAD and NAME/DEL, routed to
+#        window.overwriteCloudSave, with the same aria-label convention
+$cLoadIdx161 = $uiAcct161.IndexOf('window.loadCloudSave(')
+$cOverwriteIdx161 = $uiAcct161.IndexOf('window.overwriteCloudSave(')
+$cNameIdx161 = $uiAcct161.IndexOf('window.renameCloudSave(')
+$ariaCount161 = ([regex]::Matches($uiAcct161, 'aria-label="Overwrite ')).Count
+Check (
+    ($cLoadIdx161 -ge 0) -and ($cOverwriteIdx161 -ge 0) -and ($cNameIdx161 -ge 0) -and
+    ($cLoadIdx161 -lt $cOverwriteIdx161) -and ($cOverwriteIdx161 -lt $cNameIdx161) -and
+    ($ariaCount161 -eq 2)
+) "161.2: renderSavesList() renders a confirm-gated OVERWRITE control on each cloud save row, positioned between LOAD and NAME/DEL, routed to window.overwriteCloudSave"
+
+# 161.3  confirmOverwriteSlot() (ui-saves.js): no rename prompt, diegetic
+#        confirmAction() gate (not the blocking confirm()), delegates to the
+#        SAME saveToSlot() write path (Protocol 22 -- one overwrite implementation)
+$overwriteSlotBody161 = Get-FunctionBody $uiSaves161 "confirmOverwriteSlot"
+Check (
+    ($overwriteSlotBody161 -match "await confirmAction\(") -and
+    ($overwriteSlotBody161 -notmatch "\bprompt\(") -and
+    ($overwriteSlotBody161 -match "await saveToSlot\(slotNum\)")
+) "161.3: confirmOverwriteSlot() awaits confirmAction() (not confirm()/prompt()) and overwrites via saveToSlot() with no rename prompt -- the slot keeps its existing name"
+
+# 161.4  saveToSlot() calls renderSavesList() on a successful write -- the
+#        confirmed root cause of "the version history doesn't live update, I
+#        have to click LOAD before it updates" (loadUI(), called by LOAD, was
+#        the only path that refreshed the list; a save itself never did)
+$saveToSlotBody161 = Get-FunctionBody $uiSaves161 "saveToSlot"
+$okIdx161 = $saveToSlotBody161.IndexOf("if (ok) {")
+$renderIdx161 = $saveToSlotBody161.IndexOf("renderSavesList();")
+Check (
+    ($okIdx161 -ge 0) -and ($renderIdx161 -ge 0) -and ($renderIdx161 -gt $okIdx161)
+) "161.4: saveToSlot() calls renderSavesList() on success, so the SAVES LIST (and its VER badge) refreshes live immediately -- no unrelated LOAD click required first"
+
+# 161.5  window.overwriteCloudSave (cloud.js): gated exactly like every other
+#        cloud write (cloudSync flag + signed-in non-anonymous), confirmAction-
+#        gated, and writes via updateDoc ONLY -- never addDoc (would duplicate)
+#        or setDoc (Protocol 34's banned blind-overwrite primitive)
+$overwriteCloudBody161 = Get-WindowFnBody161 $cloud161 "overwriteCloudSave"
+Check (
+    ($overwriteCloudBody161 -match "isFeatureEnabled\('cloudSync'\)") -and
+    ($overwriteCloudBody161 -match "_currentUser\.isAnonymous") -and
+    ($overwriteCloudBody161 -match "await confirmAction\(") -and
+    ($overwriteCloudBody161 -match "\bupdateDoc\(") -and
+    ($overwriteCloudBody161 -notmatch "\baddDoc\(") -and
+    ($overwriteCloudBody161 -notmatch "\bsetDoc\(")
+) "161.5: window.overwriteCloudSave is cloudSync/signed-in gated, confirmAction-gated, and writes via updateDoc only (never addDoc/setDoc -- Protocol 34)"
+
+# 161.6  overwriteCloudSave preserves the save's EXISTING label (read live
+#        from the doc) rather than prompting for a new one, and refreshes
+#        renderSavesList() on success
+Check (
+    ($overwriteCloudBody161 -notmatch "\bprompt\(") -and
+    ($overwriteCloudBody161 -match "docSnap\.data\(\)\.label") -and
+    ($overwriteCloudBody161 -match "window\.renderSavesList\(\)")
+) "161.6: overwriteCloudSave keeps the save's existing label (no rename prompt) and calls window.renderSavesList() on success"
+
+# 161.7  SAVE_HELP documents both OVERWRITE (new) and EXPORT FULL BACKUP
+#        (pre-existing feature the "?" help menu never described)
+$helpIdx161 = $uiCore161.IndexOf("const SAVE_HELP = [")
+$helpEnd161 = $uiCore161.IndexOf("function showSaveHelpModal")
+$helpSrc161 = if (($helpIdx161 -ge 0) -and ($helpEnd161 -ge 0)) { $uiCore161.Substring($helpIdx161, $helpEnd161 - $helpIdx161) } else { "" }
+Check (
+    ($helpSrc161 -match "cmd:\s*'OVERWRITE'") -and ($helpSrc161 -match "cmd:\s*'EXPORT FULL BACKUP'")
+) "161.7: SAVE_HELP documents both OVERWRITE and EXPORT FULL BACKUP (owner report: the `"?`" save-help menu didn't describe EXPORT FULL BACKUP)"
+
+# 161.8  the Test Console template (inert inside <template>, staging/dev-only
+#        gate -- Suite 149) gains a REPLAY HATCH button
+$tplIdx161 = $html161.IndexOf('<template id="testConsoleTemplate">')
+$tplEnd161 = $html161.IndexOf('</template>', $tplIdx161)
+$tplSrc161 = if ($tplIdx161 -ge 0) { $html161.Substring($tplIdx161, $tplEnd161 - $tplIdx161) } else { "" }
+Check (
+    ($tplIdx161 -ge 0) -and ($tplSrc161 -match 'id="testConsoleReplayHatch"')
+) "161.8: the (inert, staging/dev-only) Test Console template contains a #testConsoleReplayHatch button"
+
+# 161.9  _wireReplayHatch is wired from the SAME _devConsoleUnlocked()-gated
+#        initTestConsole() as every other console control -- no new/parallel gate
+$initConsoleBody161 = Get-FunctionBody $testConsole161 "initTestConsole"
+Check (
+    ($testConsole161 -match "function _wireReplayHatch\(panel\)") -and
+    ($initConsoleBody161 -match "_wireReplayHatch\(panel\);")
+) "161.9: _wireReplayHatch() is wired from initTestConsole() -- the same _devConsoleUnlocked()-gated entry point as every other Test Console control"
+
+# 161.10 _replayHatch() resets the EXACT SAME MetaStore key releaseBayHatch()
+#        (ui-core.js) sets -- Protocol 22, never a parallel flag -- reopens the
+#        real #bayHatch overlay, and touches no campaign state or the cloud
+#        (Phase-2 prime invariant every other console control also holds to)
+$replayHatchBody161 = Get-FunctionBody $testConsole161 "_replayHatch"
+Check (
+    ($uiCore161 -match "robco_bay_opened") -and
+    ($replayHatchBody161 -match "MetaStore\.remove\('robco_bay_opened'\)") -and
+    ($replayHatchBody161 -match "hatch\.classList\.remove\('bay-hatch--open'\)") -and
+    ($replayHatchBody161 -match "hatch\.hidden = false") -and
+    ($replayHatchBody161 -notmatch "state\.") -and
+    ($replayHatchBody161 -notmatch "saveState") -and
+    ($replayHatchBody161 -notmatch "pushToCloud")
+) "161.10: _replayHatch() resets the same robco_bay_opened key ui-core.js's releaseBayHatch() sets, reopens #bayHatch, and touches no campaign state or the cloud"
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

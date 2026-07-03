@@ -245,9 +245,31 @@ async function saveToSlot(slotNum) {
     const ctx = envelope.gameContext;
     if (el) el.textContent = `${_slotLabel(slotNum)} [${ctx}] saved at ${ts}`;
     appendToChat(`> [SAVE] ${_slotLabel(slotNum)} [${ctx}] written at ${ts}`, 'sys', true);
+    // Owner report: the SAVES LIST (VER badge + slot row) didn't live-update after a
+    // save — it only refreshed once loadUI() next ran (e.g. on an unrelated LOAD
+    // click). saveToSlot is the one write path for every slot save (quicksave button
+    // AND the OVERWRITE control below), so refreshing here covers both (Protocol 22).
+    if (typeof renderSavesList === 'function') renderSavesList();
   } else {
     appendToChat('> [ERROR] Save slot write failed — storage unavailable.', 'sys', true);
   }
+}
+
+// ── OVERWRITE (local slot) — confirm-gated, keeps the slot's existing name ───
+// The unified SAVES LIST already offers LOAD/VER per slot; OVERWRITE lets the
+// technician deliberately replace a NAMED slot's contents with the current
+// campaign without ever prompting for a rename (the slot name is always the
+// fixed _slotLabel(n), never user-entered — Protocol 34 destructive-op gate).
+// Reuses saveToSlot() verbatim (Protocol 22) — the P5 version ring already
+// retains the slot's prior contents before this overwrite, so it's recoverable.
+async function confirmOverwriteSlot(slotNum) {
+  const ok = await confirmAction({
+    title: '> OVERWRITE ' + _slotLabel(slotNum),
+    warning: `Overwrite ${_slotLabel(slotNum)} with your current campaign?\n\nThis replaces its contents but keeps its name. The prior contents are preserved in VERSION HISTORY (VER) if you need to recover them.`,
+    confirmLabel: 'OVERWRITE',
+  });
+  if (!ok) return;
+  await saveToSlot(slotNum);
 }
 
 async function loadFromSlot(slotNum) {

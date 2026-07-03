@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1962/1962 | Cache: robco-terminal-v2.7.0-r42 -->
+﻿## [Unreleased]<!-- Tests: 1972/1972 | Cache: robco-terminal-v2.7.0-r43 -->
 
 ### Added
 
@@ -12,6 +12,7 @@
 - The terminal now visibly settles when you leave it alone or step away. After a couple of minutes with no input, the display dims slightly and a small "REDUCING PHOSPHOR WEAR" note appears in the corner — an understated screensaver touch that clears the instant you touch anything again. Switching away from the tab now deepens into a slower breathing dim layered on top of the terminal's existing standby screen. Both show at Balanced and Full immersion; Minimal keeps things quiet, as always, and the existing standby response itself is unchanged. The "living machine" engine also now knows how to perform a proper CRT power-down — a collapse-to-a-dot shutdown flourish — ready for an upcoming feature to trigger it. Anyone with "reduce motion" enabled sees an instant cut instead of the animation, same as every other CRT effect in the terminal.
 - Added a MODE pill to the Comm-Link input, right next to the "?" help button. Tap it to switch between OVERSEER (the AI narrator, exactly as before) and TERMINAL (typed commands and quick one-liners handled instantly on your device, no AI call). The prompt text changes to match whichever mode is active, and your choice is remembered on this device. In TERMINAL mode, natural one-liners like "killed 3 raiders", "+50 caps", "arrived Novac", or "rep NCR up" are recorded straight to the right tracker without opening any menu — comma-separate several on one line (e.g. "killed 3 raiders, +50 caps, arrived Novac, rep ncr up") to log them all at once; anything it doesn't recognize gets a gentle hint pointing you to the command list instead of doing nothing. A message that starts with `/` always goes to TERMINAL just that once, no matter which mode you're in. Putting `@` anywhere in a message pings OVERSEER with just the text after it — everything before the `@` is dropped — so you can jot a quick-log note and tack on an AI question in the same line. A small note appears the moment you type either symbol showing exactly where it's headed. TERMINAL mode also offers matching command and quick-log suggestions as you type, including creature, location, and faction names once you've started typing a recognized quick-log verb.
 - Installing or ejecting Module Bay hardware now gives you a satisfying tactile click or thunk — pulling or plugging a channel chip, the sound board itself, the radio, the power cell, or the haptic solenoid all get their own sound. A new SERVO CLICK RELAY switch on the sound board lets you turn these clicks off if you'd rather keep things quiet.
+- Added an OVERWRITE option next to each save in your saves list — for a local save slot or a cloud save — that replaces its contents with your current campaign while keeping its existing name, no rename needed. You're always asked to confirm first, and overwriting a local slot still keeps the version it replaced recoverable in its version history.
 
 ### Changed
 
@@ -34,6 +35,8 @@
 - Fixed a few places where a partial last row of controls stayed pinned to the left with an empty gap instead of centering — the sound board's channel chips, the phosphor tube color picker, and the Save/Sync-to-cloud buttons now all center a leftover row properly.
 - Fixed the bottom navigation buttons rendering above the screen instead of below it on phones — they're now pinned to the bottom of your screen at all times, and no longer occasionally split unevenly across two rows with one button floating off to the side.
 - Fixed a stray thin sliver of color trailing the last connector pin on the Module Bay's hardware boards and channel chips.
+- Fixed the saves list not updating right after you saved, overwrote, or restored a version — you previously had to tap LOAD on something else before it caught up. It now refreshes immediately every time.
+- Fixed the Save & Data help menu not explaining the EXPORT FULL BACKUP button — it now describes what it bundles and how to restore it.
 
 ### Improved
 
@@ -76,6 +79,7 @@
 - Fixed a rough edge in the "living machine" engine's tab-standby handling, found while testing the new power-down behaviour above: the "welcome back" tone and chat message are meant to play only when you're genuinely returning to the terminal, never when it's powering down — but a shutdown landing right at the start of that return, or partway through the brief moment it takes to fully re-sync, could still let one or both slip through. Both cases are now guarded against directly. That sequence isn't reachable in normal play yet, but it's fixed for when it is. Internal only.
 - Laid the first foundation stone for an upcoming visual overhaul: each supported game now carries a much richer internal "identity" profile (its device look, personality, boot style, and more) in one place, ready for future updates to build its new appearance from. New Vegas's profile is filled in with real design detail; Fallout 3's is a placeholder for now. A future third game (Fallout 4) also got a starter profile added purely to prove the system scales — it isn't selectable and changes nothing about the app today. This step changes nothing you can see or do; it's groundwork only, fully covered by new automated checks.
 - Replaced three of the developer console's manual test buttons that had no visible effect with two more useful ones — one that replays the boot sequence, and one that resets the engine straight back to normal operation. Developer/staging tooling only — never visible on the live site.
+- Added a REPLAY HATCH button to the developer console so the Module Bay's one-time hatch-opening ceremony can be re-triggered for testing without reloading the page. Developer/staging tooling only — never visible on the live site.
 
 ---
 

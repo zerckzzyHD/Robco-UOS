@@ -735,6 +735,64 @@ window.loadCloudSave = async function (docId) {
   }
 };
 
+// ── Overwrite a cloud save (confirm-gated, keeps its existing name) ─────────
+// Replaces an EXISTING cloud save's contents with the current live campaign,
+// in place — never a blind setDoc (Protocol 34: updateDoc-by-id is the
+// additive-safe overwrite pattern renameCloudSave already uses). No rename
+// prompt: the save keeps whatever label it already has. Reuses
+// _buildSavePayload (Protocol 22) — same snapshot + contentHash the manual
+// "SAVE TO CLOUD" push uses, just written onto the existing doc instead of a
+// new one.
+window.overwriteCloudSave = async function (docId) {
+  if (!window.isFeatureEnabled('cloudSync')) {
+    if (typeof openModal === 'function')
+      openModal({
+        title: '> OVERWRITE CLOUD SAVE',
+        body: 'CLOUD SYNC TEMPORARILY UNAVAILABLE — saves remain local',
+      });
+    return;
+  }
+  if (!_currentUid || !_currentUser || _currentUser.isAnonymous) return;
+  if (typeof confirmAction !== 'function') return;
+  let existingLabel = 'this save';
+  try {
+    const docSnap = await getDoc(doc(db, 'users', _currentUid, 'saves', docId));
+    if (docSnap.exists() && docSnap.data().label) existingLabel = docSnap.data().label;
+  } catch (_) {}
+  const ok = await confirmAction({
+    title: '> OVERWRITE CLOUD SAVE',
+    warning: `Overwrite "${existingLabel}" with your current campaign?\n\nThis replaces its contents but keeps its name. The previous contents cannot be recovered.`,
+    confirmLabel: 'OVERWRITE',
+  });
+  if (!ok) return;
+  const payload = _buildSavePayload(existingLabel);
+  try {
+    await updateDoc(doc(db, 'users', _currentUid, 'saves', docId), {
+      version: window.APP_VERSION || '2.7.0',
+      savedAt: Date.now(),
+      updatedAt: Date.now(),
+      label: payload.label,
+      gameContext: payload.gameContext,
+      contentHash: payload.contentHash,
+      robco_v8: payload.robco_v8,
+      chat: payload.chat,
+      playstyle: payload.playstyle,
+    });
+    localStorage.setItem('robco_last_cloud_push', Date.now().toString());
+    if (typeof playSyncTone === 'function') playSyncTone();
+    if (typeof openModal === 'function')
+      openModal({
+        title: '> OVERWRITE CLOUD SAVE',
+        body: 'CLOUD SAVE OVERWRITTEN: "' + existingLabel + '"',
+      });
+    if (typeof window.renderSavesList === 'function') window.renderSavesList();
+  } catch (e) {
+    console.warn('overwriteCloudSave failed (non-fatal):', e);
+    if (typeof openModal === 'function')
+      openModal({ title: '> OVERWRITE CLOUD SAVE', body: 'OVERWRITE FAILED — NETWORK ERROR' });
+  }
+};
+
 // ── Rename a cloud save (label only — no data change) ───────────────
 window.renameCloudSave = async function (docId, newLabel) {
   if (!window.isFeatureEnabled('cloudSync')) return;

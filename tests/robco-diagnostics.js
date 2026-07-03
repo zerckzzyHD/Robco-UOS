@@ -20275,6 +20275,194 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 161 — Owner batch: saves OVERWRITE + live-update sweep + save-help +
+//  hatch replay. Four owner reports fixed together: (1) no explicit "overwrite
+//  this save" affordance existed for a local slot OR a cloud save without a
+//  rename prompt — confirmOverwriteSlot() (ui-saves.js) + window.overwriteCloudSave
+//  (cloud.js) add one, confirm-gated, keeping the existing name (cloud writes via
+//  updateDoc-by-id only, never setDoc — Protocol 34); (2) the SAVES LIST's VER
+//  badge "doesn't live update, I have to click LOAD before it updates" — traced to
+//  saveToSlot() never calling renderSavesList() itself (only loadUI(), called by a
+//  LOAD, did) — fixed at the one write path so both the pre-existing quicksave
+//  buttons AND the new OVERWRITE control refresh the list immediately (Protocol
+//  22); (3) the save "?" field manual never described EXPORT FULL BACKUP —
+//  SAVE_HELP gains it plus an OVERWRITE entry; (4) the Module Bay's view-once
+//  hatch ceremony had no way to replay for testing — a REPLAY HATCH button in the
+//  (still gated/inert) Test Console resets the exact same robco_bay_opened
+//  MetaStore key releaseBayHatch() sets. 10 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 161 — Owner batch: saves OVERWRITE + live-update sweep + save-help + hatch replay');
+  const uiAcct161 = readFile('js/ui-account.js');
+  const uiSaves161 = readFile('js/ui-saves.js');
+  const cloud161 = readFile('js/cloud.js');
+  const uiCore161 = readFile('js/ui-core.js');
+  const html161 = readFile('index.html');
+  const testConsole161 = readFile('js/test-console.js');
+
+  // Assignment-form extractor (`window.X = async function (...) { ... }`) —
+  // extractFunctionBody()'s `function <name>` search can't find these (Suite 137
+  // precedent: extractWindowFnBody137). Re-declared locally per that same
+  // block-scoped precedent.
+  function extractWindowFnBody161(src, name) {
+    const assignIdx = src.indexOf('window.' + name + ' =');
+    if (assignIdx === -1) return '';
+    const braceIdx = src.indexOf('{', assignIdx);
+    if (braceIdx === -1) return '';
+    let depth = 0;
+    for (let i = braceIdx; i < src.length; i++) {
+      if (src[i] === '{') depth++;
+      else if (src[i] === '}' && --depth === 0) return src.slice(braceIdx, i + 1);
+    }
+    return '';
+  }
+
+  // 161.1  local slot rows: OVERWRITE sits between LOAD and the VER badge, with
+  //        a literal, descriptive aria-label (Protocol UI-3)
+  {
+    const loadIdx = uiAcct161.indexOf('loadFromSlot(');
+    const overwriteIdx = uiAcct161.indexOf('confirmOverwriteSlot(');
+    const verIdx = uiAcct161.indexOf('viewSlotVersions(');
+    assert(
+      loadIdx !== -1 &&
+        overwriteIdx !== -1 &&
+        verIdx !== -1 &&
+        loadIdx < overwriteIdx &&
+        overwriteIdx < verIdx &&
+        /aria-label="Overwrite /.test(uiAcct161),
+      '161.1: renderSavesList() renders a confirm-gated OVERWRITE control on each local slot row, positioned between LOAD and the VER badge, with a descriptive aria-label'
+    );
+  }
+
+  // 161.2  cloud rows: OVERWRITE sits between LOAD and NAME/DEL, routed to
+  //        window.overwriteCloudSave, with the same aria-label convention
+  {
+    const loadIdx = uiAcct161.indexOf('window.loadCloudSave(');
+    const overwriteIdx = uiAcct161.indexOf('window.overwriteCloudSave(');
+    const nameIdx = uiAcct161.indexOf('window.renameCloudSave(');
+    assert(
+      loadIdx !== -1 &&
+        overwriteIdx !== -1 &&
+        nameIdx !== -1 &&
+        loadIdx < overwriteIdx &&
+        overwriteIdx < nameIdx &&
+        (uiAcct161.match(/aria-label="Overwrite /g) || []).length === 2,
+      '161.2: renderSavesList() renders a confirm-gated OVERWRITE control on each cloud save row, positioned between LOAD and NAME/DEL, routed to window.overwriteCloudSave'
+    );
+  }
+
+  // 161.3  confirmOverwriteSlot() (ui-saves.js): no rename prompt, diegetic
+  //        confirmAction() gate (not the blocking confirm()), delegates to the
+  //        SAME saveToSlot() write path (Protocol 22 — one overwrite implementation)
+  {
+    const body = extractFunctionBody(uiSaves161, 'confirmOverwriteSlot');
+    assert(
+      /await confirmAction\(/.test(body) &&
+        !/\bprompt\(/.test(body) &&
+        /await saveToSlot\(slotNum\)/.test(body),
+      '161.3: confirmOverwriteSlot() awaits confirmAction() (not confirm()/prompt()) and overwrites via saveToSlot() with no rename prompt — the slot keeps its existing name'
+    );
+  }
+
+  // 161.4  saveToSlot() calls renderSavesList() on a successful write — the
+  //        confirmed root cause of "the version history doesn't live update, I
+  //        have to click LOAD before it updates" (loadUI(), called by LOAD, was
+  //        the only path that refreshed the list; a save itself never did)
+  {
+    const body = extractFunctionBody(uiSaves161, 'saveToSlot');
+    const okIdx = body.indexOf('if (ok) {');
+    const renderIdx = body.indexOf('renderSavesList();');
+    assert(
+      okIdx !== -1 && renderIdx !== -1 && renderIdx > okIdx,
+      '161.4: saveToSlot() calls renderSavesList() on success, so the SAVES LIST (and its VER badge) refreshes live immediately — no unrelated LOAD click required first'
+    );
+  }
+
+  // 161.5  window.overwriteCloudSave (cloud.js): gated exactly like every other
+  //        cloud write (cloudSync flag + signed-in non-anonymous), confirmAction-
+  //        gated, and writes via updateDoc ONLY — never addDoc (would duplicate)
+  //        or setDoc (Protocol 34's banned blind-overwrite primitive)
+  {
+    const body = extractWindowFnBody161(cloud161, 'overwriteCloudSave');
+    assert(
+      /isFeatureEnabled\('cloudSync'\)/.test(body) &&
+        /_currentUser\.isAnonymous/.test(body) &&
+        /await confirmAction\(/.test(body) &&
+        /\bupdateDoc\(/.test(body) &&
+        !/\baddDoc\(/.test(body) &&
+        !/\bsetDoc\(/.test(body),
+      '161.5: window.overwriteCloudSave is cloudSync/signed-in gated, confirmAction-gated, and writes via updateDoc only (never addDoc/setDoc — Protocol 34)'
+    );
+  }
+
+  // 161.6  overwriteCloudSave preserves the save's EXISTING label (read live
+  //        from the doc) rather than prompting for a new one, and refreshes
+  //        renderSavesList() on success
+  {
+    const body = extractWindowFnBody161(cloud161, 'overwriteCloudSave');
+    assert(
+      !/\bprompt\(/.test(body) &&
+        /docSnap\.data\(\)\.label/.test(body) &&
+        /window\.renderSavesList\(\)/.test(body),
+      "161.6: overwriteCloudSave keeps the save's existing label (no rename prompt) and calls window.renderSavesList() on success"
+    );
+  }
+
+  // 161.7  SAVE_HELP documents both OVERWRITE (new) and EXPORT FULL BACKUP
+  //        (pre-existing feature the "?" help menu never described)
+  {
+    const helpIdx = uiCore161.indexOf('const SAVE_HELP = [');
+    const helpEnd = uiCore161.indexOf('function showSaveHelpModal');
+    const helpSrc = helpIdx !== -1 && helpEnd !== -1 ? uiCore161.slice(helpIdx, helpEnd) : '';
+    assert(
+      /cmd:\s*'OVERWRITE'/.test(helpSrc) && /cmd:\s*'EXPORT FULL BACKUP'/.test(helpSrc),
+      "161.7: SAVE_HELP documents both OVERWRITE and EXPORT FULL BACKUP (owner report: the '?' save-help menu didn't describe EXPORT FULL BACKUP)"
+    );
+  }
+
+  // 161.8  the Test Console template (inert inside <template>, staging/dev-only
+  //        gate — Suite 149) gains a REPLAY HATCH button
+  {
+    const tplIdx = html161.indexOf('<template id="testConsoleTemplate">');
+    const tplEnd = html161.indexOf('</template>', tplIdx);
+    const tplSrc = tplIdx !== -1 ? html161.slice(tplIdx, tplEnd) : '';
+    assert(
+      tplIdx !== -1 && /id="testConsoleReplayHatch"/.test(tplSrc),
+      '161.8: the (inert, staging/dev-only) Test Console template contains a #testConsoleReplayHatch button'
+    );
+  }
+
+  // 161.9  _wireReplayHatch is wired from the SAME _devConsoleUnlocked()-gated
+  //        initTestConsole() as every other console control — no new/parallel gate
+  {
+    const initBody = extractFunctionBody(testConsole161, 'initTestConsole');
+    assert(
+      /function _wireReplayHatch\(panel\)/.test(testConsole161) &&
+        /_wireReplayHatch\(panel\);/.test(initBody),
+      '161.9: _wireReplayHatch() is wired from initTestConsole() — the same _devConsoleUnlocked()-gated entry point as every other Test Console control'
+    );
+  }
+
+  // 161.10 _replayHatch() resets the EXACT SAME MetaStore key releaseBayHatch()
+  //        (ui-core.js) sets — Protocol 22, never a parallel flag — reopens the
+  //        real #bayHatch overlay, and touches no campaign state or the cloud
+  //        (Phase-2 prime invariant every other console control also holds to)
+  {
+    const body = extractFunctionBody(testConsole161, '_replayHatch');
+    assert(
+      /robco_bay_opened/.test(uiCore161) &&
+        /MetaStore\.remove\('robco_bay_opened'\)/.test(body) &&
+        /hatch\.classList\.remove\('bay-hatch--open'\)/.test(body) &&
+        /hatch\.hidden = false/.test(body) &&
+        !/state\./.test(body) &&
+        !/saveState/.test(body) &&
+        !/pushToCloud/.test(body),
+      "161.10: _replayHatch() resets the same robco_bay_opened key ui-core.js's releaseBayHatch() sets, reopens #bayHatch, and touches no campaign state or the cloud"
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail
