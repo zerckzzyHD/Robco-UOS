@@ -735,6 +735,141 @@ window.loadCloudSave = async function (docId) {
   }
 };
 
+// ── Cloud save VERSION HISTORY (per-save revision ring) ─────────────────────
+// Mirrors the local per-slot P5 version ring, translated to Firestore's own
+// structural equivalent: an additive subcollection
+// users/{uid}/saves/{docId}/versions/{versionId}, one full snapshot per document
+// (never an embedded array field on the parent doc — a single Firestore document
+// is capped at 1MB, and a handful of full campaign+chat snapshots stacked into one
+// doc could approach that ceiling; a subcollection keeps every version's size
+// class identical to the main save doc, which already works fine). Every write is
+// additive (addDoc, Protocol 34) — overwriteCloudSave() archives the save's PRIOR
+// contents here BEFORE replacing them, so an overwrite is always recoverable.
+// Capped at CLOUD_SLOT_VERSION_CAP, oldest-pruned (mirrors the local ring's
+// `.slice(0, SLOT_VERSION_CAP)`): this is retention of the system's OWN
+// auto-created backups, not a user-initiated destructive action, so pruning is
+// not itself confirm-gated — exactly like the local ring's silent cap today.
+const CLOUD_SLOT_VERSION_CAP = 5;
+
+// Archives `priorData` (the save doc's contents just before an overwrite replaces
+// them) into the version subcollection, then prunes beyond the cap. Returns the
+// resulting version count (for the caller to stamp onto the parent doc as
+// `versionCount`, so the SAVES LIST can show a VER button without an extra read
+// per save). No-op-safe: a missing/malformed prior snapshot or any Firestore
+// failure never blocks the overwrite itself — it just means this one revision
+// isn't recoverable, exactly like the local ring's best-effort pushSlotVersion().
+async function _pushCloudSaveVersion(docId, priorData) {
+  const fallbackCount = (priorData && priorData.versionCount) || 0;
+  if (!priorData || !priorData.robco_v8) return fallbackCount;
+  try {
+    const col = collection(db, 'users', _currentUid, 'saves', docId, 'versions');
+    await addDoc(col, {
+      archivedAt: Date.now(),
+      savedAt: priorData.savedAt || Date.now(),
+      version: priorData.version || '',
+      label: priorData.label || '',
+      gameContext: priorData.gameContext || '',
+      contentHash: priorData.contentHash || '',
+      robco_v8: priorData.robco_v8,
+      chat: priorData.chat || [],
+      playstyle: priorData.playstyle || 'any',
+    });
+    const snap = await getDocs(col);
+    const entries = [];
+    snap.forEach(d => entries.push({ id: d.id, archivedAt: d.data().archivedAt || 0 }));
+    entries.sort((a, b) => b.archivedAt - a.archivedAt); // newest first
+    if (entries.length > CLOUD_SLOT_VERSION_CAP) {
+      const excess = entries.slice(CLOUD_SLOT_VERSION_CAP);
+      for (const ex of excess) {
+        try {
+          await deleteDoc(doc(db, 'users', _currentUid, 'saves', docId, 'versions', ex.id));
+        } catch (_) {}
+      }
+    }
+    return Math.min(entries.length, CLOUD_SLOT_VERSION_CAP);
+  } catch (e) {
+    console.warn('_pushCloudSaveVersion failed (non-fatal):', e);
+    return fallbackCount;
+  }
+}
+
+// The retained prior revisions for a cloud save, newest-first. Returns [] on any
+// failure or when signed out / the feature is disabled — a caller that gets []
+// simply offers no version history (fail-safe, mirrors readSlotVersions()).
+window.listCloudSaveVersions = async function (docId) {
+  if (!window.isFeatureEnabled('cloudSync') || !_currentUid) return [];
+  try {
+    const col = collection(db, 'users', _currentUid, 'saves', docId, 'versions');
+    const snap = await getDocs(col);
+    const versions = [];
+    snap.forEach(d => versions.push({ id: d.id, data: d.data() }));
+    versions.sort((a, b) => (b.data.archivedAt || 0) - (a.data.archivedAt || 0));
+    return versions;
+  } catch (e) {
+    console.warn('listCloudSaveVersions failed (non-fatal):', e);
+    return [];
+  }
+};
+
+// Restores a retained cloud-save revision into the LIVE local campaign — confirm-
+// gated (Protocol 34) and DESTRUCTIVE to the current session, mirroring
+// restoreSlotVersion(): it replaces the in-app campaign, never the cloud save
+// itself (the cloud doc's current contents are untouched; the next overwrite of
+// that save will archive today's live state as its own new version, same as the
+// local ring). Sanitize + migrate before applying (same integrity path as
+// loadCloudSave). A rolling backup of the current state is taken first.
+window.restoreCloudSaveVersion = async function (docId, versionId) {
+  if (!window.isFeatureEnabled('cloudSync')) return;
+  if (!_currentUid) return;
+  if (typeof confirmAction !== 'function') return;
+  try {
+    const vSnap = await getDoc(
+      doc(db, 'users', _currentUid, 'saves', docId, 'versions', versionId)
+    );
+    if (!vSnap.exists()) {
+      if (typeof openModal === 'function')
+        openModal({ title: '> RESTORE VERSION', body: 'THAT VERSION IS NO LONGER AVAILABLE.' });
+      return;
+    }
+    const data = vSnap.data();
+    if (!data.robco_v8) {
+      if (typeof openModal === 'function')
+        openModal({ title: '> RESTORE VERSION', body: 'VERSION FORMAT NOT SUPPORTED' });
+      return;
+    }
+    const ts = data.archivedAt ? new Date(data.archivedAt).toLocaleString() : 'unknown';
+    const ok = await confirmAction({
+      title: '> RESTORE VERSION',
+      warning: `Restore your campaign to the version saved ${ts}?\n\nThis REPLACES your current in-app campaign. A rolling backup of the current state is taken first, so this can be undone.`,
+      confirmLabel: 'RESTORE VERSION',
+    });
+    if (!ok) return;
+    if (typeof window.snapRollingBackup === 'function') window.snapRollingBackup();
+    const sanitized =
+      typeof sanitizeImportedContainer === 'function'
+        ? sanitizeImportedContainer(data.robco_v8)
+        : data.robco_v8;
+    if (typeof migrateState === 'function' && sanitized.campaigns) {
+      Object.keys(sanitized.campaigns).forEach(ctx => {
+        sanitized.campaigns[ctx] = migrateState(data.version || '1.0', sanitized.campaigns[ctx]);
+      });
+    }
+    localStorage.setItem('robco_v8', JSON.stringify(sanitized));
+    if (data.chat && Array.isArray(data.chat))
+      localStorage.setItem('robco_chat', JSON.stringify(data.chat));
+    if (data.playstyle) localStorage.setItem('robco_playstyle', data.playstyle);
+    // Guard the impending reload's beforeunload flush (clobber regression).
+    window._loadingSave = true;
+    if (typeof openModal === 'function')
+      openModal({ title: '> RESTORE VERSION', body: 'VERSION RESTORED. REBOOTING SYSTEM...' });
+    setTimeout(() => window.location.reload(), 2000);
+  } catch (e) {
+    console.warn('restoreCloudSaveVersion failed (non-fatal):', e);
+    if (typeof openModal === 'function')
+      openModal({ title: '> RESTORE VERSION', body: 'RESTORE FAILED — NETWORK ERROR' });
+  }
+};
+
 // ── Overwrite a cloud save (confirm-gated, keeps its existing name) ─────────
 // Replaces an EXISTING cloud save's contents with the current live campaign,
 // in place — never a blind setDoc (Protocol 34: updateDoc-by-id is the
@@ -742,7 +877,8 @@ window.loadCloudSave = async function (docId) {
 // prompt: the save keeps whatever label it already has. Reuses
 // _buildSavePayload (Protocol 22) — same snapshot + contentHash the manual
 // "SAVE TO CLOUD" push uses, just written onto the existing doc instead of a
-// new one.
+// new one. The save's PRIOR contents are archived into version history
+// (_pushCloudSaveVersion) before being replaced, so the overwrite is recoverable.
 window.overwriteCloudSave = async function (docId) {
   if (!window.isFeatureEnabled('cloudSync')) {
     if (typeof openModal === 'function')
@@ -755,18 +891,23 @@ window.overwriteCloudSave = async function (docId) {
   if (!_currentUid || !_currentUser || _currentUser.isAnonymous) return;
   if (typeof confirmAction !== 'function') return;
   let existingLabel = 'this save';
+  let existingData = null;
   try {
     const docSnap = await getDoc(doc(db, 'users', _currentUid, 'saves', docId));
-    if (docSnap.exists() && docSnap.data().label) existingLabel = docSnap.data().label;
+    if (docSnap.exists()) {
+      existingData = docSnap.data();
+      if (existingData.label) existingLabel = existingData.label;
+    }
   } catch (_) {}
   const ok = await confirmAction({
     title: '> OVERWRITE CLOUD SAVE',
-    warning: `Overwrite "${existingLabel}" with your current campaign?\n\nThis replaces its contents but keeps its name. The previous contents cannot be recovered.`,
+    warning: `Overwrite "${existingLabel}" with your current campaign?\n\nThis replaces its contents but keeps its name. The prior contents are preserved in VERSION HISTORY (VER) if you need to recover them.`,
     confirmLabel: 'OVERWRITE',
   });
   if (!ok) return;
   const payload = _buildSavePayload(existingLabel);
   try {
+    const versionCount = await _pushCloudSaveVersion(docId, existingData);
     await updateDoc(doc(db, 'users', _currentUid, 'saves', docId), {
       version: window.APP_VERSION || '2.7.0',
       savedAt: Date.now(),
@@ -777,6 +918,7 @@ window.overwriteCloudSave = async function (docId) {
       robco_v8: payload.robco_v8,
       chat: payload.chat,
       playstyle: payload.playstyle,
+      versionCount,
     });
     localStorage.setItem('robco_last_cloud_push', Date.now().toString());
     if (typeof playSyncTone === 'function') playSyncTone();
@@ -822,6 +964,18 @@ window.deleteCloudSave = async function (docId) {
   });
   if (!ok) return;
   try {
+    // Firestore does not cascade-delete subcollections — clear this save's
+    // retained version history first (best-effort; an orphaned version doc left
+    // behind by a failed delete is harmless clutter, never a blocker for the
+    // main doc delete below).
+    try {
+      const versions = await window.listCloudSaveVersions(docId);
+      for (const v of versions) {
+        try {
+          await deleteDoc(doc(db, 'users', _currentUid, 'saves', docId, 'versions', v.id));
+        } catch (_) {}
+      }
+    } catch (_) {}
     await deleteDoc(doc(db, 'users', _currentUid, 'saves', docId));
     if (typeof window.renderSavesList === 'function') window.renderSavesList();
   } catch (e) {

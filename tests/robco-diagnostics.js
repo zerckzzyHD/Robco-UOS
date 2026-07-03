@@ -20427,7 +20427,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     const body = extractWindowFnBody161(cloud161, 'overwriteCloudSave');
     assert(
       !/\bprompt\(/.test(body) &&
-        /docSnap\.data\(\)\.label/.test(body) &&
+        /existingData = docSnap\.data\(\)/.test(body) &&
+        /existingData\.label/.test(body) &&
         /window\.renderSavesList\(\)/.test(body),
       "161.6: overwriteCloudSave keeps the save's existing label (no rename prompt) and calls window.renderSavesList() on success"
     );
@@ -21097,6 +21098,277 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       /getElementById\('modePill'\)/.test(toggleInputModeBody162) &&
         /\.blur\(\)/.test(toggleInputModeBody162),
       '162.28b: toggleInputMode() blurs the pill after a tap (belt-and-suspenders alongside the CSS hover-gate fix)'
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 163 — Owner batch: SAVES LIST overhaul — local DELETE, cloud VERSION
+//  HISTORY, per-game filtering, row-layout fit. Four owner reports fixed
+//  together: (1) local slots had no DELETE control (cloud rows already had
+//  DEL) — confirmDeleteSlot()/_deleteSlotApply() (ui-saves.js) add one,
+//  confirm-gated, clearing the localStorage mirror + the IDB-primary slot +
+//  its P5 version ring; (2) cloud saves had no version history even though
+//  OVERWRITE could destroy prior contents — an additive Firestore
+//  subcollection (users/{uid}/saves/{docId}/versions) mirrors the local P5
+//  ring, archived by _pushCloudSaveVersion() before every overwrite, capped
+//  and oldest-pruned, with a versionCount field on the parent doc so the SAVES
+//  LIST can show a VER button without an extra read per save; (3) the list
+//  showed every save regardless of which game was active — renderSavesList()
+//  now filters both local slots and cloud saves to the active game context,
+//  degrading to SHOW (never hide) a save with no recorded gameContext; (4) the
+//  row's growing button set could clip at 360/412px — rows moved from inline
+//  styles to .save-row/.save-row-actions CSS classes, with flex-wrap letting
+//  buttons wrap onto their own line instead of overflowing. 15 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header(
+    'Suite 163 — Owner batch: SAVES LIST local DELETE + cloud VERSION HISTORY + per-game filter'
+  );
+  const uiSaves163 = readFile('js/ui-saves.js');
+  const uiAcct163 = readFile('js/ui-account.js');
+  const cloud163 = readFile('js/cloud.js');
+
+  // Assignment-form extractor (`window.X = async function (...) { ... }`) —
+  // re-declared locally per the Suite 137/161 block-scoped precedent.
+  function extractWindowFnBody163(src, name) {
+    const assignIdx = src.indexOf('window.' + name + ' =');
+    if (assignIdx === -1) return '';
+    const braceIdx = src.indexOf('{', assignIdx);
+    if (braceIdx === -1) return '';
+    let depth = 0;
+    for (let i = braceIdx; i < src.length; i++) {
+      if (src[i] === '{') depth++;
+      else if (src[i] === '}' && --depth === 0) return src.slice(braceIdx, i + 1);
+    }
+    return '';
+  }
+
+  // 163.1  confirmDeleteSlot() (ui-saves.js): diegetic confirmAction() gate
+  //        (not the blocking confirm()), delegates to _deleteSlotApply()
+  {
+    const body = extractFunctionBody(uiSaves163, 'confirmDeleteSlot');
+    assert(
+      /await confirmAction\(/.test(body) &&
+        !/\bconfirm\(/.test(body) &&
+        /await _deleteSlotApply\(slotNum\)/.test(body),
+      '163.1: confirmDeleteSlot() awaits confirmAction() (not confirm()) and delegates the erase to _deleteSlotApply()'
+    );
+  }
+
+  // 163.2  _deleteSlotApply() clears BOTH the localStorage mirror and the
+  //        IDB-primary copy (P3), plus that slot's retained version ring
+  //        (P5) — a deleted slot leaves no orphaned version history — and
+  //        refreshes renderSavesList() on completion
+  {
+    const body = extractFunctionBody(uiSaves163, '_deleteSlotApply');
+    assert(
+      /localStorage\.removeItem\(_slotKey\(slotNum\)\)/.test(body) &&
+        /IdbStore\.remove\('campaign', 'slot_' \+ slotNum\)/.test(body) &&
+        /IdbStore\.remove\('campaign', 'slot_' \+ slotNum \+ '_versions'\)/.test(body) &&
+        /renderSavesList\(\)/.test(body),
+      "163.2: _deleteSlotApply() removes the slot's localStorage key, its IDB campaign entry, and its version-history ring, then refreshes renderSavesList()"
+    );
+  }
+
+  // 163.3  renderSavesList() renders a DELETE control on every local slot row,
+  //        routed to confirmDeleteSlot(), with a literal descriptive
+  //        aria-label (Protocol UI-3) and the shared .delete-btn styling
+  //        cloud rows already use (Protocol 22 — one delete-button class)
+  {
+    assert(
+      /onclick="confirmDeleteSlot\(/.test(uiAcct163) &&
+        /class="btn-sm delete-btn" onclick="confirmDeleteSlot\(/.test(uiAcct163) &&
+        /aria-label="Delete /.test(uiAcct163),
+      '163.3: renderSavesList() renders a confirm-gated DELETE control on each local slot row (btn-sm delete-btn, same class cloud DEL already uses) with a descriptive aria-label'
+    );
+  }
+
+  // 163.4  cloud save VERSION HISTORY lives in an ADDITIVE Firestore
+  //        subcollection (users/{uid}/saves/{docId}/versions) — a structural
+  //        translation of the local P5 ring, never an embedded array field on
+  //        the parent doc (a single Firestore document is capped at 1MB;
+  //        stacking several full campaign+chat snapshots into one doc could
+  //        approach that ceiling). _pushCloudSaveVersion archives via addDoc
+  //        (Protocol 34) and prunes beyond CLOUD_SLOT_VERSION_CAP via deleteDoc
+  //        (system-retention of its own auto-created backups, not a
+  //        user-initiated destructive action — mirrors the local ring's
+  //        silent `.slice(0, SLOT_VERSION_CAP)` cap)
+  {
+    const body = extractFunctionBody(cloud163, '_pushCloudSaveVersion');
+    assert(
+      /const CLOUD_SLOT_VERSION_CAP = 5;/.test(cloud163) &&
+        /collection\(db, 'users', _currentUid, 'saves', docId, 'versions'\)/.test(body) &&
+        /await addDoc\(col,/.test(body) &&
+        /await deleteDoc\(doc\(db, 'users', _currentUid, 'saves', docId, 'versions', ex\.id\)\)/.test(
+          body
+        ),
+      '163.4: _pushCloudSaveVersion() archives via addDoc into an additive users/{uid}/saves/{docId}/versions subcollection and prunes beyond CLOUD_SLOT_VERSION_CAP via deleteDoc'
+    );
+  }
+
+  // 163.5  window.listCloudSaveVersions: fail-safe (returns [] when signed
+  //        out, the feature is disabled, or on any error) — mirrors
+  //        readSlotVersions()'s contract so a caller that gets [] simply
+  //        offers no version history
+  {
+    const body = extractWindowFnBody163(cloud163, 'listCloudSaveVersions');
+    assert(
+      /if \(!window\.isFeatureEnabled\('cloudSync'\) \|\| !_currentUid\) return \[\];/.test(body) &&
+        /catch \(e\) \{[\s\S]*?return \[\];/.test(body),
+      '163.5: window.listCloudSaveVersions() is fail-safe — returns [] when cloudSync is disabled, signed out, or on any Firestore error'
+    );
+  }
+
+  // 163.6  window.restoreCloudSaveVersion: DESTRUCTIVE to the live campaign →
+  //        confirm-gated (Protocol 34), sanitized + migrated before applying
+  //        (same integrity path as loadCloudSave), and takes a rolling backup
+  //        first — restores into the LOCAL campaign only, never rewrites the
+  //        cloud doc itself (mirrors restoreSlotVersion's local-only apply)
+  {
+    const body = extractWindowFnBody163(cloud163, 'restoreCloudSaveVersion');
+    assert(
+      /await confirmAction\(/.test(body) &&
+        /snapRollingBackup/.test(body) &&
+        /sanitizeImportedContainer/.test(body) &&
+        /migrateState/.test(body) &&
+        !/updateDoc\(doc\(db, 'users', _currentUid, 'saves', docId\)/.test(body),
+      '163.6: window.restoreCloudSaveVersion() is confirm-gated, sanitizes + migrates before applying, snapshots a rolling backup first, and only ever replaces the LOCAL campaign (never writes back to the cloud doc)'
+    );
+  }
+
+  // 163.7  overwriteCloudSave() archives the save's PRIOR contents via
+  //        _pushCloudSaveVersion() BEFORE the updateDoc call replaces them,
+  //        stamps the resulting versionCount onto the same updateDoc write
+  //        (no extra read needed to show the VER button later), and its
+  //        confirm-gate warning now points at VERSION HISTORY instead of
+  //        claiming the prior contents "cannot be recovered"
+  {
+    const body = extractWindowFnBody163(cloud163, 'overwriteCloudSave');
+    const versionIdx = body.indexOf('_pushCloudSaveVersion(docId, existingData)');
+    const updateIdx = body.indexOf('await updateDoc(doc(db,');
+    assert(
+      versionIdx !== -1 &&
+        updateIdx !== -1 &&
+        versionIdx < updateIdx &&
+        /versionCount,/.test(body) &&
+        /VERSION HISTORY \(VER\)/.test(body) &&
+        !/cannot be recovered/.test(body),
+      '163.7: overwriteCloudSave() archives the prior contents (_pushCloudSaveVersion) BEFORE the updateDoc replaces them, stamps versionCount onto that same write, and its confirm warning now points at VERSION HISTORY rather than claiming data loss'
+    );
+  }
+
+  // 163.8  deleteCloudSave() purges the retained version subcollection before
+  //        deleting the parent doc — Firestore does not cascade-delete
+  //        subcollections, so skipping this would leave orphaned version
+  //        documents behind forever
+  {
+    const body = extractWindowFnBody163(cloud163, 'deleteCloudSave');
+    const versionsIdx = body.indexOf('listCloudSaveVersions(docId)');
+    const mainDeleteIdx = body.indexOf(
+      "await deleteDoc(doc(db, 'users', _currentUid, 'saves', docId));"
+    );
+    assert(
+      versionsIdx !== -1 && mainDeleteIdx !== -1 && versionsIdx < mainDeleteIdx,
+      '163.8: deleteCloudSave() clears the retained version subcollection before deleting the parent save doc, so no version document is ever orphaned'
+    );
+  }
+
+  // 163.9  viewCloudSaveVersions() (ui-saves.js) mirrors viewSlotVersions()'s
+  //        shape exactly — same openModal driver, same escapeHtml discipline,
+  //        RESTORE routed to window.restoreCloudSaveVersion (Protocol 22 — no
+  //        parallel viewer implementation)
+  {
+    const body = extractFunctionBody(uiSaves163, 'viewCloudSaveVersions');
+    assert(
+      /window\.listCloudSaveVersions\(docId\)/.test(body) &&
+        /openModal\(/.test(body) &&
+        /escapeHtml\(/.test(body) &&
+        /window\.restoreCloudSaveVersion\(\\'/.test(body) &&
+        /NO PRIOR VERSIONS ON FILE/.test(body),
+      '163.9: viewCloudSaveVersions() mirrors viewSlotVersions() — lists window.listCloudSaveVersions() in the shared modal, escaped, with RESTORE routed to window.restoreCloudSaveVersion()'
+    );
+  }
+
+  // 163.10  renderSavesList() offers the VER button on a cloud row ONLY when
+  //         that save's versionCount is truthy — fail-safe, mirrors the local
+  //         ring's versionCounts gate so a pre-feature cloud save (no
+  //         versionCount field yet) shows no button until its first overwrite
+  {
+    assert(
+      /d\.versionCount\s*\?[\s\S]{0,120}viewCloudSaveVersions\(\\'/.test(uiAcct163),
+      '163.10: renderSavesList() renders the cloud VER button only when d.versionCount is truthy — no button for a save with no retained versions yet'
+    );
+  }
+
+  // 163.11  listLocalSaves() tags each slot with its recorded gameContext
+  //         (unfiltered) so the filter step below can judge every source
+  //         (localStorage + the IDB-only supplement) exactly once
+  {
+    const body = extractFunctionBody(uiSaves163, 'listLocalSaves');
+    assert(
+      /gameContext: slot\.gameContext \|\| null,/.test(body),
+      '163.11: listLocalSaves() tags each returned slot with its recorded gameContext (or null), unfiltered — the per-game filter itself lives centrally in renderSavesList()'
+    );
+  }
+
+  // 163.12  renderSavesList() filters BOTH local slots and cloud saves to the
+  //         ACTIVE game (getGameContext()), degrading to SHOW — never hide —
+  //         a save with no recorded gameContext (can't attribute it to a
+  //         game, so showing beats silently hiding data)
+  {
+    assert(
+      /const curCtx = typeof getGameContext === 'function' \? getGameContext\(\) : 'FNV';/.test(
+        uiAcct163
+      ) &&
+        /s\.isSlot && s\.gameContext && s\.gameContext !== curCtx/.test(uiAcct163) &&
+        /!s\.isSlot \|\| !s\.gameContext \|\| s\.gameContext === curCtx/.test(uiAcct163) &&
+        /s\.data\.gameContext && s\.data\.gameContext !== curCtx/.test(uiAcct163) &&
+        /!s\.data\.gameContext \|\| s\.data\.gameContext === curCtx/.test(uiAcct163),
+      '163.12: renderSavesList() filters both local slots and cloud saves to getGameContext(), showing (never hiding) any save with no recorded gameContext'
+    );
+  }
+
+  // 163.13  the empty state tells the user WHY the list is empty when saves
+  //         exist but are all hidden by the per-game filter, instead of
+  //         reusing the same "no archives at all" message for both cases
+  {
+    assert(
+      /NO ARCHIVES FOR ACTIVE GAME/.test(uiAcct163) && /NO ARCHIVES ON FILE/.test(uiAcct163),
+      '163.13: the SAVES LIST empty state distinguishes "no archives for the active game" (some exist under other games) from "no archives on file" (none exist anywhere)'
+    );
+  }
+
+  // 163.14  .save-row/.save-row-label/.save-row-tag/.save-row-name/
+  //         .save-row-actions are defined in terminal.css, with
+  //         .save-row-actions wrapping (flex-wrap) so a growing button set
+  //         (LOAD/OVERWRITE/VER/DELETE, +NAME on cloud) wraps onto its own
+  //         line instead of clipping or forcing horizontal scroll at
+  //         360/412px (Protocol 17)
+  {
+    const actionsRule = (cssSource.match(/\.save-row-actions \{[\s\S]*?\n\}/) || [''])[0];
+    assert(
+      /\.save-row \{/.test(cssSource) &&
+        /\.save-row-label \{/.test(cssSource) &&
+        /\.save-row-tag \{/.test(cssSource) &&
+        /\.save-row-name \{/.test(cssSource) &&
+        actionsRule.length > 0 &&
+        /flex-wrap: wrap;/.test(actionsRule),
+      '163.14: .save-row/.save-row-label/.save-row-tag/.save-row-name/.save-row-actions are defined in terminal.css, with .save-row-actions using flex-wrap so the button group wraps instead of clipping at 360/412px'
+    );
+  }
+
+  // 163.15  renderSavesList()'s row markup uses the CSS classes above for both
+  //         local AND cloud rows — no per-row inline styles left behind for
+  //         the label/action-group layout (the row's OWN structural styling;
+  //         a case-by-case inline style on a specific control, like the
+  //         signed-out hint line, is untouched and out of scope here)
+  {
+    assert(
+      (uiAcct163.match(/class="save-row"/g) || []).length === 2 &&
+        (uiAcct163.match(/class="save-row-label"/g) || []).length === 2 &&
+        (uiAcct163.match(/class="save-row-actions"/g) || []).length === 2,
+      '163.15: renderSavesList() uses .save-row/.save-row-label/.save-row-actions for BOTH the local-slot and cloud-save row templates — no separate inline-styled layout left behind for either'
     );
   }
 }

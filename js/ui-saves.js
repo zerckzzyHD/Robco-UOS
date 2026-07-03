@@ -161,10 +161,16 @@ function _slotLabel(n) {
 }
 
 // ── Local save list (synchronous) ────────────────────────────────────────────
-// Returns an array of {id, label, isActive|isSlot, n} for the active save + slots 1-3.
-// Co-located with the slot-schema helpers (_slotKey/_slotLabel) so a slot-key or
-// slot-count change touches only this file (DUP-2). Consumed by ui-account.js's
-// renderSavesList() as a global.
+// Returns an array of {id, label, isActive|isSlot, n, gameContext} for the active
+// save + slots 1-3. Co-located with the slot-schema helpers (_slotKey/_slotLabel)
+// so a slot-key or slot-count change touches only this file (DUP-2). Consumed by
+// ui-account.js's renderSavesList() as a global.
+//
+// gameContext is UNFILTERED here — each slot just carries whatever it recorded at
+// save time (or undefined for a pre-WU-F5 slot that never recorded one). The
+// per-game filter itself lives centrally in renderSavesList(), which merges this
+// list with the IDB-only supplement before deciding what to hide, so a slot that
+// exists in BOTH localStorage and IDB is judged exactly once (Protocol 22).
 function listLocalSaves() {
   const saves = [];
   const v8raw = localStorage.getItem('robco_v8');
@@ -187,6 +193,7 @@ function listLocalSaves() {
         label: slotName + (savedDate ? ': ' + savedDate : ''),
         isSlot: true,
         n,
+        gameContext: slot.gameContext || null,
       });
     } catch (_) {}
   }
@@ -270,6 +277,40 @@ async function confirmOverwriteSlot(slotNum) {
   });
   if (!ok) return;
   await saveToSlot(slotNum);
+}
+
+// ── DELETE (local slot) — confirm-gated, permanent ───────────────────────────
+// The unified SAVES LIST previously offered no way to clear a named local slot
+// (LOAD/OVERWRITE/VER only) — the owner asked for parity with cloud rows, which
+// already had DEL. Confirm-gated (Protocol 34 destructive-op gate) via the
+// diegetic confirmAction(), never the blocking confirm(). Clears BOTH the
+// localStorage mirror and the IDB-primary copy (P3) plus that slot's retained
+// version ring (P5) — a deleted slot leaves no orphaned version history behind.
+async function confirmDeleteSlot(slotNum) {
+  const ok = await confirmAction({
+    title: '> DELETE ' + _slotLabel(slotNum),
+    warning: `Permanently delete ${_slotLabel(slotNum)}?\n\nThis cannot be undone. Any saved version history for this slot is erased too.`,
+    confirmLabel: 'DELETE',
+  });
+  if (!ok) return;
+  await _deleteSlotApply(slotNum);
+}
+
+// _deleteSlotApply(slotNum) — the synchronous-flow erase core, separated from the
+// confirm gate so it is directly testable without mocking confirmAction() (mirrors
+// the _restoreBackupApply / _craftPrepare+Apply split — Step 2 Phase 0 U12 pattern).
+async function _deleteSlotApply(slotNum) {
+  try {
+    localStorage.removeItem(_slotKey(slotNum));
+    if (window.IdbStore) {
+      await window.IdbStore.remove('campaign', 'slot_' + slotNum);
+      await window.IdbStore.remove('campaign', 'slot_' + slotNum + '_versions');
+    }
+    appendToChat(`> [DELETE] ${_slotLabel(slotNum)} erased.`, 'sys', true);
+  } catch (_) {
+    appendToChat('> [ERROR] Slot delete failed.', 'sys', true);
+  }
+  if (typeof renderSavesList === 'function') renderSavesList();
 }
 
 async function loadFromSlot(slotNum) {
@@ -427,6 +468,47 @@ async function restoreSlotVersion(slotNum, index) {
     appendToChat('> [ERROR] Version restore failed — data unreadable.', 'sys', true);
   }
   if (typeof renderSavesList === 'function') renderSavesList();
+}
+
+// ── CLOUD SAVE VERSION HISTORY VIEWER ────────────────────────────────────────
+// viewCloudSaveVersions() mirrors viewSlotVersions() exactly, but lists a cloud
+// save's retained revisions (window.listCloudSaveVersions, cloud.js) instead of a
+// local slot's. Each row restores that revision into the LIVE local campaign via
+// window.restoreCloudSaveVersion — the cloud doc itself is untouched (Protocol 22:
+// same modal shape, same escapeHtml discipline, no parallel viewer implementation).
+async function viewCloudSaveVersions(docId) {
+  if (typeof window.listCloudSaveVersions !== 'function' || typeof openModal !== 'function') return;
+  const versions = await window.listCloudSaveVersions(docId);
+  if (!versions.length) {
+    openModal({
+      title: '> VERSION HISTORY — CLOUD SAVE',
+      body: '<div style="opacity:0.6;font-size:11px;">NO PRIOR VERSIONS ON FILE</div>',
+    });
+    return;
+  }
+  const rows = versions
+    .map((v, i) => {
+      const d = v.data;
+      const ts = d && d.archivedAt ? new Date(d.archivedAt).toLocaleString() : 'unknown';
+      const ctx = String((d && d.gameContext) || '');
+      return (
+        '<div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;">' +
+        '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;">' +
+        escapeHtml(i + 1 + '. ' + ts + (ctx ? ' [' + ctx + ']' : '')) +
+        '</span>' +
+        '<span style="flex-shrink:0;"><button class="btn-sm" onclick="window.restoreCloudSaveVersion(\'' +
+        docId +
+        "','" +
+        v.id +
+        '\')" aria-label="Restore this saved cloud version">RESTORE</button></span>' +
+        '</div>'
+      );
+    })
+    .join('');
+  openModal({
+    title: '> VERSION HISTORY — CLOUD SAVE',
+    body: '<div>' + rows + '</div>',
+  });
 }
 
 // ── QUEST LOG HELPERS (#1) ──────────────────────────────────────────

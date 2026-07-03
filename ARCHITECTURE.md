@@ -69,8 +69,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2013-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2013-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2028-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2028-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -206,6 +206,34 @@ Scripts are loaded via `<script>` tags in `index.html` in this exact order:
    'balanced', so it runs at Full/Balanced and goes quiet at Minimal (a no-op at the default). Game-
    agnostic (Protocol 38). No pre-paint apply is needed (the dial gates ambient behaviors, not the base
    visual palette), so a normal boot restore suffices.
+
+   P9 (SAVES LIST overhaul — local DELETE, cloud VERSION HISTORY, per-game filter, js/ui-saves.js +
+   js/ui-account.js + js/cloud.js): local slots gain a confirm-gated DELETE (confirmDeleteSlot /
+   _deleteSlotApply, ui-saves.js) that removes the localStorage mirror, the IDB-primary slot_<n> entry
+   (P3), and the slot's P5 version ring together, so a deleted slot leaves nothing orphaned. Cloud saves
+   gain their OWN version history, mirroring the local P5 ring but translated to Firestore's structural
+   equivalent: an ADDITIVE subcollection users/{uid}/saves/{docId}/versions (never an embedded array
+   field on the parent doc — a single Firestore document is capped at 1MB, and stacking several full
+   campaign+chat snapshots into one doc could approach that ceiling). _pushCloudSaveVersion (cloud.js)
+   archives the save's PRIOR contents via addDoc (Protocol 34) before every overwriteCloudSave() write,
+   then prunes beyond CLOUD_SLOT_VERSION_CAP (5) via deleteDoc, oldest-first — system retention of its
+   own auto-created backups, not a user-initiated destructive action, mirroring the local ring's silent
+   `.slice(0, SLOT_VERSION_CAP)` cap. The resulting count is stamped as `versionCount` onto the SAME
+   updateDoc write, so the SAVES LIST can gate the VER button with no extra read per save (mirrors the
+   local versionCounts gate — no button until a save has ≥1 retained revision). window.listCloudSaveVersions
+   / window.restoreCloudSaveVersion (cloud.js) mirror readSlotVersions/restoreSlotVersion's contract:
+   fail-safe (return [] on any error/disabled/signed-out), confirm-gated (Protocol 34), and
+   sanitizeImportedContainer + migrateState before applying — restoring a version replaces the LOCAL
+   campaign only, never rewrites the cloud doc itself. viewCloudSaveVersions (ui-saves.js) mirrors
+   viewSlotVersions's shared-modal shape exactly (Protocol 22 — no parallel viewer). deleteCloudSave now
+   purges a save's version subcollection before deleting the parent doc, since Firestore does not
+   cascade-delete subcollections. Separately, renderSavesList() filters BOTH local slots and cloud saves
+   to the ACTIVE game (getGameContext()), degrading to SHOW — never hide — a save with no recorded
+   gameContext (an older save predating that field); the empty state distinguishes "no archives for the
+   active game" from "no archives on file". The row markup moved from per-row inline styles to
+   .save-row/.save-row-label/.save-row-actions CSS classes, with .save-row-actions using flex-wrap so a
+   growing LOAD/OVERWRITE/VER/DELETE(/NAME) button set wraps instead of clipping at 360/412px.
+
    ── Per-game boot manifest (GAME_FILES in index.html; order preserved via script.async = false) ──
 1. js/db_nv.js / js/db_fo3.js → defines: databaseCSVs, lookupItemInDb (game-specific CSV data;
                        the active pair is selected by the GAME_FILES manifest, FNV fail-safe)
@@ -1898,7 +1926,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2013-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2028-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

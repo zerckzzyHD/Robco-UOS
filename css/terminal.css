@@ -1544,6 +1544,49 @@ details.sub-panel[open] > summary h3::after {
   overflow-wrap: anywhere;
 }
 
+/* SAVES LIST row (owner report — all buttons fit, nothing cut off): the label and
+   its button group stack independently so a growing action set (LOAD/OVERWRITE/
+   VER/DELETE, +NAME on cloud rows) wraps onto its own line instead of clipping or
+   forcing horizontal scroll at 360/412px (Protocol 17). Replaces the previous
+   single-line inline-styled row. */
+.save-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px dashed rgba(var(--robco-green-rgb), 0.15);
+}
+.save-row:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+.save-row-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.save-row-tag {
+  font-size: 9px;
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+.save-row-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+.save-row-actions {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
 /* WU-F10: OVERSEER'S LOG section dividers (device telemetry vs campaign log) */
 .overseer-section-label {
   font-size: 9px;

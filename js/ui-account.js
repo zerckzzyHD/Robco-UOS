@@ -84,6 +84,7 @@ async function renderSavesList() {
             label: (slot.slotName || 'Slot ' + n) + (savedDate ? ': ' + savedDate : ''),
             isSlot: true,
             n,
+            gameContext: slot.gameContext || null,
           });
         }
       } catch (_) {}
@@ -91,13 +92,26 @@ async function renderSavesList() {
     localSaves.sort((a, b) => (a.n || 0) - (b.n || 0));
   }
 
+  // FIX 3 (owner report): saves are per-game — only show the ACTIVE game's saves.
+  // A slot with no recorded gameContext predates WU-F5 and is shown regardless
+  // (can't attribute it to a game, so degrade to showing rather than hiding data).
+  // The always-visible "Active" row is exempt — it always reflects whatever game
+  // is currently live, so it is per-game by construction.
+  const curCtx = typeof getGameContext === 'function' ? getGameContext() : 'FNV';
+  const localHiddenCount = localSaves.filter(
+    s => s.isSlot && s.gameContext && s.gameContext !== curCtx
+  ).length;
+  const localSavesShown = localSaves.filter(
+    s => !s.isSlot || !s.gameContext || s.gameContext === curCtx
+  );
+
   // P5: per-slot version-history availability. The VERS affordance is offered ONLY
   // when IndexedDB is present AND that slot has ≥1 retained prior revision — so no
   // IDB means no button and save/load is unchanged (fail-safe). Computed before the
   // single innerHTML paint below, so rows render complete with no flash.
   const versionCounts = {};
   if (window.IdbStore && typeof window.readSlotVersions === 'function') {
-    for (const s of localSaves) {
+    for (const s of localSavesShown) {
       if (!s.isSlot) continue;
       try {
         const vs = await window.readSlotVersions(s.n);
@@ -117,22 +131,40 @@ async function renderSavesList() {
     }
   }
 
-  if (!localSaves.length && !cloudSaves.length) {
-    body.innerHTML = _archiveHeader + emptyState('NO ARCHIVES ON FILE');
+  // FIX 3: same per-game filter, cloud side — a doc with no recorded gameContext
+  // predates the field and is shown regardless (same graceful degrade as local).
+  const cloudHiddenCount = cloudSaves.filter(
+    s => s.data.gameContext && s.data.gameContext !== curCtx
+  ).length;
+  const cloudSavesShown = cloudSaves.filter(
+    s => !s.data.gameContext || s.data.gameContext === curCtx
+  );
+
+  if (!localSavesShown.length && !cloudSavesShown.length) {
+    const hidden = localHiddenCount + cloudHiddenCount;
+    body.innerHTML =
+      _archiveHeader +
+      emptyState(
+        hidden
+          ? `NO ARCHIVES FOR ACTIVE GAME (${hidden} archived under other games)`
+          : 'NO ARCHIVES ON FILE'
+      );
     return;
   }
 
   const rows = [];
 
-  localSaves.forEach(ls => {
+  localSavesShown.forEach(ls => {
     rows.push(
-      '<div style="display:flex;align-items:center;gap:3px;margin-bottom:3px;">' +
-        '<span style="font-size:9px;opacity:0.5;flex-shrink:0;margin-right:2px;">[LOCAL]</span>' +
-        '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;">' +
+      '<div class="save-row">' +
+        '<div class="save-row-label">' +
+        '<span class="save-row-tag">[LOCAL]</span>' +
+        '<span class="save-row-name">' +
         escapeHtml(ls.label) +
         '</span>' +
+        '</div>' +
         (ls.isSlot
-          ? '<span style="flex-shrink:0;display:flex;gap:2px;">' +
+          ? '<div class="save-row-actions">' +
             '<button class="btn-sm" onclick="loadFromSlot(' +
             ls.n +
             ')">LOAD</button>' +
@@ -150,23 +182,30 @@ async function renderSavesList() {
                 versionCounts[ls.n] +
                 '</button>'
               : '') +
-            '</span>'
+            '<button class="btn-sm delete-btn" onclick="confirmDeleteSlot(' +
+            ls.n +
+            ')" aria-label="Delete ' +
+            escapeHtml(String(ls.label)) +
+            '">DEL</button>' +
+            '</div>'
           : '') +
         '</div>'
     );
   });
 
-  cloudSaves.forEach(s => {
+  cloudSavesShown.forEach(s => {
     const d = s.data;
     const docId = s.id;
     const label = escapeHtml(d.label || (docId === 'main' ? 'Quick Save' : 'Untitled'));
     rows.push(
-      '<div style="display:flex;align-items:center;gap:3px;margin-bottom:3px;">' +
-        '<span style="font-size:9px;opacity:0.5;flex-shrink:0;margin-right:2px;">[CLOUD]</span>' +
-        '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;">' +
+      '<div class="save-row">' +
+        '<div class="save-row-label">' +
+        '<span class="save-row-tag">[CLOUD]</span>' +
+        '<span class="save-row-name">' +
         label +
         '</span>' +
-        '<span style="flex-shrink:0;display:flex;gap:2px;">' +
+        '</div>' +
+        '<div class="save-row-actions">' +
         '<button class="btn-sm" onclick="window.loadCloudSave(\'' +
         docId +
         '\')">LOAD</button>' +
@@ -175,13 +214,24 @@ async function renderSavesList() {
         '\')" aria-label="Overwrite ' +
         label +
         ' with your current campaign">OVERWRITE</button>' +
+        (d.versionCount
+          ? '<button class="btn-sm" onclick="viewCloudSaveVersions(\'' +
+            docId +
+            '\')" aria-label="View saved cloud version history for ' +
+            label +
+            '">VER ' +
+            d.versionCount +
+            '</button>'
+          : '') +
         '<button class="btn-sm" onclick="(function(){var l=prompt(\'Rename:\');if(l)window.renameCloudSave(\'' +
         docId +
         '\',l);})()">NAME</button>' +
         '<button class="btn-sm delete-btn" onclick="window.deleteCloudSave(\'' +
         docId +
-        '\')">DEL</button>' +
-        '</span>' +
+        '\')" aria-label="Delete ' +
+        label +
+        '">DEL</button>' +
+        '</div>' +
         '</div>'
     );
   });

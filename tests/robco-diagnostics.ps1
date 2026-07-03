@@ -12264,7 +12264,8 @@ Check (
 #        renderSavesList() on success
 Check (
     ($overwriteCloudBody161 -notmatch "\bprompt\(") -and
-    ($overwriteCloudBody161 -match "docSnap\.data\(\)\.label") -and
+    ($overwriteCloudBody161 -match "existingData = docSnap\.data\(\)") -and
+    ($overwriteCloudBody161 -match "existingData\.label") -and
     ($overwriteCloudBody161 -match "window\.renderSavesList\(\)")
 ) "161.6: overwriteCloudSave keeps the save's existing label (no rename prompt) and calls window.renderSavesList() on success"
 
@@ -12796,6 +12797,226 @@ Check (
     ($toggleInputModeBody162 -match "getElementById\('modePill'\)") -and
     ($toggleInputModeBody162 -match '\.blur\(\)')
 ) "162.28b: toggleInputMode() blurs the pill after a tap (belt-and-suspenders alongside the CSS hover-gate fix)"
+
+# ===========================================================
+# Suite 163 -- Owner batch: SAVES LIST overhaul -- local DELETE, cloud VERSION
+# HISTORY, per-game filtering, row-layout fit (15 tests). Four owner reports
+# fixed together: (1) local slots had no DELETE control (cloud rows already
+# had DEL) -- confirmDeleteSlot()/_deleteSlotApply() (ui-saves.js) add one,
+# confirm-gated, clearing the localStorage mirror + the IDB-primary slot +
+# its P5 version ring; (2) cloud saves had no version history even though
+# OVERWRITE could destroy prior contents -- an additive Firestore
+# subcollection (users/{uid}/saves/{docId}/versions) mirrors the local P5
+# ring, archived by _pushCloudSaveVersion() before every overwrite, capped
+# and oldest-pruned, with a versionCount field on the parent doc so the SAVES
+# LIST can show a VER button without an extra read per save; (3) the list
+# showed every save regardless of which game was active -- renderSavesList()
+# now filters both local slots and cloud saves to the active game context,
+# degrading to SHOW (never hide) a save with no recorded gameContext; (4) the
+# row's growing button set could clip at 360/412px -- rows moved from inline
+# styles to .save-row/.save-row-actions CSS classes, with flex-wrap letting
+# buttons wrap onto their own line instead of overflowing. Mirrors JS Suite 163.
+# ===========================================================
+Sep "Suite 163 -- Owner batch: SAVES LIST local DELETE + cloud VERSION HISTORY + per-game filter"
+$uiSaves163 = Read-Src "js/ui-saves.js"
+$uiAcct163 = Read-Src "js/ui-account.js"
+$cloud163 = Read-Src "js/cloud.js"
+$css163 = Read-Src "css/terminal.css"
+
+# Assignment-form extractor (`window.X = async function (...) { ... }`) --
+# re-declared locally per the Suite 137/161 precedent.
+function Get-WindowFnBody163($source, $fnName) {
+    $idx = $source.IndexOf("window.$fnName =")
+    if ($idx -lt 0) { return "" }
+    $start = $source.IndexOf('{', $idx)
+    if ($start -lt 0) { return "" }
+    $depth = 0
+    $i     = $start
+    while ($i -lt $source.Length) {
+        $ch = $source[$i]
+        if     ($ch -eq '{') { $depth++ }
+        elseif ($ch -eq '}') { $depth--; if ($depth -eq 0) { return $source.Substring($start, $i - $start + 1) } }
+        $i++
+    }
+    return ""
+}
+
+# 163.1  confirmDeleteSlot() (ui-saves.js): diegetic confirmAction() gate
+#        (not the blocking confirm()), delegates to _deleteSlotApply()
+$confirmDeleteSlotBody163 = Get-FunctionBody $uiSaves163 "confirmDeleteSlot"
+Check (
+    ($confirmDeleteSlotBody163 -match "await confirmAction\(") -and
+    ($confirmDeleteSlotBody163 -notmatch "\bconfirm\(") -and
+    ($confirmDeleteSlotBody163 -match "await _deleteSlotApply\(slotNum\)")
+) "163.1: confirmDeleteSlot() awaits confirmAction() (not confirm()) and delegates the erase to _deleteSlotApply()"
+
+# 163.2  _deleteSlotApply() clears BOTH the localStorage mirror and the
+#        IDB-primary copy (P3), plus that slot's retained version ring (P5)
+#        -- a deleted slot leaves no orphaned version history -- and
+#        refreshes renderSavesList() on completion
+$deleteSlotApplyBody163 = Get-FunctionBody $uiSaves163 "_deleteSlotApply"
+Check (
+    ($deleteSlotApplyBody163 -match "localStorage\.removeItem\(_slotKey\(slotNum\)\)") -and
+    ($deleteSlotApplyBody163 -match "IdbStore\.remove\('campaign', 'slot_' \+ slotNum\)") -and
+    ($deleteSlotApplyBody163 -match "IdbStore\.remove\('campaign', 'slot_' \+ slotNum \+ '_versions'\)") -and
+    ($deleteSlotApplyBody163 -match "renderSavesList\(\)")
+) "163.2: _deleteSlotApply() removes the slot's localStorage key, its IDB campaign entry, and its version-history ring, then refreshes renderSavesList()"
+
+# 163.3  renderSavesList() renders a DELETE control on every local slot row,
+#        routed to confirmDeleteSlot(), with a literal descriptive aria-label
+#        (Protocol UI-3) and the shared .delete-btn styling cloud rows
+#        already use (Protocol 22 -- one delete-button class)
+Check (
+    ($uiAcct163 -match 'onclick="confirmDeleteSlot\(') -and
+    ($uiAcct163 -match 'class="btn-sm delete-btn" onclick="confirmDeleteSlot\(') -and
+    ($uiAcct163 -match 'aria-label="Delete ')
+) "163.3: renderSavesList() renders a confirm-gated DELETE control on each local slot row (btn-sm delete-btn, same class cloud DEL already uses) with a descriptive aria-label"
+
+# 163.4  cloud save VERSION HISTORY lives in an ADDITIVE Firestore
+#        subcollection (users/{uid}/saves/{docId}/versions) -- a structural
+#        translation of the local P5 ring, never an embedded array field on
+#        the parent doc (a single Firestore document is capped at 1MB;
+#        stacking several full campaign+chat snapshots into one doc could
+#        approach that ceiling). _pushCloudSaveVersion archives via addDoc
+#        (Protocol 34) and prunes beyond CLOUD_SLOT_VERSION_CAP via deleteDoc
+#        (system-retention of its own auto-created backups, not a
+#        user-initiated destructive action -- mirrors the local ring's
+#        silent `.slice(0, SLOT_VERSION_CAP)` cap)
+$pushVersionBody163 = Get-FunctionBody $cloud163 "_pushCloudSaveVersion"
+Check (
+    ($cloud163 -match "const CLOUD_SLOT_VERSION_CAP = 5;") -and
+    ($pushVersionBody163 -match "collection\(db, 'users', _currentUid, 'saves', docId, 'versions'\)") -and
+    ($pushVersionBody163 -match "await addDoc\(col,") -and
+    ($pushVersionBody163 -match "await deleteDoc\(doc\(db, 'users', _currentUid, 'saves', docId, 'versions', ex\.id\)\)")
+) "163.4: _pushCloudSaveVersion() archives via addDoc into an additive users/{uid}/saves/{docId}/versions subcollection and prunes beyond CLOUD_SLOT_VERSION_CAP via deleteDoc"
+
+# 163.5  window.listCloudSaveVersions: fail-safe (returns [] when signed out,
+#        the feature is disabled, or on any error) -- mirrors
+#        readSlotVersions()'s contract so a caller that gets [] simply offers
+#        no version history
+$listVersionsBody163 = Get-WindowFnBody163 $cloud163 "listCloudSaveVersions"
+Check (
+    ($listVersionsBody163 -match "if \(!window\.isFeatureEnabled\('cloudSync'\) \|\| !_currentUid\) return \[\];") -and
+    ($listVersionsBody163 -match "catch \(e\) \{[\s\S]*?return \[\];")
+) "163.5: window.listCloudSaveVersions() is fail-safe -- returns [] when cloudSync is disabled, signed out, or on any Firestore error"
+
+# 163.6  window.restoreCloudSaveVersion: DESTRUCTIVE to the live campaign ->
+#        confirm-gated (Protocol 34), sanitized + migrated before applying
+#        (same integrity path as loadCloudSave), and takes a rolling backup
+#        first -- restores into the LOCAL campaign only, never rewrites the
+#        cloud doc itself (mirrors restoreSlotVersion's local-only apply)
+$restoreVersionBody163 = Get-WindowFnBody163 $cloud163 "restoreCloudSaveVersion"
+Check (
+    ($restoreVersionBody163 -match "await confirmAction\(") -and
+    ($restoreVersionBody163 -match "snapRollingBackup") -and
+    ($restoreVersionBody163 -match "sanitizeImportedContainer") -and
+    ($restoreVersionBody163 -match "migrateState") -and
+    ($restoreVersionBody163 -notmatch "updateDoc\(doc\(db, 'users', _currentUid, 'saves', docId\)")
+) "163.6: window.restoreCloudSaveVersion() is confirm-gated, sanitizes + migrates before applying, snapshots a rolling backup first, and only ever replaces the LOCAL campaign (never writes back to the cloud doc)"
+
+# 163.7  overwriteCloudSave() archives the save's PRIOR contents via
+#        _pushCloudSaveVersion() BEFORE the updateDoc call replaces them,
+#        stamps the resulting versionCount onto the same updateDoc write (no
+#        extra read needed to show the VER button later), and its
+#        confirm-gate warning now points at VERSION HISTORY instead of
+#        claiming the prior contents "cannot be recovered"
+$overwriteCloudBody163 = Get-WindowFnBody163 $cloud163 "overwriteCloudSave"
+$versionIdx163 = $overwriteCloudBody163.IndexOf("_pushCloudSaveVersion(docId, existingData)")
+$updateIdx163 = $overwriteCloudBody163.IndexOf("await updateDoc(doc(db,")
+Check (
+    ($versionIdx163 -ge 0) -and ($updateIdx163 -ge 0) -and ($versionIdx163 -lt $updateIdx163) -and
+    ($overwriteCloudBody163 -match "versionCount,") -and
+    ($overwriteCloudBody163 -match "VERSION HISTORY \(VER\)") -and
+    ($overwriteCloudBody163 -notmatch "cannot be recovered")
+) "163.7: overwriteCloudSave() archives the prior contents (_pushCloudSaveVersion) BEFORE the updateDoc replaces them, stamps versionCount onto that same write, and its confirm warning now points at VERSION HISTORY rather than claiming data loss"
+
+# 163.8  deleteCloudSave() purges the retained version subcollection before
+#        deleting the parent doc -- Firestore does not cascade-delete
+#        subcollections, so skipping this would leave orphaned version
+#        documents behind forever
+$deleteCloudBody163 = Get-WindowFnBody163 $cloud163 "deleteCloudSave"
+$versionsIdx163 = $deleteCloudBody163.IndexOf("listCloudSaveVersions(docId)")
+$mainDeleteIdx163 = $deleteCloudBody163.IndexOf("await deleteDoc(doc(db, 'users', _currentUid, 'saves', docId));")
+Check (
+    ($versionsIdx163 -ge 0) -and ($mainDeleteIdx163 -ge 0) -and ($versionsIdx163 -lt $mainDeleteIdx163)
+) "163.8: deleteCloudSave() clears the retained version subcollection before deleting the parent save doc, so no version document is ever orphaned"
+
+# 163.9  viewCloudSaveVersions() (ui-saves.js) mirrors viewSlotVersions()'s
+#        shape exactly -- same openModal driver, same escapeHtml discipline,
+#        RESTORE routed to window.restoreCloudSaveVersion (Protocol 22 -- no
+#        parallel viewer implementation)
+$viewCloudVersionsBody163 = Get-FunctionBody $uiSaves163 "viewCloudSaveVersions"
+Check (
+    ($viewCloudVersionsBody163 -match "window\.listCloudSaveVersions\(docId\)") -and
+    ($viewCloudVersionsBody163 -match "openModal\(") -and
+    ($viewCloudVersionsBody163 -match "escapeHtml\(") -and
+    ($viewCloudVersionsBody163 -match "window\.restoreCloudSaveVersion\(\\'") -and
+    ($viewCloudVersionsBody163 -match "NO PRIOR VERSIONS ON FILE")
+) "163.9: viewCloudSaveVersions() mirrors viewSlotVersions() -- lists window.listCloudSaveVersions() in the shared modal, escaped, with RESTORE routed to window.restoreCloudSaveVersion()"
+
+# 163.10  renderSavesList() offers the VER button on a cloud row ONLY when
+#         that save's versionCount is truthy -- fail-safe, mirrors the local
+#         ring's versionCounts gate so a pre-feature cloud save (no
+#         versionCount field yet) shows no button until its first overwrite
+Check (
+    $uiAcct163 -match "d\.versionCount\s*\?[\s\S]{0,120}viewCloudSaveVersions\(\\'"
+) "163.10: renderSavesList() renders the cloud VER button only when d.versionCount is truthy -- no button for a save with no retained versions yet"
+
+# 163.11  listLocalSaves() tags each slot with its recorded gameContext
+#         (unfiltered) so the filter step below can judge every source
+#         (localStorage + the IDB-only supplement) exactly once
+$listLocalSavesBody163 = Get-FunctionBody $uiSaves163 "listLocalSaves"
+Check (
+    $listLocalSavesBody163 -match "gameContext: slot\.gameContext \|\| null,"
+) "163.11: listLocalSaves() tags each returned slot with its recorded gameContext (or null), unfiltered -- the per-game filter itself lives centrally in renderSavesList()"
+
+# 163.12  renderSavesList() filters BOTH local slots and cloud saves to the
+#         ACTIVE game (getGameContext()), degrading to SHOW -- never hide --
+#         a save with no recorded gameContext (can't attribute it to a game,
+#         so showing beats silently hiding data)
+Check (
+    ($uiAcct163 -match "const curCtx = typeof getGameContext === 'function' \? getGameContext\(\) : 'FNV';") -and
+    ($uiAcct163 -match "s\.isSlot && s\.gameContext && s\.gameContext !== curCtx") -and
+    ($uiAcct163 -match "!s\.isSlot \|\| !s\.gameContext \|\| s\.gameContext === curCtx") -and
+    ($uiAcct163 -match "s\.data\.gameContext && s\.data\.gameContext !== curCtx") -and
+    ($uiAcct163 -match "!s\.data\.gameContext \|\| s\.data\.gameContext === curCtx")
+) "163.12: renderSavesList() filters both local slots and cloud saves to getGameContext(), showing (never hiding) any save with no recorded gameContext"
+
+# 163.13  the empty state tells the user WHY the list is empty when saves
+#         exist but are all hidden by the per-game filter, instead of reusing
+#         the same "no archives at all" message for both cases
+Check (
+    ($uiAcct163 -match "NO ARCHIVES FOR ACTIVE GAME") -and ($uiAcct163 -match "NO ARCHIVES ON FILE")
+) "163.13: the SAVES LIST empty state distinguishes `"no archives for the active game`" (some exist under other games) from `"no archives on file`" (none exist anywhere)"
+
+# 163.14  .save-row/.save-row-label/.save-row-tag/.save-row-name/
+#         .save-row-actions are defined in terminal.css, with
+#         .save-row-actions wrapping (flex-wrap) so a growing button set
+#         (LOAD/OVERWRITE/VER/DELETE, +NAME on cloud) wraps onto its own line
+#         instead of clipping or forcing horizontal scroll at 360/412px
+#         (Protocol 17)
+$actionsRuleMatch163 = [regex]::Match($css163, '\.save-row-actions \{[\s\S]*?\n\}')
+$actionsRule163 = if ($actionsRuleMatch163.Success) { $actionsRuleMatch163.Value } else { "" }
+Check (
+    ($css163 -match "\.save-row \{") -and
+    ($css163 -match "\.save-row-label \{") -and
+    ($css163 -match "\.save-row-tag \{") -and
+    ($css163 -match "\.save-row-name \{") -and
+    ($actionsRule163.Length -gt 0) -and
+    ($actionsRule163 -match "flex-wrap: wrap;")
+) "163.14: .save-row/.save-row-label/.save-row-tag/.save-row-name/.save-row-actions are defined in terminal.css, with .save-row-actions using flex-wrap so the button group wraps instead of clipping at 360/412px"
+
+# 163.15  renderSavesList()'s row markup uses the CSS classes above for both
+#         local AND cloud rows -- no per-row inline styles left behind for
+#         the label/action-group layout (the row's OWN structural styling; a
+#         case-by-case inline style on a specific control, like the
+#         signed-out hint line, is untouched and out of scope here)
+$saveRowCount163 = ([regex]::Matches($uiAcct163, 'class="save-row"')).Count
+$saveRowLabelCount163 = ([regex]::Matches($uiAcct163, 'class="save-row-label"')).Count
+$saveRowActionsCount163 = ([regex]::Matches($uiAcct163, 'class="save-row-actions"')).Count
+Check (
+    ($saveRowCount163 -eq 2) -and ($saveRowLabelCount163 -eq 2) -and ($saveRowActionsCount163 -eq 2)
+) "163.15: renderSavesList() uses .save-row/.save-row-label/.save-row-actions for BOTH the local-slot and cloud-save row templates -- no separate inline-styled layout left behind for either"
 
 # ===========================================================
 # Results
