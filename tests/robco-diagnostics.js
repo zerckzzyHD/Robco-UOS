@@ -20479,9 +20479,14 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  density fix): the D-PAD/native-command cluster is tucked into a
 //  collapsible sub-panel (default-open desktop / collapsed mobile) so the
 //  transcript leads the mobile view, the oscilloscope shrinks to a tidy
-//  banner, the command input gets real height, and the whole cluster —
-//  plus a TRANSMIT background bug found live during verification (Protocol
-//  42) — is restyled amber to match the Director Uplink. 19 tests.
+//  banner, the command input gets real height, and the whole cluster is
+//  restyled amber to match the Director Uplink. Extended again (owner
+//  composer-integration redesign): the chat input is one modern rounded
+//  composer INTEGRATED into the transcript box (.transcript-card wraps both
+//  #chatDisplay and .composer, messenger-style) with a [+ upload]/[mode
+//  pill]/[? help]/[↑ send] toolbar docked at its bottom, plus a real
+//  desktop min-height fix for a crush bug found live during verification
+//  (Protocol 42). 24 tests.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 162 — DO-O: the living Overseer (DIRECTOR UPLINK)');
@@ -20819,14 +20824,22 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     );
   }
 
-  // 162.20  owner composer redesign — one rounded box (#composer) replaces the
-  //         separate dashed VISUAL UPLOAD button and the bottom-of-panel
-  //         TRANSMIT PROTOCOL button; both old controls are gone
+  // 162.20  owner composer redesign — the composer INTEGRATES into the
+  //         transcript box (.transcript-card wraps BOTH #chatDisplay and
+  //         .composer — messenger-style, not a separate stack of controls
+  //         below it) and replaces the separate dashed VISUAL UPLOAD button +
+  //         the bottom-of-panel TRANSMIT PROTOCOL button; both old controls
+  //         are gone
+  const transcriptCardStart162 = htmlSource.indexOf('<div class="transcript-card">');
   const composerStart162 = htmlSource.indexOf('<div class="composer" id="composer">');
   const composerImgInputIdx162 = htmlSource.indexOf('id="imageInput"', composerStart162);
   const composerBlock162 =
     composerStart162 !== -1 && composerImgInputIdx162 !== -1
       ? htmlSource.slice(composerStart162, composerImgInputIdx162)
+      : '';
+  const transcriptCardBlock162 =
+    transcriptCardStart162 !== -1 && composerImgInputIdx162 !== -1
+      ? htmlSource.slice(transcriptCardStart162, composerImgInputIdx162)
       : '';
   assert(
     composerBlock162.length > 0 &&
@@ -20835,7 +20848,20 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       /id="tokenBudgetDisplay" class="composer-token-budget"/.test(composerBlock162) &&
       !/\[ &gt; VISUAL UPLOAD \]/.test(htmlSource) &&
       !/&gt; TRANSMIT PROTOCOL/.test(htmlSource),
-    '162.20: the composer is one rounded box (#composer) containing the textarea (.composer-input) and a bottom toolbar (.composer-toolbar); the old standalone dashed VISUAL UPLOAD button and bottom TRANSMIT PROTOCOL button are both gone'
+    '162.20: the composer contains the textarea (.composer-input) and a bottom toolbar (.composer-toolbar); the old standalone dashed VISUAL UPLOAD button and bottom TRANSMIT PROTOCOL button are both gone'
+  );
+
+  // 162.20b  structural integration proof — #chatDisplay and .composer are
+  //          BOTH inside the SAME .transcript-card wrapper (the composer pill
+  //          docks at the bottom of the transcript box, not below it as a
+  //          separate element)
+  assert(
+    transcriptCardStart162 !== -1 &&
+      transcriptCardStart162 < htmlSource.indexOf('id="chatDisplay"') &&
+      htmlSource.indexOf('id="chatDisplay"') < composerStart162 &&
+      transcriptCardBlock162.includes('id="chatDisplay"') &&
+      transcriptCardBlock162.includes('<div class="composer" id="composer">'),
+    '162.20b: .transcript-card wraps BOTH #chatDisplay and .composer in source order (transcript, then composer) — one integrated card, not a separate control stack below the transcript'
   );
 
   // 162.21  every composer control keeps its exact pre-existing handler
@@ -20872,22 +20898,70 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     );
   }
 
-  // 162.23  the composer and its buttons are styled amber and meet the
-  //         Protocol 17 ≥28px tap-target floor
+  // 162.23  .transcript-card carries the ONE shared border/radius (the
+  //         integrated card), #chatDisplay and .composer sit borderless
+  //         inside it (only a subtle top divider on .composer), and the
+  //         composer buttons meet the Protocol 17 ≥28px tap-target floor
   {
-    const composerRule162 = (cssSource.match(/\.composer \{[\s\S]*?\n\}/) || [''])[0];
+    const cardRule162 = (cssSource.match(/\.transcript-card \{[\s\S]*?\n\}/) || [''])[0];
+    const chatDisplayRule162 = (cssSource.match(/\n#chatDisplay \{[\s\S]*?\n\}/) || [''])[0];
+    const composerRule162 = (cssSource.match(/\n\.composer \{[\s\S]*?\n\}/) || [''])[0];
     const iconBtnRule162 = (cssSource.match(
       /\.composer-icon-btn,\s*\n\.composer-send-btn \{[\s\S]*?\n\}/
     ) || [''])[0];
     assert(
-      composerRule162.length > 0 &&
-        /border: 1px solid var\(--bezel-wire\)/.test(composerRule162) &&
-        /border-radius: 18px/.test(composerRule162) &&
-        iconBtnRule162.length > 0 &&
+      cardRule162.length > 0 &&
+        /border: 1px solid var\(--bezel-wire\)/.test(cardRule162) &&
+        /border-radius: 20px/.test(cardRule162) &&
+        /overflow: hidden/.test(cardRule162),
+      '162.23a: .transcript-card is the ONE rounded (20px) amber-bordered card that clips its content (overflow:hidden) — the shared border the transcript and composer both sit inside'
+    );
+    assert(
+      chatDisplayRule162.length > 0 &&
+        !/border:\s*1px solid/.test(chatDisplayRule162) &&
+        composerRule162.length > 0 &&
+        !/^\s*border: 1px solid var\(--bezel-wire\);/m.test(composerRule162) &&
+        /border-top: 1px solid rgba\(var\(--bezel-wire-rgb\), 0\.35\)/.test(composerRule162),
+      '162.23b: #chatDisplay and .composer no longer carry their own full border/radius — they dock borderless (composer keeps only a subtle top divider) inside the shared .transcript-card, so the two never read as separate boxes'
+    );
+    assert(
+      iconBtnRule162.length > 0 &&
         /width: 32px/.test(iconBtnRule162) &&
         /height: 32px/.test(iconBtnRule162) &&
         /border-radius: 50%/.test(iconBtnRule162),
-      '162.23: .composer is a rounded (18px) amber-bordered box, and the composer icon/send buttons are circular (border-radius:50%) at 32px — comfortably above the 28px Protocol 17 tap-target floor'
+      '162.23c: the composer icon/send buttons are circular (border-radius:50%) at 32px — comfortably above the 28px Protocol 17 tap-target floor'
+    );
+  }
+
+  // 162.24  Protocol 42 regression guard — a real bug found live while
+  //         verifying the composer-integration redesign: on desktop the
+  //         command cluster tray defaults OPEN (no height cap) and could
+  //         starve .transcript-card's flex-grow toward zero with
+  //         min-height:0, silently clipping the transcript to a sliver
+  //         inside the card's own overflow:hidden with no scrollbar ever
+  //         appearing. Fixed with a real min-height floor on the desktop
+  //         .transcript-card (covering #chatDisplay's real minimum
+  //         footprint — its 90px content min-height PLUS its 15px+15px
+  //         padding, since it is NOT box-sizing:border-box — plus
+  //         .composer's fixed 149px) and overflow-y:auto on .chat-panel
+  //         itself so any further squeeze scrolls instead of clipping.
+  {
+    const desktopBlock162 = (cssSource.match(
+      /@media \(min-width: 1000px\) and \(hover: hover\) and \(pointer: fine\) \{[\s\S]*?\n\}\n\n(?=\/\* ── Skills Grid)/
+    ) || [''])[0];
+    const desktopChatPanelRule162 = (desktopBlock162.match(
+      /\.panel\.chat-panel \{[\s\S]*?\n {2}\}/
+    ) || [''])[0];
+    const desktopCardRule162 = (desktopBlock162.match(/\.transcript-card \{[\s\S]*?\n {2}\}/) || [
+      '',
+    ])[0];
+    assert(
+      desktopBlock162.length > 0 &&
+        /overflow-y: auto;/.test(desktopChatPanelRule162) &&
+        desktopCardRule162.length > 0 &&
+        /min-height: 282px;/.test(desktopCardRule162) &&
+        !/min-height: 0;/.test(desktopCardRule162),
+      "162.24: desktop .panel.chat-panel scrolls (overflow-y:auto) and desktop .transcript-card carries a real 282px min-height floor (not 0) — with the open-by-default command tray, this is what stops the transcript from being crushed to a clipped sliver with no scrollbar (Protocol 42 — found live during this unit's desktop verification)"
     );
   }
 }

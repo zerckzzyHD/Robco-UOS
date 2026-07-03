@@ -361,13 +361,28 @@ textarea {
   font-size: 14px;
 }
 
+/* .transcript-card is the ONE bordered/rounded card that owns the visible
+   border + background; #chatDisplay sits transparently inside its top and
+   .composer docks flush at its bottom (Director Uplink composer redesign,
+   owner refinement — "integrated into the transcript box, not a separate
+   stack of controls below it"). overflow:hidden on the card clips both
+   children to its rounded corners; #chatDisplay keeps its OWN overflow-y:auto
+   so the transcript still scrolls independently inside the card. */
+.transcript-card {
+  display: flex;
+  flex-direction: column;
+  margin-top: 10px;
+  border: 1px solid var(--bezel-wire);
+  border-radius: 20px;
+  background: rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
 #chatDisplay {
   height: 250px;
   overflow-y: auto;
-  border: 1px solid var(--robco-blue);
-  background: rgba(0, 0, 0, 0.6);
+  background: transparent;
   padding: 15px;
-  margin-bottom: 5px;
+  margin-bottom: 0;
   display: flex;
   flex-direction: column;
   gap: 15px;
@@ -915,20 +930,21 @@ textarea {
 
 /* DO-O follow-up — the modern rounded composer (owner-supplied Claude-style
    reference layout) replaces the separate dashed VISUAL UPLOAD button and the
-   bottom-of-panel TRANSMIT PROTOCOL button: one bordered, rounded box holds
-   the textarea and a bottom toolbar of [+ upload] [mode pill] [? help] …
-   [↑ send]. Every control is the SAME pre-existing element/handler (Protocol
-   22) — only the container/position/styling changed. Amber/--bezel-wire
-   throughout (Protocol 38 — token only, no game literal). */
+   bottom-of-panel TRANSMIT PROTOCOL button: a bottom toolbar of [+ upload]
+   [mode pill] [? help] … [↑ send] docks flush at the bottom of the shared
+   .transcript-card (owner refinement — integrated into the transcript box,
+   not a separate box below it; the card's own border/radius/background do
+   the visual work, .composer just adds a subtle top divider). Every control
+   is the SAME pre-existing element/handler (Protocol 22) — only the
+   container/position/styling changed. Amber/--bezel-wire throughout
+   (Protocol 38 — token only, no game literal). */
 .composer {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-top: 8px;
+  flex-shrink: 0;
   padding: 8px 12px 10px;
-  border: 1px solid var(--bezel-wire);
-  border-radius: 18px;
-  background: rgba(0, 0, 0, 0.35);
+  border-top: 1px solid rgba(var(--bezel-wire-rgb), 0.35);
 }
 .composer-image-preview {
   position: relative;
@@ -1116,6 +1132,10 @@ textarea {
     display: flex;
     flex-direction: column;
     overflow-y: auto;
+  }
+  body[data-subsystem='uplink'] .transcript-card {
+    flex: 1 1 auto;
+    min-height: 0;
   }
   body[data-subsystem='uplink'] #chatDisplay {
     flex: 1 1 auto;
@@ -2656,10 +2676,36 @@ body.thermal-load .panel {
     flex-direction: column;
     margin-bottom: 0;
     min-height: 0;
+    /* Protocol 42 fix (found live while verifying the composer-integration
+       redesign): the command cluster tray defaults OPEN on desktop and has
+       no height cap, so with a short-ish viewport it could starve
+       .transcript-card's flex-grow down toward zero with nowhere for the
+       overflow to go (.col-right clips with overflow:hidden). Scrolling the
+       whole panel — mirroring the existing mobile behavior — means the
+       transcript's own min-height (below) is always honored; any excess
+       tray content scrolls into view instead of being lost. */
+    overflow-y: auto;
+  }
+  .transcript-card {
+    flex-grow: 1;
+    /* A real floor, not 0 — with min-height:0 here, .chat-panel's flex
+       algorithm was free to crush this card toward zero BEFORE its own
+       overflow-y:auto ever engaged (the card conceded the space instead of
+       .chat-panel scrolling), which in turn crushed #chatDisplay against
+       .composer's fixed 149px inside the card's own overflow:hidden —
+       clipping the transcript to a sliver with no scrollbar in sight
+       (Protocol 42, same investigation as the .chat-panel fix above). The
+       floor below is #chatDisplay's real minimum footprint — its 90px
+       content min-height PLUS its own 15px+15px padding (content-box, so
+       padding isn't absorbed into the 90px) — plus .composer's fixed 149px
+       and the card's 2px border, so any further squeeze is absorbed by
+       .chat-panel's scroll instead of clipping the transcript. */
+    min-height: 282px;
   }
   #chatDisplay {
     flex-grow: 1;
     height: 0;
+    min-height: 90px;
     overflow-y: auto;
     font-size: 15px;
   }

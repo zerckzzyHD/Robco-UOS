@@ -12308,9 +12308,14 @@ Check (
 # (Protocol 22). Extended (owner mobile-density fix): the D-PAD/native-
 # command cluster is tucked into a collapsible sub-panel (default-open
 # desktop / collapsed mobile), the oscilloscope shrinks to a tidy banner,
-# the command input gets real height, and the whole cluster -- plus a
-# TRANSMIT background bug found live during verification (Protocol 42) --
-# is restyled amber to match the Director Uplink. 19 tests.
+# the command input gets real height, and the whole cluster is restyled
+# amber to match the Director Uplink. Extended again (owner composer-
+# integration redesign): the chat input is one modern rounded composer
+# INTEGRATED into the transcript box (.transcript-card wraps both
+# #chatDisplay and .composer, messenger-style) with a [+ upload]/[mode
+# pill]/[? help]/[send] toolbar docked at its bottom, plus a real desktop
+# min-height fix for a crush bug found live during verification
+# (Protocol 42). 24 tests.
 # ===========================================================
 Sep "Suite 162 -- DO-O: the living Overseer (DIRECTOR UPLINK)"
 $html162  = Read-Src "index.html"
@@ -12586,12 +12591,17 @@ Check (
     ($mobileBlock162 -match "body\[data-subsystem='uplink'\] #chatInput \{\s*height: 76px;\s*flex-shrink: 0;")
 ) "162.19: the mobile UPLINK block shrinks #overseerScope to a 64px banner (down from the unconditional 120px) and gives #chatInput a real 76px height (was the bare 2-row textarea default)"
 
-# 162.20  owner composer redesign -- one rounded box (#composer) replaces the
-#         separate dashed VISUAL UPLOAD button and the bottom-of-panel
-#         TRANSMIT PROTOCOL button; both old controls are gone
+# 162.20  owner composer redesign -- the composer INTEGRATES into the
+#         transcript box (.transcript-card wraps BOTH #chatDisplay and
+#         .composer -- messenger-style, not a separate stack of controls
+#         below it) and replaces the separate dashed VISUAL UPLOAD button +
+#         the bottom-of-panel TRANSMIT PROTOCOL button; both old controls
+#         are gone
+$transcriptCardStart162 = $html162.IndexOf('<div class="transcript-card">')
 $composerStart162 = $html162.IndexOf('<div class="composer" id="composer">')
 $composerImgInputIdx162 = if ($composerStart162 -ge 0) { $html162.IndexOf('id="imageInput"', $composerStart162) } else { -1 }
 $composerBlock162 = if (($composerStart162 -ge 0) -and ($composerImgInputIdx162 -ge 0)) { $html162.Substring($composerStart162, $composerImgInputIdx162 - $composerStart162) } else { "" }
+$transcriptCardBlock162 = if (($transcriptCardStart162 -ge 0) -and ($composerImgInputIdx162 -ge 0)) { $html162.Substring($transcriptCardStart162, $composerImgInputIdx162 - $transcriptCardStart162) } else { "" }
 Check (
     ($composerBlock162.Length -gt 0) -and
     ($composerBlock162 -match 'class="composer-input"') -and
@@ -12599,7 +12609,20 @@ Check (
     ($composerBlock162 -match 'id="tokenBudgetDisplay" class="composer-token-budget"') -and
     ($html162 -notmatch [regex]::Escape('[ &gt; VISUAL UPLOAD ]')) -and
     ($html162 -notmatch '&gt; TRANSMIT PROTOCOL')
-) "162.20: the composer is one rounded box (#composer) containing the textarea (.composer-input) and a bottom toolbar (.composer-toolbar); the old standalone dashed VISUAL UPLOAD button and bottom TRANSMIT PROTOCOL button are both gone"
+) "162.20: the composer contains the textarea (.composer-input) and a bottom toolbar (.composer-toolbar); the old standalone dashed VISUAL UPLOAD button and bottom TRANSMIT PROTOCOL button are both gone"
+
+# 162.20b  structural integration proof -- #chatDisplay and .composer are
+#          BOTH inside the SAME .transcript-card wrapper (the composer pill
+#          docks at the bottom of the transcript box, not below it as a
+#          separate element)
+$chatDisplayIdx162 = $html162.IndexOf('id="chatDisplay"')
+Check (
+    ($transcriptCardStart162 -ge 0) -and
+    ($transcriptCardStart162 -lt $chatDisplayIdx162) -and
+    ($chatDisplayIdx162 -lt $composerStart162) -and
+    ($transcriptCardBlock162.Contains('id="chatDisplay"')) -and
+    ($transcriptCardBlock162.Contains('<div class="composer" id="composer">'))
+) "162.20b: .transcript-card wraps BOTH #chatDisplay and .composer in source order (transcript, then composer) -- one integrated card, not a separate control stack below the transcript"
 
 # 162.21  every composer control keeps its exact pre-existing handler
 #         (Protocol 22) -- only the container/position/styling changed
@@ -12627,21 +12650,60 @@ Check (
     (-not ($tm162b.Contains("btn.innerText = '> TRANSMIT PROTOCOL'")))
 ) "162.22: transmitMessage()'s busy/cancel/reset states use short glyphs, and the finally block restores onclick to submitCommandInput() -- not transmitMessage() directly (Protocol 42 fix: the prior direct rebind silently skipped TERMINAL-mode routing on every click after the first round-trip)"
 
-# 162.23  the composer and its buttons are styled amber and meet the
-#         Protocol 17 >=28px tap-target floor
-$composerRuleMatch162 = [regex]::Match($css162, '(?s)\.composer \{.*?\n\}')
+# 162.23  .transcript-card carries the ONE shared border/radius (the
+#         integrated card), #chatDisplay and .composer sit borderless inside
+#         it (only a subtle top divider on .composer), and the composer
+#         buttons meet the Protocol 17 >=28px tap-target floor
+$cardRuleMatch162 = [regex]::Match($css162, '(?s)\.transcript-card \{.*?\n\}')
+$cardRule162 = if ($cardRuleMatch162.Success) { $cardRuleMatch162.Value } else { "" }
+$chatDisplayRuleMatch162 = [regex]::Match($css162, "(?s)`n#chatDisplay \{.*?`n\}")
+$chatDisplayRule162 = if ($chatDisplayRuleMatch162.Success) { $chatDisplayRuleMatch162.Value } else { "" }
+$composerRuleMatch162 = [regex]::Match($css162, "(?s)`n\.composer \{.*?`n\}")
 $composerRule162 = if ($composerRuleMatch162.Success) { $composerRuleMatch162.Value } else { "" }
 $iconBtnRuleMatch162 = [regex]::Match($css162, "(?s)\.composer-icon-btn,\s*\n\.composer-send-btn \{.*?\n\}")
 $iconBtnRule162 = if ($iconBtnRuleMatch162.Success) { $iconBtnRuleMatch162.Value } else { "" }
 Check (
+    ($cardRule162.Length -gt 0) -and
+    ($cardRule162 -match 'border: 1px solid var\(--bezel-wire\)') -and
+    ($cardRule162 -match 'border-radius: 20px') -and
+    ($cardRule162 -match 'overflow: hidden')
+) "162.23a: .transcript-card is the ONE rounded (20px) amber-bordered card that clips its content (overflow:hidden) -- the shared border the transcript and composer both sit inside"
+Check (
+    ($chatDisplayRule162.Length -gt 0) -and
+    ($chatDisplayRule162 -notmatch 'border:\s*1px solid') -and
     ($composerRule162.Length -gt 0) -and
-    ($composerRule162 -match 'border: 1px solid var\(--bezel-wire\)') -and
-    ($composerRule162 -match 'border-radius: 18px') -and
+    ($composerRule162 -notmatch '(?m)^\s*border: 1px solid var\(--bezel-wire\);') -and
+    ($composerRule162 -match 'border-top: 1px solid rgba\(var\(--bezel-wire-rgb\), 0\.35\)')
+) "162.23b: #chatDisplay and .composer no longer carry their own full border/radius -- they dock borderless (composer keeps only a subtle top divider) inside the shared .transcript-card, so the two never read as separate boxes"
+Check (
     ($iconBtnRule162.Length -gt 0) -and
     ($iconBtnRule162 -match 'width: 32px') -and
     ($iconBtnRule162 -match 'height: 32px') -and
     ($iconBtnRule162 -match 'border-radius: 50%')
-) "162.23: .composer is a rounded (18px) amber-bordered box, and the composer icon/send buttons are circular (border-radius:50%) at 32px -- comfortably above the 28px Protocol 17 tap-target floor"
+) "162.23c: the composer icon/send buttons are circular (border-radius:50%) at 32px -- comfortably above the 28px Protocol 17 tap-target floor"
+
+# 162.24  Protocol 42 regression guard -- a real bug found live while
+#         verifying the composer-integration redesign: on desktop the
+#         command cluster tray defaults OPEN (no height cap) and could
+#         starve .transcript-card's flex-grow toward zero with
+#         min-height:0, silently clipping the transcript to a sliver inside
+#         the card's own overflow:hidden with no scrollbar ever appearing.
+#         Fixed with a real min-height floor on the desktop .transcript-card
+#         plus overflow-y:auto on .chat-panel itself so any further squeeze
+#         scrolls instead of clipping.
+$desktopMatch162 = [regex]::Match($css162, "(?s)@media \(min-width: 1000px\) and \(hover: hover\) and \(pointer: fine\) \{.*?\n\}\n\n(?=/\* ── Skills Grid)")
+$desktopBlock162 = if ($desktopMatch162.Success) { $desktopMatch162.Value } else { "" }
+$desktopChatPanelMatch162 = [regex]::Match($desktopBlock162, '(?s)\.panel\.chat-panel \{.*?\n  \}')
+$desktopChatPanelRule162 = if ($desktopChatPanelMatch162.Success) { $desktopChatPanelMatch162.Value } else { "" }
+$desktopCardMatch162 = [regex]::Match($desktopBlock162, '(?s)\.transcript-card \{.*?\n  \}')
+$desktopCardRule162 = if ($desktopCardMatch162.Success) { $desktopCardMatch162.Value } else { "" }
+Check (
+    ($desktopBlock162.Length -gt 0) -and
+    ($desktopChatPanelRule162 -match 'overflow-y: auto;') -and
+    ($desktopCardRule162.Length -gt 0) -and
+    ($desktopCardRule162 -match 'min-height: 282px;') -and
+    (-not ($desktopCardRule162 -match 'min-height: 0;'))
+) "162.24: desktop .panel.chat-panel scrolls (overflow-y:auto) and desktop .transcript-card carries a real 282px min-height floor (not 0) -- with the open-by-default command tray, this is what stops the transcript from being crushed to a clipped sliver with no scrollbar (Protocol 42 -- found live during this unit's desktop verification)"
 
 # ===========================================================
 # Results

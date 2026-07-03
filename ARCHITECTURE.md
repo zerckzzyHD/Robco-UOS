@@ -69,8 +69,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2001-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2001-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2005-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2005-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -561,7 +561,7 @@ attribute, with `identity` read by no feature code yet. DO-N (bezel chrome, `--b
 (cartridge-swap ceremony), DO-M (per-game machines), and DO-Q2–Q6 (remaining motion/cursor/audio/
 voice/ambient facets) are still future consumers. No `state.<field>` / `saveState()` / `robco_v8`
 write exists anywhere in the identity block itself. `APP_VERSION` stays 2.7.0 under `[Unreleased]`
-(cache-rev bump only, current rev `-r46`). Guarded end-to-end by
+(cache-rev bump only, current rev `-r47`). Guarded end-to-end by
 Suite 157 (both runners at parity) — a Node `vm`-sandbox behavioral test that loads the real
 `js/state.js` and proves the contract, the theme-alias reference equality, the `getIdentity()`
 fail-safe, and the FO4 designOnly guards, plus static structural guards on the three `data-game`
@@ -752,7 +752,7 @@ pre-existing focus/scroll behavior) and focuses `#chatInput`.
 **Save boundary clean (Protocol 26):** the entire DO-O block reads `state`/`getIdentity()` but
 never writes `saveState()` / `robco_v8` / `state.<field> =` anywhere — `_scopeState` is a transient
 module variable and the idle-blip observer's `appendToChat(...,true)` call is explicitly excluded
-from persistence. Guarded by Suite 162 (both runners at parity, 23 tests, including a Node
+from persistence. Guarded by Suite 162 (both runners at parity, 24 tests, including a Node
 `Function`-eval behavioral truth-table proof of `_overseerRestState()`).
 
 **DO-O follow-up — UPLINK mobile density/de-bloat/restyle (owner report):** a live-mobile
@@ -779,9 +779,9 @@ cluster is restyled amber (`.tactical-dashboard` and `.d-pad button` move from `
 `--bezel-wire`, Protocol 38 — token only, no game literal). Guarded by Suite 162 (162.16–162.19).
 
 **DO-O follow-up, part 2 — the modern rounded composer (owner-supplied reference layout):** a
-second owner note superseded the initial "fix the cramped input" item with a specific design: one
-bordered, rounded `#composer` box (`border-radius:18px`, amber `--bezel-wire` border) holds the
-borderless `#chatInput` textarea on top and a bottom `.composer-toolbar` row underneath — `[+]`
+second owner note superseded the initial "fix the cramped input" item with a specific design: a
+rounded `#composer` box holds the borderless `#chatInput` textarea on top and a bottom
+`.composer-toolbar` row underneath — `[+]`
 (`.composer-icon-btn`, calls the pre-existing `triggerImageUpload()`), the existing `#modePill`
 (unchanged `toggleInputMode()` wiring, styling untouched — it still gets its amber color from the
 pre-existing `.chat-panel .mode-pill--overseer` override, no CSS change needed since the pill lives
@@ -808,6 +808,33 @@ AI round-trip silently bypassed `submitCommandInput()`'s TERMINAL-mode/quick-log
 went through the OVERSEER path — fixed by restoring `btn.onclick = () => submitCommandInput();`,
 the same entry point the button's original inline `onclick` attribute used. Guarded by the Suite
 162 extension (162.20–162.23).
+
+**DO-O follow-up, part 3 — the composer INTEGRATES into the transcript box (owner refinement):** a
+third owner note refined part 2 further — the composer must not read as "a separate stack of
+controls below" the transcript; it has to dock at the bottom of the SAME messenger-style card. A
+new `.transcript-card` wraps BOTH `#chatDisplay` and `#composer` (source order: transcript first,
+composer second) and owns the ONE visible border + 20px radius + dark background + `overflow:
+hidden` (which is what the previous unit's `.composer` border/radius and `#chatDisplay`'s own
+`border: 1px solid var(--robco-blue)` both are, they belong to the merged card, not the individual
+pieces — `#chatDisplay` is now `background: transparent` with no border, and `.composer` keeps only
+a subtle `border-top` divider). The card clips both children to its rounded corners; `#chatDisplay`
+keeps its own `overflow-y: auto` so the transcript still scrolls independently inside the card,
+seated flush against `.composer` with zero gap between them.
+
+Making `.transcript-card` (not `#chatDisplay` directly) the flex-grow item inside `.chat-panel`
+surfaced a real desktop crush bug (Protocol 42, found live during this unit's own desktop
+verification): the command cluster tray defaults OPEN on desktop with no height cap, and
+`.transcript-card`'s `min-height: 0` let `.chat-panel`'s flex algorithm shrink the card toward zero
+to make room for the tray — BEFORE `.chat-panel`'s own overflow could ever engage — which in turn
+crushed `#chatDisplay` against `.composer`'s fixed height inside the card's own `overflow: hidden`,
+silently clipping the transcript to a sliver with no scrollbar anywhere in sight. The fix gives
+desktop `.transcript-card` a real `min-height: 282px` floor — sized for `#chatDisplay`'s true
+minimum footprint (its 90px content `min-height` PLUS its own 15px+15px padding, since it is not
+`box-sizing: border-box`) plus `.composer`'s fixed 149px plus the card's border — and adds
+`overflow-y: auto` to `.panel.chat-panel` itself (mirroring the pre-existing mobile behavior) so
+any further squeeze from a tall open tray scrolls the whole panel into view instead of clipping the
+transcript. Verified at 360px, 412px, and desktop from 800px through 1024px tall viewports with the
+tray both open and collapsed. Guarded by the Suite 162 extension (162.20b, 162.23a–c, 162.24).
 
 ---
 
@@ -1844,7 +1871,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2001-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2005-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

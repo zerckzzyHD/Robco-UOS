@@ -2454,69 +2454,70 @@
                 <div class="scope-meta" id="scopeStrip">SIGNAL — · ENCRYPTION: TRI-NODE</div>
               </div>
 
-              <div
-                id="chatDisplay"
-                aria-live="polite"
-                aria-atomic="false"
-                style="margin-top: 10px"
-              ></div>
-
-              <!-- DO-O follow-up (owner composer redesign): one modern rounded composer
-                   replaces the separate VISUAL UPLOAD button + bottom TRANSMIT PROTOCOL
-                   button. Every control keeps its exact pre-existing handler (Protocol 22):
+              <!-- Owner refinement: the composer is INTEGRATED into the transcript box,
+                   not a separate stack of controls below it — one rounded card
+                   (.transcript-card) holds the scrolling transcript on top and the
+                   composer pill docked flush at the bottom, messenger-style. Every
+                   composer control keeps its exact pre-existing handler (Protocol 22):
                    [+] = triggerImageUpload(), the pill = toggleInputMode(), [?] =
-                   showHelpModal(), [↑] = submitCommandInput() on the same #transmitBtn id. -->
-              <div class="composer" id="composer">
-                <div id="imagePreviewContainer" class="composer-image-preview">
-                  <img id="imagePreview" class="image-preview" src="" alt="Preview" />
+                   showHelpModal(), [↑] = submitCommandInput() on the same #transmitBtn id.
+                   The standalone VISUAL UPLOAD button and the bottom TRANSMIT PROTOCOL
+                   button are both gone — the [+] and [↑] replace them. -->
+              <div class="transcript-card">
+                <div id="chatDisplay" aria-live="polite" aria-atomic="false"></div>
+
+                <div class="composer" id="composer">
+                  <div id="imagePreviewContainer" class="composer-image-preview">
+                    <img id="imagePreview" class="image-preview" src="" alt="Preview" />
+                  </div>
+                  <textarea
+                    id="chatInput"
+                    class="composer-input"
+                    maxlength="4000"
+                    placeholder="ENTER COMMAND OR ACTION (E.G. '> [THREAT] GECKOS')…"
+                    onkeydown="
+                      if (event.ctrlKey && event.key === 'Enter') {
+                        event.preventDefault();
+                        submitCommandInput();
+                      }
+                    "
+                    oninput="updateTokenBudget()"
+                  ></textarea>
+                  <div id="modeHintPopup" class="mode-hint" style="display: none"></div>
+                  <div class="composer-toolbar">
+                    <button
+                      class="composer-icon-btn"
+                      onclick="triggerImageUpload()"
+                      aria-label="Attach a visual upload"
+                    >
+                      +
+                    </button>
+                    <button
+                      id="modePill"
+                      class="action-btn btn-sm mode-pill mode-pill--overseer"
+                      onclick="toggleInputMode()"
+                      aria-label="Command input mode: OVERSEER. Tap to switch to TERMINAL."
+                    >
+                      OVERSEER
+                    </button>
+                    <button
+                      class="composer-icon-btn composer-help-btn"
+                      onclick="showHelpModal()"
+                      aria-label="Show command help"
+                    >
+                      ?
+                    </button>
+                    <button
+                      onclick="submitCommandInput()"
+                      class="composer-send-btn"
+                      id="transmitBtn"
+                      aria-label="Transmit message"
+                    >
+                      ↑
+                    </button>
+                  </div>
+                  <div id="tokenBudgetDisplay" class="composer-token-budget"></div>
                 </div>
-                <textarea
-                  id="chatInput"
-                  class="composer-input"
-                  maxlength="4000"
-                  placeholder="ENTER COMMAND OR ACTION (E.G. '> [THREAT] GECKOS')…"
-                  onkeydown="
-                    if (event.ctrlKey && event.key === 'Enter') {
-                      event.preventDefault();
-                      submitCommandInput();
-                    }
-                  "
-                  oninput="updateTokenBudget()"
-                ></textarea>
-                <div id="modeHintPopup" class="mode-hint" style="display: none"></div>
-                <div class="composer-toolbar">
-                  <button
-                    class="composer-icon-btn"
-                    onclick="triggerImageUpload()"
-                    aria-label="Attach a visual upload"
-                  >
-                    +
-                  </button>
-                  <button
-                    id="modePill"
-                    class="action-btn btn-sm mode-pill mode-pill--overseer"
-                    onclick="toggleInputMode()"
-                    aria-label="Command input mode: OVERSEER. Tap to switch to TERMINAL."
-                  >
-                    OVERSEER
-                  </button>
-                  <button
-                    class="composer-icon-btn composer-help-btn"
-                    onclick="showHelpModal()"
-                    aria-label="Show command help"
-                  >
-                    ?
-                  </button>
-                  <button
-                    onclick="submitCommandInput()"
-                    class="composer-send-btn"
-                    id="transmitBtn"
-                    aria-label="Transmit message"
-                  >
-                    ↑
-                  </button>
-                </div>
-                <div id="tokenBudgetDisplay" class="composer-token-budget"></div>
               </div>
               <input
                 type="file"
