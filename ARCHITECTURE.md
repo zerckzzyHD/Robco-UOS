@@ -69,8 +69,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    1997-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    1997-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2001-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2001-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -561,7 +561,7 @@ attribute, with `identity` read by no feature code yet. DO-N (bezel chrome, `--b
 (cartridge-swap ceremony), DO-M (per-game machines), and DO-Q2–Q6 (remaining motion/cursor/audio/
 voice/ambient facets) are still future consumers. No `state.<field>` / `saveState()` / `robco_v8`
 write exists anywhere in the identity block itself. `APP_VERSION` stays 2.7.0 under `[Unreleased]`
-(cache-rev bump only, current rev `-r45`). Guarded end-to-end by
+(cache-rev bump only, current rev `-r46`). Guarded end-to-end by
 Suite 157 (both runners at parity) — a Node `vm`-sandbox behavioral test that loads the real
 `js/state.js` and proves the contract, the theme-alias reference equality, the `getIdentity()`
 fail-safe, and the FO4 designOnly guards, plus static structural guards on the three `data-game`
@@ -752,7 +752,7 @@ pre-existing focus/scroll behavior) and focuses `#chatInput`.
 **Save boundary clean (Protocol 26):** the entire DO-O block reads `state`/`getIdentity()` but
 never writes `saveState()` / `robco_v8` / `state.<field> =` anywhere — `_scopeState` is a transient
 module variable and the idle-blip observer's `appendToChat(...,true)` call is explicitly excluded
-from persistence. Guarded by Suite 162 (both runners at parity, 19 tests, including a Node
+from persistence. Guarded by Suite 162 (both runners at parity, 23 tests, including a Node
 `Function`-eval behavioral truth-table proof of `_overseerRestState()`).
 
 **DO-O follow-up — UPLINK mobile density/de-bloat/restyle (owner report):** a live-mobile
@@ -776,11 +776,38 @@ and `#chatInput` gains a real 76px height (was the bare 2-row textarea default),
 existing `body[data-subsystem='uplink']` mobile block — no wiring touched, no desktop change. The
 cluster is restyled amber (`.tactical-dashboard` and `.d-pad button` move from `--robco-blue` to
 `--bezel-wire`; the TRADE/LOOT/CONSULT/VATS-CALC macro buttons move from `--robco-green` to
-`--bezel-wire`, Protocol 38 — token only, no game literal). A real visual defect found live during
-this unit's verification — `#transmitBtn`'s `.blue-btn` base class still painted a solid blue
-background under the DO-O color-only override, leaving a blue-filled TRANSMIT button — is fixed in
-the same commit (Protocol 42): `background: transparent !important` plus an amber-tinted hover
-fill. Guarded by the Suite 162 extension (162.16–162.19).
+`--bezel-wire`, Protocol 38 — token only, no game literal). Guarded by Suite 162 (162.16–162.19).
+
+**DO-O follow-up, part 2 — the modern rounded composer (owner-supplied reference layout):** a
+second owner note superseded the initial "fix the cramped input" item with a specific design: one
+bordered, rounded `#composer` box (`border-radius:18px`, amber `--bezel-wire` border) holds the
+borderless `#chatInput` textarea on top and a bottom `.composer-toolbar` row underneath — `[+]`
+(`.composer-icon-btn`, calls the pre-existing `triggerImageUpload()`), the existing `#modePill`
+(unchanged `toggleInputMode()` wiring, styling untouched — it still gets its amber color from the
+pre-existing `.chat-panel .mode-pill--overseer` override, no CSS change needed since the pill lives
+inside `.chat-panel` either way), a round `[?]` (`.composer-help-btn`, calls the pre-existing
+`showHelpModal()`, replacing the old `[?]` bracket-text button), and a circular `↑` send button on
+the far right (`margin-left:auto`) that keeps the exact `id="transmitBtn"` +
+`onclick="submitCommandInput()"` the old bottom-of-panel `> TRANSMIT PROTOCOL` button had. The
+image-attachment preview (`#imagePreviewContainer`) and the token-budget readout
+(`#tokenBudgetDisplay`) move inside the composer too (`#tokenBudgetDisplay` sits on its own row
+below the toolbar so its longer text — `~12,345 / 128K tokens (23%)` — never crowds the icon row at
+360/412px); every element keeps the exact same `id`, so every JS reference (`getElementById`, no
+DOM-adjacency dependencies anywhere in `triggerImageUpload`/`handleImageSelection`/
+`submitCommandInput`/`updateTokenBudget`) resolves identically to before (Protocol 22 — reskin, not
+a fork). The old standalone dashed `[ > VISUAL UPLOAD ]` button and the bottom `> TRANSMIT
+PROTOCOL` button are both removed — their affordances are now the `[+]` and `[↑]` respectively.
+
+`transmitMessage()`'s busy/cancel/reset button states — previously long strings (`> TRANSMITTING...`
+/ `> CANCEL` / `> TRANSMIT PROTOCOL`) sized for a full-width button — are adapted to short glyphs
+(`⋯` / `✕` / `↑`) plus a matching `aria-label`, so they fit the small circular button without
+changing the underlying disable/abort/reset behavior. A pre-existing bug found while making this
+change (Protocol 42): the `finally` block rebound `btn.onclick` straight to `transmitMessage()`
+rather than back to `submitCommandInput()`, so every click on the button after the FIRST completed
+AI round-trip silently bypassed `submitCommandInput()`'s TERMINAL-mode/quick-log routing and always
+went through the OVERSEER path — fixed by restoring `btn.onclick = () => submitCommandInput();`,
+the same entry point the button's original inline `onclick` attribute used. Guarded by the Suite
+162 extension (162.20–162.23).
 
 ---
 
@@ -1817,7 +1844,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1997-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2001-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

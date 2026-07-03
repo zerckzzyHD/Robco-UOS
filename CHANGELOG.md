@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1997/1997 | Cache: robco-terminal-v2.7.0-r45 -->
+﻿## [Unreleased]<!-- Tests: 2001/2001 | Cache: robco-terminal-v2.7.0-r46 -->
 
 ### Added
 
@@ -38,7 +38,7 @@
 - Fixed a stray thin sliver of color trailing the last connector pin on the Module Bay's hardware boards and channel chips.
 - Fixed the saves list not updating right after you saved, overwrote, or restored a version — you previously had to tap LOAD on something else before it caught up. It now refreshes immediately every time.
 - Fixed the Save & Data help menu not explaining the EXPORT FULL BACKUP button — it now describes what it bundles and how to restore it.
-- Fixed the Director Uplink view feeling cramped on phones — the oscilloscope was eating a big share of the screen, your conversation read as a small box, the message field was too short to comfortably type in, and the D-PAD/quick-command buttons below it were rendering in an outdated blue/green style that clashed with the amber Director theme. The oscilloscope is now a compact banner, your conversation gets much more room and leads the screen, the message field is properly sized, and the D-PAD/quick-command buttons — recolored to match — tuck into a collapsible tray you can open when you need them (they stay visible on desktop, exactly as before). Also fixed the TRANSMIT button showing a solid blue fill instead of its intended transparent amber outline.
+- Fixed the Director Uplink view feeling cramped on phones and gave the message box a modern redesign. The oscilloscope was eating a big share of the screen, your conversation read as a small box, and the D-PAD/quick-command buttons below it were rendering in an outdated blue/green style that clashed with the amber Director theme. The oscilloscope is now a compact banner and your conversation gets much more room and leads the screen. Typing your message now happens in a single rounded composer box — the photo-upload button, the OVERSEER/TERMINAL mode switch, the help button, and a round send arrow all live together right by your text, instead of a plain text box with a send button buried at the very bottom of the screen. The D-PAD/quick-command buttons — recolored to match the amber theme — tuck into a collapsible tray you can open when you need them (they stay visible on desktop, exactly as before).
 
 ### Improved
 

@@ -20793,11 +20793,13 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       '162.18b: the macro-buttons cluster (THREAT/VATS/TRADE/LOOT/CONSULT/VATS CALCULATOR/TERMLINK) carries no leftover --robco-green literal — every button matches the amber Director Uplink aesthetic'
     );
     assert(
-      /\.chat-panel #transmitBtn \{[^}]*background: transparent !important;/.test(cssSource) &&
-        /\.chat-panel #transmitBtn:hover \{[^}]*background: rgba\(var\(--bezel-wire-rgb\), 0\.15\) !important;/.test(
+      /\.composer-icon-btn,\s*\n\.composer-send-btn \{[^}]*border: 1px solid var\(--bezel-wire\);/.test(
+        cssSource
+      ) &&
+        /\.composer-icon-btn:hover,\s*\n\.composer-send-btn:hover \{[^}]*background: var\(--bezel-wire\);/.test(
           cssSource
         ),
-      "162.18c: #transmitBtn's background is transparent (Protocol 42 fix — .blue-btn's solid blue fill previously survived the color-only override, leaving a blue-filled TRANSMIT button)"
+      '162.18c: the composer icon/send buttons are outlined amber (transparent background, --bezel-wire border) and fill amber on hover — no leftover .blue-btn solid-fill bug (superseded by the composer redesign)'
     );
   }
 
@@ -20814,6 +20816,78 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
           mobileBlock162
         ),
       '162.19: the mobile UPLINK block shrinks #overseerScope to a 64px banner (down from the unconditional 120px) and gives #chatInput a real 76px height (was the bare 2-row textarea default)'
+    );
+  }
+
+  // 162.20  owner composer redesign — one rounded box (#composer) replaces the
+  //         separate dashed VISUAL UPLOAD button and the bottom-of-panel
+  //         TRANSMIT PROTOCOL button; both old controls are gone
+  const composerStart162 = htmlSource.indexOf('<div class="composer" id="composer">');
+  const composerImgInputIdx162 = htmlSource.indexOf('id="imageInput"', composerStart162);
+  const composerBlock162 =
+    composerStart162 !== -1 && composerImgInputIdx162 !== -1
+      ? htmlSource.slice(composerStart162, composerImgInputIdx162)
+      : '';
+  assert(
+    composerBlock162.length > 0 &&
+      /class="composer-input"/.test(composerBlock162) &&
+      /class="composer-toolbar"/.test(composerBlock162) &&
+      /id="tokenBudgetDisplay" class="composer-token-budget"/.test(composerBlock162) &&
+      !/\[ &gt; VISUAL UPLOAD \]/.test(htmlSource) &&
+      !/&gt; TRANSMIT PROTOCOL/.test(htmlSource),
+    '162.20: the composer is one rounded box (#composer) containing the textarea (.composer-input) and a bottom toolbar (.composer-toolbar); the old standalone dashed VISUAL UPLOAD button and bottom TRANSMIT PROTOCOL button are both gone'
+  );
+
+  // 162.21  every composer control keeps its exact pre-existing handler
+  //         (Protocol 22) — only the container/position/styling changed
+  assert(
+    /class="composer-icon-btn"\s+onclick="triggerImageUpload\(\)"/.test(composerBlock162) &&
+      /id="modePill"[\s\S]{0,200}onclick="toggleInputMode\(\)"/.test(composerBlock162) &&
+      /class="composer-icon-btn composer-help-btn"\s+onclick="showHelpModal\(\)"/.test(
+        composerBlock162
+      ) &&
+      /onclick="submitCommandInput\(\)"\s+class="composer-send-btn"\s+id="transmitBtn"/.test(
+        composerBlock162
+      ),
+    '162.21: the composer [+] still calls triggerImageUpload(), the mode pill still calls toggleInputMode(), the [?] still calls showHelpModal(), and the [↑] send button keeps id="transmitBtn" + onclick="submitCommandInput()" — no rewiring'
+  );
+
+  // 162.22  transmitMessage()'s busy/cancel/reset states swap a short glyph +
+  //         aria-label (fits the small circular button) instead of the old
+  //         long button-text strings, and the Protocol 42 fix closes the
+  //         onclick-drift bug found while adapting this button: the finally
+  //         block used to rebind onclick straight to transmitMessage(),
+  //         permanently bypassing submitCommandInput()'s TERMINAL-mode/
+  //         quick-log routing for every click after the FIRST round-trip
+  {
+    const tm162b = extractFunctionBody(apiSource, 'transmitMessage');
+    assert(
+      /btn\.textContent = '⋯';/.test(tm162b) &&
+        /btn\.textContent = '✕';/.test(tm162b) &&
+        /btn\.textContent = '↑';/.test(tm162b) &&
+        /btn\.onclick = \(\) => submitCommandInput\(\);/.test(tm162b) &&
+        !/btn\.onclick = \(\) => transmitMessage\(\);/.test(tm162b) &&
+        !/btn\.innerText = '> TRANSMIT PROTOCOL'/.test(tm162b),
+      "162.22: transmitMessage()'s busy (⋯) / cancel (✕) / reset (↑) states use short glyphs, and the finally block restores onclick to submitCommandInput() — not transmitMessage() directly (Protocol 42 fix: the prior direct rebind silently skipped TERMINAL-mode routing on every click after the first round-trip)"
+    );
+  }
+
+  // 162.23  the composer and its buttons are styled amber and meet the
+  //         Protocol 17 ≥28px tap-target floor
+  {
+    const composerRule162 = (cssSource.match(/\.composer \{[\s\S]*?\n\}/) || [''])[0];
+    const iconBtnRule162 = (cssSource.match(
+      /\.composer-icon-btn,\s*\n\.composer-send-btn \{[\s\S]*?\n\}/
+    ) || [''])[0];
+    assert(
+      composerRule162.length > 0 &&
+        /border: 1px solid var\(--bezel-wire\)/.test(composerRule162) &&
+        /border-radius: 18px/.test(composerRule162) &&
+        iconBtnRule162.length > 0 &&
+        /width: 32px/.test(iconBtnRule162) &&
+        /height: 32px/.test(iconBtnRule162) &&
+        /border-radius: 50%/.test(iconBtnRule162),
+      '162.23: .composer is a rounded (18px) amber-bordered box, and the composer icon/send buttons are circular (border-radius:50%) at 32px — comfortably above the 28px Protocol 17 tap-target floor'
     );
   }
 }

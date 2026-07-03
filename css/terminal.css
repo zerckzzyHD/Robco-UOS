@@ -406,7 +406,7 @@ textarea {
 .image-preview {
   max-height: 80px;
   max-width: 100%;
-  border: 1px solid var(--robco-blue);
+  border: 1px solid var(--bezel-wire);
   display: none;
   margin-bottom: 5px;
 }
@@ -913,19 +913,83 @@ textarea {
   color: rgba(var(--bezel-wire-rgb), 0.6);
 }
 
-/* TRANSMIT control — amber/--bezel-wire, not the plain .blue-btn shared
-   elsewhere (REBOOT TERMINAL / CLOSE INTERFACE keep their own color).
-   DO-O follow-up fix (Protocol 42 — found live during mobile verification):
-   .blue-btn's solid blue background survived the original color override,
-   leaving a blue-filled button with an amber border/label. Transparent
-   (outlined, matching the mockup's TRANSMIT/HAIL controls) is correct. */
-.chat-panel #transmitBtn {
-  border-color: var(--bezel-wire) !important;
-  color: var(--bezel-wire) !important;
-  background: transparent !important;
+/* DO-O follow-up — the modern rounded composer (owner-supplied Claude-style
+   reference layout) replaces the separate dashed VISUAL UPLOAD button and the
+   bottom-of-panel TRANSMIT PROTOCOL button: one bordered, rounded box holds
+   the textarea and a bottom toolbar of [+ upload] [mode pill] [? help] …
+   [↑ send]. Every control is the SAME pre-existing element/handler (Protocol
+   22) — only the container/position/styling changed. Amber/--bezel-wire
+   throughout (Protocol 38 — token only, no game literal). */
+.composer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 8px 12px 10px;
+  border: 1px solid var(--bezel-wire);
+  border-radius: 18px;
+  background: rgba(0, 0, 0, 0.35);
 }
-.chat-panel #transmitBtn:hover {
-  background: rgba(var(--bezel-wire-rgb), 0.15) !important;
+.composer-image-preview {
+  position: relative;
+  width: 100%;
+  text-align: center;
+}
+.composer-input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--bezel-wire);
+  margin-top: 0;
+  padding: 4px 2px;
+  min-height: 56px;
+}
+.composer-input:focus {
+  outline: none;
+}
+.composer-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.composer-icon-btn,
+.composer-send-btn {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  margin: 0;
+  border-radius: 50%;
+  background: transparent;
+  border: 1px solid var(--bezel-wire);
+  color: var(--bezel-wire);
+  font-size: 15px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.composer-icon-btn:hover,
+.composer-send-btn:hover {
+  background: var(--bezel-wire);
+  color: #000;
+}
+.composer-send-btn {
+  margin-left: auto;
+  font-size: 16px;
+  font-weight: bold;
+}
+.composer-send-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.composer-token-budget {
+  font-size: 9px;
+  opacity: 0.5;
+  color: var(--bezel-wire);
+  text-align: right;
 }
 .chat-panel .mode-pill--overseer {
   border-color: var(--bezel-wire);

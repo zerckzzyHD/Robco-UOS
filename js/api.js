@@ -1823,7 +1823,11 @@ async function transmitMessage(overrideText) {
 
   const btn = document.getElementById('transmitBtn');
   const uiPanel = document.getElementById('uiPanel');
-  btn.innerText = '> TRANSMITTING...';
+  // DO-O follow-up (composer redesign): #transmitBtn is now a small circular
+  // icon button, so its busy/cancel/reset states swap a short glyph + an
+  // aria-label instead of the old long button-text strings.
+  btn.textContent = '⋯';
+  btn.setAttribute('aria-label', 'Sending…');
   btn.disabled = true;
   uiPanel.style.pointerEvents = 'none';
   uiPanel.style.opacity = '0.5';
@@ -1887,7 +1891,8 @@ async function transmitMessage(overrideText) {
     // AbortController for cancel button + 45s timeout
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 45000);
-    btn.innerText = '> CANCEL';
+    btn.textContent = '✕';
+    btn.setAttribute('aria-label', 'Cancel transmission');
     btn.disabled = false;
     btn.onclick = () => {
       controller.abort();
@@ -2108,9 +2113,16 @@ async function transmitMessage(overrideText) {
       }
     }
   } finally {
-    btn.innerText = '> TRANSMIT PROTOCOL';
+    btn.textContent = '↑';
+    btn.setAttribute('aria-label', 'Transmit message');
     btn.disabled = false;
-    btn.onclick = () => transmitMessage();
+    // Protocol 42 fix (found while adapting this button for the composer
+    // redesign): this used to rebind onclick straight to transmitMessage(),
+    // permanently bypassing submitCommandInput()'s TERMINAL-mode/quick-log
+    // routing for every click after the FIRST round-trip completed. Restoring
+    // the same entry point the button's original inline handler used closes
+    // the drift.
+    btn.onclick = () => submitCommandInput();
     document.getElementById('chatInput').focus();
     uiPanel.style.pointerEvents = 'auto';
     uiPanel.style.opacity = '1';

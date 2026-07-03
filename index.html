@@ -2461,60 +2461,37 @@
                 style="margin-top: 10px"
               ></div>
 
-              <div style="display: flex; flex-direction: column; align-items: center; width: 100%">
-                <div
-                  id="imagePreviewContainer"
-                  style="position: relative; display: inline-block; width: 100%; text-align: center"
-                >
+              <!-- DO-O follow-up (owner composer redesign): one modern rounded composer
+                   replaces the separate VISUAL UPLOAD button + bottom TRANSMIT PROTOCOL
+                   button. Every control keeps its exact pre-existing handler (Protocol 22):
+                   [+] = triggerImageUpload(), the pill = toggleInputMode(), [?] =
+                   showHelpModal(), [↑] = submitCommandInput() on the same #transmitBtn id. -->
+              <div class="composer" id="composer">
+                <div id="imagePreviewContainer" class="composer-image-preview">
                   <img id="imagePreview" class="image-preview" src="" alt="Preview" />
                 </div>
-                <button
-                  onclick="triggerImageUpload()"
-                  class="action-btn"
-                  style="
-                    width: 100%;
-                    margin-top: 0;
-                    margin-bottom: 5px;
-                    border-style: dashed;
-                    color: var(--bezel-wire);
-                    border-color: var(--bezel-wire);
+                <textarea
+                  id="chatInput"
+                  class="composer-input"
+                  maxlength="4000"
+                  placeholder="ENTER COMMAND OR ACTION (E.G. '> [THREAT] GECKOS')…"
+                  onkeydown="
+                    if (event.ctrlKey && event.key === 'Enter') {
+                      event.preventDefault();
+                      submitCommandInput();
+                    }
                   "
-                >
-                  [ > VISUAL UPLOAD ]
-                </button>
-              </div>
-              <input
-                type="file"
-                id="imageInput"
-                style="display: none"
-                accept="image/*"
-                onchange="handleImageSelection(event)"
-              />
-
-              <textarea
-                id="chatInput"
-                maxlength="4000"
-                placeholder="ENTER COMMAND OR ACTION (E.G. '> [THREAT] GECKOS')…"
-                style="border-color: var(--bezel-wire); color: var(--bezel-wire)"
-                onkeydown="
-                  if (event.ctrlKey && event.key === 'Enter') {
-                    event.preventDefault();
-                    submitCommandInput();
-                  }
-                "
-                oninput="updateTokenBudget()"
-              ></textarea>
-              <div id="modeHintPopup" class="mode-hint" style="display: none"></div>
-              <div
-                style="
-                  display: flex;
-                  justify-content: space-between;
-                  align-items: center;
-                  margin-top: 2px;
-                  margin-bottom: 2px;
-                "
-              >
-                <div style="display: flex; align-items: center; gap: 4px">
+                  oninput="updateTokenBudget()"
+                ></textarea>
+                <div id="modeHintPopup" class="mode-hint" style="display: none"></div>
+                <div class="composer-toolbar">
+                  <button
+                    class="composer-icon-btn"
+                    onclick="triggerImageUpload()"
+                    aria-label="Attach a visual upload"
+                  >
+                    +
+                  </button>
                   <button
                     id="modePill"
                     class="action-btn btn-sm mode-pill mode-pill--overseer"
@@ -2523,13 +2500,31 @@
                   >
                     OVERSEER
                   </button>
-                  <button class="action-btn btn-sm" onclick="showHelpModal()">[?]</button>
+                  <button
+                    class="composer-icon-btn composer-help-btn"
+                    onclick="showHelpModal()"
+                    aria-label="Show command help"
+                  >
+                    ?
+                  </button>
+                  <button
+                    onclick="submitCommandInput()"
+                    class="composer-send-btn"
+                    id="transmitBtn"
+                    aria-label="Transmit message"
+                  >
+                    ↑
+                  </button>
                 </div>
-                <div
-                  id="tokenBudgetDisplay"
-                  style="font-size: 9px; opacity: 0.5; color: var(--bezel-wire); text-align: right"
-                ></div>
+                <div id="tokenBudgetDisplay" class="composer-token-budget"></div>
               </div>
+              <input
+                type="file"
+                id="imageInput"
+                style="display: none"
+                accept="image/*"
+                onchange="handleImageSelection(event)"
+              />
 
               <!-- DO-O follow-up (owner mobile-density fix): the D-PAD + native command
                    cluster is tucked into a collapsible sub-panel (Protocol UI-1/UI-2) so the
@@ -2662,9 +2657,6 @@
                   </div>
                 </div>
               </details>
-              <button onclick="submitCommandInput()" class="blue-btn" id="transmitBtn">
-                &gt; TRANSMIT PROTOCOL
-              </button>
             </div>
           </div>
         </div>
