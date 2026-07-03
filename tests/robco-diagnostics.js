@@ -20475,7 +20475,13 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  "infinite scroll" problem — it previously had no data-tab and rendered
 //  permanently at full length below every other subsystem), reduced-
 //  motion/dial/standby gating, and zero campaign-state writes. Never forks
-//  appendToChat()/transmitMessage() (Protocol 22). 15 tests.
+//  appendToChat()/transmitMessage() (Protocol 22). Extended (owner mobile-
+//  density fix): the D-PAD/native-command cluster is tucked into a
+//  collapsible sub-panel (default-open desktop / collapsed mobile) so the
+//  transcript leads the mobile view, the oscilloscope shrinks to a tidy
+//  banner, the command input gets real height, and the whole cluster —
+//  plus a TRANSMIT background bug found live during verification (Protocol
+//  42) — is restyled amber to match the Director Uplink. 19 tests.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 162 — DO-O: the living Overseer (DIRECTOR UPLINK)');
@@ -20685,6 +20691,129 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         restFn162({ hasKey: true, aiEnabled: false, online: true }) === 'disabled' &&
         restFn162({ hasKey: true, aiEnabled: true, online: false }) === 'offline',
       '162.15: _overseerRestState() truth table — {key,flag-on,online}→listening, {no key}→disabled, {flag off}→disabled, {offline}→offline (behaviorally executed, not just statically asserted)'
+    );
+  }
+
+  // 162.16  DO-O follow-up (owner mobile-density fix) — the D-PAD + native
+  //         command cluster is tucked into a collapsible sub-panel (Protocol
+  //         UI-1/UI-2) so the transcript leads the mobile view, and every one
+  //         of its controls keeps its exact onclick wiring (Protocol 22 —
+  //         only the container/styling changed, never the behavior)
+  {
+    const trayOpen162 = htmlSource.indexOf('<details class="sub-panel uplink-tray"');
+    // Balanced-tag scan, not the first `</details>` — the D-PAD sub-cluster
+    // nests its OWN <details>...</details> inside the tray, which would
+    // otherwise truncate the block before the macro-buttons are reached.
+    let trayBlock162 = '';
+    if (trayOpen162 !== -1) {
+      const afterOpenTag162 = htmlSource.indexOf('>', trayOpen162) + 1;
+      const tagRe162 = /<details\b|<\/details>/g;
+      tagRe162.lastIndex = afterOpenTag162;
+      let depth162 = 1,
+        m162,
+        end162 = -1;
+      while ((m162 = tagRe162.exec(htmlSource))) {
+        if (m162[0] === '</details>') {
+          depth162--;
+          if (depth162 === 0) {
+            end162 = m162.index + m162[0].length;
+            break;
+          }
+        } else {
+          depth162++;
+        }
+      }
+      if (end162 !== -1) trayBlock162 = htmlSource.slice(trayOpen162, end162);
+    }
+    assert(
+      /data-sub-id="uplinkCommandTray"/.test(trayBlock162) &&
+        /<summary><h3>&gt; COMMAND CLUSTER<\/h3><\/summary>/.test(trayBlock162),
+      '162.16a: the command cluster is a details.sub-panel with data-sub-id="uplinkCommandTray" and a <summary><h3>> HEADING</h3> (Protocol UI-1/UI-2)'
+    );
+    assert(
+      trayBlock162.length > 0 &&
+        [
+          "macroCommand('[PAD: UP]')",
+          "macroCommand('[PAD: LEFT]')",
+          "macroCommand('[PAD: RIGHT]')",
+          "macroCommand('[PAD: DOWN]')",
+          "macroCommand('[THREAT]')",
+          "macroCommand('[VATS SIM]')",
+          "expandPanelForCategory('trade')",
+          'renderLoot()',
+          "macroCommand('[CONSULT]')",
+          'showVATSOverlay()',
+          "macroCommand('[TERMLINK]')",
+        ].every(needle => trayBlock162.includes(needle)),
+      '162.16b: every D-PAD/native-command button keeps its exact pre-existing onclick handler inside the new tray wrapper (no rewiring)'
+    );
+  }
+
+  // 162.17  _wirePanelPersistence() carries the one documented per-id
+  //         exception: the tray defaults OPEN on a real desktop (matching its
+  //         pre-existing always-visible behavior, zero added taps) and
+  //         COLLAPSED on mobile (Protocol UI-6 — the universal sub-panel
+  //         default stays "closed" for every other data-sub-id)
+  {
+    const wpp162 = extractFunctionBody(uiSource, '_wirePanelPersistence');
+    assert(
+      /id === 'uplinkCommandTray'/.test(wpp162) &&
+        /matchMedia\('\(min-width: 1000px\) and \(hover: hover\) and \(pointer: fine\)'\)\.matches/.test(
+          wpp162
+        ),
+      '162.17: _wirePanelPersistence() defaults the uplinkCommandTray sub-panel open on desktop (matchMedia gate) with no saved preference, leaving every other data-sub-id collapsed by default'
+    );
+  }
+
+  // 162.18  the cluster is restyled amber (--bezel-wire), not the old blue/
+  //         green boxy controls, and the TRANSMIT background bug (a real
+  //         visual defect found live during this unit's verification —
+  //         Protocol 42) is fixed
+  {
+    const tacticalRule162 = (cssSource.match(/\.tactical-dashboard \{[\s\S]*?\n\}/) || [''])[0];
+    const dpadBtnRule162 = (cssSource.match(/\.d-pad button \{[\s\S]*?\n\}/) || [''])[0];
+    assert(
+      tacticalRule162.length > 0 &&
+        /border: 1px dashed var\(--bezel-wire\)/.test(tacticalRule162) &&
+        dpadBtnRule162.length > 0 &&
+        /border-color: var\(--bezel-wire\)/.test(dpadBtnRule162) &&
+        !/--robco-blue/.test(tacticalRule162) &&
+        !/--robco-blue/.test(dpadBtnRule162),
+      '162.18a: .tactical-dashboard and .d-pad button use --bezel-wire, not the old --robco-blue'
+    );
+    const macroStart162 = htmlSource.indexOf('class="macro-buttons"');
+    const macroEnd162 =
+      macroStart162 === -1 ? -1 : htmlSource.indexOf('&gt; TERMLINK CONSOLE', macroStart162);
+    const macroButtonsBlock162 =
+      macroStart162 !== -1 && macroEnd162 !== -1
+        ? htmlSource.slice(macroStart162, macroEnd162)
+        : '';
+    assert(
+      macroButtonsBlock162.length > 0 && !/--robco-green/.test(macroButtonsBlock162),
+      '162.18b: the macro-buttons cluster (THREAT/VATS/TRADE/LOOT/CONSULT/VATS CALCULATOR/TERMLINK) carries no leftover --robco-green literal — every button matches the amber Director Uplink aesthetic'
+    );
+    assert(
+      /\.chat-panel #transmitBtn \{[^}]*background: transparent !important;/.test(cssSource) &&
+        /\.chat-panel #transmitBtn:hover \{[^}]*background: rgba\(var\(--bezel-wire-rgb\), 0\.15\) !important;/.test(
+          cssSource
+        ),
+      "162.18c: #transmitBtn's background is transparent (Protocol 42 fix — .blue-btn's solid blue fill previously survived the color-only override, leaving a blue-filled TRANSMIT button)"
+    );
+  }
+
+  // 162.19  mobile density — the oscilloscope shrinks to a tidy banner and the
+  //         command input gets real height, scoped to the existing UPLINK
+  //         mobile block (max-width: 999.98px)
+  {
+    const mobileBlock162 = (cssSource.match(
+      /@media \(max-width: 999\.98px\) \{[\s\S]*?\n\}\n(?=\/\* Desktop needs no explicit override)/
+    ) || [''])[0];
+    assert(
+      /body\[data-subsystem='uplink'\] #overseerScope \{\s*height: 64px;/.test(mobileBlock162) &&
+        /body\[data-subsystem='uplink'\] #chatInput \{\s*height: 76px;\s*flex-shrink: 0;/.test(
+          mobileBlock162
+        ),
+      '162.19: the mobile UPLINK block shrinks #overseerScope to a 64px banner (down from the unconditional 120px) and gives #chatInput a real 76px height (was the bare 2-row textarea default)'
     );
   }
 }

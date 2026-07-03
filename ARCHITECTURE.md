@@ -69,8 +69,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    1990-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    1990-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    1997-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    1997-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -561,7 +561,7 @@ attribute, with `identity` read by no feature code yet. DO-N (bezel chrome, `--b
 (cartridge-swap ceremony), DO-M (per-game machines), and DO-Q2–Q6 (remaining motion/cursor/audio/
 voice/ambient facets) are still future consumers. No `state.<field>` / `saveState()` / `robco_v8`
 write exists anywhere in the identity block itself. `APP_VERSION` stays 2.7.0 under `[Unreleased]`
-(cache-rev bump only, current rev `-r44`). Guarded end-to-end by
+(cache-rev bump only, current rev `-r45`). Guarded end-to-end by
 Suite 157 (both runners at parity) — a Node `vm`-sandbox behavioral test that loads the real
 `js/state.js` and proves the contract, the theme-alias reference equality, the `getIdentity()`
 fail-safe, and the FO4 designOnly guards, plus static structural guards on the three `data-game`
@@ -752,8 +752,35 @@ pre-existing focus/scroll behavior) and focuses `#chatInput`.
 **Save boundary clean (Protocol 26):** the entire DO-O block reads `state`/`getIdentity()` but
 never writes `saveState()` / `robco_v8` / `state.<field> =` anywhere — `_scopeState` is a transient
 module variable and the idle-blip observer's `appendToChat(...,true)` call is explicitly excluded
-from persistence. Guarded by Suite 162 (both runners at parity, 15 tests, including a Node
+from persistence. Guarded by Suite 162 (both runners at parity, 19 tests, including a Node
 `Function`-eval behavioral truth-table proof of `_overseerRestState()`).
+
+**DO-O follow-up — UPLINK mobile density/de-bloat/restyle (owner report):** a live-mobile
+screenshot showed the oscilloscope + SIGNAL strip eating most of the viewport, the transcript
+reading as a small box, the command input cut off/cramped, and an old blue/green boxy D-PAD +
+native-command cluster (`[THREAT]`/`[VATS]`/`[TRADE]`/`[LOOT]`/`[CONSULT]`/V.A.T.S. CALCULATOR/
+TERMLINK CONSOLE) sitting below it, clashing with the amber Director aesthetic. Root cause
+(Protocol 27): `#chatDisplay` already had `flex:1 1 auto` and should have led the view, but the
+always-open cluster below it consumed enough natural height to squeeze the transcript down to its
+`min-height:90px` floor and push the command input/TRANSMIT button toward — or past — the fold.
+
+The fix tucks the entire cluster into a collapsible `details.sub-panel`
+(`data-sub-id="uplinkCommandTray"`, Protocol UI-1/UI-2) wrapped around the pre-existing
+`.tactical-dashboard` markup — every button keeps its exact `onclick` wiring (Protocol 22). Its
+default state is the one documented per-id exception in `_wirePanelPersistence()` (`ui-core.js`):
+collapsed on mobile with no saved preference (freeing the space `#chatDisplay` immediately
+reclaims via its existing `flex:1`), open on a real desktop (`matchMedia('(min-width:1000px) and
+(hover:hover) and (pointer:fine)')`) so the desktop experience — zero added taps, cluster always
+visible — is unchanged. The oscilloscope's mobile height drops from a fixed 120px to a 64px banner
+and `#chatInput` gains a real 76px height (was the bare 2-row textarea default), both scoped to the
+existing `body[data-subsystem='uplink']` mobile block — no wiring touched, no desktop change. The
+cluster is restyled amber (`.tactical-dashboard` and `.d-pad button` move from `--robco-blue` to
+`--bezel-wire`; the TRADE/LOOT/CONSULT/VATS-CALC macro buttons move from `--robco-green` to
+`--bezel-wire`, Protocol 38 — token only, no game literal). A real visual defect found live during
+this unit's verification — `#transmitBtn`'s `.blue-btn` base class still painted a solid blue
+background under the DO-O color-only override, leaving a blue-filled TRANSMIT button — is fixed in
+the same commit (Protocol 42): `background: transparent !important` plus an amber-tinted hover
+fill. Guarded by the Suite 162 extension (162.16–162.19).
 
 ---
 
@@ -1790,7 +1817,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1990-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1997-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

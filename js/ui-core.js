@@ -1542,6 +1542,16 @@ function _wirePanelPersistence() {
     if (savedPanelState && savedPanelState[id] !== undefined) {
       if (savedPanelState[id]) d.setAttribute('open', '');
       else d.removeAttribute('open');
+    } else if (
+      id === 'uplinkCommandTray' &&
+      window.matchMedia('(min-width: 1000px) and (hover: hover) and (pointer: fine)').matches
+    ) {
+      // DO-O follow-up (owner mobile-density fix): the UPLINK command cluster (D-PAD +
+      // native command buttons) defaults OPEN on a real desktop — the same "always
+      // visible, zero added taps" behavior it had before this unit — but COLLAPSED on
+      // mobile so the Director transcript leads the view. The one documented per-id
+      // exception to the otherwise universal "new sub-trackers start closed" default.
+      d.setAttribute('open', '');
     }
     // Default: no 'open' (collapsed) — new sub-trackers start closed until user expands
     d.addEventListener('toggle', () => {
