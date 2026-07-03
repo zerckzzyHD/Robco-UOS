@@ -1498,6 +1498,10 @@
                   <button type="button" class="btn-sm" onclick="toggleBaySchematic()">
                     &#8981; SCHEMATIC VIEW
                   </button>
+                  <div class="bay-chassis">
+                    CHASSIS RIT-V300 &middot; INTERNAL SERVICE VIEW &middot; BUS VOLTAGE NOMINAL
+                    &middot; ALL MODIFICATIONS TAKE EFFECT IMMEDIATELY
+                  </div>
                 </div>
                 <div class="bay-bus-strip" aria-hidden="true">
                   &#9552;&#9552;&#9552; BACKPLANE BUS &#9573; SLOT 01 &#9573; SLOT 02 &#9573; SLOT
@@ -1682,144 +1686,150 @@
                     <div
                       style="font-size: 10px; opacity: 0.6; letter-spacing: 1px; margin-top: 10px"
                     >
-                      CHANNEL CHIPS &mdash; MUTE INDIVIDUAL CHANNELS:
+                      CHANNEL CHIPS &mdash; PULL A CHIP TO SILENCE ITS CHANNEL:
                     </div>
-                    <div class="bay-channel-list">
-                      <div class="audio-row">
+                    <div class="chip-grid">
+                      <div class="chip-wrap">
                         <input
                           type="checkbox"
                           id="muteTypingToggle"
+                          class="chip-input"
                           onchange="toggleAudio('robco_sfx_muted', this.checked)"
-                          style="width: auto; accent-color: var(--robco-green)"
                         />
-                        <label for="muteTypingToggle" style="font-size: 12px"
-                          >MUTE TYPING SFX</label
+                        <label for="muteTypingToggle" class="chip-card"
+                          >TYPING SFX<span class="pin-id">CH-01</span></label
                         >
                       </div>
-                      <div class="audio-row">
+                      <div class="chip-wrap">
                         <input
                           type="checkbox"
                           id="muteHumToggle"
+                          class="chip-input"
                           onchange="toggleAudio('robco_hum_muted', this.checked)"
-                          style="width: auto; accent-color: var(--robco-green)"
                         />
-                        <label for="muteHumToggle" style="font-size: 12px">MUTE CRT HUM</label>
+                        <label for="muteHumToggle" class="chip-card"
+                          >CRT HUM<span class="pin-id">CH-02</span></label
+                        >
                       </div>
-                      <div class="audio-row">
+                      <div class="chip-wrap">
                         <input
                           type="checkbox"
                           id="muteGeigerToggle"
+                          class="chip-input"
                           onchange="toggleAudio('robco_geiger_muted', this.checked)"
-                          style="width: auto; accent-color: var(--robco-green)"
                         />
-                        <label for="muteGeigerToggle" style="font-size: 12px"
-                          >MUTE GEIGER COUNTER</label
+                        <label for="muteGeigerToggle" class="chip-card"
+                          >GEIGER CTR<span class="pin-id">CH-03</span></label
                         >
                       </div>
-                      <div class="audio-row">
+                      <div class="chip-wrap">
                         <input
                           type="checkbox"
                           id="muteTinnitusToggle"
+                          class="chip-input"
                           onchange="toggleAudio('robco_tinnitus_muted', this.checked)"
-                          style="width: auto; accent-color: var(--robco-green)"
                         />
-                        <label for="muteTinnitusToggle" style="font-size: 12px"
-                          >MUTE TINNITUS</label
+                        <label for="muteTinnitusToggle" class="chip-card"
+                          >TINNITUS<span class="pin-id">CH-04</span></label
                         >
                       </div>
-                      <div class="audio-row">
+                      <div class="chip-wrap">
                         <input
                           type="checkbox"
                           id="muteLimbToggle"
+                          class="chip-input"
                           onchange="toggleAudio('robco_ambient_muted', this.checked)"
-                          style="width: auto; accent-color: var(--robco-green)"
                         />
-                        <label for="muteLimbToggle" style="font-size: 12px">MUTE LIMB SFX</label>
+                        <label for="muteLimbToggle" class="chip-card"
+                          >LIMB SFX<span class="pin-id">CH-05</span></label
+                        >
                       </div>
-                      <div class="audio-row">
+                      <div class="chip-wrap">
                         <input
                           type="checkbox"
                           id="muteWakeToggle"
+                          class="chip-input"
                           onchange="toggleAudio('robco_wake_muted', this.checked)"
-                          style="width: auto; accent-color: var(--robco-green)"
                         />
-                        <label for="muteWakeToggle" style="font-size: 12px">MUTE WAKE SFX</label>
+                        <label for="muteWakeToggle" class="chip-card"
+                          >WAKE SFX<span class="pin-id">CH-06</span></label
+                        >
                       </div>
-                      <div class="audio-row">
+                      <div class="chip-wrap">
                         <input
                           type="checkbox"
                           id="mutePanelClickToggle"
+                          class="chip-input"
                           onchange="toggleAudio('robco_panelclick_muted', this.checked)"
-                          style="width: auto; accent-color: var(--robco-green)"
                         />
-                        <label for="mutePanelClickToggle" style="font-size: 12px"
-                          >MUTE PANEL CLICKS</label
+                        <label for="mutePanelClickToggle" class="chip-card"
+                          >PANEL CLICKS<span class="pin-id">CH-07</span></label
                         >
                       </div>
-                      <div class="audio-row">
+                      <div class="chip-wrap">
                         <input
                           type="checkbox"
                           id="muteBootDroneToggle"
+                          class="chip-input"
                           onchange="toggleAudio('robco_bootdrone_muted', this.checked)"
-                          style="width: auto; accent-color: var(--robco-green)"
                         />
-                        <label for="muteBootDroneToggle" style="font-size: 12px"
-                          >MUTE BOOT DRONE</label
+                        <label for="muteBootDroneToggle" class="chip-card"
+                          >BOOT DRONE<span class="pin-id">CH-08</span></label
                         >
                       </div>
-                      <div class="audio-row">
+                      <div class="chip-wrap">
                         <input
                           type="checkbox"
                           id="muteLevelUpToggle"
+                          class="chip-input"
                           onchange="toggleAudio('robco_levelup_muted', this.checked)"
-                          style="width: auto; accent-color: var(--robco-green)"
                         />
-                        <label for="muteLevelUpToggle" style="font-size: 12px"
-                          >MUTE LEVEL UP SFX</label
+                        <label for="muteLevelUpToggle" class="chip-card"
+                          >LEVEL UP<span class="pin-id">CH-09</span></label
                         >
                       </div>
-                      <div class="audio-row">
+                      <div class="chip-wrap">
                         <input
                           type="checkbox"
                           id="muteHeartbeatToggle"
+                          class="chip-input"
                           onchange="toggleAudio('robco_heartbeat_muted', this.checked)"
-                          style="width: auto; accent-color: var(--robco-green)"
                         />
-                        <label for="muteHeartbeatToggle" style="font-size: 12px"
-                          >MUTE HEARTBEAT</label
+                        <label for="muteHeartbeatToggle" class="chip-card"
+                          >HEARTBEAT<span class="pin-id">CH-10</span></label
                         >
                       </div>
-                      <div class="audio-row">
+                      <div class="chip-wrap">
                         <input
                           type="checkbox"
                           id="muteQuestCompleteToggle"
+                          class="chip-input"
                           onchange="toggleAudio('robco_questcomplete_muted', this.checked)"
-                          style="width: auto; accent-color: var(--robco-green)"
                         />
-                        <label for="muteQuestCompleteToggle" style="font-size: 12px"
-                          >MUTE QUEST COMPLETE</label
+                        <label for="muteQuestCompleteToggle" class="chip-card"
+                          >QUEST CMPLT<span class="pin-id">CH-11</span></label
                         >
                       </div>
-                      <div class="audio-row">
+                      <div class="chip-wrap">
                         <input
                           type="checkbox"
                           id="muteQuestFailToggle"
+                          class="chip-input"
                           onchange="toggleAudio('robco_questfail_muted', this.checked)"
-                          style="width: auto; accent-color: var(--robco-green)"
                         />
-                        <label for="muteQuestFailToggle" style="font-size: 12px"
-                          >MUTE QUEST FAIL</label
+                        <label for="muteQuestFailToggle" class="chip-card"
+                          >QUEST FAIL<span class="pin-id">CH-12</span></label
                         >
                       </div>
-                      <div class="audio-row">
+                      <div class="chip-wrap">
                         <input
                           type="checkbox"
                           id="muteFactionThresholdToggle"
+                          class="chip-input"
                           onchange="toggleAudio('robco_factionthreshold_muted', this.checked)"
-                          style="width: auto; accent-color: var(--robco-green)"
                         />
-                        <label for="muteFactionThresholdToggle" style="font-size: 12px"
-                          >MUTE FACTION ALERTS</label
+                        <label for="muteFactionThresholdToggle" class="chip-card"
+                          >FACTION ALRT<span class="pin-id">CH-13</span></label
                         >
                       </div>
                     </div>
@@ -1866,7 +1876,9 @@
                         onchange="toggleWakeLock(this.checked)"
                       />
                       <label for="wakeLockToggle" class="bay-module-card">
-                        <span class="m-led" aria-hidden="true"></span>
+                        <span class="cell-graphic" aria-hidden="true"
+                          ><span class="cell-tag">FUSION MK-II</span></span
+                        >
                         <span class="m-name"
                           >SUSTAINED POWER CELL<span class="m-sub"
                             >KEEPS DISPLAY LIT &mdash; SCREEN NEVER SLEEPS</span
@@ -1890,7 +1902,7 @@
                         onchange="toggleHaptic(this.checked)"
                       />
                       <label for="hapticToggle" class="bay-module-card">
-                        <span class="m-led" aria-hidden="true"></span>
+                        <span class="coil-graphic" aria-hidden="true"></span>
                         <span class="m-name"
                           >HAPTIC SOLENOID<span class="m-sub"
                             >CHASSIS FEEDBACK ON KEY EVENTS</span
@@ -1930,17 +1942,32 @@
                       <span data-tier="balanced">BALANCED</span>
                       <span data-tier="minimal">MINIMAL</span>
                     </div>
-                    <div class="input-group" style="margin-top: 6px">
-                      <select
-                        id="immersionSelect"
-                        onchange="onImmersionChange(this.value)"
-                        aria-label="Ambient immersion level — how much atmosphere the terminal runs"
-                        style="width: 100%; font-size: 16px"
+                    <select
+                      id="immersionSelect"
+                      class="bay-visually-hidden-input"
+                      onchange="onImmersionChange(this.value)"
+                      aria-label="Ambient immersion level — how much atmosphere the terminal runs"
+                    >
+                      <option value="full">Full — all ambient systems</option>
+                      <option value="balanced">Balanced — reduced ambience</option>
+                      <option value="minimal">Minimal — quiet</option>
+                    </select>
+                    <div class="dial-wrap">
+                      <button
+                        type="button"
+                        class="dial"
+                        onclick="_cycleImmersionDial()"
+                        aria-label="Atmospheric regulator dial — cycles Full, Balanced, Minimal ambient levels"
                       >
-                        <option value="full">Full — all ambient systems</option>
-                        <option value="balanced">Balanced — reduced ambience</option>
-                        <option value="minimal">Minimal — quiet</option>
-                      </select>
+                        <span class="knob" id="immersionDialKnob" aria-hidden="true"></span>
+                      </button>
+                      <div class="dial-info" aria-hidden="true">
+                        <div class="dial-pos" id="immersionDialPos">FULL</div>
+                        <div class="dial-desc" id="immersionDialDesc">
+                          ALL AMBIENT SYSTEMS RUNNING &mdash; IDLE PHOSPHOR, STANDBY BREATHING, CRT
+                          POWER-DOWN, FULL SOUNDSCAPE.
+                        </div>
+                      </div>
                     </div>
                     <span id="immersionStatus" class="board-status"></span>
                   </details>
@@ -1957,6 +1984,9 @@
                       >PN RBC-AI-50 &middot; CIPHER KEY REQUIRED &middot; EXTERNAL CARRIER</span
                     >
 
+                    <div class="key-slot-label">
+                      CIPHER KEY SLOT &mdash; INSERT AUTHORIZATION KEY:
+                    </div>
                     <div class="key-slot">
                       <input
                         type="password"
@@ -1966,6 +1996,13 @@
                         style="border-color: var(--robco-alert); color: var(--robco-alert)"
                         oninput="saveApiKeySilent()"
                       />
+                      <button
+                        id="btnFetchModels"
+                        class="hs-btn alert-btn"
+                        onclick="fetchAuthorizedModels()"
+                      >
+                        HANDSHAKE
+                      </button>
                     </div>
                     <div style="margin: 6px 0 4px; font-size: 11px">
                       <a
@@ -1995,15 +2032,6 @@
                       </label>
                     </div>
 
-                    <button
-                      id="btnFetchModels"
-                      class="hs-btn alert-btn"
-                      style="margin-top: 10px"
-                      onclick="fetchAuthorizedModels()"
-                    >
-                      &gt; HANDSHAKE (VALIDATE KEY &amp; FETCH ENGINES)
-                    </button>
-
                     <select
                       id="apiModelInput"
                       style="
@@ -2030,9 +2058,6 @@
                       >FIELD SERVICE UTILITIES &mdash; NOT SLOTTED HARDWARE</span
                     >
                     <div class="bay-tools">
-                      <button onclick="_svcExportCampaignLog('txt')">
-                        &#8984; DOWNLOAD CAMPAIGN LOG
-                      </button>
                       <button
                         id="ejectHolotapeBtn"
                         onclick="ejectHolotape()"
@@ -2040,8 +2065,11 @@
                       >
                         &#9654; EJECT HOLOTAPE
                       </button>
-                      <button onclick="_svcExportCampaignLog('md')">&#8984; EXPORT .MD</button>
-                      <button onclick="_svcExportCampaignLog('html')">&#8984; EXPORT .HTML</button>
+                      <button onclick="_svcExportCampaignLog('txt')">
+                        &#9113; PRINT CAMPAIGN LOG
+                      </button>
+                      <button onclick="_svcExportCampaignLog('md')">&#9113; EXPORT .MD</button>
+                      <button onclick="_svcExportCampaignLog('html')">&#9113; EXPORT .HTML</button>
                       <button id="btnViewChangelog" onclick="_svcViewChangelog()">
                         &#8801; FIRMWARE REVISION LOG
                       </button>

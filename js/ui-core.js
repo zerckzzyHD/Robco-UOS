@@ -294,6 +294,22 @@ function initHighLumen() {
 // The gate helpers + pref live in state.js (getImmersionTier / immersionAllows /
 // setImmersionTier — the seam Phase 2 consumers read). This is only the DOM control:
 // the <select> value, the status readout, and the boot restore. No campaign state.
+// Module Bay SLOT 04 rotary dial (B2b) — knob rotation + position/description text
+// per tier. Presentation-only; the stored tier is still the single source of truth.
+const IMMERSION_DIAL = {
+  full: {
+    rot: -52,
+    desc: 'ALL AMBIENT SYSTEMS RUNNING — IDLE PHOSPHOR, STANDBY BREATHING, CRT POWER-DOWN, FULL SOUNDSCAPE.',
+  },
+  balanced: {
+    rot: 0,
+    desc: 'REDUCED AMBIENCE — ESSENTIAL EFFECTS ONLY, GENTLER IDLE BEHAVIOR.',
+  },
+  minimal: {
+    rot: 52,
+    desc: 'QUIET OPERATION — AMBIENT SYSTEMS DORMANT, TERMINAL STAYS OUT OF YOUR WAY.',
+  },
+};
 function _updateImmersionUI() {
   const note = document.getElementById('immersionStatus');
   const tier = typeof getImmersionTier === 'function' ? getImmersionTier() : 'full';
@@ -309,7 +325,40 @@ function _updateImmersionUI() {
   document.querySelectorAll('.immersion-legend span').forEach(s => {
     s.classList.toggle('on', s.dataset.tier === tier);
   });
+  // The real #immersionSelect stays in the DOM (visually hidden) as the fully
+  // accessible control — keep its value synced regardless of which entry point
+  // (select, dial) last changed the stored tier (Protocol 42 drift guard, same
+  // pattern as BAY_CHECKBOX_SYNC_MAP for the boolean modules).
+  const sel = document.getElementById('immersionSelect');
+  if (sel) sel.value = tier;
+  const dial = IMMERSION_DIAL[tier] || IMMERSION_DIAL.full;
+  const knob = document.getElementById('immersionDialKnob');
+  if (knob) knob.style.transform = 'rotate(' + dial.rot + 'deg)';
+  const posEl = document.getElementById('immersionDialPos');
+  if (posEl) posEl.textContent = tier.toUpperCase();
+  const descEl = document.getElementById('immersionDialDesc');
+  if (descEl) descEl.textContent = dial.desc;
+  const dialBtn = document.querySelector('button.dial');
+  if (dialBtn) {
+    dialBtn.setAttribute(
+      'aria-label',
+      'Atmospheric regulator dial — currently ' +
+        tier.toUpperCase() +
+        '. Press to cycle to the next level.'
+    );
+  }
 }
+// Module Bay SLOT 04 adapter (B2b) — a native <select> can't be reshaped into a
+// dial, so this genuinely-custom control cycles the exact same 3 values through
+// the exact same onImmersionChange() setter the (now visually hidden) select
+// still uses — one truth, two entry points (Protocol 22/25).
+function _cycleImmersionDial() {
+  const order = ['full', 'balanced', 'minimal'];
+  const cur = typeof getImmersionTier === 'function' ? getImmersionTier() : 'full';
+  const next = order[(order.indexOf(cur) + 1) % order.length];
+  onImmersionChange(next);
+}
+window._cycleImmersionDial = _cycleImmersionDial;
 function onImmersionChange(value) {
   if (typeof setImmersionTier === 'function') setImmersionTier(value);
   _updateImmersionUI();
@@ -387,7 +436,10 @@ function initModuleBay() {
   const opened = MetaStore.get('robco_bay_opened') === 'true';
   const hatch = document.getElementById('bayHatch');
   if (hatch) hatch.hidden = opened;
-  renderModuleBay();
+  // FIX 4 (owner report — new standing rule, "everything remembers on reload"):
+  // restore whichever of Bay / Schematic View the technician was last looking
+  // at, via the registered robco_bay_view device pref.
+  _applyBayView(MetaStore.get('robco_bay_view') === 'schematic' ? 'schematic' : 'bay');
 }
 window.initModuleBay = initModuleBay;
 
@@ -411,16 +463,28 @@ function releaseBayHatch() {
 window.releaseBayHatch = releaseBayHatch;
 
 // Permanent light-touch fallback (LOCKED-3) — swaps the bay grid for a flat,
-// regenerated list of the same controls. Never a parallel wired set.
-function toggleBaySchematic() {
+// regenerated list of the same controls. Never a parallel wired set. Shared by
+// initModuleBay() (boot restore) and toggleBaySchematic() (user action) so the
+// two never drift (Protocol 22).
+function _applyBayView(view) {
   const bay = document.getElementById('bayContent');
   const schem = document.getElementById('baySchematic');
   if (!bay || !schem) return;
-  const toSchematic = schem.hidden;
+  const toSchematic = view === 'schematic';
   schem.hidden = !toSchematic;
   bay.hidden = toSchematic;
   if (toSchematic) renderBaySchematic();
   else renderModuleBay();
+}
+window._applyBayView = _applyBayView;
+
+function toggleBaySchematic() {
+  const schem = document.getElementById('baySchematic');
+  if (!schem) return;
+  const view = schem.hidden ? 'schematic' : 'bay';
+  // FIX 4: persist the view choice so it survives a reload.
+  MetaStore.set('robco_bay_view', view);
+  _applyBayView(view);
 }
 window.toggleBaySchematic = toggleBaySchematic;
 
@@ -446,8 +510,12 @@ function renderBaySchematic() {
   const keySync = MetaStore.get('robco_gemini_key_sync') === 'true';
   const typerSpeed = parseFloat(MetaStore.get('robco_typer_speed') || '1');
 
+  // FIX 2 (owner report): name/loc stacked ABOVE a full-width control row —
+  // the control can never be squeezed narrower than its own content (which
+  // was silently ellipsis-clipping the phosphor-tube <select>, e.g. "ROBCO
+  // GR…") regardless of label length or viewport width.
   const row = (controlHtml, name, loc) =>
-    `<div class="schem-row">${controlHtml}<span class="sr-name">${escapeHtml(name)}</span><span class="sr-loc">${loc}</span></div>`;
+    `<div class="schem-row"><div class="schem-row-head"><span class="sr-name">${escapeHtml(name)}</span><span class="sr-loc">${loc}</span></div><div class="schem-row-control">${controlHtml}</div></div>`;
   const checkboxRow = (setter, checked, name, loc) =>
     row(
       `<input type="checkbox" ${checked ? 'checked' : ''} onchange="${setter}(this.checked); renderModuleBay();" aria-label="${escapeHtml(name)}" />`,

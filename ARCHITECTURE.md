@@ -66,8 +66,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    1871-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    1871-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    1887-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    1887-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -1240,46 +1240,49 @@ Two separate stores, kept apart on purpose (Protocol 23 boundary, locked structu
 
 `MetaStore.get(key)` / `.set(key, val)` / `.remove(key)` / `.has(key)` / `.keys()` is the single choke point for every `robco_*` key that describes **this device's** preferences — never campaign data. A registered-key `META_MANIFEST` (33 keys) is the boundary: a key is a "device preference" if and only if it is listed there. Every read/write of these keys across `js/ui-audio.js` / `js/ui-render.js` / `js/ui-core.js` / `js/api.js` / `js/cloud.js` routes through `MetaStore` (never bare `localStorage`). The one sanctioned exception is the two `index.html` `<head>` pre-paint scripts (flash-free optics + high-lumen), which run before `state.js` — and therefore `MetaStore` — has loaded; Suite 134.7 proves they sit strictly before the first `js/*.js` `<script>` tag.
 
-| Key                            | Type   | Owner       | Description                                                                         |
-| ------------------------------ | ------ | ----------- | ----------------------------------------------------------------------------------- |
-| `robco_gemini_key`             | string | api.js      | Gemini API key                                                                      |
-| `robco_gemini_key_sync`        | bool   | cloud.js    | Whether the Gemini key syncs to the user's Firebase account                         |
-| `robco_gemini_model`           | string | api.js      | Selected model name                                                                 |
-| `robco_sfx_muted`              | bool   | ui-audio.js | Typing sound mute                                                                   |
-| `robco_hum_muted`              | bool   | ui-audio.js | CRT hum mute                                                                        |
-| `robco_geiger_muted`           | bool   | ui-audio.js | Geiger counter mute                                                                 |
-| `robco_tinnitus_muted`         | bool   | ui-audio.js | Tinnitus mute                                                                       |
-| `robco_ambient_muted`          | bool   | ui-audio.js | Limb SFX mute                                                                       |
-| `robco_wake_muted`             | bool   | ui-audio.js | Tab-return wake tone mute                                                           |
-| `robco_panelclick_muted`       | bool   | ui-audio.js | Rotary-dial panel-click mute                                                        |
-| `robco_bootdrone_muted`        | bool   | ui-audio.js | Boot drone mute                                                                     |
-| `robco_levelup_muted`          | bool   | ui-audio.js | Level-up jingle mute                                                                |
-| `robco_heartbeat_muted`        | bool   | ui-audio.js | Low-health heartbeat mute                                                           |
-| `robco_questcomplete_muted`    | bool   | ui-audio.js | Quest-complete chime mute                                                           |
-| `robco_questfail_muted`        | bool   | ui-audio.js | Quest-fail tone mute                                                                |
-| `robco_factionthreshold_muted` | bool   | ui-audio.js | Faction-standing alert mute                                                         |
-| `robco_master_muted`           | bool   | ui-audio.js | Global audio kill switch                                                            |
-| `robco_radio_on`               | bool   | ui-audio.js | Pip-Boy Radio ON state (WU-F5 — ON-semantics player, not a mute; opt-in)            |
-| `robco_wakelock_enabled`       | bool   | ui-core.js  | Screen Wake Lock toggle (WU-F1)                                                     |
-| `robco_haptic_enabled`         | bool   | ui-audio.js | Haptic solenoid toggle (WU-F2, default OFF)                                         |
-| `robco_high_lumen`             | bool   | ui-core.js  | High-Lumen (AA+ contrast) toggle (WU-F8)                                            |
-| `robco_overseer_log`           | JSON   | ui-core.js  | Device telemetry — boot count, total/longest power-on (WU-F7)                       |
-| `robco_error_log`              | JSON   | ui-core.js  | Local-only client error ring buffer                                                 |
-| `robco_panel_state`            | JSON   | ui-core.js  | Panel/sub-panel open-closed memory                                                  |
-| `robco_active_tab`             | string | ui-core.js  | Last active tab (`'stat'`/`'inv'`/`'data'`/`'campg'`)                               |
-| `robco_typer_speed`            | float  | ui-core.js  | Typewriter speed multiplier                                                         |
-| `robco_version`                | string | ui-core.js  | Last seen version (triggers changelog)                                              |
-| `robco_optics`                 | string | ui-audio.js | _(deprecated)_ legacy site-wide color theme; migrated once into `robco_optic_<ctx>` |
-| `robco_optic_<ctx>`            | string | ui-audio.js | Per-game optic color pick (dynamic family key, one per game context)                |
-| `robco_booted_before`          | bool   | ui-audio.js | First-power-on flag (WU-F6 — gates the one-time cold-start POST)                    |
-| `robco_feature_flags`          | JSON   | cloud.js    | Last-known-good cache of the remote kill-switch config                              |
-| `robco_sw_installed`           | bool   | index.html  | Records that a service worker has ever controlled the page                          |
-| `robco_input_mode`             | string | state.js    | Command-Line MODE pill selection (`'overseer'`/`'terminal'`, B1)                    |
-| `robco_bay_opened`             | bool   | ui-core.js  | Module Bay hatch first-visit flag (B2a) — once true, the bay opens directly         |
+| Key                            | Type   | Owner       | Description                                                                                     |
+| ------------------------------ | ------ | ----------- | ----------------------------------------------------------------------------------------------- |
+| `robco_gemini_key`             | string | api.js      | Gemini API key                                                                                  |
+| `robco_gemini_key_sync`        | bool   | cloud.js    | Whether the Gemini key syncs to the user's Firebase account                                     |
+| `robco_gemini_model`           | string | api.js      | Selected model name                                                                             |
+| `robco_sfx_muted`              | bool   | ui-audio.js | Typing sound mute                                                                               |
+| `robco_hum_muted`              | bool   | ui-audio.js | CRT hum mute                                                                                    |
+| `robco_geiger_muted`           | bool   | ui-audio.js | Geiger counter mute                                                                             |
+| `robco_tinnitus_muted`         | bool   | ui-audio.js | Tinnitus mute                                                                                   |
+| `robco_ambient_muted`          | bool   | ui-audio.js | Limb SFX mute                                                                                   |
+| `robco_wake_muted`             | bool   | ui-audio.js | Tab-return wake tone mute                                                                       |
+| `robco_panelclick_muted`       | bool   | ui-audio.js | Rotary-dial panel-click mute                                                                    |
+| `robco_bootdrone_muted`        | bool   | ui-audio.js | Boot drone mute                                                                                 |
+| `robco_levelup_muted`          | bool   | ui-audio.js | Level-up jingle mute                                                                            |
+| `robco_heartbeat_muted`        | bool   | ui-audio.js | Low-health heartbeat mute                                                                       |
+| `robco_questcomplete_muted`    | bool   | ui-audio.js | Quest-complete chime mute                                                                       |
+| `robco_questfail_muted`        | bool   | ui-audio.js | Quest-fail tone mute                                                                            |
+| `robco_factionthreshold_muted` | bool   | ui-audio.js | Faction-standing alert mute                                                                     |
+| `robco_master_muted`           | bool   | ui-audio.js | Global audio kill switch                                                                        |
+| `robco_radio_on`               | bool   | ui-audio.js | Pip-Boy Radio ON state (WU-F5 — ON-semantics player, not a mute; opt-in)                        |
+| `robco_wakelock_enabled`       | bool   | ui-core.js  | Screen Wake Lock toggle (WU-F1)                                                                 |
+| `robco_haptic_enabled`         | bool   | ui-audio.js | Haptic solenoid toggle (WU-F2, default OFF)                                                     |
+| `robco_high_lumen`             | bool   | ui-core.js  | High-Lumen (AA+ contrast) toggle (WU-F8)                                                        |
+| `robco_overseer_log`           | JSON   | ui-core.js  | Device telemetry — boot count, total/longest power-on (WU-F7)                                   |
+| `robco_error_log`              | JSON   | ui-core.js  | Local-only client error ring buffer                                                             |
+| `robco_panel_state`            | JSON   | ui-core.js  | Panel/sub-panel open-closed memory                                                              |
+| `robco_active_tab`             | string | ui-core.js  | Last active tab (`'stat'`/`'inv'`/`'data'`/`'campg'`)                                           |
+| `robco_typer_speed`            | float  | ui-core.js  | Typewriter speed multiplier                                                                     |
+| `robco_version`                | string | ui-core.js  | Last seen version (triggers changelog)                                                          |
+| `robco_optics`                 | string | ui-audio.js | _(deprecated)_ legacy site-wide color theme; migrated once into `robco_optic_<ctx>`             |
+| `robco_optic_<ctx>`            | string | ui-audio.js | Per-game optic color pick (dynamic family key, one per game context)                            |
+| `robco_booted_before`          | bool   | ui-audio.js | First-power-on flag (WU-F6 — gates the one-time cold-start POST)                                |
+| `robco_feature_flags`          | JSON   | cloud.js    | Last-known-good cache of the remote kill-switch config                                          |
+| `robco_sw_installed`           | bool   | index.html  | Records that a service worker has ever controlled the page                                      |
+| `robco_input_mode`             | string | state.js    | Command-Line MODE pill selection (`'overseer'`/`'terminal'`, B1)                                |
+| `robco_bay_opened`             | bool   | ui-core.js  | Module Bay hatch first-visit flag (B2a) — once true, the bay opens directly                     |
+| `robco_bay_view`               | string | ui-core.js  | Module Bay Bay-vs-Schematic view choice (`'bay'`/`'schematic'`, B2b) — restored on every reload |
 
-### Module Bay (`js/ui-core.js`, B2a) — settings as installable hardware
+### Module Bay (`js/ui-core.js`, B2a/B2b) — settings as installable hardware
 
-The SECURITY & CONFIGURATION panel's _contents_ (not the panel itself, which is unchanged) are reframed as a chassis of hardware boards — an owner-approved redesign (Protocol 25 sanctioned exception). **One-truth model:** the bay and the permanent Schematic View fallback are both projections of the same MetaStore-backed prefs above; every control still calls the exact setter it always called (`changeOpticsColor`, `toggleHighLumen`, `toggleMasterMute`, `toggleRadio`, `toggleWakeLock`, `toggleHaptic`, `onImmersionChange`, `setGeminiKeySync`, `toggleAudio`) — zero new persistence paths, zero AI involvement. `renderModuleBay()` is the single re-sync point: it re-syncs every boolean control's `.checked` from MetaStore (so a change made via the Schematic View's separate DOM checkboxes always pushes back to the bay's own controls), refreshes the two combined status lines (SLOT 01 optics+high-lumen, SLOT 02 channel-count+radio), and regenerates the Schematic View if it's open — called after every bay/schematic control change and once at boot from `initModuleBay()`. `initModuleBay()` (called from `window.onload`, after `_restoreOpticsPreference()`/`_restoreDevicePrefs()`) decides whether the first-visit hatch ceremony (`#bayHatch`, `releaseBayHatch()`) shows at all. The 13 SLOT-02 channel-mute checkboxes keep their exact current ids/onchange/polarity (a later unit converts them to DIP-chip presentation). The bay's `.bay-grid` / `.bay-channel-list` are **single-column unconditionally** — the desktop shell fixes the settings panel's own column at a hard 380px (`grid-template-columns: 380px 1fr` in the ≥1000px shell), so a two-column `@container` breakpoint would never engage in this shell and was removed as dead code after live desktop measurement (confirmed via manual render-check, not just the automated 360/412px gate).
+The SECURITY & CONFIGURATION panel's _contents_ (not the panel itself, which is unchanged) are reframed as a chassis of hardware boards — an owner-approved redesign (Protocol 25 sanctioned exception). **One-truth model:** the bay and the permanent Schematic View fallback are both projections of the same MetaStore-backed prefs above; every control still calls the exact setter it always called (`changeOpticsColor`, `toggleHighLumen`, `toggleMasterMute`, `toggleRadio`, `toggleWakeLock`, `toggleHaptic`, `onImmersionChange`, `setGeminiKeySync`, `toggleAudio`) — zero new persistence paths, zero AI involvement. `renderModuleBay()` is the single re-sync point: it re-syncs every boolean control's `.checked` from MetaStore (so a change made via the Schematic View's separate DOM checkboxes always pushes back to the bay's own controls), refreshes the two combined status lines (SLOT 01 optics+high-lumen, SLOT 02 channel-count+radio), and regenerates the Schematic View if it's open — called after every bay/schematic control change and once at boot from `initModuleBay()`. `initModuleBay()` (called from `window.onload`, after `_restoreOpticsPreference()`/`_restoreDevicePrefs()`) decides whether the first-visit hatch ceremony (`#bayHatch`, `releaseBayHatch()`) shows at all, then applies whichever of Bay/Schematic was last viewed. The bay's `.bay-grid` is **single-column unconditionally** — the desktop shell fixes the settings panel's own column at a hard 380px (`grid-template-columns: 380px 1fr` in the ≥1000px shell), so a two-column `@container` breakpoint would never engage in this shell and was removed as dead code after live desktop measurement (confirmed via manual render-check, not just the automated 360/412px gate).
+
+**B2b — visual fidelity + owner-reported fixes.** A follow-up unit rebuilt the bay's visuals to match the owner-approved mockup exactly and fixed four issues found live-rendering it (Protocol 42): the SLOT 02 channel-mute checkboxes now render as a socketed `.chip-grid` of DIP chips (CH-01…CH-13) — the checkbox still writes the exact same `muted` boolean via the unchanged `toggleAudio()` call, but `:checked` (muted) now reads as a PULLED chip and `:not(:checked)` as a seated one, a presentation-only polarity inversion (Protocol 25); SLOT 03 gained a battery-cell graphic (Sustained Power Cell) and a coil graphic (Haptic Solenoid); SLOT 04's plain `<select>` was replaced visually by a rotary `.dial` button that cycles Full/Balanced/Minimal through the same `onImmersionChange()` setter, while `#immersionSelect` itself survives verbatim (Protocol 4) — just visually hidden (`.bay-visually-hidden-input`, kept at 16px font-size so it never triggers iOS focus-zoom) — so a screen-reader/keyboard user retains direct-jump access to any of the 3 values; SLOT 05 gained a "CIPHER KEY SLOT" label and the HANDSHAKE button moved inline beside the key input; the bay header gained the mockup's chassis subheader line. **Fixes:** the phosphor tube-rack labels were rendering as near-invisible dark-on-dark text — `.tube` is a real `<button>` and had overridden `background` but never `color`, so it inherited the global button's `color: var(--robco-dark)` (meant for a bright fill) onto its own dark card; `button.tube` now declares an explicit `color`. The Schematic View's rows were restructured to stack each control's name/location above a full-width control row (`.schem-row-head` + `.schem-row-control`) so a `<select>` can never be squeezed narrower than its own content again (Chrome silently ellipsis-clips a narrow select's rendered text). The maintenance tray (`.bay-tools`) switched from a CSS grid to `display: flex; justify-content: center`, so a partial last row (e.g. when the already-installed PWA hides "INSTALL SYSTEM (APP)") self-centers instead of staying left-pinned with a dangling gap. Finally, the Bay-vs-Schematic view choice is now a registered MetaStore pref (`robco_bay_view`) applied via a shared `_applyBayView(view)` — called by both `initModuleBay()` (boot restore) and `toggleBaySchematic()` (the user's toggle) — so the two can never drift and the choice survives a reload (Protocol UI-6).
 
 ### Campaign/save store — NOT MetaStore
 
@@ -1513,7 +1516,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1871-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1887-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

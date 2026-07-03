@@ -18864,7 +18864,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  stored device prefs; every control still calls the setter it always
 //  called (Protocol 22/23) — zero new campaign state, zero AI involvement.
 //  The 13 SLOT-02 audio channels stay in their CURRENT (un-flipped) polarity
-//  this unit — B2b converts them to DIP chips. 18 tests.
+//  this unit — B2b converts them to DIP chips. 21 tests.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 154 — Step 2 Phase 2 B2a: Module Bay core reframe');
@@ -19014,12 +19014,16 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '154.8: renderBaySchematic() regenerates the flat list via innerHTML and every row calls the same real setter the bay uses'
   );
 
-  // 154.9  toggleBaySchematic() swaps the bay grid for the schematic (never shows both)
-  const toggleSchemFn154 = (core154.match(/function toggleBaySchematic\([\s\S]*?\n\}/) || [''])[0];
+  // 154.9  toggleBaySchematic() swaps the bay grid for the schematic (never shows
+  //        both). B2b (Suite 155) factored the actual show/hide into a shared
+  //        _applyBayView(view) so the boot restore could reuse it — this test now
+  //        checks that shared function (toggleBaySchematic() itself just resolves
+  //        the target view + persists it, then delegates — Suite 155.12).
+  const toggleSchemFn154 = (core154.match(/function _applyBayView\([\s\S]*?\n\}/) || [''])[0];
   assert(
     /schem\.hidden = !toSchematic/.test(toggleSchemFn154) &&
       /bay\.hidden = toSchematic/.test(toggleSchemFn154),
-    '154.9: toggleBaySchematic() shows exactly one of the bay grid / schematic list at a time'
+    '154.9: _applyBayView() (called by both toggleBaySchematic() and initModuleBay()) shows exactly one of the bay grid / schematic list at a time'
   );
 
   // 154.10  first-visit-only hatch (LOCKED-1): a NEW device pref (not campaign state)
@@ -19053,7 +19057,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //         both meet the >=28px floor
   assert(
     /\.bay-module-card \{[\s\S]{0,300}min-height:\s*28px/.test(css154) &&
-      /button\.tube \{[\s\S]{0,300}min-height:\s*44px/.test(css154),
+      /button\.tube \{[\s\S]{0,900}min-height:\s*44px/.test(css154),
     '154.13: .bay-module-card and button.tube both declare an explicit >=28px tap target (Protocol 17)'
   );
 
@@ -19064,17 +19068,19 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //         380px (confirmed live: .module-bay measures ~338px wide at BOTH 1280px
   //         and 1920px viewports — the column never grows). A two-column @container
   //         breakpoint can therefore never engage — it would be dead, misleading
-  //         code — so .bay-grid / .bay-channel-list are single-column
-  //         UNCONDITIONALLY, and no viewport @media is used for this either
-  //         (container-type infra is kept, harmless, for if the shell ever widens).
+  //         code — so .bay-grid is single-column UNCONDITIONALLY, and no viewport
+  //         @media is used for this either (container-type infra is kept, harmless,
+  //         for if the shell ever widens). NOTE — the sibling .bay-channel-list
+  //         check this test originally carried was retired in B2b (Suite 155),
+  //         which replaced that single-column checkbox list with a deliberately
+  //         MULTI-column .chip-grid (Suite 155 covers its own bounded track).
   assert(
     /container-type:\s*inline-size/.test(css154) &&
       /container-name:\s*bay/.test(css154) &&
       !/@container bay/.test(css154) &&
       !/@media \(min-width:\s*1000px\)[\s\S]{0,120}\.bay-grid/.test(css154) &&
-      /\.bay-grid \{[\s\S]{0,900}grid-template-columns:\s*minmax\(0, 1fr\);/.test(css154) &&
-      /\.bay-channel-list \{[\s\S]{0,400}grid-template-columns:\s*minmax\(0, 1fr\);/.test(css154),
-    '154.14: .bay-grid / .bay-channel-list are single-column unconditionally — confirmed via live desktop measurement that the shell column never exceeds ~340px, so a two-column breakpoint would be unreachable dead code (Protocol 42 fix)'
+      /\.bay-grid \{[\s\S]{0,900}grid-template-columns:\s*minmax\(0, 1fr\);/.test(css154),
+    '154.14: .bay-grid is single-column unconditionally — confirmed via live desktop measurement that the shell column never exceeds ~340px, so a two-column breakpoint would be unreachable dead code (Protocol 42 fix)'
   );
 
   // 154.15  SLOT 05 keeps the amber "external hardware" identity (LOCKED-4); SLOTs
@@ -19135,18 +19141,17 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '154.19: .bay-bus-strip wraps (white-space:normal) unconditionally — no unreachable container-query clip variant (Protocol 42 render-check fix)'
   );
 
-  // 154.20  Protocol 42 fix (found during this unit's gate render-check): every
-  //         .bay-grid / .bay-channel-list track uses minmax(0, 1fr), never a bare
-  //         1fr — a bare 1fr track's implicit minimum is "auto" (content-based),
-  //         which forced each SLOT board wider than its track at narrow widths
-  //         (a real Playwright-verified 360px overflow, traced to this exact
-  //         well-known CSS Grid pitfall, not a harness artifact).
+  // 154.20  Protocol 42 fix (found during this unit's gate render-check): .bay-grid's
+  //         track uses minmax(0, 1fr), never a bare 1fr — a bare 1fr track's implicit
+  //         minimum is "auto" (content-based), which forced each SLOT board wider
+  //         than its track at narrow widths (a real Playwright-verified 360px
+  //         overflow, traced to this exact well-known CSS Grid pitfall, not a
+  //         harness artifact). The sibling .bay-channel-list check this test
+  //         originally carried was retired in B2b (Suite 155) — see 154.14's note.
   assert(
     !/\.bay-grid \{[\s\S]{0,900}grid-template-columns:\s*1fr;/.test(css154) &&
-      !/\.bay-channel-list \{[\s\S]{0,400}grid-template-columns:\s*1fr;/.test(css154) &&
-      /\.bay-grid \{[\s\S]{0,900}grid-template-columns:\s*minmax\(0, 1fr\);/.test(css154) &&
-      /\.bay-channel-list \{[\s\S]{0,400}grid-template-columns:\s*minmax\(0, 1fr\);/.test(css154),
-    '154.20: .bay-grid and .bay-channel-list use minmax(0, 1fr) tracks, never a bare 1fr, so a board can never be forced wider than its track (Protocol 42 fix — confirmed REAL via Playwright at 360px, not harness-only)'
+      /\.bay-grid \{[\s\S]{0,900}grid-template-columns:\s*minmax\(0, 1fr\);/.test(css154),
+    '154.20: .bay-grid uses a minmax(0, 1fr) track, never a bare 1fr, so a board can never be forced wider than its track (Protocol 42 fix — confirmed REAL via Playwright at 360px, not harness-only)'
   );
 
   // 154.21  Protocol 42 fix (found during this unit's manual browser verification):
@@ -19175,6 +19180,232 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       ) &&
       /else renderModuleBay\(\)/.test(toggleSchemFn154),
     '154.21: renderModuleBay() re-syncs every boolean control’s .checked from MetaStore (closing the bay↔schematic drift a live browser test found), and toggleBaySchematic() re-syncs on switching back to the bay (Protocol 42 fix)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 155 — Step 2 (v2.7.0) Phase 2 B2b: Module Bay visual fidelity + fixes
+//  Rebuilds the B2a Module Bay to match the owner-approved Fable mockup's rich
+//  diegetic visuals (DIP-chip channel array, power-cell/solenoid graphics, a
+//  rotary immersion dial, the chassis subheader) plus four owner-reported
+//  fixes discovered live-rendering this unit (Protocol 42): unreadable tube
+//  labels, Schematic View text clipping, SVC-tray centering, and a new
+//  reload-persistence pref for the Bay/Schematic view choice. One-truth model
+//  preserved throughout — every reskinned control still calls the exact
+//  setter it always called; zero forked persistence paths. 16 tests.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 155 — Step 2 Phase 2 B2b: Module Bay visual fidelity + fixes');
+  const html155 = readFile('index.html');
+  const core155 = readFile('js/ui-core.js');
+  const state155 = readFile('js/state.js');
+  const css155 = readFile('css/terminal.css');
+  const claude155 = readFile('CLAUDE.md');
+  const rules155 = readFile('RULES.md');
+
+  // 155.1  the chassis subheader from the mockup's bay-head row is present
+  assert(
+    /<div class="bay-chassis">/.test(html155) &&
+      /CHASSIS RIT-V300/.test(html155) &&
+      /BUS VOLTAGE NOMINAL/.test(html155),
+    '155.1: the "CHASSIS RIT-V300 · INTERNAL SERVICE VIEW · BUS VOLTAGE NOMINAL" subheader is present in the bay header'
+  );
+
+  // 155.2  SLOT 02: the 13 mute checkboxes are now a DIP-chip grid — exact
+  //        ids/onchange calls survive verbatim (Protocol 4/22), CH-01..CH-13
+  //        pin ids are present, and the old plain-checkbox-list markup is gone
+  const muteKeys155 = [
+    'robco_sfx_muted',
+    'robco_hum_muted',
+    'robco_geiger_muted',
+    'robco_tinnitus_muted',
+    'robco_ambient_muted',
+    'robco_wake_muted',
+    'robco_panelclick_muted',
+    'robco_bootdrone_muted',
+    'robco_levelup_muted',
+    'robco_heartbeat_muted',
+    'robco_questcomplete_muted',
+    'robco_questfail_muted',
+    'robco_factionthreshold_muted',
+  ];
+  assert(
+    (html155.match(/class="chip-wrap"/g) || []).length === 13 &&
+      (html155.match(/class="chip-input"/g) || []).length === 13 &&
+      (html155.match(/class="chip-card"/g) || []).length === 13 &&
+      Array.from({ length: 13 }, (_, i) => `CH-${String(i + 1).padStart(2, '0')}`).every(ch =>
+        html155.includes(ch)
+      ) &&
+      muteKeys155.every(k => html155.includes(`toggleAudio('${k}', this.checked)`)) &&
+      !/class="audio-row"/.test(html155) &&
+      !/class="bay-channel-list"/.test(html155),
+    '155.2: the 13 SLOT-02 channels render as a chip-grid of chip-wrap/chip-input/chip-card triples with CH-01..CH-13 pin ids, every toggleAudio() call unchanged, and the old audio-row/bay-channel-list markup is fully retired'
+  );
+
+  // 155.3  chip polarity is INVERTED in CSS only (Protocol 25 sanctioned
+  //        exception) — the checkbox keeps writing the same `muted` boolean;
+  //        :checked (muted=true) reads as a PULLED chip, not a seated one
+  assert(
+    /\.chip-input:checked \+ \.chip-card \{[\s\S]{0,200}(border-style:\s*dashed|opacity:\s*0\.5)/.test(
+      css155
+    ) &&
+      /\.chip-input:checked \+ \.chip-card \.pin-id::after \{[\s\S]{0,80}content:\s*' · SOCKET EMPTY'/.test(
+        css155
+      ),
+    '155.3: chip :checked (muted) styles as a PULLED/dashed chip and appends "SOCKET EMPTY" — presentation-only inversion, storage format unchanged'
+  );
+
+  // 155.4  SLOT 03 hardware graphics: a battery-cell graphic wired to the
+  //        Sustained Power Cell module, a coil graphic wired to the Haptic
+  //        Solenoid module — both keep their exact pre-existing setters
+  assert(
+    /id="wakeLockToggle"[\s\S]{0,60}class="bay-module-input"[\s\S]{0,300}onchange="toggleWakeLock\(this\.checked\)"/.test(
+      html155
+    ) &&
+      /<span class="cell-graphic" aria-hidden="true"[\s\S]{0,60}FUSION MK-II/.test(html155) &&
+      /id="hapticToggle"[\s\S]{0,300}onchange="toggleHaptic\(this\.checked\)"/.test(html155) &&
+      /<span class="coil-graphic" aria-hidden="true">/.test(html155),
+    '155.4: SLOT 03 shows a battery-cell graphic (Sustained Power Cell) and a coil graphic (Haptic Solenoid), both still driven by their unchanged toggleWakeLock()/toggleHaptic() setters'
+  );
+
+  // 155.5  SLOT 04: a real, functioning #immersionSelect survives VERBATIM
+  //        (Protocol 4) but is now visually hidden; a genuinely-custom rotary
+  //        dial button is the visible control, cycling the same 3 values
+  assert(
+    /id="immersionSelect"[\s\S]{0,60}class="bay-visually-hidden-input"[\s\S]{0,200}onchange="onImmersionChange\(this\.value\)"/.test(
+      html155
+    ) &&
+      /<button[\s\S]{0,100}class="dial"[\s\S]{0,120}onclick="_cycleImmersionDial\(\)"/.test(
+        html155
+      ) &&
+      /id="immersionDialKnob"/.test(html155) &&
+      /id="immersionDialPos"/.test(html155) &&
+      /id="immersionDialDesc"/.test(html155),
+    '155.5: #immersionSelect keeps its exact id/onchange (now visually hidden, Protocol 17 a11y preserved) alongside a real .dial button + knob/pos/desc readout'
+  );
+
+  // 155.6  _cycleImmersionDial() calls the SAME onImmersionChange() setter
+  //        (Protocol 22) — never a parallel persistence path
+  const cycleFn155 = (core155.match(/function _cycleImmersionDial\([\s\S]*?\n\}/) || [''])[0];
+  assert(
+    /onImmersionChange\(next\)/.test(cycleFn155) && !/MetaStore\.set/.test(cycleFn155),
+    '155.6: _cycleImmersionDial() calls onImmersionChange() (the existing setter) directly — no new persistence path'
+  );
+
+  // 155.7  _updateImmersionUI() is the single re-sync point keeping the hidden
+  //        select's value, the dial knob rotation, and the position/description
+  //        readout all agreeing with the one stored tier
+  const immersionUiFn155 = (core155.match(/function _updateImmersionUI\([\s\S]*?\n\}/) || [''])[0];
+  assert(
+    /sel\.value = tier/.test(immersionUiFn155) &&
+      /IMMERSION_DIAL\[tier\]/.test(immersionUiFn155) &&
+      /knob\.style\.transform/.test(immersionUiFn155) &&
+      /posEl\.textContent = tier\.toUpperCase\(\)/.test(immersionUiFn155),
+    '155.7: _updateImmersionUI() re-syncs the hidden select value + dial knob/position/description from the single stored tier on every call'
+  );
+
+  // 155.8  SLOT 05: the CIPHER KEY SLOT label is present, and #btnFetchModels
+  //        (moved inside .key-slot beside the input) appears EXACTLY ONCE —
+  //        the pre-existing standalone duplicate was removed, not left behind
+  assert(
+    /class="key-slot-label"[\s\S]{0,20}>\s*CIPHER KEY SLOT/.test(html155) &&
+      (html155.match(/id="btnFetchModels"/g) || []).length === 1 &&
+      /class="key-slot">[\s\S]{0,600}id="btnFetchModels"/.test(html155),
+    '155.8: the "CIPHER KEY SLOT" label is present and #btnFetchModels (HANDSHAKE) now lives exactly once, inside .key-slot beside the cipher key input'
+  );
+
+  // 155.9  SVC tray: renamed to match the mockup's "PRINT CAMPAIGN LOG" (same
+  //        setter, same .txt export — copy-only change), EJECT HOLOTAPE leads,
+  //        and the tray centers any partial last row via flex (FIX 3)
+  assert(
+    /PRINT CAMPAIGN LOG/.test(html155) &&
+      !/DOWNLOAD CAMPAIGN LOG/.test(html155) &&
+      /_svcExportCampaignLog\('txt'\)/.test(html155) &&
+      html155.indexOf('EJECT HOLOTAPE') < html155.indexOf('PRINT CAMPAIGN LOG') &&
+      /\.bay-tools \{[\s\S]{0,200}display:\s*flex[\s\S]{0,200}justify-content:\s*center/.test(
+        css155
+      ),
+    "155.9: the SVC tray leads with EJECT HOLOTAPE then PRINT CAMPAIGN LOG (same _svcExportCampaignLog('txt') setter), and .bay-tools centers a partial last row via flex + justify-content:center (FIX 3)"
+  );
+
+  // 155.10  FIX 2 (owner report): the Schematic View's rows stack name/loc
+  //         above a full-width control so a select can never be squeezed
+  //         narrower than its own content ("ROBCO GR…" clipping regression)
+  const schemFn155 = (core155.match(/function renderBaySchematic\([\s\S]*?\n(?=window\.)/) || [
+    '',
+  ])[0];
+  assert(
+    /schem-row-head/.test(schemFn155) &&
+      /schem-row-control/.test(schemFn155) &&
+      /\.schem-row-control select,\s*\n\s*\.schem-row-control input\[type='range'\] \{[\s\S]{0,60}width:\s*100%/.test(
+        css155
+      ),
+    "155.10: renderBaySchematic() stacks each row's name/loc above a full-width .schem-row-control, and the control CSS forces width:100% — the select can never clip its selected-option text again (FIX 2)"
+  );
+
+  // 155.11  FIX 1 (owner report): button.tube declares an explicit color —
+  //         regression guard against the dark-on-dark bug (a plain <button>
+  //         inherits the global button{color:var(--robco-dark)} meant for a
+  //         bright fill; .tube overrides background but had never overridden
+  //         color, rendering near-black text on its own near-black card)
+  assert(
+    /button\.tube \{[\s\S]{0,700}color:\s*var\(--robco-green\)/.test(css155),
+    '155.11: button.tube declares an explicit color (not the inherited global button dark-text default) — regression guard for the unreadable tube-label bug (FIX 1)'
+  );
+
+  // 155.12  FIX 4 (new standing rule — "everything remembers on reload"): the
+  //         Bay/Schematic view choice is a registered MetaStore device pref,
+  //         shared by both the boot restore and the user toggle so they can
+  //         never drift (Protocol 22)
+  assert(
+    /robco_bay_view: \{ type: 'string', default: 'bay', owner: 'ui-core\.js' \}/.test(state155) &&
+      /function _applyBayView\(view\)/.test(core155) &&
+      /_applyBayView\(MetaStore\.get\('robco_bay_view'\) === 'schematic' \? 'schematic' : 'bay'\)/.test(
+        core155
+      ) &&
+      /MetaStore\.set\('robco_bay_view', view\)/.test(core155) &&
+      /function toggleBaySchematic\(\)[\s\S]{0,300}_applyBayView\(view\)/.test(core155),
+    '155.12: robco_bay_view is a registered MetaStore pref; initModuleBay() and toggleBaySchematic() both route through the shared _applyBayView() so the Bay/Schematic choice survives a reload'
+  );
+
+  // 155.13  Protocol 17 — every new interactive/graphic element meets the
+  //         >=28px tap-target floor
+  assert(
+    /\.chip-card \{[\s\S]{0,400}min-height:\s*44px/.test(css155) &&
+      /button\.dial \{[\s\S]{0,400}(width:\s*84px|height:\s*84px)/.test(css155) &&
+      /\.bay-tools button \{[\s\S]{0,300}min-height:\s*28px/.test(css155),
+    '155.13: the new chip cards, the rotary dial, and the SVC tray buttons all meet the >=28px tap-target floor (Protocol 17)'
+  );
+
+  // 155.14  Protocol UI-5 — no <span onclick> pattern was introduced anywhere
+  //         in this unit's additions (re-verify after B2b's new markup)
+  assert(
+    !/<span[^>]*onclick=/.test(html155),
+    '155.14: no <span onclick> pattern anywhere (Protocol UI-5) after the B2b visual rebuild'
+  );
+
+  // 155.15  Protocol 38 — the new markup/JS is game-agnostic
+  const bayJs155 =
+    (core155.match(/const BAY_SVC_LOG_CAP[\s\S]*?window\._svcInstallPwa = _svcInstallPwa;/) || [
+      '',
+    ])[0] +
+    cycleFn155 +
+    immersionUiFn155;
+  assert(
+    !/\bFNV\b|\bFO3\b|Fallout/.test(bayJs155) &&
+      !/\bFNV\b|\bFO3\b|Fallout/.test(
+        html155.slice(html155.indexOf('id="moduleBay"'), html155.indexOf('ALL SAVES'))
+      ),
+    '155.15: the B2b Module Bay additions stay game-agnostic — no hardcoded game literals'
+  );
+
+  // 155.16  the reload-persistence standing rule + the Protocol 2a wording fix
+  //         are both recorded in the docs this unit touches
+  assert(
+    /everything remembers on reload/i.test(claude155) &&
+      !/the files are kept identical for protocol sections/.test(claude155) &&
+      !/the files are kept identical for protocol sections/.test(rules155),
+    '155.16: CLAUDE.md records the new reload-persistence standing rule, and the stale "RULES.md and CLAUDE.md are kept identical" sentence is corrected'
   );
 }
 

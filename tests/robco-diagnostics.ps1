@@ -11064,7 +11064,7 @@ Check (
 ) "153.9: CACHE_NAME is a well-formed robco-terminal-v2.7.0-rN revision string (Protocol 1)"
 
 # ===========================================================
-# Suite 154 -- Step 2 (v2.8.0) Phase 2 B2a: MODULE BAY core reframe (18 tests)
+# Suite 154 -- Step 2 (v2.8.0) Phase 2 B2a: MODULE BAY core reframe (21 tests)
 # The Security & Configuration panel reframed as installable hardware
 # (owner-approved mockup, Protocol 25 sanctioned exception). ONE-TRUTH MODEL:
 # the bay + the permanent Schematic View are both projections of the SAME
@@ -11170,12 +11170,15 @@ foreach ($fn in $schemSetters154) { if ($schemFn154 -notmatch [regex]::Escape($f
 Check ($allSchemSetters154 -and ($schemFn154 -match 'list\.innerHTML =')) `
     "154.8: renderBaySchematic() regenerates the flat list via innerHTML and every row calls the same real setter the bay uses"
 
-# 154.9  toggleBaySchematic() swaps the bay grid for the schematic (never shows both)
-$toggleSchemFn154 = Get-FunctionBody $core154 'toggleBaySchematic'
+# 154.9  toggleBaySchematic() swaps the bay grid for the schematic (never shows
+#        both). B2b (Suite 155) factored the actual show/hide into a shared
+#        _applyBayView(view) so the boot restore could reuse it -- this test now
+#        checks that shared function (Suite 155.12 covers the delegation).
+$toggleSchemFn154 = Get-FunctionBody $core154 '_applyBayView'
 Check (
     ($toggleSchemFn154 -match 'schem\.hidden = !toSchematic') -and
     ($toggleSchemFn154 -match 'bay\.hidden = toSchematic')
-) "154.9: toggleBaySchematic() shows exactly one of the bay grid / schematic list at a time"
+) "154.9: _applyBayView() (called by both toggleBaySchematic() and initModuleBay()) shows exactly one of the bay grid / schematic list at a time"
 
 # 154.10  first-visit-only hatch (LOCKED-1): a NEW device pref (not campaign state)
 #         gates whether #bayHatch is shown; releasing it sets the pref permanently
@@ -11206,7 +11209,7 @@ Check (
 #         both meet the >=28px floor
 Check (
     ($css154 -match '(?s)\.bay-module-card \{.{0,300}min-height:\s*28px') -and
-    ($css154 -match '(?s)button\.tube \{.{0,300}min-height:\s*44px')
+    ($css154 -match '(?s)button\.tube \{.{0,900}min-height:\s*44px')
 ) "154.13: .bay-module-card and button.tube both declare an explicit >=28px tap target (Protocol 17)"
 
 # 154.14  Protocol 42 fix (found during this unit's manual DESKTOP render-check,
@@ -11216,17 +11219,20 @@ Check (
 #         380px (confirmed live: .module-bay measures ~338px wide at BOTH 1280px
 #         and 1920px viewports -- the column never grows). A two-column @container
 #         breakpoint can therefore never engage -- it would be dead, misleading
-#         code -- so .bay-grid / .bay-channel-list are single-column
-#         UNCONDITIONALLY, and no viewport @media is used for this either
-#         (container-type infra is kept, harmless, for if the shell ever widens).
+#         code -- so .bay-grid is single-column UNCONDITIONALLY, and no
+#         viewport @media is used for this either (container-type infra is
+#         kept, harmless, for if the shell ever widens). NOTE -- the sibling
+#         .bay-channel-list check this test originally carried was retired in
+#         B2b (Suite 155), which replaced that single-column checkbox list
+#         with a deliberately MULTI-column .chip-grid (Suite 155 covers its
+#         own bounded track).
 Check (
     ($css154 -match 'container-type:\s*inline-size') -and
     ($css154 -match 'container-name:\s*bay') -and
     (-not ($css154 -match '@container bay')) -and
     (-not ($css154 -match '(?s)@media \(min-width:\s*1000px\).{0,120}\.bay-grid')) -and
-    ($css154 -match '(?s)\.bay-grid \{.{0,900}grid-template-columns:\s*minmax\(0, 1fr\);') -and
-    ($css154 -match '(?s)\.bay-channel-list \{.{0,400}grid-template-columns:\s*minmax\(0, 1fr\);')
-) "154.14: .bay-grid / .bay-channel-list are single-column unconditionally -- confirmed via live desktop measurement that the shell column never exceeds ~340px, so a two-column breakpoint would be unreachable dead code (Protocol 42 fix)"
+    ($css154 -match '(?s)\.bay-grid \{.{0,900}grid-template-columns:\s*minmax\(0, 1fr\);')
+) "154.14: .bay-grid is single-column unconditionally -- confirmed via live desktop measurement that the shell column never exceeds ~340px, so a two-column breakpoint would be unreachable dead code (Protocol 42 fix)"
 
 # 154.15  SLOT 05 keeps the amber "external hardware" identity (LOCKED-4); SLOTs
 #         01-04 + the SVC tray are NOT amber (green baseline / blue utility)
@@ -11281,18 +11287,17 @@ Check (
     (-not ($css154 -match '(?s)@container bay.{0,120}\.bay-bus-strip'))
 ) "154.19: .bay-bus-strip wraps (white-space:normal) unconditionally -- no unreachable container-query clip variant (Protocol 42 render-check fix)"
 
-# 154.20  Protocol 42 fix (found during this unit's gate render-check): every
-#         .bay-grid / .bay-channel-list track uses minmax(0, 1fr), never a bare
-#         1fr -- a bare 1fr track's implicit minimum is "auto" (content-based),
-#         which forced each SLOT board wider than its track at narrow widths
-#         (a real Playwright-verified 360px overflow, traced to this exact
-#         well-known CSS Grid pitfall, not a harness artifact).
+# 154.20  Protocol 42 fix (found during this unit's gate render-check): .bay-grid's
+#         track uses minmax(0, 1fr), never a bare 1fr -- a bare 1fr track's implicit
+#         minimum is "auto" (content-based), which forced each SLOT board wider
+#         than its track at narrow widths (a real Playwright-verified 360px
+#         overflow, traced to this exact well-known CSS Grid pitfall, not a
+#         harness artifact). The sibling .bay-channel-list check this test
+#         originally carried was retired in B2b (Suite 155) -- see 154.14's note.
 Check (
     (-not ($css154 -match '(?s)\.bay-grid \{.{0,900}grid-template-columns:\s*1fr;')) -and
-    (-not ($css154 -match '(?s)\.bay-channel-list \{.{0,400}grid-template-columns:\s*1fr;')) -and
-    ($css154 -match '(?s)\.bay-grid \{.{0,900}grid-template-columns:\s*minmax\(0, 1fr\);') -and
-    ($css154 -match '(?s)\.bay-channel-list \{.{0,400}grid-template-columns:\s*minmax\(0, 1fr\);')
-) "154.20: .bay-grid and .bay-channel-list use minmax(0, 1fr) tracks, never a bare 1fr, so a board can never be forced wider than its track (Protocol 42 fix -- confirmed REAL via Playwright at 360px, not harness-only)"
+    ($css154 -match '(?s)\.bay-grid \{.{0,900}grid-template-columns:\s*minmax\(0, 1fr\);')
+) "154.20: .bay-grid uses a minmax(0, 1fr) track, never a bare 1fr, so a board can never be forced wider than its track (Protocol 42 fix -- confirmed REAL via Playwright at 360px, not harness-only)"
 
 # 154.21  Protocol 42 fix (found during this unit's manual browser verification):
 #         the bay's own checkboxes and the Schematic View's mirrored checkboxes
@@ -11305,7 +11310,7 @@ Check (
 #         the gap in both directions; toggleBaySchematic() also re-syncs at the
 #         exact moment it switches back to the bay view.
 $renderBayFn154b = Get-FunctionBody $core154 'renderModuleBay'
-$toggleSchemFn154b = Get-FunctionBody $core154 'toggleBaySchematic'
+$toggleSchemFn154b = Get-FunctionBody $core154 '_applyBayView'
 $syncIds154 = @('highLumenToggle','masterMuteToggle','radioToggle','wakeLockToggle','hapticToggle','geminiKeySyncToggle')
 $allSyncIds154 = $true
 foreach ($id in $syncIds154) { if ($core154 -notmatch "$id`:\s*'robco_") { $allSyncIds154 = $false } }
@@ -11316,6 +11321,184 @@ Check (
     ($renderBayFn154b -match "el\.checked = MetaStore\.get\(BAY_CHECKBOX_SYNC_MAP\[id\]\) === 'true'") -and
     ($toggleSchemFn154b -match 'else renderModuleBay\(\)')
 ) "154.21: renderModuleBay() re-syncs every boolean control's .checked from MetaStore (closing the bay<->schematic drift a live browser test found), and toggleBaySchematic() re-syncs on switching back to the bay (Protocol 42 fix)"
+
+# ===========================================================
+# Suite 155 -- Step 2 (v2.7.0) Phase 2 B2b: Module Bay visual fidelity + fixes (16 tests)
+# Rebuilds the B2a Module Bay to match the owner-approved Fable mockup's rich
+# diegetic visuals (DIP-chip channel array, power-cell/solenoid graphics, a
+# rotary immersion dial, the chassis subheader) plus four owner-reported fixes
+# discovered live-rendering this unit (Protocol 42): unreadable tube labels,
+# Schematic View text clipping, SVC-tray centering, and a new reload-
+# persistence pref for the Bay/Schematic view choice. One-truth model
+# preserved throughout. Mirrors JS Suite 155.
+# ===========================================================
+Sep "Suite 155 -- Step 2 Phase 2 B2b: Module Bay visual fidelity + fixes"
+$html155   = Read-Src "index.html"
+$core155   = Read-Src "js/ui-core.js"
+$state155  = Read-Src "js/state.js"
+$css155    = Read-Src "css/terminal.css"
+$claude155 = Read-Src "CLAUDE.md"
+$rules155  = Read-Src "RULES.md"
+
+# 155.1  the chassis subheader from the mockup's bay-head row is present
+Check (
+    ($html155 -match '<div class="bay-chassis">') -and
+    ($html155 -match 'CHASSIS RIT-V300') -and
+    ($html155 -match 'BUS VOLTAGE NOMINAL')
+) "155.1: the ""CHASSIS RIT-V300 . INTERNAL SERVICE VIEW . BUS VOLTAGE NOMINAL"" subheader is present in the bay header"
+
+# 155.2  SLOT 02: the 13 mute checkboxes are now a DIP-chip grid -- exact
+#        ids/onchange calls survive verbatim (Protocol 4/22), CH-01..CH-13
+#        pin ids are present, and the old plain-checkbox-list markup is gone
+$muteKeys155 = @(
+    'robco_sfx_muted','robco_hum_muted','robco_geiger_muted','robco_tinnitus_muted',
+    'robco_ambient_muted','robco_wake_muted','robco_panelclick_muted','robco_bootdrone_muted',
+    'robco_levelup_muted','robco_heartbeat_muted','robco_questcomplete_muted',
+    'robco_questfail_muted','robco_factionthreshold_muted'
+)
+$allMutes155 = $true
+foreach ($k in $muteKeys155) { if (-not $html155.Contains("toggleAudio('$k', this.checked)")) { $allMutes155 = $false } }
+$allChNums155 = $true
+for ($i = 1; $i -le 13; $i++) { $ch = "CH-{0:D2}" -f $i; if (-not $html155.Contains($ch)) { $allChNums155 = $false } }
+Check (
+    ([regex]::Matches($html155, 'class="chip-wrap"').Count -eq 13) -and
+    ([regex]::Matches($html155, 'class="chip-input"').Count -eq 13) -and
+    ([regex]::Matches($html155, 'class="chip-card"').Count -eq 13) -and
+    $allChNums155 -and $allMutes155 -and
+    (-not ($html155 -match 'class="audio-row"')) -and
+    (-not ($html155 -match 'class="bay-channel-list"'))
+) "155.2: the 13 SLOT-02 channels render as a chip-grid of chip-wrap/chip-input/chip-card triples with CH-01..CH-13 pin ids, every toggleAudio() call unchanged, and the old audio-row/bay-channel-list markup is fully retired"
+
+# 155.3  chip polarity is INVERTED in CSS only (Protocol 25 sanctioned
+#        exception) -- the checkbox keeps writing the same `muted` boolean;
+#        :checked (muted=true) reads as a PULLED chip, not a seated one
+Check (
+    ($css155 -match '(?s)\.chip-input:checked \+ \.chip-card \{.{0,200}(border-style:\s*dashed|opacity:\s*0\.5)') -and
+    ($css155 -match "(?s)\.chip-input:checked \+ \.chip-card \.pin-id::after \{.{0,80}content:\s*' . SOCKET EMPTY'")
+) "155.3: chip :checked (muted) styles as a PULLED/dashed chip and appends ""SOCKET EMPTY"" -- presentation-only inversion, storage format unchanged"
+
+# 155.4  SLOT 03 hardware graphics: a battery-cell graphic wired to the
+#        Sustained Power Cell module, a coil graphic wired to the Haptic
+#        Solenoid module -- both keep their exact pre-existing setters
+Check (
+    ($html155 -match '(?s)id="wakeLockToggle".{0,60}class="bay-module-input".{0,300}onchange="toggleWakeLock\(this\.checked\)"') -and
+    ($html155 -match '(?s)<span class="cell-graphic" aria-hidden="true".{0,60}FUSION MK-II') -and
+    ($html155 -match '(?s)id="hapticToggle".{0,300}onchange="toggleHaptic\(this\.checked\)"') -and
+    ($html155 -match '<span class="coil-graphic" aria-hidden="true">')
+) "155.4: SLOT 03 shows a battery-cell graphic (Sustained Power Cell) and a coil graphic (Haptic Solenoid), both still driven by their unchanged toggleWakeLock()/toggleHaptic() setters"
+
+# 155.5  SLOT 04: a real, functioning #immersionSelect survives VERBATIM
+#        (Protocol 4) but is now visually hidden; a genuinely-custom rotary
+#        dial button is the visible control, cycling the same 3 values
+Check (
+    ($html155 -match '(?s)id="immersionSelect".{0,60}class="bay-visually-hidden-input".{0,200}onchange="onImmersionChange\(this\.value\)"') -and
+    ($html155 -match '(?s)<button.{0,100}class="dial".{0,120}onclick="_cycleImmersionDial\(\)"') -and
+    ($html155 -match 'id="immersionDialKnob"') -and
+    ($html155 -match 'id="immersionDialPos"') -and
+    ($html155 -match 'id="immersionDialDesc"')
+) "155.5: #immersionSelect keeps its exact id/onchange (now visually hidden, Protocol 17 a11y preserved) alongside a real .dial button + knob/pos/desc readout"
+
+# 155.6  _cycleImmersionDial() calls the SAME onImmersionChange() setter
+#        (Protocol 22) -- never a parallel persistence path
+$cycleFn155 = Get-FunctionBody $core155 '_cycleImmersionDial'
+Check (
+    ($cycleFn155 -match 'onImmersionChange\(next\)') -and
+    (-not ($cycleFn155 -match 'MetaStore\.set'))
+) "155.6: _cycleImmersionDial() calls onImmersionChange() (the existing setter) directly -- no new persistence path"
+
+# 155.7  _updateImmersionUI() is the single re-sync point keeping the hidden
+#        select's value, the dial knob rotation, and the position/description
+#        readout all agreeing with the one stored tier
+$immersionUiFn155 = Get-FunctionBody $core155 '_updateImmersionUI'
+Check (
+    ($immersionUiFn155 -match 'sel\.value = tier') -and
+    ($immersionUiFn155 -match 'IMMERSION_DIAL\[tier\]') -and
+    ($immersionUiFn155 -match 'knob\.style\.transform') -and
+    ($immersionUiFn155 -match 'posEl\.textContent = tier\.toUpperCase\(\)')
+) "155.7: _updateImmersionUI() re-syncs the hidden select value + dial knob/position/description from the single stored tier on every call"
+
+# 155.8  SLOT 05: the CIPHER KEY SLOT label is present, and #btnFetchModels
+#        (moved inside .key-slot beside the input) appears EXACTLY ONCE --
+#        the pre-existing standalone duplicate was removed, not left behind
+Check (
+    ($html155 -match '(?s)class="key-slot-label".{0,20}>\s*CIPHER KEY SLOT') -and
+    ([regex]::Matches($html155, 'id="btnFetchModels"').Count -eq 1) -and
+    ($html155 -match '(?s)class="key-slot">.{0,600}id="btnFetchModels"')
+) "155.8: the ""CIPHER KEY SLOT"" label is present and #btnFetchModels (HANDSHAKE) now lives exactly once, inside .key-slot beside the cipher key input"
+
+# 155.9  SVC tray: renamed to match the mockup's "PRINT CAMPAIGN LOG" (same
+#        setter, same .txt export -- copy-only change), EJECT HOLOTAPE leads,
+#        and the tray centers any partial last row via flex (FIX 3)
+Check (
+    ($html155 -match 'PRINT CAMPAIGN LOG') -and
+    (-not ($html155 -match 'DOWNLOAD CAMPAIGN LOG')) -and
+    ($html155 -match "_svcExportCampaignLog\('txt'\)") -and
+    ($html155.IndexOf('EJECT HOLOTAPE') -lt $html155.IndexOf('PRINT CAMPAIGN LOG')) -and
+    ($css155 -match '(?s)\.bay-tools \{.{0,200}display:\s*flex.{0,200}justify-content:\s*center')
+) "155.9: the SVC tray leads with EJECT HOLOTAPE then PRINT CAMPAIGN LOG (same _svcExportCampaignLog('txt') setter), and .bay-tools centers a partial last row via flex + justify-content:center (FIX 3)"
+
+# 155.10  FIX 2 (owner report): the Schematic View's rows stack name/loc
+#         above a full-width control so a select can never be squeezed
+#         narrower than its own content ("ROBCO GR..." clipping regression)
+$schemFn155 = Get-FunctionBody $core155 'renderBaySchematic'
+Check (
+    ($schemFn155 -match 'schem-row-head') -and
+    ($schemFn155 -match 'schem-row-control') -and
+    ($css155 -match "(?s)\.schem-row-control select,\s*`n\s*\.schem-row-control input\[type='range'\] \{.{0,60}width:\s*100%")
+) "155.10: renderBaySchematic() stacks each row's name/loc above a full-width .schem-row-control, and the control CSS forces width:100% -- the select can never clip its selected-option text again (FIX 2)"
+
+# 155.11  FIX 1 (owner report): button.tube declares an explicit color --
+#         regression guard against the dark-on-dark bug (a plain <button>
+#         inherits the global button{color:var(--robco-dark)} meant for a
+#         bright fill; .tube overrides background but had never overridden
+#         color, rendering near-black text on its own near-black card)
+Check (
+    ($css155 -match '(?s)button\.tube \{.{0,700}color:\s*var\(--robco-green\)')
+) "155.11: button.tube declares an explicit color (not the inherited global button dark-text default) -- regression guard for the unreadable tube-label bug (FIX 1)"
+
+# 155.12  FIX 4 (new standing rule -- "everything remembers on reload"): the
+#         Bay/Schematic view choice is a registered MetaStore device pref,
+#         shared by both the boot restore and the user toggle so they can
+#         never drift (Protocol 22)
+Check (
+    ($state155 -match "robco_bay_view: \{ type: 'string', default: 'bay', owner: 'ui-core\.js' \}") -and
+    ($core155 -match 'function _applyBayView\(view\)') -and
+    ($core155 -match "_applyBayView\(MetaStore\.get\('robco_bay_view'\) === 'schematic' \? 'schematic' : 'bay'\)") -and
+    ($core155 -match "MetaStore\.set\('robco_bay_view', view\)") -and
+    ($core155 -match '(?s)function toggleBaySchematic\(\).{0,300}_applyBayView\(view\)')
+) "155.12: robco_bay_view is a registered MetaStore pref; initModuleBay() and toggleBaySchematic() both route through the shared _applyBayView() so the Bay/Schematic choice survives a reload"
+
+# 155.13  Protocol 17 -- every new interactive/graphic element meets the
+#         >=28px tap-target floor
+Check (
+    ($css155 -match '(?s)\.chip-card \{.{0,400}min-height:\s*44px') -and
+    ($css155 -match '(?s)button\.dial \{.{0,400}(width:\s*84px|height:\s*84px)') -and
+    ($css155 -match '(?s)\.bay-tools button \{.{0,300}min-height:\s*28px')
+) "155.13: the new chip cards, the rotary dial, and the SVC tray buttons all meet the >=28px tap-target floor (Protocol 17)"
+
+# 155.14  Protocol UI-5 -- no <span onclick> pattern was introduced anywhere
+#         in this unit's additions (re-verify after B2b's new markup)
+Check (-not ($html155 -match '<span[^>]*onclick=')) "155.14: no <span onclick> pattern anywhere (Protocol UI-5) after the B2b visual rebuild"
+
+# 155.15  Protocol 38 -- the new markup/JS is game-agnostic
+$bayJsStart155 = $core155.IndexOf('const BAY_SVC_LOG_CAP')
+$bayJsEnd155 = $core155.IndexOf('window._svcInstallPwa = _svcInstallPwa;') + 'window._svcInstallPwa = _svcInstallPwa;'.Length
+$bayJs155 = $core155.Substring($bayJsStart155, $bayJsEnd155 - $bayJsStart155) + $cycleFn155 + $immersionUiFn155
+$bayHtmlStart155 = $html155.IndexOf('id="moduleBay"')
+$bayHtmlEnd155 = $html155.IndexOf('ALL SAVES')
+$bayHtml155 = $html155.Substring($bayHtmlStart155, $bayHtmlEnd155 - $bayHtmlStart155)
+Check (
+    (-not ($bayJs155 -match '\bFNV\b|\bFO3\b|Fallout')) -and
+    (-not ($bayHtml155 -match '\bFNV\b|\bFO3\b|Fallout'))
+) "155.15: the B2b Module Bay additions stay game-agnostic -- no hardcoded game literals"
+
+# 155.16  the reload-persistence standing rule + the Protocol 2a wording fix
+#         are both recorded in the docs this unit touches
+Check (
+    ($claude155 -match '(?i)everything remembers on reload') -and
+    (-not ($claude155 -match 'the files are kept identical for protocol sections')) -and
+    (-not ($rules155 -match 'the files are kept identical for protocol sections'))
+) "155.16: CLAUDE.md records the new reload-persistence standing rule, and the stale ""RULES.md and CLAUDE.md are kept identical"" sentence is corrected"
 
 # ===========================================================
 # Results

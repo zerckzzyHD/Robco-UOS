@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1871/1871 | Cache: robco-terminal-v2.7.0-r36 -->
+﻿## [Unreleased]<!-- Tests: 1887/1887 | Cache: robco-terminal-v2.7.0-r37 -->
 
 ### Added
 
@@ -24,6 +24,7 @@
 - Fixed faction reputation alerts never appearing in Fallout 3 campaigns. Crossing into Vilified or Idolized standing with any faction now reliably shows the on-screen alert and its confirmation tone/vibration in both games — previously the alert only recognized New Vegas faction names, so Fallout 3 campaigns silently never triggered it no matter how hostile or beloved a faction became.
 - Fixed the inventory filter bar offering a "Mods" filter in Fallout 3 campaigns, where weapon mods don't exist and that filter could never show anything.
 - Fixed a case where powering the terminal fully down could leave the screen completely black with no way to bring it back — a clear "PRESS TO POWER ON" button now appears whenever the terminal is shut down, and tapping it fully restores the terminal to normal.
+- Fixed hard-to-read color names on the Module Bay's phosphor tube rack, which were rendering nearly invisible against their own dark background. Also fixed the Module Bay's Schematic View clipping some control text (like the phosphor tube picker showing "ROBCO GR…" instead of the full name), and fixed the maintenance tray's buttons staying pinned to the left with an empty gap when the app is already installed — they now re-center properly.
 
 ### Improved
 
@@ -31,6 +32,7 @@
 - Your current-session time readout now shows a friendlier format (like "2h 15m") instead of a raw minute count.
 - The databank lookup now also searches your collectibles, skill books, magazines, traits, and Lincoln memorabilia trackers, and surfaces a couple of previously-hidden details when it finds a match — like a quest item's story purpose or a creature's experience yield.
 - Confirmation prompts and status messages — save/load warnings, cloud sync results, crafting and trading confirmations, and more — now appear as in-terminal pop-ups that match the rest of the interface, instead of your browser's plain "OK/Cancel" dialog boxes.
+- The Module Bay now looks and feels more like real hardware: the sound board's 13 mute switches are drawn as chips you plug in or pull, the power cell and haptic solenoid show their own device graphics, and the immersion level is now a turnable dial instead of a dropdown. Whichever view you last used — the hardware Bay or the flat Schematic list — is now remembered the next time you open Security & Configuration.
 
 ### Under the Hood
 
