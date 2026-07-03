@@ -76,6 +76,9 @@ function toggleHaptic(enabled) {
   // Confirmation buzz on enable so the user feels it works immediately.
   if (enabled) triggerHaptic('tick');
   _updateHapticUI();
+  if (typeof _logBaySvc === 'function') {
+    _logBaySvc(enabled ? 'HAPTIC SOLENOID INSTALLED' : 'HAPTIC SOLENOID REMOVED');
+  }
 }
 function initHaptic() {
   const toggle = document.getElementById('hapticToggle');
@@ -453,16 +456,18 @@ function _resolveOptic() {
   return _resolveDefaultOptics();
 }
 
-// Dynamic "(Default)" label — tag whichever OPTICS <select> option matches the ACTIVE game's
+// Dynamic "(Default)" label — tag whichever phosphor-tube button matches the ACTIVE game's
 // default optic (GAME_DEFS[ctx].theme.defaultOptics), stripping the tag from all the others.
-// Data-driven + game-agnostic: a new game's default option is labelled with no code change.
+// Data-driven + game-agnostic: a new game's default tube is labelled with no code change.
+// (Step 2 · Phase 2 · B2a: the OPTICS <select> was replaced by the Module Bay tube rack —
+// same container id `opticsColorInput`, now a <div> of `.tube` buttons instead of <option>s.)
 function _updateOpticsDefaultLabel() {
-  const sel = document.getElementById('opticsColorInput');
-  if (!sel) return;
+  const rack = document.getElementById('opticsColorInput');
+  if (!rack) return;
   const def = _resolveDefaultOptics();
-  Array.from(sel.options).forEach(opt => {
-    const base = opt.textContent.replace(/\s*\(Default\)\s*$/, '');
-    opt.textContent = opt.value === def ? base + ' (Default)' : base;
+  Array.from(rack.querySelectorAll('.tube')).forEach(btn => {
+    const tag = btn.querySelector('.t-default');
+    if (tag) tag.textContent = btn.dataset.optic === def ? '(DEFAULT)' : '';
   });
 }
 
@@ -472,6 +477,37 @@ function changeOpticsColor(color) {
   _applyThemeVars(color);
   MetaStore.set(_opticStorageKey(), color);
 }
+
+// Module Bay tube-rack adapter (Step 2 · Phase 2 · B2a) — UI-only: seats the tapped tube
+// (visual .seated state), then calls the SAME setter every other optics entry point uses
+// (Protocol 22). No new persistence path — changeOpticsColor() remains the single writer.
+function _seatOpticsTube(btnEl) {
+  if (!btnEl || !btnEl.dataset) return;
+  const key = btnEl.dataset.optic;
+  const rack = btnEl.closest('.tube-rack');
+  if (rack) {
+    Array.from(rack.querySelectorAll('.tube')).forEach(t =>
+      t.classList.toggle('seated', t === btnEl)
+    );
+  }
+  changeOpticsColor(key);
+  if (typeof renderModuleBay === 'function') renderModuleBay();
+}
+window._seatOpticsTube = _seatOpticsTube;
+
+// Module Bay SLOT 01 status line — combines the seated tube's label with the high-lumen
+// coil state into one diegetic readout. Pure presentation; reads MetaStore, writes nothing.
+function _updateOpticsBoardStatus() {
+  const note = document.getElementById('opticsStatus');
+  if (!note) return;
+  const key = _resolveOptic();
+  const label =
+    typeof THEMES !== 'undefined' && THEMES[key] ? THEMES[key].label : key.toUpperCase();
+  const coilOn = typeof isHighLumenEnabled === 'function' && isHighLumenEnabled();
+  note.textContent =
+    '> TUBE SEATED: ' + label + (coilOn ? ' · HIGH-LUMEN COIL ACTIVE' : ' · COIL SOCKET EMPTY');
+}
+window._updateOpticsBoardStatus = _updateOpticsBoardStatus;
 
 function toggleAudio(key, isMuted) {
   MetaStore.set(key, isMuted);
@@ -528,6 +564,7 @@ function toggleAudio(key, isMuted) {
       if (rads >= 600) startTinnitus();
     }
   }
+  if (typeof _updateSonicBoardStatus === 'function') _updateSonicBoardStatus();
 }
 
 // ── MASTER MUTE ────────────────────────────────────────────
@@ -556,6 +593,14 @@ function toggleMasterMute(isMuted) {
     if (AudioSettings.radio) startRadio(); // WU-F5: resume the radio if it was on
   }
   _updateRadioUI();
+  _updateSonicBoardStatus();
+  if (typeof _logBaySvc === 'function') {
+    _logBaySvc(
+      isMuted
+        ? 'SONIC PROCESSOR REMOVED — MASTER MUTE'
+        : 'SONIC PROCESSOR RESEATED — AUDIO RESTORED'
+    );
+  }
 }
 
 // ── WU-F5 PIP-BOY RADIO (synthesized — zero-byte WebAudio station) ──────────
@@ -702,6 +747,43 @@ function _updateRadioUI() {
     : '> RADIO OFFLINE — NO CARRIER';
 }
 
+// Module Bay SLOT 02 status line (Step 2 · Phase 2 · B2a) — combines the master-mute
+// state with the live active-channel count and the radio module state into one
+// diegetic readout. Pure presentation; reads MetaStore/AudioSettings, writes nothing.
+function _updateSonicBoardStatus() {
+  const note = document.getElementById('sonicStatus');
+  if (!note) return;
+  if (AudioSettings.masterMute) {
+    note.textContent = '> BOARD REMOVED — ALL AUDIO OFFLINE (CHANNEL CHIPS PRESERVED FOR RESEAT)';
+    return;
+  }
+  const keys = [
+    'robco_sfx_muted',
+    'robco_hum_muted',
+    'robco_geiger_muted',
+    'robco_tinnitus_muted',
+    'robco_ambient_muted',
+    'robco_wake_muted',
+    'robco_panelclick_muted',
+    'robco_bootdrone_muted',
+    'robco_levelup_muted',
+    'robco_heartbeat_muted',
+    'robco_questcomplete_muted',
+    'robco_questfail_muted',
+    'robco_factionthreshold_muted',
+  ];
+  const total = keys.length;
+  const active = keys.filter(k => MetaStore.get(k) !== 'true').length;
+  note.textContent =
+    '> BOARD SEATED · ' +
+    active +
+    '/' +
+    total +
+    ' CHANNELS ACTIVE · RECEIVER ' +
+    (AudioSettings.radio ? 'INSTALLED — STATION CARRIER LIVE' : 'SOCKET EMPTY');
+}
+window._updateSonicBoardStatus = _updateSonicBoardStatus;
+
 // User-facing play/stop toggle (diegetic `> PIP-BOY RADIO`). Persists the device
 // preference and starts/stops the station. The onchange fires from a real click,
 // satisfying the autoplay policy.
@@ -711,6 +793,10 @@ function toggleRadio(on) {
   if (on) startRadio();
   else stopRadio();
   _updateRadioUI();
+  _updateSonicBoardStatus();
+  if (typeof _logBaySvc === 'function') {
+    _logBaySvc(on ? 'RADIO RECEIVER MODULE INSTALLED' : 'RADIO RECEIVER MODULE REMOVED');
+  }
 }
 
 // Boot restore. The saved preference cannot auto-start audio (no gesture yet), so

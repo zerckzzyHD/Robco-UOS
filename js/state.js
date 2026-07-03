@@ -59,6 +59,7 @@ const META_MANIFEST = {
   robco_booted_before: { type: 'bool', default: false, owner: 'ui-audio.js' },
   robco_feature_flags: { type: 'json', default: '{}', owner: 'cloud.js' },
   robco_sw_installed: { type: 'bool', default: false, owner: 'index.html' },
+  robco_bay_opened: { type: 'bool', default: false, owner: 'ui-core.js' },
 };
 // Fire-and-forget write-through of a device-pref op to IndexedDB's 'meta' store
 // (Step 2 · Phase 1 · P1). The ONLY seam through which MetaStore touches IdbStore

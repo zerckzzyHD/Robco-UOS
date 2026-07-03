@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1850/1850 | Cache: robco-terminal-v2.7.0-r35 -->
+﻿## [Unreleased]<!-- Tests: 1871/1871 | Cache: robco-terminal-v2.7.0-r36 -->
 
 ### Added
 
@@ -16,6 +16,7 @@
 
 - Your CAMPAIGN NOTES panel is now purely your own manual notebook — the automatic event entries (things like level-ups, faction changes, and quest updates) that used to be mixed in with your typed notes now live in the campaign's event history (shown in CROSSROADS RECORD and the new INCIDENT LOG) instead. Your existing notes are sorted automatically: your own written notes stay in the notebook untouched, and the auto-logged events move to the history. The AI can no longer overwrite your notebook either — anything it reports is recorded in the event history, and your written notes are yours alone.
 - Removed the unused Projected Timeline feature and its command. It never had a way to be filled in on its own and always showed "no timeline generated."
+- The Security & Configuration panel is now a Module Bay — open a service hatch once, and your settings appear as labeled hardware boards (a phosphor tube rack for your screen color, a sonic processor board for sound, a power cell bay for display and vibration settings, an atmospheric regulator for the immersion level, an AI uplink board for your Gemini key, and a maintenance tray for exports and the changelog) instead of a plain list of toggles and dropdowns. Every setting still does exactly what it did before, in the same place, in the same one tap — this is a visual reframe, not a functional change. A "Schematic View" button always gives you the old flat list if you'd rather skip the theming, and your save archive and account settings stay right where they were, below the bay.
 
 ### Fixed
 

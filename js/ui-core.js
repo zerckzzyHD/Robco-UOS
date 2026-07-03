@@ -103,6 +103,9 @@ async function toggleWakeLock(enabled) {
   if (enabled) await _acquireWakeLock();
   else await _releaseWakeLock();
   _updateWakeLockUI();
+  if (typeof _logBaySvc === 'function') {
+    _logBaySvc(enabled ? 'SUSTAINED POWER CELL INSTALLED' : 'SUSTAINED POWER CELL REMOVED');
+  }
 }
 function initWakeLock() {
   const toggle = document.getElementById('wakeLockToggle');
@@ -274,6 +277,10 @@ function toggleHighLumen(enabled) {
   MetaStore.set(HIGH_LUMEN_KEY, enabled ? 'true' : 'false');
   _applyHighLumen(enabled);
   _updateHighLumenUI();
+  if (typeof _updateOpticsBoardStatus === 'function') _updateOpticsBoardStatus();
+  if (typeof _logBaySvc === 'function') {
+    _logBaySvc(enabled ? 'HIGH-LUMEN COIL INSTALLED' : 'HIGH-LUMEN COIL REMOVED');
+  }
 }
 function initHighLumen() {
   const toggle = document.getElementById('highLumenToggle');
@@ -289,24 +296,231 @@ function initHighLumen() {
 // the <select> value, the status readout, and the boot restore. No campaign state.
 function _updateImmersionUI() {
   const note = document.getElementById('immersionStatus');
-  if (!note) return;
   const tier = typeof getImmersionTier === 'function' ? getImmersionTier() : 'full';
-  note.textContent =
-    tier === 'full'
-      ? '> FULL IMMERSION — all ambient systems active'
-      : tier === 'balanced'
-        ? '> BALANCED — reduced ambient activity'
-        : '> MINIMAL — ambient systems quiet';
+  if (note) {
+    note.textContent =
+      tier === 'full'
+        ? '> FULL IMMERSION — all ambient systems active'
+        : tier === 'balanced'
+          ? '> BALANCED — reduced ambient activity'
+          : '> MINIMAL — ambient systems quiet';
+  }
+  // Module Bay SLOT 04 legend — purely decorative, mirrors the real select's value.
+  document.querySelectorAll('.immersion-legend span').forEach(s => {
+    s.classList.toggle('on', s.dataset.tier === tier);
+  });
 }
 function onImmersionChange(value) {
   if (typeof setImmersionTier === 'function') setImmersionTier(value);
   _updateImmersionUI();
+  if (typeof _logBaySvc === 'function') {
+    _logBaySvc('ATMOSPHERIC GOVERNOR → ' + String(value).toUpperCase());
+  }
 }
 function initImmersion() {
   const sel = document.getElementById('immersionSelect');
   if (sel && typeof getImmersionTier === 'function') sel.value = getImmersionTier();
   _updateImmersionUI();
 }
+
+// ── MODULE BAY (Step 2 · Phase 2 · B2a) ─────────────────────────────────────
+// The Security & Configuration panel reframed as installable hardware boards.
+// ONE-TRUTH MODEL: the bay and the Schematic View are both PROJECTIONS of the
+// same stored device prefs — every control still calls the setter it always
+// called (Protocol 22/23); this section only (a) restores the bay's own
+// presentation-only bits at boot (hatch first-visit, the two combined status
+// lines that have no other owner), (b) re-syncs those bits after any bay
+// control fires, and (c) regenerates the Schematic View from current state
+// whenever it's opened — never a second wired control set, so it can never
+// drift from the bay (Protocol 25 sanctioned-exception guardrail).
+const BAY_SVC_LOG_CAP = 12;
+
+// Diegetic confirmation line in the SLOT-adjacent service log. Presentation
+// only — never persisted, never durable state.
+function _logBaySvc(msg) {
+  const body = document.getElementById('baySvcLogBody');
+  if (!body) return;
+  const d = new Date();
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const line = document.createElement('div');
+  line.textContent = '> ' + hh + ':' + mm + ' · ' + msg;
+  body.appendChild(line);
+  while (body.children.length > BAY_SVC_LOG_CAP) body.removeChild(body.firstChild);
+  body.parentElement.scrollTop = body.parentElement.scrollHeight;
+}
+window._logBaySvc = _logBaySvc;
+
+// Re-syncs every bay-owned presentation bit from the stored prefs. Safe to call
+// after ANY bay control fires (idempotent, cheap) — this is what keeps the bay
+// and the Schematic View from ever drifting apart (they read the same prefs).
+// Protocol 42 fix (found during this unit's manual verification): the bay's
+// own checkboxes and the Schematic View's mirrored checkboxes are two SEPARATE
+// DOM elements bound to the same MetaStore key — changing one didn't push its
+// new .checked state to the other. Re-syncing every boolean control's checked
+// state from MetaStore on every renderModuleBay() call (already fired after
+// every bay AND schematic control change) closes that gap in both directions.
+const BAY_CHECKBOX_SYNC_MAP = {
+  highLumenToggle: 'robco_high_lumen',
+  masterMuteToggle: 'robco_master_muted',
+  radioToggle: 'robco_radio_on',
+  wakeLockToggle: 'robco_wakelock_enabled',
+  hapticToggle: 'robco_haptic_enabled',
+  geminiKeySyncToggle: 'robco_gemini_key_sync',
+};
+function renderModuleBay() {
+  Object.keys(BAY_CHECKBOX_SYNC_MAP).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.checked = MetaStore.get(BAY_CHECKBOX_SYNC_MAP[id]) === 'true';
+  });
+  if (typeof _updateOpticsBoardStatus === 'function') _updateOpticsBoardStatus();
+  if (typeof _updateSonicBoardStatus === 'function') _updateSonicBoardStatus();
+  const schem = document.getElementById('baySchematic');
+  if (schem && !schem.hidden) renderBaySchematic();
+}
+window.renderModuleBay = renderModuleBay;
+
+// First-visit-only hatch ceremony (LOCKED-1). After the first-ever release the
+// bay just opens with the panel — this function only decides whether the
+// closed-hatch overlay is shown at all.
+function initModuleBay() {
+  const opened = MetaStore.get('robco_bay_opened') === 'true';
+  const hatch = document.getElementById('bayHatch');
+  if (hatch) hatch.hidden = opened;
+  renderModuleBay();
+}
+window.initModuleBay = initModuleBay;
+
+function releaseBayHatch() {
+  MetaStore.set('robco_bay_opened', 'true');
+  const hatch = document.getElementById('bayHatch');
+  if (hatch) {
+    const reduced =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    hatch.classList.add('bay-hatch--open');
+    setTimeout(
+      () => {
+        hatch.hidden = true;
+      },
+      reduced ? 0 : 900
+    );
+  }
+  _logBaySvc('HATCH RELEASED — TECHNICIAN ACCESS GRANTED');
+}
+window.releaseBayHatch = releaseBayHatch;
+
+// Permanent light-touch fallback (LOCKED-3) — swaps the bay grid for a flat,
+// regenerated list of the same controls. Never a parallel wired set.
+function toggleBaySchematic() {
+  const bay = document.getElementById('bayContent');
+  const schem = document.getElementById('baySchematic');
+  if (!bay || !schem) return;
+  const toSchematic = schem.hidden;
+  schem.hidden = !toSchematic;
+  bay.hidden = toSchematic;
+  if (toSchematic) renderBaySchematic();
+  else renderModuleBay();
+}
+window.toggleBaySchematic = toggleBaySchematic;
+
+function _schemSetGeminiSync(checked) {
+  if (window.setGeminiKeySync) window.setGeminiKeySync(checked);
+  renderModuleBay();
+}
+window._schemSetGeminiSync = _schemSetGeminiSync;
+
+// Regenerated from the SAME stored prefs the bay reads — every row calls the
+// SAME setter its bay counterpart calls, then re-syncs via renderModuleBay()
+// (which re-renders this very list while it's open, so it can never drift).
+function renderBaySchematic() {
+  const list = document.getElementById('baySchematicList');
+  if (!list) return;
+  const optic = typeof _resolveOptic === 'function' ? _resolveOptic() : 'green';
+  const highLumen = typeof isHighLumenEnabled === 'function' && isHighLumenEnabled();
+  const masterMuted = MetaStore.get('robco_master_muted') === 'true';
+  const radioOn = MetaStore.get('robco_radio_on') === 'true';
+  const wakeOn = typeof isWakeLockEnabled === 'function' && isWakeLockEnabled();
+  const hapticOn = typeof isHapticEnabled === 'function' && isHapticEnabled();
+  const tier = typeof getImmersionTier === 'function' ? getImmersionTier() : 'full';
+  const keySync = MetaStore.get('robco_gemini_key_sync') === 'true';
+  const typerSpeed = parseFloat(MetaStore.get('robco_typer_speed') || '1');
+
+  const row = (controlHtml, name, loc) =>
+    `<div class="schem-row">${controlHtml}<span class="sr-name">${escapeHtml(name)}</span><span class="sr-loc">${loc}</span></div>`;
+  const checkboxRow = (setter, checked, name, loc) =>
+    row(
+      `<input type="checkbox" ${checked ? 'checked' : ''} onchange="${setter}(this.checked); renderModuleBay();" aria-label="${escapeHtml(name)}" />`,
+      name,
+      loc
+    );
+  const themeOptions =
+    typeof THEMES === 'object' && THEMES
+      ? Object.keys(THEMES)
+          .map(
+            k =>
+              `<option value="${k}"${k === optic ? ' selected' : ''}>${escapeHtml(THEMES[k].label)}</option>`
+          )
+          .join('')
+      : '';
+
+  list.innerHTML = [
+    row(
+      `<select onchange="changeOpticsColor(this.value); renderModuleBay();" aria-label="Phosphor tube">${themeOptions}</select>`,
+      'PHOSPHOR TUBE',
+      'SLOT 01'
+    ),
+    checkboxRow('toggleHighLumen', highLumen, 'HIGH-LUMEN COIL', 'SLOT 01'),
+    checkboxRow('toggleMasterMute', masterMuted, 'SONIC PROCESSOR BOARD (MASTER MUTE)', 'SLOT 02'),
+    row(
+      '<span style="opacity:.6">13 rows</span>',
+      '13 CHANNEL CHIPS — manage individually in SLOT 02 above',
+      'SLOT 02'
+    ),
+    checkboxRow('toggleRadio', radioOn, 'RADIO RECEIVER MODULE', 'SLOT 02'),
+    row(
+      `<input type="range" min="0.25" max="3" step="0.25" value="${typerSpeed}" style="flex:1 1 90px;min-width:0" oninput="MetaStore.set('robco_typer_speed', this.value); renderModuleBay();" aria-label="Print-rate trim" />`,
+      'PRINT-RATE TRIM',
+      'SLOT 02'
+    ),
+    checkboxRow('toggleWakeLock', wakeOn, 'SUSTAINED POWER CELL', 'SLOT 03'),
+    checkboxRow('toggleHaptic', hapticOn, 'HAPTIC SOLENOID', 'SLOT 03'),
+    row(
+      `<select onchange="onImmersionChange(this.value); renderModuleBay();" aria-label="Atmospheric regulator">
+        <option value="full"${tier === 'full' ? ' selected' : ''}>FULL</option>
+        <option value="balanced"${tier === 'balanced' ? ' selected' : ''}>BALANCED</option>
+        <option value="minimal"${tier === 'minimal' ? ' selected' : ''}>MINIMAL</option>
+      </select>`,
+      'ATMOSPHERIC REGULATOR',
+      'SLOT 04'
+    ),
+    checkboxRow('_schemSetGeminiSync', keySync, 'KEY-SYNC JUMPER', 'SLOT 05'),
+  ].join('');
+}
+window.renderBaySchematic = renderBaySchematic;
+
+// SVC Tray onclick wrappers — kept as tiny named functions (not inline multi-
+// statement onclick) so the diegetic log message is never embedded in an
+// index.html attribute value (avoids colliding with the Suite 59 inline-
+// handler scanner, which treats any "Word(" it finds in an attribute as a
+// candidate function reference). Each wraps the SAME existing utility action.
+function _svcExportCampaignLog(fmt) {
+  exportCampaignLog(fmt);
+  _logBaySvc('CAMPAIGN LOG EXPORTED — .' + String(fmt).toUpperCase());
+}
+window._svcExportCampaignLog = _svcExportCampaignLog;
+
+function _svcViewChangelog() {
+  showFullChangelog();
+  _logBaySvc('FIRMWARE REVISION LOG OPENED');
+}
+window._svcViewChangelog = _svcViewChangelog;
+
+function _svcInstallPwa() {
+  installPwa();
+  _logBaySvc('SYSTEM INSTALLER LAUNCHED');
+}
+window._svcInstallPwa = _svcInstallPwa;
 
 // ── CLIENT ERROR RING-BUFFER ──────────────────────────────────
 // Local-only diagnostic log — never transmitted. Cap 50 entries × 300 chars ≈ 15 KB max.
@@ -871,8 +1085,12 @@ function _restoreOpticsPreference() {
   // game's default optic) to the active game.
   const _optic = _resolveOptic();
   _applyThemeVars(_optic);
-  const _opticSel = document.getElementById('opticsColorInput');
-  if (_opticSel) _opticSel.value = _optic;
+  const _rack = document.getElementById('opticsColorInput');
+  if (_rack) {
+    Array.from(_rack.querySelectorAll('.tube')).forEach(t => {
+      t.classList.toggle('seated', t.dataset.optic === _optic);
+    });
+  }
   _updateOpticsDefaultLabel();
 }
 
@@ -1243,6 +1461,7 @@ window.onload = async function () {
     _wirePanelPersistence();
     _restoreOpticsPreference();
     _restoreDevicePrefs();
+    initModuleBay(); // Step 2 · Phase 2 · B2a: Module Bay hatch first-visit + status sync
     _wireKeyboardShortcuts();
     _runBootSequenceAndBriefing();
     _startAmbientTimers();

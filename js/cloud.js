@@ -832,6 +832,13 @@ window.saveGeminiKeyToCloud = async function (key, model) {
 window.setGeminiKeySync = async function (checked) {
   if (!window.isFeatureEnabled('keySync')) return;
   window.MetaStore.set('robco_gemini_key_sync', checked ? 'true' : 'false');
+  if (typeof window._logBaySvc === 'function') {
+    window._logBaySvc(
+      checked
+        ? 'KEY-SYNC JUMPER BRIDGED — KEY FOLLOWS ACCOUNT'
+        : 'KEY-SYNC JUMPER OPEN — KEY STAYS LOCAL'
+    );
+  }
   if (_currentUser && !_currentUser.isAnonymous && _currentUid) {
     try {
       await setDoc(

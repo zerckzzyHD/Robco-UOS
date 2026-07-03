@@ -3022,3 +3022,613 @@ button.tracker-toggle--inactive {
   font-size: 10px;
   opacity: 0.6;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   MODULE BAY (Step 2 · Phase 2 · B2a) — Security & Configuration reframed
+   as installable hardware. Every control below drives the SAME setter it
+   always has (Protocol 22/23) — this section is presentation-only. Namespaced
+   under .module-bay / .bay-* so it can never leak into other panels. The
+   desktop two-column layout is gated on the PANEL'S OWN width via a CSS
+   container query (not the viewport @media), since in-app this panel lives
+   in a narrower shell column than a full-viewport mockup (Protocol 10 risk).
+   ═══════════════════════════════════════════════════════════════════════ */
+.module-bay {
+  container-type: inline-size;
+  container-name: bay;
+  margin-top: 8px;
+}
+.bay-copper {
+  /* local alias so the edge-connector fingers don't hardcode a bespoke hex
+     outside the --robco-* token set */
+  color: #d9a24a;
+}
+
+/* ── Hatch — first-visit-only service-panel ceremony ─────────────────── */
+.bay-hatch {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background:
+    repeating-linear-gradient(
+      115deg,
+      rgba(var(--robco-green-rgb), 0.03) 0 3px,
+      transparent 3px 9px
+    ),
+    linear-gradient(180deg, #05261c, #021b13 55%, #041f16);
+  transition:
+    transform 0.85s cubic-bezier(0.6, -0.02, 0.35, 1),
+    opacity 0.5s 0.4s;
+}
+.bay-hatch[hidden] {
+  display: none;
+}
+.bay-hatch.bay-hatch--open {
+  transform: translateY(-104%);
+  opacity: 0.2;
+  pointer-events: none;
+}
+.hatch-plate {
+  width: min(480px, 100%);
+  border: 2px solid var(--robco-green);
+  box-shadow:
+    0 0 30px rgba(var(--robco-green-rgb), 0.15),
+    inset 0 0 40px rgba(0, 0, 0, 0.6);
+  padding: 24px 18px 20px;
+  position: relative;
+  background: rgba(0, 12, 8, 0.55);
+  text-align: center;
+}
+.hatch-screw {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.7);
+  border-radius: 50%;
+  color: rgba(var(--robco-green-rgb), 0.8);
+  font-size: 12px;
+  line-height: 16px;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.5);
+  transition: transform 0.7s ease;
+}
+.hatch-screw::before {
+  content: '\2715';
+}
+.hatch-screw.tl {
+  top: 7px;
+  left: 7px;
+}
+.hatch-screw.tr {
+  top: 7px;
+  right: 7px;
+}
+.hatch-screw.bl {
+  bottom: 7px;
+  left: 7px;
+}
+.hatch-screw.br {
+  bottom: 7px;
+  right: 7px;
+}
+.hatch-brand {
+  font-size: 10px;
+  letter-spacing: 2px;
+  opacity: 0.75;
+}
+.hatch-title {
+  font-size: clamp(17px, 5.4vw, 23px);
+  letter-spacing: 3px;
+  margin: 12px 0 4px;
+  color: var(--robco-green);
+}
+.hatch-sub {
+  font-size: 10px;
+  opacity: 0.6;
+  letter-spacing: 1px;
+}
+.hatch-warn {
+  margin: 14px auto 16px;
+  border: 1px dashed var(--robco-alert);
+  color: var(--robco-alert);
+  font-size: 10px;
+  letter-spacing: 1px;
+  padding: 7px 10px;
+  max-width: 380px;
+}
+.hatch-latch-btn {
+  font-size: 13px;
+  padding: 12px 20px;
+  border-width: 2px;
+  letter-spacing: 2px;
+  width: auto;
+}
+.hatch-hint {
+  margin-top: 10px;
+  font-size: 9.5px;
+  opacity: 0.45;
+}
+
+/* ── Bay chrome ───────────────────────────────────────────────────────── */
+.bay-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  border: 1px solid var(--robco-green);
+  border-bottom: 2px solid var(--robco-green);
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.3);
+}
+.bay-head-title {
+  font-size: clamp(13px, 4vw, 16px);
+  letter-spacing: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.bay-led {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--robco-green);
+  box-shadow: 0 0 8px var(--robco-green);
+  margin-right: 5px;
+  vertical-align: 1px;
+}
+.bay-bus-strip {
+  font-size: 9px;
+  letter-spacing: 1px;
+  opacity: 0.5;
+  padding: 5px 2px 10px;
+  /* Decorative flavor text — wraps freely rather than clipping via nowrap +
+     ellipsis, which left the un-rendered tail as full-width scrollable
+     content (scrollWidth > clientWidth) even though nothing was visibly cut
+     off (Protocol 42 — found during gate render-check verification). */
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.bay-grid {
+  display: grid;
+  /* Single column, unconditionally (Protocol 42 — found during this unit's
+     manual desktop render-check): the app's desktop shell fixes the settings
+     panel's own column at a hard 380px (grid-template-columns: 380px 1fr in
+     the ≥1000px shell), leaving the bay well under 340px of content width at
+     EVERY viewport size, including 4K. A two-column @container breakpoint
+     (the mockup's full-viewport-width vision) can therefore never engage in
+     this shell — it would be dead, misleading code. minmax(0, 1fr), not a
+     bare 1fr — a bare 1fr track's implicit minimum is "auto" (content-based),
+     which let each board's automatic minimum size force the track wider than
+     the container even at this single width, though nothing inside the board
+     actually needed to be that wide. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+.bay-board.span2 {
+  grid-column: 1 / -1;
+}
+
+/* ── Generic "board" (a SLOT sub-panel) ──────────────────────────────── */
+details.bay-board {
+  position: relative;
+  margin-top: 0;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.55);
+  border-top: 1px solid rgba(var(--robco-green-rgb), 0.55);
+  background:
+    linear-gradient(rgba(0, 0, 0, 0.22), rgba(0, 0, 0, 0.22)),
+    repeating-linear-gradient(
+      90deg,
+      rgba(var(--robco-green-rgb), 0.04) 0 1px,
+      transparent 1px 26px
+    ),
+    rgba(var(--robco-green-rgb), 0.045);
+  padding: 10px 10px 12px;
+}
+details.bay-board::after {
+  content: '';
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  bottom: -6px;
+  height: 6px;
+  background: repeating-linear-gradient(90deg, #d9a24a 0 7px, transparent 7px 12px);
+  opacity: 0.75;
+  pointer-events: none;
+}
+.bay-board > summary {
+  padding-right: 62px;
+  position: relative;
+}
+.bay-slot-tag {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  font-size: 8.5px;
+  letter-spacing: 1.5px;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.55);
+  border-top: none;
+  border-right: none;
+  padding: 2px 7px;
+  background: rgba(0, 0, 0, 0.55);
+  opacity: 0.85;
+}
+.bay-part-no {
+  display: block;
+  font-size: 9px;
+  opacity: 0.45;
+  letter-spacing: 1px;
+  margin: 2px 0 8px;
+}
+.board-status {
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  opacity: 0.8;
+  border-left: 2px solid var(--robco-green);
+  padding-left: 7px;
+  margin: 10px 0 0;
+  min-height: 13px;
+}
+.board-status.alert {
+  color: var(--robco-alert);
+  border-left-color: var(--robco-alert);
+}
+
+/* Amber AI Uplink board (SLOT 05 — LOCKED identity, kept amber) */
+details.bay-board.uplink {
+  border-color: rgba(243, 156, 18, 0.6);
+}
+details.bay-board.uplink::after {
+  opacity: 0.55;
+}
+details.bay-board.uplink .bay-slot-tag {
+  border-color: rgba(243, 156, 18, 0.6);
+  color: var(--robco-alert);
+}
+
+/* Blue SVC Tray (utility actions — matches the app's existing blue = utility convention) */
+details.bay-board.tray {
+  border-color: rgba(52, 152, 219, 0.55);
+}
+details.bay-board.tray .bay-slot-tag {
+  border-color: rgba(52, 152, 219, 0.55);
+  color: var(--robco-blue);
+}
+
+/* ── Boolean "module" (installable card) — wraps a REAL checkbox ────────
+   Accessible custom-checkbox pattern: the native input is visually
+   1x1/opacity:0 but stays focusable/keyboard-operable (Protocol 17); the
+   adjacent label is the visible "hardware" card. All state (LED, dashed
+   border, INSTALL/REMOVE text) is driven purely by :checked — the setter
+   functions and their ids/onchange attributes are UNTOUCHED. */
+.bay-module {
+  position: relative;
+  margin-top: 8px;
+}
+.bay-module-input {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  margin: 0;
+}
+.bay-module-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.5);
+  background: rgba(0, 0, 0, 0.35);
+  padding: 8px 10px;
+  cursor: pointer;
+  min-height: 28px;
+}
+.bay-module-input:focus-visible + .bay-module-card {
+  outline: 2px solid var(--robco-green);
+  outline-offset: 2px;
+}
+.bay-module-input:disabled + .bay-module-card {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.bay-module-input:not(:checked) + .bay-module-card {
+  border-style: dashed;
+  opacity: 0.75;
+}
+.bay-module .m-led {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.6);
+  background: transparent;
+}
+.bay-module-input:checked + .bay-module-card .m-led {
+  background: var(--robco-green);
+  box-shadow: 0 0 7px var(--robco-green);
+}
+.bay-module .m-name {
+  font-size: 11.5px;
+  letter-spacing: 1px;
+  flex: 1 1 140px;
+  min-width: 0;
+}
+.bay-module .m-sub {
+  display: block;
+  font-size: 9px;
+  opacity: 0.55;
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+}
+.bay-module .m-action {
+  font-size: 9px;
+  letter-spacing: 1px;
+  flex-shrink: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--robco-green);
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+}
+.bay-module-input:checked + .bay-module-card .m-action {
+  border-color: var(--robco-alert);
+  color: var(--robco-alert);
+}
+.bay-module .m-action .off-txt {
+  display: inline;
+}
+.bay-module .m-action .on-txt {
+  display: none;
+}
+.bay-module-input:checked + .bay-module-card .m-action .off-txt {
+  display: none;
+}
+.bay-module-input:checked + .bay-module-card .m-action .on-txt {
+  display: inline;
+}
+
+/* Master-eject variant — SAME pattern, inverted emphasis (checked = removed/muted) */
+.bay-module--eject .bay-module-card {
+  border-width: 1px;
+  font-weight: bold;
+}
+.bay-module--eject .bay-module-input:checked + .bay-module-card {
+  border-color: var(--robco-alert);
+  color: var(--robco-alert);
+  background: rgba(243, 156, 18, 0.08);
+}
+
+/* ── Phosphor tube rack (SLOT 01 optics) ─────────────────────────────── */
+.tube-rack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+button.tube {
+  --tube: var(--robco-green);
+  flex: 0 0 auto;
+  width: 100%;
+  max-width: 62px;
+  min-width: 52px;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.4);
+  background: rgba(0, 0, 0, 0.4);
+  padding: 8px 4px 6px;
+  cursor: pointer;
+  text-align: center;
+  min-height: 44px;
+}
+.tube .glass {
+  width: 20px;
+  height: 38px;
+  margin: 0 auto 5px;
+  border: 1px solid var(--tube);
+  border-radius: 9px 9px 4px 4px;
+  background: linear-gradient(180deg, transparent 12%, var(--tube) 90%);
+  opacity: 0.5;
+}
+.tube .t-name {
+  display: block;
+  font-size: 8px;
+  letter-spacing: 0.3px;
+  opacity: 0.8;
+  line-height: 1.25;
+}
+.tube .t-default {
+  display: block;
+  font-size: 7.5px;
+  opacity: 0.6;
+  margin-top: 2px;
+  min-height: 9px;
+}
+.tube.seated {
+  border-color: var(--tube);
+  box-shadow: 0 0 12px var(--tube);
+}
+.tube.seated .glass {
+  opacity: 1;
+  box-shadow: 0 0 14px var(--tube);
+}
+html.high-lumen .tube.seated,
+html.high-lumen .tube.seated .glass {
+  box-shadow: none;
+}
+
+/* ── Channel list (SLOT 02 — 13 UNFLIPPED mute checkboxes, B2b re-skins) ── */
+/* Single column, unconditionally — see the .bay-grid comment above; the bay
+   never has more than ~340px of content width in this app's shell. */
+.bay-channel-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 3px;
+  margin: 8px 0;
+}
+.bay-trimmer {
+  margin-top: 10px;
+  border-top: 1px dashed rgba(var(--robco-green-rgb), 0.4);
+  padding-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── Uplink board (SLOT 05) ──────────────────────────────────────────── */
+.uplink .key-slot {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.uplink .key-slot input {
+  flex: 1 1 150px;
+  min-width: 0;
+}
+
+/* ── Atmospheric Regulator legend (SLOT 04 — decorative, mirrors #immersionSelect) ── */
+.immersion-legend span {
+  opacity: 0.4;
+}
+.immersion-legend span.on {
+  opacity: 1;
+}
+.immersion-legend span.on::before {
+  content: '▸ ';
+}
+
+/* ── Key-sync jumper — checkbox-driven sliding switch ────────────────── */
+.jumper-wrap {
+  position: relative;
+  margin-top: 10px;
+}
+.jumper-input {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  margin: 0;
+}
+.jumper-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  flex-wrap: wrap;
+  min-height: 28px;
+}
+.jumper-input:focus-visible + .jumper-card {
+  outline: 2px solid var(--robco-alert);
+  outline-offset: 2px;
+}
+.j-track {
+  width: 38px;
+  height: 16px;
+  flex-shrink: 0;
+  border: 1px solid var(--robco-alert);
+  border-radius: 9px;
+  position: relative;
+}
+.j-track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 3px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--robco-alert);
+  transition: left 0.2s;
+}
+.jumper-input:checked + .jumper-card .j-track {
+  background: rgba(243, 156, 18, 0.25);
+}
+.jumper-input:checked + .jumper-card .j-track::after {
+  left: 23px;
+  box-shadow: 0 0 7px var(--robco-alert);
+}
+.j-label {
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  color: var(--robco-alert);
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+/* ── SVC Tray ─────────────────────────────────────────────────────────── */
+.bay-tools {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 6px;
+  margin-top: 6px;
+}
+.bay-tools button {
+  font-size: 9.5px;
+  padding: 9px 6px;
+  letter-spacing: 1px;
+  border-color: var(--robco-blue);
+  color: var(--robco-blue);
+  width: 100%;
+  min-height: 28px;
+}
+
+/* ── Service log ──────────────────────────────────────────────────────── */
+.bay-svc-log {
+  margin-top: 14px;
+  border: 1px dashed rgba(var(--robco-green-rgb), 0.4);
+  padding: 8px 10px;
+  font-size: 10px;
+  opacity: 0.85;
+  max-height: 100px;
+  overflow-y: auto;
+}
+.bay-svc-log .log-title {
+  letter-spacing: 2px;
+  opacity: 0.6;
+  font-size: 9px;
+  margin-bottom: 4px;
+}
+.bay-svc-log div {
+  line-height: 1.6;
+}
+
+/* ── Schematic View (permanent light-touch fallback) ─────────────────── */
+.bay-schematic {
+  margin-top: 10px;
+  border: 2px solid var(--robco-green);
+  background: var(--robco-dark);
+  padding: 12px;
+}
+.bay-schematic[hidden] {
+  display: none;
+}
+.bay-schematic .schem-note {
+  font-size: 10px;
+  opacity: 0.6;
+  margin-bottom: 10px;
+}
+.schem-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  padding: 5px 2px;
+  border-bottom: 1px dotted rgba(var(--robco-green-rgb), 0.25);
+  flex-wrap: wrap;
+}
+.schem-row .sr-name {
+  flex: 1 1 170px;
+  min-width: 0;
+}
+.schem-row .sr-loc {
+  font-size: 9px;
+  opacity: 0.5;
+}
+.schem-row select,
+.schem-row input[type='range'] {
+  min-width: 0;
+}

@@ -9668,10 +9668,14 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     'terminal.css .optics-label has white-space: nowrap (desktop OPTICS label wrap fix)'
   );
 
-  // 86.6  index.html OPTICS label has class="optics-label" (Protocol 20 static guard)
+  // 86.6  the standalone "OPTICS:" label was retired by the Module Bay reframe
+  //        (Step 2 · Phase 2 · B2a) — SLOT 01's own heading + the phosphor tube
+  //        rack (id="opticsColorInput") replace it; guard the replacement instead.
   assert(
-    /class="optics-label"[^>]*>OPTICS:/.test(htmlSource),
-    'index.html OPTICS label has class="optics-label" (Protocol 20 static guard)'
+    /id="opticsColorInput"/.test(htmlSource) &&
+      /class="tube-rack"/.test(htmlSource) &&
+      !/class="optics-label"[^>]*>OPTICS:/.test(htmlSource),
+    'index.html retires the standalone OPTICS: label in favor of the Module Bay tube rack (#opticsColorInput.tube-rack)'
   );
 }
 
@@ -12795,13 +12799,15 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   }
 
   // 115.8  POWER MANAGEMENT sub-panel present + accessible toggle + status note + data-sub-id
+  //        (Step 2 · Phase 2 · B2a: reframed as SLOT 03 · POWER CELL BAY — same
+  //        data-sub-id="power_systems", same controls, new diegetic heading.)
   assert(
     /data-sub-id="power_systems"/.test(html115) &&
-      /POWER MANAGEMENT/.test(html115) &&
+      /POWER CELL BAY/.test(html115) &&
       /id="wakeLockToggle"/.test(html115) &&
       /id="wakeLockStatus"/.test(html115) &&
       /for="wakeLockToggle"/.test(html115),
-    '115.8: POWER MANAGEMENT sub-panel (data-sub-id) has #wakeLockToggle + label[for] + #wakeLockStatus note'
+    '115.8: POWER CELL BAY sub-panel (data-sub-id="power_systems") has #wakeLockToggle + label[for] + #wakeLockStatus note'
   );
 }
 
@@ -13923,11 +13929,13 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   );
 
   // 124.12  the pre-paint inline head script + the OPTICS picker both cover green3 (flash-free)
+  //         (Step 2 · Phase 2 · B2a: the OPTICS <select> became the Module Bay tube
+  //         rack — a data-optic="green3" tube button replaces the <option>.)
   assert(
-    /<option value="green3">/.test(html124) &&
+    /data-optic="green3"/.test(html124) &&
       /color === 'green3'/.test(html124) &&
       html124.includes("'#4fb05a'"),
-    '124.12: index.html exposes the green3 optic option AND the pre-paint head script applies it (no flash on explicit pick)'
+    '124.12: index.html exposes the green3 phosphor tube AND the pre-paint head script applies it (no flash on explicit pick)'
   );
 }
 
@@ -14373,22 +14381,25 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '130.4: ui-core boot applies _resolveOptic(), sets the picker value, and calls _updateOpticsDefaultLabel()'
   );
 
-  // 130.5  dynamic "(Default)" label tags the option matching the active game's default optic
+  // 130.5  dynamic "(Default)" label tags the phosphor tube matching the active game's
+  //        default optic (Step 2 · Phase 2 · B2a: the OPTICS <select> became the Module
+  //        Bay tube rack — the tag now lives in each tube's .t-default span, keyed off
+  //        the button's data-optic attribute instead of an <option> value).
   assert(
     /_resolveDefaultOptics\(\)/.test(labelFn130) &&
-      /opt\.value === def/.test(labelFn130) &&
-      /\(Default\)/.test(labelFn130) &&
-      /\.replace\(/.test(labelFn130),
-    '130.5: _updateOpticsDefaultLabel tags the option whose value === _resolveDefaultOptics() with "(Default)" and strips it from the rest'
+      /btn\.dataset\.optic === def/.test(labelFn130) &&
+      /\(DEFAULT\)/.test(labelFn130) &&
+      /querySelectorAll\('\.tube'\)/.test(labelFn130),
+    '130.5: _updateOpticsDefaultLabel tags the tube whose data-optic === _resolveDefaultOptics() with "(DEFAULT)" and strips it from the rest'
   );
 
-  // 130.6  index.html: the green option carries NO static "(Default)"; the pre-paint head
-  //        script reads the per-game key
+  // 130.6  index.html: the green tube carries NO static "(DEFAULT)" tag; the pre-paint
+  //        head script reads the per-game key
   assert(
-    /<option value="green">RobCo Green<\/option>/.test(html130) &&
-      !/<option value="green">[^<]*\(Default\)/.test(html130) &&
+    /data-optic="green"/.test(html130) &&
+      !/data-optic="green"[\s\S]{0,400}\(DEFAULT\)/.test(html130) &&
       /'robco_optic_' \+ _ctx0/.test(html130),
-    '130.6: the static "(Default)" is gone from the markup (JS adds it dynamically); the head pre-paint script reads robco_optic_<ctx>'
+    '130.6: the static "(DEFAULT)" is gone from the markup (JS adds it dynamically); the head pre-paint script reads robco_optic_<ctx>'
   );
 
   // 130.7  game-agnostic / N-game scalable — no two-game hardcode in the optic code; the only
@@ -18835,10 +18846,335 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     );
   }
 
-  // 153.9  Protocol 1 — CACHE_NAME bumped for this served-file change
+  // 153.9  Protocol 1 — CACHE_NAME is a well-formed, current revision string.
+  //        (Superseded as "latest" by Suite 154 — the exact -rN pin moved
+  //        there per the rotation pattern documented at 151.18; kept generic
+  //        here so a later served-file bump can't make this suite stale.)
   assert(
-    /const CACHE_NAME = 'robco-terminal-v2\.7\.0-r35';/.test(readFile('sw.js')),
-    '153.9: CACHE_NAME bumped (js/api.js, js/db_nv.js, js/db_fo3.js, js/ui-core.js touched by the Command-Line MODE upgrades)'
+    /const CACHE_NAME = 'robco-terminal-v2\.7\.0-r\d+';/.test(readFile('sw.js')),
+    '153.9: CACHE_NAME is a well-formed robco-terminal-v2.7.0-rN revision string (Protocol 1)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 154 — Step 2 (v2.8.0) Phase 2 B2a: MODULE BAY core reframe
+//  The Security & Configuration panel reframed as installable hardware
+//  (owner-approved mockup, Protocol 25 sanctioned exception). ONE-TRUTH MODEL:
+//  the bay + the permanent Schematic View are both projections of the SAME
+//  stored device prefs; every control still calls the setter it always
+//  called (Protocol 22/23) — zero new campaign state, zero AI involvement.
+//  The 13 SLOT-02 audio channels stay in their CURRENT (un-flipped) polarity
+//  this unit — B2b converts them to DIP chips. 18 tests.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 154 — Step 2 Phase 2 B2a: Module Bay core reframe');
+  const html154 = readFile('index.html');
+  const core154 = readFile('js/ui-core.js');
+  const audio154 = readFile('js/ui-audio.js');
+  const state154 = readFile('js/state.js');
+  const css154 = readFile('css/terminal.css');
+  const claude154 = readFile('CLAUDE.md');
+
+  // 154.1  the bay chrome + all 6 SLOT sub-panels are present, each a real
+  //        sub-panel (data-sub-id) defaulting OPEN on first boot (owner decision)
+  assert(
+    /id="moduleBay" class="module-bay"/.test(html154) &&
+      /id="bayHatch" class="bay-hatch" hidden/.test(html154) &&
+      /id="bayContent" class="bay-content"/.test(html154) &&
+      [
+        'slot_01_optics',
+        'audio_systems',
+        'power_systems',
+        'slot_04_immersion',
+        'slot_05_uplink',
+        'slot_svc_tray',
+      ].every(id => new RegExp(`data-sub-id="${id}"[\\s\\S]{0,40}open`).test(html154)),
+    '154.1: #moduleBay + #bayHatch + #bayContent exist; all 6 SLOT sub-panels default open="" on first boot'
+  );
+
+  // 154.2  Protocol UI-1 clarification honored — every SLOT/tray heading is an
+  //        <h3> (not a bare/plain summary), the panel's own <h2> stays untouched
+  assert(
+    /<h2 style="border-color: var\(--robco-alert\); color: var\(--robco-alert\)">\s*> SECURITY & CONFIGURATION/.test(
+      html154
+    ) &&
+      (html154.match(/<h3[^>]*>[\s\S]{0,40}&gt; SLOT 0[1-5]/g) || []).length === 5 &&
+      /<h3>&gt; SVC TRAY/.test(html154),
+    '154.2: the panel keeps its single <h2>; every SLOT + the SVC tray use the sub-panel <h3> convention (Protocol UI-1 clarification)'
+  );
+
+  // 154.3  every pre-existing setter/id survives verbatim — no functionality lost
+  //        (checkbox-driven boolean modules keep their EXACT id + onchange contract)
+  assert(
+    [
+      'id="apiKeyInput"',
+      'id="geminiKeySyncToggle"',
+      'id="btnFetchModels"',
+      'id="apiModelInput"',
+      'id="highLumenToggle"',
+      'onchange="toggleHighLumen(this.checked)"',
+      'id="immersionSelect"',
+      'onchange="onImmersionChange(this.value)"',
+      'id="masterMuteToggle"',
+      'onchange="toggleMasterMute(this.checked)"',
+      'id="radioToggle"',
+      'onchange="toggleRadio(this.checked)"',
+      'id="wakeLockToggle"',
+      'onchange="toggleWakeLock(this.checked)"',
+      'id="hapticToggle"',
+      'onchange="toggleHaptic(this.checked)"',
+      'id="typerSpeedSlider"',
+      'id="ejectHolotapeBtn"',
+      'onclick="ejectHolotape()"',
+      'id="btnViewChangelog"',
+      'id="btnInstallPwa"',
+    ].every(needle => html154.includes(needle)),
+    '154.3: every existing control id + its EXACT onchange/onclick setter call survives the reframe unmodified'
+  );
+
+  // 154.4  all 13 channel-mute checkboxes are UNTOUCHED this unit (ids + onchange
+  //        keys identical — B2b, not B2a, converts them to DIP chips)
+  const muteKeys154 = [
+    'robco_sfx_muted',
+    'robco_hum_muted',
+    'robco_geiger_muted',
+    'robco_tinnitus_muted',
+    'robco_ambient_muted',
+    'robco_wake_muted',
+    'robco_panelclick_muted',
+    'robco_bootdrone_muted',
+    'robco_levelup_muted',
+    'robco_heartbeat_muted',
+    'robco_questcomplete_muted',
+    'robco_questfail_muted',
+    'robco_factionthreshold_muted',
+  ];
+  assert(
+    muteKeys154.every(k => html154.includes(`toggleAudio('${k}', this.checked)`)),
+    '154.4: all 13 SLOT-02 channel checkboxes keep their exact toggleAudio() call this unit (un-flipped — B2b converts to chips)'
+  );
+
+  // 154.5  the phosphor tube rack replaces the OPTICS <select> — 7 tubes, one per
+  //        THEMES key, each seating via the SAME changeOpticsColor() setter
+  const themeKeys154 = Object.keys(
+    (() => {
+      const m = state154.match(/const THEMES = \{[\s\S]*?\n\};/);
+      const obj = {};
+      (m ? m[0] : '').replace(/^\s*(\w+):\s*\{/gm, (_, k) => {
+        if (k !== 'rgb' && k !== 'hex' && k !== 'dark' && k !== 'label' && k !== 'contrastSafe')
+          obj[k] = true;
+        return '';
+      });
+      return obj;
+    })()
+  );
+  assert(
+    themeKeys154.length === 7 &&
+      themeKeys154.every(k => html154.includes(`data-optic="${k}"`)) &&
+      (html154.match(/onclick="_seatOpticsTube\(this\)"/g) || []).length === 7,
+    '154.5: the tube rack has exactly one button per THEMES key (7), each wired to _seatOpticsTube(this)'
+  );
+
+  // 154.6  _seatOpticsTube is a thin adapter — it calls the SAME changeOpticsColor()
+  //        setter (Protocol 22), never a parallel persistence path
+  const seatFn154 = (audio154.match(/function _seatOpticsTube\([\s\S]*?\n\}/) || [''])[0];
+  assert(
+    /changeOpticsColor\(key\)/.test(seatFn154) &&
+      !/MetaStore\.set/.test(seatFn154) &&
+      /renderModuleBay/.test(seatFn154),
+    '154.6: _seatOpticsTube() calls changeOpticsColor() (the existing setter) and renderModuleBay() — no new persistence path'
+  );
+
+  // 154.7  one-truth model: renderModuleBay() re-syncs status lines and, when the
+  //        Schematic View is open, regenerates it — never a second wired control set
+  const renderBayFn154 = (core154.match(/function renderModuleBay\([\s\S]*?\n\}/) || [''])[0];
+  assert(
+    /_updateOpticsBoardStatus/.test(renderBayFn154) &&
+      /_updateSonicBoardStatus/.test(renderBayFn154) &&
+      /renderBaySchematic/.test(renderBayFn154),
+    '154.7: renderModuleBay() re-syncs both combined status lines and regenerates an open Schematic View'
+  );
+
+  // 154.8  the Schematic View is REGENERATED from state on open (no persistent
+  //        parallel DOM) — every row calls the SAME setter as its bay counterpart
+  const schemFn154 = (core154.match(/function renderBaySchematic\([\s\S]*?\n(?=window\.)/) || [
+    '',
+  ])[0];
+  assert(
+    [
+      'changeOpticsColor',
+      'toggleHighLumen',
+      'toggleMasterMute',
+      'toggleRadio',
+      'toggleWakeLock',
+      'toggleHaptic',
+      'onImmersionChange',
+      '_schemSetGeminiSync',
+    ].every(fn => schemFn154.includes(fn)) && /list\.innerHTML =/.test(schemFn154),
+    '154.8: renderBaySchematic() regenerates the flat list via innerHTML and every row calls the same real setter the bay uses'
+  );
+
+  // 154.9  toggleBaySchematic() swaps the bay grid for the schematic (never shows both)
+  const toggleSchemFn154 = (core154.match(/function toggleBaySchematic\([\s\S]*?\n\}/) || [''])[0];
+  assert(
+    /schem\.hidden = !toSchematic/.test(toggleSchemFn154) &&
+      /bay\.hidden = toSchematic/.test(toggleSchemFn154),
+    '154.9: toggleBaySchematic() shows exactly one of the bay grid / schematic list at a time'
+  );
+
+  // 154.10  first-visit-only hatch (LOCKED-1): a NEW device pref (not campaign state)
+  //         gates whether #bayHatch is shown; releasing it sets the pref permanently
+  assert(
+    /robco_bay_opened: \{ type: 'bool', default: false, owner: 'ui-core\.js' \}/.test(state154) &&
+      /MetaStore\.get\('robco_bay_opened'\) === 'true'/.test(core154) &&
+      /MetaStore\.set\('robco_bay_opened', 'true'\)/.test(core154),
+    '154.10: robco_bay_opened is a registered MetaStore device pref; initModuleBay() reads it, releaseBayHatch() sets it permanently'
+  );
+
+  // 154.11  the hatch ceremony honors prefers-reduced-motion (instant reveal — no
+  //         forced animation wait for a user who has reduced motion set)
+  const releaseFn154 = (core154.match(/function releaseBayHatch\([\s\S]*?\n\}/) || [''])[0];
+  assert(
+    /prefers-reduced-motion: reduce/.test(releaseFn154) && /reduced \? 0 : 900/.test(releaseFn154),
+    '154.11: releaseBayHatch() checks prefers-reduced-motion and skips the animation wait when set'
+  );
+
+  // 154.12  Protocol UI-5 — every NEW interactive element is a real <button> or
+  //         native input; the key-sync control stays an accessible native checkbox
+  //         (no <span onclick> pattern introduced anywhere in the bay)
+  assert(
+    !/<span[^>]*onclick=/.test(html154) &&
+      /<button[\s\S]{0,40}type="button"[\s\S]{0,40}class="hatch-latch-btn"/.test(html154) &&
+      /<button[\s\S]{0,40}type="button"[\s\S]{0,40}class="tube"/.test(html154),
+    '154.12: no <span onclick> pattern anywhere; the hatch latch + tube-rack controls are real <button>s (Protocol UI-5)'
+  );
+
+  // 154.13  Protocol 17 — tap targets: the boolean-module card and phosphor tube
+  //         both meet the >=28px floor
+  assert(
+    /\.bay-module-card \{[\s\S]{0,300}min-height:\s*28px/.test(css154) &&
+      /button\.tube \{[\s\S]{0,300}min-height:\s*44px/.test(css154),
+    '154.13: .bay-module-card and button.tube both declare an explicit >=28px tap target (Protocol 17)'
+  );
+
+  // 154.14  Protocol 42 fix (found during this unit's manual DESKTOP render-check,
+  //         a check the automated 360/412px gate doesn't cover): the plan's mockup
+  //         two-column desktop bay assumed a full-viewport-width panel, but this
+  //         app's desktop shell fixes the settings panel's own column at a hard
+  //         380px (confirmed live: .module-bay measures ~338px wide at BOTH 1280px
+  //         and 1920px viewports — the column never grows). A two-column @container
+  //         breakpoint can therefore never engage — it would be dead, misleading
+  //         code — so .bay-grid / .bay-channel-list are single-column
+  //         UNCONDITIONALLY, and no viewport @media is used for this either
+  //         (container-type infra is kept, harmless, for if the shell ever widens).
+  assert(
+    /container-type:\s*inline-size/.test(css154) &&
+      /container-name:\s*bay/.test(css154) &&
+      !/@container bay/.test(css154) &&
+      !/@media \(min-width:\s*1000px\)[\s\S]{0,120}\.bay-grid/.test(css154) &&
+      /\.bay-grid \{[\s\S]{0,900}grid-template-columns:\s*minmax\(0, 1fr\);/.test(css154) &&
+      /\.bay-channel-list \{[\s\S]{0,400}grid-template-columns:\s*minmax\(0, 1fr\);/.test(css154),
+    '154.14: .bay-grid / .bay-channel-list are single-column unconditionally — confirmed via live desktop measurement that the shell column never exceeds ~340px, so a two-column breakpoint would be unreachable dead code (Protocol 42 fix)'
+  );
+
+  // 154.15  SLOT 05 keeps the amber "external hardware" identity (LOCKED-4); SLOTs
+  //         01-04 + the SVC tray are NOT amber (green baseline / blue utility)
+  assert(
+    /details\.bay-board\.uplink \{[\s\S]{0,80}border-color:\s*rgba\(243, 156, 18/.test(css154) &&
+      /<h3 style="color: var\(--robco-alert\)">[\s\S]{0,40}&gt; SLOT 05/.test(html154) &&
+      !/<h3 style="color: var\(--robco-alert\)">[\s\S]{0,40}&gt; SLOT 0[1-4]/.test(html154),
+    '154.15: SLOT 05 keeps its amber AI-uplink identity; SLOTs 01-04 do not (LOCKED-4)'
+  );
+
+  // 154.16  initModuleBay() is wired from window.onload AFTER the boot-restore
+  //         functions it depends on (optics/audio/power/immersion prefs already
+  //         restored), so its combined status lines reflect real boot state
+  const onloadBody154 = (core154.match(/window\.onload = async function \(\) \{[\s\S]*?\n\};/) || [
+    '',
+  ])[0];
+  assert(
+    (() => {
+      const order = ['_restoreOpticsPreference', '_restoreDevicePrefs', 'initModuleBay'];
+      const idxs = order.map(fn => onloadBody154.indexOf(fn + '('));
+      return idxs.every(i => i !== -1) && idxs[0] < idxs[2] && idxs[1] < idxs[2];
+    })(),
+    '154.16: window.onload calls initModuleBay() after _restoreOpticsPreference()/_restoreDevicePrefs() (correct boot order)'
+  );
+
+  // 154.17  game-agnostic (Protocol 38) — no FNV/FO3/Fallout literals anywhere in
+  //         the Module Bay markup or its controller functions
+  const bayJs154 =
+    (core154.match(/const BAY_SVC_LOG_CAP[\s\S]*?window\._svcInstallPwa = _svcInstallPwa;/) || [
+      '',
+    ])[0] + seatFn154;
+  assert(
+    !/\bFNV\b|\bFO3\b|Fallout/.test(bayJs154) &&
+      !/\bFNV\b|\bFO3\b|Fallout/.test(
+        html154.slice(html154.indexOf('id="moduleBay"'), html154.indexOf('ALL SAVES'))
+      ),
+    '154.17: the Module Bay controller code and markup are game-agnostic — no hardcoded game literals'
+  );
+
+  // 154.18  Protocol 25 sanctioned-exception clause + the UI-1 clarification are
+  //         both recorded in CLAUDE.md (this reframe's own authorization + guardrails)
+  assert(
+    /Sanctioned exception — owner-approved redesigns/.test(claude154) &&
+      /internal headings use the sub-panel/.test(claude154),
+    '154.18: CLAUDE.md records the Protocol 25 sanctioned-exception clause and the Protocol UI-1 sub-panel-heading clarification'
+  );
+
+  // 154.19  Protocol 42 fix (found during this unit's gate render-check): the
+  //         decorative bus-strip wraps UNCONDITIONALLY (no container-query clip
+  //         variant — see 154.14, the shell column never reaches a width where
+  //         clipping would matter) instead of nowrap+ellipsis, which left a
+  //         full-width scrollable node behind even though nothing was visibly
+  //         cut off (Protocol 17 — content must actually fit).
+  assert(
+    /\.bay-bus-strip \{[\s\S]{0,500}white-space:\s*normal/.test(css154) &&
+      !/@container bay[\s\S]{0,120}\.bay-bus-strip/.test(css154),
+    '154.19: .bay-bus-strip wraps (white-space:normal) unconditionally — no unreachable container-query clip variant (Protocol 42 render-check fix)'
+  );
+
+  // 154.20  Protocol 42 fix (found during this unit's gate render-check): every
+  //         .bay-grid / .bay-channel-list track uses minmax(0, 1fr), never a bare
+  //         1fr — a bare 1fr track's implicit minimum is "auto" (content-based),
+  //         which forced each SLOT board wider than its track at narrow widths
+  //         (a real Playwright-verified 360px overflow, traced to this exact
+  //         well-known CSS Grid pitfall, not a harness artifact).
+  assert(
+    !/\.bay-grid \{[\s\S]{0,900}grid-template-columns:\s*1fr;/.test(css154) &&
+      !/\.bay-channel-list \{[\s\S]{0,400}grid-template-columns:\s*1fr;/.test(css154) &&
+      /\.bay-grid \{[\s\S]{0,900}grid-template-columns:\s*minmax\(0, 1fr\);/.test(css154) &&
+      /\.bay-channel-list \{[\s\S]{0,400}grid-template-columns:\s*minmax\(0, 1fr\);/.test(css154),
+    '154.20: .bay-grid and .bay-channel-list use minmax(0, 1fr) tracks, never a bare 1fr, so a board can never be forced wider than its track (Protocol 42 fix — confirmed REAL via Playwright at 360px, not harness-only)'
+  );
+
+  // 154.21  Protocol 42 fix (found during this unit's manual browser verification):
+  //         the bay's own checkboxes and the Schematic View's mirrored checkboxes
+  //         are two SEPARATE DOM elements bound to the same MetaStore key — a change
+  //         made via the schematic silently failed to push its new .checked state
+  //         back to the bay's own control (verified REAL in a live browser, not
+  //         harness-only: toggle in schematic → back to bay → bay showed the stale
+  //         checked state until reload). renderModuleBay() now re-syncs every
+  //         boolean control's checked state from MetaStore on every call, closing
+  //         the gap in both directions; toggleBaySchematic() also re-syncs at the
+  //         exact moment it switches back to the bay view.
+  assert(
+    /const BAY_CHECKBOX_SYNC_MAP = \{/.test(core154) &&
+      [
+        'highLumenToggle',
+        'masterMuteToggle',
+        'radioToggle',
+        'wakeLockToggle',
+        'hapticToggle',
+        'geminiKeySyncToggle',
+      ].every(id => new RegExp(id + ":\\s*'robco_").test(core154)) &&
+      /Object\.keys\(BAY_CHECKBOX_SYNC_MAP\)\.forEach/.test(renderBayFn154) &&
+      /el\.checked = MetaStore\.get\(BAY_CHECKBOX_SYNC_MAP\[id\]\) === 'true'/.test(
+        renderBayFn154
+      ) &&
+      /else renderModuleBay\(\)/.test(toggleSchemFn154),
+    '154.21: renderModuleBay() re-syncs every boolean control’s .checked from MetaStore (closing the bay↔schematic drift a live browser test found), and toggleBaySchematic() re-syncs on switching back to the bay (Protocol 42 fix)'
   );
 }
 

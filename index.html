@@ -1465,526 +1465,620 @@
                 > SECURITY & CONFIGURATION
               </h2>
             </summary>
-            <div class="input-group">
-              <input
-                type="password"
-                id="apiKeyInput"
-                placeholder="PASTE GEMINI KEY HERE…"
-                maxlength="200"
-                style="width: 100%; border-color: var(--robco-alert); color: var(--robco-alert)"
-                oninput="saveApiKeySilent()"
-              />
-            </div>
-
-            <div style="margin: 3px 0 4px; font-size: 11px">
-              <a
-                href="https://aistudio.google.com/app/apikey"
-                target="_blank"
-                rel="noopener noreferrer"
-                style="color: var(--robco-alert); opacity: 0.75; text-decoration: none"
-                >&gt; GET A FREE GEMINI KEY</a
-              >
-            </div>
-
-            <div style="display: flex; align-items: flex-start; gap: 6px; margin-bottom: 6px">
-              <input
-                type="checkbox"
-                id="geminiKeySyncToggle"
-                onchange="if (window.setGeminiKeySync) window.setGeminiKeySync(this.checked);"
-                style="
-                  margin-top: 2px;
-                  accent-color: var(--robco-alert);
-                  cursor: pointer;
-                  flex-shrink: 0;
-                "
-              />
-              <label
-                for="geminiKeySyncToggle"
-                style="
-                  color: var(--robco-alert);
-                  font-size: 11px;
-                  cursor: pointer;
-                  line-height: 1.3;
-                  opacity: 0.85;
-                "
-                >Sync my Gemini key to my account (follows me across devices)</label
-              >
-            </div>
-
-            <button id="btnFetchModels" class="alert-btn" onclick="fetchAuthorizedModels()">
-              > 1. VALIDATE KEY & FETCH ENGINES
-            </button>
-
-            <div class="input-group" style="margin-top: 5px">
-              <select
-                id="apiModelInput"
-                style="
-                  width: 100%;
-                  border-color: var(--robco-alert);
-                  background: rgba(0, 0, 0, 0.8);
-                  color: var(--robco-alert);
-                "
-                onchange="saveApiKeySilent()"
-              >
-                <option value="gemini-1.5-flash">Awaiting Server Link...</option>
-              </select>
-            </div>
-
-            <div class="input-group" style="margin-top: 10px">
-              <label class="optics-label" style="color: var(--robco-alert)">OPTICS:</label>
-              <select
-                id="opticsColorInput"
-                style="
-                  width: 100%;
-                  border-color: var(--robco-alert);
-                  background: rgba(0, 0, 0, 0.8);
-                  color: var(--robco-alert);
-                "
-                onchange="changeOpticsColor(this.value)"
-              >
-                <option value="green">RobCo Green</option>
-                <option value="green3">Pip-Boy Green</option>
-                <option value="amber">New Vegas Amber</option>
-                <option value="blue">Vault-Tec Blue</option>
-                <option value="legion">Legion Red</option>
-                <option value="ghoul">Ghoul Green</option>
-                <option value="neon">Neon Purple</option>
-              </select>
-            </div>
-
-            <!-- WU-F8: High-Lumen Optics — manual high-contrast (AA+) toggle -->
-            <div class="audio-row" style="margin-top: 10px">
-              <input
-                type="checkbox"
-                id="highLumenToggle"
-                onchange="toggleHighLumen(this.checked)"
-                style="width: auto; accent-color: var(--robco-alert)"
-              />
-              <label for="highLumenToggle" style="color: var(--robco-alert); font-size: 12px"
-                >HIGH-LUMEN OPTICS (MAX CONTRAST)</label
-              >
-            </div>
-            <span
-              id="highLumenStatus"
-              style="
-                display: block;
-                color: var(--robco-alert);
-                font-size: 10px;
-                opacity: 0.7;
-                margin-top: 2px;
-              "
-            ></span>
-
-            <!-- P8: Global Immersion dial — device-level atmosphere control (Full/Balanced/Minimal) -->
-            <div class="input-group" style="margin-top: 10px">
-              <label class="optics-label" for="immersionSelect" style="color: var(--robco-alert)"
-                >IMMERSION:</label
-              >
-              <select
-                id="immersionSelect"
-                onchange="onImmersionChange(this.value)"
-                aria-label="Ambient immersion level — how much atmosphere the terminal runs"
-                style="
-                  width: 100%;
-                  font-size: 16px;
-                  border-color: var(--robco-alert);
-                  background: rgba(0, 0, 0, 0.8);
-                  color: var(--robco-alert);
-                "
-              >
-                <option value="full">Full — all ambient systems</option>
-                <option value="balanced">Balanced — reduced ambience</option>
-                <option value="minimal">Minimal — quiet</option>
-              </select>
-            </div>
-            <span
-              id="immersionStatus"
-              style="
-                display: block;
-                color: var(--robco-alert);
-                font-size: 10px;
-                opacity: 0.7;
-                margin-top: 2px;
-              "
-            ></span>
-
-            <details id="audioSystemsDetails" class="sub-panel" data-sub-id="audio_systems">
-              <summary class="config-summary" style="color: var(--robco-alert); font-size: 13px">
-                AUDIO SYSTEMS
-              </summary>
-              <div
-                style="
-                  margin-top: 8px;
-                  display: flex;
-                  flex-direction: column;
-                  gap: 6px;
-                  padding-left: 4px;
-                  border-left: 1px dashed var(--robco-alert);
-                "
-              >
-                <div
-                  style="
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    margin-bottom: 6px;
-                    padding-bottom: 6px;
-                    border-bottom: 1px dashed var(--robco-alert);
-                  "
-                >
-                  <input
-                    type="checkbox"
-                    id="masterMuteToggle"
-                    onchange="toggleMasterMute(this.checked)"
-                    style="width: auto; accent-color: var(--robco-alert)"
-                  />
-                  <label
-                    for="masterMuteToggle"
-                    style="color: var(--robco-alert); font-size: 12px; font-weight: bold"
-                    >MASTER MUTE (ALL AUDIO)</label
-                  >
-                </div>
-                <!-- WU-F5: Pip-Boy Radio — zero-byte synthesized station bed (a PLAY toggle, not a mute) -->
-                <div class="audio-row">
-                  <input
-                    type="checkbox"
-                    id="radioToggle"
-                    onchange="toggleRadio(this.checked)"
-                    style="width: auto; accent-color: var(--robco-alert)"
-                  />
-                  <label for="radioToggle" style="color: var(--robco-alert); font-size: 12px"
-                    >PIP-BOY RADIO (SYNTHESIZED STATION)</label
-                  >
-                </div>
-                <span
-                  id="radioStatus"
-                  style="
-                    display: block;
-                    color: var(--robco-alert);
-                    font-size: 10px;
-                    opacity: 0.7;
-                    margin: -2px 0 4px 0;
-                  "
-                  >&gt; RADIO OFFLINE &mdash; NO CARRIER</span
-                >
-                <div class="audio-row">
-                  <input
-                    type="checkbox"
-                    id="muteTypingToggle"
-                    onchange="toggleAudio('robco_sfx_muted', this.checked)"
-                    style="width: auto; accent-color: var(--robco-alert)"
-                  />
-                  <label for="muteTypingToggle" style="color: var(--robco-alert); font-size: 12px"
-                    >MUTE TYPING SFX</label
-                  >
-                </div>
-                <div class="audio-row">
-                  <input
-                    type="checkbox"
-                    id="muteHumToggle"
-                    onchange="toggleAudio('robco_hum_muted', this.checked)"
-                    style="width: auto; accent-color: var(--robco-alert)"
-                  />
-                  <label for="muteHumToggle" style="color: var(--robco-alert); font-size: 12px"
-                    >MUTE CRT HUM</label
-                  >
-                </div>
-                <div class="audio-row">
-                  <input
-                    type="checkbox"
-                    id="muteGeigerToggle"
-                    onchange="toggleAudio('robco_geiger_muted', this.checked)"
-                    style="width: auto; accent-color: var(--robco-alert)"
-                  />
-                  <label for="muteGeigerToggle" style="color: var(--robco-alert); font-size: 12px"
-                    >MUTE GEIGER COUNTER</label
-                  >
-                </div>
-                <div class="audio-row">
-                  <input
-                    type="checkbox"
-                    id="muteTinnitusToggle"
-                    onchange="toggleAudio('robco_tinnitus_muted', this.checked)"
-                    style="width: auto; accent-color: var(--robco-alert)"
-                  />
-                  <label for="muteTinnitusToggle" style="color: var(--robco-alert); font-size: 12px"
-                    >MUTE TINNITUS</label
-                  >
-                </div>
-                <div class="audio-row">
-                  <input
-                    type="checkbox"
-                    id="muteLimbToggle"
-                    onchange="toggleAudio('robco_ambient_muted', this.checked)"
-                    style="width: auto; accent-color: var(--robco-alert)"
-                  />
-                  <label for="muteLimbToggle" style="color: var(--robco-alert); font-size: 12px"
-                    >MUTE LIMB SFX</label
-                  >
-                </div>
-                <div class="audio-row">
-                  <input
-                    type="checkbox"
-                    id="muteWakeToggle"
-                    onchange="toggleAudio('robco_wake_muted', this.checked)"
-                    style="width: auto; accent-color: var(--robco-alert)"
-                  />
-                  <label for="muteWakeToggle" style="color: var(--robco-alert); font-size: 12px"
-                    >MUTE WAKE SFX</label
-                  >
-                </div>
-                <div class="audio-row">
-                  <input
-                    type="checkbox"
-                    id="mutePanelClickToggle"
-                    onchange="toggleAudio('robco_panelclick_muted', this.checked)"
-                    style="width: auto; accent-color: var(--robco-alert)"
-                  />
-                  <label
-                    for="mutePanelClickToggle"
-                    style="color: var(--robco-alert); font-size: 12px"
-                    >MUTE PANEL CLICKS</label
-                  >
-                </div>
-                <div class="audio-row">
-                  <input
-                    type="checkbox"
-                    id="muteBootDroneToggle"
-                    onchange="toggleAudio('robco_bootdrone_muted', this.checked)"
-                    style="width: auto; accent-color: var(--robco-alert)"
-                  />
-                  <label
-                    for="muteBootDroneToggle"
-                    style="color: var(--robco-alert); font-size: 12px"
-                    >MUTE BOOT DRONE</label
-                  >
-                </div>
-                <div class="audio-row">
-                  <input
-                    type="checkbox"
-                    id="muteLevelUpToggle"
-                    onchange="toggleAudio('robco_levelup_muted', this.checked)"
-                    style="width: auto; accent-color: var(--robco-alert)"
-                  />
-                  <label for="muteLevelUpToggle" style="color: var(--robco-alert); font-size: 12px"
-                    >MUTE LEVEL UP SFX</label
-                  >
-                </div>
-                <div class="audio-row">
-                  <input
-                    type="checkbox"
-                    id="muteHeartbeatToggle"
-                    onchange="toggleAudio('robco_heartbeat_muted', this.checked)"
-                    style="width: auto; accent-color: var(--robco-alert)"
-                  />
-                  <label
-                    for="muteHeartbeatToggle"
-                    style="color: var(--robco-alert); font-size: 12px"
-                    >MUTE HEARTBEAT</label
-                  >
-                </div>
-                <div class="audio-row">
-                  <input
-                    type="checkbox"
-                    id="muteQuestCompleteToggle"
-                    onchange="toggleAudio('robco_questcomplete_muted', this.checked)"
-                    style="width: auto; accent-color: var(--robco-alert)"
-                  />
-                  <label
-                    for="muteQuestCompleteToggle"
-                    style="color: var(--robco-alert); font-size: 12px"
-                    >MUTE QUEST COMPLETE</label
-                  >
-                </div>
-                <div class="audio-row">
-                  <input
-                    type="checkbox"
-                    id="muteQuestFailToggle"
-                    onchange="toggleAudio('robco_questfail_muted', this.checked)"
-                    style="width: auto; accent-color: var(--robco-alert)"
-                  />
-                  <label
-                    for="muteQuestFailToggle"
-                    style="color: var(--robco-alert); font-size: 12px"
-                    >MUTE QUEST FAIL</label
-                  >
-                </div>
-                <div class="audio-row">
-                  <input
-                    type="checkbox"
-                    id="muteFactionThresholdToggle"
-                    onchange="toggleAudio('robco_factionthreshold_muted', this.checked)"
-                    style="width: auto; accent-color: var(--robco-alert)"
-                  />
-                  <label
-                    for="muteFactionThresholdToggle"
-                    style="color: var(--robco-alert); font-size: 12px"
-                    >MUTE FACTION ALERTS</label
-                  >
-                </div>
-                <!-- #34 Typewriter Speed Control -->
-                <div
-                  style="
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    margin-top: 6px;
-                    padding-top: 6px;
-                    border-top: 1px dashed var(--robco-alert);
-                  "
-                >
-                  <label
-                    for="typerSpeedSlider"
-                    style="color: var(--robco-alert); font-size: 12px; white-space: nowrap"
-                    >TYPER SPD:</label
-                  >
-                  <input
-                    type="range"
-                    id="typerSpeedSlider"
-                    min="0.25"
-                    max="3"
-                    step="0.25"
-                    value="1"
-                    style="flex: 1; accent-color: var(--robco-alert)"
-                    oninput="
-                      MetaStore.set('robco_typer_speed', this.value);
-                      document.getElementById('typerSpeedVal').textContent =
-                        parseFloat(this.value).toFixed(2) + '&#215;';
-                    "
-                  />
-                  <span
-                    id="typerSpeedVal"
-                    style="color: var(--robco-alert); font-size: 11px; width: 36px"
-                    >1.00&#215;</span
-                  >
+            <div id="moduleBay" class="module-bay">
+              <!-- First-visit-only service-panel ceremony (Protocol 25 sanctioned exception) -->
+              <div id="bayHatch" class="bay-hatch" hidden>
+                <div class="hatch-plate">
+                  <span class="hatch-screw tl" aria-hidden="true"></span>
+                  <span class="hatch-screw tr" aria-hidden="true"></span>
+                  <span class="hatch-screw bl" aria-hidden="true"></span>
+                  <span class="hatch-screw br" aria-hidden="true"></span>
+                  <div class="hatch-brand">
+                    ROBCO INDUSTRIES (TM) &mdash; UNIFIED OPERATING SYSTEM
+                  </div>
+                  <div class="hatch-title">SERVICE PANEL</div>
+                  <div class="hatch-sub">MODULE BAY &middot; CHASSIS RIT-V300</div>
+                  <div class="hatch-warn">
+                    &#9888; AUTHORIZED TECHNICIANS ONLY.<br />NO USER-SERVICEABLE PARTS BEHIND CRT
+                    ASSEMBLY.
+                  </div>
+                  <button type="button" class="hatch-latch-btn" onclick="releaseBayHatch()">
+                    &#9654; RELEASE HATCH
+                  </button>
+                  <div class="hatch-hint">
+                    THE HATCH ONLY OPENS ONCE &mdash; AFTER THIS THE BAY OPENS DIRECTLY
+                  </div>
                 </div>
               </div>
-            </details>
 
-            <details class="sub-panel" data-sub-id="power_systems">
-              <summary class="config-summary" style="color: var(--robco-alert); font-size: 13px">
-                POWER MANAGEMENT
-              </summary>
-              <div
-                style="
-                  margin-top: 8px;
-                  display: flex;
-                  flex-direction: column;
-                  gap: 6px;
-                  padding-left: 4px;
-                  border-left: 1px dashed var(--robco-alert);
-                "
-              >
-                <div class="audio-row">
-                  <input
-                    type="checkbox"
-                    id="wakeLockToggle"
-                    onchange="toggleWakeLock(this.checked)"
-                    style="width: auto; accent-color: var(--robco-alert)"
-                  />
-                  <label for="wakeLockToggle" style="color: var(--robco-alert); font-size: 12px"
-                    >SUSTAINED POWER CELL (KEEP DISPLAY LIT)</label
-                  >
+              <div id="bayContent" class="bay-content">
+                <div class="bay-head">
+                  <span class="bay-led" aria-hidden="true"></span>
+                  <span class="bay-head-title">MODULE BAY</span>
+                  <button type="button" class="btn-sm" onclick="toggleBaySchematic()">
+                    &#8981; SCHEMATIC VIEW
+                  </button>
                 </div>
-                <span
-                  id="wakeLockStatus"
-                  style="
-                    color: var(--robco-alert);
-                    font-size: 10px;
-                    opacity: 0.75;
-                    padding-left: 4px;
-                  "
-                  >&gt; POWER CELL IDLE &mdash; DISPLAY MAY DIM</span
-                >
-                <div class="audio-row">
-                  <input
-                    type="checkbox"
-                    id="hapticToggle"
-                    onchange="toggleHaptic(this.checked)"
-                    style="width: auto; accent-color: var(--robco-alert)"
-                  />
-                  <label for="hapticToggle" style="color: var(--robco-alert); font-size: 12px"
-                    >HAPTIC SOLENOID (CHASSIS FEEDBACK)</label
-                  >
+                <div class="bay-bus-strip" aria-hidden="true">
+                  &#9552;&#9552;&#9552; BACKPLANE BUS &#9573; SLOT 01 &#9573; SLOT 02 &#9573; SLOT
+                  03 &#9573; SLOT 04 &#9573; SLOT 05 &#9573; SVC TRAY &#9552;&#9552;&#9552;
                 </div>
-                <span
-                  id="hapticStatus"
-                  style="
-                    color: var(--robco-alert);
-                    font-size: 10px;
-                    opacity: 0.75;
-                    padding-left: 4px;
-                  "
-                  >&gt; SOLENOID IDLE &mdash; NO CHASSIS FEEDBACK</span
-                >
+
+                <div class="bay-grid">
+                  <!-- SLOT 01 — VDU OPTICS DRIVER -->
+                  <details class="sub-panel bay-board" data-sub-id="slot_01_optics" open>
+                    <summary><h3>&gt; SLOT 01 &middot; VDU OPTICS DRIVER</h3></summary>
+                    <span class="bay-slot-tag">SLOT 01</span>
+                    <span class="bay-part-no"
+                      >PN RBC-VDU-77 &middot; PHOSPHOR TUBE + LUMEN COIL</span
+                    >
+
+                    <div
+                      id="opticsColorInput"
+                      class="tube-rack"
+                      role="radiogroup"
+                      aria-label="Phosphor tube selection"
+                    >
+                      <button
+                        type="button"
+                        class="tube"
+                        data-optic="green"
+                        style="--tube: #14fdce"
+                        onclick="_seatOpticsTube(this)"
+                      >
+                        <span class="glass" aria-hidden="true"></span>
+                        <span class="t-name">ROBCO GREEN</span>
+                        <span class="t-default"></span>
+                      </button>
+                      <button
+                        type="button"
+                        class="tube"
+                        data-optic="green3"
+                        style="--tube: #4fb05a"
+                        onclick="_seatOpticsTube(this)"
+                      >
+                        <span class="glass" aria-hidden="true"></span>
+                        <span class="t-name">PIP-BOY GREEN</span>
+                        <span class="t-default"></span>
+                      </button>
+                      <button
+                        type="button"
+                        class="tube"
+                        data-optic="amber"
+                        style="--tube: #ffb642"
+                        onclick="_seatOpticsTube(this)"
+                      >
+                        <span class="glass" aria-hidden="true"></span>
+                        <span class="t-name">NEW VEGAS AMBER</span>
+                        <span class="t-default"></span>
+                      </button>
+                      <button
+                        type="button"
+                        class="tube"
+                        data-optic="blue"
+                        style="--tube: #42cbf5"
+                        onclick="_seatOpticsTube(this)"
+                      >
+                        <span class="glass" aria-hidden="true"></span>
+                        <span class="t-name">VAULT-TEC BLUE</span>
+                        <span class="t-default"></span>
+                      </button>
+                      <button
+                        type="button"
+                        class="tube"
+                        data-optic="legion"
+                        style="--tube: #ff4040"
+                        onclick="_seatOpticsTube(this)"
+                      >
+                        <span class="glass" aria-hidden="true"></span>
+                        <span class="t-name">LEGION RED</span>
+                        <span class="t-default"></span>
+                      </button>
+                      <button
+                        type="button"
+                        class="tube"
+                        data-optic="ghoul"
+                        style="--tube: #7dff5f"
+                        onclick="_seatOpticsTube(this)"
+                      >
+                        <span class="glass" aria-hidden="true"></span>
+                        <span class="t-name">GHOUL GREEN</span>
+                        <span class="t-default"></span>
+                      </button>
+                      <button
+                        type="button"
+                        class="tube"
+                        data-optic="neon"
+                        style="--tube: #c084fc"
+                        onclick="_seatOpticsTube(this)"
+                      >
+                        <span class="glass" aria-hidden="true"></span>
+                        <span class="t-name">NEON VIOLET</span>
+                        <span class="t-default"></span>
+                      </button>
+                    </div>
+
+                    <div class="bay-module">
+                      <input
+                        type="checkbox"
+                        id="highLumenToggle"
+                        class="bay-module-input"
+                        onchange="toggleHighLumen(this.checked)"
+                      />
+                      <label for="highLumenToggle" class="bay-module-card">
+                        <span class="m-led" aria-hidden="true"></span>
+                        <span class="m-name"
+                          >HIGH-LUMEN OPTICS COIL<span class="m-sub"
+                            >MAX-CONTRAST DRIVE &middot; KILLS GLOW HALO</span
+                          ></span
+                        >
+                        <span class="m-action" aria-hidden="true"
+                          ><span class="off-txt">INSTALL</span
+                          ><span class="on-txt">REMOVE</span></span
+                        >
+                      </label>
+                    </div>
+                    <span id="highLumenStatus" class="board-status"></span>
+                    <p id="opticsStatus" class="board-status"></p>
+                  </details>
+
+                  <!-- SLOT 02 — SONIC PROCESSOR (13 channels stay UNFLIPPED this unit) -->
+                  <details
+                    id="audioSystemsDetails"
+                    class="sub-panel bay-board span2"
+                    data-sub-id="audio_systems"
+                    open
+                  >
+                    <summary><h3>&gt; SLOT 02 &middot; SONIC PROCESSOR</h3></summary>
+                    <span class="bay-slot-tag">SLOT 02</span>
+                    <span class="bay-part-no">PN RBC-SND-13 &middot; 13-CHANNEL WAVE TABLE</span>
+
+                    <div class="bay-module bay-module--eject">
+                      <input
+                        type="checkbox"
+                        id="masterMuteToggle"
+                        class="bay-module-input"
+                        onchange="toggleMasterMute(this.checked)"
+                      />
+                      <label for="masterMuteToggle" class="bay-module-card">
+                        <span class="m-led" aria-hidden="true"></span>
+                        <span class="m-name"
+                          >SONIC PROCESSOR BOARD<span class="m-sub"
+                            >MASTER MUTE &mdash; ALL AUDIO</span
+                          ></span
+                        >
+                        <span class="m-action" aria-hidden="true"
+                          ><span class="off-txt">&#9167; REMOVE BOARD</span
+                          ><span class="on-txt">&#9660; RESEAT BOARD</span></span
+                        >
+                      </label>
+                    </div>
+
+                    <!-- WU-F5: Pip-Boy Radio — zero-byte synthesized station bed (a PLAY toggle, not a mute) -->
+                    <div class="bay-module">
+                      <input
+                        type="checkbox"
+                        id="radioToggle"
+                        class="bay-module-input"
+                        onchange="toggleRadio(this.checked)"
+                      />
+                      <label for="radioToggle" class="bay-module-card">
+                        <span class="m-led" aria-hidden="true"></span>
+                        <span class="m-name"
+                          >RADIO RECEIVER MODULE<span class="m-sub"
+                            >PIP-BOY STATION BED &middot; SYNTHESIZED</span
+                          ></span
+                        >
+                        <span class="m-action" aria-hidden="true"
+                          ><span class="off-txt">INSTALL</span
+                          ><span class="on-txt">REMOVE</span></span
+                        >
+                      </label>
+                    </div>
+                    <span id="radioStatus" class="board-status"
+                      >&gt; RADIO OFFLINE &mdash; NO CARRIER</span
+                    >
+
+                    <div
+                      style="font-size: 10px; opacity: 0.6; letter-spacing: 1px; margin-top: 10px"
+                    >
+                      CHANNEL CHIPS &mdash; MUTE INDIVIDUAL CHANNELS:
+                    </div>
+                    <div class="bay-channel-list">
+                      <div class="audio-row">
+                        <input
+                          type="checkbox"
+                          id="muteTypingToggle"
+                          onchange="toggleAudio('robco_sfx_muted', this.checked)"
+                          style="width: auto; accent-color: var(--robco-green)"
+                        />
+                        <label for="muteTypingToggle" style="font-size: 12px"
+                          >MUTE TYPING SFX</label
+                        >
+                      </div>
+                      <div class="audio-row">
+                        <input
+                          type="checkbox"
+                          id="muteHumToggle"
+                          onchange="toggleAudio('robco_hum_muted', this.checked)"
+                          style="width: auto; accent-color: var(--robco-green)"
+                        />
+                        <label for="muteHumToggle" style="font-size: 12px">MUTE CRT HUM</label>
+                      </div>
+                      <div class="audio-row">
+                        <input
+                          type="checkbox"
+                          id="muteGeigerToggle"
+                          onchange="toggleAudio('robco_geiger_muted', this.checked)"
+                          style="width: auto; accent-color: var(--robco-green)"
+                        />
+                        <label for="muteGeigerToggle" style="font-size: 12px"
+                          >MUTE GEIGER COUNTER</label
+                        >
+                      </div>
+                      <div class="audio-row">
+                        <input
+                          type="checkbox"
+                          id="muteTinnitusToggle"
+                          onchange="toggleAudio('robco_tinnitus_muted', this.checked)"
+                          style="width: auto; accent-color: var(--robco-green)"
+                        />
+                        <label for="muteTinnitusToggle" style="font-size: 12px"
+                          >MUTE TINNITUS</label
+                        >
+                      </div>
+                      <div class="audio-row">
+                        <input
+                          type="checkbox"
+                          id="muteLimbToggle"
+                          onchange="toggleAudio('robco_ambient_muted', this.checked)"
+                          style="width: auto; accent-color: var(--robco-green)"
+                        />
+                        <label for="muteLimbToggle" style="font-size: 12px">MUTE LIMB SFX</label>
+                      </div>
+                      <div class="audio-row">
+                        <input
+                          type="checkbox"
+                          id="muteWakeToggle"
+                          onchange="toggleAudio('robco_wake_muted', this.checked)"
+                          style="width: auto; accent-color: var(--robco-green)"
+                        />
+                        <label for="muteWakeToggle" style="font-size: 12px">MUTE WAKE SFX</label>
+                      </div>
+                      <div class="audio-row">
+                        <input
+                          type="checkbox"
+                          id="mutePanelClickToggle"
+                          onchange="toggleAudio('robco_panelclick_muted', this.checked)"
+                          style="width: auto; accent-color: var(--robco-green)"
+                        />
+                        <label for="mutePanelClickToggle" style="font-size: 12px"
+                          >MUTE PANEL CLICKS</label
+                        >
+                      </div>
+                      <div class="audio-row">
+                        <input
+                          type="checkbox"
+                          id="muteBootDroneToggle"
+                          onchange="toggleAudio('robco_bootdrone_muted', this.checked)"
+                          style="width: auto; accent-color: var(--robco-green)"
+                        />
+                        <label for="muteBootDroneToggle" style="font-size: 12px"
+                          >MUTE BOOT DRONE</label
+                        >
+                      </div>
+                      <div class="audio-row">
+                        <input
+                          type="checkbox"
+                          id="muteLevelUpToggle"
+                          onchange="toggleAudio('robco_levelup_muted', this.checked)"
+                          style="width: auto; accent-color: var(--robco-green)"
+                        />
+                        <label for="muteLevelUpToggle" style="font-size: 12px"
+                          >MUTE LEVEL UP SFX</label
+                        >
+                      </div>
+                      <div class="audio-row">
+                        <input
+                          type="checkbox"
+                          id="muteHeartbeatToggle"
+                          onchange="toggleAudio('robco_heartbeat_muted', this.checked)"
+                          style="width: auto; accent-color: var(--robco-green)"
+                        />
+                        <label for="muteHeartbeatToggle" style="font-size: 12px"
+                          >MUTE HEARTBEAT</label
+                        >
+                      </div>
+                      <div class="audio-row">
+                        <input
+                          type="checkbox"
+                          id="muteQuestCompleteToggle"
+                          onchange="toggleAudio('robco_questcomplete_muted', this.checked)"
+                          style="width: auto; accent-color: var(--robco-green)"
+                        />
+                        <label for="muteQuestCompleteToggle" style="font-size: 12px"
+                          >MUTE QUEST COMPLETE</label
+                        >
+                      </div>
+                      <div class="audio-row">
+                        <input
+                          type="checkbox"
+                          id="muteQuestFailToggle"
+                          onchange="toggleAudio('robco_questfail_muted', this.checked)"
+                          style="width: auto; accent-color: var(--robco-green)"
+                        />
+                        <label for="muteQuestFailToggle" style="font-size: 12px"
+                          >MUTE QUEST FAIL</label
+                        >
+                      </div>
+                      <div class="audio-row">
+                        <input
+                          type="checkbox"
+                          id="muteFactionThresholdToggle"
+                          onchange="toggleAudio('robco_factionthreshold_muted', this.checked)"
+                          style="width: auto; accent-color: var(--robco-green)"
+                        />
+                        <label for="muteFactionThresholdToggle" style="font-size: 12px"
+                          >MUTE FACTION ALERTS</label
+                        >
+                      </div>
+                    </div>
+
+                    <!-- #34 Typewriter Speed Control -->
+                    <div class="bay-trimmer">
+                      <label for="typerSpeedSlider" style="font-size: 12px; white-space: nowrap"
+                        >PRINT-RATE TRIM:</label
+                      >
+                      <input
+                        type="range"
+                        id="typerSpeedSlider"
+                        min="0.25"
+                        max="3"
+                        step="0.25"
+                        value="1"
+                        style="flex: 1; accent-color: var(--robco-green)"
+                        oninput="
+                          MetaStore.set('robco_typer_speed', this.value);
+                          document.getElementById('typerSpeedVal').textContent =
+                            parseFloat(this.value).toFixed(2) + '&#215;';
+                        "
+                      />
+                      <span id="typerSpeedVal" style="font-size: 11px; width: 36px"
+                        >1.00&#215;</span
+                      >
+                    </div>
+                    <p id="sonicStatus" class="board-status"></p>
+                  </details>
+
+                  <!-- SLOT 03 — POWER CELL BAY -->
+                  <details class="sub-panel bay-board" data-sub-id="power_systems" open>
+                    <summary><h3>&gt; SLOT 03 &middot; POWER CELL BAY</h3></summary>
+                    <span class="bay-slot-tag">SLOT 03</span>
+                    <span class="bay-part-no"
+                      >PN RBC-PWR-42 &middot; CELL DOCK + SOLENOID MOUNT</span
+                    >
+
+                    <div class="bay-module">
+                      <input
+                        type="checkbox"
+                        id="wakeLockToggle"
+                        class="bay-module-input"
+                        onchange="toggleWakeLock(this.checked)"
+                      />
+                      <label for="wakeLockToggle" class="bay-module-card">
+                        <span class="m-led" aria-hidden="true"></span>
+                        <span class="m-name"
+                          >SUSTAINED POWER CELL<span class="m-sub"
+                            >KEEPS DISPLAY LIT &mdash; SCREEN NEVER SLEEPS</span
+                          ></span
+                        >
+                        <span class="m-action" aria-hidden="true"
+                          ><span class="off-txt">INSTALL</span
+                          ><span class="on-txt">REMOVE</span></span
+                        >
+                      </label>
+                    </div>
+                    <span id="wakeLockStatus" class="board-status"
+                      >&gt; POWER CELL IDLE &mdash; DISPLAY MAY DIM</span
+                    >
+
+                    <div class="bay-module">
+                      <input
+                        type="checkbox"
+                        id="hapticToggle"
+                        class="bay-module-input"
+                        onchange="toggleHaptic(this.checked)"
+                      />
+                      <label for="hapticToggle" class="bay-module-card">
+                        <span class="m-led" aria-hidden="true"></span>
+                        <span class="m-name"
+                          >HAPTIC SOLENOID<span class="m-sub"
+                            >CHASSIS FEEDBACK ON KEY EVENTS</span
+                          ></span
+                        >
+                        <span class="m-action" aria-hidden="true"
+                          ><span class="off-txt">INSTALL</span
+                          ><span class="on-txt">REMOVE</span></span
+                        >
+                      </label>
+                    </div>
+                    <span id="hapticStatus" class="board-status"
+                      >&gt; SOLENOID IDLE &mdash; NO CHASSIS FEEDBACK</span
+                    >
+                  </details>
+
+                  <!-- SLOT 04 — ATMOSPHERIC REGULATOR -->
+                  <details class="sub-panel bay-board" data-sub-id="slot_04_immersion" open>
+                    <summary><h3>&gt; SLOT 04 &middot; ATMOSPHERIC REGULATOR</h3></summary>
+                    <span class="bay-slot-tag">SLOT 04</span>
+                    <span class="bay-part-no"
+                      >PN RBC-ATM-08 &middot; 3-POSITION AMBIENT GOVERNOR</span
+                    >
+
+                    <div
+                      class="immersion-legend"
+                      aria-hidden="true"
+                      style="
+                        display: flex;
+                        gap: 12px;
+                        font-size: 9px;
+                        letter-spacing: 1.5px;
+                        margin-top: 6px;
+                      "
+                    >
+                      <span data-tier="full">FULL</span>
+                      <span data-tier="balanced">BALANCED</span>
+                      <span data-tier="minimal">MINIMAL</span>
+                    </div>
+                    <div class="input-group" style="margin-top: 6px">
+                      <select
+                        id="immersionSelect"
+                        onchange="onImmersionChange(this.value)"
+                        aria-label="Ambient immersion level — how much atmosphere the terminal runs"
+                        style="width: 100%; font-size: 16px"
+                      >
+                        <option value="full">Full — all ambient systems</option>
+                        <option value="balanced">Balanced — reduced ambience</option>
+                        <option value="minimal">Minimal — quiet</option>
+                      </select>
+                    </div>
+                    <span id="immersionStatus" class="board-status"></span>
+                  </details>
+
+                  <!-- SLOT 05 — AI UPLINK CO-PROCESSOR (amber identity kept, LOCKED-4) -->
+                  <details class="sub-panel bay-board uplink" data-sub-id="slot_05_uplink" open>
+                    <summary>
+                      <h3 style="color: var(--robco-alert)">
+                        &gt; SLOT 05 &middot; AI UPLINK CO-PROCESSOR
+                      </h3>
+                    </summary>
+                    <span class="bay-slot-tag">SLOT 05</span>
+                    <span class="bay-part-no"
+                      >PN RBC-AI-50 &middot; CIPHER KEY REQUIRED &middot; EXTERNAL CARRIER</span
+                    >
+
+                    <div class="key-slot">
+                      <input
+                        type="password"
+                        id="apiKeyInput"
+                        placeholder="PASTE GEMINI KEY HERE…"
+                        maxlength="200"
+                        style="border-color: var(--robco-alert); color: var(--robco-alert)"
+                        oninput="saveApiKeySilent()"
+                      />
+                    </div>
+                    <div style="margin: 6px 0 4px; font-size: 11px">
+                      <a
+                        href="https://aistudio.google.com/app/apikey"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style="color: var(--robco-alert); opacity: 0.75; text-decoration: none"
+                        >&gt; GET A FREE GEMINI KEY</a
+                      >
+                    </div>
+
+                    <div class="jumper-wrap">
+                      <input
+                        type="checkbox"
+                        id="geminiKeySyncToggle"
+                        class="jumper-input"
+                        onchange="
+                          if (window.setGeminiKeySync) window.setGeminiKeySync(this.checked);
+                        "
+                      />
+                      <label for="geminiKeySyncToggle" class="jumper-card">
+                        <span class="j-track" aria-hidden="true"></span>
+                        <span class="j-label"
+                          >KEY-SYNC JUMPER &mdash; sync my Gemini key to my account (follows me
+                          across devices)</span
+                        >
+                      </label>
+                    </div>
+
+                    <button
+                      id="btnFetchModels"
+                      class="hs-btn alert-btn"
+                      style="margin-top: 10px"
+                      onclick="fetchAuthorizedModels()"
+                    >
+                      &gt; HANDSHAKE (VALIDATE KEY &amp; FETCH ENGINES)
+                    </button>
+
+                    <select
+                      id="apiModelInput"
+                      style="
+                        width: 100%;
+                        margin-top: 8px;
+                        border-color: var(--robco-alert);
+                        background: rgba(0, 0, 0, 0.8);
+                        color: var(--robco-alert);
+                      "
+                      onchange="saveApiKeySilent()"
+                    >
+                      <option value="gemini-1.5-flash">Awaiting Server Link...</option>
+                    </select>
+                    <p class="board-status alert">
+                      &gt; NO CARRIER &mdash; TERMINAL FULLY OPERATIONAL OFFLINE
+                    </p>
+                  </details>
+
+                  <!-- SVC TRAY — field-service utilities, not slotted hardware -->
+                  <details class="sub-panel bay-board tray span2" data-sub-id="slot_svc_tray" open>
+                    <summary><h3>&gt; SVC TRAY &middot; MAINTENANCE TOOLS</h3></summary>
+                    <span class="bay-slot-tag">SVC TRAY</span>
+                    <span class="bay-part-no"
+                      >FIELD SERVICE UTILITIES &mdash; NOT SLOTTED HARDWARE</span
+                    >
+                    <div class="bay-tools">
+                      <button onclick="_svcExportCampaignLog('txt')">
+                        &#8984; DOWNLOAD CAMPAIGN LOG
+                      </button>
+                      <button
+                        id="ejectHolotapeBtn"
+                        onclick="ejectHolotape()"
+                        aria-label="Eject holotape transcript to the device share sheet"
+                      >
+                        &#9654; EJECT HOLOTAPE
+                      </button>
+                      <button onclick="_svcExportCampaignLog('md')">&#8984; EXPORT .MD</button>
+                      <button onclick="_svcExportCampaignLog('html')">&#8984; EXPORT .HTML</button>
+                      <button id="btnViewChangelog" onclick="_svcViewChangelog()">
+                        &#8801; FIRMWARE REVISION LOG
+                      </button>
+                      <button id="btnInstallPwa" style="display: none" onclick="_svcInstallPwa()">
+                        &#9660; INSTALL SYSTEM (APP)
+                      </button>
+                    </div>
+                    <p class="board-status">
+                      &gt; SAVE ARCHIVE &amp; ACCOUNT REMAIN IN THEIR OWN PANELS &mdash; ONLY DEVICE
+                      HARDWARE LIVES IN THE BAY
+                    </p>
+                  </details>
+                </div>
+
+                <div class="bay-svc-log" aria-live="polite">
+                  <div class="log-title">&mdash; SERVICE LOG &mdash;</div>
+                  <div id="baySvcLogBody"></div>
+                </div>
               </div>
-            </details>
 
-            <div class="input-group" style="margin-top: 5px">
-              <button
-                class="action-btn"
-                style="border-color: var(--robco-alert); color: var(--robco-alert); width: 100%"
-                onclick="exportCampaignLog('txt')"
-              >
-                DOWNLOAD CAMPAIGN LOG
-              </button>
-            </div>
-            <div class="input-group" style="margin-top: 3px">
-              <button
-                id="ejectHolotapeBtn"
-                class="action-btn"
-                style="border-color: var(--robco-alert); color: var(--robco-alert); width: 100%"
-                onclick="ejectHolotape()"
-                aria-label="Eject holotape transcript to the device share sheet"
-              >
-                &#9654; EJECT HOLOTAPE &mdash; TRANSMIT
-              </button>
-            </div>
-            <div style="display: flex; gap: 5px; margin-top: 3px">
-              <button
-                class="action-btn"
-                style="
-                  border-color: var(--robco-alert);
-                  color: var(--robco-alert);
-                  flex: 1;
-                  font-size: 10px;
-                "
-                onclick="exportCampaignLog('md')"
-              >
-                EXPORT .MD
-              </button>
-              <button
-                class="action-btn"
-                style="
-                  border-color: var(--robco-alert);
-                  color: var(--robco-alert);
-                  flex: 1;
-                  font-size: 10px;
-                "
-                onclick="exportCampaignLog('html')"
-              >
-                EXPORT .HTML
-              </button>
-            </div>
-            <div class="input-group" style="margin-top: 5px">
-              <button
-                class="action-btn"
-                id="btnViewChangelog"
-                style="border-color: var(--robco-alert); color: var(--robco-alert); width: 100%"
-                onclick="showFullChangelog()"
-              >
-                VIEW CHANGELOG
-              </button>
-            </div>
-            <div class="input-group" style="margin-top: 5px">
-              <button
-                id="btnInstallPwa"
-                class="alert-btn"
-                style="width: 100%; display: none"
-                onclick="installPwa()"
-              >
-                > INSTALL SYSTEM (APP)
-              </button>
+              <!-- Schematic View — permanent light-touch fallback (regenerated from state, never a parallel wired set) -->
+              <div id="baySchematic" class="bay-schematic" hidden>
+                <h3>&#8981; SCHEMATIC VIEW</h3>
+                <div class="schem-note">
+                  EVERY MODULE AS A FLAT LIST &mdash; SAME CONTROLS, SAME SETTINGS, NO HARDWARE
+                  FICTION.
+                </div>
+                <div id="baySchematicList"></div>
+                <button
+                  type="button"
+                  class="action-btn"
+                  onclick="toggleBaySchematic()"
+                  style="margin-top: 10px"
+                >
+                  &#9650; BACK TO BAY VIEW
+                </button>
+              </div>
             </div>
 
             <div
