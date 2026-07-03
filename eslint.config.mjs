@@ -152,6 +152,9 @@ export default [
         playClack: 'readonly',
         playPanelClick: 'readonly',
         playLevelUpJingle: 'readonly',
+        playChipClick: 'readonly', // B2c Module Bay hardware SFX (ui-audio.js)
+        playBoardThunk: 'readonly', // B2c Module Bay hardware SFX (ui-audio.js)
+        toggleAudio: 'readonly', // ui-audio.js channel-mute setter (ui-core.js calls it via _schemSetHardwareSfx)
         triggerHaptic: 'readonly', // WU-F2 Haptic Solenoid (ui-audio.js)
         initHaptic: 'readonly', // WU-F2 Haptic Solenoid (ui-audio.js)
         initRadio: 'readonly', // WU-F5 Pip-Boy Radio (ui-audio.js)

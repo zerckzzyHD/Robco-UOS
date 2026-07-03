@@ -3627,6 +3627,24 @@ html.high-lumen .tube.seated .glass {
 .chip-input:checked + .chip-card .pin-id::after {
   content: ' · SOCKET EMPTY';
 }
+/* FIX 1 (owner report, B2c unit): when the Sonic Processor board itself is
+   ejected (master mute), every channel chip must read as pulled — ALL audio
+   is offline, not just the individually-muted channels. .sonic-board--ejected
+   is toggled on #chipGrid by _updateSonicBoardStatus() and is visual-only: it
+   never touches the individual .chip-input checkboxes or their robco_*_muted
+   keys, which stay intact for reseat (Protocol 25 sanctioned-exception rule). */
+.sonic-board--ejected .chip-card {
+  background: transparent;
+  border-style: dashed;
+  opacity: 0.5;
+  transform: translateY(3px);
+}
+.sonic-board--ejected .chip-card::after {
+  opacity: 0.25;
+}
+.sonic-board--ejected .chip-card .pin-id::after {
+  content: ' · SOCKET EMPTY';
+}
 .bay-trimmer {
   margin-top: 10px;
   border-top: 1px dashed rgba(var(--robco-green-rgb), 0.4);
@@ -3704,6 +3722,9 @@ button.dial {
   padding: 0;
   margin: 0;
   box-shadow: inset 0 0 14px rgba(0, 0, 0, 0.7);
+  /* FIX 2 (owner request, B2c unit): a horizontal drag on the dial must not
+     also scroll the page on touch devices while a pointer drag is in progress. */
+  touch-action: none;
 }
 .dial .knob {
   position: absolute;

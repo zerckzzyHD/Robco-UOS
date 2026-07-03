@@ -19410,6 +19410,204 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 156 — Step 2 (v2.8.0) Phase 2 B2c: Module Bay refinements —
+//  master-mute shows all chips pulled, draggable Immersion dial, install/
+//  eject SFX. Two owner bug/request fixes + the Module Bay's SFX unit. 16 tests.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 156 — Step 2 Phase 2 B2c: Module Bay refinements + hardware SFX');
+  const html156 = readFile('index.html');
+  const core156 = readFile('js/ui-core.js');
+  const audio156 = readFile('js/ui-audio.js');
+  const state156 = readFile('js/state.js');
+  const css156 = readFile('css/terminal.css');
+  const arch156 = readFile('ARCHITECTURE.md');
+
+  // 156.1  FIX 1: #chipGrid id is present on the 13-chip grid so JS can target
+  //        it, and the CSS ejected-board rule reads every chip as pulled
+  assert(
+    /<div class="chip-grid" id="chipGrid">/.test(html156) &&
+      /\.sonic-board--ejected \.chip-card \{[\s\S]{0,120}(border-style:\s*dashed|opacity:\s*0\.5)/.test(
+        css156
+      ) &&
+      /\.sonic-board--ejected \.chip-card \.pin-id::after \{[\s\S]{0,60}content:\s*' · SOCKET EMPTY'/.test(
+        css156
+      ),
+    "156.1: #chipGrid exists and .sonic-board--ejected forces every .chip-card to read pulled/SOCKET EMPTY, independent of each chip's own :checked state"
+  );
+
+  // 156.2  FIX 1: _updateSonicBoardStatus() toggles the ejected class purely
+  //        from AudioSettings.masterMute and never writes to any robco_*_muted
+  //        key — the individual chip mute prefs must survive untouched
+  const sonicStatusFn156 = extractFunctionBody(audio156, '_updateSonicBoardStatus');
+  assert(
+    /classList\.toggle\('sonic-board--ejected', !!AudioSettings\.masterMute\)/.test(
+      sonicStatusFn156
+    ) && !/MetaStore\.set/.test(sonicStatusFn156),
+    '156.2: _updateSonicBoardStatus() drives .sonic-board--ejected purely off AudioSettings.masterMute and performs no MetaStore writes (visual-only, individual chip prefs preserved for reseat)'
+  );
+
+  // 156.3  FIX 1: toggleAudio() (the setter every one of the 13 chips + the
+  //        SERVO CLICK RELAY calls) still writes the per-key mute pref
+  //        unconditionally — the ejected-board display never short-circuits it
+  const toggleAudioFn156 = extractFunctionBody(audio156, 'toggleAudio');
+  assert(
+    /MetaStore\.set\(key, isMuted\)/.test(toggleAudioFn156),
+    '156.3: toggleAudio() still unconditionally persists the per-chip mute key regardless of master-mute state — FIX 1 is display-only'
+  );
+
+  // 156.4  FIX 2: the dial's tap-to-cycle path and the new drag path share the
+  //        SAME 3-value order and the SAME onImmersionChange() setter, and a
+  //        genuine drag suppresses the trailing synthetic click so a drag can
+  //        never double-apply on release
+  const cycleFn156 = extractFunctionBody(core156, '_cycleImmersionDial');
+  assert(
+    /const IMMERSION_ORDER = \['full', 'balanced', 'minimal'\];/.test(core156) &&
+      /let _dialDragSuppressClick = false;/.test(core156) &&
+      /if \(_dialDragSuppressClick\) \{\s*_dialDragSuppressClick = false;\s*return;/.test(
+        cycleFn156
+      ) &&
+      /onImmersionChange\(next\)/.test(cycleFn156),
+    '156.4: _cycleImmersionDial() consumes-and-resets the drag-suppress flag before falling through to its unchanged IMMERSION_ORDER cycle + onImmersionChange() call'
+  );
+
+  // 156.5  FIX 2: the drag handlers step through IMMERSION_ORDER via the SAME
+  //        onImmersionChange() setter (Protocol 22 — never a forked
+  //        persistence path), and wiring degrades gracefully with no
+  //        PointerEvent support
+  const dialMoveFn156 = extractFunctionBody(core156, '_dialPointerMove');
+  const wireDragFn156 = extractFunctionBody(core156, '_wireImmersionDialDrag');
+  assert(
+    /onImmersionChange\(IMMERSION_ORDER\[idx\]\)/.test(dialMoveFn156) &&
+      /typeof window\.PointerEvent === 'undefined'/.test(wireDragFn156) &&
+      /addEventListener\('pointerdown', _dialPointerDown\)/.test(wireDragFn156) &&
+      /_wireImmersionDialDrag\(\);/.test(extractFunctionBody(core156, 'initImmersion')),
+    '156.5: pointer-drag steps IMMERSION_ORDER through the same onImmersionChange() setter, no-ops gracefully without PointerEvent support, and is wired from initImmersion() at boot'
+  );
+
+  // 156.6  FIX 2: the dial disables page-scroll gestures while a drag is in
+  //        progress, and the existing keyboard/tap path (button + onclick) is
+  //        untouched
+  assert(
+    /button\.dial \{[\s\S]{0,700}touch-action:\s*none/.test(css156) &&
+      /class="dial"[\s\S]{0,60}onclick="_cycleImmersionDial\(\)"/.test(html156),
+    '156.6: button.dial sets touch-action:none for clean drag gestures, and the original onclick="_cycleImmersionDial()" tap/keyboard path is unchanged'
+  );
+
+  // 156.7  B2c: the new hardwareSfx channel is a registered device pref (both
+  //        the META_MANIFEST boundary and the AudioSettings runtime cache)
+  assert(
+    /robco_hardwaresfx_muted: \{ type: 'bool', default: false, owner: 'ui-audio\.js' \}/.test(
+      state156
+    ) && /hardwareSfx: MetaStore\.get\('robco_hardwaresfx_muted'\) === 'true'/.test(core156),
+    '156.7: robco_hardwaresfx_muted is registered in META_MANIFEST and seeded into AudioSettings.hardwareSfx at startup'
+  );
+
+  // 156.8  B2c (Protocol 7 guard order): both new play functions check
+  //        AudioSettings.masterMute FIRST, then their own channel flag SECOND
+  const chipClickFn156 = extractFunctionBody(audio156, 'playChipClick');
+  const boardThunkFn156 = extractFunctionBody(audio156, 'playBoardThunk');
+  const guardOrderOk = fn =>
+    /if \(AudioSettings\.masterMute\) return;\s*\n\s*if \(AudioSettings\.hardwareSfx\) return;/.test(
+      fn
+    );
+  assert(
+    guardOrderOk(chipClickFn156) && guardOrderOk(boardThunkFn156),
+    '156.8: playChipClick() and playBoardThunk() both guard on AudioSettings.masterMute first, then AudioSettings.hardwareSfx second (Protocol 7 order)'
+  );
+
+  // 156.9  B2c: toggleAudio()'s keyMap wires the new key to the AudioSettings
+  //        cache, and every chip pull/insert fires the click via that channel
+  assert(
+    /robco_hardwaresfx_muted: 'hardwareSfx', \/\/ B2c/.test(toggleAudioFn156) &&
+      /playChipClick\(!isMuted\);/.test(toggleAudioFn156),
+    '156.9: toggleAudio() maps robco_hardwaresfx_muted → AudioSettings.hardwareSfx and fires playChipClick() on every chip toggle'
+  );
+
+  // 156.10  B2c: the Sonic Processor board's own eject/reseat plays the
+  //         heavier board-thunk at the correct moment relative to the
+  //         masterMute flag flip — heard leaving on eject (before the flag
+  //         flips true), heard arriving on reseat (after it flips back false)
+  //         — so the click itself never bypasses the master-mute guard
+  const masterMuteFn156 = extractFunctionBody(audio156, 'toggleMasterMute');
+  assert(
+    /if \(isMuted\) playBoardThunk\(false\);\s*\n\s*MetaStore\.set\('robco_master_muted', isMuted\);\s*\n\s*AudioSettings\.masterMute = isMuted;\s*\n\s*if \(!isMuted\) playBoardThunk\(true\);/.test(
+      masterMuteFn156
+    ),
+    "156.10: toggleMasterMute() plays the eject thunk before the flag flips true and the reseat thunk after it flips back false, so playBoardThunk()'s own masterMute guard is never the thing suppressing it"
+  );
+
+  // 156.11  B2c: the other bay-module install/eject toggles (radio, power
+  //         cell, haptic solenoid) all fire the same tactile click
+  assert(
+    /playChipClick\(on\);/.test(extractFunctionBody(audio156, 'toggleRadio')) &&
+      /playChipClick\(enabled\);/.test(extractFunctionBody(core156, 'toggleWakeLock')) &&
+      /playChipClick\(enabled\);/.test(extractFunctionBody(audio156, 'toggleHaptic')),
+    '156.11: toggleRadio()/toggleWakeLock()/toggleHaptic() each fire playChipClick() on install/eject, alongside their unchanged feature logic'
+  );
+
+  // 156.12  B2c: the SERVO CLICK RELAY control lives inside the SLOT-02 Audio
+  //         Systems sub-panel with INVERTED checkbox semantics (checked =
+  //         installed = audible) writing through the SAME toggleAudio() every
+  //         other channel chip uses (Protocol 25 sanctioned-exception rule)
+  const audioPanel156 = html156.slice(
+    html156.indexOf('id="audioSystemsDetails"'),
+    html156.indexOf('id="chipGrid"')
+  );
+  assert(
+    /id="hardwareSfxToggle"[\s\S]{0,40}class="bay-module-input"[\s\S]{0,40}checked[\s\S]{0,40}onchange="toggleAudio\('robco_hardwaresfx_muted', !this\.checked\)"/.test(
+      audioPanel156
+    ) && /SERVO CLICK RELAY/.test(audioPanel156),
+    '156.12: #hardwareSfxToggle sits inside SLOT 02, defaults checked (installed), and writes the mute boolean through the unchanged toggleAudio() setter with inverted presentation only'
+  );
+
+  // 156.13  B2c: boot restore, the bay↔schematic resync, and the Schematic
+  //         View mirror all account for the INVERTED checkbox semantics — the
+  //         same three-way sync discipline every other bay control follows
+  assert(
+    /if \(MetaStore\.get\('robco_hardwaresfx_muted'\) === 'true'\) \{\s*\n\s*let el = document\.getElementById\('hardwareSfxToggle'\);\s*\n\s*if \(el\) el\.checked = false;/.test(
+      core156
+    ) &&
+      /hwSfxToggle\.checked = MetaStore\.get\('robco_hardwaresfx_muted'\) !== 'true'/.test(
+        core156
+      ) &&
+      /function _schemSetHardwareSfx\(checked\) \{\s*\n\s*toggleAudio\('robco_hardwaresfx_muted', !checked\);/.test(
+        core156
+      ) &&
+      /checkboxRow\('_schemSetHardwareSfx', hwSfxOn, 'SERVO CLICK RELAY', 'SLOT 02'\)/.test(
+        core156
+      ),
+    '156.13: _restoreDevicePrefs()/renderModuleBay()/renderBaySchematic() all mirror the inverted SERVO CLICK RELAY state so the bay checkbox, the schematic checkbox, and a fresh boot can never drift'
+  );
+
+  // 156.14  B2c: the new device-preference key is documented in the canonical
+  //         Settings table (Protocol 7's ARCHITECTURE.md checklist item)
+  assert(
+    /`robco_hardwaresfx_muted`\s*\|\s*bool\s*\|\s*ui-audio\.js/.test(arch156),
+    '156.14: robco_hardwaresfx_muted is documented in the ARCHITECTURE.md Settings & localStorage Keys table'
+  );
+
+  // 156.15  Protocol 38 — every B2c addition stays game-agnostic
+  const b2cJs156 =
+    chipClickFn156 +
+    boardThunkFn156 +
+    cycleFn156 +
+    dialMoveFn156 +
+    wireDragFn156 +
+    sonicStatusFn156;
+  assert(
+    !/\bFNV\b|\bFO3\b|Fallout/.test(b2cJs156) && !/\bFNV\b|\bFO3\b|Fallout/.test(audioPanel156),
+    '156.15: the B2c additions (dial drag, chip/board SFX, ejected-board display) stay game-agnostic — no hardcoded game literals'
+  );
+
+  // 156.16  Protocol UI-5 — no <span onclick> pattern was introduced anywhere
+  assert(
+    !/<span[^>]*onclick=/.test(html156),
+    '156.16: no <span onclick> pattern anywhere (Protocol UI-5) after the B2c additions'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail

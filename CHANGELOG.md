@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1887/1887 | Cache: robco-terminal-v2.7.0-r37 -->
+﻿## [Unreleased]<!-- Tests: 1903/1903 | Cache: robco-terminal-v2.7.0-r38 -->
 
 ### Added
 
@@ -11,6 +11,7 @@
 - Added an IMMERSION setting (Full / Balanced / Minimal) in Security & Configuration — one control for how much of the terminal's ambient atmosphere is switched on. It defaults to Full (exactly how the terminal behaves today) and is remembered on your device (it's a per-device display setting, so it never travels with your saves). This is the foundation for finer atmosphere control coming later; for now it already quiets one periodic ambient effect at the lower levels as a first taste.
 - The terminal now visibly settles when you leave it alone or step away. After a couple of minutes with no input, the display dims slightly and a small "REDUCING PHOSPHOR WEAR" note appears in the corner — an understated screensaver touch that clears the instant you touch anything again. Switching away from the tab now deepens into a slower breathing dim layered on top of the terminal's existing standby screen. Both show at Balanced and Full immersion; Minimal keeps things quiet, as always, and the existing standby response itself is unchanged. The "living machine" engine also now knows how to perform a proper CRT power-down — a collapse-to-a-dot shutdown flourish — ready for an upcoming feature to trigger it. Anyone with "reduce motion" enabled sees an instant cut instead of the animation, same as every other CRT effect in the terminal.
 - Added a MODE pill to the Comm-Link input, right next to the "?" help button. Tap it to switch between OVERSEER (the AI narrator, exactly as before) and TERMINAL (typed commands and quick one-liners handled instantly on your device, no AI call). The prompt text changes to match whichever mode is active, and your choice is remembered on this device. In TERMINAL mode, natural one-liners like "killed 3 raiders", "+50 caps", "arrived Novac", or "rep NCR up" are recorded straight to the right tracker without opening any menu — comma-separate several on one line (e.g. "killed 3 raiders, +50 caps, arrived Novac, rep ncr up") to log them all at once; anything it doesn't recognize gets a gentle hint pointing you to the command list instead of doing nothing. A message that starts with `/` always goes to TERMINAL just that once, no matter which mode you're in. Putting `@` anywhere in a message pings OVERSEER with just the text after it — everything before the `@` is dropped — so you can jot a quick-log note and tack on an AI question in the same line. A small note appears the moment you type either symbol showing exactly where it's headed. TERMINAL mode also offers matching command and quick-log suggestions as you type, including creature, location, and faction names once you've started typing a recognized quick-log verb.
+- Installing or ejecting Module Bay hardware now gives you a satisfying tactile click or thunk — pulling or plugging a channel chip, the sound board itself, the radio, the power cell, or the haptic solenoid all get their own sound. A new SERVO CLICK RELAY switch on the sound board lets you turn these clicks off if you'd rather keep things quiet.
 
 ### Changed
 
@@ -25,6 +26,7 @@
 - Fixed the inventory filter bar offering a "Mods" filter in Fallout 3 campaigns, where weapon mods don't exist and that filter could never show anything.
 - Fixed a case where powering the terminal fully down could leave the screen completely black with no way to bring it back — a clear "PRESS TO POWER ON" button now appears whenever the terminal is shut down, and tapping it fully restores the terminal to normal.
 - Fixed hard-to-read color names on the Module Bay's phosphor tube rack, which were rendering nearly invisible against their own dark background. Also fixed the Module Bay's Schematic View clipping some control text (like the phosphor tube picker showing "ROBCO GR…" instead of the full name), and fixed the maintenance tray's buttons staying pinned to the left with an empty gap when the app is already installed — they now re-center properly.
+- Fixed the Module Bay's sound board showing only the individually-muted channel chips as pulled when you ejected the whole board (master mute) — every channel now visibly reads as unplugged together while the board is out, and each one returns to its own on/off setting the moment you reseat it.
 
 ### Improved
 
@@ -33,6 +35,7 @@
 - The databank lookup now also searches your collectibles, skill books, magazines, traits, and Lincoln memorabilia trackers, and surfaces a couple of previously-hidden details when it finds a match — like a quest item's story purpose or a creature's experience yield.
 - Confirmation prompts and status messages — save/load warnings, cloud sync results, crafting and trading confirmations, and more — now appear as in-terminal pop-ups that match the rest of the interface, instead of your browser's plain "OK/Cancel" dialog boxes.
 - The Module Bay now looks and feels more like real hardware: the sound board's 13 mute switches are drawn as chips you plug in or pull, the power cell and haptic solenoid show their own device graphics, and the immersion level is now a turnable dial instead of a dropdown. Whichever view you last used — the hardware Bay or the flat Schematic list — is now remembered the next time you open Security & Configuration.
+- The Atmospheric Regulator dial can now be turned by dragging or sliding it with a mouse or finger, not just tapping — dial in the level you want in one smooth motion. Tapping still works exactly as before.
 
 ### Under the Hood
 

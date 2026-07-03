@@ -35,6 +35,7 @@ const AudioSettings = {
   questComplete: MetaStore.get('robco_questcomplete_muted') === 'true', // quest complete chime
   questFail: MetaStore.get('robco_questfail_muted') === 'true', // quest fail tone
   factionThreshold: MetaStore.get('robco_factionthreshold_muted') === 'true', // faction standing alert
+  hardwareSfx: MetaStore.get('robco_hardwaresfx_muted') === 'true', // B2c: chip/board install-eject click
   // WU-F5 Pip-Boy Radio: ON semantics (true = playing), NOT a mute flag. Default
   // OFF (opt-in). initRadio() does the autoplay-safe first-gesture restore at boot;
   // this initialiser just reflects the saved preference into the cache.
@@ -100,6 +101,7 @@ function _updateWakeLockUI() {
 }
 async function toggleWakeLock(enabled) {
   MetaStore.set(WAKE_LOCK_KEY, enabled ? 'true' : 'false');
+  if (typeof playChipClick === 'function') playChipClick(enabled); // B2c: tactile install/eject click
   if (enabled) await _acquireWakeLock();
   else await _releaseWakeLock();
   _updateWakeLockUI();
@@ -352,10 +354,20 @@ function _updateImmersionUI() {
 // dial, so this genuinely-custom control cycles the exact same 3 values through
 // the exact same onImmersionChange() setter the (now visually hidden) select
 // still uses — one truth, two entry points (Protocol 22/25).
+const IMMERSION_ORDER = ['full', 'balanced', 'minimal'];
+// FIX 2 (owner request, B2c unit): a suppress-click flag set by a genuine
+// drag (see _wireImmersionDialDrag below) so the trailing synthetic `click`
+// event a pointerup fires inside the button bounds doesn't re-cycle the tier
+// the drag already applied. Left false for a plain tap/keyboard activation,
+// which still falls through to the tap-to-cycle path below unchanged.
+let _dialDragSuppressClick = false;
 function _cycleImmersionDial() {
-  const order = ['full', 'balanced', 'minimal'];
+  if (_dialDragSuppressClick) {
+    _dialDragSuppressClick = false;
+    return;
+  }
   const cur = typeof getImmersionTier === 'function' ? getImmersionTier() : 'full';
-  const next = order[(order.indexOf(cur) + 1) % order.length];
+  const next = IMMERSION_ORDER[(IMMERSION_ORDER.indexOf(cur) + 1) % IMMERSION_ORDER.length];
   onImmersionChange(next);
 }
 window._cycleImmersionDial = _cycleImmersionDial;
@@ -366,10 +378,72 @@ function onImmersionChange(value) {
     _logBaySvc('ATMOSPHERIC GOVERNOR → ' + String(value).toUpperCase());
   }
 }
+
+// FIX 2 (owner request, B2c unit, best-effort): drag/slide-to-rotate for the
+// dial, layered ON TOP of the existing tap-to-cycle (onclick="_cycleImmersionDial()"
+// stays untouched) — never a forked control. A horizontal pointer drag steps
+// through the SAME 3-value IMMERSION_ORDER via the SAME onImmersionChange()
+// setter the tap and the real <select> both use (Protocol 22/25 — one truth,
+// three entry points). Keyboard activation is unaffected: it fires a `click`
+// with no preceding pointer drag, so _dialDragSuppressClick stays false and
+// the tap-to-cycle path runs exactly as before. Reduced-motion is unaffected
+// too — the knob's rotation still goes through the same CSS transform the
+// global prefers-reduced-motion block already neutralises (Suite 94).
+const DIAL_DRAG_STEP_PX = 46; // px of horizontal drag per tier step
+let _dialDrag = null; // { startX, startIndex, lastIndex } while a drag is active
+
+function _dialPointerMove(ev) {
+  if (!_dialDrag) return;
+  const dx = ev.clientX - _dialDrag.startX;
+  if (Math.abs(dx) > 6) _dialDrag.moved = true;
+  let idx = _dialDrag.startIndex + Math.round(dx / DIAL_DRAG_STEP_PX);
+  idx = Math.max(0, Math.min(IMMERSION_ORDER.length - 1, idx));
+  if (idx !== _dialDrag.lastIndex) {
+    _dialDrag.lastIndex = idx;
+    onImmersionChange(IMMERSION_ORDER[idx]);
+  }
+}
+function _dialPointerEnd(ev) {
+  if (!_dialDrag) return;
+  const btn = ev.currentTarget;
+  try {
+    btn.releasePointerCapture(ev.pointerId);
+  } catch (e) {
+    /* already released */
+  }
+  if (_dialDrag.moved) _dialDragSuppressClick = true;
+  _dialDrag = null;
+  btn.removeEventListener('pointermove', _dialPointerMove);
+  btn.removeEventListener('pointerup', _dialPointerEnd);
+  btn.removeEventListener('pointercancel', _dialPointerEnd);
+}
+function _dialPointerDown(ev) {
+  // Left button only for mouse; touch/pen have no `button` semantics (0 by spec).
+  if (ev.button !== 0) return;
+  const btn = ev.currentTarget;
+  const cur = typeof getImmersionTier === 'function' ? getImmersionTier() : 'full';
+  const startIndex = IMMERSION_ORDER.indexOf(cur);
+  _dialDrag = { startX: ev.clientX, startIndex, lastIndex: startIndex, moved: false };
+  try {
+    btn.setPointerCapture(ev.pointerId);
+  } catch (e) {
+    /* unsupported — drag still tracks via the listeners below */
+  }
+  btn.addEventListener('pointermove', _dialPointerMove);
+  btn.addEventListener('pointerup', _dialPointerEnd);
+  btn.addEventListener('pointercancel', _dialPointerEnd);
+}
+function _wireImmersionDialDrag() {
+  const btn = document.querySelector('button.dial');
+  if (!btn || typeof window.PointerEvent === 'undefined') return; // graceful fallback: tap-to-cycle still works
+  btn.addEventListener('pointerdown', _dialPointerDown);
+}
+
 function initImmersion() {
   const sel = document.getElementById('immersionSelect');
   if (sel && typeof getImmersionTier === 'function') sel.value = getImmersionTier();
   _updateImmersionUI();
+  _wireImmersionDialDrag();
 }
 
 // ── MODULE BAY (Step 2 · Phase 2 · B2a) ─────────────────────────────────────
@@ -422,6 +496,10 @@ function renderModuleBay() {
     const el = document.getElementById(id);
     if (el) el.checked = MetaStore.get(BAY_CHECKBOX_SYNC_MAP[id]) === 'true';
   });
+  // B2c: SERVO CLICK RELAY uses INVERTED checkbox semantics (checked =
+  // installed = audible), so it can't ride the 1:1 BAY_CHECKBOX_SYNC_MAP above.
+  const hwSfxToggle = document.getElementById('hardwareSfxToggle');
+  if (hwSfxToggle) hwSfxToggle.checked = MetaStore.get('robco_hardwaresfx_muted') !== 'true';
   if (typeof _updateOpticsBoardStatus === 'function') _updateOpticsBoardStatus();
   if (typeof _updateSonicBoardStatus === 'function') _updateSonicBoardStatus();
   const schem = document.getElementById('baySchematic');
@@ -494,6 +572,14 @@ function _schemSetGeminiSync(checked) {
 }
 window._schemSetGeminiSync = _schemSetGeminiSync;
 
+// B2c: mirrors the bay's SERVO CLICK RELAY toggle — same INVERTED-checkbox
+// adapter shape as _schemSetGeminiSync above (Protocol 22/25).
+function _schemSetHardwareSfx(checked) {
+  toggleAudio('robco_hardwaresfx_muted', !checked);
+  renderModuleBay();
+}
+window._schemSetHardwareSfx = _schemSetHardwareSfx;
+
 // Regenerated from the SAME stored prefs the bay reads — every row calls the
 // SAME setter its bay counterpart calls, then re-syncs via renderModuleBay()
 // (which re-renders this very list while it's open, so it can never drift).
@@ -509,6 +595,7 @@ function renderBaySchematic() {
   const tier = typeof getImmersionTier === 'function' ? getImmersionTier() : 'full';
   const keySync = MetaStore.get('robco_gemini_key_sync') === 'true';
   const typerSpeed = parseFloat(MetaStore.get('robco_typer_speed') || '1');
+  const hwSfxOn = MetaStore.get('robco_hardwaresfx_muted') !== 'true';
 
   // FIX 2 (owner report): name/loc stacked ABOVE a full-width control row —
   // the control can never be squeezed narrower than its own content (which
@@ -545,6 +632,7 @@ function renderBaySchematic() {
       '13 CHANNEL CHIPS — manage individually in SLOT 02 above',
       'SLOT 02'
     ),
+    checkboxRow('_schemSetHardwareSfx', hwSfxOn, 'SERVO CLICK RELAY', 'SLOT 02'),
     checkboxRow('toggleRadio', radioOn, 'RADIO RECEIVER MODULE', 'SLOT 02'),
     row(
       `<input type="range" min="0.25" max="3" step="0.25" value="${typerSpeed}" style="flex:1 1 90px;min-width:0" oninput="MetaStore.set('robco_typer_speed', this.value); renderModuleBay();" aria-label="Print-rate trim" />`,
@@ -1203,6 +1291,13 @@ function _restoreDevicePrefs() {
   if (MetaStore.get('robco_master_muted') === 'true') {
     let el = document.getElementById('masterMuteToggle');
     if (el) el.checked = true;
+  }
+  // B2c: SERVO CLICK RELAY — INVERTED checkbox semantics (checked = installed
+  // = audible), same as the master-mute board. Default checked in the HTML;
+  // only uncheck it when explicitly muted.
+  if (MetaStore.get('robco_hardwaresfx_muted') === 'true') {
+    let el = document.getElementById('hardwareSfxToggle');
+    if (el) el.checked = false;
   }
   // Silently refresh model list 2s after boot if key is present
   if (MetaStore.get('robco_gemini_key')) {

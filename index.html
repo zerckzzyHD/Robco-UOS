@@ -1683,12 +1683,41 @@
                       >&gt; RADIO OFFLINE &mdash; NO CARRIER</span
                     >
 
+                    <!-- B2c: SERVO CLICK RELAY — tactile install/eject SFX for chips,
+                    the board itself, and the other bay-module toggles. A MUTE flag
+                    under the hood (routes through the same toggleAudio() every other
+                    channel chip uses) presented with INVERTED checked semantics
+                    (checked = relay installed = clicks audible), same pattern as the
+                    master-mute board (Protocol 25 sanctioned-exception rule: stored
+                    boolean unchanged, only the presentation is inverted). -->
+                    <div class="bay-module">
+                      <input
+                        type="checkbox"
+                        id="hardwareSfxToggle"
+                        class="bay-module-input"
+                        checked
+                        onchange="toggleAudio('robco_hardwaresfx_muted', !this.checked)"
+                      />
+                      <label for="hardwareSfxToggle" class="bay-module-card">
+                        <span class="m-led" aria-hidden="true"></span>
+                        <span class="m-name"
+                          >SERVO CLICK RELAY<span class="m-sub"
+                            >CHIP &amp; BOARD INSTALL/EJECT SFX</span
+                          ></span
+                        >
+                        <span class="m-action" aria-hidden="true"
+                          ><span class="off-txt">INSTALL</span
+                          ><span class="on-txt">REMOVE</span></span
+                        >
+                      </label>
+                    </div>
+
                     <div
                       style="font-size: 10px; opacity: 0.6; letter-spacing: 1px; margin-top: 10px"
                     >
                       CHANNEL CHIPS &mdash; PULL A CHIP TO SILENCE ITS CHANNEL:
                     </div>
-                    <div class="chip-grid">
+                    <div class="chip-grid" id="chipGrid">
                       <div class="chip-wrap">
                         <input
                           type="checkbox"

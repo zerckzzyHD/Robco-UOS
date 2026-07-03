@@ -73,6 +73,7 @@ function _updateHapticUI() {
 }
 function toggleHaptic(enabled) {
   MetaStore.set(HAPTIC_KEY, enabled ? 'true' : 'false');
+  if (typeof playChipClick === 'function') playChipClick(enabled); // B2c: tactile install/eject click
   // Confirmation buzz on enable so the user feels it works immediately.
   if (enabled) triggerHaptic('tick');
   _updateHapticUI();
@@ -526,8 +527,14 @@ function toggleAudio(key, isMuted) {
     robco_questcomplete_muted: 'questComplete', // quest complete chime
     robco_questfail_muted: 'questFail', // quest fail tone
     robco_factionthreshold_muted: 'factionThreshold', // faction standing alert
+    robco_hardwaresfx_muted: 'hardwareSfx', // B2c: chip/board install-eject click
   };
   if (keyMap[key] !== undefined) AudioSettings[keyMap[key]] = isMuted;
+
+  // B2c: tactile confirmation click for pulling/inserting a chip — gated by
+  // the hardwareSfx channel itself, not by the specific channel being
+  // toggled, so it fires the same way regardless of which chip was touched.
+  playChipClick(!isMuted);
 
   // Immediately stop/start ambient systems based on their specific key
   if (key === 'robco_hum_muted') {
@@ -569,8 +576,17 @@ function toggleAudio(key, isMuted) {
 
 // ── MASTER MUTE ────────────────────────────────────────────
 function toggleMasterMute(isMuted) {
+  // B2c: the board's own physical thunk must be audible for the eject/reseat
+  // ACTION itself even though "master mute = zero audio" governs everything
+  // else — so it's played at the instant AudioSettings.masterMute is still on
+  // the OLD (audible) side of the flip: before the flag flips true on eject
+  // (heard leaving), after the flag flips back false on reseat (heard
+  // arriving). Never bypasses the guard — playBoardThunk() still checks
+  // AudioSettings.masterMute itself, this just calls it at the right moment.
+  if (isMuted) playBoardThunk(false);
   MetaStore.set('robco_master_muted', isMuted);
   AudioSettings.masterMute = isMuted;
+  if (!isMuted) playBoardThunk(true);
   if (isMuted) {
     geigerRunning = false;
     if (geigerTimeout) {
@@ -751,6 +767,12 @@ function _updateRadioUI() {
 // state with the live active-channel count and the radio module state into one
 // diegetic readout. Pure presentation; reads MetaStore/AudioSettings, writes nothing.
 function _updateSonicBoardStatus() {
+  // FIX 1 (owner report, B2c unit): visually pull EVERY chip while the board
+  // itself is ejected (master mute) — the individual .chip-input checkboxes
+  // and their robco_*_muted keys are untouched, only the CSS class flips, so
+  // reseating the board restores each chip to its own preserved state.
+  const grid = document.getElementById('chipGrid');
+  if (grid) grid.classList.toggle('sonic-board--ejected', !!AudioSettings.masterMute);
   const note = document.getElementById('sonicStatus');
   if (!note) return;
   if (AudioSettings.masterMute) {
@@ -784,12 +806,62 @@ function _updateSonicBoardStatus() {
 }
 window._updateSonicBoardStatus = _updateSonicBoardStatus;
 
+// ── B2c: MODULE BAY HARDWARE SFX (chip click + board thunk) ────────────────
+// Tactile install/eject feedback for physically handling Module Bay hardware:
+// the 13 SLOT-02 channel chips, the SERVO CLICK RELAY toggle that gates this
+// whole channel, and the other bay-module toggles (radio, power cell, haptic
+// solenoid — wired at their own call sites below/in ui-core.js). ONE audio
+// source per Protocol 7 (one AudioSettings.hardwareSfx flag / one
+// robco_hardwaresfx_muted key) covers every trigger site, mirroring the
+// existing "ambient"/"panelClick" precedent of a single channel gating
+// several related call sites rather than one flag per call site.
+function playChipClick(installing) {
+  if (AudioSettings.masterMute) return;
+  if (AudioSettings.hardwareSfx) return;
+  ensureAudioCtx();
+  const osc = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  osc.type = 'square';
+  const f0 = installing ? 900 : 700;
+  const f1 = installing ? 1300 : 350;
+  osc.frequency.setValueAtTime(f0, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(f1, audioCtx.currentTime + 0.03);
+  g.gain.setValueAtTime(0.05, audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.035);
+  osc.connect(g);
+  g.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.04);
+}
+
+// A heavier percussive thunk for the Sonic Processor board itself (SLOT 02's
+// own eject/reseat), distinct in weight from the lighter chip click above.
+function playBoardThunk(installing) {
+  if (AudioSettings.masterMute) return;
+  if (AudioSettings.hardwareSfx) return;
+  ensureAudioCtx();
+  const osc = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  osc.type = 'sine';
+  const f0 = installing ? 70 : 140;
+  const f1 = installing ? 130 : 45;
+  osc.frequency.setValueAtTime(f0, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(f1, audioCtx.currentTime + 0.12);
+  g.gain.setValueAtTime(0.12, audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+  osc.connect(g);
+  g.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.16);
+}
+
 // User-facing play/stop toggle (diegetic `> PIP-BOY RADIO`). Persists the device
 // preference and starts/stops the station. The onchange fires from a real click,
 // satisfying the autoplay policy.
 function toggleRadio(on) {
   MetaStore.set(RADIO_KEY, on ? 'true' : 'false');
   AudioSettings.radio = on;
+  playChipClick(on); // B2c: tactile install/eject confirmation
   if (on) startRadio();
   else stopRadio();
   _updateRadioUI();

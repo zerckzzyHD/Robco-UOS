@@ -1,7 +1,7 @@
 ﻿# RobCo U.O.S. — System Architecture
 
 > **Version:** 2.7.0
-> **Last Updated:** 2026-07-02
+> **Last Updated:** 2026-07-03
 > **Purpose:** Living reference for any engineer (human or AI) working on this project.
 > This document maps every system, its dependencies, its persistence contract, and the
 > historical lessons that shaped it.
@@ -66,8 +66,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    1887-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    1887-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    1903-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    1903-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -1238,7 +1238,7 @@ Two separate stores, kept apart on purpose (Protocol 23 boundary, locked structu
 
 ### MetaStore — device preferences (`js/state.js`)
 
-`MetaStore.get(key)` / `.set(key, val)` / `.remove(key)` / `.has(key)` / `.keys()` is the single choke point for every `robco_*` key that describes **this device's** preferences — never campaign data. A registered-key `META_MANIFEST` (33 keys) is the boundary: a key is a "device preference" if and only if it is listed there. Every read/write of these keys across `js/ui-audio.js` / `js/ui-render.js` / `js/ui-core.js` / `js/api.js` / `js/cloud.js` routes through `MetaStore` (never bare `localStorage`). The one sanctioned exception is the two `index.html` `<head>` pre-paint scripts (flash-free optics + high-lumen), which run before `state.js` — and therefore `MetaStore` — has loaded; Suite 134.7 proves they sit strictly before the first `js/*.js` `<script>` tag.
+`MetaStore.get(key)` / `.set(key, val)` / `.remove(key)` / `.has(key)` / `.keys()` is the single choke point for every `robco_*` key that describes **this device's** preferences — never campaign data. A registered-key `META_MANIFEST` (37 keys) is the boundary: a key is a "device preference" if and only if it is listed there. Every read/write of these keys across `js/ui-audio.js` / `js/ui-render.js` / `js/ui-core.js` / `js/api.js` / `js/cloud.js` routes through `MetaStore` (never bare `localStorage`). The one sanctioned exception is the two `index.html` `<head>` pre-paint scripts (flash-free optics + high-lumen), which run before `state.js` — and therefore `MetaStore` — has loaded; Suite 134.7 proves they sit strictly before the first `js/*.js` `<script>` tag.
 
 | Key                            | Type   | Owner       | Description                                                                                     |
 | ------------------------------ | ------ | ----------- | ----------------------------------------------------------------------------------------------- |
@@ -1258,6 +1258,7 @@ Two separate stores, kept apart on purpose (Protocol 23 boundary, locked structu
 | `robco_questcomplete_muted`    | bool   | ui-audio.js | Quest-complete chime mute                                                                       |
 | `robco_questfail_muted`        | bool   | ui-audio.js | Quest-fail tone mute                                                                            |
 | `robco_factionthreshold_muted` | bool   | ui-audio.js | Faction-standing alert mute                                                                     |
+| `robco_hardwaresfx_muted`      | bool   | ui-audio.js | Module Bay hardware SFX mute (B2c — chip click + board thunk on install/eject)                  |
 | `robco_master_muted`           | bool   | ui-audio.js | Global audio kill switch                                                                        |
 | `robco_radio_on`               | bool   | ui-audio.js | Pip-Boy Radio ON state (WU-F5 — ON-semantics player, not a mute; opt-in)                        |
 | `robco_wakelock_enabled`       | bool   | ui-core.js  | Screen Wake Lock toggle (WU-F1)                                                                 |
@@ -1516,7 +1517,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1887-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1903-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable
