@@ -242,7 +242,9 @@ Check ([bool]($uiSrc -match 'COMM-LINK COMMAND REGISTRY')) "showHelpModal() cont
 # ===========================================================
 Sep "Suite 2c -- C3 CAMPG Tab"
 $htmlSrc = Read-Src "index.html"
-Check ([bool]($htmlSrc -match 'id="tab-btn-campg"')) 'CAMPG tab button exists in index.html (id="tab-btn-campg")'
+# DO-N: the tab-btn-* bar was replaced by the bezel nav; CAMPG now shows
+# alongside DATA under the DATABANK keycap (see switchTab()'s _DATABANK_TABS merge).
+Check ([bool]($htmlSrc -match 'id="navkey-databank"')) 'DATABANK bezel keycap exists in index.html (id="navkey-databank", houses DATA+CAMPG)'
 Check ([bool]($htmlSrc -match 'id="campgPanel"')) 'CAMPG panel exists in index.html (id="campgPanel")'
 Check ([bool]($htmlSrc -match 'id="gameContextSelect"')) 'Game context select exists in index.html (id="gameContextSelect")'
 Check ([bool]($htmlSrc -match 'id="fo3WarningBanner"')) 'FO3 warning banner exists in index.html (id="fo3WarningBanner")'
@@ -843,11 +845,21 @@ Check (-not ($servedJs21 -match '\$\{[^}]*localStorage\.getItem')) `
 # 30 tests
 # ===========================================================
 Sep "Suite 22 -- Critical Feature Presence"
-# Tab buttons
-Check ([bool]($htmlSrc -match "onclick=""switchTab\('stat'\)"""))  "STAT tab button wired (switchTab('stat'))"
-Check ([bool]($htmlSrc -match "onclick=""switchTab\('inv'\)"""))   "INV tab button wired (switchTab('inv'))"
-Check ([bool]($htmlSrc -match "onclick=""switchTab\('data'\)"""))  "DATA tab button wired (switchTab('data'))"
-Check ([bool]($htmlSrc -match "onclick=""switchTab\('campg'\)""")) "CAMPG tab button wired (switchTab('campg'))"
+# DO-N: the tab-bar's plain buttons were replaced by illuminated bezel keycaps that
+# route through selectSubsystem() -> switchTab() (Protocol 25 owner-approved redesign;
+# the router itself is unchanged underneath).
+Check (
+    [bool]($htmlSrc -match "(?s)id=""navkey-operator"".*?onclick=""selectSubsystem\('operator'\)""")
+) "OPERATOR bezel keycap wired (selectSubsystem('operator') routes to switchTab('stat'))"
+Check (
+    [bool]($htmlSrc -match "(?s)id=""navkey-operations"".*?onclick=""selectSubsystem\('operations'\)""")
+) "OPERATIONS bezel keycap wired (selectSubsystem('operations') routes to switchTab('inv'))"
+Check (
+    [bool]($htmlSrc -match "(?s)id=""navkey-databank"".*?onclick=""selectSubsystem\('databank'\)""")
+) "DATABANK bezel keycap wired (selectSubsystem('databank') routes to switchTab('data'))"
+Check (
+    [bool]($uiSrc -match "_DATABANK_TABS\s*=\s*\['data',\s*'campg'\]")
+) "CAMPG stays reachable -- switchTab() merges 'campg' into the DATABANK subsystem alongside 'data' (_DATABANK_TABS)"
 # Add buttons
 Check ([bool]($htmlSrc -match 'onclick="addItem\(\)"'))        "Add Item button wired (addItem())"
 Check ([bool]($htmlSrc -match 'onclick="addAmmo\(\)"'))        "Add Ammo button wired (addAmmo())"
@@ -3824,12 +3836,18 @@ Check (([bool]($capBody64 -match 'n\s*>\s*10')) -and -not ([bool]($capBody64 -ma
     'capStatMax caps at 10 only (n>10 guard present; no lower-bound n<1 force -- deletion works)'
 
 # 64.12  All 7 SPECIAL inputs oninput contains capStatMax (multi-line attr safe)
+# Protocol 42 (DO-N, harness-only): a fixed idIdx+-N char window is fragile against
+# indentation depth -- bound the search to the enclosing <input> tag itself instead,
+# which is indentation-independent (see the Node runner's matching comment).
 $missing6412 = $specialIds64 | Where-Object {
     $id = $_
     $idIdx = $htmlSrc.IndexOf("id=""$id""")
     if ($idIdx -lt 0) { return $true }
-    $slice = $htmlSrc.Substring([Math]::Max(0, $idIdx - 200), [Math]::Min(750, $htmlSrc.Length - [Math]::Max(0, $idIdx - 200)))
-    $attrM = [regex]::Match($slice, '(?s)oninput\s*=\s*"([^"]*)"')
+    $tagStart = $htmlSrc.LastIndexOf('<input', $idIdx)
+    $tagEnd = $htmlSrc.IndexOf('/>', $idIdx)
+    if ($tagStart -lt 0 -or $tagEnd -lt 0) { return $true }
+    $tag = $htmlSrc.Substring($tagStart, ($tagEnd + 2) - $tagStart)
+    $attrM = [regex]::Match($tag, '(?s)oninput\s*=\s*"([^"]*)"')
     -not ($attrM.Success -and ($attrM.Groups[1].Value -match 'capStatMax'))
 }
 Check ($missing6412.Count -eq 0) `
@@ -5857,9 +5875,11 @@ $loadUIBody91ps = $uiCore91ps.Substring($loadUIStart91, [Math]::Min(8000, $uiCor
 Check ($loadUIBody91ps.Contains("_isDirty('inv'")) `
     "GATE-DIRTY-4: _isDirty('inv') called inside loadUI() -- dirty-check is wired"
 
-# 91.5  renderWorldMap is guarded by DATA tab check in loadUI (B-P1)
-Check ($loadUIBody91ps.Contains('tab-btn-data') -and $loadUIBody91ps.Contains('renderWorldMap')) `
-    'GATE-DIRTY-5: renderWorldMap guarded by tab-btn-data check in loadUI() (B-P1)'
+# 91.5  renderWorldMap is guarded by DATA tab check in loadUI (B-P1). DO-N retired the
+# tab-btn-data id (bezel nav replaced it); the guard now checks the DATA panel's own
+# visibility class directly, decoupled from whichever UI drives the tab.
+Check ($loadUIBody91ps.Contains('.panel[data-tab="data"].tab-visible') -and $loadUIBody91ps.Contains('renderWorldMap')) `
+    'GATE-DIRTY-5: renderWorldMap guarded by a DATA-panel-visibility check in loadUI() (B-P1)'
 
 # 91.6  renderWorldMap is NOT called unconditionally in loadUI (B-P1 regression guard)
 Check (-not $loadUIBody91ps.Contains('renderWorldMap(); // G6')) `
@@ -8351,8 +8371,9 @@ Check $inOrder132 'window.onload calls the 12 boot-phase functions in the origin
 
 # Threshold has headroom for new named init/phase calls (e.g. P8 initImmersion()) --
 # the guard catches a monolith (hundreds of lines), not the named-call list growing.
+# DO-N added one legitimate named call (_initBezelChrome()) -- bumped to 50 to match.
 $onloadLineCount132 = ($onloadBody132 -split "`n").Count
-Check ($onloadLineCount132 -lt 45) "window.onload body stays a slim named-call composition ($onloadLineCount132 lines, expected < 45)"
+Check ($onloadLineCount132 -lt 50) "window.onload body stays a slim named-call composition ($onloadLineCount132 lines, expected < 50)"
 
 Check ($onloadBody132 -match [regex]::Escape('initTabs()')) 'window.onload still calls initTabs() directly (Suite 57.9 boot-order guard depends on this literal call)'
 
@@ -11824,6 +11845,145 @@ Check (
 Check (
     $state157 -match "APP_VERSION\s*=\s*'2\.7\.0'"
 ) "157.19: APP_VERSION remains 2.7.0 -- DO-K ships under [Unreleased] with a cache-rev bump only"
+
+# ===========================================================
+# Suite 158 -- DO-N: bezel chrome + subsystem nav
+# Verifies the tab bar -> bezel keycap replacement preserves the router
+# (switchTab, hotkeys, #go= deep-links, robco_active_tab), adds no campaign
+# write, and honors the mobile/reduced-motion/centering-rule invariants.
+# 18 tests.
+# ===========================================================
+Sep "Suite 158 -- DO-N: bezel chrome + subsystem nav"
+$html158 = Read-Src "index.html"
+$core158 = Read-Src "js/ui-core.js"
+$state158 = Read-Src "js/state.js"
+$sw158 = Read-Src "sw.js"
+$css158 = Read-Src "css/terminal.css"
+
+# 158.1  every navkey exists with its id + hotkey label
+Check ($html158 -match 'id="navkey-operator"') "158.1a: navkey-operator keycap exists"
+Check ($html158 -match 'id="navkey-operations"') "158.1b: navkey-operations keycap exists"
+Check ($html158 -match 'id="navkey-databank"') "158.1c: navkey-databank keycap exists"
+Check ($html158 -match 'id="navkey-uplink"') "158.1d: navkey-uplink keycap exists"
+Check ($html158 -match 'id="navkey-chassis"') "158.1e: navkey-chassis keycap exists"
+Check ($html158 -match 'id="navkey-directory"') "158.1f: navkey-directory (DIR fallback) keycap exists"
+
+# 158.2  role=tablist ARIA is preserved on the new nav-cluster
+Check (
+    $html158 -match '<nav class="nav-cluster" role="tablist"'
+) "158.2: the bezel nav-cluster preserves role=""tablist"" ARIA"
+
+# 158.3  selectSubsystem() routes operator/operations/databank through the
+# EXISTING switchTab() -- no forked routing (Protocol 22)
+Check (
+    ($core158 -match 'function selectSubsystem\(view\)') -and ($core158 -match 'switchTab\(tab\)')
+) "158.3: selectSubsystem() is defined and routes tab-mapped subsystems through switchTab()"
+
+# 158.4  hotkeys 1-5 + 0 are wired to selectSubsystem()/openBezelDirectory()
+Check (
+    ($core158 -match 'hotkeyMap\[e\.key\]') -and
+    ($core158 -match 'selectSubsystem\(hotkeyMap\[e\.key\]\)') -and
+    ($core158 -match 'openBezelDirectory\(\)')
+) "158.4: hotkeys [1]-[5] call selectSubsystem() and [0] opens the DIRECTORY fallback"
+
+# 158.5  switchTab() keeps merging 'data'+'campg' into DATABANK while STAT/INV
+# stay mutually exclusive singletons (structural, behavior-preserving)
+Check (
+    ($core158 -match "_DATABANK_TABS\s*=\s*\['data',\s*'campg'\]") -and
+    ($core158 -match 'const showTabs = _DATABANK_TABS\.includes\(tab\) \? _DATABANK_TABS : \[tab\]')
+) "158.5: switchTab() merges data+campg into one DATABANK subsystem, stat/inv stay exclusive"
+
+# 158.6  robco_bezel_subsystem is a registered MetaStore device pref (Protocol UI-6)
+Check (
+    $state158 -match "robco_bezel_subsystem:\s*\{\s*type:\s*'string',\s*default:\s*'operator'"
+) "158.6: robco_bezel_subsystem is registered in META_MANIFEST, default 'operator'"
+
+# 158.7  the DIRECTORY fallback reuses the shared openModal() driver -- no
+# bespoke second dialog (Protocol 22); no new .modal-overlay markup added
+$modalOverlayCount158 = [regex]::Matches($html158, 'class="modal-overlay"').Count
+Check (
+    ($core158 -match 'function openBezelDirectory\(\)') -and
+    ($core158 -match "openModal\(\{ title: '> SUBSYSTEM DIRECTORY', body \}\)") -and
+    ($modalOverlayCount158 -eq 2)
+) "158.7: openBezelDirectory() reuses openModal()/#sysModal -- no new modal-overlay shell"
+
+# 158.8  the DO-N nav layer writes nothing durable to the campaign -- every new
+# function reads state (telemetry text) or MetaStore (view prefs) only, never
+# saveState()/robco_v8/state.<field>=
+$doNFns158 = @(
+    'selectSubsystem', '_syncBezelNav', '_bezelTelemetryText', '_bezelSweep',
+    'openBezelDirectory', 'initBezelSubsystem', '_initBezelChrome', '_updateFaultLamp'
+)
+$offenders158 = $doNFns158 | Where-Object {
+    try { $body = Get-FunctionBody $core158 $_ } catch { return $true }
+    return ($body -match 'saveState\(|robco_v8|state\.\w+\s*=')
+}
+Check (
+    $offenders158.Count -eq 0
+) ("158.8: the DO-N nav layer never writes campaign state (saveState/robco_v8/state.<field>=)" + $(if ($offenders158.Count) { " -- offenders: $($offenders158 -join ', ')" } else { "" }))
+
+# 158.9  PWA deep-links/shortcuts are untouched -- same 4 SHORTCUT_ROUTES keys,
+# same #go= allow-list regex
+Check (
+    ($core158 -match 'comm:\s*\(\)\s*=>\s*\{') -and
+    ($core158 -match "inv:\s*\(\)\s*=>\s*switchTab\('inv'\)") -and
+    ($core158 -match "stat:\s*\(\)\s*=>\s*switchTab\('stat'\)") -and
+    ($core158 -match "data:\s*\(\)\s*=>\s*switchTab\('data'\)") -and
+    ($core158 -match "new:\s*\(\)\s*=>\s*wipeTerminal\(\)") -and
+    ($core158 -match [regex]::Escape("raw.match(/^go=([a-z]+)$/)"))
+) "158.9: SHORTCUT_ROUTES keys + the #go= allow-list regex are unchanged (PWA deep-links preserved)"
+
+# 158.10  the old tab-bar/tab-btn markup and CSS are fully retired (no dead code)
+Check (
+    (-not ($html158 -match 'class="tab-bar"')) -and
+    (-not ($html158 -match 'tab-btn-')) -and
+    (-not ($css158 -match '\.tab-bar\s*\{')) -and
+    (-not ($css158 -match '\.tab-btn\s*\{'))
+) "158.10: .tab-bar/.tab-btn markup and CSS are fully retired -- no dead code left behind"
+
+# 158.11  bezel keycaps meet the Protocol 17 tap-target floor (>=28px)
+Check (
+    $css158 -match '\.navkey\s*\{[^}]*min-height:\s*4[0-9]px'
+) "158.11: .navkey declares a >=28px tap target (Protocol 17)"
+
+# 158.12  the custom cursor is scoped to FNV + fine-pointer only -- never unconditional
+Check (
+    $css158 -match "@media \(hover: hover\) and \(pointer: fine\) \{\s*\[data-game='FNV'\] body \{"
+) "158.12: the custom cursor is scoped to [data-game='FNV'] under a fine-pointer media query"
+
+# 158.13  the nav-cluster honors the centering rule
+Check (
+    $css158 -match '\.nav-cluster\s*\{[^}]*justify-content:\s*center'
+) "158.13: .nav-cluster centers its keycaps (centering rule)"
+
+# 158.14  the global reduced-motion wildcard block still exists unchanged -- the
+# new bezel-sweep/lamp animations are caught by it, no bespoke carve-out needed
+Check (
+    $css158 -match "@media \(prefers-reduced-motion: reduce\) \{\s*\*,\s*\*::before,\s*\*::after \{"
+) "158.14: the existing global prefers-reduced-motion block still covers the new bezel animations"
+
+# 158.15  the FAULT lamp reflects the existing error ring-buffer (read-only)
+Check (
+    ($core158 -match 'function _updateFaultLamp\(\)') -and
+    ($core158 -match '(?s)_recordError\(type, msg\) \{.*?_updateFaultLamp\(\);') -and
+    ($core158 -match '(?s)_clearErrorLog\(\) \{.*?_updateFaultLamp\(\);')
+) "158.15: _recordError()/_clearErrorLog() both resync the FAULT lamp from the error log"
+
+# 158.16  CACHE_NAME was bumped for this served-file change (Protocol 1)
+Check (
+    $sw158 -match "const CACHE_NAME = 'robco-terminal-v2\.7\.0-r\d+'"
+) "158.16: CACHE_NAME is a well-formed robco-terminal-v2.7.0-rN revision string (Protocol 1)"
+
+# 158.17  per-game casing flavor text is CSS-swapped, never a JS ctx branch (Protocol 38)
+Check (
+    ($css158 -match "\[data-game='FNV'\] \.chassis-flavor--generic") -and
+    ($css158 -match "\[data-game='FNV'\] \.chassis-flavor--fnv")
+) "158.17: the casing subtitle swaps generic/FNV flavor text via [data-game], not a JS branch"
+
+# 158.18  the retired .header class leaves no trace (cleanliness)
+Check (
+    (-not ($html158 -match 'class="header"')) -and (-not ($css158 -match '(?m)^\.header\s*\{'))
+) "158.18: the retired .header class/rule leaves no dead markup or CSS behind"
 
 # ===========================================================
 # Results

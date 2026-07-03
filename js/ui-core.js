@@ -694,6 +694,22 @@ function _recordError(type, msg) {
     while (log.length > ERROR_LOG_CAP) log.shift();
     MetaStore.set(ERROR_LOG_KEY, JSON.stringify(log));
   } catch (_) {} // never let logging throw
+  _updateFaultLamp();
+}
+
+// DO-N: the casing-top FAULT lamp reads the existing error ring-buffer
+// (read-only device telemetry, no new state) — lit whenever a client error
+// has been recorded this device, cleared by the existing [LOGS] CLEAR action.
+function _updateFaultLamp() {
+  const lamp = document.getElementById('lampFault');
+  if (!lamp) return;
+  let hasErrors;
+  try {
+    hasErrors = JSON.parse(MetaStore.get(ERROR_LOG_KEY) || '[]').length > 0;
+  } catch (_) {
+    hasErrors = false;
+  }
+  lamp.classList.toggle('fault', hasErrors);
 }
 
 // ── GLOBAL ERROR NET ──────────────────────────────────────────
@@ -1401,18 +1417,23 @@ function _wireKeyboardShortcuts() {
           activeEl.tagName === 'TEXTAREA' ||
           activeEl.tagName === 'SELECT');
       if (!inInput) {
-        if (e.key === '1') {
+        // DO-N bezel hotkeys: [1]-[5] select a subsystem, [0] opens the flat
+        // DIRECTORY fallback. [4]/[5] are new (UPLINK/CHASSIS were never
+        // gated by a tab); [1]-[3] keep routing through switchTab() exactly
+        // as before via selectSubsystem()'s _NAV_TAB_FOR map.
+        const hotkeyMap = {
+          1: 'operator',
+          2: 'operations',
+          3: 'databank',
+          4: 'uplink',
+          5: 'chassis',
+        };
+        if (hotkeyMap[e.key]) {
           e.preventDefault();
-          switchTab('stat');
-        } else if (e.key === '2') {
+          selectSubsystem(hotkeyMap[e.key]);
+        } else if (e.key === '0') {
           e.preventDefault();
-          switchTab('inv');
-        } else if (e.key === '3') {
-          e.preventDefault();
-          switchTab('data');
-        } else if (e.key === '4') {
-          e.preventDefault();
-          switchTab('campg');
+          openBezelDirectory();
         }
       }
     }
@@ -1610,6 +1631,7 @@ window.onload = async function () {
     _restoreApiKeyAndChatHistory();
     loadUI();
     initTabs(); // Phase 4: restore active tab (defaults to 'stat' on first load)
+    _initBezelChrome(); // DO-N: restore bezel subsystem highlight + sync the FAULT lamp
     setupHpBarInteraction();
     setupXpBarInteraction(); // C11: XP bar click-drag (mirrors HP bar, within current level range)
     startCrtHum();
@@ -1941,27 +1963,39 @@ function _updatePanelBadges() {
 // Each panel has data-tab="stat|inv|data|campg". Panels with no data-tab always show.
 // Security & Configuration has no data-tab and is always visible.
 const TAB_NAMES = ['stat', 'inv', 'data', 'campg'];
+// DO-N: 'data' and 'campg' present together as the ONE bezel subsystem
+// (DATABANK) — selecting either tab shows both panel groups; STAT/INV stay
+// mutually exclusive. switchTab() itself keeps working standalone exactly
+// as before (routing/hotkey/deep-link contract preserved) — this only
+// widens which panels a 'data'/'campg' call reveals.
+const _DATABANK_TABS = ['data', 'campg'];
+const TAB_TO_SUBSYSTEM = {
+  stat: 'operator',
+  inv: 'operations',
+  data: 'databank',
+  campg: 'databank',
+};
 
 function switchTab(tab) {
   if (!TAB_NAMES.includes(tab)) return;
   playPanelClick(); // H1: rotary dial click on tab switch
-  // Show panels for the active tab, hide others
+  // Show panels for the active tab (databank merges data+campg), hide others
+  const showTabs = _DATABANK_TABS.includes(tab) ? _DATABANK_TABS : [tab];
   document.querySelectorAll('.panel[data-tab]').forEach(el => {
-    if (el.dataset.tab === tab) {
+    if (showTabs.includes(el.dataset.tab)) {
       el.classList.add('tab-visible');
     } else {
       el.classList.remove('tab-visible');
     }
   });
-  // Update button active states
-  TAB_NAMES.forEach(t => {
-    const btn = document.getElementById('tab-btn-' + t);
-    if (btn) btn.classList.toggle('active', t === tab);
-  });
   // Store active tab so page reload restores it
   MetaStore.set('robco_active_tab', tab);
   // Re-render world map when switching to the DATA tab so it measures real panel width
   if (tab === 'data' && typeof renderWorldMap === 'function') renderWorldMap();
+  // DO-N: sync the bezel subsystem nav (LED/aria-selected/telemetry) to match —
+  // every entry path (hotkey, #go= deep-link, bezel click, AI auto-expand)
+  // stays visually consistent through this one call.
+  _syncBezelNav(TAB_TO_SUBSYSTEM[tab] || 'operator');
 }
 
 // Initialize tab on page load (restores last used tab, defaults to 'stat')
@@ -1972,6 +2006,137 @@ function initTabs() {
   switchTab(tab);
 }
 
+// ── DO-N: BEZEL SUBSYSTEM NAV ─────────────────────────────────────────
+// Illuminated keycap presentation over the existing tab/router system
+// (Protocol 25 owner-approved redesign). Every keycap routes through
+// switchTab() (stat/inv/data/campg unchanged) or, for the two subsystems
+// that were never gated by a tab (the always-visible Comm-Link column and
+// Security & Configuration/Module Bay), scrolls/focuses them directly —
+// mirroring the existing SHORTCUT_ROUTES.comm approach. Writes only the
+// MetaStore view preference (Protocol UI-6); no campaign state touched.
+const NAV_KEYS = ['operator', 'operations', 'databank', 'uplink', 'chassis'];
+const _NAV_TAB_FOR = { operator: 'stat', operations: 'inv', databank: 'data' };
+
+function _syncBezelNav(subsystem) {
+  if (!NAV_KEYS.includes(subsystem)) return;
+  NAV_KEYS.forEach(k => {
+    const btn = document.getElementById('navkey-' + k);
+    if (!btn) return;
+    const on = k === subsystem;
+    btn.classList.toggle('active', on);
+    btn.setAttribute('aria-selected', String(on));
+  });
+  const lcd = document.getElementById('bezelTelemetry');
+  if (lcd) lcd.textContent = _bezelTelemetryText(subsystem);
+  MetaStore.set('robco_bezel_subsystem', subsystem);
+}
+
+function _bezelTelemetryText(subsystem) {
+  switch (subsystem) {
+    case 'operator': {
+      const hpMax = state.hpMax || 100;
+      const nominal = hpMax <= 0 || (state.hpCur || 0) / hpMax > 0.25;
+      return '▸ SUBSYSTEM: OPERATOR · ' + (nominal ? 'VITALS NOMINAL' : 'VITALS CRITICAL');
+    }
+    case 'operations': {
+      const n = Array.isArray(state.inventory) ? state.inventory.length : 0;
+      return '▸ SUBSYSTEM: OPERATIONS · ' + n + ' MANIFEST ENTRIES';
+    }
+    case 'databank':
+      return (
+        '▸ SUBSYSTEM: DATABANK · ' +
+        (typeof _pendingDirectivesCount === 'function' ? _pendingDirectivesCount() : 0) +
+        ' ACTIVE DIRECTIVES'
+      );
+    case 'uplink':
+      return '▸ SUBSYSTEM: UPLINK · DIRECTOR CHANNEL';
+    case 'chassis':
+      return '▸ SUBSYSTEM: CHASSIS · MODULE BAY';
+    default:
+      return '▸ SUBSYSTEM: ' + subsystem.toUpperCase();
+  }
+}
+
+// SWEEP — the DO-N "re-tune the channel" motion verb on subsystem change.
+// Reduced-motion is handled by the existing global prefers-reduced-motion
+// CSS block, which zeroes the animation to an instant resting frame.
+function _bezelSweep() {
+  const wrap = document.querySelector('.glass-frame');
+  if (!wrap) return;
+  wrap.classList.remove('sweep');
+  void wrap.offsetWidth; // force reflow so the animation can restart
+  wrap.classList.add('sweep');
+}
+
+// selectSubsystem(view) — the bezel keycap click handler.
+function selectSubsystem(view) {
+  const tab = _NAV_TAB_FOR[view];
+  if (tab) {
+    switchTab(tab); // routes + syncs the nav in one call
+  } else if (view === 'uplink') {
+    const i = document.getElementById('chatInput');
+    if (i) {
+      i.scrollIntoView({ block: 'center' });
+      i.focus();
+    }
+    _syncBezelNav('uplink');
+  } else if (view === 'chassis') {
+    const bay = document.getElementById('moduleBay');
+    const details = bay && bay.closest('details.panel');
+    if (details && !details.open) details.setAttribute('open', '');
+    if (bay) bay.scrollIntoView({ block: 'center' });
+    _syncBezelNav('chassis');
+  } else {
+    return;
+  }
+  _bezelSweep();
+}
+
+// DIRECTORY fallback (Protocol 25) — a flat, plain-label list of every
+// subsystem, one tap away, reusing the shared #sysModal driver (Protocol 22)
+// rather than a bespoke dialog.
+function openBezelDirectory() {
+  const items = [
+    ['operator', 'OPERATOR', 'character stats', 'STAT · [1]'],
+    ['operations', 'OPERATIONS', 'inventory &amp; crafting', 'INV · [2]'],
+    ['databank', 'DATABANK', 'quests, map, campaign', 'DATA·CAMPG · [3]'],
+    ['uplink', 'UPLINK', 'the AI comm-link', 'COMM · [4]'],
+    ['chassis', 'CHASSIS', 'settings &amp; saves', 'SYSTEM · [5]'],
+  ];
+  const body =
+    '<div class="d-sub" style="font-size: 9px; opacity: 0.5; letter-spacing: 1px; margin-bottom: 10px">FLAT INDEX — EVERY SUBSYSTEM, PLAIN LABELS</div>' +
+    items
+      .map(
+        ([view, label, desc, sub]) =>
+          '<button type="button" class="blue-btn bezel-dir-item" onclick="selectSubsystem(\'' +
+          view +
+          '\'); closeModal();">' +
+          label +
+          ' — ' +
+          desc +
+          ' <span>' +
+          sub +
+          '</span></button>'
+      )
+      .join('');
+  openModal({ title: '> SUBSYSTEM DIRECTORY', body });
+}
+
+// Restore the last-focused non-tab subsystem (uplink/chassis) highlight on
+// boot — visual only, never scrolls/focuses anything on page load.
+function initBezelSubsystem() {
+  const saved = MetaStore.get('robco_bezel_subsystem');
+  if (saved === 'uplink' || saved === 'chassis') _syncBezelNav(saved);
+}
+
+// Single boot-phase entry point for the two DO-N bezel-chrome restores, so
+// window.onload gains one named call (Suite 132's slim-composition contract)
+// instead of two.
+function _initBezelChrome() {
+  initBezelSubsystem();
+  _updateFaultLamp();
+}
+
 // PWA app-shortcut deep-link routes. Keys are the only accepted #go= values (allow-list).
 const SHORTCUT_ROUTES = {
   comm: () => {
@@ -1980,6 +2145,7 @@ const SHORTCUT_ROUTES = {
       i.scrollIntoView({ block: 'center' });
       i.focus();
     }
+    _syncBezelNav('uplink'); // DO-N: keep the bezel highlight consistent with this deep-link
   },
   inv: () => switchTab('inv'),
   stat: () => switchTab('stat'),
@@ -2473,6 +2639,7 @@ function confirmAction(opts) {
 function _clearErrorLog() {
   MetaStore.remove(ERROR_LOG_KEY);
   showErrorLog();
+  _updateFaultLamp();
 }
 function showErrorLog() {
   const modal = document.getElementById('sysModal');
@@ -3183,8 +3350,9 @@ function loadUI() {
     renderTrade();
   if (_isDirty('gamedate', { ticks: state.ticks, ctx: state.gameContext })) renderGameDate();
   // G6: Regional Zone Map — skip when DATA tab is not active (B-P1: map work is invisible off-tab;
-  // switchTab('data') at ui-core.js:891 re-renders when the user switches to it).
-  if (document.getElementById('tab-btn-data')?.classList.contains('active')) {
+  // switchTab('data') at ui-core.js:891 re-renders when the user switches to it). Checks panel
+  // visibility directly (DO-N: decoupled from which UI drives the tab — bezel keycap or otherwise).
+  if (document.querySelector('.panel[data-tab="data"].tab-visible')) {
     if (
       _isDirty('worldmap', {
         lh: state.locationHistory,

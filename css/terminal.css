@@ -81,19 +81,6 @@ body {
   }
 }
 
-@keyframes header-pulse {
-  0%,
-  100% {
-    text-shadow: 0 0 4px var(--robco-green);
-  }
-  50% {
-    text-shadow:
-      0 0 12px var(--robco-green),
-      0 0 28px var(--robco-green),
-      0 0 50px var(--robco-green);
-  }
-}
-
 @keyframes rad-pulse {
   0%,
   100% {
@@ -112,18 +99,6 @@ body {
   box-sizing: border-box;
   position: relative;
   z-index: 10;
-}
-.header {
-  text-align: center;
-  border-bottom: 1px dashed var(--robco-green);
-  padding-bottom: 8px;
-  margin-bottom: 12px;
-}
-.header h1 {
-  margin: 0;
-  font-size: 18px;
-  letter-spacing: 2px;
-  animation: header-pulse 3s ease-in-out infinite;
 }
 .main-grid {
   display: grid;
@@ -460,55 +435,332 @@ textarea {
   overflow-x: auto;
 }
 
-/* ─── Tab Navigation Bar ──────────────────────────────────────── */
-.tab-bar {
-  display: flex;
-  gap: 2px;
-  margin-bottom: 6px;
-  border-bottom: 1px solid var(--robco-green);
-  padding-bottom: 4px;
-}
-/* F2: sticky tab-bar on mobile — desktop keeps it visible via fixed column height */
+/* Clip overflow within each column on mobile without creating a scroll container.
+   position:fixed children (autocomplete panel) are unaffected by clip. */
 @media (max-width: 999px) {
-  .tab-bar {
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    background: #010a07;
-    padding-top: 4px;
-  }
-  /* Clip overflow within each column on mobile without creating a scroll container.
-     position:fixed children (autocomplete panel) are unaffected by clip. */
   .col-left,
   .col-right {
     overflow-x: clip;
   }
 }
-.tab-btn {
-  background: transparent;
-  border: 1px solid var(--robco-green);
-  color: var(--robco-green);
-  font-family: inherit;
-  font-size: 11px;
+
+/* ════════════════════════════════════════════════════════════════════
+   DEVICE CHROME — DO-N bezel/casing (Protocol UI-7). The app becomes a
+   physical RobCo terminal: casing-top (brand/lamps) + a curved glass frame
+   (.glass-frame, curvature/vignette on the FRAME only — never the text)
+   + a bottom bezel carrying the illuminated subsystem selector (replaces
+   the old .tab-bar; Protocol 25 owner-approved redesign). Structural rules
+   here apply to every game; per-game FLAVOR (the amber "wire" split, the
+   custom cursor, the casing-top subtitle) is scoped under [data-game="FNV"]
+   with a generic fallback for every other/future game context — never a JS
+   ctx branch (Protocol 38).
+   ════════════════════════════════════════════════════════════════════ */
+:root {
+  --bezel-steel-1: #191c17;
+  --bezel-steel-2: #23271f;
+  --bezel-steel-3: #2d3128;
+  --bezel-etch: rgba(214, 224, 200, 0.38);
+  --bezel-etch-dim: rgba(214, 224, 200, 0.2);
+  /* "the wire" — the remote/comm-link accent. Defaults to the local phosphor
+     color (no separate accent) until a game's identity defines one. */
+  --bezel-wire: var(--robco-green);
+  --bezel-wire-rgb: var(--robco-green-rgb);
+}
+[data-game='FNV'] {
+  /* NV's warm bias made structural: everything local stays green, everything
+     that comes over the wire (the Comm-Link / UPLINK) reads amber. */
+  --bezel-wire: #ffb642;
+  --bezel-wire-rgb: 255, 182, 66;
+}
+
+.machine {
+  background: linear-gradient(
+    180deg,
+    var(--bezel-steel-3),
+    var(--bezel-steel-1) 35%,
+    var(--bezel-steel-2)
+  );
+}
+
+.casing-top {
+  display: flex;
+  align-items: center;
+  gap: 8px 14px;
+  flex-wrap: wrap;
+  padding: 6px 4px 10px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.5);
+  color: var(--bezel-etch);
+}
+.brand-plate {
+  border: 1px solid var(--bezel-etch-dim);
+  padding: 3px 10px 4px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.25));
   letter-spacing: 2px;
-  padding: 4px 12px;
-  margin: 0;
-  cursor: pointer;
-  width: auto;
-  transition:
-    background 0.12s ease,
-    color 0.12s ease;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.brand-plate .uos {
+  font-size: 8.5px;
+  letter-spacing: 1px;
+  display: block;
   opacity: 0.75;
 }
-.tab-btn:hover {
-  filter: brightness(1.3);
+/* Per-game casing flavor text — CSS-swapped, never a JS ctx branch. */
+.chassis-flavor--fnv {
+  display: none;
+}
+[data-game='FNV'] .chassis-flavor--generic {
+  display: none;
+}
+[data-game='FNV'] .chassis-flavor--fnv {
+  display: inline;
+}
+.lamp-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 8.5px;
+  letter-spacing: 1px;
+}
+.lamp {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.lamp i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.6);
+  background: #3a3d35;
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.6);
+}
+.lamp.on i {
+  background: var(--robco-green);
+  box-shadow: 0 0 8px var(--robco-green);
+  animation: rad-pulse 3s infinite;
+}
+.lamp.wire.on i {
+  background: var(--bezel-wire);
+  box-shadow: 0 0 8px var(--bezel-wire);
+}
+.lamp.fault i {
+  background: var(--robco-danger);
+  box-shadow: 0 0 8px var(--robco-danger);
+  animation: rad-pulse 1.4s infinite;
+}
+.vents {
+  width: 60px;
+  height: 12px;
+  background: repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.55) 0 3px, transparent 3px 7px);
+  border-radius: 2px;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+.uptime-line {
+  flex-basis: 100%;
+  margin: 4px 0 0;
+  font-size: 11px;
   opacity: 0.85;
 }
-.tab-btn.active {
-  background: rgba(var(--robco-green-rgb), 0.18);
-  border-color: var(--robco-green);
-  opacity: 1;
-  box-shadow: 0 0 6px rgba(var(--robco-green-rgb), 0.35);
+
+/* The curved glass — CRT-frame chrome. Curvature/vignette live on THIS
+   frame layer only; nothing inside .main-grid is ever transformed. */
+.glass-frame {
+  border-radius: 14px;
+  padding: 6px;
+  background: linear-gradient(160deg, #101209, #05060a 40%, #0c0e0a);
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.9),
+    inset 0 0 60px rgba(var(--robco-green-rgb), 0.03);
+  min-width: 0;
+}
+
+/* SWEEP — the DO-N "re-tune the channel" motion verb on subsystem change
+   (Protocol UI-9). Reduced-motion is handled by the existing global
+   prefers-reduced-motion block below, which zeroes every animation. */
+.glass-frame {
+  position: relative;
+  overflow: hidden;
+}
+.glass-frame.sweep::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    transparent 18%,
+    rgba(var(--robco-green-rgb), 0.16) 42%,
+    rgba(var(--bezel-wire-rgb), 0.1) 50%,
+    transparent 78%
+  );
+  animation: bezel-sweep 0.45s ease-out forwards;
+}
+@keyframes bezel-sweep {
+  from {
+    transform: translateX(-105%);
+  }
+  to {
+    transform: translateX(105%);
+  }
+}
+
+/* ─── BEZEL — illuminated subsystem selector (replaces the tab bar) ──── */
+.bezel {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(0, 0, 0, 0.5);
+}
+.telemetry {
+  margin: 0 auto 8px;
+  max-width: 100%;
+  border: 1px solid rgba(0, 0, 0, 0.7);
+  background: #0d0a04;
+  box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.9);
+  color: var(--bezel-wire);
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  padding: 5px 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+}
+/* .nav-row groups the role=tablist nav + the sibling DIR button (which is NOT
+   a tab — see index.html) as one visually centered row. */
+.nav-row {
+  display: flex;
+  justify-content: center; /* centering rule — the whole row centers as a unit */
+  align-items: stretch;
+  gap: clamp(4px, 1.4vw, 10px);
+  flex-wrap: wrap;
+}
+.nav-cluster {
+  display: flex;
+  justify-content: center; /* centering rule — the cluster centers as a unit */
+  align-items: stretch;
+  gap: clamp(4px, 1.4vw, 10px);
+  flex-wrap: wrap;
+  padding: 0;
+  margin: 0;
+  border: none;
+}
+.navkey {
+  position: relative;
+  width: auto;
+  min-width: 0;
+  box-sizing: border-box;
+  flex: 1 1 60px;
+  max-width: 110px;
+  min-height: 44px;
+  padding: 5px 2px 4px;
+  border: 1px solid rgba(0, 0, 0, 0.75);
+  border-radius: 5px;
+  background: linear-gradient(180deg, #31352b, #1d201a 60%, #171a14);
+  box-shadow:
+    0 2px 0 #0c0e0a,
+    inset 0 1px 0 rgba(255, 255, 255, 0.09);
+  color: var(--bezel-etch);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  text-transform: uppercase;
+}
+.navkey:hover {
+  background: linear-gradient(180deg, #383d31, #22251e 60%, #191c16);
+}
+.navkey:active {
+  transform: translateY(1px);
+  box-shadow:
+    0 1px 0 #0c0e0a,
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.nk-led {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #3a3d35;
+  border: 1px solid rgba(0, 0, 0, 0.6);
+}
+.navkey.active {
+  color: var(--robco-green);
+  border-color: rgba(var(--robco-green-rgb), 0.45);
+}
+.navkey.active .nk-led {
+  background: var(--robco-green);
+  box-shadow: 0 0 7px var(--robco-green);
+}
+.navkey.wirekey.active {
+  color: var(--bezel-wire);
+  border-color: rgba(var(--bezel-wire-rgb), 0.5);
+}
+.navkey.wirekey.active .nk-led {
+  background: var(--bezel-wire);
+  box-shadow: 0 0 7px var(--bezel-wire);
+}
+.nk-num {
+  font-size: 7.5px;
+  opacity: 0.55;
+  letter-spacing: 1px;
+}
+.nk-label {
+  font-size: clamp(7.5px, 2.4vw, 9px);
+  letter-spacing: 0.5px;
+  line-height: 1.15;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  text-align: center;
+}
+.nk-sub {
+  font-size: 6.5px;
+  opacity: 0.45;
+  letter-spacing: 1px;
+}
+.navkey.dirkey {
+  flex: 0 1 44px;
+  min-width: 40px;
+  max-width: 52px;
+}
+
+/* Directory fallback modal body (rendered into #sysModal via openModal()) */
+.bezel-dir-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  margin-bottom: 7px;
+  padding: 8px 10px;
+  font-size: 11px;
+}
+.bezel-dir-item span {
+  opacity: 0.55;
+  font-size: 9px;
+  flex-shrink: 0;
+}
+
+/* Custom cursor — NV amber block caret (fine pointers only; touch devices
+   keep the system cursor at zero cost). FNV-only until DO-M authors the
+   FO3/FO4 cursor facets from identity.cursor. */
+@media (hover: hover) and (pointer: fine) {
+  [data-game='FNV'] body {
+    cursor:
+      url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="13" height="19"><rect x="1" y="1" width="9" height="15" fill="%23ffb642" fill-opacity="0.9" stroke="%23130d02" stroke-width="1"/></svg>')
+        2 2,
+      auto;
+  }
+  [data-game='FNV'] button,
+  [data-game='FNV'] .navkey {
+    cursor:
+      url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17"><g stroke="%23ffb642" stroke-width="2"><line x1="8.5" y1="0" x2="8.5" y2="6"/><line x1="8.5" y1="11" x2="8.5" y2="17"/><line x1="0" y1="8.5" x2="6" y2="8.5"/><line x1="11" y1="8.5" x2="17" y2="8.5"/></g></svg>')
+        8 8,
+      pointer;
+  }
 }
 /* Hidden panels (not in active tab) */
 .panel[data-tab] {
@@ -1743,8 +1995,7 @@ body.standby::after {
   pointer-events: none;
 }
 body.standby .crt-overlay,
-body.standby .crt-overlay::after,
-body.standby .header h1 {
+body.standby .crt-overlay::after {
   animation-play-state: paused;
 }
 
@@ -1962,12 +2213,31 @@ body.thermal-load .panel {
     display: flex;
     flex-direction: column;
   }
+  /* Desk-terminal shell: casing on top, the bezel keycap strip visually at
+     the BOTTOM (a real console's control strip sits under the screen), the
+     glass in between — via CSS `order`, not DOM order, so keyboard/tab
+     order still visits the nav early (matches the mobile in-flow position
+     below) while the desktop layout reads as physical hardware. */
+  .casing-top {
+    order: 1;
+    flex-shrink: 0;
+  }
+  .glass-frame {
+    order: 2;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+  }
+  .bezel {
+    order: 3;
+    flex-shrink: 0;
+  }
   .main-grid {
     grid-template-columns: 380px 1fr;
     gap: 25px;
-    flex-grow: 1;
-    height: 0;
+    flex: 1;
     min-height: 0;
+    width: 100%;
   }
   .col-left {
     display: flex;
@@ -2622,26 +2892,16 @@ body.sync-complete {
     word-break: break-word;
   }
 
-  /* Header / boot title: shrink and allow wrap so it never forces a scrollbar */
-  .header h1 {
-    font-size: 13px;
+  /* Casing/bezel: shrink and allow wrap so it never forces a scrollbar */
+  .brand-plate {
+    font-size: 11px;
     letter-spacing: 1px;
-    line-height: 1.3;
+    white-space: normal;
     word-break: break-word;
   }
-  .header p {
+  .uptime-line {
     font-size: 9px;
     word-break: break-word;
-  }
-
-  /* Tab bar: let buttons wrap onto a second row and tighten spacing */
-  .tab-bar {
-    flex-wrap: wrap;
-  }
-  .tab-btn {
-    padding: 4px 8px;
-    letter-spacing: 1px;
-    font-size: 10px;
   }
 
   /* Rows wrap their right-hand control column under the label instead of

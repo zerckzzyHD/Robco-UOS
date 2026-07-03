@@ -415,7 +415,12 @@ guards(uiSource, [
 header('C3 CAMPG Tab');
 const htmlSource = readFile('index.html');
 guards(htmlSource, [
-  [/id="tab-btn-campg"/, 'CAMPG tab button exists in index.html (id="tab-btn-campg")'],
+  [
+    /id="navkey-databank"/,
+    // DO-N: the tab-btn-* bar was replaced by the bezel nav; CAMPG now shows
+    // alongside DATA under the DATABANK keycap (see switchTab()'s _DATABANK_TABS merge).
+    'DATABANK bezel keycap exists in index.html (id="navkey-databank", houses DATA+CAMPG)',
+  ],
   [/id="campgPanel"/, 'CAMPG panel exists in index.html (id="campgPanel")'],
   [/id="gameContextSelect"/, 'Game context select exists in index.html (id="gameContextSelect")'],
   [/id="fo3WarningBanner"/, 'FO3 warning banner exists in index.html (id="fo3WarningBanner")'],
@@ -1370,12 +1375,28 @@ assert(
 //  30 tests
 // ══════════════════════════════════════════════════════════════
 header('Critical Feature Presence');
-// Tab buttons
+// DO-N: the tab-bar's plain buttons were replaced by illuminated bezel keycaps that
+// route through selectSubsystem() -> switchTab() (Protocol 25 owner-approved redesign;
+// the router itself is unchanged underneath).
 guards(htmlSource, [
-  [/onclick="switchTab\('stat'\)"/, "STAT tab button wired (switchTab('stat'))"],
-  [/onclick="switchTab\('inv'\)"/, "INV tab button wired (switchTab('inv'))"],
-  [/onclick="switchTab\('data'\)"/, "DATA tab button wired (switchTab('data'))"],
-  [/onclick="switchTab\('campg'\)"/, "CAMPG tab button wired (switchTab('campg'))"],
+  [
+    /id="navkey-operator"[\s\S]*?onclick="selectSubsystem\('operator'\)"/,
+    "OPERATOR bezel keycap wired (selectSubsystem('operator') routes to switchTab('stat'))",
+  ],
+  [
+    /id="navkey-operations"[\s\S]*?onclick="selectSubsystem\('operations'\)"/,
+    "OPERATIONS bezel keycap wired (selectSubsystem('operations') routes to switchTab('inv'))",
+  ],
+  [
+    /id="navkey-databank"[\s\S]*?onclick="selectSubsystem\('databank'\)"/,
+    "DATABANK bezel keycap wired (selectSubsystem('databank') routes to switchTab('data'))",
+  ],
+]);
+assert(
+  /_DATABANK_TABS\s*=\s*\[\s*'data'\s*,\s*'campg'\s*\]/.test(uiSource),
+  "CAMPG stays reachable — switchTab() merges 'campg' into the DATABANK subsystem alongside 'data' (_DATABANK_TABS)"
+);
+guards(htmlSource, [
   // Add buttons
   [/onclick="addItem\(\)"/, 'Add Item button wired (addItem())'],
   [/onclick="addAmmo\(\)"/, 'Add Ammo button wired (addAmmo())'],
@@ -6628,14 +6649,21 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   }
 
   // 64.12  All 7 SPECIAL inputs oninput contains capStatMax
+  // Protocol 42 (DO-N, harness-only): a fixed idIdx±N char window is fragile against
+  // indentation depth — DO-N's extra .glass-frame nesting level shifted every attribute
+  // over by 2 spaces/line and pushed the closing quote past a idIdx+300 cutoff, failing
+  // this check with no real product defect (capStatMax wiring was always intact). Fixed
+  // by bounding the search to the enclosing <input> tag itself, which is indentation-
+  // independent, rather than widening the window again (which just moves the fragility).
   {
     const missing = specialIds.filter(id => {
       const idIdx = htmlSource.indexOf(`id="${id}"`);
       if (idIdx === -1) return true;
-      const slice = htmlSource.slice(Math.max(0, idIdx - 200), idIdx + 300);
-      // oninput may be multi-line (Prettier); search for capStatMax anywhere in
-      // the attribute value (between oninput=" and the closing ")
-      const oinputM = slice.match(/oninput\s*=\s*"([^"]*)"/s);
+      const tagStart = htmlSource.lastIndexOf('<input', idIdx);
+      const tagEnd = htmlSource.indexOf('/>', idIdx);
+      if (tagStart === -1 || tagEnd === -1) return true;
+      const tag = htmlSource.slice(tagStart, tagEnd + 2);
+      const oinputM = tag.match(/oninput\s*=\s*"([^"]*)"/s);
       return !oinputM || !/capStatMax/.test(oinputM[1]);
     });
     assert(
@@ -10204,10 +10232,13 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     "GATE-DIRTY-4: _isDirty('inv') called inside loadUI() — dirty-check is wired"
   );
 
-  // 91.5  renderWorldMap is guarded by DATA tab check in loadUI (B-P1)
+  // 91.5  renderWorldMap is guarded by DATA tab check in loadUI (B-P1). DO-N retired the
+  // tab-btn-data id (bezel nav replaced it); the guard now checks the DATA panel's own
+  // visibility class directly, decoupled from whichever UI drives the tab.
   assert(
-    loadUIBody91.includes('tab-btn-data') && loadUIBody91.includes('renderWorldMap'),
-    'GATE-DIRTY-5: renderWorldMap guarded by tab-btn-data check in loadUI() (B-P1)'
+    loadUIBody91.includes('.panel[data-tab="data"].tab-visible') &&
+      loadUIBody91.includes('renderWorldMap'),
+    'GATE-DIRTY-5: renderWorldMap guarded by a DATA-panel-visibility check in loadUI() (B-P1)'
   );
 
   // 91.6  renderWorldMap is NOT called unconditionally in loadUI (B-P1 regression guard)
@@ -14711,9 +14742,11 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     //        initImmersion()) — the guard catches a monolith (hundreds of lines),
     //        not the natural growth of the named-call list.
     const onloadLineCount = onloadBody132.split('\n').length;
+    // DO-N added one legitimate named call (_initBezelChrome()) — bumped per this test's
+    // own stated intent (headroom for natural named-call growth, not a monolith guard).
     assert(
-      onloadLineCount < 45,
-      `window.onload body stays a slim named-call composition (${onloadLineCount} lines, expected < 45)`
+      onloadLineCount < 50,
+      `window.onload body stays a slim named-call composition (${onloadLineCount} lines, expected < 50)`
     );
 
     // 132.6  initTabs() still called directly in window.onload (not wrapped —
@@ -19851,6 +19884,179 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   assert(
     /APP_VERSION\s*=\s*'2\.7\.0'/.test(stateSource),
     '157.19: APP_VERSION remains 2.7.0 — DO-K ships under [Unreleased] with a cache-rev bump only'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 158 — DO-N: bezel chrome + subsystem nav
+//  Verifies the tab bar → bezel keycap replacement preserves the router
+//  (switchTab, hotkeys, #go= deep-links, robco_active_tab), adds no campaign
+//  write, and honors the mobile/reduced-motion/centering-rule invariants.
+//  18 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 158 — DO-N: bezel chrome + subsystem nav');
+  const cssSource158 = readFile('css/terminal.css');
+
+  // 158.1  every navkey exists with its id + hotkey label
+  guards(htmlSource, [
+    [/id="navkey-operator"/, '158.1a: navkey-operator keycap exists'],
+    [/id="navkey-operations"/, '158.1b: navkey-operations keycap exists'],
+    [/id="navkey-databank"/, '158.1c: navkey-databank keycap exists'],
+    [/id="navkey-uplink"/, '158.1d: navkey-uplink keycap exists'],
+    [/id="navkey-chassis"/, '158.1e: navkey-chassis keycap exists'],
+    [/id="navkey-directory"/, '158.1f: navkey-directory (DIR fallback) keycap exists'],
+  ]);
+
+  // 158.2  role=tablist ARIA is preserved on the new nav-cluster
+  assert(
+    /<nav class="nav-cluster" role="tablist"/.test(htmlSource),
+    '158.2: the bezel nav-cluster preserves role="tablist" ARIA'
+  );
+
+  // 158.3  selectSubsystem() routes operator/operations/databank through the
+  // EXISTING switchTab() — no forked routing (Protocol 22)
+  assert(
+    /function selectSubsystem\(view\)/.test(uiSource) && /switchTab\(tab\)/.test(uiSource),
+    '158.3: selectSubsystem() is defined and routes tab-mapped subsystems through switchTab()'
+  );
+
+  // 158.4  hotkeys 1-5 + 0 are wired to selectSubsystem()/openBezelDirectory()
+  assert(
+    /hotkeyMap\[e\.key\]/.test(uiSource) &&
+      /selectSubsystem\(hotkeyMap\[e\.key\]\)/.test(uiSource) &&
+      /openBezelDirectory\(\)/.test(uiSource),
+    '158.4: hotkeys [1]-[5] call selectSubsystem() and [0] opens the DIRECTORY fallback'
+  );
+
+  // 158.5  switchTab() keeps merging 'data'+'campg' into DATABANK while STAT/INV
+  // stay mutually exclusive singletons (structural, behavior-preserving)
+  assert(
+    /_DATABANK_TABS\s*=\s*\['data',\s*'campg'\]/.test(uiSource) &&
+      /const showTabs = _DATABANK_TABS\.includes\(tab\) \? _DATABANK_TABS : \[tab\]/.test(uiSource),
+    '158.5: switchTab() merges data+campg into one DATABANK subsystem, stat/inv stay exclusive'
+  );
+
+  // 158.6  robco_bezel_subsystem is a registered MetaStore device pref (Protocol UI-6)
+  assert(
+    /robco_bezel_subsystem:\s*\{\s*type:\s*'string',\s*default:\s*'operator'/.test(stateSource),
+    "158.6: robco_bezel_subsystem is registered in META_MANIFEST, default 'operator'"
+  );
+
+  // 158.7  the DIRECTORY fallback reuses the shared openModal() driver — no
+  // bespoke second dialog (Protocol 22); no new .modal-overlay markup added
+  assert(
+    /function openBezelDirectory\(\)/.test(uiSource) &&
+      /openModal\(\{ title: '> SUBSYSTEM DIRECTORY', body \}\)/.test(uiSource) &&
+      (htmlSource.match(/class="modal-overlay"/g) || []).length === 2,
+    '158.7: openBezelDirectory() reuses openModal()/#sysModal — no new modal-overlay shell'
+  );
+
+  // 158.8  the DO-N nav layer writes nothing durable to the campaign — every new
+  // function reads state (telemetry text) or MetaStore (view prefs) only, never
+  // saveState()/robco_v8/state.<field>=
+  {
+    const doNFns158 = [
+      'selectSubsystem',
+      '_syncBezelNav',
+      '_bezelTelemetryText',
+      '_bezelSweep',
+      'openBezelDirectory',
+      'initBezelSubsystem',
+      '_initBezelChrome',
+      '_updateFaultLamp',
+    ];
+    const offenders = doNFns158.filter(n => {
+      let body;
+      try {
+        body = extractFunctionBody(uiSource, n);
+      } catch (_) {
+        return true;
+      }
+      return /saveState\(|robco_v8|state\.\w+\s*=/.test(body);
+    });
+    assert(
+      offenders.length === 0,
+      '158.8: the DO-N nav layer never writes campaign state (saveState/robco_v8/state.<field>=)' +
+        (offenders.length ? ' — offenders: ' + offenders.join(', ') : '')
+    );
+  }
+
+  // 158.9  PWA deep-links/shortcuts are untouched — same 4 SHORTCUT_ROUTES keys,
+  // same #go= allow-list regex
+  assert(
+    /comm:\s*\(\)\s*=>\s*\{/.test(uiSource) &&
+      /inv:\s*\(\)\s*=>\s*switchTab\('inv'\)/.test(uiSource) &&
+      /stat:\s*\(\)\s*=>\s*switchTab\('stat'\)/.test(uiSource) &&
+      /data:\s*\(\)\s*=>\s*switchTab\('data'\)/.test(uiSource) &&
+      /new:\s*\(\)\s*=>\s*wipeTerminal\(\)/.test(uiSource) &&
+      /raw\.match\(\/\^go=\(\[a-z\]\+\)\$\/\)/.test(uiSource),
+    '158.9: SHORTCUT_ROUTES keys + the #go= allow-list regex are unchanged (PWA deep-links preserved)'
+  );
+
+  // 158.10  the old tab-bar/tab-btn markup and CSS are fully retired (no dead code)
+  assert(
+    !/class="tab-bar"/.test(htmlSource) &&
+      !/tab-btn-/.test(htmlSource) &&
+      !/\.tab-bar\s*\{/.test(cssSource158) &&
+      !/\.tab-btn\s*\{/.test(cssSource158),
+    '158.10: .tab-bar/.tab-btn markup and CSS are fully retired — no dead code left behind'
+  );
+
+  // 158.11  bezel keycaps meet the Protocol 17 tap-target floor (>=28px)
+  assert(
+    /\.navkey\s*\{[^}]*min-height:\s*4[0-9]px/.test(cssSource158),
+    '158.11: .navkey declares a >=28px tap target (Protocol 17)'
+  );
+
+  // 158.12  the custom cursor is scoped to FNV + fine-pointer only — never unconditional
+  assert(
+    /@media \(hover: hover\) and \(pointer: fine\) \{\s*\[data-game='FNV'\] body \{/.test(
+      cssSource158
+    ),
+    "158.12: the custom cursor is scoped to [data-game='FNV'] under a fine-pointer media query"
+  );
+
+  // 158.13  the nav-cluster honors the centering rule
+  assert(
+    /\.nav-cluster\s*\{[^}]*justify-content:\s*center/.test(cssSource158),
+    '158.13: .nav-cluster centers its keycaps (centering rule)'
+  );
+
+  // 158.14  the global reduced-motion wildcard block still exists unchanged — the
+  // new bezel-sweep/lamp animations are caught by it, no bespoke carve-out needed
+  assert(
+    /@media \(prefers-reduced-motion: reduce\) \{\s*\*,\s*\*::before,\s*\*::after \{/.test(
+      cssSource158
+    ),
+    '158.14: the existing global prefers-reduced-motion block still covers the new bezel animations'
+  );
+
+  // 158.15  the FAULT lamp reflects the existing error ring-buffer (read-only)
+  assert(
+    /function _updateFaultLamp\(\)/.test(uiSource) &&
+      /_recordError\(type, msg\) \{[\s\S]*?_updateFaultLamp\(\);/.test(uiSource) &&
+      /_clearErrorLog\(\) \{[\s\S]*?_updateFaultLamp\(\);/.test(uiSource),
+    '158.15: _recordError()/_clearErrorLog() both resync the FAULT lamp from the error log'
+  );
+
+  // 158.16  CACHE_NAME was bumped for this served-file change (Protocol 1)
+  assert(
+    /const CACHE_NAME = 'robco-terminal-v2\.7\.0-r\d+'/.test(swSource),
+    '158.16: CACHE_NAME is a well-formed robco-terminal-v2.7.0-rN revision string (Protocol 1)'
+  );
+
+  // 158.17  per-game casing flavor text is CSS-swapped, never a JS ctx branch (Protocol 38)
+  assert(
+    /\[data-game='FNV'\] \.chassis-flavor--generic/.test(cssSource158) &&
+      /\[data-game='FNV'\] \.chassis-flavor--fnv/.test(cssSource158),
+    '158.17: the casing subtitle swaps generic/FNV flavor text via [data-game], not a JS branch'
+  );
+
+  // 158.18  the retired .header class leaves no trace (cleanliness)
+  assert(
+    !/class="header"/.test(htmlSource) && !/^\.header\s*\{/m.test(cssSource158),
+    '158.18: the retired .header class/rule leaves no dead markup or CSS behind'
   );
 }
 

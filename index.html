@@ -224,2298 +224,2397 @@
       </div>
     </div>
 
-    <div class="container">
-      <div class="header">
-        <h1>[ROBCO U.O.S. 2.7.0 - OPTICS ENABLED]</h1>
-        <p>SECURE NETWORK LINK ESTABLISHED _ | UPTIME: <span id="uptimeClock">00:00:00</span></p>
+    <div class="container machine" id="uosMachine">
+      <!-- ════════════════════════════════════════════════════════════════
+           DEVICE CHRome (DO-N, Protocol UI-7): the app becomes a physical
+           RobCo terminal. Casing-top = brand plate + status lamps + uptime.
+           Structural for every game (Protocol 38); flavor text (serial/brand
+           subtitle) is CSS-swapped per [data-game] in terminal.css, never a
+           JS ctx branch.
+           ════════════════════════════════════════════════════════════════ -->
+      <div class="casing-top">
+        <div class="brand-plate">
+          ROBCO INDUSTRIES
+          <span class="uos"
+            >UNIFIED OPERATING SYSTEM
+            <span class="chassis-flavor chassis-flavor--generic">TERMINAL UNIT</span
+            ><span class="chassis-flavor chassis-flavor--fnv">DESK TERMINAL</span></span
+          >
+        </div>
+        <div class="lamp-row" aria-hidden="true">
+          <span class="lamp on" id="lampPwr"><i></i>PWR</span>
+          <span class="lamp wire on" id="lampUplink"><i></i>UPLINK</span>
+          <span class="lamp" id="lampFault"><i></i>FAULT</span>
+        </div>
+        <div class="vents" aria-hidden="true"></div>
+        <p class="uptime-line">
+          SECURE NETWORK LINK ESTABLISHED _ | UPTIME: <span id="uptimeClock">00:00:00</span>
+        </p>
       </div>
 
-      <div class="main-grid">
-        <div class="col-left" id="uiPanel">
-          <!-- TAB NAVIGATION BAR -->
-          <div class="tab-bar" role="tablist">
+      <!-- ════════════════════════════════════════════════════════════════
+           BEZEL — illuminated subsystem selector (DO-N, replaces the tab bar
+           per the owner-approved Protocol 25 amendment). Every keycap routes
+           through the EXISTING switchTab()/router via selectSubsystem() —
+           no forked routing. Hotkeys [1]-[5]/[0], role=tab ARIA, and
+           #go= deep-links all keep working underneath (see ui-core.js).
+           ════════════════════════════════════════════════════════════════ -->
+      <div class="bezel">
+        <div class="telemetry" id="bezelTelemetry" aria-live="polite">
+          &#9656; SUBSYSTEM: OPERATOR
+        </div>
+        <div class="nav-row">
+          <nav class="nav-cluster" role="tablist" aria-label="Terminal subsystems">
             <button
-              id="tab-btn-stat"
-              class="tab-btn active"
+              id="navkey-operator"
+              class="navkey active"
               role="tab"
-              onclick="switchTab('stat')"
-              title="STAT [1]"
+              aria-selected="true"
+              onclick="selectSubsystem('operator')"
+              aria-label="OPERATOR subsystem &mdash; bio-stats (was the STAT tab, hotkey 1)"
             >
-              STAT
+              <span class="nk-led" aria-hidden="true"></span><span class="nk-num">[1]</span>
+              <span class="nk-label">OPERATOR</span><span class="nk-sub">STAT</span>
             </button>
             <button
-              id="tab-btn-inv"
-              class="tab-btn"
+              id="navkey-operations"
+              class="navkey"
               role="tab"
-              onclick="switchTab('inv')"
-              title="INV [2]"
+              aria-selected="false"
+              onclick="selectSubsystem('operations')"
+              aria-label="OPERATIONS subsystem &mdash; inventory and logistics (was the INV tab, hotkey 2)"
             >
-              INV
+              <span class="nk-led" aria-hidden="true"></span><span class="nk-num">[2]</span>
+              <span class="nk-label">OPERATIONS</span><span class="nk-sub">INV</span>
             </button>
             <button
-              id="tab-btn-data"
-              class="tab-btn"
+              id="navkey-databank"
+              class="navkey"
               role="tab"
-              onclick="switchTab('data')"
-              title="DATA [3]"
+              aria-selected="false"
+              onclick="selectSubsystem('databank')"
+              aria-label="DATABANK subsystem &mdash; quests, map and campaign records (was the DATA and CAMPG tabs, hotkey 3)"
             >
-              DATA
+              <span class="nk-led" aria-hidden="true"></span><span class="nk-num">[3]</span>
+              <span class="nk-label">DATABANK</span><span class="nk-sub">DATA&middot;CAMPG</span>
             </button>
             <button
-              id="tab-btn-campg"
-              class="tab-btn"
+              id="navkey-uplink"
+              class="navkey wirekey"
               role="tab"
-              onclick="switchTab('campg')"
-              title="CAMPG [4]"
+              aria-selected="false"
+              onclick="selectSubsystem('uplink')"
+              aria-label="UPLINK &mdash; the Comm-Link / AI channel (hotkey 4)"
             >
-              CAMPG
+              <span class="nk-led" aria-hidden="true"></span><span class="nk-num">[4]</span>
+              <span class="nk-label">UPLINK</span><span class="nk-sub">COMM</span>
             </button>
-          </div>
-
-          <!-- 1. BIO-METRICS (STAT tab) -->
-          <details class="panel" data-tab="stat">
-            <summary>
-              <h2>> BIO-METRICS</h2>
-            </summary>
-            <div class="special-grid">
-              <div>
-                <label>S</label
-                ><input
-                  type="number"
-                  id="s_s"
-                  value="5"
-                  min="1"
-                  max="10"
-                  inputmode="numeric"
-                  aria-label="Strength"
-                  oninput="
-                    capStatMax(this);
-                    updateMath();
-                  "
-                  onchange="commitStat(this)"
-                />
-              </div>
-              <div>
-                <label>P</label
-                ><input
-                  type="number"
-                  id="s_p"
-                  value="5"
-                  min="1"
-                  max="10"
-                  inputmode="numeric"
-                  aria-label="Perception"
-                  oninput="
-                    capStatMax(this);
-                    updateMath();
-                  "
-                  onchange="commitStat(this)"
-                />
-              </div>
-              <div>
-                <label>E</label
-                ><input
-                  type="number"
-                  id="s_e"
-                  value="5"
-                  min="1"
-                  max="10"
-                  inputmode="numeric"
-                  aria-label="Endurance"
-                  oninput="
-                    capStatMax(this);
-                    updateMath();
-                  "
-                  onchange="commitStat(this)"
-                />
-              </div>
-              <div>
-                <label>C</label
-                ><input
-                  type="number"
-                  id="s_c"
-                  value="5"
-                  min="1"
-                  max="10"
-                  inputmode="numeric"
-                  aria-label="Charisma"
-                  oninput="
-                    capStatMax(this);
-                    updateMath();
-                  "
-                  onchange="commitStat(this)"
-                />
-              </div>
-              <div>
-                <label>I</label
-                ><input
-                  type="number"
-                  id="s_i"
-                  value="5"
-                  min="1"
-                  max="10"
-                  inputmode="numeric"
-                  aria-label="Intelligence"
-                  oninput="
-                    capStatMax(this);
-                    updateMath();
-                  "
-                  onchange="commitStat(this)"
-                />
-              </div>
-              <div>
-                <label>A</label
-                ><input
-                  type="number"
-                  id="s_a"
-                  value="5"
-                  min="1"
-                  max="10"
-                  inputmode="numeric"
-                  aria-label="Agility"
-                  oninput="
-                    capStatMax(this);
-                    updateMath();
-                  "
-                  onchange="commitStat(this)"
-                />
-              </div>
-              <div>
-                <label>L</label
-                ><input
-                  type="number"
-                  id="s_l"
-                  value="5"
-                  min="1"
-                  max="10"
-                  inputmode="numeric"
-                  aria-label="Luck"
-                  oninput="
-                    capStatMax(this);
-                    updateMath();
-                  "
-                  onchange="commitStat(this)"
-                />
-              </div>
-            </div>
-            <div class="input-group">
-              <label>HP:</label>
-              <div>
-                <input
-                  type="number"
-                  id="stat_hp_cur"
-                  value="100"
-                  min="0"
-                  style="width: 40px"
-                  oninput="updateMath()"
-                />
-                /
-                <input
-                  type="number"
-                  id="stat_hp_max"
-                  value="100"
-                  min="1"
-                  style="width: 40px"
-                  oninput="updateMath()"
-                />
-              </div>
-            </div>
-            <div class="hp-bar-container" id="hp_bar_container">
-              <div class="hp-bar-fill" id="hp_bar_fill" style="width: 100%"></div>
-            </div>
-            <div class="input-group">
-              <label>LVL/XP:</label>
-              <div>
-                <input
-                  type="number"
-                  id="stat_lvl"
-                  value="1"
-                  min="1"
-                  style="width: 40px"
-                  oninput="onLvlInputChanged()"
-                />
-                /
-                <input
-                  type="number"
-                  id="stat_xp"
-                  value="0"
-                  min="0"
-                  style="width: 40px"
-                  oninput="updateMath()"
-                />
-              </div>
-            </div>
-            <div
-              class="hp-bar-container"
-              id="xp_bar_container"
-              style="cursor: default"
-              title="XP to next level"
-            >
-              <div
-                class="hp-bar-fill"
-                id="xp_bar_fill"
-                style="width: 0%; background: var(--robco-blue)"
-              ></div>
-            </div>
-            <div class="input-group">
-              <label>CAPS:</label
-              ><input type="number" id="c_caps" value="0" min="0" oninput="updateMath()" />
-            </div>
-
-            <div class="input-group" style="margin-top: 8px">
-              <label>KARMA:</label>
-              <div style="display: flex; align-items: center; gap: 5px">
-                <input
-                  type="range"
-                  id="stat_karma"
-                  min="-1000"
-                  max="1000"
-                  value="0"
-                  oninput="
-                    updateKarmaUI();
-                    updateMath();
-                  "
-                />
-                <span id="karma_label" style="font-size: 11px; width: 65px; text-align: right"
-                  >Neutral</span
-                >
-              </div>
-            </div>
-
-            <div class="input-group">
-              <label>LOCATION:</label>
-              <input
-                type="text"
-                id="stat_loc"
-                value="Mojave"
-                maxlength="100"
-                oninput="updateMath()"
-                onchange="onLocationChange()"
-                style="width: 100px"
-                list="locationOptions"
-              />
-              <datalist id="locationOptions"></datalist>
-            </div>
-            <div class="input-group">
-              <label>DATE:</label>
-              <div style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap">
-                <input
-                  type="number"
-                  id="cal_month"
-                  value="10"
-                  min="1"
-                  max="12"
-                  style="width: 42px"
-                  title="Month (1-12)"
-                  oninput="onTimeInputChanged()"
-                />
-                <span style="font-size: 11px; opacity: 0.5">/</span>
-                <input
-                  type="number"
-                  id="cal_day"
-                  value="19"
-                  min="1"
-                  max="31"
-                  style="width: 42px"
-                  title="Day (1-31)"
-                  oninput="onTimeInputChanged()"
-                />
-                <span style="font-size: 11px; opacity: 0.5">/</span>
-                <input
-                  type="number"
-                  id="cal_year"
-                  value="2281"
-                  min="2270"
-                  style="width: 60px"
-                  title="Year"
-                  oninput="onTimeInputChanged()"
-                />
-              </div>
-            </div>
-            <div class="input-group">
-              <label>TIME:</label>
-              <div style="display: flex; align-items: center; gap: 5px; flex-wrap: wrap">
-                <span style="font-size: 11px; opacity: 0.7">H</span>
-                <input
-                  type="number"
-                  id="time_hour"
-                  value="0"
-                  min="0"
-                  max="23"
-                  style="width: 32px"
-                  oninput="onTimeInputChanged()"
-                />
-                <span style="font-size: 11px; opacity: 0.7">M</span>
-                <input
-                  type="number"
-                  id="time_min"
-                  value="0"
-                  min="0"
-                  max="59"
-                  step="6"
-                  style="width: 32px"
-                  oninput="onTimeInputChanged()"
-                />
-              </div>
-              <input type="hidden" id="time_day" value="1" />
-              <input type="hidden" id="stat_ticks" value="0" />
-            </div>
-            <div class="input-group">
-              <label>DATE:</label
-              ><span
-                id="gameDateDisplay"
-                style="font-size: 11px; opacity: 0.85; letter-spacing: 0.5px"
-                >—</span
-              >
-            </div>
-            <div
-              class="input-group"
-              style="flex-direction: column; align-items: flex-start; gap: 1px"
-            >
-              <label style="margin-bottom: 1px">IN-GAME TIME:</label>
-              <span
-                id="gameTimeDisplay"
-                style="
-                  font-size: 10px;
-                  opacity: 0.8;
-                  letter-spacing: 0.3px;
-                  color: var(--robco-green);
-                "
-                >—</span
-              >
-            </div>
-            <div class="input-group">
-              <label>WEIGHT [W]:</label><span id="display_weight">0 / 200</span>
-            </div>
-            <div class="input-group"><label>MAX AP:</label><span id="display_ap">80</span></div>
-            <div
-              class="input-group"
-              style="
-                margin-top: 6px;
-                padding-top: 6px;
-                border-top: 1px dashed rgba(var(--robco-green-rgb), 0.25);
-              "
-            >
-              <label style="font-size: 10px; opacity: 0.7">EQUIPPED:</label>
-              <div id="equippedDisplay" style="font-size: 11px; margin-top: 2px">
-                <span style="opacity: 0.4">Nothing equipped</span>
-              </div>
-            </div>
-            <div
-              id="radAwayAlert"
-              style="
-                display: none;
-                margin-top: 5px;
-                font-size: 10px;
-                color: var(--robco-danger);
-                border: 1px dashed var(--robco-danger);
-                padding: 4px;
-                text-align: center;
-              "
-            ></div>
-          </details>
-
-          <details class="panel" data-tab="stat">
-            <summary>
-              <h2>> BIO-SCAN & LIMB STATUS</h2>
-            </summary>
-            <div class="input-group">
-              <label>RADIATION:</label>
-              <div style="display: flex; width: 165px; justify-content: center">
-                <input
-                  type="number"
-                  id="stat_rads"
-                  value="0"
-                  min="0"
-                  oninput="updateMath()"
-                  style="width: 80px"
-                />
-              </div>
-            </div>
-            <div class="input-group">
-              <label>HEAD:</label>
-              <div style="display: flex; width: 165px; justify-content: center">
-                <button
-                  id="btn_l_hd"
-                  class="limb-ok"
-                  onclick="toggleLimb('hd')"
-                  aria-pressed="false"
-                  aria-label="Head: OK"
-                >
-                  [████] OK
-                </button>
-              </div>
-            </div>
-            <div class="input-group">
-              <label>ARMS (L/R):</label>
-              <div style="display: flex; gap: 5px">
-                <button
-                  id="btn_l_la"
-                  class="limb-ok"
-                  onclick="toggleLimb('la')"
-                  aria-pressed="false"
-                  aria-label="Left Arm: OK"
-                >
-                  [████] OK
-                </button>
-                <button
-                  id="btn_l_ra"
-                  class="limb-ok"
-                  onclick="toggleLimb('ra')"
-                  aria-pressed="false"
-                  aria-label="Right Arm: OK"
-                >
-                  [████] OK
-                </button>
-              </div>
-            </div>
-            <div class="input-group" style="margin-top: 4px">
-              <label>LEGS (L/R):</label>
-              <div style="display: flex; gap: 5px">
-                <button
-                  id="btn_l_ll"
-                  class="limb-ok"
-                  onclick="toggleLimb('ll')"
-                  aria-pressed="false"
-                  aria-label="Left Leg: OK"
-                >
-                  [████] OK
-                </button>
-                <button
-                  id="btn_l_rl"
-                  class="limb-ok"
-                  onclick="toggleLimb('rl')"
-                  aria-pressed="false"
-                  aria-label="Right Leg: OK"
-                >
-                  [████] OK
-                </button>
-              </div>
-            </div>
-            <!-- WU-N5: native deterministic medical advisory (no AI) -->
             <button
-              class="action-btn"
-              style="width: 100%; margin-top: 8px"
-              onclick="renderBioScan()"
-              aria-label="Run BIO-SCAN medical advisory"
+              id="navkey-chassis"
+              class="navkey"
+              role="tab"
+              aria-selected="false"
+              onclick="selectSubsystem('chassis')"
+              aria-label="CHASSIS subsystem &mdash; Module Bay, settings and saves (hotkey 5)"
             >
-              &gt; RUN BIO-SCAN ADVISORY
+              <span class="nk-led" aria-hidden="true"></span><span class="nk-num">[5]</span>
+              <span class="nk-label">CHASSIS</span><span class="nk-sub">SYSTEM</span>
             </button>
-          </details>
+          </nav>
+          <!-- DIR sits OUTSIDE the role=tablist nav — it opens the flat directory
+             modal, it isn't a tab (no aria-selected/tabpanel), so it can't be a
+             role=tab child (a11y: aria-required-children). -->
+          <button
+            id="navkey-directory"
+            class="navkey dirkey"
+            onclick="openBezelDirectory()"
+            aria-label="Directory &mdash; flat list of every subsystem with plain labels (hotkey 0)"
+          >
+            <span class="nk-led" aria-hidden="true"></span><span class="nk-num">[0]</span>
+            <span class="nk-label">DIR</span><span class="nk-sub">FLAT</span>
+          </button>
+        </div>
+      </div>
 
-          <details class="panel" data-tab="inv">
-            <summary>
-              <h2>> BACKPACK INVENTORY</h2>
-            </summary>
-            <div
-              id="invFilterBar"
-              style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px"
-            >
-              <button
-                class="btn-sm action-btn inv-filter-btn active"
-                data-filter="all"
-                onclick="setInvFilter('all')"
-              >
-                All
-              </button>
-              <button
-                class="btn-sm action-btn inv-filter-btn"
-                data-filter="weapon"
-                onclick="setInvFilter('weapon')"
-              >
-                Weapons
-              </button>
-              <button
-                class="btn-sm action-btn inv-filter-btn"
-                data-filter="armor"
-                onclick="setInvFilter('armor')"
-              >
-                Apparel
-              </button>
-              <button
-                class="btn-sm action-btn inv-filter-btn"
-                data-filter="aid"
-                onclick="setInvFilter('aid')"
-              >
-                Aid
-              </button>
-              <button
-                id="invFilterMods"
-                class="btn-sm action-btn inv-filter-btn"
-                data-filter="mod"
-                onclick="setInvFilter('mod')"
-              >
-                Mods
-              </button>
-              <button
-                class="btn-sm action-btn inv-filter-btn"
-                data-filter="misc"
-                onclick="setInvFilter('misc')"
-              >
-                Misc
-              </button>
-              <button
-                class="btn-sm action-btn inv-filter-btn"
-                data-filter="ammo"
-                onclick="setInvFilter('ammo')"
-              >
-                Ammo
-              </button>
-            </div>
-            <ul class="inventory-list" id="invList"></ul>
-
-            <!-- 3b. AMMO RESERVES — nested sub-panel -->
-            <details class="sub-panel" id="ammoSubPanel" data-sub-id="ammo_reserves">
+      <!-- The curved glass — CRT-frame chrome (curvature/vignette live on THIS
+           frame only; never on the text inside .main-grid). -->
+      <div class="glass-frame">
+        <div class="main-grid">
+          <div class="col-left" id="uiPanel">
+            <!-- 1. BIO-METRICS (STAT tab) -->
+            <details class="panel" data-tab="stat">
               <summary>
-                <h3>> AMMO RESERVES</h3>
+                <h2>> BIO-METRICS</h2>
               </summary>
-              <div id="ammoList"></div>
+              <div class="special-grid">
+                <div>
+                  <label>S</label
+                  ><input
+                    type="number"
+                    id="s_s"
+                    value="5"
+                    min="1"
+                    max="10"
+                    inputmode="numeric"
+                    aria-label="Strength"
+                    oninput="
+                      capStatMax(this);
+                      updateMath();
+                    "
+                    onchange="commitStat(this)"
+                  />
+                </div>
+                <div>
+                  <label>P</label
+                  ><input
+                    type="number"
+                    id="s_p"
+                    value="5"
+                    min="1"
+                    max="10"
+                    inputmode="numeric"
+                    aria-label="Perception"
+                    oninput="
+                      capStatMax(this);
+                      updateMath();
+                    "
+                    onchange="commitStat(this)"
+                  />
+                </div>
+                <div>
+                  <label>E</label
+                  ><input
+                    type="number"
+                    id="s_e"
+                    value="5"
+                    min="1"
+                    max="10"
+                    inputmode="numeric"
+                    aria-label="Endurance"
+                    oninput="
+                      capStatMax(this);
+                      updateMath();
+                    "
+                    onchange="commitStat(this)"
+                  />
+                </div>
+                <div>
+                  <label>C</label
+                  ><input
+                    type="number"
+                    id="s_c"
+                    value="5"
+                    min="1"
+                    max="10"
+                    inputmode="numeric"
+                    aria-label="Charisma"
+                    oninput="
+                      capStatMax(this);
+                      updateMath();
+                    "
+                    onchange="commitStat(this)"
+                  />
+                </div>
+                <div>
+                  <label>I</label
+                  ><input
+                    type="number"
+                    id="s_i"
+                    value="5"
+                    min="1"
+                    max="10"
+                    inputmode="numeric"
+                    aria-label="Intelligence"
+                    oninput="
+                      capStatMax(this);
+                      updateMath();
+                    "
+                    onchange="commitStat(this)"
+                  />
+                </div>
+                <div>
+                  <label>A</label
+                  ><input
+                    type="number"
+                    id="s_a"
+                    value="5"
+                    min="1"
+                    max="10"
+                    inputmode="numeric"
+                    aria-label="Agility"
+                    oninput="
+                      capStatMax(this);
+                      updateMath();
+                    "
+                    onchange="commitStat(this)"
+                  />
+                </div>
+                <div>
+                  <label>L</label
+                  ><input
+                    type="number"
+                    id="s_l"
+                    value="5"
+                    min="1"
+                    max="10"
+                    inputmode="numeric"
+                    aria-label="Luck"
+                    oninput="
+                      capStatMax(this);
+                      updateMath();
+                    "
+                    onchange="commitStat(this)"
+                  />
+                </div>
+              </div>
+              <div class="input-group">
+                <label>HP:</label>
+                <div>
+                  <input
+                    type="number"
+                    id="stat_hp_cur"
+                    value="100"
+                    min="0"
+                    style="width: 40px"
+                    oninput="updateMath()"
+                  />
+                  /
+                  <input
+                    type="number"
+                    id="stat_hp_max"
+                    value="100"
+                    min="1"
+                    style="width: 40px"
+                    oninput="updateMath()"
+                  />
+                </div>
+              </div>
+              <div class="hp-bar-container" id="hp_bar_container">
+                <div class="hp-bar-fill" id="hp_bar_fill" style="width: 100%"></div>
+              </div>
+              <div class="input-group">
+                <label>LVL/XP:</label>
+                <div>
+                  <input
+                    type="number"
+                    id="stat_lvl"
+                    value="1"
+                    min="1"
+                    style="width: 40px"
+                    oninput="onLvlInputChanged()"
+                  />
+                  /
+                  <input
+                    type="number"
+                    id="stat_xp"
+                    value="0"
+                    min="0"
+                    style="width: 40px"
+                    oninput="updateMath()"
+                  />
+                </div>
+              </div>
               <div
+                class="hp-bar-container"
+                id="xp_bar_container"
+                style="cursor: default"
+                title="XP to next level"
+              >
+                <div
+                  class="hp-bar-fill"
+                  id="xp_bar_fill"
+                  style="width: 0%; background: var(--robco-blue)"
+                ></div>
+              </div>
+              <div class="input-group">
+                <label>CAPS:</label
+                ><input type="number" id="c_caps" value="0" min="0" oninput="updateMath()" />
+              </div>
+
+              <div class="input-group" style="margin-top: 8px">
+                <label>KARMA:</label>
+                <div style="display: flex; align-items: center; gap: 5px">
+                  <input
+                    type="range"
+                    id="stat_karma"
+                    min="-1000"
+                    max="1000"
+                    value="0"
+                    oninput="
+                      updateKarmaUI();
+                      updateMath();
+                    "
+                  />
+                  <span id="karma_label" style="font-size: 11px; width: 65px; text-align: right"
+                    >Neutral</span
+                  >
+                </div>
+              </div>
+
+              <div class="input-group">
+                <label>LOCATION:</label>
+                <input
+                  type="text"
+                  id="stat_loc"
+                  value="Mojave"
+                  maxlength="100"
+                  oninput="updateMath()"
+                  onchange="onLocationChange()"
+                  style="width: 100px"
+                  list="locationOptions"
+                />
+                <datalist id="locationOptions"></datalist>
+              </div>
+              <div class="input-group">
+                <label>DATE:</label>
+                <div style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap">
+                  <input
+                    type="number"
+                    id="cal_month"
+                    value="10"
+                    min="1"
+                    max="12"
+                    style="width: 42px"
+                    title="Month (1-12)"
+                    oninput="onTimeInputChanged()"
+                  />
+                  <span style="font-size: 11px; opacity: 0.5">/</span>
+                  <input
+                    type="number"
+                    id="cal_day"
+                    value="19"
+                    min="1"
+                    max="31"
+                    style="width: 42px"
+                    title="Day (1-31)"
+                    oninput="onTimeInputChanged()"
+                  />
+                  <span style="font-size: 11px; opacity: 0.5">/</span>
+                  <input
+                    type="number"
+                    id="cal_year"
+                    value="2281"
+                    min="2270"
+                    style="width: 60px"
+                    title="Year"
+                    oninput="onTimeInputChanged()"
+                  />
+                </div>
+              </div>
+              <div class="input-group">
+                <label>TIME:</label>
+                <div style="display: flex; align-items: center; gap: 5px; flex-wrap: wrap">
+                  <span style="font-size: 11px; opacity: 0.7">H</span>
+                  <input
+                    type="number"
+                    id="time_hour"
+                    value="0"
+                    min="0"
+                    max="23"
+                    style="width: 32px"
+                    oninput="onTimeInputChanged()"
+                  />
+                  <span style="font-size: 11px; opacity: 0.7">M</span>
+                  <input
+                    type="number"
+                    id="time_min"
+                    value="0"
+                    min="0"
+                    max="59"
+                    step="6"
+                    style="width: 32px"
+                    oninput="onTimeInputChanged()"
+                  />
+                </div>
+                <input type="hidden" id="time_day" value="1" />
+                <input type="hidden" id="stat_ticks" value="0" />
+              </div>
+              <div class="input-group">
+                <label>DATE:</label
+                ><span
+                  id="gameDateDisplay"
+                  style="font-size: 11px; opacity: 0.85; letter-spacing: 0.5px"
+                  >—</span
+                >
+              </div>
+              <div
+                class="input-group"
+                style="flex-direction: column; align-items: flex-start; gap: 1px"
+              >
+                <label style="margin-bottom: 1px">IN-GAME TIME:</label>
+                <span
+                  id="gameTimeDisplay"
+                  style="
+                    font-size: 10px;
+                    opacity: 0.8;
+                    letter-spacing: 0.3px;
+                    color: var(--robco-green);
+                  "
+                  >—</span
+                >
+              </div>
+              <div class="input-group">
+                <label>WEIGHT [W]:</label><span id="display_weight">0 / 200</span>
+              </div>
+              <div class="input-group"><label>MAX AP:</label><span id="display_ap">80</span></div>
+              <div
+                class="input-group"
                 style="
-                  border-top: 1px dashed var(--robco-green);
-                  padding-top: 8px;
                   margin-top: 6px;
-                  display: flex;
-                  gap: 4px;
-                  flex-wrap: wrap;
+                  padding-top: 6px;
+                  border-top: 1px dashed rgba(var(--robco-green-rgb), 0.25);
                 "
+              >
+                <label style="font-size: 10px; opacity: 0.7">EQUIPPED:</label>
+                <div id="equippedDisplay" style="font-size: 11px; margin-top: 2px">
+                  <span style="opacity: 0.4">Nothing equipped</span>
+                </div>
+              </div>
+              <div
+                id="radAwayAlert"
+                style="
+                  display: none;
+                  margin-top: 5px;
+                  font-size: 10px;
+                  color: var(--robco-danger);
+                  border: 1px dashed var(--robco-danger);
+                  padding: 4px;
+                  text-align: center;
+                "
+              ></div>
+            </details>
+
+            <details class="panel" data-tab="stat">
+              <summary>
+                <h2>> BIO-SCAN & LIMB STATUS</h2>
+              </summary>
+              <div class="input-group">
+                <label>RADIATION:</label>
+                <div style="display: flex; width: 165px; justify-content: center">
+                  <input
+                    type="number"
+                    id="stat_rads"
+                    value="0"
+                    min="0"
+                    oninput="updateMath()"
+                    style="width: 80px"
+                  />
+                </div>
+              </div>
+              <div class="input-group">
+                <label>HEAD:</label>
+                <div style="display: flex; width: 165px; justify-content: center">
+                  <button
+                    id="btn_l_hd"
+                    class="limb-ok"
+                    onclick="toggleLimb('hd')"
+                    aria-pressed="false"
+                    aria-label="Head: OK"
+                  >
+                    [████] OK
+                  </button>
+                </div>
+              </div>
+              <div class="input-group">
+                <label>ARMS (L/R):</label>
+                <div style="display: flex; gap: 5px">
+                  <button
+                    id="btn_l_la"
+                    class="limb-ok"
+                    onclick="toggleLimb('la')"
+                    aria-pressed="false"
+                    aria-label="Left Arm: OK"
+                  >
+                    [████] OK
+                  </button>
+                  <button
+                    id="btn_l_ra"
+                    class="limb-ok"
+                    onclick="toggleLimb('ra')"
+                    aria-pressed="false"
+                    aria-label="Right Arm: OK"
+                  >
+                    [████] OK
+                  </button>
+                </div>
+              </div>
+              <div class="input-group" style="margin-top: 4px">
+                <label>LEGS (L/R):</label>
+                <div style="display: flex; gap: 5px">
+                  <button
+                    id="btn_l_ll"
+                    class="limb-ok"
+                    onclick="toggleLimb('ll')"
+                    aria-pressed="false"
+                    aria-label="Left Leg: OK"
+                  >
+                    [████] OK
+                  </button>
+                  <button
+                    id="btn_l_rl"
+                    class="limb-ok"
+                    onclick="toggleLimb('rl')"
+                    aria-pressed="false"
+                    aria-label="Right Leg: OK"
+                  >
+                    [████] OK
+                  </button>
+                </div>
+              </div>
+              <!-- WU-N5: native deterministic medical advisory (no AI) -->
+              <button
+                class="action-btn"
+                style="width: 100%; margin-top: 8px"
+                onclick="renderBioScan()"
+                aria-label="Run BIO-SCAN medical advisory"
+              >
+                &gt; RUN BIO-SCAN ADVISORY
+              </button>
+            </details>
+
+            <details class="panel" data-tab="inv">
+              <summary>
+                <h2>> BACKPACK INVENTORY</h2>
+              </summary>
+              <div
+                id="invFilterBar"
+                style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px"
+              >
+                <button
+                  class="btn-sm action-btn inv-filter-btn active"
+                  data-filter="all"
+                  onclick="setInvFilter('all')"
+                >
+                  All
+                </button>
+                <button
+                  class="btn-sm action-btn inv-filter-btn"
+                  data-filter="weapon"
+                  onclick="setInvFilter('weapon')"
+                >
+                  Weapons
+                </button>
+                <button
+                  class="btn-sm action-btn inv-filter-btn"
+                  data-filter="armor"
+                  onclick="setInvFilter('armor')"
+                >
+                  Apparel
+                </button>
+                <button
+                  class="btn-sm action-btn inv-filter-btn"
+                  data-filter="aid"
+                  onclick="setInvFilter('aid')"
+                >
+                  Aid
+                </button>
+                <button
+                  id="invFilterMods"
+                  class="btn-sm action-btn inv-filter-btn"
+                  data-filter="mod"
+                  onclick="setInvFilter('mod')"
+                >
+                  Mods
+                </button>
+                <button
+                  class="btn-sm action-btn inv-filter-btn"
+                  data-filter="misc"
+                  onclick="setInvFilter('misc')"
+                >
+                  Misc
+                </button>
+                <button
+                  class="btn-sm action-btn inv-filter-btn"
+                  data-filter="ammo"
+                  onclick="setInvFilter('ammo')"
+                >
+                  Ammo
+                </button>
+              </div>
+              <ul class="inventory-list" id="invList"></ul>
+
+              <!-- 3b. AMMO RESERVES — nested sub-panel -->
+              <details class="sub-panel" id="ammoSubPanel" data-sub-id="ammo_reserves">
+                <summary>
+                  <h3>> AMMO RESERVES</h3>
+                </summary>
+                <div id="ammoList"></div>
+                <div
+                  style="
+                    border-top: 1px dashed var(--robco-green);
+                    padding-top: 8px;
+                    margin-top: 6px;
+                    display: flex;
+                    gap: 4px;
+                    flex-wrap: wrap;
+                  "
+                >
+                  <input
+                    type="text"
+                    id="newAmmoType"
+                    list="ammoCalibers"
+                    placeholder="CALIBER (E.G. 5.56MM)"
+                    maxlength="40"
+                    style="flex: 1; min-width: 100px"
+                    autocomplete="off"
+                  />
+                  <datalist id="ammoCalibers"></datalist>
+                  <input
+                    type="number"
+                    id="newAmmoCount"
+                    placeholder="QTY"
+                    min="0"
+                    style="width: 50px"
+                  />
+                </div>
+                <button class="action-btn" onclick="addAmmo()" style="margin-top: 4px">
+                  + ADD AMMO
+                </button>
+              </details>
+              <!-- end AMMO RESERVES sub-panel -->
+
+              <div
+                class="panel-form"
+                style="border-top: 1px dashed var(--robco-green); padding-top: 10px; gap: 5px"
               >
                 <input
                   type="text"
-                  id="newAmmoType"
-                  list="ammoCalibers"
-                  placeholder="CALIBER (E.G. 5.56MM)"
-                  maxlength="40"
-                  style="flex: 1; min-width: 100px"
-                  autocomplete="off"
+                  id="newItemName"
+                  placeholder="ITEM DESIGNATION"
+                  maxlength="80"
+                  style="flex-grow: 1; min-width: 80px"
                 />
-                <datalist id="ammoCalibers"></datalist>
                 <input
                   type="number"
-                  id="newAmmoCount"
+                  id="newItemQty"
                   placeholder="QTY"
-                  min="0"
-                  style="width: 50px"
+                  min="1"
+                  style="width: 48px"
                 />
+                <input
+                  type="number"
+                  id="newItemWeight"
+                  placeholder="WT (LBS)"
+                  min="0"
+                  style="width: 52px"
+                />
+                <input
+                  type="number"
+                  id="newItemValue"
+                  placeholder="VAL"
+                  min="0"
+                  style="width: 52px"
+                />
+                <select
+                  id="newItemType"
+                  style="width: 56px; background: rgba(0, 0, 0, 0.8); font-size: 10px"
+                >
+                  <option value="misc">misc</option>
+                  <option value="weapon">wpn</option>
+                  <option value="armor">armor</option>
+                  <option value="aid">aid</option>
+                  <option value="mod">mod</option>
+                  <option value="ammo">ammo</option>
+                </select>
               </div>
-              <button class="action-btn" onclick="addAmmo()" style="margin-top: 4px">
-                + ADD AMMO
-              </button>
+              <button class="action-btn" onclick="addItem()">+ ADD ITEM</button>
             </details>
-            <!-- end AMMO RESERVES sub-panel -->
 
-            <div
-              class="panel-form"
-              style="border-top: 1px dashed var(--robco-green); padding-top: 10px; gap: 5px"
-            >
-              <input
-                type="text"
-                id="newItemName"
-                placeholder="ITEM DESIGNATION"
-                maxlength="80"
-                style="flex-grow: 1; min-width: 80px"
-              />
-              <input type="number" id="newItemQty" placeholder="QTY" min="1" style="width: 48px" />
-              <input
-                type="number"
-                id="newItemWeight"
-                placeholder="WT (LBS)"
-                min="0"
-                style="width: 52px"
-              />
-              <input
-                type="number"
-                id="newItemValue"
-                placeholder="VAL"
-                min="0"
-                style="width: 52px"
-              />
-              <select
-                id="newItemType"
-                style="width: 56px; background: rgba(0, 0, 0, 0.8); font-size: 10px"
-              >
-                <option value="misc">misc</option>
-                <option value="weapon">wpn</option>
-                <option value="armor">armor</option>
-                <option value="aid">aid</option>
-                <option value="mod">mod</option>
-                <option value="ammo">ammo</option>
-              </select>
-            </div>
-            <button class="action-btn" onclick="addItem()">+ ADD ITEM</button>
-          </details>
-
-          <!-- 3c. COLLECTIBLES (INV tab) -->
-          <details class="panel" data-tab="inv">
-            <summary>
-              <h2>&gt; COLLECTIBLES</h2>
-            </summary>
-            <!-- Bobbleheads / Snow Globes sub-tracker -->
-            <details class="sub-panel" id="collectiblesSubPanel" data-sub-id="collectibles_main">
+            <!-- 3c. COLLECTIBLES (INV tab) -->
+            <details class="panel" data-tab="inv">
               <summary>
-                <h3>&gt; COLLECTIBLES LIST</h3>
+                <h2>&gt; COLLECTIBLES</h2>
               </summary>
-              <div id="collectiblesDisplay">
-                <span class="empty-state">ARCHIVE EMPTY</span>
+              <!-- Bobbleheads / Snow Globes sub-tracker -->
+              <details class="sub-panel" id="collectiblesSubPanel" data-sub-id="collectibles_main">
+                <summary>
+                  <h3>&gt; COLLECTIBLES LIST</h3>
+                </summary>
+                <div id="collectiblesDisplay">
+                  <span class="empty-state">ARCHIVE EMPTY</span>
+                </div>
+              </details>
+              <!-- Lincoln Memorabilia sub-tracker (FO3 only — shown/hidden by renderLincolnMemorabilia()) -->
+              <details
+                class="sub-panel"
+                id="lincolnSubPanel"
+                data-sub-id="lincoln_memorabilia"
+                style="display: none"
+              >
+                <summary>
+                  <h3>&gt; LINCOLN MEMORABILIA</h3>
+                </summary>
+                <div id="lincolnMemorabiliaDisplay"></div>
+              </details>
+            </details>
+
+            <!-- CRAFTING (INV tab) -->
+            <details class="panel" data-tab="inv" id="craftPanel">
+              <summary>
+                <h2>&gt; CRAFTING</h2>
+              </summary>
+              <div id="craftRecipeList">
+                <span class="empty-state">NO ENTRIES IN MEMORY</span>
               </div>
+              <details class="sub-panel" data-sub-id="craft_breakdown">
+                <summary>
+                  <h3>&gt; SCRAP / BREAKDOWN</h3>
+                </summary>
+                <div id="craftScrapList">
+                  <span class="empty-state">NO MATCHING ENTRIES</span>
+                </div>
+              </details>
             </details>
-            <!-- Lincoln Memorabilia sub-tracker (FO3 only — shown/hidden by renderLincolnMemorabilia()) -->
-            <details
-              class="sub-panel"
-              id="lincolnSubPanel"
-              data-sub-id="lincoln_memorabilia"
-              style="display: none"
-            >
-              <summary>
-                <h3>&gt; LINCOLN MEMORABILIA</h3>
-              </summary>
-              <div id="lincolnMemorabiliaDisplay"></div>
-            </details>
-          </details>
 
-          <!-- CRAFTING (INV tab) -->
-          <details class="panel" data-tab="inv" id="craftPanel">
-            <summary>
-              <h2>&gt; CRAFTING</h2>
-            </summary>
-            <div id="craftRecipeList">
-              <span class="empty-state">NO ENTRIES IN MEMORY</span>
-            </div>
-            <details class="sub-panel" data-sub-id="craft_breakdown">
+            <!-- TRADE / BARTER UPLINK (INV tab) -->
+            <details class="panel" data-tab="inv" id="tradePanel">
               <summary>
-                <h3>&gt; SCRAP / BREAKDOWN</h3>
+                <h2>&gt; BARTER UPLINK</h2>
               </summary>
-              <div id="craftScrapList">
-                <span class="empty-state">NO MATCHING ENTRIES</span>
+              <div id="tradeHeader">
+                <span class="empty-state">NO VENDOR DATA</span>
               </div>
+              <details class="sub-panel" data-sub-id="trade_buy" open>
+                <summary>
+                  <h3>&gt; VENDOR STOCK</h3>
+                </summary>
+                <input
+                  type="text"
+                  id="tradeBuySearch"
+                  placeholder="SEARCH VENDOR STOCK…"
+                  aria-label="Search vendor stock"
+                  maxlength="60"
+                  oninput="renderTradeBuyList()"
+                  style="width: 100%; font-size: 16px; min-height: 28px; margin-bottom: 4px"
+                />
+                <div id="tradeBuyList">
+                  <span class="empty-state">NO CATALOG LOADED</span>
+                </div>
+              </details>
+              <details class="sub-panel" data-sub-id="trade_sell">
+                <summary>
+                  <h3>&gt; COURIER INVENTORY</h3>
+                </summary>
+                <div id="tradeSellList">
+                  <span class="empty-state">COURIER INVENTORY EMPTY</span>
+                </div>
+              </details>
             </details>
-          </details>
 
-          <!-- TRADE / BARTER UPLINK (INV tab) -->
-          <details class="panel" data-tab="inv" id="tradePanel">
-            <summary>
-              <h2>&gt; BARTER UPLINK</h2>
-            </summary>
-            <div id="tradeHeader">
-              <span class="empty-state">NO VENDOR DATA</span>
-            </div>
-            <details class="sub-panel" data-sub-id="trade_buy" open>
+            <details class="panel" data-tab="stat">
               <summary>
-                <h3>&gt; VENDOR STOCK</h3>
+                <h2>> SKILL MATRIX</h2>
               </summary>
-              <input
-                type="text"
-                id="tradeBuySearch"
-                placeholder="SEARCH VENDOR STOCK…"
-                aria-label="Search vendor stock"
-                maxlength="60"
-                oninput="renderTradeBuyList()"
-                style="width: 100%; font-size: 16px; min-height: 28px; margin-bottom: 4px"
-              />
-              <div id="tradeBuyList">
-                <span class="empty-state">NO CATALOG LOADED</span>
+              <div class="skills-grid" id="skillsGrid"></div>
+            </details>
+
+            <!-- SKILL BOOKS TRACKER -->
+            <details class="panel" data-tab="stat">
+              <summary>
+                <h2>> SKILL BOOKS</h2>
+              </summary>
+              <div id="skillBooksDisplay"></div>
+            </details>
+
+            <!-- SKILL MAGAZINES TRACKER (FNV only — hidden on FO3 by renderMagazines()) -->
+            <details class="panel" id="magazinesPanel" data-tab="stat" style="display: none">
+              <summary>
+                <h2>> SKILL MAGAZINES</h2>
+              </summary>
+              <div id="magazinesDisplay"></div>
+            </details>
+
+            <!-- 5. QUEST LOG -->
+            <details class="panel" data-tab="data">
+              <summary><h2>> QUEST LOG</h2></summary>
+              <div id="questsList">
+                <span class="empty-state">NO ACTIVE DIRECTIVES</span>
               </div>
-            </details>
-            <details class="sub-panel" data-sub-id="trade_sell">
-              <summary>
-                <h3>&gt; COURIER INVENTORY</h3>
-              </summary>
-              <div id="tradeSellList">
-                <span class="empty-state">COURIER INVENTORY EMPTY</span>
-              </div>
-            </details>
-          </details>
-
-          <details class="panel" data-tab="stat">
-            <summary>
-              <h2>> SKILL MATRIX</h2>
-            </summary>
-            <div class="skills-grid" id="skillsGrid"></div>
-          </details>
-
-          <!-- SKILL BOOKS TRACKER -->
-          <details class="panel" data-tab="stat">
-            <summary>
-              <h2>> SKILL BOOKS</h2>
-            </summary>
-            <div id="skillBooksDisplay"></div>
-          </details>
-
-          <!-- SKILL MAGAZINES TRACKER (FNV only — hidden on FO3 by renderMagazines()) -->
-          <details class="panel" id="magazinesPanel" data-tab="stat" style="display: none">
-            <summary>
-              <h2>> SKILL MAGAZINES</h2>
-            </summary>
-            <div id="magazinesDisplay"></div>
-          </details>
-
-          <!-- 5. QUEST LOG -->
-          <details class="panel" data-tab="data">
-            <summary><h2>> QUEST LOG</h2></summary>
-            <div id="questsList">
-              <span class="empty-state">NO ACTIVE DIRECTIVES</span>
-            </div>
-            <div
-              class="panel-form"
-              style="border-top: 1px dashed var(--robco-green); padding-top: 8px"
-            >
-              <input
-                type="text"
-                id="newQuestName"
-                placeholder="QUEST"
-                maxlength="100"
-                style="flex: 1; min-width: 100px"
-              />
-              <select id="newQuestStatus" style="width: 80px; background: rgba(0, 0, 0, 0.8)">
-                <option value="active">Active</option>
-                <option value="complete">Complete</option>
-                <option value="failed">Failed</option>
-              </select>
-            </div>
-            <input
-              type="text"
-              id="newQuestObjective"
-              placeholder="OBJECTIVE (OPTIONAL)"
-              style="width: 100%; margin-top: 4px"
-            />
-            <button class="action-btn" onclick="addQuest()" style="margin-top: 4px">
-              + ADD QUEST
-            </button>
-          </details>
-
-          <!-- DATABANK (WU-N4b option C — persistent inline CONSULT panel) -->
-          <details class="panel" data-tab="data" id="databankPanel">
-            <summary><h2>> DATABANK</h2></summary>
-            <input
-              type="text"
-              id="databankSearch"
-              placeholder="SEARCH DATABANK…"
-              maxlength="100"
-              aria-label="Search the databank for an item, perk, quest, location, companion, or creature"
-              oninput="renderDatabankPanel()"
-              style="width: 100%; margin-bottom: 6px; font-size: 16px"
-            />
-            <div id="databankResults"></div>
-          </details>
-
-          <!-- 6. PERKS -->
-          <details class="panel" data-tab="stat">
-            <summary><h2>> PERKS</h2></summary>
-            <div id="perksList">
-              <span class="empty-state">NO PERKS ON FILE</span>
-            </div>
-            <div
-              class="panel-form"
-              style="border-top: 1px dashed var(--robco-green); padding-top: 8px"
-            >
-              <input
-                type="text"
-                id="newPerkName"
-                placeholder="PERK"
-                maxlength="80"
-                style="flex: 1; min-width: 100px"
-              />
-              <input
-                type="number"
-                id="newPerkRank"
-                placeholder="RANK"
-                min="1"
-                max="5"
-                style="width: 58px"
-              />
-              <input
-                type="number"
-                id="newPerkLevel"
-                placeholder="LVL"
-                min="0"
-                style="width: 46px"
-              />
-            </div>
-            <button class="action-btn" onclick="addPerk()" style="margin-top: 4px">
-              + ADD PERK
-            </button>
-            <!-- Traits subsection (FNV only — shown/hidden by renderTraits(), collapsible sub-panel) -->
-            <details
-              class="sub-panel"
-              id="traitsSection"
-              data-sub-id="traits"
-              style="display: none"
-            >
-              <summary>
-                <h3>&gt; TRAITS</h3>
-              </summary>
-              <input
-                type="text"
-                id="traitFilter"
-                placeholder="FILTER TRAITS…"
-                maxlength="80"
-                oninput="renderTraits()"
-                style="width: 100%; box-sizing: border-box; margin-bottom: 4px; font-size: 16px"
-              />
-              <div id="traitsDisplay"></div>
-            </details>
-          </details>
-
-          <!-- 7. STATUS EFFECTS -->
-          <details class="panel" data-tab="stat">
-            <summary>
-              <h2>> STATUS EFFECTS</h2>
-            </summary>
-            <div id="statusList">
-              <span class="empty-state">NO ACTIVE EFFECTS</span>
-            </div>
-            <div class="panel-form">
-              <select
-                id="newStatusName"
-                style="
-                  flex: 2;
-                  background: rgba(0, 0, 0, 0.8);
-                  color: var(--robco-green);
-                  border: 1px solid var(--robco-green);
-                "
-              >
-                <option value="Well Rested">Well Rested</option>
-                <option value="Dehydrated">Dehydrated</option>
-                <option value="Starving">Starving</option>
-                <option value="Sleep Deprived">Sleep Deprived</option>
-                <option value="Radiation Sickness">Radiation Sickness</option>
-                <option value="Addicted">Addicted</option>
-                <option value="Chem Sickness">Chem Sickness</option>
-                <option value="Overencumbered">Overencumbered</option>
-                <option value="Stealth Boy Active">Stealth Boy Active</option>
-                <option value="Med-X Resistance">Med-X Resistance</option>
-                <option value="Psycho Rage">Psycho Rage</option>
-                <option value="Buffout Boost">Buffout Boost</option>
-                <option value="Mentats Insight">Mentats Insight</option>
-                <option value="Jet Rush">Jet Rush</option>
-                <option value="Turbo Time">Turbo Time</option>
-                <option value="Poisoned">Poisoned</option>
-                <option value="Crippled">Crippled</option>
-                <option value="Bleeding">Bleeding</option>
-                <option value="Concussed">Concussed</option>
-              </select>
-              <input
-                type="number"
-                id="newStatusTicks"
-                placeholder="TICKS"
-                style="flex: 1; width: 50px"
-              />
-              <select
-                id="newStatusType"
-                style="
-                  flex: 1;
-                  background: rgba(0, 0, 0, 0.8);
-                  color: var(--robco-green);
-                  border: 1px solid var(--robco-green);
-                "
-              >
-                <option value="BUFF">BUFF</option>
-                <option value="DEBUFF">DEBUFF</option>
-                <option value="NEUTRAL">NEUTRAL</option>
-              </select>
-              <button
-                class="action-btn"
-                style="width: auto; padding: 0 10px"
-                onclick="addStatusEffect()"
-              >
-                ADD
-              </button>
-            </div>
-          </details>
-
-          <!-- 8. SQUAD STATUS -->
-          <details class="panel" data-tab="inv">
-            <summary>
-              <h2>> SQUAD STATUS</h2>
-            </summary>
-            <div id="squadList"></div>
-            <div class="panel-form">
-              <select
-                id="newSquadName"
-                style="
-                  flex: 1;
-                  background: rgba(0, 0, 0, 0.8);
-                  color: var(--robco-green);
-                  border: 1px solid var(--robco-green);
-                "
-              >
-                <option value="Arcade Gannon">Arcade Gannon</option>
-                <option value="Boone">Boone</option>
-                <option value="Cass">Cass</option>
-                <option value="Lily">Lily</option>
-                <option value="Raul">Raul</option>
-                <option value="Veronica">Veronica</option>
-                <option value="ED-E">ED-E</option>
-                <option value="Rex">Rex</option>
-              </select>
-              <button
-                class="action-btn"
-                style="width: auto; padding: 0 10px"
-                onclick="addSquadMember()"
-              >
-                ADD
-              </button>
-            </div>
-          </details>
-
-          <!-- 9. FACTION STANDING (FNV) -->
-          <details class="panel" data-tab="stat" id="factionPanel">
-            <summary>
-              <h2>&gt; FACTION STANDING</h2>
-            </summary>
-            <div id="factionContainer"></div>
-          </details>
-
-          <!-- 9b. KARMA CENTER (FO3 — G4) -->
-          <details class="panel" data-tab="stat" id="karmaPanel" style="display: none">
-            <summary>
-              <h2>&gt; KARMA CENTER</h2>
-            </summary>
-            <div id="karmaCenterDisplay">
-              <span style="opacity: 0.4">[FO3 MODE REQUIRED]</span>
-            </div>
-          </details>
-
-          <!-- 10. CAMPAIGN NOTES -->
-          <details class="panel" data-tab="data">
-            <summary>
-              <h2>> CAMPAIGN NOTES</h2>
-            </summary>
-            <div id="campaignNotesList">
-              <span class="empty-state">NO ENTRIES IN MEMORY</span>
-            </div>
-            <div class="panel-form">
-              <input
-                type="text"
-                id="newCampaignNote"
-                placeholder="ENTER TACTICAL NOTE…"
-                maxlength="5000"
-                style="flex: 1"
-                onkeydown="if (event.key === 'Enter') addCampaignNote();"
-              />
-              <button
-                class="action-btn"
-                style="width: auto; padding: 0 10px"
-                onclick="addCampaignNote()"
-              >
-                ADD
-              </button>
-            </div>
-          </details>
-
-          <!-- 11. OVERSEER'S LOG (WU-F7 device telemetry + WU-F10 merged campaign stats) -->
-          <details class="panel" data-tab="data" id="overseerLogPanel">
-            <summary><h2>&gt; OVERSEER'S LOG</h2></summary>
-            <div class="overseer-section-label">&gt; UNIT TELEMETRY — THIS DEVICE</div>
-            <div id="overseerLogDisplay">
-              <span class="empty-state">NO MAINTENANCE TELEMETRY ON RECORD</span>
-            </div>
-            <div class="overseer-section-label">&gt; CAMPAIGN LOG — THIS COURIER</div>
-            <div id="sessionStatsList"></div>
-            <button
-              class="action-btn"
-              onclick="resetSessionStats()"
-              style="margin-top: 6px; font-size: 10px"
-              aria-label="Reset campaign statistics (kills, caps earned, damage dealt, current sitting duration)"
-            >
-              RESET CAMPAIGN STATS
-            </button>
-            <span style="display: block; margin-top: 6px; font-size: 10px; opacity: 0.5">
-              &gt; DEVICE TELEMETRY STORED LOCALLY ON THIS UNIT
-            </span>
-          </details>
-
-          <!-- 12. WORLD MAP (G6) -->
-          <details class="panel" data-tab="data" id="worldMapPanel">
-            <summary><h2>&gt; WORLD MAP</h2></summary>
-            <div id="worldMapDisplay">
-              <span style="opacity: 0.4">[LOADING MAP...]</span>
-            </div>
-          </details>
-
-          <!-- 13b. CAMPG — Campaign & Configuration -->
-          <details class="panel" data-tab="campg" id="campgPanel" open>
-            <summary>
-              <h2>> CAMPAIGN CONFIGURATION</h2>
-            </summary>
-
-            <!-- Game Context -->
-            <div class="input-group" style="margin-bottom: 10px">
-              <label class="cfg-label" style="font-size: 11px; letter-spacing: 1px; opacity: 0.8"
-                >GAME:</label
-              >
-              <select
-                id="gameContextSelect"
-                style="width: 100%"
-                onchange="onGameContextChange(this.value)"
-              >
-                <option value="FNV">Fallout: New Vegas</option>
-                <option value="FO3">Fallout 3</option>
-              </select>
-              <!-- fo3WarningBanner moved to #fo3WarningBannerTemplate (top of body, WU-E2):
-                   a reusable disabled banner template. Clone it here to re-enable. -->
-            </div>
-
-            <!-- Playstyle -->
-            <div class="input-group" style="margin-bottom: 10px">
-              <label class="cfg-label" style="font-size: 11px; letter-spacing: 1px; opacity: 0.8"
-                >PLAYSTYLE:</label
-              >
-              <select
-                id="playstyleInput"
-                style="width: 100%"
-                onchange="changePlaystyle(this.value)"
-              >
-                <option value="any">Any Weapon (Default)</option>
-                <option value="melee">Melee/Unarmed Only</option>
-              </select>
-            </div>
-
-            <!-- Playthrough Type (state.playthroughType — Protocol 4 state field since C5) -->
-            <div class="input-group" style="margin-bottom: 10px">
-              <label class="cfg-label" style="font-size: 11px; letter-spacing: 1px; opacity: 0.8"
-                >PLAYTHROUGH TYPE:</label
-              >
-              <select
-                id="playthroughTypeSelect"
-                style="width: 100%"
-                onchange="onPlaythroughTypeChange(this.value)"
-              >
-                <option value="standard">Standard</option>
-                <option value="minmaxed">Min-Maxed</option>
-                <option value="completionist">Completionist</option>
-                <option value="casual">Casual</option>
-                <option value="speedrun">Speedrun</option>
-              </select>
-            </div>
-
-            <!-- Complete RNG (state.campaignMode — opt-in, new campaign only) -->
-            <div class="input-group rng-mode-group" style="margin-bottom: 10px">
-              <label
-                style="
-                  display: flex;
-                  align-items: center;
-                  gap: 8px;
-                  cursor: pointer;
-                  font-size: 11px;
-                  letter-spacing: 1px;
-                  opacity: 0.8;
-                "
+              <div
+                class="panel-form"
+                style="border-top: 1px dashed var(--robco-green); padding-top: 8px"
               >
                 <input
-                  type="checkbox"
-                  id="completeRngToggle"
-                  onchange="onCampaignModeChange(this.checked)"
-                  style="width: auto; accent-color: var(--robco-green)"
+                  type="text"
+                  id="newQuestName"
+                  placeholder="QUEST"
+                  maxlength="100"
+                  style="flex: 1; min-width: 100px"
                 />
-                COMPLETE RNG
-              </label>
-              <!-- Armed: checkbox checked, wipe not yet performed -->
-              <div
-                id="rngModeBanner"
-                style="
-                  display: none;
-                  margin-top: 6px;
-                  padding: 6px 8px;
-                  font-size: 9px;
-                  letter-spacing: 0.5px;
-                  line-height: 1.5;
-                  color: var(--robco-green);
-                  border: 1px dashed var(--robco-green);
-                  background: rgba(var(--robco-green-rgb), 0.04);
-                "
-              >
-                &#9658; COMPLETE RNG ACTIVE. All SPECIAL, traits, tag skills, skill points, and perk
-                selections will be randomised by the AI when requested. Opt-in only &mdash; wipe
-                terminal and start a new campaign to apply. NEVER retroactively applied to existing
-                saves. Combines freely with any Playthrough Type.
+                <select id="newQuestStatus" style="width: 80px; background: rgba(0, 0, 0, 0.8)">
+                  <option value="active">Active</option>
+                  <option value="complete">Complete</option>
+                  <option value="failed">Failed</option>
+                </select>
               </div>
-              <!-- Locked: wipe performed while armed; now permanent -->
-              <div
-                id="rngLockedBanner"
-                style="
-                  display: none;
-                  margin-top: 6px;
-                  padding: 6px 8px;
-                  font-size: 9px;
-                  letter-spacing: 0.5px;
-                  line-height: 1.5;
-                  color: var(--robco-danger);
-                  border: 1px dashed var(--robco-danger);
-                  background: rgba(231, 76, 60, 0.06);
-                "
-              >
-                &#9888; COMPLETE RNG &mdash; PERMANENTLY ACTIVE. This run is locked to full
-                randomisation. Cannot be disabled.
-              </div>
-            </div>
-
-            <!-- Campaign Status Panel (v2.0.1) -->
-            <details
-              class="sub-panel"
-              id="campaignStatusPanel"
-              data-sub-id="campaign_status"
-              style="margin-bottom: 10px"
-            >
-              <summary class="config-summary" style="font-size: 12px; opacity: 0.85">
-                CAMPAIGN STATUS
-              </summary>
-              <div
-                id="campaignStatusDisplay"
-                style="margin-top: 8px; font-size: 10px; line-height: 1.7"
-              >
-                <span style="opacity: 0.4">[LOADING...]</span>
-              </div>
-            </details>
-
-            <!-- Crossroads Record (v2.0.1) -->
-            <details class="sub-panel" data-sub-id="crossroads_record" style="margin-bottom: 10px">
-              <summary class="config-summary" style="font-size: 12px; opacity: 0.85">
-                CROSSROADS RECORD
-              </summary>
-              <div
-                id="crossroadsDisplay"
-                style="
-                  margin-top: 8px;
-                  font-size: 10px;
-                  opacity: 0.75;
-                  line-height: 1.6;
-                  padding-left: 4px;
-                  border-left: 1px dashed var(--robco-green);
-                  min-height: 32px;
-                "
-              >
-                <span style="opacity: 0.45"
-                  >NO DECISIONS RECORDED — CROSSROADS EVENTS WILL APPEAR HERE</span
-                >
-              </div>
-            </details>
-
-            <!-- Incident Log (P4 Terminal Record — milestone view) -->
-            <details class="sub-panel" data-sub-id="incident_log" style="margin-bottom: 10px">
-              <summary class="config-summary" style="font-size: 12px; opacity: 0.85">
-                INCIDENT LOG
-              </summary>
-              <div
-                id="incidentDisplay"
-                style="
-                  margin-top: 8px;
-                  font-size: 10px;
-                  opacity: 0.75;
-                  line-height: 1.6;
-                  padding-left: 4px;
-                  border-left: 1px dashed var(--robco-green);
-                  min-height: 32px;
-                "
-              >
-                <span style="opacity: 0.45"
-                  >NO INCIDENTS ON RECORD — MILESTONES WILL APPEAR HERE</span
-                >
-              </div>
-            </details>
-
-            <!-- Wipe Terminal (Danger Zone) -->
-            <div
-              style="
-                margin-top: 16px;
-                border-top: 1px dashed rgba(231, 76, 60, 0.4);
-                padding-top: 12px;
-              "
-            >
-              <div
-                style="
-                  font-size: 10px;
-                  opacity: 0.65;
-                  letter-spacing: 1px;
-                  margin-bottom: 8px;
-                  color: var(--robco-danger);
-                "
-              >
-                &#9888; DANGER ZONE
-              </div>
-              <button
-                id="wipeTerminalBtn"
-                class="action-btn"
-                onclick="wipeTerminal()"
-                style="
-                  width: 100%;
-                  color: var(--robco-danger);
-                  border-color: var(--robco-danger);
-                  font-size: 11px;
-                  letter-spacing: 1.5px;
-                "
-              >
-                &gt; WIPE TERMINAL &mdash; NEW CAMPAIGN
+              <input
+                type="text"
+                id="newQuestObjective"
+                placeholder="OBJECTIVE (OPTIONAL)"
+                style="width: 100%; margin-top: 4px"
+              />
+              <button class="action-btn" onclick="addQuest()" style="margin-top: 4px">
+                + ADD QUEST
               </button>
-            </div>
-          </details>
+            </details>
 
-          <!-- 14. ACCOUNT -->
-          <details class="panel" id="accountPanel" data-tab="data">
-            <summary>
-              <h2>> ACCOUNT</h2>
-            </summary>
-            <div id="accountBody" style="font-size: 12px">
-              <span class="empty-state">INITIALIZING…</span>
-            </div>
-            <div style="font-size: 11px; opacity: 0.5; margin-top: 6px">
-              Manage saves in Security &amp; Configuration below.
-            </div>
-          </details>
+            <!-- DATABANK (WU-N4b option C — persistent inline CONSULT panel) -->
+            <details class="panel" data-tab="data" id="databankPanel">
+              <summary><h2>> DATABANK</h2></summary>
+              <input
+                type="text"
+                id="databankSearch"
+                placeholder="SEARCH DATABANK…"
+                maxlength="100"
+                aria-label="Search the databank for an item, perk, quest, location, companion, or creature"
+                oninput="renderDatabankPanel()"
+                style="width: 100%; margin-bottom: 6px; font-size: 16px"
+              />
+              <div id="databankResults"></div>
+            </details>
 
-          <!-- 13. SECURITY & CONFIGURATION -->
-          <details class="panel" style="border-color: var(--robco-alert)">
-            <summary>
-              <h2 style="border-color: var(--robco-alert); color: var(--robco-alert)">
-                > SECURITY & CONFIGURATION
-              </h2>
-            </summary>
-            <div id="moduleBay" class="module-bay">
-              <!-- First-visit-only service-panel ceremony (Protocol 25 sanctioned exception) -->
-              <div id="bayHatch" class="bay-hatch" hidden>
-                <div class="hatch-plate">
-                  <span class="hatch-screw tl" aria-hidden="true"></span>
-                  <span class="hatch-screw tr" aria-hidden="true"></span>
-                  <span class="hatch-screw bl" aria-hidden="true"></span>
-                  <span class="hatch-screw br" aria-hidden="true"></span>
-                  <div class="hatch-brand">
-                    ROBCO INDUSTRIES (TM) &mdash; UNIFIED OPERATING SYSTEM
-                  </div>
-                  <div class="hatch-title">SERVICE PANEL</div>
-                  <div class="hatch-sub">MODULE BAY &middot; CHASSIS RIT-V300</div>
-                  <div class="hatch-warn">
-                    &#9888; AUTHORIZED TECHNICIANS ONLY.<br />NO USER-SERVICEABLE PARTS BEHIND CRT
-                    ASSEMBLY.
-                  </div>
-                  <button type="button" class="hatch-latch-btn" onclick="releaseBayHatch()">
-                    &#9654; RELEASE HATCH
-                  </button>
-                  <div class="hatch-hint">
-                    THE HATCH ONLY OPENS ONCE &mdash; AFTER THIS THE BAY OPENS DIRECTLY
-                  </div>
+            <!-- 6. PERKS -->
+            <details class="panel" data-tab="stat">
+              <summary><h2>> PERKS</h2></summary>
+              <div id="perksList">
+                <span class="empty-state">NO PERKS ON FILE</span>
+              </div>
+              <div
+                class="panel-form"
+                style="border-top: 1px dashed var(--robco-green); padding-top: 8px"
+              >
+                <input
+                  type="text"
+                  id="newPerkName"
+                  placeholder="PERK"
+                  maxlength="80"
+                  style="flex: 1; min-width: 100px"
+                />
+                <input
+                  type="number"
+                  id="newPerkRank"
+                  placeholder="RANK"
+                  min="1"
+                  max="5"
+                  style="width: 58px"
+                />
+                <input
+                  type="number"
+                  id="newPerkLevel"
+                  placeholder="LVL"
+                  min="0"
+                  style="width: 46px"
+                />
+              </div>
+              <button class="action-btn" onclick="addPerk()" style="margin-top: 4px">
+                + ADD PERK
+              </button>
+              <!-- Traits subsection (FNV only — shown/hidden by renderTraits(), collapsible sub-panel) -->
+              <details
+                class="sub-panel"
+                id="traitsSection"
+                data-sub-id="traits"
+                style="display: none"
+              >
+                <summary>
+                  <h3>&gt; TRAITS</h3>
+                </summary>
+                <input
+                  type="text"
+                  id="traitFilter"
+                  placeholder="FILTER TRAITS…"
+                  maxlength="80"
+                  oninput="renderTraits()"
+                  style="width: 100%; box-sizing: border-box; margin-bottom: 4px; font-size: 16px"
+                />
+                <div id="traitsDisplay"></div>
+              </details>
+            </details>
+
+            <!-- 7. STATUS EFFECTS -->
+            <details class="panel" data-tab="stat">
+              <summary>
+                <h2>> STATUS EFFECTS</h2>
+              </summary>
+              <div id="statusList">
+                <span class="empty-state">NO ACTIVE EFFECTS</span>
+              </div>
+              <div class="panel-form">
+                <select
+                  id="newStatusName"
+                  style="
+                    flex: 2;
+                    background: rgba(0, 0, 0, 0.8);
+                    color: var(--robco-green);
+                    border: 1px solid var(--robco-green);
+                  "
+                >
+                  <option value="Well Rested">Well Rested</option>
+                  <option value="Dehydrated">Dehydrated</option>
+                  <option value="Starving">Starving</option>
+                  <option value="Sleep Deprived">Sleep Deprived</option>
+                  <option value="Radiation Sickness">Radiation Sickness</option>
+                  <option value="Addicted">Addicted</option>
+                  <option value="Chem Sickness">Chem Sickness</option>
+                  <option value="Overencumbered">Overencumbered</option>
+                  <option value="Stealth Boy Active">Stealth Boy Active</option>
+                  <option value="Med-X Resistance">Med-X Resistance</option>
+                  <option value="Psycho Rage">Psycho Rage</option>
+                  <option value="Buffout Boost">Buffout Boost</option>
+                  <option value="Mentats Insight">Mentats Insight</option>
+                  <option value="Jet Rush">Jet Rush</option>
+                  <option value="Turbo Time">Turbo Time</option>
+                  <option value="Poisoned">Poisoned</option>
+                  <option value="Crippled">Crippled</option>
+                  <option value="Bleeding">Bleeding</option>
+                  <option value="Concussed">Concussed</option>
+                </select>
+                <input
+                  type="number"
+                  id="newStatusTicks"
+                  placeholder="TICKS"
+                  style="flex: 1; width: 50px"
+                />
+                <select
+                  id="newStatusType"
+                  style="
+                    flex: 1;
+                    background: rgba(0, 0, 0, 0.8);
+                    color: var(--robco-green);
+                    border: 1px solid var(--robco-green);
+                  "
+                >
+                  <option value="BUFF">BUFF</option>
+                  <option value="DEBUFF">DEBUFF</option>
+                  <option value="NEUTRAL">NEUTRAL</option>
+                </select>
+                <button
+                  class="action-btn"
+                  style="width: auto; padding: 0 10px"
+                  onclick="addStatusEffect()"
+                >
+                  ADD
+                </button>
+              </div>
+            </details>
+
+            <!-- 8. SQUAD STATUS -->
+            <details class="panel" data-tab="inv">
+              <summary>
+                <h2>> SQUAD STATUS</h2>
+              </summary>
+              <div id="squadList"></div>
+              <div class="panel-form">
+                <select
+                  id="newSquadName"
+                  style="
+                    flex: 1;
+                    background: rgba(0, 0, 0, 0.8);
+                    color: var(--robco-green);
+                    border: 1px solid var(--robco-green);
+                  "
+                >
+                  <option value="Arcade Gannon">Arcade Gannon</option>
+                  <option value="Boone">Boone</option>
+                  <option value="Cass">Cass</option>
+                  <option value="Lily">Lily</option>
+                  <option value="Raul">Raul</option>
+                  <option value="Veronica">Veronica</option>
+                  <option value="ED-E">ED-E</option>
+                  <option value="Rex">Rex</option>
+                </select>
+                <button
+                  class="action-btn"
+                  style="width: auto; padding: 0 10px"
+                  onclick="addSquadMember()"
+                >
+                  ADD
+                </button>
+              </div>
+            </details>
+
+            <!-- 9. FACTION STANDING (FNV) -->
+            <details class="panel" data-tab="stat" id="factionPanel">
+              <summary>
+                <h2>&gt; FACTION STANDING</h2>
+              </summary>
+              <div id="factionContainer"></div>
+            </details>
+
+            <!-- 9b. KARMA CENTER (FO3 — G4) -->
+            <details class="panel" data-tab="stat" id="karmaPanel" style="display: none">
+              <summary>
+                <h2>&gt; KARMA CENTER</h2>
+              </summary>
+              <div id="karmaCenterDisplay">
+                <span style="opacity: 0.4">[FO3 MODE REQUIRED]</span>
+              </div>
+            </details>
+
+            <!-- 10. CAMPAIGN NOTES -->
+            <details class="panel" data-tab="data">
+              <summary>
+                <h2>> CAMPAIGN NOTES</h2>
+              </summary>
+              <div id="campaignNotesList">
+                <span class="empty-state">NO ENTRIES IN MEMORY</span>
+              </div>
+              <div class="panel-form">
+                <input
+                  type="text"
+                  id="newCampaignNote"
+                  placeholder="ENTER TACTICAL NOTE…"
+                  maxlength="5000"
+                  style="flex: 1"
+                  onkeydown="if (event.key === 'Enter') addCampaignNote();"
+                />
+                <button
+                  class="action-btn"
+                  style="width: auto; padding: 0 10px"
+                  onclick="addCampaignNote()"
+                >
+                  ADD
+                </button>
+              </div>
+            </details>
+
+            <!-- 11. OVERSEER'S LOG (WU-F7 device telemetry + WU-F10 merged campaign stats) -->
+            <details class="panel" data-tab="data" id="overseerLogPanel">
+              <summary><h2>&gt; OVERSEER'S LOG</h2></summary>
+              <div class="overseer-section-label">&gt; UNIT TELEMETRY — THIS DEVICE</div>
+              <div id="overseerLogDisplay">
+                <span class="empty-state">NO MAINTENANCE TELEMETRY ON RECORD</span>
+              </div>
+              <div class="overseer-section-label">&gt; CAMPAIGN LOG — THIS COURIER</div>
+              <div id="sessionStatsList"></div>
+              <button
+                class="action-btn"
+                onclick="resetSessionStats()"
+                style="margin-top: 6px; font-size: 10px"
+                aria-label="Reset campaign statistics (kills, caps earned, damage dealt, current sitting duration)"
+              >
+                RESET CAMPAIGN STATS
+              </button>
+              <span style="display: block; margin-top: 6px; font-size: 10px; opacity: 0.5">
+                &gt; DEVICE TELEMETRY STORED LOCALLY ON THIS UNIT
+              </span>
+            </details>
+
+            <!-- 12. WORLD MAP (G6) -->
+            <details class="panel" data-tab="data" id="worldMapPanel">
+              <summary><h2>&gt; WORLD MAP</h2></summary>
+              <div id="worldMapDisplay">
+                <span style="opacity: 0.4">[LOADING MAP...]</span>
+              </div>
+            </details>
+
+            <!-- 13b. CAMPG — Campaign & Configuration -->
+            <details class="panel" data-tab="campg" id="campgPanel" open>
+              <summary>
+                <h2>> CAMPAIGN CONFIGURATION</h2>
+              </summary>
+
+              <!-- Game Context -->
+              <div class="input-group" style="margin-bottom: 10px">
+                <label class="cfg-label" style="font-size: 11px; letter-spacing: 1px; opacity: 0.8"
+                  >GAME:</label
+                >
+                <select
+                  id="gameContextSelect"
+                  style="width: 100%"
+                  onchange="onGameContextChange(this.value)"
+                >
+                  <option value="FNV">Fallout: New Vegas</option>
+                  <option value="FO3">Fallout 3</option>
+                </select>
+                <!-- fo3WarningBanner moved to #fo3WarningBannerTemplate (top of body, WU-E2):
+                   a reusable disabled banner template. Clone it here to re-enable. -->
+              </div>
+
+              <!-- Playstyle -->
+              <div class="input-group" style="margin-bottom: 10px">
+                <label class="cfg-label" style="font-size: 11px; letter-spacing: 1px; opacity: 0.8"
+                  >PLAYSTYLE:</label
+                >
+                <select
+                  id="playstyleInput"
+                  style="width: 100%"
+                  onchange="changePlaystyle(this.value)"
+                >
+                  <option value="any">Any Weapon (Default)</option>
+                  <option value="melee">Melee/Unarmed Only</option>
+                </select>
+              </div>
+
+              <!-- Playthrough Type (state.playthroughType — Protocol 4 state field since C5) -->
+              <div class="input-group" style="margin-bottom: 10px">
+                <label class="cfg-label" style="font-size: 11px; letter-spacing: 1px; opacity: 0.8"
+                  >PLAYTHROUGH TYPE:</label
+                >
+                <select
+                  id="playthroughTypeSelect"
+                  style="width: 100%"
+                  onchange="onPlaythroughTypeChange(this.value)"
+                >
+                  <option value="standard">Standard</option>
+                  <option value="minmaxed">Min-Maxed</option>
+                  <option value="completionist">Completionist</option>
+                  <option value="casual">Casual</option>
+                  <option value="speedrun">Speedrun</option>
+                </select>
+              </div>
+
+              <!-- Complete RNG (state.campaignMode — opt-in, new campaign only) -->
+              <div class="input-group rng-mode-group" style="margin-bottom: 10px">
+                <label
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    cursor: pointer;
+                    font-size: 11px;
+                    letter-spacing: 1px;
+                    opacity: 0.8;
+                  "
+                >
+                  <input
+                    type="checkbox"
+                    id="completeRngToggle"
+                    onchange="onCampaignModeChange(this.checked)"
+                    style="width: auto; accent-color: var(--robco-green)"
+                  />
+                  COMPLETE RNG
+                </label>
+                <!-- Armed: checkbox checked, wipe not yet performed -->
+                <div
+                  id="rngModeBanner"
+                  style="
+                    display: none;
+                    margin-top: 6px;
+                    padding: 6px 8px;
+                    font-size: 9px;
+                    letter-spacing: 0.5px;
+                    line-height: 1.5;
+                    color: var(--robco-green);
+                    border: 1px dashed var(--robco-green);
+                    background: rgba(var(--robco-green-rgb), 0.04);
+                  "
+                >
+                  &#9658; COMPLETE RNG ACTIVE. All SPECIAL, traits, tag skills, skill points, and
+                  perk selections will be randomised by the AI when requested. Opt-in only &mdash;
+                  wipe terminal and start a new campaign to apply. NEVER retroactively applied to
+                  existing saves. Combines freely with any Playthrough Type.
+                </div>
+                <!-- Locked: wipe performed while armed; now permanent -->
+                <div
+                  id="rngLockedBanner"
+                  style="
+                    display: none;
+                    margin-top: 6px;
+                    padding: 6px 8px;
+                    font-size: 9px;
+                    letter-spacing: 0.5px;
+                    line-height: 1.5;
+                    color: var(--robco-danger);
+                    border: 1px dashed var(--robco-danger);
+                    background: rgba(231, 76, 60, 0.06);
+                  "
+                >
+                  &#9888; COMPLETE RNG &mdash; PERMANENTLY ACTIVE. This run is locked to full
+                  randomisation. Cannot be disabled.
                 </div>
               </div>
 
-              <div id="bayContent" class="bay-content">
-                <div class="bay-head">
-                  <span class="bay-led" aria-hidden="true"></span>
-                  <span class="bay-head-title">MODULE BAY</span>
-                  <button type="button" class="btn-sm" onclick="toggleBaySchematic()">
-                    &#8981; SCHEMATIC VIEW
-                  </button>
-                  <div class="bay-chassis">
-                    CHASSIS RIT-V300 &middot; INTERNAL SERVICE VIEW &middot; BUS VOLTAGE NOMINAL
-                    &middot; ALL MODIFICATIONS TAKE EFFECT IMMEDIATELY
+              <!-- Campaign Status Panel (v2.0.1) -->
+              <details
+                class="sub-panel"
+                id="campaignStatusPanel"
+                data-sub-id="campaign_status"
+                style="margin-bottom: 10px"
+              >
+                <summary class="config-summary" style="font-size: 12px; opacity: 0.85">
+                  CAMPAIGN STATUS
+                </summary>
+                <div
+                  id="campaignStatusDisplay"
+                  style="margin-top: 8px; font-size: 10px; line-height: 1.7"
+                >
+                  <span style="opacity: 0.4">[LOADING...]</span>
+                </div>
+              </details>
+
+              <!-- Crossroads Record (v2.0.1) -->
+              <details
+                class="sub-panel"
+                data-sub-id="crossroads_record"
+                style="margin-bottom: 10px"
+              >
+                <summary class="config-summary" style="font-size: 12px; opacity: 0.85">
+                  CROSSROADS RECORD
+                </summary>
+                <div
+                  id="crossroadsDisplay"
+                  style="
+                    margin-top: 8px;
+                    font-size: 10px;
+                    opacity: 0.75;
+                    line-height: 1.6;
+                    padding-left: 4px;
+                    border-left: 1px dashed var(--robco-green);
+                    min-height: 32px;
+                  "
+                >
+                  <span style="opacity: 0.45"
+                    >NO DECISIONS RECORDED — CROSSROADS EVENTS WILL APPEAR HERE</span
+                  >
+                </div>
+              </details>
+
+              <!-- Incident Log (P4 Terminal Record — milestone view) -->
+              <details class="sub-panel" data-sub-id="incident_log" style="margin-bottom: 10px">
+                <summary class="config-summary" style="font-size: 12px; opacity: 0.85">
+                  INCIDENT LOG
+                </summary>
+                <div
+                  id="incidentDisplay"
+                  style="
+                    margin-top: 8px;
+                    font-size: 10px;
+                    opacity: 0.75;
+                    line-height: 1.6;
+                    padding-left: 4px;
+                    border-left: 1px dashed var(--robco-green);
+                    min-height: 32px;
+                  "
+                >
+                  <span style="opacity: 0.45"
+                    >NO INCIDENTS ON RECORD — MILESTONES WILL APPEAR HERE</span
+                  >
+                </div>
+              </details>
+
+              <!-- Wipe Terminal (Danger Zone) -->
+              <div
+                style="
+                  margin-top: 16px;
+                  border-top: 1px dashed rgba(231, 76, 60, 0.4);
+                  padding-top: 12px;
+                "
+              >
+                <div
+                  style="
+                    font-size: 10px;
+                    opacity: 0.65;
+                    letter-spacing: 1px;
+                    margin-bottom: 8px;
+                    color: var(--robco-danger);
+                  "
+                >
+                  &#9888; DANGER ZONE
+                </div>
+                <button
+                  id="wipeTerminalBtn"
+                  class="action-btn"
+                  onclick="wipeTerminal()"
+                  style="
+                    width: 100%;
+                    color: var(--robco-danger);
+                    border-color: var(--robco-danger);
+                    font-size: 11px;
+                    letter-spacing: 1.5px;
+                  "
+                >
+                  &gt; WIPE TERMINAL &mdash; NEW CAMPAIGN
+                </button>
+              </div>
+            </details>
+
+            <!-- 14. ACCOUNT -->
+            <details class="panel" id="accountPanel" data-tab="data">
+              <summary>
+                <h2>> ACCOUNT</h2>
+              </summary>
+              <div id="accountBody" style="font-size: 12px">
+                <span class="empty-state">INITIALIZING…</span>
+              </div>
+              <div style="font-size: 11px; opacity: 0.5; margin-top: 6px">
+                Manage saves in Security &amp; Configuration below.
+              </div>
+            </details>
+
+            <!-- 13. SECURITY & CONFIGURATION -->
+            <details class="panel" style="border-color: var(--robco-alert)">
+              <summary>
+                <h2 style="border-color: var(--robco-alert); color: var(--robco-alert)">
+                  > SECURITY & CONFIGURATION
+                </h2>
+              </summary>
+              <div id="moduleBay" class="module-bay">
+                <!-- First-visit-only service-panel ceremony (Protocol 25 sanctioned exception) -->
+                <div id="bayHatch" class="bay-hatch" hidden>
+                  <div class="hatch-plate">
+                    <span class="hatch-screw tl" aria-hidden="true"></span>
+                    <span class="hatch-screw tr" aria-hidden="true"></span>
+                    <span class="hatch-screw bl" aria-hidden="true"></span>
+                    <span class="hatch-screw br" aria-hidden="true"></span>
+                    <div class="hatch-brand">
+                      ROBCO INDUSTRIES (TM) &mdash; UNIFIED OPERATING SYSTEM
+                    </div>
+                    <div class="hatch-title">SERVICE PANEL</div>
+                    <div class="hatch-sub">MODULE BAY &middot; CHASSIS RIT-V300</div>
+                    <div class="hatch-warn">
+                      &#9888; AUTHORIZED TECHNICIANS ONLY.<br />NO USER-SERVICEABLE PARTS BEHIND CRT
+                      ASSEMBLY.
+                    </div>
+                    <button type="button" class="hatch-latch-btn" onclick="releaseBayHatch()">
+                      &#9654; RELEASE HATCH
+                    </button>
+                    <div class="hatch-hint">
+                      THE HATCH ONLY OPENS ONCE &mdash; AFTER THIS THE BAY OPENS DIRECTLY
+                    </div>
                   </div>
                 </div>
-                <div class="bay-bus-strip" aria-hidden="true">
-                  &#9552;&#9552;&#9552; BACKPLANE BUS &#9573; SLOT 01 &#9573; SLOT 02 &#9573; SLOT
-                  03 &#9573; SLOT 04 &#9573; SLOT 05 &#9573; SVC TRAY &#9552;&#9552;&#9552;
-                </div>
 
-                <div class="bay-grid">
-                  <!-- SLOT 01 — VDU OPTICS DRIVER -->
-                  <details class="sub-panel bay-board" data-sub-id="slot_01_optics" open>
-                    <summary><h3>&gt; SLOT 01 &middot; VDU OPTICS DRIVER</h3></summary>
-                    <span class="bay-slot-tag">SLOT 01</span>
-                    <span class="bay-part-no"
-                      >PN RBC-VDU-77 &middot; PHOSPHOR TUBE + LUMEN COIL</span
+                <div id="bayContent" class="bay-content">
+                  <div class="bay-head">
+                    <span class="bay-led" aria-hidden="true"></span>
+                    <span class="bay-head-title">MODULE BAY</span>
+                    <button type="button" class="btn-sm" onclick="toggleBaySchematic()">
+                      &#8981; SCHEMATIC VIEW
+                    </button>
+                    <div class="bay-chassis">
+                      CHASSIS RIT-V300 &middot; INTERNAL SERVICE VIEW &middot; BUS VOLTAGE NOMINAL
+                      &middot; ALL MODIFICATIONS TAKE EFFECT IMMEDIATELY
+                    </div>
+                  </div>
+                  <div class="bay-bus-strip" aria-hidden="true">
+                    &#9552;&#9552;&#9552; BACKPLANE BUS &#9573; SLOT 01 &#9573; SLOT 02 &#9573; SLOT
+                    03 &#9573; SLOT 04 &#9573; SLOT 05 &#9573; SVC TRAY &#9552;&#9552;&#9552;
+                  </div>
+
+                  <div class="bay-grid">
+                    <!-- SLOT 01 — VDU OPTICS DRIVER -->
+                    <details class="sub-panel bay-board" data-sub-id="slot_01_optics" open>
+                      <summary><h3>&gt; SLOT 01 &middot; VDU OPTICS DRIVER</h3></summary>
+                      <span class="bay-slot-tag">SLOT 01</span>
+                      <span class="bay-part-no"
+                        >PN RBC-VDU-77 &middot; PHOSPHOR TUBE + LUMEN COIL</span
+                      >
+
+                      <div
+                        id="opticsColorInput"
+                        class="tube-rack"
+                        role="radiogroup"
+                        aria-label="Phosphor tube selection"
+                      >
+                        <button
+                          type="button"
+                          class="tube"
+                          data-optic="green"
+                          style="--tube: #14fdce"
+                          onclick="_seatOpticsTube(this)"
+                        >
+                          <span class="glass" aria-hidden="true"></span>
+                          <span class="t-name">ROBCO GREEN</span>
+                          <span class="t-default"></span>
+                        </button>
+                        <button
+                          type="button"
+                          class="tube"
+                          data-optic="green3"
+                          style="--tube: #4fb05a"
+                          onclick="_seatOpticsTube(this)"
+                        >
+                          <span class="glass" aria-hidden="true"></span>
+                          <span class="t-name">PIP-BOY GREEN</span>
+                          <span class="t-default"></span>
+                        </button>
+                        <button
+                          type="button"
+                          class="tube"
+                          data-optic="amber"
+                          style="--tube: #ffb642"
+                          onclick="_seatOpticsTube(this)"
+                        >
+                          <span class="glass" aria-hidden="true"></span>
+                          <span class="t-name">NEW VEGAS AMBER</span>
+                          <span class="t-default"></span>
+                        </button>
+                        <button
+                          type="button"
+                          class="tube"
+                          data-optic="blue"
+                          style="--tube: #42cbf5"
+                          onclick="_seatOpticsTube(this)"
+                        >
+                          <span class="glass" aria-hidden="true"></span>
+                          <span class="t-name">VAULT-TEC BLUE</span>
+                          <span class="t-default"></span>
+                        </button>
+                        <button
+                          type="button"
+                          class="tube"
+                          data-optic="legion"
+                          style="--tube: #ff4040"
+                          onclick="_seatOpticsTube(this)"
+                        >
+                          <span class="glass" aria-hidden="true"></span>
+                          <span class="t-name">LEGION RED</span>
+                          <span class="t-default"></span>
+                        </button>
+                        <button
+                          type="button"
+                          class="tube"
+                          data-optic="ghoul"
+                          style="--tube: #7dff5f"
+                          onclick="_seatOpticsTube(this)"
+                        >
+                          <span class="glass" aria-hidden="true"></span>
+                          <span class="t-name">GHOUL GREEN</span>
+                          <span class="t-default"></span>
+                        </button>
+                        <button
+                          type="button"
+                          class="tube"
+                          data-optic="neon"
+                          style="--tube: #c084fc"
+                          onclick="_seatOpticsTube(this)"
+                        >
+                          <span class="glass" aria-hidden="true"></span>
+                          <span class="t-name">NEON VIOLET</span>
+                          <span class="t-default"></span>
+                        </button>
+                      </div>
+
+                      <div class="bay-module">
+                        <input
+                          type="checkbox"
+                          id="highLumenToggle"
+                          class="bay-module-input"
+                          onchange="toggleHighLumen(this.checked)"
+                        />
+                        <label for="highLumenToggle" class="bay-module-card">
+                          <span class="m-led" aria-hidden="true"></span>
+                          <span class="m-name"
+                            >HIGH-LUMEN OPTICS COIL<span class="m-sub"
+                              >MAX-CONTRAST DRIVE &middot; KILLS GLOW HALO</span
+                            ></span
+                          >
+                          <span class="m-action" aria-hidden="true"
+                            ><span class="off-txt">INSTALL</span
+                            ><span class="on-txt">REMOVE</span></span
+                          >
+                        </label>
+                      </div>
+                      <span id="highLumenStatus" class="board-status"></span>
+                      <p id="opticsStatus" class="board-status"></p>
+                    </details>
+
+                    <!-- SLOT 02 — SONIC PROCESSOR (13 channels stay UNFLIPPED this unit) -->
+                    <details
+                      id="audioSystemsDetails"
+                      class="sub-panel bay-board span2"
+                      data-sub-id="audio_systems"
+                      open
                     >
+                      <summary><h3>&gt; SLOT 02 &middot; SONIC PROCESSOR</h3></summary>
+                      <span class="bay-slot-tag">SLOT 02</span>
+                      <span class="bay-part-no">PN RBC-SND-13 &middot; 13-CHANNEL WAVE TABLE</span>
 
-                    <div
-                      id="opticsColorInput"
-                      class="tube-rack"
-                      role="radiogroup"
-                      aria-label="Phosphor tube selection"
-                    >
-                      <button
-                        type="button"
-                        class="tube"
-                        data-optic="green"
-                        style="--tube: #14fdce"
-                        onclick="_seatOpticsTube(this)"
-                      >
-                        <span class="glass" aria-hidden="true"></span>
-                        <span class="t-name">ROBCO GREEN</span>
-                        <span class="t-default"></span>
-                      </button>
-                      <button
-                        type="button"
-                        class="tube"
-                        data-optic="green3"
-                        style="--tube: #4fb05a"
-                        onclick="_seatOpticsTube(this)"
-                      >
-                        <span class="glass" aria-hidden="true"></span>
-                        <span class="t-name">PIP-BOY GREEN</span>
-                        <span class="t-default"></span>
-                      </button>
-                      <button
-                        type="button"
-                        class="tube"
-                        data-optic="amber"
-                        style="--tube: #ffb642"
-                        onclick="_seatOpticsTube(this)"
-                      >
-                        <span class="glass" aria-hidden="true"></span>
-                        <span class="t-name">NEW VEGAS AMBER</span>
-                        <span class="t-default"></span>
-                      </button>
-                      <button
-                        type="button"
-                        class="tube"
-                        data-optic="blue"
-                        style="--tube: #42cbf5"
-                        onclick="_seatOpticsTube(this)"
-                      >
-                        <span class="glass" aria-hidden="true"></span>
-                        <span class="t-name">VAULT-TEC BLUE</span>
-                        <span class="t-default"></span>
-                      </button>
-                      <button
-                        type="button"
-                        class="tube"
-                        data-optic="legion"
-                        style="--tube: #ff4040"
-                        onclick="_seatOpticsTube(this)"
-                      >
-                        <span class="glass" aria-hidden="true"></span>
-                        <span class="t-name">LEGION RED</span>
-                        <span class="t-default"></span>
-                      </button>
-                      <button
-                        type="button"
-                        class="tube"
-                        data-optic="ghoul"
-                        style="--tube: #7dff5f"
-                        onclick="_seatOpticsTube(this)"
-                      >
-                        <span class="glass" aria-hidden="true"></span>
-                        <span class="t-name">GHOUL GREEN</span>
-                        <span class="t-default"></span>
-                      </button>
-                      <button
-                        type="button"
-                        class="tube"
-                        data-optic="neon"
-                        style="--tube: #c084fc"
-                        onclick="_seatOpticsTube(this)"
-                      >
-                        <span class="glass" aria-hidden="true"></span>
-                        <span class="t-name">NEON VIOLET</span>
-                        <span class="t-default"></span>
-                      </button>
-                    </div>
+                      <div class="bay-module bay-module--eject">
+                        <input
+                          type="checkbox"
+                          id="masterMuteToggle"
+                          class="bay-module-input"
+                          onchange="toggleMasterMute(this.checked)"
+                        />
+                        <label for="masterMuteToggle" class="bay-module-card">
+                          <span class="m-led" aria-hidden="true"></span>
+                          <span class="m-name"
+                            >SONIC PROCESSOR BOARD<span class="m-sub"
+                              >MASTER MUTE &mdash; ALL AUDIO</span
+                            ></span
+                          >
+                          <span class="m-action" aria-hidden="true"
+                            ><span class="off-txt">&#9167; REMOVE BOARD</span
+                            ><span class="on-txt">&#9660; RESEAT BOARD</span></span
+                          >
+                        </label>
+                      </div>
 
-                    <div class="bay-module">
-                      <input
-                        type="checkbox"
-                        id="highLumenToggle"
-                        class="bay-module-input"
-                        onchange="toggleHighLumen(this.checked)"
-                      />
-                      <label for="highLumenToggle" class="bay-module-card">
-                        <span class="m-led" aria-hidden="true"></span>
-                        <span class="m-name"
-                          >HIGH-LUMEN OPTICS COIL<span class="m-sub"
-                            >MAX-CONTRAST DRIVE &middot; KILLS GLOW HALO</span
-                          ></span
-                        >
-                        <span class="m-action" aria-hidden="true"
-                          ><span class="off-txt">INSTALL</span
-                          ><span class="on-txt">REMOVE</span></span
-                        >
-                      </label>
-                    </div>
-                    <span id="highLumenStatus" class="board-status"></span>
-                    <p id="opticsStatus" class="board-status"></p>
-                  </details>
+                      <!-- WU-F5: Pip-Boy Radio — zero-byte synthesized station bed (a PLAY toggle, not a mute) -->
+                      <div class="bay-module">
+                        <input
+                          type="checkbox"
+                          id="radioToggle"
+                          class="bay-module-input"
+                          onchange="toggleRadio(this.checked)"
+                        />
+                        <label for="radioToggle" class="bay-module-card">
+                          <span class="m-led" aria-hidden="true"></span>
+                          <span class="m-name"
+                            >RADIO RECEIVER MODULE<span class="m-sub"
+                              >PIP-BOY STATION BED &middot; SYNTHESIZED</span
+                            ></span
+                          >
+                          <span class="m-action" aria-hidden="true"
+                            ><span class="off-txt">INSTALL</span
+                            ><span class="on-txt">REMOVE</span></span
+                          >
+                        </label>
+                      </div>
+                      <span id="radioStatus" class="board-status"
+                        >&gt; RADIO OFFLINE &mdash; NO CARRIER</span
+                      >
 
-                  <!-- SLOT 02 — SONIC PROCESSOR (13 channels stay UNFLIPPED this unit) -->
-                  <details
-                    id="audioSystemsDetails"
-                    class="sub-panel bay-board span2"
-                    data-sub-id="audio_systems"
-                    open
-                  >
-                    <summary><h3>&gt; SLOT 02 &middot; SONIC PROCESSOR</h3></summary>
-                    <span class="bay-slot-tag">SLOT 02</span>
-                    <span class="bay-part-no">PN RBC-SND-13 &middot; 13-CHANNEL WAVE TABLE</span>
-
-                    <div class="bay-module bay-module--eject">
-                      <input
-                        type="checkbox"
-                        id="masterMuteToggle"
-                        class="bay-module-input"
-                        onchange="toggleMasterMute(this.checked)"
-                      />
-                      <label for="masterMuteToggle" class="bay-module-card">
-                        <span class="m-led" aria-hidden="true"></span>
-                        <span class="m-name"
-                          >SONIC PROCESSOR BOARD<span class="m-sub"
-                            >MASTER MUTE &mdash; ALL AUDIO</span
-                          ></span
-                        >
-                        <span class="m-action" aria-hidden="true"
-                          ><span class="off-txt">&#9167; REMOVE BOARD</span
-                          ><span class="on-txt">&#9660; RESEAT BOARD</span></span
-                        >
-                      </label>
-                    </div>
-
-                    <!-- WU-F5: Pip-Boy Radio — zero-byte synthesized station bed (a PLAY toggle, not a mute) -->
-                    <div class="bay-module">
-                      <input
-                        type="checkbox"
-                        id="radioToggle"
-                        class="bay-module-input"
-                        onchange="toggleRadio(this.checked)"
-                      />
-                      <label for="radioToggle" class="bay-module-card">
-                        <span class="m-led" aria-hidden="true"></span>
-                        <span class="m-name"
-                          >RADIO RECEIVER MODULE<span class="m-sub"
-                            >PIP-BOY STATION BED &middot; SYNTHESIZED</span
-                          ></span
-                        >
-                        <span class="m-action" aria-hidden="true"
-                          ><span class="off-txt">INSTALL</span
-                          ><span class="on-txt">REMOVE</span></span
-                        >
-                      </label>
-                    </div>
-                    <span id="radioStatus" class="board-status"
-                      >&gt; RADIO OFFLINE &mdash; NO CARRIER</span
-                    >
-
-                    <!-- B2c: SERVO CLICK RELAY — tactile install/eject SFX for chips,
+                      <!-- B2c: SERVO CLICK RELAY — tactile install/eject SFX for chips,
                     the board itself, and the other bay-module toggles. A MUTE flag
                     under the hood (routes through the same toggleAudio() every other
                     channel chip uses) presented with INVERTED checked semantics
                     (checked = relay installed = clicks audible), same pattern as the
                     master-mute board (Protocol 25 sanctioned-exception rule: stored
                     boolean unchanged, only the presentation is inverted). -->
-                    <div class="bay-module">
-                      <input
-                        type="checkbox"
-                        id="hardwareSfxToggle"
-                        class="bay-module-input"
-                        checked
-                        onchange="toggleAudio('robco_hardwaresfx_muted', !this.checked)"
-                      />
-                      <label for="hardwareSfxToggle" class="bay-module-card">
-                        <span class="m-led" aria-hidden="true"></span>
-                        <span class="m-name"
-                          >SERVO CLICK RELAY<span class="m-sub"
-                            >CHIP &amp; BOARD INSTALL/EJECT SFX</span
-                          ></span
-                        >
-                        <span class="m-action" aria-hidden="true"
-                          ><span class="off-txt">INSTALL</span
-                          ><span class="on-txt">REMOVE</span></span
-                        >
-                      </label>
-                    </div>
+                      <div class="bay-module">
+                        <input
+                          type="checkbox"
+                          id="hardwareSfxToggle"
+                          class="bay-module-input"
+                          checked
+                          onchange="toggleAudio('robco_hardwaresfx_muted', !this.checked)"
+                        />
+                        <label for="hardwareSfxToggle" class="bay-module-card">
+                          <span class="m-led" aria-hidden="true"></span>
+                          <span class="m-name"
+                            >SERVO CLICK RELAY<span class="m-sub"
+                              >CHIP &amp; BOARD INSTALL/EJECT SFX</span
+                            ></span
+                          >
+                          <span class="m-action" aria-hidden="true"
+                            ><span class="off-txt">INSTALL</span
+                            ><span class="on-txt">REMOVE</span></span
+                          >
+                        </label>
+                      </div>
 
-                    <div
-                      style="font-size: 10px; opacity: 0.6; letter-spacing: 1px; margin-top: 10px"
-                    >
-                      CHANNEL CHIPS &mdash; PULL A CHIP TO SILENCE ITS CHANNEL:
-                    </div>
-                    <div class="chip-grid" id="chipGrid">
-                      <div class="chip-wrap">
-                        <input
-                          type="checkbox"
-                          id="muteTypingToggle"
-                          class="chip-input"
-                          onchange="toggleAudio('robco_sfx_muted', this.checked)"
-                        />
-                        <label for="muteTypingToggle" class="chip-card"
-                          >TYPING SFX<span class="pin-id">CH-01</span></label
-                        >
-                      </div>
-                      <div class="chip-wrap">
-                        <input
-                          type="checkbox"
-                          id="muteHumToggle"
-                          class="chip-input"
-                          onchange="toggleAudio('robco_hum_muted', this.checked)"
-                        />
-                        <label for="muteHumToggle" class="chip-card"
-                          >CRT HUM<span class="pin-id">CH-02</span></label
-                        >
-                      </div>
-                      <div class="chip-wrap">
-                        <input
-                          type="checkbox"
-                          id="muteGeigerToggle"
-                          class="chip-input"
-                          onchange="toggleAudio('robco_geiger_muted', this.checked)"
-                        />
-                        <label for="muteGeigerToggle" class="chip-card"
-                          >GEIGER CTR<span class="pin-id">CH-03</span></label
-                        >
-                      </div>
-                      <div class="chip-wrap">
-                        <input
-                          type="checkbox"
-                          id="muteTinnitusToggle"
-                          class="chip-input"
-                          onchange="toggleAudio('robco_tinnitus_muted', this.checked)"
-                        />
-                        <label for="muteTinnitusToggle" class="chip-card"
-                          >TINNITUS<span class="pin-id">CH-04</span></label
-                        >
-                      </div>
-                      <div class="chip-wrap">
-                        <input
-                          type="checkbox"
-                          id="muteLimbToggle"
-                          class="chip-input"
-                          onchange="toggleAudio('robco_ambient_muted', this.checked)"
-                        />
-                        <label for="muteLimbToggle" class="chip-card"
-                          >LIMB SFX<span class="pin-id">CH-05</span></label
-                        >
-                      </div>
-                      <div class="chip-wrap">
-                        <input
-                          type="checkbox"
-                          id="muteWakeToggle"
-                          class="chip-input"
-                          onchange="toggleAudio('robco_wake_muted', this.checked)"
-                        />
-                        <label for="muteWakeToggle" class="chip-card"
-                          >WAKE SFX<span class="pin-id">CH-06</span></label
-                        >
-                      </div>
-                      <div class="chip-wrap">
-                        <input
-                          type="checkbox"
-                          id="mutePanelClickToggle"
-                          class="chip-input"
-                          onchange="toggleAudio('robco_panelclick_muted', this.checked)"
-                        />
-                        <label for="mutePanelClickToggle" class="chip-card"
-                          >PANEL CLICKS<span class="pin-id">CH-07</span></label
-                        >
-                      </div>
-                      <div class="chip-wrap">
-                        <input
-                          type="checkbox"
-                          id="muteBootDroneToggle"
-                          class="chip-input"
-                          onchange="toggleAudio('robco_bootdrone_muted', this.checked)"
-                        />
-                        <label for="muteBootDroneToggle" class="chip-card"
-                          >BOOT DRONE<span class="pin-id">CH-08</span></label
-                        >
-                      </div>
-                      <div class="chip-wrap">
-                        <input
-                          type="checkbox"
-                          id="muteLevelUpToggle"
-                          class="chip-input"
-                          onchange="toggleAudio('robco_levelup_muted', this.checked)"
-                        />
-                        <label for="muteLevelUpToggle" class="chip-card"
-                          >LEVEL UP<span class="pin-id">CH-09</span></label
-                        >
-                      </div>
-                      <div class="chip-wrap">
-                        <input
-                          type="checkbox"
-                          id="muteHeartbeatToggle"
-                          class="chip-input"
-                          onchange="toggleAudio('robco_heartbeat_muted', this.checked)"
-                        />
-                        <label for="muteHeartbeatToggle" class="chip-card"
-                          >HEARTBEAT<span class="pin-id">CH-10</span></label
-                        >
-                      </div>
-                      <div class="chip-wrap">
-                        <input
-                          type="checkbox"
-                          id="muteQuestCompleteToggle"
-                          class="chip-input"
-                          onchange="toggleAudio('robco_questcomplete_muted', this.checked)"
-                        />
-                        <label for="muteQuestCompleteToggle" class="chip-card"
-                          >QUEST CMPLT<span class="pin-id">CH-11</span></label
-                        >
-                      </div>
-                      <div class="chip-wrap">
-                        <input
-                          type="checkbox"
-                          id="muteQuestFailToggle"
-                          class="chip-input"
-                          onchange="toggleAudio('robco_questfail_muted', this.checked)"
-                        />
-                        <label for="muteQuestFailToggle" class="chip-card"
-                          >QUEST FAIL<span class="pin-id">CH-12</span></label
-                        >
-                      </div>
-                      <div class="chip-wrap">
-                        <input
-                          type="checkbox"
-                          id="muteFactionThresholdToggle"
-                          class="chip-input"
-                          onchange="toggleAudio('robco_factionthreshold_muted', this.checked)"
-                        />
-                        <label for="muteFactionThresholdToggle" class="chip-card"
-                          >FACTION ALRT<span class="pin-id">CH-13</span></label
-                        >
-                      </div>
-                    </div>
-
-                    <!-- #34 Typewriter Speed Control -->
-                    <div class="bay-trimmer">
-                      <label for="typerSpeedSlider" style="font-size: 12px; white-space: nowrap"
-                        >PRINT-RATE TRIM:</label
+                      <div
+                        style="font-size: 10px; opacity: 0.6; letter-spacing: 1px; margin-top: 10px"
                       >
-                      <input
-                        type="range"
-                        id="typerSpeedSlider"
-                        min="0.25"
-                        max="3"
-                        step="0.25"
-                        value="1"
-                        style="flex: 1; accent-color: var(--robco-green)"
-                        oninput="
-                          MetaStore.set('robco_typer_speed', this.value);
-                          document.getElementById('typerSpeedVal').textContent =
-                            parseFloat(this.value).toFixed(2) + '&#215;';
-                        "
-                      />
-                      <span id="typerSpeedVal" style="font-size: 11px; width: 36px"
-                        >1.00&#215;</span
-                      >
-                    </div>
-                    <p id="sonicStatus" class="board-status"></p>
-                  </details>
-
-                  <!-- SLOT 03 — POWER CELL BAY -->
-                  <details class="sub-panel bay-board" data-sub-id="power_systems" open>
-                    <summary><h3>&gt; SLOT 03 &middot; POWER CELL BAY</h3></summary>
-                    <span class="bay-slot-tag">SLOT 03</span>
-                    <span class="bay-part-no"
-                      >PN RBC-PWR-42 &middot; CELL DOCK + SOLENOID MOUNT</span
-                    >
-
-                    <div class="bay-module">
-                      <input
-                        type="checkbox"
-                        id="wakeLockToggle"
-                        class="bay-module-input"
-                        onchange="toggleWakeLock(this.checked)"
-                      />
-                      <label for="wakeLockToggle" class="bay-module-card">
-                        <span class="cell-graphic" aria-hidden="true"
-                          ><span class="cell-tag">FUSION MK-II</span></span
-                        >
-                        <span class="m-name"
-                          >SUSTAINED POWER CELL<span class="m-sub"
-                            >KEEPS DISPLAY LIT &mdash; SCREEN NEVER SLEEPS</span
-                          ></span
-                        >
-                        <span class="m-action" aria-hidden="true"
-                          ><span class="off-txt">INSTALL</span
-                          ><span class="on-txt">REMOVE</span></span
-                        >
-                      </label>
-                    </div>
-                    <span id="wakeLockStatus" class="board-status"
-                      >&gt; POWER CELL IDLE &mdash; DISPLAY MAY DIM</span
-                    >
-
-                    <div class="bay-module">
-                      <input
-                        type="checkbox"
-                        id="hapticToggle"
-                        class="bay-module-input"
-                        onchange="toggleHaptic(this.checked)"
-                      />
-                      <label for="hapticToggle" class="bay-module-card">
-                        <span class="coil-graphic" aria-hidden="true"></span>
-                        <span class="m-name"
-                          >HAPTIC SOLENOID<span class="m-sub"
-                            >CHASSIS FEEDBACK ON KEY EVENTS</span
-                          ></span
-                        >
-                        <span class="m-action" aria-hidden="true"
-                          ><span class="off-txt">INSTALL</span
-                          ><span class="on-txt">REMOVE</span></span
-                        >
-                      </label>
-                    </div>
-                    <span id="hapticStatus" class="board-status"
-                      >&gt; SOLENOID IDLE &mdash; NO CHASSIS FEEDBACK</span
-                    >
-                  </details>
-
-                  <!-- SLOT 04 — ATMOSPHERIC REGULATOR -->
-                  <details class="sub-panel bay-board" data-sub-id="slot_04_immersion" open>
-                    <summary><h3>&gt; SLOT 04 &middot; ATMOSPHERIC REGULATOR</h3></summary>
-                    <span class="bay-slot-tag">SLOT 04</span>
-                    <span class="bay-part-no"
-                      >PN RBC-ATM-08 &middot; 3-POSITION AMBIENT GOVERNOR</span
-                    >
-
-                    <div
-                      class="immersion-legend"
-                      aria-hidden="true"
-                      style="
-                        display: flex;
-                        gap: 12px;
-                        font-size: 9px;
-                        letter-spacing: 1.5px;
-                        margin-top: 6px;
-                      "
-                    >
-                      <span data-tier="full">FULL</span>
-                      <span data-tier="balanced">BALANCED</span>
-                      <span data-tier="minimal">MINIMAL</span>
-                    </div>
-                    <select
-                      id="immersionSelect"
-                      class="bay-visually-hidden-input"
-                      onchange="onImmersionChange(this.value)"
-                      aria-label="Ambient immersion level — how much atmosphere the terminal runs"
-                    >
-                      <option value="full">Full — all ambient systems</option>
-                      <option value="balanced">Balanced — reduced ambience</option>
-                      <option value="minimal">Minimal — quiet</option>
-                    </select>
-                    <div class="dial-wrap">
-                      <button
-                        type="button"
-                        class="dial"
-                        onclick="_cycleImmersionDial()"
-                        aria-label="Atmospheric regulator dial — cycles Full, Balanced, Minimal ambient levels"
-                      >
-                        <span class="knob" id="immersionDialKnob" aria-hidden="true"></span>
-                      </button>
-                      <div class="dial-info" aria-hidden="true">
-                        <div class="dial-pos" id="immersionDialPos">FULL</div>
-                        <div class="dial-desc" id="immersionDialDesc">
-                          ALL AMBIENT SYSTEMS RUNNING &mdash; IDLE PHOSPHOR, STANDBY BREATHING, CRT
-                          POWER-DOWN, FULL SOUNDSCAPE.
+                        CHANNEL CHIPS &mdash; PULL A CHIP TO SILENCE ITS CHANNEL:
+                      </div>
+                      <div class="chip-grid" id="chipGrid">
+                        <div class="chip-wrap">
+                          <input
+                            type="checkbox"
+                            id="muteTypingToggle"
+                            class="chip-input"
+                            onchange="toggleAudio('robco_sfx_muted', this.checked)"
+                          />
+                          <label for="muteTypingToggle" class="chip-card"
+                            >TYPING SFX<span class="pin-id">CH-01</span></label
+                          >
+                        </div>
+                        <div class="chip-wrap">
+                          <input
+                            type="checkbox"
+                            id="muteHumToggle"
+                            class="chip-input"
+                            onchange="toggleAudio('robco_hum_muted', this.checked)"
+                          />
+                          <label for="muteHumToggle" class="chip-card"
+                            >CRT HUM<span class="pin-id">CH-02</span></label
+                          >
+                        </div>
+                        <div class="chip-wrap">
+                          <input
+                            type="checkbox"
+                            id="muteGeigerToggle"
+                            class="chip-input"
+                            onchange="toggleAudio('robco_geiger_muted', this.checked)"
+                          />
+                          <label for="muteGeigerToggle" class="chip-card"
+                            >GEIGER CTR<span class="pin-id">CH-03</span></label
+                          >
+                        </div>
+                        <div class="chip-wrap">
+                          <input
+                            type="checkbox"
+                            id="muteTinnitusToggle"
+                            class="chip-input"
+                            onchange="toggleAudio('robco_tinnitus_muted', this.checked)"
+                          />
+                          <label for="muteTinnitusToggle" class="chip-card"
+                            >TINNITUS<span class="pin-id">CH-04</span></label
+                          >
+                        </div>
+                        <div class="chip-wrap">
+                          <input
+                            type="checkbox"
+                            id="muteLimbToggle"
+                            class="chip-input"
+                            onchange="toggleAudio('robco_ambient_muted', this.checked)"
+                          />
+                          <label for="muteLimbToggle" class="chip-card"
+                            >LIMB SFX<span class="pin-id">CH-05</span></label
+                          >
+                        </div>
+                        <div class="chip-wrap">
+                          <input
+                            type="checkbox"
+                            id="muteWakeToggle"
+                            class="chip-input"
+                            onchange="toggleAudio('robco_wake_muted', this.checked)"
+                          />
+                          <label for="muteWakeToggle" class="chip-card"
+                            >WAKE SFX<span class="pin-id">CH-06</span></label
+                          >
+                        </div>
+                        <div class="chip-wrap">
+                          <input
+                            type="checkbox"
+                            id="mutePanelClickToggle"
+                            class="chip-input"
+                            onchange="toggleAudio('robco_panelclick_muted', this.checked)"
+                          />
+                          <label for="mutePanelClickToggle" class="chip-card"
+                            >PANEL CLICKS<span class="pin-id">CH-07</span></label
+                          >
+                        </div>
+                        <div class="chip-wrap">
+                          <input
+                            type="checkbox"
+                            id="muteBootDroneToggle"
+                            class="chip-input"
+                            onchange="toggleAudio('robco_bootdrone_muted', this.checked)"
+                          />
+                          <label for="muteBootDroneToggle" class="chip-card"
+                            >BOOT DRONE<span class="pin-id">CH-08</span></label
+                          >
+                        </div>
+                        <div class="chip-wrap">
+                          <input
+                            type="checkbox"
+                            id="muteLevelUpToggle"
+                            class="chip-input"
+                            onchange="toggleAudio('robco_levelup_muted', this.checked)"
+                          />
+                          <label for="muteLevelUpToggle" class="chip-card"
+                            >LEVEL UP<span class="pin-id">CH-09</span></label
+                          >
+                        </div>
+                        <div class="chip-wrap">
+                          <input
+                            type="checkbox"
+                            id="muteHeartbeatToggle"
+                            class="chip-input"
+                            onchange="toggleAudio('robco_heartbeat_muted', this.checked)"
+                          />
+                          <label for="muteHeartbeatToggle" class="chip-card"
+                            >HEARTBEAT<span class="pin-id">CH-10</span></label
+                          >
+                        </div>
+                        <div class="chip-wrap">
+                          <input
+                            type="checkbox"
+                            id="muteQuestCompleteToggle"
+                            class="chip-input"
+                            onchange="toggleAudio('robco_questcomplete_muted', this.checked)"
+                          />
+                          <label for="muteQuestCompleteToggle" class="chip-card"
+                            >QUEST CMPLT<span class="pin-id">CH-11</span></label
+                          >
+                        </div>
+                        <div class="chip-wrap">
+                          <input
+                            type="checkbox"
+                            id="muteQuestFailToggle"
+                            class="chip-input"
+                            onchange="toggleAudio('robco_questfail_muted', this.checked)"
+                          />
+                          <label for="muteQuestFailToggle" class="chip-card"
+                            >QUEST FAIL<span class="pin-id">CH-12</span></label
+                          >
+                        </div>
+                        <div class="chip-wrap">
+                          <input
+                            type="checkbox"
+                            id="muteFactionThresholdToggle"
+                            class="chip-input"
+                            onchange="toggleAudio('robco_factionthreshold_muted', this.checked)"
+                          />
+                          <label for="muteFactionThresholdToggle" class="chip-card"
+                            >FACTION ALRT<span class="pin-id">CH-13</span></label
+                          >
                         </div>
                       </div>
-                    </div>
-                    <span id="immersionStatus" class="board-status"></span>
-                  </details>
 
-                  <!-- SLOT 05 — AI UPLINK CO-PROCESSOR (amber identity kept, LOCKED-4) -->
-                  <details class="sub-panel bay-board uplink" data-sub-id="slot_05_uplink" open>
-                    <summary>
-                      <h3 style="color: var(--robco-alert)">
-                        &gt; SLOT 05 &middot; AI UPLINK CO-PROCESSOR
-                      </h3>
-                    </summary>
-                    <span class="bay-slot-tag">SLOT 05</span>
-                    <span class="bay-part-no"
-                      >PN RBC-AI-50 &middot; CIPHER KEY REQUIRED &middot; EXTERNAL CARRIER</span
-                    >
-
-                    <div class="key-slot-label">
-                      CIPHER KEY SLOT &mdash; INSERT AUTHORIZATION KEY:
-                    </div>
-                    <div class="key-slot">
-                      <input
-                        type="password"
-                        id="apiKeyInput"
-                        placeholder="PASTE GEMINI KEY HERE…"
-                        maxlength="200"
-                        style="border-color: var(--robco-alert); color: var(--robco-alert)"
-                        oninput="saveApiKeySilent()"
-                      />
-                      <button
-                        id="btnFetchModels"
-                        class="hs-btn alert-btn"
-                        onclick="fetchAuthorizedModels()"
-                      >
-                        HANDSHAKE
-                      </button>
-                    </div>
-                    <div style="margin: 6px 0 4px; font-size: 11px">
-                      <a
-                        href="https://aistudio.google.com/app/apikey"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style="color: var(--robco-alert); opacity: 0.75; text-decoration: none"
-                        >&gt; GET A FREE GEMINI KEY</a
-                      >
-                    </div>
-
-                    <div class="jumper-wrap">
-                      <input
-                        type="checkbox"
-                        id="geminiKeySyncToggle"
-                        class="jumper-input"
-                        onchange="
-                          if (window.setGeminiKeySync) window.setGeminiKeySync(this.checked);
-                        "
-                      />
-                      <label for="geminiKeySyncToggle" class="jumper-card">
-                        <span class="j-track" aria-hidden="true"></span>
-                        <span class="j-label"
-                          >KEY-SYNC JUMPER &mdash; sync my Gemini key to my account (follows me
-                          across devices)</span
+                      <!-- #34 Typewriter Speed Control -->
+                      <div class="bay-trimmer">
+                        <label for="typerSpeedSlider" style="font-size: 12px; white-space: nowrap"
+                          >PRINT-RATE TRIM:</label
                         >
-                      </label>
-                    </div>
+                        <input
+                          type="range"
+                          id="typerSpeedSlider"
+                          min="0.25"
+                          max="3"
+                          step="0.25"
+                          value="1"
+                          style="flex: 1; accent-color: var(--robco-green)"
+                          oninput="
+                            MetaStore.set('robco_typer_speed', this.value);
+                            document.getElementById('typerSpeedVal').textContent =
+                              parseFloat(this.value).toFixed(2) + '&#215;';
+                          "
+                        />
+                        <span id="typerSpeedVal" style="font-size: 11px; width: 36px"
+                          >1.00&#215;</span
+                        >
+                      </div>
+                      <p id="sonicStatus" class="board-status"></p>
+                    </details>
 
-                    <select
-                      id="apiModelInput"
-                      style="
-                        width: 100%;
-                        margin-top: 8px;
-                        border-color: var(--robco-alert);
-                        background: rgba(0, 0, 0, 0.8);
-                        color: var(--robco-alert);
-                      "
-                      onchange="saveApiKeySilent()"
-                    >
-                      <option value="gemini-1.5-flash">Awaiting Server Link...</option>
-                    </select>
-                    <p class="board-status alert">
-                      &gt; NO CARRIER &mdash; TERMINAL FULLY OPERATIONAL OFFLINE
-                    </p>
-                  </details>
-
-                  <!-- SVC TRAY — field-service utilities, not slotted hardware -->
-                  <details class="sub-panel bay-board tray span2" data-sub-id="slot_svc_tray" open>
-                    <summary><h3>&gt; SVC TRAY &middot; MAINTENANCE TOOLS</h3></summary>
-                    <span class="bay-slot-tag">SVC TRAY</span>
-                    <span class="bay-part-no"
-                      >FIELD SERVICE UTILITIES &mdash; NOT SLOTTED HARDWARE</span
-                    >
-                    <div class="bay-tools">
-                      <button
-                        id="ejectHolotapeBtn"
-                        onclick="ejectHolotape()"
-                        aria-label="Eject holotape transcript to the device share sheet"
+                    <!-- SLOT 03 — POWER CELL BAY -->
+                    <details class="sub-panel bay-board" data-sub-id="power_systems" open>
+                      <summary><h3>&gt; SLOT 03 &middot; POWER CELL BAY</h3></summary>
+                      <span class="bay-slot-tag">SLOT 03</span>
+                      <span class="bay-part-no"
+                        >PN RBC-PWR-42 &middot; CELL DOCK + SOLENOID MOUNT</span
                       >
-                        &#9654; EJECT HOLOTAPE
-                      </button>
-                      <button onclick="_svcExportCampaignLog('txt')">
-                        &#9113; PRINT CAMPAIGN LOG
-                      </button>
-                      <button onclick="_svcExportCampaignLog('md')">&#9113; EXPORT .MD</button>
-                      <button onclick="_svcExportCampaignLog('html')">&#9113; EXPORT .HTML</button>
-                      <button id="btnViewChangelog" onclick="_svcViewChangelog()">
-                        &#8801; FIRMWARE REVISION LOG
-                      </button>
-                      <button id="btnInstallPwa" style="display: none" onclick="_svcInstallPwa()">
-                        &#9660; INSTALL SYSTEM (APP)
-                      </button>
-                    </div>
-                    <p class="board-status">
-                      &gt; SAVE ARCHIVE &amp; ACCOUNT REMAIN IN THEIR OWN PANELS &mdash; ONLY DEVICE
-                      HARDWARE LIVES IN THE BAY
-                    </p>
-                  </details>
+
+                      <div class="bay-module">
+                        <input
+                          type="checkbox"
+                          id="wakeLockToggle"
+                          class="bay-module-input"
+                          onchange="toggleWakeLock(this.checked)"
+                        />
+                        <label for="wakeLockToggle" class="bay-module-card">
+                          <span class="cell-graphic" aria-hidden="true"
+                            ><span class="cell-tag">FUSION MK-II</span></span
+                          >
+                          <span class="m-name"
+                            >SUSTAINED POWER CELL<span class="m-sub"
+                              >KEEPS DISPLAY LIT &mdash; SCREEN NEVER SLEEPS</span
+                            ></span
+                          >
+                          <span class="m-action" aria-hidden="true"
+                            ><span class="off-txt">INSTALL</span
+                            ><span class="on-txt">REMOVE</span></span
+                          >
+                        </label>
+                      </div>
+                      <span id="wakeLockStatus" class="board-status"
+                        >&gt; POWER CELL IDLE &mdash; DISPLAY MAY DIM</span
+                      >
+
+                      <div class="bay-module">
+                        <input
+                          type="checkbox"
+                          id="hapticToggle"
+                          class="bay-module-input"
+                          onchange="toggleHaptic(this.checked)"
+                        />
+                        <label for="hapticToggle" class="bay-module-card">
+                          <span class="coil-graphic" aria-hidden="true"></span>
+                          <span class="m-name"
+                            >HAPTIC SOLENOID<span class="m-sub"
+                              >CHASSIS FEEDBACK ON KEY EVENTS</span
+                            ></span
+                          >
+                          <span class="m-action" aria-hidden="true"
+                            ><span class="off-txt">INSTALL</span
+                            ><span class="on-txt">REMOVE</span></span
+                          >
+                        </label>
+                      </div>
+                      <span id="hapticStatus" class="board-status"
+                        >&gt; SOLENOID IDLE &mdash; NO CHASSIS FEEDBACK</span
+                      >
+                    </details>
+
+                    <!-- SLOT 04 — ATMOSPHERIC REGULATOR -->
+                    <details class="sub-panel bay-board" data-sub-id="slot_04_immersion" open>
+                      <summary><h3>&gt; SLOT 04 &middot; ATMOSPHERIC REGULATOR</h3></summary>
+                      <span class="bay-slot-tag">SLOT 04</span>
+                      <span class="bay-part-no"
+                        >PN RBC-ATM-08 &middot; 3-POSITION AMBIENT GOVERNOR</span
+                      >
+
+                      <div
+                        class="immersion-legend"
+                        aria-hidden="true"
+                        style="
+                          display: flex;
+                          gap: 12px;
+                          font-size: 9px;
+                          letter-spacing: 1.5px;
+                          margin-top: 6px;
+                        "
+                      >
+                        <span data-tier="full">FULL</span>
+                        <span data-tier="balanced">BALANCED</span>
+                        <span data-tier="minimal">MINIMAL</span>
+                      </div>
+                      <select
+                        id="immersionSelect"
+                        class="bay-visually-hidden-input"
+                        onchange="onImmersionChange(this.value)"
+                        aria-label="Ambient immersion level — how much atmosphere the terminal runs"
+                      >
+                        <option value="full">Full — all ambient systems</option>
+                        <option value="balanced">Balanced — reduced ambience</option>
+                        <option value="minimal">Minimal — quiet</option>
+                      </select>
+                      <div class="dial-wrap">
+                        <button
+                          type="button"
+                          class="dial"
+                          onclick="_cycleImmersionDial()"
+                          aria-label="Atmospheric regulator dial — cycles Full, Balanced, Minimal ambient levels"
+                        >
+                          <span class="knob" id="immersionDialKnob" aria-hidden="true"></span>
+                        </button>
+                        <div class="dial-info" aria-hidden="true">
+                          <div class="dial-pos" id="immersionDialPos">FULL</div>
+                          <div class="dial-desc" id="immersionDialDesc">
+                            ALL AMBIENT SYSTEMS RUNNING &mdash; IDLE PHOSPHOR, STANDBY BREATHING,
+                            CRT POWER-DOWN, FULL SOUNDSCAPE.
+                          </div>
+                        </div>
+                      </div>
+                      <span id="immersionStatus" class="board-status"></span>
+                    </details>
+
+                    <!-- SLOT 05 — AI UPLINK CO-PROCESSOR (amber identity kept, LOCKED-4) -->
+                    <details class="sub-panel bay-board uplink" data-sub-id="slot_05_uplink" open>
+                      <summary>
+                        <h3 style="color: var(--robco-alert)">
+                          &gt; SLOT 05 &middot; AI UPLINK CO-PROCESSOR
+                        </h3>
+                      </summary>
+                      <span class="bay-slot-tag">SLOT 05</span>
+                      <span class="bay-part-no"
+                        >PN RBC-AI-50 &middot; CIPHER KEY REQUIRED &middot; EXTERNAL CARRIER</span
+                      >
+
+                      <div class="key-slot-label">
+                        CIPHER KEY SLOT &mdash; INSERT AUTHORIZATION KEY:
+                      </div>
+                      <div class="key-slot">
+                        <input
+                          type="password"
+                          id="apiKeyInput"
+                          placeholder="PASTE GEMINI KEY HERE…"
+                          maxlength="200"
+                          style="border-color: var(--robco-alert); color: var(--robco-alert)"
+                          oninput="saveApiKeySilent()"
+                        />
+                        <button
+                          id="btnFetchModels"
+                          class="hs-btn alert-btn"
+                          onclick="fetchAuthorizedModels()"
+                        >
+                          HANDSHAKE
+                        </button>
+                      </div>
+                      <div style="margin: 6px 0 4px; font-size: 11px">
+                        <a
+                          href="https://aistudio.google.com/app/apikey"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style="color: var(--robco-alert); opacity: 0.75; text-decoration: none"
+                          >&gt; GET A FREE GEMINI KEY</a
+                        >
+                      </div>
+
+                      <div class="jumper-wrap">
+                        <input
+                          type="checkbox"
+                          id="geminiKeySyncToggle"
+                          class="jumper-input"
+                          onchange="
+                            if (window.setGeminiKeySync) window.setGeminiKeySync(this.checked);
+                          "
+                        />
+                        <label for="geminiKeySyncToggle" class="jumper-card">
+                          <span class="j-track" aria-hidden="true"></span>
+                          <span class="j-label"
+                            >KEY-SYNC JUMPER &mdash; sync my Gemini key to my account (follows me
+                            across devices)</span
+                          >
+                        </label>
+                      </div>
+
+                      <select
+                        id="apiModelInput"
+                        style="
+                          width: 100%;
+                          margin-top: 8px;
+                          border-color: var(--robco-alert);
+                          background: rgba(0, 0, 0, 0.8);
+                          color: var(--robco-alert);
+                        "
+                        onchange="saveApiKeySilent()"
+                      >
+                        <option value="gemini-1.5-flash">Awaiting Server Link...</option>
+                      </select>
+                      <p class="board-status alert">
+                        &gt; NO CARRIER &mdash; TERMINAL FULLY OPERATIONAL OFFLINE
+                      </p>
+                    </details>
+
+                    <!-- SVC TRAY — field-service utilities, not slotted hardware -->
+                    <details
+                      class="sub-panel bay-board tray span2"
+                      data-sub-id="slot_svc_tray"
+                      open
+                    >
+                      <summary><h3>&gt; SVC TRAY &middot; MAINTENANCE TOOLS</h3></summary>
+                      <span class="bay-slot-tag">SVC TRAY</span>
+                      <span class="bay-part-no"
+                        >FIELD SERVICE UTILITIES &mdash; NOT SLOTTED HARDWARE</span
+                      >
+                      <div class="bay-tools">
+                        <button
+                          id="ejectHolotapeBtn"
+                          onclick="ejectHolotape()"
+                          aria-label="Eject holotape transcript to the device share sheet"
+                        >
+                          &#9654; EJECT HOLOTAPE
+                        </button>
+                        <button onclick="_svcExportCampaignLog('txt')">
+                          &#9113; PRINT CAMPAIGN LOG
+                        </button>
+                        <button onclick="_svcExportCampaignLog('md')">&#9113; EXPORT .MD</button>
+                        <button onclick="_svcExportCampaignLog('html')">
+                          &#9113; EXPORT .HTML
+                        </button>
+                        <button id="btnViewChangelog" onclick="_svcViewChangelog()">
+                          &#8801; FIRMWARE REVISION LOG
+                        </button>
+                        <button id="btnInstallPwa" style="display: none" onclick="_svcInstallPwa()">
+                          &#9660; INSTALL SYSTEM (APP)
+                        </button>
+                      </div>
+                      <p class="board-status">
+                        &gt; SAVE ARCHIVE &amp; ACCOUNT REMAIN IN THEIR OWN PANELS &mdash; ONLY
+                        DEVICE HARDWARE LIVES IN THE BAY
+                      </p>
+                    </details>
+                  </div>
+
+                  <div class="bay-svc-log" aria-live="polite">
+                    <div class="log-title">&mdash; SERVICE LOG &mdash;</div>
+                    <div id="baySvcLogBody"></div>
+                  </div>
                 </div>
 
-                <div class="bay-svc-log" aria-live="polite">
-                  <div class="log-title">&mdash; SERVICE LOG &mdash;</div>
-                  <div id="baySvcLogBody"></div>
+                <!-- Schematic View — permanent light-touch fallback (regenerated from state, never a parallel wired set) -->
+                <div id="baySchematic" class="bay-schematic" hidden>
+                  <h3>&#8981; SCHEMATIC VIEW</h3>
+                  <div class="schem-note">
+                    EVERY MODULE AS A FLAT LIST &mdash; SAME CONTROLS, SAME SETTINGS, NO HARDWARE
+                    FICTION.
+                  </div>
+                  <div id="baySchematicList"></div>
+                  <button
+                    type="button"
+                    class="action-btn"
+                    onclick="toggleBaySchematic()"
+                    style="margin-top: 10px"
+                  >
+                    &#9650; BACK TO BAY VIEW
+                  </button>
                 </div>
               </div>
 
-              <!-- Schematic View — permanent light-touch fallback (regenerated from state, never a parallel wired set) -->
-              <div id="baySchematic" class="bay-schematic" hidden>
-                <h3>&#8981; SCHEMATIC VIEW</h3>
-                <div class="schem-note">
-                  EVERY MODULE AS A FLAT LIST &mdash; SAME CONTROLS, SAME SETTINGS, NO HARDWARE
-                  FICTION.
-                </div>
-                <div id="baySchematicList"></div>
-                <button
-                  type="button"
-                  class="action-btn"
-                  onclick="toggleBaySchematic()"
-                  style="margin-top: 10px"
+              <div
+                class="input-group"
+                style="
+                  margin-top: 15px;
+                  border-top: 1px dashed var(--robco-blue);
+                  padding-top: 10px;
+                "
+              >
+                <div
+                  style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 5px;
+                  "
                 >
-                  &#9650; BACK TO BAY VIEW
+                  <div style="font-size: 10px; opacity: 0.55; letter-spacing: 1px">ALL SAVES</div>
+                  <button
+                    class="action-btn btn-sm"
+                    onclick="showSaveHelpModal()"
+                    aria-label="Open save menu help"
+                    title="Save menu help"
+                    style="border-color: var(--robco-blue); color: var(--robco-blue)"
+                  >
+                    [?]
+                  </button>
+                </div>
+                <div id="savesListBody" style="font-size: 12px; margin-bottom: 4px"></div>
+                <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px">
+                  <button
+                    id="btnSaveToCloud"
+                    class="action-btn"
+                    style="
+                      font-size: 10px;
+                      border-color: var(--robco-blue);
+                      color: var(--robco-blue);
+                      display: none;
+                    "
+                    onclick="if (window.saveCurrentToCloud) window.saveCurrentToCloud();"
+                  >
+                    SAVE TO CLOUD
+                  </button>
+                  <button
+                    id="btnSyncSlotsToCloud"
+                    class="action-btn"
+                    style="
+                      font-size: 11px;
+                      border-color: var(--robco-blue);
+                      color: var(--robco-blue);
+                      display: none;
+                    "
+                    onclick="if (window.syncLocalSavesToCloud) window.syncLocalSavesToCloud();"
+                  >
+                    &gt; SYNC LOCAL SLOTS &rarr; CLOUD
+                  </button>
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 10px; margin-top: 10px">
+                <button class="action-btn" onclick="exportSaveFile()" style="font-size: 11px">
+                  > EXPORT SAVE
+                </button>
+                <button class="action-btn" onclick="triggerFileInput()" style="font-size: 11px">
+                  > IMPORT SAVE
+                </button>
+                <button
+                  class="action-btn"
+                  onclick="restoreRollingBackup()"
+                  style="
+                    font-size: 11px;
+                    border-color: var(--robco-alert);
+                    color: var(--robco-alert);
+                  "
+                >
+                  > RESTORE BACKUP
                 </button>
               </div>
-            </div>
+              <div style="display: flex; gap: 10px; margin-top: 6px">
+                <button
+                  class="action-btn"
+                  onclick="exportFullBundle()"
+                  style="font-size: 11px"
+                  aria-label="Export your entire history — all save slots, version history, and live campaign — as one backup file"
+                >
+                  > EXPORT FULL BACKUP
+                </button>
+              </div>
+              <div style="font-size: 9px; opacity: 0.5; margin-top: 4px">
+                Exports your whole history in one file. IMPORT SAVE restores either a single save or
+                a full backup.
+              </div>
+              <!-- #6 Multiple Save Slots -->
+              <div
+                style="margin-top: 8px; border-top: 1px dashed var(--robco-alert); padding-top: 8px"
+              >
+                <div
+                  style="
+                    font-size: 10px;
+                    color: var(--robco-alert);
+                    margin-bottom: 5px;
+                    letter-spacing: 1px;
+                  "
+                >
+                  SAVE SLOTS
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px">
+                  <button
+                    class="action-btn"
+                    style="
+                      font-size: 10px;
+                      border-color: var(--robco-alert);
+                      color: var(--robco-alert);
+                    "
+                    onclick="saveToSlot(1)"
+                  >
+                    SAVE A
+                  </button>
+                  <button
+                    class="action-btn"
+                    style="
+                      font-size: 10px;
+                      border-color: var(--robco-alert);
+                      color: var(--robco-alert);
+                    "
+                    onclick="saveToSlot(2)"
+                  >
+                    SAVE B
+                  </button>
+                  <button
+                    class="action-btn"
+                    style="
+                      font-size: 10px;
+                      border-color: var(--robco-alert);
+                      color: var(--robco-alert);
+                    "
+                    onclick="saveToSlot(3)"
+                  >
+                    SAVE C
+                  </button>
+                  <button class="action-btn" style="font-size: 10px" onclick="loadFromSlot(1)">
+                    LOAD A
+                  </button>
+                  <button class="action-btn" style="font-size: 10px" onclick="loadFromSlot(2)">
+                    LOAD B
+                  </button>
+                  <button class="action-btn" style="font-size: 10px" onclick="loadFromSlot(3)">
+                    LOAD C
+                  </button>
+                </div>
+                <div id="slotStatus" style="font-size: 9px; opacity: 0.55; margin-top: 4px"></div>
+              </div>
+              <input
+                type="file"
+                id="fileInput"
+                style="display: none"
+                accept=".json"
+                onchange="handleFileUpload(event)"
+              />
+            </details>
+          </div>
 
-            <div
-              class="input-group"
-              style="margin-top: 15px; border-top: 1px dashed var(--robco-blue); padding-top: 10px"
-            >
+          <div class="col-right">
+            <div class="panel chat-panel" style="border-color: var(--robco-blue)">
               <div
                 style="
                   display: flex;
                   justify-content: space-between;
                   align-items: center;
-                  margin-bottom: 5px;
+                  border-bottom: 1px solid var(--robco-blue);
+                  padding-bottom: 4px;
                 "
               >
-                <div style="font-size: 10px; opacity: 0.55; letter-spacing: 1px">ALL SAVES</div>
+                <h2 style="border: none; margin: 0; padding: 0; color: var(--robco-blue)">
+                  > ROBCO COMM-LINK
+                </h2>
                 <button
+                  onclick="clearChat()"
                   class="action-btn btn-sm"
-                  onclick="showSaveHelpModal()"
-                  aria-label="Open save menu help"
-                  title="Save menu help"
                   style="border-color: var(--robco-blue); color: var(--robco-blue)"
                 >
-                  [?]
+                  [ PURGE LOGS ]
                 </button>
               </div>
-              <div id="savesListBody" style="font-size: 12px; margin-bottom: 4px"></div>
-              <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px">
-                <button
-                  id="btnSaveToCloud"
-                  class="action-btn"
-                  style="
-                    font-size: 10px;
-                    border-color: var(--robco-blue);
-                    color: var(--robco-blue);
-                    display: none;
-                  "
-                  onclick="if (window.saveCurrentToCloud) window.saveCurrentToCloud();"
-                >
-                  SAVE TO CLOUD
-                </button>
-                <button
-                  id="btnSyncSlotsToCloud"
-                  class="action-btn"
-                  style="
-                    font-size: 11px;
-                    border-color: var(--robco-blue);
-                    color: var(--robco-blue);
-                    display: none;
-                  "
-                  onclick="if (window.syncLocalSavesToCloud) window.syncLocalSavesToCloud();"
-                >
-                  &gt; SYNC LOCAL SLOTS &rarr; CLOUD
-                </button>
-              </div>
-            </div>
 
-            <div style="display: flex; gap: 10px; margin-top: 10px">
-              <button class="action-btn" onclick="exportSaveFile()" style="font-size: 11px">
-                > EXPORT SAVE
-              </button>
-              <button class="action-btn" onclick="triggerFileInput()" style="font-size: 11px">
-                > IMPORT SAVE
-              </button>
-              <button
-                class="action-btn"
-                onclick="restoreRollingBackup()"
-                style="font-size: 11px; border-color: var(--robco-alert); color: var(--robco-alert)"
-              >
-                > RESTORE BACKUP
-              </button>
-            </div>
-            <div style="display: flex; gap: 10px; margin-top: 6px">
-              <button
-                class="action-btn"
-                onclick="exportFullBundle()"
-                style="font-size: 11px"
-                aria-label="Export your entire history — all save slots, version history, and live campaign — as one backup file"
-              >
-                > EXPORT FULL BACKUP
-              </button>
-            </div>
-            <div style="font-size: 9px; opacity: 0.5; margin-top: 4px">
-              Exports your whole history in one file. IMPORT SAVE restores either a single save or a
-              full backup.
-            </div>
-            <!-- #6 Multiple Save Slots -->
-            <div
-              style="margin-top: 8px; border-top: 1px dashed var(--robco-alert); padding-top: 8px"
-            >
               <div
-                style="
-                  font-size: 10px;
-                  color: var(--robco-alert);
-                  margin-bottom: 5px;
-                  letter-spacing: 1px;
-                "
-              >
-                SAVE SLOTS
-              </div>
-              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px">
-                <button
-                  class="action-btn"
-                  style="
-                    font-size: 10px;
-                    border-color: var(--robco-alert);
-                    color: var(--robco-alert);
-                  "
-                  onclick="saveToSlot(1)"
-                >
-                  SAVE A
-                </button>
-                <button
-                  class="action-btn"
-                  style="
-                    font-size: 10px;
-                    border-color: var(--robco-alert);
-                    color: var(--robco-alert);
-                  "
-                  onclick="saveToSlot(2)"
-                >
-                  SAVE B
-                </button>
-                <button
-                  class="action-btn"
-                  style="
-                    font-size: 10px;
-                    border-color: var(--robco-alert);
-                    color: var(--robco-alert);
-                  "
-                  onclick="saveToSlot(3)"
-                >
-                  SAVE C
-                </button>
-                <button class="action-btn" style="font-size: 10px" onclick="loadFromSlot(1)">
-                  LOAD A
-                </button>
-                <button class="action-btn" style="font-size: 10px" onclick="loadFromSlot(2)">
-                  LOAD B
-                </button>
-                <button class="action-btn" style="font-size: 10px" onclick="loadFromSlot(3)">
-                  LOAD C
-                </button>
-              </div>
-              <div id="slotStatus" style="font-size: 9px; opacity: 0.55; margin-top: 4px"></div>
-            </div>
-            <input
-              type="file"
-              id="fileInput"
-              style="display: none"
-              accept=".json"
-              onchange="handleFileUpload(event)"
-            />
-          </details>
-        </div>
-
-        <div class="col-right">
-          <div class="panel chat-panel" style="border-color: var(--robco-blue)">
-            <div
-              style="
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                border-bottom: 1px solid var(--robco-blue);
-                padding-bottom: 4px;
-              "
-            >
-              <h2 style="border: none; margin: 0; padding: 0; color: var(--robco-blue)">
-                > ROBCO COMM-LINK
-              </h2>
-              <button
-                onclick="clearChat()"
-                class="action-btn btn-sm"
-                style="border-color: var(--robco-blue); color: var(--robco-blue)"
-              >
-                [ PURGE LOGS ]
-              </button>
-            </div>
-
-            <div
-              id="chatDisplay"
-              aria-live="polite"
-              aria-atomic="false"
-              style="margin-top: 10px"
-            ></div>
-
-            <div style="display: flex; flex-direction: column; align-items: center; width: 100%">
-              <div
-                id="imagePreviewContainer"
-                style="position: relative; display: inline-block; width: 100%; text-align: center"
-              >
-                <img id="imagePreview" class="image-preview" src="" alt="Preview" />
-              </div>
-              <button
-                onclick="triggerImageUpload()"
-                class="action-btn"
-                style="
-                  width: 100%;
-                  margin-top: 0;
-                  margin-bottom: 5px;
-                  border-style: dashed;
-                  color: var(--robco-blue);
-                  border-color: var(--robco-blue);
-                "
-              >
-                [ > VISUAL UPLOAD ]
-              </button>
-            </div>
-            <input
-              type="file"
-              id="imageInput"
-              style="display: none"
-              accept="image/*"
-              onchange="handleImageSelection(event)"
-            />
-
-            <textarea
-              id="chatInput"
-              maxlength="4000"
-              placeholder="ENTER COMMAND OR ACTION (E.G. '> [THREAT] GECKOS')…"
-              style="border-color: var(--robco-blue); color: var(--robco-blue)"
-              onkeydown="
-                if (event.ctrlKey && event.key === 'Enter') {
-                  event.preventDefault();
-                  submitCommandInput();
-                }
-              "
-              oninput="updateTokenBudget()"
-            ></textarea>
-            <div id="modeHintPopup" class="mode-hint" style="display: none"></div>
-            <div
-              style="
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                margin-top: 2px;
-                margin-bottom: 2px;
-              "
-            >
-              <div style="display: flex; align-items: center; gap: 4px">
-                <button
-                  id="modePill"
-                  class="action-btn btn-sm mode-pill mode-pill--overseer"
-                  onclick="toggleInputMode()"
-                  aria-label="Command input mode: OVERSEER. Tap to switch to TERMINAL."
-                >
-                  OVERSEER
-                </button>
-                <button class="action-btn btn-sm" onclick="showHelpModal()">[?]</button>
-              </div>
-              <div
-                id="tokenBudgetDisplay"
-                style="font-size: 9px; opacity: 0.5; color: var(--robco-blue); text-align: right"
+                id="chatDisplay"
+                aria-live="polite"
+                aria-atomic="false"
+                style="margin-top: 10px"
               ></div>
-            </div>
 
-            <div class="tactical-dashboard">
-              <details style="align-self: start; grid-area: dpad" open>
-                <summary
-                  class="config-summary"
-                  style="
-                    font-size: 11px;
-                    margin-bottom: 5px;
-                    color: var(--robco-blue);
-                    border-bottom: 1px dashed var(--robco-blue);
-                    padding-bottom: 2px;
-                  "
+              <div style="display: flex; flex-direction: column; align-items: center; width: 100%">
+                <div
+                  id="imagePreviewContainer"
+                  style="position: relative; display: inline-block; width: 100%; text-align: center"
                 >
-                  D-PAD
-                </summary>
-                <div class="d-pad" style="margin-right: 15px">
-                  <button class="action-btn" onclick="macroCommand('[PAD: UP]')">▲</button>
-                  <div class="d-pad-row">
-                    <button class="action-btn" onclick="macroCommand('[PAD: LEFT]')">◄</button>
-                    <button class="action-btn" onclick="macroCommand('[PAD: RIGHT]')">►</button>
-                  </div>
-                  <button class="action-btn" onclick="macroCommand('[PAD: DOWN]')">▼</button>
+                  <img id="imagePreview" class="image-preview" src="" alt="Preview" />
                 </div>
-              </details>
-              <div class="macro-actions" style="grid-area: input">
-                <input
-                  type="text"
-                  id="macroTarget"
-                  placeholder="TARGET / ITEM…"
+                <button
+                  onclick="triggerImageUpload()"
+                  class="action-btn"
                   style="
-                    border-color: var(--robco-blue);
-                    color: var(--robco-blue);
                     width: 100%;
+                    margin-top: 0;
                     margin-bottom: 5px;
-                  "
-                />
-              </div>
-              <div
-                class="macro-buttons"
-                style="grid-area: buttons; display: grid; grid-template-columns: 1fr 1fr; gap: 5px"
-              >
-                <button
-                  class="action-btn"
-                  style="margin: 0; color: var(--robco-blue); border-color: var(--robco-blue)"
-                  onclick="macroCommand('[THREAT]')"
-                >
-                  [THREAT]
-                </button>
-                <button
-                  class="action-btn"
-                  style="margin: 0; color: var(--robco-blue); border-color: var(--robco-blue)"
-                  onclick="macroCommand('[VATS SIM]')"
-                >
-                  [VATS]
-                </button>
-                <button
-                  class="action-btn"
-                  style="margin: 0; color: var(--robco-green); border-color: var(--robco-green)"
-                  onclick="expandPanelForCategory('trade')"
-                  aria-label="Open the native barter terminal"
-                >
-                  [TRADE]
-                </button>
-                <button
-                  class="action-btn"
-                  style="margin: 0; color: var(--robco-green); border-color: var(--robco-green)"
-                  onclick="renderLoot()"
-                  aria-label="Open the native salvage / loot terminal"
-                >
-                  [LOOT]
-                </button>
-                <button
-                  class="action-btn"
-                  id="consultBtn"
-                  style="
-                    margin: 0;
-                    color: var(--robco-green);
-                    border-color: var(--robco-green);
-                    grid-column: 1 / -1;
-                  "
-                  onclick="macroCommand('[CONSULT]')"
-                  aria-label="Look up a topic in the databank — enter a topic in the field above, then tap CONSULT"
-                >
-                  [CONSULT]
-                </button>
-                <button
-                  class="action-btn"
-                  id="vatsCalcBtn"
-                  style="
-                    margin: 0;
-                    color: var(--robco-green);
-                    border-color: var(--robco-green);
-                    grid-column: 1 / -1;
-                    font-size: 10px;
-                    letter-spacing: 1.5px;
-                  "
-                  onclick="showVATSOverlay()"
-                >
-                  V.A.T.S. CALCULATOR
-                </button>
-                <button
-                  class="action-btn"
-                  id="termlinkBtn"
-                  style="
-                    margin: 0;
+                    border-style: dashed;
                     color: var(--robco-blue);
                     border-color: var(--robco-blue);
-                    grid-column: 1 / -1;
-                    font-size: 10px;
-                    letter-spacing: 1.5px;
                   "
-                  onclick="macroCommand('[TERMLINK]')"
-                  aria-label="Open the TERMLINK command console — launch any offline subsystem"
                 >
-                  &gt; TERMLINK CONSOLE
+                  [ > VISUAL UPLOAD ]
                 </button>
               </div>
+              <input
+                type="file"
+                id="imageInput"
+                style="display: none"
+                accept="image/*"
+                onchange="handleImageSelection(event)"
+              />
+
+              <textarea
+                id="chatInput"
+                maxlength="4000"
+                placeholder="ENTER COMMAND OR ACTION (E.G. '> [THREAT] GECKOS')…"
+                style="border-color: var(--robco-blue); color: var(--robco-blue)"
+                onkeydown="
+                  if (event.ctrlKey && event.key === 'Enter') {
+                    event.preventDefault();
+                    submitCommandInput();
+                  }
+                "
+                oninput="updateTokenBudget()"
+              ></textarea>
+              <div id="modeHintPopup" class="mode-hint" style="display: none"></div>
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  margin-top: 2px;
+                  margin-bottom: 2px;
+                "
+              >
+                <div style="display: flex; align-items: center; gap: 4px">
+                  <button
+                    id="modePill"
+                    class="action-btn btn-sm mode-pill mode-pill--overseer"
+                    onclick="toggleInputMode()"
+                    aria-label="Command input mode: OVERSEER. Tap to switch to TERMINAL."
+                  >
+                    OVERSEER
+                  </button>
+                  <button class="action-btn btn-sm" onclick="showHelpModal()">[?]</button>
+                </div>
+                <div
+                  id="tokenBudgetDisplay"
+                  style="font-size: 9px; opacity: 0.5; color: var(--robco-blue); text-align: right"
+                ></div>
+              </div>
+
+              <div class="tactical-dashboard">
+                <details style="align-self: start; grid-area: dpad" open>
+                  <summary
+                    class="config-summary"
+                    style="
+                      font-size: 11px;
+                      margin-bottom: 5px;
+                      color: var(--robco-blue);
+                      border-bottom: 1px dashed var(--robco-blue);
+                      padding-bottom: 2px;
+                    "
+                  >
+                    D-PAD
+                  </summary>
+                  <div class="d-pad" style="margin-right: 15px">
+                    <button class="action-btn" onclick="macroCommand('[PAD: UP]')">▲</button>
+                    <div class="d-pad-row">
+                      <button class="action-btn" onclick="macroCommand('[PAD: LEFT]')">◄</button>
+                      <button class="action-btn" onclick="macroCommand('[PAD: RIGHT]')">►</button>
+                    </div>
+                    <button class="action-btn" onclick="macroCommand('[PAD: DOWN]')">▼</button>
+                  </div>
+                </details>
+                <div class="macro-actions" style="grid-area: input">
+                  <input
+                    type="text"
+                    id="macroTarget"
+                    placeholder="TARGET / ITEM…"
+                    style="
+                      border-color: var(--robco-blue);
+                      color: var(--robco-blue);
+                      width: 100%;
+                      margin-bottom: 5px;
+                    "
+                  />
+                </div>
+                <div
+                  class="macro-buttons"
+                  style="
+                    grid-area: buttons;
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 5px;
+                  "
+                >
+                  <button
+                    class="action-btn"
+                    style="margin: 0; color: var(--robco-blue); border-color: var(--robco-blue)"
+                    onclick="macroCommand('[THREAT]')"
+                  >
+                    [THREAT]
+                  </button>
+                  <button
+                    class="action-btn"
+                    style="margin: 0; color: var(--robco-blue); border-color: var(--robco-blue)"
+                    onclick="macroCommand('[VATS SIM]')"
+                  >
+                    [VATS]
+                  </button>
+                  <button
+                    class="action-btn"
+                    style="margin: 0; color: var(--robco-green); border-color: var(--robco-green)"
+                    onclick="expandPanelForCategory('trade')"
+                    aria-label="Open the native barter terminal"
+                  >
+                    [TRADE]
+                  </button>
+                  <button
+                    class="action-btn"
+                    style="margin: 0; color: var(--robco-green); border-color: var(--robco-green)"
+                    onclick="renderLoot()"
+                    aria-label="Open the native salvage / loot terminal"
+                  >
+                    [LOOT]
+                  </button>
+                  <button
+                    class="action-btn"
+                    id="consultBtn"
+                    style="
+                      margin: 0;
+                      color: var(--robco-green);
+                      border-color: var(--robco-green);
+                      grid-column: 1 / -1;
+                    "
+                    onclick="macroCommand('[CONSULT]')"
+                    aria-label="Look up a topic in the databank — enter a topic in the field above, then tap CONSULT"
+                  >
+                    [CONSULT]
+                  </button>
+                  <button
+                    class="action-btn"
+                    id="vatsCalcBtn"
+                    style="
+                      margin: 0;
+                      color: var(--robco-green);
+                      border-color: var(--robco-green);
+                      grid-column: 1 / -1;
+                      font-size: 10px;
+                      letter-spacing: 1.5px;
+                    "
+                    onclick="showVATSOverlay()"
+                  >
+                    V.A.T.S. CALCULATOR
+                  </button>
+                  <button
+                    class="action-btn"
+                    id="termlinkBtn"
+                    style="
+                      margin: 0;
+                      color: var(--robco-blue);
+                      border-color: var(--robco-blue);
+                      grid-column: 1 / -1;
+                      font-size: 10px;
+                      letter-spacing: 1.5px;
+                    "
+                    onclick="macroCommand('[TERMLINK]')"
+                    aria-label="Open the TERMLINK command console — launch any offline subsystem"
+                  >
+                    &gt; TERMLINK CONSOLE
+                  </button>
+                </div>
+              </div>
+              <button onclick="submitCommandInput()" class="blue-btn" id="transmitBtn">
+                &gt; TRANSMIT PROTOCOL
+              </button>
             </div>
-            <button onclick="submitCommandInput()" class="blue-btn" id="transmitBtn">
-              &gt; TRANSMIT PROTOCOL
-            </button>
           </div>
         </div>
       </div>
