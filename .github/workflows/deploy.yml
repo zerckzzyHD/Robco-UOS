@@ -38,7 +38,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # Deploy the exact commit CI tested; fall back to HEAD for manual dispatch.
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
