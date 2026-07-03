@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1903/1903 | Cache: robco-terminal-v2.7.0-r38 -->
+﻿## [Unreleased]<!-- Tests: 1927/1927 | Cache: robco-terminal-v2.7.0-r39 -->
 
 ### Added
 
@@ -67,6 +67,7 @@
 - Began building the developer/debug console that a future hacking minigame is planned to let you unlock in the live game — for now it only ever appears on the private staging build used for testing, never on the live site. It shows what the terminal's new "living machine" engine is doing in real time and lets a developer manually step it through its states while testing new atmospheric features as they're built. It is purely a testing aid today: it never touches your campaign, save, or stats, and a player on the real site will never see any trace of it until that future unlock exists.
 - Fixed the developer/debug console's manual state-forcing buttons — previously only one of the seven actually did anything, since they tried to move the engine through the same real-world-only transitions it uses during normal play. Every button can now force the engine directly into any state for testing, with no change to how the engine behaves for real users.
 - Fixed a rough edge in the "living machine" engine's tab-standby handling, found while testing the new power-down behaviour above: the "welcome back" tone and chat message are meant to play only when you're genuinely returning to the terminal, never when it's powering down — but a shutdown landing right at the start of that return, or partway through the brief moment it takes to fully re-sync, could still let one or both slip through. Both cases are now guarded against directly. That sequence isn't reachable in normal play yet, but it's fixed for when it is. Internal only.
+- Laid the first foundation stone for an upcoming visual overhaul: each supported game now carries a much richer internal "identity" profile (its device look, personality, boot style, and more) in one place, ready for future updates to build its new appearance from. New Vegas's profile is filled in with real design detail; Fallout 3's is a placeholder for now. A future third game (Fallout 4) also got a starter profile added purely to prove the system scales — it isn't selectable and changes nothing about the app today. This step changes nothing you can see or do; it's groundwork only, fully covered by new automated checks.
 
 ---
 

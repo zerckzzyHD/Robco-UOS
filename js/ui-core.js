@@ -1234,6 +1234,12 @@ function _wirePanelPersistence() {
 }
 
 function _restoreOpticsPreference() {
+  // DO-K: keep the pre-paint data-game attribute in sync with the resolved game context. The
+  // index.html head script already sets it (best-effort) from raw localStorage before state.js
+  // loads (flash-free, same pattern as the optics/high-lumen pre-paint reads); this re-applies
+  // the authoritative value once state is live. No visible consumer yet — DO-N's bezel chrome
+  // is the first `[data-game]` CSS reader.
+  document.documentElement.dataset.game = getGameContext();
   // Per-game optics resolution — resolve THIS game's optic (its own remembered pick
   // robco_optic_<ctx> → the game's default optic → green) and apply it. A game switch reloads
   // (onGameContextChange), so each game re-resolves to its own remembered optic / default here.
@@ -1808,12 +1814,17 @@ function changePlaystyle(style) {
 }
 
 function onGameContextChange(ctx) {
-  if (!GAME_DEFS[ctx]) return;
+  // DO-K: designOnly games (FO4) prove the N-game data abstraction but aren't selectable yet —
+  // #gameContextSelect already offers no FO4 <option>, this is the defensive second guard.
+  if (!GAME_DEFS[ctx] || GAME_DEFS[ctx].designOnly) return;
   if (!window.robco_v8) window.robco_v8 = { activeContext: 'FNV', campaigns: {} };
   window.robco_v8.campaigns[state.gameContext] = JSON.parse(JSON.stringify(state));
   window.robco_v8.activeContext = ctx;
   state.gameContext = ctx;
   window._contextSwitching = true;
+  // DO-K: flip the pre-paint attribute before the reload so a briefly-cached document (or a
+  // future non-full-reload switch path) never shows the outgoing game's identity chrome.
+  document.documentElement.dataset.game = ctx;
   localStorage.setItem('robco_v8', JSON.stringify(window.robco_v8));
   window.location.reload();
 }
@@ -3721,9 +3732,13 @@ async function wipeTerminal() {
   // Show context selection prompt in chat
   appendToChat('> TERMINAL WIPED. INITIATING NEW CAMPAIGN...', 'sys', true);
   appendToChat('> SELECT GAME CONTEXT:', 'sys', true);
-  Object.values(GAME_DEFS).forEach(d => {
-    appendToChat(`> Type [CONTEXT: ${d.id}] for ${d.label}`, 'sys', true);
-  });
+  // DO-K: skip designOnly entries (FO4) — advertising a context nothing can actually select
+  // would be a real, visible regression the moment GAME_DEFS grows a third game.
+  Object.values(GAME_DEFS)
+    .filter(d => !d.designOnly)
+    .forEach(d => {
+      appendToChat(`> Type [CONTEXT: ${d.id}] for ${d.label}`, 'sys', true);
+    });
   appendToChat('> Or the AI will detect your game automatically.', 'sys', true);
 }
 

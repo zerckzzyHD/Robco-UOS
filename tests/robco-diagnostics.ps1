@@ -11663,6 +11663,169 @@ Check (
 Check (-not ($html156 -match '<span[^>]*onclick=')) "156.16: no <span onclick> pattern anywhere (Protocol UI-5) after the B2c additions"
 
 # ===========================================================
+# Suite 157 -- DO-K: identity keystone -- GAME_DEFS[ctx].identity + data-game
+# (Design Overhaul, build FIRST). Shells out to node (mirrors the Suite 133
+# pattern) to behaviorally prove: every GAME_DEFS entry (FNV/FO3/FO4) carries
+# a complete `identity` contract; `identity.theme` is the SAME object as the
+# game's existing `theme` facet (Protocol 22 -- widened, never forked); and
+# getIdentity() resolves the active game by default, an explicit ctx, and
+# fails safe to FNV for an unknown ctx. FO4 is a complete-but-designOnly entry
+# with the skill-less (FO4-class) contract (skillKeys/factions/combatSkills:
+# []) locked by the Step 2 Phase 0 U11 audit. Static guards cover the three
+# data-game write sites (index.html pre-paint, _restoreOpticsPreference(),
+# onGameContextChange()), the designOnly guards in onGameContextChange() and
+# wipeTerminal()'s context-list loop, and the save boundary (no
+# saveState()/robco_v8 write anywhere in the DO-K additions). Mirrors JS
+# Suite 157. 24 tests.
+# ===========================================================
+Sep "Suite 157 -- DO-K: identity keystone (GAME_DEFS.identity + data-game)"
+$html157   = Read-Src "index.html"
+$core157   = Read-Src "js/ui-core.js"
+$state157  = Read-Src "js/state.js"
+$eslint157 = Read-Src "eslint.config.mjs"
+
+$labels157 = @(
+    "js/state.js loads cleanly in a fresh VM sandbox",
+    "157.1.FNV: GAME_DEFS.FNV.identity carries every contract field (machine/material/structuralMode/theme/persona/ceremony/motionTexture/cursor/audio/voice/ambient)",
+    "157.1.FO3: GAME_DEFS.FO3.identity carries every contract field (machine/material/structuralMode/theme/persona/ceremony/motionTexture/cursor/audio/voice/ambient)",
+    "157.1.FO4: GAME_DEFS.FO4.identity carries every contract field (machine/material/structuralMode/theme/persona/ceremony/motionTexture/cursor/audio/voice/ambient)",
+    "157.2.FNV: GAME_DEFS.FNV.identity.theme === GAME_DEFS.FNV.theme (same object, zero drift possible)",
+    "157.2.FO3: GAME_DEFS.FO3.identity.theme === GAME_DEFS.FO3.theme (same object, zero drift possible)",
+    "157.2.FO4: GAME_DEFS.FO4.identity.theme === GAME_DEFS.FO4.theme (same object, zero drift possible)",
+    "157.3: getIdentity() is defined in js/state.js and exposed as window.getIdentity",
+    "157.4: getIdentity() with no ctx resolves the active game (default FNV) identity block",
+    "157.5: getIdentity(""FO3"") resolves GAME_DEFS.FO3.identity by explicit ctx",
+    "157.6: getIdentity() fails safe to FNV identity for an unknown/invalid ctx -- never returns undefined",
+    "157.7: GAME_DEFS.FO4.designOnly === true",
+    "157.8: GAME_DEFS.FO4.skillKeys/factions/combatSkills are declared as empty arrays (never omitted -- the skill-less FO4-class contract)",
+    "157.9: FO3.identity and FO4.identity are distinct objects with distinct machine/persona/cursor values",
+    "157.10: GAME_DEFS.FNV.identity matches the approved NV mockup (salvaged-terminal, amber-block cursor, Mojave uplink handshake, populated blip bank)"
+)
+try {
+    $nodeCheck157 = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCheck157) {
+        $statePathNode157 = (Join-Path $Root "js/state.js").Replace('\', '/')
+        $testScript157 = @"
+const fs = require('fs');
+const vm = require('vm');
+const stateSource = fs.readFileSync('$statePathNode157', 'utf8');
+const sandbox = { window: {}, document: { getElementById: () => null }, console: { error: () => {}, log: () => {}, warn: () => {} } };
+vm.createContext(sandbox);
+const results = [];
+let GAME_DEFS, getIdentity;
+try {
+  vm.runInContext(stateSource, sandbox);
+  GAME_DEFS = sandbox.window.GAME_DEFS;
+  getIdentity = sandbox.window.getIdentity;
+  results.push(!!GAME_DEFS && !!getIdentity);
+} catch (e) {
+  results.push(false);
+}
+const CONTRACT = ['machine','material','structuralMode','theme','persona','ceremony','motionTexture','cursor','audio','voice','ambient'];
+['FNV','FO3','FO4'].forEach(ctx => {
+  try {
+    const id = GAME_DEFS[ctx] && GAME_DEFS[ctx].identity;
+    const missing = CONTRACT.filter(f => !id || id[f] === undefined || id[f] === null);
+    results.push(!!id && missing.length === 0);
+  } catch (e) { results.push(false); }
+});
+['FNV','FO3','FO4'].forEach(ctx => {
+  try {
+    const def = GAME_DEFS[ctx];
+    results.push(!!def && !!def.identity && def.identity.theme === def.theme);
+  } catch (e) { results.push(false); }
+});
+try { results.push(typeof getIdentity === 'function'); } catch (e) { results.push(false); }
+try { results.push(getIdentity() === GAME_DEFS.FNV.identity); } catch (e) { results.push(false); }
+try { results.push(getIdentity('FO3') === GAME_DEFS.FO3.identity); } catch (e) { results.push(false); }
+try { results.push(getIdentity('NOT-A-REAL-GAME') === GAME_DEFS.FNV.identity); } catch (e) { results.push(false); }
+try { results.push(GAME_DEFS.FO4.designOnly === true); } catch (e) { results.push(false); }
+try {
+  const fo4 = GAME_DEFS.FO4;
+  results.push(Array.isArray(fo4.skillKeys) && fo4.skillKeys.length === 0 && Array.isArray(fo4.factions) && fo4.factions.length === 0 && Array.isArray(fo4.combatSkills) && fo4.combatSkills.length === 0);
+} catch (e) { results.push(false); }
+try {
+  const fo3id = GAME_DEFS.FO3.identity, fo4id = GAME_DEFS.FO4.identity;
+  results.push(fo3id !== fo4id && fo3id.machine !== fo4id.machine && fo3id.persona.texture !== fo4id.persona.texture && fo3id.cursor !== fo4id.cursor);
+} catch (e) { results.push(false); }
+try {
+  const nv = GAME_DEFS.FNV.identity;
+  results.push(nv.machine === 'salvaged-terminal' && nv.cursor === 'amber-block' && nv.ceremony.coldStart === 'mojave-uplink-handshake' && Array.isArray(nv.persona.blipBank) && nv.persona.blipBank.length > 0);
+} catch (e) { results.push(false); }
+console.log('RESULT:' + results.map(r => r ? '1' : '0').join(''));
+"@
+        $out157 = ($testScript157 | node 2>&1 | Out-String)
+        $rm157 = [regex]::Match($out157, 'RESULT:([01]{15})')
+        if ($rm157.Success) {
+            $bits157 = $rm157.Groups[1].Value
+            for ($bi = 0; $bi -lt 15; $bi++) { Check ($bits157.Substring($bi, 1) -eq '1') $labels157[$bi] }
+        } else {
+            $err157 = if ([string]::IsNullOrWhiteSpace($out157)) { "No output from node" } else { $out157.Trim() }
+            foreach ($lbl in $labels157) { Fail "$lbl  (runtime error: $err157)" }
+        }
+    } else {
+        foreach ($lbl in $labels157) { Fail "$lbl  (node not found)" }
+    }
+} catch {
+    foreach ($lbl in $labels157) { Fail "$lbl  (harness error: $_)" }
+}
+
+# 157.11  data-game pre-paint (index.html head script, before state.js loads)
+Check (
+    $html157 -match 'document\.documentElement\.dataset\.game\s*=\s*_ctx0'
+) "157.11: index.html sets a flash-free pre-paint data-game attribute from the same _ctx0 the optics head script already resolves"
+
+# 157.12  data-game re-applied once state.js is live (_restoreOpticsPreference)
+$restoreBody157 = Get-FunctionBody $core157 '_restoreOpticsPreference'
+Check (
+    $restoreBody157 -match 'document\.documentElement\.dataset\.game\s*=\s*getGameContext\(\)'
+) "157.12: _restoreOpticsPreference() re-applies data-game from getGameContext() once state is live"
+
+# 157.13  data-game flips before the reload in onGameContextChange()
+$ctxChangeBody157 = Get-FunctionBody $core157 'onGameContextChange'
+$setIdx157 = $ctxChangeBody157.IndexOf('document.documentElement.dataset.game = ctx')
+$reloadIdx157 = $ctxChangeBody157.IndexOf('window.location.reload()')
+Check (
+    ($setIdx157 -ge 0) -and ($reloadIdx157 -ge 0) -and ($setIdx157 -lt $reloadIdx157)
+) "157.13: onGameContextChange() sets data-game to the target ctx BEFORE window.location.reload()"
+
+# 157.14  onGameContextChange() refuses a designOnly game context (the FO4 guard)
+Check (
+    $ctxChangeBody157 -match 'if \(!GAME_DEFS\[ctx\] \|\| GAME_DEFS\[ctx\]\.designOnly\) return;'
+) "157.14: onGameContextChange() returns early for an unknown OR designOnly game context"
+
+# 157.15  #gameContextSelect offers no FO4 <option> (FO4 stays unreachable in the live UI)
+$selectStart157 = $html157.IndexOf('id="gameContextSelect"')
+$selectEnd157 = $html157.IndexOf('</select>', $selectStart157)
+$selectBlock157 = $html157.Substring($selectStart157, $selectEnd157 - $selectStart157)
+Check (
+    ($selectBlock157 -match 'value="FNV"') -and ($selectBlock157 -match 'value="FO3"') -and (-not ($selectBlock157 -match 'value="FO4"'))
+) "157.15: #gameContextSelect lists FNV and FO3 only -- no FO4 <option> (FO4 stays unreachable this cycle)"
+
+# 157.16  wipeTerminal()'s "SELECT GAME CONTEXT" chat list filters out designOnly entries
+$wipeBody157 = Get-FunctionBody $core157 'wipeTerminal'
+Check (
+    $wipeBody157 -match "(?s)Object\.values\(GAME_DEFS\)\s*\.filter\(d => !d\.designOnly\)\s*\.forEach"
+) "157.16: wipeTerminal() filters Object.values(GAME_DEFS) to !d.designOnly before listing selectable contexts"
+
+# 157.17  eslint.config.mjs declares the new getIdentity() cross-file global (readonly)
+Check (
+    $eslint157 -match "getIdentity:\s*'readonly'"
+) "157.17: eslint.config.mjs declares getIdentity as a readonly cross-file global"
+
+# 157.18  save boundary -- the DO-K additions write nothing durable to the campaign
+$identityBlockMatch157 = [regex]::Match($state157, '(?s)DO-K: identity keystone.*?window\.GAME_DEFS = GAME_DEFS;')
+$identityBlock157 = if ($identityBlockMatch157.Success) { $identityBlockMatch157.Value } else { '' }
+Check (
+    ($identityBlock157.Length -gt 0) -and (-not ($identityBlock157 -match 'saveState\(')) -and (-not ($identityBlock157 -match "localStorage\.setItem\('robco_v8'"))
+) "157.18: the DO-K identity/theme-alias block in state.js contains no saveState()/robco_v8 write (data-def only, Protocol 26)"
+
+# 157.19  APP_VERSION stays 2.7.0 under [Unreleased] -- DO-K is cache-rev-only (Protocol 2)
+Check (
+    $state157 -match "APP_VERSION\s*=\s*'2\.7\.0'"
+) "157.19: APP_VERSION remains 2.7.0 -- DO-K ships under [Unreleased] with a cache-rev bump only"
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

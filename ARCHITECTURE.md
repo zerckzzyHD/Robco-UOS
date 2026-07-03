@@ -13,6 +13,7 @@
 1. [Project Philosophy](#project-philosophy)
 2. [File Map](#file-map)
 3. [Script Load Order & Globals](#script-load-order--globals)
+   3a. [Per-Game Identity Block](#per-game-identity-block-game_defsctxidentity--design-overhaul-do-k)
 4. [State Architecture](#state-architecture)
 5. [Persistence Lifecycle](#persistence-lifecycle)
 6. [Save/Load/Sync Contract](#saveloadsync-contract)
@@ -66,8 +67,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    1903-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    1903-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    1927-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    1927-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -482,7 +483,83 @@ it must explicitly declare `skillKeys: []` — **never omit the field** — beca
 (`state.js`) returns `GAME_DEFS[ctx].skillKeys` with no further fallback, and an omitted field
 would make `getSkillKeys()` return `undefined`, which every `.forEach()`/`.map()`/`.includes()`
 call site above would throw on. This single rule (`skillKeys: []`, not absent) is what makes
-FO4 "data + declared stretches" for the skill system specifically.
+FO4 "data + declared stretches" for the skill system specifically. **This rule was consumed,
+not just planned, by the DO-K unit below** — `GAME_DEFS.FO4` now exists with `skillKeys: []`.
+
+---
+
+## Per-Game Identity Block (`GAME_DEFS[ctx].identity` — Design Overhaul DO-K)
+
+The Design Overhaul's keystone unit (`planning/DESIGN_OVERHAUL_BUILD_PLAN.md`, DO-K, built first
+per its dependency spine) widens each `GAME_DEFS[ctx].theme` into a full `identity` block — the
+single per-machine design-data table every later overhaul unit (bezel chrome, Overseer presence,
+cartridge-swap ceremony, motion-verb grammar, sonic identity, cursor, empty/loading voice,
+living-world ambient banks) will read from. `identity` is the sanctioned **Protocol 38 extension**:
+per-machine design facets are data on this block, never a game literal in feature code.
+
+**Schema** (present and complete for FNV, FO3, and FO4):
+
+```js
+GAME_DEFS[ctx].identity = {
+  machine,          // 'salvaged-terminal' | 'pipboy-3000' | 'pipboy-3000-mk4'
+  material,         // 'scavenged-steel' | 'vaulttec-molded' | 'vaulttec-mk4' -> future [data-game] CSS
+  structuralMode,   // 'bay' — hook kept open; no alternate mode built this cycle
+  theme,            // ALIASED to the game's existing top-level `theme` object (see below) — never a copy
+  persona:        { texture, cadence, blipBank: [...] },        // -> future Overseer presence unit
+  ceremony:       { coldStart, switchLabel },                    // -> future cartridge-swap unit
+  motionTexture:  { seat, sweep, wake, fault, breathe },         // -> future motion-verb grammar unit
+  cursor,           // 'amber-block' | 'pipboy-reticle' | 'mk4-pointer'
+  audio:          { humFreq, humGrit, bootDrone, wakeTone, radioBed },  // -> future sonic-identity unit
+  voice:          { emptyStates: {...}, loading: [...] },        // -> future empty/loading-voice unit
+  ambient:        { broadcasts: [...], news: [...], weatherLabel },     // -> future living-world unit
+};
+```
+
+- **NV** is populated richly and accurately from the owner-approved mockup
+  (`planning/mockups/nv-machine-mockup.html` + `nv-machine-rationale.md`) — the salvaged desk
+  terminal, the green-local/amber-remote phosphor split, the Mojave-uplink boot handshake, the
+  oscilloscope Overseer persona.
+- **FO3** gets a sensible stub (visibly distinct from NV, proving the per-game read works) — its
+  real Vault-Tec-molded facets are authored from an approved mockup when the FO3 machine builds
+  (DO-M).
+- **FO4** is a brand-new `GAME_DEFS.FO4` entry, **design-only** (`designOnly: true`) — it exists
+  and fully validates (identity included) to prove the N-game abstraction, but is unreachable in
+  the live app this cycle: `onGameContextChange()` refuses a `designOnly` context,
+  `wipeTerminal()`'s "SELECT GAME CONTEXT" chat prompt filters `designOnly` entries out of its
+  list, and `#gameContextSelect` offers no FO4 `<option>`. Per the skill-less (FO4-class)
+  degradation audit above, `GAME_DEFS.FO4.skillKeys` / `.factions` / `.combatSkills` are declared
+  as empty arrays (never omitted).
+
+**`identity.theme` aliasing (Protocol 22 — widened, never forked):** the existing
+`defaultOptics`/`framing`/`pipBoyModel`/`bootFlavor`/`saveLabel` facet each game already declares
+as its top-level `theme` is **not duplicated** inside `identity` — a one-line loop right after
+`GAME_DEFS` finishes constructing assigns `GAME_DEFS[k].identity.theme = GAME_DEFS[k].theme` for
+every game, so `identity.theme` is the exact same object reference. `changeOpticsColor()` /
+`_resolveOptic()` / `_resolveDefaultOptics()` / `_opticStorageKey()` (`ui-audio.js`) and the WU-T3
+save-header consumer (`ui-account.js`) all keep reading the untouched literal — zero risk of the
+two ever drifting apart.
+
+**Accessor:** `getIdentity(ctx)` (`js/state.js`) mirrors `getFactionRegistry()`/`getSkillKeys()` —
+omit `ctx` to resolve the active game via `_activeDef()`, or pass an explicit `ctx` to inspect any
+game's identity (including FO4's design-only entry) without switching context. Fails safe to
+FNV's identity for an unknown/invalid `ctx` — never returns `undefined`.
+
+**`data-game` root attribute:** `document.documentElement.dataset.game` is set at three sites so a
+future `[data-game="FNV"|"FO3"]` CSS consumer (DO-N's bezel chrome is the first) never sees a
+flash of the wrong identity: the `index.html` pre-paint `<head>` script (flash-free, alongside the
+existing optics/high-lumen reads — the one other sanctioned pre-`state.js` bare read), once more
+in `_restoreOpticsPreference()` once state is live, and in `onGameContextChange()` before the
+reload.
+
+**Zero behavior change (Protocol 26):** DO-K is pure data + one DOM attribute. Nothing reads
+`identity` yet — DO-N (bezel chrome), DO-O (Overseer presence), DO-C (cartridge-swap ceremony),
+DO-M (per-game machines), and DO-Q2–Q6 (motion/cursor/audio/voice/ambient) are the future
+consumers. No `state.<field>` / `saveState()` / `robco_v8` write exists anywhere in the unit.
+`APP_VERSION` stays 2.7.0 under `[Unreleased]` (cache-rev bump only). Guarded end-to-end by
+Suite 157 (both runners at parity) — a Node `vm`-sandbox behavioral test that loads the real
+`js/state.js` and proves the contract, the theme-alias reference equality, the `getIdentity()`
+fail-safe, and the FO4 designOnly guards, plus static structural guards on the three `data-game`
+write sites.
 
 ---
 
@@ -1517,7 +1594,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1903-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1927-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

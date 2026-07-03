@@ -860,6 +860,68 @@ const GAME_DEFS = {
       bootFlavor: 'MOJAVE WASTELAND UPLINK',
       saveLabel: 'LUCKY 38 TELEMETRY — MOJAVE ARCHIVE',
     },
+    // ── DO-K: identity keystone — the single per-machine design-data block every later
+    // overhaul unit (bezel nav, Overseer, ceremony, motion, audio, cursor, voice, ambient)
+    // reads from (Protocol 38 extension — see CLAUDE.md). `identity.theme` is NOT written
+    // here as a literal — it is aliased to the SAME `theme` object above, right after
+    // GAME_DEFS finishes constructing (see the loop just before `window.GAME_DEFS =
+    // GAME_DEFS` below), so there is exactly one theme object per game, never a duplicated/
+    // forked copy (Protocol 22). NV is populated richly and accurately from the
+    // owner-approved mockup (planning/mockups/nv-machine-mockup.html +
+    // nv-machine-rationale.md) — the salvaged desk terminal, green-local/amber-remote split,
+    // Mojave-uplink boot, oscilloscope-Overseer persona. Nothing reads `identity` yet
+    // (DO-N/DO-O/DO-C/DO-M/DO-Q2-6 are the future consumers) — this unit is pure data, zero
+    // behavior change (Protocol 26).
+    identity: {
+      machine: 'salvaged-terminal',
+      material: 'scavenged-steel',
+      structuralMode: 'bay',
+      persona: {
+        texture: 'uplink-scratchy',
+        cadence:
+          'field-grade, intermittent, static-bursted — a scratchy signal off the Lucky 38 relay, not a clean broadcast',
+        blipBank: [
+          '▸ CARRIER DRIFT +0.02 MHz — COMPENSATED',
+          '▸ LUCKY 38 RELAY: SIGNAL NOMINAL',
+          '▸ STATIC BURST — RESUMING CARRIER',
+          '▸ UPLINK JITTER — RECALIBRATING',
+          '▸ 0.417 MHz HOLDING STEADY',
+        ],
+      },
+      ceremony: {
+        coldStart: 'mojave-uplink-handshake',
+        switchLabel: 'MOJAVE UPLINK — EJECTING CARTRIDGE',
+      },
+      motionTexture: {
+        seat: 'thunk-and-spin',
+        sweep: 'phosphor-smear',
+        wake: 'carrier-acquire',
+        fault: 'static-scratch-burst',
+        breathe: 'slow-warm-sine',
+      },
+      cursor: 'amber-block',
+      audio: {
+        humFreq: 82,
+        humGrit: 'scratchy-carrier',
+        bootDrone: 'mojave-uplink-dial',
+        wakeTone: 'carrier-acquired-chime',
+        radioBed: 'wasteland-static-bed',
+      },
+      voice: {
+        emptyStates: {
+          inventory: 'NO CARGO LOGGED',
+          quests: 'NO ACTIVE DIRECTIVES',
+          notes: 'LOGBOOK EMPTY',
+          generic: 'NOTHING ON RECORD',
+        },
+        loading: ['ESTABLISHING DIRECTOR LINK…', 'DECRYPTING TELEMETRY…', 'CARRIER SYNC…'],
+      },
+      ambient: {
+        broadcasts: ['> [WASTELAND UPLINK] SIGNAL FROM THE MOJAVE — CARRIER HOLDING.'],
+        news: ['> RADIO NEW VEGAS: A COURIER WAS SEEN LEAVING GOODSPRINGS…'],
+        weatherLabel: 'MOJAVE RAD-STORM',
+      },
+    },
     factions: FACTION_REGISTRY,
     skillKeys: SKILL_KEYS,
     // WU-N1 GA-10: the combat-skill set VATS draws from (weapon-damage skills only).
@@ -971,6 +1033,61 @@ Update state.magazines when the Courier reads a skill magazine. Include only nam
       bootFlavor: 'CAPITAL WASTELAND UPLINK',
       saveLabel: 'VAULT-TEC ARCHIVE — CAPITAL WASTELAND',
     },
+    // ── DO-K: FO3 identity — sensible STUBS/defaults (§ build plan: "FO3 and FO4 get
+    // sensible stubs for now — their machines aren't designed yet"). FO3's real
+    // Vault-Tec-molded bezel/persona/motion facets are authored from an approved mockup at
+    // DO-M; these placeholder values only need to validate + be visibly distinct from NV's
+    // so the N-game abstraction (Protocol 38) is proven. `identity.theme` is aliased to the
+    // SAME `theme` object above (see the loop before `window.GAME_DEFS = GAME_DEFS` below) —
+    // never a duplicated copy (Protocol 22).
+    identity: {
+      machine: 'pipboy-3000',
+      material: 'vaulttec-molded',
+      structuralMode: 'bay',
+      persona: {
+        texture: 'vault-institutional',
+        cadence:
+          'clipped, procedural, Vault-Tec formal — a standard-issue Overseer, not a scavenged signal',
+        blipBank: [
+          '▸ VAULT-TEC DIAGNOSTIC: NOMINAL',
+          '▸ RADIATION SENSOR: NOMINAL',
+          '▸ CAPITAL WASTELAND UPLINK: HOLDING',
+        ],
+      },
+      ceremony: {
+        coldStart: 'vaulttec-post',
+        switchLabel: 'VAULT-TEC UPLINK — EJECTING CARTRIDGE',
+      },
+      motionTexture: {
+        seat: 'mechanical-clunk',
+        sweep: 'scanline-sweep',
+        wake: 'post-check-chime',
+        fault: 'buzzer-fault',
+        breathe: 'steady-hum',
+      },
+      cursor: 'pipboy-reticle',
+      audio: {
+        humFreq: 55,
+        humGrit: 'steady-hum',
+        bootDrone: 'vaulttec-post-drone',
+        wakeTone: 'post-check-chime',
+        radioBed: 'capital-wasteland-static',
+      },
+      voice: {
+        emptyStates: {
+          inventory: 'NO ITEMS LOGGED',
+          quests: 'NO ACTIVE DIRECTIVES',
+          notes: 'LOGBOOK EMPTY',
+          generic: 'NOTHING ON RECORD',
+        },
+        loading: ['RUNNING DIAGNOSTIC…', 'QUERYING VAULT-TEC ARCHIVE…'],
+      },
+      ambient: {
+        broadcasts: ['> [CAPITAL WASTELAND UPLINK] SIGNAL FROM THE RUINS — CARRIER HOLDING.'],
+        news: ['> GALAXY NEWS RADIO: A WANDERER WAS SEEN LEAVING MEGATON…'],
+        weatherLabel: 'CAPITAL WASTELAND RAD-STORM',
+      },
+    },
     factions: FACTION_REGISTRY_FO3,
     skillKeys: SKILL_KEYS_FO3,
     // WU-N1 GA-10 (LIVE BUG FIX): FO3 splits firearms into small_guns + big_guns. The old
@@ -1056,7 +1173,106 @@ Update state.lincolnItems when the Courier acquires or sells any Lincoln artifac
 `,
     },
   },
+  // ── DO-K: FO4 — DESIGN-ONLY this cycle (§0.2 build-plan reconciliation). FO4 = the
+  // Pip-Boy 3000 Mark IV, a refined evolution of the FO3 Pip-Boy — NOT an Institute
+  // holo-terminal (the slate's original framing is dropped). This entry exists to PROVE the
+  // N-game abstraction (Protocol 38) and force the `identity` contract to be right; it is
+  // UNREACHABLE in the live UI: `designOnly: true` is checked by onGameContextChange()'s
+  // guard (ui-core.js) and #gameContextSelect (index.html) offers no FO4 <option>. No
+  // db_fo4.js / reg_fo4.js exist this cycle — no FO4 game-data files are required (DO-K spec).
+  FO4: {
+    id: 'FO4',
+    label: 'Fallout 4',
+    designOnly: true,
+    theme: {
+      defaultOptics: 'green3',
+      framing: 'commonwealth',
+      pipBoyModel: 'Pip-Boy 3000 Mark IV',
+      bootFlavor: 'COMMONWEALTH UPLINK',
+      saveLabel: 'VAULT-TEC ARCHIVE — COMMONWEALTH',
+    },
+    // Skill-less (FO4-class) degradation contract, locked by the Step 2 Phase 0 U11 audit
+    // (ARCHITECTURE.md "Skill-less (FO4-class) degradation audit"): FO4 replaced the SPECIAL
+    // skill system with perks, so skillKeys/combatSkills/factions MUST be declared as empty
+    // arrays here — never omitted — so getSkillKeys()/getFactionRegistry() return `[]`
+    // (which every consumer already degrades to safely) instead of `undefined` (which every
+    // .forEach()/.map()/.includes() call site would throw on). Real FO4 faction/perk data is
+    // authored when FO4 actually builds at 3.0.
+    factions: [],
+    skillKeys: [],
+    combatSkills: [],
+    usesKarmaCenter: false,
+    collectibleLabel: 'BOBBLEHEADS', // FO4 keeps bobbleheads — placeholder pending 3.0 design
+    hasWeaponMods: true, // FO4's deep weapon-crafting system — placeholder pending 3.0 design
+    seedInventory: [],
+    // Placeholder — Fallout 4 begins 2287-10-23 (fallout.wiki); epochWeekday is UNVERIFIED
+    // and unused (FO4 has no live calendar consumer this cycle) — verify before this becomes
+    // load-bearing at the 3.0 build (Protocol 3).
+    calendar: { startMonth: 10, startDay: 23, startYear: 2287, epochWeekday: 0 },
+    ammoPerAttack: 1,
+    // Minimal defensive stub — never read today (gameContext cannot reach FO4), kept only so
+    // getSystemDirective() can't crash if this guard is ever bypassed by a future regression.
+    ai: {
+      skillSystemText: 'FO4 has no traditional skill system this cycle (design-only stub).',
+      factionSystemText: 'FO4 faction data is not yet authored (design-only stub).',
+      irreversibleTriggers: '**FO4 Irreversible Triggers** — not yet authored (design-only stub).',
+      trackerDirectives: '',
+    },
+    // DO-K identity — the Mark IV design brief (spec-only; built at 3.0 per DO-M).
+    identity: {
+      machine: 'pipboy-3000-mk4',
+      material: 'vaulttec-mk4',
+      structuralMode: 'bay',
+      persona: {
+        texture: 'mk4-clean',
+        cadence:
+          'refined, quieter Vault-Tec cadence — a cleaner evolution of the FO3 Overseer, less clunk, more precision',
+        blipBank: ['▸ MARK IV DIAGNOSTIC: NOMINAL', '▸ COMMONWEALTH UPLINK: HOLDING'],
+      },
+      ceremony: {
+        coldStart: 'mk4-post',
+        switchLabel: 'MARK IV UPLINK — EJECTING CARTRIDGE',
+      },
+      motionTexture: {
+        seat: 'refined-clunk',
+        sweep: 'crisp-scanline-sweep',
+        wake: 'mk4-chime',
+        fault: 'soft-buzzer-fault',
+        breathe: 'quiet-steady-hum',
+      },
+      cursor: 'mk4-pointer',
+      audio: {
+        humFreq: 60,
+        humGrit: 'quiet-steady-hum',
+        bootDrone: 'mk4-post-drone',
+        wakeTone: 'mk4-chime',
+        radioBed: 'commonwealth-static',
+      },
+      voice: {
+        emptyStates: {
+          inventory: 'NO ITEMS LOGGED',
+          quests: 'NO ACTIVE DIRECTIVES',
+          notes: 'LOGBOOK EMPTY',
+          generic: 'NOTHING ON RECORD',
+        },
+        loading: ['RUNNING DIAGNOSTIC…', 'QUERYING VAULT-TEC ARCHIVE…'],
+      },
+      ambient: {
+        broadcasts: ['> [COMMONWEALTH UPLINK] SIGNAL FROM THE COMMONWEALTH — CARRIER HOLDING.'],
+        news: ['> DIAMOND CITY RADIO: A SOLE SURVIVOR WAS SEEN LEAVING SANCTUARY…'],
+        weatherLabel: 'COMMONWEALTH RAD-STORM',
+      },
+    },
+  },
 };
+// DO-K: alias identity.theme → the SAME theme object each game already declares above, so
+// changeOpticsColor()/_resolveOptic()/_resolveDefaultOptics()/_opticStorageKey() (ui-audio.js)
+// and the WU-T3 save-header consumer (ui-account.js) keep reading identical values — one
+// theme object per game, never a duplicated/forked copy (Protocol 22). Zero behavior change:
+// the `theme` key itself is untouched; this only adds a second reference to it.
+Object.keys(GAME_DEFS).forEach(k => {
+  if (GAME_DEFS[k].identity) GAME_DEFS[k].identity.theme = GAME_DEFS[k].theme;
+});
 window.GAME_DEFS = GAME_DEFS;
 
 // _activeDef() — TDZ-safe: returns the active game's config object.
@@ -1080,6 +1296,16 @@ function getFactionRegistry() {
 function getSkillKeys() {
   return _activeDef().skillKeys;
 }
+
+// getIdentity(ctx) — DO-K read-only accessor for the per-game identity keystone block.
+// Mirrors getFactionRegistry()/getSkillKeys(): omit ctx to resolve the ACTIVE game via
+// _activeDef(); pass an explicit ctx to inspect any game's identity (e.g. FO4's design-only
+// entry) without switching context. Fails safe to FNV's identity — never returns undefined.
+function getIdentity(ctx) {
+  const def = (ctx && GAME_DEFS[ctx]) || _activeDef();
+  return (def && def.identity) || GAME_DEFS.FNV.identity;
+}
+window.getIdentity = getIdentity;
 
 // getGameContext() — the sanctioned read accessor for the active game context.
 // External modules (cloud.js, the cloud-sync boundary) MUST call this instead of

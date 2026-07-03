@@ -21,7 +21,7 @@
     or the canonical suites change, update this file in the SAME commit and bump
     the suite count marker. The gate fails on drift.
 
-    Suites: 20
+    Suites: 21
 -->
 <html lang="en">
   <head>
@@ -663,15 +663,23 @@
         section('Suite 9 — Game-agnostic registry dispatch');
 
         const savedCtx = state.gameContext;
-        Object.values(GAME_DEFS).forEach(def => {
-          state.gameContext = def.id;
-          const sk = getSkillKeys();
-          const fac = getFactionRegistry();
-          assert(
-            sk === def.skillKeys && fac === def.factions && sk.length > 0 && fac.length > 0,
-            `${def.id}: getSkillKeys()/getFactionRegistry() resolve to GAME_DEFS.${def.id} (${sk.length} skills, ${fac.length} factions)`
-          );
-        });
+        // DO-K: skip designOnly entries (FO4) — the Step 2 Phase 0 U11 skill-less
+        // (FO4-class) audit locks skillKeys/factions to [] for a designOnly game (never
+        // omitted, so getSkillKeys()/getFactionRegistry() degrade to [] instead of
+        // throwing), so a live/selectable game is the only kind this dispatch check can
+        // assert ">0" against. FO4's identity/contract completeness is proven separately
+        // by Suite 20 below.
+        Object.values(GAME_DEFS)
+          .filter(def => !def.designOnly)
+          .forEach(def => {
+            state.gameContext = def.id;
+            const sk = getSkillKeys();
+            const fac = getFactionRegistry();
+            assert(
+              sk === def.skillKeys && fac === def.factions && sk.length > 0 && fac.length > 0,
+              `${def.id}: getSkillKeys()/getFactionRegistry() resolve to GAME_DEFS.${def.id} (${sk.length} skills, ${fac.length} factions)`
+            );
+          });
         state.gameContext = savedCtx;
       } catch (err) {
         assert(false, 'FATAL: audit threw an exception', String((err && err.stack) || err));
@@ -1695,6 +1703,71 @@
           );
         } catch (err) {
           assert(false, 'FATAL: Developer Console suite threw', String((err && err.stack) || err));
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        //  Suite 20 — DO-K identity keystone (GAME_DEFS.identity + data-game)
+        // ══════════════════════════════════════════════════════════════
+        try {
+          section('Suite 20 — DO-K identity keystone (GAME_DEFS.identity + data-game)');
+
+          assert(
+            typeof window.getIdentity === 'function',
+            'getIdentity() is available (js/state.js)'
+          );
+
+          const FIELDS20 = [
+            'machine',
+            'material',
+            'structuralMode',
+            'theme',
+            'persona',
+            'ceremony',
+            'motionTexture',
+            'cursor',
+            'audio',
+            'voice',
+            'ambient',
+          ];
+          Object.values(GAME_DEFS).forEach(def => {
+            const id = def.identity;
+            const missing = FIELDS20.filter(f => id == null || id[f] == null);
+            assert(
+              id && missing.length === 0,
+              `${def.id}: GAME_DEFS.${def.id}.identity carries every contract field` +
+                (missing.length ? ' — MISSING: ' + missing.join(', ') : '')
+            );
+          });
+
+          // identity.theme aliases the SAME object as the game's existing theme facet
+          // (Protocol 22 — widened, never forked).
+          assert(
+            getIdentity('FNV').theme === GAME_DEFS.FNV.theme,
+            'FNV: identity.theme === the existing theme facet (same object, no fork)'
+          );
+          assert(
+            getIdentity('FO3').theme === GAME_DEFS.FO3.theme,
+            'FO3: identity.theme === the existing theme facet (same object, no fork)'
+          );
+
+          // FO4 is design-only and carries the skill-less (FO4-class) empty-array contract.
+          assert(
+            GAME_DEFS.FO4 && GAME_DEFS.FO4.designOnly === true,
+            'GAME_DEFS.FO4 exists and is flagged designOnly (unreachable this cycle)'
+          );
+
+          // data-game is a real, settable DOM attribute driven by getGameContext() — the exact
+          // assignment index.html's pre-paint script and _restoreOpticsPreference() perform.
+          // test.html doesn't load index.html/ui-core.js (so neither call site runs here), so
+          // this proves the DOM mechanic itself rather than re-deriving a value nothing wrote;
+          // both write sites are structurally guarded in the canonical runners (Suite 157).
+          document.documentElement.dataset.game = getGameContext();
+          assert(
+            document.documentElement.dataset.game === getGameContext(),
+            'document.documentElement.dataset.game round-trips the active game context'
+          );
+        } catch (err) {
+          assert(false, 'FATAL: DO-K identity suite threw', String((err && err.stack) || err));
         }
 
         // ── Summary ──────────────────────────────────────────────────────────

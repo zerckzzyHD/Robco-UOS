@@ -19608,6 +19608,253 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 157 — DO-K: identity keystone — GAME_DEFS[ctx].identity + data-game
+//  (Design Overhaul, build FIRST). A Node vm sandbox loads the REAL js/state.js
+//  and behaviorally proves: every GAME_DEFS entry (FNV/FO3/FO4) carries a
+//  complete `identity` contract; `identity.theme` is the SAME object as the
+//  game's existing `theme` facet (Protocol 22 — widened, never forked, so
+//  changeOpticsColor()/_resolveOptic()/_resolveDefaultOptics()/_opticStorageKey()
+//  and the WU-T3 save-header consumer keep resolving identically — the
+//  optic-resolution golden master, already covered live by Suite 124, is
+//  untouched because those literal `theme` blocks were not edited); getIdentity()
+//  resolves the active game by default, an explicit ctx, and fails safe to FNV
+//  for an unknown ctx; and FO4 is a complete-but-designOnly entry with the
+//  skill-less (FO4-class) contract (skillKeys/factions/combatSkills: [])
+//  locked by the Step 2 Phase 0 U11 audit. Static guards cover the three
+//  data-game write sites (index.html pre-paint, _restoreOpticsPreference(),
+//  onGameContextChange()), the designOnly guards in onGameContextChange() and
+//  wipeTerminal()'s context-list loop, and the save-boundary (no
+//  saveState()/robco_v8 write anywhere in the DO-K additions — pure data + one
+//  attribute set, Protocol 26). 24 tests.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 157 — DO-K: identity keystone (GAME_DEFS.identity + data-game)');
+
+  const html157 = readFile('index.html');
+  const core157 = readFile('js/ui-core.js');
+
+  const vm157 = require('vm');
+  let h157 = null;
+  let err157 = null;
+  try {
+    const sandbox = {
+      window: {},
+      document: { getElementById: () => null },
+      console: { error: () => {}, log: () => {}, warn: () => {} },
+    };
+    vm157.createContext(sandbox);
+    vm157.runInContext(stateSource, sandbox);
+    // GAME_DEFS/getIdentity are declared `const`/`function` at the script's top level, which in
+    // a vm context lands in that context's lexical scope, NOT as a property of the sandbox
+    // object itself — so read them back off the plain `window` object state.js explicitly
+    // mirrors them onto (`window.GAME_DEFS = GAME_DEFS`, `window.getIdentity = getIdentity`).
+    h157 = { GAME_DEFS: sandbox.window.GAME_DEFS, getIdentity: sandbox.window.getIdentity };
+  } catch (e) {
+    err157 = e;
+  }
+
+  assert(
+    h157 && !err157,
+    'js/state.js loads cleanly in a fresh VM sandbox' +
+      (err157 ? ' — ' + String(err157.message || err157) : '')
+  );
+
+  const CONTRACT157 = [
+    'machine',
+    'material',
+    'structuralMode',
+    'theme',
+    'persona',
+    'ceremony',
+    'motionTexture',
+    'cursor',
+    'audio',
+    'voice',
+    'ambient',
+  ];
+
+  // 157.1 — every GAME_DEFS entry (FNV, FO3, FO4 included) carries a complete identity contract
+  if (h157) {
+    ['FNV', 'FO3', 'FO4'].forEach(ctx => {
+      const id = h157.GAME_DEFS[ctx] && h157.GAME_DEFS[ctx].identity;
+      const missing = CONTRACT157.filter(f => !id || id[f] === undefined || id[f] === null);
+      assert(
+        id && missing.length === 0,
+        `157.1.${ctx}: GAME_DEFS.${ctx}.identity carries every contract field (machine/material/structuralMode/theme/persona/ceremony/motionTexture/cursor/audio/voice/ambient)` +
+          (missing.length ? ' — MISSING: ' + missing.join(', ') : '')
+      );
+    });
+  } else {
+    assert(false, '157.1: skipped — sandbox failed to load');
+  }
+
+  // 157.2 — identity.theme is the SAME object reference as the game's existing top-level
+  //         theme facet for all three games (Protocol 22 — widened, never forked/duplicated)
+  if (h157) {
+    ['FNV', 'FO3', 'FO4'].forEach(ctx => {
+      const def = h157.GAME_DEFS[ctx];
+      assert(
+        def && def.identity && def.identity.theme === def.theme,
+        `157.2.${ctx}: GAME_DEFS.${ctx}.identity.theme === GAME_DEFS.${ctx}.theme (same object, zero drift possible)`
+      );
+    });
+  } else {
+    assert(false, '157.2: skipped — sandbox failed to load');
+  }
+
+  // 157.3  getIdentity() is exposed globally and resolves the ACTIVE game by default
+  assert(
+    h157 && typeof h157.getIdentity === 'function',
+    '157.3: getIdentity() is defined in js/state.js and exposed as window.getIdentity'
+  );
+  if (h157) {
+    assert(
+      h157.getIdentity() === h157.GAME_DEFS.FNV.identity,
+      '157.4: getIdentity() with no ctx resolves the active game (default FNV) identity block'
+    );
+    assert(
+      h157.getIdentity('FO3') === h157.GAME_DEFS.FO3.identity,
+      '157.5: getIdentity("FO3") resolves GAME_DEFS.FO3.identity by explicit ctx'
+    );
+    assert(
+      h157.getIdentity('NOT-A-REAL-GAME') === h157.GAME_DEFS.FNV.identity,
+      '157.6: getIdentity() fails safe to FNV identity for an unknown/invalid ctx — never returns undefined'
+    );
+  }
+
+  // 157.7  FO4 is flagged designOnly and carries the skill-less (FO4-class) empty-array
+  //        contract locked by the Step 2 Phase 0 U11 audit (ARCHITECTURE.md) — never omitted.
+  if (h157) {
+    const fo4 = h157.GAME_DEFS.FO4;
+    assert(fo4 && fo4.designOnly === true, '157.7: GAME_DEFS.FO4.designOnly === true');
+    assert(
+      Array.isArray(fo4.skillKeys) &&
+        fo4.skillKeys.length === 0 &&
+        Array.isArray(fo4.factions) &&
+        fo4.factions.length === 0 &&
+        Array.isArray(fo4.combatSkills) &&
+        fo4.combatSkills.length === 0,
+      '157.8: GAME_DEFS.FO4.skillKeys/factions/combatSkills are declared as empty arrays (never omitted — the skill-less FO4-class contract)'
+    );
+  }
+
+  // 157.9  FO4's identity is genuinely distinct data, not a copy-paste of FO3's (proves the
+  //        N-game abstraction is real per-game data, not a shared placeholder object)
+  if (h157) {
+    const fo3id = h157.GAME_DEFS.FO3.identity;
+    const fo4id = h157.GAME_DEFS.FO4.identity;
+    assert(
+      fo3id !== fo4id &&
+        fo3id.machine !== fo4id.machine &&
+        fo3id.persona.texture !== fo4id.persona.texture &&
+        fo3id.cursor !== fo4id.cursor,
+      '157.9: FO3.identity and FO4.identity are distinct objects with distinct machine/persona/cursor values'
+    );
+  }
+
+  // 157.10  NV identity is populated richly and accurately from the approved mockup
+  //         (spot-check the mockup's hero values, not a placeholder)
+  if (h157) {
+    const nv = h157.GAME_DEFS.FNV.identity;
+    assert(
+      nv.machine === 'salvaged-terminal' &&
+        nv.cursor === 'amber-block' &&
+        nv.ceremony.coldStart === 'mojave-uplink-handshake' &&
+        Array.isArray(nv.persona.blipBank) &&
+        nv.persona.blipBank.length > 0,
+      '157.10: GAME_DEFS.FNV.identity matches the approved NV mockup (salvaged-terminal, amber-block cursor, Mojave uplink handshake, populated blip bank)'
+    );
+  }
+
+  // 157.11  data-game pre-paint (index.html head script, before state.js loads)
+  assert(
+    /document\.documentElement\.dataset\.game\s*=\s*_ctx0/.test(html157),
+    '157.11: index.html sets a flash-free pre-paint data-game attribute from the same _ctx0 the optics head script already resolves'
+  );
+
+  // 157.12  data-game re-applied once state.js is live (_restoreOpticsPreference)
+  {
+    const restoreBody157 = extractFunctionBody(core157, '_restoreOpticsPreference');
+    assert(
+      /document\.documentElement\.dataset\.game\s*=\s*getGameContext\(\)/.test(restoreBody157),
+      '157.12: _restoreOpticsPreference() re-applies data-game from getGameContext() once state is live'
+    );
+  }
+
+  // 157.13  data-game flips before the reload in onGameContextChange()
+  {
+    const ctxChangeBody157 = extractFunctionBody(core157, 'onGameContextChange');
+    const setIdx = ctxChangeBody157.indexOf('document.documentElement.dataset.game = ctx');
+    const reloadIdx = ctxChangeBody157.indexOf('window.location.reload()');
+    assert(
+      setIdx !== -1 && reloadIdx !== -1 && setIdx < reloadIdx,
+      '157.13: onGameContextChange() sets data-game to the target ctx BEFORE window.location.reload()'
+    );
+  }
+
+  // 157.14  onGameContextChange() refuses a designOnly game context (the FO4 guard)
+  {
+    const ctxChangeBody157b = extractFunctionBody(core157, 'onGameContextChange');
+    assert(
+      /if\s*\(!GAME_DEFS\[ctx\]\s*\|\|\s*GAME_DEFS\[ctx\]\.designOnly\)\s*return;/.test(
+        ctxChangeBody157b
+      ),
+      '157.14: onGameContextChange() returns early for an unknown OR designOnly game context'
+    );
+  }
+
+  // 157.15  #gameContextSelect offers no FO4 <option> (FO4 stays unreachable in the live UI)
+  {
+    const selectBlock157 = (html157.match(/id="gameContextSelect"[\s\S]*?<\/select>/) || [''])[0];
+    assert(
+      /value="FNV"/.test(selectBlock157) &&
+        /value="FO3"/.test(selectBlock157) &&
+        !/value="FO4"/.test(selectBlock157),
+      '157.15: #gameContextSelect lists FNV and FO3 only — no FO4 <option> (FO4 stays unreachable this cycle)'
+    );
+  }
+
+  // 157.16  wipeTerminal()'s "SELECT GAME CONTEXT" chat list filters out designOnly entries
+  //         (advertising a context nothing can select would be a real, visible regression
+  //         the moment GAME_DEFS grows a third game)
+  {
+    const wipeBody157 = extractFunctionBody(core157, 'wipeTerminal');
+    assert(
+      /Object\.values\(GAME_DEFS\)\s*\.filter\(d => !d\.designOnly\)\s*\.forEach/.test(wipeBody157),
+      '157.16: wipeTerminal() filters Object.values(GAME_DEFS) to !d.designOnly before listing selectable contexts'
+    );
+  }
+
+  // 157.17  eslint.config.mjs declares the new getIdentity() cross-file global (readonly)
+  assert(
+    /getIdentity:\s*'readonly'/.test(readFile('eslint.config.mjs')),
+    '157.17: eslint.config.mjs declares getIdentity as a readonly cross-file global'
+  );
+
+  // 157.18  save boundary — the DO-K additions write nothing durable to the campaign: the
+  //         identity/theme-alias block in state.js contains no saveState()/robco_v8 write,
+  //         and _restoreOpticsPreference()'s new data-game line is presentation-only.
+  {
+    const identityBlockMatch157 = stateSource.match(
+      /\/\/ ── DO-K: identity keystone[\s\S]*?window\.GAME_DEFS = GAME_DEFS;/
+    );
+    const identityBlock157 = identityBlockMatch157 ? identityBlockMatch157[0] : '';
+    assert(
+      identityBlock157.length > 0 &&
+        !/saveState\(/.test(identityBlock157) &&
+        !/localStorage\.setItem\('robco_v8'/.test(identityBlock157),
+      '157.18: the DO-K identity/theme-alias block in state.js contains no saveState()/robco_v8 write (data-def only, Protocol 26)'
+    );
+  }
+
+  // 157.19  APP_VERSION stays 2.7.0 under [Unreleased] — DO-K is cache-rev-only (Protocol 2)
+  assert(
+    /APP_VERSION\s*=\s*'2\.7\.0'/.test(stateSource),
+    '157.19: APP_VERSION remains 2.7.0 — DO-K ships under [Unreleased] with a cache-rev bump only'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail

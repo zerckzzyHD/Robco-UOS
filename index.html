@@ -29,6 +29,11 @@
       try {
         _ctx0 = JSON.parse(localStorage.getItem('robco_v8') || '{}').activeContext || 'FNV';
       } catch (e) {}
+      // DO-K: pre-paint data-game attribute (flash-free) — the identity keystone's root
+      // marker. Nothing reads it yet (DO-N's bezel chrome is the first [data-game] CSS
+      // consumer); set here, alongside the optics read above, so it is never absent on first
+      // paint once a later unit starts styling off it.
+      document.documentElement.dataset.game = _ctx0;
       var _optic0 =
         localStorage.getItem('robco_optic_' + _ctx0) || localStorage.getItem('robco_optics');
       if (_optic0) {
