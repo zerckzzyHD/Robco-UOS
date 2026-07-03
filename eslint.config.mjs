@@ -130,6 +130,9 @@ export default [
         _commandSuggestions: 'readonly',
         _hideModeHint: 'readonly',
         _resolveCommandInput: 'readonly',
+        // Small-UI-polish batch — composer auto-grow (js/ui-core.js), called from js/api.js
+        // after clearing #chatInput so the box resets to its small size after every send
+        _autoGrowComposer: 'readonly',
         markLocationVisited: 'readonly',
         // Step 2 Phase 2 A1 — Ambient Runtime (js/runtime.js): lifecycle state machine + observer scheduler
         AmbientRuntime: 'readonly',

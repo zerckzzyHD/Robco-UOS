@@ -69,8 +69,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2005-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2005-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2013-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2013-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -752,7 +752,7 @@ pre-existing focus/scroll behavior) and focuses `#chatInput`.
 **Save boundary clean (Protocol 26):** the entire DO-O block reads `state`/`getIdentity()` but
 never writes `saveState()` / `robco_v8` / `state.<field> =` anywhere — `_scopeState` is a transient
 module variable and the idle-blip observer's `appendToChat(...,true)` call is explicitly excluded
-from persistence. Guarded by Suite 162 (both runners at parity, 24 tests, including a Node
+from persistence. Guarded by Suite 162 (both runners at parity, 31 tests, including a Node
 `Function`-eval behavioral truth-table proof of `_overseerRestState()`).
 
 **DO-O follow-up — UPLINK mobile density/de-bloat/restyle (owner report):** a live-mobile
@@ -835,6 +835,33 @@ minimum footprint (its 90px content `min-height` PLUS its own 15px+15px padding,
 any further squeeze from a tall open tray scrolls the whole panel into view instead of clipping the
 transcript. Verified at 360px, 412px, and desktop from 800px through 1024px tall viewports with the
 tray both open and collapsed. Guarded by the Suite 162 extension (162.20b, 162.23a–c, 162.24).
+
+**Small-UI-polish batch — composer auto-grow, mode-pill sticky-hover fix, modernized help
+button (owner report):** three follow-on fixes, none of them DO-O-scoped architecture changes,
+sharing the composer/pill surface. `#chatInput`'s two fixed heights (desktop 80px, mobile 76px)
+are retired in favor of auto-grow: `.composer-input` carries a small 40px `min-height` floor and a
+160px `max-height` cap (`overflow-y: auto` beyond that), and `_autoGrowComposer()` (`ui-core.js`)
+measures `scrollHeight` to size the box — briefly filling an empty box with its own `placeholder`
+text to measure the smallest box that fits the whole example sentence, then restoring the empty
+value (a plain `.value` write never fires `'input'`, so there is no feedback loop). It is wired to
+`#chatInput`'s `'input'` event via `_wireComposerAutoGrow()` (boot-called from `_restoreDevicePrefs()`
+alongside `_wireModeHint()`), re-invoked by `_renderModePill()` whenever the placeholder itself
+changes (mode toggle), and called again by both `transmitMessage()` and `transmitTerminal()`
+(`js/api.js`) immediately after they clear `#chatInput`'s value, so the box snaps back to its small
+size after every send. Second: the mode pill's `:hover` fill (from the general
+`button.action-btn:hover` rule) was "sticking" after a touch tap — mobile browsers apply `:hover` on
+tap with no `pointerleave` event to clear it. `button.mode-pill--terminal:hover` /
+`--overseer:hover` unconditionally reset `background`/`filter` back to the pill's own resting look
+(same specificity as `button.action-btn:hover`, declared after it in source order to win the
+cascade tie), with the real green fill restored only inside a `@media (hover: hover) and
+(pointer: fine)` gate — the same signal Suite 129 already uses for desktop-only behavior — so real
+mouse users keep the feedback. `toggleInputMode()` also blurs the pill after a tap as a second line
+of defense. Third: the ALL SAVES bracket `[?]` help button is reskinned to the composer's round `?`
+shape via a new shared `.icon-btn-round` class (Protocol 22 — the same rule the composer's `[+]`/
+`?`/send buttons already use, extended rather than duplicated) driven by an `--icon-btn-color`
+custom property that falls back to `--bezel-wire`; the save-menu button sets it to the existing
+`--robco-blue` accent so its panel's color is unchanged. Guarded by the Suite 162 extension
+(162.25–162.28) and the Suite 103 extension (103.3 updated, 103.8 added).
 
 ---
 
@@ -1871,7 +1898,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2005-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2013-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

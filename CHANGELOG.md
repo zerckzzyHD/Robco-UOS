@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2005/2005 | Cache: robco-terminal-v2.7.0-r47 -->
+﻿## [Unreleased]<!-- Tests: 2013/2013 | Cache: robco-terminal-v2.7.0-r48 -->
 
 ### Added
 
@@ -39,6 +39,8 @@
 - Fixed the saves list not updating right after you saved, overwrote, or restored a version — you previously had to tap LOAD on something else before it caught up. It now refreshes immediately every time.
 - Fixed the Save & Data help menu not explaining the EXPORT FULL BACKUP button — it now describes what it bundles and how to restore it.
 - Fixed the Director Uplink view feeling cramped on phones and gave the message box a modern, messenger-style redesign. The oscilloscope was eating a big share of the screen, your conversation read as a small box, and the D-PAD/quick-command buttons below it were rendering in an outdated blue/green style that clashed with the amber Director theme. The oscilloscope is now a compact banner and your conversation gets much more room and leads the screen. Your conversation and your typing box are now one single rounded card, just like a modern messaging app — the photo-upload button, the OVERSEER/TERMINAL mode switch, the help button, and a round send arrow all sit together in one row at the bottom of that same card, instead of a plain text box with a send button buried at the very bottom of the screen. The D-PAD/quick-command buttons — recolored to match the amber theme — tuck into a collapsible tray you can open when you need them (they stay visible on desktop, exactly as before).
+- Fixed the Director Uplink message box showing a chunk of empty space below the example text. It now starts just tall enough to show its placeholder line, grows only as you actually type, and shrinks back down to that small size right after you send.
+- Fixed the OVERSEER/TERMINAL mode button staying visibly lit up after you tapped it on a phone, until you tapped something else on screen.
 
 ### Improved
 
@@ -48,6 +50,7 @@
 - Confirmation prompts and status messages — save/load warnings, cloud sync results, crafting and trading confirmations, and more — now appear as in-terminal pop-ups that match the rest of the interface, instead of your browser's plain "OK/Cancel" dialog boxes.
 - The Module Bay now looks and feels more like real hardware: the sound board's 13 mute switches are drawn as chips you plug in or pull, the power cell and haptic solenoid show their own device graphics, and the immersion level is now a turnable dial instead of a dropdown. Whichever view you last used — the hardware Bay or the flat Schematic list — is now remembered the next time you open Security & Configuration.
 - The Atmospheric Regulator dial can now be turned by dragging or sliding it with a mouse or finger, not just tapping — dial in the level you want in one smooth motion. Tapping still works exactly as before.
+- The Save & Data help button now matches the modern round design already used on the Comm-Link's help button, instead of the older bracket style.
 
 ### Under the Hood
 

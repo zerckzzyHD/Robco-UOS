@@ -6406,11 +6406,14 @@ Check ([bool](($firstInteract102 -match '!_bootActive') -and $guardIdx102 -ge 0 
     '102.6: boot-active first gesture plays the drone exactly once; post-boot first gesture suppresses it (no detached drone)'
 
 # ===========================================================
-# Suite 103 -- WU-C13 SAVE MENU "?" help affordance (7 tests)
+# Suite 103 -- WU-C13 SAVE MENU "?" help affordance (8 tests)
 # A diegetic "?" button in the save panel header opens a help modal explaining
 # each save action. Reuses the shared sysModal entry point (_openSysModal, WU-C4)
 # so it inherits the focus-trap + ARIA dialog semantics. Game-agnostic copy
-# (Protocol 38). These guards lock the affordance + its coverage.
+# (Protocol 38). These guards lock the affordance + its coverage. Small-UI-
+# polish batch: the button was modernized from a bracket "[?]" to the shared
+# round .icon-btn-round shape (Protocol 22 reuse of the composer's round-
+# help-button styling).
 # ===========================================================
 Sep "Suite 103 -- WU-C13 SAVE MENU `"?`" help affordance"
 $uiCore103 = Read-Src "js/ui-core.js"
@@ -6426,9 +6429,15 @@ Check (($htmlSrc -match 'onclick="showSaveHelpModal\(\)"') -and ($btnTag103 -ne 
 Check ([bool]($btnTag103 -match 'aria-label="[^"]+"')) `
     '103.2: save-menu "?" button has a descriptive aria-label (screen-reader operable)'
 
-# 103.3 >=28px tap target via the shared .btn-sm hook (Protocol 17)
-Check ([bool]($btnTag103 -match '\bbtn-sm\b')) `
-    '103.3: save-menu "?" button uses .btn-sm (>=28px min tap target -- Protocol 17)'
+# 103.3 >=28px tap target via the shared .icon-btn-round shape (Protocol 17) --
+#       modernized from the bracket "[?]" (small-UI-polish batch)
+$btnTagIdx103 = $htmlSrc.IndexOf($btnTag103)
+$btnEndIdx103 = if ($btnTagIdx103 -ge 0) { $htmlSrc.IndexOf('</button>', $btnTagIdx103) } else { -1 }
+$btnText103 = if (($btnTagIdx103 -ge 0) -and ($btnEndIdx103 -ge 0)) {
+    $htmlSrc.Substring($btnTagIdx103 + $btnTag103.Length, $btnEndIdx103 - ($btnTagIdx103 + $btnTag103.Length))
+} else { '' }
+Check (([bool]($btnTag103 -match '\bicon-btn-round\b')) -and (-not ($btnText103 -match '\[\?\]')) -and ($btnText103.Trim() -eq '?')) `
+    '103.3: save-menu help button uses the shared .icon-btn-round shape (>=28px min tap target -- Protocol 17) and reads a plain "?" -- no leftover bracket "[?]"'
 
 # 103.4 showSaveHelpModal defined and reuses openModal (Step 2 Phase 0 U12 consolidated driver)
 Check (($uiCore103 -match 'function showSaveHelpModal\s*\(') -and ($helpBody103 -match 'openModal\s*\(\s*\)')) `
@@ -6448,6 +6457,12 @@ Check (($helpBody103 -match 'escapeHtml\(c\.cmd\)') -and ($helpBody103 -match 'e
 # 103.7 game-agnostic (Protocol 38): no game-specific literals in the help copy
 Check (-not ($saveHelp103 -match '\bFNV\b|\bFO3\b|Fallout|New Vegas|Vault-Tec')) `
     '103.7: SAVE_HELP copy is game-agnostic -- no FNV/FO3/Fallout/New Vegas literals (Protocol 38)'
+
+# 103.8 small-UI-polish batch -- the save-menu help button rides the shared
+#       .icon-btn-round class (Protocol 22 reuse) with its own accent color
+#       via --icon-btn-color, not a forked/duplicated round-button rule
+Check (([bool]($btnTag103 -match '--icon-btn-color: var\(--robco-blue\)')) -and ([bool]($cssSrc -match '\.icon-btn-round\b'))) `
+    '103.8: the save-menu help button sets --icon-btn-color to the existing --robco-blue accent (kept blue, matching its panel) via the shared .icon-btn-round class, not a duplicated CSS rule'
 
 # ===========================================================
 # Suite 104 -- WU-D4 deterministic-feature coefficients (fallout.wiki-verified) (19 tests)
@@ -12315,7 +12330,11 @@ Check (
 # #chatDisplay and .composer, messenger-style) with a [+ upload]/[mode
 # pill]/[? help]/[send] toolbar docked at its bottom, plus a real desktop
 # min-height fix for a crush bug found live during verification
-# (Protocol 42). 24 tests.
+# (Protocol 42). Extended again (owner small-UI-polish batch): the composer
+# textarea auto-grows from a small placeholder-fit size up to a cap instead
+# of a fixed-height box, resets to small after every send, and the mode
+# pill's touch-sticky hover fill is neutralized (gated back in for real
+# hover-capable pointers only) with a blur() second line of defense. 31 tests.
 # ===========================================================
 Sep "Suite 162 -- DO-O: the living Overseer (DIRECTOR UPLINK)"
 $html162  = Read-Src "index.html"
@@ -12577,19 +12596,21 @@ Check (
 ) "162.18b: the macro-buttons cluster (THREAT/VATS/TRADE/LOOT/CONSULT/VATS CALCULATOR/TERMLINK) carries no leftover --robco-green literal -- every button matches the amber Director Uplink aesthetic"
 
 Check (
-    ($css162 -match "(?s)\.composer-icon-btn,\s*\n\.composer-send-btn \{[^}]*border: 1px solid var\(--bezel-wire\);") -and
-    ($css162 -match "(?s)\.composer-icon-btn:hover,\s*\n\.composer-send-btn:hover \{[^}]*background: var\(--bezel-wire\);")
-) "162.18c: the composer icon/send buttons are outlined amber (transparent background, --bezel-wire border) and fill amber on hover -- no leftover .blue-btn solid-fill bug (superseded by the composer redesign)"
+    ($css162 -match "(?s)\.composer-icon-btn,\s*\n\.composer-send-btn,\s*\n\.icon-btn-round \{[^}]*border: 1px solid var\(--icon-btn-color, var\(--bezel-wire\)\);") -and
+    ($css162 -match "(?s)\.composer-icon-btn:hover,\s*\n\.composer-send-btn:hover,\s*\n\.icon-btn-round:hover \{[^}]*background: var\(--icon-btn-color, var\(--bezel-wire\)\);")
+) "162.18c: the composer icon/send buttons (and the shared .icon-btn-round) are outlined amber by default (transparent background, --icon-btn-color falling back to --bezel-wire) and fill on hover -- no leftover .blue-btn solid-fill bug (superseded by the composer redesign)"
 
-# 162.19  mobile density -- the oscilloscope shrinks to a tidy banner and the
-#         command input gets real height, scoped to the existing UPLINK
+# 162.19  mobile density -- the oscilloscope shrinks to a tidy banner;
+#         #chatInput's own fixed height was superseded by the small-UI-
+#         polish batch's auto-grow (162.25+), scoped to the existing UPLINK
 #         mobile block (max-width: 999.98px)
 $mobileMatch162 = [regex]::Match($css162, "(?s)@media \(max-width: 999\.98px\) \{.*?\n\}\n(?=/\* Desktop needs no explicit override)")
 $mobileBlock162 = if ($mobileMatch162.Success) { $mobileMatch162.Value } else { "" }
 Check (
     ($mobileBlock162 -match "body\[data-subsystem='uplink'\] #overseerScope \{\s*height: 64px;") -and
-    ($mobileBlock162 -match "body\[data-subsystem='uplink'\] #chatInput \{\s*height: 76px;\s*flex-shrink: 0;")
-) "162.19: the mobile UPLINK block shrinks #overseerScope to a 64px banner (down from the unconditional 120px) and gives #chatInput a real 76px height (was the bare 2-row textarea default)"
+    ($mobileBlock162 -match "body\[data-subsystem='uplink'\] #chatInput \{\s*flex-shrink: 0;\s*\}") -and
+    (-not ($mobileBlock162 -match "body\[data-subsystem='uplink'\] #chatInput \{\s*height:"))
+) "162.19: the mobile UPLINK block shrinks #overseerScope to a 64px banner (down from the unconditional 120px); #chatInput keeps flex-shrink:0 but no longer hardcodes a fixed height (superseded by auto-grow -- see 162.25)"
 
 # 162.20  owner composer redesign -- the composer INTEGRATES into the
 #         transcript box (.transcript-card wraps BOTH #chatDisplay and
@@ -12660,7 +12681,7 @@ $chatDisplayRuleMatch162 = [regex]::Match($css162, "(?s)`n#chatDisplay \{.*?`n\}
 $chatDisplayRule162 = if ($chatDisplayRuleMatch162.Success) { $chatDisplayRuleMatch162.Value } else { "" }
 $composerRuleMatch162 = [regex]::Match($css162, "(?s)`n\.composer \{.*?`n\}")
 $composerRule162 = if ($composerRuleMatch162.Success) { $composerRuleMatch162.Value } else { "" }
-$iconBtnRuleMatch162 = [regex]::Match($css162, "(?s)\.composer-icon-btn,\s*\n\.composer-send-btn \{.*?\n\}")
+$iconBtnRuleMatch162 = [regex]::Match($css162, "(?s)\.composer-icon-btn,\s*\n\.composer-send-btn,\s*\n\.icon-btn-round \{.*?\n\}")
 $iconBtnRule162 = if ($iconBtnRuleMatch162.Success) { $iconBtnRuleMatch162.Value } else { "" }
 Check (
     ($cardRule162.Length -gt 0) -and
@@ -12704,6 +12725,77 @@ Check (
     ($desktopCardRule162 -match 'min-height: 282px;') -and
     (-not ($desktopCardRule162 -match 'min-height: 0;'))
 ) "162.24: desktop .panel.chat-panel scrolls (overflow-y:auto) and desktop .transcript-card carries a real 282px min-height floor (not 0) -- with the open-by-default command tray, this is what stops the transcript from being crushed to a clipped sliver with no scrollbar (Protocol 42 -- found live during this unit's desktop verification)"
+
+# 162.25  owner small-UI-polish batch -- .composer-input starts as small as
+#         possible (a small floor + a cap that scrolls) instead of a big
+#         fixed-height box, and neither #chatInput override (mobile or
+#         desktop) hardcodes a fixed height anymore
+$composerInputRuleMatch162 = [regex]::Match($css162, "(?s)`n\.composer-input \{.*?`n\}")
+$composerInputRule162 = if ($composerInputRuleMatch162.Success) { $composerInputRuleMatch162.Value } else { "" }
+Check (
+    ($composerInputRule162.Length -gt 0) -and
+    ($composerInputRule162 -match 'min-height: 40px;') -and
+    ($composerInputRule162 -match 'max-height: 160px;') -and
+    ($composerInputRule162 -match 'overflow-y: auto;') -and
+    (-not ($composerInputRule162 -match 'min-height: 56px;'))
+) "162.25a: .composer-input has a small min-height floor (40px) + a max-height cap (160px) that scrolls, replacing the old fixed 56px min-height"
+Check (
+    ($desktopBlock162 -match '#chatInput \{\s*flex-shrink: 0;\s*\}') -and
+    ($mobileBlock162 -match "body\[data-subsystem='uplink'\] #chatInput \{\s*flex-shrink: 0;\s*\}")
+) "162.25b: neither the desktop nor the mobile #chatInput override hardcodes a fixed height anymore -- both keep only flex-shrink:0 (auto-grow supersedes the old 80px/76px fixed heights)"
+
+# 162.26  owner small-UI-polish batch -- _autoGrowComposer()/
+#         _wireComposerAutoGrow() (ui-core.js) drive the auto-grow: wired at
+#         boot alongside _wireModeHint(), and re-measured whenever the
+#         placeholder itself changes (mode toggle)
+$autoGrowBody162 = Get-FunctionBody $core162 '_autoGrowComposer'
+$wireAutoGrowBody162 = Get-FunctionBody $core162 '_wireComposerAutoGrow'
+$restoreDevicePrefsBody162 = Get-FunctionBody $core162 '_restoreDevicePrefs'
+$renderModePillBody162 = Get-FunctionBody $core162 '_renderModePill'
+Check (
+    ($autoGrowBody162 -match "el\.style\.height = 'auto';") -and
+    ($autoGrowBody162 -match 'el\.value = el\.placeholder;') -and
+    ($autoGrowBody162 -match 'Math\.min\(el\.scrollHeight, COMPOSER_INPUT_MAX_HEIGHT_PX\)') -and
+    ($autoGrowBody162 -match "el\.value = '';")
+) "162.26a: _autoGrowComposer() measures scrollHeight (briefly filling the empty box with its own placeholder to size the default state), caps it at COMPOSER_INPUT_MAX_HEIGHT_PX, and never leaves a placeholder string behind in the real value"
+Check (
+    ($wireAutoGrowBody162 -match "addEventListener\('input', _autoGrowComposer\)") -and
+    ($restoreDevicePrefsBody162 -match '_wireComposerAutoGrow\(\);') -and
+    ($renderModePillBody162 -match '_autoGrowComposer\(\);')
+) "162.26b: _wireComposerAutoGrow() wires #chatInput to re-measure on every keystroke and is called from boot (_restoreDevicePrefs, alongside _wireModeHint); _renderModePill() re-measures too so switching modes resizes to fit the new placeholder"
+
+# 162.27  owner small-UI-polish batch -- the composer resets to its small
+#         size after every send (both OVERSEER and TERMINAL mode), not just
+#         while typing
+$tmBody162c = Get-FunctionBody $api162 'transmitMessage'
+$ttBody162c = Get-FunctionBody $api162 'transmitTerminal'
+Check (
+    ($tmBody162c -match "inputEl\.value = '';\s*if \(typeof _autoGrowComposer === 'function'\) _autoGrowComposer\(\);") -and
+    ($ttBody162c -match "inputEl\.value = '';\s*if \(typeof _autoGrowComposer === 'function'\) _autoGrowComposer\(\);")
+) "162.27: transmitMessage() and transmitTerminal() (api.js) both re-measure the composer immediately after clearing #chatInput, so it snaps back to its small placeholder-fit size after every send"
+
+# 162.28  owner report fix -- the mode pill's touch-sticky hover fill (from
+#         the general button.action-btn:hover rule persisting after a tap
+#         with no pointerleave to clear it) is neutralized unconditionally,
+#         with the real fill restored only for genuine hover-capable
+#         pointers; toggleInputMode() also blurs the pill as a second line
+#         of defense
+$pillHoverResetIdx162 = $css162.IndexOf('button.mode-pill--terminal:hover')
+$pillHoverGatedIdx162 = if ($pillHoverResetIdx162 -ge 0) { $css162.IndexOf('(hover: hover) and (pointer: fine)', $pillHoverResetIdx162) } else { -1 }
+$pillHoverResetBlock162 = if ($pillHoverResetIdx162 -ge 0) { $css162.Substring($pillHoverResetIdx162, [Math]::Min(400, $css162.Length - $pillHoverResetIdx162)) } else { "" }
+Check (
+    ($pillHoverResetIdx162 -ge 0) -and
+    ($pillHoverGatedIdx162 -ge 0) -and
+    ($pillHoverGatedIdx162 -gt $pillHoverResetIdx162) -and
+    ($pillHoverResetBlock162 -match '(?s)button\.mode-pill--terminal:hover \{[^}]*background: transparent;[^}]*filter: none;') -and
+    ($pillHoverResetBlock162 -match '(?s)button\.mode-pill--overseer:hover \{[^}]*background: transparent;[^}]*filter: none;') -and
+    ($css162 -match '(?s)button\.mode-pill:hover \{[^}]*background: var\(--robco-green\);')
+) "162.28a: button.mode-pill--terminal:hover / --overseer:hover unconditionally reset background/filter (declared BEFORE the gated hover-capable-only restore) so a touch tap can never leave the pill looking stuck-highlighted"
+$toggleInputModeBody162 = Get-FunctionBody $core162 'toggleInputMode'
+Check (
+    ($toggleInputModeBody162 -match "getElementById\('modePill'\)") -and
+    ($toggleInputModeBody162 -match '\.blur\(\)')
+) "162.28b: toggleInputMode() blurs the pill after a tap (belt-and-suspenders alongside the CSS hover-gate fix)"
 
 # ===========================================================
 # Results

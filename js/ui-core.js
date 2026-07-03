@@ -1696,6 +1696,7 @@ function _restoreDevicePrefs() {
   // the persisted device pref and wire the `/`/`@` hint reveal.
   _renderModePill();
   _wireModeHint();
+  _wireComposerAutoGrow();
 }
 
 function _wireKeyboardShortcuts() {
@@ -3230,6 +3231,7 @@ function _renderModePill() {
     );
   }
   if (input) input.placeholder = _modePlaceholder(mode);
+  _autoGrowComposer();
 }
 
 // Tapping the pill swaps the PERSISTED mode (device pref) — distinct from the
@@ -3240,6 +3242,11 @@ function toggleInputMode() {
   _renderModePill();
   _updateModeHint();
   if (typeof playPanelClick === 'function') playPanelClick();
+  // FIX (owner report): a touch tap leaves the pill focused with no real
+  // pointerleave to clear it — blur it so no lingering focus ring survives
+  // the tap (belt-and-suspenders alongside the CSS hover-gate fix below).
+  const pill = document.getElementById('modePill');
+  if (pill && typeof pill.blur === 'function') pill.blur();
 }
 window.toggleInputMode = toggleInputMode;
 
@@ -3285,6 +3292,39 @@ window._hideModeHint = _hideModeHint;
 function _wireModeHint() {
   const input = document.getElementById('chatInput');
   if (input) input.addEventListener('input', _updateModeHint);
+}
+
+// Owner fix (small-UI-polish batch): #chatInput starts as small as possible
+// (sized to fit its own placeholder sentence — no dead space below the
+// text) and grows with typed content up to a cap, then scrolls internally.
+// Keep in sync with .composer-input's max-height (terminal.css).
+const COMPOSER_INPUT_MAX_HEIGHT_PX = 160;
+
+function _autoGrowComposer() {
+  const el = document.getElementById('chatInput');
+  if (!el) return;
+  el.style.height = 'auto';
+  if (!el.value) {
+    // scrollHeight only reflects real VALUE content, not placeholder text —
+    // briefly fill with the placeholder to measure the smallest box that
+    // fits the whole example sentence, then restore the empty value.
+    // Programmatic .value writes don't fire 'input', so no feedback loop.
+    el.value = el.placeholder;
+    el.style.height = Math.min(el.scrollHeight, COMPOSER_INPUT_MAX_HEIGHT_PX) + 'px';
+    el.value = '';
+  } else {
+    el.style.height = Math.min(el.scrollHeight, COMPOSER_INPUT_MAX_HEIGHT_PX) + 'px';
+  }
+}
+window._autoGrowComposer = _autoGrowComposer;
+
+// Boot-wired alongside _wireModeHint() (same #chatInput surface); re-measures
+// on every keystroke. The initial call sizes the box to the placeholder.
+function _wireComposerAutoGrow() {
+  const el = document.getElementById('chatInput');
+  if (!el) return;
+  el.addEventListener('input', _autoGrowComposer);
+  _autoGrowComposer();
 }
 
 // WU-E3: the command registry is kept in lock-step with reality — every entry

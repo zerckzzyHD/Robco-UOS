@@ -1384,6 +1384,7 @@ async function transmitTerminal(overrideText) {
 
   appendToChat(`> ${userText}`, 'user');
   inputEl.value = '';
+  if (typeof _autoGrowComposer === 'function') _autoGrowComposer();
 
   if (_routeNativeCommand(userText)) {
     if (_isPrecisePointer()) document.getElementById('chatInput').focus();
@@ -1787,6 +1788,7 @@ async function transmitMessage(overrideText) {
   let displayUserText = attachedImageData ? '[VISUAL DATA UPLOADED] ' + userText : userText;
   appendToChat(`> ${displayUserText}`, 'user');
   inputEl.value = '';
+  if (typeof _autoGrowComposer === 'function') _autoGrowComposer();
 
   // Native command router — intercepts deterministic commands before any network call
   if (!attachedImageData && _routeNativeCommand(userText)) {

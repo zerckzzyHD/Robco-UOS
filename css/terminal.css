@@ -958,7 +958,13 @@ textarea {
   color: var(--bezel-wire);
   margin-top: 0;
   padding: 4px 2px;
-  min-height: 56px;
+  /* Owner fix (small-UI-polish batch): the box starts as small as possible
+     (sized to fit its own placeholder — _autoGrowComposer() in ui-core.js —
+     not a big fixed-height box with dead space below the text) and grows
+     with typed content up to this cap, then scrolls internally. */
+  min-height: 40px;
+  max-height: 160px;
+  overflow-y: auto;
 }
 .composer-input:focus {
   outline: none;
@@ -968,8 +974,13 @@ textarea {
   align-items: center;
   gap: 8px;
 }
+/* .icon-btn-round (small-UI-polish batch) — the shared modern round "?"
+   shape, reused outside the composer too (e.g. the ALL SAVES help button)
+   via the --icon-btn-color custom property; a caller that doesn't set it
+   falls back to --bezel-wire, matching the composer buttons unchanged. */
 .composer-icon-btn,
-.composer-send-btn {
+.composer-send-btn,
+.icon-btn-round {
   width: 32px;
   height: 32px;
   min-width: 32px;
@@ -978,8 +989,8 @@ textarea {
   margin: 0;
   border-radius: 50%;
   background: transparent;
-  border: 1px solid var(--bezel-wire);
-  color: var(--bezel-wire);
+  border: 1px solid var(--icon-btn-color, var(--bezel-wire));
+  color: var(--icon-btn-color, var(--bezel-wire));
   font-size: 15px;
   line-height: 1;
   display: inline-flex;
@@ -988,8 +999,9 @@ textarea {
   flex-shrink: 0;
 }
 .composer-icon-btn:hover,
-.composer-send-btn:hover {
-  background: var(--bezel-wire);
+.composer-send-btn:hover,
+.icon-btn-round:hover {
+  background: var(--icon-btn-color, var(--bezel-wire));
   color: #000;
 }
 .composer-send-btn {
@@ -1145,8 +1157,10 @@ textarea {
   /* DO-O follow-up (owner mobile-density fix): trim the oscilloscope to a
      tidy banner (was a fixed 120px, plus head/meta chrome, on every
      viewport) so the transcript above reclaims the freed space and leads
-     the view; the command input gets real height instead of the bare
-     2-row textarea default. Neither rule touches wiring — layout only. */
+     the view. Neither rule touches wiring — layout only. #chatInput's own
+     fixed height was superseded by the small-UI-polish batch's auto-grow
+     (.composer-input's min/max-height + _autoGrowComposer(), ui-core.js) —
+     flex-shrink:0 still guards it from being crushed by flex siblings. */
   body[data-subsystem='uplink'] .scope-wrap {
     padding: 5px 0 4px;
   }
@@ -1157,7 +1171,6 @@ textarea {
     font-size: 8px;
   }
   body[data-subsystem='uplink'] #chatInput {
-    height: 76px;
     flex-shrink: 0;
   }
   body:not([data-subsystem='uplink']) .col-right {
@@ -2692,14 +2705,16 @@ body.thermal-load .panel {
        algorithm was free to crush this card toward zero BEFORE its own
        overflow-y:auto ever engaged (the card conceded the space instead of
        .chat-panel scrolling), which in turn crushed #chatDisplay against
-       .composer's fixed 149px inside the card's own overflow:hidden —
+       .composer's then-fixed ~149px inside the card's own overflow:hidden —
        clipping the transcript to a sliver with no scrollbar in sight
        (Protocol 42, same investigation as the .chat-panel fix above). The
        floor below is #chatDisplay's real minimum footprint — its 90px
        content min-height PLUS its own 15px+15px padding (content-box, so
-       padding isn't absorbed into the 90px) — plus .composer's fixed 149px
-       and the card's 2px border, so any further squeeze is absorbed by
-       .chat-panel's scroll instead of clipping the transcript. */
+       padding isn't absorbed into the 90px) — plus the composer's own
+       height and the card's 2px border, so any further squeeze is absorbed
+       by .chat-panel's scroll instead of clipping the transcript. #chatInput
+       is now auto-grow (small-UI-polish batch) rather than a fixed 80px, so
+       this floor is a conservative upper bound, not an exact tally. */
     min-height: 282px;
   }
   #chatDisplay {
@@ -2710,7 +2725,6 @@ body.thermal-load .panel {
     font-size: 15px;
   }
   #chatInput {
-    height: 80px;
     flex-shrink: 0;
   }
 }
@@ -3113,6 +3127,36 @@ body.sync-complete {
 .mode-pill--overseer {
   border-color: var(--robco-blue);
   color: var(--robco-blue);
+}
+/* FIX (owner report, small-UI-polish batch): button.action-btn:hover's fill
+   "sticks" after a touch tap — mobile browsers apply :hover on tap with no
+   pointerleave event to clear it, so the pill stayed lit green/dark until
+   something else was tapped. Reset the pill's hover look unconditionally
+   (every pointer type) here, then layer the real fill back in for genuine
+   hover-capable pointers only — the same (hover: hover) signal Suite 129
+   already uses for desktop-only behavior — so mouse users keep the
+   feedback and a touch tap never looks stuck. toggleInputMode() (ui-core.js)
+   also blurs the pill after a tap as a second line of defense.
+   Both reset rules must tie-or-beat button.action-btn:hover's specificity
+   (element + class + pseudo-class) and be declared AFTER it in source
+   order to win the cascade tie; the gated restore below is declared after
+   THEM for the same reason. */
+button.mode-pill--terminal:hover {
+  background: transparent;
+  filter: none;
+  color: var(--robco-green);
+}
+button.mode-pill--overseer:hover {
+  background: transparent;
+  filter: none;
+  color: var(--bezel-wire);
+}
+@media (hover: hover) and (pointer: fine) {
+  button.mode-pill:hover {
+    background: var(--robco-green);
+    color: var(--robco-dark);
+    filter: brightness(1.1);
+  }
 }
 /* Inline reveal (not a floating overlay) so it can never overflow at
    360/412px — it simply occupies its own row while `/` or `@` is typed. */

@@ -11111,11 +11111,14 @@ header('Suite 102 — WU-B10 boot-drone autoplay timing');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 103 — WU-C13 SAVE MENU "?" help affordance (7 tests)
+//  Suite 103 — WU-C13 SAVE MENU "?" help affordance (8 tests)
 //  A diegetic "?" button in the save panel header opens a help modal explaining
 //  each save action. Reuses the shared sysModal entry point (_openSysModal,
 //  WU-C4) so it inherits the focus-trap + ARIA dialog semantics. Game-agnostic
 //  copy (Protocol 38). These guards lock the affordance + its coverage.
+//  Small-UI-polish batch: the button was modernized from a bracket "[?]" to
+//  the shared round .icon-btn-round shape (Protocol 22 reuse of the
+//  composer's round-help-button styling).
 // ══════════════════════════════════════════════════════════════
 header('Suite 103 — WU-C13 SAVE MENU "?" help affordance');
 {
@@ -11139,11 +11142,21 @@ header('Suite 103 — WU-C13 SAVE MENU "?" help affordance');
     '103.2: save-menu "?" button has a descriptive aria-label (screen-reader operable)'
   );
 
-  // 103.3 ≥28px tap target via the shared .btn-sm hook (Protocol 17)
-  assert(
-    /\bbtn-sm\b/.test(btnTag103),
-    '103.3: save-menu "?" button uses .btn-sm (≥28px min tap target — Protocol 17)'
-  );
+  // 103.3 ≥28px tap target via the shared .icon-btn-round shape (Protocol 17) —
+  //       modernized from the bracket "[?]" (small-UI-polish batch)
+  {
+    const saveHelpBtnEnd103 = htmlSource.indexOf('</button>', htmlSource.indexOf(btnTag103));
+    const saveHelpBtnText103 =
+      btnTag103 !== '' && saveHelpBtnEnd103 !== -1
+        ? htmlSource.slice(htmlSource.indexOf(btnTag103) + btnTag103.length, saveHelpBtnEnd103)
+        : '';
+    assert(
+      /\bicon-btn-round\b/.test(btnTag103) &&
+        !/\[\?\]/.test(saveHelpBtnText103) &&
+        saveHelpBtnText103.trim() === '?',
+      '103.3: save-menu help button uses the shared .icon-btn-round shape (≥28px min tap target — Protocol 17) and reads a plain "?" — no leftover bracket "[?]"'
+    );
+  }
 
   // 103.4 showSaveHelpModal defined and reuses openModal (Step 2 Phase 0 U12 consolidated
   //       driver; opens the same #sysModal, so it still inherits the WU-C4 focus-trap + ARIA)
@@ -11183,6 +11196,17 @@ header('Suite 103 — WU-C13 SAVE MENU "?" help affordance');
     assert(
       !/\bFNV\b|\bFO3\b|Fallout|New Vegas|Vault-Tec/.test(saveHelp103b),
       '103.7: SAVE_HELP copy is game-agnostic — no FNV/FO3/Fallout/New Vegas literals (Protocol 38)'
+    );
+  }
+
+  // 103.8 small-UI-polish batch — the save-menu help button rides the shared
+  //       .icon-btn-round class (Protocol 22 reuse) with its own accent color
+  //       via --icon-btn-color, not a forked/duplicated round-button rule
+  {
+    assert(
+      /--icon-btn-color: var\(--robco-blue\)/.test(btnTag103) &&
+        /\.icon-btn-round\b/.test(cssSource),
+      '103.8: the save-menu help button sets --icon-btn-color to the existing --robco-blue accent (kept blue, matching its panel) via the shared .icon-btn-round class, not a duplicated CSS rule'
     );
   }
 }
@@ -20486,7 +20510,11 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  #chatDisplay and .composer, messenger-style) with a [+ upload]/[mode
 //  pill]/[? help]/[↑ send] toolbar docked at its bottom, plus a real
 //  desktop min-height fix for a crush bug found live during verification
-//  (Protocol 42). 24 tests.
+//  (Protocol 42). Extended again (owner small-UI-polish batch): the composer
+//  textarea auto-grows from a small placeholder-fit size up to a cap instead
+//  of a fixed-height box, resets to small after every send, and the mode
+//  pill's touch-sticky hover fill is neutralized (gated back in for real
+//  hover-capable pointers only) with a blur() second line of defense. 31 tests.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 162 — DO-O: the living Overseer (DIRECTOR UPLINK)');
@@ -20798,29 +20826,29 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       '162.18b: the macro-buttons cluster (THREAT/VATS/TRADE/LOOT/CONSULT/VATS CALCULATOR/TERMLINK) carries no leftover --robco-green literal — every button matches the amber Director Uplink aesthetic'
     );
     assert(
-      /\.composer-icon-btn,\s*\n\.composer-send-btn \{[^}]*border: 1px solid var\(--bezel-wire\);/.test(
+      /\.composer-icon-btn,\s*\n\.composer-send-btn,\s*\n\.icon-btn-round \{[^}]*border: 1px solid var\(--icon-btn-color, var\(--bezel-wire\)\);/.test(
         cssSource
       ) &&
-        /\.composer-icon-btn:hover,\s*\n\.composer-send-btn:hover \{[^}]*background: var\(--bezel-wire\);/.test(
+        /\.composer-icon-btn:hover,\s*\n\.composer-send-btn:hover,\s*\n\.icon-btn-round:hover \{[^}]*background: var\(--icon-btn-color, var\(--bezel-wire\)\);/.test(
           cssSource
         ),
-      '162.18c: the composer icon/send buttons are outlined amber (transparent background, --bezel-wire border) and fill amber on hover — no leftover .blue-btn solid-fill bug (superseded by the composer redesign)'
+      '162.18c: the composer icon/send buttons (and the shared .icon-btn-round) are outlined amber by default (transparent background, --icon-btn-color falling back to --bezel-wire) and fill on hover — no leftover .blue-btn solid-fill bug (superseded by the composer redesign)'
     );
   }
 
-  // 162.19  mobile density — the oscilloscope shrinks to a tidy banner and the
-  //         command input gets real height, scoped to the existing UPLINK
-  //         mobile block (max-width: 999.98px)
+  // 162.19  mobile density — the oscilloscope shrinks to a tidy banner;
+  //         #chatInput's own fixed height was superseded by the small-UI-
+  //         polish batch's auto-grow (162.25+), scoped to the existing
+  //         UPLINK mobile block (max-width: 999.98px)
   {
     const mobileBlock162 = (cssSource.match(
       /@media \(max-width: 999\.98px\) \{[\s\S]*?\n\}\n(?=\/\* Desktop needs no explicit override)/
     ) || [''])[0];
     assert(
       /body\[data-subsystem='uplink'\] #overseerScope \{\s*height: 64px;/.test(mobileBlock162) &&
-        /body\[data-subsystem='uplink'\] #chatInput \{\s*height: 76px;\s*flex-shrink: 0;/.test(
-          mobileBlock162
-        ),
-      '162.19: the mobile UPLINK block shrinks #overseerScope to a 64px banner (down from the unconditional 120px) and gives #chatInput a real 76px height (was the bare 2-row textarea default)'
+        /body\[data-subsystem='uplink'\] #chatInput \{\s*flex-shrink: 0;/.test(mobileBlock162) &&
+        !/body\[data-subsystem='uplink'\] #chatInput \{\s*height:/.test(mobileBlock162),
+      '162.19: the mobile UPLINK block shrinks #overseerScope to a 64px banner (down from the unconditional 120px); #chatInput keeps flex-shrink:0 but no longer hardcodes a fixed height (superseded by auto-grow — see 162.25)'
     );
   }
 
@@ -20907,7 +20935,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     const chatDisplayRule162 = (cssSource.match(/\n#chatDisplay \{[\s\S]*?\n\}/) || [''])[0];
     const composerRule162 = (cssSource.match(/\n\.composer \{[\s\S]*?\n\}/) || [''])[0];
     const iconBtnRule162 = (cssSource.match(
-      /\.composer-icon-btn,\s*\n\.composer-send-btn \{[\s\S]*?\n\}/
+      /\.composer-icon-btn,\s*\n\.composer-send-btn,\s*\n\.icon-btn-round \{[\s\S]*?\n\}/
     ) || [''])[0];
     assert(
       cardRule162.length > 0 &&
@@ -20962,6 +20990,113 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         /min-height: 282px;/.test(desktopCardRule162) &&
         !/min-height: 0;/.test(desktopCardRule162),
       "162.24: desktop .panel.chat-panel scrolls (overflow-y:auto) and desktop .transcript-card carries a real 282px min-height floor (not 0) — with the open-by-default command tray, this is what stops the transcript from being crushed to a clipped sliver with no scrollbar (Protocol 42 — found live during this unit's desktop verification)"
+    );
+  }
+
+  // 162.25  owner small-UI-polish batch — .composer-input starts as small as
+  //         possible (a small floor + a cap that scrolls) instead of a big
+  //         fixed-height box, and neither #chatInput override (mobile or
+  //         desktop) hardcodes a fixed height anymore
+  {
+    const composerInputRule162 = (cssSource.match(/\n\.composer-input \{[\s\S]*?\n\}/) || [''])[0];
+    assert(
+      composerInputRule162.length > 0 &&
+        /min-height: 40px;/.test(composerInputRule162) &&
+        /max-height: 160px;/.test(composerInputRule162) &&
+        /overflow-y: auto;/.test(composerInputRule162) &&
+        !/min-height: 56px;/.test(composerInputRule162),
+      '162.25a: .composer-input has a small min-height floor (40px) + a max-height cap (160px) that scrolls, replacing the old fixed 56px min-height'
+    );
+    const desktopBlock162b = (cssSource.match(
+      /@media \(min-width: 1000px\) and \(hover: hover\) and \(pointer: fine\) \{[\s\S]*?\n\}\n\n(?=\/\* ── Skills Grid)/
+    ) || [''])[0];
+    const mobileBlock162b = (cssSource.match(
+      /@media \(max-width: 999\.98px\) \{[\s\S]*?\n\}\n(?=\/\* Desktop needs no explicit override)/
+    ) || [''])[0];
+    assert(
+      /#chatInput \{\s*flex-shrink: 0;\s*\}/.test(desktopBlock162b) &&
+        /body\[data-subsystem='uplink'\] #chatInput \{\s*flex-shrink: 0;\s*\}/.test(
+          mobileBlock162b
+        ),
+      '162.25b: neither the desktop nor the mobile #chatInput override hardcodes a fixed height anymore — both keep only flex-shrink:0 (auto-grow supersedes the old 80px/76px fixed heights)'
+    );
+  }
+
+  // 162.26  owner small-UI-polish batch — _autoGrowComposer()/
+  //         _wireComposerAutoGrow() (ui-core.js) drive the auto-grow: wired
+  //         at boot alongside _wireModeHint(), and re-measured whenever the
+  //         placeholder itself changes (mode toggle)
+  {
+    const autoGrowBody162 = extractFunctionBody(uiSource, '_autoGrowComposer');
+    const wireAutoGrowBody162 = extractFunctionBody(uiSource, '_wireComposerAutoGrow');
+    const restoreDevicePrefsBody162 = extractFunctionBody(uiSource, '_restoreDevicePrefs');
+    const renderModePillBody162 = extractFunctionBody(uiSource, '_renderModePill');
+    assert(
+      /el\.style\.height = 'auto';/.test(autoGrowBody162) &&
+        /el\.value = el\.placeholder;/.test(autoGrowBody162) &&
+        /Math\.min\(el\.scrollHeight, COMPOSER_INPUT_MAX_HEIGHT_PX\)/.test(autoGrowBody162) &&
+        /el\.value = '';/.test(autoGrowBody162),
+      '162.26a: _autoGrowComposer() measures scrollHeight (briefly filling the empty box with its own placeholder to size the default state), caps it at COMPOSER_INPUT_MAX_HEIGHT_PX, and never leaves a placeholder string behind in the real value'
+    );
+    assert(
+      /addEventListener\('input', _autoGrowComposer\)/.test(wireAutoGrowBody162) &&
+        /_wireComposerAutoGrow\(\);/.test(restoreDevicePrefsBody162) &&
+        /_autoGrowComposer\(\);/.test(renderModePillBody162),
+      '162.26b: _wireComposerAutoGrow() wires #chatInput to re-measure on every keystroke and is called from boot (_restoreDevicePrefs, alongside _wireModeHint); _renderModePill() re-measures too so switching modes resizes to fit the new placeholder'
+    );
+  }
+
+  // 162.27  owner small-UI-polish batch — the composer resets to its small
+  //         size after every send (both OVERSEER and TERMINAL mode), not
+  //         just while typing
+  {
+    const tm162c = extractFunctionBody(apiSource, 'transmitMessage');
+    const tt162c = extractFunctionBody(apiSource, 'transmitTerminal');
+    assert(
+      /inputEl\.value = '';\s*\n\s*if \(typeof _autoGrowComposer === 'function'\) _autoGrowComposer\(\);/.test(
+        tm162c
+      ) &&
+        /inputEl\.value = '';\s*\n\s*if \(typeof _autoGrowComposer === 'function'\) _autoGrowComposer\(\);/.test(
+          tt162c
+        ),
+      '162.27: transmitMessage() and transmitTerminal() (api.js) both re-measure the composer immediately after clearing #chatInput, so it snaps back to its small placeholder-fit size after every send'
+    );
+  }
+
+  // 162.28  owner report fix — the mode pill's touch-sticky hover fill (from
+  //         the general button.action-btn:hover rule persisting after a tap
+  //         with no pointerleave to clear it) is neutralized unconditionally,
+  //         with the real fill restored only for genuine hover-capable
+  //         pointers; toggleInputMode() also blurs the pill as a second line
+  //         of defense
+  {
+    const pillHoverResetIdx162 = cssSource.indexOf('button.mode-pill--terminal:hover');
+    const pillHoverGatedIdx162 = cssSource.indexOf(
+      '(hover: hover) and (pointer: fine)',
+      pillHoverResetIdx162 === -1 ? 0 : pillHoverResetIdx162
+    );
+    const pillHoverResetBlock162 =
+      pillHoverResetIdx162 !== -1
+        ? cssSource.slice(pillHoverResetIdx162, pillHoverResetIdx162 + 400)
+        : '';
+    assert(
+      pillHoverResetIdx162 !== -1 &&
+        pillHoverGatedIdx162 !== -1 &&
+        pillHoverGatedIdx162 > pillHoverResetIdx162 &&
+        /button\.mode-pill--terminal:hover \{[^}]*background: transparent;[^}]*filter: none;/.test(
+          pillHoverResetBlock162
+        ) &&
+        /button\.mode-pill--overseer:hover \{[^}]*background: transparent;[^}]*filter: none;/.test(
+          pillHoverResetBlock162
+        ) &&
+        /button\.mode-pill:hover \{[^}]*background: var\(--robco-green\);/.test(cssSource),
+      '162.28a: button.mode-pill--terminal:hover / --overseer:hover unconditionally reset background/filter (declared BEFORE the gated hover-capable-only restore) so a touch tap can never leave the pill looking stuck-highlighted'
+    );
+    const toggleInputModeBody162 = extractFunctionBody(uiSource, 'toggleInputMode');
+    assert(
+      /getElementById\('modePill'\)/.test(toggleInputModeBody162) &&
+        /\.blur\(\)/.test(toggleInputModeBody162),
+      '162.28b: toggleInputMode() blurs the pill after a tap (belt-and-suspenders alongside the CSS hover-gate fix)'
     );
   }
 }
