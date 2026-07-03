@@ -68,8 +68,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    1956-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    1956-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    1962-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    1962-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -625,6 +625,30 @@ neutralizes it automatically with no bespoke carve-out.
 `_initBezelChrome`, `_updateFaultLamp`) reads `state`/MetaStore but never writes `saveState()` /
 `robco_v8` / `state.<field> =` anywhere — view choice and device telemetry only. Guarded by
 Suite 158 (both runners at parity, 18 tests).
+
+**Mobile bottom-dock follow-up (owner audit, Suite 160):** DO-N originally shipped the desktop
+casing-top/glass-frame/bezel `order:1/2/3` flip (Desk-terminal shell, above) but had no mobile
+equivalent, so the bezel rendered above the glass on phones. Mobile is not a fixed-height
+single-viewport shell (it's a normal, very long document-flow page), so a plain reorder or
+`position: sticky` would only move the nav to the _end_ of that page — reachable after scrolling
+past every panel, which is worse than the original bug (nav visible immediately, just at the wrong
+edge). Mobile (`max-width: 999.98px`) instead docks `.bezel` as a genuine `position: fixed` bottom
+bar, with `.container.machine` reserving matching bottom padding so the dock never covers the last
+panel's controls. DOM position is unchanged (still between `casing-top` and `.glass-frame`) so
+keyboard/tab order is untouched. **Known trade-off:** three ambient-runtime body states
+(`body.rt-idle`, `body.time-night`, `body.rt-shutdown`) apply `filter`/`transform` to `.container`,
+which per spec makes it the containing block for its `position: fixed` descendants — while any of
+those three states is active, the fixed bezel gracefully degrades to the bottom of the page instead
+of staying pinned to the viewport (never broken, just temporarily not "always visible"). Closing
+this fully would mean retargeting those three ambient selectors to an inner wrapper that excludes
+the bezel — deferred as a separate, wider-reaching change. The same batch also (a) changed
+`.nav-cluster` to `flex-wrap: nowrap` so the 5 tabs always render as one shrinking strip instead of
+independently wrapping (CHASSIS was orphaning onto its own second line with DIR floating beside
+it), and (b) fixed the amber connector/vent-pin strips (`details.bay-board::after`,
+`.chip-card::after`) from a `repeating-linear-gradient` — whose fixed cycle length rarely divides
+the strip's actual responsive width evenly, leaving a stray thin partial pin at the end — to
+`background-repeat: round`, which rescales the tile so a whole number of pins always fits. Guarded
+by Suite 160 (both runners at parity, 6 tests).
 
 ---
 
@@ -1661,7 +1685,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1956-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 1962-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

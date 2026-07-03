@@ -20197,6 +20197,84 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 160 — Owner audit: bezel bottom placement + stray-pin cleanup
+//  Two more owner-reported staging bugs from the same DO-N follow-up batch:
+//  (1) the bezel keycap nav rendered ABOVE the glass on mobile (a normal
+//  document-flow page, unlike desktop's fixed-height single-viewport shell)
+//  — reordering alone would just bury it after the very long single-column
+//  panel stack, so mobile docks it as a genuine position:fixed thumb-zone
+//  bar instead, reserving bottom padding so it never covers the last
+//  panel's content; desktop is untouched (it already put the bezel at the
+//  bottom via CSS `order`); (2) the nav-cluster's independent flex-wrap
+//  let CHASSIS wrap onto its own second line with DIR floating beside it —
+//  fixed to a single non-wrapping strip; (3) the amber connector/vent-pin
+//  strips (Module Bay board dividers, SLOT-02 chip sockets) tiled with a
+//  repeating-linear-gradient whose cycle length rarely divides the strip's
+//  actual (responsive) width evenly, leaving a stray thin partial pin at
+//  the end — background-repeat:round rescales the tile so a whole number
+//  of pins always fits.
+//  6 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 160 — Owner audit: bezel bottom placement + stray-pin cleanup');
+  const cssSource160 = readFile('css/terminal.css');
+
+  // 160.1  the nav-cluster never wraps its own 5 tabs independently — the whole
+  //        strip shrinks together instead of orphaning a key onto its own line
+  assert(
+    /\.nav-cluster \{[^}]*flex-wrap:\s*nowrap/.test(cssSource160),
+    '160.1: .nav-cluster is flex-wrap:nowrap — the 5 tabs always render as one strip (owner report: CHASSIS was wrapping onto its own second line with DIR floating beside it)'
+  );
+
+  // 160.2  mobile (<1000px) docks the bezel as a real position:fixed bottom bar,
+  //        not a reorder/sticky — a reorder-only fix would bury the nav after the
+  //        very long single-column mobile page instead of keeping it reachable
+  assert(
+    /@media \(max-width:\s*999\.98px\)\s*\{\s*\.bezel\s*\{[^}]*position:\s*fixed;[^}]*left:\s*0;[^}]*right:\s*0;[^}]*bottom:\s*0;/.test(
+      cssSource160
+    ),
+    '160.2: the mobile bezel is position:fixed;left:0;right:0;bottom:0 — a genuine thumb-zone dock, not just a reorder (owner report: "it\'s at the top instead of the bottom")'
+  );
+
+  // 160.3  the fixed mobile bezel reserves bottom space on .container so the dock
+  //        never covers the last panel's controls (Protocol 17)
+  assert(
+    /@media \(max-width:\s*999\.98px\)\s*\{[\s\S]*?\.container\.machine\s*\{[^}]*padding-bottom:/.test(
+      cssSource160
+    ),
+    "160.3: the mobile media query reserves bottom padding on .container.machine so the fixed bezel never covers the last panel's content"
+  );
+
+  // 160.4  desktop's existing order-based bottom placement is untouched (it was
+  //        already correct — this owner batch only ever needed to fix mobile)
+  assert(
+    /\.casing-top\s*\{\s*order:\s*1;/.test(cssSource160) &&
+      /\.glass-frame\s*\{\s*order:\s*2;/.test(cssSource160) &&
+      /\.bezel\s*\{\s*order:\s*3;/.test(cssSource160),
+    '160.4: the desktop casing-top/glass-frame/bezel order:1/2/3 flip is unchanged (desktop already rendered the bezel at the bottom)'
+  );
+
+  // 160.5  details.bay-board::after (Module Bay board divider pins) uses
+  //        background-repeat:round so a whole number of pins always fits — no
+  //        truncated stub pin at the end
+  assert(
+    /details\.bay-board::after\s*\{[^}]*background-size:\s*12px 100%;[^}]*background-repeat:\s*round;/.test(
+      cssSource160
+    ),
+    '160.5: details.bay-board::after uses background-repeat:round (owner report: a stray thin partial block trailed the last full pin)'
+  );
+
+  // 160.6  .chip-card::after (SLOT-02 channel chip socket pins) uses the same
+  //        background-repeat:round fix
+  assert(
+    /\.chip-card::after\s*\{[^}]*background-size:\s*8px 100%;[^}]*background-repeat:\s*round;/.test(
+      cssSource160
+    ),
+    '160.6: .chip-card::after uses background-repeat:round — same stray-pin fix as details.bay-board::after'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail

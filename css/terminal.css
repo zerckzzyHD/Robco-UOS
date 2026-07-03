@@ -639,10 +639,18 @@ textarea {
 }
 .nav-cluster {
   display: flex;
+  flex: 0 1 auto;
+  min-width: 0;
   justify-content: center; /* centering rule — the cluster centers as a unit */
   align-items: stretch;
   gap: clamp(4px, 1.4vw, 10px);
-  flex-wrap: wrap;
+  /* nowrap — the 5 tabs always render as ONE strip and shrink together
+     (owner report: independent wrapping here split OPERATOR/OPERATIONS/
+     DATABANK/UPLINK onto a first line while CHASSIS wrapped alone onto a
+     second line, with DIR then reading as floating beside that lone key).
+     .nav-row is still flex-wrap:wrap as a last-resort fallback for
+     genuinely extreme widths. */
+  flex-wrap: nowrap;
   padding: 0;
   margin: 0;
   border: none;
@@ -725,6 +733,57 @@ textarea {
   flex: 0 1 44px;
   min-width: 40px;
   max-width: 52px;
+}
+
+/* MOBILE (<1000px): the bezel keycap nav docks to the true bottom of the
+   viewport as a fixed thumb-zone bar (Protocol UI-7 — matches the
+   approved mockup's "sticky bottom bar" mobile layout). Fixed, not
+   sticky/reordered: on a normal document-flow mobile page the bezel is
+   the LAST element after a very long single-column stack of panels, so
+   a reorder-only or position:sticky fix would still bury the nav below
+   thousands of pixels of scrollable content — reachable only after
+   scrolling all the way down, which is worse than today's bug (nav
+   visible immediately, just at the wrong edge). Only position:fixed
+   keeps it reachable without scrolling. DOM position is deliberately
+   UNCHANGED (still between casing-top and glass-frame) so keyboard/tab
+   order is untouched by this fix.
+   Known trade-off (flagged for owner follow-up, not silently swept):
+   .container receives `filter`/`transform` from three ambient-runtime
+   body states (body.rt-idle, body.time-night, body.rt-shutdown), which
+   per spec makes .container the containing block for ITS fixed
+   descendants. While any of those three states is active, this fixed
+   bezel gracefully degrades to sitting at the true bottom of the page
+   (same as a plain reorder) instead of staying pinned to the viewport —
+   never broken/mispositioned, just temporarily not "always visible."
+   Closing that gap fully requires retargeting those three ambient
+   selectors to an inner wrapper that excludes the bezel — deferred as a
+   separate, wider-reaching change. */
+@media (max-width: 999.98px) {
+  .bezel {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 60;
+    margin-top: 0;
+    border-top: 1px solid rgba(0, 0, 0, 0.5);
+    background:
+      linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.03),
+        transparent 40%,
+        transparent 60%,
+        rgba(0, 0, 0, 0.15)
+      ),
+      linear-gradient(180deg, var(--bezel-steel-3), var(--bezel-steel-1) 80%, var(--bezel-steel-2));
+    box-shadow: 0 -3px 12px rgba(0, 0, 0, 0.7);
+  }
+  /* Reserve space at the end of the scrollable page equal to the fixed
+     bezel's own height so the dock never covers the last panel's
+     content or controls (Protocol 17). */
+  .container.machine {
+    padding-bottom: 100px;
+  }
 }
 
 /* Directory fallback modal body (rendered into #sysModal via openModal()) */
@@ -2216,8 +2275,10 @@ body.thermal-load .panel {
   /* Desk-terminal shell: casing on top, the bezel keycap strip visually at
      the BOTTOM (a real console's control strip sits under the screen), the
      glass in between — via CSS `order`, not DOM order, so keyboard/tab
-     order still visits the nav early (matches the mobile in-flow position
-     below) while the desktop layout reads as physical hardware. */
+     order still visits the nav early (matches the mobile in-flow DOM
+     position — mobile instead docks the bezel as a fixed thumb-zone bar,
+     see the max-width:999.98px block above) while the desktop layout reads
+     as physical hardware. */
   .casing-top {
     order: 1;
     flex-shrink: 0;
@@ -3501,7 +3562,12 @@ details.bay-board::after {
   right: 10%;
   bottom: -6px;
   height: 6px;
-  background: repeating-linear-gradient(90deg, #d9a24a 0 7px, transparent 7px 12px);
+  /* background-repeat:round rescales the tile so a WHOLE number of pins
+     always fits the strip's width — no truncated stub pin at the end
+     (owner report: a stray thin partial block trailed the last full pin). */
+  background-image: linear-gradient(90deg, #d9a24a 0 7px, transparent 7px 12px);
+  background-size: 12px 100%;
+  background-repeat: round;
   opacity: 0.75;
   pointer-events: none;
 }
@@ -3872,7 +3938,10 @@ html.high-lumen .tube.seated .glass {
   right: 4px;
   bottom: -4px;
   height: 4px;
-  background: repeating-linear-gradient(90deg, #d9a24a 0 3px, transparent 3px 8px);
+  /* background-repeat:round — see details.bay-board::after above */
+  background-image: linear-gradient(90deg, #d9a24a 0 3px, transparent 3px 8px);
+  background-size: 8px 100%;
+  background-repeat: round;
   opacity: 0.7;
 }
 .chip-card .pin-id {

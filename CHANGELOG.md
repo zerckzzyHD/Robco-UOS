@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 1956/1956 | Cache: robco-terminal-v2.7.0-r41 -->
+﻿## [Unreleased]<!-- Tests: 1962/1962 | Cache: robco-terminal-v2.7.0-r42 -->
 
 ### Added
 
@@ -32,6 +32,8 @@
 - Fixed the Module Bay's one-time service-hatch reveal popping open the moment the terminal loaded on a wider screen, before Security & Configuration had even been opened. That panel now starts closed by default, and the hatch only ever appears the first time you actually open it.
 - Fixed the AI Uplink board always reading "NO CARRIER" even after your Gemini key was validated and an engine selected. It now shows a clear "carrier established" status with your chosen engine once the handshake actually succeeds, and reverts automatically if you edit the key afterward.
 - Fixed a few places where a partial last row of controls stayed pinned to the left with an empty gap instead of centering — the sound board's channel chips, the phosphor tube color picker, and the Save/Sync-to-cloud buttons now all center a leftover row properly.
+- Fixed the bottom navigation buttons rendering above the screen instead of below it on phones — they're now pinned to the bottom of your screen at all times, and no longer occasionally split unevenly across two rows with one button floating off to the side.
+- Fixed a stray thin sliver of color trailing the last connector pin on the Module Bay's hardware boards and channel chips.
 
 ### Improved
 
