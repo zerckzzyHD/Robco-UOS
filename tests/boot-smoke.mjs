@@ -89,9 +89,10 @@ function isExpectedNoise(text) {
   if (/content.security.policy/i.test(text) && /report.only/i.test(text)) return true;
   // frame-ancestors is spec-invalid in a <meta> CSP (CSP spec §5.1 — the browser MUST
   // ignore it when delivered via meta; it can only be enforced via HTTP response headers).
-  // The directive is retained in the meta for documentation intent and is guarded by
-  // test 55.9. GitHub Pages does not allow custom HTTP headers, so this is the best
-  // available expression of intent. Not an app bug — expected in enforcing mode.
+  // Our own CSP no longer declares it at all (removed rather than left in as a silent
+  // no-op — see index.html + test 55.9). This filter now only catches frame-ancestors
+  // noise from third-party SDK iframes (e.g. Firebase App Check's recaptcha), which are
+  // not ours to fix.
   if (/frame-ancestors/i.test(text) && /ignored/i.test(text)) return true;
   // Service worker noise (edge-case environments)
   if (text.includes('ServiceWorker') || text.includes('service-worker')) return true;

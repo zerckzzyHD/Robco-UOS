@@ -10,6 +10,42 @@ function ensureAudioCtx() {
   return audioCtx;
 }
 
+// ── FIRST-GESTURE AMBIENT-AUDIO ARM ───────────────────────────────────────
+// One-shot SFX (level-up jingle, chip clicks, etc.) always fire from a real
+// user action, so they naturally land after a gesture. But CONTINUOUS ambient
+// starters — the CRT hum (always started at boot) and the Geiger/tinnitus/
+// heartbeat loops (started at boot when an existing save already has high
+// rads/crippled limbs/critical HP) — were calling ensureAudioCtx() straight
+// out of window.onload/updateMath(), long before any gesture. Each blocked
+// resume()/node-start attempt logs "AudioContext was not allowed to start",
+// and a self-rescheduling loop (Geiger ticks, the ~833ms heartbeat) repeats
+// that every cycle until the user's first click/keydown — dozens of warnings
+// for a single boot. This defers those starters to the first gesture instead,
+// mirroring playBootDrone's (H4) own arming pattern, generalized to a shared
+// queue so multiple starters queued before that gesture all fire once, in
+// order, off ONE pair of listeners (no stacked duplicate listeners).
+let _firstGestureSeen = false;
+let _pendingAmbientAudio = [];
+function _onFirstAmbientGesture() {
+  document.removeEventListener('click', _onFirstAmbientGesture);
+  document.removeEventListener('keydown', _onFirstAmbientGesture);
+  _firstGestureSeen = true;
+  const pending = _pendingAmbientAudio;
+  _pendingAmbientAudio = [];
+  pending.forEach(fn => fn());
+}
+function _armAmbientAudio(fn) {
+  if (_firstGestureSeen) {
+    fn();
+    return;
+  }
+  if (_pendingAmbientAudio.length === 0) {
+    document.addEventListener('click', _onFirstAmbientGesture, { once: true });
+    document.addEventListener('keydown', _onFirstAmbientGesture, { once: true });
+  }
+  _pendingAmbientAudio.push(fn);
+}
+
 // ── WU-F2 HAPTIC SOLENOID (Vibration API) ─────────────────────────────────
 // Brief chassis buzz on key events (level-up, faction-threshold alert, critical
 // HP) via navigator.vibrate. Free, offline, no AI, game-agnostic (Protocol 38)
@@ -161,7 +197,7 @@ function setGeigerRate(rate) {
   }
   if (rate > 0) {
     geigerRunning = true;
-    scheduleGeiger(rate);
+    _armAmbientAudio(() => scheduleGeiger(rate));
   }
 }
 

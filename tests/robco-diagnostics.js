@@ -5393,10 +5393,14 @@ header('Suite 55 — CSP Stage 1 Origin Guards + Firebase Pin');
       "CSP contains base-uri 'none' (blocks base-tag injection — Protocol 20 guard)",
     ],
 
-    // 55.9 frame-ancestors 'none' present in CSP (prevents clickjacking)
+    // 55.9 frame-ancestors 'none' ABSENT from the meta CSP — a <meta> tag can
+    // never enforce frame-ancestors (HTTP-response-header-only directive per
+    // spec); leaving it in produced a silently-ignored console warning with
+    // zero actual enforcement. Every other directive still works in meta.
     [
       /frame-ancestors\s+'none'/,
-      "CSP contains frame-ancestors 'none' (prevents clickjacking — Protocol 20 guard)",
+      "CSP meta tag omits frame-ancestors (meta can't enforce it, only an HTTP header can — a no-op directive was producing a console warning with no security benefit)",
+      true,
     ],
 
     // 55.10 Tripwire: script-src still contains 'unsafe-inline'
@@ -23611,6 +23615,136 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     /\.bay-holotape-control select \{[\s\S]{0,80}min-height:\s*28px/.test(css174),
     '174.8: .bay-holotape-control select has an explicit min-height:28px (Protocol 17 tap-target floor)'
   );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 175 — Owner batch: dead meta frame-ancestors removed + continuous
+//  ambient audio deferred to the first user gesture
+//  Two console-hygiene fixes: (1) frame-ancestors is unenforceable via a
+//  <meta> CSP and only ever produced a silently-ignored console warning —
+//  removed rather than left in as a no-op. (2) the CRT hum/Geiger/tinnitus/
+//  heartbeat continuous ambient starters called ensureAudioCtx() straight out
+//  of window.onload/updateMath() before any user gesture, spamming "AudioContext
+//  was not allowed to start" warnings — each is now deferred to the first
+//  click/keydown via a shared _armAmbientAudio() arm, mirroring playBootDrone's
+//  (H4) own established pattern. The opening boot drone itself is untouched.
+//  9 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header(
+    'Suite 175 — Owner batch: dead meta frame-ancestors removed + ambient audio first-gesture arm'
+  );
+  const html175 = readFile('index.html');
+  const uiAudio175 = readFile('js/ui-audio.js');
+  const uiCore175 = readFile('js/ui-core.js');
+
+  // 175.1  frame-ancestors is gone from the meta CSP entirely (not just
+  //        silently ignored) — a real regression guard against it creeping back.
+  assert(
+    !/frame-ancestors/.test(
+      (html175.match(/<meta[^>]*http-equiv="Content-Security-Policy"[^>]*>/) || [''])[0]
+    ),
+    '175.1: the meta Content-Security-Policy tag no longer declares frame-ancestors (unenforceable via meta — HTTP-header-only directive)'
+  );
+
+  // 175.2  every other CSP directive is still present and untouched.
+  assert(
+    /object-src 'none'/.test(html175) &&
+      /base-uri 'none'/.test(html175) &&
+      /generativelanguage\.googleapis\.com/.test(html175) &&
+      /'unsafe-inline'/.test(html175),
+    '175.2: removing frame-ancestors left every other CSP directive (object-src, base-uri, Gemini origin, unsafe-inline) intact'
+  );
+
+  // 175.3  _armAmbientAudio() + its single shared gesture listener are defined
+  //        in ui-audio.js, queue-based (not per-call duplicate listeners).
+  const armBody175 = extractFunctionBody(uiAudio175, '_armAmbientAudio');
+  const onFirstBody175 = extractFunctionBody(uiAudio175, '_onFirstAmbientGesture');
+  assert(
+    /function _armAmbientAudio\s*\(/.test(uiAudio175) &&
+      /_pendingAmbientAudio\.push\(fn\)/.test(armBody175) &&
+      /if \(_firstGestureSeen\)/.test(armBody175) &&
+      /addEventListener\('click', _onFirstAmbientGesture, \{ once: true \}\)/.test(armBody175) &&
+      /addEventListener\('keydown', _onFirstAmbientGesture, \{ once: true \}\)/.test(armBody175),
+    '175.3: _armAmbientAudio() calls immediately once a gesture has occurred, otherwise queues fn and arms ONE shared click/keydown listener pair'
+  );
+
+  // 175.4  the shared gesture handler drains the whole pending queue exactly
+  //        once and flips _firstGestureSeen (so later calls stop queueing).
+  assert(
+    /_firstGestureSeen = true/.test(onFirstBody175) &&
+      /pending\.forEach\(fn => fn\(\)\)/.test(onFirstBody175) &&
+      /removeEventListener\('click', _onFirstAmbientGesture\)/.test(onFirstBody175) &&
+      /removeEventListener\('keydown', _onFirstAmbientGesture\)/.test(onFirstBody175),
+    '175.4: the first-gesture handler flips _firstGestureSeen, drains every queued ambient starter, and removes both listeners'
+  );
+
+  // 175.5  ensureAudioCtx() itself is untouched — the fix defers CALLERS, not
+  //        the shared primitive every one-shot SFX (level-up jingle, chip
+  //        clicks, etc.) also relies on.
+  const ensureBody175 = extractFunctionBody(uiAudio175, 'ensureAudioCtx');
+  assert(
+    /if \(!audioCtx\) \{/.test(ensureBody175) &&
+      /audioCtx\.resume\(\)/.test(ensureBody175) &&
+      !/_firstGestureSeen/.test(ensureBody175),
+    '175.5: ensureAudioCtx() is unmodified — no gesture gate inside the shared primitive itself, so user-triggered one-shot SFX are unaffected'
+  );
+
+  // 175.6  playBootDrone (the opening boot sound) is untouched — still its
+  //        own independent click/keydown arm, never routed through
+  //        _armAmbientAudio (regression guard: the beep must keep working
+  //        exactly as before).
+  const droneBody175 = extractFunctionBody(uiAudio175, 'playBootDrone');
+  assert(
+    /function _tryDrone\s*\(/.test(droneBody175) &&
+      /function _onFirstInteract\s*\(/.test(droneBody175) &&
+      !/_armAmbientAudio/.test(droneBody175),
+    '175.6: playBootDrone() keeps its own independent first-gesture arm untouched — not routed through the new shared helper'
+  );
+
+  // 175.7  setGeigerRate()'s scheduling kick-off is deferred — the recursive
+  //        Geiger-click loop that used to retry ensureAudioCtx() every tick
+  //        pre-gesture now waits for the shared arm.
+  const geigerBody175 = extractFunctionBody(uiAudio175, 'setGeigerRate');
+  assert(
+    /_armAmbientAudio\(\(\) => scheduleGeiger\(rate\)\)/.test(geigerBody175),
+    '175.7: setGeigerRate() defers its scheduleGeiger(rate) kick-off through _armAmbientAudio() instead of calling it bare'
+  );
+
+  // 175.8  updateMath()'s tinnitus + heartbeat starters are deferred (both can
+  //        fire at boot for a returning save with high rads/a crippled head/
+  //        critical HP, before any gesture has happened).
+  const updateMathBody175 = extractFunctionBody(uiCore175, 'updateMath');
+  assert(
+    /_armAmbientAudio\(\(\) => startHeartbeat\(pct \/ 100\)\)/.test(updateMathBody175) &&
+      /_armAmbientAudio\(startTinnitus\)/.test(updateMathBody175),
+    '175.8: updateMath() defers startHeartbeat()/startTinnitus() through _armAmbientAudio() so a critical-state boot never spams pre-gesture warnings'
+  );
+
+  // 175.9  both startCrtHum() call sites (the direct boot call in
+  //        window.onload, and the crt-hum-power runtime observer's onExit,
+  //        which also fires at boot on the initial OFF -> COLD_BOOT
+  //        transition) are deferred through _armAmbientAudio().
+  {
+    const onloadIdx175 = uiCore175.indexOf('window.onload = async function () {');
+    const braceStart175 = uiCore175.indexOf('{', onloadIdx175);
+    let depth175 = 0,
+      i175 = braceStart175;
+    for (; i175 < uiCore175.length; i175++) {
+      if (uiCore175[i175] === '{') depth175++;
+      else if (uiCore175[i175] === '}' && --depth175 === 0) break;
+    }
+    const onloadBody175 = uiCore175.slice(braceStart175, i175 + 1);
+    const humObsIdx175 = uiCore175.indexOf("id: 'crt-hum-power'");
+    const humObsBlock175 = uiCore175.slice(humObsIdx175, humObsIdx175 + 700);
+    assert(
+      /_armAmbientAudio\(startCrtHum\)/.test(onloadBody175) &&
+        /onExit: \(\) => \{[\s\S]{0,200}_armAmbientAudio\(\(\) => \{[\s\S]{0,400}startCrtHum\(\)/.test(
+          humObsBlock175
+        ),
+      "175.9: startCrtHum() is deferred through _armAmbientAudio() at BOTH call sites — window.onload's direct boot call and the crt-hum-power observer's onExit"
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

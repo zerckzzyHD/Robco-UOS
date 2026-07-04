@@ -3060,9 +3060,12 @@ Check ([bool]($htmlSrc55 -match "object-src\s+'none'")) `
 Check ([bool]($htmlSrc55 -match "base-uri\s+'none'")) `
     "CSP contains base-uri 'none' (blocks base-tag injection -- Protocol 20 guard)"
 
-# 55.9 frame-ancestors 'none' present in CSP (prevents clickjacking)
-Check ([bool]($htmlSrc55 -match "frame-ancestors\s+'none'")) `
-    "CSP contains frame-ancestors 'none' (prevents clickjacking -- Protocol 20 guard)"
+# 55.9 frame-ancestors 'none' ABSENT from the meta CSP -- a <meta> tag can
+# never enforce frame-ancestors (HTTP-response-header-only directive per
+# spec); leaving it in produced a silently-ignored console warning with zero
+# actual enforcement. Every other directive still works in meta.
+Check ([bool](-not ($htmlSrc55 -match "frame-ancestors\s+'none'"))) `
+    "CSP meta tag omits frame-ancestors (meta can't enforce it, only an HTTP header can -- a no-op directive was producing a console warning with no security benefit)"
 
 # 55.10 Tripwire: script-src still contains 'unsafe-inline'
 # (~148 inline event handlers require this; must not be silently dropped)
@@ -14489,6 +14492,122 @@ Check (
 Check (
     $css174 -match '(?s)\.bay-holotape-control select \{.{0,80}min-height:\s*28px'
 ) "174.8: .bay-holotape-control select has an explicit min-height:28px (Protocol 17 tap-target floor)"
+
+# ══════════════════════════════════════════════════════════════
+# Suite 175 -- Owner batch: dead meta frame-ancestors removed + continuous
+# ambient audio deferred to the first user gesture
+# Two console-hygiene fixes: (1) frame-ancestors is unenforceable via a
+# <meta> CSP and only ever produced a silently-ignored console warning --
+# removed rather than left in as a no-op. (2) the CRT hum/Geiger/tinnitus/
+# heartbeat continuous ambient starters called ensureAudioCtx() straight out
+# of window.onload/updateMath() before any user gesture, spamming "AudioContext
+# was not allowed to start" warnings -- each is now deferred to the first
+# click/keydown via a shared _armAmbientAudio() arm, mirroring playBootDrone's
+# (H4) own established pattern. The opening boot drone itself is untouched.
+# 9 tests
+# ══════════════════════════════════════════════════════════════
+Sep "Suite 175 -- Owner batch: dead meta frame-ancestors removed + ambient audio first-gesture arm"
+$html175 = Read-Src "index.html"
+$uiAudio175 = Read-Src "js/ui-audio.js"
+$uiCore175 = Read-Src "js/ui-core.js"
+
+# 175.1  frame-ancestors is gone from the meta CSP entirely (not just
+#        silently ignored) -- a real regression guard against it creeping back.
+$cspMatch175 = [regex]::Match($html175, '<meta[^>]*http-equiv="Content-Security-Policy"[^>]*>')
+$cspTag175 = if ($cspMatch175.Success) { $cspMatch175.Value } else { '' }
+Check (
+    -not ($cspTag175 -match 'frame-ancestors')
+) "175.1: the meta Content-Security-Policy tag no longer declares frame-ancestors (unenforceable via meta -- HTTP-header-only directive)"
+
+# 175.2  every other CSP directive is still present and untouched.
+Check (
+    ($html175 -match "object-src 'none'") -and
+    ($html175 -match "base-uri 'none'") -and
+    ($html175 -match 'generativelanguage\.googleapis\.com') -and
+    ($html175 -match "'unsafe-inline'")
+) "175.2: removing frame-ancestors left every other CSP directive (object-src, base-uri, Gemini origin, unsafe-inline) intact"
+
+# 175.3  _armAmbientAudio() + its single shared gesture listener are defined
+#        in ui-audio.js, queue-based (not per-call duplicate listeners).
+$armBody175 = Get-FunctionBody $uiAudio175 '_armAmbientAudio'
+$onFirstBody175 = Get-FunctionBody $uiAudio175 '_onFirstAmbientGesture'
+Check (
+    ($uiAudio175 -match 'function _armAmbientAudio\s*\(') -and
+    ($armBody175 -match '_pendingAmbientAudio\.push\(fn\)') -and
+    ($armBody175 -match 'if \(_firstGestureSeen\)') -and
+    ($armBody175 -match "addEventListener\('click', _onFirstAmbientGesture, \{ once: true \}\)") -and
+    ($armBody175 -match "addEventListener\('keydown', _onFirstAmbientGesture, \{ once: true \}\)")
+) "175.3: _armAmbientAudio() calls immediately once a gesture has occurred, otherwise queues fn and arms ONE shared click/keydown listener pair"
+
+# 175.4  the shared gesture handler drains the whole pending queue exactly
+#        once and flips _firstGestureSeen (so later calls stop queueing).
+Check (
+    ($onFirstBody175 -match '_firstGestureSeen = true') -and
+    ($onFirstBody175 -match 'pending\.forEach\(fn => fn\(\)\)') -and
+    ($onFirstBody175 -match "removeEventListener\('click', _onFirstAmbientGesture\)") -and
+    ($onFirstBody175 -match "removeEventListener\('keydown', _onFirstAmbientGesture\)")
+) "175.4: the first-gesture handler flips _firstGestureSeen, drains every queued ambient starter, and removes both listeners"
+
+# 175.5  ensureAudioCtx() itself is untouched -- the fix defers CALLERS, not
+#        the shared primitive every one-shot SFX (level-up jingle, chip
+#        clicks, etc.) also relies on.
+$ensureBody175 = Get-FunctionBody $uiAudio175 'ensureAudioCtx'
+Check (
+    ($ensureBody175 -match 'if \(!audioCtx\) \{') -and
+    ($ensureBody175 -match 'audioCtx\.resume\(\)') -and
+    (-not ($ensureBody175 -match '_firstGestureSeen'))
+) "175.5: ensureAudioCtx() is unmodified -- no gesture gate inside the shared primitive itself, so user-triggered one-shot SFX are unaffected"
+
+# 175.6  playBootDrone (the opening boot sound) is untouched -- still its own
+#        independent click/keydown arm, never routed through
+#        _armAmbientAudio (regression guard: the beep must keep working
+#        exactly as before).
+$droneBody175 = Get-FunctionBody $uiAudio175 'playBootDrone'
+Check (
+    ($droneBody175 -match 'function _tryDrone\s*\(') -and
+    ($droneBody175 -match 'function _onFirstInteract\s*\(') -and
+    (-not ($droneBody175 -match '_armAmbientAudio'))
+) "175.6: playBootDrone() keeps its own independent first-gesture arm untouched -- not routed through the new shared helper"
+
+# 175.7  setGeigerRate()'s scheduling kick-off is deferred -- the recursive
+#        Geiger-click loop that used to retry ensureAudioCtx() every tick
+#        pre-gesture now waits for the shared arm.
+$geigerBody175 = Get-FunctionBody $uiAudio175 'setGeigerRate'
+Check (
+    $geigerBody175 -match '_armAmbientAudio\(\(\) => scheduleGeiger\(rate\)\)'
+) "175.7: setGeigerRate() defers its scheduleGeiger(rate) kick-off through _armAmbientAudio() instead of calling it bare"
+
+# 175.8  updateMath()'s tinnitus + heartbeat starters are deferred (both can
+#        fire at boot for a returning save with high rads/a crippled head/
+#        critical HP, before any gesture has happened).
+$updateMathBody175 = Get-FunctionBody $uiCore175 'updateMath'
+Check (
+    ($updateMathBody175 -match '_armAmbientAudio\(\(\) => startHeartbeat\(pct / 100\)\)') -and
+    ($updateMathBody175 -match '_armAmbientAudio\(startTinnitus\)')
+) "175.8: updateMath() defers startHeartbeat()/startTinnitus() through _armAmbientAudio() so a critical-state boot never spams pre-gesture warnings"
+
+# 175.9  both startCrtHum() call sites (the direct boot call in
+#        window.onload, and the crt-hum-power runtime observer's onExit,
+#        which also fires at boot on the initial OFF -> COLD_BOOT
+#        transition) are deferred through _armAmbientAudio().
+$onloadIdx175 = $uiCore175.IndexOf('window.onload = async function () {')
+$braceStart175 = $uiCore175.IndexOf('{', $onloadIdx175)
+$depth175 = 0
+$i175 = $braceStart175
+for (; $i175 -lt $uiCore175.Length; $i175++) {
+    if ($uiCore175[$i175] -eq '{') { $depth175++ }
+    elseif ($uiCore175[$i175] -eq '}') {
+        $depth175--
+        if ($depth175 -eq 0) { break }
+    }
+}
+$onloadBody175 = $uiCore175.Substring($braceStart175, $i175 - $braceStart175 + 1)
+$humObsIdx175 = $uiCore175.IndexOf("id: 'crt-hum-power'")
+$humObsBlock175 = $uiCore175.Substring($humObsIdx175, [Math]::Min(700, $uiCore175.Length - $humObsIdx175))
+Check (
+    ($onloadBody175 -match '_armAmbientAudio\(startCrtHum\)') -and
+    ($humObsBlock175 -match "(?s)onExit: \(\) => \{.{0,200}_armAmbientAudio\(\(\) => \{.{0,400}startCrtHum\(\)")
+) "175.9: startCrtHum() is deferred through _armAmbientAudio() at BOTH call sites -- window.onload's direct boot call and the crt-hum-power observer's onExit"
 
 # ===========================================================
 # Results

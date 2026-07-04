@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2197/2197 | Cache: robco-terminal-v2.7.0-r68 -->
+﻿## [Unreleased]<!-- Tests: 2206/2206 | Cache: robco-terminal-v2.7.0-r69 -->
 
 ### Added
 
@@ -74,6 +74,8 @@
 - If Complete RNG is turned on when you wipe the terminal, the confirmation now warns you up front that doing so locks it on PERMANENTLY for that save, with no way to turn it back off — instead of finding out only after the fact.
 - Fixed a rare but serious bug where reopening the terminal could silently pop up the Module Bay's "service hatch" screen and lock out every button on the page, with no obvious way back in — this could happen if Security & Configuration had been left open on a device without ever finishing that first-time hatch ceremony. The hatch now only ever appears the first time you genuinely open Security & Configuration yourself; it never pops up on its own when the terminal restores what was open from your last visit.
 - CROSSROADS RECORD and INCIDENT LOG entries no longer show a cryptic "[T0]"-style tick count — each entry now shows a real in-game date and time instead, like "Sunday, 10.19.81, 12:00 AM".
+- Removed a security-header entry that browsers can't actually enforce from a webpage and were only ever silently ignoring and warning about in the console — dropping it has no effect on how the site is protected, since it was never doing anything to begin with.
+- Fixed a burst of "audio blocked" warnings cluttering the browser console right after opening the terminal. The background CRT hum — and, for a returning character who's already critically irradiated, badly hurt, or has a crippled head, the Geiger counter and health/tinnitus warning tones — now wait for your first tap or keypress before starting, exactly like the opening boot sound already did. Nothing about how or when any of these sounds actually play for you has changed.
 
 ### Improved
 

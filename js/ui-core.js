@@ -1264,11 +1264,14 @@ function _wireAmbientExperiences() {
     },
     onExit: () => {
       if (typeof startCrtHum !== 'function') return;
-      startCrtHum();
-      if (typeof setCrtHumIntensity !== 'function') return;
-      const rads = parseInt((document.getElementById('stat_rads') || {}).value) || 0;
-      const hasCrippled = ['la', 'ra', 'll', 'rl', 'hd'].some(l => state[l] !== 'OK');
-      setCrtHumIntensity(rads, hasCrippled);
+      // Deferred to first gesture — this exit fires at boot too.
+      _armAmbientAudio(() => {
+        startCrtHum();
+        if (typeof setCrtHumIntensity !== 'function') return;
+        const rads = parseInt((document.getElementById('stat_rads') || {}).value) || 0;
+        const hasCrippled = ['la', 'ra', 'll', 'rl', 'hd'].some(l => state[l] !== 'OK');
+        setCrtHumIntensity(rads, hasCrippled);
+      });
     },
   });
 }
@@ -2136,7 +2139,7 @@ window.onload = async function () {
     _initBezelChrome(); // DO-N: restore bezel subsystem highlight + sync the FAULT lamp
     setupHpBarInteraction();
     setupXpBarInteraction(); // C11: XP bar click-drag (mirrors HP bar, within current level range)
-    startCrtHum();
+    _armAmbientAudio(startCrtHum); // continuous ambient — deferred to first gesture (blocked-autoplay spam fix)
     initRegistryAutocomplete();
     initAmmoDatalist();
     initLocationDatalist();
@@ -4297,8 +4300,11 @@ function updateMath() {
     }
     _lastHpPct = pct;
     // H4: Low Health Heartbeat — start when HP < 25%, stop when >= 25%
+    // Deferred to the first user gesture (_armAmbientAudio, ui-audio.js) — an
+    // existing save loaded already-critical spams blocked-autoplay warnings
+    // otherwise, since the heartbeat's own ~833ms interval keeps retrying.
     if (pct < 25 && hpMax > 0) {
-      startHeartbeat(pct / 100);
+      _armAmbientAudio(() => startHeartbeat(pct / 100));
     } else {
       stopHeartbeat();
     }
@@ -4369,7 +4375,10 @@ function updateMath() {
       _lastRads = rads;
       _lastCrippled = hasCrippled;
       setGeigerRate(rads >= 1000 ? 25 : rads >= 600 ? 12 : rads >= 200 ? 0.33 : 0);
-      if (rads >= 600 || state.hd === 'CRIPPLED') startTinnitus();
+      // Deferred to the first gesture (_armAmbientAudio) — same blocked-autoplay
+      // spam risk as the heartbeat above when an existing save already has high
+      // rads/a crippled head at boot.
+      if (rads >= 600 || state.hd === 'CRIPPLED') _armAmbientAudio(startTinnitus);
       else stopTinnitus();
       setCrtHumIntensity(rads, hasCrippled);
     }

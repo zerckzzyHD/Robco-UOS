@@ -246,6 +246,7 @@ export default [
         playWakeTone: 'readonly',
         setCrtHumIntensity: 'readonly',
         setGeigerRate: 'readonly',
+        _armAmbientAudio: 'readonly',
         startCrtHum: 'readonly',
         stopCrtHum: 'readonly',
         startTinnitus: 'readonly',
