@@ -12649,6 +12649,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '[ARCHIVE]',
     '[TIMELINE]', // U9-1: Projected Timeline stub retired (Step 2 Phase 0)
     '[CROSSROADS]', // Owner cleanup batch: Crossroads is now panel-only, not a command
+    '[TERMLINK]', // Suite 168: TERMLINK Command Console fully retired — Tool Deck supersedes it
+    '[TL]', // Suite 168: TERMLINK short alias fully retired alongside [TERMLINK]
   ];
 
   // 113.1  registry parsed + a dedicated NATIVE TERMINALS group marked OFFLINE / NO AI
@@ -13622,111 +13624,20 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  SUITE 123 — WU-F9 TERMLINK Command Console + WU-HF2/HF3 hotfixes
-//  The Phase-F launcher surface that routes the offline subsystems through
-//  NATIVE_COMMAND_ROUTER (or the documented BARTER panel). Guards the console ↔ router
-//  consistency so it can't advertise a dead subsystem, stays offline (0 AI),
-//  game-agnostic (Protocol 38), and XSS-safe. Also locks the v2.7.0 hotfixes: WU-HF2
-//  (no soft-keyboard pop — the post-command Comm-Link re-focus is precise-pointer gated)
-//  and WU-HF3 (typed panel navigation — a whole-input panel alias opens that panel
-//  natively, consult/databank/lookup → the DATABANK panel, "consult <topic>" still runs
-//  the native lookup).
-//  19 tests
+//  SUITE 123 — WU-HF2/HF3: precise-pointer refocus + native panel navigation
+//  Locks the v2.7.0 hotfixes: WU-HF2 (no soft-keyboard pop — the post-native-command
+//  Comm-Link re-focus is precise-pointer gated) and WU-HF3 (typed panel navigation —
+//  a whole-input panel alias opens that panel natively, consult/databank/lookup → the
+//  DATABANK panel, "consult <topic>" still runs the native lookup). Formerly bundled
+//  with the WU-F9 TERMLINK Command Console tests; TERMLINK was fully retired — see
+//  Suite 168 — and its tests removed rather than renumbered in place.
+//  10 tests
 // ══════════════════════════════════════════════════════════════
 {
-  header('Suite 123 — WU-F9 TERMLINK Command Console');
+  header('Suite 123 — WU-HF2/HF3 precise-pointer refocus + native panel navigation');
   const api123 = readFile('js/api.js');
   const uiCore123 = readFile('js/ui-core.js');
   const html123 = readFile('index.html');
-  const css123 = readFile('css/terminal.css');
-  const router123 = (api123.match(/const NATIVE_COMMAND_ROUTER = \{([\s\S]*?)\n\};/) || [
-    '',
-    '',
-  ])[1];
-  const consoleArr123 = (api123.match(/const TERMLINK_CONSOLE = \[([\s\S]*?)\n\];/) || ['', ''])[1];
-  const showFn123 = (api123.match(
-    /function showTermlinkConsole\(\)[\s\S]*?openModal\(\);\s*\n\}/
-  ) || [''])[0];
-  const launchFn123 = (api123.match(/function _termlinkLaunch\([\s\S]*?\n\}/) || [''])[0];
-  const consoleTokens123 = [...consoleArr123.matchAll(/token:\s*'([^']+)'/g)].map(m => m[1]);
-
-  // 123.1  [TERMLINK] / [TL] / bare TERMLINK all route to showTermlinkConsole in the native router
-  assert(
-    /'\[TERMLINK\]':\s*\(\)\s*=>\s*showTermlinkConsole\(\)/.test(router123) &&
-      /'\[TL\]':\s*\(\)\s*=>\s*showTermlinkConsole\(\)/.test(router123) &&
-      /\bTERMLINK:\s*\(\)\s*=>\s*showTermlinkConsole\(\)/.test(router123),
-    '123.1: NATIVE_COMMAND_ROUTER routes [TERMLINK], [TL] and bare TERMLINK to showTermlinkConsole()'
-  );
-
-  // 123.2  showTermlinkConsole defined and opens via openModal (Step 2 Phase 0 U12
-  //        consolidated driver; opens the same #sysModal, still inherits the WU-C4
-  //        focus-trap + ARIA dialog semantics)
-  assert(
-    showFn123.length > 0 && /openModal\(\)/.test(showFn123),
-    '123.2: showTermlinkConsole() is defined and opens the console via openModal() (U12 driver — focus-trap + ARIA)'
-  );
-
-  // 123.3  the console manifest exists with the six offline subsystem entries
-  assert(
-    consoleArr123.length > 0 && consoleTokens123.length >= 6,
-    '123.3: TERMLINK_CONSOLE lists at least six subsystem entries (' + consoleTokens123.length + ')'
-  );
-
-  // 123.4  router-drift guard: every router-backed console token resolves in NATIVE_COMMAND_ROUTER;
-  //        [TRADE] is the documented panel exception (panel:true, intentionally NOT a router token).
-  const tradePanel123 = /\{[^}]*token:\s*'\[TRADE\]'[^}]*panel:\s*true[^}]*\}/.test(consoleArr123);
-  const drift123 = consoleTokens123.filter(
-    t => t !== '[TRADE]' && !router123.includes("'" + t + "'")
-  );
-  assert(
-    drift123.length === 0 && tradePanel123 && !router123.includes("'[TRADE]'"),
-    '123.4: every router-backed TERMLINK token resolves in NATIVE_COMMAND_ROUTER; [TRADE] is the panel exception' +
-      (drift123.length ? ' — DRIFT: ' + drift123.join(', ') : '')
-  );
-
-  // 123.5  _termlinkLaunch routes router tokens through _routeNativeCommand and the panel via the trade panel
-  assert(
-    launchFn123.length > 0 &&
-      /_routeNativeCommand\(token\)/.test(launchFn123) &&
-      /expandPanelForCategory\('trade'\)/.test(launchFn123) &&
-      /closeModal\(\)/.test(launchFn123),
-    '123.5: _termlinkLaunch() routes native tokens via _routeNativeCommand, opens BARTER via the trade panel, closes the console first'
-  );
-
-  // 123.6  offline / zero-AI: neither the console nor the launcher does network I/O or AI calls
-  assert(
-    !/fetch\(|XMLHttpRequest|transmitMessage\(|generativelanguage|gemini/i.test(
-      showFn123 + launchFn123
-    ),
-    '123.6: showTermlinkConsole + _termlinkLaunch make no network/AI call (routes natively, fully offline)'
-  );
-
-  // 123.7  XSS-safe: rendered token/label/blurb run through escapeHtml
-  assert(
-    (showFn123.match(/escapeHtml\(/g) || []).length >= 3,
-    '123.7: showTermlinkConsole escapes rendered token/label/blurb via escapeHtml (XSS-safe)'
-  );
-
-  // 123.8  game-agnostic (Protocol 38): the TERMLINK block carries no game literals
-  assert(
-    !/New Vegas|Mojave|Fallout|\bFNV\b|\bFO3\b|Vault 101|Capital Wasteland|Courier/i.test(
-      consoleArr123 + showFn123 + launchFn123
-    ),
-    '123.8: the TERMLINK console block is game-agnostic (no FNV/FO3/Fallout/location literals)'
-  );
-
-  // 123.9  Tool Deck unit: the on-screen #termlinkBtn is retired (the deck supersedes
-  //        it — TOOLDECK_PLAN.md decision 3) but TERMLINK stays fully typable: the
-  //        router, COMMAND_REGISTRY entry, and console CSS are all unchanged.
-  assert(
-    !/id="termlinkBtn"/.test(html123) &&
-      /\[TERMLINK\] \/ \[TL\]/.test(uiCore123) &&
-      /\.termlink-grid\b/.test(css123) &&
-      /\.termlink-entry\b/.test(css123),
-    '123.9: #termlinkBtn is retired from index.html (Tool Deck supersedes it); [TERMLINK] stays typable — COMMAND_REGISTRY advertises it, console CSS present'
-  );
-
-  // ── WU-HF2 + WU-HF3 hotfixes (folded into v2.7.0) ───────────────────────────
   const aliasBlock123 = (api123.match(/const PANEL_NAV_ALIASES = \{([\s\S]*?)\n\};/) || [
     '',
     '',
@@ -13749,31 +13660,31 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     aliasMap123[m[1].replace(/'/g, '')] = m[2];
   }
 
-  // 123.10 WU-HF2: the post-native-command Comm-Link re-focus is gated behind a precise-pointer
-  // probe so a native command (TERMLINK/VATS/panel-nav) never re-pops the soft keyboard on touch.
+  // 123.1 WU-HF2: the post-native-command Comm-Link re-focus is gated behind a precise-pointer
+  // probe so a native command (VATS/panel-nav) never re-pops the soft keyboard on touch.
   assert(
     /function _isPrecisePointer\s*\(/.test(api123) &&
       /hover: hover[\s\S]*?pointer: fine/.test(api123) &&
       /_isPrecisePointer\(\)\s*\)\s*document\.getElementById\('chatInput'\)\.focus\(\)/.test(
         transmitBody123
       ),
-    '123.10: WU-HF2 — transmitMessage gates the post-command chatInput.focus() behind _isPrecisePointer() (no touch keyboard pop)'
+    '123.1: WU-HF2 — transmitMessage gates the post-command chatInput.focus() behind _isPrecisePointer() (no touch keyboard pop)'
   );
-  // 123.11 WU-HF3: the PANEL_NAV_ALIASES map exists with a healthy set of aliases
+  // 123.2 WU-HF3: the PANEL_NAV_ALIASES map exists with a healthy set of aliases
   assert(
     aliasBlock123.length > 0 && Object.keys(aliasMap123).length >= 30,
-    '123.11: PANEL_NAV_ALIASES map defined with ≥30 alias entries (' +
+    '123.2: PANEL_NAV_ALIASES map defined with ≥30 alias entries (' +
       Object.keys(aliasMap123).length +
       ')'
   );
-  // 123.12 _routePanelNav defined AND runs FIRST in _routeNativeCommand (native, before the AI)
+  // 123.3 _routePanelNav defined AND runs FIRST in _routeNativeCommand (native, before the AI)
   assert(
     /function _routePanelNav\s*\(/.test(api123) &&
       /_routePanelNav\(raw\)/.test(routerBody123) &&
       routerBody123.indexOf('_routePanelNav(raw)') < routerBody123.indexOf('NATIVE_COMMAND_ROUTER'),
-    '123.12: _routePanelNav() defined and called in _routeNativeCommand BEFORE the command loop (routes natively, before AI)'
+    '123.3: _routePanelNav() defined and called in _routeNativeCommand BEFORE the command loop (routes natively, before AI)'
   );
-  // 123.13 covers every required panel category (the alias VALUES include them all)
+  // 123.4 covers every required panel category (the alias VALUES include them all)
   {
     const required123 = [
       'inventory',
@@ -13794,11 +13705,11 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     const missing123 = required123.filter(c => !aliasVals123.includes(c));
     assert(
       missing123.length === 0,
-      '123.13: PANEL_NAV_ALIASES covers every required panel category' +
+      '123.4: PANEL_NAV_ALIASES covers every required panel category' +
         (missing123.length ? ' — MISSING: ' + missing123.join(', ') : '')
     );
   }
-  // 123.14 the common nicknames resolve to the correct category
+  // 123.5 the common nicknames resolve to the correct category
   {
     const pairs123 = [
       ['inv', 'inventory'],
@@ -13818,18 +13729,18 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     const bad123 = pairs123.filter(([a, c]) => aliasMap123[a] !== c);
     assert(
       bad123.length === 0,
-      '123.14: panel-nav nicknames resolve to the right category' +
+      '123.5: panel-nav nicknames resolve to the right category' +
         (bad123.length ? ' — WRONG: ' + bad123.map(p => p[0]).join(', ') : '')
     );
   }
-  // 123.15 OWNER DIRECTIVE: consult / databank / lookup all open the DATABANK panel (not the AI/modal)
+  // 123.6 OWNER DIRECTIVE: consult / databank / lookup all open the DATABANK panel (not the AI/modal)
   assert(
     aliasMap123['consult'] === 'databank' &&
       aliasMap123['databank'] === 'databank' &&
       aliasMap123['lookup'] === 'databank',
-    '123.15: consult/databank/lookup → DATABANK panel (owner directive — not the AI CONSULT modal)'
+    '123.6: consult/databank/lookup → DATABANK panel (owner directive — not the AI CONSULT modal)'
   );
-  // 123.16 expandPanelForCategory maps the new WU-HF3 categories to a tab + h2 prefix
+  // 123.7 expandPanelForCategory maps the panel-nav categories to a tab + h2 prefix
   {
     let expandBody123 = '';
     try {
@@ -13844,31 +13755,31 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         /databank:\s*'>\s*DATABANK'/.test(expandBody123) &&
         /config:\s*'campg'/.test(expandBody123) &&
         /config:\s*'>\s*CAMPAIGN CONFIGURATION'/.test(expandBody123),
-      '123.16: expandPanelForCategory maps the new panel-nav categories (special/skills/bio/map/databank/config) to a tab + h2'
+      '123.7: expandPanelForCategory maps the panel-nav categories (special/skills/bio/map/databank/config) to a tab + h2'
     );
   }
-  // 123.17 EXACT whole-input match: _routePanelNav does a direct map lookup (no includes/startsWith/
+  // 123.8 EXACT whole-input match: _routePanelNav does a direct map lookup (no includes/startsWith/
   // indexOf), so "consult deathclaw" still falls through to the native CONSULT lookup.
   assert(
     /PANEL_NAV_ALIASES\[\s*key\s*\]/.test(panelNavBody123) &&
       !/\.includes\(|\.startsWith\(|\.indexOf\(/.test(panelNavBody123),
-    '123.17: _routePanelNav uses an exact whole-input map lookup (no substring match) so "consult <topic>" still reaches the native lookup'
+    '123.8: _routePanelNav uses an exact whole-input map lookup (no substring match) so "consult <topic>" still reaches the native lookup'
   );
-  // 123.18 game-agnostic (Protocol 38): the panel-nav block names UI panels, never game data
+  // 123.9 game-agnostic (Protocol 38): the panel-nav block names UI panels, never game data
   assert(
     !/New Vegas|Mojave|Fallout|\bFNV\b|\bFO3\b|Vault 101|Capital Wasteland|Courier|Deathclaw/i.test(
       aliasBlock123 + panelNavBody123
     ),
-    '123.18: PANEL_NAV_ALIASES + _routePanelNav are game-agnostic (no FNV/FO3/Fallout/location literals — Protocol 38)'
+    '123.9: PANEL_NAV_ALIASES + _routePanelNav are game-agnostic (no FNV/FO3/Fallout/location literals — Protocol 38)'
   );
-  // 123.19 the CONSULT→DATABANK target panel actually exists on the DATA tab
+  // 123.10 the CONSULT→DATABANK target panel actually exists on the DATA tab
   assert(
     /id="databankPanel"/.test(html123) &&
       /data-tab="data"[^>]*id="databankPanel"|id="databankPanel"[^>]*data-tab="data"/.test(
         html123
       ) &&
       /DATABANK<\/h2>/.test(html123),
-    '123.19: #databankPanel (DATABANK h2, data-tab="data") exists as the consult/databank/lookup target'
+    '123.10: #databankPanel (DATABANK h2, data-tab="data") exists as the consult/databank/lookup target'
   );
 }
 
@@ -22445,6 +22356,100 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     /\.msg-tag\s*\{/.test(css167) &&
       /\.msg-tag--overseer\s*\{[^}]*var\(--bezel-wire\)/.test(css167),
     '167.8: terminal.css defines .msg-tag/.msg-tag--overseer, colored via the existing --bezel-wire token (game-agnostic)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 168 — TERMLINK Command Console fully retired
+//  Owner directive: TERMLINK (WU-F9) is the predecessor of the Tool Deck (◈) and is
+//  now redundant — every subsystem it launched is reachable via the deck or its own
+//  panel button. Unlike the [CROSSROADS] retirement (command removed, helper kept),
+//  TERMLINK is removed ENTIRELY: the router entries, the console (manifest + launcher
+//  + renderer), the COMMAND_REGISTRY entry, and the console CSS. BIO-SCAN and the Tool
+//  Deck are independent of TERMLINK and are proven untouched by this batch.
+//  8 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 168 — TERMLINK Command Console fully retired');
+  const api168 = readFile('js/api.js');
+  const uiCore168 = readFile('js/ui-core.js');
+  const uiRender168 = readFile('js/ui-render.js');
+  const html168 = readFile('index.html');
+  const css168 = readFile('css/terminal.css');
+  const router168 = (api168.match(/const NATIVE_COMMAND_ROUTER = \{([\s\S]*?)\n\};/) || [
+    '',
+    '',
+  ])[1];
+  const registry168 = (uiCore168.match(/const COMMAND_REGISTRY = \[([\s\S]*?)\n\];/) || [
+    '',
+    '',
+  ])[1];
+
+  // 168.1  NATIVE_COMMAND_ROUTER no longer routes [TERMLINK] / [TL] / bare TERMLINK
+  assert(
+    !/'\[TERMLINK\]'/.test(router168) &&
+      !/'\[TL\]'/.test(router168) &&
+      !/\bTERMLINK:\s*\(\)/.test(router168),
+    '168.1: NATIVE_COMMAND_ROUTER no longer has [TERMLINK] / [TL] / bare TERMLINK entries — all three fall through unresolved'
+  );
+
+  // 168.2  the console itself is fully deleted from api.js — not just unreachable
+  assert(
+    !/const TERMLINK_CONSOLE/.test(api168) &&
+      !/function showTermlinkConsole/.test(api168) &&
+      !/function _termlinkLaunch/.test(api168),
+    '168.2: TERMLINK_CONSOLE, showTermlinkConsole(), and _termlinkLaunch() are all fully removed from api.js (not left as dead code)'
+  );
+
+  // 168.3  COMMAND_REGISTRY no longer advertises TERMLINK — the [FEATURES] help modal
+  //        (which renders COMMAND_REGISTRY, per Suite 113.5) stays accurate
+  assert(
+    !/\[TERMLINK\]/.test(registry168),
+    '168.3: COMMAND_REGISTRY no longer advertises [TERMLINK] / [TL] (help modal stays accurate)'
+  );
+
+  // 168.4  the console CSS is fully removed from terminal.css
+  assert(
+    !/\.termlink-/.test(css168),
+    '168.4: terminal.css no longer defines any .termlink-* rule (console markup + styling both gone)'
+  );
+
+  // 168.5  self-referential escape-ratchet guard: [TERMLINK] and [TL] are registered
+  //        in the Suite 113 RETIRED-macro list (mirrors 136.11 for [TIMELINE] and
+  //        167.4 for [CROSSROADS])
+  assert(
+    /const RETIRED = \[[\s\S]*?'\[TERMLINK\]'[\s\S]*?\]/.test(
+      readFile('tests/robco-diagnostics.js')
+    ) &&
+      /const RETIRED = \[[\s\S]*?'\[TL\]'[\s\S]*?\]/.test(readFile('tests/robco-diagnostics.js')),
+    '168.5: [TERMLINK] and [TL] are both registered in the Suite 113 RETIRED-macro list (self-referential escape-ratchet guard)'
+  );
+
+  // 168.6  #termlinkBtn stays absent from index.html (already retired at the Tool Deck
+  //        unit) and no stray onclick/id references the retired launcher anywhere
+  assert(
+    !/id="termlinkBtn"/.test(html168) &&
+      !/_termlinkLaunch\(/.test(html168) &&
+      !/showTermlinkConsole\(\)/.test(html168),
+    '168.6: index.html has no #termlinkBtn and no lingering reference to the retired launcher functions'
+  );
+
+  // 168.7  BIO-SCAN is untouched: its own panel button still calls renderBioScan()
+  //        directly — TERMLINK was never its only entry point
+  assert(
+    /function renderBioScan\(/.test(uiRender168) &&
+      /onclick="renderBioScan\(\)"/.test(html168) &&
+      /BIO-SCAN & LIMB STATUS/.test(html168),
+    '168.7: BIO-SCAN & LIMB STATUS panel + its RUN BIO-SCAN button (renderBioScan()) are unaffected by the TERMLINK removal'
+  );
+
+  // 168.8  the Tool Deck is untouched: its render/wire/open functions are still
+  //        present and were never routed through TERMLINK
+  assert(
+    /function renderHolster\(/.test(uiRender168) &&
+      /function _wireToolDeck\(/.test(uiCore168) &&
+      /function openToolDeck\(/.test(uiCore168),
+    '168.8: the Tool Deck (renderHolster/_wireToolDeck/openToolDeck) is unaffected by the TERMLINK removal'
   );
 }
 

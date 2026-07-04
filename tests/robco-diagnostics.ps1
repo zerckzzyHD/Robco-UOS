@@ -7228,7 +7228,7 @@ $router113   = [regex]::Match($api113, 'const NATIVE_COMMAND_ROUTER = \{([\s\S]*
 
 $NATIVES113 = @('[VATS SIM]','[THREAT]','[TRADE]','CONSULT','[BIO-SCAN]','[LOOT]')
 $ROUTER_NATIVES113 = @('[VATS SIM]','[THREAT]','[BIO-SCAN]','[LOOT]','[CONSULT]')
-$RETIRED113 = @('[VVATS]','[TACTICS]','[SYNC:','[STASH','[EXCESS]','[CURRENCY]','[AUDIT]','[TIMER/CHEM]','[SQUAD]','[TRAVEL CLUSTER]','[CASINO]','[COMM LINK]','[PAUSE]','[PAGE 2','[ARCHIVE]','[TIMELINE]','[CROSSROADS]')
+$RETIRED113 = @('[VVATS]','[TACTICS]','[SYNC:','[STASH','[EXCESS]','[CURRENCY]','[AUDIT]','[TIMER/CHEM]','[SQUAD]','[TRAVEL CLUSTER]','[CASINO]','[COMM LINK]','[PAUSE]','[PAGE 2','[ARCHIVE]','[TIMELINE]','[CROSSROADS]','[TERMLINK]','[TL]')
 
 # 113.1  registry parsed + NATIVE TERMINALS group marked OFFLINE / NO AI
 Check (($registry113.Length -gt 0) -and ($registry113 -match 'NATIVE TERMINALS[^'']*OFFLINE[^'']*NO AI')) `
@@ -7709,72 +7709,18 @@ Check (($bootLines122 -match 'APP_VERSION') -and (($pick122 + $bootLines122) -no
     '122.8: the boot-flavor strings are game-agnostic (no FNV/FO3/Fallout/location literals) and version via APP_VERSION'
 
 # ===========================================================
-# Suite 123 -- WU-F9 TERMLINK Command Console + WU-HF2/HF3 hotfixes (19 tests)
-# The Phase-F launcher surface that routes the offline subsystems through
-# NATIVE_COMMAND_ROUTER (or the documented BARTER panel). Guards console <-> router
-# consistency, offline (0 AI), game-agnostic, XSS-safe. Also locks the v2.7.0 hotfixes:
-# WU-HF2 (no soft-keyboard pop -- precise-pointer gated re-focus) and WU-HF3 (typed panel
-# navigation -- whole-input panel alias opens that panel natively, consult/databank/lookup
-# -> DATABANK panel, "consult <topic>" still runs the native lookup).
-# (PS mirror of JS 123.)
+# Suite 123 -- WU-HF2/HF3: precise-pointer refocus + native panel navigation (10 tests)
+# Locks the v2.7.0 hotfixes: WU-HF2 (no soft-keyboard pop -- precise-pointer gated
+# re-focus) and WU-HF3 (typed panel navigation -- whole-input panel alias opens that
+# panel natively, consult/databank/lookup -> DATABANK panel, "consult <topic>" still
+# runs the native lookup). Formerly bundled with the WU-F9 TERMLINK Command Console
+# tests; TERMLINK was fully retired -- see Suite 168 -- and its tests removed rather
+# than renumbered in place. (PS mirror of JS 123.)
 # ===========================================================
-Sep "Suite 123 -- WU-F9 TERMLINK Command Console"
+Sep "Suite 123 -- WU-HF2/HF3 precise-pointer refocus + native panel navigation"
 $api123  = Read-Src "js/api.js"
 $core123 = Read-Src "js/ui-core.js"
 $html123 = Read-Src "index.html"
-$css123  = Read-Src "css/terminal.css"
-$router123     = [regex]::Match($api123, '(?s)const NATIVE_COMMAND_ROUTER = \{[\s\S]*?\n\};').Value
-$consoleArr123 = [regex]::Match($api123, '(?s)const TERMLINK_CONSOLE = \[[\s\S]*?\n\];').Value
-$showFn123     = [regex]::Match($api123, '(?s)function showTermlinkConsole\(\)[\s\S]*?openModal\(\);\s*\n\}').Value
-$launchFn123   = [regex]::Match($api123, '(?s)function _termlinkLaunch\([\s\S]*?\n\}').Value
-$tokCount123   = ([regex]::Matches($consoleArr123, "token:\s*'[^']+'")).Count
-
-# 123.1  [TERMLINK] / [TL] / bare TERMLINK all route to showTermlinkConsole in the native router
-Check (($router123 -match "'\[TERMLINK\]':\s*\(\)\s*=>\s*showTermlinkConsole\(\)") -and ($router123 -match "'\[TL\]':\s*\(\)\s*=>\s*showTermlinkConsole\(\)") -and ($router123 -match '\bTERMLINK:\s*\(\)\s*=>\s*showTermlinkConsole\(\)')) `
-    '123.1: NATIVE_COMMAND_ROUTER routes [TERMLINK], [TL] and bare TERMLINK to showTermlinkConsole()'
-
-# 123.2  showTermlinkConsole defined and opens via openModal (Step 2 Phase 0 U12 consolidated driver)
-Check (($showFn123.Length -gt 0) -and ($showFn123 -match 'openModal\(\)')) `
-    '123.2: showTermlinkConsole() is defined and opens the console via openModal() (U12 driver -- focus-trap + ARIA)'
-
-# 123.3  the console manifest exists with the six offline subsystem entries
-Check (($consoleArr123.Length -gt 0) -and ($tokCount123 -ge 6)) `
-    '123.3: TERMLINK_CONSOLE lists at least six subsystem entries'
-
-# 123.4  router-drift guard: every router-backed console token resolves in NATIVE_COMMAND_ROUTER;
-#        [TRADE] is the documented panel exception (panel:true, intentionally NOT a router token).
-$rbOk123 = $true
-foreach ($t in @('[VATS SIM]', '[THREAT]', '[CONSULT]', '[BIO-SCAN]', '[LOOT]')) {
-    if (-not $router123.Contains("'$t'")) { $rbOk123 = $false }
-    if (-not $consoleArr123.Contains($t)) { $rbOk123 = $false }
-}
-$tradePanel123 = $consoleArr123 -match "(?s)\{[^}]*token:\s*'\[TRADE\]'[^}]*panel:\s*true[^}]*\}"
-Check ($rbOk123 -and $tradePanel123 -and (-not $router123.Contains("'[TRADE]'"))) `
-    '123.4: every router-backed TERMLINK token resolves in NATIVE_COMMAND_ROUTER; [TRADE] is the panel exception'
-
-# 123.5  _termlinkLaunch routes router tokens through _routeNativeCommand and the panel via the trade panel
-Check (($launchFn123.Length -gt 0) -and ($launchFn123 -match '_routeNativeCommand\(token\)') -and ($launchFn123 -match "expandPanelForCategory\('trade'\)") -and ($launchFn123 -match 'closeModal\(\)')) `
-    '123.5: _termlinkLaunch() routes native tokens via _routeNativeCommand, opens BARTER via the trade panel, closes the console first'
-
-# 123.6  offline / zero-AI: neither the console nor the launcher does network I/O or AI calls
-Check (($showFn123 + $launchFn123) -notmatch 'fetch\(|XMLHttpRequest|transmitMessage\(|generativelanguage|gemini') `
-    '123.6: showTermlinkConsole + _termlinkLaunch make no network/AI call (routes natively, fully offline)'
-
-# 123.7  XSS-safe: rendered token/label/blurb run through escapeHtml
-Check ((([regex]::Matches($showFn123, 'escapeHtml\(')).Count) -ge 3) `
-    '123.7: showTermlinkConsole escapes rendered token/label/blurb via escapeHtml (XSS-safe)'
-
-# 123.8  game-agnostic (Protocol 38): the TERMLINK block carries no game literals
-Check (($consoleArr123 + $showFn123 + $launchFn123) -notmatch 'New Vegas|Mojave|Fallout|\bFNV\b|\bFO3\b|Vault 101|Capital Wasteland|Courier') `
-    '123.8: the TERMLINK console block is game-agnostic (no FNV/FO3/Fallout/location literals)'
-
-# 123.9  Tool Deck unit: the on-screen #termlinkBtn is retired (the deck supersedes
-#        it -- TOOLDECK_PLAN.md decision 3) but TERMLINK stays fully typable: the
-#        router, COMMAND_REGISTRY entry, and console CSS are all unchanged.
-Check (($html123 -notmatch 'id="termlinkBtn"') -and ($core123 -match '\[TERMLINK\] / \[TL\]') -and ($css123 -match '\.termlink-grid') -and ($css123 -match '\.termlink-entry')) `
-    '123.9: #termlinkBtn is retired from index.html (Tool Deck supersedes it); [TERMLINK] stays typable -- COMMAND_REGISTRY advertises it, console CSS present'
-
-# -- WU-HF2 + WU-HF3 hotfixes (folded into v2.7.0) --------------------------------
 $aliasBlock123 = [regex]::Match($api123, "(?s)const PANEL_NAV_ALIASES = \{[\s\S]*?\n\};").Value
 $aliasMap123 = @{}
 foreach ($m in [regex]::Matches($aliasBlock123, "(\w+):\s*'([^']+)'")) { $aliasMap123[$m.Groups[1].Value] = $m.Groups[2].Value }
@@ -7786,51 +7732,51 @@ try { $routerBody123 = Get-FunctionBody $api123 '_routeNativeCommand' } catch {}
 $transmitBody123 = ''
 try { $transmitBody123 = Get-FunctionBody $api123 'transmitMessage' } catch {}
 
-# 123.10 WU-HF2: the post-native-command Comm-Link re-focus is precise-pointer gated (no touch keyboard pop)
+# 123.1 WU-HF2: the post-native-command Comm-Link re-focus is precise-pointer gated (no touch keyboard pop)
 Check (($api123 -match 'function _isPrecisePointer\s*\(') -and ($api123 -match 'hover: hover[\s\S]*?pointer: fine') -and ($transmitBody123 -match "_isPrecisePointer\(\)\s*\)\s*document\.getElementById\('chatInput'\)\.focus\(\)")) `
-    '123.10: WU-HF2 -- transmitMessage gates the post-command chatInput.focus() behind _isPrecisePointer() (no touch keyboard pop)'
+    '123.1: WU-HF2 -- transmitMessage gates the post-command chatInput.focus() behind _isPrecisePointer() (no touch keyboard pop)'
 
-# 123.11 WU-HF3: PANEL_NAV_ALIASES map exists with a healthy set of aliases
+# 123.2 WU-HF3: PANEL_NAV_ALIASES map exists with a healthy set of aliases
 Check (($aliasBlock123.Length -gt 0) -and ($aliasMap123.Count -ge 30)) `
-    '123.11: PANEL_NAV_ALIASES map defined with >=30 alias entries'
+    '123.2: PANEL_NAV_ALIASES map defined with >=30 alias entries'
 
-# 123.12 _routePanelNav defined AND runs FIRST in _routeNativeCommand (native, before the AI)
+# 123.3 _routePanelNav defined AND runs FIRST in _routeNativeCommand (native, before the AI)
 Check (($api123 -match 'function _routePanelNav\s*\(') -and ($routerBody123 -match '_routePanelNav\(raw\)') -and ($routerBody123.IndexOf('_routePanelNav(raw)') -ge 0) -and ($routerBody123.IndexOf('_routePanelNav(raw)') -lt $routerBody123.IndexOf('NATIVE_COMMAND_ROUTER'))) `
-    '123.12: _routePanelNav() defined and called in _routeNativeCommand BEFORE the command loop (routes natively, before AI)'
+    '123.3: _routePanelNav() defined and called in _routeNativeCommand BEFORE the command loop (routes natively, before AI)'
 
-# 123.13 covers every required panel category (the alias VALUES include them all)
+# 123.4 covers every required panel category (the alias VALUES include them all)
 $required123 = @('inventory', 'special', 'skills', 'perks', 'quests', 'factions', 'map', 'craft', 'trade', 'status', 'bio', 'log', 'config', 'databank')
 $missing123 = @($required123 | Where-Object { $aliasVals123 -notcontains $_ })
 Check ($missing123.Count -eq 0) `
-    ('123.13: PANEL_NAV_ALIASES covers every required panel category' + $(if ($missing123.Count) { ' -- MISSING: ' + ($missing123 -join ', ') } else { '' }))
+    ('123.4: PANEL_NAV_ALIASES covers every required panel category' + $(if ($missing123.Count) { ' -- MISSING: ' + ($missing123 -join ', ') } else { '' }))
 
-# 123.14 the common nicknames resolve to the correct category
+# 123.5 the common nicknames resolve to the correct category
 $pairs123 = @(@('inv', 'inventory'), @('items', 'inventory'), @('stats', 'special'), @('character', 'special'), @('journal', 'quests'), @('rep', 'factions'), @('reputation', 'factions'), @('world', 'map'), @('workbench', 'craft'), @('barter', 'trade'), @('limbs', 'bio'), @('overseer', 'log'), @('settings', 'config'))
 $bad123 = @($pairs123 | Where-Object { $aliasMap123[$_[0]] -ne $_[1] })
 Check ($bad123.Count -eq 0) `
-    ('123.14: panel-nav nicknames resolve to the right category' + $(if ($bad123.Count) { ' -- WRONG: ' + (($bad123 | ForEach-Object { $_[0] }) -join ', ') } else { '' }))
+    ('123.5: panel-nav nicknames resolve to the right category' + $(if ($bad123.Count) { ' -- WRONG: ' + (($bad123 | ForEach-Object { $_[0] }) -join ', ') } else { '' }))
 
-# 123.15 OWNER DIRECTIVE: consult / databank / lookup all open the DATABANK panel (not the AI/modal)
+# 123.6 OWNER DIRECTIVE: consult / databank / lookup all open the DATABANK panel (not the AI/modal)
 Check (($aliasMap123['consult'] -eq 'databank') -and ($aliasMap123['databank'] -eq 'databank') -and ($aliasMap123['lookup'] -eq 'databank')) `
-    '123.15: consult/databank/lookup -> DATABANK panel (owner directive -- not the AI CONSULT modal)'
+    '123.6: consult/databank/lookup -> DATABANK panel (owner directive -- not the AI CONSULT modal)'
 
-# 123.16 expandPanelForCategory maps the new WU-HF3 categories to a tab + h2 prefix
+# 123.7 expandPanelForCategory maps the panel-nav categories to a tab + h2 prefix
 $expandBody123 = ''
 try { $expandBody123 = Get-FunctionBody $core123 'expandPanelForCategory' } catch {}
 Check (($expandBody123 -match "special:\s*'stat'") -and ($expandBody123 -match "special:\s*'>\s*BIO-METRICS'") -and ($expandBody123 -match "skills:\s*'>\s*SKILL MATRIX'") -and ($expandBody123 -match "bio:\s*'>\s*BIO-SCAN'") -and ($expandBody123 -match "map:\s*'>\s*WORLD MAP'") -and ($expandBody123 -match "databank:\s*'>\s*DATABANK'") -and ($expandBody123 -match "config:\s*'campg'") -and ($expandBody123 -match "config:\s*'>\s*CAMPAIGN CONFIGURATION'")) `
-    '123.16: expandPanelForCategory maps the new panel-nav categories (special/skills/bio/map/databank/config) to a tab + h2'
+    '123.7: expandPanelForCategory maps the panel-nav categories (special/skills/bio/map/databank/config) to a tab + h2'
 
-# 123.17 EXACT whole-input match: _routePanelNav does a direct map lookup (no includes/startsWith/indexOf)
+# 123.8 EXACT whole-input match: _routePanelNav does a direct map lookup (no includes/startsWith/indexOf)
 Check (($panelNavBody123 -match 'PANEL_NAV_ALIASES\[\s*key\s*\]') -and ($panelNavBody123 -notmatch '\.includes\(|\.startsWith\(|\.indexOf\(')) `
-    '123.17: _routePanelNav uses an exact whole-input map lookup (no substring match) so "consult <topic>" still reaches the native lookup'
+    '123.8: _routePanelNav uses an exact whole-input map lookup (no substring match) so "consult <topic>" still reaches the native lookup'
 
-# 123.18 game-agnostic (Protocol 38): the panel-nav block names UI panels, never game data
+# 123.9 game-agnostic (Protocol 38): the panel-nav block names UI panels, never game data
 Check (($aliasBlock123 + $panelNavBody123) -notmatch 'New Vegas|Mojave|Fallout|\bFNV\b|\bFO3\b|Vault 101|Capital Wasteland|Courier|Deathclaw') `
-    '123.18: PANEL_NAV_ALIASES + _routePanelNav are game-agnostic (no FNV/FO3/Fallout/location literals -- Protocol 38)'
+    '123.9: PANEL_NAV_ALIASES + _routePanelNav are game-agnostic (no FNV/FO3/Fallout/location literals -- Protocol 38)'
 
-# 123.19 the CONSULT->DATABANK target panel actually exists on the DATA tab
+# 123.10 the CONSULT->DATABANK target panel actually exists on the DATA tab
 Check (($html123 -match 'id="databankPanel"') -and ($html123 -match 'data-tab="data"[^>]*id="databankPanel"|id="databankPanel"[^>]*data-tab="data"') -and ($html123 -match 'DATABANK</h2>')) `
-    '123.19: #databankPanel (DATABANK h2, data-tab="data") exists as the consult/databank/lookup target'
+    '123.10: #databankPanel (DATABANK h2, data-tab="data") exists as the consult/databank/lookup target'
 
 # ===========================================================
 # Suite 124 -- WU-T1 per-game theming + AA contrast (12 tests)
@@ -13751,6 +13697,59 @@ Check (($appendBody167 -match 'msgContent\.textContent\s*=\s*plainText') -and ((
 # 167.8  terminal.css defines the tag classes, colored via --bezel-wire
 Check (($css167 -match '\.msg-tag\s*\{') -and ($css167 -match '\.msg-tag--overseer\s*\{[^}]*var\(--bezel-wire\)')) `
     '167.8: terminal.css defines .msg-tag/.msg-tag--overseer, colored via the existing --bezel-wire token (game-agnostic)'
+
+# ===========================================================
+# Suite 168 -- TERMLINK Command Console fully retired (8 tests)
+# Owner directive: TERMLINK (WU-F9) is the predecessor of the Tool Deck (deck-key) and
+# is now redundant -- every subsystem it launched is reachable via the deck or its own
+# panel button. Unlike the [CROSSROADS] retirement (command removed, helper kept),
+# TERMLINK is removed ENTIRELY: the router entries, the console (manifest + launcher +
+# renderer), the COMMAND_REGISTRY entry, and the console CSS. BIO-SCAN and the Tool
+# Deck are independent of TERMLINK and are proven untouched by this batch.
+# (PS mirror of JS Suite 168.)
+# ===========================================================
+Sep "Suite 168 -- TERMLINK Command Console fully retired"
+$api168      = Read-Src "js/api.js"
+$uiCore168   = Read-Src "js/ui-core.js"
+$uiRender168 = Read-Src "js/ui-render.js"
+$html168     = Read-Src "index.html"
+$css168      = Read-Src "css/terminal.css"
+$router168   = [regex]::Match($api168, '(?s)const NATIVE_COMMAND_ROUTER = \{[\s\S]*?\n\};').Value
+$registry168 = [regex]::Match($uiCore168, '(?s)const COMMAND_REGISTRY = \[[\s\S]*?\n\];').Value
+
+# 168.1  NATIVE_COMMAND_ROUTER no longer routes [TERMLINK] / [TL] / bare TERMLINK
+Check ((-not ($router168 -match "'\[TERMLINK\]'")) -and (-not ($router168 -match "'\[TL\]'")) -and (-not ($router168 -match '\bTERMLINK:\s*\(\)'))) `
+    '168.1: NATIVE_COMMAND_ROUTER no longer has [TERMLINK] / [TL] / bare TERMLINK entries -- all three fall through unresolved'
+
+# 168.2  the console itself is fully deleted from api.js -- not just unreachable
+Check ((-not ($api168 -match 'const TERMLINK_CONSOLE')) -and (-not ($api168 -match 'function showTermlinkConsole')) -and (-not ($api168 -match 'function _termlinkLaunch'))) `
+    '168.2: TERMLINK_CONSOLE, showTermlinkConsole(), and _termlinkLaunch() are all fully removed from api.js (not left as dead code)'
+
+# 168.3  COMMAND_REGISTRY no longer advertises TERMLINK
+Check (-not ($registry168 -match '\[TERMLINK\]')) `
+    '168.3: COMMAND_REGISTRY no longer advertises [TERMLINK] / [TL] (help modal stays accurate)'
+
+# 168.4  the console CSS is fully removed from terminal.css
+Check (-not ($css168 -match '\.termlink-')) `
+    '168.4: terminal.css no longer defines any .termlink-* rule (console markup + styling both gone)'
+
+# 168.5  self-referential escape-ratchet guard: [TERMLINK] and [TL] are registered
+#        in the Suite 113 RETIRED-macro list (mirrors 167.4 for [CROSSROADS])
+Check (($RETIRED113 -contains '[TERMLINK]') -and ($RETIRED113 -contains '[TL]')) `
+    '168.5: [TERMLINK] and [TL] are both registered in the Suite 113 RETIRED-macro list (self-referential escape-ratchet guard)'
+
+# 168.6  #termlinkBtn stays absent from index.html and no stray reference to the
+#        retired launcher remains anywhere
+Check ((-not ($html168 -match 'id="termlinkBtn"')) -and (-not ($html168 -match '_termlinkLaunch\(')) -and (-not ($html168 -match 'showTermlinkConsole\(\)'))) `
+    '168.6: index.html has no #termlinkBtn and no lingering reference to the retired launcher functions'
+
+# 168.7  BIO-SCAN is untouched: its own panel button still calls renderBioScan() directly
+Check (($uiRender168 -match 'function renderBioScan\(') -and ($html168 -match 'onclick="renderBioScan\(\)"') -and ($html168 -match 'BIO-SCAN & LIMB STATUS')) `
+    '168.7: BIO-SCAN & LIMB STATUS panel + its RUN BIO-SCAN button (renderBioScan()) are unaffected by the TERMLINK removal'
+
+# 168.8  the Tool Deck is untouched: its render/wire/open functions are still present
+Check (($uiRender168 -match 'function renderHolster\(') -and ($uiCore168 -match 'function _wireToolDeck\(') -and ($uiCore168 -match 'function openToolDeck\(')) `
+    '168.8: the Tool Deck (renderHolster/_wireToolDeck/openToolDeck) is unaffected by the TERMLINK removal'
 
 # ===========================================================
 # Results

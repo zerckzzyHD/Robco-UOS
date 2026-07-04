@@ -50,7 +50,7 @@ Both games are first-class and fully data-driven. A single `GAME_DEFS` table plu
 
 ### 🛠️ Native Offline Tools (no AI, deterministic, free)
 
-Six in-terminal tools compute their results **on-device from the game's own data** — zero network, zero AI, the same answer every time. Reachable from the Tool Deck (a small button beside the Comm-Link message box), typed commands, or the TERMLINK console.
+Six in-terminal tools compute their results **on-device from the game's own data** — zero network, zero AI, the same answer every time. Reachable from the Tool Deck (a small button beside the Comm-Link message box) or typed commands.
 
 | Tool                      | What it does                                                                                                                                                 |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -61,11 +61,11 @@ Six in-terminal tools compute their results **on-device from the game's own data
 | **BIO-SCAN**              | Medical advisory — HP tier, radiation, per-limb OK/CRIPPLED, addiction flags, and the right healing/rad/cure items (sourced from the game's own chem data)   |
 | **LOOT**                  | Salvage intake — search the item database and add anything to your pack at its canonical value (additive + confirm-gated)                                    |
 
-A **TERMLINK command console** launches all six from one menu; a `[FEATURES]` command registry lists every command the terminal supports and is kept honest by the build gate.
+A `[FEATURES]` command registry lists every command the terminal supports and is kept honest by the build gate.
 
 ### 📟 Device Capabilities
 
-Ten capabilities, each with a graceful fallback when the device/browser doesn't support it:
+Nine capabilities, each with a graceful fallback when the device/browser doesn't support it:
 
 - **Sustained Power Cell** — Screen Wake Lock (keep the display awake while reading)
 - **Haptic Solenoid** — Vibration feedback on level-up, faction flips, and critical HP (honours reduced-motion)
@@ -76,7 +76,6 @@ Ten capabilities, each with a graceful fallback when the device/browser doesn't 
 - **Overseer's Log** — local device telemetry (uptime, longest session, total power-on, boot count) merged with your campaign statistics
 - **High-Lumen Optics** — a high-contrast display mode (auto-on under `prefers-contrast`)
 - **Immersion dial** — a Full/Balanced/Minimal control for how much ambient atmosphere the terminal runs; a per-device preference (never rides your saves), defaulting to Full. A born-compliant seam the ambient layer will subscribe to
-- **TERMLINK Console** — the native command surface above
 
 ### 🎮 Character, Combat & World
 
@@ -150,7 +149,7 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 | **PWA**         | Service Worker + Manifest                        | Installable, offline-capable, reliable auto-update           |
 | **Hosting**     | GitHub Pages (prod) + Cloudflare Pages (staging) | Release-gated production; auto-deployed staging              |
 | **Dev Tooling** | ESLint + Prettier + Vite                         | Linting, formatting, dev server                              |
-| **Testing**     | Node + PowerShell + Playwright                   | 2127-test gate at parity + boot-smoke / render / a11y checks |
+| **Testing**     | Node + PowerShell + Playwright                   | 2126-test gate at parity + boot-smoke / render / a11y checks |
 
 ### Per-game data system
 
@@ -180,7 +179,7 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 ├── sw.js                   Service Worker (cache-first, atomic precache, reliable update)
 ├── manifest.json           PWA manifest (version-less name + app shortcuts)
 ├── tests/
-│   ├── robco-diagnostics.js   Node persistence/structure audit (2127 tests, 168 suites)
+│   ├── robco-diagnostics.js   Node persistence/structure audit (2126 tests, 169 suites)
 │   ├── robco-diagnostics.ps1  PowerShell mirror (parity-locked)
 │   ├── test.html              Browser-side runtime import-contract audit
 │   └── *.mjs                  Playwright boot-smoke / render-check / a11y-baseline
@@ -240,7 +239,7 @@ npm run dev        # Vite dev server with hot reload (typically http://localhost
 1. Open the terminal and let the boot sequence finish.
 2. Pick your game (New Vegas or Fallout 3).
 3. _(Optional)_ Paste a Gemini key in Configuration → **VALIDATE KEY & FETCH ENGINES**, then pick a model — only needed for the AI Director.
-4. Start playing: type commands or free text in the Comm-Link, or use the native tools (TERMLINK, VATS, TRADE, THREAT, CONSULT, BIO-SCAN, LOOT) with no key at all.
+4. Start playing: type commands or free text in the Comm-Link, or use the native tools (VATS, TRADE, THREAT, CONSULT, BIO-SCAN, LOOT) with no key at all.
 
 ### Hosting & Release Flow
 
@@ -270,7 +269,7 @@ Commits and pushes are blocked unless the gate is green. The pre-commit hook run
 
 ### Commit Workflow (dev-branch model)
 
-All unreleased work goes to **`dev`**; **`main` is release-only**. Each commit keeps docs + the 2127-test count in sync and bumps `CACHE_NAME` when a served file changes.
+All unreleased work goes to **`dev`**; **`main` is release-only**. Each commit keeps docs + the 2126-test count in sync and bumps `CACHE_NAME` when a served file changes.
 
 ```
 npm run lint && npm run format
@@ -309,8 +308,8 @@ The browser-native era: a second game (**Fallout 3**) added as a first-class, fu
 A **production-quality, two-game browser application** with:
 
 - **Both Fallout: New Vegas and Fallout 3** as fully data-driven game contexts (`GAME_DEFS`, per-game registries/databases/theming/identity)
-- **Six native offline tools** (V.A.T.S., TRADE, THREAT, CONSULT, BIO-SCAN, LOOT) — deterministic, no AI, plus a TERMLINK console and a self-checked command registry
-- **Nine device capabilities** (Wake Lock, Vibration, Web Share, Badging, Pip-Boy Radio, cold-start/degraded boot, Overseer's Log, High-Lumen Optics, TERMLINK)
+- **Six native offline tools** (V.A.T.S., TRADE, THREAT, CONSULT, BIO-SCAN, LOOT) — deterministic, no AI, plus a self-checked command registry
+- **Eight device capabilities** (Wake Lock, Vibration, Web Share, Badging, Pip-Boy Radio, cold-start/degraded boot, Overseer's Log, High-Lumen Optics)
 - **Per-game theming** — per-game default optic, dynamic "(Default)" label, per-game colour memory, per-game boot/save identity
 - **Device bezel chrome** _(Design Overhaul, dev-only)_ — the app renders inside a physical RobCo terminal casing, with the old tab bar replaced by an illuminated subsystem selector (OPERATOR/OPERATIONS/DATABANK/UPLINK/CHASSIS + a flat DIRECTORY fallback) that routes through the same underlying tab router
 - **Director Uplink — the living Overseer** _(Design Overhaul, dev-only)_ — the Comm-Link is reskinned as a phosphor-oscilloscope presence whose waveform reacts to the real AI lifecycle (listening/thinking/speaking/no-carrier/offline), with a per-game status strip and a self-contained mobile view
@@ -320,7 +319,7 @@ A **production-quality, two-game browser application** with:
 - **Saves & cloud** — auto-save, A/B/C slots (with confirm-gated overwrite/delete + version history), export/import + migration, rolling checksummed backups, additive Firestore sync (with its own confirm-gated overwrite/delete + version history), Google sign-in, remote kill-switch, per-game filtered saves list
 - **Accessibility + PWA** — focus rings, reduced-motion, live regions, dialog focus traps, AA contrast; installable, offline, reliable auto-update; touch-first responsive
 - **Wiki-sourced data** — per-game Fallout Data Registries + combat databases (weapons, armor, bestiary, chems, recipes, vendors, quest items), all from the Independent Fallout Wiki
-- **A self-improving gate** — **2127 tests across 168 suites**, mirrored in the Node and PowerShell runners at exact parity (per-suite composition, not just the grand total), plus Playwright boot-smoke / render-check / a11y baseline and a `test.html` runtime audit; CI + a nightly run back it up
+- **A self-improving gate** — **2126 tests across 169 suites**, mirrored in the Node and PowerShell runners at exact parity (per-suite composition, not just the grand total), plus Playwright boot-smoke / render-check / a11y baseline and a `test.html` runtime audit; CI + a nightly run back it up
 
 ---
 
