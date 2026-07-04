@@ -237,6 +237,36 @@ function startCrtHum() {
   crtHumLfo.start();
 }
 
+// Owner report: the CRT hum kept playing while the terminal was powered off.
+// Mirrors stopTinnitus()'s full-teardown pattern (stop+disconnect+null every
+// node) rather than just zeroing gain, so a subsequent startCrtHum() call
+// (guarded on `if (crtHumNode ...) return`) is free to recreate the graph
+// instead of finding stale nodes already in place.
+function stopCrtHum() {
+  if (crtHumLfo) {
+    try {
+      crtHumLfo.stop();
+    } catch (e) {}
+    crtHumLfo.disconnect();
+    crtHumLfo = null;
+  }
+  if (crtHumLfoGain) {
+    crtHumLfoGain.disconnect();
+    crtHumLfoGain = null;
+  }
+  if (crtHumNode) {
+    try {
+      crtHumNode.stop();
+    } catch (e) {}
+    crtHumNode.disconnect();
+    crtHumNode = null;
+  }
+  if (crtHumGain) {
+    crtHumGain.disconnect();
+    crtHumGain = null;
+  }
+}
+
 function setCrtHumIntensity(rads, hasCrippled) {
   if (!crtHumGain || !crtHumNode || !audioCtx) return;
   let targetFreq = rads >= 600 ? 82 : 60;

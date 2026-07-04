@@ -23,9 +23,16 @@ body {
   min-height: 100vh;
 }
 
-/* Authentic CRT Scanlines & Screen Curvature */
+/* Authentic CRT Scanlines & Screen Curvature.
+   Owner report: this used to be position:fixed against the viewport, so the
+   scanline/vignette bled out over the casing-top and bezel chrome instead of
+   staying inside the terminal's own screen. It now lives inside .glass-frame
+   (index.html) — the device chrome's "screen" layer, already
+   position:relative + overflow:hidden — as position:absolute, so it's
+   clipped to exactly the glass area (including its rounded corners) and
+   never covers the casing/bezel outside it. */
 .crt-overlay {
-  position: fixed;
+  position: absolute;
   top: 0;
   left: 0;
   bottom: 0;
@@ -637,6 +644,15 @@ button.lamp {
 .glass-frame {
   position: relative;
   overflow: hidden;
+  /* z-index establishes its OWN stacking context (needed now that
+     .crt-overlay lives inside it at z-index:9999) — without this, that
+     9999 would be compared directly against sibling .bezel's z-index:60
+     (mobile, position:fixed) in .container's shared stacking context, so
+     the scanline could still paint over the bezel at some scroll depths
+     even though overflow:hidden already clips its box correctly. Trapping
+     it here means nothing inside .glass-frame can ever paint above a
+     sibling like .casing-top/.bezel outside it. */
+  z-index: 1;
 }
 .glass-frame.sweep::after {
   content: '';

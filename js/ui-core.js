@@ -1230,6 +1230,29 @@ function _wireAmbientExperiences() {
       _updatePwrLamp(true);
     },
   });
+
+  // Owner report: the CRT hum kept playing while the terminal was powered
+  // off. Reuses the exact SHUTDOWN/OFF state set the PWR lamp/shutdown-crt
+  // flourish above already key off (Protocol 22) — not tier-gated (mirrors
+  // 'overseer-scope' below: a functional power link, not a decorative
+  // ambient flourish), so it stops/resumes at every Immersion level. Volume
+  // (masterMute + the hum's own mute key) is still the only other gate,
+  // enforced inside startCrtHum()/setCrtHumIntensity() themselves.
+  AmbientRuntime.register({
+    id: 'crt-hum-power',
+    states: ['SHUTDOWN', 'OFF'],
+    onEnter: () => {
+      if (typeof stopCrtHum === 'function') stopCrtHum();
+    },
+    onExit: () => {
+      if (typeof startCrtHum !== 'function') return;
+      startCrtHum();
+      if (typeof setCrtHumIntensity !== 'function') return;
+      const rads = parseInt((document.getElementById('stat_rads') || {}).value) || 0;
+      const hasCrippled = ['la', 'ra', 'll', 'rl', 'hd'].some(l => state[l] !== 'OK');
+      setCrtHumIntensity(rads, hasCrippled);
+    },
+  });
 }
 
 // ── DO-O: THE LIVING OVERSEER — DIRECTOR UPLINK (Protocol UI-10) ───────────

@@ -69,8 +69,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2153-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2153-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2162-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2162-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -607,6 +607,15 @@ live telemetry LCD and six illuminated `.navkey` keycaps — over the **unchange
 This unit is chrome + nav only: every subsystem's actual panels (including OPERATOR/STAT) render
 exactly as before; per-subsystem visual dressing is a later DO-P unit.
 
+**Owner-report fix (casing/CRT batch):** `.crt-overlay` (the scanline/vignette) moved from a
+page-level `position:fixed` overlay (bled out over `.casing-top`/`.bezel`) to living inside
+`.glass-frame` itself as `position:absolute` — clipped to exactly the screen area by
+`.glass-frame`'s existing `overflow:hidden`. `.glass-frame` also gained its own explicit
+`z-index`, establishing a stacking context so the overlay's `z-index:9999` is trapped inside it
+rather than being compared directly against sibling `.bezel`'s `z-index:60` (mobile,
+`position:fixed`) — without that, the scanline could still paint over the fixed bezel at some
+scroll depths even with the geometric clip in place.
+
 **The router is untouched, only re-presented (Protocol 25 owner-approved redesign):**
 
 - `switchTab(tab)` (`ui-core.js`) keeps its exact `'stat'|'inv'|'data'|'campg'` contract, hotkey
@@ -657,6 +666,17 @@ widened the same way: every subsystem's line now ends in a common `_bezelStatusS
 rads value), and CARRIER (the same `_isUplinkConnected()` signal) — recomputed from
 `updateMath()` (HP/rads/limb changes) and `refreshOverseerCarrier()` (connection changes), so
 nothing here can go stale without a reload. Save-boundary clean, same as the rest of this section.
+
+**Owner-report fix — the CRT hum now follows real power state:** a new `crt-hum-power`
+`AmbientRuntime` observer (`_wireAmbientExperiences()`, `ui-core.js`), scoped to the same
+`['SHUTDOWN', 'OFF']` state set the PWR lamp/`shutdown-crt` observer above already key off
+(Protocol 22), stops the hum's audio graph on power-off via a new `stopCrtHum()` (`ui-audio.js` —
+a full stop+disconnect+null teardown mirroring `stopTinnitus()`'s pattern) and, on power-on, calls
+the existing `startCrtHum()` then re-derives the correct radiation/crippled-based intensity via
+`setCrtHumIntensity(rads, hasCrippled)` — `updateMath()` only re-calls that when rads/crippled
+actually change, so a bare restart alone would resume at the wrong base level after a
+radiation-elevated shutdown. Not tier-gated (a functional power link, not a decorative ambient
+flourish); volume is still gated only by `startCrtHum()`'s own existing masterMute/hum-mute guard.
 
 **Per-game flavor is `[data-game]` CSS, never a JS branch (Protocol 38/UI-7):** a `--bezel-wire`
 custom property defaults to the local phosphor color and is overridden amber only under
@@ -1960,7 +1980,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2153-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2162-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

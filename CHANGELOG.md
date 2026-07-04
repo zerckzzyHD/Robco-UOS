@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2153/2153 | Cache: robco-terminal-v2.7.0-r62 -->
+﻿## [Unreleased]<!-- Tests: 2162/2162 | Cache: robco-terminal-v2.7.0-r63 -->
 
 ### Added
 
@@ -65,6 +65,8 @@
 - Tapping the Director Uplink's "LISTENING" status now gives the waveform a fun one-shot pulse, purely for flavor — it's just a flourish and doesn't change your connection or anything else.
 - Fixed the Tool Deck's tool descriptions getting cut off with "…" on phones (THREAT, LOOT, CONSULT, and the V.A.T.S. calculator all did this) — every description now fits and reads in full, without making the tool list any taller.
 - Fixed the Module Bay's "3 TYPES" and "(DEFAULT)" tube tags being hard to read on a computer, where they stayed at their small phone size even though there was more room to work with — both are now bigger and easier to read on a larger screen, while phones look exactly as they did before.
+- Fixed the CRT hum continuing to play after you powered the terminal off. It now stops the moment the screen goes dark and picks back up automatically when you power back on (it stays silent if you'd already muted it).
+- Fixed the terminal's scanline effect bleeding out over the casing and navigation buttons around the screen. It now stays contained inside the screen itself, exactly like a real CRT.
 
 ### Improved
 

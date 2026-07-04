@@ -14041,6 +14041,96 @@ Check (($setStateBody169 -match 'tap to pulse the scope') -and ($setStateBody169
     "169.12: setOverseerState() updates #scopeTag's aria-label for both the LISTENING pulse action and the disabled/offline NO CARRIER routing"
 
 # ===========================================================
+# Suite 170 -- Owner batch: CRT hum follows power state + scanline
+# contained in screen (9 tests)
+# Two owner-reported casing/CRT fixes: (1) the CRT hum kept playing while the
+# terminal was powered off -- a new 'crt-hum-power' AmbientRuntime observer,
+# scoped to the same SHUTDOWN/OFF states the PWR lamp/shutdown-crt flourish
+# already key off, stops the hum's audio graph on power-off (stopCrtHum(), a
+# full stop+disconnect+null teardown mirroring stopTinnitus()) and restarts +
+# re-derives its correct radiation/crippled-based intensity on power-on; not
+# tier-gated (a functional power link, not a decorative ambient flourish),
+# and still only ever audible per the existing masterMute/hum-mute guards
+# inside startCrtHum() itself. (2) the CRT scanline/vignette overlay used to
+# be position:fixed against the whole viewport, bleeding out over the
+# casing-top/bezel chrome -- it now lives inside .glass-frame (the device
+# chrome's "screen" layer, already position:relative;overflow:hidden) as
+# position:absolute, and .glass-frame gained its own explicit z-index so the
+# overlay's z-index:9999 is trapped inside that stacking context instead of
+# being compared directly against sibling .bezel's z-index:60 (mobile,
+# position:fixed) -- otherwise the scanline could still paint over the fixed
+# bezel at some scroll depths even though overflow:hidden already clipped
+# its box. (PS mirror of JS Suite 170.)
+# ===========================================================
+Sep "Suite 170 -- Owner batch: CRT hum follows power state + scanline contained in screen"
+$uiAudio170 = Read-Src "js/ui-audio.js"
+$uiCore170 = Read-Src "js/ui-core.js"
+$css170 = Read-Src "css/terminal.css"
+$html170 = Read-Src "index.html"
+
+# 170.1  stopCrtHum() fully tears down the hum's audio graph
+$stopCrtHumBody170 = Get-FunctionBody $uiAudio170 "stopCrtHum"
+Check (
+    ($stopCrtHumBody170 -match 'crtHumNode = null') -and
+    ($stopCrtHumBody170 -match 'crtHumGain = null') -and
+    ($stopCrtHumBody170 -match 'crtHumLfo = null') -and
+    ($stopCrtHumBody170 -match 'crtHumLfoGain = null') -and
+    ($stopCrtHumBody170 -match 'crtHumNode\.stop\(\)') -and
+    ($stopCrtHumBody170 -match 'crtHumLfo\.stop\(\)')
+) '170.1: stopCrtHum() stops+disconnects+nulls crtHumNode/crtHumGain/crtHumLfo/crtHumLfoGain (full teardown, not just a gain ramp)'
+
+# 170.2  a 'crt-hum-power' observer is registered, scoped to SHUTDOWN/OFF
+$wireAmbient170 = Get-FunctionBody $uiCore170 "_wireAmbientExperiences"
+$humObsIdx170 = $wireAmbient170.IndexOf("id: 'crt-hum-power'")
+$humObsLen170 = [Math]::Min(700, $wireAmbient170.Length - $humObsIdx170)
+$humObsBlock170 = if ($humObsIdx170 -ge 0) { $wireAmbient170.Substring($humObsIdx170, $humObsLen170) } else { '' }
+Check (($humObsIdx170 -ge 0) -and ($humObsBlock170 -match "states: \['SHUTDOWN', 'OFF'\]")) `
+    "170.2: a 'crt-hum-power' observer is registered inside _wireAmbientExperiences(), scoped to states ['SHUTDOWN', 'OFF']"
+
+# 170.3  onEnter stops the hum; onExit restarts + re-derives its intensity
+Check (
+    ($humObsBlock170 -match 'onEnter: \(\) => \{[\s\S]{0,80}stopCrtHum\(\)') -and
+    ($humObsBlock170 -match 'onExit: \(\) => \{[\s\S]{0,400}startCrtHum\(\)[\s\S]{0,400}setCrtHumIntensity\(rads, hasCrippled\)')
+) '170.3: the crt-hum-power observer stops the hum on power-off (onEnter) and restarts + re-derives its intensity on power-on (onExit)'
+
+# 170.4  the observer is not tier-gated (a functional power link, not an
+#        Immersion-gated decorative flourish)
+Check (-not ($humObsBlock170 -match 'tier:')) `
+    '170.4: the crt-hum-power observer has no `tier` property -- it stops/resumes at every Immersion level, matching the PWR lamp'
+
+# 170.5  volume is still gated only by startCrtHum()'s existing guard
+$startCrtHumBody170 = Get-FunctionBody $uiAudio170 "startCrtHum"
+Check ($startCrtHumBody170 -match 'if \(crtHumNode \|\| AudioSettings\.masterMute \|\| AudioSettings\.hum\) return;') `
+    "170.5: startCrtHum()'s existing masterMute/hum-mute guard is untouched -- a muted hum stays silent through a power cycle"
+
+# 170.6  .crt-overlay now lives inside .glass-frame in index.html
+$glassFrameIdx170 = $html170.IndexOf('<div class="glass-frame">')
+$glassFrameLen170 = [Math]::Min(600, $html170.Length - $glassFrameIdx170)
+$glassFrameWindow170 = if ($glassFrameIdx170 -ge 0) { $html170.Substring($glassFrameIdx170, $glassFrameLen170) } else { '' }
+Check (($glassFrameIdx170 -ge 0) -and ($glassFrameWindow170 -match '<div class="crt-overlay"></div>')) `
+    '170.6: <div class="crt-overlay"> is nested inside <div class="glass-frame"> in index.html (not a page-level sibling before .container)'
+
+# 170.7  .crt-overlay is position:absolute, not position:fixed
+$crtOverlayRule170 = [regex]::Match($css170, '\.crt-overlay \{[^}]*\}').Value
+Check (($crtOverlayRule170 -match 'position: absolute;') -and (-not ($crtOverlayRule170 -match 'position: fixed;'))) `
+    '170.7: .crt-overlay is position:absolute (was position:fixed against the viewport)'
+
+# 170.8  .glass-frame declares its own z-index (stacking-context containment)
+$glassFrameRuleMatches170 = [regex]::Matches($css170, '\.glass-frame \{[^}]*\}')
+$glassFrameHasZIndex170 = $false
+foreach ($m in $glassFrameRuleMatches170) {
+    if ($m.Value -match 'z-index:\s*\d') { $glassFrameHasZIndex170 = $true }
+}
+Check $glassFrameHasZIndex170 `
+    "170.8: .glass-frame declares its own z-index (traps .crt-overlay's stacking inside it, never above sibling .casing-top/.bezel)"
+
+# 170.9  reduced-motion / high-lumen behavior for .crt-overlay is untouched
+Check (
+    ($css170 -match 'prefers-reduced-motion\s*:\s*reduce\b[\s\S]*?\.crt-overlay') -and
+    ($css170 -match 'html\.high-lumen \.crt-overlay')
+) '170.9: .crt-overlay keeps its prefers-reduced-motion + html.high-lumen behavior after the containment fix'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

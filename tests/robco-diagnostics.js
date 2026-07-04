@@ -22825,6 +22825,116 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   );
 }
 
+{
+  header('Suite 170 — Owner batch: CRT hum follows power state + scanline contained in screen');
+  const uiAudio170 = readFile('js/ui-audio.js');
+  const uiCore170 = readFile('js/ui-core.js');
+  const css170 = readFile('css/terminal.css');
+  const html170 = readFile('index.html');
+
+  // 170.1  stopCrtHum() exists and fully tears down the hum's audio graph
+  //        (stop+disconnect+null every node) — mirrors stopTinnitus()'s
+  //        pattern rather than just zeroing gain, so a later startCrtHum()
+  //        (guarded on `if (crtHumNode ...) return`) is free to recreate it.
+  const stopCrtHumBody170 = extractFunctionBody(uiAudio170, 'stopCrtHum');
+  assert(
+    /crtHumNode = null/.test(stopCrtHumBody170) &&
+      /crtHumGain = null/.test(stopCrtHumBody170) &&
+      /crtHumLfo = null/.test(stopCrtHumBody170) &&
+      /crtHumLfoGain = null/.test(stopCrtHumBody170) &&
+      /crtHumNode\.stop\(\)/.test(stopCrtHumBody170) &&
+      /crtHumLfo\.stop\(\)/.test(stopCrtHumBody170),
+    '170.1: stopCrtHum() stops+disconnects+nulls crtHumNode/crtHumGain/crtHumLfo/crtHumLfoGain (full teardown, not just a gain ramp)'
+  );
+
+  // 170.2  the owner-reported bug (hum kept playing while powered off) is
+  //        fixed via a NEW AmbientRuntime observer scoped to SHUTDOWN/OFF —
+  //        the same state set the PWR lamp/shutdown-crt flourish already key
+  //        off (Protocol 22) — registered inside _wireAmbientExperiences().
+  const wireAmbient170 = extractFunctionBody(uiCore170, '_wireAmbientExperiences');
+  const humObsIdx170 = wireAmbient170.indexOf("id: 'crt-hum-power'");
+  const humObsBlock170 = wireAmbient170.slice(humObsIdx170, humObsIdx170 + 700);
+  assert(
+    humObsIdx170 !== -1 && /states: \['SHUTDOWN', 'OFF'\]/.test(humObsBlock170),
+    "170.2: a 'crt-hum-power' observer is registered inside _wireAmbientExperiences(), scoped to states ['SHUTDOWN', 'OFF']"
+  );
+
+  // 170.3  onEnter (power-off) calls stopCrtHum(); onExit (power-on) calls
+  //        startCrtHum() then re-derives the correct intensity via
+  //        setCrtHumIntensity(rads, hasCrippled) — since updateMath() only
+  //        re-calls setCrtHumIntensity when rads/crippled actually CHANGE, a
+  //        bare startCrtHum() alone would resume at the wrong (base) level
+  //        after a radiation-elevated shutdown.
+  assert(
+    /onEnter: \(\) => \{[\s\S]{0,80}stopCrtHum\(\)/.test(humObsBlock170) &&
+      /onExit: \(\) => \{[\s\S]{0,400}startCrtHum\(\)[\s\S]{0,400}setCrtHumIntensity\(rads, hasCrippled\)/.test(
+        humObsBlock170
+      ),
+    '170.3: the crt-hum-power observer stops the hum on power-off (onEnter) and restarts + re-derives its intensity on power-on (onExit)'
+  );
+
+  // 170.4  the observer is not tier-gated (no `tier:` key) — a functional
+  //        power link, like the PWR lamp itself, not a decorative ambient
+  //        flourish that quiets at lower Immersion levels.
+  assert(
+    !/tier:/.test(humObsBlock170),
+    '170.4: the crt-hum-power observer has no `tier` property — it stops/resumes at every Immersion level, matching the PWR lamp'
+  );
+
+  // 170.5  volume is still gated ONLY by the existing Protocol 7 guards
+  //        (masterMute + the hum's own mute key) inside startCrtHum() itself
+  //        — the new observer never bypasses them.
+  const startCrtHumBody170 = extractFunctionBody(uiAudio170, 'startCrtHum');
+  assert(
+    /if \(crtHumNode \|\| AudioSettings\.masterMute \|\| AudioSettings\.hum\) return;/.test(
+      startCrtHumBody170
+    ),
+    "170.5: startCrtHum()'s existing masterMute/hum-mute guard is untouched — a muted hum stays silent through a power cycle"
+  );
+
+  // 170.6  .crt-overlay (the scanline/vignette) now lives INSIDE .glass-frame
+  //        in index.html — not as a page-level sibling before .container —
+  //        so it can never bleed out over the casing-top/bezel chrome.
+  const glassFrameIdx170 = html170.indexOf('<div class="glass-frame">');
+  const glassFrameCloseSearchWindow170 = html170.slice(glassFrameIdx170, glassFrameIdx170 + 600);
+  assert(
+    glassFrameIdx170 !== -1 &&
+      /<div class="crt-overlay"><\/div>/.test(glassFrameCloseSearchWindow170),
+    '170.6: <div class="crt-overlay"> is nested inside <div class="glass-frame"> in index.html (not a page-level sibling before .container)'
+  );
+
+  // 170.7  .crt-overlay is no longer position:fixed against the viewport —
+  //        it's position:absolute, so it's scoped to (and clipped by) its
+  //        new .glass-frame parent's own box (position:relative;
+  //        overflow:hidden), including that parent's rounded corners.
+  const crtOverlayRule170 = (css170.match(/\.crt-overlay \{[^}]*\}/) || [''])[0];
+  assert(
+    /position: absolute;/.test(crtOverlayRule170) && !/position: fixed;/.test(crtOverlayRule170),
+    '170.7: .crt-overlay is position:absolute (was position:fixed against the viewport)'
+  );
+
+  // 170.8  .glass-frame declares an explicit z-index, establishing its OWN
+  //        stacking context — without this, .crt-overlay's z-index:9999
+  //        (now nested two levels inside .glass-frame) would be compared
+  //        directly against sibling .bezel's z-index:60 (mobile,
+  //        position:fixed) in their shared ancestor's stacking context, so
+  //        the scanline could still paint over the fixed bezel at some
+  //        scroll depths even though overflow:hidden already clips its box.
+  const glassFrameRules170 = css170.match(/\.glass-frame \{[^}]*\}/g) || [];
+  assert(
+    glassFrameRules170.some(r => /z-index:\s*\d/.test(r)),
+    "170.8: .glass-frame declares its own z-index (traps .crt-overlay's stacking inside it, never above sibling .casing-top/.bezel)"
+  );
+
+  // 170.9  the reduced-motion / high-lumen behavior blocks for .crt-overlay
+  //        are untouched by this move (Suite 94/120 regression guard).
+  assert(
+    /prefers-reduced-motion\s*:\s*reduce\b[\s\S]*?\.crt-overlay/.test(css170) &&
+      /html\.high-lumen \.crt-overlay/.test(css170),
+    '170.9: .crt-overlay keeps its prefers-reduced-motion + html.high-lumen behavior after the containment fix'
+  );
+}
+
 // ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════

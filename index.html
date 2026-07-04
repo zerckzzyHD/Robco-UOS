@@ -221,8 +221,6 @@
       ▶ PRESS TO POWER ON
     </button>
 
-    <div class="crt-overlay"></div>
-
     <div
       id="sysModal"
       class="modal-overlay"
@@ -382,6 +380,12 @@
       <!-- The curved glass — CRT-frame chrome (curvature/vignette live on THIS
            frame only; never on the text inside .main-grid). -->
       <div class="glass-frame">
+        <!-- Owner report: the scanline/vignette used to be a page-level
+             position:fixed overlay, so it bled out over the casing-top/bezel
+             chrome instead of staying inside the screen. Moved inside
+             .glass-frame (position:relative;overflow:hidden) so it's
+             clipped to exactly the terminal's own glass area. -->
+        <div class="crt-overlay"></div>
         <!-- DO-O: mobile carrier strip — the Overseer never fully leaves the
              screen even when another subsystem is open. Shown only via the
              mobile media query (hidden whenever data-subsystem="uplink"); the

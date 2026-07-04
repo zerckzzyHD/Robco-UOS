@@ -246,6 +246,7 @@ export default [
         setCrtHumIntensity: 'readonly',
         setGeigerRate: 'readonly',
         startCrtHum: 'readonly',
+        stopCrtHum: 'readonly',
         startTinnitus: 'readonly',
         stopTinnitus: 'readonly',
         runBootSequence: 'readonly',
