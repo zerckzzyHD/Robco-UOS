@@ -94,7 +94,13 @@ body {
 .container {
   max-width: 100%;
   margin: 0 auto;
-  border: 2px solid var(--robco-green);
+  /* Owner-report fix (casing/layout polish batch): this pre-DO-N flat CRT-edge
+     border predates the device-chrome bezel (.casing-top + .glass-frame +
+     .bezel) that now frames the whole machine — left in place, it draws a
+     second, redundant rectangle around the ENTIRE app (casing, bezel, and
+     glass together), reading as a stray outline whose color always matches
+     whatever optic the user has selected (e.g. NEON VIOLET reads as a big
+     purple frame). The device chrome supplies the real framing now. */
   padding: 12px;
   box-sizing: border-box;
   position: relative;
@@ -4251,6 +4257,10 @@ button.tracker-toggle--inactive {
      off (Protocol 42 — found during gate render-check verification). */
   white-space: normal;
   overflow-wrap: anywhere;
+  /* Owner-report fix (casing/layout polish batch): text-align:center keeps
+     the strip centered as a whole AND centers each individually-wrapped
+     line at narrow widths, instead of the default ragged left edge. */
+  text-align: center;
 }
 .bay-grid {
   display: grid;

@@ -13488,6 +13488,206 @@ Check (
 ) "165.30: none of the new lamp/routing/telemetry functions write campaign state or call saveState() -- read + route/toggle-class only"
 
 # ===========================================================
+# Suite 166 -- Casing/layout polish batch (owner-reported): the big purple
+# frame outline removed, per-subsystem scroll-position memory added, and the
+# Module Bay's BACKPLANE BUS header centered.
+# ===========================================================
+Sep "Suite 166 -- Casing/layout polish batch (outline, scroll memory, header centering)"
+
+Check (
+    $stateSrc -match "robco_scroll_positions:\s*\{\s*type:\s*'json',\s*default:\s*'\{\}'"
+) "166.1: robco_scroll_positions is registered in META_MANIFEST (type json, default '{}')"
+
+$containerBlock166 = ([regex]::Match($cssSrc, '(?s)\.container\s*\{[^}]*\}')).Value
+Check (
+    ($containerBlock166 -match [regex]::Escape('padding: 12px')) -and
+    ($containerBlock166 -match [regex]::Escape('box-sizing: border-box')) -and
+    ($containerBlock166 -notmatch 'border:\s*2px solid var\(--robco-green\)')
+) "166.2: .container no longer carries the leftover ``border: 2px solid var(--robco-green)`` frame (owner report -- read as a big purple outline under the NEON VIOLET optic), while padding/box-sizing/position/z-index are preserved"
+
+Check (
+    $cssSrc -match '(?s)\.bay-bus-strip\s*\{[^}]*text-align:\s*center'
+) "166.3: .bay-bus-strip is centered (text-align: center) so the BACKPLANE BUS header and its wrapped lines are no longer ragged/left-aligned"
+
+Check (
+    $uiSrc -match [regex]::Escape("const NAV_KEYS = ['operator', 'operations', 'databank', 'uplink', 'chassis'];")
+) "166.4: NAV_KEYS stays exactly the 5 persistent subsystem views -- DIRECTORY isn't one of them (it's a transient modal, no scroll memory of its own)"
+
+Check ($uiSrc -match 'function _readScrollPositions\(\)') "166.5a: _readScrollPositions() is defined"
+Check ($uiSrc -match 'function _scrollElFor\(subsystem\)') "166.5b: _scrollElFor() is defined"
+Check ($uiSrc -match 'function _saveScrollFor\(subsystem\)') "166.5c: _saveScrollFor() is defined"
+Check ($uiSrc -match 'function _restoreScrollFor\(subsystem, fallbackToTop\)') "166.5d: _restoreScrollFor() is defined"
+Check ($uiSrc -match 'function _saveOutgoingScroll\(\)') "166.5e: _saveOutgoingScroll() is defined"
+
+$scrollElBody166 = Get-FunctionBody $uiSrc "_scrollElFor"
+Check (
+    ($scrollElBody166 -match [regex]::Escape("document.querySelector('.panel.chat-panel')")) -and
+    ($scrollElBody166 -match [regex]::Escape('(min-width: 1000px) and (hover: hover) and (pointer: fine)')) -and
+    ($scrollElBody166 -match [regex]::Escape("document.getElementById('uiPanel')"))
+) "166.5f: _scrollElFor() maps UPLINK to .panel.chat-panel (every breakpoint) and every other subsystem to #uiPanel gated by the SAME desktop matchMedia query used elsewhere (no drifted second breakpoint definition)"
+
+$switchTabBody166 = Get-FunctionBody $uiSrc "switchTab"
+Check (
+    ($switchTabBody166 -match [regex]::Escape('_saveOutgoingScroll();')) -and
+    ($switchTabBody166.IndexOf('_saveOutgoingScroll();') -lt $switchTabBody166.IndexOf("querySelectorAll('.panel[data-tab]')")) -and
+    ($switchTabBody166 -match "(?s)_syncBezelNav\(subsystem\);.*?_restoreScrollFor\(subsystem, true\);") -and
+    ($switchTabBody166 -match [regex]::Escape('_lastScrollSubsystem = subsystem;'))
+) "166.6: switchTab() calls _saveOutgoingScroll() before hiding/showing panels and _restoreScrollFor(subsystem, true) after _syncBezelNav() -- the boot-time initTabs()->switchTab() call restores the initial tab too"
+
+$selectSubBody166 = Get-FunctionBody $uiSrc "selectSubsystem"
+$chassisIdx166 = $selectSubBody166.IndexOf("} else if (view === 'chassis')")
+$finalElseIdx166 = $selectSubBody166.IndexOf('} else {', $chassisIdx166)
+$uplinkBranch166 = $selectSubBody166.Substring(0, [Math]::Max(0, $chassisIdx166))
+$chassisBranch166 = if ($chassisIdx166 -ge 0 -and $finalElseIdx166 -ge 0) {
+    $selectSubBody166.Substring($chassisIdx166, $finalElseIdx166 - $chassisIdx166)
+} else { '' }
+
+Check (
+    ($chassisIdx166 -ge 0) -and
+    ($uplinkBranch166 -match [regex]::Escape('_saveOutgoingScroll(); // FIX 2')) -and
+    ($uplinkBranch166 -match "(?s)scrollIntoView\(\{ block: 'center' \}\);\s*i\.focus\(\);") -and
+    ($uplinkBranch166 -match [regex]::Escape("_syncBezelNav('uplink');")) -and
+    ($uplinkBranch166 -match [regex]::Escape("_restoreScrollFor('uplink', false);")) -and
+    ($uplinkBranch166 -match [regex]::Escape("_lastScrollSubsystem = 'uplink';"))
+) "166.7: selectSubsystem()'s uplink branch saves-before/restores-after (fallbackToTop=false) around the existing chatInput scrollIntoView+focus jump"
+
+Check (
+    ($finalElseIdx166 -ge 0) -and
+    ($chassisBranch166 -match [regex]::Escape('_saveOutgoingScroll(); // FIX 2')) -and
+    ($chassisBranch166 -match [regex]::Escape("bay.scrollIntoView({ block: 'center' });")) -and
+    ($chassisBranch166 -match [regex]::Escape("_syncBezelNav('chassis');")) -and
+    ($chassisBranch166 -match [regex]::Escape("_restoreScrollFor('chassis', false);")) -and
+    ($chassisBranch166 -match [regex]::Escape("_lastScrollSubsystem = 'chassis';"))
+) "166.8: selectSubsystem()'s chassis branch saves-before/restores-after (fallbackToTop=false) around the existing Module Bay scrollIntoView jump"
+
+Check (
+    $uiSrc -match "(?s)comm:\s*\(\)\s*=>\s*\{\s*_saveOutgoingScroll\(\); // FIX 2.*?_syncBezelNav\('uplink'\);.*?_restoreScrollFor\('uplink', false\);.*?_lastScrollSubsystem = 'uplink';"
+) "166.9: SHORTCUT_ROUTES.comm (the #go=comm deep-link) saves/restores UPLINK's scroll exactly like selectSubsystem('uplink')"
+
+$battery166 = @('_readScrollPositions','_scrollElFor','_saveScrollFor','_restoreScrollFor','_saveOutgoingScroll')
+$combined166 = ($battery166 | ForEach-Object { Get-FunctionBody $uiSrc $_ }) -join "`n"
+Check (
+    ($combined166 -notmatch 'saveState\(') -and ($combined166 -notmatch 'robco_v8') -and ($combined166 -notmatch 'state\.\w+\s*=')
+) "166.10: the scroll-memory functions never write campaign state (saveState/robco_v8/state.<field>=) -- MetaStore device-pref only"
+
+# 166.11-166.17  behavioral proof, shelled out to node (mirrors the Suite 165
+# pattern above -- a temp file, never a piped heredoc, per the Protocol 42
+# stdin-corruption fix). Reconstructs the real function bodies (params are
+# hardcoded here since Get-FunctionBody returns only the brace-delimited body)
+# and executes them against a synthetic MetaStore+DOM, exactly like the JS
+# runner's vm-sandbox proof.
+try {
+    $nodePath166 = Get-Command node -ErrorAction SilentlyContinue
+    $labels166 = @(
+        "166.11: [behavioral] a desktop #uiPanel scroll offset saved under a subsystem key is restored exactly on return",
+        "166.12: [behavioral] a never-visited subsystem restores to the top (0) when fallbackToTop=true",
+        "166.13: [behavioral] a never-visited subsystem with fallbackToTop=false leaves the element untouched (preserves the existing UPLINK/CHASSIS jump-to-content default)",
+        "166.14: [behavioral] UPLINK's .panel.chat-panel scroll offset round-trips independently of #uiPanel",
+        "166.15: [behavioral] on a mobile (non-desktop) breakpoint, scroll memory reads/writes window.scrollY/scrollTo instead of #uiPanel",
+        "166.16: [behavioral] _saveOutgoingScroll() is a no-op when nothing has been visited yet (boot-safe -- nothing stale to save)",
+        "166.17: [behavioral] an unrecognized subsystem name is ignored by both _saveScrollFor() and _restoreScrollFor() (NAV_KEYS guard)"
+    )
+    if ($nodePath166) {
+        $readPositionsBodyJson166 = (Get-FunctionBody $uiSrc "_readScrollPositions") | ConvertTo-Json
+        $scrollElBodyJson166 = $scrollElBody166 | ConvertTo-Json
+        $saveScrollBodyJson166 = (Get-FunctionBody $uiSrc "_saveScrollFor") | ConvertTo-Json
+        $restoreScrollBodyJson166 = (Get-FunctionBody $uiSrc "_restoreScrollFor") | ConvertTo-Json
+        $saveOutgoingBodyJson166 = (Get-FunctionBody $uiSrc "_saveOutgoingScroll") | ConvertTo-Json
+        $tmpScript166 = Join-Path ([System.IO.Path]::GetTempPath()) ("robco_166_" + [guid]::NewGuid().ToString("N") + ".js")
+        $nodeScript166 = @"
+const NAV_KEYS = ['operator', 'operations', 'databank', 'uplink', 'chassis'];
+const SCROLL_POS_KEY = 'robco_scroll_positions';
+let _lastScrollSubsystem = null;
+const _readScrollPositions = new Function('MetaStore', 'SCROLL_POS_KEY', 'return (function _readScrollPositions()' + $readPositionsBodyJson166 + ')();');
+const _scrollElFor = new Function('subsystem', 'document', 'window', 'return (function _scrollElFor(subsystem)' + $scrollElBodyJson166 + ')(subsystem);');
+function makeSandbox(desktop) {
+  const store = {};
+  const uiPanelEl = { scrollTop: 0 };
+  const chatPanelEl = { scrollTop: 0 };
+  const st = { desktop: desktop !== false, scrollY: 0 };
+  const MetaStore = {
+    get(k) { return Object.prototype.hasOwnProperty.call(store, k) ? store[k] : null; },
+    set(k, v) { store[k] = v; },
+  };
+  const document = {
+    querySelector(sel) { return sel === '.panel.chat-panel' ? chatPanelEl : null; },
+    getElementById(id) { return id === 'uiPanel' ? uiPanelEl : null; },
+  };
+  const window = {
+    matchMedia() { return { matches: st.desktop }; },
+    get scrollY() { return st.scrollY; },
+    scrollTo(x, y) { st.scrollY = y; },
+  };
+  const scrollElFor = subsystem => _scrollElFor(subsystem, document, window);
+  const readPositions = () => _readScrollPositions(MetaStore, SCROLL_POS_KEY);
+  const saveScrollFor = new Function('subsystem', 'NAV_KEYS', '_scrollElFor', '_readScrollPositions', 'MetaStore', 'SCROLL_POS_KEY', 'window',
+    'return (function _saveScrollFor(subsystem)' + $saveScrollBodyJson166 + ')(subsystem);');
+  const restoreScrollFor = new Function('subsystem', 'fallbackToTop', 'NAV_KEYS', '_scrollElFor', '_readScrollPositions', 'window',
+    'return (function _restoreScrollFor(subsystem, fallbackToTop)' + $restoreScrollBodyJson166 + ')(subsystem, fallbackToTop);');
+  return {
+    store, uiPanelEl, chatPanelEl, st,
+    saveScrollFor: (s) => saveScrollFor(s, NAV_KEYS, scrollElFor, readPositions, MetaStore, SCROLL_POS_KEY, window),
+    restoreScrollFor: (s, f) => restoreScrollFor(s, f, NAV_KEYS, scrollElFor, readPositions, window),
+  };
+}
+const results = [];
+try {
+  // 166.11 desktop round trip
+  { const sb = makeSandbox(true); sb.uiPanelEl.scrollTop = 250; sb.saveScrollFor('operator'); sb.uiPanelEl.scrollTop = 0;
+    const restored = sb.restoreScrollFor('operator', true);
+    results.push(restored === true && sb.uiPanelEl.scrollTop === 250); }
+  // 166.12 fallback to top when never visited
+  { const sb = makeSandbox(true); sb.uiPanelEl.scrollTop = 999;
+    const restored = sb.restoreScrollFor('operations', true);
+    results.push(restored === false && sb.uiPanelEl.scrollTop === 0); }
+  // 166.13 no-fallback leaves element untouched
+  { const sb = makeSandbox(true); sb.uiPanelEl.scrollTop = 777;
+    const restored = sb.restoreScrollFor('chassis', false);
+    results.push(restored === false && sb.uiPanelEl.scrollTop === 777); }
+  // 166.14 uplink independent of uiPanel
+  { const sb = makeSandbox(true); sb.chatPanelEl.scrollTop = 400; sb.uiPanelEl.scrollTop = 111;
+    sb.saveScrollFor('uplink'); sb.chatPanelEl.scrollTop = 0;
+    const restored = sb.restoreScrollFor('uplink', false);
+    results.push(restored === true && sb.chatPanelEl.scrollTop === 400 && sb.uiPanelEl.scrollTop === 111); }
+  // 166.15 mobile uses window.scrollY/scrollTo
+  { const sb = makeSandbox(false); sb.st.scrollY = 333; sb.saveScrollFor('databank'); sb.st.scrollY = 0;
+    const restored = sb.restoreScrollFor('databank', true);
+    results.push(restored === true && sb.st.scrollY === 333); }
+  // 166.16 _saveOutgoingScroll no-op when nothing visited (real function, real _lastScrollSubsystem)
+  { const sb = makeSandbox(true);
+    const saveOutgoing = new Function('_lastScrollSubsystem', '_saveScrollFor',
+      'return (function _saveOutgoingScroll()' + $saveOutgoingBodyJson166 + ')();');
+    saveOutgoing(null, sb.saveScrollFor);
+    results.push(!Object.prototype.hasOwnProperty.call(sb.store, SCROLL_POS_KEY)); }
+  // 166.17 invalid subsystem name ignored by both save and restore
+  { const sb = makeSandbox(true); sb.uiPanelEl.scrollTop = 42;
+    sb.saveScrollFor('bogus');
+    const restored = sb.restoreScrollFor('bogus', true);
+    results.push(restored === false && sb.uiPanelEl.scrollTop === 42 && !Object.prototype.hasOwnProperty.call(sb.store, SCROLL_POS_KEY)); }
+} catch (e) {
+  while (results.length < 7) results.push(false);
+}
+console.log('RESULT:' + results.map(r => r ? '1' : '0').join(''));
+"@
+        Set-Content -Path $tmpScript166 -Value $nodeScript166 -Encoding UTF8
+        $out166 = (node $tmpScript166 2>&1 | Out-String)
+        Remove-Item $tmpScript166 -ErrorAction SilentlyContinue
+        $rm166 = [regex]::Match($out166, 'RESULT:([01]{7})')
+        if ($rm166.Success) {
+            $bits166 = $rm166.Groups[1].Value
+            for ($bi166 = 0; $bi166 -lt 7; $bi166++) { Check ($bits166.Substring($bi166, 1) -eq '1') $labels166[$bi166] }
+        } else {
+            $err166 = if ([string]::IsNullOrWhiteSpace($out166)) { "No output from node" } else { $out166.Trim() }
+            foreach ($lbl in $labels166) { Fail "$lbl  (runtime error: $err166)" }
+        }
+    } else {
+        foreach ($lbl in $labels166) { Fail "$lbl  (node not found)" }
+    }
+} catch {
+    foreach ($lbl in $labels166) { Fail "$lbl  (harness error: $_)" }
+}
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

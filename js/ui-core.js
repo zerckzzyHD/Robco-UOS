@@ -2364,6 +2364,7 @@ const TAB_TO_SUBSYSTEM = {
 
 function switchTab(tab) {
   if (!TAB_NAMES.includes(tab)) return;
+  _saveOutgoingScroll(); // FIX 2: remember where the previous subsystem was scrolled to
   playPanelClick(); // H1: rotary dial click on tab switch
   // Show panels for the active tab (databank merges data+campg), hide others
   const showTabs = _DATABANK_TABS.includes(tab) ? _DATABANK_TABS : [tab];
@@ -2381,7 +2382,13 @@ function switchTab(tab) {
   // DO-N: sync the bezel subsystem nav (LED/aria-selected/telemetry) to match —
   // every entry path (hotkey, #go= deep-link, bezel click, AI auto-expand)
   // stays visually consistent through this one call.
-  _syncBezelNav(TAB_TO_SUBSYSTEM[tab] || 'operator');
+  const subsystem = TAB_TO_SUBSYSTEM[tab] || 'operator';
+  _syncBezelNav(subsystem);
+  // FIX 2: restore this subsystem's remembered scroll offset (or the top of
+  // the column if it's never been visited) — covers the boot-time initial
+  // tab too, since initTabs() calls switchTab() directly.
+  _restoreScrollFor(subsystem, true);
+  _lastScrollSubsystem = subsystem;
 }
 
 // Initialize tab on page load (restores last used tab, defaults to 'stat')
@@ -2402,6 +2409,85 @@ function initTabs() {
 // MetaStore view preference (Protocol UI-6); no campaign state touched.
 const NAV_KEYS = ['operator', 'operations', 'databank', 'uplink', 'chassis'];
 const _NAV_TAB_FOR = { operator: 'stat', operations: 'inv', databank: 'data' };
+
+// ── PER-SUBSYSTEM SCROLL MEMORY (owner-report, casing/layout polish batch) ──
+// Each bezel subsystem remembers its own exact scroll offset across a switch
+// AND across a reload — a device pref (Protocol UI-6, MetaStore key
+// robco_scroll_positions), never campaign state. OPERATOR/OPERATIONS/DATABANK/
+// CHASSIS all live in the SAME scrollable column (#uiPanel on a real desktop;
+// the page itself on mobile, since .col-left has no overflow-y:auto there) —
+// switchTab()/selectSubsystem() only toggle which panels are visible inside
+// it, so persisting a per-subsystem offset is what makes "coming back" show
+// the expected view instead of whatever scrollTop the column happened to be
+// left at. UPLINK's own transcript panel (.panel.chat-panel) scrolls
+// independently at every breakpoint. _scrollElFor() is the single lookup both
+// the save and restore path read, so they can never disagree about which
+// element owns the offset. DIR isn't tracked — it opens a transient modal
+// (openBezelDirectory), not a persistent view.
+const SCROLL_POS_KEY = 'robco_scroll_positions';
+// Tracks whichever subsystem switchTab()/selectSubsystem() actually LAST
+// displayed (never the boot-time cosmetic bezel-highlight restore that
+// initBezelSubsystem() applies without moving anything) — resets to null on
+// every reload so the very first user-triggered switch has nothing stale to
+// save, and initTabs()'s boot-time switchTab() call is what fills it in for
+// "restore the initial tab's position" instead.
+let _lastScrollSubsystem = null;
+
+function _readScrollPositions() {
+  try {
+    const obj = JSON.parse(MetaStore.get(SCROLL_POS_KEY) || '{}');
+    return obj && typeof obj === 'object' && !Array.isArray(obj) ? obj : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+function _scrollElFor(subsystem) {
+  if (subsystem === 'uplink') return document.querySelector('.panel.chat-panel') || null;
+  const isDesktop =
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(min-width: 1000px) and (hover: hover) and (pointer: fine)').matches;
+  return isDesktop ? document.getElementById('uiPanel') : null;
+}
+
+// Saves the CURRENT scroll offset under `subsystem`'s key. null el = the page
+// itself scrolls (mobile).
+function _saveScrollFor(subsystem) {
+  if (!NAV_KEYS.includes(subsystem)) return;
+  const el = _scrollElFor(subsystem);
+  const positions = _readScrollPositions();
+  positions[subsystem] = el ? el.scrollTop : window.scrollY || 0;
+  MetaStore.set(SCROLL_POS_KEY, JSON.stringify(positions));
+}
+
+// Restores `subsystem`'s saved offset if one exists. Returns true when a
+// saved value was applied; false (no-op) when nothing was ever recorded, so
+// callers with an existing "jump to X" fallback (UPLINK/CHASSIS) can leave
+// that fallback in place on a genuine first visit, while switchTab()'s three
+// tab-gated subsystems (which have no such fallback today) can default to
+// the top of the column instead of an unrelated leftover scrollTop.
+function _restoreScrollFor(subsystem, fallbackToTop) {
+  if (!NAV_KEYS.includes(subsystem)) return false;
+  const el = _scrollElFor(subsystem);
+  const val = _readScrollPositions()[subsystem];
+  if (typeof val === 'number') {
+    if (el) el.scrollTop = val;
+    else window.scrollTo(0, val);
+    return true;
+  }
+  if (fallbackToTop) {
+    if (el) el.scrollTop = 0;
+    else window.scrollTo(0, 0);
+  }
+  return false;
+}
+
+// Called at the top of switchTab()/selectSubsystem(), before any visual
+// change, so it captures the offset of whatever the user was ACTUALLY just
+// looking at.
+function _saveOutgoingScroll() {
+  if (_lastScrollSubsystem) _saveScrollFor(_lastScrollSubsystem);
+}
 
 function _syncBezelNav(subsystem) {
   if (!NAV_KEYS.includes(subsystem)) return;
@@ -2511,20 +2597,30 @@ function _bezelSweep() {
 function selectSubsystem(view) {
   const tab = _NAV_TAB_FOR[view];
   if (tab) {
-    switchTab(tab); // routes + syncs the nav in one call
+    switchTab(tab); // routes + syncs the nav in one call (saves/restores scroll too)
   } else if (view === 'uplink') {
+    _saveOutgoingScroll(); // FIX 2
     const i = document.getElementById('chatInput');
     if (i) {
       i.scrollIntoView({ block: 'center' });
       i.focus();
     }
     _syncBezelNav('uplink');
+    // FIX 2: a remembered offset overrides the jump-to-composer default above;
+    // a first-ever visit (nothing saved) keeps that default untouched.
+    _restoreScrollFor('uplink', false);
+    _lastScrollSubsystem = 'uplink';
   } else if (view === 'chassis') {
+    _saveOutgoingScroll(); // FIX 2
     const bay = document.getElementById('moduleBay');
     const details = bay && bay.closest('details.panel');
     if (details && !details.open) details.setAttribute('open', '');
     if (bay) bay.scrollIntoView({ block: 'center' });
     _syncBezelNav('chassis');
+    // FIX 2: a remembered offset overrides the jump-to-Module-Bay default
+    // above; a first-ever visit (nothing saved) keeps that default untouched.
+    _restoreScrollFor('chassis', false);
+    _lastScrollSubsystem = 'chassis';
   } else {
     return;
   }
@@ -2579,12 +2675,15 @@ function _initBezelChrome() {
 // PWA app-shortcut deep-link routes. Keys are the only accepted #go= values (allow-list).
 const SHORTCUT_ROUTES = {
   comm: () => {
+    _saveOutgoingScroll(); // FIX 2
     const i = document.getElementById('chatInput');
     if (i) {
       i.scrollIntoView({ block: 'center' });
       i.focus();
     }
     _syncBezelNav('uplink'); // DO-N: keep the bezel highlight consistent with this deep-link
+    _restoreScrollFor('uplink', false); // FIX 2: override the jump above if a memory exists
+    _lastScrollSubsystem = 'uplink';
   },
   inv: () => switchTab('inv'),
   stat: () => switchTab('stat'),

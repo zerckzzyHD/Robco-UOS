@@ -22004,6 +22004,339 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 166 — Casing/layout polish batch (owner-reported): the big purple
+//  frame outline removed, per-subsystem scroll-position memory added, and
+//  the Module Bay's BACKPLANE BUS header centered.
+//  17 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 166 — Casing/layout polish batch (outline, scroll memory, header centering)');
+
+  // 166.1  robco_scroll_positions is a registered MetaStore device pref
+  //        (Protocol UI-6/Protocol 4) — a json blob, never campaign state
+  assert(
+    /robco_scroll_positions:\s*\{\s*type:\s*'json',\s*default:\s*'\{\}'/.test(stateSource),
+    "166.1: robco_scroll_positions is registered in META_MANIFEST (type json, default '{}')"
+  );
+
+  // 166.2  FIX 1 — the pre-DO-N flat CRT-edge border on .container (the "big
+  //        purple frame") is gone; the rule itself is untouched otherwise
+  //        (Protocol 20 — guards against the border silently coming back)
+  {
+    const containerBlock = (cssSource.match(/\.container\s*\{[^}]*\}/) || [''])[0];
+    assert(
+      containerBlock.includes('padding: 12px') &&
+        containerBlock.includes('box-sizing: border-box') &&
+        !/border:\s*2px solid var\(--robco-green\)/.test(containerBlock),
+      '166.2: .container no longer carries the leftover `border: 2px solid var(--robco-green)` frame (owner report — read as a big purple outline under the NEON VIOLET optic), while padding/box-sizing/position/z-index are preserved'
+    );
+  }
+
+  // 166.3  FIX 3 — the Module Bay's decorative BACKPLANE BUS header strip is
+  //        centered (was left-aligned/ragged on wrap)
+  assert(
+    /\.bay-bus-strip\s*\{[^}]*text-align:\s*center/.test(cssSource),
+    '166.3: .bay-bus-strip is centered (text-align: center) so the BACKPLANE BUS header and its wrapped lines are no longer ragged/left-aligned'
+  );
+
+  // 166.4  FIX 2 scope — the five real bezel subsystems are unchanged; DIR is
+  //        deliberately NOT tracked (it opens a transient modal, not a
+  //        persistent view) rather than left ambiguous
+  assert(
+    /const NAV_KEYS = \['operator', 'operations', 'databank', 'uplink', 'chassis'\];/.test(
+      uiSource
+    ),
+    "166.4: NAV_KEYS stays exactly the 5 persistent subsystem views — DIRECTORY isn't one of them (it's a transient modal, no scroll memory of its own)"
+  );
+
+  // 166.5  the scroll-memory helpers exist and reuse the EXISTING desktop
+  //        matchMedia gate (Suite 129/158 convention) rather than a new
+  //        ad hoc breakpoint check
+  guards(uiSource, [
+    [/function _readScrollPositions\(\)/, '166.5a: _readScrollPositions() is defined'],
+    [/function _scrollElFor\(subsystem\)/, '166.5b: _scrollElFor() is defined'],
+    [/function _saveScrollFor\(subsystem\)/, '166.5c: _saveScrollFor() is defined'],
+    [
+      /function _restoreScrollFor\(subsystem, fallbackToTop\)/,
+      '166.5d: _restoreScrollFor() is defined',
+    ],
+    [/function _saveOutgoingScroll\(\)/, '166.5e: _saveOutgoingScroll() is defined'],
+  ]);
+  assert(
+    (() => {
+      const body = extractFunctionBody(uiSource, '_scrollElFor');
+      return (
+        /document\.querySelector\('\.panel\.chat-panel'\)/.test(body) &&
+        /\(min-width: 1000px\) and \(hover: hover\) and \(pointer: fine\)/.test(body) &&
+        /document\.getElementById\('uiPanel'\)/.test(body)
+      );
+    })(),
+    '166.5f: _scrollElFor() maps UPLINK to .panel.chat-panel (every breakpoint) and every other subsystem to #uiPanel gated by the SAME desktop matchMedia query used elsewhere (no drifted second breakpoint definition)'
+  );
+
+  // 166.6  switchTab() saves the outgoing subsystem's scroll BEFORE toggling
+  //        panel visibility, and restores the incoming subsystem's AFTER
+  //        _syncBezelNav — including the boot path, since initTabs() calls
+  //        switchTab() directly
+  {
+    const switchTabBody166 = extractFunctionBody(uiSource, 'switchTab');
+    assert(
+      /_saveOutgoingScroll\(\);/.test(switchTabBody166) &&
+        switchTabBody166.indexOf('_saveOutgoingScroll();') <
+          switchTabBody166.indexOf("querySelectorAll('.panel[data-tab]')") &&
+        /_syncBezelNav\(subsystem\);\s*[\s\S]*?_restoreScrollFor\(subsystem, true\);/.test(
+          switchTabBody166
+        ) &&
+        /_lastScrollSubsystem = subsystem;/.test(switchTabBody166),
+      '166.6: switchTab() calls _saveOutgoingScroll() before hiding/showing panels and _restoreScrollFor(subsystem, true) after _syncBezelNav() — the boot-time initTabs()->switchTab() call restores the initial tab too'
+    );
+  }
+
+  // 166.7/166.8  selectSubsystem()'s uplink/chassis branches wrap their
+  //        existing scrollIntoView jump with save-before/restore-after, with
+  //        fallbackToTop=false so a first-ever visit keeps that jump intact
+  {
+    const selectSubsystemBody166 = extractFunctionBody(uiSource, 'selectSubsystem');
+    // Slice each branch out precisely (rather than one lazy regex spanning
+    // both) so a regression that deletes ONE branch's hooks can't hide behind
+    // the other branch's identical-looking markers.
+    const chassisIdx166 = selectSubsystemBody166.indexOf("} else if (view === 'chassis')");
+    const finalElseIdx166 = selectSubsystemBody166.indexOf('} else {', chassisIdx166);
+    const uplinkBranch166 = selectSubsystemBody166.slice(0, chassisIdx166);
+    const chassisBranch166 = selectSubsystemBody166.slice(
+      chassisIdx166,
+      finalElseIdx166 === -1 ? undefined : finalElseIdx166
+    );
+    assert(
+      chassisIdx166 !== -1 &&
+        /_saveOutgoingScroll\(\); \/\/ FIX 2/.test(uplinkBranch166) &&
+        /scrollIntoView\(\{ block: 'center' \}\);\s*i\.focus\(\);/.test(uplinkBranch166) &&
+        /_syncBezelNav\('uplink'\);/.test(uplinkBranch166) &&
+        /_restoreScrollFor\('uplink', false\);/.test(uplinkBranch166) &&
+        /_lastScrollSubsystem = 'uplink';/.test(uplinkBranch166),
+      "166.7: selectSubsystem()'s uplink branch saves-before/restores-after (fallbackToTop=false) around the existing chatInput scrollIntoView+focus jump"
+    );
+    assert(
+      finalElseIdx166 !== -1 &&
+        /_saveOutgoingScroll\(\); \/\/ FIX 2/.test(chassisBranch166) &&
+        /bay\.scrollIntoView\(\{ block: 'center' \}\);/.test(chassisBranch166) &&
+        /_syncBezelNav\('chassis'\);/.test(chassisBranch166) &&
+        /_restoreScrollFor\('chassis', false\);/.test(chassisBranch166) &&
+        /_lastScrollSubsystem = 'chassis';/.test(chassisBranch166),
+      "166.8: selectSubsystem()'s chassis branch saves-before/restores-after (fallbackToTop=false) around the existing Module Bay scrollIntoView jump"
+    );
+  }
+
+  // 166.9  the #go=comm PWA deep-link (SHORTCUT_ROUTES.comm) — the OTHER
+  //        entry point that jumps straight to UPLINK — is wired identically
+  //        (Protocol 22, no drift between the two "jump to uplink" paths)
+  assert(
+    /comm:\s*\(\)\s*=>\s*\{\s*_saveOutgoingScroll\(\); \/\/ FIX 2[\s\S]*?_syncBezelNav\('uplink'\);[\s\S]*?_restoreScrollFor\('uplink', false\);[\s\S]*?_lastScrollSubsystem = 'uplink';/.test(
+      uiSource
+    ),
+    "166.9: SHORTCUT_ROUTES.comm (the #go=comm deep-link) saves/restores UPLINK's scroll exactly like selectSubsystem('uplink')"
+  );
+
+  // 166.10  the scroll-memory layer writes nothing durable to the campaign —
+  //         MetaStore/device-pref reads+writes only, never saveState()/
+  //         robco_v8/state.<field>=
+  {
+    const battery166 = [
+      '_readScrollPositions',
+      '_scrollElFor',
+      '_saveScrollFor',
+      '_restoreScrollFor',
+      '_saveOutgoingScroll',
+    ];
+    const combined166 = battery166.map(n => extractFunctionBody(uiSource, n)).join('\n');
+    assert(
+      !/saveState\(|robco_v8|state\.\w+\s*=/.test(combined166),
+      '166.10: the scroll-memory functions never write campaign state (saveState/robco_v8/state.<field>=) — MetaStore device-pref only'
+    );
+  }
+
+  // 166.11-166.17  BEHAVIORAL — the real _scrollElFor/_saveScrollFor/
+  //  _restoreScrollFor/_saveOutgoingScroll/_readScrollPositions bodies,
+  //  executed against a synthetic MetaStore+DOM in a Node vm sandbox (not
+  //  just a structural grep), proving the actual save/restore contract.
+  {
+    const vm166 = require('vm');
+    function declareFn166(src, name) {
+      const nameIdx = src.indexOf('function ' + name);
+      const parenIdx = src.indexOf('(', nameIdx);
+      const braceIdx = src.indexOf('{', parenIdx);
+      const params = src.slice(parenIdx, braceIdx);
+      return 'function ' + name + params + extractFunctionBody(src, name);
+    }
+    const src166 =
+      "var NAV_KEYS = ['operator', 'operations', 'databank', 'uplink', 'chassis'];\n" +
+      "var SCROLL_POS_KEY = 'robco_scroll_positions';\n" +
+      'var _lastScrollSubsystem = null;\n' +
+      declareFn166(uiSource, '_readScrollPositions') +
+      '\n' +
+      declareFn166(uiSource, '_scrollElFor') +
+      '\n' +
+      declareFn166(uiSource, '_saveScrollFor') +
+      '\n' +
+      declareFn166(uiSource, '_restoreScrollFor') +
+      '\n' +
+      declareFn166(uiSource, '_saveOutgoingScroll');
+
+    function makeSandbox166(desktop) {
+      const store = {};
+      const uiPanelEl = { scrollTop: 0 };
+      const chatPanelEl = { scrollTop: 0 };
+      const st = { desktop: desktop !== false, scrollY: 0 };
+      const sb = {
+        MetaStore: {
+          get(k) {
+            return Object.prototype.hasOwnProperty.call(store, k) ? store[k] : null;
+          },
+          set(k, v) {
+            store[k] = v;
+          },
+        },
+        document: {
+          querySelector(sel) {
+            return sel === '.panel.chat-panel' ? chatPanelEl : null;
+          },
+          getElementById(id) {
+            return id === 'uiPanel' ? uiPanelEl : null;
+          },
+        },
+        window: {
+          matchMedia() {
+            return { matches: st.desktop };
+          },
+          get scrollY() {
+            return st.scrollY;
+          },
+          scrollTo(x, y) {
+            st.scrollY = y;
+          },
+        },
+        _lastScrollSubsystem: null,
+      };
+      vm166.createContext(sb);
+      vm166.runInContext(src166, sb);
+      return { sb, store, uiPanelEl, chatPanelEl, st };
+    }
+
+    let r166 = null,
+      err166 = null;
+    try {
+      r166 = {};
+
+      // 166.11 desktop round trip: operator's #uiPanel offset saved+restored exactly
+      {
+        const { sb, uiPanelEl } = makeSandbox166(true);
+        uiPanelEl.scrollTop = 250;
+        sb._lastScrollSubsystem = 'operator';
+        sb._saveOutgoingScroll();
+        uiPanelEl.scrollTop = 0;
+        const restored = sb._restoreScrollFor('operator', true);
+        r166.desktopRoundTrip = restored === true && uiPanelEl.scrollTop === 250;
+      }
+
+      // 166.12 a never-visited subsystem falls back to the top when asked to
+      {
+        const { sb, uiPanelEl } = makeSandbox166(true);
+        uiPanelEl.scrollTop = 999;
+        const restored = sb._restoreScrollFor('operations', true);
+        r166.fallbackTop = restored === false && uiPanelEl.scrollTop === 0;
+      }
+
+      // 166.13 a never-visited subsystem with fallbackToTop=false leaves the
+      //        element exactly as the caller's own jump left it (UPLINK/
+      //        CHASSIS's existing scrollIntoView default stays intact)
+      {
+        const { sb, uiPanelEl } = makeSandbox166(true);
+        uiPanelEl.scrollTop = 777;
+        const restored = sb._restoreScrollFor('chassis', false);
+        r166.noFallbackNoop = restored === false && uiPanelEl.scrollTop === 777;
+      }
+
+      // 166.14 UPLINK's own .panel.chat-panel round-trips independently of
+      //        #uiPanel, at a desktop breakpoint
+      {
+        const { sb, chatPanelEl, uiPanelEl } = makeSandbox166(true);
+        chatPanelEl.scrollTop = 400;
+        uiPanelEl.scrollTop = 111; // unrelated column — must stay untouched
+        sb._saveScrollFor('uplink');
+        chatPanelEl.scrollTop = 0;
+        const restored = sb._restoreScrollFor('uplink', false);
+        r166.uplinkIndependent =
+          restored === true && chatPanelEl.scrollTop === 400 && uiPanelEl.scrollTop === 111;
+      }
+
+      // 166.15 mobile (no desktop match) uses window.scrollY/scrollTo instead
+      //        of #uiPanel for a tab-gated subsystem
+      {
+        const { sb, st } = makeSandbox166(false);
+        st.scrollY = 333;
+        sb._saveScrollFor('databank');
+        st.scrollY = 0;
+        const restored = sb._restoreScrollFor('databank', true);
+        r166.mobileWindowScroll = restored === true && st.scrollY === 333;
+      }
+
+      // 166.16 _saveOutgoingScroll() is a no-op boot-safe guard when nothing
+      //        has been visited yet (_lastScrollSubsystem still null)
+      {
+        const { sb, store } = makeSandbox166(true);
+        sb._saveOutgoingScroll();
+        r166.bootSafeNoop = !Object.prototype.hasOwnProperty.call(store, 'robco_scroll_positions');
+      }
+
+      // 166.17 an invalid/unknown subsystem name is ignored by both save and
+      //        restore (the NAV_KEYS guard clause)
+      {
+        const { sb, uiPanelEl, store } = makeSandbox166(true);
+        uiPanelEl.scrollTop = 42;
+        sb._saveScrollFor('bogus');
+        const restored = sb._restoreScrollFor('bogus', true);
+        r166.invalidSubsystemGuard =
+          restored === false &&
+          uiPanelEl.scrollTop === 42 &&
+          !Object.prototype.hasOwnProperty.call(store, 'robco_scroll_positions');
+      }
+    } catch (e) {
+      err166 = e;
+    }
+
+    assert(
+      err166 === null && r166 && r166.desktopRoundTrip === true,
+      '166.11: [behavioral] a desktop #uiPanel scroll offset saved under a subsystem key is restored exactly on return' +
+        (err166 ? ` (harness error: ${err166.message})` : '')
+    );
+    assert(
+      err166 === null && r166 && r166.fallbackTop === true,
+      '166.12: [behavioral] a never-visited subsystem restores to the top (0) when fallbackToTop=true'
+    );
+    assert(
+      err166 === null && r166 && r166.noFallbackNoop === true,
+      '166.13: [behavioral] a never-visited subsystem with fallbackToTop=false leaves the element untouched (preserves the existing UPLINK/CHASSIS jump-to-content default)'
+    );
+    assert(
+      err166 === null && r166 && r166.uplinkIndependent === true,
+      "166.14: [behavioral] UPLINK's .panel.chat-panel scroll offset round-trips independently of #uiPanel"
+    );
+    assert(
+      err166 === null && r166 && r166.mobileWindowScroll === true,
+      '166.15: [behavioral] on a mobile (non-desktop) breakpoint, scroll memory reads/writes window.scrollY/scrollTo instead of #uiPanel'
+    );
+    assert(
+      err166 === null && r166 && r166.bootSafeNoop === true,
+      '166.16: [behavioral] _saveOutgoingScroll() is a no-op when nothing has been visited yet (boot-safe — nothing stale to save)'
+    );
+    assert(
+      err166 === null && r166 && r166.invalidSubsystemGuard === true,
+      '166.17: [behavioral] an unrecognized subsystem name is ignored by both _saveScrollFor() and _restoreScrollFor() (NAV_KEYS guard)'
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail

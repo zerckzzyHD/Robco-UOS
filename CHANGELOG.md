@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2096/2096 | Cache: robco-terminal-v2.7.0-r52 -->
+﻿## [Unreleased]<!-- Tests: 2118/2118 | Cache: robco-terminal-v2.7.0-r53 -->
 
 ### Added
 
@@ -52,6 +52,9 @@
 - Fixed the PWR, UPLINK, and FAULT status lights on the terminal's casing being purely decorative. Tapping PWR now powers the terminal off (tap the "PRESS TO POWER ON" button to bring it back); UPLINK now only lights up when your AI connection is actually working and jumps straight to the AI Uplink settings when tapped; FAULT now only lights up when an error has actually been recorded and opens the error log when tapped.
 - Fixed the Director Uplink's "NO CARRIER" status doing nothing when tapped and never updating without a reload. Tapping it while disconnected now jumps straight to the AI Uplink settings, and the status flips between "listening" and "no carrier" the instant you add, remove, or change your key — no reload needed.
 - Fixed the status strip along the bottom always claiming your vitals were nominal no matter what. It now shows your real health status (including warnings for low, critical, or crippled conditions), your actual radiation level, and whether your AI connection is genuinely online.
+- Fixed a stray purple-tinted outline framing the entire terminal casing under some phosphor color choices — the terminal's own device chrome frames the screen now, so a leftover flat border underneath no longer draws a second frame around everything.
+- Fixed switching between the terminal's sections (Operator, Operations, Databank, Uplink, Chassis) losing your scroll position — each section now remembers exactly where you left off, restored automatically when you switch back or reload the page.
+- Fixed the Module Bay's decorative BACKPLANE BUS header wrapping raggedly along the left edge on narrower screens — it's now centered.
 
 ### Improved
 
