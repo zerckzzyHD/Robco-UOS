@@ -79,7 +79,7 @@
 │   ├── install-hooks.js        Copies pre-commit hook into .git/hooks on npm install
 │   └── rollback.sh             Protocol 16 one-command hotfix rollback
 ├── CHANGELOG.md        ~74KB  Full version history
-├── icon.png            68KB   PWA icon
+├── assets/              68KB  PWA icon + app-shortcut icons
 ├── manifest.json       592B   PWA manifest
 └── ARCHITECTURE.md     THIS FILE
 ```

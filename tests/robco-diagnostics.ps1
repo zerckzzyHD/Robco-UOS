@@ -2389,11 +2389,11 @@ $releaseSrc49 = Read-Src ".github/workflows/release.yml"
 Check (([bool]($releaseSrc49 -match 'workflow_run')) -and ([bool]($releaseSrc49 -match "conclusion\s*==\s*'success'"))) `
     "release.yml uses workflow_run trigger with conclusion == 'success' (release gated on CI)"
 
-# 49.5  deploy.yml stage step deploys root-level PNGs via *.png glob
+# 49.5  deploy.yml stage step deploys the assets/ directory (icon.png + shortcut icons)
 #        (Protocol 36 escape-ratchet: shortcut icon 404 regression guard)
 $deployYml49 = Read-Src ".github/workflows/deploy.yml"
-Check ([bool]($deployYml49 -match 'cp\s+[^\n]*\*\.png')) `
-    "deploy.yml stage step uses *.png glob so all root-level icon files (icon.png + shortcut icons) are copied to _site/"
+Check ([bool]($deployYml49 -match 'cp\s+-r\s+[^\n]*\bassets\b')) `
+    "deploy.yml stage step copies the assets/ directory so icon.png + all shortcut icons are served from _site/"
 
 # ===========================================================
 # Suite 50 -- Gate Parity Guards (Protocol 36)
@@ -3333,10 +3333,10 @@ Check ([bool]($uiCoreSrc57 -match 'history\.replaceState')) `
 
 # 57.11 Each shortcut references its own specific custom icon (not icon.png)
 $expectedIconMap57 = @{
-    'Comm-Link'    = 'comm-link-icon.png'
-    'Inventory'    = 'inventory-icon.png'
-    'Stats'        = 'stats-icon.png'
-    'New Campaign' = 'new-campaign-icon.png'
+    'Comm-Link'    = 'assets/comm-link-icon.png'
+    'Inventory'    = 'assets/inventory-icon.png'
+    'Stats'        = 'assets/stats-icon.png'
+    'New Campaign' = 'assets/new-campaign-icon.png'
 }
 $allCustomIcons57 = $true
 foreach ($s in $shorts57) {
@@ -3346,23 +3346,23 @@ foreach ($s in $shorts57) {
     if ($exp -notin $iconSrcs) { $allCustomIcons57 = $false; break }
 }
 Check $allCustomIcons57 `
-    "Each shortcut has its own custom icon src (comm-link-icon.png, inventory-icon.png, stats-icon.png, new-campaign-icon.png)"
+    "Each shortcut has its own custom icon src (assets/comm-link-icon.png, assets/inventory-icon.png, assets/stats-icon.png, assets/new-campaign-icon.png)"
 
 # 57.12-57.15 Each shortcut icon file exists on disk
 $shortcutIconFiles57 = @('comm-link-icon.png','inventory-icon.png','stats-icon.png','new-campaign-icon.png')
 foreach ($iconFile in $shortcutIconFiles57) {
-    Check (Test-Path (Join-Path $Root $iconFile)) "$iconFile exists on disk"
+    Check (Test-Path (Join-Path $Root "assets/$iconFile")) "assets/$iconFile exists on disk"
 }
 
 # 57.16 All 4 shortcut icon files are listed in sw.js ASSETS precache array
 $swSrc57 = Read-Src "sw.js"
-$allIconsInAssets57 = ($shortcutIconFiles57 | Where-Object { -not $swSrc57.Contains("'./$_'") }).Count -eq 0
+$allIconsInAssets57 = ($shortcutIconFiles57 | Where-Object { -not $swSrc57.Contains("'./assets/$_'") }).Count -eq 0
 Check $allIconsInAssets57 `
     "All 4 shortcut icon files are listed in sw.js ASSETS precache array"
 
 # 57.17 App icon (icon.png) exists on disk
-Check (Test-Path (Join-Path $Root 'icon.png')) `
-    "icon.png exists on disk (PWA app icon)"
+Check (Test-Path (Join-Path $Root 'assets/icon.png')) `
+    "assets/icon.png exists on disk (PWA app icon)"
 
 # ===========================================================
 # Suite 58 -- Client Error Ring-Buffer Guards (Item C)

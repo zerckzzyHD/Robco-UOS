@@ -4153,13 +4153,13 @@ header('Suite 49 — CI / Repo Hardening Guards');
     "release.yml uses workflow_run trigger with conclusion == 'success' (release gated on CI)"
   );
 
-  // 49.5  deploy.yml stage step deploys root-level PNGs via *.png glob
+  // 49.5  deploy.yml stage step deploys the assets/ directory (icon.png + shortcut icons)
   //       (Protocol 36 escape-ratchet: shortcut icon 404 regression guard — ff42c51→c64617c deployed
   //       the icons to git but deploy.yml only listed icon.png by name, leaving the 4 shortcut icons unserved)
   const deployYml49 = readFile('.github/workflows/deploy.yml');
   assert(
-    /cp\s+[^\n]*\*\.png/.test(deployYml49),
-    'deploy.yml stage step uses *.png glob so all root-level icon files (icon.png + shortcut icons) are copied to _site/'
+    /cp\s+-r\s+[^\n]*\bassets\b/.test(deployYml49),
+    'deploy.yml stage step copies the assets/ directory so icon.png + all shortcut icons are served from _site/'
   );
 }
 
@@ -5788,10 +5788,10 @@ header('Suite 57 — PWA App Shortcuts Guards');
 
   // 57.11  Each shortcut references its own specific custom icon (not icon.png)
   const expectedIcons57 = {
-    'Comm-Link': 'comm-link-icon.png',
-    Inventory: 'inventory-icon.png',
-    Stats: 'stats-icon.png',
-    'New Campaign': 'new-campaign-icon.png',
+    'Comm-Link': 'assets/comm-link-icon.png',
+    Inventory: 'assets/inventory-icon.png',
+    Stats: 'assets/stats-icon.png',
+    'New Campaign': 'assets/new-campaign-icon.png',
   };
   const allCustomIcons57 = shortcuts57.every(s => {
     const expected = expectedIcons57[s.name];
@@ -5799,7 +5799,7 @@ header('Suite 57 — PWA App Shortcuts Guards');
   });
   assert(
     allCustomIcons57,
-    'Each shortcut has its own custom icon src (comm-link-icon.png, inventory-icon.png, stats-icon.png, new-campaign-icon.png)'
+    'Each shortcut has its own custom icon src (assets/comm-link-icon.png, assets/inventory-icon.png, assets/stats-icon.png, assets/new-campaign-icon.png)'
   );
 
   // 57.12-57.15  Each shortcut icon file exists on disk
@@ -5810,16 +5810,19 @@ header('Suite 57 — PWA App Shortcuts Guards');
     'new-campaign-icon.png',
   ];
   for (const iconFile of shortcutIconFiles57) {
-    assert(fs.existsSync(path.join(ROOT, iconFile)), `${iconFile} exists on disk`);
+    assert(fs.existsSync(path.join(ROOT, 'assets', iconFile)), `assets/${iconFile} exists on disk`);
   }
 
   // 57.16  All 4 shortcut icon files are listed in sw.js ASSETS precache array
   const swSrc57 = readFile('sw.js');
-  const allIconsInAssets57 = shortcutIconFiles57.every(f => swSrc57.includes(`'./${f}'`));
+  const allIconsInAssets57 = shortcutIconFiles57.every(f => swSrc57.includes(`'./assets/${f}'`));
   assert(allIconsInAssets57, 'All 4 shortcut icon files are listed in sw.js ASSETS precache array');
 
   // 57.17  App icon (icon.png) exists on disk
-  assert(fs.existsSync(path.join(ROOT, 'icon.png')), 'icon.png exists on disk (PWA app icon)');
+  assert(
+    fs.existsSync(path.join(ROOT, 'assets', 'icon.png')),
+    'assets/icon.png exists on disk (PWA app icon)'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════

@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="icon.png" alt="RobCo U.O.S." width="120" />
+<img src="assets/icon.png" alt="RobCo U.O.S." width="120" />
 
 # RobCo U.O.S.
 
@@ -186,7 +186,7 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 ├── scripts/gate.js         The full local gate (lint, format, both runners, browser checks)
 ├── ARCHITECTURE.md         Full system dependency map & patterns
 ├── CHANGELOG.md            Version history (in-app FIRMWARE REVISION LOG reads this)
-└── icon.png                PWA icon
+└── assets/                 PWA icon + app-shortcut icons
 ```
 
 ### Script Load Order

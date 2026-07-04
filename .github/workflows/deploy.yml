@@ -47,11 +47,11 @@ jobs:
         # Copy only the files that belong on the public site.
         # Private files (CLAUDE.md, RULES.md, ARCHITECTURE.md, tests/, scripts/,
         # .github/, node_modules, package files) are intentionally excluded.
-        # *.png covers icon.png + all shortcut icons (comm-link, inventory, stats, new-campaign).
+        # assets/ covers icon.png + all shortcut icons (comm-link, inventory, stats, new-campaign).
         run: |
           mkdir -p _site
-          cp *.png index.html sw.js manifest.json _site/
-          cp -r css js docs _site/
+          cp index.html sw.js manifest.json _site/
+          cp -r assets css js docs _site/
           cp CHANGELOG.md _site/
 
       - name: Setup Pages

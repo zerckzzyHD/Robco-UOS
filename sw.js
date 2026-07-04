@@ -1,19 +1,19 @@
 // ⚠ PROTOCOL: Bump CACHE_NAME on commits that touch a served/precached file:
-// index.html, sw.js, manifest.json, icon*.png, css/, or js/.
+// index.html, sw.js, manifest.json, assets/icon*.png, css/, or js/.
 // Format: 'robco-terminal-v{APP_VERSION}-r{N}'  (N starts at 1, increments each served-file change)
 // Changing this string is the ONLY thing that triggers the "REBOOT TERMINAL" update
 // prompt for users who already have the site cached. Forgetting to bump means cached
 // users silently run the old UI until they manually clear their browser cache.
-const CACHE_NAME = 'robco-terminal-v2.7.0-r56';
+const CACHE_NAME = 'robco-terminal-v2.7.0-r57';
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './icon.png',
-  './comm-link-icon.png',
-  './inventory-icon.png',
-  './stats-icon.png',
-  './new-campaign-icon.png',
+  './assets/icon.png',
+  './assets/comm-link-icon.png',
+  './assets/inventory-icon.png',
+  './assets/stats-icon.png',
+  './assets/new-campaign-icon.png',
   './css/terminal.css',
   './js/api.js',
   './js/cloud.js',
