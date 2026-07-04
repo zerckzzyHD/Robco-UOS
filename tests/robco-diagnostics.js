@@ -18917,8 +18917,9 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  stored device prefs; every control still calls the setter it always
 //  called (Protocol 22/23) — zero new campaign state, zero AI involvement.
 //  The 13 SLOT-02 audio channels stay in their CURRENT (un-flipped) polarity
-//  this unit — B2b converts them to DIP chips. 33 tests (154.24-154.33 add the
-//  WU-optics-picker GREEN FAMILY phosphor-tube-picker redesign coverage).
+//  this unit — B2b converts them to DIP chips. 36 tests (154.24-154.33 add the
+//  WU-optics-picker GREEN FAMILY phosphor-tube-picker redesign coverage; 154.34-
+//  154.36 add the owner post-ship audit's anode-nib/ghost-peek/compact-tag fixes).
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 154 — Step 2 Phase 2 B2a: Module Bay core reframe');
@@ -19399,6 +19400,39 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       /_resolveOpticsFamilyRepresentative/.test(restoreFn154) &&
       /_updateOpticsFamilyRepresentative/.test(restoreFn154),
     '154.33: _restoreOpticsPreference() force-collapses the family socket and repaints its representative on every boot/game-switch'
+  );
+
+  // 154.34  owner audit vs the mockup, FIX 1: the built tube read as a flat-topped
+  //         battery — .tube .glass is missing the mockup's small rounded "anode nib"
+  //         cap above the border-radius'd top that reads as a vacuum-phosphor-tube
+  //         silhouette rather than a battery cell.
+  assert(
+    /\.tube \.glass::after \{[\s\S]{0,300}border-radius:\s*2px 2px 0 0/.test(css154),
+    "154.34: .tube .glass::after adds the mockup's rounded anode-nib cap to every tube (owner FIX 1 — no more flat-topped battery look)"
+  );
+
+  // 154.35  owner audit vs the mockup, FIX 2: the ghosts were sized/offset
+  //         independently of the glass they hide behind, so the "hint of 3 types"
+  //         never actually peeked out from behind the seated glass. The ghosts now
+  //         share the glass's own 20x38 footprint so the peek math is provable.
+  const ghostBlock154 = (css154.match(/\.tube\.family \.ghost \{[\s\S]*?\n\}/) || [''])[0];
+  assert(
+    /width:\s*20px/.test(ghostBlock154) &&
+      /height:\s*38px/.test(ghostBlock154) &&
+      /\.tube\.family \.ghost\.g1 \{[\s\S]{0,80}margin-left:\s*-5px/.test(css154) &&
+      /\.tube\.family \.ghost\.g2 \{[\s\S]{0,80}margin-left:\s*-15px/.test(css154),
+    "154.35: .tube.family .ghost shares the glass's 20x38 footprint, with g1/g2 margin-left offsets recalculated so each peeks out from behind the seated glass (owner FIX 2)"
+  );
+
+  // 154.36  owner audit, FIX 3: "make the 3 types a tag ... so the squares can all
+  //         be the same size without being big af" — the multi-tag used to sit in
+  //         flow as its own line, forcing --tube-h ~22px taller than every other
+  //         tube needed. It's now an absolute corner chip, and --tube-h shrank
+  //         back down now that every tube converges on the same natural height.
+  assert(
+    /\.tube\.family \.multi-tag \{[\s\S]{0,300}position:\s*absolute/.test(css154) &&
+      /--tube-h:\s*112px/.test(css154),
+    '154.36: .tube.family .multi-tag is an absolute corner chip (no longer forces its own flow line), and the shared --tube-h shrank accordingly — all tubes stay the same, compact size (owner FIX 3)'
   );
 }
 

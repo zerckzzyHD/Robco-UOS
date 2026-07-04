@@ -11099,8 +11099,9 @@ Check (
 ) "153.9: CACHE_NAME is a well-formed robco-terminal-v2.7.0-rN revision string (Protocol 1)"
 
 # ===========================================================
-# Suite 154 -- Step 2 (v2.8.0) Phase 2 B2a: MODULE BAY core reframe (33 tests --
-# 154.24-154.33 add the WU-optics-picker GREEN FAMILY phosphor-tube-picker redesign)
+# Suite 154 -- Step 2 (v2.8.0) Phase 2 B2a: MODULE BAY core reframe (36 tests --
+# 154.24-154.33 add the WU-optics-picker GREEN FAMILY phosphor-tube-picker redesign;
+# 154.34-154.36 add the owner post-ship audit's anode-nib/ghost-peek/compact-tag fixes)
 # The Security & Configuration panel reframed as installable hardware
 # (owner-approved mockup, Protocol 25 sanctioned exception). ONE-TRUTH MODEL:
 # the bay + the permanent Schematic View are both projections of the SAME
@@ -11494,6 +11495,36 @@ Check (
     ($restoreFn154 -match '_resolveOpticsFamilyRepresentative') -and
     ($restoreFn154 -match '_updateOpticsFamilyRepresentative')
 ) "154.33: _restoreOpticsPreference() force-collapses the family socket and repaints its representative on every boot/game-switch"
+
+# 154.34  owner audit vs the mockup, FIX 1: the built tube read as a flat-topped
+#         battery -- .tube .glass is missing the mockup's small rounded "anode nib"
+#         cap above the border-radius'd top that reads as a vacuum-phosphor-tube
+#         silhouette rather than a battery cell.
+Check (
+    $css154 -match '(?s)\.tube \.glass::after \{.{0,300}border-radius:\s*2px 2px 0 0'
+) "154.34: .tube .glass::after adds the mockup's rounded anode-nib cap to every tube (owner FIX 1 -- no more flat-topped battery look)"
+
+# 154.35  owner audit vs the mockup, FIX 2: the ghosts were sized/offset
+#         independently of the glass they hide behind, so the "hint of 3 types"
+#         never actually peeked out from behind the seated glass. The ghosts now
+#         share the glass's own 20x38 footprint so the peek math is provable.
+$ghostBlock154 = [regex]::Match($css154, '(?s)\.tube\.family \.ghost \{.*?\n\}').Value
+Check (
+    ($ghostBlock154 -match 'width:\s*20px') -and
+    ($ghostBlock154 -match 'height:\s*38px') -and
+    ($css154 -match '(?s)\.tube\.family \.ghost\.g1 \{.{0,80}margin-left:\s*-5px') -and
+    ($css154 -match '(?s)\.tube\.family \.ghost\.g2 \{.{0,80}margin-left:\s*-15px')
+) "154.35: .tube.family .ghost shares the glass's 20x38 footprint, with g1/g2 margin-left offsets recalculated so each peeks out from behind the seated glass (owner FIX 2)"
+
+# 154.36  owner audit, FIX 3: "make the 3 types a tag ... so the squares can all
+#         be the same size without being big af" -- the multi-tag used to sit in
+#         flow as its own line, forcing --tube-h ~22px taller than every other
+#         tube needed. It's now an absolute corner chip, and --tube-h shrank back
+#         down now that every tube converges on the same natural height.
+Check (
+    ($css154 -match '(?s)\.tube\.family \.multi-tag \{.{0,300}position:\s*absolute') -and
+    ($css154 -match '--tube-h:\s*112px')
+) "154.36: .tube.family .multi-tag is an absolute corner chip (no longer forces its own flow line), and the shared --tube-h shrank accordingly -- all tubes stay the same, compact size (owner FIX 3)"
 
 # ===========================================================
 # Suite 155 -- Step 2 (v2.7.0) Phase 2 B2b: Module Bay visual fidelity + fixes (16 tests)
