@@ -362,20 +362,17 @@ textarea {
   font-size: 14px;
 }
 
-/* .transcript-card is the ONE bordered/rounded card that owns the visible
-   border + background; #chatDisplay sits transparently inside its top and
-   .composer docks flush at its bottom (Director Uplink composer redesign,
-   owner refinement — "integrated into the transcript box, not a separate
-   stack of controls below it"). overflow:hidden on the card clips both
-   children to its rounded corners; #chatDisplay keeps its OWN overflow-y:auto
-   so the transcript still scrolls independently inside the card. */
+/* Owner-report fix (real-terminal-screen batch): .transcript-card no longer
+   owns a visible border/radius/background — the transcript now flows
+   directly on the screen with no box around it, like a real terminal. The
+   bordered "pill" look moves to .composer alone (below) so the input stays
+   visually contained while the transcript above it doesn't. Purely a layout
+   shell now: #chatDisplay keeps its OWN overflow-y:auto, so the transcript
+   still scrolls exactly as before — only the box around it is gone. */
 .transcript-card {
   display: flex;
   flex-direction: column;
   margin-top: 10px;
-  border: 1px solid var(--bezel-wire);
-  border-radius: 20px;
-  background: rgba(0, 0, 0, 0.35);
   overflow: hidden;
 }
 #chatDisplay {
@@ -954,6 +951,18 @@ button.lamp {
   overflow-wrap: break-word;
 }
 
+/* Owner-report fix (real-terminal-screen batch): the outer amber content-area
+   frame that boxed the WHOLE Director Uplink column (header + oscilloscope +
+   transcript + composer together) is removed — border AND the base .panel
+   background tint both go, so no rectangle of any kind demarcates the column
+   — so the view reads as a real terminal screen rather than a panel-in-a-
+   panel. Only .panel.chat-panel loses its box here; every other .panel keeps
+   the base green frame. */
+.panel.chat-panel {
+  border: none;
+  background: none;
+}
+
 /* Transcript restyle — the `> ` prefix on user lines already exists in
    appendToChat(); this only recolors the AI/sys lines to read as the
    remote Director presence (amber/--bezel-wire) vs local phosphor. */
@@ -966,22 +975,26 @@ button.lamp {
 }
 
 /* DO-O follow-up — the modern rounded composer (owner-supplied Claude-style
-   reference layout) replaces the separate dashed VISUAL UPLOAD button and the
-   bottom-of-panel TRANSMIT PROTOCOL button: a bottom toolbar of [+ upload]
-   [mode pill] [? help] … [↑ send] docks flush at the bottom of the shared
-   .transcript-card (owner refinement — integrated into the transcript box,
-   not a separate box below it; the card's own border/radius/background do
-   the visual work, .composer just adds a subtle top divider). Every control
-   is the SAME pre-existing element/handler (Protocol 22) — only the
-   container/position/styling changed. Amber/--bezel-wire throughout
-   (Protocol 38 — token only, no game literal). */
+   reference layout): a bottom toolbar of [+ upload] [mode pill] [? help] …
+   [↑ send]. Every control is the SAME pre-existing element/handler
+   (Protocol 22) — only the container/position/styling changed. Amber/
+   --bezel-wire throughout (Protocol 38 — token only, no game literal).
+   Owner-report fix (real-terminal-screen batch): .composer now carries its
+   OWN border/radius/background (transplanted from the retired
+   .transcript-card box below) — it's the one thing in the Director Uplink
+   column meant to still read as a bordered "pill," now that the transcript
+   above it and the outer content frame around the whole column are both
+   borderless. */
 .composer {
   display: flex;
   flex-direction: column;
   gap: 6px;
   flex-shrink: 0;
+  margin-top: 8px;
   padding: 8px 12px 10px;
-  border-top: 1px solid rgba(var(--bezel-wire-rgb), 0.35);
+  border: 1px solid var(--bezel-wire);
+  border-radius: 20px;
+  background: rgba(0, 0, 0, 0.35);
 }
 .composer-image-preview {
   position: relative;

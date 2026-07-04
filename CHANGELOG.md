@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2118/2118 | Cache: robco-terminal-v2.7.0-r53 -->
+﻿## [Unreleased]<!-- Tests: 2119/2119 | Cache: robco-terminal-v2.7.0-r54 -->
 
 ### Added
 
@@ -55,6 +55,7 @@
 - Fixed a stray purple-tinted outline framing the entire terminal casing under some phosphor color choices — the terminal's own device chrome frames the screen now, so a leftover flat border underneath no longer draws a second frame around everything.
 - Fixed switching between the terminal's sections (Operator, Operations, Databank, Uplink, Chassis) losing your scroll position — each section now remembers exactly where you left off, restored automatically when you switch back or reload the page.
 - Fixed the Module Bay's decorative BACKPLANE BUS header wrapping raggedly along the left edge on narrower screens — it's now centered.
+- Fixed the Director Uplink view looking like a panel stacked inside another panel. The amber frame that boxed the whole conversation area, and the separate box around the transcript itself, are both gone — your conversation now reads directly on the screen, like a real terminal, with only the message box at the bottom still shown as a bordered pill.
 
 ### Improved
 

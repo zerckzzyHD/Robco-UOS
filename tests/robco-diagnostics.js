@@ -20895,38 +20895,48 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     );
   }
 
-  // 162.23  .transcript-card carries the ONE shared border/radius (the
-  //         integrated card), #chatDisplay and .composer sit borderless
-  //         inside it (only a subtle top divider on .composer), and the
-  //         composer buttons meet the Protocol 17 ≥28px tap-target floor
+  // 162.23  owner-report fix (real-terminal-screen batch): .transcript-card no
+  //         longer carries a box (border/radius/background) — the transcript
+  //         flows free on the screen; .composer now carries its OWN full
+  //         border/radius/background (the one thing still meant to read as a
+  //         bordered "pill"); the composer buttons still meet the Protocol 17
+  //         ≥28px tap-target floor
   {
     const cardRule162 = (cssSource.match(/\.transcript-card \{[\s\S]*?\n\}/) || [''])[0];
     const chatDisplayRule162 = (cssSource.match(/\n#chatDisplay \{[\s\S]*?\n\}/) || [''])[0];
     const composerRule162 = (cssSource.match(/\n\.composer \{[\s\S]*?\n\}/) || [''])[0];
+    const chatPanelRule162 = (cssSource.match(/\n\.panel\.chat-panel \{[\s\S]*?\n\}/) || [''])[0];
     const iconBtnRule162 = (cssSource.match(
       /\.composer-icon-btn,\s*\n\.composer-send-btn,\s*\n\.icon-btn-round \{[\s\S]*?\n\}/
     ) || [''])[0];
     assert(
+      chatPanelRule162.length > 0 &&
+        /border: none;/.test(chatPanelRule162) &&
+        /background: none;/.test(chatPanelRule162),
+      '162.23a: .panel.chat-panel (the outer Director Uplink content-area frame) carries no border AND no background — every other .panel keeps the base green frame, only the Uplink column loses its box entirely'
+    );
+    assert(
       cardRule162.length > 0 &&
-        /border: 1px solid var\(--bezel-wire\)/.test(cardRule162) &&
-        /border-radius: 20px/.test(cardRule162) &&
-        /overflow: hidden/.test(cardRule162),
-      '162.23a: .transcript-card is the ONE rounded (20px) amber-bordered card that clips its content (overflow:hidden) — the shared border the transcript and composer both sit inside'
+        !/border:/.test(cardRule162) &&
+        !/border-radius/.test(cardRule162) &&
+        !/background:/.test(cardRule162),
+      '162.23b: .transcript-card carries no border/radius/background — the transcript flows directly on the screen with no box around it, like a real terminal'
     );
     assert(
       chatDisplayRule162.length > 0 &&
         !/border:\s*1px solid/.test(chatDisplayRule162) &&
         composerRule162.length > 0 &&
-        !/^\s*border: 1px solid var\(--bezel-wire\);/m.test(composerRule162) &&
-        /border-top: 1px solid rgba\(var\(--bezel-wire-rgb\), 0\.35\)/.test(composerRule162),
-      '162.23b: #chatDisplay and .composer no longer carry their own full border/radius — they dock borderless (composer keeps only a subtle top divider) inside the shared .transcript-card, so the two never read as separate boxes'
+        /border: 1px solid var\(--bezel-wire\);/.test(composerRule162) &&
+        /border-radius: 20px;/.test(composerRule162) &&
+        /background: rgba\(0, 0, 0, 0\.35\);/.test(composerRule162),
+      '162.23c: #chatDisplay stays borderless (the transcript never boxes itself) while .composer carries its own full border/radius/background — the input pill is the one thing in the Director Uplink column still meant to read as boxed'
     );
     assert(
       iconBtnRule162.length > 0 &&
         /width: 32px/.test(iconBtnRule162) &&
         /height: 32px/.test(iconBtnRule162) &&
         /border-radius: 50%/.test(iconBtnRule162),
-      '162.23c: the composer icon/send buttons are circular (border-radius:50%) at 32px — comfortably above the 28px Protocol 17 tap-target floor'
+      '162.23d: the composer icon/send buttons are circular (border-radius:50%) at 32px — comfortably above the 28px Protocol 17 tap-target floor'
     );
   }
 

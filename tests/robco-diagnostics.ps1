@@ -12654,37 +12654,47 @@ Check (
     (-not ($tm162b.Contains("btn.innerText = '> TRANSMIT PROTOCOL'")))
 ) "162.22: transmitMessage()'s busy/cancel/reset states use short glyphs, and the finally block restores onclick to submitCommandInput() -- not transmitMessage() directly (Protocol 42 fix: the prior direct rebind silently skipped TERMINAL-mode routing on every click after the first round-trip)"
 
-# 162.23  .transcript-card carries the ONE shared border/radius (the
-#         integrated card), #chatDisplay and .composer sit borderless inside
-#         it (only a subtle top divider on .composer), and the composer
-#         buttons meet the Protocol 17 >=28px tap-target floor
+# 162.23  owner-report fix (real-terminal-screen batch): .transcript-card no
+#         longer carries a box (border/radius/background) -- the transcript
+#         flows free on the screen; .composer now carries its OWN full
+#         border/radius/background (the one thing still meant to read as a
+#         bordered "pill"); the composer buttons still meet the Protocol 17
+#         >=28px tap-target floor
 $cardRuleMatch162 = [regex]::Match($css162, '(?s)\.transcript-card \{.*?\n\}')
 $cardRule162 = if ($cardRuleMatch162.Success) { $cardRuleMatch162.Value } else { "" }
 $chatDisplayRuleMatch162 = [regex]::Match($css162, "(?s)`n#chatDisplay \{.*?`n\}")
 $chatDisplayRule162 = if ($chatDisplayRuleMatch162.Success) { $chatDisplayRuleMatch162.Value } else { "" }
 $composerRuleMatch162 = [regex]::Match($css162, "(?s)`n\.composer \{.*?`n\}")
 $composerRule162 = if ($composerRuleMatch162.Success) { $composerRuleMatch162.Value } else { "" }
+$chatPanelRuleMatch162 = [regex]::Match($css162, "(?s)`n\.panel\.chat-panel \{.*?`n\}")
+$chatPanelRule162 = if ($chatPanelRuleMatch162.Success) { $chatPanelRuleMatch162.Value } else { "" }
 $iconBtnRuleMatch162 = [regex]::Match($css162, "(?s)\.composer-icon-btn,\s*\n\.composer-send-btn,\s*\n\.icon-btn-round \{.*?\n\}")
 $iconBtnRule162 = if ($iconBtnRuleMatch162.Success) { $iconBtnRuleMatch162.Value } else { "" }
 Check (
+    ($chatPanelRule162.Length -gt 0) -and
+    ($chatPanelRule162 -match 'border: none;') -and
+    ($chatPanelRule162 -match 'background: none;')
+) "162.23a: .panel.chat-panel (the outer Director Uplink content-area frame) carries no border AND no background -- every other .panel keeps the base green frame, only the Uplink column loses its box entirely"
+Check (
     ($cardRule162.Length -gt 0) -and
-    ($cardRule162 -match 'border: 1px solid var\(--bezel-wire\)') -and
-    ($cardRule162 -match 'border-radius: 20px') -and
-    ($cardRule162 -match 'overflow: hidden')
-) "162.23a: .transcript-card is the ONE rounded (20px) amber-bordered card that clips its content (overflow:hidden) -- the shared border the transcript and composer both sit inside"
+    ($cardRule162 -notmatch 'border:') -and
+    ($cardRule162 -notmatch 'border-radius') -and
+    ($cardRule162 -notmatch 'background:')
+) "162.23b: .transcript-card carries no border/radius/background -- the transcript flows directly on the screen with no box around it, like a real terminal"
 Check (
     ($chatDisplayRule162.Length -gt 0) -and
     ($chatDisplayRule162 -notmatch 'border:\s*1px solid') -and
     ($composerRule162.Length -gt 0) -and
-    ($composerRule162 -notmatch '(?m)^\s*border: 1px solid var\(--bezel-wire\);') -and
-    ($composerRule162 -match 'border-top: 1px solid rgba\(var\(--bezel-wire-rgb\), 0\.35\)')
-) "162.23b: #chatDisplay and .composer no longer carry their own full border/radius -- they dock borderless (composer keeps only a subtle top divider) inside the shared .transcript-card, so the two never read as separate boxes"
+    ($composerRule162 -match 'border: 1px solid var\(--bezel-wire\);') -and
+    ($composerRule162 -match 'border-radius: 20px;') -and
+    ($composerRule162 -match 'background: rgba\(0, 0, 0, 0\.35\);')
+) "162.23c: #chatDisplay stays borderless (the transcript never boxes itself) while .composer carries its own full border/radius/background -- the input pill is the one thing in the Director Uplink column still meant to read as boxed"
 Check (
     ($iconBtnRule162.Length -gt 0) -and
     ($iconBtnRule162 -match 'width: 32px') -and
     ($iconBtnRule162 -match 'height: 32px') -and
     ($iconBtnRule162 -match 'border-radius: 50%')
-) "162.23c: the composer icon/send buttons are circular (border-radius:50%) at 32px -- comfortably above the 28px Protocol 17 tap-target floor"
+) "162.23d: the composer icon/send buttons are circular (border-radius:50%) at 32px -- comfortably above the 28px Protocol 17 tap-target floor"
 
 # 162.24  Protocol 42 regression guard -- a real bug found live while
 #         verifying the composer-integration redesign: on desktop the
