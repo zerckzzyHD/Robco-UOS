@@ -1601,6 +1601,10 @@ function refreshOverseerCarrier() {
   if (typeof _updateUplinkLamp === 'function') _updateUplinkLamp();
   if (typeof _refreshBezelTelemetry === 'function') _refreshBezelTelemetry();
   if (typeof renderSystemStatus === 'function') renderSystemStatus();
+  // SU-4: the ACCOUNT/REG PORT board's words read the same carrier signal as the
+  // lines above — routing it through this one choke point is what keeps it from
+  // ever disagreeing with the UPLINK lamp/bezel telemetry/SYSTEM STATUS carrier.
+  if (typeof renderAccount === 'function') renderAccount();
   if (_scopeState === 'thinking' || _scopeState === 'speaking') {
     drawScope();
     return;

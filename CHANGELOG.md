@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2217/2217 | Cache: robco-terminal-v2.7.0-r70 -->
+﻿## [Unreleased]<!-- Tests: 2226/2226 | Cache: robco-terminal-v2.7.0-r71 -->
 
 ### Added
 
@@ -34,6 +34,7 @@
 - The SKILL BOOKS and SKILL MAGAZINES trackers are no longer separate panels — they now live as collapsible sections inside the SKILL MATRIX panel, right below your skills. Everything about them works exactly as before: marking a book or magazine read/unread, the count badge, and whether a section was left open or closed all carry over the same way.
 - The Module Bay's SVC tray had four separate buttons that all exported the same conversation log (EJECT HOLOTAPE, PRINT CAMPAIGN LOG, EXPORT .MD, EXPORT .HTML) — these are now one EJECT HOLOTAPE control with a format picker (TXT/MD/HTML). Sharing to your device still works exactly as it did before when TXT is selected; picking MD or HTML downloads a file exactly as those buttons used to.
 - The CHASSIS section is no longer just a shortcut into the Module Bay — it's now its own SYSTEM STATUS screen showing your device's uptime, firmware version, connection status, and feature availability at a glance, alongside a new ERROR LOG button. Your campaign kill/caps/damage stats moved out of it into their own CAMPAIGN LOG section in DATABANK, so device information and campaign information are no longer mixed together in one place.
+- Your ACCOUNT status now reflects reality instead of a mostly-fixed message. Signing in or out, and your connection dropping or coming back, all update the ACCOUNT section immediately — no reload needed — showing whether an operator is on record, whether your archives are syncing to the cloud, and a short status line even while the section is collapsed.
 
 ### Fixed
 

@@ -23959,6 +23959,209 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 177 — Step 2 v2.8.0 SU-4: dynamic ACCOUNT (REG PORT) status words
+//  The REG PORT / Operator Registry board's diegetic status text is driven
+//  entirely by real auth + connection state (getAccountState()/
+//  isFeatureEnabled('googleSignIn')/_isUplinkConnected()) — never a hardcoded
+//  story — and live-updates through the SAME refreshOverseerCarrier() choke
+//  point that already drives the UPLINK lamp, bezel telemetry, and SYSTEM
+//  STATUS carrier line, so none of them can disagree. A Node vm sandbox
+//  actually EXECUTES the real renderAccount() body (not a static grep) across
+//  all four conditions and asserts the resulting DOM text.
+//  9 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 177 — SU-4: dynamic ACCOUNT (REG PORT) status words');
+  const html177 = htmlSource;
+  const acctSrc177 = readFile('js/ui-account.js');
+  const core177 = readFile('js/ui-core.js');
+  const css177 = readFile('css/terminal.css');
+
+  // 177.1  index.html: #acctSummaryStatus lives in the ACCOUNT panel's <summary>,
+  //        styled via .panel-substatus (visible whether the panel is open or collapsed)
+  assert(
+    /<h2>>\s*ACCOUNT<\/h2>\s*<span id="acctSummaryStatus" class="panel-substatus">/.test(html177) &&
+      /\.panel-substatus\s*\{/.test(css177),
+    '177.1: #acctSummaryStatus sits inside the ACCOUNT panel summary, styled via .panel-substatus'
+  );
+
+  // 177.2  renderAccount() reads the real signals — getAccountState(), the
+  //        googleSignIn flag, and _isUplinkConnected() — never navigator.onLine
+  //        or a second, parallel connection check (Protocol 22)
+  {
+    const acctBody177 = extractFunctionBody(acctSrc177, 'renderAccount');
+    assert(
+      /window\.getAccountState/.test(acctBody177) &&
+        /isFeatureEnabled\('googleSignIn'\)/.test(acctBody177) &&
+        /_isUplinkConnected\(\)/.test(acctBody177) &&
+        !/navigator\.onLine/.test(acctBody177),
+      "177.2: renderAccount() reads getAccountState()/isFeatureEnabled('googleSignIn')/_isUplinkConnected() — no navigator.onLine, no parallel connection check"
+    );
+  }
+
+  // 177.3  refreshOverseerCarrier() calls renderAccount() — the single choke point
+  //        that also drives the UPLINK lamp, bezel telemetry, and SYSTEM STATUS
+  assert(
+    /_updateUplinkLamp\(\);[\s\S]{0,200}_refreshBezelTelemetry\(\);[\s\S]{0,200}renderSystemStatus\(\);[\s\S]{0,300}if \(typeof renderAccount === 'function'\) renderAccount\(\);/.test(
+      core177
+    ),
+    '177.3: refreshOverseerCarrier() calls renderAccount() alongside _updateUplinkLamp()/_refreshBezelTelemetry()/renderSystemStatus() — one choke point, cannot drift'
+  );
+
+  // 177.4–177.7: behavioral — a Node vm sandbox executes the REAL renderAccount()
+  // body against each of the 4 conditions and asserts the resulting DOM text.
+  {
+    const vm = require('vm');
+    const _decl177 = (src, name) => {
+      const body = extractFunctionBody(src, name);
+      const s = src.indexOf('function ' + name);
+      const p = src.slice(src.indexOf('(', s), src.indexOf('{', src.indexOf('(', s)));
+      return 'function ' + name + p + body;
+    };
+    function runAccount177(acct, googleSignInOn, connected) {
+      const els = { accountBody: { innerHTML: '' }, acctSummaryStatus: { textContent: '' } };
+      const sandbox = {
+        console,
+        escapeHtml: s => String(s),
+        _isUplinkConnected: () => connected,
+        document: { getElementById: id => els[id] || null },
+        window: {
+          getAccountState: () => acct,
+          isFeatureEnabled: key => (key === 'googleSignIn' ? googleSignInOn : true),
+        },
+      };
+      vm.createContext(sandbox);
+      vm.runInContext(_decl177(acctSrc177, 'renderAccount') + '\nrenderAccount();', sandbox);
+      return els;
+    }
+
+    // 177.4  signed out, googleSignIn ON -> NO OPERATOR ON RECORD / REG PORT VACANT /
+    //        CLOUD ARCHIVE SYNC OFFLINE + a sign-in button
+    let els177a, err177a;
+    try {
+      els177a = runAccount177(
+        { uid: null, isAnonymous: true, email: null, displayName: null },
+        true,
+        false
+      );
+    } catch (e) {
+      err177a = e;
+    }
+    assert(
+      !err177a &&
+        /NO OPERATOR ON RECORD/.test(els177a.accountBody.innerHTML) &&
+        /REG PORT VACANT/.test(els177a.accountBody.innerHTML) &&
+        /CLOUD ARCHIVE SYNC OFFLINE/.test(els177a.accountBody.innerHTML) &&
+        /signInWithGoogle/.test(els177a.accountBody.innerHTML) &&
+        /UPLINK OFFLINE/.test(els177a.acctSummaryStatus.textContent),
+      '177.4: [behavioral] signed-out + googleSignIn ON -> NO OPERATOR ON RECORD, REG PORT VACANT, CLOUD ARCHIVE SYNC OFFLINE, sign-in button, summary UPLINK OFFLINE' +
+        (err177a ? ' — ' + err177a.message : '')
+    );
+
+    // 177.5  signed out, googleSignIn OFF -> LOCAL ARCHIVES ACTIVE, no sign-in button
+    let els177b, err177b;
+    try {
+      els177b = runAccount177(
+        { uid: null, isAnonymous: true, email: null, displayName: null },
+        false,
+        false
+      );
+    } catch (e) {
+      err177b = e;
+    }
+    assert(
+      !err177b &&
+        /LOCAL ARCHIVES ACTIVE/.test(els177b.accountBody.innerHTML) &&
+        !/signInWithGoogle/.test(els177b.accountBody.innerHTML) &&
+        /UPLINK TEMPORARILY UNAVAILABLE/.test(els177b.acctSummaryStatus.textContent),
+      '177.5: [behavioral] signed-out + googleSignIn OFF -> LOCAL ARCHIVES ACTIVE, no sign-in button, summary UPLINK TEMPORARILY UNAVAILABLE' +
+        (err177b ? ' — ' + err177b.message : '')
+    );
+
+    // 177.6  signed in, carrier connected -> OPERATOR VERIFIED, CLOUD ARCHIVES +
+    //        CIPHER-KEY SYNC AVAILABLE, sever-uplink button, name/email escaped in
+    assert(
+      (() => {
+        let els, err;
+        try {
+          els = runAccount177(
+            { uid: 'abc', isAnonymous: false, email: 'courier@six.test', displayName: 'Six' },
+            true,
+            true
+          );
+        } catch (e) {
+          err = e;
+        }
+        return (
+          !err &&
+          /OPERATOR VERIFIED/.test(els.accountBody.innerHTML) &&
+          /CLOUD ARCHIVES \+ CIPHER-KEY SYNC AVAILABLE/.test(els.accountBody.innerHTML) &&
+          /signOutAccount/.test(els.accountBody.innerHTML) &&
+          /Six/.test(els.accountBody.innerHTML) &&
+          /courier@six\.test/.test(els.accountBody.innerHTML) &&
+          /UPLINK ACTIVE/.test(els.acctSummaryStatus.textContent) &&
+          // Protocol 42 regression guard: the summary line is set via .textContent
+          // (never parsed as HTML), so a literal '&middot;' entity would show up
+          // as raw text instead of a dot — the real Unicode '·' character must be
+          // used instead. Caught live during render-verify.
+          els.acctSummaryStatus.textContent.includes('Six · courier@six.test') &&
+          !/&middot;/.test(els.acctSummaryStatus.textContent)
+        );
+      })(),
+      '177.6: [behavioral] signed-in + carrier connected -> OPERATOR VERIFIED, CLOUD ARCHIVES + CIPHER-KEY SYNC AVAILABLE, sever-uplink button, name/email shown (real · not &middot; entity), summary UPLINK ACTIVE'
+    );
+
+    // 177.7  signed in, carrier disconnected -> OPERATOR VERIFIED, CLOUD ARCHIVE
+    //        SYNC OFFLINE (NO CARRIER), sever-uplink button STILL present
+    assert(
+      (() => {
+        let els, err;
+        try {
+          els = runAccount177(
+            { uid: 'abc', isAnonymous: false, email: 'courier@six.test', displayName: 'Six' },
+            true,
+            false
+          );
+        } catch (e) {
+          err = e;
+        }
+        return (
+          !err &&
+          /OPERATOR VERIFIED/.test(els.accountBody.innerHTML) &&
+          /CLOUD ARCHIVE SYNC OFFLINE \(NO CARRIER\)/.test(els.accountBody.innerHTML) &&
+          /signOutAccount/.test(els.accountBody.innerHTML) &&
+          /CLOUD UNREACHABLE/.test(els.acctSummaryStatus.textContent)
+        );
+      })(),
+      '177.7: [behavioral] signed-in + carrier disconnected -> OPERATOR VERIFIED, CLOUD ARCHIVE SYNC OFFLINE (NO CARRIER), sever-uplink button still present, summary CLOUD UNREACHABLE'
+    );
+  }
+
+  // 177.8  live-update trigger points: boot (loadUI), sign-in/out/collision (cloud.js,
+  //        3 sites), and connectivity (refreshOverseerCarrier, asserted at 177.3) all
+  //        end up calling renderAccount() — no path can leave it stale.
+  {
+    const cloud177 = readFile('js/cloud.js');
+    const loadUIBody177 = extractFunctionBody(core177, 'loadUI');
+    assert(
+      /renderAccount\(\);/.test(loadUIBody177) &&
+        (cloud177.match(/window\.renderAccount\(\);/g) || []).length >= 3,
+      '177.8: renderAccount() is called from loadUI() (boot) and at least 3 sites in cloud.js (sign-in/out/collision)'
+    );
+  }
+
+  // 177.9  the account-word layer writes nothing durable to the campaign — it only
+  //        reads state/DOM, never saveState()/robco_v8/state.<field>=
+  {
+    const acctBody177b = extractFunctionBody(acctSrc177, 'renderAccount');
+    assert(
+      !/saveState\(|robco_v8|state\.\w+\s*=/.test(acctBody177b),
+      '177.9: renderAccount() never writes campaign state (saveState/robco_v8/state.<field>=)'
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail

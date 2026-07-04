@@ -1354,6 +1354,18 @@ details.panel:not([open]) summary h2 {
   border-bottom: none;
 }
 
+/* One-line summary status (e.g. ACCOUNT's live REG PORT state) — visible whether
+   the panel is open or collapsed, so a collapsed panel still shows its state. */
+.panel-substatus {
+  display: block;
+  font-size: 10px;
+  opacity: 0.55;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* ─── Sub-Panel (nested <details> inside a top-level panel) ──────── */
 /* Used by AMMO RESERVES nested inside BACKPACK INVENTORY */
 details.sub-panel {

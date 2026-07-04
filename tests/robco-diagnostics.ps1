@@ -14772,6 +14772,150 @@ Check (
 ) ("176.9: renderSystemStatus()/selectSubsystem() never write campaign state (saveState/robco_v8/state.<field>=)" + $(if ($offenders176.Count) { " -- offenders: $($offenders176 -join ', ')" } else { "" }))
 
 # ===========================================================
+# Suite 177 -- Step 2 v2.8.0 SU-4: dynamic ACCOUNT (REG PORT) status words
+# The REG PORT / Operator Registry board's diegetic status text is driven
+# entirely by real auth + connection state (getAccountState()/
+# isFeatureEnabled('googleSignIn')/_isUplinkConnected()) -- never a hardcoded
+# story -- and live-updates through the SAME refreshOverseerCarrier() choke
+# point that already drives the UPLINK lamp, bezel telemetry, and SYSTEM
+# STATUS carrier line. Shells out to node (mirrors the Suite 133/135 pattern,
+# temp-file transport per the Protocol 42 stdin-corruption fix) to actually
+# EXECUTE the real renderAccount() body across all four conditions.
+# 9 tests (PS mirror of JS Suite 177.)
+# ===========================================================
+Sep "Suite 177 -- SU-4: dynamic ACCOUNT (REG PORT) status words"
+$html177 = Read-Src "index.html"
+$acctSrc177 = Read-Src "js/ui-account.js"
+$core177 = Read-Src "js/ui-core.js"
+$css177 = Read-Src "css/terminal.css"
+
+# 177.1  index.html: #acctSummaryStatus lives in the ACCOUNT panel's <summary>,
+#        styled via .panel-substatus
+Check (
+    ($html177 -match '(?s)<h2>>\s*ACCOUNT</h2>\s*<span id="acctSummaryStatus" class="panel-substatus">') -and
+    ($css177 -match '\.panel-substatus\s*\{')
+) "177.1: #acctSummaryStatus sits inside the ACCOUNT panel summary, styled via .panel-substatus"
+
+# 177.2  renderAccount() reads the real signals -- never navigator.onLine or a
+#        second, parallel connection check (Protocol 22)
+$acctBody177 = Get-FunctionBody $acctSrc177 "renderAccount"
+Check (
+    ($acctBody177 -match 'window\.getAccountState') -and
+    ($acctBody177 -match "isFeatureEnabled\('googleSignIn'\)") -and
+    ($acctBody177 -match '_isUplinkConnected\(\)') -and
+    (-not ($acctBody177 -match 'navigator\.onLine'))
+) "177.2: renderAccount() reads getAccountState()/isFeatureEnabled('googleSignIn')/_isUplinkConnected() -- no navigator.onLine, no parallel connection check"
+
+# 177.3  refreshOverseerCarrier() calls renderAccount() -- the single choke point
+Check (
+    $core177 -match "(?s)_updateUplinkLamp\(\);.{0,200}_refreshBezelTelemetry\(\);.{0,200}renderSystemStatus\(\);.{0,300}if \(typeof renderAccount === 'function'\) renderAccount\(\);"
+) "177.3: refreshOverseerCarrier() calls renderAccount() alongside _updateUplinkLamp()/_refreshBezelTelemetry()/renderSystemStatus() -- one choke point, cannot drift"
+
+# 177.4-177.7  behavioral -- shell out to node and actually execute the real
+# renderAccount() body against all four conditions.
+$labels177 = @(
+    "signed-out + googleSignIn ON -> NO OPERATOR ON RECORD, REG PORT VACANT, CLOUD ARCHIVE SYNC OFFLINE, sign-in button, summary UPLINK OFFLINE",
+    "signed-out + googleSignIn OFF -> LOCAL ARCHIVES ACTIVE, no sign-in button, summary UPLINK TEMPORARILY UNAVAILABLE",
+    "signed-in + carrier connected -> OPERATOR VERIFIED, CLOUD ARCHIVES + CIPHER-KEY SYNC AVAILABLE, sever-uplink button, name/email shown (real middot not &middot; entity), summary UPLINK ACTIVE",
+    "signed-in + carrier disconnected -> OPERATOR VERIFIED, CLOUD ARCHIVE SYNC OFFLINE (NO CARRIER), sever-uplink button still present, summary CLOUD UNREACHABLE"
+)
+try {
+    $nodeCheck177 = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCheck177) {
+        $acctPathNode177 = (Join-Path $Root "js/ui-account.js").Replace('\', '/')
+        $testScript177 = @"
+const fs = require('fs');
+const vm = require('vm');
+const acctSource = fs.readFileSync('$acctPathNode177', 'utf8');
+function extractFunctionBody(source, fnName) {
+  const idx = source.indexOf('function ' + fnName);
+  const braceStart = source.indexOf('{', source.indexOf('(', idx));
+  let depth = 0, i = braceStart;
+  for (; i < source.length; i++) {
+    if (source[i] === '{') depth++;
+    else if (source[i] === '}' && --depth === 0) break;
+  }
+  return source.slice(braceStart, i + 1);
+}
+function decl(name) {
+  const s = acctSource.indexOf('function ' + name);
+  const p = acctSource.slice(acctSource.indexOf('(', s), acctSource.indexOf('{', acctSource.indexOf('(', s)));
+  return 'function ' + name + p + extractFunctionBody(acctSource, name);
+}
+function runAccount(acct, googleSignInOn, connected) {
+  const els = { accountBody: { innerHTML: '' }, acctSummaryStatus: { textContent: '' } };
+  const sandbox = {
+    console,
+    escapeHtml: s => String(s),
+    _isUplinkConnected: () => connected,
+    document: { getElementById: id => els[id] || null },
+    window: {
+      getAccountState: () => acct,
+      isFeatureEnabled: key => (key === 'googleSignIn' ? googleSignInOn : true),
+    },
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(decl('renderAccount') + '\nrenderAccount();', sandbox);
+  return els;
+}
+const results = [];
+try {
+  const e = runAccount({ uid: null, isAnonymous: true, email: null, displayName: null }, true, false);
+  results.push(/NO OPERATOR ON RECORD/.test(e.accountBody.innerHTML) && /REG PORT VACANT/.test(e.accountBody.innerHTML) && /CLOUD ARCHIVE SYNC OFFLINE/.test(e.accountBody.innerHTML) && /signInWithGoogle/.test(e.accountBody.innerHTML) && /UPLINK OFFLINE/.test(e.acctSummaryStatus.textContent));
+} catch (err) { results.push(false); }
+try {
+  const e = runAccount({ uid: null, isAnonymous: true, email: null, displayName: null }, false, false);
+  results.push(/LOCAL ARCHIVES ACTIVE/.test(e.accountBody.innerHTML) && !/signInWithGoogle/.test(e.accountBody.innerHTML) && /UPLINK TEMPORARILY UNAVAILABLE/.test(e.acctSummaryStatus.textContent));
+} catch (err) { results.push(false); }
+try {
+  const e = runAccount({ uid: 'abc', isAnonymous: false, email: 'courier@six.test', displayName: 'Six' }, true, true);
+  results.push(/OPERATOR VERIFIED/.test(e.accountBody.innerHTML) && /CLOUD ARCHIVES \+ CIPHER-KEY SYNC AVAILABLE/.test(e.accountBody.innerHTML) && /signOutAccount/.test(e.accountBody.innerHTML) && /Six/.test(e.accountBody.innerHTML) && /courier@six\.test/.test(e.accountBody.innerHTML) && /UPLINK ACTIVE/.test(e.acctSummaryStatus.textContent) && e.acctSummaryStatus.textContent.includes('Six · courier@six.test') && !/&middot;/.test(e.acctSummaryStatus.textContent));
+} catch (err) { results.push(false); }
+try {
+  const e = runAccount({ uid: 'abc', isAnonymous: false, email: 'courier@six.test', displayName: 'Six' }, true, false);
+  results.push(/OPERATOR VERIFIED/.test(e.accountBody.innerHTML) && /CLOUD ARCHIVE SYNC OFFLINE \(NO CARRIER\)/.test(e.accountBody.innerHTML) && /signOutAccount/.test(e.accountBody.innerHTML) && /CLOUD UNREACHABLE/.test(e.acctSummaryStatus.textContent));
+} catch (err) { results.push(false); }
+console.log('RESULT:' + results.map(r => r ? '1' : '0').join(''));
+"@
+        # Write to a temp file rather than piping through stdin (Protocol 42 fix --
+        # see the Suite 135 precedent above).
+        $tmpScript177 = [System.IO.Path]::GetTempFileName() + '.js'
+        [System.IO.File]::WriteAllText($tmpScript177, $testScript177, [System.Text.Encoding]::UTF8)
+        try {
+            $out177 = (node $tmpScript177 2>&1 | Out-String)
+        } finally {
+            Remove-Item -Path $tmpScript177 -Force -ErrorAction SilentlyContinue
+        }
+        $rm177 = [regex]::Match($out177, 'RESULT:([01]{4})')
+        if ($rm177.Success) {
+            $bits177 = $rm177.Groups[1].Value
+            for ($bi = 0; $bi -lt 4; $bi++) { Check ($bits177.Substring($bi, 1) -eq '1') "177.$(4+$bi): [behavioral] $($labels177[$bi])" }
+        } else {
+            $err177 = if ([string]::IsNullOrWhiteSpace($out177)) { "No output from node" } else { $out177.Trim() }
+            foreach ($lbl in $labels177) { Fail "$lbl  (runtime error: $err177)" }
+        }
+    } else {
+        foreach ($lbl in $labels177) { Fail "$lbl  (node not available in PATH)" }
+    }
+} catch {
+    foreach ($lbl in $labels177) { Fail "$lbl  (exception: $($_.Exception.Message))" }
+}
+
+# 177.8  live-update trigger points: boot (loadUI) + sign-in/out/collision (cloud.js,
+#        3 sites) + connectivity (refreshOverseerCarrier, asserted at 177.3)
+$cloud177 = Read-Src "js/cloud.js"
+$loadUIBody177 = Get-FunctionBody $core177 "loadUI"
+$renderAcctCount177 = ([regex]::Matches($cloud177, [regex]::Escape('window.renderAccount();'))).Count
+Check (
+    ($loadUIBody177 -match 'renderAccount\(\);') -and ($renderAcctCount177 -ge 3)
+) "177.8: renderAccount() is called from loadUI() (boot) and at least 3 sites in cloud.js (sign-in/out/collision)"
+
+# 177.9  the account-word layer writes nothing durable to the campaign
+Check (
+    -not ($acctBody177 -match 'saveState\(|robco_v8|state\.\w+\s*=')
+) "177.9: renderAccount() never writes campaign state (saveState/robco_v8/state.<field>=)"
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

@@ -178,6 +178,7 @@ export default [
         renderSavesList: 'readonly',
         listLocalSaves: 'readonly',
         undoLastSync: 'readonly',
+        _isUplinkConnected: 'readonly', // SU-4: renderAccount() reads the shared carrier signal (js/ui-core.js)
         // Saves module cross-file globals (js/ui-saves.js ↔ js/ui.js)
         CHAT_MAX: 'readonly',
         _chatSaveTimer: 'writable',

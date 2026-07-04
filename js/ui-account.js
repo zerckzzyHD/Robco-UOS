@@ -2,38 +2,82 @@
 // (co-located with the slot-schema helpers _slotKey/_slotLabel). renderSavesList()
 // below calls it as a global. (DUP-2 consolidation, WU-B7.)
 
+// SU-4 (Step 2 v2.8.0 Settings-tab unit): the REG PORT / Operator Registry board's
+// diegetic status words are driven entirely by real auth + connection state — never
+// hardcoded to one story. Four conditions (Protocol 22 — reuses the exact same
+// signals as everywhere else, no parallel connection check):
+//   1. signed out, googleSignIn ON   -> NO OPERATOR ON RECORD, REG PORT VACANT,
+//                                        CLOUD ARCHIVE SYNC OFFLINE, sign-in button
+//   2. signed out, googleSignIn OFF  -> LOCAL ARCHIVES ACTIVE, no button
+//   3. signed in, carrier connected  -> OPERATOR VERIFIED, CLOUD ARCHIVES + CIPHER-
+//                                        KEY SYNC AVAILABLE, sever-uplink button
+//   4. signed in, carrier disconnected -> OPERATOR VERIFIED, CLOUD ARCHIVE SYNC
+//                                        OFFLINE (NO CARRIER), sever-uplink button
+// _isUplinkConnected() is the SAME carrier signal the UPLINK lamp, the bezel
+// telemetry CARRIER suffix, and the SYSTEM STATUS panel already use — reusing it
+// here (rather than a second navigator.onLine check) is what keeps every one of
+// those readouts in agreement (they're all driven by refreshOverseerCarrier(),
+// which calls this function — see ui-core.js).
 function renderAccount() {
   const body = document.getElementById('accountBody');
+  const summaryEl = document.getElementById('acctSummaryStatus');
   if (!body) return;
   const acct =
     typeof window.getAccountState === 'function'
       ? window.getAccountState()
       : { uid: null, isAnonymous: true, email: null, displayName: null };
-  if (acct.isAnonymous || !acct.uid) {
-    if (typeof window.isFeatureEnabled === 'function' && !window.isFeatureEnabled('googleSignIn')) {
-      body.innerHTML =
-        '<div style="font-size:11px;opacity:0.7;margin-bottom:8px;">UPLINK OFFLINE — ARCHIVES STORED LOCALLY</div>' +
-        '<div style="font-size:11px;opacity:0.5;padding:6px 0;">UPLINK TEMPORARILY UNAVAILABLE — LOCAL ARCHIVES ACTIVE.</div>';
+  const signedIn = !acct.isAnonymous && !!acct.uid;
+  const googleSignInOff =
+    typeof window.isFeatureEnabled === 'function' && !window.isFeatureEnabled('googleSignIn');
+  const connected = typeof _isUplinkConnected === 'function' ? _isUplinkConnected() : false;
+  const name = acct.displayName ? escapeHtml(acct.displayName) : '';
+  const email = acct.email ? escapeHtml(acct.email) : '';
+  // Protocol 42 fix (found during render-verify): '·' is a literal Unicode
+  // character, NOT the HTML entity '&middot;' — `summary` is assigned via
+  // .textContent below (never parsed as HTML), so an entity there would show
+  // up as the literal text "&middot;" instead of a dot. Using the real
+  // character here keeps it correct in both the innerHTML board AND the
+  // textContent summary from a single shared value.
+  const idBits = [name, email].filter(Boolean).join(' · ');
+
+  let summary, board;
+  if (!signedIn) {
+    if (googleSignInOff) {
+      summary = 'UPLINK TEMPORARILY UNAVAILABLE';
+      board =
+        '<div style="font-size:11px;margin-bottom:4px;">NO OPERATOR ON RECORD</div>' +
+        '<div style="font-size:11px;opacity:0.7;">&gt; LOCAL ARCHIVES ACTIVE</div>';
     } else {
-      body.innerHTML =
-        '<div style="font-size:11px;opacity:0.7;margin-bottom:8px;">UPLINK OFFLINE — ARCHIVES STORED LOCALLY</div>' +
+      summary = 'UPLINK OFFLINE — ARCHIVES STORED LOCALLY';
+      board =
+        '<div style="font-size:11px;margin-bottom:4px;">NO OPERATOR ON RECORD</div>' +
+        '<div style="font-size:11px;opacity:0.7;margin-bottom:8px;">&gt; REG PORT VACANT — LOCAL ARCHIVES ACTIVE · CLOUD ARCHIVE SYNC OFFLINE</div>' +
         '<button class="action-btn" style="width:100%" onclick="if(window.signInWithGoogle)window.signInWithGoogle()">' +
-        '> ESTABLISH GOOGLE UPLINK — SYNC TELEMETRY ACROSS TERMINALS</button>';
+        '&gt; ESTABLISH GOOGLE UPLINK — SYNC TELEMETRY ACROSS TERMINALS</button>';
     }
-  } else {
-    const name = acct.displayName ? escapeHtml(acct.displayName) : '';
-    const email = acct.email ? escapeHtml(acct.email) : '';
-    body.innerHTML =
-      '<div style="font-size:11px;margin-bottom:4px;">UPLINK ACTIVE</div>' +
-      (name
-        ? '<div style="font-size:11px;opacity:0.85;margin-bottom:2px;">' + name + '</div>'
+  } else if (connected) {
+    summary = 'UPLINK ACTIVE' + (idBits ? ' · ' + idBits : '');
+    board =
+      '<div style="font-size:11px;margin-bottom:2px;">UPLINK ACTIVE · OPERATOR VERIFIED</div>' +
+      (idBits
+        ? '<div style="font-size:11px;opacity:0.6;margin-bottom:4px;">' + idBits + '</div>'
         : '') +
-      (email
-        ? '<div style="font-size:11px;opacity:0.6;margin-bottom:8px;">' + email + '</div>'
-        : '') +
+      '<div style="font-size:11px;opacity:0.7;margin-bottom:8px;">&gt; CLOUD ARCHIVES + CIPHER-KEY SYNC AVAILABLE</div>' +
       '<button class="action-btn" style="width:100%" onclick="if(window.signOutAccount)window.signOutAccount()">' +
-      '> SEVER UPLINK</button>';
+      '&gt; SEVER UPLINK</button>';
+  } else {
+    summary = 'UPLINK ACTIVE — CLOUD UNREACHABLE';
+    board =
+      '<div style="font-size:11px;margin-bottom:2px;">OPERATOR VERIFIED</div>' +
+      (idBits
+        ? '<div style="font-size:11px;opacity:0.6;margin-bottom:4px;">' + idBits + '</div>'
+        : '') +
+      '<div style="font-size:11px;opacity:0.7;margin-bottom:8px;">&gt; CLOUD ARCHIVE SYNC OFFLINE (NO CARRIER)</div>' +
+      '<button class="action-btn" style="width:100%" onclick="if(window.signOutAccount)window.signOutAccount()">' +
+      '&gt; SEVER UPLINK</button>';
   }
+  body.innerHTML = board;
+  if (summaryEl) summaryEl.textContent = summary;
 }
 
 // ── Unified Saves List (Phase 6 Task 7) ──────────────────────────────────────
