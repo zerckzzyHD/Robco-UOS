@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2171/2171 | Cache: robco-terminal-v2.7.0-r64 -->
+﻿## [Unreleased]<!-- Tests: 2179/2179 | Cache: robco-terminal-v2.7.0-r65 -->
 
 ### Added
 
@@ -29,6 +29,7 @@
 - Removed the TERMLINK command console entirely — the Tool Deck already covers every subsystem it used to launch, so it was left as an unnecessary second way to reach the same tools. Typing TERMLINK no longer does anything; everything it offered (V.A.T.S., THREAT, TRADE, CONSULT, BIO-SCAN, LOOT) is still reachable exactly as before, either through the Tool Deck or that tool's own panel button.
 - Retired the typed CROSSROADS command, now that the CROSSROADS RECORD is already a standing panel you can open any time — typing it (or looking for it in the command list) no longer does anything. Nothing about the panel itself changes.
 - The Module Bay's phosphor tube color picker got a visual upgrade to match the rest of the hardware rack: the three green tube colors (RobCo Green, Pip-Boy Green, Ghoul Green) now collapse into one "3 types" cartridge you tap to fan open, instead of showing all seven colors side by side, and every tube — including the cartridge and the four standalone colors — now shows a small indicator light under its name so you can see which one is seated at a glance. Every tube is also now the exact same size. Picking a color, and which color is remembered for which game, both still work exactly as before.
+- The SKILL BOOKS and SKILL MAGAZINES trackers are no longer separate panels — they now live as collapsible sections inside the SKILL MATRIX panel, right below your skills. Everything about them works exactly as before: marking a book or magazine read/unread, the count badge, and whether a section was left open or closed all carry over the same way.
 
 ### Fixed
 

@@ -1068,22 +1068,27 @@
                 <h2>> SKILL MATRIX</h2>
               </summary>
               <div class="skills-grid" id="skillsGrid"></div>
-            </details>
 
-            <!-- SKILL BOOKS TRACKER -->
-            <details class="panel" data-tab="stat">
-              <summary>
-                <h2>> SKILL BOOKS</h2>
-              </summary>
-              <div id="skillBooksDisplay"></div>
-            </details>
+              <!-- SKILL BOOKS TRACKER (nested sub-panel, Protocol UI-1/UI-2) -->
+              <details class="sub-panel" id="skillBooksPanel" data-sub-id="skill_matrix_books">
+                <summary>
+                  <h3>&gt; SKILL BOOKS</h3>
+                </summary>
+                <div id="skillBooksDisplay"></div>
+              </details>
 
-            <!-- SKILL MAGAZINES TRACKER (FNV only — hidden on FO3 by renderMagazines()) -->
-            <details class="panel" id="magazinesPanel" data-tab="stat" style="display: none">
-              <summary>
-                <h2>> SKILL MAGAZINES</h2>
-              </summary>
-              <div id="magazinesDisplay"></div>
+              <!-- SKILL MAGAZINES TRACKER (FNV only — hidden on FO3 by renderMagazines()) -->
+              <details
+                class="sub-panel"
+                id="magazinesPanel"
+                data-sub-id="skill_matrix_magazines"
+                style="display: none"
+              >
+                <summary>
+                  <h3>&gt; SKILL MAGAZINES</h3>
+                </summary>
+                <div id="magazinesDisplay"></div>
+              </details>
             </details>
 
             <!-- 5. QUEST LOG -->

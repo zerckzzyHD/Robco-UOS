@@ -5393,7 +5393,7 @@ Check ($uiRSrc84.Contains('function _craftGetHave(')) "_craftGetHave() helper de
 
 # ===========================================================
 # Suite 85 -- Skill Books Tracker (FNV+FO3, Protocol 4) + WU-B8 _renderReadTracker guards
-# 26 tests
+# 30 tests
 # ===========================================================
 Sep "Suite 85 -- Skill Books Tracker (FNV+FO3, Protocol 4)"
 $nvRegSrc85 = Get-Content 'js/reg_nv.js' -Raw
@@ -5516,6 +5516,32 @@ Check (($renderSBBody85 -match '_renderReadTracker\s*\(') -and ($renderMagBody85
 # 85.26  The shared helper carries the full row/sub-panel contract in one place.
 Check ($helperBody85.Contains('tracker-row') -and ($helperBody85 -match 'class="sub-panel" data-sub-id="\$\{opts\.subIdRead\}') -and ($helperBody85 -match 'class="sub-panel" data-sub-id="\$\{opts\.subIdUnread\}') -and $helperBody85.Contains('tracker-toggle') -and ($helperBody85 -match 'opts\.meta\(d\)')) "85.26: _renderReadTracker carries the shared contract -- .tracker-row, READ/UNREAD sub-panels (data-sub-id), .tracker-toggle, opts.meta(d)"
 
+# -- Skill Matrix nesting guards (owner report -- SKILL BOOKS/SKILL MAGAZINES
+#    re-homed as sub-panels inside SKILL MATRIX, Protocol UI-1/UI-2) --
+$skillMatrixStart85 = $idxSrc85.IndexOf('> SKILL MATRIX')
+$skillMatrixEnd85 = $idxSrc85.IndexOf('<!-- 5. QUEST LOG -->', $skillMatrixStart85)
+$skillMatrixBlock85 = if ($skillMatrixStart85 -ge 0 -and $skillMatrixEnd85 -ge 0) { $idxSrc85.Substring($skillMatrixStart85, $skillMatrixEnd85 - $skillMatrixStart85) } else { '' }
+
+# 85.27  #skillBooksPanel is a <details class="sub-panel"> with data-sub-id, nested inside SKILL MATRIX
+Check (($skillMatrixBlock85 -match '(?s)<details[^>]*class="sub-panel"[^>]*id="skillBooksPanel"[^>]*data-sub-id="skill_matrix_books"') -or ($skillMatrixBlock85 -match '(?s)<details[^>]*id="skillBooksPanel"[^>]*class="sub-panel"[^>]*data-sub-id="skill_matrix_books"')) `
+    "85.27: index.html #skillBooksPanel is a <details class=`"sub-panel`" data-sub-id=`"skill_matrix_books`"> nested inside SKILL MATRIX"
+
+# 85.28  SKILL BOOKS heading is now <h3> (sub-panel heading), no longer a top-level <h2> panel
+Check (($skillMatrixBlock85 -match '<h3>&gt; SKILL BOOKS</h3>') -and (-not ($idxSrc85 -match '<h2>>\s*SKILL BOOKS'))) `
+    "85.28: SKILL BOOKS heading is a nested <h3> sub-panel heading, not a standalone top-level <h2> panel"
+
+# 85.29  #skillBooksPanel carries no data-tab of its own -- it is not a top-level tab-gated panel anymore
+Check (-not ($idxSrc85 -match '(?s)<details[^>]*id="skillBooksPanel"[^>]*data-tab')) `
+    "85.29: #skillBooksPanel has no data-tab attribute -- it is nested inside SKILL MATRIX, not its own tab-gated panel"
+
+# 85.30  _updatePanelBadges()/expandPanelForCategory() query '.panel h2, .sub-panel h3' and expandPanelForCategory opens #skillBooksPanel
+$badgesBody85 = ''
+try { $badgesBody85 = Get-FunctionBody $uiCoreSrc85 '_updatePanelBadges' } catch {}
+$expandBody85 = ''
+try { $expandBody85 = Get-FunctionBody $uiCoreSrc85 'expandPanelForCategory' } catch {}
+Check (($badgesBody85 -match '\.panel h2,\s*\.sub-panel h3') -and ($expandBody85 -match '\.panel h2,\s*\.sub-panel h3') -and ($expandBody85 -match "getElementById\('skillBooksPanel'\)")) `
+    "85.30: _updatePanelBadges()/expandPanelForCategory() query '.panel h2, .sub-panel h3' and expandPanelForCategory opens #skillBooksPanel for the 'skillBooks' category"
+
 
 # ===========================================================
 # Suite 86 -- Maskable shortcut icons + OPTICS label wrap (6 tests)
@@ -5547,7 +5573,7 @@ Check (($idxSrc86 -match 'id="opticsColorInput"') -and ($idxSrc86 -match 'class=
     "index.html retires the standalone OPTICS: label in favor of the Module Bay tube rack (#opticsColorInput.tube-rack)"
 
 # ===========================================================
-# Suite 87 -- NV Skill Magazines tracker (FNV-only, Protocol 4) (25 tests)
+# Suite 87 -- NV Skill Magazines tracker (FNV-only, Protocol 4) (29 tests)
 # ===========================================================
 Sep "Suite 87 -- NV Skill Magazines tracker (FNV-only, Protocol 4)"
 
@@ -5654,6 +5680,33 @@ Check ([bool]($idxSrc87 -match 'id="magazinesDisplay"')) "index.html has #magazi
 #  in api.js -- the literal copy lives in state.js, not api.js, post-refactor.
 $sdBody87 = (Get-DirectiveFullBody $apiSrc87) + "`n" + $stateSrc87
 Check (($sdBody87 -match 'magazines') -and ($sdBody87 -match 'FNV')) "getSystemDirective() references magazines in FNV-only context (Protocol 4 AI contract)"
+
+# -- Skill Matrix nesting guards (owner report -- SKILL MAGAZINES re-homed as
+#    a sub-panel inside SKILL MATRIX, Protocol UI-1/UI-2) --
+$skillMatrixStart87 = $idxSrc87.IndexOf('> SKILL MATRIX')
+$skillMatrixEnd87 = $idxSrc87.IndexOf('<!-- 5. QUEST LOG -->', $skillMatrixStart87)
+$skillMatrixBlock87 = if ($skillMatrixStart87 -ge 0 -and $skillMatrixEnd87 -ge 0) { $idxSrc87.Substring($skillMatrixStart87, $skillMatrixEnd87 - $skillMatrixStart87) } else { '' }
+
+# 87.26  #magazinesPanel is a <details class="sub-panel"> with data-sub-id, nested inside SKILL MATRIX
+Check (($skillMatrixBlock87 -match '(?s)<details[^>]*class="sub-panel"[^>]*id="magazinesPanel"[^>]*data-sub-id="skill_matrix_magazines"') -or ($skillMatrixBlock87 -match '(?s)<details[\s\S]{0,80}id="magazinesPanel"[\s\S]{0,120}data-sub-id="skill_matrix_magazines"[\s\S]{0,120}class="sub-panel"')) `
+    "87.26: index.html #magazinesPanel is a <details class=`"sub-panel`" data-sub-id=`"skill_matrix_magazines`"> nested inside SKILL MATRIX"
+
+# 87.27  SKILL MAGAZINES heading is now <h3> (sub-panel heading), no longer a top-level <h2> panel
+Check (($skillMatrixBlock87 -match '<h3>&gt; SKILL MAGAZINES</h3>') -and (-not ($idxSrc87 -match '<h2>>\s*SKILL MAGAZINES'))) `
+    "87.27: SKILL MAGAZINES heading is a nested <h3> sub-panel heading, not a standalone top-level <h2> panel"
+
+# 87.28  #magazinesPanel carries no data-tab of its own -- it is not a top-level tab-gated panel anymore
+$magPanelIdx87 = $idxSrc87.IndexOf('id="magazinesPanel"')
+$magPanelChunk87 = if ($magPanelIdx87 -ge 0) { $idxSrc87.Substring(0, [Math]::Min($magPanelIdx87 + 300, $idxSrc87.Length)) } else { '' }
+Check (-not ($magPanelChunk87 -match '(?s)<details[^>]*id="magazinesPanel"[^>]*data-tab')) `
+    "87.28: #magazinesPanel has no data-tab attribute -- it is nested inside SKILL MATRIX, not its own tab-gated panel"
+
+# 87.29  expandPanelForCategory() opens the #magazinesPanel sub-panel for the 'magazines' category
+$uiCoreSrc87b = Read-Src "js/ui-core.js"
+$expandBody87 = ''
+try { $expandBody87 = Get-FunctionBody $uiCoreSrc87b 'expandPanelForCategory' } catch {}
+Check ([bool]($expandBody87 -match "getElementById\('magazinesPanel'\)")) `
+    "87.29: expandPanelForCategory() opens #magazinesPanel for the 'magazines' category (nested sub-panel reveal)"
 
 # ===========================================================
 # Suite 88 -- GATE-UI: UI consistency structural guards (8 tests)

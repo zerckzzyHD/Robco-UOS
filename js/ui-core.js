@@ -2397,8 +2397,11 @@ function _updatePanelBadges() {
     },
   ];
   badges.forEach(({ h2text, count, total }) => {
-    // Find the h2 with exactly this text (case-insensitive prefix match)
-    const h2 = Array.from(document.querySelectorAll('.panel h2')).find(el =>
+    // Find the heading with exactly this text (case-insensitive prefix match).
+    // SKILL BOOKS/SKILL MAGAZINES now live as <h3> sub-panel headings nested
+    // inside SKILL MATRIX (Protocol UI-1), so this also matches .sub-panel h3
+    // — every other entry here is still a top-level .panel h2 (Protocol 22).
+    const h2 = Array.from(document.querySelectorAll('.panel h2, .sub-panel h3')).find(el =>
       el.textContent.trim().startsWith(h2text)
     );
     if (!h2) return;
@@ -2868,7 +2871,10 @@ function expandPanelForCategory(categoryKey) {
   };
   const target = map[categoryKey];
   if (!target) return;
-  const h2 = Array.from(document.querySelectorAll('.panel h2')).find(el =>
+  // SKILL BOOKS/SKILL MAGAZINES now live as <h3> sub-panel headings nested
+  // inside SKILL MATRIX (Protocol UI-1) — .closest('details.panel') below
+  // still correctly walks up past the sub-panel to the enclosing panel.
+  const h2 = Array.from(document.querySelectorAll('.panel h2, .sub-panel h3')).find(el =>
     el.textContent.trim().startsWith(target)
   );
   if (!h2) return;
@@ -2882,9 +2888,15 @@ function expandPanelForCategory(categoryKey) {
       MetaStore.set('robco_panel_state', JSON.stringify(ps));
     }
   }
-  // For ammo, also open the nested ammo sub-panel
+  // For ammo/skillBooks/magazines, also open the relevant nested sub-panel
   if (categoryKey === 'ammo') {
     const subPanel = document.getElementById('ammoSubPanel');
+    if (subPanel && !subPanel.open) subPanel.setAttribute('open', '');
+  } else if (categoryKey === 'skillBooks') {
+    const subPanel = document.getElementById('skillBooksPanel');
+    if (subPanel && !subPanel.open) subPanel.setAttribute('open', '');
+  } else if (categoryKey === 'magazines') {
+    const subPanel = document.getElementById('magazinesPanel');
     if (subPanel && !subPanel.open) subPanel.setAttribute('open', '');
   }
   // WU-HF1: bring the opened panel into view. Without this, opening a panel that sits

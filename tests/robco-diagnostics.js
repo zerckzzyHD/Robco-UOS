@@ -9365,7 +9365,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  autoImportState validation, getSystemDirective, render wiring,
 //  index.html container, READ/UNREAD sub-panel structural guards,
 //  WU-B8 shared _renderReadTracker consolidation guards.
-//  26 tests
+//  30 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 85 — Skill Books Tracker (FNV+FO3, Protocol 4)');
@@ -9681,6 +9681,53 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
       '85.26: _renderReadTracker carries the shared contract — .tracker-row, READ/UNREAD sub-panels (data-sub-id), .tracker-toggle, opts.meta(d)'
     );
   }
+
+  // ── Skill Matrix nesting guards (owner report — SKILL BOOKS/SKILL MAGAZINES
+  //    re-homed as sub-panels inside SKILL MATRIX, Protocol UI-1/UI-2) ──
+  const skillMatrixStart85 = htmlSource.indexOf('> SKILL MATRIX');
+  const skillMatrixEnd85 = htmlSource.indexOf('<!-- 5. QUEST LOG -->', skillMatrixStart85);
+  const skillMatrixBlock85 =
+    skillMatrixStart85 >= 0 && skillMatrixEnd85 >= 0
+      ? htmlSource.slice(skillMatrixStart85, skillMatrixEnd85)
+      : '';
+
+  // 85.27  #skillBooksPanel is a <details class="sub-panel"> with data-sub-id, nested inside SKILL MATRIX
+  assert(
+    /<details[^>]*class="sub-panel"[^>]*id="skillBooksPanel"[^>]*data-sub-id="skill_matrix_books"|<details[^>]*id="skillBooksPanel"[^>]*class="sub-panel"[^>]*data-sub-id="skill_matrix_books"/.test(
+      skillMatrixBlock85
+    ),
+    '85.27: index.html #skillBooksPanel is a <details class="sub-panel" data-sub-id="skill_matrix_books"> nested inside SKILL MATRIX'
+  );
+
+  // 85.28  SKILL BOOKS heading is now <h3> (sub-panel heading), no longer a top-level <h2> panel
+  assert(
+    /<h3>&gt; SKILL BOOKS<\/h3>/.test(skillMatrixBlock85) &&
+      !/<h2>>\s*SKILL BOOKS/.test(htmlSource),
+    '85.28: SKILL BOOKS heading is a nested <h3> sub-panel heading, not a standalone top-level <h2> panel'
+  );
+
+  // 85.29  #skillBooksPanel carries no data-tab of its own — it is not a top-level tab-gated panel anymore
+  assert(
+    !/<details[^>]*id="skillBooksPanel"[^>]*data-tab/.test(htmlSource),
+    '85.29: #skillBooksPanel has no data-tab attribute — it is nested inside SKILL MATRIX, not its own tab-gated panel'
+  );
+
+  // 85.30  _updatePanelBadges() and expandPanelForCategory() match .sub-panel h3 headings too,
+  //        so the nested SKILL BOOKS badge/auto-expand keep working (Protocol 22 — reused, not forked)
+  {
+    let badgesBody85 = '';
+    let expandBody85 = '';
+    try {
+      badgesBody85 = extractFunctionBody(uiCoreSrc85, '_updatePanelBadges');
+      expandBody85 = extractFunctionBody(uiCoreSrc85, 'expandPanelForCategory');
+    } catch (_) {}
+    assert(
+      /\.panel h2,\s*\.sub-panel h3/.test(badgesBody85) &&
+        /\.panel h2,\s*\.sub-panel h3/.test(expandBody85) &&
+        /getElementById\('skillBooksPanel'\)/.test(expandBody85),
+      "85.30: _updatePanelBadges()/expandPanelForCategory() query '.panel h2, .sub-panel h3' and expandPanelForCategory opens #skillBooksPanel for the 'skillBooks' category"
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -9725,7 +9772,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 
 // ══════════════════════════════════════════════════════════════
 // Suite 87 — NV Skill Magazines tracker (FNV-only, Protocol 4)
-// 25 tests
+// 29 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 87 — NV Skill Magazines tracker (FNV-only, Protocol 4)');
@@ -9921,6 +9968,52 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     /magazines/.test(sdBody87) && /FNV/.test(sdBody87),
     'getSystemDirective() references magazines in FNV-only context (Protocol 4 AI contract)'
   );
+
+  // ── Skill Matrix nesting guards (owner report — SKILL MAGAZINES re-homed as
+  //    a sub-panel inside SKILL MATRIX, Protocol UI-1/UI-2) ──
+  const skillMatrixStart87 = idxSrc87.indexOf('> SKILL MATRIX');
+  const skillMatrixEnd87 = idxSrc87.indexOf('<!-- 5. QUEST LOG -->', skillMatrixStart87);
+  const skillMatrixBlock87 =
+    skillMatrixStart87 >= 0 && skillMatrixEnd87 >= 0
+      ? idxSrc87.slice(skillMatrixStart87, skillMatrixEnd87)
+      : '';
+
+  // 87.26  #magazinesPanel is a <details class="sub-panel"> with data-sub-id, nested inside SKILL MATRIX
+  assert(
+    /<details[\s\S]{0,80}class="sub-panel"[\s\S]{0,80}id="magazinesPanel"[\s\S]{0,80}data-sub-id="skill_matrix_magazines"|<details[\s\S]{0,80}id="magazinesPanel"[\s\S]{0,120}data-sub-id="skill_matrix_magazines"[\s\S]{0,120}class="sub-panel"/.test(
+      skillMatrixBlock87
+    ),
+    '87.26: index.html #magazinesPanel is a <details class="sub-panel" data-sub-id="skill_matrix_magazines"> nested inside SKILL MATRIX'
+  );
+
+  // 87.27  SKILL MAGAZINES heading is now <h3> (sub-panel heading), no longer a top-level <h2> panel
+  assert(
+    /<h3>&gt; SKILL MAGAZINES<\/h3>/.test(skillMatrixBlock87) &&
+      !/<h2>>\s*SKILL MAGAZINES/.test(idxSrc87),
+    '87.27: SKILL MAGAZINES heading is a nested <h3> sub-panel heading, not a standalone top-level <h2> panel'
+  );
+
+  // 87.28  #magazinesPanel carries no data-tab of its own — it is not a top-level tab-gated panel anymore
+  assert(
+    !/<details[\s\S]{0,200}id="magazinesPanel"[\s\S]{0,200}data-tab/.test(
+      idxSrc87.slice(0, idxSrc87.indexOf('id="magazinesPanel"') + 300)
+    ),
+    '87.28: #magazinesPanel has no data-tab attribute — it is nested inside SKILL MATRIX, not its own tab-gated panel'
+  );
+
+  // 87.29  expandPanelForCategory() opens the #magazinesPanel sub-panel for the 'magazines' category
+  //        (mirrors the existing ammoSubPanel special case, Protocol 22)
+  {
+    const uiCoreSrc87 = readFile('js/ui-core.js');
+    let expandBody87 = '';
+    try {
+      expandBody87 = extractFunctionBody(uiCoreSrc87, 'expandPanelForCategory');
+    } catch (_) {}
+    assert(
+      /getElementById\('magazinesPanel'\)/.test(expandBody87),
+      "87.29: expandPanelForCategory() opens #magazinesPanel for the 'magazines' category (nested sub-panel reveal)"
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
