@@ -889,6 +889,9 @@ const GAME_DEFS = {
       pipBoyModel: 'Pip-Boy 3000',
       bootFlavor: 'MOJAVE WASTELAND UPLINK',
       saveLabel: 'LUCKY 38 TELEMETRY — MOJAVE ARCHIVE',
+      // Program-cartridge stack subtitle (CAMPAIGN PROFILE board) — data-driven so
+      // renderCartDeck() (ui-core.js) never hardcodes a per-game tape name (Protocol 38).
+      cartridgeTape: 'MOJAVE PROGRAM TAPE · RBX-2281',
     },
     // ── DO-K: identity keystone — the single per-machine design-data block every later
     // overhaul unit (bezel nav, Overseer, ceremony, motion, audio, cursor, voice, ambient)
@@ -1080,6 +1083,7 @@ Update state.magazines when the Courier reads a skill magazine. Include only nam
       pipBoyModel: 'Pip-Boy 3000',
       bootFlavor: 'CAPITAL WASTELAND UPLINK',
       saveLabel: 'VAULT-TEC ARCHIVE — CAPITAL WASTELAND',
+      cartridgeTape: 'CAPITAL WASTELAND TAPE · RBX-2277',
     },
     // ── DO-K: FO3 identity — sensible STUBS/defaults (§ build plan: "FO3 and FO4 get
     // sensible stubs for now — their machines aren't designed yet"). FO3's real
@@ -1254,6 +1258,7 @@ Update state.lincolnItems when the Courier acquires or sells any Lincoln artifac
       pipBoyModel: 'Pip-Boy 3000 Mark IV',
       bootFlavor: 'COMMONWEALTH UPLINK',
       saveLabel: 'VAULT-TEC ARCHIVE — COMMONWEALTH',
+      cartridgeTape: 'COMMONWEALTH PROGRAM TAPE · RBX-2287',
     },
     // Skill-less (FO4-class) degradation contract, locked by the Step 2 Phase 0 U11 audit
     // (ARCHITECTURE.md "Skill-less (FO4-class) degradation audit"): FO4 replaced the SPECIAL

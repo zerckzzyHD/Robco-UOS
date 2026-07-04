@@ -4481,29 +4481,49 @@ details.bay-board.dangerboard::after {
   letter-spacing: 1.5px;
 }
 
-/* ── PROGRAM CARTRIDGE deck (CAMPAIGN PROFILE board — #gameContextSelect) ──
+/* ── PROGRAM CARTRIDGE stack (CAMPAIGN PROFILE board — #gameContextSelect) ──
    A real, native #gameContextSelect stays in the DOM (Protocol 4/17/22 — the
    exact id/onchange survives, keyboard/AT users can jump straight to either
    option), visually hidden with the same .bay-visually-hidden-input
    technique as #immersionSelect. The cartridge buttons are the visible,
    genuinely-custom control; both entry points route through the SAME
-   confirm-gated setter (Protocol 22 — one truth, two entry points). */
+   confirm-gated setter (Protocol 22 — one truth, two entry points).
+
+   Owner-requested restyle: a genuine physical PILE, not a side-by-side row —
+   every .cart shares the same grid cell (grid-area: 1 / 1) so they overlap;
+   --stack-index (0 = the active/seated cartridge on top, set per-button by
+   renderCartDeck() in ui-core.js) drives both the z-index and a diagonal
+   "peek" offset via transform, so cartridges further back in the pile sit
+   visually behind and below-right of the one in front. Only their bottom-right
+   edge (>=28px, Protocol 17) is left uncovered, which is exactly what stays
+   tappable — clicking that sliver still reaches the real button underneath,
+   no pointer-events trick needed. --cart-stack-depth (set once per render to
+   the seatable-game count) reserves just enough deck padding for however many
+   cartridges are piled beneath the top one, so a future 3rd seatable game
+   reserves more room automatically instead of a CSS rewrite (Protocol 38). */
 .cart-deck {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center; /* centering rule */
-  gap: 10px;
+  display: grid;
+  justify-items: center; /* centering rule */
   margin-top: 8px;
+  padding-bottom: calc((var(--cart-stack-depth, 2) - 1) * 30px);
+  padding-right: calc((var(--cart-stack-depth, 2) - 1) * 30px);
 }
 .cart {
-  flex: 1 1 160px;
-  max-width: 240px;
+  grid-area: 1 / 1;
+  width: 100%;
+  max-width: 260px;
   min-height: 74px;
   position: relative;
   border: 1px solid rgba(var(--robco-green-rgb), 0.5);
   background: linear-gradient(180deg, rgba(var(--robco-green-rgb), 0.08), rgba(0, 0, 0, 0.45) 70%);
   padding: 12px 10px 10px;
   text-align: left;
+  /* Diagonal peek offset per stack depth (see block comment above); a plain
+     transition (not a bespoke @keyframes) so the global prefers-reduced-motion
+     block (transition-duration: 0.01ms !important) neutralises the shuffle
+     with no carve-out (Protocol UI-9 convention). */
+  transform: translate(calc(var(--stack-index, 0) * 30px), calc(var(--stack-index, 0) * 30px));
+  z-index: calc(50 - var(--stack-index, 0));
   transition:
     transform 0.25s,
     opacity 0.25s,
@@ -4565,8 +4585,15 @@ details.bay-board.dangerboard::after {
 }
 .cart:not(.seated) {
   border-style: dashed;
-  opacity: 0.6;
-  transform: translateY(-4px); /* raised, not seated */
+  opacity: 0.6; /* piled beneath — the base .cart rule's transform already sets the peek offset */
+}
+/* Hover/focus lift — a peeking cartridge previews sliding toward the front
+   before you commit to tapping it. Reuses the base transition (no separate
+   carve-out), so reduced-motion still neutralises it to an instant snap. */
+.cart:not(.seated):hover,
+.cart:not(.seated):focus-visible {
+  transform: translate(calc(var(--stack-index, 0) * 16px), calc(var(--stack-index, 0) * 16px));
+  opacity: 0.85;
 }
 
 /* ── DOCTRINE ROCKER — 2-position switch (CAMPAIGN PROFILE — #playstyleInput) ── */

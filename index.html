@@ -2473,34 +2473,18 @@
                     <option value="FNV">Fallout: New Vegas</option>
                     <option value="FO3">Fallout 3</option>
                   </select>
-                  <div class="cart-deck" role="radiogroup" aria-label="Program cartridge">
-                    <button
-                      type="button"
-                      class="cart seated"
-                      id="cart-fnv"
-                      onclick="_seatGameCartridge('FNV')"
-                      role="radio"
-                      aria-checked="true"
-                      aria-label="Seat the Fallout: New Vegas program cartridge — switches the active game campaign"
-                    >
-                      <span class="spools" aria-hidden="true"><i></i><i></i></span>
-                      <span class="c-name">FALLOUT: NEW VEGAS</span>
-                      <span class="c-sub">MOJAVE PROGRAM TAPE &middot; RBX-2281</span>
-                    </button>
-                    <button
-                      type="button"
-                      class="cart"
-                      id="cart-fo3"
-                      onclick="_seatGameCartridge('FO3')"
-                      role="radio"
-                      aria-checked="false"
-                      aria-label="Seat the Fallout 3 program cartridge — switches the active game campaign"
-                    >
-                      <span class="spools" aria-hidden="true"><i></i><i></i></span>
-                      <span class="c-name">FALLOUT 3</span>
-                      <span class="c-sub">CAPITAL WASTELAND TAPE &middot; RBX-2277</span>
-                    </button>
-                  </div>
+                  <!-- Owner-requested restyle: the cartridges render as a physical STACK —
+                       the active game on top, every other seatable game piled beneath with
+                       only an edge peeking out. Populated by renderCartDeck() (ui-core.js)
+                       from GAME_DEFS (Protocol 38 — a future seatable game needs only a
+                       GAME_DEFS entry, never a markup rewrite); #cartDeck starts empty and
+                       is filled at boot via _syncCampaignProfileUI(). -->
+                  <div
+                    class="cart-deck"
+                    id="cartDeck"
+                    role="radiogroup"
+                    aria-label="Program cartridge"
+                  ></div>
                   <p class="board-status" id="st-cart">
                     &gt; SWAPPING CARTRIDGES REBOOTS THE TERMINAL &mdash; EACH TAPE KEEPS ITS OWN
                     CAMPAIGN

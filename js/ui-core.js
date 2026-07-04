@@ -2541,22 +2541,54 @@ const _TEMPO_LABELS = {
   speedrun: 'SPEEDRUN',
 };
 
+// The seatable (non design-only) games, in GAME_DEFS declaration order — the
+// single source renderCartDeck() generates the cartridge stack from (Protocol
+// 38: a future seatable game needs only a new GAME_DEFS entry, never a markup
+// or stacking-logic rewrite).
+function _seatableGames() {
+  return Object.keys(GAME_DEFS).filter(k => !GAME_DEFS[k].designOnly);
+}
+
+// Renders the PROGRAM CARTRIDGE stack — a physical pile, active game on top
+// (stack-index 0, full legibility), every other seatable game piled beneath it
+// with a progressively larger peek offset driven by the CSS --stack-index/
+// --cart-stack-depth custom properties (css/terminal.css). Reuses the exact
+// pre-existing _seatGameCartridge(ctx) onclick wiring (Protocol 22) — tapping
+// a peeking cartridge still routes through the unchanged confirm-gated swap.
+function renderCartDeck() {
+  const deck = document.getElementById('cartDeck');
+  if (!deck) return;
+  const ctx = (state && state.gameContext) || 'FNV';
+  const games = _seatableGames();
+  const ordered = games.includes(ctx) ? [ctx, ...games.filter(g => g !== ctx)] : games;
+  deck.style.setProperty('--cart-stack-depth', String(ordered.length));
+  deck.innerHTML = ordered
+    .map((g, i) => {
+      const def = GAME_DEFS[g] || {};
+      const label = String(def.label || g);
+      const sub = (def.theme && def.theme.cartridgeTape) || '';
+      const seated = g === ctx;
+      return (
+        `<button type="button" class="cart${seated ? ' seated' : ''}" id="cart-${escapeHtml(g.toLowerCase())}" ` +
+        `style="--stack-index:${i}" onclick="_seatGameCartridge('${escapeHtml(g)}')" role="radio" ` +
+        `aria-checked="${seated}" aria-label="Seat the ${escapeHtml(label)} program cartridge — switches the active game campaign">` +
+        `<span class="spools" aria-hidden="true"><i></i><i></i></span>` +
+        `<span class="c-name">${escapeHtml(label.toUpperCase())}</span>` +
+        `<span class="c-sub">${escapeHtml(sub)}</span>` +
+        `</button>`
+      );
+    })
+    .join('');
+}
+window.renderCartDeck = renderCartDeck;
+
 // Re-paints the CAMPAIGN PROFILE board's custom controls from the real,
 // underlying state — cartridges/rocker/detents/dial/summary line. Called after
 // every profile change and once at boot; never drifts from the hidden real
 // controls, which stay the actual source of truth.
 function _syncCampaignProfileUI() {
   const ctx = (state && state.gameContext) || 'FNV';
-  const fnvCart = document.getElementById('cart-fnv');
-  const fo3Cart = document.getElementById('cart-fo3');
-  if (fnvCart) {
-    fnvCart.classList.toggle('seated', ctx === 'FNV');
-    fnvCart.setAttribute('aria-checked', String(ctx === 'FNV'));
-  }
-  if (fo3Cart) {
-    fo3Cart.classList.toggle('seated', ctx === 'FO3');
-    fo3Cart.setAttribute('aria-checked', String(ctx === 'FO3'));
-  }
+  renderCartDeck();
 
   const style = localStorage.getItem('robco_playstyle') || 'any';
   const isMelee = style === 'melee';

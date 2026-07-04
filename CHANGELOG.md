@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2241/2241 | Cache: robco-terminal-v2.7.0-r72 -->
+﻿## [Unreleased]<!-- Tests: 2252/2252 | Cache: robco-terminal-v2.7.0-r73 -->
 
 ### Added
 
@@ -38,6 +38,7 @@
 - Your Campaign Configs now look and feel like real hardware, matching the rest of the settings section. Which game you're playing shows as two cartridges you tap to seat, your playstyle is a two-way switch, and your playthrough type is a dial with five direct picks — one tap instead of opening a dropdown. Everything still does exactly what it did before, just faster to use and easier to read at a glance.
 - Complete RNG mode is now a breaker switch under a safety cover instead of a plain checkbox, with a status strip that always shows exactly where you stand — Safe, Armed (still reversible), or Sealed (permanent, once a new campaign has been started under it). Wipe Terminal sits right below it as the next step in that sequence. Nothing about what these settings actually do has changed, just how clearly they show it.
 - Swapping which game you're playing now asks you to confirm first, since it reboots the terminal into that game's own separate campaign. Confirming continues as before; cancelling leaves you exactly where you were with nothing changed.
+- The game cartridges no longer sit side by side — they're now a genuine stacked pile, with the game you're currently playing on top and every other cartridge tucked mostly out of sight behind it, its edge still peeking out. Tapping a peeking cartridge still asks you to confirm and swaps games exactly as before; nothing about how the swap itself works has changed.
 
 ### Fixed
 
