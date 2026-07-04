@@ -4968,14 +4968,19 @@ details.bay-board.dangerboard::after {
   gap: 8px;
   flex-wrap: wrap;
 }
+/* Owner report: this button's fill is the same theme-accent color the global
+   `button` rule always paints (var(--robco-green) — bright green by default,
+   but whatever hue the active optics theme resolves it to, e.g. bright red
+   under LEGION RED). The fixed amber label text below used to override that
+   fill's own already-correct, theme-matched dark partner (var(--robco-dark)
+   — the same pairing every ordinary solid button already relies on) with a
+   constant amber that doesn't adapt per theme, reading as low-contrast
+   red-on-red under a warm-toned optic. Falling back to var(--robco-dark)
+   (by not overriding color at all) reuses that already-legible pairing
+   instead of re-deriving a new one (Protocol 22). */
 .ilk-actions button {
   border-color: var(--robco-alert);
-  color: var(--robco-alert);
   font-size: 9.5px;
-  text-shadow: 0 0 7px rgba(243, 156, 18, 0.55);
-}
-.ilk-actions button:hover {
-  background: rgba(243, 156, 18, 0.12);
 }
 
 /* the commit-sequence legend — permanence made explicit */

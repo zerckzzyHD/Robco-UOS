@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2256/2256 | Cache: robco-terminal-v2.7.0-r74 -->
+﻿## [Unreleased]<!-- Tests: 2259/2259 | Cache: robco-terminal-v2.7.0-r75 -->
 
 ### Added
 
@@ -84,6 +84,7 @@
 - Removed a security-header entry that browsers can't actually enforce from a webpage and were only ever silently ignoring and warning about in the console — dropping it has no effect on how the site is protected, since it was never doing anything to begin with.
 - Fixed a burst of "audio blocked" warnings cluttering the browser console right after opening the terminal. The background CRT hum — and, for a returning character who's already critically irradiated, badly hurt, or has a crippled head, the Geiger counter and health/tinnitus warning tones — now wait for your first tap or keypress before starting, exactly like the opening boot sound already did. Nothing about how or when any of these sounds actually play for you has changed.
 - Fixed the whole Campaign Configs section — the game cartridges, the doctrine and tempo controls, and the randomizer interlock — reading as dim, near-illegible text on a near-black background. Every one of those controls now reads clearly again, matching the rest of the terminal.
+- Fixed the "DISARM — RETURN TO SAFE" button reading as barely-legible dim text on its own bright fill once Complete RNG was armed. Its label now reads clearly against the fill, no matter which phosphor colour you're running.
 
 ### Improved
 

@@ -24429,7 +24429,18 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  dark one these controls actually have. Each now explicitly resets `color`
 //  to the same `--robco-green` phosphor tone the rest of the panel already
 //  reads correctly in (matching the approved mockup's legible palette).
-//  15 tests
+//  Follow-up owner report: the ARMED "▾ DISARM — RETURN TO SAFE" button (and,
+//  diligence-checked, WIPE TERMINAL + the safety-cover label) — .ilk-actions
+//  button explicitly overrode the label to a FIXED amber (var(--robco-alert))
+//  while its background stayed the THEME-DEPENDENT var(--robco-green) inherited
+//  from the base button rule (bright green by default, but whatever hue the
+//  active optics theme resolves it to — e.g. bright red under LEGION RED). A
+//  fixed amber label doesn't adapt per theme, so it read as low-contrast
+//  red-on-red under a warm-toned optic, exactly matching the owner's report.
+//  Removing the override lets the label fall back to var(--robco-dark) — the
+//  SAME theme-matched dark partner the base button rule already reuses
+//  everywhere else (Protocol 22), verified by real WCAG contrast math below.
+//  18 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 179 — Owner-requested restyle: PROGRAM CARTRIDGE stack (physical pile)');
@@ -24634,6 +24645,69 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       /color:\s*var\(--robco-dark\)/.test(buttonRule179) &&
         /background:\s*var\(--robco-green\)/.test(buttonRule179),
       '179.15: the global button { background: var(--robco-green); color: var(--robco-dark) } reset is untouched — only the custom board controls that override background away from it also now reset color'
+    );
+  }
+
+  // 179.16  Owner follow-up: .ilk-actions button (the ARMED "DISARM" button) no
+  //         longer overrides color/text-shadow with a fixed amber — it falls
+  //         back to the base button rule's theme-matched var(--robco-dark),
+  //         the same pairing that already works everywhere else.
+  {
+    const ilkActionsRuleMatch179 = css179.match(/\.ilk-actions button\s*\{([\s\S]*?)\n\}/);
+    const ilkActionsRule179 = ilkActionsRuleMatch179 ? ilkActionsRuleMatch179[1] : '';
+    assert(
+      /border-color:\s*var\(--robco-alert\)/.test(ilkActionsRule179) &&
+        !/(?:^|\n)\s*color:\s*var\(--robco-alert\)/.test(ilkActionsRule179) &&
+        !/text-shadow/.test(ilkActionsRule179),
+      "179.16: .ilk-actions button keeps its amber border accent but no longer overrides color/text-shadow — falls back to the base button rule's theme-matched var(--robco-dark) label instead of a fixed amber that clashed under a warm-toned optic"
+    );
+  }
+
+  // 179.17  .ilk-actions button:hover no longer replaces the button's solid
+  //         fill with a near-transparent amber tint (which, combined with the
+  //         no-longer-amber label, would have created a NEW dark-on-near-black
+  //         contrast bug on hover) — it falls back to the global
+  //         button:hover { filter: brightness(1.35) } every ordinary button uses.
+  assert(
+    !/\.ilk-actions button:hover/.test(css179),
+    '179.17: .ilk-actions button:hover no longer overrides background — falls back to the global button:hover brightness-filter behavior (avoids reintroducing a hover-state contrast bug)'
+  );
+
+  // 179.18  real WCAG 2.x contrast math: the var(--robco-green)/var(--robco-dark)
+  //         pairing .ilk-actions button now relies on (via the base button rule)
+  //         clears AA (>=4.5:1) for every contrastSafe:true THEMES entry — not
+  //         just asserted by convention, actually computed.
+  {
+    const _lum179 = hex => {
+      const m = hex.replace('#', '');
+      const ch = i => {
+        const c = parseInt(m.slice(i, i + 2), 16) / 255;
+        return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+      };
+      return 0.2126 * ch(0) + 0.7152 * ch(2) + 0.0722 * ch(4);
+    };
+    const _contrast179 = (h1, h2) => {
+      const a = _lum179(h1);
+      const b = _lum179(h2);
+      return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    };
+    const themesBlock179 = (state179.match(/const THEMES = \{([\s\S]*?)\n\};/) || ['', ''])[1];
+    const themeEntries179 = [
+      ...themesBlock179.matchAll(
+        /(\w+):\s*\{\s*rgb:\s*'([^']+)',\s*hex:\s*'(#[0-9a-fA-F]{6})',\s*dark:\s*'(#[0-9a-fA-F]{6})',\s*label:\s*'[^']+',\s*contrastSafe:\s*(true|false),?\s*(?:family:\s*'\w+',?\s*)?\}/g
+      ),
+    ].map(m => ({ key: m[1], hex: m[3], dark: m[4], safe: m[5] === 'true' }));
+    const safeThemes179 = themeEntries179.filter(t => t.safe);
+    const failing179 = safeThemes179.filter(t => _contrast179(t.hex, t.dark) < 4.5);
+    assert(
+      themeEntries179.length >= 7 && safeThemes179.length >= 4 && failing179.length === 0,
+      "179.18: every contrastSafe:true THEMES entry's hex/dark pairing clears real WCAG AA (>=4.5:1) — the exact pairing .ilk-actions button (DISARM) now relies on via the base button rule" +
+        (failing179.length
+          ? ' — FAILING: ' +
+            failing179
+              .map(t => t.key + ' (' + _contrast179(t.hex, t.dark).toFixed(2) + ')')
+              .join(', ')
+          : '')
     );
   }
 }

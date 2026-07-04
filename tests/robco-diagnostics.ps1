@@ -15125,7 +15125,18 @@ Check (
 # dark one these controls actually have. Each now explicitly resets `color`
 # to the same `--robco-green` phosphor tone the rest of the panel already
 # reads correctly in (matching the approved mockup's legible palette).
-# 15 tests
+# Follow-up owner report: the ARMED "DISARM -- RETURN TO SAFE" button (and,
+# diligence-checked, WIPE TERMINAL + the safety-cover label) -- .ilk-actions
+# button explicitly overrode the label to a FIXED amber (var(--robco-alert))
+# while its background stayed the THEME-DEPENDENT var(--robco-green) inherited
+# from the base button rule (bright green by default, but whatever hue the
+# active optics theme resolves it to -- e.g. bright red under LEGION RED). A
+# fixed amber label doesn't adapt per theme, so it read as low-contrast
+# red-on-red under a warm-toned optic, exactly matching the owner's report.
+# Removing the override lets the label fall back to var(--robco-dark) -- the
+# SAME theme-matched dark partner the base button rule already reuses
+# everywhere else (Protocol 22), verified by real WCAG contrast math below.
+# 18 tests
 # ══════════════════════════════════════════════════════════════
 Sep "Suite 179 -- Owner-requested restyle: PROGRAM CARTRIDGE stack (physical pile)"
 $html179 = Read-Src "index.html"
@@ -15280,6 +15291,65 @@ Check (
     ($buttonRule179 -match 'color:\s*var\(--robco-dark\)') -and
     ($buttonRule179 -match 'background:\s*var\(--robco-green\)')
 ) "179.15: the global button { background: var(--robco-green); color: var(--robco-dark) } reset is untouched -- only the custom board controls that override background away from it also now reset color"
+
+# 179.16  Owner follow-up: .ilk-actions button (the ARMED "DISARM" button) no
+#         longer overrides color/text-shadow with a fixed amber -- it falls
+#         back to the base button rule's theme-matched var(--robco-dark),
+#         the same pairing that already works everywhere else.
+$ilkActionsRuleMatch179 = [regex]::Match($css179, '\.ilk-actions button\s*\{([\s\S]*?)\n\}')
+$ilkActionsRule179 = if ($ilkActionsRuleMatch179.Success) { $ilkActionsRuleMatch179.Groups[1].Value } else { '' }
+Check (
+    ($ilkActionsRule179 -match 'border-color:\s*var\(--robco-alert\)') -and
+    (-not ($ilkActionsRule179 -match '(?:^|\n)\s*color:\s*var\(--robco-alert\)')) -and
+    (-not ($ilkActionsRule179 -match 'text-shadow'))
+) "179.16: .ilk-actions button keeps its amber border accent but no longer overrides color/text-shadow -- falls back to the base button rule's theme-matched var(--robco-dark) label instead of a fixed amber that clashed under a warm-toned optic"
+
+# 179.17  .ilk-actions button:hover no longer replaces the button's solid fill
+#         with a near-transparent amber tint (which, combined with the
+#         no-longer-amber label, would have created a NEW dark-on-near-black
+#         contrast bug on hover) -- it falls back to the global
+#         button:hover { filter: brightness(1.35) } every ordinary button uses.
+Check (
+    -not ($css179 -match '\.ilk-actions button:hover')
+) "179.17: .ilk-actions button:hover no longer overrides background -- falls back to the global button:hover brightness-filter behavior (avoids reintroducing a hover-state contrast bug)"
+
+# 179.18  real WCAG 2.x contrast math: the var(--robco-green)/var(--robco-dark)
+#         pairing .ilk-actions button now relies on (via the base button rule)
+#         clears AA (>=4.5:1) for every contrastSafe:true THEMES entry -- not
+#         just asserted by convention, actually computed.
+function Get-Luminance179($hexColor) {
+    $m = $hexColor.Replace('#', '')
+    $chan = {
+        param($i)
+        $c = [Convert]::ToInt32($m.Substring($i, 2), 16) / 255.0
+        if ($c -le 0.03928) { return $c / 12.92 }
+        return [Math]::Pow((($c + 0.055) / 1.055), 2.4)
+    }
+    return 0.2126 * (& $chan 0) + 0.7152 * (& $chan 2) + 0.0722 * (& $chan 4)
+}
+function Get-Contrast179($h1, $h2) {
+    $a = Get-Luminance179 $h1
+    $b = Get-Luminance179 $h2
+    return ([Math]::Max($a, $b) + 0.05) / ([Math]::Min($a, $b) + 0.05)
+}
+$themesBlock179 = [regex]::Match($state179, '(?s)const THEMES = \{(.*?)\n\};').Groups[1].Value
+$themeMatches179 = [regex]::Matches(
+    $themesBlock179,
+    "(?s)(\w+):\s*\{\s*rgb:\s*'([^']+)',\s*hex:\s*'(#[0-9a-fA-F]{6})',\s*dark:\s*'(#[0-9a-fA-F]{6})',\s*label:\s*'[^']+',\s*contrastSafe:\s*(true|false),?\s*(?:family:\s*'\w+',?\s*)?\}"
+)
+$themeEntries179 = $themeMatches179 | ForEach-Object {
+    [PSCustomObject]@{
+        Key  = $_.Groups[1].Value
+        Hex  = $_.Groups[3].Value
+        Dark = $_.Groups[4].Value
+        Safe = $_.Groups[5].Value -eq 'true'
+    }
+}
+$safeThemes179 = $themeEntries179 | Where-Object { $_.Safe }
+$failing179 = $safeThemes179 | Where-Object { (Get-Contrast179 $_.Hex $_.Dark) -lt 4.5 }
+Check (
+    $themeEntries179.Count -ge 7 -and $safeThemes179.Count -ge 4 -and $failing179.Count -eq 0
+) "179.18: every contrastSafe:true THEMES entry's hex/dark pairing clears real WCAG AA (>=4.5:1) -- the exact pairing .ilk-actions button (DISARM) now relies on via the base button rule"
 
 # ===========================================================
 # Results
