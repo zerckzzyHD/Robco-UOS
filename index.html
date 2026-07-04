@@ -360,10 +360,21 @@
               role="tab"
               aria-selected="false"
               onclick="selectSubsystem('chassis')"
-              aria-label="CHASSIS subsystem &mdash; Module Bay, settings and saves (hotkey 5)"
+              aria-label="CHASSIS subsystem &mdash; system status and telemetry (hotkey 5)"
             >
               <span class="nk-led" aria-hidden="true"></span><span class="nk-num">[5]</span>
               <span class="nk-label">CHASSIS</span><span class="nk-sub">SYSTEM</span>
+            </button>
+            <button
+              id="navkey-settings"
+              class="navkey setkey"
+              role="tab"
+              aria-selected="false"
+              onclick="selectSubsystem('settings')"
+              aria-label="SETTINGS subsystem &mdash; config and account (hotkey 6)"
+            >
+              <span class="nk-led" aria-hidden="true"></span><span class="nk-num">[6]</span>
+              <span class="nk-label">SETTINGS</span><span class="nk-sub">CONFIG&middot;ACCT</span>
             </button>
           </nav>
           <!-- DIR sits OUTSIDE the role=tablist nav — it opens the flat directory
@@ -1362,13 +1373,45 @@
               </div>
             </details>
 
-            <!-- 11. OVERSEER'S LOG (WU-F7 device telemetry + WU-F10 merged campaign stats) -->
-            <details class="panel" data-tab="data" id="overseerLogPanel">
-              <summary><h2>&gt; OVERSEER'S LOG</h2></summary>
+            <!-- 11a. SYSTEM STATUS (WU-F7 device telemetry half of the former Overseer's
+                 Log, merged with firmware/cache/carrier/feature-flag status). CHASSIS. -->
+            <details class="panel" data-tab="chassis" id="systemStatusPanel">
+              <summary><h2>&gt; SYSTEM STATUS</h2></summary>
               <div class="overseer-section-label">&gt; UNIT TELEMETRY — THIS DEVICE</div>
               <div id="overseerLogDisplay">
                 <span class="empty-state">NO MAINTENANCE TELEMETRY ON RECORD</span>
               </div>
+              <div class="overseer-section-label">&gt; FIRMWARE &amp; CARRIER</div>
+              <div id="systemStatusDisplay">
+                <span class="empty-state">[LOADING...]</span>
+              </div>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px">
+                <button
+                  id="btnViewChangelog"
+                  class="action-btn"
+                  style="font-size: 10px"
+                  onclick="_svcViewChangelog()"
+                >
+                  &#8801; FIRMWARE REVISION LOG
+                </button>
+                <button
+                  id="btnSystemStatusErrorLog"
+                  class="action-btn"
+                  style="font-size: 10px"
+                  onclick="showErrorLog()"
+                >
+                  &#9888; ERROR LOG
+                </button>
+              </div>
+              <span style="display: block; margin-top: 6px; font-size: 10px; opacity: 0.5">
+                &gt; DEVICE TELEMETRY STORED LOCALLY ON THIS UNIT
+              </span>
+            </details>
+
+            <!-- 11b. CAMPAIGN LOG (WU-F10 campaign-stats half of the former Overseer's
+                 Log). DATABANK. -->
+            <details class="panel" data-tab="data" id="campaignLogPanel">
+              <summary><h2>&gt; CAMPAIGN LOG</h2></summary>
               <div class="overseer-section-label">&gt; CAMPAIGN LOG — THIS COURIER</div>
               <div id="sessionStatsList"></div>
               <button
@@ -1379,9 +1422,6 @@
               >
                 RESET CAMPAIGN STATS
               </button>
-              <span style="display: block; margin-top: 6px; font-size: 10px; opacity: 0.5">
-                &gt; DEVICE TELEMETRY STORED LOCALLY ON THIS UNIT
-              </span>
             </details>
 
             <!-- 12. WORLD MAP (G6) -->
@@ -1392,122 +1432,13 @@
               </div>
             </details>
 
-            <!-- 13b. CAMPG — Campaign & Configuration -->
+            <!-- 13b. CAMPG — Campaign Record (config controls moved to #campaignConfigPanel,
+                 data-tab="settings", Step 2 v2.8.0 Settings-tab unit). This panel keeps only
+                 the record sub-panels + data-tab="campg" (Protocol UI-2 persistence untouched). -->
             <details class="panel" data-tab="campg" id="campgPanel" open>
               <summary>
-                <h2>> CAMPAIGN CONFIGURATION</h2>
+                <h2>> CAMPAIGN RECORD</h2>
               </summary>
-
-              <!-- Game Context -->
-              <div class="input-group" style="margin-bottom: 10px">
-                <label class="cfg-label" style="font-size: 11px; letter-spacing: 1px; opacity: 0.8"
-                  >GAME:</label
-                >
-                <select
-                  id="gameContextSelect"
-                  style="width: 100%"
-                  onchange="onGameContextChange(this.value)"
-                >
-                  <option value="FNV">Fallout: New Vegas</option>
-                  <option value="FO3">Fallout 3</option>
-                </select>
-                <!-- fo3WarningBanner moved to #fo3WarningBannerTemplate (top of body, WU-E2):
-                   a reusable disabled banner template. Clone it here to re-enable. -->
-              </div>
-
-              <!-- Playstyle -->
-              <div class="input-group" style="margin-bottom: 10px">
-                <label class="cfg-label" style="font-size: 11px; letter-spacing: 1px; opacity: 0.8"
-                  >PLAYSTYLE:</label
-                >
-                <select
-                  id="playstyleInput"
-                  style="width: 100%"
-                  onchange="changePlaystyle(this.value)"
-                >
-                  <option value="any">Any Weapon (Default)</option>
-                  <option value="melee">Melee/Unarmed Only</option>
-                </select>
-              </div>
-
-              <!-- Playthrough Type (state.playthroughType — Protocol 4 state field since C5) -->
-              <div class="input-group" style="margin-bottom: 10px">
-                <label class="cfg-label" style="font-size: 11px; letter-spacing: 1px; opacity: 0.8"
-                  >PLAYTHROUGH TYPE:</label
-                >
-                <select
-                  id="playthroughTypeSelect"
-                  style="width: 100%"
-                  onchange="onPlaythroughTypeChange(this.value)"
-                >
-                  <option value="standard">Standard</option>
-                  <option value="minmaxed">Min-Maxed</option>
-                  <option value="completionist">Completionist</option>
-                  <option value="casual">Casual</option>
-                  <option value="speedrun">Speedrun</option>
-                </select>
-              </div>
-
-              <!-- Complete RNG (state.campaignMode — opt-in, new campaign only) -->
-              <div class="input-group rng-mode-group" style="margin-bottom: 10px">
-                <label
-                  style="
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    cursor: pointer;
-                    font-size: 11px;
-                    letter-spacing: 1px;
-                    opacity: 0.8;
-                  "
-                >
-                  <input
-                    type="checkbox"
-                    id="completeRngToggle"
-                    onchange="onCampaignModeChange(this.checked)"
-                    style="width: auto; accent-color: var(--robco-green)"
-                  />
-                  COMPLETE RNG
-                </label>
-                <!-- Armed: checkbox checked, wipe not yet performed -->
-                <div
-                  id="rngModeBanner"
-                  style="
-                    display: none;
-                    margin-top: 6px;
-                    padding: 6px 8px;
-                    font-size: 9px;
-                    letter-spacing: 0.5px;
-                    line-height: 1.5;
-                    color: var(--robco-green);
-                    border: 1px dashed var(--robco-green);
-                    background: rgba(var(--robco-green-rgb), 0.04);
-                  "
-                >
-                  &#9658; COMPLETE RNG ACTIVE. All SPECIAL, traits, tag skills, skill points, and
-                  perk selections will be randomised by the AI when requested. Opt-in only &mdash;
-                  wipe terminal and start a new campaign to apply. NEVER retroactively applied to
-                  existing saves. Combines freely with any Playthrough Type.
-                </div>
-                <!-- Locked: wipe performed while armed; now permanent -->
-                <div
-                  id="rngLockedBanner"
-                  style="
-                    display: none;
-                    margin-top: 6px;
-                    padding: 6px 8px;
-                    font-size: 9px;
-                    letter-spacing: 0.5px;
-                    line-height: 1.5;
-                    color: var(--robco-danger);
-                    border: 1px dashed var(--robco-danger);
-                    background: rgba(231, 76, 60, 0.06);
-                  "
-                >
-                  &#9888; COMPLETE RNG &mdash; PERMANENTLY ACTIVE. This run is locked to full
-                  randomisation. Cannot be disabled.
-                </div>
-              </div>
 
               <!-- Campaign Status Panel (v2.0.1) -->
               <details
@@ -1576,60 +1507,23 @@
                   >
                 </div>
               </details>
-
-              <!-- Wipe Terminal (Danger Zone) -->
-              <div
-                style="
-                  margin-top: 16px;
-                  border-top: 1px dashed rgba(231, 76, 60, 0.4);
-                  padding-top: 12px;
-                "
-              >
-                <div
-                  style="
-                    font-size: 10px;
-                    opacity: 0.65;
-                    letter-spacing: 1px;
-                    margin-bottom: 8px;
-                    color: var(--robco-danger);
-                  "
-                >
-                  &#9888; DANGER ZONE
-                </div>
-                <button
-                  id="wipeTerminalBtn"
-                  class="action-btn"
-                  onclick="wipeTerminal()"
-                  style="
-                    width: 100%;
-                    color: var(--robco-danger);
-                    border-color: var(--robco-danger);
-                    font-size: 11px;
-                    letter-spacing: 1.5px;
-                  "
-                >
-                  &gt; WIPE TERMINAL &mdash; NEW CAMPAIGN
-                </button>
-              </div>
             </details>
 
-            <!-- 14. ACCOUNT -->
-            <details class="panel" id="accountPanel" data-tab="data">
+            <!-- 14. ACCOUNT (Step 2 v2.8.0 Settings-tab unit — SETTINGS is the 1st panel) -->
+            <details class="panel" id="accountPanel" data-tab="settings">
               <summary>
                 <h2>> ACCOUNT</h2>
               </summary>
               <div id="accountBody" style="font-size: 12px">
                 <span class="empty-state">INITIALIZING…</span>
               </div>
-              <div style="font-size: 11px; opacity: 0.5; margin-top: 6px">
-                Manage saves in Security &amp; Configuration below.
-              </div>
             </details>
 
-            <!-- 13. SECURITY & CONFIGURATION -->
+            <!-- 13. SECURITY & CONFIGURATION (Module Bay — 2nd SETTINGS panel) -->
             <details
               id="securityConfigPanel"
               class="panel"
+              data-tab="settings"
               style="border-color: var(--robco-alert)"
             >
               <summary>
@@ -2327,9 +2221,6 @@
                             >EXPORTS YOUR COMM-LINK CONVERSATION LOG</span
                           >
                         </div>
-                        <button id="btnViewChangelog" onclick="_svcViewChangelog()">
-                          &#8801; FIRMWARE REVISION LOG
-                        </button>
                         <button id="btnInstallPwa" style="display: none" onclick="_svcInstallPwa()">
                           &#9660; INSTALL SYSTEM (APP)
                         </button>
@@ -2365,14 +2256,17 @@
                   </button>
                 </div>
               </div>
+            </details>
 
+            <!-- 15. SAVE ARCHIVE (extracted from Security & Configuration, Step 2 v2.8.0
+                 Settings-tab unit — every id/handler kept verbatim, Protocol 22) -->
+            <details class="panel" data-tab="settings" id="savesPanel">
+              <summary>
+                <h2>> SAVE ARCHIVE</h2>
+              </summary>
               <div
                 class="input-group"
-                style="
-                  margin-top: 15px;
-                  border-top: 1px dashed var(--robco-blue);
-                  padding-top: 10px;
-                "
+                style="border-top: 1px dashed var(--robco-blue); padding-top: 10px"
               >
                 <div
                   style="
@@ -2532,6 +2426,161 @@
                 accept=".json"
                 onchange="handleFileUpload(event)"
               />
+            </details>
+
+            <!-- 16. CAMPAIGN CONFIGS (extracted from CAMPG, Step 2 v2.8.0 Settings-tab
+                 unit — every id/handler kept verbatim, Protocol 22; visual modernization is
+                 a separate gated unit, SU-3) -->
+            <details class="panel" data-tab="settings" id="campaignConfigPanel">
+              <summary>
+                <h2>> CAMPAIGN CONFIGS</h2>
+              </summary>
+
+              <!-- Game Context -->
+              <div class="input-group" style="margin-bottom: 10px">
+                <label class="cfg-label" style="font-size: 11px; letter-spacing: 1px; opacity: 0.8"
+                  >GAME:</label
+                >
+                <select
+                  id="gameContextSelect"
+                  style="width: 100%"
+                  onchange="onGameContextChange(this.value)"
+                >
+                  <option value="FNV">Fallout: New Vegas</option>
+                  <option value="FO3">Fallout 3</option>
+                </select>
+                <!-- fo3WarningBanner moved to #fo3WarningBannerTemplate (top of body, WU-E2):
+                   a reusable disabled banner template. Clone it here to re-enable. -->
+              </div>
+
+              <!-- Playstyle -->
+              <div class="input-group" style="margin-bottom: 10px">
+                <label class="cfg-label" style="font-size: 11px; letter-spacing: 1px; opacity: 0.8"
+                  >PLAYSTYLE:</label
+                >
+                <select
+                  id="playstyleInput"
+                  style="width: 100%"
+                  onchange="changePlaystyle(this.value)"
+                >
+                  <option value="any">Any Weapon (Default)</option>
+                  <option value="melee">Melee/Unarmed Only</option>
+                </select>
+              </div>
+
+              <!-- Playthrough Type (state.playthroughType — Protocol 4 state field since C5) -->
+              <div class="input-group" style="margin-bottom: 10px">
+                <label class="cfg-label" style="font-size: 11px; letter-spacing: 1px; opacity: 0.8"
+                  >PLAYTHROUGH TYPE:</label
+                >
+                <select
+                  id="playthroughTypeSelect"
+                  style="width: 100%"
+                  onchange="onPlaythroughTypeChange(this.value)"
+                >
+                  <option value="standard">Standard</option>
+                  <option value="minmaxed">Min-Maxed</option>
+                  <option value="completionist">Completionist</option>
+                  <option value="casual">Casual</option>
+                  <option value="speedrun">Speedrun</option>
+                </select>
+              </div>
+
+              <!-- Complete RNG (state.campaignMode — opt-in, new campaign only) -->
+              <div class="input-group rng-mode-group" style="margin-bottom: 10px">
+                <label
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    cursor: pointer;
+                    font-size: 11px;
+                    letter-spacing: 1px;
+                    opacity: 0.8;
+                  "
+                >
+                  <input
+                    type="checkbox"
+                    id="completeRngToggle"
+                    onchange="onCampaignModeChange(this.checked)"
+                    style="width: auto; accent-color: var(--robco-green)"
+                  />
+                  COMPLETE RNG
+                </label>
+                <!-- Armed: checkbox checked, wipe not yet performed -->
+                <div
+                  id="rngModeBanner"
+                  style="
+                    display: none;
+                    margin-top: 6px;
+                    padding: 6px 8px;
+                    font-size: 9px;
+                    letter-spacing: 0.5px;
+                    line-height: 1.5;
+                    color: var(--robco-green);
+                    border: 1px dashed var(--robco-green);
+                    background: rgba(var(--robco-green-rgb), 0.04);
+                  "
+                >
+                  &#9658; COMPLETE RNG ACTIVE. All SPECIAL, traits, tag skills, skill points, and
+                  perk selections will be randomised by the AI when requested. Opt-in only &mdash;
+                  wipe terminal and start a new campaign to apply. NEVER retroactively applied to
+                  existing saves. Combines freely with any Playthrough Type.
+                </div>
+                <!-- Locked: wipe performed while armed; now permanent -->
+                <div
+                  id="rngLockedBanner"
+                  style="
+                    display: none;
+                    margin-top: 6px;
+                    padding: 6px 8px;
+                    font-size: 9px;
+                    letter-spacing: 0.5px;
+                    line-height: 1.5;
+                    color: var(--robco-danger);
+                    border: 1px dashed var(--robco-danger);
+                    background: rgba(231, 76, 60, 0.06);
+                  "
+                >
+                  &#9888; COMPLETE RNG &mdash; PERMANENTLY ACTIVE. This run is locked to full
+                  randomisation. Cannot be disabled.
+                </div>
+              </div>
+
+              <!-- Wipe Terminal (Danger Zone) -->
+              <div
+                style="
+                  margin-top: 16px;
+                  border-top: 1px dashed rgba(231, 76, 60, 0.4);
+                  padding-top: 12px;
+                "
+              >
+                <div
+                  style="
+                    font-size: 10px;
+                    opacity: 0.65;
+                    letter-spacing: 1px;
+                    margin-bottom: 8px;
+                    color: var(--robco-danger);
+                  "
+                >
+                  &#9888; DANGER ZONE
+                </div>
+                <button
+                  id="wipeTerminalBtn"
+                  class="action-btn"
+                  onclick="wipeTerminal()"
+                  style="
+                    width: 100%;
+                    color: var(--robco-danger);
+                    border-color: var(--robco-danger);
+                    font-size: 11px;
+                    letter-spacing: 1.5px;
+                  "
+                >
+                  &gt; WIPE TERMINAL &mdash; NEW CAMPAIGN
+                </button>
+              </div>
             </details>
           </div>
 

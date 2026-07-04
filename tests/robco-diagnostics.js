@@ -3687,10 +3687,10 @@ header('Phase 5c-iii: Cloud Save Picker + Local Migration');
     );
   }
 
-  // 46.16  index.html has savesListBody element (unified list mount point in Security & Config)
+  // 46.16  index.html has savesListBody element (unified list mount point in SAVE ARCHIVE, SETTINGS tab)
   assert(
     /id="savesListBody"/.test(htmlSource),
-    'index.html has #savesListBody element (unified saves list mount point in Security & Config)'
+    'index.html has #savesListBody element (unified saves list mount point in SAVE ARCHIVE, SETTINGS tab)'
   );
 
   // 46.17  WU-B5: cloud push→sanitize→migrate→apply round-trip — every Phase-6 field
@@ -6541,10 +6541,10 @@ header('Suite 63 — Save/Cloud UI consolidation guards');
     );
   }
 
-  // 63.7  index.html has #savesListBody (new mount point in Security & Config)
+  // 63.7  index.html has #savesListBody (mount point in SAVE ARCHIVE, SETTINGS tab)
   assert(
     /id="savesListBody"/.test(htmlSource),
-    'index.html has #savesListBody element (unified saves list mount point in Security & Config)'
+    'index.html has #savesListBody element (unified saves list mount point in SAVE ARCHIVE, SETTINGS tab)'
   );
 
   // 63.8  index.html has #btnSaveToCloud (replaces btnCloudPush — additive save)
@@ -13384,20 +13384,23 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     );
   }
 
-  // 119.8  OVERSEER'S LOG panel: DATA-tab .panel + summary>h2 with ">" + display mount + local-only note, game-agnostic
+  // 119.8  device telemetry now lives in the SYSTEM STATUS panel (CHASSIS tab, Step 2
+  //        v2.8.0 Settings-tab unit — the former OVERSEER'S LOG panel was split in two,
+  //        see Suite 125): CHASSIS-tab .panel + summary>h2 with ">" + display mount +
+  //        local-only note, game-agnostic
   assert(
-    /id="overseerLogPanel"/.test(html119) &&
-      /<details class="panel" data-tab="data" id="overseerLogPanel">/.test(html119) &&
-      /<summary><h2>&gt; OVERSEER'S LOG<\/h2><\/summary>/.test(html119) &&
+    /id="systemStatusPanel"/.test(html119) &&
+      /<details class="panel" data-tab="chassis" id="systemStatusPanel">/.test(html119) &&
+      /<summary><h2>&gt; SYSTEM STATUS<\/h2><\/summary>/.test(html119) &&
       /id="overseerLogDisplay"/.test(html119) &&
       /STORED LOCALLY ON THIS UNIT/.test(html119) &&
       !/\bFNV\b|\bFO3\b|Fallout/.test(
         html119.slice(
-          html119.indexOf('overseerLogPanel'),
-          html119.indexOf('overseerLogPanel') + 600
+          html119.indexOf('systemStatusPanel'),
+          html119.indexOf('systemStatusPanel') + 600
         )
       ),
-    '119.8: OVERSEER\'S LOG is a DATA-tab .panel (summary>h2 with ">") with #overseerLogDisplay + a local-only note, and is game-agnostic (no FNV/FO3/Fallout literals)'
+    '119.8: device telemetry lives in the CHASSIS-tab SYSTEM STATUS .panel (summary>h2 with ">") with #overseerLogDisplay + a local-only note, and is game-agnostic (no FNV/FO3/Fallout literals)'
   );
 }
 
@@ -13858,8 +13861,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         /bio:\s*'>\s*BIO-SCAN'/.test(expandBody123) &&
         /map:\s*'>\s*WORLD MAP'/.test(expandBody123) &&
         /databank:\s*'>\s*DATABANK'/.test(expandBody123) &&
-        /config:\s*'campg'/.test(expandBody123) &&
-        /config:\s*'>\s*CAMPAIGN CONFIGURATION'/.test(expandBody123),
+        /config:\s*'settings'/.test(expandBody123) &&
+        /config:\s*'>\s*CAMPAIGN CONFIGS'/.test(expandBody123),
       '123.7: expandPanelForCategory maps the panel-nav categories (special/skills/bio/map/databank/config) to a tab + h2'
     );
   }
@@ -14072,8 +14075,13 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 //  SUITE 125 — WU-F10 Session Statistics merged into the OVERSEER'S LOG panel
 //  The standalone SESSION STATISTICS panel is retired; its campaign readout (kills,
-//  caps, damage, campaign play-time, location visits) now lives in the OVERSEER'S LOG
-//  panel beside the device telemetry, with the two time metrics clearly distinguished.
+//  caps, damage, campaign play-time, location visits) lives beside the device
+//  telemetry, with the two time metrics clearly distinguished. UPDATED (Step 2
+//  v2.8.0 Settings-tab unit): the former single OVERSEER'S LOG panel was split in
+//  two — the device-telemetry half is now the CHASSIS-tab #systemStatusPanel
+//  (SYSTEM STATUS) and the campaign-stats half is now the DATABANK-tab
+//  #campaignLogPanel (CAMPAIGN LOG) — so this suite verifies the two halves
+//  independently instead of one merged panel.
 //  8 tests
 // ══════════════════════════════════════════════════════════════
 {
@@ -14082,7 +14090,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   const render125 = readFile('js/ui-render.js');
   const core125 = readFile('js/ui-core.js');
   const saves125 = readFile('js/ui-saves.js');
-  const panel125 = (html125.match(/id="overseerLogPanel"[\s\S]*?<\/details>/) || [''])[0];
+  const statusPanel125 = (html125.match(/id="systemStatusPanel"[\s\S]*?<\/details>/) || [''])[0];
+  const logPanel125 = (html125.match(/id="campaignLogPanel"[\s\S]*?<\/details>/) || [''])[0];
   const sessFn125 = (render125.match(/function renderSessionStats\(\)[\s\S]*?\n\}/) || [''])[0];
   const overFn125 = (core125.match(/function renderOverseerLog\(\)[\s\S]*?\n\}/) || [''])[0];
   const resetFn125 = (saves125.match(/function resetSessionStats\(\)[\s\S]*?\n\}/) || [''])[0];
@@ -14093,15 +14102,17 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '125.1: the standalone "SESSION STATISTICS" panel is removed from index.html'
   );
 
-  // 125.2  the campaign-stats container is merged INTO the Overseer's Log panel
+  // 125.2  the campaign-stats container lives in its own DATABANK-tab CAMPAIGN LOG
+  //        panel; the device telemetry lives in its own CHASSIS-tab SYSTEM STATUS panel
   assert(
-    /id="overseerLogPanel"/.test(html125) &&
-      panel125.includes('id="overseerLogDisplay"') &&
-      panel125.includes('id="sessionStatsList"'),
-    '125.2: #sessionStatsList (campaign stats) now lives inside #overseerLogPanel beside the device telemetry'
+    /id="campaignLogPanel"/.test(html125) &&
+      /id="systemStatusPanel"/.test(html125) &&
+      logPanel125.includes('id="sessionStatsList"') &&
+      statusPanel125.includes('id="overseerLogDisplay"'),
+    '125.2: #sessionStatsList (campaign stats) lives in #campaignLogPanel; #overseerLogDisplay (device telemetry) lives in #systemStatusPanel'
   );
 
-  // 125.3  no duplicate campaign-stats container survived the merge
+  // 125.3  no duplicate campaign-stats container survived the split
   assert(
     (html125.match(/id="sessionStatsList"/g) || []).length === 1,
     '125.3: exactly one #sessionStatsList remains (no leftover duplicate panel)'
@@ -14119,7 +14130,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '125.4: renderSessionStats shows kills, caps earned, dmg dealt, CURRENT SITTING, and the LOCATION VISITS count'
   );
 
-  // 125.5  device telemetry is preserved in the same panel
+  // 125.5  device telemetry is preserved (function body unchanged by the panel split)
   assert(
     /CURRENT UPTIME/.test(overFn125) &&
       /BOOT COUNT/.test(overFn125) &&
@@ -14127,29 +14138,32 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '125.5: renderOverseerLog still shows device telemetry (CURRENT UPTIME / TOTAL POWER-ON / BOOT COUNT)'
   );
 
-  // 125.6  the two time notions are distinctly labelled — session duration vs device uptime
+  // 125.6  the two time notions are distinctly labelled — session duration vs device
+  //        uptime — each now under its own panel heading rather than a shared sub-label
   assert(
-    panel125.includes('UNIT TELEMETRY') &&
-      panel125.includes('CAMPAIGN LOG') &&
+    statusPanel125.includes('UNIT TELEMETRY') &&
+      logPanel125.includes('CAMPAIGN LOG') &&
       /CURRENT SITTING/.test(sessFn125) &&
       /CURRENT UPTIME/.test(overFn125),
-    '125.6: session duration (CURRENT SITTING) and device uptime (CURRENT UPTIME) sit under clearly labelled UNIT TELEMETRY / CAMPAIGN LOG sections'
+    '125.6: session duration (CURRENT SITTING) and device uptime (CURRENT UPTIME) sit under clearly labelled CAMPAIGN LOG / UNIT TELEMETRY panels'
   );
 
   // 125.7  RESET CAMPAIGN STATS is wired to resetSessionStats, which clears state.stats + re-renders
   assert(
-    /onclick="resetSessionStats\(\)"/.test(panel125) &&
-      /RESET CAMPAIGN STATS/.test(panel125) &&
+    /onclick="resetSessionStats\(\)"/.test(logPanel125) &&
+      /RESET CAMPAIGN STATS/.test(logPanel125) &&
       /state\.stats = \{/.test(resetFn125) &&
       /renderSessionStats\(\)/.test(resetFn125),
     '125.7: the RESET CAMPAIGN STATS button calls resetSessionStats(), which resets state.stats and re-renders'
   );
 
-  // 125.8  game-agnostic (Protocol 38) — no game literals in the merged readout
+  // 125.8  game-agnostic (Protocol 38) — no game literals in either half of the split readout
   //        (FALLOUT_REGISTRY is the sanctioned API, so bare "Fallout" is intentionally not matched)
   assert(
-    !/New Vegas|Mojave|\bFNV\b|\bFO3\b|Capital Wasteland|Vault 101/i.test(sessFn125 + panel125),
-    '125.8: the merged campaign readout is game-agnostic (no FNV/FO3/location literals)'
+    !/New Vegas|Mojave|\bFNV\b|\bFO3\b|Capital Wasteland|Vault 101/i.test(
+      sessFn125 + logPanel125 + statusPanel125
+    ),
+    '125.8: the split campaign/telemetry readouts are game-agnostic (no FNV/FO3/location literals)'
   );
 }
 
@@ -20229,7 +20243,9 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  Verifies the tab bar → bezel keycap replacement preserves the router
 //  (switchTab, hotkeys, #go= deep-links, robco_active_tab), adds no campaign
 //  write, and honors the mobile/reduced-motion/centering-rule invariants.
-//  18 tests
+//  UPDATED (Step 2 v2.8.0 Settings-tab unit): extended with the 7th [6]
+//  SETTINGS keycap (158.19/158.20).
+//  20 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 158 — DO-N: bezel chrome + subsystem nav');
@@ -20394,6 +20410,33 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   assert(
     !/class="header"/.test(htmlSource) && !/^\.header\s*\{/m.test(cssSource158),
     '158.18: the retired .header class/rule leaves no dead markup or CSS behind'
+  );
+
+  // 158.19  the 7th [6] SETTINGS keycap exists, is a real role=tab, wired to
+  //         selectSubsystem('settings'), and carries the amber service-stripe class
+  //         (Step 2 v2.8.0 Settings-tab unit)
+  assert(
+    /id="navkey-settings"/.test(htmlSource) &&
+      /id="navkey-settings"\s+class="navkey setkey"\s+role="tab"/.test(htmlSource) &&
+      /onclick="selectSubsystem\('settings'\)"/.test(htmlSource) &&
+      /hotkeyMap = \{[\s\S]*?6:\s*'settings',/.test(uiSource) &&
+      /\.navkey\.setkey::after\s*\{/.test(cssSource158),
+    "158.19: #navkey-settings exists as a role=tab keycap wired to selectSubsystem('settings'), hotkey [6], with the .setkey amber service-stripe"
+  );
+
+  // 158.20  #go=settings deep-link + TAB_NAMES/NAV_KEYS/_NAV_TAB_FOR all include the
+  //         new 'settings' subsystem (and 'chassis' is now a real tab too, no longer
+  //         the scroll-to-Module-Bay hack)
+  assert(
+    /settings:\s*\(\)\s*=>\s*switchTab\('settings'\)/.test(uiSource) &&
+      /const TAB_NAMES = \['stat', 'inv', 'data', 'campg', 'chassis', 'settings'\]/.test(
+        uiSource
+      ) &&
+      /const NAV_KEYS = \[[^\]]*'settings'[^\]]*\]/.test(uiSource) &&
+      /_NAV_TAB_FOR = \{[\s\S]*?chassis:\s*'chassis',[\s\S]*?settings:\s*'settings',/.test(
+        uiSource
+      ),
+    "158.20: SHORTCUT_ROUTES.settings routes #go=settings through switchTab('settings'); TAB_NAMES/NAV_KEYS/_NAV_TAB_FOR all include 'settings' and 'chassis' is a real tab"
   );
 }
 
@@ -22097,10 +22140,16 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   }
   {
     const openSlotBody = extractFunctionBody(uiSource, '_openAiUplinkSlot');
+    // UPDATED (Step 2 v2.8.0 Settings-tab unit, Protocol 42 fix): the Module Bay
+    // (and its SLOT 05 sub-panel) moved from the always-visible CHASSIS scroll
+    // target to the tab-gated SETTINGS subsystem — a stale 'chassis' route here
+    // would switch to the new (Module-Bay-free) SYSTEM STATUS tab and try to
+    // open/scroll a slot_05_uplink element hidden behind display:none.
     assert(
-      /selectSubsystem\('chassis'\)/.test(openSlotBody) &&
+      /selectSubsystem\('settings'\)/.test(openSlotBody) &&
+        !/selectSubsystem\('chassis'\)/.test(openSlotBody) &&
         /data-sub-id="slot_05_uplink"/.test(openSlotBody),
-      "165.16: _openAiUplinkSlot() reuses selectSubsystem('chassis') (Protocol 22) then opens/scrolls the SLOT 05 sub-panel specifically"
+      "165.16: _openAiUplinkSlot() reuses selectSubsystem('settings') (Protocol 22 — Module Bay lives under SETTINGS, not CHASSIS) then opens/scrolls the SLOT 05 sub-panel specifically"
     );
   }
   {
@@ -22267,14 +22316,16 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '166.3: .bay-bus-strip is centered (text-align: center) so the BACKPLANE BUS header and its wrapped lines are no longer ragged/left-aligned'
   );
 
-  // 166.4  FIX 2 scope — the five real bezel subsystems are unchanged; DIR is
-  //        deliberately NOT tracked (it opens a transient modal, not a
-  //        persistent view) rather than left ambiguous
+  // 166.4  FIX 2 scope — the persistent bezel subsystems are tracked for scroll
+  //        memory; DIR is deliberately NOT tracked (it opens a transient modal,
+  //        not a persistent view) rather than left ambiguous. UPDATED (Step 2
+  //        v2.8.0 Settings-tab unit): 'settings' joins the tracked set —
+  //        6 persistent views now, still never DIRECTORY.
   assert(
-    /const NAV_KEYS = \['operator', 'operations', 'databank', 'uplink', 'chassis'\];/.test(
+    /const NAV_KEYS = \[\s*'operator',\s*'operations',\s*'databank',\s*'uplink',\s*'chassis',\s*'settings'\s*\];/.test(
       uiSource
     ),
-    "166.4: NAV_KEYS stays exactly the 5 persistent subsystem views — DIRECTORY isn't one of them (it's a transient modal, no scroll memory of its own)"
+    "166.4: NAV_KEYS stays exactly the 6 persistent subsystem views (now including 'settings') — DIRECTORY isn't one of them (it's a transient modal, no scroll memory of its own)"
   );
 
   // 166.5  the scroll-memory helpers exist and reuse the EXISTING desktop
@@ -22320,23 +22371,25 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     );
   }
 
-  // 166.7/166.8  selectSubsystem()'s uplink/chassis branches wrap their
-  //        existing scrollIntoView jump with save-before/restore-after, with
-  //        fallbackToTop=false so a first-ever visit keeps that jump intact
+  // 166.7  selectSubsystem()'s uplink branch wraps its existing scrollIntoView
+  //        jump with save-before/restore-after, with fallbackToTop=false so a
+  //        first-ever visit keeps that jump intact
+  // 166.8  UPDATED (Step 2 v2.8.0 Settings-tab unit): CHASSIS is no longer a
+  //        bespoke scroll-to-Module-Bay branch — the bay moved into the
+  //        tab-gated SETTINGS subsystem, so CHASSIS now falls through the
+  //        generic `if (tab)` branch (_NAV_TAB_FOR.chassis === 'chassis') and
+  //        gets its save/restore scroll for free from switchTab() itself
+  //        (166.6 already proves switchTab() does this for every tab).
   {
     const selectSubsystemBody166 = extractFunctionBody(uiSource, 'selectSubsystem');
-    // Slice each branch out precisely (rather than one lazy regex spanning
-    // both) so a regression that deletes ONE branch's hooks can't hide behind
-    // the other branch's identical-looking markers.
-    const chassisIdx166 = selectSubsystemBody166.indexOf("} else if (view === 'chassis')");
-    const finalElseIdx166 = selectSubsystemBody166.indexOf('} else {', chassisIdx166);
-    const uplinkBranch166 = selectSubsystemBody166.slice(0, chassisIdx166);
-    const chassisBranch166 = selectSubsystemBody166.slice(
-      chassisIdx166,
+    const uplinkIdx166 = selectSubsystemBody166.indexOf("} else if (view === 'uplink')");
+    const finalElseIdx166 = selectSubsystemBody166.indexOf('} else {', uplinkIdx166);
+    const uplinkBranch166 = selectSubsystemBody166.slice(
+      uplinkIdx166,
       finalElseIdx166 === -1 ? undefined : finalElseIdx166
     );
     assert(
-      chassisIdx166 !== -1 &&
+      uplinkIdx166 !== -1 &&
         /_saveOutgoingScroll\(\); \/\/ FIX 2/.test(uplinkBranch166) &&
         /scrollIntoView\(\{ block: 'center' \}\);\s*i\.focus\(\);/.test(uplinkBranch166) &&
         /_syncBezelNav\('uplink'\);/.test(uplinkBranch166) &&
@@ -22344,14 +22397,13 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         /_lastScrollSubsystem = 'uplink';/.test(uplinkBranch166),
       "166.7: selectSubsystem()'s uplink branch saves-before/restores-after (fallbackToTop=false) around the existing chatInput scrollIntoView+focus jump"
     );
+    const tabBranch166 = selectSubsystemBody166.slice(0, uplinkIdx166);
     assert(
-      finalElseIdx166 !== -1 &&
-        /_saveOutgoingScroll\(\); \/\/ FIX 2/.test(chassisBranch166) &&
-        /bay\.scrollIntoView\(\{ block: 'center' \}\);/.test(chassisBranch166) &&
-        /_syncBezelNav\('chassis'\);/.test(chassisBranch166) &&
-        /_restoreScrollFor\('chassis', false\);/.test(chassisBranch166) &&
-        /_lastScrollSubsystem = 'chassis';/.test(chassisBranch166),
-      "166.8: selectSubsystem()'s chassis branch saves-before/restores-after (fallbackToTop=false) around the existing Module Bay scrollIntoView jump"
+      /_NAV_TAB_FOR = \{[\s\S]*?chassis:\s*'chassis',/.test(uiSource) &&
+        /if \(tab\) \{\s*switchTab\(tab\);/.test(tabBranch166) &&
+        // the settings-only hatch trigger is scoped to view==='settings', never chassis
+        /if \(view === 'settings'\) \{/.test(tabBranch166),
+      "166.8: CHASSIS routes through the generic if(tab) branch (_NAV_TAB_FOR.chassis='chassis' -> switchTab()) instead of a bespoke scroll-to-Module-Bay branch; the settings-only hatch trigger never fires for chassis"
     );
   }
 
@@ -23743,6 +23795,165 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
           humObsBlock175
         ),
       "175.9: startCrtHum() is deferred through _armAmbientAudio() at BOTH call sites — window.onload's direct boot call and the crt-hum-power observer's onExit"
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 176 — Step 2 v2.8.0: SETTINGS tab [6] + CHASSIS reorg (SU-1 + SU-2)
+//  The 7th bezel keycap opens a new tab-gated SETTINGS subsystem holding the
+//  relocated Account/Module Bay/Save Archive/Campaign Configs panels; CHASSIS
+//  becomes a real tab hosting the new SYSTEM STATUS panel (device telemetry +
+//  firmware/carrier/feature-flag readout); the campaign-stats half of the
+//  former Overseer's Log becomes its own CAMPAIGN LOG panel on DATABANK.
+//  Functional relocation only (Protocol 22) — every id/handler preserved.
+//  9 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 176 — SETTINGS tab [6] + CHASSIS reorg (SU-1 + SU-2)');
+  const html176 = htmlSource;
+  const core176 = readFile('js/ui-core.js');
+
+  // 176.1  the 4 SETTINGS panels exist with the exact ids the plan specifies,
+  //        each data-tab="settings", and are absent from every other tab
+  assert(
+    /<details class="panel" id="accountPanel" data-tab="settings">/.test(html176) &&
+      /<details\s+id="securityConfigPanel"\s+class="panel"\s+data-tab="settings"/.test(html176) &&
+      /<details class="panel" data-tab="settings" id="savesPanel">/.test(html176) &&
+      /<details class="panel" data-tab="settings" id="campaignConfigPanel">/.test(html176) &&
+      !/data-tab="data"\s+id="accountPanel"/.test(html176) &&
+      !/data-tab="campg"\s+id="campgPanel" open>\s*<summary>\s*<h2>>\s*CAMPAIGN CONFIGURATION/.test(
+        html176
+      ),
+    '176.1: #accountPanel, #securityConfigPanel, #savesPanel, #campaignConfigPanel are all data-tab="settings" — Account/Module-Bay/Saves/Campaign-configs removed from their old tabs'
+  );
+
+  // 176.2  #campgPanel keeps only the campaign RECORD sub-panels + data-tab="campg",
+  //        renamed CAMPAIGN RECORD; the config controls (GAME/PLAYSTYLE/PLAYTHROUGH/
+  //        COMPLETE-RNG/DANGER-ZONE) live only in the new #campaignConfigPanel
+  {
+    // Non-greedy [\s\S]*?<\/details> would stop at the FIRST nested sub-panel's
+    // closing tag (campgPanel contains 3 nested <details data-sub-id> sub-panels),
+    // so slice to the next known sibling marker instead of relying on a single
+    // closing </details>.
+    const campgStart176 = html176.indexOf('id="campgPanel"');
+    const campgBlock176 = html176.slice(campgStart176, html176.indexOf('id="accountPanel"'));
+    const configStart176 = html176.indexOf('id="campaignConfigPanel"');
+    const configBlock176 = html176.slice(
+      configStart176,
+      html176.indexOf('<div class="col-right">')
+    );
+    assert(
+      /<h2>>\s*CAMPAIGN RECORD<\/h2>/.test(campgBlock176) &&
+        campgBlock176.includes('data-sub-id="campaign_status"') &&
+        campgBlock176.includes('data-sub-id="crossroads_record"') &&
+        campgBlock176.includes('data-sub-id="incident_log"') &&
+        !campgBlock176.includes('id="gameContextSelect"') &&
+        !campgBlock176.includes('id="wipeTerminalBtn"') &&
+        configBlock176.includes('id="gameContextSelect"') &&
+        configBlock176.includes('id="playstyleInput"') &&
+        configBlock176.includes('id="playthroughTypeSelect"') &&
+        configBlock176.includes('id="completeRngToggle"') &&
+        configBlock176.includes('id="wipeTerminalBtn"'),
+      '176.2: #campgPanel (renamed CAMPAIGN RECORD) keeps only the record sub-panels; every config control + the DANGER ZONE moved verbatim into #campaignConfigPanel'
+    );
+  }
+
+  // 176.3  #systemStatusPanel exists on CHASSIS with device telemetry + the
+  //        firmware-log + error-log buttons; the firmware button is gone from
+  //        the SVC tray
+  {
+    const svcTrayBlock176 = (html176.match(/data-sub-id="slot_svc_tray"[\s\S]*?<\/details>/) || [
+      '',
+    ])[0];
+    assert(
+      /<details class="panel" data-tab="chassis" id="systemStatusPanel">/.test(html176) &&
+        /id="systemStatusDisplay"/.test(html176) &&
+        /id="btnSystemStatusErrorLog"[^>]*onclick="showErrorLog\(\)"/.test(html176) &&
+        /id="btnViewChangelog"[^>]*onclick="_svcViewChangelog\(\)"/.test(html176) &&
+        !svcTrayBlock176.includes('id="btnViewChangelog"'),
+      '176.3: #systemStatusPanel (CHASSIS) hosts device telemetry + #systemStatusDisplay + the firmware-log button (moved out of the SVC tray) + a new error-log button'
+    );
+  }
+
+  // 176.4  #campaignLogPanel exists on DATABANK with the campaign stats + reset button
+  assert(
+    /<details class="panel" data-tab="data" id="campaignLogPanel">/.test(html176) &&
+      /id="sessionStatsList"/.test(html176) &&
+      /onclick="resetSessionStats\(\)"/.test(html176),
+    '176.4: #campaignLogPanel (DATABANK) hosts #sessionStatsList + the RESET CAMPAIGN STATS button'
+  );
+
+  // 176.5  renderSystemStatus() is defined, reads real carrier/feature-flag/version
+  //        signals (no game literal), and is wired into both loadUI() and
+  //        refreshOverseerCarrier() (the single connection-status choke point)
+  {
+    const renderBody176 = extractFunctionBody(core176, 'renderSystemStatus');
+    const carrierBody176 = extractFunctionBody(core176, 'refreshOverseerCarrier');
+    assert(
+      /getElementById\('systemStatusDisplay'\)/.test(renderBody176) &&
+        /_isUplinkConnected/.test(renderBody176) &&
+        /isFeatureEnabled/.test(renderBody176) &&
+        /APP_VERSION/.test(renderBody176) &&
+        /renderSystemStatus\(\);/.test(carrierBody176) &&
+        /if \(typeof renderSystemStatus === 'function'\) renderSystemStatus\(\);/.test(core176),
+      '176.5: renderSystemStatus() reads carrier/feature-flag/version state and is called from both loadUI() and refreshOverseerCarrier()'
+    );
+  }
+
+  // 176.6  TAB_NAMES/TAB_TO_SUBSYSTEM include 'settings' and 'chassis' as real tabs
+  assert(
+    /const TAB_NAMES = \['stat', 'inv', 'data', 'campg', 'chassis', 'settings'\];/.test(core176) &&
+      /TAB_TO_SUBSYSTEM = \{[\s\S]*?chassis:\s*'chassis',[\s\S]*?settings:\s*'settings',/.test(
+        core176
+      ),
+    "176.6: TAB_NAMES and TAB_TO_SUBSYSTEM both include 'settings' and 'chassis' as real, independently tab-gated subsystems"
+  );
+
+  // 176.7  the first-visit Module Bay hatch fires on a genuine user [6]/SETTINGS
+  //        visit (via selectSubsystem) but NEVER on the boot-time initTabs() restore
+  {
+    const initTabsBody176 = extractFunctionBody(core176, 'initTabs');
+    assert(
+      /if \(view === 'settings'\) \{[\s\S]{0,200}securityConfigPanel[\s\S]{0,120}setAttribute\('open', ''\)/.test(
+        core176
+      ) && !/selectSubsystem/.test(initTabsBody176),
+      "176.7: selectSubsystem('settings') re-opens #securityConfigPanel (firing its own once-only hatch toggle listener); initTabs() never calls selectSubsystem(), so a boot-time restore can't re-trigger the hatch (Protocol 42)"
+    );
+  }
+
+  // 176.8  expandPanelForCategory's 'config'/'log' categories were re-routed to
+  //        their new homes (settings/chassis) rather than left pointing at the
+  //        panels they used to live in
+  {
+    const expandBody176 = extractFunctionBody(core176, 'expandPanelForCategory');
+    assert(
+      /config:\s*'settings'/.test(expandBody176) &&
+        /config:\s*'>\s*CAMPAIGN CONFIGS'/.test(expandBody176) &&
+        /log:\s*'chassis'/.test(expandBody176) &&
+        /log:\s*'>\s*SYSTEM STATUS'/.test(expandBody176),
+      "176.8: expandPanelForCategory routes 'config' to the settings tab / CAMPAIGN CONFIGS panel and 'log' to the chassis tab / SYSTEM STATUS panel"
+    );
+  }
+
+  // 176.9  the nav/render layer added by this unit writes nothing durable to the
+  //        campaign — renderSystemStatus() and the settings-hatch trigger inside
+  //        selectSubsystem() only read state/MetaStore, never saveState()/robco_v8
+  {
+    const fns176 = ['renderSystemStatus', 'selectSubsystem'];
+    const offenders176 = fns176.filter(n => {
+      let body;
+      try {
+        body = extractFunctionBody(core176, n);
+      } catch (_) {
+        return true;
+      }
+      return /saveState\(|robco_v8|state\.\w+\s*=/.test(body);
+    });
+    assert(
+      offenders176.length === 0,
+      '176.9: renderSystemStatus()/selectSubsystem() never write campaign state (saveState/robco_v8/state.<field>=)' +
+        (offenders176.length ? ' — offenders: ' + offenders176.join(', ') : '')
     );
   }
 }

@@ -213,6 +213,76 @@ function renderOverseerLog() {
     '</span>' +
     '</div>';
 }
+// ── SYSTEM STATUS (CHASSIS) — Step 2 v2.8.0 Settings-tab unit ───────────
+// Firmware/cache/carrier/feature-flag readout, merged beside the WU-F7 device
+// telemetry half of the former Overseer's Log. Reads the real active
+// Cache Storage key rather than duplicating the sw.js CACHE_NAME literal
+// (Protocol 22) — resolved once and cached, since it never changes mid-session.
+let _systemStatusCacheName = null;
+function _readActiveCacheName(cb) {
+  if (_systemStatusCacheName) {
+    cb(_systemStatusCacheName);
+    return;
+  }
+  if (!window.caches || typeof window.caches.keys !== 'function') {
+    cb(null);
+    return;
+  }
+  window.caches
+    .keys()
+    .then(keys => {
+      _systemStatusCacheName = keys.find(k => k.indexOf('robco-terminal-v') === 0) || null;
+      cb(_systemStatusCacheName);
+    })
+    .catch(() => cb(null));
+}
+const _SYSTEM_STATUS_FLAGS = [
+  'aiChat',
+  'cloudSync',
+  'googleSignIn',
+  'keySync',
+  'saveMigration',
+  'offlineQueue',
+];
+function renderSystemStatus() {
+  const el = document.getElementById('systemStatusDisplay');
+  if (!el) return;
+  const connected = typeof _isUplinkConnected === 'function' ? _isUplinkConnected() : false;
+  const flagsHtml = _SYSTEM_STATUS_FLAGS
+    .map(k => {
+      const on =
+        typeof window.isFeatureEnabled !== 'function' || window.isFeatureEnabled(k) !== false;
+      return (
+        '<span style="opacity:0.65;">' +
+        k.toUpperCase() +
+        '</span><span style="color:' +
+        (on ? 'var(--robco-green)' : 'var(--robco-danger)') +
+        ';">' +
+        (on ? 'ENABLED' : 'DISABLED') +
+        '</span>'
+      );
+    })
+    .join('');
+  _readActiveCacheName(cacheName => {
+    el.innerHTML =
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;font-size:11px;">' +
+      '<span style="opacity:0.65;">FIRMWARE</span><span>v' +
+      escapeHtml(APP_VERSION) +
+      '</span>' +
+      '<span style="opacity:0.65;">CACHE REV</span><span>' +
+      escapeHtml(cacheName || 'UNKNOWN') +
+      '</span>' +
+      '<span style="opacity:0.65;">CARRIER</span><span style="color:' +
+      (connected ? 'var(--robco-green)' : 'var(--robco-danger)') +
+      ';">' +
+      (connected ? 'ONLINE' : 'OFFLINE') +
+      '</span>' +
+      flagsHtml +
+      '</div>';
+  });
+}
+window.renderSystemStatus = renderSystemStatus;
+
 function initOverseerLog() {
   // Boot-count increments exactly once per page load (window.onload), even though
   // renderOverseerLog() is re-run from loadUI on every tab switch.
@@ -775,10 +845,12 @@ function _updateUplinkLamp() {
 
 // FIX 2/4a: shared navigation target for "go fix the AI connection" — used by
 // the UPLINK lamp click and the Overseer's NO CARRIER tag click. Reuses
-// selectSubsystem('chassis') (Protocol 22) to route + sync the bezel nav,
-// then opens/scrolls the SLOT 05 sub-panel specifically.
+// selectSubsystem('settings') (Protocol 22) to route + sync the bezel nav —
+// the Module Bay (and its SLOT 05 AI Uplink board) lives under the SETTINGS
+// subsystem (Step 2 v2.8.0 Settings-tab unit), not CHASSIS — then opens/
+// scrolls the SLOT 05 sub-panel specifically.
 function _openAiUplinkSlot() {
-  if (typeof selectSubsystem === 'function') selectSubsystem('chassis');
+  if (typeof selectSubsystem === 'function') selectSubsystem('settings');
   const slot = document.querySelector('details[data-sub-id="slot_05_uplink"]');
   if (!slot) return;
   if (!slot.open) slot.setAttribute('open', '');
@@ -1528,6 +1600,7 @@ function refreshOverseerCarrier() {
   // (Protocol 22).
   if (typeof _updateUplinkLamp === 'function') _updateUplinkLamp();
   if (typeof _refreshBezelTelemetry === 'function') _refreshBezelTelemetry();
+  if (typeof renderSystemStatus === 'function') renderSystemStatus();
   if (_scopeState === 'thinking' || _scopeState === 'speaking') {
     drawScope();
     return;
@@ -1932,6 +2005,7 @@ function _wireKeyboardShortcuts() {
           3: 'databank',
           4: 'uplink',
           5: 'chassis',
+          6: 'settings',
         };
         if (hotkeyMap[e.key]) {
           e.preventDefault();
@@ -2490,10 +2564,10 @@ function _updatePanelBadges() {
 
 // ── AUTO-EXPAND PANEL (#31) ──────────────────────────────────────────
 // ── TAB NAVIGATION ───────────────────────────────────────────────
-// Tabs: 'stat' | 'inv' | 'data'
-// Each panel has data-tab="stat|inv|data|campg". Panels with no data-tab always show.
-// Security & Configuration has no data-tab and is always visible.
-const TAB_NAMES = ['stat', 'inv', 'data', 'campg'];
+// Tabs: 'stat' | 'inv' | 'data' | 'campg' | 'chassis' | 'settings'
+// Each panel has data-tab="stat|inv|data|campg|chassis|settings". Panels with no
+// data-tab always show.
+const TAB_NAMES = ['stat', 'inv', 'data', 'campg', 'chassis', 'settings'];
 // DO-N: 'data' and 'campg' present together as the ONE bezel subsystem
 // (DATABANK) — selecting either tab shows both panel groups; STAT/INV stay
 // mutually exclusive. switchTab() itself keeps working standalone exactly
@@ -2505,6 +2579,8 @@ const TAB_TO_SUBSYSTEM = {
   inv: 'operations',
   data: 'databank',
   campg: 'databank',
+  chassis: 'chassis',
+  settings: 'settings',
 };
 
 function switchTab(tab) {
@@ -2552,8 +2628,14 @@ function initTabs() {
 // Security & Configuration/Module Bay), scrolls/focuses them directly —
 // mirroring the existing SHORTCUT_ROUTES.comm approach. Writes only the
 // MetaStore view preference (Protocol UI-6); no campaign state touched.
-const NAV_KEYS = ['operator', 'operations', 'databank', 'uplink', 'chassis'];
-const _NAV_TAB_FOR = { operator: 'stat', operations: 'inv', databank: 'data' };
+const NAV_KEYS = ['operator', 'operations', 'databank', 'uplink', 'chassis', 'settings'];
+const _NAV_TAB_FOR = {
+  operator: 'stat',
+  operations: 'inv',
+  databank: 'data',
+  chassis: 'chassis',
+  settings: 'settings',
+};
 
 // ── PER-SUBSYSTEM SCROLL MEMORY (owner-report, casing/layout polish batch) ──
 // Each bezel subsystem remembers its own exact scroll offset across a switch
@@ -2668,7 +2750,9 @@ function _bezelSubsystemLabel(subsystem) {
     case 'uplink':
       return '▸ SUBSYSTEM: UPLINK · DIRECTOR CHANNEL';
     case 'chassis':
-      return '▸ SUBSYSTEM: CHASSIS · MODULE BAY';
+      return '▸ SUBSYSTEM: CHASSIS · SYSTEM STATUS';
+    case 'settings':
+      return '▸ SUBSYSTEM: SETTINGS · CONFIG + REGISTRY';
     default:
       return '▸ SUBSYSTEM: ' + subsystem.toUpperCase();
   }
@@ -2743,6 +2827,19 @@ function selectSubsystem(view) {
   const tab = _NAV_TAB_FOR[view];
   if (tab) {
     switchTab(tab); // routes + syncs the nav in one call (saves/restores scroll too)
+    // Step 2 v2.8.0 Settings-tab unit: the Module Bay's first-visit hatch
+    // ceremony used to fire only via the CHASSIS scroll-to-bay branch; now
+    // that the bay lives inside the tab-gated SETTINGS subsystem, a genuine
+    // user-initiated [6]/SETTINGS visit re-opens it (setAttribute('open','')
+    // fires securityConfigPanel's own toggle listener, which is what
+    // actually runs the once-only ceremony — see _wirePanelPersistence()).
+    // A boot-time initTabs() restore never calls selectSubsystem(), so this
+    // never fires at page load (Protocol 42 — boot-restore must not
+    // re-trigger the hatch).
+    if (view === 'settings') {
+      const secPanel = document.getElementById('securityConfigPanel');
+      if (secPanel && !secPanel.open) secPanel.setAttribute('open', '');
+    }
   } else if (view === 'uplink') {
     _saveOutgoingScroll(); // FIX 2
     const i = document.getElementById('chatInput');
@@ -2755,17 +2852,6 @@ function selectSubsystem(view) {
     // a first-ever visit (nothing saved) keeps that default untouched.
     _restoreScrollFor('uplink', false);
     _lastScrollSubsystem = 'uplink';
-  } else if (view === 'chassis') {
-    _saveOutgoingScroll(); // FIX 2
-    const bay = document.getElementById('moduleBay');
-    const details = bay && bay.closest('details.panel');
-    if (details && !details.open) details.setAttribute('open', '');
-    if (bay) bay.scrollIntoView({ block: 'center' });
-    _syncBezelNav('chassis');
-    // FIX 2: a remembered offset overrides the jump-to-Module-Bay default
-    // above; a first-ever visit (nothing saved) keeps that default untouched.
-    _restoreScrollFor('chassis', false);
-    _lastScrollSubsystem = 'chassis';
   } else {
     return;
   }
@@ -2781,7 +2867,8 @@ function openBezelDirectory() {
     ['operations', 'OPERATIONS', 'inventory &amp; crafting', 'INV · [2]'],
     ['databank', 'DATABANK', 'quests, map, campaign', 'DATA·CAMPG · [3]'],
     ['uplink', 'UPLINK', 'the AI comm-link', 'COMM · [4]'],
-    ['chassis', 'CHASSIS', 'settings &amp; saves', 'SYSTEM · [5]'],
+    ['chassis', 'CHASSIS', 'system status &amp; telemetry', 'SYSTEM · [5]'],
+    ['settings', 'SETTINGS', 'config &amp; account', 'CONFIG·ACCT · [6]'],
   ];
   const body =
     '<div class="d-sub" style="font-size: 9px; opacity: 0.5; letter-spacing: 1px; margin-bottom: 10px">FLAT INDEX — EVERY SUBSYSTEM, PLAIN LABELS</div>' +
@@ -2802,11 +2889,13 @@ function openBezelDirectory() {
   openModal({ title: '> SUBSYSTEM DIRECTORY', body });
 }
 
-// Restore the last-focused non-tab subsystem (uplink/chassis) highlight on
-// boot — visual only, never scrolls/focuses anything on page load.
+// Restore the last-focused non-tab subsystem (uplink) highlight on boot —
+// visual only, never scrolls/focuses anything on page load. chassis/settings
+// are now real tabs (Step 2 v2.8.0 Settings-tab unit) restored by initTabs()
+// via robco_active_tab, so re-highlighting them here would be redundant.
 function initBezelSubsystem() {
   const saved = MetaStore.get('robco_bezel_subsystem');
-  if (saved === 'uplink' || saved === 'chassis') _syncBezelNav(saved);
+  if (saved === 'uplink') _syncBezelNav(saved);
 }
 
 // Single boot-phase entry point for the two DO-N bezel-chrome restores, so
@@ -2833,6 +2922,7 @@ const SHORTCUT_ROUTES = {
   inv: () => switchTab('inv'),
   stat: () => switchTab('stat'),
   data: () => switchTab('data'),
+  settings: () => switchTab('settings'),
   new: () => wipeTerminal(),
 };
 function routeLaunchShortcut() {
@@ -2908,9 +2998,9 @@ function expandPanelForCategory(categoryKey) {
     skills: 'stat',
     bio: 'stat',
     map: 'data',
-    log: 'data',
+    log: 'chassis',
     databank: 'data',
-    config: 'campg',
+    config: 'settings',
   };
   if (tabMap[categoryKey]) switchTab(tabMap[categoryKey]);
 
@@ -2934,9 +3024,9 @@ function expandPanelForCategory(categoryKey) {
     skills: '> SKILL MATRIX',
     bio: '> BIO-SCAN',
     map: '> WORLD MAP',
-    log: "> OVERSEER'S LOG",
+    log: '> SYSTEM STATUS',
     databank: '> DATABANK',
-    config: '> CAMPAIGN CONFIGURATION',
+    config: '> CAMPAIGN CONFIGS',
   };
   const target = map[categoryKey];
   if (!target) return;
@@ -4151,6 +4241,7 @@ function loadUI() {
   renderAccount(); // always — reads Firebase auth state, not covered by state slice
   renderSavesList(); // always — reads localStorage/cloud saves, not covered by state slice
   if (typeof renderOverseerLog === 'function') renderOverseerLog(); // WU-F7: local device telemetry, not a state slice
+  if (typeof renderSystemStatus === 'function') renderSystemStatus(); // CHASSIS: firmware/cache/carrier/flags, not a state slice
   _updateContextPanels(); // G4: switch faction/karma panel visibility
   // C5/C11: Restore CAMPG dropdowns from state
   {

@@ -2163,9 +2163,9 @@ try { $loadUIBody46 = Get-FunctionBody $uiSrc 'loadUI' } catch {}
 Check ([bool]($loadUIBody46 -match 'renderSavesList\(\)')) `
     'loadUI() calls renderSavesList() (unified saves list wired into page load)'
 
-# 46.16  index.html has savesListBody element (unified list mount point in Security & Config)
+# 46.16  index.html has savesListBody element (unified list mount point in SAVE ARCHIVE, SETTINGS tab)
 Check ([bool]($htmlSrc -match 'id="savesListBody"')) `
-    'index.html has #savesListBody element (unified saves list mount point in Security & Config)'
+    'index.html has #savesListBody element (unified saves list mount point in SAVE ARCHIVE, SETTINGS tab)'
 
 # 46.17  WU-B5: cloud push->sanitize->migrate->apply round-trip — Phase-6 fields survive.
 #        (JS runner runs the full VM-sandbox behavioral round-trip; PS runner does the
@@ -3753,9 +3753,9 @@ try { $loadUIBody63 = Get-FunctionBody $uiSrc 'loadUI' } catch {}
 Check ([bool]($loadUIBody63 -match 'renderSavesList\(\)')) `
     'loadUI() calls renderSavesList() (unified saves list wired into page load)'
 
-# 63.7  index.html has #savesListBody (new mount point in Security & Config)
+# 63.7  index.html has #savesListBody (mount point in SAVE ARCHIVE, SETTINGS tab)
 Check ([bool]($htmlSrc -match 'id="savesListBody"')) `
-    'index.html has #savesListBody element (unified saves list mount point in Security & Config)'
+    'index.html has #savesListBody element (unified saves list mount point in SAVE ARCHIVE, SETTINGS tab)'
 
 # 63.8  index.html has #btnSaveToCloud (replaces btnCloudPush -- additive save)
 Check ([bool]($htmlSrc -match 'id="btnSaveToCloud"')) `
@@ -7577,7 +7577,7 @@ $wr119  = [regex]::Match($uiCore119, '(?s)function _writeOverseerLog\([\s\S]*?\n
 $ini119 = [regex]::Match($uiCore119, '(?s)function initOverseerLog\([\s\S]*?\n\}').Value
 $fl119  = [regex]::Match($uiCore119, '(?s)function _flushOverseerLog\([\s\S]*?\n\}').Value
 $rn119  = [regex]::Match($uiCore119, '(?s)function renderOverseerLog\([\s\S]*?\n\}').Value
-$ovIdx119 = $html119.IndexOf('overseerLogPanel')
+$ovIdx119 = $html119.IndexOf('systemStatusPanel')
 $ovSlice119 = if ($ovIdx119 -ge 0) { $html119.Substring($ovIdx119, [Math]::Min(600, $html119.Length - $ovIdx119)) } else { '' }
 
 # 119.1  telemetry store constant + tolerant reader (localStorage device stat, not state)
@@ -7610,9 +7610,12 @@ Check (($uiCore119 -match 'if \(document\.hidden\) _flushOverseerLog\(\)') -and 
 Check (($uiCore119 -match 'renderOverseerLog\(\); // WU-F7') -and ($ini119 -match "id:\s*'overseer-flush'") -and ($ini119 -match '_flushOverseerLog\(\)')) `
     '119.7: renderOverseerLog() is called from loadUI and a runtime overseer-flush observer keeps the live read-out + power-on total current'
 
-# 119.8  OVERSEER'S LOG panel: DATA-tab .panel + summary>h2 with ">" + display mount + local-only note, game-agnostic
-Check (($html119 -match 'id="overseerLogPanel"') -and ($html119 -match '<details class="panel" data-tab="data" id="overseerLogPanel">') -and ($html119 -match '<summary><h2>&gt; OVERSEER''S LOG</h2></summary>') -and ($html119 -match 'id="overseerLogDisplay"') -and ($html119 -match 'STORED LOCALLY ON THIS UNIT') -and ($ovSlice119 -notmatch '\bFNV\b|\bFO3\b|Fallout')) `
-    '119.8: OVERSEER''S LOG is a DATA-tab .panel (summary>h2 with ">") with #overseerLogDisplay + a local-only note, and is game-agnostic (no FNV/FO3/Fallout literals)'
+# 119.8  device telemetry now lives in the SYSTEM STATUS panel (CHASSIS tab, Step 2
+#        v2.8.0 Settings-tab unit -- the former OVERSEER'S LOG panel was split in two,
+#        see Suite 125): CHASSIS-tab .panel + summary>h2 with ">" + display mount +
+#        local-only note, game-agnostic
+Check (($html119 -match 'id="systemStatusPanel"') -and ($html119 -match '<details class="panel" data-tab="chassis" id="systemStatusPanel">') -and ($html119 -match '<summary><h2>&gt; SYSTEM STATUS</h2></summary>') -and ($html119 -match 'id="overseerLogDisplay"') -and ($html119 -match 'STORED LOCALLY ON THIS UNIT') -and ($ovSlice119 -notmatch '\bFNV\b|\bFO3\b|Fallout')) `
+    '119.8: device telemetry lives in the CHASSIS-tab SYSTEM STATUS .panel (summary>h2 with ">") with #overseerLogDisplay + a local-only note, and is game-agnostic (no FNV/FO3/Fallout literals)'
 
 # ===========================================================
 # Suite 120 -- WU-F8 High-Lumen Optics (high-contrast mode) (8 tests)
@@ -7822,7 +7825,7 @@ Check (($aliasMap123['consult'] -eq 'databank') -and ($aliasMap123['databank'] -
 # 123.7 expandPanelForCategory maps the panel-nav categories to a tab + h2 prefix
 $expandBody123 = ''
 try { $expandBody123 = Get-FunctionBody $core123 'expandPanelForCategory' } catch {}
-Check (($expandBody123 -match "special:\s*'stat'") -and ($expandBody123 -match "special:\s*'>\s*BIO-METRICS'") -and ($expandBody123 -match "skills:\s*'>\s*SKILL MATRIX'") -and ($expandBody123 -match "bio:\s*'>\s*BIO-SCAN'") -and ($expandBody123 -match "map:\s*'>\s*WORLD MAP'") -and ($expandBody123 -match "databank:\s*'>\s*DATABANK'") -and ($expandBody123 -match "config:\s*'campg'") -and ($expandBody123 -match "config:\s*'>\s*CAMPAIGN CONFIGURATION'")) `
+Check (($expandBody123 -match "special:\s*'stat'") -and ($expandBody123 -match "special:\s*'>\s*BIO-METRICS'") -and ($expandBody123 -match "skills:\s*'>\s*SKILL MATRIX'") -and ($expandBody123 -match "bio:\s*'>\s*BIO-SCAN'") -and ($expandBody123 -match "map:\s*'>\s*WORLD MAP'") -and ($expandBody123 -match "databank:\s*'>\s*DATABANK'") -and ($expandBody123 -match "config:\s*'settings'") -and ($expandBody123 -match "config:\s*'>\s*CAMPAIGN CONFIGS'")) `
     '123.7: expandPanelForCategory maps the panel-nav categories (special/skills/bio/map/databank/config) to a tab + h2'
 
 # 123.8 EXACT whole-input match: _routePanelNav does a direct map lookup (no includes/startsWith/indexOf)
@@ -7949,15 +7952,20 @@ Check (
 # ===========================================================
 # Suite 125 -- WU-F10 session stats merged into OVERSEER LOG (8 tests)
 # Standalone SESSION STATISTICS panel retired; its campaign readout (kills, caps,
-# damage, campaign play-time, location visits) merged into OVERSEER'S LOG beside the
-# device telemetry, both time metrics clearly distinguished. (PS mirror of JS 125.)
+# damage, campaign play-time, location visits) merged beside the device telemetry,
+# both time metrics clearly distinguished. UPDATED (Step 2 v2.8.0 Settings-tab
+# unit): the former single OVERSEER'S LOG panel was split in two -- the device-
+# telemetry half is now the CHASSIS-tab #systemStatusPanel (SYSTEM STATUS) and
+# the campaign-stats half is now the DATABANK-tab #campaignLogPanel (CAMPAIGN
+# LOG) -- so this suite verifies the two halves independently. (PS mirror of JS 125.)
 # ===========================================================
 Sep "Suite 125 -- WU-F10 session stats merged into OVERSEER LOG"
 $html125   = Read-Src "index.html"
 $render125 = Read-Src "js/ui-render.js"
 $core125   = Read-Src "js/ui-core.js"
 $saves125  = Read-Src "js/ui-saves.js"
-$panel125 = [regex]::Match($html125, '(?s)id="overseerLogPanel"[\s\S]*?</details>').Value
+$statusPanel125 = [regex]::Match($html125, '(?s)id="systemStatusPanel"[\s\S]*?</details>').Value
+$logPanel125 = [regex]::Match($html125, '(?s)id="campaignLogPanel"[\s\S]*?</details>').Value
 $sessFn125 = [regex]::Match($render125, '(?s)function renderSessionStats\(\)[\s\S]*?\n\}').Value
 $overFn125 = [regex]::Match($core125, '(?s)function renderOverseerLog\(\)[\s\S]*?\n\}').Value
 $resetFn125 = [regex]::Match($saves125, '(?s)function resetSessionStats\(\)[\s\S]*?\n\}').Value
@@ -7966,11 +7974,12 @@ $resetFn125 = [regex]::Match($saves125, '(?s)function resetSessionStats\(\)[\s\S
 Check (-not ($html125 -match 'SESSION STATISTICS')) `
     '125.1: the standalone "SESSION STATISTICS" panel is removed from index.html'
 
-# 125.2  the campaign-stats container is merged INTO the Overseer's Log panel
-Check (($html125 -match 'id="overseerLogPanel"') -and ($panel125.Contains('id="overseerLogDisplay"')) -and ($panel125.Contains('id="sessionStatsList"'))) `
-    '125.2: #sessionStatsList (campaign stats) now lives inside #overseerLogPanel beside the device telemetry'
+# 125.2  the campaign-stats container lives in its own DATABANK-tab CAMPAIGN LOG
+#        panel; the device telemetry lives in its own CHASSIS-tab SYSTEM STATUS panel
+Check (($html125 -match 'id="campaignLogPanel"') -and ($html125 -match 'id="systemStatusPanel"') -and ($logPanel125.Contains('id="sessionStatsList"')) -and ($statusPanel125.Contains('id="overseerLogDisplay"'))) `
+    '125.2: #sessionStatsList (campaign stats) lives in #campaignLogPanel; #overseerLogDisplay (device telemetry) lives in #systemStatusPanel'
 
-# 125.3  no duplicate campaign-stats container survived the merge
+# 125.3  no duplicate campaign-stats container survived the split
 $sslCount125 = ([regex]::Matches($html125, 'id="sessionStatsList"')).Count
 Check ($sslCount125 -eq 1) `
     '125.3: exactly one #sessionStatsList remains (no leftover duplicate panel)'
@@ -7979,21 +7988,22 @@ Check ($sslCount125 -eq 1) `
 Check (($sessFn125 -match 'state\.stats') -and ($sessFn125 -match 'KILLS') -and ($sessFn125 -match 'CAPS EARNED') -and ($sessFn125 -match 'DMG DEALT') -and ($sessFn125 -match 'CURRENT SITTING') -and ($sessFn125 -match 'LOCATION VISITS') -and ($sessFn125 -match 'locationHistory')) `
     '125.4: renderSessionStats shows kills, caps earned, dmg dealt, CURRENT SITTING, and the LOCATION VISITS count'
 
-# 125.5  device telemetry is preserved in the same panel
+# 125.5  device telemetry is preserved (function body unchanged by the panel split)
 Check (($overFn125 -match 'CURRENT UPTIME') -and ($overFn125 -match 'BOOT COUNT') -and ($overFn125 -match 'TOTAL POWER-ON')) `
     '125.5: renderOverseerLog still shows device telemetry (CURRENT UPTIME / TOTAL POWER-ON / BOOT COUNT)'
 
-# 125.6  the two time notions are distinctly labelled -- session duration vs device uptime
-Check (($panel125.Contains('UNIT TELEMETRY')) -and ($panel125.Contains('CAMPAIGN LOG')) -and ($sessFn125 -match 'CURRENT SITTING') -and ($overFn125 -match 'CURRENT UPTIME')) `
-    '125.6: session duration (CURRENT SITTING) and device uptime (CURRENT UPTIME) sit under clearly labelled UNIT TELEMETRY / CAMPAIGN LOG sections'
+# 125.6  the two time notions are distinctly labelled -- session duration vs device
+#        uptime -- each now under its own panel heading rather than a shared sub-label
+Check (($statusPanel125.Contains('UNIT TELEMETRY')) -and ($logPanel125.Contains('CAMPAIGN LOG')) -and ($sessFn125 -match 'CURRENT SITTING') -and ($overFn125 -match 'CURRENT UPTIME')) `
+    '125.6: session duration (CURRENT SITTING) and device uptime (CURRENT UPTIME) sit under clearly labelled CAMPAIGN LOG / UNIT TELEMETRY panels'
 
 # 125.7  RESET CAMPAIGN STATS is wired to resetSessionStats, which clears state.stats + re-renders
-Check (($panel125 -match 'onclick="resetSessionStats\(\)"') -and ($panel125 -match 'RESET CAMPAIGN STATS') -and ($resetFn125 -match 'state\.stats = \{') -and ($resetFn125 -match 'renderSessionStats\(\)')) `
+Check (($logPanel125 -match 'onclick="resetSessionStats\(\)"') -and ($logPanel125 -match 'RESET CAMPAIGN STATS') -and ($resetFn125 -match 'state\.stats = \{') -and ($resetFn125 -match 'renderSessionStats\(\)')) `
     '125.7: the RESET CAMPAIGN STATS button calls resetSessionStats(), which resets state.stats and re-renders'
 
-# 125.8  game-agnostic (Protocol 38) -- no game literals in the merged readout
-Check (-not (($sessFn125 + $panel125) -match 'New Vegas|Mojave|\bFNV\b|\bFO3\b|Capital Wasteland|Vault 101')) `
-    '125.8: the merged campaign readout is game-agnostic (no FNV/FO3/location literals)'
+# 125.8  game-agnostic (Protocol 38) -- no game literals in either half of the split readout
+Check (-not (($sessFn125 + $logPanel125 + $statusPanel125) -match 'New Vegas|Mojave|\bFNV\b|\bFO3\b|Capital Wasteland|Vault 101')) `
+    '125.8: the split campaign/telemetry readouts are game-agnostic (no FNV/FO3/location literals)'
 
 # ===========================================================
 # Suite 126 -- WU-F11 native mark-visited map control (8 tests)
@@ -12111,7 +12121,9 @@ Check (
 # Verifies the tab bar -> bezel keycap replacement preserves the router
 # (switchTab, hotkeys, #go= deep-links, robco_active_tab), adds no campaign
 # write, and honors the mobile/reduced-motion/centering-rule invariants.
-# 18 tests.
+# UPDATED (Step 2 v2.8.0 Settings-tab unit): extended with the 7th [6]
+# SETTINGS keycap (158.19/158.20).
+# 20 tests.
 # ===========================================================
 Sep "Suite 158 -- DO-N: bezel chrome + subsystem nav"
 $html158 = Read-Src "index.html"
@@ -12244,6 +12256,27 @@ Check (
 Check (
     (-not ($html158 -match 'class="header"')) -and (-not ($css158 -match '(?m)^\.header\s*\{'))
 ) "158.18: the retired .header class/rule leaves no dead markup or CSS behind"
+
+# 158.19  the 7th [6] SETTINGS keycap exists, is a real role=tab, wired to
+#         selectSubsystem('settings'), and carries the amber service-stripe class
+#         (Step 2 v2.8.0 Settings-tab unit)
+Check (
+    ($html158 -match 'id="navkey-settings"') -and
+    ($html158 -match '(?s)id="navkey-settings"\s+class="navkey setkey"\s+role="tab"') -and
+    ($html158 -match "onclick=""selectSubsystem\('settings'\)""") -and
+    ($core158 -match "(?s)hotkeyMap = \{.*?6:\s*'settings',") -and
+    ($css158 -match '\.navkey\.setkey::after\s*\{')
+) "158.19: #navkey-settings exists as a role=tab keycap wired to selectSubsystem('settings'), hotkey [6], with the .setkey amber service-stripe"
+
+# 158.20  #go=settings deep-link + TAB_NAMES/NAV_KEYS/_NAV_TAB_FOR all include the
+#         new 'settings' subsystem (and 'chassis' is now a real tab too, no longer
+#         the scroll-to-Module-Bay hack)
+Check (
+    ($core158 -match "settings:\s*\(\)\s*=>\s*switchTab\('settings'\)") -and
+    ($core158 -match "const TAB_NAMES = \['stat', 'inv', 'data', 'campg', 'chassis', 'settings'\]") -and
+    ($core158 -match "const NAV_KEYS = \[[^\]]*'settings'[^\]]*\]") -and
+    ($core158 -match "(?s)_NAV_TAB_FOR = \{.*?chassis:\s*'chassis',.*?settings:\s*'settings',")
+) "158.20: SHORTCUT_ROUTES.settings routes #go=settings through switchTab('settings'); TAB_NAMES/NAV_KEYS/_NAV_TAB_FOR all include 'settings' and 'chassis' is a real tab"
 
 # ===========================================================
 # Suite 159 -- Owner bug-fix batch: eventLog live-render + centering rule (2 tests)
@@ -13563,11 +13596,17 @@ Check (
     $upLampBody165 -match [regex]::Escape('_isUplinkConnected()')
 ) "165.15: _updateUplinkLamp() reads _isUplinkConnected() -- the UPLINK lamp can never disagree with the Overseer"
 
+# UPDATED (Step 2 v2.8.0 Settings-tab unit, Protocol 42 fix): the Module Bay (and its
+# SLOT 05 sub-panel) moved from the always-visible CHASSIS scroll target to the
+# tab-gated SETTINGS subsystem -- a stale 'chassis' route here would switch to the new
+# (Module-Bay-free) SYSTEM STATUS tab and try to open/scroll a slot_05_uplink element
+# hidden behind display:none.
 $openSlotBody165 = Get-FunctionBody $uiSrc "_openAiUplinkSlot"
 Check (
-    ($openSlotBody165 -match [regex]::Escape("selectSubsystem('chassis')")) -and
+    ($openSlotBody165 -match [regex]::Escape("selectSubsystem('settings')")) -and
+    (-not ($openSlotBody165 -match [regex]::Escape("selectSubsystem('chassis')"))) -and
     ($openSlotBody165 -match [regex]::Escape('data-sub-id="slot_05_uplink"'))
-) "165.16: _openAiUplinkSlot() reuses selectSubsystem('chassis') (Protocol 22) then opens/scrolls the SLOT 05 sub-panel specifically"
+) "165.16: _openAiUplinkSlot() reuses selectSubsystem('settings') (Protocol 22 -- Module Bay lives under SETTINGS, not CHASSIS) then opens/scrolls the SLOT 05 sub-panel specifically"
 
 $setStateBody165 = Get-FunctionBody $uiSrc "setOverseerState"
 # Suite 169 (owner FIX 3): LISTENING became actionable too (tap -> scope pulse),
@@ -13700,8 +13739,8 @@ Check (
 ) "166.3: .bay-bus-strip is centered (text-align: center) so the BACKPLANE BUS header and its wrapped lines are no longer ragged/left-aligned"
 
 Check (
-    $uiSrc -match [regex]::Escape("const NAV_KEYS = ['operator', 'operations', 'databank', 'uplink', 'chassis'];")
-) "166.4: NAV_KEYS stays exactly the 5 persistent subsystem views -- DIRECTORY isn't one of them (it's a transient modal, no scroll memory of its own)"
+    $uiSrc -match "(?s)const NAV_KEYS = \[\s*'operator',\s*'operations',\s*'databank',\s*'uplink',\s*'chassis',\s*'settings'\s*\];"
+) "166.4: NAV_KEYS stays exactly the 6 persistent subsystem views (now including 'settings') -- DIRECTORY isn't one of them (it's a transient modal, no scroll memory of its own)"
 
 Check ($uiSrc -match 'function _readScrollPositions\(\)') "166.5a: _readScrollPositions() is defined"
 Check ($uiSrc -match 'function _scrollElFor\(subsystem\)') "166.5b: _scrollElFor() is defined"
@@ -13724,16 +13763,24 @@ Check (
     ($switchTabBody166 -match [regex]::Escape('_lastScrollSubsystem = subsystem;'))
 ) "166.6: switchTab() calls _saveOutgoingScroll() before hiding/showing panels and _restoreScrollFor(subsystem, true) after _syncBezelNav() -- the boot-time initTabs()->switchTab() call restores the initial tab too"
 
+# 166.7  selectSubsystem()'s uplink branch wraps its existing scrollIntoView
+#        jump with save-before/restore-after, with fallbackToTop=false so a
+#        first-ever visit keeps that jump intact
+# 166.8  UPDATED (Step 2 v2.8.0 Settings-tab unit): CHASSIS is no longer a
+#        bespoke scroll-to-Module-Bay branch -- the bay moved into the
+#        tab-gated SETTINGS subsystem, so CHASSIS now falls through the
+#        generic if(tab) branch (_NAV_TAB_FOR.chassis === 'chassis') and gets
+#        its save/restore scroll for free from switchTab() itself (166.6
+#        already proves switchTab() does this for every tab).
 $selectSubBody166 = Get-FunctionBody $uiSrc "selectSubsystem"
-$chassisIdx166 = $selectSubBody166.IndexOf("} else if (view === 'chassis')")
-$finalElseIdx166 = $selectSubBody166.IndexOf('} else {', $chassisIdx166)
-$uplinkBranch166 = $selectSubBody166.Substring(0, [Math]::Max(0, $chassisIdx166))
-$chassisBranch166 = if ($chassisIdx166 -ge 0 -and $finalElseIdx166 -ge 0) {
-    $selectSubBody166.Substring($chassisIdx166, $finalElseIdx166 - $chassisIdx166)
+$uplinkIdx166 = $selectSubBody166.IndexOf("} else if (view === 'uplink')")
+$finalElseIdx166 = $selectSubBody166.IndexOf('} else {', $uplinkIdx166)
+$uplinkBranch166 = if ($uplinkIdx166 -ge 0 -and $finalElseIdx166 -ge 0) {
+    $selectSubBody166.Substring($uplinkIdx166, $finalElseIdx166 - $uplinkIdx166)
 } else { '' }
 
 Check (
-    ($chassisIdx166 -ge 0) -and
+    ($uplinkIdx166 -ge 0) -and
     ($uplinkBranch166 -match [regex]::Escape('_saveOutgoingScroll(); // FIX 2')) -and
     ($uplinkBranch166 -match "(?s)scrollIntoView\(\{ block: 'center' \}\);\s*i\.focus\(\);") -and
     ($uplinkBranch166 -match [regex]::Escape("_syncBezelNav('uplink');")) -and
@@ -13741,14 +13788,12 @@ Check (
     ($uplinkBranch166 -match [regex]::Escape("_lastScrollSubsystem = 'uplink';"))
 ) "166.7: selectSubsystem()'s uplink branch saves-before/restores-after (fallbackToTop=false) around the existing chatInput scrollIntoView+focus jump"
 
+$tabBranch166 = $selectSubBody166.Substring(0, [Math]::Max(0, $uplinkIdx166))
 Check (
-    ($finalElseIdx166 -ge 0) -and
-    ($chassisBranch166 -match [regex]::Escape('_saveOutgoingScroll(); // FIX 2')) -and
-    ($chassisBranch166 -match [regex]::Escape("bay.scrollIntoView({ block: 'center' });")) -and
-    ($chassisBranch166 -match [regex]::Escape("_syncBezelNav('chassis');")) -and
-    ($chassisBranch166 -match [regex]::Escape("_restoreScrollFor('chassis', false);")) -and
-    ($chassisBranch166 -match [regex]::Escape("_lastScrollSubsystem = 'chassis';"))
-) "166.8: selectSubsystem()'s chassis branch saves-before/restores-after (fallbackToTop=false) around the existing Module Bay scrollIntoView jump"
+    ($uiSrc -match "(?s)_NAV_TAB_FOR = \{.*?chassis:\s*'chassis',") -and
+    ($tabBranch166 -match "(?s)if \(tab\) \{\s*switchTab\(tab\);") -and
+    ($tabBranch166 -match "if \(view === 'settings'\) \{")
+) "166.8: CHASSIS routes through the generic if(tab) branch (_NAV_TAB_FOR.chassis='chassis' -> switchTab()) instead of a bespoke scroll-to-Module-Bay branch; the settings-only hatch trigger never fires for chassis"
 
 Check (
     $uiSrc -match "(?s)comm:\s*\(\)\s*=>\s*\{\s*_saveOutgoingScroll\(\); // FIX 2.*?_syncBezelNav\('uplink'\);.*?_restoreScrollFor\('uplink', false\);.*?_lastScrollSubsystem = 'uplink';"
@@ -14608,6 +14653,123 @@ Check (
     ($onloadBody175 -match '_armAmbientAudio\(startCrtHum\)') -and
     ($humObsBlock175 -match "(?s)onExit: \(\) => \{.{0,200}_armAmbientAudio\(\(\) => \{.{0,400}startCrtHum\(\)")
 ) "175.9: startCrtHum() is deferred through _armAmbientAudio() at BOTH call sites -- window.onload's direct boot call and the crt-hum-power observer's onExit"
+
+# ===========================================================
+# Suite 176 -- Step 2 v2.8.0: SETTINGS tab [6] + CHASSIS reorg (SU-1 + SU-2)
+# The 7th bezel keycap opens a new tab-gated SETTINGS subsystem holding the
+# relocated Account/Module Bay/Save Archive/Campaign Configs panels; CHASSIS
+# becomes a real tab hosting the new SYSTEM STATUS panel (device telemetry +
+# firmware/carrier/feature-flag readout); the campaign-stats half of the
+# former Overseer's Log becomes its own CAMPAIGN LOG panel on DATABANK.
+# Functional relocation only (Protocol 22) -- every id/handler preserved.
+# 9 tests (PS mirror of JS Suite 176.)
+# ===========================================================
+Sep "Suite 176 -- SETTINGS tab [6] + CHASSIS reorg (SU-1 + SU-2)"
+$html176 = Read-Src "index.html"
+$core176 = Read-Src "js/ui-core.js"
+
+# 176.1  the 4 SETTINGS panels exist with the exact ids the plan specifies,
+#        each data-tab="settings", and are absent from every other tab
+Check (
+    ($html176 -match '<details class="panel" id="accountPanel" data-tab="settings">') -and
+    ($html176 -match '(?s)<details\s+id="securityConfigPanel"\s+class="panel"\s+data-tab="settings"') -and
+    ($html176 -match '<details class="panel" data-tab="settings" id="savesPanel">') -and
+    ($html176 -match '<details class="panel" data-tab="settings" id="campaignConfigPanel">') -and
+    (-not ($html176 -match 'data-tab="data"\s+id="accountPanel"')) -and
+    (-not ($html176 -match '(?s)data-tab="campg"\s+id="campgPanel" open>\s*<summary>\s*<h2>>\s*CAMPAIGN CONFIGURATION'))
+) '176.1: #accountPanel, #securityConfigPanel, #savesPanel, #campaignConfigPanel are all data-tab="settings" -- Account/Module-Bay/Saves/Campaign-configs removed from their old tabs'
+
+# 176.2  #campgPanel keeps only the campaign RECORD sub-panels + data-tab="campg",
+#        renamed CAMPAIGN RECORD; the config controls (GAME/PLAYSTYLE/PLAYTHROUGH/
+#        COMPLETE-RNG/DANGER-ZONE) live only in the new #campaignConfigPanel
+$campgStart176 = $html176.IndexOf('id="campgPanel"')
+$campgBlock176 = $html176.Substring($campgStart176, $html176.IndexOf('id="accountPanel"') - $campgStart176)
+$configStart176 = $html176.IndexOf('id="campaignConfigPanel"')
+$configBlock176 = $html176.Substring($configStart176, $html176.IndexOf('<div class="col-right">') - $configStart176)
+Check (
+    ($campgBlock176 -match '<h2>>\s*CAMPAIGN RECORD</h2>') -and
+    ($campgBlock176.Contains('data-sub-id="campaign_status"')) -and
+    ($campgBlock176.Contains('data-sub-id="crossroads_record"')) -and
+    ($campgBlock176.Contains('data-sub-id="incident_log"')) -and
+    (-not ($campgBlock176.Contains('id="gameContextSelect"'))) -and
+    (-not ($campgBlock176.Contains('id="wipeTerminalBtn"'))) -and
+    ($configBlock176.Contains('id="gameContextSelect"')) -and
+    ($configBlock176.Contains('id="playstyleInput"')) -and
+    ($configBlock176.Contains('id="playthroughTypeSelect"')) -and
+    ($configBlock176.Contains('id="completeRngToggle"')) -and
+    ($configBlock176.Contains('id="wipeTerminalBtn"'))
+) '176.2: #campgPanel (renamed CAMPAIGN RECORD) keeps only the record sub-panels; every config control + the DANGER ZONE moved verbatim into #campaignConfigPanel'
+
+# 176.3  #systemStatusPanel exists on CHASSIS with device telemetry + the
+#        firmware-log + error-log buttons; the firmware button is gone from
+#        the SVC tray
+$svcTrayMatch176 = [regex]::Match($html176, '(?s)data-sub-id="slot_svc_tray"[\s\S]*?</details>')
+$svcTrayBlock176 = if ($svcTrayMatch176.Success) { $svcTrayMatch176.Value } else { '' }
+Check (
+    ($html176 -match '<details class="panel" data-tab="chassis" id="systemStatusPanel">') -and
+    ($html176 -match 'id="systemStatusDisplay"') -and
+    ($html176 -match 'id="btnSystemStatusErrorLog"[^>]*onclick="showErrorLog\(\)"') -and
+    ($html176 -match 'id="btnViewChangelog"[^>]*onclick="_svcViewChangelog\(\)"') -and
+    (-not ($svcTrayBlock176.Contains('id="btnViewChangelog"')))
+) '176.3: #systemStatusPanel (CHASSIS) hosts device telemetry + #systemStatusDisplay + the firmware-log button (moved out of the SVC tray) + a new error-log button'
+
+# 176.4  #campaignLogPanel exists on DATABANK with the campaign stats + reset button
+Check (
+    ($html176 -match '<details class="panel" data-tab="data" id="campaignLogPanel">') -and
+    ($html176 -match 'id="sessionStatsList"') -and
+    ($html176 -match 'onclick="resetSessionStats\(\)"')
+) '176.4: #campaignLogPanel (DATABANK) hosts #sessionStatsList + the RESET CAMPAIGN STATS button'
+
+# 176.5  renderSystemStatus() is defined, reads real carrier/feature-flag/version
+#        signals (no game literal), and is wired into both loadUI() and
+#        refreshOverseerCarrier() (the single connection-status choke point)
+$renderBody176 = Get-FunctionBody $core176 'renderSystemStatus'
+$carrierBody176 = Get-FunctionBody $core176 'refreshOverseerCarrier'
+Check (
+    ($renderBody176 -match "getElementById\('systemStatusDisplay'\)") -and
+    ($renderBody176 -match '_isUplinkConnected') -and
+    ($renderBody176 -match 'isFeatureEnabled') -and
+    ($renderBody176 -match 'APP_VERSION') -and
+    ($carrierBody176 -match 'renderSystemStatus\(\);') -and
+    ($core176 -match "if \(typeof renderSystemStatus === 'function'\) renderSystemStatus\(\);")
+) '176.5: renderSystemStatus() reads carrier/feature-flag/version state and is called from both loadUI() and refreshOverseerCarrier()'
+
+# 176.6  TAB_NAMES/TAB_TO_SUBSYSTEM include 'settings' and 'chassis' as real tabs
+Check (
+    ($core176 -match "const TAB_NAMES = \['stat', 'inv', 'data', 'campg', 'chassis', 'settings'\];") -and
+    ($core176 -match "(?s)TAB_TO_SUBSYSTEM = \{.*?chassis:\s*'chassis',.*?settings:\s*'settings',")
+) "176.6: TAB_NAMES and TAB_TO_SUBSYSTEM both include 'settings' and 'chassis' as real, independently tab-gated subsystems"
+
+# 176.7  the first-visit Module Bay hatch fires on a genuine user [6]/SETTINGS
+#        visit (via selectSubsystem) but NEVER on the boot-time initTabs() restore
+$initTabsBody176 = Get-FunctionBody $core176 'initTabs'
+Check (
+    ($core176 -match "(?s)if \(view === 'settings'\) \{.{0,200}securityConfigPanel.{0,120}setAttribute\('open', ''\)") -and
+    (-not ($initTabsBody176 -match 'selectSubsystem'))
+) "176.7: selectSubsystem('settings') re-opens #securityConfigPanel (firing its own once-only hatch toggle listener); initTabs() never calls selectSubsystem(), so a boot-time restore can't re-trigger the hatch (Protocol 42)"
+
+# 176.8  expandPanelForCategory's 'config'/'log' categories were re-routed to
+#        their new homes (settings/chassis) rather than left pointing at the
+#        panels they used to live in
+$expandBody176 = Get-FunctionBody $core176 'expandPanelForCategory'
+Check (
+    ($expandBody176 -match "config:\s*'settings'") -and
+    ($expandBody176 -match "config:\s*'>\s*CAMPAIGN CONFIGS'") -and
+    ($expandBody176 -match "log:\s*'chassis'") -and
+    ($expandBody176 -match "log:\s*'>\s*SYSTEM STATUS'")
+) "176.8: expandPanelForCategory routes 'config' to the settings tab / CAMPAIGN CONFIGS panel and 'log' to the chassis tab / SYSTEM STATUS panel"
+
+# 176.9  the nav/render layer added by this unit writes nothing durable to the
+#        campaign -- renderSystemStatus() and the settings-hatch trigger inside
+#        selectSubsystem() only read state/MetaStore, never saveState()/robco_v8
+$fns176 = @('renderSystemStatus', 'selectSubsystem')
+$offenders176 = $fns176 | Where-Object {
+    try { $body = Get-FunctionBody $core176 $_ } catch { return $true }
+    return ($body -match 'saveState\(|robco_v8|state\.\w+\s*=')
+}
+Check (
+    $offenders176.Count -eq 0
+) ("176.9: renderSystemStatus()/selectSubsystem() never write campaign state (saveState/robco_v8/state.<field>=)" + $(if ($offenders176.Count) { " -- offenders: $($offenders176 -join ', ')" } else { "" }))
 
 # ===========================================================
 # Results

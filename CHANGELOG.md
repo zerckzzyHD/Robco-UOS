@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2206/2206 | Cache: robco-terminal-v2.7.0-r69 -->
+﻿## [Unreleased]<!-- Tests: 2217/2217 | Cache: robco-terminal-v2.7.0-r70 -->
 
 ### Added
 
@@ -18,6 +18,7 @@
 - Cloud saves now keep version history too, just like your local save slots. Overwriting a cloud save no longer risks losing what was there before — up to five earlier versions are kept, and a "VER" button appears once a save has any to show. Tap it to see when each version was saved and restore one; restoring is confirm-gated and only replaces your current campaign, never the cloud save itself.
 - Added a TOOL DECK to the Director Uplink — a new diamond-shaped button beside the message box raises a compact panel with one-tap access to THREAT, V.A.T.S., TRADE, LOOT, CONSULT, and the V.A.T.S. calculator, so none of them need to sit permanently on screen anymore. The old blind D-Pad shortcuts are redesigned into a Quick-Draw Holster inside the same panel: all four gear slots now visibly show what's bound to them instead of blank arrows, fire with a single tap, and can be rebound to a different item right there.
 - Added a LEVEL UP button right under your XP bar, so you can level up yourself once you've earned enough XP instead of having to ask the AI to do it for you. It lights up as soon as you've reached the next level's XP threshold.
+- Added a new SETTINGS section (a 6th hardware button, next to Operator/Operations/Databank/Uplink/Chassis) that gathers your Account, the Module Bay's hardware settings, your Save Archive, and your Campaign Configs in one place — nothing about how any of them works has changed, just where you find them.
 
 ### Changed
 
@@ -32,6 +33,7 @@
 - The Module Bay's phosphor tube color picker got a visual upgrade to match the rest of the hardware rack: the three green tube colors (RobCo Green, Pip-Boy Green, Ghoul Green) now collapse into one "3 types" cartridge you tap to fan open, instead of showing all seven colors side by side, and every tube — including the cartridge and the four standalone colors — now shows a small indicator light under its name so you can see which one is seated at a glance. Every tube is also now the exact same size. Picking a color, and which color is remembered for which game, both still work exactly as before.
 - The SKILL BOOKS and SKILL MAGAZINES trackers are no longer separate panels — they now live as collapsible sections inside the SKILL MATRIX panel, right below your skills. Everything about them works exactly as before: marking a book or magazine read/unread, the count badge, and whether a section was left open or closed all carry over the same way.
 - The Module Bay's SVC tray had four separate buttons that all exported the same conversation log (EJECT HOLOTAPE, PRINT CAMPAIGN LOG, EXPORT .MD, EXPORT .HTML) — these are now one EJECT HOLOTAPE control with a format picker (TXT/MD/HTML). Sharing to your device still works exactly as it did before when TXT is selected; picking MD or HTML downloads a file exactly as those buttons used to.
+- The CHASSIS section is no longer just a shortcut into the Module Bay — it's now its own SYSTEM STATUS screen showing your device's uptime, firmware version, connection status, and feature availability at a glance, alongside a new ERROR LOG button. Your campaign kill/caps/damage stats moved out of it into their own CAMPAIGN LOG section in DATABANK, so device information and campaign information are no longer mixed together in one place.
 
 ### Fixed
 

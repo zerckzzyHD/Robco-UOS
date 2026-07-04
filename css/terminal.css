@@ -808,6 +808,23 @@ button.lamp {
   min-width: 40px;
   max-width: 52px;
 }
+/* SETTINGS keycap gets a subtle amber service-stripe so it reads as the
+   config/service cap, distinct from the phosphor-green subsystem keys. */
+.navkey.setkey::after {
+  content: '';
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 3px;
+  height: 2px;
+  background: repeating-linear-gradient(
+    115deg,
+    rgba(var(--bezel-wire-rgb), 0.5) 0 4px,
+    transparent 4px 8px
+  );
+  opacity: 0.55;
+  border-radius: 1px;
+}
 
 /* MOBILE (<1000px): the bezel keycap nav docks to the true bottom of the
    viewport as a fixed thumb-zone bar (Protocol UI-7 — matches the
@@ -1270,7 +1287,7 @@ button.lamp {
 .panel[data-tab].tab-visible {
   display: block;
 }
-/* Security panel (no data-tab) always shows */
+/* Panels with no data-tab (e.g. the chat panel) always show */
 .panel:not([data-tab]) {
   display: block;
 }
