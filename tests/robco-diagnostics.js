@@ -13177,13 +13177,18 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '117.7: ejectHolotape() refuses on an empty comm-link log (NOTHING TO EJECT)'
   );
 
-  // 117.8  diegetic trigger button wired with an accessible label
+  // 117.8  diegetic trigger button wired with an accessible label. Owner
+  //        report (SVC tray consolidation): the button now routes through
+  //        _svcEjectHolotape() — the format-aware wrapper that calls this
+  //        very ejectHolotape() for TXT (Suite 174 covers the wrapper
+  //        itself) — rather than calling ejectHolotape() inline, but the
+  //        button's own diegetic identity is unchanged.
   assert(
     /id="ejectHolotapeBtn"/.test(html117) &&
-      /onclick="ejectHolotape\(\)"/.test(html117) &&
+      /onclick="_svcEjectHolotape\(\)"/.test(html117) &&
       /aria-label="[^"]*[Hh]olotape[^"]*"/.test(html117) &&
       /EJECT HOLOTAPE/.test(html117),
-    '117.8: #ejectHolotapeBtn diegetic button wires onclick=ejectHolotape() with a descriptive aria-label'
+    '117.8: #ejectHolotapeBtn diegetic button wires onclick=_svcEjectHolotape() with a descriptive aria-label'
   );
 }
 
@@ -19074,10 +19079,13 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       'onchange="toggleHaptic(this.checked)"',
       'id="typerSpeedSlider"',
       'id="ejectHolotapeBtn"',
-      'onclick="ejectHolotape()"',
       'id="btnViewChangelog"',
       'id="btnInstallPwa"',
     ].every(needle => html154.includes(needle)),
+    // Owner report (SVC tray export consolidation): #ejectHolotapeBtn's onclick
+    // intentionally changed from ejectHolotape() to _svcEjectHolotape() — the
+    // new format-aware wrapper — as part of that authorized redesign; every
+    // OTHER id/onchange/onclick pair in this list is still required verbatim.
     '154.3: every existing control id + its EXACT onchange/onclick setter call survives the reframe unmodified'
   );
 
@@ -19676,18 +19684,13 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '155.8: the "CIPHER KEY SLOT" label is present and #btnFetchModels (HANDSHAKE) now lives exactly once, inside .key-slot beside the cipher key input'
   );
 
-  // 155.9  SVC tray: renamed to match the mockup's "PRINT CAMPAIGN LOG" (same
-  //        setter, same .txt export — copy-only change), EJECT HOLOTAPE leads,
-  //        and the tray centers any partial last row via flex (FIX 3)
+  // 155.9  SVC tray: the tray still centers any partial last row via flex
+  //        (FIX 3) — the EJECT HOLOTAPE consolidation (owner report, a later
+  //        unit) is covered by its own dedicated suite; this guard only
+  //        locks the .bay-tools centering behavior it originally verified.
   assert(
-    /PRINT CAMPAIGN LOG/.test(html155) &&
-      !/DOWNLOAD CAMPAIGN LOG/.test(html155) &&
-      /_svcExportCampaignLog\('txt'\)/.test(html155) &&
-      html155.indexOf('EJECT HOLOTAPE') < html155.indexOf('PRINT CAMPAIGN LOG') &&
-      /\.bay-tools \{[\s\S]{0,200}display:\s*flex[\s\S]{0,200}justify-content:\s*center/.test(
-        css155
-      ),
-    "155.9: the SVC tray leads with EJECT HOLOTAPE then PRINT CAMPAIGN LOG (same _svcExportCampaignLog('txt') setter), and .bay-tools centers a partial last row via flex + justify-content:center (FIX 3)"
+    /\.bay-tools \{[\s\S]{0,200}display:\s*flex[\s\S]{0,200}justify-content:\s*center/.test(css155),
+    '155.9: .bay-tools centers a partial last row via flex + justify-content:center (FIX 3)'
   );
 
   // 155.10  FIX 2 (owner report): the Schematic View's rows stack name/loc
@@ -23494,6 +23497,120 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         (err173 ? ' — ' + err173.message : '')
     );
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+// Suite 174 — Owner-approved: SVC tray EJECT HOLOTAPE export consolidation
+//
+// The SVC tray had FOUR buttons that all exported the SAME content (the
+// chat-transcript "after-action campaign log"): EJECT HOLOTAPE (share/.txt),
+// PRINT CAMPAIGN LOG (.txt download), EXPORT .MD, EXPORT .HTML. Consolidated
+// into ONE control — the diegetic EJECT HOLOTAPE button plus a
+// #holotapeFormatSelect (TXT/MD/HTML) — that re-routes to the SAME,
+// UNFORKED functions (Protocol 22): TXT still calls ejectHolotape() (its
+// share → clipboard → download fallback chain, unchanged); MD/HTML still
+// call exportCampaignLog(fmt) (download-only, unchanged). FIRMWARE REVISION
+// LOG and INSTALL SYSTEM are untouched.
+//
+// 8 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 174 — SVC tray EJECT HOLOTAPE export consolidation');
+  const html174 = readFile('index.html');
+  const uiCore174 = readFile('js/ui-core.js');
+  const uiSaves174 = readFile('js/ui-saves.js');
+  const css174 = readFile('css/terminal.css');
+  const eslintCfg174 = readFile('eslint.config.mjs');
+
+  // 174.1  the four old export buttons are gone — only the consolidated
+  //        control remains (regression guard against reverting).
+  assert(
+    !/PRINT CAMPAIGN LOG/.test(html174) &&
+      !/EXPORT \.MD/.test(html174) &&
+      !/EXPORT \.HTML/.test(html174) &&
+      !/_svcExportCampaignLog/.test(html174),
+    '174.1: index.html no longer has PRINT CAMPAIGN LOG / EXPORT .MD / EXPORT .HTML buttons or any _svcExportCampaignLog() call site'
+  );
+
+  // 174.2  #ejectHolotapeBtn is a real <button> (Protocol UI-5) wired to
+  //        _svcEjectHolotape(), and #holotapeFormatSelect offers all three
+  //        formats — TXT/MD/HTML — nothing lost.
+  {
+    const btnMatch174 = html174.match(/<button[^>]*id="ejectHolotapeBtn"[\s\S]{0,500}?<\/button>/);
+    const btnTag174 = btnMatch174 ? btnMatch174[0] : '';
+    const selMatch174 = html174.match(
+      /<select[^>]*id="holotapeFormatSelect"[\s\S]{0,500}?<\/select>/
+    );
+    const selTag174 = selMatch174 ? selMatch174[0] : '';
+    assert(
+      /<button/.test(btnTag174) &&
+        /onclick="_svcEjectHolotape\(\)"/.test(btnTag174) &&
+        /aria-label="[^"]+"/.test(btnTag174) &&
+        /<option value="txt"/.test(selTag174) &&
+        /<option value="md"/.test(selTag174) &&
+        /<option value="html"/.test(selTag174),
+      '174.2: #ejectHolotapeBtn is a real <button> wired to _svcEjectHolotape(); #holotapeFormatSelect offers txt/md/html options — every original format still reachable'
+    );
+  }
+
+  // 174.3  a plain sub-label clarifies what the control exports.
+  assert(
+    /bay-holotape-caption[^"]*"[^>]*>EXPORTS YOUR COMM-LINK CONVERSATION LOG/.test(html174) ||
+      /EXPORTS YOUR COMM-LINK CONVERSATION LOG/.test(html174),
+    '174.3: index.html has a plain sub-label clarifying the control exports the Comm-Link conversation log'
+  );
+
+  // 174.4  FIRMWARE REVISION LOG and INSTALL SYSTEM are untouched — same ids,
+  //        same onclick wrappers, unaffected by the export consolidation.
+  assert(
+    /id="btnViewChangelog"[^>]*onclick="_svcViewChangelog\(\)"/.test(html174) &&
+      /id="btnInstallPwa"[^>]*style="display: none"[^>]*onclick="_svcInstallPwa\(\)"/.test(html174),
+    '174.4: #btnViewChangelog (FIRMWARE REVISION LOG) and #btnInstallPwa (INSTALL SYSTEM) keep their exact ids + onclick wrappers, unaffected by the export consolidation'
+  );
+
+  // 174.5  _svcEjectHolotape() is defined in ui-core.js and re-routes by
+  //        format WITHOUT forking ejectHolotape()/exportCampaignLog() (Protocol 22).
+  {
+    const wrapperBody174 = extractFunctionBody(uiCore174, '_svcEjectHolotape');
+    assert(
+      /function _svcEjectHolotape\s*\(/.test(uiCore174) &&
+        /getElementById\('holotapeFormatSelect'\)/.test(wrapperBody174) &&
+        /if \(fmt === 'txt'\) \{\s*ejectHolotape\(\);/.test(wrapperBody174) &&
+        /\} else \{\s*exportCampaignLog\(fmt\);/.test(wrapperBody174),
+      "174.5: _svcEjectHolotape() reads #holotapeFormatSelect and re-routes 'txt' to ejectHolotape() and any other format to exportCampaignLog(fmt) — no forked export logic"
+    );
+  }
+
+  // 174.6  the retired _svcExportCampaignLog() wrapper is fully removed (dead
+  //        code cleanup, matching the project's established QA-DEAD precedent)
+  //        — from ui-core.js AND its ESLint globals declaration.
+  assert(
+    !/function _svcExportCampaignLog/.test(uiCore174) &&
+      !/_svcExportCampaignLog: 'readonly'/.test(eslintCfg174),
+    '174.6: the retired _svcExportCampaignLog() wrapper is fully removed from ui-core.js and eslint.config.mjs (no dead code left behind)'
+  );
+
+  // 174.7  ejectHolotape()/exportCampaignLog() themselves are byte-for-byte
+  //        unforked — _buildHolotapeText() (the shared transcript builder)
+  //        still backs both the share path and the .txt download path.
+  {
+    const ejectBody174 = extractFunctionBody(uiSaves174, 'ejectHolotape');
+    const exportBody174 = extractFunctionBody(uiSaves174, 'exportCampaignLog');
+    assert(
+      /_buildHolotapeText\(\)/.test(ejectBody174) &&
+        /_buildHolotapeText\(\)/.test(exportBody174) &&
+        /navigator\.share\(/.test(ejectBody174) &&
+        /format === 'html'/.test(exportBody174) &&
+        /format === 'md'/.test(exportBody174),
+      '174.7: ejectHolotape() (share→clipboard→download) and exportCampaignLog() (txt/md/html download) are unchanged — both still share _buildHolotapeText(), and exportCampaignLog() still handles all three formats'
+    );
+  }
+
+  // 174.8  the format <select> meets the Protocol 17 ≥28px tap-target floor.
+  assert(
+    /\.bay-holotape-control select \{[\s\S]{0,80}min-height:\s*28px/.test(css174),
+    '174.8: .bay-holotape-control select has an explicit min-height:28px (Protocol 17 tap-target floor)'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════

@@ -664,11 +664,29 @@ window.renderBaySchematic = renderBaySchematic;
 // index.html attribute value (avoids colliding with the Suite 59 inline-
 // handler scanner, which treats any "Word(" it finds in an attribute as a
 // candidate function reference). Each wraps the SAME existing utility action.
-function _svcExportCampaignLog(fmt) {
-  exportCampaignLog(fmt);
-  _logBaySvc('CAMPAIGN LOG EXPORTED — .' + String(fmt).toUpperCase());
+
+// Consolidated EJECT HOLOTAPE control (owner report): merges the four
+// previously-separate export buttons (EJECT HOLOTAPE / PRINT CAMPAIGN LOG /
+// EXPORT .MD / EXPORT .HTML) into one — a #holotapeFormatSelect format
+// choice plus this single action. Re-routes to the existing, UNFORKED
+// functions (Protocol 22): TXT keeps the original EJECT HOLOTAPE behavior
+// (ejectHolotape()'s share → clipboard → download fallback chain); MD/HTML
+// keep the original EXPORT .MD/.HTML behavior (exportCampaignLog(fmt)'s
+// download-only path) — neither function's own logic changes, only which
+// one this control calls.
+function _svcEjectHolotape() {
+  const sel = document.getElementById('holotapeFormatSelect');
+  const fmt = sel ? sel.value : 'txt';
+  if (fmt === 'txt') {
+    ejectHolotape();
+  } else {
+    exportCampaignLog(fmt);
+  }
+  _logBaySvc(
+    'CAMPAIGN LOG EXPORTED — .' + String(fmt).toUpperCase() + (fmt === 'txt' ? ' (SHARE)' : '')
+  );
 }
-window._svcExportCampaignLog = _svcExportCampaignLog;
+window._svcEjectHolotape = _svcEjectHolotape;
 
 function _svcViewChangelog() {
   showFullChangelog();

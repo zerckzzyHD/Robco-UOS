@@ -5269,6 +5269,31 @@ button.dial:focus-visible {
   background: rgba(52, 152, 219, 0.12);
 }
 
+/* Consolidated EJECT HOLOTAPE control (owner report — merges the four
+   former export buttons into one): the button + format <select> sit on one
+   row, with the caption wrapping to its own full-width line underneath.
+   Reuses the generic <select> styling already defined at the top of this
+   file (background/border/color) — no per-select override needed. Takes a
+   full flex row of its own within .bay-tools so it reads as one cohesive
+   unit next to the unrelated FIRMWARE LOG / INSTALL SYSTEM buttons. */
+.bay-holotape-control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 1 1 100%;
+}
+.bay-holotape-control select {
+  min-height: 28px;
+  width: auto;
+}
+.bay-holotape-caption {
+  flex: 1 1 100%;
+  text-align: center;
+  margin: 0;
+}
+
 /* ── Service log ──────────────────────────────────────────────────────── */
 .bay-svc-log {
   margin-top: 14px;

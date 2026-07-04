@@ -7508,9 +7508,12 @@ Check (($eject117 -match '_clipboardSupported\(\)') -and ($eject117 -match 'navi
 Check (($eject117 -match '!chatHistory \|\| chatHistory\.length === 0') -and ($eject117 -match 'NOTHING TO EJECT')) `
     '117.7: ejectHolotape() refuses on an empty comm-link log (NOTHING TO EJECT)'
 
-# 117.8  diegetic trigger button wired with an accessible label
-Check (($html117 -match 'id="ejectHolotapeBtn"') -and ($html117 -match 'onclick="ejectHolotape\(\)"') -and ($html117 -match 'aria-label="[^"]*[Hh]olotape[^"]*"') -and ($html117 -match 'EJECT HOLOTAPE')) `
-    '117.8: #ejectHolotapeBtn diegetic button wires onclick=ejectHolotape() with a descriptive aria-label'
+# 117.8  diegetic trigger button wired with an accessible label. Owner report
+#        (SVC tray consolidation): the button now routes through
+#        _svcEjectHolotape() -- the format-aware wrapper that calls this very
+#        ejectHolotape() for TXT (Suite 174 covers the wrapper itself).
+Check (($html117 -match 'id="ejectHolotapeBtn"') -and ($html117 -match 'onclick="_svcEjectHolotape\(\)"') -and ($html117 -match 'aria-label="[^"]*[Hh]olotape[^"]*"') -and ($html117 -match 'EJECT HOLOTAPE')) `
+    '117.8: #ejectHolotapeBtn diegetic button wires onclick=_svcEjectHolotape() with a descriptive aria-label'
 
 # ===========================================================
 # Suite 118 -- WU-F4 Pending-Directives Tally (Badging API) (8 tests)
@@ -11196,7 +11199,11 @@ Check (
 ) "154.2: the panel keeps its single <h2>; every SLOT + the SVC tray use the sub-panel <h3> convention (Protocol UI-1 clarification)"
 
 # 154.3  every pre-existing setter/id survives verbatim -- no functionality lost
-#        (checkbox-driven boolean modules keep their EXACT id + onchange contract)
+#        (checkbox-driven boolean modules keep their EXACT id + onchange contract).
+#        Owner report (SVC tray export consolidation): #ejectHolotapeBtn's
+#        onclick intentionally changed from ejectHolotape() to
+#        _svcEjectHolotape() as part of that authorized redesign -- every
+#        OTHER id/onchange/onclick pair below is still required verbatim.
 $needles154 = @(
     'id="apiKeyInput"', 'id="geminiKeySyncToggle"', 'id="btnFetchModels"', 'id="apiModelInput"',
     'id="highLumenToggle"', 'onchange="toggleHighLumen(this.checked)"',
@@ -11205,7 +11212,7 @@ $needles154 = @(
     'id="radioToggle"', 'onchange="toggleRadio(this.checked)"',
     'id="wakeLockToggle"', 'onchange="toggleWakeLock(this.checked)"',
     'id="hapticToggle"', 'onchange="toggleHaptic(this.checked)"',
-    'id="typerSpeedSlider"', 'id="ejectHolotapeBtn"', 'onclick="ejectHolotape()"',
+    'id="typerSpeedSlider"', 'id="ejectHolotapeBtn"',
     'id="btnViewChangelog"', 'id="btnInstallPwa"'
 )
 $allNeedles154 = $true
@@ -11700,16 +11707,13 @@ Check (
     ($html155 -match '(?s)class="key-slot">.{0,600}id="btnFetchModels"')
 ) "155.8: the ""CIPHER KEY SLOT"" label is present and #btnFetchModels (HANDSHAKE) now lives exactly once, inside .key-slot beside the cipher key input"
 
-# 155.9  SVC tray: renamed to match the mockup's "PRINT CAMPAIGN LOG" (same
-#        setter, same .txt export -- copy-only change), EJECT HOLOTAPE leads,
-#        and the tray centers any partial last row via flex (FIX 3)
+# 155.9  SVC tray: the tray still centers any partial last row via flex
+#        (FIX 3) -- the EJECT HOLOTAPE consolidation (owner report, a later
+#        unit) is covered by its own dedicated Suite 174; this guard only
+#        locks the .bay-tools centering behavior it originally verified.
 Check (
-    ($html155 -match 'PRINT CAMPAIGN LOG') -and
-    (-not ($html155 -match 'DOWNLOAD CAMPAIGN LOG')) -and
-    ($html155 -match "_svcExportCampaignLog\('txt'\)") -and
-    ($html155.IndexOf('EJECT HOLOTAPE') -lt $html155.IndexOf('PRINT CAMPAIGN LOG')) -and
     ($css155 -match '(?s)\.bay-tools \{.{0,200}display:\s*flex.{0,200}justify-content:\s*center')
-) "155.9: the SVC tray leads with EJECT HOLOTAPE then PRINT CAMPAIGN LOG (same _svcExportCampaignLog('txt') setter), and .bay-tools centers a partial last row via flex + justify-content:center (FIX 3)"
+) "155.9: .bay-tools centers a partial last row via flex + justify-content:center (FIX 3)"
 
 # 155.10  FIX 2 (owner report): the Schematic View's rows stack name/loc
 #         above a full-width control so a select can never be squeezed
@@ -14401,6 +14405,90 @@ Check (
     ($formatGameTimeBody173 -match "dateStr = `\`\$\{mm\}\.`\$\{dd\}\.`\$\{yy\}`;" -or $formatGameTimeBody173 -match '\$\{mm\}\.\$\{dd\}\.\$\{yy\}') -and
     ($formatGameTimeBody173 -match '\$\{h12\}:\$\{String\(dt\.minute\)\.padStart\(2, .0.\)\} \$\{ampm\}')
 ) "173.8: structural mirror of the JS behavioral proof -- formatGameTime() (which _recordLine() now delegates to) still builds the 'Weekday, MM.DD.YY, H:MM AM/PM' template the JS side executes and regex-asserts against"
+
+# ===========================================================
+# Suite 174 -- Owner-approved: SVC tray EJECT HOLOTAPE export consolidation
+# 8 tests
+# ===========================================================
+Sep "Suite 174 -- SVC tray EJECT HOLOTAPE export consolidation"
+$html174 = Read-Src "index.html"
+$uiCore174 = Read-Src "js/ui-core.js"
+$uiSaves174 = Read-Src "js/ui-saves.js"
+$css174 = Read-Src "css/terminal.css"
+$eslintCfg174 = Read-Src "eslint.config.mjs"
+
+# 174.1  the four old export buttons are gone -- only the consolidated
+#        control remains (regression guard against reverting).
+Check (
+    (-not ($html174 -match 'PRINT CAMPAIGN LOG')) -and
+    (-not ($html174 -match 'EXPORT \.MD')) -and
+    (-not ($html174 -match 'EXPORT \.HTML')) -and
+    (-not ($html174 -match '_svcExportCampaignLog'))
+) "174.1: index.html no longer has PRINT CAMPAIGN LOG / EXPORT .MD / EXPORT .HTML buttons or any _svcExportCampaignLog() call site"
+
+# 174.2  #ejectHolotapeBtn is a real <button> (Protocol UI-5) wired to
+#        _svcEjectHolotape(), and #holotapeFormatSelect offers all three
+#        formats -- TXT/MD/HTML -- nothing lost.
+$btnMatch174 = [regex]::Match($html174, '(?s)<button[^>]*id="ejectHolotapeBtn"[\s\S]{0,500}?</button>')
+$btnTag174 = if ($btnMatch174.Success) { $btnMatch174.Value } else { '' }
+$selMatch174 = [regex]::Match($html174, '(?s)<select[^>]*id="holotapeFormatSelect"[\s\S]{0,500}?</select>')
+$selTag174 = if ($selMatch174.Success) { $selMatch174.Value } else { '' }
+Check (
+    ($btnTag174 -match '<button') -and
+    ($btnTag174 -match 'onclick="_svcEjectHolotape\(\)"') -and
+    ($btnTag174 -match 'aria-label="[^"]+"') -and
+    ($selTag174 -match '<option value="txt"') -and
+    ($selTag174 -match '<option value="md"') -and
+    ($selTag174 -match '<option value="html"')
+) "174.2: #ejectHolotapeBtn is a real <button> wired to _svcEjectHolotape(); #holotapeFormatSelect offers txt/md/html options -- every original format still reachable"
+
+# 174.3  a plain sub-label clarifies what the control exports.
+Check (
+    $html174 -match 'EXPORTS YOUR COMM-LINK CONVERSATION LOG'
+) "174.3: index.html has a plain sub-label clarifying the control exports the Comm-Link conversation log"
+
+# 174.4  FIRMWARE REVISION LOG and INSTALL SYSTEM are untouched -- same ids,
+#        same onclick wrappers, unaffected by the export consolidation.
+Check (
+    ($html174 -match 'id="btnViewChangelog"[^>]*onclick="_svcViewChangelog\(\)"') -and
+    ($html174 -match 'id="btnInstallPwa"[^>]*style="display: none"[^>]*onclick="_svcInstallPwa\(\)"')
+) "174.4: #btnViewChangelog (FIRMWARE REVISION LOG) and #btnInstallPwa (INSTALL SYSTEM) keep their exact ids + onclick wrappers, unaffected by the export consolidation"
+
+# 174.5  _svcEjectHolotape() is defined in ui-core.js and re-routes by format
+#        WITHOUT forking ejectHolotape()/exportCampaignLog() (Protocol 22).
+$wrapperBody174 = Get-FunctionBody $uiCore174 '_svcEjectHolotape'
+Check (
+    ($uiCore174 -match 'function _svcEjectHolotape\s*\(') -and
+    ($wrapperBody174 -match "getElementById\('holotapeFormatSelect'\)") -and
+    ($wrapperBody174 -match "(?s)if \(fmt === 'txt'\) \{\s*ejectHolotape\(\);") -and
+    ($wrapperBody174 -match "(?s)\} else \{\s*exportCampaignLog\(fmt\);")
+) "174.5: _svcEjectHolotape() reads #holotapeFormatSelect and re-routes 'txt' to ejectHolotape() and any other format to exportCampaignLog(fmt) -- no forked export logic"
+
+# 174.6  the retired _svcExportCampaignLog() wrapper is fully removed (dead
+#        code cleanup, matching the project's established QA-DEAD precedent)
+#        -- from ui-core.js AND its ESLint globals declaration.
+Check (
+    (-not ($uiCore174 -match 'function _svcExportCampaignLog')) -and
+    (-not ($eslintCfg174 -match "_svcExportCampaignLog: 'readonly'"))
+) "174.6: the retired _svcExportCampaignLog() wrapper is fully removed from ui-core.js and eslint.config.mjs (no dead code left behind)"
+
+# 174.7  ejectHolotape()/exportCampaignLog() themselves are byte-for-byte
+#        unforked -- _buildHolotapeText() (the shared transcript builder)
+#        still backs both the share path and the .txt download path.
+$ejectBody174 = Get-FunctionBody $uiSaves174 'ejectHolotape'
+$exportBody174 = Get-FunctionBody $uiSaves174 'exportCampaignLog'
+Check (
+    ($ejectBody174 -match '_buildHolotapeText\(\)') -and
+    ($exportBody174 -match '_buildHolotapeText\(\)') -and
+    ($ejectBody174 -match 'navigator\.share\(') -and
+    ($exportBody174 -match "format === 'html'") -and
+    ($exportBody174 -match "format === 'md'")
+) "174.7: ejectHolotape() (share->clipboard->download) and exportCampaignLog() (txt/md/html download) are unchanged -- both still share _buildHolotapeText(), and exportCampaignLog() still handles all three formats"
+
+# 174.8  the format <select> meets the Protocol 17 >=28px tap-target floor.
+Check (
+    $css174 -match '(?s)\.bay-holotape-control select \{.{0,80}min-height:\s*28px'
+) "174.8: .bay-holotape-control select has an explicit min-height:28px (Protocol 17 tap-target floor)"
 
 # ===========================================================
 # Results

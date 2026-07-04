@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2189/2189 | Cache: robco-terminal-v2.7.0-r67 -->
+﻿## [Unreleased]<!-- Tests: 2197/2197 | Cache: robco-terminal-v2.7.0-r68 -->
 
 ### Added
 
@@ -31,6 +31,7 @@
 - Retired the typed CROSSROADS command, now that the CROSSROADS RECORD is already a standing panel you can open any time — typing it (or looking for it in the command list) no longer does anything. Nothing about the panel itself changes.
 - The Module Bay's phosphor tube color picker got a visual upgrade to match the rest of the hardware rack: the three green tube colors (RobCo Green, Pip-Boy Green, Ghoul Green) now collapse into one "3 types" cartridge you tap to fan open, instead of showing all seven colors side by side, and every tube — including the cartridge and the four standalone colors — now shows a small indicator light under its name so you can see which one is seated at a glance. Every tube is also now the exact same size. Picking a color, and which color is remembered for which game, both still work exactly as before.
 - The SKILL BOOKS and SKILL MAGAZINES trackers are no longer separate panels — they now live as collapsible sections inside the SKILL MATRIX panel, right below your skills. Everything about them works exactly as before: marking a book or magazine read/unread, the count badge, and whether a section was left open or closed all carry over the same way.
+- The Module Bay's SVC tray had four separate buttons that all exported the same conversation log (EJECT HOLOTAPE, PRINT CAMPAIGN LOG, EXPORT .MD, EXPORT .HTML) — these are now one EJECT HOLOTAPE control with a format picker (TXT/MD/HTML). Sharing to your device still works exactly as it did before when TXT is selected; picking MD or HTML downloads a file exactly as those buttons used to.
 
 ### Fixed
 

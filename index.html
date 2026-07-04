@@ -2306,20 +2306,23 @@
                         >FIELD SERVICE UTILITIES &mdash; NOT SLOTTED HARDWARE</span
                       >
                       <div class="bay-tools">
-                        <button
-                          id="ejectHolotapeBtn"
-                          onclick="ejectHolotape()"
-                          aria-label="Eject holotape transcript to the device share sheet"
-                        >
-                          &#9654; EJECT HOLOTAPE
-                        </button>
-                        <button onclick="_svcExportCampaignLog('txt')">
-                          &#9113; PRINT CAMPAIGN LOG
-                        </button>
-                        <button onclick="_svcExportCampaignLog('md')">&#9113; EXPORT .MD</button>
-                        <button onclick="_svcExportCampaignLog('html')">
-                          &#9113; EXPORT .HTML
-                        </button>
+                        <div class="bay-holotape-control">
+                          <button
+                            id="ejectHolotapeBtn"
+                            onclick="_svcEjectHolotape()"
+                            aria-label="Eject holotape — share or download your Comm-Link conversation log in the selected format"
+                          >
+                            &#9654; EJECT HOLOTAPE
+                          </button>
+                          <select id="holotapeFormatSelect" aria-label="Holotape export format">
+                            <option value="txt">TXT (SHARE)</option>
+                            <option value="md">MD</option>
+                            <option value="html">HTML</option>
+                          </select>
+                          <span class="bay-part-no bay-holotape-caption"
+                            >EXPORTS YOUR COMM-LINK CONVERSATION LOG</span
+                          >
+                        </div>
                         <button id="btnViewChangelog" onclick="_svcViewChangelog()">
                           &#8801; FIRMWARE REVISION LOG
                         </button>
