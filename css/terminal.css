@@ -4654,12 +4654,38 @@ button.shell {
   opacity: 0.45;
   flex-shrink: 0;
 }
+/* FIX 3 follow-up (owner: "make the default a tag too somehow? or a badge... not
+   tabs badges" — a small chip on the tube itself, not the bezel/tab-bar badges):
+   (DEFAULT) used to sit in normal flow with a reserved min-height so it never grew
+   the box, but it still read as inline text rather than a tag. It's now the same
+   absolute corner-chip treatment as .multi-tag (top-left instead of top-right, so
+   the two info chips never collide if a future tube ever carried both), fully out
+   of flow like multi-tag — so it drops the min-height reservation entirely, not
+   just avoid growing off of it. :empty hides the chip's border/background on every
+   tube that isn't the active game's default (the JS side, _updateOpticsDefaultLabel
+   in ui-audio.js, still just sets/clears textContent — unchanged). */
 .tube .t-default {
-  display: block;
-  font-size: 7.5px;
-  opacity: 0.75;
-  margin-top: 2px;
-  min-height: 9px;
+  display: none;
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  margin: 0;
+  padding: 1px 3px;
+  font-size: 6.5px;
+  letter-spacing: 0.4px;
+  line-height: 1.3;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.5);
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.55);
+  color: var(--robco-dim);
+  text-shadow: none;
+  opacity: 0.95;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 2;
+}
+.tube .t-default:not(:empty) {
+  display: inline-block;
 }
 .tube.seated {
   border-color: var(--tube);

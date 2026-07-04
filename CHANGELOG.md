@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2140/2140 | Cache: robco-terminal-v2.7.0-r59 -->
+﻿## [Unreleased]<!-- Tests: 2141/2141 | Cache: robco-terminal-v2.7.0-r60 -->
 
 ### Added
 
@@ -59,7 +59,7 @@
 - Fixed switching between the terminal's sections (Operator, Operations, Databank, Uplink, Chassis) losing your scroll position — each section now remembers exactly where you left off, restored automatically when you switch back or reload the page.
 - Fixed the Module Bay's decorative BACKPLANE BUS header wrapping raggedly along the left edge on narrower screens — it's now centered.
 - Fixed the Director Uplink view looking like a panel stacked inside another panel. The amber frame that boxed the whole conversation area, and the separate box around the transcript itself, are both gone — your conversation now reads directly on the screen, like a real terminal, with only the message box at the bottom still shown as a bordered pill.
-- Fixed the Module Bay's green phosphor tube looking like a flat-topped battery instead of a real tube, fixed its two hidden "sister" tubes never actually peeking out from behind it to hint there were more shades to choose from, and shrank the oversized "3 TYPES" label into a small tag in the corner so every tube on the rack — not just the green one — can stay the same compact size.
+- Fixed the Module Bay's green phosphor tube looking like a flat-topped battery instead of a real tube, fixed its two hidden "sister" tubes never actually peeking out from behind it to hint there were more shades to choose from, and shrank both the oversized "3 TYPES" label and the "(DEFAULT)" marker into small tags in the corners so every tube on the rack — not just the green one — can stay the same compact size.
 
 ### Improved
 

@@ -11099,9 +11099,10 @@ Check (
 ) "153.9: CACHE_NAME is a well-formed robco-terminal-v2.7.0-rN revision string (Protocol 1)"
 
 # ===========================================================
-# Suite 154 -- Step 2 (v2.8.0) Phase 2 B2a: MODULE BAY core reframe (36 tests --
+# Suite 154 -- Step 2 (v2.8.0) Phase 2 B2a: MODULE BAY core reframe (37 tests --
 # 154.24-154.33 add the WU-optics-picker GREEN FAMILY phosphor-tube-picker redesign;
-# 154.34-154.36 add the owner post-ship audit's anode-nib/ghost-peek/compact-tag fixes)
+# 154.34-154.37 add the owner post-ship audit's anode-nib/ghost-peek/compact-tag fixes,
+# including the (DEFAULT) marker's own matching corner-chip treatment)
 # The Security & Configuration panel reframed as installable hardware
 # (owner-approved mockup, Protocol 25 sanctioned exception). ONE-TRUTH MODEL:
 # the bay + the permanent Schematic View are both projections of the SAME
@@ -11525,6 +11526,19 @@ Check (
     ($css154 -match '(?s)\.tube\.family \.multi-tag \{.{0,300}position:\s*absolute') -and
     ($css154 -match '--tube-h:\s*112px')
 ) "154.36: .tube.family .multi-tag is an absolute corner chip (no longer forces its own flow line), and the shared --tube-h shrank accordingly -- all tubes stay the same, compact size (owner FIX 3)"
+
+# 154.37  FIX 3 follow-up (owner: "make the default a tag too somehow? or a badge...
+#         not tabs badges") -- (DEFAULT) gets the same absolute corner-chip treatment
+#         as .multi-tag (opposite corner), and :empty hides the chip entirely on
+#         every tube that isn't the active game's default -- _updateOpticsDefaultLabel()
+#         itself is unchanged (Protocol 22).
+$tDefaultBlock154 = [regex]::Match($css154, '(?s)\.tube \.t-default \{.*?\n\}').Value
+Check (
+    ($tDefaultBlock154 -match 'position:\s*absolute') -and
+    ($tDefaultBlock154 -match 'display:\s*none') -and
+    ($css154 -match '(?s)\.tube \.t-default:not\(:empty\) \{.{0,60}display:\s*inline-block') -and
+    (-not ($tDefaultBlock154 -match 'min-height'))
+) "154.37: .tube .t-default is an absolute corner chip hidden via :empty (no longer a reserved-min-height flow line), matching .multi-tag's treatment on the opposite corner"
 
 # ===========================================================
 # Suite 155 -- Step 2 (v2.7.0) Phase 2 B2b: Module Bay visual fidelity + fixes (16 tests)

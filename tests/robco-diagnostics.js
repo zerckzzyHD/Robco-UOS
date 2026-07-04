@@ -18917,9 +18917,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  stored device prefs; every control still calls the setter it always
 //  called (Protocol 22/23) — zero new campaign state, zero AI involvement.
 //  The 13 SLOT-02 audio channels stay in their CURRENT (un-flipped) polarity
-//  this unit — B2b converts them to DIP chips. 36 tests (154.24-154.33 add the
+//  this unit — B2b converts them to DIP chips. 37 tests (154.24-154.33 add the
 //  WU-optics-picker GREEN FAMILY phosphor-tube-picker redesign coverage; 154.34-
-//  154.36 add the owner post-ship audit's anode-nib/ghost-peek/compact-tag fixes).
+//  154.37 add the owner post-ship audit's anode-nib/ghost-peek/compact-tag fixes,
+//  including the (DEFAULT) marker's own matching corner-chip treatment).
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 154 — Step 2 Phase 2 B2a: Module Bay core reframe');
@@ -19433,6 +19434,20 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     /\.tube\.family \.multi-tag \{[\s\S]{0,300}position:\s*absolute/.test(css154) &&
       /--tube-h:\s*112px/.test(css154),
     '154.36: .tube.family .multi-tag is an absolute corner chip (no longer forces its own flow line), and the shared --tube-h shrank accordingly — all tubes stay the same, compact size (owner FIX 3)'
+  );
+
+  // 154.37  FIX 3 follow-up (owner: "make the default a tag too somehow? or a
+  //         badge... not tabs badges") — (DEFAULT) gets the same absolute
+  //         corner-chip treatment as .multi-tag (opposite corner), and :empty
+  //         hides the chip entirely on every tube that isn't the active game's
+  //         default — _updateOpticsDefaultLabel() itself is unchanged (Protocol 22).
+  const tDefaultBlock154 = (css154.match(/\.tube \.t-default \{[\s\S]*?\n\}/) || [''])[0];
+  assert(
+    /position:\s*absolute/.test(tDefaultBlock154) &&
+      /display:\s*none/.test(tDefaultBlock154) &&
+      /\.tube \.t-default:not\(:empty\) \{[\s\S]{0,60}display:\s*inline-block/.test(css154) &&
+      !/min-height/.test(tDefaultBlock154),
+    "154.37: .tube .t-default is an absolute corner chip hidden via :empty (no longer a reserved-min-height flow line), matching .multi-tag's treatment on the opposite corner"
   );
 }
 
