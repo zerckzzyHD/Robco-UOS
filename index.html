@@ -2528,8 +2528,10 @@
               <div class="scope-wrap">
                 <canvas id="overseerScope" aria-hidden="true"></canvas>
                 <!-- FIX 4a (owner report): a real <button> (Protocol UI-5) — only
-                     actionable while NO CARRIER/OFFLINE (setOverseerState()
-                     toggles `disabled`); routes to the SLOT 05 AI Uplink board. -->
+                     actionable while NO CARRIER/OFFLINE (routes to the SLOT 05 AI
+                     Uplink board) or LISTENING (FIX 3 owner report: taps a
+                     one-shot scope pulse); disabled mid-transaction
+                     (thinking/speaking). setOverseerState() toggles `disabled`. -->
                 <button
                   type="button"
                   class="scope-tag"

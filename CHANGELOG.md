@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2141/2141 | Cache: robco-terminal-v2.7.0-r60 -->
+﻿## [Unreleased]<!-- Tests: 2153/2153 | Cache: robco-terminal-v2.7.0-r61 -->
 
 ### Added
 
@@ -60,6 +60,9 @@
 - Fixed the Module Bay's decorative BACKPLANE BUS header wrapping raggedly along the left edge on narrower screens — it's now centered.
 - Fixed the Director Uplink view looking like a panel stacked inside another panel. The amber frame that boxed the whole conversation area, and the separate box around the transcript itself, are both gone — your conversation now reads directly on the screen, like a real terminal, with only the message box at the bottom still shown as a bordered pill.
 - Fixed the Module Bay's green phosphor tube looking like a flat-topped battery instead of a real tube, fixed its two hidden "sister" tubes never actually peeking out from behind it to hint there were more shades to choose from, and shrank both the oversized "3 TYPES" label and the "(DEFAULT)" marker into small tags in the corners so every tube on the rack — not just the green one — can stay the same compact size.
+- Fixed the Director Uplink transcript reading as an inconsistent jumble — your messages, the Director's replies, and system log lines used to bounce between right-aligned, centered, and left-aligned with clashing italics and side borders eating up phone screen width. Every line now reads left-to-right at full width in one clean, consistent style, with a small tag above each line naming who's speaking.
+- Fixed the Director Uplink's command suggestions dropping down over the message box's toolbar, sometimes making it impossible to tap the send button while a suggestion list was open. Suggestions now open upward instead, out of the way of the toolbar and send button.
+- Tapping the Director Uplink's "LISTENING" status now gives the waveform a fun one-shot pulse, purely for flavor — it's just a flourish and doesn't change your connection or anything else.
 
 ### Improved
 

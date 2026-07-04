@@ -1269,6 +1269,12 @@ let _scopeAnimHandle = null;
 let _scopeT = 0;
 let _scopeScratchUntil = 0;
 let _runtimeAwake = true;
+// FIX 3 (owner report): a transient, one-shot amplitude bump for tapping the
+// [ LISTENING ] tag — decays to 0 by _scopePulseDurationMs after the tap, a
+// pure visual flourish that never touches _scopeState (the real state
+// machine is untouched).
+let _scopePulseUntil = 0;
+const _scopePulseDurationMs = 450;
 
 // _overseerRestState — PURE, vm-testable (Suite 162 behavioral test). Decides
 // the resting tag from the three live signals; never touches the DOM.
@@ -1353,6 +1359,11 @@ function drawScope() {
   ctx.lineWidth = 1.6 * dpr;
   ctx.beginPath();
   const scratching = performance.now() < _scopeScratchUntil;
+  // FIX 3: a tap-triggered pulse envelope — 1 right after the tap, decaying
+  // linearly to 0 by _scopePulseDurationMs later. Only listening's carrier
+  // wave reads it (thinking/speaking/disabled already have their own motion).
+  const pulseRemain = _scopePulseUntil - performance.now();
+  const pulseEnv = pulseRemain > 0 ? pulseRemain / _scopePulseDurationMs : 0;
   for (let x = 0; x <= W; x += 2) {
     let y;
     if (_scopeState === 'thinking') {
@@ -1367,12 +1378,13 @@ function drawScope() {
     } else if (_scopeState === 'disabled' || _scopeState === 'offline') {
       y = mid + (Math.random() - 0.5) * H * 0.02;
     } else {
-      // listening — gentle carrier sine, occasional NV-persona scratch burst
+      // listening — gentle carrier sine, occasional NV-persona scratch burst,
+      // amplified by the one-shot tap pulse while it decays
       y =
         mid +
-        Math.sin(x * 0.02 + _scopeT) * H * 0.14 +
+        Math.sin(x * 0.02 + _scopeT) * H * 0.14 * (1 + pulseEnv * 2.5) +
         Math.sin(x * 0.006 - _scopeT * 0.4) * H * 0.05 +
-        (Math.random() - 0.5) * H * (scratching ? 0.22 : 0.02);
+        (Math.random() - 0.5) * H * (scratching ? 0.22 : 0.02) * (1 + pulseEnv * 1.5);
     }
     if (x === 0) ctx.moveTo(x, y);
     else ctx.lineTo(x, y);
@@ -1424,9 +1436,20 @@ function setOverseerState(s) {
     tagEl.textContent = tag;
     tagEl.classList.toggle('thinking', s === 'thinking');
     // FIX 4a (owner report): only NO CARRIER (disabled/offline) has somewhere
-    // useful to route to — the tag is only actionable then, so a tap during an
-    // active exchange (listening/thinking/speaking) stays a pure status readout.
-    if (tagEl.tagName === 'BUTTON') tagEl.disabled = s !== 'disabled' && s !== 'offline';
+    // useful to route to. FIX 3 (owner report): LISTENING is ALSO actionable —
+    // a tap triggers a one-shot scope pulse (see _scopeTagClick/_scopePulse) —
+    // so only a mid-transaction tag (thinking/speaking) stays a pure readout.
+    if (tagEl.tagName === 'BUTTON') {
+      tagEl.disabled = s === 'thinking' || s === 'speaking';
+      tagEl.setAttribute(
+        'aria-label',
+        s === 'listening'
+          ? tag + ' — tap to pulse the scope'
+          : s === 'disabled' || s === 'offline'
+            ? tag + ' — tap to open the AI Uplink settings'
+            : tag
+      );
+    }
   }
   const csEl = document.getElementById('csState');
   if (csEl) csEl.textContent = tag;
@@ -1469,12 +1492,28 @@ function refreshOverseerCarrier() {
 }
 window.refreshOverseerCarrier = refreshOverseerCarrier;
 
+// _scopePulse — FIX 3 (owner report): a fun one-shot flourish for tapping
+// [ LISTENING ]. Purely visual (transient module var only, Protocol UI-10's
+// zero-campaign-write rule); degrades to a no-op under the SAME gate every
+// other scope motion already obeys (reduced-motion / Minimal dial / hidden
+// tab / runtime STANDBY-SHUTDOWN-OFF), never a bespoke carve-out.
+function _scopePulse() {
+  if (_scopeState !== 'listening') return;
+  if (!_scopeShouldAnimate()) return;
+  _scopePulseUntil = performance.now() + _scopePulseDurationMs;
+  _armScopeLoop();
+}
+window._scopePulse = _scopePulse;
+
 // FIX 4a (owner report): the scope tag's click handler — only NO CARRIER
 // (disabled/offline) routes anywhere; the native `disabled` attribute above
 // already blocks the click in every other state, this is defense-in-depth.
+// FIX 3 (owner report): LISTENING routes to the pulse flourish instead.
 function _scopeTagClick() {
   if (_scopeState === 'disabled' || _scopeState === 'offline') {
     if (typeof _openAiUplinkSlot === 'function') _openAiUplinkSlot();
+  } else if (_scopeState === 'listening') {
+    _scopePulse();
   }
 }
 window._scopeTagClick = _scopeTagClick;
@@ -4399,6 +4438,15 @@ function appendToChat(text, sender, isHistoryLoad = false) {
     const tagEl = document.createElement('span');
     tagEl.className = 'msg-tag msg-tag--overseer';
     tagEl.textContent = 'OVERSEER';
+    msgDiv.appendChild(tagEl);
+  } else if (sender === 'user') {
+    // Style A cleanup (owner-approved mockup): the user side gets a matching
+    // phosphor TERMINAL tag above its lines, for symmetry with OVERSEER — the
+    // existing "> " chevron (baked into the text at the transmitMessage()
+    // call sites) is kept alongside it.
+    const tagEl = document.createElement('span');
+    tagEl.className = 'msg-tag msg-tag--terminal';
+    tagEl.textContent = 'TERMINAL';
     msgDiv.appendChild(tagEl);
   }
   msgDiv.appendChild(msgContent);

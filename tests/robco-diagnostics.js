@@ -22004,9 +22004,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   }
   {
     const setStateBody = extractFunctionBody(uiSource, 'setOverseerState');
+    // Suite 169 (owner FIX 3): LISTENING became actionable too (tap → scope
+    // pulse), so the button is now disabled only mid-transaction
+    // (thinking/speaking) — see Suite 169.10 for the dedicated regression.
     assert(
-      /tagEl\.disabled = s !== 'disabled' && s !== 'offline'/.test(setStateBody),
-      "165.17: setOverseerState() toggles the scope-tag button's disabled attribute — actionable ONLY in disabled/offline (NO CARRIER), a pure status readout otherwise"
+      /tagEl\.disabled = s === 'thinking' \|\| s === 'speaking'/.test(setStateBody),
+      "165.17: setOverseerState() toggles the scope-tag button's disabled attribute — inert ONLY mid-transaction (thinking/speaking); listening/disabled/offline are all actionable (Suite 169 FIX 3 update)"
     );
   }
   {
@@ -22520,17 +22523,20 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     "167.5: appendToChat() adds a 'msg-tag--overseer' tag element reading OVERSEER for sender === 'ai'"
   );
 
-  // 167.6  the tag is gated on sender — a 'sys' or 'user' message body renders with
-  //        no msg-tag element (checked structurally: the tagEl creation branch is
-  //        the ONLY 'msg-tag' reference in the function, inside the ai-only if)
-  const overseerBranch167 = (appendBody167.match(/if \(sender === 'ai'\) \{[\s\S]*?\n {2}\}/) || [
-    '',
-  ])[0];
+  // 167.6  the tag is gated on sender — a 'sys' message body renders with no
+  //        msg-tag element at all (checked structurally: the tagEl creation
+  //        branches are the ONLY 'msg-tag' references in the function, inside
+  //        the ai/user sender branches — DO-P Style A cleanup added the
+  //        symmetric TERMINAL tag for 'user', 'sys' still gets none)
+  const tagBranches167 = (appendBody167.match(
+    /if \(sender === 'ai'\) \{[\s\S]*?\n {2}\} else if \(sender === 'user'\) \{[\s\S]*?\n {2}\}/
+  ) || [''])[0];
   assert(
-    overseerBranch167.includes('msg-tag--overseer') &&
+    tagBranches167.includes('msg-tag--overseer') &&
+      tagBranches167.includes('msg-tag--terminal') &&
       (appendBody167.match(/msg-tag/g) || []).length ===
-        (overseerBranch167.match(/msg-tag/g) || []).length,
-    "167.6: the OVERSEER tag element is created ONLY inside the sender === 'ai' branch — 'sys'/'user' messages get no tag"
+        (tagBranches167.match(/msg-tag/g) || []).length,
+    "167.6: the OVERSEER/TERMINAL tag elements are created ONLY inside the sender === 'ai'/'user' branches — 'sys' messages get no tag"
   );
 
   // 167.7  the typewriter's per-frame writes target the dedicated msgContent span,
@@ -22644,6 +22650,178 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       /function _wireToolDeck\(/.test(uiCore168) &&
       /function openToolDeck\(/.test(uiCore168),
     '168.8: the Tool Deck (renderHolster/_wireToolDeck/openToolDeck) is unaffected by the TERMLINK removal'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 169 — Owner batch: transcript cleanup (Style A) + composer
+//  autocomplete drop-up + Overseer LISTENING pulse
+//  Three owner-reported UPLINK/Director-Uplink polish fixes: (1) the
+//  transcript's old bounce (right-aligned/border'd user lines, centered
+//  italic system lines, italic tight-leading AI lines) is replaced with the
+//  approved chat-overhaul mockup's shared cleanup — every line left-anchored
+//  + full-width with a 14px hanging indent, voice carried by color/weight/
+//  size only — while keeping Style A's OVERSEER tag-above (now mirrored by a
+//  symmetric TERMINAL tag on user lines, per the mockup); (2) the composer's
+//  (#chatInput) registry-autocomplete singleton now drops UP instead of down
+//  for that one input, since dropping down covered the composer's own
+//  toolbar/send button; (3) tapping the Overseer scope's [ LISTENING ] tag
+//  (now enabled in that state, not just disabled/offline) triggers a
+//  transient one-shot amplitude pulse on the waveform — gated by the exact
+//  same _scopeShouldAnimate() reduced-motion/dial/hidden/standby check every
+//  other scope motion already obeys, never a bespoke carve-out — and never
+//  writes any campaign state.
+//  12 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 169 — transcript cleanup + composer autocomplete drop-up + scope pulse');
+  const uiCore169 = readFile('js/ui-core.js');
+  const uiSaves169 = readFile('js/ui-saves.js');
+  const css169 = readFile('css/terminal.css');
+  const appendBody169 = extractFunctionBody(uiCore169, 'appendToChat');
+
+  // 169.1  appendToChat() adds a symmetric 'msg-tag--terminal' tag reading
+  //        TERMINAL for sender === 'user' (Style A cleanup — mirrors the
+  //        existing OVERSEER tag for 'ai', proven by Suite 167.5)
+  assert(
+    /else if \(sender === 'user'\) \{[\s\S]{0,500}msg-tag--terminal/.test(appendBody169) &&
+      /tagEl\.textContent = 'TERMINAL'/.test(appendBody169),
+    "169.1: appendToChat() adds a 'msg-tag--terminal' tag element reading TERMINAL for sender === 'user'"
+  );
+
+  // 169.2  terminal.css: .msg-user/.msg-ai/.msg-sys are ALL left-anchored
+  //        with the same 14px hanging indent (text-align:left +
+  //        padding-left:14px + text-indent:-14px) instead of three
+  //        independently-bouncing rules
+  const msgUserRule169 = (css169.match(/\.msg-user \{[^}]*\}/) || [''])[0];
+  const msgAiRule169 = (css169.match(/\.msg-ai \{[^}]*\}/) || [''])[0];
+  const msgSysRule169 = (css169.match(/\.msg-sys \{[^}]*\}/) || [''])[0];
+  assert(
+    [msgUserRule169, msgAiRule169, msgSysRule169].every(
+      rule =>
+        /text-align: left;/.test(rule) &&
+        /padding-left: 14px;/.test(rule) &&
+        /text-indent: -14px;/.test(rule)
+    ),
+    '169.2: .msg-user/.msg-ai/.msg-sys are each left-anchored with the same 14px hanging indent'
+  );
+
+  // 169.3  the old bounce is gone: no right/center alignment, no side
+  //        borders/margins eating mobile width, no AI italic/tight-leading
+  assert(
+    !/\.msg-user \{[^}]*text-align: right/.test(css169) &&
+      !/\.msg-user \{[^}]*border-left/.test(css169) &&
+      !/\.msg-user \{[^}]*margin-left: 40px/.test(css169) &&
+      !/\.msg-sys \{[^}]*text-align: center/.test(css169) &&
+      !/\.msg-sys \{[^}]*font-style: italic/.test(css169) &&
+      !/\.msg-ai \{[^}]*font-style: italic/.test(css169) &&
+      !/\.msg-ai \{[^}]*line-height: 1\.15/.test(css169) &&
+      !/\.msg-ai \{[^}]*border-right/.test(css169) &&
+      !/\.chat-panel \.msg-ai \{[^}]*border-right/.test(css169),
+    '169.3: the old transcript bounce (right/center alignment, side borders/margins, AI italic + tight leading) is fully removed'
+  );
+
+  // 169.4  .msg-tag--terminal is defined, colored via the local phosphor
+  //        token (--robco-green) — distinct from OVERSEER's --bezel-wire —
+  //        and .msg-tag resets text-indent so the tag row itself never
+  //        inherits the hanging indent
+  assert(
+    /\.msg-tag--terminal \{[^}]*var\(--robco-green\)/.test(css169) &&
+      /\.msg-tag \{[^}]*text-indent: 0;/.test(css169),
+    '169.4: .msg-tag--terminal is defined via --robco-green (phosphor), and .msg-tag resets text-indent:0 for the tag row'
+  );
+
+  // 169.5  acPosition() (the shared registry-autocomplete singleton) drops
+  //        the panel UP specifically for #chatInput (composer context) via a
+  //        dedicated acDropsUp() gate, and still drops DOWN for every other
+  //        registry-backed input (rect.bottom-based, unchanged)
+  const acFnBody169 = uiSaves169.slice(
+    uiSaves169.indexOf('function acDropsUp'),
+    uiSaves169.indexOf('function acRender')
+  );
+  assert(
+    /function acDropsUp\(inputEl\) \{\s*return inputEl && inputEl\.id === 'chatInput';/.test(
+      acFnBody169
+    ) &&
+      /if \(acDropsUp\(inputEl\)\)/.test(acFnBody169) &&
+      /rect\.top - panelH - 2/.test(acFnBody169) &&
+      /panel\.style\.top = rect\.bottom \+ 2 \+ 'px';/.test(acFnBody169),
+    '169.5: acPosition() drops the panel UP for #chatInput (acDropsUp gate, rect.top-based) and DOWN for every other input (rect.bottom-based, unchanged)'
+  );
+
+  // 169.6  acRender() adds the 'ac-visible' class BEFORE calling acPosition()
+  //        so panel.offsetHeight reflects the just-rendered result list (a
+  //        display:none panel always measures 0, which would break the
+  //        composer's drop-up math)
+  const acRenderBody169 = extractFunctionBody(uiSaves169, 'acRender');
+  const visibleIdx169 = acRenderBody169.indexOf("classList.add('ac-visible')");
+  const positionIdx169 = acRenderBody169.indexOf('acPosition(inputEl)');
+  assert(
+    visibleIdx169 !== -1 && positionIdx169 !== -1 && visibleIdx169 < positionIdx169,
+    "169.6: acRender() adds 'ac-visible' BEFORE calling acPosition(), so the composer's drop-up height measurement is never taken against a display:none panel"
+  );
+
+  // 169.7  _scopePulse() is gated on BOTH the real state (only 'listening'
+  //        pulses) and the exact same _scopeShouldAnimate() reduced-motion/
+  //        Minimal-dial/hidden-tab/runtime-standby gate every other scope
+  //        motion already obeys — no bespoke reduced-motion carve-out
+  const pulseBody169 = extractFunctionBody(uiCore169, '_scopePulse');
+  assert(
+    /if \(_scopeState !== 'listening'\) return;/.test(pulseBody169) &&
+      /if \(!_scopeShouldAnimate\(\)\) return;/.test(pulseBody169) &&
+      /_scopePulseUntil = performance\.now\(\) \+ _scopePulseDurationMs;/.test(pulseBody169),
+    "169.7: _scopePulse() only pulses in the 'listening' state and reuses _scopeShouldAnimate() as its reduced-motion/dial/hidden/standby gate — no separate carve-out"
+  );
+
+  // 169.8  drawScope()'s listening branch amplifies its carrier-wave
+  //        amplitude from a pulse envelope derived from _scopePulseUntil —
+  //        proves the pulse is actually wired into the waveform, not just a
+  //        dead flag
+  const drawScopeBody169 = extractFunctionBody(uiCore169, 'drawScope');
+  assert(
+    /pulseEnv = pulseRemain > 0 \? pulseRemain \/ _scopePulseDurationMs : 0/.test(
+      drawScopeBody169
+    ) && /\* \(1 \+ pulseEnv \* 2\.5\)/.test(drawScopeBody169),
+    '169.8: drawScope() derives a decaying pulseEnv from _scopePulseUntil and amplifies the listening-state carrier wave with it'
+  );
+
+  // 169.9  _scopeTagClick() routes 'listening' to the pulse flourish while
+  //        preserving the FIX 4a NO-CARRIER routing for disabled/offline —
+  //        both behaviors coexist in the one click handler
+  const tagClickBody169 = extractFunctionBody(uiCore169, '_scopeTagClick');
+  assert(
+    /_scopeState === 'disabled' \|\| _scopeState === 'offline'/.test(tagClickBody169) &&
+      /_openAiUplinkSlot/.test(tagClickBody169) &&
+      /else if \(_scopeState === 'listening'\) \{\s*_scopePulse\(\);/.test(tagClickBody169),
+    "169.9: _scopeTagClick() routes 'listening' to _scopePulse() while keeping the disabled/offline → _openAiUplinkSlot() routing intact"
+  );
+
+  // 169.10  setOverseerState() disables the #scopeTag button ONLY during
+  //         thinking/speaking (mid-transaction) — listening/disabled/offline
+  //         are all clickable, since FIX 3 (pulse) and FIX 4a (NO-CARRIER
+  //         routing) both need the button enabled in their own state
+  const setStateBody169 = extractFunctionBody(uiCore169, 'setOverseerState');
+  assert(
+    /tagEl\.disabled = s === 'thinking' \|\| s === 'speaking';/.test(setStateBody169),
+    "169.10: setOverseerState() disables #scopeTag only for 'thinking'/'speaking' — listening/disabled/offline stay clickable"
+  );
+
+  // 169.11  zero campaign-state write: the pulse is a transient module var
+  //         only — no state.*/saveState()/robco_v8 reference anywhere near
+  //         the pulse machinery (Protocol UI-10)
+  assert(
+    !/_scopePulse[\s\S]{0,10}state\./.test(uiCore169) &&
+      !new RegExp('let _scopePulseUntil[\\s\\S]{0,400}saveState\\(').test(uiCore169),
+    '169.11: the scope pulse writes nothing durable — _scopePulseUntil is a transient module var, never persisted to state/robco_v8'
+  );
+
+  // 169.12  the #scopeTag button's aria-label is kept in sync with its new
+  //         actionable states so a screen-reader user knows a tap does
+  //         something in LISTENING too, not just NO CARRIER
+  assert(
+    /tap to pulse the scope/.test(setStateBody169) &&
+      /tap to open the AI Uplink settings/.test(setStateBody169),
+    "169.12: setOverseerState() updates #scopeTag's aria-label for both the LISTENING pulse action and the disabled/offline NO CARRIER routing"
   );
 }
 

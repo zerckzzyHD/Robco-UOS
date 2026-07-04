@@ -385,12 +385,16 @@ textarea {
   flex-direction: column;
   gap: 15px;
 }
+/* Style A transcript cleanup (owner-approved mockup,
+   planning/mockups/chat-overhaul.html): every line left-anchored + full-width
+   — no more right-aligned/centered voices or side borders eating mobile
+   width — with a 14px hanging indent so wrapped rows tuck under the first
+   row's text start. Voice is carried by color/weight/size only. */
 .msg-user {
   color: var(--robco-green);
-  text-align: right;
-  border-left: 2px solid var(--robco-green);
-  padding-left: 10px;
-  margin-left: 40px;
+  text-align: left;
+  padding-left: 14px;
+  text-indent: -14px;
   /* Match .msg-ai: a long unbroken token in a restored user message must wrap,
      not set a wide min-content that blows out the single 1fr main-grid track. */
   overflow-wrap: anywhere;
@@ -399,25 +403,26 @@ textarea {
 .msg-ai {
   color: var(--robco-blue);
   text-align: left;
-  border-right: 2px solid var(--robco-blue);
-  padding-right: 15px;
-  margin-right: 20px;
+  padding-left: 14px;
+  text-indent: -14px;
   white-space: pre-wrap;
   word-break: break-word;
-  line-height: 1.15;
+  line-height: 1.4;
 }
 .msg-sys {
   color: var(--robco-alert);
-  text-align: center;
-  font-style: italic;
-  font-size: 12px;
+  text-align: left;
+  padding-left: 14px;
+  text-indent: -14px;
+  font-size: 11px;
   /* Match .msg-ai: wrap long unbroken tokens instead of widening the track. */
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 .msg-content {
   /* Keeps the typewriter's textContent/innerHTML writes scoped to the message
-     body only, so an OVERSEER tag (a sibling element) never gets wiped. */
+     body only, so an OVERSEER/TERMINAL tag (a sibling element) never gets
+     wiped. */
   display: inline;
 }
 .msg-tag {
@@ -427,9 +432,13 @@ textarea {
   letter-spacing: 0.08em;
   opacity: 0.65;
   margin-bottom: 2px;
+  text-indent: 0; /* the tag row itself never inherits the hanging indent */
 }
 .msg-tag--overseer {
   color: var(--bezel-wire);
+}
+.msg-tag--terminal {
+  color: var(--robco-green);
 }
 
 .image-preview {
@@ -981,10 +990,10 @@ button.lamp {
 
 /* Transcript restyle — the `> ` prefix on user lines already exists in
    appendToChat(); this only recolors the AI/sys lines to read as the
-   remote Director presence (amber/--bezel-wire) vs local phosphor. */
+   remote Director presence (amber/--bezel-wire) vs local phosphor. Style A
+   cleanup dropped the side border entirely (see the shared .msg-ai rule). */
 .chat-panel .msg-ai {
   color: var(--bezel-wire);
-  border-right: 2px solid var(--bezel-wire);
 }
 .chat-panel .msg-sys {
   color: rgba(var(--bezel-wire-rgb), 0.6);

@@ -832,13 +832,31 @@ function initRegistryAutocomplete() {
     _acCurrentInput = null;
   }
 
+  // The composer (#chatInput) has its own toolbar row (+/pill/?/send) docked
+  // directly BELOW the textarea inside the same bordered box — a drop-down
+  // panel there covers the send button. Drop UP instead for that one input
+  // (Protocol 22 — same singleton panel/logic, just flipped vertically for
+  // the composer context); every other registry-backed input keeps dropping
+  // down as before.
+  function acDropsUp(inputEl) {
+    return inputEl && inputEl.id === 'chatInput';
+  }
+
   function acPosition(inputEl) {
     var rect = inputEl.getBoundingClientRect();
-    panel.style.top = rect.bottom + 2 + 'px';
-    panel.style.left = rect.left + 'px';
     // Clamp to viewport right edge
     var panelW = Math.min(340, Math.max(220, rect.width));
     panel.style.width = panelW + 'px';
+    if (acDropsUp(inputEl)) {
+      // panel.offsetHeight only reflects real content once visible — callers
+      // add 'ac-visible' before invoking acPosition() so this measures the
+      // just-rendered result list, not a stale/zero height.
+      var panelH = panel.offsetHeight || 0;
+      panel.style.top = Math.max(4, rect.top - panelH - 2) + 'px';
+    } else {
+      panel.style.top = rect.bottom + 2 + 'px';
+    }
+    panel.style.left = rect.left + 'px';
   }
 
   function acRender(results, inputEl) {
@@ -888,8 +906,11 @@ function initRegistryAutocomplete() {
       });
     }
 
-    acPosition(inputEl);
+    // Make it visible BEFORE positioning — acPosition() needs a real
+    // offsetHeight to drop-up correctly for the composer, and a panel with
+    // display:none always measures 0.
     panel.classList.add('ac-visible');
+    acPosition(inputEl);
   }
 
   function acSetActive(idx) {

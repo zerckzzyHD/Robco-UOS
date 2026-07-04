@@ -13507,9 +13507,12 @@ Check (
 ) "165.16: _openAiUplinkSlot() reuses selectSubsystem('chassis') (Protocol 22) then opens/scrolls the SLOT 05 sub-panel specifically"
 
 $setStateBody165 = Get-FunctionBody $uiSrc "setOverseerState"
+# Suite 169 (owner FIX 3): LISTENING became actionable too (tap -> scope pulse),
+# so the button is now disabled only mid-transaction (thinking/speaking) --
+# see Suite 169.10 for the dedicated regression.
 Check (
-    $setStateBody165 -match [regex]::Escape("tagEl.disabled = s !== 'disabled' && s !== 'offline'")
-) "165.17: setOverseerState() toggles the scope-tag button's disabled attribute -- actionable ONLY in disabled/offline (NO CARRIER), a pure status readout otherwise"
+    $setStateBody165 -match [regex]::Escape("tagEl.disabled = s === 'thinking' || s === 'speaking'")
+) "165.17: setOverseerState() toggles the scope-tag button's disabled attribute -- inert ONLY mid-transaction (thinking/speaking); listening/disabled/offline are all actionable (Suite 169 FIX 3 update)"
 
 $scopeClickBody165 = Get-FunctionBody $uiSrc "_scopeTagClick"
 Check (
@@ -13848,12 +13851,13 @@ Check ($RETIRED113 -contains '[CROSSROADS]') `
 Check (($appendBody167 -match "sender === 'ai'[\s\S]{0,200}msg-tag--overseer") -and ($appendBody167 -match "tagEl\.textContent = 'OVERSEER'")) `
     "167.5: appendToChat() adds a 'msg-tag--overseer' tag element reading OVERSEER for sender === 'ai'"
 
-# 167.6  the tag is gated on sender -- created ONLY inside the ai-only branch
-$overseerBranch167 = [regex]::Match($appendBody167, "(?s)if \(sender === 'ai'\) \{.*?\n  \}").Value
+# 167.6  the tag is gated on sender -- created ONLY inside the ai/user branches
+# (DO-P Style A cleanup added the symmetric TERMINAL tag for 'user'; 'sys' still gets none)
+$tagBranches167 = [regex]::Match($appendBody167, "(?s)if \(sender === 'ai'\) \{.*?\n  \} else if \(sender === 'user'\) \{.*?\n  \}").Value
 $allTagHits167  = [regex]::Matches($appendBody167, 'msg-tag').Count
-$branchTagHits167 = [regex]::Matches($overseerBranch167, 'msg-tag').Count
-Check ($overseerBranch167.Contains('msg-tag--overseer') -and ($allTagHits167 -eq $branchTagHits167)) `
-    "167.6: the OVERSEER tag element is created ONLY inside the sender === 'ai' branch -- 'sys'/'user' messages get no tag"
+$branchTagHits167 = [regex]::Matches($tagBranches167, 'msg-tag').Count
+Check ($tagBranches167.Contains('msg-tag--overseer') -and $tagBranches167.Contains('msg-tag--terminal') -and ($allTagHits167 -eq $branchTagHits167)) `
+    "167.6: the OVERSEER/TERMINAL tag elements are created ONLY inside the sender === 'ai'/'user' branches -- 'sys' messages get no tag"
 
 # 167.7  the typewriter's per-frame writes target msgContent, never msgDiv directly
 Check (($appendBody167 -match 'msgContent\.textContent\s*=\s*plainText') -and (([regex]::Matches($appendBody167, 'msgContent\.innerHTML\s*=\s*fullHtml')).Count -eq 2) -and (-not ($appendBody167 -match 'msgDiv\.textContent\s*=')) -and (-not ($appendBody167 -match 'msgDiv\.innerHTML\s*='))) `
@@ -13915,6 +13919,126 @@ Check (($uiRender168 -match 'function renderBioScan\(') -and ($html168 -match 'o
 # 168.8  the Tool Deck is untouched: its render/wire/open functions are still present
 Check (($uiRender168 -match 'function renderHolster\(') -and ($uiCore168 -match 'function _wireToolDeck\(') -and ($uiCore168 -match 'function openToolDeck\(')) `
     '168.8: the Tool Deck (renderHolster/_wireToolDeck/openToolDeck) is unaffected by the TERMLINK removal'
+
+# ===========================================================
+# Suite 169 -- Owner batch: transcript cleanup (Style A) + composer
+# autocomplete drop-up + Overseer LISTENING pulse (12 tests)
+# Three owner-reported UPLINK/Director-Uplink polish fixes: (1) the
+# transcript's old bounce (right-aligned/border'd user lines, centered italic
+# system lines, italic tight-leading AI lines) is replaced with the approved
+# chat-overhaul mockup's shared cleanup -- every line left-anchored + full-
+# width with a 14px hanging indent, voice carried by color/weight/size only --
+# while keeping Style A's OVERSEER tag-above (now mirrored by a symmetric
+# TERMINAL tag on user lines, per the mockup); (2) the composer's (#chatInput)
+# registry-autocomplete singleton now drops UP instead of down for that one
+# input, since dropping down covered the composer's own toolbar/send button;
+# (3) tapping the Overseer scope's [ LISTENING ] tag (now enabled in that
+# state, not just disabled/offline) triggers a transient one-shot amplitude
+# pulse on the waveform -- gated by the exact same _scopeShouldAnimate()
+# reduced-motion/dial/hidden/standby check every other scope motion already
+# obeys, never a bespoke carve-out -- and never writes any campaign state.
+# (PS mirror of JS Suite 169.)
+# ===========================================================
+Sep "Suite 169 -- transcript cleanup + composer autocomplete drop-up + scope pulse"
+$uiCore169 = Read-Src "js/ui-core.js"
+$uiSaves169 = Read-Src "js/ui-saves.js"
+$css169 = Read-Src "css/terminal.css"
+$appendBody169 = Get-FunctionBody $uiCore169 "appendToChat"
+
+# 169.1  appendToChat() adds a symmetric 'msg-tag--terminal' tag reading
+#        TERMINAL for sender === 'user'
+Check (($appendBody169 -match "else if \(sender === 'user'\) \{[\s\S]{0,500}msg-tag--terminal") -and ($appendBody169 -match "tagEl\.textContent = 'TERMINAL'")) `
+    "169.1: appendToChat() adds a 'msg-tag--terminal' tag element reading TERMINAL for sender === 'user'"
+
+# 169.2  .msg-user/.msg-ai/.msg-sys are each left-anchored with the same
+#        14px hanging indent
+$msgUserRule169 = [regex]::Match($css169, '\.msg-user \{[^}]*\}').Value
+$msgAiRule169   = [regex]::Match($css169, '\.msg-ai \{[^}]*\}').Value
+$msgSysRule169  = [regex]::Match($css169, '\.msg-sys \{[^}]*\}').Value
+$hangingIndentOk169 = $true
+foreach ($rule in @($msgUserRule169, $msgAiRule169, $msgSysRule169)) {
+    if (-not (($rule -match 'text-align: left;') -and ($rule -match 'padding-left: 14px;') -and ($rule -match 'text-indent: -14px;'))) {
+        $hangingIndentOk169 = $false
+    }
+}
+Check $hangingIndentOk169 `
+    '169.2: .msg-user/.msg-ai/.msg-sys are each left-anchored with the same 14px hanging indent'
+
+# 169.3  the old bounce is gone: no right/center alignment, no side
+#        borders/margins eating mobile width, no AI italic/tight-leading
+Check (
+    (-not ($css169 -match '\.msg-user \{[^}]*text-align: right')) -and
+    (-not ($css169 -match '\.msg-user \{[^}]*border-left')) -and
+    (-not ($css169 -match '\.msg-user \{[^}]*margin-left: 40px')) -and
+    (-not ($css169 -match '\.msg-sys \{[^}]*text-align: center')) -and
+    (-not ($css169 -match '\.msg-sys \{[^}]*font-style: italic')) -and
+    (-not ($css169 -match '\.msg-ai \{[^}]*font-style: italic')) -and
+    (-not ($css169 -match '\.msg-ai \{[^}]*line-height: 1\.15')) -and
+    (-not ($css169 -match '\.msg-ai \{[^}]*border-right')) -and
+    (-not ($css169 -match '\.chat-panel \.msg-ai \{[^}]*border-right'))
+) '169.3: the old transcript bounce (right/center alignment, side borders/margins, AI italic + tight leading) is fully removed'
+
+# 169.4  .msg-tag--terminal is defined via --robco-green; .msg-tag resets
+#        text-indent for the tag row
+Check (($css169 -match '\.msg-tag--terminal \{[^}]*var\(--robco-green\)') -and ($css169 -match '\.msg-tag \{[^}]*text-indent: 0;')) `
+    '169.4: .msg-tag--terminal is defined via --robco-green (phosphor), and .msg-tag resets text-indent:0 for the tag row'
+
+# 169.5  acPosition() drops the panel UP for #chatInput, DOWN for others
+$acStart169 = $uiSaves169.IndexOf('function acDropsUp')
+$acEnd169   = $uiSaves169.IndexOf('function acRender')
+$acFnBody169 = $uiSaves169.Substring($acStart169, $acEnd169 - $acStart169)
+Check (
+    ($acFnBody169 -match "function acDropsUp\(inputEl\) \{\s*return inputEl && inputEl\.id === 'chatInput';") -and
+    ($acFnBody169 -match 'if \(acDropsUp\(inputEl\)\)') -and
+    ($acFnBody169 -match 'rect\.top - panelH - 2') -and
+    ($acFnBody169 -match "panel\.style\.top = rect\.bottom \+ 2 \+ 'px';")
+) "169.5: acPosition() drops the panel UP for #chatInput (acDropsUp gate, rect.top-based) and DOWN for every other input (rect.bottom-based, unchanged)"
+
+# 169.6  acRender() adds 'ac-visible' BEFORE calling acPosition()
+$acRenderBody169 = Get-FunctionBody $uiSaves169 "acRender"
+$visibleIdx169 = $acRenderBody169.IndexOf("classList.add('ac-visible')")
+$positionIdx169 = $acRenderBody169.IndexOf('acPosition(inputEl)')
+Check (($visibleIdx169 -ge 0) -and ($positionIdx169 -ge 0) -and ($visibleIdx169 -lt $positionIdx169)) `
+    "169.6: acRender() adds 'ac-visible' BEFORE calling acPosition(), so the composer's drop-up height measurement is never taken against a display:none panel"
+
+# 169.7  _scopePulse() is gated on 'listening' AND _scopeShouldAnimate()
+$pulseBody169 = Get-FunctionBody $uiCore169 "_scopePulse"
+Check (
+    ($pulseBody169 -match "if \(_scopeState !== 'listening'\) return;") -and
+    ($pulseBody169 -match 'if \(!_scopeShouldAnimate\(\)\) return;') -and
+    ($pulseBody169 -match '_scopePulseUntil = performance\.now\(\) \+ _scopePulseDurationMs;')
+) "169.7: _scopePulse() only pulses in the 'listening' state and reuses _scopeShouldAnimate() as its reduced-motion/dial/hidden/standby gate -- no separate carve-out"
+
+# 169.8  drawScope()'s listening branch amplifies from a decaying pulseEnv
+$drawScopeBody169 = Get-FunctionBody $uiCore169 "drawScope"
+Check (
+    ($drawScopeBody169 -match 'pulseEnv = pulseRemain > 0 \? pulseRemain / _scopePulseDurationMs : 0') -and
+    ($drawScopeBody169 -match '\* \(1 \+ pulseEnv \* 2\.5\)')
+) '169.8: drawScope() derives a decaying pulseEnv from _scopePulseUntil and amplifies the listening-state carrier wave with it'
+
+# 169.9  _scopeTagClick() routes 'listening' to the pulse while keeping the
+#        disabled/offline routing intact
+$tagClickBody169 = Get-FunctionBody $uiCore169 "_scopeTagClick"
+Check (
+    ($tagClickBody169 -match "_scopeState === 'disabled' \|\| _scopeState === 'offline'") -and
+    ($tagClickBody169 -match '_openAiUplinkSlot') -and
+    ($tagClickBody169 -match "else if \(_scopeState === 'listening'\) \{\s*_scopePulse\(\);")
+) "169.9: _scopeTagClick() routes 'listening' to _scopePulse() while keeping the disabled/offline -> _openAiUplinkSlot() routing intact"
+
+# 169.10  setOverseerState() disables #scopeTag only for thinking/speaking
+$setStateBody169 = Get-FunctionBody $uiCore169 "setOverseerState"
+Check ($setStateBody169 -match "tagEl\.disabled = s === 'thinking' \|\| s === 'speaking';") `
+    "169.10: setOverseerState() disables #scopeTag only for 'thinking'/'speaking' -- listening/disabled/offline stay clickable"
+
+# 169.11  zero campaign-state write -- transient module var only
+Check (
+    (-not ($uiCore169 -match '_scopePulse[\s\S]{0,10}state\.')) -and
+    (-not ($uiCore169 -match 'let _scopePulseUntil[\s\S]{0,400}saveState\('))
+) '169.11: the scope pulse writes nothing durable -- _scopePulseUntil is a transient module var, never persisted to state/robco_v8'
+
+# 169.12  #scopeTag's aria-label reflects both new actionable states
+Check (($setStateBody169 -match 'tap to pulse the scope') -and ($setStateBody169 -match 'tap to open the AI Uplink settings')) `
+    "169.12: setOverseerState() updates #scopeTag's aria-label for both the LISTENING pulse action and the disabled/offline NO CARRIER routing"
 
 # ===========================================================
 # Results
