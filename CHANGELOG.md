@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2066/2066 | Cache: robco-terminal-v2.7.0-r51 -->
+﻿## [Unreleased]<!-- Tests: 2096/2096 | Cache: robco-terminal-v2.7.0-r52 -->
 
 ### Added
 
@@ -49,6 +49,9 @@
 - Fixed the growing button row on each save (Load, Overwrite, version history, Delete, and — for cloud saves — Rename) potentially getting cut off on narrower screens. Buttons now wrap onto a second line instead of clipping or forcing the row to scroll sideways.
 - Fixed the Tool Deck's target field not offering any suggestions as you typed. It now suggests matching creatures, items, locations, and other topics as you type, the same way the other search boxes in the terminal already do.
 - Fixed the Tool Deck popping open the on-screen keyboard the moment you opened it, which could cover the Quick-Draw Holster's four gear slots underneath. The keyboard now only appears once you actually tap the field.
+- Fixed the PWR, UPLINK, and FAULT status lights on the terminal's casing being purely decorative. Tapping PWR now powers the terminal off (tap the "PRESS TO POWER ON" button to bring it back); UPLINK now only lights up when your AI connection is actually working and jumps straight to the AI Uplink settings when tapped; FAULT now only lights up when an error has actually been recorded and opens the error log when tapped.
+- Fixed the Director Uplink's "NO CARRIER" status doing nothing when tapped and never updating without a reload. Tapping it while disconnected now jumps straight to the AI Uplink settings, and the status flips between "listening" and "no carrier" the instant you add, remove, or change your key — no reload needed.
+- Fixed the status strip along the bottom always claiming your vitals were nominal no matter what. It now shows your real health status (including warnings for low, critical, or crippled conditions), your actual radiation level, and whether your AI connection is genuinely online.
 
 ### Improved
 

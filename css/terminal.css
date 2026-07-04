@@ -538,6 +538,23 @@ textarea {
   align-items: center;
   gap: 4px;
 }
+/* Owner-report batch: lamps are now real <button>s (Protocol UI-5) — undo the
+   global button reset (background/color/padding/width/margin/font-weight) so
+   they keep their original inline-badge look, and give each a >=28px tap
+   target (Protocol 17) without growing the visible glyph. */
+button.lamp {
+  background: none;
+  border: none;
+  padding: 4px 2px;
+  margin: 0;
+  width: auto;
+  color: inherit;
+  font: inherit;
+  font-weight: normal;
+  letter-spacing: inherit;
+  min-height: 28px;
+  cursor: pointer;
+}
 .lamp i {
   width: 8px;
   height: 8px;
@@ -633,9 +650,12 @@ textarea {
   font-size: 10px;
   letter-spacing: 1.5px;
   padding: 5px 12px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* Owner-report batch (Suite 165): the strip grew a live VITALS/RAD/CARRIER
+     suffix on every subsystem, which no longer reliably fits one line at
+     narrow widths — wrap instead of the previous nowrap+ellipsis, so the
+     status text is never silently truncated (Protocol 17). */
+  white-space: normal;
+  overflow-wrap: break-word;
   text-align: center;
 }
 /* .nav-row groups the role=tablist nav + the sibling DIR button (which is NOT
@@ -894,6 +914,22 @@ textarea {
   background: rgba(0, 0, 0, 0.55);
   padding: 2px 6px;
   border: 1px solid rgba(var(--bezel-wire-rgb), 0.4);
+  /* FIX 4a (owner report): now a real <button> (Protocol UI-5) — undo the
+     global button reset (width:100%/margin-top/font-weight) so it keeps its
+     original absolute-positioned overlay look at every state. */
+  width: auto;
+  margin: 0;
+  font-weight: normal;
+  font-family: inherit;
+  cursor: default;
+}
+.scope-tag:not(:disabled) {
+  cursor: pointer;
+}
+.scope-tag:disabled {
+  /* A status readout even while inert — never dimmed just because it's disabled. */
+  opacity: 1;
+  color: var(--bezel-wire);
 }
 .scope-tag.thinking {
   animation: ovs-tag-blink 0.7s steps(2) infinite;

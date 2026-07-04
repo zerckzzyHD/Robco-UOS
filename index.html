@@ -254,10 +254,40 @@
             ><span class="chassis-flavor chassis-flavor--fnv">DESK TERMINAL</span></span
           >
         </div>
-        <div class="lamp-row" aria-hidden="true">
-          <span class="lamp on" id="lampPwr"><i></i>PWR</span>
-          <span class="lamp wire on" id="lampUplink"><i></i>UPLINK</span>
-          <span class="lamp" id="lampFault"><i></i>FAULT</span>
+        <!-- Owner-report batch: casing lamps go from decorative to functional
+             (js/ui-core.js) — PWR powers the terminal off (reuses the A3
+             AmbientRuntime shutdown path), UPLINK reflects + opens the AI
+             connection (SLOT 05), FAULT reflects + opens the client error log.
+             Real <button>s (Protocol UI-5), so the row is no longer
+             aria-hidden. -->
+        <div class="lamp-row">
+          <button
+            type="button"
+            class="lamp on"
+            id="lampPwr"
+            onclick="_powerOffFromLamp()"
+            aria-label="Power off the terminal"
+          >
+            <i aria-hidden="true"></i>PWR
+          </button>
+          <button
+            type="button"
+            class="lamp wire on"
+            id="lampUplink"
+            onclick="_openAiUplinkSlot()"
+            aria-label="AI Uplink connection status &mdash; open AI Uplink slot"
+          >
+            <i aria-hidden="true"></i>UPLINK
+          </button>
+          <button
+            type="button"
+            class="lamp"
+            id="lampFault"
+            onclick="showErrorLog()"
+            aria-label="Client error log status &mdash; open error log"
+          >
+            <i aria-hidden="true"></i>FAULT
+          </button>
         </div>
         <div class="vents" aria-hidden="true"></div>
         <p class="uptime-line">
@@ -2450,7 +2480,18 @@
               </div>
               <div class="scope-wrap">
                 <canvas id="overseerScope" aria-hidden="true"></canvas>
-                <div class="scope-tag" id="scopeTag">[ LISTENING ]</div>
+                <!-- FIX 4a (owner report): a real <button> (Protocol UI-5) — only
+                     actionable while NO CARRIER/OFFLINE (setOverseerState()
+                     toggles `disabled`); routes to the SLOT 05 AI Uplink board. -->
+                <button
+                  type="button"
+                  class="scope-tag"
+                  id="scopeTag"
+                  onclick="_scopeTagClick()"
+                  disabled
+                >
+                  [ LISTENING ]
+                </button>
                 <div class="scope-meta" id="scopeStrip">SIGNAL — · ENCRYPTION: TRI-NODE</div>
               </div>
 

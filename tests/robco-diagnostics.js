@@ -21759,6 +21759,251 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 165 — Functional casing lamps + Overseer routing + VITALS strip
+//  (owner-reported batch). The PWR/UPLINK/FAULT casing lamps and the
+//  Overseer's NO CARRIER tag go from purely decorative to real, wired
+//  controls; the bezel status strip goes from a hardcoded VITALS NOMINAL
+//  to a live HP/limb/rad/connection readout. Every fix reuses an existing
+//  system (Protocol 22): AmbientRuntime.shutdown(), selectSubsystem(),
+//  showErrorLog(), and the Overseer's own _overseerRestState/
+//  _overseerRestSignals connection signal.
+//  30 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 165 — Functional casing lamps + Overseer routing + VITALS strip');
+
+  // ── FIX 1/2/3: lamp markup — real <button>s, not <span>s (Protocol UI-5) ──
+  assert(
+    /<div class="lamp-row">\s*<!--|<div class="lamp-row">\s*\n\s*<button/.test(htmlSource) ||
+      (htmlSource.includes('<div class="lamp-row">') &&
+        !/<div class="lamp-row" aria-hidden="true">/.test(htmlSource)),
+    '165.1: .lamp-row no longer carries aria-hidden="true" (it now holds real interactive buttons)'
+  );
+  guards(htmlSource, [
+    [
+      /<button\s+type="button"\s+class="lamp on"\s+id="lampPwr"\s+onclick="_powerOffFromLamp\(\)"/,
+      '165.2: #lampPwr is a real <button> whose onclick calls _powerOffFromLamp()',
+    ],
+    [
+      /<button\s+type="button"\s+class="lamp wire on"\s+id="lampUplink"\s+onclick="_openAiUplinkSlot\(\)"/,
+      '165.3: #lampUplink is a real <button> whose onclick calls _openAiUplinkSlot()',
+    ],
+    [
+      /<button\s+type="button"\s+class="lamp"\s+id="lampFault"\s+onclick="showErrorLog\(\)"/,
+      '165.4: #lampFault is a real <button> whose onclick calls the existing showErrorLog() (Protocol 22 — no new error-log viewer)',
+    ],
+  ]);
+  {
+    const lampBlock = htmlSource.slice(
+      htmlSource.indexOf('<div class="lamp-row">'),
+      htmlSource.indexOf('<div class="vents"')
+    );
+    assert(
+      (lampBlock.match(/aria-label="/g) || []).length === 3,
+      '165.5: all 3 lamps carry a descriptive aria-label (literal, not diegetic — Protocol UI-3 convention)'
+    );
+    assert(
+      (lampBlock.match(/<i aria-hidden="true"><\/i>/g) || []).length === 3,
+      '165.6: the decorative dot inside each lamp is aria-hidden (the button itself carries the accessible name)'
+    );
+  }
+  assert(
+    /<button\s+type="button"\s+class="scope-tag"\s+id="scopeTag"\s+onclick="_scopeTagClick\(\)"\s+disabled\s*>/.test(
+      htmlSource
+    ),
+    '165.7: #scopeTag is a real <button> (Protocol UI-5), onclick=_scopeTagClick(), and starts disabled (safe default until the real connection state is computed at boot)'
+  );
+
+  // ── CSS: undo the global button reset so the lamps/scope-tag keep their
+  //    original look, and meet the >=28px tap target (Protocol 17) ──────────
+  guards(cssSource, [
+    [
+      /button\.lamp\s*\{[^}]*min-height:\s*28px/s,
+      '165.8: button.lamp sets a >=28px tap target (Protocol 17)',
+    ],
+    [
+      /button\.lamp\s*\{[^}]*width:\s*auto/s,
+      '165.9: button.lamp resets the global button width:100% back to auto',
+    ],
+    [
+      /\.scope-tag\s*\{[^}]*width:\s*auto/s,
+      '165.10: .scope-tag resets the global button width:100% back to auto now that it is a <button>',
+    ],
+    [
+      /\.scope-tag:disabled\s*\{[^}]*opacity:\s*1/s,
+      '165.11: .scope-tag:disabled stays fully legible (never dimmed just because it is inert)',
+    ],
+  ]);
+
+  // ── FIX 1: PWR lamp → the existing AmbientRuntime shutdown path ──────────
+  {
+    const powerOffBody = extractFunctionBody(uiSource, '_powerOffFromLamp');
+    assert(
+      /AmbientRuntime\.shutdown\(\)/.test(powerOffBody) &&
+        !/AmbientRuntime\.forceState/.test(powerOffBody),
+      '165.12: _powerOffFromLamp() calls the existing AmbientRuntime.shutdown() (Protocol 22 — never forceState(), the TEST-ONLY escape hatch)'
+    );
+  }
+  {
+    const shutdownCrtIdx = uiSource.indexOf("id: 'shutdown-crt'");
+    const shutdownCrtBlock = uiSource.slice(shutdownCrtIdx, shutdownCrtIdx + 700);
+    assert(
+      /onEnter:[^]*?_updatePwrLamp\(false\)/.test(shutdownCrtBlock) &&
+        /onExit:[^]*?_updatePwrLamp\(true\)/.test(shutdownCrtBlock),
+      '165.13: the shutdown-crt observer (the ONE SHUTDOWN/OFF observer) unlights the PWR lamp on entry and relights it on exit — no second observer registered just for the lamp'
+    );
+  }
+
+  // ── FIX 2/4/5: the ONE connection signal, reused everywhere ──────────────
+  {
+    const isConnBody = extractFunctionBody(uiSource, '_isUplinkConnected');
+    assert(
+      /_overseerRestState\(_overseerRestSignals\(\)\) === 'listening'/.test(isConnBody) &&
+        !/robco_gemini_validated_key/.test(isConnBody),
+      "165.14: _isUplinkConnected() reuses the Overseer's own _overseerRestState/_overseerRestSignals (Protocol 22, single source) — deliberately NOT the stricter validated-key check SLOT 05's own board status uses"
+    );
+  }
+  {
+    const upLampBody = extractFunctionBody(uiSource, '_updateUplinkLamp');
+    assert(
+      /_isUplinkConnected\(\)/.test(upLampBody),
+      '165.15: _updateUplinkLamp() reads _isUplinkConnected() — the UPLINK lamp can never disagree with the Overseer'
+    );
+  }
+  {
+    const openSlotBody = extractFunctionBody(uiSource, '_openAiUplinkSlot');
+    assert(
+      /selectSubsystem\('chassis'\)/.test(openSlotBody) &&
+        /data-sub-id="slot_05_uplink"/.test(openSlotBody),
+      "165.16: _openAiUplinkSlot() reuses selectSubsystem('chassis') (Protocol 22) then opens/scrolls the SLOT 05 sub-panel specifically"
+    );
+  }
+  {
+    const setStateBody = extractFunctionBody(uiSource, 'setOverseerState');
+    assert(
+      /tagEl\.disabled = s !== 'disabled' && s !== 'offline'/.test(setStateBody),
+      "165.17: setOverseerState() toggles the scope-tag button's disabled attribute — actionable ONLY in disabled/offline (NO CARRIER), a pure status readout otherwise"
+    );
+  }
+  {
+    const scopeClickBody = extractFunctionBody(uiSource, '_scopeTagClick');
+    assert(
+      /_scopeState === 'disabled' \|\| _scopeState === 'offline'/.test(scopeClickBody) &&
+        /_openAiUplinkSlot\(\)/.test(scopeClickBody),
+      '165.18: _scopeTagClick() routes to the AI Uplink slot only in disabled/offline (defense-in-depth alongside the native disabled attribute)'
+    );
+  }
+  {
+    const refreshBody = extractFunctionBody(uiSource, 'refreshOverseerCarrier');
+    assert(
+      /_updateUplinkLamp\(\)/.test(refreshBody) && /_refreshBezelTelemetry\(\)/.test(refreshBody),
+      '165.19: refreshOverseerCarrier() is the ONE choke point that also refreshes the UPLINK lamp + the bezel telemetry strip — every connection-change entry path (online/offline events, initial boot, a key edit) live-updates all three together'
+    );
+  }
+  assert(
+    /function saveApiKeySilent\(\)[^]*?refreshOverseerCarrier\(\)/.test(apiSource),
+    '165.20: saveApiKeySilent() (fired on every key-field keystroke) calls refreshOverseerCarrier() — FIX 4b: adding/removing the key live-flips NO CARRIER/LISTENING with no reload'
+  );
+
+  // ── FIX 5: VITALS/RAD/CARRIER strip ──────────────────────────────────────
+  {
+    const suffixBody = extractFunctionBody(uiSource, '_bezelStatusSuffix');
+    assert(
+      /_isUplinkConnected\(\)/.test(suffixBody) &&
+        /'ONLINE'/.test(suffixBody) &&
+        /'OFFLINE'/.test(suffixBody),
+      '165.21: _bezelStatusSuffix() derives CARRIER from the same _isUplinkConnected() signal as the UPLINK lamp (Protocol 22, single source)'
+    );
+    assert(
+      /RAD '/.test(suffixBody) && /getElementById\('stat_rads'\)/.test(suffixBody),
+      "165.22: _bezelStatusSuffix() reads the real rads value (DOM-first, matching updateMath()'s own live-read pattern) instead of a hardcoded figure"
+    );
+  }
+  {
+    const vitalsBody = extractFunctionBody(uiSource, '_vitalsTier');
+    assert(
+      /CRIPPLED/.test(vitalsBody) &&
+        /hpPct <= 25/.test(vitalsBody) &&
+        /hpPct <= 60/.test(vitalsBody) &&
+        /'NOMINAL'/.test(vitalsBody),
+      '165.23: _vitalsTier() derives NOMINAL/WARNING/CRITICAL/CRIPPLED from HP% and the la/ra/ll/rl/hd limb fields (crippled overrides HP%) — game-agnostic, Protocol 38'
+    );
+    // Behavioral proof (real execution) — mirrors the Suite 133/164 eval-extracted-function convention.
+    let _testVitals165 = null;
+    try {
+      _testVitals165 = new Function(
+        'document',
+        'state',
+        'return (function _vitalsTier()' + vitalsBody + ')();'
+      );
+    } catch (_) {}
+    if (_testVitals165) {
+      const mkDoc = (hpCur, hpMax) => ({
+        getElementById(id) {
+          if (id === 'stat_hp_cur') return { value: String(hpCur) };
+          if (id === 'stat_hp_max') return { value: String(hpMax) };
+          return null;
+        },
+      });
+      const okLimbs = { hd: 'OK', la: 'OK', ra: 'OK', ll: 'OK', rl: 'OK' };
+      assert(
+        _testVitals165(mkDoc(100, 100), okLimbs) === 'NOMINAL',
+        '165.24: [behavioral] _vitalsTier() returns NOMINAL at full HP with no crippled limbs'
+      );
+      assert(
+        _testVitals165(mkDoc(50, 100), okLimbs) === 'WARNING',
+        '165.25: [behavioral] _vitalsTier() returns WARNING at 50% HP (<=60%, >25%)'
+      );
+      assert(
+        _testVitals165(mkDoc(20, 100), okLimbs) === 'CRITICAL',
+        '165.26: [behavioral] _vitalsTier() returns CRITICAL at 20% HP (<=25%)'
+      );
+      assert(
+        _testVitals165(mkDoc(100, 100), { ...okLimbs, la: 'CRIPPLED' }) === 'CRIPPLED',
+        '165.27: [behavioral] _vitalsTier() returns CRIPPLED whenever any limb is crippled, even at full HP (overrides the HP-derived tier)'
+      );
+    } else {
+      fail('165.24-27: _vitalsTier() behavioral harness failed to initialize');
+    }
+  }
+  {
+    const telemetryBody = extractFunctionBody(uiSource, '_bezelTelemetryText');
+    assert(
+      /_bezelSubsystemLabel\(subsystem\) \+ _bezelStatusSuffix\(\)/.test(telemetryBody),
+      '165.28: _bezelTelemetryText() composes the per-subsystem label with the common VITALS/RAD/CARRIER suffix — every subsystem gets the live suffix, not just OPERATOR'
+    );
+  }
+  assert(
+    /function updateMath\(\)[^]*?_refreshBezelTelemetry\(\)[^]*?saveState\(\);\s*\n\}/.test(
+      uiSource
+    ),
+    '165.29: updateMath() calls _refreshBezelTelemetry() — the single choke point every HP/rads DOM edit and every limb toggle (via loadUI()) already runs through, so the strip live-updates without a second listener'
+  );
+
+  // ── Save-boundary guard (mirrors Suite 158.8/162.14): this whole batch is
+  //    read state + route/toggle-class, never a new campaign-state write ────
+  {
+    const battery = [
+      '_powerOffFromLamp',
+      '_updatePwrLamp',
+      '_isUplinkConnected',
+      '_updateUplinkLamp',
+      '_openAiUplinkSlot',
+      '_scopeTagClick',
+      '_vitalsTier',
+      '_bezelStatusSuffix',
+      '_bezelSubsystemLabel',
+      '_refreshBezelTelemetry',
+    ];
+    const combined = battery.map(n => extractFunctionBody(uiSource, n)).join('\n');
+    assert(
+      !/saveState\(|robco_v8|state\.\w+\s*=/.test(combined),
+      '165.30: none of the new lamp/routing/telemetry functions write campaign state or call saveState() — read + route/toggle-class only'
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail

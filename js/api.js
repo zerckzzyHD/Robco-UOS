@@ -367,6 +367,11 @@ function saveApiKeySilent() {
   // Owner report fix: editing the key live-reverts SLOT 05 to NO CARRIER immediately
   // (robco_gemini_validated_key no longer matches) — no manual refresh needed either way.
   if (typeof _updateUplinkBoardStatus === 'function') _updateUplinkBoardStatus();
+  // FIX 4b (owner report): the same edit live-flips the Overseer's NO CARRIER/
+  // LISTENING tag, the UPLINK lamp, and the bezel CARRIER field — no reload
+  // needed. refreshOverseerCarrier() is the single choke point all three
+  // route through (Protocol 22).
+  if (typeof window.refreshOverseerCarrier === 'function') window.refreshOverseerCarrier();
 }
 
 // Type-coerces and validates a robco_v8 container before writing to localStorage.

@@ -69,8 +69,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2066-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2066-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2096-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2096-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -638,7 +638,25 @@ exactly as before; per-subsystem visual dressing is a later DO-P unit.
 
 **The FAULT lamp is read-only device telemetry:** `_updateFaultLamp()` reads the pre-existing
 client error ring-buffer (`ERROR_LOG_KEY`) and toggles a CSS class — called from `_recordError()`,
-`_clearErrorLog()`, and once at boot. No new write path; PWR/UPLINK lamps are presentational.
+`_clearErrorLog()`, and once at boot. No new write path.
+
+**Owner-report batch — the casing lamps are functional, not presentational (Suite 165):** all
+three `.lamp` elements are real `<button>`s (Protocol UI-5), and the FAULT lamp above is joined by
+two more real controls. **PWR** (`_powerOffFromLamp()`) calls the existing
+`AmbientRuntime.shutdown()` (Protocol 22 — the same SHUTDOWN path the A3 `shutdown-crt` observer
+already drives); that same observer's `onEnter`/`onExit` now also call `_updatePwrLamp(false/true)`
+so the lamp tracks real power state with no second observer. **UPLINK** (`_updateUplinkLamp()`,
+`_openAiUplinkSlot()`) reads `_isUplinkConnected()` — a single wrapper around the Director
+Uplink's own `_overseerRestState(_overseerRestSignals())` (see below), deliberately the same
+lighter hasKey/aiEnabled/online check the Overseer already used, not SLOT 05's stricter
+validated-key board status — and clicking it routes to `selectSubsystem('chassis')` then opens the
+`data-sub-id="slot_05_uplink"` sub-panel directly. **FAULT** now also opens `showErrorLog()` on
+click, reusing the existing `[LOGS]` viewer. The bezel telemetry LCD (`_bezelTelemetryText()`) is
+widened the same way: every subsystem's line now ends in a common `_bezelStatusSuffix()` — VITALS
+(`_vitalsTier()`, HP% plus any crippled limb, NOMINAL/WARNING/CRITICAL/CRIPPLED), RAD (the real
+rads value), and CARRIER (the same `_isUplinkConnected()` signal) — recomputed from
+`updateMath()` (HP/rads/limb changes) and `refreshOverseerCarrier()` (connection changes), so
+nothing here can go stale without a reload. Save-boundary clean, same as the rest of this section.
 
 **Per-game flavor is `[data-game]` CSS, never a JS branch (Protocol 38/UI-7):** a `--bezel-wire`
 custom property defaults to the local phosphor color and is overridden amber only under
@@ -699,14 +717,14 @@ same functions as before, hooked at two points each — no parallel chat pipelin
 **The state machine (`js/ui-core.js`, the "DO-O" block, co-located with the A3 ambient
 observers rather than a new served file):**
 
-| Function                                        | Role                                                                                                                                                                                                                                                                          |
-| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `setOverseerState(s)` / `getOverseerState()`    | The one state setter/getter. `s` ∈ `listening/thinking/speaking/disabled/offline`. Every `setOverseerState()` call draws one frame immediately (so reduced-motion/Minimal-dial users still see the correct frame), then arms the rAF loop iff currently allowed.              |
-| `_overseerRestState({hasKey,aiEnabled,online})` | **Pure**, vm-testable. Decides the resting tag: offline → disabled → listening (in that priority).                                                                                                                                                                            |
-| `_overseerRestSignals()`                        | Reads the same key (`MetaStore.get('robco_gemini_key')`), flag (`isFeatureEnabled('aiChat')`), and `navigator.onLine` signals `transmitMessage()` itself gates on — the scope's resting tag always matches reality.                                                           |
-| `refreshOverseerCarrier()`                      | Re-reads `getIdentity().overseer` into the header/relay/status-strip text; recomputes the resting state **only** when not mid-transaction (never clobbers a genuine `thinking`/`speaking` in flight — e.g. an `online`/`offline` event firing mid-request).                   |
-| `initOverseerScope()`                           | Boot wiring — called once from `window.onload` (after `_wireAmbientExperiences()`). Sizes the canvas, paints the initial frame, wires `resize`/`online`/`offline`/`visibilitychange`/reduced-motion-change listeners, and registers the two `AmbientRuntime` observers below. |
-| `_scopeShouldAnimate()`                         | `!reducedMotion && immersionAllows('balanced') && _runtimeAwake && !document.hidden`. Re-checked every frame.                                                                                                                                                                 |
+| Function                                        | Role                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `setOverseerState(s)` / `getOverseerState()`    | The one state setter/getter. `s` ∈ `listening/thinking/speaking/disabled/offline`. Every `setOverseerState()` call draws one frame immediately (so reduced-motion/Minimal-dial users still see the correct frame), then arms the rAF loop iff currently allowed.                                                                                                                                                                                                                                                                                                               |
+| `_overseerRestState({hasKey,aiEnabled,online})` | **Pure**, vm-testable. Decides the resting tag: offline → disabled → listening (in that priority).                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `_overseerRestSignals()`                        | Reads the same key (`MetaStore.get('robco_gemini_key')`), flag (`isFeatureEnabled('aiChat')`), and `navigator.onLine` signals `transmitMessage()` itself gates on — the scope's resting tag always matches reality.                                                                                                                                                                                                                                                                                                                                                            |
+| `refreshOverseerCarrier()`                      | Re-reads `getIdentity().overseer` into the header/relay/status-strip text; recomputes the resting state **only** when not mid-transaction (never clobbers a genuine `thinking`/`speaking` in flight — e.g. an `online`/`offline` event firing mid-request). Owner-report batch (Suite 165): also the ONE choke point that refreshes the casing UPLINK lamp (`_updateUplinkLamp()`) and the bezel VITALS strip (`_refreshBezelTelemetry()`), and is now additionally called from `saveApiKeySilent()` (api.js) so editing the key live-flips all three together with no reload. |
+| `initOverseerScope()`                           | Boot wiring — called once from `window.onload` (after `_wireAmbientExperiences()`). Sizes the canvas, paints the initial frame, wires `resize`/`online`/`offline`/`visibilitychange`/reduced-motion-change listeners, and registers the two `AmbientRuntime` observers below.                                                                                                                                                                                                                                                                                                  |
+| `_scopeShouldAnimate()`                         | `!reducedMotion && immersionAllows('balanced') && _runtimeAwake && !document.hidden`. Re-checked every frame.                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 **Hooked into the real lifecycle, not a demo timer:**
 
@@ -725,6 +743,13 @@ observers rather than a new served file):**
 - Error/abort/429/5xx branches in `transmitMessage()` never call `appendToChat(...,'ai')` — they
   append `'sys'` — so the scope stays `thinking` until `finally` resets it to the freshly-computed
   resting state.
+
+**`#scopeTag` is a real, conditionally-actionable `<button>` (owner-report batch, Suite 165):**
+`setOverseerState()` toggles its native `disabled` attribute — enabled only in `disabled`/`offline`
+(NO CARRIER), inert otherwise, so a tap mid-exchange is a no-op rather than a stray navigation.
+`_scopeTagClick()` (defense-in-depth behind the native attribute) routes to `_openAiUplinkSlot()` —
+the same SLOT 05 destination the casing UPLINK lamp routes to (see the Bezel Chrome section above)
+— so there are never two different "fix the connection" destinations in the app.
 
 **Runtime + dial gating (`AmbientRuntime`, A3 pattern):** `initOverseerScope()` registers an
 `overseer-scope` observer for `['STANDBY','SHUTDOWN','OFF']` — `onEnter` pauses the loop and
@@ -1930,7 +1955,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2066-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2096-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

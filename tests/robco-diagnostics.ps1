@@ -13301,6 +13301,193 @@ Check (
 ) "164.30: initRegistryAutocomplete() wires the Tool Deck's #deckTarget to _deckTargetSuggestions via the existing shared wireInput() autocomplete singleton (Protocol 22 -- owner report: the field had no autocomplete)"
 
 # ===========================================================
+# Suite 165 -- Functional casing lamps + Overseer routing + VITALS strip
+# (owner-reported batch). Structural mirror of tests/robco-diagnostics.js
+# Suite 165 (Protocol 15 parity -- no JS eval available here, see the
+# Suite 149.8/162 convention).
+# ===========================================================
+Sep "Suite 165 -- Functional casing lamps + Overseer routing + VITALS strip"
+
+Check (
+    ($htmlSrc -match [regex]::Escape('<div class="lamp-row">')) -and
+    ($htmlSrc -notmatch [regex]::Escape('<div class="lamp-row" aria-hidden="true">'))
+) "165.1: .lamp-row no longer carries aria-hidden=""true"" (it now holds real interactive buttons)"
+
+Check (
+    $htmlSrc -match '<button\s+type="button"\s+class="lamp on"\s+id="lampPwr"\s+onclick="_powerOffFromLamp\(\)"'
+) "165.2: #lampPwr is a real <button> whose onclick calls _powerOffFromLamp()"
+
+Check (
+    $htmlSrc -match '<button\s+type="button"\s+class="lamp wire on"\s+id="lampUplink"\s+onclick="_openAiUplinkSlot\(\)"'
+) "165.3: #lampUplink is a real <button> whose onclick calls _openAiUplinkSlot()"
+
+Check (
+    $htmlSrc -match '<button\s+type="button"\s+class="lamp"\s+id="lampFault"\s+onclick="showErrorLog\(\)"'
+) "165.4: #lampFault is a real <button> whose onclick calls the existing showErrorLog() (Protocol 22 -- no new error-log viewer)"
+
+$lampRowStart165 = $htmlSrc.IndexOf('<div class="lamp-row">')
+$ventsStart165 = $htmlSrc.IndexOf('<div class="vents"')
+$lampBlock165 = $htmlSrc.Substring($lampRowStart165, $ventsStart165 - $lampRowStart165)
+Check (
+    ([regex]::Matches($lampBlock165, 'aria-label="')).Count -eq 3
+) "165.5: all 3 lamps carry a descriptive aria-label (literal, not diegetic -- Protocol UI-3 convention)"
+Check (
+    ([regex]::Matches($lampBlock165, [regex]::Escape('<i aria-hidden="true"></i>'))).Count -eq 3
+) "165.6: the decorative dot inside each lamp is aria-hidden (the button itself carries the accessible name)"
+
+Check (
+    $htmlSrc -match '<button\s+type="button"\s+class="scope-tag"\s+id="scopeTag"\s+onclick="_scopeTagClick\(\)"\s+disabled\s*>'
+) "165.7: #scopeTag is a real <button> (Protocol UI-5), onclick=_scopeTagClick(), and starts disabled (safe default until the real connection state is computed at boot)"
+
+Check (
+    $cssSrc -match '(?s)button\.lamp\s*\{[^}]*min-height:\s*28px'
+) "165.8: button.lamp sets a >=28px tap target (Protocol 17)"
+Check (
+    $cssSrc -match '(?s)button\.lamp\s*\{[^}]*width:\s*auto'
+) "165.9: button.lamp resets the global button width:100% back to auto"
+Check (
+    $cssSrc -match '(?s)\.scope-tag\s*\{[^}]*width:\s*auto'
+) "165.10: .scope-tag resets the global button width:100% back to auto now that it is a <button>"
+Check (
+    $cssSrc -match '(?s)\.scope-tag:disabled\s*\{[^}]*opacity:\s*1'
+) "165.11: .scope-tag:disabled stays fully legible (never dimmed just because it is inert)"
+
+$powerOffBody165 = Get-FunctionBody $uiSrc "_powerOffFromLamp"
+Check (
+    ($powerOffBody165 -match [regex]::Escape('AmbientRuntime.shutdown()')) -and
+    ($powerOffBody165 -notmatch [regex]::Escape('AmbientRuntime.forceState'))
+) "165.12: _powerOffFromLamp() calls the existing AmbientRuntime.shutdown() (Protocol 22 -- never forceState(), the TEST-ONLY escape hatch)"
+
+$shutdownCrtIdx165 = $uiSrc.IndexOf("id: 'shutdown-crt'")
+$shutdownCrtBlock165 = $uiSrc.Substring($shutdownCrtIdx165, [Math]::Min(700, $uiSrc.Length - $shutdownCrtIdx165))
+Check (
+    ($shutdownCrtBlock165 -match '(?s)onEnter:.*?_updatePwrLamp\(false\)') -and
+    ($shutdownCrtBlock165 -match '(?s)onExit:.*?_updatePwrLamp\(true\)')
+) "165.13: the shutdown-crt observer (the ONE SHUTDOWN/OFF observer) unlights the PWR lamp on entry and relights it on exit -- no second observer registered just for the lamp"
+
+$isConnBody165 = Get-FunctionBody $uiSrc "_isUplinkConnected"
+Check (
+    ($isConnBody165 -match [regex]::Escape("_overseerRestState(_overseerRestSignals()) === 'listening'")) -and
+    ($isConnBody165 -notmatch 'robco_gemini_validated_key')
+) "165.14: _isUplinkConnected() reuses the Overseer's own _overseerRestState/_overseerRestSignals (Protocol 22, single source) -- deliberately NOT the stricter validated-key check SLOT 05's own board status uses"
+
+$upLampBody165 = Get-FunctionBody $uiSrc "_updateUplinkLamp"
+Check (
+    $upLampBody165 -match [regex]::Escape('_isUplinkConnected()')
+) "165.15: _updateUplinkLamp() reads _isUplinkConnected() -- the UPLINK lamp can never disagree with the Overseer"
+
+$openSlotBody165 = Get-FunctionBody $uiSrc "_openAiUplinkSlot"
+Check (
+    ($openSlotBody165 -match [regex]::Escape("selectSubsystem('chassis')")) -and
+    ($openSlotBody165 -match [regex]::Escape('data-sub-id="slot_05_uplink"'))
+) "165.16: _openAiUplinkSlot() reuses selectSubsystem('chassis') (Protocol 22) then opens/scrolls the SLOT 05 sub-panel specifically"
+
+$setStateBody165 = Get-FunctionBody $uiSrc "setOverseerState"
+Check (
+    $setStateBody165 -match [regex]::Escape("tagEl.disabled = s !== 'disabled' && s !== 'offline'")
+) "165.17: setOverseerState() toggles the scope-tag button's disabled attribute -- actionable ONLY in disabled/offline (NO CARRIER), a pure status readout otherwise"
+
+$scopeClickBody165 = Get-FunctionBody $uiSrc "_scopeTagClick"
+Check (
+    ($scopeClickBody165 -match [regex]::Escape("_scopeState === 'disabled' || _scopeState === 'offline'")) -and
+    ($scopeClickBody165 -match [regex]::Escape('_openAiUplinkSlot()'))
+) "165.18: _scopeTagClick() routes to the AI Uplink slot only in disabled/offline (defense-in-depth alongside the native disabled attribute)"
+
+$refreshBody165 = Get-FunctionBody $uiSrc "refreshOverseerCarrier"
+Check (
+    ($refreshBody165 -match [regex]::Escape('_updateUplinkLamp()')) -and
+    ($refreshBody165 -match [regex]::Escape('_refreshBezelTelemetry()'))
+) "165.19: refreshOverseerCarrier() is the ONE choke point that also refreshes the UPLINK lamp + the bezel telemetry strip -- every connection-change entry path (online/offline events, initial boot, a key edit) live-updates all three together"
+
+Check (
+    $apiSrc -match '(?s)function saveApiKeySilent\(\).*?refreshOverseerCarrier\(\)'
+) "165.20: saveApiKeySilent() (fired on every key-field keystroke) calls refreshOverseerCarrier() -- FIX 4b: adding/removing the key live-flips NO CARRIER/LISTENING with no reload"
+
+$suffixBody165 = Get-FunctionBody $uiSrc "_bezelStatusSuffix"
+Check (
+    ($suffixBody165 -match [regex]::Escape('_isUplinkConnected()')) -and
+    ($suffixBody165 -match [regex]::Escape("'ONLINE'")) -and
+    ($suffixBody165 -match [regex]::Escape("'OFFLINE'"))
+) "165.21: _bezelStatusSuffix() derives CARRIER from the same _isUplinkConnected() signal as the UPLINK lamp (Protocol 22, single source)"
+Check (
+    ($suffixBody165 -match "RAD '") -and
+    ($suffixBody165 -match [regex]::Escape("getElementById('stat_rads')"))
+) "165.22: _bezelStatusSuffix() reads the real rads value (DOM-first, matching updateMath()'s own live-read pattern) instead of a hardcoded figure"
+
+$vitalsBody165 = Get-FunctionBody $uiSrc "_vitalsTier"
+Check (
+    ($vitalsBody165 -match 'CRIPPLED') -and
+    ($vitalsBody165 -match [regex]::Escape('hpPct <= 25')) -and
+    ($vitalsBody165 -match [regex]::Escape('hpPct <= 60')) -and
+    ($vitalsBody165 -match [regex]::Escape("'NOMINAL'"))
+) "165.23: _vitalsTier() derives NOMINAL/WARNING/CRITICAL/CRIPPLED from HP% and the la/ra/ll/rl/hd limb fields (crippled overrides HP%) -- game-agnostic, Protocol 38"
+
+# 165.24-27  behavioral proof, shelled out to node (mirrors the Suite 164 pattern above --
+# a temp file, never a piped heredoc, per the Protocol 42 stdin-corruption fix).
+try {
+    $nodePath165 = Get-Command node -ErrorAction SilentlyContinue
+    $labels165 = @(
+        "165.24: [behavioral] _vitalsTier() returns NOMINAL at full HP with no crippled limbs",
+        "165.25: [behavioral] _vitalsTier() returns WARNING at 50% HP (<=60%, >25%)",
+        "165.26: [behavioral] _vitalsTier() returns CRITICAL at 20% HP (<=25%)",
+        "165.27: [behavioral] _vitalsTier() returns CRIPPLED whenever any limb is crippled, even at full HP (overrides the HP-derived tier)"
+    )
+    if ($nodePath165) {
+        $vitalsBodyJson165 = $vitalsBody165 | ConvertTo-Json
+        $tmpScript165 = Join-Path ([System.IO.Path]::GetTempPath()) ("robco_165_" + [guid]::NewGuid().ToString("N") + ".js")
+        $nodeScript165 = @"
+const vitalsBody = $vitalsBodyJson165;
+const fn = new Function('document', 'state', 'return (function _vitalsTier()' + vitalsBody + ')();');
+const mkDoc = (hpCur, hpMax) => ({
+  getElementById(id) {
+    if (id === 'stat_hp_cur') return { value: String(hpCur) };
+    if (id === 'stat_hp_max') return { value: String(hpMax) };
+    return null;
+  },
+});
+const ok = { hd: 'OK', la: 'OK', ra: 'OK', ll: 'OK', rl: 'OK' };
+const results = [
+  fn(mkDoc(100, 100), ok) === 'NOMINAL',
+  fn(mkDoc(50, 100), ok) === 'WARNING',
+  fn(mkDoc(20, 100), ok) === 'CRITICAL',
+  fn(mkDoc(100, 100), Object.assign({}, ok, { la: 'CRIPPLED' })) === 'CRIPPLED',
+];
+console.log('RESULT:' + results.map(r => r ? '1' : '0').join(''));
+"@
+        Set-Content -Path $tmpScript165 -Value $nodeScript165 -Encoding UTF8
+        $out165 = (node $tmpScript165 2>&1 | Out-String)
+        Remove-Item $tmpScript165 -ErrorAction SilentlyContinue
+        $rm165 = [regex]::Match($out165, 'RESULT:([01]{4})')
+        if ($rm165.Success) {
+            $bits165 = $rm165.Groups[1].Value
+            for ($bi165 = 0; $bi165 -lt 4; $bi165++) { Check ($bits165.Substring($bi165, 1) -eq '1') $labels165[$bi165] }
+        } else {
+            $err165 = if ([string]::IsNullOrWhiteSpace($out165)) { "No output from node" } else { $out165.Trim() }
+            foreach ($lbl in $labels165) { Fail "$lbl  (runtime error: $err165)" }
+        }
+    } else {
+        foreach ($lbl in $labels165) { Fail "$lbl  (node not found)" }
+    }
+} catch {
+    foreach ($lbl in $labels165) { Fail "$lbl  (harness error: $_)" }
+}
+
+$telemetryBody165 = Get-FunctionBody $uiSrc "_bezelTelemetryText"
+Check (
+    $telemetryBody165 -match [regex]::Escape('_bezelSubsystemLabel(subsystem) + _bezelStatusSuffix()')
+) "165.28: _bezelTelemetryText() composes the per-subsystem label with the common VITALS/RAD/CARRIER suffix -- every subsystem gets the live suffix, not just OPERATOR"
+
+Check (
+    $uiSrc -match '(?s)function updateMath\(\).*?_refreshBezelTelemetry\(\).*?saveState\(\);\s*\r?\n\}'
+) "165.29: updateMath() calls _refreshBezelTelemetry() -- the single choke point every HP/rads DOM edit and every limb toggle (via loadUI()) already runs through, so the strip live-updates without a second listener"
+
+$battery165 = @('_powerOffFromLamp','_updatePwrLamp','_isUplinkConnected','_updateUplinkLamp','_openAiUplinkSlot','_scopeTagClick','_vitalsTier','_bezelStatusSuffix','_bezelSubsystemLabel','_refreshBezelTelemetry')
+$combined165 = ($battery165 | ForEach-Object { Get-FunctionBody $uiSrc $_ }) -join "`n"
+Check (
+    ($combined165 -notmatch 'saveState\(') -and ($combined165 -notmatch 'robco_v8') -and ($combined165 -notmatch 'state\.\w+\s*=')
+) "165.30: none of the new lamp/routing/telemetry functions write campaign state or call saveState() -- read + route/toggle-class only"
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

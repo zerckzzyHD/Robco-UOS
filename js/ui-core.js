@@ -716,6 +716,58 @@ function _updateFaultLamp() {
   lamp.classList.toggle('fault', hasErrors);
 }
 
+// ── Owner-report batch: casing lamps go from decorative to functional ──────
+// FIX 1: PWR lamp click → the existing AmbientRuntime SHUTDOWN path (Protocol
+// 22 — the exact same shutdown() the A3 shutdown-crt observer already uses;
+// #powerOnBtn/_powerOnFromShutdown() above remains the sole way back on).
+function _powerOffFromLamp() {
+  if (typeof AmbientRuntime === 'undefined' || !AmbientRuntime) return;
+  AmbientRuntime.shutdown();
+}
+window._powerOffFromLamp = _powerOffFromLamp;
+
+// PWR lamp reflects the real runtime power state — lit outside SHUTDOWN/OFF,
+// unlit while shut down. Wired from the shutdown-crt observer's onEnter/onExit
+// (Protocol 22 — no separate observer registered just for the lamp).
+function _updatePwrLamp(on) {
+  const lamp = document.getElementById('lampPwr');
+  if (lamp) lamp.classList.toggle('on', !!on);
+}
+
+// FIX 2/4/5: the ONE connection signal — reused by the UPLINK lamp, the
+// Overseer's own NO-CARRIER resting tag, the scope-tag click gate, and the
+// bezel VITALS-strip CARRIER field, so none of them can ever disagree
+// (Protocol 22). Deliberately the SAME hasKey/aiEnabled/online check
+// _overseerRestState/_overseerRestSignals already use — not the stricter
+// validated-key check SLOT 05's own board status uses (Suite 121/162).
+function _isUplinkConnected() {
+  return (
+    typeof _overseerRestState === 'function' &&
+    typeof _overseerRestSignals === 'function' &&
+    _overseerRestState(_overseerRestSignals()) === 'listening'
+  );
+}
+window._isUplinkConnected = _isUplinkConnected;
+
+// UPLINK lamp reflects the same connection signal.
+function _updateUplinkLamp() {
+  const lamp = document.getElementById('lampUplink');
+  if (lamp) lamp.classList.toggle('on', _isUplinkConnected());
+}
+
+// FIX 2/4a: shared navigation target for "go fix the AI connection" — used by
+// the UPLINK lamp click and the Overseer's NO CARRIER tag click. Reuses
+// selectSubsystem('chassis') (Protocol 22) to route + sync the bezel nav,
+// then opens/scrolls the SLOT 05 sub-panel specifically.
+function _openAiUplinkSlot() {
+  if (typeof selectSubsystem === 'function') selectSubsystem('chassis');
+  const slot = document.querySelector('details[data-sub-id="slot_05_uplink"]');
+  if (!slot) return;
+  if (!slot.open) slot.setAttribute('open', '');
+  slot.scrollIntoView({ block: 'center' });
+}
+window._openAiUplinkSlot = _openAiUplinkSlot;
+
 // ── GLOBAL ERROR NET ──────────────────────────────────────────
 // Catches uncaught JS errors and unhandled promise rejections and surfaces a
 // recoverable on-screen diagnostic instead of leaving the user with a blank screen.
@@ -1168,9 +1220,14 @@ function _wireAmbientExperiences() {
       document.body.classList.remove('rt-idle', 'standby-deep', 'standby');
       const full = typeof immersionAllows === 'function' ? immersionAllows('full') : true;
       document.body.classList.add(full ? 'rt-shutdown' : 'rt-shutdown-plain');
+      // FIX 1 (owner report): the PWR lamp reflects real power state — never
+      // tier-gated (unlike the CRT flourish above), a genuine power-down always
+      // unlights it.
+      _updatePwrLamp(false);
     },
     onExit: () => {
       document.body.classList.remove('rt-shutdown', 'rt-shutdown-plain');
+      _updatePwrLamp(true);
     },
   });
 }
@@ -1366,6 +1423,10 @@ function setOverseerState(s) {
   if (tagEl) {
     tagEl.textContent = tag;
     tagEl.classList.toggle('thinking', s === 'thinking');
+    // FIX 4a (owner report): only NO CARRIER (disabled/offline) has somewhere
+    // useful to route to — the tag is only actionable then, so a tap during an
+    // active exchange (listening/thinking/speaking) stays a pure status readout.
+    if (tagEl.tagName === 'BUTTON') tagEl.disabled = s !== 'disabled' && s !== 'offline';
   }
   const csEl = document.getElementById('csState');
   if (csEl) csEl.textContent = tag;
@@ -1392,6 +1453,14 @@ function refreshOverseerCarrier() {
   if (relayEl) relayEl.textContent = ov.relay;
   const metaEl = document.getElementById('scopeStrip');
   if (metaEl) metaEl.textContent = ov.signalStrip;
+  // FIX 2/5 (owner report): the casing UPLINK lamp + bezel VITALS strip read the
+  // exact same connection signal this function is about to recompute below —
+  // this is the ONE choke point every connection-change entry path (online/
+  // offline events, a key edit via saveApiKeySilent, initial boot) already
+  // routes through, so they live-update together and can never drift apart
+  // (Protocol 22).
+  if (typeof _updateUplinkLamp === 'function') _updateUplinkLamp();
+  if (typeof _refreshBezelTelemetry === 'function') _refreshBezelTelemetry();
   if (_scopeState === 'thinking' || _scopeState === 'speaking') {
     drawScope();
     return;
@@ -1399,6 +1468,16 @@ function refreshOverseerCarrier() {
   setOverseerState(_overseerRestState(_overseerRestSignals()));
 }
 window.refreshOverseerCarrier = refreshOverseerCarrier;
+
+// FIX 4a (owner report): the scope tag's click handler — only NO CARRIER
+// (disabled/offline) routes anywhere; the native `disabled` attribute above
+// already blocks the click in every other state, this is defense-in-depth.
+function _scopeTagClick() {
+  if (_scopeState === 'disabled' || _scopeState === 'offline') {
+    if (typeof _openAiUplinkSlot === 'function') _openAiUplinkSlot();
+  }
+}
+window._scopeTagClick = _scopeTagClick;
 
 // initOverseerScope — boot wiring (called once from window.onload, A3
 // precedent). Registers the runtime pause/resume observer + the dial-gated
@@ -2341,13 +2420,10 @@ function _syncBezelNav(subsystem) {
   document.body.dataset.subsystem = subsystem;
 }
 
-function _bezelTelemetryText(subsystem) {
+function _bezelSubsystemLabel(subsystem) {
   switch (subsystem) {
-    case 'operator': {
-      const hpMax = state.hpMax || 100;
-      const nominal = hpMax <= 0 || (state.hpCur || 0) / hpMax > 0.25;
-      return '▸ SUBSYSTEM: OPERATOR · ' + (nominal ? 'VITALS NOMINAL' : 'VITALS CRITICAL');
-    }
+    case 'operator':
+      return '▸ SUBSYSTEM: OPERATOR';
     case 'operations': {
       const n = Array.isArray(state.inventory) ? state.inventory.length : 0;
       return '▸ SUBSYSTEM: OPERATIONS · ' + n + ' MANIFEST ENTRIES';
@@ -2366,6 +2442,59 @@ function _bezelTelemetryText(subsystem) {
       return '▸ SUBSYSTEM: ' + subsystem.toUpperCase();
   }
 }
+
+// FIX 5 (owner report): VITALS tier derived from HP% + crippled-limb count +
+// radiation tier (game-agnostic — reads the same la/ra/ll/rl/hd limb fields
+// and hpCur/hpMax/rads every game context already carries, Protocol 38).
+// Reads the DOM inputs first (falling back to state) so it stays live on
+// every keystroke exactly like updateMath()'s own HP bar read — never a
+// stale state value while the Courier is still typing.
+function _vitalsTier() {
+  const hpCurEl = document.getElementById('stat_hp_cur');
+  const hpMaxEl = document.getElementById('stat_hp_max');
+  const hpCur = hpCurEl ? parseInt(hpCurEl.value) || 0 : state.hpCur || 0;
+  const hpMax = hpMaxEl ? Math.max(1, parseInt(hpMaxEl.value) || 1) : Math.max(1, state.hpMax || 1);
+  const hpPct = (Math.max(0, hpCur) / hpMax) * 100;
+  const crippled = ['hd', 'la', 'ra', 'll', 'rl'].some(
+    k => String(state[k] || 'OK').toUpperCase() === 'CRIPPLED'
+  );
+  if (crippled) return 'CRIPPLED';
+  if (hpPct <= 25) return 'CRITICAL';
+  if (hpPct <= 60) return 'WARNING';
+  return 'NOMINAL';
+}
+
+// Common VITALS/RAD/CARRIER suffix appended to every subsystem's telemetry
+// line (FIX 5) — CARRIER reuses the exact same connection signal as the
+// UPLINK lamp and the Overseer's own resting tag (Protocol 22, single source).
+function _bezelStatusSuffix() {
+  const radsEl = document.getElementById('stat_rads');
+  const rads = radsEl ? parseInt(radsEl.value) || 0 : state.rads || 0;
+  const connected = typeof _isUplinkConnected === 'function' ? _isUplinkConnected() : false;
+  return (
+    ' · VITALS ' +
+    _vitalsTier() +
+    ' · RAD ' +
+    Math.max(0, rads) +
+    ' · CARRIER ' +
+    (connected ? 'ONLINE' : 'OFFLINE')
+  );
+}
+
+function _bezelTelemetryText(subsystem) {
+  return _bezelSubsystemLabel(subsystem) + _bezelStatusSuffix();
+}
+
+// FIX 5: re-render the strip in place, using whichever subsystem is currently
+// shown (document.body.dataset.subsystem — the same choke point _syncBezelNav
+// already writes) — called on every relevant state change (HP/rads/limb via
+// updateMath(), connection change via refreshOverseerCarrier()) without
+// touching the nav highlight/MetaStore pref themselves.
+function _refreshBezelTelemetry() {
+  const lcd = document.getElementById('bezelTelemetry');
+  if (lcd) lcd.textContent = _bezelTelemetryText(document.body.dataset.subsystem || 'operator');
+}
+window._refreshBezelTelemetry = _refreshBezelTelemetry;
 
 // SWEEP — the DO-N "re-tune the channel" motion verb on subsystem change.
 // Reduced-motion is handled by the existing global prefers-reduced-motion
@@ -4072,6 +4201,12 @@ function updateMath() {
       });
     }
   }
+
+  // FIX 5 (owner report): the bezel VITALS/RAD strip is HP/rads/limb-driven —
+  // updateMath() is the single choke point every HP/rads DOM edit and every
+  // limb toggle (via loadUI()) already runs through, so this keeps the strip
+  // live without a second listener (Protocol 22).
+  if (typeof _refreshBezelTelemetry === 'function') _refreshBezelTelemetry();
 
   saveState();
 }
