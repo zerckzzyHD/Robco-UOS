@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2226/2226 | Cache: robco-terminal-v2.7.0-r71 -->
+﻿## [Unreleased]<!-- Tests: 2241/2241 | Cache: robco-terminal-v2.7.0-r72 -->
 
 ### Added
 
@@ -35,6 +35,9 @@
 - The Module Bay's SVC tray had four separate buttons that all exported the same conversation log (EJECT HOLOTAPE, PRINT CAMPAIGN LOG, EXPORT .MD, EXPORT .HTML) — these are now one EJECT HOLOTAPE control with a format picker (TXT/MD/HTML). Sharing to your device still works exactly as it did before when TXT is selected; picking MD or HTML downloads a file exactly as those buttons used to.
 - The CHASSIS section is no longer just a shortcut into the Module Bay — it's now its own SYSTEM STATUS screen showing your device's uptime, firmware version, connection status, and feature availability at a glance, alongside a new ERROR LOG button. Your campaign kill/caps/damage stats moved out of it into their own CAMPAIGN LOG section in DATABANK, so device information and campaign information are no longer mixed together in one place.
 - Your ACCOUNT status now reflects reality instead of a mostly-fixed message. Signing in or out, and your connection dropping or coming back, all update the ACCOUNT section immediately — no reload needed — showing whether an operator is on record, whether your archives are syncing to the cloud, and a short status line even while the section is collapsed.
+- Your Campaign Configs now look and feel like real hardware, matching the rest of the settings section. Which game you're playing shows as two cartridges you tap to seat, your playstyle is a two-way switch, and your playthrough type is a dial with five direct picks — one tap instead of opening a dropdown. Everything still does exactly what it did before, just faster to use and easier to read at a glance.
+- Complete RNG mode is now a breaker switch under a safety cover instead of a plain checkbox, with a status strip that always shows exactly where you stand — Safe, Armed (still reversible), or Sealed (permanent, once a new campaign has been started under it). Wipe Terminal sits right below it as the next step in that sequence. Nothing about what these settings actually do has changed, just how clearly they show it.
+- Swapping which game you're playing now asks you to confirm first, since it reboots the terminal into that game's own separate campaign. Confirming continues as before; cancelling leaves you exactly where you were with nothing changed.
 
 ### Fixed
 

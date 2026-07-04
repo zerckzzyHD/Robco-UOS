@@ -5989,16 +5989,22 @@ Check (
     -not [System.Text.RegularExpressions.Regex]::IsMatch($css92ps, '\.macro-buttons\s+button\s*\{')
 ) 'GATE-NOWRAP-5: .tool-row span/.uses-target carry white-space: nowrap in terminal.css (device-wrap fix, carried forward from the retired .macro-buttons button rule to the Tool Deck)'
 
-# 92.6  WU-C14: the COMPLETE RNG label carries white-space: nowrap so it can
-#       never wrap one character per line when squeezed beside its warning.
-Check ([System.Text.RegularExpressions.Regex]::IsMatch($css92ps, '\.rng-mode-group\s*>\s*label\s*\{[^}]*white-space:\s*nowrap')) `
-    'GATE-NOWRAP-6: .rng-mode-group > label has white-space: nowrap (COMPLETE RNG label must not wrap per-character)'
+# 92.6/92.7  WU-C14's .rng-mode-group guard protected a VISIBLE "COMPLETE RNG"
+#       checkbox label from wrapping one character per line beside its warning.
+#       Retired by the SU-3 Randomizer Interlock reskin (Step 2 v2.8.0):
+#       #completeRngToggle is now .bay-visually-hidden-input (Protocol 22 -- the
+#       Immersion Dial technique), so there is no longer a visible label that
+#       could wrap that way. The successor guard is the interlock's own
+#       user-visible short-text elements (.seq-step), which must carry the same
+#       nowrap protection now that they carry the equivalent state-label role.
+Check (
+    (-not $html92ps.Contains('class="input-group rng-mode-group"')) -and
+    [System.Text.RegularExpressions.Regex]::IsMatch($html92ps, 'id="completeRngToggle"[^>]*class="bay-visually-hidden-input"')
+) 'GATE-NOWRAP-6: the old visible .rng-mode-group wrapper is retired -- #completeRngToggle is now .bay-visually-hidden-input (SU-3 Randomizer Interlock reskin)'
 
-# 92.7  WU-C14: the COMPLETE RNG group stacks as a column (label on its own
-#       full-width row above the warning) and the class hook is applied.
-Check (([System.Text.RegularExpressions.Regex]::IsMatch($css92ps, '\.rng-mode-group\s*\{[^}]*flex-direction:\s*column')) -and `
-       ($html92ps.Contains('class="input-group rng-mode-group"'))) `
-    'GATE-NOWRAP-7: .rng-mode-group forces column stacking (label above warning) + class applied to the Complete RNG group in index.html'
+Check (
+    [System.Text.RegularExpressions.Regex]::IsMatch($css92ps, '\.seq-step\s*\{[^}]*white-space:\s*nowrap')
+) 'GATE-NOWRAP-7: .seq-step (the interlock SAFE/ARMED/+WIPE/SEALED legend, the successor to the old COMPLETE RNG label) carries white-space: nowrap -- must not wrap per-character'
 
 
 # ===========================================================
@@ -14914,6 +14920,189 @@ Check (
 Check (
     -not ($acctBody177 -match 'saveState\(|robco_v8|state\.\w+\s*=')
 ) "177.9: renderAccount() never writes campaign state (saveState/robco_v8/state.<field>=)"
+
+# ===========================================================
+# Suite 178 -- Step 2 v2.8.0 SU-3: CAMPAIGN CONFIGS modernized (P-DECK +
+# RANDOMIZER INTERLOCK * PURGE)
+# The #campaignConfigPanel config controls (GAME/PLAYSTYLE/PLAYTHROUGH TYPE/
+# COMPLETE RNG/WIPE TERMINAL) are reskinned into the two-board Module-Bay
+# hardware language -- RESKIN ONLY (Protocol 22/25): every control keeps its
+# exact id/onchange/onclick, reachable both via the hidden real control (the
+# Immersion Dial technique, Protocol 17) and the new visible cartridge/
+# rocker/detent/breaker widgets, which drive the SAME setters. New in this
+# unit: a confirm gate in front of a game-cartridge swap (owner decision).
+# 15 tests (PS mirror of JS Suite 178.)
+# ===========================================================
+Sep "Suite 178 -- SU-3: CAMPAIGN CONFIGS modernized (P-DECK + INTERLOCK)"
+$html178 = Read-Src "index.html"
+$core178 = Read-Src "js/ui-core.js"
+$css178 = Read-Src "css/terminal.css"
+$cfgStart178 = $html178.IndexOf('id="campaignConfigPanel"')
+$cfgEnd178 = $html178.IndexOf('<div class="col-right">', $cfgStart178)
+$configBlock178 = $html178.Substring($cfgStart178, $cfgEnd178 - $cfgStart178)
+
+# 178.1  both boards exist, nested inside #campaignConfigPanel with their own
+#        data-sub-id persistence (Protocol UI-2) and collapsed-summary status lines
+Check (
+    ($configBlock178 -match 'data-sub-id="settings_campaign_profile"') -and
+    ($configBlock178 -match 'data-sub-id="settings_campaign_interlock"') -and
+    ($configBlock178 -match 'id="sum-profile"') -and
+    ($configBlock178 -match 'id="sum-ilk"') -and
+    ($configBlock178 -match 'class="sub-panel bay-board dangerboard"')
+) "178.1: CAMPAIGN PROFILE and RANDOMIZER INTERLOCK * PURGE are both sub-panel boards (data-sub-id persistence) with one-line collapsed summary status"
+
+# 178.2  every real control keeps its exact id + is visually hidden via the
+#        SAME .bay-visually-hidden-input technique already shipped for
+#        #immersionSelect (Protocol 17/22) -- never removed, never renamed
+$hiddenIds178 = @('gameContextSelect', 'playstyleInput', 'playthroughTypeSelect', 'completeRngToggle')
+$hiddenOk178 = $true
+foreach ($id178 in $hiddenIds178) {
+    if (-not [System.Text.RegularExpressions.Regex]::IsMatch($html178, 'id="' + $id178 + '"[^>]*class="bay-visually-hidden-input"')) {
+        $hiddenOk178 = $false
+    }
+}
+Check ($hiddenOk178) "178.2: #gameContextSelect/#playstyleInput/#playthroughTypeSelect/#completeRngToggle all keep their exact ids and are visually hidden via .bay-visually-hidden-input"
+
+# 178.3  the hidden real controls route through the new wrapper functions --
+#        which themselves delegate to the UNCHANGED onGameContextChange/
+#        changePlaystyle/onPlaythroughTypeChange/onCampaignModeChange
+Check (
+    [System.Text.RegularExpressions.Regex]::IsMatch($html178, 'id="gameContextSelect"[^>]*onchange="_confirmGameContextChange\(this\.value\)"') -and
+    [System.Text.RegularExpressions.Regex]::IsMatch($html178, 'id="playstyleInput"[^>]*onchange="_setDoctrine\(this\.value\)"') -and
+    [System.Text.RegularExpressions.Regex]::IsMatch($html178, 'id="playthroughTypeSelect"[^>]*onchange="_setTempo\(this\.value\)"') -and
+    [System.Text.RegularExpressions.Regex]::IsMatch($html178, 'id="completeRngToggle"[^>]*onchange="onCampaignModeChange\(this\.checked\)"')
+) "178.3: the hidden real controls route through _confirmGameContextChange/_setDoctrine/_setTempo (new wrappers) and the unchanged onCampaignModeChange"
+
+# 178.4  the new wrapper functions delegate to the EXACT pre-existing setters
+#        (Protocol 22 -- one truth, two entry points, no forked persistence path)
+$setDoctrineBody178 = Get-FunctionBody $core178 "_setDoctrine"
+$setTempoBody178 = Get-FunctionBody $core178 "_setTempo"
+$seatCartBody178 = Get-FunctionBody $core178 "_seatGameCartridge"
+Check (
+    ($setDoctrineBody178 -match 'changePlaystyle\(style\)') -and
+    ($setTempoBody178 -match 'onPlaythroughTypeChange\(type\)') -and
+    ($seatCartBody178 -match '_confirmGameContextChange\(ctx\)')
+) "178.4: _setDoctrine()/_setTempo()/_seatGameCartridge() delegate to the unchanged changePlaystyle()/onPlaythroughTypeChange()/_confirmGameContextChange() -- no forked setter logic"
+
+# 178.5  PROGRAM CARTRIDGE deck: 2 buttons, real radiogroup ARIA, wired to
+#        _seatGameCartridge with the exact FNV/FO3 values #gameContextSelect used
+Check (
+    [System.Text.RegularExpressions.Regex]::IsMatch($html178, "id=`"cart-fnv`"[^>]*onclick=`"_seatGameCartridge\('FNV'\)`"") -and
+    [System.Text.RegularExpressions.Regex]::IsMatch($html178, "id=`"cart-fo3`"[^>]*onclick=`"_seatGameCartridge\('FO3'\)`"") -and
+    ($html178 -match 'class="cart-deck" role="radiogroup"')
+) "178.5: the PROGRAM CARTRIDGE deck has 2 buttons (#cart-fnv/#cart-fo3) wired to _seatGameCartridge('FNV'/'FO3') inside a role=radiogroup"
+
+# 178.6  ENGAGEMENT DOCTRINE rocker: 2-position, wired to _setDoctrine with the
+#        exact any/melee values #playstyleInput used
+Check (
+    [System.Text.RegularExpressions.Regex]::IsMatch($html178, "id=`"rk-any`"[^>]*onclick=`"_setDoctrine\('any'\)`"") -and
+    [System.Text.RegularExpressions.Regex]::IsMatch($html178, "id=`"rk-melee`"[^>]*onclick=`"_setDoctrine\('melee'\)`"") -and
+    ($html178 -match 'class="rocker" role="radiogroup"')
+) "178.6: the ENGAGEMENT DOCTRINE rocker has 2 buttons (#rk-any/#rk-melee) wired to _setDoctrine('any'/'melee') inside a role=radiogroup"
+
+# 178.7  OPERATIONAL TEMPO: 5 direct-pick detents (1 tap per pick, no cycling),
+#        wired to _setTempo with the exact 5 values #playthroughTypeSelect used
+$tempoValues178 = @('standard', 'minmaxed', 'completionist', 'casual', 'speedrun')
+$tempoOk178 = $true
+foreach ($tv178 in $tempoValues178) {
+    if (-not [System.Text.RegularExpressions.Regex]::IsMatch($html178, 'data-tempo="' + $tv178 + '"[^>]*onclick="_setTempo\(''' + $tv178 + '''\)"')) {
+        $tempoOk178 = $false
+    }
+}
+$detentCount178 = ([System.Text.RegularExpressions.Regex]::Matches($html178, 'class="detent(?: on)?"')).Count
+Check ($tempoOk178 -and ($detentCount178 -eq 5)) "178.7: exactly 5 direct-pick detent buttons exist, one per playthroughType value (standard/minmaxed/completionist/casual/speedrun), each wired to _setTempo(value)"
+
+# 178.8  RANDOMIZER INTERLOCK breaker: well/cover/seal/handle all present, wired
+#        to _interlockLiftCover/_interlockThrowBreaker; the seal is CSS-gated on
+#        data-rng="locked" (never a separate JS-toggled class)
+Check (
+    ($configBlock178 -match 'id="ilkWell"') -and
+    [System.Text.RegularExpressions.Regex]::IsMatch($configBlock178, 'id="ilkCover"[^>]*onclick="_interlockLiftCover\(event\)"') -and
+    [System.Text.RegularExpressions.Regex]::IsMatch($configBlock178, 'class="ilk-breaker"[^>]*onclick="_interlockThrowBreaker\(\)"') -and
+    ($configBlock178 -match 'class="ilk-seal"') -and
+    [System.Text.RegularExpressions.Regex]::IsMatch($css178, "\.interlock\[data-rng='locked'\] \.ilk-seal\s*\{")
+) "178.8: the interlock well/cover/breaker/seal all exist, wired to _interlockLiftCover()/_interlockThrowBreaker(), with the seal CSS-gated on data-rng=locked"
+
+# 178.9  #rngModeBanner/#rngLockedBanner keep their exact ids (only the
+#        presentation moved from inline styles to .rng-banner classes)
+$onCampaignModeBody178 = Get-FunctionBody $core178 "onCampaignModeChange"
+Check (
+    ($configBlock178 -match 'id="rngModeBanner" class="rng-banner armed"') -and
+    ($configBlock178 -match 'id="rngLockedBanner" class="rng-banner locked"') -and
+    ($onCampaignModeBody178 -match "rngModeBanner'\)")
+) "178.9: #rngModeBanner/#rngLockedBanner keep their exact ids (reskinned via .rng-banner classes, not inline styles) -- onCampaignModeChange() still targets #rngModeBanner unchanged"
+
+# 178.10  #wipeTerminalBtn keeps its exact id + onclick -- the danger-zone
+#         double-confirm gate (wipeTerminal()) is completely untouched
+Check (
+    [System.Text.RegularExpressions.Regex]::IsMatch($configBlock178, '(?s)id="wipeTerminalBtn".*?class="purge-btn".*?onclick="wipeTerminal\(\)"')
+) "178.10: #wipeTerminalBtn keeps its exact id + onclick=wipeTerminal() -- only reskinned to .purge-btn"
+
+# 178.11  _syncCampaignProfileUI()/_syncInterlockUI() are wired into both the
+#         boot-time restore block and loadUI()
+$loadUIBody178 = Get-FunctionBody $core178 "loadUI"
+$restoreDevicePrefsBody178 = Get-FunctionBody $core178 "_restoreDevicePrefs"
+Check (
+    ($loadUIBody178 -match '_syncCampaignProfileUI\(\)') -and
+    ($loadUIBody178 -match '_syncInterlockUI\(\)') -and
+    ($restoreDevicePrefsBody178 -match '_syncCampaignProfileUI\(\)') -and
+    ($restoreDevicePrefsBody178 -match '_syncInterlockUI\(\)')
+) "178.11: _syncCampaignProfileUI()/_syncInterlockUI() are called from both _restoreDevicePrefs() (boot) and loadUI()"
+
+# 178.12  _confirmGameContextChange(): structural proof it's an async gate that
+#         only calls the real onGameContextChange() AFTER an awaited
+#         confirmAction() resolves truthy, and explicitly reverts the hidden
+#         select + re-syncs the profile UI on a falsy (cancel) result.
+$confirmSwapBody178 = Get-FunctionBody $core178 "_confirmGameContextChange"
+$okBranchIdx178 = $confirmSwapBody178.IndexOf('if (!ok)')
+$cancelBranch178 = if ($okBranchIdx178 -ge 0) {
+    $ogccIdx178 = $confirmSwapBody178.IndexOf('onGameContextChange(ctx)')
+    $confirmSwapBody178.Substring($okBranchIdx178, [Math]::Max(0, $ogccIdx178 - $okBranchIdx178))
+} else { '' }
+Check (
+    ($core178 -match 'async function _confirmGameContextChange') -and
+    ($confirmSwapBody178 -match 'await confirmAction\(\{') -and
+    ($okBranchIdx178 -ge 0) -and
+    ($cancelBranch178 -match 'sel\.value = current') -and
+    ($cancelBranch178 -match '_syncCampaignProfileUI\(\)') -and
+    ($cancelBranch178 -match 'return;') -and
+    ($confirmSwapBody178 -match 'onGameContextChange\(ctx\);')
+) "178.12: _confirmGameContextChange() is async, awaits confirmAction(), and on cancel (!ok) reverts the hidden select to the current game + re-syncs the profile UI + returns BEFORE reaching onGameContextChange(ctx) -- a cancelled swap never reloads"
+
+# 178.13  the new custom-control layer writes nothing durable to the campaign
+#         beyond the exact pre-existing setters it delegates to
+$wrapperFns178 = @('_seatGameCartridge', '_setDoctrine', '_setTempo', '_interlockLiftCover', '_interlockThrowBreaker', '_syncCampaignProfileUI', '_syncInterlockUI')
+$offenders178 = $wrapperFns178 | Where-Object {
+    try { $body = Get-FunctionBody $core178 $_ } catch { return $true }
+    # Protocol 42 fix (found while writing the JS mirror): exclude ==/=== reads
+    # (e.g. state.campaignMode === 'rng-locked') from the assignment check.
+    return ($body -match 'saveState\(|robco_v8|state\.\w+\s*=(?!=)')
+}
+Check (
+    $offenders178.Count -eq 0
+) ("178.13: the new cartridge/rocker/detent/breaker wrapper + sync functions never write campaign state directly (saveState/robco_v8/state.<field>=)" + $(if ($offenders178.Count) { " -- offenders: $($offenders178 -join ', ')" } else { "" }))
+
+# 178.14  game-agnostic construction (Protocol 38): the tempo detent
+#         labels/descriptions and doctrine rocker carry no game literal
+$tempoRockerStart178 = $configBlock178.IndexOf('rack-note" style="margin-top: 14px">ENGAGEMENT')
+$detentRackIdx178 = $configBlock178.IndexOf('detent-rack')
+$detailsEndIdx178 = $configBlock178.IndexOf('</details>', $detentRackIdx178)
+$tempoAndRockerSlice178 = if ($tempoRockerStart178 -ge 0 -and $detailsEndIdx178 -gt $tempoRockerStart178) {
+    $configBlock178.Substring($tempoRockerStart178, $detailsEndIdx178 - $tempoRockerStart178)
+} else { '' }
+Check (
+    -not [System.Text.RegularExpressions.Regex]::IsMatch($tempoAndRockerSlice178, '\bFNV\b|\bFO3\b|Capital Wasteland|Vault 101', 'IgnoreCase')
+) "178.14: the doctrine rocker and tempo detent rack are game-agnostic -- no FNV/FO3/location literals (the GAME cartridge itself is exempt -- it IS the per-game picker)"
+
+# 178.15  Protocol 42 fix (found live during render-verify): #completeRngToggle
+#         is a real, keyboard/AT-reachable control (.bay-visually-hidden-input)
+#         -- toggling it DIRECTLY (never touching the fancy breaker button) must
+#         still repaint the whole interlock board. onCampaignModeChange() now
+#         calls _syncInterlockUI() itself so BOTH entry points stay in sync.
+$onCampaignModeBody178 = Get-FunctionBody $core178 "onCampaignModeChange"
+Check (
+    $onCampaignModeBody178 -match '_syncInterlockUI\(\)'
+) "178.15: onCampaignModeChange() calls _syncInterlockUI() -- a direct toggle of the hidden #completeRngToggle repaints the whole interlock board, not just the armed banner"
 
 # ===========================================================
 # Results

@@ -4406,6 +4406,10 @@ details.bay-board::after {
   color: var(--robco-alert);
   border-left-color: var(--robco-alert);
 }
+.board-status.danger {
+  color: var(--robco-danger);
+  border-left-color: var(--robco-danger);
+}
 
 /* Amber AI Uplink board (SLOT 05 — LOCKED identity, kept amber) */
 details.bay-board.uplink {
@@ -4426,6 +4430,618 @@ details.bay-board.tray {
 details.bay-board.tray .bay-slot-tag {
   border-color: rgba(52, 152, 219, 0.55);
   color: var(--robco-blue);
+}
+
+/* Red danger board (CAMPAIGN CONFIGS' RANDOMIZER INTERLOCK · PURGE, SU-3) */
+details.bay-board.dangerboard {
+  border-color: rgba(231, 76, 60, 0.55);
+}
+details.bay-board.dangerboard .bay-slot-tag {
+  border-color: rgba(231, 76, 60, 0.55);
+  color: var(--robco-danger);
+}
+details.bay-board.dangerboard::after {
+  background-image: linear-gradient(90deg, #b0642f 0 7px, transparent 7px 12px);
+  background-size: 12px 100%;
+  background-repeat: round;
+}
+
+/* LED color modifiers (module bay LEDs default green — amber/red/off states) */
+.bay-led.amber {
+  background: var(--robco-alert);
+  box-shadow: 0 0 8px var(--robco-alert);
+  animation: bayLedPulse 1.6s infinite;
+}
+.bay-led.red {
+  background: var(--robco-danger);
+  box-shadow: 0 0 8px var(--robco-danger);
+}
+.bay-led.off {
+  background: #3a3d35;
+  box-shadow: none;
+}
+@keyframes bayLedPulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* Rack labeling — one plain-English real-control label per rack-mounted
+   control (Protocol 25 — the fiction never obscures what a control actually
+   does). .real-label is the dimmer, smaller, literal-name half. */
+.rack-note {
+  font-size: 10px;
+  letter-spacing: 1px;
+  opacity: 0.65;
+  margin-top: 4px;
+}
+.rack-note .real-label {
+  opacity: 0.6;
+  font-size: 8.5px;
+  letter-spacing: 1.5px;
+}
+
+/* ── PROGRAM CARTRIDGE deck (CAMPAIGN PROFILE board — #gameContextSelect) ──
+   A real, native #gameContextSelect stays in the DOM (Protocol 4/17/22 — the
+   exact id/onchange survives, keyboard/AT users can jump straight to either
+   option), visually hidden with the same .bay-visually-hidden-input
+   technique as #immersionSelect. The cartridge buttons are the visible,
+   genuinely-custom control; both entry points route through the SAME
+   confirm-gated setter (Protocol 22 — one truth, two entry points). */
+.cart-deck {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center; /* centering rule */
+  gap: 10px;
+  margin-top: 8px;
+}
+.cart {
+  flex: 1 1 160px;
+  max-width: 240px;
+  min-height: 74px;
+  position: relative;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.5);
+  background: linear-gradient(180deg, rgba(var(--robco-green-rgb), 0.08), rgba(0, 0, 0, 0.45) 70%);
+  padding: 12px 10px 10px;
+  text-align: left;
+  transition:
+    transform 0.25s,
+    opacity 0.25s,
+    border-color 0.25s;
+}
+.cart .spools {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.cart .spools i {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.55);
+  background: repeating-radial-gradient(
+    circle at center,
+    rgba(var(--robco-green-rgb), 0.35) 0 2px,
+    transparent 2px 4px
+  );
+}
+.cart .c-name {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 1px;
+  line-height: 1.3;
+}
+.cart .c-sub {
+  display: block;
+  font-size: 8.5px;
+  opacity: 0.5;
+  letter-spacing: 0.5px;
+  margin-top: 3px;
+  text-transform: none;
+}
+/* write-protect notch */
+.cart::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  right: 14px;
+  width: 14px;
+  height: 6px;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.5);
+  border-top: none;
+  background: #010a07;
+}
+.cart.seated {
+  border-color: var(--robco-green);
+  box-shadow:
+    0 0 14px rgba(var(--robco-green-rgb), 0.3),
+    inset 0 0 14px rgba(0, 0, 0, 0.5);
+}
+.cart.seated .c-name {
+  text-shadow: 0 0 6px rgba(var(--robco-green-rgb), 0.6);
+}
+.cart.seated .c-name::after {
+  content: ' \25CF';
+}
+.cart:not(.seated) {
+  border-style: dashed;
+  opacity: 0.6;
+  transform: translateY(-4px); /* raised, not seated */
+}
+
+/* ── DOCTRINE ROCKER — 2-position switch (CAMPAIGN PROFILE — #playstyleInput) ── */
+.rocker {
+  display: flex;
+  margin-top: 8px;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.5);
+  background: rgba(0, 0, 0, 0.45);
+  padding: 4px;
+  gap: 4px;
+}
+.rocker button {
+  flex: 1 1 0;
+  min-height: 44px;
+  border: 1px solid transparent;
+  font-size: 10px;
+  letter-spacing: 1px;
+  line-height: 1.3;
+  opacity: 0.55;
+  background: rgba(0, 0, 0, 0.3);
+}
+.rocker button .r-sub {
+  display: block;
+  font-size: 8px;
+  opacity: 0.6;
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+  text-transform: none;
+}
+.rocker button.on {
+  opacity: 1;
+  border-color: var(--robco-green);
+  background: rgba(var(--robco-green-rgb), 0.12);
+  box-shadow:
+    inset 0 0 10px rgba(var(--robco-green-rgb), 0.15),
+    0 0 8px rgba(var(--robco-green-rgb), 0.25);
+  text-shadow: 0 0 6px rgba(var(--robco-green-rgb), 0.6);
+}
+
+/* ── TEMPO SELECTOR — decorative rotary dial + 5 direct-pick detents
+   (CAMPAIGN PROFILE board — #playthroughTypeSelect). Unlike the Immersion
+   dial (a clickable cycle-through button), this dial is purely cosmetic
+   (aria-hidden) — the 5 detent buttons are the real, direct-pick control,
+   1 tap per pick, satisfying the no-added-taps guardrail versus the old
+   <select>'s open-then-pick. ────────────────────────────────────────── */
+.tempo-wrap {
+  display: flex;
+  gap: 14px;
+  margin-top: 10px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.tempo-dial {
+  width: 74px;
+  height: 74px;
+  flex-shrink: 0;
+  border: 2px solid var(--robco-green);
+  border-radius: 50%;
+  position: relative;
+  background: radial-gradient(
+    circle at 38% 34%,
+    rgba(var(--robco-green-rgb), 0.16),
+    rgba(0, 0, 0, 0.6) 70%
+  );
+  box-shadow: inset 0 0 16px rgba(0, 0, 0, 0.7);
+  margin: 4px auto 0;
+}
+.tempo-dial .knob {
+  position: absolute;
+  inset: 15px;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.7);
+  border-radius: 50%;
+  transition: transform 0.35s cubic-bezier(0.3, 1.3, 0.55, 1);
+  background: rgba(0, 0, 0, 0.5);
+}
+.tempo-dial .knob::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 3px;
+  transform: translateX(-50%);
+  width: 3px;
+  height: 12px;
+  background: var(--robco-green);
+  box-shadow: 0 0 6px var(--robco-green);
+}
+.detent-rack {
+  flex: 1 1 200px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.detent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.3);
+  background: rgba(0, 0, 0, 0.3);
+  font-size: 10px;
+  letter-spacing: 1px;
+  padding: 4px 9px;
+  text-align: left;
+  opacity: 0.6;
+  width: 100%;
+}
+.detent .d-pip {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.6);
+}
+.detent .d-txt {
+  flex: 1;
+  min-width: 0;
+}
+.detent .d-desc {
+  display: block;
+  font-size: 8.5px;
+  opacity: 0.55;
+  letter-spacing: 0.4px;
+  margin-top: 1px;
+  text-transform: none;
+}
+.detent.on {
+  opacity: 1;
+  border-color: var(--robco-green);
+  background: rgba(var(--robco-green-rgb), 0.1);
+  text-shadow: 0 0 6px rgba(var(--robco-green-rgb), 0.6);
+}
+.detent.on .d-pip {
+  background: var(--robco-green);
+  box-shadow: 0 0 6px var(--robco-green);
+}
+
+/* ── RANDOMIZER INTERLOCK — arm-then-commit breaker (RANDOMIZER INTERLOCK ·
+   PURGE board — #completeRngToggle → state.campaignMode). SAFE (cover
+   closed) → ARMED (reversible until wipe) → SEALED (rng-locked: permanent,
+   welded shut). data-rng is scoped to #interlockWrap, never document.body,
+   so this stays a self-contained board effect. ─────────────────────────── */
+.interlock {
+  margin-top: 8px;
+  border: 1px solid rgba(243, 156, 18, 0.5);
+  background:
+    linear-gradient(rgba(1, 10, 7, 0.88), rgba(1, 10, 7, 0.88)) padding-box,
+    repeating-linear-gradient(45deg, rgba(243, 156, 18, 0.55) 0 10px, rgba(0, 0, 0, 0.8) 10px 20px)
+      border-box;
+  border: 6px solid transparent;
+  outline: 1px solid rgba(243, 156, 18, 0.45);
+  padding: 12px;
+}
+.interlock[data-rng='locked'] {
+  background:
+    linear-gradient(rgba(1, 10, 7, 0.88), rgba(1, 10, 7, 0.88)) padding-box,
+    repeating-linear-gradient(45deg, rgba(231, 76, 60, 0.6) 0 10px, rgba(0, 0, 0, 0.8) 10px 20px)
+      border-box;
+  outline-color: rgba(231, 76, 60, 0.5);
+}
+.ilk-row {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.ilk-well {
+  position: relative;
+  width: 104px;
+  height: 118px;
+  flex-shrink: 0;
+  border: 1px solid rgba(243, 156, 18, 0.4);
+  background: rgba(0, 0, 0, 0.5);
+  margin: 0 auto;
+}
+.ilk-breaker {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  min-height: 44px;
+  width: 100%;
+}
+.ilk-slot-line {
+  width: 14px;
+  height: 62px;
+  border: 1px solid rgba(243, 156, 18, 0.6);
+  border-radius: 7px;
+  position: relative;
+  background: rgba(0, 0, 0, 0.6);
+}
+.ilk-handle {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #3a3e33, #22251e);
+  border: 1px solid rgba(0, 0, 0, 0.8);
+  box-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.8),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  transition: top 0.25s;
+  top: 34px; /* down = SAFE */
+}
+.interlock[data-rng='armed'] .ilk-handle,
+.interlock[data-rng='locked'] .ilk-handle {
+  top: -2px; /* up = ARMED */
+}
+.ilk-word {
+  font-size: 8px;
+  letter-spacing: 2px;
+  opacity: 0.7;
+}
+.ilk-word.top {
+  color: var(--robco-alert);
+}
+/* safety cover — closed over the lever while SAFE */
+.ilk-cover {
+  position: absolute;
+  inset: -1px;
+  border: 1px solid rgba(243, 156, 18, 0.65);
+  background:
+    repeating-linear-gradient(45deg, rgba(243, 156, 18, 0.16) 0 8px, transparent 8px 16px),
+    linear-gradient(180deg, #23261f, #14160f);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  color: var(--robco-alert);
+  text-shadow: 0 0 7px rgba(243, 156, 18, 0.55);
+  font-size: 8px;
+  letter-spacing: 1.5px;
+  text-align: center;
+  padding: 6px;
+  transition:
+    transform 0.3s,
+    opacity 0.3s;
+  transform-origin: top center;
+  min-height: 44px;
+  z-index: 2;
+  line-height: 1.5;
+}
+.ilk-cover .cv-screw {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.7);
+  background: #4a4e41;
+}
+.ilk-cover .cv-screw.tl {
+  top: 3px;
+  left: 3px;
+}
+.ilk-cover .cv-screw.tr {
+  top: 3px;
+  right: 3px;
+}
+.ilk-cover .cv-screw.bl {
+  bottom: 3px;
+  left: 3px;
+}
+.ilk-cover .cv-screw.br {
+  bottom: 3px;
+  right: 3px;
+}
+/* lifted = an opened lid resting just above the well, lever exposed */
+.ilk-well.lifted .ilk-cover {
+  height: 22px;
+  min-height: 0;
+  padding: 2px;
+  font-size: 0;
+  transform: translateY(-115%);
+  opacity: 0.85;
+  pointer-events: none;
+}
+.ilk-well.lifted .cv-screw {
+  display: none;
+}
+.interlock[data-rng='locked'] .ilk-cover {
+  display: none;
+}
+/* the seal — locked state only */
+.ilk-seal {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+.interlock[data-rng='locked'] .ilk-seal {
+  display: block;
+}
+.ilk-seal::before,
+.ilk-seal::after {
+  content: '';
+  position: absolute;
+  left: -8%;
+  right: -8%;
+  top: 50%;
+  height: 2px;
+  background: var(--robco-danger);
+  box-shadow: 0 0 6px rgba(231, 76, 60, 0.8);
+}
+.ilk-seal::before {
+  transform: rotate(24deg);
+}
+.ilk-seal::after {
+  transform: rotate(-24deg);
+}
+.ilk-seal .seal-disc {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) rotate(-8deg);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid var(--robco-danger);
+  background: radial-gradient(circle at 40% 35%, #3d1512, #1b0605 75%);
+  color: var(--robco-danger);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 7px;
+  letter-spacing: 1px;
+  box-shadow: 0 0 10px rgba(231, 76, 60, 0.5);
+}
+.ilk-info {
+  flex: 1 1 170px;
+  min-width: 0;
+}
+.ilk-title {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--robco-alert);
+  text-shadow: 0 0 7px rgba(243, 156, 18, 0.55);
+}
+.interlock[data-rng='locked'] .ilk-title {
+  color: var(--robco-danger);
+  text-shadow: 0 0 7px rgba(231, 76, 60, 0.55);
+}
+.ilk-desc {
+  font-size: 9.5px;
+  opacity: 0.65;
+  margin-top: 5px;
+  line-height: 1.55;
+  letter-spacing: 0.3px;
+}
+.ilk-actions {
+  margin-top: 9px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ilk-actions button {
+  border-color: var(--robco-alert);
+  color: var(--robco-alert);
+  font-size: 9.5px;
+  text-shadow: 0 0 7px rgba(243, 156, 18, 0.55);
+}
+.ilk-actions button:hover {
+  background: rgba(243, 156, 18, 0.12);
+}
+
+/* the commit-sequence legend — permanence made explicit */
+.seq-strip {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center; /* centering rule */
+  align-items: center;
+  gap: 4px 7px;
+  margin-top: 12px;
+  font-size: 8.5px;
+  letter-spacing: 1px;
+  opacity: 0.85;
+}
+.seq-step {
+  border: 1px dashed rgba(var(--robco-green-rgb), 0.4);
+  padding: 3px 8px;
+  opacity: 0.5;
+  white-space: nowrap;
+}
+.seq-arrow {
+  opacity: 0.4;
+}
+.seq-step.now {
+  opacity: 1;
+  border-style: solid;
+  border-color: var(--robco-green);
+  text-shadow: 0 0 6px rgba(var(--robco-green-rgb), 0.6);
+}
+.seq-step.armed-step.now {
+  border-color: var(--robco-alert);
+  color: var(--robco-alert);
+  text-shadow: 0 0 7px rgba(243, 156, 18, 0.55);
+}
+.seq-step.locked-step.now {
+  border-color: var(--robco-danger);
+  color: var(--robco-danger);
+  text-shadow: 0 0 7px rgba(231, 76, 60, 0.55);
+}
+
+/* armed / locked banners (same information + toggling as before — #rngModeBanner
+   / #rngLockedBanner keep their exact ids + onCampaignModeChange() wiring;
+   only the presentation moved here from inline styles) */
+.rng-banner {
+  margin-top: 10px;
+  padding: 7px 9px;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  line-height: 1.6;
+  text-transform: none;
+}
+.rng-banner.armed {
+  color: var(--robco-alert);
+  border: 1px dashed var(--robco-alert);
+  background: rgba(243, 156, 18, 0.05);
+}
+.rng-banner.locked {
+  color: var(--robco-danger);
+  border: 1px dashed var(--robco-danger);
+  background: rgba(231, 76, 60, 0.06);
+}
+
+/* ── TERMINAL PURGE — wipeTerminal() (double-confirm unchanged) ────────── */
+.purge {
+  margin-top: 14px;
+  border-top: 1px dashed rgba(231, 76, 60, 0.4);
+  padding-top: 12px;
+}
+.purge .p-head {
+  font-size: 9.5px;
+  letter-spacing: 2px;
+  color: var(--robco-danger);
+  text-shadow: 0 0 7px rgba(231, 76, 60, 0.55);
+  margin-bottom: 8px;
+}
+.purge-btn {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid var(--robco-danger);
+  color: var(--robco-danger);
+  text-shadow: 0 0 7px rgba(231, 76, 60, 0.55);
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  background:
+    linear-gradient(rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.55)) padding-box,
+    repeating-linear-gradient(45deg, rgba(231, 76, 60, 0.4) 0 8px, rgba(0, 0, 0, 0.7) 8px 16px)
+      border-box;
+  border: 4px solid transparent;
+  outline: 1px solid var(--robco-danger);
+}
+.purge-btn:hover {
+  background:
+    linear-gradient(rgba(231, 76, 60, 0.1), rgba(231, 76, 60, 0.1)) padding-box,
+    repeating-linear-gradient(45deg, rgba(231, 76, 60, 0.4) 0 8px, rgba(0, 0, 0, 0.7) 8px 16px)
+      border-box;
+}
+.purge .p-note {
+  font-size: 8.5px;
+  opacity: 0.5;
+  letter-spacing: 0.5px;
+  margin-top: 7px;
+  line-height: 1.6;
+  text-transform: none;
 }
 
 /* ── Boolean "module" (installable card) — wraps a REAL checkbox ────────

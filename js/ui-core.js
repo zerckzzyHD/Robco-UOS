@@ -1943,11 +1943,14 @@ function _restoreDevicePrefs() {
       cb.checked = locked || armed;
       cb.disabled = locked;
     }
-    const banner = document.getElementById('rngModeBanner');
-    if (banner) banner.style.display = armed ? 'block' : 'none';
-    const lockedBanner = document.getElementById('rngLockedBanner');
-    if (lockedBanner) lockedBanner.style.display = locked ? 'block' : 'none';
+    // The armed/locked banners are painted by _syncInterlockUI() below (Protocol
+    // 22 — one repaint function owns the whole board, not a duplicate here too).
   }
+  // SU-3: paint the CAMPAIGN PROFILE / RANDOMIZER INTERLOCK custom controls from
+  // the state just restored above — cartridges/rocker/detents/dial/breaker/seq
+  // strip/summary lines/banners all start in sync with the hidden real controls.
+  if (typeof _syncCampaignProfileUI === 'function') _syncCampaignProfileUI();
+  if (typeof _syncInterlockUI === 'function') _syncInterlockUI();
 
   // #34 Typewriter Speed — restore slider + label on load
   {
@@ -2402,6 +2405,11 @@ function onCampaignModeChange(checked) {
   saveState();
   const banner = document.getElementById('rngModeBanner');
   if (banner) banner.style.display = checked ? 'block' : 'none';
+  // SU-3 (found during render-verify, Protocol 42): #completeRngToggle is a real,
+  // keyboard/AT-reachable control (.bay-visually-hidden-input) — a user toggling
+  // it DIRECTLY (never touching the fancy breaker button) must still repaint the
+  // well/cover/seal/title/desc/summary/sequence-legend, not just this banner.
+  if (typeof _syncInterlockUI === 'function') _syncInterlockUI();
 }
 
 let deferredPrompt;
@@ -2456,6 +2464,249 @@ function onGameContextChange(ctx) {
   localStorage.setItem('robco_v8', JSON.stringify(window.robco_v8));
   window.location.reload();
 }
+
+// ── CAMPAIGN PROFILE / RANDOMIZER INTERLOCK custom-control wiring (SU-3) ──
+// The real controls (#gameContextSelect, #playstyleInput, #playthroughTypeSelect,
+// #completeRngToggle) stay in the DOM, visually hidden via .bay-visually-hidden-input
+// (the same technique already shipped for #immersionSelect — Protocol 17: a
+// keyboard/AT user can still reach any of them directly); the cartridge/rocker/
+// detent/breaker buttons below are the genuinely-custom visible controls, and both
+// entry points drive the EXACT SAME setters (Protocol 22 — one truth, many entries).
+
+// Owner decision: a cartridge swap reboots the terminal into a different game's
+// campaign, so it is gated behind a light confirm — confirm -> proceed (calls the
+// unchanged onGameContextChange), cancel -> stay (reverts the hidden select back to
+// the still-active game; onGameContextChange is never called, so nothing reloads).
+async function _confirmGameContextChange(ctx) {
+  const sel = document.getElementById('gameContextSelect');
+  const current = (state && state.gameContext) || 'FNV';
+  if (ctx === current) {
+    if (sel) sel.value = ctx;
+    return;
+  }
+  const label = ctx === 'FNV' ? 'Fallout: New Vegas' : 'Fallout 3';
+  const ok = await confirmAction({
+    title: '> SWAP PROGRAM CARTRIDGE',
+    warning:
+      'Seating the ' +
+      label +
+      " cartridge reboots the terminal into that game's campaign.\n\nEach game keeps its own separate campaign — nothing is lost.\n\nContinue?",
+    confirmLabel: 'SEAT CARTRIDGE',
+  });
+  if (!ok) {
+    if (sel) sel.value = current;
+    _syncCampaignProfileUI();
+    return;
+  }
+  onGameContextChange(ctx);
+}
+window._confirmGameContextChange = _confirmGameContextChange;
+
+// Cartridge button click — syncs the hidden select then routes through the exact
+// same confirm gate a direct select change uses.
+function _seatGameCartridge(ctx) {
+  const sel = document.getElementById('gameContextSelect');
+  if (sel) sel.value = ctx;
+  _confirmGameContextChange(ctx);
+}
+window._seatGameCartridge = _seatGameCartridge;
+
+// PLAYSTYLE doctrine rocker. changePlaystyle() itself reverts #playstyleInput's
+// value on the Educated/Dead-Weight melee lockout (unchanged) — re-syncing after
+// it returns always reflects the ACTUAL final value, lockout or not.
+function _setDoctrine(style) {
+  const sel = document.getElementById('playstyleInput');
+  if (sel) sel.value = style;
+  changePlaystyle(style);
+  _syncCampaignProfileUI();
+}
+window._setDoctrine = _setDoctrine;
+
+// PLAYTHROUGH TYPE tempo dial + 5 direct-pick detents — one tap per pick.
+function _setTempo(type) {
+  const sel = document.getElementById('playthroughTypeSelect');
+  if (sel) sel.value = type;
+  onPlaythroughTypeChange(type);
+  _syncCampaignProfileUI();
+}
+window._setTempo = _setTempo;
+
+const _TEMPO_ORDER = ['standard', 'minmaxed', 'completionist', 'casual', 'speedrun'];
+const _TEMPO_ROT = [-64, -32, 0, 32, 64];
+const _TEMPO_LABELS = {
+  standard: 'STANDARD',
+  minmaxed: 'MIN-MAXED',
+  completionist: 'COMPLETIONIST',
+  casual: 'CASUAL',
+  speedrun: 'SPEEDRUN',
+};
+
+// Re-paints the CAMPAIGN PROFILE board's custom controls from the real,
+// underlying state — cartridges/rocker/detents/dial/summary line. Called after
+// every profile change and once at boot; never drifts from the hidden real
+// controls, which stay the actual source of truth.
+function _syncCampaignProfileUI() {
+  const ctx = (state && state.gameContext) || 'FNV';
+  const fnvCart = document.getElementById('cart-fnv');
+  const fo3Cart = document.getElementById('cart-fo3');
+  if (fnvCart) {
+    fnvCart.classList.toggle('seated', ctx === 'FNV');
+    fnvCart.setAttribute('aria-checked', String(ctx === 'FNV'));
+  }
+  if (fo3Cart) {
+    fo3Cart.classList.toggle('seated', ctx === 'FO3');
+    fo3Cart.setAttribute('aria-checked', String(ctx === 'FO3'));
+  }
+
+  const style = localStorage.getItem('robco_playstyle') || 'any';
+  const isMelee = style === 'melee';
+  const anyBtn = document.getElementById('rk-any');
+  const meleeBtn = document.getElementById('rk-melee');
+  if (anyBtn) {
+    anyBtn.classList.toggle('on', !isMelee);
+    anyBtn.setAttribute('aria-checked', String(!isMelee));
+  }
+  if (meleeBtn) {
+    meleeBtn.classList.toggle('on', isMelee);
+    meleeBtn.setAttribute('aria-checked', String(isMelee));
+  }
+  const doctrineStatus = document.getElementById('st-doctrine');
+  if (doctrineStatus)
+    doctrineStatus.textContent = '> DOCTRINE: ' + (isMelee ? 'MELEE / UNARMED ONLY' : 'ANY WEAPON');
+
+  const tempo = (state && state.playthroughType) || 'standard';
+  const tIdx = Math.max(0, _TEMPO_ORDER.indexOf(tempo));
+  document.querySelectorAll('.detent').forEach(d => {
+    const on = d.dataset.tempo === _TEMPO_ORDER[tIdx];
+    d.classList.toggle('on', on);
+    d.setAttribute('aria-checked', String(on));
+  });
+  const knob = document.getElementById('tempoKnob');
+  if (knob) knob.style.transform = 'rotate(' + _TEMPO_ROT[tIdx] + 'deg)';
+  const tempoStatus = document.getElementById('st-tempo');
+  if (tempoStatus) tempoStatus.textContent = '> TEMPO: ' + _TEMPO_LABELS[_TEMPO_ORDER[tIdx]];
+
+  const sum = document.getElementById('sum-profile');
+  if (sum) {
+    const gameLabel = ctx === 'FNV' ? 'NEW VEGAS' : 'FALLOUT 3';
+    const doctrineLabel = isMelee ? 'MELEE ONLY' : 'ANY WEAPON';
+    sum.textContent =
+      gameLabel +
+      ' CARTRIDGE · ' +
+      doctrineLabel +
+      ' · TEMPO: ' +
+      _TEMPO_LABELS[_TEMPO_ORDER[tIdx]];
+  }
+}
+window._syncCampaignProfileUI = _syncCampaignProfileUI;
+
+// ── RANDOMIZER INTERLOCK — the breaker/cover/seal fiction over
+// #completeRngToggle / state.campaignMode (mirrors the ARCHITECTURE.md-documented
+// SAFE/'standard' -> ARMED/'rng' (reversible) -> SEALED/'rng-locked' (permanent,
+// only via wipeTerminal() while armed) lifecycle — unchanged). Two deliberate
+// taps arm from SAFE (lift the cover, then throw the lever) so a stray tap can't
+// arm it; a single tap disarms/re-arms once the cover is already lifted.
+// _ilkCoverLifted is transient UI state only (never persisted) — a fresh render
+// always starts with the cover closed, matching SAFE.
+let _ilkCoverLifted = false;
+function _interlockLiftCover(ev) {
+  if (ev) ev.stopPropagation();
+  if (state.campaignMode === 'rng-locked') return;
+  _ilkCoverLifted = true;
+  const well = document.getElementById('ilkWell');
+  if (well) well.classList.add('lifted');
+}
+window._interlockLiftCover = _interlockLiftCover;
+
+function _interlockThrowBreaker() {
+  if (state.campaignMode === 'rng-locked') return;
+  const armed = state.campaignMode === 'rng';
+  if (!armed && !_ilkCoverLifted) {
+    _interlockLiftCover();
+    return;
+  }
+  const cb = document.getElementById('completeRngToggle');
+  const nextChecked = !armed;
+  if (cb) cb.checked = nextChecked;
+  onCampaignModeChange(nextChecked);
+  _ilkCoverLifted = nextChecked;
+  _syncInterlockUI();
+}
+window._interlockThrowBreaker = _interlockThrowBreaker;
+
+// Re-paints the RANDOMIZER INTERLOCK · PURGE board from state.campaignMode — the
+// well/lever/cover/seal, the sequence legend, the summary line, and the LED.
+// Called after every interlock change and once at boot.
+function _syncInterlockUI() {
+  const mode = (state && state.campaignMode) || 'standard';
+  const rngState = mode === 'rng' ? 'armed' : mode === 'rng-locked' ? 'locked' : 'safe';
+  const wrap = document.getElementById('interlockWrap');
+  if (wrap) wrap.dataset.rng = rngState;
+  const well = document.getElementById('ilkWell');
+  if (well) well.classList.toggle('lifted', rngState !== 'safe');
+  if (rngState === 'safe') _ilkCoverLifted = false;
+
+  const title = document.getElementById('ilkTitle');
+  if (title)
+    title.textContent =
+      'COMPLETE RNG — ' +
+      (rngState === 'safe' ? 'SAFE' : rngState === 'armed' ? 'ARMED' : 'SEALED');
+  const desc = document.getElementById('ilkDesc');
+  if (desc) {
+    desc.textContent =
+      rngState === 'safe'
+        ? 'Full randomisation of SPECIAL, traits, tag skills, skill points and perk picks — handed to the AI for a NEW campaign only. Arming changes nothing until the next terminal wipe, and never touches an existing save.'
+        : rngState === 'armed'
+          ? 'Breaker thrown. The NEXT new campaign will be fully randomised. This one is untouched. Throw the breaker back down to disarm — right up until the wipe.'
+          : 'This run was created with the breaker thrown. The interlock sealed at campaign creation and cannot be reopened — the seal is the fiction for: the toggle is disabled for this whole run.';
+  }
+  const actions = document.getElementById('ilkActions');
+  if (actions) actions.style.display = rngState === 'armed' ? '' : 'none';
+
+  // Protocol 22 consolidation (found during render-verify): _restoreDevicePrefs()/
+  // loadUI() already toggled these banners from the same state.campaignMode read
+  // before calling this function — folding it in here too means ANY future
+  // caller of _syncInterlockUI() repaints the WHOLE board, banners included,
+  // instead of depending on a caller-specific duplicate a few lines above it.
+  const armedBanner = document.getElementById('rngModeBanner');
+  if (armedBanner) armedBanner.style.display = rngState === 'armed' ? 'block' : 'none';
+  const lockedBanner = document.getElementById('rngLockedBanner');
+  if (lockedBanner) lockedBanner.style.display = rngState === 'locked' ? 'block' : 'none';
+
+  const safeStep = document.getElementById('sq-safe');
+  const armedStep = document.getElementById('sq-armed');
+  const lockedStep = document.getElementById('sq-locked');
+  if (safeStep) safeStep.classList.toggle('now', rngState === 'safe');
+  if (armedStep) armedStep.classList.toggle('now', rngState === 'armed');
+  if (lockedStep) lockedStep.classList.toggle('now', rngState === 'locked');
+
+  const sum = document.getElementById('sum-ilk');
+  if (sum)
+    sum.textContent =
+      rngState === 'safe'
+        ? 'RNG SAFE · PURGE KEY STOWED'
+        : rngState === 'armed'
+          ? 'RNG ARMED — COMMITS AT NEXT WIPE'
+          : 'RNG SEALED — PERMANENT THIS RUN';
+
+  const led = document.getElementById('ilkLed');
+  if (led)
+    led.className =
+      'bay-led ' + (rngState === 'safe' ? 'off' : rngState === 'armed' ? 'amber' : 'red');
+
+  const st = document.getElementById('st-ilk');
+  if (st) {
+    st.textContent =
+      rngState === 'safe'
+        ? '> INTERLOCK SAFE — STANDARD CAMPAIGN MODE'
+        : rngState === 'armed'
+          ? '> INTERLOCK ARMED — NOTHING CHANGES UNTIL THE NEXT WIPE'
+          : '> INTERLOCK SEALED — FULL RANDOMISATION ACTIVE, PERMANENT FOR THIS RUN';
+    st.className =
+      'board-status' + (rngState === 'armed' ? ' alert' : rngState === 'locked' ? ' danger' : '');
+  }
+}
+window._syncInterlockUI = _syncInterlockUI;
 
 // ── CAMPAIGN LOG EXPORT ────────────────────────────────────────
 // format: 'txt' (default), 'html' (#41), 'md' (#27)
@@ -4259,11 +4510,14 @@ function loadUI() {
       cb.checked = locked || armed;
       cb.disabled = locked; // cannot uncheck when permanently active
     }
-    const banner = document.getElementById('rngModeBanner');
-    if (banner) banner.style.display = armed ? 'block' : 'none';
-    const lockedBanner = document.getElementById('rngLockedBanner');
-    if (lockedBanner) lockedBanner.style.display = locked ? 'block' : 'none';
+    // The armed/locked banners are painted by _syncInterlockUI() below (Protocol
+    // 22 — one repaint function owns the whole board, not a duplicate here too).
   }
+  // SU-3: keep the CAMPAIGN PROFILE / RANDOMIZER INTERLOCK custom controls (and
+  // the armed/locked banners) in sync with state on every loadUI() pass too
+  // (e.g. an AI-driven update, or wipeTerminal()'s post-wipe loadUI() call).
+  if (typeof _syncCampaignProfileUI === 'function') _syncCampaignProfileUI();
+  if (typeof _syncInterlockUI === 'function') _syncInterlockUI();
   updateMath();
   triggerPhosphorGhost();
   // Radiation SPECIAL debuff coloring (display-only, does not modify state)

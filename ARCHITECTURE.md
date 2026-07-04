@@ -69,8 +69,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2226-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2226-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2241-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2241-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -1043,11 +1043,18 @@ The campaign lifecycle **config** controls live in `#campaignConfigPanel`
 | Control                 | ID                      | Storage                                      | Handler                         |
 | ----------------------- | ----------------------- | -------------------------------------------- | ------------------------------- |
 | Game Context select     | `gameContextSelect`     | `state.gameContext`                          | `onGameContextChange(ctx)`      |
+| Playstyle select        | `playstyleInput`        | `localStorage.robco_playstyle`               | `changePlaystyle(style)`        |
 | Playthrough Type select | `playthroughTypeSelect` | `state.playthroughType`                      | `onPlaythroughTypeChange(type)` |
 | Complete RNG checkbox   | `completeRngToggle`     | `state.campaignMode` (`'standard'`\|`'rng'`) | `onCampaignModeChange(checked)` |
 | Wipe Terminal button    | `wipeTerminalBtn`       | —                                            | `wipeTerminal()`                |
 
 **Complete RNG and Playthrough Type are independent.** All combinations are valid (e.g. Completionist + RNG, Speedrun + RNG). The playthrough type directive and RNG directive are both injected into the AI system prompt and concatenated when both are active.
+
+**Two-board hardware reskin (SU-3, Step 2 v2.8.0) — reuses these exact ids/handlers, no behavior change.** The five controls above are all real, native elements that stay in the DOM — visually hidden via `.bay-visually-hidden-input` (the same technique `#immersionSelect` already used), so a keyboard/AT user can still reach any of them directly — while two new hardware boards provide the visible interaction:
+
+- **CAMPAIGN PROFILE** (`#b-profile`-equivalent sub-panel, green): GAME is two seatable PROGRAM CARTRIDGE buttons (`#cart-fnv`/`#cart-fo3`); PLAYSTYLE is a 2-position ENGAGEMENT DOCTRINE rocker (`#rk-any`/`#rk-melee`); PLAYTHROUGH TYPE is a decorative rotating dial plus 5 direct-pick OPERATIONAL TEMPO detents (one tap per pick). New wrapper functions (`_seatGameCartridge`/`_confirmGameContextChange`, `_setDoctrine`, `_setTempo`) sync the hidden real control's `.value` then call the exact unchanged setter — one truth, two entry points (Protocol 22). `_syncCampaignProfileUI()` repaints the cartridges/rocker/detents/dial/summary line from state; called from both `_restoreDevicePrefs()` (boot) and `loadUI()`.
+- **RANDOMIZER INTERLOCK · PURGE** (`#b-interlock`-equivalent sub-panel, red `dangerboard`): COMPLETE RNG is a breaker (`_interlockThrowBreaker()`) under an amber safety cover (`_interlockLiftCover()`) in a hazard-striped well — two deliberate taps to arm from SAFE (lift cover, then throw lever); an always-visible commit-sequence legend (`SAFE ▸ ARMED — reversible ▸ + WIPE ▸ SEALED — permanent`) lights the current step via `[data-rng]` on `#interlockWrap` (`safe`/`armed`/`locked`, derived from `state.campaignMode`). SEALED (`rng-locked`) shows a red wire-seal `✕` + lead disc welded over the lever, gated purely by CSS on `[data-rng='locked']` — the seal literally _is_ the disabled toggle, no separate JS-toggled class. WIPE TERMINAL sits on the same board as its commit point (`.purge-btn`), `wipeTerminal()`'s double-confirm and RNG-armed warning unchanged. `_syncInterlockUI()` is the single repaint function for the WHOLE board — well/cover/seal/title/desc/summary/sequence-legend AND the `#rngModeBanner`/`#rngLockedBanner` banners — called from `_restoreDevicePrefs()`/`loadUI()` **and** from `onCampaignModeChange()` itself, so a direct toggle of the hidden `#completeRngToggle` (bypassing the breaker button) still repaints the whole board, not just the banner (a Protocol 42 fix — the banners used to be toggled redundantly in 3 separate places).
+- **Owner-approved confirm gate:** unlike every other reskinned control, a game-cartridge swap is gated behind `confirmAction()` inside `_confirmGameContextChange()` — confirm proceeds to the unchanged `onGameContextChange()` (still reboots the terminal); cancel reverts the hidden select to the still-active game and re-syncs the profile UI, never touching `onGameContextChange()` — so an accidental cartridge tap can no longer reload unprompted.
 
 **Complete RNG's permanent lock, and the owner-report wipe-dialog batch:** checking the box only sets `state.campaignMode = 'rng'` (freely toggleable — nothing gates it to "only right before a wipe"); the commitment is permanent only if `wipeTerminal()` actually runs while it's checked, at which point the fresh state is stamped `'rng-locked'` instead of `'rng'`. `onCampaignModeChange()` is what makes that stick: once `campaignMode === 'rng-locked'`, it refuses to uncheck/re-enable the control for the rest of that save, forcing the checkbox back to checked+disabled. `wipeTerminal()`'s first confirm gate now also warns explicitly when RNG is armed (`state.campaignMode === 'rng'` — the same signal the lock-commit check reads a few lines later, so the warning and the lock can never disagree) that continuing will make the lock permanent. Separately, `confirmAction()` (the shared driver behind this dialog and every other destructive confirm — craft/scrap, save delete/overwrite, cloud save/version restore) gained `openModal({hideCloseBtn: true})`: the modal's always-present static `[ CLOSE INTERFACE ]` button used to sit alongside `confirmAction()`'s own labeled CANCEL button, both just dismissing — a duplicate cancel. `hideCloseBtn` toggles a `.confirm-mode` class (the same idiom the pre-existing `wide` option already uses) that hides the redundant static button via CSS; `closeModal()` always resets the class, so no other modal (help, error log, changelog, save help) is ever affected.
 
@@ -2000,7 +2007,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2226-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2241-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

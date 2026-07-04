@@ -2430,157 +2430,352 @@
             </details>
 
             <!-- 16. CAMPAIGN CONFIGS (extracted from CAMPG, Step 2 v2.8.0 Settings-tab
-                 unit — every id/handler kept verbatim, Protocol 22; visual modernization is
-                 a separate gated unit, SU-3) -->
+                 unit; modernized into the two-board Module-Bay/Director-Uplink hardware
+                 language, SU-3 — RESKIN ONLY, every control keeps its exact id/handler,
+                 Protocol 22/25). -->
             <details class="panel" data-tab="settings" id="campaignConfigPanel">
               <summary>
                 <h2>> CAMPAIGN CONFIGS</h2>
               </summary>
 
-              <!-- Game Context -->
-              <div class="input-group" style="margin-bottom: 10px">
-                <label class="cfg-label" style="font-size: 11px; letter-spacing: 1px; opacity: 0.8"
-                  >GAME:</label
-                >
-                <select
-                  id="gameContextSelect"
-                  style="width: 100%"
-                  onchange="onGameContextChange(this.value)"
-                >
-                  <option value="FNV">Fallout: New Vegas</option>
-                  <option value="FO3">Fallout 3</option>
-                </select>
-                <!-- fo3WarningBanner moved to #fo3WarningBannerTemplate (top of body, WU-E2):
-                   a reusable disabled banner template. Clone it here to re-enable. -->
+              <div class="bay-bus-strip" aria-hidden="true">
+                &#9552;&#9552;&#9552; BACKPLANE &#9573; P-DECK &#9573; INTERLOCK
+                &#9552;&#9552;&#9552;
               </div>
 
-              <!-- Playstyle -->
-              <div class="input-group" style="margin-bottom: 10px">
-                <label class="cfg-label" style="font-size: 11px; letter-spacing: 1px; opacity: 0.8"
-                  >PLAYSTYLE:</label
-                >
-                <select
-                  id="playstyleInput"
-                  style="width: 100%"
-                  onchange="changePlaystyle(this.value)"
-                >
-                  <option value="any">Any Weapon (Default)</option>
-                  <option value="melee">Melee/Unarmed Only</option>
-                </select>
-              </div>
+              <div class="bay-grid">
+                <!-- ══ CAMPAIGN PROFILE — P-DECK ══ -->
+                <details class="sub-panel bay-board" data-sub-id="settings_campaign_profile" open>
+                  <summary>
+                    <span class="bay-led" id="profileLed" aria-hidden="true"></span>
+                    <h3>&gt; CAMPAIGN PROFILE</h3>
+                    <span class="panel-substatus" id="sum-profile"
+                      >NEW VEGAS CARTRIDGE &middot; ANY WEAPON &middot; TEMPO: STANDARD</span
+                    >
+                  </summary>
+                  <span class="bay-slot-tag">P-DECK</span>
+                  <span class="bay-part-no"
+                    >PN RBC-CMP-81 &middot; PROGRAM DECK &mdash; SIMULATION PROFILE FOR THE ACTIVE
+                    CAMPAIGN</span
+                  >
 
-              <!-- Playthrough Type (state.playthroughType — Protocol 4 state field since C5) -->
-              <div class="input-group" style="margin-bottom: 10px">
-                <label class="cfg-label" style="font-size: 11px; letter-spacing: 1px; opacity: 0.8"
-                  >PLAYTHROUGH TYPE:</label
-                >
-                <select
-                  id="playthroughTypeSelect"
-                  style="width: 100%"
-                  onchange="onPlaythroughTypeChange(this.value)"
-                >
-                  <option value="standard">Standard</option>
-                  <option value="minmaxed">Min-Maxed</option>
-                  <option value="completionist">Completionist</option>
-                  <option value="casual">Casual</option>
-                  <option value="speedrun">Speedrun</option>
-                </select>
-              </div>
+                  <!-- GAME — program cartridge (#gameContextSelect, unchanged reload semantics,
+                       now gated behind a confirm per owner decision) -->
+                  <div class="rack-note">
+                    PROGRAM CARTRIDGE &mdash; SEAT ONE: <span class="real-label">(GAME)</span>
+                  </div>
+                  <select
+                    id="gameContextSelect"
+                    class="bay-visually-hidden-input"
+                    onchange="_confirmGameContextChange(this.value)"
+                    aria-label="Game — which Fallout title this campaign profile runs"
+                  >
+                    <option value="FNV">Fallout: New Vegas</option>
+                    <option value="FO3">Fallout 3</option>
+                  </select>
+                  <div class="cart-deck" role="radiogroup" aria-label="Program cartridge">
+                    <button
+                      type="button"
+                      class="cart seated"
+                      id="cart-fnv"
+                      onclick="_seatGameCartridge('FNV')"
+                      role="radio"
+                      aria-checked="true"
+                      aria-label="Seat the Fallout: New Vegas program cartridge — switches the active game campaign"
+                    >
+                      <span class="spools" aria-hidden="true"><i></i><i></i></span>
+                      <span class="c-name">FALLOUT: NEW VEGAS</span>
+                      <span class="c-sub">MOJAVE PROGRAM TAPE &middot; RBX-2281</span>
+                    </button>
+                    <button
+                      type="button"
+                      class="cart"
+                      id="cart-fo3"
+                      onclick="_seatGameCartridge('FO3')"
+                      role="radio"
+                      aria-checked="false"
+                      aria-label="Seat the Fallout 3 program cartridge — switches the active game campaign"
+                    >
+                      <span class="spools" aria-hidden="true"><i></i><i></i></span>
+                      <span class="c-name">FALLOUT 3</span>
+                      <span class="c-sub">CAPITAL WASTELAND TAPE &middot; RBX-2277</span>
+                    </button>
+                  </div>
+                  <p class="board-status" id="st-cart">
+                    &gt; SWAPPING CARTRIDGES REBOOTS THE TERMINAL &mdash; EACH TAPE KEEPS ITS OWN
+                    CAMPAIGN
+                  </p>
 
-              <!-- Complete RNG (state.campaignMode — opt-in, new campaign only) -->
-              <div class="input-group rng-mode-group" style="margin-bottom: 10px">
-                <label
-                  style="
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    cursor: pointer;
-                    font-size: 11px;
-                    letter-spacing: 1px;
-                    opacity: 0.8;
-                  "
+                  <!-- PLAYSTYLE — doctrine rocker (#playstyleInput → robco_playstyle) -->
+                  <div class="rack-note" style="margin-top: 14px">
+                    ENGAGEMENT DOCTRINE &mdash; TWO-POSITION ROCKER:
+                    <span class="real-label">(PLAYSTYLE)</span>
+                  </div>
+                  <select
+                    id="playstyleInput"
+                    class="bay-visually-hidden-input"
+                    onchange="_setDoctrine(this.value)"
+                    aria-label="Playstyle — engagement doctrine"
+                  >
+                    <option value="any">Any Weapon (Default)</option>
+                    <option value="melee">Melee/Unarmed Only</option>
+                  </select>
+                  <div class="rocker" role="radiogroup" aria-label="Playstyle">
+                    <button
+                      type="button"
+                      class="on"
+                      id="rk-any"
+                      onclick="_setDoctrine('any')"
+                      role="radio"
+                      aria-checked="true"
+                    >
+                      ANY WEAPON<span class="r-sub">default &mdash; no restrictions</span>
+                    </button>
+                    <button
+                      type="button"
+                      id="rk-melee"
+                      onclick="_setDoctrine('melee')"
+                      role="radio"
+                      aria-checked="false"
+                    >
+                      MELEE / UNARMED ONLY<span class="r-sub">blades, fists &amp; thrown</span>
+                    </button>
+                  </div>
+                  <p class="board-status" id="st-doctrine">&gt; DOCTRINE: ANY WEAPON</p>
+
+                  <!-- PLAYTHROUGH TYPE — tempo dial + 5 direct-pick detents (#playthroughTypeSelect) -->
+                  <div class="rack-note" style="margin-top: 14px">
+                    OPERATIONAL TEMPO &mdash; 5-POSITION SELECTOR, DIRECT PICK:
+                    <span class="real-label">(PLAYTHROUGH TYPE)</span>
+                  </div>
+                  <select
+                    id="playthroughTypeSelect"
+                    class="bay-visually-hidden-input"
+                    onchange="_setTempo(this.value)"
+                    aria-label="Playthrough type — operational tempo"
+                  >
+                    <option value="standard">Standard</option>
+                    <option value="minmaxed">Min-Maxed</option>
+                    <option value="completionist">Completionist</option>
+                    <option value="casual">Casual</option>
+                    <option value="speedrun">Speedrun</option>
+                  </select>
+                  <div class="tempo-wrap">
+                    <div class="tempo-dial" aria-hidden="true">
+                      <span class="knob" id="tempoKnob"></span>
+                    </div>
+                    <div class="detent-rack" role="radiogroup" aria-label="Playthrough type">
+                      <button
+                        type="button"
+                        class="detent on"
+                        data-tempo="standard"
+                        onclick="_setTempo('standard')"
+                        role="radio"
+                        aria-checked="true"
+                      >
+                        <span class="d-pip" aria-hidden="true"></span
+                        ><span class="d-txt"
+                          >STANDARD<span class="d-desc"
+                            >balanced pacing &mdash; the default simulation</span
+                          ></span
+                        >
+                      </button>
+                      <button
+                        type="button"
+                        class="detent"
+                        data-tempo="minmaxed"
+                        onclick="_setTempo('minmaxed')"
+                        role="radio"
+                        aria-checked="false"
+                      >
+                        <span class="d-pip" aria-hidden="true"></span
+                        ><span class="d-txt"
+                          >MIN-MAXED<span class="d-desc"
+                            >the AI assumes optimized builds</span
+                          ></span
+                        >
+                      </button>
+                      <button
+                        type="button"
+                        class="detent"
+                        data-tempo="completionist"
+                        onclick="_setTempo('completionist')"
+                        role="radio"
+                        aria-checked="false"
+                      >
+                        <span class="d-pip" aria-hidden="true"></span
+                        ><span class="d-txt"
+                          >COMPLETIONIST<span class="d-desc">every side path surfaces</span></span
+                        >
+                      </button>
+                      <button
+                        type="button"
+                        class="detent"
+                        data-tempo="casual"
+                        onclick="_setTempo('casual')"
+                        role="radio"
+                        aria-checked="false"
+                      >
+                        <span class="d-pip" aria-hidden="true"></span
+                        ><span class="d-txt"
+                          >CASUAL<span class="d-desc"
+                            >forgiving pacing, lighter bookkeeping</span
+                          ></span
+                        >
+                      </button>
+                      <button
+                        type="button"
+                        class="detent"
+                        data-tempo="speedrun"
+                        onclick="_setTempo('speedrun')"
+                        role="radio"
+                        aria-checked="false"
+                      >
+                        <span class="d-pip" aria-hidden="true"></span
+                        ><span class="d-txt"
+                          >SPEEDRUN<span class="d-desc"
+                            >critical path only &mdash; aggressive clock</span
+                          ></span
+                        >
+                      </button>
+                    </div>
+                  </div>
+                  <p class="board-status" id="st-tempo">&gt; TEMPO: STANDARD</p>
+                </details>
+
+                <!-- ══ RANDOMIZER INTERLOCK · PURGE — INTERLOCK (red danger board) ══ -->
+                <details
+                  class="sub-panel bay-board dangerboard"
+                  data-sub-id="settings_campaign_interlock"
+                  open
                 >
+                  <summary>
+                    <span class="bay-led off" id="ilkLed" aria-hidden="true"></span>
+                    <h3 style="color: var(--robco-danger)">
+                      &gt; RANDOMIZER INTERLOCK &middot; PURGE
+                    </h3>
+                    <span class="panel-substatus" id="sum-ilk"
+                      >RNG SAFE &middot; PURGE KEY STOWED</span
+                    >
+                  </summary>
+                  <span class="bay-slot-tag">INTERLOCK</span>
+                  <span class="bay-part-no"
+                    >PN RBC-RNG-00 &middot; ONE-WAY BREAKER &mdash; SEALS AT CAMPAIGN CREATION
+                    &middot; NO FIELD RESET</span
+                  >
+
+                  <!-- COMPLETE RNG (state.campaignMode — opt-in, new campaign only) -->
+                  <div class="rack-note">
+                    COMPLETE-RNG BREAKER &mdash; LIFT COVER, THROW TO ARM:
+                    <span class="real-label">(COMPLETE RNG)</span>
+                  </div>
                   <input
                     type="checkbox"
                     id="completeRngToggle"
+                    class="bay-visually-hidden-input"
                     onchange="onCampaignModeChange(this.checked)"
-                    style="width: auto; accent-color: var(--robco-green)"
+                    aria-label="Complete RNG — full randomisation for the next new campaign"
                   />
-                  COMPLETE RNG
-                </label>
-                <!-- Armed: checkbox checked, wipe not yet performed -->
-                <div
-                  id="rngModeBanner"
-                  style="
-                    display: none;
-                    margin-top: 6px;
-                    padding: 6px 8px;
-                    font-size: 9px;
-                    letter-spacing: 0.5px;
-                    line-height: 1.5;
-                    color: var(--robco-green);
-                    border: 1px dashed var(--robco-green);
-                    background: rgba(var(--robco-green-rgb), 0.04);
-                  "
-                >
-                  &#9658; COMPLETE RNG ACTIVE. All SPECIAL, traits, tag skills, skill points, and
-                  perk selections will be randomised by the AI when requested. Opt-in only &mdash;
-                  wipe terminal and start a new campaign to apply. NEVER retroactively applied to
-                  existing saves. Combines freely with any Playthrough Type.
-                </div>
-                <!-- Locked: wipe performed while armed; now permanent -->
-                <div
-                  id="rngLockedBanner"
-                  style="
-                    display: none;
-                    margin-top: 6px;
-                    padding: 6px 8px;
-                    font-size: 9px;
-                    letter-spacing: 0.5px;
-                    line-height: 1.5;
-                    color: var(--robco-danger);
-                    border: 1px dashed var(--robco-danger);
-                    background: rgba(231, 76, 60, 0.06);
-                  "
-                >
-                  &#9888; COMPLETE RNG &mdash; PERMANENTLY ACTIVE. This run is locked to full
-                  randomisation. Cannot be disabled.
-                </div>
-              </div>
+                  <div class="interlock" id="interlockWrap" data-rng="safe">
+                    <div class="ilk-row">
+                      <div class="ilk-well" id="ilkWell">
+                        <button
+                          type="button"
+                          class="ilk-breaker"
+                          onclick="_interlockThrowBreaker()"
+                          aria-label="Complete RNG breaker — arm or disarm full randomisation for the next new campaign"
+                        >
+                          <span class="ilk-word top">ARM</span>
+                          <span class="ilk-slot-line" aria-hidden="true"
+                            ><span class="ilk-handle"></span
+                          ></span>
+                          <span class="ilk-word">SAFE</span>
+                        </button>
+                        <button
+                          type="button"
+                          class="ilk-cover"
+                          id="ilkCover"
+                          onclick="_interlockLiftCover(event)"
+                          aria-label="Safety cover — lift to reach the Complete RNG breaker"
+                        >
+                          <span class="cv-screw tl" aria-hidden="true"></span
+                          ><span class="cv-screw tr" aria-hidden="true"></span>
+                          <span class="cv-screw bl" aria-hidden="true"></span
+                          ><span class="cv-screw br" aria-hidden="true"></span> &#9888; SAFETY<br />COVER<br /><span
+                            style="opacity: 0.7"
+                            >LIFT TO ARM</span
+                          >
+                        </button>
+                        <span class="ilk-seal" aria-hidden="true"
+                          ><span class="seal-disc">SEALED</span></span
+                        >
+                      </div>
+                      <div class="ilk-info">
+                        <div class="ilk-title" id="ilkTitle">COMPLETE RNG &mdash; SAFE</div>
+                        <div class="ilk-desc" id="ilkDesc">
+                          Full randomisation of SPECIAL, traits, tag skills, skill points and perk
+                          picks &mdash; handed to the AI for a NEW campaign only. Arming changes
+                          nothing until the next terminal wipe, and never touches an existing save.
+                        </div>
+                        <div class="ilk-actions" id="ilkActions" style="display: none">
+                          <button
+                            type="button"
+                            onclick="_interlockThrowBreaker()"
+                            id="ilkDisarmBtn"
+                          >
+                            &#9662; DISARM &mdash; RETURN TO SAFE
+                          </button>
+                        </div>
+                      </div>
+                    </div>
 
-              <!-- Wipe Terminal (Danger Zone) -->
-              <div
-                style="
-                  margin-top: 16px;
-                  border-top: 1px dashed rgba(231, 76, 60, 0.4);
-                  padding-top: 12px;
-                "
-              >
-                <div
-                  style="
-                    font-size: 10px;
-                    opacity: 0.65;
-                    letter-spacing: 1px;
-                    margin-bottom: 8px;
-                    color: var(--robco-danger);
-                  "
-                >
-                  &#9888; DANGER ZONE
-                </div>
-                <button
-                  id="wipeTerminalBtn"
-                  class="action-btn"
-                  onclick="wipeTerminal()"
-                  style="
-                    width: 100%;
-                    color: var(--robco-danger);
-                    border-color: var(--robco-danger);
-                    font-size: 11px;
-                    letter-spacing: 1.5px;
-                  "
-                >
-                  &gt; WIPE TERMINAL &mdash; NEW CAMPAIGN
-                </button>
+                    <!-- the commit path, made explicit -->
+                    <div class="seq-strip" aria-label="Interlock sequence" id="ilkSeq">
+                      <span class="seq-step now" id="sq-safe">SAFE</span>
+                      <span class="seq-arrow" aria-hidden="true">&#9656;</span>
+                      <span class="seq-step armed-step" id="sq-armed"
+                        >ARMED &mdash; reversible</span
+                      >
+                      <span class="seq-arrow" aria-hidden="true">&#9656;</span>
+                      <span class="seq-step" id="sq-wipe">+ WIPE</span>
+                      <span class="seq-arrow" aria-hidden="true">&#9656;</span>
+                      <span class="seq-step locked-step" id="sq-locked"
+                        >SEALED &mdash; permanent</span
+                      >
+                    </div>
+
+                    <!-- Armed: checkbox checked, wipe not yet performed -->
+                    <div id="rngModeBanner" class="rng-banner armed" style="display: none">
+                      &#9658; COMPLETE RNG ACTIVE. All SPECIAL, traits, tag skills, skill points,
+                      and perk selections will be randomised by the AI when requested. Opt-in only
+                      &mdash; wipe terminal and start a new campaign to apply. NEVER retroactively
+                      applied to existing saves. Combines freely with any Playthrough Type.
+                    </div>
+                    <!-- Locked: wipe performed while armed; now permanent -->
+                    <div id="rngLockedBanner" class="rng-banner locked" style="display: none">
+                      &#9888; COMPLETE RNG &mdash; PERMANENTLY ACTIVE. This run is locked to full
+                      randomisation. Cannot be disabled.
+                    </div>
+                  </div>
+
+                  <!-- Wipe Terminal (Danger Zone) -->
+                  <div class="purge">
+                    <div class="p-head">
+                      &#9888; DANGER ZONE &mdash; TERMINAL PURGE
+                      <span class="real-label" style="opacity: 0.55; font-size: 8.5px"
+                        >(WIPE TERMINAL)</span
+                      >
+                    </div>
+                    <button id="wipeTerminalBtn" class="purge-btn" onclick="wipeTerminal()">
+                      &#9656; WIPE TERMINAL &mdash; NEW CAMPAIGN
+                    </button>
+                    <p class="p-note">
+                      Double-confirm gate unchanged. A wipe while the interlock is ARMED seals it
+                      for the new campaign (SEALED &mdash; permanent). A wipe while SAFE starts a
+                      standard run.
+                    </p>
+                  </div>
+                </details>
               </div>
             </details>
           </div>

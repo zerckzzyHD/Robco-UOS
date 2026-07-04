@@ -10422,20 +10422,23 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     'GATE-NOWRAP-5: .tool-row span/.uses-target carry white-space: nowrap in terminal.css (device-wrap fix, carried forward from the retired .macro-buttons button rule to the Tool Deck)'
   );
 
-  // 92.6  WU-C14: the COMPLETE RNG label carries white-space: nowrap so it can
-  //       never wrap one character per line when squeezed beside its warning.
+  // 92.6/92.7  WU-C14's .rng-mode-group guard protected a VISIBLE "COMPLETE RNG"
+  //       checkbox label from wrapping one character per line beside its warning.
+  //       Retired by the SU-3 Randomizer Interlock reskin (Step 2 v2.8.0):
+  //       #completeRngToggle is now .bay-visually-hidden-input (Protocol 22 — the
+  //       Immersion Dial technique), so there is no longer a visible label that
+  //       could wrap that way. The successor guard is the interlock's own
+  //       user-visible short-text elements (.ilk-word/.seq-step), which must
+  //       carry the same nowrap protection now that they carry the equivalent
+  //       state-label role.
   assert(
-    /\.rng-mode-group\s*>\s*label\s*\{[^}]*white-space:\s*nowrap/.test(css92),
-    'GATE-NOWRAP-6: .rng-mode-group > label has white-space: nowrap (COMPLETE RNG label must not wrap per-character)'
+    !/class="input-group rng-mode-group"/.test(html92) &&
+      /id="completeRngToggle"[^>]*class="bay-visually-hidden-input"/.test(html92),
+    'GATE-NOWRAP-6: the old visible .rng-mode-group wrapper is retired — #completeRngToggle is now .bay-visually-hidden-input (SU-3 Randomizer Interlock reskin)'
   );
-
-  // 92.7  WU-C14: the COMPLETE RNG group stacks as a column (label on its own
-  //       full-width row above the warning, desktop matches mobile) and the
-  //       class hook is applied in index.html.
   assert(
-    /\.rng-mode-group\s*\{[^}]*flex-direction:\s*column/.test(css92) &&
-      /class="input-group rng-mode-group"/.test(html92),
-    'GATE-NOWRAP-7: .rng-mode-group forces column stacking (label above warning) + class applied to the Complete RNG group in index.html'
+    /\.seq-step\s*\{[^}]*white-space:\s*nowrap/.test(css92),
+    'GATE-NOWRAP-7: .seq-step (the interlock SAFE/ARMED/+WIPE/SEALED legend, the successor to the old COMPLETE RNG label) carries white-space: nowrap — must not wrap per-character'
   );
 }
 
@@ -24157,6 +24160,251 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     assert(
       !/saveState\(|robco_v8|state\.\w+\s*=/.test(acctBody177b),
       '177.9: renderAccount() never writes campaign state (saveState/robco_v8/state.<field>=)'
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 178 — Step 2 v2.8.0 SU-3: CAMPAIGN CONFIGS modernized (P-DECK +
+//  RANDOMIZER INTERLOCK · PURGE)
+//  The #campaignConfigPanel config controls (GAME/PLAYSTYLE/PLAYTHROUGH TYPE/
+//  COMPLETE RNG/WIPE TERMINAL) are reskinned into the two-board Module-Bay
+//  hardware language — RESKIN ONLY (Protocol 22/25): every control keeps its
+//  exact id/onchange/onclick, reachable both via the hidden real control (the
+//  Immersion Dial technique, Protocol 17) and the new visible cartridge/
+//  rocker/detent/breaker widgets, which drive the SAME setters. New in this
+//  unit: a confirm gate in front of a game-cartridge swap (owner decision).
+//  15 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 178 — SU-3: CAMPAIGN CONFIGS modernized (P-DECK + INTERLOCK)');
+  const html178 = htmlSource;
+  const core178 = readFile('js/ui-core.js');
+  const css178 = readFile('css/terminal.css');
+  const configBlock178 = (html178.match(
+    /id="campaignConfigPanel"[\s\S]*?<div class="col-right">/
+  ) || [''])[0];
+
+  // 178.1  both boards exist, nested inside #campaignConfigPanel with their own
+  //        data-sub-id persistence (Protocol UI-2) and collapsed-summary status lines
+  assert(
+    /data-sub-id="settings_campaign_profile"/.test(configBlock178) &&
+      /data-sub-id="settings_campaign_interlock"/.test(configBlock178) &&
+      /id="sum-profile"/.test(configBlock178) &&
+      /id="sum-ilk"/.test(configBlock178) &&
+      /class="sub-panel bay-board dangerboard"/.test(configBlock178),
+    '178.1: CAMPAIGN PROFILE and RANDOMIZER INTERLOCK · PURGE are both sub-panel boards (data-sub-id persistence) with one-line collapsed summary status'
+  );
+
+  // 178.2  every real control keeps its exact id + is visually hidden via the
+  //        SAME .bay-visually-hidden-input technique already shipped for
+  //        #immersionSelect (Protocol 17/22) — never removed, never renamed
+  assert(
+    ['gameContextSelect', 'playstyleInput', 'playthroughTypeSelect', 'completeRngToggle'].every(
+      id => new RegExp('id="' + id + '"[^>]*class="bay-visually-hidden-input"').test(html178)
+    ),
+    '178.2: #gameContextSelect/#playstyleInput/#playthroughTypeSelect/#completeRngToggle all keep their exact ids and are visually hidden via .bay-visually-hidden-input'
+  );
+
+  // 178.3  the hidden real controls route through the new wrapper functions —
+  //        which themselves delegate to the UNCHANGED onGameContextChange/
+  //        changePlaystyle/onPlaythroughTypeChange/onCampaignModeChange
+  assert(
+    /id="gameContextSelect"[^>]*onchange="_confirmGameContextChange\(this\.value\)"/.test(
+      html178
+    ) &&
+      /id="playstyleInput"[^>]*onchange="_setDoctrine\(this\.value\)"/.test(html178) &&
+      /id="playthroughTypeSelect"[^>]*onchange="_setTempo\(this\.value\)"/.test(html178) &&
+      /id="completeRngToggle"[^>]*onchange="onCampaignModeChange\(this\.checked\)"/.test(html178),
+    '178.3: the hidden real controls route through _confirmGameContextChange/_setDoctrine/_setTempo (new wrappers) and the unchanged onCampaignModeChange'
+  );
+
+  // 178.4  the new wrapper functions delegate to the EXACT pre-existing setters
+  //        (Protocol 22 — one truth, two entry points, no forked persistence path)
+  {
+    const setDoctrineBody = extractFunctionBody(core178, '_setDoctrine');
+    const setTempoBody = extractFunctionBody(core178, '_setTempo');
+    const seatCartBody = extractFunctionBody(core178, '_seatGameCartridge');
+    assert(
+      /changePlaystyle\(style\)/.test(setDoctrineBody) &&
+        /onPlaythroughTypeChange\(type\)/.test(setTempoBody) &&
+        /_confirmGameContextChange\(ctx\)/.test(seatCartBody),
+      '178.4: _setDoctrine()/_setTempo()/_seatGameCartridge() delegate to the unchanged changePlaystyle()/onPlaythroughTypeChange()/_confirmGameContextChange() — no forked setter logic'
+    );
+  }
+
+  // 178.5  PROGRAM CARTRIDGE deck: 2 buttons, real radiogroup ARIA, wired to
+  //        _seatGameCartridge with the exact FNV/FO3 values #gameContextSelect used
+  assert(
+    /id="cart-fnv"[^>]*onclick="_seatGameCartridge\('FNV'\)"/.test(html178) &&
+      /id="cart-fo3"[^>]*onclick="_seatGameCartridge\('FO3'\)"/.test(html178) &&
+      /class="cart-deck" role="radiogroup"/.test(html178),
+    "178.5: the PROGRAM CARTRIDGE deck has 2 buttons (#cart-fnv/#cart-fo3) wired to _seatGameCartridge('FNV'/'FO3') inside a role=radiogroup"
+  );
+
+  // 178.6  ENGAGEMENT DOCTRINE rocker: 2-position, wired to _setDoctrine with the
+  //        exact any/melee values #playstyleInput used
+  assert(
+    /id="rk-any"[^>]*onclick="_setDoctrine\('any'\)"/.test(html178) &&
+      /id="rk-melee"[^>]*onclick="_setDoctrine\('melee'\)"/.test(html178) &&
+      /class="rocker" role="radiogroup"/.test(html178),
+    "178.6: the ENGAGEMENT DOCTRINE rocker has 2 buttons (#rk-any/#rk-melee) wired to _setDoctrine('any'/'melee') inside a role=radiogroup"
+  );
+
+  // 178.7  OPERATIONAL TEMPO: 5 direct-pick detents (1 tap per pick, no cycling),
+  //        wired to _setTempo with the exact 5 values #playthroughTypeSelect used
+  {
+    const tempoValues = ['standard', 'minmaxed', 'completionist', 'casual', 'speedrun'];
+    assert(
+      tempoValues.every(v =>
+        new RegExp('data-tempo="' + v + '"[^>]*onclick="_setTempo\\(\'' + v + '\'\\)"').test(
+          html178
+        )
+      ) && (html178.match(/class="detent(?: on)?"/g) || []).length === 5,
+      '178.7: exactly 5 direct-pick detent buttons exist, one per playthroughType value (standard/minmaxed/completionist/casual/speedrun), each wired to _setTempo(value)'
+    );
+  }
+
+  // 178.8  RANDOMIZER INTERLOCK breaker: well/cover/seal/handle all present, wired
+  //        to _interlockLiftCover/_interlockThrowBreaker; the seal is CSS-gated on
+  //        data-rng="locked" (never a separate JS-toggled class — the seal IS the
+  //        disabled toggle, per the mockup's fiction)
+  assert(
+    /id="ilkWell"/.test(configBlock178) &&
+      /id="ilkCover"[^>]*onclick="_interlockLiftCover\(event\)"/.test(configBlock178) &&
+      /class="ilk-breaker"[^>]*onclick="_interlockThrowBreaker\(\)"/.test(configBlock178) &&
+      /class="ilk-seal"/.test(configBlock178) &&
+      /\.interlock\[data-rng=.locked.\] \.ilk-seal\s*\{/.test(css178),
+    '178.8: the interlock well/cover/breaker/seal all exist, wired to _interlockLiftCover()/_interlockThrowBreaker(), with the seal CSS-gated on data-rng="locked"'
+  );
+
+  // 178.9  #rngModeBanner/#rngLockedBanner keep their exact ids (only the
+  //        presentation moved from inline styles to .rng-banner classes) — the
+  //        SAME onCampaignModeChange()/loadUI() toggle logic still targets them
+  assert(
+    /id="rngModeBanner" class="rng-banner armed"/.test(configBlock178) &&
+      /id="rngLockedBanner" class="rng-banner locked"/.test(configBlock178) &&
+      /rngModeBanner'\)/.test(extractFunctionBody(core178, 'onCampaignModeChange')),
+    '178.9: #rngModeBanner/#rngLockedBanner keep their exact ids (reskinned via .rng-banner classes, not inline styles) — onCampaignModeChange() still targets #rngModeBanner unchanged'
+  );
+
+  // 178.10  #wipeTerminalBtn keeps its exact id + onclick — the danger-zone
+  //         double-confirm gate (wipeTerminal()) is completely untouched
+  assert(
+    /id="wipeTerminalBtn"[\s\S]*?class="purge-btn"[\s\S]*?onclick="wipeTerminal\(\)"/.test(
+      configBlock178
+    ),
+    '178.10: #wipeTerminalBtn keeps its exact id + onclick="wipeTerminal()" — only reskinned to .purge-btn'
+  );
+
+  // 178.11  _syncCampaignProfileUI()/_syncInterlockUI() are wired into both the
+  //         boot-time restore block and loadUI(), so the custom controls can
+  //         never drift from the state they were just restored from
+  {
+    const loadUIBody178 = extractFunctionBody(core178, 'loadUI');
+    const restoreDevicePrefsBody178 = extractFunctionBody(core178, '_restoreDevicePrefs');
+    assert(
+      /_syncCampaignProfileUI\(\)/.test(loadUIBody178) &&
+        /_syncInterlockUI\(\)/.test(loadUIBody178) &&
+        /_syncCampaignProfileUI\(\)/.test(restoreDevicePrefsBody178) &&
+        /_syncInterlockUI\(\)/.test(restoreDevicePrefsBody178),
+      '178.11: _syncCampaignProfileUI()/_syncInterlockUI() are called from both _restoreDevicePrefs() (boot) and loadUI()'
+    );
+  }
+
+  // 178.12  _confirmGameContextChange(): structural proof it's an async gate that
+  //         only calls the real onGameContextChange() AFTER an awaited
+  //         confirmAction() resolves truthy, and explicitly reverts the hidden
+  //         select + re-syncs the profile UI on a falsy (cancel) result — never
+  //         calling onGameContextChange() in that branch (owner decision #4: a
+  //         game swap reboots the terminal, so an accidental cartridge tap must
+  //         not reload unprompted).
+  {
+    const confirmSwapBody178 = extractFunctionBody(core178, '_confirmGameContextChange');
+    const okBranchIdx178 = confirmSwapBody178.indexOf('if (!ok)');
+    const cancelBranch178 = confirmSwapBody178.slice(
+      okBranchIdx178,
+      confirmSwapBody178.indexOf('onGameContextChange(ctx)')
+    );
+    assert(
+      /^async function _confirmGameContextChange/.test(
+        core178.slice(core178.indexOf('function _confirmGameContextChange') - 6)
+      ) &&
+        /await confirmAction\(\{/.test(confirmSwapBody178) &&
+        okBranchIdx178 !== -1 &&
+        /sel\.value = current/.test(cancelBranch178) &&
+        /_syncCampaignProfileUI\(\)/.test(cancelBranch178) &&
+        /return;/.test(cancelBranch178) &&
+        /onGameContextChange\(ctx\);/.test(confirmSwapBody178),
+      '178.12: _confirmGameContextChange() is async, awaits confirmAction(), and on cancel (!ok) reverts the hidden select to the current game + re-syncs the profile UI + returns BEFORE reaching onGameContextChange(ctx) — a cancelled swap never reloads'
+    );
+  }
+
+  // 178.13  the new custom-control layer writes nothing durable to the campaign
+  //         beyond the exact pre-existing setters it delegates to — no new
+  //         saveState()/robco_v8/state.<field>= inside the wrapper functions
+  //         themselves (the delegated-to setters' own writes are unchanged and
+  //         out of scope for this guard)
+  {
+    const wrapperFns178 = [
+      '_seatGameCartridge',
+      '_setDoctrine',
+      '_setTempo',
+      '_interlockLiftCover',
+      '_interlockThrowBreaker',
+      '_syncCampaignProfileUI',
+      '_syncInterlockUI',
+    ];
+    const offenders178 = wrapperFns178.filter(n => {
+      let body;
+      try {
+        body = extractFunctionBody(core178, n);
+      } catch (_) {
+        return true;
+      }
+      // Protocol 42 fix (found while writing this very test): a bare
+      // state\.\w+\s*= also matches a `state.foo === 'bar'` READ (comparison,
+      // not assignment) — both _interlockLiftCover/_interlockThrowBreaker read
+      // state.campaignMode === 'rng-locked', a false-positive offender. The
+      // negative lookahead excludes ==/=== so only a genuine assignment trips it.
+      return /saveState\(|robco_v8|state\.\w+\s*=(?!=)/.test(body);
+    });
+    assert(
+      offenders178.length === 0,
+      '178.13: the new cartridge/rocker/detent/breaker wrapper + sync functions never write campaign state directly (saveState/robco_v8/state.<field>=)' +
+        (offenders178.length ? ' — offenders: ' + offenders178.join(', ') : '')
+    );
+  }
+
+  // 178.14  game-agnostic construction (Protocol 38): the tempo detent
+  //         labels/descriptions and doctrine rocker carry no game literal —
+  //         only the pre-existing GAME cartridge names (already game-specific
+  //         by definition) are exempt from this check
+  {
+    const tempoAndRockerSlice178 = configBlock178.slice(
+      configBlock178.indexOf('rack-note" style="margin-top: 14px">ENGAGEMENT'),
+      configBlock178.indexOf('</details>', configBlock178.indexOf('detent-rack'))
+    );
+    assert(
+      !/\bFNV\b|\bFO3\b|Capital Wasteland|Vault 101/i.test(tempoAndRockerSlice178),
+      '178.14: the doctrine rocker and tempo detent rack are game-agnostic — no FNV/FO3/location literals (the GAME cartridge itself is exempt — it IS the per-game picker)'
+    );
+  }
+
+  // 178.15  Protocol 42 fix (found live during render-verify): #completeRngToggle
+  //         is a real, keyboard/AT-reachable control (.bay-visually-hidden-input)
+  //         — toggling it DIRECTLY (never touching the fancy breaker button) must
+  //         still repaint the whole interlock board (well/cover/seal/title/desc/
+  //         summary/sequence-legend), not just the armed banner. onCampaignModeChange()
+  //         now calls _syncInterlockUI() itself so BOTH entry points stay in sync;
+  //         the redundant banner-toggle lines that used to sit in the boot-restore
+  //         and loadUI() blocks are gone — _syncInterlockUI() is the one place that
+  //         owns the whole board's repaint (Protocol 22).
+  {
+    const onCampaignModeBody178 = extractFunctionBody(core178, 'onCampaignModeChange');
+    assert(
+      /_syncInterlockUI\(\)/.test(onCampaignModeBody178),
+      '178.15: onCampaignModeChange() calls _syncInterlockUI() — a direct toggle of the hidden #completeRngToggle repaints the whole interlock board, not just the armed banner'
     );
   }
 }
