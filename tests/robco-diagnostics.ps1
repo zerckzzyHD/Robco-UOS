@@ -14131,6 +14131,93 @@ Check (
 ) '170.9: .crt-overlay keeps its prefers-reduced-motion + html.high-lumen behavior after the containment fix'
 
 # ===========================================================
+# Suite 171 -- WIPE TERMINAL dialog: one cancel + Complete RNG lock
+# warning (9 tests)
+# Two owner-reported wipe-dialog fixes: (1) confirmAction() (the ONE shared
+# driver behind WIPE TERMINAL and every other destructive confirm --
+# craft/scrap, save delete/overwrite, cloud save/version restore, etc.) used
+# to render its own labeled CONTINUE + CANCEL pair INSIDE a modal that also
+# carries an always-present static "[ CLOSE INTERFACE ]" button outside the
+# injected content -- both did the exact same dismiss-without-confirming
+# thing, reading as two cancels. openModal() gained a `hideCloseBtn` option
+# (the same class-toggle idiom its pre-existing `wide` option already uses)
+# that confirmAction() now always passes, toggling a new .confirm-mode class
+# that hides the redundant static button via CSS; closeModal() always resets
+# the class so no OTHER modal (help/error log/changelog/save help) is ever
+# affected. (2) Complete RNG's permanent-lock mechanism was verified: once a
+# wipe is performed while armed (state.campaignMode === 'rng'), the resulting
+# 'rng-locked' state is enforced by onCampaignModeChange() refusing to
+# uncheck/re-enable the control ever again for that save (pre-existing,
+# previously untested -- now locked by 171.6) -- but the wipe dialog itself
+# said nothing about this irreversible commitment. wipeTerminal() now appends
+# a warning line to the first confirm gate, gated on the exact same
+# state.campaignMode === 'rng' signal wasRngArmed reads a few lines later to
+# actually commit the lock, so the warning and the lock can never disagree.
+# (PS mirror of JS Suite 171.)
+# ===========================================================
+Sep "Suite 171 -- WIPE TERMINAL dialog: one cancel + Complete RNG lock warning"
+$uiCore171 = Read-Src "js/ui-core.js"
+$css171 = Read-Src "css/terminal.css"
+
+# 171.1  openModal() supports hideCloseBtn -> .confirm-mode class toggle
+$openModalBody171 = Get-FunctionBody $uiCore171 "openModal"
+Check (
+    ($openModalBody171 -match 'opts\.hideCloseBtn !== undefined') -and
+    ($openModalBody171 -match "classList\.toggle\('confirm-mode', !!opts\.hideCloseBtn\)")
+) "171.1: openModal({hideCloseBtn}) toggles .modal-box's confirm-mode class"
+
+# 171.2  closeModal() always resets confirm-mode
+$closeModalBody171 = Get-FunctionBody $uiCore171 "closeModal"
+Check ($closeModalBody171 -match "classList\.remove\('confirm-mode'\)") `
+    "171.2: closeModal() resets the confirm-mode class for the next modal open"
+
+# 171.3  confirmAction() passes hideCloseBtn: true
+$confirmActionBody171 = Get-FunctionBody $uiCore171 "confirmAction"
+Check ($confirmActionBody171 -match 'hideCloseBtn: true,') `
+    '171.3: confirmAction() opens its modal with hideCloseBtn:true, suppressing the redundant static CLOSE INTERFACE button'
+
+# 171.4  the CSS rule that hides the button exists, scoped to .confirm-mode
+Check ($css171 -match '\.modal-box\.confirm-mode \.close-btn \{\s*display: none;') `
+    '171.4: .modal-box.confirm-mode .close-btn { display: none } is defined in terminal.css'
+
+# 171.5  the surviving CANCEL button still calls closeModal()
+Check ($confirmActionBody171 -match "noBtn\.addEventListener\('click', \(\) => \{\s*closeModal\(\);") `
+    '171.5: the CANCEL button (#modalConfirmNo) still calls closeModal() -- dismiss behavior is unchanged'
+
+# 171.6  onCampaignModeChange() refuses to un-lock once rng-locked
+$campaignModeBody171 = Get-FunctionBody $uiCore171 "onCampaignModeChange"
+Check (
+    ($campaignModeBody171 -match "if \(state\.campaignMode === 'rng-locked'\) \{") -and
+    ($campaignModeBody171 -match 'cb\.checked = true;') -and
+    ($campaignModeBody171 -match 'cb\.disabled = true;') -and
+    ($campaignModeBody171 -match 'return;')
+) "171.6: onCampaignModeChange() forces the checkbox back to checked+disabled and no-ops once campaignMode is 'rng-locked' (permanent, matches the save)"
+
+# 171.7  wipeTerminal() appends the RNG warning gated on the same signal
+#        wasRngArmed reads later
+$wipeTerminalBody171 = Get-FunctionBody $uiCore171 "wipeTerminal"
+$rngWarnIdx171 = $wipeTerminalBody171.IndexOf("if (state.campaignMode === 'rng')")
+$wasRngArmedIdx171 = $wipeTerminalBody171.IndexOf('wasRngArmed = state.campaignMode')
+Check (
+    ($rngWarnIdx171 -ge 0) -and
+    ($wasRngArmedIdx171 -ge 0) -and
+    ($rngWarnIdx171 -lt $wasRngArmedIdx171) -and
+    ($wipeTerminalBody171 -match 'wipeWarning \+=')
+) "171.7: wipeTerminal() appends an RNG-armed warning to gate1's text, gated on the same state.campaignMode === 'rng' check wasRngArmed reads later"
+
+# 171.8  the warning states the lock is permanent and irreversible
+Check (
+    ($wipeTerminalBody171 -match 'PERMANENTLY enable it for this save') -and
+    ($wipeTerminalBody171 -match 'cannot be changed or disabled afterward')
+) '171.8: the RNG warning states the lock will be PERMANENT and cannot be changed/disabled afterward'
+
+# 171.9  the original wipe warning text is preserved verbatim (additive only)
+Check (
+    ($wipeTerminalBody171 -match 'This will erase ALL Courier data') -and
+    ($wipeTerminalBody171 -match 'This CANNOT be undone\. Continue\?')
+) '171.9: the original wipe warning text (Courier data erasure list) is preserved verbatim; the RNG line is additive'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

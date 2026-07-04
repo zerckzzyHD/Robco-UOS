@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2162/2162 | Cache: robco-terminal-v2.7.0-r63 -->
+﻿## [Unreleased]<!-- Tests: 2171/2171 | Cache: robco-terminal-v2.7.0-r64 -->
 
 ### Added
 
@@ -67,6 +67,8 @@
 - Fixed the Module Bay's "3 TYPES" and "(DEFAULT)" tube tags being hard to read on a computer, where they stayed at their small phone size even though there was more room to work with — both are now bigger and easier to read on a larger screen, while phones look exactly as they did before.
 - Fixed the CRT hum continuing to play after you powered the terminal off. It now stops the moment the screen goes dark and picks back up automatically when you power back on (it stays silent if you'd already muted it).
 - Fixed the terminal's scanline effect bleeding out over the casing and navigation buttons around the screen. It now stays contained inside the screen itself, exactly like a real CRT.
+- Fixed the WIPE TERMINAL confirmation showing two separate "no, don't wipe" buttons (CANCEL and CLOSE INTERFACE) that did the exact same thing. It's now one clear CONTINUE and one CANCEL — and this same cleanup carries over to every other confirmation dialog in the terminal (deleting a save, scrapping an item, and so on), which all had the same duplicate button.
+- If Complete RNG is turned on when you wipe the terminal, the confirmation now warns you up front that doing so locks it on PERMANENTLY for that save, with no way to turn it back off — instead of finding out only after the fact.
 
 ### Improved
 

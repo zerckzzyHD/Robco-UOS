@@ -22935,6 +22935,103 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   );
 }
 
+{
+  header('Suite 171 — WIPE TERMINAL dialog: one cancel + Complete RNG lock warning');
+  const uiCore171 = readFile('js/ui-core.js');
+  const css171 = readFile('css/terminal.css');
+
+  // 171.1  openModal() supports hideCloseBtn, toggling a .confirm-mode class
+  //        on .modal-box — the same class-toggle idiom the pre-existing
+  //        `wide` option already uses for changelog-wide (Protocol 22).
+  const openModalBody171 = extractFunctionBody(uiCore171, 'openModal');
+  assert(
+    /opts\.hideCloseBtn !== undefined/.test(openModalBody171) &&
+      /classList\.toggle\('confirm-mode', !!opts\.hideCloseBtn\)/.test(openModalBody171),
+    "171.1: openModal({hideCloseBtn}) toggles .modal-box's confirm-mode class"
+  );
+
+  // 171.2  closeModal() always resets confirm-mode (mirrors its existing
+  //        changelog-wide reset) so the NEXT modal opened — of any kind —
+  //        never inherits a stale suppressed close button.
+  const closeModalBody171 = extractFunctionBody(uiCore171, 'closeModal');
+  assert(
+    /classList\.remove\('confirm-mode'\)/.test(closeModalBody171),
+    '171.2: closeModal() resets the confirm-mode class for the next modal open'
+  );
+
+  // 171.3  confirmAction() (the ONE shared driver behind WIPE TERMINAL and
+  //        every other destructive confirm — craft/scrap, save delete/
+  //        overwrite, cloud save/version restore, etc.) passes
+  //        hideCloseBtn: true — fixing the duplicate-cancel bug everywhere
+  //        that reuses it, not just this one dialog (Protocol 22).
+  const confirmActionBody171 = extractFunctionBody(uiCore171, 'confirmAction');
+  assert(
+    /hideCloseBtn: true,/.test(confirmActionBody171),
+    '171.3: confirmAction() opens its modal with hideCloseBtn:true, suppressing the redundant static CLOSE INTERFACE button'
+  );
+
+  // 171.4  the CSS rule that actually hides the button exists and is scoped
+  //        to .confirm-mode only (never a blanket .close-btn hide).
+  assert(
+    /\.modal-box\.confirm-mode \.close-btn \{\s*display: none;/.test(css171),
+    '171.4: .modal-box.confirm-mode .close-btn { display: none } is defined in terminal.css'
+  );
+
+  // 171.5  the surviving CANCEL button (#modalConfirmNo) still funnels
+  //        through the same closeModal() dismiss path as before — removing
+  //        the redundant button must never also remove the dismiss action.
+  assert(
+    /noBtn\.addEventListener\('click', \(\) => \{\s*closeModal\(\);/.test(confirmActionBody171),
+    '171.5: the CANCEL button (#modalConfirmNo) still calls closeModal() — dismiss behavior is unchanged'
+  );
+
+  // 171.6  onCampaignModeChange() refuses to un-check/disable Complete RNG
+  //        once state.campaignMode is 'rng-locked' — the permanent-lock
+  //        enforcement a wipe-while-armed commits to (verified pre-existing,
+  //        now locked by a regression test).
+  const campaignModeBody171 = extractFunctionBody(uiCore171, 'onCampaignModeChange');
+  assert(
+    /if \(state\.campaignMode === 'rng-locked'\) \{/.test(campaignModeBody171) &&
+      /cb\.checked = true;/.test(campaignModeBody171) &&
+      /cb\.disabled = true;/.test(campaignModeBody171) &&
+      /return;/.test(campaignModeBody171),
+    "171.6: onCampaignModeChange() forces the checkbox back to checked+disabled and no-ops once campaignMode is 'rng-locked' (permanent, matches the save)"
+  );
+
+  // 171.7  wipeTerminal() adds a warning line to the FIRST confirm gate
+  //        ONLY when Complete RNG is currently armed (state.campaignMode
+  //        === 'rng') — reusing the exact same signal wasRngArmed reads a
+  //        few lines later to actually commit the lock (Protocol 22, single
+  //        source — the warning and the lock can never disagree).
+  const wipeTerminalBody171 = extractFunctionBody(uiCore171, 'wipeTerminal');
+  const rngWarnIdx171 = wipeTerminalBody171.indexOf("if (state.campaignMode === 'rng')");
+  const wasRngArmedIdx171 = wipeTerminalBody171.indexOf('wasRngArmed = state.campaignMode');
+  assert(
+    rngWarnIdx171 !== -1 &&
+      wasRngArmedIdx171 !== -1 &&
+      rngWarnIdx171 < wasRngArmedIdx171 &&
+      /wipeWarning \+=/.test(wipeTerminalBody171),
+    "171.7: wipeTerminal() appends an RNG-armed warning to gate1's text, gated on the same state.campaignMode === 'rng' check wasRngArmed reads later"
+  );
+
+  // 171.8  the appended warning explicitly states the lock is permanent and
+  //        irreversible for this save — not just "RNG is on".
+  assert(
+    /PERMANENTLY enable it for this save/.test(wipeTerminalBody171) &&
+      /cannot be changed or disabled afterward/.test(wipeTerminalBody171),
+    '171.8: the RNG warning states the lock will be PERMANENT and cannot be changed/disabled afterward'
+  );
+
+  // 171.9  the warning is additive to (not a replacement of) the base wipe
+  //        warning text — a non-RNG wipe still sees the full original
+  //        Courier-data-erasure copy, unchanged.
+  assert(
+    /This will erase ALL Courier data/.test(wipeTerminalBody171) &&
+      /This CANNOT be undone\. Continue\?/.test(wipeTerminalBody171),
+    '171.9: the original wipe warning text (Courier data erasure list) is preserved verbatim; the RNG line is additive'
+  );
+}
+
 // ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════

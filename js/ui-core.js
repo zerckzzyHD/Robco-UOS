@@ -3181,6 +3181,18 @@ function openModal(opts) {
     const box = modal.querySelector('.modal-box');
     if (box) box.classList.toggle('changelog-wide', !!opts.wide);
   }
+  // Owner report: confirmAction() dialogs (WIPE TERMINAL and every other
+  // confirm-gated destructive action) carry their own labeled CANCEL button
+  // alongside the modal's always-present static "[ CLOSE INTERFACE ]" button
+  // — both just dismiss, a duplicate cancel. hideCloseBtn lets confirmAction()
+  // suppress the redundant static button (Protocol 22 — same class-toggle
+  // idiom as `wide` above) so a confirm dialog reads as exactly one CONTINUE
+  // + one CANCEL; every other openModal() caller (help, error log, changelog,
+  // save help) is unaffected and keeps its one CLOSE INTERFACE button.
+  if (opts.hideCloseBtn !== undefined) {
+    const box = modal.querySelector('.modal-box');
+    if (box) box.classList.toggle('confirm-mode', !!opts.hideCloseBtn);
+  }
   _modalCloseCallback = typeof opts.onClose === 'function' ? opts.onClose : null;
   _openSysModal();
 }
@@ -3192,6 +3204,9 @@ function closeModal() {
   // command reference, etc.) renders at the normal width (WU-C11).
   const box = modal.querySelector('.modal-box');
   if (box) box.classList.remove('changelog-wide');
+  // Restore the static CLOSE INTERFACE button for the next modal open — a
+  // confirmAction() dialog is the only caller that ever suppresses it.
+  if (box) box.classList.remove('confirm-mode');
   if (_sysModalTrigger && typeof _sysModalTrigger.focus === 'function') {
     _sysModalTrigger.focus();
   }
@@ -3241,6 +3256,7 @@ function confirmAction(opts) {
     openModal({
       title: opts.title || '> CONFIRM ACTION',
       body,
+      hideCloseBtn: true,
       onClose: () => settle(false),
     });
     const yesBtn = document.getElementById('modalConfirmYes');
@@ -4751,10 +4767,20 @@ async function clearChat() {
 // Double-confirmation wipe: resets state to defaults, clears chat history,
 // re-presents game context selection screen.
 async function wipeTerminal() {
+  let wipeWarning =
+    'This will erase ALL Courier data:\n- SPECIAL / Skills / Perks / Quests\n- Inventory / Factions / Status Effects\n- Campaign Notes / Collectibles / Squad\n- Chat History / Session Statistics\n\nSave slots are preserved.\n\nThis CANNOT be undone. Continue?';
+  // Owner report: Complete RNG is only ever PERMANENTLY locked in by a wipe
+  // performed while armed (see wasRngArmed below) — warn about that
+  // irreversible commitment right here, at the one moment it actually takes
+  // effect, rather than relying on the arm-time banner alone. Reuses the
+  // same state.campaignMode signal wasRngArmed reads later (Protocol 22).
+  if (state.campaignMode === 'rng') {
+    wipeWarning +=
+      '\n\n⚠ COMPLETE RNG is armed. Continuing will PERMANENTLY enable it for this save — it cannot be changed or disabled afterward.';
+  }
   const gate1 = await confirmAction({
     title: '> WIPE TERMINAL',
-    warning:
-      'This will erase ALL Courier data:\n- SPECIAL / Skills / Perks / Quests\n- Inventory / Factions / Status Effects\n- Campaign Notes / Collectibles / Squad\n- Chat History / Session Statistics\n\nSave slots are preserved.\n\nThis CANNOT be undone. Continue?',
+    warning: wipeWarning,
     confirmLabel: 'CONTINUE',
   });
   if (!gate1) return;

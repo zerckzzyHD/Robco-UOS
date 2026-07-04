@@ -1424,6 +1424,16 @@ details.sub-panel[open] > summary h3::after {
   min-width: 120px;
   min-height: 28px; /* ≥28px tap target (Protocol 17) */
 }
+/* Owner report: a confirmAction() dialog already carries its own labeled
+   CONTINUE + CANCEL pair (.modal-confirm-actions above) — the modal's
+   always-present static "[ CLOSE INTERFACE ]" button duplicated CANCEL's
+   exact dismiss behavior, reading as two cancels. Suppressed only while
+   .confirm-mode is set (openModal({hideCloseBtn:true}), toggled by
+   confirmAction() alone); every other modal (help/error log/changelog/save
+   help) keeps its one CLOSE INTERFACE button untouched. */
+.modal-box.confirm-mode .close-btn {
+  display: none;
+}
 
 /* ── WU-C11 Changelog viewer ("FIRMWARE REVISION LOG") ──────────── */
 /* Changelog-only wide mode: a comfortable ~700px reading column on desktop,
