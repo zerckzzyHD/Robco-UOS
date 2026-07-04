@@ -462,11 +462,14 @@ function _resolveOptic() {
 // Data-driven + game-agnostic: a new game's default tube is labelled with no code change.
 // (Step 2 · Phase 2 · B2a: the OPTICS <select> was replaced by the Module Bay tube rack —
 // same container id `opticsColorInput`, now a <div> of `.tube` buttons instead of <option>s.)
+// The GREEN FAMILY cartridge (WU-optics-picker) is skipped — it carries its own "N TYPES"
+// tag instead, and the fan-tray variant sharing its data-optic still gets tagged normally.
 function _updateOpticsDefaultLabel() {
   const rack = document.getElementById('opticsColorInput');
   if (!rack) return;
   const def = _resolveDefaultOptics();
   Array.from(rack.querySelectorAll('.tube')).forEach(btn => {
+    if (btn.classList.contains('family')) return;
     const tag = btn.querySelector('.t-default');
     if (tag) tag.textContent = btn.dataset.optic === def ? '(DEFAULT)' : '';
   });
@@ -479,19 +482,136 @@ function changeOpticsColor(color) {
   MetaStore.set(_opticStorageKey(), color);
 }
 
+// WU-optics-picker: every THEMES key sharing the given family tag, in THEMES declaration
+// order. Data-driven (Protocol 38) — reads THEMES[k].family rather than a hardcoded colour
+// list, so a future second family works by tagging its rows, not by editing this function.
+function _themeFamilyMembers(familyKey) {
+  if (!familyKey || typeof THEMES === 'undefined') return [];
+  return Object.keys(THEMES).filter(k => THEMES[k].family === familyKey);
+}
+
+// The family cartridge's representative member: the currently seated optic if it's IN the
+// family; else the active game's default optic if that's in the family; else the family's
+// first declared member. Pure derivation — no new persistence (Protocol UI-6 n/a: this is a
+// momentary picker gesture, not a view mode).
+function _resolveOpticsFamilyRepresentative(familyKey) {
+  const members = _themeFamilyMembers(familyKey);
+  if (!members.length) return null;
+  const seated = typeof _resolveOptic === 'function' ? _resolveOptic() : null;
+  if (seated && members.includes(seated)) return seated;
+  const def = typeof _resolveDefaultOptics === 'function' ? _resolveDefaultOptics() : null;
+  if (def && members.includes(def)) return def;
+  return members[0];
+}
+
+// Repaints the family cartridge (glass colour, name, ghost ring, aria-label) to represent
+// the given member key. UI-only — never persists; changeOpticsColor() remains the single
+// writer (Protocol 22).
+function _updateOpticsFamilyRepresentative(key) {
+  const fam = document.getElementById('opticsFamilyTube');
+  if (!fam || typeof THEMES === 'undefined' || !THEMES[key]) return;
+  const familyKey = fam.dataset.family;
+  const t = THEMES[key];
+  fam.dataset.optic = key;
+  fam.style.setProperty('--tube', t.hex);
+  const nameEl = fam.querySelector('.t-name');
+  if (nameEl) nameEl.textContent = t.label;
+  const members = _themeFamilyMembers(familyKey);
+  const others = members.filter(k => k !== key);
+  const ghosts = fam.querySelectorAll('.ghost');
+  ghosts.forEach((g, i) => {
+    const ok = others[i];
+    if (ok && THEMES[ok]) g.style.setProperty('--g', THEMES[ok].hex);
+  });
+  const familyLabel =
+    (typeof OPTIC_FAMILY_LABELS !== 'undefined' && OPTIC_FAMILY_LABELS[familyKey]) ||
+    familyKey.toUpperCase();
+  fam.setAttribute(
+    'aria-label',
+    familyLabel +
+      ' family — currently ' +
+      t.label +
+      '. Activate to open cartridge and choose between ' +
+      members.length +
+      ' ' +
+      familyKey +
+      ' types.'
+  );
+}
+
+// Cartridge tap → fans the family out into its variant tubes (mockup: "the cartridge ejects
+// its tubes"). Lights whichever variant is currently seated so the choice reads at a glance.
+function _expandOpticsFamily(btnEl) {
+  if (!btnEl) return;
+  const socket = btnEl.closest('.family-socket');
+  if (!socket) return;
+  socket.classList.add('expanded');
+  btnEl.setAttribute('aria-expanded', 'true');
+  const seated = typeof _resolveOptic === 'function' ? _resolveOptic() : null;
+  const tray = socket.querySelector('.fan-tray');
+  if (tray) {
+    Array.from(tray.querySelectorAll('.tube')).forEach(t =>
+      t.classList.toggle('seated', t.dataset.optic === seated)
+    );
+  }
+  const note = document.getElementById('opticsStatus');
+  if (note) {
+    const familyLabel =
+      (typeof OPTIC_FAMILY_LABELS !== 'undefined' && OPTIC_FAMILY_LABELS[btnEl.dataset.family]) ||
+      String(btnEl.dataset.family).toUpperCase();
+    note.textContent =
+      '> ' +
+      familyLabel +
+      ' CARTRIDGE OPEN — ' +
+      _themeFamilyMembers(btnEl.dataset.family).length +
+      ' PHOSPHOR TYPES EXPOSED';
+  }
+}
+window._expandOpticsFamily = _expandOpticsFamily;
+
+// Shell tap (escape hatch, no change) OR the post-pick collapse (reseat=true plays the
+// tubeSeat re-latch flourish — a plain CSS animation, neutralized to its final frame by the
+// app's global prefers-reduced-motion block, Protocol UI-9).
+function _collapseOpticsFamily(reseat) {
+  const socket = document.getElementById('opticsFamilySocket');
+  const fam = document.getElementById('opticsFamilyTube');
+  if (!socket || !fam) return;
+  socket.classList.remove('expanded');
+  fam.setAttribute('aria-expanded', 'false');
+  if (reseat) {
+    fam.classList.remove('reseat');
+    void fam.offsetWidth; // restart the seat animation cleanly on repeated picks
+    fam.classList.add('reseat');
+  }
+  if (!reseat && typeof _updateOpticsBoardStatus === 'function') {
+    const note = document.getElementById('opticsStatus');
+    if (note) note.textContent = '> GREEN CARTRIDGE LATCHED — NO CHANGE';
+  } else if (typeof _updateOpticsBoardStatus === 'function') {
+    _updateOpticsBoardStatus();
+  }
+}
+window._collapseOpticsFamily = _collapseOpticsFamily;
+
 // Module Bay tube-rack adapter (Step 2 · Phase 2 · B2a) — UI-only: seats the tapped tube
 // (visual .seated state), then calls the SAME setter every other optics entry point uses
 // (Protocol 22). No new persistence path — changeOpticsColor() remains the single writer.
+// WU-optics-picker: a family-member pick also repaints the cartridge to represent it and
+// collapses the fan-tray with the reseat flourish (mockup: "tap a green variant → seated,
+// tray collapses, cartridge reappears showing the chosen green").
 function _seatOpticsTube(btnEl) {
   if (!btnEl || !btnEl.dataset) return;
   const key = btnEl.dataset.optic;
-  const rack = btnEl.closest('.tube-rack');
+  const t = typeof THEMES !== 'undefined' ? THEMES[key] : null;
+  const isFamilyMember = !!(t && t.family);
+  if (isFamilyMember) _updateOpticsFamilyRepresentative(key);
+  const rack = document.getElementById('opticsColorInput');
   if (rack) {
-    Array.from(rack.querySelectorAll('.tube')).forEach(t =>
-      t.classList.toggle('seated', t === btnEl)
+    Array.from(rack.querySelectorAll('.tube')).forEach(el =>
+      el.classList.toggle('seated', el.dataset.optic === key)
     );
   }
   changeOpticsColor(key);
+  if (isFamilyMember) _collapseOpticsFamily(true);
   if (typeof renderModuleBay === 'function') renderModuleBay();
 }
 window._seatOpticsTube = _seatOpticsTube;

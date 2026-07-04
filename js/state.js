@@ -809,6 +809,10 @@ const SKILL_KEYS_FO3 = [
 // game data — a new game just points its theme.defaultOptics at one of these (or adds a
 // row). contrastSafe:false entries (legion/neon) are manual-only and never a per-game
 // default — Suite 124 enforces AA ≥4.5:1 for every contrastSafe:true colour.
+// `family` (WU-optics-picker) tags the 3 green hues as one grouped phosphor cartridge in the
+// SLOT 01 picker UI — pure presentation metadata (Protocol 38: the picker code reads this tag
+// rather than hardcoding which colour keys are "green"). A future family only needs the same
+// tag on its rows; OPTIC_FAMILY_LABELS below supplies the family's diegetic display name.
 const THEMES = {
   green: {
     rgb: '20, 253, 206',
@@ -816,6 +820,23 @@ const THEMES = {
     dark: '#021c14',
     label: 'ROBCO GREEN',
     contrastSafe: true,
+    family: 'green',
+  },
+  green3: {
+    rgb: '79, 176, 90',
+    hex: '#4fb05a',
+    dark: '#07210b',
+    label: 'PIP-BOY GREEN',
+    contrastSafe: true,
+    family: 'green',
+  },
+  ghoul: {
+    rgb: '125, 255, 95',
+    hex: '#7dff5f',
+    dark: '#0a1e03',
+    label: 'GHOUL GREEN',
+    contrastSafe: true,
+    family: 'green',
   },
   amber: {
     rgb: '255, 182, 66',
@@ -829,20 +850,6 @@ const THEMES = {
     hex: '#42cbf5',
     dark: '#03202e',
     label: 'VAULT-TEC BLUE',
-    contrastSafe: true,
-  },
-  ghoul: {
-    rgb: '125, 255, 95',
-    hex: '#7dff5f',
-    dark: '#0a1e03',
-    label: 'GHOUL GREEN',
-    contrastSafe: true,
-  },
-  green3: {
-    rgb: '79, 176, 90',
-    hex: '#4fb05a',
-    dark: '#07210b',
-    label: 'PIP-BOY GREEN',
     contrastSafe: true,
   },
   legion: {
@@ -861,6 +868,13 @@ const THEMES = {
   },
 };
 window.THEMES = THEMES;
+
+// Diegetic display name for each family key referenced by THEMES[k].family — kept separate
+// from THEMES so the picker's family label text is data too, never a hardcoded string.
+const OPTIC_FAMILY_LABELS = {
+  green: 'GREEN PHOSPHOR',
+};
+window.OPTIC_FAMILY_LABELS = OPTIC_FAMILY_LABELS;
 
 const GAME_DEFS = {
   FNV: {

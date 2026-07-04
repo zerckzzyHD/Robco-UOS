@@ -213,6 +213,13 @@ export default [
         _opticStorageKey: 'readonly',
         _resolveOptic: 'readonly',
         _updateOpticsDefaultLabel: 'readonly',
+        // WU-optics-picker: GREEN FAMILY cartridge cross-file globals
+        OPTIC_FAMILY_LABELS: 'readonly',
+        _themeFamilyMembers: 'readonly',
+        _resolveOpticsFamilyRepresentative: 'readonly',
+        _updateOpticsFamilyRepresentative: 'readonly',
+        _expandOpticsFamily: 'readonly',
+        _collapseOpticsFamily: 'readonly',
         // Module Bay (Step 2 · Phase 2 · B2a) cross-file globals
         isHighLumenEnabled: 'readonly',
         isHapticEnabled: 'readonly',

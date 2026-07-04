@@ -7808,7 +7808,7 @@ $saves124 = Read-Src "js/ui-saves.js"
 $core124  = Read-Src "js/ui-core.js"
 $html124  = Read-Src "index.html"
 $themesBlock124 = [regex]::Match($state124, '(?s)const THEMES = \{[\s\S]*?\n\};').Value
-$themeMatches124 = [regex]::Matches($themesBlock124, "(\w+):\s*\{\s*rgb:\s*'([^']+)',\s*hex:\s*'(#[0-9a-fA-F]{6})',\s*dark:\s*'(#[0-9a-fA-F]{6})',\s*label:\s*'[^']+',\s*contrastSafe:\s*(true|false),?\s*\}")
+$themeMatches124 = [regex]::Matches($themesBlock124, "(\w+):\s*\{\s*rgb:\s*'([^']+)',\s*hex:\s*'(#[0-9a-fA-F]{6})',\s*dark:\s*'(#[0-9a-fA-F]{6})',\s*label:\s*'[^']+',\s*contrastSafe:\s*(true|false),?\s*(?:family:\s*'\w+',?\s*)?\}")
 $themeKeys124 = @($themeMatches124 | ForEach-Object { $_.Groups[1].Value })
 $safeKeys124 = @($themeMatches124 | Where-Object { $_.Groups[5].Value -eq 'true' } | ForEach-Object { $_.Groups[1].Value })
 $themeDefaults124 = @([regex]::Matches($state124, "theme:\s*\{\s*defaultOptics:\s*'(\w+)'") | ForEach-Object { $_.Groups[1].Value })
@@ -7875,6 +7875,17 @@ Check (($core124 -match '_resolveOptic\(\)') -and ($core124 -match '_applyThemeV
 #         a data-optic="green3" tube button replaces the <option>.)
 Check (($html124 -match 'data-optic="green3"') -and ($html124 -match "color === 'green3'") -and ($html124.Contains("'#4fb05a'"))) `
     '124.12: index.html exposes the green3 phosphor tube AND the pre-paint head script applies it (no flash on explicit pick)'
+
+# 124.13  WU-optics-picker: the green family tag is DATA on the THEMES rows (Protocol 38)
+#         -- exactly the 3 greens carry family:'green', every other colour carries none
+$familyTagged124 = @($themeKeys124 | Where-Object {
+    $themesBlock124 -match ('\b' + $_ + ":\s*\{[^}]*family:\s*'green'")
+})
+Check (
+    (@('green', 'green3', 'ghoul') | ForEach-Object { $familyTagged124 -contains $_ }) -notcontains $false -and
+    ($familyTagged124.Count -eq 3) -and
+    ((@('amber', 'blue', 'legion', 'neon') | ForEach-Object { $familyTagged124 -contains $_ }) -notcontains $true)
+) '124.13: exactly green/green3/ghoul carry THEMES[k].family="green" (data-driven family grouping, Protocol 38)'
 
 # ===========================================================
 # Suite 125 -- WU-F10 session stats merged into OVERSEER LOG (8 tests)
@@ -11088,7 +11099,8 @@ Check (
 ) "153.9: CACHE_NAME is a well-formed robco-terminal-v2.7.0-rN revision string (Protocol 1)"
 
 # ===========================================================
-# Suite 154 -- Step 2 (v2.8.0) Phase 2 B2a: MODULE BAY core reframe (23 tests)
+# Suite 154 -- Step 2 (v2.8.0) Phase 2 B2a: MODULE BAY core reframe (33 tests --
+# 154.24-154.33 add the WU-optics-picker GREEN FAMILY phosphor-tube-picker redesign)
 # The Security & Configuration panel reframed as installable hardware
 # (owner-approved mockup, Protocol 25 sanctioned exception). ONE-TRUTH MODEL:
 # the bay + the permanent Schematic View are both projections of the SAME
@@ -11230,10 +11242,15 @@ Check (
 ) "154.12: no <span onclick> pattern anywhere; the hatch latch + tube-rack controls are real <button>s (Protocol UI-5)"
 
 # 154.13  Protocol 17 -- tap targets: the boolean-module card and phosphor tube
-#         both meet the >=28px floor
+#         both meet the >=28px floor (WU-optics-picker: button.tube's floor is the
+#         shared --tube-h cell-geometry var, driven well past 28px so every rack
+#         cell -- standalone tube, cartridge, fan-tray variant -- is the same size)
+$tubeHVal154 = 0
+if ($css154 -match '--tube-h:\s*(\d+)px') { $tubeHVal154 = [int]$matches[1] }
 Check (
     ($css154 -match '(?s)\.bay-module-card \{.{0,300}min-height:\s*28px') -and
-    ($css154 -match '(?s)button\.tube \{.{0,900}min-height:\s*44px')
+    ($css154 -match '(?s)button\.tube \{.{0,900}min-height:\s*var\(--tube-h\)') -and
+    ($tubeHVal154 -ge 28)
 ) "154.13: .bay-module-card and button.tube both declare an explicit >=28px tap target (Protocol 17)"
 
 # 154.14  Protocol 42 fix (found during this unit's manual DESKTOP render-check,
@@ -11374,6 +11391,109 @@ Check (
     ($apiSrc154 -match "MetaStore\.set\('robco_gemini_validated_key', rawKey\)") -and
     ($apiSrc154 -match "_updateUplinkBoardStatus === 'function'\) _updateUplinkBoardStatus\(\)")
 ) "154.23: SLOT 05 reflects the REAL AI Uplink connection (validated key + model) via _updateUplinkBoardStatus(), live-wired into renderModuleBay(), fetchAuthorizedModels() success, and every key edit -- never a hardcoded NO CARRIER (owner report fix)"
+
+# -- WU-optics-picker: SLOT 01 phosphor-tube picker redesign (154.24-154.33) --
+# The 7 flat swatches become one GREEN FAMILY cartridge (ROBCO/PIP-BOY/GHOUL fan
+# out of a shared socket) + 4 standalone tubes, every tube gets a seat lamp,
+# every rack cell is the same size, and the expand/collapse motion is plain CSS
+# animation (Protocol UI-9 auto-degrades under reduced-motion).
+
+# 154.24  the family-socket markup: cartridge (data-family, aria-expanded) + fan-tray
+#         (shell escape hatch + the 3 green variant tubes)
+Check (
+    ($html154 -match 'class="family-socket" id="opticsFamilySocket"') -and
+    ($html154 -match '(?s)id="opticsFamilyTube".{0,200}data-family="green"') -and
+    ($html154 -match 'aria-expanded="false"') -and
+    ($html154 -match 'id="opticsFamilyTray"') -and
+    ($html154 -match '(?s)class="shell".{0,200}_collapseOpticsFamily\(false\)')
+) "154.24: the GREEN FAMILY cartridge (#opticsFamilyTube, data-family, aria-expanded) + its fan-tray (#opticsFamilyTray + a shell escape-hatch button) are present in the markup"
+
+# 154.25  seat lamp: every single .tube (cartridge, fan-tray variants, and the 4
+#         standalone tubes -- 8 total) carries a .t-led dot
+$rackBlock154 = [regex]::Match($html154, '(?s)id="opticsColorInput"[\s\S]*?</div>\s*<div class="bay-module">').Value
+$tubeButtonCount154 = ([regex]::Matches($rackBlock154, 'class="tube[ "]')).Count
+$tLedCount154 = ([regex]::Matches($rackBlock154, 'class="t-led"')).Count
+Check (
+    ($tubeButtonCount154 -eq 8) -and ($tLedCount154 -eq 8) -and ($tubeButtonCount154 -eq $tLedCount154)
+) "154.25: every .tube button (8 -- cartridge + 3 fan-tray variants + 4 standalone) carries a .t-led seat lamp (found $tubeButtonCount154 tubes, $tLedCount154 lamps)"
+
+# 154.26  the expand/collapse adapters exist, are wired to the cartridge/shell onclick
+#         handlers, and are window-exposed (inline-handler entry points)
+Check (
+    ($html154 -match 'onclick="_expandOpticsFamily\(this\)"') -and
+    ($audio154 -match 'function _expandOpticsFamily\(btnEl\)') -and
+    ($audio154 -match 'window\._expandOpticsFamily = _expandOpticsFamily') -and
+    ($audio154 -match 'function _collapseOpticsFamily\(reseat\)') -and
+    ($audio154 -match 'window\._collapseOpticsFamily = _collapseOpticsFamily')
+) "154.26: _expandOpticsFamily()/_collapseOpticsFamily() exist, are window-exposed, and the cartridge is wired to _expandOpticsFamily(this)"
+
+# 154.27  _seatOpticsTube() is extended (Protocol 22, same function) to repaint the
+#         cartridge representative + collapse-with-reseat ONLY for a family member pick --
+#         changeOpticsColor() stays the single persistence writer
+$seatFn154b = Get-FunctionBody $audio154 '_seatOpticsTube'
+Check (
+    ($seatFn154b -match 'isFamilyMember = !!\(t && t\.family\)') -and
+    ($seatFn154b -match '_updateOpticsFamilyRepresentative\(key\)') -and
+    ($seatFn154b -match '_collapseOpticsFamily\(true\)') -and
+    ($seatFn154b -match 'changeOpticsColor\(key\)')
+) "154.27: _seatOpticsTube() detects a family-member pick, repaints the cartridge, and collapses with the reseat flourish -- changeOpticsColor(key) remains the single writer"
+
+# 154.28  data-driven family membership (Protocol 38): _themeFamilyMembers() reads
+#         THEMES[k].family -- no hardcoded ['green','green3','ghoul']-style colour-key
+#         array anywhere in the optics picker code
+Check (
+    ($audio154 -match 'function _themeFamilyMembers\(familyKey\)') -and
+    ($audio154 -match 'THEMES\[k\]\.family === familyKey') -and
+    (-not ($audio154 -match "\[\s*'green'\s*,\s*'green3'\s*,\s*'ghoul'\s*\]"))
+) "154.28: _themeFamilyMembers() derives family membership from THEMES[k].family -- no hardcoded ['green','green3','ghoul'] array in the picker code (Protocol 38)"
+
+# 154.29  uniform cell geometry (owner directive: "the boxes should all be the same
+#         size") -- one shared --tube-h/--tube-w/--cell driving BOTH button.tube and
+#         button.shell to the identical floor
+Check (
+    ($css154 -match '--tube-w:\s*\d+px') -and
+    ($css154 -match '--tube-h:\s*\d+px') -and
+    ($css154 -match '--cell:\s*calc\(var\(--tube-w\) \+ var\(--rack-gap\)\)') -and
+    ($css154 -match '(?s)button\.tube \{.{0,900}min-height:\s*var\(--tube-h\)') -and
+    ($css154 -match '(?s)button\.shell \{.{0,400}min-height:\s*var\(--tube-h\)')
+) "154.29: .tube-rack declares shared --tube-w/--tube-h/--cell geometry, and BOTH button.tube and button.shell floor to the same min-height: var(--tube-h) (uniform cell size)"
+
+# 154.30  every new motion verb is a plain animation: declaration (never transition:
+#         alone), so the app's global prefers-reduced-motion block neutralizes each to
+#         its instant final frame with no bespoke carve-out (Protocol UI-9)
+Check (
+    ($css154 -match '@keyframes tubeEject') -and
+    ($css154 -match '@keyframes shellOpen') -and
+    ($css154 -match '@keyframes tubeSeat') -and
+    ($css154 -match 'animation:\s*tubeEject') -and
+    ($css154 -match 'animation:\s*shellOpen') -and
+    ($css154 -match 'animation:\s*tubeSeat')
+) "154.30: tubeEject/shellOpen/tubeSeat are all plain animation: declarations (Protocol UI-9 -- the global reduced-motion block degrades them for free)"
+
+# 154.31  hover feedback is gated behind (hover:hover) and (pointer:fine) -- the mockup
+#         verification found a stuck-hover-after-tap issue on the eject animation
+#         (variants animate out from under the pointer)
+Check (
+    ($css154 -match '(?s)@media \(hover: hover\) and \(pointer: fine\) \{.{0,200}button\.tube:hover') -and
+    ($css154 -match '(?s)@media \(hover: hover\) and \(pointer: fine\) \{.{0,200}button\.tube:hover.{0,200}button\.shell:hover')
+) "154.31: button.tube:hover and button.shell:hover both sit inside a (hover:hover) and (pointer:fine) gate (no sticky touch hover)"
+
+# 154.32  the family cartridge is excluded from the generic (DEFAULT) tagging loop (it
+#         shows its own "N TYPES" tag instead) -- no tag collision
+Check (
+    ($audio154 -match "if \(btn\.classList\.contains\('family'\)\) return;") -and
+    ($html154 -match 'class="multi-tag"')
+) '154.32: _updateOpticsDefaultLabel() skips the family cartridge (it shows its own multi-tag "N TYPES" instead of a redundant (DEFAULT))'
+
+# 154.33  boot-restore (_restoreOpticsPreference, ui-core.js) repaints the family
+#         representative and force-collapses the socket on every boot/game-switch --
+#         the tray never opens on a fresh page load
+$restoreFn154 = Get-FunctionBody $core154 '_restoreOpticsPreference'
+Check (
+    ($restoreFn154 -match "_famSocket\.classList\.remove\('expanded'\)") -and
+    ($restoreFn154 -match '_resolveOpticsFamilyRepresentative') -and
+    ($restoreFn154 -match '_updateOpticsFamilyRepresentative')
+) "154.33: _restoreOpticsPreference() force-collapses the family socket and repaints its representative on every boot/game-switch"
 
 # ===========================================================
 # Suite 155 -- Step 2 (v2.7.0) Phase 2 B2b: Module Bay visual fidelity + fixes (16 tests)

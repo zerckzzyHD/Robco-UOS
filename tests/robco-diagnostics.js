@@ -13822,7 +13822,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   const themesBlock124 = (state124.match(/const THEMES = \{([\s\S]*?)\n\};/) || ['', ''])[1];
   const themeEntries124 = [
     ...themesBlock124.matchAll(
-      /(\w+):\s*\{\s*rgb:\s*'([^']+)',\s*hex:\s*'(#[0-9a-fA-F]{6})',\s*dark:\s*'(#[0-9a-fA-F]{6})',\s*label:\s*'[^']+',\s*contrastSafe:\s*(true|false),?\s*\}/g
+      /(\w+):\s*\{\s*rgb:\s*'([^']+)',\s*hex:\s*'(#[0-9a-fA-F]{6})',\s*dark:\s*'(#[0-9a-fA-F]{6})',\s*label:\s*'[^']+',\s*contrastSafe:\s*(true|false),?\s*(?:family:\s*'\w+',?\s*)?\}/g
     ),
   ].map(m => ({ key: m[1], rgb: m[2], hex: m[3], dark: m[4], safe: m[5] === 'true' }));
   const themeKeys124 = themeEntries124.map(t => t.key);
@@ -13949,6 +13949,21 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       /color === 'green3'/.test(html124) &&
       html124.includes("'#4fb05a'"),
     '124.12: index.html exposes the green3 phosphor tube AND the pre-paint head script applies it (no flash on explicit pick)'
+  );
+
+  // 124.13  WU-optics-picker: the green family tag is DATA on the THEMES rows
+  //         (Protocol 38) — exactly the 3 greens carry family:'green', every
+  //         other colour carries no family tag at all
+  const familyTagged124 = themeEntries124
+    .map(t => t.key)
+    // [^}]* is safe here — no THEMES entry nests another {} inside it, so this
+    // always stops at THIS entry's own closing brace, never a later entry's.
+    .filter(k => new RegExp(`\\b${k}:\\s*\\{[^}]*family:\\s*'green'`).test(themesBlock124));
+  assert(
+    ['green', 'green3', 'ghoul'].every(k => familyTagged124.includes(k)) &&
+      familyTagged124.length === 3 &&
+      !['amber', 'blue', 'legion', 'neon'].some(k => familyTagged124.includes(k)),
+    '124.13: exactly green/green3/ghoul carry THEMES[k].family="green" (data-driven family grouping, Protocol 38)'
   );
 }
 
@@ -18902,7 +18917,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  stored device prefs; every control still calls the setter it always
 //  called (Protocol 22/23) — zero new campaign state, zero AI involvement.
 //  The 13 SLOT-02 audio channels stay in their CURRENT (un-flipped) polarity
-//  this unit — B2b converts them to DIP chips. 23 tests.
+//  this unit — B2b converts them to DIP chips. 33 tests (154.24-154.33 add the
+//  WU-optics-picker GREEN FAMILY phosphor-tube-picker redesign coverage).
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 154 — Step 2 Phase 2 B2a: Module Bay core reframe');
@@ -19092,10 +19108,15 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   );
 
   // 154.13  Protocol 17 — tap targets: the boolean-module card and phosphor tube
-  //         both meet the >=28px floor
+  //         both meet the >=28px floor (WU-optics-picker: button.tube's floor is
+  //         the shared --tube-h cell-geometry var, driven well past 28px so every
+  //         rack cell — standalone tube, cartridge, fan-tray variant — renders
+  //         the same uniform size; see 154.13b for the numeric value check)
+  const tubeHVal154 = parseInt((css154.match(/--tube-h:\s*(\d+)px/) || [0, '0'])[1], 10);
   assert(
     /\.bay-module-card \{[\s\S]{0,300}min-height:\s*28px/.test(css154) &&
-      /button\.tube \{[\s\S]{0,900}min-height:\s*44px/.test(css154),
+      /button\.tube \{[\s\S]{0,900}min-height:\s*var\(--tube-h\)/.test(css154) &&
+      tubeHVal154 >= 28,
     '154.13: .bay-module-card and button.tube both declare an explicit >=28px tap target (Protocol 17)'
   );
 
@@ -19257,6 +19278,127 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       /MetaStore\.set\('robco_gemini_validated_key', rawKey\)/.test(apiSrc154) &&
       /_updateUplinkBoardStatus === 'function'\) _updateUplinkBoardStatus\(\)/.test(apiSrc154),
     '154.23: SLOT 05 reflects the REAL AI Uplink connection (validated key + model) via _updateUplinkBoardStatus(), live-wired into renderModuleBay(), fetchAuthorizedModels() success, and every key edit — never a hardcoded NO CARRIER (owner report fix)'
+  );
+
+  // ── WU-optics-picker: SLOT 01 phosphor-tube picker redesign (154.24–154.33) ──
+  // The 7 flat swatches become one GREEN FAMILY cartridge (ROBCO/PIP-BOY/GHOUL
+  // fan out of a shared socket) + 4 standalone tubes, every tube gets a seat
+  // lamp, every rack cell is the same size, and the expand/collapse motion is
+  // plain CSS animation (Protocol UI-9 auto-degrades under reduced-motion).
+
+  // 154.24  the family-socket markup: cartridge (data-family, aria-expanded) +
+  //         fan-tray (shell escape hatch + the 3 green variant tubes)
+  assert(
+    /class="family-socket" id="opticsFamilySocket"/.test(html154) &&
+      /id="opticsFamilyTube"[\s\S]{0,200}data-family="green"/.test(html154) &&
+      /aria-expanded="false"/.test(html154) &&
+      /id="opticsFamilyTray"/.test(html154) &&
+      /class="shell"[\s\S]{0,200}_collapseOpticsFamily\(false\)/.test(html154),
+    '154.24: the GREEN FAMILY cartridge (#opticsFamilyTube, data-family, aria-expanded) + its fan-tray (#opticsFamilyTray + a shell escape-hatch button) are present in the markup'
+  );
+
+  // 154.25  seat lamp: every single .tube (cartridge, fan-tray variants, and
+  //         the 4 standalone tubes — 8 total) carries a .t-led dot
+  const rackBlock154 = (html154.match(
+    /id="opticsColorInput"[\s\S]*?<\/div>\s*<div class="bay-module">/
+  ) || ['', ''])[0];
+  const tubeButtonCount154 = (rackBlock154.match(/class="tube[ "]/g) || []).length;
+  const tLedCount154 = (rackBlock154.match(/class="t-led"/g) || []).length;
+  assert(
+    tubeButtonCount154 === 8 && tLedCount154 === 8 && tubeButtonCount154 === tLedCount154,
+    `154.25: every .tube button (8 — cartridge + 3 fan-tray variants + 4 standalone) carries a .t-led seat lamp (found ${tubeButtonCount154} tubes, ${tLedCount154} lamps)`
+  );
+
+  // 154.26  the expand/collapse adapters exist, are wired to the cartridge/shell
+  //         onclick handlers, and are window-exposed (inline-handler entry points)
+  assert(
+    /onclick="_expandOpticsFamily\(this\)"/.test(html154) &&
+      /function _expandOpticsFamily\(btnEl\)/.test(audio154) &&
+      /window\._expandOpticsFamily = _expandOpticsFamily/.test(audio154) &&
+      /function _collapseOpticsFamily\(reseat\)/.test(audio154) &&
+      /window\._collapseOpticsFamily = _collapseOpticsFamily/.test(audio154),
+    '154.26: _expandOpticsFamily()/_collapseOpticsFamily() exist, are window-exposed, and the cartridge is wired to _expandOpticsFamily(this)'
+  );
+
+  // 154.27  _seatOpticsTube() is extended (Protocol 22, same function) to repaint
+  //         the cartridge representative + collapse-with-reseat ONLY for a family
+  //         member pick — changeOpticsColor() stays the single persistence writer
+  assert(
+    /isFamilyMember = !!\(t && t\.family\)/.test(seatFn154) &&
+      /_updateOpticsFamilyRepresentative\(key\)/.test(seatFn154) &&
+      /_collapseOpticsFamily\(true\)/.test(seatFn154) &&
+      /changeOpticsColor\(key\)/.test(seatFn154),
+    '154.27: _seatOpticsTube() detects a family-member pick, repaints the cartridge, and collapses with the reseat flourish — changeOpticsColor(key) remains the single writer'
+  );
+
+  // 154.28  data-driven family membership (Protocol 38): _themeFamilyMembers()
+  //         reads THEMES[k].family — no hardcoded ['green','green3','ghoul']-style
+  //         colour-key array anywhere in the optics picker code
+  assert(
+    /function _themeFamilyMembers\(familyKey\)/.test(audio154) &&
+      /THEMES\[k\]\.family === familyKey/.test(audio154) &&
+      !/\[\s*'green'\s*,\s*'green3'\s*,\s*'ghoul'\s*\]/.test(audio154),
+    "154.28: _themeFamilyMembers() derives family membership from THEMES[k].family — no hardcoded ['green','green3','ghoul'] array in the picker code (Protocol 38)"
+  );
+
+  // 154.29  uniform cell geometry (owner directive: "the boxes should all be the
+  //         same size") — one shared --tube-h/--tube-w/--cell driving BOTH
+  //         button.tube and button.shell to the identical floor
+  assert(
+    /--tube-w:\s*\d+px/.test(css154) &&
+      /--tube-h:\s*\d+px/.test(css154) &&
+      /--cell:\s*calc\(var\(--tube-w\) \+ var\(--rack-gap\)\)/.test(css154) &&
+      /button\.tube \{[\s\S]{0,900}min-height:\s*var\(--tube-h\)/.test(css154) &&
+      /button\.shell \{[\s\S]{0,400}min-height:\s*var\(--tube-h\)/.test(css154),
+    '154.29: .tube-rack declares shared --tube-w/--tube-h/--cell geometry, and BOTH button.tube and button.shell floor to the same min-height: var(--tube-h) (uniform cell size)'
+  );
+
+  // 154.30  every new motion verb is a plain `animation:` declaration (never
+  //         `transition:` alone), so the app's global prefers-reduced-motion
+  //         block neutralizes each to its instant final frame with no
+  //         bespoke carve-out (Protocol UI-9)
+  assert(
+    /@keyframes tubeEject/.test(css154) &&
+      /@keyframes shellOpen/.test(css154) &&
+      /@keyframes tubeSeat/.test(css154) &&
+      /animation:\s*tubeEject/.test(css154) &&
+      /animation:\s*shellOpen/.test(css154) &&
+      /animation:\s*tubeSeat/.test(css154),
+    '154.30: tubeEject/shellOpen/tubeSeat are all plain animation: declarations (Protocol UI-9 — the global reduced-motion block degrades them for free)'
+  );
+
+  // 154.31  hover feedback is gated behind (hover:hover) and (pointer:fine) — the
+  //         mockup verification found a stuck-hover-after-tap issue on the eject
+  //         animation (variants animate out from under the pointer)
+  assert(
+    /@media \(hover: hover\) and \(pointer: fine\) \{[\s\S]{0,200}button\.tube:hover/.test(
+      css154
+    ) &&
+      /@media \(hover: hover\) and \(pointer: fine\) \{[\s\S]{0,200}button\.tube:hover[\s\S]{0,200}button\.shell:hover/.test(
+        css154
+      ),
+    '154.31: button.tube:hover and button.shell:hover both sit inside a (hover:hover) and (pointer:fine) gate (no sticky touch hover)'
+  );
+
+  // 154.32  the family cartridge is excluded from the generic (DEFAULT) tagging
+  //         loop (it shows its own "N TYPES" tag instead) — no tag collision
+  assert(
+    /if \(btn\.classList\.contains\('family'\)\) return;/.test(audio154) &&
+      /class="multi-tag"/.test(html154),
+    '154.32: _updateOpticsDefaultLabel() skips the family cartridge (it shows its own multi-tag "N TYPES" instead of a redundant (DEFAULT))'
+  );
+
+  // 154.33  boot-restore (_restoreOpticsPreference, ui-core.js) repaints the
+  //         family representative and force-collapses the socket on every
+  //         boot/game-switch — the tray never opens on a fresh page load
+  const restoreFn154 = (core154.match(/function _restoreOpticsPreference\(\)[\s\S]*?\n\}/) || [
+    '',
+  ])[0];
+  assert(
+    /_famSocket\.classList\.remove\('expanded'\)/.test(restoreFn154) &&
+      /_resolveOpticsFamilyRepresentative/.test(restoreFn154) &&
+      /_updateOpticsFamilyRepresentative/.test(restoreFn154),
+    '154.33: _restoreOpticsPreference() force-collapses the family socket and repaints its representative on every boot/game-switch'
   );
 }
 

@@ -1669,28 +1669,82 @@
                         role="radiogroup"
                         aria-label="Phosphor tube selection"
                       >
-                        <button
-                          type="button"
-                          class="tube"
-                          data-optic="green"
-                          style="--tube: #14fdce"
-                          onclick="_seatOpticsTube(this)"
-                        >
-                          <span class="glass" aria-hidden="true"></span>
-                          <span class="t-name">ROBCO GREEN</span>
-                          <span class="t-default"></span>
-                        </button>
-                        <button
-                          type="button"
-                          class="tube"
-                          data-optic="green3"
-                          style="--tube: #4fb05a"
-                          onclick="_seatOpticsTube(this)"
-                        >
-                          <span class="glass" aria-hidden="true"></span>
-                          <span class="t-name">PIP-BOY GREEN</span>
-                          <span class="t-default"></span>
-                        </button>
+                        <!-- GREEN FAMILY cartridge: 3 green hues fan out of one socket -->
+                        <div class="family-socket" id="opticsFamilySocket">
+                          <button
+                            type="button"
+                            class="tube family"
+                            id="opticsFamilyTube"
+                            data-optic="green"
+                            data-family="green"
+                            style="--tube: #14fdce"
+                            aria-expanded="false"
+                            aria-label="Green phosphor family — currently ROBCO GREEN. Activate to open cartridge and choose between 3 green types."
+                            onclick="_expandOpticsFamily(this)"
+                          >
+                            <span class="ghost g1" style="--g: #4fb05a" aria-hidden="true"></span>
+                            <span class="ghost g2" style="--g: #7dff5f" aria-hidden="true"></span>
+                            <span class="glass" aria-hidden="true"></span>
+                            <span class="t-name">ROBCO GREEN</span>
+                            <span class="t-led" aria-hidden="true"></span>
+                            <span class="t-default"></span>
+                            <span class="multi-tag">&#9636; 3 TYPES</span>
+                          </button>
+                          <div
+                            class="fan-tray"
+                            id="opticsFamilyTray"
+                            role="group"
+                            aria-label="Green phosphor variants"
+                          >
+                            <button
+                              type="button"
+                              class="shell"
+                              onclick="_collapseOpticsFamily(false)"
+                              aria-label="Close green cartridge without changing tube"
+                            >
+                              <span class="slotway" aria-hidden="true"></span>
+                              <span class="t-name">CARTRIDGE<br />OPEN &#9668;</span>
+                            </button>
+                            <button
+                              type="button"
+                              class="tube"
+                              data-optic="green"
+                              style="--tube: #14fdce; --i: 1; --d: 0ms"
+                              onclick="_seatOpticsTube(this)"
+                            >
+                              <span class="glass" aria-hidden="true"></span>
+                              <span class="t-name">ROBCO GREEN</span>
+                              <span class="t-led" aria-hidden="true"></span>
+                              <span class="t-default"></span>
+                            </button>
+                            <button
+                              type="button"
+                              class="tube"
+                              data-optic="green3"
+                              style="--tube: #4fb05a; --i: 2; --d: 70ms"
+                              onclick="_seatOpticsTube(this)"
+                            >
+                              <span class="glass" aria-hidden="true"></span>
+                              <span class="t-name">PIP-BOY GREEN</span>
+                              <span class="t-led" aria-hidden="true"></span>
+                              <span class="t-default"></span>
+                            </button>
+                            <button
+                              type="button"
+                              class="tube"
+                              data-optic="ghoul"
+                              style="--tube: #7dff5f; --i: 3; --d: 140ms"
+                              onclick="_seatOpticsTube(this)"
+                            >
+                              <span class="glass" aria-hidden="true"></span>
+                              <span class="t-name">GHOUL GREEN</span>
+                              <span class="t-led" aria-hidden="true"></span>
+                              <span class="t-default"></span>
+                            </button>
+                          </div>
+                        </div>
+
+                        <!-- single-hue tubes: seat directly, no fan-out -->
                         <button
                           type="button"
                           class="tube"
@@ -1700,6 +1754,7 @@
                         >
                           <span class="glass" aria-hidden="true"></span>
                           <span class="t-name">NEW VEGAS AMBER</span>
+                          <span class="t-led" aria-hidden="true"></span>
                           <span class="t-default"></span>
                         </button>
                         <button
@@ -1711,6 +1766,7 @@
                         >
                           <span class="glass" aria-hidden="true"></span>
                           <span class="t-name">VAULT-TEC BLUE</span>
+                          <span class="t-led" aria-hidden="true"></span>
                           <span class="t-default"></span>
                         </button>
                         <button
@@ -1722,17 +1778,7 @@
                         >
                           <span class="glass" aria-hidden="true"></span>
                           <span class="t-name">LEGION RED</span>
-                          <span class="t-default"></span>
-                        </button>
-                        <button
-                          type="button"
-                          class="tube"
-                          data-optic="ghoul"
-                          style="--tube: #7dff5f"
-                          onclick="_seatOpticsTube(this)"
-                        >
-                          <span class="glass" aria-hidden="true"></span>
-                          <span class="t-name">GHOUL GREEN</span>
+                          <span class="t-led" aria-hidden="true"></span>
                           <span class="t-default"></span>
                         </button>
                         <button
@@ -1744,6 +1790,7 @@
                         >
                           <span class="glass" aria-hidden="true"></span>
                           <span class="t-name">NEON VIOLET</span>
+                          <span class="t-led" aria-hidden="true"></span>
                           <span class="t-default"></span>
                         </button>
                       </div>

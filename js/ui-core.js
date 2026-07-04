@@ -1649,6 +1649,17 @@ function _restoreOpticsPreference() {
   _applyThemeVars(_optic);
   const _rack = document.getElementById('opticsColorInput');
   if (_rack) {
+    // WU-optics-picker: keep the green family cartridge collapsed and its representative
+    // repainted BEFORE the generic seated-class sync below, so the cartridge lights up
+    // correctly whenever the resolved optic is one of its members.
+    const _famSocket = document.getElementById('opticsFamilySocket');
+    const _famTube = document.getElementById('opticsFamilyTube');
+    if (_famSocket) _famSocket.classList.remove('expanded');
+    if (_famTube && typeof _resolveOpticsFamilyRepresentative === 'function') {
+      const _rep = _resolveOpticsFamilyRepresentative(_famTube.dataset.family);
+      if (_rep && typeof _updateOpticsFamilyRepresentative === 'function')
+        _updateOpticsFamilyRepresentative(_rep);
+    }
     Array.from(_rack.querySelectorAll('.tube')).forEach(t => {
       t.classList.toggle('seated', t.dataset.optic === _optic);
     });
