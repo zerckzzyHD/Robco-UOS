@@ -2883,8 +2883,9 @@ header('Weapon Mods CSV + Registry Parity');
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 42 — Native Command Router (Phase 5a / 5a-fix)
-//  Deterministic commands ([FEATURES]/[CROSSROADS]/[SLEEP]/[WAIT])
-//  are intercepted pre-fetch; dead system-prompt blocks removed.
+//  Deterministic commands ([FEATURES]/[SLEEP]/[WAIT]) are intercepted pre-fetch;
+//  dead system-prompt blocks removed. [CROSSROADS] was retired as a command
+//  (owner cleanup batch) — 42.3 now guards its absence.
 //  42.6 non-empty guard prevents vacuous pass on 42.7/42.8.
 //  42.10/42.11 guard the syncStateFromDom round-trip bug fix:
 //  _nativeSleep/_nativeWait must call loadUI() BEFORE saveState()
@@ -2903,8 +2904,15 @@ header('Native Command Router (Phase 5a)');
     // 42.2  [FEATURES] is a key in NATIVE_COMMAND_ROUTER
     [/'\[FEATURES\]'\s*:/, 'NATIVE_COMMAND_ROUTER has [FEATURES] handler'],
 
-    // 42.3  [CROSSROADS] is a key in NATIVE_COMMAND_ROUTER
-    [/'\[CROSSROADS\]'\s*:/, 'NATIVE_COMMAND_ROUTER has [CROSSROADS] handler'],
+    // 42.3  [CROSSROADS] retired as a native command (owner cleanup batch) — the
+    // Crossroads record is now a standing panel, so the point-in-time modal
+    // analysis it drove is redundant. Negated in place rather than deleted so the
+    // regression (a stray [CROSSROADS] key reappearing) still fails the gate.
+    [
+      /'\[CROSSROADS\]'\s*:/,
+      'NATIVE_COMMAND_ROUTER no longer has a [CROSSROADS] handler (retired — Crossroads is now panel-only)',
+      true,
+    ],
 
     // 42.4  [SLEEP] is a key in NATIVE_COMMAND_ROUTER
     [/'\[SLEEP\]'\s*:/, 'NATIVE_COMMAND_ROUTER has [SLEEP] handler'],
@@ -12640,6 +12648,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '[PAGE 2',
     '[ARCHIVE]',
     '[TIMELINE]', // U9-1: Projected Timeline stub retired (Step 2 Phase 0)
+    '[CROSSROADS]', // Owner cleanup batch: Crossroads is now panel-only, not a command
   ];
 
   // 113.1  registry parsed + a dedicated NATIVE TERMINALS group marked OFFLINE / NO AI
@@ -22344,6 +22353,99 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       '166.17: [behavioral] an unrecognized subsystem name is ignored by both _saveScrollFor() and _restoreScrollFor() (NAV_KEYS guard)'
     );
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 167 — Owner cleanup batch: [CROSSROADS] command retired (panel kept)
+//  + unified transcript source tags (OVERSEER)
+//  [CROSSROADS] is retired as a native command/help entry now that the
+//  Crossroads record is a standing UI panel — the panel and the internal
+//  _nativeCrossroads() helper are both kept. appendToChat() gains a
+//  display-only OVERSEER tag on AI-sourced transcript lines, mirroring the
+//  existing [TERM] quick-log text tag, so a shared transcript still shows at
+//  a glance which side produced each line.
+//  8 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 167 — [CROSSROADS] command retirement + OVERSEER transcript tag');
+  const api167 = readFile('js/api.js');
+  const uiCore167 = readFile('js/ui-core.js');
+  const html167 = readFile('index.html');
+  const css167 = readFile('css/terminal.css');
+  const registry167 = (uiCore167.match(/const COMMAND_REGISTRY = \[([\s\S]*?)\n\];/) || [
+    '',
+    '',
+  ])[1];
+
+  // 167.1  COMMAND_REGISTRY no longer advertises [CROSSROADS]
+  assert(
+    !registry167.includes('[CROSSROADS]'),
+    '167.1: COMMAND_REGISTRY no longer advertises [CROSSROADS] (retired — help modal stays accurate)'
+  );
+
+  // 167.2  the CROSSROADS RECORD panel markup is kept (feature retained; only the
+  //        command was retired)
+  assert(
+    /CROSSROADS RECORD/.test(html167),
+    '167.2: the CROSSROADS RECORD panel is kept in index.html — only the native command was retired'
+  );
+
+  // 167.3  _nativeCrossroads() is kept as an internal helper (not deleted), just
+  //        unreachable from the command line
+  assert(
+    /function _nativeCrossroads\(\)/.test(api167),
+    '167.3: _nativeCrossroads() remains defined in api.js as an internal helper (dead-code deletion was out of scope for this batch)'
+  );
+
+  // 167.4  [CROSSROADS] is registered in the Suite 113 RETIRED-macro list
+  //        (self-referential escape-ratchet guard, mirrors 136.11 for [TIMELINE])
+  assert(
+    /const RETIRED = \[[\s\S]*?'\[CROSSROADS\]'[\s\S]*?\]/.test(
+      readFile('tests/robco-diagnostics.js')
+    ),
+    '167.4: [CROSSROADS] is registered in the Suite 113 RETIRED-macro list (self-referential escape-ratchet guard)'
+  );
+
+  // 167.5  appendToChat() creates an OVERSEER tag element specifically for the
+  //        'ai' sender (display-only — never mixed into the escaped/typed text)
+  const appendBody167 = extractFunctionBody(uiCore167, 'appendToChat');
+  assert(
+    /sender === 'ai'[\s\S]{0,200}msg-tag--overseer/.test(appendBody167) &&
+      /tagEl\.textContent = 'OVERSEER'/.test(appendBody167),
+    "167.5: appendToChat() adds a 'msg-tag--overseer' tag element reading OVERSEER for sender === 'ai'"
+  );
+
+  // 167.6  the tag is gated on sender — a 'sys' or 'user' message body renders with
+  //        no msg-tag element (checked structurally: the tagEl creation branch is
+  //        the ONLY 'msg-tag' reference in the function, inside the ai-only if)
+  const overseerBranch167 = (appendBody167.match(/if \(sender === 'ai'\) \{[\s\S]*?\n {2}\}/) || [
+    '',
+  ])[0];
+  assert(
+    overseerBranch167.includes('msg-tag--overseer') &&
+      (appendBody167.match(/msg-tag/g) || []).length ===
+        (overseerBranch167.match(/msg-tag/g) || []).length,
+    "167.6: the OVERSEER tag element is created ONLY inside the sender === 'ai' branch — 'sys'/'user' messages get no tag"
+  );
+
+  // 167.7  the typewriter's per-frame writes target the dedicated msgContent span,
+  //        never msgDiv directly — so the OVERSEER tag (a msgDiv sibling) is never
+  //        wiped by the typewriter's textContent/innerHTML assignment
+  assert(
+    /msgContent\.textContent\s*=\s*plainText/.test(appendBody167) &&
+      (appendBody167.match(/msgContent\.innerHTML\s*=\s*fullHtml/g) || []).length === 2 &&
+      !/msgDiv\.textContent\s*=/.test(appendBody167) &&
+      !/msgDiv\.innerHTML\s*=/.test(appendBody167),
+    '167.7: appendToChat() writes the message body to msgContent (never msgDiv directly) in both the typewriter and instant-render paths'
+  );
+
+  // 167.8  terminal.css defines the tag classes, and the OVERSEER color rides the
+  //        existing --bezel-wire per-game token (Protocol 38 — no game literal)
+  assert(
+    /\.msg-tag\s*\{/.test(css167) &&
+      /\.msg-tag--overseer\s*\{[^}]*var\(--bezel-wire\)/.test(css167),
+    '167.8: terminal.css defines .msg-tag/.msg-tag--overseer, colored via the existing --bezel-wire token (game-agnostic)'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════

@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2119/2119 | Cache: robco-terminal-v2.7.0-r54 -->
+﻿## [Unreleased]<!-- Tests: 2127/2127 | Cache: robco-terminal-v2.7.0-r55 -->
 
 ### Added
 
@@ -26,6 +26,7 @@
 - The terminal now looks and feels like a physical RobCo device — a casing with brand plating and status lamps frames the screen, and the plain tab bar has been replaced with a row of illuminated hardware buttons: OPERATOR (your stats), OPERATIONS (inventory and crafting), DATABANK (quests, the map, and campaign records), UPLINK (the AI comm-link), and CHASSIS (settings and saves). A live readout above the buttons shows which section you're in. Number keys 1 through 5 jump straight to each section exactly like before, and a new DIRECTORY button (or the 0 key) opens a plain, old-style list of every section for anyone who prefers it. Every section works exactly as it did before — this only changes how you get there, and everything still fits cleanly on a phone screen.
 - Your saves list now only shows saves for the game you're currently playing — New Vegas saves stay out of sight while you're in Fallout 3, and vice versa. An older save that predates this change is still shown rather than hidden, since there's no way to tell which game it belongs to.
 - The always-visible row of quick-command buttons and the D-Pad below the Director Uplink message box are gone, replaced by the new Tool Deck panel described above — the conversation now has the whole screen to itself until you need one of those tools. The on-screen TERMLINK CONSOLE button goes with it, though typing TERMLINK still opens the console exactly as before.
+- Retired the typed CROSSROADS command, now that the CROSSROADS RECORD is already a standing panel you can open any time — typing it (or looking for it in the command list) no longer does anything. Nothing about the panel itself changes.
 
 ### Fixed
 
@@ -66,6 +67,7 @@
 - The Module Bay now looks and feels more like real hardware: the sound board's 13 mute switches are drawn as chips you plug in or pull, the power cell and haptic solenoid show their own device graphics, and the immersion level is now a turnable dial instead of a dropdown. Whichever view you last used — the hardware Bay or the flat Schematic list — is now remembered the next time you open Security & Configuration.
 - The Atmospheric Regulator dial can now be turned by dragging or sliding it with a mouse or finger, not just tapping — dial in the level you want in one smooth motion. Tapping still works exactly as before.
 - The Save & Data help button now matches the modern round design already used on the Comm-Link's help button, instead of the older bracket style.
+- Every line in the Director Uplink transcript now carries a small OVERSEER tag when the Director itself is speaking, so it's easy to tell at a glance which lines came from the AI versus your own typed or logged commands.
 
 ### Under the Hood
 

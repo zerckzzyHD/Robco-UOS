@@ -1704,8 +1704,9 @@ Check ($missing41b.Count -eq 0) "FNV: all WEAPON_MODS.CSV rows exist in registry
 
 # ===========================================================
 # Suite 42 -- Native Command Router (Phase 5a / 5a-fix)
-# Deterministic commands ([FEATURES]/[CROSSROADS]/[SLEEP]/[WAIT])
-# are intercepted pre-fetch; dead system-prompt blocks removed.
+# Deterministic commands ([FEATURES]/[SLEEP]/[WAIT]) are intercepted pre-fetch;
+# dead system-prompt blocks removed. [CROSSROADS] was retired as a command
+# (owner cleanup batch) -- 42.3 now guards its absence.
 # 42.6 non-empty guard prevents vacuous pass on 42.7/42.8.
 # 42.10/42.11 guard the syncStateFromDom round-trip bug fix:
 # _nativeSleep/_nativeWait must call loadUI() BEFORE saveState()
@@ -1725,9 +1726,11 @@ Check ([bool]($apiSrc42 -match 'const NATIVE_COMMAND_ROUTER')) `
 Check ([bool]($apiSrc42 -match "'\[FEATURES\]'\s*:")) `
     'NATIVE_COMMAND_ROUTER has [FEATURES] handler'
 
-# 42.3  [CROSSROADS] key in NATIVE_COMMAND_ROUTER
-Check ([bool]($apiSrc42 -match "'\[CROSSROADS\]'\s*:")) `
-    'NATIVE_COMMAND_ROUTER has [CROSSROADS] handler'
+# 42.3  [CROSSROADS] retired as a native command (owner cleanup batch) -- the
+#       Crossroads record is now a standing panel, so the point-in-time modal
+#       analysis it drove is redundant. Guards against a regression reappearance.
+Check (-not ($apiSrc42 -match "'\[CROSSROADS\]'\s*:")) `
+    'NATIVE_COMMAND_ROUTER no longer has a [CROSSROADS] handler (retired -- Crossroads is now panel-only)'
 
 # 42.4  [SLEEP] key in NATIVE_COMMAND_ROUTER
 Check ([bool]($apiSrc42 -match "'\[SLEEP\]'\s*:")) `
@@ -7225,7 +7228,7 @@ $router113   = [regex]::Match($api113, 'const NATIVE_COMMAND_ROUTER = \{([\s\S]*
 
 $NATIVES113 = @('[VATS SIM]','[THREAT]','[TRADE]','CONSULT','[BIO-SCAN]','[LOOT]')
 $ROUTER_NATIVES113 = @('[VATS SIM]','[THREAT]','[BIO-SCAN]','[LOOT]','[CONSULT]')
-$RETIRED113 = @('[VVATS]','[TACTICS]','[SYNC:','[STASH','[EXCESS]','[CURRENCY]','[AUDIT]','[TIMER/CHEM]','[SQUAD]','[TRAVEL CLUSTER]','[CASINO]','[COMM LINK]','[PAUSE]','[PAGE 2','[ARCHIVE]','[TIMELINE]')
+$RETIRED113 = @('[VVATS]','[TACTICS]','[SYNC:','[STASH','[EXCESS]','[CURRENCY]','[AUDIT]','[TIMER/CHEM]','[SQUAD]','[TRAVEL CLUSTER]','[CASINO]','[COMM LINK]','[PAUSE]','[PAGE 2','[ARCHIVE]','[TIMELINE]','[CROSSROADS]')
 
 # 113.1  registry parsed + NATIVE TERMINALS group marked OFFLINE / NO AI
 Check (($registry113.Length -gt 0) -and ($registry113 -match 'NATIVE TERMINALS[^'']*OFFLINE[^'']*NO AI')) `
@@ -13696,6 +13699,58 @@ console.log('RESULT:' + results.map(r => r ? '1' : '0').join(''));
 } catch {
     foreach ($lbl in $labels166) { Fail "$lbl  (harness error: $_)" }
 }
+
+# ===========================================================
+# Suite 167 -- Owner cleanup batch: [CROSSROADS] command retired (panel kept)
+# + unified transcript source tags (OVERSEER) (8 tests)
+# [CROSSROADS] is retired as a native command/help entry now that the
+# Crossroads record is a standing UI panel -- the panel and the internal
+# _nativeCrossroads() helper are both kept. appendToChat() gains a
+# display-only OVERSEER tag on AI-sourced transcript lines, mirroring the
+# existing [TERM] quick-log text tag. (PS mirror of JS Suite 167.)
+# ===========================================================
+Sep "Suite 167 -- [CROSSROADS] command retirement + OVERSEER transcript tag"
+$api167    = Read-Src "js/api.js"
+$uiCore167 = Read-Src "js/ui-core.js"
+$html167   = Read-Src "index.html"
+$css167    = Read-Src "css/terminal.css"
+$registry167 = [regex]::Match($uiCore167, 'const COMMAND_REGISTRY = \[([\s\S]*?)\n\];').Groups[1].Value
+$appendBody167 = [regex]::Match($uiCore167, '(?s)function appendToChat\([^)]*\)[\s\S]*?\n\}\n\n').Value
+
+# 167.1  COMMAND_REGISTRY no longer advertises [CROSSROADS]
+Check (-not $registry167.Contains('[CROSSROADS]')) `
+    '167.1: COMMAND_REGISTRY no longer advertises [CROSSROADS] (retired -- help modal stays accurate)'
+
+# 167.2  the CROSSROADS RECORD panel markup is kept
+Check ([bool]($html167 -match 'CROSSROADS RECORD')) `
+    '167.2: the CROSSROADS RECORD panel is kept in index.html -- only the native command was retired'
+
+# 167.3  _nativeCrossroads() is kept as an internal helper (not deleted)
+Check ([bool]($api167 -match 'function _nativeCrossroads\(\)')) `
+    '167.3: _nativeCrossroads() remains defined in api.js as an internal helper (dead-code deletion was out of scope for this batch)'
+
+# 167.4  [CROSSROADS] is registered in the Suite 113 RETIRED-macro list
+Check ($RETIRED113 -contains '[CROSSROADS]') `
+    '167.4: [CROSSROADS] is registered in the Suite 113 RETIRED-macro list (self-referential escape-ratchet guard)'
+
+# 167.5  appendToChat() creates an OVERSEER tag element for the 'ai' sender
+Check (($appendBody167 -match "sender === 'ai'[\s\S]{0,200}msg-tag--overseer") -and ($appendBody167 -match "tagEl\.textContent = 'OVERSEER'")) `
+    "167.5: appendToChat() adds a 'msg-tag--overseer' tag element reading OVERSEER for sender === 'ai'"
+
+# 167.6  the tag is gated on sender -- created ONLY inside the ai-only branch
+$overseerBranch167 = [regex]::Match($appendBody167, "(?s)if \(sender === 'ai'\) \{.*?\n  \}").Value
+$allTagHits167  = [regex]::Matches($appendBody167, 'msg-tag').Count
+$branchTagHits167 = [regex]::Matches($overseerBranch167, 'msg-tag').Count
+Check ($overseerBranch167.Contains('msg-tag--overseer') -and ($allTagHits167 -eq $branchTagHits167)) `
+    "167.6: the OVERSEER tag element is created ONLY inside the sender === 'ai' branch -- 'sys'/'user' messages get no tag"
+
+# 167.7  the typewriter's per-frame writes target msgContent, never msgDiv directly
+Check (($appendBody167 -match 'msgContent\.textContent\s*=\s*plainText') -and (([regex]::Matches($appendBody167, 'msgContent\.innerHTML\s*=\s*fullHtml')).Count -eq 2) -and (-not ($appendBody167 -match 'msgDiv\.textContent\s*=')) -and (-not ($appendBody167 -match 'msgDiv\.innerHTML\s*='))) `
+    '167.7: appendToChat() writes the message body to msgContent (never msgDiv directly) in both the typewriter and instant-render paths'
+
+# 167.8  terminal.css defines the tag classes, colored via --bezel-wire
+Check (($css167 -match '\.msg-tag\s*\{') -and ($css167 -match '\.msg-tag--overseer\s*\{[^}]*var\(--bezel-wire\)')) `
+    '167.8: terminal.css defines .msg-tag/.msg-tag--overseer, colored via the existing --bezel-wire token (game-agnostic)'
 
 # ===========================================================
 # Results

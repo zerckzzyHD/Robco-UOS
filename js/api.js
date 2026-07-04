@@ -1102,7 +1102,11 @@ const NATIVE_COMMAND_ROUTER = {
   '[TERMLINK]': () => showTermlinkConsole(),
   '[TL]': () => showTermlinkConsole(),
   TERMLINK: () => showTermlinkConsole(),
-  '[CROSSROADS]': () => _nativeCrossroads(),
+  // Owner cleanup batch: [CROSSROADS] retired as a native command — the Crossroads
+  // record is now a standing UI panel (CROSSROADS RECORD), so the point-in-time modal
+  // analysis this command produced is redundant. _nativeCrossroads() itself is left
+  // in place (Suite 89.2/89.3 exercise its body directly) but is no longer reachable
+  // from the command line — see the Suite 113 RETIRED-macro list.
   '[SLEEP]': () => _nativeSleep(),
   // WU-N3: THREAT is a fully-deterministic native bestiary/TTK terminal — the AI
   // never computes time-to-kill. The argument is the target enemy name.

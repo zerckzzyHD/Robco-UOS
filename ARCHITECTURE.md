@@ -1,7 +1,7 @@
 ﻿# RobCo U.O.S. — System Architecture
 
 > **Version:** 2.7.0
-> **Last Updated:** 2026-07-03
+> **Last Updated:** 2026-07-04
 > **Purpose:** Living reference for any engineer (human or AI) working on this project.
 > This document maps every system, its dependencies, its persistence contract, and the
 > historical lessons that shaped it.
@@ -69,8 +69,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2119-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2119-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2127-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2127-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -1169,9 +1169,12 @@ non-`[T#]` note STAYS in the notebook. It is idempotent (a re-run moves nothing)
 runs from both `migrateState()` and the ui-core v8 boot fast-path (so existing v8
 saves migrate on load). A manual note is never lost.
 
-**Views** are cheap filters over the record: CROSSROADS RECORD (all recent events),
-INCIDENT LOG (milestone types only — level/faction/quest), and `_nativeCrossroads`
-(the CROSSROADS command). **Cloud-sync path:** serialized-whole via the campaign
+**Views** are cheap filters over the record: CROSSROADS RECORD (all recent events)
+and INCIDENT LOG (milestone types only — level/faction/quest). The `[CROSSROADS]`
+native command variant of this analysis (`_nativeCrossroads()`) was retired (owner
+cleanup batch) now that the record is a standing panel — the function itself remains
+as an internal helper but is no longer reachable from the command line (see the
+Suite 113 RETIRED-macro list). **Cloud-sync path:** serialized-whole via the campaign
 container (`robco_v8`) — eventLog rides the save/export/rolling-backup/cloud push and
 is coerced by `sanitizeImportedContainer()` → `migrateState()` on pull (Protocol 34);
 no dedicated Firestore doc.
@@ -1955,7 +1958,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2119-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2127-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

@@ -3637,7 +3637,6 @@ const COMMAND_REGISTRY = [
       { cmd: '[GPS] / [MAP]', desc: 'Localized geographic compass grid.' },
       { cmd: '[WAIT: X Hrs]', desc: 'Advance the clock by X hours; restock.' },
       { cmd: '[SLEEP]', desc: 'Advance 8 hours; heal HP & limbs. Offline.' },
-      { cmd: '[CROSSROADS]', desc: 'Point-of-no-return / butterfly-effect check. Offline.' },
     ],
   },
   {
@@ -4377,6 +4376,23 @@ function appendToChat(text, sender, isHistoryLoad = false) {
   msgDiv.className = sender === 'user' ? 'msg-user' : sender === 'sys' ? 'msg-sys' : 'msg-ai';
   chatBox.appendChild(msgDiv);
 
+  // Owner batch: unified transcript source tag — AI/Overseer-side lines carry an
+  // OVERSEER tag, mirroring the existing [TERM] quick-log text prefix, so a shared
+  // transcript still shows at a glance which side (native TERMINAL vs Director
+  // OVERSEER) produced each line. Derived from `sender` every render (display-only,
+  // never written into `text`/chatHistory), so it can never double up on a history
+  // replay. A dedicated content span keeps the typewriter's textContent/innerHTML
+  // writes scoped to the message body — never wiping the tag (Protocol 22).
+  const msgContent = document.createElement('span');
+  msgContent.className = 'msg-content';
+  if (sender === 'ai') {
+    const tagEl = document.createElement('span');
+    tagEl.className = 'msg-tag msg-tag--overseer';
+    tagEl.textContent = 'OVERSEER';
+    msgDiv.appendChild(tagEl);
+  }
+  msgDiv.appendChild(msgContent);
+
   // Build safe HTML once — escapes first, then applies formatting
   const fullHtml = escapeAndFormat(text);
 
@@ -4396,13 +4412,13 @@ function appendToChat(text, sender, isHistoryLoad = false) {
     function typeWriter() {
       if (i < plainText.length) {
         i = Math.min(i + batchSize, plainText.length);
-        msgDiv.textContent = plainText.substring(0, i);
+        msgContent.textContent = plainText.substring(0, i);
         if (i % 3 === 0) playClack();
         chatBox.scrollTop = chatBox.scrollHeight;
         setTimeout(typeWriter, speed);
       } else {
         // Animation complete — apply full safe HTML formatting
-        msgDiv.innerHTML = fullHtml;
+        msgContent.innerHTML = fullHtml;
         chatBox.scrollTop = chatBox.scrollHeight;
         // DO-O: the typewriter owns the SPEAKING → LISTENING reset (transmitMessage's
         // finally hook only resets from 'thinking' — never truncates this).
@@ -4411,7 +4427,7 @@ function appendToChat(text, sender, isHistoryLoad = false) {
     }
     typeWriter();
   } else {
-    msgDiv.innerHTML = fullHtml;
+    msgContent.innerHTML = fullHtml;
     chatBox.scrollTop = chatBox.scrollHeight;
     // DO-O: reduced-motion / isHistoryLoad-false instant branch — the reply
     // is already fully delivered, so SPEAKING → LISTENING fires immediately.
