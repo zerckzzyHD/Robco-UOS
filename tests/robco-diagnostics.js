@@ -23436,42 +23436,48 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '173.2: nativeLevelUp() is defined in ui-core.js'
   );
 
-  // 173.3  nativeLevelUp() reuses the exact xpNext formula (also present in
-  //        updateMath()'s XP-bar block), proving no forked threshold logic
-  //        (Protocol 22).
+  // 173.3  owner report: leveling up is deterministic and ungated by XP —
+  //        MAX_PLAYER_LEVEL is a single named constant (Protocol 22), read by
+  //        BOTH nativeLevelUp() and updateMath(), never a re-derived/forked
+  //        magic number in either place.
   {
     const nativeLevelUpBody173 = extractFunctionBody(uiCore173, 'nativeLevelUp');
     const updateMathBody173 = extractFunctionBody(uiCore173, 'updateMath');
-    const FORMULA = '75 * ((lvl + 1) * (lvl + 1)) - 25 * (lvl + 1) - 50';
     assert(
-      nativeLevelUpBody173.includes(FORMULA) && updateMathBody173.includes(FORMULA),
-      '173.3: nativeLevelUp() and updateMath() both use the identical xpNext threshold formula (Protocol 22 — one formula, not a forked copy)'
+      /const MAX_PLAYER_LEVEL = 50;/.test(uiCore173) &&
+        nativeLevelUpBody173.includes('MAX_PLAYER_LEVEL') &&
+        updateMathBody173.includes('MAX_PLAYER_LEVEL') &&
+        !/\bxp\b/.test(nativeLevelUpBody173),
+      '173.3: MAX_PLAYER_LEVEL is a single named constant read by both nativeLevelUp() and updateMath() (Protocol 22); nativeLevelUp() never reads XP at all — leveling is fully ungated by XP'
     );
   }
 
-  // 173.4  nativeLevelUp() increments state.lvl by 1 and emits the SAME
-  //        'level.up' RobcoEvents the AI-driven autoImportState() path uses
-  //        (api.js) — reused, not forked.
+  // 173.4  nativeLevelUp() increments state.lvl by exactly +1 per press,
+  //        clamped at MAX_PLAYER_LEVEL, and emits the SAME 'level.up'
+  //        RobcoEvents the AI-driven autoImportState() path uses (api.js) —
+  //        reused, not forked.
   {
     const nativeLevelUpBody173c = extractFunctionBody(uiCore173, 'nativeLevelUp');
     const autoImportBody173 = extractFunctionBody(apiSource, 'autoImportState');
     assert(
-      /const newLvl = lvl \+ 1;/.test(nativeLevelUpBody173c) &&
+      /if \(lvl >= MAX_PLAYER_LEVEL\) return;/.test(nativeLevelUpBody173c) &&
+        /const newLvl = Math\.min\(MAX_PLAYER_LEVEL, lvl \+ 1\);/.test(nativeLevelUpBody173c) &&
         /state\.lvl = newLvl;/.test(nativeLevelUpBody173c) &&
         /RobcoEvents\.emit\('level\.up', \{ oldLvl: lvl, newLvl \}\)/.test(nativeLevelUpBody173c) &&
         /RobcoEvents\.emit\('level\.up',/.test(autoImportBody173),
-      "173.4: nativeLevelUp() increments state.lvl by 1 and emits RobcoEvents 'level.up' — the same event autoImportState()'s AI-driven level-up path emits (Protocol 22)"
+      "173.4: nativeLevelUp() no-ops at MAX_PLAYER_LEVEL, otherwise always increments state.lvl by exactly +1, and emits RobcoEvents 'level.up' — the same event autoImportState()'s AI-driven level-up path emits (Protocol 22)"
     );
   }
 
-  // 173.5  updateMath() toggles #btnLevelUp.disabled from the SAME xp/xpNext
-  //        comparison the XP bar fill itself is computed from.
+  // 173.5  updateMath() toggles #btnLevelUp.disabled ONLY at MAX_PLAYER_LEVEL
+  //        — never from an XP comparison (owner report: the button must work
+  //        on every press regardless of XP).
   {
     const updateMathBody173d = extractFunctionBody(uiCore173, 'updateMath');
     assert(
       /getElementById\('btnLevelUp'\)/.test(updateMathBody173d) &&
-        /levelUpBtn\.disabled = xp < xpNext;/.test(updateMathBody173d),
-      "173.5: updateMath() keeps #btnLevelUp's disabled state in sync with xp < xpNext (the same threshold the XP bar fill uses)"
+        /levelUpBtn\.disabled = lvl >= MAX_PLAYER_LEVEL;/.test(updateMathBody173d),
+      "173.5: updateMath() keeps #btnLevelUp's disabled state in sync with lvl >= MAX_PLAYER_LEVEL only — never gated on XP"
     );
   }
 
@@ -23554,6 +23560,96 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         /^\[\w+, \d{2}\.\d{2}\.\d{2}, \d{1,2}:\d{2} (AM|PM)\] Later Event$/.test(result173.line200),
       '173.8: [behavioral] _recordLine() renders a real readable weekday/date/time stamp (e.g. "[Sunday, 10.19.81, 12:00 AM] Test Event") for both a t:0 and a later tick value — never the old raw "[T<ticks>]" form' +
         (err173 ? ' — ' + err173.message : '')
+    );
+  }
+
+  // 173.9  Owner-report regression (Protocol 13): [behavioral] the REAL
+  //        nativeLevelUp() body, executed in a vm sandbox against a synthetic
+  //        #stat_lvl input + a RobcoEvents.emit spy, proves the button
+  //        (a) always increments by exactly +1 on every press regardless of
+  //        XP (no xp/xpNext read anywhere in the path), (b) fires 'level.up'
+  //        on every successful press, and (c) no-ops (no state change, no
+  //        event) once MAX_PLAYER_LEVEL is reached — the exact "works on
+  //        every press until max level" behavior the owner asked for.
+  {
+    const vm173b = require('vm');
+    let outcome173b = null;
+    let err173b = null;
+    try {
+      const declared173b =
+        'function nativeLevelUp()' + extractFunctionBody(uiCore173, 'nativeLevelUp');
+      const sandbox173b = {
+        console: { warn() {} },
+        state: { lvl: 1 },
+        emits: [],
+        RobcoEvents: {
+          emit(name, payload) {
+            sandbox173b.emits.push({ name, payload });
+          },
+        },
+        updateMath() {},
+        saveState() {},
+        document: {
+          getElementById(id) {
+            if (id === 'stat_lvl') return sandbox173b._lvlInput;
+            return null;
+          },
+        },
+        _lvlInput: { value: '1' },
+      };
+      vm173b.createContext(sandbox173b);
+      vm173b.runInContext('const MAX_PLAYER_LEVEL = 50;\n' + declared173b, sandbox173b);
+
+      // (a)/(b): 5 presses from level 1, ungated by XP (no xp variable ever set) —
+      // each press must increment by exactly +1 and fire exactly one 'level.up'.
+      for (let i = 0; i < 5; i++) {
+        vm173b.runInContext('nativeLevelUp()', sandbox173b);
+      }
+      const after5Presses = {
+        lvl: parseInt(sandbox173b._lvlInput.value),
+        emitCount: sandbox173b.emits.length,
+        allLevelUp: sandbox173b.emits.every(e => e.name === 'level.up'),
+        sequenceCorrect: sandbox173b.emits.every(
+          (e, i) => e.payload.oldLvl === i + 1 && e.payload.newLvl === i + 2
+        ),
+      };
+
+      // (c): jump to MAX_PLAYER_LEVEL and press again — must no-op (no state
+      // change, no event fired).
+      sandbox173b._lvlInput.value = '50';
+      sandbox173b.emits.length = 0;
+      vm173b.runInContext('nativeLevelUp()', sandbox173b);
+      const atMax = {
+        lvl: parseInt(sandbox173b._lvlInput.value),
+        emitCount: sandbox173b.emits.length,
+      };
+
+      // Boundary: one press from MAX_PLAYER_LEVEL - 1 must land exactly on
+      // MAX_PLAYER_LEVEL (clamped, not overshooting).
+      sandbox173b._lvlInput.value = '49';
+      sandbox173b.emits.length = 0;
+      vm173b.runInContext('nativeLevelUp()', sandbox173b);
+      const boundary = {
+        lvl: parseInt(sandbox173b._lvlInput.value),
+        emitCount: sandbox173b.emits.length,
+      };
+
+      outcome173b = { after5Presses, atMax, boundary };
+    } catch (e) {
+      err173b = e;
+    }
+    assert(
+      !err173b &&
+        outcome173b.after5Presses.lvl === 6 &&
+        outcome173b.after5Presses.emitCount === 5 &&
+        outcome173b.after5Presses.allLevelUp &&
+        outcome173b.after5Presses.sequenceCorrect &&
+        outcome173b.atMax.lvl === 50 &&
+        outcome173b.atMax.emitCount === 0 &&
+        outcome173b.boundary.lvl === 50 &&
+        outcome173b.boundary.emitCount === 1,
+      '173.9: [behavioral] nativeLevelUp() always increments by exactly +1 per press and fires level.up every time (5 presses from level 1 → level 6, 5 events, correct oldLvl/newLvl sequence, XP never read) — and no-ops with zero events at MAX_PLAYER_LEVEL while a press from MAX_PLAYER_LEVEL-1 lands exactly on the cap' +
+        (err173b ? ' — ' + err173b.message : '')
     );
   }
 }

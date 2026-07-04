@@ -14403,31 +14403,38 @@ Check (
 # 173.2  nativeLevelUp() is defined in ui-core.js
 Check ([bool]($uiCore173 -match 'function nativeLevelUp\s*\(')) "173.2: nativeLevelUp() is defined in ui-core.js"
 
-# 173.3  nativeLevelUp() reuses the exact xpNext formula (also present in
-#        updateMath()'s XP-bar block), proving no forked threshold logic.
+# 173.3  owner report: leveling up is deterministic and ungated by XP --
+#        MAX_PLAYER_LEVEL is a single named constant (Protocol 22), read by
+#        BOTH nativeLevelUp() and updateMath(), never a re-derived/forked
+#        magic number in either place.
 $nativeLevelUpBody173 = Get-FunctionBody $uiCore173 'nativeLevelUp'
 $updateMathBody173 = Get-FunctionBody $uiCore173 'updateMath'
-$FORMULA173 = '75 * ((lvl + 1) * (lvl + 1)) - 25 * (lvl + 1) - 50'
 Check (
-    $nativeLevelUpBody173.Contains($FORMULA173) -and $updateMathBody173.Contains($FORMULA173)
-) "173.3: nativeLevelUp() and updateMath() both use the identical xpNext threshold formula (Protocol 22 -- one formula, not a forked copy)"
+    ($uiCore173 -match 'const MAX_PLAYER_LEVEL = 50;') -and
+    $nativeLevelUpBody173.Contains('MAX_PLAYER_LEVEL') -and
+    $updateMathBody173.Contains('MAX_PLAYER_LEVEL') -and
+    (-not ($nativeLevelUpBody173 -match '\bxp\b'))
+) "173.3: MAX_PLAYER_LEVEL is a single named constant read by both nativeLevelUp() and updateMath() (Protocol 22); nativeLevelUp() never reads XP at all -- leveling is fully ungated by XP"
 
-# 173.4  nativeLevelUp() increments state.lvl by 1 and emits the SAME
-#        'level.up' RobcoEvents the AI-driven autoImportState() path uses.
+# 173.4  nativeLevelUp() increments state.lvl by exactly +1 per press,
+#        clamped at MAX_PLAYER_LEVEL, and emits the SAME 'level.up'
+#        RobcoEvents the AI-driven autoImportState() path uses.
 $autoImportBody173 = Get-FunctionBody $apiSrc 'autoImportState'
 Check (
-    ($nativeLevelUpBody173 -match 'const newLvl = lvl \+ 1;') -and
+    ($nativeLevelUpBody173 -match 'if \(lvl >= MAX_PLAYER_LEVEL\) return;') -and
+    ($nativeLevelUpBody173 -match 'const newLvl = Math\.min\(MAX_PLAYER_LEVEL, lvl \+ 1\);') -and
     ($nativeLevelUpBody173 -match 'state\.lvl = newLvl;') -and
     ($nativeLevelUpBody173 -match "RobcoEvents\.emit\('level\.up', \{ oldLvl: lvl, newLvl \}\)") -and
     ($autoImportBody173 -match "RobcoEvents\.emit\('level\.up',")
-) "173.4: nativeLevelUp() increments state.lvl by 1 and emits RobcoEvents 'level.up' -- the same event autoImportState()'s AI-driven level-up path emits (Protocol 22)"
+) "173.4: nativeLevelUp() no-ops at MAX_PLAYER_LEVEL, otherwise always increments state.lvl by exactly +1, and emits RobcoEvents 'level.up' -- the same event autoImportState()'s AI-driven level-up path emits (Protocol 22)"
 
-# 173.5  updateMath() toggles #btnLevelUp.disabled from the SAME xp/xpNext
-#        comparison the XP bar fill itself is computed from.
+# 173.5  updateMath() toggles #btnLevelUp.disabled ONLY at MAX_PLAYER_LEVEL --
+#        never from an XP comparison (owner report: the button must work on
+#        every press regardless of XP).
 Check (
     ($updateMathBody173 -match "getElementById\('btnLevelUp'\)") -and
-    ($updateMathBody173 -match 'levelUpBtn\.disabled = xp < xpNext;')
-) "173.5: updateMath() keeps #btnLevelUp's disabled state in sync with xp < xpNext (the same threshold the XP bar fill uses)"
+    ($updateMathBody173 -match 'levelUpBtn\.disabled = lvl >= MAX_PLAYER_LEVEL;')
+) "173.5: updateMath() keeps #btnLevelUp's disabled state in sync with lvl >= MAX_PLAYER_LEVEL only -- never gated on XP"
 
 # 173.6  _recordLine() no longer emits the raw "[T<ticks>]" prefix -- it
 #        formats the same stored tick value with formatGameTime() instead.
@@ -14459,6 +14466,26 @@ Check (
     ($formatGameTimeBody173 -match "dateStr = `\`\$\{mm\}\.`\$\{dd\}\.`\$\{yy\}`;" -or $formatGameTimeBody173 -match '\$\{mm\}\.\$\{dd\}\.\$\{yy\}') -and
     ($formatGameTimeBody173 -match '\$\{h12\}:\$\{String\(dt\.minute\)\.padStart\(2, .0.\)\} \$\{ampm\}')
 ) "173.8: structural mirror of the JS behavioral proof -- formatGameTime() (which _recordLine() now delegates to) still builds the 'Weekday, MM.DD.YY, H:MM AM/PM' template the JS side executes and regex-asserts against"
+
+# 173.9  Owner-report regression (Protocol 13): STRUCTURAL MIRROR of the JS
+#        behavioral vm-sandbox proof (PowerShell has no JS execution sandbox
+#        -- same convention as Suite 150.10/172.2/173.8): nativeLevelUp()'s
+#        body shape locks in the exact "always +1, no-op at max, XP never
+#        read" contract the JS side actually EXECUTES and asserts --
+#        (a) the level-cap guard is the FIRST statement (checked before any
+#        state mutation or event emit), (b) the increment is unconditionally
+#        +1 (Math.min(MAX_PLAYER_LEVEL, lvl + 1), never lvl + N or a
+#        threshold-gated branch), and (c) RobcoEvents.emit('level.up', ...)
+#        always follows the state write when the guard doesn't return early.
+$guardIdx173 = $nativeLevelUpBody173.IndexOf('if (lvl >= MAX_PLAYER_LEVEL) return;')
+$newLvlIdx173 = $nativeLevelUpBody173.IndexOf('const newLvl = Math.min(MAX_PLAYER_LEVEL, lvl + 1);')
+$stateWriteIdx173 = $nativeLevelUpBody173.IndexOf('state.lvl = newLvl;')
+$emitIdx173 = $nativeLevelUpBody173.IndexOf("RobcoEvents.emit('level.up',")
+Check (
+    ($guardIdx173 -ge 0) -and ($newLvlIdx173 -gt $guardIdx173) -and
+    ($stateWriteIdx173 -gt $newLvlIdx173) -and ($emitIdx173 -gt $stateWriteIdx173) -and
+    (-not ($nativeLevelUpBody173 -match '\bxp\b'))
+) "173.9: structural mirror of the JS behavioral proof -- nativeLevelUp()'s MAX_PLAYER_LEVEL guard runs first, the +1 clamp/state write/level.up emit follow in that exact order, and XP is never read anywhere in the path (always +1 per press, no-op only at the cap)"
 
 # ===========================================================
 # Suite 174 -- Owner-approved: SVC tray EJECT HOLOTAPE export consolidation

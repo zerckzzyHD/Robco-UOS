@@ -2356,21 +2356,32 @@ function onLvlInputChanged() {
   updateMath();
 }
 
-// Native LEVEL UP control (owner report): a player-driven way to apply a
-// level-up without needing to type it to the AI. Reuses the SAME xpNext
-// threshold formula the XP bar/onLvlInputChanged() already use, and fires
-// through the SAME RobcoEvents 'level.up' path the AI-driven autoImportState()
-// level-up already emits (Protocol 22) — so the jingle, haptic, and auto-log
-// subscribers all react identically to a native level-up, no forked logic.
-// #btnLevelUp's own disabled state (kept in sync inside updateMath()) already
-// gates this to XP >= the next-level threshold; the guard below is
-// defense-in-depth against a stale/disabled-bypassed click.
+// Owner report: no existing app-enforced level cap was found anywhere in the
+// codebase (only a display-only clamp in the XP bar's percentage math, and a
+// flavor-text trait description in reg_nv.js that isn't consumed as a real
+// constant). 50 is picked as a single, game-agnostic ceiling (Protocol 38 —
+// applied uniformly, never a per-game literal) — it matches the top of the
+// already-existing XP-curve display range (updateMath()'s XP bar previously
+// hardcoded this same 50 as "where the curve display stops mattering"), so
+// this reuses that same implicit ceiling as an explicit, named constant
+// instead of introducing a new, disconnected number.
+const MAX_PLAYER_LEVEL = 50;
+
+// Native LEVEL UP control (owner report): deterministic, player-controlled,
+// and completely ungated by XP — pressing it always applies exactly +1
+// level (until MAX_PLAYER_LEVEL), never requiring the XP bar to have
+// reached any threshold. XP can go out of sync with level (the AI doesn't
+// always keep it in lockstep) without ever blocking manual leveling. Fires
+// through the SAME RobcoEvents 'level.up' path the AI-driven
+// autoImportState() level-up already emits (Protocol 22) — so the jingle,
+// haptic, and auto-log subscribers all react identically to a manual
+// level-up, no forked logic. XP itself is left untouched by a manual
+// level-up (simplest, least surprising choice — the XP bar keeps showing
+// progress toward whatever level is current, exactly as it already did).
 function nativeLevelUp() {
   const lvl = Math.max(1, parseInt(document.getElementById('stat_lvl').value) || 1);
-  const xp = parseInt(document.getElementById('stat_xp').value) || 0;
-  const xpNext = 75 * ((lvl + 1) * (lvl + 1)) - 25 * (lvl + 1) - 50;
-  if (xp < xpNext) return;
-  const newLvl = lvl + 1;
+  if (lvl >= MAX_PLAYER_LEVEL) return;
+  const newLvl = Math.min(MAX_PLAYER_LEVEL, lvl + 1);
   document.getElementById('stat_lvl').value = newLvl;
   state.lvl = newLvl;
   RobcoEvents.emit('level.up', { oldLvl: lvl, newLvl });
@@ -4698,12 +4709,15 @@ function updateMath() {
     let xp = parseInt(document.getElementById('stat_xp').value) || 0;
     let xpCur = lvl <= 1 ? 0 : 75 * (lvl * lvl) - 25 * lvl - 50;
     let xpNext = 75 * ((lvl + 1) * (lvl + 1)) - 25 * (lvl + 1) - 50;
-    let pct = lvl >= 50 ? 100 : Math.min(100, Math.max(0, ((xp - xpCur) / (xpNext - xpCur)) * 100));
+    let pct =
+      lvl >= MAX_PLAYER_LEVEL
+        ? 100
+        : Math.min(100, Math.max(0, ((xp - xpCur) / (xpNext - xpCur)) * 100));
     xpFill.style.width = pct + '%';
-    // Native LEVEL UP control (owner report): enabled once XP reaches the
-    // same next-level threshold the bar itself just filled up to.
+    // Native LEVEL UP control (owner report): ungated by XP — only disabled
+    // once the player has actually reached MAX_PLAYER_LEVEL.
     const levelUpBtn = document.getElementById('btnLevelUp');
-    if (levelUpBtn) levelUpBtn.disabled = xp < xpNext;
+    if (levelUpBtn) levelUpBtn.disabled = lvl >= MAX_PLAYER_LEVEL;
   }
 
   // Karma Flash (#30) — flash when karma polarity changes or large delta
