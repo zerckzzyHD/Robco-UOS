@@ -1087,11 +1087,15 @@ function addCampaignNote() {
   updateMath();
 }
 
-// P4: format a Terminal Record event { t, rt, type, text } as a display line,
-// preserving the diegetic [T<ticks>] prefix the Crossroads/Incident views show.
+// P4: format a Terminal Record event { t, rt, type, text } as a display line.
+// Owner report: the raw [T<ticks>] tick prefix was too cryptic. The stored
+// tick value (ev.t) is unchanged — only the DISPLAY now runs it through the
+// same formatGameTime() every other player-visible time stamp already uses
+// (Protocol 22), so Crossroads Record/Incident Log read a real in-game
+// date/time instead of a bare tick count.
 function _recordLine(ev) {
   if (!ev || typeof ev !== 'object') return String(ev == null ? '' : ev);
-  return `[T${ev.t || 0}] ${ev.text || ''}`;
+  return `[${formatGameTime(ev.t || 0)}] ${ev.text || ''}`;
 }
 
 // ── CAMPAIGN STATUS PANEL (v2.0.1) ───────────────────────────────

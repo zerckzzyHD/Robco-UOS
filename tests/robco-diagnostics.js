@@ -23325,6 +23325,178 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
+// Suite 173 — Owner batch: native LEVEL UP control + readable event-log
+// timestamps
+//
+// FIX 1: there was no native (non-AI) way to apply a level-up even once the
+// XP bar reached the next-level threshold. #btnLevelUp is a real <button>
+// (Protocol UI-5) wired to nativeLevelUp(), which reuses the SAME
+// xpCur/xpNext formula onLvlInputChanged()/updateMath() already use
+// (Protocol 22 — no forked formula) and fires the SAME RobcoEvents
+// 'level.up' event the AI-driven autoImportState() path already emits, so
+// the jingle/haptic/auto-log subscribers react identically either way.
+// updateMath() keeps the button's disabled state in sync with the same
+// threshold every render.
+//
+// FIX 2: Crossroads Record / Incident Log entries were prefixed with a raw
+// "[T<ticks>]" tick count the owner found unreadable. _recordLine() (the one
+// choke point both views render through) now formats that same stored tick
+// value with formatGameTime() — the same helper every other player-visible
+// time stamp already uses — so the display reads e.g.
+// "[Sunday, 10.19.81, 12:00 AM]" instead of "[T0]". The underlying ev.t data
+// is untouched; only the display changed.
+//
+// 8 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 173 — Owner batch: native LEVEL UP control + readable event-log timestamps');
+  const uiCore173 = readFile('js/ui-core.js');
+  const uiRender173 = readFile('js/ui-render.js');
+
+  // 173.1  index.html: #btnLevelUp is a real <button> (Protocol UI-5), starts
+  //        disabled (no XP banked yet on a fresh campaign), and carries a
+  //        descriptive aria-label.
+  {
+    const btnMatch173 = htmlSource.match(/<button[^>]*id="btnLevelUp"[\s\S]{0,500}?<\/button>/);
+    const btnTag173 = btnMatch173 ? btnMatch173[0] : '';
+    assert(
+      /<button/.test(btnTag173) &&
+        /onclick="nativeLevelUp\(\)"/.test(btnTag173) &&
+        /\bdisabled\b/.test(btnTag173) &&
+        /aria-label="[^"]+"/.test(btnTag173),
+      '173.1: index.html #btnLevelUp is a real <button> wired to nativeLevelUp(), starts disabled, and has a descriptive aria-label (Protocol UI-5)'
+    );
+  }
+
+  // 173.2  nativeLevelUp() is defined in ui-core.js
+  assert(
+    /function nativeLevelUp\s*\(/.test(uiCore173),
+    '173.2: nativeLevelUp() is defined in ui-core.js'
+  );
+
+  // 173.3  nativeLevelUp() reuses the exact xpNext formula (also present in
+  //        updateMath()'s XP-bar block), proving no forked threshold logic
+  //        (Protocol 22).
+  {
+    const nativeLevelUpBody173 = extractFunctionBody(uiCore173, 'nativeLevelUp');
+    const updateMathBody173 = extractFunctionBody(uiCore173, 'updateMath');
+    const FORMULA = '75 * ((lvl + 1) * (lvl + 1)) - 25 * (lvl + 1) - 50';
+    assert(
+      nativeLevelUpBody173.includes(FORMULA) && updateMathBody173.includes(FORMULA),
+      '173.3: nativeLevelUp() and updateMath() both use the identical xpNext threshold formula (Protocol 22 — one formula, not a forked copy)'
+    );
+  }
+
+  // 173.4  nativeLevelUp() increments state.lvl by 1 and emits the SAME
+  //        'level.up' RobcoEvents the AI-driven autoImportState() path uses
+  //        (api.js) — reused, not forked.
+  {
+    const nativeLevelUpBody173c = extractFunctionBody(uiCore173, 'nativeLevelUp');
+    const autoImportBody173 = extractFunctionBody(apiSource, 'autoImportState');
+    assert(
+      /const newLvl = lvl \+ 1;/.test(nativeLevelUpBody173c) &&
+        /state\.lvl = newLvl;/.test(nativeLevelUpBody173c) &&
+        /RobcoEvents\.emit\('level\.up', \{ oldLvl: lvl, newLvl \}\)/.test(nativeLevelUpBody173c) &&
+        /RobcoEvents\.emit\('level\.up',/.test(autoImportBody173),
+      "173.4: nativeLevelUp() increments state.lvl by 1 and emits RobcoEvents 'level.up' — the same event autoImportState()'s AI-driven level-up path emits (Protocol 22)"
+    );
+  }
+
+  // 173.5  updateMath() toggles #btnLevelUp.disabled from the SAME xp/xpNext
+  //        comparison the XP bar fill itself is computed from.
+  {
+    const updateMathBody173d = extractFunctionBody(uiCore173, 'updateMath');
+    assert(
+      /getElementById\('btnLevelUp'\)/.test(updateMathBody173d) &&
+        /levelUpBtn\.disabled = xp < xpNext;/.test(updateMathBody173d),
+      "173.5: updateMath() keeps #btnLevelUp's disabled state in sync with xp < xpNext (the same threshold the XP bar fill uses)"
+    );
+  }
+
+  // 173.6  _recordLine() no longer emits the raw "[T<ticks>]" prefix — it
+  //        formats the same stored tick value with formatGameTime() instead
+  //        (Protocol 22 — reuses the existing time-display helper).
+  {
+    const recordLineBody173 = extractFunctionBody(uiRender173, '_recordLine');
+    assert(
+      /formatGameTime\(ev\.t \|\| 0\)/.test(recordLineBody173) &&
+        !/\[T\$\{ev\.t/.test(recordLineBody173),
+      '173.6: _recordLine() formats ev.t through formatGameTime() instead of the raw "[T<ticks>]" prefix'
+    );
+  }
+
+  // 173.7  Both Crossroads Record and Incident Log still route through the
+  //        single _recordLine() choke point (Protocol 22 — no second,
+  //        drifted formatter for either view).
+  {
+    const rcStart173 = uiRender173.indexOf('function renderCampaignStatus');
+    const rcEnd173 = uiRender173.indexOf('\nfunction ', rcStart173 + 1);
+    const rcBody173 = rcStart173 >= 0 ? uiRender173.slice(rcStart173, rcEnd173) : '';
+    const recordLineCalls173 = (rcBody173.match(/_recordLine\(ev\)/g) || []).length;
+    assert(
+      recordLineCalls173 === 2,
+      '173.7: both the Crossroads Record and Incident Log renderers call _recordLine(ev) (single formatter, no drift) — found ' +
+        recordLineCalls173
+    );
+  }
+
+  // 173.8  Behavioral proof (real execution, vm sandbox — mirrors Suite 133):
+  //        loads the REAL state.js (for GAME_DEFS/_activeDef) plus the REAL
+  //        _resolveGameDateTime/formatGameTime/_recordLine bodies from
+  //        ui-render.js, and asserts _recordLine({t:0, text}) produces a
+  //        readable weekday/date/time stamp — never the old "[T0]" form —
+  //        while the underlying event's ticks value (ev.t) is left
+  //        completely unread/unmutated by the formatter itself.
+  {
+    const vm173 = require('vm');
+    let result173 = null;
+    let err173 = null;
+    try {
+      const sandbox173 = {
+        window: {},
+        document: { getElementById: () => null },
+        console: { error() {}, log() {}, warn() {} },
+        loadUI: () => {},
+        appendToChat: () => {},
+        expandPanelForCategory: () => {},
+      };
+      vm173.createContext(sandbox173);
+      vm173.runInContext(stateSource, sandbox173);
+      function declareFn173(src, name) {
+        const nameIdx = src.indexOf('function ' + name);
+        const parenIdx = src.indexOf('(', nameIdx);
+        const braceIdx = src.indexOf('{', parenIdx);
+        const params = src.slice(parenIdx, braceIdx);
+        return 'function ' + name + params + extractFunctionBody(src, name);
+      }
+      const timeSrc173 =
+        declareFn173(uiRender173, '_resolveGameDateTime') +
+        '\n' +
+        declareFn173(uiRender173, 'formatGameTime') +
+        '\n' +
+        declareFn173(uiRender173, '_recordLine');
+      vm173.runInContext(timeSrc173, sandbox173);
+      const line0 = vm173.runInContext("_recordLine({ t: 0, text: 'Test Event' })", sandbox173);
+      const line200 = vm173.runInContext(
+        "_recordLine({ t: 200, text: 'Later Event' })",
+        sandbox173
+      );
+      result173 = { line0, line200 };
+    } catch (e) {
+      err173 = e;
+    }
+    assert(
+      !err173 &&
+        !/\[T0\]/.test(result173.line0) &&
+        /^\[\w+, \d{2}\.\d{2}\.\d{2}, \d{1,2}:\d{2} (AM|PM)\] Test Event$/.test(result173.line0) &&
+        /^\[\w+, \d{2}\.\d{2}\.\d{2}, \d{1,2}:\d{2} (AM|PM)\] Later Event$/.test(result173.line200),
+      '173.8: [behavioral] _recordLine() renders a real readable weekday/date/time stamp (e.g. "[Sunday, 10.19.81, 12:00 AM] Test Event") for both a t:0 and a later tick value — never the old raw "[T<ticks>]" form' +
+        (err173 ? ' — ' + err173.message : '')
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail

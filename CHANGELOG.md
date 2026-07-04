@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2181/2181 | Cache: robco-terminal-v2.7.0-r66 -->
+﻿## [Unreleased]<!-- Tests: 2189/2189 | Cache: robco-terminal-v2.7.0-r67 -->
 
 ### Added
 
@@ -17,6 +17,7 @@
 - Added a DELETE option to each local save slot in your saves list, matching the one cloud saves already had. You're always asked to confirm first, and deleting a slot also clears any version history saved for it.
 - Cloud saves now keep version history too, just like your local save slots. Overwriting a cloud save no longer risks losing what was there before — up to five earlier versions are kept, and a "VER" button appears once a save has any to show. Tap it to see when each version was saved and restore one; restoring is confirm-gated and only replaces your current campaign, never the cloud save itself.
 - Added a TOOL DECK to the Director Uplink — a new diamond-shaped button beside the message box raises a compact panel with one-tap access to THREAT, V.A.T.S., TRADE, LOOT, CONSULT, and the V.A.T.S. calculator, so none of them need to sit permanently on screen anymore. The old blind D-Pad shortcuts are redesigned into a Quick-Draw Holster inside the same panel: all four gear slots now visibly show what's bound to them instead of blank arrows, fire with a single tap, and can be rebound to a different item right there.
+- Added a LEVEL UP button right under your XP bar, so you can level up yourself once you've earned enough XP instead of having to ask the AI to do it for you. It lights up as soon as you've reached the next level's XP threshold.
 
 ### Changed
 
@@ -71,6 +72,7 @@
 - Fixed the WIPE TERMINAL confirmation showing two separate "no, don't wipe" buttons (CANCEL and CLOSE INTERFACE) that did the exact same thing. It's now one clear CONTINUE and one CANCEL — and this same cleanup carries over to every other confirmation dialog in the terminal (deleting a save, scrapping an item, and so on), which all had the same duplicate button.
 - If Complete RNG is turned on when you wipe the terminal, the confirmation now warns you up front that doing so locks it on PERMANENTLY for that save, with no way to turn it back off — instead of finding out only after the fact.
 - Fixed a rare but serious bug where reopening the terminal could silently pop up the Module Bay's "service hatch" screen and lock out every button on the page, with no obvious way back in — this could happen if Security & Configuration had been left open on a device without ever finishing that first-time hatch ceremony. The hatch now only ever appears the first time you genuinely open Security & Configuration yourself; it never pops up on its own when the terminal restores what was open from your last visit.
+- CROSSROADS RECORD and INCIDENT LOG entries no longer show a cryptic "[T0]"-style tick count — each entry now shows a real in-game date and time instead, like "Sunday, 10.19.81, 12:00 AM".
 
 ### Improved
 

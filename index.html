@@ -588,6 +588,19 @@
                   style="width: 0%; background: var(--robco-blue)"
                 ></div>
               </div>
+              <div class="input-group" style="margin-top: 4px">
+                <button
+                  type="button"
+                  id="btnLevelUp"
+                  class="action-btn btn-sm"
+                  style="width: 100%"
+                  disabled
+                  onclick="nativeLevelUp()"
+                  aria-label="Level up — apply the next level using your current XP"
+                >
+                  &gt; LEVEL UP
+                </button>
+              </div>
               <div class="input-group">
                 <label>CAPS:</label
                 ><input type="number" id="c_caps" value="0" min="0" oninput="updateMath()" />

@@ -2254,6 +2254,28 @@ function onLvlInputChanged() {
   updateMath();
 }
 
+// Native LEVEL UP control (owner report): a player-driven way to apply a
+// level-up without needing to type it to the AI. Reuses the SAME xpNext
+// threshold formula the XP bar/onLvlInputChanged() already use, and fires
+// through the SAME RobcoEvents 'level.up' path the AI-driven autoImportState()
+// level-up already emits (Protocol 22) — so the jingle, haptic, and auto-log
+// subscribers all react identically to a native level-up, no forked logic.
+// #btnLevelUp's own disabled state (kept in sync inside updateMath()) already
+// gates this to XP >= the next-level threshold; the guard below is
+// defense-in-depth against a stale/disabled-bypassed click.
+function nativeLevelUp() {
+  const lvl = Math.max(1, parseInt(document.getElementById('stat_lvl').value) || 1);
+  const xp = parseInt(document.getElementById('stat_xp').value) || 0;
+  const xpNext = 75 * ((lvl + 1) * (lvl + 1)) - 25 * (lvl + 1) - 50;
+  if (xp < xpNext) return;
+  const newLvl = lvl + 1;
+  document.getElementById('stat_lvl').value = newLvl;
+  state.lvl = newLvl;
+  RobcoEvents.emit('level.up', { oldLvl: lvl, newLvl });
+  updateMath();
+  saveState();
+}
+
 // C5: Playthrough type handler — writes state field (Protocol 4).
 // Affects AI directive. Triggers saveState() so the change persists.
 // Valid combinations with Complete RNG are all supported.
@@ -4273,6 +4295,10 @@ function updateMath() {
     let xpNext = 75 * ((lvl + 1) * (lvl + 1)) - 25 * (lvl + 1) - 50;
     let pct = lvl >= 50 ? 100 : Math.min(100, Math.max(0, ((xp - xpCur) / (xpNext - xpCur)) * 100));
     xpFill.style.width = pct + '%';
+    // Native LEVEL UP control (owner report): enabled once XP reaches the
+    // same next-level threshold the bar itself just filled up to.
+    const levelUpBtn = document.getElementById('btnLevelUp');
+    if (levelUpBtn) levelUpBtn.disabled = xp < xpNext;
   }
 
   // Karma Flash (#30) — flash when karma polarity changes or large delta

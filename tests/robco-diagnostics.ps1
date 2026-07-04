@@ -14322,6 +14322,87 @@ Check (
 ) "172.2: structural mirror of the JS behavioral proof -- the _restoringPanels (boot-time restore) branch marks robco_bay_opened released and calls renderModuleBay(), never initModuleBay(); the single initModuleBay() call site in this listener sits only in the else branch (a genuine post-boot user open)"
 
 # ===========================================================
+# Suite 173 -- Owner batch: native LEVEL UP control + readable event-log
+# timestamps
+# 8 tests
+# ===========================================================
+Sep "Suite 173 -- Owner batch: native LEVEL UP control + readable event-log timestamps"
+$uiCore173 = Read-Src "js/ui-core.js"
+$uiRender173 = Read-Src "js/ui-render.js"
+$idxSrc173 = Read-Src "index.html"
+
+# 173.1  index.html: #btnLevelUp is a real <button> (Protocol UI-5), starts
+#        disabled, and carries a descriptive aria-label.
+$btnMatch173 = [regex]::Match($idxSrc173, '(?s)<button[^>]*id="btnLevelUp"[\s\S]{0,500}?</button>')
+$btnTag173 = if ($btnMatch173.Success) { $btnMatch173.Value } else { '' }
+Check (
+    ($btnTag173 -match '<button') -and
+    ($btnTag173 -match 'onclick="nativeLevelUp\(\)"') -and
+    ($btnTag173 -match '\bdisabled\b') -and
+    ($btnTag173 -match 'aria-label="[^"]+"')
+) "173.1: index.html #btnLevelUp is a real <button> wired to nativeLevelUp(), starts disabled, and has a descriptive aria-label (Protocol UI-5)"
+
+# 173.2  nativeLevelUp() is defined in ui-core.js
+Check ([bool]($uiCore173 -match 'function nativeLevelUp\s*\(')) "173.2: nativeLevelUp() is defined in ui-core.js"
+
+# 173.3  nativeLevelUp() reuses the exact xpNext formula (also present in
+#        updateMath()'s XP-bar block), proving no forked threshold logic.
+$nativeLevelUpBody173 = Get-FunctionBody $uiCore173 'nativeLevelUp'
+$updateMathBody173 = Get-FunctionBody $uiCore173 'updateMath'
+$FORMULA173 = '75 * ((lvl + 1) * (lvl + 1)) - 25 * (lvl + 1) - 50'
+Check (
+    $nativeLevelUpBody173.Contains($FORMULA173) -and $updateMathBody173.Contains($FORMULA173)
+) "173.3: nativeLevelUp() and updateMath() both use the identical xpNext threshold formula (Protocol 22 -- one formula, not a forked copy)"
+
+# 173.4  nativeLevelUp() increments state.lvl by 1 and emits the SAME
+#        'level.up' RobcoEvents the AI-driven autoImportState() path uses.
+$autoImportBody173 = Get-FunctionBody $apiSrc 'autoImportState'
+Check (
+    ($nativeLevelUpBody173 -match 'const newLvl = lvl \+ 1;') -and
+    ($nativeLevelUpBody173 -match 'state\.lvl = newLvl;') -and
+    ($nativeLevelUpBody173 -match "RobcoEvents\.emit\('level\.up', \{ oldLvl: lvl, newLvl \}\)") -and
+    ($autoImportBody173 -match "RobcoEvents\.emit\('level\.up',")
+) "173.4: nativeLevelUp() increments state.lvl by 1 and emits RobcoEvents 'level.up' -- the same event autoImportState()'s AI-driven level-up path emits (Protocol 22)"
+
+# 173.5  updateMath() toggles #btnLevelUp.disabled from the SAME xp/xpNext
+#        comparison the XP bar fill itself is computed from.
+Check (
+    ($updateMathBody173 -match "getElementById\('btnLevelUp'\)") -and
+    ($updateMathBody173 -match 'levelUpBtn\.disabled = xp < xpNext;')
+) "173.5: updateMath() keeps #btnLevelUp's disabled state in sync with xp < xpNext (the same threshold the XP bar fill uses)"
+
+# 173.6  _recordLine() no longer emits the raw "[T<ticks>]" prefix -- it
+#        formats the same stored tick value with formatGameTime() instead.
+$recordLineBody173 = Get-FunctionBody $uiRender173 '_recordLine'
+Check (
+    ($recordLineBody173 -match 'formatGameTime\(ev\.t \|\| 0\)') -and
+    (-not ($recordLineBody173 -match '\[T\$\{ev\.t'))
+) "173.6: _recordLine() formats ev.t through formatGameTime() instead of the raw ""[T<ticks>]"" prefix"
+
+# 173.7  Both Crossroads Record and Incident Log still route through the
+#        single _recordLine() choke point.
+$rcStart173 = $uiRender173.IndexOf('function renderCampaignStatus')
+$rcEnd173 = $uiRender173.IndexOf("`nfunction ", $rcStart173 + 1)
+$rcBody173 = if ($rcStart173 -ge 0) { $uiRender173.Substring($rcStart173, $rcEnd173 - $rcStart173) } else { '' }
+$recordLineCalls173 = ([regex]::Matches($rcBody173, '_recordLine\(ev\)')).Count
+Check (
+    $recordLineCalls173 -eq 2
+) "173.7: both the Crossroads Record and Incident Log renderers call _recordLine(ev) (single formatter, no drift) -- found $recordLineCalls173"
+
+# 173.8  STRUCTURAL MIRROR of the JS behavioral vm-sandbox proof (PowerShell
+#        has no JS execution sandbox -- same convention as Suite 150.10/172.2):
+#        formatGameTime() itself (the function _recordLine() now delegates
+#        to) still builds the exact 'Weekday, MM.DD.YY, H:MM AM/PM' template
+#        the JS side actually EXECUTES and regex-asserts against -- the same
+#        shape guarantee, checked at its one source instead of by running it.
+$formatGameTimeBody173 = Get-FunctionBody $uiRender173 'formatGameTime'
+Check (
+    ($formatGameTimeBody173 -match '\$\{WEEKDAYS\[dt\.weekday\]\}, \$\{dateStr\}, \$\{timeStr\}') -and
+    ($formatGameTimeBody173 -match "dateStr = `\`\$\{mm\}\.`\$\{dd\}\.`\$\{yy\}`;" -or $formatGameTimeBody173 -match '\$\{mm\}\.\$\{dd\}\.\$\{yy\}') -and
+    ($formatGameTimeBody173 -match '\$\{h12\}:\$\{String\(dt\.minute\)\.padStart\(2, .0.\)\} \$\{ampm\}')
+) "173.8: structural mirror of the JS behavioral proof -- formatGameTime() (which _recordLine() now delegates to) still builds the 'Weekday, MM.DD.YY, H:MM AM/PM' template the JS side executes and regex-asserts against"
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"
