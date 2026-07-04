@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2153/2153 | Cache: robco-terminal-v2.7.0-r61 -->
+﻿## [Unreleased]<!-- Tests: 2153/2153 | Cache: robco-terminal-v2.7.0-r62 -->
 
 ### Added
 
@@ -63,6 +63,8 @@
 - Fixed the Director Uplink transcript reading as an inconsistent jumble — your messages, the Director's replies, and system log lines used to bounce between right-aligned, centered, and left-aligned with clashing italics and side borders eating up phone screen width. Every line now reads left-to-right at full width in one clean, consistent style, with a small tag above each line naming who's speaking.
 - Fixed the Director Uplink's command suggestions dropping down over the message box's toolbar, sometimes making it impossible to tap the send button while a suggestion list was open. Suggestions now open upward instead, out of the way of the toolbar and send button.
 - Tapping the Director Uplink's "LISTENING" status now gives the waveform a fun one-shot pulse, purely for flavor — it's just a flourish and doesn't change your connection or anything else.
+- Fixed the Tool Deck's tool descriptions getting cut off with "…" on phones (THREAT, LOOT, CONSULT, and the V.A.T.S. calculator all did this) — every description now fits and reads in full, without making the tool list any taller.
+- Fixed the Module Bay's "3 TYPES" and "(DEFAULT)" tube tags being hard to read on a computer, where they stayed at their small phone size even though there was more room to work with — both are now bigger and easier to read on a larger screen, while phones look exactly as they did before.
 
 ### Improved
 

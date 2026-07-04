@@ -1830,6 +1830,22 @@ details.sub-panel[open] > summary h3::after {
   flex-shrink: 0;
   font-style: normal;
 }
+/* Owner report: Tool Deck descriptions truncated with "..." at 360/412px —
+   the chip + tag squeeze the description column too tight for the full
+   text to render on its one allotted line. Fix without adding row height:
+   drop the per-char letter-spacing on the description (the row's own
+   min-height/tool-chip size are untouched) and tighten the TARGET/TOPIC
+   tag's own footprint — mobile-only so desktop (already roomy) is
+   unchanged. */
+@media (max-width: 999.98px) {
+  .tool-row span {
+    letter-spacing: 0;
+  }
+  .tool-row .uses-target {
+    font-size: 6.5px;
+    padding: 1px 4px;
+  }
+}
 .holster {
   border-top: 1px dashed rgba(var(--bezel-wire-rgb), 0.3);
   margin-top: 4px;
@@ -4771,6 +4787,26 @@ html.high-lumen .tube.seated .glass {
   white-space: nowrap;
   pointer-events: none;
   z-index: 2;
+}
+/* Owner report: the "3 TYPES" / "(DEFAULT)" corner chips read fine on mobile
+   (where the tube is viewed up close) but are too small/low-contrast at the
+   desktop tube size. Desktop-only bump — both chips stay absolutely
+   positioned corner overlays, so growing them never changes the tube's own
+   box (Protocol 17 uniform boxes are untouched); mobile keeps the original
+   6.5px sizing unchanged. */
+@media (min-width: 1000px) and (hover: hover) and (pointer: fine) {
+  .tube .t-default,
+  .tube.family .multi-tag {
+    font-size: 8px;
+    padding: 2px 4px;
+    background: rgba(0, 0, 0, 0.8);
+  }
+  .tube .t-default {
+    border-color: rgba(var(--robco-green-rgb), 0.85);
+  }
+  .tube.family .multi-tag {
+    border-color: rgba(243, 156, 18, 0.9);
+  }
 }
 
 /* --- the opened cartridge shell the variants slide out of --- */
