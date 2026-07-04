@@ -977,6 +977,11 @@ function initRegistryAutocomplete() {
   if (typeof _commandSuggestions === 'function') {
     wireInput('chatInput', _commandSuggestions);
   }
+  // Tool Deck: the shared #deckTarget field (TARGET/ITEM/TOPIC) gets
+  // creature/item/location/topic suggestions (_deckTargetSuggestions, ui-render.js).
+  if (typeof _deckTargetSuggestions === 'function') {
+    wireInput('deckTarget', _deckTargetSuggestions);
+  }
 
   // Reposition on scroll/resize so the panel doesn't orphan
   window.addEventListener(

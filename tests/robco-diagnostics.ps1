@@ -13007,7 +13007,7 @@ Check (
 # footprint ◈ Tool Deck launcher key that raises a bottom-sheet TOOL DECK, and
 # redesigns the D-Pad into the Quick-Draw Holster -- four gear-vector sockets
 # driven by a NEW native state field, state.padBindings (Protocol 4), which
-# the AI can never read or write (Protocol 24/14). 27 tests
+# the AI can never read or write (Protocol 24/14). 30 tests
 # ===========================================================
 Sep "Suite 164 -- Tool Deck + Quick-Draw Holster + padBindings"
 
@@ -13277,6 +13277,28 @@ Check (
 Check (
     $apiSrc -notmatch [regex]::Escape('parsed.padBindings')
 ) "164.27: autoImportState() never references parsed.padBindings anywhere -- the AI has no path to write it"
+
+# 164.28-30  owner-report follow-up: #deckTarget autocomplete + no-autofocus-on-open
+$openBody164 = Get-FunctionBody $uiSrc "openToolDeck"
+Check (
+    ($openBody164.Length -gt 0) -and
+    ($openBody164 -notmatch '\.focus\(\)') -and
+    ($openBody164 -notmatch [regex]::Escape("getElementById('deckTarget')"))
+) "164.28: openToolDeck() does NOT autofocus #deckTarget (owner report -- auto-popping the mobile keyboard on deck OPEN covered the Quick-Draw Holster sockets); the field only focuses on a user tap or via the BIND ▸ flow (bindKey listener in _wireToolDeck())"
+
+$deckSuggBody164 = Get-FunctionBody $uiSrc "_deckTargetSuggestions"
+Check (
+    ($deckSuggBody164.Length -gt 0) -and
+    ($deckSuggBody164 -match [regex]::Escape('query.length < 2')) -and
+    ($deckSuggBody164 -match 'getBestiaryNames') -and
+    ($deckSuggBody164 -match 'registrySearch') -and
+    ($deckSuggBody164 -match '_CONSULT_CATS') -and
+    ($deckSuggBody164 -match [regex]::Escape('.slice(0, 8)'))
+) "164.29: _deckTargetSuggestions() short-circuits below 2 chars and combines getBestiaryNames() creature names with registrySearch() across the same _CONSULT_CATS CONSULT already searches (items/perks/quests/locations/companions/trackers), deduped and capped at 8 (Protocol 22 -- no new lookup mechanism)"
+
+Check (
+    $uiSrc -match [regex]::Escape("wireInput('deckTarget', _deckTargetSuggestions);")
+) "164.30: initRegistryAutocomplete() wires the Tool Deck's #deckTarget to _deckTargetSuggestions via the existing shared wireInput() autocomplete singleton (Protocol 22 -- owner report: the field had no autocomplete)"
 
 # ===========================================================
 # Results

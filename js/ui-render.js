@@ -2603,6 +2603,43 @@ function _consultSearch(topic) {
   return { q, noQuery: false, empty, groups, creature, weapon, dbItem, questItem };
 }
 
+// Autocomplete source for the Tool Deck's shared #deckTarget field (wired via
+// wireInput() in ui-saves.js, Protocol 22 — the same registry-autocomplete
+// singleton every other input already uses, no new mechanism). One field feeds
+// several tools (THREAT/VATS = creature, TRADE/LOOT = item, CONSULT = any
+// topic), so suggestions combine the same sources CONSULT already searches
+// (_CONSULT_CATS via registrySearch) plus bestiary creature names — reusing,
+// never forking, the existing lookups. Read-only, no state write. Game-agnostic
+// (Protocol 38): every source is registry/DB-driven, never a hardcoded name.
+function _deckTargetSuggestions(q) {
+  const query = String(q || '').trim();
+  if (query.length < 2) return [];
+  const out = [];
+  if (typeof getBestiaryNames === 'function') {
+    const ql = query.toLowerCase();
+    getBestiaryNames()
+      .filter(n => n.toLowerCase().includes(ql))
+      .slice(0, 5)
+      .forEach(n => out.push({ name: n, type: 'creature' }));
+  }
+  if (typeof registrySearch === 'function') {
+    _CONSULT_CATS.forEach(c => {
+      registrySearch(c.key, query).forEach(entry => {
+        out.push({ name: entry.name, type: c.label.toLowerCase() });
+      });
+    });
+  }
+  const seen = new Set();
+  return out
+    .filter(entry => {
+      const k = entry.name.toLowerCase();
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    })
+    .slice(0, 8);
+}
+
 // Shared CONSULT renderer (Protocol 22) — builds the escaped DATABANK result HTML
 // string from a _consultSearch() result. Used by both the modal and the panel.
 function _consultRenderHTML(res) {

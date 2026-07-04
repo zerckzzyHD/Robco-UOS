@@ -21729,6 +21729,33 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     !/parsed\.padBindings/.test(apiSource),
     '164.27: autoImportState() never references parsed.padBindings anywhere — the AI has no path to write it'
   );
+
+  // ── Owner-report follow-up: #deckTarget autocomplete + no-autofocus-on-open ──
+  {
+    const openBody164 = extractFunctionBody(uiSource, 'openToolDeck');
+    assert(
+      openBody164.length > 0 &&
+        !/\.focus\(\)/.test(openBody164) &&
+        !openBody164.includes("getElementById('deckTarget')"),
+      '164.28: openToolDeck() does NOT autofocus #deckTarget (owner report — auto-popping the mobile keyboard on deck OPEN covered the Quick-Draw Holster sockets); the field only focuses on a user tap or via the BIND ▸ flow (bindKey listener in _wireToolDeck())'
+    );
+  }
+  {
+    const deckSuggBody164 = extractFunctionBody(uiSource, '_deckTargetSuggestions');
+    assert(
+      deckSuggBody164.length > 0 &&
+        /query\.length < 2/.test(deckSuggBody164) &&
+        /getBestiaryNames/.test(deckSuggBody164) &&
+        /registrySearch/.test(deckSuggBody164) &&
+        /_CONSULT_CATS/.test(deckSuggBody164) &&
+        /\.slice\(0, 8\)/.test(deckSuggBody164),
+      '164.29: _deckTargetSuggestions() short-circuits below 2 chars and combines getBestiaryNames() creature names with registrySearch() across the same _CONSULT_CATS CONSULT already searches (items/perks/quests/locations/companions/trackers), deduped and capped at 8 (Protocol 22 — no new lookup mechanism)'
+    );
+  }
+  assert(
+    /wireInput\('deckTarget', _deckTargetSuggestions\);/.test(uiSource),
+    "164.30: initRegistryAutocomplete() wires the Tool Deck's #deckTarget to _deckTargetSuggestions via the existing shared wireInput() autocomplete singleton (Protocol 22 — owner report: the field had no autocomplete)"
+  );
 }
 
 // ══════════════════════════════════════════════════════════════

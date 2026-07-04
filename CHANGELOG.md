@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2063/2063 | Cache: robco-terminal-v2.7.0-r50 -->
+﻿## [Unreleased]<!-- Tests: 2066/2066 | Cache: robco-terminal-v2.7.0-r51 -->
 
 ### Added
 
@@ -47,6 +47,8 @@
 - Fixed the Director Uplink message box showing a chunk of empty space below the example text. It now starts just tall enough to show its placeholder line, grows only as you actually type, and shrinks back down to that small size right after you send.
 - Fixed the OVERSEER/TERMINAL mode button staying visibly lit up after you tapped it on a phone, until you tapped something else on screen.
 - Fixed the growing button row on each save (Load, Overwrite, version history, Delete, and — for cloud saves — Rename) potentially getting cut off on narrower screens. Buttons now wrap onto a second line instead of clipping or forcing the row to scroll sideways.
+- Fixed the Tool Deck's target field not offering any suggestions as you typed. It now suggests matching creatures, items, locations, and other topics as you type, the same way the other search boxes in the terminal already do.
+- Fixed the Tool Deck popping open the on-screen keyboard the moment you opened it, which could cover the Quick-Draw Holster's four gear slots underneath. The keyboard now only appears once you actually tap the field.
 
 ### Improved
 

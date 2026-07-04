@@ -4236,14 +4236,16 @@ function openToolDeck() {
   const deck = document.getElementById('toolDeck');
   const scrim = document.getElementById('deckScrim');
   const key = document.getElementById('deckKey');
-  const target = document.getElementById('deckTarget');
   if (!deck || !scrim || !key) return;
   deck.hidden = false;
   scrim.hidden = false;
   key.classList.add('open');
   key.setAttribute('aria-expanded', 'true');
   if (typeof renderHolster === 'function') renderHolster();
-  if (target) target.focus();
+  // Deliberately no autofocus on #deckTarget here (owner report — auto-popping the
+  // mobile keyboard on deck OPEN covered the Quick-Draw Holster sockets below it).
+  // The field still focuses itself when the user taps it, or via the BIND ▸ flow
+  // (see the bindKey listener in _wireToolDeck()), which specifically needs it.
 }
 
 function _disarmHolsterBind() {

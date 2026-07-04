@@ -152,6 +152,7 @@ export default [
         renderLoot: 'readonly',
         renderLootList: 'readonly',
         renderHolster: 'readonly', // Tool Deck + Quick-Draw Holster (ui-render.js), called from ui-core.js
+        _deckTargetSuggestions: 'readonly', // Tool Deck #deckTarget autocomplete source (ui-render.js), wired from ui-saves.js
         doLoot: 'readonly',
         _lootAdd: 'readonly',
         expandPanelForCategory: 'readonly',
