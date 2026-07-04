@@ -1634,6 +1634,16 @@ function _wirePanelPersistence() {
   // On desktop, default-open still applies if no saved state exists
   const savedPanelState = JSON.parse(MetaStore.get('robco_panel_state') || 'null');
   const panelEls = Array.from(document.querySelectorAll('details.panel'));
+  // FIX (owner report): a boot-time RESTORE of a persisted panel-open state
+  // must never be treated as a genuine user click. Without this, reloading
+  // with Security & Configuration left open from a prior session (hatch never
+  // released) silently re-fires the first-visit hatch ceremony at boot — and
+  // .bay-hatch is a position:fixed;inset:0 overlay that swallows every click
+  // on the page (not just the casing UPLINK lamp) until the user finds and
+  // releases it. `toggle` fires as a queued task (not synchronously), so this
+  // flag stays true through every restore-triggered toggle queued by the loop
+  // below and is cleared right after, before any real user click can occur.
+  let _restoringPanels = true;
   panelEls.forEach((d, idx) => {
     const id =
       d.id ||
@@ -1667,13 +1677,29 @@ function _wirePanelPersistence() {
       MetaStore.set('robco_panel_state', JSON.stringify(ps));
       if (d.id === 'worldMapPanel' && d.open && typeof renderWorldMap === 'function')
         renderWorldMap();
-      // Module Bay hatch ceremony (owner report): fires only on the panel's OWN toggle —
-      // never unconditionally at page load — so a Courier who has never opened Settings
-      // never sees the hatch until they actually click it open.
-      if (d.id === 'securityConfigPanel' && d.open && typeof initModuleBay === 'function')
-        initModuleBay();
+      // Module Bay hatch ceremony (owner report): fires only on a genuine
+      // user-initiated toggle — never on the boot-time state restore above.
+      // A panel restored already-open has, by definition, been opened before
+      // in an earlier session, so the ceremony's purpose is already served —
+      // mark it released and just sync the bay content, rather than popping
+      // the full-viewport hatch overlay unprompted at boot (FIX).
+      if (d.id === 'securityConfigPanel' && d.open) {
+        if (_restoringPanels) {
+          if (MetaStore.get('robco_bay_opened') !== 'true')
+            MetaStore.set('robco_bay_opened', 'true');
+          if (typeof renderModuleBay === 'function') renderModuleBay();
+        } else if (typeof initModuleBay === 'function') {
+          initModuleBay();
+        }
+      }
     });
   });
+  // The 'toggle' events queued by the setAttribute/removeAttribute calls above
+  // fire as tasks, not synchronously — deferring this reset ensures the flag
+  // is still true for every one of those before any real user click can land.
+  setTimeout(() => {
+    _restoringPanels = false;
+  }, 0);
 
   // Sub-panel persistence — traits, collectibles sub-trackers (default: collapsed)
   // Reuses robco_panel_state; new sub-trackers default to closed on first ever load.

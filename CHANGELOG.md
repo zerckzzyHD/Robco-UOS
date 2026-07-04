@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2179/2179 | Cache: robco-terminal-v2.7.0-r65 -->
+﻿## [Unreleased]<!-- Tests: 2181/2181 | Cache: robco-terminal-v2.7.0-r66 -->
 
 ### Added
 
@@ -70,6 +70,7 @@
 - Fixed the terminal's scanline effect bleeding out over the casing and navigation buttons around the screen. It now stays contained inside the screen itself, exactly like a real CRT.
 - Fixed the WIPE TERMINAL confirmation showing two separate "no, don't wipe" buttons (CANCEL and CLOSE INTERFACE) that did the exact same thing. It's now one clear CONTINUE and one CANCEL — and this same cleanup carries over to every other confirmation dialog in the terminal (deleting a save, scrapping an item, and so on), which all had the same duplicate button.
 - If Complete RNG is turned on when you wipe the terminal, the confirmation now warns you up front that doing so locks it on PERMANENTLY for that save, with no way to turn it back off — instead of finding out only after the fact.
+- Fixed a rare but serious bug where reopening the terminal could silently pop up the Module Bay's "service hatch" screen and lock out every button on the page, with no obvious way back in — this could happen if Security & Configuration had been left open on a device without ever finishing that first-time hatch ceremony. The hatch now only ever appears the first time you genuinely open Security & Configuration yourself; it never pops up on its own when the terminal restores what was open from your last visit.
 
 ### Improved
 

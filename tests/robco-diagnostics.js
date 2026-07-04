@@ -19250,7 +19250,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //         window.onload (that fired the first-visit hatch ceremony at page load,
   //         before the Courier had touched anything) — it's wired instead to
   //         securityConfigPanel's own toggle listener inside _wirePanelPersistence(),
-  //         so the ceremony only ever fires on a genuine user-initiated panel open.
+  //         gated on _restoringPanels so a genuine user-initiated panel open still
+  //         reaches it (a boot-time state RESTORE never does — Suite 172).
   const onloadBody154 = (core154.match(/window\.onload = async function \(\) \{[\s\S]*?\n\};/) || [
     '',
   ])[0];
@@ -19260,9 +19261,9 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   assert(
     !/initModuleBay\(/.test(onloadBody154) &&
       /_wirePanelPersistence\(\);/.test(onloadBody154) &&
-      /d\.id === 'securityConfigPanel' && d\.open && typeof initModuleBay === 'function'/.test(
-        panelPersistFn154
-      ) &&
+      /d\.id === 'securityConfigPanel' && d\.open/.test(panelPersistFn154) &&
+      /_restoringPanels/.test(panelPersistFn154) &&
+      /typeof initModuleBay === 'function'/.test(panelPersistFn154) &&
       /initModuleBay\(\);/.test(panelPersistFn154),
     "154.16: initModuleBay() is wired to securityConfigPanel's own toggle event (inside _wirePanelPersistence()) instead of window.onload — the hatch ceremony never fires at page load (Protocol 42 fix)"
   );
@@ -23123,6 +23124,204 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       /This CANNOT be undone\. Continue\?/.test(wipeTerminalBody171),
     '171.9: the original wipe warning text (Courier data erasure list) is preserved verbatim; the RNG line is additive'
   );
+}
+
+// ══════════════════════════════════════════════════════════════
+// Suite 172 — Owner-report fix: boot-time panel-state RESTORE must never
+// re-trigger the Module Bay hatch ceremony (Protocol 13 regression)
+//
+// Root cause: _wirePanelPersistence() restores a persisted panel-open state
+// at boot via d.setAttribute('open', ''), which fires a native 'toggle'
+// event. The toggle listener used to treat ANY toggle-to-open on
+// securityConfigPanel as a genuine user click and called initModuleBay(),
+// which shows the hatch overlay (.bay-hatch: position:fixed;inset:0;
+// z-index:500) whenever robco_bay_opened isn't yet 'true'. So a device where
+// Security & Configuration was once left open, but the hatch never
+// released, silently re-popped the full-viewport hatch on EVERY reload —
+// swallowing every click on the page, not just the casing UPLINK lamp.
+//
+// Fix: a _restoringPanels flag, true only during the boot-time restore loop
+// (cleared via a deferred setTimeout(...,0), since 'toggle' fires as a
+// queued task, not synchronously). While true, a securityConfigPanel
+// toggle-to-open marks robco_bay_opened released and just syncs bay content
+// (renderModuleBay()) instead of popping the ceremony. A genuine post-boot
+// user click (flag already false) still runs initModuleBay() normally.
+//
+// 2 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 172 — Boot-restore must never re-trigger the Module Bay hatch');
+  const uiCore172 = readFile('js/ui-core.js');
+  const wirePanelBody172 = extractFunctionBody(uiCore172, '_wirePanelPersistence');
+
+  // 172.1  Structural guard: the flag is declared before the restore loop,
+  //        checked in the securityConfigPanel toggle branch, and reset via a
+  //        setTimeout AFTER the loop (so every restore-triggered toggle —
+  //        queued as a task by the loop's own setAttribute/removeAttribute
+  //        calls — is still caught before the flag flips back to false).
+  {
+    const declIdx172 = wirePanelBody172.indexOf('let _restoringPanels = true;');
+    const forEachIdx172 = wirePanelBody172.indexOf('panelEls.forEach(');
+    const checkIdx172 = wirePanelBody172.indexOf('if (_restoringPanels)');
+    const resetIdx172 = wirePanelBody172.indexOf('_restoringPanels = false;');
+    assert(
+      declIdx172 !== -1 &&
+        forEachIdx172 !== -1 &&
+        declIdx172 < forEachIdx172 &&
+        checkIdx172 !== -1 &&
+        checkIdx172 > forEachIdx172 &&
+        resetIdx172 !== -1 &&
+        resetIdx172 > checkIdx172 &&
+        /setTimeout\(\(\) => \{\s*_restoringPanels = false;/.test(wirePanelBody172) &&
+        /MetaStore\.set\('robco_bay_opened', 'true'\)/.test(wirePanelBody172) &&
+        /if \(typeof renderModuleBay === 'function'\) renderModuleBay\(\);/.test(wirePanelBody172),
+      '172.1: _restoringPanels is declared before the restore loop, checked in the securityConfigPanel toggle branch, and reset via a deferred setTimeout after the loop — marking robco_bay_opened + syncing content via renderModuleBay() while restoring'
+    );
+  }
+
+  // 172.2  Behavioral proof (not just structural): the REAL _wirePanelPersistence
+  //        body, executed against a synthetic <details>/document/MetaStore in a
+  //        Node vm sandbox, with a task queue standing in for the browser's
+  //        'toggle'-fires-as-a-queued-task + setTimeout ordering (both enqueue
+  //        into the SAME FIFO queue, exactly mirroring real macrotask order):
+  //          (a) a boot-time RESTORE of a persisted securityConfigPanel:true
+  //              never calls initModuleBay() (the hatch never pops) — it marks
+  //              robco_bay_opened released and calls renderModuleBay() instead;
+  //          (b) a genuine POST-BOOT user open (flag already cleared) still
+  //              calls initModuleBay() — the first-visit ceremony is untouched.
+  {
+    const vm172 = require('vm');
+
+    function makeFakeDetails172(id) {
+      return {
+        id,
+        _open: false,
+        dataset: {},
+        _listeners: [],
+        get open() {
+          return this._open;
+        },
+        addEventListener(type, cb) {
+          if (type === 'toggle') this._listeners.push(cb);
+        },
+        setAttribute(name) {
+          if (name === 'open' && !this._open) {
+            this._open = true;
+            // Listeners are looked up at DISPATCH time (queue drain), not here at
+            // enqueue time — 'toggle' fires as a real queued task in browsers, so
+            // addEventListener() calls made AFTER this setAttribute() in the same
+            // synchronous pass (exactly what _wirePanelPersistence() does) are
+            // still attached by the time the event actually fires.
+            sb172._taskQueue.push(() => this._listeners.slice().forEach(cb => cb()));
+          }
+        },
+        removeAttribute(name) {
+          if (name === 'open' && this._open) {
+            this._open = false;
+            sb172._taskQueue.push(() => this._listeners.slice().forEach(cb => cb()));
+          }
+        },
+        querySelector() {
+          return null;
+        },
+      };
+    }
+
+    let sb172 = null;
+    function freshSandbox172() {
+      const secPanel = makeFakeDetails172('securityConfigPanel');
+      const s = {
+        console: { warn() {} },
+        window: { matchMedia: () => ({ matches: true }) }, // simulate a real desktop
+        MetaStore: {
+          _store: {},
+          get(k) {
+            return Object.prototype.hasOwnProperty.call(this._store, k) ? this._store[k] : null;
+          },
+          set(k, v) {
+            this._store[k] = v;
+          },
+        },
+        document: {
+          querySelectorAll(sel) {
+            if (sel === 'details.panel') return [secPanel];
+            return [];
+          },
+        },
+        initModuleBayCalls: 0,
+        renderModuleBayCalls: 0,
+        initModuleBay() {
+          s.initModuleBayCalls++;
+        },
+        renderModuleBay() {
+          s.renderModuleBayCalls++;
+        },
+        _taskQueue: [],
+        setTimeout(fn) {
+          s._taskQueue.push(fn);
+        },
+        secPanel,
+      };
+      return s;
+    }
+
+    function drainQueue172(s) {
+      while (s._taskQueue.length) s._taskQueue.shift()();
+    }
+
+    let scenarioA172 = null;
+    let scenarioB172 = null;
+    let err172 = null;
+    try {
+      const declared172 = 'function _wirePanelPersistence()' + wirePanelBody172;
+
+      // Scenario (a): a boot-time RESTORE of securityConfigPanel:true.
+      sb172 = freshSandbox172();
+      sb172.MetaStore._store['robco_panel_state'] = JSON.stringify({ securityConfigPanel: true });
+      vm172.createContext(sb172);
+      vm172.runInContext(declared172, sb172);
+      sb172._wirePanelPersistence();
+      drainQueue172(sb172);
+      scenarioA172 = {
+        initCalls: sb172.initModuleBayCalls,
+        renderCalls: sb172.renderModuleBayCalls,
+        bayOpened: sb172.MetaStore.get('robco_bay_opened'),
+        secPanelOpen: sb172.secPanel.open,
+      };
+
+      // Scenario (b): fresh boot (no saved state — panel starts/stays closed),
+      // then a genuine POST-BOOT user click opens it directly.
+      sb172 = freshSandbox172();
+      vm172.createContext(sb172);
+      vm172.runInContext(declared172, sb172);
+      sb172._wirePanelPersistence();
+      drainQueue172(sb172); // flushes the boot-time flag-reset setTimeout
+      sb172.secPanel.setAttribute('open', ''); // the genuine user click
+      drainQueue172(sb172);
+      scenarioB172 = {
+        initCalls: sb172.initModuleBayCalls,
+        renderCalls: sb172.renderModuleBayCalls,
+        bayOpened: sb172.MetaStore.get('robco_bay_opened'),
+        secPanelOpen: sb172.secPanel.open,
+      };
+    } catch (e) {
+      err172 = e;
+    }
+
+    assert(
+      !err172 &&
+        scenarioA172.initCalls === 0 &&
+        scenarioA172.renderCalls === 1 &&
+        scenarioA172.bayOpened === 'true' &&
+        scenarioA172.secPanelOpen === true &&
+        scenarioB172.initCalls === 1 &&
+        scenarioB172.renderCalls === 0 &&
+        scenarioB172.bayOpened === null &&
+        scenarioB172.secPanelOpen === true,
+      '172.2: [behavioral] a boot-time restore of a persisted securityConfigPanel:true never calls initModuleBay() (hatch never pops) — it marks robco_bay_opened released and syncs via renderModuleBay(); a genuine post-boot user open still calls initModuleBay() (the first-visit ceremony is untouched)' +
+        (err172 ? ' — ' + err172.message : '')
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

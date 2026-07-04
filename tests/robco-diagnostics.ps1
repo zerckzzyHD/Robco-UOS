@@ -11342,7 +11342,8 @@ Check (
 #         window.onload (that fired the first-visit hatch ceremony at page load,
 #         before the Courier had touched anything) -- it's wired instead to
 #         securityConfigPanel's own toggle listener inside _wirePanelPersistence(),
-#         so the ceremony only ever fires on a genuine user-initiated panel open.
+#         gated on _restoringPanels so a genuine user-initiated panel open still
+#         reaches it (a boot-time state RESTORE never does -- Suite 172).
 $onloadIdx154 = $core154.IndexOf('window.onload = async function ()')
 $onloadEnd154 = $core154.IndexOf("`n};", $onloadIdx154)
 $onloadBody154 = $core154.Substring($onloadIdx154, $onloadEnd154 - $onloadIdx154)
@@ -11350,7 +11351,9 @@ $panelPersistFn154 = Get-FunctionBody $core154 '_wirePanelPersistence'
 Check (
     (-not ($onloadBody154 -match 'initModuleBay\(')) -and
     ($onloadBody154 -match '_wirePanelPersistence\(\);') -and
-    ($panelPersistFn154 -match "d\.id === 'securityConfigPanel' && d\.open && typeof initModuleBay === 'function'") -and
+    ($panelPersistFn154 -match "d\.id === 'securityConfigPanel' && d\.open") -and
+    ($panelPersistFn154 -match '_restoringPanels') -and
+    ($panelPersistFn154 -match "typeof initModuleBay === 'function'") -and
     ($panelPersistFn154 -match 'initModuleBay\(\);')
 ) "154.16: initModuleBay() is wired to securityConfigPanel's own toggle event (inside _wirePanelPersistence()) instead of window.onload -- the hatch ceremony never fires at page load (Protocol 42 fix)"
 
@@ -14269,6 +14272,54 @@ Check (
     ($wipeTerminalBody171 -match 'This will erase ALL Courier data') -and
     ($wipeTerminalBody171 -match 'This CANNOT be undone\. Continue\?')
 ) '171.9: the original wipe warning text (Courier data erasure list) is preserved verbatim; the RNG line is additive'
+
+# ===========================================================
+# Suite 172 -- Owner-report fix: boot-time panel-state RESTORE must never
+# re-trigger the Module Bay hatch ceremony (Protocol 13 regression)
+# 2 tests
+# ===========================================================
+Sep "Suite 172 -- Boot-restore must never re-trigger the Module Bay hatch"
+$core172 = Read-Src "js/ui-core.js"
+$wirePanelBody172 = Get-FunctionBody $core172 '_wirePanelPersistence'
+
+# 172.1  Structural guard: the flag is declared before the restore loop,
+#        checked in the securityConfigPanel toggle branch, and reset via a
+#        setTimeout AFTER the loop (so every restore-triggered toggle --
+#        queued as a task by the loop's own setAttribute/removeAttribute
+#        calls -- is still caught before the flag flips back to false).
+$declIdx172 = $wirePanelBody172.IndexOf('let _restoringPanels = true;')
+$forEachIdx172 = $wirePanelBody172.IndexOf('panelEls.forEach(')
+$checkIdx172 = $wirePanelBody172.IndexOf('if (_restoringPanels)')
+$resetIdx172 = $wirePanelBody172.IndexOf('_restoringPanels = false;')
+Check (
+    ($declIdx172 -ge 0) -and ($forEachIdx172 -ge 0) -and ($declIdx172 -lt $forEachIdx172) -and
+    ($checkIdx172 -ge 0) -and ($checkIdx172 -gt $forEachIdx172) -and
+    ($resetIdx172 -ge 0) -and ($resetIdx172 -gt $checkIdx172) -and
+    ($wirePanelBody172 -match "(?s)setTimeout\(\(\) => \{\s*_restoringPanels = false;") -and
+    ($wirePanelBody172 -match "MetaStore\.set\('robco_bay_opened', 'true'\)") -and
+    ($wirePanelBody172 -match "if \(typeof renderModuleBay === 'function'\) renderModuleBay\(\);")
+) "172.1: _restoringPanels is declared before the restore loop, checked in the securityConfigPanel toggle branch, and reset via a deferred setTimeout after the loop -- marking robco_bay_opened + syncing content via renderModuleBay() while restoring"
+
+# 172.2  STRUCTURAL MIRROR of the JS behavioral vm-sandbox proof (PowerShell
+#        has no JS execution sandbox -- same convention as Suite 150.10): the
+#        two scenarios the JS side actually EXECUTES are locked here as
+#        source-shape guards instead -- (a) the _restoringPanels branch
+#        (boot-time restore) marks robco_bay_opened + calls renderModuleBay()
+#        and NEVER calls initModuleBay() from that branch; (b) the else
+#        branch (a genuine post-boot toggle, _restoringPanels already false)
+#        is the ONLY place initModuleBay() is called from this listener.
+$restoringBranchIdx172 = $wirePanelBody172.IndexOf('if (_restoringPanels) {')
+$elseBranchIdx172 = $wirePanelBody172.IndexOf('} else if (typeof initModuleBay', $restoringBranchIdx172)
+$restoringBranchBody172 = if ($restoringBranchIdx172 -ge 0 -and $elseBranchIdx172 -gt $restoringBranchIdx172) {
+    $wirePanelBody172.Substring($restoringBranchIdx172, $elseBranchIdx172 - $restoringBranchIdx172)
+} else { '' }
+Check (
+    ($restoringBranchIdx172 -ge 0) -and ($elseBranchIdx172 -gt $restoringBranchIdx172) -and
+    ($restoringBranchBody172 -match "MetaStore\.set\('robco_bay_opened', 'true'\)") -and
+    ($restoringBranchBody172 -match 'renderModuleBay\(\);') -and
+    (-not ($restoringBranchBody172 -match 'initModuleBay\(\);')) -and
+    (([regex]::Matches($wirePanelBody172, 'initModuleBay\(\);')).Count -eq 1)
+) "172.2: structural mirror of the JS behavioral proof -- the _restoringPanels (boot-time restore) branch marks robco_bay_opened released and calls renderModuleBay(), never initModuleBay(); the single initModuleBay() call site in this listener sits only in the else branch (a genuine post-boot user open)"
 
 # ===========================================================
 # Results
