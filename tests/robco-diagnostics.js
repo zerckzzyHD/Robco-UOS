@@ -24418,7 +24418,18 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  seatable game needs only a new GAME_DEFS entry, never a markup rewrite),
 //  reusing the EXACT pre-existing _seatGameCartridge(ctx) confirm-gated swap
 //  (Protocol 22) — visual/layout only, no behavior change.
-//  11 tests
+//  Owner-reported urgent addition: the whole Campaign Configs section (both
+//  boards) rendered near-illegible — dim/dark text on a near-black
+//  background. Root cause: the global `button { color: var(--robco-dark) }`
+//  reset (meant for a solid bright-background button) leaked into every
+//  custom board control that overrides `background` away from that bright
+//  default (.cart, .rocker button, .detent, .ilk-breaker) without ever
+//  resetting `color` back to the legible phosphor tone — so their text
+//  inherited a near-black color meant to sit on a bright background, not the
+//  dark one these controls actually have. Each now explicitly resets `color`
+//  to the same `--robco-green` phosphor tone the rest of the panel already
+//  reads correctly in (matching the approved mockup's legible palette).
+//  15 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 179 — Owner-requested restyle: PROGRAM CARTRIDGE stack (physical pile)');
@@ -24581,6 +24592,50 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       ),
     '179.11: renderCartDeck()/_seatableGames() write nothing durable to the campaign (read-only DOM/GAME_DEFS render helpers)'
   );
+
+  // 179.12  Owner-reported urgent legibility fix: .cart explicitly resets
+  //         color to the legible phosphor tone — never left to inherit the
+  //         global button rule's dark-on-bright text color.
+  {
+    const cartRule179b = (css179.match(/\.cart\s*\{[\s\S]*?\n\}/) || [''])[0];
+    assert(
+      /color:\s*var\(--robco-green\)/.test(cartRule179b),
+      '179.12: .cart explicitly sets color: var(--robco-green) — never inherits the global button dark-on-bright text color'
+    );
+  }
+
+  // 179.13  ENGAGEMENT DOCTRINE rocker (.rocker button) and OPERATIONAL TEMPO
+  //         detents (.detent) — same legibility fix, same reason.
+  assert(
+    /\.rocker button\s*\{[^}]*color:\s*var\(--robco-green\)/.test(css179) &&
+      /\.detent\s*\{[^}]*color:\s*var\(--robco-green\)/.test(css179),
+    '179.13: .rocker button and .detent both explicitly reset color to var(--robco-green) (the global button dark-text reset no longer leaks into either control)'
+  );
+
+  // 179.14  RANDOMIZER INTERLOCK · PURGE board's breaker (.ilk-breaker) gets
+  //         the same fix — the board's danger-red/amber ACCENTS (border,
+  //         hazard stripes, the WIPE TERMINAL button, the safety-cover text)
+  //         are untouched; only the previously-illegible body text is fixed.
+  assert(
+    /\.ilk-breaker\s*\{[^}]*color:\s*var\(--robco-green\)/.test(css179) &&
+      /\.ilk-cover\s*\{[\s\S]*?color:\s*var\(--robco-alert\)/.test(css179) &&
+      /\.purge-btn\s*\{[^}]*color:\s*var\(--robco-danger\)/.test(css179),
+    '179.14: .ilk-breaker resets its body text to var(--robco-green) (the same leaked dark-button-text bug), while .ilk-cover (amber) and .purge-btn (red) keep their own already-correct accent colors untouched'
+  );
+
+  // 179.15  the global button reset itself (color: var(--robco-dark)) is left
+  //         completely unchanged — this fix resets CALLERS that override
+  //         background away from the bright default, not the shared base
+  //         rule every normal solid-background action button still relies on.
+  {
+    const buttonRuleMatch179 = css179.match(/(?:^|\n)button\s*\{([\s\S]*?)\n\}/);
+    const buttonRule179 = buttonRuleMatch179 ? buttonRuleMatch179[1] : '';
+    assert(
+      /color:\s*var\(--robco-dark\)/.test(buttonRule179) &&
+        /background:\s*var\(--robco-green\)/.test(buttonRule179),
+      '179.15: the global button { background: var(--robco-green); color: var(--robco-dark) } reset is untouched — only the custom board controls that override background away from it also now reset color'
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

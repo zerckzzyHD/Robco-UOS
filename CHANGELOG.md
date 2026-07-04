@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2252/2252 | Cache: robco-terminal-v2.7.0-r73 -->
+﻿## [Unreleased]<!-- Tests: 2256/2256 | Cache: robco-terminal-v2.7.0-r74 -->
 
 ### Added
 
@@ -83,6 +83,7 @@
 - CROSSROADS RECORD and INCIDENT LOG entries no longer show a cryptic "[T0]"-style tick count — each entry now shows a real in-game date and time instead, like "Sunday, 10.19.81, 12:00 AM".
 - Removed a security-header entry that browsers can't actually enforce from a webpage and were only ever silently ignoring and warning about in the console — dropping it has no effect on how the site is protected, since it was never doing anything to begin with.
 - Fixed a burst of "audio blocked" warnings cluttering the browser console right after opening the terminal. The background CRT hum — and, for a returning character who's already critically irradiated, badly hurt, or has a crippled head, the Geiger counter and health/tinnitus warning tones — now wait for your first tap or keypress before starting, exactly like the opening boot sound already did. Nothing about how or when any of these sounds actually play for you has changed.
+- Fixed the whole Campaign Configs section — the game cartridges, the doctrine and tempo controls, and the randomizer interlock — reading as dim, near-illegible text on a near-black background. Every one of those controls now reads clearly again, matching the rest of the terminal.
 
 ### Improved
 
