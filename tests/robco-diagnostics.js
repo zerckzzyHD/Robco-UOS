@@ -25854,6 +25854,27 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     /@media \(hover:\s*hover\) and \(pointer:\s*fine\)\s*\{\s*\.detent2:hover\s*\{/.test(css183),
     '183.7: .detent2:hover is gated behind @media (hover:hover) and (pointer:fine) so a touch tap cannot leave the highlight fill stuck on'
   );
+
+  // 183.8  Follow-up (owner report: 183.5's spinner suppression alone did NOT
+  //        fix the centering — confirmed live via screenshot at 412px: the
+  //        "0" still rendered flush left, both before and after several
+  //        appearance-based attempts). Root cause found by comparing rendered
+  //        geometry, not computed style: a pre-existing mobile-only rule,
+  //        `input[type='number'] { max-width: 56px }` inside
+  //        @media (max-width:480px) (added long ago to stop HP/LVL/XP number
+  //        fields ballooning inside .input-group rows), also clamped #c_caps
+  //        to 56px wide — so text-align:center correctly centered the glyph
+  //        WITHIN that 56px box, but the box itself never stretched to fill
+  //        the ~150px tile, leaving it sitting flush left of the tile as a
+  //        whole. `.rb-tile input` now asserts `max-width: 100%` — identical
+  //        (0,1,1) specificity to the mobile rule, but later in source order,
+  //        so it wins the tie and #c_caps stretches to match its sibling
+  //        .rb-val tiles exactly (confirmed live: input and tile centers now
+  //        match to the pixel at 360px/412px/desktop).
+  assert(
+    /\.rb-tile input\s*\{[^}]*max-width:\s*100%/.test(css183),
+    "183.8: .rb-tile input asserts max-width:100% — beats the pre-existing mobile input[type='number']{max-width:56px} rule (@media max-width:480px) that was clamping #c_caps to a narrow box sitting flush-left of its tile, the real cause behind the still-left-skewed BOTTLE CAPS value"
+  );
 }
 
 // ══════════════════════════════════════════════════════════════

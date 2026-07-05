@@ -2416,7 +2416,6 @@ details.sub-panel[open] > summary h3::after {
 #c_caps {
   -moz-appearance: textfield;
 }
-
 /* Themed Scrollbar */
 ::-webkit-scrollbar {
   width: 4px;
@@ -6455,12 +6454,25 @@ input.num-sm {
   display: block;
   text-transform: none;
 }
+/* max-width:100% beats the mobile input[type='number']{max-width:56px} cap
+   (@media max-width:480px, below) — same (0,1,1) specificity, later in source
+   order, so it wins the tie. Without it, #c_caps (the readback-strip BOTTLE
+   CAPS tile, the only <input> among the 4 readback tiles) got clamped to
+   56px wide at phone widths: text-align:center correctly centered the "0"
+   within THAT 56px box, but the box itself never stretched to fill the
+   ~150px tile, so it sat flush left of the tile as a whole (confirmed by
+   screenshot: box width measured 56px vs the tile's ~150px content width,
+   both before AND after trying several appearance-based fixes, which were
+   a dead end — this was a width/max-width bug, not a text-align bug). The
+   56px mobile cap exists for #stat_hp_cur/#stat_lvl/#stat_xp inside
+   .input-group rows, a different layout this rule does not touch. */
 .rb-tile input {
   border: none;
   background: transparent;
   font-size: 17px;
   letter-spacing: 1.5px;
   width: 100%;
+  max-width: 100%;
   padding: 0;
   text-shadow: var(--robco-glow);
   text-align: center;

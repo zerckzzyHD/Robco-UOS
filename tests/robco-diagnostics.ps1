@@ -16041,6 +16041,17 @@ Check (
     [System.Text.RegularExpressions.Regex]::IsMatch($css183, '(?s)@media \(hover:\s*hover\) and \(pointer:\s*fine\)\s*\{\s*\.detent2:hover\s*\{')
 ) "183.7: .detent2:hover is gated behind @media (hover:hover) and (pointer:fine) so a touch tap cannot leave the highlight fill stuck on"
 
+# 183.8  Follow-up -- 183.5's spinner suppression alone did NOT fix the
+#        centering. Root cause: a pre-existing mobile-only rule,
+#        input[type='number']{max-width:56px} inside @media (max-width:480px),
+#        also clamped #c_caps to 56px wide, so text-align:center centered the
+#        glyph within that narrow box but the box itself never stretched to
+#        fill the tile. .rb-tile input now asserts max-width:100% -- same
+#        specificity, later in source order, so it wins the tie.
+Check (
+    [System.Text.RegularExpressions.Regex]::IsMatch($css183, "(?s)\.rb-tile input\s*\{[^\}]*max-width:\s*100%")
+) "183.8: .rb-tile input asserts max-width:100% -- beats the pre-existing mobile input[type='number']{max-width:56px} rule (@media max-width:480px) that was clamping #c_caps to a narrow box sitting flush-left of its tile, the real cause behind the still-left-skewed BOTTLE CAPS value"
+
 # ===========================================================
 # Results
 # ===========================================================

@@ -69,8 +69,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2311-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2311-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2312-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2312-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -1091,11 +1091,20 @@ work, one gate run):
 
 - **BOTTLE CAPS readback value left-skewed.** Confirmed live: MAX AP/WEIGHT/GRADE ADVANCE were
   already perfectly centered (`.rb-val`'s box center exactly matched its tile's center), but
-  `#c_caps` (the only `<input type="number">` among the four readback tiles) was not in this file's
-  existing spinner-suppression rule (`#stat_hp_cur`/`#stat_hp_max`/`#stat_lvl`/`#stat_xp`) — its
-  native spin button reserved space on the right of the input's content box, so `text-align: center`
-  centered the "0" against a narrower effective width than the tile itself. `#c_caps` now joins that
-  exact rule (Protocol 22), with no other readback tile touched since none needed it.
+  `#c_caps` (the only `<input type="number">` among the four readback tiles) was not. First attempt
+  (this same unit) added `#c_caps` to the existing HP/XP/LVL spinner-suppression rule, reasoning the
+  native spin button was reserving space on the right — this did NOT fix it (confirmed via a follow-up
+  screenshot: the "0", and a typed "123", both still rendered flush left). Live geometry comparison
+  (not just computed style, which showed `text-align: center` applying fine) found the REAL cause: a
+  pre-existing mobile-only rule, `input[type='number'] { max-width: 56px }` inside
+  `@media (max-width: 480px)` (added long ago to stop the HP/LVL/XP number fields inside
+  `.input-group` rows from ballooning), also clamped `#c_caps` to 56px wide — so the glyph centered
+  correctly WITHIN that narrow box, but the box itself never stretched to fill the ~150px tile, and
+  sat flush-left of the tile as a whole. `.rb-tile input` now asserts `max-width: 100%` — identical
+  `(0,1,1)` specificity to the mobile rule, but later in source order, so it wins the tie; confirmed
+  live that `#c_caps`'s rendered width and center now match its sibling `.rb-val` tiles to the pixel
+  at 360px/412px/desktop, for both a single digit and a multi-digit value. The spinner-suppression
+  rule from the first attempt is harmless and left in place, but was not the actual fix.
 - **OPERATIONAL TEMPO dial detent hit-area overlap.** Root cause confirmed by live bounding-box
   measurement: `.detent2` never overrode the global `button { width: 100% }` rule (the documented
   Protocol UI-5 override, missed on this control), so every one of the 5 position buttons stretched
@@ -1115,13 +1124,13 @@ work, one gate run):
   already shipped for the mode pill), since an ungated `:hover` fill can stick visibly after a tap on
   a touch device.
 
-Guarded by Suite 183 (both runners, 7 tests): the `.panel.bay-board` margin-top rule and its scoping
+Guarded by Suite 183 (both runners, 8 tests): the `.panel.bay-board` margin-top rule and its scoping
 away from `.sub-panel.bay-board`, the neutralized `h2`/`h2::after` header treatment, a regression
 guard that the reverted `.zc-name`/`.rad-row` content changes stay gone, the `#c_caps` spinner
-suppression, the `.detent2` `width: auto` + bounded `max-width` at both breakpoints, and the
-`.detent2:hover` touch-safety gate. CSS/markup only — no id, handler, or state-write changed; every
-control (HP/XP/fader drag, skeleton-zone click, RAD clamp, tempo dial drag/arrow-keys) verified
-unchanged.
+suppression, the `.rb-tile input` `max-width: 100%` override (the actual BOTTLE CAPS fix), the
+`.detent2` `width: auto` + bounded `max-width` at both breakpoints, and the `.detent2:hover`
+touch-safety gate. CSS/markup only — no id, handler, or state-write changed; every control (HP/XP/
+fader drag, skeleton-zone click, RAD clamp, tempo dial drag/arrow-keys) verified unchanged.
 
 ---
 
@@ -2192,7 +2201,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2311-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2312-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable
