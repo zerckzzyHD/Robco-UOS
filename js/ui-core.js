@@ -4643,16 +4643,12 @@ function loadUI() {
     let btn = document.getElementById('btn_l_' + k);
     if (!btn) return;
     const isCrippled = state[k] !== 'OK';
-    // Write the state glyph into .zc-state only — .zc-name (the visible per-limb
-    // label, e.g. "HD"/"LA") is a static sibling and must survive every re-render
-    // (a bare btn.innerText assignment here would wipe it — Protocol 42 lesson).
-    const stateEl = btn.querySelector('.zc-state');
     if (!isCrippled) {
       btn.className = 'limb-ok';
-      if (stateEl) stateEl.textContent = '[████] OK';
+      btn.innerText = '[██████] OK';
     } else {
       btn.className = 'limb-crip limb-glitch';
-      if (stateEl) stateEl.textContent = '[░░░░] CRIP';
+      btn.innerText = '[░░░░░░] CRIP';
     }
     btn.setAttribute('aria-pressed', isCrippled ? 'true' : 'false');
     btn.setAttribute('aria-label', (_limbNames[k] || k) + ': ' + (isCrippled ? 'Crippled' : 'OK'));

@@ -25761,20 +25761,17 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 183 — OPERATOR boards brought up to the Settings/Module Bay
-//  polish standard: contained connector strips, no header/tag collision,
-//  centered RAD EXPOSURE row, and restored per-limb labels (owner report,
-//  confirmed live via rendered bounding-box measurement before the fix:
-//  0px gap between consecutive .panel.bay-board boards let each one's
-//  connector-strip pseudo-element bleed onto the next board's top edge,
-//  and .rad-row had no justify-content while .rr-meter's unbounded
-//  flex-grow pushed the RAD value/CPM readout to the far right edge). 8 tests.
+//  Suite 183 — OPERATOR collapsed-board frames brought up to the Settings/
+//  Module Bay containment standard, plus two independent owner-reported
+//  fixes bundled into the same push (Protocol 19): the BOTTLE CAPS readback
+//  value and the OPERATIONAL TEMPO dial's overlapping detent hit areas.
+//  Owner scope correction: the limb-label / RAD-row-centering content
+//  changes from the prior push were reverted — frames only. 7 tests.
 // ══════════════════════════════════════════════════════════════
 {
-  header('Suite 183 — OPERATOR boards: Module Bay containment + limb labels');
+  header('Suite 183 — OPERATOR frames + readback centering + tempo dial hit-areas');
   const html183 = readFile('index.html');
   const css183 = readFile('css/terminal.css');
-  const uiCore183 = readFile('js/ui-core.js');
 
   // 183.1  top-level bay-board panels (OPERATOR) get the SAME 12px
   //        clearance the Module Bay's SLOT sub-panels already get from
@@ -25808,64 +25805,54 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     "183.3: .panel.bay-board > summary h2 (and its ::after [+]/[-] indicator) drop the plain .panel h2 full-bleed colored bar + float:right in favor of the Module Bay's clean inline h3 treatment"
   );
 
-  // 183.4  every SKELETAL HARNESS limb chip carries a visible per-limb label
-  //        (matching the body-diagram SVG's own HD/LA/RA/LL/RL zone text —
-  //        Protocol 22, the established short forms) — before this fix the
-  //        chip showed only "[████] OK"/"[░░░░] CRIP" with the limb name
-  //        readable solely via aria-label (owner report: "the 5 limb bars
-  //        lost their per-limb labels").
-  const limbChipLabels183 = {
-    btn_l_hd: 'HD',
-    btn_l_la: 'LA',
-    btn_l_ra: 'RA',
-    btn_l_ll: 'LL',
-    btn_l_rl: 'RL',
-  };
-  const missingChipLabels183 = Object.entries(limbChipLabels183).filter(
-    ([id, label]) =>
-      !new RegExp('id="' + id + '"[\\s\\S]{0,400}?<span class="zc-name">' + label + '</span>').test(
-        html183
-      )
-  );
+  // 183.4  the reverted content-scope changes (per-limb labels, RAD-row
+  //        centering) stay gone — a regression guard that a future commit
+  //        doesn't silently re-add the over-scoped content changes the
+  //        owner explicitly asked to drop.
   assert(
-    missingChipLabels183.length === 0,
-    '183.4: every btn_l_* limb chip carries a visible <span class="zc-name"> label (HD/LA/RA/LL/RL) — missing: ' +
-      missingChipLabels183.map(([id]) => id).join(', ')
+    !/\.zc-name\s*\{/.test(css183) &&
+      !/class="zc-name"/.test(html183) &&
+      !/\.rad-row\s*\{[^}]*justify-content:\s*center/.test(css183),
+    '183.4: the reverted over-scoped content changes (.zc-name limb labels, .rad-row centering) stay reverted — this push is frame/layout only, per the owner scope correction'
   );
 
-  // 183.5  loadUI() writes the state glyph into a dedicated .zc-state child,
-  //        never back into the whole button (a bare btn.innerText/btn.textContent
-  //        assignment would silently wipe the .zc-name label on every re-render
-  //        — Protocol 42: the exact footgun this fix closes).
-  const limbLoopBody183 = extractFunctionBody(uiCore183, 'loadUI').slice(0, 4000);
+  // 183.5  #c_caps (the readback-strip BOTTLE CAPS tile) joins the existing
+  //        spinner-suppression list — its native spin button was reserving
+  //        space on the right of the input's content box, so text-align:
+  //        center centered the "0" against a narrower effective width than
+  //        the tile itself, reading as left-skewed even though the box was
+  //        correctly centered (owner report). MAX AP/WEIGHT/GRADE ADVANCE
+  //        were confirmed already centered live and needed no change.
   assert(
-    /stateEl\.textContent\s*=\s*'\[/.test(limbLoopBody183) &&
-      !/btn\.innerText\s*=/.test(limbLoopBody183) &&
-      !/btn\.textContent\s*=/.test(limbLoopBody183),
-    "183.5: loadUI()'s limb loop writes only into the .zc-state child (stateEl.textContent) — no bare btn.innerText/btn.textContent assignment that would wipe the .zc-name label"
+    /#c_caps::-webkit-outer-spin-button/.test(css183) &&
+      /#c_caps::-webkit-inner-spin-button/.test(css183) &&
+      /-moz-appearance:\s*textfield;\s*\}/.test(
+        css183.slice(css183.indexOf('#stat_hp_cur,\n#stat_hp_max,\n#stat_lvl,\n#stat_xp,\n#c_caps'))
+      ),
+    '183.5: #c_caps joins the existing HP/XP/LVL spinner-suppression rule (Protocol 22) so its native number-input spin button no longer skews the centered "0" left of the tile'
   );
 
-  // 183.6  .zc-name is a real, styled class (not just inline markup with no
-  //        CSS behind it).
-  assert(/\.zc-name\s*\{/.test(css183), '183.6: .zc-name has a real CSS rule styling the label');
-
-  // 183.7  RAD EXPOSURE row centers as a group instead of letting .rr-meter's
-  //        unbounded flex-grow push the RAD value + CPM label to the far
-  //        right edge (owner report: "RAD EXPOSURE field + CPM + RUN
-  //        BIO-SCAN button currently left-skewed").
+  // 183.6  the OPERATIONAL TEMPO dial's 5 .detent2 position buttons override
+  //        the global `button { width: 100% }` rule (Protocol UI-5) with a
+  //        real width:auto + a bounded max-width — without it, every
+  //        position stretched to the full width of .dial-assembly (~300+px),
+  //        massively overlapping every other position and the knob (owner
+  //        report: "the right-side position's clickable area is so big it
+  //        overlaps and covers the left-side position").
   assert(
-    /\.rad-row\s*\{[^}]*justify-content:\s*center/.test(css183) &&
-      /\.rad-row\s+\.rr-meter\s*\{[^}]*max-width:\s*\d+px/.test(css183),
-    '183.7: .rad-row centers its content as a group (justify-content:center) and .rr-meter is bounded with a max-width so it no longer eats all free space and pushes the CPM readout to the edge'
+    /\.detent2\s*\{[^}]*width:\s*auto;[^}]*max-width:\s*52px/.test(css183) &&
+      /\(min-width:\s*1000px\)[\s\S]{0,400}?\.detent2\s*\{[^}]*max-width:\s*68px/.test(css183),
+    '183.6: .detent2 overrides the inherited button{width:100%} with width:auto + a bounded max-width (52px mobile / 68px desktop) so no position can stretch wide enough to overlap its neighbors'
   );
 
-  // 183.8  .bio-actions (the RUN BIO-SCAN ADVISORY button row) was already
-  //        centered before this fix — a regression guard that it stays that
-  //        way alongside the newly-centered .rad-row (Protocol 42 — verified
-  //        live, not just assumed).
+  // 183.7  the detent hover fill is gated to real mouse/trackpad input
+  //        (Protocol 22 — the same touch-safety gate already shipped for
+  //        the mode pill), so a tap on a touch device can't leave the fill
+  //        "stuck" over the (now correctly-sized) button — closing the
+  //        owner-reported "pressing reveals a hidden highlight block".
   assert(
-    /\.bio-actions\s*\{[^}]*justify-content:\s*center/.test(css183),
-    '183.8: .bio-actions (RUN BIO-SCAN ADVISORY row) still centers its content — regression guard alongside the new .rad-row centering fix'
+    /@media \(hover:\s*hover\) and \(pointer:\s*fine\)\s*\{\s*\.detent2:hover\s*\{/.test(css183),
+    '183.7: .detent2:hover is gated behind @media (hover:hover) and (pointer:fine) so a touch tap cannot leave the highlight fill stuck on'
   );
 }
 

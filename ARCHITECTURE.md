@@ -69,8 +69,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2312-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2312-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2311-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2311-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -1053,12 +1053,14 @@ that a zone click/Enter/Space calls `toggleLimb()` (and an unrelated key does no
 guards for the `GAME_DEFS` fields, the `#stat_rads` wiring, the `syncStateFromDom()`/`autoImportState()`
 clamps, the widened `.fd-ladder` tap target, and a no-new-write-site guard.
 
-**Owner polish pass — OPERATOR boards brought up to the Settings/Module Bay containment standard.**
-Live rendered-bounding-box measurement (not just static CSS reading) confirmed three real, distinct
-root causes behind the owner's "OPERATOR doesn't match Settings" report, all traced to how a
-top-level `<details class="panel bay-board">` (OPERATOR) differs from a `<details class="sub-panel
-bay-board">` (Module Bay SLOT board) even though both already share the `.bay-board` machine-language
-class (Protocol 22):
+**Owner polish pass — OPERATOR collapsed-board frames + two bundled owner-reported fixes.** An
+earlier attempt at this same polish pass over-scoped into content changes (per-limb labels, RAD-row
+centering) the owner explicitly did not ask for; those were reverted in the same unit (below) so the
+push stays frame/layout-only, per the owner's scope correction. Live rendered-bounding-box
+measurement (not just static CSS reading) confirmed the real root cause behind the owner's
+"OPERATOR doesn't match Settings" report, traced to how a top-level `<details class="panel
+bay-board">` (OPERATOR) differs from a `<details class="sub-panel bay-board">` (Module Bay SLOT
+board) even though both already share the `.bay-board` machine-language class (Protocol 22):
 
 - **Connector-strip bleed.** OPERATOR boards stack in a plain block-flow column (`.col-left`/
   `.col-right`, no CSS Grid), while Module Bay SLOT boards sit in `.bay-grid` (`gap: 12px`). With
@@ -1075,26 +1077,50 @@ class (Protocol 22):
 h2` now neutralizes that treatment (no background/margin/padding, `display: inline`) to match the
   Module Bay's plain-text `.sub-panel > summary h3` header exactly — same machine, no more collision.
   The element is still a real `<h2>` (Protocol UI-1/Suite 88 unaffected); only its decorative styling
-  changed.
-- **RAD EXPOSURE row left-skewed.** `.rad-row` had no `justify-content`, and `.rr-meter`'s unbounded
-  `flex: 1 1 150px` (no `max-width`) consumed all free space, pushing the RAD value + CPM label to the
-  row's far right edge instead of reading as a centered cluster. Fixed with `justify-content: center`
-  on `.rad-row` and a `max-width: 220px` bound on `.rr-meter` so the group centers as a whole
-  (`.bio-actions` was already centered — confirmed unaffected, not assumed).
-- **Missing per-limb labels.** The five SKELETAL HARNESS limb chips (`#btn_l_hd/la/ra/ll/rl`) rendered
-  only `[████] OK`/`[░░░░] CRIP`, with the limb name readable solely via `aria-label` — no sighted-user
-  label at all. Each chip now carries a `<span class="zc-name">` (HD/LA/RA/LL/RL, matching the body-
-  diagram SVG's own zone text — Protocol 22) as a static sibling of a new `<span class="zc-state">`
-  that `loadUI()` writes the state glyph into — the previous `btn.innerText = '[████] OK'` assignment
-  would have wiped a label placed directly in the button, so the state write was re-targeted to the
-  `.zc-state` child specifically (Protocol 42 — the exact footgun this fix closes).
+  changed. Both fixes were verified live against the Module Bay reference at 360/412/desktop, in the
+  boards' actual COLLAPSED state (not force-opened) — a 27px+ gap between collapsed boards and a
+  fully transparent, plain-text header, matching the SLOT boards' own measured geometry exactly.
+- **Reverted (owner scope correction):** the per-limb `.zc-name` labels on the SKELETAL HARNESS zone
+  chips and the `.rad-row`/`.rr-meter` centering fix from the prior attempt were both rolled back —
+  `loadUI()`'s limb loop is back to a bare `btn.innerText` assignment, the chips are back to
+  `[████] OK`/`[░░░░░░] CRIP` with no visible label, and `.rad-row` has no `justify-content` again.
+  The owner was explicit that panel CONTENT is fine and this pass is frames only.
 
-Guarded by Suite 183 (both runners, 8 tests): the `.panel.bay-board` margin-top rule and its scoping
-away from `.sub-panel.bay-board`, the neutralized `h2`/`h2::after` header treatment, the five
-`.zc-name` labels present in markup, `loadUI()`'s limb loop writing only into `.zc-state` (never a
-bare `btn.innerText`/`btn.textContent`), the `.zc-name` CSS rule, and `.rad-row`/`.rr-meter`'s
-centering + bound (plus a `.bio-actions` regression guard). CSS/markup only — no id, handler, or
-state-write changed; every control (HP/XP/fader drag, skeleton-zone click, RAD clamp) verified
+Two independent owner-reported fixes were bundled into the same push (Protocol 19 — batch related
+work, one gate run):
+
+- **BOTTLE CAPS readback value left-skewed.** Confirmed live: MAX AP/WEIGHT/GRADE ADVANCE were
+  already perfectly centered (`.rb-val`'s box center exactly matched its tile's center), but
+  `#c_caps` (the only `<input type="number">` among the four readback tiles) was not in this file's
+  existing spinner-suppression rule (`#stat_hp_cur`/`#stat_hp_max`/`#stat_lvl`/`#stat_xp`) — its
+  native spin button reserved space on the right of the input's content box, so `text-align: center`
+  centered the "0" against a narrower effective width than the tile itself. `#c_caps` now joins that
+  exact rule (Protocol 22), with no other readback tile touched since none needed it.
+- **OPERATIONAL TEMPO dial detent hit-area overlap.** Root cause confirmed by live bounding-box
+  measurement: `.detent2` never overrode the global `button { width: 100% }` rule (the documented
+  Protocol UI-5 override, missed on this control), so every one of the 5 position buttons stretched
+  to the full width of `.dial-assembly` (~316px measured) instead of shrinking to its own label —
+  massively overlapping every other position (confirmed: the right-side positions' oversized boxes
+  covered the left-side ones) and revealing a large stray `.detent2:hover` highlight fill across the
+  whole dial on press. Fixed with `width: auto` plus a bounded `max-width` (52px mobile / 68px
+  desktop, tuned below the ~60px/~73px true chord distance between adjacent 42°-apart ring positions
+  at each breakpoint's `--rl` radius) and `white-space: normal` so the longest label
+  ("COMPLETIONIST") wraps instead of forcing the button wide. Verified live with real 2D
+  rectangle-intersection math (not just an x-axis projection, which is misleading on a curved ring
+  layout) that none of the 5 positions overlap each other at 360px/412px/desktop, that every position
+  is independently hit-testable via `elementFromPoint` (including the previously-unreachable
+  left-side ones), and that a click on any position still drives `state.playthroughType` through the
+  unchanged `_setTempo()`/`onPlaythroughTypeChange()` path. The hover fill is additionally gated
+  behind `@media (hover: hover) and (pointer: fine)` (Protocol 22 — the same touch-safety gate
+  already shipped for the mode pill), since an ungated `:hover` fill can stick visibly after a tap on
+  a touch device.
+
+Guarded by Suite 183 (both runners, 7 tests): the `.panel.bay-board` margin-top rule and its scoping
+away from `.sub-panel.bay-board`, the neutralized `h2`/`h2::after` header treatment, a regression
+guard that the reverted `.zc-name`/`.rad-row` content changes stay gone, the `#c_caps` spinner
+suppression, the `.detent2` `width: auto` + bounded `max-width` at both breakpoints, and the
+`.detent2:hover` touch-safety gate. CSS/markup only — no id, handler, or state-write changed; every
+control (HP/XP/fader drag, skeleton-zone click, RAD clamp, tempo dial drag/arrow-keys) verified
 unchanged.
 
 ---
@@ -2166,7 +2192,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2312-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2311-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable
