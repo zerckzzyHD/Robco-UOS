@@ -2221,6 +2221,7 @@ window.onload = async function () {
     _initBezelChrome(); // DO-N: restore bezel subsystem highlight + sync the FAULT lamp
     setupHpBarInteraction();
     setupXpBarInteraction(); // C11: XP bar click-drag (mirrors HP bar, within current level range)
+    _wireBioHarnessZones(); // PHASE 3 · OPERATOR BUS-03: SVG zone taps route through toggleLimb()
     _armAmbientAudio(startCrtHum); // continuous ambient — deferred to first gesture (blocked-autoplay spam fix)
     initRegistryAutocomplete();
     initAmmoDatalist();
@@ -3463,10 +3464,15 @@ function expandPanelForCategory(categoryKey) {
     trade: '> BARTER UPLINK',
     skillBooks: '> SKILL BOOKS',
     magazines: '> SKILL MAGAZINES',
-    // WU-HF3 panel navigation targets (h2 prefixes, matched via startsWith)
-    special: '> BIO-METRICS',
+    // WU-HF3 panel navigation targets (h2 prefixes, matched via startsWith).
+    // PHASE 3 OPERATOR reskin (Suite 181): BIO-METRICS was split into its 3
+    // real boards (VITAL TELEMETRY/S.P.E.C.I.A.L. TUNING/CHRONO), and
+    // BIO-SCAN & LIMB STATUS was re-dressed as SKELETAL HARNESS — both
+    // targets updated to the new titles so "stats"/"special"/"biometrics"/
+    // "bio" keep landing on the right board instead of silently no-opping.
+    special: '> VITAL TELEMETRY',
     skills: '> SKILL MATRIX',
-    bio: '> BIO-SCAN',
+    bio: '> SKELETAL HARNESS',
     map: '> WORLD MAP',
     log: '> SYSTEM STATUS',
     databank: '> DATABANK',
@@ -4502,6 +4508,33 @@ function toggleLimb(limb) {
   loadUI();
 }
 
+// PHASE 3 · OPERATOR BUS-03 — the SVG anatomical zone plate is a second,
+// purely visual projection of state.la/ra/ll/rl/hd (the same fields the
+// btn_l_* readout list above already reflects). Called from loadUI() so it
+// can never drift from the mirrored chip list (Protocol 22 single-apply,
+// the Module-Bay bay/schematic precedent).
+function _syncBioHarnessZones() {
+  ['hd', 'la', 'ra', 'll', 'rl'].forEach(limb => {
+    const zone = document.querySelector('.zone[data-limb="' + limb + '"]');
+    if (zone) zone.classList.toggle('crippled', state[limb] !== 'OK');
+  });
+}
+
+// Wires the SVG zone taps/keyboard activation to the EXACT SAME toggleLimb()
+// the mirrored chip buttons already call (Protocol 22 — one handler, two
+// input surfaces). Static markup, so this wires once at boot.
+function _wireBioHarnessZones() {
+  document.querySelectorAll('.zone[data-limb]').forEach(zone => {
+    zone.addEventListener('click', () => toggleLimb(zone.dataset.limb));
+    zone.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        toggleLimb(zone.dataset.limb);
+      }
+    });
+  });
+}
+
 function updateKarmaUI() {
   let k = parseInt(document.getElementById('stat_karma').value) || 0;
   let label = 'Neutral';
@@ -4607,6 +4640,10 @@ function loadUI() {
     btn.setAttribute('aria-pressed', isCrippled ? 'true' : 'false');
     btn.setAttribute('aria-label', (_limbNames[k] || k) + ': ' + (isCrippled ? 'Crippled' : 'OK'));
   });
+  // PHASE 3 · OPERATOR BUS-03: sync the SVG zone plate — the "second
+  // projection" of the exact same state.la/ra/ll/rl/hd this loop already
+  // reads (Protocol 22 single-apply — never a second state source).
+  if (typeof _syncBioHarnessZones === 'function') _syncBioHarnessZones();
   updateKarmaUI();
   if (_isDirty('inv', { inv: state.inventory, f: _invFilter })) renderInventory();
   if (_isDirty('ammo', state.ammo)) renderAmmo();
@@ -4805,6 +4842,163 @@ function _wireCoreEventBusSubscribers() {
     setTimeout(() => document.body.classList.remove('crit-hp-flash'), 750);
     if (typeof triggerHaptic === 'function') triggerHaptic('lowhealth'); // WU-F2 haptic
   });
+  // PHASE 3 · OPERATOR: the COMMIT LEVEL-UP key (#btnLevelUp) flashes its own
+  // label on a successful level-up — reacts to the SAME 'level.up' bus event
+  // nativeLevelUp() already emits (Protocol 22, never touches onclick or
+  // forks the handler). Purely cosmetic text swap; no state/campaign write.
+  RobcoEvents.on('level.up', p => {
+    const tag = document.getElementById('opLevelUpKeyText');
+    if (!tag) return;
+    const newLvl = p && typeof p.newLvl === 'number' ? p.newLvl : state.lvl;
+    tag.textContent = '▲ LEVEL ' + newLvl + ' COMMITTED';
+    clearTimeout(_levelUpKeyFlashTimer);
+    _levelUpKeyFlashTimer = setTimeout(() => {
+      tag.textContent = '▲ LEVEL UP';
+    }, 1200);
+  });
+}
+let _levelUpKeyFlashTimer = null;
+
+// PHASE 3 · OPERATOR — S.P.E.C.I.A.L. fader steppers (BUS-02). Sets the
+// existing s_<key> input's value then routes through the EXACT SAME
+// commitStat(el) the raw number field already used (Protocol 22) — the
+// stepper is a second way to reach the same clamp/state-write/save path,
+// never a parallel one.
+function _bumpSpecialStat(key, delta) {
+  const el = document.getElementById('s_' + key);
+  if (!el) return;
+  const cur = parseInt(el.value, 10);
+  const next = Math.max(1, Math.min(10, (isNaN(cur) ? 5 : cur) + delta));
+  el.value = String(next);
+  commitStat(el);
+}
+
+const _SPECIAL_KEYS = ['s', 'p', 'e', 'c', 'i', 'a', 'l'];
+
+// PHASE 3 · OPERATOR hero-three instrument sync (Protocol 22/25 reskin).
+// Reads the exact same DOM/state updateMath() already reads for HP/rads/
+// SPECIAL; drives the NEW CRT-trace/fader-ladder/zone-plate/board-status
+// visuals added around those unchanged ids. Called once at the end of
+// updateMath() — no new call sites elsewhere, no forked logic. Writes
+// nothing to state/campaign — display-only, mirroring existing DOM values.
+function _syncOperatorTelemetry() {
+  // BUS-01 — HP condition word + critical trace line
+  const hpCurEl = document.getElementById('stat_hp_cur');
+  const hpMaxEl = document.getElementById('stat_hp_max');
+  let hpPct = 100;
+  if (hpCurEl && hpMaxEl) {
+    const hpCur = parseInt(hpCurEl.value) || 0;
+    const hpMax = Math.max(1, parseInt(hpMaxEl.value) || 1);
+    hpPct = Math.min(100, Math.max(0, (hpCur / hpMax) * 100));
+  }
+  const hpCrit = hpPct <= 25;
+  const condWord = document.getElementById('opCondWord');
+  if (condWord) {
+    condWord.textContent = hpCrit ? 'CRITICAL' : hpPct <= 60 ? 'IMPAIRED' : 'NOMINAL';
+    condWord.classList.toggle('crit', hpCrit);
+  }
+  const traceHp = document.getElementById('opTraceHp');
+  if (traceHp) traceHp.classList.toggle('critline', hpCrit);
+  const vitalLed = document.getElementById('opVitalLed');
+  if (vitalLed) vitalLed.classList.toggle('red', hpCrit);
+
+  // BUS-01 RAD trace + BUS-03 mirrored readout — stat_rads' one real,
+  // editable input lives on BUS-01 (the owner-picked Option C placement);
+  // BUS-03 shows the same value read-only (Protocol 22 single source, never
+  // a second input sharing the id).
+  const radsEl = document.getElementById('stat_rads');
+  const rads = radsEl ? parseInt(radsEl.value) || 0 : 0;
+  const radPct = Math.min(100, rads / 10);
+  const radLine = document.getElementById('opRadLine');
+  if (radLine) radLine.style.width = radPct + '%';
+  const radBar = document.getElementById('opHarnessRadBar');
+  if (radBar) radBar.style.width = radPct + '%';
+  const radMirror = document.getElementById('opHarnessRadMirror');
+  if (radMirror) radMirror.textContent = String(rads);
+
+  // BUS-02 — seven-fader segment ladders (1-10 segments, amber top segment).
+  // Reads the DOM value directly (same "avoid stale state" approach the HP/
+  // XP bars above already use) so the ladder stays live while typing/
+  // stepping, not just after commitStat()'s own save.
+  let specialLine = '';
+  _SPECIAL_KEYS.forEach(k => {
+    const input = document.getElementById('s_' + k);
+    const raw = input ? parseInt(input.value, 10) : NaN;
+    const v = Math.max(1, Math.min(10, isNaN(raw) ? 5 : raw));
+    specialLine += (specialLine ? '·' : '') + v;
+    const ladder = document.querySelector('[data-fd-ladder="' + k + '"]');
+    if (!ladder) return;
+    const segs = ladder.querySelectorAll('i');
+    segs.forEach((seg, idx) => {
+      seg.classList.toggle('lit', idx < v);
+      seg.classList.toggle('top', idx === v - 1);
+    });
+    const cap = ladder.querySelector('.fd-cap');
+    if (cap) cap.style.bottom = ((v - 1) / 9) * 88 + 4 + '%';
+  });
+
+  // BUS-03 — crippled-limb fault count for the board status/LED (the SVG
+  // zone crippled-class sync itself lives in _syncBioHarnessZones(), called
+  // from loadUI() since toggleLimb() already re-renders the whole UI there).
+  const limbFaultCount = ['la', 'ra', 'll', 'rl', 'hd'].filter(l => state[l] !== 'OK').length;
+  const harnessLed = document.getElementById('opHarnessLed');
+  if (harnessLed) harnessLed.classList.toggle('red', limbFaultCount > 0);
+
+  // 0i one-line board status rows (Protocol 25 — never information-free).
+  const setStatus = (id, text, alert) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = text;
+    el.classList.toggle('alert', !!alert);
+  };
+  setStatus(
+    'opVitalStatus',
+    'HP ' +
+      Math.round(hpPct) +
+      '% · LVL ' +
+      (parseInt((document.getElementById('stat_lvl') || {}).value) || 1) +
+      ' · ' +
+      (parseInt((document.getElementById('c_caps') || {}).value) || 0) +
+      ' CAPS',
+    hpCrit
+  );
+  setStatus('opSpecialStatus', specialLine, false);
+  setStatus(
+    'opHarnessStatus',
+    (limbFaultCount
+      ? '⚠ ' + limbFaultCount + ' LIMB FAULT' + (limbFaultCount > 1 ? 'S' : '')
+      : 'ALL LIMBS OK') +
+      ' · RAD ' +
+      rads +
+      ' CPM',
+    limbFaultCount > 0
+  );
+  const locEl = document.getElementById('stat_loc');
+  const dateEl = document.getElementById('gameDateDisplay');
+  setStatus(
+    'opChronoStatus',
+    (locEl ? locEl.value : '—') +
+      (dateEl && dateEl.textContent !== '—' ? ' · ' + dateEl.textContent : ''),
+    false
+  );
+  setStatus(
+    'opSkillsStatus',
+    (typeof getSkillKeys === 'function' ? getSkillKeys().length : 0) + ' CHANNELS TRACKED',
+    false
+  );
+  setStatus('opPerksStatus', (state.perks || []).length + ' PERKS ON FILE', false);
+  setStatus('opStatusStatus', (state.status || []).length + ' ACTIVE EFFECTS', false);
+  setStatus(
+    'opFactionStatus',
+    (typeof getFactionRegistry === 'function' ? getFactionRegistry().length : 0) +
+      ' FACTIONS TRACKED',
+    false
+  );
+  setStatus(
+    'opKarmaCenterStatus',
+    (document.getElementById('karma_label') || {}).innerText || '—',
+    false
+  );
 }
 
 function updateMath() {
@@ -4931,22 +5125,36 @@ function updateMath() {
   else if (curWt >= maxWeight * 0.9) document.body.classList.add('weight-critical');
   else if (curWt >= maxWeight * 0.75) document.body.classList.add('weight-heavy');
 
-  // #25 Radiation Treatment Alert — compute how many RadAway doses needed
+  // #25 Radiation Treatment Alert — compute how many RadAway doses needed.
+  // PHASE 3: #radAwayAlert now wraps a lamp <i> + a #radAwayAlertText span
+  // (the .radaway-lamp reskin) instead of being a plain text node — the
+  // message goes on that inner span (never alertEl.textContent directly,
+  // which would wipe out the lamp <i>), and display flips to 'flex' to match
+  // the lamp's icon+text row layout. Same show/hide/color logic as before.
   {
     const rads = state.rads || 0;
     const alertEl = document.getElementById('radAwayAlert');
+    const alertTextEl = document.getElementById('radAwayAlertText');
     if (alertEl) {
       if (rads >= 200) {
         const dosesNeeded = Math.ceil(rads / 150);
         const hasRadAway = state.inventory.some(i => /radaway/i.test(i.name));
-        alertEl.textContent = `RAD TREATMENT: ~${dosesNeeded} RadAway needed${hasRadAway ? ' — RadAway in pack' : ' — NONE IN PACK'}`;
-        alertEl.style.display = 'block';
+        const msg = `RAD TREATMENT: ~${dosesNeeded} RadAway needed${hasRadAway ? ' — RadAway in pack' : ' — NONE IN PACK'}`;
+        if (alertTextEl) alertTextEl.textContent = msg;
+        else alertEl.textContent = msg; // fail-safe if the lamp markup isn't present
+        alertEl.style.display = 'flex';
         alertEl.style.color = hasRadAway ? 'var(--robco-alert)' : 'var(--robco-danger)';
       } else {
         alertEl.style.display = 'none';
       }
     }
   }
+
+  // PHASE 3 · OPERATOR hero-three instrument sync (Protocol 22 reskin) —
+  // reads the exact same DOM this function already updated above; drives the
+  // new CRT-trace/fader-ladder/zone-plate/board-status visuals. One new call
+  // site, no forked logic.
+  _syncOperatorTelemetry();
 
   // Notification Badges (#13) — update panel summary badges after all renders
   _updatePanelBadges();

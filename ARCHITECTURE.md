@@ -69,8 +69,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2272-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2272-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2292-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2292-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -937,6 +937,86 @@ shape via a new shared `.icon-btn-round` class (Protocol 22 — the same rule th
 custom property that falls back to `--bezel-wire`; the save-menu button sets it to the existing
 `--robco-blue` accent so its panel's color is unchanged. Guarded by the Suite 162 extension
 (162.25–162.28) and the Suite 103 extension (103.3 updated, 103.8 added).
+
+---
+
+## OPERATOR Screen Hardware Dressing (`index.html` + `css/terminal.css` + `js/ui-core.js` — Design Overhaul, Phase-3 hero-three)
+
+The STAT tab's panels are reskinned into the same labeled-hardware-board language as the Module
+Bay and Director Uplink, per the owner-approved `planning/mockups/operator-combined.html` mockup.
+This is a pure Protocol 22/25 reskin: every existing id, handler, and render-function contract is
+preserved exactly (the fixed-id set `loadUI()`/`updateMath()` call `getElementById` on every
+render — SPECIAL `s_s..s_l` + `commitStat`/`capStatMax`, `stat_hp_cur/max`, `stat_lvl`, `stat_xp`,
+`c_caps`, `display_ap`, `display_weight`, `stat_rads`, the five limb toggle buttons,
+`nativeLevelUp`, `renderBioScan`, `renderSkills`/`renderFactionRep`/`renderPerks`/`renderKarmaCenter`,
+etc.) — new markup wraps around these elements, nothing is renamed or forked, and no state field or
+campaign write was added beyond what the existing handlers already did.
+
+**The hero three (deep-dressed):**
+
+- **BUS-01 VITAL TELEMETRY** — HP, LVL/XP, and RAD render as CRT patient-monitor beam traces
+  (`.crt-mon` > `.trace` rows) reusing the existing `hp_bar_container`/`hp_bar_fill` and
+  `xp_bar_container`/`xp_bar_fill` elements (restyled via an added `.t-line` class, never replaced)
+  alongside the real `stat_hp_cur`/`stat_hp_max`/`stat_lvl`/`stat_xp` inputs. A bottom
+  `.readback-strip` of four uniform `.rb-tile`s shows BOTTLE CAPS (`c_caps`, still the real editable
+  amber input), MAX AP and WEIGHT (`display_ap`/`display_weight`, computed readouts, unchanged), and
+  a `button.rb-key#btnLevelUp` (still `onclick="nativeLevelUp()"`) whose label
+  (`#opLevelUpKeyText`) flashes "▲ LEVEL N COMMITTED" for 1.2s on a `RobcoEvents.on('level.up', ...)`
+  callback, then reverts — a new UI-only subscriber added to `_wireCoreEventBusSubscribers()`
+  alongside the pre-existing HP-critical one, never a new emit site. `radAwayAlert` is restructured
+  into a `.radaway-lamp` (pulsing dot + `#radAwayAlertText` span) but keeps its id and
+  `style.display` toggle exactly as `updateMath()`'s existing "Radiation Treatment Alert" block
+  already drove it.
+- **BUS-02 S.P.E.C.I.A.L. TUNING** — the 7 `s_s..s_l` inputs are each wrapped in a `.fader` (a
+  `.fd-ladder` of 10 segment `<i>` marks, lit up to the current value with the top lit segment
+  carrying an `.top` amber accent, plus a `.fd-cap` position marker) with the original input
+  (`class="num-sm fader-input"`, `oninput="capStatMax(this); updateMath();"`,
+  `onchange="commitStat(this)"` all unchanged) and a new `.fd-steps` pair of `±` buttons calling a
+  new `_bumpSpecialStat(key, delta)` helper (`js/ui-core.js`) that only writes the input's `.value`
+  and dispatches the same `change`/`input` events `commitStat`/`capStatMax` already listen for —
+  never a parallel state-write path.
+- **BUS-03 SKELETAL HARNESS** — an SVG anatomical zone plate (`.zone[data-limb="hd|la|ra|ll|rl"]`,
+  `role="button"`, `tabindex="0"`) sits beside the original `btn_l_hd/la/ra/ll/rl` limb-toggle
+  buttons (unchanged, just re-parented into `.zone-chips`). `_syncBioHarnessZones()` (called from
+  `loadUI()`) toggles a `.crippled` class on the matching zone from `state[limb] !== 'OK'`, which
+  drives a `zoneCriBlink` red-hatch animation; `_wireBioHarnessZones()` (called once from
+  `window.onload`) wires each zone's click/keydown to the same `toggleLimb(limb)` handler the chip
+  buttons already call — one state mutation path, two input surfaces. The board also carries a
+  read-only RAD EXPOSURE mirror (`#opHarnessRadBar`/`#opHarnessRadMirror`) kept in sync with the
+  real, editable `stat_rads` input on BUS-01 by `_syncOperatorTelemetry()` — `stat_rads` is
+  intentionally the ONE real id (Suite 181 locks it appearing exactly once file-wide); the mockup
+  shows a rad readout on both boards using a non-unique attribute, which isn't possible with real
+  DOM ids, so BUS-03 gets a synced read-only mirror instead of a second editable field. RUN
+  BIO-SCAN ADVISORY reuses the existing `onclick="renderBioScan()"` button unchanged.
+
+**Light-framed boards (Protocol 25 scope-limited — not deep-redesigned this pass):** SKILL MATRIX,
+PERKS/TRAITS, CHRONO/POSITION FIX, STATUS EFFECTS, FACTION STANDING, and KARMA CENTER each gain the
+same `bay-board` header treatment (a `.board-led` dot, a `BUS-0N` `.bay-slot-tag`, an arbitrary
+non-count-derived `.bay-part-no`, and a `.panel-substatus` "0i status row" in the `<summary>`) but
+their inner rendered markup (`skillsGrid`, `perksList`, `statusList`, `factionContainer`,
+`karmaCenterDisplay`) is untouched. All nine boards' `<h2>` headings keep the mandatory `>` glyph
+(Protocol UI-1); `.bay-board`/`.bay-slot-tag`/`.bay-part-no`/`.panel-substatus` are the same classes
+already established by the Module Bay and ACCOUNT panel (Protocol 22 — extended, not forked).
+
+**`_syncOperatorTelemetry()`** (`js/ui-core.js`, called from `updateMath()`) is the one new
+central sync function driving every derived OPERATOR readout: the HP condition word
+(`#opCondWord`, NOMINAL/IMPAIRED/CRITICAL) and its critical-state pulse, the RAD trace/bar widths
+and the BUS-03 mirror, each SPECIAL fader's lit-segment count and cap position, the limb-fault LED,
+and every board's `.panel-substatus` 0i status line (via a local `setStatus(id, text, alert)`
+helper) — all read from existing `state`/DOM values, none of it introduces a new write path.
+
+**A real Protocol 42 fix landed in the same commit:** `expandPanelForCategory()`'s `map` lookup
+table (`js/ui-core.js`) still targeted the old `'> BIO-METRICS'`/`'> BIO-SCAN'` heading strings for
+the `special`/`bio` categories — since those headings were renamed to `'> VITAL TELEMETRY'`/
+`'> SKELETAL HARNESS'` in this same unit, the Comm-Link's panel-expand-on-mention behavior (driven
+by `PANEL_NAV_ALIASES` in `js/api.js` — e.g. typing "stats" or "bio scan") would have silently
+stopped finding these panels. Fixed alongside the rename, with the pre-existing regression tests
+covering it (123.7, 168.7) updated to the new strings rather than left stale.
+
+Guarded by Suite 181 (both runners, 20 tests): id/handler preservation, the `stat_rads`
+single-instance invariant, `>` glyph presence on all nine board headings, `_syncOperatorTelemetry()`
+status-row wiring, the `_bumpSpecialStat`/zone-click/`level.up`-subscriber wiring, the Protocol 38
+part-number fix, and the `expandPanelForCategory()` string-literal fix.
 
 ---
 
@@ -2007,7 +2087,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2272-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2292-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

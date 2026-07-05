@@ -7831,7 +7831,10 @@ Check (($aliasMap123['consult'] -eq 'databank') -and ($aliasMap123['databank'] -
 # 123.7 expandPanelForCategory maps the panel-nav categories to a tab + h2 prefix
 $expandBody123 = ''
 try { $expandBody123 = Get-FunctionBody $core123 'expandPanelForCategory' } catch {}
-Check (($expandBody123 -match "special:\s*'stat'") -and ($expandBody123 -match "special:\s*'>\s*BIO-METRICS'") -and ($expandBody123 -match "skills:\s*'>\s*SKILL MATRIX'") -and ($expandBody123 -match "bio:\s*'>\s*BIO-SCAN'") -and ($expandBody123 -match "map:\s*'>\s*WORLD MAP'") -and ($expandBody123 -match "databank:\s*'>\s*DATABANK'") -and ($expandBody123 -match "config:\s*'settings'") -and ($expandBody123 -match "config:\s*'>\s*CAMPAIGN CONFIGS'")) `
+# PHASE 3 OPERATOR reskin (Suite 181) renamed BIO-METRICS/BIO-SCAN & LIMB
+# STATUS to VITAL TELEMETRY/SKELETAL HARNESS -- targets updated in the same
+# commit so "special"/"bio" panel-nav aliases keep landing on the right board.
+Check (($expandBody123 -match "special:\s*'stat'") -and ($expandBody123 -match "special:\s*'>\s*VITAL TELEMETRY'") -and ($expandBody123 -match "skills:\s*'>\s*SKILL MATRIX'") -and ($expandBody123 -match "bio:\s*'>\s*SKELETAL HARNESS'") -and ($expandBody123 -match "map:\s*'>\s*WORLD MAP'") -and ($expandBody123 -match "databank:\s*'>\s*DATABANK'") -and ($expandBody123 -match "config:\s*'settings'") -and ($expandBody123 -match "config:\s*'>\s*CAMPAIGN CONFIGS'")) `
     '123.7: expandPanelForCategory maps the panel-nav categories (special/skills/bio/map/databank/config) to a tab + h2'
 
 # 123.8 EXACT whole-input match: _routePanelNav does a direct map lookup (no includes/startsWith/indexOf)
@@ -14026,9 +14029,11 @@ Check (($RETIRED113 -contains '[TERMLINK]') -and ($RETIRED113 -contains '[TL]'))
 Check ((-not ($html168 -match 'id="termlinkBtn"')) -and (-not ($html168 -match '_termlinkLaunch\(')) -and (-not ($html168 -match 'showTermlinkConsole\(\)'))) `
     '168.6: index.html has no #termlinkBtn and no lingering reference to the retired launcher functions'
 
-# 168.7  BIO-SCAN is untouched: its own panel button still calls renderBioScan() directly
-Check (($uiRender168 -match 'function renderBioScan\(') -and ($html168 -match 'onclick="renderBioScan\(\)"') -and ($html168 -match 'BIO-SCAN & LIMB STATUS')) `
-    '168.7: BIO-SCAN & LIMB STATUS panel + its RUN BIO-SCAN button (renderBioScan()) are unaffected by the TERMLINK removal'
+# 168.7  BIO-SCAN is untouched: its own panel button still calls renderBioScan() directly.
+#        The panel title is now "SKELETAL HARNESS" (PHASE 3 OPERATOR reskin, Suite 181)
+#        -- same board, same button, same handler, new dressing.
+Check (($uiRender168 -match 'function renderBioScan\(') -and ($html168 -match 'onclick="renderBioScan\(\)"') -and ($html168 -match 'SKELETAL HARNESS')) `
+    '168.7: the BIO-SCAN board (now dressed as SKELETAL HARNESS, Suite 181) + its RUN BIO-SCAN button (renderBioScan()) are unaffected by the TERMLINK removal'
 
 # 168.8  the Tool Deck is untouched: its render/wire/open functions are still present
 Check (($uiRender168 -match 'function renderHolster\(') -and ($uiCore168 -match 'function _wireToolDeck\(') -and ($uiCore168 -match 'function openToolDeck\(')) `
@@ -15569,6 +15574,191 @@ Check (
     (-not ($knob2Rule180 -match 'animation:')) -and
     (-not [System.Text.RegularExpressions.Regex]::IsMatch($css180, '(?s)\.knob2[\s\S]{0,40}prefers-reduced-motion'))
 ) "180.12: .knob2 rotates via a plain transition (no animation:) and declares no bespoke reduced-motion carve-out -- the existing global block neutralises it automatically"
+
+# ===========================================================
+# Suite 181 -- PHASE 3 OPERATOR hero-three reskin (id-preservation
+# contract) (20 tests)
+# The Phase-3 hero-three OPERATOR/STAT dressing (planning/PHASE3_OPERATOR_
+# PLAN.md, matching the owner-approved planning/mockups/operator-combined.html
+# mix of Option-C CRT vitals monitor + Option-B fader bank + Option-B zone
+# plate). A pure Protocol 22/25 RESKIN -- every id/handler the plan's
+# id-preservation contract lists is preserved verbatim; BIO-METRICS is split
+# into its 3 real boards (BUS-01 VITAL TELEMETRY, BUS-02 S.P.E.C.I.A.L.
+# TUNING, BUS-04 CHRONO/POSITION) and BIO-SCAN & LIMB STATUS is re-dressed as
+# BUS-03 SKELETAL HARNESS; the other 5 OPERATOR boards (SKILL MATRIX/PERKS/
+# STATUS EFFECTS/FACTION STANDING/KARMA CENTER) are light-framed only (BUS
+# tag + 0i status row, no internal redesign, renderSkills()/renderFactionRep()/
+# renderKarmaCenter() untouched). All new instrument CSS (CRT trace, fader
+# ladder, zone plate) reuses the existing .bay-board/.bay-slot-tag/.bay-part-
+# no/.panel-substatus machine-language classes (Module Bay / ACCOUNT
+# precedent) rather than a parallel class family. stat_rads stays a single
+# unique id on BUS-01 (the owner-picked CRT-monitor placement) -- BUS-03
+# mirrors the same value read-only rather than duplicating the id, a
+# documented resolution of a mockup fidelity gap (the mockup fakes two
+# rad readouts via a shared, non-unique data attribute). Fixing this same
+# rename also caught a REAL regression during testing (Protocol 42):
+# expandPanelForCategory() looked up the SPECIAL/BIO-SCAN boards by their old
+# h2 text, which this rename broke silently -- fixed in the same commit
+# (Suites 123.7/168.7 updated). (PS mirror of JS Suite 181.)
+# ===========================================================
+Sep "Suite 181 -- PHASE 3 OPERATOR hero-three reskin (id-preservation contract)"
+$html181 = Read-Src "index.html"
+$uiCore181 = Read-Src "js/ui-core.js"
+$uiRender181 = Read-Src "js/ui-render.js"
+$css181 = Read-Src "css/terminal.css"
+
+# 181.1  the full fixed-id set from planning/PHASE3_OPERATOR_PLAN.md sec3
+$FIXED_IDS_181 = @(
+    's_s','s_p','s_e','s_c','s_i','s_a','s_l','stat_hp_cur','stat_hp_max','hp_bar_fill','hp_bar_container',
+    'stat_lvl','stat_xp','xp_bar_fill','xp_bar_container','btnLevelUp','c_caps','stat_karma','karma_label',
+    'stat_loc','locationOptions','cal_month','cal_day','cal_year','time_hour','time_min','time_day','stat_ticks',
+    'gameDateDisplay','gameTimeDisplay','display_weight','display_ap','equippedDisplay','radAwayAlert','stat_rads',
+    'btn_l_hd','btn_l_la','btn_l_ra','btn_l_ll','btn_l_rl','skillsGrid','skillBooksPanel','skillBooksDisplay',
+    'magazinesPanel','magazinesDisplay','perksList','newPerkName','newPerkRank','newPerkLevel','traitsSection',
+    'traitFilter','traitsDisplay','statusList','newStatusName','newStatusTicks','newStatusType','factionContainer',
+    'factionPanel','karmaPanel','karmaCenterDisplay'
+)
+$missingIds181 = @($FIXED_IDS_181 | Where-Object { $html181 -notmatch ('id="' + $_ + '"') })
+Check ($missingIds181.Count -eq 0) `
+    ('181.1: every id in the PHASE3_OPERATOR_PLAN.md id-preservation contract (60 ids) still exists in index.html -- missing: ' + ($missingIds181 -join ', '))
+
+# 181.2  every shipped handler the plan names is still referenced unchanged
+$HANDLERS_181 = @('commitStat','capStatMax','toggleLimb','nativeLevelUp','onLvlInputChanged','onTimeInputChanged','onLocationChange','updateKarmaUI','renderBioScan')
+$missingHandlers181 = @($HANDLERS_181 | Where-Object { $html181 -notmatch ($_ + '\(') })
+Check ($missingHandlers181.Count -eq 0) `
+    ('181.2: every shipped handler (commitStat/capStatMax/toggleLimb/nativeLevelUp/onLvlInputChanged/onTimeInputChanged/onLocationChange/updateKarmaUI/renderBioScan) is still called from index.html -- missing: ' + ($missingHandlers181 -join ', '))
+
+# 181.3  renderSkills()/renderFactionRep()/renderKarmaCenter() untouched
+Check (($uiCore181 -match 'function renderSkills\(\)') -and ($uiRender181 -match 'function renderFactionRep\(\)') -and ($uiRender181 -match 'function renderKarmaCenter\(\)')) `
+    '181.3: renderSkills()/renderFactionRep()/renderKarmaCenter() are all still defined unchanged -- the light-frame pass only wraps their containing board, never their own render template'
+
+# 181.4  all 9 OPERATOR boards are <details class="panel bay-board"> with a BUS-0N tag
+$boardTitles181 = @('VITAL TELEMETRY','S.P.E.C.I.A.L. TUNING','CHRONO / POSITION FIX','SKELETAL HARNESS','SKILL MATRIX','PERKS','STATUS EFFECTS','FACTION STANDING','KARMA CENTER')
+$busTags181 = @('BUS-01','BUS-02','BUS-04','BUS-03','BUS-05','BUS-06','BUS-07','BUS-08','BUS-09')
+# Prettier is free to wrap a long <h2> (id attribute + multi-word title) onto several
+# indented lines, so a multi-word title matches with \s+ between words instead of a
+# literal space (Protocol 42 -- caught live by npm run format wrapping the 4 hero boards).
+$boardsOk181 = $true
+foreach ($t in $boardTitles181) {
+    # .NET Regex.Escape also escapes plain whitespace (e.g. "VITAL TELEMETRY" -> "VITAL\ TELEMETRY"),
+    # so a blind space->\s+ replace afterward corrupts that backslash into a literal-backslash match
+    # instead of a whitespace class. Escape each word separately, then join with \s+ instead.
+    $escaped = (($t -split ' ') | ForEach-Object { [regex]::Escape($_) }) -join '\s+'
+    if (-not [System.Text.RegularExpressions.Regex]::IsMatch($html181, '(?s)class="panel bay-board"[\s\S]{0,400}' + $escaped)) { $boardsOk181 = $false }
+}
+foreach ($b in $busTags181) {
+    if ($html181 -notmatch ('class="bay-slot-tag">' + $b + '<')) { $boardsOk181 = $false }
+}
+Check $boardsOk181 `
+    '181.4: all 9 OPERATOR boards are <details class="panel bay-board"> and carry their BUS-0N slot tag (reuses the existing Module Bay board-frame class, Protocol 22)'
+
+# 181.5  Protocol UI-1 -- all 9 OPERATOR board h2 headings keep the ">" glyph
+$opH2Ok181 = $true
+foreach ($t in $boardTitles181) {
+    # .NET Regex.Escape also escapes plain whitespace (e.g. "VITAL TELEMETRY" -> "VITAL\ TELEMETRY"),
+    # so a blind space->\s+ replace afterward corrupts that backslash into a literal-backslash match
+    # instead of a whitespace class. Escape each word separately, then join with \s+ instead.
+    $escaped = (($t -split ' ') | ForEach-Object { [regex]::Escape($_) }) -join '\s+'
+    $m = [System.Text.RegularExpressions.Regex]::Match($html181, '(?s)<h2>[\s\S]{0,200}?' + $escaped + '[\s\S]{0,20}?</h2>')
+    if (-not $m.Success) { $opH2Ok181 = $false; continue }
+    $text = ($m.Value -replace '<[^>]+>', '') -replace '&gt;', '>'
+    if (-not $text.Trim().StartsWith('>')) { $opH2Ok181 = $false }
+}
+Check $opH2Ok181 `
+    '181.5: all 9 OPERATOR board <h2> headings still start with the mandatory "> " glyph (Protocol UI-1) despite the new <span class="board-led">'
+
+# 181.6  the SPECIAL fader steppers route through the existing commitStat(el)
+$bumpBody181 = Get-FunctionBody $uiCore181 '_bumpSpecialStat'
+Check (($bumpBody181 -match 'el\.value = String\(next\)') -and ($bumpBody181 -match 'commitStat\(el\)')) `
+    '181.6: _bumpSpecialStat() sets el.value then calls the existing commitStat(el) -- one clamp/state-write/save path for both the typed field and the steppers'
+
+# 181.7  updateMath() calls _syncOperatorTelemetry() exactly once
+$updateMathBody181 = Get-FunctionBody $uiCore181 'updateMath'
+Check ($updateMathBody181 -match '_syncOperatorTelemetry\(\);') `
+    '181.7: updateMath() calls _syncOperatorTelemetry() exactly once, at the end of its existing body'
+
+# 181.8  _syncOperatorTelemetry() drives HP cond-word, RAD trace/mirror, ladders, statuses
+$syncBody181 = Get-FunctionBody $uiCore181 '_syncOperatorTelemetry'
+Check (
+    ($syncBody181 -match "getElementById\('opCondWord'\)") -and
+    ($syncBody181 -match "getElementById\('opRadLine'\)") -and
+    ($syncBody181 -match "getElementById\('opHarnessRadBar'\)") -and
+    ($syncBody181 -match "getElementById\('opHarnessRadMirror'\)") -and
+    ($syncBody181 -match 'data-fd-ladder') -and
+    ($syncBody181 -match "setStatus\(\s*'opVitalStatus'") -and
+    ($syncBody181 -match "setStatus\(\s*'opHarnessStatus'")
+) '181.8: _syncOperatorTelemetry() drives the HP cond-word, the RAD trace + BUS-03 mirror, the SPECIAL fader ladders, and the board-status rows'
+
+# 181.9  stat_rads stays a single unique id
+$radIdOccurrences181 = ([regex]::Matches($html181, 'id="stat_rads"')).Count
+Check ($radIdOccurrences181 -eq 1) `
+    '181.9: id="stat_rads" appears exactly once (BUS-01) -- BUS-03 mirrors the same value read-only via #opHarnessRadMirror, never a duplicate input sharing the id'
+
+# 181.10  the RadAway alert restructure is handled correctly by updateMath()
+Check (($updateMathBody181 -match 'if \(alertTextEl\) alertTextEl\.textContent = msg;') -and ($updateMathBody181 -match "alertEl\.style\.display = 'flex'")) `
+    "181.10: updateMath()'s RadAway block sets #radAwayAlertText's textContent on its primary path (a bare alertEl.textContent would erase the lamp icon) and flips display to 'flex'"
+
+# 181.11  loadUI() calls _syncBioHarnessZones()
+$loadUIBody181 = Get-FunctionBody $uiCore181 'loadUI'
+Check ($loadUIBody181 -match '_syncBioHarnessZones\(\);') `
+    '181.11: loadUI() calls _syncBioHarnessZones() -- the SVG zone crippled-state can never drift from the limb-button re-render in the same function'
+
+# 181.12  zone taps route through the existing toggleLimb()
+$wireZonesBody181 = Get-FunctionBody $uiCore181 '_wireBioHarnessZones'
+Check (($wireZonesBody181 -match 'toggleLimb\(zone\.dataset\.limb\)') -and ($wireZonesBody181 -match "addEventListener\('click'") -and ($wireZonesBody181 -match "addEventListener\('keydown'")) `
+    '181.12: _wireBioHarnessZones() routes both click and Enter/Space keyboard activation through the existing toggleLimb() -- one handler, two input surfaces'
+
+# 181.13  the SVG zone plate has all 5 data-limb zones
+$zonesOk181 = $true
+foreach ($l in @('hd','la','ra','ll','rl')) {
+    if ($html181 -notmatch ('data-limb="' + $l + '"')) { $zonesOk181 = $false }
+}
+Check $zonesOk181 '181.13: the SVG zone plate has all 5 data-limb zones (hd/la/ra/ll/rl)'
+
+# 181.14  the level-up key flash is a NEW 'level.up' bus subscriber
+$wireEventBusBody181 = Get-FunctionBody $uiCore181 '_wireCoreEventBusSubscribers'
+Check (
+    ($wireEventBusBody181 -match "RobcoEvents\.on\('level\.up', p => \{") -and
+    ($wireEventBusBody181 -match 'opLevelUpKeyText') -and
+    ($wireEventBusBody181 -match "LEVEL ' \+ newLvl \+ ' COMMITTED")
+) "181.14: _wireCoreEventBusSubscribers() adds a NEW 'level.up' subscriber that flashes #opLevelUpKeyText -- nativeLevelUp()'s existing emit call and onclick wiring are untouched"
+
+# 181.15  #btnLevelUp still calls onclick="nativeLevelUp()" directly
+Check ($html181 -match 'onclick="nativeLevelUp\(\)"') `
+    '181.15: #btnLevelUp still calls onclick="nativeLevelUp()" directly -- the flash is a bus subscriber, never a wrapper around the click handler'
+
+# 181.16  centering rule on every new incomplete-row flex container
+$centeredClasses181 = @('.fader-row','.zone-flex','.zone-chips','.readback-strip','.bio-actions')
+$centeringOk181 = $true
+foreach ($cls in $centeredClasses181) {
+    $escaped = [regex]::Escape($cls)
+    $m = [System.Text.RegularExpressions.Regex]::Match($css181, $escaped + ' \{[^}]*\}')
+    if (-not ($m.Success -and ($m.Value -match 'justify-content:\s*center'))) { $centeringOk181 = $false }
+}
+Check $centeringOk181 `
+    '181.16: .fader-row/.zone-flex/.zone-chips/.readback-strip/.bio-actions all center an incomplete last row (justify-content:center)'
+
+# 181.17  reduced-motion -- new discrete effects are plain animation: (no bespoke carve-out)
+$ledRuleMatch181 = [regex]::Match($css181, '\.board-led \{[^}]*\}')
+$ledRule181 = if ($ledRuleMatch181.Success) { $ledRuleMatch181.Value } else { '' }
+Check (
+    ($ledRule181 -match 'animation:\s*rad-pulse') -and
+    ($css181 -match '@keyframes zoneCriBlink') -and
+    [System.Text.RegularExpressions.Regex]::IsMatch($css181, '(?s)\.zone\.crippled path,[\s\S]{0,120}animation:\s*zoneCriBlink')
+) '181.17: .board-led and .zone.crippled both use plain `animation:` keyframes (rad-pulse / zoneCriBlink) -- no bespoke reduced-motion carve-out needed'
+
+# 181.18  game-agnostic status computation (no hardcoded skill/faction counts)
+Check (($syncBody181 -match 'getSkillKeys\(\)\.length') -and ($syncBody181 -match 'getFactionRegistry\(\)\.length')) `
+    '181.18: the SKILL MATRIX / FACTION STANDING 0i status lines are computed via getSkillKeys().length / getFactionRegistry().length (Protocol 38 -- never a hardcoded per-game count)'
+
+# 181.19  no stray game-literal skill count in the decorative part number
+Check (-not ($html181 -match 'PN RBC-SKL-13')) `
+    "181.19: the SKILL MATRIX board's decorative part number does not hardcode FNV's real skill count as a literal (Protocol 38 -- flavor text is not a game-agnostic guarantee, but a stray count-shaped literal was caught and fixed during this build)"
+
+# 181.20  no new campaign-state field was added by this reskin
+$stateSrc181 = Read-Src "js/state.js"
+Check (-not [System.Text.RegularExpressions.Regex]::IsMatch($stateSrc181, '(?i)opVital|opSpecial|opHarness|fdLadder|zonePlate')) `
+    '181.20: js/state.js declares no new state field for this reskin -- every new id is a transient DOM/display concern, never persisted campaign data'
 
 # ===========================================================
 # Results

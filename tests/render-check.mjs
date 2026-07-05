@@ -370,6 +370,13 @@ for (const vp of VIEWPORTS) {
           if (el.tagName === 'SUMMARY') return false;
           const cls = (el.className || '').toString();
           if (cls.includes('faction-card-name') || cls.includes('phosphor-ghost')) return false;
+          // OPERATOR reskin (Design Overhaul Phase-3): the BUS-01 CRT trace glow-dot
+          // (::after on .hp-bar-fill / #opRadLine, positioned via a negative offset so
+          // it visually bleeds past the trace's own tip) and the BUS-02 fader cap
+          // (intentionally wider than its .fd-ladder track) are the same harmless
+          // decorative-overflow category as .phosphor-ghost above — clipped visually
+          // by their .crt-mon/.fd-ladder ancestor, no page-level overflow.
+          if (el.closest && (el.closest('.crt-mon') || cls.includes('fd-ladder'))) return false;
           return true;
         })
         .map(

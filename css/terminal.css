@@ -6157,3 +6157,560 @@ button.dial:focus-visible {
   width: 100%;
   min-width: 0;
 }
+
+/* ════════════════════════════════════════════════════════════════════
+   PHASE 3 · OPERATOR/STAT hero-three (Protocol 22/25 RESKIN — wraps the
+   exact shipped ids/handlers, no behavior change). Matches
+   planning/PHASE3_OPERATOR_PLAN.md + the owner-approved
+   planning/mockups/operator-combined.html (Option C vitals CRT monitor +
+   Option B fader bank + Option B zone plate). Every OPERATOR board reuses
+   the existing .bay-board/.bay-slot-tag/.bay-part-no/.panel-substatus
+   machine-language classes (Module Bay / ACCOUNT precedent) rather than a
+   parallel class family — the hero-three add new instrument CSS below;
+   the other 5 boards are light-framed with just those reused classes.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* .panel + .bay-board together: details.bay-board (specificity 0,1,1) wins
+   the shared border/background/padding over plain .panel (0,1,0); the h2
+   edge-bleed trick (.panel h2's -10px margins) still lines up because
+   .bay-board's own padding keeps the same 10px top/side values. */
+.board-led {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--robco-green);
+  box-shadow: 0 0 7px var(--robco-green);
+  margin-right: 2px;
+  flex-shrink: 0;
+  animation: rad-pulse 3s infinite;
+}
+.board-led.red {
+  background: var(--robco-danger);
+  box-shadow: 0 0 7px var(--robco-danger);
+  animation: rad-pulse 1.2s infinite;
+}
+.op-light-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(var(--robco-green-rgb), 0.25);
+  font-size: 11px;
+}
+.op-light-row label {
+  flex-shrink: 0;
+  opacity: 0.7;
+  font-size: 10px;
+}
+
+/* ── shared readback field sizing (mirrors the mockup's .num/.num-sm) ── */
+input.num {
+  width: 64px;
+}
+input.num-sm {
+  width: 46px;
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   BUS-01 — CRT MULTI-TRACE VITAL TELEMETRY (Option C)
+   ──────────────────────────────────────────────────────────────────── */
+.crt-mon {
+  margin-top: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.85);
+  outline: 1px solid rgba(var(--robco-green-rgb), 0.45);
+  background:
+    repeating-linear-gradient(0deg, rgba(var(--robco-green-rgb), 0.03) 0 1px, transparent 1px 14px),
+    repeating-linear-gradient(
+      90deg,
+      rgba(var(--robco-green-rgb), 0.03) 0 1px,
+      transparent 1px 14px
+    ),
+    #02120c;
+  box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.85);
+  padding: 10px 12px 12px;
+}
+.trace {
+  display: flex;
+  align-items: center;
+  gap: 8px 10px;
+  flex-wrap: wrap;
+  padding: 7px 0;
+  border-bottom: 1px dotted rgba(var(--robco-green-rgb), 0.18);
+}
+.trace:last-child {
+  border-bottom: none;
+}
+.trace .t-cap {
+  flex: 0 0 74px;
+  font-size: 8.5px;
+  letter-spacing: 1.5px;
+  opacity: 0.6;
+}
+.real-label {
+  opacity: 0.55;
+  font-size: 8.5px;
+  letter-spacing: 1.5px;
+}
+/* .t-line reuses the existing .hp-bar-container track — scoped here so the
+   CRT-trace look never leaks to any other future .hp-bar-container use. */
+.crt-mon .t-line {
+  flex: 1 1 110px;
+  min-width: 90px;
+  height: 12px;
+  margin: 0;
+  border: none;
+  border-bottom: 1px solid rgba(var(--robco-green-rgb), 0.25);
+  background: rgba(0, 0, 0, 0.4);
+  position: relative;
+  overflow: hidden; /* the glow-dot ::after marker bleeds past a 0%-width fill at 0 HP/RAD — clip it here so a healthy stat can never register a stray few px of inner scroll overflow */
+}
+.crt-mon .hp-bar-fill {
+  position: relative;
+  box-shadow: 0 0 8px currentColor;
+}
+.crt-mon .hp-bar-fill::after {
+  content: '';
+  position: absolute;
+  right: -3px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin-top: -3.5px;
+  border-radius: 50%;
+  background: inherit;
+  box-shadow: 0 0 10px currentColor;
+}
+#opRadLineWrap {
+  flex: 1 1 110px;
+  min-width: 90px;
+  height: 12px;
+  position: relative;
+  background: rgba(0, 0, 0, 0.4);
+  border-bottom: 1px solid rgba(var(--robco-green-rgb), 0.25);
+  overflow: hidden; /* matches .crt-mon .t-line — clips the glow-dot ::after marker at 0 RAD so it can never register a stray few px of inner scroll overflow */
+}
+#opRadLineWrap i {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  height: 3px;
+  margin-top: -1.5px;
+  background: var(--bezel-wire);
+  box-shadow: 0 0 8px var(--bezel-wire);
+  transition: width 0.9s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+#opRadLineWrap i::after {
+  content: '';
+  position: absolute;
+  right: -3px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin-top: -3.5px;
+  border-radius: 50%;
+  background: inherit;
+  box-shadow: 0 0 10px currentColor;
+}
+.trace.critline .crt-mon .hp-bar-fill,
+.trace.critline .hp-bar-fill {
+  box-shadow: 0 0 8px var(--robco-danger);
+  animation: rad-pulse 1.2s infinite;
+}
+.trace .t-read {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+}
+.trace .t-read label {
+  font-size: 7.5px;
+  opacity: 0.45;
+  letter-spacing: 1px;
+}
+.cond-word {
+  font-size: 9px;
+  letter-spacing: 2px;
+}
+.cond-word.crit {
+  color: var(--robco-danger);
+  text-shadow: 0 0 7px rgba(231, 76, 60, 0.55);
+  animation: rad-pulse 1.2s infinite;
+}
+
+/* ── the readback strip: one uniform 4-tile hardware row ── */
+.readback-strip {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center; /* centering rule */
+  gap: 9px;
+  margin-top: 12px;
+  align-items: stretch;
+}
+.rb-tile {
+  flex: 1 1 128px;
+  max-width: 190px;
+  min-width: 122px;
+  min-height: 68px;
+  border: 1px solid rgba(0, 0, 0, 0.85);
+  outline: 1px solid rgba(var(--robco-green-rgb), 0.42);
+  background: linear-gradient(rgba(var(--robco-green-rgb), 0.025), rgba(0, 0, 0, 0.5)), #05100b;
+  box-shadow: inset 0 1px 5px rgba(0, 0, 0, 0.9);
+  padding: 8px 10px 9px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  text-align: center;
+  position: relative;
+  box-sizing: border-box;
+}
+.rb-cap {
+  font-size: 7.5px;
+  letter-spacing: 1.5px;
+  opacity: 0.5;
+  display: block;
+}
+.rb-val {
+  font-size: 17px;
+  letter-spacing: 1.5px;
+  display: block;
+}
+.rb-sub {
+  font-size: 6.5px;
+  letter-spacing: 1px;
+  opacity: 0.32;
+  display: block;
+  text-transform: none;
+}
+.rb-tile input {
+  border: none;
+  background: transparent;
+  font-size: 17px;
+  letter-spacing: 1.5px;
+  width: 100%;
+  padding: 0;
+  text-shadow: var(--robco-glow);
+  text-align: center;
+}
+.rb-tile.amber {
+  outline-color: rgba(var(--amber-rgb, 255, 182, 66), 0.5);
+  border-color: rgba(255, 182, 66, 0.3);
+}
+.rb-tile.amber .rb-val,
+.rb-tile.amber input {
+  color: var(--bezel-wire);
+  text-shadow: 0 0 7px rgba(255, 182, 66, 0.55);
+}
+.rb-tile.amber .rb-cap {
+  color: var(--bezel-wire);
+  opacity: 0.55;
+}
+/* the level-up key — same footprint as the tiles, reads as a keycap */
+button.rb-key {
+  flex: 1 1 128px;
+  max-width: 190px;
+  min-width: 122px;
+  min-height: 68px;
+  border: 1px solid var(--robco-green);
+  outline: none;
+  background: linear-gradient(
+    180deg,
+    rgba(var(--robco-green-rgb), 0.1),
+    rgba(var(--robco-green-rgb), 0.03) 55%,
+    rgba(0, 0, 0, 0.4)
+  );
+  box-shadow:
+    inset 0 -3px 0 rgba(0, 0, 0, 0.65),
+    inset 0 1px 0 rgba(var(--robco-green-rgb), 0.25),
+    0 0 10px rgba(var(--robco-green-rgb), 0.14);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  padding: 8px 6px;
+  margin-top: 0;
+  color: var(--robco-green);
+  text-shadow: var(--robco-glow);
+}
+button.rb-key .rb-cap {
+  opacity: 0.5;
+  color: var(--robco-green);
+}
+button.rb-key:active {
+  transform: translateY(1px);
+  box-shadow:
+    inset 0 -1px 0 rgba(0, 0, 0, 0.65),
+    0 0 10px rgba(var(--robco-green-rgb), 0.14);
+}
+button.rb-key:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* the RadAway lamp — restyles the existing #radAwayAlert (JS still only
+   toggles style.display; the flex/lamp look is purely CSS via this class,
+   already present on the element in index.html). */
+.radaway-lamp {
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  color: var(--bezel-wire);
+  text-shadow: 0 0 7px rgba(255, 182, 66, 0.55);
+  border: 1px dashed rgba(255, 182, 66, 0.5);
+  padding: 5px 8px;
+  text-align: left;
+}
+.radaway-lamp i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--bezel-wire);
+  box-shadow: 0 0 8px var(--bezel-wire);
+  animation: rad-pulse 1s infinite;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   BUS-02 — SEVEN-FADER EQUALIZER BANK (Option B)
+   ──────────────────────────────────────────────────────────────────── */
+.fader-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 4px;
+  justify-content: center; /* centering rule */
+  margin-top: 10px;
+}
+.fader {
+  flex: 0 0 38px;
+  text-align: center;
+}
+.fd-letter {
+  font-size: 12px;
+  display: block;
+}
+.fd-ladder {
+  width: 22px;
+  height: 110px;
+  margin: 4px auto;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.45);
+  background: rgba(0, 0, 0, 0.5);
+  position: relative;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 2px;
+  padding: 2px;
+  box-sizing: border-box;
+}
+.fd-ladder i {
+  flex: 1;
+  background: rgba(var(--robco-green-rgb), 0.1);
+}
+.fd-ladder i.lit {
+  background: var(--robco-green);
+  box-shadow: 0 0 6px rgba(var(--robco-green-rgb), 0.7);
+}
+.fd-ladder i.lit.top {
+  background: var(--bezel-wire);
+  box-shadow: 0 0 6px rgba(255, 182, 66, 0.7);
+}
+.fd-cap {
+  position: absolute;
+  left: -5px;
+  right: -5px;
+  height: 7px;
+  background: linear-gradient(180deg, #3a3e33, #22251e);
+  border: 1px solid rgba(0, 0, 0, 0.8);
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.8),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  transition: bottom 0.35s cubic-bezier(0.3, 1.3, 0.55, 1); /* SEAT */
+  bottom: 40%;
+}
+.fader input.fader-input {
+  width: 36px;
+  font-size: 16px;
+  padding: 3px 1px;
+  margin-top: 3px;
+}
+.fd-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 3px;
+}
+.fd-steps button {
+  width: 100%;
+  min-height: 28px;
+  padding: 1px 0;
+  font-size: 11px;
+  margin-top: 0;
+  border-color: rgba(var(--robco-green-rgb), 0.4);
+}
+.fader-note {
+  text-align: center;
+  font-size: 8px;
+  letter-spacing: 1px;
+  opacity: 0.4;
+  margin-top: 8px;
+  text-transform: none;
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   BUS-03 — ANATOMICAL ZONE PLATE (Option B)
+   ──────────────────────────────────────────────────────────────────── */
+.zone-flex {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 26px;
+  align-items: center;
+  justify-content: center; /* centering rule */
+  margin-top: 8px;
+}
+.zone-body svg {
+  display: block;
+  width: 148px;
+  height: auto;
+  overflow: visible;
+}
+.zone {
+  cursor: pointer;
+}
+.zone path,
+.zone circle.zshape {
+  fill: rgba(var(--robco-green-rgb), 0.1);
+  stroke: rgba(var(--robco-green-rgb), 0.8);
+  stroke-width: 1.6;
+}
+.zone text {
+  fill: var(--robco-green);
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-anchor: middle;
+  font-family: inherit;
+}
+.zone:hover path,
+.zone:hover circle.zshape {
+  fill: rgba(var(--robco-green-rgb), 0.2);
+}
+.zone:focus-visible {
+  outline: 2px solid var(--robco-alert);
+  outline-offset: 2px;
+}
+.zone.crippled path,
+.zone.crippled circle.zshape {
+  fill: rgba(231, 76, 60, 0.3);
+  stroke: var(--robco-danger);
+  animation: zoneCriBlink 1s steps(2) infinite;
+}
+.zone.crippled text {
+  fill: var(--robco-danger);
+}
+@keyframes zoneCriBlink {
+  50% {
+    opacity: 0.4;
+  }
+}
+.zone-readout {
+  flex: 1 1 190px;
+  max-width: 330px;
+  min-width: 0;
+}
+.zone-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  justify-content: center; /* centering rule */
+  margin-top: 4px;
+}
+/* .limb-ok/.limb-crip are the shipped classes loadUI() sets directly via
+   btn.className — restyled here (never renamed) to read as the mockup's
+   zone-chip boxes, so the "mirrored readout list" IS the real limb toggles,
+   not a second parallel element. */
+.zone-chips button.limb-ok,
+.zone-chips button.limb-crip {
+  border-radius: 0;
+  font-size: 9px;
+  letter-spacing: 1px;
+  padding: 6px 9px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  background: rgba(0, 0, 0, 0.4);
+}
+.zone-chips button.limb-crip {
+  text-shadow: 0 0 6px rgba(231, 76, 60, 0.5);
+}
+.rad-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.rad-row .rr-meter {
+  flex: 1 1 150px;
+  min-width: 0;
+}
+.rad-row .rr-label {
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  opacity: 0.65;
+  color: var(--bezel-wire);
+}
+.bar-track {
+  margin-top: 4px;
+  height: 10px;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.5);
+  background: rgba(0, 0, 0, 0.5);
+  position: relative;
+  overflow: hidden;
+}
+.bar-fill.rad {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--bezel-wire) 0 5px,
+    rgba(255, 182, 66, 0.25) 5px 8px
+  );
+  box-shadow: 0 0 7px rgba(255, 182, 66, 0.5);
+  transition: width 0.9s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+.bio-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center; /* centering rule */
+  gap: 8px;
+  margin-top: 12px;
+}
+.bio-actions .keybtn {
+  width: auto;
+  flex: 1 1 220px;
+  max-width: 320px;
+}
+
+/* ── mobile: keep the fader bank to a single row even at 360px ── */
+@media (max-width: 480px) {
+  .fader {
+    flex: 0 0 34px;
+  }
+  .fd-ladder {
+    width: 20px;
+    height: 96px;
+  }
+}
+
+/* No bespoke reduced-motion carve-out needed here: .board-led/.zone.crippled/
+   .radaway-lamp i are all plain `animation:` (rad-pulse / zoneCriBlink), so
+   the existing global `*, *::before, *::after` prefers-reduced-motion block
+   already zeroes them to their resting frame automatically. */

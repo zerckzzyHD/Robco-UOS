@@ -418,212 +418,153 @@
         </button>
         <div class="main-grid">
           <div class="col-left" id="uiPanel">
-            <!-- 1. BIO-METRICS (STAT tab) -->
-            <details class="panel" data-tab="stat">
+            <!-- 1. VITAL TELEMETRY / S.P.E.C.I.A.L. TUNING / CHRONO-POSITION (STAT tab) -->
+            <!-- ══════════════════════════════════════════════════════════════
+                 PHASE 3 · OPERATOR hero-three (Protocol 22/25 reskin — wraps the
+                 exact shipped ids/handlers, no behavior change). BIO-METRICS is
+                 split into its 3 real boards (BUS-01 VITAL TELEMETRY, BUS-02
+                 S.P.E.C.I.A.L. TUNING, BUS-04 CHRONO/POSITION — see below),
+                 matching planning/PHASE3_OPERATOR_PLAN.md + the owner-approved
+                 planning/mockups/operator-combined.html mix (C-vitals CRT
+                 monitor + B-faders EQ bank + B-plate zone harness).
+                 ══════════════════════════════════════════════════════════════ -->
+
+            <!-- BUS-01 · VITAL TELEMETRY — CRT multi-trace patient monitor -->
+            <details class="panel bay-board" data-tab="stat" open>
               <summary>
-                <h2>> BIO-METRICS</h2>
+                <h2>
+                  &gt; <span class="board-led" id="opVitalLed" aria-hidden="true"></span> VITAL
+                  TELEMETRY
+                </h2>
+                <span class="panel-substatus" id="opVitalStatus"
+                  >HP —% · LVL — · XP —% · — CAPS</span
+                >
               </summary>
-              <div class="special-grid">
-                <div>
-                  <label>S</label
-                  ><input
-                    type="number"
-                    id="s_s"
-                    value="5"
-                    min="1"
-                    max="10"
-                    inputmode="numeric"
-                    aria-label="Strength"
-                    oninput="
-                      capStatMax(this);
-                      updateMath();
-                    "
-                    onchange="commitStat(this)"
-                  />
-                </div>
-                <div>
-                  <label>P</label
-                  ><input
-                    type="number"
-                    id="s_p"
-                    value="5"
-                    min="1"
-                    max="10"
-                    inputmode="numeric"
-                    aria-label="Perception"
-                    oninput="
-                      capStatMax(this);
-                      updateMath();
-                    "
-                    onchange="commitStat(this)"
-                  />
-                </div>
-                <div>
-                  <label>E</label
-                  ><input
-                    type="number"
-                    id="s_e"
-                    value="5"
-                    min="1"
-                    max="10"
-                    inputmode="numeric"
-                    aria-label="Endurance"
-                    oninput="
-                      capStatMax(this);
-                      updateMath();
-                    "
-                    onchange="commitStat(this)"
-                  />
-                </div>
-                <div>
-                  <label>C</label
-                  ><input
-                    type="number"
-                    id="s_c"
-                    value="5"
-                    min="1"
-                    max="10"
-                    inputmode="numeric"
-                    aria-label="Charisma"
-                    oninput="
-                      capStatMax(this);
-                      updateMath();
-                    "
-                    onchange="commitStat(this)"
-                  />
-                </div>
-                <div>
-                  <label>I</label
-                  ><input
-                    type="number"
-                    id="s_i"
-                    value="5"
-                    min="1"
-                    max="10"
-                    inputmode="numeric"
-                    aria-label="Intelligence"
-                    oninput="
-                      capStatMax(this);
-                      updateMath();
-                    "
-                    onchange="commitStat(this)"
-                  />
-                </div>
-                <div>
-                  <label>A</label
-                  ><input
-                    type="number"
-                    id="s_a"
-                    value="5"
-                    min="1"
-                    max="10"
-                    inputmode="numeric"
-                    aria-label="Agility"
-                    oninput="
-                      capStatMax(this);
-                      updateMath();
-                    "
-                    onchange="commitStat(this)"
-                  />
-                </div>
-                <div>
-                  <label>L</label
-                  ><input
-                    type="number"
-                    id="s_l"
-                    value="5"
-                    min="1"
-                    max="10"
-                    inputmode="numeric"
-                    aria-label="Luck"
-                    oninput="
-                      capStatMax(this);
-                      updateMath();
-                    "
-                    onchange="commitStat(this)"
-                  />
-                </div>
-              </div>
-              <div class="input-group">
-                <label>HP:</label>
-                <div>
-                  <input
-                    type="number"
-                    id="stat_hp_cur"
-                    value="100"
-                    min="0"
-                    style="width: 40px"
-                    oninput="updateMath()"
-                  />
-                  /
-                  <input
-                    type="number"
-                    id="stat_hp_max"
-                    value="100"
-                    min="1"
-                    style="width: 40px"
-                    oninput="updateMath()"
-                  />
-                </div>
-              </div>
-              <div class="hp-bar-container" id="hp_bar_container">
-                <div class="hp-bar-fill" id="hp_bar_fill" style="width: 100%"></div>
-              </div>
-              <div class="input-group">
-                <label>LVL/XP:</label>
-                <div>
-                  <input
-                    type="number"
-                    id="stat_lvl"
-                    value="1"
-                    min="1"
-                    style="width: 40px"
-                    oninput="onLvlInputChanged()"
-                  />
-                  /
-                  <input
-                    type="number"
-                    id="stat_xp"
-                    value="0"
-                    min="0"
-                    style="width: 40px"
-                    oninput="updateMath()"
-                  />
-                </div>
-              </div>
-              <div
-                class="hp-bar-container"
-                id="xp_bar_container"
-                style="cursor: default"
-                title="XP to next level"
+              <span class="bay-slot-tag">BUS-01</span>
+              <span class="bay-part-no"
+                >PN RBC-VIT-01 &middot; MULTI-TRACE PATIENT MONITOR — BEAM TRACES + EDITABLE
+                READBACK FIELDS</span
               >
-                <div
-                  class="hp-bar-fill"
-                  id="xp_bar_fill"
-                  style="width: 0%; background: var(--robco-blue)"
-                ></div>
+
+              <div class="crt-mon">
+                <div class="trace" id="opTraceHp">
+                  <span class="t-cap">CONDITION <span class="real-label">(HP)</span></span>
+                  <div class="hp-bar-container t-line" id="hp_bar_container">
+                    <div class="hp-bar-fill" id="hp_bar_fill" style="width: 100%"></div>
+                  </div>
+                  <span class="t-read">
+                    <input
+                      type="number"
+                      id="stat_hp_cur"
+                      value="100"
+                      min="0"
+                      class="num num-sm"
+                      oninput="updateMath()"
+                    />
+                    /
+                    <input
+                      type="number"
+                      id="stat_hp_max"
+                      value="100"
+                      min="1"
+                      class="num num-sm"
+                      oninput="updateMath()"
+                    />
+                    <span class="cond-word" id="opCondWord">NOMINAL</span>
+                  </span>
+                </div>
+                <div class="trace">
+                  <span class="t-cap">GRADE <span class="real-label">(LVL&middot;XP)</span></span>
+                  <div
+                    class="hp-bar-container t-line"
+                    id="xp_bar_container"
+                    title="XP to next level"
+                  >
+                    <div
+                      class="hp-bar-fill"
+                      id="xp_bar_fill"
+                      style="width: 0%; background: var(--robco-blue)"
+                    ></div>
+                  </div>
+                  <span class="t-read">
+                    <label>L</label>
+                    <input
+                      type="number"
+                      id="stat_lvl"
+                      value="1"
+                      min="1"
+                      class="num num-sm"
+                      oninput="onLvlInputChanged()"
+                    />
+                    <label>XP</label>
+                    <input
+                      type="number"
+                      id="stat_xp"
+                      value="0"
+                      min="0"
+                      class="num"
+                      oninput="updateMath()"
+                    />
+                  </span>
+                </div>
+                <div class="trace radline" id="opTraceRad">
+                  <span class="t-cap" style="color: var(--bezel-wire)"
+                    >RAD <span class="real-label">(RADS)</span></span
+                  >
+                  <div class="t-line" id="opRadLineWrap">
+                    <i id="opRadLine" style="width: 0%"></i>
+                  </div>
+                  <span class="t-read">
+                    <input
+                      type="number"
+                      id="stat_rads"
+                      value="0"
+                      min="0"
+                      class="num num-sm rad-input"
+                      oninput="updateMath()"
+                    />
+                    <label>CPM</label>
+                  </span>
+                </div>
               </div>
-              <div class="input-group" style="margin-top: 4px">
+
+              <!-- the polished readback strip: one uniform 4-tile hardware row -->
+              <div class="readback-strip">
+                <div class="rb-tile amber">
+                  <span class="rb-cap">BOTTLE CAPS</span>
+                  <input type="number" id="c_caps" value="0" min="0" oninput="updateMath()" />
+                  <span class="rb-sub">editable readout</span>
+                </div>
+                <div class="rb-tile">
+                  <span class="rb-cap">MAX AP</span>
+                  <span class="rb-val" id="display_ap">80</span>
+                  <span class="rb-sub">computed readout</span>
+                </div>
+                <div class="rb-tile">
+                  <span class="rb-cap">WEIGHT</span>
+                  <span class="rb-val" id="display_weight">0 / 200</span>
+                  <span class="rb-sub">computed readout</span>
+                </div>
                 <button
                   type="button"
                   id="btnLevelUp"
-                  class="action-btn btn-sm"
-                  style="width: 100%"
+                  class="rb-key"
                   disabled
                   onclick="nativeLevelUp()"
                   aria-label="Level up — advance to the next level"
                 >
-                  &gt; LEVEL UP
+                  <span class="rb-cap">GRADE ADVANCE</span>
+                  <span id="opLevelUpKeyText">&#9650; LEVEL UP</span>
                 </button>
               </div>
-              <div class="input-group">
-                <label>CAPS:</label
-                ><input type="number" id="c_caps" value="0" min="0" oninput="updateMath()" />
+
+              <div id="radAwayAlert" class="radaway-lamp" style="display: none">
+                <i aria-hidden="true"></i><span id="radAwayAlertText"></span>
               </div>
 
-              <div class="input-group" style="margin-top: 8px">
+              <div class="op-light-row">
                 <label>KARMA:</label>
-                <div style="display: flex; align-items: center; gap: 5px">
+                <div style="display: flex; align-items: center; gap: 5px; flex: 1">
                   <input
                     type="range"
                     id="stat_karma"
@@ -640,6 +581,314 @@
                   >
                 </div>
               </div>
+              <div class="op-light-row" style="align-items: flex-start">
+                <label style="padding-top: 1px">EQUIPPED:</label>
+                <div id="equippedDisplay" style="font-size: 11px; flex: 1">
+                  <span style="opacity: 0.4">Nothing equipped</span>
+                </div>
+              </div>
+            </details>
+
+            <!-- BUS-02 · S.P.E.C.I.A.L. TUNING — seven-fader equalizer bank -->
+            <details class="panel bay-board" data-tab="stat" open>
+              <summary>
+                <h2>
+                  &gt; <span class="board-led" aria-hidden="true"></span> S.P.E.C.I.A.L. TUNING
+                </h2>
+                <span class="panel-substatus" id="opSpecialStatus"
+                  >5&middot;5&middot;5&middot;5&middot;5&middot;5&middot;5</span
+                >
+              </summary>
+              <span class="bay-slot-tag">BUS-02</span>
+              <span class="bay-part-no"
+                >PN RBC-SPC-07 &middot; SEVEN-FADER EQUALIZER BANK — FIELD + STEPPERS UNDER EACH
+                FADER, ALWAYS VISIBLE</span
+              >
+
+              <div class="fader-row">
+                <div class="fader">
+                  <span class="fd-letter" title="Strength">S</span>
+                  <div class="fd-ladder" aria-hidden="true" data-fd-ladder="s">
+                    <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+                    <span class="fd-cap"></span>
+                  </div>
+                  <input
+                    type="number"
+                    id="s_s"
+                    value="5"
+                    min="1"
+                    max="10"
+                    inputmode="numeric"
+                    aria-label="Strength"
+                    class="num-sm fader-input"
+                    oninput="
+                      capStatMax(this);
+                      updateMath();
+                    "
+                    onchange="commitStat(this)"
+                  />
+                  <div class="fd-steps">
+                    <button
+                      type="button"
+                      onclick="_bumpSpecialStat('s', 1)"
+                      aria-label="Increase Strength"
+                    >
+                      +
+                    </button>
+                    <button
+                      type="button"
+                      onclick="_bumpSpecialStat('s', -1)"
+                      aria-label="Decrease Strength"
+                    >
+                      &minus;
+                    </button>
+                  </div>
+                </div>
+                <div class="fader">
+                  <span class="fd-letter" title="Perception">P</span>
+                  <div class="fd-ladder" aria-hidden="true" data-fd-ladder="p">
+                    <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+                    <span class="fd-cap"></span>
+                  </div>
+                  <input
+                    type="number"
+                    id="s_p"
+                    value="5"
+                    min="1"
+                    max="10"
+                    inputmode="numeric"
+                    aria-label="Perception"
+                    class="num-sm fader-input"
+                    oninput="
+                      capStatMax(this);
+                      updateMath();
+                    "
+                    onchange="commitStat(this)"
+                  />
+                  <div class="fd-steps">
+                    <button
+                      type="button"
+                      onclick="_bumpSpecialStat('p', 1)"
+                      aria-label="Increase Perception"
+                    >
+                      +
+                    </button>
+                    <button
+                      type="button"
+                      onclick="_bumpSpecialStat('p', -1)"
+                      aria-label="Decrease Perception"
+                    >
+                      &minus;
+                    </button>
+                  </div>
+                </div>
+                <div class="fader">
+                  <span class="fd-letter" title="Endurance">E</span>
+                  <div class="fd-ladder" aria-hidden="true" data-fd-ladder="e">
+                    <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+                    <span class="fd-cap"></span>
+                  </div>
+                  <input
+                    type="number"
+                    id="s_e"
+                    value="5"
+                    min="1"
+                    max="10"
+                    inputmode="numeric"
+                    aria-label="Endurance"
+                    class="num-sm fader-input"
+                    oninput="
+                      capStatMax(this);
+                      updateMath();
+                    "
+                    onchange="commitStat(this)"
+                  />
+                  <div class="fd-steps">
+                    <button
+                      type="button"
+                      onclick="_bumpSpecialStat('e', 1)"
+                      aria-label="Increase Endurance"
+                    >
+                      +
+                    </button>
+                    <button
+                      type="button"
+                      onclick="_bumpSpecialStat('e', -1)"
+                      aria-label="Decrease Endurance"
+                    >
+                      &minus;
+                    </button>
+                  </div>
+                </div>
+                <div class="fader">
+                  <span class="fd-letter" title="Charisma">C</span>
+                  <div class="fd-ladder" aria-hidden="true" data-fd-ladder="c">
+                    <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+                    <span class="fd-cap"></span>
+                  </div>
+                  <input
+                    type="number"
+                    id="s_c"
+                    value="5"
+                    min="1"
+                    max="10"
+                    inputmode="numeric"
+                    aria-label="Charisma"
+                    class="num-sm fader-input"
+                    oninput="
+                      capStatMax(this);
+                      updateMath();
+                    "
+                    onchange="commitStat(this)"
+                  />
+                  <div class="fd-steps">
+                    <button
+                      type="button"
+                      onclick="_bumpSpecialStat('c', 1)"
+                      aria-label="Increase Charisma"
+                    >
+                      +
+                    </button>
+                    <button
+                      type="button"
+                      onclick="_bumpSpecialStat('c', -1)"
+                      aria-label="Decrease Charisma"
+                    >
+                      &minus;
+                    </button>
+                  </div>
+                </div>
+                <div class="fader">
+                  <span class="fd-letter" title="Intelligence">I</span>
+                  <div class="fd-ladder" aria-hidden="true" data-fd-ladder="i">
+                    <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+                    <span class="fd-cap"></span>
+                  </div>
+                  <input
+                    type="number"
+                    id="s_i"
+                    value="5"
+                    min="1"
+                    max="10"
+                    inputmode="numeric"
+                    aria-label="Intelligence"
+                    class="num-sm fader-input"
+                    oninput="
+                      capStatMax(this);
+                      updateMath();
+                    "
+                    onchange="commitStat(this)"
+                  />
+                  <div class="fd-steps">
+                    <button
+                      type="button"
+                      onclick="_bumpSpecialStat('i', 1)"
+                      aria-label="Increase Intelligence"
+                    >
+                      +
+                    </button>
+                    <button
+                      type="button"
+                      onclick="_bumpSpecialStat('i', -1)"
+                      aria-label="Decrease Intelligence"
+                    >
+                      &minus;
+                    </button>
+                  </div>
+                </div>
+                <div class="fader">
+                  <span class="fd-letter" title="Agility">A</span>
+                  <div class="fd-ladder" aria-hidden="true" data-fd-ladder="a">
+                    <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+                    <span class="fd-cap"></span>
+                  </div>
+                  <input
+                    type="number"
+                    id="s_a"
+                    value="5"
+                    min="1"
+                    max="10"
+                    inputmode="numeric"
+                    aria-label="Agility"
+                    class="num-sm fader-input"
+                    oninput="
+                      capStatMax(this);
+                      updateMath();
+                    "
+                    onchange="commitStat(this)"
+                  />
+                  <div class="fd-steps">
+                    <button
+                      type="button"
+                      onclick="_bumpSpecialStat('a', 1)"
+                      aria-label="Increase Agility"
+                    >
+                      +
+                    </button>
+                    <button
+                      type="button"
+                      onclick="_bumpSpecialStat('a', -1)"
+                      aria-label="Decrease Agility"
+                    >
+                      &minus;
+                    </button>
+                  </div>
+                </div>
+                <div class="fader">
+                  <span class="fd-letter" title="Luck">L</span>
+                  <div class="fd-ladder" aria-hidden="true" data-fd-ladder="l">
+                    <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+                    <span class="fd-cap"></span>
+                  </div>
+                  <input
+                    type="number"
+                    id="s_l"
+                    value="5"
+                    min="1"
+                    max="10"
+                    inputmode="numeric"
+                    aria-label="Luck"
+                    class="num-sm fader-input"
+                    oninput="
+                      capStatMax(this);
+                      updateMath();
+                    "
+                    onchange="commitStat(this)"
+                  />
+                  <div class="fd-steps">
+                    <button
+                      type="button"
+                      onclick="_bumpSpecialStat('l', 1)"
+                      aria-label="Increase Luck"
+                    >
+                      +
+                    </button>
+                    <button
+                      type="button"
+                      onclick="_bumpSpecialStat('l', -1)"
+                      aria-label="Decrease Luck"
+                    >
+                      &minus;
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div class="fader-note">
+                segment ladder 1&ndash;10 &middot; amber top segment marks the current value
+                &middot; 1&ndash;10 clamp = the shipped commitStat path
+              </div>
+            </details>
+
+            <!-- BUS-04 · CHRONO / POSITION FIX (light-frame only this pass) -->
+            <details class="panel bay-board" data-tab="stat">
+              <summary>
+                <h2>
+                  &gt; <span class="board-led" aria-hidden="true"></span> CHRONO / POSITION FIX
+                </h2>
+                <span class="panel-substatus" id="opChronoStatus">&mdash;</span>
+              </summary>
+              <span class="bay-slot-tag">BUS-04</span>
+              <span class="bay-part-no">PN RBC-CHR-02 &middot; POSITION FIX + MISSION CLOCK</span>
 
               <div class="input-group">
                 <label>LOCATION:</label>
@@ -743,123 +992,172 @@
                   >—</span
                 >
               </div>
-              <div class="input-group">
-                <label>WEIGHT [W]:</label><span id="display_weight">0 / 200</span>
-              </div>
-              <div class="input-group"><label>MAX AP:</label><span id="display_ap">80</span></div>
-              <div
-                class="input-group"
-                style="
-                  margin-top: 6px;
-                  padding-top: 6px;
-                  border-top: 1px dashed rgba(var(--robco-green-rgb), 0.25);
-                "
-              >
-                <label style="font-size: 10px; opacity: 0.7">EQUIPPED:</label>
-                <div id="equippedDisplay" style="font-size: 11px; margin-top: 2px">
-                  <span style="opacity: 0.4">Nothing equipped</span>
-                </div>
-              </div>
-              <div
-                id="radAwayAlert"
-                style="
-                  display: none;
-                  margin-top: 5px;
-                  font-size: 10px;
-                  color: var(--robco-danger);
-                  border: 1px dashed var(--robco-danger);
-                  padding: 4px;
-                  text-align: center;
-                "
-              ></div>
             </details>
 
-            <details class="panel" data-tab="stat">
+            <!-- BUS-03 · SKELETAL HARNESS — anatomical zone plate.
+                 Owner-report resolution (mockup fidelity gap, documented not
+                 forced through — the mockup shows a RAD readout on both
+                 BUS-01's CRT trace AND this board via a shared fake
+                 data-attribute, which the real id-preservation contract can't
+                 duplicate: stat_rads is a single unique id and now lives on
+                 BUS-01 (the owner-picked Option C placement). This board
+                 mirrors that SAME value read-only (#opHarnessRadMirror,
+                 refreshed alongside stat_rads by updateMath()) rather than a
+                 second editable input with a duplicate id. -->
+            <details class="panel bay-board" data-tab="stat" open>
               <summary>
-                <h2>> BIO-SCAN & LIMB STATUS</h2>
+                <h2>
+                  &gt; <span class="board-led" id="opHarnessLed" aria-hidden="true"></span> SKELETAL
+                  HARNESS
+                </h2>
+                <span class="panel-substatus" id="opHarnessStatus"
+                  >ALL LIMBS OK &middot; RAD 0 CPM</span
+                >
               </summary>
-              <div class="input-group">
-                <label>RADIATION:</label>
-                <div style="display: flex; width: 165px; justify-content: center">
-                  <input
-                    type="number"
-                    id="stat_rads"
-                    value="0"
-                    min="0"
-                    oninput="updateMath()"
-                    style="width: 80px"
-                  />
-                </div>
-              </div>
-              <div class="input-group">
-                <label>HEAD:</label>
-                <div style="display: flex; width: 165px; justify-content: center">
-                  <button
-                    id="btn_l_hd"
-                    class="limb-ok"
-                    onclick="toggleLimb('hd')"
-                    aria-pressed="false"
-                    aria-label="Head: OK"
-                  >
-                    [████] OK
-                  </button>
-                </div>
-              </div>
-              <div class="input-group">
-                <label>ARMS (L/R):</label>
-                <div style="display: flex; gap: 5px">
-                  <button
-                    id="btn_l_la"
-                    class="limb-ok"
-                    onclick="toggleLimb('la')"
-                    aria-pressed="false"
-                    aria-label="Left Arm: OK"
-                  >
-                    [████] OK
-                  </button>
-                  <button
-                    id="btn_l_ra"
-                    class="limb-ok"
-                    onclick="toggleLimb('ra')"
-                    aria-pressed="false"
-                    aria-label="Right Arm: OK"
-                  >
-                    [████] OK
-                  </button>
-                </div>
-              </div>
-              <div class="input-group" style="margin-top: 4px">
-                <label>LEGS (L/R):</label>
-                <div style="display: flex; gap: 5px">
-                  <button
-                    id="btn_l_ll"
-                    class="limb-ok"
-                    onclick="toggleLimb('ll')"
-                    aria-pressed="false"
-                    aria-label="Left Leg: OK"
-                  >
-                    [████] OK
-                  </button>
-                  <button
-                    id="btn_l_rl"
-                    class="limb-ok"
-                    onclick="toggleLimb('rl')"
-                    aria-pressed="false"
-                    aria-label="Right Leg: OK"
-                  >
-                    [████] OK
-                  </button>
-                </div>
-              </div>
-              <!-- WU-N5: native deterministic medical advisory (no AI) -->
-              <button
-                class="action-btn"
-                style="width: 100%; margin-top: 8px"
-                onclick="renderBioScan()"
-                aria-label="Run BIO-SCAN medical advisory"
+              <span class="bay-slot-tag">BUS-03</span>
+              <span class="bay-part-no"
+                >PN RBC-BIO-05 &middot; ANATOMICAL ZONE PLATE — TAP A BODY ZONE OR ITS CHIP
+                <span class="real-label">(LIMB TOGGLES)</span></span
               >
-                &gt; RUN BIO-SCAN ADVISORY
-              </button>
+
+              <div class="zone-flex">
+                <div class="zone-body">
+                  <svg viewBox="0 0 140 230" aria-hidden="true">
+                    <g
+                      class="zone"
+                      data-limb="hd"
+                      tabindex="0"
+                      role="button"
+                      aria-label="Head — toggle crippled"
+                    >
+                      <circle class="zshape" cx="70" cy="26" r="17" />
+                      <text x="70" y="30">HD</text>
+                    </g>
+                    <path
+                      d="M54,46 L86,46 L90,112 L50,112 Z"
+                      fill="rgba(20,253,206,0.05)"
+                      stroke="rgba(20,253,206,0.4)"
+                      stroke-width="1.2"
+                    />
+                    <g
+                      class="zone"
+                      data-limb="la"
+                      tabindex="0"
+                      role="button"
+                      aria-label="Left arm — toggle crippled"
+                    >
+                      <path d="M52,50 L38,54 L28,112 L42,116 L52,76 Z" />
+                      <text x="38" y="90">LA</text>
+                    </g>
+                    <g
+                      class="zone"
+                      data-limb="ra"
+                      tabindex="0"
+                      role="button"
+                      aria-label="Right arm — toggle crippled"
+                    >
+                      <path d="M88,50 L102,54 L112,112 L98,116 L88,76 Z" />
+                      <text x="102" y="90">RA</text>
+                    </g>
+                    <g
+                      class="zone"
+                      data-limb="ll"
+                      tabindex="0"
+                      role="button"
+                      aria-label="Left leg — toggle crippled"
+                    >
+                      <path d="M52,114 L68,114 L62,212 L46,210 Z" />
+                      <text x="57" y="170">LL</text>
+                    </g>
+                    <g
+                      class="zone"
+                      data-limb="rl"
+                      tabindex="0"
+                      role="button"
+                      aria-label="Right leg — toggle crippled"
+                    >
+                      <path d="M72,114 L88,114 L94,210 L78,212 Z" />
+                      <text x="83" y="170">RL</text>
+                    </g>
+                  </svg>
+                </div>
+                <div class="zone-readout">
+                  <div class="zone-chips">
+                    <button
+                      id="btn_l_hd"
+                      class="limb-ok"
+                      onclick="toggleLimb('hd')"
+                      aria-pressed="false"
+                      aria-label="Head: OK"
+                    >
+                      [████] OK
+                    </button>
+                    <button
+                      id="btn_l_la"
+                      class="limb-ok"
+                      onclick="toggleLimb('la')"
+                      aria-pressed="false"
+                      aria-label="Left Arm: OK"
+                    >
+                      [████] OK
+                    </button>
+                    <button
+                      id="btn_l_ra"
+                      class="limb-ok"
+                      onclick="toggleLimb('ra')"
+                      aria-pressed="false"
+                      aria-label="Right Arm: OK"
+                    >
+                      [████] OK
+                    </button>
+                    <button
+                      id="btn_l_ll"
+                      class="limb-ok"
+                      onclick="toggleLimb('ll')"
+                      aria-pressed="false"
+                      aria-label="Left Leg: OK"
+                    >
+                      [████] OK
+                    </button>
+                    <button
+                      id="btn_l_rl"
+                      class="limb-ok"
+                      onclick="toggleLimb('rl')"
+                      aria-pressed="false"
+                      aria-label="Right Leg: OK"
+                    >
+                      [████] OK
+                    </button>
+                  </div>
+                  <div class="rad-row">
+                    <div class="rr-meter">
+                      <span class="rr-label"
+                        >RAD EXPOSURE <span class="real-label">(RADS)</span></span
+                      >
+                      <div class="bar-track">
+                        <div class="bar-fill rad" id="opHarnessRadBar" style="width: 0%"></div>
+                      </div>
+                    </div>
+                    <span
+                      class="rb-val"
+                      id="opHarnessRadMirror"
+                      style="color: var(--bezel-wire); font-size: 14px"
+                      >0</span
+                    >
+                    <span style="font-size: 9px; opacity: 0.5">CPM</span>
+                  </div>
+                  <div class="bio-actions">
+                    <!-- WU-N5: native deterministic medical advisory (no AI) -->
+                    <button
+                      class="action-btn keybtn"
+                      onclick="renderBioScan()"
+                      aria-label="Run BIO-SCAN medical advisory"
+                    >
+                      &gt; RUN BIO-SCAN ADVISORY
+                    </button>
+                  </div>
+                </div>
+              </div>
             </details>
 
             <details class="panel" data-tab="inv">
@@ -1091,10 +1389,14 @@
               </details>
             </details>
 
-            <details class="panel" data-tab="stat">
+            <!-- BUS-05 · SKILL VU ARRAY (light-frame only this pass) -->
+            <details class="panel bay-board" data-tab="stat">
               <summary>
-                <h2>> SKILL MATRIX</h2>
+                <h2>&gt; <span class="board-led" aria-hidden="true"></span> SKILL MATRIX</h2>
+                <span class="panel-substatus" id="opSkillsStatus">&mdash;</span>
               </summary>
+              <span class="bay-slot-tag">BUS-05</span>
+              <span class="bay-part-no">PN RBC-SKL-09 &middot; SKILL VU ARRAY</span>
               <div class="skills-grid" id="skillsGrid"></div>
 
               <!-- SKILL BOOKS TRACKER (nested sub-panel, Protocol UI-1/UI-2) -->
@@ -1169,8 +1471,14 @@
             </details>
 
             <!-- 6. PERKS -->
-            <details class="panel" data-tab="stat">
-              <summary><h2>> PERKS</h2></summary>
+            <!-- BUS-06 · PERK LOADOUT (light-frame only this pass) -->
+            <details class="panel bay-board" data-tab="stat">
+              <summary>
+                <h2>&gt; <span class="board-led" aria-hidden="true"></span> PERKS</h2>
+                <span class="panel-substatus" id="opPerksStatus">&mdash;</span>
+              </summary>
+              <span class="bay-slot-tag">BUS-06</span>
+              <span class="bay-part-no">PN RBC-PRK-06 &middot; PERK LOADOUT</span>
               <div id="perksList">
                 <span class="empty-state">NO PERKS ON FILE</span>
               </div>
@@ -1227,10 +1535,14 @@
             </details>
 
             <!-- 7. STATUS EFFECTS -->
-            <details class="panel" data-tab="stat">
+            <!-- BUS-07 · COMPOUND LAMPS (light-frame only this pass) -->
+            <details class="panel bay-board" data-tab="stat">
               <summary>
-                <h2>> STATUS EFFECTS</h2>
+                <h2>&gt; <span class="board-led" aria-hidden="true"></span> STATUS EFFECTS</h2>
+                <span class="panel-substatus" id="opStatusStatus">&mdash;</span>
               </summary>
+              <span class="bay-slot-tag">BUS-07</span>
+              <span class="bay-part-no">PN RBC-STS-08 &middot; COMPOUND LAMPS</span>
               <div id="statusList">
                 <span class="empty-state">NO ACTIVE EFFECTS</span>
               </div>
@@ -1329,18 +1641,25 @@
             </details>
 
             <!-- 9. FACTION STANDING (FNV) -->
-            <details class="panel" data-tab="stat" id="factionPanel">
+            <!-- BUS-08 · REPUTATION (light-frame only this pass) -->
+            <details class="panel bay-board" data-tab="stat" id="factionPanel">
               <summary>
-                <h2>&gt; FACTION STANDING</h2>
+                <h2>&gt; <span class="board-led" aria-hidden="true"></span> FACTION STANDING</h2>
+                <span class="panel-substatus" id="opFactionStatus">&mdash;</span>
               </summary>
+              <span class="bay-slot-tag">BUS-08</span>
+              <span class="bay-part-no">PN RBC-REP-10 &middot; REPUTATION MATRIX</span>
               <div id="factionContainer"></div>
             </details>
 
-            <!-- 9b. KARMA CENTER (FO3 — G4) -->
-            <details class="panel" data-tab="stat" id="karmaPanel" style="display: none">
+            <!-- 9b. KARMA CENTER (FO3 — G4) — BUS-09 · KARMA ALIGNMENT (light-frame only this pass) -->
+            <details class="panel bay-board" data-tab="stat" id="karmaPanel" style="display: none">
               <summary>
-                <h2>&gt; KARMA CENTER</h2>
+                <h2>&gt; <span class="board-led" aria-hidden="true"></span> KARMA CENTER</h2>
+                <span class="panel-substatus" id="opKarmaCenterStatus">&mdash;</span>
               </summary>
+              <span class="bay-slot-tag">BUS-09</span>
+              <span class="bay-part-no">PN RBC-KRM-11 &middot; KARMA ALIGNMENT</span>
               <div id="karmaCenterDisplay">
                 <span style="opacity: 0.4">[FO3 MODE REQUIRED]</span>
               </div>

@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2272/2272 | Cache: robco-terminal-v2.7.0-r77 -->
+﻿## [Unreleased]<!-- Tests: 2292/2292 | Cache: robco-terminal-v2.7.0-r78 -->
 
 ### Added
 
@@ -40,6 +40,7 @@
 - Complete RNG mode is now a breaker switch under a safety cover instead of a plain checkbox, with a status strip that always shows exactly where you stand — Safe, Armed (still reversible), or Sealed (permanent, once a new campaign has been started under it). Wipe Terminal sits right below it as the next step in that sequence. Nothing about what these settings actually do has changed, just how clearly they show it.
 - Swapping which game you're playing now asks you to confirm first, since it reboots the terminal into that game's own separate campaign. Confirming continues as before; cancelling leaves you exactly where you were with nothing changed.
 - The game cartridges no longer sit side by side — they're now a genuine stacked pile, with the game you're currently playing on top and every other cartridge tucked mostly out of sight behind it, its edge still peeking out. Tapping a peeking cartridge still asks you to confirm and swaps games exactly as before; nothing about how the swap itself works has changed.
+- Your OPERATOR screen got a full hardware makeover to match the rest of the terminal. Your health, level, and radiation now read out as glowing patient-monitor traces with a bottom strip showing your caps, carry weight, and AP alongside a LEVEL UP key that flashes "LEVEL N COMMITTED" when pressed. Your S.P.E.C.I.A.L. stats are now a row of seven sliders with lit segment ladders and dedicated plus/minus buttons. Your limb condition shows as a tappable anatomical diagram that blinks red wherever you're hurt, mirrored by the same limb buttons as before. Every other board on the screen — perks, status effects, faction standing, karma, and your skill list — now shares the same labeled hardware look for a consistent feel. Nothing about how any of these work has changed: every field is still editable exactly as before, and all your existing buttons do exactly what they always did.
 
 ### Fixed
 

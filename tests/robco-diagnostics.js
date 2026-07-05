@@ -13859,13 +13859,17 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     } catch (_) {}
     assert(
       /special:\s*'stat'/.test(expandBody123) &&
-        /special:\s*'>\s*BIO-METRICS'/.test(expandBody123) &&
+        /special:\s*'>\s*VITAL TELEMETRY'/.test(expandBody123) &&
         /skills:\s*'>\s*SKILL MATRIX'/.test(expandBody123) &&
-        /bio:\s*'>\s*BIO-SCAN'/.test(expandBody123) &&
+        /bio:\s*'>\s*SKELETAL HARNESS'/.test(expandBody123) &&
         /map:\s*'>\s*WORLD MAP'/.test(expandBody123) &&
         /databank:\s*'>\s*DATABANK'/.test(expandBody123) &&
         /config:\s*'settings'/.test(expandBody123) &&
         /config:\s*'>\s*CAMPAIGN CONFIGS'/.test(expandBody123),
+      // PHASE 3 OPERATOR reskin (Suite 181) renamed the BIO-METRICS/BIO-SCAN &
+      // LIMB STATUS panels to VITAL TELEMETRY/SKELETAL HARNESS — these targets
+      // were updated in the SAME commit so "special"/"bio" panel-nav aliases
+      // keep landing on the right board instead of silently no-opping.
       '123.7: expandPanelForCategory maps the panel-nav categories (special/skills/bio/map/databank/config) to a tab + h2'
     );
   }
@@ -22791,12 +22795,14 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   );
 
   // 168.7  BIO-SCAN is untouched: its own panel button still calls renderBioScan()
-  //        directly — TERMLINK was never its only entry point
+  //        directly — TERMLINK was never its only entry point. The panel
+  //        title itself is now "SKELETAL HARNESS" (PHASE 3 OPERATOR reskin,
+  //        Suite 181) — same board, same button, same handler, new dressing.
   assert(
     /function renderBioScan\(/.test(uiRender168) &&
       /onclick="renderBioScan\(\)"/.test(html168) &&
-      /BIO-SCAN & LIMB STATUS/.test(html168),
-    '168.7: BIO-SCAN & LIMB STATUS panel + its RUN BIO-SCAN button (renderBioScan()) are unaffected by the TERMLINK removal'
+      /SKELETAL HARNESS/.test(html168),
+    '168.7: the BIO-SCAN board (now dressed as SKELETAL HARNESS, Suite 181) + its RUN BIO-SCAN button (renderBioScan()) are unaffected by the TERMLINK removal'
   );
 
   // 168.8  the Tool Deck is untouched: its render/wire/open functions are still
@@ -25063,6 +25069,317 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       '180.12: .knob2 rotates via a plain transition (no animation:) and declares no bespoke reduced-motion carve-out — the existing global block neutralises it automatically'
     );
   }
+}
+
+{
+  header('Suite 181 — PHASE 3 OPERATOR hero-three reskin (id-preservation contract)');
+  const html181 = readFile('index.html');
+  const uiCore181 = readFile('js/ui-core.js');
+  const css181 = readFile('css/terminal.css');
+
+  // 181.1  the full fixed-id set from planning/PHASE3_OPERATOR_PLAN.md §3
+  //        still exists verbatim — the load-bearing constraint loadUI()/
+  //        updateMath() do direct getElementById() on every render.
+  const FIXED_IDS_181 = [
+    's_s',
+    's_p',
+    's_e',
+    's_c',
+    's_i',
+    's_a',
+    's_l',
+    'stat_hp_cur',
+    'stat_hp_max',
+    'hp_bar_fill',
+    'hp_bar_container',
+    'stat_lvl',
+    'stat_xp',
+    'xp_bar_fill',
+    'xp_bar_container',
+    'btnLevelUp',
+    'c_caps',
+    'stat_karma',
+    'karma_label',
+    'stat_loc',
+    'locationOptions',
+    'cal_month',
+    'cal_day',
+    'cal_year',
+    'time_hour',
+    'time_min',
+    'time_day',
+    'stat_ticks',
+    'gameDateDisplay',
+    'gameTimeDisplay',
+    'display_weight',
+    'display_ap',
+    'equippedDisplay',
+    'radAwayAlert',
+    'stat_rads',
+    'btn_l_hd',
+    'btn_l_la',
+    'btn_l_ra',
+    'btn_l_ll',
+    'btn_l_rl',
+    'skillsGrid',
+    'skillBooksPanel',
+    'skillBooksDisplay',
+    'magazinesPanel',
+    'magazinesDisplay',
+    'perksList',
+    'newPerkName',
+    'newPerkRank',
+    'newPerkLevel',
+    'traitsSection',
+    'traitFilter',
+    'traitsDisplay',
+    'statusList',
+    'newStatusName',
+    'newStatusTicks',
+    'newStatusType',
+    'factionContainer',
+    'factionPanel',
+    'karmaPanel',
+    'karmaCenterDisplay',
+  ];
+  const missingIds181 = FIXED_IDS_181.filter(id => !new RegExp('id="' + id + '"').test(html181));
+  assert(
+    missingIds181.length === 0,
+    '181.1: every id in the PHASE3_OPERATOR_PLAN.md id-preservation contract (60 ids) still exists in index.html — missing: ' +
+      missingIds181.join(', ')
+  );
+
+  // 181.2  every shipped handler the plan names is still referenced
+  //        unchanged — no handler forked, no onclick/oninput rewired away
+  //        from the original function name.
+  const HANDLERS_181 = [
+    'commitStat',
+    'capStatMax',
+    'toggleLimb',
+    'nativeLevelUp',
+    'onLvlInputChanged',
+    'onTimeInputChanged',
+    'onLocationChange',
+    'updateKarmaUI',
+    'renderBioScan',
+  ];
+  const missingHandlers181 = HANDLERS_181.filter(fn => !new RegExp(fn + '\\(').test(html181));
+  assert(
+    missingHandlers181.length === 0,
+    '181.2: every shipped handler (commitStat/capStatMax/toggleLimb/nativeLevelUp/onLvlInputChanged/onTimeInputChanged/onLocationChange/updateKarmaUI/renderBioScan) is still called from index.html — missing: ' +
+      missingHandlers181.join(', ')
+  );
+  const uiRender181 = readFile('js/ui-render.js');
+  assert(
+    /function renderSkills\(\)/.test(uiCore181) &&
+      /function renderFactionRep\(\)/.test(uiRender181) &&
+      /function renderKarmaCenter\(\)/.test(uiRender181),
+    '181.3: renderSkills()/renderFactionRep()/renderKarmaCenter() are all still defined unchanged — the light-frame pass only wraps their containing board, never their own render template'
+  );
+
+  // 181.4  every OPERATOR board is a real <details class="panel"> carrying
+  //        the reused .bay-board machine-language class (Protocol 22 — no
+  //        parallel board-frame class family invented for this reskin).
+  const boardTitles181 = [
+    'VITAL TELEMETRY',
+    'S.P.E.C.I.A.L. TUNING',
+    'CHRONO / POSITION FIX',
+    'SKELETAL HARNESS',
+    'SKILL MATRIX',
+    'PERKS',
+    'STATUS EFFECTS',
+    'FACTION STANDING',
+    'KARMA CENTER',
+  ];
+  const busTags181 = [
+    'BUS-01',
+    'BUS-02',
+    'BUS-04',
+    'BUS-03',
+    'BUS-05',
+    'BUS-06',
+    'BUS-07',
+    'BUS-08',
+    'BUS-09',
+  ];
+  // Prettier is free to wrap a long <h2> (id attribute + multi-word title)
+  // onto several indented lines, so a multi-word title is matched with
+  // \s+ between words instead of a literal space (Protocol 42 — caught live
+  // by npm run format inserting exactly this wrap on the 4 hero boards).
+  const flexTitle181 = t => t.replace(/[.]/g, '\\.').replace(/ /g, '\\s+');
+  assert(
+    boardTitles181.every(t =>
+      new RegExp('class="panel bay-board"[\\s\\S]{0,400}' + flexTitle181(t)).test(html181)
+    ) && busTags181.every(b => new RegExp('class="bay-slot-tag">' + b + '<').test(html181)),
+    '181.4: all 9 OPERATOR boards are <details class="panel bay-board"> and carry their BUS-0N slot tag (reuses the existing Module Bay board-frame class, Protocol 22)'
+  );
+
+  // 181.5  Protocol UI-1 — every one of the 9 new/re-dressed OPERATOR board
+  //        h2 headings still starts with the mandatory "> " glyph, even with
+  //        the new <span class="board-led"> injected before the title text
+  //        (a real regression caught during this build — the glyph was
+  //        dropped on the first pass and had to be added back).
+  const opH2Blocks181 = boardTitles181.map(
+    t =>
+      (html181.match(
+        new RegExp('<h2>[\\s\\S]{0,200}?' + flexTitle181(t) + '[\\s\\S]{0,20}?</h2>')
+      ) || [''])[0]
+  );
+  const badGlyph181 = opH2Blocks181.filter(s => {
+    const text = s
+      .replace(/<[^>]+>/g, '')
+      .replace(/&gt;/g, '>')
+      .trim();
+    return !text.startsWith('>');
+  });
+  assert(
+    opH2Blocks181.every(s => s) && badGlyph181.length === 0,
+    '181.5: all 9 OPERATOR board <h2> headings still start with the mandatory "> " glyph (Protocol UI-1) despite the new <span class="board-led"> — offenders: ' +
+      badGlyph181.length
+  );
+
+  // 181.6  the SPECIAL fader steppers route through the EXACT SAME
+  //        commitStat(el) the raw number field already used — never a
+  //        parallel state-write path.
+  const bumpBody181 = extractFunctionBody(uiCore181, '_bumpSpecialStat');
+  assert(
+    /el\.value = String\(next\)/.test(bumpBody181) && /commitStat\(el\)/.test(bumpBody181),
+    '181.6: _bumpSpecialStat() sets el.value then calls the existing commitStat(el) — one clamp/state-write/save path for both the typed field and the steppers'
+  );
+
+  // 181.7  the fader ladder + board-status sync all live in ONE function,
+  //        called once from the end of updateMath() (no new call sites
+  //        scattered elsewhere, no forked duplicate of the HP/rad reads
+  //        updateMath() already does).
+  const updateMathBody181 = extractFunctionBody(uiCore181, 'updateMath');
+  assert(
+    /_syncOperatorTelemetry\(\);/.test(updateMathBody181),
+    '181.7: updateMath() calls _syncOperatorTelemetry() exactly once, at the end of its existing body'
+  );
+  const syncBody181 = extractFunctionBody(uiCore181, '_syncOperatorTelemetry');
+  assert(
+    /getElementById\('opCondWord'\)/.test(syncBody181) &&
+      /getElementById\('opRadLine'\)/.test(syncBody181) &&
+      /getElementById\('opHarnessRadBar'\)/.test(syncBody181) &&
+      /getElementById\('opHarnessRadMirror'\)/.test(syncBody181) &&
+      /data-fd-ladder/.test(syncBody181) &&
+      /setStatus\(\s*'opVitalStatus'/.test(syncBody181) &&
+      /setStatus\(\s*'opHarnessStatus'/.test(syncBody181),
+    '181.8: _syncOperatorTelemetry() drives the HP cond-word, the RAD trace + BUS-03 mirror, the SPECIAL fader ladders, and the board-status rows'
+  );
+
+  // 181.9  stat_rads stays a single unique id (owner-report resolution of
+  //        the mockup's duplicated fake data-attribute) — never duplicated
+  //        onto BUS-03 as a second input.
+  const radIdOccurrences181 = (html181.match(/id="stat_rads"/g) || []).length;
+  assert(
+    radIdOccurrences181 === 1,
+    '181.9: id="stat_rads" appears exactly once (BUS-01) — BUS-03 mirrors the same value read-only via #opHarnessRadMirror, never a duplicate input sharing the id'
+  );
+
+  // 181.10  the RadAway alert restructure (icon + #radAwayAlertText span)
+  //         is handled correctly by updateMath() — the message goes on the
+  //         inner span, never alertEl.textContent directly (which would
+  //         wipe out the lamp <i>), and display flips to 'flex' to match
+  //         the .radaway-lamp row layout.
+  assert(
+    /if \(alertTextEl\) alertTextEl\.textContent = msg;/.test(updateMathBody181) &&
+      /alertEl\.style\.display = 'flex'/.test(updateMathBody181),
+    "181.10: updateMath()'s RadAway block sets #radAwayAlertText's textContent on its primary path (a bare alertEl.textContent would erase the lamp icon) and flips display to 'flex'"
+  );
+
+  // 181.11  the SVG zone plate is a second, read-only projection of the
+  //         exact same state.la/ra/ll/rl/hd fields the mirrored chip list
+  //         already reflects — synced from loadUI() (Protocol 22 single-
+  //         apply, the Module-Bay bay/schematic precedent) — and zone taps
+  //         route through the SAME toggleLimb() the chip buttons call.
+  const loadUIBody181 = extractFunctionBody(uiCore181, 'loadUI');
+  assert(
+    /_syncBioHarnessZones\(\);/.test(loadUIBody181),
+    '181.11: loadUI() calls _syncBioHarnessZones() — the SVG zone crippled-state can never drift from the limb-button re-render in the same function'
+  );
+  const wireZonesBody181 = extractFunctionBody(uiCore181, '_wireBioHarnessZones');
+  assert(
+    /toggleLimb\(zone\.dataset\.limb\)/.test(wireZonesBody181) &&
+      /addEventListener\('click'/.test(wireZonesBody181) &&
+      /addEventListener\('keydown'/.test(wireZonesBody181),
+    '181.12: _wireBioHarnessZones() routes both click and Enter/Space keyboard activation through the existing toggleLimb() — one handler, two input surfaces'
+  );
+  const zonesInHtml181 = ['hd', 'la', 'ra', 'll', 'rl'].every(l =>
+    new RegExp('data-limb="' + l + '"').test(html181)
+  );
+  assert(zonesInHtml181, '181.13: the SVG zone plate has all 5 data-limb zones (hd/la/ra/ll/rl)');
+
+  // 181.14  the level-up key flash is a NEW subscriber on the existing
+  //         'level.up' bus event nativeLevelUp() already emits — never a
+  //         second emit call, never a rewritten onclick.
+  const wireEventBusBody181 = extractFunctionBody(uiCore181, '_wireCoreEventBusSubscribers');
+  assert(
+    /RobcoEvents\.on\('level\.up', p => \{/.test(wireEventBusBody181) &&
+      /opLevelUpKeyText/.test(wireEventBusBody181) &&
+      /LEVEL ' \+ newLvl \+ ' COMMITTED/.test(wireEventBusBody181),
+    "181.14: _wireCoreEventBusSubscribers() adds a NEW 'level.up' subscriber that flashes #opLevelUpKeyText — nativeLevelUp()'s existing emit call and onclick wiring are untouched"
+  );
+  assert(
+    /onclick="nativeLevelUp\(\)"/.test(html181),
+    '181.15: #btnLevelUp still calls onclick="nativeLevelUp()" directly — the flash is a bus subscriber, never a wrapper around the click handler'
+  );
+
+  // 181.16  centering rule — every incomplete-row flex container added by
+  //         this reskin centers instead of pinning left (fader-row, zone-
+  //         flex, zone-chips, readback-strip, bio-actions).
+  const centeredClasses181 = [
+    '.fader-row',
+    '.zone-flex',
+    '.zone-chips',
+    '.readback-strip',
+    '.bio-actions',
+  ];
+  assert(
+    centeredClasses181.every(cls => {
+      const rule = (css181.match(new RegExp(cls.replace('.', '\\.') + ' \\{[^}]*\\}')) || [''])[0];
+      return /justify-content:\s*center/.test(rule);
+    }),
+    '181.16: .fader-row/.zone-flex/.zone-chips/.readback-strip/.bio-actions all center an incomplete last row (justify-content:center)'
+  );
+
+  // 181.17  reduced-motion — the new discrete state-change effects
+  //         (board-led pulse, zone crippled blink, RadAway lamp pulse) are
+  //         all plain `animation:` (never transition: for a discrete
+  //         on/off effect), so the existing global prefers-reduced-motion
+  //         block neutralises them automatically — no bespoke carve-out
+  //         block was added for this reskin.
+  const ledRule181 = (css181.match(/\.board-led \{[^}]*\}/) || [''])[0];
+  const blinkKeyframe181 = /@keyframes zoneCriBlink/.test(css181);
+  assert(
+    /animation:\s*rad-pulse/.test(ledRule181) &&
+      blinkKeyframe181 &&
+      /\.zone\.crippled path,[\s\S]{0,120}animation:\s*zoneCriBlink/.test(css181),
+    '181.17: .board-led and .zone.crippled both use plain `animation:` keyframes (rad-pulse / zoneCriBlink) — no bespoke reduced-motion carve-out needed'
+  );
+
+  // 181.18  game-agnostic — the new light-frame SKILL MATRIX status text is
+  //         computed via getSkillKeys().length (never a hardcoded skill
+  //         count literal like the franchise's real FNV total), and the
+  //         FACTION STANDING status via getFactionRegistry().length.
+  assert(
+    /getSkillKeys\(\)\.length/.test(syncBody181) &&
+      /getFactionRegistry\(\)\.length/.test(syncBody181),
+    '181.18: the SKILL MATRIX / FACTION STANDING 0i status lines are computed via getSkillKeys().length / getFactionRegistry().length (Protocol 38 — never a hardcoded per-game count)'
+  );
+  assert(
+    !/PN RBC-SKL-13/.test(html181),
+    "181.19: the SKILL MATRIX board's decorative part number does not hardcode FNV's real skill count as a literal (Protocol 38 — flavor text is not a game-agnostic guarantee, but a stray count-shaped literal was caught and fixed during this build)"
+  );
+
+  // 181.20  no campaign-state field was added or removed by this reskin —
+  //         the plan's "no state field touched" constraint, checked against
+  //         the state.js default-state declaration.
+  const stateSrc181 = readFile('js/state.js');
+  assert(
+    !/opVital|opSpecial|opHarness|fdLadder|zonePlate/i.test(stateSrc181),
+    '181.20: js/state.js declares no new state field for this reskin — every new id is a transient DOM/display concern, never persisted campaign data'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════
