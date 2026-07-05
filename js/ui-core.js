@@ -1951,6 +1951,7 @@ function _restoreDevicePrefs() {
   // strip/summary lines/banners all start in sync with the hidden real controls.
   if (typeof _syncCampaignProfileUI === 'function') _syncCampaignProfileUI();
   if (typeof _syncInterlockUI === 'function') _syncInterlockUI();
+  if (typeof _wireTempoDialDrag === 'function') _wireTempoDialDrag(); // one-time listener attach, boot only
 
   // #34 Typewriter Speed — restore slider + label on load
   {
@@ -2543,13 +2544,25 @@ function _setTempo(type) {
 window._setTempo = _setTempo;
 
 const _TEMPO_ORDER = ['standard', 'minmaxed', 'completionist', 'casual', 'speedrun'];
-const _TEMPO_ROT = [-64, -32, 0, 32, 64];
+// SU-3 rework: the needle's rotation IS its index on the gauge arc — −84° …
+// +84°, 42° apart, 0° = up (matches the owner-approved mockup geometry).
+const _TEMPO_ARC_MIN = -84;
+const _TEMPO_ARC_STEP = 42;
+const _TEMPO_ARC_MAX = 84;
+const _TEMPO_ROT = [-84, -42, 0, 42, 84];
 const _TEMPO_LABELS = {
   standard: 'STANDARD',
   minmaxed: 'MIN-MAXED',
   completionist: 'COMPLETIONIST',
   casual: 'CASUAL',
   speedrun: 'SPEEDRUN',
+};
+const _TEMPO_DESC = {
+  standard: 'balanced pacing — the default simulation',
+  minmaxed: 'the AI assumes optimized builds',
+  completionist: 'every side path surfaces',
+  casual: 'forgiving pacing, lighter bookkeeping',
+  speedrun: 'critical path only — aggressive clock',
 };
 
 // The seatable (non design-only) games, in GAME_DEFS declaration order — the
@@ -2619,15 +2632,27 @@ function _syncCampaignProfileUI() {
 
   const tempo = (state && state.playthroughType) || 'standard';
   const tIdx = Math.max(0, _TEMPO_ORDER.indexOf(tempo));
-  document.querySelectorAll('.detent').forEach(d => {
-    const on = d.dataset.tempo === _TEMPO_ORDER[tIdx];
+  const tKey = _TEMPO_ORDER[tIdx];
+  document.querySelectorAll('.detent2').forEach(d => {
+    const on = d.dataset.tempo === tKey;
     d.classList.toggle('on', on);
     d.setAttribute('aria-checked', String(on));
   });
+  document.querySelectorAll('.tempo-tick').forEach(t => {
+    t.classList.toggle('lit', Number(t.dataset.i) === tIdx);
+  });
   const knob = document.getElementById('tempoKnob');
-  if (knob) knob.style.transform = 'rotate(' + _TEMPO_ROT[tIdx] + 'deg)';
+  if (knob) {
+    knob.style.transform = 'rotate(' + _TEMPO_ROT[tIdx] + 'deg)';
+    knob.setAttribute('aria-valuenow', String(tIdx));
+    knob.setAttribute('aria-valuetext', _TEMPO_LABELS[tKey] + ' — ' + _TEMPO_DESC[tKey]);
+  }
+  const readoutName = document.getElementById('tempoReadoutName');
+  if (readoutName) readoutName.textContent = _TEMPO_LABELS[tKey];
+  const readoutDesc = document.getElementById('tempoReadoutDesc');
+  if (readoutDesc) readoutDesc.textContent = _TEMPO_DESC[tKey];
   const tempoStatus = document.getElementById('st-tempo');
-  if (tempoStatus) tempoStatus.textContent = '> TEMPO: ' + _TEMPO_LABELS[_TEMPO_ORDER[tIdx]];
+  if (tempoStatus) tempoStatus.textContent = '> TEMPO: ' + _TEMPO_LABELS[tKey];
 
   const sum = document.getElementById('sum-profile');
   if (sum) {
@@ -2642,6 +2667,127 @@ function _syncCampaignProfileUI() {
   }
 }
 window._syncCampaignProfileUI = _syncCampaignProfileUI;
+
+// ── OPERATIONAL TEMPO rotary dial — drag-to-rotate (SU-3 rework) ───────────
+// Reuses the Immersion dial's drag PATTERN (pointerdown/move/up/cancel,
+// pointer capture, a "did this actually move" flag gating a real drag vs a
+// tap, listeners added on down and removed on up/cancel) but NOT its pixel-
+// step math: the Immersion dial steps 3 tiers off horizontal drag distance,
+// while this dial has 5 positions ringed on a real arc and the needle must
+// visually track the pointer's actual ANGLE while dragging (live needle-
+// follow), snapping to the nearest position only on release — a genuinely
+// different geometry gets its own angle-based handlers rather than force-
+// fitting the pixel-step function onto it (Protocol 22: same established
+// pattern, not a wholesale duplicate of unrelated math).
+//
+// Owner directive: tapping the knob body does NOTHING — unlike the
+// Immersion dial there is no tap-to-advance/cycle here, only a drag, a
+// direct .detent2 position tap, or the arrow keys change the value. The
+// knob has no click handler at all, so a real drag's trailing synthetic
+// click has nothing to do — the Immersion dial's own _dialDragSuppressClick
+// flag is untouched by any of this (there's nothing here for it to suppress).
+let _tempoDrag = null; // { startA, moved } while a genuine drag is in progress
+
+function _tempoPointerAngle(ev, knob) {
+  const r = knob.getBoundingClientRect();
+  const cx = r.left + r.width / 2;
+  const cy = r.top + r.height / 2;
+  return (Math.atan2(ev.clientX - cx, cy - ev.clientY) * 180) / Math.PI; // 0° = up
+}
+function _tempoClampArc(a) {
+  return Math.max(_TEMPO_ARC_MIN, Math.min(_TEMPO_ARC_MAX, a));
+}
+function _tempoNearestIndex(a) {
+  return Math.max(
+    0,
+    Math.min(4, Math.round((_tempoClampArc(a) - _TEMPO_ARC_MIN) / _TEMPO_ARC_STEP))
+  );
+}
+function _tempoPointerMove(ev) {
+  if (!_tempoDrag) return;
+  const knob = ev.currentTarget;
+  const a = _tempoPointerAngle(ev, knob);
+  if (!_tempoDrag.moved && Math.abs(a - _tempoDrag.startA) < 7) return; // wobble = still a tap
+  _tempoDrag.moved = true;
+  knob.classList.add('dragging'); // kill the transition for live needle-follow
+  const clamped = _tempoClampArc(a);
+  knob.style.transform = 'rotate(' + clamped + 'deg)';
+  // Live preview of the nearest position while dragging — not committed
+  // (onPlaythroughTypeChange) until pointerup, matching the mockup.
+  const near = _tempoNearestIndex(clamped);
+  document.querySelectorAll('.detent2').forEach(d => {
+    d.classList.toggle('on', Number(d.dataset.i) === near);
+  });
+}
+function _tempoPointerCleanup(knob) {
+  knob.classList.remove('dragging');
+  knob.removeEventListener('pointermove', _tempoPointerMove);
+  knob.removeEventListener('pointerup', _tempoPointerUp);
+  knob.removeEventListener('pointercancel', _tempoPointerCancel);
+}
+function _tempoPointerUp(ev) {
+  if (!_tempoDrag) return;
+  const knob = ev.currentTarget;
+  try {
+    knob.releasePointerCapture(ev.pointerId);
+  } catch (e) {
+    /* already released */
+  }
+  const drag = _tempoDrag;
+  _tempoDrag = null;
+  _tempoPointerCleanup(knob);
+  if (drag.moved) {
+    const idx = _tempoNearestIndex(_tempoPointerAngle(ev, knob));
+    _setTempo(_TEMPO_ORDER[idx]); // real commit + repaint — the source of truth
+  }
+}
+function _tempoPointerCancel(ev) {
+  if (!_tempoDrag) return;
+  const knob = ev.currentTarget;
+  _tempoDrag = null;
+  _tempoPointerCleanup(knob);
+  _syncCampaignProfileUI(); // revert any live drag-preview back to the committed value
+}
+function _tempoPointerDown(ev) {
+  if (ev.button !== 0) return; // left button only for mouse; touch/pen have no `button` semantics
+  const knob = ev.currentTarget;
+  _tempoDrag = { startA: _tempoPointerAngle(ev, knob), moved: false };
+  try {
+    knob.setPointerCapture(ev.pointerId);
+  } catch (e) {
+    /* unsupported — drag still tracks via the listeners below */
+  }
+  knob.addEventListener('pointermove', _tempoPointerMove);
+  knob.addEventListener('pointerup', _tempoPointerUp);
+  knob.addEventListener('pointercancel', _tempoPointerCancel);
+}
+// Arrow-key stepping — the knob is role=slider, so ArrowLeft/Right/Up/Down +
+// Home/End are the expected native slider keymap.
+function _tempoKeyDown(ev) {
+  const tempo = (state && state.playthroughType) || 'standard';
+  const idx = Math.max(0, _TEMPO_ORDER.indexOf(tempo));
+  if (ev.key === 'ArrowRight' || ev.key === 'ArrowUp') {
+    ev.preventDefault();
+    _setTempo(_TEMPO_ORDER[Math.min(4, idx + 1)]);
+  } else if (ev.key === 'ArrowLeft' || ev.key === 'ArrowDown') {
+    ev.preventDefault();
+    _setTempo(_TEMPO_ORDER[Math.max(0, idx - 1)]);
+  } else if (ev.key === 'Home') {
+    ev.preventDefault();
+    _setTempo(_TEMPO_ORDER[0]);
+  } else if (ev.key === 'End') {
+    ev.preventDefault();
+    _setTempo(_TEMPO_ORDER[4]);
+  }
+}
+function _wireTempoDialDrag() {
+  const knob = document.getElementById('tempoKnob');
+  if (!knob) return;
+  knob.addEventListener('keydown', _tempoKeyDown); // works with or without PointerEvent support
+  if (typeof window.PointerEvent === 'undefined') return; // graceful fallback: tap-position + arrows still work
+  knob.addEventListener('pointerdown', _tempoPointerDown);
+}
+window._wireTempoDialDrag = _wireTempoDialDrag;
 
 // ── RANDOMIZER INTERLOCK — the breaker/cover/seal fiction over
 // #completeRngToggle / state.campaignMode (mirrors the ARCHITECTURE.md-documented

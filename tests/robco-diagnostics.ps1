@@ -15029,15 +15029,17 @@ Check (
 ) "178.6: the ENGAGEMENT DOCTRINE rocker has 2 buttons (#rk-any/#rk-melee) wired to _setDoctrine('any'/'melee') inside a role=radiogroup"
 
 # 178.7  OPERATIONAL TEMPO: 5 direct-pick detents (1 tap per pick, no cycling),
-#        wired to _setTempo with the exact 5 values #playthroughTypeSelect used
+#        wired to _setTempo with the exact 5 values #playthroughTypeSelect used.
+#        SU-3 rotary-dial rework (see Suite 180): .detent renamed .detent2 --
+#        [\s\S]*? spans Prettier's multi-line attribute wrapping.
 $tempoValues178 = @('standard', 'minmaxed', 'completionist', 'casual', 'speedrun')
 $tempoOk178 = $true
 foreach ($tv178 in $tempoValues178) {
-    if (-not [System.Text.RegularExpressions.Regex]::IsMatch($html178, 'data-tempo="' + $tv178 + '"[^>]*onclick="_setTempo\(''' + $tv178 + '''\)"')) {
+    if (-not [System.Text.RegularExpressions.Regex]::IsMatch($html178, 'data-tempo="' + $tv178 + '"[\s\S]*?onclick="_setTempo\(''' + $tv178 + '''\)"')) {
         $tempoOk178 = $false
     }
 }
-$detentCount178 = ([System.Text.RegularExpressions.Regex]::Matches($html178, 'class="detent(?: on)?"')).Count
+$detentCount178 = ([System.Text.RegularExpressions.Regex]::Matches($html178, 'class="detent2(?: on)?"')).Count
 Check ($tempoOk178 -and ($detentCount178 -eq 5)) "178.7: exactly 5 direct-pick detent buttons exist, one per playthroughType value (standard/minmaxed/completionist/casual/speedrun), each wired to _setTempo(value)"
 
 # 178.8  RANDOMIZER INTERLOCK breaker: well/cover/seal/handle all present, wired
@@ -15113,7 +15115,7 @@ Check (
 # 178.14  game-agnostic construction (Protocol 38): the tempo detent
 #         labels/descriptions and doctrine rocker carry no game literal
 $tempoRockerStart178 = $configBlock178.IndexOf('rack-note" style="margin-top: 14px">ENGAGEMENT')
-$detentRackIdx178 = $configBlock178.IndexOf('detent-rack')
+$detentRackIdx178 = $configBlock178.IndexOf('dial-hint')
 $detailsEndIdx178 = $configBlock178.IndexOf('</details>', $detentRackIdx178)
 $tempoAndRockerSlice178 = if ($tempoRockerStart178 -ge 0 -and $detailsEndIdx178 -gt $tempoRockerStart178) {
     $configBlock178.Substring($tempoRockerStart178, $detailsEndIdx178 - $tempoRockerStart178)
@@ -15292,11 +15294,12 @@ Check (
 ) "179.12: .cart explicitly sets color: var(--robco-green) -- never inherits the global button dark-on-bright text color"
 
 # 179.13  ENGAGEMENT DOCTRINE rocker (.rocker button) and OPERATIONAL TEMPO
-#         detents (.detent) -- same legibility fix, same reason.
+#         detents (.detent2 -- renamed from .detent by the SU-3 rotary-dial
+#         rework, Suite 180) -- same legibility fix, same reason.
 Check (
     ($css179 -match '(?s)\.rocker button\s*\{[^}]*color:\s*var\(--robco-green\)') -and
-    ($css179 -match '(?s)\.detent\s*\{[^}]*color:\s*var\(--robco-green\)')
-) "179.13: .rocker button and .detent both explicitly reset color to var(--robco-green) (the global button dark-text reset no longer leaks into either control)"
+    ($css179 -match '(?s)\.detent2\s*\{[^}]*color:\s*var\(--robco-green\)')
+) "179.13: .rocker button and .detent2 both explicitly reset color to var(--robco-green) (the global button dark-text reset no longer leaks into either control)"
 
 # 179.14  RANDOMIZER INTERLOCK * PURGE board's breaker (.ilk-breaker) gets
 #         the same fix -- the board's danger-red/amber ACCENTS (border,
@@ -15377,6 +15380,195 @@ $failing179 = $safeThemes179 | Where-Object { (Get-Contrast179 $_.Hex $_.Dark) -
 Check (
     $themeEntries179.Count -ge 7 -and $safeThemes179.Count -ge 4 -and $failing179.Count -eq 0
 ) "179.18: every contrastSafe:true THEMES entry's hex/dark pairing clears real WCAG AA (>=4.5:1) -- the exact pairing .ilk-actions button (DISARM) now relies on via the base button rule"
+
+# ===========================================================
+# Suite 180 -- OPERATIONAL TEMPO centered rotary dial (SU-3 rework)
+# Owner-approved mockup: planning/mockups/tempo-dial.html. Replaces the
+# decorative-dial-plus-vertical-list from Suite 178/179 with a true rotary
+# dial: the 5 playthroughType positions ring the knob on a gauge arc and the
+# needle (the knob's own rotation) always points at the active one. Owner
+# directive: the knob performs NO action on tap -- only a drag, a direct
+# position tap, or the arrow keys change #playthroughTypeSelect.
+# 12 tests (PS mirror of JS Suite 180.)
+# ===========================================================
+Sep "Suite 180 -- OPERATIONAL TEMPO centered rotary dial (SU-3 rework)"
+$html180 = Read-Src "index.html"
+$core180 = Read-Src "js/ui-core.js"
+$css180 = Read-Src "css/terminal.css"
+$cfgStart180 = $html180.IndexOf('id="campaignConfigPanel"')
+$cfgEnd180 = $html180.IndexOf('<div class="col-right">', $cfgStart180)
+$configBlock180 = $html180.Substring($cfgStart180, $cfgEnd180 - $cfgStart180)
+
+# 180.1  the dial assembly: a tick-ring, 5 ticks on the exact gauge-arc
+#        angles (-84...+84 deg, 42 apart, 0 = up), and the knob itself is a
+#        real role=slider control spanning the 5 positions.
+$tickAngles180 = @('-84deg', '-42deg', '0deg', '42deg', '84deg')
+$ticksOk180 = ($tickAngles180 | Where-Object {
+    -not [System.Text.RegularExpressions.Regex]::IsMatch($configBlock180, 'class="tempo-tick[^"]*"[\s\S]*?--a:\s*' + $_)
+}).Count -eq 0
+Check (
+    ($configBlock180 -match 'id="tempoDialAssembly"') -and
+    ($configBlock180 -match 'class="tick-ring"') -and
+    $ticksOk180 -and
+    [System.Text.RegularExpressions.Regex]::IsMatch($configBlock180, 'id="tempoKnob"[\s\S]*?role="slider"[\s\S]*?aria-valuemin="0"[\s\S]*?aria-valuemax="4"')
+) "180.1: #tempoDialAssembly has a tick-ring + 5 ticks at the exact -84/-42/0/42/84 deg gauge-arc angles, and #tempoKnob is a real role=slider spanning 0..4"
+
+# 180.2  5 direct-pick .detent2 position buttons ring the knob, each wired to
+#        _setTempo with the exact playthroughType value, each carrying a
+#        data-i index matching its tick (never orphaned from the arc).
+$tempos180 = @(
+    @{v = 'standard'; i = 0 }, @{v = 'minmaxed'; i = 1 }, @{v = 'completionist'; i = 2 },
+    @{v = 'casual'; i = 3 }, @{v = 'speedrun'; i = 4 }
+)
+$detentOk180 = ($tempos180 | Where-Object {
+    -not [System.Text.RegularExpressions.Regex]::IsMatch(
+        $configBlock180,
+        'class="detent2[^"]*"[\s\S]*?data-tempo="' + $_.v + '"[\s\S]*?data-i="' + $_.i + '"[\s\S]*?onclick="_setTempo\(''' + $_.v + '''\)"'
+    )
+}).Count -eq 0
+$detent2Count180 = ([System.Text.RegularExpressions.Regex]::Matches($configBlock180, 'class="detent2(?: on)?"')).Count
+Check (
+    $detentOk180 -and ($detent2Count180 -eq 5)
+) "180.2: exactly 5 .detent2 position buttons ring the knob, each wired to _setTempo(value) and carrying the data-i index matching its tick -- one tap per pick, never a cycle"
+
+# 180.3  owner directive: the knob performs NO action on tap -- no onclick
+#        attribute in the markup, and no .addEventListener('click', ...)
+#        targeting the knob anywhere in ui-core.js.
+$knobTagMatch180 = [regex]::Match($configBlock180, '<button[^>]*id="tempoKnob"[^>]*>')
+$knobTag180 = if ($knobTagMatch180.Success) { $knobTagMatch180.Value } else { '' }
+Check (
+    ($knobTag180 -ne '') -and
+    (-not ($knobTag180 -match 'onclick=')) -and
+    (-not [System.Text.RegularExpressions.Regex]::IsMatch($core180, "tempoKnob'\)[\s\S]{0,60}addEventListener\(\s*'click'")) -and
+    (-not [System.Text.RegularExpressions.Regex]::IsMatch($core180, "addEventListener\(\s*'click'[\s\S]{0,120}tempoKnob"))
+) "180.3: the knob has no onclick attribute and no click listener anywhere -- tapping the knob body does nothing (owner decision), only drag/position-tap/arrow-keys change the value"
+
+# 180.4  _wireTempoDialDrag(): keydown attached unconditionally, pointerdown
+#        gated on window.PointerEvent (graceful fallback) -- same shape as
+#        the Immersion dial's own _wireImmersionDialDrag(), a parallel
+#        pattern rather than a shared/forked implementation.
+$wireBody180 = Get-FunctionBody $core180 '_wireTempoDialDrag'
+Check (
+    ($wireBody180 -match "addEventListener\('keydown', _tempoKeyDown\)") -and
+    ($wireBody180 -match "typeof window\.PointerEvent === 'undefined'") -and
+    ($wireBody180 -match "addEventListener\('pointerdown', _tempoPointerDown\)")
+) "180.4: _wireTempoDialDrag() attaches keydown unconditionally and pointerdown only when window.PointerEvent exists (graceful fallback: tap-position + arrows still work)"
+
+# 180.5  the needle-angle formula: _TEMPO_ROT is derived from the same
+#        _TEMPO_ARC_MIN/_TEMPO_ARC_STEP the drag math uses -- the needle
+#        always points at one of the 5 real positions, never empty space.
+$arcMinMatch180 = [regex]::Match($core180, 'const _TEMPO_ARC_MIN = (-?\d+);')
+$arcStepMatch180 = [regex]::Match($core180, 'const _TEMPO_ARC_STEP = (-?\d+);')
+$rotMatch180 = [regex]::Match($core180, 'const _TEMPO_ROT = \[([^\]]+)\];')
+$arcMin180 = if ($arcMinMatch180.Success) { [int]$arcMinMatch180.Groups[1].Value } else { 0 }
+$arcStep180 = if ($arcStepMatch180.Success) { [int]$arcStepMatch180.Groups[1].Value } else { 0 }
+$rotValues180 = if ($rotMatch180.Success) { $rotMatch180.Groups[1].Value -split ',' | ForEach-Object { [int]$_.Trim() } } else { @() }
+$expected180 = 0..4 | ForEach-Object { $arcMin180 + $arcStep180 * $_ }
+$rotMatchesExpected180 = $true
+for ($i = 0; $i -lt 5; $i++) {
+    if ($expected180[$i] -ne $rotValues180[$i]) { $rotMatchesExpected180 = $false }
+}
+$syncBody180ForRot = Get-FunctionBody $core180 '_syncCampaignProfileUI'
+Check (
+    ($rotValues180.Count -eq 5) -and $rotMatchesExpected180 -and
+    ($syncBody180ForRot -match "knob\.style\.transform = 'rotate\(' \+ _TEMPO_ROT\[tIdx\] \+ 'deg\)'")
+) ("180.5: _TEMPO_ROT === [_TEMPO_ARC_MIN + _TEMPO_ARC_STEP*i for i in 0..4] (" + ($expected180 -join ',') + ") and _syncCampaignProfileUI() rotates the knob to exactly that angle -- the needle always points at the active position")
+
+# 180.6  all three input paths (drag release, direct position tap, arrow
+#        keys) converge on the one real setter -- _setTempo(), which itself
+#        still delegates to the unchanged onPlaythroughTypeChange().
+$pointerUpBody180 = Get-FunctionBody $core180 '_tempoPointerUp'
+$keyDownBody180 = Get-FunctionBody $core180 '_tempoKeyDown'
+$setTempoBody180 = Get-FunctionBody $core180 '_setTempo'
+$keyDownSetTempoCount180 = ([regex]::Matches($keyDownBody180, '_setTempo\(_TEMPO_ORDER\[')).Count
+Check (
+    ($pointerUpBody180 -match '_setTempo\(_TEMPO_ORDER\[idx\]\)') -and
+    ($keyDownSetTempoCount180 -eq 4) -and
+    ($setTempoBody180 -match 'onPlaythroughTypeChange\(type\)')
+) "180.6: drag-release, arrow-key stepping (all 4 key branches), and the direct .detent2 tap (Suite 180.2) all call _setTempo(), which still delegates to the unchanged onPlaythroughTypeChange()"
+
+# 180.7  _syncCampaignProfileUI() is the one repaint function that keeps the
+#        knob/ticks/detents/readout/status line all in sync with
+#        state.playthroughType.
+$syncBody180 = Get-FunctionBody $core180 '_syncCampaignProfileUI'
+Check (
+    ($syncBody180 -match 'tempo-tick') -and
+    ($syncBody180 -match 'detent2') -and
+    ($syncBody180 -match 'aria-valuenow') -and
+    ($syncBody180 -match 'aria-valuetext') -and
+    ($syncBody180 -match 'tempoReadoutName') -and
+    ($syncBody180 -match 'tempoReadoutDesc') -and
+    ($syncBody180 -match 'st-tempo')
+) "180.7: _syncCampaignProfileUI() repaints the ticks, detents, knob (transform + ARIA), readout (name + description), and status line together -- one function, no partial repaints"
+
+# 180.8  game-agnostic (Protocol 38): the dial markup and every new
+#        drag/keyboard function carry no FNV/FO3 literal.
+$dragFnNames180 = @('_tempoPointerAngle', '_tempoPointerMove', '_tempoPointerUp', '_tempoPointerCancel', '_tempoPointerDown', '_tempoKeyDown', '_wireTempoDialDrag')
+$dragFns180 = ($dragFnNames180 | ForEach-Object { Get-FunctionBody $core180 $_ }) -join "`n"
+$tempoSliceStart180 = $configBlock180.IndexOf('rack-note" style="margin-top: 16px">OPERATIONAL')
+$tempoSliceDialHint180 = $configBlock180.IndexOf('dial-hint')
+$tempoSliceEnd180 = $configBlock180.IndexOf('</details>', $tempoSliceDialHint180)
+$tempoSlice180 = if ($tempoSliceStart180 -ge 0 -and $tempoSliceEnd180 -gt $tempoSliceStart180) {
+    $configBlock180.Substring($tempoSliceStart180, $tempoSliceEnd180 - $tempoSliceStart180)
+} else { '' }
+Check (
+    (-not [System.Text.RegularExpressions.Regex]::IsMatch($tempoSlice180, '\bFNV\b|\bFO3\b|Capital Wasteland|Vault 101', 'IgnoreCase')) -and
+    (-not [System.Text.RegularExpressions.Regex]::IsMatch($dragFns180, '\bFNV\b|\bFO3\b', 'IgnoreCase'))
+) "180.8: the dial markup and every new drag/keyboard function are game-agnostic -- no FNV/FO3 literal (the 5 tempo names/descriptions are read from the existing shared maps)"
+
+# 180.9  the new drag/keyboard functions write nothing durable to the
+#        campaign directly -- only _setTempo()/onPlaythroughTypeChange()
+#        (out of this guard's scope, already covered by 178.4/178.13)
+#        actually persist a value.
+$dragOffenderNames180 = @('_tempoPointerAngle', '_tempoPointerMove', '_tempoPointerCleanup', '_tempoPointerUp', '_tempoPointerCancel', '_tempoPointerDown', '_tempoKeyDown', '_wireTempoDialDrag')
+$offenders180 = $dragOffenderNames180 | Where-Object {
+    $body = Get-FunctionBody $core180 $_
+    return ($body -match 'saveState\(|robco_v8|state\.\w+\s*=(?!=)')
+}
+Check (
+    $offenders180.Count -eq 0
+) ("180.9: the new drag/keyboard handler functions never write campaign state directly (saveState/robco_v8/state.<field>=) -- only the unchanged _setTempo()/onPlaythroughTypeChange() persist a value" + $(if ($offenders180.Count) { " -- offenders: $($offenders180 -join ', ')" } else { "" }))
+
+# 180.10  the old decorative-dial-plus-vertical-list widget is fully
+#         retired -- no orphaned .tempo-wrap/.tempo-dial/.detent-rack/
+#         old-.detent markup or CSS remains.
+Check (
+    (-not ($html180 -match 'tempo-wrap')) -and
+    (-not ($css180 -match 'tempo-wrap')) -and
+    (-not ($html180 -match '"tempo-dial"')) -and
+    (-not [System.Text.RegularExpressions.Regex]::IsMatch($css180, '\.tempo-dial\b')) -and
+    (-not ($html180 -match 'detent-rack')) -and
+    (-not ($css180 -match 'detent-rack')) -and
+    (-not ($html180 -match 'class="detent"')) -and
+    (-not [System.Text.RegularExpressions.Regex]::IsMatch($css180, '\.detent\s*\{'))
+) "180.10: the old .tempo-wrap/.tempo-dial/.detent-rack/.detent widget is fully retired (not left as orphaned dead markup/CSS) -- superseded by .dial-assembly/.detent2"
+
+# 180.11  Protocol 17: every .detent2 keeps a >=28px tap target; touch-
+#         action:none is scoped to .knob2 ONLY (not the whole assembly or
+#         the readout), so the surrounding page still scrolls normally.
+$detent2RuleMatch180 = [regex]::Match($css180, '(?s)\.detent2\s*\{([\s\S]*?)\n\}')
+$detent2Rule180 = if ($detent2RuleMatch180.Success) { $detent2RuleMatch180.Groups[1].Value } else { '' }
+$minH180 = ([regex]::Match($detent2Rule180, 'min-height:\s*(\d+)px')).Groups[1].Value
+$minW180 = ([regex]::Match($detent2Rule180, 'min-width:\s*(\d+)px')).Groups[1].Value
+$touchActionMatches180 = [regex]::Matches($css180, '([.\w-]+)\s*\{[^}]*touch-action:\s*none')
+$touchActionSites180 = $touchActionMatches180 | ForEach-Object { $_.Groups[1].Value }
+Check (
+    ([int]$minH180 -ge 28) -and ([int]$minW180 -ge 28) -and
+    ($touchActionSites180 -contains '.knob2') -and
+    (-not ($touchActionSites180 -contains '.dial-assembly')) -and
+    (-not ($touchActionSites180 -contains '.tempo-readout'))
+) "180.11: .detent2 keeps a >=28px tap target (Protocol 17), and touch-action:none is scoped to .knob2 only -- the assembly/readout never block page scroll"
+
+# 180.12  reduced-motion: the knob's rotation is a plain CSS transition
+#         (never animation:), so the existing global prefers-reduced-motion
+#         block neutralises it to an instant snap with no bespoke carve-out.
+$knob2RuleMatch180 = [regex]::Match($css180, '(?s)\.knob2\s*\{([\s\S]*?)\n\}')
+$knob2Rule180 = if ($knob2RuleMatch180.Success) { $knob2RuleMatch180.Groups[1].Value } else { '' }
+Check (
+    ($knob2Rule180 -match 'transition:\s*transform') -and
+    (-not ($knob2Rule180 -match 'animation:')) -and
+    (-not [System.Text.RegularExpressions.Regex]::IsMatch($css180, '(?s)\.knob2[\s\S]{0,40}prefers-reduced-motion'))
+) "180.12: .knob2 rotates via a plain transition (no animation:) and declares no bespoke reduced-motion carve-out -- the existing global block neutralises it automatically"
 
 # ===========================================================
 # Results

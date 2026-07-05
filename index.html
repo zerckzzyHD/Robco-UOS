@@ -2527,9 +2527,17 @@
                   </div>
                   <p class="board-status" id="st-doctrine">&gt; DOCTRINE: ANY WEAPON</p>
 
-                  <!-- PLAYTHROUGH TYPE — tempo dial + 5 direct-pick detents (#playthroughTypeSelect) -->
-                  <div class="rack-note" style="margin-top: 14px">
-                    OPERATIONAL TEMPO &mdash; 5-POSITION SELECTOR, DIRECT PICK:
+                  <!-- PLAYTHROUGH TYPE — centered rotary dial, 5 positions ringed on a
+                       gauge arc (#playthroughTypeSelect). Owner-approved mockup:
+                       planning/mockups/tempo-dial.html. The needle always points at the
+                       active position; only short labels ring the knob — the active
+                       option's full name + description shows on the readout below
+                       (verified legible at 360px in the mockup). Tapping the knob body
+                       does NOTHING (owner decision, unlike the Immersion dial's tap-to-
+                       cycle) — only a drag, a direct position tap, or the arrow keys
+                       change the value. -->
+                  <div class="rack-note" style="margin-top: 16px">
+                    OPERATIONAL TEMPO &mdash; ROTARY SELECTOR:
                     <span class="real-label">(PLAYTHROUGH TYPE)</span>
                   </div>
                   <select
@@ -2544,85 +2552,116 @@
                     <option value="casual">Casual</option>
                     <option value="speedrun">Speedrun</option>
                   </select>
-                  <div class="tempo-wrap">
-                    <div class="tempo-dial" aria-hidden="true">
-                      <span class="knob" id="tempoKnob"></span>
-                    </div>
-                    <div class="detent-rack" role="radiogroup" aria-label="Playthrough type">
-                      <button
-                        type="button"
-                        class="detent on"
-                        data-tempo="standard"
-                        onclick="_setTempo('standard')"
-                        role="radio"
-                        aria-checked="true"
-                      >
-                        <span class="d-pip" aria-hidden="true"></span
-                        ><span class="d-txt"
-                          >STANDARD<span class="d-desc"
-                            >balanced pacing &mdash; the default simulation</span
-                          ></span
-                        >
-                      </button>
-                      <button
-                        type="button"
-                        class="detent"
-                        data-tempo="minmaxed"
-                        onclick="_setTempo('minmaxed')"
-                        role="radio"
-                        aria-checked="false"
-                      >
-                        <span class="d-pip" aria-hidden="true"></span
-                        ><span class="d-txt"
-                          >MIN-MAXED<span class="d-desc"
-                            >the AI assumes optimized builds</span
-                          ></span
-                        >
-                      </button>
-                      <button
-                        type="button"
-                        class="detent"
-                        data-tempo="completionist"
-                        onclick="_setTempo('completionist')"
-                        role="radio"
-                        aria-checked="false"
-                      >
-                        <span class="d-pip" aria-hidden="true"></span
-                        ><span class="d-txt"
-                          >COMPLETIONIST<span class="d-desc">every side path surfaces</span></span
-                        >
-                      </button>
-                      <button
-                        type="button"
-                        class="detent"
-                        data-tempo="casual"
-                        onclick="_setTempo('casual')"
-                        role="radio"
-                        aria-checked="false"
-                      >
-                        <span class="d-pip" aria-hidden="true"></span
-                        ><span class="d-txt"
-                          >CASUAL<span class="d-desc"
-                            >forgiving pacing, lighter bookkeeping</span
-                          ></span
-                        >
-                      </button>
-                      <button
-                        type="button"
-                        class="detent"
-                        data-tempo="speedrun"
-                        onclick="_setTempo('speedrun')"
-                        role="radio"
-                        aria-checked="false"
-                      >
-                        <span class="d-pip" aria-hidden="true"></span
-                        ><span class="d-txt"
-                          >SPEEDRUN<span class="d-desc"
-                            >critical path only &mdash; aggressive clock</span
-                          ></span
-                        >
-                      </button>
-                    </div>
+                  <div class="dial-assembly" id="tempoDialAssembly">
+                    <span class="tick-ring" aria-hidden="true"></span>
+                    <span
+                      class="tempo-tick lit"
+                      data-i="0"
+                      style="--a: -84deg"
+                      aria-hidden="true"
+                    ></span>
+                    <span
+                      class="tempo-tick"
+                      data-i="1"
+                      style="--a: -42deg"
+                      aria-hidden="true"
+                    ></span>
+                    <span class="tempo-tick" data-i="2" style="--a: 0deg" aria-hidden="true"></span>
+                    <span
+                      class="tempo-tick"
+                      data-i="3"
+                      style="--a: 42deg"
+                      aria-hidden="true"
+                    ></span>
+                    <span
+                      class="tempo-tick"
+                      data-i="4"
+                      style="--a: 84deg"
+                      aria-hidden="true"
+                    ></span>
+                    <button
+                      type="button"
+                      class="detent2 on"
+                      data-tempo="standard"
+                      data-i="0"
+                      style="--a: -84deg"
+                      onclick="_setTempo('standard')"
+                      role="radio"
+                      aria-checked="true"
+                    >
+                      <span class="d-num" aria-hidden="true">01</span>STANDARD
+                    </button>
+                    <button
+                      type="button"
+                      class="detent2"
+                      data-tempo="minmaxed"
+                      data-i="1"
+                      style="--a: -42deg"
+                      onclick="_setTempo('minmaxed')"
+                      role="radio"
+                      aria-checked="false"
+                    >
+                      <span class="d-num" aria-hidden="true">02</span>MIN-MAXED
+                    </button>
+                    <button
+                      type="button"
+                      class="detent2"
+                      data-tempo="completionist"
+                      data-i="2"
+                      style="--a: 0deg"
+                      onclick="_setTempo('completionist')"
+                      role="radio"
+                      aria-checked="false"
+                    >
+                      <span class="d-num" aria-hidden="true">03</span>COMPLETIONIST
+                    </button>
+                    <button
+                      type="button"
+                      class="detent2"
+                      data-tempo="casual"
+                      data-i="3"
+                      style="--a: 42deg"
+                      onclick="_setTempo('casual')"
+                      role="radio"
+                      aria-checked="false"
+                    >
+                      <span class="d-num" aria-hidden="true">04</span>CASUAL
+                    </button>
+                    <button
+                      type="button"
+                      class="detent2"
+                      data-tempo="speedrun"
+                      data-i="4"
+                      style="--a: 84deg"
+                      onclick="_setTempo('speedrun')"
+                      role="radio"
+                      aria-checked="false"
+                    >
+                      <span class="d-num" aria-hidden="true">05</span>SPEEDRUN
+                    </button>
+                    <button
+                      type="button"
+                      class="knob2"
+                      id="tempoKnob"
+                      role="slider"
+                      aria-valuemin="0"
+                      aria-valuemax="4"
+                      aria-valuenow="0"
+                      aria-valuetext="Standard — balanced pacing, the default simulation"
+                      aria-label="Operational tempo dial — drag to rotate or use the arrow keys to change; tap a position label to select it directly"
+                      style="transform: rotate(-84deg)"
+                    ></button>
+                  </div>
+                  <div class="tempo-readout" aria-live="polite">
+                    <span class="tr-pos">&gt; TEMPO SELECTED</span>
+                    <span class="tr-name" id="tempoReadoutName">STANDARD</span>
+                    <span class="tr-desc" id="tempoReadoutDesc"
+                      >balanced pacing &mdash; the default simulation</span
+                    >
+                  </div>
+                  <div class="dial-hint">
+                    drag the knob to rotate &middot; tap a position directly &middot; arrow keys
+                    step
                   </div>
                   <p class="board-status" id="st-tempo">&gt; TEMPO: STANDARD</p>
                 </details>

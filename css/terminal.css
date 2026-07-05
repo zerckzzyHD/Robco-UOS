@@ -4641,103 +4641,207 @@ details.bay-board.dangerboard::after {
   text-shadow: 0 0 6px rgba(var(--robco-green-rgb), 0.6);
 }
 
-/* ── TEMPO SELECTOR — decorative rotary dial + 5 direct-pick detents
-   (CAMPAIGN PROFILE board — #playthroughTypeSelect). Unlike the Immersion
-   dial (a clickable cycle-through button), this dial is purely cosmetic
-   (aria-hidden) — the 5 detent buttons are the real, direct-pick control,
-   1 tap per pick, satisfying the no-added-taps guardrail versus the old
-   <select>'s open-then-pick. ────────────────────────────────────────── */
-.tempo-wrap {
-  display: flex;
-  gap: 14px;
-  margin-top: 10px;
-  align-items: flex-start;
-  flex-wrap: wrap;
-}
-.tempo-dial {
-  width: 74px;
-  height: 74px;
-  flex-shrink: 0;
-  border: 2px solid var(--robco-green);
-  border-radius: 50%;
+/* ── TEMPO SELECTOR — centered rotary dial (SU-3 rework, owner-approved
+   mockup: planning/mockups/tempo-dial.html). The 5 playthroughType positions
+   ring the knob on a gauge arc (−84°…+84°, 42° apart, 0° = up) and the needle
+   (the knob's own rotation) always points at the active one. Short labels
+   only sit on the ring — the active option's full name + description lives
+   on the .tempo-readout below (this is how mobile legibility is solved,
+   verified at 360px in the mockup screenshots). The 5 .detent2 buttons are
+   the real direct-pick control (1 tap per pick); the knob itself performs NO
+   action on tap (owner decision) — only a drag, a direct .detent2 tap, or
+   arrow keys (knob is role=slider) change #playthroughTypeSelect. ───────── */
+.dial-assembly {
+  --kd: 108px; /* knob diameter */
+  --rt: 62px; /* tick-ring radius */
+  --rl: 82px; /* detent-label radius */
+  --cy: 100px; /* hub center y inside the assembly */
   position: relative;
-  background: radial-gradient(
-    circle at 38% 34%,
-    rgba(var(--robco-green-rgb), 0.16),
-    rgba(0, 0, 0, 0.6) 70%
-  );
-  box-shadow: inset 0 0 16px rgba(0, 0, 0, 0.7);
-  margin: 4px auto 0;
+  width: 100%;
+  max-width: 300px;
+  height: 168px;
+  margin: 12px auto 0;
+  user-select: none;
+  -webkit-user-select: none;
 }
-.tempo-dial .knob {
+.tick-ring {
   position: absolute;
-  inset: 15px;
-  border: 1px solid rgba(var(--robco-green-rgb), 0.7);
+  left: 50%;
+  top: var(--cy);
+  width: calc(var(--rt) * 2);
+  height: calc(var(--rt) * 2);
+  margin: calc(var(--rt) * -1) 0 0 calc(var(--rt) * -1);
   border-radius: 50%;
-  transition: transform 0.35s cubic-bezier(0.3, 1.3, 0.55, 1);
-  background: rgba(0, 0, 0, 0.5);
+  border: 1px dashed rgba(var(--robco-green-rgb), 0.25);
+  -webkit-mask-image: linear-gradient(180deg, #000 0 62%, transparent 78%);
+  mask-image: linear-gradient(180deg, #000 0 62%, transparent 78%);
+  pointer-events: none;
 }
-.tempo-dial .knob::before {
+.tempo-tick {
+  position: absolute;
+  left: 50%;
+  top: var(--cy);
+  width: 2px;
+  height: 9px;
+  margin-left: -1px;
+  margin-top: -4.5px;
+  background: rgba(var(--robco-green-rgb), 0.4);
+  transform: rotate(var(--a)) translateY(calc(var(--rt) * -1));
+  pointer-events: none;
+}
+.tempo-tick.lit {
+  background: var(--robco-green);
+  box-shadow: 0 0 7px var(--robco-green);
+}
+/* detent labels ring the knob — short names only, tap to select directly */
+.detent2 {
+  position: absolute;
+  left: 50%;
+  top: var(--cy);
+  transform: translate(-50%, -50%) rotate(var(--a)) translateY(calc(var(--rl) * -1))
+    rotate(calc(var(--a) * -1));
+  border: none;
+  background: transparent;
+  padding: 7px 5px; /* >=28px total tap target */
+  min-height: 28px;
+  min-width: 28px;
+  font-size: 8px;
+  letter-spacing: 0.5px;
+  line-height: 1;
+  opacity: 0.5;
+  white-space: nowrap;
+  text-shadow: none;
+  color: var(--robco-green); /* see .cart's comment above */
+}
+.detent2:hover {
+  background: rgba(var(--robco-green-rgb), 0.08);
+}
+.detent2 .d-num {
+  display: block;
+  font-size: 7px;
+  opacity: 0.55;
+  margin-bottom: 2px;
+  letter-spacing: 1px;
+}
+.detent2.on {
+  opacity: 1;
+  text-shadow: 0 0 6px rgba(var(--robco-green-rgb), 0.6);
+  font-weight: bold;
+}
+/* the knob — grip ridges + needle; the WHOLE button rotates. Rotation is a
+   plain CSS transition (never a bespoke carve-out needed — the existing
+   global prefers-reduced-motion block already collapses it to an instant
+   snap). touch-action:none is scoped to the knob ONLY so the page still
+   scrolls normally everywhere else. */
+.knob2 {
+  position: absolute;
+  left: 50%;
+  top: var(--cy);
+  width: var(--kd);
+  height: var(--kd);
+  margin: calc(var(--kd) / -2) 0 0 calc(var(--kd) / -2);
+  border-radius: 50%;
+  border: 2px solid var(--robco-green);
+  padding: 0;
+  background:
+    repeating-conic-gradient(rgba(var(--robco-green-rgb), 0.1) 0deg 4deg, transparent 4deg 24deg),
+    radial-gradient(circle at 38% 32%, rgba(var(--robco-green-rgb), 0.16), rgba(0, 0, 0, 0.65) 72%);
+  box-shadow:
+    inset 0 0 20px rgba(0, 0, 0, 0.75),
+    0 0 12px rgba(var(--robco-green-rgb), 0.18);
+  transition: transform 0.35s cubic-bezier(0.3, 1.3, 0.55, 1);
+  touch-action: none;
+  color: var(--robco-green);
+}
+.knob2.dragging {
+  transition: none;
+}
+.knob2:focus-visible {
+  outline: 2px solid var(--robco-alert);
+  outline-offset: 4px;
+}
+.knob2::before {
   content: '';
   position: absolute;
   left: 50%;
-  top: 3px;
+  top: 5px;
   transform: translateX(-50%);
-  width: 3px;
-  height: 12px;
+  width: 4px;
+  height: 30%;
   background: var(--robco-green);
-  box-shadow: 0 0 6px var(--robco-green);
+  box-shadow: 0 0 8px var(--robco-green);
+  border-radius: 2px;
 }
-.detent-rack {
-  flex: 1 1 200px;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-.detent {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 34px;
-  border: 1px solid rgba(var(--robco-green-rgb), 0.3);
-  background: rgba(0, 0, 0, 0.3);
-  font-size: 10px;
-  letter-spacing: 1px;
-  padding: 4px 9px;
-  text-align: left;
-  opacity: 0.6;
-  color: var(--robco-green); /* see .cart's comment above */
-  width: 100%;
-}
-.detent .d-pip {
-  width: 7px;
-  height: 7px;
+.knob2::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 26%;
+  height: 26%;
   border-radius: 50%;
-  flex-shrink: 0;
-  border: 1px solid rgba(var(--robco-green-rgb), 0.6);
+  border: 1px solid rgba(var(--robco-green-rgb), 0.55);
+  background: radial-gradient(circle at 40% 35%, #1d221c, #05080a 75%);
 }
-.detent .d-txt {
-  flex: 1;
-  min-width: 0;
+/* LCD readout — the active option's full name + description (mobile
+   legibility fix: the ring only carries short labels) */
+.tempo-readout {
+  max-width: 320px;
+  margin: 6px auto 0;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.45);
+  background: linear-gradient(rgba(var(--robco-green-rgb), 0.03), rgba(0, 0, 0, 0.4)), #041009;
+  box-shadow: inset 0 1px 5px rgba(0, 0, 0, 0.85);
+  padding: 8px 12px 9px;
+  text-align: center;
 }
-.detent .d-desc {
+.tempo-readout .tr-pos {
+  font-size: 8px;
+  letter-spacing: 2px;
+  opacity: 0.45;
   display: block;
-  font-size: 8.5px;
-  opacity: 0.55;
-  letter-spacing: 0.4px;
-  margin-top: 1px;
-  text-transform: none;
 }
-.detent.on {
-  opacity: 1;
-  border-color: var(--robco-green);
-  background: rgba(var(--robco-green-rgb), 0.1);
+.tempo-readout .tr-name {
+  font-size: 13px;
+  letter-spacing: 3px;
+  display: block;
+  margin-top: 2px;
   text-shadow: 0 0 6px rgba(var(--robco-green-rgb), 0.6);
 }
-.detent.on .d-pip {
-  background: var(--robco-green);
-  box-shadow: 0 0 6px var(--robco-green);
+.tempo-readout .tr-desc {
+  display: block;
+  font-size: 9.5px;
+  letter-spacing: 0.4px;
+  opacity: 0.6;
+  margin-top: 3px;
+  line-height: 1.5;
+  text-transform: none;
+  min-height: 15px;
+}
+.dial-hint {
+  text-align: center;
+  font-size: 8px;
+  letter-spacing: 1px;
+  opacity: 0.35;
+  margin-top: 6px;
+  text-transform: none;
+}
+/* Desktop-only size bump — gated on hover/fine-pointer (Suite 129: an ungated
+   min-width query is what let a phone's mis-measured viewport briefly boot
+   into the desktop shell; every desktop-only tweak in this file, not just
+   the shell reflow, carries the same gate). */
+@media (min-width: 1000px) and (hover: hover) and (pointer: fine) {
+  .dial-assembly {
+    --kd: 132px;
+    --rt: 76px;
+    --rl: 100px;
+    --cy: 118px;
+    max-width: 360px;
+    height: 198px;
+  }
+  .detent2 {
+    font-size: 9.5px;
+  }
 }
 
 /* ── RANDOMIZER INTERLOCK — arm-then-commit breaker (RANDOMIZER INTERLOCK ·

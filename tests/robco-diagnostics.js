@@ -24348,15 +24348,19 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   );
 
   // 178.7  OPERATIONAL TEMPO: 5 direct-pick detents (1 tap per pick, no cycling),
-  //        wired to _setTempo with the exact 5 values #playthroughTypeSelect used
+  //        wired to _setTempo with the exact 5 values #playthroughTypeSelect used.
+  //        SU-3 rotary-dial rework (see Suite 180): the detent class renamed
+  //        .detent -> .detent2 (ringed on the dial's gauge arc rather than a
+  //        vertical list) — [\s\S]*? spans Prettier's multi-line attribute
+  //        wrapping instead of a same-line [^>]* regex.
   {
     const tempoValues = ['standard', 'minmaxed', 'completionist', 'casual', 'speedrun'];
     assert(
       tempoValues.every(v =>
-        new RegExp('data-tempo="' + v + '"[^>]*onclick="_setTempo\\(\'' + v + '\'\\)"').test(
+        new RegExp('data-tempo="' + v + '"[\\s\\S]*?onclick="_setTempo\\(\'' + v + '\'\\)"').test(
           html178
         )
-      ) && (html178.match(/class="detent(?: on)?"/g) || []).length === 5,
+      ) && (html178.match(/class="detent2(?: on)?"/g) || []).length === 5,
       '178.7: exactly 5 direct-pick detent buttons exist, one per playthroughType value (standard/minmaxed/completionist/casual/speedrun), each wired to _setTempo(value)'
     );
   }
@@ -24479,7 +24483,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   {
     const tempoAndRockerSlice178 = configBlock178.slice(
       configBlock178.indexOf('rack-note" style="margin-top: 14px">ENGAGEMENT'),
-      configBlock178.indexOf('</details>', configBlock178.indexOf('detent-rack'))
+      configBlock178.indexOf('</details>', configBlock178.indexOf('dial-hint'))
     );
     assert(
       !/\bFNV\b|\bFO3\b|Capital Wasteland|Vault 101/i.test(tempoAndRockerSlice178),
@@ -24712,11 +24716,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   }
 
   // 179.13  ENGAGEMENT DOCTRINE rocker (.rocker button) and OPERATIONAL TEMPO
-  //         detents (.detent) — same legibility fix, same reason.
+  //         detents (.detent2 — renamed from .detent by the SU-3 rotary-dial
+  //         rework, Suite 180) — same legibility fix, same reason.
   assert(
     /\.rocker button\s*\{[^}]*color:\s*var\(--robco-green\)/.test(css179) &&
-      /\.detent\s*\{[^}]*color:\s*var\(--robco-green\)/.test(css179),
-    '179.13: .rocker button and .detent both explicitly reset color to var(--robco-green) (the global button dark-text reset no longer leaks into either control)'
+      /\.detent2\s*\{[^}]*color:\s*var\(--robco-green\)/.test(css179),
+    '179.13: .rocker button and .detent2 both explicitly reset color to var(--robco-green) (the global button dark-text reset no longer leaks into either control)'
   );
 
   // 179.14  RANDOMIZER INTERLOCK · PURGE board's breaker (.ilk-breaker) gets
@@ -24804,6 +24809,258 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
               .map(t => t.key + ' (' + _contrast179(t.hex, t.dark).toFixed(2) + ')')
               .join(', ')
           : '')
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 180 — OPERATIONAL TEMPO centered rotary dial (SU-3 rework)
+//  Owner-approved mockup: planning/mockups/tempo-dial.html. Replaces the
+//  decorative-dial-plus-vertical-list from Suite 178/179 with a true rotary
+//  dial: the 5 playthroughType positions ring the knob on a gauge arc and
+//  the needle (the knob's own rotation) always points at the active one.
+//  Owner directive: the knob performs NO action on tap — only a drag, a
+//  direct position tap, or the arrow keys change #playthroughTypeSelect.
+//  12 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 180 — OPERATIONAL TEMPO centered rotary dial (SU-3 rework)');
+  const html180 = readFile('index.html');
+  const core180 = readFile('js/ui-core.js');
+  const css180 = readFile('css/terminal.css');
+  const configBlock180 = (html180.match(
+    /id="campaignConfigPanel"[\s\S]*?<div class="col-right">/
+  ) || [''])[0];
+
+  // 180.1  the dial assembly: a tick-ring, 5 ticks on the exact gauge-arc
+  //        angles (−84°…+84°, 42° apart, 0° = up), and the knob itself is a
+  //        real role=slider control spanning the 5 positions.
+  assert(
+    /id="tempoDialAssembly"/.test(configBlock180) &&
+      /class="tick-ring"/.test(configBlock180) &&
+      ['-84deg', '-42deg', '0deg', '42deg', '84deg'].every(
+        a => configBlock180.match(new RegExp('class="tempo-tick[^"]*"[\\s\\S]*?--a:\\s*' + a)) // one tick per angle
+      ) &&
+      /id="tempoKnob"[\s\S]*?role="slider"[\s\S]*?aria-valuemin="0"[\s\S]*?aria-valuemax="4"/.test(
+        configBlock180
+      ),
+    '180.1: #tempoDialAssembly has a tick-ring + 5 ticks at the exact −84/−42/0/42/84° gauge-arc angles, and #tempoKnob is a real role=slider spanning 0..4'
+  );
+
+  // 180.2  5 direct-pick .detent2 position buttons ring the knob, each wired
+  //        to _setTempo with the exact playthroughType value, each carrying
+  //        a data-i index matching its tick (never orphaned from the arc).
+  {
+    const tempos180 = [
+      { v: 'standard', i: 0 },
+      { v: 'minmaxed', i: 1 },
+      { v: 'completionist', i: 2 },
+      { v: 'casual', i: 3 },
+      { v: 'speedrun', i: 4 },
+    ];
+    assert(
+      tempos180.every(t =>
+        new RegExp(
+          'class="detent2[^"]*"[\\s\\S]*?data-tempo="' +
+            t.v +
+            '"[\\s\\S]*?data-i="' +
+            t.i +
+            '"[\\s\\S]*?onclick="_setTempo\\(\'' +
+            t.v +
+            '\'\\)"'
+        ).test(configBlock180)
+      ) && (configBlock180.match(/class="detent2(?: on)?"/g) || []).length === 5,
+      '180.2: exactly 5 .detent2 position buttons ring the knob, each wired to _setTempo(value) and carrying the data-i index matching its tick — one tap per pick, never a cycle'
+    );
+  }
+
+  // 180.3  owner directive: the knob performs NO action on tap — no onclick
+  //        attribute in the markup, and no .addEventListener('click', ...)
+  //        targeting the knob anywhere in ui-core.js (unlike the Immersion
+  //        dial's tap-to-cycle _cycleImmersionDial()).
+  {
+    const knobTag180 = (configBlock180.match(/<button[^>]*id="tempoKnob"[^>]*>/) || [''])[0];
+    assert(
+      knobTag180 !== '' &&
+        !/onclick=/.test(knobTag180) &&
+        !/tempoKnob'\)[\s\S]{0,60}addEventListener\(\s*'click'/.test(core180) &&
+        !/addEventListener\(\s*'click'[\s\S]{0,120}tempoKnob/.test(core180),
+      '180.3: the knob has no onclick attribute and no click listener anywhere — tapping the knob body does nothing (owner decision), only drag/position-tap/arrow-keys change the value'
+    );
+  }
+
+  // 180.4  _wireTempoDialDrag(): keydown is attached unconditionally (arrow
+  //        keys work with or without pointer support) while pointerdown is
+  //        gated on window.PointerEvent (graceful fallback) — same shape as
+  //        the Immersion dial's own _wireImmersionDialDrag(), a parallel
+  //        pattern rather than a shared/forked implementation (the two
+  //        dials' drag math is genuinely different: pixel-step vs angle).
+  {
+    const wireBody180 = extractFunctionBody(core180, '_wireTempoDialDrag');
+    assert(
+      /addEventListener\('keydown', _tempoKeyDown\)/.test(wireBody180) &&
+        /typeof window\.PointerEvent === 'undefined'/.test(wireBody180) &&
+        /addEventListener\('pointerdown', _tempoPointerDown\)/.test(wireBody180),
+      '180.4: _wireTempoDialDrag() attaches keydown unconditionally and pointerdown only when window.PointerEvent exists (graceful fallback: tap-position + arrows still work)'
+    );
+  }
+
+  // 180.5  the needle-angle formula: _TEMPO_ROT is derived from the same
+  //        _TEMPO_ARC_MIN/_TEMPO_ARC_STEP the drag math uses (never a second,
+  //        independently-hand-typed angle array that could drift from the
+  //        arc the ticks/detents are actually drawn on) — the needle always
+  //        points at one of the 5 real positions, never empty space.
+  {
+    const arcMinMatch180 = core180.match(/const _TEMPO_ARC_MIN = (-?\d+);/);
+    const arcStepMatch180 = core180.match(/const _TEMPO_ARC_STEP = (-?\d+);/);
+    const rotMatch180 = core180.match(/const _TEMPO_ROT = \[([^\]]+)\];/);
+    const arcMin180 = arcMinMatch180 ? Number(arcMinMatch180[1]) : NaN;
+    const arcStep180 = arcStepMatch180 ? Number(arcStepMatch180[1]) : NaN;
+    const rotValues180 = rotMatch180 ? rotMatch180[1].split(',').map(n => Number(n.trim())) : [];
+    const expected180 = [0, 1, 2, 3, 4].map(i => arcMin180 + arcStep180 * i);
+    assert(
+      rotValues180.length === 5 &&
+        expected180.every((v, i) => v === rotValues180[i]) &&
+        /knob\.style\.transform = 'rotate\(' \+ _TEMPO_ROT\[tIdx\] \+ 'deg\)'/.test(
+          extractFunctionBody(core180, '_syncCampaignProfileUI')
+        ),
+      '180.5: _TEMPO_ROT === [_TEMPO_ARC_MIN + _TEMPO_ARC_STEP*i for i in 0..4] (' +
+        JSON.stringify(expected180) +
+        ') and _syncCampaignProfileUI() rotates the knob to exactly that angle — the needle always points at the active position'
+    );
+  }
+
+  // 180.6  all three input paths (drag release, direct position tap, arrow
+  //        keys) converge on the one real setter — _setTempo(), which itself
+  //        still delegates to the unchanged onPlaythroughTypeChange()
+  //        (Protocol 22 — one truth, three entry points, never a forked
+  //        persistence path).
+  {
+    const pointerUpBody180 = extractFunctionBody(core180, '_tempoPointerUp');
+    const keyDownBody180 = extractFunctionBody(core180, '_tempoKeyDown');
+    const setTempoBody180 = extractFunctionBody(core180, '_setTempo');
+    assert(
+      /_setTempo\(_TEMPO_ORDER\[idx\]\)/.test(pointerUpBody180) &&
+        (keyDownBody180.match(/_setTempo\(_TEMPO_ORDER\[/g) || []).length === 4 &&
+        /onPlaythroughTypeChange\(type\)/.test(setTempoBody180),
+      '180.6: drag-release, arrow-key stepping (all 4 key branches), and the direct .detent2 tap (Suite 180.2) all call _setTempo(), which still delegates to the unchanged onPlaythroughTypeChange()'
+    );
+  }
+
+  // 180.7  _syncCampaignProfileUI() is the one repaint function that keeps
+  //        the knob/ticks/detents/readout/status line all in sync with
+  //        state.playthroughType — never drifts from the hidden real select.
+  {
+    const syncBody180 = extractFunctionBody(core180, '_syncCampaignProfileUI');
+    assert(
+      /tempo-tick/.test(syncBody180) &&
+        /detent2/.test(syncBody180) &&
+        /aria-valuenow/.test(syncBody180) &&
+        /aria-valuetext/.test(syncBody180) &&
+        /tempoReadoutName/.test(syncBody180) &&
+        /tempoReadoutDesc/.test(syncBody180) &&
+        /st-tempo/.test(syncBody180),
+      '180.7: _syncCampaignProfileUI() repaints the ticks, detents, knob (transform + ARIA), readout (name + description), and status line together — one function, no partial repaints'
+    );
+  }
+
+  // 180.8  game-agnostic (Protocol 38): the dial markup and every new
+  //        drag/keyboard function carry no FNV/FO3 literal — the 5 tempos
+  //        come from the existing _TEMPO_LABELS/_TEMPO_DESC maps, not a
+  //        per-game branch.
+  {
+    const dragFns180 = [
+      '_tempoPointerAngle',
+      '_tempoPointerMove',
+      '_tempoPointerUp',
+      '_tempoPointerCancel',
+      '_tempoPointerDown',
+      '_tempoKeyDown',
+      '_wireTempoDialDrag',
+    ]
+      .map(n => extractFunctionBody(core180, n))
+      .join('\n');
+    const tempoSlice180 = configBlock180.slice(
+      configBlock180.indexOf('rack-note" style="margin-top: 16px">OPERATIONAL'),
+      configBlock180.indexOf('</details>', configBlock180.indexOf('dial-hint'))
+    );
+    assert(
+      !/\bFNV\b|\bFO3\b|Capital Wasteland|Vault 101/i.test(tempoSlice180) &&
+        !/\bFNV\b|\bFO3\b/i.test(dragFns180),
+      '180.8: the dial markup and every new drag/keyboard function are game-agnostic — no FNV/FO3 literal (the 5 tempo names/descriptions are read from the existing shared maps)'
+    );
+  }
+
+  // 180.9  the new drag/keyboard functions write nothing durable to the
+  //        campaign directly — only the unchanged _setTempo()/
+  //        onPlaythroughTypeChange() (out of this guard's scope, already
+  //        covered by Suite 178.4/178.13) actually persist a value.
+  {
+    const offenders180 = [
+      '_tempoPointerAngle',
+      '_tempoPointerMove',
+      '_tempoPointerCleanup',
+      '_tempoPointerUp',
+      '_tempoPointerCancel',
+      '_tempoPointerDown',
+      '_tempoKeyDown',
+      '_wireTempoDialDrag',
+    ].filter(n => /saveState\(|robco_v8|state\.\w+\s*=(?!=)/.test(extractFunctionBody(core180, n)));
+    assert(
+      offenders180.length === 0,
+      '180.9: the new drag/keyboard handler functions never write campaign state directly (saveState/robco_v8/state.<field>=) — only the unchanged _setTempo()/onPlaythroughTypeChange() persist a value' +
+        (offenders180.length ? ' — offenders: ' + offenders180.join(', ') : '')
+    );
+  }
+
+  // 180.10  the old decorative-dial-plus-vertical-list widget is fully
+  //         retired, not merely superseded — no orphaned .tempo-wrap/
+  //         .tempo-dial/.detent-rack/old-.detent markup or CSS remains.
+  assert(
+    !/tempo-wrap/.test(html180) &&
+      !/tempo-wrap/.test(css180) &&
+      !/"tempo-dial"/.test(html180) &&
+      !/\.tempo-dial\b/.test(css180) &&
+      !/detent-rack/.test(html180) &&
+      !/detent-rack/.test(css180) &&
+      !/class="detent"/.test(html180) &&
+      !/\.detent\s*\{/.test(css180),
+    '180.10: the old .tempo-wrap/.tempo-dial/.detent-rack/.detent widget is fully retired (not left as orphaned dead markup/CSS) — superseded by .dial-assembly/.detent2'
+  );
+
+  // 180.11  Protocol 17: every .detent2 keeps a >=28px tap target; touch-
+  //         action:none is scoped to .knob2 ONLY (not the whole assembly or
+  //         the readout), so the surrounding page still scrolls normally.
+  {
+    const detent2Rule180 = (css180.match(/\.detent2\s*\{([\s\S]*?)\n\}/) || ['', ''])[1];
+    const minH180 = (detent2Rule180.match(/min-height:\s*(\d+)px/) || [0, '0'])[1];
+    const minW180 = (detent2Rule180.match(/min-width:\s*(\d+)px/) || [0, '0'])[1];
+    const touchActionSites180 = [
+      ...css180.matchAll(/([.\w-]+)\s*\{[^}]*touch-action:\s*none/g),
+    ].map(m => m[1]);
+    assert(
+      Number(minH180) >= 28 &&
+        Number(minW180) >= 28 &&
+        touchActionSites180.includes('.knob2') &&
+        !touchActionSites180.includes('.dial-assembly') &&
+        !touchActionSites180.includes('.tempo-readout'),
+      '180.11: .detent2 keeps a >=28px tap target (Protocol 17), and touch-action:none is scoped to .knob2 only — the assembly/readout never block page scroll'
+    );
+  }
+
+  // 180.12  reduced-motion: the knob's rotation is a plain CSS transition
+  //         (never animation:), so the existing global prefers-reduced-
+  //         motion block (which already zeroes transition-duration on
+  //         *, *::before, *::after) neutralises it to an instant snap with
+  //         no bespoke carve-out — regression guard that .knob2 never grows
+  //         its own separate reduced-motion override.
+  {
+    const knob2Rule180 = (css180.match(/\.knob2\s*\{([\s\S]*?)\n\}/) || ['', ''])[1];
+    assert(
+      /transition:\s*transform/.test(knob2Rule180) &&
+        !/animation:/.test(knob2Rule180) &&
+        !/\.knob2[\s\S]{0,40}prefers-reduced-motion/.test(css180),
+      '180.12: .knob2 rotates via a plain transition (no animation:) and declares no bespoke reduced-motion carve-out — the existing global block neutralises it automatically'
     );
   }
 }
