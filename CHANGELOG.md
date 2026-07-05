@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2304/2304 | Cache: robco-terminal-v2.7.0-r79 -->
+﻿## [Unreleased]<!-- Tests: 2312/2312 | Cache: robco-terminal-v2.7.0-r80 -->
 
 ### Added
 
@@ -89,6 +89,7 @@
 - Fixed the whole Campaign Configs section — the game cartridges, the doctrine and tempo controls, and the randomizer interlock — reading as dim, near-illegible text on a near-black background. Every one of those controls now reads clearly again, matching the rest of the terminal.
 - Fixed the "DISARM — RETURN TO SAFE" button reading as barely-legible dim text on its own bright fill once Complete RNG was armed. Its label now reads clearly against the fill, no matter which phosphor colour you're running.
 - Fixed the LEVEL UP button only working once your XP bar was completely full, which made it feel useless if your XP wasn't perfectly up to date. It now works on every tap, raising your level by one each time, all the way up to level 50 — no XP requirement.
+- Fixed your OPERATOR boards (Vital Telemetry, S.P.E.C.I.A.L. Tuning, Chrono/Position, and your other stat panels) reading messier than the rest of the terminal — their connector-strip trim used to bleed onto the panel below, and a board's corner tag could crowd its own title. They now sit cleanly apart and read as the same clean hardware look as your Settings section. Fixed your five limb condition chips losing their labels, so each one again clearly says which limb it's showing (Head, Left Arm, Right Arm, Left Leg, Right Leg). Fixed your RAD EXPOSURE reading, CPM number, and RUN BIO-SCAN button reading skewed to one side — they're now centered like everything else.
 
 ### Improved
 

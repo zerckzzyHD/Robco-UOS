@@ -25761,6 +25761,115 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 183 — OPERATOR boards brought up to the Settings/Module Bay
+//  polish standard: contained connector strips, no header/tag collision,
+//  centered RAD EXPOSURE row, and restored per-limb labels (owner report,
+//  confirmed live via rendered bounding-box measurement before the fix:
+//  0px gap between consecutive .panel.bay-board boards let each one's
+//  connector-strip pseudo-element bleed onto the next board's top edge,
+//  and .rad-row had no justify-content while .rr-meter's unbounded
+//  flex-grow pushed the RAD value/CPM readout to the far right edge). 8 tests.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 183 — OPERATOR boards: Module Bay containment + limb labels');
+  const html183 = readFile('index.html');
+  const css183 = readFile('css/terminal.css');
+  const uiCore183 = readFile('js/ui-core.js');
+
+  // 183.1  top-level bay-board panels (OPERATOR) get the SAME 12px
+  //        clearance the Module Bay's SLOT sub-panels already get from
+  //        .bay-grid's grid gap — without it, each board's connector-strip
+  //        ::after (protrudes 6px below) bled onto the next board's top
+  //        border (owner report: "connector strips bleed/overflow").
+  assert(
+    /\.panel\.bay-board\s*\{[^}]*margin-top:\s*12px/.test(css183),
+    '183.1: .panel.bay-board carries margin-top:12px — the same real separation the Module Bay SLOT boards get from .bay-grid gap:12px, so each connector-strip pseudo-element has room to render fully contained'
+  );
+
+  // 183.2  the sub-panel (Module Bay SLOT) variant is untouched — the fix is
+  //        scoped to `.panel.bay-board` only, never a bare `.bay-board` or
+  //        `.sub-panel.bay-board` rewrite (Protocol 22 — additive, no
+  //        regression to the boards already at the reference standard).
+  assert(
+    !/\.sub-panel\.bay-board\s*\{[^}]*margin-top:\s*12px/.test(css183),
+    '183.2: the margin-top:12px fix is scoped to .panel.bay-board only — .sub-panel.bay-board (Module Bay SLOT boards) keeps getting its spacing from .bay-grid gap, untouched'
+  );
+
+  // 183.3  a .panel.bay-board's own <h2> (Protocol UI-1 still requires a
+  //        real h2 on every top-level .panel) is unified with the Module
+  //        Bay's clean plain-text h3 sub-panel header — no more full-bleed
+  //        colored background/negative margins crowding .bay-slot-tag's
+  //        reserved top-right corner (owner report: "BUS-03 overlaps
+  //        SKELETAL HARNESS title").
+  assert(
+    /\.panel\.bay-board\s*>\s*summary\s+h2\s*\{[^}]*margin:\s*0;[^}]*padding:\s*0;[^}]*background:\s*none;[^}]*border-bottom:\s*none;[^}]*display:\s*inline;/.test(
+      css183
+    ) && /\.panel\.bay-board\s*>\s*summary\s+h2::after\s*\{\s*float:\s*none;/.test(css183),
+    "183.3: .panel.bay-board > summary h2 (and its ::after [+]/[-] indicator) drop the plain .panel h2 full-bleed colored bar + float:right in favor of the Module Bay's clean inline h3 treatment"
+  );
+
+  // 183.4  every SKELETAL HARNESS limb chip carries a visible per-limb label
+  //        (matching the body-diagram SVG's own HD/LA/RA/LL/RL zone text —
+  //        Protocol 22, the established short forms) — before this fix the
+  //        chip showed only "[████] OK"/"[░░░░] CRIP" with the limb name
+  //        readable solely via aria-label (owner report: "the 5 limb bars
+  //        lost their per-limb labels").
+  const limbChipLabels183 = {
+    btn_l_hd: 'HD',
+    btn_l_la: 'LA',
+    btn_l_ra: 'RA',
+    btn_l_ll: 'LL',
+    btn_l_rl: 'RL',
+  };
+  const missingChipLabels183 = Object.entries(limbChipLabels183).filter(
+    ([id, label]) =>
+      !new RegExp('id="' + id + '"[\\s\\S]{0,400}?<span class="zc-name">' + label + '</span>').test(
+        html183
+      )
+  );
+  assert(
+    missingChipLabels183.length === 0,
+    '183.4: every btn_l_* limb chip carries a visible <span class="zc-name"> label (HD/LA/RA/LL/RL) — missing: ' +
+      missingChipLabels183.map(([id]) => id).join(', ')
+  );
+
+  // 183.5  loadUI() writes the state glyph into a dedicated .zc-state child,
+  //        never back into the whole button (a bare btn.innerText/btn.textContent
+  //        assignment would silently wipe the .zc-name label on every re-render
+  //        — Protocol 42: the exact footgun this fix closes).
+  const limbLoopBody183 = extractFunctionBody(uiCore183, 'loadUI').slice(0, 4000);
+  assert(
+    /stateEl\.textContent\s*=\s*'\[/.test(limbLoopBody183) &&
+      !/btn\.innerText\s*=/.test(limbLoopBody183) &&
+      !/btn\.textContent\s*=/.test(limbLoopBody183),
+    "183.5: loadUI()'s limb loop writes only into the .zc-state child (stateEl.textContent) — no bare btn.innerText/btn.textContent assignment that would wipe the .zc-name label"
+  );
+
+  // 183.6  .zc-name is a real, styled class (not just inline markup with no
+  //        CSS behind it).
+  assert(/\.zc-name\s*\{/.test(css183), '183.6: .zc-name has a real CSS rule styling the label');
+
+  // 183.7  RAD EXPOSURE row centers as a group instead of letting .rr-meter's
+  //        unbounded flex-grow push the RAD value + CPM label to the far
+  //        right edge (owner report: "RAD EXPOSURE field + CPM + RUN
+  //        BIO-SCAN button currently left-skewed").
+  assert(
+    /\.rad-row\s*\{[^}]*justify-content:\s*center/.test(css183) &&
+      /\.rad-row\s+\.rr-meter\s*\{[^}]*max-width:\s*\d+px/.test(css183),
+    '183.7: .rad-row centers its content as a group (justify-content:center) and .rr-meter is bounded with a max-width so it no longer eats all free space and pushes the CPM readout to the edge'
+  );
+
+  // 183.8  .bio-actions (the RUN BIO-SCAN ADVISORY button row) was already
+  //        centered before this fix — a regression guard that it stays that
+  //        way alongside the newly-centered .rad-row (Protocol 42 — verified
+  //        live, not just assumed).
+  assert(
+    /\.bio-actions\s*\{[^}]*justify-content:\s*center/.test(css183),
+    '183.8: .bio-actions (RUN BIO-SCAN ADVISORY row) still centers its content — regression guard alongside the new .rad-row centering fix'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail

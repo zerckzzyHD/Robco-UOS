@@ -15988,6 +15988,68 @@ Check (-not [System.Text.RegularExpressions.Regex]::IsMatch($dragBlockSrc182, 'r
     "182.12: the drag handlers and capRadsMax() touch only DOM/state fields the existing setters (commitStat/updateMath/syncStateFromDom) already own -- no new localStorage/robco_v8 write site"
 
 # ===========================================================
+# Suite 183 -- OPERATOR boards brought up to the Settings/Module Bay
+# polish standard: contained connector strips, no header/tag collision,
+# centered RAD EXPOSURE row, and restored per-limb labels. 8 tests.
+# Mirrors JS Suite 183.
+# ===========================================================
+Write-Host "`n-- Suite 183 -- OPERATOR boards: Module Bay containment + limb labels $('-' * 5)"
+$html183 = Read-Src "index.html"
+$css183 = Read-Src "css/terminal.css"
+$uiCore183 = Read-Src "js/ui-core.js"
+
+# 183.1  top-level bay-board panels (OPERATOR) get the same 12px clearance
+#        the Module Bay's SLOT sub-panels already get from .bay-grid's grid gap.
+Check ([System.Text.RegularExpressions.Regex]::IsMatch($css183, '(?s)\.panel\.bay-board\s*\{[^\}]*margin-top:\s*12px')) `
+    "183.1: .panel.bay-board carries margin-top:12px -- the same real separation the Module Bay SLOT boards get from .bay-grid gap:12px, so each connector-strip pseudo-element has room to render fully contained"
+
+# 183.2  the sub-panel (Module Bay SLOT) variant is untouched.
+Check (-not [System.Text.RegularExpressions.Regex]::IsMatch($css183, '(?s)\.sub-panel\.bay-board\s*\{[^\}]*margin-top:\s*12px')) `
+    "183.2: the margin-top:12px fix is scoped to .panel.bay-board only -- .sub-panel.bay-board (Module Bay SLOT boards) keeps getting its spacing from .bay-grid gap, untouched"
+
+# 183.3  a .panel.bay-board's own h2 is unified with the Module Bay's clean
+#        plain-text h3 sub-panel header treatment.
+Check (
+    [System.Text.RegularExpressions.Regex]::IsMatch($css183, '(?s)\.panel\.bay-board\s*>\s*summary\s+h2\s*\{[^\}]*margin:\s*0;[^\}]*padding:\s*0;[^\}]*background:\s*none;[^\}]*border-bottom:\s*none;[^\}]*display:\s*inline;') -and
+    [System.Text.RegularExpressions.Regex]::IsMatch($css183, '(?s)\.panel\.bay-board\s*>\s*summary\s+h2::after\s*\{\s*float:\s*none;')
+) "183.3: .panel.bay-board > summary h2 (and its ::after [+]/[-] indicator) drop the plain .panel h2 full-bleed colored bar + float:right in favor of the Module Bay's clean inline h3 treatment"
+
+# 183.4  every SKELETAL HARNESS limb chip carries a visible per-limb label.
+$limbChipLabels183 = @{ btn_l_hd = 'HD'; btn_l_la = 'LA'; btn_l_ra = 'RA'; btn_l_ll = 'LL'; btn_l_rl = 'RL' }
+$missingChipLabels183 = @()
+foreach ($id in $limbChipLabels183.Keys) {
+    $label = $limbChipLabels183[$id]
+    $pattern = '(?s)id="' + $id + '"[\s\S]{0,400}?<span class="zc-name">' + $label + '</span>'
+    if (-not [System.Text.RegularExpressions.Regex]::IsMatch($html183, $pattern)) { $missingChipLabels183 += $id }
+}
+Check ($missingChipLabels183.Count -eq 0) `
+    ("183.4: every btn_l_* limb chip carries a visible <span class=`"zc-name`"> label (HD/LA/RA/LL/RL) -- missing: " + ($missingChipLabels183 -join ', '))
+
+# 183.5  loadUI() writes the state glyph into a dedicated .zc-state child,
+#        never back into the whole button.
+$limbLoopBody183 = (Get-FunctionBody $uiCore183 'loadUI')
+if ($limbLoopBody183.Length -gt 4000) { $limbLoopBody183 = $limbLoopBody183.Substring(0, 4000) }
+Check (
+    ($limbLoopBody183 -match "stateEl\.textContent\s*=\s*'\[") -and
+    -not ($limbLoopBody183 -match 'btn\.innerText\s*=') -and
+    -not ($limbLoopBody183 -match 'btn\.textContent\s*=')
+) "183.5: loadUI()'s limb loop writes only into the .zc-state child (stateEl.textContent) -- no bare btn.innerText/btn.textContent assignment that would wipe the .zc-name label"
+
+# 183.6  .zc-name is a real, styled class.
+Check ($css183 -match '\.zc-name\s*\{') "183.6: .zc-name has a real CSS rule styling the label"
+
+# 183.7  RAD EXPOSURE row centers as a group instead of .rr-meter's unbounded
+#        flex-grow pushing the RAD value + CPM label to the far right edge.
+Check (
+    [System.Text.RegularExpressions.Regex]::IsMatch($css183, '(?s)\.rad-row\s*\{[^\}]*justify-content:\s*center') -and
+    [System.Text.RegularExpressions.Regex]::IsMatch($css183, '(?s)\.rad-row\s+\.rr-meter\s*\{[^\}]*max-width:\s*\d+px')
+) "183.7: .rad-row centers its content as a group (justify-content:center) and .rr-meter is bounded with a max-width so it no longer eats all free space and pushes the CPM readout to the edge"
+
+# 183.8  .bio-actions stays centered (regression guard).
+Check ([System.Text.RegularExpressions.Regex]::IsMatch($css183, '(?s)\.bio-actions\s*\{[^\}]*justify-content:\s*center')) `
+    "183.8: .bio-actions (RUN BIO-SCAN ADVISORY row) still centers its content -- regression guard alongside the new .rad-row centering fix"
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

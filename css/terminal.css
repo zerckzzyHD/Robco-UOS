@@ -4373,6 +4373,46 @@ details.bay-board::after {
   padding-right: 62px;
   position: relative;
 }
+
+/* OPERATOR "hero"/light-frame boards (a top-level <details class="panel
+   bay-board">) stack in a plain block-flow column (.col-left/.col-right —
+   no CSS Grid gap), unlike the Module Bay's SLOT sub-panels (.bay-grid
+   gap:12px). With zero space between them, each board's own connector-strip
+   pseudo-element (details.bay-board::after, above — protrudes 6px below the
+   board) had nowhere to sit and bled straight over the NEXT board's top
+   border (owner report: "connector strips bleed/overflow"). Give top-level
+   bay-board panels the SAME 12px clearance the Module Bay already gets from
+   its grid gap, so the strip renders fully contained again — same machine,
+   same standard (Protocol 22). Specificity (0,2,0) beats the base
+   `details.bay-board` rule's (0,1,1) margin-top:0 above regardless of source
+   order. Sub-panel SLOT boards are untouched — they never match `.panel`. */
+.panel.bay-board {
+  margin-top: 12px;
+}
+
+/* A .panel.bay-board keeps a REAL <h2> (Protocol UI-1 requires it), but the
+   plain `.panel h2` treatment below (full-bleed colored bar + negative
+   margins, meant for an ordinary panel with no corner label) reads as
+   cluttered right against `.bay-slot-tag`'s reserved top-right corner —
+   e.g. "BUS-03" crowding the SKELETAL HARNESS title. Unify it with the
+   Module Bay's clean, plain-text `.sub-panel > summary h3` treatment instead
+   (below) so every bay-board — panel or sub-panel — reads as the SAME
+   machine (Protocol 22). Only the decorative header styling changes; the
+   element is still a real h2 for Protocol UI-1/Suite 88. */
+.panel.bay-board > summary h2 {
+  margin: 0;
+  padding: 0;
+  background: none;
+  border-bottom: none;
+  display: inline;
+  font-size: 12px;
+  font-weight: normal;
+  letter-spacing: 1px;
+  opacity: 0.85;
+}
+.panel.bay-board > summary h2::after {
+  float: none;
+}
 .bay-slot-tag {
   position: absolute;
   top: -1px;
@@ -6652,15 +6692,29 @@ button.rb-key:disabled {
 .zone-chips button.limb-crip {
   text-shadow: 0 0 6px rgba(231, 76, 60, 0.5);
 }
+/* Per-limb label (owner report: the 5 limb chips lost a visible label and
+   read as identical, unlabeled bars — only a screen-reader aria-label named
+   the limb). Matches the body-diagram SVG's own HD/LA/RA/LL/RL zone text
+   (Protocol 22 — the established short forms), first inside the button so
+   it always leads the [████]/[░░░░] state glyph loadUI() writes into
+   .zc-state (js/ui-core.js) — never overwritten by that assignment. */
+.zc-name {
+  font-weight: bold;
+  opacity: 0.7;
+  letter-spacing: 1px;
+}
 .rad-row {
   display: flex;
   align-items: center;
+  justify-content: center; /* centering rule — owner report: RAD EXPOSURE/CPM read left-skewed */
   gap: 10px;
   flex-wrap: wrap;
   margin-top: 12px;
 }
 .rad-row .rr-meter {
   flex: 1 1 150px;
+  max-width: 220px; /* bounded, not unbounded growth — lets the CPM readout sit as
+    a centered cluster with the meter instead of being pushed to the far edge */
   min-width: 0;
 }
 .rad-row .rr-label {

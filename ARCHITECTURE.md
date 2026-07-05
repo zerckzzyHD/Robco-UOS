@@ -69,8 +69,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2304-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2304-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2312-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2312-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -1052,6 +1052,50 @@ that a zone click/Enter/Space calls `toggleLimb()` (and an unrelated key does no
 `capRadsMax()` clamps to whichever game's `maxRads` is active (not a fixed literal) — plus structural
 guards for the `GAME_DEFS` fields, the `#stat_rads` wiring, the `syncStateFromDom()`/`autoImportState()`
 clamps, the widened `.fd-ladder` tap target, and a no-new-write-site guard.
+
+**Owner polish pass — OPERATOR boards brought up to the Settings/Module Bay containment standard.**
+Live rendered-bounding-box measurement (not just static CSS reading) confirmed three real, distinct
+root causes behind the owner's "OPERATOR doesn't match Settings" report, all traced to how a
+top-level `<details class="panel bay-board">` (OPERATOR) differs from a `<details class="sub-panel
+bay-board">` (Module Bay SLOT board) even though both already share the `.bay-board` machine-language
+class (Protocol 22):
+
+- **Connector-strip bleed.** OPERATOR boards stack in a plain block-flow column (`.col-left`/
+  `.col-right`, no CSS Grid), while Module Bay SLOT boards sit in `.bay-grid` (`gap: 12px`). With
+  `details.bay-board { margin-top: 0 }` universal to both variants, OPERATOR boards had a literal 0px
+  gap between them — measured live — so each board's `::after` connector-strip pseudo-element
+  (protrudes 6px below) bled straight onto the next board's top border. Fixed with a single scoped
+  rule, `.panel.bay-board { margin-top: 12px }` (specificity (0,2,0) beats the base rule's (0,1,1)
+  regardless of source order), giving OPERATOR boards the exact same 12px clearance the Module Bay
+  already had. `.sub-panel.bay-board` is untouched — it keeps getting its spacing from the grid gap.
+- **`.bay-slot-tag` crowding the header.** A `.panel`'s `<h2>` carries a full-bleed colored background
+  bar via negative margins (`.panel h2 { margin: -10px -10px 10px -10px }`), a treatment meant for an
+  ordinary panel with no corner label. Combined with `.bay-slot-tag`'s reserved top-right corner, this
+  read as cluttered (e.g. "BUS-03" crowding the SKELETAL HARNESS title). `.panel.bay-board > summary
+h2` now neutralizes that treatment (no background/margin/padding, `display: inline`) to match the
+  Module Bay's plain-text `.sub-panel > summary h3` header exactly — same machine, no more collision.
+  The element is still a real `<h2>` (Protocol UI-1/Suite 88 unaffected); only its decorative styling
+  changed.
+- **RAD EXPOSURE row left-skewed.** `.rad-row` had no `justify-content`, and `.rr-meter`'s unbounded
+  `flex: 1 1 150px` (no `max-width`) consumed all free space, pushing the RAD value + CPM label to the
+  row's far right edge instead of reading as a centered cluster. Fixed with `justify-content: center`
+  on `.rad-row` and a `max-width: 220px` bound on `.rr-meter` so the group centers as a whole
+  (`.bio-actions` was already centered — confirmed unaffected, not assumed).
+- **Missing per-limb labels.** The five SKELETAL HARNESS limb chips (`#btn_l_hd/la/ra/ll/rl`) rendered
+  only `[████] OK`/`[░░░░] CRIP`, with the limb name readable solely via `aria-label` — no sighted-user
+  label at all. Each chip now carries a `<span class="zc-name">` (HD/LA/RA/LL/RL, matching the body-
+  diagram SVG's own zone text — Protocol 22) as a static sibling of a new `<span class="zc-state">`
+  that `loadUI()` writes the state glyph into — the previous `btn.innerText = '[████] OK'` assignment
+  would have wiped a label placed directly in the button, so the state write was re-targeted to the
+  `.zc-state` child specifically (Protocol 42 — the exact footgun this fix closes).
+
+Guarded by Suite 183 (both runners, 8 tests): the `.panel.bay-board` margin-top rule and its scoping
+away from `.sub-panel.bay-board`, the neutralized `h2`/`h2::after` header treatment, the five
+`.zc-name` labels present in markup, `loadUI()`'s limb loop writing only into `.zc-state` (never a
+bare `btn.innerText`/`btn.textContent`), the `.zc-name` CSS rule, and `.rad-row`/`.rr-meter`'s
+centering + bound (plus a `.bio-actions` regression guard). CSS/markup only — no id, handler, or
+state-write changed; every control (HP/XP/fader drag, skeleton-zone click, RAD clamp) verified
+unchanged.
 
 ---
 
@@ -2122,7 +2166,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2304-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2312-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable
