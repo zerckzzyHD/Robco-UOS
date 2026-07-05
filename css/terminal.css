@@ -6498,7 +6498,7 @@ button.rb-key:disabled {
   display: block;
 }
 .fd-ladder {
-  width: 22px;
+  width: 28px; /* Protocol 17 -- this is also the drag hit-area (owner interactivity fold-in), so it must clear the 28px tap-target floor itself, not just its .fader column */
   height: 110px;
   margin: 4px auto;
   border: 1px solid rgba(var(--robco-green-rgb), 0.45);
@@ -6509,6 +6509,8 @@ button.rb-key:disabled {
   gap: 2px;
   padding: 2px;
   box-sizing: border-box;
+  touch-action: none; /* scoped to the ladder only -- the page/panel still scrolls everywhere else */
+  cursor: ns-resize;
 }
 .fd-ladder i {
   flex: 1;
@@ -6705,7 +6707,7 @@ button.rb-key:disabled {
     flex: 0 0 34px;
   }
   .fd-ladder {
-    width: 20px;
+    width: 28px;
     height: 96px;
   }
 }

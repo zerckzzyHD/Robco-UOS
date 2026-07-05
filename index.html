@@ -521,7 +521,10 @@
                       value="0"
                       min="0"
                       class="num num-sm rad-input"
-                      oninput="updateMath()"
+                      oninput="
+                        capRadsMax(this);
+                        updateMath();
+                      "
                     />
                     <label>CPM</label>
                   </span>

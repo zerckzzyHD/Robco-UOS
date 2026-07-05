@@ -1002,6 +1002,12 @@ const GAME_DEFS = {
       sellBase: 0.45,
       slopePerPoint: 0.0045,
     },
+    // Owner interactivity fold-in (Phase 3 OPERATOR follow-up): the RAD EXPOSURE field had
+    // no upper bound. 1000 rads is the documented fatal radiation-poisoning threshold in
+    // both FNV and FO3 (crossing 1001 kills the player character on exiting the Pip-Boy).
+    // Source: fallout.wiki "Radiated (Fallout: New Vegas)" / "Radiated (Fallout 3)".
+    // Never hardcode 1000 in the clamp logic -- read this field so a future game can differ.
+    maxRads: 1000,
     vats: {
       // VATS critical-hit-chance bonus: FNV +5%. Source: fallout.wiki "Vault-Tec Assisted
       // Targeting System" ("...in Fallout: New Vegas this was reduced to a +5% boost").
@@ -1186,6 +1192,9 @@ Update state.magazines when the Courier reads a skill magazine. Include only nam
       sellBase: 0.45,
       slopePerPoint: 0.0045,
     },
+    // Owner interactivity fold-in (Phase 3 OPERATOR follow-up): same 1000-rad fatal
+    // threshold as FNV. Source: fallout.wiki "Radiated (Fallout 3)".
+    maxRads: 1000,
     vats: {
       // VATS critical-hit-chance bonus: FO3 +15% (the per-game difference vs FNV's +5%).
       // Source: fallout.wiki VATS ("In Fallout 3, when using V.A.T.S., a +15% critical hit
@@ -1279,6 +1288,9 @@ Update state.lincolnItems when the Courier acquires or sells any Lincoln artifac
     // load-bearing at the 3.0 build (Protocol 3).
     calendar: { startMonth: 10, startDay: 23, startYear: 2287, epochWeekday: 0 },
     ammoPerAttack: 1,
+    // FO4 also uses the 1000-rad fatal threshold (unverified for 3.0, kept consistent with
+    // FNV/FO3 pending real fallout.wiki confirmation when FO4 actually builds — Protocol 3).
+    maxRads: 1000,
     // Minimal defensive stub — never read today (gameContext cannot reach FO4), kept only so
     // getSystemDirective() can't crash if this guard is ever bypassed by a future regression.
     ai: {
@@ -1522,7 +1534,16 @@ function syncStateFromDom() {
   });
   state.caps = parseInt(document.getElementById('c_caps').value) || 0;
   state.loc = document.getElementById('stat_loc').value;
-  state.rads = parseInt(document.getElementById('stat_rads').value) || 0;
+  {
+    // Owner interactivity fold-in: RAD EXPOSURE clamped to [0, GAME_DEFS[ctx].maxRads]
+    // here too (defense in depth alongside capRadsMax()'s oninput clamp) — mirrors the
+    // SPECIAL-stat clamp just above. Never hardcode 1000 (Protocol 38).
+    const _radsN = parseInt(document.getElementById('stat_rads').value) || 0;
+    const _ctx = typeof getGameContext === 'function' ? getGameContext() : 'FNV';
+    const _def = (GAME_DEFS && GAME_DEFS[_ctx]) || (GAME_DEFS && GAME_DEFS.FNV) || {};
+    const _maxRads = typeof _def.maxRads === 'number' ? _def.maxRads : 1000;
+    state.rads = Math.max(0, Math.min(_maxRads, _radsN));
+  }
   state.karma = parseInt(document.getElementById('stat_karma').value) || 0;
   // TIME: read calendar Date (M/D/Y) + H/M inputs → convert to ticks via calendarToTicks()
   // Backward-compat: if new inputs missing, fall back to hidden stat_ticks field

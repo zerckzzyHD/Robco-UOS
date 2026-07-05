@@ -610,7 +610,14 @@ function autoImportState(jsonString) {
     const karmaV = _g(parsed, 'karma');
     if (karmaV !== undefined) state.karma = parseInt(karmaV) || 0;
     const radsV = _g(parsed, 'rads');
-    if (radsV !== undefined) state.rads = parseInt(radsV) || 0;
+    if (radsV !== undefined) {
+      // Owner interactivity fold-in: clamp the AI-write path too, mirroring the
+      // SPECIAL-stat clamp above — [0, GAME_DEFS[ctx].maxRads], never a hardcoded 1000.
+      const _ctx = typeof getGameContext === 'function' ? getGameContext() : 'FNV';
+      const _def = (GAME_DEFS && GAME_DEFS[_ctx]) || (GAME_DEFS && GAME_DEFS.FNV) || {};
+      const _maxRads = typeof _def.maxRads === 'number' ? _def.maxRads : 1000;
+      state.rads = Math.max(0, Math.min(_maxRads, parseInt(radsV) || 0));
+    }
     const ticksV = _g(parsed, 'ticks');
     if (ticksV !== undefined) state.ticks = parseInt(ticksV) || 0;
     // All five limbs including head

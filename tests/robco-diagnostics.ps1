@@ -15761,6 +15761,233 @@ Check (-not [System.Text.RegularExpressions.Regex]::IsMatch($stateSrc181, '(?i)o
     '181.20: js/state.js declares no new state field for this reskin -- every new id is a transient DOM/display concern, never persisted campaign data'
 
 # ===========================================================
+# Suite 182 -- PHASE 3 OPERATOR follow-up: draggable HP/XP/SPECIAL,
+# behavioral zone-click proof, and the RAD EXPOSURE max-rads clamp
+# (owner interactivity fold-in). 12 tests. Mirrors JS Suite 182.
+# ===========================================================
+Write-Host "`n-- Suite 182 -- OPERATOR follow-up: drag controls + RAD max clamp $('-' * 5)"
+$uiCore182 = Read-Src "js/ui-core.js"
+$stateSrc182 = Read-Src "js/state.js"
+$apiSrc182 = Read-Src "js/api.js"
+$css182 = Read-Src "css/terminal.css"
+$index182 = Read-Src "index.html"
+
+# 182.1-182.4 + 182.7  behavioral -- shell out to node and actually execute the
+# real setupHpBarInteraction()/setupXpBarInteraction()/_applyFaderDragValue()/
+# _wireFaderDrag()/_wireBioHarnessZones()/capRadsMax() bodies (Protocol 15
+# parity with JS Suite 182, mirroring the Suite 177 node-shell-out technique).
+$labels182 = @(
+    "setupHpBarInteraction() behavioral: dragging to 80% of hp_bar_container sets stat_hp_cur + state.hpCur to 80 of hpMax 100 -- the HP trace is a real drag control, not a display-only bar",
+    "setupXpBarInteraction() behavioral: dragging to 50% of xp_bar_container at level 1 (xp range 0-199) sets stat_xp + state.xp to 100 -- the XP/GRADE trace is a real drag control, not a display-only bar",
+    "_wireFaderDrag() behavioral: dragging a .fd-ladder to its top/bottom sets the SPECIAL stat to 10/1 through the EXACT SAME commitStat(el) the typed field and +/- steppers already use",
+    "_wireBioHarnessZones() behavioral: a click, Enter keydown, and Space keydown on a .zone element each call toggleLimb(limb) exactly once; an unrelated key does nothing",
+    "capRadsMax() behavioral: a value of 5000 clamps to 1000 under a maxRads:1000 game and to 500 under a maxRads:500 game -- proves the ceiling is read live from GAME_DEFS[ctx], not hardcoded"
+)
+try {
+    $nodeCheck182 = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCheck182) {
+        $uiCorePathNode182 = (Join-Path $Root "js/ui-core.js").Replace('\', '/')
+        $testScript182 = @"
+const fs = require('fs');
+const vm = require('vm');
+const uiCoreSource = fs.readFileSync('$uiCorePathNode182', 'utf8');
+function extractFunctionBody(source, fnName) {
+  const idx = source.indexOf('function ' + fnName);
+  const braceStart = source.indexOf('{', source.indexOf('(', idx));
+  let depth = 0, i = braceStart;
+  for (; i < source.length; i++) {
+    if (source[i] === '{') depth++;
+    else if (source[i] === '}' && --depth === 0) break;
+  }
+  return source.slice(braceStart, i + 1);
+}
+function decl(name) {
+  const s = uiCoreSource.indexOf('function ' + name);
+  const p = uiCoreSource.slice(uiCoreSource.indexOf('(', s), uiCoreSource.indexOf('{', uiCoreSource.indexOf('(', s)));
+  return 'function ' + name + p + extractFunctionBody(uiCoreSource, name);
+}
+function makeFakeEl(overrides) {
+  const listeners = {};
+  let _value = String((overrides && overrides.value) || '0');
+  const base = Object.assign({
+    id: '', style: {}, dataset: {},
+    classList: { add(){}, remove(){}, toggle(){}, contains: () => false },
+    addEventListener(type, fn) { (listeners[type] = listeners[type] || []).push(fn); },
+    removeEventListener(type, fn) { if (listeners[type]) listeners[type] = listeners[type].filter(f => f !== fn); },
+    _fire(type, evt) { (listeners[type] || []).forEach(fn => fn(evt)); },
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: 100, height: 100, bottom: 100 }),
+  }, overrides || {});
+  delete base.value;
+  Object.defineProperty(base, 'value', { get: () => _value, set: v => { _value = String(v); }, enumerable: true });
+  return base;
+}
+function makeFakeDoc(elements, qsaMap) {
+  const listeners = {};
+  return {
+    getElementById: id => elements[id] || null,
+    querySelectorAll: sel => (qsaMap && qsaMap[sel]) || [],
+    addEventListener(type, fn) { (listeners[type] = listeners[type] || []).push(fn); },
+    _fire(type, evt) { (listeners[type] || []).forEach(fn => fn(evt)); },
+  };
+}
+const results = [];
+try {
+  const els = { hp_bar_container: makeFakeEl({ getBoundingClientRect: () => ({ left: 0, width: 100 }) }), stat_hp_max: makeFakeEl({ value: '100' }), stat_hp_cur: makeFakeEl({ value: '10' }) };
+  const doc = makeFakeDoc(els);
+  const sb = { document: doc, state: {}, updateMath: () => {}, Math, parseInt };
+  vm.createContext(sb);
+  vm.runInContext(decl('setupHpBarInteraction'), sb);
+  sb.setupHpBarInteraction();
+  els.hp_bar_container._fire('mousedown', { clientX: 80 });
+  doc._fire('mousemove', { clientX: 80 });
+  results.push(els.stat_hp_cur.value === '80' && sb.state.hpCur === 80);
+} catch (e) { results.push(false); }
+try {
+  const els = { xp_bar_container: makeFakeEl({ getBoundingClientRect: () => ({ left: 0, width: 100 }) }), stat_lvl: makeFakeEl({ value: '1' }), stat_xp: makeFakeEl({ value: '0' }) };
+  const doc = makeFakeDoc(els);
+  const sb = { document: doc, state: {}, updateMath: () => {}, Math, parseInt };
+  vm.createContext(sb);
+  vm.runInContext(decl('setupXpBarInteraction'), sb);
+  sb.setupXpBarInteraction();
+  els.xp_bar_container._fire('mousedown', { clientX: 50 });
+  doc._fire('mousemove', { clientX: 50 });
+  results.push(els.stat_xp.value === '100' && sb.state.xp === 100);
+} catch (e) { results.push(false); }
+try {
+  const els = { s_s: makeFakeEl({ id: 's_s', value: '5' }) };
+  const ladder = makeFakeEl({ dataset: { fdLadder: 's' }, getBoundingClientRect: () => ({ top: 0, bottom: 100, height: 100 }) });
+  const doc = makeFakeDoc(els, { '.fd-ladder[data-fd-ladder]': [ladder] });
+  const sb = { document: doc, state: {}, updateMath: () => {}, saveState: () => {}, Math, parseInt, isNaN, String };
+  vm.createContext(sb);
+  vm.runInContext(decl('commitStat') + '\n' + decl('_applyFaderDragValue') + '\n' + decl('_wireFaderDrag'), sb);
+  sb._wireFaderDrag();
+  ladder._fire('mousedown', { clientY: 2 });
+  const topVal = els.s_s.value;
+  ladder._fire('mousedown', { clientY: 98 });
+  const bottomVal = els.s_s.value;
+  results.push(topVal === '10' && bottomVal === '1' && sb.state.s === 1);
+} catch (e) { results.push(false); }
+try {
+  const zone = makeFakeEl({ dataset: { limb: 'la' } });
+  const doc = { querySelectorAll: sel => (sel === '.zone[data-limb]' ? [zone] : []) };
+  const calls = [];
+  const sb = { document: doc, toggleLimb: l => calls.push(l) };
+  vm.createContext(sb);
+  vm.runInContext(decl('_wireBioHarnessZones'), sb);
+  sb._wireBioHarnessZones();
+  zone._fire('click', {});
+  const c1 = calls[0];
+  zone._fire('keydown', { key: 'Enter', preventDefault(){} });
+  const c2 = calls[1];
+  zone._fire('keydown', { key: ' ', preventDefault(){} });
+  const c3 = calls[2];
+  const before = calls.length;
+  zone._fire('keydown', { key: 'Tab', preventDefault(){} });
+  const tabFired = calls.length > before;
+  results.push(c1 === 'la' && c2 === 'la' && c3 === 'la' && !tabFired);
+} catch (e) { results.push(false); }
+try {
+  const el = makeFakeEl({ value: '5000' });
+  const sb = { document: { getElementById: () => el }, GAME_DEFS: { FNV: { maxRads: 1000 }, FO3: { maxRads: 500 } }, getGameContext: () => 'FNV', window: {}, parseInt, isNaN, String };
+  sb.window.GAME_DEFS = sb.GAME_DEFS;
+  vm.createContext(sb);
+  vm.runInContext(decl('capRadsMax'), sb);
+  sb.capRadsMax(el);
+  const clampedA = el.value;
+  el.value = '5000';
+  sb.getGameContext = () => 'FO3';
+  sb.capRadsMax(el);
+  const clampedB = el.value;
+  results.push(clampedA === '1000' && clampedB === '500');
+} catch (e) { results.push(false); }
+console.log('RESULT:' + results.map(r => r ? '1' : '0').join(''));
+"@
+        $tmpScript182 = [System.IO.Path]::GetTempFileName() + '.js'
+        [System.IO.File]::WriteAllText($tmpScript182, $testScript182, [System.Text.Encoding]::UTF8)
+        try {
+            $out182 = (node $tmpScript182 2>&1 | Out-String)
+        } finally {
+            Remove-Item -Path $tmpScript182 -Force -ErrorAction SilentlyContinue
+        }
+        $rm182 = [regex]::Match($out182, 'RESULT:([01]{5})')
+        if ($rm182.Success) {
+            $bits182 = $rm182.Groups[1].Value
+            for ($bi = 0; $bi -lt 5; $bi++) { Check ($bits182.Substring($bi, 1) -eq '1') "[behavioral] $($labels182[$bi])" }
+        } else {
+            $err182 = if ([string]::IsNullOrWhiteSpace($out182)) { "No output from node" } else { $out182.Trim() }
+            foreach ($lbl in $labels182) { Fail "$lbl  (runtime error: $err182)" }
+        }
+    } else {
+        foreach ($lbl in $labels182) { Fail "$lbl  (node not available in PATH)" }
+    }
+} catch {
+    foreach ($lbl in $labels182) { Fail "$lbl  (exception: $($_.Exception.Message))" }
+}
+
+# 182.5  GAME_DEFS.FNV/FO3/FO4 each declare maxRads: 1000, fallout.wiki-sourced
+Check (
+    ([regex]::Matches($stateSrc182, 'maxRads:\s*1000')).Count -eq 3 -and
+    $stateSrc182 -match 'Source: fallout\.wiki "Radiated \(Fallout: New Vegas\)"' -and
+    $stateSrc182 -match 'Source: fallout\.wiki "Radiated \(Fallout 3\)"'
+) "182.5: GAME_DEFS.FNV/FO3/FO4 each declare maxRads: 1000, sourced to fallout.wiki (Protocol 3)"
+
+# 182.6  capRadsMax() reads GAME_DEFS[ctx].maxRads (Protocol 38)
+$capRadsMaxBody182 = Get-FunctionBody $uiCore182 'capRadsMax'
+Check ($capRadsMaxBody182 -match 'def\.maxRads' -and $capRadsMaxBody182 -match 'GAME_DEFS\[ctx\]') `
+    "182.6: capRadsMax() reads GAME_DEFS[ctx].maxRads as its primary source (Protocol 38 -- not a bare hardcoded clamp)"
+
+# 182.8  #stat_rads wires oninput="capRadsMax(this); updateMath()" -- tolerant of
+#        Prettier reformatting the inline handler onto multiple lines / adding a
+#        trailing semicolon (it does exactly this to the long attribute value).
+Check ([System.Text.RegularExpressions.Regex]::IsMatch($index182, '(?s)id="stat_rads".{0,250}?oninput="\s*capRadsMax\(this\);\s*updateMath\(\);?\s*"')) `
+    '182.8: #stat_rads wires oninput="capRadsMax(this); updateMath()" -- the typed field is clamped on every keystroke, mirroring the SPECIAL inputs'' capStatMax pattern'
+
+# 182.9  syncStateFromDom() clamps state.rads to [0, GAME_DEFS[ctx].maxRads]
+$syncBody182 = Get-FunctionBody $stateSrc182 'syncStateFromDom'
+Check ($syncBody182 -match 'Math\.max\(0, Math\.min\(_maxRads, _radsN\)\)' -and $syncBody182 -match '_def\.maxRads') `
+    "182.9: syncStateFromDom() clamps state.rads to [0, GAME_DEFS[ctx].maxRads] (defense in depth, not just the oninput handler)"
+
+# 182.10  autoImportState() clamps the AI-write path too
+$autoImportBody182 = if ($apiSrc182 -match 'function autoImportState') { Get-FunctionBody $apiSrc182 'autoImportState' } else { '' }
+Check ($autoImportBody182 -match 'Math\.max\(0, Math\.min\(_maxRads, parseInt\(radsV\) \|\| 0\)\)' -and $autoImportBody182 -match '_def\.maxRads') `
+    "182.10: autoImportState() clamps state.rads to [0, GAME_DEFS[ctx].maxRads] on the AI-write path too, not only the typed input"
+
+# 182.11  .fd-ladder is >=28px in the base rule AND the mobile override, with
+#         touch-action:none scoped to the ladder itself. Brace-depth extraction
+#         (not a lazy match) for the mobile block -- it nests OTHER rules' own
+#         closing braces before its own. There are TWO 480px media queries in
+#         this file, so the fader-specific one is found by ITS OWN preceding
+#         comment, not the first @media hit (both were real bugs this test
+#         caught while being written, Protocol 42).
+function Get-BraceBlock182($src, $startIdx) {
+    $i = $src.IndexOf('{', $startIdx)
+    if ($i -lt 0) { return '' }
+    $depth = 0
+    $start = $i
+    while ($i -lt $src.Length) {
+        $ch = $src[$i]
+        if ($ch -eq '{') { $depth++ }
+        elseif ($ch -eq '}') { $depth--; if ($depth -eq 0) { return $src.Substring($start, $i - $start + 1) } }
+        $i++
+    }
+    return ''
+}
+$faderMediaComment182 = 'keep the fader bank to a single row even at 360px'
+$mobileCommentIdx182 = $css182.IndexOf($faderMediaComment182)
+$mobileStart182 = if ($mobileCommentIdx182 -lt 0) { -1 } else { $css182.IndexOf('@media (max-width: 480px)', $mobileCommentIdx182) }
+$mobileBlock182 = if ($mobileStart182 -lt 0) { '' } else { Get-BraceBlock182 $css182 $mobileStart182 }
+Check (
+    [System.Text.RegularExpressions.Regex]::IsMatch($css182, '(?s)\.fd-ladder\s*\{.{0,300}?width:\s*28px') -and
+    ($mobileBlock182 -match 'width:\s*28px') -and
+    [System.Text.RegularExpressions.Regex]::IsMatch($css182, '(?s)\.fd-ladder\s*\{.{0,600}?touch-action:\s*none')
+) "182.11: .fd-ladder is >=28px wide in both the base rule and the mobile override (Protocol 17 drag-target floor), with touch-action:none scoped to the ladder only"
+
+# 182.12  no new localStorage/robco_v8 write site in the new drag/clamp code
+$dragBlockSrc182 = (Get-FunctionBody $uiCore182 'setupHpBarInteraction') + (Get-FunctionBody $uiCore182 'setupXpBarInteraction') + (Get-FunctionBody $uiCore182 '_applyFaderDragValue') + (Get-FunctionBody $uiCore182 '_wireFaderDrag') + $capRadsMaxBody182
+Check (-not [System.Text.RegularExpressions.Regex]::IsMatch($dragBlockSrc182, 'robco_v8|localStorage\.setItem')) `
+    "182.12: the drag handlers and capRadsMax() touch only DOM/state fields the existing setters (commitStat/updateMath/syncStateFromDom) already own -- no new localStorage/robco_v8 write site"
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

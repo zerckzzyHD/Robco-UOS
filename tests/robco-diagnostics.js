@@ -25383,6 +25383,384 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 182 — PHASE 3 OPERATOR follow-up: draggable HP/XP/SPECIAL,
+//  behavioral zone-click proof, and the RAD EXPOSURE max-rads clamp
+//  (owner interactivity fold-in). 12 tests.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 182 — OPERATOR follow-up: drag controls + RAD max clamp');
+  const uiCore182 = readFile('js/ui-core.js');
+  const stateSrc182 = readFile('js/state.js');
+  const apiSrc182 = readFile('js/api.js');
+
+  // Reconstructs a full, standalone "function name(params) { body }" text for
+  // redeclaration in a vm sandbox (mirrors Suite 137.6's declareFn137 pattern —
+  // extractFunctionBody() alone only returns the brace-matched body).
+  function declareFn182(src, name) {
+    const nameIdx = src.indexOf('function ' + name);
+    const parenIdx = src.indexOf('(', nameIdx);
+    const braceIdx = src.indexOf('{', parenIdx);
+    const params = src.slice(parenIdx, braceIdx);
+    return 'function ' + name + params + extractFunctionBody(src, name);
+  }
+  function makeFakeEl182(overrides) {
+    const listeners = {};
+    const initialValue = overrides && 'value' in overrides ? overrides.value : '0';
+    delete (overrides = Object.assign({}, overrides)).value;
+    let _value = String(initialValue);
+    const el = Object.assign(
+      {
+        id: '',
+        style: {},
+        dataset: {},
+        classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
+        addEventListener(type, fn) {
+          (listeners[type] = listeners[type] || []).push(fn);
+        },
+        removeEventListener(type, fn) {
+          if (listeners[type]) listeners[type] = listeners[type].filter(f => f !== fn);
+        },
+        _fire(type, evt) {
+          (listeners[type] || []).forEach(fn => fn(evt));
+        },
+        getBoundingClientRect: () => ({ left: 0, top: 0, width: 100, height: 100, bottom: 100 }),
+      },
+      overrides
+    );
+    // Real HTMLInputElement.value always coerces the assigned value to a string
+    // (e.g. `el.value = 80` reads back as "80") — mirror that here so a test
+    // comparing against a string literal reflects real DOM behavior, not a
+    // harness artifact (Protocol 42: fix the harness, don't loosen the assertion).
+    Object.defineProperty(el, 'value', {
+      get: () => _value,
+      set: v => {
+        _value = String(v);
+      },
+      enumerable: true,
+    });
+    return el;
+  }
+  function makeFakeDoc182(elements, qsaMap) {
+    const listeners = {};
+    return {
+      getElementById: id => elements[id] || null,
+      querySelectorAll: sel => (qsaMap && qsaMap[sel]) || [],
+      addEventListener(type, fn) {
+        (listeners[type] = listeners[type] || []).push(fn);
+      },
+      _fire(type, evt) {
+        (listeners[type] || []).forEach(fn => fn(evt));
+      },
+    };
+  }
+
+  // 182.1  BEHAVIORAL — dragging the HP trace to 80% of a 100px-wide
+  //        hp_bar_container sets stat_hp_cur (and state.hpCur) to 80 of a
+  //        100 hpMax, via the real setupHpBarInteraction() body (still
+  //        wired to the unchanged hp_bar_container/stat_hp_cur/stat_hp_max
+  //        ids the CRT-trace reskin reused) — not just a structural grep.
+  {
+    let err = null,
+      hpAfter = null,
+      stateHp = null;
+    try {
+      const vm182 = require('vm');
+      const els = {
+        hp_bar_container: makeFakeEl182({ getBoundingClientRect: () => ({ left: 0, width: 100 }) }),
+        stat_hp_max: makeFakeEl182({ value: '100' }),
+        stat_hp_cur: makeFakeEl182({ value: '10' }),
+      };
+      const doc = makeFakeDoc182(els);
+      const sb = { document: doc, state: {}, updateMath: () => {}, Math, parseInt };
+      vm182.createContext(sb);
+      vm182.runInContext(declareFn182(uiCore182, 'setupHpBarInteraction'), sb);
+      sb.setupHpBarInteraction();
+      els.hp_bar_container._fire('mousedown', { clientX: 80 });
+      doc._fire('mousemove', { clientX: 80 });
+      hpAfter = els.stat_hp_cur.value;
+      stateHp = sb.state.hpCur;
+    } catch (e) {
+      err = e;
+    }
+    assert(
+      !err && hpAfter === '80' && stateHp === 80,
+      'setupHpBarInteraction() behavioral: dragging to 80% of hp_bar_container sets stat_hp_cur + state.hpCur to 80 of hpMax 100 — the HP trace is a real drag control, not a display-only bar' +
+        (err ? ' — ' + err.message : '')
+    );
+  }
+
+  // 182.2  BEHAVIORAL — dragging the XP/GRADE trace to 50% of a 100px-wide
+  //        xp_bar_container at level 1 (xpCur=0, xpNext=200) sets stat_xp
+  //        (and state.xp) to 100, via the real setupXpBarInteraction() body.
+  {
+    let err = null,
+      xpAfter = null,
+      stateXp = null;
+    try {
+      const vm182 = require('vm');
+      const els = {
+        xp_bar_container: makeFakeEl182({ getBoundingClientRect: () => ({ left: 0, width: 100 }) }),
+        stat_lvl: makeFakeEl182({ value: '1' }),
+        stat_xp: makeFakeEl182({ value: '0' }),
+      };
+      const doc = makeFakeDoc182(els);
+      const sb = { document: doc, state: {}, updateMath: () => {}, Math, parseInt };
+      vm182.createContext(sb);
+      vm182.runInContext(declareFn182(uiCore182, 'setupXpBarInteraction'), sb);
+      sb.setupXpBarInteraction();
+      els.xp_bar_container._fire('mousedown', { clientX: 50 });
+      doc._fire('mousemove', { clientX: 50 });
+      xpAfter = els.stat_xp.value;
+      stateXp = sb.state.xp;
+    } catch (e) {
+      err = e;
+    }
+    assert(
+      !err && xpAfter === '100' && stateXp === 100,
+      'setupXpBarInteraction() behavioral: dragging to 50% of xp_bar_container at level 1 (xp range 0-199) sets stat_xp + state.xp to 100 — the XP/GRADE trace is a real drag control, not a display-only bar' +
+        (err ? ' — ' + err.message : '')
+    );
+  }
+
+  // 182.3  BEHAVIORAL — dragging a .fd-ladder to its top sets the SPECIAL
+  //        stat to 10, dragging to its bottom sets it to 1, both via the
+  //        EXACT SAME commitStat(el) the typed field/steppers already use
+  //        (never a parallel write path) — proving the fader ladder is a
+  //        real drag control, not just a display for the typed field.
+  {
+    let err = null,
+      topVal = null,
+      bottomVal = null,
+      committedState = null;
+    try {
+      const vm182 = require('vm');
+      const els = { s_s: makeFakeEl182({ id: 's_s', value: '5' }) };
+      const ladder = makeFakeEl182({
+        dataset: { fdLadder: 's' },
+        getBoundingClientRect: () => ({ top: 0, bottom: 100, height: 100 }),
+      });
+      const doc = makeFakeDoc182(els, { '.fd-ladder[data-fd-ladder]': [ladder] });
+      const sb = {
+        document: doc,
+        state: {},
+        updateMath: () => {},
+        saveState: () => {},
+        Math,
+        parseInt,
+        isNaN,
+        String,
+      };
+      vm182.createContext(sb);
+      vm182.runInContext(
+        declareFn182(uiCore182, 'commitStat') +
+          '\n' +
+          declareFn182(uiCore182, '_applyFaderDragValue') +
+          '\n' +
+          declareFn182(uiCore182, '_wireFaderDrag'),
+        sb
+      );
+      sb._wireFaderDrag();
+      ladder._fire('mousedown', { clientY: 2 }); // near the top -> value 10
+      topVal = els.s_s.value;
+      ladder._fire('mousedown', { clientY: 98 }); // near the bottom -> value 1
+      bottomVal = els.s_s.value;
+      committedState = sb.state.s;
+    } catch (e) {
+      err = e;
+    }
+    assert(
+      !err && topVal === '10' && bottomVal === '1' && committedState === 1,
+      '_wireFaderDrag() behavioral: dragging a .fd-ladder to its top/bottom sets the SPECIAL stat to 10/1 through the EXACT SAME commitStat(el) the typed field and +/- steppers already use (state.s written by commitStat, not by the drag handler directly)' +
+        (err ? ' — ' + err.message : '')
+    );
+  }
+
+  // 182.4  BEHAVIORAL — clicking a .zone[data-limb] element calls
+  //        toggleLimb() with that zone's limb, Enter and Space keydowns do
+  //        the same, and an unrelated key does nothing — via the real
+  //        _wireBioHarnessZones() body (not just a structural grep, which
+  //        Suite 181.12 already covers).
+  {
+    let err = null,
+      clickArg = null,
+      enterArg = null,
+      spaceArg = null,
+      tabFired = false;
+    try {
+      const vm182 = require('vm');
+      const zone = makeFakeEl182({ dataset: { limb: 'la' } });
+      const doc = { querySelectorAll: sel => (sel === '.zone[data-limb]' ? [zone] : []) };
+      const calls = [];
+      const sb = { document: doc, toggleLimb: l => calls.push(l) };
+      vm182.createContext(sb);
+      vm182.runInContext(declareFn182(uiCore182, '_wireBioHarnessZones'), sb);
+      sb._wireBioHarnessZones();
+      zone._fire('click', {});
+      clickArg = calls[0];
+      zone._fire('keydown', { key: 'Enter', preventDefault() {} });
+      enterArg = calls[1];
+      zone._fire('keydown', { key: ' ', preventDefault() {} });
+      spaceArg = calls[2];
+      const before = calls.length;
+      zone._fire('keydown', { key: 'Tab', preventDefault() {} });
+      tabFired = calls.length > before;
+    } catch (e) {
+      err = e;
+    }
+    assert(
+      !err && clickArg === 'la' && enterArg === 'la' && spaceArg === 'la' && !tabFired,
+      '_wireBioHarnessZones() behavioral: a click, Enter keydown, and Space keydown on a .zone element each call toggleLimb(limb) exactly once; an unrelated key does nothing — the skeleton zone is a real click target driving the existing limb setter' +
+        (err ? ' — ' + err.message : '')
+    );
+  }
+
+  // 182.5  GAME_DEFS.FNV/FO3/FO4 each declare maxRads: 1000, fallout.wiki-sourced
+  //        (Protocol 3) — the RAD EXPOSURE fatal-threshold ceiling.
+  assert(
+    /maxRads:\s*1000/.test(stateSrc182) &&
+      (stateSrc182.match(/maxRads:\s*1000/g) || []).length === 3 &&
+      /Source: fallout\.wiki "Radiated \(Fallout: New Vegas\)"/.test(stateSrc182) &&
+      /Source: fallout\.wiki "Radiated \(Fallout 3\)"/.test(stateSrc182),
+    '182.5: GAME_DEFS.FNV/FO3/FO4 each declare maxRads: 1000, sourced to fallout.wiki (Protocol 3)'
+  );
+
+  // 182.6  capRadsMax() reads GAME_DEFS[ctx].maxRads (Protocol 38) rather
+  //        than only ever clamping to a bare hardcoded 1000 — the fallback
+  //        literal (matching the established VATS hitChanceMin/Max pattern)
+  //        is acceptable, but the PRIMARY read must be GAME_DEFS-driven.
+  const capRadsMaxBody182 = extractFunctionBody(uiCore182, 'capRadsMax');
+  assert(
+    /def\.maxRads/.test(capRadsMaxBody182) && /GAME_DEFS\[ctx\]/.test(capRadsMaxBody182),
+    '182.6: capRadsMax() reads GAME_DEFS[ctx].maxRads as its primary source (Protocol 38 — not a bare hardcoded clamp)'
+  );
+
+  // 182.7  BEHAVIORAL — capRadsMax() clamps to the ACTIVE game's own
+  //        maxRads, not a fixed literal: switching the sandbox's
+  //        getGameContext() between two games with DIFFERENT maxRads values
+  //        changes the clamp ceiling accordingly.
+  {
+    let err = null,
+      clampedA = null,
+      clampedB = null;
+    try {
+      const vm182 = require('vm');
+      const el = makeFakeEl182({ value: '5000' });
+      const sb = {
+        document: { getElementById: () => el },
+        GAME_DEFS: { FNV: { maxRads: 1000 }, FO3: { maxRads: 500 } },
+        getGameContext: () => 'FNV',
+        window: {},
+        parseInt,
+        isNaN,
+        String,
+      };
+      sb.window.GAME_DEFS = sb.GAME_DEFS;
+      vm182.createContext(sb);
+      vm182.runInContext(declareFn182(uiCore182, 'capRadsMax'), sb);
+      sb.capRadsMax(el);
+      clampedA = el.value;
+      el.value = '5000';
+      sb.getGameContext = () => 'FO3';
+      sb.capRadsMax(el);
+      clampedB = el.value;
+    } catch (e) {
+      err = e;
+    }
+    assert(
+      !err && clampedA === '1000' && clampedB === '500',
+      'capRadsMax() behavioral: a value of 5000 clamps to 1000 under a maxRads:1000 game and to 500 under a maxRads:500 game — proves the ceiling is read live from GAME_DEFS[ctx], not hardcoded' +
+        (err ? ' — ' + err.message : '')
+    );
+  }
+
+  // 182.8  The stat_rads input's oninput calls capRadsMax(this) before
+  //        updateMath() — the same two-handler pattern the SPECIAL inputs
+  //        already use (capStatMax(this); updateMath()).
+  const index182 = readFile('index.html');
+  assert(
+    /id="stat_rads"[\s\S]{0,250}oninput="\s*capRadsMax\(this\);\s*updateMath\(\);?\s*"/.test(
+      index182
+    ),
+    '182.8: #stat_rads wires oninput="capRadsMax(this); updateMath()" — the typed field is clamped on every keystroke, mirroring the SPECIAL inputs\' capStatMax pattern (Prettier may reformat the inline handler onto multiple lines/add a trailing semicolon; the check tolerates both)'
+  );
+
+  // 182.9  syncStateFromDom() (state.js) also clamps state.rads to
+  //        [0, GAME_DEFS[ctx].maxRads] — defense in depth alongside the
+  //        oninput clamp, mirroring the SPECIAL-stat clamp immediately above it.
+  const syncBody182 = extractFunctionBody(stateSrc182, 'syncStateFromDom');
+  assert(
+    /Math\.max\(0, Math\.min\(_maxRads, _radsN\)\)/.test(syncBody182) &&
+      /_def\.maxRads/.test(syncBody182),
+    '182.9: syncStateFromDom() clamps state.rads to [0, GAME_DEFS[ctx].maxRads] (defense in depth, not just the oninput handler)'
+  );
+
+  // 182.10  autoImportState() (api.js) clamps the AI-write path too, so an
+  //         AI response can never push rads above the per-game max either
+  //         — mirroring the existing SPECIAL-stat clamp in the same function.
+  const autoImportBody182 = apiSrc182.includes('function autoImportState')
+    ? extractFunctionBody(apiSrc182, 'autoImportState')
+    : '';
+  assert(
+    /Math\.max\(0, Math\.min\(_maxRads, parseInt\(radsV\) \|\| 0\)\)/.test(autoImportBody182) &&
+      /_def\.maxRads/.test(autoImportBody182),
+    '182.10: autoImportState() clamps state.rads to [0, GAME_DEFS[ctx].maxRads] on the AI-write path too, not only the typed input'
+  );
+
+  // 182.11  Protocol 17 — the fader drag hit-area (.fd-ladder) is widened to
+  //         >=28px in BOTH the base rule and the <=480px mobile override
+  //         (was 22px/20px before this fold-in), and touch-action:none is
+  //         scoped to the ladder itself so the surrounding page still scrolls.
+  const css182 = readFile('css/terminal.css');
+  // Brace-depth extraction (not a lazy [\s\S]*?\n\}) -- the mobile media query
+  // nests OTHER rules' own closing braces before its own, which a lazy match
+  // would stop at prematurely (a real bug this test caught while being written).
+  function extractBraceBlock182(src, startIdx) {
+    let i = src.indexOf('{', startIdx);
+    if (i === -1) return '';
+    let depth = 0;
+    const start = i;
+    while (i < src.length) {
+      if (src[i] === '{') depth++;
+      else if (src[i] === '}' && --depth === 0) return src.slice(start, i + 1);
+      i++;
+    }
+    return '';
+  }
+  // There are TWO `@media (max-width: 480px)` blocks in this file -- find the
+  // fader-specific one by its own preceding comment, not indexOf()'s first hit
+  // (a real bug this test caught: an earlier version of this check silently
+  // graded the WRONG, unrelated general-mobile media block).
+  const faderMediaComment182 = 'keep the fader bank to a single row even at 360px';
+  const mobileCommentIdx182 = css182.indexOf(faderMediaComment182);
+  const mobileStart182 =
+    mobileCommentIdx182 === -1
+      ? -1
+      : css182.indexOf('@media (max-width: 480px)', mobileCommentIdx182);
+  const mobileBlock182 = mobileStart182 === -1 ? '' : extractBraceBlock182(css182, mobileStart182);
+  assert(
+    /\.fd-ladder\s*\{[\s\S]{0,300}?width:\s*28px/.test(css182) &&
+      /width:\s*28px/.test(mobileBlock182) &&
+      /\.fd-ladder\s*\{[\s\S]{0,600}?touch-action:\s*none/.test(css182),
+    '182.11: .fd-ladder is >=28px wide in both the base rule and the mobile override (Protocol 17 drag-target floor), with touch-action:none scoped to the ladder only'
+  );
+
+  // 182.12  none of the new drag/clamp code writes campaign state through
+  //         any path OTHER than the pre-existing setters (commitStat /
+  //         updateMath's DOM writes / state.rads assignment already
+  //         covered by 182.9-182.10) — no new saveState()/robco_v8 call site.
+  const dragBlockSrc182 =
+    extractFunctionBody(uiCore182, 'setupHpBarInteraction') +
+    extractFunctionBody(uiCore182, 'setupXpBarInteraction') +
+    extractFunctionBody(uiCore182, '_applyFaderDragValue') +
+    extractFunctionBody(uiCore182, '_wireFaderDrag') +
+    capRadsMaxBody182;
+  assert(
+    !/robco_v8|localStorage\.setItem/.test(dragBlockSrc182),
+    '182.12: the drag handlers and capRadsMax() touch only DOM/state fields the existing setters (commitStat/updateMath/syncStateFromDom) already own — no new localStorage/robco_v8 write site'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail

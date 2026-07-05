@@ -69,8 +69,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2292-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2292-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2304-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2304-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -1017,6 +1017,41 @@ Guarded by Suite 181 (both runners, 20 tests): id/handler preservation, the `sta
 single-instance invariant, `>` glyph presence on all nine board headings, `_syncOperatorTelemetry()`
 status-row wiring, the `_bumpSpecialStat`/zone-click/`level.up`-subscriber wiring, the Protocol 38
 part-number fix, and the `expandPanelForCategory()` string-literal fix.
+
+**Owner interactivity fold-in (Phase 3 OPERATOR follow-up):** the hero-three controls are genuinely
+interactive, not display-only readouts beside an editable number field:
+
+- **HP/XP bars are draggable.** `setupHpBarInteraction()`/`setupXpBarInteraction()` (`js/ui-core.js`)
+  already existed (the "C11" mouse+touch drag pattern, pre-dating this reskin) and target the exact
+  same `hp_bar_container`/`xp_bar_container` ids the CRT-trace markup reused verbatim — no new code
+  was needed here, only live verification that the reskin didn't break the existing drag wiring.
+- **SPECIAL faders are draggable.** `_wireFaderDrag()` (boot-called from `window.onload`) attaches
+  mouse/touch listeners to every `.fd-ladder[data-fd-ladder]`; `_applyFaderDragValue()` computes a
+  1–10 value from vertical pointer position and writes through the EXACT SAME `commitStat(el)` the
+  typed field and `_bumpSpecialStat()` steppers already use (Protocol 22 — one clamp/state-write/save
+  path for all three input methods). `.fd-ladder` was widened from 22px/20px (base/mobile) to 28px in
+  both rules to clear the Protocol 17 tap-target floor now that it is itself a drag target, with
+  `touch-action: none` scoped to the ladder only so the page still scrolls everywhere else.
+- **Skeleton zones are clickable** — this was already the BUS-03 behavior (`_wireBioHarnessZones()`
+  routes click + Enter/Space keydown through the existing `toggleLimb()`), now additionally proven
+  with a genuine event-dispatch behavioral test (Suite 182) rather than only the prior structural grep.
+- **RAD EXPOSURE max-rads clamp (pre-existing bug, fixed in this unit):** the RAD field had no upper
+  bound. `GAME_DEFS.FNV/FO3/FO4` each gained a `maxRads: 1000` field (fallout.wiki-sourced, Protocol
+  3 — 1000 rads is the documented fatal radiation-poisoning threshold in both live games). A new
+  `capRadsMax(el)` (`js/ui-core.js`, mirrors `capStatMax()`'s upper-clamp-on-input pattern) reads
+  `GAME_DEFS[ctx].maxRads` — never a bare hardcoded 1000 — and is wired into `#stat_rads`'s `oninput`
+  alongside `updateMath()`. The same `[0, GAME_DEFS[ctx].maxRads]` clamp is applied at two more
+  layers for defense in depth: `syncStateFromDom()` (`js/state.js`, mirroring the adjacent SPECIAL-stat
+  clamp) and `autoImportState()` (`js/api.js`, so an AI response can't push rads above the per-game max
+  either).
+
+Guarded by Suite 182 (both runners, 12 tests): behavioral proofs (via a Node `vm` sandbox executing
+the REAL function bodies against a synthetic DOM, mirroring the Suite 137.6/177.4 technique) that
+dragging the HP/XP bars and the SPECIAL faders actually drives `stat_hp_cur`/`stat_xp`/`commitStat`,
+that a zone click/Enter/Space calls `toggleLimb()` (and an unrelated key does not), and that
+`capRadsMax()` clamps to whichever game's `maxRads` is active (not a fixed literal) — plus structural
+guards for the `GAME_DEFS` fields, the `#stat_rads` wiring, the `syncStateFromDom()`/`autoImportState()`
+clamps, the widened `.fd-ladder` tap target, and a no-new-write-site guard.
 
 ---
 
@@ -2087,7 +2122,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2292-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2304-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

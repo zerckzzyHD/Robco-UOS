@@ -2222,6 +2222,7 @@ window.onload = async function () {
     setupHpBarInteraction();
     setupXpBarInteraction(); // C11: XP bar click-drag (mirrors HP bar, within current level range)
     _wireBioHarnessZones(); // PHASE 3 · OPERATOR BUS-03: SVG zone taps route through toggleLimb()
+    _wireFaderDrag(); // PHASE 3 follow-up · OPERATOR BUS-02: fader-ladder drag routes through commitStat()
     _armAmbientAudio(startCrtHum); // continuous ambient — deferred to first gesture (blocked-autoplay spam fix)
     initRegistryAutocomplete();
     initAmmoDatalist();
@@ -4471,6 +4472,18 @@ function capStatMax(el) {
   const n = parseInt(el.value, 10);
   if (!isNaN(n) && n > 10) el.value = '10';
 }
+// Owner interactivity fold-in (Phase 3 OPERATOR follow-up): RAD EXPOSURE had no upper
+// bound. Mirrors capStatMax()'s upper-clamp-on-input pattern exactly, but reads the
+// per-game fatal threshold from GAME_DEFS[ctx].maxRads (Protocol 38) instead of a
+// hardcoded literal, so a future game can supply its own value.
+function capRadsMax(el) {
+  const n = parseInt(el.value, 10);
+  if (isNaN(n)) return;
+  const ctx = typeof getGameContext === 'function' ? getGameContext() : 'FNV';
+  const def = (window.GAME_DEFS && GAME_DEFS[ctx]) || (window.GAME_DEFS && GAME_DEFS.FNV) || {};
+  const maxRads = typeof def.maxRads === 'number' ? def.maxRads : 1000;
+  if (n > maxRads) el.value = String(maxRads);
+}
 function commitStat(el) {
   const k = el.id.slice(2);
   let v = parseInt(el.value, 10);
@@ -4874,6 +4887,58 @@ function _bumpSpecialStat(key, delta) {
 }
 
 const _SPECIAL_KEYS = ['s', 'p', 'e', 'c', 'i', 'a', 'l'];
+
+// PHASE 3 follow-up (owner interactivity fold-in) -- the S.P.E.C.I.A.L. faders
+// must be draggable, not just typed/stepped. Drags the fader ladder track
+// directly to a 1-10 value from vertical pointer position, then routes
+// through the EXACT SAME commitStat(el) _bumpSpecialStat already uses --
+// one clamp/state-write/save path for the typed field, the steppers, AND
+// the drag (Protocol 22). Mirrors the existing setupHpBarInteraction()/
+// setupXpBarInteraction() mouse+touch pattern (this file, above).
+function _applyFaderDragValue(ladder, clientY) {
+  const key = ladder.dataset.fdLadder;
+  const el = document.getElementById('s_' + key);
+  if (!el) return;
+  const rect = ladder.getBoundingClientRect();
+  const pct = Math.min(1, Math.max(0, (rect.bottom - clientY) / rect.height));
+  const next = Math.max(1, Math.min(10, Math.round(pct * 9) + 1));
+  el.value = String(next);
+  commitStat(el);
+}
+function _wireFaderDrag() {
+  document.querySelectorAll('.fd-ladder[data-fd-ladder]').forEach(ladder => {
+    let dragging = false;
+    ladder.addEventListener('mousedown', e => {
+      dragging = true;
+      _applyFaderDragValue(ladder, e.clientY);
+    });
+    document.addEventListener('mousemove', e => {
+      if (dragging) _applyFaderDragValue(ladder, e.clientY);
+    });
+    document.addEventListener('mouseup', () => {
+      dragging = false;
+    });
+    ladder.addEventListener(
+      'touchstart',
+      e => {
+        dragging = true;
+        _applyFaderDragValue(ladder, e.touches[0].clientY);
+        e.preventDefault();
+      },
+      { passive: false }
+    );
+    document.addEventListener(
+      'touchmove',
+      e => {
+        if (dragging) _applyFaderDragValue(ladder, e.touches[0].clientY);
+      },
+      { passive: false }
+    );
+    document.addEventListener('touchend', () => {
+      dragging = false;
+    });
+  });
+}
 
 // PHASE 3 · OPERATOR hero-three instrument sync (Protocol 22/25 reskin).
 // Reads the exact same DOM/state updateMath() already reads for HP/rads/
