@@ -93,12 +93,30 @@ function _updateWakeLockUI() {
   if (!note) return;
   if (!_wakeLockSupported()) {
     note.textContent = '> POWER CELL UNAVAILABLE ON THIS UNIT';
+    if (typeof _updatePowerBoardStatus === 'function') _updatePowerBoardStatus();
     return;
   }
   note.textContent = isWakeLockEnabled()
     ? '> DISPLAY SUSTAINED — SCREEN STAYS LIT'
     : '> POWER CELL IDLE — DISPLAY MAY DIM';
+  if (typeof _updatePowerBoardStatus === 'function') _updatePowerBoardStatus();
 }
+
+// Owner batch item 5: SLOT 03 (POWER CELL BAY) collapsed summary line — combines
+// the wake-lock + haptic states its own two status notes already show (reads the
+// same underlying booleans those notes read, Protocol 22 — never re-parses their
+// text) into one line so the board's state is visible collapsed too.
+function _updatePowerBoardStatus() {
+  const sum = document.getElementById('sum-slot03');
+  if (!sum) return;
+  const wakeOn =
+    typeof _wakeLockSupported === 'function' && _wakeLockSupported() && isWakeLockEnabled();
+  const hapticOn =
+    typeof _hapticSupported === 'function' && _hapticSupported() && isHapticEnabled();
+  sum.textContent =
+    'DISPLAY SUSTAIN ' + (wakeOn ? 'ON' : 'OFF') + ' · HAPTICS ' + (hapticOn ? 'ON' : 'OFF');
+}
+window._updatePowerBoardStatus = _updatePowerBoardStatus;
 async function toggleWakeLock(enabled) {
   MetaStore.set(WAKE_LOCK_KEY, enabled ? 'true' : 'false');
   if (typeof playChipClick === 'function') playChipClick(enabled); // B2c: tactile install/eject click
@@ -393,6 +411,9 @@ function _updateImmersionUI() {
           ? '> BALANCED — reduced ambient activity'
           : '> MINIMAL — ambient systems quiet';
   }
+  // Owner batch item 5: mirror into SLOT 04's collapsed summary line (Protocol 22).
+  const sum04 = document.getElementById('sum-slot04');
+  if (sum04 && note) sum04.textContent = note.textContent.replace(/^>\s*/, '');
   // Module Bay SLOT 04 legend — purely decorative, mirrors the real select's value.
   document.querySelectorAll('.immersion-legend span').forEach(s => {
     s.classList.toggle('on', s.dataset.tier === tier);
@@ -576,10 +597,31 @@ function renderModuleBay() {
   if (typeof _updateOpticsBoardStatus === 'function') _updateOpticsBoardStatus();
   if (typeof _updateSonicBoardStatus === 'function') _updateSonicBoardStatus();
   if (typeof _updateUplinkBoardStatus === 'function') _updateUplinkBoardStatus();
+  if (typeof _updatePowerBoardStatus === 'function') _updatePowerBoardStatus();
+  if (typeof _updateImmersionUI === 'function') _updateImmersionUI();
+  _updateModuleBaySummary(); // owner batch item 5: top-level collapsed summary line
   const schem = document.getElementById('baySchematic');
   if (schem && !schem.hidden) renderBaySchematic();
 }
 window.renderModuleBay = renderModuleBay;
+
+// Owner batch item 5: the SECURITY & CONFIGURATION (Module Bay) top-level panel's
+// own collapsed-summary line — a short, dynamically-accurate combination of the
+// same signals its SLOT boards already show (Protocol 22: reads the same
+// underlying state, never re-derives it), so the whole bay's status is visible
+// even before it's opened.
+function _updateModuleBaySummary() {
+  const sum = document.getElementById('sum-bay');
+  if (!sum) return;
+  const opticKey = typeof _resolveOptic === 'function' ? _resolveOptic() : 'green';
+  const opticLabel =
+    typeof THEMES !== 'undefined' && THEMES[opticKey] ? THEMES[opticKey].label : opticKey;
+  const audioOn = !(window.AudioSettings && AudioSettings.masterMute);
+  const carrier =
+    typeof _isUplinkConnected === 'function' && _isUplinkConnected() ? 'CARRIER' : 'NO CARRIER';
+  sum.textContent = opticLabel + ' · AUDIO ' + (audioOn ? 'ON' : 'OFF') + ' · ' + carrier;
+}
+window._updateModuleBaySummary = _updateModuleBaySummary;
 
 // First-visit-only hatch ceremony (LOCKED-1). After the first-ever release the
 // bay just opens with the panel — this function only decides whether the
@@ -1817,6 +1859,16 @@ function _wirePanelPersistence() {
       } catch (_) {}
     });
   });
+
+  // Owner batch item 4 (Protocol 42 fix, found while verifying full-reload restore):
+  // initTabs() (called earlier in window.onload) already restored the active
+  // subsystem's saved scroll offset, but that ran BEFORE this function applied
+  // every panel/sub-panel's saved open/closed state above — a panel opening or
+  // closing changes page height, which can silently invalidate the scroll offset
+  // initTabs() already set. Re-apply it now that every panel's final open/closed
+  // state is in place, so "exact scroll position" survives a full reload even
+  // when panel-state and scroll-state interact.
+  if (_lastScrollSubsystem) _restoreScrollFor(_lastScrollSubsystem, false);
 }
 
 function _restoreOpticsPreference() {
@@ -1967,6 +2019,14 @@ function _restoreDevicePrefs() {
   _renderModePill();
   _wireModeHint();
   _wireComposerAutoGrow();
+
+  // Owner batch item 5: populate every Module Bay SLOT board's (and the bay's
+  // own) collapsed summary line at boot regardless of whether the panel is
+  // open — without this, the summaries stayed blank until the user's first
+  // manual open, since renderModuleBay() otherwise only fires from a control
+  // change or from _wirePanelPersistence()'s restored-open branch. Already
+  // documented as safe to call anytime (idempotent, cheap).
+  if (typeof renderModuleBay === 'function') renderModuleBay();
 }
 
 function _wireKeyboardShortcuts() {
@@ -2132,6 +2192,16 @@ function _runBootSequenceAndBriefing() {
       let undoBtn = document.getElementById('undoSyncBtn');
       if (undoBtn) undoBtn.style.display = 'block';
     }
+
+    // Owner batch item 4 (Protocol 42 fix, found while verifying full-reload restore):
+    // this callback's own appendToChat() briefing line above can grow the mobile
+    // carrier-strip (the persistent Overseer presence shown on every non-UPLINK
+    // subsystem, DO-O) — which changes page height AFTER window.onload's own
+    // post-_wirePanelPersistence() scroll re-restore already ran. Since this
+    // callback is the actual last deterministic point boot-time content gets
+    // added, re-apply the saved scroll offset once more here so it isn't left
+    // stale by a briefing line's effect on the carrier-strip's height.
+    if (_lastScrollSubsystem) _restoreScrollFor(_lastScrollSubsystem, false);
   });
 }
 
@@ -2221,6 +2291,7 @@ window.onload = async function () {
     _initBezelChrome(); // DO-N: restore bezel subsystem highlight + sync the FAULT lamp
     setupHpBarInteraction();
     setupXpBarInteraction(); // C11: XP bar click-drag (mirrors HP bar, within current level range)
+    setupRadBarInteraction(); // RAD bar click-drag (mirrors HP/XP bars, owner batch item 2)
     _wireBioHarnessZones(); // PHASE 3 · OPERATOR BUS-03: SVG zone taps route through toggleLimb()
     _wireFaderDrag(); // PHASE 3 follow-up · OPERATOR BUS-02: fader-ladder drag routes through commitStat()
     _armAmbientAudio(startCrtHum); // continuous ambient — deferred to first gesture (blocked-autoplay spam fix)
@@ -2239,7 +2310,7 @@ window.onload = async function () {
     initOverseerScope(); // DO-O: the living Overseer (Director Uplink oscilloscope presence)
     initAmbientRuntime(); // A1: Ambient Runtime — additive state machine + observer scheduler (parallel to standby; owns no timers yet)
     initTestConsole(); // staging/dev-only Test Console — no-ops (stays hidden) on production
-    _wirePanelPersistence(); // also wires the Module Bay hatch ceremony to securityConfigPanel's own first user-open (owner report — never at boot)
+    _wirePanelPersistence(); // also wires the Module Bay hatch ceremony to securityConfigPanel's own first user-open (owner report — never at boot); also re-applies scroll restore (Protocol 42)
     _wireToolDeck(); // Tool Deck + Quick-Draw Holster — deck/scrim/tool-row/socket/bind-key wiring
     _restoreOpticsPreference();
     _restoreDevicePrefs();
@@ -2348,16 +2419,95 @@ function setupXpBarInteraction() {
   });
 }
 
+// Owner batch item 2: RAD EXPOSURE bar click-drag — mirrors setupHpBarInteraction()/
+// setupXpBarInteraction() exactly (Protocol 22), scaling to this game's RAD ceiling
+// (_resolveMaxRads(), the same GAME_DEFS[ctx].maxRads capRadsMax() already clamps to)
+// instead of a fixed max. Writes through the single real #stat_rads input — the
+// SKELETAL HARNESS bar stays a read-only mirror of it (updateMath() repaints both).
+function setupRadBarInteraction() {
+  const container = document.getElementById('radDragTrack');
+  if (!container) return;
+  function applyRad(e) {
+    const rect = container.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const pct = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    const maxRads = _resolveMaxRads();
+    const newRads = Math.round(pct * maxRads);
+    document.getElementById('stat_rads').value = newRads;
+    state.rads = newRads;
+    updateMath();
+  }
+  let dragging = false;
+  container.addEventListener('mousedown', e => {
+    dragging = true;
+    applyRad(e);
+  });
+  document.addEventListener('mousemove', e => {
+    if (dragging) applyRad(e);
+  });
+  document.addEventListener('mouseup', () => {
+    dragging = false;
+  });
+  container.addEventListener(
+    'touchstart',
+    e => {
+      dragging = true;
+      applyRad(e);
+      e.preventDefault();
+    },
+    { passive: false }
+  );
+  document.addEventListener(
+    'touchmove',
+    e => {
+      if (dragging) applyRad(e);
+    },
+    { passive: false }
+  );
+  document.addEventListener('touchend', () => {
+    dragging = false;
+  });
+}
+
 // C11: Level input change handler — when user edits the level field,
-// auto-set XP to the minimum XP required for that level (xpCur).
+// auto-set XP to the minimum XP required for that level (xpCur). Clamped to
+// MAX_PLAYER_LEVEL (owner batch item 3) — the number input's native stepper
+// arrows fire the same oninput event as typing, so one clamp covers both.
+// MAX_PLAYER_LEVEL is declared later in this file as a module-scope const;
+// referencing it here is safe since this function only runs later, at user
+// interaction time, well after the whole script has parsed.
 function onLvlInputChanged() {
-  const lvl = Math.max(1, parseInt(document.getElementById('stat_lvl').value) || 1);
+  const lvlEl = document.getElementById('stat_lvl');
+  const raw = Math.max(1, parseInt(lvlEl.value) || 1);
+  const lvl = Math.min(MAX_PLAYER_LEVEL, raw);
+  if (lvl !== raw) lvlEl.value = lvl;
   const xpCur = lvl <= 1 ? 0 : 75 * (lvl * lvl) - 25 * lvl - 50;
   document.getElementById('stat_xp').value = xpCur;
   state.lvl = lvl;
   state.xp = xpCur;
   updateMath();
 }
+
+// Owner batch item 3: XP-amount input caps at the current level's max XP —
+// xpNext(lvl) - 1, the same upper edge of the [xpCur, xpNext-1] band the XP
+// bar's own drag handler (setupXpBarInteraction()) already generates
+// (Protocol 22, same curve, never a second formula) — so typing (or using
+// the number input's native stepper, which fires the same oninput event)
+// can't push XP past what the current level actually allows. Scales per
+// level automatically since xpNext is a function of lvl.
+function onXpInputChanged() {
+  const xpEl = document.getElementById('stat_xp');
+  const lvl = Math.max(1, parseInt(document.getElementById('stat_lvl').value) || 1);
+  const xpNext = 75 * ((lvl + 1) * (lvl + 1)) - 25 * (lvl + 1) - 50;
+  const raw = parseInt(xpEl.value, 10);
+  if (!isNaN(raw)) {
+    const capped = Math.max(0, Math.min(raw, xpNext - 1));
+    if (capped !== raw) xpEl.value = capped;
+  }
+  state.xp = parseInt(xpEl.value, 10) || 0;
+  updateMath();
+}
+window.onXpInputChanged = onXpInputChanged;
 
 // Owner report: no existing app-enforced level cap was found anywhere in the
 // codebase (only a display-only clamp in the XP bar's percentage math, and a
@@ -2667,8 +2817,26 @@ function _syncCampaignProfileUI() {
       ' · TEMPO: ' +
       _TEMPO_LABELS[_TEMPO_ORDER[tIdx]];
   }
+  _syncCampaignConfigTopSummary();
 }
 window._syncCampaignProfileUI = _syncCampaignProfileUI;
+
+// Owner batch item 5: the CAMPAIGN CONFIGS top-level panel's own collapsed
+// summary line — aggregates the CAMPAIGN PROFILE + RANDOMIZER INTERLOCK
+// boards' own summary text (Protocol 22, never re-derives their state) into
+// one line. Called from both boards' own sync functions so it can never go
+// stale regardless of which board last changed.
+function _syncCampaignConfigTopSummary() {
+  const sum = document.getElementById('sum-campaignConfig');
+  if (!sum) return;
+  const profile = document.getElementById('sum-profile');
+  const ilk = document.getElementById('sum-ilk');
+  const parts = [];
+  if (profile && profile.textContent) parts.push(profile.textContent);
+  if (ilk && ilk.textContent) parts.push(ilk.textContent);
+  sum.textContent = parts.join(' · ');
+}
+window._syncCampaignConfigTopSummary = _syncCampaignConfigTopSummary;
 
 // ── OPERATIONAL TEMPO rotary dial — drag-to-rotate (SU-3 rework) ───────────
 // Reuses the Immersion dial's drag PATTERN (pointerdown/move/up/cancel,
@@ -2896,6 +3064,7 @@ function _syncInterlockUI() {
     st.className =
       'board-status' + (rngState === 'armed' ? ' alert' : rngState === 'locked' ? ' danger' : '');
   }
+  _syncCampaignConfigTopSummary();
 }
 window._syncInterlockUI = _syncInterlockUI;
 
@@ -4472,6 +4641,16 @@ function capStatMax(el) {
   const n = parseInt(el.value, 10);
   if (!isNaN(n) && n > 10) el.value = '10';
 }
+// Single source for the per-game RAD ceiling (Protocol 22) — capRadsMax() and the
+// RAD bar drag handler (setupRadBarInteraction()) both resolve the same value the
+// same way, so a clamp and a drag scale can never disagree on what "full" means.
+function _resolveMaxRads() {
+  const ctx = typeof getGameContext === 'function' ? getGameContext() : 'FNV';
+  const def = (window.GAME_DEFS && GAME_DEFS[ctx]) || (window.GAME_DEFS && GAME_DEFS.FNV) || {};
+  return typeof def.maxRads === 'number' ? def.maxRads : 1000;
+}
+window._resolveMaxRads = _resolveMaxRads;
+
 // Owner interactivity fold-in (Phase 3 OPERATOR follow-up): RAD EXPOSURE had no upper
 // bound. Mirrors capStatMax()'s upper-clamp-on-input pattern exactly, but reads the
 // per-game fatal threshold from GAME_DEFS[ctx].maxRads (Protocol 38) instead of a
@@ -4479,9 +4658,7 @@ function capStatMax(el) {
 function capRadsMax(el) {
   const n = parseInt(el.value, 10);
   if (isNaN(n)) return;
-  const ctx = typeof getGameContext === 'function' ? getGameContext() : 'FNV';
-  const def = (window.GAME_DEFS && GAME_DEFS[ctx]) || (window.GAME_DEFS && GAME_DEFS.FNV) || {};
-  const maxRads = typeof def.maxRads === 'number' ? def.maxRads : 1000;
+  const maxRads = _resolveMaxRads();
   if (n > maxRads) el.value = String(maxRads);
 }
 function commitStat(el) {

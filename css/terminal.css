@@ -4752,7 +4752,21 @@ details.bay-board.dangerboard::after {
    footprint; `max-width` + wrapping (no more nowrap) keeps even the longest
    label ("COMPLETIONIST") inside a box narrower than the ~60px (mobile) /
    ~73px (desktop) arc-length between adjacent ticks, so positions can no
-   longer overlap each other or the central knob. */
+   longer overlap each other or the central knob.
+   Follow-up owner report: that fix made STANDARD/SPEEDRUN (single 8-letter
+   words with no space/hyphen) wrap mid-word ("STANDAR/D") — the inherited
+   `.panel { overflow-wrap: anywhere }` breaks at an arbitrary character once
+   a word can't fit the box. Live-measured in browser: dropping to 7px/0
+   letter-spacing (from 8px/0.5px) gives STANDARD, MIN-MAXED, CASUAL and
+   SPEEDRUN enough single-line room in the SAME 52px box — verified via a
+   real off-DOM text-width measurement, not guessed — so none of those four
+   ever wrap again. COMPLETIONIST (13 letters, no natural break point) is the
+   one label that cannot fit on one line at any legible size within this
+   radius without growing the dial past the owner-approved mockup geometry
+   (would need to re-derive the hit-area math below from scratch) — owner
+   decision: keep it as the sole two-line label, given a real word-break point
+   via <wbr> in the markup (COMPLE/TIONIST) instead of an arbitrary character
+   split, so its own wrap at least reads cleanly. */
 .detent2 {
   position: absolute;
   left: 50%;
@@ -4766,8 +4780,8 @@ details.bay-board.dangerboard::after {
   padding: 7px 5px; /* >=28px total tap target */
   min-height: 28px;
   min-width: 28px;
-  font-size: 8px;
-  letter-spacing: 0.5px;
+  font-size: 7px;
+  letter-spacing: 0;
   line-height: 1.2;
   opacity: 0.5;
   white-space: normal;
@@ -6758,6 +6772,15 @@ button.rb-key:disabled {
   background: rgba(0, 0, 0, 0.5);
   position: relative;
   overflow: hidden;
+}
+/* Owner batch item 2: the RAD EXPOSURE bar is now a drag surface
+   (setupRadBarInteraction(), ui-core.js), not just a read-only mirror —
+   Protocol 17's >=28px tap-target minimum applies to it same as any other
+   interactive control, so its own track grows taller (the fill still fills
+   it via inset:0, no separate change needed there). */
+#radDragTrack {
+  height: 28px;
+  cursor: ew-resize;
 }
 .bar-fill.rad {
   position: absolute;

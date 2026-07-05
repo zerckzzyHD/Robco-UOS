@@ -493,6 +493,7 @@
                       id="stat_lvl"
                       value="1"
                       min="1"
+                      max="50"
                       class="num num-sm"
                       oninput="onLvlInputChanged()"
                     />
@@ -503,7 +504,7 @@
                       value="0"
                       min="0"
                       class="num"
-                      oninput="updateMath()"
+                      oninput="onXpInputChanged()"
                     />
                   </span>
                 </div>
@@ -1137,7 +1138,7 @@
                       <span class="rr-label"
                         >RAD EXPOSURE <span class="real-label">(RADS)</span></span
                       >
-                      <div class="bar-track">
+                      <div class="bar-track" id="radDragTrack" title="Drag to set RAD exposure">
                         <div class="bar-fill rad" id="opHarnessRadBar" style="width: 0%"></div>
                       </div>
                     </div>
@@ -1853,6 +1854,7 @@
                 <h2 style="border-color: var(--robco-alert); color: var(--robco-alert)">
                   > SECURITY & CONFIGURATION
                 </h2>
+                <span class="panel-substatus" id="sum-bay"></span>
               </summary>
               <div id="moduleBay" class="module-bay">
                 <!-- First-visit-only service-panel ceremony (Protocol 25 sanctioned exception) -->
@@ -1900,7 +1902,10 @@
                   <div class="bay-grid">
                     <!-- SLOT 01 — VDU OPTICS DRIVER -->
                     <details class="sub-panel bay-board" data-sub-id="slot_01_optics" open>
-                      <summary><h3>&gt; SLOT 01 &middot; VDU OPTICS DRIVER</h3></summary>
+                      <summary>
+                        <h3>&gt; SLOT 01 &middot; VDU OPTICS DRIVER</h3>
+                        <span class="panel-substatus" id="sum-slot01"></span>
+                      </summary>
                       <span class="bay-slot-tag">SLOT 01</span>
                       <span class="bay-part-no"
                         >PN RBC-VDU-77 &middot; PHOSPHOR TUBE + LUMEN COIL</span
@@ -2069,7 +2074,10 @@
                       data-sub-id="audio_systems"
                       open
                     >
-                      <summary><h3>&gt; SLOT 02 &middot; SONIC PROCESSOR</h3></summary>
+                      <summary>
+                        <h3>&gt; SLOT 02 &middot; SONIC PROCESSOR</h3>
+                        <span class="panel-substatus" id="sum-slot02"></span>
+                      </summary>
                       <span class="bay-slot-tag">SLOT 02</span>
                       <span class="bay-part-no">PN RBC-SND-13 &middot; 13-CHANNEL WAVE TABLE</span>
 
@@ -2327,7 +2335,10 @@
 
                     <!-- SLOT 03 — POWER CELL BAY -->
                     <details class="sub-panel bay-board" data-sub-id="power_systems" open>
-                      <summary><h3>&gt; SLOT 03 &middot; POWER CELL BAY</h3></summary>
+                      <summary>
+                        <h3>&gt; SLOT 03 &middot; POWER CELL BAY</h3>
+                        <span class="panel-substatus" id="sum-slot03"></span>
+                      </summary>
                       <span class="bay-slot-tag">SLOT 03</span>
                       <span class="bay-part-no"
                         >PN RBC-PWR-42 &middot; CELL DOCK + SOLENOID MOUNT</span
@@ -2386,7 +2397,10 @@
 
                     <!-- SLOT 04 — ATMOSPHERIC REGULATOR -->
                     <details class="sub-panel bay-board" data-sub-id="slot_04_immersion" open>
-                      <summary><h3>&gt; SLOT 04 &middot; ATMOSPHERIC REGULATOR</h3></summary>
+                      <summary>
+                        <h3>&gt; SLOT 04 &middot; ATMOSPHERIC REGULATOR</h3>
+                        <span class="panel-substatus" id="sum-slot04"></span>
+                      </summary>
                       <span class="bay-slot-tag">SLOT 04</span>
                       <span class="bay-part-no"
                         >PN RBC-ATM-08 &middot; 3-POSITION AMBIENT GOVERNOR</span
@@ -2443,6 +2457,7 @@
                         <h3 style="color: var(--robco-alert)">
                           &gt; SLOT 05 &middot; AI UPLINK CO-PROCESSOR
                         </h3>
+                        <span class="panel-substatus" id="sum-slot05"></span>
                       </summary>
                       <span class="bay-slot-tag">SLOT 05</span>
                       <span class="bay-part-no"
@@ -2586,6 +2601,7 @@
             <details class="panel" data-tab="settings" id="savesPanel">
               <summary>
                 <h2>> SAVE ARCHIVE</h2>
+                <span class="panel-substatus" id="sum-saves"></span>
               </summary>
               <div
                 class="input-group"
@@ -2758,6 +2774,7 @@
             <details class="panel" data-tab="settings" id="campaignConfigPanel">
               <summary>
                 <h2>> CAMPAIGN CONFIGS</h2>
+                <span class="panel-substatus" id="sum-campaignConfig"></span>
               </summary>
 
               <div class="bay-bus-strip" aria-hidden="true">
@@ -2935,7 +2952,7 @@
                       role="radio"
                       aria-checked="false"
                     >
-                      <span class="d-num" aria-hidden="true">03</span>COMPLETIONIST
+                      <span class="d-num" aria-hidden="true">03</span>COMPLE<wbr />TIONIST
                     </button>
                     <button
                       type="button"

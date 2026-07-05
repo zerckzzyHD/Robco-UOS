@@ -15891,6 +15891,7 @@ try {
   const sb = { document: { getElementById: () => el }, GAME_DEFS: { FNV: { maxRads: 1000 }, FO3: { maxRads: 500 } }, getGameContext: () => 'FNV', window: {}, parseInt, isNaN, String };
   sb.window.GAME_DEFS = sb.GAME_DEFS;
   vm.createContext(sb);
+  vm.runInContext(decl('_resolveMaxRads'), sb);
   vm.runInContext(decl('capRadsMax'), sb);
   sb.capRadsMax(el);
   const clampedA = el.value;
@@ -15931,10 +15932,13 @@ Check (
     $stateSrc182 -match 'Source: fallout\.wiki "Radiated \(Fallout 3\)"'
 ) "182.5: GAME_DEFS.FNV/FO3/FO4 each declare maxRads: 1000, sourced to fallout.wiki (Protocol 3)"
 
-# 182.6  capRadsMax() reads GAME_DEFS[ctx].maxRads (Protocol 38)
+# 182.6  capRadsMax() reads GAME_DEFS[ctx].maxRads (Protocol 38) -- owner batch
+#        item 2 refactor: this resolution now lives in a shared _resolveMaxRads()
+#        helper (Protocol 22 -- setupRadBarInteraction()'s drag handler reuses it).
 $capRadsMaxBody182 = Get-FunctionBody $uiCore182 'capRadsMax'
-Check ($capRadsMaxBody182 -match 'def\.maxRads' -and $capRadsMaxBody182 -match 'GAME_DEFS\[ctx\]') `
-    "182.6: capRadsMax() reads GAME_DEFS[ctx].maxRads as its primary source (Protocol 38 -- not a bare hardcoded clamp)"
+$resolveMaxRadsBody182 = Get-FunctionBody $uiCore182 '_resolveMaxRads'
+Check ($capRadsMaxBody182 -match '_resolveMaxRads\(\)' -and $resolveMaxRadsBody182 -match 'def\.maxRads' -and $resolveMaxRadsBody182 -match 'GAME_DEFS\[ctx\]') `
+    "182.6: capRadsMax() calls the shared _resolveMaxRads() helper, which reads GAME_DEFS[ctx].maxRads as its primary source (Protocol 38 -- not a bare hardcoded clamp; Protocol 22 -- one resolution shared with the RAD bar drag handler)"
 
 # 182.8  #stat_rads wires oninput="capRadsMax(this); updateMath()" -- tolerant of
 #        Prettier reformatting the inline handler onto multiple lines / adding a
@@ -16051,6 +16055,258 @@ Check (
 Check (
     [System.Text.RegularExpressions.Regex]::IsMatch($css183, "(?s)\.rb-tile input\s*\{[^\}]*max-width:\s*100%")
 ) "183.8: .rb-tile input asserts max-width:100% -- beats the pre-existing mobile input[type='number']{max-width:56px} rule (@media max-width:480px) that was clamping #c_caps to a narrow box sitting flush-left of its tile, the real cause behind the still-left-skewed BOTTLE CAPS value"
+
+# ===========================================================
+# Suite 184 -- Owner batch: tempo dial no-wrap fix, RAD bar drag, level/XP
+# caps, full scroll+panel-state restore ordering, SETTINGS collapsed
+# summary lines. 19 tests. Mirrors JS Suite 184.
+# ===========================================================
+Write-Host "`n-- Suite 184 -- owner batch: tempo no-wrap, RAD drag, level/XP caps, scroll restore, SETTINGS summaries $('-' * 5)"
+$html184 = Read-Src "index.html"
+$css184 = Read-Src "css/terminal.css"
+$core184 = Read-Src "js/ui-core.js"
+$audio184 = Read-Src "js/ui-audio.js"
+$acct184 = Read-Src "js/ui-account.js"
+
+# 184.1  the tempo dial's mobile-base .detent2 rule drops to 7px/letter-spacing:0
+#        (from 8px/0.5px) -- fits STANDARD/MIN-MAXED/CASUAL/SPEEDRUN on one line,
+#        max-width stays unchanged (52px/68px) so the 183.6 hit-area bound holds.
+Check (
+    [System.Text.RegularExpressions.Regex]::IsMatch($css184, '(?s)\.detent2\s*\{[^\}]*font-size:\s*7px;[^\}]*letter-spacing:\s*0;') -and
+    [System.Text.RegularExpressions.Regex]::IsMatch($css184, '(?s)\.detent2\s*\{[^\}]*max-width:\s*52px') -and
+    [System.Text.RegularExpressions.Regex]::IsMatch($css184, '(?s)\(min-width:\s*1000px\)[\s\S]{0,400}?\.detent2\s*\{[^\}]*max-width:\s*68px')
+) "184.1: .detent2 mobile base drops to font-size:7px/letter-spacing:0 (fits STANDARD/MIN-MAXED/CASUAL/SPEEDRUN on one line) while max-width stays 52px/68px -- the Suite 183.6 hit-area bound is never widened to fix this"
+
+# 184.2  COMPLETIONIST gets a real <wbr> break point between COMPLE/TIONIST.
+Check (
+    [System.Text.RegularExpressions.Regex]::IsMatch($html184, '<span class="d-num" aria-hidden="true">03</span>COMPLE<wbr\s*/?>TIONIST')
+) "184.2: the COMPLETIONIST detent label carries a <wbr> between COMPLE/TIONIST so its unavoidable 2-line wrap breaks at a real word boundary, not an arbitrary character split"
+
+# 184.3  #radDragTrack wraps the existing #opHarnessRadBar fill.
+Check (
+    [System.Text.RegularExpressions.Regex]::IsMatch($html184, '(?s)<div class="bar-track" id="radDragTrack"[^>]*>\s*<div class="bar-fill rad" id="opHarnessRadBar"')
+) "184.3: #radDragTrack wraps the existing #opHarnessRadBar fill -- the drag surface sits on the one real RAD meter, never a duplicate"
+
+# 184.4  Protocol 17 -- the new drag surface gets a real >=28px tap target.
+Check (
+    [System.Text.RegularExpressions.Regex]::IsMatch($css184, '(?s)#radDragTrack\s*\{[^\}]*height:\s*28px')
+) "184.4: #radDragTrack asserts height:28px -- the >=28px Protocol 17 drag-target minimum, same standard every other interactive control here is held to"
+
+# 184.5  setupRadBarInteraction() mirrors the HP/XP drag pattern.
+$radDragBody184 = Get-FunctionBody $core184 'setupRadBarInteraction'
+Check (
+    ($radDragBody184 -match "getElementById\('radDragTrack'\)") -and
+    ($radDragBody184 -match '_resolveMaxRads\(\)') -and
+    ($radDragBody184 -match "stat_rads'\)\.value = newRads") -and
+    ($radDragBody184 -match 'state\.rads = newRads') -and
+    [System.Text.RegularExpressions.Regex]::IsMatch($radDragBody184, "addEventListener\(\s*'touchstart'") -and
+    ($core184.Substring($core184.IndexOf('window.onload')) -match 'setupRadBarInteraction\(\);')
+) "184.5: setupRadBarInteraction() mirrors the HP/XP drag pattern (mouse+touch, pct-of-width) but scales to _resolveMaxRads(), writes #stat_rads + state.rads, and is called from window.onload"
+
+# 184.6 + 184.9  BEHAVIORAL -- shell out to node and actually execute the real
+# setupRadBarInteraction()/onLvlInputChanged()/onXpInputChanged() bodies
+# (Protocol 15 parity with JS Suite 184, mirroring the Suite 182 technique).
+$labels184 = @(
+    "RAD bar drag behavioral: dragging to 50% of the track sets #stat_rads/state.rads to 500 (half of a 1000 maxRads game), and over-dragging clamps to exactly maxRads (1000) -- proves the scale reads _resolveMaxRads() live",
+    "level/XP cap behavioral: typing 999 into the level field clamps to 50; an oversized XP value at level 10 clamps to exactly xpNext(10)-1; a valid in-range XP value is left untouched"
+)
+try {
+    $nodeCheck184 = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCheck184) {
+        $uiCorePathNode184 = (Join-Path $Root "js/ui-core.js").Replace('\', '/')
+        $testScript184 = @"
+const fs = require('fs');
+const vm = require('vm');
+const uiCoreSource = fs.readFileSync('$uiCorePathNode184', 'utf8');
+function extractFunctionBody(source, fnName) {
+  const idx = source.indexOf('function ' + fnName);
+  const braceStart = source.indexOf('{', source.indexOf('(', idx));
+  let depth = 0, i = braceStart;
+  for (; i < source.length; i++) {
+    if (source[i] === '{') depth++;
+    else if (source[i] === '}' && --depth === 0) break;
+  }
+  return source.slice(braceStart, i + 1);
+}
+function decl(name) {
+  const s = uiCoreSource.indexOf('function ' + name);
+  const p = uiCoreSource.slice(uiCoreSource.indexOf('(', s), uiCoreSource.indexOf('{', uiCoreSource.indexOf('(', s)));
+  return 'function ' + name + p + extractFunctionBody(uiCoreSource, name);
+}
+const results = [];
+try {
+  const listeners = {};
+  let radVal = '0';
+  const statRads = { get value() { return radVal; }, set value(v) { radVal = String(v); } };
+  const container = {
+    getBoundingClientRect: () => ({ left: 0, width: 100 }),
+    addEventListener(type, fn) { (listeners[type] = listeners[type] || []).push(fn); },
+  };
+  const docListeners = {};
+  const doc = {
+    getElementById: id => (id === 'radDragTrack' ? container : id === 'stat_rads' ? statRads : null),
+    addEventListener(type, fn) { (docListeners[type] = docListeners[type] || []).push(fn); },
+  };
+  const sb = { document: doc, state: {}, updateMath: () => {}, GAME_DEFS: { FNV: { maxRads: 1000 } }, getGameContext: () => 'FNV', window: {}, Math, parseInt };
+  sb.window.GAME_DEFS = sb.GAME_DEFS;
+  vm.createContext(sb);
+  vm.runInContext(decl('_resolveMaxRads'), sb);
+  vm.runInContext(decl('setupRadBarInteraction'), sb);
+  sb.setupRadBarInteraction();
+  listeners.mousedown[0]({ clientX: 50 });
+  const halfVal = statRads.value;
+  listeners.mousedown[0]({ clientX: 1000 });
+  const clampedVal = statRads.value;
+  results.push(halfVal === '500' && clampedVal === '1000');
+} catch (e) { results.push(false); }
+try {
+  let lvlVal = '999', xpVal = '0';
+  const lvlEl = { get value() { return lvlVal; }, set value(v) { lvlVal = String(v); } };
+  const xpEl = { get value() { return xpVal; }, set value(v) { xpVal = String(v); } };
+  const sb = { document: { getElementById: id => (id === 'stat_lvl' ? lvlEl : id === 'stat_xp' ? xpEl : null) }, state: {}, updateMath: () => {}, Math, parseInt, isNaN, MAX_PLAYER_LEVEL: 50 };
+  vm.createContext(sb);
+  vm.runInContext(decl('onLvlInputChanged'), sb);
+  vm.runInContext(decl('onXpInputChanged'), sb);
+  sb.onLvlInputChanged();
+  const lvlAfter = lvlEl.value;
+  lvlEl.value = '10';
+  const xpNext10 = 75 * (11 * 11) - 25 * 11 - 50;
+  xpEl.value = String(xpNext10 + 5000);
+  sb.onXpInputChanged();
+  const xpOver = xpEl.value;
+  xpEl.value = String(xpNext10 - 100);
+  sb.onXpInputChanged();
+  const xpValid = xpEl.value;
+  results.push(lvlAfter === '50' && xpOver === String(xpNext10 - 1) && xpValid === String(xpNext10 - 100));
+} catch (e) { results.push(false); }
+console.log('RESULT:' + results.map(r => r ? '1' : '0').join(''));
+"@
+        $tmpScript184 = [System.IO.Path]::GetTempFileName() + '.js'
+        [System.IO.File]::WriteAllText($tmpScript184, $testScript184, [System.Text.Encoding]::UTF8)
+        try {
+            $out184 = (node $tmpScript184 2>&1 | Out-String)
+        } finally {
+            Remove-Item -Path $tmpScript184 -Force -ErrorAction SilentlyContinue
+        }
+        $rm184 = [regex]::Match($out184, 'RESULT:([01]{2})')
+        if ($rm184.Success) {
+            $bits184 = $rm184.Groups[1].Value
+            for ($bi = 0; $bi -lt 2; $bi++) { Check ($bits184.Substring($bi, 1) -eq '1') "[behavioral] $($labels184[$bi])" }
+        } else {
+            $err184 = if ([string]::IsNullOrWhiteSpace($out184)) { "No output from node" } else { $out184.Trim() }
+            foreach ($lbl in $labels184) { Fail "$lbl  (runtime error: $err184)" }
+        }
+    } else {
+        foreach ($lbl in $labels184) { Fail "$lbl  (node not available in PATH)" }
+    }
+} catch {
+    foreach ($lbl in $labels184) { Fail "$lbl  (exception: $($_.Exception.Message))" }
+}
+
+# 184.7  Level input caps at MAX_PLAYER_LEVEL.
+$lvlBody184 = Get-FunctionBody $core184 'onLvlInputChanged'
+Check (
+    ($lvlBody184 -match 'Math\.min\(MAX_PLAYER_LEVEL,\s*raw\)') -and
+    ($lvlBody184 -match 'lvlEl\.value = lvl')
+) "184.7: onLvlInputChanged() clamps to Math.min(MAX_PLAYER_LEVEL, raw) and writes the clamped value back to #stat_lvl -- a typed/stepped level above 50 can never stick"
+
+# 184.7b  #stat_lvl carries a native max=`"50`" attribute.
+Check (
+    [System.Text.RegularExpressions.Regex]::IsMatch($html184, '(?s)id="stat_lvl"[\s\S]{0,120}max="50"')
+) "184.7b: #stat_lvl carries a native max=`"50`" attribute matching MAX_PLAYER_LEVEL, alongside the JS clamp"
+
+# 184.8  onXpInputChanged() caps the XP-amount input at xpNext(lvl)-1.
+$xpBody184 = Get-FunctionBody $core184 'onXpInputChanged'
+Check (
+    ($xpBody184 -match [regex]::Escape('75 * ((lvl + 1) * (lvl + 1)) - 25 * (lvl + 1) - 50')) -and
+    ($xpBody184 -match [regex]::Escape('Math.max(0, Math.min(raw, xpNext - 1))')) -and
+    [System.Text.RegularExpressions.Regex]::IsMatch($html184, '(?s)id="stat_xp"[\s\S]{0,120}oninput="onXpInputChanged\(\)"')
+) "184.8: onXpInputChanged() caps the typed/stepped XP value at xpNext(lvl)-1 using the exact same per-level curve as the XP bar drag handler, and #stat_xp is wired to call it"
+
+# 184.10  Protocol 42 fix -- _wirePanelPersistence() itself re-applies the saved
+#         scroll offset as its OWN last step, after applying every panel/sub-panel's
+#         saved open/closed state -- not just once earlier inside initTabs() (called
+#         before _wirePanelPersistence() in window.onload). Folding the re-apply into
+#         this function itself (rather than a second onload call site) keeps
+#         window.onload a slim named-call composition (Suite 132.5).
+$wirePanelPersistenceBody184 = Get-FunctionBody $core184 '_wirePanelPersistence'
+$onloadIdx184 = $core184.IndexOf('window.onload')
+Check (
+    ($wirePanelPersistenceBody184 -match [regex]::Escape('if (_lastScrollSubsystem) _restoreScrollFor(_lastScrollSubsystem, false);')) -and
+    ($core184.IndexOf('_wirePanelPersistence();', $onloadIdx184) -gt $core184.IndexOf('initTabs();', $onloadIdx184))
+) "184.10: _wirePanelPersistence() re-applies the saved scroll offset as its own last step (not just once earlier inside initTabs(), which window.onload calls first, before panel state is final) -- a panel opening/closing can no longer silently invalidate the restored scroll position"
+
+# 184.11  a SECOND re-restore lives inside _runBootSequenceAndBriefing()'s own
+#         boot-sequence completion callback.
+$briefingBody184 = Get-FunctionBody $core184 '_runBootSequenceAndBriefing'
+Check (
+    ($briefingBody184 -match [regex]::Escape('if (_lastScrollSubsystem) _restoreScrollFor(_lastScrollSubsystem, false);'))
+) "184.11: _runBootSequenceAndBriefing()'s boot-sequence completion callback re-applies the saved scroll offset once more, after its own appendToChat() briefing has had a chance to grow the mobile carrier-strip"
+
+# 184.12  panel-state coverage audit -- every <details> is either class="panel"
+#         or carries data-sub-id.
+$detailsTags184 = [regex]::Matches($html184, '<details\b[^>]*>')
+$uncovered184 = @($detailsTags184 | Where-Object {
+    (-not [System.Text.RegularExpressions.Regex]::IsMatch($_.Value, 'class="[^"]*\bpanel\b[^"]*"')) -and
+    (-not [System.Text.RegularExpressions.Regex]::IsMatch($_.Value, 'data-sub-id='))
+})
+Check (
+    ($detailsTags184.Count -gt 40) -and ($uncovered184.Count -eq 0)
+) "184.12: every <details> element in index.html ($($detailsTags184.Count) found) is either class=`"panel`" or carries data-sub-id -- full panel-state persistence coverage, none left un-tracked"
+
+# 184.13  every new SETTINGS board carries a .panel-substatus summary span.
+$summaryIds184 = @('sum-bay', 'sum-slot01', 'sum-slot02', 'sum-slot03', 'sum-slot04', 'sum-slot05', 'sum-saves', 'sum-campaignConfig')
+$summaryOk184 = $true
+foreach ($sid in $summaryIds184) {
+    if (-not ($html184 -match [regex]::Escape('<span class="panel-substatus" id="' + $sid + '">'))) { $summaryOk184 = $false }
+}
+Check ($summaryOk184) "184.13: every new SETTINGS board (Module Bay + all 5 SLOTs + SAVE ARCHIVE + CAMPAIGN CONFIGS) carries a .panel-substatus summary span, matching the existing CAMPAIGN PROFILE/ACCOUNT pattern"
+
+# 184.14  each SLOT's status-updater function mirrors its text into the summary.
+Check (
+    ($audio184 -match "getElementById\('sum-slot01'\)") -and
+    ($audio184 -match "getElementById\('sum-slot02'\)") -and
+    ($audio184 -match "getElementById\('sum-slot05'\)") -and
+    ($core184 -match "getElementById\('sum-slot03'\)") -and
+    ($core184 -match "getElementById\('sum-slot04'\)")
+) "184.14: _updateOpticsBoardStatus()/_updateSonicBoardStatus()/_updateUplinkBoardStatus() (ui-audio.js) and the new _updatePowerBoardStatus()/_updateImmersionUI() (ui-core.js) each mirror their status text into their SLOT's collapsed summary span"
+
+# 184.15  renderModuleBay() refreshes SLOT 03/04 + the bay summary, and
+#         _restoreDevicePrefs() calls renderModuleBay() unconditionally at boot.
+$bayBody184 = Get-FunctionBody $core184 'renderModuleBay'
+$restoreDevicePrefsBody184 = Get-FunctionBody $core184 '_restoreDevicePrefs'
+Check (
+    ($bayBody184 -match '_updatePowerBoardStatus\(\)') -and
+    ($bayBody184 -match '_updateImmersionUI\(\)') -and
+    ($bayBody184 -match '_updateModuleBaySummary\(\)') -and
+    ($restoreDevicePrefsBody184 -match 'renderModuleBay\(\)')
+) "184.15: renderModuleBay() also refreshes SLOT 03/04 + the bay's own summary, and _restoreDevicePrefs() calls renderModuleBay() unconditionally at boot -- so summaries populate even while the Module Bay panel starts collapsed"
+
+# 184.16  _updateModuleBaySummary() reads the same signals its SLOT boards use.
+$summaryBody184 = Get-FunctionBody $core184 '_updateModuleBaySummary'
+Check (
+    ($summaryBody184 -match '_resolveOptic\(\)') -and
+    ($summaryBody184 -match 'AudioSettings\.masterMute') -and
+    ($summaryBody184 -match '_isUplinkConnected\(\)')
+) "184.16: _updateModuleBaySummary() reads the same optic/master-mute/uplink-connected signals the SLOT boards already use -- never a parallel computation"
+
+# 184.17  renderSavesList() sets #sum-saves on every code path.
+Check (
+    ($acct184 -match [regex]::Escape("summaryEl.textContent = 'ARCHIVE LINK FAILED'")) -and
+    ($acct184 -match [regex]::Escape("summaryEl.textContent = 'NO ARCHIVES ON FILE'")) -and
+    ($acct184 -match [regex]::Escape("localSavesShown.length + ' LOCAL " + [char]0x00B7 + " ' + cloudSavesShown.length + ' CLOUD ARCHIVES'"))
+) "184.17: renderSavesList() sets #sum-saves with a real local/cloud archive count on every exit path (success, empty, and cloud-link-failure), never left stale"
+
+# 184.18  _syncCampaignConfigTopSummary() aggregates both boards' summaries.
+$profileBody184 = Get-FunctionBody $core184 '_syncCampaignProfileUI'
+$interlockBody184 = Get-FunctionBody $core184 '_syncInterlockUI'
+$topSummaryBody184 = Get-FunctionBody $core184 '_syncCampaignConfigTopSummary'
+Check (
+    ($profileBody184 -match '_syncCampaignConfigTopSummary\(\);') -and
+    ($interlockBody184 -match '_syncCampaignConfigTopSummary\(\);') -and
+    ($topSummaryBody184 -match "getElementById\('sum-profile'\)") -and
+    ($topSummaryBody184 -match "getElementById\('sum-ilk'\)")
+) "184.18: _syncCampaignConfigTopSummary() aggregates the CAMPAIGN PROFILE + RANDOMIZER INTERLOCK boards' own summary text and is called from both boards' sync functions -- never stale regardless of which one last changed"
 
 # ===========================================================
 # Results

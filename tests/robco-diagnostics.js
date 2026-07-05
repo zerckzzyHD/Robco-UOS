@@ -23329,6 +23329,11 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
           s._taskQueue.push(fn);
         },
         secPanel,
+        // Owner batch item 4: _wirePanelPersistence() now ends with a scroll
+        // re-restore gated on _lastScrollSubsystem — null here (falsy) so the
+        // guard short-circuits and _restoreScrollFor is never actually called,
+        // matching a fresh boot before any subsystem switch has happened.
+        _lastScrollSubsystem: null,
       };
       return s;
     }
@@ -25628,10 +25633,18 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //        than only ever clamping to a bare hardcoded 1000 — the fallback
   //        literal (matching the established VATS hitChanceMin/Max pattern)
   //        is acceptable, but the PRIMARY read must be GAME_DEFS-driven.
+  //        Owner batch item 2 refactor: this resolution now lives in a
+  //        shared _resolveMaxRads() helper (Protocol 22 — setupRadBarInteraction()'s
+  //        drag handler reuses the exact same resolution), so capRadsMax()
+  //        itself is checked for the call, and _resolveMaxRads() is checked
+  //        for the actual GAME_DEFS read.
   const capRadsMaxBody182 = extractFunctionBody(uiCore182, 'capRadsMax');
+  const resolveMaxRadsBody182 = extractFunctionBody(uiCore182, '_resolveMaxRads');
   assert(
-    /def\.maxRads/.test(capRadsMaxBody182) && /GAME_DEFS\[ctx\]/.test(capRadsMaxBody182),
-    '182.6: capRadsMax() reads GAME_DEFS[ctx].maxRads as its primary source (Protocol 38 — not a bare hardcoded clamp)'
+    /_resolveMaxRads\(\)/.test(capRadsMaxBody182) &&
+      /def\.maxRads/.test(resolveMaxRadsBody182) &&
+      /GAME_DEFS\[ctx\]/.test(resolveMaxRadsBody182),
+    '182.6: capRadsMax() calls the shared _resolveMaxRads() helper, which reads GAME_DEFS[ctx].maxRads as its primary source (Protocol 38 — not a bare hardcoded clamp; Protocol 22 — one resolution shared with the RAD bar drag handler)'
   );
 
   // 182.7  BEHAVIORAL — capRadsMax() clamps to the ACTIVE game's own
@@ -25656,6 +25669,9 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       };
       sb.window.GAME_DEFS = sb.GAME_DEFS;
       vm182.createContext(sb);
+      // Owner batch item 2 refactor: capRadsMax() now delegates to the shared
+      // _resolveMaxRads() helper — inject both into the sandbox (Protocol 22).
+      vm182.runInContext(declareFn182(uiCore182, '_resolveMaxRads'), sb);
       vm182.runInContext(declareFn182(uiCore182, 'capRadsMax'), sb);
       sb.capRadsMax(el);
       clampedA = el.value;
@@ -25875,6 +25891,405 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     /\.rb-tile input\s*\{[^}]*max-width:\s*100%/.test(css183),
     "183.8: .rb-tile input asserts max-width:100% — beats the pre-existing mobile input[type='number']{max-width:56px} rule (@media max-width:480px) that was clamping #c_caps to a narrow box sitting flush-left of its tile, the real cause behind the still-left-skewed BOTTLE CAPS value"
   );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 184 — Owner batch: tempo dial no-wrap fix, RAD bar drag, level/XP
+//  caps, full scroll+panel-state restore ordering, SETTINGS collapsed
+//  summary lines. 19 tests.
+// ══════════════════════════════════════════════════════════════
+{
+  header(
+    'Suite 184 — owner batch: tempo no-wrap, RAD drag, level/XP caps, scroll restore, SETTINGS summaries'
+  );
+  const html184 = readFile('index.html');
+  const css184 = readFile('css/terminal.css');
+  const core184 = readFile('js/ui-core.js');
+  const audio184 = readFile('js/ui-audio.js');
+  const acct184 = readFile('js/ui-account.js');
+  // Reconstructs a full, standalone "function name(params) { body }" text for
+  // redeclaration in a vm sandbox (mirrors Suite 182's declareFn182 pattern —
+  // extractFunctionBody() alone only returns the brace-matched body).
+  function declareFn184(src, name) {
+    const nameIdx = src.indexOf('function ' + name);
+    const parenIdx = src.indexOf('(', nameIdx);
+    const braceIdx = src.indexOf('{', parenIdx);
+    const params = src.slice(parenIdx, braceIdx);
+    return 'function ' + name + params + extractFunctionBody(src, name);
+  }
+
+  // 184.1  the tempo dial's mobile-base .detent2 rule drops to 7px/letter-
+  //        spacing:0 (from 8px/0.5px) — live-measured to give STANDARD/
+  //        MIN-MAXED/CASUAL/SPEEDRUN enough single-line room in the SAME
+  //        52px box, fixing the "STANDAR/D" mid-word wrap the owner
+  //        screenshotted — while max-width itself is UNCHANGED (52px mobile
+  //        / 68px desktop), so the Suite 183.6 hit-area non-overlap
+  //        guarantee still holds (never widened to fix this).
+  assert(
+    /\.detent2\s*\{[^}]*font-size:\s*7px;[^}]*letter-spacing:\s*0;/.test(css184) &&
+      /\.detent2\s*\{[^}]*max-width:\s*52px/.test(css184) &&
+      /\(min-width:\s*1000px\)[\s\S]{0,400}?\.detent2\s*\{[^}]*max-width:\s*68px/.test(css184),
+    '184.1: .detent2 mobile base drops to font-size:7px/letter-spacing:0 (fits STANDARD/MIN-MAXED/CASUAL/SPEEDRUN on one line) while max-width stays 52px/68px — the Suite 183.6 hit-area bound is never widened to fix this'
+  );
+
+  // 184.2  COMPLETIONIST (the one label too long to fit on one line at any
+  //        legible size within the current dial radius — owner decision,
+  //        see the .detent2 CSS comment) gets a real <wbr> break point
+  //        between COMPLE/TIONIST instead of an arbitrary character split
+  //        from the inherited .panel{overflow-wrap:anywhere}.
+  assert(
+    /<span class="d-num" aria-hidden="true">03<\/span>COMPLE<wbr\s*\/?>TIONIST/.test(html184),
+    '184.2: the COMPLETIONIST detent label carries a <wbr> between COMPLE/TIONIST so its unavoidable 2-line wrap breaks at a real word boundary, not an arbitrary character split'
+  );
+
+  // 184.3  RAD EXPOSURE (SKELETAL HARNESS) meter is now a drag surface —
+  //        #radDragTrack wraps #opHarnessRadBar (the single real fill),
+  //        never a second element sharing that id.
+  assert(
+    /<div class="bar-track" id="radDragTrack"[^>]*>\s*<div class="bar-fill rad" id="opHarnessRadBar"/.test(
+      html184
+    ),
+    '184.3: #radDragTrack wraps the existing #opHarnessRadBar fill — the drag surface sits on the one real RAD meter, never a duplicate'
+  );
+
+  // 184.4  Protocol 17 — the new drag surface gets a real >=28px tap
+  //        target (the visual track was 10px; the interactive one is 28px).
+  assert(
+    /#radDragTrack\s*\{[^}]*height:\s*28px/.test(css184),
+    '184.4: #radDragTrack asserts height:28px — the >=28px Protocol 17 drag-target minimum, same standard every other interactive control here is held to'
+  );
+
+  // 184.5  setupRadBarInteraction() mirrors setupHpBarInteraction()/
+  //        setupXpBarInteraction() exactly (Protocol 22 — mouse + touch,
+  //        pct-of-width math, writes #stat_rads + state.rads + updateMath()),
+  //        scaled to _resolveMaxRads() instead of a fixed max, and is wired
+  //        into window.onload alongside its two siblings.
+  {
+    const radDragBody184 = extractFunctionBody(core184, 'setupRadBarInteraction');
+    assert(
+      /getElementById\('radDragTrack'\)/.test(radDragBody184) &&
+        /_resolveMaxRads\(\)/.test(radDragBody184) &&
+        /stat_rads'\)\.value = newRads/.test(radDragBody184) &&
+        /state\.rads = newRads/.test(radDragBody184) &&
+        /addEventListener\(\s*'touchstart'/.test(radDragBody184) &&
+        /setupRadBarInteraction\(\);/.test(core184.slice(core184.indexOf('window.onload'))),
+      '184.5: setupRadBarInteraction() mirrors the HP/XP drag pattern (mouse+touch, pct-of-width) but scales to _resolveMaxRads(), writes #stat_rads + state.rads, and is called from window.onload'
+    );
+  }
+
+  // 184.6  BEHAVIORAL — dragging #radDragTrack to 50% of its width sets
+  //        #stat_rads/state.rads to ~half of the ACTIVE game's maxRads
+  //        (proves the scale is live, not a fixed 1000 literal).
+  {
+    let err = null,
+      halfVal = null,
+      clampedVal = null;
+    try {
+      const vm184 = require('vm');
+      const listeners = {};
+      const statRads = {
+        _v: '0',
+        get value() {
+          return this._v;
+        },
+        set value(v) {
+          this._v = String(v);
+        },
+      };
+      const container = {
+        getBoundingClientRect: () => ({ left: 0, width: 100 }),
+        addEventListener(type, fn) {
+          (listeners[type] = listeners[type] || []).push(fn);
+        },
+      };
+      const docListeners = {};
+      const doc = {
+        getElementById: id =>
+          id === 'radDragTrack' ? container : id === 'stat_rads' ? statRads : null,
+        addEventListener(type, fn) {
+          (docListeners[type] = docListeners[type] || []).push(fn);
+        },
+      };
+      const sb = {
+        document: doc,
+        state: {},
+        updateMath: () => {},
+        GAME_DEFS: { FNV: { maxRads: 1000 } },
+        getGameContext: () => 'FNV',
+        window: {},
+        Math,
+        parseInt,
+      };
+      sb.window.GAME_DEFS = sb.GAME_DEFS;
+      vm184.createContext(sb);
+      vm184.runInContext(declareFn184(core184, '_resolveMaxRads'), sb);
+      vm184.runInContext(declareFn184(core184, 'setupRadBarInteraction'), sb);
+      sb.setupRadBarInteraction();
+      listeners.mousedown[0]({ clientX: 50 });
+      halfVal = statRads.value;
+      listeners.mousedown[0]({ clientX: 1000 }); // way past the edge
+      clampedVal = statRads.value;
+    } catch (e) {
+      err = e;
+    }
+    assert(
+      !err && halfVal === '500' && clampedVal === '1000',
+      'RAD bar drag behavioral: dragging to 50% of the track sets #stat_rads/state.rads to 500 (half of a 1000 maxRads game), and over-dragging clamps to exactly maxRads (1000) — proves the scale reads _resolveMaxRads() live' +
+        (err ? ' — ' + err.message : '')
+    );
+  }
+
+  // 184.7  Level input caps at MAX_PLAYER_LEVEL — onLvlInputChanged() clamps
+  //        the raw parsed value with Math.min(MAX_PLAYER_LEVEL, raw) and
+  //        writes the clamped value back to the input (not just state),
+  //        so a stepper click or a typed 999 can't leave a stale display.
+  {
+    const lvlBody184 = extractFunctionBody(core184, 'onLvlInputChanged');
+    assert(
+      /Math\.min\(MAX_PLAYER_LEVEL,\s*raw\)/.test(lvlBody184) &&
+        /lvlEl\.value = lvl/.test(lvlBody184),
+      '184.7: onLvlInputChanged() clamps to Math.min(MAX_PLAYER_LEVEL, raw) and writes the clamped value back to #stat_lvl — a typed/stepped level above 50 can never stick'
+    );
+  }
+  assert(
+    /id="stat_lvl"[\s\S]{0,120}max="50"/.test(html184),
+    '184.7b: #stat_lvl carries a native max="50" attribute matching MAX_PLAYER_LEVEL, alongside the JS clamp'
+  );
+
+  // 184.8  onXpInputChanged() caps the XP-amount input at the CURRENT
+  //        level's max (xpNext(lvl) - 1 — the same upper edge of the
+  //        [xpCur, xpNext-1] band setupXpBarInteraction()'s own drag
+  //        handler already generates, Protocol 22, never a second formula),
+  //        and #stat_xp's oninput is wired to it instead of a bare
+  //        updateMath().
+  {
+    const xpBody184 = extractFunctionBody(core184, 'onXpInputChanged');
+    assert(
+      /75 \* \(\(lvl \+ 1\) \* \(lvl \+ 1\)\) - 25 \* \(lvl \+ 1\) - 50/.test(xpBody184) &&
+        /Math\.max\(0, Math\.min\(raw, xpNext - 1\)\)/.test(xpBody184) &&
+        /id="stat_xp"[\s\S]{0,120}oninput="onXpInputChanged\(\)"/.test(html184),
+      '184.8: onXpInputChanged() caps the typed/stepped XP value at xpNext(lvl)-1 using the exact same per-level curve as the XP bar drag handler, and #stat_xp is wired to call it'
+    );
+  }
+
+  // 184.9  BEHAVIORAL — the level input clamps 999→50, and the XP input
+  //        clamps an oversized value to exactly xpNext(lvl)-1 for a
+  //        non-trivial level (10), while a valid in-range value is left
+  //        untouched.
+  {
+    let err = null,
+      lvlAfter = null,
+      xpOver = null,
+      xpValid = null;
+    try {
+      const vm184b = require('vm');
+      const lvlEl = {
+        _v: '999',
+        get value() {
+          return this._v;
+        },
+        set value(v) {
+          this._v = String(v);
+        },
+      };
+      const xpEl = {
+        _v: '0',
+        get value() {
+          return this._v;
+        },
+        set value(v) {
+          this._v = String(v);
+        },
+      };
+      const sb = {
+        document: {
+          getElementById: id => (id === 'stat_lvl' ? lvlEl : id === 'stat_xp' ? xpEl : null),
+        },
+        state: {},
+        updateMath: () => {},
+        Math,
+        parseInt,
+        isNaN,
+        MAX_PLAYER_LEVEL: 50,
+      };
+      vm184b.createContext(sb);
+      vm184b.runInContext(declareFn184(core184, 'onLvlInputChanged'), sb);
+      vm184b.runInContext(declareFn184(core184, 'onXpInputChanged'), sb);
+      sb.onLvlInputChanged();
+      lvlAfter = lvlEl.value;
+      lvlEl.value = '10';
+      const xpNext10 = 75 * (11 * 11) - 25 * 11 - 50;
+      xpEl.value = String(xpNext10 + 5000);
+      sb.onXpInputChanged();
+      xpOver = xpEl.value;
+      xpEl.value = String(xpNext10 - 100);
+      sb.onXpInputChanged();
+      xpValid = xpEl.value;
+    } catch (e) {
+      err = e;
+    }
+    const xpNext10Expected = 75 * (11 * 11) - 25 * 11 - 50;
+    assert(
+      !err &&
+        lvlAfter === '50' &&
+        xpOver === String(xpNext10Expected - 1) &&
+        xpValid === String(xpNext10Expected - 100),
+      'level/XP cap behavioral: typing 999 into the level field clamps to 50; an oversized XP value at level 10 clamps to exactly xpNext(10)-1; a valid in-range XP value is left untouched' +
+        (err ? ' — ' + err.message : '')
+    );
+  }
+
+  // 184.10  Protocol 42 fix — _wirePanelPersistence() itself re-applies the
+  //         saved scroll offset as its OWN last step, AFTER it has applied
+  //         every panel/sub-panel's saved open/closed state above — not just
+  //         once earlier inside initTabs() (called before _wirePanelPersistence()
+  //         in window.onload), before panel state is final. A panel opening or
+  //         closing changes page height, which silently invalidated the
+  //         earlier restore; folding the re-apply into this function itself
+  //         (rather than a second onload call site) keeps window.onload a
+  //         slim named-call composition (Suite 132.5).
+  {
+    const wirePanelPersistenceBody184 = extractFunctionBody(core184, '_wirePanelPersistence');
+    assert(
+      /if \(_lastScrollSubsystem\) _restoreScrollFor\(_lastScrollSubsystem, false\);/.test(
+        wirePanelPersistenceBody184
+      ) &&
+        core184.indexOf('_wirePanelPersistence();', core184.indexOf('window.onload')) >
+          core184.indexOf('initTabs();', core184.indexOf('window.onload')),
+      '184.10: _wirePanelPersistence() re-applies the saved scroll offset as its own last step (not just once earlier inside initTabs(), which window.onload calls first, before panel state is final) — a panel opening/closing can no longer silently invalidate the restored scroll position'
+    );
+  }
+
+  // 184.11  a SECOND re-restore lives inside _runBootSequenceAndBriefing()'s
+  //         own boot-sequence completion callback — that callback's own
+  //         appendToChat() session-resumed briefing can grow the mobile
+  //         carrier-strip (DO-O) AFTER the first re-restore already ran,
+  //         so this is the true last deterministic point boot content
+  //         changes page height.
+  {
+    const briefingBody184 = extractFunctionBody(core184, '_runBootSequenceAndBriefing');
+    assert(
+      /if \(_lastScrollSubsystem\) _restoreScrollFor\(_lastScrollSubsystem, false\);/.test(
+        briefingBody184
+      ),
+      "184.11: _runBootSequenceAndBriefing()'s boot-sequence completion callback re-applies the saved scroll offset once more, after its own appendToChat() briefing has had a chance to grow the mobile carrier-strip"
+    );
+  }
+
+  // 184.12  panel-state coverage audit — every single <details> in
+  //         index.html is either a top-level `class="panel"` (covered by
+  //         _wirePanelPersistence()'s `details.panel` selector) or carries
+  //         `data-sub-id` (covered by its `details[data-sub-id]` selector).
+  //         No collapsible is left un-persisted.
+  {
+    const detailsTags184 = html184.match(/<details\b[^>]*>/g) || [];
+    const uncovered184 = detailsTags184.filter(
+      tag => !/class="[^"]*\bpanel\b[^"]*"/.test(tag) && !/data-sub-id=/.test(tag)
+    );
+    assert(
+      detailsTags184.length > 40 && uncovered184.length === 0,
+      `184.12: every <details> element in index.html (${detailsTags184.length} found) is either class="panel" or carries data-sub-id — full panel-state persistence coverage, none left un-tracked`
+    );
+  }
+
+  // 184.13  the SETTINGS tab's collapsed-board summary line (.panel-substatus,
+  //         the same pattern the CAMPAIGN PROFILE/RANDOMIZER INTERLOCK/ACCOUNT
+  //         boards already use — Protocol 22) is now also present on the
+  //         Module Bay's own panel, all 5 SLOT boards, SAVE ARCHIVE, and
+  //         CAMPAIGN CONFIGS — visible whether the board is open or collapsed.
+  {
+    const summaryIds184 = [
+      'sum-bay',
+      'sum-slot01',
+      'sum-slot02',
+      'sum-slot03',
+      'sum-slot04',
+      'sum-slot05',
+      'sum-saves',
+      'sum-campaignConfig',
+    ];
+    assert(
+      summaryIds184.every(id =>
+        new RegExp('<span class="panel-substatus" id="' + id + '">').test(html184)
+      ),
+      '184.13: every new SETTINGS board (Module Bay + all 5 SLOTs + SAVE ARCHIVE + CAMPAIGN CONFIGS) carries a .panel-substatus summary span, matching the existing CAMPAIGN PROFILE/ACCOUNT pattern'
+    );
+  }
+
+  // 184.14  each SLOT's existing status-updater function ALSO mirrors its
+  //         text into the new collapsed summary span (Protocol 22 — reuses
+  //         the same computed string, never a duplicated computation).
+  assert(
+    /getElementById\('sum-slot01'\)/.test(audio184) &&
+      /getElementById\('sum-slot02'\)/.test(audio184) &&
+      /getElementById\('sum-slot05'\)/.test(audio184) &&
+      /getElementById\('sum-slot03'\)/.test(core184) &&
+      /getElementById\('sum-slot04'\)/.test(core184),
+    "184.14: _updateOpticsBoardStatus()/_updateSonicBoardStatus()/_updateUplinkBoardStatus() (ui-audio.js) and the new _updatePowerBoardStatus()/_updateImmersionUI() (ui-core.js) each mirror their status text into their SLOT's collapsed summary span"
+  );
+
+  // 184.15  renderModuleBay() (the existing Module Bay choke point) now also
+  //         calls _updatePowerBoardStatus()/_updateImmersionUI()/the new
+  //         _updateModuleBaySummary() — and _restoreDevicePrefs() calls
+  //         renderModuleBay() unconditionally at boot, so every SLOT/bay
+  //         summary populates even when the Module Bay panel starts
+  //         collapsed (its default state) rather than staying blank until
+  //         the user's first manual open.
+  {
+    const bayBody184 = extractFunctionBody(core184, 'renderModuleBay');
+    const restoreDevicePrefsBody184 = extractFunctionBody(core184, '_restoreDevicePrefs');
+    assert(
+      /_updatePowerBoardStatus\(\)/.test(bayBody184) &&
+        /_updateImmersionUI\(\)/.test(bayBody184) &&
+        /_updateModuleBaySummary\(\)/.test(bayBody184) &&
+        /renderModuleBay\(\)/.test(restoreDevicePrefsBody184),
+      "184.15: renderModuleBay() also refreshes SLOT 03/04 + the bay's own summary, and _restoreDevicePrefs() calls renderModuleBay() unconditionally at boot — so summaries populate even while the Module Bay panel starts collapsed"
+    );
+  }
+
+  // 184.16  _updateModuleBaySummary() computes the bay's own line from the
+  //         same optics/audio/carrier signals its SLOT boards already read
+  //         (Protocol 22 — never a duplicated computation).
+  {
+    const summaryBody184 = extractFunctionBody(core184, '_updateModuleBaySummary');
+    assert(
+      /_resolveOptic\(\)/.test(summaryBody184) &&
+        /AudioSettings\.masterMute/.test(summaryBody184) &&
+        /_isUplinkConnected\(\)/.test(summaryBody184),
+      '184.16: _updateModuleBaySummary() reads the same optic/master-mute/uplink-connected signals the SLOT boards already use — never a parallel computation'
+    );
+  }
+
+  // 184.17  renderSavesList() (ui-account.js) sets #sum-saves with a live
+  //         local/cloud archive count on every code path — the normal
+  //         render, the empty-state, and the cloud-fetch-failure path —
+  //         so the summary is never stale or blank.
+  assert(
+    /summaryEl\.textContent = 'ARCHIVE LINK FAILED'/.test(acct184) &&
+      /summaryEl\.textContent = 'NO ARCHIVES ON FILE'/.test(acct184) &&
+      /localSavesShown\.length \+ ' LOCAL · ' \+ cloudSavesShown\.length \+ ' CLOUD ARCHIVES'/.test(
+        acct184
+      ),
+    '184.17: renderSavesList() sets #sum-saves with a real local/cloud archive count on every exit path (success, empty, and cloud-link-failure), never left stale'
+  );
+
+  // 184.18  _syncCampaignConfigTopSummary() aggregates CAMPAIGN PROFILE +
+  //         RANDOMIZER INTERLOCK's own summary text (Protocol 22 — never
+  //         re-derives their state) and is called from BOTH of their sync
+  //         functions, so the top-level CAMPAIGN CONFIGS summary can never
+  //         go stale regardless of which board last changed.
+  {
+    const profileBody184 = extractFunctionBody(core184, '_syncCampaignProfileUI');
+    const interlockBody184 = extractFunctionBody(core184, '_syncInterlockUI');
+    const topSummaryBody184 = extractFunctionBody(core184, '_syncCampaignConfigTopSummary');
+    assert(
+      /_syncCampaignConfigTopSummary\(\);/.test(profileBody184) &&
+        /_syncCampaignConfigTopSummary\(\);/.test(interlockBody184) &&
+        /getElementById\('sum-profile'\)/.test(topSummaryBody184) &&
+        /getElementById\('sum-ilk'\)/.test(topSummaryBody184),
+      "184.18: _syncCampaignConfigTopSummary() aggregates the CAMPAIGN PROFILE + RANDOMIZER INTERLOCK boards' own summary text and is called from both boards' sync functions — never stale regardless of which one last changed"
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

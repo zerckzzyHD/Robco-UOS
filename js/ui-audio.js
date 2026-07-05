@@ -97,15 +97,18 @@ function _updateHapticUI() {
   if (!note) return;
   if (!_hapticSupported()) {
     note.textContent = '> SOLENOID UNAVAILABLE ON THIS UNIT';
+    if (typeof _updatePowerBoardStatus === 'function') _updatePowerBoardStatus();
     return;
   }
   if (_hapticReducedMotion()) {
     note.textContent = '> SOLENOID HELD — REDUCED-MOTION ACTIVE';
+    if (typeof _updatePowerBoardStatus === 'function') _updatePowerBoardStatus();
     return;
   }
   note.textContent = isHapticEnabled()
     ? '> SOLENOID ARMED — CHASSIS PULSES ON ALERTS'
     : '> SOLENOID IDLE — NO CHASSIS FEEDBACK';
+  if (typeof _updatePowerBoardStatus === 'function') _updatePowerBoardStatus();
 }
 function toggleHaptic(enabled) {
   MetaStore.set(HAPTIC_KEY, enabled ? 'true' : 'false');
@@ -693,6 +696,11 @@ function _updateOpticsBoardStatus() {
   const coilOn = typeof isHighLumenEnabled === 'function' && isHighLumenEnabled();
   note.textContent =
     '> TUBE SEATED: ' + label + (coilOn ? ' · HIGH-LUMEN COIL ACTIVE' : ' · COIL SOCKET EMPTY');
+  // Owner batch item 5: mirror the same live text into the collapsed-board summary
+  // line (the same .panel-substatus pattern the CAMPAIGN PROFILE/ACCOUNT boards
+  // already use, Protocol 22) so SLOT 01's state is visible collapsed too.
+  const sum = document.getElementById('sum-slot01');
+  if (sum) sum.textContent = note.textContent.replace(/^>\s*/, '');
 }
 window._updateOpticsBoardStatus = _updateOpticsBoardStatus;
 
@@ -713,6 +721,9 @@ function _updateUplinkBoardStatus() {
   } else {
     note.textContent = '> NO CARRIER — TERMINAL FULLY OPERATIONAL OFFLINE';
   }
+  // Owner batch item 5: mirror into SLOT 05's collapsed summary line (Protocol 22).
+  const sum = document.getElementById('sum-slot05');
+  if (sum) sum.textContent = note.textContent.replace(/^>\s*/, '');
 }
 window._updateUplinkBoardStatus = _updateUplinkBoardStatus;
 
@@ -980,9 +991,12 @@ function _updateSonicBoardStatus() {
   const grid = document.getElementById('chipGrid');
   if (grid) grid.classList.toggle('sonic-board--ejected', !!AudioSettings.masterMute);
   const note = document.getElementById('sonicStatus');
+  const sum = document.getElementById('sum-slot02');
   if (!note) return;
   if (AudioSettings.masterMute) {
     note.textContent = '> BOARD REMOVED — ALL AUDIO OFFLINE (CHANNEL CHIPS PRESERVED FOR RESEAT)';
+    // Owner batch item 5: mirror into SLOT 02's collapsed summary line (Protocol 22).
+    if (sum) sum.textContent = note.textContent.replace(/^>\s*/, '');
     return;
   }
   const keys = [
@@ -1009,6 +1023,7 @@ function _updateSonicBoardStatus() {
     total +
     ' CHANNELS ACTIVE · RECEIVER ' +
     (AudioSettings.radio ? 'INSTALLED — STATION CARRIER LIVE' : 'SOCKET EMPTY');
+  if (sum) sum.textContent = note.textContent.replace(/^>\s*/, '');
 }
 window._updateSonicBoardStatus = _updateSonicBoardStatus;
 

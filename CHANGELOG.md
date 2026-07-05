@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2312/2312 | Cache: robco-terminal-v2.7.0-r82 -->
+﻿## [Unreleased]<!-- Tests: 2331/2331 | Cache: robco-terminal-v2.7.0-r83 -->
 
 ### Added
 
@@ -19,6 +19,9 @@
 - Added a TOOL DECK to the Director Uplink — a new diamond-shaped button beside the message box raises a compact panel with one-tap access to THREAT, V.A.T.S., TRADE, LOOT, CONSULT, and the V.A.T.S. calculator, so none of them need to sit permanently on screen anymore. The old blind D-Pad shortcuts are redesigned into a Quick-Draw Holster inside the same panel: all four gear slots now visibly show what's bound to them instead of blank arrows, fire with a single tap, and can be rebound to a different item right there.
 - Added a LEVEL UP button right under your XP bar, so you can level up yourself once you've earned enough XP instead of having to ask the AI to do it for you. It lights up as soon as you've reached the next level's XP threshold.
 - Added a new SETTINGS section (a 6th hardware button, next to Operator/Operations/Databank/Uplink/Chassis) that gathers your Account, the Module Bay's hardware settings, your Save Archive, and your Campaign Configs in one place — nothing about how any of them works has changed, just where you find them.
+- Your RAD EXPOSURE reading can now be dragged to set your radiation level directly, exactly like your HP and XP bars already work — typing the number in by hand still works too.
+- Added a level cap (50) and a matching XP cap that scales with your current level — typing in a level or an XP amount higher than what's actually possible now gets held at the real maximum instead of accepting any number.
+- Extended the short one-line status preview already shown on your OPERATOR boards to every board in Settings — Security & Configuration and each of its five hardware slots, your Save Archive, and your Campaign Configs now all show a real, live status line even while collapsed.
 
 ### Changed
 
@@ -92,6 +95,8 @@
 - Fixed your OPERATOR boards (Vital Telemetry, S.P.E.C.I.A.L. Tuning, Chrono/Position, and your other stat panels) reading messier than the rest of the terminal — their connector-strip trim used to bleed onto the panel below, and a board's corner tag could crowd its own title. They now sit cleanly apart and read as the same clean hardware look as your Settings section.
 - Fixed the BOTTLE CAPS number in your OPERATOR readback strip reading skewed to one side — it's now centered like the tiles beside it.
 - Fixed the OPERATIONAL TEMPO dial's five position labels having oversized, overlapping tap zones — the ones on the right could cover the ones on the left, making some positions impossible to tap, and pressing one could flash a stray highlight over the whole dial. Each position now has its own properly-sized, non-overlapping tap zone.
+- Fixed two of the OPERATIONAL TEMPO dial's position labels (STANDARD and SPEEDRUN) rendering with an awkward mid-word break instead of sitting on one line.
+- Fixed the terminal not always restoring your exact scroll position after a full reload when a panel's open/closed state also needed restoring — the two could get applied in the wrong order, throwing off where you landed. Your scroll position and every panel's open/closed state are now both restored correctly together, so you land exactly where you left off.
 
 ### Improved
 

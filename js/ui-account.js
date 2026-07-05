@@ -164,6 +164,8 @@ async function renderSavesList() {
     }
   }
 
+  const summaryEl = document.getElementById('sum-saves');
+
   let cloudSaves = [];
   if (isSignedIn && typeof window.listCloudSaves === 'function') {
     body.innerHTML = emptyState('RETRIEVING ARCHIVES…');
@@ -171,6 +173,7 @@ async function renderSavesList() {
       cloudSaves = await window.listCloudSaves();
     } catch (_) {
       body.innerHTML = emptyState('⚠ ARCHIVE LINK FAILED');
+      if (summaryEl) summaryEl.textContent = 'ARCHIVE LINK FAILED';
       return;
     }
   }
@@ -193,6 +196,7 @@ async function renderSavesList() {
           ? `NO ARCHIVES FOR ACTIVE GAME (${hidden} archived under other games)`
           : 'NO ARCHIVES ON FILE'
       );
+    if (summaryEl) summaryEl.textContent = 'NO ARCHIVES ON FILE';
     return;
   }
 
@@ -287,6 +291,10 @@ async function renderSavesList() {
   }
 
   body.innerHTML = _archiveHeader + rows.join('');
+  if (summaryEl) {
+    summaryEl.textContent =
+      localSavesShown.length + ' LOCAL · ' + cloudSavesShown.length + ' CLOUD ARCHIVES';
+  }
 }
 
 function undoLastSync() {

@@ -225,10 +225,12 @@ export default [
         isHighLumenEnabled: 'readonly',
         isHapticEnabled: 'readonly',
         isWakeLockEnabled: 'readonly',
+        _hapticSupported: 'readonly', // owner batch item 5 (js/ui-audio.js), read by _updatePowerBoardStatus() (js/ui-core.js)
         _seatOpticsTube: 'readonly',
         _updateOpticsBoardStatus: 'readonly',
         _updateSonicBoardStatus: 'readonly',
         _updateUplinkBoardStatus: 'readonly',
+        _updatePowerBoardStatus: 'readonly', // owner batch item 5 (js/ui-core.js), called from ui-audio.js's wake-lock/haptic status setters
         renderModuleBay: 'readonly',
         initModuleBay: 'readonly',
         releaseBayHatch: 'readonly',

@@ -1,7 +1,7 @@
 ﻿# RobCo U.O.S. — System Architecture
 
 > **Version:** 2.7.0
-> **Last Updated:** 2026-07-04
+> **Last Updated:** 2026-07-05
 > **Purpose:** Living reference for any engineer (human or AI) working on this project.
 > This document maps every system, its dependencies, its persistence contract, and the
 > historical lessons that shaped it.
@@ -69,8 +69,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2312-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2312-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2331-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2331-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -1948,6 +1948,7 @@ Two separate stores, kept apart on purpose (Protocol 23 boundary, locked structu
 | `robco_overseer_log`           | JSON   | ui-core.js  | Device telemetry — boot count, total/longest power-on (WU-F7)                                                                                                                                                                                                                          |
 | `robco_error_log`              | JSON   | ui-core.js  | Local-only client error ring buffer                                                                                                                                                                                                                                                    |
 | `robco_panel_state`            | JSON   | ui-core.js  | Panel/sub-panel open-closed memory                                                                                                                                                                                                                                                     |
+| `robco_scroll_positions`       | JSON   | ui-core.js  | Per-subsystem exact scroll offset (`operator`/`operations`/`databank`/`uplink`/`chassis`/`settings`), restored on every switch and full reload                                                                                                                                         |
 | `robco_active_tab`             | string | ui-core.js  | Last active tab (`'stat'`/`'inv'`/`'data'`/`'campg'`)                                                                                                                                                                                                                                  |
 | `robco_typer_speed`            | float  | ui-core.js  | Typewriter speed multiplier                                                                                                                                                                                                                                                            |
 | `robco_version`                | string | ui-core.js  | Last seen version (triggers changelog)                                                                                                                                                                                                                                                 |
@@ -2201,7 +2202,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2312-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2331-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable
