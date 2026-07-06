@@ -1268,13 +1268,16 @@ artifacts (rifle/hat/cylinder/figure/poster/book/coin) — via a new `_curioObje
 helper (`ui-render.js`) dispatched on a data-driven token: `GAME_DEFS[ctx].collectibleCategory`
 (`'snowglobe'`/`'bobblehead'`) for the uniform per-game collectible type, and a new per-item
 `shape` field on every `reg_fo3.js` `lincolnMemorabilia` entry for the non-uniform Lincoln relics
-— never a JS ctx branch (Protocol 38). A persisted CASE (sealed vitrine) ⟷ SHELF (open plank, the
-BUS-05a skill-books DNA) view toggle — `setCurioView()`/`_applyCurioView()`, a new `robco_curio_view`
-MetaStore device pref (Protocol UI-6) mirroring the Module Bay's `robco_bay_view` — flips a
-`[data-curio-view]` attribute on `#curioPanel`; both views render from the exact same
-`renderCollectibles()`/`renderLincolnMemorabilia()` markup (CSS-only skins), and
-`renderCollectibles()` re-syncs the view from MetaStore on every call so the two variants can
-never drift. `renderCollectibles()`'s `.tracker-row`/`.tracker-toggle` contract (Suite 88) and
+— never a JS ctx branch (Protocol 38). The objects rest on plank shelves (the BUS-05a skill-books
+DNA) mounted INSIDE one sealed glass display case — a first pass shipped a switchable CASE ⟷
+SHELF view toggle, but the owner clarified that a sealed display case naturally has shelves
+inside it, so the toggle (`setCurioView()`/`_applyCurioView()` and the `robco_curio_view`
+MetaStore pref) was fully retired in favor of ONE unified vitrine: `.curio-display` carries the
+case's border + dark backlit interior + box-shadow unconditionally, `.curio-caselist` carries the
+plank-shelf background unconditionally, and the glass sheen (`::before`, z-index 2) + the
+`◈ SEALED EXHIBIT` latch plate (`::after`, z-index 3) paint above the shelves/objects (which set
+no z-index of their own), so the shelves and everything on them read as sitting BEHIND the glass.
+`renderCollectibles()`'s `.tracker-row`/`.tracker-toggle` contract (Suite 88) and
 `renderLincolnMemorabilia()`'s FO3-only nesting, disposition `<select>`, and `.panel-substatus`
 (`#opsCurioStatus`) + part-number text (game-specific `collectibleLabel`) are all unchanged —
 every curio button carries `tracker-row`/`tracker-toggle`/`tracker-toggle--active`/`--inactive`

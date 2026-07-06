@@ -27929,12 +27929,15 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 //  Suite 191 — BUS-15 CURIO ARCHIVE themed-object redesign: collectibles
 //  as their recognizable Fallout object (snow globe / bobblehead / typed
-//  Lincoln relic), category-driven (Protocol 38), with a persisted CASE
-//  <-> SHELF view toggle rendering from one shared path.
-//  18 tests.
+//  Lincoln relic), category-driven (Protocol 38), on plank shelves mounted
+//  INSIDE one sealed glass display case (owner clarification: a display
+//  case naturally has shelves inside it — merged into ONE unified vitrine,
+//  never a switchable view; the CASE/SHELF toggle from the first pass was
+//  removed entirely, including its MetaStore pref).
+//  19 tests.
 // ══════════════════════════════════════════════════════════════
 {
-  header('Suite 191 — CURIO ARCHIVE themed-object redesign (CASE/SHELF toggle)');
+  header('Suite 191 — CURIO ARCHIVE: shelves-inside-a-sealed-case themed objects');
   const state191 = readFile('js/state.js');
   const render191 = readFile('js/ui-render.js');
   const reg191 = readFile('js/reg_fo3.js');
@@ -27943,34 +27946,29 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
   // 191.1  The pre-existing tracker-toggle contract is fully preserved —
   //        every function the mockup notes promise stays unchanged is
-  //        still present, plus the new curio helpers.
+  //        still present, plus the new curio icon helper.
   assert(
     /function renderCollectibles\(/.test(render191) &&
       /function toggleCollectible\(/.test(render191) &&
       /function renderLincolnMemorabilia\(/.test(render191) &&
       /function toggleLincolnItem\(/.test(render191) &&
       /function setLincolnDisposition\(/.test(render191) &&
-      /function _curioObjectIconHtml\(/.test(render191) &&
-      /function setCurioView\(/.test(render191) &&
-      /function _applyCurioView\(/.test(render191),
-    '191.1: renderCollectibles/toggleCollectible/renderLincolnMemorabilia/toggleLincolnItem/setLincolnDisposition contract kept unchanged, plus the new _curioObjectIconHtml/setCurioView/_applyCurioView helpers'
+      /function _curioObjectIconHtml\(/.test(render191),
+    '191.1: renderCollectibles/toggleCollectible/renderLincolnMemorabilia/toggleLincolnItem/setLincolnDisposition contract kept unchanged, plus the new _curioObjectIconHtml helper'
   );
 
-  // 191.2  setCurioView/_applyCurioView are globally exposed for the
-  //        index.html onclick handlers (mirrors toggleBaySchematic).
+  // 191.2  The CASE/SHELF view toggle was fully retired, not just orphaned
+  //        — no setCurioView/_applyCurioView functions remain anywhere.
   assert(
-    /window\.setCurioView\s*=\s*setCurioView/.test(render191) &&
-      /window\._applyCurioView\s*=\s*_applyCurioView/.test(render191),
-    '191.2: setCurioView and _applyCurioView are both exposed on window for the CASE/SHELF button onclick handlers'
+    !/function setCurioView\(/.test(render191) && !/function _applyCurioView\(/.test(render191),
+    '191.2: setCurioView/_applyCurioView no longer exist — the view toggle was removed entirely, not left as dead code (owner clarification: one unified vitrine, not a switchable view)'
   );
 
-  // 191.3  robco_curio_view is a registered MetaStore device preference
-  //        (Protocol UI-6/23 — born-compliant, never a bare localStorage call).
+  // 191.3  robco_curio_view is NOT a registered MetaStore key — the toggle
+  //        preference was removed along with the toggle itself.
   assert(
-    /robco_curio_view:\s*\{\s*type:\s*'string',\s*default:\s*'case',\s*owner:\s*'ui-render\.js'\s*\}/.test(
-      state191
-    ),
-    "191.3: META_MANIFEST registers robco_curio_view as a string device pref defaulting to 'case', owned by ui-render.js"
+    !/robco_curio_view/.test(state191),
+    '191.3: robco_curio_view no longer appears anywhere in state.js — the retired view-toggle preference left no trace'
   );
 
   // 191.4  collectibleCategory is a data-driven Protocol-38 token on every
@@ -28019,29 +28017,18 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     );
   }
 
-  // 191.8  index.html: the CASE/SHELF view toggle exists with both real
-  //        <button> elements (Protocol UI-5), aria-pressed state, and
-  //        literal aria-labels (Protocol UI-3).
+  // 191.8  index.html: the CASE/SHELF view-toggle buttons and attribute are
+  //        gone — #curioPanel is a plain board with no data-curio-view.
   assert(
-    /id="curioViewCaseBtn"[\s\S]{0,120}onclick="setCurioView\('case'\)"[\s\S]{0,80}aria-label="Sealed Display Case view"[\s\S]{0,40}aria-pressed="true"/.test(
-      html191
-    ) &&
-      /id="curioViewShelfBtn"[\s\S]{0,120}onclick="setCurioView\('shelf'\)"[\s\S]{0,80}aria-label="Open Collection Shelf view"[\s\S]{0,40}aria-pressed="false"/.test(
-        html191
-      ),
-    '191.8: index.html has real <button> CASE/SHELF view-toggle controls with literal aria-labels and aria-pressed state'
+    !/id="curioViewCaseBtn"/.test(html191) &&
+      !/id="curioViewShelfBtn"/.test(html191) &&
+      !/data-curio-view/.test(html191),
+    '191.8: index.html no longer has CASE/SHELF view-toggle buttons or a data-curio-view attribute — one unified board, no switchable view'
   );
 
-  // 191.9  #curioPanel carries the default data-curio-view="case" attribute
-  //        the CSS variant selectors key off.
-  assert(
-    /id="curioPanel"\s+data-curio-view="case"/.test(html191),
-    '191.9: #curioPanel declares the default data-curio-view="case" attribute the CASE/SHELF CSS variants select on'
-  );
-
-  // 191.10  #collectiblesDisplay and #lincolnMemorabiliaDisplay are both
-  //         nested inside the shared curio-display/scrollwrap/caselist/
-  //         row-flex chrome (bounded scroll, Protocol 10/17).
+  // 191.9  #collectiblesDisplay and #lincolnMemorabiliaDisplay are both
+  //        nested inside the shared curio-display/scrollwrap/caselist/
+  //        row-flex chrome (bounded scroll, Protocol 10/17).
   assert(
     /curio-display[\s\S]{0,40}id="curioDisplayWrap"[\s\S]{0,120}curio-scrollwrap[\s\S]{0,80}curio-caselist[\s\S]{0,80}curio-row-flex"\s+id="collectiblesDisplay"/.test(
       html191
@@ -28049,19 +28036,19 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       /curio-display[\s\S]{0,40}id="lincolnDisplayWrap"[\s\S]{0,150}curio-caselist[\s\S]{0,80}curio-row-flex"\s+id="lincolnMemorabiliaDisplay"/.test(
         html191
       ),
-    '191.10: #collectiblesDisplay and #lincolnMemorabiliaDisplay are both nested inside the shared .curio-display/.curio-scrollwrap/.curio-caselist/.curio-row-flex chrome'
+    '191.9: #collectiblesDisplay and #lincolnMemorabiliaDisplay are both nested inside the shared .curio-display/.curio-scrollwrap/.curio-caselist/.curio-row-flex chrome'
   );
 
-  // 191.11  #curioMainPlaque / #lincolnTally / #lincolnPlaque mount points
+  // 191.10  #curioMainPlaque / #lincolnTally / #lincolnPlaque mount points
   //         exist for the live count-plaque/tally text.
   assert(
     /id="curioMainPlaque"/.test(html191) &&
       /id="lincolnTally"/.test(html191) &&
       /id="lincolnPlaque"/.test(html191),
-    '191.11: #curioMainPlaque, #lincolnTally, and #lincolnPlaque mount points exist for the live plaque/tally readouts'
+    '191.10: #curioMainPlaque, #lincolnTally, and #lincolnPlaque mount points exist for the live plaque/tally readouts'
   );
 
-  // 191.12  button.curio-obj carries the same specificity fix as
+  // 191.11  button.curio-obj carries the same specificity fix as
   //         button.spine/button.mag (Protocol 42) and the mockup's 88x112
   //         button footprint.
   {
@@ -28071,40 +28058,75 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       /width:\s*88px/.test(curioObjRule191) &&
         /min-height:\s*112px/.test(curioObjRule191) &&
         !/^\s*\.curio-obj\s*\{/m.test(cssStripped191),
-      '191.12: button.curio-obj (element+class specificity, not plain .curio-obj) sets the 88x112px button footprint so it beats button.tracker-toggle'
+      '191.11: button.curio-obj (element+class specificity, not plain .curio-obj) sets the 88x112px button footprint so it beats button.tracker-toggle'
     );
   }
 
-  // 191.13  Both CASE and SHELF variant rules exist, scoped under
-  //         #curioPanel[data-curio-view=...].
-  assert(
-    /#curioPanel\[data-curio-view='case'\]\s*\.curio-display/.test(css191) &&
-      /#curioPanel\[data-curio-view='shelf'\]\s*\.curio-caselist/.test(css191),
-    '191.13: both #curioPanel[data-curio-view="case"] and #curioPanel[data-curio-view="shelf"] variant rules exist'
-  );
-
-  // 191.14  The CASE latch plate reads "◈ SEALED EXHIBIT" with the space
-  //         intact — a CSS \XXXX escape immediately followed by a literal
-  //         space consumes that space as the escape's own delimiter, which
-  //         is why the literal ◈ character is used instead (Protocol 39).
-  assert(
-    css191.includes("content: '◈ SEALED EXHIBIT';") && !css191.includes('\\25C8'),
-    '191.14: the CASE latch plate content is the literal ◈ character (not a \\25C8 CSS escape, which would swallow the following space and render "◈SEALEDEXHIBIT")'
-  );
-
-  // 191.15  .curio-caselist is a bounded, scrolling, phosphor-scrollbar
-  //         surface with an edge fade — no infinite render, no page growth
-  //         (Protocol 10/17, the same no-infinite-scroll answer as .tray-list).
+  // 191.12  .curio-display carries the sealed-case vitrine chrome
+  //         UNCONDITIONALLY (no longer gated behind a [data-curio-view]
+  //         attribute) — border, dark backlit interior, box-shadow.
   {
-    const cssStripped191b = css191.replace(/\/\*[\s\S]*?\*\//g, '');
-    const caselistRule191 = (cssStripped191b.match(/\.curio-caselist\s*\{[^}]*\}/) || [''])[0];
+    const cssStripped191d = css191.replace(/\/\*[\s\S]*?\*\//g, '');
+    const displayRule191 = (cssStripped191d.match(/\.curio-display\s*\{[^}]*\}/) || [''])[0];
     assert(
-      /max-height:\s*430px/.test(caselistRule191) && /overflow-y:\s*auto/.test(caselistRule191),
-      '191.15: .curio-caselist is bounded (max-height:430px) with overflow-y:auto — every collectible reachable by scrolling, never an unbounded render'
+      !/data-curio-view/.test(css191) &&
+        /border:\s*2px solid/.test(displayRule191) &&
+        /box-shadow:\s*inset/.test(displayRule191),
+      '191.12: .curio-display carries the sealed-vitrine border/box-shadow unconditionally — no [data-curio-view] gate remains anywhere in the CSS'
+    );
+  }
+
+  // 191.13  .curio-caselist carries the plank-shelf background
+  //         UNCONDITIONALLY, merged with the 24px top clearance for the
+  //         latch plate — the shelves live permanently INSIDE the case.
+  {
+    const cssStripped191e = css191.replace(/\/\*[\s\S]*?\*\//g, '');
+    const caselistRule191 = (cssStripped191e.match(/\.curio-caselist\s*\{[^}]*\}/) || [''])[0];
+    assert(
+      /repeating-linear-gradient/.test(caselistRule191) &&
+        /max-height:\s*430px/.test(caselistRule191) &&
+        /overflow-y:\s*auto/.test(caselistRule191) &&
+        /padding:\s*24px/.test(caselistRule191),
+      '191.13: .curio-caselist always carries the plank-shelf repeating-gradient background AND the bounded scroll (max-height:430px, overflow-y:auto) AND the 24px latch-plate clearance — the shelves are permanently mounted inside the case'
+    );
+  }
+
+  // 191.14  The glass sheen and the sealed latch plate exist unconditionally
+  //         on .curio-display, each above the shelves in paint order
+  //         (positive z-index), so the shelves/objects read as sitting
+  //         BEHIND the glass rather than as flat page content. The latch
+  //         plate text keeps its space intact — a CSS \XXXX escape
+  //         immediately followed by a literal space consumes that space as
+  //         the escape's own delimiter, which is why the literal ◈
+  //         character is used instead (Protocol 39).
+  {
+    const cssStripped191f = css191.replace(/\/\*[\s\S]*?\*\//g, '');
+    const sheenRule191 = (cssStripped191f.match(/\.curio-display::before\s*\{[^}]*\}/) || [''])[0];
+    const latchRule191 = (cssStripped191f.match(/\.curio-display::after\s*\{[^}]*\}/) || [''])[0];
+    assert(
+      /z-index:\s*2/.test(sheenRule191) && /z-index:\s*3/.test(latchRule191),
+      '191.14a: the glass sheen (::before, z-index 2) and the sealed latch plate (::after, z-index 3) both paint above the plank shelves/objects (which set no z-index), reading as behind the glass'
+    );
+    assert(
+      css191.includes("content: '◈ SEALED EXHIBIT';") && !css191.includes('\\25C8'),
+      '191.14b: the sealed latch plate content is the literal ◈ character (not a \\25C8 CSS escape, which would swallow the following space and render "◈SEALEDEXHIBIT")'
+    );
+  }
+
+  // 191.15  .curio-scrollwrap declares no z-index of its own, so it can
+  //         never be raised above the glass sheen/latch plate by the
+  //         cascade — the shelves stay behind the glass regardless of
+  //         future edits to this rule.
+  {
+    const cssStripped191g = css191.replace(/\/\*[\s\S]*?\*\//g, '');
+    const scrollwrapRule191 = (cssStripped191g.match(/\.curio-scrollwrap\s*\{[^}]*\}/) || [''])[0];
+    assert(
+      scrollwrapRule191.length > 0 && !/z-index/.test(scrollwrapRule191),
+      '191.15: .curio-scrollwrap sets no z-index (stays at the auto/base paint level), so the glass sheen/latch plate above it can never end up rendering underneath the shelves'
     );
     assert(
       /\.curio-scrollwrap::after/.test(css191),
-      '191.15b: .curio-scrollwrap::after supplies the bottom edge-fade over the bounded scroll region'
+      '191.15b: .curio-scrollwrap::after still supplies the bottom edge-fade over the bounded scroll region'
     );
   }
 
@@ -28130,18 +28152,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       /tracker-toggle--inactive\s+\.cb-head\s*\{[^}]*animation:\s*none/.test(css191),
     '191.17: the bobblehead bobble is a plain @keyframes curioBob animation (auto-neutralised by the global reduced-motion block) and is turned off (animation:none) on the uncollected/dashed state'
   );
-
-  // 191.18  renderCollectibles() itself re-syncs the CASE/SHELF view from
-  //         MetaStore on every call — the one choke point that keeps the
-  //         two visual variants from ever drifting out of sync (mirrors
-  //         renderModuleBay()'s own self-healing re-sync pattern).
-  {
-    const renderCollectiblesBody191 = extractFunctionBody(render191, 'renderCollectibles');
-    assert(
-      /_applyCurioView\(\s*MetaStore\.get\('robco_curio_view'\)/.test(renderCollectiblesBody191),
-      "191.18: renderCollectibles() re-syncs the CASE/SHELF view from MetaStore.get('robco_curio_view') on every call, so the two view variants can never drift apart"
-    );
-  }
 }
 
 // ══════════════════════════════════════════════════════════════

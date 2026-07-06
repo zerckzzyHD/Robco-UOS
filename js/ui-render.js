@@ -1017,17 +1017,14 @@ function renderEquipped() {
 // ── CURIO ARCHIVE (BUS-15 COLLECTIBLES) ─────────────────────────────
 // Owner-approved themed-object redesign (Protocol 25): every collectible
 // renders as its recognizable Fallout object instead of a plain [ACQUIRED]/
-// [MISSING] text row. Object CLASS is category-driven (Protocol 38) — never
+// [MISSING] text row, displayed inside one sealed glass display case with
+// plank shelves mounted inside it (owner clarification — a display case
+// naturally has shelves inside it, so this is ONE unified vitrine, not a
+// switchable view). Object CLASS is category-driven (Protocol 38) — never
 // a JS ctx branch: GAME_DEFS[ctx].collectibleCategory picks the uniform
 // object every collectible in that game renders as (snowglobe/bobblehead);
 // each Lincoln relic carries its OWN registry `shape` field instead, since
 // (unlike collectibles) Lincoln relics are not one uniform object type.
-//
-// The persisted CASE <-> SHELF view toggle (setCurioView/_applyCurioView,
-// robco_curio_view MetaStore pref) is CSS-only — it flips a [data-curio-view]
-// attribute on #curioPanel and both render functions below emit the SAME
-// markup regardless of which view is active. One render path, two skins;
-// the two views can never drift out of sync with each other.
 function _curioObjectIconHtml(kind) {
   if (kind === 'bobblehead') {
     return '<span class="curio-bob" aria-hidden="true"><span class="cb-head"></span><span class="cb-body"></span><span class="cb-base"></span></span>';
@@ -1041,42 +1038,11 @@ function _curioObjectIconHtml(kind) {
   return '<span class="curio-globe" aria-hidden="true"><span class="cg-dome"></span><span class="cg-base"></span></span>';
 }
 
-// Persists + applies the CASE/SHELF display choice (Protocol UI-6 — mirrors
-// the Module Bay's toggleBaySchematic()/_applyBayView() pattern exactly).
-function setCurioView(view) {
-  const v = view === 'shelf' ? 'shelf' : 'case';
-  MetaStore.set('robco_curio_view', v);
-  _applyCurioView(v);
-}
-window.setCurioView = setCurioView;
-
-function _applyCurioView(view) {
-  const v = view === 'shelf' ? 'shelf' : 'case';
-  const panel = document.getElementById('curioPanel');
-  if (panel) panel.dataset.curioView = v;
-  const caseBtn = document.getElementById('curioViewCaseBtn');
-  const shelfBtn = document.getElementById('curioViewShelfBtn');
-  if (caseBtn) {
-    caseBtn.classList.toggle('active', v === 'case');
-    caseBtn.setAttribute('aria-pressed', v === 'case' ? 'true' : 'false');
-  }
-  if (shelfBtn) {
-    shelfBtn.classList.toggle('active', v === 'shelf');
-    shelfBtn.setAttribute('aria-pressed', v === 'shelf' ? 'true' : 'false');
-  }
-}
-window._applyCurioView = _applyCurioView;
-
 // Reads FALLOUT_REGISTRY.collectibles (game-specific list) and state.collectibles
 // (flat array of collected item names). Renders the themed curio grid.
 function renderCollectibles() {
   const container = document.getElementById('collectiblesDisplay');
   if (!container) return;
-
-  // Re-sync the view toggle on every render (cheap, idempotent) — the same
-  // self-healing choke point renderModuleBay() uses for its own view prefs,
-  // so the CASE/SHELF choice can never drift from MetaStore.
-  _applyCurioView(MetaStore.get('robco_curio_view') === 'shelf' ? 'shelf' : 'case');
 
   const defs =
     typeof FALLOUT_REGISTRY !== 'undefined' && FALLOUT_REGISTRY.collectibles

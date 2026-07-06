@@ -80,10 +80,6 @@ const META_MANIFEST = {
   // Phase 3 · Piece 3 — DATABANK BUS-17 DIRECTIVE REGISTRY: which status
   // drawer (all/active/complete/failed) was last open (Protocol UI-6).
   robco_databank_qdrawer: { type: 'string', default: 'all', owner: 'ui-render.js' },
-  // BUS-15 CURIO ARCHIVE redesign: which display style (CASE vitrine / SHELF
-  // open planks) the technician last chose (Protocol UI-6, everything
-  // remembers on reload) — mirrors the Module Bay's robco_bay_view pattern.
-  robco_curio_view: { type: 'string', default: 'case', owner: 'ui-render.js' },
 };
 // Fire-and-forget write-through of a device-pref op to IndexedDB's 'meta' store
 // (Step 2 · Phase 1 · P1). The ONLY seam through which MetaStore touches IdbStore

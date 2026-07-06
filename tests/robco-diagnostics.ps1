@@ -17419,11 +17419,14 @@ Check (
 # ===========================================================
 # Suite 191 -- BUS-15 CURIO ARCHIVE themed-object redesign: collectibles
 # as their recognizable Fallout object (snow globe / bobblehead / typed
-# Lincoln relic), category-driven (Protocol 38), with a persisted CASE
-# <-> SHELF view toggle rendering from one shared path.
-# Mirrors JS Suite 191. 18 tests.
+# Lincoln relic), category-driven (Protocol 38), on plank shelves mounted
+# INSIDE one sealed glass display case (owner clarification: a display
+# case naturally has shelves inside it -- merged into ONE unified vitrine,
+# never a switchable view; the CASE/SHELF toggle from the first pass was
+# removed entirely, including its MetaStore pref).
+# Mirrors JS Suite 191. 19 tests.
 # ===========================================================
-Sep "Suite 191 -- CURIO ARCHIVE themed-object redesign (CASE/SHELF toggle)"
+Sep "Suite 191 -- CURIO ARCHIVE: shelves-inside-a-sealed-case themed objects"
 $state191 = Read-Src "js/state.js"
 $render191 = Read-Src "js/ui-render.js"
 $reg191 = Read-Src "js/reg_fo3.js"
@@ -17432,30 +17435,27 @@ $css191 = Read-Src "css/terminal.css"
 
 # 191.1  The pre-existing tracker-toggle contract is fully preserved --
 #        every function the mockup notes promise stays unchanged is
-#        still present, plus the new curio helpers.
+#        still present, plus the new curio icon helper.
 Check (
     ($render191 -match 'function renderCollectibles\(') -and
     ($render191 -match 'function toggleCollectible\(') -and
     ($render191 -match 'function renderLincolnMemorabilia\(') -and
     ($render191 -match 'function toggleLincolnItem\(') -and
     ($render191 -match 'function setLincolnDisposition\(') -and
-    ($render191 -match 'function _curioObjectIconHtml\(') -and
-    ($render191 -match 'function setCurioView\(') -and
-    ($render191 -match 'function _applyCurioView\(')
-) '191.1: renderCollectibles/toggleCollectible/renderLincolnMemorabilia/toggleLincolnItem/setLincolnDisposition contract kept unchanged, plus the new _curioObjectIconHtml/setCurioView/_applyCurioView helpers'
+    ($render191 -match 'function _curioObjectIconHtml\(')
+) '191.1: renderCollectibles/toggleCollectible/renderLincolnMemorabilia/toggleLincolnItem/setLincolnDisposition contract kept unchanged, plus the new _curioObjectIconHtml helper'
 
-# 191.2  setCurioView/_applyCurioView are globally exposed for the
-#        index.html onclick handlers (mirrors toggleBaySchematic).
+# 191.2  The CASE/SHELF view toggle was fully retired, not just orphaned --
+#        no setCurioView/_applyCurioView functions remain anywhere.
 Check (
-    ($render191 -match 'window\.setCurioView\s*=\s*setCurioView') -and
-    ($render191 -match 'window\._applyCurioView\s*=\s*_applyCurioView')
-) '191.2: setCurioView and _applyCurioView are both exposed on window for the CASE/SHELF button onclick handlers'
+    (-not ($render191 -match 'function setCurioView\(')) -and (-not ($render191 -match 'function _applyCurioView\('))
+) '191.2: setCurioView/_applyCurioView no longer exist -- the view toggle was removed entirely, not left as dead code (owner clarification: one unified vitrine, not a switchable view)'
 
-# 191.3  robco_curio_view is a registered MetaStore device preference
-#        (Protocol UI-6/23 -- born-compliant, never a bare localStorage call).
+# 191.3  robco_curio_view is NOT a registered MetaStore key -- the toggle
+#        preference was removed along with the toggle itself.
 Check (
-    $state191 -match "robco_curio_view:\s*\{\s*type:\s*'string',\s*default:\s*'case',\s*owner:\s*'ui-render\.js'\s*\}"
-) "191.3: META_MANIFEST registers robco_curio_view as a string device pref defaulting to 'case', owned by ui-render.js"
+    -not ($state191 -match 'robco_curio_view')
+) '191.3: robco_curio_view no longer appears anywhere in state.js -- the retired view-toggle preference left no trace'
 
 # 191.4  collectibleCategory is a data-driven Protocol-38 token on every
 #        GAME_DEFS entry (never a JS ctx branch in the consuming code).
@@ -17495,37 +17495,31 @@ Check (
     ($hatEntry191 -match "shape:\s*'hat'") -and ($repeaterEntry191 -match "shape:\s*'rifle'")
 ) "191.7: `"Lincoln's Hat`" resolves to shape 'hat' and `"Lincoln's Repeater`" resolves to shape 'rifle'"
 
-# 191.8  index.html: the CASE/SHELF view toggle exists with both real
-#        <button> elements (Protocol UI-5), aria-pressed state, and
-#        literal aria-labels (Protocol UI-3).
+# 191.8  index.html: the CASE/SHELF view-toggle buttons and attribute are
+#        gone -- #curioPanel is a plain board with no data-curio-view.
 Check (
-    [System.Text.RegularExpressions.Regex]::IsMatch($html191, 'id="curioViewCaseBtn"[\s\S]{0,120}onclick="setCurioView\(''case''\)"[\s\S]{0,80}aria-label="Sealed Display Case view"[\s\S]{0,40}aria-pressed="true"') -and
-    [System.Text.RegularExpressions.Regex]::IsMatch($html191, 'id="curioViewShelfBtn"[\s\S]{0,120}onclick="setCurioView\(''shelf''\)"[\s\S]{0,80}aria-label="Open Collection Shelf view"[\s\S]{0,40}aria-pressed="false"')
-) '191.8: index.html has real <button> CASE/SHELF view-toggle controls with literal aria-labels and aria-pressed state'
+    (-not ($html191 -match 'id="curioViewCaseBtn"')) -and
+    (-not ($html191 -match 'id="curioViewShelfBtn"')) -and
+    (-not ($html191 -match 'data-curio-view'))
+) '191.8: index.html no longer has CASE/SHELF view-toggle buttons or a data-curio-view attribute -- one unified board, no switchable view'
 
-# 191.9  #curioPanel carries the default data-curio-view="case" attribute
-#        the CSS variant selectors key off.
-Check (
-    $html191 -match 'id="curioPanel"\s+data-curio-view="case"'
-) '191.9: #curioPanel declares the default data-curio-view="case" attribute the CASE/SHELF CSS variants select on'
-
-# 191.10  #collectiblesDisplay and #lincolnMemorabiliaDisplay are both
-#         nested inside the shared curio-display/scrollwrap/caselist/
-#         row-flex chrome (bounded scroll, Protocol 10/17).
+# 191.9  #collectiblesDisplay and #lincolnMemorabiliaDisplay are both
+#        nested inside the shared curio-display/scrollwrap/caselist/
+#        row-flex chrome (bounded scroll, Protocol 10/17).
 Check (
     [System.Text.RegularExpressions.Regex]::IsMatch($html191, 'curio-display[\s\S]{0,40}id="curioDisplayWrap"[\s\S]{0,120}curio-scrollwrap[\s\S]{0,80}curio-caselist[\s\S]{0,80}curio-row-flex"\s+id="collectiblesDisplay"') -and
     [System.Text.RegularExpressions.Regex]::IsMatch($html191, 'curio-display[\s\S]{0,40}id="lincolnDisplayWrap"[\s\S]{0,150}curio-caselist[\s\S]{0,80}curio-row-flex"\s+id="lincolnMemorabiliaDisplay"')
-) '191.10: #collectiblesDisplay and #lincolnMemorabiliaDisplay are both nested inside the shared .curio-display/.curio-scrollwrap/.curio-caselist/.curio-row-flex chrome'
+) '191.9: #collectiblesDisplay and #lincolnMemorabiliaDisplay are both nested inside the shared .curio-display/.curio-scrollwrap/.curio-caselist/.curio-row-flex chrome'
 
-# 191.11  #curioMainPlaque / #lincolnTally / #lincolnPlaque mount points
+# 191.10  #curioMainPlaque / #lincolnTally / #lincolnPlaque mount points
 #         exist for the live count-plaque/tally text.
 Check (
     ($html191 -match 'id="curioMainPlaque"') -and
     ($html191 -match 'id="lincolnTally"') -and
     ($html191 -match 'id="lincolnPlaque"')
-) '191.11: #curioMainPlaque, #lincolnTally, and #lincolnPlaque mount points exist for the live plaque/tally readouts'
+) '191.10: #curioMainPlaque, #lincolnTally, and #lincolnPlaque mount points exist for the live plaque/tally readouts'
 
-# 191.12  button.curio-obj carries the same specificity fix as
+# 191.11  button.curio-obj carries the same specificity fix as
 #         button.spine/button.mag (Protocol 42) and the mockup's 88x112
 #         button footprint.
 $cssStripped191 = [regex]::Replace($css191, '/\*[\s\S]*?\*/', '')
@@ -17534,35 +17528,61 @@ Check (
     ($curioObjRule191 -match 'width:\s*88px') -and
     ($curioObjRule191 -match 'min-height:\s*112px') -and
     (-not [System.Text.RegularExpressions.Regex]::IsMatch($cssStripped191, '(?m)^\s*\.curio-obj\s*\{'))
-) '191.12: button.curio-obj (element+class specificity, not plain .curio-obj) sets the 88x112px button footprint so it beats button.tracker-toggle'
+) '191.11: button.curio-obj (element+class specificity, not plain .curio-obj) sets the 88x112px button footprint so it beats button.tracker-toggle'
 
-# 191.13  Both CASE and SHELF variant rules exist, scoped under
-#         #curioPanel[data-curio-view=...].
+# 191.12  .curio-display carries the sealed-case vitrine chrome
+#         UNCONDITIONALLY (no longer gated behind a [data-curio-view]
+#         attribute) -- border, dark backlit interior, box-shadow.
+$cssStripped191d = [regex]::Replace($css191, '/\*[\s\S]*?\*/', '')
+$displayRule191 = [regex]::Match($cssStripped191d, '\.curio-display\s*\{[^\}]*\}').Value
 Check (
-    ($css191 -match "#curioPanel\[data-curio-view='case'\]\s*\.curio-display") -and
-    ($css191 -match "#curioPanel\[data-curio-view='shelf'\]\s*\.curio-caselist")
-) "191.13: both #curioPanel[data-curio-view='case'] and #curioPanel[data-curio-view='shelf'] variant rules exist"
+    (-not ($css191 -match 'data-curio-view')) -and
+    ($displayRule191 -match 'border:\s*2px solid') -and
+    ($displayRule191 -match 'box-shadow:\s*inset')
+) '191.12: .curio-display carries the sealed-vitrine border/box-shadow unconditionally -- no [data-curio-view] gate remains anywhere in the CSS'
 
-# 191.14  The CASE latch plate reads the literal diamond glyph + " SEALED
-#         EXHIBIT" with the space intact -- a CSS \XXXX escape immediately
-#         followed by a literal space consumes that space as the escape's
-#         own delimiter, which is why the literal character is used
-#         instead (Protocol 39).
+# 191.13  .curio-caselist carries the plank-shelf background
+#         UNCONDITIONALLY, merged with the 24px top clearance for the
+#         latch plate -- the shelves live permanently INSIDE the case.
+$cssStripped191e = [regex]::Replace($css191, '/\*[\s\S]*?\*/', '')
+$caselistRule191 = [regex]::Match($cssStripped191e, '\.curio-caselist\s*\{[^\}]*\}').Value
+Check (
+    ($caselistRule191 -match 'repeating-linear-gradient') -and
+    ($caselistRule191 -match 'max-height:\s*430px') -and
+    ($caselistRule191 -match 'overflow-y:\s*auto') -and
+    ($caselistRule191 -match 'padding:\s*24px')
+) '191.13: .curio-caselist always carries the plank-shelf repeating-gradient background AND the bounded scroll (max-height:430px, overflow-y:auto) AND the 24px latch-plate clearance -- the shelves are permanently mounted inside the case'
+
+# 191.14  The glass sheen and the sealed latch plate exist unconditionally
+#         on .curio-display, each above the shelves in paint order
+#         (positive z-index), so the shelves/objects read as sitting
+#         BEHIND the glass rather than as flat page content. The latch
+#         plate text keeps its space intact -- a CSS \XXXX escape
+#         immediately followed by a literal space consumes that space as
+#         the escape's own delimiter, which is why the literal character
+#         is used instead (Protocol 39).
+$cssStripped191f = [regex]::Replace($css191, '/\*[\s\S]*?\*/', '')
+$sheenRule191 = [regex]::Match($cssStripped191f, '\.curio-display::before\s*\{[^\}]*\}').Value
+$latchRule191 = [regex]::Match($cssStripped191f, '\.curio-display::after\s*\{[^\}]*\}').Value
+Check (
+    ($sheenRule191 -match 'z-index:\s*2') -and ($latchRule191 -match 'z-index:\s*3')
+) '191.14a: the glass sheen (::before, z-index 2) and the sealed latch plate (::after, z-index 3) both paint above the plank shelves/objects (which set no z-index), reading as behind the glass'
 Check (
     ($css191.Contains("content: '$([char]0x25C8) SEALED EXHIBIT';")) -and (-not ($css191.Contains('\25C8')))
-) '191.14: the CASE latch plate content is the literal diamond character (not a \25C8 CSS escape, which would swallow the following space and render the words run together)'
+) '191.14b: the sealed latch plate content is the literal diamond character (not a \25C8 CSS escape, which would swallow the following space and render the words run together)'
 
-# 191.15  .curio-caselist is a bounded, scrolling, phosphor-scrollbar
-#         surface with an edge fade -- no infinite render, no page growth
-#         (Protocol 10/17, the same no-infinite-scroll answer as .tray-list).
-$cssStripped191b = [regex]::Replace($css191, '/\*[\s\S]*?\*/', '')
-$caselistRule191 = [regex]::Match($cssStripped191b, '\.curio-caselist\s*\{[^\}]*\}').Value
+# 191.15  .curio-scrollwrap declares no z-index of its own, so it can
+#         never be raised above the glass sheen/latch plate by the
+#         cascade -- the shelves stay behind the glass regardless of
+#         future edits to this rule.
+$cssStripped191g = [regex]::Replace($css191, '/\*[\s\S]*?\*/', '')
+$scrollwrapRule191 = [regex]::Match($cssStripped191g, '\.curio-scrollwrap\s*\{[^\}]*\}').Value
 Check (
-    ($caselistRule191 -match 'max-height:\s*430px') -and ($caselistRule191 -match 'overflow-y:\s*auto')
-) '191.15: .curio-caselist is bounded (max-height:430px) with overflow-y:auto -- every collectible reachable by scrolling, never an unbounded render'
+    ($scrollwrapRule191.Length -gt 0) -and (-not ($scrollwrapRule191 -match 'z-index'))
+) '191.15: .curio-scrollwrap sets no z-index (stays at the auto/base paint level), so the glass sheen/latch plate above it can never end up rendering underneath the shelves'
 Check (
     $css191 -match '\.curio-scrollwrap::after'
-) '191.15b: .curio-scrollwrap::after supplies the bottom edge-fade over the bounded scroll region'
+) '191.15b: .curio-scrollwrap::after still supplies the bottom edge-fade over the bounded scroll region'
 
 # 191.16  .curio-row-flex follows the centering rule (flex-wrap +
 #         justify-content:center), matching every other wrapped-row
@@ -17582,15 +17602,6 @@ Check (
     ($css191 -match 'animation:\s*curioBob\s') -and
     [System.Text.RegularExpressions.Regex]::IsMatch($css191, 'tracker-toggle--inactive\s+\.cb-head\s*\{[^\}]*animation:\s*none')
 ) '191.17: the bobblehead bobble is a plain @keyframes curioBob animation (auto-neutralised by the global reduced-motion block) and is turned off (animation:none) on the uncollected/dashed state'
-
-# 191.18  renderCollectibles() itself re-syncs the CASE/SHELF view from
-#         MetaStore on every call -- the one choke point that keeps the
-#         two visual variants from ever drifting out of sync (mirrors
-#         renderModuleBay()'s own self-healing re-sync pattern).
-$renderCollectiblesBody191 = Get-FunctionBody $render191 'renderCollectibles'
-Check (
-    $renderCollectiblesBody191 -match "_applyCurioView\(\s*MetaStore\.get\('robco_curio_view'\)"
-) "191.18: renderCollectibles() re-syncs the CASE/SHELF view from MetaStore.get('robco_curio_view') on every call, so the two view variants can never drift apart"
 
 # ===========================================================
 # Results

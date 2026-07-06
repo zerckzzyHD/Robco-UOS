@@ -1506,10 +1506,11 @@
             <!-- BUS-15 · CURIO ARCHIVE (COLLECTIBLES) — owner-approved themed-object
                  redesign (Protocol 25): every collectible renders as its recognizable
                  Fallout object (snow globe / bobblehead / Lincoln relic), category-driven
-                 (Protocol 38 — GAME_DEFS collectibleCategory / per-item shape), with a
-                 persisted CASE <-> SHELF view toggle driving the SAME rendered markup via
-                 the [data-curio-view] attribute below — one render path, two CSS skins. -->
-            <details class="panel bay-board" data-tab="inv" id="curioPanel" data-curio-view="case">
+                 (Protocol 38 — GAME_DEFS collectibleCategory / per-item shape), displayed
+                 inside ONE sealed glass display case with plank shelves mounted inside it
+                 — a display case naturally has shelves inside it, so this is a single
+                 unified vitrine (owner clarification), not a switchable view. -->
+            <details class="panel bay-board" data-tab="inv" id="curioPanel">
               <summary>
                 <h2>&gt; <span class="board-led" aria-hidden="true"></span> CURIO ARCHIVE</h2>
                 <span class="panel-substatus" id="opsCurioStatus">— / — ACQUIRED</span>
@@ -1519,28 +1520,6 @@
                 >PN RBC-FRT-15 &middot; DISPLAY CASE
                 <span class="real-label">(COLLECTIBLES — toggleCollectible unchanged)</span></span
               >
-              <div class="curio-view-toggle" role="group" aria-label="Curio Archive display style">
-                <button
-                  type="button"
-                  id="curioViewCaseBtn"
-                  class="curio-view-btn active"
-                  onclick="setCurioView('case')"
-                  aria-label="Sealed Display Case view"
-                  aria-pressed="true"
-                >
-                  &#9670; CASE
-                </button>
-                <button
-                  type="button"
-                  id="curioViewShelfBtn"
-                  class="curio-view-btn"
-                  onclick="setCurioView('shelf')"
-                  aria-label="Open Collection Shelf view"
-                  aria-pressed="false"
-                >
-                  &#9776; SHELF
-                </button>
-              </div>
               <!-- Bobbleheads / Snow Globes sub-tracker -->
               <details class="sub-panel" id="collectiblesSubPanel" data-sub-id="collectibles_main">
                 <summary>

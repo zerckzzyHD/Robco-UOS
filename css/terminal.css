@@ -7419,16 +7419,21 @@ button.mag {
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   BUS-15 · CURIO ARCHIVE — collectibles as THEMED OBJECTS (owner-approved
-   redesign, Protocol 25 sanctioned exception; mockup:
-   planning/mockups/curio-display-case.html). Every collectible renders as
-   its recognizable Fallout object (snow globe / bobblehead / typed Lincoln
+   BUS-15 · CURIO ARCHIVE — collectibles as THEMED OBJECTS on SHELVES
+   INSIDE a sealed glass display case (owner-approved redesign, Protocol 25
+   sanctioned exception; mockup: planning/mockups/curio-display-case.html,
+   the CASE and SHELF variants merged per owner clarification — a sealed
+   display case naturally has shelves inside it, so this is ONE unified
+   vitrine, never a switchable view). Every collectible renders as its
+   recognizable Fallout object (snow globe / bobblehead / typed Lincoln
    relic) instead of a plain [ACQUIRED]/[MISSING] text row. Object class is
    category-driven (Protocol 38) — never a JS ctx branch: see
-   _curioObjectIconHtml() in ui-render.js. A persisted CASE <-> SHELF view
-   toggle (robco_curio_view MetaStore pref) flips the [data-curio-view]
-   attribute below — BOTH variants render from the exact same markup, only
-   the CSS skin differs, so they can never drift apart (Protocol UI-6).
+   _curioObjectIconHtml() in ui-render.js. The glass frame (border + dark
+   backlit interior + diagonal sheen + the "SEALED EXHIBIT" latch plate)
+   wraps the plank-shelf scroll region so the shelves and the objects
+   resting on them read as sitting BEHIND the glass — the sheen and the
+   frame chrome sit at a higher z-index than the shelves/objects, painting
+   over them.
    ══════════════════════════════════════════════════════════════════════ */
 :root {
   /* Fixed "museum brass" plaque material — deliberately NOT --bezel-wire,
@@ -7439,31 +7444,6 @@ button.mag {
   --curio-copper-rgb: 217, 162, 74;
 }
 
-.curio-view-toggle {
-  display: flex;
-  justify-content: center; /* centering rule */
-  gap: 8px;
-  margin: 8px 0 4px;
-}
-button.curio-view-btn {
-  width: auto;
-  min-height: 28px;
-  min-width: 28px;
-  padding: 4px 12px;
-  font-size: 9.5px;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  border: 1px solid rgba(var(--robco-green-rgb), 0.45);
-  background: rgba(0, 0, 0, 0.4);
-  color: rgba(var(--robco-green-rgb), 0.6);
-}
-button.curio-view-btn.active {
-  border-color: var(--robco-green);
-  color: var(--robco-green);
-  text-shadow: var(--robco-glow);
-  background: rgba(var(--robco-green-rgb), 0.14);
-}
-
 .curio-tally {
   text-align: center;
   font-size: 9px;
@@ -7472,25 +7452,70 @@ button.curio-view-btn.active {
   margin-bottom: 6px;
 }
 
-/* the display surface — CASE (sealed vitrine) vs SHELF (open planks) */
+/* the sealed glass display case — the outer vitrine frame */
 .curio-display {
   margin-top: 8px;
   position: relative;
+  border: 2px solid rgba(var(--robco-green-rgb), 0.45);
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(var(--robco-green-rgb), 0.07), transparent 60%), #01100a;
+  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.8);
+}
+.curio-display::before {
+  /* the glass sheen — painted above the shelves/objects (z-index) so they
+     read as sitting BEHIND the glass, not as flat page content */
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.045) 42%,
+    transparent 54%,
+    rgba(255, 255, 255, 0.03) 70%,
+    transparent 78%
+  );
+}
+.curio-display::after {
+  /* the sealed latch plate */
+  content: '◈ SEALED EXHIBIT';
+  position: absolute;
+  top: -1px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 6.5px;
+  letter-spacing: 2px;
+  color: var(--curio-copper);
+  border: 1px solid rgba(var(--curio-copper-rgb), 0.45);
+  border-top: none;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 2px 9px;
+  z-index: 3;
+  white-space: nowrap;
 }
 .curio-scrollwrap {
   position: relative;
   min-width: 0;
 }
-/* bounded in-panel scroll for long collections (e.g. FO3's 20 bobbleheads) —
-   every item reachable by scrolling, the page never grows. */
+/* the plank shelves mounted INSIDE the case (the BUS-05a skill-books DNA)
+   — bounded in-panel scroll for long collections (e.g. FO3's 20
+   bobbleheads), every item reachable by scrolling, the page never grows. */
 .curio-caselist {
   max-height: 430px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 14px 8px 6px;
+  padding: 24px 8px 6px; /* top clearance for the latch plate above */
   min-width: 0;
   scrollbar-width: thin;
   scrollbar-color: rgba(var(--robco-green-rgb), 0.55) rgba(0, 0, 0, 0.45);
+  background: repeating-linear-gradient(
+    180deg,
+    transparent 0 118px,
+    #343830 118px 121px,
+    #14160f 121px 126px
+  );
 }
 .curio-caselist--linc {
   max-height: 320px;
@@ -7534,51 +7559,13 @@ button.curio-view-btn.active {
   align-items: center;
   gap: 4px;
 }
-
-/* VARIANT: CASE — sealed museum vitrine */
-#curioPanel[data-curio-view='case'] .curio-display {
-  border: 2px solid rgba(var(--robco-green-rgb), 0.45);
-  background:
-    radial-gradient(ellipse at 50% 0%, rgba(var(--robco-green-rgb), 0.07), transparent 60%), #01100a;
-  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.8);
-}
-#curioPanel[data-curio-view='case'] .curio-display::before {
-  /* glass sheen */
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  pointer-events: none;
-  background: linear-gradient(
-    115deg,
-    transparent 30%,
-    rgba(255, 255, 255, 0.045) 42%,
-    transparent 54%,
-    rgba(255, 255, 255, 0.03) 70%,
-    transparent 78%
-  );
-}
-#curioPanel[data-curio-view='case'] .curio-display::after {
-  /* sealed latch plate */
-  content: '◈ SEALED EXHIBIT';
-  position: absolute;
-  top: -1px;
-  left: 50%;
-  transform: translateX(-50%);
+.c-plate {
   font-size: 6.5px;
-  letter-spacing: 2px;
-  color: var(--curio-copper);
-  border: 1px solid rgba(var(--curio-copper-rgb), 0.45);
-  border-top: none;
-  background: rgba(0, 0, 0, 0.7);
-  padding: 2px 9px;
-  z-index: 3;
-  white-space: nowrap;
-}
-#curioPanel[data-curio-view='case'] .curio-caselist {
-  padding-top: 24px;
-}
-#curioPanel[data-curio-view='case'] .c-plate {
+  letter-spacing: 0.5px;
+  line-height: 1.3;
+  max-width: 84px;
+  overflow-wrap: break-word;
+  /* museum brass plaque under every object on the shelf */
   border: 1px solid rgba(var(--curio-copper-rgb), 0.45);
   background: linear-gradient(180deg, rgba(var(--curio-copper-rgb), 0.14), rgba(0, 0, 0, 0.5));
   color: var(--curio-copper);
@@ -7586,22 +7573,7 @@ button.curio-view-btn.active {
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
 }
 
-/* VARIANT: SHELF — open plank shelves (the BUS-05a skill-books DNA) */
-#curioPanel[data-curio-view='shelf'] .curio-caselist {
-  background: repeating-linear-gradient(
-    180deg,
-    transparent 0 118px,
-    #343830 118px 121px,
-    #14160f 121px 126px
-  );
-  padding-top: 6px;
-}
-#curioPanel[data-curio-view='shelf'] .curio-display {
-  border: none;
-  background: none;
-}
-
-/* the curio button (shared by both variants) — object + plate, toggles
+/* the curio button — object + plate, toggles
    collected. button.curio-obj (not plain .curio-obj) for the same
    specificity reason as button.spine/button.mag above (Protocol 42). */
 button.curio-obj {
@@ -7622,15 +7594,6 @@ button.curio-obj {
 }
 button.curio-obj:hover {
   background: rgba(var(--robco-green-rgb), 0.05);
-}
-.c-plate {
-  font-size: 6.5px;
-  letter-spacing: 0.5px;
-  line-height: 1.3;
-  color: var(--robco-green);
-  opacity: 0.85;
-  max-width: 84px;
-  overflow-wrap: break-word;
 }
 button.curio-obj.tracker-toggle--inactive .c-plate {
   opacity: 0.35;
