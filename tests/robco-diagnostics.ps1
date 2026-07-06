@@ -520,12 +520,16 @@ Sep "Suite 14 -- Render Contracts (Protocol 20)"
 try {
     $renderFactionRepBody = Get-FunctionBody $uiSrc 'renderFactionRep'
     $renderWorldMapBody   = Get-FunctionBody $uiSrc 'renderWorldMap'
-    Check ($renderFactionRepBody -match 'class="faction-card-btns"')   'renderFactionRep contains class="faction-card-btns"'
-    Check ($renderFactionRepBody -match 'faction-btn')                  'renderFactionRep contains faction-btn class reference'
+    # Phase 3 OPERATOR batch 2 ground-up reskin: the old per-card
+    # .faction-card-btns/.faction-btn grid is retired in favor of one shared
+    # BUS-08 console -- a channel selector (.facon-chan) + one meter's +-5
+    # keys (.facon-keys) -- reusing the SAME adjustFaction() handler (Protocol 22).
+    Check ($renderFactionRepBody -match 'class="facon-keys"')           'renderFactionRep contains class="facon-keys" (the shared meter''s +-5 key row)'
+    Check ($renderFactionRepBody -match 'facon-chan' -and $renderFactionRepBody -match 'facon-selector') 'renderFactionRep contains facon-chan/facon-selector class references (the channel keycap selector)'
     $adjCount = ([regex]::Matches($renderFactionRepBody, 'adjustFaction\(')).Count
     Check ($adjCount -ge 4)                                             "renderFactionRep has >=4 adjustFaction() calls (found $adjCount)"
-    Check (-not ($renderFactionRepBody -match '<button[^>]*class="faction-btn[^"]*"[^>]*style=') -and `
-           -not ($renderFactionRepBody -match '<button[^>]*style=[^>]*class="faction-btn'))     'renderFactionRep faction-btn buttons have no inline style attribute'
+    Check (-not ($renderFactionRepBody -match '<button[^>]*class="facon-chan[^"]*"[^>]*style=') -and `
+           -not ($renderFactionRepBody -match '<button[^>]*style=[^>]*class="facon-chan'))     'renderFactionRep facon-chan buttons have no inline style attribute'
     Check ($renderWorldMapBody -match 'minmax\(0,\s*1fr\)')             'renderWorldMap uses minmax(0,1fr) for grid columns'
     Check ($renderWorldMapBody -match 'max-width\s*:\s*100%')           'renderWorldMap uses max-width:100% on the grid container'
     Check ($renderWorldMapBody -match 'map-cell' -and $renderWorldMapBody -match 'map-cell-name' -and $renderWorldMapBody -match 'map-cell-pip') 'renderWorldMap contains map-cell, map-cell-name, map-cell-pip class references'
@@ -554,14 +558,18 @@ Sep "Suite 15 -- CSS Invariants (Protocol 20)"
 $cssSrc = Read-Src "css/terminal.css"
 # Strip block comments so embedded {} in comments don't break rule-block extraction
 $cssSrcStripped = $cssSrc -replace '(?s)/\*.*?\*/', ''
-$factionBtnRule     = ([regex]::Match($cssSrcStripped, '\.faction-btn\s*\{[^}]*\}')).Value
-$factionCardBtnsRule= ([regex]::Match($cssSrcStripped, '\.faction-card-btns\s*\{[^}]*\}')).Value
+# Phase 3 OPERATOR batch 2: .faction-btn/.faction-card-btns retired along
+# with the per-card grid -- the BUS-08 console's .facon-chan keycaps and
+# .facon-keys +-5 row are the equivalent centering/sizing guards now.
+$faconChanRule      = ([regex]::Match($cssSrcStripped, '\.facon-chan\s*\{[^}]*\}')).Value
+$faconSelectorRule  = ([regex]::Match($cssSrcStripped, '\.facon-selector\s*\{[^}]*\}')).Value
+$faconKeysRule      = ([regex]::Match($cssSrcStripped, '\.facon-keys\s*\{[^}]*\}')).Value
 $mapCellRule        = ([regex]::Match($cssSrcStripped, '\.map-cell\s*\{[^}]*\}')).Value
 $buttonRule         = ([regex]::Match($cssSrcStripped, '(?m)^button\s*\{[^}]*\}')).Value
 
-Check ($factionBtnRule -match 'width\s*:\s*auto')          '.faction-btn has width:auto'
-Check ($factionBtnRule -match 'display\s*:\s*flex')        '.faction-btn uses display:flex'
-Check ($factionCardBtnsRule -match 'flex-wrap')            '.faction-card-btns has flex-wrap'
+Check ($faconChanRule -match 'width\s*:\s*auto')           '.facon-chan has width:auto'
+Check ($faconSelectorRule -match 'flex-wrap')              '.facon-selector has flex-wrap'
+Check ($faconKeysRule -match 'flex-wrap')                  '.facon-keys has flex-wrap'
 Check ($mapCellRule -match 'min-width\s*:\s*0')            '.map-cell has min-width:0'
 Check ($mapCellRule -match 'overflow\s*:\s*hidden')        '.map-cell has overflow:hidden'
 Check ($mapCellRule -match 'min-height|aspect-ratio')      '.map-cell has height floor (min-height or aspect-ratio)'
@@ -1226,8 +1234,10 @@ $removed32api = (-not ($apiSrc32 -match 'VIEW.*D.*M')) -and (-not ($apiSrc32 -ma
 Check $removed32api 'Removed legacy commands absent from api.js canonical command list'
 
 # 32.6 renderSkills() in ui-core.js generates .skill-row elements dynamically
+# Phase 3 OPERATOR batch 2: each row now also carries .vu-row (the BUS-05 VU
+# meter skin) alongside .skill-row -- prefix match tolerates either.
 $uiCoreSrc32 = Read-Src 'js/ui-core.js'
-Check ([bool]($uiCoreSrc32 -match 'class="skill-row"')) `
+Check ([bool]($uiCoreSrc32 -match 'class="skill-row')) `
     'ui-core.js: renderSkills() generates .skill-row elements dynamically (static index.html rows replaced)'
 
 # 32.7 _applyChemHighlights() uses .skill-row for both clear and highlight
@@ -4518,9 +4528,16 @@ if ($lincolnMatch71.Success) { $lincolnBody71 = $lincolnMatch71.Groups[1].Value 
 Check ($lincolnBody71 -match 'margin-bottom:2px' -and $lincolnBody71 -notmatch 'margin-bottom:4px') `
     'renderLincolnMemorabilia() uses margin-bottom:2px (compact one-line format) -- no 4px spacing'
 
-# 71.17  Faction lone-card CSS: :last-child:nth-child(odd) in terminal.css
-Check ([bool]($cssSrc71 -match 'faction-card:last-child:nth-child\(odd\)')) `
-    'terminal.css has .faction-card:last-child:nth-child(odd) rule for centering lone card in mobile grid'
+# 71.17  Faction lone-card centering: the old CSS Grid .faction-card layout
+# needed a bespoke :last-child:nth-child(odd) hack to center an incomplete
+# last row. Phase 3 OPERATOR batch 2 retires that grid for the BUS-08
+# console's .facon-selector, a flexbox row with justify-content:center --
+# which centers an incomplete last row for free, no nth-child hack needed.
+Check (-not [bool]($cssSrc71 -match 'faction-card:last-child:nth-child\(odd\)')) `
+    'terminal.css: the retired .faction-card:last-child:nth-child(odd) hack is gone (superseded by .facon-selector flexbox centering)'
+$faconSelectorRule71 = ([regex]::Match($cssSrc71, '\.facon-selector\s*\{[^}]*\}')).Value
+Check (($faconSelectorRule71 -match 'flex-wrap') -and ($faconSelectorRule71 -match 'justify-content\s*:\s*center')) `
+    'terminal.css: .facon-selector uses flex-wrap + justify-content:center (centers an incomplete last row for free -- no nth-child hack needed)'
 
 # 71.18  renderCollectibles updates sub-panel summary h3
 $collectiblesBody71 = ''
@@ -5756,11 +5773,15 @@ $delegateOk88 = ($delegatingTrackers88 | ForEach-Object { (Get-Body88 $_) -match
 $helperRow88 = (Get-Body88 '_renderReadTracker') -match 'tracker-row'
 Check ($inlineOk88 -and $delegateOk88 -and $helperRow88) "GATE-UI-4: all 5 tracker renderers use .tracker-row (3 inline + 2 via shared _renderReadTracker which carries it)"
 
-# 88.5  renderFactionRep MINOR FACTIONS details has class="sub-panel" and data-sub-id="minor_factions"
+# 88.5  Phase 3 OPERATOR batch 2: the old collapsed MINOR FACTIONS sub-panel
+# is retired -- every faction (major+minor) now rides the SAME BUS-08
+# console selector with zero extra disclosure tap (Protocol 25: no increase
+# in tap-count), so renderFactionRep() must build its selector/strip from
+# the FULL getFactionRegistry() with no tier filter.
 $rfStart88 = $uiRenderSrc88.IndexOf('function renderFactionRep()')
 $rfEnd88   = $uiRenderSrc88.IndexOf("`nfunction ", $rfStart88 + 1)
 $rfBody88  = if ($rfStart88 -ge 0) { $uiRenderSrc88.Substring($rfStart88, $rfEnd88 - $rfStart88) } else { "" }
-Check (($rfBody88 -match 'class="sub-panel"') -and ($rfBody88 -match 'data-sub-id="minor_factions"')) "GATE-UI-5: renderFactionRep() MINOR FACTIONS has class='sub-panel' and data-sub-id='minor_factions'"
+Check (($rfBody88 -match 'getFactionRegistry\(\)') -and -not ($rfBody88 -match "f\.tier\s*===\s*['""]major['""]")) "GATE-UI-5: renderFactionRep() builds its selector/strip from the full getFactionRegistry() (no tier==='major' filter hiding minor factions behind a disclosure)"
 
 # 88.6  renderFactionRep helper text says ±5 not ±50
 Check (($rfBody88 -match [regex]::Escape('±5')) -and -not ($rfBody88 -match [regex]::Escape('±50'))) "GATE-UI-6: renderFactionRep() faction label says ±5 not ±50 (faction button increment is 5)"
@@ -15635,9 +15656,14 @@ $missingHandlers181 = @($HANDLERS_181 | Where-Object { $html181 -notmatch ($_ + 
 Check ($missingHandlers181.Count -eq 0) `
     ('181.2: every shipped handler (commitStat/capStatMax/toggleLimb/nativeLevelUp/onLvlInputChanged/onTimeInputChanged/onLocationChange/updateKarmaUI/renderBioScan) is still called from index.html -- missing: ' + ($missingHandlers181 -join ', '))
 
-# 181.3  renderSkills()/renderFactionRep()/renderKarmaCenter() untouched
+# 181.3  renderSkills()/renderFactionRep()/renderKarmaCenter() still defined
+# Phase 3 OPERATOR batch 2 (Suite 185b) ground-up-reskinned renderSkills()
+# and renderFactionRep()'s OWN templates (VU meters / reputation console)
+# while keeping this same function name + the id-preservation contract
+# (Suite 181.1/181.2) intact -- renderKarmaCenter() is untouched, still
+# light-frame-only, since BUS-09 was out of scope for that unit.
 Check (($uiCore181 -match 'function renderSkills\(\)') -and ($uiRender181 -match 'function renderFactionRep\(\)') -and ($uiRender181 -match 'function renderKarmaCenter\(\)')) `
-    '181.3: renderSkills()/renderFactionRep()/renderKarmaCenter() are all still defined unchanged -- the light-frame pass only wraps their containing board, never their own render template'
+    '181.3: renderSkills()/renderFactionRep()/renderKarmaCenter() are all still defined under their original names -- renderKarmaCenter() stays light-frame-only, while renderSkills()/renderFactionRep() were ground-up reskinned at Suite 185b (their own templates changed, but every id/handler the plan requires is still emitted -- see Suite 185b)'
 
 # 181.4  all 9 OPERATOR boards are <details class="panel bay-board"> with a BUS-0N tag
 $boardTitles181 = @('VITAL TELEMETRY','S.P.E.C.I.A.L. TUNING','CHRONO / POSITION FIX','SKELETAL HARNESS','SKILL MATRIX','PERKS','STATUS EFFECTS','FACTION STANDING','KARMA CENTER')
@@ -16542,6 +16568,158 @@ $expandBody185 = Get-FunctionBody $core185 'expandPanelForCategory'
 Check (
     ($expandBody185 -match "setInvFilter\('ammo'\)")
 ) "185.24: expandPanelForCategory('ammo') reveals the AMMO drawer via setInvFilter('ammo') (drawer-gated visibility, not a stale .open toggle)"
+
+# ===========================================================
+# Suite 186 -- Phase 3 OPERATOR batch 2: BUS-05/07/08 ground-up reskin
+# (SKILL MATRIX -> VU array, STATUS EFFECTS -> compound lamps, FACTION
+# STANDING -> reputation console). id/handler-preservation + game-agnostic
+# + no-new-campaign-state + centering + reduced-motion guards. 18 tests.
+# Mirrors JS Suite 186.
+# ===========================================================
+Write-Host "`n-- Suite 186 -- Phase 3 OPERATOR batch 2: BUS-05/07/08 ground-up reskin $('-' * 5)"
+$core186 = Read-Src 'js/ui-core.js'
+$render186 = Read-Src 'js/ui-render.js'
+$css186 = Read-Src 'css/terminal.css'
+$stateSrc186 = Read-Src 'js/state.js'
+$skillsBody186 = Get-FunctionBody $core186 'renderSkills'
+$statusBody186 = Get-FunctionBody $render186 'renderStatus'
+$factionBody186 = Get-FunctionBody $render186 'renderFactionRep'
+
+# 186.1  renderSkills() still emits the exact sk_<key> inputs inside a VU track.
+Check (
+    ($skillsBody186 -match 'id="sk_\$\{sk\}"') -and
+    ($skillsBody186 -match 'class="skill-row vu-row"') -and
+    ($skillsBody186 -match 'data-vu-track="\$\{sk\}"') -and
+    ($skillsBody186 -match 'oninput="_onSkillVuInput')
+) '186.1: renderSkills() emits id="sk_${sk}" inputs inside a .vu-row/.vu-track VU meter (Protocol 22 -- id/class preserved, meter added)'
+
+# 186.2  the VU track is a real role=slider with ARIA value bounds.
+Check (
+    ($skillsBody186 -match 'role="slider"') -and
+    ($skillsBody186 -match 'aria-valuemin="0"') -and
+    ($skillsBody186 -match 'aria-valuemax="100"')
+) '186.2: the .vu-track carries role="slider" + aria-valuemin/max="0"/"100"'
+
+# 186.3  channel count/order is driven by getSkillKeys() -- never a hardcoded 13.
+Check (
+    ($skillsBody186 -match 'getSkillKeys\(\)') -and (-not ($skillsBody186 -match '\b13\b'))
+) '186.3: renderSkills() channels come from getSkillKeys() with no hardcoded 13 literal (Protocol 38)'
+
+# 186.4  _skillVuSet()/_onSkillVuInput() both clamp 0-100 and call saveState().
+$skillVuSetBody186 = Get-FunctionBody $core186 '_skillVuSet'
+$onSkillVuInputBody186 = Get-FunctionBody $core186 '_onSkillVuInput'
+Check (
+    ($skillVuSetBody186 -match 'Math\.max\(0,\s*Math\.min\(100,') -and
+    ($skillVuSetBody186 -match 'saveState\(\)') -and
+    ($onSkillVuInputBody186 -match 'Math\.max\(0,\s*Math\.min\(100,') -and
+    ($onSkillVuInputBody186 -match 'saveState\(\)')
+) '186.4: _skillVuSet()/_onSkillVuInput() both clamp to [0,100] and call saveState() -- drag and typing share one clamp+save path'
+
+# 186.5  drag wiring is idempotent and covers pointer drag + arrow-key/Home/End.
+$wireVuDragBody186 = Get-FunctionBody $core186 '_wireSkillVuDrag'
+Check (
+    ($wireVuDragBody186 -match 'grid\.dataset\.vuWired') -and
+    ($wireVuDragBody186 -match 'pointerdown') -and
+    ($wireVuDragBody186 -match 'pointermove') -and
+    ($wireVuDragBody186 -match 'ArrowRight') -and
+    ($wireVuDragBody186 -match 'ArrowLeft') -and
+    ($wireVuDragBody186 -match 'Home') -and
+    ($wireVuDragBody186 -match 'End')
+) '186.5: _wireSkillVuDrag() guards against double-wiring on re-render and wires pointer drag + arrow/Home/End keyboard control'
+
+# 186.6  renderStatus() builds lit/dark compound lamp tiles, purge still calls removeStatusEffect(i).
+Check (
+    ($statusBody186 -match 'stlamp-tile') -and
+    ($statusBody186 -match 'debuff') -and
+    ($statusBody186 -match 'neutral') -and
+    ($statusBody186 -match 'onclick="removeStatusEffect\(\$\{i\}\)"')
+) '186.6: renderStatus() emits .stlamp-tile lamps (buff/debuff/neutral) whose purge key still calls removeStatusEffect(i)'
+
+# 186.7  empty state shows dark standby lamps + the required note text.
+Check (
+    ($statusBody186 -match 'stlamp-tile dark') -and ($statusBody186 -match 'ALL LAMPS DARK')
+) '186.7: renderStatus() empty state renders dark standby lamp tiles + "ALL LAMPS DARK" note'
+
+# 186.8  the live 0i board-status summary is a single shared helper.
+$lampSummaryBody186 = Get-FunctionBody $render186 '_statusLampSummary'
+$syncTelemetryBody186 = Get-FunctionBody $core186 '_syncOperatorTelemetry'
+Check (
+    ($lampSummaryBody186 -match 'LAMPS LIT') -and
+    ($lampSummaryBody186 -match 'DEBUFF') -and
+    ($lampSummaryBody186 -match 'NEXT EXPIRY') -and
+    ($syncTelemetryBody186 -match '_statusLampSummary\(\)')
+) '186.8: _statusLampSummary() computes "N LAMPS LIT . N DEBUFF . NEXT EXPIRY: ..." and is read by _syncOperatorTelemetry() for opStatusStatus'
+
+# 186.9  the add-effect form ids + handler are unchanged.
+$html186 = Read-Src 'index.html'
+Check (
+    ($html186 -match 'id="newStatusName"') -and
+    ($html186 -match 'id="newStatusTicks"') -and
+    ($html186 -match 'id="newStatusType"') -and
+    ($html186 -match 'onclick="addStatusEffect\(\)"')
+) '186.9: the STATUS EFFECTS add-form (newStatusName/newStatusTicks/newStatusType -> addStatusEffect()) is unchanged'
+
+# 186.10  renderFactionRep() builds selector + strip from the FULL getFactionRegistry() with >=4 adjustFaction() calls.
+$adjCount186 = ([regex]::Matches($factionBody186, 'adjustFaction\(')).Count
+Check (
+    ($factionBody186 -match 'getFactionRegistry\(\)') -and
+    ($factionBody186 -match 'facon-selector') -and
+    ($factionBody186 -match 'facon-strip') -and
+    ($adjCount186 -ge 4)
+) '186.10: renderFactionRep() builds the selector + strip from getFactionRegistry() and keeps >=4 adjustFaction() calls'
+
+# 186.11  setFactionChannel() persists via MetaStore then re-renders via renderFactionRep() only.
+$setChannelBody186 = Get-FunctionBody $render186 'setFactionChannel'
+Check (
+    ($setChannelBody186 -match "MetaStore\.set\('robco_faction_channel'") -and
+    ($setChannelBody186 -match 'renderFactionRep\(\)')
+) "186.11: setFactionChannel() persists via MetaStore.set('robco_faction_channel', ...) then calls renderFactionRep() (single repaint)"
+
+# 186.12  robco_faction_channel is a registered device pref.
+Check (
+    $stateSrc186 -match "robco_faction_channel:\s*\{\s*type:\s*'string',\s*default:\s*''"
+) "186.12: robco_faction_channel is registered in META_MANIFEST as a string device pref (default '')"
+
+# 186.13  _facPinPct() computes the fame/(fame+infamy) ratio.
+$facPinPctBody186 = Get-FunctionBody $render186 '_facPinPct'
+Check (
+    ($facPinPctBody186 -match 'fam\s*\+\s*inf\s*\|\|\s*1') -and ($facPinPctBody186 -match 'fam\s*/\s*total')
+) '186.13: _facPinPct() computes fame/(fame+infamy) with the same divide-by-zero guard the retired bar chart used'
+
+# 186.14  no new campaign-state field was introduced for this reskin.
+Check (
+    -not (($core186 + $render186) -match 'state\.factionChannel|state\.skillVu|state\.statusLamp')
+) '186.14: no new campaign-state field was introduced for the VU/lamp/console reskin'
+
+# 186.15  game-agnostic: no hardcoded faction-key array or per-game skill count literal.
+Check (
+    (-not ($factionBody186 -match "\[\s*'ncr'\s*,\s*'legion'")) -and (-not ($skillsBody186 -match 'skillCount\s*=\s*13'))
+) '186.15: no hardcoded faction-key array or a fixed 13-skill-count literal in the new render code (Protocol 38)'
+
+# 186.16  centering rule: the lamp grid uses flex-wrap + justify-content:center.
+$cssStripped186 = $css186 -replace '(?s)/\*.*?\*/', ''
+$stlampGridRule186 = ([regex]::Match($cssStripped186, '\.stlamp-grid\s*\{[^}]*\}')).Value
+Check (
+    ($stlampGridRule186 -match 'flex-wrap') -and ($stlampGridRule186 -match 'justify-content\s*:\s*center')
+) '186.16: .stlamp-grid uses flex-wrap + justify-content:center (centering rule)'
+
+# 186.17  every new motion effect is a plain animation: declaration.
+Check (
+    ($cssStripped186 -match '@keyframes\s+vuFillIn') -and
+    ($cssStripped186 -match 'animation:\s*vuFillIn') -and
+    ($cssStripped186 -match '@keyframes\s+stlampPulse') -and
+    ($cssStripped186 -match 'animation:\s*stlampPulse')
+) '186.17: vuFillIn/stlampPulse are plain `animation:` keyframes (Protocol UI-9 -- auto-neutralized by the global reduced-motion block)'
+
+# 186.18  tap targets: facon-chan/facon-keys button/stlamp-purge all clear the >=28px floor.
+$faconChanRule186 = ([regex]::Match($cssStripped186, '\.facon-chan\s*\{[^}]*\}')).Value
+$faconKeysBtnRule186 = ([regex]::Match($cssStripped186, '\.facon-keys button\s*\{[^}]*\}')).Value
+$stlampPurgeRule186 = ([regex]::Match($cssStripped186, '\.stlamp-purge\s*\{[^}]*\}')).Value
+Check (
+    ($faconChanRule186 -match 'min-height:\s*40px') -and
+    ($faconKeysBtnRule186 -match 'min-height:\s*32px') -and
+    ($stlampPurgeRule186 -match 'min-height:\s*28px')
+) '186.18: .facon-chan (40px) / .facon-keys button (32px) / .stlamp-purge (28px) all clear the >=28px tap-target floor'
 
 # ===========================================================
 # Results

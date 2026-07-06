@@ -149,7 +149,7 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 | **PWA**         | Service Worker + Manifest                        | Installable, offline-capable, reliable auto-update           |
 | **Hosting**     | GitHub Pages (prod) + Cloudflare Pages (staging) | Release-gated production; auto-deployed staging              |
 | **Dev Tooling** | ESLint + Prettier + Vite                         | Linting, formatting, dev server                              |
-| **Testing**     | Node + PowerShell + Playwright                   | 2355-test gate at parity + boot-smoke / render / a11y checks |
+| **Testing**     | Node + PowerShell + Playwright                   | 2374-test gate at parity + boot-smoke / render / a11y checks |
 
 ### Per-game data system
 
@@ -179,7 +179,7 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 ├── sw.js                   Service Worker (cache-first, atomic precache, reliable update)
 ├── manifest.json           PWA manifest (version-less name + app shortcuts)
 ├── tests/
-│   ├── robco-diagnostics.js   Node persistence/structure audit (2355 tests, 186 suites)
+│   ├── robco-diagnostics.js   Node persistence/structure audit (2374 tests, 187 suites)
 │   ├── robco-diagnostics.ps1  PowerShell mirror (parity-locked)
 │   ├── test.html              Browser-side runtime import-contract audit
 │   └── *.mjs                  Playwright boot-smoke / render-check / a11y-baseline
@@ -315,12 +315,13 @@ A **production-quality, two-game browser application** with:
 - **Director Uplink — the living Overseer** _(Design Overhaul, dev-only)_ — the Comm-Link is reskinned as a phosphor-oscilloscope presence whose waveform reacts to the real AI lifecycle (listening/thinking/speaking/no-carrier/offline), with a per-game status strip and a self-contained mobile view
 - **Tool Deck + Quick-Draw Holster** _(Design Overhaul, dev-only)_ — a zero-footprint launcher key beside the Comm-Link message box raises a bottom-sheet deck for the six native tools, and the old blind D-Pad shortcuts are redesigned into four gear-vector sockets that show, fire, and let you rebind your quick-draw gear
 - **OPERATIONS — the quartermaster's freight console** _(Design Overhaul, dev-only)_ — your inventory screen reads as freight-handling hardware: a LOAD-CELL WEIGH BRIDGE bends a physical load beam in live proportion to your carry weight (nominal/amber/SEIZED), a six-drawer CARGO MANIFEST replaces the flat item filter with pull-drawers that scroll in place (every item reachable, nothing capped), items can be equipped or bumped in quantity right from their row, and FIELD FABRICATION/BARTER UPLINK/SQUAD ROSTER/CURIO ARCHIVE match the same hardware language (with SQUAD ROSTER's companion list now correctly reading each game's own roster)
+- **OPERATOR — SKILL MATRIX / STATUS EFFECTS / FACTION STANDING reskins** _(Design Overhaul, dev-only)_ — your skills show as a 13-channel drag-to-set VU meter array, active status effects light up as color-coded compound lamps (buff/debuff/neutral) with a tick countdown and purge key, and faction standing is one shared INFAMY◂▸FAME reputation console with a per-faction channel selector and an all-faction mini-pin strip so nothing is hidden
 - **Full character/world systems** — SPECIAL, per-game skills, limbs, perks, quests, factions, world-grid map with mark-visited, and trackers (collectibles, Lincoln memorabilia, traits, skill books, magazines) + a crafting panel
 - **Optional AI Director** — Tri-Node JSON, validated import, resilient + prompt-injection-hardened
 - **Saves & cloud** — auto-save, A/B/C slots (with confirm-gated overwrite/delete + version history), export/import + migration, rolling checksummed backups, additive Firestore sync (with its own confirm-gated overwrite/delete + version history), Google sign-in, remote kill-switch, per-game filtered saves list
 - **Accessibility + PWA** — focus rings, reduced-motion, live regions, dialog focus traps, AA contrast; installable, offline, reliable auto-update; touch-first responsive
 - **Wiki-sourced data** — per-game Fallout Data Registries + combat databases (weapons, armor, bestiary, chems, recipes, vendors, quest items), all from the Independent Fallout Wiki
-- **A self-improving gate** — **2355 tests across 186 suites**, mirrored in the Node and PowerShell runners at exact parity (per-suite composition, not just the grand total), plus Playwright boot-smoke / render-check / a11y baseline and a `test.html` runtime audit; CI + a nightly run back it up
+- **A self-improving gate** — **2374 tests across 187 suites**, mirrored in the Node and PowerShell runners at exact parity (per-suite composition, not just the grand total), plus Playwright boot-smoke / render-check / a11y baseline and a `test.html` runtime audit; CI + a nightly run back it up
 
 ---
 

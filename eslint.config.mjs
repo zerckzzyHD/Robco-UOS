@@ -197,6 +197,7 @@ export default [
         renderInventory: 'readonly',
         renderSquad: 'readonly',
         renderStatus: 'readonly',
+        _statusLampSummary: 'readonly', // Phase 3 OPERATOR batch 2 BUS-07 compound-lamp 0i summary (ui-render.js)
         renderCampaignNotes: 'readonly',
         renderFactionRep: 'readonly',
         renderPerks: 'readonly',

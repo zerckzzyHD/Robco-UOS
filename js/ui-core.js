@@ -4786,16 +4786,120 @@ const SKILL_LABELS = {
   unarmed: 'Unarmed',
 };
 
+// BUS-05 · SKILL VU ARRAY (Phase 3 OPERATOR batch 2, ground-up reskin) —
+// still emits the exact sk_<key> number inputs (Protocol 22); the VU track
+// is an ADDED drag/keyboard affordance over the same input, never a parallel
+// state path. .skill-row is kept alongside .vu-row so _applyChemHighlights()
+// (which targets .skill-row) needs no change. Channel count/order comes from
+// getSkillKeys() — never a hardcoded 13 (Protocol 38).
 function renderSkills() {
   const grid = document.getElementById('skillsGrid');
   if (!grid) return;
-  grid.innerHTML = getSkillKeys()
+  const rows = getSkillKeys()
     .map(sk => {
       const val = state.skills && state.skills[sk] !== undefined ? state.skills[sk] : 15;
       const label = SKILL_LABELS[sk] || sk;
-      return `<div class="skill-row"><label for="sk_${sk}">${escapeHtml(label)}</label><input type="number" id="sk_${sk}" value="${val}" min="0" max="100" inputmode="numeric" oninput="saveState()"></div>`;
+      const labelSafe = escapeHtml(label);
+      return `<div class="skill-row vu-row" data-skill="${sk}">
+        <label for="sk_${sk}" class="vu-label" title="${labelSafe}">${labelSafe}</label>
+        <span class="vu-track" data-vu-track="${sk}" role="slider" tabindex="0"
+              aria-label="${labelSafe} signal level, drag or use arrow keys to set"
+              aria-valuemin="0" aria-valuemax="100" aria-valuenow="${val}">
+          <span class="vu-fill" data-vu-fill="${sk}" style="width:${val}%"></span>
+        </span>
+        <input type="number" id="sk_${sk}" class="vu-input" value="${val}" min="0" max="100"
+               inputmode="numeric" oninput="_onSkillVuInput('${sk}')" aria-label="${labelSafe} value, 0 to 100" />
+      </div>`;
     })
     .join('');
+  grid.innerHTML =
+    `<div class="vu-rows">${rows}</div>` +
+    '<div class="vu-legend"><span>0</span><span>25</span><span>50</span><span>75</span><span>100</span></div>';
+  _wireSkillVuDrag(grid);
+}
+
+// Shared clamp/paint helper for both the drag surface and the arrow-key path —
+// mirrors syncStateFromDom()'s Math.min(100,Math.max(0,...)) skill clamp, then
+// calls the SAME saveState() the typed field's oninput already called.
+function _skillVuSet(key, rawVal) {
+  const v = Math.max(0, Math.min(100, Math.round(rawVal)));
+  const input = document.getElementById('sk_' + key);
+  if (input) input.value = v;
+  const fill = document.querySelector('[data-vu-fill="' + key + '"]');
+  if (fill) fill.style.width = v + '%';
+  const track = document.querySelector('[data-vu-track="' + key + '"]');
+  if (track) track.setAttribute('aria-valuenow', String(v));
+  saveState();
+}
+
+// Live-preview the fill as the user types, without rewriting the field
+// mid-keystroke — the actual clamp still happens in syncStateFromDom().
+function _onSkillVuInput(key) {
+  const input = document.getElementById('sk_' + key);
+  if (!input) {
+    saveState();
+    return;
+  }
+  const v = Math.max(0, Math.min(100, parseInt(input.value, 10) || 0));
+  const fill = document.querySelector('[data-vu-fill="' + key + '"]');
+  if (fill) fill.style.width = v + '%';
+  const track = document.querySelector('[data-vu-track="' + key + '"]');
+  if (track) track.setAttribute('aria-valuenow', String(v));
+  saveState();
+}
+
+// Pointer-drag-to-set on the VU track (same idiom as the Immersion/tempo dial
+// drags — pointer capture, delegated listeners on the stable #skillsGrid node
+// so re-renders never need to re-wire) + arrow-key/Home/End on the role=slider
+// track. Wired once (grid.dataset.vuWired guard) since renderSkills() rebuilds
+// only the grid's innerHTML, not the grid element itself.
+function _wireSkillVuDrag(grid) {
+  if (grid.dataset.vuWired) return;
+  grid.dataset.vuWired = '1';
+  let draggingKey = null;
+  const pctFromEvent = (track, ev) => {
+    const r = track.getBoundingClientRect();
+    return r.width > 0 ? ((ev.clientX - r.left) / r.width) * 100 : 0;
+  };
+  grid.addEventListener('pointerdown', ev => {
+    const track = ev.target.closest('.vu-track');
+    if (!track) return;
+    draggingKey = track.dataset.vuTrack;
+    try {
+      track.setPointerCapture(ev.pointerId);
+    } catch (_) {}
+    _skillVuSet(draggingKey, pctFromEvent(track, ev));
+  });
+  grid.addEventListener('pointermove', ev => {
+    if (!draggingKey) return;
+    const track = grid.querySelector('[data-vu-track="' + draggingKey + '"]');
+    if (track) _skillVuSet(draggingKey, pctFromEvent(track, ev));
+  });
+  grid.addEventListener('pointerup', () => {
+    draggingKey = null;
+  });
+  grid.addEventListener('pointercancel', () => {
+    draggingKey = null;
+  });
+  grid.addEventListener('keydown', ev => {
+    const track = ev.target.closest('.vu-track');
+    if (!track) return;
+    const key = track.dataset.vuTrack;
+    const cur = state.skills && state.skills[key] !== undefined ? state.skills[key] : 15;
+    if (ev.key === 'ArrowRight' || ev.key === 'ArrowUp') {
+      _skillVuSet(key, cur + 1);
+      ev.preventDefault();
+    } else if (ev.key === 'ArrowLeft' || ev.key === 'ArrowDown') {
+      _skillVuSet(key, cur - 1);
+      ev.preventDefault();
+    } else if (ev.key === 'Home') {
+      _skillVuSet(key, 0);
+      ev.preventDefault();
+    } else if (ev.key === 'End') {
+      _skillVuSet(key, 100);
+      ev.preventDefault();
+    }
+  });
 }
 
 function loadUI() {
@@ -5253,7 +5357,11 @@ function _syncOperatorTelemetry() {
     false
   );
   setStatus('opPerksStatus', (state.perks || []).length + ' PERKS ON FILE', false);
-  setStatus('opStatusStatus', (state.status || []).length + ' ACTIVE EFFECTS', false);
+  setStatus(
+    'opStatusStatus',
+    typeof _statusLampSummary === 'function' ? _statusLampSummary() : '— ACTIVE EFFECTS',
+    false
+  );
   setStatus(
     'opFactionStatus',
     (typeof getFactionRegistry === 'function' ? getFactionRegistry().length : 0) +

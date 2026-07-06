@@ -1,7 +1,7 @@
 ﻿# RobCo U.O.S. — System Architecture
 
 > **Version:** 2.7.0
-> **Last Updated:** 2026-07-05
+> **Last Updated:** 2026-07-06
 > **Purpose:** Living reference for any engineer (human or AI) working on this project.
 > This document maps every system, its dependencies, its persistence contract, and the
 > historical lessons that shaped it.
@@ -69,8 +69,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2355-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2355-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2374-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2374-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -988,14 +988,34 @@ campaign write was added beyond what the existing handlers already did.
   DOM ids, so BUS-03 gets a synced read-only mirror instead of a second editable field. RUN
   BIO-SCAN ADVISORY reuses the existing `onclick="renderBioScan()"` button unchanged.
 
-**Light-framed boards (Protocol 25 scope-limited — not deep-redesigned this pass):** SKILL MATRIX,
-PERKS/TRAITS, CHRONO/POSITION FIX, STATUS EFFECTS, FACTION STANDING, and KARMA CENTER each gain the
-same `bay-board` header treatment (a `.board-led` dot, a `BUS-0N` `.bay-slot-tag`, an arbitrary
-non-count-derived `.bay-part-no`, and a `.panel-substatus` "0i status row" in the `<summary>`) but
-their inner rendered markup (`skillsGrid`, `perksList`, `statusList`, `factionContainer`,
-`karmaCenterDisplay`) is untouched. All nine boards' `<h2>` headings keep the mandatory `>` glyph
+**Light-framed boards (Protocol 25 scope-limited — not deep-redesigned this pass):** PERKS/TRAITS,
+CHRONO/POSITION FIX, and KARMA CENTER gain the same `bay-board` header treatment (a `.board-led`
+dot, a `BUS-0N` `.bay-slot-tag`, an arbitrary non-count-derived `.bay-part-no`, and a
+`.panel-substatus` "0i status row" in the `<summary>`) but their inner rendered markup (`perksList`,
+`karmaCenterDisplay`) is untouched. SKILL MATRIX, STATUS EFFECTS, and FACTION STANDING were later
+ground-up reskinned (Phase 3 OPERATOR batch 2, Suite 186 — see below) — their inner templates
+changed, not just their board frame. All nine boards' `<h2>` headings keep the mandatory `>` glyph
 (Protocol UI-1); `.bay-board`/`.bay-slot-tag`/`.bay-part-no`/`.panel-substatus` are the same classes
 already established by the Module Bay and ACCOUNT panel (Protocol 22 — extended, not forked).
+
+**Ground-up reskinned boards (Phase 3 OPERATOR batch 2):** `renderSkills()` (`ui-core.js`) now
+builds a `.vu-rows` container of 13 horizontal VU meter rows (`.vu-row`/`.vu-track`/`.vu-fill`),
+still emitting the exact `sk_<key>` inputs (`class="skill-row vu-row"`, dual class so
+`_applyChemHighlights()`'s `.skill-row` selector needs no change) — a drag/keyboard affordance on
+each `.vu-track` (`_wireSkillVuDrag()`, `_skillVuSet()`, `_onSkillVuInput()`) routes through the
+same `syncStateFromDom()` 0-100 clamp + `saveState()` the typed field always used; channel count
+comes from `getSkillKeys()` (Protocol 38). `renderStatus()` (`ui-render.js`) now builds
+`.stlamp-grid` compound lamp tiles (`.stlamp-tile.buff`/`.debuff`/`.neutral`, dark standby tiles for
+the empty state) with a tick countdown + pip meter and a `✕` purge key that still calls the
+unchanged `removeStatusEffect(i)`; a new `_statusLampSummary()` helper computes the live 0i
+board-status line, read by `_syncOperatorTelemetry()`. `renderFactionRep()` (`ui-render.js`) now
+builds a single shared INFAMY◂▸FAME console (`.facon-selector`/`.facon-meter-wrap`/`.facon-strip`)
+instead of the old per-card `.faction-card` grid — the channel selector spans the FULL
+`getFactionRegistry()` (major+minor together, retiring the old collapsed MINOR FACTIONS sub-panel,
+since the console adds no extra disclosure tap over it), the selected channel's wide meter keeps the
+same four `adjustFaction(key, field, delta)` ±5 keys, and an all-faction mini-pin strip
+(`.facon-mini`) means no faction's standing is ever hidden behind the selector. The last-picked
+channel persists via the registered `robco_faction_channel` MetaStore device pref (`setFactionChannel()`).
 
 **`_syncOperatorTelemetry()`** (`js/ui-core.js`, called from `updateMath()`) is the one new
 central sync function driving every derived OPERATOR readout: the HP condition word
@@ -1798,18 +1818,18 @@ loadUI()
 
 ### Key Render Functions
 
-| Function                | State Source           | UI Target                                   |
-| ----------------------- | ---------------------- | ------------------------------------------- |
-| `renderInventory()`     | `state.inventory`      | `#invList` — event-delegated click handlers |
-| `renderAmmo()`          | `state.ammo`           | `#ammoList` — sorted grid, X remove buttons |
-| `renderSquad()`         | `state.squad`          | `#squadList` — HP bars, affinity, weapon    |
-| `renderStatus()`        | `state.status`         | `#statusList` — color-coded buff/debuff     |
-| `renderPerks()`         | `state.perks`          | `#perksList` — rank, level taken            |
-| `renderQuests()`        | `state.quests`         | `#questsList` — color by status             |
-| `renderSessionStats()`  | `state.stats`          | `#sessionStatsList` — grid layout           |
-| `renderEquipped()`      | `state.equipped`       | `#equippedDisplay` — weapon/armor/head      |
-| `renderCampaignNotes()` | `state.campaign_notes` | `#campaignNotesList`                        |
-| `renderFactionRep()`    | `state.factions`       | `#factionContainer` — major/minor grid      |
+| Function                | State Source           | UI Target                                                          |
+| ----------------------- | ---------------------- | ------------------------------------------------------------------ |
+| `renderInventory()`     | `state.inventory`      | `#invList` — event-delegated click handlers                        |
+| `renderAmmo()`          | `state.ammo`           | `#ammoList` — sorted grid, X remove buttons                        |
+| `renderSquad()`         | `state.squad`          | `#squadList` — HP bars, affinity, weapon                           |
+| `renderStatus()`        | `state.status`         | `#statusList` — compound lamp tiles (buff/debuff/neutral)          |
+| `renderPerks()`         | `state.perks`          | `#perksList` — rank, level taken                                   |
+| `renderQuests()`        | `state.quests`         | `#questsList` — color by status                                    |
+| `renderSessionStats()`  | `state.stats`          | `#sessionStatsList` — grid layout                                  |
+| `renderEquipped()`      | `state.equipped`       | `#equippedDisplay` — weapon/armor/head                             |
+| `renderCampaignNotes()` | `state.campaign_notes` | `#campaignNotesList`                                               |
+| `renderFactionRep()`    | `state.factions`       | `#factionContainer` — shared reputation console + channel selector |
 
 All render functions use `.innerHTML = items.map(...).join('')` (single assignment,
 not `+=` loop) for O(n) performance instead of O(n²).
@@ -1885,16 +1905,23 @@ const FACTION_THRESHOLDS = {
 | 0        | 3          | Hated              |
 | 0        | 4          | Vilified           |
 
-### Panel Preservation
+### Channel Selection (Phase 3 OPERATOR batch 2)
 
-`renderFactionRep()` saves the `<details open>` state of the minor-factions
-collapsible before replacing `container.innerHTML`, then restores it afterward.
-This prevents the panel collapsing when the user clicks F+/F-/I+/I- buttons.
+`renderFactionRep()` no longer has a minor-factions collapsible to preserve —
+the console's channel selector spans the FULL `getFactionRegistry()` (major +
+minor together), so no faction needs a disclosure tap to reach. The last-picked
+channel (`_facChannel`, module-scope) persists across re-renders via the
+registered `robco_faction_channel` MetaStore key; `setFactionChannel(key)` is
+the one function that updates it and re-renders.
 
-### Faction Card Display
+### Faction Console Display
 
-Each faction card now shows `F:{fame} / I:{infamy}` rather than a net score.
-Fame and infamy are independent and the display reflects this.
+The selected channel's meter shows `FAME {fame}` / `INFAMY {infamy}` — fame and
+infamy stay independent values, never collapsed to a single net score — while
+the pin position on the shared 0-100 scale is `fame / (fame + infamy)`, the
+same ratio the retired bar chart used. The all-faction mini-pin strip below
+plots every faction (major + minor) on the same ratio so no standing is
+hidden behind the selector.
 
 ### Auto-Logging
 
@@ -2309,7 +2336,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2355-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2374-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

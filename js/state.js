@@ -74,6 +74,9 @@ const META_MANIFEST = {
   // Phase 3 · Piece 2 — OPERATIONS CARGO MANIFEST: which pull-drawer was last
   // open (Protocol UI-6, "everything remembers on reload").
   robco_cargo_drawer: { type: 'string', default: 'weapon', owner: 'ui-render.js' },
+  // Phase 3 OPERATOR batch 2 — BUS-08 REPUTATION CONSOLE: which faction
+  // channel the shared meter/selector was last showing (Protocol UI-6).
+  robco_faction_channel: { type: 'string', default: '', owner: 'ui-render.js' },
 };
 // Fire-and-forget write-through of a device-pref op to IndexedDB's 'meta' store
 // (Step 2 · Phase 1 · P1). The ONLY seam through which MetaStore touches IdbStore

@@ -571,38 +571,82 @@ function getFactionStanding(key, fame, infamy) {
   return { label, color };
 }
 
+// BUS-07 · COMPOUND LAMPS (Phase 3 OPERATOR batch 2, ground-up reskin) — each
+// active status effect becomes a lit lamp tile, color-coded by type (BUFF
+// phosphor / DEBUFF red / NEUTRAL amber), with a tick countdown + pip meter
+// and a ✕ purge key that still calls the unchanged removeStatusEffect(i)
+// (Protocol 22). Empty state shows dark standby lamps instead of a bare
+// empty-state line, so the board is never information-free (Protocol 25).
+const _STLAMP_PIP_TOTAL = 6;
+function _stlampPips(ticks, maxTicks) {
+  const m = maxTicks > 0 ? maxTicks : Math.max(ticks, 1);
+  const lit = Math.max(0, Math.min(_STLAMP_PIP_TOTAL, Math.round((ticks / m) * _STLAMP_PIP_TOTAL)));
+  return '▮'.repeat(lit) + '▯'.repeat(_STLAMP_PIP_TOTAL - lit);
+}
 function renderStatus() {
   const statusDiv = document.getElementById('statusList');
   if (!statusDiv) return;
-  if (!state.status || state.status.length === 0) {
-    statusDiv.innerHTML = emptyState('NO ACTIVE EFFECTS');
+  const effects = state.status || [];
+  if (effects.length === 0) {
+    statusDiv.innerHTML =
+      '<div class="stlamp-grid">' +
+      ['STIMULANT', 'ANALGESIC', 'PROPHYLACTIC']
+        .map(
+          n =>
+            `<div class="stlamp-tile dark"><div class="stlamp-head"><span class="stlamp-led" aria-hidden="true"></span><span class="stlamp-name">${n} — DARK</span></div><div class="stlamp-sub"><span class="stlamp-type">STANDBY</span></div></div>`
+        )
+        .join('') +
+      '</div><div class="stlamp-empty-note">ALL LAMPS DARK — NO COMPOUNDS IN THE BLOODSTREAM</div>';
+    // G3: Apply chem boost highlights to Skill Matrix rows
+    _applyChemHighlights();
     return;
   }
-  statusDiv.innerHTML = state.status
-    .map((eff, i) => {
-      const ticks = eff.ticks || 0;
-      let typeClass =
-        eff.type === 'BUFF'
-          ? 'effect-buff'
-          : eff.type === 'DEBUFF'
-            ? 'effect-debuff'
-            : 'effect-neutral';
-      let tickInfo = ticks > 0 ? ` [${ticks}t]` : '';
-      // Expiry warning: 1–2 ticks remaining on a timed effect
-      let expiryBadge = '';
-      let itemCls = 'effect-item';
-      if (ticks > 0 && ticks <= 2) {
-        itemCls += ' effect-item--expiring';
-        expiryBadge = `<span class="effect-expiring-badge">[EXPIRING]</span>`;
-      } else if (ticks === 0 && eff.type !== 'NEUTRAL') {
-        // permanent effects get a subtle marker
-        tickInfo = ' [∞]';
-      }
-      return `<div class="${itemCls}"><span class="${typeClass}">${escapeHtml(eff.name || '')}${tickInfo}${expiryBadge}</span><div><span class="effect-type" style="margin-right:8px;">${escapeHtml(eff.type || 'BUFF')}</span><button class="delete-btn" onclick="removeStatusEffect(${i})">X</button></div></div>`;
-    })
-    .join('');
+  statusDiv.innerHTML =
+    '<div class="stlamp-grid">' +
+    effects
+      .map((eff, i) => {
+        const ticks = eff.ticks || 0;
+        const type = (eff.type || 'BUFF').toUpperCase();
+        const typeCls = type === 'DEBUFF' ? 'debuff' : type === 'NEUTRAL' ? 'neutral' : 'buff';
+        const name = escapeHtml(eff.name || '');
+        const ticksLine = ticks > 0 ? `${ticks} TICKS LEFT` : 'PERMANENT';
+        const pips =
+          ticks > 0
+            ? `<span class="stlamp-pips" aria-hidden="true">${_stlampPips(ticks, ticks)}</span>`
+            : '';
+        return `<div class="stlamp-tile ${typeCls}">
+          <div class="stlamp-head">
+            <span class="stlamp-led" aria-hidden="true"></span>
+            <span class="stlamp-name">${name}</span>
+            <button class="stlamp-purge" aria-label="Purge ${name}" onclick="removeStatusEffect(${i})">✕</button>
+          </div>
+          <div class="stlamp-sub">
+            <span class="stlamp-type">${type}</span>
+            <span class="stlamp-ticks">${ticksLine}</span>
+            ${pips}
+          </div>
+        </div>`;
+      })
+      .join('') +
+    '</div>';
   // G3: Apply chem boost highlights to Skill Matrix rows
   _applyChemHighlights();
+}
+
+// Single-source live 0i summary for BUS-07's board-status row (called from
+// ui-core.js's _syncOperatorTelemetry(), the existing board-status choke
+// point) — "N LAMPS LIT · N DEBUFF · NEXT EXPIRY: name (N TICKS)".
+function _statusLampSummary() {
+  const effects = state.status || [];
+  if (effects.length === 0) return 'ALL LAMPS DARK · NO ACTIVE COMPOUNDS';
+  const debuffCount = effects.filter(e => (e.type || '').toUpperCase() === 'DEBUFF').length;
+  const timed = effects.filter(e => (e.ticks || 0) > 0);
+  let expiry = '';
+  if (timed.length) {
+    const next = timed.slice().sort((a, b) => (a.ticks || 0) - (b.ticks || 0))[0];
+    expiry = ' · NEXT EXPIRY: ' + (next.name || '?').toUpperCase() + ' (' + next.ticks + ' TICKS)';
+  }
+  return effects.length + ' LAMPS LIT · ' + debuffCount + ' DEBUFF' + expiry;
 }
 
 // G3: Active Chem Visualizer ─────────────────────────────────────────────────
@@ -1685,83 +1729,99 @@ function adjustFaction(key, field, delta) {
   _updatePanelBadges();
 }
 
+// BUS-08 · REPUTATION CONSOLE (Phase 3 OPERATOR batch 2, ground-up reskin) —
+// a single shared dual-scale INFAMY◂▸FAME meter driven by a channel keycap
+// selector (every faction from getFactionRegistry(), major+minor together —
+// nothing hidden behind a collapsed sub-panel, Protocol 25 no-added-taps),
+// plus an all-faction mini-pin strip so no faction's standing is hidden
+// behind the selector. The ±5 adjust keys still call the unchanged
+// adjustFaction(key, field, delta) (Protocol 22). Last-picked channel
+// persists via the registered robco_faction_channel device pref
+// (Protocol UI-6).
+let _facChannel = null;
+
+// setFactionChannel(key) — selects the meter's active faction channel and
+// persists the choice; re-renders through the same single render function
+// so the selector/meter/strip can never drift from each other.
+function setFactionChannel(key) {
+  _facChannel = key;
+  if (typeof MetaStore !== 'undefined') MetaStore.set('robco_faction_channel', key);
+  renderFactionRep();
+}
+
+// Net fame/infamy position on the shared 0-100 scale (50 = balanced center
+// detent), same fame/(fame+infamy) ratio the old bar chart used.
+function _facPinPct(data) {
+  const fam = data.fame || 0;
+  const inf = data.infamy || 0;
+  const total = fam + inf || 1;
+  return Math.min(100, Math.max(0, (fam / total) * 100));
+}
+
 function renderFactionRep() {
   const container = document.getElementById('factionContainer');
   if (!container) return;
   const factions = state.factions || {};
-
-  // Build faction card with inline [+]/[-] fame/infamy nudges.
-  // Net standing label shown prominently; reputation trend bar and threshold
-  // markers (Vilified/Idolized) give at-a-glance progress context.
-  // Mobile-friendly: buttons have min 28×28px touch targets via CSS class.
-  function factionCard(f) {
-    const data = factions[f.key] || { fame: 0, infamy: 0 };
-    const s = getFactionStanding(f.key, data.fame, data.infamy);
-    const famVal = data.fame || 0;
-    const infamyVal = data.infamy || 0;
-
-    // Net rep for bar: ranges -100 (pure infamy) to +100 (pure fame).
-    // bar fill = fame fraction; threshold markers at ±75 standing.
-    const total = famVal + infamyVal || 1;
-    const netPct = Math.min(100, Math.max(0, (famVal / total) * 100));
-    // Vilified threshold marker = 25% (infamy dominant), Idolized = 75%
-    const barHtml = `
-      <div class="faction-rep-bar-track" title="Fame ${famVal} / Infamy ${infamyVal}">
-        <div class="faction-rep-bar-fill" style="width:${netPct}%;background:${s.color};"></div>
-        <div class="faction-rep-bar-marker" style="left:25%;" title="Vilified threshold"></div>
-        <div class="faction-rep-bar-marker" style="left:75%;" title="Idolized threshold"></div>
-      </div>`;
-
-    return `<div class="faction-card">
-      <span class="faction-card-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name).toUpperCase()}</span>
-      <span class="faction-card-standing" style="color:${s.color};">${s.label}</span>
-      <span class="faction-card-counts">F:${famVal} / I:${infamyVal}</span>
-      ${barHtml}
-      <div class="faction-card-btns">
-        <button class="faction-btn faction-btn--fame" aria-label="Fame +5 for ${escapeHtml(f.name)}" onclick="adjustFaction('${f.key}','fame',5)">F+</button>
-        <button class="faction-btn faction-btn--fame" aria-label="Fame -5 for ${escapeHtml(f.name)}" onclick="adjustFaction('${f.key}','fame',-5)">F-</button>
-        <button class="faction-btn faction-btn--infamy" aria-label="Infamy +5 for ${escapeHtml(f.name)}" onclick="adjustFaction('${f.key}','infamy',5)">I+</button>
-        <button class="faction-btn faction-btn--infamy" aria-label="Infamy -5 for ${escapeHtml(f.name)}" onclick="adjustFaction('${f.key}','infamy',-5)">I-</button>
-      </div>
-    </div>`;
+  const registry = getFactionRegistry();
+  if (!registry.length) {
+    container.innerHTML = emptyState('NO FACTIONS TRACKED');
+    return;
   }
 
-  const major = getFactionRegistry().filter(f => f.tier === 'major');
-  const minor = getFactionRegistry().filter(f => f.tier === 'minor');
+  if (!_facChannel || !registry.some(f => f.key === _facChannel)) {
+    const persisted =
+      typeof MetaStore !== 'undefined' ? MetaStore.get('robco_faction_channel') : null;
+    _facChannel = registry.some(f => f.key === persisted) ? persisted : registry[0].key;
+  }
 
-  // Save open state from DOM (re-render collapse fix) and localStorage (reload persistence)
-  const minorDetails = container.querySelector('details[data-sub-id="minor_factions"]');
-  const minorWasOpen = minorDetails ? minorDetails.open : false;
-  let minorPersisted = false;
-  try {
-    const ps = JSON.parse(MetaStore.get('robco_panel_state') || '{}');
-    if (typeof ps['minor_factions'] === 'boolean') minorPersisted = ps['minor_factions'];
-  } catch (_) {}
-  const minorOpen = minorWasOpen || minorPersisted;
+  const dataFor = key => factions[key] || { fame: 0, infamy: 0 };
+  const standingOf = f => {
+    const d = dataFor(f.key);
+    return getFactionStanding(f.key, d.fame || 0, d.infamy || 0);
+  };
+
+  const selectorHtml = registry
+    .map(f => {
+      const cur = f.key === _facChannel;
+      return `<button class="facon-chan${cur ? ' cur' : ''}" onclick="setFactionChannel('${f.key}')" aria-label="Select ${escapeHtml(f.name)} channel" aria-pressed="${cur}">${escapeHtml(f.name).toUpperCase()}</button>`;
+    })
+    .join('');
+
+  const sel = registry.find(f => f.key === _facChannel) || registry[0];
+  const selData = dataFor(sel.key);
+  const selStanding = standingOf(sel);
+  const selPinPct = _facPinPct(selData);
+
+  const stripHtml = registry
+    .map(f => {
+      const st = standingOf(f);
+      const pinPct = _facPinPct(dataFor(f.key));
+      return `<div class="facon-strip-row"><b class="facon-strip-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</b><span class="facon-mini"><i style="left:${pinPct}%"></i></span><span class="facon-standing" style="color:${st.color}">${st.label}</span></div>`;
+    })
+    .join('');
 
   container.innerHTML = `
-    <div style="font-size:9px;opacity:0.45;margin-bottom:4px;letter-spacing:0.5px;">F+/F- = Fame ±5 &nbsp; I+/I- = Infamy ±5 &nbsp; BAR = F/(F+I) ratio</div>
-    <div class="faction-grid">
-      ${major.map(factionCard).join('')}
-    </div>
-    <details class="sub-panel" data-sub-id="minor_factions"${minorOpen ? ' open' : ''}>
-      <summary class="config-summary" style="font-size:11px;opacity:0.6;padding:2px 0;">MINOR FACTIONS</summary>
-      <div class="faction-grid" style="margin-top:5px;">
-        ${minor.map(factionCard).join('')}
+    <div class="facon-selector">${selectorHtml}</div>
+    <div class="facon-meter-wrap">
+      <div class="facon-title">
+        <span class="facon-name">${escapeHtml(sel.name).toUpperCase()}</span>
+        <span class="facon-standing" style="color:${selStanding.color}">${selStanding.label.toUpperCase()}</span>
       </div>
-    </details>
+      <div class="facon-scale">
+        <div class="facon-pin" style="left:${selPinPct}%"></div>
+      </div>
+      <div class="facon-ends"><span>&#9668; INFAMY</span><span>CENTER DETENT</span><span>FAME &#9658;</span></div>
+      <div class="facon-nums"><span>FAME ${selData.fame || 0}</span><span>INFAMY ${selData.infamy || 0}</span></div>
+      <div class="facon-keys">
+        <button aria-label="Fame plus 5 for ${escapeHtml(sel.name)}" onclick="adjustFaction('${sel.key}','fame',5)">F +5</button>
+        <button aria-label="Fame minus 5 for ${escapeHtml(sel.name)}" onclick="adjustFaction('${sel.key}','fame',-5)">F -5</button>
+        <button class="ikey" aria-label="Infamy plus 5 for ${escapeHtml(sel.name)}" onclick="adjustFaction('${sel.key}','infamy',5)">I +5</button>
+        <button class="ikey" aria-label="Infamy minus 5 for ${escapeHtml(sel.name)}" onclick="adjustFaction('${sel.key}','infamy',-5)">I -5</button>
+      </div>
+      <div style="font-size:9px;opacity:0.45;margin-top:8px;letter-spacing:0.5px;text-align:center;">F +5/-5 = FAME ±5 &nbsp; I +5/-5 = INFAMY ±5</div>
+    </div>
+    <div class="facon-strip">${stripHtml}</div>
   `;
-
-  // Wire sub-panel persistence for minor factions
-  container.querySelectorAll('details[data-sub-id]').forEach(d => {
-    d.addEventListener('toggle', () => {
-      try {
-        const p = JSON.parse(MetaStore.get('robco_panel_state') || '{}');
-        p[d.dataset.subId] = d.open;
-        MetaStore.set('robco_panel_state', JSON.stringify(p));
-      } catch (_) {}
-    });
-  });
 }
 
 // ── G4: EXPANDED KARMA SYSTEM (FO3) ─────────────────────────────

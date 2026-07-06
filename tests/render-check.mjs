@@ -377,6 +377,23 @@ for (const vp of VIEWPORTS) {
           // decorative-overflow category as .phosphor-ghost above — clipped visually
           // by their .crt-mon/.fd-ladder ancestor, no page-level overflow.
           if (el.closest && (el.closest('.crt-mon') || cls.includes('fd-ladder'))) return false;
+          // Phase 3 OPERATOR batch 2 (BUS-05/08 ground-up reskin): .vu-label
+          // (the skill-channel name) and .facon-strip-name (the reputation
+          // console's per-faction mini-strip label) are the same
+          // nowrap+overflow:hidden+text-overflow:ellipsis truncation pattern
+          // as the retired .faction-card-name — a long name (e.g. "Energy
+          // Weapons", "Followers of the Apocalypse") intentionally clips
+          // inside its own fixed-width label, never causing page overflow.
+          if (cls.includes('vu-label') || cls.includes('facon-strip-name')) return false;
+          // The BUS-08 reputation console's pin markers (.facon-pin in the
+          // wide meter, .facon-mini i in the all-faction strip) are
+          // position:absolute + translateX(-50%) at a 0%/100% extreme (e.g.
+          // a faction at pure fame or pure infamy) — a couple px of
+          // decorative bleed past their own track, same harmless, visually-
+          // contained category as the BUS-02 fader cap above. No page-level
+          // overflow (the SAVE_VIEWPORTS page-overflow check already covers
+          // that separately).
+          if (cls.includes('facon-scale') || cls.includes('facon-mini')) return false;
           return true;
         })
         .map(

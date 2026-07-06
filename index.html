@@ -1543,7 +1543,10 @@
               </details>
             </details>
 
-            <!-- BUS-05 · SKILL VU ARRAY (light-frame only this pass) -->
+            <!-- BUS-05 · SKILL VU ARRAY (Phase 3 OPERATOR batch 2 — ground-up
+                 reskin: renderSkills() now builds a 13-channel VU meter row
+                 per skill, drag/keyboard-settable, still emitting sk_<key>
+                 inputs through the same clamp+save path) -->
             <details class="panel bay-board" data-tab="stat">
               <summary>
                 <h2>&gt; <span class="board-led" aria-hidden="true"></span> SKILL MATRIX</h2>
@@ -1689,7 +1692,9 @@
             </details>
 
             <!-- 7. STATUS EFFECTS -->
-            <!-- BUS-07 · COMPOUND LAMPS (light-frame only this pass) -->
+            <!-- BUS-07 · COMPOUND LAMPS (Phase 3 OPERATOR batch 2 — ground-up
+                 reskin: renderStatus() now builds lit/dark compound lamp
+                 tiles; the add-effect form ids/addStatusEffect() unchanged) -->
             <details class="panel bay-board" data-tab="stat">
               <summary>
                 <h2>&gt; <span class="board-led" aria-hidden="true"></span> STATUS EFFECTS</h2>
@@ -1764,7 +1769,10 @@
                  UPLINK cluster above. -->
 
             <!-- 9. FACTION STANDING (FNV) -->
-            <!-- BUS-08 · REPUTATION (light-frame only this pass) -->
+            <!-- BUS-08 · REPUTATION (Phase 3 OPERATOR batch 2 — ground-up
+                 reskin: renderFactionRep() now builds a shared INFAMY<>FAME
+                 console — channel selector + wide meter + all-faction mini
+                 pin strip — the ±5 adjustFaction() keys unchanged) -->
             <details class="panel bay-board" data-tab="stat" id="factionPanel">
               <summary>
                 <h2>&gt; <span class="board-led" aria-hidden="true"></span> FACTION STANDING</h2>

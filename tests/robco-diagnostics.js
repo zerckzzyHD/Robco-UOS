@@ -880,22 +880,26 @@ try {
 } catch (e) {
   fail(`Cannot extract render functions: ${e.message}`);
 }
+// Phase 3 OPERATOR batch 2 ground-up reskin: the old per-card
+// .faction-card-btns/.faction-btn grid is retired in favor of one shared
+// BUS-08 console — a channel selector (.facon-chan) + one meter's ±5 keys
+// (.facon-keys) — reusing the SAME adjustFaction() handler (Protocol 22).
 assert(
-  /class="faction-card-btns"/.test(renderFactionRepBody),
-  'renderFactionRep contains class="faction-card-btns"'
+  /class="facon-keys"/.test(renderFactionRepBody),
+  'renderFactionRep contains class="facon-keys" (the shared meter\'s ±5 key row)'
 );
 assert(
-  /faction-btn/.test(renderFactionRepBody),
-  'renderFactionRep contains faction-btn class reference'
+  /facon-chan/.test(renderFactionRepBody) && /facon-selector/.test(renderFactionRepBody),
+  'renderFactionRep contains facon-chan/facon-selector class references (the channel keycap selector)'
 );
 assert(
   (renderFactionRepBody.match(/adjustFaction\(/g) || []).length >= 4,
   'renderFactionRep has ≥4 adjustFaction() calls'
 );
 assert(
-  !/<button[^>]*class="faction-btn[^"]*"[^>]*style=/.test(renderFactionRepBody) &&
-    !/<button[^>]*style=[^>]*class="faction-btn/.test(renderFactionRepBody),
-  'renderFactionRep faction-btn buttons have no inline style attribute'
+  !/<button[^>]*class="facon-chan[^"]*"[^>]*style=/.test(renderFactionRepBody) &&
+    !/<button[^>]*style=[^>]*class="facon-chan/.test(renderFactionRepBody),
+  'renderFactionRep facon-chan buttons have no inline style attribute'
 );
 assert(
   /minmax\(0,\s*1fr\)/.test(renderWorldMapBody),
@@ -949,14 +953,18 @@ header('CSS Invariants (Protocol 20)');
 const cssSource = readFile('css/terminal.css');
 // Strip block comments so embedded {} in comments don't break rule-block extraction
 const cssSourceStripped = cssSource.replace(/\/\*[\s\S]*?\*\//g, '');
-const factionBtnRule = (cssSourceStripped.match(/\.faction-btn\s*\{[^}]*\}/) || [''])[0];
-const factionCardBtnsRule = (cssSourceStripped.match(/\.faction-card-btns\s*\{[^}]*\}/) || [''])[0];
+// Phase 3 OPERATOR batch 2: .faction-btn/.faction-card-btns retired along
+// with the per-card grid — the BUS-08 console's .facon-chan keycaps and
+// .facon-keys ±5 row are the equivalent centering/sizing guards now.
+const faconChanRule = (cssSourceStripped.match(/\.facon-chan\s*\{[^}]*\}/) || [''])[0];
+const faconSelectorRule = (cssSourceStripped.match(/\.facon-selector\s*\{[^}]*\}/) || [''])[0];
+const faconKeysRule = (cssSourceStripped.match(/\.facon-keys\s*\{[^}]*\}/) || [''])[0];
 const mapCellRule = (cssSourceStripped.match(/\.map-cell\s*\{[^}]*\}/) || [''])[0];
 const buttonRule = (cssSourceStripped.match(/^button\s*\{[^}]*\}/m) || [''])[0];
 
-assert(/width\s*:\s*auto/.test(factionBtnRule), '.faction-btn has width:auto');
-assert(/display\s*:\s*flex/.test(factionBtnRule), '.faction-btn uses display:flex');
-assert(/flex-wrap/.test(factionCardBtnsRule), '.faction-card-btns has flex-wrap');
+assert(/width\s*:\s*auto/.test(faconChanRule), '.facon-chan has width:auto');
+assert(/flex-wrap/.test(faconSelectorRule), '.facon-selector has flex-wrap');
+assert(/flex-wrap/.test(faconKeysRule), '.facon-keys has flex-wrap');
 guards(mapCellRule, [
   [/min-width\s*:\s*0/, '.map-cell has min-width:0'],
   [/overflow\s*:\s*hidden/, '.map-cell has overflow:hidden'],
@@ -2171,8 +2179,10 @@ assert(
 // 32.6 renderSkills() in ui-core.js generates .skill-row elements dynamically
 {
   const uiCoreSrc32 = readFile('js/ui-core.js');
+  // Phase 3 OPERATOR batch 2: each row now also carries .vu-row (the BUS-05
+  // VU meter skin) alongside .skill-row — prefix match tolerates either.
   assert(
-    /class="skill-row"/.test(uiCoreSrc32),
+    /class="skill-row/.test(uiCoreSrc32),
     'ui-core.js: renderSkills() generates .skill-row elements dynamically (static index.html rows replaced)'
   );
 }
@@ -7780,10 +7790,20 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     );
   }
 
-  // 71.17  Faction lone-card CSS rule: :last-child:nth-child(odd) in terminal.css
+  // 71.17  Faction lone-card centering: the old CSS Grid .faction-card layout
+  // needed a bespoke :last-child:nth-child(odd) hack to center an incomplete
+  // last row. Phase 3 OPERATOR batch 2 retires that grid for the BUS-08
+  // console's .facon-selector, a flexbox row with justify-content:center —
+  // which centers an incomplete last row for free, no nth-child hack needed.
   assert(
-    /faction-card:last-child:nth-child\(odd\)/.test(cssSrc71),
-    'terminal.css has .faction-card:last-child:nth-child(odd) rule for centering lone card in mobile grid'
+    !/faction-card:last-child:nth-child\(odd\)/.test(cssSrc71),
+    'terminal.css: the retired .faction-card:last-child:nth-child(odd) hack is gone (superseded by .facon-selector flexbox centering)'
+  );
+  const faconSelectorRule71 = (cssSrc71.match(/\.facon-selector\s*\{[^}]*\}/) || [''])[0];
+  assert(
+    /flex-wrap/.test(faconSelectorRule71) &&
+      /justify-content\s*:\s*center/.test(faconSelectorRule71),
+    'terminal.css: .facon-selector uses flex-wrap + justify-content:center (centers an incomplete last row for free — no nth-child hack needed)'
   );
 
   // 71.18  renderCollectibles updates sub-panel summary h3 with game-specific label
@@ -10083,13 +10103,17 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     'GATE-UI-4: all 5 tracker renderers use .tracker-row (3 inline + 2 via shared _renderReadTracker which carries it)'
   );
 
-  // 88.5  renderFactionRep MINOR FACTIONS details has class="sub-panel" and data-sub-id
+  // 88.5  Phase 3 OPERATOR batch 2: the old collapsed MINOR FACTIONS
+  // sub-panel is retired — every faction (major+minor) now rides the SAME
+  // BUS-08 console selector with zero extra disclosure tap (Protocol 25:
+  // no increase in tap-count), so renderFactionRep() must build its
+  // selector/strip from the FULL getFactionRegistry() with no tier filter.
   const rfStart88 = uiRenderSrc88.indexOf('function renderFactionRep()');
   const rfEnd88 = uiRenderSrc88.indexOf('\nfunction ', rfStart88 + 1);
   const rfBody88 = rfStart88 >= 0 ? uiRenderSrc88.slice(rfStart88, rfEnd88) : '';
   assert(
-    /class="sub-panel"/.test(rfBody88) && /data-sub-id="minor_factions"/.test(rfBody88),
-    'GATE-UI-5: renderFactionRep() MINOR FACTIONS details has class="sub-panel" and data-sub-id="minor_factions"'
+    /getFactionRegistry\(\)/.test(rfBody88) && !/f\.tier\s*===\s*['"]major['"]/.test(rfBody88),
+    "GATE-UI-5: renderFactionRep() builds its selector/strip from the full getFactionRegistry() (no tier==='major' filter hiding minor factions behind a disclosure)"
   );
 
   // 88.6  renderFactionRep helper text says ±5 not ±50
@@ -25188,7 +25212,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     /function renderSkills\(\)/.test(uiCore181) &&
       /function renderFactionRep\(\)/.test(uiRender181) &&
       /function renderKarmaCenter\(\)/.test(uiRender181),
-    '181.3: renderSkills()/renderFactionRep()/renderKarmaCenter() are all still defined unchanged — the light-frame pass only wraps their containing board, never their own render template'
+    // Phase 3 OPERATOR batch 2 (Suite 185b) ground-up-reskinned renderSkills()
+    // and renderFactionRep()'s OWN templates (VU meters / reputation console)
+    // while keeping this same function name + the id-preservation contract
+    // (Suite 181.1/181.2) intact — renderKarmaCenter() is untouched, still
+    // light-frame-only, since BUS-09 was out of scope for that unit.
+    '181.3: renderSkills()/renderFactionRep()/renderKarmaCenter() are all still defined under their original names — renderKarmaCenter() stays light-frame-only, while renderSkills()/renderFactionRep() were ground-up reskinned at Suite 185b (their own templates changed, but every id/handler the plan requires is still emitted — see Suite 185b)'
   );
 
   // 181.4  every OPERATOR board is a real <details class="panel"> carrying
@@ -26681,6 +26710,203 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   assert(
     /setInvFilter\('ammo'\)/.test(expandBody185),
     "185.24: expandPanelForCategory('ammo') reveals the AMMO drawer via setInvFilter('ammo') (drawer-gated visibility, not a stale .open toggle)"
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 186 — Phase 3 OPERATOR batch 2: BUS-05/07/08 ground-up reskin
+//  (SKILL MATRIX → VU array, STATUS EFFECTS → compound lamps, FACTION
+//  STANDING → reputation console). id/handler-preservation + game-agnostic
+//  + no-new-campaign-state + centering + reduced-motion guards. 18 tests.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 186 — Phase 3 OPERATOR batch 2: BUS-05/07/08 ground-up reskin');
+  const core186 = readFile('js/ui-core.js');
+  const render186 = readFile('js/ui-render.js');
+  const css186 = readFile('css/terminal.css');
+  const stateSrc186 = readFile('js/state.js');
+  const skillsBody186 = extractFunctionBody(core186, 'renderSkills');
+  const statusBody186 = extractFunctionBody(render186, 'renderStatus');
+  const factionBody186 = extractFunctionBody(render186, 'renderFactionRep');
+
+  // 186.1  renderSkills() still emits the exact sk_<key> inputs, now inside
+  //        a VU track, with the SAME oninput-driven save path (Protocol 22).
+  assert(
+    /id="sk_\$\{sk\}"/.test(skillsBody186) &&
+      /class="skill-row vu-row"/.test(skillsBody186) &&
+      /data-vu-track="\$\{sk\}"/.test(skillsBody186) &&
+      /oninput="_onSkillVuInput/.test(skillsBody186),
+    '186.1: renderSkills() emits id="sk_${sk}" inputs inside a .vu-row/.vu-track VU meter (Protocol 22 — id/class preserved, meter added)'
+  );
+
+  // 186.2  the VU track is a real role=slider with ARIA value bounds.
+  assert(
+    /role="slider"/.test(skillsBody186) &&
+      /aria-valuemin="0"/.test(skillsBody186) &&
+      /aria-valuemax="100"/.test(skillsBody186),
+    '186.2: the .vu-track carries role="slider" + aria-valuemin/max="0"/"100"'
+  );
+
+  // 186.3  channel count/order is driven by getSkillKeys() — never a
+  //        hardcoded 13 (Protocol 38).
+  assert(
+    /getSkillKeys\(\)\s*\n?\s*\.map/.test(skillsBody186) && !/\b13\b/.test(skillsBody186),
+    '186.3: renderSkills() channels come from getSkillKeys() with no hardcoded 13 literal (Protocol 38)'
+  );
+
+  // 186.4  _skillVuSet()/_onSkillVuInput() both clamp 0-100 and call the
+  //        SAME saveState() the typed field's oninput already called — the
+  //        drag surface is an added affordance, not a parallel state path.
+  const skillVuSetBody186 = extractFunctionBody(core186, '_skillVuSet');
+  const onSkillVuInputBody186 = extractFunctionBody(core186, '_onSkillVuInput');
+  assert(
+    /Math\.max\(0,\s*Math\.min\(100,/.test(skillVuSetBody186) &&
+      /saveState\(\)/.test(skillVuSetBody186) &&
+      /Math\.max\(0,\s*Math\.min\(100,/.test(onSkillVuInputBody186) &&
+      /saveState\(\)/.test(onSkillVuInputBody186),
+    '186.4: _skillVuSet()/_onSkillVuInput() both clamp to [0,100] and call saveState() — drag and typing share one clamp+save path'
+  );
+
+  // 186.5  drag wiring is idempotent (guarded so re-render never double-
+  //        wires) and covers pointer drag + arrow-key/Home/End on the track.
+  const wireVuDragBody186 = extractFunctionBody(core186, '_wireSkillVuDrag');
+  assert(
+    /grid\.dataset\.vuWired/.test(wireVuDragBody186) &&
+      /pointerdown/.test(wireVuDragBody186) &&
+      /pointermove/.test(wireVuDragBody186) &&
+      /ArrowRight/.test(wireVuDragBody186) &&
+      /ArrowLeft/.test(wireVuDragBody186) &&
+      /Home/.test(wireVuDragBody186) &&
+      /End/.test(wireVuDragBody186),
+    '186.5: _wireSkillVuDrag() guards against double-wiring on re-render and wires pointer drag + arrow/Home/End keyboard control'
+  );
+
+  // 186.6  renderStatus() builds lit/dark compound lamp tiles, classed by
+  //        type, with the purge key still calling the unchanged
+  //        removeStatusEffect(i) (Protocol 22).
+  assert(
+    /stlamp-tile/.test(statusBody186) &&
+      /debuff/.test(statusBody186) &&
+      /neutral/.test(statusBody186) &&
+      /onclick="removeStatusEffect\(\$\{i\}\)"/.test(statusBody186),
+    '186.6: renderStatus() emits .stlamp-tile lamps (buff/debuff/neutral) whose purge key still calls removeStatusEffect(i)'
+  );
+
+  // 186.7  empty state shows dark standby lamps + the required note text —
+  //        never information-free (Protocol 25).
+  assert(
+    /stlamp-tile dark/.test(statusBody186) && /ALL LAMPS DARK/.test(statusBody186),
+    '186.7: renderStatus() empty state renders dark standby lamp tiles + "ALL LAMPS DARK" note'
+  );
+
+  // 186.8  the live 0i board-status summary is a single shared helper, wired
+  //        into the existing _syncOperatorTelemetry() choke point.
+  const lampSummaryBody186 = extractFunctionBody(render186, '_statusLampSummary');
+  const syncTelemetryBody186 = extractFunctionBody(core186, '_syncOperatorTelemetry');
+  assert(
+    /LAMPS LIT/.test(lampSummaryBody186) &&
+      /DEBUFF/.test(lampSummaryBody186) &&
+      /NEXT EXPIRY/.test(lampSummaryBody186) &&
+      /_statusLampSummary\(\)/.test(syncTelemetryBody186),
+    '186.8: _statusLampSummary() computes "N LAMPS LIT · N DEBUFF · NEXT EXPIRY: …" and is read by _syncOperatorTelemetry() for opStatusStatus'
+  );
+
+  // 186.9  the add-effect form ids + handler are unchanged (already in the
+  //        Suite 181.1 id contract; re-asserted here against the live
+  //        function body for a direct, single-file guard).
+  const html186 = readFile('index.html');
+  assert(
+    /id="newStatusName"/.test(html186) &&
+      /id="newStatusTicks"/.test(html186) &&
+      /id="newStatusType"/.test(html186) &&
+      /onclick="addStatusEffect\(\)"/.test(html186),
+    '186.9: the STATUS EFFECTS add-form (newStatusName/newStatusTicks/newStatusType → addStatusEffect()) is unchanged'
+  );
+
+  // 186.10  renderFactionRep() builds its selector + strip from the FULL
+  //         getFactionRegistry() (major+minor together) with the SAME ±5
+  //         adjustFaction() keys (Protocol 22/25 — see also 88.5 above).
+  assert(
+    (factionBody186.match(/getFactionRegistry\(\)/g) || []).length >= 1 &&
+      /facon-selector/.test(factionBody186) &&
+      /facon-strip/.test(factionBody186) &&
+      (factionBody186.match(/adjustFaction\(/g) || []).length >= 4,
+    '186.10: renderFactionRep() builds the selector + strip from getFactionRegistry() and keeps ≥4 adjustFaction() calls'
+  );
+
+  // 186.11  setFactionChannel() persists the picked channel through the
+  //         registered MetaStore key and re-renders via renderFactionRep()
+  //         only — one repaint function, selector/meter/strip can't drift.
+  const setChannelBody186 = extractFunctionBody(render186, 'setFactionChannel');
+  assert(
+    /MetaStore\.set\('robco_faction_channel'/.test(setChannelBody186) &&
+      /renderFactionRep\(\)/.test(setChannelBody186),
+    "186.11: setFactionChannel() persists via MetaStore.set('robco_faction_channel', ...) then calls renderFactionRep() (single repaint)"
+  );
+
+  // 186.12  robco_faction_channel is a registered device pref (Protocol UI-6
+  //         / the two-store MetaStore boundary), not a campaign-state field.
+  assert(
+    /robco_faction_channel:\s*\{\s*type:\s*'string',\s*default:\s*''/.test(stateSrc186),
+    "186.12: robco_faction_channel is registered in META_MANIFEST as a string device pref (default '')"
+  );
+
+  // 186.13  _facPinPct() computes the fame/(fame+infamy) ratio — the same
+  //         net-standing math the retired bar chart used (Protocol 22 —
+  //         continuity of meaning, not just of markup).
+  const facPinPctBody186 = extractFunctionBody(render186, '_facPinPct');
+  assert(
+    /fam\s*\+\s*inf\s*\|\|\s*1/.test(facPinPctBody186) && /fam\s*\/\s*total/.test(facPinPctBody186),
+    '186.13: _facPinPct() computes fame/(fame+infamy) with the same divide-by-zero guard the retired bar chart used'
+  );
+
+  // 186.14  no new campaign-state field was introduced for this reskin —
+  //         only a MetaStore device pref (Protocol 4/23 — device vs
+  //         campaign boundary).
+  assert(
+    !/state\.factionChannel|state\.skillVu|state\.statusLamp/.test(core186 + render186),
+    '186.14: no new campaign-state field was introduced for the VU/lamp/console reskin'
+  );
+
+  // 186.15  game-agnostic: no hardcoded faction-key array or per-game skill
+  //         count literal in the new render code (Protocol 38).
+  assert(
+    !/\[\s*'ncr'\s*,\s*'legion'/.test(factionBody186) && !/skillCount\s*=\s*13/.test(skillsBody186),
+    '186.15: no hardcoded faction-key array or a fixed 13-skill-count literal in the new render code (Protocol 38)'
+  );
+
+  // 186.16  centering rule: the lamp grid + faction selector/keys all wrap
+  //         via flex-wrap + justify-content:center (an incomplete last row
+  //         centers for free — no nth-child hack needed, unlike CSS Grid).
+  const cssStripped186 = css186.replace(/\/\*[\s\S]*?\*\//g, '');
+  const stlampGridRule186 = (cssStripped186.match(/\.stlamp-grid\s*\{[^}]*\}/) || [''])[0];
+  assert(
+    /flex-wrap/.test(stlampGridRule186) && /justify-content\s*:\s*center/.test(stlampGridRule186),
+    '186.16: .stlamp-grid uses flex-wrap + justify-content:center (centering rule)'
+  );
+
+  // 186.17  every new motion effect is a plain `animation:` declaration
+  //         (vuFillIn/stlampPulse), never `transition:` alone for a motion
+  //         verb — auto-neutralized by the existing global reduced-motion
+  //         block with no bespoke carve-out (Protocol UI-9).
+  assert(
+    /@keyframes\s+vuFillIn/.test(cssStripped186) &&
+      /animation:\s*vuFillIn/.test(cssStripped186) &&
+      /@keyframes\s+stlampPulse/.test(cssStripped186) &&
+      /animation:\s*stlampPulse/.test(cssStripped186),
+    '186.17: vuFillIn/stlampPulse are plain `animation:` keyframes (Protocol UI-9 — auto-neutralized by the global reduced-motion block)'
+  );
+
+  // 186.18  tap targets: the faction channel keycaps and ±5 keys, and the
+  //         lamp purge key, all clear the Protocol 17 >=28px floor.
+  const faconChanRule186 = (cssStripped186.match(/\.facon-chan\s*\{[^}]*\}/) || [''])[0];
+  const faconKeysBtnRule186 = (cssStripped186.match(/\.facon-keys button\s*\{[^}]*\}/) || [''])[0];
+  const stlampPurgeRule186 = (cssStripped186.match(/\.stlamp-purge\s*\{[^}]*\}/) || [''])[0];
+  assert(
+    /min-height:\s*40px/.test(faconChanRule186) &&
+      /min-height:\s*32px/.test(faconKeysBtnRule186) &&
+      /min-height:\s*28px/.test(stlampPurgeRule186),
+    '186.18: .facon-chan (40px) / .facon-keys button (32px) / .stlamp-purge (28px) all clear the >=28px tap-target floor'
   );
 }
 
