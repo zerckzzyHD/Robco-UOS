@@ -25572,7 +25572,14 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         stat_hp_cur: makeFakeEl182({ value: '10' }),
       };
       const doc = makeFakeDoc182(els);
-      const sb = { document: doc, state: {}, updateMath: () => {}, Math, parseInt };
+      const sb = {
+        document: doc,
+        state: {},
+        updateMath: () => {},
+        Math,
+        parseInt,
+        _emitStatChangeIfDiffers: () => {},
+      };
       vm182.createContext(sb);
       vm182.runInContext(declareFn182(uiCore182, 'setupHpBarInteraction'), sb);
       sb.setupHpBarInteraction();
@@ -25605,7 +25612,14 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         stat_xp: makeFakeEl182({ value: '0' }),
       };
       const doc = makeFakeDoc182(els);
-      const sb = { document: doc, state: {}, updateMath: () => {}, Math, parseInt };
+      const sb = {
+        document: doc,
+        state: {},
+        updateMath: () => {},
+        Math,
+        parseInt,
+        _emitStatChangeIfDiffers: () => {},
+      };
       vm182.createContext(sb);
       vm182.runInContext(declareFn182(uiCore182, 'setupXpBarInteraction'), sb);
       sb.setupXpBarInteraction();
@@ -25650,6 +25664,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         parseInt,
         isNaN,
         String,
+        RobcoEvents: { emit: () => {} },
       };
       vm182.createContext(sb);
       vm182.runInContext(
@@ -26119,6 +26134,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         window: {},
         Math,
         parseInt,
+        _emitStatChangeIfDiffers: () => {},
       };
       sb.window.GAME_DEFS = sb.GAME_DEFS;
       vm184.createContext(sb);
@@ -27854,6 +27870,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         window: {},
         Math,
         parseInt,
+        _emitStatChangeIfDiffers: () => {},
       };
       sb.window.GAME_DEFS = sb.GAME_DEFS;
       vm190.createContext(sb);
@@ -28815,6 +28832,96 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     (cssStripped192.match(/\.chassis-core-shape\.chassis-core-mini\s*\{/g) || []).length >= 2 &&
       !/(?<!\.chassis-core-shape)\.chassis-core-mini\s*\{/.test(cssStripped192),
     '192.26: every #chassisCoreMini sizing rule (base + the @media(max-width:480px) mobile shrink) uses the compound .chassis-core-shape.chassis-core-mini selector, never a bare .chassis-core-mini that would tie in specificity with .chassis-core-shape and silently lose by source order'
+  );
+
+  // 192.27  owner re-verification (Option A confirmed) — #chassisScreenMini
+  //         sits inside the always-visible .casing-top header, which is
+  //         structurally OUTSIDE every tab-gated panel (no [data-tab]
+  //         attribute reaches it), so the mini core renders on every page,
+  //         not just SETTINGS/CHASSIS. Reuses the 192.22 casingTopBlock192
+  //         slice (casing-top through the bezel) and asserts it carries no
+  //         data-tab/panel gating of its own.
+  assert(
+    /class="casing-top"/.test(casingTopBlock192) &&
+      /id="chassisScreenMini"/.test(casingTopBlock192) &&
+      /id="chassisCoreMini"/.test(casingTopBlock192) &&
+      !/data-tab=/.test(casingTopBlock192) &&
+      !/class="panel/.test(casingTopBlock192),
+    '192.27: #chassisScreenMini/#chassisCoreMini sit inside .casing-top, which carries no data-tab gating and no panel wrapper — the mini core is visible on every subsystem/page, not settings-only'
+  );
+
+  // 192.28  the Director Uplink header no longer hosts a second mini-core
+  //         mirror — placement is singular (the casing-top screen only),
+  //         so the two views can never drift or double-render. Reuses the
+  //         192.22 ovsHeadBlock192 slice.
+  assert(
+    !ovsHeadBlock192.includes('id="chassisCoreMini"'),
+    '192.28: the Director Uplink/Overseer header does not carry a second chassisCoreMini mirror — the mini core lives ONLY in the casing-top screen'
+  );
+
+  // 192.29  #14 3D ring burst — _coreStatBurst()/_emitStatChangeIfDiffers()
+  //         exist, the burst routes through the SAME gated _coreOneShot()
+  //         every other flourish uses (no bespoke reduced-motion carve-out),
+  //         and the RobcoEvents bus fires it on both level.up and a real
+  //         stat.change.
+  const statBurstBody192 = extractFunctionBody(core192, '_coreStatBurst');
+  assert(
+    /_coreOneShot\('core-stat-burst'/.test(statBurstBody192) &&
+      /RobcoEvents\.on\('level\.up',\s*\(\)\s*=>\s*_coreStatBurst\(\)\)/.test(wireBody192) &&
+      /RobcoEvents\.on\('stat\.change',\s*\(\)\s*=>\s*_coreStatBurst\(\)\)/.test(wireBody192),
+    '192.29: _coreStatBurst() routes through the shared, gated _coreOneShot() and RobcoEvents wires BOTH level.up and stat.change to trigger it'
+  );
+
+  // 192.30  _emitStatChangeIfDiffers() only emits stat.change on a REAL value
+  //         change (not on every call/every render) — a static shape check
+  //         (old !== undefined guard so the first-ever call per key never
+  //         fires, and old !== newVal so a same-value re-set never fires),
+  //         plus every drag-style stat setter (HP/XP/RAD bars, the skill VU
+  //         meter) and the onchange commitStat() path call it/emit directly.
+  const emitDiffersBody192 = extractFunctionBody(core192, '_emitStatChangeIfDiffers');
+  const applyHpBody192 = extractFunctionBody(core192, 'setupHpBarInteraction');
+  const applyXpBody192 = extractFunctionBody(core192, 'setupXpBarInteraction');
+  const wireRadBody192 = extractFunctionBody(core192, '_wireRadDragSurface');
+  const skillVuSetBody192 = extractFunctionBody(core192, '_skillVuSet');
+  const commitStatBody192 = extractFunctionBody(core192, 'commitStat');
+  assert(
+    /old !== undefined/.test(emitDiffersBody192) &&
+      /old !== newVal/.test(emitDiffersBody192) &&
+      /RobcoEvents\.emit\('stat\.change'/.test(emitDiffersBody192) &&
+      /_emitStatChangeIfDiffers\('hp',\s*newHp\)/.test(applyHpBody192) &&
+      /_emitStatChangeIfDiffers\('xp',\s*newXp\)/.test(applyXpBody192) &&
+      /_emitStatChangeIfDiffers\('rads',\s*newRads\)/.test(wireRadBody192) &&
+      /_emitStatChangeIfDiffers\('skill:'\s*\+\s*key,\s*v\)/.test(skillVuSetBody192) &&
+      /RobcoEvents\.emit\('stat\.change'/.test(commitStatBody192),
+    '192.30: _emitStatChangeIfDiffers() only fires stat.change on a genuine value change (never the first-seen baseline, never a same-value re-set), and every drag-style stat setter plus commitStat() feeds it/emits directly'
+  );
+
+  // 192.31  the 3D orbital burst is real CSS (rotateX/rotateY/rotateZ
+  //         keyframes, a distinct per-ring tumble via .core-stat-burst on the
+  //         SAME .chassis-core-shape shared by both the full core and the
+  //         casing-top mini core), and it is caught by the SAME .core-still
+  //         gate that already pauses every other .c-ring animation — no
+  //         second gate was written for it.
+  assert(
+    /rotateX/.test(cssStripped192) &&
+      /rotateY/.test(cssStripped192) &&
+      /rotateZ/.test(cssStripped192) &&
+      /\.chassis-core-shape\.core-stat-burst \.c-ring\.r1/.test(cssStripped192) &&
+      /\.chassis-core-shape\.core-stat-burst \.c-ring\.r2/.test(cssStripped192) &&
+      /\.chassis-core-shape\.core-stat-burst \.c-ring\.r3/.test(cssStripped192) &&
+      /\.core-still,[\s\S]*\.c-ring,[\s\S]*\.c-heart/.test(cssStripped192),
+    '192.31: the 3D orbital burst (rotateX/rotateY/rotateZ per-ring keyframes on .core-stat-burst) applies to the same .chassis-core-shape used by both cores, and is stilled by the existing generic .core-still .c-ring gate — no bespoke reduced-motion carve-out'
+  );
+
+  // 192.32  zero campaign-state write — the new #14 functions never touch
+  //         saveState()/robco_v8/state.<field>= (extends the existing 192.15
+  //         guard to the new code).
+  assert(
+    !/saveState\(\)/.test(statBurstBody192) &&
+      !/robco_v8/.test(statBurstBody192) &&
+      !/saveState\(\)/.test(emitDiffersBody192) &&
+      !/robco_v8/.test(emitDiffersBody192),
+    '192.32: _coreStatBurst()/_emitStatChangeIfDiffers() are free of saveState()/robco_v8 writes — purely a transient in-memory/DOM flourish, extending the 192.15 zero-write guard'
   );
 }
 

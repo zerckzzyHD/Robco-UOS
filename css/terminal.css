@@ -9926,6 +9926,65 @@ button.chassis-core-shape {
   box-shadow: 0 0 40px rgba(var(--robco-green-rgb), 1);
   transform: scale(1.16);
 }
+/* #14 3D ring burst on a real stat change (owner follow-up) — a genuine
+   orbital tumble, distinct from the flat 2D chassisCoreSpin the rings idle
+   with. `perspective` on the shell gives the rotateX/rotateY children real
+   depth (harmless when no 3D transform is active, so it's safe on the base
+   rule); the compound `.chassis-core-shape.chassis-core-mini` selector picks
+   a smaller perspective distance so the effect reads proportionally similar
+   at the small casing-top size (Protocol 42 precedent — same reasoning as
+   the mini-core sizing fix below). Each ring gets its own tumble so the
+   three read as independent orbits, same as their existing spin-direction
+   variety; all three start and end at a multiple of 360° so the burst hands
+   off seamlessly back to the continuous flat spin with no visual snap. */
+.chassis-core-shape {
+  perspective: 320px;
+}
+.chassis-core-shape.chassis-core-mini {
+  perspective: 90px;
+}
+@keyframes chassisCoreOrbitBurst1 {
+  0% {
+    transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg);
+  }
+  50% {
+    transform: rotateX(180deg) rotateY(90deg) rotateZ(180deg);
+  }
+  100% {
+    transform: rotateX(360deg) rotateY(180deg) rotateZ(360deg);
+  }
+}
+@keyframes chassisCoreOrbitBurst2 {
+  0% {
+    transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg);
+  }
+  50% {
+    transform: rotateX(-120deg) rotateY(200deg) rotateZ(-160deg);
+  }
+  100% {
+    transform: rotateX(-360deg) rotateY(360deg) rotateZ(-360deg);
+  }
+}
+@keyframes chassisCoreOrbitBurst3 {
+  0% {
+    transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg);
+  }
+  50% {
+    transform: rotateX(160deg) rotateY(-140deg) rotateZ(200deg);
+  }
+  100% {
+    transform: rotateX(360deg) rotateY(-360deg) rotateZ(360deg);
+  }
+}
+.chassis-core-shape.core-stat-burst .c-ring.r1 {
+  animation: chassisCoreOrbitBurst1 900ms cubic-bezier(0.34, 1.56, 0.64, 1) 1;
+}
+.chassis-core-shape.core-stat-burst .c-ring.r2 {
+  animation: chassisCoreOrbitBurst2 900ms cubic-bezier(0.34, 1.56, 0.64, 1) 1;
+}
+.chassis-core-shape.core-stat-burst .c-ring.r3 {
+  animation: chassisCoreOrbitBurst3 900ms cubic-bezier(0.34, 1.56, 0.64, 1) 1;
+}
 /* The gate (Protocol UI-10) — reduced-motion OR the Immersion dial below
    Balanced OR document.hidden OR the Ambient Runtime in STANDBY/SHUTDOWN/
    OFF each suppress every CONTINUOUS loop above as one group; the state

@@ -1999,6 +1999,35 @@ function _coreTapPoke() {
 }
 window._coreTapPoke = _coreTapPoke;
 
+// #14 3D ring burst on a real stat change (owner follow-up) — a genuine 3D
+// orbital tumble (rotateX/rotateY/rotateZ), distinct from the flat 2D
+// chassisCoreSpin the rings idle with, layered on via the same one-shot
+// add-then-reflow-then-remove pattern as every other flourish above. Fires
+// through _coreOneShot(), so it is already gated by _coreShouldAnimate() —
+// no bespoke reduced-motion carve-out.
+function _coreStatBurst() {
+  _coreOneShot('core-stat-burst', 900);
+}
+window._coreStatBurst = _coreStatBurst;
+
+// _emitStatChangeIfDiffers(key, newVal) — the shared "did this ACTUALLY
+// change?" cache for the drag-style stat setters (HP/XP/RAD bars, the skill
+// VU meter), which are called on every mousemove/touchmove tick during a
+// drag and have no other "before this call" value to compare against
+// (unlike commitStat()'s onchange commit, which reads state[k] directly
+// before overwriting it). Deliberately does NOT seed from state at boot —
+// the FIRST edit to a given key each session only establishes the baseline
+// (no burst); every edit after that on the same key fires correctly. Purely
+// an in-memory comparison cache — writes nothing durable to the campaign.
+const _lastStatValues = {};
+function _emitStatChangeIfDiffers(key, newVal) {
+  const old = _lastStatValues[key];
+  _lastStatValues[key] = newVal;
+  if (old !== undefined && old !== newVal) {
+    RobcoEvents.emit('stat.change', { key, oldVal: old, newVal });
+  }
+}
+
 // The "?" explainer (Suite 103 showSaveHelpModal precedent, Protocol 22) —
 // plain, in-voice language describing what the cell is and what each
 // behaviour means. Game-agnostic (Protocol 38) — device fiction only.
@@ -2048,6 +2077,10 @@ const CORE_HELP = [
   {
     cmd: 'TAP TO PULSE',
     desc: 'Tap the cell any time for a quick kick — purely cosmetic, changes nothing.',
+  },
+  {
+    cmd: '3D RING BURST',
+    desc: "The cell's rings tumble in a real 3D orbit for a moment whenever you actually change a stat — a S.P.E.C.I.A.L. attribute, a skill, your HP, XP, or radiation level — or level up.",
   },
 ];
 function showCoreHelpModal() {
@@ -2101,6 +2134,11 @@ function _wireChassisCoreEventBusSubscribers() {
   // #9 save/sync write-pulse — emitted by saveToSlot() (ui-saves.js) and
   // saveCurrentToCloud()/loadCloudSave()/overwriteCloudSave() (cloud.js).
   RobcoEvents.on('data.write', () => _coreDataPulse());
+  // #14 3D ring burst on a real stat change — level-up IS a stat change (in
+  // addition to its own heart flare above), plus every genuine SPECIAL/
+  // skill/HP/XP/RAD edit via the new 'stat.change' event.
+  RobcoEvents.on('level.up', () => _coreStatBurst());
+  RobcoEvents.on('stat.change', () => _coreStatBurst());
 }
 // ── CHASSIS CORE END ────────────────────────────────────────────────────
 
@@ -2675,7 +2713,7 @@ window.onload = async function () {
     _wireCoreEventBusSubscribers();
     _wireAudioEventBusSubscribers();
     _wireApiEventBusSubscribers();
-    _wireChassisCoreEventBusSubscribers(); // CHASSIS LIVING CORE: runtime.state/level.up/data.write
+    _wireChassisCoreEventBusSubscribers(); // CHASSIS LIVING CORE: runtime.state/level.up/data.write/stat.change
     // P2: reconcile device prefs from IndexedDB (bounded + fail-safe) BEFORE the rest of boot reads them.
     await _hydrateMetaFromIdb();
     _hydrateStateFromStorage();
@@ -2732,6 +2770,7 @@ function setupHpBarInteraction() {
     const newHp = Math.round(pct * hpMax);
     document.getElementById('stat_hp_cur').value = newHp;
     state.hpCur = newHp;
+    _emitStatChangeIfDiffers('hp', newHp); // CHASSIS LIVING CORE #14
     updateMath();
   }
   let dragging = false;
@@ -2781,6 +2820,7 @@ function setupXpBarInteraction() {
     const newXp = Math.round(xpCur + pct * (xpNext - xpCur - 1));
     document.getElementById('stat_xp').value = newXp;
     state.xp = newXp;
+    _emitStatChangeIfDiffers('xp', newXp); // CHASSIS LIVING CORE #14
     updateMath();
   }
   let dragging = false;
@@ -2856,6 +2896,7 @@ function _wireRadDragSurface(containerId) {
     const newRads = Math.round(pct * maxRads);
     document.getElementById('stat_rads').value = newRads;
     state.rads = newRads;
+    _emitStatChangeIfDiffers('rads', newRads); // CHASSIS LIVING CORE #14
     updateMath();
   }
   let dragging = false;
@@ -5113,7 +5154,13 @@ function commitStat(el) {
   if (isNaN(v)) v = (state && state[k]) || 5;
   v = Math.max(1, Math.min(10, v));
   el.value = String(v);
+  const old = state && state[k];
   if (state) state[k] = v;
+  // CHASSIS LIVING CORE #14 (3D ring burst on stat change) — a genuine
+  // committed SPECIAL edit, not a re-render; RobcoEvents.emit is a no-op
+  // with zero subscribers if the core hasn't wired up yet (Protocol 22).
+  if (old !== undefined && old !== v)
+    RobcoEvents.emit('stat.change', { key: k, oldVal: old, newVal: v });
   updateMath();
   saveState();
 }
@@ -5288,6 +5335,11 @@ function _skillVuSet(key, rawVal) {
   if (fill) fill.style.width = v + '%';
   const track = document.querySelector('[data-vu-track="' + key + '"]');
   if (track) track.setAttribute('aria-valuenow', String(v));
+  // CHASSIS LIVING CORE #14 (3D ring burst on stat change) — the one committed
+  // skill setter (drag AND arrow-key path both call this); _onSkillVuInput()'s
+  // oninput live-preview deliberately does NOT hook this (fires every
+  // keystroke, never a settled value).
+  _emitStatChangeIfDiffers('skill:' + key, v);
   saveState();
 }
 

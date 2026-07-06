@@ -15941,7 +15941,7 @@ const results = [];
 try {
   const els = { hp_bar_container: makeFakeEl({ getBoundingClientRect: () => ({ left: 0, width: 100 }) }), stat_hp_max: makeFakeEl({ value: '100' }), stat_hp_cur: makeFakeEl({ value: '10' }) };
   const doc = makeFakeDoc(els);
-  const sb = { document: doc, state: {}, updateMath: () => {}, Math, parseInt };
+  const sb = { document: doc, state: {}, updateMath: () => {}, Math, parseInt, _emitStatChangeIfDiffers: () => {} };
   vm.createContext(sb);
   vm.runInContext(decl('setupHpBarInteraction'), sb);
   sb.setupHpBarInteraction();
@@ -15952,7 +15952,7 @@ try {
 try {
   const els = { xp_bar_container: makeFakeEl({ getBoundingClientRect: () => ({ left: 0, width: 100 }) }), stat_lvl: makeFakeEl({ value: '1' }), stat_xp: makeFakeEl({ value: '0' }) };
   const doc = makeFakeDoc(els);
-  const sb = { document: doc, state: {}, updateMath: () => {}, Math, parseInt };
+  const sb = { document: doc, state: {}, updateMath: () => {}, Math, parseInt, _emitStatChangeIfDiffers: () => {} };
   vm.createContext(sb);
   vm.runInContext(decl('setupXpBarInteraction'), sb);
   sb.setupXpBarInteraction();
@@ -15964,7 +15964,7 @@ try {
   const els = { s_s: makeFakeEl({ id: 's_s', value: '5' }) };
   const ladder = makeFakeEl({ dataset: { fdLadder: 's' }, getBoundingClientRect: () => ({ top: 0, bottom: 100, height: 100 }) });
   const doc = makeFakeDoc(els, { '.fd-ladder[data-fd-ladder]': [ladder] });
-  const sb = { document: doc, state: {}, updateMath: () => {}, saveState: () => {}, Math, parseInt, isNaN, String };
+  const sb = { document: doc, state: {}, updateMath: () => {}, saveState: () => {}, Math, parseInt, isNaN, String, RobcoEvents: { emit: () => {} } };
   vm.createContext(sb);
   vm.runInContext(decl('commitStat') + '\n' + decl('_applyFaderDragValue') + '\n' + decl('_wireFaderDrag'), sb);
   sb._wireFaderDrag();
@@ -16255,7 +16255,7 @@ try {
     getElementById: id => (id === 'radDragTrack' ? container : id === 'stat_rads' ? statRads : null),
     addEventListener(type, fn) { (docListeners[type] = docListeners[type] || []).push(fn); },
   };
-  const sb = { document: doc, state: {}, updateMath: () => {}, GAME_DEFS: { FNV: { maxRads: 1000 } }, getGameContext: () => 'FNV', window: {}, Math, parseInt };
+  const sb = { document: doc, state: {}, updateMath: () => {}, GAME_DEFS: { FNV: { maxRads: 1000 } }, getGameContext: () => 'FNV', window: {}, Math, parseInt, _emitStatChangeIfDiffers: () => {} };
   sb.window.GAME_DEFS = sb.GAME_DEFS;
   vm.createContext(sb);
   vm.runInContext(decl('_resolveMaxRads'), sb);
@@ -17394,7 +17394,7 @@ try {
     getElementById: id => (id === 'opRadLineWrap' ? container : id === 'stat_rads' ? statRads : null),
     addEventListener() {},
   };
-  const sb = { document: doc, state: {}, updateMath: () => {}, GAME_DEFS: { FNV: { maxRads: 1000 } }, getGameContext: () => 'FNV', window: {}, Math, parseInt };
+  const sb = { document: doc, state: {}, updateMath: () => {}, GAME_DEFS: { FNV: { maxRads: 1000 } }, getGameContext: () => 'FNV', window: {}, Math, parseInt, _emitStatChangeIfDiffers: () => {} };
   sb.window.GAME_DEFS = sb.GAME_DEFS;
   vm.createContext(sb);
   vm.runInContext(decl('_resolveMaxRads'), sb);
@@ -18169,6 +18169,89 @@ Check (
     ($compoundMiniCount192 -ge 2) -and
     (-not ($cssStripped192 -match '(?<!\.chassis-core-shape)\.chassis-core-mini\s*\{'))
 ) '192.26: every #chassisCoreMini sizing rule (base + the @media(max-width:480px) mobile shrink) uses the compound .chassis-core-shape.chassis-core-mini selector, never a bare .chassis-core-mini that would tie in specificity with .chassis-core-shape and silently lose by source order'
+
+# 192.27  owner re-verification (Option A confirmed) -- #chassisScreenMini
+#         sits inside the always-visible .casing-top header, which is
+#         structurally OUTSIDE every tab-gated panel (no [data-tab] attribute
+#         reaches it), so the mini core renders on every page, not just
+#         SETTINGS/CHASSIS. Reuses the 192.22 $casingTopBlock192 slice
+#         (casing-top through the bezel) and asserts it carries no
+#         data-tab/panel gating of its own.
+Check (
+    ($casingTopBlock192 -match 'class="casing-top"') -and
+    ($casingTopBlock192 -match 'id="chassisScreenMini"') -and
+    ($casingTopBlock192 -match 'id="chassisCoreMini"') -and
+    (-not ($casingTopBlock192 -match 'data-tab=')) -and
+    (-not ($casingTopBlock192 -match 'class="panel'))
+) '192.27: #chassisScreenMini/#chassisCoreMini sit inside .casing-top, which carries no data-tab gating and no panel wrapper -- the mini core is visible on every subsystem/page, not settings-only'
+
+# 192.28  the Director Uplink header no longer hosts a second mini-core mirror
+#         -- placement is singular (the casing-top screen only), so the two
+#         views can never drift or double-render. Reuses the 192.22
+#         $ovsHeadBlock192 slice.
+Check (
+    -not ($ovsHeadBlock192.Contains('id="chassisCoreMini"'))
+) '192.28: the Director Uplink/Overseer header does not carry a second chassisCoreMini mirror -- the mini core lives ONLY in the casing-top screen'
+
+# 192.29  #14 3D ring burst -- _coreStatBurst()/_emitStatChangeIfDiffers()
+#         exist, the burst routes through the SAME gated _coreOneShot() every
+#         other flourish uses (no bespoke reduced-motion carve-out), and the
+#         RobcoEvents bus fires it on both level.up and a real stat.change.
+$statBurstBody192 = Get-FunctionBody $core192 '_coreStatBurst'
+Check (
+    ($statBurstBody192 -match "_coreOneShot\('core-stat-burst'") -and
+    ($wireBody192 -match "RobcoEvents\.on\('level\.up',\s*\(\)\s*=>\s*_coreStatBurst\(\)\)") -and
+    ($wireBody192 -match "RobcoEvents\.on\('stat\.change',\s*\(\)\s*=>\s*_coreStatBurst\(\)\)")
+) '192.29: _coreStatBurst() routes through the shared, gated _coreOneShot() and RobcoEvents wires BOTH level.up and stat.change to trigger it'
+
+# 192.30  _emitStatChangeIfDiffers() only emits stat.change on a REAL value
+#         change (not on every call/every render) -- a static shape check (old
+#         !== undefined guard so the first-ever call per key never fires, and
+#         old !== newVal so a same-value re-set never fires), plus every
+#         drag-style stat setter (HP/XP/RAD bars, the skill VU meter) and the
+#         onchange commitStat() path call it/emit directly.
+$emitDiffersBody192 = Get-FunctionBody $core192 '_emitStatChangeIfDiffers'
+$applyHpBody192 = Get-FunctionBody $core192 'setupHpBarInteraction'
+$applyXpBody192 = Get-FunctionBody $core192 'setupXpBarInteraction'
+$wireRadBody192 = Get-FunctionBody $core192 '_wireRadDragSurface'
+$skillVuSetBody192 = Get-FunctionBody $core192 '_skillVuSet'
+$commitStatBody192 = Get-FunctionBody $core192 'commitStat'
+Check (
+    ($emitDiffersBody192 -match 'old !== undefined') -and
+    ($emitDiffersBody192 -match 'old !== newVal') -and
+    ($emitDiffersBody192 -match "RobcoEvents\.emit\('stat\.change'") -and
+    ($applyHpBody192 -match "_emitStatChangeIfDiffers\('hp',\s*newHp\)") -and
+    ($applyXpBody192 -match "_emitStatChangeIfDiffers\('xp',\s*newXp\)") -and
+    ($wireRadBody192 -match "_emitStatChangeIfDiffers\('rads',\s*newRads\)") -and
+    ($skillVuSetBody192 -match "_emitStatChangeIfDiffers\('skill:'\s*\+\s*key,\s*v\)") -and
+    ($commitStatBody192 -match "RobcoEvents\.emit\('stat\.change'")
+) '192.30: _emitStatChangeIfDiffers() only fires stat.change on a genuine value change (never the first-seen baseline, never a same-value re-set), and every drag-style stat setter plus commitStat() feeds it/emits directly'
+
+# 192.31  the 3D orbital burst is real CSS (rotateX/rotateY/rotateZ keyframes,
+#         a distinct per-ring tumble via .core-stat-burst on the SAME
+#         .chassis-core-shape shared by both the full core and the
+#         casing-top mini core), and it is caught by the SAME .core-still gate
+#         that already pauses every other .c-ring animation -- no second gate
+#         was written for it.
+Check (
+    ($cssStripped192 -match 'rotateX') -and
+    ($cssStripped192 -match 'rotateY') -and
+    ($cssStripped192 -match 'rotateZ') -and
+    ($cssStripped192 -match '\.chassis-core-shape\.core-stat-burst \.c-ring\.r1') -and
+    ($cssStripped192 -match '\.chassis-core-shape\.core-stat-burst \.c-ring\.r2') -and
+    ($cssStripped192 -match '\.chassis-core-shape\.core-stat-burst \.c-ring\.r3') -and
+    ($cssStripped192 -match '(?s)\.core-still,[\s\S]*\.c-ring,[\s\S]*\.c-heart')
+) '192.31: the 3D orbital burst (rotateX/rotateY/rotateZ per-ring keyframes on .core-stat-burst) applies to the same .chassis-core-shape used by both cores, and is stilled by the existing generic .core-still .c-ring gate -- no bespoke reduced-motion carve-out'
+
+# 192.32  zero campaign-state write -- the new #14 functions never touch
+#         saveState()/robco_v8/state.<field>= (extends the existing 192.15
+#         guard to the new code).
+Check (
+    (-not ($statBurstBody192 -match 'saveState\(\)')) -and
+    (-not ($statBurstBody192 -match 'robco_v8')) -and
+    (-not ($emitDiffersBody192 -match 'saveState\(\)')) -and
+    (-not ($emitDiffersBody192 -match 'robco_v8'))
+) '192.32: _coreStatBurst()/_emitStatChangeIfDiffers() are free of saveState()/robco_v8 writes -- purely a transient in-memory/DOM flourish, extending the 192.15 zero-write guard'
 
 # ===========================================================
 # Results
