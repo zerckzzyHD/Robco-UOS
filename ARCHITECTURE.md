@@ -69,8 +69,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2484-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2484-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2488-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2488-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -962,9 +962,17 @@ to match the split (Suite 176.8/192 both guard this).
 **THE LIVING CORE (`js/ui-core.js`, the "CHASSIS CORE" block, co-located with the DO-O Overseer
 block it reuses):** a shared visual shell, `.chassis-core-shape` (rings + a pulsing heart, CSS-only
 — no canvas), carried by BOTH `#chassisCore` (a real `<button>`, BUS-22, Protocol UI-5) and
-`#chassisCoreMini` (a decorative `aria-hidden` mirror in the Director Uplink's `.ovs-head` header —
-the waveform is the AI's voice, the core is machine power, kept minimal so it never crowds the
-scope). One choke point paints both from a single snapshot:
+`#chassisCoreMini` (a decorative `aria-hidden` mirror). **Owner follow-up:** the mini mirror
+originally lived in the Director Uplink's `.ovs-head` header, but read poorly squeezed next to the
+Overseer waveform there — it now lives in its own dedicated readout window, `#chassisScreenMini`
+(a small dark recessed "screen" matching `.telemetry`'s CRT-window language), built into the
+**always-visible casing-top header** (the `ROBCO INDUSTRIES` brand plate + PWR/UPLINK/FAULT lamps +
+backplane vents + uptime line) — pushed to the right of that header via `margin-left: auto` on the
+same flex row as the brand plate/lamp row/vents (`.uptime-line`'s own `flex-basis: 100%` still
+forces the uptime line onto its own row below, unaffected). The screen shrinks from 44×34px to
+36×28px under the existing `@media (max-width: 480px)` casing-shrink block so the header never
+overflows at 360/412px; `#chassisCoreMini` itself grew from 20px to 26px now that it has real room.
+One choke point paints both from a single snapshot:
 
 | Function                                | Role                                                                                                                                                                                                                                                                                                                                                            |
 | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1022,11 +1030,38 @@ entries, one per behaviour) into the shared `#sysModal` via `openModal()`.
 device telemetry; no function in the CHASSIS CORE block ever touches `state.*`, `saveState()`, or
 `robco_v8` (Suite 192.15, a static grep across the whole block).
 
-Guarded by Suite 192 (both runners at parity, 22 tests): the three-board split, the button/mirror
-contract, `_coreRefresh()`'s single-query behaviour, the gate's four conditions, the `.core-still`
-CSS rule, every hook-point call site, the 4 `data.write` emit sites, the one-shot reflow-restart
-pattern, the Protocol 7 SFX reuse, the zero-campaign-write guard, the Protocol 17 tap-target floor,
-and game-agnosticism.
+Guarded by Suite 192 (both runners at parity, 26 tests): the three-board split, the button/mirror
+contract, the casing-top screen's placement/sizing (192.23), the `.chassis-core-shape` self-clip
+regression guard (192.24 — Protocol 42, see below), the `#chassisScreenMini` aria-prohibited-attr
+regression guard (192.25 — Protocol 42, see below), the compound-selector specificity regression
+guard (192.26 — Protocol 42, see below), `_coreRefresh()`'s single-query behaviour, the gate's four
+conditions, the `.core-still` CSS rule, every hook-point call site, the 4 `data.write` emit sites,
+the one-shot reflow-restart pattern, the Protocol 7 SFX reuse, the zero-campaign-write guard, the
+Protocol 17 tap-target floor, and game-agnosticism.
+
+**Owner follow-up + three Protocol 42 fixes (same commit):** the mini-core's ring/heart children are
+positioned via percentage `inset` + a `border`, and at the mini core's new 26px size that
+combination could round to a couple of stray px past `.chassis-core-shape`'s own box — caught live
+by the gate's populated-save render-check (an inner-overflow scan across the fully rendered app,
+not a synthetic test). `.chassis-core-shape` now declares `overflow: hidden`, which is safe and
+correct: it is a self-contained circular cell by design (the clip is imperceptible — the shape
+already reads as a circle via `border-radius: 50%`), and `.core-help-btn` is a SIBLING of
+`.chassis-core-shape` inside `.chassis-core-shell`, never a descendant, so the clip never touches
+it. `overflow: hidden` alone does not change `scrollWidth`, so the actual gate-passing fix is a new
+allowlist entry in `tests/render-check.mjs`'s populated-save scrollWidth scan (`cls.includes(
+'chassis-core-shape')`) — the same harmless decorative-bleed category already covering the BUS-02
+fader cap and the BUS-08 reputation console's pin markers. Separately, the gate's axe scan caught a
+new `aria-prohibited-attr` violation: `#chassisScreenMini` is a plain, non-interactive `<div>`
+whose implicit ARIA role is "generic," which does not support `aria-label` — fixed by dropping the
+label in favor of `aria-hidden="true"` (matching `#chassisCoreMini`'s own decorative marker) while
+keeping `title` as a harmless mouse-only tooltip (not an ARIA attribute). A third fix, also found
+live during render-verify: `#chassisCoreMini` carries BOTH `.chassis-core-shape` (the shared 96px
+base) and `.chassis-core-mini` (its own size) — a bare `.chassis-core-mini { ... }` rule ties in
+specificity with `.chassis-core-shape { ... }`, so whichever sits LATER in the file silently wins
+regardless of intent, which twice defeated the mini-core's own sizing (the 26px base, then the
+20px mobile shrink) depending on where each rule happened to sit relative to the shared base.
+Fixed by giving every mini-core sizing rule the compound `.chassis-core-shape.chassis-core-mini`
+selector (0,2,0), which always beats the shared base (0,1,0) regardless of source order.
 
 ---
 
@@ -2617,7 +2652,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2484-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2488-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

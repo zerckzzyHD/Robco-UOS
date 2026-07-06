@@ -1871,10 +1871,11 @@ window.initOverseerScope = initOverseerScope;
 // setOverseerState()/_isUplinkConnected()/AmbientRuntime/RobcoEvents, never
 // re-instruments transmitMessage()/appendToChat() itself. _coreRefresh() is
 // the ONE choke point that recomputes every continuous signal and paints
-// BOTH the full BUS-22 instrument (#chassisCore) and the mini mirror in the
-// Overseer header (#chassisCoreMini) from the SAME snapshot — one shared
-// source, so the two views can never drift (document.querySelectorAll keys
-// off the shared .chassis-core-shape class both elements carry). Continuous
+// BOTH the full BUS-22 instrument (#chassisCore) and the mini mirror in its
+// own casing-top readout window (#chassisCoreMini inside #chassisScreenMini)
+// from the SAME snapshot — one shared source, so the two views can never
+// drift (document.querySelectorAll keys off the shared .chassis-core-shape
+// class both elements carry). Continuous
 // motion (ring spin / heart pulse / flicker / fault ring / radio shimmer) is
 // a plain CSS `animation:`, gated as a GROUP by _coreShouldAnimate() via the
 // .core-still class; one-shot flourishes (level-up flare, save/sync pulse,

@@ -598,6 +598,40 @@ button.lamp {
   font-size: 11px;
   opacity: 0.85;
 }
+/* CHASSIS mini-core readout window (owner follow-up) — a small framed
+   "screen" built into the ROBCO INDUSTRIES casing-top header, pushed to the
+   right where the header has clear open space, alongside the PWR/UPLINK/
+   FAULT lamps and the backplane vents. Always visible (the casing-top never
+   hides), machine-language dark recessed glass matching .telemetry's own
+   CRT-window treatment. The mini core itself (#chassisCoreMini) is styled
+   with the shared .chassis-core-shape system further down (Protocol 22). */
+.chassis-screen-mini {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 34px;
+  flex-shrink: 0;
+  border: 1px solid rgba(0, 0, 0, 0.7);
+  border-radius: 4px;
+  background: #0d0a04;
+  box-shadow:
+    inset 0 1px 4px rgba(0, 0, 0, 0.9),
+    inset 0 0 10px rgba(var(--robco-green-rgb), 0.08);
+}
+/* Base size for the mini core itself (#chassisCoreMini) — a COMPOUND selector
+   (Protocol 42 fix, found live during render-verify): `#chassisCoreMini`
+   carries BOTH `.chassis-core-shape` (the shared 96px base, defined further
+   down the file) and `.chassis-core-mini`. A bare `.chassis-core-mini { ... }`
+   has the SAME specificity as `.chassis-core-shape { ... }`, so whichever one
+   is later in source order wins regardless of which is "supposed to"
+   override the other — this compound form (0,2,0) always beats the shared
+   base (0,1,0) no matter where either rule sits in the file. */
+.chassis-core-shape.chassis-core-mini {
+  width: 26px;
+  height: 26px;
+}
 
 /* The curved glass — CRT-frame chrome. Curvature/vignette live on THIS
    frame layer only; nothing inside .main-grid is ever transformed. */
@@ -3487,6 +3521,22 @@ button.mode-pill--overseer:hover {
   input[type='number'] {
     max-width: 56px;
     box-sizing: border-box;
+  }
+
+  /* The casing-top readout window shrinks a touch at narrow widths so the
+     header (brand plate + lamps + vents + screen) has room to wrap cleanly
+     instead of ever forcing a scrollbar (Protocol 17 — the core itself, 26px,
+     stays comfortably clear of any tap-target floor since it's decorative).
+     The compound .chassis-core-shape.chassis-core-mini selector (Protocol 42
+     — see the base rule's comment) keeps this shrink effective regardless of
+     source order relative to the shared .chassis-core-shape base rule. */
+  .chassis-screen-mini {
+    width: 36px;
+    height: 28px;
+  }
+  .chassis-core-shape.chassis-core-mini {
+    width: 20px;
+    height: 20px;
   }
 
   /* Nested value wrappers (HP/LVL "cur / max") and the limb button groups stay
@@ -9636,10 +9686,10 @@ g.node:focus-visible .focusring {
 
 /* The living core — a decorative shell shared verbatim (Protocol 22) between
    the full BUS-22 instrument (#chassisCore, a real <button> — Protocol UI-5)
-   and the mini mirror in the Overseer Uplink header (#chassisCoreMini, a
-   decorative aria-hidden <span>). Both carry the SAME .chassis-core-shape
-   base class plus state-modifier classes applied by the ONE shared
-   _coreRefresh() (ui-core.js), so they can never drift. */
+   and the mini mirror in its own casing-top readout window (#chassisCoreMini,
+   a decorative aria-hidden <span> inside #chassisScreenMini). Both carry the
+   SAME .chassis-core-shape base class plus state-modifier classes applied by
+   the ONE shared _coreRefresh() (ui-core.js), so they can never drift. */
 .chassis-core-shell {
   position: relative;
   display: inline-flex;
@@ -9655,6 +9705,16 @@ g.node:focus-visible .focusring {
   padding: 0;
   min-height: 0; /* override the global button{min-height:28px} — a decorative
                     circle sized by width/height, not line-height */
+  /* Owner follow-up fix (Protocol 42, found live during render-verify at the
+     new 26px mini size): the ring/heart children are positioned by percentage
+     inset + a border, and at small sizes that combination can round to a
+     couple of stray px past the shape's own box — caught by the gate's
+     populated-save inner-overflow scan. The shape is a self-contained
+     circular cell by design, so clipping its own bleed at its own boundary is
+     correct (never visible — border-radius:50% already reads as circular),
+     and .core-help-btn is a SIBLING of this class inside .chassis-core-shell,
+     never a descendant, so it is unaffected. */
+  overflow: hidden;
 }
 button.chassis-core-shape {
   width: 96px; /* override the global button{width:100%} (Protocol UI-5) */
@@ -9723,14 +9783,15 @@ button.chassis-core-shape {
   color: var(--robco-green);
 }
 
-/* Mini mirror — a small reactor glyph in the Overseer header (decorative,
-   no r2/cap — kept minimal per owner directive so it never crowds the
-   waveform). Same state classes, smaller geometry. */
-.chassis-core-mini {
-  width: 20px;
-  height: 20px;
-  margin-left: 2px;
-}
+/* Mini mirror — a small reactor glyph sized to actually read well inside its
+   own casing-top screen (owner follow-up: squeezed next to the Overseer
+   waveform it was both hard to see and hard to make look good; a dedicated
+   readout window gives it real room). No r2/cap — kept minimal for the small
+   frame. Same state classes, smaller geometry. The base width/height rule
+   lives up near .chassis-screen-mini (Protocol 42 fix — see that comment for
+   why: it must stay BEFORE its own @media (max-width:480px) shrink override
+   in source order, or the equal-specificity base rule wins regardless of the
+   media query, silently defeating the mobile shrink). */
 .chassis-core-mini .c-ring {
   border-width: 1px;
 }

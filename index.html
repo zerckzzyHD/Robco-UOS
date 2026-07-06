@@ -292,6 +292,31 @@
           </button>
         </div>
         <div class="vents" aria-hidden="true"></div>
+        <!-- CHASSIS mini core mirror — a small dedicated readout window built
+             into the casing-top header (owner request: the core reads better
+             here than squeezed into the Director Uplink header, and this
+             header is always visible, unlike a subsystem panel). Shares the
+             SAME .chassis-core-shape class + the single _coreRefresh() paint
+             as the full BUS-22 core (Protocol 22 — one truth, no drift).
+             Purely decorative (aria-hidden — a plain, non-interactive <div>'s
+             implicit "generic" role does not support aria-label, per axe's
+             aria-prohibited-attr rule; title still gives sighted mouse users
+             a tooltip, which is not an ARIA attribute). -->
+        <div
+          class="chassis-screen-mini"
+          id="chassisScreenMini"
+          title="Unit power (see CHASSIS)"
+          aria-hidden="true"
+        >
+          <span
+            class="chassis-core-shape chassis-core-mini"
+            id="chassisCoreMini"
+            aria-hidden="true"
+          >
+            <span class="c-ring r1"></span><span class="c-ring r3"></span>
+            <span class="c-heart"></span>
+          </span>
+        </div>
         <p class="uptime-line">
           SECURE NETWORK LINK ESTABLISHED _ | UPTIME: <span id="uptimeClock">00:00:00</span>
         </p>
@@ -3607,20 +3632,6 @@
                 <span class="ovs-lamp" aria-hidden="true"></span>
                 <span id="ovsTitle">DIRECTOR UPLINK</span>
                 <span class="ovs-carrier" id="ovsRelay">CARRIER LINK</span>
-                <!-- CHASSIS mini core mirror — a small reactor glyph reflecting the
-                     SAME shared _coreRefresh() drive-state as the full BUS-22 core
-                     (single source, Protocol 22). The waveform above is the AI
-                     voice; this is machine power — kept minimal so it never
-                     crowds the Overseer scope. Decorative only (aria-hidden). -->
-                <span
-                  class="chassis-core-shape chassis-core-mini"
-                  id="chassisCoreMini"
-                  aria-hidden="true"
-                  title="Unit power (see CHASSIS)"
-                >
-                  <span class="c-ring r1"></span><span class="c-ring r3"></span>
-                  <span class="c-heart"></span>
-                </span>
                 <button
                   onclick="clearChat()"
                   class="action-btn btn-sm ovs-purge-btn"

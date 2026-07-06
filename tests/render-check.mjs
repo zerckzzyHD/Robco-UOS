@@ -394,6 +394,15 @@ for (const vp of VIEWPORTS) {
           // overflow (the SAVE_VIEWPORTS page-overflow check already covers
           // that separately).
           if (cls.includes('facon-scale') || cls.includes('facon-mini')) return false;
+          // CHASSIS LIVING CORE (Protocol UI-10): the ring/heart children are
+          // positioned via percentage inset + a border, and at the mini
+          // core's compact size that combination can round to a couple of
+          // stray px past the shape's own box — the same harmless,
+          // visually-contained decorative-bleed category as the entries
+          // above (the shape already clips its own rendering via
+          // overflow:hidden; this is purely a scrollWidth measurement
+          // artifact, never a page-level overflow).
+          if (cls.includes('chassis-core-shape')) return false;
           return true;
         })
         .map(

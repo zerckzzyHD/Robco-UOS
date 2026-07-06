@@ -28451,9 +28451,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  layer over REAL machine signals (setOverseerState/_isUplinkConnected/
 //  AmbientRuntime/RobcoEvents — reused, never forked), gate-stacked to a
 //  single static frame, zero campaign-state write, and mirrored verbatim
-//  (single shared _coreRefresh() choke point) into a mini glyph in the
-//  Overseer Uplink header.
-//  22 tests
+//  (single shared _coreRefresh() choke point) into a mini glyph. UPDATED
+//  (owner follow-up): the mini glyph moved from the Overseer Uplink header
+//  into its own dedicated readout window in the always-visible casing-top
+//  header (#chassisScreenMini), since it read poorly squeezed next to the
+//  Overseer waveform.
+//  26 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 192 — Design Overhaul CHASSIS unit: THE LIVING CORE');
@@ -28735,13 +28738,83 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '192.21: BUS-22/23/24 each carry <summary><h2>> (Protocol UI-1 panel heading standard)'
   );
 
-  // 192.22  the mini core mirror sits in the Overseer Uplink header (.ovs-head)
-  //         WITHOUT altering the existing waveform (#overseerScope) markup
+  // 192.22  UPDATED (owner follow-up): the mini core mirror was moved out of
+  //         the Overseer Uplink header into its own dedicated readout window
+  //         built into the casing-top header (#chassisScreenMini), which is
+  //         always visible — WITHOUT altering the Overseer waveform
+  //         (#overseerScope) markup, and no longer present in .ovs-head
+  const casingTopBlock192 = (html192.match(
+    /<div class="casing-top">[\s\S]*?<div class="bezel">/
+  ) || [''])[0];
   const ovsHeadBlock192 = (html192.match(/<div class="ovs-head">[\s\S]*?<\/div>/) || [''])[0];
   assert(
-    ovsHeadBlock192.includes('id="chassisCoreMini"') &&
+    /<div\s+class="chassis-screen-mini"\s+id="chassisScreenMini"/.test(casingTopBlock192) &&
+      casingTopBlock192.includes('id="chassisCoreMini"') &&
+      !ovsHeadBlock192.includes('id="chassisCoreMini"') &&
       /<canvas id="overseerScope" aria-hidden="true"><\/canvas>/.test(html192),
-    '192.22: #chassisCoreMini sits in the Overseer Uplink header (.ovs-head), and the #overseerScope waveform canvas is untouched'
+    '192.22: #chassisCoreMini sits in its own #chassisScreenMini readout window inside the always-visible casing-top header (not the Overseer Uplink header), and the #overseerScope waveform canvas is untouched'
+  );
+
+  // 192.23  the casing-top screen is pushed to the right of the header (the
+  //         owner's requested placement) via margin-left:auto, and is sized
+  //         to actually be visible/legible rather than a near-invisible sliver
+  const screenRule192 = (cssStripped192.match(/\.chassis-screen-mini\s*\{[^}]*\}/) || [''])[0];
+  const screenWMatch192 = screenRule192.match(/width:\s*(\d+)px/);
+  const screenHMatch192 = screenRule192.match(/height:\s*(\d+)px/);
+  const screenW192 = screenWMatch192 ? Number(screenWMatch192[1]) : 0;
+  const screenH192 = screenHMatch192 ? Number(screenHMatch192[1]) : 0;
+  assert(
+    /margin-left:\s*auto/.test(screenRule192) && screenW192 >= 30 && screenH192 >= 20,
+    `192.23: .chassis-screen-mini is pushed to the right of the casing-top header (margin-left:auto) and sized to be legible (${screenW192}x${screenH192}px, not a near-invisible sliver)`
+  );
+
+  // 192.24  Protocol 42 regression guard — a real overflow found live by the
+  //         gate's populated-save render-check: at the new 26px mini size,
+  //         the ring/heart children's percentage-inset + border positioning
+  //         rounds to a couple of stray px past the shape's own box. Two
+  //         parts: .chassis-core-shape visually clips its own bleed
+  //         (overflow:hidden — never visible, it's already a circle;
+  //         .core-help-btn is a SIBLING inside .chassis-core-shell, never a
+  //         descendant, so it is unaffected) AND the render-check's
+  //         populated-save scrollWidth scan allowlists the class (since
+  //         overflow:hidden does not itself change scrollWidth — the actual
+  //         gate-passing fix).
+  const renderCheckSrc192 = readFile('tests/render-check.mjs');
+  assert(
+    /overflow:\s*hidden/.test(coreShapeRule192) &&
+      /cls\.includes\('chassis-core-shape'\)/.test(renderCheckSrc192),
+    "192.24: .chassis-core-shape clips its own ring/heart bleed (overflow:hidden) AND is allowlisted in render-check.mjs's populated-save scrollWidth scan (the harmless decorative-bleed category, matching the .facon-mini/.facon-scale precedent) — fixes a real render-check-caught overflow at the small mini-core size, never affecting the sibling .core-help-btn"
+  );
+
+  // 192.25  Protocol 42 regression guard — a real a11y regression found live
+  //         by the gate's axe scan: #chassisScreenMini is a plain,
+  //         non-interactive <div> whose implicit ARIA role is "generic",
+  //         which does not support aria-label (axe's aria-prohibited-attr
+  //         rule) — it must stay aria-hidden with no naming attribute
+  //         (a mouse-only title tooltip is fine; that is not an ARIA attr).
+  const screenTag192 = (html192.match(/<div[^>]*id="chassisScreenMini"[^>]*>/) || [''])[0];
+  assert(
+    /aria-hidden="true"/.test(screenTag192) && !/aria-label=/.test(screenTag192),
+    '192.25: #chassisScreenMini is aria-hidden with no aria-label (a generic-role <div> cannot carry one — axe aria-prohibited-attr)'
+  );
+
+  // 192.26  Protocol 42 regression guard — a real live-render bug found
+  //         during render-verify: #chassisCoreMini carries BOTH
+  //         .chassis-core-shape (the shared 96px base) and .chassis-core-mini
+  //         (its own size). A bare `.chassis-core-mini { ... }` rule has the
+  //         SAME specificity as `.chassis-core-shape { ... }`, so whichever
+  //         one sits LATER in the file silently wins, regardless of which is
+  //         "supposed to" override the other — this bit twice (the 26px base
+  //         size, then the 20px @media(max-width:480px) mobile shrink) before
+  //         landing on the fix: every mini-core SIZING rule must use the
+  //         compound `.chassis-core-shape.chassis-core-mini` selector
+  //         (0,2,0), which always beats the shared base (0,1,0) regardless of
+  //         source order. The .c-ring/.c-cap descendant overrides are
+  //         unaffected (no competing equal-specificity rule exists for them).
+  assert(
+    (cssStripped192.match(/\.chassis-core-shape\.chassis-core-mini\s*\{/g) || []).length >= 2 &&
+      !/(?<!\.chassis-core-shape)\.chassis-core-mini\s*\{/.test(cssStripped192),
+    '192.26: every #chassisCoreMini sizing rule (base + the @media(max-width:480px) mobile shrink) uses the compound .chassis-core-shape.chassis-core-mini selector, never a bare .chassis-core-mini that would tie in specificity with .chassis-core-shape and silently lose by source order'
   );
 }
 
