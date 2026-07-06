@@ -18253,6 +18253,63 @@ Check (
     (-not ($emitDiffersBody192 -match 'robco_v8'))
 ) '192.32: _coreStatBurst()/_emitStatChangeIfDiffers() are free of saveState()/robco_v8 writes -- purely a transient in-memory/DOM flourish, extending the 192.15 zero-write guard'
 
+# 192.33  owner prominence-pass follow-up -- the casing-top screen/mini-core
+#         now scales across THREE size tiers (desktop base > the
+#         >400-480px tier > the <=400px tier), each strictly bigger than the
+#         last, and every tier is bigger than the pre-prominence-pass
+#         baseline (44x34 screen / 26x26 core desktop, 36x28 / 20x20 old
+#         mobile) -- locking the regression so a future edit can't quietly
+#         shrink it back down.
+$tier480Rule192 = [regex]::Match($cssStripped192, '(?s)@media \(max-width:\s*480px\)\s*\{[\s\S]*?\.chassis-screen-mini\s*\{([^\}]*)\}[\s\S]*?\.chassis-core-shape\.chassis-core-mini\s*\{([^\}]*)\}')
+$tier480ScreenBody192 = $tier480Rule192.Groups[1].Value
+$tier480CoreBody192 = $tier480Rule192.Groups[2].Value
+$tier400Block192 = [regex]::Match($cssStripped192, '(?s)@media \(max-width:\s*400px\)\s*\{([\s\S]*?)\n\}').Groups[1].Value
+$tier400ScreenBody192 = [regex]::Match($tier400Block192, '(?s)\.chassis-screen-mini\s*\{([^\}]*)\}').Groups[1].Value
+$tier400CoreBody192 = [regex]::Match($tier400Block192, '(?s)\.chassis-core-shape\.chassis-core-mini\s*\{([^\}]*)\}').Groups[1].Value
+$coreShapeMiniBaseBody192 = [regex]::Match($cssStripped192, '(?s)\.chassis-core-shape\.chassis-core-mini\s*\{([^\}]*)\}').Groups[1].Value
+function Get-NumPx192($body, $prop) {
+    $m = [regex]::Match($body, "$prop`:\s*(\d+)px")
+    if ($m.Success) { return [int]$m.Groups[1].Value }
+    return 0
+}
+$desktopScreenW192 = Get-NumPx192 $screenRule192 'width'
+$desktopCoreW192 = Get-NumPx192 $coreShapeMiniBaseBody192 'width'
+$tier480ScreenW192 = Get-NumPx192 $tier480ScreenBody192 'width'
+$tier480CoreW192 = Get-NumPx192 $tier480CoreBody192 'width'
+$tier400ScreenW192 = Get-NumPx192 $tier400ScreenBody192 'width'
+$tier400CoreW192 = Get-NumPx192 $tier400CoreBody192 'width'
+Check (
+    ($desktopScreenW192 -gt $tier480ScreenW192) -and
+    ($tier480ScreenW192 -gt $tier400ScreenW192) -and
+    ($desktopCoreW192 -gt $tier480CoreW192) -and
+    ($tier480CoreW192 -gt $tier400CoreW192) -and
+    ($tier400ScreenW192 -gt 36) -and
+    ($tier400CoreW192 -gt 20) -and
+    ($desktopScreenW192 -ge 60) -and
+    ($desktopCoreW192 -ge 36)
+) "192.33: the casing-top screen/mini-core scale across three strictly-decreasing size tiers (desktop $desktopScreenW192/${desktopCoreW192}px > 401-480px tier $tier480ScreenW192/${tier480CoreW192}px > <=400px tier $tier400ScreenW192/${tier400CoreW192}px), and every tier is bigger than the pre-prominence-pass baseline (44/26px desktop, 36/20px old mobile)"
+
+# 192.34  owner prominence-pass follow-up -- the 3D ring burst is now
+#         substantially bigger and longer: every axis completes a full
+#         720deg double rotation (not the old 360deg single swing), the CSS
+#         animation-duration and the JS _coreOneShot() removal timeout both
+#         moved from 900ms/900 to a matching 1.4s/1400, and the burst now
+#         also flares the heart (paired with the ring tumble so the whole
+#         event reads as one unmistakable flourish, not just the rings) via
+#         the same box-shadow/transform mechanism every other one-shot
+#         flourish already uses (Protocol 22).
+$burstCssBlock192 = [regex]::Match($cssStripped192, '(?s)@keyframes chassisCoreOrbitBurst1[\s\S]*?\.chassis-core-shape\.core-stat-burst \.c-heart[\s\S]*?\}').Value
+Check (
+    ($burstCssBlock192 -match 'rotateX\(720deg\)') -and
+    ($burstCssBlock192 -match 'rotateY\(720deg\)') -and
+    ($burstCssBlock192 -match 'rotateZ\(720deg\)') -and
+    ($burstCssBlock192 -match 'chassisCoreOrbitBurst1 1\.4s') -and
+    ($burstCssBlock192 -match 'chassisCoreOrbitBurst2 1\.4s') -and
+    ($burstCssBlock192 -match 'chassisCoreOrbitBurst3 1\.4s') -and
+    ($statBurstBody192 -match "_coreOneShot\('core-stat-burst',\s*1400\)") -and
+    ($burstCssBlock192 -match '(?s)\.core-stat-burst \.c-heart\s*\{[^\}]*box-shadow')
+) '192.34: the 3D ring burst now completes a full 720deg double rotation on every axis over a matching 1.4s CSS/JS duration, and flares the heart alongside the ring tumble -- a substantially more prominent event than the old 360deg/900ms swing'
+
 # ===========================================================
 # Results
 # ===========================================================

@@ -28923,6 +28923,83 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       !/robco_v8/.test(emitDiffersBody192),
     '192.32: _coreStatBurst()/_emitStatChangeIfDiffers() are free of saveState()/robco_v8 writes — purely a transient in-memory/DOM flourish, extending the 192.15 zero-write guard'
   );
+
+  // 192.33  owner prominence-pass follow-up — the casing-top screen/mini-core
+  //         now scales across THREE size tiers (desktop base > the
+  //         >400-480px tier > the <=400px tier), each strictly bigger than
+  //         the last, and every tier is bigger than the pre-prominence-pass
+  //         baseline (44x34 screen / 26x26 core desktop, 36x28 / 20x20 old
+  //         mobile) — locking the regression so a future edit can't quietly
+  //         shrink it back down.
+  const tier480Rule192 = (cssStripped192.match(
+    /@media \(max-width:\s*480px\)\s*\{[\s\S]*?\.chassis-screen-mini\s*\{([^}]*)\}[\s\S]*?\.chassis-core-shape\.chassis-core-mini\s*\{([^}]*)\}/
+  ) || ['', '', ''])[0];
+  const tier480ScreenBody192 = (tier480Rule192.match(/\.chassis-screen-mini\s*\{([^}]*)\}/) || [
+    '',
+    '',
+  ])[1];
+  const tier480CoreBody192 = (tier480Rule192.match(
+    /\.chassis-core-shape\.chassis-core-mini\s*\{([^}]*)\}/
+  ) || ['', ''])[1];
+  const tier400Block192 = (cssStripped192.match(
+    /@media \(max-width:\s*400px\)\s*\{([\s\S]*?)\n\}/
+  ) || ['', ''])[1];
+  const tier400ScreenBody192 = (tier400Block192.match(/\.chassis-screen-mini\s*\{([^}]*)\}/) || [
+    '',
+    '',
+  ])[1];
+  const tier400CoreBody192 = (tier400Block192.match(
+    /\.chassis-core-shape\.chassis-core-mini\s*\{([^}]*)\}/
+  ) || ['', ''])[1];
+  const coreShapeMiniBaseBody192 = (cssStripped192.match(
+    /\.chassis-core-shape\.chassis-core-mini\s*\{([^}]*)\}/
+  ) || ['', ''])[1];
+  const numPx192 = (body, prop) => {
+    const m = body.match(new RegExp(prop + ':\\s*(\\d+)px'));
+    return m ? Number(m[1]) : 0;
+  };
+  const desktopScreenW192 = numPx192(screenRule192, 'width');
+  const desktopCoreW192 = numPx192(coreShapeMiniBaseBody192, 'width');
+  const tier480ScreenW192 = numPx192(tier480ScreenBody192, 'width');
+  const tier480CoreW192 = numPx192(tier480CoreBody192, 'width');
+  const tier400ScreenW192 = numPx192(tier400ScreenBody192, 'width');
+  const tier400CoreW192 = numPx192(tier400CoreBody192, 'width');
+  assert(
+    desktopScreenW192 > tier480ScreenW192 &&
+      tier480ScreenW192 > tier400ScreenW192 &&
+      desktopCoreW192 > tier480CoreW192 &&
+      tier480CoreW192 > tier400CoreW192 &&
+      tier400ScreenW192 > 36 &&
+      tier400CoreW192 > 20 &&
+      desktopScreenW192 >= 60 &&
+      desktopCoreW192 >= 36,
+    `192.33: the casing-top screen/mini-core scale across three strictly-decreasing size tiers (desktop ${desktopScreenW192}/${desktopCoreW192}px > 401-480px tier ${tier480ScreenW192}/${tier480CoreW192}px > <=400px tier ${tier400ScreenW192}/${tier400CoreW192}px), and every tier is bigger than the pre-prominence-pass baseline (44/26px desktop, 36/20px old mobile)`
+  );
+
+  // 192.34  owner prominence-pass follow-up — the 3D ring burst is now
+  //         substantially bigger and longer: every axis completes a full
+  //         720deg double rotation (not the old 360deg single swing), the
+  //         CSS animation-duration and the JS _coreOneShot() removal timeout
+  //         both moved from 900ms/900 to a matching 1.4s/1400, and the burst
+  //         now also flares the heart (paired with the ring tumble so the
+  //         whole event reads as one unmistakable flourish, not just the
+  //         rings) via the same box-shadow/transform mechanism every other
+  //         one-shot flourish already uses (Protocol 22).
+  const burstCss192 = cssStripped192.match(
+    /@keyframes chassisCoreOrbitBurst1[\s\S]*?\.chassis-core-shape\.core-stat-burst \.c-heart[\s\S]*?\}/
+  );
+  const burstCssBlock192 = burstCss192 ? burstCss192[0] : '';
+  assert(
+    /rotateX\(720deg\)/.test(burstCssBlock192) &&
+      /rotateY\(720deg\)/.test(burstCssBlock192) &&
+      /rotateZ\(720deg\)/.test(burstCssBlock192) &&
+      /chassisCoreOrbitBurst1 1\.4s/.test(burstCssBlock192) &&
+      /chassisCoreOrbitBurst2 1\.4s/.test(burstCssBlock192) &&
+      /chassisCoreOrbitBurst3 1\.4s/.test(burstCssBlock192) &&
+      /_coreOneShot\('core-stat-burst',\s*1400\)/.test(statBurstBody192) &&
+      /\.core-stat-burst \.c-heart\s*\{[^}]*box-shadow/.test(burstCssBlock192),
+    '192.34: the 3D ring burst now completes a full 720deg double rotation on every axis over a matching 1.4s CSS/JS duration, and flares the heart alongside the ring tumble — a substantially more prominent event than the old 360deg/900ms swing'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════
