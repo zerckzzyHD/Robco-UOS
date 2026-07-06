@@ -6075,6 +6075,17 @@ input.num-sm {
      read as unresponsive, the same bug already fixed on the SKELETAL HARNESS bar. */
   transition: width 0.3s ease;
 }
+/* Owner follow-up (Protocol 27, 3rd report): even at the matched 0.3s duration,
+   the fill still visibly chased a fast real-time drag, since the transition
+   retriggers a fresh tween on every mousemove/touchmove target — unlike HP/XP,
+   nothing here ever suppressed it mid-drag. #opRadLineWrap.dragging (toggled by
+   _wireRadDragSurface(), mirroring the tempo dial's .knob2.dragging precedent)
+   zeroes the transition only while actively dragging, so the fill snaps exactly
+   to the pointer every frame; the 0.3s transition still applies to any
+   programmatic (non-drag) width change. */
+#opRadLineWrap.dragging i {
+  transition: none;
+}
 #opRadLineWrap i::after {
   content: '';
   position: absolute;
@@ -6499,6 +6510,13 @@ button.rb-key:disabled {
      fill visibly failed to track the cursor, reading as unresponsive/broken
      even though #stat_rads/state.rads were already updating correctly. */
   transition: width 0.3s ease;
+}
+/* Owner follow-up (Protocol 27, 3rd report) — same fix as #opRadLineWrap.dragging
+   above: #radDragTrack.dragging zeroes the fill's transition only while actively
+   dragging, so it snaps to the pointer every frame instead of visibly chasing a
+   fast drag; a programmatic (non-drag) width change still transitions at 0.3s. */
+#radDragTrack.dragging .bar-fill.rad {
+  transition: none;
 }
 .bio-actions {
   display: flex;

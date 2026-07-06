@@ -26070,6 +26070,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         addEventListener(type, fn) {
           (listeners[type] = listeners[type] || []).push(fn);
         },
+        classList: { add: () => {}, remove: () => {} },
       };
       const docListeners = {};
       const doc = {
@@ -27705,8 +27706,9 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 //  Suite 190 — Owner batch: VITAL TELEMETRY RAD trace drag, SKILL BOOKS/
 //  MAGAZINES live-count + stamp wrap, Module Bay panel-reopen fix, MINOR
-//  FACTIONS collapsible, faction pin-strip uniform width.
-//  14 tests.
+//  FACTIONS collapsible, faction pin-strip uniform width, RAD-drag
+//  transition-lag follow-up (dragging-class transition suppression).
+//  17 tests.
 // ══════════════════════════════════════════════════════════════
 {
   header(
@@ -27803,6 +27805,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         addEventListener(type, fn) {
           (listeners[type] = listeners[type] || []).push(fn);
         },
+        classList: { add: () => {}, remove: () => {} },
       };
       const docListeners = {};
       const doc = {
@@ -28011,6 +28014,43 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     assert(
       /flex:\s*0 0 90px/.test(faconMiniRule190) && !/flex:\s*1 1 60px/.test(faconMiniRule190),
       "190.11: .facon-mini uses a fixed flex:0 0 90px (no grow/shrink) instead of the old flex:1 1 60px, so every faction row's pin-strip track renders the same width regardless of name/standing length"
+    );
+  }
+
+  // 190.12  Owner follow-up (Protocol 27, 3rd report): both RAD fills still
+  //         visibly chased a fast real drag even at the matched 0.3s
+  //         transition duration — because nothing suspended that transition
+  //         WHILE actively dragging (unlike a snap-to-pointer feel), so every
+  //         mousemove/touchmove retriggered a fresh tween toward the newest
+  //         target. _wireRadDragSurface() now toggles a 'dragging' class on
+  //         the container (added on mousedown/touchstart, removed on
+  //         mouseup/touchend) — mirrors the tempo dial's .knob2.dragging
+  //         precedent (Protocol 22).
+  {
+    const wireBody190b = extractFunctionBody(core190, '_wireRadDragSurface');
+    assert(
+      /container\.classList\.add\('dragging'\)/.test(wireBody190b) &&
+        /container\.classList\.remove\('dragging'\)/.test(wireBody190b) &&
+        (wireBody190b.match(/container\.classList\.add\('dragging'\)/g) || []).length === 2 &&
+        (wireBody190b.match(/container\.classList\.remove\('dragging'\)/g) || []).length === 2,
+      "190.12: _wireRadDragSurface() adds the 'dragging' class on both mousedown AND touchstart, and removes it on both mouseup AND touchend — the RAD drag surface is marked dragging for the full duration of either input method"
+    );
+  }
+
+  // 190.13  The CSS half of 190.12 — while a RAD drag surface carries
+  //         .dragging, its fill's transition is suppressed entirely so it
+  //         snaps exactly to the pointer every frame; the 0.3s transition
+  //         (190.2b) still applies to any width change made outside an
+  //         active drag (e.g. an AI-driven rads update).
+  {
+    const cssStripped190d = css190.replace(/\/\*[\s\S]*?\*\//g, '');
+    assert(
+      /#opRadLineWrap\.dragging i\s*\{[^}]*transition:\s*none/.test(cssStripped190d),
+      '190.13a: #opRadLineWrap.dragging i sets transition:none — the VITAL TELEMETRY RAD trace never lags a real-time drag'
+    );
+    assert(
+      /#radDragTrack\.dragging \.bar-fill\.rad\s*\{[^}]*transition:\s*none/.test(cssStripped190d),
+      '190.13b: #radDragTrack.dragging .bar-fill.rad sets transition:none — the SKELETAL HARNESS RAD bar never lags a real-time drag either'
     );
   }
 }

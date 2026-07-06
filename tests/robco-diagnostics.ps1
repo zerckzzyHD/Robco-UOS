@@ -16225,6 +16225,7 @@ try {
   const container = {
     getBoundingClientRect: () => ({ left: 0, width: 100 }),
     addEventListener(type, fn) { (listeners[type] = listeners[type] || []).push(fn); },
+    classList: { add: () => {}, remove: () => {} },
   };
   const docListeners = {};
   const doc = {
@@ -17292,8 +17293,9 @@ Check (
 # ===========================================================
 # Suite 190 -- Owner batch: VITAL TELEMETRY RAD trace drag, SKILL BOOKS/
 # MAGAZINES live-count + stamp wrap, Module Bay panel-reopen fix, MINOR
-# FACTIONS collapsible, faction pin-strip uniform width.
-# Mirrors JS Suite 190. 14 tests.
+# FACTIONS collapsible, faction pin-strip uniform width, RAD-drag
+# transition-lag follow-up (dragging-class transition suppression).
+# Mirrors JS Suite 190. 17 tests.
 # ===========================================================
 Sep "Suite 190 -- owner batch: RAD trace drag, skill books/mags, panel persistence, MINOR FACTIONS, pin-strip"
 $core190 = Read-Src "js/ui-core.js"
@@ -17363,6 +17365,7 @@ try {
   const container = {
     getBoundingClientRect: () => ({ left: 0, width: 100 }),
     addEventListener(type, fn) { (listeners[type] = listeners[type] || []).push(fn); },
+    classList: { add: () => {}, remove: () => {} },
   };
   const doc = {
     getElementById: id => (id === 'opRadLineWrap' ? container : id === 'stat_rads' ? statRads : null),
@@ -17513,6 +17516,30 @@ $faconMiniRule190 = [regex]::Match($cssStripped190, '\.facon-mini\s*\{[^\}]*\}')
 Check (
     ($faconMiniRule190 -match 'flex:\s*0 0 90px') -and (-not ($faconMiniRule190 -match 'flex:\s*1 1 60px'))
 ) "190.11: .facon-mini uses a fixed flex:0 0 90px (no grow/shrink) instead of the old flex:1 1 60px, so every faction row's pin-strip track renders the same width regardless of name/standing length"
+
+# 190.12  Owner follow-up (Protocol 27, 3rd report): both RAD fills still
+#         visibly chased a fast real drag even at the matched 0.3s transition
+#         duration -- _wireRadDragSurface() now toggles a 'dragging' class on
+#         the container (added on mousedown/touchstart, removed on
+#         mouseup/touchend), mirroring the tempo dial's .knob2.dragging
+#         precedent (Protocol 22).
+$wireBody190b = Get-FunctionBody $core190 '_wireRadDragSurface'
+Check (
+    ($wireBody190b -match "container\.classList\.add\('dragging'\)") -and
+    ($wireBody190b -match "container\.classList\.remove\('dragging'\)") -and
+    (([regex]::Matches($wireBody190b, "container\.classList\.add\('dragging'\)")).Count -eq 2) -and
+    (([regex]::Matches($wireBody190b, "container\.classList\.remove\('dragging'\)")).Count -eq 2)
+) "190.12: _wireRadDragSurface() adds the 'dragging' class on both mousedown AND touchstart, and removes it on both mouseup AND touchend -- the RAD drag surface is marked dragging for the full duration of either input method"
+
+# 190.13  The CSS half of 190.12 -- while a RAD drag surface carries
+#         .dragging, its fill's transition is suppressed entirely so it
+#         snaps exactly to the pointer every frame.
+Check (
+    [System.Text.RegularExpressions.Regex]::IsMatch($cssStripped190, '#opRadLineWrap\.dragging i\s*\{[^\}]*transition:\s*none')
+) '190.13a: #opRadLineWrap.dragging i sets transition:none -- the VITAL TELEMETRY RAD trace never lags a real-time drag'
+Check (
+    [System.Text.RegularExpressions.Regex]::IsMatch($cssStripped190, '#radDragTrack\.dragging \.bar-fill\.rad\s*\{[^\}]*transition:\s*none')
+) '190.13b: #radDragTrack.dragging .bar-fill.rad sets transition:none -- the SKELETAL HARNESS RAD bar never lags a real-time drag either'
 
 # ===========================================================
 # Suite 191 -- BUS-15 CURIO ARCHIVE themed-object redesign: collectibles

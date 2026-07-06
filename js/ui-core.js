@@ -2476,6 +2476,21 @@ function setupXpBarInteraction() {
 // _syncOperatorTelemetry(), unlike #hp_bar_container/#xp_bar_container in the same
 // monitor. _wireRadDragSurface() is the one drag mechanism (Protocol 22 — no
 // duplicated logic) now attached to BOTH RAD surfaces from setupRadBarInteraction().
+//
+// Owner follow-up (Protocol 27 root cause, 3rd report): both RAD fills still
+// visibly lagged behind a real drag while HP/XP tracked instantly, even after
+// the touch-action/transition-duration fixes above — because the fills'
+// width transition (needed so a PROGRAMMATIC change, e.g. an AI update or
+// resting, still animates smoothly) was also active DURING an interactive
+// drag, so every fast mousemove/touchmove retriggered a fresh 0.3s tween
+// toward the newest target instead of jumping straight to it — a visible
+// "chasing" trail that HP/XP never show because nothing here suppresses
+// their transition mid-drag. A 'dragging' class (added on
+// mousedown/touchstart, removed on mouseup/touchend, mirroring the tempo
+// dial's .knob2.dragging precedent) now sets transition:none on the fill
+// only while the container carries it, so the bar snaps to the pointer's
+// exact position on every move with zero animation lag, while the 0.3s
+// transition still applies to any width change made outside an active drag.
 function _wireRadDragSurface(containerId) {
   const container = document.getElementById(containerId);
   if (!container) return;
@@ -2492,6 +2507,7 @@ function _wireRadDragSurface(containerId) {
   let dragging = false;
   container.addEventListener('mousedown', e => {
     dragging = true;
+    container.classList.add('dragging');
     applyRad(e);
   });
   document.addEventListener('mousemove', e => {
@@ -2499,11 +2515,13 @@ function _wireRadDragSurface(containerId) {
   });
   document.addEventListener('mouseup', () => {
     dragging = false;
+    container.classList.remove('dragging');
   });
   container.addEventListener(
     'touchstart',
     e => {
       dragging = true;
+      container.classList.add('dragging');
       applyRad(e);
       e.preventDefault();
     },
@@ -2518,6 +2536,7 @@ function _wireRadDragSurface(containerId) {
   );
   document.addEventListener('touchend', () => {
     dragging = false;
+    container.classList.remove('dragging');
   });
 }
 function setupRadBarInteraction() {

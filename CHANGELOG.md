@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2458/2458 | Cache: robco-terminal-v2.7.0-r95 -->
+﻿## [Unreleased]<!-- Tests: 2461/2461 | Cache: robco-terminal-v2.7.0-r96 -->
 
 ### Added
 
@@ -121,6 +121,7 @@
 - Your FACTION STANDING reputation console's MINOR FACTIONS group is now collapsible, tucked neatly under MAJOR FACTIONS, so you can hide it out of the way when you don't need it.
 - Fixed the little standing bars in your faction reputation console's at-a-glance list rendering at different widths depending on a faction's name or how far along its standing was — they're now all a consistent, aligned size.
 - Fixed Fallout 3's KARMA ALIGNMENT board showing your karma twice — the swing-needle gauge and the KARMA CENTER readout underneath it, both saying the same thing. Fallout 3 now shows only its own KARMA CENTER readout; New Vegas still shows the swing needle. The slider that actually sets your karma is unchanged and still works exactly the same in both games.
+- Fixed both radiation bars — the one in Vital Telemetry and the one on your Skeletal Harness — visibly trailing behind your finger or cursor while dragging, unlike the health and level/XP bars, which tracked instantly. Both radiation bars now snap to your exact drag position in real time with no lag, matching the feel of every other draggable bar.
 
 ### Improved
 
