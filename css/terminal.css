@@ -10,6 +10,17 @@
 }
 html {
   overflow-x: hidden;
+  /* Owner report: the browser's own default tap/active highlight box flashed
+     on the real interactive element underneath every dressed control (worst
+     on the CHASSIS living core, where it washed out the tap-to-poke pulse) —
+     "breaks immersion." -webkit-tap-highlight-color is NOT inherited by every
+     engine the same way a normal CSS property is, so it is set both here
+     (broad, catches most WebKit/Blink builds) and directly on the interactive
+     elements below (belt-and-suspenders for engines that look at the element
+     itself). This only suppresses the tap/mouse-active highlight OVERLAY —
+     :focus-visible (Protocol 17) is untouched and stays fully visible for
+     keyboard navigation. */
+  -webkit-tap-highlight-color: transparent;
 }
 body {
   background-color: #010a07;
@@ -217,6 +228,14 @@ select {
   width: 100%;
   text-align: center;
   padding: 4px 0;
+}
+button,
+a,
+summary,
+select,
+[role='button'],
+[role='tab'] {
+  -webkit-tap-highlight-color: transparent;
 }
 button {
   background: var(--robco-green);
@@ -7669,6 +7688,22 @@ button.mag {
      relic) are unaffected since there's nothing to gap against. */
   gap: 12px;
 }
+/* Owner report: the Lincoln relics rendered ONE PER ROW instead of side by
+   side like the snow globes/bobbleheads. Root cause — the disposition
+   <select> below sized itself to its own widest OPTION content (~234px,
+   see the .curio-linc-disposition comment below), which made every "found"
+   Lincoln cell far wider than the 88px object button above it; .curio-cell
+   has no width of its own (sizes to its widest child), so the row-flex's
+   flex-wrap only ever fit ONE such wide cell per line. Pinning the Lincoln
+   cell to a fixed compact width (min-width:0 lets it shrink below the
+   select's natural content width — the classic flexbox min-width:auto trap)
+   forces the select to size to ITS CELL instead of its content, restoring
+   the same side-by-side layout the other collectibles already have. */
+.curio-caselist--linc .curio-cell {
+  width: 128px;
+  flex: 0 0 128px;
+  min-width: 0;
+}
 .c-plate {
   font-size: 6.5px;
   letter-spacing: 0.5px;
@@ -7752,24 +7787,30 @@ button.curio-obj.tracker-toggle--inactive .c-chip {
    this control ~8px wider than an appearance:none version at the same
    content, and other engines are known to go considerably further. `
    appearance: none` (+ prefixes) strips that native chrome entirely so the
-   box is ALWAYS driven purely by this rule's own compact padding/min-height
-   — consistent and tight on every device, never at the mercy of native
-   control sizing. font-size stays >=16px (Protocol 17 — prevents iOS/
-   Android focus auto-zoom) and min-height stays >=28px (Protocol 17 tap
-   target floor); neither is reduced further, since both are hard mobile-
-   baseline requirements, not a source of the reported bloat — the fix is
-   entirely in removing native chrome and tightening padding/min-width. A
-   small CSS-drawn triangle (no extra DOM element) replaces the native
-   dropdown arrow appearance:none removes. */
+   box's PADDING is always driven by this rule, not native chrome variance.
+   Owner report round 3 (side-by-side): width: auto also meant the select
+   sized itself to its widest OPTION regardless of viewport, forcing every
+   found relic's cell wide enough to strand it one-per-row (see the
+   .curio-caselist--linc .curio-cell comment above). It now sizes to its
+   grid CELL instead (width: 100%, min-width: 0) with overflow/text-overflow
+   handling any label too long for that compact width the same graceful,
+   non-mid-glyph way ellipsis always does — the full label is still always
+   reachable by opening the dropdown's own option list. font-size stays
+   >=16px (Protocol 17 — prevents iOS/Android focus auto-zoom) and
+   min-height stays >=28px (Protocol 17 tap target floor); neither is
+   reduced to chase compactness. */
 .curio-linc-disposition {
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
   font-size: 16px;
   line-height: 1.1;
-  width: auto;
-  min-width: 64px;
-  max-width: 260px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   background-color: transparent;
   background-image:
     linear-gradient(45deg, transparent 50%, var(--robco-green) 50%),
@@ -9745,6 +9786,10 @@ g.node:focus-visible .focusring {
 button.chassis-core-shape {
   width: 96px; /* override the global button{width:100%} (Protocol UI-5) */
   cursor: pointer;
+  /* Owner report: the native tap-highlight box was the worst offender here,
+     washing out the core's own tap-to-poke pulse — belt-and-suspenders on
+     top of the broad html/button rules above. */
+  -webkit-tap-highlight-color: transparent;
 }
 .core-help-btn {
   position: absolute;

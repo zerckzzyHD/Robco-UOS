@@ -3361,6 +3361,22 @@ function _tempoPointerMove(ev) {
   document.querySelectorAll('.detent2').forEach(d => {
     d.classList.toggle('on', Number(d.dataset.i) === near);
   });
+  document.querySelectorAll('.tempo-tick').forEach(t => {
+    t.classList.toggle('lit', Number(t.dataset.i) === near);
+  });
+  // Owner report: the readout name/description used to only refresh on
+  // release (_setTempo -> _syncCampaignProfileUI), so the needle could point
+  // at CASUAL mid-drag while the readout still read COMPLETIONIST. Preview
+  // the readout (and the knob's own ARIA) at the nearest position live, on
+  // every drag frame — the actual value commit still only happens on
+  // pointerup (_tempoPointerUp -> _setTempo), unchanged.
+  const nearKey = _TEMPO_ORDER[near];
+  const readoutName = document.getElementById('tempoReadoutName');
+  if (readoutName) readoutName.textContent = _TEMPO_LABELS[nearKey];
+  const readoutDesc = document.getElementById('tempoReadoutDesc');
+  if (readoutDesc) readoutDesc.textContent = _TEMPO_DESC[nearKey];
+  knob.setAttribute('aria-valuenow', String(near));
+  knob.setAttribute('aria-valuetext', _TEMPO_LABELS[nearKey] + ' — ' + _TEMPO_DESC[nearKey]);
 }
 function _tempoPointerCleanup(knob) {
   knob.classList.remove('dragging');

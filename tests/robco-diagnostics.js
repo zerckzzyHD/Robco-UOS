@@ -24913,7 +24913,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  the needle (the knob's own rotation) always points at the active one.
 //  Owner directive: the knob performs NO action on tap — only a drag, a
 //  direct position tap, or the arrow keys change #playthroughTypeSelect.
-//  12 tests
+//  13 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 180 — OPERATIONAL TEMPO centered rotary dial (SU-3 rework)');
@@ -25153,6 +25153,29 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         !/animation:/.test(knob2Rule180) &&
         !/\.knob2[\s\S]{0,40}prefers-reduced-motion/.test(css180),
       '180.12: .knob2 rotates via a plain transition (no animation:) and declares no bespoke reduced-motion carve-out — the existing global block neutralises it automatically'
+    );
+  }
+
+  // 180.13  Owner report: the readout ("> TEMPO SELECTED / <NAME> / <desc>")
+  //         used to only refresh on release (_setTempo -> _syncCampaignProfileUI),
+  //         so the needle could point at a new position mid-drag while the
+  //         readout still showed the last COMMITTED one. _tempoPointerMove()
+  //         must live-preview the readout (+ the knob's own ARIA) to the
+  //         NEAREST drag position on every frame, while still never
+  //         committing the value itself (_setTempo/onPlaythroughTypeChange)
+  //         until pointerup (Suite 180.6/180.9 — commit-on-release unchanged).
+  {
+    const moveBody180 = extractFunctionBody(core180, '_tempoPointerMove');
+    assert(
+      /tempoReadoutName/.test(moveBody180) &&
+        /tempoReadoutDesc/.test(moveBody180) &&
+        /_TEMPO_LABELS\[nearKey\]/.test(moveBody180) &&
+        /_TEMPO_DESC\[nearKey\]/.test(moveBody180) &&
+        /aria-valuenow/.test(moveBody180) &&
+        /aria-valuetext/.test(moveBody180) &&
+        !/_setTempo\(/.test(moveBody180) &&
+        !/onPlaythroughTypeChange\(/.test(moveBody180),
+      "180.13: _tempoPointerMove() live-previews the readout name+description and the knob's ARIA to the nearest drag position on every frame, without ever committing (_setTempo/onPlaythroughTypeChange) until pointerup"
     );
   }
 }
@@ -28400,27 +28423,24 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   // 191.21  Owner report round 1: the Lincoln disposition <select> was a
   //         fixed width: 88px (matching the object button above it),
   //         clipping the longer labels ("HANNIBAL (FREE SLAVES)", "LEROY
-  //         WALKER (SLAVERS)") mid-glyph. It must size to its own content
-  //         (width: auto) with a generous max-width headroom — verified
-  //         live against the real rendered content need (~234px) — so no
-  //         option is ever clipped, while still capping well under the
-  //         narrowest supported viewport (360px) so it can never force
-  //         page-level horizontal overflow. min-width is now 64px (was
-  //         88px) — see 191.22 for why the box is compact regardless of
-  //         which disposition is selected.
+  //         WALKER (SLAVERS)") mid-glyph. SUPERSEDED (owner polish batch,
+  //         see Suite 193): sizing to its own widest-option content
+  //         (width:auto/min-width:64px/max-width:~234px) turned out to be
+  //         the Protocol 27 root cause of a LATER owner report — it forced
+  //         every "found" Lincoln cell wide enough to strand it one-per-row
+  //         instead of sitting side by side with its siblings. The select
+  //         now sizes to its (fixed-width) grid CELL instead, with ellipsis
+  //         for any label too long for that compact width — see Suite
+  //         193.5/193.6 for the current contract; this guard now only
+  //         confirms the old content-sizing contract is truly gone.
   {
     const cssStripped191k = css191.replace(/\/\*[\s\S]*?\*\//g, '');
     const dispositionRule191 = (cssStripped191k.match(/\.curio-linc-disposition\s*\{[^}]*\}/) || [
       '',
     ])[0];
-    const maxWidthMatch191 = dispositionRule191.match(/max-width:\s*(\d+)px/);
-    const maxWidthPx191 = maxWidthMatch191 ? Number(maxWidthMatch191[1]) : 0;
     assert(
-      /width:\s*auto/.test(dispositionRule191) &&
-        /min-width:\s*64px/.test(dispositionRule191) &&
-        maxWidthPx191 >= 230 &&
-        maxWidthPx191 < 360,
-      `191.21: .curio-linc-disposition sizes to its own content (width:auto, min-width:64px) with max-width:${maxWidthPx191}px — enough headroom for the longest disposition label (~234px measured live) without ever forcing horizontal overflow at the narrowest supported viewport (360px)`
+      !/width:\s*auto/.test(dispositionRule191) && !/min-width:\s*64px/.test(dispositionRule191),
+      '191.21: .curio-linc-disposition no longer sizes to its own widest-option content (width:auto/min-width:64px) — that contract was the Protocol 27 root cause of the later one-per-row stacking bug fixed in Suite 193'
     );
   }
 
@@ -28999,6 +29019,154 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       /_coreOneShot\('core-stat-burst',\s*1400\)/.test(statBurstBody192) &&
       /\.core-stat-burst \.c-heart\s*\{[^}]*box-shadow/.test(burstCssBlock192),
     '192.34: the 3D ring burst now completes a full 720deg double rotation on every axis over a matching 1.4s CSS/JS duration, and flares the heart alongside the ring tumble — a substantially more prominent event than the old 360deg/900ms swing'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 193 — Owner polish batch: tap-highlight kill + CURIO ARCHIVE
+//  Lincoln side-by-side grid (the OPERATIONAL TEMPO live-readout-while-
+//  dragging fix from this same batch is covered by Suite 180.13, added
+//  alongside this suite).
+//  Item 1: the browser's own default tap/active highlight box flashed on
+//  the real <button> underneath every dressed control (worst on the
+//  CHASSIS living core, washing out its own tap-to-poke pulse) — fixed via
+//  -webkit-tap-highlight-color:transparent on a broad selector, with
+//  :focus-visible (Protocol 17 keyboard focus) left fully intact.
+//  Item 2: the FO3 Lincoln relics stacked one-per-row instead of side by
+//  side like the snow globes/bobbleheads — root cause (Protocol 27): the
+//  disposition <select> sized itself to its widest OPTION content
+//  (~234px, width:auto), forcing every "found" cell far wider than the
+//  88px object button and stranding it alone on its row. Fixed by pinning
+//  the Lincoln cell to a fixed compact width (min-width:0 to escape the
+//  flexbox min-width:auto trap) so the select now sizes to its CELL
+//  instead, with ellipsis for any label too long for that compact width.
+//  8 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 193 — Owner polish batch: tap-highlight kill + Lincoln side-by-side grid');
+  const html193 = readFile('index.html');
+  const css193 = readFile('css/terminal.css');
+  const cssStripped193 = css193.replace(/\/\*[\s\S]*?\*\//g, '');
+
+  // 193.1  -webkit-tap-highlight-color:transparent is declared on a broad
+  //        base selector (html) so the native tap/active highlight overlay
+  //        never shows.
+  {
+    const htmlRule193 = (cssStripped193.match(/^html\s*\{[^}]*\}/m) || [''])[0];
+    assert(
+      /-webkit-tap-highlight-color:\s*transparent/.test(htmlRule193),
+      '193.1: html { -webkit-tap-highlight-color: transparent } suppresses the browser default tap/active highlight box app-wide'
+    );
+  }
+
+  // 193.2  the same suppression is repeated directly on every interactive
+  //        element type (button/a/summary/select/[role=button]/[role=tab])
+  //        as belt-and-suspenders for engines that key off the element
+  //        itself rather than the inherited/root value.
+  {
+    const broadRuleMatch193 = cssStripped193.match(
+      /button,\s*a,\s*summary,\s*select,\s*\[role='button'\],\s*\[role='tab'\]\s*\{([^}]*)\}/
+    );
+    const broadRule193 = broadRuleMatch193 ? broadRuleMatch193[1] : '';
+    assert(
+      /-webkit-tap-highlight-color:\s*transparent/.test(broadRule193),
+      '193.2: button/a/summary/select/[role=button]/[role=tab] each get -webkit-tap-highlight-color:transparent directly, not just via html inheritance'
+    );
+  }
+
+  // 193.3  the CHASSIS living core's own tap-to-poke button explicitly
+  //        neutralises the tap highlight too — the owner's specifically
+  //        named worst-offender, where the highlight washed out the
+  //        core's own pulse.
+  {
+    const coreShapeRule193 = (cssStripped193.match(/button\.chassis-core-shape\s*\{([^}]*)\}/) || [
+      '',
+      '',
+    ])[1];
+    assert(
+      /-webkit-tap-highlight-color:\s*transparent/.test(coreShapeRule193),
+      '193.3: button.chassis-core-shape (the CHASSIS living core tap-to-poke control) declares its own -webkit-tap-highlight-color:transparent'
+    );
+  }
+
+  // 193.4  regression guard: :focus-visible keyboard focus rings (Protocol
+  //        17) are untouched — the tap-highlight fix must never also
+  //        suppress KEYBOARD focus visibility.
+  assert(
+    /button:focus-visible,/.test(css193) &&
+      /outline:\s*2px solid var\(--robco-green\)/.test(css193),
+    '193.4: the button:focus-visible keyboard-focus ring rule still exists — the tap-highlight fix only removes the mouse/touch active overlay, never keyboard focus visibility'
+  );
+
+  // 193.5  CURIO ARCHIVE: the Lincoln cell is pinned to a fixed, compact
+  //        width (with min-width:0 to escape the flexbox min-width:auto
+  //        trap) so it can never be forced wide by its disposition
+  //        <select>'s own content-based sizing — the Protocol 27 root
+  //        cause of the one-per-row stacking bug.
+  {
+    const lincCellRule193 = (cssStripped193.match(
+      /\.curio-caselist--linc \.curio-cell\s*\{([^}]*)\}/
+    ) || ['', ''])[1];
+    const widthMatch193 = lincCellRule193.match(/(?:^|\s)width:\s*(\d+)px/);
+    const widthPx193 = widthMatch193 ? Number(widthMatch193[1]) : 0;
+    assert(
+      widthPx193 >= 100 &&
+        widthPx193 <= 160 &&
+        /min-width:\s*0\b/.test(lincCellRule193) &&
+        /flex:\s*0 0 \d+px/.test(lincCellRule193),
+      `193.5: .curio-caselist--linc .curio-cell is pinned to a fixed compact width (${widthPx193}px, in the 100-160px range two fit side by side at 360px) with min-width:0 so it never grows to fit its select's own content`
+    );
+  }
+
+  // 193.6  the disposition <select> now sizes to its CELL (width:100%,
+  //        min-width:0) instead of its own widest-option content, with
+  //        ellipsis handling any label too long for that compact width —
+  //        the old width:auto/min-width:64px content-sizing contract
+  //        (which forced the one-per-row bug) is gone.
+  {
+    const dispRule193 = (cssStripped193.match(/\.curio-linc-disposition\s*\{([^}]*)\}/) || [
+      '',
+      '',
+    ])[1];
+    assert(
+      /width:\s*100%/.test(dispRule193) &&
+        /min-width:\s*0\b/.test(dispRule193) &&
+        /overflow:\s*hidden/.test(dispRule193) &&
+        /text-overflow:\s*ellipsis/.test(dispRule193) &&
+        /white-space:\s*nowrap/.test(dispRule193) &&
+        !/width:\s*auto/.test(dispRule193) &&
+        !/min-width:\s*64px/.test(dispRule193),
+      '193.6: .curio-linc-disposition sizes to its cell (width:100%, min-width:0) with overflow/text-overflow/white-space ellipsis handling — no longer auto-sizes to its widest option content'
+    );
+  }
+
+  // 193.7  Protocol 17 mobile-baseline floors are not sacrificed to chase
+  //        the new compact width: font-size still >=16px (prevents iOS/
+  //        Android focus auto-zoom), min-height still >=28px (tap target).
+  {
+    const dispRule193b = (cssStripped193.match(/\.curio-linc-disposition\s*\{([^}]*)\}/) || [
+      '',
+      '',
+    ])[1];
+    const fontSizeMatch193 = dispRule193b.match(/font-size:\s*(\d+)px/);
+    const minHeightMatch193 = dispRule193b.match(/min-height:\s*(\d+)px/);
+    assert(
+      (fontSizeMatch193 ? Number(fontSizeMatch193[1]) : 0) >= 16 &&
+        (minHeightMatch193 ? Number(minHeightMatch193[1]) : 0) >= 28,
+      '193.7: .curio-linc-disposition keeps font-size >=16px and min-height >=28px (Protocol 17) even after the compact-width fix'
+    );
+  }
+
+  // 193.8  structural guard: #lincolnMemorabiliaDisplay still sits inside
+  //        .curio-caselist.curio-caselist--linc (the exact selector the
+  //        193.5 grid fix scopes to) — if this wrapper class were ever
+  //        renamed/removed, the compact-width rule would silently stop
+  //        applying and the one-per-row bug could recur unnoticed.
+  assert(
+    /class="curio-caselist curio-caselist--linc"[\s\S]{0,150}id="lincolnMemorabiliaDisplay"/.test(
+      html193
+    ),
+    '193.8: #lincolnMemorabiliaDisplay is still wrapped by .curio-caselist.curio-caselist--linc, the exact scope the Lincoln-only compact-cell/select rules (193.5/193.6) target'
   );
 }
 

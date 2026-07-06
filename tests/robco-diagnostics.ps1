@@ -15492,7 +15492,7 @@ Check (
 # needle (the knob's own rotation) always points at the active one. Owner
 # directive: the knob performs NO action on tap -- only a drag, a direct
 # position tap, or the arrow keys change #playthroughTypeSelect.
-# 12 tests (PS mirror of JS Suite 180.)
+# 13 tests (PS mirror of JS Suite 180.)
 # ===========================================================
 Sep "Suite 180 -- OPERATIONAL TEMPO centered rotary dial (SU-3 rework)"
 $html180 = Read-Src "index.html"
@@ -15672,6 +15672,26 @@ Check (
     (-not ($knob2Rule180 -match 'animation:')) -and
     (-not [System.Text.RegularExpressions.Regex]::IsMatch($css180, '(?s)\.knob2[\s\S]{0,40}prefers-reduced-motion'))
 ) "180.12: .knob2 rotates via a plain transition (no animation:) and declares no bespoke reduced-motion carve-out -- the existing global block neutralises it automatically"
+
+# 180.13  Owner report: the readout ("> TEMPO SELECTED / <NAME> / <desc>")
+#         used to only refresh on release (_setTempo -> _syncCampaignProfileUI),
+#         so the needle could point at a new position mid-drag while the
+#         readout still showed the last COMMITTED one. _tempoPointerMove()
+#         must live-preview the readout (+ the knob's own ARIA) to the
+#         NEAREST drag position on every frame, while still never
+#         committing the value itself (_setTempo/onPlaythroughTypeChange)
+#         until pointerup (180.6/180.9 -- commit-on-release unchanged).
+$moveBody180 = Get-FunctionBody $core180 '_tempoPointerMove'
+Check (
+    ($moveBody180 -match 'tempoReadoutName') -and
+    ($moveBody180 -match 'tempoReadoutDesc') -and
+    ($moveBody180 -match '_TEMPO_LABELS\[nearKey\]') -and
+    ($moveBody180 -match '_TEMPO_DESC\[nearKey\]') -and
+    ($moveBody180 -match 'aria-valuenow') -and
+    ($moveBody180 -match 'aria-valuetext') -and
+    (-not ($moveBody180 -match '_setTempo\(')) -and
+    (-not ($moveBody180 -match 'onPlaythroughTypeChange\('))
+) "180.13: _tempoPointerMove() live-previews the readout name+description and the knob's ARIA to the nearest drag position on every frame, without ever committing (_setTempo/onPlaythroughTypeChange) until pointerup"
 
 # ===========================================================
 # Suite 181 -- PHASE 3 OPERATOR hero-three reskin (id-preservation
@@ -17814,23 +17834,22 @@ Check (
 # 191.21  Owner report round 1: the Lincoln disposition <select> was a
 #         fixed width: 88px (matching the object button above it),
 #         clipping the longer labels ("HANNIBAL (FREE SLAVES)", "LEROY
-#         WALKER (SLAVERS)") mid-glyph. It must size to its own content
-#         (width: auto) with a generous max-width headroom -- verified
-#         live against the real rendered content need (~234px) -- so no
-#         option is ever clipped, while still capping well under the
-#         narrowest supported viewport (360px) so it can never force
-#         page-level horizontal overflow. min-width is now 64px (was
-#         88px) -- see 191.22 for why the box is compact regardless of
-#         which disposition is selected.
+#         WALKER (SLAVERS)") mid-glyph. SUPERSEDED (owner polish batch, see
+#         Suite 193): sizing to its own widest-option content
+#         (width:auto/min-width:64px/max-width:~234px) turned out to be the
+#         Protocol 27 root cause of a LATER owner report -- it forced every
+#         "found" Lincoln cell wide enough to strand it one-per-row instead
+#         of sitting side by side with its siblings. The select now sizes
+#         to its (fixed-width) grid CELL instead, with ellipsis for any
+#         label too long for that compact width -- see Suite 193.5/193.6
+#         for the current contract; this guard now only confirms the old
+#         content-sizing contract is truly gone.
 $cssStripped191k = [regex]::Replace($css191, '/\*[\s\S]*?\*/', '')
 $dispositionRule191 = [regex]::Match($cssStripped191k, '\.curio-linc-disposition\s*\{[^\}]*\}').Value
-$maxWidthMatch191 = [regex]::Match($dispositionRule191, 'max-width:\s*(\d+)px')
-$maxWidthPx191 = if ($maxWidthMatch191.Success) { [int]$maxWidthMatch191.Groups[1].Value } else { 0 }
 Check (
-    ($dispositionRule191 -match 'width:\s*auto') -and
-    ($dispositionRule191 -match 'min-width:\s*64px') -and
-    ($maxWidthPx191 -ge 230) -and ($maxWidthPx191 -lt 360)
-) "191.21: .curio-linc-disposition sizes to its own content (width:auto, min-width:64px) with max-width:${maxWidthPx191}px -- enough headroom for the longest disposition label (~234px measured live) without ever forcing horizontal overflow at the narrowest supported viewport (360px)"
+    (-not ($dispositionRule191 -match 'width:\s*auto')) -and
+    (-not ($dispositionRule191 -match 'min-width:\s*64px'))
+) '191.21: .curio-linc-disposition no longer sizes to its own widest-option content (width:auto/min-width:64px) -- that contract was the Protocol 27 root cause of the later one-per-row stacking bug fixed in Suite 193'
 
 # 191.22  Owner report round 2 (Protocol 27 root cause, live-measured): a
 #         native <select> with only width: auto renders using the
@@ -18309,6 +18328,116 @@ Check (
     ($statBurstBody192 -match "_coreOneShot\('core-stat-burst',\s*1400\)") -and
     ($burstCssBlock192 -match '(?s)\.core-stat-burst \.c-heart\s*\{[^\}]*box-shadow')
 ) '192.34: the 3D ring burst now completes a full 720deg double rotation on every axis over a matching 1.4s CSS/JS duration, and flares the heart alongside the ring tumble -- a substantially more prominent event than the old 360deg/900ms swing'
+
+# ===========================================================
+# Suite 193 -- Owner polish batch: tap-highlight kill + CURIO ARCHIVE
+# Lincoln side-by-side grid (the OPERATIONAL TEMPO live-readout-while-
+# dragging fix from this same batch is covered by Suite 180.13). Item 1:
+# the browser's own default tap/active highlight box flashed on the real
+# <button> underneath every dressed control (worst on the CHASSIS living
+# core) -- fixed via -webkit-tap-highlight-color:transparent on a broad
+# selector, :focus-visible left fully intact. Item 2: the FO3 Lincoln
+# relics stacked one-per-row instead of side by side -- root cause: the
+# disposition <select> sized itself to its widest OPTION content
+# (width:auto, ~234px), forcing every "found" cell far wider than the 88px
+# object button. Fixed by pinning the Lincoln cell to a fixed compact
+# width (min-width:0 to escape the flexbox min-width:auto trap). (PS
+# mirror of JS Suite 193.)
+# 8 tests
+# ===========================================================
+Sep "Suite 193 -- Owner polish batch: tap-highlight kill + Lincoln side-by-side grid"
+$html193 = Read-Src "index.html"
+$css193 = Read-Src "css/terminal.css"
+$cssStripped193 = [regex]::Replace($css193, '/\*[\s\S]*?\*/', '')
+
+# 193.1  -webkit-tap-highlight-color:transparent is declared on a broad
+#        base selector (html) so the native tap/active highlight overlay
+#        never shows.
+$htmlRuleMatch193 = [regex]::Match($cssStripped193, '(?m)^html\s*\{[^\}]*\}')
+$htmlRule193 = if ($htmlRuleMatch193.Success) { $htmlRuleMatch193.Value } else { '' }
+Check (
+    $htmlRule193 -match '-webkit-tap-highlight-color:\s*transparent'
+) '193.1: html { -webkit-tap-highlight-color: transparent } suppresses the browser default tap/active highlight box app-wide'
+
+# 193.2  the same suppression is repeated directly on every interactive
+#        element type (button/a/summary/select/[role=button]/[role=tab])
+#        as belt-and-suspenders for engines that key off the element
+#        itself rather than the inherited/root value.
+$broadRuleMatch193 = [regex]::Match($cssStripped193, "button,\s*a,\s*summary,\s*select,\s*\[role='button'\],\s*\[role='tab'\]\s*\{([^\}]*)\}")
+$broadRule193 = if ($broadRuleMatch193.Success) { $broadRuleMatch193.Groups[1].Value } else { '' }
+Check (
+    $broadRule193 -match '-webkit-tap-highlight-color:\s*transparent'
+) '193.2: button/a/summary/select/[role=button]/[role=tab] each get -webkit-tap-highlight-color:transparent directly, not just via html inheritance'
+
+# 193.3  the CHASSIS living core's own tap-to-poke button explicitly
+#        neutralises the tap highlight too -- the owner's specifically
+#        named worst-offender, where the highlight washed out the core's
+#        own pulse.
+$coreShapeRuleMatch193 = [regex]::Match($cssStripped193, '(?s)button\.chassis-core-shape\s*\{([^\}]*)\}')
+$coreShapeRule193 = if ($coreShapeRuleMatch193.Success) { $coreShapeRuleMatch193.Groups[1].Value } else { '' }
+Check (
+    $coreShapeRule193 -match '-webkit-tap-highlight-color:\s*transparent'
+) '193.3: button.chassis-core-shape (the CHASSIS living core tap-to-poke control) declares its own -webkit-tap-highlight-color:transparent'
+
+# 193.4  regression guard: :focus-visible keyboard focus rings (Protocol
+#        17) are untouched -- the tap-highlight fix must never also
+#        suppress KEYBOARD focus visibility.
+Check (
+    ($css193 -match 'button:focus-visible,') -and
+    ($css193 -match 'outline:\s*2px solid var\(--robco-green\)')
+) '193.4: the button:focus-visible keyboard-focus ring rule still exists -- the tap-highlight fix only removes the mouse/touch active overlay, never keyboard focus visibility'
+
+# 193.5  CURIO ARCHIVE: the Lincoln cell is pinned to a fixed, compact
+#        width (with min-width:0 to escape the flexbox min-width:auto
+#        trap) so it can never be forced wide by its disposition
+#        <select>'s own content-based sizing -- the Protocol 27 root
+#        cause of the one-per-row stacking bug.
+$lincCellRuleMatch193 = [regex]::Match($cssStripped193, '(?s)\.curio-caselist--linc \.curio-cell\s*\{([^\}]*)\}')
+$lincCellRule193 = if ($lincCellRuleMatch193.Success) { $lincCellRuleMatch193.Groups[1].Value } else { '' }
+$widthMatch193 = [regex]::Match($lincCellRule193, '(?:^|\s)width:\s*(\d+)px')
+$widthPx193 = if ($widthMatch193.Success) { [int]$widthMatch193.Groups[1].Value } else { 0 }
+Check (
+    ($widthPx193 -ge 100) -and ($widthPx193 -le 160) -and
+    ($lincCellRule193 -match 'min-width:\s*0\b') -and
+    ($lincCellRule193 -match 'flex:\s*0 0 \d+px')
+) "193.5: .curio-caselist--linc .curio-cell is pinned to a fixed compact width (${widthPx193}px, in the 100-160px range two fit side by side at 360px) with min-width:0 so it never grows to fit its select's own content"
+
+# 193.6  the disposition <select> now sizes to its CELL (width:100%,
+#        min-width:0) instead of its own widest-option content, with
+#        ellipsis handling any label too long for that compact width --
+#        the old width:auto/min-width:64px content-sizing contract (which
+#        forced the one-per-row bug) is gone.
+$dispRuleMatch193 = [regex]::Match($cssStripped193, '(?s)\.curio-linc-disposition\s*\{([^\}]*)\}')
+$dispRule193 = if ($dispRuleMatch193.Success) { $dispRuleMatch193.Groups[1].Value } else { '' }
+Check (
+    ($dispRule193 -match 'width:\s*100%') -and
+    ($dispRule193 -match 'min-width:\s*0\b') -and
+    ($dispRule193 -match 'overflow:\s*hidden') -and
+    ($dispRule193 -match 'text-overflow:\s*ellipsis') -and
+    ($dispRule193 -match 'white-space:\s*nowrap') -and
+    (-not ($dispRule193 -match 'width:\s*auto')) -and
+    (-not ($dispRule193 -match 'min-width:\s*64px'))
+) '193.6: .curio-linc-disposition sizes to its cell (width:100%, min-width:0) with overflow/text-overflow/white-space ellipsis handling -- no longer auto-sizes to its widest option content'
+
+# 193.7  Protocol 17 mobile-baseline floors are not sacrificed to chase
+#        the new compact width: font-size still >=16px (prevents iOS/
+#        Android focus auto-zoom), min-height still >=28px (tap target).
+$fontSizeMatch193 = [regex]::Match($dispRule193, 'font-size:\s*(\d+)px')
+$minHeightMatch193 = [regex]::Match($dispRule193, 'min-height:\s*(\d+)px')
+$fontSizePx193 = if ($fontSizeMatch193.Success) { [int]$fontSizeMatch193.Groups[1].Value } else { 0 }
+$minHeightPx193 = if ($minHeightMatch193.Success) { [int]$minHeightMatch193.Groups[1].Value } else { 0 }
+Check (
+    ($fontSizePx193 -ge 16) -and ($minHeightPx193 -ge 28)
+) '193.7: .curio-linc-disposition keeps font-size >=16px and min-height >=28px (Protocol 17) even after the compact-width fix'
+
+# 193.8  structural guard: #lincolnMemorabiliaDisplay still sits inside
+#        .curio-caselist.curio-caselist--linc (the exact selector the
+#        193.5 grid fix scopes to) -- if this wrapper class were ever
+#        renamed/removed, the compact-width rule would silently stop
+#        applying and the one-per-row bug could recur unnoticed.
+Check (
+    [System.Text.RegularExpressions.Regex]::IsMatch($html193, '(?s)class="curio-caselist curio-caselist--linc"[\s\S]{0,150}id="lincolnMemorabiliaDisplay"')
+) '193.8: #lincolnMemorabiliaDisplay is still wrapped by .curio-caselist.curio-caselist--linc, the exact scope the Lincoln-only compact-cell/select rules (193.5/193.6) target'
 
 # ===========================================================
 # Results

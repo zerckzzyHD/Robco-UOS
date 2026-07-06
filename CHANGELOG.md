@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2496/2496 | Cache: robco-terminal-v2.7.0-r101 -->
+﻿## [Unreleased]<!-- Tests: 2505/2505 | Cache: robco-terminal-v2.7.0-r102 -->
 
 ### Added
 
@@ -124,6 +124,9 @@
 - Fixed the little standing bars in your faction reputation console's at-a-glance list rendering at different widths depending on a faction's name or how far along its standing was — they're now all a consistent, aligned size.
 - Fixed Fallout 3's KARMA ALIGNMENT board showing your karma twice — the swing-needle gauge and the KARMA CENTER readout underneath it, both saying the same thing. Fallout 3 now shows only its own KARMA CENTER readout; New Vegas still shows the swing needle. The slider that actually sets your karma is unchanged and still works exactly the same in both games.
 - Fixed both radiation bars — the one in Vital Telemetry and the one on your Skeletal Harness — visibly trailing behind your finger or cursor while dragging, unlike the health and level/XP bars, which tracked instantly. Both radiation bars now snap to your exact drag position in real time with no lag, matching the feel of every other draggable bar.
+- Fixed the browser's own default tap/press highlight flashing on buttons across the whole terminal, most noticeably washing out the power core's own pulse when you tapped it. Pressing or tapping any control now shows only its own designed feedback, with no stray highlight box — keyboard focus rings are completely unaffected.
+- Fixed your CURIO ARCHIVE's Lincoln memorabilia relics stacking one to a row instead of sitting side by side like your snow globes or bobbleheads. They now display in the same multi-column layout as the rest of your collectibles.
+- Fixed the OPERATIONAL TEMPO dial's readout not updating until you let go of the knob — dragging it now shows the position and description update live as the needle passes each one, snapping to the nearest choice the moment you release.
 
 ### Improved
 
