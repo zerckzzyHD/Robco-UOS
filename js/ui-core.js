@@ -210,6 +210,12 @@ function _fmtOverseerDuration(ms) {
   if (m > 0) return `${m}m ${String(s).padStart(2, '0')}s`;
   return `${s}s`;
 }
+// BUS-22 UNIT POWER PLANT reskin (CHASSIS): the same four telemetry figures,
+// now rendered as odo-tile industrial digit wheels — reusing the BUS-21
+// SERVICE TALLY's _odoTile() helper verbatim (ui-render.js, Protocol 22) rather
+// than a parallel drum-tile implementation. #chassisPlantStatus is the board's
+// collapsed one-line summary (Protocol 22 — the same pattern every other
+// bay-board's panel-substatus line already follows).
 function renderOverseerLog() {
   const el = document.getElementById('overseerLogDisplay');
   if (!el) return;
@@ -219,21 +225,26 @@ function renderOverseerLog() {
   const longest = Math.max(o.longestSessionMs, session);
   const hours = total / 3600000;
   const hoursStr = hours >= 10 ? hours.toFixed(0) : hours.toFixed(1);
+  const tile =
+    typeof _odoTile === 'function'
+      ? _odoTile
+      : (cap, v) => '<span style="opacity:0.65;">' + cap + '</span><span>' + v + '</span>';
   el.innerHTML =
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;font-size:11px;">' +
-    '<span style="opacity:0.65;">CURRENT UPTIME</span><span>' +
-    _fmtOverseerDuration(session) +
-    '</span>' +
-    '<span style="opacity:0.65;">LONGEST SESSION</span><span>' +
-    _fmtOverseerDuration(longest) +
-    '</span>' +
-    '<span style="opacity:0.65;">TOTAL POWER-ON</span><span>' +
-    hoursStr +
-    'h</span>' +
-    '<span style="opacity:0.65;">BOOT COUNT</span><span>' +
-    o.bootCount +
-    '</span>' +
-    '</div>';
+    tile('CURRENT UPTIME', _fmtOverseerDuration(session), 'live — this sitting') +
+    tile('LONGEST SESSION', _fmtOverseerDuration(longest), 'record sitting') +
+    tile('TOTAL POWER-ON', hoursStr + 'H', 'lifetime hour meter') +
+    tile('BOOT COUNT', String(o.bootCount).padStart(4, '0'), 'ignitions — one per cold start');
+  const sum = document.getElementById('chassisPlantStatus');
+  if (sum) {
+    sum.textContent =
+      'SITTING ' +
+      _fmtOverseerDuration(session) +
+      ' · TOTAL ' +
+      hoursStr +
+      'H · ' +
+      o.bootCount +
+      ' IGNITIONS';
+  }
 }
 // ── SYSTEM STATUS (CHASSIS) — Step 2 v2.8.0 Settings-tab unit ───────────
 // Firmware/cache/carrier/feature-flag readout, merged beside the WU-F7 device
@@ -266,41 +277,88 @@ const _SYSTEM_STATUS_FLAGS = [
   'saveMigration',
   'offlineQueue',
 ];
+// BUS-23 IDENTITY PLATE & BREAKERS reskin (CHASSIS): the same firmware/cache/
+// carrier/feature-flag read-out, now rendered as a stamped serial plate (id-
+// plate/rivets/id-row) + a breaker-lever rack (one per remote kill-switch
+// flag, plus CARRIER) — read-outs only, the user never throws a lever
+// (Protocol 33/35: the flags are set by the remote kill-switch config).
+// #chassisIdentityStatus is the board's collapsed summary line.
+function _chassisIdRow(label, val) {
+  return (
+    '<div class="id-row"><b>' + escapeHtml(label) + '</b><span>' + escapeHtml(val) + '</span></div>'
+  );
+}
+function _chassisBreaker(label, on, wire, onWord, offWord) {
+  return (
+    '<div class="breaker' +
+    (wire ? ' wire' : '') +
+    ' ' +
+    (on ? 'on' : 'off') +
+    '">' +
+    '<span class="bk-cap">' +
+    escapeHtml(label) +
+    '</span>' +
+    '<span class="bk-slot" aria-hidden="true"><span class="bk-lever"></span></span>' +
+    '<span class="bk-led" aria-hidden="true"></span>' +
+    '<span class="bk-state">' +
+    (on ? onWord : offWord) +
+    '</span>' +
+    '</div>'
+  );
+}
 function renderSystemStatus() {
   const el = document.getElementById('systemStatusDisplay');
   if (!el) return;
   const connected = typeof _isUplinkConnected === 'function' ? _isUplinkConnected() : false;
-  const flagsHtml = _SYSTEM_STATUS_FLAGS
-    .map(k => {
-      const on =
-        typeof window.isFeatureEnabled !== 'function' || window.isFeatureEnabled(k) !== false;
-      return (
-        '<span style="opacity:0.65;">' +
-        k.toUpperCase() +
-        '</span><span style="color:' +
-        (on ? 'var(--robco-green)' : 'var(--robco-danger)') +
-        ';">' +
-        (on ? 'ENABLED' : 'DISABLED') +
-        '</span>'
-      );
-    })
-    .join('');
+  const flags = _SYSTEM_STATUS_FLAGS.map(k => ({
+    key: k,
+    on: typeof window.isFeatureEnabled !== 'function' || window.isFeatureEnabled(k) !== false,
+  }));
+  const enabledCount = flags.filter(f => f.on).length;
   _readActiveCacheName(cacheName => {
+    const cacheRev = (cacheName || 'UNKNOWN').match(/-r\d+$/);
     el.innerHTML =
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;font-size:11px;">' +
-      '<span style="opacity:0.65;">FIRMWARE</span><span>v' +
-      escapeHtml(APP_VERSION) +
-      '</span>' +
-      '<span style="opacity:0.65;">CACHE REV</span><span>' +
-      escapeHtml(cacheName || 'UNKNOWN') +
-      '</span>' +
-      '<span style="opacity:0.65;">CARRIER</span><span style="color:' +
-      (connected ? 'var(--robco-green)' : 'var(--robco-danger)') +
-      ';">' +
-      (connected ? 'ONLINE' : 'OFFLINE') +
-      '</span>' +
-      flagsHtml +
+      '<div class="id-plate">' +
+      '<span class="rivet tl" aria-hidden="true"></span><span class="rivet tr" aria-hidden="true"></span>' +
+      '<span class="rivet bl" aria-hidden="true"></span><span class="rivet br" aria-hidden="true"></span>' +
+      '<div class="id-title">ROBCO INDUSTRIES — UNIT IDENTITY</div>' +
+      _chassisIdRow('MODEL', 'RIT-V300 DESK TERMINAL') +
+      _chassisIdRow('FIRMWARE', 'v' + APP_VERSION) +
+      _chassisIdRow('CACHE REV', cacheName || 'UNKNOWN') +
+      _chassisIdRow('STORAGE', 'LOCAL · PWA SERVICE WORKER ACTIVE') +
+      '</div>' +
+      '<div class="breaker-rack">' +
+      _chassisBreaker('CARRIER', connected, true, 'ONLINE', 'OFFLINE') +
+      flags
+        .map(f => _chassisBreaker(f.key.toUpperCase(), f.on, false, 'ENABLED', 'DISABLED'))
+        .join('') +
+      '</div>' +
+      '<div class="rack-note" style="text-align:center;opacity:0.4;font-size:8px;text-transform:none;margin-top:8px">' +
+      'breaker levers are read-outs of the remote kill-switch flags — the machine shows its own switchgear, users never throw these' +
       '</div>';
+    const sum = document.getElementById('chassisIdentityStatus');
+    if (sum) {
+      sum.textContent =
+        'FW v' +
+        APP_VERSION +
+        ' · CACHE ' +
+        (cacheRev ? cacheRev[0].slice(1) : cacheName || 'UNKNOWN') +
+        ' · CARRIER ' +
+        (connected ? 'ONLINE' : 'OFFLINE') +
+        ' · ' +
+        enabledCount +
+        '/' +
+        flags.length +
+        ' SYSTEMS ENABLED';
+    }
+    // .wire (amber, --bezel-wire) and .red (--robco-danger) share equal CSS
+    // specificity — keep them mutually exclusive rather than stacking both,
+    // so a disconnected carrier reliably shows red regardless of source order.
+    const led = document.getElementById('carrierBoardLed');
+    if (led) {
+      led.classList.toggle('wire', connected);
+      led.classList.toggle('red', !connected);
+    }
   });
 }
 window.renderSystemStatus = renderSystemStatus;
@@ -475,6 +533,8 @@ function onImmersionChange(value) {
   // DO-O: a dial change can flip _scopeShouldAnimate() live — re-arm so the
   // oscilloscope starts/stops animating immediately, not on the next state change.
   if (typeof _armScopeLoop === 'function') _armScopeLoop();
+  // CHASSIS LIVING CORE: a dial change can flip _coreShouldAnimate() live too.
+  if (typeof _coreRefresh === 'function') _coreRefresh();
 }
 
 // FIX 2 (owner request, B2c unit, best-effort): drag/slide-to-rotate for the
@@ -835,20 +895,69 @@ function _recordError(type, msg) {
   _updateFaultLamp();
 }
 
+// Shared reader (Protocol 22) — the casing FAULT lamp, the BUS-24 fault
+// annunciator, and the LIVING CORE's fault-strain signal (#6) all read the
+// SAME client error ring-buffer through this one function, so they can never
+// disagree on the buffered-fault count.
+function _readErrorLog() {
+  try {
+    return JSON.parse(MetaStore.get(ERROR_LOG_KEY) || '[]');
+  } catch (_) {
+    return [];
+  }
+}
+
 // DO-N: the casing-top FAULT lamp reads the existing error ring-buffer
 // (read-only device telemetry, no new state) — lit whenever a client error
 // has been recorded this device, cleared by the existing [LOGS] CLEAR action.
 function _updateFaultLamp() {
   const lamp = document.getElementById('lampFault');
-  if (!lamp) return;
-  let hasErrors;
-  try {
-    hasErrors = JSON.parse(MetaStore.get(ERROR_LOG_KEY) || '[]').length > 0;
-  } catch (_) {
-    hasErrors = false;
-  }
-  lamp.classList.toggle('fault', hasErrors);
+  const hasErrors = _readErrorLog().length > 0;
+  if (lamp) lamp.classList.toggle('fault', hasErrors);
+  if (typeof renderServiceFaultConsole === 'function') renderServiceFaultConsole();
+  if (typeof _coreRefresh === 'function') _coreRefresh(); // LIVING CORE behavior #6: fault strain
 }
+
+// BUS-24 SERVICE & FAULT CONSOLE (CHASSIS) — the fault-annunciator half; the
+// revision-log spool half is static markup (its one live value, #svcRevLine,
+// is stamped once at boot by initChassisCore()). Reads the SAME ring-buffer
+// _updateFaultLamp() already reads (Protocol 22) — never a second source of
+// truth for "how many faults are buffered."
+function renderServiceFaultConsole() {
+  const counter = document.getElementById('svcFaultCounter');
+  const numEl = document.getElementById('svcFaultNum');
+  const lastEl = document.getElementById('svcFaultLast');
+  const led = document.getElementById('svcBoardLed');
+  const sum = document.getElementById('chassisSvcStatus');
+  if (!counter && !sum) return;
+  const log = _readErrorLog();
+  const clear = log.length === 0;
+  if (counter) counter.classList.toggle('clear', clear);
+  if (numEl) numEl.textContent = String(Math.min(log.length, 99)).padStart(2, '0');
+  if (lastEl) {
+    if (clear) {
+      lastEl.textContent = 'NO FAULTS ON THE BUFFER — UNIT NOMINAL';
+    } else {
+      const last = log[log.length - 1];
+      const ts = new Date(last.t || Date.now()).toISOString().replace('T', ' ').slice(0, 19);
+      lastEl.textContent =
+        'LAST: [' +
+        (last.type || '?') +
+        '] ' +
+        (last.msg || '') +
+        ' · ' +
+        ts +
+        ' · buffered locally, never transmitted';
+    }
+  }
+  if (led) led.classList.toggle('red', !clear);
+  if (sum) {
+    sum.textContent = clear
+      ? 'REV LOG READY · NO FAULTS BUFFERED'
+      : 'REV LOG READY · ' + log.length + ' FAULT' + (log.length === 1 ? '' : 'S') + ' BUFFERED';
+  }
+}
+window.renderServiceFaultConsole = renderServiceFaultConsole;
 
 // ── Owner-report batch: casing lamps go from decorative to functional ──────
 // FIX 1: PWR lamp click → the existing AmbientRuntime SHUTDOWN path (Protocol
@@ -1617,6 +1726,10 @@ function setOverseerState(s) {
   if (csEl) csEl.textContent = tag;
   drawScope();
   _armScopeLoop();
+  // CHASSIS LIVING CORE #2/#3 (AI revs / connection) — reuses this SAME
+  // choke point rather than re-instrumenting transmitMessage()/
+  // appendToChat() (Protocol 22).
+  if (typeof _coreRefresh === 'function') _coreRefresh();
 }
 window.setOverseerState = setOverseerState;
 
@@ -1751,6 +1864,244 @@ function initOverseerScope() {
 }
 window.initOverseerScope = initOverseerScope;
 // ── DO-O END ────────────────────────────────────────────────────────────
+
+// ── CHASSIS [5] — THE LIVING CORE (Protocol UI-10) ─────────────────────────
+// A decorative layer OVER real machine signals — the SAME pattern DO-O
+// establishes above, reused rather than forked (Protocol 22): the core hooks
+// setOverseerState()/_isUplinkConnected()/AmbientRuntime/RobcoEvents, never
+// re-instruments transmitMessage()/appendToChat() itself. _coreRefresh() is
+// the ONE choke point that recomputes every continuous signal and paints
+// BOTH the full BUS-22 instrument (#chassisCore) and the mini mirror in the
+// Overseer header (#chassisCoreMini) from the SAME snapshot — one shared
+// source, so the two views can never drift (document.querySelectorAll keys
+// off the shared .chassis-core-shape class both elements carry). Continuous
+// motion (ring spin / heart pulse / flicker / fault ring / radio shimmer) is
+// a plain CSS `animation:`, gated as a GROUP by _coreShouldAnimate() via the
+// .core-still class; one-shot flourishes (level-up flare, save/sync pulse,
+// tap-to-poke) use `transition:` instead (css: .chassis-core-shape rules),
+// which the same global prefers-reduced-motion block also neutralises, so
+// they still settle to a correct frame even while .core-still is present.
+// Writes NOTHING durable to the campaign anywhere in this block — every
+// signal read here is transient/in-memory or MetaStore device telemetry,
+// never state.*/saveState()/robco_v8.
+// ── CHASSIS CORE START ──────────────────────────────────────────────────
+const CORE_POWER_CLASSES = ['core-boot', 'core-idle', 'core-standby', 'core-shutdown'];
+
+// #1/#4/#5/#7 — idle heartbeat / standby dim / shutdown collapse / boot
+// ignition all derive from the ONE canonical Ambient Runtime state (no
+// separate observers registered — RobcoEvents' existing 'runtime.state'
+// broadcast, subscribed in _wireChassisCoreEventBusSubscribers() below, is
+// what actually triggers a repaint on every transition).
+function _corePowerClass() {
+  const rt =
+    typeof AmbientRuntime !== 'undefined' && AmbientRuntime ? AmbientRuntime.getState() : 'ACTIVE';
+  if (rt === 'COLD_BOOT') return 'core-boot';
+  if (rt === 'IDLE' || rt === 'STANDBY') return 'core-standby';
+  if (rt === 'SHUTDOWN' || rt === 'OFF') return 'core-shutdown';
+  return 'core-idle';
+}
+
+// The gate (Protocol UI-10) — mirrors _scopeShouldAnimate()'s exact gate list
+// (Protocol 22): reduced-motion, the Immersion dial below Balanced,
+// document.hidden, and the runtime in STANDBY/SHUTDOWN/OFF each suppress the
+// continuous loop as one group — no bespoke per-behaviour carve-out.
+function _coreShouldAnimate() {
+  const reduced =
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduced) return false;
+  if (typeof immersionAllows === 'function' && !immersionAllows('balanced')) return false;
+  if (typeof document !== 'undefined' && document.hidden) return false;
+  const rt =
+    typeof AmbientRuntime !== 'undefined' && AmbientRuntime ? AmbientRuntime.getState() : 'ACTIVE';
+  if (rt === 'STANDBY' || rt === 'SHUTDOWN' || rt === 'OFF') return false;
+  return true;
+}
+
+// The shared shell query — both #chassisCore (the real button) and
+// #chassisCoreMini (the decorative header mirror) carry this one class.
+function _coreShells() {
+  return Array.from(document.querySelectorAll('.chassis-core-shape'));
+}
+
+// _coreRefresh — recomputes every continuous signal and paints both shells
+// from the SAME snapshot. Call sites: setOverseerState() (#2 AI revs / #3
+// connection), _updateFaultLamp() (#6 fault strain), onImmersionChange() +
+// a reduced-motion/visibilitychange listener (the gate), and the
+// 'runtime.state' bus subscription (#1/#4/#5/#7). Never a polling loop.
+function _coreRefresh() {
+  const shells = _coreShells();
+  if (!shells.length) return;
+  const thinking =
+    typeof getOverseerState === 'function' &&
+    (getOverseerState() === 'thinking' || getOverseerState() === 'speaking');
+  const disconnected =
+    typeof getOverseerState === 'function' &&
+    (getOverseerState() === 'disabled' || getOverseerState() === 'offline');
+  const faultCount = typeof _readErrorLog === 'function' ? _readErrorLog().length : 0;
+  const radioOn = typeof _radioPlaying === 'function' && _radioPlaying();
+  const power = _corePowerClass();
+  const animate = _coreShouldAnimate();
+  // #12 Overclock strain — several signals active at once works the core
+  // visibly harder. Recomputed live every call, no separate decay timer.
+  const overclock = [thinking, radioOn, faultCount > 0].filter(Boolean).length >= 2;
+
+  shells.forEach(el => {
+    CORE_POWER_CLASSES.forEach(c => el.classList.toggle(c, c === power));
+    el.classList.toggle('core-thinking', thinking);
+    el.classList.toggle('core-disconnected', disconnected && !thinking);
+    el.classList.toggle('core-fault', faultCount > 0);
+    el.classList.toggle('core-radio', radioOn);
+    el.classList.toggle('core-overclock', overclock);
+    el.classList.toggle('core-still', !animate);
+  });
+
+  const led = document.getElementById('corePowerLed');
+  if (led) led.classList.toggle('red', faultCount > 0);
+}
+window._coreRefresh = _coreRefresh;
+
+// One-shot flourishes (#8 level-up flare, #9 save/sync write-pulse, #13
+// tap-to-poke) — add-then-remove the reflow-restart pattern the OS Event Bus
+// subscribers already use elsewhere (Suite 135/162 precedent) so a repeated
+// trigger restarts cleanly. Skipped entirely when the gate is closed — a
+// suppressed flourish simply never fires, leaving the correct resting frame.
+const _coreOneShotTimers = {};
+function _coreOneShot(cls, ms) {
+  if (!_coreShouldAnimate()) return;
+  _coreShells().forEach(el => {
+    el.classList.remove(cls);
+    void el.offsetWidth; // force reflow so a repeated trigger restarts the transition
+    el.classList.add(cls);
+  });
+  clearTimeout(_coreOneShotTimers[cls]);
+  _coreOneShotTimers[cls] = setTimeout(() => {
+    _coreShells().forEach(el => el.classList.remove(cls));
+  }, ms);
+}
+function _coreFlare() {
+  _coreOneShot('core-flare', 900);
+}
+window._coreFlare = _coreFlare;
+function _coreDataPulse() {
+  _coreOneShot('core-datapulse', 700);
+}
+window._coreDataPulse = _coreDataPulse;
+
+// #13 Tap-to-poke — the #chassisCore button's onclick. An optional short
+// synth kick via the EXISTING hardware-SFX channel (Protocol 7 —
+// playChipClick() already guards masterMute + the hardwareSfx pref; reused
+// as-is, never forked). Purely cosmetic — no campaign write.
+function _coreTapPoke() {
+  _coreOneShot('core-tap', 500);
+  if (typeof playChipClick === 'function') playChipClick(true);
+}
+window._coreTapPoke = _coreTapPoke;
+
+// The "?" explainer (Suite 103 showSaveHelpModal precedent, Protocol 22) —
+// plain, in-voice language describing what the cell is and what each
+// behaviour means. Game-agnostic (Protocol 38) — device fiction only.
+const CORE_HELP = [
+  {
+    cmd: 'IDLE HEARTBEAT',
+    desc: 'A slow, steady pulse — the cell sitting quietly while the terminal is powered and waiting.',
+  },
+  {
+    cmd: 'DIRECTOR UPLINK',
+    desc: 'The cell spins up and glows brighter while the Director composes a reply — the same moment the Uplink scope reads THINKING.',
+  },
+  {
+    cmd: 'CARRIER LINK',
+    desc: 'A steady glow means the carrier is connected. No key, a disabled uplink, or no connection at all and the cell flickers and dims.',
+  },
+  {
+    cmd: 'STANDBY',
+    desc: 'The cell dims and slows whenever the terminal sits idle or the tab loses focus — a power-saving state, not a fault.',
+  },
+  {
+    cmd: 'SHUTDOWN',
+    desc: 'A full power-down collapses the cell to a dark point. Use PRESS TO POWER ON to bring it back.',
+  },
+  {
+    cmd: 'FAULT STRAIN',
+    desc: 'A faint red ring appears whenever the client error log has something buffered — clear it from the FAULT ANNUNCIATOR on BUS-24.',
+  },
+  {
+    cmd: 'IGNITION',
+    desc: 'A cold boot spins the cell up fast before it settles into its normal idle rhythm.',
+  },
+  { cmd: 'LEVEL-UP FLARE', desc: 'A single bright flash marks a level committed.' },
+  {
+    cmd: 'DATA PULSE',
+    desc: 'A quick brighten marks a save written — to a local slot, or pushed to / pulled from the cloud.',
+  },
+  { cmd: 'RADIO SHIMMER', desc: 'A gentle shimmer plays while the Pip-Boy Radio station is on.' },
+  {
+    cmd: 'CELL COLOUR',
+    desc: 'The cell always glows in whatever optic colour is currently selected on this terminal.',
+  },
+  {
+    cmd: 'OVERCLOCK',
+    desc: 'Several of the above happening at once (the Director busy, the radio playing, a fault buffered) works the cell visibly harder.',
+  },
+  {
+    cmd: 'TAP TO PULSE',
+    desc: 'Tap the cell any time for a quick kick — purely cosmetic, changes nothing.',
+  },
+];
+function showCoreHelpModal() {
+  openModal({
+    title: '> SUSTAINED CELL — FIELD MANUAL',
+    body:
+      '<div class="cmd-registry">' +
+      CORE_HELP.map(
+        c =>
+          '<div class="cmd-card"><span class="cmd-name">' +
+          escapeHtml(c.cmd) +
+          '</span><span class="cmd-desc">' +
+          escapeHtml(c.desc) +
+          '</span></div>'
+      ).join('') +
+      '</div>',
+  });
+}
+window.showCoreHelpModal = showCoreHelpModal;
+
+// Boot wiring — mirrors initOverseerScope()'s call shape (called once from
+// window.onload). Stamps the BUS-24 revision line, paints the fault console
+// + the core's initial frame, and re-arms the gate on the two live signals
+// that can flip it outside a runtime transition (a reduced-motion OS
+// preference change, and the tab visibility toggle).
+function initChassisCore() {
+  const svcRev = document.getElementById('svcRevLine');
+  if (svcRev) svcRev.textContent = 'CURRENT: v' + APP_VERSION;
+  if (typeof renderServiceFaultConsole === 'function') renderServiceFaultConsole();
+  _coreRefresh();
+  document.addEventListener('visibilitychange', () => _coreRefresh());
+  if (typeof window.matchMedia === 'function') {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    if (typeof mq.addEventListener === 'function')
+      mq.addEventListener('change', () => _coreRefresh());
+  }
+}
+window.initChassisCore = initChassisCore;
+
+// RobcoEvents subscriptions — deferred to a function called from
+// window.onload (the Suite 135 U7 boot-order lesson: ui-core.js is a static
+// <script> tag that can execute before state.js, which defines RobcoEvents,
+// finishes its dynamic context-conditional load; a top-level .on() call here
+// would throw "RobcoEvents is not defined" on some boots).
+function _wireChassisCoreEventBusSubscribers() {
+  // #1/#4/#5/#7 idle/standby/shutdown/boot — every Ambient Runtime
+  // transition already broadcasts here (runtime.js _emit()).
+  RobcoEvents.on('runtime.state', () => _coreRefresh());
+  // #8 level-up flare — the SAME event nativeLevelUp() already emits.
+  RobcoEvents.on('level.up', () => _coreFlare());
+  // #9 save/sync write-pulse — emitted by saveToSlot() (ui-saves.js) and
+  // saveCurrentToCloud()/loadCloudSave()/overwriteCloudSave() (cloud.js).
+  RobcoEvents.on('data.write', () => _coreDataPulse());
+}
+// ── CHASSIS CORE END ────────────────────────────────────────────────────
 
 // Power-on affordance (Protocol 42 fix): the #powerOnBtn click handler. Owner
 // bug — forcing SHUTDOWN/OFF left a fully black screen with no visible way
@@ -2323,6 +2674,7 @@ window.onload = async function () {
     _wireCoreEventBusSubscribers();
     _wireAudioEventBusSubscribers();
     _wireApiEventBusSubscribers();
+    _wireChassisCoreEventBusSubscribers(); // CHASSIS LIVING CORE: runtime.state/level.up/data.write
     // P2: reconcile device prefs from IndexedDB (bounded + fail-safe) BEFORE the rest of boot reads them.
     await _hydrateMetaFromIdb();
     _hydrateStateFromStorage();
@@ -2351,6 +2703,7 @@ window.onload = async function () {
     _wireAmbientExperiences(); // A3: IDLE/STANDBY-deepen/SHUTDOWN dial-gated ambient observers
     initOverseerScope(); // DO-O: the living Overseer (Director Uplink oscilloscope presence)
     initAmbientRuntime(); // A1: Ambient Runtime — additive state machine + observer scheduler (parallel to standby; owns no timers yet)
+    initChassisCore(); // CHASSIS: the LIVING CORE — paints its initial frame after the runtime state is live
     initTestConsole(); // staging/dev-only Test Console — no-ops (stays hidden) on production
     _wirePanelPersistence(); // also wires the Module Bay hatch ceremony to securityConfigPanel's own first user-open (owner report — never at boot); also re-applies scroll restore (Protocol 42)
     _wireToolDeck(); // Tool Deck + Quick-Draw Holster — deck/scrim/tool-row/socket/bind-key wiring
@@ -3440,7 +3793,7 @@ function _bezelSubsystemLabel(subsystem) {
     case 'uplink':
       return '▸ SUBSYSTEM: UPLINK · DIRECTOR CHANNEL';
     case 'chassis':
-      return '▸ SUBSYSTEM: CHASSIS · SYSTEM STATUS';
+      return '▸ SUBSYSTEM: CHASSIS · SELF-DIAGNOSTIC BAY';
     case 'settings':
       return '▸ SUBSYSTEM: SETTINGS · CONFIG + REGISTRY';
     default:
@@ -3735,7 +4088,10 @@ function expandPanelForCategory(categoryKey) {
     skills: '> SKILL MATRIX',
     bio: '> SKELETAL HARNESS',
     map: '> CARTOGRAPHY TABLE',
-    log: '> SYSTEM STATUS',
+    // CHASSIS reskin: the former single SYSTEM STATUS panel split into BUS-22
+    // UNIT POWER PLANT + BUS-23 IDENTITY PLATE & BREAKERS + BUS-24 SERVICE &
+    // FAULT CONSOLE — "log" now lands on the device-telemetry board.
+    log: '> UNIT POWER PLANT',
     databank: '> CATALOG QUERY',
     config: '> CAMPAIGN CONFIGS',
   };

@@ -969,6 +969,11 @@ function stopRadio() {
 }
 
 function _updateRadioUI() {
+  // CHASSIS LIVING CORE #10 (radio-reactive) — this is the one choke point
+  // both startRadio()/stopRadio() already call, so hooking here covers every
+  // entry path (the toggle, the boot first-gesture arm, and master-mute
+  // stopping/resuming the station) without a second call site.
+  if (typeof _coreRefresh === 'function') _coreRefresh();
   const note = document.getElementById('radioStatus');
   if (!note) return;
   if (AudioSettings.masterMute) {

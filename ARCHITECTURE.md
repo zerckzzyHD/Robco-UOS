@@ -69,8 +69,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2462-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2462-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2484-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2484-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -937,6 +937,96 @@ shape via a new shared `.icon-btn-round` class (Protocol 22 — the same rule th
 custom property that falls back to `--bezel-wire`; the save-menu button sets it to the existing
 `--robco-blue` accent so its panel's color is unchanged. Guarded by the Suite 162 extension
 (162.25–162.28) and the Suite 103 extension (103.3 updated, 103.8 added).
+
+---
+
+## CHASSIS — Self-Diagnostic Maintenance Bay + THE LIVING CORE (`index.html` + `css/terminal.css` + `js/ui-core.js` + `js/ui-audio.js` + `js/ui-saves.js` + `js/cloud.js` — Design Overhaul CHASSIS unit)
+
+Rebuilds the CHASSIS `[5]` tab from one flat SYSTEM STATUS panel into three real
+`.panel.bay-board` boards, and adds THE LIVING CORE — a decorative reactor glyph driven entirely
+by real machine signals (Protocol UI-10, adopted a second time after Director Uplink DO-O).
+Reskin only (Protocol 22/25): every existing id/handler is kept unchanged.
+
+**The three boards:**
+
+| Board                            | id                         | Contents                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| -------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BUS-22 UNIT POWER PLANT          | `unitPowerPlantPanel`      | `#overseerLogDisplay`/`renderOverseerLog()` (unchanged reader) reskinned as industrial hour meters via the BUS-21 `_odoTile()` digit-wheel helper (Protocol 22 reuse, no parallel drum-tile implementation) — CURRENT UPTIME / LONGEST SESSION / TOTAL POWER-ON / BOOT COUNT — plus THE LIVING CORE (`#chassisCore`).                                                                                                                                    |
+| BUS-23 IDENTITY PLATE & BREAKERS | `systemStatusPanel`        | `#systemStatusDisplay`/`renderSystemStatus()` (unchanged reader) reskinned as a stamped serial plate (MODEL/FIRMWARE/CACHE REV/STORAGE rows) + a breaker-lever rack (CARRIER plus every `_SYSTEM_STATUS_FLAGS` entry) — read-outs only, never user-actionable (the flags are set by the remote kill-switch config, Protocol 32/33/35).                                                                                                                   |
+| BUS-24 SERVICE & FAULT CONSOLE   | `serviceFaultConsolePanel` | `btnViewChangelog`→`_svcViewChangelog()` and `btnSystemStatusErrorLog`→`showErrorLog()` (unchanged handlers), dressed as a revision-log spool and an amber fault annunciator. `renderServiceFaultConsole()` (new) reads a new shared `_readErrorLog()` helper — the SAME reader `_updateFaultLamp()` and the core's fault-strain signal use — so the casing FAULT lamp, this console, and the core can never disagree on "how many faults are buffered." |
+
+`expandPanelForCategory()`'s `log` category and `_bezelSubsystemLabel('chassis')` were both
+repointed from the old single "SYSTEM STATUS" title to "UNIT POWER PLANT" / "SELF-DIAGNOSTIC BAY"
+to match the split (Suite 176.8/192 both guard this).
+
+**THE LIVING CORE (`js/ui-core.js`, the "CHASSIS CORE" block, co-located with the DO-O Overseer
+block it reuses):** a shared visual shell, `.chassis-core-shape` (rings + a pulsing heart, CSS-only
+— no canvas), carried by BOTH `#chassisCore` (a real `<button>`, BUS-22, Protocol UI-5) and
+`#chassisCoreMini` (a decorative `aria-hidden` mirror in the Director Uplink's `.ovs-head` header —
+the waveform is the AI's voice, the core is machine power, kept minimal so it never crowds the
+scope). One choke point paints both from a single snapshot:
+
+| Function                                | Role                                                                                                                                                                                                                                                                                                                                                            |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `_coreRefresh()`                        | Reads every signal (`getOverseerState()`, `_readErrorLog().length`, `_radioPlaying()`, `AmbientRuntime.getState()` via `_corePowerClass()`) and toggles the resulting classes on **every** `.chassis-core-shape` element (`document.querySelectorAll`, never two separate `getElementById` calls) — so the full core and the mini mirror can never drift apart. |
+| `_corePowerClass()`                     | Maps the Ambient Runtime state to one of `core-boot` (`COLD_BOOT`) / `core-idle` (`READY`/`ACTIVE`) / `core-standby` (`IDLE`/`STANDBY`) / `core-shutdown` (`SHUTDOWN`/`OFF`).                                                                                                                                                                                   |
+| `_coreShouldAnimate()`                  | The gate (Protocol UI-10): `!reducedMotion && immersionAllows('balanced') && !document.hidden && runtime ∉ {STANDBY,SHUTDOWN,OFF}` — mirrors `_scopeShouldAnimate()`'s exact gate list.                                                                                                                                                                         |
+| `_coreOneShot(cls, ms)`                 | The shared one-shot flourish driver (level-up flare, save/sync pulse, tap-to-poke) — no-ops when the gate is closed; otherwise removes-then-reflows-then-adds `cls` on every shell (Suite 135/162 reflow-restart pattern) and auto-removes it after `ms`.                                                                                                       |
+| `initChassisCore()`                     | Boot wiring — called from `window.onload` **after** `initAmbientRuntime()` so the first paint already reads a live runtime state. Stamps `#svcRevLine`, paints the BUS-24 fault console, and re-arms the gate on `visibilitychange` + a reduced-motion `matchMedia` listener.                                                                                   |
+| `_wireChassisCoreEventBusSubscribers()` | Deferred to `window.onload` (the Suite 135 U7 boot-order lesson — `RobcoEvents` may not exist at this file's parse time). Subscribes `'runtime.state'`→`_coreRefresh()`, `'level.up'`→`_coreFlare()`, `'data.write'`→`_coreDataPulse()`.                                                                                                                        |
+
+**All 13 behaviors hook REAL signals — reused, never re-instrumented (Protocol 22):**
+
+- **Idle heartbeat / standby dim / shutdown collapse / boot ignition** — one `AmbientRuntime`
+  `'runtime.state'` bus subscription drives `_corePowerClass()`; no new observer registered.
+- **AI revs / connection** — `setOverseerState()` (the DO-O Overseer's own single state setter)
+  gained one line, `_coreRefresh()`, at its end — the core reacts to the exact same
+  thinking/speaking/disabled/offline transitions the oscilloscope already reacts to.
+- **Fault strain** — the new shared `_readErrorLog()` reader; `_updateFaultLamp()` (existing) calls
+  both `renderServiceFaultConsole()` and `_coreRefresh()`.
+- **Radio-reactive** — `_updateRadioUI()` (`js/ui-audio.js`, the one function both `startRadio()`
+  and `stopRadio()` already call) gained one line, `_coreRefresh()`. `_radioPlaying()` is exposed
+  cross-file for this read.
+- **Save/sync write-pulse** — a NEW `RobcoEvents` bus event, `'data.write'`, emitted from
+  `saveToSlot()` (`js/ui-saves.js`, local slot save) and `saveCurrentToCloud()` /
+  `loadCloudSave()` / `overwriteCloudSave()` (`js/cloud.js`, cloud push ×2 + pull) — an event
+  rather than a direct call into the core, matching the DO-O hook convention.
+- **Colour follows optic** — free: the core's CSS reads `var(--robco-green)`/
+  `var(--robco-green-rgb)`, the same custom property `changeOpticsColor()` already sets on
+  `:root` — no JS colour branch anywhere in this unit.
+- **Overclock strain** — `_coreRefresh()` counts how many of {thinking, radio-playing,
+  fault-present} are simultaneously true; ≥2 adds `core-overclock` (faster spin + a red-tinted
+  heart glow layered over whichever power state is active).
+- **Tap-to-poke** — `_coreTapPoke()` (the button's `onclick`) fires the one-shot `core-tap`
+  flourish and reuses `playChipClick(true)` (Protocol 7 hardware-SFX channel, no forked audio).
+
+**Gate-stacking, and why one-shots survive it:** continuous motion (ring spin, heart pulse, the
+fault ring, the radio shimmer) is a plain `@keyframes` `animation:`, paused as a GROUP by one CSS
+rule — `.core-still, .core-still .c-ring, .core-still .c-heart, .core-still.core-fault::after {
+animation-play-state: paused !important; }` — toggled by `_coreRefresh()`. The state classes
+themselves (colour/opacity/overlay) are plain class toggles, unaffected by that pause, so a state
+CHANGE always paints one correct frame even while `.core-still` is present. One-shot flourishes
+(level-up flare, the data-write pulse, tap-to-poke, and the shutdown collapse) instead use
+`transition:` on `.c-heart` (box-shadow/transform) or on `.chassis-core-shape.core-shutdown`
+(opacity/scale) — `animation-play-state` has no effect on a `transition`, so these still settle
+correctly to their target frame even during SHUTDOWN/OFF (exactly when `.core-still` is also
+present). The existing global `prefers-reduced-motion` block's `transition-duration: 0.01ms
+!important` neutralises them to instant for motion-sensitive users, same as everywhere else in the
+app (Protocol UI-9) — no bespoke carve-out for either mechanism.
+
+**The "?" explainer:** `showCoreHelpModal()` mirrors the Suite 103 `showSaveHelpModal()` pattern —
+a `.icon-btn-round` button (shared class, ≥28px) renders the `CORE_HELP` array (13 plain-language
+entries, one per behaviour) into the shared `#sysModal` via `openModal()`.
+
+**Zero campaign-state write:** every signal the core reads is transient/in-memory or MetaStore
+device telemetry; no function in the CHASSIS CORE block ever touches `state.*`, `saveState()`, or
+`robco_v8` (Suite 192.15, a static grep across the whole block).
+
+Guarded by Suite 192 (both runners at parity, 22 tests): the three-board split, the button/mirror
+contract, `_coreRefresh()`'s single-query behaviour, the gate's four conditions, the `.core-still`
+CSS rule, every hook-point call site, the 4 `data.write` emit sites, the one-shot reflow-restart
+pattern, the Protocol 7 SFX reuse, the zero-campaign-write guard, the Protocol 17 tap-target floor,
+and game-agnosticism.
 
 ---
 
@@ -2527,7 +2617,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2462-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2484-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

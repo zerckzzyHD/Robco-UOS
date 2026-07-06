@@ -167,6 +167,7 @@ export default [
         triggerHaptic: 'readonly', // WU-F2 Haptic Solenoid (ui-audio.js)
         initHaptic: 'readonly', // WU-F2 Haptic Solenoid (ui-audio.js)
         initRadio: 'readonly', // WU-F5 Pip-Boy Radio (ui-audio.js)
+        _radioPlaying: 'readonly', // CHASSIS LIVING CORE #10 radio-reactive signal (ui-audio.js)
         _wireAudioEventBusSubscribers: 'readonly', // U7 OS event bus (ui-audio.js)
         startHeartbeat: 'readonly',
         stopHeartbeat: 'readonly',
@@ -179,6 +180,7 @@ export default [
         listLocalSaves: 'readonly',
         undoLastSync: 'readonly',
         _isUplinkConnected: 'readonly', // SU-4: renderAccount() reads the shared carrier signal (js/ui-core.js)
+        _coreRefresh: 'readonly', // CHASSIS LIVING CORE (Protocol UI-10) single choke point (js/ui-core.js), called from js/ui-audio.js's _updateRadioUI()
         // Saves module cross-file globals (js/ui-saves.js ↔ js/ui.js)
         CHAT_MAX: 'readonly',
         _chatSaveTimer: 'writable',
@@ -275,6 +277,7 @@ export default [
         updateMath: 'readonly',
         wipeTerminal: 'readonly',
         _fmtOverseerDuration: 'readonly', // WU-F7 duration formatter, reused by U9-2 CURRENT SITTING (js/ui-core.js)
+        _odoTile: 'readonly', // BUS-21 SERVICE TALLY digit-wheel helper (js/ui-render.js), reused by CHASSIS BUS-22 renderOverseerLog()
         attachedImageData: 'writable',
         attachedImageMimeType: 'writable',
         _buildFactions: 'readonly',

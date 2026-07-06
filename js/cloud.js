@@ -394,6 +394,10 @@ window.saveCurrentToCloud = async function () {
     if (typeof openModal === 'function')
       openModal({ title: '> SAVE TO CLOUD', body: 'SAVED TO CLOUD: "' + finalLabel + '"' });
     if (typeof window.renderSavesList === 'function') window.renderSavesList();
+    // CHASSIS LIVING CORE #9 (save/sync write-pulse) — an actual new cloud
+    // document was written (the 'duplicate' branch above returns before this
+    // point, so a no-op push never fires a pulse).
+    if (window.RobcoEvents) window.RobcoEvents.emit('data.write', { kind: 'cloud-push' });
   } catch (e) {
     console.error('saveCurrentToCloud failed:', e);
     // A genuine connectivity failure mid-push → queue THIS user-initiated push for
@@ -727,6 +731,9 @@ window.loadCloudSave = async function (docId) {
     window._loadingSave = true;
     if (typeof openModal === 'function')
       openModal({ title: '> LOAD CLOUD SAVE', body: 'CLOUD SAVE RESTORED. REBOOTING SYSTEM...' });
+    // CHASSIS LIVING CORE #9 (save/sync write-pulse) — the reload below is imminent,
+    // but the pulse still paints for the brief window before it fires.
+    if (window.RobcoEvents) window.RobcoEvents.emit('data.write', { kind: 'cloud-pull' });
     setTimeout(() => window.location.reload(), 2000);
   } catch (e) {
     console.warn('loadCloudSave failed (non-fatal):', e);
@@ -928,6 +935,9 @@ window.overwriteCloudSave = async function (docId) {
         body: 'CLOUD SAVE OVERWRITTEN: "' + existingLabel + '"',
       });
     if (typeof window.renderSavesList === 'function') window.renderSavesList();
+    // CHASSIS LIVING CORE #9 (save/sync write-pulse) — a cloud push, additive
+    // or an explicit overwrite, is still a write.
+    if (window.RobcoEvents) window.RobcoEvents.emit('data.write', { kind: 'cloud-push' });
   } catch (e) {
     console.warn('overwriteCloudSave failed (non-fatal):', e);
     if (typeof openModal === 'function')

@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2462/2462 | Cache: robco-terminal-v2.7.0-r97 -->
+﻿## [Unreleased]<!-- Tests: 2484/2484 | Cache: robco-terminal-v2.7.0-r98 -->
 
 ### Added
 
@@ -57,6 +57,7 @@
 - SKILL BOOKS and SKILL MAGAZINES are separate boards again, no longer tucked inside the Skill Matrix — SKILL BOOKS now shows as a reference shelf of book spines (upright and ribboned once read, leaning and dashed while unread), and SKILL MAGAZINES shows as a rack of dog-eared covers that go matte with a CONSUMED stamp once read. Marking a book or magazine read/unread works exactly as before.
 - Your KARMA reading moved off the OPERATOR vitals board into its own KARMA ALIGNMENT board, now shown as an EVIL–GOOD swing needle with a lit tier strip (Very Evil through the top tier) instead of a plain slider and label — the same slider is still right there as the control. Fallout 3's KARMA CENTER readout now lives inside this same board instead of a separate one.
 - Your CURIO ARCHIVE now shows every collectible as its actual recognizable object, displayed on shelves inside a sealed glass display case — snow globes appear as glass domes over a lit skyline scene, bobbleheads as a grinning Vault-Boy figure that gently bobbles once collected, and Lincoln memorabilia as their real shape (a rifle, a hat, a coin, and so on), all sitting behind the case's glass. Tapping an object to mark it collected or missing, the disposition picker for Lincoln relics, and the running count all still work exactly as before.
+- Your CHASSIS section got a full hardware makeover to match the rest of the terminal. Your device status is now split across three labeled boards: a UNIT POWER PLANT showing your session and lifetime uptime as industrial hour meters beside a small pulsing power core, an IDENTITY PLATE & BREAKERS board showing your firmware and connection status as a stamped nameplate with breaker switches, and a SERVICE & FAULT CONSOLE holding the firmware revision log and error log buttons. The power core is alive — it beats gently while the terminal sits idle, spins up and glows brighter while the Director composes a reply, dims and flickers if your connection drops, dims and slows when the terminal is idle or in standby, collapses to a dark point when fully shut down, shows a faint red ring whenever an error is buffered, shimmers while the Pip-Boy Radio plays, flashes once on a level-up, pulses on every save, glows in whatever optic color you've picked, and works visibly harder when several of those are happening at once. Tap the core for a quick, purely cosmetic kick, or tap its "?" for a plain-language explainer of what each behavior means. A small mirror of the same core also sits in the Director Uplink header so you can see it react from there too.
 
 ### Fixed
 

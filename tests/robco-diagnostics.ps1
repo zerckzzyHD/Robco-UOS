@@ -7641,7 +7641,7 @@ $wr119  = [regex]::Match($uiCore119, '(?s)function _writeOverseerLog\([\s\S]*?\n
 $ini119 = [regex]::Match($uiCore119, '(?s)function initOverseerLog\([\s\S]*?\n\}').Value
 $fl119  = [regex]::Match($uiCore119, '(?s)function _flushOverseerLog\([\s\S]*?\n\}').Value
 $rn119  = [regex]::Match($uiCore119, '(?s)function renderOverseerLog\([\s\S]*?\n\}').Value
-$ovIdx119 = $html119.IndexOf('systemStatusPanel')
+$ovIdx119 = $html119.IndexOf('unitPowerPlantPanel')
 $ovSlice119 = if ($ovIdx119 -ge 0) { $html119.Substring($ovIdx119, [Math]::Min(600, $html119.Length - $ovIdx119)) } else { '' }
 
 # 119.1  telemetry store constant + tolerant reader (localStorage device stat, not state)
@@ -7674,12 +7674,13 @@ Check (($uiCore119 -match 'if \(document\.hidden\) _flushOverseerLog\(\)') -and 
 Check (($uiCore119 -match 'renderOverseerLog\(\); // WU-F7') -and ($ini119 -match "id:\s*'overseer-flush'") -and ($ini119 -match '_flushOverseerLog\(\)')) `
     '119.7: renderOverseerLog() is called from loadUI and a runtime overseer-flush observer keeps the live read-out + power-on total current'
 
-# 119.8  device telemetry now lives in the SYSTEM STATUS panel (CHASSIS tab, Step 2
-#        v2.8.0 Settings-tab unit -- the former OVERSEER'S LOG panel was split in two,
-#        see Suite 125): CHASSIS-tab .panel + summary>h2 with ">" + display mount +
-#        local-only note, game-agnostic
-Check (($html119 -match 'id="systemStatusPanel"') -and ($html119 -match '<details class="panel" data-tab="chassis" id="systemStatusPanel">') -and ($html119 -match '<summary><h2>&gt; SYSTEM STATUS</h2></summary>') -and ($html119 -match 'id="overseerLogDisplay"') -and ($html119 -match 'STORED LOCALLY ON THIS UNIT') -and ($ovSlice119 -notmatch '\bFNV\b|\bFO3\b|Fallout')) `
-    '119.8: device telemetry lives in the CHASSIS-tab SYSTEM STATUS .panel (summary>h2 with ">") with #overseerLogDisplay + a local-only note, and is game-agnostic (no FNV/FO3/Fallout literals)'
+# 119.8  device telemetry now lives in the CHASSIS-tab BUS-22 UNIT POWER PLANT
+#        board (Design Overhaul CHASSIS unit -- the former single SYSTEM
+#        STATUS panel split into BUS-22/23/24, see Suite 125/192):
+#        .panel.bay-board + summary>h2 with ">" + display mount + local-only
+#        note, game-agnostic
+Check (($html119 -match 'id="unitPowerPlantPanel"') -and ($html119 -match '<details class="panel bay-board" data-tab="chassis" id="unitPowerPlantPanel"') -and ($html119 -match 'UNIT\s+POWER PLANT') -and ($html119 -match 'id="overseerLogDisplay"') -and ($html119 -match 'STORED LOCALLY ON THIS UNIT') -and ($ovSlice119 -notmatch '\bFNV\b|\bFO3\b|Fallout')) `
+    '119.8: device telemetry lives in the CHASSIS-tab BUS-22 UNIT POWER PLANT .panel.bay-board (summary>h2 with ">") with #overseerLogDisplay + a local-only note, and is game-agnostic (no FNV/FO3/Fallout literals)'
 
 # ===========================================================
 # Suite 120 -- WU-F8 High-Lumen Optics (high-contrast mode) (8 tests)
@@ -8026,13 +8027,16 @@ Check (
 # telemetry half is now the CHASSIS-tab #systemStatusPanel (SYSTEM STATUS) and
 # the campaign-stats half is now the DATABANK-tab #campaignLogPanel (CAMPAIGN
 # LOG) -- so this suite verifies the two halves independently. (PS mirror of JS 125.)
+# UPDATED (Design Overhaul CHASSIS unit): the device-telemetry half moved again,
+# from #systemStatusPanel into its own BUS-22 #unitPowerPlantPanel board
+# (#systemStatusPanel is now BUS-23 IDENTITY PLATE & BREAKERS -- see Suite 192).
 # ===========================================================
 Sep "Suite 125 -- WU-F10 session stats merged into OVERSEER LOG"
 $html125   = Read-Src "index.html"
 $render125 = Read-Src "js/ui-render.js"
 $core125   = Read-Src "js/ui-core.js"
 $saves125  = Read-Src "js/ui-saves.js"
-$statusPanel125 = [regex]::Match($html125, '(?s)id="systemStatusPanel"[\s\S]*?</details>').Value
+$statusPanel125 = [regex]::Match($html125, '(?s)id="unitPowerPlantPanel"[\s\S]*?</details>').Value
 $logPanel125 = [regex]::Match($html125, '(?s)id="campaignLogPanel"[\s\S]*?</details>').Value
 $sessFn125 = [regex]::Match($render125, '(?s)function renderSessionStats\(\)[\s\S]*?\n\}').Value
 $overFn125 = [regex]::Match($core125, '(?s)function renderOverseerLog\(\)[\s\S]*?\n\}').Value
@@ -8043,9 +8047,10 @@ Check (-not ($html125 -match 'SESSION STATISTICS')) `
     '125.1: the standalone "SESSION STATISTICS" panel is removed from index.html'
 
 # 125.2  the campaign-stats container lives in its own DATABANK-tab CAMPAIGN LOG
-#        panel; the device telemetry lives in its own CHASSIS-tab SYSTEM STATUS panel
-Check (($html125 -match 'id="campaignLogPanel"') -and ($html125 -match 'id="systemStatusPanel"') -and ($logPanel125.Contains('id="sessionStatsList"')) -and ($statusPanel125.Contains('id="overseerLogDisplay"'))) `
-    '125.2: #sessionStatsList (campaign stats) lives in #campaignLogPanel; #overseerLogDisplay (device telemetry) lives in #systemStatusPanel'
+#        panel; the device telemetry lives in its own CHASSIS-tab BUS-22 UNIT
+#        POWER PLANT board
+Check (($html125 -match 'id="campaignLogPanel"') -and ($html125 -match 'id="unitPowerPlantPanel"') -and ($logPanel125.Contains('id="sessionStatsList"')) -and ($statusPanel125.Contains('id="overseerLogDisplay"'))) `
+    '125.2: #sessionStatsList (campaign stats) lives in #campaignLogPanel; #overseerLogDisplay (device telemetry) lives in #unitPowerPlantPanel'
 
 # 125.3  no duplicate campaign-stats container survived the split
 $sslCount125 = ([regex]::Matches($html125, 'id="sessionStatsList"')).Count
@@ -8064,8 +8069,10 @@ Check (($overFn125 -match 'CURRENT UPTIME') -and ($overFn125 -match 'BOOT COUNT'
 
 # 125.6  the two time notions are distinctly labelled -- session duration vs device
 #        uptime -- each now under its own panel heading rather than a shared sub-label
-Check (($statusPanel125.Contains('UNIT TELEMETRY')) -and ($logPanel125.Contains('CAMPAIGN LOG')) -and ($sessFn125 -match 'CURRENT SITTING') -and ($overFn125 -match 'CURRENT UPTIME')) `
-    '125.6: session duration (CURRENT SITTING) and device uptime (CURRENT UPTIME) sit under clearly labelled CAMPAIGN LOG / UNIT TELEMETRY panels'
+#        (UPDATED, Design Overhaul CHASSIS unit: the device-telemetry board is now
+#        titled UNIT POWER PLANT rather than the old UNIT TELEMETRY sub-label)
+Check (($statusPanel125 -match 'UNIT\s+POWER PLANT') -and ($logPanel125.Contains('CAMPAIGN LOG')) -and ($sessFn125 -match 'CURRENT SITTING') -and ($overFn125 -match 'CURRENT UPTIME')) `
+    '125.6: session duration (CURRENT SITTING) and device uptime (CURRENT UPTIME) sit under clearly labelled CAMPAIGN LOG / UNIT POWER PLANT panels'
 
 # 125.7  the ZERO CAMPAIGN COUNTERS key (renamed at Phase 3 . Piece 3, BUS-21
 #        SERVICE TALLY) is wired to resetSessionStats, which clears state.stats + re-renders
@@ -8511,8 +8518,10 @@ Check $inOrder132 'window.onload calls the 12 boot-phase functions in the origin
 # Threshold has headroom for new named init/phase calls (e.g. P8 initImmersion()) --
 # the guard catches a monolith (hundreds of lines), not the named-call list growing.
 # DO-N added one legitimate named call (_initBezelChrome()) -- bumped to 50 to match.
+# CHASSIS unit added two more (_wireChassisCoreEventBusSubscribers()/initChassisCore()) --
+# bumped again for the same reason.
 $onloadLineCount132 = ($onloadBody132 -split "`n").Count
-Check ($onloadLineCount132 -lt 50) "window.onload body stays a slim named-call composition ($onloadLineCount132 lines, expected < 50)"
+Check ($onloadLineCount132 -lt 55) "window.onload body stays a slim named-call composition ($onloadLineCount132 lines, expected < 55)"
 
 Check ($onloadBody132 -match [regex]::Escape('initTabs()')) 'window.onload still calls initTabs() directly (Suite 57.9 boot-order guard depends on this literal call)'
 
@@ -9055,21 +9064,28 @@ Check (
 
 # 135.16  negative guard: no RobcoEvents.on() call escapes its wiring function in
 #         ui-audio.js / ui-core.js / api.js -- i.e. no bare top-level registration
-#         has crept back in (the exact shape of the boot-order bug)
-function Test-OnCallsInsideWiringFn($src, $fnName) {
-    try { $body = Get-FunctionBody $src $fnName } catch { return @{ total = -1; inside = -2 } }
+#         has crept back in (the exact shape of the boot-order bug). ui-core.js
+#         now carries a SECOND wiring function alongside _wireCoreEventBusSubscribers
+#         (the CHASSIS unit's _wireChassisCoreEventBusSubscribers) -- fnNames
+#         accepts an array so a file's total is checked against the SUM across
+#         all its wiring fns.
+function Test-OnCallsInsideWiringFn($src, $fnNames) {
+    $inside = 0
+    foreach ($fnName in @($fnNames)) {
+        try { $body = Get-FunctionBody $src $fnName } catch { return @{ total = -1; inside = -2 } }
+        $inside += ([regex]::Matches($body, "RobcoEvents\.on\(\s*['`"]")).Count
+    }
     $total = ([regex]::Matches($src, "RobcoEvents\.on\(\s*['`"]")).Count
-    $inside = ([regex]::Matches($body, "RobcoEvents\.on\(\s*['`"]")).Count
     return @{ total = $total; inside = $inside }
 }
 $audioCheck135 = Test-OnCallsInsideWiringFn $uiAudioSrc135 '_wireAudioEventBusSubscribers'
-$coreCheck135  = Test-OnCallsInsideWiringFn $uiCoreSrc135 '_wireCoreEventBusSubscribers'
+$coreCheck135  = Test-OnCallsInsideWiringFn $uiCoreSrc135 @('_wireCoreEventBusSubscribers', '_wireChassisCoreEventBusSubscribers')
 $apiCheck135   = Test-OnCallsInsideWiringFn $apiSrc '_wireApiEventBusSubscribers'
 Check (
     ($audioCheck135.total -eq $audioCheck135.inside) -and ($audioCheck135.total -gt 0) -and
     ($coreCheck135.total -eq $coreCheck135.inside) -and ($coreCheck135.total -gt 0) -and
     ($apiCheck135.total -eq $apiCheck135.inside) -and ($apiCheck135.total -gt 0)
-) '135.16: every RobcoEvents.on() call in ui-audio.js/ui-core.js/api.js sits inside its _wire*EventBusSubscribers() function -- none at bare top level (the U7 boot-order regression)'
+) '135.16: every RobcoEvents.on() call in ui-audio.js/ui-core.js/api.js sits inside a named _wire*EventBusSubscribers() function -- none at bare top level (the U7 boot-order regression)'
 
 # ===========================================================
 # Suite 136 -- Step 2 (v2.8.0) Phase 0 U9/U10: cheap connector sweep +
@@ -14807,18 +14823,23 @@ Check (
     ($configBlock176.Contains('id="wipeTerminalBtn"'))
 ) '176.2: #campgPanel (renamed CAMPAIGN CHRONICLE at Phase 3 . Piece 3) keeps only the record sub-panels; every config control + the DANGER ZONE moved verbatim into #campaignConfigPanel'
 
-# 176.3  #systemStatusPanel exists on CHASSIS with device telemetry + the
-#        firmware-log + error-log buttons; the firmware button is gone from
-#        the SVC tray
+# 176.3  #systemStatusPanel exists on CHASSIS with device telemetry; the
+#        firmware-log + error-log buttons are gone from the SVC tray.
+#        UPDATED (Design Overhaul CHASSIS unit): the firmware-log/error-log
+#        buttons moved again, from #systemStatusPanel into their own BUS-24
+#        #serviceFaultConsolePanel board (see Suite 192) -- #systemStatusPanel
+#        itself is now BUS-23 IDENTITY PLATE & BREAKERS (#systemStatusDisplay
+#        only, no buttons).
 $svcTrayMatch176 = [regex]::Match($html176, '(?s)data-sub-id="slot_svc_tray"[\s\S]*?</details>')
 $svcTrayBlock176 = if ($svcTrayMatch176.Success) { $svcTrayMatch176.Value } else { '' }
 Check (
-    ($html176 -match '<details class="panel" data-tab="chassis" id="systemStatusPanel">') -and
+    ($html176 -match '<details class="panel bay-board" data-tab="chassis" id="systemStatusPanel">') -and
     ($html176 -match 'id="systemStatusDisplay"') -and
+    ($html176 -match '<details class="panel bay-board" data-tab="chassis" id="serviceFaultConsolePanel">') -and
     ($html176 -match 'id="btnSystemStatusErrorLog"[^>]*onclick="showErrorLog\(\)"') -and
     ($html176 -match 'id="btnViewChangelog"[^>]*onclick="_svcViewChangelog\(\)"') -and
     (-not ($svcTrayBlock176.Contains('id="btnViewChangelog"')))
-) '176.3: #systemStatusPanel (CHASSIS) hosts device telemetry + #systemStatusDisplay + the firmware-log button (moved out of the SVC tray) + a new error-log button'
+) '176.3: #systemStatusPanel (CHASSIS, BUS-23) hosts #systemStatusDisplay; #serviceFaultConsolePanel (BUS-24) hosts the firmware-log button (moved out of the SVC tray) + the error-log button'
 
 # 176.4  #campaignLogPanel exists on DATABANK with the campaign stats + reset
 #        button (reskinned as BUS-21 SERVICE TALLY at Phase 3 . Piece 3)
@@ -14863,14 +14884,16 @@ Check (
 
 # 176.8  expandPanelForCategory's 'config'/'log' categories were re-routed to
 #        their new homes (settings/chassis) rather than left pointing at the
-#        panels they used to live in
+#        panels they used to live in. UPDATED (Design Overhaul CHASSIS unit):
+#        'log' now targets the BUS-22 UNIT POWER PLANT board title, since the
+#        former single SYSTEM STATUS panel split into three (Suite 192).
 $expandBody176 = Get-FunctionBody $core176 'expandPanelForCategory'
 Check (
     ($expandBody176 -match "config:\s*'settings'") -and
     ($expandBody176 -match "config:\s*'>\s*CAMPAIGN CONFIGS'") -and
     ($expandBody176 -match "log:\s*'chassis'") -and
-    ($expandBody176 -match "log:\s*'>\s*SYSTEM STATUS'")
-) "176.8: expandPanelForCategory routes 'config' to the settings tab / CAMPAIGN CONFIGS panel and 'log' to the chassis tab / SYSTEM STATUS panel"
+    ($expandBody176 -match "log:\s*'>\s*UNIT POWER PLANT'")
+) "176.8: expandPanelForCategory routes 'config' to the settings tab / CAMPAIGN CONFIGS panel and 'log' to the chassis tab / UNIT POWER PLANT panel"
 
 # 176.9  the nav/render layer added by this unit writes nothing durable to the
 #        campaign -- renderSystemStatus() and the settings-hatch trigger inside
@@ -17834,6 +17857,252 @@ Check (
     ($dispositionRule191b -match '-webkit-appearance:\s*none') -and
     ($fontSizePx191 -ge 16) -and ($minHeightPx191 -ge 28)
 ) "191.22: .curio-linc-disposition uses appearance:none (+ -webkit-appearance) to strip native form-control chrome variance, while keeping font-size (${fontSizePx191}px) >=16 and min-height (${minHeightPx191}px) >=28 -- the Protocol 17 mobile-baseline floors are never reduced to chase compactness"
+
+# ===========================================================
+# Suite 192 -- Design Overhaul CHASSIS unit: the self-diagnostic maintenance
+# bay + THE LIVING CORE (Protocol UI-10). The former single SYSTEM STATUS
+# panel is rebuilt as three boards (BUS-22 UNIT POWER PLANT / BUS-23 IDENTITY
+# PLATE & BREAKERS / BUS-24 SERVICE & FAULT CONSOLE, reskin only). The core is
+# a decorative layer over REAL machine signals (setOverseerState/
+# _isUplinkConnected/AmbientRuntime/RobcoEvents -- reused, never forked),
+# gate-stacked to a single static frame, zero campaign-state write, and
+# mirrored verbatim (single shared _coreRefresh() choke point) into a mini
+# glyph in the Overseer Uplink header. (PS mirror of JS Suite 192.)
+# 22 tests
+# ===========================================================
+Sep "Suite 192 -- Design Overhaul CHASSIS unit: THE LIVING CORE"
+$html192 = Read-Src "index.html"
+$core192 = Read-Src "js/ui-core.js"
+$audio192 = Read-Src "js/ui-audio.js"
+$saves192 = Read-Src "js/ui-saves.js"
+$cloud192 = Read-Src "js/cloud.js"
+$css192 = Read-Src "css/terminal.css"
+
+# 192.1  the three BUS-22/23/24 boards exist on the CHASSIS tab, each a real
+#        .panel.bay-board with its own BUS slot tag
+Check (
+    ($html192 -match '<details class="panel bay-board" data-tab="chassis" id="unitPowerPlantPanel"') -and
+    ($html192 -match '<details class="panel bay-board" data-tab="chassis" id="systemStatusPanel">') -and
+    ($html192 -match '<details class="panel bay-board" data-tab="chassis" id="serviceFaultConsolePanel">') -and
+    ($html192 -match 'BUS-22') -and ($html192 -match 'BUS-23') -and ($html192 -match 'BUS-24')
+) '192.1: BUS-22 UNIT POWER PLANT / BUS-23 IDENTITY PLATE & BREAKERS / BUS-24 SERVICE & FAULT CONSOLE are three real .panel.bay-board boards on the CHASSIS tab'
+
+# 192.2  #chassisCore is a real <button> (Protocol UI-5) wired to
+#        _coreTapPoke() with a descriptive aria-label; #chassisCoreMini is a
+#        decorative aria-hidden mirror -- both share .chassis-core-shape
+$coreBtnTag192 = [regex]::Match($html192, '(?s)<button[^>]*id="chassisCore"[^>]*>').Value
+$miniTag192 = [regex]::Match($html192, '(?s)<span[^>]*id="chassisCoreMini"[^>]*>').Value
+Check (
+    ($coreBtnTag192 -match 'class="chassis-core-shape"') -and
+    ($coreBtnTag192 -match 'onclick="_coreTapPoke\(\)"') -and
+    ($coreBtnTag192 -match 'aria-label="[^"]+"') -and
+    ($miniTag192 -match 'chassis-core-shape') -and
+    ($miniTag192 -match 'aria-hidden="true"')
+) '192.2: #chassisCore is a real <button> (onclick="_coreTapPoke()", descriptive aria-label) and #chassisCoreMini is a decorative aria-hidden mirror -- both carry .chassis-core-shape'
+
+# 192.3  the "?" explainer opens showCoreHelpModal(), which is defined and
+#        drives the shared openModal() (Suite 103 showSaveHelpModal pattern)
+Check (
+    ($html192 -match '(?s)onclick="showCoreHelpModal\(\)".{0,120}aria-label="[^"]+"') -and
+    ($core192 -match 'function showCoreHelpModal\(\)') -and
+    ((Get-FunctionBody $core192 'showCoreHelpModal') -match 'openModal\(\{')
+) '192.3: a "?" button opens showCoreHelpModal(), which renders through the shared openModal() driver'
+
+# 192.4  _coreRefresh() is the ONE choke point -- queries the shared
+#        .chassis-core-shape class (never two separate getElementById calls,
+#        which would let the two views drift) and reads every real signal
+$coreRefreshBody192 = Get-FunctionBody $core192 '_coreRefresh'
+Check (
+    ((Get-FunctionBody $core192 '_coreShells') -match "querySelectorAll\('\.chassis-core-shape'\)") -and
+    ($coreRefreshBody192 -match 'getOverseerState') -and
+    ($coreRefreshBody192 -match '_readErrorLog') -and
+    ($coreRefreshBody192 -match '_radioPlaying') -and
+    ($coreRefreshBody192 -match '_corePowerClass') -and
+    (-not ($coreRefreshBody192 -match "getElementById\('chassisCore'\)")) -and
+    (-not ($coreRefreshBody192 -match "getElementById\('chassisCoreMini'\)"))
+) '192.4: _coreRefresh() is the single choke point -- reads getOverseerState()/_readErrorLog()/_radioPlaying()/_corePowerClass() and paints both shells via ONE shared .chassis-core-shape query, never two separate ids'
+
+# 192.5  _coreShouldAnimate() gates on all four documented signals --
+#        reduced-motion, the Immersion dial below Balanced, document.hidden,
+#        and the Ambient Runtime in STANDBY/SHUTDOWN/OFF
+$shouldAnimateBody192 = Get-FunctionBody $core192 '_coreShouldAnimate'
+Check (
+    ($shouldAnimateBody192 -match 'prefers-reduced-motion') -and
+    ($shouldAnimateBody192 -match "immersionAllows\('balanced'\)") -and
+    ($shouldAnimateBody192 -match 'document\.hidden') -and
+    ($shouldAnimateBody192 -match 'STANDBY') -and
+    ($shouldAnimateBody192 -match 'SHUTDOWN') -and
+    ($shouldAnimateBody192 -match "'OFF'")
+) "192.5: _coreShouldAnimate() suppresses the continuous loop on reduced-motion OR Immersion<Balanced OR document.hidden OR runtime STANDBY/SHUTDOWN/OFF -- no bespoke per-behaviour carve-out"
+
+# 192.6  the gate is a single .core-still CSS rule pausing every continuous
+#        animation as a group -- the state classes themselves are untouched
+#        by it, so a state CHANGE still paints instantly even while paused
+$cssStripped192 = [regex]::Replace($css192, '/\*[\s\S]*?\*/', '')
+$coreStillRule192 = [regex]::Match($cssStripped192, '(?s)\.core-still[\s\S]*?\{[^\}]*\}').Value
+Check (
+    ($coreStillRule192 -match 'animation-play-state:\s*paused\s*!important') -and
+    ($cssStripped192 -match '(?s)\.core-still,[\s\S]*\.c-ring,[\s\S]*\.c-heart')
+) '192.6: .core-still pauses .c-ring/.c-heart/the fault overlay via animation-play-state:paused as one group (Protocol UI-10 gate-stacking)'
+
+# 192.7  the AI-revs (#2) and connection (#3) behaviors reuse the Overseer's
+#        OWN choke points rather than re-instrumenting transmitMessage()/
+#        appendToChat() -- one new line each in setOverseerState()/onImmersionChange()
+Check (
+    ((Get-FunctionBody $core192 'setOverseerState') -match '_coreRefresh') -and
+    ((Get-FunctionBody $core192 'onImmersionChange') -match '_coreRefresh')
+) '192.7: setOverseerState() and onImmersionChange() both call _coreRefresh() (Protocol 22 -- reused, not re-instrumented)'
+
+# 192.8  fault strain (#6) reuses ONE shared _readErrorLog() reader across
+#        _updateFaultLamp()/renderServiceFaultConsole()/_coreRefresh() --
+#        never a second source of truth for "how many faults are buffered"
+$faultLampBody192 = Get-FunctionBody $core192 '_updateFaultLamp'
+Check (
+    ($core192 -match 'function _readErrorLog\(\)') -and
+    ($faultLampBody192 -match 'renderServiceFaultConsole') -and
+    ($faultLampBody192 -match '_coreRefresh') -and
+    ((Get-FunctionBody $core192 'renderServiceFaultConsole') -match '_readErrorLog')
+) '192.8: _updateFaultLamp() calls both renderServiceFaultConsole() and _coreRefresh(), and renderServiceFaultConsole() reads the SAME _readErrorLog() the core also reads'
+
+# 192.9  radio-reactive (#10) hooks the ONE existing choke point
+#        (_updateRadioUI, called by both startRadio()/stopRadio()) rather than
+#        a second call site or a poll loop
+Check ((Get-FunctionBody $audio192 '_updateRadioUI') -match '_coreRefresh') `
+    '192.9: _updateRadioUI() (called by both startRadio()/stopRadio()) calls _coreRefresh() -- one choke point covers the whole radio lifecycle'
+
+# 192.10  the OS Event Bus wiring (deferred to window.onload, the Suite 135
+#         U7 boot-order lesson) subscribes runtime.state/level.up/data.write
+$wireBody192 = Get-FunctionBody $core192 '_wireChassisCoreEventBusSubscribers'
+Check (
+    ($wireBody192 -match "RobcoEvents\.on\('runtime\.state', \(\) => _coreRefresh\(\)\)") -and
+    ($wireBody192 -match "RobcoEvents\.on\('level\.up', \(\) => _coreFlare\(\)\)") -and
+    ($wireBody192 -match "RobcoEvents\.on\('data\.write', \(\) => _coreDataPulse\(\)\)") -and
+    ($core192 -match '_wireChassisCoreEventBusSubscribers\(\);')
+) '192.10: _wireChassisCoreEventBusSubscribers() subscribes runtime.state->_coreRefresh, level.up->_coreFlare, data.write->_coreDataPulse, and is called from window.onload'
+
+# 192.11  initChassisCore() paints the boot frame after the Ambient Runtime is
+#         live (called AFTER initAmbientRuntime() in window.onload)
+Check ($core192 -match '(?s)initAmbientRuntime\(\);.{0,200}initChassisCore\(\);') `
+    '192.11: initChassisCore() is called from window.onload, after initAmbientRuntime() so the first paint reads a live runtime state'
+
+# 192.12  save/sync write-pulse (#9) -- data.write is emitted from every write
+#         path: the local slot save, and the three cloud paths (push, pull, overwrite)
+$dataWriteCount192 = ([regex]::Matches($cloud192, "RobcoEvents\.emit\('data\.write'")).Count
+Check (
+    ($saves192 -match "RobcoEvents\.emit\('data\.write', \{ kind: 'local-save' \}\)") -and
+    ($dataWriteCount192 -eq 3) -and
+    ($cloud192 -match "kind: 'cloud-push'") -and
+    ($cloud192 -match "kind: 'cloud-pull'")
+) "192.12: 'data.write' is emitted from saveToSlot() (local-save) and from saveCurrentToCloud()/loadCloudSave()/overwriteCloudSave() (cloud-push x2 + cloud-pull) in cloud.js"
+
+# 192.13  the one-shot flourishes (#8/#9/#13) all gate on _coreShouldAnimate()
+#         and use the reflow-restart pattern so a repeated trigger restarts
+#         cleanly (the Suite 135/162 precedent)
+$oneShotBody192 = Get-FunctionBody $core192 '_coreOneShot'
+Check (
+    ($oneShotBody192 -match 'if \(!_coreShouldAnimate\(\)\) return;') -and
+    ($oneShotBody192 -match 'void el\.offsetWidth') -and
+    ($core192 -match 'function _coreFlare\(\)') -and
+    ($core192 -match 'function _coreDataPulse\(\)') -and
+    ($core192 -match 'function _coreTapPoke\(\)')
+) '192.13: _coreFlare()/_coreDataPulse()/_coreTapPoke() all route through _coreOneShot(), which gates on _coreShouldAnimate() and force-reflows before re-adding the class (repeated triggers restart cleanly)'
+
+# 192.14  tap-to-poke (#13) reuses the EXISTING hardware-SFX channel
+#         (Protocol 7 -- playChipClick() already guards masterMute + the
+#         hardwareSfx pref) rather than a new audio function
+$tapPokeBody192 = Get-FunctionBody $core192 '_coreTapPoke'
+Check (
+    ($tapPokeBody192 -match 'playChipClick\(true\)') -and
+    (-not ($tapPokeBody192 -match 'function playChipClick'))
+) '192.14: _coreTapPoke() reuses the existing playChipClick() hardware-SFX function (Protocol 7), never a forked audio path'
+
+# 192.15  zero campaign-state write -- none of the CHASSIS core functions
+#         ever touch saveState()/robco_v8/state.<field>=
+$coreFns192 = @('_coreRefresh', '_coreShouldAnimate', '_corePowerClass', '_coreOneShot', '_coreFlare', '_coreDataPulse', '_coreTapPoke', 'initChassisCore', 'showCoreHelpModal', 'renderServiceFaultConsole')
+$offenders192 = @()
+foreach ($n in $coreFns192) {
+    try {
+        $body = Get-FunctionBody $core192 $n
+        if ($body -match 'saveState\(|robco_v8|state\.\w+\s*=') { $offenders192 += $n }
+    } catch {
+        $offenders192 += $n
+    }
+}
+Check ($offenders192.Count -eq 0) `
+    ('192.15: every LIVING CORE function is free of saveState()/robco_v8/state.<field>= writes' + $(if ($offenders192.Count) { ' -- offenders: ' + ($offenders192 -join ', ') } else { '' }))
+
+# 192.16  mobile baseline (Protocol 17) -- the core button is well over the
+#         28px tap-target floor, and the "?" explainer reuses the shared
+#         >=28px .icon-btn-round (never a bespoke small target)
+$coreShapeRule192 = [regex]::Match($cssStripped192, '\.chassis-core-shape\s*\{[^\}]*\}').Value
+$coreShapeWMatch192 = [regex]::Match($coreShapeRule192, 'width:\s*(\d+)px')
+$coreShapeW192 = if ($coreShapeWMatch192.Success) { [int]$coreShapeWMatch192.Groups[1].Value } else { 0 }
+Check (
+    ($coreShapeW192 -ge 28) -and
+    ($html192 -match 'class="icon-btn-round core-help-btn"')
+) "192.16: #chassisCore is ${coreShapeW192}px (>=28px Protocol 17 floor) and the ""?"" reuses the shared .icon-btn-round (>=28px)"
+
+# 192.17  game-agnostic (Protocol 38) -- no FNV/FO3/Fallout literals in the
+#         CHASSIS boards or the core's field-manual copy
+$chassisIdx192 = $html192.IndexOf('id="unitPowerPlantPanel"')
+$chassisEndIdx192 = $html192.IndexOf('</details>', $html192.IndexOf('id="serviceFaultConsolePanel"'))
+$chassisBlock192 = $html192.Substring($chassisIdx192, $chassisEndIdx192 - $chassisIdx192)
+Check (
+    (-not ($chassisBlock192 -match '(?i)\bFNV\b|\bFO3\b|Fallout|New Vegas|Capital Wasteland')) -and
+    (-not ((Get-FunctionBody $core192 'showCoreHelpModal') -match '(?i)\bFNV\b|\bFO3\b|Fallout|New Vegas|Capital Wasteland'))
+) '192.17: the CHASSIS boards and the core help modal carry zero game literals -- device/OS fiction only'
+
+# 192.18  BUS-22 UNIT POWER PLANT reuses the BUS-21 SERVICE TALLY's _odoTile()
+#         digit-wheel helper verbatim (Protocol 22, no parallel drum-tile
+#         implementation) and stamps the collapsed summary line
+$overseerBody192 = Get-FunctionBody $core192 'renderOverseerLog'
+Check (
+    ($overseerBody192 -match '_odoTile') -and
+    ($overseerBody192 -match "getElementById\('chassisPlantStatus'\)")
+) '192.18: renderOverseerLog() renders BUS-22 hour meters via the shared _odoTile() helper and stamps #chassisPlantStatus'
+
+# 192.19  BUS-23 IDENTITY PLATE & BREAKERS renders the serial plate + breaker
+#         rack (CARRIER + every _SYSTEM_STATUS_FLAGS entry) and stamps the
+#         collapsed summary line
+$statusBody192 = Get-FunctionBody $core192 'renderSystemStatus'
+Check (
+    ($statusBody192 -match 'id-plate') -and
+    ($statusBody192 -match 'breaker-rack') -and
+    ($statusBody192 -match "_chassisBreaker\('CARRIER'") -and
+    ($statusBody192 -match "getElementById\('chassisIdentityStatus'\)")
+) '192.19: renderSystemStatus() renders the BUS-23 id-plate + a breaker-rack (CARRIER + every feature flag) and stamps #chassisIdentityStatus'
+
+# 192.20  BUS-24 SERVICE & FAULT CONSOLE -- renderServiceFaultConsole() is
+#         defined, updates every fault-annunciator element, and is called
+#         from initChassisCore() (initial paint) as well as _updateFaultLamp()
+$svcConsoleBody192 = Get-FunctionBody $core192 'renderServiceFaultConsole'
+Check (
+    ($svcConsoleBody192 -match "getElementById\('svcFaultCounter'\)") -and
+    ($svcConsoleBody192 -match "getElementById\('svcFaultNum'\)") -and
+    ($svcConsoleBody192 -match "getElementById\('svcFaultLast'\)") -and
+    ($svcConsoleBody192 -match "getElementById\('chassisSvcStatus'\)") -and
+    ((Get-FunctionBody $core192 'initChassisCore') -match 'renderServiceFaultConsole\(\)')
+) '192.20: renderServiceFaultConsole() paints the fault counter/last-fault line/summary, and initChassisCore() calls it for the initial frame'
+
+# 192.21  every CHASSIS board follows the Protocol UI-1 heading standard
+#         (summary > h2 starting with ">") -- already covered generically by
+#         Suite 88, reconfirmed directly here scoped to the three new boards
+$plantSlice192 = [regex]::Match($html192, '(?s)id="unitPowerPlantPanel".{0,200}').Value
+$idpSlice192 = [regex]::Match($html192, '(?s)id="systemStatusPanel">.{0,200}').Value
+$svcSlice192 = [regex]::Match($html192, '(?s)id="serviceFaultConsolePanel">.{0,200}').Value
+Check (
+    ($plantSlice192 -match '(?s)<summary>\s*<h2>\s*&gt;') -and
+    ($idpSlice192 -match '(?s)<summary>\s*<h2>\s*&gt;') -and
+    ($svcSlice192 -match '(?s)<summary>\s*<h2>\s*&gt;')
+) '192.21: BUS-22/23/24 each carry <summary><h2>> (Protocol UI-1 panel heading standard)'
+
+# 192.22  the mini core mirror sits in the Overseer Uplink header (.ovs-head)
+#         WITHOUT altering the existing waveform (#overseerScope) markup
+$ovsHeadBlock192 = [regex]::Match($html192, '(?s)<div class="ovs-head">[\s\S]*?</div>').Value
+Check (
+    ($ovsHeadBlock192.Contains('id="chassisCoreMini"')) -and
+    ($html192 -match '<canvas id="overseerScope" aria-hidden="true"></canvas>')
+) '192.22: #chassisCoreMini sits in the Overseer Uplink header (.ovs-head), and the #overseerScope waveform canvas is untouched'
 
 # ===========================================================
 # Results

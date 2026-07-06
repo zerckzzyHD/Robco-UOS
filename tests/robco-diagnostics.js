@@ -13414,23 +13414,26 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     );
   }
 
-  // 119.8  device telemetry now lives in the SYSTEM STATUS panel (CHASSIS tab, Step 2
-  //        v2.8.0 Settings-tab unit — the former OVERSEER'S LOG panel was split in two,
-  //        see Suite 125): CHASSIS-tab .panel + summary>h2 with ">" + display mount +
-  //        local-only note, game-agnostic
+  // 119.8  device telemetry now lives in the CHASSIS-tab BUS-22 UNIT POWER
+  //        PLANT board (Design Overhaul CHASSIS unit — the former single
+  //        SYSTEM STATUS panel split into BUS-22/23/24, see Suite 125/192):
+  //        .panel.bay-board + summary>h2 with ">" + display mount + local-only
+  //        note, game-agnostic
   assert(
-    /id="systemStatusPanel"/.test(html119) &&
-      /<details class="panel" data-tab="chassis" id="systemStatusPanel">/.test(html119) &&
-      /<summary><h2>&gt; SYSTEM STATUS<\/h2><\/summary>/.test(html119) &&
+    /id="unitPowerPlantPanel"/.test(html119) &&
+      /<details class="panel bay-board" data-tab="chassis" id="unitPowerPlantPanel"/.test(
+        html119
+      ) &&
+      /UNIT\s+POWER PLANT/.test(html119) &&
       /id="overseerLogDisplay"/.test(html119) &&
       /STORED LOCALLY ON THIS UNIT/.test(html119) &&
       !/\bFNV\b|\bFO3\b|Fallout/.test(
         html119.slice(
-          html119.indexOf('systemStatusPanel'),
-          html119.indexOf('systemStatusPanel') + 600
+          html119.indexOf('unitPowerPlantPanel'),
+          html119.indexOf('unitPowerPlantPanel') + 600
         )
       ),
-    '119.8: device telemetry lives in the CHASSIS-tab SYSTEM STATUS .panel (summary>h2 with ">") with #overseerLogDisplay + a local-only note, and is game-agnostic (no FNV/FO3/Fallout literals)'
+    '119.8: device telemetry lives in the CHASSIS-tab BUS-22 UNIT POWER PLANT .panel.bay-board (summary>h2 with ">") with #overseerLogDisplay + a local-only note, and is game-agnostic (no FNV/FO3/Fallout literals)'
   );
 }
 
@@ -14117,7 +14120,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  two — the device-telemetry half is now the CHASSIS-tab #systemStatusPanel
 //  (SYSTEM STATUS) and the campaign-stats half is now the DATABANK-tab
 //  #campaignLogPanel (CAMPAIGN LOG) — so this suite verifies the two halves
-//  independently instead of one merged panel.
+//  independently instead of one merged panel. UPDATED (Design Overhaul CHASSIS
+//  unit): the device-telemetry half moved again, from #systemStatusPanel into
+//  its own BUS-22 #unitPowerPlantPanel board (#systemStatusPanel is now BUS-23
+//  IDENTITY PLATE & BREAKERS — see Suite 192).
 //  8 tests
 // ══════════════════════════════════════════════════════════════
 {
@@ -14126,7 +14132,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   const render125 = readFile('js/ui-render.js');
   const core125 = readFile('js/ui-core.js');
   const saves125 = readFile('js/ui-saves.js');
-  const statusPanel125 = (html125.match(/id="systemStatusPanel"[\s\S]*?<\/details>/) || [''])[0];
+  const statusPanel125 = (html125.match(/id="unitPowerPlantPanel"[\s\S]*?<\/details>/) || [''])[0];
   const logPanel125 = (html125.match(/id="campaignLogPanel"[\s\S]*?<\/details>/) || [''])[0];
   const sessFn125 = (render125.match(/function renderSessionStats\(\)[\s\S]*?\n\}/) || [''])[0];
   const overFn125 = (core125.match(/function renderOverseerLog\(\)[\s\S]*?\n\}/) || [''])[0];
@@ -14139,13 +14145,14 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   );
 
   // 125.2  the campaign-stats container lives in its own DATABANK-tab CAMPAIGN LOG
-  //        panel; the device telemetry lives in its own CHASSIS-tab SYSTEM STATUS panel
+  //        panel; the device telemetry lives in its own CHASSIS-tab BUS-22 UNIT
+  //        POWER PLANT board
   assert(
     /id="campaignLogPanel"/.test(html125) &&
-      /id="systemStatusPanel"/.test(html125) &&
+      /id="unitPowerPlantPanel"/.test(html125) &&
       logPanel125.includes('id="sessionStatsList"') &&
       statusPanel125.includes('id="overseerLogDisplay"'),
-    '125.2: #sessionStatsList (campaign stats) lives in #campaignLogPanel; #overseerLogDisplay (device telemetry) lives in #systemStatusPanel'
+    '125.2: #sessionStatsList (campaign stats) lives in #campaignLogPanel; #overseerLogDisplay (device telemetry) lives in #unitPowerPlantPanel'
   );
 
   // 125.3  no duplicate campaign-stats container survived the split
@@ -14179,12 +14186,14 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
   // 125.6  the two time notions are distinctly labelled — session duration vs device
   //        uptime — each now under its own panel heading rather than a shared sub-label
+  //        (UPDATED, Design Overhaul CHASSIS unit: the device-telemetry board is now
+  //        titled UNIT POWER PLANT rather than the old UNIT TELEMETRY sub-label)
   assert(
-    statusPanel125.includes('UNIT TELEMETRY') &&
+    /UNIT\s+POWER PLANT/.test(statusPanel125) &&
       logPanel125.includes('CAMPAIGN LOG') &&
       /CURRENT SITTING/.test(sessFn125) &&
       /CURRENT UPTIME/.test(overFn125),
-    '125.6: session duration (CURRENT SITTING) and device uptime (CURRENT UPTIME) sit under clearly labelled CAMPAIGN LOG / UNIT TELEMETRY panels'
+    '125.6: session duration (CURRENT SITTING) and device uptime (CURRENT UPTIME) sit under clearly labelled CAMPAIGN LOG / UNIT POWER PLANT panels'
   );
 
   // 125.7  the ZERO CAMPAIGN COUNTERS key (renamed at Phase 3 · Piece 3, BUS-21
@@ -14901,9 +14910,11 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     const onloadLineCount = onloadBody132.split('\n').length;
     // DO-N added one legitimate named call (_initBezelChrome()) — bumped per this test's
     // own stated intent (headroom for natural named-call growth, not a monolith guard).
+    // CHASSIS unit added two more (_wireChassisCoreEventBusSubscribers()/initChassisCore()) —
+    // bumped again for the same reason.
     assert(
-      onloadLineCount < 50,
-      `window.onload body stays a slim named-call composition (${onloadLineCount} lines, expected < 50)`
+      onloadLineCount < 55,
+      `window.onload body stays a slim named-call composition (${onloadLineCount} lines, expected < 55)`
     );
 
     // 132.6  initTabs() still called directly in window.onload (not wrapped —
@@ -15851,21 +15862,31 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
   // 135.16  negative guard: no RobcoEvents.on() call escapes its wiring function
   //         in ui-audio.js / ui-core.js / api.js — i.e. no bare top-level
-  //         registration has crept back in (the exact shape of the boot-order bug)
+  //         registration has crept back in (the exact shape of the boot-order bug).
+  //         ui-core.js now carries a SECOND wiring function alongside
+  //         _wireCoreEventBusSubscribers (the CHASSIS unit's
+  //         _wireChassisCoreEventBusSubscribers) — fnNames accepts an array so
+  //         a file's total is checked against the SUM across all its wiring fns.
   {
-    function onCallsInsideWiringFn(src, fnName) {
-      let body;
-      try {
-        body = extractFunctionBody(src, fnName);
-      } catch (_) {
-        return { total: -1, inside: -2 }; // force mismatch → fail
+    function onCallsInsideWiringFn(src, fnNames) {
+      const names = Array.isArray(fnNames) ? fnNames : [fnNames];
+      let inside = 0;
+      for (const fnName of names) {
+        try {
+          const body = extractFunctionBody(src, fnName);
+          inside += (body.match(/RobcoEvents\.on\(\s*['"]/g) || []).length;
+        } catch (_) {
+          return { total: -1, inside: -2 }; // force mismatch → fail
+        }
       }
       const total = (src.match(/RobcoEvents\.on\(\s*['"]/g) || []).length;
-      const inside = (body.match(/RobcoEvents\.on\(\s*['"]/g) || []).length;
       return { total, inside };
     }
     const audioCheck135 = onCallsInsideWiringFn(uiAudioSrc135, '_wireAudioEventBusSubscribers');
-    const coreCheck135 = onCallsInsideWiringFn(uiCoreSrc135, '_wireCoreEventBusSubscribers');
+    const coreCheck135 = onCallsInsideWiringFn(uiCoreSrc135, [
+      '_wireCoreEventBusSubscribers',
+      '_wireChassisCoreEventBusSubscribers',
+    ]);
     const apiCheck135 = onCallsInsideWiringFn(apiSource, '_wireApiEventBusSubscribers');
     assert(
       audioCheck135.total === audioCheck135.inside &&
@@ -15874,7 +15895,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         audioCheck135.total > 0 &&
         coreCheck135.total > 0 &&
         apiCheck135.total > 0,
-      '135.16: every RobcoEvents.on() call in ui-audio.js/ui-core.js/api.js sits inside its _wire*EventBusSubscribers() function — none at bare top level (the U7 boot-order regression)'
+      '135.16: every RobcoEvents.on() call in ui-audio.js/ui-core.js/api.js sits inside a named _wire*EventBusSubscribers() function — none at bare top level (the U7 boot-order regression)'
     );
   }
 }
@@ -24012,20 +24033,27 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     );
   }
 
-  // 176.3  #systemStatusPanel exists on CHASSIS with device telemetry + the
-  //        firmware-log + error-log buttons; the firmware button is gone from
-  //        the SVC tray
+  // 176.3  #systemStatusPanel exists on CHASSIS with device telemetry; the
+  //        firmware-log + error-log buttons are gone from the SVC tray.
+  //        UPDATED (Design Overhaul CHASSIS unit): the firmware-log/error-log
+  //        buttons moved again, from #systemStatusPanel into their own BUS-24
+  //        #serviceFaultConsolePanel board (see Suite 192) — #systemStatusPanel
+  //        itself is now BUS-23 IDENTITY PLATE & BREAKERS (#systemStatusDisplay
+  //        only, no buttons).
   {
     const svcTrayBlock176 = (html176.match(/data-sub-id="slot_svc_tray"[\s\S]*?<\/details>/) || [
       '',
     ])[0];
     assert(
-      /<details class="panel" data-tab="chassis" id="systemStatusPanel">/.test(html176) &&
+      /<details class="panel bay-board" data-tab="chassis" id="systemStatusPanel">/.test(html176) &&
         /id="systemStatusDisplay"/.test(html176) &&
+        /<details class="panel bay-board" data-tab="chassis" id="serviceFaultConsolePanel">/.test(
+          html176
+        ) &&
         /id="btnSystemStatusErrorLog"[^>]*onclick="showErrorLog\(\)"/.test(html176) &&
         /id="btnViewChangelog"[^>]*onclick="_svcViewChangelog\(\)"/.test(html176) &&
         !svcTrayBlock176.includes('id="btnViewChangelog"'),
-      '176.3: #systemStatusPanel (CHASSIS) hosts device telemetry + #systemStatusDisplay + the firmware-log button (moved out of the SVC tray) + a new error-log button'
+      '176.3: #systemStatusPanel (CHASSIS, BUS-23) hosts #systemStatusDisplay; #serviceFaultConsolePanel (BUS-24) hosts the firmware-log button (moved out of the SVC tray) + the error-log button'
     );
   }
 
@@ -24085,15 +24113,17 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
   // 176.8  expandPanelForCategory's 'config'/'log' categories were re-routed to
   //        their new homes (settings/chassis) rather than left pointing at the
-  //        panels they used to live in
+  //        panels they used to live in. UPDATED (Design Overhaul CHASSIS unit):
+  //        'log' now targets the BUS-22 UNIT POWER PLANT board title, since the
+  //        former single SYSTEM STATUS panel split into three (Suite 192).
   {
     const expandBody176 = extractFunctionBody(core176, 'expandPanelForCategory');
     assert(
       /config:\s*'settings'/.test(expandBody176) &&
         /config:\s*'>\s*CAMPAIGN CONFIGS'/.test(expandBody176) &&
         /log:\s*'chassis'/.test(expandBody176) &&
-        /log:\s*'>\s*SYSTEM STATUS'/.test(expandBody176),
-      "176.8: expandPanelForCategory routes 'config' to the settings tab / CAMPAIGN CONFIGS panel and 'log' to the chassis tab / SYSTEM STATUS panel"
+        /log:\s*'>\s*UNIT POWER PLANT'/.test(expandBody176),
+      "176.8: expandPanelForCategory routes 'config' to the settings tab / CAMPAIGN CONFIGS panel and 'log' to the chassis tab / UNIT POWER PLANT panel"
     );
   }
 
@@ -28408,6 +28438,311 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       `191.22: .curio-linc-disposition uses appearance:none (+ -webkit-appearance) to strip native form-control chrome variance, while keeping font-size (${fontSizePx191}px) >=16 and min-height (${minHeightPx191}px) >=28 — the Protocol 17 mobile-baseline floors are never reduced to chase compactness`
     );
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 192 — Design Overhaul CHASSIS unit: the self-diagnostic maintenance
+//  bay + THE LIVING CORE (Protocol UI-10). The former single SYSTEM STATUS
+//  panel is rebuilt as three boards (BUS-22 UNIT POWER PLANT / BUS-23
+//  IDENTITY PLATE & BREAKERS / BUS-24 SERVICE & FAULT CONSOLE, reskin only —
+//  overseerLogDisplay/renderOverseerLog, systemStatusDisplay/
+//  renderSystemStatus, btnViewChangelog->_svcViewChangelog,
+//  btnSystemStatusErrorLog->showErrorLog all kept). The core is a decorative
+//  layer over REAL machine signals (setOverseerState/_isUplinkConnected/
+//  AmbientRuntime/RobcoEvents — reused, never forked), gate-stacked to a
+//  single static frame, zero campaign-state write, and mirrored verbatim
+//  (single shared _coreRefresh() choke point) into a mini glyph in the
+//  Overseer Uplink header.
+//  22 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 192 — Design Overhaul CHASSIS unit: THE LIVING CORE');
+  const html192 = readFile('index.html');
+  const core192 = readFile('js/ui-core.js');
+  const audio192 = readFile('js/ui-audio.js');
+  const saves192 = readFile('js/ui-saves.js');
+  const cloud192 = readFile('js/cloud.js');
+  const css192 = readFile('css/terminal.css');
+
+  // 192.1  the three BUS-22/23/24 boards exist on the CHASSIS tab, each a real
+  //        .panel.bay-board with its own BUS slot tag
+  assert(
+    /<details class="panel bay-board" data-tab="chassis" id="unitPowerPlantPanel"/.test(html192) &&
+      /<details class="panel bay-board" data-tab="chassis" id="systemStatusPanel">/.test(html192) &&
+      /<details class="panel bay-board" data-tab="chassis" id="serviceFaultConsolePanel">/.test(
+        html192
+      ) &&
+      /BUS-22/.test(html192) &&
+      /BUS-23/.test(html192) &&
+      /BUS-24/.test(html192),
+    '192.1: BUS-22 UNIT POWER PLANT / BUS-23 IDENTITY PLATE & BREAKERS / BUS-24 SERVICE & FAULT CONSOLE are three real .panel.bay-board boards on the CHASSIS tab'
+  );
+
+  // 192.2  #chassisCore is a real <button> (Protocol UI-5) wired to
+  //        _coreTapPoke() with a descriptive aria-label; #chassisCoreMini is
+  //        a decorative aria-hidden mirror — both share .chassis-core-shape
+  const coreBtnTag192 = (html192.match(/<button[^>]*id="chassisCore"[^>]*>/) || [''])[0];
+  const miniTag192 = (html192.match(/<span[^>]*id="chassisCoreMini"[^>]*>/) || [''])[0];
+  assert(
+    /class="chassis-core-shape"/.test(coreBtnTag192) &&
+      /onclick="_coreTapPoke\(\)"/.test(coreBtnTag192) &&
+      /aria-label="[^"]+"/.test(coreBtnTag192) &&
+      /chassis-core-shape/.test(miniTag192) &&
+      /aria-hidden="true"/.test(miniTag192),
+    '192.2: #chassisCore is a real <button> (onclick="_coreTapPoke()", descriptive aria-label) and #chassisCoreMini is a decorative aria-hidden mirror — both carry .chassis-core-shape'
+  );
+
+  // 192.3  the "?" explainer opens showCoreHelpModal(), which is defined and
+  //        drives the shared openModal() (Suite 103 showSaveHelpModal pattern)
+  assert(
+    /onclick="showCoreHelpModal\(\)"[\s\S]{0,120}aria-label="[^"]+"/.test(html192) &&
+      /function showCoreHelpModal\(\)/.test(core192) &&
+      /openModal\(\{/.test(extractFunctionBody(core192, 'showCoreHelpModal')),
+    '192.3: a "?" button opens showCoreHelpModal(), which renders through the shared openModal() driver'
+  );
+
+  // 192.4  _coreRefresh() is the ONE choke point — queries the shared
+  //        .chassis-core-shape class (never two separate getElementById
+  //        calls, which would let the two views drift) and reads every real
+  //        signal: the Overseer's own state, the fault ring-buffer, the
+  //        radio, and the Ambient Runtime.
+  const coreRefreshBody192 = extractFunctionBody(core192, '_coreRefresh');
+  assert(
+    /querySelectorAll\('\.chassis-core-shape'\)/.test(
+      extractFunctionBody(core192, '_coreShells')
+    ) &&
+      /getOverseerState/.test(coreRefreshBody192) &&
+      /_readErrorLog/.test(coreRefreshBody192) &&
+      /_radioPlaying/.test(coreRefreshBody192) &&
+      /_corePowerClass/.test(coreRefreshBody192) &&
+      !/getElementById\('chassisCore'\)/.test(coreRefreshBody192) &&
+      !/getElementById\('chassisCoreMini'\)/.test(coreRefreshBody192),
+    '192.4: _coreRefresh() is the single choke point — reads getOverseerState()/_readErrorLog()/_radioPlaying()/_corePowerClass() and paints both shells via ONE shared .chassis-core-shape query, never two separate ids'
+  );
+
+  // 192.5  _coreShouldAnimate() gates on all four documented signals —
+  //        reduced-motion, the Immersion dial below Balanced, document.hidden,
+  //        and the Ambient Runtime in STANDBY/SHUTDOWN/OFF
+  const shouldAnimateBody192 = extractFunctionBody(core192, '_coreShouldAnimate');
+  assert(
+    /prefers-reduced-motion/.test(shouldAnimateBody192) &&
+      /immersionAllows\('balanced'\)/.test(shouldAnimateBody192) &&
+      /document\.hidden/.test(shouldAnimateBody192) &&
+      /STANDBY/.test(shouldAnimateBody192) &&
+      /SHUTDOWN/.test(shouldAnimateBody192) &&
+      /'OFF'/.test(shouldAnimateBody192),
+    '192.5: _coreShouldAnimate() suppresses the continuous loop on reduced-motion OR Immersion<Balanced OR document.hidden OR runtime STANDBY/SHUTDOWN/OFF — no bespoke per-behaviour carve-out'
+  );
+
+  // 192.6  the gate is a single .core-still CSS rule pausing every continuous
+  //        animation as a group (ring spin, heart pulse, fault ring) — the
+  //        state classes themselves are untouched by it, so a state CHANGE
+  //        still paints instantly even while paused (one correct static frame)
+  const cssStripped192 = css192.replace(/\/\*[\s\S]*?\*\//g, '');
+  const coreStillRule192 = (cssStripped192.match(/\.core-still[\s\S]*?\{[^}]*\}/) || [''])[0];
+  assert(
+    /animation-play-state:\s*paused\s*!important/.test(coreStillRule192) &&
+      /\.core-still,[\s\S]*\.c-ring,[\s\S]*\.c-heart/.test(cssStripped192),
+    '192.6: .core-still pauses .c-ring/.c-heart/the fault overlay via animation-play-state:paused as one group (Protocol UI-10 gate-stacking)'
+  );
+
+  // 192.7  the AI-revs (#2) and connection (#3) behaviors reuse the Overseer's
+  //        OWN choke points rather than re-instrumenting transmitMessage()/
+  //        appendToChat() — one new line each in setOverseerState()/
+  //        onImmersionChange()
+  assert(
+    /_coreRefresh/.test(extractFunctionBody(core192, 'setOverseerState')) &&
+      /_coreRefresh/.test(extractFunctionBody(core192, 'onImmersionChange')),
+    '192.7: setOverseerState() and onImmersionChange() both call _coreRefresh() (Protocol 22 — reused, not re-instrumented)'
+  );
+
+  // 192.8  fault strain (#6) reuses ONE shared _readErrorLog() reader across
+  //        _updateFaultLamp()/renderServiceFaultConsole()/_coreRefresh() —
+  //        never a second source of truth for "how many faults are buffered"
+  const faultLampBody192 = extractFunctionBody(core192, '_updateFaultLamp');
+  assert(
+    /function _readErrorLog\(\)/.test(core192) &&
+      /renderServiceFaultConsole/.test(faultLampBody192) &&
+      /_coreRefresh/.test(faultLampBody192) &&
+      /_readErrorLog/.test(extractFunctionBody(core192, 'renderServiceFaultConsole')),
+    '192.8: _updateFaultLamp() calls both renderServiceFaultConsole() and _coreRefresh(), and renderServiceFaultConsole() reads the SAME _readErrorLog() the core also reads'
+  );
+
+  // 192.9  radio-reactive (#10) hooks the ONE existing choke point
+  //        (_updateRadioUI, called by both startRadio()/stopRadio()) rather
+  //        than a second call site or a poll loop
+  assert(
+    /_coreRefresh/.test(extractFunctionBody(audio192, '_updateRadioUI')),
+    '192.9: _updateRadioUI() (called by both startRadio()/stopRadio()) calls _coreRefresh() — one choke point covers the whole radio lifecycle'
+  );
+
+  // 192.10  the OS Event Bus wiring (deferred to window.onload, the Suite 135
+  //         U7 boot-order lesson) subscribes runtime.state/level.up/data.write
+  const wireBody192 = extractFunctionBody(core192, '_wireChassisCoreEventBusSubscribers');
+  assert(
+    /RobcoEvents\.on\('runtime\.state', \(\) => _coreRefresh\(\)\)/.test(wireBody192) &&
+      /RobcoEvents\.on\('level\.up', \(\) => _coreFlare\(\)\)/.test(wireBody192) &&
+      /RobcoEvents\.on\('data\.write', \(\) => _coreDataPulse\(\)\)/.test(wireBody192) &&
+      /_wireChassisCoreEventBusSubscribers\(\);/.test(core192),
+    '192.10: _wireChassisCoreEventBusSubscribers() subscribes runtime.state->_coreRefresh, level.up->_coreFlare, data.write->_coreDataPulse, and is called from window.onload'
+  );
+
+  // 192.11  initChassisCore() paints the boot frame after the Ambient Runtime
+  //         is live (called AFTER initAmbientRuntime() in window.onload)
+  assert(
+    /initAmbientRuntime\(\);[\s\S]{0,200}initChassisCore\(\);/.test(core192),
+    '192.11: initChassisCore() is called from window.onload, after initAmbientRuntime() so the first paint reads a live runtime state'
+  );
+
+  // 192.12  save/sync write-pulse (#9) — data.write is emitted from every
+  //         write path: the local slot save, and the three cloud paths
+  //         (push, pull, overwrite)
+  assert(
+    /RobcoEvents\.emit\('data\.write', \{ kind: 'local-save' \}\)/.test(saves192) &&
+      (cloud192.match(/RobcoEvents\.emit\('data\.write'/g) || []).length === 3 &&
+      /kind: 'cloud-push'/.test(cloud192) &&
+      /kind: 'cloud-pull'/.test(cloud192),
+    "192.12: 'data.write' is emitted from saveToSlot() (local-save) and from saveCurrentToCloud()/loadCloudSave()/overwriteCloudSave() (cloud-push x2 + cloud-pull) in cloud.js"
+  );
+
+  // 192.13  the one-shot flourishes (#8/#9/#13) all gate on _coreShouldAnimate()
+  //         and use the reflow-restart pattern so a repeated trigger restarts
+  //         cleanly (the Suite 135/162 precedent)
+  const oneShotBody192 = extractFunctionBody(core192, '_coreOneShot');
+  assert(
+    /if \(!_coreShouldAnimate\(\)\) return;/.test(oneShotBody192) &&
+      /void el\.offsetWidth/.test(oneShotBody192) &&
+      /function _coreFlare\(\)/.test(core192) &&
+      /function _coreDataPulse\(\)/.test(core192) &&
+      /function _coreTapPoke\(\)/.test(core192),
+    '192.13: _coreFlare()/_coreDataPulse()/_coreTapPoke() all route through _coreOneShot(), which gates on _coreShouldAnimate() and force-reflows before re-adding the class (repeated triggers restart cleanly)'
+  );
+
+  // 192.14  tap-to-poke (#13) reuses the EXISTING hardware-SFX channel
+  //         (Protocol 7 — playChipClick() already guards masterMute + the
+  //         hardwareSfx pref) rather than a new audio function
+  assert(
+    /playChipClick\(true\)/.test(extractFunctionBody(core192, '_coreTapPoke')) &&
+      !/function playChipClick/.test(extractFunctionBody(core192, '_coreTapPoke')),
+    '192.14: _coreTapPoke() reuses the existing playChipClick() hardware-SFX function (Protocol 7), never a forked audio path'
+  );
+
+  // 192.15  zero campaign-state write — none of the CHASSIS core functions
+  //         ever touch saveState()/robco_v8/state.<field>=
+  {
+    const coreFns192 = [
+      '_coreRefresh',
+      '_coreShouldAnimate',
+      '_corePowerClass',
+      '_coreOneShot',
+      '_coreFlare',
+      '_coreDataPulse',
+      '_coreTapPoke',
+      'initChassisCore',
+      'showCoreHelpModal',
+      'renderServiceFaultConsole',
+    ];
+    const offenders192 = coreFns192.filter(n => {
+      let body;
+      try {
+        body = extractFunctionBody(core192, n);
+      } catch (_) {
+        return true;
+      }
+      return /saveState\(|robco_v8|state\.\w+\s*=/.test(body);
+    });
+    assert(
+      offenders192.length === 0,
+      '192.15: every LIVING CORE function is free of saveState()/robco_v8/state.<field>= writes' +
+        (offenders192.length ? ' — offenders: ' + offenders192.join(', ') : '')
+    );
+  }
+
+  // 192.16  mobile baseline (Protocol 17) — the core button is well over the
+  //         28px tap-target floor, and the "?" explainer reuses the shared
+  //         >=28px .icon-btn-round (never a bespoke small target)
+  const coreShapeRule192 = (cssStripped192.match(/\.chassis-core-shape\s*\{[^}]*\}/) || [''])[0];
+  const coreShapeW192 = Number((coreShapeRule192.match(/width:\s*(\d+)px/) || [0, 0])[1]);
+  assert(
+    coreShapeW192 >= 28 && /class="icon-btn-round core-help-btn"/.test(html192),
+    `192.16: #chassisCore is ${coreShapeW192}px (>=28px Protocol 17 floor) and the "?" reuses the shared .icon-btn-round (>=28px)`
+  );
+
+  // 192.17  game-agnostic (Protocol 38) — no FNV/FO3/Fallout literals in the
+  //         CHASSIS boards or the core's field-manual copy
+  const chassisIdx192 = html192.indexOf('id="unitPowerPlantPanel"');
+  const chassisEndIdx192 = html192.indexOf(
+    '</details>',
+    html192.indexOf('id="serviceFaultConsolePanel"')
+  );
+  const chassisBlock192 = html192.slice(chassisIdx192, chassisEndIdx192);
+  assert(
+    !/\bFNV\b|\bFO3\b|Fallout|New Vegas|Capital Wasteland/i.test(chassisBlock192) &&
+      !/\bFNV\b|\bFO3\b|Fallout|New Vegas|Capital Wasteland/i.test(
+        extractFunctionBody(core192, 'showCoreHelpModal')
+      ),
+    '192.17: the CHASSIS boards and the core help modal carry zero game literals — device/OS fiction only'
+  );
+
+  // 192.18  BUS-22 UNIT POWER PLANT reuses the BUS-21 SERVICE TALLY's
+  //         _odoTile() digit-wheel helper verbatim (Protocol 22, no parallel
+  //         drum-tile implementation) and stamps the collapsed summary line
+  const overseerBody192 = extractFunctionBody(core192, 'renderOverseerLog');
+  assert(
+    /_odoTile/.test(overseerBody192) &&
+      /getElementById\('chassisPlantStatus'\)/.test(overseerBody192),
+    '192.18: renderOverseerLog() renders BUS-22 hour meters via the shared _odoTile() helper and stamps #chassisPlantStatus'
+  );
+
+  // 192.19  BUS-23 IDENTITY PLATE & BREAKERS renders the serial plate +
+  //         breaker rack (CARRIER + every _SYSTEM_STATUS_FLAGS entry) and
+  //         stamps the collapsed summary line
+  const statusBody192 = extractFunctionBody(core192, 'renderSystemStatus');
+  assert(
+    /id-plate/.test(statusBody192) &&
+      /breaker-rack/.test(statusBody192) &&
+      /_chassisBreaker\('CARRIER'/.test(statusBody192) &&
+      /getElementById\('chassisIdentityStatus'\)/.test(statusBody192),
+    '192.19: renderSystemStatus() renders the BUS-23 id-plate + a breaker-rack (CARRIER + every feature flag) and stamps #chassisIdentityStatus'
+  );
+
+  // 192.20  BUS-24 SERVICE & FAULT CONSOLE — renderServiceFaultConsole() is
+  //         defined, updates every fault-annunciator element, and is called
+  //         from initChassisCore() (initial paint) as well as _updateFaultLamp()
+  const svcConsoleBody192 = extractFunctionBody(core192, 'renderServiceFaultConsole');
+  assert(
+    /getElementById\('svcFaultCounter'\)/.test(svcConsoleBody192) &&
+      /getElementById\('svcFaultNum'\)/.test(svcConsoleBody192) &&
+      /getElementById\('svcFaultLast'\)/.test(svcConsoleBody192) &&
+      /getElementById\('chassisSvcStatus'\)/.test(svcConsoleBody192) &&
+      /renderServiceFaultConsole\(\)/.test(extractFunctionBody(core192, 'initChassisCore')),
+    '192.20: renderServiceFaultConsole() paints the fault counter/last-fault line/summary, and initChassisCore() calls it for the initial frame'
+  );
+
+  // 192.21  every CHASSIS board follows the Protocol UI-1 heading standard
+  //         (summary > h2 starting with ">") — already covered generically by
+  //         Suite 88, reconfirmed directly here scoped to the three new boards
+  assert(
+    /<summary>\s*<h2>\s*&gt;/.test(
+      (html192.match(/id="unitPowerPlantPanel"[\s\S]{0,200}/) || [''])[0]
+    ) &&
+      /<summary>\s*<h2>\s*&gt;/.test(
+        (html192.match(/id="systemStatusPanel">[\s\S]{0,200}/) || [''])[0]
+      ) &&
+      /<summary>\s*<h2>\s*&gt;/.test(
+        (html192.match(/id="serviceFaultConsolePanel">[\s\S]{0,200}/) || [''])[0]
+      ),
+    '192.21: BUS-22/23/24 each carry <summary><h2>> (Protocol UI-1 panel heading standard)'
+  );
+
+  // 192.22  the mini core mirror sits in the Overseer Uplink header (.ovs-head)
+  //         WITHOUT altering the existing waveform (#overseerScope) markup
+  const ovsHeadBlock192 = (html192.match(/<div class="ovs-head">[\s\S]*?<\/div>/) || [''])[0];
+  assert(
+    ovsHeadBlock192.includes('id="chassisCoreMini"') &&
+      /<canvas id="overseerScope" aria-hidden="true"><\/canvas>/.test(html192),
+    '192.22: #chassisCoreMini sits in the Overseer Uplink header (.ovs-head), and the #overseerScope waveform canvas is untouched'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════

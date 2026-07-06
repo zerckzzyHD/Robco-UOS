@@ -2021,39 +2021,156 @@
               </div>
             </details>
 
-            <!-- 11a. SYSTEM STATUS (WU-F7 device telemetry half of the former Overseer's
-                 Log, merged with firmware/cache/carrier/feature-flag status). CHASSIS. -->
-            <details class="panel" data-tab="chassis" id="systemStatusPanel">
-              <summary><h2>&gt; SYSTEM STATUS</h2></summary>
-              <div class="overseer-section-label">&gt; UNIT TELEMETRY — THIS DEVICE</div>
-              <div id="overseerLogDisplay">
-                <span class="empty-state">NO MAINTENANCE TELEMETRY ON RECORD</span>
+            <!-- CHASSIS [5] — self-diagnostic maintenance bay (Design Overhaul,
+                 planning/mockups/chassis-diagnostic.html CORE variant). BUS-22/23/24.
+                 Reskin only — every id/handler kept (Protocol 22/25):
+                 overseerLogDisplay/renderOverseerLog, systemStatusDisplay/
+                 renderSystemStatus, btnViewChangelog -> _svcViewChangelog,
+                 btnSystemStatusErrorLog -> showErrorLog. The LIVING CORE
+                 (Protocol UI-10) is a decorative layer driven by real machine
+                 signals — see _coreRefresh()/_coreShouldAnimate() in ui-core.js.
+                 Zero game literals anywhere in this block (Protocol 38). -->
+
+            <!-- BUS-22 · UNIT POWER PLANT — overseerLogDisplay telemetry as
+                 industrial hour meters (odo-tile, Protocol 22 reuse of the
+                 BUS-21 SERVICE TALLY digit-wheel pattern) docked beside the
+                 LIVING CORE. -->
+            <details class="panel bay-board" data-tab="chassis" id="unitPowerPlantPanel" open>
+              <summary>
+                <h2>
+                  &gt; <span class="board-led" id="corePowerLed" aria-hidden="true"></span> UNIT
+                  POWER PLANT
+                </h2>
+                <span class="panel-substatus" id="chassisPlantStatus">&mdash;</span>
+              </summary>
+              <span class="bay-slot-tag">BUS-22</span>
+              <span class="bay-part-no"
+                >PN RBC-PWR-22 &middot; INDUSTRIAL HOUR METERS + SUSTAINED CELL
+                <span class="real-label"
+                  >(overseerLogDisplay &middot; renderOverseerLog UNCHANGED)</span
+                ></span
+              >
+              <div class="plant-wrap">
+                <div class="chassis-core-shell">
+                  <button
+                    type="button"
+                    class="chassis-core-shape"
+                    id="chassisCore"
+                    onclick="_coreTapPoke()"
+                    aria-label="Sustained cell — the unit's living power core. Tap to give it a kick."
+                  >
+                    <span class="c-ring r1" aria-hidden="true"></span>
+                    <span class="c-ring r2" aria-hidden="true"></span>
+                    <span class="c-ring r3" aria-hidden="true"></span>
+                    <span class="c-heart" aria-hidden="true"></span>
+                    <span class="c-cap" aria-hidden="true">SUSTAINED CELL &mdash; LIVE DRAW</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="icon-btn-round core-help-btn"
+                    onclick="showCoreHelpModal()"
+                    aria-label="What is the sustained cell? Open explainer"
+                    title="What is this?"
+                    style="--icon-btn-color: var(--robco-green)"
+                  >
+                    ?
+                  </button>
+                </div>
+                <div class="meter-bank" id="overseerLogDisplay">
+                  <span class="empty-state">NO MAINTENANCE TELEMETRY ON RECORD</span>
+                </div>
               </div>
-              <div class="overseer-section-label">&gt; FIRMWARE &amp; CARRIER</div>
+            </details>
+
+            <!-- BUS-23 · IDENTITY PLATE & BREAKERS — systemStatusDisplay
+                 firmware/cache/carrier/feature-flag readout as a stamped serial
+                 plate + breaker-lever read-outs (users never throw these — they
+                 mirror the remote kill-switch flags). -->
+            <details class="panel bay-board" data-tab="chassis" id="systemStatusPanel">
+              <summary>
+                <h2>
+                  &gt; <span class="board-led wire" id="carrierBoardLed" aria-hidden="true"></span>
+                  IDENTITY PLATE &amp; BREAKERS
+                </h2>
+                <span class="panel-substatus" id="chassisIdentityStatus">&mdash;</span>
+              </summary>
+              <span class="bay-slot-tag">BUS-23</span>
+              <span class="bay-part-no"
+                >PN RBC-IDP-23 &middot; STAMPED SERIAL PLATE + BREAKER READ-OUTS
+                <span class="real-label"
+                  >(systemStatusDisplay &middot; renderSystemStatus UNCHANGED)</span
+                ></span
+              >
               <div id="systemStatusDisplay">
                 <span class="empty-state">[LOADING...]</span>
-              </div>
-              <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px">
-                <button
-                  id="btnViewChangelog"
-                  class="action-btn"
-                  style="font-size: 10px"
-                  onclick="_svcViewChangelog()"
-                >
-                  &#8801; FIRMWARE REVISION LOG
-                </button>
-                <button
-                  id="btnSystemStatusErrorLog"
-                  class="action-btn"
-                  style="font-size: 10px"
-                  onclick="showErrorLog()"
-                >
-                  &#9888; ERROR LOG
-                </button>
               </div>
               <span style="display: block; margin-top: 6px; font-size: 10px; opacity: 0.5">
                 &gt; DEVICE TELEMETRY STORED LOCALLY ON THIS UNIT
               </span>
+            </details>
+
+            <!-- BUS-24 · SERVICE &amp; FAULT CONSOLE — the revision-log spool
+                 (_svcViewChangelog, unchanged) and the amber FAULT ANNUNCIATOR
+                 reading the existing client error ring-buffer (showErrorLog,
+                 unchanged; local-only, never transmitted). -->
+            <details class="panel bay-board" data-tab="chassis" id="serviceFaultConsolePanel">
+              <summary>
+                <h2>
+                  &gt; <span class="board-led" id="svcBoardLed" aria-hidden="true"></span> SERVICE
+                  &amp; FAULT CONSOLE
+                </h2>
+                <span class="panel-substatus" id="chassisSvcStatus">&mdash;</span>
+              </summary>
+              <span class="bay-slot-tag">BUS-24</span>
+              <span class="bay-part-no"
+                >PN RBC-SVC-24 &middot; REVISION LOG + FAULT ANNUNCIATOR
+                <span class="real-label"
+                  >(btnViewChangelog &rarr; _svcViewChangelog &middot; btnSystemStatusErrorLog
+                  &rarr; showErrorLog)</span
+                ></span
+              >
+              <div class="svc-wrap">
+                <div class="svc-cell">
+                  <span class="svc-cap">FIRMWARE REVISION LOG</span>
+                  <div class="rev-spool" aria-hidden="true">
+                    <span class="reel"></span>
+                    <span>
+                      <span class="rev-line" id="svcRevLine">CURRENT: v&hellip;</span><br />
+                      <span class="rev-sub"
+                        >full revision history on the spool &mdash; staging channel shows
+                        Unreleased</span
+                      >
+                    </span>
+                  </div>
+                  <button
+                    id="btnViewChangelog"
+                    class="action-btn keybtn"
+                    onclick="_svcViewChangelog()"
+                  >
+                    &#8801; PULL REVISION LOG
+                  </button>
+                </div>
+                <div class="svc-cell fault" id="svcFaultCell">
+                  <span class="svc-cap">FAULT ANNUNCIATOR</span>
+                  <div class="fault-counter clear" id="svcFaultCounter">
+                    <span class="fc-lamp" aria-hidden="true"></span>
+                    <span class="fc-num" id="svcFaultNum">00</span>
+                    <span style="font-size: 8px; letter-spacing: 1.5px; opacity: 0.6"
+                      >FAULTS<br />BUFFERED</span
+                    >
+                  </div>
+                  <div class="fault-last" id="svcFaultLast">
+                    NO FAULTS ON THE BUFFER &mdash; UNIT NOMINAL
+                  </div>
+                  <button
+                    id="btnSystemStatusErrorLog"
+                    class="action-btn keybtn"
+                    onclick="showErrorLog()"
+                  >
+                    &#9888; OPEN FAULT LOG
+                  </button>
+                </div>
+              </div>
             </details>
 
             <!-- BUS-21 · SERVICE TALLY (Phase 3 · Piece 3 — mechanical odometer bank
@@ -3490,6 +3607,20 @@
                 <span class="ovs-lamp" aria-hidden="true"></span>
                 <span id="ovsTitle">DIRECTOR UPLINK</span>
                 <span class="ovs-carrier" id="ovsRelay">CARRIER LINK</span>
+                <!-- CHASSIS mini core mirror — a small reactor glyph reflecting the
+                     SAME shared _coreRefresh() drive-state as the full BUS-22 core
+                     (single source, Protocol 22). The waveform above is the AI
+                     voice; this is machine power — kept minimal so it never
+                     crowds the Overseer scope. Decorative only (aria-hidden). -->
+                <span
+                  class="chassis-core-shape chassis-core-mini"
+                  id="chassisCoreMini"
+                  aria-hidden="true"
+                  title="Unit power (see CHASSIS)"
+                >
+                  <span class="c-ring r1"></span><span class="c-ring r3"></span>
+                  <span class="c-heart"></span>
+                </span>
                 <button
                   onclick="clearChat()"
                   class="action-btn btn-sm ovs-purge-btn"

@@ -257,6 +257,12 @@ async function saveToSlot(slotNum) {
     // click). saveToSlot is the one write path for every slot save (quicksave button
     // AND the OVERWRITE control below), so refreshing here covers both (Protocol 22).
     if (typeof renderSavesList === 'function') renderSavesList();
+    // CHASSIS LIVING CORE #9 (save/sync write-pulse) — saveToSlot is the one
+    // write path for every local slot save (the quicksave button AND the
+    // OVERWRITE control below), so emitting here covers both (Protocol 22 —
+    // an event, not a direct call into the core, matching the U8 auto-log
+    // emit convention elsewhere in this file).
+    RobcoEvents.emit('data.write', { kind: 'local-save' });
   } else {
     appendToChat('> [ERROR] Save slot write failed — storage unavailable.', 'sys', true);
   }
