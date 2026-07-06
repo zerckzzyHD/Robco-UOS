@@ -7099,6 +7099,556 @@ button.rb-key:disabled {
    (the tempo-dial precedent) — one shared block, no per-verb exception. */
 
 /* ════════════════════════════════════════════════════════════════════
+   PHASE 3 · OPERATOR batch 3 (Protocol 22/25 reskin) — the last five
+   OPERATOR boards, ground-up: BUS-04 POSITION & MISSION CLOCK, BUS-06 PERK
+   LOADOUT (+ FNV traits), BUS-05a SKILL BOOKS shelf, BUS-05b SKILL MAGAZINES
+   rack, BUS-09 KARMA ALIGNMENT. Matches planning/mockups/operator-boards3.html
+   (owner-picked variants: perks=rack, karma=needle). Every id/handler this
+   wraps is unchanged — see planning/PHASE3_OPERATOR_PLAN.md §3.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* ── BUS-04 · CHRONO / POSITION — flip-card date tiles + LCD clock + a
+   position-fix plate. Every input inside stays the real, editable field. ── */
+.chrono-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center; /* centering rule */
+  gap: 14px 22px;
+  margin-top: 10px;
+  align-items: stretch;
+}
+.chrono-unit {
+  flex: 1 1 210px;
+  max-width: 320px;
+  min-width: 0;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.4);
+  background: rgba(0, 0, 0, 0.3);
+  padding: 10px 12px 12px;
+  text-align: center;
+}
+.chrono-unit--pos {
+  flex: 1 1 250px;
+}
+.cu-cap {
+  font-size: 8.5px;
+  letter-spacing: 2px;
+  opacity: 0.55;
+  display: block;
+  margin-bottom: 8px;
+}
+.flip-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.flip {
+  display: inline-block;
+  border: 1px solid rgba(0, 0, 0, 0.85);
+  outline: 1px solid rgba(var(--robco-green-rgb), 0.42);
+  background: linear-gradient(180deg, #0a1812 48%, #05100b 52%);
+  box-shadow: inset 0 1px 5px rgba(0, 0, 0, 0.9);
+  padding: 4px 2px;
+  text-align: center;
+}
+.flip input {
+  border: none;
+  background: transparent;
+  color: var(--robco-green);
+  text-shadow: var(--robco-glow);
+  font-size: 17px;
+  letter-spacing: 1px;
+  padding: 2px 0;
+  text-align: center;
+}
+.flip .f-cap {
+  display: block;
+  font-size: 6.5px;
+  letter-spacing: 1.5px;
+  opacity: 0.4;
+}
+.flip.f-mm input,
+.flip.f-dd input {
+  width: 44px;
+}
+.flip.f-yy input {
+  width: 72px;
+}
+.flip.f-hh input,
+.flip.f-mi input {
+  width: 48px;
+}
+.colon {
+  font-size: 18px;
+  animation: chronoColonBlink 2s steps(2) infinite;
+}
+@keyframes chronoColonBlink {
+  50% {
+    opacity: 0.25;
+  }
+}
+.chrono-readout {
+  margin-top: 9px;
+  font-size: 9.5px;
+  letter-spacing: 1.5px;
+  border-top: 1px dashed rgba(var(--robco-green-rgb), 0.25);
+  padding-top: 7px;
+  opacity: 0.75;
+}
+.pos-plate {
+  margin-top: 2px;
+  position: relative;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.45);
+  background:
+    repeating-linear-gradient(0deg, rgba(var(--robco-green-rgb), 0.04) 0 1px, transparent 1px 13px),
+    repeating-linear-gradient(
+      90deg,
+      rgba(var(--robco-green-rgb), 0.04) 0 1px,
+      transparent 1px 13px
+    ),
+    #02120c;
+  padding: 12px 12px 10px;
+}
+.pos-dot {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--robco-green);
+  box-shadow: 0 0 9px var(--robco-green);
+  animation: bayLedPulse 1.6s infinite;
+}
+.pos-plate input {
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+  border-color: rgba(var(--robco-green-rgb), 0.5);
+}
+.pos-last {
+  font-size: 8.5px;
+  letter-spacing: 1px;
+  opacity: 0.5;
+  margin-top: 7px;
+  text-align: left;
+  text-transform: none;
+}
+
+/* ── BUS-06 · PERK LOADOUT — numbered loadout slots + FNV trait chips ── */
+.slot-row {
+  display: flex;
+  align-items: center;
+  gap: 8px 10px;
+  flex-wrap: wrap;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.3);
+  border-left: 4px solid rgba(var(--robco-green-rgb), 0.55);
+  background: rgba(0, 0, 0, 0.3);
+  padding: 7px 10px;
+  margin-bottom: 7px;
+}
+.slot-row .s-idx {
+  font-size: 8px;
+  letter-spacing: 1.5px;
+  opacity: 0.45;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.3);
+  padding: 2px 6px;
+  flex-shrink: 0;
+}
+.slot-row .s-name {
+  flex: 1 1 150px;
+  min-width: 0;
+  font-size: 11px;
+  letter-spacing: 1px;
+  overflow-wrap: break-word;
+}
+.slot-row .s-meta {
+  font-size: 8.5px;
+  opacity: 0.55;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+.slot-row .s-rank {
+  color: var(--bezel-wire);
+  text-shadow: 0 0 7px rgba(var(--bezel-wire-rgb), 0.55);
+  font-size: 10px;
+  letter-spacing: 2px;
+}
+.slot-row .pk-x {
+  margin-left: auto;
+  min-width: 28px;
+  min-height: 28px;
+  width: auto;
+}
+.slot-row.vacant {
+  border-style: dashed;
+  border-left-style: dashed;
+  opacity: 0.4;
+  justify-content: center;
+  font-size: 8.5px;
+  letter-spacing: 2px;
+  min-height: 40px;
+}
+.perk-form {
+  margin-top: 12px;
+  border-top: 1px dashed var(--robco-green);
+  padding-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: center;
+}
+.perk-form .p-name {
+  flex: 1 1 160px;
+  min-width: 130px;
+}
+.perk-form .p-rank,
+.perk-form .p-lvl {
+  width: 64px;
+}
+.perk-form .keybtn {
+  flex: 0 1 auto;
+  min-height: 34px;
+  letter-spacing: 1.5px;
+  font-size: 10.5px;
+  border-color: var(--robco-green);
+  background: rgba(var(--robco-green-rgb), 0.07);
+  box-shadow:
+    inset 0 -2px 0 rgba(0, 0, 0, 0.6),
+    0 0 8px rgba(var(--robco-green-rgb), 0.15);
+}
+/* FNV FACTORY-BURNED trait chips — the shipped .tracker-row/.tracker-toggle
+   pattern (Protocol UI-3) restyled as a wrapping chip rack via CSS only; no
+   markup change to renderTraits(). */
+.trait-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center; /* centering rule */
+  gap: 8px;
+  margin-top: 4px;
+}
+.trait-chips .tracker-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px dashed rgba(var(--bezel-wire-rgb), 0.6);
+  color: var(--bezel-wire);
+  text-shadow: 0 0 7px rgba(var(--bezel-wire-rgb), 0.55);
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  padding: 7px 11px;
+  min-height: 28px;
+  background: rgba(var(--bezel-wire-rgb), 0.05);
+  opacity: 1;
+  width: auto;
+}
+.trait-chips .tracker-row.tracker-toggle--inactive {
+  opacity: 0.55;
+  border-style: dotted;
+}
+.trait-chips .tracker-meta {
+  font-size: 6.5px;
+  opacity: 0.7;
+  letter-spacing: 1px;
+}
+
+/* ── BUS-05a · SKILL BOOKS — the reference shelf ── */
+.shelf {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center; /* centering rule */
+  align-items: flex-end;
+  gap: 7px 5px;
+  margin-top: 14px;
+  padding: 0 4px;
+  /* a plank under EVERY wrapped row (row cycle = 96px spine + 7px gap) */
+  background: repeating-linear-gradient(
+    180deg,
+    transparent 0 96px,
+    #343830 96px 99px,
+    #14160f 99px 103px
+  );
+}
+/* button.spine (not plain .spine) so the base rule's specificity (0,1,1)
+   ties button.tracker-toggle's own (0,1,1) and wins on source order — a
+   plain single-class .spine (0,1,0) lost to button.tracker-toggle's
+   display:inline-flex/width:auto/min-height:28px, leaving every spine an
+   un-shelved-looking horizontal chip instead of a vertical shelf spine
+   (caught live during render-verify, Protocol 42). */
+button.spine {
+  display: block;
+  width: 34px;
+  min-width: 34px; /* cancels button.tracker-toggle's inherited min-width:44px floor */
+  min-height: 96px;
+  border: 1px solid var(--robco-green);
+  background: linear-gradient(
+    90deg,
+    rgba(var(--robco-green-rgb), 0.22),
+    rgba(var(--robco-green-rgb), 0.06) 30%,
+    rgba(0, 0, 0, 0.5)
+  );
+  writing-mode: vertical-rl;
+  font-size: 7.5px;
+  letter-spacing: 0.5px;
+  color: var(--robco-green);
+  text-shadow: var(--robco-glow);
+  padding: 6px 0;
+  text-align: center;
+  overflow: hidden;
+  position: relative;
+}
+.spine .tracker-meta {
+  display: block;
+  font-size: 6px;
+  opacity: 0.5;
+  letter-spacing: 1px;
+}
+.spine::after {
+  /* read-ribbon bookmark */
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: -1px;
+  width: 5px;
+  height: 14px;
+  background: var(--bezel-wire);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 72%, 0 100%);
+  box-shadow: 0 0 5px rgba(var(--bezel-wire-rgb), 0.7);
+}
+.spine.unread {
+  border-style: dashed;
+  border-color: rgba(var(--robco-green-rgb), 0.35);
+  color: rgba(var(--robco-green-rgb), 0.55);
+  text-shadow: none;
+  background: rgba(0, 0, 0, 0.35);
+  transform: rotate(4deg) translateY(3px); /* leaning, unshelved */
+}
+.spine.unread::after {
+  display: none;
+}
+.shelf-note {
+  text-align: center;
+  font-size: 8px;
+  letter-spacing: 1px;
+  opacity: 0.4;
+  margin-top: 8px;
+  text-transform: none;
+}
+
+/* ── BUS-05b · SKILL MAGAZINES — the periodical rack (sibling) ── */
+.mag-rack {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center; /* centering rule */
+  gap: 9px;
+  margin-top: 12px;
+}
+/* button.mag (not plain .mag) -- same button.tracker-toggle specificity fix
+   as button.spine above (Protocol 42). */
+button.mag {
+  display: block;
+  flex: 0 0 auto;
+  width: 104px;
+  min-height: 66px;
+  border: 1px solid var(--bezel-wire);
+  background: linear-gradient(180deg, rgba(var(--bezel-wire-rgb), 0.1), rgba(0, 0, 0, 0.45) 75%);
+  color: var(--bezel-wire);
+  text-shadow: 0 0 7px rgba(var(--bezel-wire-rgb), 0.55);
+  font-size: 8px;
+  letter-spacing: 0.5px;
+  padding: 8px 7px;
+  text-align: left;
+  position: relative;
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% calc(100% - 12px),
+    calc(100% - 12px) 100%,
+    0 100%
+  ); /* dog-ear */
+}
+.mag .tracker-meta {
+  display: block;
+  font-size: 6.5px;
+  opacity: 0.55;
+  letter-spacing: 1px;
+  margin-top: 4px;
+}
+.mag.consumed {
+  border-style: dashed;
+  border-color: rgba(var(--bezel-wire-rgb), 0.35);
+  color: rgba(var(--bezel-wire-rgb), 0.45);
+  text-shadow: none;
+  background: rgba(0, 0, 0, 0.35);
+}
+.mag.consumed::after {
+  content: 'CONSUMED';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) rotate(-8deg);
+  border: 1px solid rgba(var(--bezel-wire-rgb), 0.5);
+  font-size: 6.5px;
+  letter-spacing: 2px;
+  padding: 1px 5px;
+  background: rgba(0, 0, 0, 0.6);
+}
+.mag-note {
+  text-align: center;
+  font-size: 8px;
+  letter-spacing: 1px;
+  opacity: 0.4;
+  margin-top: 8px;
+  text-transform: none;
+}
+
+/* ── BUS-09 · KARMA ALIGNMENT — EVIL |^| GOOD swing needle ── */
+.kn-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center; /* centering rule */
+  gap: 12px 26px;
+  align-items: center;
+  margin-top: 10px;
+}
+.kn-face {
+  width: 190px;
+  height: 99px;
+  margin: 0 auto;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.55);
+  border-bottom: 2px solid var(--robco-green);
+  border-radius: 190px 190px 0 0;
+  position: relative;
+  overflow: hidden;
+  background:
+    conic-gradient(
+      from -90deg at 50% 100%,
+      rgba(231, 76, 60, 0.28) 0deg 72deg,
+      rgba(0, 0, 0, 0.35) 72deg 108deg,
+      rgba(var(--robco-green-rgb), 0.2) 108deg 180deg
+    ),
+    #02120c;
+}
+.kn-face .kn-detent {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 2px;
+  height: 14px;
+  margin-left: -1px;
+  background: rgba(255, 255, 255, 0.4);
+}
+.kn-needle {
+  position: absolute;
+  left: 50%;
+  bottom: -2px;
+  width: 3px;
+  height: 88px;
+  margin-left: -1.5px;
+  background: var(--robco-green);
+  box-shadow: 0 0 8px var(--robco-green);
+  transform-origin: bottom center;
+  transition: transform 0.7s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+.kn-needle.evil {
+  background: var(--robco-danger);
+  box-shadow: 0 0 8px var(--robco-danger);
+}
+.kn-ends {
+  display: flex;
+  justify-content: space-between;
+  width: 190px;
+  margin: 3px auto 0;
+  font-size: 7px;
+  letter-spacing: 1px;
+  opacity: 0.45;
+}
+.kn-side {
+  flex: 1 1 200px;
+  max-width: 320px;
+  min-width: 0;
+  text-align: center;
+}
+.k-standing {
+  font-size: 14px;
+  letter-spacing: 3px;
+}
+.k-standing.good {
+  color: var(--robco-green);
+  text-shadow: var(--robco-glow);
+}
+.k-standing.evil {
+  color: var(--robco-danger);
+  text-shadow: 0 0 7px rgba(231, 76, 60, 0.55);
+}
+.k-standing.neut {
+  color: var(--bezel-wire);
+  text-shadow: 0 0 7px rgba(var(--bezel-wire-rgb), 0.55);
+}
+.k-val {
+  font-size: 9.5px;
+  letter-spacing: 1px;
+  opacity: 0.6;
+  margin-top: 4px;
+}
+.tier-lamps {
+  display: flex;
+  justify-content: center; /* centering rule */
+  gap: 6px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.tier-lamps span {
+  font-size: 7px;
+  letter-spacing: 1px;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.25);
+  padding: 3px 6px;
+  opacity: 0.35;
+}
+.tier-lamps span.cur {
+  opacity: 1;
+  border-color: currentColor;
+}
+.tier-lamps .t-evil.cur {
+  color: var(--robco-danger);
+  text-shadow: 0 0 7px rgba(231, 76, 60, 0.55);
+}
+.tier-lamps .t-neut.cur {
+  color: var(--bezel-wire);
+  text-shadow: 0 0 7px rgba(var(--bezel-wire-rgb), 0.55);
+}
+.tier-lamps .t-good.cur {
+  color: var(--robco-green);
+  text-shadow: var(--robco-glow);
+}
+.k-slider {
+  margin-top: 12px;
+}
+.k-slider input {
+  width: min(100%, 280px);
+}
+.k-slider .ks-cap {
+  display: block;
+  font-size: 7.5px;
+  letter-spacing: 1.5px;
+  opacity: 0.45;
+  margin-top: 3px;
+  text-transform: none;
+}
+.karma-center {
+  margin-top: 14px;
+  border: 1px dashed rgba(var(--bezel-wire-rgb), 0.5);
+  padding: 9px 11px 11px;
+}
+.kc-title {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--bezel-wire);
+  text-shadow: 0 0 7px rgba(var(--bezel-wire-rgb), 0.55);
+}
+
+/* ════════════════════════════════════════════════════════════════════
    PHASE 3 · PIECE 2 — OPERATIONS "quartermaster's freight console"
    (Protocol 22/25 reskin). Matches planning/PHASE3_OPERATIONS_PLAN.md +
    the owner-approved planning/mockups/operations-console.html (BEAM

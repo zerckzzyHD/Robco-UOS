@@ -9388,9 +9388,11 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  Suite 85 — Skill Books Tracker (FNV+FO3, Protocol 4)
 //  registry count/skills, sentinel checks, state default/migrate,
 //  autoImportState validation, getSystemDirective, render wiring,
-//  index.html container, READ/UNREAD sub-panel structural guards,
-//  WU-B8 shared _renderReadTracker consolidation guards.
-//  30 tests
+//  index.html container, Phase 3 OPERATOR batch 3 reference-shelf reskin
+//  guards (BUS-05a — top-level board, single-flowing shelf, no more
+//  READ/UNREAD sub-panel split), WU-B8 shared _renderReadTracker
+//  consolidation guards.
+//  27 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 85 — Skill Books Tracker (FNV+FO3, Protocol 4)');
@@ -9582,44 +9584,49 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     'index.html has #skillBooksDisplay container (Protocol 5 panel element)'
   );
 
-  // 85.17  renderSkillBooks source has skill_books_read sub-panel marker
+  // ── Phase 3 OPERATOR batch 3 (BUS-05a reskin) — SKILL BOOKS promoted from
+  //    a SKILL MATRIX sub-panel to its own top-level "reference shelf" board.
+  //    Guards 85.17-85.27 below replace the old READ/UNREAD sub-panel-split
+  //    contract with the new single-flowing-shelf contract. ──
+
+  // 85.17  renderSkillBooks() delegates to the shared _renderReadTracker with
+  //        the 'spine' item variant (shelf rows, Protocol 22 — no duplicated
+  //        render logic).
   {
-    let renderSBBody85 = '';
+    let sbWrap85 = '';
     try {
-      renderSBBody85 = extractFunctionBody(uiRenderSrc85, 'renderSkillBooks');
+      sbWrap85 = extractFunctionBody(uiRenderSrc85, 'renderSkillBooks');
     } catch (_) {}
     assert(
-      /skill_books_read/.test(renderSBBody85),
-      'renderSkillBooks() references skill_books_read sub-panel data-sub-id (READ/UNREAD split)'
+      /_renderReadTracker\s*\(/.test(sbWrap85) && /itemClass:\s*'spine'/.test(sbWrap85),
+      "85.17: renderSkillBooks() delegates to _renderReadTracker with itemClass: 'spine' (shelf variant)"
     );
   }
 
-  // 85.18  renderSkillBooks source has skill_books_unread sub-panel marker
+  // 85.18  The shared helper's row is a SINGLE <button> carrying BOTH the
+  //        Protocol UI-3 .tracker-row and .tracker-toggle classes — the
+  //        spine/cover IS its own toggle.
   {
-    let renderSBBody85b = '';
+    let helper85 = '';
     try {
-      renderSBBody85b = extractFunctionBody(uiRenderSrc85, 'renderSkillBooks');
+      helper85 = extractFunctionBody(uiRenderSrc85, '_renderReadTracker');
     } catch (_) {}
     assert(
-      /skill_books_unread/.test(renderSBBody85b),
-      'renderSkillBooks() references skill_books_unread sub-panel data-sub-id (READ/UNREAD split)'
+      /tracker-row tracker-toggle/.test(helper85) && /<button class=/.test(helper85),
+      '85.18: _renderReadTracker rows are a single <button class="tracker-row tracker-toggle ...">'
     );
   }
 
-  // 85.19  Collapse persistence is wired in the shared _renderReadTracker helper,
-  //        and renderSkillBooks delegates to it (WU-B8 consolidation).
+  // 85.19  The shared helper calls opts.toggleFn on click and opts.meta(d) for
+  //        the sub-label (data-driven contract, Protocol 38).
   {
-    let helperBody85c = '';
-    let sbWrap85c = '';
+    let helper85b = '';
     try {
-      helperBody85c = extractFunctionBody(uiRenderSrc85, '_renderReadTracker');
-      sbWrap85c = extractFunctionBody(uiRenderSrc85, 'renderSkillBooks');
+      helper85b = extractFunctionBody(uiRenderSrc85, '_renderReadTracker');
     } catch (_) {}
     assert(
-      /querySelectorAll/.test(helperBody85c) &&
-        /addEventListener\s*\(\s*'toggle'/.test(helperBody85c) &&
-        /_renderReadTracker\s*\(/.test(sbWrap85c),
-      "_renderReadTracker wires 'toggle' collapse persistence, and renderSkillBooks delegates to it"
+      /onclick="\$\{opts\.toggleFn\}/.test(helper85b) && /opts\.meta\(d\)/.test(helper85b),
+      '85.19: _renderReadTracker wires onclick to opts.toggleFn and renders opts.meta(d)'
     );
   }
 
@@ -9629,55 +9636,59 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     'index.html: old static skillBooksSubPanel removed — READ/UNREAD sub-panels are dynamic (Protocol 20)'
   );
 
-  // 85.21  The shared helper splits by read.includes / !read.includes, and
-  //        renderSkillBooks delegates to it (WU-B8 consolidation, behavioral correctness).
-  {
-    let helperBody85d = '';
-    let sbWrap85d = '';
-    try {
-      helperBody85d = extractFunctionBody(uiRenderSrc85, '_renderReadTracker');
-      sbWrap85d = extractFunctionBody(uiRenderSrc85, 'renderSkillBooks');
-    } catch (_) {}
-    assert(
-      /read\.includes\(d\.name\)/.test(helperBody85d) &&
-        /!read\.includes\(d\.name\)/.test(helperBody85d) &&
-        /_renderReadTracker\s*\(/.test(sbWrap85d),
-      '_renderReadTracker splits by read.includes(d.name)/!read.includes for READ/UNREAD, and renderSkillBooks delegates to it'
-    );
-  }
-
-  // 85.22  "NO BOOKS READ" empty state present in renderSkillBooks source
-  {
-    let renderSBBody85e = '';
-    try {
-      renderSBBody85e = extractFunctionBody(uiRenderSrc85, 'renderSkillBooks');
-    } catch (_) {}
-    assert(
-      /NO BOOKS READ/.test(renderSBBody85e),
-      'renderSkillBooks() has "NO BOOKS READ" empty state for empty READ list'
-    );
-  }
-
-  // 85.23  "ALL BOOKS READ" empty state present in renderSkillBooks source
-  {
-    let renderSBBody85f = '';
-    try {
-      renderSBBody85f = extractFunctionBody(uiRenderSrc85, 'renderSkillBooks');
-    } catch (_) {}
-    assert(
-      /ALL BOOKS READ/.test(renderSBBody85f),
-      'renderSkillBooks() has "ALL BOOKS READ" empty state for empty UNREAD list'
-    );
-  }
-
-  // ── WU-B8 consolidation guards (QA-DUP-1) ──
-  // 85.24  Shared _renderReadTracker(opts) helper is defined in ui-render.js.
+  // 85.21  #skillBooksDisplay carries class="shelf" (the flex-wrap shelf
+  //        layout — Protocol 22, CSS-only variant of the shared row markup).
   assert(
-    /function _renderReadTracker\s*\(/.test(uiRenderSrc85),
-    '85.24: shared _renderReadTracker(opts) helper is defined in ui-render.js (WU-B8 dedup)'
+    /id="skillBooksDisplay"\s+class="shelf"/.test(htmlSource),
+    'index.html: #skillBooksDisplay carries class="shelf"'
   );
 
-  // 85.25  BOTH read-trackers delegate to the shared helper (single source of row logic).
+  // 85.22  "NO SKILL BOOKS IN THE REGISTRY" empty state present in renderSkillBooks source
+  {
+    let sbWrap85c = '';
+    try {
+      sbWrap85c = extractFunctionBody(uiRenderSrc85, 'renderSkillBooks');
+    } catch (_) {}
+    assert(
+      /NO SKILL BOOKS IN THE REGISTRY/.test(sbWrap85c),
+      'renderSkillBooks() has an empty-board state for a registry with zero skillBooks'
+    );
+  }
+
+  // ── Skill Matrix promotion guards (Phase 3 OPERATOR batch 3 — SKILL BOOKS
+  //    is no longer nested inside SKILL MATRIX; it is its own top-level
+  //    board, BUS-05a) ──
+  const skillMatrixStart85 = htmlSource.indexOf('> SKILL MATRIX');
+  const skillMatrixEnd85 = htmlSource.indexOf('<!-- BUS-05a', skillMatrixStart85);
+  const skillMatrixBlock85 =
+    skillMatrixStart85 >= 0 && skillMatrixEnd85 >= 0
+      ? htmlSource.slice(skillMatrixStart85, skillMatrixEnd85)
+      : '';
+
+  // 85.23  #skillBooksPanel is a TOP-LEVEL <details class="panel bay-board"
+  //        data-tab="stat"> — no longer nested inside SKILL MATRIX.
+  assert(
+    !/skillBooksPanel/.test(skillMatrixBlock85) &&
+      /<details class="panel bay-board" data-tab="stat" id="skillBooksPanel">/.test(htmlSource),
+    '85.23: #skillBooksPanel is a top-level <details class="panel bay-board" data-tab="stat">, not nested inside SKILL MATRIX'
+  );
+
+  // 85.24  SKILL BOOKS heading is a real top-level <h2> carrying the BUS-05a slot tag.
+  assert(
+    /SKILL BOOKS.{0,100}<\/h2>/s.test(
+      htmlSource.slice(htmlSource.indexOf('id="skillBooksPanel"'))
+    ) && /class="bay-slot-tag">BUS-05a</.test(htmlSource),
+    '85.24: SKILL BOOKS heading is a top-level <h2> board, carrying the BUS-05a slot tag'
+  );
+
+  // ── WU-B8 consolidation guards (QA-DUP-1), reskinned for the shelf/rack contract ──
+  // 85.25  Shared _renderReadTracker(opts) helper is defined in ui-render.js.
+  assert(
+    /function _renderReadTracker\s*\(/.test(uiRenderSrc85),
+    '85.25: shared _renderReadTracker(opts) helper is defined in ui-render.js (WU-B8 dedup)'
+  );
+
+  // 85.26  BOTH read-trackers delegate to the shared helper (single source of row logic).
   {
     let sb85 = '';
     let mag85 = '';
@@ -9687,58 +9698,13 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     } catch (_) {}
     assert(
       /_renderReadTracker\s*\(/.test(sb85) && /_renderReadTracker\s*\(/.test(mag85),
-      '85.25: renderSkillBooks AND renderMagazines both delegate to _renderReadTracker (no duplicated render logic)'
+      '85.26: renderSkillBooks AND renderMagazines both delegate to _renderReadTracker (no duplicated render logic)'
     );
   }
 
-  // 85.26  The shared helper carries the full row/sub-panel contract in one place.
-  {
-    let helper85 = '';
-    try {
-      helper85 = extractFunctionBody(uiRenderSrc85, '_renderReadTracker');
-    } catch (_) {}
-    assert(
-      /tracker-row/.test(helper85) &&
-        /class="sub-panel" data-sub-id="\$\{opts\.subIdRead\}/.test(helper85) &&
-        /class="sub-panel" data-sub-id="\$\{opts\.subIdUnread\}/.test(helper85) &&
-        /tracker-toggle/.test(helper85) &&
-        /opts\.meta\(d\)/.test(helper85),
-      '85.26: _renderReadTracker carries the shared contract — .tracker-row, READ/UNREAD sub-panels (data-sub-id), .tracker-toggle, opts.meta(d)'
-    );
-  }
-
-  // ── Skill Matrix nesting guards (owner report — SKILL BOOKS/SKILL MAGAZINES
-  //    re-homed as sub-panels inside SKILL MATRIX, Protocol UI-1/UI-2) ──
-  const skillMatrixStart85 = htmlSource.indexOf('> SKILL MATRIX');
-  const skillMatrixEnd85 = htmlSource.indexOf('<!-- 5. QUEST LOG -->', skillMatrixStart85);
-  const skillMatrixBlock85 =
-    skillMatrixStart85 >= 0 && skillMatrixEnd85 >= 0
-      ? htmlSource.slice(skillMatrixStart85, skillMatrixEnd85)
-      : '';
-
-  // 85.27  #skillBooksPanel is a <details class="sub-panel"> with data-sub-id, nested inside SKILL MATRIX
-  assert(
-    /<details[^>]*class="sub-panel"[^>]*id="skillBooksPanel"[^>]*data-sub-id="skill_matrix_books"|<details[^>]*id="skillBooksPanel"[^>]*class="sub-panel"[^>]*data-sub-id="skill_matrix_books"/.test(
-      skillMatrixBlock85
-    ),
-    '85.27: index.html #skillBooksPanel is a <details class="sub-panel" data-sub-id="skill_matrix_books"> nested inside SKILL MATRIX'
-  );
-
-  // 85.28  SKILL BOOKS heading is now <h3> (sub-panel heading), no longer a top-level <h2> panel
-  assert(
-    /<h3>&gt; SKILL BOOKS<\/h3>/.test(skillMatrixBlock85) &&
-      !/<h2>>\s*SKILL BOOKS/.test(htmlSource),
-    '85.28: SKILL BOOKS heading is a nested <h3> sub-panel heading, not a standalone top-level <h2> panel'
-  );
-
-  // 85.29  #skillBooksPanel carries no data-tab of its own — it is not a top-level tab-gated panel anymore
-  assert(
-    !/<details[^>]*id="skillBooksPanel"[^>]*data-tab/.test(htmlSource),
-    '85.29: #skillBooksPanel has no data-tab attribute — it is nested inside SKILL MATRIX, not its own tab-gated panel'
-  );
-
-  // 85.30  _updatePanelBadges() and expandPanelForCategory() match .sub-panel h3 headings too,
-  //        so the nested SKILL BOOKS badge/auto-expand keep working (Protocol 22 — reused, not forked)
+  // 85.27  _updatePanelBadges()/expandPanelForCategory() reference the renamed
+  //        '> PERK LOADOUT' heading (Phase 3 OPERATOR batch 3 rename), and no
+  //        longer special-case skillBooks/magazines as nested sub-panels.
   {
     let badgesBody85 = '';
     let expandBody85 = '';
@@ -9747,10 +9713,10 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
       expandBody85 = extractFunctionBody(uiCoreSrc85, 'expandPanelForCategory');
     } catch (_) {}
     assert(
-      /\.panel h2,\s*\.sub-panel h3/.test(badgesBody85) &&
-        /\.panel h2,\s*\.sub-panel h3/.test(expandBody85) &&
-        /getElementById\('skillBooksPanel'\)/.test(expandBody85),
-      "85.30: _updatePanelBadges()/expandPanelForCategory() query '.panel h2, .sub-panel h3' and expandPanelForCategory opens #skillBooksPanel for the 'skillBooks' category"
+      /'> PERK LOADOUT'/.test(badgesBody85) &&
+        /'> PERK LOADOUT'/.test(expandBody85) &&
+        !/getElementById\('skillBooksPanel'\)/.test(expandBody85),
+      "85.27: _updatePanelBadges()/expandPanelForCategory() reference '> PERK LOADOUT', and expandPanelForCategory no longer special-cases #skillBooksPanel as a nested sub-panel"
     );
   }
 }
@@ -9797,7 +9763,9 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 
 // ══════════════════════════════════════════════════════════════
 // Suite 87 — NV Skill Magazines tracker (FNV-only, Protocol 4)
-// 29 tests
+// Phase 3 OPERATOR batch 3: periodical-rack reskin guards (BUS-05b — top-
+// level board, no more READ/UNREAD sub-panel split).
+// 24 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 87 — NV Skill Magazines tracker (FNV-only, Protocol 4)');
@@ -9927,43 +9895,48 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   // 87.16  renderMagazines() defined
   assert(rmStart87 >= 0, 'renderMagazines() is defined in js/ui-render.js');
 
-  // 87.17  references magazines_read sub-panel
+  // 87.17  renderMagazines() delegates to the shared _renderReadTracker with
+  //        the 'mag' item variant (periodical-rack rows, Protocol 22 — no
+  //        duplicated render logic), gated by hasMagazines (FNV-only).
   assert(
-    /magazines_read/.test(renderMagBody87),
-    "renderMagazines() references 'magazines_read' sub-panel data-sub-id"
+    /_renderReadTracker\s*\(/.test(renderMagBody87) &&
+      /itemClass:\s*'mag'/.test(renderMagBody87) &&
+      /hasMagazines/.test(renderMagBody87),
+    "87.17: renderMagazines() delegates to _renderReadTracker with itemClass: 'mag' (rack variant), gated by hasMagazines"
   );
 
-  // 87.18  references magazines_unread sub-panel
+  // 87.18  #magazinesDisplay carries class="mag-rack" (the flex-wrap rack
+  //        layout — Protocol 22, CSS-only variant of the shared row markup).
   assert(
-    /magazines_unread/.test(renderMagBody87),
-    "renderMagazines() references 'magazines_unread' sub-panel data-sub-id"
+    /id="magazinesDisplay"\s+class="mag-rack"/.test(idxSrc87),
+    'index.html: #magazinesDisplay carries class="mag-rack"'
   );
 
-  // 87.19  toggle persistence is wired in the shared _renderReadTracker helper,
-  //        and renderMagazines delegates to it (WU-B8 consolidation).
+  // 87.19  The shared helper's row is a SINGLE <button> carrying BOTH the
+  //        Protocol UI-3 .tracker-row and .tracker-toggle classes — the
+  //        cover IS its own toggle.
   {
     let helperBody87 = '';
     try {
       helperBody87 = extractFunctionBody(uiRenderSrc87, '_renderReadTracker');
     } catch (_) {}
     assert(
-      /querySelectorAll/.test(helperBody87) &&
-        /addEventListener\s*\(\s*'toggle'/.test(helperBody87) &&
-        /_renderReadTracker\s*\(/.test(renderMagBody87),
-      '_renderReadTracker wires toggle persistence, and renderMagazines delegates to it'
+      /tracker-row tracker-toggle/.test(helperBody87) && /<button class=/.test(helperBody87),
+      '87.19: _renderReadTracker rows are a single <button class="tracker-row tracker-toggle ...">'
     );
   }
 
-  // 87.20  NO MAGAZINES READ empty state
+  // 87.20  "NO SKILL MAGAZINES IN THE REGISTRY" empty state present in renderMagazines source
   assert(
-    /NO MAGAZINES READ/.test(renderMagBody87),
-    "renderMagazines() has 'NO MAGAZINES READ' empty state"
+    /NO SKILL MAGAZINES IN THE REGISTRY/.test(renderMagBody87),
+    'renderMagazines() has an empty-board state for a registry with zero magazines'
   );
 
-  // 87.21  ALL MAGAZINES READ empty state
+  // 87.21  the 'mag' variant marks the consumed (done) state with the 'consumed'
+  //        modifier — the dog-eared cover goes matte + stamped, per the mockup.
   assert(
-    /ALL MAGAZINES READ/.test(renderMagBody87),
-    "renderMagazines() has 'ALL MAGAZINES READ' empty state"
+    /doneModifier:\s*'consumed'/.test(renderMagBody87),
+    "87.21: renderMagazines() marks the consumed state with doneModifier: 'consumed'"
   );
 
   // 87.22  toggleMagazine() defined
@@ -9994,40 +9967,34 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     'getSystemDirective() references magazines in FNV-only context (Protocol 4 AI contract)'
   );
 
-  // ── Skill Matrix nesting guards (owner report — SKILL MAGAZINES re-homed as
-  //    a sub-panel inside SKILL MATRIX, Protocol UI-1/UI-2) ──
+  // ── Skill Matrix promotion guards (Phase 3 OPERATOR batch 3 — SKILL
+  //    MAGAZINES is no longer nested inside SKILL MATRIX; it is its own
+  //    top-level board, BUS-05b) ──
   const skillMatrixStart87 = idxSrc87.indexOf('> SKILL MATRIX');
-  const skillMatrixEnd87 = idxSrc87.indexOf('<!-- 5. QUEST LOG -->', skillMatrixStart87);
+  const skillMatrixEnd87 = idxSrc87.indexOf('<!-- BUS-05a', skillMatrixStart87);
   const skillMatrixBlock87 =
     skillMatrixStart87 >= 0 && skillMatrixEnd87 >= 0
       ? idxSrc87.slice(skillMatrixStart87, skillMatrixEnd87)
       : '';
 
-  // 87.26  #magazinesPanel is a <details class="sub-panel"> with data-sub-id, nested inside SKILL MATRIX
+  // 87.26  #magazinesPanel is a TOP-LEVEL <details class="panel bay-board"
+  //        data-tab="stat"> — no longer nested inside SKILL MATRIX.
   assert(
-    /<details[\s\S]{0,80}class="sub-panel"[\s\S]{0,80}id="magazinesPanel"[\s\S]{0,80}data-sub-id="skill_matrix_magazines"|<details[\s\S]{0,80}id="magazinesPanel"[\s\S]{0,120}data-sub-id="skill_matrix_magazines"[\s\S]{0,120}class="sub-panel"/.test(
-      skillMatrixBlock87
-    ),
-    '87.26: index.html #magazinesPanel is a <details class="sub-panel" data-sub-id="skill_matrix_magazines"> nested inside SKILL MATRIX'
+    !/magazinesPanel/.test(skillMatrixBlock87) &&
+      /<details class="panel bay-board" data-tab="stat" id="magazinesPanel">/.test(idxSrc87),
+    '87.26: index.html #magazinesPanel is a top-level <details class="panel bay-board" data-tab="stat">, not nested inside SKILL MATRIX'
   );
 
-  // 87.27  SKILL MAGAZINES heading is now <h3> (sub-panel heading), no longer a top-level <h2> panel
+  // 87.27  SKILL MAGAZINES heading is a real top-level <h2> carrying the BUS-05b slot tag.
   assert(
-    /<h3>&gt; SKILL MAGAZINES<\/h3>/.test(skillMatrixBlock87) &&
-      !/<h2>>\s*SKILL MAGAZINES/.test(idxSrc87),
-    '87.27: SKILL MAGAZINES heading is a nested <h3> sub-panel heading, not a standalone top-level <h2> panel'
+    /SKILL MAGAZINES.{0,60}<\/h2>/s.test(idxSrc87.slice(idxSrc87.indexOf('id="magazinesPanel"'))) &&
+      /class="bay-slot-tag">BUS-05b</.test(idxSrc87),
+    '87.27: SKILL MAGAZINES heading is a top-level <h2> board, carrying the BUS-05b slot tag'
   );
 
-  // 87.28  #magazinesPanel carries no data-tab of its own — it is not a top-level tab-gated panel anymore
-  assert(
-    !/<details[\s\S]{0,200}id="magazinesPanel"[\s\S]{0,200}data-tab/.test(
-      idxSrc87.slice(0, idxSrc87.indexOf('id="magazinesPanel"') + 300)
-    ),
-    '87.28: #magazinesPanel has no data-tab attribute — it is nested inside SKILL MATRIX, not its own tab-gated panel'
-  );
-
-  // 87.29  expandPanelForCategory() opens the #magazinesPanel sub-panel for the 'magazines' category
-  //        (mirrors the existing ammoSubPanel special case, Protocol 22)
+  // 87.28  expandPanelForCategory() no longer special-cases #magazinesPanel as
+  //        a nested sub-panel — the generic top-level details.open handling
+  //        already reveals it (Phase 3 OPERATOR batch 3 promotion).
   {
     const uiCoreSrc87 = readFile('js/ui-core.js');
     let expandBody87 = '';
@@ -10035,8 +10002,9 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
       expandBody87 = extractFunctionBody(uiCoreSrc87, 'expandPanelForCategory');
     } catch (_) {}
     assert(
-      /getElementById\('magazinesPanel'\)/.test(expandBody87),
-      "87.29: expandPanelForCategory() opens #magazinesPanel for the 'magazines' category (nested sub-panel reveal)"
+      !/getElementById\('magazinesPanel'\)/.test(expandBody87) &&
+        /'> SKILL MAGAZINES'/.test(expandBody87),
+      "87.28: expandPanelForCategory() no longer special-cases #magazinesPanel as a nested sub-panel — reveals it via the generic top-level board match on '> SKILL MAGAZINES'"
     );
   }
 }
@@ -25223,16 +25191,24 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   // 181.4  every OPERATOR board is a real <details class="panel"> carrying
   //        the reused .bay-board machine-language class (Protocol 22 — no
   //        parallel board-frame class family invented for this reskin).
+  //        Phase 3 OPERATOR batch 3 renamed 3 board titles to match the
+  //        owner-approved mockup (CHRONO/POSITION FIX -> POSITION & MISSION
+  //        CLOCK, PERKS -> PERK LOADOUT, KARMA CENTER -> KARMA ALIGNMENT)
+  //        and promoted SKILL BOOKS/SKILL MAGAZINES from SKILL MATRIX
+  //        sub-panels to their own top-level boards (BUS-05a/BUS-05b) — 9
+  //        boards became 11.
   const boardTitles181 = [
     'VITAL TELEMETRY',
     'S.P.E.C.I.A.L. TUNING',
-    'CHRONO / POSITION FIX',
+    'POSITION &amp; MISSION CLOCK',
     'SKELETAL HARNESS',
     'SKILL MATRIX',
-    'PERKS',
+    'SKILL BOOKS — REFERENCE SHELF',
+    'SKILL MAGAZINES — PERIODICAL RACK',
+    'PERK LOADOUT',
     'STATUS EFFECTS',
     'FACTION STANDING',
-    'KARMA CENTER',
+    'KARMA ALIGNMENT',
   ];
   const busTags181 = [
     'BUS-01',
@@ -25240,6 +25216,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     'BUS-04',
     'BUS-03',
     'BUS-05',
+    'BUS-05a',
+    'BUS-05b',
     'BUS-06',
     'BUS-07',
     'BUS-08',
@@ -25254,10 +25232,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     boardTitles181.every(t =>
       new RegExp('class="panel bay-board"[\\s\\S]{0,400}' + flexTitle181(t)).test(html181)
     ) && busTags181.every(b => new RegExp('class="bay-slot-tag">' + b + '<').test(html181)),
-    '181.4: all 9 OPERATOR boards are <details class="panel bay-board"> and carry their BUS-0N slot tag (reuses the existing Module Bay board-frame class, Protocol 22)'
+    '181.4: all 11 OPERATOR boards are <details class="panel bay-board"> and carry their BUS-0N slot tag (reuses the existing Module Bay board-frame class, Protocol 22)'
   );
 
-  // 181.5  Protocol UI-1 — every one of the 9 new/re-dressed OPERATOR board
+  // 181.5  Protocol UI-1 — every one of the 11 new/re-dressed OPERATOR board
   //        h2 headings still starts with the mandatory "> " glyph, even with
   //        the new <span class="board-led"> injected before the title text
   //        (a real regression caught during this build — the glyph was
@@ -25277,7 +25255,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   });
   assert(
     opH2Blocks181.every(s => s) && badGlyph181.length === 0,
-    '181.5: all 9 OPERATOR board <h2> headings still start with the mandatory "> " glyph (Protocol UI-1) despite the new <span class="board-led"> — offenders: ' +
+    '181.5: all 11 OPERATOR board <h2> headings still start with the mandatory "> " glyph (Protocol UI-1) despite the new <span class="board-led"> — offenders: ' +
       badGlyph181.length
   );
 
@@ -26908,6 +26886,252 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       /min-height:\s*28px/.test(stlampPurgeRule186),
     '186.18: .facon-chan (40px) / .facon-keys button (32px) / .stlamp-purge (28px) all clear the >=28px tap-target floor'
   );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 187 — Phase 3 OPERATOR batch 3: CHRONO/PERKS/BOOKS/MAGS/KARMA
+//  ground-up reskin (the last five OPERATOR boards). BUS-04 flip-card
+//  mission clock + position plate, BUS-06 numbered perk-loadout rack +
+//  scroll+search + FNV trait chips, BUS-09 EVIL/GOOD swing-needle karma
+//  gauge (now a universal board with a nested FO3-only KARMA CENTER
+//  appendix). id/handler-preservation + game-agnostic + no-new-campaign-
+//  state + centering + reduced-motion guards. 20 tests.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 187 — Phase 3 OPERATOR batch 3: CHRONO/PERKS/BOOKS/MAGS/KARMA ground-up reskin');
+  const core187 = readFile('js/ui-core.js');
+  const render187 = readFile('js/ui-render.js');
+  const css187 = readFile('css/terminal.css');
+  const html187 = readFile('index.html');
+  const perksBody187 = extractFunctionBody(render187, 'renderPerks');
+  const karmaBody187 = extractFunctionBody(core187, 'updateKarmaUI');
+  const contextPanelsBody187 = extractFunctionBody(render187, '_updateContextPanels');
+  const karmaCenterBody187 = extractFunctionBody(render187, 'renderKarmaCenter');
+
+  // 187.1  BUS-04 CHRONO/POSITION keeps every editable id + handler
+  //        (cal_month/day/year, time_hour/min/day, stat_ticks, stat_loc +
+  //        locationOptions, gameDateDisplay/gameTimeDisplay) inside the new
+  //        flip-card/position-plate markup.
+  assert(
+    [
+      'id="cal_month"',
+      'id="cal_day"',
+      'id="cal_year"',
+      'id="time_hour"',
+      'id="time_min"',
+      'id="time_day"',
+      'id="stat_ticks"',
+      'id="stat_loc"',
+      'id="locationOptions"',
+      'id="gameDateDisplay"',
+      'id="gameTimeDisplay"',
+      'onTimeInputChanged()',
+      'onLocationChange()',
+    ].every(needle => html187.includes(needle)) && /class="chrono-wrap"/.test(html187),
+    '187.1: BUS-04 flip-card/position-plate reskin keeps every editable chrono/location id and handler'
+  );
+
+  // 187.2  renderPerks() renders numbered loadout slots (.slot-row) and reads
+  //        a #perkSearch filter — the CARGO MANIFEST drawer scroll+search
+  //        pattern reused, not forked (Protocol 22).
+  assert(
+    /slot-row/.test(perksBody187) && /getElementById\('perkSearch'\)/.test(perksBody187),
+    '187.2: renderPerks() renders .slot-row loadout slots and reads #perkSearch'
+  );
+
+  // 187.3  #perksList sits inside the shared .tray-scrollwrap/.tray-list
+  //        bounded-scroll region (same classes as CARGO MANIFEST's drawer,
+  //        Protocol 22 — a real reuse, not a re-implementation).
+  assert(
+    /class="tray-scrollwrap"/.test(html187) &&
+      /class="tray-list slot-list" id="perksList"/.test(html187),
+    '187.3: #perksList reuses the .tray-scrollwrap/.tray-list CARGO MANIFEST scroll region'
+  );
+
+  // 187.4  addPerk()/newPerkName/newPerkRank/newPerkLevel are unchanged —
+  //        the socket-perk-card form still calls the exact same handler.
+  assert(
+    /id="newPerkName"/.test(html187) &&
+      /id="newPerkRank"/.test(html187) &&
+      /id="newPerkLevel"/.test(html187) &&
+      /onclick="addPerk\(\)"/.test(html187),
+    '187.4: the perk-form ids (newPerkName/newPerkRank/newPerkLevel) and addPerk() onclick are unchanged'
+  );
+
+  // 187.5  renderPerks() pads dashed VACANT rows only for a small roster and
+  //        never when a search filter is active (no absurd vacant-row list
+  //        for a 90-perk search result).
+  assert(
+    /vacantCount\s*=\s*q\s*\?\s*0\s*:/.test(perksBody187) && /vacant/.test(perksBody187),
+    '187.5: renderPerks() only pads dashed VACANT rows when no search filter is active'
+  );
+
+  // 187.6  #traitsSection keeps its exact sub-panel contract (Protocol UI-3 —
+  //        .tracker-row/.tracker-toggle from renderTraits() are untouched);
+  //        the reskin is a CSS-only chip treatment via #traitsDisplay's new
+  //        .trait-chips wrapper class.
+  assert(
+    /id="traitsDisplay" class="trait-chips"/.test(html187) &&
+      /\.trait-chips \.tracker-row/.test(css187),
+    '187.6: #traitsDisplay carries class="trait-chips" and the chip look is CSS-only over the unchanged tracker-row/tracker-toggle markup'
+  );
+
+  // 187.7  BUS-09 KARMA ALIGNMENT is a UNIVERSAL board now — #karmaPanel
+  //        carries no hardcoded style="display: none" (that hid it on every
+  //        non-usesKarmaCenter game); only the nested #karmaCenterBlock
+  //        appendix stays conditional.
+  assert(
+    !/id="karmaPanel"\s+style="display:\s*none"/.test(html187) &&
+      /id="karmaCenterBlock"\s+style="display:\s*none"/.test(html187),
+    '187.7: #karmaPanel has no hardcoded display:none (universal board); only #karmaCenterBlock starts hidden (FO3-only appendix)'
+  );
+
+  // 187.8  _updateContextPanels() no longer toggles #karmaPanel's display —
+  //        the board itself is universal (Protocol 22, reskin only).
+  assert(
+    !/karmaPanel/.test(contextPanelsBody187),
+    '187.8: _updateContextPanels() no longer references karmaPanel — it is a universal board, not per-game-hidden'
+  );
+
+  // 187.9  renderKarmaCenter() toggles #karmaCenterBlock's display per
+  //        usesKarmaCenter — the ONE remaining per-game gate for karma.
+  assert(
+    /karmaCenterBlock/.test(karmaCenterBody187) && /usesKarmaCenter/.test(karmaCenterBody187),
+    '187.9: renderKarmaCenter() toggles #karmaCenterBlock display per usesKarmaCenter'
+  );
+
+  // 187.10  stat_karma/karma_label kept as the real control (relocated from
+  //         BUS-01 to BUS-09, Protocol 22 — the #c_caps/BUS-10 precedent),
+  //         still calling updateKarmaUI()+updateMath() on input.
+  assert(
+    /id="stat_karma"/.test(html187) &&
+      /id="karma_label"/.test(html187) &&
+      /updateKarmaUI\(\);/.test(html187) &&
+      (html187.match(/id="stat_karma"/g) || []).length === 1,
+    '187.10: #stat_karma/#karma_label are kept as the one real karma control, wired to updateKarmaUI()'
+  );
+
+  // 187.11  updateKarmaUI() drives the needle rotation + tier lamps + value
+  //         readout from the exact same 5-tier label logic (unchanged
+  //         breakpoints — Protocol 22, no new tiers).
+  assert(
+    /getElementById\('karmaNeedle'\)/.test(karmaBody187) &&
+      /getElementById\('karmaTierLamps'\)/.test(karmaBody187) &&
+      /getElementById\('karmaValReadout'\)/.test(karmaBody187) &&
+      /_KARMA_TIERS/.test(karmaBody187),
+    '187.11: updateKarmaUI() drives the needle/tier-lamps/value readout via the unchanged _KARMA_TIERS breakpoints'
+  );
+
+  // 187.12  the 5-tier breakpoints are byte-identical to the pre-reskin
+  //         thresholds (<=-750 / <=-250 / <250 / <750 / else) — Protocol 22,
+  //         no karma-system behavior change, only the added visualization.
+  assert(
+    /k\s*<=\s*-750/.test(core187) &&
+      /k\s*<=\s*-250/.test(core187) &&
+      /k\s*<\s*250/.test(core187) &&
+      /k\s*<\s*750/.test(core187),
+    '187.12: the karma tier breakpoints (<=-750/<=-250/<250/<750) are unchanged from the pre-reskin logic'
+  );
+
+  // 187.13  BUS-05a/BUS-05b/BUS-06/BUS-09 all carry their slot tags + a
+  //         .panel-substatus 0i line (never information-free, Protocol 25).
+  assert(
+    ['BUS-05a', 'BUS-05b', 'BUS-06', 'BUS-09'].every(tag =>
+      new RegExp('class="bay-slot-tag">' + tag + '<').test(html187)
+    ) &&
+      /id="opBooksStatus"/.test(html187) &&
+      /id="opMagsStatus"/.test(html187) &&
+      /id="opPerksStatus"/.test(html187) &&
+      /id="opKarmaStatus"/.test(html187),
+    '187.13: BUS-05a/05b/06/09 all carry their slot tag and a live 0i .panel-substatus line'
+  );
+
+  // 187.14  _syncOperatorTelemetry() (called once per updateMath(), per Suite
+  //         181.7) computes the opBooksStatus/opMagsStatus/opKarmaStatus/
+  //         opPerksStatus 0i lines from real registry+state counts, magazines
+  //         gated by hasMagazines (never shown for a game without them).
+  const telemetryBody187 = extractFunctionBody(core187, '_syncOperatorTelemetry');
+  assert(
+    /opBooksStatus/.test(telemetryBody187) &&
+      /opMagsStatus/.test(telemetryBody187) &&
+      /hasMagazines/.test(telemetryBody187) &&
+      /opKarmaStatus/.test(telemetryBody187),
+    '187.14: _syncOperatorTelemetry() populates the BUS-05a/05b/09 0i status lines, magazines gated by hasMagazines'
+  );
+
+  // 187.15  no new campaign-state field was introduced for this reskin —
+  //         perks/traits/skillBooks/magazines/karma are all pre-existing
+  //         state fields (Protocol 4 untouched).
+  assert(
+    !/state\.(perkRack|karmaNeedleValue|chronoFlip|bookShelf)/.test(render187 + core187),
+    '187.15: no new campaign-state field was introduced (perks/traits/books/mags/karma are pre-existing fields)'
+  );
+
+  // 187.16  every new interactive control clears the Protocol 17 >=28px
+  //         tap-target floor: the perk ✕ button, the slot-list row height
+  //         implied by its own padding, and the spine/mag tiles.
+  const pkXRule187 = (css187.match(/\.slot-row \.pk-x\s*\{[^}]*\}/) || [''])[0];
+  const spineRule187 = (css187.match(/^button\.spine\s*\{[^}]*\}/m) || [''])[0];
+  const magRule187 = (css187.match(/^button\.mag\s*\{[^}]*\}/m) || [''])[0];
+  assert(
+    /min-height:\s*28px/.test(pkXRule187) &&
+      /min-height:\s*96px/.test(spineRule187) &&
+      /min-height:\s*66px/.test(magRule187),
+    '187.16: .pk-x (28px), .spine (96px), and .mag (66px) all clear the Protocol 17 tap-target floor'
+  );
+
+  // 187.17  the shelf/mag-rack/perk-form/trait-chips rows all center an
+  //         incomplete last row (justify-content:center, the centering rule).
+  assert(
+    /\.shelf\s*\{[^}]*justify-content:\s*center/.test(css187) &&
+      /\.mag-rack\s*\{[^}]*justify-content:\s*center/.test(css187) &&
+      /\.trait-chips\s*\{[^}]*justify-content:\s*center/.test(css187) &&
+      /\.chrono-wrap\s*\{[^}]*justify-content:\s*center/.test(css187),
+    '187.17: .shelf/.mag-rack/.trait-chips/.chrono-wrap all center an incomplete last row (justify-content:center)'
+  );
+
+  // 187.18  the new motion (colon blink, position-fix dot pulse, karma
+  //         needle rotation) is either a plain `animation:` keyframe or a
+  //         CSS `transition:` — both are auto-neutralised by the existing
+  //         global prefers-reduced-motion block, no bespoke carve-out.
+  assert(
+    /@keyframes chronoColonBlink/.test(css187) &&
+      /animation:\s*bayLedPulse/.test((css187.match(/\.pos-dot\s*\{[^}]*\}/) || [''])[0]) &&
+      /transition:\s*transform/.test((css187.match(/\.kn-needle\s*\{[^}]*\}/) || [''])[0]),
+    '187.18: the colon blink / position-fix pulse / needle rotation are plain animation/transition, auto-neutralised by the global reduced-motion block'
+  );
+
+  // 187.19  the reskin is game-agnostic (Protocol 38) — no hardcoded FNV/FO3
+  //         literal branch in the new render/update code (traits/magazines/
+  //         karma-center gating all read the existing hasTraits/hasMagazines/
+  //         usesKarmaCenter flags, never a ctx === 'FNV' check).
+  assert(
+    !/ctx\s*===\s*'FNV'|ctx\s*===\s*'FO3'/.test(perksBody187 + karmaBody187 + karmaCenterBody187),
+    '187.19: renderPerks()/updateKarmaUI()/renderKarmaCenter() carry no hardcoded FNV/FO3 ctx literal (Protocol 38)'
+  );
+
+  // 187.20  SKILL BOOKS/SKILL MAGAZINES/PERK LOADOUT/KARMA ALIGNMENT board
+  //         titles are all real <h2> headings starting with the mandatory
+  //         "> " glyph (Protocol UI-1) — covered in full by Suite 181.5, this
+  //         is a targeted spot-check scoped to just this unit's 4 renamed
+  //         boards, independent of Suite 181's board list staying in sync.
+  {
+    // Prettier is free to wrap a long <h2> title across lines (the same
+    // tolerance Suite 181.4/181.5 already build in) — spaces are matched
+    // with \s+ instead of a literal space.
+    const flexTitle187 = t => t.replace(/[.]/g, '\\.').replace(/ /g, '\\s+');
+    assert(
+      [
+        'SKILL BOOKS — REFERENCE SHELF',
+        'SKILL MAGAZINES — PERIODICAL RACK',
+        'PERK LOADOUT',
+        'KARMA ALIGNMENT',
+      ].every(t =>
+        new RegExp('<h2>[\\s\\S]{0,20}?&gt;[\\s\\S]{0,80}?' + flexTitle187(t)).test(html187)
+      ),
+      '187.20: SKILL BOOKS/SKILL MAGAZINES/PERK LOADOUT/KARMA ALIGNMENT headings all start with the mandatory "> " glyph'
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

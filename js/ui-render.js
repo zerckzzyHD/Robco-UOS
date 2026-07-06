@@ -719,22 +719,58 @@ function addStatusEffect() {
   updateMath();
 }
 
+// BUS-06 · PERK LOADOUT (Phase 3 OPERATOR batch 3, ground-up reskin) — a
+// numbered loadout-slot rack rendered inside the shared CARGO MANIFEST
+// drawer scroll+search pattern (.tray-scrollwrap/.tray-list, Protocol 22 —
+// the registry carries 90+ perks, so the list is a bounded in-panel scroll
+// region with an optional search filter, never a render cap). Still emits
+// the exact #perksList container + removePerk(i)/addPerk() handlers.
 function renderPerks() {
   const perksDiv = document.getElementById('perksList');
   if (!perksDiv) return;
-  if (!state.perks || state.perks.length === 0) {
+  const perks = state.perks || [];
+  if (perks.length === 0) {
     perksDiv.innerHTML = emptyState('NO PERKS ON FILE');
     return;
   }
-  perksDiv.innerHTML =
-    '<ul class="notes-list">' +
-    state.perks
-      .map(
-        (p, i) =>
-          `<li><span class="list-row-prefix">> </span><span class="list-row-content">${escapeHtml(p.name)}${p.rank > 1 ? ' (Rank ' + p.rank + ')' : ''}${p.level_taken ? ' — Lv.' + p.level_taken : ''}</span><button class="delete-btn" onclick="removePerk(${i})">X</button></li>`
-      )
-      .join('') +
-    '</ul>';
+  const searchEl = document.getElementById('perkSearch');
+  const q = (searchEl ? searchEl.value : '').toLowerCase().trim();
+  const displayPerks = perks
+    .map((p, i) => ({ ...p, _origIdx: i }))
+    .filter(p => !q || p.name.toLowerCase().includes(q));
+
+  if (displayPerks.length === 0) {
+    perksDiv.innerHTML = emptyState('NO PERK MATCHES');
+    return;
+  }
+  const rows = displayPerks
+    .map(p => {
+      const rank = Math.max(1, parseInt(p.rank) || 1);
+      const pips = '&#9679;'.repeat(Math.min(6, rank));
+      const levelTag = p.level_taken
+        ? `<span class="s-meta">REQ LVL ${parseInt(p.level_taken)}</span>`
+        : '';
+      return (
+        `<div class="slot-row">` +
+        `<span class="s-idx">SLOT ${String(p._origIdx + 1).padStart(2, '0')}</span>` +
+        `<span class="s-name">${escapeHtml(p.name)}</span>` +
+        `<span class="s-rank" title="Rank ${rank}">${pips}</span>` +
+        levelTag +
+        `<button class="delete-btn pk-x" onclick="removePerk(${p._origIdx})" aria-label="Remove ${escapeHtml(p.name)}">✕</button>` +
+        `</div>`
+      );
+    })
+    .join('');
+  // Pad with dashed VACANT rows only when the real count is small (never
+  // pads a search result — matches the mockup's small-loadout look without
+  // absurdly listing dozens of vacant slots for a big roster).
+  const vacantCount = q ? 0 : Math.max(0, 6 - perks.length);
+  const vacantRows = Array.from(
+    { length: vacantCount },
+    (_, i) =>
+      `<div class="slot-row vacant">SLOT ${String(perks.length + i + 1).padStart(2, '0')} — VACANT</div>`
+  ).join('');
+  perksDiv.innerHTML = rows + vacantRows;
 }
 
 function removePerk(idx) {
@@ -1097,21 +1133,28 @@ function toggleTrait(name) {
   saveState();
 }
 
-// ── Shared READ/UNREAD tracker renderer (QA-DUP-1 / WU-B8) ──────────
-// Drives the Skill Books and Skill Magazines panels (and any future binary
-// read-tracker) from one config object so the row markup, READ/UNREAD
-// sub-panel split, empty states, and collapse-persistence live in exactly
-// one place. Fully data-driven — no game literals (Protocol 38).
+// ── Shared SHELF/RACK tracker renderer (Phase 3 OPERATOR batch 3 — ground-
+// up reskin of the WU-B8 shared helper) ─────────────────────────────────
+// Drives the BUS-05a SKILL BOOKS reference shelf and BUS-05b SKILL MAGAZINES
+// periodical rack from one config object — the row markup, empty state, and
+// toggle wiring live in exactly one place (Protocol 22 — no duplicated
+// render logic). Each row is a SINGLE <button> carrying BOTH the Protocol
+// UI-3 .tracker-row and .tracker-toggle classes (the spine/cover IS its own
+// toggle) — read = upright/lit/ribbon (books) or consumed = matte+stamped
+// (magazines), the undone state leaning/dashed/dim. Fully data-driven — no
+// game literals (Protocol 38).
 //
 // opts: {
-//   containerId,                // required: where the sub-panels mount
-//   panelId?, visible?,         // optional: hide panelId when visible() is false
-//   defs,                       // registry array of {name, skill}
-//   read,                       // state array of read names
-//   subIdRead, subIdUnread,     // data-sub-id keys (persistence)
-//   toggleFn,                   // name of the global toggle function
-//   meta,                       // (d) => inner HTML for the .tracker-meta span
-//   emptyRead, emptyUnread,     // empty-state strings
+//   containerId,                     // required: shelf/rack mount point
+//   panelId?, visible?,              // optional: hide panelId when visible() is false
+//   defs,                            // registry array of {name, skill}
+//   read,                            // state array of read/consumed names
+//   toggleFn,                        // name of the global toggle function
+//   meta,                            // (d) => plain-text sub-label (skill name)
+//   itemClass,                       // 'spine' | 'mag' — row CSS variant
+//   doneModifier, undoneModifier,    // extra class applied per state
+//   doneWord, undoneWord,            // aria-label phrasing
+//   emptyBoard,                      // empty-state text when defs.length === 0
 // }
 function _renderReadTracker(opts) {
   const container = document.getElementById(opts.containerId);
@@ -1125,59 +1168,28 @@ function _renderReadTracker(opts) {
 
   const defs = Array.isArray(opts.defs) ? opts.defs : [];
   const read = Array.isArray(opts.read) ? opts.read : [];
-  const readDefs = defs.filter(d => read.includes(d.name));
-  const unreadDefs = defs.filter(d => !read.includes(d.name));
 
-  let ps = {};
-  try {
-    ps = JSON.parse(MetaStore.get('robco_panel_state') || '{}');
-  } catch (_) {}
-  const readOpen = ps[opts.subIdRead] !== false;
-  const unreadOpen = ps[opts.subIdUnread] !== false;
-
-  const rowHtml = (d, isRead) => {
+  const rowHtml = d => {
     const safeAttr = escapeHtml(d.name);
-    const tag = isRead
-      ? `<button class="tracker-toggle tracker-toggle--active" data-name="${safeAttr}" onclick="${opts.toggleFn}(this.dataset.name)" aria-label="Mark ${safeAttr} unread">[READ]</button>`
-      : `<button class="tracker-toggle tracker-toggle--inactive" data-name="${safeAttr}" onclick="${opts.toggleFn}(this.dataset.name)" aria-label="Mark ${safeAttr} read">[----]</button>`;
-    const nameHtml = isRead
-      ? `<strong>${escapeHtml(d.name.toUpperCase())}</strong>`
-      : escapeHtml(d.name.toUpperCase());
+    const isRead = read.includes(d.name);
+    const modifier = isRead ? opts.doneModifier : opts.undoneModifier;
+    const word = isRead ? opts.doneWord : opts.undoneWord;
+    const metaText = opts.meta(d);
+    const cls =
+      'tracker-row tracker-toggle ' +
+      (isRead ? 'tracker-toggle--active' : 'tracker-toggle--inactive') +
+      ' ' +
+      opts.itemClass +
+      (modifier ? ' ' + modifier : '');
     return (
-      `<div class="tracker-row"${isRead ? '' : ' style="opacity:0.7;"'}>` +
-      tag +
-      nameHtml +
-      ` <span class="tracker-meta">&mdash; ${opts.meta(d)}</span>` +
-      `</div>`
+      `<button class="${cls}" data-name="${safeAttr}" onclick="${opts.toggleFn}(this.dataset.name)" ` +
+      `aria-label="${escapeHtml(d.name)} (${escapeHtml(metaText)}) — ${word}">` +
+      `${escapeHtml(d.name)}<span class="tracker-meta">${escapeHtml(metaText)}</span>` +
+      `</button>`
     );
   };
 
-  const readRows = readDefs.length
-    ? readDefs.map(d => rowHtml(d, true)).join('')
-    : `<div style="font-size:11px;opacity:0.5;padding:2px 0 4px;">${opts.emptyRead}</div>`;
-  const unreadRows = unreadDefs.length
-    ? unreadDefs.map(d => rowHtml(d, false)).join('')
-    : `<div style="font-size:11px;opacity:0.5;padding:2px 0 4px;">${opts.emptyUnread}</div>`;
-
-  container.innerHTML =
-    `<details class="sub-panel" data-sub-id="${opts.subIdRead}"${readOpen ? ' open' : ''}>` +
-    `<summary><h3>&gt; READ [${readDefs.length}]</h3></summary>` +
-    readRows +
-    `</details>` +
-    `<details class="sub-panel" data-sub-id="${opts.subIdUnread}"${unreadOpen ? ' open' : ''}>` +
-    `<summary><h3>&gt; UNREAD [${unreadDefs.length}]</h3></summary>` +
-    unreadRows +
-    `</details>`;
-
-  container.querySelectorAll('details[data-sub-id]').forEach(d => {
-    d.addEventListener('toggle', () => {
-      try {
-        const p = JSON.parse(MetaStore.get('robco_panel_state') || '{}');
-        p[d.dataset.subId] = d.open;
-        MetaStore.set('robco_panel_state', JSON.stringify(p));
-      } catch (_) {}
-    });
-  });
+  container.innerHTML = defs.length ? defs.map(rowHtml).join('') : emptyState(opts.emptyBoard);
 }
 
 function renderSkillBooks() {
@@ -1188,12 +1200,14 @@ function renderSkillBooks() {
         ? FALLOUT_REGISTRY.skillBooks
         : [],
     read: Array.isArray(state.skillBooks) ? state.skillBooks : [],
-    subIdRead: 'skill_books_read',
-    subIdUnread: 'skill_books_unread',
     toggleFn: 'toggleSkillBook',
-    meta: d => escapeHtml((d.skill || '').replace(/_/g, ' ').toUpperCase()),
-    emptyRead: 'NO BOOKS READ',
-    emptyUnread: 'ALL BOOKS READ',
+    meta: d => (d.skill || '').replace(/_/g, ' ').toUpperCase(),
+    itemClass: 'spine',
+    doneModifier: '',
+    undoneModifier: 'unread',
+    doneWord: 'read; tap to mark unread',
+    undoneWord: 'unread; tap to mark read',
+    emptyBoard: 'NO SKILL BOOKS IN THE REGISTRY',
   });
 }
 
@@ -1219,15 +1233,17 @@ function renderMagazines() {
         ? FALLOUT_REGISTRY.magazines
         : [],
     read: Array.isArray(state.magazines) ? state.magazines : [],
-    subIdRead: 'magazines_read',
-    subIdUnread: 'magazines_unread',
     toggleFn: 'toggleMagazine',
     meta: d =>
       d.skill === 'Critical Chance'
-        ? '(Critical Chance)'
-        : `(boosts ${escapeHtml((d.skill || '').replace(/_/g, ' ').toUpperCase())})`,
-    emptyRead: 'NO MAGAZINES READ',
-    emptyUnread: 'ALL MAGAZINES READ',
+        ? 'CRITICAL CHANCE +10 (TEMP)'
+        : (d.skill || '').replace(/_/g, ' ').toUpperCase() + ' +10 (TEMP)',
+    itemClass: 'mag',
+    doneModifier: 'consumed',
+    undoneModifier: '',
+    doneWord: 'consumed; tap to restore',
+    undoneWord: 'unread; tap to mark consumed',
+    emptyBoard: 'NO SKILL MAGAZINES IN THE REGISTRY',
   });
 }
 
@@ -1825,13 +1841,16 @@ function renderFactionRep() {
 }
 
 // ── G4: EXPANDED KARMA SYSTEM (FO3) ─────────────────────────────
-// When gameContext === 'FO3': Karma Center shown, Faction Standing hidden.
-// When gameContext === 'FNV' (or default): Faction Standing shown, Karma Center hidden.
+// When gameContext === 'FO3': Karma Center appendix shown inside BUS-09
+// KARMA ALIGNMENT (Phase 3 OPERATOR batch 3 — the board itself is now
+// universal; only this nested block is FO3-only, per usesKarmaCenter).
 // Thresholds: Very Evil (<-750) / Evil (<-250) / Neutral / Good (>250) / Very Good (>750).
 // Differentiated by text labels and brightness — no multi-color.
 function renderKarmaCenter() {
+  const block = document.getElementById('karmaCenterBlock');
   const display = document.getElementById('karmaCenterDisplay');
   if (!display) return;
+  if (block) block.style.display = _activeDef().usesKarmaCenter ? '' : 'none';
 
   const karma = state.karma || 0;
   let label, opacity, hitSquad;
@@ -3115,15 +3134,15 @@ function renderBioScan() {
 function _updateContextPanels() {
   const usesKarmaCenter = _activeDef().usesKarmaCenter;
   const factionPanel = document.getElementById('factionPanel');
-  const karmaPanel = document.getElementById('karmaPanel');
   if (factionPanel) {
     // Let the tab system control visibility via tab-visible; just toggle display
     factionPanel.style.display = usesKarmaCenter ? 'none' : '';
   }
-  if (karmaPanel) {
-    // Only show if on stat tab and FO3 mode; otherwise hide
-    karmaPanel.style.display = usesKarmaCenter ? '' : 'none';
-  }
+  // BUS-09 KARMA ALIGNMENT (Phase 3 OPERATOR batch 3): the needle gauge +
+  // stat_karma slider are UNIVERSAL — every game tracks karma — so the board
+  // itself is no longer hidden per-game (Protocol 22, reskin only). Only the
+  // nested FO3 KARMA CENTER appendix stays conditional on usesKarmaCenter;
+  // renderKarmaCenter() owns that inner toggle.
   // U9-5: FO3 has no weapon-mod system/data — hide the MODS drawer so it never
   // advertises a category that can never have entries (Protocol 38 reverse leak).
   const hasWeaponMods = _activeDef().hasWeaponMods;

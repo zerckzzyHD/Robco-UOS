@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2374/2374 | Cache: robco-terminal-v2.7.0-r85 -->
+﻿## [Unreleased]<!-- Tests: 2390/2390 | Cache: robco-terminal-v2.7.0-r86 -->
 
 ### Added
 
@@ -49,6 +49,10 @@
 - Your SKILL MATRIX now shows every skill as a lit signal-level meter you can drag left or right to set, instead of a plain row with just a number box — the number field is still right there and still fully typeable, dragging the meter is just a faster way to do the same thing. Your active skills are unchanged; this only changes how you view and adjust them.
 - Your STATUS EFFECTS board now shows every active effect as its own lit indicator lamp — green for a buff, red for a debuff, amber for a neutral effect — with a tick countdown and a purge button on each one, instead of a plain list. When nothing is active, the board now shows a few dark standby lamps instead of just an empty note. Adding or removing an effect works exactly as it did before.
 - Your FACTION STANDING board is now one shared reputation meter with a row of channel buttons, one per faction, instead of a grid of separate cards. Pick a faction to see its full INFAMY/FAME scale and adjust its standing with the same +5/-5 buttons as before, while a compact strip underneath always shows every faction's current standing at a glance, major and minor alike, so nothing is left hidden behind the selector.
+- Your MISSION CLOCK is now a physical flip-card date display and a 24-hour clock face with a blinking colon, and your current location sits on its own position-fix plate with a pulsing marker. Every field — the date, the time, and your location — is still exactly as editable as before, typed the same way you always have.
+- Your PERKS board is now a numbered loadout rack, each perk showing as its own slot with amber rank pips and its level requirement, and the list now scrolls in place with a search box above it so a long perk roster never runs the page long. Adding a perk works exactly as before. Your FNV traits now show as a row of amber "factory-burned" chips instead of a plain list, with the same filter box and tap-to-select behavior as always.
+- SKILL BOOKS and SKILL MAGAZINES are separate boards again, no longer tucked inside the Skill Matrix — SKILL BOOKS now shows as a reference shelf of book spines (upright and ribboned once read, leaning and dashed while unread), and SKILL MAGAZINES shows as a rack of dog-eared covers that go matte with a CONSUMED stamp once read. Marking a book or magazine read/unread works exactly as before.
+- Your KARMA reading moved off the OPERATOR vitals board into its own KARMA ALIGNMENT board, now shown as an EVIL–GOOD swing needle with a lit tier strip (Very Evil through the top tier) instead of a plain slider and label — the same slider is still right there as the control. Fallout 3's KARMA CENTER readout now lives inside this same board instead of a separate one.
 
 ### Fixed
 

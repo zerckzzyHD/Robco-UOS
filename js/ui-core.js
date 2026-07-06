@@ -3124,7 +3124,7 @@ document.addEventListener('visibilitychange', _updateAppBadge);
 
 function _updatePanelBadges() {
   const badges = [
-    { h2text: '> PERKS', count: (state.perks || []).length },
+    { h2text: '> PERK LOADOUT', count: (state.perks || []).length },
     {
       h2text: '> CARGO MANIFEST',
       // Combined: non-ammo inventory items + tracked ammo calibers
@@ -3171,9 +3171,9 @@ function _updatePanelBadges() {
   ];
   badges.forEach(({ h2text, count, total }) => {
     // Find the heading with exactly this text (case-insensitive prefix match).
-    // SKILL BOOKS/SKILL MAGAZINES now live as <h3> sub-panel headings nested
-    // inside SKILL MATRIX (Protocol UI-1), so this also matches .sub-panel h3
-    // — every other entry here is still a top-level .panel h2 (Protocol 22).
+    // SKILL BOOKS/SKILL MAGAZINES are top-level .panel h2 boards (BUS-05a/
+    // BUS-05b, Phase 3 OPERATOR batch 3) — the .sub-panel h3 half of this
+    // selector still covers any other nested sub-panel badge (Protocol 22).
     const h2 = Array.from(document.querySelectorAll('.panel h2, .sub-panel h3')).find(el =>
       el.textContent.trim().startsWith(h2text)
     );
@@ -3645,7 +3645,7 @@ function expandPanelForCategory(categoryKey) {
     status: '> STATUS EFFECTS',
     inventory: '> CARGO MANIFEST',
     campaign_notes: '> CAMPAIGN NOTES',
-    perks: '> PERKS',
+    perks: '> PERK LOADOUT',
     factions: '> FACTION STANDING',
     quests: '> QUEST LOG',
     ammo: '> CARGO MANIFEST', // ammo now lives in the AMMO drawer, folded into the manifest board
@@ -3671,9 +3671,9 @@ function expandPanelForCategory(categoryKey) {
   };
   const target = map[categoryKey];
   if (!target) return;
-  // SKILL BOOKS/SKILL MAGAZINES now live as <h3> sub-panel headings nested
-  // inside SKILL MATRIX (Protocol UI-1) — .closest('details.panel') below
-  // still correctly walks up past the sub-panel to the enclosing panel.
+  // SKILL BOOKS/SKILL MAGAZINES are top-level .panel h2 boards (BUS-05a/
+  // BUS-05b, Phase 3 OPERATOR batch 3) — the .sub-panel h3 half of this
+  // selector still covers any other nested sub-panel target (Protocol 22).
   const h2 = Array.from(document.querySelectorAll('.panel h2, .sub-panel h3')).find(el =>
     el.textContent.trim().startsWith(target)
   );
@@ -3688,19 +3688,14 @@ function expandPanelForCategory(categoryKey) {
       MetaStore.set('robco_panel_state', JSON.stringify(ps));
     }
   }
-  // For ammo/skillBooks/magazines, also open the relevant nested sub-panel.
-  // Ammo's visibility is now drawer-gated (Phase 3 · Piece 2 CARGO MANIFEST
+  // Ammo's visibility is drawer-gated (Phase 3 · Piece 2 CARGO MANIFEST
   // reskin) rather than a collapsible <details> — pulling the AMMO drawer
   // via setInvFilter() is what reveals it (also updates the drawer's active
-  // state + persists the choice, Protocol 22 single entry point).
+  // state + persists the choice, Protocol 22 single entry point). SKILL
+  // BOOKS/SKILL MAGAZINES are now top-level boards (BUS-05a/BUS-05b), so
+  // the generic details.open handling above already reveals them.
   if (categoryKey === 'ammo') {
     if (typeof setInvFilter === 'function') setInvFilter('ammo');
-  } else if (categoryKey === 'skillBooks') {
-    const subPanel = document.getElementById('skillBooksPanel');
-    if (subPanel && !subPanel.open) subPanel.setAttribute('open', '');
-  } else if (categoryKey === 'magazines') {
-    const subPanel = document.getElementById('magazinesPanel');
-    if (subPanel && !subPanel.open) subPanel.setAttribute('open', '');
   }
   // WU-HF1: bring the opened panel into view. Without this, opening a panel that sits
   // below the fold (e.g. BARTER UPLINK is beneath BACKPACK/EQUIPPED/AMMO/CRAFTING on the
@@ -4749,14 +4744,51 @@ function _wireBioHarnessZones() {
   });
 }
 
+// BUS-09 · KARMA ALIGNMENT (Phase 3 OPERATOR batch 3, ground-up reskin) —
+// the exact shipped 5-tier label logic (Protocol 22, unchanged breakpoints),
+// now also driving the EVIL/GOOD swing-needle rotation + tier-lamp strip +
+// live value readout the reskin adds. No new state, no new tiers.
+const _KARMA_TIERS = [
+  { label: 'Very Evil', test: k => k <= -750 },
+  { label: 'Evil', test: k => k <= -250 },
+  { label: 'Neutral', test: k => k < 250 },
+  { label: 'Good', test: k => k < 750 },
+  { label: 'Messiah', test: () => true },
+];
 function updateKarmaUI() {
-  let k = parseInt(document.getElementById('stat_karma').value) || 0;
-  let label = 'Neutral';
-  if (k >= 750) label = 'Messiah';
-  else if (k >= 250) label = 'Good';
-  else if (k <= -750) label = 'Very Evil';
-  else if (k <= -250) label = 'Evil';
-  document.getElementById('karma_label').innerText = label;
+  const k = parseInt(document.getElementById('stat_karma').value) || 0;
+  const tier = _KARMA_TIERS.find(t => t.test(k)) || _KARMA_TIERS[2];
+  const label = tier.label;
+
+  const labelEl = document.getElementById('karma_label');
+  if (labelEl) {
+    labelEl.innerText = label;
+    labelEl.className = 'k-standing ' + (label === 'Neutral' ? 'neut' : k < 0 ? 'evil' : 'good');
+  }
+
+  const needle = document.getElementById('karmaNeedle');
+  if (needle) {
+    needle.style.transform = 'rotate(' + ((k / 1000) * 82).toFixed(1) + 'deg)';
+    needle.classList.toggle('evil', k < 0);
+  }
+
+  const valEl = document.getElementById('karmaValReadout');
+  if (valEl) valEl.textContent = 'KARMA ' + (k >= 0 ? '+' : '') + k + ' OF ±1000';
+
+  const lampsEl = document.getElementById('karmaTierLamps');
+  if (lampsEl) {
+    lampsEl.innerHTML = _KARMA_TIERS
+      .map(t => {
+        const zone =
+          t.label === 'Very Evil' || t.label === 'Evil'
+            ? 't-evil'
+            : t.label === 'Neutral'
+              ? 't-neut'
+              : 't-good';
+        return `<span class="${zone}${t.label === label ? ' cur' : ''}">${t.label.toUpperCase()}</span>`;
+      })
+      .join('');
+  }
 }
 
 function seedNewCampaignInventory(ctx) {
@@ -5356,7 +5388,22 @@ function _syncOperatorTelemetry() {
     (typeof getSkillKeys === 'function' ? getSkillKeys().length : 0) + ' CHANNELS TRACKED',
     false
   );
-  setStatus('opPerksStatus', (state.perks || []).length + ' PERKS ON FILE', false);
+  {
+    const traitCount = Array.isArray(state.traits) ? state.traits.length : 0;
+    const traitSuffix =
+      typeof _activeDef === 'function' && _activeDef().hasTraits
+        ? ' · ' + traitCount + ' TRAIT' + (traitCount === 1 ? '' : 'S') + ' BURNED-IN'
+        : '';
+    setStatus(
+      'opPerksStatus',
+      (state.perks || []).length +
+        ' PERK' +
+        ((state.perks || []).length === 1 ? '' : 'S') +
+        ' SOCKETED' +
+        traitSuffix,
+      false
+    );
+  }
   setStatus(
     'opStatusStatus',
     typeof _statusLampSummary === 'function' ? _statusLampSummary() : '— ACTIVE EFFECTS',
@@ -5369,10 +5416,26 @@ function _syncOperatorTelemetry() {
     false
   );
   setStatus(
-    'opKarmaCenterStatus',
+    'opKarmaStatus',
     (document.getElementById('karma_label') || {}).innerText || '—',
     false
   );
+  {
+    const bookDefs =
+      typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.skillBooks)
+        ? FALLOUT_REGISTRY.skillBooks
+        : [];
+    const bookRead = Array.isArray(state.skillBooks) ? state.skillBooks.length : 0;
+    setStatus('opBooksStatus', bookRead + '/' + bookDefs.length + ' READ', false);
+  }
+  if (typeof _activeDef === 'function' && _activeDef().hasMagazines) {
+    const magDefs =
+      typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.magazines)
+        ? FALLOUT_REGISTRY.magazines
+        : [];
+    const magConsumed = Array.isArray(state.magazines) ? state.magazines.length : 0;
+    setStatus('opMagsStatus', magConsumed + '/' + magDefs.length + ' CONSUMED', false);
+  }
 }
 
 // OPERATIONS BUS-10 LOAD-CELL WEIGH BRIDGE — a read-only mirror of the exact

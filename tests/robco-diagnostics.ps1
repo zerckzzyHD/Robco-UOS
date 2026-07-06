@@ -5414,7 +5414,8 @@ Check ($uiRSrc84.Contains('function _craftGetHave(')) "_craftGetHave() helper de
 
 # ===========================================================
 # Suite 85 -- Skill Books Tracker (FNV+FO3, Protocol 4) + WU-B8 _renderReadTracker guards
-# 30 tests
+# Phase 3 OPERATOR batch 3: reference-shelf reskin guards (BUS-05a).
+# 27 tests
 # ===========================================================
 Sep "Suite 85 -- Skill Books Tracker (FNV+FO3, Protocol 4)"
 $nvRegSrc85 = Get-Content 'js/reg_nv.js' -Raw
@@ -5500,68 +5501,68 @@ Check ($loadUIBody85 -match 'renderSkillBooks\s*\(\s*\)') "renderSkillBooks() ca
 # 85.16  index.html has #skillBooksDisplay container
 Check ($idxSrc85 -match 'id="skillBooksDisplay"') 'index.html has #skillBooksDisplay container (Protocol 5 panel element)'
 
-# 85.17  renderSkillBooks source has skill_books_read sub-panel marker
+# -- Phase 3 OPERATOR batch 3 (BUS-05a reskin) -- SKILL BOOKS promoted from a
+#    SKILL MATRIX sub-panel to its own top-level "reference shelf" board.
+#    Guards 85.17-85.27 mirror the new single-flowing-shelf contract (JS Suite 85). --
 $renderSBBody85 = ''
 try { $renderSBBody85 = Get-FunctionBody $uiRenderSrc85 'renderSkillBooks' } catch {}
 $helperBody85 = ''
 try { $helperBody85 = Get-FunctionBody $uiRenderSrc85 '_renderReadTracker' } catch {}
 $renderMagBody85 = ''
 try { $renderMagBody85 = Get-FunctionBody $uiRenderSrc85 'renderMagazines' } catch {}
-Check ($renderSBBody85.Contains('skill_books_read')) "renderSkillBooks() references skill_books_read sub-panel data-sub-id (READ/UNREAD split)"
 
-# 85.18  renderSkillBooks source has skill_books_unread sub-panel marker
-Check ($renderSBBody85.Contains('skill_books_unread')) "renderSkillBooks() references skill_books_unread sub-panel data-sub-id (READ/UNREAD split)"
+# 85.17  renderSkillBooks() delegates to _renderReadTracker with itemClass: 'spine'
+Check (($renderSBBody85 -match '_renderReadTracker\s*\(') -and ($renderSBBody85 -match "itemClass:\s*'spine'")) `
+    "85.17: renderSkillBooks() delegates to _renderReadTracker with itemClass: 'spine' (shelf variant)"
 
-# 85.19  Collapse persistence is wired in the shared _renderReadTracker helper, and renderSkillBooks delegates to it (WU-B8).
-Check ($helperBody85.Contains('querySelectorAll') -and ($helperBody85 -match "addEventListener\s*\(\s*'toggle'") -and ($renderSBBody85 -match '_renderReadTracker\s*\(')) "_renderReadTracker wires 'toggle' collapse persistence, and renderSkillBooks delegates to it"
+# 85.18  The shared helper's row is a single <button class="tracker-row tracker-toggle ...">
+Check (($helperBody85 -match 'tracker-row tracker-toggle') -and $helperBody85.Contains('<button class=')) `
+    '85.18: _renderReadTracker rows are a single <button class="tracker-row tracker-toggle ...">'
+
+# 85.19  The shared helper calls opts.toggleFn on click and opts.meta(d) for the sub-label
+Check (($helperBody85 -match 'onclick="\$\{opts\.toggleFn\}') -and ($helperBody85 -match 'opts\.meta\(d\)')) `
+    "85.19: _renderReadTracker wires onclick to opts.toggleFn and renders opts.meta(d)"
 
 # 85.20  Old static skillBooksSubPanel removed from index.html (Protocol 20 regression guard)
 Check (-not ($idxSrc85 -match 'id="skillBooksSubPanel"')) 'index.html: old static skillBooksSubPanel removed -- READ/UNREAD sub-panels are dynamic (Protocol 20)'
 
-# 85.21  The shared helper splits by read.includes / !read.includes, and renderSkillBooks delegates to it (WU-B8).
-Check ($helperBody85.Contains('read.includes(d.name)') -and ($helperBody85 -match '!read\.includes') -and ($renderSBBody85 -match '_renderReadTracker\s*\(')) "_renderReadTracker splits by read.includes(d.name)/!read.includes for READ/UNREAD, and renderSkillBooks delegates to it"
+# 85.21  #skillBooksDisplay carries class="shelf"
+Check ([bool]($idxSrc85 -match 'id="skillBooksDisplay"\s+class="shelf"')) 'index.html: #skillBooksDisplay carries class="shelf"'
 
-# 85.22  "NO BOOKS READ" empty state present in renderSkillBooks source
-Check ($renderSBBody85.Contains('NO BOOKS READ')) "renderSkillBooks() has 'NO BOOKS READ' empty state for empty READ list"
+# 85.22  "NO SKILL BOOKS IN THE REGISTRY" empty state present in renderSkillBooks source
+Check ($renderSBBody85.Contains('NO SKILL BOOKS IN THE REGISTRY')) "renderSkillBooks() has an empty-board state for a registry with zero skillBooks"
 
-# 85.23  "ALL BOOKS READ" empty state present in renderSkillBooks source
-Check ($renderSBBody85.Contains('ALL BOOKS READ')) "renderSkillBooks() has 'ALL BOOKS READ' empty state for empty UNREAD list"
-
-# -- WU-B8 consolidation guards (QA-DUP-1) --
-# 85.24  Shared _renderReadTracker(opts) helper is defined in ui-render.js.
-Check ([bool]($uiRenderSrc85 -match 'function _renderReadTracker\s*\(')) "85.24: shared _renderReadTracker(opts) helper is defined in ui-render.js (WU-B8 dedup)"
-
-# 85.25  BOTH read-trackers delegate to the shared helper (single source of row logic).
-Check (($renderSBBody85 -match '_renderReadTracker\s*\(') -and ($renderMagBody85 -match '_renderReadTracker\s*\(')) "85.25: renderSkillBooks AND renderMagazines both delegate to _renderReadTracker (no duplicated render logic)"
-
-# 85.26  The shared helper carries the full row/sub-panel contract in one place.
-Check ($helperBody85.Contains('tracker-row') -and ($helperBody85 -match 'class="sub-panel" data-sub-id="\$\{opts\.subIdRead\}') -and ($helperBody85 -match 'class="sub-panel" data-sub-id="\$\{opts\.subIdUnread\}') -and $helperBody85.Contains('tracker-toggle') -and ($helperBody85 -match 'opts\.meta\(d\)')) "85.26: _renderReadTracker carries the shared contract -- .tracker-row, READ/UNREAD sub-panels (data-sub-id), .tracker-toggle, opts.meta(d)"
-
-# -- Skill Matrix nesting guards (owner report -- SKILL BOOKS/SKILL MAGAZINES
-#    re-homed as sub-panels inside SKILL MATRIX, Protocol UI-1/UI-2) --
+# -- Skill Matrix promotion guards (Phase 3 OPERATOR batch 3 -- SKILL BOOKS
+#    is no longer nested inside SKILL MATRIX; it is its own top-level board, BUS-05a) --
 $skillMatrixStart85 = $idxSrc85.IndexOf('> SKILL MATRIX')
-$skillMatrixEnd85 = $idxSrc85.IndexOf('<!-- 5. QUEST LOG -->', $skillMatrixStart85)
+$skillMatrixEnd85 = $idxSrc85.IndexOf('<!-- BUS-05a', $skillMatrixStart85)
 $skillMatrixBlock85 = if ($skillMatrixStart85 -ge 0 -and $skillMatrixEnd85 -ge 0) { $idxSrc85.Substring($skillMatrixStart85, $skillMatrixEnd85 - $skillMatrixStart85) } else { '' }
 
-# 85.27  #skillBooksPanel is a <details class="sub-panel"> with data-sub-id, nested inside SKILL MATRIX
-Check (($skillMatrixBlock85 -match '(?s)<details[^>]*class="sub-panel"[^>]*id="skillBooksPanel"[^>]*data-sub-id="skill_matrix_books"') -or ($skillMatrixBlock85 -match '(?s)<details[^>]*id="skillBooksPanel"[^>]*class="sub-panel"[^>]*data-sub-id="skill_matrix_books"')) `
-    "85.27: index.html #skillBooksPanel is a <details class=`"sub-panel`" data-sub-id=`"skill_matrix_books`"> nested inside SKILL MATRIX"
+# 85.23  #skillBooksPanel is a TOP-LEVEL <details class="panel bay-board" data-tab="stat"> -- no longer nested inside SKILL MATRIX
+Check ((-not ($skillMatrixBlock85 -match 'skillBooksPanel')) -and ($idxSrc85 -match [regex]::Escape('<details class="panel bay-board" data-tab="stat" id="skillBooksPanel">'))) `
+    '85.23: #skillBooksPanel is a top-level <details class="panel bay-board" data-tab="stat">, not nested inside SKILL MATRIX'
 
-# 85.28  SKILL BOOKS heading is now <h3> (sub-panel heading), no longer a top-level <h2> panel
-Check (($skillMatrixBlock85 -match '<h3>&gt; SKILL BOOKS</h3>') -and (-not ($idxSrc85 -match '<h2>>\s*SKILL BOOKS'))) `
-    "85.28: SKILL BOOKS heading is a nested <h3> sub-panel heading, not a standalone top-level <h2> panel"
+# 85.24  SKILL BOOKS heading is a real top-level <h2> carrying the BUS-05a slot tag.
+$skillBooksIdx85 = $idxSrc85.IndexOf('id="skillBooksPanel"')
+$skillBooksTail85 = if ($skillBooksIdx85 -ge 0) { $idxSrc85.Substring($skillBooksIdx85) } else { '' }
+Check (($skillBooksTail85 -match '(?s)SKILL BOOKS.{0,100}</h2>') -and ($idxSrc85 -match 'class="bay-slot-tag">BUS-05a<')) `
+    '85.24: SKILL BOOKS heading is a top-level <h2> board, carrying the BUS-05a slot tag'
 
-# 85.29  #skillBooksPanel carries no data-tab of its own -- it is not a top-level tab-gated panel anymore
-Check (-not ($idxSrc85 -match '(?s)<details[^>]*id="skillBooksPanel"[^>]*data-tab')) `
-    "85.29: #skillBooksPanel has no data-tab attribute -- it is nested inside SKILL MATRIX, not its own tab-gated panel"
+# -- WU-B8 consolidation guards (QA-DUP-1), reskinned for the shelf/rack contract --
+# 85.25  Shared _renderReadTracker(opts) helper is defined in ui-render.js.
+Check ([bool]($uiRenderSrc85 -match 'function _renderReadTracker\s*\(')) "85.25: shared _renderReadTracker(opts) helper is defined in ui-render.js (WU-B8 dedup)"
 
-# 85.30  _updatePanelBadges()/expandPanelForCategory() query '.panel h2, .sub-panel h3' and expandPanelForCategory opens #skillBooksPanel
+# 85.26  BOTH read-trackers delegate to the shared helper (single source of row logic).
+Check (($renderSBBody85 -match '_renderReadTracker\s*\(') -and ($renderMagBody85 -match '_renderReadTracker\s*\(')) "85.26: renderSkillBooks AND renderMagazines both delegate to _renderReadTracker (no duplicated render logic)"
+
+# 85.27  _updatePanelBadges()/expandPanelForCategory() reference the renamed '> PERK LOADOUT'
+#        heading, and no longer special-case skillBooks/magazines as nested sub-panels.
 $badgesBody85 = ''
 try { $badgesBody85 = Get-FunctionBody $uiCoreSrc85 '_updatePanelBadges' } catch {}
 $expandBody85 = ''
 try { $expandBody85 = Get-FunctionBody $uiCoreSrc85 'expandPanelForCategory' } catch {}
-Check (($badgesBody85 -match '\.panel h2,\s*\.sub-panel h3') -and ($expandBody85 -match '\.panel h2,\s*\.sub-panel h3') -and ($expandBody85 -match "getElementById\('skillBooksPanel'\)")) `
-    "85.30: _updatePanelBadges()/expandPanelForCategory() query '.panel h2, .sub-panel h3' and expandPanelForCategory opens #skillBooksPanel for the 'skillBooks' category"
+Check (($badgesBody85 -match "'> PERK LOADOUT'") -and ($expandBody85 -match "'> PERK LOADOUT'") -and (-not ($expandBody85 -match "getElementById\('skillBooksPanel'\)"))) `
+    "85.27: _updatePanelBadges()/expandPanelForCategory() reference '> PERK LOADOUT', and expandPanelForCategory no longer special-cases #skillBooksPanel as a nested sub-panel"
 
 
 # ===========================================================
@@ -5594,7 +5595,8 @@ Check (($idxSrc86 -match 'id="opticsColorInput"') -and ($idxSrc86 -match 'class=
     "index.html retires the standalone OPTICS: label in favor of the Module Bay tube rack (#opticsColorInput.tube-rack)"
 
 # ===========================================================
-# Suite 87 -- NV Skill Magazines tracker (FNV-only, Protocol 4) (29 tests)
+# Suite 87 -- NV Skill Magazines tracker (FNV-only, Protocol 4)
+# Phase 3 OPERATOR batch 3: periodical-rack reskin guards (BUS-05b). (24 tests)
 # ===========================================================
 Sep "Suite 87 -- NV Skill Magazines tracker (FNV-only, Protocol 4)"
 
@@ -5671,20 +5673,22 @@ try { $helperBody87 = Get-FunctionBody $uiRenderSrc87 '_renderReadTracker' } cat
 # 87.16  renderMagazines() defined
 Check ($rmStart87 -ge 0) "renderMagazines() is defined in js/ui-render.js"
 
-# 87.17  references magazines_read sub-panel
-Check ([bool]($renderMagBody87 -match 'magazines_read')) "renderMagazines() references 'magazines_read' sub-panel data-sub-id"
+# 87.17  renderMagazines() delegates to _renderReadTracker with itemClass: 'mag', gated by hasMagazines
+Check (($renderMagBody87 -match '_renderReadTracker\s*\(') -and ($renderMagBody87 -match "itemClass:\s*'mag'") -and ($renderMagBody87 -match 'hasMagazines')) `
+    "87.17: renderMagazines() delegates to _renderReadTracker with itemClass: 'mag' (rack variant), gated by hasMagazines"
 
-# 87.18  references magazines_unread sub-panel
-Check ([bool]($renderMagBody87 -match 'magazines_unread')) "renderMagazines() references 'magazines_unread' sub-panel data-sub-id"
+# 87.18  #magazinesDisplay carries class="mag-rack"
+Check ([bool]($idxSrc87 -match 'id="magazinesDisplay"\s+class="mag-rack"')) 'index.html: #magazinesDisplay carries class="mag-rack"'
 
-# 87.19  toggle persistence is wired in the shared _renderReadTracker helper, and renderMagazines delegates to it (WU-B8).
-Check (($helperBody87 -match 'querySelectorAll') -and ($helperBody87 -match "addEventListener\s*\(\s*'toggle'") -and ($renderMagBody87 -match '_renderReadTracker\s*\(')) "_renderReadTracker wires toggle persistence, and renderMagazines delegates to it"
+# 87.19  The shared helper's row is a single <button class="tracker-row tracker-toggle ...">
+Check (($helperBody87 -match 'tracker-row tracker-toggle') -and $helperBody87.Contains('<button class=')) `
+    '87.19: _renderReadTracker rows are a single <button class="tracker-row tracker-toggle ...">'
 
-# 87.20  NO MAGAZINES READ empty state
-Check ([bool]($renderMagBody87 -match 'NO MAGAZINES READ')) "renderMagazines() has 'NO MAGAZINES READ' empty state"
+# 87.20  "NO SKILL MAGAZINES IN THE REGISTRY" empty state present in renderMagazines source
+Check ([bool]($renderMagBody87 -match 'NO SKILL MAGAZINES IN THE REGISTRY')) "renderMagazines() has an empty-board state for a registry with zero magazines"
 
-# 87.21  ALL MAGAZINES READ empty state
-Check ([bool]($renderMagBody87 -match 'ALL MAGAZINES READ')) "renderMagazines() has 'ALL MAGAZINES READ' empty state"
+# 87.21  the 'mag' variant marks the consumed (done) state with the 'consumed' modifier
+Check ([bool]($renderMagBody87 -match "doneModifier:\s*'consumed'")) "87.21: renderMagazines() marks the consumed state with doneModifier: 'consumed'"
 
 # 87.22  toggleMagazine() defined
 Check ([bool]($uiRenderSrc87 -match 'function toggleMagazine\(')) "toggleMagazine() is defined in js/ui-render.js"
@@ -5702,32 +5706,31 @@ Check ([bool]($idxSrc87 -match 'id="magazinesDisplay"')) "index.html has #magazi
 $sdBody87 = (Get-DirectiveFullBody $apiSrc87) + "`n" + $stateSrc87
 Check (($sdBody87 -match 'magazines') -and ($sdBody87 -match 'FNV')) "getSystemDirective() references magazines in FNV-only context (Protocol 4 AI contract)"
 
-# -- Skill Matrix nesting guards (owner report -- SKILL MAGAZINES re-homed as
-#    a sub-panel inside SKILL MATRIX, Protocol UI-1/UI-2) --
+# -- Skill Matrix promotion guards (Phase 3 OPERATOR batch 3 -- SKILL
+#    MAGAZINES is no longer nested inside SKILL MATRIX; it is its own
+#    top-level board, BUS-05b) --
 $skillMatrixStart87 = $idxSrc87.IndexOf('> SKILL MATRIX')
-$skillMatrixEnd87 = $idxSrc87.IndexOf('<!-- 5. QUEST LOG -->', $skillMatrixStart87)
+$skillMatrixEnd87 = $idxSrc87.IndexOf('<!-- BUS-05a', $skillMatrixStart87)
 $skillMatrixBlock87 = if ($skillMatrixStart87 -ge 0 -and $skillMatrixEnd87 -ge 0) { $idxSrc87.Substring($skillMatrixStart87, $skillMatrixEnd87 - $skillMatrixStart87) } else { '' }
 
-# 87.26  #magazinesPanel is a <details class="sub-panel"> with data-sub-id, nested inside SKILL MATRIX
-Check (($skillMatrixBlock87 -match '(?s)<details[^>]*class="sub-panel"[^>]*id="magazinesPanel"[^>]*data-sub-id="skill_matrix_magazines"') -or ($skillMatrixBlock87 -match '(?s)<details[\s\S]{0,80}id="magazinesPanel"[\s\S]{0,120}data-sub-id="skill_matrix_magazines"[\s\S]{0,120}class="sub-panel"')) `
-    "87.26: index.html #magazinesPanel is a <details class=`"sub-panel`" data-sub-id=`"skill_matrix_magazines`"> nested inside SKILL MATRIX"
+# 87.26  #magazinesPanel is a TOP-LEVEL <details class="panel bay-board" data-tab="stat"> -- no longer nested inside SKILL MATRIX
+Check ((-not ($skillMatrixBlock87 -match 'magazinesPanel')) -and ($idxSrc87 -match [regex]::Escape('<details class="panel bay-board" data-tab="stat" id="magazinesPanel">'))) `
+    '87.26: index.html #magazinesPanel is a top-level <details class="panel bay-board" data-tab="stat">, not nested inside SKILL MATRIX'
 
-# 87.27  SKILL MAGAZINES heading is now <h3> (sub-panel heading), no longer a top-level <h2> panel
-Check (($skillMatrixBlock87 -match '<h3>&gt; SKILL MAGAZINES</h3>') -and (-not ($idxSrc87 -match '<h2>>\s*SKILL MAGAZINES'))) `
-    "87.27: SKILL MAGAZINES heading is a nested <h3> sub-panel heading, not a standalone top-level <h2> panel"
-
-# 87.28  #magazinesPanel carries no data-tab of its own -- it is not a top-level tab-gated panel anymore
+# 87.27  SKILL MAGAZINES heading is a real top-level <h2> carrying the BUS-05b slot tag.
 $magPanelIdx87 = $idxSrc87.IndexOf('id="magazinesPanel"')
-$magPanelChunk87 = if ($magPanelIdx87 -ge 0) { $idxSrc87.Substring(0, [Math]::Min($magPanelIdx87 + 300, $idxSrc87.Length)) } else { '' }
-Check (-not ($magPanelChunk87 -match '(?s)<details[^>]*id="magazinesPanel"[^>]*data-tab')) `
-    "87.28: #magazinesPanel has no data-tab attribute -- it is nested inside SKILL MATRIX, not its own tab-gated panel"
+$magPanelTail87 = if ($magPanelIdx87 -ge 0) { $idxSrc87.Substring($magPanelIdx87) } else { '' }
+Check (($magPanelTail87 -match '(?s)SKILL MAGAZINES.{0,60}</h2>') -and ($idxSrc87 -match 'class="bay-slot-tag">BUS-05b<')) `
+    '87.27: SKILL MAGAZINES heading is a top-level <h2> board, carrying the BUS-05b slot tag'
 
-# 87.29  expandPanelForCategory() opens the #magazinesPanel sub-panel for the 'magazines' category
+# 87.28  expandPanelForCategory() no longer special-cases #magazinesPanel as a
+#        nested sub-panel -- the generic top-level details.open handling
+#        already reveals it (Phase 3 OPERATOR batch 3 promotion).
 $uiCoreSrc87b = Read-Src "js/ui-core.js"
 $expandBody87 = ''
 try { $expandBody87 = Get-FunctionBody $uiCoreSrc87b 'expandPanelForCategory' } catch {}
-Check ([bool]($expandBody87 -match "getElementById\('magazinesPanel'\)")) `
-    "87.29: expandPanelForCategory() opens #magazinesPanel for the 'magazines' category (nested sub-panel reveal)"
+Check ((-not ($expandBody87 -match "getElementById\('magazinesPanel'\)")) -and ($expandBody87 -match "'> SKILL MAGAZINES'")) `
+    "87.28: expandPanelForCategory() no longer special-cases #magazinesPanel as a nested sub-panel -- reveals it via the generic top-level board match on '> SKILL MAGAZINES'"
 
 # ===========================================================
 # Suite 88 -- GATE-UI: UI consistency structural guards (8 tests)
@@ -15665,9 +15668,13 @@ Check ($missingHandlers181.Count -eq 0) `
 Check (($uiCore181 -match 'function renderSkills\(\)') -and ($uiRender181 -match 'function renderFactionRep\(\)') -and ($uiRender181 -match 'function renderKarmaCenter\(\)')) `
     '181.3: renderSkills()/renderFactionRep()/renderKarmaCenter() are all still defined under their original names -- renderKarmaCenter() stays light-frame-only, while renderSkills()/renderFactionRep() were ground-up reskinned at Suite 185b (their own templates changed, but every id/handler the plan requires is still emitted -- see Suite 185b)'
 
-# 181.4  all 9 OPERATOR boards are <details class="panel bay-board"> with a BUS-0N tag
-$boardTitles181 = @('VITAL TELEMETRY','S.P.E.C.I.A.L. TUNING','CHRONO / POSITION FIX','SKELETAL HARNESS','SKILL MATRIX','PERKS','STATUS EFFECTS','FACTION STANDING','KARMA CENTER')
-$busTags181 = @('BUS-01','BUS-02','BUS-04','BUS-03','BUS-05','BUS-06','BUS-07','BUS-08','BUS-09')
+# 181.4  all 11 OPERATOR boards are <details class="panel bay-board"> with a BUS-0N tag
+# Phase 3 OPERATOR batch 3 renamed 3 board titles (CHRONO/POSITION FIX ->
+# POSITION & MISSION CLOCK, PERKS -> PERK LOADOUT, KARMA CENTER -> KARMA
+# ALIGNMENT) and promoted SKILL BOOKS/SKILL MAGAZINES to their own top-level
+# boards (BUS-05a/BUS-05b) -- 9 boards became 11.
+$boardTitles181 = @('VITAL TELEMETRY','S.P.E.C.I.A.L. TUNING','POSITION &amp; MISSION CLOCK','SKELETAL HARNESS','SKILL MATRIX','SKILL BOOKS — REFERENCE SHELF','SKILL MAGAZINES — PERIODICAL RACK','PERK LOADOUT','STATUS EFFECTS','FACTION STANDING','KARMA ALIGNMENT')
+$busTags181 = @('BUS-01','BUS-02','BUS-04','BUS-03','BUS-05','BUS-05a','BUS-05b','BUS-06','BUS-07','BUS-08','BUS-09')
 # Prettier is free to wrap a long <h2> (id attribute + multi-word title) onto several
 # indented lines, so a multi-word title matches with \s+ between words instead of a
 # literal space (Protocol 42 -- caught live by npm run format wrapping the 4 hero boards).
@@ -15683,9 +15690,9 @@ foreach ($b in $busTags181) {
     if ($html181 -notmatch ('class="bay-slot-tag">' + $b + '<')) { $boardsOk181 = $false }
 }
 Check $boardsOk181 `
-    '181.4: all 9 OPERATOR boards are <details class="panel bay-board"> and carry their BUS-0N slot tag (reuses the existing Module Bay board-frame class, Protocol 22)'
+    '181.4: all 11 OPERATOR boards are <details class="panel bay-board"> and carry their BUS-0N slot tag (reuses the existing Module Bay board-frame class, Protocol 22)'
 
-# 181.5  Protocol UI-1 -- all 9 OPERATOR board h2 headings keep the ">" glyph
+# 181.5  Protocol UI-1 -- all 11 OPERATOR board h2 headings keep the ">" glyph
 $opH2Ok181 = $true
 foreach ($t in $boardTitles181) {
     # .NET Regex.Escape also escapes plain whitespace (e.g. "VITAL TELEMETRY" -> "VITAL\ TELEMETRY"),
@@ -15698,7 +15705,7 @@ foreach ($t in $boardTitles181) {
     if (-not $text.Trim().StartsWith('>')) { $opH2Ok181 = $false }
 }
 Check $opH2Ok181 `
-    '181.5: all 9 OPERATOR board <h2> headings still start with the mandatory "> " glyph (Protocol UI-1) despite the new <span class="board-led">'
+    '181.5: all 11 OPERATOR board <h2> headings still start with the mandatory "> " glyph (Protocol UI-1) despite the new <span class="board-led">'
 
 # 181.6  the SPECIAL fader steppers route through the existing commitStat(el)
 $bumpBody181 = Get-FunctionBody $uiCore181 '_bumpSpecialStat'
@@ -16720,6 +16727,131 @@ Check (
     ($faconKeysBtnRule186 -match 'min-height:\s*32px') -and
     ($stlampPurgeRule186 -match 'min-height:\s*28px')
 ) '186.18: .facon-chan (40px) / .facon-keys button (32px) / .stlamp-purge (28px) all clear the >=28px tap-target floor'
+
+# ===========================================================
+# Suite 187 -- Phase 3 OPERATOR batch 3: CHRONO/PERKS/BOOKS/MAGS/KARMA
+# ground-up reskin (the last five OPERATOR boards). BUS-04 flip-card mission
+# clock + position plate, BUS-06 numbered perk-loadout rack + scroll+search +
+# FNV trait chips, BUS-09 EVIL/GOOD swing-needle karma gauge (now a universal
+# board with a nested FO3-only KARMA CENTER appendix). id/handler-preservation
+# + game-agnostic + no-new-campaign-state + centering + reduced-motion
+# guards. Mirrors JS Suite 187. (20 tests)
+# ===========================================================
+Write-Host "`n-- Suite 187 -- Phase 3 OPERATOR batch 3: CHRONO/PERKS/BOOKS/MAGS/KARMA ground-up reskin $('-' * 5)"
+$core187 = Read-Src "js/ui-core.js"
+$render187 = Read-Src "js/ui-render.js"
+$css187 = Read-Src "css/terminal.css"
+$html187 = Read-Src "index.html"
+$perksBody187 = Get-FunctionBody $render187 'renderPerks'
+$karmaBody187 = Get-FunctionBody $core187 'updateKarmaUI'
+$contextPanelsBody187 = Get-FunctionBody $render187 '_updateContextPanels'
+$karmaCenterBody187 = Get-FunctionBody $render187 'renderKarmaCenter'
+
+# 187.1  BUS-04 CHRONO/POSITION keeps every editable id + handler
+$chronoNeedles187 = @('id="cal_month"','id="cal_day"','id="cal_year"','id="time_hour"','id="time_min"','id="time_day"','id="stat_ticks"','id="stat_loc"','id="locationOptions"','id="gameDateDisplay"','id="gameTimeDisplay"','onTimeInputChanged()','onLocationChange()')
+$chronoOk187 = $true
+foreach ($n in $chronoNeedles187) { if (-not $html187.Contains($n)) { $chronoOk187 = $false } }
+Check ($chronoOk187 -and ($html187 -match 'class="chrono-wrap"')) `
+    '187.1: BUS-04 flip-card/position-plate reskin keeps every editable chrono/location id and handler'
+
+# 187.2  renderPerks() renders numbered loadout slots (.slot-row) and reads #perkSearch
+Check (($perksBody187 -match 'slot-row') -and ($perksBody187 -match "getElementById\('perkSearch'\)")) `
+    '187.2: renderPerks() renders .slot-row loadout slots and reads #perkSearch'
+
+# 187.3  #perksList reuses the .tray-scrollwrap/.tray-list CARGO MANIFEST scroll region
+Check (($html187 -match 'class="tray-scrollwrap"') -and ($html187 -match 'class="tray-list slot-list" id="perksList"')) `
+    '187.3: #perksList reuses the .tray-scrollwrap/.tray-list CARGO MANIFEST scroll region'
+
+# 187.4  the perk-form ids and addPerk() onclick are unchanged
+Check (($html187 -match 'id="newPerkName"') -and ($html187 -match 'id="newPerkRank"') -and ($html187 -match 'id="newPerkLevel"') -and ($html187 -match 'onclick="addPerk\(\)"')) `
+    '187.4: the perk-form ids (newPerkName/newPerkRank/newPerkLevel) and addPerk() onclick are unchanged'
+
+# 187.5  renderPerks() only pads dashed VACANT rows when no search filter is active
+Check (($perksBody187 -match 'vacantCount\s*=\s*q\s*\?\s*0\s*:') -and ($perksBody187 -match 'vacant')) `
+    '187.5: renderPerks() only pads dashed VACANT rows when no search filter is active'
+
+# 187.6  #traitsDisplay carries class="trait-chips" (CSS-only chip reskin)
+Check (($html187 -match 'id="traitsDisplay" class="trait-chips"') -and ($css187 -match '\.trait-chips \.tracker-row')) `
+    '187.6: #traitsDisplay carries class="trait-chips" and the chip look is CSS-only over the unchanged tracker-row/tracker-toggle markup'
+
+# 187.7  #karmaPanel has no hardcoded display:none (universal board); only #karmaCenterBlock starts hidden
+Check ((-not ($html187 -match 'id="karmaPanel"\s+style="display:\s*none"')) -and ($html187 -match 'id="karmaCenterBlock"\s+style="display:\s*none"')) `
+    '187.7: #karmaPanel has no hardcoded display:none (universal board); only #karmaCenterBlock starts hidden (FO3-only appendix)'
+
+# 187.8  _updateContextPanels() no longer references karmaPanel
+Check (-not ($contextPanelsBody187 -match 'karmaPanel')) `
+    '187.8: _updateContextPanels() no longer references karmaPanel -- it is a universal board, not per-game-hidden'
+
+# 187.9  renderKarmaCenter() toggles #karmaCenterBlock display per usesKarmaCenter
+Check (($karmaCenterBody187 -match 'karmaCenterBlock') -and ($karmaCenterBody187 -match 'usesKarmaCenter')) `
+    '187.9: renderKarmaCenter() toggles #karmaCenterBlock display per usesKarmaCenter'
+
+# 187.10  #stat_karma/#karma_label are kept as the one real karma control, wired to updateKarmaUI()
+$statKarmaCount187 = ([regex]::Matches($html187, 'id="stat_karma"')).Count
+Check (($html187 -match 'id="stat_karma"') -and ($html187 -match 'id="karma_label"') -and ($html187 -match 'updateKarmaUI\(\);') -and ($statKarmaCount187 -eq 1)) `
+    '187.10: #stat_karma/#karma_label are kept as the one real karma control, wired to updateKarmaUI()'
+
+# 187.11  updateKarmaUI() drives the needle/tier-lamps/value readout via the unchanged _KARMA_TIERS breakpoints
+Check (($karmaBody187 -match "getElementById\('karmaNeedle'\)") -and ($karmaBody187 -match "getElementById\('karmaTierLamps'\)") -and ($karmaBody187 -match "getElementById\('karmaValReadout'\)") -and ($karmaBody187 -match '_KARMA_TIERS')) `
+    '187.11: updateKarmaUI() drives the needle/tier-lamps/value readout via the unchanged _KARMA_TIERS breakpoints'
+
+# 187.12  the karma tier breakpoints are unchanged from the pre-reskin logic
+Check (($core187 -match 'k\s*<=\s*-750') -and ($core187 -match 'k\s*<=\s*-250') -and ($core187 -match 'k\s*<\s*250') -and ($core187 -match 'k\s*<\s*750')) `
+    '187.12: the karma tier breakpoints (<=-750/<=-250/<250/<750) are unchanged from the pre-reskin logic'
+
+# 187.13  BUS-05a/05b/06/09 all carry their slot tag and a live 0i .panel-substatus line
+$tagsOk187 = $true
+foreach ($tag in @('BUS-05a','BUS-05b','BUS-06','BUS-09')) { if ($html187 -notmatch ('class="bay-slot-tag">' + $tag + '<')) { $tagsOk187 = $false } }
+Check ($tagsOk187 -and ($html187 -match 'id="opBooksStatus"') -and ($html187 -match 'id="opMagsStatus"') -and ($html187 -match 'id="opPerksStatus"') -and ($html187 -match 'id="opKarmaStatus"')) `
+    '187.13: BUS-05a/05b/06/09 all carry their slot tag and a live 0i .panel-substatus line'
+
+# 187.14  _syncOperatorTelemetry() populates the BUS-05a/05b/09 0i status lines, magazines gated by hasMagazines
+$telemetryBody187 = Get-FunctionBody $core187 '_syncOperatorTelemetry'
+Check (($telemetryBody187 -match 'opBooksStatus') -and ($telemetryBody187 -match 'opMagsStatus') -and ($telemetryBody187 -match 'hasMagazines') -and ($telemetryBody187 -match 'opKarmaStatus')) `
+    '187.14: _syncOperatorTelemetry() populates the BUS-05a/05b/09 0i status lines, magazines gated by hasMagazines'
+
+# 187.15  no new campaign-state field was introduced for this reskin
+Check (-not (($render187 + $core187) -match 'state\.(perkRack|karmaNeedleValue|chronoFlip|bookShelf)')) `
+    '187.15: no new campaign-state field was introduced (perks/traits/books/mags/karma are pre-existing fields)'
+
+# 187.16  .pk-x (28px), .spine (96px), and .mag (66px) all clear the Protocol 17 tap-target floor
+$cssStripped187 = $css187 -replace '(?s)/\*.*?\*/', ''
+$pkXRule187 = ([regex]::Match($cssStripped187, '\.slot-row \.pk-x\s*\{[^}]*\}')).Value
+$spineRule187 = ([regex]::Match($cssStripped187, '(?m)^button\.spine\s*\{[^}]*\}')).Value
+$magRule187 = ([regex]::Match($cssStripped187, '(?m)^button\.mag\s*\{[^}]*\}')).Value
+Check (($pkXRule187 -match 'min-height:\s*28px') -and ($spineRule187 -match 'min-height:\s*96px') -and ($magRule187 -match 'min-height:\s*66px')) `
+    '187.16: .pk-x (28px), .spine (96px), and .mag (66px) all clear the Protocol 17 tap-target floor'
+
+# 187.17  .shelf/.mag-rack/.trait-chips/.chrono-wrap all center an incomplete last row
+Check (
+    ($cssStripped187 -match '(?s)\.shelf\s*\{[^}]*justify-content:\s*center') -and
+    ($cssStripped187 -match '(?s)\.mag-rack\s*\{[^}]*justify-content:\s*center') -and
+    ($cssStripped187 -match '(?s)\.trait-chips\s*\{[^}]*justify-content:\s*center') -and
+    ($cssStripped187 -match '(?s)\.chrono-wrap\s*\{[^}]*justify-content:\s*center')
+) '187.17: .shelf/.mag-rack/.trait-chips/.chrono-wrap all center an incomplete last row (justify-content:center)'
+
+# 187.18  the colon blink / position-fix pulse / needle rotation are plain animation/transition
+$posDotRule187 = ([regex]::Match($cssStripped187, '\.pos-dot\s*\{[^}]*\}')).Value
+$knNeedleRule187 = ([regex]::Match($cssStripped187, '\.kn-needle\s*\{[^}]*\}')).Value
+Check (($cssStripped187 -match '@keyframes\s+chronoColonBlink') -and ($posDotRule187 -match 'animation:\s*bayLedPulse') -and ($knNeedleRule187 -match 'transition:\s*transform')) `
+    '187.18: the colon blink / position-fix pulse / needle rotation are plain animation/transition, auto-neutralised by the global reduced-motion block'
+
+# 187.19  no hardcoded FNV/FO3 ctx literal in the new render/update code (Protocol 38)
+Check (-not (($perksBody187 + $karmaBody187 + $karmaCenterBody187) -match "ctx\s*===\s*'FNV'|ctx\s*===\s*'FO3'")) `
+    "187.19: renderPerks()/updateKarmaUI()/renderKarmaCenter() carry no hardcoded FNV/FO3 ctx literal (Protocol 38)"
+
+# 187.20  SKILL BOOKS/SKILL MAGAZINES/PERK LOADOUT/KARMA ALIGNMENT headings all start with the mandatory "> " glyph
+# Prettier is free to wrap a long <h2> title across lines (the same tolerance
+# Suite 181.4/181.5 already build in) -- words are joined with \s+ instead of
+# a literal space.
+$titles187 = @('SKILL BOOKS — REFERENCE SHELF','SKILL MAGAZINES — PERIODICAL RACK','PERK LOADOUT','KARMA ALIGNMENT')
+$titlesOk187 = $true
+foreach ($t in $titles187) {
+    $escaped = (($t -split ' ') | ForEach-Object { [regex]::Escape($_) }) -join '\s+'
+    if (-not [System.Text.RegularExpressions.Regex]::IsMatch($html187, '(?s)<h2>[\s\S]{0,20}?&gt;[\s\S]{0,80}?' + $escaped)) { $titlesOk187 = $false }
+}
+Check $titlesOk187 `
+    '187.20: SKILL BOOKS/SKILL MAGAZINES/PERK LOADOUT/KARMA ALIGNMENT headings all start with the mandatory "> " glyph'
 
 # ===========================================================
 # Results

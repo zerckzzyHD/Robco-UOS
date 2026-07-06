@@ -561,25 +561,9 @@
                 <i aria-hidden="true"></i><span id="radAwayAlertText"></span>
               </div>
 
-              <div class="op-light-row">
-                <label>KARMA:</label>
-                <div style="display: flex; align-items: center; gap: 5px; flex: 1">
-                  <input
-                    type="range"
-                    id="stat_karma"
-                    min="-1000"
-                    max="1000"
-                    value="0"
-                    oninput="
-                      updateKarmaUI();
-                      updateMath();
-                    "
-                  />
-                  <span id="karma_label" style="font-size: 11px; width: 65px; text-align: right"
-                    >Neutral</span
-                  >
-                </div>
-              </div>
+              <!-- KARMA (stat_karma/karma_label) relocated to BUS-09 · KARMA
+                   ALIGNMENT below (Phase 3 OPERATOR batch 3) — same ids/handlers,
+                   new DOM location (Protocol 22, the #c_caps/BUS-10 precedent). -->
               <div class="op-light-row" style="align-items: flex-start">
                 <label style="padding-top: 1px">EQUIPPED:</label>
                 <div id="equippedDisplay" style="font-size: 11px; flex: 1">
@@ -878,118 +862,128 @@
               </div>
             </details>
 
-            <!-- BUS-04 · CHRONO / POSITION FIX (light-frame only this pass) -->
+            <!-- BUS-04 · POSITION & MISSION CLOCK (Phase 3 OPERATOR batch 3 —
+                 ground-up reskin: flip-card date tiles + an LCD 24h mission
+                 clock + a position-fix plate around the location field. EVERY
+                 field stays editable — same ids/handlers, Protocol 22.) -->
             <details class="panel bay-board" data-tab="stat">
               <summary>
                 <h2>
-                  &gt; <span class="board-led" aria-hidden="true"></span> CHRONO / POSITION FIX
+                  &gt; <span class="board-led" aria-hidden="true"></span> POSITION &amp; MISSION
+                  CLOCK
                 </h2>
                 <span class="panel-substatus" id="opChronoStatus">&mdash;</span>
               </summary>
               <span class="bay-slot-tag">BUS-04</span>
-              <span class="bay-part-no">PN RBC-CHR-02 &middot; POSITION FIX + MISSION CLOCK</span>
-
-              <div class="input-group">
-                <label>LOCATION:</label>
-                <input
-                  type="text"
-                  id="stat_loc"
-                  value="Mojave"
-                  maxlength="100"
-                  oninput="updateMath()"
-                  onchange="onLocationChange()"
-                  style="width: 100px"
-                  list="locationOptions"
-                />
-                <datalist id="locationOptions"></datalist>
-              </div>
-              <div class="input-group">
-                <label>DATE:</label>
-                <div style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap">
-                  <input
-                    type="number"
-                    id="cal_month"
-                    value="10"
-                    min="1"
-                    max="12"
-                    style="width: 42px"
-                    title="Month (1-12)"
-                    oninput="onTimeInputChanged()"
-                  />
-                  <span style="font-size: 11px; opacity: 0.5">/</span>
-                  <input
-                    type="number"
-                    id="cal_day"
-                    value="19"
-                    min="1"
-                    max="31"
-                    style="width: 42px"
-                    title="Day (1-31)"
-                    oninput="onTimeInputChanged()"
-                  />
-                  <span style="font-size: 11px; opacity: 0.5">/</span>
-                  <input
-                    type="number"
-                    id="cal_year"
-                    value="2281"
-                    min="2270"
-                    style="width: 60px"
-                    title="Year"
-                    oninput="onTimeInputChanged()"
-                  />
-                </div>
-              </div>
-              <div class="input-group">
-                <label>TIME:</label>
-                <div style="display: flex; align-items: center; gap: 5px; flex-wrap: wrap">
-                  <span style="font-size: 11px; opacity: 0.7">H</span>
-                  <input
-                    type="number"
-                    id="time_hour"
-                    value="0"
-                    min="0"
-                    max="23"
-                    style="width: 32px"
-                    oninput="onTimeInputChanged()"
-                  />
-                  <span style="font-size: 11px; opacity: 0.7">M</span>
-                  <input
-                    type="number"
-                    id="time_min"
-                    value="0"
-                    min="0"
-                    max="59"
-                    step="6"
-                    style="width: 32px"
-                    oninput="onTimeInputChanged()"
-                  />
-                </div>
-                <input type="hidden" id="time_day" value="1" />
-                <input type="hidden" id="stat_ticks" value="0" />
-              </div>
-              <div class="input-group">
-                <label>DATE:</label
-                ><span
-                  id="gameDateDisplay"
-                  style="font-size: 11px; opacity: 0.85; letter-spacing: 0.5px"
-                  >—</span
-                >
-              </div>
-              <div
-                class="input-group"
-                style="flex-direction: column; align-items: flex-start; gap: 1px"
+              <span class="bay-part-no"
+                >PN RBC-CHR-04 &middot; MISSION CLOCK + POSITION FIX — EVERY FIELD STAYS EDITABLE
+                <span class="real-label"
+                  >(cal_month/day/year &middot; time_hour/min &middot; stat_loc + AUTOCOMPLETE
+                  &middot; onTimeInputChanged / onLocationChange)</span
+                ></span
               >
-                <label style="margin-bottom: 1px">IN-GAME TIME:</label>
-                <span
-                  id="gameTimeDisplay"
-                  style="
-                    font-size: 10px;
-                    opacity: 0.8;
-                    letter-spacing: 0.3px;
-                    color: var(--robco-green);
-                  "
-                  >—</span
-                >
+
+              <div class="chrono-wrap">
+                <div class="chrono-unit">
+                  <span class="cu-cap"
+                    >MISSION DATE <span class="real-label">(EDITABLE)</span></span
+                  >
+                  <div class="flip-row">
+                    <span class="flip f-mm"
+                      ><input
+                        type="number"
+                        id="cal_month"
+                        value="10"
+                        min="1"
+                        max="12"
+                        title="Month (1-12)"
+                        oninput="onTimeInputChanged()"
+                        aria-label="Month"
+                      /><span class="f-cap">MM</span></span
+                    >
+                    <span class="flip f-dd"
+                      ><input
+                        type="number"
+                        id="cal_day"
+                        value="19"
+                        min="1"
+                        max="31"
+                        title="Day (1-31)"
+                        oninput="onTimeInputChanged()"
+                        aria-label="Day"
+                      /><span class="f-cap">DD</span></span
+                    >
+                    <span class="flip f-yy"
+                      ><input
+                        type="number"
+                        id="cal_year"
+                        value="2281"
+                        min="2270"
+                        title="Year"
+                        oninput="onTimeInputChanged()"
+                        aria-label="Year"
+                      /><span class="f-cap">YYYY</span></span
+                    >
+                  </div>
+                  <div class="chrono-readout">&#9656; <span id="gameDateDisplay">—</span></div>
+                </div>
+                <div class="chrono-unit">
+                  <span class="cu-cap"
+                    >MISSION CLOCK <span class="real-label">(EDITABLE &middot; 24H)</span></span
+                  >
+                  <div class="flip-row">
+                    <span class="flip f-hh"
+                      ><input
+                        type="number"
+                        id="time_hour"
+                        value="0"
+                        min="0"
+                        max="23"
+                        oninput="onTimeInputChanged()"
+                        aria-label="Hour"
+                      /><span class="f-cap">HH</span></span
+                    >
+                    <span class="colon" aria-hidden="true">:</span>
+                    <span class="flip f-mi"
+                      ><input
+                        type="number"
+                        id="time_min"
+                        value="0"
+                        min="0"
+                        max="59"
+                        step="6"
+                        oninput="onTimeInputChanged()"
+                        aria-label="Minute"
+                      /><span class="f-cap">MM</span></span
+                    >
+                  </div>
+                  <input type="hidden" id="time_day" value="1" />
+                  <input type="hidden" id="stat_ticks" value="0" />
+                  <div class="chrono-readout">&#9656; <span id="gameTimeDisplay">—</span></div>
+                </div>
+                <div class="chrono-unit chrono-unit--pos">
+                  <span class="cu-cap"
+                    >POSITION FIX
+                    <span class="real-label">(LOCATION — REGISTRY AUTOCOMPLETE KEPT)</span></span
+                  >
+                  <div class="pos-plate">
+                    <span class="pos-dot" aria-hidden="true"></span>
+                    <input
+                      type="text"
+                      id="stat_loc"
+                      value="Mojave"
+                      maxlength="100"
+                      oninput="updateMath()"
+                      onchange="onLocationChange()"
+                      list="locationOptions"
+                      aria-label="Current location"
+                    />
+                    <datalist id="locationOptions"></datalist>
+                    <div class="pos-last">
+                      &#9656; POSITION RECORDED TO THE WORLD GRID ON CHANGE
+                    </div>
+                  </div>
+                </div>
               </div>
             </details>
 
@@ -1555,27 +1549,56 @@
               <span class="bay-slot-tag">BUS-05</span>
               <span class="bay-part-no">PN RBC-SKL-09 &middot; SKILL VU ARRAY</span>
               <div class="skills-grid" id="skillsGrid"></div>
+            </details>
 
-              <!-- SKILL BOOKS TRACKER (nested sub-panel, Protocol UI-1/UI-2) -->
-              <details class="sub-panel" id="skillBooksPanel" data-sub-id="skill_matrix_books">
-                <summary>
-                  <h3>&gt; SKILL BOOKS</h3>
-                </summary>
-                <div id="skillBooksDisplay"></div>
-              </details>
-
-              <!-- SKILL MAGAZINES TRACKER (FNV only — hidden on FO3 by renderMagazines()) -->
-              <details
-                class="sub-panel"
-                id="magazinesPanel"
-                data-sub-id="skill_matrix_magazines"
-                style="display: none"
+            <!-- BUS-05a · SKILL BOOKS — reference shelf (Phase 3 OPERATOR
+                 batch 3 — ground-up reskin, promoted from a SKILL MATRIX
+                 sub-panel to its own board: one vertical spine per volume,
+                 read = upright/lit/ribbon, unread = leaning/dashed/dim.
+                 renderSkillBooks() toggles kept; ids unchanged, Protocol 22.) -->
+            <details class="panel bay-board" data-tab="stat" id="skillBooksPanel">
+              <summary>
+                <h2>
+                  &gt; <span class="board-led" aria-hidden="true"></span> SKILL BOOKS — REFERENCE
+                  SHELF
+                </h2>
+                <span class="panel-substatus" id="opBooksStatus">&mdash;</span>
+              </summary>
+              <span class="bay-slot-tag">BUS-05a</span>
+              <span class="bay-part-no"
+                >PN RBC-LIB-05a &middot; ONE SPINE PER VOLUME — TAP TO SHELVE (READ) / UNSHELVE
+                <span class="real-label"
+                  >(SKILL BOOKS — renderSkillBooks TOGGLES &middot; REGISTRY-DRIVEN)</span
+                ></span
               >
-                <summary>
-                  <h3>&gt; SKILL MAGAZINES</h3>
-                </summary>
-                <div id="magazinesDisplay"></div>
-              </details>
+              <div id="skillBooksDisplay" class="shelf"></div>
+              <div class="shelf-note">
+                seated upright + ribbon = read &middot; leaning dashed = unread
+              </div>
+            </details>
+
+            <!-- BUS-05b · SKILL MAGAZINES — periodical rack (FNV only —
+                 hidden on FO3 by renderMagazines() per hasMagazines) -->
+            <details class="panel bay-board" data-tab="stat" id="magazinesPanel">
+              <summary>
+                <h2>
+                  &gt; <span class="board-led" aria-hidden="true"></span> SKILL MAGAZINES —
+                  PERIODICAL RACK
+                </h2>
+                <span class="panel-substatus" id="opMagsStatus">&mdash;</span>
+              </summary>
+              <span class="bay-slot-tag">BUS-05b</span>
+              <span class="bay-part-no"
+                >PN RBC-LIB-05b &middot; DOG-EARED COVERS — TAP TO MARK CONSUMED
+                <span class="real-label"
+                  >(MAGAZINES — renderMagazines TOGGLES &middot; SHOWN PER hasMagazines)</span
+                ></span
+              >
+              <div id="magazinesDisplay" class="mag-rack"></div>
+              <div class="mag-note">
+                amber = the temporary +10 boost family &middot; consumed issues go matte with a
+                CONSUMED stamp
+              </div>
             </details>
 
             <!-- 5. QUEST LOG -->
@@ -1628,47 +1651,74 @@
             </details>
 
             <!-- 6. PERKS -->
-            <!-- BUS-06 · PERK LOADOUT (light-frame only this pass) -->
+            <!-- BUS-06 · PERK LOADOUT (Phase 3 OPERATOR batch 3 — ground-up
+                 reskin: numbered loadout slots (SLOT 01…, dashed VACANT rows),
+                 a bounded in-panel scroll region + search over the socketed
+                 list (reusing the CARGO MANIFEST drawer scroll+search pattern,
+                 Protocol 22 — there are 90+ perks in the registry), and FNV
+                 traits as amber "FACTORY-BURNED" chips. Every id/handler kept:
+                 perksList + newPerkName/newPerkRank/newPerkLevel → addPerk;
+                 traitsSection/traitFilter/traitsDisplay + renderTraits.) -->
             <details class="panel bay-board" data-tab="stat">
               <summary>
-                <h2>&gt; <span class="board-led" aria-hidden="true"></span> PERKS</h2>
+                <h2>&gt; <span class="board-led" aria-hidden="true"></span> PERK LOADOUT</h2>
                 <span class="panel-substatus" id="opPerksStatus">&mdash;</span>
               </summary>
               <span class="bay-slot-tag">BUS-06</span>
-              <span class="bay-part-no">PN RBC-PRK-06 &middot; PERK LOADOUT</span>
-              <div id="perksList">
-                <span class="empty-state">NO PERKS ON FILE</span>
-              </div>
-              <div
-                class="panel-form"
-                style="border-top: 1px dashed var(--robco-green); padding-top: 8px"
+              <span class="bay-part-no"
+                >PN RBC-PRK-06 &middot; NUMBERED LOADOUT SLOTS
+                <span class="real-label"
+                  >(PERKS — perksList &middot; newPerkName/Rank/Level &rarr; addPerk &middot; TRAITS
+                  FNV-ONLY PER hasTraits)</span
+                ></span
               >
+
+              <div class="tray-head">
+                <span class="t-title">SOCKETED SLOTS</span>
                 <input
+                  type="search"
+                  id="perkSearch"
+                  placeholder="⌕ FILTER PERK LOADOUT (OPTIONAL)…"
+                  aria-label="Filter the perk loadout"
+                  maxlength="60"
+                  oninput="renderPerks()"
+                />
+              </div>
+              <div class="tray-scrollwrap">
+                <div class="tray-list slot-list" id="perksList">
+                  <span class="empty-state">NO PERKS ON FILE</span>
+                </div>
+              </div>
+
+              <div class="perk-form">
+                <input
+                  class="p-name"
                   type="text"
                   id="newPerkName"
-                  placeholder="PERK"
+                  placeholder="PERK NAME…"
                   maxlength="80"
-                  style="flex: 1; min-width: 100px"
+                  aria-label="New perk name"
                 />
                 <input
+                  class="p-rank"
                   type="number"
                   id="newPerkRank"
                   placeholder="RANK"
                   min="1"
                   max="5"
-                  style="width: 58px"
+                  aria-label="Perk rank"
                 />
                 <input
+                  class="p-lvl"
                   type="number"
                   id="newPerkLevel"
                   placeholder="LVL"
                   min="0"
-                  style="width: 46px"
+                  aria-label="Perk level requirement"
                 />
+                <button class="action-btn keybtn" onclick="addPerk()">▸ SOCKET PERK CARD</button>
               </div>
-              <button class="action-btn" onclick="addPerk()" style="margin-top: 4px">
-                + ADD PERK
-              </button>
+
               <!-- Traits subsection (FNV only — shown/hidden by renderTraits(), collapsible sub-panel) -->
               <details
                 class="sub-panel"
@@ -1677,17 +1727,21 @@
                 style="display: none"
               >
                 <summary>
-                  <h3>&gt; TRAITS</h3>
+                  <h3>&gt; FACTORY-BURNED TRAITS</h3>
                 </summary>
+                <span class="rack-note"
+                  >SET AT ASSEMBLY
+                  <span class="real-label">(TRAITS &middot; traitFilter kept)</span></span
+                >
                 <input
                   type="text"
                   id="traitFilter"
-                  placeholder="FILTER TRAITS…"
+                  placeholder="⌕ FILTER TRAIT REGISTRY…"
                   maxlength="80"
                   oninput="renderTraits()"
-                  style="width: 100%; box-sizing: border-box; margin-bottom: 4px; font-size: 16px"
+                  style="width: 100%; box-sizing: border-box; margin: 6px 0; font-size: 16px"
                 />
-                <div id="traitsDisplay"></div>
+                <div id="traitsDisplay" class="trait-chips"></div>
               </details>
             </details>
 
@@ -1783,16 +1837,66 @@
               <div id="factionContainer"></div>
             </details>
 
-            <!-- 9b. KARMA CENTER (FO3 — G4) — BUS-09 · KARMA ALIGNMENT (light-frame only this pass) -->
-            <details class="panel bay-board" data-tab="stat" id="karmaPanel" style="display: none">
+            <!-- 9b. KARMA ALIGNMENT — BUS-09 (Phase 3 OPERATOR batch 3 —
+                 ground-up reskin: EVIL ◂▸ GOOD swing-needle gauge. Relocated
+                 stat_karma/karma_label here from BUS-01 VITAL TELEMETRY
+                 (Protocol 22, the #c_caps/BUS-10 precedent) — now a UNIVERSAL
+                 board (every game tracks karma); only the nested FO3 KARMA
+                 CENTER appendix is conditional per usesKarmaCenter. -->
+            <details class="panel bay-board" data-tab="stat" id="karmaPanel">
               <summary>
-                <h2>&gt; <span class="board-led" aria-hidden="true"></span> KARMA CENTER</h2>
-                <span class="panel-substatus" id="opKarmaCenterStatus">&mdash;</span>
+                <h2>&gt; <span class="board-led" aria-hidden="true"></span> KARMA ALIGNMENT</h2>
+                <span class="panel-substatus" id="opKarmaStatus">&mdash;</span>
               </summary>
               <span class="bay-slot-tag">BUS-09</span>
-              <span class="bay-part-no">PN RBC-KRM-11 &middot; KARMA ALIGNMENT</span>
-              <div id="karmaCenterDisplay">
-                <span style="opacity: 0.4">[FO3 MODE REQUIRED]</span>
+              <span class="bay-part-no"
+                >PN RBC-KRM-11 &middot; MORAL DRIFT INSTRUMENT
+                <span class="real-label"
+                  >(KARMA — stat_karma SLIDER KEPT + updateKarmaUI &middot; FO3 KARMA CENTER PER
+                  usesKarmaCenter)</span
+                ></span
+              >
+
+              <div class="kn-wrap">
+                <div>
+                  <div class="kn-face">
+                    <span class="kn-detent" aria-hidden="true"></span>
+                    <div class="kn-needle" id="karmaNeedle"></div>
+                  </div>
+                  <div class="kn-ends">
+                    <span>&#9668; EVIL</span><span>NEUTRAL</span><span>GOOD &#9658;</span>
+                  </div>
+                </div>
+                <div class="kn-side">
+                  <div class="k-standing" id="karma_label">Neutral</div>
+                  <div class="k-val" id="karmaValReadout">KARMA 0 OF &plusmn;1000</div>
+                  <div class="tier-lamps" id="karmaTierLamps"></div>
+                  <div class="k-slider">
+                    <input
+                      type="range"
+                      id="stat_karma"
+                      min="-1000"
+                      max="1000"
+                      value="0"
+                      oninput="
+                        updateKarmaUI();
+                        updateMath();
+                      "
+                      aria-label="Karma value"
+                    />
+                    <span class="ks-cap">THE SHIPPED stat_karma SLIDER — STILL THE CONTROL</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="karma-center" id="karmaCenterBlock" style="display: none">
+                <div class="kc-title">
+                  &#9656; KARMA CENTER — VAULT LEGEND INDEX
+                  <span class="real-label">(FO3 — karmaCenterDisplay)</span>
+                </div>
+                <div id="karmaCenterDisplay">
+                  <span style="opacity: 0.4">[FO3 MODE REQUIRED]</span>
+                </div>
               </div>
             </details>
 
