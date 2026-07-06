@@ -69,8 +69,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2432-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2432-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2451-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2451-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -1258,10 +1258,29 @@ also renders `.sq-card` roster cards (HP bar, HP/AMMO/CND/WPN/DT row, an affinit
 unchanged `adjustAffinity(idx, ±5)` nudge buttons) instead of inline-styled `<div>`s — same handlers,
 restyled markup.
 
-**BUS-15 CURIO ARCHIVE** (ex-COLLECTIBLES) — a wrapper-only dress; `renderCollectibles()`'s
-`.tracker-row`/`.tracker-toggle` contract (Suite 88) and `renderLincolnMemorabilia()`'s FO3-only
-nesting are untouched. `renderCollectibles()` additionally writes the board's own `.panel-substatus`
-(`#opsCurioStatus`) and part-number text (game-specific `collectibleLabel`).
+**BUS-15 CURIO ARCHIVE** (ex-COLLECTIBLES) — originally a wrapper-only dress; superseded by the
+Suite 191 themed-object ground-up redesign (Protocol 25 owner-approved exception, mockup
+`planning/mockups/curio-display-case.html`). Every collectible now renders as its recognizable
+Fallout object — NV snow globes as a glass dome + skyline scene on a brass-trimmed base, FO3
+bobbleheads as a Vault-Boy figure on a VAULT-TEC base (a plain `@keyframes curioBob` bobble,
+auto-neutralised by the global reduced-motion block), FO3 Lincoln relics as per-item typed
+artifacts (rifle/hat/cylinder/figure/poster/book/coin) — via a new `_curioObjectIconHtml(kind)`
+helper (`ui-render.js`) dispatched on a data-driven token: `GAME_DEFS[ctx].collectibleCategory`
+(`'snowglobe'`/`'bobblehead'`) for the uniform per-game collectible type, and a new per-item
+`shape` field on every `reg_fo3.js` `lincolnMemorabilia` entry for the non-uniform Lincoln relics
+— never a JS ctx branch (Protocol 38). A persisted CASE (sealed vitrine) ⟷ SHELF (open plank, the
+BUS-05a skill-books DNA) view toggle — `setCurioView()`/`_applyCurioView()`, a new `robco_curio_view`
+MetaStore device pref (Protocol UI-6) mirroring the Module Bay's `robco_bay_view` — flips a
+`[data-curio-view]` attribute on `#curioPanel`; both views render from the exact same
+`renderCollectibles()`/`renderLincolnMemorabilia()` markup (CSS-only skins), and
+`renderCollectibles()` re-syncs the view from MetaStore on every call so the two variants can
+never drift. `renderCollectibles()`'s `.tracker-row`/`.tracker-toggle` contract (Suite 88) and
+`renderLincolnMemorabilia()`'s FO3-only nesting, disposition `<select>`, and `.panel-substatus`
+(`#opsCurioStatus`) + part-number text (game-specific `collectibleLabel`) are all unchanged —
+every curio button carries `tracker-row`/`tracker-toggle`/`tracker-toggle--active`/`--inactive`
+alongside its new `curio-obj` reskin class, the same dual-class pattern `button.spine`/`button.mag`
+already established. The display surface (`.curio-caselist`) is a bounded, phosphor-scrollbar,
+edge-faded scroll region (max-height 430px) — no infinite scroll. Zero new campaign-state field.
 
 Every board carries a live `.panel-substatus` 0i collapsed-summary line (the same standard every
 other bay-board in the app follows) — `opsBridgeStatus`/`opsManifestStatus` (painted by the bridge
@@ -2481,7 +2500,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2432-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2451-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

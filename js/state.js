@@ -80,6 +80,10 @@ const META_MANIFEST = {
   // Phase 3 · Piece 3 — DATABANK BUS-17 DIRECTIVE REGISTRY: which status
   // drawer (all/active/complete/failed) was last open (Protocol UI-6).
   robco_databank_qdrawer: { type: 'string', default: 'all', owner: 'ui-render.js' },
+  // BUS-15 CURIO ARCHIVE redesign: which display style (CASE vitrine / SHELF
+  // open planks) the technician last chose (Protocol UI-6, everything
+  // remembers on reload) — mirrors the Module Bay's robco_bay_view pattern.
+  robco_curio_view: { type: 'string', default: 'case', owner: 'ui-render.js' },
 };
 // Fire-and-forget write-through of a device-pref op to IndexedDB's 'meta' store
 // (Step 2 · Phase 1 · P1). The ONLY seam through which MetaStore touches IdbStore
@@ -999,6 +1003,11 @@ const GAME_DEFS = {
     combatSkills: ['guns', 'energy_weapons', 'explosives', 'melee_weapons', 'unarmed'],
     usesKarmaCenter: false,
     collectibleLabel: 'SNOW GLOBES',
+    // Curio Archive object-class token (Protocol 38): drives which themed CSS
+    // object _curioObjectIconHtml() builds for every collectible — never a JS
+    // ctx branch. A game's collectibles are ALWAYS one uniform object type, so
+    // this lives at the game level (like collectibleLabel), not per-item.
+    collectibleCategory: 'snowglobe',
     hasTraits: true,
     hasMagazines: true,
     // U9-5: FNV has a [WEAPON_MODS.CSV] table (db_nv.js) and weapon-mod items are
@@ -1203,6 +1212,7 @@ Update state.magazines when the Courier reads a skill magazine. Include only nam
     ],
     usesKarmaCenter: true,
     collectibleLabel: 'BOBBLEHEADS',
+    collectibleCategory: 'bobblehead',
     tracksLincoln: true,
     hasWeaponMods: false,
     seedInventory: [],
@@ -1306,6 +1316,7 @@ Update state.lincolnItems when the Courier acquires or sells any Lincoln artifac
     combatSkills: [],
     usesKarmaCenter: false,
     collectibleLabel: 'BOBBLEHEADS', // FO4 keeps bobbleheads — placeholder pending 3.0 design
+    collectibleCategory: 'bobblehead',
     hasWeaponMods: true, // FO4's deep weapon-crafting system — placeholder pending 3.0 design
     seedInventory: [],
     // Placeholder — Fallout 4 begins 2287-10-23 (fallout.wiki); epochWeekday is UNVERIFIED

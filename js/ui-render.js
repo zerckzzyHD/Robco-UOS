@@ -1014,12 +1014,69 @@ function renderEquipped() {
     : '<span style="opacity:0.4;">Nothing equipped</span>';
 }
 
-// ── COLLECTIBLES PANEL ────────────────────────────────────────────
+// ── CURIO ARCHIVE (BUS-15 COLLECTIBLES) ─────────────────────────────
+// Owner-approved themed-object redesign (Protocol 25): every collectible
+// renders as its recognizable Fallout object instead of a plain [ACQUIRED]/
+// [MISSING] text row. Object CLASS is category-driven (Protocol 38) — never
+// a JS ctx branch: GAME_DEFS[ctx].collectibleCategory picks the uniform
+// object every collectible in that game renders as (snowglobe/bobblehead);
+// each Lincoln relic carries its OWN registry `shape` field instead, since
+// (unlike collectibles) Lincoln relics are not one uniform object type.
+//
+// The persisted CASE <-> SHELF view toggle (setCurioView/_applyCurioView,
+// robco_curio_view MetaStore pref) is CSS-only — it flips a [data-curio-view]
+// attribute on #curioPanel and both render functions below emit the SAME
+// markup regardless of which view is active. One render path, two skins;
+// the two views can never drift out of sync with each other.
+function _curioObjectIconHtml(kind) {
+  if (kind === 'bobblehead') {
+    return '<span class="curio-bob" aria-hidden="true"><span class="cb-head"></span><span class="cb-body"></span><span class="cb-base"></span></span>';
+  }
+  if (typeof kind === 'string' && kind.indexOf('lincoln-') === 0) {
+    const shape = kind.slice(8).replace(/[^a-z]/gi, '') || 'book';
+    return `<span class="curio-linc curio-linc--${shape}" aria-hidden="true"><i></i></span>`;
+  }
+  // Default/fallback: snowglobe (also what a future game with no authored
+  // collectibleCategory degrades to — a safe generic, never a thrown error).
+  return '<span class="curio-globe" aria-hidden="true"><span class="cg-dome"></span><span class="cg-base"></span></span>';
+}
+
+// Persists + applies the CASE/SHELF display choice (Protocol UI-6 — mirrors
+// the Module Bay's toggleBaySchematic()/_applyBayView() pattern exactly).
+function setCurioView(view) {
+  const v = view === 'shelf' ? 'shelf' : 'case';
+  MetaStore.set('robco_curio_view', v);
+  _applyCurioView(v);
+}
+window.setCurioView = setCurioView;
+
+function _applyCurioView(view) {
+  const v = view === 'shelf' ? 'shelf' : 'case';
+  const panel = document.getElementById('curioPanel');
+  if (panel) panel.dataset.curioView = v;
+  const caseBtn = document.getElementById('curioViewCaseBtn');
+  const shelfBtn = document.getElementById('curioViewShelfBtn');
+  if (caseBtn) {
+    caseBtn.classList.toggle('active', v === 'case');
+    caseBtn.setAttribute('aria-pressed', v === 'case' ? 'true' : 'false');
+  }
+  if (shelfBtn) {
+    shelfBtn.classList.toggle('active', v === 'shelf');
+    shelfBtn.setAttribute('aria-pressed', v === 'shelf' ? 'true' : 'false');
+  }
+}
+window._applyCurioView = _applyCurioView;
+
 // Reads FALLOUT_REGISTRY.collectibles (game-specific list) and state.collectibles
-// (flat array of collected item names). Renders terminal-style [ACQUIRED]/[MISSING] list.
+// (flat array of collected item names). Renders the themed curio grid.
 function renderCollectibles() {
   const container = document.getElementById('collectiblesDisplay');
   if (!container) return;
+
+  // Re-sync the view toggle on every render (cheap, idempotent) — the same
+  // self-healing choke point renderModuleBay() uses for its own view prefs,
+  // so the CASE/SHELF choice can never drift from MetaStore.
+  _applyCurioView(MetaStore.get('robco_curio_view') === 'shelf' ? 'shelf' : 'case');
 
   const defs =
     typeof FALLOUT_REGISTRY !== 'undefined' && FALLOUT_REGISTRY.collectibles
@@ -1036,6 +1093,7 @@ function renderCollectibles() {
   }
 
   const typeLabel = _activeDef().collectibleLabel;
+  const category = _activeDef().collectibleCategory || 'snowglobe';
 
   // Update sub-panel summary label with game-specific type and count
   const collectiblesH3 = document.querySelector('#collectiblesSubPanel > summary > h3');
@@ -1046,32 +1104,29 @@ function renderCollectibles() {
   const curioPn = document.querySelector('#curioPanel .bay-part-no');
   if (curioPn)
     curioPn.innerHTML = `PN RBC-FRT-15 &middot; DISPLAY CASE — ${escapeHtml(typeLabel)} <span class="real-label">(COLLECTIBLES — toggleCollectible unchanged)</span>`;
+  const plaque = document.getElementById('curioMainPlaque');
+  if (plaque) plaque.textContent = `◈ ${acquiredCount} OF ${total} ${typeLabel} ON DISPLAY`;
 
-  let html = '';
-
-  // Acquired items first
-  const acquiredDefs = defs.filter(d => acquired.has(d.name.toLowerCase()));
-  const missingDefs = defs.filter(d => !acquired.has(d.name.toLowerCase()));
-
-  acquiredDefs.forEach(d => {
-    const safeName = escapeHtml(d.name);
-    html += `<div class="tracker-row"><button class="tracker-toggle tracker-toggle--active" onclick="toggleCollectible('${safeName}')" aria-label="Mark ${safeName} missing">[ACQUIRED]</button> ${escapeHtml(d.name.toUpperCase())}</div>`;
-  });
-
-  if (acquiredDefs.length > 0 && missingDefs.length > 0) {
-    html +=
-      '<div style="border-top:1px dashed rgba(var(--robco-green-rgb),0.2);margin:4px 0;"></div>';
-  }
-
-  missingDefs.forEach(d => {
-    const safeName = escapeHtml(d.name);
-    const locHint = d.location
-      ? ` &mdash; <span class="tracker-meta">LOC: ${escapeHtml(d.location)}</span>`
-      : '';
-    html += `<div class="tracker-row" style="opacity:0.75;"><button class="tracker-toggle tracker-toggle--inactive" onclick="toggleCollectible('${safeName}')" aria-label="Mark ${safeName} acquired">[MISSING]</button> ${escapeHtml(d.name.toUpperCase())}${locHint}</div>`;
-  });
-
-  container.innerHTML = html;
+  const icon = _curioObjectIconHtml(category);
+  container.innerHTML = defs
+    .map(d => {
+      const isAcq = acquired.has(d.name.toLowerCase());
+      const safeAttr = escapeHtml(d.name);
+      const word = isAcq
+        ? 'acquired; tap to mark missing'
+        : 'missing; tap to mark acquired' +
+          (d.location ? ` — last known location ${escapeHtml(d.location)}` : '');
+      const cls =
+        'curio-obj tracker-row tracker-toggle ' +
+        (isAcq ? 'tracker-toggle--active' : 'tracker-toggle--inactive');
+      return (
+        `<div class="curio-cell"><button class="${cls}" data-name="${safeAttr}" ` +
+        `onclick="toggleCollectible(this.dataset.name)" aria-label="${escapeHtml(d.name)} — ${word}">` +
+        `${icon}<span class="c-plate">${escapeHtml(d.name.toUpperCase())}</span>` +
+        `<span class="c-chip">${isAcq ? '◈ ACQUIRED' : '◇ MISSING'}</span></button></div>`
+      );
+    })
+    .join('');
 }
 
 function toggleCollectible(name) {
@@ -1088,6 +1143,7 @@ function toggleCollectible(name) {
   renderSessionStats();
   updateMath();
 }
+
 function renderLincolnMemorabilia() {
   const subPanel = document.getElementById('lincolnSubPanel');
   const container = document.getElementById('lincolnMemorabiliaDisplay');
@@ -1107,7 +1163,7 @@ function renderLincolnMemorabilia() {
 
   // Update sub-panel summary label with current count
   const summaryH3 = subPanel?.querySelector('summary > h3');
-  if (summaryH3) summaryH3.textContent = `> LINCOLN MEMORABILIA [${foundCount}/9]`;
+  if (summaryH3) summaryH3.textContent = `> LINCOLN MEMORABILIA [${foundCount}/${defs.length}]`;
 
   const dispTally = { hannibal: 0, leroy: 0, washington: 0, undecided: 0 };
   defs.forEach(d => {
@@ -1118,48 +1174,51 @@ function renderLincolnMemorabilia() {
     else if (disp === 'found') dispTally.undecided++;
   });
 
-  let html = `<div style="font-size:10px;opacity:0.65;margin-bottom:2px;letter-spacing:0.5px;">`;
-  html += `HANNIBAL ${dispTally.hannibal} &middot; LEROY ${dispTally.leroy} &middot; WASHINGTON ${dispTally.washington} &middot; UNDECIDED ${dispTally.undecided}`;
-  html += `</div>`;
+  const tally = document.getElementById('lincolnTally');
+  if (tally)
+    tally.textContent = `HANNIBAL ${dispTally.hannibal} · LEROY ${dispTally.leroy} · WASHINGTON ${dispTally.washington} · UNDECIDED ${dispTally.undecided}`;
+  const plaque = document.getElementById('lincolnPlaque');
+  if (plaque) plaque.textContent = `◈ ${foundCount} OF ${defs.length} RELICS RECOVERED`;
 
-  defs.forEach(d => {
-    const safeName = escapeHtml(d.name);
-    const disp = items[d.name];
-    const isFound = !!disp;
-    if (isFound) {
-      html += `<div class="tracker-row">`;
-      html += `<button class="tracker-toggle tracker-toggle--active" data-lname="${safeName}" onclick="toggleLincolnItem(this.dataset.lname)" aria-label="Mark ${escapeHtml(d.name)} missing">[ACQUIRED]</button> `;
-      html += `${escapeHtml(d.name.toUpperCase())} `;
-      html += `<select data-lname="${safeName}" onchange="setLincolnDisposition(this.dataset.lname,this.value)" style="font-size:11px;background:transparent;color:inherit;border:1px solid var(--robco-green);min-height:28px;cursor:pointer;">`;
-      const opts = [
-        ['found', 'UNDECIDED'],
-        ['hannibal', 'HANNIBAL (FREE SLAVES)'],
-        ['leroy', 'LEROY WALKER (SLAVERS)'],
-        ['washington', 'WASHINGTON (MUSEUM)'],
-      ];
-      opts.forEach(([val, label]) => {
-        if (val !== 'leroy' || d.buyers.includes('leroy')) {
-          if (val !== 'hannibal' || d.buyers.includes('hannibal')) {
-            if (val !== 'washington' || d.buyers.includes('washington')) {
-              html += `<option value="${val}"${disp === val ? ' selected' : ''}>${label}</option>`;
-            }
-          }
-        }
-      });
-      html += `</select>`;
-      html += `</div>`;
-    } else {
-      const locHint = d.location
-        ? ` &mdash; <span class="tracker-meta">LOC: ${escapeHtml(d.location)}</span>`
-        : '';
-      html += `<div class="tracker-row" style="opacity:0.75;">`;
-      html += `<button class="tracker-toggle tracker-toggle--inactive" data-lname="${safeName}" onclick="toggleLincolnItem(this.dataset.lname)" aria-label="Mark ${escapeHtml(d.name)} acquired">[MISSING]</button> `;
-      html += `${escapeHtml(d.name.toUpperCase())}${locHint}`;
-      html += `</div>`;
-    }
-  });
+  const OPTS = [
+    ['found', 'UNDECIDED'],
+    ['hannibal', 'HANNIBAL (FREE SLAVES)'],
+    ['leroy', 'LEROY WALKER (SLAVERS)'],
+    ['washington', 'WASHINGTON (MUSEUM)'],
+  ];
 
-  container.innerHTML = html;
+  container.innerHTML = defs
+    .map(d => {
+      const safeName = escapeHtml(d.name);
+      const disp = items[d.name];
+      const isFound = !!disp;
+      const icon = _curioObjectIconHtml('lincoln-' + (d.shape || 'book'));
+      const word = isFound ? 'recovered; tap to mark missing' : 'missing; tap to mark recovered';
+      const cls =
+        'curio-obj tracker-row tracker-toggle ' +
+        (isFound ? 'tracker-toggle--active' : 'tracker-toggle--inactive');
+      let dispositionSelect = '';
+      if (isFound) {
+        const optsHtml = OPTS.filter(([val]) => val === 'found' || d.buyers.includes(val))
+          .map(
+            ([val, label]) =>
+              `<option value="${val}"${disp === val ? ' selected' : ''}>${label}</option>`
+          )
+          .join('');
+        dispositionSelect =
+          `<select class="curio-linc-disposition" data-lname="${safeName}" ` +
+          `onchange="setLincolnDisposition(this.dataset.lname,this.value)" ` +
+          `aria-label="${escapeHtml(d.name)} disposition">${optsHtml}</select>`;
+      }
+      return (
+        `<div class="curio-cell"><button class="${cls}" data-lname="${safeName}" ` +
+        `onclick="toggleLincolnItem(this.dataset.lname)" aria-label="${escapeHtml(d.name)} — ${word}">` +
+        `${icon}<span class="c-plate">${escapeHtml(d.name.toUpperCase())}</span>` +
+        `<span class="c-chip">${isFound ? '◈ RECOVERED' : '◇ MISSING'}</span></button>` +
+        `${dispositionSelect}</div>`
+      );
+    })
+    .join('');
 }
 
 function toggleLincolnItem(name) {

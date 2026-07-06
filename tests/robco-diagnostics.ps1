@@ -4526,12 +4526,20 @@ Check (-not ($htmlSrc71 -match '<details[^>]*id="lincolnSubPanel"[^>]*\sopen[\s>
 Check ([bool]($uiCoreSrc71 -match "JSON\.parse\s*\(\s*MetaStore\.get\s*\(\s*['""]robco_panel_state['""]\s*\)\s*\|\|\s*'\{\}'")) `
     "ui-core.js sub-panel persistence uses JSON.parse(... || '{}') fail-safe"
 
-# 71.16  Lincoln compact: margin-bottom:2px (not 4px) in renderLincolnMemorabilia
+# 71.16  Lincoln memorabilia disposition tally stays a compact one-line
+#        readout. Superseded by the Suite 191 CURIO ARCHIVE redesign
+#        (Protocol 25 owner-approved exception): the inline
+#        margin-bottom:2px style this test originally guarded was retired
+#        along with the old .tracker-row markup -- the tally now renders
+#        into the static #lincolnTally mount via the .curio-tally CSS
+#        class (compact spacing lives in CSS, not an inline style).
 $lincolnBody71 = ''
 $lincolnMatch71 = [regex]::Match($uiRenderSrc71, '(?s)function renderLincolnMemorabilia\s*\([^)]*\)\s*\{(.*?)\n\}')
 if ($lincolnMatch71.Success) { $lincolnBody71 = $lincolnMatch71.Groups[1].Value }
-Check ($lincolnBody71 -match 'margin-bottom:2px' -and $lincolnBody71 -notmatch 'margin-bottom:4px') `
-    'renderLincolnMemorabilia() uses margin-bottom:2px (compact one-line format) -- no 4px spacing'
+Check (
+    ($lincolnBody71 -match "getElementById\('lincolnTally'\)") -and
+    ($lincolnBody71 -notmatch 'margin-bottom:2px') -and ($lincolnBody71 -notmatch 'margin-bottom:4px')
+) "renderLincolnMemorabilia() writes the disposition tally into #lincolnTally (Suite 191's .curio-tally CSS class supplies the compact one-line spacing, not an inline margin-bottom style)"
 
 # 71.17  Faction lone-card centering: the old CSS Grid .faction-card layout
 # needed a bespoke :last-child:nth-child(odd) hack to center an incomplete
@@ -17407,6 +17415,182 @@ $faconMiniRule190 = [regex]::Match($cssStripped190, '\.facon-mini\s*\{[^\}]*\}')
 Check (
     ($faconMiniRule190 -match 'flex:\s*0 0 90px') -and (-not ($faconMiniRule190 -match 'flex:\s*1 1 60px'))
 ) "190.11: .facon-mini uses a fixed flex:0 0 90px (no grow/shrink) instead of the old flex:1 1 60px, so every faction row's pin-strip track renders the same width regardless of name/standing length"
+
+# ===========================================================
+# Suite 191 -- BUS-15 CURIO ARCHIVE themed-object redesign: collectibles
+# as their recognizable Fallout object (snow globe / bobblehead / typed
+# Lincoln relic), category-driven (Protocol 38), with a persisted CASE
+# <-> SHELF view toggle rendering from one shared path.
+# Mirrors JS Suite 191. 18 tests.
+# ===========================================================
+Sep "Suite 191 -- CURIO ARCHIVE themed-object redesign (CASE/SHELF toggle)"
+$state191 = Read-Src "js/state.js"
+$render191 = Read-Src "js/ui-render.js"
+$reg191 = Read-Src "js/reg_fo3.js"
+$html191 = Read-Src "index.html"
+$css191 = Read-Src "css/terminal.css"
+
+# 191.1  The pre-existing tracker-toggle contract is fully preserved --
+#        every function the mockup notes promise stays unchanged is
+#        still present, plus the new curio helpers.
+Check (
+    ($render191 -match 'function renderCollectibles\(') -and
+    ($render191 -match 'function toggleCollectible\(') -and
+    ($render191 -match 'function renderLincolnMemorabilia\(') -and
+    ($render191 -match 'function toggleLincolnItem\(') -and
+    ($render191 -match 'function setLincolnDisposition\(') -and
+    ($render191 -match 'function _curioObjectIconHtml\(') -and
+    ($render191 -match 'function setCurioView\(') -and
+    ($render191 -match 'function _applyCurioView\(')
+) '191.1: renderCollectibles/toggleCollectible/renderLincolnMemorabilia/toggleLincolnItem/setLincolnDisposition contract kept unchanged, plus the new _curioObjectIconHtml/setCurioView/_applyCurioView helpers'
+
+# 191.2  setCurioView/_applyCurioView are globally exposed for the
+#        index.html onclick handlers (mirrors toggleBaySchematic).
+Check (
+    ($render191 -match 'window\.setCurioView\s*=\s*setCurioView') -and
+    ($render191 -match 'window\._applyCurioView\s*=\s*_applyCurioView')
+) '191.2: setCurioView and _applyCurioView are both exposed on window for the CASE/SHELF button onclick handlers'
+
+# 191.3  robco_curio_view is a registered MetaStore device preference
+#        (Protocol UI-6/23 -- born-compliant, never a bare localStorage call).
+Check (
+    $state191 -match "robco_curio_view:\s*\{\s*type:\s*'string',\s*default:\s*'case',\s*owner:\s*'ui-render\.js'\s*\}"
+) "191.3: META_MANIFEST registers robco_curio_view as a string device pref defaulting to 'case', owned by ui-render.js"
+
+# 191.4  collectibleCategory is a data-driven Protocol-38 token on every
+#        GAME_DEFS entry (never a JS ctx branch in the consuming code).
+Check (
+    [System.Text.RegularExpressions.Regex]::IsMatch($state191, "FNV:\s*\{[\s\S]*?collectibleCategory:\s*'snowglobe'") -and
+    [System.Text.RegularExpressions.Regex]::IsMatch($state191, "FO3:\s*\{[\s\S]*?collectibleCategory:\s*'bobblehead'") -and
+    [System.Text.RegularExpressions.Regex]::IsMatch($state191, "FO4:\s*\{[\s\S]*?collectibleCategory:\s*'bobblehead'")
+) "191.4: GAME_DEFS.FNV/FO3/FO4 each declare collectibleCategory ('snowglobe'/'bobblehead'/'bobblehead') -- the Curio Archive object class is data, not a per-game code branch"
+
+# 191.5  _curioObjectIconHtml() itself carries no hardcoded game literal
+#        (Protocol 38) -- it dispatches purely on the `kind` string.
+$iconBody191 = Get-FunctionBody $render191 '_curioObjectIconHtml'
+Check (
+    (-not [System.Text.RegularExpressions.Regex]::IsMatch($iconBody191, "'FNV'|'FO3'|`"FNV`"|`"FO3`"")) -and
+    ($iconBody191 -match "kind === 'bobblehead'") -and
+    ($iconBody191 -match "kind\.indexOf\('lincoln-'\)")
+) '191.5: _curioObjectIconHtml() dispatches on the collectibleCategory/shape token only -- no hardcoded FNV/FO3 literal anywhere in the function body'
+
+# 191.6  reg_fo3.js: every one of the 9 Lincoln relics carries a `shape`
+#        field from the typed-artifact vocabulary, and the two literal
+#        sentinels the mockup names resolve correctly.
+$lincStart191 = $reg191.IndexOf('lincolnMemorabilia: [')
+$lincEnd191 = $reg191.IndexOf('// -- ZONES')
+if ($lincEnd191 -lt 0) { $lincEnd191 = $reg191.IndexOf('zones: [') }
+$lincBlock191 = $reg191.Substring($lincStart191, $lincEnd191 - $lincStart191)
+$shapeMatches191 = [System.Text.RegularExpressions.Regex]::Matches($lincBlock191, "shape:\s*'(\w+)'")
+$validShapes191 = @('rifle', 'hat', 'cylinder', 'figure', 'poster', 'book', 'coin')
+$allShapesValid191 = $true
+foreach ($m in $shapeMatches191) { if ($validShapes191 -notcontains $m.Groups[1].Value) { $allShapesValid191 = $false } }
+Check (
+    ($shapeMatches191.Count -eq 9) -and $allShapesValid191
+) '191.6: all 9 FO3 lincolnMemorabilia entries carry a shape field drawn from the typed-artifact vocabulary (rifle/hat/cylinder/figure/poster/book/coin)'
+
+$hatEntry191 = [System.Text.RegularExpressions.Regex]::Match($lincBlock191, "name:\s*`"Lincoln's Hat`"[\s\S]*?\n\s*\},").Value
+$repeaterEntry191 = [System.Text.RegularExpressions.Regex]::Match($lincBlock191, "name:\s*`"Lincoln's Repeater`"[\s\S]*?\n\s*\},").Value
+Check (
+    ($hatEntry191 -match "shape:\s*'hat'") -and ($repeaterEntry191 -match "shape:\s*'rifle'")
+) "191.7: `"Lincoln's Hat`" resolves to shape 'hat' and `"Lincoln's Repeater`" resolves to shape 'rifle'"
+
+# 191.8  index.html: the CASE/SHELF view toggle exists with both real
+#        <button> elements (Protocol UI-5), aria-pressed state, and
+#        literal aria-labels (Protocol UI-3).
+Check (
+    [System.Text.RegularExpressions.Regex]::IsMatch($html191, 'id="curioViewCaseBtn"[\s\S]{0,120}onclick="setCurioView\(''case''\)"[\s\S]{0,80}aria-label="Sealed Display Case view"[\s\S]{0,40}aria-pressed="true"') -and
+    [System.Text.RegularExpressions.Regex]::IsMatch($html191, 'id="curioViewShelfBtn"[\s\S]{0,120}onclick="setCurioView\(''shelf''\)"[\s\S]{0,80}aria-label="Open Collection Shelf view"[\s\S]{0,40}aria-pressed="false"')
+) '191.8: index.html has real <button> CASE/SHELF view-toggle controls with literal aria-labels and aria-pressed state'
+
+# 191.9  #curioPanel carries the default data-curio-view="case" attribute
+#        the CSS variant selectors key off.
+Check (
+    $html191 -match 'id="curioPanel"\s+data-curio-view="case"'
+) '191.9: #curioPanel declares the default data-curio-view="case" attribute the CASE/SHELF CSS variants select on'
+
+# 191.10  #collectiblesDisplay and #lincolnMemorabiliaDisplay are both
+#         nested inside the shared curio-display/scrollwrap/caselist/
+#         row-flex chrome (bounded scroll, Protocol 10/17).
+Check (
+    [System.Text.RegularExpressions.Regex]::IsMatch($html191, 'curio-display[\s\S]{0,40}id="curioDisplayWrap"[\s\S]{0,120}curio-scrollwrap[\s\S]{0,80}curio-caselist[\s\S]{0,80}curio-row-flex"\s+id="collectiblesDisplay"') -and
+    [System.Text.RegularExpressions.Regex]::IsMatch($html191, 'curio-display[\s\S]{0,40}id="lincolnDisplayWrap"[\s\S]{0,150}curio-caselist[\s\S]{0,80}curio-row-flex"\s+id="lincolnMemorabiliaDisplay"')
+) '191.10: #collectiblesDisplay and #lincolnMemorabiliaDisplay are both nested inside the shared .curio-display/.curio-scrollwrap/.curio-caselist/.curio-row-flex chrome'
+
+# 191.11  #curioMainPlaque / #lincolnTally / #lincolnPlaque mount points
+#         exist for the live count-plaque/tally text.
+Check (
+    ($html191 -match 'id="curioMainPlaque"') -and
+    ($html191 -match 'id="lincolnTally"') -and
+    ($html191 -match 'id="lincolnPlaque"')
+) '191.11: #curioMainPlaque, #lincolnTally, and #lincolnPlaque mount points exist for the live plaque/tally readouts'
+
+# 191.12  button.curio-obj carries the same specificity fix as
+#         button.spine/button.mag (Protocol 42) and the mockup's 88x112
+#         button footprint.
+$cssStripped191 = [regex]::Replace($css191, '/\*[\s\S]*?\*/', '')
+$curioObjRule191 = [regex]::Match($cssStripped191, 'button\.curio-obj\s*\{[^\}]*\}').Value
+Check (
+    ($curioObjRule191 -match 'width:\s*88px') -and
+    ($curioObjRule191 -match 'min-height:\s*112px') -and
+    (-not [System.Text.RegularExpressions.Regex]::IsMatch($cssStripped191, '(?m)^\s*\.curio-obj\s*\{'))
+) '191.12: button.curio-obj (element+class specificity, not plain .curio-obj) sets the 88x112px button footprint so it beats button.tracker-toggle'
+
+# 191.13  Both CASE and SHELF variant rules exist, scoped under
+#         #curioPanel[data-curio-view=...].
+Check (
+    ($css191 -match "#curioPanel\[data-curio-view='case'\]\s*\.curio-display") -and
+    ($css191 -match "#curioPanel\[data-curio-view='shelf'\]\s*\.curio-caselist")
+) "191.13: both #curioPanel[data-curio-view='case'] and #curioPanel[data-curio-view='shelf'] variant rules exist"
+
+# 191.14  The CASE latch plate reads the literal diamond glyph + " SEALED
+#         EXHIBIT" with the space intact -- a CSS \XXXX escape immediately
+#         followed by a literal space consumes that space as the escape's
+#         own delimiter, which is why the literal character is used
+#         instead (Protocol 39).
+Check (
+    ($css191.Contains("content: '$([char]0x25C8) SEALED EXHIBIT';")) -and (-not ($css191.Contains('\25C8')))
+) '191.14: the CASE latch plate content is the literal diamond character (not a \25C8 CSS escape, which would swallow the following space and render the words run together)'
+
+# 191.15  .curio-caselist is a bounded, scrolling, phosphor-scrollbar
+#         surface with an edge fade -- no infinite render, no page growth
+#         (Protocol 10/17, the same no-infinite-scroll answer as .tray-list).
+$cssStripped191b = [regex]::Replace($css191, '/\*[\s\S]*?\*/', '')
+$caselistRule191 = [regex]::Match($cssStripped191b, '\.curio-caselist\s*\{[^\}]*\}').Value
+Check (
+    ($caselistRule191 -match 'max-height:\s*430px') -and ($caselistRule191 -match 'overflow-y:\s*auto')
+) '191.15: .curio-caselist is bounded (max-height:430px) with overflow-y:auto -- every collectible reachable by scrolling, never an unbounded render'
+Check (
+    $css191 -match '\.curio-scrollwrap::after'
+) '191.15b: .curio-scrollwrap::after supplies the bottom edge-fade over the bounded scroll region'
+
+# 191.16  .curio-row-flex follows the centering rule (flex-wrap +
+#         justify-content:center), matching every other wrapped-row
+#         board in the app.
+$cssStripped191c = [regex]::Replace($css191, '/\*[\s\S]*?\*/', '')
+$rowFlexRule191 = [regex]::Match($cssStripped191c, '\.curio-row-flex\s*\{[^\}]*\}').Value
+Check (
+    ($rowFlexRule191 -match 'flex-wrap:\s*wrap') -and ($rowFlexRule191 -match 'justify-content:\s*center')
+) '191.16: .curio-row-flex wraps with justify-content:center (the centering rule) so a partial last row is never left-stranded'
+
+# 191.17  The bobblehead bobble is a plain @keyframes animation (never a
+#         bare transition), so the existing global prefers-reduced-motion
+#         block neutralises it automatically -- and the uncollected state
+#         stops the animation entirely (dashed silhouette, no bobble).
+Check (
+    ($css191 -match '@keyframes\s+curioBob\s*\{') -and
+    ($css191 -match 'animation:\s*curioBob\s') -and
+    [System.Text.RegularExpressions.Regex]::IsMatch($css191, 'tracker-toggle--inactive\s+\.cb-head\s*\{[^\}]*animation:\s*none')
+) '191.17: the bobblehead bobble is a plain @keyframes curioBob animation (auto-neutralised by the global reduced-motion block) and is turned off (animation:none) on the uncollected/dashed state'
+
+# 191.18  renderCollectibles() itself re-syncs the CASE/SHELF view from
+#         MetaStore on every call -- the one choke point that keeps the
+#         two visual variants from ever drifting out of sync (mirrors
+#         renderModuleBay()'s own self-healing re-sync pattern).
+$renderCollectiblesBody191 = Get-FunctionBody $render191 'renderCollectibles'
+Check (
+    $renderCollectiblesBody191 -match "_applyCurioView\(\s*MetaStore\.get\('robco_curio_view'\)"
+) "191.18: renderCollectibles() re-syncs the CASE/SHELF view from MetaStore.get('robco_curio_view') on every call, so the two view variants can never drift apart"
 
 # ===========================================================
 # Results

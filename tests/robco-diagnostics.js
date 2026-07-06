@@ -7787,15 +7787,22 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     "ui-core.js sub-panel persistence uses JSON.parse(...|| '{}') fail-safe"
   );
 
-  // 71.16  Lincoln memorabilia compact: margin-bottom:2px (not 4px) in renderLincolnMemorabilia
+  // 71.16  Lincoln memorabilia disposition tally stays a compact one-line
+  //        readout. Superseded by the Suite 191 CURIO ARCHIVE redesign
+  //        (Protocol 25 owner-approved exception): the inline
+  //        margin-bottom:2px style this test originally guarded was
+  //        retired along with the old .tracker-row markup — the tally now
+  //        renders into the static #lincolnTally mount via the .curio-tally
+  //        CSS class (compact spacing lives in CSS, not an inline style).
   {
     let lincolnBody71 = '';
     try {
       lincolnBody71 = extractFunctionBody(uiRenderSrc71, 'renderLincolnMemorabilia');
     } catch (_) {}
     assert(
-      /margin-bottom:2px/.test(lincolnBody71) && !/margin-bottom:4px/.test(lincolnBody71),
-      'renderLincolnMemorabilia() uses margin-bottom:2px (compact one-line format) — no 4px spacing'
+      /getElementById\('lincolnTally'\)/.test(lincolnBody71) &&
+        !/margin-bottom:2px|margin-bottom:4px/.test(lincolnBody71),
+      "renderLincolnMemorabilia() writes the disposition tally into #lincolnTally (Suite 191's .curio-tally CSS class supplies the compact one-line spacing, not an inline margin-bottom style)"
     );
   }
 
@@ -27915,6 +27922,224 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     assert(
       /flex:\s*0 0 90px/.test(faconMiniRule190) && !/flex:\s*1 1 60px/.test(faconMiniRule190),
       "190.11: .facon-mini uses a fixed flex:0 0 90px (no grow/shrink) instead of the old flex:1 1 60px, so every faction row's pin-strip track renders the same width regardless of name/standing length"
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 191 — BUS-15 CURIO ARCHIVE themed-object redesign: collectibles
+//  as their recognizable Fallout object (snow globe / bobblehead / typed
+//  Lincoln relic), category-driven (Protocol 38), with a persisted CASE
+//  <-> SHELF view toggle rendering from one shared path.
+//  18 tests.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 191 — CURIO ARCHIVE themed-object redesign (CASE/SHELF toggle)');
+  const state191 = readFile('js/state.js');
+  const render191 = readFile('js/ui-render.js');
+  const reg191 = readFile('js/reg_fo3.js');
+  const html191 = readFile('index.html');
+  const css191 = readFile('css/terminal.css');
+
+  // 191.1  The pre-existing tracker-toggle contract is fully preserved —
+  //        every function the mockup notes promise stays unchanged is
+  //        still present, plus the new curio helpers.
+  assert(
+    /function renderCollectibles\(/.test(render191) &&
+      /function toggleCollectible\(/.test(render191) &&
+      /function renderLincolnMemorabilia\(/.test(render191) &&
+      /function toggleLincolnItem\(/.test(render191) &&
+      /function setLincolnDisposition\(/.test(render191) &&
+      /function _curioObjectIconHtml\(/.test(render191) &&
+      /function setCurioView\(/.test(render191) &&
+      /function _applyCurioView\(/.test(render191),
+    '191.1: renderCollectibles/toggleCollectible/renderLincolnMemorabilia/toggleLincolnItem/setLincolnDisposition contract kept unchanged, plus the new _curioObjectIconHtml/setCurioView/_applyCurioView helpers'
+  );
+
+  // 191.2  setCurioView/_applyCurioView are globally exposed for the
+  //        index.html onclick handlers (mirrors toggleBaySchematic).
+  assert(
+    /window\.setCurioView\s*=\s*setCurioView/.test(render191) &&
+      /window\._applyCurioView\s*=\s*_applyCurioView/.test(render191),
+    '191.2: setCurioView and _applyCurioView are both exposed on window for the CASE/SHELF button onclick handlers'
+  );
+
+  // 191.3  robco_curio_view is a registered MetaStore device preference
+  //        (Protocol UI-6/23 — born-compliant, never a bare localStorage call).
+  assert(
+    /robco_curio_view:\s*\{\s*type:\s*'string',\s*default:\s*'case',\s*owner:\s*'ui-render\.js'\s*\}/.test(
+      state191
+    ),
+    "191.3: META_MANIFEST registers robco_curio_view as a string device pref defaulting to 'case', owned by ui-render.js"
+  );
+
+  // 191.4  collectibleCategory is a data-driven Protocol-38 token on every
+  //        GAME_DEFS entry (never a JS ctx branch in the consuming code).
+  assert(
+    /FNV:\s*\{[\s\S]*?collectibleCategory:\s*'snowglobe'/.test(state191) &&
+      /FO3:\s*\{[\s\S]*?collectibleCategory:\s*'bobblehead'/.test(state191) &&
+      /FO4:\s*\{[\s\S]*?collectibleCategory:\s*'bobblehead'/.test(state191),
+    "191.4: GAME_DEFS.FNV/FO3/FO4 each declare collectibleCategory ('snowglobe'/'bobblehead'/'bobblehead') — the Curio Archive object class is data, not a per-game code branch"
+  );
+
+  // 191.5  _curioObjectIconHtml() itself carries no hardcoded game literal
+  //        (Protocol 38) — it dispatches purely on the `kind` string.
+  {
+    const iconBody191 = extractFunctionBody(render191, '_curioObjectIconHtml');
+    assert(
+      !/'FNV'|'FO3'|"FNV"|"FO3"/.test(iconBody191) &&
+        /kind === 'bobblehead'/.test(iconBody191) &&
+        /kind\.indexOf\('lincoln-'\)/.test(iconBody191),
+      '191.5: _curioObjectIconHtml() dispatches on the collectibleCategory/shape token only — no hardcoded FNV/FO3 literal anywhere in the function body'
+    );
+  }
+
+  // 191.6  reg_fo3.js: every one of the 9 Lincoln relics carries a `shape`
+  //        field from the typed-artifact vocabulary, and the two literal
+  //        sentinels the mockup names resolve correctly.
+  {
+    const lincBlock191 = reg191.slice(
+      reg191.indexOf('lincolnMemorabilia: ['),
+      reg191.indexOf('// ── ZONES')
+    );
+    const shapeMatches191 = lincBlock191.match(/shape:\s*'(\w+)'/g) || [];
+    const validShapes191 = ['rifle', 'hat', 'cylinder', 'figure', 'poster', 'book', 'coin'];
+    assert(
+      shapeMatches191.length === 9 &&
+        shapeMatches191.every(m => validShapes191.includes(m.match(/'(\w+)'/)[1])),
+      '191.6: all 9 FO3 lincolnMemorabilia entries carry a shape field drawn from the typed-artifact vocabulary (rifle/hat/cylinder/figure/poster/book/coin)'
+    );
+    const hatEntry191 = (lincBlock191.match(/name:\s*"Lincoln's Hat"[\s\S]*?\n\s*\},/) || [''])[0];
+    const repeaterEntry191 = (lincBlock191.match(
+      /name:\s*"Lincoln's Repeater"[\s\S]*?\n\s*\},/
+    ) || [''])[0];
+    assert(
+      /shape:\s*'hat'/.test(hatEntry191) && /shape:\s*'rifle'/.test(repeaterEntry191),
+      "191.7: \"Lincoln's Hat\" resolves to shape 'hat' and \"Lincoln's Repeater\" resolves to shape 'rifle'"
+    );
+  }
+
+  // 191.8  index.html: the CASE/SHELF view toggle exists with both real
+  //        <button> elements (Protocol UI-5), aria-pressed state, and
+  //        literal aria-labels (Protocol UI-3).
+  assert(
+    /id="curioViewCaseBtn"[\s\S]{0,120}onclick="setCurioView\('case'\)"[\s\S]{0,80}aria-label="Sealed Display Case view"[\s\S]{0,40}aria-pressed="true"/.test(
+      html191
+    ) &&
+      /id="curioViewShelfBtn"[\s\S]{0,120}onclick="setCurioView\('shelf'\)"[\s\S]{0,80}aria-label="Open Collection Shelf view"[\s\S]{0,40}aria-pressed="false"/.test(
+        html191
+      ),
+    '191.8: index.html has real <button> CASE/SHELF view-toggle controls with literal aria-labels and aria-pressed state'
+  );
+
+  // 191.9  #curioPanel carries the default data-curio-view="case" attribute
+  //        the CSS variant selectors key off.
+  assert(
+    /id="curioPanel"\s+data-curio-view="case"/.test(html191),
+    '191.9: #curioPanel declares the default data-curio-view="case" attribute the CASE/SHELF CSS variants select on'
+  );
+
+  // 191.10  #collectiblesDisplay and #lincolnMemorabiliaDisplay are both
+  //         nested inside the shared curio-display/scrollwrap/caselist/
+  //         row-flex chrome (bounded scroll, Protocol 10/17).
+  assert(
+    /curio-display[\s\S]{0,40}id="curioDisplayWrap"[\s\S]{0,120}curio-scrollwrap[\s\S]{0,80}curio-caselist[\s\S]{0,80}curio-row-flex"\s+id="collectiblesDisplay"/.test(
+      html191
+    ) &&
+      /curio-display[\s\S]{0,40}id="lincolnDisplayWrap"[\s\S]{0,150}curio-caselist[\s\S]{0,80}curio-row-flex"\s+id="lincolnMemorabiliaDisplay"/.test(
+        html191
+      ),
+    '191.10: #collectiblesDisplay and #lincolnMemorabiliaDisplay are both nested inside the shared .curio-display/.curio-scrollwrap/.curio-caselist/.curio-row-flex chrome'
+  );
+
+  // 191.11  #curioMainPlaque / #lincolnTally / #lincolnPlaque mount points
+  //         exist for the live count-plaque/tally text.
+  assert(
+    /id="curioMainPlaque"/.test(html191) &&
+      /id="lincolnTally"/.test(html191) &&
+      /id="lincolnPlaque"/.test(html191),
+    '191.11: #curioMainPlaque, #lincolnTally, and #lincolnPlaque mount points exist for the live plaque/tally readouts'
+  );
+
+  // 191.12  button.curio-obj carries the same specificity fix as
+  //         button.spine/button.mag (Protocol 42) and the mockup's 88x112
+  //         button footprint.
+  {
+    const cssStripped191 = css191.replace(/\/\*[\s\S]*?\*\//g, '');
+    const curioObjRule191 = (cssStripped191.match(/button\.curio-obj\s*\{[^}]*\}/) || [''])[0];
+    assert(
+      /width:\s*88px/.test(curioObjRule191) &&
+        /min-height:\s*112px/.test(curioObjRule191) &&
+        !/^\s*\.curio-obj\s*\{/m.test(cssStripped191),
+      '191.12: button.curio-obj (element+class specificity, not plain .curio-obj) sets the 88x112px button footprint so it beats button.tracker-toggle'
+    );
+  }
+
+  // 191.13  Both CASE and SHELF variant rules exist, scoped under
+  //         #curioPanel[data-curio-view=...].
+  assert(
+    /#curioPanel\[data-curio-view='case'\]\s*\.curio-display/.test(css191) &&
+      /#curioPanel\[data-curio-view='shelf'\]\s*\.curio-caselist/.test(css191),
+    '191.13: both #curioPanel[data-curio-view="case"] and #curioPanel[data-curio-view="shelf"] variant rules exist'
+  );
+
+  // 191.14  The CASE latch plate reads "◈ SEALED EXHIBIT" with the space
+  //         intact — a CSS \XXXX escape immediately followed by a literal
+  //         space consumes that space as the escape's own delimiter, which
+  //         is why the literal ◈ character is used instead (Protocol 39).
+  assert(
+    css191.includes("content: '◈ SEALED EXHIBIT';") && !css191.includes('\\25C8'),
+    '191.14: the CASE latch plate content is the literal ◈ character (not a \\25C8 CSS escape, which would swallow the following space and render "◈SEALEDEXHIBIT")'
+  );
+
+  // 191.15  .curio-caselist is a bounded, scrolling, phosphor-scrollbar
+  //         surface with an edge fade — no infinite render, no page growth
+  //         (Protocol 10/17, the same no-infinite-scroll answer as .tray-list).
+  {
+    const cssStripped191b = css191.replace(/\/\*[\s\S]*?\*\//g, '');
+    const caselistRule191 = (cssStripped191b.match(/\.curio-caselist\s*\{[^}]*\}/) || [''])[0];
+    assert(
+      /max-height:\s*430px/.test(caselistRule191) && /overflow-y:\s*auto/.test(caselistRule191),
+      '191.15: .curio-caselist is bounded (max-height:430px) with overflow-y:auto — every collectible reachable by scrolling, never an unbounded render'
+    );
+    assert(
+      /\.curio-scrollwrap::after/.test(css191),
+      '191.15b: .curio-scrollwrap::after supplies the bottom edge-fade over the bounded scroll region'
+    );
+  }
+
+  // 191.16  .curio-row-flex follows the centering rule (flex-wrap +
+  //         justify-content:center), matching every other wrapped-row
+  //         board in the app.
+  {
+    const cssStripped191c = css191.replace(/\/\*[\s\S]*?\*\//g, '');
+    const rowFlexRule191 = (cssStripped191c.match(/\.curio-row-flex\s*\{[^}]*\}/) || [''])[0];
+    assert(
+      /flex-wrap:\s*wrap/.test(rowFlexRule191) && /justify-content:\s*center/.test(rowFlexRule191),
+      '191.16: .curio-row-flex wraps with justify-content:center (the centering rule) so a partial last row is never left-stranded'
+    );
+  }
+
+  // 191.17  The bobblehead bobble is a plain @keyframes animation (never a
+  //         bare transition), so the existing global prefers-reduced-motion
+  //         block neutralises it automatically — and the uncollected state
+  //         stops the animation entirely (dashed silhouette, no bobble).
+  assert(
+    /@keyframes\s+curioBob\s*\{/.test(css191) &&
+      /animation:\s*curioBob\s/.test(css191) &&
+      /tracker-toggle--inactive\s+\.cb-head\s*\{[^}]*animation:\s*none/.test(css191),
+    '191.17: the bobblehead bobble is a plain @keyframes curioBob animation (auto-neutralised by the global reduced-motion block) and is turned off (animation:none) on the uncollected/dashed state'
+  );
+
+  // 191.18  renderCollectibles() itself re-syncs the CASE/SHELF view from
+  //         MetaStore on every call — the one choke point that keeps the
+  //         two visual variants from ever drifting out of sync (mirrors
+  //         renderModuleBay()'s own self-healing re-sync pattern).
+  {
+    const renderCollectiblesBody191 = extractFunctionBody(render191, 'renderCollectibles');
+    assert(
+      /_applyCurioView\(\s*MetaStore\.get\('robco_curio_view'\)/.test(renderCollectiblesBody191),
+      "191.18: renderCollectibles() re-syncs the CASE/SHELF view from MetaStore.get('robco_curio_view') on every call, so the two view variants can never drift apart"
     );
   }
 }

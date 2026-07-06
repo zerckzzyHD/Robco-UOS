@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2432/2432 | Cache: robco-terminal-v2.7.0-r91 -->
+﻿## [Unreleased]<!-- Tests: 2451/2451 | Cache: robco-terminal-v2.7.0-r92 -->
 
 ### Added
 
@@ -56,6 +56,7 @@
 - Your PERKS board is now a numbered loadout rack, each perk showing as its own slot with amber rank pips and its level requirement, and the list now scrolls in place with a search box above it so a long perk roster never runs the page long. Adding a perk works exactly as before. Your FNV traits now show as a row of amber "factory-burned" chips instead of a plain list, with the same filter box and tap-to-select behavior as always.
 - SKILL BOOKS and SKILL MAGAZINES are separate boards again, no longer tucked inside the Skill Matrix — SKILL BOOKS now shows as a reference shelf of book spines (upright and ribboned once read, leaning and dashed while unread), and SKILL MAGAZINES shows as a rack of dog-eared covers that go matte with a CONSUMED stamp once read. Marking a book or magazine read/unread works exactly as before.
 - Your KARMA reading moved off the OPERATOR vitals board into its own KARMA ALIGNMENT board, now shown as an EVIL–GOOD swing needle with a lit tier strip (Very Evil through the top tier) instead of a plain slider and label — the same slider is still right there as the control. Fallout 3's KARMA CENTER readout now lives inside this same board instead of a separate one.
+- Your CURIO ARCHIVE now shows every collectible as its actual recognizable object instead of a plain acquired/missing line — snow globes appear as glass domes over a lit skyline scene, bobbleheads as a grinning Vault-Boy figure that gently bobbles once collected, and Lincoln memorabilia as their real shape (a rifle, a hat, a coin, and so on). You can now switch between a sealed museum display case and an open collection shelf using a new CASE/SHELF toggle on the board — your choice is remembered the next time you visit. Tapping an object to mark it collected or missing, the disposition picker for Lincoln relics, and the running count all still work exactly as before.
 
 ### Fixed
 
