@@ -17521,8 +17521,11 @@ Check (
 # INSIDE one sealed glass display case (owner clarification: a display
 # case naturally has shelves inside it -- merged into ONE unified vitrine,
 # never a switchable view; the CASE/SHELF toggle from the first pass was
-# removed entirely, including its MetaStore pref).
-# Mirrors JS Suite 191. 19 tests.
+# removed entirely, including its MetaStore pref). Owner batch: each
+# object now carries its own shelf plank (immune to scroll desync and to
+# Lincoln's row-height variance) and the Lincoln disposition <select>
+# sizes to its own content (no more mid-glyph clipping).
+# Mirrors JS Suite 191. 23 tests.
 # ===========================================================
 Sep "Suite 191 -- CURIO ARCHIVE: shelves-inside-a-sealed-case themed objects"
 $state191 = Read-Src "js/state.js"
@@ -17639,17 +17642,18 @@ Check (
     ($displayRule191 -match 'box-shadow:\s*inset')
 ) '191.12: .curio-display carries the sealed-vitrine border/box-shadow unconditionally -- no [data-curio-view] gate remains anywhere in the CSS'
 
-# 191.13  .curio-caselist carries the plank-shelf background
-#         UNCONDITIONALLY, merged with the 24px top clearance for the
-#         latch plate -- the shelves live permanently INSIDE the case.
+# 191.13  .curio-caselist is the bounded scroll VIEWPORT (max-height,
+#         overflow-y) with the 24px top clearance for the latch plate --
+#         the shelf itself is NOT painted here (see 191.18/191.19: it
+#         moved to a per-object plank so it can never desync from the
+#         objects while scrolling, Protocol 27 owner report).
 $cssStripped191e = [regex]::Replace($css191, '/\*[\s\S]*?\*/', '')
 $caselistRule191 = [regex]::Match($cssStripped191e, '\.curio-caselist\s*\{[^\}]*\}').Value
 Check (
-    ($caselistRule191 -match 'repeating-linear-gradient') -and
     ($caselistRule191 -match 'max-height:\s*430px') -and
     ($caselistRule191 -match 'overflow-y:\s*auto') -and
     ($caselistRule191 -match 'padding:\s*24px')
-) '191.13: .curio-caselist always carries the plank-shelf repeating-gradient background AND the bounded scroll (max-height:430px, overflow-y:auto) AND the 24px latch-plate clearance -- the shelves are permanently mounted inside the case'
+) '191.13: .curio-caselist provides the bounded scroll (max-height:430px, overflow-y:auto) AND the 24px latch-plate clearance'
 
 # 191.14  The glass sheen and the sealed latch plate exist unconditionally
 #         on .curio-display, each above the shelves in paint order
@@ -17700,6 +17704,79 @@ Check (
     ($css191 -match 'animation:\s*curioBob\s') -and
     [System.Text.RegularExpressions.Regex]::IsMatch($css191, 'tracker-toggle--inactive\s+\.cb-head\s*\{[^\}]*animation:\s*none')
 ) '191.17: the bobblehead bobble is a plain @keyframes curioBob animation (auto-neutralised by the global reduced-motion block) and is turned off (animation:none) on the uncollected/dashed state'
+
+# 191.18  Owner report (Protocol 27 root cause): the shelf used to be a
+#         single repeating-gradient background painted on .curio-caselist
+#         (the scroll VIEWPORT) -- background-attachment:scroll anchors a
+#         background to the element it's declared on, not to that
+#         element's own overflow content, so the shelf stayed fixed while
+#         the objects scrolled past it. .curio-caselist must carry no
+#         such background any more.
+$cssStripped191h = [regex]::Replace($css191, '/\*[\s\S]*?\*/', '')
+$caselistRule191b = [regex]::Match($cssStripped191h, '\.curio-caselist\s*\{[^\}]*\}').Value
+Check (
+    (-not ($caselistRule191b -match 'repeating-linear-gradient')) -and (-not ($caselistRule191b -match 'background:'))
+) '191.18: .curio-caselist (the scroll viewport) no longer carries the shelf background -- the old fixed-in-place shelf bug can no longer recur there'
+
+# 191.19  Each object now carries its OWN shelf plank as a
+#         button.curio-obj::after pseudo-element, attached to the object
+#         itself rather than a shared row/container background -- immune
+#         to scroll position (it moves with its own button by
+#         construction) AND to row-height variance from the Lincoln
+#         sub-case's taller "found" rows (a shared fixed-cycle background
+#         would drift out of alignment there; a per-object pseudo cannot).
+#         Also confirms neither .curio-row-flex nor .curio-cell picked up
+#         a repeating-gradient shelf background as an alternate fix.
+$cssStripped191i = [regex]::Replace($css191, '/\*[\s\S]*?\*/', '')
+$plankRule191 = [regex]::Match($cssStripped191i, 'button\.curio-obj::after\s*\{[^\}]*\}').Value
+$rowFlexRule191b = [regex]::Match($cssStripped191i, '\.curio-row-flex\s*\{[^\}]*\}').Value
+$cellRule191b = [regex]::Match($cssStripped191i, '\.curio-cell\s*\{[^\}]*\}').Value
+Check (
+    ($plankRule191 -match 'position:\s*absolute') -and
+    ($plankRule191 -match 'background:\s*linear-gradient') -and
+    (-not ($rowFlexRule191b -match 'repeating-linear-gradient')) -and
+    (-not ($cellRule191b -match 'repeating-linear-gradient'))
+) '191.19: button.curio-obj::after renders each object''s own shelf plank (position:absolute, attached to the button) -- neither .curio-row-flex nor .curio-cell carries a shared repeating-gradient shelf background instead'
+
+# 191.20  .curio-cell's gap is wide enough to clear the plank's own
+#         protrusion below the button (bottom offset + height), so the
+#         plank can never visually overlap the Lincoln disposition
+#         <select> that can follow the button in the same cell.
+$cssStripped191j = [regex]::Replace($css191, '/\*[\s\S]*?\*/', '')
+$cellRule191 = [regex]::Match($cssStripped191j, '\.curio-cell\s*\{[^\}]*\}').Value
+$plankRule191b = [regex]::Match($cssStripped191j, 'button\.curio-obj::after\s*\{[^\}]*\}').Value
+$gapMatch191 = [regex]::Match($cellRule191, 'gap:\s*(\d+)px')
+$bottomMatch191 = [regex]::Match($plankRule191b, 'bottom:\s*-(\d+)px')
+$heightMatch191 = [regex]::Match($plankRule191b, 'height:\s*(\d+)px')
+$gapPx191 = 0
+if ($gapMatch191.Success) { $gapPx191 = [int]$gapMatch191.Groups[1].Value }
+$bottomPx191 = 0
+if ($bottomMatch191.Success) { $bottomPx191 = [int]$bottomMatch191.Groups[1].Value }
+$heightPx191 = 0
+if ($heightMatch191.Success) { $heightPx191 = [int]$heightMatch191.Groups[1].Value }
+$protrusionPx191 = $bottomPx191 + $heightPx191
+Check (
+    ($gapPx191 -gt 0) -and ($protrusionPx191 -gt 0) -and ($gapPx191 -gt $protrusionPx191)
+) "191.20: .curio-cell's gap (${gapPx191}px) clears button.curio-obj::after's total protrusion below the button (${protrusionPx191}px), so the plank can never overlap the Lincoln disposition <select> that follows it"
+
+# 191.21  Owner report: the Lincoln disposition <select> was a fixed
+#         width: 88px (matching the object button above it), clipping the
+#         longer labels ("HANNIBAL (FREE SLAVES)", "LEROY WALKER
+#         (SLAVERS)") mid-glyph. It must now size to its own content
+#         (width: auto) with a generous max-width headroom -- verified
+#         live against the real rendered content need (240px) -- so no
+#         option is ever clipped, while still capping well under the
+#         narrowest supported viewport (360px) so it can never force
+#         page-level horizontal overflow.
+$cssStripped191k = [regex]::Replace($css191, '/\*[\s\S]*?\*/', '')
+$dispositionRule191 = [regex]::Match($cssStripped191k, '\.curio-linc-disposition\s*\{[^\}]*\}').Value
+$maxWidthMatch191 = [regex]::Match($dispositionRule191, 'max-width:\s*(\d+)px')
+$maxWidthPx191 = if ($maxWidthMatch191.Success) { [int]$maxWidthMatch191.Groups[1].Value } else { 0 }
+Check (
+    ($dispositionRule191 -match 'width:\s*auto') -and
+    ($dispositionRule191 -match 'min-width:\s*88px') -and
+    ($maxWidthPx191 -ge 240) -and ($maxWidthPx191 -lt 360)
+) "191.21: .curio-linc-disposition sizes to its own content (width:auto, min-width:88px) with max-width:${maxWidthPx191}px -- enough headroom for the longest disposition label (240px measured live) without ever forcing horizontal overflow at the narrowest supported viewport (360px)"
 
 # ===========================================================
 # Results

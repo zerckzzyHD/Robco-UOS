@@ -28022,8 +28022,11 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  INSIDE one sealed glass display case (owner clarification: a display
 //  case naturally has shelves inside it — merged into ONE unified vitrine,
 //  never a switchable view; the CASE/SHELF toggle from the first pass was
-//  removed entirely, including its MetaStore pref).
-//  19 tests.
+//  removed entirely, including its MetaStore pref). Owner batch: each
+//  object now carries its own shelf plank (immune to scroll desync and to
+//  Lincoln's row-height variance) and the Lincoln disposition <select>
+//  sizes to its own content (no more mid-glyph clipping).
+//  23 tests.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 191 — CURIO ARCHIVE: shelves-inside-a-sealed-case themed objects');
@@ -28165,18 +28168,19 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     );
   }
 
-  // 191.13  .curio-caselist carries the plank-shelf background
-  //         UNCONDITIONALLY, merged with the 24px top clearance for the
-  //         latch plate — the shelves live permanently INSIDE the case.
+  // 191.13  .curio-caselist is the bounded scroll VIEWPORT (max-height,
+  //         overflow-y) with the 24px top clearance for the latch plate —
+  //         the shelf itself is NOT painted here (see 191.18/191.19: it
+  //         moved to a per-object plank so it can never desync from the
+  //         objects while scrolling, Protocol 27 owner report).
   {
     const cssStripped191e = css191.replace(/\/\*[\s\S]*?\*\//g, '');
     const caselistRule191 = (cssStripped191e.match(/\.curio-caselist\s*\{[^}]*\}/) || [''])[0];
     assert(
-      /repeating-linear-gradient/.test(caselistRule191) &&
-        /max-height:\s*430px/.test(caselistRule191) &&
+      /max-height:\s*430px/.test(caselistRule191) &&
         /overflow-y:\s*auto/.test(caselistRule191) &&
         /padding:\s*24px/.test(caselistRule191),
-      '191.13: .curio-caselist always carries the plank-shelf repeating-gradient background AND the bounded scroll (max-height:430px, overflow-y:auto) AND the 24px latch-plate clearance — the shelves are permanently mounted inside the case'
+      '191.13: .curio-caselist provides the bounded scroll (max-height:430px, overflow-y:auto) AND the 24px latch-plate clearance'
     );
   }
 
@@ -28241,6 +28245,93 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       /tracker-toggle--inactive\s+\.cb-head\s*\{[^}]*animation:\s*none/.test(css191),
     '191.17: the bobblehead bobble is a plain @keyframes curioBob animation (auto-neutralised by the global reduced-motion block) and is turned off (animation:none) on the uncollected/dashed state'
   );
+
+  // 191.18  Owner report (Protocol 27 root cause): the shelf used to be a
+  //         single repeating-gradient background painted on .curio-caselist
+  //         (the scroll VIEWPORT) — background-attachment:scroll anchors a
+  //         background to the element it's declared on, not to that
+  //         element's own overflow content, so the shelf stayed fixed while
+  //         the objects scrolled past it. .curio-caselist must carry no
+  //         such background any more.
+  {
+    const cssStripped191h = css191.replace(/\/\*[\s\S]*?\*\//g, '');
+    const caselistRule191b = (cssStripped191h.match(/\.curio-caselist\s*\{[^}]*\}/) || [''])[0];
+    assert(
+      !/repeating-linear-gradient/.test(caselistRule191b) && !/background:/.test(caselistRule191b),
+      '191.18: .curio-caselist (the scroll viewport) no longer carries the shelf background — the old fixed-in-place shelf bug can no longer recur there'
+    );
+  }
+
+  // 191.19  Each object now carries its OWN shelf plank as a
+  //         button.curio-obj::after pseudo-element, attached to the object
+  //         itself rather than a shared row/container background — immune
+  //         to scroll position (it moves with its own button by
+  //         construction) AND to row-height variance from the Lincoln
+  //         sub-case's taller "found" rows (a shared fixed-cycle background
+  //         would drift out of alignment there; a per-object pseudo cannot).
+  //         Also confirms neither .curio-row-flex nor .curio-cell picked up
+  //         a repeating-gradient shelf background as an alternate fix.
+  {
+    const cssStripped191i = css191.replace(/\/\*[\s\S]*?\*\//g, '');
+    const plankRule191 = (cssStripped191i.match(/button\.curio-obj::after\s*\{[^}]*\}/) || [''])[0];
+    const rowFlexRule191b = (cssStripped191i.match(/\.curio-row-flex\s*\{[^}]*\}/) || [''])[0];
+    const cellRule191b = (cssStripped191i.match(/\.curio-cell\s*\{[^}]*\}/) || [''])[0];
+    assert(
+      /position:\s*absolute/.test(plankRule191) &&
+        /background:\s*linear-gradient/.test(plankRule191) &&
+        !/repeating-linear-gradient/.test(rowFlexRule191b) &&
+        !/repeating-linear-gradient/.test(cellRule191b),
+      "191.19: button.curio-obj::after renders each object's own shelf plank (position:absolute, attached to the button) — neither .curio-row-flex nor .curio-cell carries a shared repeating-gradient shelf background instead"
+    );
+  }
+
+  // 191.20  .curio-cell's gap is wide enough to clear the plank's own
+  //         protrusion below the button (bottom offset + height), so the
+  //         plank can never visually overlap the Lincoln disposition
+  //         <select> that can follow the button in the same cell.
+  {
+    const cssStripped191j = css191.replace(/\/\*[\s\S]*?\*\//g, '');
+    const cellRule191 = (cssStripped191j.match(/\.curio-cell\s*\{[^}]*\}/) || [''])[0];
+    const plankRule191b = (cssStripped191j.match(/button\.curio-obj::after\s*\{[^}]*\}/) || [
+      '',
+    ])[0];
+    const gapMatch191 = cellRule191.match(/gap:\s*(\d+)px/);
+    const bottomMatch191 = plankRule191b.match(/bottom:\s*-(\d+)px/);
+    const heightMatch191 = plankRule191b.match(/height:\s*(\d+)px/);
+    const gapPx191 = gapMatch191 ? Number(gapMatch191[1]) : 0;
+    const protrusionPx191 =
+      (bottomMatch191 ? Number(bottomMatch191[1]) : 0) +
+      (heightMatch191 ? Number(heightMatch191[1]) : 0);
+    assert(
+      gapPx191 > 0 && protrusionPx191 > 0 && gapPx191 > protrusionPx191,
+      `191.20: .curio-cell's gap (${gapPx191}px) clears button.curio-obj::after's total protrusion below the button (${protrusionPx191}px), so the plank can never overlap the Lincoln disposition <select> that follows it`
+    );
+  }
+
+  // 191.21  Owner report: the Lincoln disposition <select> was a fixed
+  //         width: 88px (matching the object button above it), clipping the
+  //         longer labels ("HANNIBAL (FREE SLAVES)", "LEROY WALKER
+  //         (SLAVERS)") mid-glyph. It must now size to its own content
+  //         (width: auto) with a generous max-width headroom — verified
+  //         live against the real rendered content need (240px) — so no
+  //         option is ever clipped, while still capping well under the
+  //         narrowest supported viewport (360px) so it can never force
+  //         page-level horizontal overflow.
+  {
+    const cssStripped191k = css191.replace(/\/\*[\s\S]*?\*\//g, '');
+    const dispositionRule191 = (cssStripped191k.match(/\.curio-linc-disposition\s*\{[^}]*\}/) || [
+      '',
+    ])[0];
+    const maxWidthMatch191 = dispositionRule191.match(/max-width:\s*(\d+)px/);
+    const maxWidthPx191 = maxWidthMatch191 ? Number(maxWidthMatch191[1]) : 0;
+    assert(
+      /width:\s*auto/.test(dispositionRule191) &&
+        /min-width:\s*88px/.test(dispositionRule191) &&
+        maxWidthPx191 >= 240 &&
+        maxWidthPx191 < 360,
+      `191.21: .curio-linc-disposition sizes to its own content (width:auto, min-width:88px) with max-width:${maxWidthPx191}px — enough headroom for the longest disposition label (240px measured live) without ever forcing horizontal overflow at the narrowest supported viewport (360px)`
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

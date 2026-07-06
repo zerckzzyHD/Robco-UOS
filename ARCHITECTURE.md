@@ -69,8 +69,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2454-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2454-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2458-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2458-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -1273,10 +1273,23 @@ DNA) mounted INSIDE one sealed glass display case — a first pass shipped a swi
 SHELF view toggle, but the owner clarified that a sealed display case naturally has shelves
 inside it, so the toggle (`setCurioView()`/`_applyCurioView()` and the `robco_curio_view`
 MetaStore pref) was fully retired in favor of ONE unified vitrine: `.curio-display` carries the
-case's border + dark backlit interior + box-shadow unconditionally, `.curio-caselist` carries the
-plank-shelf background unconditionally, and the glass sheen (`::before`, z-index 2) + the
-`◈ SEALED EXHIBIT` latch plate (`::after`, z-index 3) paint above the shelves/objects (which set
-no z-index of their own), so the shelves and everything on them read as sitting BEHIND the glass.
+case's border + dark backlit interior + box-shadow unconditionally, and the glass sheen
+(`::before`, z-index 2) + the `◈ SEALED EXHIBIT` latch plate (`::after`, z-index 3) paint above the
+shelves/objects (which set no z-index of their own), so the shelves and everything on them read as
+sitting BEHIND the glass. **Owner report fix (shelf/scroll desync):** the plank-shelf was
+originally one repeating-gradient background painted on `.curio-caselist` (the scroll viewport) —
+CSS backgrounds default to `background-attachment: scroll`, anchoring a background to the element
+it's declared on rather than to that element's own overflow content, so the shelf stayed fixed in
+place while the objects (the actual scrolled content) moved past it. Moving the background to the
+scrolled content box would fix the general case, but live measurement showed the Lincoln sub-case's
+rows are NOT uniform height (a "found" relic's row grows to fit the disposition `<select>`), so a
+single shared repeating-gradient would still drift row-to-row there. The fix instead gives every
+object its OWN shelf plank via a `button.curio-obj::after` pseudo-element attached to the button
+itself — immune to both scroll position and row-height variance by construction — with `.curio-cell`'s
+gap widened to 12px so the plank (protruding 11px below the button) can never overlap a following
+Lincoln disposition `<select>`. **Owner report fix (disposition clipping):** `.curio-linc-disposition`
+was a fixed `width: 88px` (matching the button above it), clipping longer labels mid-glyph; changed
+to `width: auto` (sizes to its own content) with `min-width: 88px` and `max-width: 260px`.
 `renderCollectibles()`'s `.tracker-row`/`.tracker-toggle` contract (Suite 88) and
 `renderLincolnMemorabilia()`'s FO3-only nesting, disposition `<select>`, and `.panel-substatus`
 (`#opsCurioStatus`) + part-number text (game-specific `collectibleLabel`) are all unchanged —
@@ -2503,7 +2516,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2454-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2458-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

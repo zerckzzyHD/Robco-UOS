@@ -7430,10 +7430,14 @@ button.mag {
    category-driven (Protocol 38) — never a JS ctx branch: see
    _curioObjectIconHtml() in ui-render.js. The glass frame (border + dark
    backlit interior + diagonal sheen + the "SEALED EXHIBIT" latch plate)
-   wraps the plank-shelf scroll region so the shelves and the objects
-   resting on them read as sitting BEHIND the glass — the sheen and the
-   frame chrome sit at a higher z-index than the shelves/objects, painting
-   over them.
+   wraps the scroll region so the shelves and the objects resting on them
+   read as sitting BEHIND the glass — the sheen and the frame chrome sit at
+   a higher z-index than the shelves/objects, painting over them. Each
+   object carries its OWN shelf plank (button.curio-obj::after, below) —
+   attached to the object itself rather than a shared row/container
+   background, so a plank always travels with its object through scrolling
+   and is immune to row-height variance (e.g. the Lincoln sub-case's taller
+   "found" rows) — see the .curio-caselist comment for the full root cause.
    ══════════════════════════════════════════════════════════════════════ */
 :root {
   /* Fixed "museum brass" plaque material — deliberately NOT --bezel-wire,
@@ -7499,9 +7503,22 @@ button.mag {
   position: relative;
   min-width: 0;
 }
-/* the plank shelves mounted INSIDE the case (the BUS-05a skill-books DNA)
-   — bounded in-panel scroll for long collections (e.g. FO3's 20
-   bobbleheads), every item reachable by scrolling, the page never grows. */
+/* the bounded in-panel scroll VIEWPORT for long collections (e.g. FO3's 20
+   bobbleheads), every item reachable by scrolling, the page never grows.
+   Owner report (Protocol 27 root cause): the plank-shelf used to be a
+   single repeating-gradient background painted HERE, on the scroll
+   viewport itself — CSS backgrounds default to background-attachment:
+   scroll, which anchors a background to the element it's declared on and
+   does NOT scroll with that element's own overflow CONTENT, so the shelf
+   stayed fixed in place while the objects (the actual scrolled content)
+   moved past it. A shared background on the scrolled content box itself
+   (.curio-row-flex) would fix the pure scroll-desync case, but the Lincoln
+   sub-case's rows are NOT uniform height (a "found" relic grows its cell
+   to fit the disposition <select>), so a single fixed-cycle repeating
+   background would still drift out of alignment row-to-row there. Instead
+   each object now carries its OWN shelf plank as a `button.curio-obj::after`
+   pseudo-element (below) — attached to the object itself, it is immune to
+   both scroll position and row-height variance by construction. */
 .curio-caselist {
   max-height: 430px;
   overflow-y: auto;
@@ -7510,12 +7527,6 @@ button.mag {
   min-width: 0;
   scrollbar-width: thin;
   scrollbar-color: rgba(var(--robco-green-rgb), 0.55) rgba(0, 0, 0, 0.45);
-  background: repeating-linear-gradient(
-    180deg,
-    transparent 0 118px,
-    #343830 118px 121px,
-    #14160f 121px 126px
-  );
 }
 .curio-caselist--linc {
   max-height: 320px;
@@ -7557,7 +7568,12 @@ button.mag {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  /* 12px clears the button's own ::after shelf plank (protrudes 11px below
+     the button's border-box, see button.curio-obj::after) so the Lincoln
+     disposition <select> that can follow the button never overlaps it;
+     cells with no second child (every collectible, every "missing" Lincoln
+     relic) are unaffected since there's nothing to gap against. */
+  gap: 12px;
 }
 .c-plate {
   font-size: 6.5px;
@@ -7595,6 +7611,29 @@ button.curio-obj {
 button.curio-obj:hover {
   background: rgba(var(--robco-green-rgb), 0.05);
 }
+/* the object's own shelf plank — a pseudo-element on the button itself
+   (not a shared row/container background) so it always renders directly
+   under THIS object, immune to scroll position and to row-height variance
+   from taller neighboring cells (owner report, Protocol 27 root cause —
+   see the .curio-caselist comment above). Absolutely positioned outside
+   the button's own border-box (bottom is negative), so it never affects
+   the button's or the row's layout size. */
+button.curio-obj::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  transform: translateX(-50%);
+  width: 76px;
+  height: 5px;
+  background: linear-gradient(180deg, #3d4136, #191c17 80%);
+  border-bottom: 1px solid rgba(var(--curio-copper-rgb), 0.5);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+button.curio-obj.tracker-toggle--inactive::after {
+  opacity: 0.4;
+}
 button.curio-obj.tracker-toggle--inactive .c-plate {
   opacity: 0.35;
 }
@@ -7607,14 +7646,23 @@ button.curio-obj.tracker-toggle--inactive .c-plate {
 button.curio-obj.tracker-toggle--inactive .c-chip {
   color: rgba(var(--robco-green-rgb), 0.4);
 }
+/* Owner report: the fixed width: 88px (matching the object button above it)
+   clipped the longer disposition labels ("HANNIBAL (FREE SLAVES)", "LEROY
+   WALKER (SLAVERS)") mid-glyph with no ellipsis. width: auto lets the
+   native <select> size itself to its own content (the widest option text),
+   with min-width keeping it no narrower than the button above and
+   max-width capping it well under the narrowest supported viewport (360px)
+   so a single control can never force page-level horizontal overflow. */
 .curio-linc-disposition {
   font-size: 8.5px;
-  width: 88px;
-  max-width: 100%;
+  width: auto;
+  min-width: 88px;
+  max-width: 260px;
   background: transparent;
   color: inherit;
   border: 1px solid var(--robco-green);
   min-height: 28px;
+  padding: 2px 4px;
   cursor: pointer;
 }
 
