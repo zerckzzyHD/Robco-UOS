@@ -69,8 +69,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2461-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2461-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2462-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2462-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -1290,7 +1290,18 @@ gap widened to 12px so the plank (protruding 11px below the button) can never ov
 Lincoln disposition `<select>`. **Owner report fix (disposition clipping):** `.curio-linc-disposition`
 was a fixed `width: 88px` (matching the button above it), clipping longer labels mid-glyph; changed
 to `width: auto` (sizes to its own content) with `min-width: 88px` and `max-width: 260px`.
-`renderCollectibles()`'s `.tracker-row`/`.tracker-toggle` contract (Suite 88) and
+**Owner report fix (disposition box too spacious):** `width: auto` alone let the control render
+using the browser/OS's own native form-control chrome (padding, minimum touch height, arrow gutter)
+instead of this rule's box model — live-measured, even Chromium alone rendered ~8px wider than an
+`appearance: none` version at identical content, which is what spread the acquired Lincoln rows
+apart. `appearance: none` (+ vendor prefixes) now strips that native chrome so the box is driven
+purely by its own tight `padding: 1px 16px 1px 4px` and a from-scratch CSS-drawn dropdown arrow (two
+gradient triangles, no extra DOM element); `min-width` dropped to 64px, though every browser's
+widest-option sizing for a `<select>`'s closed box means it renders at the same ~234px regardless of
+which disposition is picked. `font-size` stays exactly at the Protocol 17 floor (16px, prevents iOS/
+Android focus auto-zoom) and `min-height` stays exactly at the Protocol 17 tap-target floor (28px) —
+neither mobile-baseline rule is loosened to chase compactness. `renderCollectibles()`'s
+`.tracker-row`/`.tracker-toggle` contract (Suite 88) and
 `renderLincolnMemorabilia()`'s FO3-only nesting, disposition `<select>`, and `.panel-substatus`
 (`#opsCurioStatus`) + part-number text (game-specific `collectibleLabel`) are all unchanged —
 every curio button carries `tracker-row`/`tracker-toggle`/`tracker-toggle--active`/`--inactive`
@@ -2516,7 +2527,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2461-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2462-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

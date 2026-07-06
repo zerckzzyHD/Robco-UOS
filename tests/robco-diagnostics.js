@@ -28065,8 +28065,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  removed entirely, including its MetaStore pref). Owner batch: each
 //  object now carries its own shelf plank (immune to scroll desync and to
 //  Lincoln's row-height variance) and the Lincoln disposition <select>
-//  sizes to its own content (no more mid-glyph clipping).
-//  23 tests.
+//  sizes to its own content (no more mid-glyph clipping) with native
+//  form-control chrome stripped via appearance:none so the box stays
+//  compact and consistent across devices (Protocol 17 floors preserved).
+//  25 tests.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 191 — CURIO ARCHIVE: shelves-inside-a-sealed-case themed objects');
@@ -28348,15 +28350,17 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     );
   }
 
-  // 191.21  Owner report: the Lincoln disposition <select> was a fixed
-  //         width: 88px (matching the object button above it), clipping the
-  //         longer labels ("HANNIBAL (FREE SLAVES)", "LEROY WALKER
-  //         (SLAVERS)") mid-glyph. It must now size to its own content
+  // 191.21  Owner report round 1: the Lincoln disposition <select> was a
+  //         fixed width: 88px (matching the object button above it),
+  //         clipping the longer labels ("HANNIBAL (FREE SLAVES)", "LEROY
+  //         WALKER (SLAVERS)") mid-glyph. It must size to its own content
   //         (width: auto) with a generous max-width headroom — verified
-  //         live against the real rendered content need (240px) — so no
+  //         live against the real rendered content need (~234px) — so no
   //         option is ever clipped, while still capping well under the
   //         narrowest supported viewport (360px) so it can never force
-  //         page-level horizontal overflow.
+  //         page-level horizontal overflow. min-width is now 64px (was
+  //         88px) — see 191.22 for why the box is compact regardless of
+  //         which disposition is selected.
   {
     const cssStripped191k = css191.replace(/\/\*[\s\S]*?\*\//g, '');
     const dispositionRule191 = (cssStripped191k.match(/\.curio-linc-disposition\s*\{[^}]*\}/) || [
@@ -28366,10 +28370,42 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     const maxWidthPx191 = maxWidthMatch191 ? Number(maxWidthMatch191[1]) : 0;
     assert(
       /width:\s*auto/.test(dispositionRule191) &&
-        /min-width:\s*88px/.test(dispositionRule191) &&
-        maxWidthPx191 >= 240 &&
+        /min-width:\s*64px/.test(dispositionRule191) &&
+        maxWidthPx191 >= 230 &&
         maxWidthPx191 < 360,
-      `191.21: .curio-linc-disposition sizes to its own content (width:auto, min-width:88px) with max-width:${maxWidthPx191}px — enough headroom for the longest disposition label (240px measured live) without ever forcing horizontal overflow at the narrowest supported viewport (360px)`
+      `191.21: .curio-linc-disposition sizes to its own content (width:auto, min-width:64px) with max-width:${maxWidthPx191}px — enough headroom for the longest disposition label (~234px measured live) without ever forcing horizontal overflow at the narrowest supported viewport (360px)`
+    );
+  }
+
+  // 191.22  Owner report round 2 (Protocol 27 root cause, live-measured): a
+  //         native <select> with only width: auto renders using the
+  //         browser/OS's own default form-control chrome (padding, minimum
+  //         touch height, arrow gutter), which varies across engines and
+  //         can render far bigger than this rule's own box model — measured
+  //         live, even Chromium alone rendered ~8px wider than an
+  //         appearance:none version at identical content. appearance: none
+  //         (+ vendor prefixes) strips that native chrome so the box is
+  //         driven purely by this rule's own compact padding, consistent on
+  //         every device. font-size stays >=16px (Protocol 17 — prevents
+  //         iOS/Android focus auto-zoom) and min-height stays >=28px
+  //         (Protocol 17 tap-target floor) — neither mobile-baseline floor
+  //         is reduced to chase compactness; the fix is entirely in
+  //         removing native chrome variance, not in violating either rule.
+  {
+    const cssStripped191l = css191.replace(/\/\*[\s\S]*?\*\//g, '');
+    const dispositionRule191b = (cssStripped191l.match(/\.curio-linc-disposition\s*\{[^}]*\}/) || [
+      '',
+    ])[0];
+    const fontSizeMatch191 = dispositionRule191b.match(/font-size:\s*(\d+)px/);
+    const fontSizePx191 = fontSizeMatch191 ? Number(fontSizeMatch191[1]) : 0;
+    const minHeightMatch191 = dispositionRule191b.match(/min-height:\s*(\d+)px/);
+    const minHeightPx191 = minHeightMatch191 ? Number(minHeightMatch191[1]) : 0;
+    assert(
+      /appearance:\s*none/.test(dispositionRule191b) &&
+        /-webkit-appearance:\s*none/.test(dispositionRule191b) &&
+        fontSizePx191 >= 16 &&
+        minHeightPx191 >= 28,
+      `191.22: .curio-linc-disposition uses appearance:none (+ -webkit-appearance) to strip native form-control chrome variance, while keeping font-size (${fontSizePx191}px) >=16 and min-height (${minHeightPx191}px) >=28 — the Protocol 17 mobile-baseline floors are never reduced to chase compactness`
     );
   }
 }

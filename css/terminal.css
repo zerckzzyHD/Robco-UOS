@@ -7664,23 +7664,52 @@ button.curio-obj.tracker-toggle--inactive .c-plate {
 button.curio-obj.tracker-toggle--inactive .c-chip {
   color: rgba(var(--robco-green-rgb), 0.4);
 }
-/* Owner report: the fixed width: 88px (matching the object button above it)
-   clipped the longer disposition labels ("HANNIBAL (FREE SLAVES)", "LEROY
-   WALKER (SLAVERS)") mid-glyph with no ellipsis. width: auto lets the
-   native <select> size itself to its own content (the widest option text),
-   with min-width keeping it no narrower than the button above and
-   max-width capping it well under the narrowest supported viewport (360px)
-   so a single control can never force page-level horizontal overflow. */
+/* Owner report round 1: the fixed width: 88px (matching the object button
+   above it) clipped the longer disposition labels ("HANNIBAL (FREE
+   SLAVES)", "LEROY WALKER (SLAVERS)") mid-glyph with no ellipsis — fixed
+   with width: auto so the label always shows in full.
+   Owner report round 2 (Protocol 27 root cause): width: auto alone lets
+   a NATIVE <select> render using the browser/OS's own default form-control
+   chrome (padding, minimum touch height, dropdown-arrow gutter), which
+   varies a lot across browsers/devices and can render far bigger than this
+   rule's own box model specifies — measured live, Chromium alone rendered
+   this control ~8px wider than an appearance:none version at the same
+   content, and other engines are known to go considerably further. `
+   appearance: none` (+ prefixes) strips that native chrome entirely so the
+   box is ALWAYS driven purely by this rule's own compact padding/min-height
+   — consistent and tight on every device, never at the mercy of native
+   control sizing. font-size stays >=16px (Protocol 17 — prevents iOS/
+   Android focus auto-zoom) and min-height stays >=28px (Protocol 17 tap
+   target floor); neither is reduced further, since both are hard mobile-
+   baseline requirements, not a source of the reported bloat — the fix is
+   entirely in removing native chrome and tightening padding/min-width. A
+   small CSS-drawn triangle (no extra DOM element) replaces the native
+   dropdown arrow appearance:none removes. */
 .curio-linc-disposition {
-  font-size: 8.5px;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  font-size: 16px;
+  line-height: 1.1;
   width: auto;
-  min-width: 88px;
+  min-width: 64px;
   max-width: 260px;
-  background: transparent;
+  background-color: transparent;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--robco-green) 50%),
+    linear-gradient(135deg, var(--robco-green) 50%, transparent 50%);
+  background-position:
+    calc(100% - 10px) center,
+    calc(100% - 6px) center;
+  background-size:
+    4px 4px,
+    4px 4px;
+  background-repeat: no-repeat;
   color: inherit;
   border: 1px solid var(--robco-green);
+  border-radius: 0;
   min-height: 28px;
-  padding: 2px 4px;
+  padding: 1px 16px 1px 4px;
   cursor: pointer;
 }
 

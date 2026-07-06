@@ -17551,8 +17551,10 @@ Check (
 # removed entirely, including its MetaStore pref). Owner batch: each
 # object now carries its own shelf plank (immune to scroll desync and to
 # Lincoln's row-height variance) and the Lincoln disposition <select>
-# sizes to its own content (no more mid-glyph clipping).
-# Mirrors JS Suite 191. 23 tests.
+# sizes to its own content (no more mid-glyph clipping) with native
+# form-control chrome stripped via appearance:none so the box stays
+# compact and consistent across devices (Protocol 17 floors preserved).
+# Mirrors JS Suite 191. 25 tests.
 # ===========================================================
 Sep "Suite 191 -- CURIO ARCHIVE: shelves-inside-a-sealed-case themed objects"
 $state191 = Read-Src "js/state.js"
@@ -17786,24 +17788,52 @@ Check (
     ($gapPx191 -gt 0) -and ($protrusionPx191 -gt 0) -and ($gapPx191 -gt $protrusionPx191)
 ) "191.20: .curio-cell's gap (${gapPx191}px) clears button.curio-obj::after's total protrusion below the button (${protrusionPx191}px), so the plank can never overlap the Lincoln disposition <select> that follows it"
 
-# 191.21  Owner report: the Lincoln disposition <select> was a fixed
-#         width: 88px (matching the object button above it), clipping the
-#         longer labels ("HANNIBAL (FREE SLAVES)", "LEROY WALKER
-#         (SLAVERS)") mid-glyph. It must now size to its own content
+# 191.21  Owner report round 1: the Lincoln disposition <select> was a
+#         fixed width: 88px (matching the object button above it),
+#         clipping the longer labels ("HANNIBAL (FREE SLAVES)", "LEROY
+#         WALKER (SLAVERS)") mid-glyph. It must size to its own content
 #         (width: auto) with a generous max-width headroom -- verified
-#         live against the real rendered content need (240px) -- so no
+#         live against the real rendered content need (~234px) -- so no
 #         option is ever clipped, while still capping well under the
 #         narrowest supported viewport (360px) so it can never force
-#         page-level horizontal overflow.
+#         page-level horizontal overflow. min-width is now 64px (was
+#         88px) -- see 191.22 for why the box is compact regardless of
+#         which disposition is selected.
 $cssStripped191k = [regex]::Replace($css191, '/\*[\s\S]*?\*/', '')
 $dispositionRule191 = [regex]::Match($cssStripped191k, '\.curio-linc-disposition\s*\{[^\}]*\}').Value
 $maxWidthMatch191 = [regex]::Match($dispositionRule191, 'max-width:\s*(\d+)px')
 $maxWidthPx191 = if ($maxWidthMatch191.Success) { [int]$maxWidthMatch191.Groups[1].Value } else { 0 }
 Check (
     ($dispositionRule191 -match 'width:\s*auto') -and
-    ($dispositionRule191 -match 'min-width:\s*88px') -and
-    ($maxWidthPx191 -ge 240) -and ($maxWidthPx191 -lt 360)
-) "191.21: .curio-linc-disposition sizes to its own content (width:auto, min-width:88px) with max-width:${maxWidthPx191}px -- enough headroom for the longest disposition label (240px measured live) without ever forcing horizontal overflow at the narrowest supported viewport (360px)"
+    ($dispositionRule191 -match 'min-width:\s*64px') -and
+    ($maxWidthPx191 -ge 230) -and ($maxWidthPx191 -lt 360)
+) "191.21: .curio-linc-disposition sizes to its own content (width:auto, min-width:64px) with max-width:${maxWidthPx191}px -- enough headroom for the longest disposition label (~234px measured live) without ever forcing horizontal overflow at the narrowest supported viewport (360px)"
+
+# 191.22  Owner report round 2 (Protocol 27 root cause, live-measured): a
+#         native <select> with only width: auto renders using the
+#         browser/OS's own default form-control chrome (padding, minimum
+#         touch height, arrow gutter), which varies across engines and can
+#         render far bigger than this rule's own box model -- measured
+#         live, even Chromium alone rendered ~8px wider than an
+#         appearance:none version at identical content. appearance: none
+#         (+ vendor prefixes) strips that native chrome so the box is
+#         driven purely by this rule's own compact padding, consistent on
+#         every device. font-size stays >=16px (Protocol 17 -- prevents
+#         iOS/Android focus auto-zoom) and min-height stays >=28px
+#         (Protocol 17 tap-target floor) -- neither mobile-baseline floor
+#         is reduced to chase compactness; the fix is entirely in removing
+#         native chrome variance, not in violating either rule.
+$cssStripped191l = [regex]::Replace($css191, '/\*[\s\S]*?\*/', '')
+$dispositionRule191b = [regex]::Match($cssStripped191l, '\.curio-linc-disposition\s*\{[^\}]*\}').Value
+$fontSizeMatch191 = [regex]::Match($dispositionRule191b, 'font-size:\s*(\d+)px')
+$fontSizePx191 = if ($fontSizeMatch191.Success) { [int]$fontSizeMatch191.Groups[1].Value } else { 0 }
+$minHeightMatch191 = [regex]::Match($dispositionRule191b, 'min-height:\s*(\d+)px')
+$minHeightPx191 = if ($minHeightMatch191.Success) { [int]$minHeightMatch191.Groups[1].Value } else { 0 }
+Check (
+    ($dispositionRule191b -match 'appearance:\s*none') -and
+    ($dispositionRule191b -match '-webkit-appearance:\s*none') -and
+    ($fontSizePx191 -ge 16) -and ($minHeightPx191 -ge 28)
+) "191.22: .curio-linc-disposition uses appearance:none (+ -webkit-appearance) to strip native form-control chrome variance, while keeping font-size (${fontSizePx191}px) >=16 and min-height (${minHeightPx191}px) >=28 -- the Protocol 17 mobile-baseline floors are never reduced to chase compactness"
 
 # ===========================================================
 # Results
