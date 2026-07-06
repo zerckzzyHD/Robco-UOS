@@ -25920,7 +25920,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 //  Suite 184 — Owner batch: tempo dial no-wrap fix, RAD bar drag, level/XP
 //  caps, full scroll+panel-state restore ordering, SETTINGS collapsed
-//  summary lines. 19 tests.
+//  summary lines, plus the RAD-bar touch-action/transition-lag follow-up.
+//  21 tests.
 // ══════════════════════════════════════════════════════════════
 {
   header(
@@ -26060,6 +26061,29 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       !err && halfVal === '500' && clampedVal === '1000',
       'RAD bar drag behavioral: dragging to 50% of the track sets #stat_rads/state.rads to 500 (half of a 1000 maxRads game), and over-dragging clamps to exactly maxRads (1000) — proves the scale reads _resolveMaxRads() live' +
         (err ? ' — ' + err.message : '')
+    );
+  }
+
+  // 184.6b  Owner report follow-up (Protocol 27 root cause): #radDragTrack was
+  //         the one drag surface in the whole OPERATOR redesign missing
+  //         touch-action:none, and .bar-fill.rad had a 0.9s transition (vs
+  //         .hp-bar-fill's 0.3s) that visibly lagged behind a real-time drag.
+  //         Neither is catchable by 184.6's mock-event behavioral test (it
+  //         calls the listener functions directly, never exercising real
+  //         browser touch-scroll arbitration or CSS transition timing) — a
+  //         live on-device drag still failed even with 184.5/184.6 green.
+  {
+    const cssStripped184b = css184.replace(/\/\*[\s\S]*?\*\//g, '');
+    const radDragTrackRule184b = (cssStripped184b.match(/#radDragTrack\s*\{[^}]*\}/) || [''])[0];
+    const barFillRadRule184b = (cssStripped184b.match(/\.bar-fill\.rad\s*\{[^}]*\}/) || [''])[0];
+    assert(
+      /touch-action:\s*none/.test(radDragTrackRule184b),
+      '184.6b: #radDragTrack declares touch-action:none (matches every other OPERATOR drag surface — .fd-ladder/.vu-track/the dial knobs — so a real touch-drag is never reinterpreted as a page scroll)'
+    );
+    assert(
+      /transition:\s*width 0\.3s ease/.test(barFillRadRule184b) &&
+        !/0\.9s/.test(barFillRadRule184b),
+      "184.6c: .bar-fill.rad's transition now matches .hp-bar-fill's width 0.3s ease exactly (no more 0.9s lag behind a real-time drag)"
     );
   }
 

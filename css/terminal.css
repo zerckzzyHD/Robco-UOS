@@ -6621,10 +6621,22 @@ button.rb-key:disabled {
    (setupRadBarInteraction(), ui-core.js), not just a read-only mirror —
    Protocol 17's >=28px tap-target minimum applies to it same as any other
    interactive control, so its own track grows taller (the fill still fills
-   it via inset:0, no separate change needed there). */
+   it via inset:0, no separate change needed there).
+   Owner report follow-up (Protocol 27 root cause): the drag mechanism's JS
+   logic was already correct (mousedown/mousemove/mouseup + touchstart/
+   touchmove all wired and clamping through _resolveMaxRads()), but this was
+   the ONE drag surface in the whole OPERATOR redesign missing
+   touch-action:none — every sibling (.fd-ladder, .vu-track, the tempo/
+   immersion dial knobs) declares it so a real touch-drag is never
+   reinterpreted as a page-scroll gesture before the touchmove handler gets
+   to run; a synthetic-event test (mousedown/mousemove dispatched directly)
+   never exercises that browser-level scroll-vs-gesture arbitration, so the
+   existing regression test passed while a real on-device drag still failed.
+   Restoring the same touch-action every other drag surface already has. */
 #radDragTrack {
   height: 28px;
   cursor: ew-resize;
+  touch-action: none;
 }
 .bar-fill.rad {
   position: absolute;
@@ -6635,7 +6647,11 @@ button.rb-key:disabled {
     rgba(255, 182, 66, 0.25) 5px 8px
   );
   box-shadow: 0 0 7px rgba(255, 182, 66, 0.5);
-  transition: width 0.9s cubic-bezier(0.2, 0.8, 0.3, 1);
+  /* Matches .hp-bar-fill's transition exactly (Protocol 22) — the previous
+     0.9s cubic-bezier lagged far enough behind a real-time drag that the
+     fill visibly failed to track the cursor, reading as unresponsive/broken
+     even though #stat_rads/state.rads were already updating correctly. */
+  transition: width 0.3s ease;
 }
 .bio-actions {
   display: flex;

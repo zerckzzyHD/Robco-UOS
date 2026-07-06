@@ -16109,7 +16109,8 @@ Check (
 # ===========================================================
 # Suite 184 -- Owner batch: tempo dial no-wrap fix, RAD bar drag, level/XP
 # caps, full scroll+panel-state restore ordering, SETTINGS collapsed
-# summary lines. 19 tests. Mirrors JS Suite 184.
+# summary lines, plus the RAD-bar touch-action/transition-lag follow-up.
+# 21 tests. Mirrors JS Suite 184.
 # ===========================================================
 Write-Host "`n-- Suite 184 -- owner batch: tempo no-wrap, RAD drag, level/XP caps, scroll restore, SETTINGS summaries $('-' * 5)"
 $html184 = Read-Src "index.html"
@@ -16252,6 +16253,24 @@ console.log('RESULT:' + results.map(r => r ? '1' : '0').join(''));
 } catch {
     foreach ($lbl in $labels184) { Fail "$lbl  (exception: $($_.Exception.Message))" }
 }
+
+# 184.6b/184.6c  Owner report follow-up (Protocol 27 root cause): #radDragTrack
+# was the one drag surface in the whole OPERATOR redesign missing
+# touch-action:none, and .bar-fill.rad had a 0.9s transition (vs
+# .hp-bar-fill's 0.3s) that visibly lagged behind a real-time drag. Neither is
+# catchable by 184.6's mock-event behavioral test (it calls the listener
+# functions directly, never exercising real browser touch-scroll arbitration
+# or CSS transition timing) -- a live on-device drag still failed even with
+# 184.5/184.6 green.
+$cssStripped184b = $css184 -replace '(?s)/\*.*?\*/', ''
+$radDragTrackRule184b = ([regex]::Match($cssStripped184b, '#radDragTrack\s*\{[^}]*\}')).Value
+$barFillRadRule184b = ([regex]::Match($cssStripped184b, '\.bar-fill\.rad\s*\{[^}]*\}')).Value
+Check (
+    $radDragTrackRule184b -match 'touch-action:\s*none'
+) '184.6b: #radDragTrack declares touch-action:none (matches every other OPERATOR drag surface -- .fd-ladder/.vu-track/the dial knobs -- so a real touch-drag is never reinterpreted as a page scroll)'
+Check (
+    ($barFillRadRule184b -match 'transition:\s*width 0\.3s ease') -and (-not ($barFillRadRule184b -match '0\.9s'))
+) "184.6c: .bar-fill.rad's transition now matches .hp-bar-fill's width 0.3s ease exactly (no more 0.9s lag behind a real-time drag)"
 
 # 184.7  Level input caps at MAX_PLAYER_LEVEL.
 $lvlBody184 = Get-FunctionBody $core184 'onLvlInputChanged'

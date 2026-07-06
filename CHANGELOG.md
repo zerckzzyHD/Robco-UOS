@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2396/2396 | Cache: robco-terminal-v2.7.0-r88 -->
+﻿## [Unreleased]<!-- Tests: 2398/2398 | Cache: robco-terminal-v2.7.0-r89 -->
 
 ### Added
 
@@ -109,6 +109,7 @@
 - Fixed your squad's ENLIST list always showing New Vegas's companions even in Fallout 3 campaigns — it now correctly offers the companions available in whichever game you're actually playing.
 - Fixed the USE button on your cargo manifest's item tags being cramped and cut off, jammed into the tag's pointed left end right next to its eyelet. It now sits with clean spacing and reads fully, and the quantity +/- and delete controls beside it are unaffected.
 - Fixed your FACTION STANDING reputation console's faction selector losing its MAJOR/MINOR grouping in its redesign — every faction now groups under MAJOR FACTIONS and MINOR FACTIONS headers again, matching how they were categorized before, instead of one long flat list.
+- Fixed your RAD EXPOSURE bar not actually responding to a drag on a touchscreen — a real touch could get swallowed as a page scroll instead of moving the bar. Dragging it now reliably sets your radiation level on both touch and mouse, and the bar itself now keeps up with your finger or cursor in real time instead of visibly lagging behind.
 
 ### Improved
 

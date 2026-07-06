@@ -69,8 +69,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2396-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2396-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2398-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2398-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -1072,6 +1072,21 @@ interactive, not display-only readouts beside an editable number field:
   layers for defense in depth: `syncStateFromDom()` (`js/state.js`, mirroring the adjacent SPECIAL-stat
   clamp) and `autoImportState()` (`js/api.js`, so an AI response can't push rads above the per-game max
   either).
+- **RAD EXPOSURE bar is draggable** (`#radDragTrack` on BUS-03 SKELETAL HARNESS, wrapping
+  `#opHarnessRadBar`) — `setupRadBarInteraction()` (`js/ui-core.js`) mirrors
+  `setupHpBarInteraction()`/`setupXpBarInteraction()` byte-for-byte (mouse+touch, pct-of-width, writes
+  `#stat_rads` + `state.rads`, scales to `_resolveMaxRads()` instead of a fixed max). An owner report
+  that the drag still didn't work despite this landing (and its own mock-event regression test
+  passing) led to a Protocol 27 live-browser investigation: the mock test calls the listener functions
+  directly, so it can prove the clamp math but never exercises real browser touch-scroll arbitration
+  or CSS transition timing. Two real, verifiable defects surfaced — `#radDragTrack` was the one drag
+  surface in the whole OPERATOR redesign missing `touch-action: none` (every sibling — `.fd-ladder`,
+  `.vu-track`, the tempo/immersion dial knobs — already declares it, so a real touch-drag on RAD alone
+  could be reinterpreted as a page scroll before `touchmove` ever ran), and `.bar-fill.rad` carried a
+  0.9s `cubic-bezier` transition versus `.hp-bar-fill`'s 0.3s, visibly lagging the fill behind a
+  real-time drag. Both are fixed to match their siblings exactly (Protocol 22); re-verified live via a
+  real `elementFromPoint` hit-test followed by dispatched `mousedown`/`mousemove`/`mouseup` (never a
+  direct-to-element dispatch, which would bypass the hit-test the fix depends on).
 
 Guarded by Suite 182 (both runners, 12 tests): behavioral proofs (via a Node `vm` sandbox executing
 the REAL function bodies against a synthetic DOM, mirroring the Suite 137.6/177.4 technique) that
@@ -2352,7 +2367,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2396-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2398-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable
