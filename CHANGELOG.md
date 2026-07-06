@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2390/2390 | Cache: robco-terminal-v2.7.0-r86 -->
+﻿## [Unreleased]<!-- Tests: 2394/2394 | Cache: robco-terminal-v2.7.0-r87 -->
 
 ### Added
 
@@ -107,6 +107,7 @@
 - Fixed two of the OPERATIONAL TEMPO dial's position labels (STANDARD and SPEEDRUN) rendering with an awkward mid-word break instead of sitting on one line.
 - Fixed the terminal not always restoring your exact scroll position after a full reload when a panel's open/closed state also needed restoring — the two could get applied in the wrong order, throwing off where you landed. Your scroll position and every panel's open/closed state are now both restored correctly together, so you land exactly where you left off.
 - Fixed your squad's ENLIST list always showing New Vegas's companions even in Fallout 3 campaigns — it now correctly offers the companions available in whichever game you're actually playing.
+- Fixed the USE button on your cargo manifest's item tags being cramped and cut off, jammed into the tag's pointed left end right next to its eyelet. It now sits with clean spacing and reads fully, and the quantity +/- and delete controls beside it are unaffected.
 
 ### Improved
 

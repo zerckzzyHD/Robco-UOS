@@ -7990,6 +7990,22 @@ button.drawer.active .d-count {
   gap: 5px 8px;
   min-width: 0;
 }
+/* Owner report (Protocol 27 root cause): the pre-existing .inventory-list li
+   rule (element+class, specificity 0-1-1) was beating .mrow's bare class
+   (0-1-0) for padding/justify-content/border-bottom — collapsing the tag's
+   30px left clearance back to 0 and pulling the USE button into the pointed
+   clip-path corner + eyelet hole, clipping "USE". Every .mrow lives inside a
+   .tray-list, so scoping the fix there (0-2-0) wins on specificity
+   regardless of source order. CSS/layout only — no id/handler change. */
+.tray-list .mrow {
+  padding: 9px 12px 9px 30px;
+  justify-content: flex-start;
+  border-bottom: none;
+}
+.tray-list .mrow .use-btn {
+  margin: 0 6px 0 0;
+  padding: 4px 10px;
+}
 .mrow .hole {
   display: block;
   position: absolute;

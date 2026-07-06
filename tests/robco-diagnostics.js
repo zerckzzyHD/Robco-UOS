@@ -27135,6 +27135,64 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 188 — CARGO MANIFEST row fix: USE button clipping (owner report)
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 188 — CARGO TAG row fix: USE button clipping (owner report)');
+  const css188 = readFile('css/terminal.css');
+
+  // 188.1  Root cause (Protocol 27): the pre-existing .inventory-list li rule
+  //        (element+class, specificity 0-1-1) beats .mrow's bare class
+  //        (0-1-0) for shared properties — proved by confirming the
+  //        conflicting rule is still present unchanged (this fix overrides
+  //        it via specificity, never removes/weakens it).
+  assert(
+    /\.inventory-list li\s*\{[^}]*padding:\s*5px 0/.test(css188) &&
+      /\.inventory-list li\s*\{[^}]*justify-content:\s*space-between/.test(css188),
+    '188.1: the root-cause .inventory-list li rule (padding: 5px 0, justify-content: space-between) still exists unchanged — this fix overrides it via specificity, not by weakening the shared list rule'
+  );
+
+  // 188.2  The fix: a higher-specificity .tray-list .mrow override (0-2-0,
+  //        beats .inventory-list li's 0-1-1 regardless of source order)
+  //        restores the tag's 30px left clearance and left-aligned flow.
+  assert(
+    /\.tray-list \.mrow\s*\{[^}]*padding:\s*9px 12px 9px 30px/.test(css188) &&
+      /\.tray-list \.mrow\s*\{[^}]*justify-content:\s*flex-start/.test(css188) &&
+      /\.tray-list \.mrow\s*\{[^}]*border-bottom:\s*none/.test(css188),
+    '188.2: .tray-list .mrow restores the 30px left padding + flex-start flow + neutralises the leaked border-bottom, at a specificity (0-2-0) that beats .inventory-list li (0-1-1) regardless of source order'
+  );
+
+  // 188.3  The USE button itself gets a touch of breathing room from the
+  //        tag/eyelet without touching the shared, app-wide .use-btn class
+  //        (Protocol 22 — its 44px min-height tap-target convention is used
+  //        elsewhere and must not shrink).
+  const sharedUseBtnBlock188 = css188.slice(
+    css188.indexOf('.use-btn {'),
+    css188.indexOf('}', css188.indexOf('.use-btn {'))
+  );
+  assert(
+    /\.tray-list \.mrow \.use-btn\s*\{[^}]*margin:\s*0 6px 0 0/.test(css188) &&
+      /\.tray-list \.mrow \.use-btn\s*\{[^}]*padding:\s*4px 10px/.test(css188) &&
+      /min-height:\s*44px/.test(sharedUseBtnBlock188),
+    '188.3: a scoped .tray-list .mrow .use-btn rule adds spacing only — the shared .use-btn class (min-height:44px, used elsewhere) is untouched'
+  );
+
+  // 188.4  CSS/layout only — no id, handler, or markup-order change: the
+  //        renderInventory() row template (data-use/data-idx delegation,
+  //        .hole/.use-btn/.tag/.m-id/.m-ctrl element order) is byte-identical
+  //        to before this fix.
+  const render188 = readFile('js/ui-render.js');
+  const invBody188 = (render188.match(/function renderInventory\(\)[\s\S]*?\n\}/) || [''])[0];
+  assert(
+    /data-use="\$\{it\._origIdx\}"/.test(invBody188) &&
+      /class="hole" aria-hidden="true"/.test(invBody188) &&
+      /class="use-btn"/.test(invBody188) &&
+      invBody188.indexOf('class="hole"') < invBody188.indexOf('class="use-btn"'),
+    "188.4: renderInventory()'s row template (element order, data-use delegation) is unchanged — this was a CSS-only fix"
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail
