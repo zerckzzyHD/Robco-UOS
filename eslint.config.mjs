@@ -186,6 +186,9 @@ export default [
         restoreRollingBackup: 'readonly',
         // Render module cross-file globals (js/ui-render.js ↔ js/ui.js)
         _invFilter: 'writable',
+        setInvFilter: 'readonly',
+        _syncDrawerButtons: 'readonly', // Phase 3 · Piece 2 CARGO MANIFEST drawer bank (ui-render.js)
+        _DRAWER_LABELS: 'readonly', // Phase 3 · Piece 2 CARGO MANIFEST drawer labels (ui-render.js)
         _updatePanelBadges: 'readonly',
         escapeHtml: 'readonly',
         emptyState: 'readonly',

@@ -1,6 +1,10 @@
 let attachedImageData = null;
 let attachedImageMimeType = null;
-let _invFilter = 'all';
+// Phase 3 · Piece 2 (CARGO MANIFEST drawer bank): default drawer before the
+// robco_cargo_drawer MetaStore pref is restored at boot (_restoreDevicePrefs).
+// No 'all' drawer exists in the physical pull-drawer design (each item type
+// is exactly one drawer away) — 'weapon' mirrors the approved mockup default.
+let _invFilter = 'weapon';
 
 // ── RENDER SIGNATURE CACHE (WU-A3) ────────────────────────────
 // Tracks the last-rendered state slice per panel. Module scope means the
@@ -1954,6 +1958,17 @@ function _restoreDevicePrefs() {
     let el = document.getElementById('hardwareSfxToggle');
     if (el) el.checked = false;
   }
+  // Phase 3 · Piece 2 (CARGO MANIFEST): restore the last-open drawer (UI-6).
+  // Only the button/tray visibility is synced here — renderInventory()/
+  // renderAmmo() (called later from loadUI()) do the actual data render, and
+  // _updateContextPanels() self-heals a stale 'mod' pick on a no-mods game.
+  {
+    const savedDrawer = MetaStore.get('robco_cargo_drawer');
+    if (savedDrawer && typeof _DRAWER_LABELS !== 'undefined' && _DRAWER_LABELS[savedDrawer]) {
+      _invFilter = savedDrawer;
+    }
+    if (typeof _syncDrawerButtons === 'function') _syncDrawerButtons(_invFilter);
+  }
   // Silently refresh model list 2s after boot if key is present
   if (MetaStore.get('robco_gemini_key')) {
     setTimeout(() => {
@@ -3111,13 +3126,13 @@ function _updatePanelBadges() {
   const badges = [
     { h2text: '> PERKS', count: (state.perks || []).length },
     {
-      h2text: '> BACKPACK INVENTORY',
+      h2text: '> CARGO MANIFEST',
       // Combined: non-ammo inventory items + tracked ammo calibers
       count:
         (state.inventory || []).filter(it => (it.type || 'misc') !== 'ammo').length +
         Object.values(state.ammo || {}).filter(v => v > 0).length,
     },
-    { h2text: '> SQUAD STATUS', count: (state.squad || []).length },
+    { h2text: '> SQUAD ROSTER', count: (state.squad || []).length },
     { h2text: '> STATUS EFFECTS', count: (state.status || []).length },
     { h2text: '> CAMPAIGN NOTES', count: (state.campaign_notes || []).length },
     {
@@ -3125,11 +3140,11 @@ function _updatePanelBadges() {
       count: _pendingDirectivesCount(),
     },
     {
-      h2text: '> COLLECTIBLES',
+      h2text: '> CURIO ARCHIVE',
       count: (state.collectibles || []).length,
     },
     {
-      h2text: '> CRAFTING',
+      h2text: '> FIELD FABRICATION',
       count:
         typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.recipes)
           ? FALLOUT_REGISTRY.recipes.filter(r =>
@@ -3401,11 +3416,17 @@ function _bezelStatusSuffix() {
   const radsEl = document.getElementById('stat_rads');
   const rads = radsEl ? parseInt(radsEl.value) || 0 : state.rads || 0;
   const connected = typeof _isUplinkConnected === 'function' ? _isUplinkConnected() : false;
+  // Phase 3 · Piece 2: the OPERATIONS weigh bridge's SEIZED (over-encumbered)
+  // state also flags on the bezel telemetry strip, alongside every other
+  // subsystem's VITALS/RAD/CARRIER line — reads the same body.weight-over
+  // class updateMath() already toggles, never a second weight computation.
+  const overEncumbered = document.body.classList.contains('weight-over');
   return (
     ' · VITALS ' +
     _vitalsTier() +
     ' · RAD ' +
     Math.max(0, rads) +
+    (overEncumbered ? ' · ⚠ CARGO SEIZED' : '') +
     ' · CARRIER ' +
     (connected ? 'ONLINE' : 'OFFLINE')
   );
@@ -3620,17 +3641,17 @@ function expandPanelForCategory(categoryKey) {
   if (tabMap[categoryKey]) switchTab(tabMap[categoryKey]);
 
   const map = {
-    squad: '> SQUAD STATUS',
+    squad: '> SQUAD ROSTER',
     status: '> STATUS EFFECTS',
-    inventory: '> BACKPACK INVENTORY',
+    inventory: '> CARGO MANIFEST',
     campaign_notes: '> CAMPAIGN NOTES',
     perks: '> PERKS',
     factions: '> FACTION STANDING',
     quests: '> QUEST LOG',
-    ammo: '> BACKPACK INVENTORY', // ammo lives in the sub-panel inside BACKPACK
+    ammo: '> CARGO MANIFEST', // ammo now lives in the AMMO drawer, folded into the manifest board
     equipped: '> EQUIPPED',
-    collectibles: '> COLLECTIBLES',
-    craft: '> CRAFTING',
+    collectibles: '> CURIO ARCHIVE',
+    craft: '> FIELD FABRICATION',
     trade: '> BARTER UPLINK',
     skillBooks: '> SKILL BOOKS',
     magazines: '> SKILL MAGAZINES',
@@ -3667,10 +3688,13 @@ function expandPanelForCategory(categoryKey) {
       MetaStore.set('robco_panel_state', JSON.stringify(ps));
     }
   }
-  // For ammo/skillBooks/magazines, also open the relevant nested sub-panel
+  // For ammo/skillBooks/magazines, also open the relevant nested sub-panel.
+  // Ammo's visibility is now drawer-gated (Phase 3 · Piece 2 CARGO MANIFEST
+  // reskin) rather than a collapsible <details> — pulling the AMMO drawer
+  // via setInvFilter() is what reveals it (also updates the drawer's active
+  // state + persists the choice, Protocol 22 single entry point).
   if (categoryKey === 'ammo') {
-    const subPanel = document.getElementById('ammoSubPanel');
-    if (subPanel && !subPanel.open) subPanel.setAttribute('open', '');
+    if (typeof setInvFilter === 'function') setInvFilter('ammo');
   } else if (categoryKey === 'skillBooks') {
     const subPanel = document.getElementById('skillBooksPanel');
     if (subPanel && !subPanel.open) subPanel.setAttribute('open', '');
@@ -5243,6 +5267,54 @@ function _syncOperatorTelemetry() {
   );
 }
 
+// OPERATIONS BUS-10 LOAD-CELL WEIGH BRIDGE — a read-only mirror of the exact
+// curWt/maxWeight updateMath() already computed (Phase 3 · Piece 2). Drives a
+// physical load-beam SVG that bends continuously in proportion to real carry
+// weight (never 4 discrete frames) via a plain CSS `transition: d`, which the
+// existing global prefers-reduced-motion block collapses to an instant snap
+// (transition-duration:0.01ms) with no bespoke carve-out. Zero new state —
+// source of truth stays curWt/maxWeight; this only paints a second projection.
+function _paintWeighBridge(curWt, maxWeight) {
+  const path = document.getElementById('opsBeamPath');
+  if (!path) return; // OPERATIONS markup not present (e.g. a stripped test harness)
+  const pct = maxWeight > 0 ? (curWt / maxWeight) * 100 : 0;
+  const bendPct = Math.min(130, pct); // visual bend caps past ~130% so the SVG never inverts
+  const sag = 4 + bendPct * 0.48;
+  path.setAttribute('d', 'M30,36 Q150,' + (36 + sag).toFixed(1) + ' 270,36');
+  const block = document.getElementById('opsBeamBlock');
+  if (block) {
+    const midY = 36 + sag * 0.5;
+    block.setAttribute('y', (midY - 16).toFixed(1));
+  }
+  const seized = curWt >= maxWeight;
+  const heavy = !seized && curWt >= maxWeight * 0.75;
+  const tag = seized ? 'SEIZED — OVER-ENCUMBERED' : heavy ? 'heavy load' : 'nominal';
+  const pctText = document.getElementById('opsBeamPct');
+  if (pctText) pctText.textContent = 'LOAD ' + Math.round(pct) + '%' + (seized ? ' — OVER' : '');
+  const loadSub = document.getElementById('opsLoadSub');
+  if (loadSub) loadSub.textContent = 'load ' + Math.round(pct) + '% · ' + tag;
+  const stamp = document.getElementById('opsSeizedStamp');
+  if (stamp) stamp.style.display = seized ? '' : 'none';
+  const note = document.getElementById('opsSeizedNote');
+  if (note) note.style.display = seized ? '' : 'none';
+  const led = document.getElementById('opsBridgeLed');
+  if (led) led.classList.toggle('red', seized);
+  const caps = parseInt((document.getElementById('c_caps') || {}).value) || 0;
+  const status = document.getElementById('opsBridgeStatus');
+  if (status) {
+    status.textContent =
+      (seized ? '⚠ SEIZED · ' : '') +
+      'CARGO ' +
+      curWt.toFixed(1) +
+      ' / ' +
+      maxWeight +
+      ' LB · ' +
+      caps +
+      ' CAPS';
+    status.classList.toggle('alert', seized);
+  }
+}
+
 function updateMath() {
   let maxAp = 65 + state.a * 3;
   document.getElementById('display_ap').innerText = maxAp;
@@ -5254,8 +5326,11 @@ function updateMath() {
     .filter(item => (item.type || 'misc') !== 'ammo')
     .reduce((acc, item) => acc + item.qty * item.wgt, 0);
   document.getElementById('display_weight').innerText = `${curWt.toFixed(1)} / ${maxWeight}`;
-  document.getElementById('display_weight').style.color =
-    curWt > maxWeight ? 'var(--robco-danger)' : 'var(--robco-green)';
+  // Color now rides the body.weight-heavy/-critical/-over classes (toggled
+  // below) via CSS instead of an inline style — the LOAD-CELL WEIGH BRIDGE
+  // (OPERATIONS BUS-10) needs the same 3-tier nominal/amber/red readout the
+  // bridge instrument itself uses, and a single CSS rule keeps both in sync
+  // (Phase 3 · Piece 2).
 
   // HP Bar update + Critical HP Flash (#37)
   let hpFill = document.getElementById('hp_bar_fill');
@@ -5366,6 +5441,11 @@ function updateMath() {
   if (curWt >= maxWeight) document.body.classList.add('weight-over');
   else if (curWt >= maxWeight * 0.9) document.body.classList.add('weight-critical');
   else if (curWt >= maxWeight * 0.75) document.body.classList.add('weight-heavy');
+  // OPERATIONS BUS-10 LOAD-CELL WEIGH BRIDGE — read-only mirror of the same
+  // curWt/maxWeight this function already computed; painted from this one
+  // apply path so the bridge and OPERATOR's own display_weight can never
+  // disagree (Phase 3 · Piece 2, Protocol 22 single-apply).
+  if (typeof _paintWeighBridge === 'function') _paintWeighBridge(curWt, maxWeight);
 
   // #25 Radiation Treatment Alert — compute how many RadAway doses needed.
   // PHASE 3: #radAwayAlert now wraps a lamp <i> + a #radAwayAlertText span

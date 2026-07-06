@@ -50,22 +50,117 @@ function delItem(idx) {
   renderInventory();
   updateMath();
 }
-function setInvFilter(cat) {
-  _invFilter = cat;
+
+// Phase 3 · Piece 2 (CARGO MANIFEST): per-row quantity ± stepper. Clamped >=0;
+// hitting 0 removes the row entirely (mirrors delItem's "gone" semantics —
+// there is no such thing as a zero-quantity cargo tag). A new native write
+// path (Protocol 13 regression test covers it), reusing the exact same
+// render/save calls every other inventory mutator already makes.
+function adjItemQty(idx, delta) {
+  const it = state.inventory[idx];
+  if (!it) return;
+  const next = Math.max(0, (parseInt(it.qty) || 0) + delta);
+  if (next === 0) {
+    state.inventory.splice(idx, 1);
+  } else {
+    it.qty = next;
+  }
+  renderInventory();
+  updateMath();
+  saveState();
+}
+
+// Phase 3 · Piece 2: native EQUIP control, closing the U10 audit gap
+// (state.equipped was previously AI-write-only — see api.js autoImportState,
+// which keeps validating/applying the AI's own equipped writes unchanged).
+// One equipped item per slot family: 'weapon'-typed items occupy
+// state.equipped.weapon, 'armor'-typed items occupy state.equipped.armor.
+// Headgear has no distinct inventory item type, so it stays AI-write-only.
+// Tapping the equipped item's own button unequips it; tapping a different
+// item of the same family replaces it (single-apply per slot).
+function toggleEquipItem(idx) {
+  const it = state.inventory[idx];
+  if (!it) return;
+  const cat = (it.type || 'misc').toLowerCase();
+  const slot = cat === 'weapon' ? 'weapon' : cat === 'armor' ? 'armor' : null;
+  if (!slot) return;
+  if (!state.equipped) state.equipped = { weapon: null, armor: null, headgear: null };
+  state.equipped[slot] = state.equipped[slot] === it.name ? null : it.name;
+  renderEquipped();
+  renderInventory();
+  saveState();
+}
+
+// Drawer bank labels + the state.inventory/state.ammo count each drawer badge
+// mirrors (Phase 3 · Piece 2 CARGO MANIFEST). Pure data — no game literal.
+const _DRAWER_LABELS = {
+  weapon: 'WEAPONS',
+  armor: 'APPAREL',
+  aid: 'AID',
+  mod: 'MODS',
+  misc: 'MISC',
+  ammo: 'AMMO',
+};
+function _drawerCount(cat) {
+  if (cat === 'ammo') return Object.values(state.ammo || {}).filter(n => n > 0).length;
+  return state.inventory.filter(it => (it.type || 'misc') === cat).length;
+}
+// Live per-drawer count badges + the CARGO MANIFEST board's 0i summary line —
+// called from both renderInventory() and renderAmmo() so it never goes stale
+// regardless of which one last mutated state.
+function _updateManifestChrome() {
+  const bar = document.getElementById('invFilterBar');
+  if (bar) {
+    bar.querySelectorAll('[data-dcount]').forEach(el => {
+      el.textContent = String(_drawerCount(el.dataset.dcount));
+    });
+  }
+  const label = _DRAWER_LABELS[_invFilter] || String(_invFilter).toUpperCase();
+  const title = document.getElementById('opsDrawerTitle');
+  if (title) title.textContent = label + ' DRAWER';
+  const total =
+    state.inventory.filter(it => (it.type || 'misc') !== 'ammo').length +
+    Object.values(state.ammo || {}).filter(n => n > 0).length;
+  const status = document.getElementById('opsManifestStatus');
+  if (status) status.textContent = total + ' ITEMS · ' + label + ' DRAWER OPEN';
+}
+
+// Syncs the drawer bank's visual "pulled" state + which tray is visible for
+// the given category — split out from setInvFilter() so boot restore
+// (_restoreDevicePrefs, ui-core.js) can apply a persisted drawer choice
+// before state/renderInventory are necessarily ready, without re-persisting
+// or re-rendering prematurely.
+function _syncDrawerButtons(cat) {
   const bar = document.getElementById('invFilterBar');
   if (bar) {
     bar.querySelectorAll('.inv-filter-btn').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.filter === cat);
+      const isActive = btn.dataset.filter === cat;
+      btn.classList.toggle('active', isActive);
+      btn.classList.toggle('pulled', isActive);
     });
   }
+  // AMMO folds the AMMO RESERVES tray in place of the item list — every other
+  // drawer shows the manifest list instead (same ammoList/ammoSubPanel ids,
+  // just display-toggled by the drawer choice, Protocol 22).
+  const invListWrap = document.getElementById('invListWrap');
+  const ammoTray = document.getElementById('ammoSubPanel');
+  if (invListWrap) invListWrap.style.display = cat === 'ammo' ? 'none' : '';
+  if (ammoTray) ammoTray.style.display = cat === 'ammo' ? '' : 'none';
+}
+
+function setInvFilter(cat) {
+  _invFilter = cat;
+  _syncDrawerButtons(cat);
+  MetaStore.set('robco_cargo_drawer', cat); // UI-6 — remember the last-open drawer
   renderInventory();
+  renderAmmo();
 }
 
 function renderInventory() {
   const lst = document.getElementById('invList');
   if (!lst) return;
   // #23 Consumable Quick-Use + #32 Item Category Tags
-  // Each row shows: [TYPE] qty x Name (weight · value) [USE] [X]
+  // Each row shows: [TYPE] name (qty · weight · value) [EQUIP] [-/qty/+] [USE] [X]
   const typeColors = {
     weapon: 'var(--robco-danger)',
     armor: 'var(--robco-blue)',
@@ -74,34 +169,49 @@ function renderInventory() {
     ammo: 'var(--robco-alert)',
     misc: 'var(--robco-alert)',
   };
-  // Filter ammo-typed items — they render in the ammo sub-panel
-  // Map with original index FIRST so data-idx and data-use stay correct after filter
+  const searchEl = document.getElementById('invDrawerSearch');
+  const q = (searchEl ? searchEl.value : '').toLowerCase().trim();
+  // Filter ammo-typed items — they render in the AMMO drawer instead.
+  // Map with original index FIRST so data-idx/data-use/data-equip/data-qtyidx
+  // stay correct after filtering.
   const displayItems = state.inventory
     .map((it, idx) => ({ ...it, _origIdx: idx }))
     .filter(it => {
       const type = it.type || 'misc';
       if (type === 'ammo') return false;
-      if (_invFilter === 'all') return true;
-      return type === _invFilter;
+      if (type !== _invFilter) return false;
+      if (q && !it.name.toLowerCase().includes(q)) return false;
+      return true;
     });
+  _updateManifestChrome();
   if (displayItems.length === 0) {
-    const label =
-      _invFilter === 'all'
-        ? 'INVENTORY ITEMS'
-        : _invFilter === 'armor'
-          ? 'APPAREL'
-          : _invFilter === 'ammo'
-            ? 'AMMO — SEE AMMO RESERVES BELOW'
-            : _invFilter.toUpperCase() + ' ITEMS';
-    lst.innerHTML = emptyState('NO ' + label);
+    const label = _DRAWER_LABELS[_invFilter] || String(_invFilter).toUpperCase();
+    lst.innerHTML = emptyState('NO ' + label + (q ? ' MATCHES' : ' ITEMS'));
     lst.onclick = null;
     return;
   }
+  const eq = state.equipped || {};
   lst.innerHTML = displayItems
     .map(it => {
       const cat = (it.type || 'misc').toLowerCase();
       const typeTag = `<span class="tag" style="color:${typeColors[cat] || 'inherit'};">[${cat.toUpperCase()}]</span>`;
-      return `<li><button class="use-btn" data-use="${it._origIdx}" title="Quick-use: send [USE] ${escapeHtml(it.name)}" aria-label="Use item: ${escapeHtml(it.name)}">USE</button>${typeTag}<span class="inv-name">${parseInt(it.qty) || 0}x ${escapeHtml(it.name)} (${parseFloat(it.wgt) || 0} lb${parseInt(it.val) ? ' · ' + parseInt(it.val) + 'c' : ''})</span><button class="delete-btn" data-idx="${it._origIdx}" aria-label="Remove ${escapeHtml(it.name)} from inventory">X</button></li>`;
+      const slot = cat === 'weapon' ? 'weapon' : cat === 'armor' ? 'armor' : null;
+      const isEq = !!(slot && eq[slot] === it.name);
+      const equipBtn = slot
+        ? `<button class="equip-btn${isEq ? ' equip-btn--on' : ''}" data-equip="${it._origIdx}" aria-label="${isEq ? 'Unequip' : 'Equip'} ${escapeHtml(it.name)}">${isEq ? '● EQUIPPED' : 'EQUIP'}</button>`
+        : '';
+      return (
+        `<li class="mrow${isEq ? ' iseq' : ''}">` +
+        `<span class="hole" aria-hidden="true"></span>` +
+        `<button class="use-btn" data-use="${it._origIdx}" title="Quick-use: send [USE] ${escapeHtml(it.name)}" aria-label="Use item: ${escapeHtml(it.name)}">USE</button>${typeTag}` +
+        `<span class="m-id"><span class="inv-name m-name">${escapeHtml(it.name)}</span>` +
+        `<span class="m-meta">${parseInt(it.qty) || 0}x &middot; ${parseFloat(it.wgt) || 0} lb${parseInt(it.val) ? ' &middot; ' + parseInt(it.val) + 'c' : ''}</span></span>` +
+        `<span class="m-ctrl">${equipBtn}` +
+        `<span class="qtybox"><button class="qty-btn" data-qtyidx="${it._origIdx}" data-qtydelta="-1" aria-label="Decrease ${escapeHtml(it.name)} quantity">−</button>` +
+        `<span class="q">${parseInt(it.qty) || 0}</span>` +
+        `<button class="qty-btn" data-qtyidx="${it._origIdx}" data-qtydelta="1" aria-label="Increase ${escapeHtml(it.name)} quantity">+</button></span>` +
+        `<button class="delete-btn" data-idx="${it._origIdx}" aria-label="Remove ${escapeHtml(it.name)} from inventory">X</button></span></li>`
+      );
     })
     .join('');
   lst.onclick = e => {
@@ -116,33 +226,41 @@ function renderInventory() {
       if (!item) return;
       document.getElementById('chatInput').value = `> [USE] ${item.name}`;
       transmitMessage();
+      return;
+    }
+    const eqBtn = e.target.closest('[data-equip]');
+    if (eqBtn) {
+      toggleEquipItem(+eqBtn.dataset.equip);
+      return;
+    }
+    const qtyBtn = e.target.closest('[data-qtyidx]');
+    if (qtyBtn) {
+      adjItemQty(+qtyBtn.dataset.qtyidx, +qtyBtn.dataset.qtydelta);
+      return;
     }
   };
 }
 
-// ── AMMO RESERVES ──────────────────────────────────────────────
+// ── AMMO RESERVES (folded into the CARGO MANIFEST's AMMO drawer) ───────
 function renderAmmo() {
   const ammoDiv = document.getElementById('ammoList');
   if (!ammoDiv) return;
   const ammoObj = state.ammo || {};
   const entries = Object.entries(ammoObj).filter(([, count]) => count > 0);
+  _updateManifestChrome();
   if (entries.length === 0) {
     ammoDiv.innerHTML = emptyState('NO AMMO TRACKED');
     return;
   }
   // Sort alphabetically by caliber name
   entries.sort((a, b) => a[0].localeCompare(b[0]));
-  ammoDiv.innerHTML =
-    '<div style="display:grid;grid-template-columns:1fr auto auto;gap:2px 8px;font-size:11px;">' +
-    entries
-      .map(
-        ([caliber, count]) =>
-          `<span style="opacity:0.8;">${escapeHtml(caliber)}</span>` +
-          `<span style="text-align:right;">${count}</span>` +
-          `<button class="delete-btn" style="font-size:9px;padding:0 4px;" onclick="removeAmmo('${escapeHtml(caliber).replace(/'/g, '&#39;')}')" title="Remove">X</button>`
-      )
-      .join('') +
-    '</div>';
+  ammoDiv.innerHTML = entries
+    .map(
+      ([caliber, count]) =>
+        `<div class="arow"><b>${escapeHtml(caliber)}</b><span class="a-count">&times;${count}</span>` +
+        `<button class="delete-btn" onclick="removeAmmo('${escapeHtml(caliber).replace(/'/g, '&#39;')}')" aria-label="Remove ${escapeHtml(caliber)} reserve">X</button></div>`
+    )
+    .join('');
 }
 
 function addAmmo() {
@@ -167,46 +285,71 @@ function removeAmmo(caliber) {
   updateMath();
 }
 
+// Phase 3 \u00b7 Piece 2 (SQUAD ROSTER, BUS-14): registry-driven ENLIST options,
+// replacing the hardcoded 8-FNV-companion <select> (a Protocol 38 game-literal
+// bug \u2014 FO3 campaigns previously showed FNV companion names). Reads the SAME
+// FALLOUT_REGISTRY the active game boot already swapped in (Protocol 22,
+// mirrors renderCollectibles()'s FALLOUT_REGISTRY.collectibles pattern) \u2014
+// already-enlisted companions are filtered out of the picker.
+function _populateSquadEnlistOptions() {
+  const sel = document.getElementById('newSquadName');
+  if (!sel) return;
+  const companions =
+    typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.companions)
+      ? FALLOUT_REGISTRY.companions
+      : [];
+  const enlisted = new Set((state.squad || []).map(m => m.name.toLowerCase()));
+  sel.innerHTML =
+    '<option disabled selected value="">SELECT COMPANION\u2026</option>' +
+    companions
+      .filter(c => !enlisted.has(c.name.toLowerCase()))
+      .map(c => `<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)}</option>`)
+      .join('');
+}
+
 function renderSquad() {
   const squadDiv = document.getElementById('squadList');
   if (!squadDiv) return;
+  _populateSquadEnlistOptions();
+  const status = document.getElementById('opsSquadStatus');
   if (!state.squad || state.squad.length === 0) {
     squadDiv.innerHTML = emptyState('NO ACTIVE COMPANIONS');
+    if (status) status.textContent = 'NO ACTIVE COMPANIONS';
     return;
+  }
+  if (status) {
+    const affs = state.squad.map(m => Math.min(100, Math.max(0, parseInt(m.affinity) || 0)));
+    const avg = Math.round(affs.reduce((a, b) => a + b, 0) / affs.length);
+    status.textContent = state.squad.length + ' ACTIVE \u00b7 AVG AFFINITY ' + avg + '%';
   }
   squadDiv.innerHTML = state.squad
     .map((member, i) => {
       const hpRatio = member.hp / (member.hpMax || 100);
-      const pBars = Math.ceil(hpRatio * 10);
-      const barStr = '['.padEnd(pBars + 1, '\u2588').padEnd(11, '\u2591') + ']';
+      const pBars = Math.max(0, Math.min(100, Math.round(hpRatio * 100)));
       // #11 Companion Affinity \u2014 U10: always rendered with native [+]/[-] nudge
       // buttons (previously AI-write-only via autoImportState; the affinity bar
       // stayed invisible until the AI happened to set it, with no player-facing
       // way to ever initialize it). Missing affinity defaults to 0, same fallback
       // adjustAffinity() uses.
       const aff = Math.min(100, Math.max(0, parseInt(member.affinity) || 0));
-      const affBars = Math.round(aff / 10);
-      const affBar = '['.padEnd(affBars + 1, '\u25a0').padEnd(11, '\u25a1') + ']';
-      const affColor =
-        aff >= 75 ? 'var(--robco-green)' : aff >= 40 ? 'var(--robco-alert)' : 'var(--robco-danger)';
-      const affinityStr = `<div style="font-size:10px;margin-top:2px;display:flex;align-items:center;gap:6px;">
-                <span style="color:${affColor};">AFF: ${affBar} ${aff}%</span>
-                <button class="faction-btn" aria-label="Affinity +5 for ${escapeHtml(member.name)}" onclick="adjustAffinity(${i},5)">+</button>
-                <button class="faction-btn" aria-label="Affinity -5 for ${escapeHtml(member.name)}" onclick="adjustAffinity(${i},-5)">-</button>
-            </div>`;
-      return `<div style="margin-bottom: 5px; border-bottom: 1px dashed rgba(var(--robco-green-rgb), 0.3); padding-bottom: 4px;">
-            <div style="font-weight:bold;display:flex;justify-content:space-between;align-items:center;">
-                <span>${barStr} ${escapeHtml(member.name)}</span>
-                <button class="delete-btn" onclick="removeSquadMember(${i})">X</button>
-            </div>
-            <div style="font-size: 11px; display:flex; justify-content:space-between; margin-top:2px;">
-                <span style="color: var(--robco-green)">HP: ${parseInt(member.hp) || 0}/${parseInt(member.hpMax) || 0}</span>
-                <span style="color: var(--robco-alert)">AMMO: ${parseInt(member.ammo) || 0}</span>
-                <span style="color: var(--robco-danger)">CND: ${escapeHtml(String(member.condition))}</span>
-            </div>
-            ${member.weapon ? `<div style="font-size:10px;opacity:0.6;margin-top:1px;">WPN: ${escapeHtml(member.weapon)}${member.dt !== undefined ? ' | DT: ' + (parseInt(member.dt) || 0) : ''}</div>` : ''}
-            ${affinityStr}
-        </div>`;
+      return (
+        `<div class="sq-card">` +
+        `<div class="sq-head"><span class="sq-name">${escapeHtml(member.name)}</span>` +
+        `<button class="delete-btn" aria-label="Dismiss ${escapeHtml(member.name)}" onclick="removeSquadMember(${i})">\u2715 DISMISS</button></div>` +
+        `<div class="sq-bar"><i style="width:${pBars}%"></i></div>` +
+        `<div class="sq-stats"><span>HP ${parseInt(member.hp) || 0}/${parseInt(member.hpMax) || 0}</span>` +
+        `<span>AMMO ${parseInt(member.ammo) || 0}</span>` +
+        `<span>CND ${escapeHtml(String(member.condition))}</span>` +
+        (member.weapon
+          ? `<span>WPN: ${escapeHtml(member.weapon)}${member.dt !== undefined ? ' \u00b7 DT ' + (parseInt(member.dt) || 0) : ''}</span>`
+          : '') +
+        `</div>` +
+        `<div class="aff-row"><span class="a-cap">AFFINITY ${aff}%</span>` +
+        `<span class="aff-meter"><i style="width:${aff}%"></i></span>` +
+        `<button aria-label="Lower ${escapeHtml(member.name)} affinity" onclick="adjustAffinity(${i},-5)">\u2212</button>` +
+        `<button aria-label="Raise ${escapeHtml(member.name)} affinity" onclick="adjustAffinity(${i},5)">+</button></div>` +
+        `</div>`
+      );
     })
     .join('');
 }
@@ -686,6 +829,12 @@ function renderCollectibles() {
   // Update sub-panel summary label with game-specific type and count
   const collectiblesH3 = document.querySelector('#collectiblesSubPanel > summary > h3');
   if (collectiblesH3) collectiblesH3.textContent = `> ${typeLabel} [${acquiredCount}/${total}]`;
+  // BUS-15 CURIO ARCHIVE board-level 0i status (Phase 3 · Piece 2)
+  const curioStatus = document.getElementById('opsCurioStatus');
+  if (curioStatus) curioStatus.textContent = `${acquiredCount}/${total} ${typeLabel} ACQUIRED`;
+  const curioPn = document.querySelector('#curioPanel .bay-part-no');
+  if (curioPn)
+    curioPn.innerHTML = `PN RBC-FRT-15 &middot; DISPLAY CASE — ${escapeHtml(typeLabel)} <span class="real-label">(COLLECTIBLES — toggleCollectible unchanged)</span>`;
 
   let html = '';
 
@@ -1739,13 +1888,22 @@ function renderCraftCard() {
     skillHtml = `<span style="font-size:10px;color:${col};white-space:nowrap;">(${escapeHtml(lbl)} ${req.level} ${met ? '✓' : '✗'})</span>`;
   }
   let maxBatch = MAX_CAP;
+  // Phase 3 · Piece 2 (FIELD FABRICATION): per-ingredient HAVE/NEED meter bars
+  // — same have/need numbers as before, now with a fill bar (short = red).
   const ingHtml = recipe.ingredients
     .map(ing => {
       const haveN = _craftGetHave(ing.item);
       const canMake = ing.qty > 0 ? Math.floor(haveN / ing.qty) : MAX_CAP;
       if (canMake < maxBatch) maxBatch = canMake;
-      const col = haveN >= ing.qty ? 'var(--robco-green)' : 'var(--robco-danger)';
-      return `<span style="color:${col};font-size:10px;margin-right:5px;">${escapeHtml(ing.item)} ${haveN}/${ing.qty}</span>`;
+      const short = haveN < ing.qty;
+      const fillPct = ing.qty > 0 ? Math.min(100, Math.round((haveN / ing.qty) * 100)) : 100;
+      return (
+        `<div class="ing${short ? ' short' : ''}">` +
+        `<b>${escapeHtml(ing.item)}</b>` +
+        `<span class="hn-meter"><i style="width:${fillPct}%"></i></span>` +
+        `<span class="hn-txt">HAVE ${haveN} / NEED ${ing.qty}</span>` +
+        `</div>`
+      );
     })
     .join('');
   const allMet = recipe.ingredients.every(ing => _craftGetHave(ing.item) >= ing.qty);
@@ -1812,6 +1970,9 @@ function renderCraft() {
     typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.breakdowns)
       ? FALLOUT_REGISTRY.breakdowns
       : [];
+  const fabStatus = document.getElementById('opsFabStatus');
+  if (fabStatus)
+    fabStatus.textContent = recipes.length + ' RECIPES · ' + breakdowns.length + ' BREAKDOWNS';
 
   // ── Recipe picker ──────────────────────────────────────────────
   if (recipes.length === 0) {
@@ -2080,6 +2241,14 @@ function _renderTradeStats() {
     `<span>CAPS: <b>${state.caps || 0}</b></span>` +
     `<span>VENDOR PURSE: <b>${v ? v.baseCaps : 0}</b></span>` +
     `<span>BARTER: <b>${_tradeBarterSkill()}</b></span>`;
+  const boardStatus = document.getElementById('opsBarterStatus');
+  if (boardStatus && v)
+    boardStatus.textContent =
+      v.name.toUpperCase() +
+      (v.location ? ' — ' + v.location.toUpperCase() : '') +
+      ' · PURSE ' +
+      v.baseCaps +
+      ' CAPS';
 }
 
 function renderTrade() {
@@ -2092,6 +2261,8 @@ function renderTrade() {
     header.innerHTML = '<span class="empty-state">No vendor data for this game.</span>';
     if (buyList) buyList.innerHTML = '';
     if (sellList) sellList.innerHTML = '';
+    const boardStatus = document.getElementById('opsBarterStatus');
+    if (boardStatus) boardStatus.textContent = 'NO VENDOR DATA';
     return;
   }
   if (_tradeVendorIdx < 0 || _tradeVendorIdx >= vendors.length) _tradeVendorIdx = 0;
@@ -2893,14 +3064,14 @@ function _updateContextPanels() {
     // Only show if on stat tab and FO3 mode; otherwise hide
     karmaPanel.style.display = usesKarmaCenter ? '' : 'none';
   }
-  // U9-5: FO3 has no weapon-mod system/data — hide the inventory "Mods" filter so
-  // it never advertises a category that can never have entries (Protocol 38 reverse leak).
+  // U9-5: FO3 has no weapon-mod system/data — hide the MODS drawer so it never
+  // advertises a category that can never have entries (Protocol 38 reverse leak).
   const hasWeaponMods = _activeDef().hasWeaponMods;
   const modsFilterBtn = document.getElementById('invFilterMods');
   if (modsFilterBtn) {
     modsFilterBtn.style.display = hasWeaponMods ? '' : 'none';
     if (!hasWeaponMods && typeof _invFilter !== 'undefined' && _invFilter === 'mod') {
-      setInvFilter('all');
+      setInvFilter('weapon'); // the drawer bank has no "All" drawer to fall back to
     }
   }
 }

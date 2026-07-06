@@ -532,21 +532,16 @@
                 </div>
               </div>
 
-              <!-- the polished readback strip: one uniform 4-tile hardware row -->
+              <!-- the polished readback strip: BOTTLE CAPS + WEIGHT moved to
+                   OPERATIONS' BUS-10 LOAD-CELL WEIGH BRIDGE (Phase 3 · Piece 2).
+                   #c_caps stays the ONE editable caps input in the app — it now
+                   lives on the bridge board; every reference (updateMath,
+                   barter doBuy/doSell, saveState/syncStateFromDom) still resolves
+                   it by id, unaffected by its new DOM location (Protocol 22). -->
               <div class="readback-strip">
-                <div class="rb-tile amber">
-                  <span class="rb-cap">BOTTLE CAPS</span>
-                  <input type="number" id="c_caps" value="0" min="0" oninput="updateMath()" />
-                  <span class="rb-sub">editable readout</span>
-                </div>
                 <div class="rb-tile">
                   <span class="rb-cap">MAX AP</span>
                   <span class="rb-val" id="display_ap">80</span>
-                  <span class="rb-sub">computed readout</span>
-                </div>
-                <div class="rb-tile">
-                  <span class="rb-cap">WEIGHT</span>
-                  <span class="rb-val" id="display_weight">0 / 200</span>
                   <span class="rb-sub">computed readout</span>
                 </div>
                 <button
@@ -1164,73 +1159,177 @@
               </div>
             </details>
 
-            <details class="panel" data-tab="inv">
+            <!-- ══════════════════════════════════════════════════════════════
+                 PHASE 3 · PIECE 2 — OPERATIONS "quartermaster's freight
+                 console" (Protocol 22/25 reskin — wraps the exact shipped
+                 ids/handlers, no behavior regression). Matches
+                 planning/PHASE3_OPERATIONS_PLAN.md + the owner-approved
+                 planning/mockups/operations-console.html (BEAM bridge
+                 variant + Variant A CARGO TAG rows). BUS-10…15 continue the
+                 OPERATOR BUS-01…09 part-number series on the same bus.
+                 ══════════════════════════════════════════════════════════════ -->
+
+            <!-- BUS-10 · LOAD-CELL WEIGH BRIDGE — read-only mirror, live beam bend -->
+            <details class="panel bay-board span2" data-tab="inv" id="opsBridgePanel" open>
               <summary>
-                <h2>> BACKPACK INVENTORY</h2>
+                <h2>
+                  &gt;
+                  <span class="board-led" id="opsBridgeLed" aria-hidden="true"></span> LOAD-CELL
+                  WEIGH BRIDGE
+                </h2>
+                <span class="panel-substatus" id="opsBridgeStatus">CARGO — / — LB · — CAPS</span>
               </summary>
-              <div
-                id="invFilterBar"
-                style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px"
+              <span class="bay-slot-tag">BUS-10</span>
+              <span class="bay-part-no"
+                >PN RBC-FRT-10 &middot; STRAIN-GAUGE LOAD CELL — LIVE BEND
+                <span class="real-label"
+                  >(CARRY WEIGHT — read-only mirror of the OPERATOR calc)</span
+                ></span
               >
+
+              <div class="bridge-wrap">
+                <div class="beam-instrument">
+                  <svg viewBox="0 0 300 96" aria-hidden="true">
+                    <path class="beam-support" d="M22,60 L38,60 L30,36 Z" />
+                    <path class="beam-support" d="M262,60 L278,60 L270,36 Z" />
+                    <path class="beam-path" id="opsBeamPath" d="M30,36 Q150,44 270,36" />
+                    <rect
+                      class="beam-block"
+                      id="opsBeamBlock"
+                      x="132"
+                      y="18"
+                      width="36"
+                      height="16"
+                      rx="2"
+                    />
+                    <text class="beam-pct" id="opsBeamPct" x="150" y="82">LOAD 0%</text>
+                  </svg>
+                  <span class="seized-stamp" id="opsSeizedStamp" style="display: none"
+                    >&#9888; SEIZED</span
+                  >
+                </div>
+                <div class="wb-readouts">
+                  <div class="rb-tile loadtile">
+                    <span class="rb-cap"
+                      >CARGO LOAD <span class="real-label">(CARRY WEIGHT)</span></span
+                    >
+                    <span class="rb-val" id="display_weight">0 / 200</span>
+                    <span class="rb-sub" id="opsLoadSub">load 0% &middot; nominal</span>
+                  </div>
+                  <div class="rb-tile wire">
+                    <span class="rb-cap"
+                      >REQUISITION CREDIT <span class="real-label">(CAPS)</span></span
+                    >
+                    <input type="number" id="c_caps" value="0" min="0" oninput="updateMath()" />
+                    <span class="rb-sub">editable readout — the one caps field in the app</span>
+                  </div>
+                </div>
+              </div>
+              <div class="seized-note" id="opsSeizedNote" style="display: none">
+                &#9888; BRIDGE SEIZED — OVER-ENCUMBERED. Load exceeds rated capacity. Shed cargo to
+                move freely.
+              </div>
+            </details>
+
+            <!-- BUS-11 · CARGO MANIFEST — six pull-drawers, bounded in-panel scroll -->
+            <details class="panel bay-board span2" data-tab="inv" id="opsManifestPanel" open>
+              <summary>
+                <h2>&gt; <span class="board-led" aria-hidden="true"></span> CARGO MANIFEST</h2>
+                <span class="panel-substatus" id="opsManifestStatus">— ITEMS · — DRAWER OPEN</span>
+              </summary>
+              <span class="bay-slot-tag">BUS-11</span>
+              <span class="bay-part-no"
+                >PN RBC-FRT-11 &middot; SIX-DRAWER CARGO BANK — ONE DRAWER OPEN AT A TIME
+                <span class="real-label"
+                  >(INVENTORY FILTER — setInvFilter, same single-select)</span
+                ></span
+              >
+
+              <div id="invFilterBar" class="drawer-bank">
                 <button
-                  class="btn-sm action-btn inv-filter-btn active"
-                  data-filter="all"
-                  onclick="setInvFilter('all')"
-                >
-                  All
-                </button>
-                <button
-                  class="btn-sm action-btn inv-filter-btn"
+                  class="drawer inv-filter-btn pulled"
                   data-filter="weapon"
                   onclick="setInvFilter('weapon')"
+                  aria-label="Weapons drawer"
                 >
-                  Weapons
+                  WEAPONS<span class="d-count" data-dcount="weapon">0</span>
                 </button>
                 <button
-                  class="btn-sm action-btn inv-filter-btn"
+                  class="drawer inv-filter-btn"
                   data-filter="armor"
                   onclick="setInvFilter('armor')"
+                  aria-label="Apparel drawer"
                 >
-                  Apparel
+                  APPAREL<span class="d-count" data-dcount="armor">0</span>
                 </button>
                 <button
-                  class="btn-sm action-btn inv-filter-btn"
+                  class="drawer inv-filter-btn"
                   data-filter="aid"
                   onclick="setInvFilter('aid')"
+                  aria-label="Aid drawer"
                 >
-                  Aid
+                  AID<span class="d-count" data-dcount="aid">0</span>
                 </button>
                 <button
                   id="invFilterMods"
-                  class="btn-sm action-btn inv-filter-btn"
+                  class="drawer inv-filter-btn"
                   data-filter="mod"
                   onclick="setInvFilter('mod')"
+                  aria-label="Mods drawer"
                 >
-                  Mods
+                  MODS<span class="d-count" data-dcount="mod">0</span>
                 </button>
                 <button
-                  class="btn-sm action-btn inv-filter-btn"
+                  class="drawer inv-filter-btn"
                   data-filter="misc"
                   onclick="setInvFilter('misc')"
+                  aria-label="Misc drawer"
                 >
-                  Misc
+                  MISC<span class="d-count" data-dcount="misc">0</span>
                 </button>
                 <button
-                  class="btn-sm action-btn inv-filter-btn"
+                  class="drawer inv-filter-btn"
                   data-filter="ammo"
                   onclick="setInvFilter('ammo')"
+                  aria-label="Ammo drawer"
                 >
-                  Ammo
+                  AMMO<span class="d-count" data-dcount="ammo">0</span>
                 </button>
               </div>
-              <ul class="inventory-list" id="invList"></ul>
 
-              <!-- 3b. AMMO RESERVES — nested sub-panel -->
-              <details class="sub-panel" id="ammoSubPanel" data-sub-id="ammo_reserves">
+              <div class="tray-head">
+                <span class="t-title" id="opsDrawerTitle">WEAPONS DRAWER</span>
+                <input
+                  type="search"
+                  id="invDrawerSearch"
+                  placeholder="⌕ FILTER DRAWER (OPTIONAL)…"
+                  aria-label="Filter the open drawer"
+                  maxlength="60"
+                  oninput="renderInventory()"
+                />
+              </div>
+              <div class="tray-scrollwrap" id="invListWrap">
+                <ul
+                  class="inventory-list tray-list"
+                  id="invList"
+                  role="list"
+                  aria-label="Cargo manifest — open drawer contents"
+                ></ul>
+              </div>
+
+              <!-- AMMO drawer folds AMMO RESERVES in place of the item list above (ids kept) -->
+              <details
+                class="sub-panel"
+                id="ammoSubPanel"
+                data-sub-id="ammo_reserves"
+                style="display: none"
+              >
                 <summary>
-                  <h3>> AMMO RESERVES</h3>
+                  <h3>&gt; AMMO RESERVES</h3>
                 </summary>
-                <div id="ammoList"></div>
+                <div class="tray-scrollwrap">
+                  <div class="tray-list" id="ammoList"></div>
+                </div>
                 <div
                   style="
                     border-top: 1px dashed var(--robco-green);
@@ -1260,11 +1359,15 @@
                   />
                 </div>
                 <button class="action-btn" onclick="addAmmo()" style="margin-top: 4px">
-                  + ADD AMMO
+                  + LOG ROUNDS
                 </button>
               </details>
-              <!-- end AMMO RESERVES sub-panel -->
+              <!-- end AMMO RESERVES tray -->
 
+              <div class="rack-note">
+                REQUISITION SLIP — LOG NEW CARGO:
+                <span class="real-label">(ADD ITEM — registry autocomplete kept)</span>
+              </div>
               <div
                 class="panel-form"
                 style="border-top: 1px dashed var(--robco-green); padding-top: 10px; gap: 5px"
@@ -1309,48 +1412,28 @@
                   <option value="ammo">ammo</option>
                 </select>
               </div>
-              <button class="action-btn" onclick="addItem()">+ ADD ITEM</button>
+              <button class="action-btn" onclick="addItem()">+ LOG CARGO</button>
             </details>
 
-            <!-- 3c. COLLECTIBLES (INV tab) -->
-            <details class="panel" data-tab="inv">
+            <!-- BUS-12 · FIELD FABRICATION (CRAFTING) -->
+            <details class="panel bay-board" data-tab="inv" id="craftPanel">
               <summary>
-                <h2>&gt; COLLECTIBLES</h2>
+                <h2>&gt; <span class="board-led" aria-hidden="true"></span> FIELD FABRICATION</h2>
+                <span class="panel-substatus" id="opsFabStatus">— RECIPES · — BREAKDOWNS</span>
               </summary>
-              <!-- Bobbleheads / Snow Globes sub-tracker -->
-              <details class="sub-panel" id="collectiblesSubPanel" data-sub-id="collectibles_main">
-                <summary>
-                  <h3>&gt; COLLECTIBLES LIST</h3>
-                </summary>
-                <div id="collectiblesDisplay">
-                  <span class="empty-state">ARCHIVE EMPTY</span>
-                </div>
-              </details>
-              <!-- Lincoln Memorabilia sub-tracker (FO3 only — shown/hidden by renderLincolnMemorabilia()) -->
-              <details
-                class="sub-panel"
-                id="lincolnSubPanel"
-                data-sub-id="lincoln_memorabilia"
-                style="display: none"
+              <span class="bay-slot-tag">BUS-12</span>
+              <span class="bay-part-no"
+                >PN RBC-FRT-12 &middot; FABRICATION BENCH + BREAKDOWN VISE
+                <span class="real-label"
+                  >(CRAFTING — doCraft/doScrap, confirm gates unchanged)</span
+                ></span
               >
-                <summary>
-                  <h3>&gt; LINCOLN MEMORABILIA</h3>
-                </summary>
-                <div id="lincolnMemorabiliaDisplay"></div>
-              </details>
-            </details>
-
-            <!-- CRAFTING (INV tab) -->
-            <details class="panel" data-tab="inv" id="craftPanel">
-              <summary>
-                <h2>&gt; CRAFTING</h2>
-              </summary>
               <div id="craftRecipeList">
                 <span class="empty-state">NO ENTRIES IN MEMORY</span>
               </div>
               <details class="sub-panel" data-sub-id="craft_breakdown">
                 <summary>
-                  <h3>&gt; SCRAP / BREAKDOWN</h3>
+                  <h3>&gt; BREAKDOWN VISE</h3>
                 </summary>
                 <div id="craftScrapList">
                   <span class="empty-state">NO MATCHING ENTRIES</span>
@@ -1358,11 +1441,19 @@
               </details>
             </details>
 
-            <!-- TRADE / BARTER UPLINK (INV tab) -->
-            <details class="panel" data-tab="inv" id="tradePanel">
+            <!-- BUS-13 · BARTER UPLINK — amber "over the wire" -->
+            <details class="panel bay-board wireboard" data-tab="inv" id="tradePanel">
               <summary>
-                <h2>&gt; BARTER UPLINK</h2>
+                <h2>&gt; <span class="board-led wire" aria-hidden="true"></span> BARTER UPLINK</h2>
+                <span class="panel-substatus" id="opsBarterStatus">NO VENDOR DATA</span>
               </summary>
+              <span class="bay-slot-tag">BUS-13</span>
+              <span class="bay-part-no"
+                >PN RBC-FRT-13 &middot; REMOTE VENDOR LINK — OVER THE WIRE
+                <span class="real-label"
+                  >(TRADE — doBuy/doSell, confirm gates unchanged)</span
+                ></span
+              >
               <div id="tradeHeader">
                 <span class="empty-state">NO VENDOR DATA</span>
               </div>
@@ -1390,6 +1481,65 @@
                 <div id="tradeSellList">
                   <span class="empty-state">COURIER INVENTORY EMPTY</span>
                 </div>
+              </details>
+            </details>
+
+            <!-- BUS-14 · SQUAD ROSTER (registry-driven ENLIST) -->
+            <details class="panel bay-board" data-tab="inv" id="squadPanel">
+              <summary>
+                <h2>&gt; <span class="board-led" aria-hidden="true"></span> SQUAD ROSTER</h2>
+                <span class="panel-substatus" id="opsSquadStatus">NO ACTIVE COMPANIONS</span>
+              </summary>
+              <span class="bay-slot-tag">BUS-14</span>
+              <span class="bay-part-no"
+                >PN RBC-FRT-14 &middot; FIELD TEAM TELEMETRY
+                <span class="real-label"
+                  >(SQUAD — adjustAffinity/addSquadMember unchanged)</span
+                ></span
+              >
+              <div id="squadList"></div>
+              <div class="enlist">
+                <select id="newSquadName" aria-label="Companion to enlist">
+                  <option disabled selected value="">SELECT COMPANION…</option>
+                </select>
+                <button class="action-btn keybtn" onclick="addSquadMember()">+ ENLIST</button>
+                <span class="enlist-note"
+                  >roster options read the active game's companion registry (game-agnostic)</span
+                >
+              </div>
+            </details>
+
+            <!-- BUS-15 · CURIO ARCHIVE (COLLECTIBLES) -->
+            <details class="panel bay-board" data-tab="inv" id="curioPanel">
+              <summary>
+                <h2>&gt; <span class="board-led" aria-hidden="true"></span> CURIO ARCHIVE</h2>
+                <span class="panel-substatus" id="opsCurioStatus">— / — ACQUIRED</span>
+              </summary>
+              <span class="bay-slot-tag">BUS-15</span>
+              <span class="bay-part-no"
+                >PN RBC-FRT-15 &middot; DISPLAY CASE
+                <span class="real-label">(COLLECTIBLES — toggleCollectible unchanged)</span></span
+              >
+              <!-- Bobbleheads / Snow Globes sub-tracker -->
+              <details class="sub-panel" id="collectiblesSubPanel" data-sub-id="collectibles_main">
+                <summary>
+                  <h3>&gt; COLLECTIBLES LIST</h3>
+                </summary>
+                <div id="collectiblesDisplay">
+                  <span class="empty-state">ARCHIVE EMPTY</span>
+                </div>
+              </details>
+              <!-- Lincoln Memorabilia sub-tracker (FO3 only — shown/hidden by renderLincolnMemorabilia()) -->
+              <details
+                class="sub-panel"
+                id="lincolnSubPanel"
+                data-sub-id="lincoln_memorabilia"
+                style="display: none"
+              >
+                <summary>
+                  <h3>&gt; LINCOLN MEMORABILIA</h3>
+                </summary>
+                <div id="lincolnMemorabiliaDisplay"></div>
               </details>
             </details>
 
@@ -1609,40 +1759,9 @@
               </div>
             </details>
 
-            <!-- 8. SQUAD STATUS -->
-            <details class="panel" data-tab="inv">
-              <summary>
-                <h2>> SQUAD STATUS</h2>
-              </summary>
-              <div id="squadList"></div>
-              <div class="panel-form">
-                <select
-                  id="newSquadName"
-                  style="
-                    flex: 1;
-                    background: rgba(0, 0, 0, 0.8);
-                    color: var(--robco-green);
-                    border: 1px solid var(--robco-green);
-                  "
-                >
-                  <option value="Arcade Gannon">Arcade Gannon</option>
-                  <option value="Boone">Boone</option>
-                  <option value="Cass">Cass</option>
-                  <option value="Lily">Lily</option>
-                  <option value="Raul">Raul</option>
-                  <option value="Veronica">Veronica</option>
-                  <option value="ED-E">ED-E</option>
-                  <option value="Rex">Rex</option>
-                </select>
-                <button
-                  class="action-btn"
-                  style="width: auto; padding: 0 10px"
-                  onclick="addSquadMember()"
-                >
-                  ADD
-                </button>
-              </div>
-            </details>
+            <!-- SQUAD ROSTER moved up to BUS-14 (Phase 3 · Piece 2 OPERATIONS
+                 reskin) — see the CARGO MANIFEST/FIELD FABRICATION/BARTER
+                 UPLINK cluster above. -->
 
             <!-- 9. FACTION STANDING (FNV) -->
             <!-- BUS-08 · REPUTATION (light-frame only this pass) -->

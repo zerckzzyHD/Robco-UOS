@@ -6821,3 +6821,666 @@ button.rb-key:disabled {
    .radaway-lamp i are all plain `animation:` (rad-pulse / zoneCriBlink), so
    the existing global `*, *::before, *::after` prefers-reduced-motion block
    already zeroes them to their resting frame automatically. */
+
+/* ════════════════════════════════════════════════════════════════════
+   PHASE 3 · PIECE 2 — OPERATIONS "quartermaster's freight console"
+   (Protocol 22/25 reskin). Matches planning/PHASE3_OPERATIONS_PLAN.md +
+   the owner-approved planning/mockups/operations-console.html (BEAM
+   bridge variant + Variant A CARGO TAG rows). Every board reuses the
+   existing .bay-board/.bay-slot-tag/.bay-part-no/.panel-substatus/
+   .board-led machine-language classes (Protocol 22) — only the
+   BUS-10/11 hero instruments (weigh bridge, drawer bank) get new CSS.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* amber "over the wire" board (BARTER UPLINK) — rides --bezel-wire so it
+   is amber under NV and falls back to local phosphor for an unauthored
+   game (Protocol 38), distinct from the fixed-amber .bay-board.uplink
+   (SLOT 05 AI Uplink) which is a locked identity, not a --bezel-wire read. */
+details.bay-board.wireboard {
+  border-color: rgba(var(--bezel-wire-rgb), 0.55);
+}
+details.bay-board.wireboard .bay-slot-tag {
+  border-color: rgba(var(--bezel-wire-rgb), 0.55);
+  color: var(--bezel-wire);
+}
+.board-led.wire {
+  background: var(--bezel-wire);
+  box-shadow: 0 0 7px var(--bezel-wire);
+}
+
+/* ── BUS-10 · LOAD-CELL WEIGH BRIDGE ─────────────────────────────────── */
+.bridge-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 22px;
+  justify-content: center; /* centering rule */
+  align-items: center;
+  margin-top: 6px;
+}
+@keyframes opsBridgeShudder {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-2px) rotate(-0.2deg);
+  }
+  40% {
+    transform: translateX(2px);
+  }
+  60% {
+    transform: translateX(-1.5px) rotate(0.2deg);
+  }
+  80% {
+    transform: translateX(1.5px);
+  }
+}
+/* SEIZED shudder — a plain `animation:`, so the existing global
+   prefers-reduced-motion block (animation-duration:0.01ms + iteration-
+   count:1) collapses it to the resting static bend automatically. */
+body.weight-over .beam-instrument {
+  animation: opsBridgeShudder 0.5s linear infinite;
+}
+.beam-instrument {
+  position: relative;
+  text-align: center;
+}
+.beam-instrument svg {
+  display: block;
+  width: min(300px, 84vw);
+  height: auto;
+  margin: 0 auto;
+  overflow: visible;
+}
+.beam-path {
+  stroke: var(--robco-green);
+  stroke-width: 4;
+  fill: none;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 5px rgba(var(--robco-green-rgb), 0.7));
+  /* LIVE PROPORTIONAL BEND — a plain CSS transition on the `d` attribute
+     (supported in current evergreen browsers) so the beam bends smoothly
+     as real carry weight changes, never 4 discrete frames. The existing
+     global prefers-reduced-motion block (transition-duration:0.01ms
+     !important) collapses this to an instant snap with no bespoke
+     carve-out. */
+  transition: d 0.7s;
+}
+body.weight-heavy .beam-path,
+body.weight-critical .beam-path {
+  stroke: var(--robco-alert);
+  filter: drop-shadow(0 0 5px rgba(243, 156, 18, 0.7));
+}
+body.weight-over .beam-path {
+  stroke: var(--robco-danger);
+  filter: drop-shadow(0 0 5px rgba(231, 76, 60, 0.7));
+}
+.beam-support {
+  stroke: rgba(var(--robco-green-rgb), 0.55);
+  stroke-width: 2;
+  fill: rgba(0, 0, 0, 0.4);
+}
+.beam-block {
+  fill: rgba(var(--robco-green-rgb), 0.18);
+  stroke: var(--robco-green);
+  stroke-width: 1.4;
+  transition: y 0.7s;
+}
+body.weight-heavy .beam-block,
+body.weight-critical .beam-block {
+  stroke: var(--robco-alert);
+}
+body.weight-over .beam-block {
+  stroke: var(--robco-danger);
+}
+.beam-pct {
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 1px;
+  fill: var(--robco-green);
+  text-anchor: middle;
+}
+.seized-stamp {
+  position: absolute;
+  left: 50%;
+  top: 30%;
+  transform: translate(-50%, -50%) rotate(-7deg);
+  border: 2px solid var(--robco-danger);
+  color: var(--robco-danger);
+  text-shadow: 0 0 7px rgba(231, 76, 60, 0.55);
+  font-size: 13px;
+  letter-spacing: 3px;
+  padding: 3px 10px;
+  background: rgba(0, 0, 0, 0.65);
+  box-shadow: 0 0 14px rgba(231, 76, 60, 0.5);
+  z-index: 2;
+}
+.wb-readouts {
+  flex: 1 1 190px;
+  max-width: 320px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* 3-tier CARGO LOAD readout — nominal/heavy-amber/seized-red — the same
+   body.weight-* classes updateMath() already toggles drive both this
+   tile's text AND the beam/needle color (single source, Phase 3 · Piece 2). */
+#display_weight {
+  color: var(--robco-green);
+}
+body.weight-heavy #display_weight,
+body.weight-critical #display_weight {
+  color: var(--robco-alert);
+  text-shadow: 0 0 7px rgba(243, 156, 18, 0.55);
+}
+body.weight-over #display_weight {
+  color: var(--robco-danger);
+  text-shadow: 0 0 7px rgba(231, 76, 60, 0.55);
+}
+.rb-tile.loadtile,
+.rb-tile.wire {
+  flex: 1 1 auto;
+  max-width: none;
+}
+.seized-note {
+  margin-top: 10px;
+  padding: 6px 9px;
+  font-size: 9px;
+  letter-spacing: 1px;
+  line-height: 1.5;
+  color: var(--robco-danger);
+  text-shadow: 0 0 7px rgba(231, 76, 60, 0.55);
+  border: 1px dashed var(--robco-danger);
+  background: rgba(231, 76, 60, 0.06);
+  text-transform: none;
+}
+
+/* ── BUS-11 · CARGO MANIFEST — pull-drawer bank ──────────────────────── */
+.drawer-bank {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center; /* centering rule */
+  gap: 7px;
+  margin-top: 10px;
+}
+button.drawer {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 84px;
+  min-height: 46px;
+  border: 1px solid rgba(0, 0, 0, 0.8);
+  border-radius: 4px;
+  background: linear-gradient(180deg, #2c3027, #1b1e18 65%, #14160f);
+  box-shadow:
+    0 2px 0 #0c0e0a,
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  color: var(--bezel-etch, rgba(214, 224, 200, 0.65));
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.8);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: 9px;
+  letter-spacing: 1px;
+  padding: 5px 8px 7px;
+  position: relative;
+}
+button.drawer::after {
+  /* drawer handle slot */
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  left: 26%;
+  right: 26%;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.65);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+button.drawer .d-count {
+  font-size: 8px;
+  letter-spacing: 0.5px;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.35);
+  padding: 1px 6px;
+  background: rgba(0, 0, 0, 0.5);
+  color: rgba(var(--robco-green-rgb), 0.55);
+}
+button.drawer.pulled,
+button.drawer.active {
+  transform: translateY(3px);
+  color: var(--robco-green);
+  text-shadow: var(--robco-glow);
+  border-color: rgba(var(--robco-green-rgb), 0.55);
+  box-shadow:
+    0 0 0 #0c0e0a,
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 0 10px rgba(var(--robco-green-rgb), 0.2);
+}
+button.drawer.pulled .d-count,
+button.drawer.active .d-count {
+  color: var(--robco-green);
+  border-color: var(--robco-green);
+}
+/* DRAWER-SLIDE — a plain `animation:`, auto-neutralised by the global
+   prefers-reduced-motion block (Protocol UI-9). */
+@keyframes opsDrawerSlide {
+  from {
+    opacity: 0.3;
+    transform: translateY(-7px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.tray-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 10px 0 6px;
+  animation: opsDrawerSlide 0.25s ease-out;
+}
+.tray-head .t-title {
+  font-size: 10px;
+  letter-spacing: 2px;
+  opacity: 0.75;
+}
+.tray-head input[type='search'] {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+/* The open drawer's item list scrolls IN-PANEL — every item reachable by
+   scrolling, the page never grows (the owner-approved no-render-cap
+   answer to the mobile no-infinite-scroll problem). */
+.tray-scrollwrap {
+  position: relative;
+  min-width: 0;
+}
+.tray-list {
+  max-height: 342px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 7px;
+  min-width: 0;
+  margin: 0;
+  list-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(var(--robco-green-rgb), 0.55) rgba(0, 0, 0, 0.45);
+}
+.tray-list::-webkit-scrollbar {
+  width: 9px;
+}
+.tray-list::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(var(--robco-green-rgb), 0.18);
+}
+.tray-list::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    rgba(var(--robco-green-rgb), 0.65),
+    rgba(var(--robco-green-rgb), 0.35)
+  );
+  border: 1px solid rgba(0, 0, 0, 0.7);
+  box-shadow: 0 0 5px rgba(var(--robco-green-rgb), 0.35);
+}
+.tray-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(var(--robco-green-rgb), 0.75);
+}
+/* Desktop-only tweak — carries the same pointer/hover gate as every other
+   desktop-only rule (Suite 129) so a touch phone with a mis-measured wide
+   viewport can never match it. */
+@media (min-width: 1000px) and (hover: hover) and (pointer: fine) {
+  .tray-list {
+    max-height: 420px;
+  }
+}
+
+/* ══ CARGO TAG manifest rows (the approved Variant A row style) — a
+   punched freight tag: pointed left end + eyelet + dashed perforation
+   rail above the controls. No condition indicator (the app does not
+   track item condition). ══ */
+.mrow {
+  border: none;
+  margin: 0 0 9px;
+  padding: 9px 10px 9px 30px;
+  position: relative;
+  list-style: none;
+  clip-path: polygon(18px 0, 100% 0, 100% 100%, 18px 100%, 0 50%);
+  background:
+    linear-gradient(90deg, rgba(var(--robco-green-rgb), 0.14) 0 18px, transparent 18px),
+    repeating-linear-gradient(
+      115deg,
+      rgba(var(--robco-green-rgb), 0.02) 0 3px,
+      transparent 3px 9px
+    ),
+    linear-gradient(180deg, rgba(var(--robco-green-rgb), 0.07), rgba(0, 0, 0, 0.45) 75%);
+  box-shadow: inset 0 0 0 1px rgba(var(--robco-green-rgb), 0.4);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 8px;
+  min-width: 0;
+}
+.mrow .hole {
+  display: block;
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  margin-top: -4.5px;
+  border-radius: 50%;
+  background: var(--robco-dark);
+  box-shadow:
+    0 0 0 2px rgba(var(--robco-green-rgb), 0.7),
+    inset 0 0 3px rgba(0, 0, 0, 0.9);
+}
+.mrow .m-id {
+  flex: 1 1 150px;
+  min-width: 0;
+}
+.mrow .m-name {
+  font-size: 12.5px;
+  letter-spacing: 2px;
+  display: block;
+  overflow-wrap: break-word;
+}
+.mrow .m-meta {
+  font-size: 8.5px;
+  opacity: 0.5;
+  letter-spacing: 0.5px;
+  display: block;
+  margin-top: 2px;
+}
+.mrow .tag {
+  font-size: 7.5px;
+  letter-spacing: 1px;
+  opacity: 0.8;
+  border: 1px dashed rgba(var(--robco-green-rgb), 0.4);
+  padding: 1px 5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.m-ctrl {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  border-top: 1px dashed rgba(var(--robco-green-rgb), 0.3); /* perforation rail */
+  padding-top: 6px;
+  margin-top: 2px;
+  flex-basis: 100%;
+  justify-content: flex-end;
+}
+.m-ctrl button {
+  font-size: 9px;
+  padding: 3px 7px;
+  min-height: 28px;
+  min-width: 28px;
+  width: auto;
+}
+.qtybox {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.qtybox .q {
+  min-width: 22px;
+  text-align: center;
+  font-size: 12px;
+}
+.equip-btn.equip-btn--on {
+  border-color: var(--robco-green);
+  background: rgba(var(--robco-green-rgb), 0.14);
+  text-shadow: var(--robco-glow);
+  box-shadow: 0 0 8px rgba(var(--robco-green-rgb), 0.25);
+}
+.mrow.iseq {
+  box-shadow:
+    inset 0 0 0 1px var(--bezel-wire),
+    0 0 12px rgba(var(--bezel-wire-rgb), 0.25);
+  background:
+    linear-gradient(90deg, rgba(var(--bezel-wire-rgb), 0.2) 0 18px, transparent 18px),
+    repeating-linear-gradient(
+      115deg,
+      rgba(var(--bezel-wire-rgb), 0.035) 0 3px,
+      transparent 3px 9px
+    ),
+    linear-gradient(180deg, rgba(var(--bezel-wire-rgb), 0.08), rgba(0, 0, 0, 0.45) 75%);
+}
+.mrow.iseq::after {
+  content: 'IN SERVICE';
+  position: absolute;
+  right: 8px;
+  top: 6px;
+  transform: rotate(-4deg);
+  border: 1px solid var(--bezel-wire);
+  color: var(--bezel-wire);
+  text-shadow: 0 0 7px rgba(var(--bezel-wire-rgb), 0.55);
+  font-size: 7.5px;
+  letter-spacing: 2px;
+  padding: 2px 6px;
+  background: rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+.mrow.iseq .hole {
+  box-shadow:
+    0 0 0 2px var(--bezel-wire),
+    inset 0 0 3px rgba(0, 0, 0, 0.9);
+}
+.mrow.iseq .m-name {
+  color: var(--bezel-wire);
+  text-shadow: 0 0 7px rgba(var(--bezel-wire-rgb), 0.55);
+}
+.rack-note {
+  font-size: 10px;
+  opacity: 0.6;
+  letter-spacing: 1px;
+  margin: 10px 0 0;
+  text-transform: none;
+}
+
+/* ammo drawer rows */
+.arow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  border-bottom: 1px dotted rgba(var(--robco-green-rgb), 0.25);
+  padding: 6px 2px;
+  font-size: 11.5px;
+  letter-spacing: 1px;
+}
+.arow b {
+  font-weight: normal;
+  flex: 1 1 120px;
+  min-width: 0;
+}
+.arow .a-count {
+  font-size: 13px;
+}
+
+/* ── BUS-12 · FIELD FABRICATION — HAVE/NEED ingredient meters ────────── */
+.ing {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px 0;
+  border-bottom: 1px dotted rgba(var(--robco-green-rgb), 0.2);
+}
+.ing b {
+  font-weight: normal;
+  flex: 1 1 130px;
+  min-width: 0;
+  font-size: 10.5px;
+  letter-spacing: 0.5px;
+  opacity: 0.8;
+}
+.ing .hn-meter {
+  flex: 1 1 90px;
+  min-width: 70px;
+  max-width: 150px;
+  height: 9px;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.4);
+  background: rgba(0, 0, 0, 0.5);
+  position: relative;
+  overflow: hidden;
+}
+.ing .hn-meter i {
+  position: absolute;
+  inset: 1px auto 1px 1px;
+  background: var(--robco-green);
+  box-shadow: 0 0 6px rgba(var(--robco-green-rgb), 0.6);
+  /* meter fill — plain `animation:`, auto-neutralised by the global
+     prefers-reduced-motion block (Protocol UI-9). */
+  animation: opsMeterFill 0.6s ease-out;
+}
+@keyframes opsMeterFill {
+  from {
+    width: 0 !important;
+  }
+}
+.ing.short .hn-meter i {
+  background: var(--robco-danger);
+  box-shadow: 0 0 6px rgba(231, 76, 60, 0.6);
+}
+.ing .hn-txt {
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  flex: 0 0 auto;
+}
+.ing.short .hn-txt {
+  color: var(--robco-danger);
+  text-shadow: 0 0 5px rgba(231, 76, 60, 0.5);
+}
+
+/* ── BUS-14 · SQUAD ROSTER ────────────────────────────────────────────── */
+#squadList {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center; /* centering rule */
+  gap: 10px;
+  margin-top: 4px;
+}
+.sq-card {
+  flex: 1 1 230px;
+  max-width: 330px;
+  min-width: 0;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.4);
+  background: rgba(0, 0, 0, 0.3);
+  padding: 9px 10px 10px;
+}
+.sq-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: baseline;
+}
+.sq-name {
+  font-size: 11.5px;
+  letter-spacing: 1.5px;
+}
+.sq-head button {
+  font-size: 8px;
+  padding: 2px 6px;
+  min-height: 28px;
+  width: auto;
+  border-color: rgba(231, 76, 60, 0.6);
+  color: var(--robco-danger);
+}
+.sq-bar {
+  margin-top: 6px;
+  height: 10px;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.5);
+  background: rgba(0, 0, 0, 0.5);
+  position: relative;
+  overflow: hidden;
+}
+.sq-bar i {
+  position: absolute;
+  inset: 1px auto 1px 1px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--robco-green) 0 6px,
+    rgba(var(--robco-green-rgb), 0.25) 6px 9px
+  );
+}
+.sq-stats {
+  display: flex;
+  gap: 6px 14px;
+  flex-wrap: wrap;
+  font-size: 9px;
+  letter-spacing: 1px;
+  opacity: 0.7;
+  margin-top: 6px;
+}
+.aff-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.aff-row .a-cap {
+  font-size: 8.5px;
+  letter-spacing: 1.5px;
+  opacity: 0.6;
+}
+.aff-meter {
+  flex: 1 1 80px;
+  min-width: 60px;
+  height: 8px;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.4);
+  background: rgba(0, 0, 0, 0.5);
+  position: relative;
+  overflow: hidden;
+}
+.aff-meter i {
+  position: absolute;
+  inset: 1px auto 1px 1px;
+  background: var(--robco-green);
+  box-shadow: 0 0 5px rgba(var(--robco-green-rgb), 0.6);
+}
+.aff-row button {
+  min-width: 28px;
+  min-height: 28px;
+  width: auto;
+  padding: 2px 0;
+  font-size: 11px;
+}
+.enlist {
+  margin-top: 12px;
+  border-top: 1px dashed rgba(var(--robco-green-rgb), 0.3);
+  padding-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: center;
+}
+.enlist select {
+  flex: 1 1 170px;
+  min-width: 0;
+}
+.enlist .keybtn {
+  flex: 0 1 auto;
+  width: auto;
+}
+.enlist-note {
+  width: 100%;
+  font-size: 8px;
+  opacity: 0.4;
+  letter-spacing: 1px;
+  text-transform: none;
+}
+
+/* ── mobile: keep the drawer bank + squad grid from overflowing at 360px ── */
+@media (max-width: 480px) {
+  button.drawer {
+    min-width: 76px;
+    font-size: 8.5px;
+  }
+}

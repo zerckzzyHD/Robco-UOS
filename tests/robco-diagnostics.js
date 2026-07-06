@@ -9049,17 +9049,18 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     'renderCraft() called from loadUI() in js/ui-core.js'
   );
 
-  // 84.g  "> CRAFTING" badge entry in _updatePanelBadges
+  // 84.g  "> FIELD FABRICATION" badge entry in _updatePanelBadges (Phase 3 ·
+  //       Piece 2 renamed CRAFTING -> FIELD FABRICATION on OPERATIONS)
   const badgesBody84 = extractFunctionBody(uiCSrc84, '_updatePanelBadges');
   assert(
-    badgesBody84.includes('> CRAFTING'),
-    '"> CRAFTING" badge entry present in _updatePanelBadges()'
+    badgesBody84.includes('> FIELD FABRICATION'),
+    '"> FIELD FABRICATION" badge entry present in _updatePanelBadges()'
   );
 
   // 84.h  craft key in expandPanelForCategory tabMap and map
   const expandBody84 = extractFunctionBody(uiCSrc84, 'expandPanelForCategory');
   assert(
-    expandBody84.includes("craft: 'inv'") && expandBody84.includes("craft: '> CRAFTING'"),
+    expandBody84.includes("craft: 'inv'") && expandBody84.includes("craft: '> FIELD FABRICATION'"),
     "'craft' key in expandPanelForCategory tabMap and panel map"
   );
 
@@ -11796,10 +11797,13 @@ header('Suite 106 — WU-N2 TRADE native barter terminal');
     !/array of item objects.*vendor/.test(api106) && !/function tradeItem\s*\(/.test(core106),
     '106.14: getSystemDirective no longer defines a TRADE modal shape; dead tradeItem() removed from ui-core.js'
   );
-  // 106.15 TRADE panel + sub-panels present in index.html
+  // 106.15 TRADE panel + sub-panels present in index.html. The BARTER UPLINK
+  // h2 now carries a <span class="board-led wire"> before the title text
+  // (Phase 3 · Piece 2 OPERATIONS reskin, same board-led idiom as OPERATOR/
+  // Suite 181.5) — the glyph-to-title gap is markup, not just whitespace.
   assert(
     /id="tradePanel"/.test(html106) &&
-      /&gt;\s*BARTER UPLINK/.test(html106) &&
+      /&gt;[\s\S]{0,200}?BARTER UPLINK/.test(html106) &&
       /data-sub-id="trade_buy"/.test(html106) &&
       /data-sub-id="trade_sell"/.test(html106),
     '106.15: #tradePanel with BARTER UPLINK h2 + trade_buy/trade_sell sub-panels (data-sub-id) present'
@@ -15946,13 +15950,15 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
   // 136.7  U9-5: the inventory "Mods" filter button is gated by hasWeaponMods
   //        in _updateContextPanels() (called from loadUI on every game-context
-  //        switch), and resets an active "mod" filter back to "all" if hidden
-  //        so FO3 can never be stranded on an unreachable filter.
+  //        switch), and resets an active "mod" filter back to "weapon" if
+  //        hidden so FO3 can never be stranded on an unreachable filter — the
+  //        Phase 3 · Piece 2 CARGO MANIFEST drawer bank has no "all" drawer
+  //        to fall back to (every item type is exactly one drawer away).
   assert(
     /id="invFilterMods"/.test(html136) &&
       /_activeDef\(\)\.hasWeaponMods/.test(uiRender136) &&
       /getElementById\('invFilterMods'\)/.test(uiRender136) &&
-      /setInvFilter\('all'\)/.test(
+      /setInvFilter\('weapon'\)/.test(
         (uiRender136.match(/function _updateContextPanels\(\)[\s\S]*?\n\}/) || [''])[0]
       ),
     '136.7: the inventory Mods filter button is hidden per-game via _updateContextPanels() + GAME_DEFS.hasWeaponMods, with a fail-safe reset off the mod filter'
@@ -15976,13 +15982,16 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   // 136.9  U10: the affinity buttons are wired into renderSquad() as real
   //        <button> elements (Protocol UI-5) with descriptive aria-labels
   //        (Protocol UI-3), always rendered (not gated on affinity being set).
+  //        Phase 3 · Piece 2 (SQUAD ROSTER) restyled the aria-label wording
+  //        to "Raise/Lower … affinity" (matching the approved mockup) — same
+  //        functional guarantee, different label text.
   {
     const squadFn136 = (uiRender136.match(/function renderSquad\(\)[\s\S]*?\n\}/) || [''])[0];
     assert(
       /adjustAffinity\(\$\{i\},5\)/.test(squadFn136) &&
         /adjustAffinity\(\$\{i\},-5\)/.test(squadFn136) &&
-        /aria-label="Affinity \+5 for/.test(squadFn136) &&
-        /aria-label="Affinity -5 for/.test(squadFn136) &&
+        /aria-label="Raise \$\{escapeHtml\(member\.name\)\} affinity"/.test(squadFn136) &&
+        /aria-label="Lower \$\{escapeHtml\(member\.name\)\} affinity"/.test(squadFn136) &&
         !/member\.affinity !== undefined/.test(squadFn136),
       '136.9: renderSquad() always renders the [+]/[-] affinity buttons (real <button>s with aria-labels), not gated behind member.affinity being pre-set'
     );
@@ -26290,6 +26299,389 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       "184.18: _syncCampaignConfigTopSummary() aggregates the CAMPAIGN PROFILE + RANDOMIZER INTERLOCK boards' own summary text and is called from both boards' sync functions — never stale regardless of which one last changed"
     );
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 185 — Phase 3 · Piece 2: OPERATIONS "quartermaster's freight
+//  console" reskin (BUS-10…15). Weigh bridge live beam bend, caps
+//  relocation, CARGO MANIFEST drawer bank + bounded scroll, native
+//  EQUIP + qty steppers, registry-driven SQUAD ROSTER, collapsed
+//  summary lines, id-preservation contract. 24 tests.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 185 — Phase 3 Piece 2: OPERATIONS quartermaster freight console (BUS-10 to 15)');
+  const html185 = readFile('index.html');
+  const css185 = readFile('css/terminal.css');
+  const core185 = readFile('js/ui-core.js');
+  const render185 = readFile('js/ui-render.js');
+  const api185 = readFile('js/api.js');
+  const stateSrc185 = readFile('js/state.js');
+
+  // 185.1  BOTTLE CAPS + WEIGHT tiles are gone from the OPERATOR readback
+  //        strip (only MAX AP + GRADE ADVANCE remain); #c_caps/#display_weight
+  //        exist EXACTLY ONCE each in index.html, now inside the OPERATIONS
+  //        BUS-10 weigh bridge board.
+  // (a <!-- --> comment near the OPERATOR readback-strip documents the
+  // historical relocation and legitimately mentions "BOTTLE CAPS" — the real
+  // guard is the *tile* markup being gone, i.e. #c_caps/#display_weight each
+  // existing exactly once, nested inside the new OPERATIONS bridge board.)
+  assert(
+    !/<span class="rb-cap">BOTTLE CAPS<\/span>/.test(html185) &&
+      (html185.match(/id="c_caps"/g) || []).length === 1 &&
+      (html185.match(/id="display_weight"/g) || []).length === 1 &&
+      /id="opsBridgePanel"[\s\S]*?id="c_caps"/.test(html185) &&
+      /id="opsBridgePanel"[\s\S]*?id="display_weight"/.test(html185),
+    '185.1: BOTTLE CAPS + WEIGHT tiles removed from OPERATOR — #c_caps/#display_weight now live exactly once, inside the OPERATIONS BUS-10 weigh bridge board'
+  );
+
+  // 185.2  OPERATOR readback-strip keeps MAX AP + the LEVEL UP key, still
+  //        centered (the strip auto-recenters via its existing
+  //        justify-content:center — no CSS change needed).
+  assert(
+    /<span class="rb-cap">MAX AP<\/span>/.test(html185) &&
+      /id="btnLevelUp"/.test(html185) &&
+      /class="readback-strip"/.test(html185),
+    '185.2: OPERATOR readback-strip retains MAX AP + the LEVEL UP key (auto-recenters via the existing justify-content:center)'
+  );
+
+  // 185.3  BUS-10 LOAD-CELL WEIGH BRIDGE: the BEAM SVG (owner-locked variant,
+  //        no dial) + its readouts exist, wrapped in a real bay-board panel.
+  assert(
+    /id="opsBridgePanel"/.test(html185) &&
+      /class="panel bay-board span2"/.test(
+        html185.slice(html185.indexOf('id="opsBridgePanel"') - 60)
+      ) &&
+      /id="opsBeamPath"/.test(html185) &&
+      /id="opsBeamBlock"/.test(html185) &&
+      /id="opsBeamPct"/.test(html185) &&
+      /id="opsSeizedStamp"/.test(html185) &&
+      /id="opsSeizedNote"/.test(html185) &&
+      /BUS-10/.test(html185),
+    '185.3: BUS-10 LOAD-CELL WEIGH BRIDGE — the BEAM SVG (path/block/pct) + SEIZED stamp/note all present in a real bay-board panel'
+  );
+
+  // 185.4  _paintWeighBridge() is the single mirror function: reads
+  //        curWt/maxWeight (never re-derives them), paints the beam `d` +
+  //        block `y` proportionally to load%, and is called from
+  //        updateMath() right after the existing weight-* class toggle —
+  //        one apply path, so the bridge and OPERATOR's own display_weight
+  //        can never disagree.
+  const paintBody185 = extractFunctionBody(core185, '_paintWeighBridge');
+  const updateMathBody185 = extractFunctionBody(core185, 'updateMath');
+  assert(
+    /getElementById\('opsBeamPath'\)/.test(paintBody185) &&
+      /setAttribute\('d'/.test(paintBody185) &&
+      /getElementById\('opsBeamBlock'\)/.test(paintBody185) &&
+      /setAttribute\('y'/.test(paintBody185) &&
+      /curWt >= maxWeight/.test(paintBody185) &&
+      /_paintWeighBridge\(curWt, maxWeight\)/.test(updateMathBody185),
+    '185.4: _paintWeighBridge(curWt, maxWeight) paints the beam d/block y proportionally to real carry weight, called from updateMath() as a read-only mirror (Protocol 22 single-apply)'
+  );
+
+  // 185.5  LIVE PROPORTIONAL BEND: the beam path/block use a plain CSS
+  //        `transition:` (not a discrete-frame swap), so the existing global
+  //        prefers-reduced-motion block (transition-duration:0.01ms
+  //        !important) collapses it to an instant snap automatically — no
+  //        bespoke carve-out. The SEIZED shudder is a plain `animation:`,
+  //        likewise auto-neutralised.
+  assert(
+    /\.beam-path\s*\{[^}]*transition:\s*d\s/.test(css185) &&
+      /\.beam-block\s*\{[^}]*transition:\s*y\s/.test(css185) &&
+      /body\.weight-over \.beam-instrument\s*\{\s*animation:/.test(css185),
+    '185.5: the beam bends via a plain CSS `transition: d`/`transition: y` (never 4 discrete frames), and the SEIZED shudder is a plain `animation:` — both auto-neutralised by the global prefers-reduced-motion block'
+  );
+
+  // 185.6  3-tier CARGO LOAD color (nominal/amber-heavy/red-seized) rides the
+  //        SAME body.weight-heavy/-critical/-over classes updateMath()
+  //        already toggles — no second weight computation, no inline
+  //        style.color fight with the CSS.
+  assert(
+    !/getElementById\('display_weight'\)\.style\.color/.test(updateMathBody185) &&
+      /body\.weight-heavy #display_weight/.test(css185) &&
+      /body\.weight-over #display_weight/.test(css185),
+    '185.6: #display_weight color now rides body.weight-heavy/-critical/-over CSS classes (removed the old inline 2-tier style.color) — single 3-tier source shared with the bridge'
+  );
+
+  // 185.7  CARGO MANIFEST drawer bank: exactly the 6 owner-approved drawers
+  //        (weapon/armor/aid/mod/misc/ammo), no "All" drawer — the physical
+  //        pull-drawer design has no such category. #invFilterMods keeps its
+  //        exact id (Suite 136.7 gate) so the FO3 hasWeaponMods hide still works.
+  const drawerFilters185 = [...html185.matchAll(/data-filter="([a-z]+)"/g)].map(m => m[1]);
+  assert(
+    drawerFilters185.length === 6 &&
+      ['weapon', 'armor', 'aid', 'mod', 'misc', 'ammo'].every(c => drawerFilters185.includes(c)) &&
+      !drawerFilters185.includes('all') &&
+      /id="invFilterMods"/.test(html185) &&
+      /class="drawer-bank"/.test(html185),
+    '185.7: exactly the 6 owner-approved drawers (weapon/armor/aid/mod/misc/ammo) exist as a .drawer-bank, no "All" drawer, #invFilterMods id preserved'
+  );
+
+  // 185.8  bounded IN-PANEL scroll — the open drawer's item list scrolls
+  //        inside a fixed max-height region (owner revision: NO render cap,
+  //        every item reachable by scrolling) with an on-theme phosphor
+  //        scrollbar.
+  assert(
+    /\.tray-list\s*\{[^}]*max-height:\s*342px/.test(css185) &&
+      /overflow-y:\s*auto/.test(css185.slice(css185.indexOf('.tray-list {'))) &&
+      /\.tray-list::-webkit-scrollbar-thumb/.test(css185) &&
+      !/\+N more — refine search/.test(
+        (render185.match(/function renderInventory\(\)[\s\S]*?\n\}/) || [''])[0]
+      ),
+    '185.8: the open drawer scrolls in a bounded max-height region with a phosphor scrollbar — no "+N more" render cap on the manifest (owner revision)'
+  );
+
+  // 185.9  the last-open drawer is remembered across reload (Protocol UI-6) —
+  //        a registered MetaStore device pref, restored at boot and written
+  //        on every setInvFilter() call (the app's one drawer-choice entry
+  //        point).
+  const setInvFilterBody185 = extractFunctionBody(render185, 'setInvFilter');
+  const restoreDevicePrefsBody185 = extractFunctionBody(core185, '_restoreDevicePrefs');
+  assert(
+    /robco_cargo_drawer:/.test(stateSrc185) &&
+      /MetaStore\.set\('robco_cargo_drawer', cat\)/.test(setInvFilterBody185) &&
+      /MetaStore\.get\('robco_cargo_drawer'\)/.test(restoreDevicePrefsBody185),
+    '185.9: robco_cargo_drawer is a registered MetaStore device pref, written by setInvFilter() and restored by _restoreDevicePrefs() at boot (Protocol UI-6)'
+  );
+
+  // 185.10  per-row quantity ± stepper: adjItemQty(idx, delta) is a new
+  //         native write path — clamped >=0, and hitting 0 removes the row
+  //         entirely (there is no zero-quantity cargo tag).
+  const adjQtyBody185 = extractFunctionBody(render185, 'adjItemQty');
+  assert(
+    /Math\.max\(0, \(parseInt\(it\.qty\) \|\| 0\) \+ delta\)/.test(adjQtyBody185) &&
+      /next === 0/.test(adjQtyBody185) &&
+      /state\.inventory\.splice\(idx, 1\)/.test(adjQtyBody185) &&
+      /saveState\(\)/.test(adjQtyBody185) &&
+      /data-qtyidx=/.test(render185) &&
+      /data-qtydelta=/.test(render185),
+    '185.10: adjItemQty(idx, delta) clamps >=0 and removes the row at 0 — a new native per-row qty ± write path, wired via data-qtyidx/data-qtydelta'
+  );
+
+  // 185.11  native EQUIP control (closes the U10 audit gap): one equipped
+  //         item per slot family — 'weapon' items occupy state.equipped.weapon,
+  //         'armor' items occupy state.equipped.armor. Tapping the equipped
+  //         item's own button unequips it (toggle), tapping another of the
+  //         same family replaces it (single-apply).
+  const toggleEquipBody185 = extractFunctionBody(render185, 'toggleEquipItem');
+  assert(
+    /cat === 'weapon' \? 'weapon' : cat === 'armor' \? 'armor' : null/.test(toggleEquipBody185) &&
+      /state\.equipped\[slot\] = state\.equipped\[slot\] === it\.name \? null : it\.name/.test(
+        toggleEquipBody185
+      ) &&
+      /renderEquipped\(\)/.test(toggleEquipBody185) &&
+      /saveState\(\)/.test(toggleEquipBody185) &&
+      /data-equip=/.test(render185),
+    '185.11: toggleEquipItem(idx) writes state.equipped.weapon/.armor (one per slot family, toggle-off on re-tap) — a new native EQUIP write path, wired via data-equip'
+  );
+
+  // 185.12  autoImportState()'s AI-write equip path stays intact — the native
+  //         EQUIP control is an ADDITIONAL write path, never a replacement of
+  //         the AI's own (Protocol 14/24: the AI is never the sole source of
+  //         truth, but its own validated writes still apply unchanged).
+  assert(
+    /state\.equipped\.weapon = e\.weapon \|\| null/.test(api185) &&
+      /state\.equipped\.armor = e\.armor \|\| null/.test(api185) &&
+      /state\.equipped\.headgear = e\.headgear \|\| null/.test(api185),
+    "185.12: autoImportState()'s AI-write equipped path is untouched — the native EQUIP control is additive, not a fork"
+  );
+
+  // 185.13  SQUAD ROSTER ENLIST is registry-driven (fixes the Protocol 38
+  //         FNV-hardcode bug — FO3 campaigns previously showed FNV companion
+  //         names): _populateSquadEnlistOptions() reads FALLOUT_REGISTRY.
+  //         companions, called from renderSquad(); no static 8-name FNV
+  //         <option> list remains in index.html.
+  const renderSquadBody185 = extractFunctionBody(render185, 'renderSquad');
+  const populateEnlistBody185 = extractFunctionBody(render185, '_populateSquadEnlistOptions');
+  assert(
+    /FALLOUT_REGISTRY\.companions/.test(populateEnlistBody185) &&
+      /_populateSquadEnlistOptions\(\)/.test(renderSquadBody185) &&
+      !/<option value="Arcade Gannon">/.test(html185) &&
+      !/<option value="Boone">/.test(html185),
+    "185.13: SQUAD ROSTER's ENLIST select is populated from FALLOUT_REGISTRY.companions (game-agnostic — fixes the FNV-hardcode bug), no static 8-name option list remains"
+  );
+
+  // 185.14  every BUS-10…15 board carries a live .panel-substatus collapsed
+  //         summary line (the 0i standard) — never information-free even
+  //         while collapsed.
+  const summaryIds185 = [
+    'opsBridgeStatus',
+    'opsManifestStatus',
+    'opsFabStatus',
+    'opsBarterStatus',
+    'opsSquadStatus',
+    'opsCurioStatus',
+  ];
+  assert(
+    summaryIds185.every(id =>
+      new RegExp(
+        'id="' + id + '"[^>]*class="panel-substatus"|class="panel-substatus" id="' + id + '"'
+      ).test(html185)
+    ),
+    '185.14: every OPERATIONS board (BUS-10…15) carries a .panel-substatus collapsed summary line — missing: ' +
+      summaryIds185
+        .filter(
+          id =>
+            !new RegExp(
+              'id="' + id + '"[^>]*class="panel-substatus"|class="panel-substatus" id="' + id + '"'
+            ).test(html185)
+        )
+        .join(', ')
+  );
+
+  // 185.15  those 6 summary lines are actually kept live by their respective
+  //         render functions (never static placeholder text left to rot).
+  assert(
+    /getElementById\('opsBridgeStatus'\)/.test(core185) &&
+      /getElementById\('opsManifestStatus'\)/.test(render185) &&
+      /getElementById\('opsFabStatus'\)/.test(render185) &&
+      /getElementById\('opsBarterStatus'\)/.test(render185) &&
+      /getElementById\('opsSquadStatus'\)/.test(render185) &&
+      /getElementById\('opsCurioStatus'\)/.test(render185),
+    '185.15: each BUS-10…15 summary line is updated by its owning render function (bridge mirror / manifest / fab / barter / squad / curio)'
+  );
+
+  // 185.16  id-preservation contract (PHASE3_OPERATIONS_PLAN.md §3): every
+  //         shipped id/handler the dressing wraps is still present verbatim.
+  const FIXED_IDS_185 = [
+    'invFilterBar',
+    'invFilterMods',
+    'invList',
+    'ammoSubPanel',
+    'ammoList',
+    'newAmmoType',
+    'ammoCalibers',
+    'newAmmoCount',
+    'newItemName',
+    'newItemQty',
+    'newItemWeight',
+    'newItemValue',
+    'newItemType',
+    'craftPanel',
+    'craftRecipeList',
+    'craftScrapList',
+    'tradePanel',
+    'tradeHeader',
+    'tradeVendorSelect',
+    'tradeStats',
+    'tradeBuySearch',
+    'tradeBuyList',
+    'tradeSellList',
+    'squadList',
+    'newSquadName',
+    'collectiblesSubPanel',
+    'collectiblesDisplay',
+    'lincolnSubPanel',
+    'lincolnMemorabiliaDisplay',
+  ];
+  // tradeVendorSelect/tradeStats are id="..." only once renderTrade() has
+  // populated #tradeHeader — check the combined HTML+JS source, same as the
+  // handler sweep below (mirrors the id-preservation contract's own note
+  // that render-fn-emitted ids are still covered, just not statically in
+  // index.html).
+  const allSrc185 = html185 + render185 + core185;
+  const missingIds185 = FIXED_IDS_185.filter(id => !new RegExp('id="' + id + '"').test(allSrc185));
+  const FIXED_HANDLERS_185 = [
+    'setInvFilter',
+    'addItem',
+    'delItem',
+    'addAmmo',
+    'removeAmmo',
+    'doCraft',
+    'doScrap',
+    'setTradeVendor',
+    'doBuy',
+    'doSell',
+    'addSquadMember',
+    'adjustAffinity',
+    'removeSquadMember',
+    'toggleCollectible',
+  ];
+  const missingHandlers185 = FIXED_HANDLERS_185.filter(
+    fn => !new RegExp(fn + '\\(').test(allSrc185)
+  );
+  assert(
+    missingIds185.length === 0 && missingHandlers185.length === 0,
+    '185.16: the id/handler-preservation contract holds — missing ids: [' +
+      missingIds185.join(', ') +
+      '], missing handlers: [' +
+      missingHandlers185.join(', ') +
+      ']'
+  );
+
+  // 185.17  BARTER UPLINK leans amber "over the wire" via the game-agnostic
+  //         --bezel-wire token (never a hardcoded color) — Protocol 38.
+  assert(
+    /class="panel bay-board wireboard"/.test(html185) &&
+      /details\.bay-board\.wireboard\s*\{[^}]*border-color:\s*rgba\(var\(--bezel-wire-rgb\)/.test(
+        css185
+      ),
+    '185.17: BARTER UPLINK (BUS-13) is a .wireboard riding the game-agnostic --bezel-wire token (amber under NV, local phosphor fallback for an unauthored game)'
+  );
+
+  // 185.18  centering rule: the drawer bank, the squad roster grid, and the
+  //         bridge instrument+readouts row all center an incomplete last row.
+  assert(
+    /\.drawer-bank\s*\{[^}]*justify-content:\s*center/.test(css185) &&
+      /#squadList\s*\{[^}]*justify-content:\s*center/.test(css185) &&
+      /\.bridge-wrap\s*\{[^}]*justify-content:\s*center/.test(css185),
+    '185.18: .drawer-bank / #squadList / .bridge-wrap all center an incomplete last row (justify-content:center)'
+  );
+
+  // 185.19  mobile baseline (Protocol 17): drawer keycaps + manifest row
+  //         controls clear the >=28px tap-target floor.
+  assert(
+    /button\.drawer\s*\{[^}]*min-height:\s*46px/.test(css185) &&
+      /\.m-ctrl button\s*\{[^}]*min-height:\s*28px/.test(css185),
+    '185.19: button.drawer (46px) and .m-ctrl row controls (28px) both clear the Protocol 17 >=28px tap-target floor'
+  );
+
+  // 185.20  FIELD FABRICATION HAVE/NEED ingredient meters — a fill bar (short
+  //         = red) alongside the same have/need numbers, driven by a plain
+  //         `animation:` (meter fill), auto-neutralised by reduced-motion.
+  const craftCardBody185 = extractFunctionBody(render185, 'renderCraftCard');
+  assert(
+    /class="hn-meter"/.test(craftCardBody185) &&
+      /HAVE \$\{haveN\} \/ NEED \$\{ing\.qty\}/.test(craftCardBody185) &&
+      /\.ing \.hn-meter i\s*\{[^}]*animation:\s*opsMeterFill/.test(css185),
+    '185.20: FIELD FABRICATION ingredient rows show a HAVE/NEED meter fill bar (short = red) via a plain `animation:` (reduced-motion-safe)'
+  );
+
+  // 185.21  Protocol 38 game-agnosticism: no hardcoded FNV/FO3 company name or
+  //         game literal in the new squad/drawer/bridge code paths (the
+  //         enlist list and drawer categories are pure data/registry reads).
+  assert(
+    !/'Boone'|'Cass'|'Veronica'|'Dogmeat'|'Charon'/.test(populateEnlistBody185) &&
+      !/ctx === 'FNV'|ctx === 'FO3'/.test(setInvFilterBody185),
+    '185.21: the registry-driven ENLIST picker and the drawer bank carry no hardcoded companion name or per-game literal branch'
+  );
+
+  // 185.22  zero new durable campaign-state write beyond the pre-existing
+  //         state.equipped/state.inventory/state.caps fields the dressing
+  //         already touches — no NEW state.<field> introduced by this unit.
+  assert(
+    !/state\.opsBridge|state\.cargoDrawer|state\.manifestOpen/.test(render185 + core185),
+    '185.22: no new campaign-state field was introduced for the weigh bridge/drawer bank — the drawer choice is a MetaStore device pref, not campaign state'
+  );
+
+  // 185.23  bezel telemetry reflects a SEIZED (over-encumbered) bridge —
+  //         reads the same body.weight-over class updateMath() already
+  //         toggles, never a second weight computation.
+  const bezelSuffixBody185 = extractFunctionBody(core185, '_bezelStatusSuffix');
+  assert(
+    /classList\.contains\('weight-over'\)/.test(bezelSuffixBody185) &&
+      /CARGO SEIZED/.test(bezelSuffixBody185),
+    '185.23: _bezelStatusSuffix() flags "CARGO SEIZED" on the bezel telemetry strip when body.weight-over is set (reads the existing class, no second computation)'
+  );
+
+  // 185.24  AMMO drawer fold-in: expandPanelForCategory('ammo') now pulls the
+  //         AMMO drawer via setInvFilter('ammo') instead of the retired
+  //         ammoSubPanel.open toggle (its visibility is drawer-gated, not a
+  //         user-collapsible <details> anymore).
+  const expandBody185 = extractFunctionBody(core185, 'expandPanelForCategory');
+  assert(
+    /setInvFilter\('ammo'\)/.test(expandBody185),
+    "185.24: expandPanelForCategory('ammo') reveals the AMMO drawer via setInvFilter('ammo') (drawer-gated visibility, not a stale .open toggle)"
+  );
 }
 
 // ══════════════════════════════════════════════════════════════

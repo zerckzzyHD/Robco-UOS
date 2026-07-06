@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2331/2331 | Cache: robco-terminal-v2.7.0-r83 -->
+﻿## [Unreleased]<!-- Tests: 2355/2355 | Cache: robco-terminal-v2.7.0-r84 -->
 
 ### Added
 
@@ -22,6 +22,8 @@
 - Your RAD EXPOSURE reading can now be dragged to set your radiation level directly, exactly like your HP and XP bars already work — typing the number in by hand still works too.
 - Added a level cap (50) and a matching XP cap that scales with your current level — typing in a level or an XP amount higher than what's actually possible now gets held at the real maximum instead of accepting any number.
 - Extended the short one-line status preview already shown on your OPERATOR boards to every board in Settings — Security & Configuration and each of its five hardware slots, your Save Archive, and your Campaign Configs now all show a real, live status line even while collapsed.
+- Your OPERATIONS screen got a full hardware makeover to match the rest of the terminal, styled as a quartermaster's freight console. A LOAD-CELL WEIGH BRIDGE now shows your carry weight as a physical load beam that visibly sags further the more you're carrying — turning amber as you approach your limit, and locking red with a SEIZED stamp if you go over. Your inventory is now organized into six pull-out drawers (Weapons, Apparel, Aid, Mods, Misc, Ammo) instead of one long filtered list — pull one open at a time to see just that category, with a live item count on every drawer, a search box to filter what's inside, and the whole list scrolls in place so nothing is ever capped or hidden; the drawer you last had open is remembered the next time you visit. Every item in your cargo manifest now has a quantity +/- stepper, so you can adjust how many you're carrying by one without re-adding or deleting the whole stack. Weapons and armor can now be equipped or unequipped directly from their row in your inventory — tap EQUIP and it's marked in service, with only one weapon and one piece of armor equipped at a time; this was previously something only the AI could set for you. Your crafting bench now shows a fill meter for every ingredient in a recipe, so you can see at a glance how close you are to having enough to craft it.
+- Bottle caps and carry weight moved off your OPERATOR screen onto the new weigh bridge on OPERATIONS, right alongside the rest of your cargo — OPERATOR's readback strip now shows just your max AP and the LEVEL UP key, still centered the same way as before. There's still only ever one caps field in the whole app; it just lives in a new place.
 
 ### Changed
 
@@ -97,6 +99,7 @@
 - Fixed the OPERATIONAL TEMPO dial's five position labels having oversized, overlapping tap zones — the ones on the right could cover the ones on the left, making some positions impossible to tap, and pressing one could flash a stray highlight over the whole dial. Each position now has its own properly-sized, non-overlapping tap zone.
 - Fixed two of the OPERATIONAL TEMPO dial's position labels (STANDARD and SPEEDRUN) rendering with an awkward mid-word break instead of sitting on one line.
 - Fixed the terminal not always restoring your exact scroll position after a full reload when a panel's open/closed state also needed restoring — the two could get applied in the wrong order, throwing off where you landed. Your scroll position and every panel's open/closed state are now both restored correctly together, so you land exactly where you left off.
+- Fixed your squad's ENLIST list always showing New Vegas's companions even in Fallout 3 campaigns — it now correctly offers the companions available in whichever game you're actually playing.
 
 ### Improved
 

@@ -5327,13 +5327,14 @@ Check ($idxSrc84.Contains('data-sub-id="craft_breakdown"')) 'data-sub-id="craft_
 $loadUIBody84 = Get-FnBody84 $uiCSrc84 'loadUI'
 Check ($loadUIBody84.Contains('renderCraft(')) "renderCraft() called from loadUI() in js/ui-core.js"
 
-# 84.g  "> CRAFTING" badge entry in _updatePanelBadges
+# 84.g  "> FIELD FABRICATION" badge entry in _updatePanelBadges (Phase 3 ·
+#       Piece 2 renamed CRAFTING -> FIELD FABRICATION on OPERATIONS)
 $badgesBody84 = Get-FnBody84 $uiCSrc84 '_updatePanelBadges'
-Check ($badgesBody84.Contains('> CRAFTING')) '"> CRAFTING" badge entry present in _updatePanelBadges()'
+Check ($badgesBody84.Contains('> FIELD FABRICATION')) '"> FIELD FABRICATION" badge entry present in _updatePanelBadges()'
 
 # 84.h  craft key in expandPanelForCategory tabMap and map
 $expandBody84 = Get-FnBody84 $uiCSrc84 'expandPanelForCategory'
-Check ($expandBody84.Contains("craft: 'inv'") -and $expandBody84.Contains("craft: '> CRAFTING'")) `
+Check ($expandBody84.Contains("craft: 'inv'") -and $expandBody84.Contains("craft: '> FIELD FABRICATION'")) `
     "'craft' key in expandPanelForCategory tabMap and panel map"
 
 # 84.i  NO-CLOUD guard: doCraft + doScrap bodies have no cloud write calls
@@ -6837,8 +6838,10 @@ Check (-not ($api106 -match "mType\s*===\s*'TRADE'")) `
 # 106.14 AI no longer emits TRADE modal + dead tradeItem removed
 Check ((-not ($api106 -match 'array of item objects.*vendor')) -and (-not ($core106 -match 'function tradeItem\s*\('))) `
     '106.14: getSystemDirective no longer defines a TRADE modal shape; dead tradeItem() removed from ui-core.js'
-# 106.15 TRADE panel + sub-panels present
-Check (($htmlSrc -match 'id="tradePanel"') -and ($htmlSrc -match '&gt;\s*BARTER UPLINK') -and ($htmlSrc -match 'data-sub-id="trade_buy"') -and ($htmlSrc -match 'data-sub-id="trade_sell"')) `
+# 106.15 TRADE panel + sub-panels present. The BARTER UPLINK h2 now carries a
+# <span class="board-led wire"> before the title text (Phase 3 · Piece 2
+# OPERATIONS reskin) -- the glyph-to-title gap is markup, not just whitespace.
+Check (($htmlSrc -match 'id="tradePanel"') -and ($htmlSrc -match '&gt;[\s\S]{0,200}?BARTER UPLINK') -and ($htmlSrc -match 'data-sub-id="trade_buy"') -and ($htmlSrc -match 'data-sub-id="trade_sell"')) `
     '106.15: #tradePanel with BARTER UPLINK h2 + trade_buy/trade_sell sub-panels (data-sub-id) present'
 # 106.16 Tool Deck TRADE row (data-tool="TRADE") dispatches to the native panel
 # (ui-core.js's _wireToolDeck() switch-case), never the retired AI macro.
@@ -9078,12 +9081,14 @@ Check (
 ) '136.6: GAME_DEFS.FNV.hasWeaponMods === true and GAME_DEFS.FO3.hasWeaponMods === false'
 
 # 136.7  U9-5: the inventory Mods filter is gated by hasWeaponMods in _updateContextPanels()
+# (Phase 3 · Piece 2: the drawer bank has no "all" drawer, so the fail-safe
+# reset lands on "weapon" instead.)
 $ctxPanelsFn136 = [regex]::Match($render136, '(?s)function _updateContextPanels\(\)[\s\S]*?\n\}').Value
 Check (
     ($html136 -match 'id="invFilterMods"') -and
     ($render136 -match "_activeDef\(\)\.hasWeaponMods") -and
     ($render136 -match "getElementById\('invFilterMods'\)") -and
-    ($ctxPanelsFn136 -match "setInvFilter\('all'\)")
+    ($ctxPanelsFn136 -match "setInvFilter\('weapon'\)")
 ) '136.7: the inventory Mods filter button is hidden per-game via _updateContextPanels() + GAME_DEFS.hasWeaponMods, with a fail-safe reset off the mod filter'
 
 # 136.8  U10: adjustAffinity(idx, delta) -- clamps 0-100, persists + re-renders
@@ -9096,12 +9101,14 @@ Check (
 ) '136.8: adjustAffinity(idx, delta) exists, clamps 0-100, and persists + re-renders'
 
 # 136.9  U10: native [+]/[-] affinity buttons always rendered on every squad row
+# (Phase 3 · Piece 2 SQUAD ROSTER restyled the aria-label wording to
+# "Raise/Lower ... affinity", matching the approved mockup.)
 $squadFn136 = [regex]::Match($render136, '(?s)function renderSquad\(\)[\s\S]*?\n\}').Value
 Check (
     ($squadFn136 -match 'adjustAffinity\(\$\{i\},5\)') -and
     ($squadFn136 -match 'adjustAffinity\(\$\{i\},-5\)') -and
-    ($squadFn136 -match 'aria-label="Affinity \+5 for') -and
-    ($squadFn136 -match 'aria-label="Affinity -5 for') -and
+    ($squadFn136 -match 'aria-label="Raise \$\{escapeHtml\(member\.name\)\} affinity"') -and
+    ($squadFn136 -match 'aria-label="Lower \$\{escapeHtml\(member\.name\)\} affinity"') -and
     (-not ($squadFn136 -match 'member\.affinity !== undefined'))
 ) '136.9: renderSquad() always renders the [+]/[-] affinity buttons (real <button>s with aria-labels), not gated behind member.affinity being pre-set'
 
@@ -16307,6 +16314,234 @@ Check (
     ($topSummaryBody184 -match "getElementById\('sum-profile'\)") -and
     ($topSummaryBody184 -match "getElementById\('sum-ilk'\)")
 ) "184.18: _syncCampaignConfigTopSummary() aggregates the CAMPAIGN PROFILE + RANDOMIZER INTERLOCK boards' own summary text and is called from both boards' sync functions -- never stale regardless of which one last changed"
+
+# ===========================================================
+# Suite 185 -- Phase 3 . Piece 2: OPERATIONS "quartermaster's freight
+# console" reskin (BUS-10...15). Weigh bridge live beam bend, caps
+# relocation, CARGO MANIFEST drawer bank + bounded scroll, native EQUIP
+# + qty steppers, registry-driven SQUAD ROSTER, collapsed summary
+# lines, id-preservation contract. 24 tests. Mirrors JS Suite 185.
+# ===========================================================
+Write-Host "`n-- Suite 185 -- Phase 3 Piece 2: OPERATIONS quartermaster freight console (BUS-10 to 15) $('-' * 5)"
+$html185 = Read-Src "index.html"
+$css185 = Read-Src "css/terminal.css"
+$core185 = Read-Src "js/ui-core.js"
+$render185 = Read-Src "js/ui-render.js"
+$api185 = Read-Src "js/api.js"
+$stateSrc185 = Read-Src "js/state.js"
+
+# 185.1  BOTTLE CAPS + WEIGHT tiles gone from OPERATOR; #c_caps/#display_weight
+#        exist exactly once, now inside the OPERATIONS BUS-10 weigh bridge.
+Check (
+    (-not ($html185 -match '<span class="rb-cap">BOTTLE CAPS</span>')) -and
+    (([regex]::Matches($html185, 'id="c_caps"')).Count -eq 1) -and
+    (([regex]::Matches($html185, 'id="display_weight"')).Count -eq 1) -and
+    ($html185 -match '(?s)id="opsBridgePanel"[\s\S]*?id="c_caps"') -and
+    ($html185 -match '(?s)id="opsBridgePanel"[\s\S]*?id="display_weight"')
+) '185.1: BOTTLE CAPS + WEIGHT tiles removed from OPERATOR -- #c_caps/#display_weight now live exactly once, inside the OPERATIONS BUS-10 weigh bridge board'
+
+# 185.2  OPERATOR readback-strip keeps MAX AP + the LEVEL UP key.
+Check (
+    ($html185 -match '<span class="rb-cap">MAX AP</span>') -and
+    ($html185 -match 'id="btnLevelUp"') -and
+    ($html185 -match 'class="readback-strip"')
+) '185.2: OPERATOR readback-strip retains MAX AP + the LEVEL UP key (auto-recenters via the existing justify-content:center)'
+
+# 185.3  BUS-10 LOAD-CELL WEIGH BRIDGE: the BEAM SVG + readouts exist.
+Check (
+    ($html185 -match 'id="opsBridgePanel"') -and
+    ($html185 -match 'class="panel bay-board span2"') -and
+    ($html185 -match 'id="opsBeamPath"') -and
+    ($html185 -match 'id="opsBeamBlock"') -and
+    ($html185 -match 'id="opsBeamPct"') -and
+    ($html185 -match 'id="opsSeizedStamp"') -and
+    ($html185 -match 'id="opsSeizedNote"') -and
+    ($html185 -match 'BUS-10')
+) '185.3: BUS-10 LOAD-CELL WEIGH BRIDGE -- the BEAM SVG (path/block/pct) + SEIZED stamp/note all present in a real bay-board panel'
+
+# 185.4  _paintWeighBridge() single mirror function, called from updateMath().
+$paintBody185 = Get-FunctionBody $core185 '_paintWeighBridge'
+$updateMathBody185 = Get-FunctionBody $core185 'updateMath'
+Check (
+    ($paintBody185 -match "getElementById\('opsBeamPath'\)") -and
+    ($paintBody185 -match "setAttribute\('d'") -and
+    ($paintBody185 -match "getElementById\('opsBeamBlock'\)") -and
+    ($paintBody185 -match "setAttribute\('y'") -and
+    ($paintBody185 -match 'curWt >= maxWeight') -and
+    ($updateMathBody185 -match '_paintWeighBridge\(curWt, maxWeight\)')
+) '185.4: _paintWeighBridge(curWt, maxWeight) paints the beam d/block y proportionally to real carry weight, called from updateMath() as a read-only mirror (Protocol 22 single-apply)'
+
+# 185.5  LIVE PROPORTIONAL BEND via plain CSS transition; SEIZED shudder via
+#        plain animation -- both auto-neutralised by reduced-motion.
+Check (
+    ($css185 -match '(?s)\.beam-path\s*\{[^\}]*transition:\s*d\s') -and
+    ($css185 -match '(?s)\.beam-block\s*\{[^\}]*transition:\s*y\s') -and
+    ($css185 -match '(?s)body\.weight-over \.beam-instrument\s*\{\s*animation:')
+) '185.5: the beam bends via a plain CSS `transition: d`/`transition: y` (never 4 discrete frames), and the SEIZED shudder is a plain `animation:` -- both auto-neutralised by the global prefers-reduced-motion block'
+
+# 185.6  3-tier CARGO LOAD color rides body.weight-* classes (no inline fight).
+Check (
+    (-not ($updateMathBody185 -match "getElementById\('display_weight'\)\.style\.color")) -and
+    ($css185 -match 'body\.weight-heavy #display_weight') -and
+    ($css185 -match 'body\.weight-over #display_weight')
+) '185.6: #display_weight color now rides body.weight-heavy/-critical/-over CSS classes (removed the old inline 2-tier style.color) -- single 3-tier source shared with the bridge'
+
+# 185.7  exactly the 6 owner-approved drawers, no "All" drawer.
+$drawerFilters185 = [regex]::Matches($html185, 'data-filter="([a-z]+)"') | ForEach-Object { $_.Groups[1].Value }
+$expectedDrawers185 = @('weapon', 'armor', 'aid', 'mod', 'misc', 'ammo')
+Check (
+    ($drawerFilters185.Count -eq 6) -and
+    (($expectedDrawers185 | Where-Object { $drawerFilters185 -notcontains $_ }).Count -eq 0) -and
+    ($drawerFilters185 -notcontains 'all') -and
+    ($html185 -match 'id="invFilterMods"') -and
+    ($html185 -match 'class="drawer-bank"')
+) '185.7: exactly the 6 owner-approved drawers (weapon/armor/aid/mod/misc/ammo) exist as a .drawer-bank, no "All" drawer, #invFilterMods id preserved'
+
+# 185.8  bounded IN-PANEL scroll -- no render cap on the manifest.
+$renderInvBody185 = Get-FunctionBody $render185 'renderInventory'
+Check (
+    ($css185 -match '(?s)\.tray-list\s*\{[^\}]*max-height:\s*342px') -and
+    ($css185.Substring($css185.IndexOf('.tray-list {')) -match 'overflow-y:\s*auto') -and
+    ($css185 -match '\.tray-list::-webkit-scrollbar-thumb') -and
+    (-not ($renderInvBody185 -match [regex]::Escape('+N more — refine search')))
+) '185.8: the open drawer scrolls in a bounded max-height region with a phosphor scrollbar -- no "+N more" render cap on the manifest (owner revision)'
+
+# 185.9  last-open drawer remembered via a registered MetaStore pref (UI-6).
+$setInvFilterBody185 = Get-FunctionBody $render185 'setInvFilter'
+$restoreDevicePrefsBody185 = Get-FunctionBody $core185 '_restoreDevicePrefs'
+Check (
+    ($stateSrc185 -match 'robco_cargo_drawer:') -and
+    ($setInvFilterBody185 -match "MetaStore\.set\('robco_cargo_drawer', cat\)") -and
+    ($restoreDevicePrefsBody185 -match "MetaStore\.get\('robco_cargo_drawer'\)")
+) '185.9: robco_cargo_drawer is a registered MetaStore device pref, written by setInvFilter() and restored by _restoreDevicePrefs() at boot (Protocol UI-6)'
+
+# 185.10  adjItemQty(idx, delta) -- clamps >=0, removes the row at 0.
+$adjQtyBody185 = Get-FunctionBody $render185 'adjItemQty'
+Check (
+    ($adjQtyBody185 -match 'Math\.max\(0, \(parseInt\(it\.qty\) \|\| 0\) \+ delta\)') -and
+    ($adjQtyBody185 -match 'next === 0') -and
+    ($adjQtyBody185 -match 'state\.inventory\.splice\(idx, 1\)') -and
+    ($adjQtyBody185 -match 'saveState\(\)') -and
+    ($render185 -match 'data-qtyidx=') -and
+    ($render185 -match 'data-qtydelta=')
+) '185.10: adjItemQty(idx, delta) clamps >=0 and removes the row at 0 -- a new native per-row qty ± write path, wired via data-qtyidx/data-qtydelta'
+
+# 185.11  native EQUIP control -- one equipped item per slot family.
+$toggleEquipBody185 = Get-FunctionBody $render185 'toggleEquipItem'
+Check (
+    ($toggleEquipBody185 -match "cat === 'weapon' \? 'weapon' : cat === 'armor' \? 'armor' : null") -and
+    ($toggleEquipBody185 -match 'state\.equipped\[slot\] = state\.equipped\[slot\] === it\.name \? null : it\.name') -and
+    ($toggleEquipBody185 -match 'renderEquipped\(\)') -and
+    ($toggleEquipBody185 -match 'saveState\(\)') -and
+    ($render185 -match 'data-equip=')
+) '185.11: toggleEquipItem(idx) writes state.equipped.weapon/.armor (one per slot family, toggle-off on re-tap) -- a new native EQUIP write path, wired via data-equip'
+
+# 185.12  autoImportState()'s AI-write equip path stays intact (additive, not forked).
+Check (
+    ($api185 -match 'state\.equipped\.weapon = e\.weapon \|\| null') -and
+    ($api185 -match 'state\.equipped\.armor = e\.armor \|\| null') -and
+    ($api185 -match 'state\.equipped\.headgear = e\.headgear \|\| null')
+) "185.12: autoImportState()'s AI-write equipped path is untouched -- the native EQUIP control is additive, not a fork"
+
+# 185.13  SQUAD ROSTER ENLIST is registry-driven -- fixes the FNV-hardcode bug.
+$renderSquadBody185 = Get-FunctionBody $render185 'renderSquad'
+$populateEnlistBody185 = Get-FunctionBody $render185 '_populateSquadEnlistOptions'
+Check (
+    ($populateEnlistBody185 -match 'FALLOUT_REGISTRY\.companions') -and
+    ($renderSquadBody185 -match '_populateSquadEnlistOptions\(\)') -and
+    (-not ($html185 -match '<option value="Arcade Gannon">')) -and
+    (-not ($html185 -match '<option value="Boone">'))
+) "185.13: SQUAD ROSTER's ENLIST select is populated from FALLOUT_REGISTRY.companions (game-agnostic -- fixes the FNV-hardcode bug), no static 8-name option list remains"
+
+# 185.14  every BUS-10...15 board carries a live .panel-substatus summary line.
+$summaryIds185 = @('opsBridgeStatus', 'opsManifestStatus', 'opsFabStatus', 'opsBarterStatus', 'opsSquadStatus', 'opsCurioStatus')
+$missingSummaries185 = $summaryIds185 | Where-Object {
+    -not ($html185 -match ('id="' + $_ + '"[^>]*class="panel-substatus"|class="panel-substatus" id="' + $_ + '"'))
+}
+Check (
+    ($missingSummaries185.Count -eq 0)
+) ('185.14: every OPERATIONS board (BUS-10...15) carries a .panel-substatus collapsed summary line -- missing: ' + ($missingSummaries185 -join ', '))
+
+# 185.15  those 6 summary lines are kept live by their owning render functions.
+Check (
+    ($core185 -match "getElementById\('opsBridgeStatus'\)") -and
+    ($render185 -match "getElementById\('opsManifestStatus'\)") -and
+    ($render185 -match "getElementById\('opsFabStatus'\)") -and
+    ($render185 -match "getElementById\('opsBarterStatus'\)") -and
+    ($render185 -match "getElementById\('opsSquadStatus'\)") -and
+    ($render185 -match "getElementById\('opsCurioStatus'\)")
+) '185.15: each BUS-10...15 summary line is updated by its owning render function (bridge mirror / manifest / fab / barter / squad / curio)'
+
+# 185.16  id-preservation contract (PHASE3_OPERATIONS_PLAN.md section 3).
+$FIXED_IDS_185 = @(
+    'invFilterBar', 'invFilterMods', 'invList', 'ammoSubPanel', 'ammoList', 'newAmmoType',
+    'ammoCalibers', 'newAmmoCount', 'newItemName', 'newItemQty', 'newItemWeight', 'newItemValue',
+    'newItemType', 'craftPanel', 'craftRecipeList', 'craftScrapList', 'tradePanel', 'tradeHeader',
+    'tradeVendorSelect', 'tradeStats', 'tradeBuySearch', 'tradeBuyList', 'tradeSellList', 'squadList',
+    'newSquadName', 'collectiblesSubPanel', 'collectiblesDisplay', 'lincolnSubPanel', 'lincolnMemorabiliaDisplay'
+)
+$allSrc185 = $html185 + $render185 + $core185
+$missingIds185 = $FIXED_IDS_185 | Where-Object { -not ($allSrc185 -match ('id="' + $_ + '"')) }
+$FIXED_HANDLERS_185 = @(
+    'setInvFilter', 'addItem', 'delItem', 'addAmmo', 'removeAmmo', 'doCraft', 'doScrap',
+    'setTradeVendor', 'doBuy', 'doSell', 'addSquadMember', 'adjustAffinity', 'removeSquadMember',
+    'toggleCollectible'
+)
+$missingHandlers185 = $FIXED_HANDLERS_185 | Where-Object { -not ($allSrc185 -match ($_ + '\(')) }
+Check (
+    ($missingIds185.Count -eq 0) -and ($missingHandlers185.Count -eq 0)
+) ('185.16: the id/handler-preservation contract holds -- missing ids: [' + ($missingIds185 -join ', ') + '], missing handlers: [' + ($missingHandlers185 -join ', ') + ']')
+
+# 185.17  BARTER UPLINK leans amber "over the wire" via --bezel-wire.
+Check (
+    ($html185 -match 'class="panel bay-board wireboard"') -and
+    ($css185 -match '(?s)details\.bay-board\.wireboard\s*\{[^\}]*border-color:\s*rgba\(var\(--bezel-wire-rgb\)')
+) '185.17: BARTER UPLINK (BUS-13) is a .wireboard riding the game-agnostic --bezel-wire token (amber under NV, local phosphor fallback for an unauthored game)'
+
+# 185.18  centering rule on the drawer bank, squad grid, bridge readouts.
+Check (
+    ($css185 -match '(?s)\.drawer-bank\s*\{[^\}]*justify-content:\s*center') -and
+    ($css185 -match '(?s)#squadList\s*\{[^\}]*justify-content:\s*center') -and
+    ($css185 -match '(?s)\.bridge-wrap\s*\{[^\}]*justify-content:\s*center')
+) '185.18: .drawer-bank / #squadList / .bridge-wrap all center an incomplete last row (justify-content:center)'
+
+# 185.19  mobile baseline (Protocol 17): >=28px tap targets.
+Check (
+    ($css185 -match '(?s)button\.drawer\s*\{[^\}]*min-height:\s*46px') -and
+    ($css185 -match '(?s)\.m-ctrl button\s*\{[^\}]*min-height:\s*28px')
+) '185.19: button.drawer (46px) and .m-ctrl row controls (28px) both clear the Protocol 17 >=28px tap-target floor'
+
+# 185.20  FIELD FABRICATION HAVE/NEED ingredient meters via plain animation.
+$craftCardBody185 = Get-FunctionBody $render185 'renderCraftCard'
+Check (
+    ($craftCardBody185 -match 'class="hn-meter"') -and
+    ($craftCardBody185 -match [regex]::Escape('HAVE ${haveN} / NEED ${ing.qty}')) -and
+    ($css185 -match '(?s)\.ing \.hn-meter i\s*\{[^\}]*animation:\s*opsMeterFill')
+) '185.20: FIELD FABRICATION ingredient rows show a HAVE/NEED meter fill bar (short = red) via a plain `animation:` (reduced-motion-safe)'
+
+# 185.21  Protocol 38 game-agnosticism -- no hardcoded companion/game literal.
+Check (
+    (-not ($populateEnlistBody185 -match "'Boone'|'Cass'|'Veronica'|'Dogmeat'|'Charon'")) -and
+    (-not ($setInvFilterBody185 -match "ctx === 'FNV'|ctx === 'FO3'"))
+) '185.21: the registry-driven ENLIST picker and the drawer bank carry no hardcoded companion name or per-game literal branch'
+
+# 185.22  zero new durable campaign-state field introduced.
+Check (
+    (-not (($render185 + $core185) -match 'state\.opsBridge|state\.cargoDrawer|state\.manifestOpen'))
+) '185.22: no new campaign-state field was introduced for the weigh bridge/drawer bank -- the drawer choice is a MetaStore device pref, not campaign state'
+
+# 185.23  bezel telemetry flags a SEIZED bridge via the existing weight-over class.
+$bezelSuffixBody185 = Get-FunctionBody $core185 '_bezelStatusSuffix'
+Check (
+    ($bezelSuffixBody185 -match "classList\.contains\('weight-over'\)") -and
+    ($bezelSuffixBody185 -match 'CARGO SEIZED')
+) '185.23: _bezelStatusSuffix() flags "CARGO SEIZED" on the bezel telemetry strip when body.weight-over is set (reads the existing class, no second computation)'
+
+# 185.24  AMMO drawer fold-in via setInvFilter('ammo'), not a stale .open toggle.
+$expandBody185 = Get-FunctionBody $core185 'expandPanelForCategory'
+Check (
+    ($expandBody185 -match "setInvFilter\('ammo'\)")
+) "185.24: expandPanelForCategory('ammo') reveals the AMMO drawer via setInvFilter('ammo') (drawer-gated visibility, not a stale .open toggle)"
 
 # ===========================================================
 # Results

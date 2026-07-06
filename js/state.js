@@ -71,6 +71,9 @@ const META_MANIFEST = {
   robco_bay_view: { type: 'string', default: 'bay', owner: 'ui-core.js' },
   robco_bezel_subsystem: { type: 'string', default: 'operator', owner: 'ui-core.js' },
   robco_scroll_positions: { type: 'json', default: '{}', owner: 'ui-core.js' },
+  // Phase 3 · Piece 2 — OPERATIONS CARGO MANIFEST: which pull-drawer was last
+  // open (Protocol UI-6, "everything remembers on reload").
+  robco_cargo_drawer: { type: 'string', default: 'weapon', owner: 'ui-render.js' },
 };
 // Fire-and-forget write-through of a device-pref op to IndexedDB's 'meta' store
 // (Step 2 · Phase 1 · P1). The ONLY seam through which MetaStore touches IdbStore
