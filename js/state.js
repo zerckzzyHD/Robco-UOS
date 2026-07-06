@@ -77,6 +77,9 @@ const META_MANIFEST = {
   // Phase 3 OPERATOR batch 2 — BUS-08 REPUTATION CONSOLE: which faction
   // channel the shared meter/selector was last showing (Protocol UI-6).
   robco_faction_channel: { type: 'string', default: '', owner: 'ui-render.js' },
+  // Phase 3 · Piece 3 — DATABANK BUS-17 DIRECTIVE REGISTRY: which status
+  // drawer (all/active/complete/failed) was last open (Protocol UI-6).
+  robco_databank_qdrawer: { type: 'string', default: 'all', owner: 'ui-render.js' },
 };
 // Fire-and-forget write-through of a device-pref op to IndexedDB's 'meta' store
 // (Step 2 · Phase 1 · P1). The ONLY seam through which MetaStore touches IdbStore
@@ -978,6 +981,15 @@ const GAME_DEFS = {
         },
         greeting: '▸ EVENING, COURIER. The Director is on the wire. Transmit when ready.',
       },
+      // ── Phase 3 · Piece 3 — DATABANK "Records Bay" per-game flavor (owner-
+      // approved, databank-notes.md Q6): the map region caption + records
+      // framing read by BUS-16 CARTOGRAPHY TABLE / BUS-18 CAMPAIGN CHRONICLE.
+      // Never a JS ctx branch — data only (Protocol 38).
+      databank: {
+        mapCaption: 'MOJAVE WASTELAND',
+        mapCaptionSub: 'SURVEY GRID',
+        recordsLabel: "COURIER'S RECORDS BAY",
+      },
     },
     factions: FACTION_REGISTRY,
     skillKeys: SKILL_KEYS,
@@ -1166,6 +1178,13 @@ Update state.magazines when the Courier reads a skill magazine. Include only nam
           offline: '[ OFFLINE ]',
         },
         greeting: '▸ VAULT DWELLER, THE OVERSEER IS MONITORING. Transmit when ready.',
+      },
+      // ── sensible stub (FO3's real records-bay flavor is authored from an
+      // approved mockup later) — validates + is visibly distinct from NV's.
+      databank: {
+        mapCaption: 'CAPITAL WASTELAND',
+        mapCaptionSub: 'SURVEY GRID',
+        recordsLabel: "WANDERER'S RECORDS BAY",
       },
     },
     factions: FACTION_REGISTRY_FO3,
@@ -1363,6 +1382,13 @@ Update state.lincolnItems when the Courier acquires or sells any Lincoln artifac
           offline: '[ OFFLINE ]',
         },
         greeting: '▸ GENERAL, THE UPLINK IS READY. Transmit when ready.',
+      },
+      // ── design-only stub — validates the contract; unreachable at runtime
+      // (designOnly: true), same as the rest of FO4's identity block.
+      databank: {
+        mapCaption: 'THE COMMONWEALTH',
+        mapCaptionSub: 'SURVEY GRID',
+        recordsLabel: "SURVIVOR'S RECORDS BAY",
       },
     },
   },

@@ -901,19 +901,25 @@ assert(
     !/<button[^>]*style=[^>]*class="facon-chan/.test(renderFactionRepBody),
   'renderFactionRep facon-chan buttons have no inline style attribute'
 );
+// Phase 3 · Piece 3 (DATABANK BUS-16): renderWorldMap() was rewritten from a
+// boxed CSS grid to an inline SVG "Phosphor Cartography" node map — the
+// overflow-safety guarantee now lives in CSS (.map-svg-wrap svg{width:100%})
+// rather than an inline grid-template-columns string in the JS body, so the
+// contract checks the new SVG node-map markup instead.
 assert(
-  /minmax\(0,\s*1fr\)/.test(renderWorldMapBody),
-  'renderWorldMap uses minmax(0,1fr) for grid columns'
+  /class="map-svg-wrap"/.test(renderWorldMapBody) &&
+    /viewBox="\$\{viewBox\}"/.test(renderWorldMapBody),
+  'renderWorldMap builds a responsive .map-svg-wrap SVG with a computed viewBox (no hardcoded pixel grid)'
 );
 assert(
-  /max-width\s*:\s*100%/.test(renderWorldMapBody),
-  'renderWorldMap uses max-width:100% on the grid container'
+  /class="node/.test(renderWorldMapBody) &&
+    /class="dot"/.test(renderWorldMapBody) &&
+    /class="halo"/.test(renderWorldMapBody),
+  'renderWorldMap contains g.node/.dot/.halo SVG node markup (the spatial glyph nodes)'
 );
 assert(
-  /map-cell/.test(renderWorldMapBody) &&
-    /map-cell-name/.test(renderWorldMapBody) &&
-    /map-cell-pip/.test(renderWorldMapBody),
-  'renderWorldMap contains map-cell, map-cell-name, map-cell-pip class references'
+  /class="sig-glyph"/.test(renderWorldMapBody) && /sigGlyphChar/.test(renderWorldMapBody),
+  'renderWorldMap contains typed sig-glyph signal-return markers'
 );
 // Reload-size guard: size is state-driven, no width measurement (Protocol 8 plan)
 guards(renderWorldMapBody, [
@@ -940,8 +946,8 @@ try {
   fail(`setMapView function not found: ${e.message}`);
 }
 assert(
-  /map-toggle-btn/.test(renderWorldMapBody),
-  'renderWorldMap contains map-toggle-btn reference'
+  /class="chart-scale"/.test(renderWorldMapBody) && /setMapView\('full'\)/.test(renderWorldMapBody),
+  'renderWorldMap contains the CHART SCALE toggle (chart-scale class + setMapView calls)'
 );
 
 // ══════════════════════════════════════════════════════════════
@@ -959,16 +965,19 @@ const cssSourceStripped = cssSource.replace(/\/\*[\s\S]*?\*\//g, '');
 const faconChanRule = (cssSourceStripped.match(/\.facon-chan\s*\{[^}]*\}/) || [''])[0];
 const faconSelectorRule = (cssSourceStripped.match(/\.facon-selector\s*\{[^}]*\}/) || [''])[0];
 const faconKeysRule = (cssSourceStripped.match(/\.facon-keys\s*\{[^}]*\}/) || [''])[0];
-const mapCellRule = (cssSourceStripped.match(/\.map-cell\s*\{[^}]*\}/) || [''])[0];
+// Phase 3 · Piece 3: the boxed .map-cell CSS-grid was retired in favor of the
+// BUS-16 Phosphor Cartography SVG node map — the mobile overflow-safety
+// invariant now lives on the responsive SVG wrapper instead.
+const mapSvgWrapRule = (cssSourceStripped.match(/\.map-svg-wrap svg\s*\{[^}]*\}/) || [''])[0];
 const buttonRule = (cssSourceStripped.match(/^button\s*\{[^}]*\}/m) || [''])[0];
 
 assert(/width\s*:\s*auto/.test(faconChanRule), '.facon-chan has width:auto');
 assert(/flex-wrap/.test(faconSelectorRule), '.facon-selector has flex-wrap');
 assert(/flex-wrap/.test(faconKeysRule), '.facon-keys has flex-wrap');
-guards(mapCellRule, [
-  [/min-width\s*:\s*0/, '.map-cell has min-width:0'],
-  [/overflow\s*:\s*hidden/, '.map-cell has overflow:hidden'],
-  [/(min-height|aspect-ratio)/, '.map-cell has height floor (min-height or aspect-ratio)'],
+guards(mapSvgWrapRule, [
+  [/display\s*:\s*block/, '.map-svg-wrap svg has display:block'],
+  [/width\s*:\s*100%/, '.map-svg-wrap svg has width:100% (never overflows its board at 360px)'],
+  [/height\s*:\s*auto/, '.map-svg-wrap svg has height:auto (viewBox scales proportionally)'],
 ]);
 assert(
   /@media[^{]*480px[\s\S]{0,2000}max-width\s*:\s*56px/.test(cssSource),
@@ -12148,8 +12157,10 @@ header('Suite 108 — WU-N4 CONSULT native databank lookup');
   );
 
   // ── WU-N4b option C: DATABANK panel (DATA tab) sharing the CONSULT engine ─────
+  // Phase 3 · Piece 3: reskinned as BUS-19 CATALOG QUERY (class="panel bay-board
+  // wireboard") — the id/handler contract is unchanged, only extra classes added.
   const databankPanel108 = (html108.match(
-    /<details class="panel"[^>]*id="databankPanel"[\s\S]*?<\/details>/
+    /<details class="panel[^"]*"[^>]*id="databankPanel"[\s\S]*?<\/details>/
   ) || [''])[0];
   const renderDbBody = (() => {
     try {
@@ -12177,9 +12188,9 @@ header('Suite 108 — WU-N4 CONSULT native databank lookup');
   // #databankSearch (oninput→renderDatabankPanel) + #databankResults; renderDatabankPanel
   // defined in ui-render.js AND called from loadUI in ui-core.js.
   assert(
-    /<details class="panel"[^>]*id="databankPanel"/.test(html108) &&
+    /<details class="panel[^"]*"[^>]*id="databankPanel"/.test(html108) &&
       /data-tab="data"/.test(databankPanel108) &&
-      /<summary><h2>[^<]*DATABANK<\/h2>/.test(databankPanel108) &&
+      /<h2>[\s\S]*?CATALOG QUERY<\/h2>/.test(databankPanel108) &&
       /id="databankSearch"[\s\S]*?oninput="renderDatabankPanel\(\)"/.test(databankPanel108) &&
       /aria-label="[^"]+"/.test(databankPanel108) &&
       /id="databankResults"/.test(databankPanel108) &&
@@ -13227,14 +13238,15 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '118.1: _badgeSupported() feature-detects navigator.setAppBadge + clearAppBadge before any use'
   );
 
-  // 118.2  pending-directives count = active quests, shared with the QUEST LOG badge (Protocol 22)
+  // 118.2  pending-directives count = active quests, shared with the DIRECTIVE
+  //        REGISTRY badge (Protocol 22; renamed from QUEST LOG at Phase 3 · Piece 3)
   assert(
     /function _pendingDirectivesCount\(\)/.test(uiCore118) &&
       /state\.quests \|\| \[\]\)\.filter\(q => q\.status === 'active' \|\| !q\.status\)/.test(
         uiCore118
       ) &&
-      /h2text: '> QUEST LOG',\s*count: _pendingDirectivesCount\(\)/.test(uiCore118),
-    '118.2: _pendingDirectivesCount() (active quests) is the single source reused by the QUEST LOG panel badge'
+      /h2text: '> DIRECTIVE REGISTRY',\s*count: _pendingDirectivesCount\(\)/.test(uiCore118),
+    '118.2: _pendingDirectivesCount() (active quests) is the single source reused by the DIRECTIVE REGISTRY panel badge'
   );
 
   // 118.3  graceful no-op: badge update returns early when the API is unavailable
@@ -13866,14 +13878,15 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         /special:\s*'>\s*VITAL TELEMETRY'/.test(expandBody123) &&
         /skills:\s*'>\s*SKILL MATRIX'/.test(expandBody123) &&
         /bio:\s*'>\s*SKELETAL HARNESS'/.test(expandBody123) &&
-        /map:\s*'>\s*WORLD MAP'/.test(expandBody123) &&
-        /databank:\s*'>\s*DATABANK'/.test(expandBody123) &&
+        /map:\s*'>\s*CARTOGRAPHY TABLE'/.test(expandBody123) &&
+        /databank:\s*'>\s*CATALOG QUERY'/.test(expandBody123) &&
         /config:\s*'settings'/.test(expandBody123) &&
         /config:\s*'>\s*CAMPAIGN CONFIGS'/.test(expandBody123),
       // PHASE 3 OPERATOR reskin (Suite 181) renamed the BIO-METRICS/BIO-SCAN &
-      // LIMB STATUS panels to VITAL TELEMETRY/SKELETAL HARNESS — these targets
-      // were updated in the SAME commit so "special"/"bio" panel-nav aliases
-      // keep landing on the right board instead of silently no-opping.
+      // LIMB STATUS panels to VITAL TELEMETRY/SKELETAL HARNESS; Phase 3 · Piece 3
+      // (DATABANK "Records Bay") renamed WORLD MAP → CARTOGRAPHY TABLE and
+      // DATABANK → CATALOG QUERY — these targets were updated in the SAME
+      // commit so the panel-nav aliases keep landing on the right board.
       '123.7: expandPanelForCategory maps the panel-nav categories (special/skills/bio/map/databank/config) to a tab + h2'
     );
   }
@@ -13892,13 +13905,14 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '123.9: PANEL_NAV_ALIASES + _routePanelNav are game-agnostic (no FNV/FO3/Fallout/location literals — Protocol 38)'
   );
   // 123.10 the CONSULT→DATABANK target panel actually exists on the DATA tab
+  // (reskinned as BUS-19 CATALOG QUERY at Phase 3 · Piece 3 — id unchanged)
   assert(
     /id="databankPanel"/.test(html123) &&
       /data-tab="data"[^>]*id="databankPanel"|id="databankPanel"[^>]*data-tab="data"/.test(
         html123
       ) &&
-      /DATABANK<\/h2>/.test(html123),
-    '123.10: #databankPanel (DATABANK h2, data-tab="data") exists as the consult/databank/lookup target'
+      /CATALOG QUERY<\/h2>/.test(html123),
+    '123.10: #databankPanel (CATALOG QUERY h2, data-tab="data") exists as the consult/databank/lookup target'
   );
 }
 
@@ -14130,15 +14144,18 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   );
 
   // 125.4  campaign readout shows all the owner-confirmed stats incl. session duration
+  // (Phase 3 · Piece 3 BUS-21 SERVICE TALLY odometer reskin — the tile captions
+  // read CONFIRMED KILLS/DAMAGE DEALT/LOCATIONS FIXED rather than the old bare
+  // KILLS/DMG DEALT/LOCATION VISITS labels, same underlying data reads).
   assert(
     /state\.stats/.test(sessFn125) &&
       /KILLS/.test(sessFn125) &&
       /CAPS EARNED/.test(sessFn125) &&
-      /DMG DEALT/.test(sessFn125) &&
+      /DAMAGE DEALT/.test(sessFn125) &&
       /CURRENT SITTING/.test(sessFn125) &&
-      /LOCATION VISITS/.test(sessFn125) &&
+      /LOCATIONS FIXED/.test(sessFn125) &&
       /locationHistory/.test(sessFn125),
-    '125.4: renderSessionStats shows kills, caps earned, dmg dealt, CURRENT SITTING, and the LOCATION VISITS count'
+    '125.4: renderSessionStats shows kills, caps earned, damage dealt, CURRENT SITTING, and the LOCATIONS FIXED count'
   );
 
   // 125.5  device telemetry is preserved (function body unchanged by the panel split)
@@ -14159,13 +14176,14 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '125.6: session duration (CURRENT SITTING) and device uptime (CURRENT UPTIME) sit under clearly labelled CAMPAIGN LOG / UNIT TELEMETRY panels'
   );
 
-  // 125.7  RESET CAMPAIGN STATS is wired to resetSessionStats, which clears state.stats + re-renders
+  // 125.7  the ZERO CAMPAIGN COUNTERS key (renamed at Phase 3 · Piece 3, BUS-21
+  //        SERVICE TALLY) is wired to resetSessionStats, which clears state.stats + re-renders
   assert(
     /onclick="resetSessionStats\(\)"/.test(logPanel125) &&
-      /RESET CAMPAIGN STATS/.test(logPanel125) &&
+      /ZERO CAMPAIGN COUNTERS/.test(logPanel125) &&
       /state\.stats = \{/.test(resetFn125) &&
       /renderSessionStats\(\)/.test(resetFn125),
-    '125.7: the RESET CAMPAIGN STATS button calls resetSessionStats(), which resets state.stats and re-renders'
+    '125.7: the ZERO CAMPAIGN COUNTERS button calls resetSessionStats(), which resets state.stats and re-renders'
   );
 
   // 125.8  game-agnostic (Protocol 38) — no game literals in either half of the split readout
@@ -14192,7 +14210,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   const css126 = readFile('css/terminal.css');
   const markFn126 = (render126.match(/function markLocationVisited\(loc\)[\s\S]*?\n\}/) || [''])[0];
   const recFn126 = (state126.match(/function recordLocationVisit\([\s\S]*?\n\}/) || [''])[0];
-  const markCss126 = (css126.match(/\.map-mark-visited\s*\{[\s\S]*?\}/) || [''])[0];
+  // Phase 3 · Piece 3 renamed the button to MARK SURVEYED (class="mark") as
+  // part of the BUS-16 sector-sheet reskin — same handler, same add-only
+  // semantics (Protocol 22).
+  const markCss126 = (css126.match(/\.loc-row button\.mark\s*\{[\s\S]*?\}/) || [''])[0];
 
   // 126.1  the handler exists and routes through the single-source helper → persist → re-render
   assert(
@@ -14218,20 +14239,21 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '126.3: mark-visited is add-only — recordLocationVisit appends+dedups, no un-mark/forget helper exists'
   );
 
-  // 126.4  a real LOG VISIT <button> is rendered per row, wired to markLocationVisited via an
+  // 126.4  a real MARK SURVEYED <button> is rendered per row (renamed from LOG
+  //         VISIT at Phase 3 · Piece 3), wired to markLocationVisited via an
   //         escaped data-loc (apostrophe-safe), not a <span onclick>
   assert(
-    /class="map-mark-visited"/.test(render126) &&
+    /class="mark"/.test(render126) &&
       /onclick="markLocationVisited\(this\.dataset\.loc\)"/.test(render126) &&
       /data-loc="\$\{escapeHtml\(/.test(render126) &&
-      /LOG VISIT<\/button>/.test(render126),
-    '126.4: each WORLD GRID row renders a LOG VISIT <button> wired to markLocationVisited via an escaped data-loc'
+      /MARK SURVEYED<\/button>/.test(render126),
+    '126.4: each sector-sheet row renders a MARK SURVEYED <button> wired to markLocationVisited via an escaped data-loc'
   );
 
   // 126.5  accessible label — literal aria-label (UI-3), not diegetic
   assert(
-    /aria-label="Mark \$\{escapeHtml\(/.test(render126) && /as visited"/.test(render126),
-    '126.5: the LOG VISIT button carries a literal aria-label ("Mark <loc> as visited")'
+    /aria-label="Mark \$\{escapeHtml\(/.test(render126) && /as surveyed"/.test(render126),
+    '126.5: the MARK SURVEYED button carries a literal aria-label ("Mark <loc> as surveyed")'
   );
 
   // 126.6  add-only gating — the button is suppressed on the current + already-visited rows
@@ -14245,7 +14267,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     markCss126.length > 0 &&
       /min-height:\s*28px/.test(markCss126) &&
       /width:\s*auto/.test(markCss126),
-    '126.7: .map-mark-visited has a ≥28px tap target (min-height) and width:auto (overrides global button width)'
+    '126.7: .loc-row button.mark has a ≥28px tap target (min-height) and width:auto (overrides global button width)'
   );
 
   // 126.8  game-agnostic (Protocol 38) — no game literal in the handler
@@ -20071,6 +20093,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     'voice',
     'ambient',
     'overseer', // DO-O: extends the DO-K identity-completeness contract (Suite 162 §7)
+    'databank', // Phase 3 · Piece 3: extends the contract again (Suite 189 §12)
   ];
 
   // 157.1 — every GAME_DEFS entry (FNV, FO3, FO4 included) carries a complete identity contract
@@ -20080,7 +20103,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       const missing = CONTRACT157.filter(f => !id || id[f] === undefined || id[f] === null);
       assert(
         id && missing.length === 0,
-        `157.1.${ctx}: GAME_DEFS.${ctx}.identity carries every contract field (machine/material/structuralMode/theme/persona/ceremony/motionTexture/cursor/audio/voice/ambient/overseer)` +
+        `157.1.${ctx}: GAME_DEFS.${ctx}.identity carries every contract field (machine/material/structuralMode/theme/persona/ceremony/motionTexture/cursor/audio/voice/ambient/overseer/databank)` +
           (missing.length ? ' — MISSING: ' + missing.join(', ') : '')
       );
     });
@@ -23963,7 +23986,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       html176.indexOf('<div class="col-right">')
     );
     assert(
-      /<h2>>\s*CAMPAIGN RECORD<\/h2>/.test(campgBlock176) &&
+      /<h2>&gt;[\s\S]*?CAMPAIGN CHRONICLE<\/h2>/.test(campgBlock176) &&
         campgBlock176.includes('data-sub-id="campaign_status"') &&
         campgBlock176.includes('data-sub-id="crossroads_record"') &&
         campgBlock176.includes('data-sub-id="incident_log"') &&
@@ -23974,7 +23997,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         configBlock176.includes('id="playthroughTypeSelect"') &&
         configBlock176.includes('id="completeRngToggle"') &&
         configBlock176.includes('id="wipeTerminalBtn"'),
-      '176.2: #campgPanel (renamed CAMPAIGN RECORD) keeps only the record sub-panels; every config control + the DANGER ZONE moved verbatim into #campaignConfigPanel'
+      '176.2: #campgPanel (renamed CAMPAIGN CHRONICLE at Phase 3 · Piece 3) keeps only the record sub-panels; every config control + the DANGER ZONE moved verbatim into #campaignConfigPanel'
     );
   }
 
@@ -23995,12 +24018,13 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     );
   }
 
-  // 176.4  #campaignLogPanel exists on DATABANK with the campaign stats + reset button
+  // 176.4  #campaignLogPanel exists on DATABANK with the campaign stats + reset
+  //        button (reskinned as BUS-21 SERVICE TALLY at Phase 3 · Piece 3)
   assert(
-    /<details class="panel" data-tab="data" id="campaignLogPanel">/.test(html176) &&
+    /<details class="panel[^"]*"[^>]*data-tab="data"[^>]*id="campaignLogPanel">/.test(html176) &&
       /id="sessionStatsList"/.test(html176) &&
       /onclick="resetSessionStats\(\)"/.test(html176),
-    '176.4: #campaignLogPanel (DATABANK) hosts #sessionStatsList + the RESET CAMPAIGN STATS button'
+    '176.4: #campaignLogPanel (DATABANK) hosts #sessionStatsList + the ZERO CAMPAIGN COUNTERS reset button'
   );
 
   // 176.5  renderSystemStatus() is defined, reads real carrier/feature-flag/version
@@ -27246,6 +27270,321 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       /class="use-btn"/.test(invBody188) &&
       invBody188.indexOf('class="hole"') < invBody188.indexOf('class="use-btn"'),
     "188.4: renderInventory()'s row template (element order, data-use delegation) is unchanged — this was a CSS-only fix"
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 189 — Phase 3 · Piece 3: DATABANK "The Records Bay" (BUS-16…21)
+//  The six DATABANK boards (CARTOGRAPHY TABLE/DIRECTIVE REGISTRY/CAMPAIGN
+//  CHRONICLE/CATALOG QUERY/FIELD NOTES/SERVICE TALLY) rebuilt ground-up per
+//  PHASE3_DATABANK_PLAN.md + the approved databank-records-bay.html mockup.
+//  Covers: the BUS-16 Phosphor Cartography SVG node map (real gridRow/gridCol
+//  coordinates, fog-of-war, typed signal glyphs, the deleted _mapAbbrev
+//  table), the BUS-17 native quest status-cycle write path (behavioral,
+//  owner-locked Q3), the status-drawer + search filters, identity.databank
+//  per-game flavor, and the full id-preservation contract across all six
+//  boards (Protocol 22 — every original id/handler survives the reskin).
+//  20 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 189 — Phase 3 Piece 3: DATABANK Records Bay (BUS-16...21)');
+  const html189 = readFile('index.html');
+  const render189 = readFile('js/ui-render.js');
+  const state189src = readFile('js/state.js');
+  const css189 = readFile('css/terminal.css');
+  const mapBody189 = (() => {
+    try {
+      return extractFunctionBody(render189, 'renderWorldMap');
+    } catch (_) {
+      return '';
+    }
+  })();
+  const questsBody189 = (() => {
+    try {
+      return extractFunctionBody(render189, 'renderQuests');
+    } catch (_) {
+      return '';
+    }
+  })();
+
+  // 189.1  the _mapAbbrev table is fully deleted — nodes are keyed by
+  //        coordinate identity, not a hand-maintained abbreviation lookup
+  assert(
+    !/_mapAbbrev|_MAP_ABBREV/.test(render189) && !/_mapAbbrev|_MAP_ABBREV/.test(html189),
+    '189.1: _mapAbbrev/_MAP_ABBREV is fully deleted (nodes plot at real gridRow/gridCol, no abbreviation table)'
+  );
+
+  // 189.2  nodes plot at each zone's REAL gridRow/gridCol (zero new/fabricated
+  //        coordinate data — the registry stays the single source, Protocol 23)
+  assert(
+    /MARGIN \+ \(z\.gridCol - 1\) \* STEP/.test(mapBody189) &&
+      /MARGIN \+ \(z\.gridRow - 1\) \* STEP/.test(mapBody189) &&
+      /\.map\(\(z, i\) => \{/.test(mapBody189),
+    "189.2: renderWorldMap positions every SVG node from the zone's own gridCol/gridRow (nx/ny), iterating the real FALLOUT_REGISTRY.zones array"
+  );
+
+  // 189.3  fog-of-war: a node is fog only when neither the current-zone match
+  //        nor zoneVisited() hold — current/visited nodes are lit + labeled;
+  //        a fog node's <text class="lbl"> is never emitted (no label at
+  //        all, rather than an emitted-then-hidden element) and the dim
+  //        dashed dot/halo styling is CSS-only (g.node.fog .dot/.halo)
+  assert(
+    /const fog = !isCur && !isVisited/.test(mapBody189) &&
+      /const label = fog[\s\S]{0,20}''/.test(mapBody189) &&
+      /g\.node\.fog \.dot/.test(css189) &&
+      /g\.node\.fog \.halo/.test(css189),
+    '189.3: fog-of-war status (fog = !current && !visited) suppresses the node label entirely and drives the dim/dashed CSS styling — discovered zones stay lit + labeled'
+  );
+
+  // 189.4  typed collectible signal glyphs — driven by the existing per-game
+  //        collectibleLabel field (BOBBLEHEAD → ◆, else ★) plus a distinct ▲
+  //        for Lincoln memorabilia — never a hardcoded game literal (Protocol 38)
+  assert(
+    /BOBBLEHEAD.*sigGlyphChar|sigGlyphChar.*BOBBLEHEAD/.test(mapBody189.replace(/\n/g, ' ')) &&
+      /'▲'/.test(mapBody189) &&
+      /lincolnMemorabilia/.test(mapBody189) &&
+      !/=== 'FO3'|=== 'FNV'/.test(mapBody189),
+    '189.4: typed signal glyphs (★/◆ from collectibleLabel, ▲ from lincolnMemorabilia) are data-driven — no ctx branch in renderWorldMap'
+  );
+
+  // 189.5  the known-route trail turns state.locationHistory into connected
+  //        line segments between consecutive DISTINCT discovered zones —
+  //        capped so a long campaign never clutters the fixed-size chart
+  assert(
+    /trailZones\.slice\(-25\)/.test(mapBody189) && /class="route"/.test(mapBody189),
+    '189.5: the known-route trail is built from locationHistory (capped, deduped) and rendered as .route line segments'
+  );
+
+  // 189.6  keyboard traversal: arrow keys move focus to the nearest node in
+  //        the pressed direction (by real grid coordinate), Enter/Space pulls
+  //        the sector sheet — a real per-node control, not a hover-only chart
+  assert(
+    /function _mapNodeKeyNav/.test(render189) &&
+      /ArrowLeft:\s*\[-1, 0\]/.test(render189) &&
+      /onkeydown="_mapNodeKeyNav\(event,/.test(mapBody189) &&
+      /tabindex="0"/.test(mapBody189),
+    '189.6: every SVG node is a real tabindex="0" control wired to _mapNodeKeyNav (arrow-key nearest-neighbor traversal + Enter/Space to zoom)'
+  );
+
+  // 189.7  the sector sheet (zoom detail) still routes MARK SURVEYED through
+  //        the unchanged markLocationVisited → recordLocationVisit single
+  //        source (add-only fog-of-war, Protocol 22) — reskinned markup only
+  assert(
+    /onclick="resetMapZoom\(\)"/.test(mapBody189) &&
+      /onclick="markLocationVisited\(this\.dataset\.loc\)"/.test(mapBody189) &&
+      /let rowCls = 'loc-row'/.test(mapBody189),
+    '189.7: the sector sheet keeps zoomMapToZone/resetMapZoom/markLocationVisited unchanged — only the .loc-row markup was reskinned'
+  );
+
+  // 189.8  BUS-17 the ⟳ CYCLE key — the ONE new native write path this build
+  //        adds (owner-locked Q3) — real behavioral proof: three calls cycle
+  //        active→complete→failed→active on the SAME quest slot
+  {
+    const vm189 = require('vm');
+    let cycleOk = false;
+    let cycleErr = null;
+    try {
+      const cycleFnSrc =
+        'function cycleQuestStatus(idx) ' + extractFunctionBody(render189, 'cycleQuestStatus');
+      const cycleConstMatch = render189.match(/const _QUEST_CYCLE = \{[^}]*\};/);
+      const sandbox = {
+        state: { quests: [{ name: 'Test Directive', status: 'active' }] },
+        saveState: () => {},
+        renderQuests: () => {},
+        updateMath: () => {},
+        console: { error: () => {}, log: () => {} },
+      };
+      vm189.createContext(sandbox);
+      vm189.runInContext((cycleConstMatch ? cycleConstMatch[0] : '') + '\n' + cycleFnSrc, sandbox);
+      vm189.runInContext('cycleQuestStatus(0)', sandbox);
+      const s1 = sandbox.state.quests[0].status;
+      vm189.runInContext('cycleQuestStatus(0)', sandbox);
+      const s2 = sandbox.state.quests[0].status;
+      vm189.runInContext('cycleQuestStatus(0)', sandbox);
+      const s3 = sandbox.state.quests[0].status;
+      cycleOk = s1 === 'complete' && s2 === 'failed' && s3 === 'active';
+    } catch (e) {
+      cycleErr = e;
+    }
+    assert(
+      cycleOk,
+      '189.8: cycleQuestStatus() behaviorally advances a quest ACTIVE→COMPLETE→FAILED→ACTIVE (the one new native write path, owner-locked Q3)' +
+        (cycleErr ? ' — ' + String(cycleErr.message || cycleErr) : '')
+    );
+  }
+
+  // 189.9  the CYCLE key is additive — autoImportState()'s own AI-write quest
+  //        status path is untouched (Protocol 14/24 — a second entry point,
+  //        never a fork of the AI path)
+  const apiSrc189 = readFile('js/api.js');
+  assert(
+    /status/.test(apiSrc189) &&
+      /quests/i.test(apiSrc189) &&
+      /function autoImportState/.test(apiSrc189),
+    '189.9: autoImportState() still handles AI-write quest status — cycleQuestStatus is additive, not a fork'
+  );
+
+  // 189.10  the status drawer bank (ALL/ACTIVE/COMPLETE/FAILED) is a display-
+  //         only filter (no state.quests mutation) whose last-open choice
+  //         persists via the registered robco_databank_qdrawer MetaStore pref
+  assert(
+    /function setQuestDrawer/.test(render189) &&
+      /MetaStore\.set\('robco_databank_qdrawer'/.test(render189) &&
+      /robco_databank_qdrawer:\s*\{\s*type:\s*'string'/.test(state189src),
+    '189.10: setQuestDrawer() persists the last-open status drawer via the registered robco_databank_qdrawer MetaStore pref'
+  );
+
+  // 189.11  the in-tray search filters are display-only (never mutate
+  //         state.quests / state.campaign_notes)
+  assert(
+    /document\.getElementById\('questSearch'\)/.test(questsBody189) &&
+      !/state\.quests\.splice|state\.quests\s*=\s*\[\]/.test(questsBody189),
+    '189.11: #questSearch is a pure display filter over state.quests — renderQuests() never mutates the array while filtering'
+  );
+
+  // 189.12  identity.databank facet — per-game map caption + records label,
+  //         authored on all three GAME_DEFS entries (Protocol 38 extension)
+  {
+    const vm189b = require('vm');
+    let idOk = false;
+    let idErr = null;
+    try {
+      const sandbox = { window: {}, document: { getElementById: () => null } };
+      vm189b.createContext(sandbox);
+      vm189b.runInContext(state189src, sandbox);
+      const GD = sandbox.window.GAME_DEFS;
+      idOk = ['FNV', 'FO3', 'FO4'].every(
+        ctx =>
+          GD[ctx].identity.databank &&
+          typeof GD[ctx].identity.databank.mapCaption === 'string' &&
+          GD[ctx].identity.databank.mapCaption.length > 0
+      );
+    } catch (e) {
+      idErr = e;
+    }
+    assert(
+      idOk,
+      '189.12: GAME_DEFS.{FNV,FO3,FO4}.identity.databank.mapCaption is authored on all three games' +
+        (idErr ? ' — ' + String(idErr.message || idErr) : '')
+    );
+  }
+
+  // 189.13  BUS-16 CARTOGRAPHY TABLE reads the per-game map caption via
+  //         getIdentity() — never a hardcoded MOJAVE/CAPITAL literal
+  assert(
+    /dbFacet\.mapCaption/.test(mapBody189) && /getIdentity/.test(mapBody189),
+    '189.13: renderWorldMap reads the map caption from getIdentity().databank.mapCaption (Protocol 38, no hardcoded region string)'
+  );
+
+  // 189.14  id-preservation contract (Protocol 22) — every original id from
+  //         the plan's contract still exists exactly once across the 6 boards
+  {
+    const ids189 = [
+      'worldMapDisplay',
+      'questsList',
+      'newQuestName',
+      'newQuestStatus',
+      'newQuestObjective',
+      'databankPanel',
+      'databankSearch',
+      'databankResults',
+      'campaignNotesList',
+      'newCampaignNote',
+      'campaignLogPanel',
+      'sessionStatsList',
+      'campgPanel',
+      'campaignStatusPanel',
+      'campaignStatusDisplay',
+      'crossroadsDisplay',
+      'incidentDisplay',
+      'worldMapPanel',
+    ];
+    const missing189 = ids189.filter(
+      id => (html189.match(new RegExp(`id="${id}"`, 'g')) || []).length !== 1
+    );
+    assert(
+      missing189.length === 0,
+      '189.14: every id-preservation-contract id appears exactly once' +
+        (missing189.length ? ' — offenders: ' + missing189.join(', ') : '')
+    );
+  }
+
+  // 189.15  every original handler from the contract is still referenced
+  assert(
+    [
+      'renderQuests',
+      'addQuest',
+      'removeQuest',
+      'renderDatabankPanel',
+      'renderCampaignNotes',
+      'addCampaignNote',
+      'removeCampaignNote',
+      'renderSessionStats',
+      'resetSessionStats',
+      'renderWorldMap',
+      'setMapView',
+      'zoomMapToZone',
+      'resetMapZoom',
+      'markLocationVisited',
+      'renderCampaignStatus',
+    ].every(fn => new RegExp(fn + '\\(').test(html189 + render189)),
+    '189.15: every id-preservation-contract handler (renderQuests/addQuest/removeQuest/renderDatabankPanel/renderCampaignNotes/addCampaignNote/removeCampaignNote/renderSessionStats/resetSessionStats/renderWorldMap/setMapView/zoomMapToZone/resetMapZoom/markLocationVisited/renderCampaignStatus) is still called'
+  );
+
+  // 189.16  all six boards carry their BUS-16…21 slot tag + the bay-board frame
+  assert(
+    ['BUS-16', 'BUS-17', 'BUS-18', 'BUS-19', 'BUS-20', 'BUS-21'].every(bus =>
+      html189.includes('>' + bus + '<')
+    ) && (html189.match(/class="panel bay-board/g) || []).length >= 6,
+    '189.16: all six DATABANK boards carry their BUS-16…21 slot tag and the shared bay-board frame'
+  );
+
+  // 189.17  every board has a live .panel-substatus 0i summary line, each
+  //         updated by its own owning render function (not left static)
+  assert(
+    /id="dbMapStatus"/.test(html189) &&
+      /id="dbQuestStatus"/.test(html189) &&
+      /id="dbChronStatus"/.test(html189) &&
+      /id="dbCatalogStatus"/.test(html189) &&
+      /id="dbNotesStatus"/.test(html189) &&
+      /id="dbTallyStatus"/.test(html189) &&
+      /getElementById\('dbMapStatus'\)/.test(render189) &&
+      /getElementById\('dbQuestStatus'\)/.test(render189) &&
+      /getElementById\('dbChronStatus'\)/.test(render189) &&
+      /getElementById\('dbCatalogStatus'\)/.test(render189) &&
+      /getElementById\('dbNotesStatus'\)/.test(render189) &&
+      /getElementById\('dbTallyStatus'\)/.test(render189),
+    '189.17: all six BUS-16…21 boards carry a live 0i .panel-substatus line, each written by its own render function'
+  );
+
+  // 189.18  the two heroes (CARTOGRAPHY TABLE + DIRECTIVE REGISTRY) default
+  //         open; the other four default collapsed (mobile no-infinite-scroll)
+  assert(
+    /id="worldMapPanel" open>/.test(html189) &&
+      /id="questLogPanel" open>/.test(html189) &&
+      /id="campgPanel">/.test(html189) &&
+      /id="databankPanel">/.test(html189) &&
+      /id="campaignNotesPanel">/.test(html189) &&
+      /id="campaignLogPanel">/.test(html189),
+    '189.18: CARTOGRAPHY TABLE + DIRECTIVE REGISTRY default open ("open>"); CHRONICLE/CATALOG/NOTES/TALLY close their tag with no open attribute'
+  );
+
+  // 189.19  centering rule + bounded scroll — the drawer bank, tally bank, and
+  //         quest/notes trays all center an incomplete row / stay bounded
+  assert(
+    /\.tally-bank\s*\{[^}]*justify-content:\s*center/.test(css189) &&
+      /\.stat-head\s*\{[^}]*justify-content:\s*center/.test(css189) &&
+      /\.survey-legend\s*\{[^}]*justify-content:\s*center/.test(css189),
+    '189.19: .tally-bank/.stat-head/.survey-legend all center an incomplete last row (centering rule)'
+  );
+
+  // 189.20  game-agnostic (Protocol 38) — the new render code carries no
+  //         hardcoded FNV/FO3/Fallout literal (identity.databank supplies flavor)
+  assert(
+    !/New Vegas|Mojave Wasteland|Capital Wasteland|\bFNV\b|\bFO3\b/.test(
+      mapBody189 + questsBody189
+    ),
+    '189.20: renderWorldMap/renderQuests carry no hardcoded game-flavor literal — per-game text comes only from identity.databank/GAME_DEFS'
   );
 }
 

@@ -800,32 +800,134 @@ function addPerk() {
   updateMath();
 }
 
-// #1 Quest Log — renders state.quests[] as a filterable list
+// ── BUS-17 · DIRECTIVE REGISTRY (Phase 3 · Piece 3) — quests as numbered
+// directive slots inside a bounded tray-scrollwrap, with a status drawer
+// bank (ALL/ACTIVE/COMPLETE/FAILED — a display-only filter, one open at a
+// time, the OPERATIONS CARGO drawer mechanic reused, Protocol 22) and an
+// in-tray search. The drawer bank's last-open choice persists via the
+// registered robco_databank_qdrawer MetaStore pref (Protocol UI-6).
+let _qDrawer = null;
+function _qDrawerGet() {
+  if (_qDrawer === null)
+    _qDrawer =
+      (typeof MetaStore !== 'undefined' && MetaStore.get('robco_databank_qdrawer')) || 'all';
+  return _qDrawer;
+}
+// Called by the drawer-bank keycaps — a pure display filter, no state change.
+function setQuestDrawer(k) {
+  _qDrawer = k;
+  if (typeof MetaStore !== 'undefined') MetaStore.set('robco_databank_qdrawer', k);
+  renderQuests();
+}
+
+// The ⟳ CYCLE key — owner-approved (databank-notes.md Q3) the ONE new native
+// write path this build adds: advances a directive's status ACTIVE→COMPLETE→
+// FAILED→ACTIVE with no AI involved. autoImportState()'s own AI-write quest-
+// status path (Protocol 14/24) is untouched — this is a second, native entry
+// point onto the SAME state.quests[i].status field, exactly like the
+// existing native affinity/mark-visited setters (Protocol 22 pattern).
+const _QUEST_CYCLE = { active: 'complete', complete: 'failed', failed: 'active' };
+function cycleQuestStatus(idx) {
+  if (!state.quests || !state.quests[idx]) return;
+  const cur = String(state.quests[idx].status || 'active').toLowerCase();
+  state.quests[idx].status = _QUEST_CYCLE[cur] || 'active';
+  saveState();
+  renderQuests();
+  updateMath();
+}
+
+// #1 Quest Log — renders state.quests[] as numbered directive slots, filtered
+// by the active status drawer + the optional in-tray search.
 function renderQuests() {
   const questsDiv = document.getElementById('questsList');
   if (!questsDiv) return;
-  if (!state.quests || state.quests.length === 0) {
+  const all = state.quests || [];
+  const norm = q => {
+    const s = String((q && q.status) || 'active').toLowerCase();
+    return ['active', 'complete', 'failed'].includes(s) ? s : 'active';
+  };
+  const counts = {
+    all: all.length,
+    active: all.filter(q => norm(q) === 'active').length,
+    complete: all.filter(q => norm(q) === 'complete').length,
+    failed: all.filter(q => norm(q) === 'failed').length,
+  };
+  const drawer = ['all', 'active', 'complete', 'failed'].includes(_qDrawerGet())
+    ? _qDrawerGet()
+    : 'all';
+
+  const bank = document.getElementById('questDrawerBank');
+  if (bank) {
+    bank.innerHTML = [
+      ['all', 'ALL'],
+      ['active', 'ACTIVE'],
+      ['complete', 'COMPLETE'],
+      ['failed', 'FAILED'],
+    ]
+      .map(
+        ([k, label]) =>
+          `<button class="drawer${k === drawer ? ' pulled' : ''}" onclick="setQuestDrawer('${k}')" aria-label="${label} directives drawer — ${counts[k]} entries">${label}<span class="d-count">${counts[k]}</span></button>`
+      )
+      .join('');
+  }
+
+  const searchEl = document.getElementById('questSearch');
+  const q = (searchEl ? searchEl.value : '').trim().toLowerCase();
+  const shown = all
+    .map((quest, i) => ({ quest, i }))
+    .filter(({ quest }) => drawer === 'all' || norm(quest) === drawer)
+    .filter(
+      ({ quest }) =>
+        !q ||
+        String(quest.name || '')
+          .toLowerCase()
+          .includes(q) ||
+        String(quest.objective || '')
+          .toLowerCase()
+          .includes(q)
+    );
+
+  const titleEl = document.getElementById('questDrawerTitle');
+  if (titleEl)
+    titleEl.textContent =
+      drawer === 'all' ? 'ALL DIRECTIVES' : drawer.toUpperCase() + ' DIRECTIVES';
+  const countEl = document.getElementById('questDrawerCount');
+  if (countEl) countEl.textContent = `${shown.length} SHOWN · SCROLLS ▾`;
+  const statusEl = document.getElementById('dbQuestStatus');
+  if (statusEl) {
+    statusEl.textContent = `${counts.active} ACTIVE · ${counts.complete} DONE · ${counts.failed} FAILED`;
+  }
+
+  if (!all.length) {
     questsDiv.innerHTML = emptyState('NO ACTIVE DIRECTIVES');
     return;
   }
-  const statusColors = {
-    active: 'var(--robco-alert)',
-    complete: 'var(--robco-green)',
-    failed: 'var(--robco-danger)',
-  };
-  questsDiv.innerHTML =
-    '<ul class="notes-list">' +
-    state.quests
-      .map((q, i) => {
-        const st = (q.status || 'active').toLowerCase();
-        const color = statusColors[st] || 'inherit';
-        const factions = q.factions
-          ? ` <span style="font-size:9px;opacity:0.6;">[${escapeHtml(String(q.factions))}]</span>`
-          : '';
-        return `<li style="color:${color};"><span class="list-row-prefix">> </span><div class="list-row-content">[${escapeHtml(st.toUpperCase())}] ${escapeHtml(q.name)}${factions}${q.objective ? '<div style="font-size:10px;opacity:0.7;margin-left:10px;">' + escapeHtml(q.objective) + '</div>' : ''}</div><button class="delete-btn" onclick="removeQuest(${i})">X</button></li>`;
-      })
-      .join('') +
-    '</ul>';
+  if (!shown.length) {
+    questsDiv.innerHTML = emptyState('NO DIRECTIVES MATCH THIS FILTER');
+    return;
+  }
+
+  questsDiv.innerHTML = shown
+    .map(({ quest: qq, i }) => {
+      const st = norm(qq);
+      const factions = qq.factions
+        ? ` <span style="font-size:9px;opacity:0.6;">[${escapeHtml(String(qq.factions))}]</span>`
+        : '';
+      return `<div class="dir-slot ${st}">
+        <span class="s-idx">SLOT ${String(i + 1).padStart(2, '0')}</span>
+        <span class="dir-lamp" aria-hidden="true"></span>
+        <span class="dir-main">
+          <span class="d-name">${escapeHtml(qq.name)}${factions}</span>
+          ${qq.objective ? `<span class="d-obj">${escapeHtml(qq.objective)}</span>` : ''}
+        </span>
+        <span class="dir-keys">
+          <span class="d-st">${escapeHtml(st.toUpperCase())}</span>
+          <button class="cyc" onclick="cycleQuestStatus(${i})" aria-label="Cycle ${escapeHtml(qq.name)} status (now ${st})">&#8635; CYCLE</button>
+          <button class="del" onclick="removeQuest(${i})" aria-label="Remove ${escapeHtml(qq.name)}">&#10005;</button>
+        </span>
+      </div>`;
+    })
+    .join('');
 }
 function removeQuest(idx) {
   state.quests.splice(idx, 1);
@@ -834,6 +936,20 @@ function removeQuest(idx) {
 }
 
 // #8 Session Statistics — renders state.stats
+// Builds one BUS-21 mechanical odometer tile — the value is rendered as
+// individual digit/character cells (works for both a zero-padded number and
+// a formatted duration string like "3:12").
+function _odoTile(cap, valueStr, sub) {
+  const digits = String(valueStr)
+    .split('')
+    .map(ch => `<b>${escapeHtml(ch)}</b>`)
+    .join('');
+  return `<div class="odo-tile"><span class="odo-cap">${escapeHtml(cap)}</span><span class="odo-digits">${digits}</span><span class="odo-sub">${escapeHtml(sub)}</span></div>`;
+}
+
+// ── BUS-21 · SERVICE TALLY (Phase 3 · Piece 3) — session stats as a
+// mechanical odometer/counter bank (Protocol 22 — resetSessionStats/
+// state.stats reads untouched).
 function renderSessionStats() {
   const statsDiv = document.getElementById('sessionStatsList');
   if (!statsDiv) return;
@@ -850,20 +966,35 @@ function renderSessionStats() {
       : [];
   const collectAcquired = (state.collectibles || []).length;
   const collectTotal = collectDefs.length;
-  const collectLine =
-    collectTotal > 0
-      ? `<span style="opacity:0.65;">COLLECTIBLES</span><span>${collectAcquired}/${collectTotal}</span>`
-      : '';
-  statsDiv.innerHTML = `
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;font-size:11px;">
-            <span style="opacity:0.65;">KILLS</span><span>${s.kills || 0}</span>
-            <span style="opacity:0.65;">CAPS EARNED</span><span>${s.capsEarned || 0}</span>
-            <span style="opacity:0.65;">DMG DEALT</span><span>${s.damageDealt || 0}</span>
-            <span style="opacity:0.65;">CURRENT SITTING</span><span>${sittingStr}</span>
-            <span style="opacity:0.65;">TICKS</span><span>${state.ticks || 0}</span>
-            <span style="opacity:0.65;">LOCATION VISITS</span><span>${(state.locationHistory || []).length}</span>
-            ${collectLine}
-        </div>`;
+  const collectLabel = String(_activeDef().collectibleLabel || 'CURIOS').toLowerCase();
+
+  const tiles = [
+    _odoTile('CONFIRMED KILLS', String(s.kills || 0).padStart(4, '0'), 'campaign total'),
+    _odoTile('CAPS EARNED', String(s.capsEarned || 0).padStart(4, '0'), 'gross intake'),
+    _odoTile('DAMAGE DEALT', String(s.damageDealt || 0).padStart(4, '0'), 'cumulative'),
+    _odoTile('CURRENT SITTING', sittingStr, 'live duration'),
+    _odoTile('TICKS ELAPSED', String(state.ticks || 0).padStart(4, '0'), 'game time'),
+    _odoTile(
+      'LOCATIONS FIXED',
+      String((state.locationHistory || []).length).padStart(4, '0'),
+      'survey count'
+    ),
+  ];
+  if (collectTotal > 0) {
+    tiles.push(
+      _odoTile(
+        'CURIOS FOUND',
+        String(collectAcquired).padStart(2, '0'),
+        `of ${collectTotal} ${collectLabel}`
+      )
+    );
+  }
+  statsDiv.innerHTML = `<div class="tally-bank">${tiles.join('')}</div>`;
+
+  const statusEl = document.getElementById('dbTallyStatus');
+  if (statusEl) {
+    statusEl.textContent = `${s.kills || 0} KILLS · ${s.capsEarned || 0}c EARNED · ${sittingStr} SITTING`;
+  }
 }
 
 // #2 Equipped Item Tracking — renders state.equipped in bio-metrics
@@ -1259,23 +1390,40 @@ function toggleMagazine(name) {
   saveState();
 }
 
+// ── BUS-20 · FIELD NOTES (Phase 3 · Piece 3) — courier's field ledger:
+// bounded tray-scrollwrap + an optional in-tray search filter (display-only,
+// Protocol 22 — removeCampaignNote/addCampaignNote untouched). The auto-log
+// [T…] dimming distinction is preserved.
 function renderCampaignNotes() {
   const notesDiv = document.getElementById('campaignNotesList');
   if (!notesDiv) return;
-  if (!state.campaign_notes || state.campaign_notes.length === 0) {
+  const all = state.campaign_notes || [];
+  const searchEl = document.getElementById('notesSearch');
+  const q = (searchEl ? searchEl.value : '').trim().toLowerCase();
+  const shown = all
+    .map((note, i) => ({ note, i }))
+    .filter(({ note }) => !q || String(note).toLowerCase().includes(q));
+
+  const statusEl = document.getElementById('dbNotesStatus');
+  if (statusEl) {
+    const autoCount = all.filter(n => /^\[T\d+\]/.test(n)).length;
+    statusEl.textContent = `${all.length} ON FILE · ${autoCount} AUTO-LOGGED`;
+  }
+
+  if (!all.length) {
     notesDiv.innerHTML = emptyState('NO ENTRIES IN MEMORY');
     return;
   }
-  notesDiv.innerHTML =
-    '<ul class="notes-list">' +
-    state.campaign_notes
-      .map((note, i) => {
-        const isAutoLog = /^\[T\d+\]/.test(note);
-        const opacity = isAutoLog ? '0.65' : '1';
-        return `<li style="opacity:${opacity};"><span class="list-row-prefix">> </span><span class="list-row-content">${escapeHtml(String(note))}</span><button class="delete-btn" onclick="removeCampaignNote(${i})">X</button></li>`;
-      })
-      .join('') +
-    '</ul>';
+  if (!shown.length) {
+    notesDiv.innerHTML = emptyState('NO NOTES MATCH THIS FILTER');
+    return;
+  }
+  notesDiv.innerHTML = shown
+    .map(({ note, i }) => {
+      const isAutoLog = /^\[T\d+\]/.test(note);
+      return `<div class="note-row${isAutoLog ? ' autolog' : ''}"><span class="n-txt">${escapeHtml(String(note))}</span><button class="n-x" onclick="removeCampaignNote(${i})" aria-label="Remove note">&#10005;</button></div>`;
+    })
+    .join('');
 }
 
 function removeCampaignNote(idx) {
@@ -1311,21 +1459,19 @@ function _recordLine(ev) {
 // Reads existing state fields — no new state fields, no Protocol 4 required.
 // Displays: quest summary, top faction standings, active effects, and campaign notes count.
 // Crossroads Record tab reads campaign_notes for auto-logged quest/faction events.
+// ── BUS-18 · CAMPAIGN CHRONICLE (Phase 3 · Piece 3) — the tape-spool
+// chronicle/ledger dress over the SAME campaignStatusDisplay/crossroadsDisplay
+// /incidentDisplay reads (Protocol 22 — no state field or handler changed).
 function renderCampaignStatus() {
   const display = document.getElementById('campaignStatusDisplay');
   const crossroads = document.getElementById('crossroadsDisplay');
 
-  // ── Campaign Status ──────────────────────────────────────
+  // ── Status readout head ──────────────────────────────────
   if (display) {
     const quests = state.quests || [];
-    const completed = quests.filter(
-      q => q.status === 'completed' || q.status === 'complete'
-    ).length;
     const active = quests.filter(q => q.status === 'in progress' || q.status === 'active').length;
-    const failed = quests.filter(q => q.status === 'failed').length;
-    const total = quests.length;
 
-    // Top 3 faction standings by absolute net rep
+    // Notable faction standings by absolute net rep
     const factions = state.factions || {};
     const factionReg = typeof getFactionRegistry === 'function' ? getFactionRegistry() : [];
     const topFactions = factionReg
@@ -1335,50 +1481,42 @@ function renderCampaignStatus() {
           typeof getFactionStanding === 'function'
             ? getFactionStanding(f.key, data.fame || 0, data.infamy || 0)
             : { label: 'NEUTRAL', color: 'var(--robco-green)' };
-        return { name: f.name, label: s.label, color: s.color };
+        return {
+          name: f.name,
+          label: s.label,
+          color: s.color,
+          bad: s.color === 'var(--robco-danger)',
+        };
       })
       .filter(f => f.label !== 'Neutral' && f.label !== 'NEUTRAL')
-      .slice(0, 4);
+      .slice(0, 6);
 
-    // Active effects summary
     const activeEffects = (state.status || []).length;
-    const expiringEffects = (state.status || []).filter(
-      e => (e.ticks || 0) > 0 && (e.ticks || 0) <= 2
-    ).length;
+    const eventCount = (state.eventLog || []).length;
 
-    // Build the HTML
-    let html = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;">
-      <div class="campg-stat-box">
-        <div class="campg-stat-label">QUESTS</div>
-        <div class="campg-stat-value">${total}</div>
-        <div class="campg-stat-sub">${completed} done · ${active} active · ${failed} failed</div>
-      </div>
-      <div class="campg-stat-box">
-        <div class="campg-stat-label">EFFECTS</div>
-        <div class="campg-stat-value">${activeEffects}</div>
-        <div class="campg-stat-sub">${expiringEffects > 0 ? expiringEffects + ' expiring' : 'none expiring'}</div>
-      </div>
+    let html = `<div class="stat-head">
+      <div class="cs-box"><span class="c-cap">DIRECTIVES ACTIVE</span><span class="c-val">${active}</span></div>
+      <div class="cs-box"><span class="c-cap">COMPOUNDS LIVE</span><span class="c-val">${activeEffects}</span></div>
+      <div class="cs-box"><span class="c-cap">EVENTS LOGGED</span><span class="c-val">${eventCount}</span></div>
     </div>`;
 
     if (topFactions.length > 0) {
-      html += `<div style="margin-bottom:6px;font-size:9px;opacity:0.5;letter-spacing:0.5px;">NOTABLE STANDINGS</div>`;
-      html += `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;">`;
-      topFactions.forEach(f => {
-        html += `<span style="font-size:9px;border:1px dashed rgba(var(--robco-green-rgb),0.25);padding:2px 6px;color:${f.color};">${escapeHtml(f.name.toUpperCase())}: ${f.label}</span>`;
-      });
+      html += `<div class="standing-chips">`;
+      html += topFactions
+        .map(
+          f =>
+            `<span class="stch${f.bad ? ' bad' : ''}">${escapeHtml(f.name.toUpperCase())} &mdash; ${escapeHtml(f.label.toUpperCase())}</span>`
+        )
+        .join('');
       html += `</div>`;
     } else {
-      html += `<div style="font-size:9px;opacity:0.4;margin-bottom:6px;">No notable faction standings</div>`;
+      html += `<div class="rack-note" style="text-align:center;opacity:0.5">NO NOTABLE STANDINGS ON FILE</div>`;
     }
-
-    // Terminal Record event count (P4)
-    const eventCount = (state.eventLog || []).length;
-    html += `<div style="font-size:9px;opacity:0.5;">${eventCount} event${eventCount === 1 ? '' : 's'} on record</div>`;
 
     display.innerHTML = html;
   }
 
-  // ── Crossroads Record (P4) ───────────────────────────────
+  // ── The record spool (CROSSROADS RECORD) ─────────────────
   // Reads the structured Terminal Record (state.eventLog) — the canonical
   // campaign history. Shows the most recent events across all types.
   if (crossroads) {
@@ -1388,46 +1526,67 @@ function renderCampaignStatus() {
         'NO DECISIONS RECORDED — CROSSROADS EVENTS WILL APPEAR HERE'
       );
     } else {
-      crossroads.innerHTML = recent
-        .map(
-          ev =>
-            `<div style="border-bottom:1px solid rgba(var(--robco-green-rgb),0.1);padding:4px 0;font-size:10px;opacity:0.75;">${escapeHtml(_recordLine(ev))}</div>`
-        )
-        .join('');
+      crossroads.innerHTML =
+        `<div class="spool-wrap"><div class="reels" aria-hidden="true"><span class="reel"></span><span class="reel"></span></div><div class="spool-list">` +
+        recent
+          .map(ev => {
+            const line = escapeHtml(_recordLine(ev));
+            const bracket = line.match(/^(\[[^\]]*\])\s*(.*)$/);
+            return `<div class="rec-line">${bracket ? `<span class="rt">${bracket[1]}</span> ${bracket[2]}` : line}</div>`;
+          })
+          .join('') +
+        `</div></div>`;
     }
   }
 
-  // ── Incident Log (P4) ────────────────────────────────────
+  // ── Stamped milestone entries (INCIDENT LOG) ──────────────
   // A milestone view over the Terminal Record: the "big moments" only
   // (level-ups, faction standing shifts, quest outcomes) — the chatter
   // (trades/crafts/sleeps) is filtered out, leaving the incidents that matter.
   const incident = document.getElementById('incidentDisplay');
+  const MILESTONES = ['level', 'faction', 'quest'];
+  const incidents = (state.eventLog || [])
+    .filter(ev => ev && MILESTONES.includes(ev.type))
+    .slice(-20)
+    .reverse();
   if (incident) {
-    const MILESTONES = ['level', 'faction', 'quest'];
-    const incidents = (state.eventLog || [])
-      .filter(ev => ev && MILESTONES.includes(ev.type))
-      .slice(-20)
-      .reverse();
     if (incidents.length === 0) {
       incident.innerHTML = emptyState('NO INCIDENTS ON RECORD — MILESTONES WILL APPEAR HERE');
     } else {
       incident.innerHTML = incidents
-        .map(
-          ev =>
-            `<div style="border-bottom:1px solid rgba(var(--robco-green-rgb),0.1);padding:4px 0;font-size:10px;opacity:0.75;">${escapeHtml(_recordLine(ev))}</div>`
-        )
+        .map(ev => {
+          const line = escapeHtml(_recordLine(ev));
+          const bracket = line.match(/^(\[[^\]]*\])\s*(.*)$/);
+          const bad = ev && ev.type === 'faction' && /vilified|hated|shunned/i.test(ev.text || '');
+          return `<div class="incident${bad ? ' milestone-fac bad' : ''}"><span>${bracket ? bracket[2] : line}</span><span class="in-t">${bracket ? bracket[1] : ''}</span></div>`;
+        })
         .join('');
     }
   }
+
+  // Board 0i summary line (BUS-18's collapsed-state status row).
+  const chronStatusEl = document.getElementById('dbChronStatus');
+  if (chronStatusEl) {
+    const eventCount = (state.eventLog || []).length;
+    chronStatusEl.textContent = `${eventCount} EVENTS ON THE SPOOL · ${incidents.length} INCIDENT STAMPS`;
+  }
 }
 
-// ── G6: REGIONAL ZONE MAP (WORLD MAP) ────────────────────────────
-// Registry-driven 6×6 CSS grid. Markers:
-//   CURRENT — bright border, on zone matching state.loc (fuzzy match against zone.locations[])
-//   VISITED — dashed muted border, on zones in locationHistory
-//   [?] pip  — on zones containing uncollected collectibles
-// Compass strip labels orientation. Narrow viewports get a 4×4 core-zone fallback.
+// ── BUS-16 · CARTOGRAPHY TABLE — "Phosphor Cartography" spatial node map ──
+// (Phase 3 · Piece 3, replacing the boxed 6×6 CSS grid). One inline SVG built
+// with map().join('') and assigned ONCE to #worldMapDisplay.innerHTML — a
+// single bulk assignment, never repeated-innerHTML concatenation inside a
+// loop (Prohibited Patterns). Nodes plot at each zone's REAL
+// gridRow/gridCol (zero new data, registry stays read-only — Protocol 23);
+// status classes reuse the existing --current/--visited/fog semantics. Same
+// fog-of-war single-source (recordLocationVisit) and same zoomMapToZone/
+// resetMapZoom/setMapView/markLocationVisited ids/handlers as before
+// (Protocol 22) — only the presentation layer is rebuilt as vector graphics.
 let _mapActiveZone = null;
+// Last-rendered node list (index-aligned to FALLOUT_REGISTRY.zones), kept for
+// arrow-key nearest-neighbor traversal (_mapNodeKeyNav) without re-deriving
+// zone status on every keystroke.
+let _mapLastNodes = [];
 
 function setMapView(v) {
   state.mapView = v;
@@ -1445,27 +1604,6 @@ function resetMapZoom() {
   renderWorldMap();
 }
 
-// Abbreviation map for long zone names in the 6×6 grid display.
-// Full names are always available via the title tooltip.
-const _MAP_ABBREV = {
-  'Ranger Station Foxtrot': 'R.S. Foxtrot',
-  'Ranger Station Alpha': 'R.S. Alpha',
-  'Ranger Station Bravo': 'R.S. Bravo',
-  'Ranger Station Charlie': 'R.S. Charlie',
-  'Ranger Station Delta': 'R.S. Delta',
-  'Ranger Station Echo': 'R.S. Echo',
-  'Camp Forlorn Hope': 'Forlorn Hope',
-  'Camp Searchlight': 'Searchlight',
-  'Camp McCarran': 'McCarran',
-  '188 Trading Post': '188 Post',
-  'Mount Charleston': 'Mt. Charleston',
-  'Searchlight Airport': 'S.L. Airport',
-};
-
-function _mapAbbrev(name) {
-  return _MAP_ABBREV[name] || name;
-}
-
 // WU-F11: native "mark visited" — flags a WORLD GRID location as discovered directly from
 // the map, with NO AI (never routes to the Director). Add-only: routes through the single-
 // source recordLocationVisit() helper (state.js), which is permanent + dedup'd, so the
@@ -1477,6 +1615,35 @@ function markLocationVisited(loc) {
   recordLocationVisit(loc);
   if (typeof saveState === 'function') saveState();
   renderWorldMap();
+}
+
+// Arrow-key traversal between rendered SVG nodes (nearest node in the pressed
+// direction, by real grid coordinate) + Enter/Space pulls the sector sheet.
+// Reads _mapLastNodes (set by renderWorldMap's strategic-view branch) so it
+// never has to re-walk the registry on every keystroke.
+function _mapNodeKeyNav(e, zoneName) {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    zoomMapToZone(zoneName);
+    return;
+  }
+  const dir = {
+    ArrowLeft: [-1, 0],
+    ArrowRight: [1, 0],
+    ArrowUp: [0, -1],
+    ArrowDown: [0, 1],
+  }[e.key];
+  if (!dir) return;
+  e.preventDefault();
+  const from = _mapLastNodes.find(n => n.name === zoneName);
+  if (!from) return;
+  const cand = _mapLastNodes
+    .map(n => ({ n, dx: n.gridCol - from.gridCol, dy: n.gridRow - from.gridRow }))
+    .filter(o => o.n !== from && o.dx * dir[0] + o.dy * dir[1] > 0)
+    .sort((a, b) => a.dx * a.dx + a.dy * a.dy - (b.dx * b.dx + b.dy * b.dy))[0];
+  if (!cand) return;
+  const el = document.getElementById('mapNode-' + cand.n.idx);
+  if (el) el.focus();
 }
 
 function renderWorldMap() {
@@ -1558,7 +1725,7 @@ function renderWorldMap() {
     return false;
   }
 
-  // ── ZOOM LEVEL 2: DETAILED REGIONAL VIEW ─────────────────────────
+  // ── SECTOR SHEET — pulled by tapping/Entering a node ─────────────
   if (_mapActiveZone) {
     const activeZone = zones.find(z => z.name === _mapActiveZone);
     if (!activeZone) {
@@ -1570,11 +1737,11 @@ function renderWorldMap() {
       ? `<span class="map-collectible-badge badge">[?]</span>`
       : '';
     let html = `
-      <div class="map-detail-header">
-        <button class="action-btn map-back-btn" onclick="resetMapZoom()">&lt; WORLD GRID</button>
-        <span style="font-weight:bold; font-size:11px; letter-spacing:1px;">${escapeHtml(activeZone.name).toUpperCase()} REGION</span>${zoneBadge}
-      </div>
-      <div class="map-detail-list">
+      <div class="sheet">
+        <div class="sheet-head">
+          <button class="action-btn map-back-btn" onclick="resetMapZoom()">&#9668; SURVEY CHART</button>
+          <span class="sheet-title">${escapeHtml(activeZone.name).toUpperCase()} REGION</span>${zoneBadge}
+        </div>
     `;
 
     const locs = activeZone.locations || [];
@@ -1601,33 +1768,33 @@ function renderWorldMap() {
         const isYou = i === currentLocIdx;
         const wasVisited = locVisited(loc);
 
-        let statusText = '<span style="opacity:0.4;">[UNKNOWN]</span>';
-        let rowCls = 'map-detail-row';
+        let statusText = '<span class="loc-st st-unk">UNSURVEYED</span>';
+        let rowCls = 'loc-row';
         if (isYou) {
-          statusText = '<span class="map-you-marker">[CURRENT]</span>';
-          rowCls += ' map-detail-row--current';
+          statusText = '<span class="loc-st st-cur">&#9673; CURRENT</span>';
         } else if (wasVisited) {
-          statusText = '<span style="opacity:0.8;">[VISITED]</span>';
-          rowCls += ' map-detail-row--visited';
+          statusText = '<span class="loc-st st-vis">SURVEYED</span>';
+        } else {
+          rowCls += ' unknown';
         }
 
         // WU-F11: native "mark visited" affordance — only on undiscovered rows (not the
-        // current location, not already visited). Add-only: tapping LOG VISIT flags the place
-        // as discovered (permanent, no un-mark) directly, with NO AI.
+        // current location, not already visited). Add-only: tapping MARK SURVEYED flags the
+        // place as discovered (permanent, no un-mark) directly, with NO AI.
         const markBtn =
           isYou || wasVisited
             ? ''
-            : `<button class="map-mark-visited" data-loc="${escapeHtml(
+            : `<button class="mark" data-loc="${escapeHtml(
                 loc
               )}" onclick="markLocationVisited(this.dataset.loc)" aria-label="Mark ${escapeHtml(
                 loc
-              )} as visited">LOG VISIT</button>`;
+              )} as surveyed">&#9656; MARK SURVEYED</button>`;
 
         html += `
           <div class="${rowCls}">
-            <span class="map-detail-name">- ${escapeHtml(loc)}</span>
+            <b>${escapeHtml(loc)}</b>
+            ${statusText}
             ${markBtn}
-            <span style="font-size:9px;white-space:nowrap;">${statusText}</span>
           </div>
         `;
       });
@@ -1638,97 +1805,211 @@ function renderWorldMap() {
     return;
   }
 
-  // ── ZOOM LEVEL 1: STRATEGIC WORLD VIEW ───────────────────────────
-  // Size is a pure function of state.mapView (persisted) — no width measurement.
-  // 'full' → 6×6 grid; 'auto' and 'core' → 4×4 core grid (rows 2–5, cols 2–5).
+  // ── PHOSPHOR CARTOGRAPHY — the spatial node map ──────────────────
+  // 'full' state.mapView = STRATEGIC (whole chart); anything else = CORE, a
+  // tighter viewBox CROP over the exact same node set — no zone is ever
+  // excluded from the DOM, only the visible window changes (unlike the old
+  // grid, which physically dropped off-crop zones). setMapView/state.mapView
+  // unchanged (Protocol 22).
   const mv = state.mapView || 'auto';
   const useFull = mv === 'full';
+  const MARGIN = 30;
+  const STEP = 48;
+  const nx = z => MARGIN + (z.gridCol - 1) * STEP;
+  const ny = z => MARGIN + (z.gridRow - 1) * STEP;
+  const maxRow = Math.max(...zones.map(z => z.gridRow));
+  const maxCol = Math.max(...zones.map(z => z.gridCol));
+  const fullSize = MARGIN * 2 + Math.max(maxRow - 1, maxCol - 1) * STEP;
+  const CORE_LO = 2,
+    CORE_HI = 5,
+    CORE_PAD = 30;
+  const coreOrigin = MARGIN + (CORE_LO - 1) * STEP - CORE_PAD;
+  const coreSize = (CORE_HI - CORE_LO) * STEP + 2 * CORE_PAD;
+  const viewBox = useFull
+    ? `0 0 ${fullSize} ${fullSize}`
+    : `${coreOrigin} ${coreOrigin} ${coreSize} ${coreSize}`;
 
-  const rowMin = useFull ? 1 : 2;
-  const rowMax = useFull ? 6 : 5;
-  const colMin = useFull ? 1 : 2;
-  const colMax = useFull ? 6 : 5;
-  const cols = colMax - colMin + 1;
-
-  // Build zone lookup by grid position
-  const gridMap = {};
-  zones.forEach(z => {
-    gridMap[`${z.gridRow},${z.gridCol}`] = z;
-  });
-
-  // Compute ONE winning grid key for current location to prevent multi-highlight
-  let currentZoneKey = null;
+  // Compute ONE winning current zone (unchanged fuzzy-match logic — a fixed
+  // per-zone identity, not per-cell — Protocol 22).
+  let currentZone = null;
   if (currentLoc) {
     let bestScore = 0,
       bestLen = 0;
-    Object.entries(gridMap).forEach(([key, zone]) => {
+    zones.forEach(zone => {
       const score = scoreZoneForLoc(zone, currentLoc);
       if (score > bestScore || (score > 0 && score === bestScore && zone.name.length > bestLen)) {
         bestScore = score;
         bestLen = zone.name.length;
-        currentZoneKey = score >= 50 ? key : null;
+        currentZone = score >= 50 ? zone : null;
       }
     });
-    if (bestScore < 50) currentZoneKey = null;
+    if (bestScore < 50) currentZone = null;
   }
 
-  // Compass column labels (W → E)
-  const compassCols = [];
-  for (let c = colMin; c <= colMax; c++) {
-    if (c === colMin) compassCols.push('W');
-    else if (c === colMax) compassCols.push('E');
-    else compassCols.push('·');
+  // Typed signal glyph — ★ this game's primary collectible (SNOW GLOBE/
+  // BOBBLEHEAD, driven by the existing per-game collectibleLabel field, never
+  // a hardcoded game literal — Protocol 38) or ▲ Lincoln memorabilia
+  // (lincolnMemorabilia is simply empty for a game without tracksLincoln).
+  const collectiblesLbl = String(_activeDef().collectibleLabel || 'SIGNAL').replace(/S$/, '');
+  const sigGlyphChar = /BOBBLEHEAD/.test(String(_activeDef().collectibleLabel || '')) ? '◆' : '★';
+  const lincolnDefs =
+    typeof FALLOUT_REGISTRY !== 'undefined' && FALLOUT_REGISTRY.lincolnMemorabilia
+      ? FALLOUT_REGISTRY.lincolnMemorabilia
+      : [];
+  const lincolnAcquired = state.lincolnItems || {};
+  function zoneSignal(zone) {
+    const hasCollectible = collectDefs.some(def => {
+      if (typeof def.gridRow !== 'number' || typeof def.gridCol !== 'number') return false;
+      if (collected.has((def.name || '').toLowerCase())) return false;
+      return def.gridRow === zone.gridRow && def.gridCol === zone.gridCol;
+    });
+    if (hasCollectible) return { glyph: sigGlyphChar, label: collectiblesLbl + ' SIGNAL' };
+    const hasLincoln = lincolnDefs.some(def => {
+      if (typeof def.gridRow !== 'number' || typeof def.gridCol !== 'number') return false;
+      if (lincolnAcquired[def.name]) return false;
+      return def.gridRow === zone.gridRow && def.gridCol === zone.gridCol;
+    });
+    if (hasLincoln) return { glyph: '▲', label: 'LINCOLN SIGNAL' };
+    return null;
   }
 
-  let html = `<div style="display:grid; grid-template-columns:14px repeat(${cols},minmax(0,1fr)); gap:2px; font-size:9px; letter-spacing:0.3px; margin:4px 0; max-width:100%;">`;
-
-  // Compass header row
-  html += `<div></div>`; // corner spacer
-  compassCols.forEach(lbl => {
-    html += `<div style="text-align:center;font-size:8px;opacity:0.35;line-height:1.4;">${lbl}</div>`;
+  // Known-route trail — turns state.locationHistory into a visible
+  // exploration path: connect each CONSECUTIVE DISTINCT zone in actual
+  // discovery order (self-loops within one zone collapse away). Capped at
+  // the most recent 25 zone-transitions so a long campaign never clutters
+  // the chart — the map stays fixed-size by construction (Protocol 17).
+  const zoneByLoc = {};
+  zones.forEach(z => {
+    [z.name, ...(z.locations || [])].forEach(s => {
+      zoneByLoc[String(s).toLowerCase()] = z;
+    });
+  });
+  const trailZones = [];
+  (state.locationHistory || []).forEach(loc => {
+    const z = zoneByLoc[String(loc || '').toLowerCase()];
+    if (z && trailZones[trailZones.length - 1] !== z) trailZones.push(z);
+  });
+  const routeSegs = [];
+  const seenSeg = new Set();
+  trailZones.slice(-25).forEach((z, i, arr) => {
+    if (i === 0) return;
+    const a = arr[i - 1],
+      b = z;
+    if (a === b) return;
+    const key = a.gridRow + ',' + a.gridCol + '-' + b.gridRow + ',' + b.gridCol;
+    const keyRev = b.gridRow + ',' + b.gridCol + '-' + a.gridRow + ',' + a.gridCol;
+    if (seenSeg.has(key) || seenSeg.has(keyRev)) return;
+    seenSeg.add(key);
+    routeSegs.push([a, b]);
   });
 
-  for (let r = rowMin; r <= rowMax; r++) {
-    // Row N/S label
-    let rowLbl = '·';
-    if (r === rowMin) rowLbl = 'N';
-    else if (r === rowMax) rowLbl = 'S';
-    html += `<div style="display:flex;align-items:center;justify-content:center;font-size:8px;opacity:0.35;">${rowLbl}</div>`;
+  const rings = [0.35, 0.68, 1]
+    .map(
+      k =>
+        `<circle class="rangering" cx="${fullSize / 2}" cy="${fullSize / 2}" r="${(fullSize / 2 - MARGIN * 0.4) * k}"/>`
+    )
+    .join('');
+  const routesSvg = routeSegs
+    .map(
+      ([a, b]) => `<line class="route" x1="${nx(a)}" y1="${ny(a)}" x2="${nx(b)}" y2="${ny(b)}"/>`
+    )
+    .join('');
 
-    for (let c = colMin; c <= colMax; c++) {
-      const zone = gridMap[`${r},${c}`] || null;
-      if (!zone) {
-        html += `<div class="map-cell map-cell--empty"></div>`;
-        continue;
-      }
+  _mapLastNodes = [];
+  let signalCount = 0;
+  const nodesSvg = zones
+    .map((z, i) => {
+      const x = nx(z),
+        y = ny(z);
+      const isCur = z === currentZone;
+      const isVisited = !isCur && zoneVisited(z);
+      const fog = !isCur && !isVisited;
+      _mapLastNodes.push({ idx: i, name: z.name, gridRow: z.gridRow, gridCol: z.gridCol, fog });
+      const signal = zoneSignal(z);
+      if (signal) signalCount++;
+      const sigSvg = signal
+        ? `<text class="sig-glyph" x="${x + 11}" y="${y - 7}">${signal.glyph}</text>`
+        : '';
+      const label = fog
+        ? ''
+        : `<text class="lbl" x="${x}" y="${y + 17}">${escapeHtml(z.name.toUpperCase())}</text>`;
+      const statusWord = isCur
+        ? 'current position'
+        : fog
+          ? 'unsurveyed signal return'
+          : 'surveyed node';
+      const safeName = escapeHtml(z.name.replace(/'/g, "\\'"));
+      return `<g class="node${fog ? ' fog' : ''}" id="mapNode-${i}" tabindex="0" role="button"
+        aria-label="${escapeHtml(z.name)} — ${statusWord}${signal ? ', ' + signal.label.toLowerCase() : ''}; Enter pulls the sector sheet"
+        onclick="zoomMapToZone('${safeName}')"
+        onkeydown="_mapNodeKeyNav(event, '${safeName}')">
+        <circle class="hit" cx="${x}" cy="${y}" r="17"/>
+        <circle class="focusring" cx="${x}" cy="${y}" r="13"/>
+        <circle class="halo" cx="${x}" cy="${y}" r="8.5"/>
+        <circle class="dot" cx="${x}" cy="${y}" r="${fog ? 4 : 4.4}"/>
+        ${label}${sigSvg}
+      </g>`;
+    })
+    .join('');
 
-      const isYou = currentZoneKey === `${r},${c}`;
-      const wasVisited = zoneVisited(zone);
-      const hasUncollected = zoneHasUncollectedCollectible(zone);
-
-      let cellCls = 'map-cell';
-      if (isYou) cellCls += ' map-cell--current';
-      else if (wasVisited) cellCls += ' map-cell--visited';
-
-      const collectiblePip = hasUncollected ? `<span class="map-cell-pip">[?]</span>` : '';
-      const displayName = escapeHtml(_mapAbbrev(zone.name));
-
-      html += `<div class="${cellCls}" onclick="zoomMapToZone('${escapeHtml(zone.name.replace(/'/g, "\\'"))}')" title="${escapeHtml(zone.name)}">
-        <span class="map-cell-name">${displayName}</span>
-        ${collectiblePip}
-      </div>`;
-    }
+  let youSvg = '';
+  if (currentZone) {
+    const cx = nx(currentZone),
+      cy = ny(currentZone);
+    youSvg = `<g class="you" aria-hidden="true">
+      <circle cx="${cx}" cy="${cy}" r="9.5"/>
+      <line x1="${cx - 15}" y1="${cy}" x2="${cx - 10}" y2="${cy}"/>
+      <line x1="${cx + 10}" y1="${cy}" x2="${cx + 15}" y2="${cy}"/>
+      <line x1="${cx}" y1="${cy - 15}" x2="${cx}" y2="${cy - 10}"/>
+      <line x1="${cx}" y1="${cy + 10}" x2="${cx}" y2="${cy + 15}"/>
+      <text x="${cx}" y="${cy - 19}">[YOU]</text>
+    </g>`;
   }
 
-  html += '</div>';
+  // Per-game map caption (identity.databank, Protocol 38 — a generic fallback
+  // for a game that hasn't authored the facet yet).
+  const dbId = (typeof getIdentity === 'function' ? getIdentity() : null) || {};
+  const dbFacet = dbId.databank || {};
+  const caption = escapeHtml(dbFacet.mapCaption || 'SURVEY GRID');
+  const captionSub = escapeHtml(dbFacet.mapCaptionSub || 'SURVEY GRID');
 
-  // Legend + toggle button (shown on all widths; persists view preference via state.mapView)
-  const toggleBtn = useFull
-    ? `<button class="map-toggle-btn" onclick="setMapView('core')">CORE VIEW</button>`
-    : `<button class="map-toggle-btn" onclick="setMapView('full')">FULL MAP</button>`;
+  // Board 0i summary line (BUS-16's collapsed-state status row).
+  const totalLocs = zones.reduce((a, z) => a + (z.locations || []).length, 0);
+  const chartedLocs = Math.min((state.locationHistory || []).length, totalLocs);
+  const fixLabel = currentZone ? currentZone.name.toUpperCase() + ' FIX' : 'NO FIX';
+  const mapStatusEl = document.getElementById('dbMapStatus');
+  if (mapStatusEl) {
+    mapStatusEl.textContent =
+      `${chartedLocs}/${totalLocs} CHARTED · ${fixLabel}` +
+      (signalCount ? ` · ${signalCount} SIGNAL RETURN${signalCount === 1 ? '' : 'S'}` : '');
+  }
 
-  html += `<div class="map-legend">N=CURRENT &nbsp;·=VISITED &nbsp;[?]=COLLECTIBLE &nbsp;TAP=ZOOM ${toggleBtn}</div>`;
-  display.innerHTML = html;
+  display.innerHTML = `
+    <div class="map-caption">${caption}<span class="mc-sub">${captionSub}</span></div>
+    <div class="chart-scale">
+      <button class="${useFull ? 'cur' : ''}" onclick="setMapView('full')">&#9700; STRATEGIC</button>
+      <button class="${!useFull ? 'cur' : ''}" onclick="setMapView('core')">&#9701; CORE</button>
+      <span class="real-label" style="align-self:center">(setMapView &middot; state.mapView)</span>
+    </div>
+    <div class="table-frame">
+      <span class="compass n">N</span><span class="compass s">S</span>
+      <span class="compass w">W</span><span class="compass e">E</span>
+      <div class="sweep-radar" aria-hidden="true"></div>
+      <div class="map-svg-wrap">
+        <svg viewBox="${viewBox}" role="application"
+             aria-label="Survey chart — arrow keys traverse surveyed nodes, Enter pulls the sector sheet">
+          ${rings}${routesSvg}${nodesSvg}${youSvg}
+        </svg>
+      </div>
+    </div>
+    <div class="survey-legend">
+      <span>&#9673; [YOU] &mdash; PLOT FIX</span>
+      <span>&#9679; SURVEYED &middot; KNOWN ROUTE</span>
+      <span class="lg-fog">&#9711; UNSURVEYED RETURN</span>
+      <span class="lg-sig">${sigGlyphChar} ${escapeHtml(collectiblesLbl)} SIGNAL${lincolnDefs.length ? ' &middot; &#9650; LINCOLN SIGNAL' : ''}</span>
+    </div>
+    <div class="kbd-hint">&#9668; &#9658; &#9650; &#9660; arrow keys traverse surveyed nodes &middot; ENTER pulls the sector sheet &middot; tap any node</div>
+  `;
 }
 
 // ── FACTION REPUTATION — inline editing (Implementation 3) ─────────
@@ -2992,15 +3273,30 @@ function renderConsult(topic) {
   }
 }
 
-// DATABANK panel path (DATA tab) — persistent inline lookup. Reads #databankSearch
-// and renders the SAME shared CONSULT engine into #databankResults, so the user can
-// leave the panel open and keep searching without reopening a modal. Read-only, no AI.
+// BUS-19 · CATALOG QUERY (Phase 3 · Piece 3) — DATABANK panel path (DATA tab):
+// persistent inline lookup. Reads #databankSearch and renders the SAME shared
+// CONSULT engine into #databankResults (Protocol 22 — _consultSearch/
+// _consultRenderHTML are byte-identical to the CONSULT modal path), so the
+// user can leave the panel open and keep searching without reopening a
+// modal. Read-only, no AI. The amber "wireboard" skin is CSS-only, scoped to
+// #databankPanel — this function only adds the board's 0i status line.
 function renderDatabankPanel() {
   const out = document.getElementById('databankResults');
   if (!out) return;
   const inp = document.getElementById('databankSearch');
   const res = _consultSearch(inp ? inp.value : '');
   out.innerHTML = _consultRenderHTML(res);
+  const statusEl = document.getElementById('dbCatalogStatus');
+  if (statusEl) {
+    const hitCount =
+      res.groups.reduce((a, g) => a + g.hits.length, 0) +
+      (res.creature || res.weapon || res.dbItem || res.questItem ? 1 : 0);
+    statusEl.textContent = res.noQuery
+      ? 'INDEX READY — TYPE TO QUERY THE ARCHIVE'
+      : res.empty
+        ? `NO CATALOG MATCH — "${res.q}"`
+        : `${hitCount} RESULT${hitCount === 1 ? '' : 'S'} — "${res.q}"`;
+  }
 }
 
 // ── WU-N5: BIO-SCAN — native medical advisory ────────────────────────────

@@ -530,9 +530,11 @@ try {
     Check ($adjCount -ge 4)                                             "renderFactionRep has >=4 adjustFaction() calls (found $adjCount)"
     Check (-not ($renderFactionRepBody -match '<button[^>]*class="facon-chan[^"]*"[^>]*style=') -and `
            -not ($renderFactionRepBody -match '<button[^>]*style=[^>]*class="facon-chan'))     'renderFactionRep facon-chan buttons have no inline style attribute'
-    Check ($renderWorldMapBody -match 'minmax\(0,\s*1fr\)')             'renderWorldMap uses minmax(0,1fr) for grid columns'
-    Check ($renderWorldMapBody -match 'max-width\s*:\s*100%')           'renderWorldMap uses max-width:100% on the grid container'
-    Check ($renderWorldMapBody -match 'map-cell' -and $renderWorldMapBody -match 'map-cell-name' -and $renderWorldMapBody -match 'map-cell-pip') 'renderWorldMap contains map-cell, map-cell-name, map-cell-pip class references'
+    # Phase 3 . Piece 3 (DATABANK BUS-16): renderWorldMap() was rewritten from a
+    # boxed CSS grid to an inline SVG "Phosphor Cartography" node map.
+    Check (($renderWorldMapBody -match 'class="map-svg-wrap"') -and ($renderWorldMapBody -match 'viewBox="\$\{viewBox\}"')) 'renderWorldMap builds a responsive .map-svg-wrap SVG with a computed viewBox (no hardcoded pixel grid)'
+    Check (($renderWorldMapBody -match 'class="node') -and ($renderWorldMapBody -match 'class="dot"') -and ($renderWorldMapBody -match 'class="halo"')) 'renderWorldMap contains g.node/.dot/.halo SVG node markup (the spatial glyph nodes)'
+    Check (($renderWorldMapBody -match 'class="sig-glyph"') -and ($renderWorldMapBody -match 'sigGlyphChar'))    'renderWorldMap contains typed sig-glyph signal-return markers'
     # Reload-size guard: size is state-driven, no width measurement (Protocol 8 plan)
     Check ($renderWorldMapBody -match 'state\.mapView')                 'renderWorldMap reads state.mapView (state-driven size)'
     Check (-not ($renderWorldMapBody -match 'window\.innerWidth'))      'renderWorldMap size path has no window.innerWidth'
@@ -544,7 +546,7 @@ try {
     } catch {
         Fail "setMapView function not found: $_"
     }
-    Check ($renderWorldMapBody -match 'map-toggle-btn')                 'renderWorldMap contains map-toggle-btn reference'
+    Check (($renderWorldMapBody -match 'class="chart-scale"') -and ($renderWorldMapBody -match "setMapView\('full'\)")) 'renderWorldMap contains the CHART SCALE toggle (chart-scale class + setMapView calls)'
 } catch {
     Fail "Render contract extraction failed: $_"
 }
@@ -564,15 +566,18 @@ $cssSrcStripped = $cssSrc -replace '(?s)/\*.*?\*/', ''
 $faconChanRule      = ([regex]::Match($cssSrcStripped, '\.facon-chan\s*\{[^}]*\}')).Value
 $faconSelectorRule  = ([regex]::Match($cssSrcStripped, '\.facon-selector\s*\{[^}]*\}')).Value
 $faconKeysRule      = ([regex]::Match($cssSrcStripped, '\.facon-keys\s*\{[^}]*\}')).Value
-$mapCellRule        = ([regex]::Match($cssSrcStripped, '\.map-cell\s*\{[^}]*\}')).Value
+# Phase 3 . Piece 3: the boxed .map-cell CSS-grid was retired in favor of the
+# BUS-16 Phosphor Cartography SVG node map -- the mobile overflow-safety
+# invariant now lives on the responsive SVG wrapper instead.
+$mapSvgWrapRule     = ([regex]::Match($cssSrcStripped, '\.map-svg-wrap svg\s*\{[^}]*\}')).Value
 $buttonRule         = ([regex]::Match($cssSrcStripped, '(?m)^button\s*\{[^}]*\}')).Value
 
 Check ($faconChanRule -match 'width\s*:\s*auto')           '.facon-chan has width:auto'
 Check ($faconSelectorRule -match 'flex-wrap')              '.facon-selector has flex-wrap'
 Check ($faconKeysRule -match 'flex-wrap')                  '.facon-keys has flex-wrap'
-Check ($mapCellRule -match 'min-width\s*:\s*0')            '.map-cell has min-width:0'
-Check ($mapCellRule -match 'overflow\s*:\s*hidden')        '.map-cell has overflow:hidden'
-Check ($mapCellRule -match 'min-height|aspect-ratio')      '.map-cell has height floor (min-height or aspect-ratio)'
+Check ($mapSvgWrapRule -match 'display\s*:\s*block')       '.map-svg-wrap svg has display:block'
+Check ($mapSvgWrapRule -match 'width\s*:\s*100%')          '.map-svg-wrap svg has width:100% (never overflows its board at 360px)'
+Check ($mapSvgWrapRule -match 'height\s*:\s*auto')         '.map-svg-wrap svg has height:auto (viewBox scales proportionally)'
 Check ([bool]([regex]::Match($cssSrc, '(?s)@media[^{]*480px.{0,2000}max-width\s*:\s*56px').Success)) '@media max-width:480px has max-width:56px for number inputs'
 Check ($buttonRule -match 'width\s*:\s*100%')              'global button{} has width:100%'
 $htmlRule = ([regex]::Match($cssSrcStripped, 'html\s*\{[^}]*\}')).Value
@@ -7062,7 +7067,9 @@ Check ($routerBlock -match "'\[CONSULT\]':\s*topic\s*=>\s*renderConsult\(topic\)
     '108.15: [CONSULT] routes via NATIVE_COMMAND_ROUTER -> renderConsult -- the CONSULT button is native, never falls through to the AI (WU-N4b)'
 
 # ── WU-N4b option C: DATABANK panel (DATA tab) sharing the CONSULT engine ─────
-$databankPanel108 = [regex]::Match($html108, '<details class="panel"[^>]*id="databankPanel"[\s\S]*?</details>').Value
+# Phase 3 . Piece 3: reskinned as BUS-19 CATALOG QUERY (class="panel bay-board
+# wireboard") -- the id/handler contract is unchanged, only extra classes added.
+$databankPanel108 = [regex]::Match($html108, '<details class="panel[^"]*"[^>]*id="databankPanel"[\s\S]*?</details>').Value
 $renderDbBody = ''
 try { $renderDbBody = Get-FunctionBody $ren108 'renderDatabankPanel' } catch {}
 $renderConsultBody = ''
@@ -7070,7 +7077,7 @@ try { $renderConsultBody = Get-FunctionBody $ren108 'renderConsult' } catch {}
 $consultRenderHtmlBody = ''
 try { $consultRenderHtmlBody = Get-FunctionBody $ren108 '_consultRenderHTML' } catch {}
 # 108.16 DATABANK panel present (DATA tab) + Protocol 5 wiring + render fn called from loadUI
-Check (($html108 -match '<details class="panel"[^>]*id="databankPanel"') -and ($databankPanel108 -match 'data-tab="data"') -and ($databankPanel108 -match '<summary><h2>[^<]*DATABANK</h2>') -and ($databankPanel108 -match 'id="databankSearch"[\s\S]*?oninput="renderDatabankPanel\(\)"') -and ($databankPanel108 -match 'aria-label="[^"]+"') -and ($databankPanel108 -match 'id="databankResults"') -and ($ren108 -match 'function renderDatabankPanel\s*\(') -and ($core108 -match 'renderDatabankPanel\(\)')) `
+Check (($html108 -match '<details class="panel[^"]*"[^>]*id="databankPanel"') -and ($databankPanel108 -match 'data-tab="data"') -and ($databankPanel108 -match '(?s)<h2>[\s\S]*?CATALOG QUERY</h2>') -and ($databankPanel108 -match 'id="databankSearch"[\s\S]*?oninput="renderDatabankPanel\(\)"') -and ($databankPanel108 -match 'aria-label="[^"]+"') -and ($databankPanel108 -match 'id="databankResults"') -and ($ren108 -match 'function renderDatabankPanel\s*\(') -and ($core108 -match 'renderDatabankPanel\(\)')) `
     '108.16: DATABANK panel (DATA tab) -- <details class="panel"> + UI-1 heading + accessible #databankSearch (oninput->renderDatabankPanel) + #databankResults; renderDatabankPanel() defined + called from loadUI (WU-N4b option C, Protocol 5)'
 # 108.17 shared CONSULT engine (Protocol 22) -- both renderers route through the shared core; no duplicated card markup
 Check (($ren108 -match 'function _consultSearch\s*\(') -and ($ren108 -match 'function _consultRenderHTML\s*\(') -and ($renderConsultBody -match '_consultSearch\(') -and ($renderConsultBody -match '_consultRenderHTML\(') -and ($renderDbBody -match '_consultSearch\(') -and ($renderDbBody -match '_consultRenderHTML\(') -and ($consultRenderHtmlBody -match 'consult-card') -and (-not ($renderConsultBody -match 'consult-card')) -and (-not ($renderDbBody -match 'consult-card'))) `
@@ -7577,9 +7584,10 @@ $badgeFn118 = [regex]::Match($uiCore118, '(?s)function _updateAppBadge\([\s\S]*?
 Check (($uiCore118 -match 'function _badgeSupported\(\)') -and ($uiCore118 -match "typeof navigator\.setAppBadge === 'function'") -and ($uiCore118 -match "typeof navigator\.clearAppBadge === 'function'")) `
     '118.1: _badgeSupported() feature-detects navigator.setAppBadge + clearAppBadge before any use'
 
-# 118.2  pending-directives count = active quests, shared with the QUEST LOG badge (Protocol 22)
-Check (($uiCore118 -match 'function _pendingDirectivesCount\(\)') -and ($uiCore118 -match "state\.quests \|\| \[\]\)\.filter\(q => q\.status === 'active' \|\| !q\.status\)") -and ($uiCore118 -match "h2text: '> QUEST LOG',\s*count: _pendingDirectivesCount\(\)")) `
-    '118.2: _pendingDirectivesCount() (active quests) is the single source reused by the QUEST LOG panel badge'
+# 118.2  pending-directives count = active quests, shared with the DIRECTIVE
+#        REGISTRY badge (Protocol 22; renamed from QUEST LOG at Phase 3 . Piece 3)
+Check (($uiCore118 -match 'function _pendingDirectivesCount\(\)') -and ($uiCore118 -match "state\.quests \|\| \[\]\)\.filter\(q => q\.status === 'active' \|\| !q\.status\)") -and ($uiCore118 -match "h2text: '> DIRECTIVE REGISTRY',\s*count: _pendingDirectivesCount\(\)")) `
+    '118.2: _pendingDirectivesCount() (active quests) is the single source reused by the DIRECTIVE REGISTRY panel badge'
 
 # 118.3  graceful no-op: badge update returns early when the API is unavailable
 Check ($badgeFn118 -match 'if \(!_badgeSupported\(\)\) return') `
@@ -7871,7 +7879,7 @@ try { $expandBody123 = Get-FunctionBody $core123 'expandPanelForCategory' } catc
 # PHASE 3 OPERATOR reskin (Suite 181) renamed BIO-METRICS/BIO-SCAN & LIMB
 # STATUS to VITAL TELEMETRY/SKELETAL HARNESS -- targets updated in the same
 # commit so "special"/"bio" panel-nav aliases keep landing on the right board.
-Check (($expandBody123 -match "special:\s*'stat'") -and ($expandBody123 -match "special:\s*'>\s*VITAL TELEMETRY'") -and ($expandBody123 -match "skills:\s*'>\s*SKILL MATRIX'") -and ($expandBody123 -match "bio:\s*'>\s*SKELETAL HARNESS'") -and ($expandBody123 -match "map:\s*'>\s*WORLD MAP'") -and ($expandBody123 -match "databank:\s*'>\s*DATABANK'") -and ($expandBody123 -match "config:\s*'settings'") -and ($expandBody123 -match "config:\s*'>\s*CAMPAIGN CONFIGS'")) `
+Check (($expandBody123 -match "special:\s*'stat'") -and ($expandBody123 -match "special:\s*'>\s*VITAL TELEMETRY'") -and ($expandBody123 -match "skills:\s*'>\s*SKILL MATRIX'") -and ($expandBody123 -match "bio:\s*'>\s*SKELETAL HARNESS'") -and ($expandBody123 -match "map:\s*'>\s*CARTOGRAPHY TABLE'") -and ($expandBody123 -match "databank:\s*'>\s*CATALOG QUERY'") -and ($expandBody123 -match "config:\s*'settings'") -and ($expandBody123 -match "config:\s*'>\s*CAMPAIGN CONFIGS'")) `
     '123.7: expandPanelForCategory maps the panel-nav categories (special/skills/bio/map/databank/config) to a tab + h2'
 
 # 123.8 EXACT whole-input match: _routePanelNav does a direct map lookup (no includes/startsWith/indexOf)
@@ -7883,8 +7891,9 @@ Check (($aliasBlock123 + $panelNavBody123) -notmatch 'New Vegas|Mojave|Fallout|\
     '123.9: PANEL_NAV_ALIASES + _routePanelNav are game-agnostic (no FNV/FO3/Fallout/location literals -- Protocol 38)'
 
 # 123.10 the CONSULT->DATABANK target panel actually exists on the DATA tab
-Check (($html123 -match 'id="databankPanel"') -and ($html123 -match 'data-tab="data"[^>]*id="databankPanel"|id="databankPanel"[^>]*data-tab="data"') -and ($html123 -match 'DATABANK</h2>')) `
-    '123.10: #databankPanel (DATABANK h2, data-tab="data") exists as the consult/databank/lookup target'
+# (reskinned as BUS-19 CATALOG QUERY at Phase 3 . Piece 3 -- id unchanged)
+Check (($html123 -match 'id="databankPanel"') -and ($html123 -match 'data-tab="data"[^>]*id="databankPanel"|id="databankPanel"[^>]*data-tab="data"') -and ($html123 -match 'CATALOG QUERY</h2>')) `
+    '123.10: #databankPanel (CATALOG QUERY h2, data-tab="data") exists as the consult/databank/lookup target'
 
 # ===========================================================
 # Suite 124 -- WU-T1 per-game theming + AA contrast (12 tests)
@@ -8030,9 +8039,11 @@ $sslCount125 = ([regex]::Matches($html125, 'id="sessionStatsList"')).Count
 Check ($sslCount125 -eq 1) `
     '125.3: exactly one #sessionStatsList remains (no leftover duplicate panel)'
 
-# 125.4  campaign readout shows all the owner-confirmed stats incl. session duration
-Check (($sessFn125 -match 'state\.stats') -and ($sessFn125 -match 'KILLS') -and ($sessFn125 -match 'CAPS EARNED') -and ($sessFn125 -match 'DMG DEALT') -and ($sessFn125 -match 'CURRENT SITTING') -and ($sessFn125 -match 'LOCATION VISITS') -and ($sessFn125 -match 'locationHistory')) `
-    '125.4: renderSessionStats shows kills, caps earned, dmg dealt, CURRENT SITTING, and the LOCATION VISITS count'
+# 125.4  campaign readout shows all the owner-confirmed stats incl. session
+#        duration (Phase 3 . Piece 3 BUS-21 SERVICE TALLY odometer reskin --
+#        tile captions read CONFIRMED KILLS/DAMAGE DEALT/LOCATIONS FIXED)
+Check (($sessFn125 -match 'state\.stats') -and ($sessFn125 -match 'KILLS') -and ($sessFn125 -match 'CAPS EARNED') -and ($sessFn125 -match 'DAMAGE DEALT') -and ($sessFn125 -match 'CURRENT SITTING') -and ($sessFn125 -match 'LOCATIONS FIXED') -and ($sessFn125 -match 'locationHistory')) `
+    '125.4: renderSessionStats shows kills, caps earned, damage dealt, CURRENT SITTING, and the LOCATIONS FIXED count'
 
 # 125.5  device telemetry is preserved (function body unchanged by the panel split)
 Check (($overFn125 -match 'CURRENT UPTIME') -and ($overFn125 -match 'BOOT COUNT') -and ($overFn125 -match 'TOTAL POWER-ON')) `
@@ -8043,9 +8054,10 @@ Check (($overFn125 -match 'CURRENT UPTIME') -and ($overFn125 -match 'BOOT COUNT'
 Check (($statusPanel125.Contains('UNIT TELEMETRY')) -and ($logPanel125.Contains('CAMPAIGN LOG')) -and ($sessFn125 -match 'CURRENT SITTING') -and ($overFn125 -match 'CURRENT UPTIME')) `
     '125.6: session duration (CURRENT SITTING) and device uptime (CURRENT UPTIME) sit under clearly labelled CAMPAIGN LOG / UNIT TELEMETRY panels'
 
-# 125.7  RESET CAMPAIGN STATS is wired to resetSessionStats, which clears state.stats + re-renders
-Check (($logPanel125 -match 'onclick="resetSessionStats\(\)"') -and ($logPanel125 -match 'RESET CAMPAIGN STATS') -and ($resetFn125 -match 'state\.stats = \{') -and ($resetFn125 -match 'renderSessionStats\(\)')) `
-    '125.7: the RESET CAMPAIGN STATS button calls resetSessionStats(), which resets state.stats and re-renders'
+# 125.7  the ZERO CAMPAIGN COUNTERS key (renamed at Phase 3 . Piece 3, BUS-21
+#        SERVICE TALLY) is wired to resetSessionStats, which clears state.stats + re-renders
+Check (($logPanel125 -match 'onclick="resetSessionStats\(\)"') -and ($logPanel125 -match 'ZERO CAMPAIGN COUNTERS') -and ($resetFn125 -match 'state\.stats = \{') -and ($resetFn125 -match 'renderSessionStats\(\)')) `
+    '125.7: the ZERO CAMPAIGN COUNTERS button calls resetSessionStats(), which resets state.stats and re-renders'
 
 # 125.8  game-agnostic (Protocol 38) -- no game literals in either half of the split readout
 Check (-not (($sessFn125 + $logPanel125 + $statusPanel125) -match 'New Vegas|Mojave|\bFNV\b|\bFO3\b|Capital Wasteland|Vault 101')) `
@@ -8063,7 +8075,9 @@ $state126  = Read-Src "js/state.js"
 $css126    = Read-Src "css/terminal.css"
 $markFn126 = [regex]::Match($render126, '(?s)function markLocationVisited\(loc\)[\s\S]*?\n\}').Value
 $recFn126  = [regex]::Match($state126, '(?s)function recordLocationVisit\([\s\S]*?\n\}').Value
-$markCss126 = [regex]::Match($css126, '(?s)\.map-mark-visited\s*\{[\s\S]*?\}').Value
+# Phase 3 . Piece 3 renamed the button to MARK SURVEYED (class="mark") as
+# part of the BUS-16 sector-sheet reskin -- same handler, same add-only semantics.
+$markCss126 = [regex]::Match($css126, '(?s)\.loc-row button\.mark\s*\{[\s\S]*?\}').Value
 
 # 126.1  the handler exists and routes through the single-source helper -> persist -> re-render
 Check (($render126 -match 'function markLocationVisited\(loc\)') -and ($markFn126 -match 'recordLocationVisit\(loc\)') -and ($markFn126 -match 'saveState\(\)') -and ($markFn126 -match 'renderWorldMap\(\)')) `
@@ -8077,21 +8091,22 @@ Check (-not ($markFn126 -match 'fetch\(|XMLHttpRequest|transmitMessage\(|generat
 Check (($recFn126 -match '\.push\(') -and (-not ($recFn126 -match '\.splice\(|removeLocation|forgetLocation')) -and (-not (($render126 + $state126) -match 'forgetLocationVisit|unmarkLocation|removeLocationVisit'))) `
     '126.3: mark-visited is add-only -- recordLocationVisit appends+dedups, no un-mark/forget helper exists'
 
-# 126.4  a real LOG VISIT <button> per row, wired via an escaped data-loc (apostrophe-safe)
-Check (($render126 -match 'class="map-mark-visited"') -and ($render126 -match 'onclick="markLocationVisited\(this\.dataset\.loc\)"') -and ($render126 -match 'data-loc="\$\{escapeHtml\(') -and ($render126 -match 'LOG VISIT</button>')) `
-    '126.4: each WORLD GRID row renders a LOG VISIT <button> wired to markLocationVisited via an escaped data-loc'
+# 126.4  a real MARK SURVEYED <button> per row (renamed from LOG VISIT at
+#        Phase 3 . Piece 3), wired via an escaped data-loc (apostrophe-safe)
+Check (($render126 -match 'class="mark"') -and ($render126 -match 'onclick="markLocationVisited\(this\.dataset\.loc\)"') -and ($render126 -match 'data-loc="\$\{escapeHtml\(') -and ($render126 -match 'MARK SURVEYED</button>')) `
+    '126.4: each sector-sheet row renders a MARK SURVEYED <button> wired to markLocationVisited via an escaped data-loc'
 
 # 126.5  accessible label -- literal aria-label (UI-3)
-Check (($render126 -match 'aria-label="Mark \$\{escapeHtml\(') -and ($render126 -match 'as visited"')) `
-    '126.5: the LOG VISIT button carries a literal aria-label ("Mark <loc> as visited")'
+Check (($render126 -match 'aria-label="Mark \$\{escapeHtml\(') -and ($render126 -match 'as surveyed"')) `
+    '126.5: the MARK SURVEYED button carries a literal aria-label ("Mark <loc> as surveyed")'
 
 # 126.6  add-only gating -- button suppressed on current + already-visited rows
 Check ($render126 -match "isYou \|\| wasVisited\s*\?\s*''") `
-    '126.6: the LOG VISIT button only appears on undiscovered rows (suppressed when current or already visited)'
+    '126.6: the MARK SURVEYED button only appears on undiscovered rows (suppressed when current or already visited)'
 
 # 126.7  >=28px tap target + width:auto override (Protocol 17 / UI-5)
 Check (($markCss126.Length -gt 0) -and ($markCss126 -match 'min-height:\s*28px') -and ($markCss126 -match 'width:\s*auto')) `
-    '126.7: .map-mark-visited has a >=28px tap target (min-height) and width:auto (overrides global button width)'
+    '126.7: .loc-row button.mark has a >=28px tap target (min-height) and width:auto (overrides global button width)'
 
 # 126.8  game-agnostic (Protocol 38) -- no game literal in the handler
 Check (-not ($markFn126 -match 'New Vegas|Mojave|\bFNV\b|\bFO3\b|Capital Wasteland|Vault 101')) `
@@ -12027,9 +12042,9 @@ $eslint157 = Read-Src "eslint.config.mjs"
 
 $labels157 = @(
     "js/state.js loads cleanly in a fresh VM sandbox",
-    "157.1.FNV: GAME_DEFS.FNV.identity carries every contract field (machine/material/structuralMode/theme/persona/ceremony/motionTexture/cursor/audio/voice/ambient/overseer)",
-    "157.1.FO3: GAME_DEFS.FO3.identity carries every contract field (machine/material/structuralMode/theme/persona/ceremony/motionTexture/cursor/audio/voice/ambient/overseer)",
-    "157.1.FO4: GAME_DEFS.FO4.identity carries every contract field (machine/material/structuralMode/theme/persona/ceremony/motionTexture/cursor/audio/voice/ambient/overseer)",
+    "157.1.FNV: GAME_DEFS.FNV.identity carries every contract field (machine/material/structuralMode/theme/persona/ceremony/motionTexture/cursor/audio/voice/ambient/overseer/databank)",
+    "157.1.FO3: GAME_DEFS.FO3.identity carries every contract field (machine/material/structuralMode/theme/persona/ceremony/motionTexture/cursor/audio/voice/ambient/overseer/databank)",
+    "157.1.FO4: GAME_DEFS.FO4.identity carries every contract field (machine/material/structuralMode/theme/persona/ceremony/motionTexture/cursor/audio/voice/ambient/overseer/databank)",
     "157.2.FNV: GAME_DEFS.FNV.identity.theme === GAME_DEFS.FNV.theme (same object, zero drift possible)",
     "157.2.FO3: GAME_DEFS.FO3.identity.theme === GAME_DEFS.FO3.theme (same object, zero drift possible)",
     "157.2.FO4: GAME_DEFS.FO4.identity.theme === GAME_DEFS.FO4.theme (same object, zero drift possible)",
@@ -12062,7 +12077,7 @@ try {
 } catch (e) {
   results.push(false);
 }
-const CONTRACT = ['machine','material','structuralMode','theme','persona','ceremony','motionTexture','cursor','audio','voice','ambient','overseer'];
+const CONTRACT = ['machine','material','structuralMode','theme','persona','ceremony','motionTexture','cursor','audio','voice','ambient','overseer','databank'];
 ['FNV','FO3','FO4'].forEach(ctx => {
   try {
     const id = GAME_DEFS[ctx] && GAME_DEFS[ctx].identity;
@@ -14766,7 +14781,7 @@ $campgBlock176 = $html176.Substring($campgStart176, $html176.IndexOf('id="accoun
 $configStart176 = $html176.IndexOf('id="campaignConfigPanel"')
 $configBlock176 = $html176.Substring($configStart176, $html176.IndexOf('<div class="col-right">') - $configStart176)
 Check (
-    ($campgBlock176 -match '<h2>>\s*CAMPAIGN RECORD</h2>') -and
+    ($campgBlock176 -match '(?s)<h2>&gt;[\s\S]*?CAMPAIGN CHRONICLE</h2>') -and
     ($campgBlock176.Contains('data-sub-id="campaign_status"')) -and
     ($campgBlock176.Contains('data-sub-id="crossroads_record"')) -and
     ($campgBlock176.Contains('data-sub-id="incident_log"')) -and
@@ -14777,7 +14792,7 @@ Check (
     ($configBlock176.Contains('id="playthroughTypeSelect"')) -and
     ($configBlock176.Contains('id="completeRngToggle"')) -and
     ($configBlock176.Contains('id="wipeTerminalBtn"'))
-) '176.2: #campgPanel (renamed CAMPAIGN RECORD) keeps only the record sub-panels; every config control + the DANGER ZONE moved verbatim into #campaignConfigPanel'
+) '176.2: #campgPanel (renamed CAMPAIGN CHRONICLE at Phase 3 . Piece 3) keeps only the record sub-panels; every config control + the DANGER ZONE moved verbatim into #campaignConfigPanel'
 
 # 176.3  #systemStatusPanel exists on CHASSIS with device telemetry + the
 #        firmware-log + error-log buttons; the firmware button is gone from
@@ -14792,12 +14807,13 @@ Check (
     (-not ($svcTrayBlock176.Contains('id="btnViewChangelog"')))
 ) '176.3: #systemStatusPanel (CHASSIS) hosts device telemetry + #systemStatusDisplay + the firmware-log button (moved out of the SVC tray) + a new error-log button'
 
-# 176.4  #campaignLogPanel exists on DATABANK with the campaign stats + reset button
+# 176.4  #campaignLogPanel exists on DATABANK with the campaign stats + reset
+#        button (reskinned as BUS-21 SERVICE TALLY at Phase 3 . Piece 3)
 Check (
-    ($html176 -match '<details class="panel" data-tab="data" id="campaignLogPanel">') -and
+    ($html176 -match '<details class="panel[^"]*"[^>]*data-tab="data"[^>]*id="campaignLogPanel">') -and
     ($html176 -match 'id="sessionStatsList"') -and
     ($html176 -match 'onclick="resetSessionStats\(\)"')
-) '176.4: #campaignLogPanel (DATABANK) hosts #sessionStatsList + the RESET CAMPAIGN STATS button'
+) '176.4: #campaignLogPanel (DATABANK) hosts #sessionStatsList + the ZERO CAMPAIGN COUNTERS reset button'
 
 # 176.5  renderSystemStatus() is defined, reads real carrier/feature-flag/version
 #        signals (no game literal), and is wired into both loadUI() and
@@ -16952,6 +16968,210 @@ Check (
     ($invBody188 -match 'class="use-btn"') -and
     ($invBody188.IndexOf('class="hole"') -lt $invBody188.IndexOf('class="use-btn"'))
 ) "188.4: renderInventory()'s row template (element order, data-use delegation) is unchanged -- this was a CSS-only fix"
+
+# ===========================================================
+# Suite 189 -- Phase 3 . Piece 3: DATABANK "The Records Bay" (BUS-16...21)
+# Mirrors JS Suite 189. 20 tests.
+# ===========================================================
+Sep "Suite 189 -- Phase 3 Piece 3: DATABANK Records Bay (BUS-16...21)"
+$html189 = Read-Src "index.html"
+$render189 = Read-Src "js/ui-render.js"
+$state189src = Read-Src "js/state.js"
+$css189 = Read-Src "css/terminal.css"
+$mapBody189 = ''
+try { $mapBody189 = Get-FunctionBody $render189 'renderWorldMap' } catch {}
+$questsBody189 = ''
+try { $questsBody189 = Get-FunctionBody $render189 'renderQuests' } catch {}
+
+# 189.1
+Check (
+    (-not ($render189 -match '_mapAbbrev|_MAP_ABBREV')) -and (-not ($html189 -match '_mapAbbrev|_MAP_ABBREV'))
+) '189.1: _mapAbbrev/_MAP_ABBREV is fully deleted (nodes plot at real gridRow/gridCol, no abbreviation table)'
+
+# 189.2
+Check (
+    ($mapBody189 -match 'MARGIN \+ \(z\.gridCol - 1\) \* STEP') -and
+    ($mapBody189 -match 'MARGIN \+ \(z\.gridRow - 1\) \* STEP') -and
+    ($mapBody189 -match '\.map\(\(z, i\) => \{')
+) "189.2: renderWorldMap positions every SVG node from the zone's own gridCol/gridRow (nx/ny), iterating the real FALLOUT_REGISTRY.zones array"
+
+# 189.3
+Check (
+    ($mapBody189 -match 'const fog = !isCur && !isVisited') -and
+    ($mapBody189 -match "(?s)const label = fog[\s\S]{0,20}''") -and
+    ($css189 -match 'g\.node\.fog \.dot') -and
+    ($css189 -match 'g\.node\.fog \.halo')
+) '189.3: fog-of-war status (fog = !current && !visited) suppresses the node label entirely and drives the dim/dashed CSS styling -- discovered zones stay lit + labeled'
+
+# 189.4
+Check (
+    (($mapBody189 -replace "`n", ' ') -match 'BOBBLEHEAD.*sigGlyphChar|sigGlyphChar.*BOBBLEHEAD') -and
+    ($mapBody189 -match "'▲'") -and
+    ($mapBody189 -match 'lincolnMemorabilia') -and
+    (-not ($mapBody189 -match "=== 'FO3'|=== 'FNV'"))
+) '189.4: typed signal glyphs (star/diamond from collectibleLabel, triangle from lincolnMemorabilia) are data-driven -- no ctx branch in renderWorldMap'
+
+# 189.5
+Check (
+    ($mapBody189 -match 'trailZones\.slice\(-25\)') -and ($mapBody189 -match 'class="route"')
+) '189.5: the known-route trail is built from locationHistory (capped, deduped) and rendered as .route line segments'
+
+# 189.6
+Check (
+    ($render189 -match 'function _mapNodeKeyNav') -and
+    ($render189 -match 'ArrowLeft:\s*\[-1, 0\]') -and
+    ($mapBody189 -match 'onkeydown="_mapNodeKeyNav\(event,') -and
+    ($mapBody189 -match 'tabindex="0"')
+) '189.6: every SVG node is a real tabindex="0" control wired to _mapNodeKeyNav (arrow-key nearest-neighbor traversal + Enter/Space to zoom)'
+
+# 189.7
+Check (
+    ($mapBody189 -match 'onclick="resetMapZoom\(\)"') -and
+    ($mapBody189 -match 'onclick="markLocationVisited\(this\.dataset\.loc\)"') -and
+    ($mapBody189 -match "let rowCls = 'loc-row'")
+) '189.7: the sector sheet keeps zoomMapToZone/resetMapZoom/markLocationVisited unchanged -- only the .loc-row markup was reskinned'
+
+# 189.8 + 189.12  behavioral (shells out to node, temp-file transport -- Protocol 42)
+$labels189 = @(
+    '189.8: cycleQuestStatus() behaviorally advances a quest ACTIVE->COMPLETE->FAILED->ACTIVE (the one new native write path, owner-locked Q3)',
+    '189.12: GAME_DEFS.{FNV,FO3,FO4}.identity.databank.mapCaption is authored on all three games'
+)
+try {
+    $nodeCheck189 = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCheck189) {
+        $statePathNode189 = (Join-Path $Root "js/state.js").Replace('\', '/')
+        $renderPathNode189 = (Join-Path $Root "js/ui-render.js").Replace('\', '/')
+        $testScript189 = @"
+const fs = require('fs');
+const vm = require('vm');
+const results = [];
+try {
+  const src = fs.readFileSync('$renderPathNode189', 'utf8');
+  function extractFunctionBody(source, fnName) {
+    let idx = source.indexOf('function ' + fnName);
+    let i = source.indexOf('{', idx);
+    let depth = 0;
+    const start = i;
+    while (i < source.length) {
+      if (source[i] === '{') depth++;
+      else if (source[i] === '}' && --depth === 0) return source.slice(start, i + 1);
+      i++;
+    }
+  }
+  const cycleFnSrc = 'function cycleQuestStatus(idx) ' + extractFunctionBody(src, 'cycleQuestStatus');
+  const cycleConstMatch = src.match(/const _QUEST_CYCLE = \{[^}]*\};/);
+  const sandbox = { state: { quests: [{ name: 'Test Directive', status: 'active' }] }, saveState: () => {}, renderQuests: () => {}, updateMath: () => {}, console };
+  vm.createContext(sandbox);
+  vm.runInContext((cycleConstMatch ? cycleConstMatch[0] : '') + '\n' + cycleFnSrc, sandbox);
+  vm.runInContext('cycleQuestStatus(0)', sandbox);
+  const s1 = sandbox.state.quests[0].status;
+  vm.runInContext('cycleQuestStatus(0)', sandbox);
+  const s2 = sandbox.state.quests[0].status;
+  vm.runInContext('cycleQuestStatus(0)', sandbox);
+  const s3 = sandbox.state.quests[0].status;
+  results.push(s1 === 'complete' && s2 === 'failed' && s3 === 'active');
+} catch (e) { results.push(false); }
+try {
+  const stateSource = fs.readFileSync('$statePathNode189', 'utf8');
+  const sandbox = { window: {}, document: { getElementById: () => null } };
+  vm.createContext(sandbox);
+  vm.runInContext(stateSource, sandbox);
+  const GD = sandbox.window.GAME_DEFS;
+  results.push(['FNV','FO3','FO4'].every(ctx => GD[ctx].identity.databank && typeof GD[ctx].identity.databank.mapCaption === 'string' && GD[ctx].identity.databank.mapCaption.length > 0));
+} catch (e) { results.push(false); }
+console.log('RESULT:' + results.map(r => r ? '1' : '0').join(''));
+"@
+        $tmpScript189 = [System.IO.Path]::GetTempFileName() + '.js'
+        [System.IO.File]::WriteAllText($tmpScript189, $testScript189, [System.Text.Encoding]::UTF8)
+        try {
+            $out189 = (node $tmpScript189 2>&1 | Out-String)
+        } finally {
+            Remove-Item -Path $tmpScript189 -Force -ErrorAction SilentlyContinue
+        }
+        $rm189 = [regex]::Match($out189, 'RESULT:([01]{2})')
+        if ($rm189.Success) {
+            $bits189 = $rm189.Groups[1].Value
+            for ($bi = 0; $bi -lt 2; $bi++) { Check ($bits189.Substring($bi, 1) -eq '1') $labels189[$bi] }
+        } else {
+            $err189 = if ([string]::IsNullOrWhiteSpace($out189)) { "No output from node" } else { $out189.Trim() }
+            foreach ($lbl in $labels189) { Fail "$lbl  (runtime error: $err189)" }
+        }
+    } else {
+        foreach ($lbl in $labels189) { Fail "$lbl  (node not available in PATH)" }
+    }
+} catch {
+    foreach ($lbl in $labels189) { Fail "$lbl  (harness error: $_)" }
+}
+
+# 189.9
+$apiSrc189 = Read-Src "js/api.js"
+Check (
+    ($apiSrc189 -match 'status') -and ($apiSrc189 -match '(?i)quests') -and ($apiSrc189 -match 'function autoImportState')
+) '189.9: autoImportState() still handles AI-write quest status -- cycleQuestStatus is additive, not a fork'
+
+# 189.10
+Check (
+    ($render189 -match 'function setQuestDrawer') -and
+    ($render189 -match "MetaStore\.set\('robco_databank_qdrawer'") -and
+    ($state189src -match "robco_databank_qdrawer:\s*\{\s*type:\s*'string'")
+) '189.10: setQuestDrawer() persists the last-open status drawer via the registered robco_databank_qdrawer MetaStore pref'
+
+# 189.11
+Check (
+    ($questsBody189 -match "document\.getElementById\('questSearch'\)") -and
+    (-not ($questsBody189 -match 'state\.quests\.splice|state\.quests\s*=\s*\[\]'))
+) "189.11: #questSearch is a pure display filter over state.quests -- renderQuests() never mutates the array while filtering"
+
+# 189.13
+Check (
+    ($mapBody189 -match 'dbFacet\.mapCaption') -and ($mapBody189 -match 'getIdentity')
+) '189.13: renderWorldMap reads the map caption from getIdentity().databank.mapCaption (Protocol 38, no hardcoded region string)'
+
+# 189.14
+$ids189 = @('worldMapDisplay','questsList','newQuestName','newQuestStatus','newQuestObjective','databankPanel','databankSearch','databankResults','campaignNotesList','newCampaignNote','campaignLogPanel','sessionStatsList','campgPanel','campaignStatusPanel','campaignStatusDisplay','crossroadsDisplay','incidentDisplay','worldMapPanel')
+$missing189 = @($ids189 | Where-Object { ([regex]::Matches($html189, [regex]::Escape('id="' + $_ + '"'))).Count -ne 1 })
+Check ($missing189.Count -eq 0) ('189.14: every id-preservation-contract id appears exactly once' + $(if ($missing189.Count) { ' -- offenders: ' + ($missing189 -join ', ') } else { '' }))
+
+# 189.15
+$fns189 = @('renderQuests','addQuest','removeQuest','renderDatabankPanel','renderCampaignNotes','addCampaignNote','removeCampaignNote','renderSessionStats','resetSessionStats','renderWorldMap','setMapView','zoomMapToZone','resetMapZoom','markLocationVisited','renderCampaignStatus')
+$combined189 = $html189 + $render189
+$missingFn189 = @($fns189 | Where-Object { -not ($combined189 -match [regex]::Escape($_) + '\(') })
+Check ($missingFn189.Count -eq 0) '189.15: every id-preservation-contract handler (renderQuests/addQuest/removeQuest/renderDatabankPanel/renderCampaignNotes/addCampaignNote/removeCampaignNote/renderSessionStats/resetSessionStats/renderWorldMap/setMapView/zoomMapToZone/resetMapZoom/markLocationVisited/renderCampaignStatus) is still called'
+
+# 189.16
+$busTags189 = @('BUS-16','BUS-17','BUS-18','BUS-19','BUS-20','BUS-21')
+Check (
+    ($busTags189 | ForEach-Object { $html189.Contains('>' + $_ + '<') }) -notcontains $false -and
+    (([regex]::Matches($html189, 'class="panel bay-board')).Count -ge 6)
+) '189.16: all six DATABANK boards carry their BUS-16...21 slot tag and the shared bay-board frame'
+
+# 189.17
+Check (
+    ($html189 -match 'id="dbMapStatus"') -and ($html189 -match 'id="dbQuestStatus"') -and ($html189 -match 'id="dbChronStatus"') -and
+    ($html189 -match 'id="dbCatalogStatus"') -and ($html189 -match 'id="dbNotesStatus"') -and ($html189 -match 'id="dbTallyStatus"') -and
+    ($render189 -match "getElementById\('dbMapStatus'\)") -and ($render189 -match "getElementById\('dbQuestStatus'\)") -and
+    ($render189 -match "getElementById\('dbChronStatus'\)") -and ($render189 -match "getElementById\('dbCatalogStatus'\)") -and
+    ($render189 -match "getElementById\('dbNotesStatus'\)") -and ($render189 -match "getElementById\('dbTallyStatus'\)")
+) '189.17: all six BUS-16...21 boards carry a live 0i .panel-substatus line, each written by its own render function'
+
+# 189.18
+Check (
+    ($html189 -match 'id="worldMapPanel" open>') -and ($html189 -match 'id="questLogPanel" open>') -and
+    ($html189 -match 'id="campgPanel">') -and ($html189 -match 'id="databankPanel">') -and
+    ($html189 -match 'id="campaignNotesPanel">') -and ($html189 -match 'id="campaignLogPanel">')
+) '189.18: CARTOGRAPHY TABLE + DIRECTIVE REGISTRY default open ("open>"); CHRONICLE/CATALOG/NOTES/TALLY close their tag with no open attribute'
+
+# 189.19
+Check (
+    ($css189 -match '(?s)\.tally-bank\s*\{[^\}]*justify-content:\s*center') -and
+    ($css189 -match '(?s)\.stat-head\s*\{[^\}]*justify-content:\s*center') -and
+    ($css189 -match '(?s)\.survey-legend\s*\{[^\}]*justify-content:\s*center')
+) '189.19: .tally-bank/.stat-head/.survey-legend all center an incomplete last row (centering rule)'
+
+# 189.20
+Check (
+    -not (($mapBody189 + $questsBody189) -match 'New Vegas|Mojave Wasteland|Capital Wasteland|\bFNV\b|\bFO3\b')
+) '189.20: renderWorldMap/renderQuests carry no hardcoded game-flavor literal -- per-game text comes only from identity.databank/GAME_DEFS'
 
 # ===========================================================
 # Results

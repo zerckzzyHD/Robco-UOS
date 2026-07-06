@@ -1601,52 +1601,99 @@
               </div>
             </details>
 
-            <!-- 5. QUEST LOG -->
-            <details class="panel" data-tab="data">
-              <summary><h2>> QUEST LOG</h2></summary>
-              <div id="questsList">
-                <span class="empty-state">NO ACTIVE DIRECTIVES</span>
-              </div>
-              <div
-                class="panel-form"
-                style="border-top: 1px dashed var(--robco-green); padding-top: 8px"
+            <!-- BUS-17 · DIRECTIVE REGISTRY (Phase 3 · Piece 3 — DATABANK "Records
+                 Bay" reskin): quests as numbered directive slots inside a bounded
+                 tray-scrollwrap, a status drawer bank (ALL/ACTIVE/COMPLETE/FAILED,
+                 the OPERATIONS CARGO drawer mechanic reused) + in-tray search, and
+                 the native CYCLE key (cycleQuestStatus — the one new write path
+                 this build adds, owner-locked Q3). Every id/handler kept: questsList
+                 · addQuest/removeQuest · newQuestName/Status/Objective. -->
+            <details class="panel bay-board span2" data-tab="data" id="questLogPanel" open>
+              <summary>
+                <h2>&gt; <span class="board-led" aria-hidden="true"></span> DIRECTIVE REGISTRY</h2>
+                <span class="panel-substatus" id="dbQuestStatus">&mdash;</span>
+              </summary>
+              <span class="bay-slot-tag">BUS-17</span>
+              <span class="bay-part-no"
+                >PN RBC-DIR-17 &middot; NUMBERED DIRECTIVE RACK
+                <span class="real-label"
+                  >(QUEST LOG — questsList &middot; addQuest / removeQuest &middot; CYCLE =
+                  cycleQuestStatus)</span
+                ></span
               >
+              <div class="drawer-bank" id="questDrawerBank"></div>
+              <div class="tray-head">
+                <span class="t-title" id="questDrawerTitle">ALL DIRECTIVES</span>
+                <span class="t-count" id="questDrawerCount">&mdash;</span>
                 <input
+                  type="search"
+                  id="questSearch"
+                  placeholder="⌕ FILTER DIRECTIVES (OPTIONAL)…"
+                  aria-label="Filter directives"
+                  maxlength="80"
+                  oninput="renderQuests()"
+                />
+              </div>
+              <div class="tray-scrollwrap">
+                <div class="tray-list" id="questsList">
+                  <span class="empty-state">NO ACTIVE DIRECTIVES</span>
+                </div>
+              </div>
+              <div class="file-slip">
+                <input
+                  class="fs-name"
                   type="text"
                   id="newQuestName"
-                  placeholder="QUEST"
+                  placeholder="DIRECTIVE NAME…"
                   maxlength="100"
-                  style="flex: 1; min-width: 100px"
+                  aria-label="New quest name"
                 />
-                <select id="newQuestStatus" style="width: 80px; background: rgba(0, 0, 0, 0.8)">
+                <select id="newQuestStatus" aria-label="Initial status">
                   <option value="active">Active</option>
                   <option value="complete">Complete</option>
                   <option value="failed">Failed</option>
                 </select>
+                <input
+                  class="fs-obj"
+                  type="text"
+                  id="newQuestObjective"
+                  placeholder="OBJECTIVE (OPTIONAL)"
+                  aria-label="Objective"
+                />
+                <button class="action-btn keybtn" onclick="addQuest()">
+                  &#9656; FILE DIRECTIVE
+                </button>
               </div>
-              <input
-                type="text"
-                id="newQuestObjective"
-                placeholder="OBJECTIVE (OPTIONAL)"
-                style="width: 100%; margin-top: 4px"
-              />
-              <button class="action-btn" onclick="addQuest()" style="margin-top: 4px">
-                + ADD QUEST
-              </button>
             </details>
 
-            <!-- DATABANK (WU-N4b option C — persistent inline CONSULT panel) -->
-            <details class="panel" data-tab="data" id="databankPanel">
-              <summary><h2>> DATABANK</h2></summary>
-              <input
-                type="text"
-                id="databankSearch"
-                placeholder="SEARCH DATABANK…"
-                maxlength="100"
-                aria-label="Search the databank for an item, perk, quest, location, companion, or creature"
-                oninput="renderDatabankPanel()"
-                style="width: 100%; margin-bottom: 6px; font-size: 16px"
-              />
+            <!-- BUS-19 · CATALOG QUERY (Phase 3 · Piece 3 — amber "reference
+                 retrieval" reskin over the shared CONSULT engine). Every id/handler
+                 kept: databankSearch/databankResults/renderDatabankPanel
+                 (_consultSearch/_consultRenderHTML unchanged). -->
+            <details class="panel bay-board wireboard" data-tab="data" id="databankPanel">
+              <summary>
+                <h2>&gt; <span class="board-led wire" aria-hidden="true"></span> CATALOG QUERY</h2>
+                <span class="panel-substatus" id="dbCatalogStatus">&mdash;</span>
+              </summary>
+              <span class="bay-slot-tag">BUS-19</span>
+              <span class="bay-part-no"
+                >PN RBC-CAT-19 &middot; INDEX-CATALOG RETRIEVAL
+                <span class="real-label"
+                  >(DATABANK SEARCH — databankSearch &middot; databankResults &middot;
+                  renderDatabankPanel / SHARED CONSULT ENGINE)</span
+                ></span
+              >
+              <div class="query-line">
+                <input
+                  type="text"
+                  id="databankSearch"
+                  placeholder="⌕ QUERY THE ARCHIVE — ITEMS · PERKS · DIRECTIVES · PLACES…"
+                  maxlength="100"
+                  aria-label="Search the databank for an item, perk, quest, location, companion, or creature"
+                  oninput="renderDatabankPanel()"
+                  style="font-size: 16px"
+                />
+              </div>
               <div id="databankResults"></div>
             </details>
 
@@ -1900,29 +1947,48 @@
               </div>
             </details>
 
-            <!-- 10. CAMPAIGN NOTES -->
-            <details class="panel" data-tab="data">
+            <!-- BUS-20 · FIELD NOTES (Phase 3 · Piece 3 — courier's field ledger
+                 reskin). Every id/handler kept: campaignNotesList ·
+                 addCampaignNote/removeCampaignNote · newCampaignNote (Enter-to-add). -->
+            <details class="panel bay-board" data-tab="data" id="campaignNotesPanel">
               <summary>
-                <h2>> CAMPAIGN NOTES</h2>
+                <h2>&gt; <span class="board-led" aria-hidden="true"></span> FIELD NOTES</h2>
+                <span class="panel-substatus" id="dbNotesStatus">&mdash;</span>
               </summary>
-              <div id="campaignNotesList">
-                <span class="empty-state">NO ENTRIES IN MEMORY</span>
+              <span class="bay-slot-tag">BUS-20</span>
+              <span class="bay-part-no"
+                >PN RBC-NTE-20 &middot; COURIER'S FIELD LEDGER
+                <span class="real-label"
+                  >(CAMPAIGN NOTES — campaignNotesList &middot; addCampaignNote / removeCampaignNote
+                  &middot; AUTO-LOG DIMMING KEPT)</span
+                ></span
+              >
+              <div class="tray-head">
+                <span class="t-title">FILED ENTRIES</span>
+                <input
+                  type="search"
+                  id="notesSearch"
+                  placeholder="⌕ FILTER NOTES (OPTIONAL)…"
+                  aria-label="Filter notes"
+                  maxlength="80"
+                  oninput="renderCampaignNotes()"
+                />
               </div>
-              <div class="panel-form">
+              <div class="tray-scrollwrap">
+                <div class="tray-list" id="campaignNotesList" style="max-height: 260px">
+                  <span class="empty-state">NO ENTRIES IN MEMORY</span>
+                </div>
+              </div>
+              <div class="note-slip">
                 <input
                   type="text"
                   id="newCampaignNote"
-                  placeholder="ENTER TACTICAL NOTE…"
+                  placeholder="FILE A FIELD NOTE… (ENTER TO ADD)"
                   maxlength="5000"
-                  style="flex: 1"
                   onkeydown="if (event.key === 'Enter') addCampaignNote();"
                 />
-                <button
-                  class="action-btn"
-                  style="width: auto; padding: 0 10px"
-                  onclick="addCampaignNote()"
-                >
-                  ADD
+                <button class="action-btn keybtn" onclick="addCampaignNote()">
+                  &#9656; FILE NOTE
                 </button>
               </div>
             </details>
@@ -1962,37 +2028,74 @@
               </span>
             </details>
 
-            <!-- 11b. CAMPAIGN LOG (WU-F10 campaign-stats half of the former Overseer's
-                 Log). DATABANK. -->
-            <details class="panel" data-tab="data" id="campaignLogPanel">
-              <summary><h2>&gt; CAMPAIGN LOG</h2></summary>
-              <div class="overseer-section-label">&gt; CAMPAIGN LOG — THIS COURIER</div>
-              <div id="sessionStatsList"></div>
-              <button
-                class="action-btn"
-                onclick="resetSessionStats()"
-                style="margin-top: 6px; font-size: 10px"
-                aria-label="Reset campaign statistics (kills, caps earned, damage dealt, current sitting duration)"
+            <!-- BUS-21 · SERVICE TALLY (Phase 3 · Piece 3 — mechanical odometer bank
+                 reskin, WU-F10 campaign-stats half of the former Overseer's Log).
+                 Every id/handler kept: sessionStatsList · resetSessionStats. -->
+            <details class="panel bay-board" data-tab="data" id="campaignLogPanel">
+              <summary>
+                <h2>&gt; <span class="board-led" aria-hidden="true"></span> SERVICE TALLY</h2>
+                <span class="panel-substatus" id="dbTallyStatus">&mdash;</span>
+              </summary>
+              <span class="bay-slot-tag">BUS-21</span>
+              <span class="bay-part-no"
+                >PN RBC-TLY-21 &middot; MECHANICAL COUNTER BANK
+                <span class="real-label"
+                  >(CAMPAIGN LOG — sessionStatsList &middot; resetSessionStats)</span
+                ></span
               >
-                RESET CAMPAIGN STATS
-              </button>
+              <div id="sessionStatsList"></div>
+              <div class="tally-actions">
+                <button
+                  class="action-btn"
+                  onclick="resetSessionStats()"
+                  aria-label="Reset campaign statistics (kills, caps earned, damage dealt, current sitting duration)"
+                >
+                  &#9888; ZERO CAMPAIGN COUNTERS
+                </button>
+              </div>
             </details>
 
-            <!-- 12. WORLD MAP (G6) -->
-            <details class="panel" data-tab="data" id="worldMapPanel">
-              <summary><h2>&gt; WORLD MAP</h2></summary>
+            <!-- BUS-16 · CARTOGRAPHY TABLE — "Phosphor Cartography" (Phase 3 ·
+                 Piece 3, replacing the boxed 6×6 grid). Every id/handler kept:
+                 worldMapDisplay/renderWorldMap · zoomMapToZone/resetMapZoom ·
+                 setMapView/state.mapView · markLocationVisited/recordLocationVisit. -->
+            <details class="panel bay-board span2" data-tab="data" id="worldMapPanel" open>
+              <summary>
+                <h2>&gt; <span class="board-led" aria-hidden="true"></span> CARTOGRAPHY TABLE</h2>
+                <span class="panel-substatus" id="dbMapStatus">&mdash;</span>
+              </summary>
+              <span class="bay-slot-tag">BUS-16</span>
+              <span class="bay-part-no"
+                >PN RBC-CRT-16 &middot; PHOSPHOR CARTOGRAPHY — SPATIAL NODE CHART
+                <span class="real-label"
+                  >(WORLD MAP — renderWorldMap &middot; zoomMapToZone &middot; setMapView &middot;
+                  markLocationVisited / recordLocationVisit)</span
+                ></span
+              >
               <div id="worldMapDisplay">
                 <span style="opacity: 0.4">[LOADING MAP...]</span>
               </div>
             </details>
 
-            <!-- 13b. CAMPG — Campaign Record (config controls moved to #campaignConfigPanel,
-                 data-tab="settings", Step 2 v2.8.0 Settings-tab unit). This panel keeps only
-                 the record sub-panels + data-tab="campg" (Protocol UI-2 persistence untouched). -->
-            <details class="panel" data-tab="campg" id="campgPanel" open>
+            <!-- BUS-18 · CAMPAIGN CHRONICLE — tape-spool chronicle/ledger reskin
+                 (Phase 3 · Piece 3; config controls moved to #campaignConfigPanel,
+                 data-tab="settings", Step 2 v2.8.0). Every id/handler kept:
+                 campaignStatusDisplay/crossroadsDisplay/incidentDisplay ·
+                 renderCampaignStatus/_recordLine. Sub-panel data-sub-ids kept
+                 (Protocol UI-2). -->
+            <details class="panel bay-board" data-tab="campg" id="campgPanel">
               <summary>
-                <h2>> CAMPAIGN RECORD</h2>
+                <h2>&gt; <span class="board-led" aria-hidden="true"></span> CAMPAIGN CHRONICLE</h2>
+                <span class="panel-substatus" id="dbChronStatus">&mdash;</span>
               </summary>
+              <span class="bay-slot-tag">BUS-18</span>
+              <span class="bay-part-no"
+                >PN RBC-CHR-18 &middot; TAPE-SPOOL CHRONICLE
+                <span class="real-label"
+                  >(CAMPAIGN RECORD — campaignStatusDisplay &middot; crossroadsDisplay &middot;
+                  incidentDisplay)</span
+                ></span
+              >
 
               <!-- Campaign Status Panel (v2.0.1) -->
               <details
@@ -2004,15 +2107,12 @@
                 <summary class="config-summary" style="font-size: 12px; opacity: 0.85">
                   CAMPAIGN STATUS
                 </summary>
-                <div
-                  id="campaignStatusDisplay"
-                  style="margin-top: 8px; font-size: 10px; line-height: 1.7"
-                >
+                <div id="campaignStatusDisplay" style="margin-top: 8px">
                   <span style="opacity: 0.4">[LOADING...]</span>
                 </div>
               </details>
 
-              <!-- Crossroads Record (v2.0.1) -->
+              <!-- Crossroads Record (v2.0.1) — the record spool -->
               <details
                 class="sub-panel"
                 data-sub-id="crossroads_record"
@@ -2021,18 +2121,7 @@
                 <summary class="config-summary" style="font-size: 12px; opacity: 0.85">
                   CROSSROADS RECORD
                 </summary>
-                <div
-                  id="crossroadsDisplay"
-                  style="
-                    margin-top: 8px;
-                    font-size: 10px;
-                    opacity: 0.75;
-                    line-height: 1.6;
-                    padding-left: 4px;
-                    border-left: 1px dashed var(--robco-green);
-                    min-height: 32px;
-                  "
-                >
+                <div id="crossroadsDisplay" style="margin-top: 8px">
                   <span style="opacity: 0.45"
                     >NO DECISIONS RECORDED — CROSSROADS EVENTS WILL APPEAR HERE</span
                   >
@@ -2044,18 +2133,7 @@
                 <summary class="config-summary" style="font-size: 12px; opacity: 0.85">
                   INCIDENT LOG
                 </summary>
-                <div
-                  id="incidentDisplay"
-                  style="
-                    margin-top: 8px;
-                    font-size: 10px;
-                    opacity: 0.75;
-                    line-height: 1.6;
-                    padding-left: 4px;
-                    border-left: 1px dashed var(--robco-green);
-                    min-height: 32px;
-                  "
-                >
+                <div id="incidentDisplay" style="margin-top: 8px">
                   <span style="opacity: 0.45"
                     >NO INCIDENTS ON RECORD — MILESTONES WILL APPEAR HERE</span
                   >

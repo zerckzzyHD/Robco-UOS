@@ -69,8 +69,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2398-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2398-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2418-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2418-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -1284,6 +1284,120 @@ Protocol 17 tap-target floor, and the bezel-telemetry SEIZED flag.
 
 ---
 
+## DATABANK Screen Hardware Dressing (`index.html` + `css/terminal.css` + `js/ui-render.js` + `js/ui-core.js` + `js/state.js` — Phase 3 · Piece 3, "The Records Bay" archival cartography station)
+
+The DATA/CAMPG tab's six panels (WORLD MAP, QUEST LOG, DATABANK search, CAMPAIGN NOTES, CAMPAIGN LOG,
+CAMPAIGN RECORD) are reskinned into six `bay-board` panels — BUS-16 through BUS-21, continuing the
+OPERATOR/OPERATIONS BUS-01…15 part-number series — per the owner-approved
+`planning/mockups/databank-records-bay.html` mockup. Same Protocol 22/25 reskin discipline as
+OPERATOR/OPERATIONS: every shipped id/handler is preserved (`worldMapDisplay`/`renderWorldMap`/
+`zoomMapToZone`/`resetMapZoom`/`setMapView`/`markLocationVisited`, `questsList`/`renderQuests`/
+`addQuest`/`removeQuest` + `newQuestName`/`newQuestStatus`/`newQuestObjective`, `databankPanel`/
+`databankSearch`/`databankResults`/`renderDatabankPanel`, `campaignNotesList`/`newCampaignNote`/
+`addCampaignNote`/`removeCampaignNote`, `campaignLogPanel`/`sessionStatsList`/`resetSessionStats`,
+`campgPanel`/`campaignStatusPanel`/`campaignStatusDisplay`/`crossroadsDisplay`/`incidentDisplay`/
+`renderCampaignStatus` — all unchanged).
+
+**BUS-16 CARTOGRAPHY TABLE** (new hero board, ex-WORLD MAP) — the "Phosphor Cartography" remake
+(`planning/FEATURE_REMAKES.md`): `renderWorldMap()`'s strategic view was rewritten from a boxed 6×6
+CSS grid into one inline SVG, built with a single `map().join('')` bulk assignment (never
+`innerHTML +=` in a loop). Nodes plot at each zone's real `gridRow`/`gridCol` (`nx`/`ny` helpers,
+`MARGIN + (z.gridCol - 1) * STEP`) — zero new registry data, the registry stays read-only (Protocol
+23). Status is computed per node: `isCur` (the same `scoreZoneForLoc` fuzzy-match logic as before,
+unchanged), `isVisited` (`zoneVisited()`, unchanged), and `fog = !isCur && !isVisited` — a fog node
+never emits its `<text class="lbl">` label at all (not a hidden element) and renders dashed/dim via
+CSS (`g.node.fog .dot/.halo`). A known-route trail connects consecutive DISTINCT zones from
+`state.locationHistory` in actual discovery order (capped at the most recent 25 transitions, deduped)
+— turning the fog-of-war history into a visible exploration path. Typed signal-return glyphs mark an
+uncollected pickup: ★ or ◆ driven entirely by the existing per-game `collectibleLabel` field
+(`/BOBBLEHEAD/.test(...)`, no ctx branch), or ▲ for an uncollected `lincolnMemorabilia` entry
+(FO3-only via `tracksLincoln`, but the check is purely data-driven — `lincolnMemorabilia` is simply
+empty for a game without it). A `[YOU]` reticle blinks at the current-zone match (PLOT-FIX) and a
+rotating amber conic-gradient overlay sweeps the chart (SURVEY-SWEEP) — both plain CSS `animation:`,
+auto-neutralized by the existing global `prefers-reduced-motion` block. `state.mapView` keeps its
+exact meaning (`'full'` = STRATEGIC, else CORE) but now drives an SVG `viewBox` crop over the SAME
+node set, rather than physically excluding off-crop zones from the DOM as the old grid did. Real
+per-node keyboard traversal: every `<g class="node">` is `tabindex="0"` with an `onkeydown` wired to
+a new `_mapNodeKeyNav(event, zoneName)` (`js/ui-render.js`) — arrow keys move focus to the nearest
+node in the pressed direction by real grid coordinate (reading a module-level `_mapLastNodes` cache
+set at render time), Enter/Space pulls the sector sheet. The zoom-detail view is reskinned as a
+"sector sheet" (`.sheet`/`.loc-row`/`.loc-st`) — same `_mapActiveZone`/`zoomMapToZone`/`resetMapZoom`
+logic, only the markup changed; the MARK SURVEYED key (renamed from LOG VISIT, class `.mark`) still
+routes through the unchanged `markLocationVisited()` → `recordLocationVisit()` single source
+(add-only, permanent fog-of-war). The dead `_mapAbbrev`/`_MAP_ABBREV` hand-maintained abbreviation
+table is deleted entirely — nodes are keyed by coordinate identity now, not a name-shortening lookup
+— along with every now-orphaned boxed-grid CSS rule (`.map-cell*`, `.map-detail-*`, `.map-legend`,
+`.map-toggle-btn`, `.map-you-marker`); `.map-back-btn` and `.map-collectible-badge` are kept, still
+reused verbatim by the reskinned sector sheet. The map caption reads the new `identity.databank`
+per-game facet (below) via `getIdentity()` — e.g. `MOJAVE WASTELAND` (FNV) vs `CAPITAL WASTELAND`
+(FO3) — with a generic fallback for an unauthored game.
+
+**BUS-17 DIRECTIVE REGISTRY** (new hero board, ex-QUEST LOG) — `renderQuests()` rewritten into
+numbered directive slots (`SLOT 01…`, `.dir-slot`) inside a bounded `.tray-scrollwrap`, each with a
+physical status lamp (`.dir-lamp`, amber-active/green-complete/red-failed). A status **drawer bank**
+(ALL/ACTIVE/COMPLETE/FAILED, one open at a time, the OPERATIONS CARGO drawer mechanic reused
+verbatim) is a pure display-only filter over `state.quests` — never mutates it — with the last-open
+choice persisted via a new registered `robco_databank_qdrawer` MetaStore device pref (`setQuestDrawer()`,
+Protocol UI-6). An in-tray search field (`#questSearch`) narrows the list client-side. The owner-locked
+**⟳ CYCLE key** (`cycleQuestStatus(idx)`, `js/ui-render.js`) is the ONE new native write path this unit
+adds: advances a directive's status ACTIVE→COMPLETE→FAILED→ACTIVE with no AI involved, proven by a
+real Node `vm`-sandbox behavioral test (both runners) that actually executes the function body across
+three calls on the same quest slot. `autoImportState()`'s own AI-write quest-status path (`js/api.js`)
+is completely untouched — this is a second, additive entry point onto the same `state.quests[i].status`
+field (Protocol 14/24), exactly like the existing native affinity/mark-visited setters. `addQuest`/
+`removeQuest`/the add-form ids are unchanged.
+
+**BUS-18 CAMPAIGN CHRONICLE** (ex-CAMPAIGN RECORD, `#campgPanel`) — a tape-spool chronicle/ledger dress
+over the SAME `campaignStatusDisplay`/`crossroadsDisplay`/`incidentDisplay` reads. `renderCampaignStatus()`
+now builds a `.stat-head` counter trio (DIRECTIVES ACTIVE/COMPOUNDS LIVE/EVENTS LOGGED, reusing
+`.cs-box`), `.standing-chips` (`.stch`/`.stch.bad`, "bad" derived from `getFactionStanding()`'s own
+`color === 'var(--robco-danger)'` — never a label-text string match), a reeled `.spool-list`/`.rec-line`
+crossroads record, and stamped `.incident`/`.incident.milestone-fac.bad` milestone entries — same
+`state.eventLog`/`_recordLine()` reads, template-only edit. The 3 nested sub-panels
+(`campaign_status`/`crossroads_record`/`incident_log`) keep their exact `data-sub-id`s (Protocol UI-2).
+No longer defaults open (the plan's mobile 0i-collapsed standard — the two CARTOGRAPHY TABLE/DIRECTIVE
+REGISTRY heroes are the only default-open boards).
+
+**BUS-19 CATALOG QUERY** (unchanged panel id `databankPanel`) — leans amber "reference retrieval over
+the wire" via the same `.wireboard`/`--bezel-wire` modifier BUS-13 BARTER UPLINK already established
+(Protocol 22 reuse, game-agnostic fallback for an unauthored game). The shared CONSULT engine
+(`_consultSearch`/`_consultRenderHTML`) is byte-identical — reused by both this panel and the CONSULT
+modal elsewhere, never forked; the amber skin is CSS-only, scoped to `#databankPanel #databankResults`
+so the CONSULT modal keeps its own green treatment. `renderDatabankPanel()` gains one additive line: a
+`.panel-substatus` status readout (`dbCatalogStatus`) reporting the query/result count.
+
+**BUS-20 FIELD NOTES** (ex-CAMPAIGN NOTES) — a courier's field-ledger dress: `renderCampaignNotes()`
+now renders `.note-row`/`.note-row.autolog` ledger rows inside a bounded `.tray-scrollwrap`, with a new
+in-tray search field (`#notesSearch`, display-only client-side filter) — the auto-log `[T…]` dimming
+distinction and `addCampaignNote`/`removeCampaignNote` are unchanged.
+
+**BUS-21 SERVICE TALLY** (ex-CAMPAIGN LOG, unchanged panel id `campaignLogPanel`) — `renderSessionStats()`
+rewritten into a mechanical odometer/counter bank (`_odoTile()` helper builds one digit-cell tile per
+stat: CONFIRMED KILLS/CAPS EARNED/DAMAGE DEALT/CURRENT SITTING/TICKS ELAPSED/LOCATIONS FIXED/CURIOS
+FOUND) — same `state.stats`/`state.ticks`/`state.locationHistory` reads. The reset button is renamed
+ZERO CAMPAIGN COUNTERS but still calls the unchanged `resetSessionStats()`.
+
+A new `identity.databank` facet (`mapCaption`/`mapCaptionSub`/`recordsLabel`) extends the DO-K
+per-game identity keystone (`js/state.js`, Protocol 38) on all three `GAME_DEFS` entries (FNV/FO3/FO4)
+— read by BUS-16's map caption via `getIdentity()`. Every board carries a live `.panel-substatus` 0i
+collapsed-summary line (`dbMapStatus`/`dbQuestStatus`/`dbChronStatus`/`dbCatalogStatus`/`dbNotesStatus`/
+`dbTallyStatus`), each painted by its own owning render function. Mobile default-open is the two heroes
+only (BUS-16/17); BUS-18–21 default collapsed — the same `<details open>` HTML-attribute convention
+`_wirePanelPersistence()` already reads. Zero new campaign-state field: the quest-drawer choice is a
+MetaStore device pref (`robco_databank_qdrawer`), not `state.*`.
+
+Guarded by Suite 189 (both runners, 20 tests): the deleted `_mapAbbrev` table, the SVG node-map's
+gridRow/gridCol positioning, the fog-of-war label-suppression + CSS styling, the typed signal-glyph
+data-driven logic, the known-route trail, the `_mapNodeKeyNav` keyboard contract, the sector-sheet
+handler preservation, `cycleQuestStatus()`'s real behavioral ACTIVE→COMPLETE→FAILED→ACTIVE proof, the
+`autoImportState()` non-fork guard, the `robco_databank_qdrawer` MetaStore round-trip, the
+`#questSearch` display-only-filter guard, the `identity.databank` completeness proof (all 3 games), the
+full id/handler-preservation contract across all six boards, the BUS-16…21 slot tags + bay-board frame,
+the 6 `.panel-substatus` summary lines, the two-heroes-open/four-collapsed default, the centering rule,
+and the game-agnostic guard (no hardcoded FNV/FO3/region literal in the new render code).
+
+---
+
 ## State Architecture
 
 ### The `state` Object (js/state.js)
@@ -2367,7 +2481,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2398-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2418-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

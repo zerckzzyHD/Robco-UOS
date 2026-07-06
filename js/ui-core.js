@@ -3134,9 +3134,9 @@ function _updatePanelBadges() {
     },
     { h2text: '> SQUAD ROSTER', count: (state.squad || []).length },
     { h2text: '> STATUS EFFECTS', count: (state.status || []).length },
-    { h2text: '> CAMPAIGN NOTES', count: (state.campaign_notes || []).length },
+    { h2text: '> FIELD NOTES', count: (state.campaign_notes || []).length },
     {
-      h2text: '> QUEST LOG',
+      h2text: '> DIRECTIVE REGISTRY',
       count: _pendingDirectivesCount(),
     },
     {
@@ -3644,10 +3644,10 @@ function expandPanelForCategory(categoryKey) {
     squad: '> SQUAD ROSTER',
     status: '> STATUS EFFECTS',
     inventory: '> CARGO MANIFEST',
-    campaign_notes: '> CAMPAIGN NOTES',
+    campaign_notes: '> FIELD NOTES',
     perks: '> PERK LOADOUT',
     factions: '> FACTION STANDING',
-    quests: '> QUEST LOG',
+    quests: '> DIRECTIVE REGISTRY',
     ammo: '> CARGO MANIFEST', // ammo now lives in the AMMO drawer, folded into the manifest board
     equipped: '> EQUIPPED',
     collectibles: '> CURIO ARCHIVE',
@@ -3664,9 +3664,9 @@ function expandPanelForCategory(categoryKey) {
     special: '> VITAL TELEMETRY',
     skills: '> SKILL MATRIX',
     bio: '> SKELETAL HARNESS',
-    map: '> WORLD MAP',
+    map: '> CARTOGRAPHY TABLE',
     log: '> SYSTEM STATUS',
-    databank: '> DATABANK',
+    databank: '> CATALOG QUERY',
     config: '> CAMPAIGN CONFIGS',
   };
   const target = map[categoryKey];
