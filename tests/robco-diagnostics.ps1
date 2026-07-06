@@ -18329,6 +18329,40 @@ Check (
     ($burstCssBlock192 -match '(?s)\.core-stat-burst \.c-heart\s*\{[^\}]*box-shadow')
 ) '192.34: the 3D ring burst now completes a full 720deg double rotation on every axis over a matching 1.4s CSS/JS duration, and flares the heart alongside the ring tumble -- a substantially more prominent event than the old 360deg/900ms swing'
 
+# 192.35  owner fluidity pass -- the previous 0/40/70/100 keyframes with an
+#         overshoot "back" bezier bounced at every segment boundary, reading
+#         as three chained snaps rather than one continuous tumble. Now
+#         every burst keyframe is evenly spaced (0/25/50/75/100%) with each
+#         axis value held EXACTLY proportional to its keyframe percent
+#         (constant angular velocity, no per-segment speed changes), the
+#         overshoot bezier is gone in favor of a smooth non-overshooting
+#         ease-in-out applied to the whole span, and the always-animating
+#         .c-ring gets will-change:transform so neither the burst nor the
+#         continuous idle spin stutters off the GPU compositor.
+$orbitBurst1KF192 = [regex]::Match($cssStripped192, '(?s)@keyframes chassisCoreOrbitBurst1\s*\{[\s\S]*?\n\}').Value
+$evenlySpaced192 = (
+    ($orbitBurst1KF192 -match '0%\s*\{') -and
+    ($orbitBurst1KF192 -match '25%\s*\{') -and
+    ($orbitBurst1KF192 -match '50%\s*\{') -and
+    ($orbitBurst1KF192 -match '75%\s*\{') -and
+    ($orbitBurst1KF192 -match '100%\s*\{')
+)
+$proportional192 = (
+    ($orbitBurst1KF192 -match '(?s)25%\s*\{\s*transform:\s*rotateX\(180deg\)\s*rotateY\(180deg\)\s*rotateZ\(180deg\)') -and
+    ($orbitBurst1KF192 -match '(?s)50%\s*\{\s*transform:\s*rotateX\(360deg\)\s*rotateY\(360deg\)\s*rotateZ\(360deg\)') -and
+    ($orbitBurst1KF192 -match '(?s)75%\s*\{\s*transform:\s*rotateX\(540deg\)\s*rotateY\(540deg\)\s*rotateZ\(540deg\)')
+)
+$ringRule192 = [regex]::Match($cssStripped192, '\.chassis-core-shape \.c-ring\s*\{[^\}]*\}').Value
+Check (
+    $evenlySpaced192 -and
+    $proportional192 -and
+    ($burstCssBlock192 -match 'chassisCoreOrbitBurst1 1\.4s ease-in-out') -and
+    ($burstCssBlock192 -match 'chassisCoreOrbitBurst2 1\.4s ease-in-out') -and
+    ($burstCssBlock192 -match 'chassisCoreOrbitBurst3 1\.4s ease-in-out') -and
+    (-not ($burstCssBlock192 -match 'cubic-bezier\(0\.34,\s*1\.56')) -and
+    ($ringRule192 -match 'will-change:\s*transform')
+) '192.35: the 3D ring burst keyframes are now evenly spaced with each axis held exactly proportional to its keyframe percent (constant angular velocity), driven by a smooth ease-in-out instead of the old overshoot "back" bezier, and the always-animating .c-ring carries will-change:transform for GPU compositing -- fixing the owner-reported choppy/jerky tumble'
+
 # ===========================================================
 # Suite 193 -- Owner polish batch: tap-highlight kill + CURIO ARCHIVE
 # Lincoln side-by-side grid (the OPERATIONAL TEMPO live-readout-while-

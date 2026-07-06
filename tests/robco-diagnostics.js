@@ -29020,6 +29020,50 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       /\.core-stat-burst \.c-heart\s*\{[^}]*box-shadow/.test(burstCssBlock192),
     '192.34: the 3D ring burst now completes a full 720deg double rotation on every axis over a matching 1.4s CSS/JS duration, and flares the heart alongside the ring tumble — a substantially more prominent event than the old 360deg/900ms swing'
   );
+
+  // 192.35  owner fluidity pass — the previous 0/40/70/100 keyframes with an
+  //         overshoot "back" bezier bounced at every segment boundary,
+  //         reading as three chained snaps rather than one continuous
+  //         tumble. Now every burst keyframe is evenly spaced (0/25/50/75/
+  //         100%) with each axis value held EXACTLY proportional to its
+  //         keyframe percent (constant angular velocity, no per-segment
+  //         speed changes), the overshoot bezier is gone in favor of a
+  //         smooth non-overshooting ease-in-out applied to the whole span,
+  //         and the always-animating .c-ring gets will-change:transform so
+  //         neither the burst nor the continuous idle spin stutters off the
+  //         GPU compositor.
+  const orbitBurst1KF192 = (cssStripped192.match(
+    /@keyframes chassisCoreOrbitBurst1\s*\{[\s\S]*?\n\}/
+  ) || [''])[0];
+  const evenlySpaced192 =
+    /0%\s*\{/.test(orbitBurst1KF192) &&
+    /25%\s*\{/.test(orbitBurst1KF192) &&
+    /50%\s*\{/.test(orbitBurst1KF192) &&
+    /75%\s*\{/.test(orbitBurst1KF192) &&
+    /100%\s*\{/.test(orbitBurst1KF192);
+  const proportional192 =
+    /25%\s*\{\s*transform:\s*rotateX\(180deg\)\s*rotateY\(180deg\)\s*rotateZ\(180deg\)/.test(
+      orbitBurst1KF192
+    ) &&
+    /50%\s*\{\s*transform:\s*rotateX\(360deg\)\s*rotateY\(360deg\)\s*rotateZ\(360deg\)/.test(
+      orbitBurst1KF192
+    ) &&
+    /75%\s*\{\s*transform:\s*rotateX\(540deg\)\s*rotateY\(540deg\)\s*rotateZ\(540deg\)/.test(
+      orbitBurst1KF192
+    );
+  const ringRule192 = (cssStripped192.match(/\.chassis-core-shape \.c-ring\s*\{[^}]*\}/) || [
+    '',
+  ])[0];
+  assert(
+    evenlySpaced192 &&
+      proportional192 &&
+      /chassisCoreOrbitBurst1 1\.4s ease-in-out/.test(burstCssBlock192) &&
+      /chassisCoreOrbitBurst2 1\.4s ease-in-out/.test(burstCssBlock192) &&
+      /chassisCoreOrbitBurst3 1\.4s ease-in-out/.test(burstCssBlock192) &&
+      !/cubic-bezier\(0\.34,\s*1\.56/.test(burstCssBlock192) &&
+      /will-change:\s*transform/.test(ringRule192),
+    '192.35: the 3D ring burst keyframes are now evenly spaced with each axis held exactly proportional to its keyframe percent (constant angular velocity), driven by a smooth ease-in-out instead of the old overshoot "back" bezier, and the always-animating .c-ring carries will-change:transform for GPU compositing — fixing the owner-reported choppy/jerky tumble'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════

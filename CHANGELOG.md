@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2505/2505 | Cache: robco-terminal-v2.7.0-r102 -->
+﻿## [Unreleased]<!-- Tests: 2506/2506 | Cache: robco-terminal-v2.7.0-r103 -->
 
 ### Added
 
@@ -27,7 +27,7 @@
 - Your DATABANK section got a full hardware makeover to match OPERATOR and OPERATIONS, styled as an archival cartography station. The world map is completely rebuilt as a real spatial chart instead of a grid of boxes: surveyed locations now show up as glowing points on the map, connected by dotted route lines that trace where you've actually traveled, with a rotating survey sweep and a blinking "YOU ARE HERE" marker. Uncollected snow globes, bobbleheads, and Lincoln memorabilia now show up as distinct signal-return symbols right on the map instead of a generic marker. Tap any point — or use the arrow keys to jump between surveyed ones — to pull up that area's location list, with a MARK SURVEYED button on anywhere you haven't logged yet.
 - Your quest log is now a numbered directive rack with a lit status lamp on every entry, filterable to ALL, ACTIVE, COMPLETE, or FAILED with a live count on each, plus a search box to find one quickly. Every quest now has a CYCLE button so you can advance its status yourself — Active to Complete to Failed and back around — without waiting on the AI to update it for you.
 - The DATABANK search panel, campaign record, campaign notes, and session stats panels all got matching hardware makeovers to go with the new map and quest log — an amber archive-query terminal for search, a tape-spool campaign chronicle for your recorded history, a filterable field-notes ledger, and a mechanical odometer-style counter bank for your session stats.
-- The power core's rings now visibly tumble in real 3D for a moment whenever a stat actually changes — leveling up, or adjusting a S.P.E.C.I.A.L. attribute, a skill, your HP, XP, or radiation level — on both the main core and its mirror in the top casing, with the core's heart flaring bright at the same time so the moment is easy to catch. It only plays on a genuine change, never just from looking at the screen, and settles right back into its normal gentle spin afterward.
+- The power core's rings now visibly tumble in real 3D for a moment whenever a stat actually changes — leveling up, or adjusting a S.P.E.C.I.A.L. attribute, a skill, your HP, XP, or radiation level — on both the main core and its mirror in the top casing, with the core's heart flaring bright at the same time so the moment is easy to catch. The tumble itself now flows smoothly from start to finish instead of the choppier motion it launched with. It only plays on a genuine change, never just from looking at the screen, and settles right back into its normal gentle spin afterward.
 
 ### Changed
 
