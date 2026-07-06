@@ -27106,6 +27106,95 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '187.9: renderKarmaCenter() toggles #karmaCenterBlock display per usesKarmaCenter'
   );
 
+  // 187.9a  Owner fix (FO3 duplicate-karma-readout report): renderKarmaCenter()
+  //         also toggles #karmaNeedleReadout — the OPPOSITE of #karmaCenterBlock
+  //         — so a usesKarmaCenter game (FO3) shows exactly ONE karma readout
+  //         (the Karma Center), never both. Gated purely on the existing
+  //         usesKarmaCenter flag (Protocol 38 — no game literal).
+  assert(
+    /karmaNeedleReadout/.test(karmaCenterBody187) &&
+      /needleReadout\.style\.display\s*=\s*usesKarmaCenter\s*\?\s*'none'\s*:\s*''/.test(
+        karmaCenterBody187
+      ),
+    '187.9a: renderKarmaCenter() hides #karmaNeedleReadout exactly when usesKarmaCenter is true (mutually exclusive with #karmaCenterBlock)'
+  );
+
+  // 187.9b  #stat_karma (the karma CONTROL) sits OUTSIDE #karmaNeedleReadout
+  //         inside .kn-wrap, so hiding the needle readout for a KarmaCenter
+  //         game never hides the slider — FO3 karma must stay changeable.
+  {
+    const karmaBoardStart187 = html187.indexOf('id="karmaPanel"');
+    const readoutIdx187 = html187.indexOf('id="karmaNeedleReadout"', karmaBoardStart187);
+    const controlNoteIdx187 = html187.indexOf('The karma CONTROL', readoutIdx187);
+    const sliderIdx187 = html187.indexOf('id="stat_karma"', readoutIdx187);
+    assert(
+      karmaBoardStart187 >= 0 &&
+        readoutIdx187 > karmaBoardStart187 &&
+        controlNoteIdx187 > readoutIdx187 &&
+        sliderIdx187 > controlNoteIdx187,
+      '187.9b: #stat_karma sits structurally after (outside) #karmaNeedleReadout inside .kn-wrap — the slider is never nested inside the hideable needle readout'
+    );
+  }
+
+  // 187.9c  Behavioral proof (VM sandbox, real DOM stub): the ACTUAL
+  //         renderKarmaCenter() body, executed for a usesKarmaCenter=true game,
+  //         hides #karmaNeedleReadout and shows #karmaCenterBlock; for
+  //         usesKarmaCenter=false, the reverse — exactly one readout, never
+  //         both, in both directions.
+  {
+    const vm = require('vm');
+    function makeKarmaDom187() {
+      const registry = new Map();
+      function makeEl() {
+        return { style: {}, innerHTML: '' };
+      }
+      ['karmaCenterBlock', 'karmaNeedleReadout', 'karmaCenterDisplay'].forEach(id =>
+        registry.set(id, makeEl())
+      );
+      return { getElementById: id => registry.get(id) || null, _registry: registry };
+    }
+    function declareFn187(src, name) {
+      const nameIdx = src.indexOf('function ' + name);
+      const parenIdx = src.indexOf('(', nameIdx);
+      const braceIdx = src.indexOf('{', parenIdx);
+      const params = src.slice(parenIdx, braceIdx);
+      return 'function ' + name + params + extractFunctionBody(src, name);
+    }
+    let fo3Ok = false;
+    let fnvOk = false;
+    let errMsg187 = '';
+    try {
+      const runOnce = usesKarmaCenter => {
+        const dom = makeKarmaDom187();
+        const sandbox = {
+          document: dom,
+          state: { karma: 0 },
+          _activeDef: () => ({ usesKarmaCenter }),
+          console,
+        };
+        vm.createContext(sandbox);
+        vm.runInContext(declareFn187(render187, 'renderKarmaCenter'), sandbox);
+        vm.runInContext('renderKarmaCenter()', sandbox);
+        return dom._registry;
+      };
+      const fo3Reg = runOnce(true);
+      fo3Ok =
+        fo3Reg.get('karmaCenterBlock').style.display === '' &&
+        fo3Reg.get('karmaNeedleReadout').style.display === 'none';
+      const fnvReg = runOnce(false);
+      fnvOk =
+        fnvReg.get('karmaCenterBlock').style.display === 'none' &&
+        fnvReg.get('karmaNeedleReadout').style.display === '';
+    } catch (e) {
+      errMsg187 = e && e.message;
+    }
+    assert(
+      fo3Ok && fnvOk,
+      '187.9c: [behavioral] renderKarmaCenter() run against a real DOM stub — usesKarmaCenter=true shows ONLY Karma Center (needle hidden), usesKarmaCenter=false shows ONLY the needle (Karma Center hidden)' +
+        (errMsg187 ? ' — error: ' + errMsg187 : '')
+    );
+  }
+
   // 187.10  stat_karma/karma_label kept as the real control (relocated from
   //         BUS-01 to BUS-09, Protocol 22 — the #c_caps/BUS-10 precedent),
   //         still calling updateKarmaUI()+updateMath() on input.

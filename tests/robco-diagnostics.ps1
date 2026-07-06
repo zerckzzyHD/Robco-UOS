@@ -16868,6 +16868,104 @@ Check (-not ($contextPanelsBody187 -match 'karmaPanel')) `
 Check (($karmaCenterBody187 -match 'karmaCenterBlock') -and ($karmaCenterBody187 -match 'usesKarmaCenter')) `
     '187.9: renderKarmaCenter() toggles #karmaCenterBlock display per usesKarmaCenter'
 
+# 187.9a  Owner fix (FO3 duplicate-karma-readout report): renderKarmaCenter()
+#         also toggles #karmaNeedleReadout -- the OPPOSITE of #karmaCenterBlock
+#         -- so a usesKarmaCenter game (FO3) shows exactly ONE karma readout
+#         (the Karma Center), never both. Gated purely on the existing
+#         usesKarmaCenter flag (Protocol 38 -- no game literal).
+Check (($karmaCenterBody187 -match 'karmaNeedleReadout') -and ($karmaCenterBody187 -match "needleReadout\.style\.display\s*=\s*usesKarmaCenter\s*\?\s*'none'\s*:\s*''")) `
+    "187.9a: renderKarmaCenter() hides #karmaNeedleReadout exactly when usesKarmaCenter is true (mutually exclusive with #karmaCenterBlock)"
+
+# 187.9b  #stat_karma (the karma CONTROL) sits OUTSIDE #karmaNeedleReadout
+#         inside .kn-wrap, so hiding the needle readout for a KarmaCenter game
+#         never hides the slider -- FO3 karma must stay changeable.
+$karmaBoardStart187 = $html187.IndexOf('id="karmaPanel"')
+$readoutIdx187 = $html187.IndexOf('id="karmaNeedleReadout"', [Math]::Max(0, $karmaBoardStart187))
+$controlNoteIdx187 = if ($readoutIdx187 -ge 0) { $html187.IndexOf('The karma CONTROL', $readoutIdx187) } else { -1 }
+$sliderIdx187 = if ($readoutIdx187 -ge 0) { $html187.IndexOf('id="stat_karma"', $readoutIdx187) } else { -1 }
+Check (($karmaBoardStart187 -ge 0) -and ($readoutIdx187 -gt $karmaBoardStart187) -and ($controlNoteIdx187 -gt $readoutIdx187) -and ($sliderIdx187 -gt $controlNoteIdx187)) `
+    '187.9b: #stat_karma sits structurally after (outside) #karmaNeedleReadout inside .kn-wrap -- the slider is never nested inside the hideable needle readout'
+
+# 187.9c  Behavioral proof (shelled to node, real DOM stub -- mirrors the
+#         Suite 133/134/135 pattern): the ACTUAL renderKarmaCenter() body,
+#         executed for a usesKarmaCenter=true game, hides #karmaNeedleReadout
+#         and shows #karmaCenterBlock; for usesKarmaCenter=false, the reverse
+#         -- exactly one readout, never both, in both directions.
+try {
+    $nodeCheck187 = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCheck187) {
+        $renderPathNode187 = (Join-Path $Root "js/ui-render.js").Replace('\', '/')
+        $testScript187 = @"
+const fs = require('fs');
+const vm = require('vm');
+const renderSource = fs.readFileSync('$renderPathNode187', 'utf8');
+function extractFunctionBody(source, fnName) {
+  let idx = source.indexOf('function ' + fnName);
+  if (idx === -1) throw new Error('Cannot find function "' + fnName + '"');
+  let i = source.indexOf('{', idx);
+  let depth = 0;
+  const start = i;
+  while (i < source.length) {
+    if (source[i] === '{') depth++;
+    else if (source[i] === '}' && --depth === 0) return source.slice(start, i + 1);
+    i++;
+  }
+  throw new Error('Unclosed brace for function "' + fnName + '"');
+}
+function declareFn(src, name) {
+  const nameIdx = src.indexOf('function ' + name);
+  const parenIdx = src.indexOf('(', nameIdx);
+  const braceIdx = src.indexOf('{', parenIdx);
+  const params = src.slice(parenIdx, braceIdx);
+  return 'function ' + name + params + extractFunctionBody(src, name);
+}
+function makeKarmaDom() {
+  const registry = new Map();
+  function makeEl() { return { style: {}, innerHTML: '' }; }
+  ['karmaCenterBlock', 'karmaNeedleReadout', 'karmaCenterDisplay'].forEach(id => registry.set(id, makeEl()));
+  return { getElementById: id => registry.get(id) || null, _registry: registry };
+}
+function runOnce(usesKarmaCenter) {
+  const dom = makeKarmaDom();
+  const sandbox = { document: dom, state: { karma: 0 }, _activeDef: () => ({ usesKarmaCenter }), console };
+  vm.createContext(sandbox);
+  vm.runInContext(declareFn(renderSource, 'renderKarmaCenter'), sandbox);
+  vm.runInContext('renderKarmaCenter()', sandbox);
+  return dom._registry;
+}
+const results = [];
+try {
+  const fo3Reg = runOnce(true);
+  results.push(fo3Reg.get('karmaCenterBlock').style.display === '' && fo3Reg.get('karmaNeedleReadout').style.display === 'none');
+} catch (e) { results.push(false); }
+try {
+  const fnvReg = runOnce(false);
+  results.push(fnvReg.get('karmaCenterBlock').style.display === 'none' && fnvReg.get('karmaNeedleReadout').style.display === '');
+} catch (e) { results.push(false); }
+console.log('RESULT:' + results.map(r => r ? '1' : '0').join(''));
+"@
+        $tmpScript187 = [System.IO.Path]::GetTempFileName() + '.js'
+        [System.IO.File]::WriteAllText($tmpScript187, $testScript187, [System.Text.Encoding]::UTF8)
+        try {
+            $out187 = (node $tmpScript187 2>&1 | Out-String)
+        } finally {
+            Remove-Item -Path $tmpScript187 -Force -ErrorAction SilentlyContinue
+        }
+        $rm187 = [regex]::Match($out187, 'RESULT:([01]{2})')
+        if ($rm187.Success) {
+            Check ($rm187.Groups[1].Value -eq '11') `
+                '187.9c: [behavioral] renderKarmaCenter() run against a real DOM stub -- usesKarmaCenter=true shows ONLY Karma Center (needle hidden), usesKarmaCenter=false shows ONLY the needle (Karma Center hidden)'
+        } else {
+            $err187 = if ([string]::IsNullOrWhiteSpace($out187)) { "No output from node" } else { $out187.Trim() }
+            Fail "187.9c: [behavioral] renderKarmaCenter() DOM-stub proof  (runtime error: $err187)"
+        }
+    } else {
+        Fail "187.9c: [behavioral] renderKarmaCenter() DOM-stub proof  (node not found)"
+    }
+} catch {
+    Fail "187.9c: [behavioral] renderKarmaCenter() DOM-stub proof  (harness error: $_)"
+}
+
 # 187.10  #stat_karma/#karma_label are kept as the one real karma control, wired to updateKarmaUI()
 $statKarmaCount187 = ([regex]::Matches($html187, 'id="stat_karma"')).Count
 Check (($html187 -match 'id="stat_karma"') -and ($html187 -match 'id="karma_label"') -and ($html187 -match 'updateKarmaUI\(\);') -and ($statKarmaCount187 -eq 1)) `

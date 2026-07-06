@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2451/2451 | Cache: robco-terminal-v2.7.0-r93 -->
+﻿## [Unreleased]<!-- Tests: 2454/2454 | Cache: robco-terminal-v2.7.0-r94 -->
 
 ### Added
 
@@ -120,6 +120,7 @@
 - Fixed the Security & Configuration panel popping back open every time you switched away from Settings and back, even after you'd deliberately collapsed it — it now stays exactly as you left it, across switching sections and reloading the page, the same as every other panel.
 - Your FACTION STANDING reputation console's MINOR FACTIONS group is now collapsible, tucked neatly under MAJOR FACTIONS, so you can hide it out of the way when you don't need it.
 - Fixed the little standing bars in your faction reputation console's at-a-glance list rendering at different widths depending on a faction's name or how far along its standing was — they're now all a consistent, aligned size.
+- Fixed Fallout 3's KARMA ALIGNMENT board showing your karma twice — the swing-needle gauge and the KARMA CENTER readout underneath it, both saying the same thing. Fallout 3 now shows only its own KARMA CENTER readout; New Vegas still shows the swing needle. The slider that actually sets your karma is unchanged and still works exactly the same in both games.
 
 ### Improved
 

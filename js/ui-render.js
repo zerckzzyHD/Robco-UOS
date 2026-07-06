@@ -2194,11 +2194,24 @@ function renderFactionRep() {
 // universal; only this nested block is FO3-only, per usesKarmaCenter).
 // Thresholds: Very Evil (<-750) / Evil (<-250) / Neutral / Good (>250) / Very Good (>750).
 // Differentiated by text labels and brightness — no multi-color.
+//
+// Owner fix (FO3 duplicate-readout report): a game either presents karma via
+// the swing-needle readout (#karmaNeedleReadout — NV, and any future non-
+// KarmaCenter game) OR the Karma Center appendix (usesKarmaCenter — FO3),
+// never both. The stat_karma slider itself is NEVER hidden — it's the one
+// editable control for every game (Protocol 22); only the READOUT half is
+// gated, purely on the existing usesKarmaCenter flag (Protocol 38, no game
+// literal). karma_label/updateKarmaUI keep writing into the needle readout's
+// DOM regardless of its visibility, so the FO3 slider still updates state
+// and the Karma Center title/readout below (both driven off state.karma).
 function renderKarmaCenter() {
   const block = document.getElementById('karmaCenterBlock');
+  const needleReadout = document.getElementById('karmaNeedleReadout');
   const display = document.getElementById('karmaCenterDisplay');
   if (!display) return;
-  if (block) block.style.display = _activeDef().usesKarmaCenter ? '' : 'none';
+  const usesKarmaCenter = _activeDef().usesKarmaCenter;
+  if (block) block.style.display = usesKarmaCenter ? '' : 'none';
+  if (needleReadout) needleReadout.style.display = usesKarmaCenter ? 'none' : '';
 
   const karma = state.karma || 0;
   let label, opacity, hitSquad;

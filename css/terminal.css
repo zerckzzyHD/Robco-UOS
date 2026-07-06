@@ -7976,11 +7976,20 @@ button.curio-obj.tracker-toggle--inactive .curio-linc--figure i {
 /* ── BUS-09 · KARMA ALIGNMENT — EVIL |^| GOOD swing needle ── */
 .kn-wrap {
   display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  margin-top: 10px;
+}
+/* The swing-needle readout half — hidden on a usesKarmaCenter game
+   (renderKarmaCenter()) so the board never shows two karma readouts. */
+.kn-readout {
+  display: flex;
   flex-wrap: wrap;
   justify-content: center; /* centering rule */
   gap: 12px 26px;
   align-items: center;
-  margin-top: 10px;
+  width: 100%;
 }
 .kn-face {
   width: 190px;
@@ -8093,7 +8102,10 @@ button.curio-obj.tracker-toggle--inactive .curio-linc--figure i {
   text-shadow: var(--robco-glow);
 }
 .k-slider {
-  margin-top: 12px;
+  margin-top: 0;
+  width: 100%;
+  max-width: 320px;
+  text-align: center; /* was inherited from the old parent .kn-side; now a direct .kn-wrap child */
 }
 .k-slider input {
   width: min(100%, 280px);

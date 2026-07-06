@@ -1926,34 +1926,41 @@
               >
 
               <div class="kn-wrap">
-                <div>
-                  <div class="kn-face">
-                    <span class="kn-detent" aria-hidden="true"></span>
-                    <div class="kn-needle" id="karmaNeedle"></div>
+                <!-- Swing-needle readout — NV (and any non-KarmaCenter game).
+                     Hidden on FO3 by renderKarmaCenter() so a KarmaCenter game
+                     shows exactly one readout, never both (owner report). -->
+                <div class="kn-readout" id="karmaNeedleReadout">
+                  <div>
+                    <div class="kn-face">
+                      <span class="kn-detent" aria-hidden="true"></span>
+                      <div class="kn-needle" id="karmaNeedle"></div>
+                    </div>
+                    <div class="kn-ends">
+                      <span>&#9668; EVIL</span><span>NEUTRAL</span><span>GOOD &#9658;</span>
+                    </div>
                   </div>
-                  <div class="kn-ends">
-                    <span>&#9668; EVIL</span><span>NEUTRAL</span><span>GOOD &#9658;</span>
+                  <div class="kn-side">
+                    <div class="k-standing" id="karma_label">Neutral</div>
+                    <div class="k-val" id="karmaValReadout">KARMA 0 OF &plusmn;1000</div>
+                    <div class="tier-lamps" id="karmaTierLamps"></div>
                   </div>
                 </div>
-                <div class="kn-side">
-                  <div class="k-standing" id="karma_label">Neutral</div>
-                  <div class="k-val" id="karmaValReadout">KARMA 0 OF &plusmn;1000</div>
-                  <div class="tier-lamps" id="karmaTierLamps"></div>
-                  <div class="k-slider">
-                    <input
-                      type="range"
-                      id="stat_karma"
-                      min="-1000"
-                      max="1000"
-                      value="0"
-                      oninput="
-                        updateKarmaUI();
-                        updateMath();
-                      "
-                      aria-label="Karma value"
-                    />
-                    <span class="ks-cap">THE SHIPPED stat_karma SLIDER — STILL THE CONTROL</span>
-                  </div>
+                <!-- The karma CONTROL — always present for every game, FO3
+                     included (Protocol 22: one editable stat_karma slider). -->
+                <div class="k-slider">
+                  <input
+                    type="range"
+                    id="stat_karma"
+                    min="-1000"
+                    max="1000"
+                    value="0"
+                    oninput="
+                      updateKarmaUI();
+                      updateMath();
+                    "
+                    aria-label="Karma value"
+                  />
+                  <span class="ks-cap">THE SHIPPED stat_karma SLIDER — STILL THE CONTROL</span>
                 </div>
               </div>
 
