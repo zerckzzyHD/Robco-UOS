@@ -10080,13 +10080,15 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     'GATE-UI-4: all 5 tracker renderers use .tracker-row (3 inline + 2 via shared _renderReadTracker which carries it)'
   );
 
-  // 88.5  Phase 3 OPERATOR batch 2 + owner follow-up: the old collapsed
-  // MINOR FACTIONS sub-panel is retired — every faction (major+minor) rides
-  // the SAME BUS-08 console with zero extra disclosure tap (Protocol 25: no
-  // increase in tap-count) — but the owner asked the pre-reskin MAJOR/MINOR
-  // grouping back on the keycap selector, so renderFactionRep() now DOES
-  // split by the data-driven f.tier field (getFactionRegistry(), Protocol
-  // 38) while still never hiding a tier behind a <details> disclosure.
+  // 88.5  Phase 3 OPERATOR batch 2 + owner follow-up: every faction
+  // (major+minor) rides the SAME BUS-08 console, split by the data-driven
+  // f.tier field (getFactionRegistry(), Protocol 38). Owner batch item 6
+  // (superseding the earlier "neither tier hidden" stance): MAJOR FACTIONS
+  // stays a plain always-visible section (zero added taps, Protocol 25), but
+  // MINOR FACTIONS is now DELIBERATELY a collapsible data-sub-id="minor_
+  // factions_channel" sub-panel sitting directly under it (a NEW id, distinct
+  // from the retired pre-reskin "minor_factions" disclosure this same guard
+  // used to forbid) — see Suite 190.8 for the full markup + persistence check.
   const rfStart88 = uiRenderSrc88.indexOf('function renderFactionRep()');
   const rfEnd88 = uiRenderSrc88.indexOf('\nfunction ', rfStart88 + 1);
   const rfBody88 = rfStart88 >= 0 ? uiRenderSrc88.slice(rfStart88, rfEnd88) : '';
@@ -10097,8 +10099,10 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
       /MAJOR FACTIONS/.test(rfBody88) &&
       /MINOR FACTIONS/.test(rfBody88) &&
       !/data-sub-id="minor_factions"/.test(rfBody88) &&
-      !/<details/.test(rfBody88),
-    'GATE-UI-5: renderFactionRep() groups its selector by the data-driven f.tier field into MAJOR FACTIONS/MINOR FACTIONS sections (getFactionRegistry(), Protocol 38), with neither tier hidden behind a <details> disclosure'
+      /<details class="facon-section sub-panel" data-sub-id="minor_factions_channel">/.test(
+        rfBody88
+      ),
+    'GATE-UI-5: renderFactionRep() groups its selector by the data-driven f.tier field into MAJOR FACTIONS (always-visible)/MINOR FACTIONS (collapsible data-sub-id="minor_factions_channel", owner batch item 6) sections'
   );
 
   // 88.6  renderFactionRep helper text says ±5 not ±50
@@ -24054,14 +24058,21 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   );
 
   // 176.7  the first-visit Module Bay hatch fires on a genuine user [6]/SETTINGS
-  //        visit (via selectSubsystem) but NEVER on the boot-time initTabs() restore
+  //        visit (via selectSubsystem) but NEVER on the boot-time initTabs() restore.
+  //        Owner batch item 5 (Protocol 27 root cause) tightened this further —
+  //        selectSubsystem('settings') only force-opens the panel on a genuine
+  //        FIRST-EVER visit (robco_bay_opened not yet 'true'); see Suite 190.7
+  //        for the full guarded-reopen regression coverage.
   {
     const initTabsBody176 = extractFunctionBody(core176, 'initTabs');
+    const selectSubsystemBody176 = extractFunctionBody(core176, 'selectSubsystem');
     assert(
-      /if \(view === 'settings'\) \{[\s\S]{0,200}securityConfigPanel[\s\S]{0,120}setAttribute\('open', ''\)/.test(
-        core176
-      ) && !/selectSubsystem/.test(initTabsBody176),
-      "176.7: selectSubsystem('settings') re-opens #securityConfigPanel (firing its own once-only hatch toggle listener); initTabs() never calls selectSubsystem(), so a boot-time restore can't re-trigger the hatch (Protocol 42)"
+      /if \(view === 'settings'\) \{[\s\S]{0,700}securityConfigPanel[\s\S]{0,200}setAttribute\('open', ''\)/.test(
+        selectSubsystemBody176
+      ) &&
+        /MetaStore\.get\('robco_bay_opened'\) !== 'true'/.test(selectSubsystemBody176) &&
+        !/selectSubsystem/.test(initTabsBody176),
+      "176.7: selectSubsystem('settings') re-opens #securityConfigPanel only on a genuine first-ever visit (robco_bay_opened not yet 'true'), firing its own once-only hatch toggle listener; initTabs() never calls selectSubsystem(), so a boot-time restore can't re-trigger the hatch (Protocol 42)"
     );
   }
 
@@ -26008,21 +26019,23 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '184.4: #radDragTrack asserts height:28px — the >=28px Protocol 17 drag-target minimum, same standard every other interactive control here is held to'
   );
 
-  // 184.5  setupRadBarInteraction() mirrors setupHpBarInteraction()/
-  //        setupXpBarInteraction() exactly (Protocol 22 — mouse + touch,
-  //        pct-of-width math, writes #stat_rads + state.rads + updateMath()),
-  //        scaled to _resolveMaxRads() instead of a fixed max, and is wired
-  //        into window.onload alongside its two siblings.
+  // 184.5  setupRadBarInteraction() now delegates to a shared
+  //        _wireRadDragSurface(containerId) helper (owner follow-up — the
+  //        VITAL TELEMETRY RAD trace, #opRadLineWrap, never had ANY drag
+  //        wiring at all, so dragging it on a real device did nothing; see
+  //        Suite 190 for the full mechanism + behavioral proof). That helper
+  //        mirrors setupHpBarInteraction()/setupXpBarInteraction() exactly
+  //        (Protocol 22 — mouse + touch, pct-of-width math, writes
+  //        #stat_rads + state.rads + updateMath()), scaled to
+  //        _resolveMaxRads() instead of a fixed max — setupRadBarInteraction()
+  //        itself is now just the two call sites, wired into window.onload.
   {
     const radDragBody184 = extractFunctionBody(core184, 'setupRadBarInteraction');
     assert(
-      /getElementById\('radDragTrack'\)/.test(radDragBody184) &&
-        /_resolveMaxRads\(\)/.test(radDragBody184) &&
-        /stat_rads'\)\.value = newRads/.test(radDragBody184) &&
-        /state\.rads = newRads/.test(radDragBody184) &&
-        /addEventListener\(\s*'touchstart'/.test(radDragBody184) &&
+      /_wireRadDragSurface\('radDragTrack'\)/.test(radDragBody184) &&
+        /_wireRadDragSurface\('opRadLineWrap'\)/.test(radDragBody184) &&
         /setupRadBarInteraction\(\);/.test(core184.slice(core184.indexOf('window.onload'))),
-      '184.5: setupRadBarInteraction() mirrors the HP/XP drag pattern (mouse+touch, pct-of-width) but scales to _resolveMaxRads(), writes #stat_rads + state.rads, and is called from window.onload'
+      '184.5: setupRadBarInteraction() wires BOTH RAD drag surfaces (radDragTrack + opRadLineWrap) via the shared _wireRadDragSurface() helper, and is still called from window.onload'
     );
   }
 
@@ -26072,6 +26085,11 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       sb.window.GAME_DEFS = sb.GAME_DEFS;
       vm184.createContext(sb);
       vm184.runInContext(declareFn184(core184, '_resolveMaxRads'), sb);
+      // setupRadBarInteraction() now delegates to _wireRadDragSurface() (see
+      // 184.5) — declare it too so this mock (which only stubs #radDragTrack,
+      // not #opRadLineWrap) still exercises the SKELETAL HARNESS surface
+      // exactly as before the refactor.
+      vm184.runInContext(declareFn184(core184, '_wireRadDragSurface'), sb);
       vm184.runInContext(declareFn184(core184, 'setupRadBarInteraction'), sb);
       sb.setupRadBarInteraction();
       listeners.mousedown[0]({ clientX: 50 });
@@ -27586,6 +27604,319 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     ),
     '189.20: renderWorldMap/renderQuests carry no hardcoded game-flavor literal — per-game text comes only from identity.databank/GAME_DEFS'
   );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 190 — Owner batch: VITAL TELEMETRY RAD trace drag, SKILL BOOKS/
+//  MAGAZINES live-count + stamp wrap, Module Bay panel-reopen fix, MINOR
+//  FACTIONS collapsible, faction pin-strip uniform width.
+//  14 tests.
+// ══════════════════════════════════════════════════════════════
+{
+  header(
+    'Suite 190 — owner batch: RAD trace drag, skill books/mags, panel persistence, MINOR FACTIONS, pin-strip'
+  );
+  const core190 = readFile('js/ui-core.js');
+  const render190 = readFile('js/ui-render.js');
+  const css190 = readFile('css/terminal.css');
+
+  function declareFn190(src, name) {
+    const nameIdx = src.indexOf('function ' + name);
+    const parenIdx = src.indexOf('(', nameIdx);
+    const braceIdx = src.indexOf('{', parenIdx);
+    const params = src.slice(parenIdx, braceIdx);
+    return 'function ' + name + params + extractFunctionBody(src, name);
+  }
+
+  // 190.1  _wireRadDragSurface(containerId) — the shared drag mechanism both
+  //        RAD surfaces now use — mirrors setupHpBarInteraction()/
+  //        setupXpBarInteraction() exactly (Protocol 22: mouse + touch,
+  //        pct-of-width math, _resolveMaxRads() scale, writes #stat_rads +
+  //        state.rads + updateMath()).
+  {
+    const wireBody190 = extractFunctionBody(core190, '_wireRadDragSurface');
+    assert(
+      /getElementById\(containerId\)/.test(wireBody190) &&
+        /_resolveMaxRads\(\)/.test(wireBody190) &&
+        /stat_rads'\)\.value = newRads/.test(wireBody190) &&
+        /state\.rads = newRads/.test(wireBody190) &&
+        /addEventListener\(\s*'mousedown'/.test(wireBody190) &&
+        /addEventListener\(\s*'touchstart'/.test(wireBody190) &&
+        /addEventListener\(\s*'touchmove'/.test(wireBody190) &&
+        /passive:\s*false/.test(wireBody190),
+      '190.1: _wireRadDragSurface() mirrors the HP/XP drag pattern exactly (mouse+touch, non-passive touchstart, pct-of-width) scaled to _resolveMaxRads(), writing #stat_rads + state.rads'
+    );
+  }
+
+  // 190.2  Owner follow-up root cause (Protocol 27, 2nd report): the owner
+  //        drags the RAD trace INSIDE the VITAL TELEMETRY monitor
+  //        (#opRadLineWrap, alongside the HP/GRADE traces which already
+  //        dragged on real touch) — not the SKELETAL HARNESS bar
+  //        (#radDragTrack) the earlier fixes targeted. #opRadLineWrap must
+  //        now carry the same touch-action:none + fast transition the
+  //        SKELETAL HARNESS bar already has (the exact CSS-invariant class
+  //        of bug a mock-event behavioral test alone can't catch — 184.6b).
+  {
+    const cssStripped190 = css190.replace(/\/\*[\s\S]*?\*\//g, '');
+    const opRadLineWrapRule190 = (cssStripped190.match(/#opRadLineWrap\s*\{[^}]*\}/) || [''])[0];
+    const opRadLineInnerRule190 = (cssStripped190.match(/#opRadLineWrap i\s*\{[^}]*\}/) || [''])[0];
+    assert(
+      /touch-action:\s*none/.test(opRadLineWrapRule190),
+      '190.2a: #opRadLineWrap declares touch-action:none — a real touch-drag on the VITAL TELEMETRY RAD trace is never reinterpreted as a page-scroll gesture'
+    );
+    assert(
+      /transition:\s*width 0\.3s ease/.test(opRadLineInnerRule190) &&
+        !/0\.9s/.test(opRadLineInnerRule190),
+      "190.2b: #opRadLineWrap i's transition matches .hp-bar-fill/.bar-fill.rad exactly (width 0.3s ease, no more 0.9s lag)"
+    );
+  }
+
+  // 190.3  setupRadBarInteraction() call site markup — #opRadLineWrap wraps
+  //        #opRadLine (the one real fill this surface paints), never a
+  //        duplicate id.
+  {
+    const html190 = readFile('index.html');
+    assert(
+      /<div class="t-line" id="opRadLineWrap">\s*<i id="opRadLine"/.test(html190),
+      '190.3: #opRadLineWrap wraps the existing #opRadLine fill — the new drag surface sits on the one real VITAL TELEMETRY RAD trace, never a duplicate'
+    );
+  }
+
+  // 190.4  BEHAVIORAL — dragging #opRadLineWrap to 50% of its width sets
+  //        #stat_rads/state.rads to ~half of the ACTIVE game's maxRads,
+  //        proving the NEW surface's wiring (not just the pre-existing
+  //        SKELETAL HARNESS one) is live and reads _resolveMaxRads().
+  {
+    let err = null,
+      halfVal = null,
+      clampedVal = null;
+    try {
+      const vm190 = require('vm');
+      const listeners = {};
+      const statRads = {
+        _v: '0',
+        get value() {
+          return this._v;
+        },
+        set value(v) {
+          this._v = String(v);
+        },
+      };
+      const container = {
+        getBoundingClientRect: () => ({ left: 0, width: 100 }),
+        addEventListener(type, fn) {
+          (listeners[type] = listeners[type] || []).push(fn);
+        },
+      };
+      const docListeners = {};
+      const doc = {
+        getElementById: id =>
+          id === 'opRadLineWrap' ? container : id === 'stat_rads' ? statRads : null,
+        addEventListener(type, fn) {
+          (docListeners[type] = docListeners[type] || []).push(fn);
+        },
+      };
+      const sb = {
+        document: doc,
+        state: {},
+        updateMath: () => {},
+        GAME_DEFS: { FNV: { maxRads: 1000 } },
+        getGameContext: () => 'FNV',
+        window: {},
+        Math,
+        parseInt,
+      };
+      sb.window.GAME_DEFS = sb.GAME_DEFS;
+      vm190.createContext(sb);
+      vm190.runInContext(declareFn190(core190, '_resolveMaxRads'), sb);
+      vm190.runInContext(declareFn190(core190, '_wireRadDragSurface'), sb);
+      sb._wireRadDragSurface('opRadLineWrap');
+      listeners.mousedown[0]({ clientX: 50 });
+      halfVal = statRads.value;
+      listeners.touchstart[0]({ touches: [{ clientX: 1000 }], preventDefault: () => {} });
+      clampedVal = statRads.value;
+    } catch (e) {
+      err = e;
+    }
+    assert(
+      !err && halfVal === '500' && clampedVal === '1000',
+      'VITAL TELEMETRY RAD trace drag behavioral: wiring #opRadLineWrap directly via _wireRadDragSurface() and dragging to 50% sets #stat_rads/state.rads to 500 (half of a 1000 maxRads game); a synthesized touchstart past the edge clamps to exactly 1000 — proves this surface (previously unwired on any event, mouse or touch) now works' +
+        (err ? ' — ' + err.message : '')
+    );
+  }
+
+  // 190.5  Owner batch item 2: toggleSkillBook()/toggleMagazine() refresh the
+  //        "n/13 READ" / "n/14 CONSUMED" #opBooksStatus/#opMagsStatus summary
+  //        immediately on shelve/unshelve — previously only reachable via the
+  //        next unrelated updateMath() call, so the count lagged a full
+  //        render cycle behind the tap.
+  {
+    const toggleBookBody190 = extractFunctionBody(render190, 'toggleSkillBook');
+    const toggleMagBody190 = extractFunctionBody(render190, 'toggleMagazine');
+    assert(
+      /_syncOperatorTelemetry\(\)/.test(toggleBookBody190) &&
+        /renderSkillBooks\(\)/.test(toggleBookBody190),
+      '190.5a: toggleSkillBook() calls _syncOperatorTelemetry() (which paints #opBooksStatus) right after renderSkillBooks(), so the READ count updates immediately'
+    );
+    assert(
+      /_syncOperatorTelemetry\(\)/.test(toggleMagBody190) &&
+        /renderMagazines\(\)/.test(toggleMagBody190),
+      '190.5b: toggleMagazine() calls the same _syncOperatorTelemetry() fix (identical root cause, Protocol 22) so #opMagsStatus updates immediately too'
+    );
+  }
+
+  // 190.6  Owner batch item 3: the SKILL MAGAZINES "CONSUMED" stamp no longer
+  //        wraps to two lines ("CONSUM/ED") — it inherited the ancestor
+  //        .panel's overflow-wrap:anywhere; white-space:nowrap fixes it.
+  {
+    const cssStripped190b = css190.replace(/\/\*[\s\S]*?\*\//g, '');
+    const magConsumedRule190 = (cssStripped190b.match(/\.mag\.consumed::after\s*\{[^}]*\}/) || [
+      '',
+    ])[0];
+    assert(
+      /white-space:\s*nowrap/.test(magConsumedRule190),
+      '190.6: .mag.consumed::after declares white-space:nowrap — the CONSUMED stamp always renders on one line'
+    );
+  }
+
+  // 190.7  Owner batch item 5 (Protocol 27 root cause): selectSubsystem()'s
+  //        SETTINGS branch used to force securityConfigPanel open on EVERY
+  //        visit, silently reopening it even after the user deliberately
+  //        collapsed it. It must now only auto-open on a genuine first-ever
+  //        visit (robco_bay_opened not yet 'true') — once the hatch ceremony
+  //        has fired, the panel's own persisted open/closed state
+  //        (robco_panel_state, via _wirePanelPersistence()'s toggle listener,
+  //        which is NOT excluded for securityConfigPanel) is respected like
+  //        every other panel.
+  {
+    const selectSubsystemBody190 = extractFunctionBody(core190, 'selectSubsystem');
+    assert(
+      /if\s*\(view === 'settings'\)/.test(selectSubsystemBody190) &&
+        /MetaStore\.get\('robco_bay_opened'\) !== 'true'/.test(selectSubsystemBody190) &&
+        /secPanel\.setAttribute\('open', ''\)/.test(selectSubsystemBody190),
+      "190.7: selectSubsystem('settings') only force-opens #securityConfigPanel when robco_bay_opened isn't yet 'true' (a genuine first visit) — a later visit never overrides the user's own collapsed choice"
+    );
+    // _wirePanelPersistence()'s per-panel toggle listener must NOT special-
+    // case securityConfigPanel out of the persistence WRITE (only out of the
+    // desktop default-open branch) — otherwise its collapsed state could
+    // never be remembered at all, regardless of the 190.7 fix above.
+    const panelPersistBody190 = extractFunctionBody(core190, '_wirePanelPersistence');
+    const toggleListenerIdx190 = panelPersistBody190.indexOf("addEventListener('toggle'");
+    assert(
+      toggleListenerIdx190 !== -1 &&
+        /ps\[id\] = d\.open;/.test(panelPersistBody190.slice(toggleListenerIdx190)),
+      "190.7b: _wirePanelPersistence()'s toggle listener persists ps[id] = d.open unconditionally for every details.panel, including securityConfigPanel — the ceremony exclusion only applies to the default-open branch, not to remembering the user's own choice"
+    );
+  }
+
+  // 190.8  Owner batch item 6: MINOR FACTIONS is now a collapsible sub-panel
+  //        (Protocol UI-2 — data-sub-id + shared persistence) sitting
+  //        directly under MAJOR FACTIONS, rather than a second always-visible
+  //        flat section.
+  {
+    const factionRepBody190 = extractFunctionBody(render190, 'renderFactionRep');
+    assert(
+      /<details class="facon-section sub-panel" data-sub-id="minor_factions_channel">/.test(
+        factionRepBody190
+      ) &&
+        /<summary><h3>&gt; MINOR FACTIONS<\/h3><\/summary>/.test(factionRepBody190) &&
+        /_wireDynamicSubPanel\(container\.querySelector\(\s*'\[data-sub-id="minor_factions_channel"\]'\s*\)\)/.test(
+          factionRepBody190
+        ),
+      '190.8: renderFactionRep() renders MINOR FACTIONS as a collapsible <details data-sub-id="minor_factions_channel"> directly under MAJOR FACTIONS, and re-wires it via _wireDynamicSubPanel() after every innerHTML re-render'
+    );
+  }
+
+  // 190.9  _wireDynamicSubPanel() — the reusable helper for a dynamically-
+  //        rendered sub-panel (Protocol UI-2's "wire their own toggle
+  //        listeners immediately after the innerHTML assignment" clause) —
+  //        mirrors _wirePanelPersistence()'s boot-time restore + toggle-
+  //        persist logic exactly (Protocol 22 — one persistence mechanism).
+  {
+    const wireDynBody190 = extractFunctionBody(core190, '_wireDynamicSubPanel');
+    assert(
+      /robco_panel_state/.test(wireDynBody190) &&
+        /details\.dataset\.subId/.test(wireDynBody190) &&
+        /setAttribute\('open', ''\)/.test(wireDynBody190) &&
+        /removeAttribute\('open'\)/.test(wireDynBody190) &&
+        /addEventListener\('toggle'/.test(wireDynBody190),
+      '190.9: _wireDynamicSubPanel() restores the saved open/closed state from robco_panel_state and wires a toggle listener that persists future changes — the same mechanism _wirePanelPersistence() uses at boot'
+    );
+  }
+
+  // 190.10  BEHAVIORAL — _wireDynamicSubPanel() actually restores a saved
+  //         closed state and persists a new open state through a mocked
+  //         MetaStore, proving the round trip (not just the static shape).
+  {
+    let err = null,
+      restoredOpenAttrCalls = null,
+      persistedValue = null;
+    try {
+      const vm190b = require('vm');
+      let stored = JSON.stringify({ minor_factions_channel: false });
+      const setCalls = [];
+      const MetaStore = {
+        get: k => (k === 'robco_panel_state' ? stored : null),
+        set: (k, v) => {
+          if (k === 'robco_panel_state') {
+            stored = v;
+            setCalls.push(v);
+          }
+        },
+      };
+      let openAttrSet = 0,
+        openAttrRemoved = 0;
+      const details = {
+        dataset: { subId: 'minor_factions_channel' },
+        open: true, // starts open; restore should close it per the mocked saved state
+        setAttribute: () => {
+          openAttrSet++;
+        },
+        removeAttribute: () => {
+          openAttrRemoved++;
+        },
+        _toggleHandlers: [],
+        addEventListener(type, fn) {
+          if (type === 'toggle') this._toggleHandlers.push(fn);
+        },
+      };
+      const sb = { MetaStore, JSON, window: {} };
+      vm190b.createContext(sb);
+      vm190b.runInContext(declareFn190(core190, '_wireDynamicSubPanel'), sb);
+      sb._wireDynamicSubPanel(details);
+      restoredOpenAttrCalls = { set: openAttrSet, removed: openAttrRemoved };
+      // Simulate the user opening it — fire the toggle listener and confirm
+      // the new state gets written back to the mocked MetaStore.
+      details.open = true;
+      details._toggleHandlers.forEach(fn => fn());
+      persistedValue = JSON.parse(stored).minor_factions_channel;
+    } catch (e) {
+      err = e;
+    }
+    assert(
+      !err &&
+        restoredOpenAttrCalls &&
+        restoredOpenAttrCalls.removed === 1 &&
+        persistedValue === true,
+      '_wireDynamicSubPanel() behavioral: restores a saved closed state (removeAttribute called) on wiring, and persists a later user-driven open back to robco_panel_state' +
+        (err ? ' — ' + err.message : '')
+    );
+  }
+
+  // 190.11  Owner batch item 7: the all-faction mini pin-strip meter track
+  //         (.facon-mini) is a fixed, non-growing width — previously
+  //         flex:1 1 60px, which grew/shrank based on how much space the
+  //         variable-length STANDING label (the row's only other
+  //         unconstrained item) left over, so the bar's rendered width
+  //         differed row to row.
+  {
+    const cssStripped190c = css190.replace(/\/\*[\s\S]*?\*\//g, '');
+    const faconMiniRule190 = (cssStripped190c.match(/\.facon-mini\s*\{[^}]*\}/) || [''])[0];
+    assert(
+      /flex:\s*0 0 90px/.test(faconMiniRule190) && !/flex:\s*1 1 60px/.test(faconMiniRule190),
+      "190.11: .facon-mini uses a fixed flex:0 0 90px (no grow/shrink) instead of the old flex:1 1 60px, so every faction row's pin-strip track renders the same width regardless of name/standing length"
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

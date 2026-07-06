@@ -1773,6 +1773,33 @@ function _powerOnFromShutdown() {
 }
 window._powerOnFromShutdown = _powerOnFromShutdown;
 
+// Owner batch item 6: wires ONE dynamically-rendered <details data-sub-id>
+// element for open/closed persistence — for sub-panels that get replaced by
+// an innerHTML re-render (e.g. renderFactionRep()'s MINOR FACTIONS section),
+// since _wirePanelPersistence()'s boot-time querySelectorAll only ever sees
+// the DOM as it existed at boot and a later re-render would otherwise drop
+// both the restored state and the toggle listener. Mirrors the exact same
+// restore + toggle-persist logic as that boot-time loop (Protocol 22 — one
+// persistence mechanism, not a second one) — call this once, right after the
+// innerHTML assignment that (re)creates the element.
+function _wireDynamicSubPanel(details) {
+  if (!details) return;
+  const id = details.dataset.subId;
+  if (!id) return;
+  const saved = JSON.parse(MetaStore.get('robco_panel_state') || 'null');
+  if (saved && saved[id] !== undefined) {
+    if (saved[id]) details.setAttribute('open', '');
+    else details.removeAttribute('open');
+  }
+  details.addEventListener('toggle', () => {
+    try {
+      const ps = JSON.parse(MetaStore.get('robco_panel_state') || '{}');
+      ps[id] = details.open;
+      MetaStore.set('robco_panel_state', JSON.stringify(ps));
+    } catch (_) {}
+  });
+}
+
 function _wirePanelPersistence() {
   // #35 Panel Memory — restore previously open/closed panel states
   // On desktop, default-open still applies if no saved state exists
@@ -2437,10 +2464,20 @@ function setupXpBarInteraction() {
 // Owner batch item 2: RAD EXPOSURE bar click-drag — mirrors setupHpBarInteraction()/
 // setupXpBarInteraction() exactly (Protocol 22), scaling to this game's RAD ceiling
 // (_resolveMaxRads(), the same GAME_DEFS[ctx].maxRads capRadsMax() already clamps to)
-// instead of a fixed max. Writes through the single real #stat_rads input — the
-// SKELETAL HARNESS bar stays a read-only mirror of it (updateMath() repaints both).
-function setupRadBarInteraction() {
-  const container = document.getElementById('radDragTrack');
+// instead of a fixed max. Writes through the single real #stat_rads input — every
+// RAD surface (SKELETAL HARNESS + VITAL TELEMETRY) stays a read-only mirror of it
+// (updateMath() repaints all of them).
+//
+// Owner follow-up (Protocol 27 root cause, 2nd report): the owner drags the RAD
+// trace inside the VITAL TELEMETRY monitor (#opRadLineWrap, alongside the HP/GRADE
+// traces which already drag on real touch) — not the SKELETAL HARNESS bar
+// (#radDragTrack) the earlier fixes targeted. #opRadLineWrap never had ANY drag
+// wiring at all, on mouse or touch — it was a display-only readout painted by
+// _syncOperatorTelemetry(), unlike #hp_bar_container/#xp_bar_container in the same
+// monitor. _wireRadDragSurface() is the one drag mechanism (Protocol 22 — no
+// duplicated logic) now attached to BOTH RAD surfaces from setupRadBarInteraction().
+function _wireRadDragSurface(containerId) {
+  const container = document.getElementById(containerId);
   if (!container) return;
   function applyRad(e) {
     const rect = container.getBoundingClientRect();
@@ -2482,6 +2519,10 @@ function setupRadBarInteraction() {
   document.addEventListener('touchend', () => {
     dragging = false;
   });
+}
+function setupRadBarInteraction() {
+  _wireRadDragSurface('radDragTrack'); // SKELETAL HARNESS bar
+  _wireRadDragSurface('opRadLineWrap'); // VITAL TELEMETRY trace (owner follow-up — was never wired)
 }
 
 // C11: Level input change handler — when user edits the level field,
@@ -3473,8 +3514,18 @@ function selectSubsystem(view) {
     // never fires at page load (Protocol 42 — boot-restore must not
     // re-trigger the hatch).
     if (view === 'settings') {
+      // Owner report (Protocol 27 root cause): this used to force the panel
+      // open on EVERY SETTINGS visit, silently reopening it even after the
+      // user had deliberately collapsed it — the once-only hatch ceremony
+      // (robco_bay_opened) is the correct signal for "has this already fired
+      // at least once"; once it has, the panel's own persisted open/closed
+      // state (robco_panel_state, written by its toggle listener in
+      // _wirePanelPersistence()) is respected like every other panel instead
+      // of being overridden here.
       const secPanel = document.getElementById('securityConfigPanel');
-      if (secPanel && !secPanel.open) secPanel.setAttribute('open', '');
+      if (secPanel && !secPanel.open && MetaStore.get('robco_bay_opened') !== 'true') {
+        secPanel.setAttribute('open', '');
+      }
     }
   } else if (view === 'uplink') {
     _saveOutgoingScroll(); // FIX 2

@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2418/2418 | Cache: robco-terminal-v2.7.0-r90 -->
+﻿## [Unreleased]<!-- Tests: 2432/2432 | Cache: robco-terminal-v2.7.0-r91 -->
 
 ### Added
 
@@ -113,6 +113,12 @@
 - Fixed the USE button on your cargo manifest's item tags being cramped and cut off, jammed into the tag's pointed left end right next to its eyelet. It now sits with clean spacing and reads fully, and the quantity +/- and delete controls beside it are unaffected.
 - Fixed your FACTION STANDING reputation console's faction selector losing its MAJOR/MINOR grouping in its redesign — every faction now groups under MAJOR FACTIONS and MINOR FACTIONS headers again, matching how they were categorized before, instead of one long flat list.
 - Fixed your RAD EXPOSURE bar not actually responding to a drag on a touchscreen — a real touch could get swallowed as a page scroll instead of moving the bar. Dragging it now reliably sets your radiation level on both touch and mouse, and the bar itself now keeps up with your finger or cursor in real time instead of visibly lagging behind.
+- Fixed the radiation reading in your Vital Telemetry monitor not responding to a drag at all on a touchscreen, even after the fix above — it turned out this was a second, separate radiation display that had never been made draggable in the first place. It now drags exactly like the health and level/XP readouts right beside it.
+- Fixed your SKILL BOOKS shelf's "read" count not updating until the next time something else refreshed the screen — shelving or unshelving a book now updates the count immediately.
+- Fixed the "CONSUMED" stamp on a used skill magazine sometimes breaking awkwardly across two lines when it easily fit on one.
+- Fixed the Security & Configuration panel popping back open every time you switched away from Settings and back, even after you'd deliberately collapsed it — it now stays exactly as you left it, across switching sections and reloading the page, the same as every other panel.
+- Your FACTION STANDING reputation console's MINOR FACTIONS group is now collapsible, tucked neatly under MAJOR FACTIONS, so you can hide it out of the way when you don't need it.
+- Fixed the little standing bars in your faction reputation console's at-a-glance list rendering at different widths depending on a faction's name or how far along its standing was — they're now all a consistent, aligned size.
 
 ### Improved
 

@@ -1351,6 +1351,13 @@ function toggleSkillBook(name) {
     state.skillBooks.push(name);
   }
   renderSkillBooks();
+  // Owner batch item 2: the "n/13 READ" #opBooksStatus summary (BUS-05a's
+  // <summary> line, doubling as the collapsed-state readout) is painted by
+  // _syncOperatorTelemetry() — previously only reached via the next unrelated
+  // updateMath() call, so the count lagged a shelve/unshelve tap by a full
+  // render cycle. Calling the same sync function directly here (Protocol 22 —
+  // no new counting logic) refreshes it immediately.
+  if (typeof _syncOperatorTelemetry === 'function') _syncOperatorTelemetry();
   saveState();
 }
 
@@ -1387,6 +1394,9 @@ function toggleMagazine(name) {
     state.magazines.push(name);
   }
   renderMagazines();
+  // Same #opMagsStatus live-count fix as toggleSkillBook() (Protocol 22 — the
+  // identical root cause, same fix, same sync function).
+  if (typeof _syncOperatorTelemetry === 'function') _syncOperatorTelemetry();
   saveState();
 }
 
@@ -2081,10 +2091,14 @@ function renderFactionRep() {
   // FACTIONS / MINOR FACTIONS sections — restore that grouping on the
   // console's keycap selector, sourced from the SAME data-driven f.tier
   // field the retired grid used (getFactionRegistry(), Protocol 38), never a
-  // hardcoded key list. No disclosure/collapse reintroduced — every section
-  // stays always-visible, so this is zero added taps over the flat selector
-  // (Protocol 25). A faction with no recognized tier still renders (an "OTHER
-  // FACTIONS" fallback bucket) rather than silently vanishing.
+  // hardcoded key list. A faction with no recognized tier still renders (an
+  // "OTHER FACTIONS" fallback bucket) rather than silently vanishing.
+  //
+  // Owner batch item 6: MINOR FACTIONS is now a collapsible sub-panel sitting
+  // directly under MAJOR FACTIONS (Protocol UI-2 — data-sub-id + the shared
+  // robco_panel_state persistence, same mechanism as every other sub-panel),
+  // styled to blend into the .facon-section look rather than read as a
+  // separate boxed sub-panel (see the .facon-section.sub-panel CSS override).
   const chanBtn = f => {
     const cur = f.key === _facChannel;
     return `<button class="facon-chan${cur ? ' cur' : ''}" onclick="setFactionChannel('${f.key}')" aria-label="Select ${escapeHtml(f.name)} channel" aria-pressed="${cur}">${escapeHtml(f.name).toUpperCase()}</button>`;
@@ -2093,12 +2107,16 @@ function renderFactionRep() {
     list.length
       ? `<div class="facon-section"><div class="facon-section-label">${escapeHtml(label)}</div><div class="facon-selector">${list.map(chanBtn).join('')}</div></div>`
       : '';
+  const minorSelectorSection = list =>
+    list.length
+      ? `<details class="facon-section sub-panel" data-sub-id="minor_factions_channel"><summary><h3>&gt; MINOR FACTIONS</h3></summary><div class="facon-selector">${list.map(chanBtn).join('')}</div></details>`
+      : '';
   const majorFactions = registry.filter(f => f.tier === 'major');
   const minorFactions = registry.filter(f => f.tier === 'minor');
   const otherFactions = registry.filter(f => f.tier !== 'major' && f.tier !== 'minor');
   const selectorHtml =
     selectorSection(majorFactions, 'MAJOR FACTIONS') +
-    selectorSection(minorFactions, 'MINOR FACTIONS') +
+    minorSelectorSection(minorFactions) +
     selectorSection(otherFactions, 'OTHER FACTIONS');
 
   const sel = registry.find(f => f.key === _facChannel) || registry[0];
@@ -2136,6 +2154,13 @@ function renderFactionRep() {
     </div>
     <div class="facon-strip">${stripHtml}</div>
   `;
+  // MINOR FACTIONS is rendered fresh every call (innerHTML replacement), which
+  // would otherwise drop its open/closed state and toggle listener — wire it
+  // the same way every OTHER dynamically-rendered sub-panel must (Protocol
+  // UI-2), reusing the one persistence helper rather than a second mechanism.
+  if (typeof _wireDynamicSubPanel === 'function') {
+    _wireDynamicSubPanel(container.querySelector('[data-sub-id="minor_factions_channel"]'));
+  }
 }
 
 // ── G4: EXPANDED KARMA SYSTEM (FO3) ─────────────────────────────

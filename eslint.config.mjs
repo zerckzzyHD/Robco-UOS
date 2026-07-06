@@ -198,6 +198,8 @@ export default [
         renderSquad: 'readonly',
         renderStatus: 'readonly',
         _statusLampSummary: 'readonly', // Phase 3 OPERATOR batch 2 BUS-07 compound-lamp 0i summary (ui-render.js)
+        _syncOperatorTelemetry: 'readonly', // PHASE 3 OPERATOR telemetry sync (js/ui-core.js), called by toggleSkillBook/toggleMagazine (js/ui-render.js) for the owner batch item 2 live-count fix
+        _wireDynamicSubPanel: 'readonly', // owner batch item 6: dynamically-rendered sub-panel persistence helper (js/ui-core.js), called by renderFactionRep() (js/ui-render.js)
         renderCampaignNotes: 'readonly',
         renderFactionRep: 'readonly',
         renderPerks: 'readonly',

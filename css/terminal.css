@@ -6055,6 +6055,12 @@ input.num-sm {
   background: rgba(0, 0, 0, 0.4);
   border-bottom: 1px solid rgba(var(--robco-green-rgb), 0.25);
   overflow: hidden; /* matches .crt-mon .t-line — clips the glow-dot ::after marker at 0 RAD so it can never register a stray few px of inner scroll overflow */
+  cursor: ew-resize;
+  /* Owner follow-up (Protocol 27): this trace is now a real drag surface
+     (_wireRadDragSurface('opRadLineWrap')) — matching the #radDragTrack fix,
+     touch-action:none stops a real touch-drag from being reinterpreted as a
+     page-scroll gesture before touchmove ever fires. */
+  touch-action: none;
 }
 #opRadLineWrap i {
   position: absolute;
@@ -6064,7 +6070,10 @@ input.num-sm {
   margin-top: -1.5px;
   background: var(--bezel-wire);
   box-shadow: 0 0 8px var(--bezel-wire);
-  transition: width 0.9s cubic-bezier(0.2, 0.8, 0.3, 1);
+  /* Matches .hp-bar-fill/.bar-fill.rad's transition exactly (Protocol 22) — the
+     previous 0.9s cubic-bezier would lag far enough behind a real-time drag to
+     read as unresponsive, the same bug already fixed on the SKELETAL HARNESS bar. */
+  transition: width 0.3s ease;
 }
 #opRadLineWrap i::after {
   content: '';
@@ -6789,9 +6798,10 @@ button.rb-key:disabled {
    .facon-section restores it as a labeled group around each tier's own
    .facon-selector row — the tier split is read from the SAME data-driven
    f.tier field the retired card grid used (getFactionRegistry(), Protocol 38 —
-   both FNV/FO3 registries declare it), never a hardcoded key list. No
-   disclosure/collapse reintroduced — both sections stay always-visible, so
-   this adds zero taps over the flat selector (Protocol 25). */
+   both FNV/FO3 registries declare it), never a hardcoded key list. Owner
+   batch item 6: MINOR FACTIONS is now collapsible (a data-sub-id sub-panel,
+   see .facon-section.sub-panel below) sitting directly under MAJOR; MAJOR
+   and OTHER stay always-visible plain sections. */
 .facon-groups {
   display: block;
 }
@@ -6803,6 +6813,27 @@ button.rb-key:disabled {
   font-size: 8.5px;
   letter-spacing: 1.5px;
   opacity: 0.5;
+}
+/* MINOR FACTIONS collapsible — reuses details.sub-panel's collapse mechanics
+   (persistence via _wireDynamicSubPanel(), the [+]/[-] summary-marker CSS)
+   but overrides its boxed look so the expanded content "just fits in" under
+   MAJOR FACTIONS: no dashed divider, and the <summary><h3> reads exactly like
+   the plain .facon-section-label above it instead of the generic sub-panel
+   header style. */
+.facon-section.sub-panel {
+  border-top: none;
+  padding-top: 0;
+}
+.facon-section.sub-panel > summary {
+  text-align: center;
+}
+.facon-section.sub-panel > summary h3 {
+  display: inline;
+  font-size: 8.5px;
+  font-weight: normal;
+  letter-spacing: 1.5px;
+  opacity: 0.5;
+  margin: 0;
 }
 .facon-selector {
   display: flex;
@@ -6937,7 +6968,13 @@ button.rb-key:disabled {
   text-overflow: ellipsis;
 }
 .facon-mini {
-  flex: 1 1 60px;
+  /* Owner batch item 7: was flex:1 1 60px (grow+shrink), so this track's
+     final width was whatever space was left after the STANDING label —
+     which varies row to row ("IDOLIZED" vs "NEUTRAL" vs "VILIFIED"), the
+     only other unconstrained item in this flex row. A fixed, non-growing
+     basis makes every row's track the same width regardless of faction name
+     or standing-word length. */
+  flex: 0 0 90px;
   height: 7px;
   position: relative;
   border: 1px solid rgba(var(--robco-green-rgb), 0.25);
@@ -7367,6 +7404,10 @@ button.mag {
   letter-spacing: 2px;
   padding: 1px 5px;
   background: rgba(0, 0, 0, 0.6);
+  /* Owner batch item 3: the generated-content stamp inherited the ancestor
+     .panel's overflow-wrap:anywhere, wrapping to "CONSUM/ED" even though it
+     fits on one line at this size — nowrap keeps it a single-line stamp. */
+  white-space: nowrap;
 }
 .mag-note {
   text-align: center;

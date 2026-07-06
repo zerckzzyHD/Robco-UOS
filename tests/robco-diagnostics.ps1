@@ -5791,6 +5791,11 @@ Check ($inlineOk88 -and $delegateOk88 -and $helperRow88) "GATE-UI-4: all 5 track
 $rfStart88 = $uiRenderSrc88.IndexOf('function renderFactionRep()')
 $rfEnd88   = $uiRenderSrc88.IndexOf("`nfunction ", $rfStart88 + 1)
 $rfBody88  = if ($rfStart88 -ge 0) { $uiRenderSrc88.Substring($rfStart88, $rfEnd88 - $rfStart88) } else { "" }
+# Owner batch item 6 (supersedes the earlier "neither tier hidden" stance):
+# MAJOR FACTIONS stays a plain always-visible section, but MINOR FACTIONS is
+# now DELIBERATELY a collapsible data-sub-id="minor_factions_channel"
+# sub-panel directly under it (a NEW id, distinct from the retired pre-reskin
+# "minor_factions" disclosure this guard used to forbid) -- see Suite 190.8.
 Check (
     ($rfBody88 -match 'getFactionRegistry\(\)') -and
     ($rfBody88 -match "f\.tier\s*===\s*['""]major['""]") -and
@@ -5798,8 +5803,8 @@ Check (
     ($rfBody88 -match 'MAJOR FACTIONS') -and
     ($rfBody88 -match 'MINOR FACTIONS') -and
     (-not ($rfBody88 -match 'data-sub-id="minor_factions"')) -and
-    (-not ($rfBody88 -match '<details'))
-) "GATE-UI-5: renderFactionRep() groups its selector by the data-driven f.tier field into MAJOR FACTIONS/MINOR FACTIONS sections (getFactionRegistry(), Protocol 38), with neither tier hidden behind a <details> disclosure"
+    ($rfBody88 -match '<details class="facon-section sub-panel" data-sub-id="minor_factions_channel">')
+) "GATE-UI-5: renderFactionRep() groups its selector by the data-driven f.tier field into MAJOR FACTIONS (always-visible)/MINOR FACTIONS (collapsible data-sub-id=`"minor_factions_channel`", owner batch item 6) sections"
 
 # 88.6  renderFactionRep helper text says ±5 not ±50
 Check (($rfBody88 -match [regex]::Escape('±5')) -and -not ($rfBody88 -match [regex]::Escape('±50'))) "GATE-UI-6: renderFactionRep() faction label says ±5 not ±50 (faction button increment is 5)"
@@ -14836,12 +14841,17 @@ Check (
 ) "176.6: TAB_NAMES and TAB_TO_SUBSYSTEM both include 'settings' and 'chassis' as real, independently tab-gated subsystems"
 
 # 176.7  the first-visit Module Bay hatch fires on a genuine user [6]/SETTINGS
-#        visit (via selectSubsystem) but NEVER on the boot-time initTabs() restore
+#        visit (via selectSubsystem) but NEVER on the boot-time initTabs() restore.
+#        Owner batch item 5 (Protocol 27 root cause) tightened this further --
+#        selectSubsystem('settings') only force-opens the panel on a genuine
+#        FIRST-EVER visit (robco_bay_opened not yet 'true'); see Suite 190.7.
 $initTabsBody176 = Get-FunctionBody $core176 'initTabs'
+$selectSubsystemBody176 = Get-FunctionBody $core176 'selectSubsystem'
 Check (
-    ($core176 -match "(?s)if \(view === 'settings'\) \{.{0,200}securityConfigPanel.{0,120}setAttribute\('open', ''\)") -and
+    ($selectSubsystemBody176 -match "(?s)if \(view === 'settings'\) \{.{0,700}securityConfigPanel.{0,200}setAttribute\('open', ''\)") -and
+    ($selectSubsystemBody176 -match "MetaStore\.get\('robco_bay_opened'\) !== 'true'") -and
     (-not ($initTabsBody176 -match 'selectSubsystem'))
-) "176.7: selectSubsystem('settings') re-opens #securityConfigPanel (firing its own once-only hatch toggle listener); initTabs() never calls selectSubsystem(), so a boot-time restore can't re-trigger the hatch (Protocol 42)"
+) "176.7: selectSubsystem('settings') re-opens #securityConfigPanel only on a genuine first-ever visit (robco_bay_opened not yet 'true'), firing its own once-only hatch toggle listener; initTabs() never calls selectSubsystem(), so a boot-time restore can't re-trigger the hatch (Protocol 42)"
 
 # 176.8  expandPanelForCategory's 'config'/'log' categories were re-routed to
 #        their new homes (settings/chassis) rather than left pointing at the
@@ -16159,16 +16169,15 @@ Check (
     [System.Text.RegularExpressions.Regex]::IsMatch($css184, '(?s)#radDragTrack\s*\{[^\}]*height:\s*28px')
 ) "184.4: #radDragTrack asserts height:28px -- the >=28px Protocol 17 drag-target minimum, same standard every other interactive control here is held to"
 
-# 184.5  setupRadBarInteraction() mirrors the HP/XP drag pattern.
+# 184.5  setupRadBarInteraction() now delegates to a shared
+# _wireRadDragSurface(containerId) helper for BOTH RAD drag surfaces (owner
+# follow-up -- see Suite 190 for the opRadLineWrap mechanism + behavioral proof).
 $radDragBody184 = Get-FunctionBody $core184 'setupRadBarInteraction'
 Check (
-    ($radDragBody184 -match "getElementById\('radDragTrack'\)") -and
-    ($radDragBody184 -match '_resolveMaxRads\(\)') -and
-    ($radDragBody184 -match "stat_rads'\)\.value = newRads") -and
-    ($radDragBody184 -match 'state\.rads = newRads') -and
-    [System.Text.RegularExpressions.Regex]::IsMatch($radDragBody184, "addEventListener\(\s*'touchstart'") -and
+    ($radDragBody184 -match "_wireRadDragSurface\('radDragTrack'\)") -and
+    ($radDragBody184 -match "_wireRadDragSurface\('opRadLineWrap'\)") -and
     ($core184.Substring($core184.IndexOf('window.onload')) -match 'setupRadBarInteraction\(\);')
-) "184.5: setupRadBarInteraction() mirrors the HP/XP drag pattern (mouse+touch, pct-of-width) but scales to _resolveMaxRads(), writes #stat_rads + state.rads, and is called from window.onload"
+) "184.5: setupRadBarInteraction() wires BOTH RAD drag surfaces (radDragTrack + opRadLineWrap) via the shared _wireRadDragSurface() helper, and is still called from window.onload"
 
 # 184.6 + 184.9  BEHAVIORAL -- shell out to node and actually execute the real
 # setupRadBarInteraction()/onLvlInputChanged()/onXpInputChanged() bodies
@@ -16218,6 +16227,7 @@ try {
   sb.window.GAME_DEFS = sb.GAME_DEFS;
   vm.createContext(sb);
   vm.runInContext(decl('_resolveMaxRads'), sb);
+  vm.runInContext(decl('_wireRadDragSurface'), sb);
   vm.runInContext(decl('setupRadBarInteraction'), sb);
   sb.setupRadBarInteraction();
   listeners.mousedown[0]({ clientX: 50 });
@@ -17172,6 +17182,231 @@ Check (
 Check (
     -not (($mapBody189 + $questsBody189) -match 'New Vegas|Mojave Wasteland|Capital Wasteland|\bFNV\b|\bFO3\b')
 ) '189.20: renderWorldMap/renderQuests carry no hardcoded game-flavor literal -- per-game text comes only from identity.databank/GAME_DEFS'
+
+# ===========================================================
+# Suite 190 -- Owner batch: VITAL TELEMETRY RAD trace drag, SKILL BOOKS/
+# MAGAZINES live-count + stamp wrap, Module Bay panel-reopen fix, MINOR
+# FACTIONS collapsible, faction pin-strip uniform width.
+# Mirrors JS Suite 190. 14 tests.
+# ===========================================================
+Sep "Suite 190 -- owner batch: RAD trace drag, skill books/mags, panel persistence, MINOR FACTIONS, pin-strip"
+$core190 = Read-Src "js/ui-core.js"
+$render190 = Read-Src "js/ui-render.js"
+$css190 = Read-Src "css/terminal.css"
+$html190 = Read-Src "index.html"
+
+# 190.1  _wireRadDragSurface(containerId) -- the shared drag mechanism both
+#        RAD surfaces now use -- mirrors setupHpBarInteraction()/
+#        setupXpBarInteraction() exactly.
+$wireBody190 = Get-FunctionBody $core190 '_wireRadDragSurface'
+Check (
+    ($wireBody190 -match 'getElementById\(containerId\)') -and
+    ($wireBody190 -match '_resolveMaxRads\(\)') -and
+    ($wireBody190 -match "stat_rads'\)\.value = newRads") -and
+    ($wireBody190 -match 'state\.rads = newRads') -and
+    [System.Text.RegularExpressions.Regex]::IsMatch($wireBody190, "addEventListener\(\s*'mousedown'") -and
+    [System.Text.RegularExpressions.Regex]::IsMatch($wireBody190, "addEventListener\(\s*'touchstart'") -and
+    [System.Text.RegularExpressions.Regex]::IsMatch($wireBody190, "addEventListener\(\s*'touchmove'") -and
+    ($wireBody190 -match 'passive:\s*false')
+) '190.1: _wireRadDragSurface() mirrors the HP/XP drag pattern exactly (mouse+touch, non-passive touchstart, pct-of-width) scaled to _resolveMaxRads(), writing #stat_rads + state.rads'
+
+# 190.2  Owner follow-up root cause (Protocol 27, 2nd report): the VITAL
+#        TELEMETRY RAD trace (#opRadLineWrap) needs the same touch-action:none
+#        + fast transition the SKELETAL HARNESS bar already has.
+$cssStripped190 = [regex]::Replace($css190, '/\*[\s\S]*?\*/', '')
+$opRadLineWrapRule190 = [regex]::Match($cssStripped190, '#opRadLineWrap\s*\{[^\}]*\}').Value
+$opRadLineInnerRule190 = [regex]::Match($cssStripped190, '#opRadLineWrap i\s*\{[^\}]*\}').Value
+Check ($opRadLineWrapRule190 -match 'touch-action:\s*none') '190.2a: #opRadLineWrap declares touch-action:none -- a real touch-drag on the VITAL TELEMETRY RAD trace is never reinterpreted as a page-scroll gesture'
+Check (
+    ($opRadLineInnerRule190 -match 'transition:\s*width 0\.3s ease') -and
+    (-not ($opRadLineInnerRule190 -match '0\.9s'))
+) "190.2b: #opRadLineWrap i's transition matches .hp-bar-fill/.bar-fill.rad exactly (width 0.3s ease, no more 0.9s lag)"
+
+# 190.3  #opRadLineWrap wraps #opRadLine (the one real fill), never a duplicate id.
+Check (
+    $html190 -match '<div class="t-line" id="opRadLineWrap">\s*<i id="opRadLine"'
+) '190.3: #opRadLineWrap wraps the existing #opRadLine fill -- the new drag surface sits on the one real VITAL TELEMETRY RAD trace, never a duplicate'
+
+# 190.4  BEHAVIORAL -- dragging #opRadLineWrap to 50% of its width sets
+#        #stat_rads/state.rads to ~half of the ACTIVE game's maxRads.
+$uiCorePathNode190 = (Join-Path $Root "js/ui-core.js").Replace('\', '/')
+$testScript190a = @"
+const fs = require('fs');
+const vm = require('vm');
+const uiCoreSource = fs.readFileSync('$uiCorePathNode190', 'utf8');
+function extractFunctionBody(source, fnName) {
+  const idx = source.indexOf('function ' + fnName);
+  const braceStart = source.indexOf('{', source.indexOf('(', idx));
+  let depth = 0, i = braceStart;
+  for (; i < source.length; i++) {
+    if (source[i] === '{') depth++;
+    else if (source[i] === '}' && --depth === 0) break;
+  }
+  return source.slice(braceStart, i + 1);
+}
+function decl(name) {
+  const s = uiCoreSource.indexOf('function ' + name);
+  const p = uiCoreSource.slice(uiCoreSource.indexOf('(', s), uiCoreSource.indexOf('{', uiCoreSource.indexOf('(', s)));
+  return 'function ' + name + p + extractFunctionBody(uiCoreSource, name);
+}
+let result = false;
+try {
+  const listeners = {};
+  let radVal = '0';
+  const statRads = { get value() { return radVal; }, set value(v) { radVal = String(v); } };
+  const container = {
+    getBoundingClientRect: () => ({ left: 0, width: 100 }),
+    addEventListener(type, fn) { (listeners[type] = listeners[type] || []).push(fn); },
+  };
+  const doc = {
+    getElementById: id => (id === 'opRadLineWrap' ? container : id === 'stat_rads' ? statRads : null),
+    addEventListener() {},
+  };
+  const sb = { document: doc, state: {}, updateMath: () => {}, GAME_DEFS: { FNV: { maxRads: 1000 } }, getGameContext: () => 'FNV', window: {}, Math, parseInt };
+  sb.window.GAME_DEFS = sb.GAME_DEFS;
+  vm.createContext(sb);
+  vm.runInContext(decl('_resolveMaxRads'), sb);
+  vm.runInContext(decl('_wireRadDragSurface'), sb);
+  sb._wireRadDragSurface('opRadLineWrap');
+  listeners.mousedown[0]({ clientX: 50 });
+  const halfVal = statRads.value;
+  listeners.touchstart[0]({ touches: [{ clientX: 1000 }], preventDefault: () => {} });
+  const clampedVal = statRads.value;
+  result = (halfVal === '500' && clampedVal === '1000');
+} catch (e) { result = false; }
+console.log('RESULT:' + (result ? '1' : '0'));
+"@
+$tmpScript190a = [System.IO.Path]::GetTempFileName() + '.js'
+[System.IO.File]::WriteAllText($tmpScript190a, $testScript190a, [System.Text.Encoding]::UTF8)
+try {
+    $out190a = (node $tmpScript190a 2>&1 | Out-String)
+} finally {
+    Remove-Item -Path $tmpScript190a -Force -ErrorAction SilentlyContinue
+}
+Check (
+    $out190a -match 'RESULT:1'
+) 'VITAL TELEMETRY RAD trace drag behavioral: wiring #opRadLineWrap directly via _wireRadDragSurface() and dragging to 50% sets #stat_rads/state.rads to 500 (half of a 1000 maxRads game); a synthesized touchstart past the edge clamps to exactly 1000 -- proves this surface (previously unwired on any event, mouse or touch) now works'
+
+# 190.5  Owner batch item 2: toggleSkillBook()/toggleMagazine() refresh the
+#        live READ/CONSUMED count immediately on shelve/unshelve.
+$toggleBookBody190 = Get-FunctionBody $render190 'toggleSkillBook'
+$toggleMagBody190 = Get-FunctionBody $render190 'toggleMagazine'
+Check (
+    ($toggleBookBody190 -match '_syncOperatorTelemetry\(\)') -and
+    ($toggleBookBody190 -match 'renderSkillBooks\(\)')
+) '190.5a: toggleSkillBook() calls _syncOperatorTelemetry() (which paints #opBooksStatus) right after renderSkillBooks(), so the READ count updates immediately'
+Check (
+    ($toggleMagBody190 -match '_syncOperatorTelemetry\(\)') -and ($toggleMagBody190 -match 'renderMagazines\(\)')
+) '190.5b: toggleMagazine() calls the same _syncOperatorTelemetry() fix (identical root cause, Protocol 22) so #opMagsStatus updates immediately too'
+
+# 190.6  Owner batch item 3: the SKILL MAGAZINES "CONSUMED" stamp no longer wraps.
+$magConsumedRule190 = [regex]::Match($cssStripped190, '\.mag\.consumed::after\s*\{[^\}]*\}').Value
+Check ($magConsumedRule190 -match 'white-space:\s*nowrap') '190.6: .mag.consumed::after declares white-space:nowrap -- the CONSUMED stamp always renders on one line'
+
+# 190.7  Owner batch item 5 (Protocol 27 root cause): selectSubsystem()'s
+#        SETTINGS branch only auto-opens securityConfigPanel on a genuine
+#        first-ever visit; _wirePanelPersistence()'s toggle listener persists
+#        every panel's state (including securityConfigPanel) unconditionally.
+$selectSubsystemBody190 = Get-FunctionBody $core190 'selectSubsystem'
+Check (
+    [System.Text.RegularExpressions.Regex]::IsMatch($selectSubsystemBody190, "if\s*\(view === 'settings'\)") -and
+    ($selectSubsystemBody190 -match "MetaStore\.get\('robco_bay_opened'\) !== 'true'") -and
+    ($selectSubsystemBody190 -match "secPanel\.setAttribute\('open', ''\)")
+) "190.7: selectSubsystem('settings') only force-opens #securityConfigPanel when robco_bay_opened isn't yet 'true' (a genuine first visit) -- a later visit never overrides the user's own collapsed choice"
+$panelPersistBody190 = Get-FunctionBody $core190 '_wirePanelPersistence'
+$toggleListenerIdx190 = $panelPersistBody190.IndexOf("addEventListener('toggle'")
+Check (
+    ($toggleListenerIdx190 -ne -1) -and
+    ($panelPersistBody190.Substring($toggleListenerIdx190) -match 'ps\[id\] = d\.open;')
+) "190.7b: _wirePanelPersistence()'s toggle listener persists ps[id] = d.open unconditionally for every details.panel, including securityConfigPanel -- the ceremony exclusion only applies to the default-open branch, not to remembering the user's own choice"
+
+# 190.8  Owner batch item 6: MINOR FACTIONS is now a collapsible sub-panel
+#        sitting directly under MAJOR FACTIONS.
+$factionRepBody190 = Get-FunctionBody $render190 'renderFactionRep'
+Check (
+    ($factionRepBody190 -match '<details class="facon-section sub-panel" data-sub-id="minor_factions_channel">') -and
+    ($factionRepBody190 -match '<summary><h3>&gt; MINOR FACTIONS</h3></summary>') -and
+    [System.Text.RegularExpressions.Regex]::IsMatch($factionRepBody190, "_wireDynamicSubPanel\(container\.querySelector\(\s*'\[data-sub-id=""minor_factions_channel""\]'\s*\)\)")
+) '190.8: renderFactionRep() renders MINOR FACTIONS as a collapsible <details data-sub-id="minor_factions_channel"> directly under MAJOR FACTIONS, and re-wires it via _wireDynamicSubPanel() after every innerHTML re-render'
+
+# 190.9  _wireDynamicSubPanel() -- the reusable helper for a dynamically-
+#        rendered sub-panel -- mirrors _wirePanelPersistence()'s boot-time
+#        restore + toggle-persist logic exactly (Protocol 22).
+$wireDynBody190 = Get-FunctionBody $core190 '_wireDynamicSubPanel'
+Check (
+    ($wireDynBody190 -match 'robco_panel_state') -and
+    ($wireDynBody190 -match 'details\.dataset\.subId') -and
+    ($wireDynBody190 -match "setAttribute\('open', ''\)") -and
+    ($wireDynBody190 -match "removeAttribute\('open'\)") -and
+    ($wireDynBody190 -match "addEventListener\('toggle'")
+) '190.9: _wireDynamicSubPanel() restores the saved open/closed state from robco_panel_state and wires a toggle listener that persists future changes -- the same mechanism _wirePanelPersistence() uses at boot'
+
+# 190.10  BEHAVIORAL -- _wireDynamicSubPanel() actually restores a saved
+#         closed state and persists a new open state through a mocked
+#         MetaStore, proving the round trip.
+$testScript190b = @"
+const fs = require('fs');
+const vm = require('vm');
+const uiCoreSource = fs.readFileSync('$uiCorePathNode190', 'utf8');
+function extractFunctionBody(source, fnName) {
+  const idx = source.indexOf('function ' + fnName);
+  const braceStart = source.indexOf('{', source.indexOf('(', idx));
+  let depth = 0, i = braceStart;
+  for (; i < source.length; i++) {
+    if (source[i] === '{') depth++;
+    else if (source[i] === '}' && --depth === 0) break;
+  }
+  return source.slice(braceStart, i + 1);
+}
+function decl(name) {
+  const s = uiCoreSource.indexOf('function ' + name);
+  const p = uiCoreSource.slice(uiCoreSource.indexOf('(', s), uiCoreSource.indexOf('{', uiCoreSource.indexOf('(', s)));
+  return 'function ' + name + p + extractFunctionBody(uiCoreSource, name);
+}
+let result = false;
+try {
+  let stored = JSON.stringify({ minor_factions_channel: false });
+  const MetaStore = {
+    get: k => (k === 'robco_panel_state' ? stored : null),
+    set: (k, v) => { if (k === 'robco_panel_state') { stored = v; } },
+  };
+  let openAttrRemoved = 0;
+  const details = {
+    dataset: { subId: 'minor_factions_channel' },
+    open: true,
+    setAttribute: () => {},
+    removeAttribute: () => { openAttrRemoved++; },
+    _toggleHandlers: [],
+    addEventListener(type, fn) { if (type === 'toggle') this._toggleHandlers.push(fn); },
+  };
+  const sb = { MetaStore, JSON, window: {} };
+  vm.createContext(sb);
+  vm.runInContext(decl('_wireDynamicSubPanel'), sb);
+  sb._wireDynamicSubPanel(details);
+  details.open = true;
+  details._toggleHandlers.forEach(fn => fn());
+  const persistedValue = JSON.parse(stored).minor_factions_channel;
+  result = (openAttrRemoved === 1 && persistedValue === true);
+} catch (e) { result = false; }
+console.log('RESULT:' + (result ? '1' : '0'));
+"@
+$tmpScript190b = [System.IO.Path]::GetTempFileName() + '.js'
+[System.IO.File]::WriteAllText($tmpScript190b, $testScript190b, [System.Text.Encoding]::UTF8)
+try {
+    $out190b = (node $tmpScript190b 2>&1 | Out-String)
+} finally {
+    Remove-Item -Path $tmpScript190b -Force -ErrorAction SilentlyContinue
+}
+Check (
+    $out190b -match 'RESULT:1'
+) '_wireDynamicSubPanel() behavioral: restores a saved closed state (removeAttribute called) on wiring, and persists a later user-driven open back to robco_panel_state'
+
+# 190.11  Owner batch item 7: the all-faction mini pin-strip meter track
+#         (.facon-mini) is a fixed, non-growing width.
+$faconMiniRule190 = [regex]::Match($cssStripped190, '\.facon-mini\s*\{[^\}]*\}').Value
+Check (
+    ($faconMiniRule190 -match 'flex:\s*0 0 90px') -and (-not ($faconMiniRule190 -match 'flex:\s*1 1 60px'))
+) "190.11: .facon-mini uses a fixed flex:0 0 90px (no grow/shrink) instead of the old flex:1 1 60px, so every faction row's pin-strip track renders the same width regardless of name/standing length"
 
 # ===========================================================
 # Results
