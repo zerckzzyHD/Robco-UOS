@@ -1796,12 +1796,29 @@ function renderFactionRep() {
     return getFactionStanding(f.key, d.fame || 0, d.infamy || 0);
   };
 
-  const selectorHtml = registry
-    .map(f => {
-      const cur = f.key === _facChannel;
-      return `<button class="facon-chan${cur ? ' cur' : ''}" onclick="setFactionChannel('${f.key}')" aria-label="Select ${escapeHtml(f.name)} channel" aria-pressed="${cur}">${escapeHtml(f.name).toUpperCase()}</button>`;
-    })
-    .join('');
+  // Owner follow-up: the pre-reskin card grid grouped factions into MAJOR
+  // FACTIONS / MINOR FACTIONS sections — restore that grouping on the
+  // console's keycap selector, sourced from the SAME data-driven f.tier
+  // field the retired grid used (getFactionRegistry(), Protocol 38), never a
+  // hardcoded key list. No disclosure/collapse reintroduced — every section
+  // stays always-visible, so this is zero added taps over the flat selector
+  // (Protocol 25). A faction with no recognized tier still renders (an "OTHER
+  // FACTIONS" fallback bucket) rather than silently vanishing.
+  const chanBtn = f => {
+    const cur = f.key === _facChannel;
+    return `<button class="facon-chan${cur ? ' cur' : ''}" onclick="setFactionChannel('${f.key}')" aria-label="Select ${escapeHtml(f.name)} channel" aria-pressed="${cur}">${escapeHtml(f.name).toUpperCase()}</button>`;
+  };
+  const selectorSection = (list, label) =>
+    list.length
+      ? `<div class="facon-section"><div class="facon-section-label">${escapeHtml(label)}</div><div class="facon-selector">${list.map(chanBtn).join('')}</div></div>`
+      : '';
+  const majorFactions = registry.filter(f => f.tier === 'major');
+  const minorFactions = registry.filter(f => f.tier === 'minor');
+  const otherFactions = registry.filter(f => f.tier !== 'major' && f.tier !== 'minor');
+  const selectorHtml =
+    selectorSection(majorFactions, 'MAJOR FACTIONS') +
+    selectorSection(minorFactions, 'MINOR FACTIONS') +
+    selectorSection(otherFactions, 'OTHER FACTIONS');
 
   const sel = registry.find(f => f.key === _facChannel) || registry[0];
   const selData = dataFor(sel.key);
@@ -1817,7 +1834,7 @@ function renderFactionRep() {
     .join('');
 
   container.innerHTML = `
-    <div class="facon-selector">${selectorHtml}</div>
+    <div class="facon-groups">${selectorHtml}</div>
     <div class="facon-meter-wrap">
       <div class="facon-title">
         <span class="facon-name">${escapeHtml(sel.name).toUpperCase()}</span>

@@ -69,8 +69,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2394-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2394-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2396-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2396-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -1016,6 +1016,15 @@ since the console adds no extra disclosure tap over it), the selected channel's 
 same four `adjustFaction(key, field, delta)` ±5 keys, and an all-faction mini-pin strip
 (`.facon-mini`) means no faction's standing is ever hidden behind the selector. The last-picked
 channel persists via the registered `robco_faction_channel` MetaStore device pref (`setFactionChannel()`).
+An owner follow-up restored the pre-reskin card grid's MAJOR FACTIONS / MINOR FACTIONS
+categorization on the selector: `selectorSection(list, label)` wraps each tier's keycaps in its own
+labeled `.facon-section` (`.facon-section-label` + a `.facon-selector` row), splitting
+`getFactionRegistry()` by the same data-driven `f.tier` field the retired grid used (declared on
+every entry in both `FACTION_REGISTRY` and `FACTION_REGISTRY_FO3`, Protocol 38) — plus a defensive
+`OTHER FACTIONS` bucket (`f.tier !== 'major' && f.tier !== 'minor'`) so a faction with an
+unrecognized tier is still rendered, never silently dropped. No disclosure/collapse was
+reintroduced — both sections stay always-visible (zero added taps, Protocol 25); only the mini-pin
+strip (`stripHtml`) stays flat/ungrouped.
 
 **`_syncOperatorTelemetry()`** (`js/ui-core.js`, called from `updateMath()`) is the one new
 central sync function driving every derived OPERATOR readout: the HP condition word
@@ -1905,14 +1914,21 @@ const FACTION_THRESHOLDS = {
 | 0        | 3          | Hated              |
 | 0        | 4          | Vilified           |
 
-### Channel Selection (Phase 3 OPERATOR batch 2)
+### Channel Selection (Phase 3 OPERATOR batch 2 + owner follow-up)
 
 `renderFactionRep()` no longer has a minor-factions collapsible to preserve —
 the console's channel selector spans the FULL `getFactionRegistry()` (major +
-minor together), so no faction needs a disclosure tap to reach. The last-picked
-channel (`_facChannel`, module-scope) persists across re-renders via the
-registered `robco_faction_channel` MetaStore key; `setFactionChannel(key)` is
-the one function that updates it and re-renders.
+minor together), so no faction needs a disclosure tap to reach. The selector is
+grouped into labeled MAJOR FACTIONS / MINOR FACTIONS sections (an owner
+follow-up restoring the pre-reskin card grid's categorization), split by the
+same data-driven `f.tier` field the retired grid used — never a hardcoded key
+list — via `selectorSection(list, label)`; an `OTHER FACTIONS` fallback bucket
+catches any faction whose tier isn't `'major'`/`'minor'` so it's still
+rendered, never silently dropped. Both sections stay always-visible (no
+disclosure reintroduced). The last-picked channel (`_facChannel`,
+module-scope) persists across re-renders via the registered
+`robco_faction_channel` MetaStore key; `setFactionChannel(key)` is the one
+function that updates it and re-renders.
 
 ### Faction Console Display
 
@@ -2336,7 +2352,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2394-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2396-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

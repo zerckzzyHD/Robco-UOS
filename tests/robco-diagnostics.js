@@ -10071,17 +10071,25 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     'GATE-UI-4: all 5 tracker renderers use .tracker-row (3 inline + 2 via shared _renderReadTracker which carries it)'
   );
 
-  // 88.5  Phase 3 OPERATOR batch 2: the old collapsed MINOR FACTIONS
-  // sub-panel is retired — every faction (major+minor) now rides the SAME
-  // BUS-08 console selector with zero extra disclosure tap (Protocol 25:
-  // no increase in tap-count), so renderFactionRep() must build its
-  // selector/strip from the FULL getFactionRegistry() with no tier filter.
+  // 88.5  Phase 3 OPERATOR batch 2 + owner follow-up: the old collapsed
+  // MINOR FACTIONS sub-panel is retired — every faction (major+minor) rides
+  // the SAME BUS-08 console with zero extra disclosure tap (Protocol 25: no
+  // increase in tap-count) — but the owner asked the pre-reskin MAJOR/MINOR
+  // grouping back on the keycap selector, so renderFactionRep() now DOES
+  // split by the data-driven f.tier field (getFactionRegistry(), Protocol
+  // 38) while still never hiding a tier behind a <details> disclosure.
   const rfStart88 = uiRenderSrc88.indexOf('function renderFactionRep()');
   const rfEnd88 = uiRenderSrc88.indexOf('\nfunction ', rfStart88 + 1);
   const rfBody88 = rfStart88 >= 0 ? uiRenderSrc88.slice(rfStart88, rfEnd88) : '';
   assert(
-    /getFactionRegistry\(\)/.test(rfBody88) && !/f\.tier\s*===\s*['"]major['"]/.test(rfBody88),
-    "GATE-UI-5: renderFactionRep() builds its selector/strip from the full getFactionRegistry() (no tier==='major' filter hiding minor factions behind a disclosure)"
+    /getFactionRegistry\(\)/.test(rfBody88) &&
+      /f\.tier\s*===\s*['"]major['"]/.test(rfBody88) &&
+      /f\.tier\s*===\s*['"]minor['"]/.test(rfBody88) &&
+      /MAJOR FACTIONS/.test(rfBody88) &&
+      /MINOR FACTIONS/.test(rfBody88) &&
+      !/data-sub-id="minor_factions"/.test(rfBody88) &&
+      !/<details/.test(rfBody88),
+    'GATE-UI-5: renderFactionRep() groups its selector by the data-driven f.tier field into MAJOR FACTIONS/MINOR FACTIONS sections (getFactionRegistry(), Protocol 38), with neither tier hidden behind a <details> disclosure'
   );
 
   // 88.6  renderFactionRep helper text says ±5 not ±50
@@ -26695,7 +26703,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  Suite 186 — Phase 3 OPERATOR batch 2: BUS-05/07/08 ground-up reskin
 //  (SKILL MATRIX → VU array, STATUS EFFECTS → compound lamps, FACTION
 //  STANDING → reputation console). id/handler-preservation + game-agnostic
-//  + no-new-campaign-state + centering + reduced-motion guards. 18 tests.
+//  + no-new-campaign-state + centering + reduced-motion guards, plus the
+//  owner follow-up restoring the MAJOR/MINOR faction grouping. 20 tests.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 186 — Phase 3 OPERATOR batch 2: BUS-05/07/08 ground-up reskin');
@@ -26885,6 +26894,30 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       /min-height:\s*32px/.test(faconKeysBtnRule186) &&
       /min-height:\s*28px/.test(stlampPurgeRule186),
     '186.18: .facon-chan (40px) / .facon-keys button (32px) / .stlamp-purge (28px) all clear the >=28px tap-target floor'
+  );
+
+  // 186.19  Owner follow-up: the reputation console's keycap selector is
+  //         grouped into MAJOR FACTIONS / MINOR FACTIONS sections (restoring
+  //         the pre-reskin card grid's categorization) via a data-driven
+  //         f.tier split — never a hardcoded faction-key list — with a
+  //         defensive "OTHER FACTIONS" bucket so a faction with no
+  //         recognized tier is still rendered, never silently dropped. Each
+  //         section is a labeled, always-visible group (no disclosure
+  //         reintroduced) sharing the same .facon-selector mechanic.
+  assert(
+    /const majorFactions = registry\.filter\(f => f\.tier === 'major'\)/.test(factionBody186) &&
+      /const minorFactions = registry\.filter\(f => f\.tier === 'minor'\)/.test(factionBody186) &&
+      /OTHER FACTIONS/.test(factionBody186) &&
+      /facon-section-label/.test(factionBody186) &&
+      /facon-section/.test(factionBody186),
+    '186.19: renderFactionRep() groups the keycap selector into MAJOR FACTIONS/MINOR FACTIONS via a data-driven f.tier split, plus an OTHER FACTIONS fallback bucket so no faction is silently dropped'
+  );
+  const faconSectionLabelRule186 = (cssStripped186.match(/\.facon-section-label\s*\{[^}]*\}/) || [
+    '',
+  ])[0];
+  assert(
+    /text-align:\s*center/.test(faconSectionLabelRule186),
+    '186.20: .facon-section-label is centered (centering rule applied to the new section headers too)'
   );
 }
 

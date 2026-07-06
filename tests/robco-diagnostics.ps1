@@ -5776,15 +5776,25 @@ $delegateOk88 = ($delegatingTrackers88 | ForEach-Object { (Get-Body88 $_) -match
 $helperRow88 = (Get-Body88 '_renderReadTracker') -match 'tracker-row'
 Check ($inlineOk88 -and $delegateOk88 -and $helperRow88) "GATE-UI-4: all 5 tracker renderers use .tracker-row (3 inline + 2 via shared _renderReadTracker which carries it)"
 
-# 88.5  Phase 3 OPERATOR batch 2: the old collapsed MINOR FACTIONS sub-panel
-# is retired -- every faction (major+minor) now rides the SAME BUS-08
-# console selector with zero extra disclosure tap (Protocol 25: no increase
-# in tap-count), so renderFactionRep() must build its selector/strip from
-# the FULL getFactionRegistry() with no tier filter.
+# 88.5  Phase 3 OPERATOR batch 2 + owner follow-up: the old collapsed MINOR
+# FACTIONS sub-panel is retired -- every faction (major+minor) rides the SAME
+# BUS-08 console with zero extra disclosure tap (Protocol 25: no increase in
+# tap-count) -- but the owner asked the pre-reskin MAJOR/MINOR grouping back
+# on the keycap selector, so renderFactionRep() now DOES split by the
+# data-driven f.tier field (getFactionRegistry(), Protocol 38) while still
+# never hiding a tier behind a <details> disclosure.
 $rfStart88 = $uiRenderSrc88.IndexOf('function renderFactionRep()')
 $rfEnd88   = $uiRenderSrc88.IndexOf("`nfunction ", $rfStart88 + 1)
 $rfBody88  = if ($rfStart88 -ge 0) { $uiRenderSrc88.Substring($rfStart88, $rfEnd88 - $rfStart88) } else { "" }
-Check (($rfBody88 -match 'getFactionRegistry\(\)') -and -not ($rfBody88 -match "f\.tier\s*===\s*['""]major['""]")) "GATE-UI-5: renderFactionRep() builds its selector/strip from the full getFactionRegistry() (no tier==='major' filter hiding minor factions behind a disclosure)"
+Check (
+    ($rfBody88 -match 'getFactionRegistry\(\)') -and
+    ($rfBody88 -match "f\.tier\s*===\s*['""]major['""]") -and
+    ($rfBody88 -match "f\.tier\s*===\s*['""]minor['""]") -and
+    ($rfBody88 -match 'MAJOR FACTIONS') -and
+    ($rfBody88 -match 'MINOR FACTIONS') -and
+    (-not ($rfBody88 -match 'data-sub-id="minor_factions"')) -and
+    (-not ($rfBody88 -match '<details'))
+) "GATE-UI-5: renderFactionRep() groups its selector by the data-driven f.tier field into MAJOR FACTIONS/MINOR FACTIONS sections (getFactionRegistry(), Protocol 38), with neither tier hidden behind a <details> disclosure"
 
 # 88.6  renderFactionRep helper text says ±5 not ±50
 Check (($rfBody88 -match [regex]::Escape('±5')) -and -not ($rfBody88 -match [regex]::Escape('±50'))) "GATE-UI-6: renderFactionRep() faction label says ±5 not ±50 (faction button increment is 5)"
@@ -16580,7 +16590,8 @@ Check (
 # Suite 186 -- Phase 3 OPERATOR batch 2: BUS-05/07/08 ground-up reskin
 # (SKILL MATRIX -> VU array, STATUS EFFECTS -> compound lamps, FACTION
 # STANDING -> reputation console). id/handler-preservation + game-agnostic
-# + no-new-campaign-state + centering + reduced-motion guards. 18 tests.
+# + no-new-campaign-state + centering + reduced-motion guards, plus the
+# owner follow-up restoring the MAJOR/MINOR faction grouping. 20 tests.
 # Mirrors JS Suite 186.
 # ===========================================================
 Write-Host "`n-- Suite 186 -- Phase 3 OPERATOR batch 2: BUS-05/07/08 ground-up reskin $('-' * 5)"
@@ -16727,6 +16738,24 @@ Check (
     ($faconKeysBtnRule186 -match 'min-height:\s*32px') -and
     ($stlampPurgeRule186 -match 'min-height:\s*28px')
 ) '186.18: .facon-chan (40px) / .facon-keys button (32px) / .stlamp-purge (28px) all clear the >=28px tap-target floor'
+
+# 186.19  Owner follow-up: the reputation console's keycap selector is grouped
+# into MAJOR FACTIONS / MINOR FACTIONS sections (restoring the pre-reskin card
+# grid's categorization) via a data-driven f.tier split -- never a hardcoded
+# faction-key list -- with a defensive "OTHER FACTIONS" bucket so a faction
+# with no recognized tier is still rendered, never silently dropped.
+Check (
+    ($factionBody186 -match "const majorFactions = registry\.filter\(f => f\.tier === 'major'\)") -and
+    ($factionBody186 -match "const minorFactions = registry\.filter\(f => f\.tier === 'minor'\)") -and
+    ($factionBody186 -match 'OTHER FACTIONS') -and
+    ($factionBody186 -match 'facon-section-label') -and
+    ($factionBody186 -match 'facon-section')
+) "186.19: renderFactionRep() groups the keycap selector into MAJOR FACTIONS/MINOR FACTIONS via a data-driven f.tier split, plus an OTHER FACTIONS fallback bucket so no faction is silently dropped"
+
+$faconSectionLabelRule186 = ([regex]::Match($cssStripped186, '\.facon-section-label\s*\{[^}]*\}')).Value
+Check (
+    $faconSectionLabelRule186 -match 'text-align:\s*center'
+) '186.20: .facon-section-label is centered (centering rule applied to the new section headers too)'
 
 # ===========================================================
 # Suite 187 -- Phase 3 OPERATOR batch 3: CHRONO/PERKS/BOOKS/MAGS/KARMA

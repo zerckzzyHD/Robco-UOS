@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2394/2394 | Cache: robco-terminal-v2.7.0-r87 -->
+﻿## [Unreleased]<!-- Tests: 2396/2396 | Cache: robco-terminal-v2.7.0-r88 -->
 
 ### Added
 
@@ -108,6 +108,7 @@
 - Fixed the terminal not always restoring your exact scroll position after a full reload when a panel's open/closed state also needed restoring — the two could get applied in the wrong order, throwing off where you landed. Your scroll position and every panel's open/closed state are now both restored correctly together, so you land exactly where you left off.
 - Fixed your squad's ENLIST list always showing New Vegas's companions even in Fallout 3 campaigns — it now correctly offers the companions available in whichever game you're actually playing.
 - Fixed the USE button on your cargo manifest's item tags being cramped and cut off, jammed into the tag's pointed left end right next to its eyelet. It now sits with clean spacing and reads fully, and the quantity +/- and delete controls beside it are unaffected.
+- Fixed your FACTION STANDING reputation console's faction selector losing its MAJOR/MINOR grouping in its redesign — every faction now groups under MAJOR FACTIONS and MINOR FACTIONS headers again, matching how they were categorized before, instead of one long flat list.
 
 ### Improved
 

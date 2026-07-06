@@ -6930,6 +6930,26 @@ button.rb-key:disabled {
 }
 
 /* ── BUS-08 · REPUTATION CONSOLE (shared dual-scale meter + selector) ── */
+/* Owner follow-up: the pre-reskin card grid grouped factions into MAJOR/MINOR
+   sections; the console's flat keycap selector had dropped that grouping.
+   .facon-section restores it as a labeled group around each tier's own
+   .facon-selector row — the tier split is read from the SAME data-driven
+   f.tier field the retired card grid used (getFactionRegistry(), Protocol 38 —
+   both FNV/FO3 registries declare it), never a hardcoded key list. No
+   disclosure/collapse reintroduced — both sections stay always-visible, so
+   this adds zero taps over the flat selector (Protocol 25). */
+.facon-groups {
+  display: block;
+}
+.facon-section + .facon-section {
+  margin-top: 10px;
+}
+.facon-section-label {
+  text-align: center;
+  font-size: 8.5px;
+  letter-spacing: 1.5px;
+  opacity: 0.5;
+}
 .facon-selector {
   display: flex;
   flex-wrap: wrap;
