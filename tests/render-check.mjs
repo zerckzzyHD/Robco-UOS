@@ -433,6 +433,166 @@ for (const vp of VIEWPORTS) {
   }
 }
 
+// ── DATABANK CARTOGRAPHY TABLE — legend z-order + node-back scroll (owner
+// re-fix, Protocol 27 root-cause). The existing Suite 196.30 static test only
+// regexes the CSS text for position:relative+z-index:10000 — it can't catch a
+// real paint-order regression (e.g. a future overlapping element). These are
+// genuine behavioral proofs: elementFromPoint hit-testing for z-order, and a
+// real tap-a-node-then-back flow for the scroll-preserve fix.
+{
+  const ctx = await browser.newContext({ viewport: { width: 412, height: 900 } });
+  const page = await ctx.newPage();
+  await page.goto(`file://${INDEX.replace(/\\/g, '/')}`);
+  await page.waitForTimeout(1000);
+  await page.evaluate(() => {
+    if (typeof switchTab === 'function') switchTab('data');
+    const panel = document.getElementById('worldMapPanel');
+    if (panel) panel.open = true;
+  });
+  await page.waitForTimeout(200);
+
+  // z-order: the legend/hint text must paint ABOVE the app-wide CRT overlay,
+  // at both a moderate and a deep scroll position (the overlay spans the
+  // full scrollable glass-frame height, not just one screen).
+  for (const scrollY of [0, 900, 3000]) {
+    const hit = await page.evaluate(sy => {
+      window.scrollTo(0, sy);
+      const overlay = document.querySelector('.crt-overlay');
+      const legend = document.querySelector('.survey-legend');
+      const kbd = document.querySelector('.kbd-hint');
+      if (!overlay || !legend || !kbd) return null;
+      const wasPE = overlay.style.pointerEvents;
+      overlay.style.pointerEvents = 'auto'; // probe only — CSS default is none
+      const probe = el => {
+        const r = el.getBoundingClientRect();
+        if (r.width === 0 || r.height === 0) return 'not-visible';
+        const cx = r.left + r.width / 2,
+          cy = r.top + r.height / 2;
+        if (cx < 0 || cy < 0 || cx > window.innerWidth || cy > window.innerHeight)
+          return 'off-screen';
+        const el2 = document.elementFromPoint(cx, cy);
+        return el2 === overlay ? 'COVERED-BY-OVERLAY' : 'ok';
+      };
+      const result = { legend: probe(legend), kbd: probe(kbd) };
+      overlay.style.pointerEvents = wasPE;
+      return result;
+    }, scrollY);
+    if (!hit) {
+      pass(
+        `map legend z-order @scrollY=${scrollY} — elements not present (game may lack a map), skipped`
+      );
+    } else if (hit.legend !== 'COVERED-BY-OVERLAY' && hit.kbd !== 'COVERED-BY-OVERLAY') {
+      pass(
+        `map legend z-order @scrollY=${scrollY} — legend/kbd-hint paint above .crt-overlay (${JSON.stringify(hit)})`
+      );
+    } else {
+      fail(
+        `map legend z-order @scrollY=${scrollY} — the CRT overlay covers the legend! (${JSON.stringify(hit)})`
+      );
+    }
+  }
+
+  // node-back scroll preservation: tap a node deep in a long scroll, back out,
+  // and assert the panel's own viewport position is unchanged (Protocol 27 —
+  // a raw scrollTop restore breaks because the full-grid vs sector-sheet
+  // views are very different heights).
+  const scrollResult = await page.evaluate(() => {
+    window.scrollTo(0, 0);
+    const panel = document.getElementById('worldMapPanel');
+    panel.scrollIntoView({ block: 'center' });
+    const before = panel.getBoundingClientRect().top;
+    const zone =
+      typeof FALLOUT_REGISTRY !== 'undefined' && FALLOUT_REGISTRY.zones && FALLOUT_REGISTRY.zones[0]
+        ? FALLOUT_REGISTRY.zones[0].name
+        : null;
+    if (!zone || typeof zoomMapToZone !== 'function') return null;
+    zoomMapToZone(zone);
+    resetMapZoom();
+    const after = panel.getBoundingClientRect().top;
+    return { before, after, delta: after - before };
+  });
+  if (!scrollResult) {
+    pass('map node-back scroll preservation — zones/functions not present, skipped');
+  } else if (Math.abs(scrollResult.delta) <= 2) {
+    pass(
+      `map node-back scroll preservation — panel stays at the same viewport position (delta ${scrollResult.delta}px)`
+    );
+  } else {
+    fail(
+      `map node-back scroll preservation — panel jumped ${scrollResult.delta}px after tapping a node then backing out! ${JSON.stringify(scrollResult)}`
+    );
+  }
+
+  await ctx.close();
+}
+
+// ── OPERATOR TRAITS (FNV) — uniform chip size + full-row clickability
+// (owner report). Every trait chip must render at the SAME width and the
+// whole chip (not just its inner toggle glyph) must be clickable.
+{
+  const ctx = await browser.newContext({ viewport: { width: 412, height: 900 } });
+  const page = await ctx.newPage();
+  await page.goto(`file://${INDEX.replace(/\\/g, '/')}`);
+  await page.waitForTimeout(1000);
+  const traitInfo = await page.evaluate(() => {
+    if (typeof switchTab === 'function') switchTab('stat');
+    document.querySelectorAll('details').forEach(d => (d.open = true));
+    if (typeof renderTraits === 'function') renderTraits();
+    const rows = Array.from(document.querySelectorAll('#traitsDisplay .tracker-row'));
+    if (rows.length === 0) return null;
+    const widths = rows.map(r => Math.round(r.getBoundingClientRect().width));
+    // Click the far-right edge of an unselected row (away from the toggle
+    // glyph) and confirm the trait toggles — proves whole-row clickability.
+    const target = rows.find(r => !r.classList.contains('tracker-toggle--active'));
+    let toggled = false;
+    if (target) {
+      const name = target.dataset.name;
+      const before = Array.isArray(state.traits) ? state.traits.slice() : [];
+      const rect = target.getBoundingClientRect();
+      target.dispatchEvent(
+        new MouseEvent('click', {
+          bubbles: true,
+          clientX: rect.right - 4,
+          clientY: rect.top + rect.height / 2,
+        })
+      );
+      const after = Array.isArray(state.traits) ? state.traits.slice() : [];
+      toggled = !before.includes(name) && after.includes(name);
+      if (toggled) toggleTrait(name); // revert
+    }
+    return {
+      widths,
+      uniform: new Set(widths).size === 1,
+      toggled,
+      allButtons: rows.every(r => r.tagName === 'BUTTON'),
+    };
+  });
+  if (!traitInfo) {
+    pass('OPERATOR traits chip uniformity — no traits registry for this game, skipped');
+  } else {
+    if (traitInfo.uniform) {
+      pass(
+        `OPERATOR traits — every chip renders at the same width (${traitInfo.widths[0]}px, n=${traitInfo.widths.length})`
+      );
+    } else {
+      fail(`OPERATOR traits — chip widths are NOT uniform: ${JSON.stringify(traitInfo.widths)}`);
+    }
+    if (traitInfo.allButtons) {
+      pass('OPERATOR traits — every chip is a real <button> (Protocol UI-5)');
+    } else {
+      fail('OPERATOR traits — a chip is not a <button> element');
+    }
+    if (traitInfo.toggled) {
+      pass('OPERATOR traits — clicking the far edge of a chip (not the toggle glyph) toggles it');
+    } else {
+      fail(
+        'OPERATOR traits — clicking the far edge of a chip did NOT toggle it (not fully clickable)'
+      );
+    }
+  }
+  await ctx.close();
+}
+
 await browser.close();
 
 if (failed === 0) {

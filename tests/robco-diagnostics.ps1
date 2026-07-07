@@ -4479,8 +4479,10 @@ Check ([bool]($htmlSrc71 -match 'id="traitsSection"[^>]*data-sub-id|data-sub-id[
 $renderBody71 = ''
 $renderMatch71 = [regex]::Match($uiRenderSrc71, '(?s)function renderTraits\s*\([^)]*\)\s*\{(.*?)\n\}')
 if ($renderMatch71.Success) { $renderBody71 = $renderMatch71.Groups[1].Value }
-Check ($renderBody71 -match 'effectSpan' -and $renderBody71 -notmatch "html\s*\+=\s*``<div[^``]*font-size:10px[^``]*>`\s*`\$\{escapeHtml\(d\.effect\)") `
-    'renderTraits() renders effect inline as <span> (compact one-line format -- no block <div> per effect)'
+Check (
+    ([System.Text.RegularExpressions.Regex]::IsMatch($renderBody71, '<span class="tracker-meta">[^<]*\$\{escapeHtml\(d\.effect\)')) -and
+    (-not ($renderBody71 -match "html\s*\+=\s*``<div[^``]*font-size:10px[^``]*>`\s*`\$\{escapeHtml\(d\.effect\)"))
+) 'renderTraits() renders effect inline as <span> (compact one-line format -- no block <div> per effect)'
 
 # 71.5  #collectiblesSubPanel exists in index.html
 Check ([bool]($htmlSrc71 -match 'id="collectiblesSubPanel"')) `
@@ -17059,13 +17061,16 @@ $magRule187 = ([regex]::Match($cssStripped187, '(?m)^button\.mag\s*\{[^}]*\}')).
 Check (($pkXRule187 -match 'min-height:\s*28px') -and ($spineRule187 -match 'min-height:\s*96px') -and ($magRule187 -match 'min-height:\s*66px')) `
     '187.16: .pk-x (28px), .spine (96px), and .mag (66px) all clear the Protocol 17 tap-target floor'
 
-# 187.17  .shelf/.mag-rack/.trait-chips/.chrono-wrap all center an incomplete last row
+# 187.17  .shelf/.mag-rack/.chrono-wrap all center an incomplete last row.
+#         .trait-chips is intentionally EXCLUDED as of Suite 198 (owner
+#         report fix) -- it changed from a wrapping chip grid to a uniform
+#         width:100% column stack (fixing the narrower-chip bug), so there's
+#         no longer an "incomplete last row" for it to center.
 Check (
     ($cssStripped187 -match '(?s)\.shelf\s*\{[^}]*justify-content:\s*center') -and
     ($cssStripped187 -match '(?s)\.mag-rack\s*\{[^}]*justify-content:\s*center') -and
-    ($cssStripped187 -match '(?s)\.trait-chips\s*\{[^}]*justify-content:\s*center') -and
     ($cssStripped187 -match '(?s)\.chrono-wrap\s*\{[^}]*justify-content:\s*center')
-) '187.17: .shelf/.mag-rack/.trait-chips/.chrono-wrap all center an incomplete last row (justify-content:center)'
+) '187.17: .shelf/.mag-rack/.chrono-wrap all center an incomplete last row (justify-content:center)'
 
 # 187.18  the colon blink / position-fix pulse / needle rotation are plain animation/transition
 $posDotRule187 = ([regex]::Match($cssStripped187, '\.pos-dot\s*\{[^}]*\}')).Value
@@ -19455,9 +19460,13 @@ Check (
 $zoomBody196 = Get-FunctionBody $renderSrc196 'zoomMapToZone'
 $resetZoomBody196 = Get-FunctionBody $renderSrc196 'resetMapZoom'
 $markVisitedBody196 = Get-FunctionBody $renderSrc196 'markLocationVisited'
+# resetMapZoom() gained a Suite 198 refinement (Protocol 27 re-fix): it
+# passes the pre-zoom anchor (_mapPreZoomAnchor) back into
+# _rerenderMapPreservingScroll() instead of calling it bare -- still the
+# SAME shared helper, never a direct renderWorldMap() call, so it's checked
+# with its own (argument-aware) pattern below.
 foreach ($pair196b in @(
     @('zoomMapToZone', $zoomBody196),
-    @('resetMapZoom', $resetZoomBody196),
     @('markLocationVisited', $markVisitedBody196)
 )) {
     $name196b = $pair196b[0]
@@ -19466,6 +19475,10 @@ foreach ($pair196b in @(
         ($body196b -match '_rerenderMapPreservingScroll\(\);') -and (-not ($body196b -match 'renderWorldMap\(\);'))
     ) "196.31: $name196b() re-renders via _rerenderMapPreservingScroll() -- not a direct renderWorldMap() call"
 }
+Check (
+    ($resetZoomBody196 -match [regex]::Escape('_rerenderMapPreservingScroll(_mapPreZoomAnchor);')) -and
+    (-not ($resetZoomBody196 -match 'renderWorldMap\(\);'))
+) '196.31: resetMapZoom() re-renders via _rerenderMapPreservingScroll(_mapPreZoomAnchor) -- not a direct renderWorldMap() call'
 
 # 196.32  Owner report fix: the route segment leading to a freshly-surveyed
 #         node used to render already fully drawn by the time the
@@ -19726,6 +19739,135 @@ Check (
     ($coreSrc197 -match '_wireCoreEventBusSubscribers\(\);') -and
     ($coreSrc197 -match '_wireFeedbackEchoSubscribers\(\); // FEEDBACK ANIMATION WAVE 1')
 ) '197.26: both wiring functions are still invoked from window.onload'
+
+# ===========================================================
+# Suite 198 -- DATABANK map re-fix (node-back scroll anchor) + OPERATOR
+# TRAITS chip reskin (owner report, two re-fixes + one new fix). The map's
+# node-back scroll preserve (999a32f) still drifted because the browser
+# auto-clamps scrollY when the short sector sheet shrinks the document --
+# fixed by having zoomMapToZone() capture the panel's pre-zoom viewport
+# position (_mapPreZoomAnchor) and resetMapZoom() restore relative to THAT
+# anchor. TRAITS chips were inconsistent widths (width:auto sized each row
+# to its own content) and only a small inner button toggled -- fixed to the
+# same single-button tracker-row+tracker-toggle pattern every other tracker
+# (skill books/magazines/curios) already uses, with a lit/dim ./O glyph
+# replacing the dated [SEL]/[---] bracket text.
+# 11 tests
+# ===========================================================
+Sep "Suite 198 -- DATABANK map re-fix (node-back scroll anchor) + OPERATOR TRAITS chip reskin"
+$renderSrc198 = Read-Src "js/ui-render.js"
+$css198 = Read-Src "css/terminal.css"
+$cssStripped198 = [regex]::Replace($css198, '/\*[\s\S]*?\*/', '')
+
+$preserveScrollBody198 = Get-FunctionBody $renderSrc198 '_rerenderMapPreservingScroll'
+$zoomBody198 = Get-FunctionBody $renderSrc198 'zoomMapToZone'
+$resetZoomBody198 = Get-FunctionBody $renderSrc198 'resetMapZoom'
+$markVisitedBody198 = Get-FunctionBody $renderSrc198 'markLocationVisited'
+
+# 198.1  _rerenderMapPreservingScroll() accepts an optional anchor override
+#        instead of always re-deriving "before" from the panel's OWN current
+#        (possibly-clamped) position.
+Check (
+    ($renderSrc198 -match 'function _rerenderMapPreservingScroll\(anchor\)') -and
+    ($preserveScrollBody198 -match [regex]::Escape('const before = anchor != null ? anchor : panel ? panel.getBoundingClientRect().top : null;'))
+) "198.1: _rerenderMapPreservingScroll(anchor) uses a passed-in anchor when given one, falling back to the panel's own current position"
+
+# 198.2  the delta-correction itself is unchanged (still nudges the real
+#        scroll element by the panel's before/after viewport delta).
+Check (
+    ($preserveScrollBody198 -match [regex]::Escape('const delta = panel.getBoundingClientRect().top - before;')) -and
+    ($preserveScrollBody198 -match [regex]::Escape('el.scrollTop += delta')) -and
+    ($preserveScrollBody198 -match [regex]::Escape('window.scrollTo(0, (window.scrollY || 0) + delta)'))
+) '198.2: the panel-anchor delta correction nudges whichever element actually scrolls by the measured delta'
+
+# 198.3  zoomMapToZone() captures the panel's PRE-ZOOM position into
+#        _mapPreZoomAnchor BEFORE flipping _mapActiveZone, and calls
+#        _rerenderMapPreservingScroll() with NO argument (a fresh
+#        before/after measurement is correct for the zoom-IN direction --
+#        only the zoom-OUT needs the older, pre-zoom anchor).
+Check (
+    ($zoomBody198 -match [regex]::Escape('_mapPreZoomAnchor = panel ? panel.getBoundingClientRect().top : null;')) -and
+    ($zoomBody198 -match '_mapActiveZone = zoneName;') -and
+    ($zoomBody198 -match [regex]::Escape('_rerenderMapPreservingScroll();'))
+) '198.3: zoomMapToZone() captures _mapPreZoomAnchor before zooming in'
+
+# 198.4  resetMapZoom() passes the captured _mapPreZoomAnchor back into
+#        _rerenderMapPreservingScroll() (restoring relative to the position
+#        from BEFORE the trip into the sector sheet, immune to the
+#        intermediate scrollY clamp) and clears it afterward so a later
+#        unrelated re-render never reuses a stale anchor.
+Check (
+    ($resetZoomBody198 -match '_mapActiveZone = null;') -and
+    ($resetZoomBody198 -match [regex]::Escape('_rerenderMapPreservingScroll(_mapPreZoomAnchor);')) -and
+    ($resetZoomBody198 -match '_mapPreZoomAnchor = null;')
+) '198.4: resetMapZoom() restores via the pre-zoom anchor, then clears it'
+
+# 198.5  markLocationVisited() (no view-height change, stays on the same
+#        grid view) is untouched -- still a bare, anchor-less call.
+Check (
+    ($markVisitedBody198 -match [regex]::Escape('_rerenderMapPreservingScroll();')) -and
+    (-not ($markVisitedBody198 -match [regex]::Escape('_rerenderMapPreservingScroll(_map')))
+) '198.5: markLocationVisited() still calls _rerenderMapPreservingScroll() with no anchor override (no zoom transition involved)'
+
+# 198.6  the old absolute raw-scrollTop restore only survives as the
+#        no-panel-found fallback, never the primary path.
+Check (
+    ($preserveScrollBody198 -match 'Fallback \(panel not found') -and
+    (([regex]::Matches($preserveScrollBody198, [regex]::Escape('el.scrollTop = scrollVal'))).Count -eq 1)
+) '198.6: the raw scrollTop=scrollVal restore is confined to the panel-missing fallback branch, not the primary path'
+
+$renderTraitsBody198 = Get-FunctionBody $renderSrc198 'renderTraits'
+
+# 198.7  the row IS the toggle -- ONE <button class="tracker-row
+#        tracker-toggle ..."> per trait (Protocol UI-5), not a wrapper div
+#        around a separate inner button.
+Check (
+    ($renderTraitsBody198 -match [regex]::Escape("'tracker-row tracker-toggle '")) -and
+    ($renderTraitsBody198 -match [regex]::Escape('onclick="toggleTrait(this.dataset.name)"')) -and
+    ($renderTraitsBody198 -match [regex]::Escape('data-name="${safeAttr}"')) -and
+    (-not ($renderTraitsBody198 -match [regex]::Escape('<div class="tracker-row"')))
+) '198.7: renderTraits() emits one button.tracker-row.tracker-toggle per trait -- no separate wrapper div + inner button'
+
+# 198.8  the dated [SEL]/[---] bracket-text glyph is gone, replaced by a
+#        lit/dim lamp glyph (bullet / circle) that still carries
+#        active/inactive semantics via the same tracker-toggle--active/
+#        --inactive classes.
+Check (
+    (-not ($renderTraitsBody198 -match [regex]::Escape('>[SEL]<'))) -and
+    (-not ($renderTraitsBody198 -match [regex]::Escape('>[---]<'))) -and
+    ($renderTraitsBody198 -match 'trait-lamp') -and
+    ($renderTraitsBody198 -match '&#9679;') -and
+    ($renderTraitsBody198 -match '&#9675;') -and
+    ($renderTraitsBody198 -match 'tracker-toggle--active') -and
+    ($renderTraitsBody198 -match 'tracker-toggle--inactive')
+) "198.8: renderTraits() uses a lit/dim bullet/circle lamp glyph instead of the dated [SEL]/[---] bracket text, keeping active/inactive toggle semantics"
+
+# 198.9  the aria-label stays literal/descriptive (Protocol UI-3) across the
+#        merge -- never diegetic.
+Check (
+    ($renderTraitsBody198 -match [regex]::Escape('aria-label="${word} ${safeAttr}"')) -and
+    ($renderTraitsBody198 -match [regex]::Escape("const word = isSel ? 'Deselect trait' : 'Select trait';"))
+) "198.9: renderTraits() keeps a literal, descriptive aria-label (Select/Deselect trait X) on the merged button"
+
+# 198.10  CSS: .trait-chips .tracker-row is width:100%% (uniform), not the
+#         old width:auto (content-sized, the actual root cause of the
+#         narrower-chip bug) -- every chip renders the same width
+#         regardless of its own name/effect text length.
+$traitChipsRowMatch198 = [System.Text.RegularExpressions.Regex]::Match($cssStripped198, '\.trait-chips \.tracker-row\s*\{[^}]*\}')
+$traitChipsRowRule198 = if ($traitChipsRowMatch198.Success) { $traitChipsRowMatch198.Value } else { '' }
+Check (
+    ($traitChipsRowRule198 -match 'width:\s*100%') -and
+    (-not ($traitChipsRowRule198 -match 'width:\s*auto'))
+) '198.10: .trait-chips .tracker-row is width:100% -- every trait chip renders at the same uniform width'
+
+# 198.11  the .tracker-row.tracker-toggle--inactive selector now actually
+#         matches something (the merged element carries BOTH classes on the
+#         SAME node -- before the merge, only the row's now-removed inner
+#         button carried tracker-toggle--inactive, so this rule was dead CSS
+#         that could never apply).
+Check (
+    [System.Text.RegularExpressions.Regex]::IsMatch($cssStripped198, '\.trait-chips \.tracker-row\.tracker-toggle--inactive\s*\{')
+) '198.11: .trait-chips .tracker-row.tracker-toggle--inactive is still declared, and now matches (row+toggle merged onto one element)'
 
 # ===========================================================
 # Results

@@ -7712,7 +7712,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
       renderBody71 = extractFunctionBody(uiRenderSrc71, 'renderTraits');
     } catch (_) {}
     assert(
-      /effectSpan/.test(renderBody71) &&
+      /<span class="tracker-meta">[^<]*\$\{escapeHtml\(d\.effect\)/.test(renderBody71) &&
         !/html\s*\+=\s*`<div[^`]*font-size:10px[^`]*>\s*\$\{escapeHtml\(d\.effect\)/.test(
           renderBody71
         ),
@@ -27372,14 +27372,17 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '187.16: .pk-x (28px), .spine (96px), and .mag (66px) all clear the Protocol 17 tap-target floor'
   );
 
-  // 187.17  the shelf/mag-rack/perk-form/trait-chips rows all center an
-  //         incomplete last row (justify-content:center, the centering rule).
+  // 187.17  the shelf/mag-rack/chrono-wrap rows all center an incomplete
+  //         last row (justify-content:center, the centering rule). .trait-
+  //         chips is intentionally EXCLUDED as of Suite 198 (owner report
+  //         fix) — it changed from a wrapping chip grid to a uniform
+  //         width:100% column stack (fixing the narrower-chip bug), so
+  //         there's no longer an "incomplete last row" for it to center.
   assert(
     /\.shelf\s*\{[^}]*justify-content:\s*center/.test(css187) &&
       /\.mag-rack\s*\{[^}]*justify-content:\s*center/.test(css187) &&
-      /\.trait-chips\s*\{[^}]*justify-content:\s*center/.test(css187) &&
       /\.chrono-wrap\s*\{[^}]*justify-content:\s*center/.test(css187),
-    '187.17: .shelf/.mag-rack/.trait-chips/.chrono-wrap all center an incomplete last row (justify-content:center)'
+    '187.17: .shelf/.mag-rack/.chrono-wrap all center an incomplete last row (justify-content:center)'
   );
 
   // 187.18  the new motion (colon blink, position-fix dot pulse, karma
@@ -30559,9 +30562,13 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     const zoomBody196 = extractFunctionBody(renderSrc196, 'zoomMapToZone');
     const resetZoomBody196 = extractFunctionBody(renderSrc196, 'resetMapZoom');
     const markVisitedBody196 = extractFunctionBody(renderSrc196, 'markLocationVisited');
+    // resetMapZoom() gained a Suite 198 refinement (Protocol 27 re-fix): it
+    // passes the pre-zoom anchor (_mapPreZoomAnchor) back into
+    // _rerenderMapPreservingScroll() instead of calling it bare — still the
+    // SAME shared helper, never a direct renderWorldMap() call, so it's
+    // checked with its own (argument-aware) pattern below.
     [
       ['zoomMapToZone', zoomBody196],
-      ['resetMapZoom', resetZoomBody196],
       ['markLocationVisited', markVisitedBody196],
     ].forEach(([name, body]) => {
       assert(
@@ -30569,6 +30576,11 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         `196.31: ${name}() re-renders via _rerenderMapPreservingScroll() — not a direct renderWorldMap() call`
       );
     });
+    assert(
+      /_rerenderMapPreservingScroll\(_mapPreZoomAnchor\);/.test(resetZoomBody196) &&
+        !/\brenderWorldMap\(\);/.test(resetZoomBody196),
+      '196.31: resetMapZoom() re-renders via _rerenderMapPreservingScroll(_mapPreZoomAnchor) — not a direct renderWorldMap() call'
+    );
   }
 
   // 196.32  Owner report fix: the route segment leading to a freshly-surveyed
@@ -30868,6 +30880,159 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     /_wireCoreEventBusSubscribers\(\);/.test(coreSrc197) &&
       /_wireFeedbackEchoSubscribers\(\); \/\/ FEEDBACK ANIMATION WAVE 1/.test(coreSrc197),
     '197.26: both wiring functions are still invoked from window.onload'
+  );
+}
+
+{
+  header('Suite 198 — DATABANK map re-fix (node-back scroll anchor) + OPERATOR TRAITS chip reskin');
+  const renderSrc198 = readFile('js/ui-render.js');
+  const css198 = readFile('css/terminal.css');
+  const cssStripped198 = css198.replace(/\/\*[\s\S]*?\*\//g, '');
+
+  // ── DATABANK CARTOGRAPHY TABLE — node-back scroll re-fix (owner report:
+  //    the FIRST scroll-preserve attempt (999a32f) captured/restored a raw
+  //    scrollTop pixel value; live-reproduced (Protocol 27) to still drift
+  //    because the browser auto-clamps scrollY down when the short sector-
+  //    sheet shrinks the document, and the panel-anchor delta correction
+  //    itself can't undo that clamp within the same still-short document —
+  //    only once the full grid view re-expands is there room to restore it.
+  //    Fixed by having zoomMapToZone() capture the panel's PRE-ZOOM viewport
+  //    position and resetMapZoom() restore relative to THAT anchor, not the
+  //    clamped position the short sheet was left at. A real behavioral proof
+  //    (tests/render-check.mjs) drives the actual tap-a-node-then-back flow
+  //    and asserts the panel lands back at the exact same viewport position
+  //    — this static suite locks the shape that proof depends on. ──────────
+  const preserveScrollBody198 = extractFunctionBody(renderSrc198, '_rerenderMapPreservingScroll');
+  const zoomBody198 = extractFunctionBody(renderSrc198, 'zoomMapToZone');
+  const resetZoomBody198 = extractFunctionBody(renderSrc198, 'resetMapZoom');
+  const markVisitedBody198 = extractFunctionBody(renderSrc198, 'markLocationVisited');
+
+  // 198.1  _rerenderMapPreservingScroll() accepts an optional anchor
+  //        override instead of always re-deriving "before" from the panel's
+  //        OWN current (possibly-clamped) position.
+  assert(
+    /function _rerenderMapPreservingScroll\(anchor\)/.test(renderSrc198) &&
+      /const before = anchor != null \? anchor : panel \? panel\.getBoundingClientRect\(\)\.top : null;/.test(
+        preserveScrollBody198
+      ),
+    "198.1: _rerenderMapPreservingScroll(anchor) uses a passed-in anchor when given one, falling back to the panel's own current position"
+  );
+
+  // 198.2  the delta-correction itself is unchanged (still nudges the real
+  //        scroll element by the panel's before/after viewport delta).
+  assert(
+    /const delta = panel\.getBoundingClientRect\(\)\.top - before;/.test(preserveScrollBody198) &&
+      /el\.scrollTop \+= delta/.test(preserveScrollBody198) &&
+      /window\.scrollTo\(0, \(window\.scrollY \|\| 0\) \+ delta\)/.test(preserveScrollBody198),
+    '198.2: the panel-anchor delta correction nudges whichever element actually scrolls by the measured delta'
+  );
+
+  // 198.3  zoomMapToZone() captures the panel's PRE-ZOOM position into
+  //        _mapPreZoomAnchor BEFORE flipping _mapActiveZone, and calls
+  //        _rerenderMapPreservingScroll() with NO argument (a fresh
+  //        before/after measurement is correct for the zoom-IN direction —
+  //        only the zoom-OUT needs the older, pre-zoom anchor).
+  assert(
+    /_mapPreZoomAnchor = panel \? panel\.getBoundingClientRect\(\)\.top : null;/.test(
+      zoomBody198
+    ) &&
+      /_mapActiveZone = zoneName;/.test(zoomBody198) &&
+      /_rerenderMapPreservingScroll\(\);/.test(zoomBody198),
+    '198.3: zoomMapToZone() captures _mapPreZoomAnchor before zooming in'
+  );
+
+  // 198.4  resetMapZoom() passes the captured _mapPreZoomAnchor back into
+  //        _rerenderMapPreservingScroll() (restoring relative to the
+  //        position from BEFORE the trip into the sector sheet, immune to
+  //        the intermediate scrollY clamp) and clears it afterward so a
+  //        later unrelated re-render never reuses a stale anchor.
+  assert(
+    /_mapActiveZone = null;/.test(resetZoomBody198) &&
+      /_rerenderMapPreservingScroll\(_mapPreZoomAnchor\);/.test(resetZoomBody198) &&
+      /_mapPreZoomAnchor = null;/.test(resetZoomBody198),
+    '198.4: resetMapZoom() restores via the pre-zoom anchor, then clears it'
+  );
+
+  // 198.5  markLocationVisited() (no view-height change, stays on the same
+  //        grid view) is untouched — still a bare, anchor-less call.
+  assert(
+    /_rerenderMapPreservingScroll\(\);/.test(markVisitedBody198) &&
+      !/_rerenderMapPreservingScroll\(_map/.test(markVisitedBody198),
+    '198.5: markLocationVisited() still calls _rerenderMapPreservingScroll() with no anchor override (no zoom transition involved)'
+  );
+
+  // 198.6  the old absolute raw-scrollTop restore only survives as the
+  //        no-panel-found fallback, never the primary path.
+  assert(
+    /Fallback \(panel not found/.test(preserveScrollBody198) &&
+      (preserveScrollBody198.match(/el\.scrollTop = scrollVal/g) || []).length === 1,
+    '198.6: the raw scrollTop=scrollVal restore is confined to the panel-missing fallback branch, not the primary path'
+  );
+
+  // ── OPERATOR TRAITS (FNV) — uniform chip size + full-row clickability +
+  //    modernized toggle glyph (owner report). Previously each trait was a
+  //    <div class="tracker-row"> wrapping a small inner <button
+  //    class="tracker-toggle">[SEL]/[---]</button> — only that small bracket
+  //    -text button toggled, and .trait-chips' width:auto sized each row to
+  //    its OWN content, so short-effect traits (Skilled, Small Frame)
+  //    rendered narrower than the rest. Fixed to match the SAME single-
+  //    button pattern every other tracker (skill books/magazines/curios —
+  //    _renderReadTracker) already uses. ─────────────────────────────────
+  const renderTraitsBody198 = extractFunctionBody(renderSrc198, 'renderTraits');
+
+  // 198.7  the row IS the toggle — ONE <button class="tracker-row
+  //        tracker-toggle ..."> per trait (Protocol UI-5), not a wrapper div
+  //        around a separate inner button.
+  assert(
+    /'tracker-row tracker-toggle '/.test(renderTraitsBody198) &&
+      /onclick="toggleTrait\(this\.dataset\.name\)"/.test(renderTraitsBody198) &&
+      /data-name="\$\{safeAttr\}"/.test(renderTraitsBody198) &&
+      !/<div class="tracker-row"/.test(renderTraitsBody198),
+    '198.7: renderTraits() emits one <button class="tracker-row tracker-toggle ..."> per trait — no separate wrapper div + inner button'
+  );
+
+  // 198.8  the dated [SEL]/[---] bracket-text glyph is gone, replaced by a
+  //        lit/dim lamp glyph (● / ○) that still carries active/inactive
+  //        semantics via the same tracker-toggle--active/--inactive classes.
+  assert(
+    !/>\[SEL\]</.test(renderTraitsBody198) &&
+      !/>\[---\]</.test(renderTraitsBody198) &&
+      /trait-lamp/.test(renderTraitsBody198) &&
+      /&#9679;/.test(renderTraitsBody198) &&
+      /&#9675;/.test(renderTraitsBody198) &&
+      /tracker-toggle--active/.test(renderTraitsBody198) &&
+      /tracker-toggle--inactive/.test(renderTraitsBody198),
+    '198.8: renderTraits() uses a lit/dim ●/○ lamp glyph instead of the dated [SEL]/[---] bracket text, keeping active/inactive toggle semantics'
+  );
+
+  // 198.9  the aria-label stays literal/descriptive (Protocol UI-3) across
+  //        the merge — never diegetic.
+  assert(
+    /aria-label="\$\{word\} \$\{safeAttr\}"/.test(renderTraitsBody198) &&
+      /const word = isSel \? 'Deselect trait' : 'Select trait';/.test(renderTraitsBody198),
+    '198.9: renderTraits() keeps a literal, descriptive aria-label ("Select trait X" / "Deselect trait X") on the merged button'
+  );
+
+  // 198.10  CSS: .trait-chips .tracker-row is width:100% (uniform), not the
+  //         old width:auto (content-sized, the actual root cause of the
+  //         narrower-chip bug) — every chip renders the same width
+  //         regardless of its own name/effect text length.
+  const traitChipsRowRule198 = (cssStripped198.match(/\.trait-chips \.tracker-row\s*\{[^}]*\}/) || [
+    '',
+  ])[0];
+  assert(
+    /width:\s*100%/.test(traitChipsRowRule198) && !/width:\s*auto/.test(traitChipsRowRule198),
+    '198.10: .trait-chips .tracker-row is width:100% — every trait chip renders at the same uniform width'
+  );
+
+  // 198.11  the .tracker-row.tracker-toggle--inactive selector now actually
+  //         matches something (the merged element carries BOTH classes on
+  //         the SAME node — before the merge, only the row's now-removed
+  //         inner button carried tracker-toggle--inactive, so this rule was
+  //         dead CSS that could never apply).
+  assert(
+    /\.trait-chips \.tracker-row\.tracker-toggle--inactive\s*\{/.test(cssStripped198),
+    '198.11: .trait-chips .tracker-row.tracker-toggle--inactive is still declared, and now matches (row+toggle merged onto one element)'
   );
 }
 

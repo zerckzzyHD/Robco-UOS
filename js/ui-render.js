@@ -1299,23 +1299,31 @@ function renderTraits() {
   const selectedDefs = visibleDefs.filter(d => selected.includes(d.name));
   const unselectedDefs = visibleDefs.filter(d => !selected.includes(d.name));
 
+  // Owner report fix: each row used to be a wrapper DIV (class tracker-row)
+  // around a small inner toggle BUTTON (class tracker-toggle) — only that
+  // inner [SEL]/[---] bracket-text button actually toggled, and
+  // .trait-chips' width:auto sized each row to its OWN content, so
+  // short-effect traits (Skilled, Small Frame) rendered as narrow/indented
+  // chips next to the full-width ones. Fixed to match the SAME single-button
+  // pattern every other tracker (skill books/magazines/curios — see
+  // _renderReadTracker above) already uses: the row IS the toggle (a single
+  // combined button.tracker-row.tracker-toggle, Protocol UI-3/UI-5), so the
+  // whole chip is clickable, and a lit/dim ●/○ glyph replaces the dated
+  // [SEL]/[---] bracket text while keeping identical toggle semantics.
   const renderRow = d => {
-    const safeName = escapeHtml(d.name);
+    const safeAttr = escapeHtml(d.name);
     const isSel = selected.includes(d.name);
     const dlcBadge =
       d.dlc === 'owb' ? ' <span style="font-size:9px;opacity:0.5;">[OWB]</span>' : '';
-    const effectSpan = `<span class="tracker-meta"> &mdash; ${escapeHtml(d.effect)}</span>`;
-    if (isSel) {
-      html += `<div class="tracker-row">`;
-      html += `<button class="tracker-toggle tracker-toggle--active" onclick="toggleTrait('${safeName}')" aria-label="Deselect trait ${safeName}">[SEL]</button>`;
-      html += `<strong>${escapeHtml(d.name.toUpperCase())}${dlcBadge}</strong>${effectSpan}`;
-      html += `</div>`;
-    } else {
-      html += `<div class="tracker-row" style="opacity:0.7;">`;
-      html += `<button class="tracker-toggle tracker-toggle--inactive" onclick="toggleTrait('${safeName}')" aria-label="Select trait ${safeName}">[---]</button>`;
-      html += `${escapeHtml(d.name.toUpperCase())}${dlcBadge}${effectSpan}`;
-      html += `</div>`;
-    }
+    const cls =
+      'tracker-row tracker-toggle ' +
+      (isSel ? 'tracker-toggle--active' : 'tracker-toggle--inactive');
+    const glyph = isSel ? '&#9679;' : '&#9675;'; // ● / ○
+    const word = isSel ? 'Deselect trait' : 'Select trait';
+    html += `<button class="${cls}" data-name="${safeAttr}" onclick="toggleTrait(this.dataset.name)" aria-label="${word} ${safeAttr}">`;
+    html += `<span class="trait-lamp" aria-hidden="true">${glyph}</span>`;
+    html += `${escapeHtml(d.name.toUpperCase())}${dlcBadge}<span class="tracker-meta"> &mdash; ${escapeHtml(d.effect)}</span>`;
+    html += `</button>`;
   };
 
   if (filterQ && visibleDefs.length === 0) {
@@ -1706,6 +1714,11 @@ let _mapActiveZone = null;
 // arrow-key nearest-neighbor traversal (_mapNodeKeyNav) without re-deriving
 // zone status on every keystroke.
 let _mapLastNodes = [];
+// The panel's viewport position captured right before zooming INTO a node,
+// so resetMapZoom() can restore to that exact pre-zoom position (not just
+// whatever the short sector-sheet's own scroll happened to be) — see the
+// _rerenderMapPreservingScroll() comment for why this is needed.
+let _mapPreZoomAnchor = null;
 
 function setMapView(v) {
   state.mapView = v;
@@ -1718,27 +1731,70 @@ function setMapView(v) {
 // DOM node currently holds focus (the tapped node's <g>, or the
 // "< SURVEY CHART" back button), and losing focus to <body> like that is a
 // well-known trigger for browsers to auto-scroll the page to an unrelated
-// position. Captures + restores the scroll offset of whichever element
-// actually scrolls (the SAME _scrollElFor() lookup switchTab()'s per-subsystem
-// scroll memory already uses — Protocol 22, no second scroll-detection path)
-// around the re-render, so the cartography table visibly stays exactly where
-// it was instead of jumping away.
-function _rerenderMapPreservingScroll() {
+// position.
+//
+// Root cause of the "backing out shows only the top half" re-fix (Protocol
+// 27, live-reproduced): the FIRST attempt captured/restored a raw scrollTop
+// PIXEL VALUE. The full grid view (.table-frame + SVG + legend) and the
+// zoomed sector sheet (.sheet) are very different heights — tapping a node
+// CONDENSES the panel to the short sheet, so the captured scrollVal is small
+// (clamped to the short document). Backing out re-expands the panel back to
+// its full height, and blindly restoring that small pixel value lands the
+// viewport far short of where the panel now sits (showing only its top
+// portion) instead of where the user was actually looking.
+//
+// Fixed by anchoring on the PANEL's own viewport position instead of an
+// absolute pixel offset: capture #worldMapPanel's getBoundingClientRect().top
+// before the re-render, then nudge whichever element actually scrolls (the
+// SAME _scrollElFor() lookup switchTab()'s per-subsystem scroll memory
+// already uses — Protocol 22, no second scroll-detection path) by exactly
+// the delta needed to put the panel back at that same viewport position.
+// This is immune to the panel's own height changing (unlike a raw scrollTop)
+// and still absorbs the browser's own focus-loss auto-scroll, since that
+// shows up as the same before/after rect delta.
+//
+// One more real wrinkle (Protocol 27, live-reproduced): switching TO the
+// short sector sheet SHRINKS the document, and the browser auto-clamps the
+// current scroll position down to the new (smaller) max scroll — a side
+// effect that happens BEFORE this function's own correction ever runs, and
+// which the correction then can't undo (there's nowhere to scroll TO in a
+// document that's still short). That clamp silently eats however much
+// scroll the zoom-in used up. Fixed by having zoomMapToZone() capture the
+// panel's PRE-ZOOM position into _mapPreZoomAnchor and passing it back in as
+// `anchor` when resetMapZoom() zooms back OUT — restoring relative to the
+// position from before the trip into the sheet, not the clamped position
+// the sheet was left at.
+function _rerenderMapPreservingScroll(anchor) {
   const el = typeof _scrollElFor === 'function' ? _scrollElFor('databank') : null;
-  const scrollVal = el ? el.scrollTop : window.scrollY || 0;
+  const panel = document.getElementById('worldMapPanel');
+  const before = anchor != null ? anchor : panel ? panel.getBoundingClientRect().top : null;
   renderWorldMap();
-  if (el) el.scrollTop = scrollVal;
-  else window.scrollTo(0, scrollVal);
+  if (panel && before !== null) {
+    const delta = panel.getBoundingClientRect().top - before;
+    if (delta) {
+      if (el) el.scrollTop += delta;
+      else window.scrollTo(0, (window.scrollY || 0) + delta);
+    }
+  } else {
+    // Fallback (panel not found — shouldn't happen on static markup): the
+    // old absolute-offset behavior is still better than not restoring at all.
+    const scrollVal = el ? el.scrollTop : window.scrollY || 0;
+    if (el) el.scrollTop = scrollVal;
+    else window.scrollTo(0, scrollVal);
+  }
 }
 
 function zoomMapToZone(zoneName) {
+  const panel = document.getElementById('worldMapPanel');
+  _mapPreZoomAnchor = panel ? panel.getBoundingClientRect().top : null;
   _mapActiveZone = zoneName;
   _rerenderMapPreservingScroll();
 }
 
 function resetMapZoom() {
   _mapActiveZone = null;
-  _rerenderMapPreservingScroll();
+  _rerenderMapPreservingScroll(_mapPreZoomAnchor);
+  _mapPreZoomAnchor = null;
 }
 
 // WU-F11: native "mark visited" — flags a WORLD GRID location as discovered directly from

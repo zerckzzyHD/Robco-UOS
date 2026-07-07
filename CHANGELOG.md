@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2615/2615 | Cache: robco-terminal-v2.7.0-r113 -->
+﻿## [Unreleased]<!-- Tests: 2626/2626 | Cache: robco-terminal-v2.7.0-r114 -->
 
 ### Added
 
@@ -135,8 +135,9 @@
 - Fixed the CASE-CLOSED / FAILED stamp on a directive slot landing right on top of its CYCLE button instead of sitting clear of it. The stamp now always shows above the slot's controls.
 - Fixed a critical bug where using an item from your cargo manifest could dim the entire screen and lock out all interaction with no way to recover short of reloading. The terminal already dims the screen briefly while waiting on a reply — the bug was that an unexpected hiccup right at the start of that wait could leave it stuck dimmed forever instead of clearing normally. Any transmission that runs into trouble now always restores the screen and lets you keep using the terminal.
 - Fixed the map screen's own scanning glow passing over the legend text at the bottom, briefly hiding the words it was explaining. The map's text now always stays fully readable.
-- Fixed backing out of a surveyed location's detail view scrolling the map screen away instead of leaving it exactly where you were looking.
+- Fixed backing out of a surveyed location's detail view leaving the map scrolled to the wrong spot — showing only part of the chart instead of the whole thing you'd been looking at before you tapped in. The map now returns to exactly the same spot every time, no matter how tall or short the view you're coming back from was.
 - Fixed a newly discovered location's route line on the map appearing already fully drawn instead of tracing itself in — you can now actually watch it connect to the new point.
+- Fixed your TRAITS list showing inconsistent-sized entries — a couple of traits with shorter descriptions rendered narrower and indented compared to the rest. Every trait now displays at the same uniform size. Tapping anywhere on a trait's row now toggles it on or off, not just its small indicator, and that indicator has been modernized to a clearer lit/unlit marker.
 
 ### Improved
 

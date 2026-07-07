@@ -7380,19 +7380,25 @@ button.rb-key:disabled {
     0 0 8px rgba(var(--robco-green-rgb), 0.15);
 }
 /* FNV FACTORY-BURNED trait chips — the shipped .tracker-row/.tracker-toggle
-   pattern (Protocol UI-3) restyled as a wrapping chip rack via CSS only; no
-   markup change to renderTraits(). */
+   pattern (Protocol UI-3) restyled as a chip rack via CSS only.
+   Owner report fix: renderTraits() now emits ONE <button class="tracker-row
+   tracker-toggle ..."> per trait (the row IS the toggle, Protocol UI-5 — the
+   whole chip is clickable, not just a small inner sub-element), matching
+   every other tracker (skill books/magazines/curios). width:100% (was
+   width:auto + inline-flex, which sized each chip to its OWN content —
+   short-effect traits like Skilled/Small Frame rendered narrower than the
+   rest) makes every chip the same uniform full-row width regardless of its
+   text length. */
 .trait-chips {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center; /* centering rule */
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
   margin-top: 4px;
 }
 .trait-chips .tracker-row {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   border: 1px dashed rgba(var(--bezel-wire-rgb), 0.6);
   color: var(--bezel-wire);
   text-shadow: 0 0 7px rgba(var(--bezel-wire-rgb), 0.55);
@@ -7402,11 +7408,16 @@ button.rb-key:disabled {
   min-height: 28px;
   background: rgba(var(--bezel-wire-rgb), 0.05);
   opacity: 1;
-  width: auto;
+  width: 100%;
+  text-align: left;
 }
 .trait-chips .tracker-row.tracker-toggle--inactive {
   opacity: 0.55;
   border-style: dotted;
+}
+.trait-chips .trait-lamp {
+  flex-shrink: 0;
+  font-size: 11px;
 }
 .trait-chips .tracker-meta {
   font-size: 6.5px;
