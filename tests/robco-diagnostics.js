@@ -15886,6 +15886,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     const coreCheck135 = onCallsInsideWiringFn(uiCoreSrc135, [
       '_wireCoreEventBusSubscribers',
       '_wireChassisCoreEventBusSubscribers',
+      '_wireFeedbackEchoSubscribers', // FEEDBACK ANIMATION WAVE 1 — the STATUS ANNUNCIATOR's own wiring fn
     ]);
     const apiCheck135 = onCallsInsideWiringFn(apiSource, '_wireApiEventBusSubscribers');
     assert(
@@ -27579,6 +27580,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         saveState: () => {},
         renderQuests: () => {},
         updateMath: () => {},
+        // FEEDBACK ANIMATION WAVE 1 added a RobcoEvents.emit('quest.status', ...)
+        // call + a _pendingQuestStamp assignment inside cycleQuestStatus() — stub
+        // both so this pre-existing behavioral proof keeps exercising the real
+        // 3-state cycle (Protocol 22, additive — never forked).
+        RobcoEvents: { emit: () => {} },
+        _pendingQuestStamp: null,
         console: { error: () => {}, log: () => {} },
       };
       vm189.createContext(sandbox);
@@ -29969,6 +29976,351 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   assert(
     /width:\s*32px/.test(iconBtnRule195) && /min-width:\s*32px/.test(iconBtnRule195),
     '195.8: .icon-btn-round keeps its 32px (>=28px Protocol 17) tap target — the help button repositioning only changed top/right, never its size'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 196 — FEEDBACK ANIMATION WAVE 1: the STATUS ANNUNCIATOR echo
+//  mechanism, 4 new additive RobcoEvents emits (rad.tier/limb.state/
+//  quest.status/location.visited + the collectible.acquired AI-path emit),
+//  and the 8 Tier-S flagship home-panel animations
+//  (planning/FEEDBACK_ANIMATION_BUILD_PLAN.md — WAVE 1).
+//  37 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 196 — FEEDBACK ANIMATION WAVE 1: annunciator + new emits + 8 flagships');
+  const stateSrc196 = readFile('js/state.js');
+  const coreSrc196 = readFile('js/ui-core.js');
+  const renderSrc196 = readFile('js/ui-render.js');
+  const apiSrc196 = readFile('js/api.js');
+  const htmlSrc196 = readFile('index.html');
+  const css196 = readFile('css/terminal.css');
+  const cssStripped196 = css196.replace(/\/\*[\s\S]*?\*\//g, '');
+
+  // ── New additive emits (§4 of the build plan) ──────────────────────────
+
+  // 196.1  rad.tier emitted once at the existing radThreshold crossing
+  //        detector in updateMath() — the hp.critical precedent, reusing
+  //        _bioScanCompute's own NONE/MINOR/ADVANCED/SEVERE breakpoints.
+  {
+    const updateMathBody196 = extractFunctionBody(coreSrc196, 'updateMath');
+    assert(
+      /RobcoEvents\.emit\(\s*['"]rad\.tier['"]/.test(updateMathBody196) &&
+        /_lastRadThreshold\s*=\s*radThreshold/.test(updateMathBody196),
+      '196.1: updateMath() emits rad.tier exactly at the existing _lastRadThreshold crossing detector'
+    );
+  }
+
+  // 196.2  _radTierName() maps the threshold ladder onto _bioScanCompute's
+  //        own NONE/MINOR/ADVANCED/SEVERE tier names — no new breakpoint table.
+  assert(
+    /function _radTierName\(threshold\)/.test(coreSrc196) &&
+      /'SEVERE'/.test(coreSrc196) &&
+      /'ADVANCED'/.test(coreSrc196) &&
+      /'MINOR'/.test(coreSrc196) &&
+      /'NONE'/.test(coreSrc196),
+    '196.2: _radTierName() reuses the NONE/MINOR/ADVANCED/SEVERE tier vocabulary (no second breakpoint table)'
+  );
+
+  // 196.3  limb.state emitted from the native toggleLimb() setter.
+  {
+    const toggleLimbBody196 = extractFunctionBody(coreSrc196, 'toggleLimb');
+    assert(
+      /RobcoEvents\.emit\(\s*['"]limb\.state['"]/.test(toggleLimbBody196),
+      '196.3: toggleLimb() emits limb.state on every native limb toggle'
+    );
+  }
+
+  // 196.4  limb.state ALSO emitted from the AI limb-set path in
+  //        autoImportState() (api.js) — fired only on a genuine change.
+  assert(
+    /const wasOk = state\[limb\] === 'OK';/.test(apiSrc196) &&
+      /RobcoEvents\.emit\(\s*['"]limb\.state['"]/.test(apiSrc196) &&
+      /if \(wasOk !== nowOk\)/.test(apiSrc196),
+    '196.4: the AI limb-set path in autoImportState() also emits limb.state, gated on a genuine OK<->CRIPPLED change'
+  );
+
+  // 196.5  quest.status emitted from the native cycleQuestStatus() — the ONE
+  //        native quest-status write path (Suite 189) — AND from the AI
+  //        quest-status-diff in autoImportState() (Protocol 14 AI-contract:
+  //        both paths drive the SAME event, never a fork).
+  {
+    const cycleBody196 = extractFunctionBody(renderSrc196, 'cycleQuestStatus');
+    assert(
+      /RobcoEvents\.emit\(\s*['"]quest\.status['"]/.test(cycleBody196),
+      '196.5: cycleQuestStatus() emits quest.status on a genuine complete/failed transition'
+    );
+  }
+  assert(
+    /if \(prev && prev\.status !== curr\.status\) \{[\s\S]{0,1200}RobcoEvents\.emit\(\s*['"]quest\.status['"]/.test(
+      apiSrc196
+    ),
+    '196.6: the AI quest-status-diff in autoImportState() also emits quest.status (same event as the native cycle key)'
+  );
+
+  // 196.7  location.visited emitted from the SINGLE choke point
+  //        recordLocationVisit() (state.js) — covers manual mark-visited,
+  //        arrival, and the AI autoImport path in one emit (Protocol 22).
+  {
+    const recordBody196 = extractFunctionBody(stateSrc196, 'recordLocationVisit');
+    assert(
+      /RobcoEvents\.emit\(\s*['"]location\.visited['"]/.test(recordBody196),
+      '196.7: recordLocationVisit() emits location.visited — the single choke point for every discovery path'
+    );
+  }
+
+  // 196.8  collectible.acquired ALSO emitted on the AI collectible-add path
+  //        (previously only the native toggleCollectible() emitted it) —
+  //        fired only for genuinely NEW names (never an AI resend replay).
+  assert(
+    /_collectBefore\.has\(name\.toLowerCase\(\)\)/.test(apiSrc196) &&
+      /RobcoEvents\.emit\(\s*['"]collectible\.acquired['"]/.test(apiSrc196),
+    '196.8: the AI collectible-add path in autoImportState() emits collectible.acquired for genuinely new items only'
+  );
+
+  // ── THE STATUS ANNUNCIATOR (§2) ─────────────────────────────────────────
+
+  // 196.9  the casing-top readout is a real <button> (Protocol UI-5), with
+  //        role=status + aria-live=polite (doubles as an SR notification)
+  //        and a static aria-label (so an empty button always has an
+  //        accessible name — the a11y button-name rule).
+  assert(
+    /<button[\s\S]{0,300}id="statusAnnunciator"[\s\S]{0,200}role="status"[\s\S]{0,200}aria-live="polite"[\s\S]{0,300}aria-label="[^"]+"/.test(
+      htmlSrc196
+    ) && /onclick="_echoJump\(\)"/.test(htmlSrc196),
+    '196.9: #statusAnnunciator is a real <button> with role=status, aria-live=polite, a static aria-label, and tap-to-jump wired to _echoJump()'
+  );
+
+  // 196.10 the suppression rule (the viewability core): _echoPush() fires
+  //        IFF the event's home subsystem != the active one — never both.
+  {
+    const echoPushBody196 = extractFunctionBody(coreSrc196, '_echoPush');
+    assert(
+      /_echoActiveSubsystem\(\) === homeSubsystem\) return;/.test(echoPushBody196),
+      "196.10: _echoPush() suppresses the echo when the active subsystem already equals the event's home (no redundant echo)"
+    );
+  }
+
+  // 196.11 identical-consecutive collapse (×N) — never floods with repeats.
+  {
+    const echoPushBody196b = extractFunctionBody(coreSrc196, '_echoPush');
+    assert(
+      /_echoCurrent\.count\+\+/.test(echoPushBody196b) && /tail\.count\+\+/.test(echoPushBody196b),
+      '196.11: _echoPush() collapses an identical consecutive event into a ×N count bump instead of a new entry'
+    );
+    assert(
+      /count > 1 \? ' ×' \+ c\.count/.test(coreSrc196),
+      '196.11b: _echoRenderCurrent() actually renders the ×N suffix when count > 1'
+    );
+  }
+
+  // 196.12 FIFO queue, cap 6, drop-oldest — never floods.
+  assert(
+    /const ECHO_QUEUE_CAP = 6;/.test(coreSrc196) &&
+      /_echoQueue\.length > ECHO_QUEUE_CAP\) _echoQueue\.shift\(\);/.test(coreSrc196),
+    '196.12: the echo queue is capped at 6 with a drop-oldest (shift) policy'
+  );
+
+  // 196.13 tap-to-jump routes through the SAME selectSubsystem()/switchTab()
+  //        router every bezel keycap already uses (Protocol 22 — no forked
+  //        routing) — never a bespoke navigation path.
+  {
+    const echoJumpBody196 = extractFunctionBody(coreSrc196, '_echoJump');
+    assert(
+      /selectSubsystem\(home\)/.test(echoJumpBody196),
+      '196.13: _echoJump() calls the existing selectSubsystem() router — no forked navigation'
+    );
+  }
+
+  // 196.14 the visibility gate is DELIBERATELY narrower than
+  //        _coreShouldAnimate(): the readout must stay visible at every
+  //        Immersion tier and under reduced-motion (only the entrance/exit
+  //        FLOURISH quiets there, automatically, via the global
+  //        prefers-reduced-motion block) — fully suppressed only when there
+  //        is truly no viewer (hidden tab / runtime powered down).
+  {
+    const gateBody196 = extractFunctionBody(coreSrc196, '_echoShouldShow');
+    assert(
+      !/immersionAllows/.test(gateBody196) &&
+        !/prefers-reduced-motion/.test(gateBody196) &&
+        /document\.hidden/.test(gateBody196) &&
+        /STANDBY['"]|SHUTDOWN['"]|OFF['"]/.test(gateBody196),
+      '196.14: _echoShouldShow() does NOT gate on immersion tier or reduced-motion (essential feedback stays visible) — only on document.hidden / runtime STANDBY-SHUTDOWN-OFF'
+    );
+  }
+  assert(
+    /_echoPush\(evt\) \{\s*\n\s*if \(!evt \|\| !_echoShouldShow\(\)\) return;/.test(coreSrc196),
+    '196.14b: _echoPush() is gated by _echoShouldShow() before anything else — no viewer means no push'
+  );
+
+  // 196.15 the annunciator entrance/exit are plain @keyframes (never
+  //        transition-only) so the existing global prefers-reduced-motion
+  //        block auto-neutralizes them to a correct, instant final frame —
+  //        no bespoke carve-out (Protocol UI-9).
+  assert(
+    /@keyframes annunciator-in/.test(cssStripped196) &&
+      /@keyframes annunciator-out/.test(cssStripped196) &&
+      /\.status-annunciator\.show \{[^}]*animation:\s*annunciator-in/.test(cssStripped196),
+    '196.15: the annunciator entrance/exit are plain @keyframes animations (reduced-motion-safe by construction)'
+  );
+
+  // 196.16 _wireFeedbackEchoSubscribers() is called from window.onload (the
+  //        U7 boot-order lesson — never a bare top-level RobcoEvents.on()).
+  assert(
+    /_wireFeedbackEchoSubscribers\(\);/.test(coreSrc196) &&
+      (() => {
+        const onloadIdx = coreSrc196.indexOf('window.onload');
+        const wireIdx = coreSrc196.indexOf('_wireFeedbackEchoSubscribers();');
+        return onloadIdx !== -1 && wireIdx > onloadIdx;
+      })(),
+    '196.16: _wireFeedbackEchoSubscribers() is called from window.onload, after it is declared'
+  );
+
+  // 196.17 the annunciator subscribes to every (b)-class WAVE 1 event — the
+  //        8 flagships each also drive an annunciation.
+  {
+    const wireBody196 = extractFunctionBody(coreSrc196, '_wireFeedbackEchoSubscribers');
+    [
+      'hp.critical',
+      'rad.tier',
+      'limb.state',
+      'level.up',
+      'faction.threshold',
+      'quest.status',
+      'location.visited',
+      'collectible.acquired',
+    ].forEach(evt => {
+      assert(
+        wireBody196.includes(`'${evt}'`),
+        `196.17: _wireFeedbackEchoSubscribers() subscribes to ${evt}`
+      );
+    });
+  }
+
+  // ── THE 8 TIER-S FLAGSHIP ANIMATIONS ─────────────────────────────────────
+
+  // 196.18  #1 FLATLINE WARNING — a one-shot EKG stutter on the HP trace at
+  //         the hp.critical crossing, PLUS a continuous red vignette for as
+  //         long as HP stays critical (both gated on the same pct<25).
+  assert(
+    /@keyframes flatline-stutter/.test(cssStripped196) &&
+      /@keyframes hp-vignette-breathe/.test(cssStripped196) &&
+      /hpTrace\.classList\.add\('flatline-stutter'\)/.test(coreSrc196) &&
+      /classList\.toggle\('hp-critical-vignette', pct < 25 && hpMax > 0\)/.test(coreSrc196),
+    '196.18: #1 FLATLINE WARNING — one-shot HP-trace stutter (on crossing) + continuous vignette (while critical)'
+  );
+
+  // 196.19  #4 GEIGER SPIKE / #5 RADAWAY DRAIN — RAD trace chatter/drain +
+  //         film-grain flourish, triggered off the new rad.tier event.
+  assert(
+    /@keyframes rad-spike-chatter/.test(cssStripped196) &&
+      /@keyframes rad-drain-bubble/.test(cssStripped196) &&
+      /@keyframes geiger-film-grain/.test(cssStripped196) &&
+      /RobcoEvents\.on\(\s*['"]rad\.tier['"], p => \{/.test(coreSrc196),
+    '196.19: #4 GEIGER SPIKE / #5 RADAWAY DRAIN — RAD trace chatter/drain + film grain, triggered by rad.tier'
+  );
+
+  // 196.20  #6 X-RAY FLASH / #7 SPLINT WRAP — bone-white inversion + a
+  //         per-zone fracture/wrap, triggered off the new limb.state event.
+  assert(
+    /@keyframes xray-invert-flash/.test(cssStripped196) &&
+      /@keyframes zone-fracture-draw/.test(cssStripped196) &&
+      /@keyframes zone-splint-wrap/.test(cssStripped196) &&
+      /RobcoEvents\.on\(\s*['"]limb\.state['"], p => \{/.test(coreSrc196),
+    '196.20: #6 X-RAY FLASH / #7 SPLINT WRAP — zone-body inversion + per-zone fracture/wrap, triggered by limb.state'
+  );
+
+  // 196.21  #9 VAULT-BOY LEVEL CARD (the flagship) — a static, always-in-DOM
+  //         card toggled by a one-shot 'show' class on level.up, with a
+  //         paired XP-bar sweep-shimmer.
+  assert(
+    /id="levelUpCard"/.test(htmlSrc196) &&
+      /id="levelUpCardText"/.test(htmlSrc196) &&
+      /@keyframes level-card-in/.test(cssStripped196) &&
+      /@keyframes level-card-sunburst/.test(cssStripped196) &&
+      /@keyframes xp-sweep-shimmer/.test(cssStripped196) &&
+      /card\.classList\.add\('show'\)/.test(coreSrc196),
+    '196.21: #9 VAULT-BOY LEVEL CARD — static card + sunburst + XP sweep-shimmer, toggled on level.up'
+  );
+
+  // 196.22  #14 REPUTATION STAMP — a rubber-stamp slam consumed exactly once
+  //         by renderFactionRep(), deferred via a pending var (survives the
+  //         innerHTML rebuild race, the _pendingSurveyPing pattern).
+  assert(
+    /@keyframes facon-stamp-slam/.test(cssStripped196) &&
+      /let _pendingRepStamp = null;/.test(stateSrc196) &&
+      /_pendingRepStamp && _pendingRepStamp\.key === sel\.key/.test(renderSrc196) &&
+      /_pendingRepStamp = null;/.test(renderSrc196),
+    '196.22: #14 REPUTATION STAMP — pending-var (state.js) deferred consumption in renderFactionRep(), cleared after one use'
+  );
+
+  // 196.23  #23 CASE-CLOSED STAMP / #24 FILAMENT DIE — a stamp + lamp
+  //         steady/flicker-out consumed exactly once by renderQuests().
+  assert(
+    /@keyframes dir-stamp-punch/.test(cssStripped196) &&
+      /@keyframes dir-lamp-steady/.test(cssStripped196) &&
+      /@keyframes dir-lamp-flicker-out/.test(cssStripped196) &&
+      /let _pendingQuestStamp = null;/.test(stateSrc196) &&
+      /stampName = _pendingQuestStamp/.test(renderSrc196) &&
+      /_pendingQuestStamp = null;/.test(renderSrc196),
+    '196.23: #23 CASE-CLOSED STAMP / #24 FILAMENT DIE — pending-var (state.js) deferred consumption in renderQuests(), cleared after one use'
+  );
+
+  // 196.24  #22 EXHIBIT LIGHT-UP — a case-spotlight flourish consumed
+  //         exactly once by renderCollectibles().
+  assert(
+    /@keyframes curio-lightup/.test(cssStripped196) &&
+      /let _pendingExhibitLight = \[\];/.test(stateSrc196) &&
+      /lightNames = new Set\(_pendingExhibitLight\.map/.test(renderSrc196) &&
+      /_pendingExhibitLight = \[\];/.test(renderSrc196),
+    '196.24: #22 EXHIBIT LIGHT-UP — pending-list (state.js) deferred consumption in renderCollectibles(), cleared after one use'
+  );
+
+  // 196.25  #26 SURVEY PING (§5) — deferred: consumed ONLY on the WORLD GRID
+  //         paint (never the zoomed sector sheet, which returns early above
+  //         it in renderWorldMap()), so the ping is always actually seen.
+  {
+    const mapBody196 = extractFunctionBody(renderSrc196, 'renderWorldMap');
+    const sectorSheetIdx = mapBody196.indexOf('if (_mapActiveZone)');
+    const pingConsumeIdx = mapBody196.indexOf('const pingZone = _pendingSurveyPing');
+    assert(
+      /@keyframes survey-ping-ring/.test(cssStripped196) &&
+        sectorSheetIdx !== -1 &&
+        pingConsumeIdx !== -1 &&
+        pingConsumeIdx > sectorSheetIdx,
+      '196.25: #26 SURVEY PING is consumed AFTER the zoomed-sector-sheet early return — only the WORLD GRID paint ever plays it'
+    );
+    assert(
+      /_pendingSurveyPing = null;/.test(mapBody196),
+      '196.25b: renderWorldMap() clears _pendingSurveyPing after consuming it (never replays on the next paint)'
+    );
+  }
+
+  // 196.26  zero campaign-state write — every WAVE 1 addition is transient
+  //         (module vars / DOM classes) or an event payload; none of it
+  //         ever assigns state.<field> or calls saveState()/robco_v8.
+  {
+    const waveBodies196 = [
+      extractFunctionBody(coreSrc196, '_echoPush'),
+      extractFunctionBody(coreSrc196, '_echoAdvance'),
+      extractFunctionBody(coreSrc196, '_echoRenderCurrent'),
+      extractFunctionBody(coreSrc196, '_echoJump'),
+      extractFunctionBody(coreSrc196, '_wireFeedbackEchoSubscribers'),
+    ].join('\n');
+    assert(
+      !/state\.\w+\s*=/.test(waveBodies196) && !/saveState\(\)/.test(waveBodies196),
+      '196.26: the annunciator mechanism never assigns state.* or calls saveState() — purely transient/presentational'
+    );
+  }
+
+  // 196.27  the level-up card and every stamp/overlay are aria-hidden
+  //         (purely decorative) — consistent with every other one-shot
+  //         flourish already shipped (Protocol UI-10 gate-stacking precedent).
+  assert(
+    /id="levelUpCard" aria-hidden="true"/.test(htmlSrc196) &&
+      /class="facon-stamp facon-stamp--\$\{dir\}" aria-hidden="true"/.test(renderSrc196) &&
+      /class="dir-stamp dir-stamp--\$\{stampStatus\}" aria-hidden="true"/.test(renderSrc196),
+    '196.27: the level-up card and the rep/quest stamps are aria-hidden (decorative, never double-announced)'
   );
 }
 

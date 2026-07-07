@@ -10764,3 +10764,477 @@ button.chassis-core-shape {
     max-width: 640px;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   FEEDBACK ANIMATION WAVE 1 (planning/FEEDBACK_ANIMATION_BUILD_PLAN.md)
+   Every rule below is a plain @keyframes (never transition-only), so the
+   existing global prefers-reduced-motion block (top of this file) already
+   neutralizes each to an instant, correct final frame with no bespoke
+   carve-out (Protocol UI-9). Transform/opacity/filter only — compositor
+   friendly, mobile-safe, never blocks input.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── THE STATUS ANNUNCIATOR — casing-top echo (§2) ──────────────────── */
+@keyframes annunciator-in {
+  0% {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes annunciator-out {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.status-annunciator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  min-height: 28px;
+  padding: 3px 10px;
+  border: 1px solid var(--bezel-wire, var(--robco-green));
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.4);
+  font-size: 10px;
+  letter-spacing: 0.6px;
+  color: var(--robco-green);
+  opacity: 0;
+  pointer-events: none;
+  cursor: default;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+.status-annunciator.show {
+  opacity: 1;
+  pointer-events: auto;
+  cursor: pointer;
+  animation: annunciator-in 260ms ease-out;
+}
+.status-annunciator.hide {
+  animation: annunciator-out 200ms ease-in forwards;
+}
+.status-annunciator.tone-amber {
+  color: var(--robco-alert);
+  border-color: var(--robco-alert);
+}
+.status-annunciator.tone-red {
+  color: var(--robco-danger);
+  border-color: var(--robco-danger);
+}
+.status-annunciator .an-glyph {
+  font-size: 13px;
+}
+.status-annunciator .an-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 480px) {
+  .status-annunciator {
+    flex-basis: 100%;
+    order: 5;
+    max-width: none;
+  }
+}
+
+/* ── #1 FLATLINE WARNING — BUS-01 HP trace (Group 1) ────────────────── */
+@keyframes flatline-stutter {
+  0%,
+  100% {
+    filter: brightness(1) contrast(1);
+  }
+  10%,
+  30%,
+  50% {
+    filter: brightness(2.2) contrast(1.4);
+  }
+  20%,
+  40%,
+  60% {
+    filter: brightness(0.6) contrast(1.4);
+  }
+  70% {
+    filter: brightness(1.6);
+  }
+}
+#opTraceHp.flatline-stutter .hp-bar-fill {
+  animation: flatline-stutter 1.6s ease-in-out;
+}
+@keyframes hp-vignette-breathe {
+  0%,
+  100% {
+    box-shadow: inset 0 0 40px 6px rgba(231, 76, 60, 0.15);
+  }
+  50% {
+    box-shadow: inset 0 0 70px 14px rgba(231, 76, 60, 0.4);
+  }
+}
+body.hp-critical-vignette .glass-frame {
+  animation: hp-vignette-breathe 1.1s ease-in-out infinite;
+}
+
+/* ── #4 GEIGER SPIKE / #5 RADAWAY DRAIN — BUS-01 RAD trace (Group 1) ─── */
+@keyframes rad-spike-chatter {
+  0%,
+  100% {
+    transform: translateX(0);
+    filter: brightness(1);
+  }
+  15% {
+    transform: translateX(-2px);
+    filter: brightness(2);
+  }
+  30% {
+    transform: translateX(2px);
+    filter: brightness(1.4);
+  }
+  45% {
+    transform: translateX(-1px);
+    filter: brightness(2);
+  }
+  60% {
+    transform: translateX(1px);
+    filter: brightness(1.2);
+  }
+}
+#opRadLineWrap.rad-spike {
+  animation: rad-spike-chatter 1.1s ease-in-out;
+}
+@keyframes rad-drain-bubble {
+  0% {
+    filter: brightness(1.6);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+#opRadLineWrap.rad-drain {
+  animation: rad-drain-bubble 1.1s ease-out;
+}
+@keyframes geiger-film-grain {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  10%,
+  30%,
+  50%,
+  70%,
+  90% {
+    opacity: 0.06;
+  }
+  20%,
+  40%,
+  60%,
+  80% {
+    opacity: 0.02;
+  }
+}
+body.geiger-film-grain .crt-overlay {
+  animation: geiger-film-grain 1s steps(8, end);
+}
+
+/* ── #6 X-RAY FLASH / #7 SPLINT WRAP — BUS-03 zone plate (Group 1) ──── */
+@keyframes xray-invert-flash {
+  0% {
+    filter: invert(0) brightness(1);
+  }
+  15% {
+    filter: invert(1) brightness(2.4);
+  }
+  100% {
+    filter: invert(0) brightness(1);
+  }
+}
+.zone-body.zone-xray-flash svg {
+  animation: xray-invert-flash 0.5s ease-out;
+}
+@keyframes zone-fracture-draw {
+  0% {
+    filter: brightness(1);
+    stroke-dashoffset: 40;
+  }
+  20% {
+    filter: brightness(3);
+  }
+  100% {
+    filter: brightness(1);
+    stroke-dashoffset: 0;
+  }
+}
+.zone.zone-fracture .zshape,
+.zone.zone-fracture path {
+  animation: zone-fracture-draw 0.9s ease-out;
+  stroke-dasharray: 40;
+}
+@keyframes zone-splint-wrap {
+  0% {
+    filter: brightness(0.6) saturate(0.4);
+  }
+  100% {
+    filter: brightness(1) saturate(1);
+  }
+}
+.zone.zone-splint-wrap .zshape,
+.zone.zone-splint-wrap path {
+  animation: zone-splint-wrap 0.9s ease-out;
+}
+
+/* ── #9 VAULT-BOY LEVEL CARD — BUS-01, the flagship (Group 2) ───────── */
+.crt-mon {
+  position: relative;
+}
+@keyframes level-card-in {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.94);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes level-card-sunburst {
+  0% {
+    transform: rotate(0deg);
+    opacity: 0.7;
+  }
+  100% {
+    transform: rotate(360deg);
+    opacity: 0.35;
+  }
+}
+.level-card {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.82);
+  border: 1px solid var(--robco-green);
+  border-radius: 4px;
+  opacity: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.level-card.show {
+  opacity: 1;
+  animation: level-card-in 500ms ease-out;
+}
+.level-card .lc-sunburst {
+  position: absolute;
+  inset: -30%;
+  background: repeating-conic-gradient(var(--robco-green) 0deg 4deg, transparent 4deg 20deg);
+  opacity: 0.35;
+}
+.level-card.show .lc-sunburst {
+  animation: level-card-sunburst 2.2s linear;
+}
+.level-card .lc-figure {
+  position: relative;
+  font-size: 32px;
+  line-height: 1;
+  color: var(--robco-green);
+  text-shadow: var(--robco-glow);
+}
+.level-card .lc-stencil {
+  position: relative;
+  font-size: 15px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  color: var(--robco-green);
+  text-shadow: var(--robco-glow);
+}
+@keyframes xp-sweep-shimmer {
+  0% {
+    filter: brightness(1);
+  }
+  40% {
+    filter: brightness(2.6);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+#xp_bar_fill.xp-sweep-shimmer {
+  animation: xp-sweep-shimmer 1.4s ease-out;
+}
+
+/* ── #14 REPUTATION STAMP — BUS-08 reputation console (Group 3) ─────── */
+@keyframes facon-stamp-slam {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -60%) rotate(-4deg) scale(2.2);
+  }
+  55% {
+    opacity: 1;
+    transform: translate(-50%, -50%) rotate(4deg) scale(0.92);
+  }
+  75% {
+    transform: translate(-50%, -50%) rotate(3deg) scale(1.05);
+  }
+  100% {
+    opacity: 0.9;
+    transform: translate(-50%, -50%) rotate(4deg) scale(1);
+  }
+}
+.facon-stamp {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  z-index: 4;
+  padding: 4px 14px;
+  border: 3px solid var(--robco-danger);
+  border-radius: 3px;
+  font-size: 16px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  color: var(--robco-danger);
+  background: rgba(0, 0, 0, 0.2);
+  animation: facon-stamp-slam 700ms ease-out both;
+  pointer-events: none;
+}
+.facon-stamp--idolized {
+  border-color: var(--robco-green);
+  color: var(--robco-green);
+}
+
+/* ── #23 CASE-CLOSED STAMP / #24 FILAMENT DIE — BUS-17 slot (Group 5) ── */
+@keyframes dir-stamp-punch {
+  0% {
+    opacity: 0;
+    transform: scale(2.4) rotate(-6deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(0.95) rotate(2deg);
+  }
+  100% {
+    opacity: 0.95;
+    transform: scale(1) rotate(0deg);
+  }
+}
+.dir-stamp {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 2px 8px;
+  border: 2px solid var(--robco-green);
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  color: var(--robco-green);
+  animation: dir-stamp-punch 550ms ease-out both;
+  pointer-events: none;
+}
+.dir-stamp--failed {
+  border-color: var(--robco-danger);
+  color: var(--robco-danger);
+}
+.dir-slot {
+  position: relative;
+}
+@keyframes dir-lamp-flicker-out {
+  0%,
+  20%,
+  45%,
+  100% {
+    opacity: 0.15;
+  }
+  10%,
+  30%,
+  60% {
+    opacity: 0.9;
+  }
+}
+.dir-slot--stamped.failed .dir-lamp {
+  animation: dir-lamp-flicker-out 1.2s steps(6, end);
+}
+@keyframes dir-lamp-steady {
+  0% {
+    opacity: 0.3;
+    filter: brightness(1);
+  }
+  50% {
+    opacity: 1;
+    filter: brightness(2.4);
+  }
+  100% {
+    opacity: 0.7;
+    filter: brightness(1);
+  }
+}
+.dir-slot--stamped.complete .dir-lamp {
+  animation: dir-lamp-steady 900ms ease-out;
+}
+
+/* ── #22 EXHIBIT LIGHT-UP — BUS-15 curio archive (Group 4) ──────────── */
+@keyframes curio-lightup {
+  0% {
+    filter: brightness(0.35) saturate(0.4);
+  }
+  30% {
+    filter: brightness(0.5) saturate(0.5);
+  }
+  45% {
+    filter: brightness(0.4) saturate(0.4);
+  }
+  70% {
+    filter: brightness(1.6) saturate(1.3);
+  }
+  100% {
+    filter: brightness(1) saturate(1);
+  }
+}
+.curio-obj.curio-lightup {
+  animation: curio-lightup 1.4s ease-out;
+}
+
+/* ── #26 SURVEY PING — BUS-16 cartography table (Group 5) ───────────── */
+@keyframes survey-ping-ring {
+  0% {
+    r: 6;
+    opacity: 0.9;
+    stroke-width: 2.5;
+  }
+  100% {
+    r: 22;
+    opacity: 0;
+    stroke-width: 0.5;
+  }
+}
+.survey-ping-ring {
+  fill: none;
+  stroke: var(--robco-green);
+  animation: survey-ping-ring 1.6s ease-out both;
+}
+@keyframes survey-ping-dot-pulse {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  40% {
+    filter: brightness(2.6);
+  }
+}
+.node.survey-ping .dot {
+  animation: survey-ping-dot-pulse 1.6s ease-out both;
+}

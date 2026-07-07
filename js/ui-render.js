@@ -827,10 +827,24 @@ function setQuestDrawer(k) {
 // point onto the SAME state.quests[i].status field, exactly like the
 // existing native affinity/mark-visited setters (Protocol 22 pattern).
 const _QUEST_CYCLE = { active: 'complete', complete: 'failed', failed: 'active' };
+// _pendingQuestStamp (FEEDBACK ANIMATION WAVE 1, #23 CASE-CLOSED STAMP / #24
+// FILAMENT DIE) — a transient module var, never state.*, declared in
+// state.js (loaded by test.html's reduced boot chain too — Protocol 27),
+// consumed by renderQuests() the next time it paints (mirrors
+// _pendingSurveyPing — the innerHTML-rebuild-survives-the-race pattern).
 function cycleQuestStatus(idx) {
   if (!state.quests || !state.quests[idx]) return;
   const cur = String(state.quests[idx].status || 'active').toLowerCase();
-  state.quests[idx].status = _QUEST_CYCLE[cur] || 'active';
+  const next = _QUEST_CYCLE[cur] || 'active';
+  state.quests[idx].status = next;
+  if (next === 'complete' || next === 'failed') {
+    RobcoEvents.emit('quest.status', {
+      name: state.quests[idx].name,
+      status: next,
+      prevStatus: cur,
+    });
+    _pendingQuestStamp = { name: state.quests[idx].name, status: next };
+  }
   saveState();
   renderQuests();
   updateMath();
@@ -907,13 +921,23 @@ function renderQuests() {
     return;
   }
 
+  // FEEDBACK ANIMATION WAVE 1 (#23/#24) — consume the pending stamp exactly
+  // once, only for the row it names, then clear it (never state.*).
+  const stampName = _pendingQuestStamp ? String(_pendingQuestStamp.name || '').toLowerCase() : null;
+  const stampStatus = _pendingQuestStamp ? _pendingQuestStamp.status : null;
+  _pendingQuestStamp = null;
+
   questsDiv.innerHTML = shown
     .map(({ quest: qq, i }) => {
       const st = norm(qq);
       const factions = qq.factions
         ? ` <span style="font-size:9px;opacity:0.6;">[${escapeHtml(String(qq.factions))}]</span>`
         : '';
-      return `<div class="dir-slot ${st}">
+      const isStamped = stampName && String(qq.name || '').toLowerCase() === stampName;
+      const stampHtml = isStamped
+        ? `<span class="dir-stamp dir-stamp--${stampStatus}" aria-hidden="true">${stampStatus === 'failed' ? 'FAILED' : 'COMPLETE'}</span>`
+        : '';
+      return `<div class="dir-slot ${st}${isStamped ? ' dir-slot--stamped' : ''}">
         <span class="s-idx">SLOT ${String(i + 1).padStart(2, '0')}</span>
         <span class="dir-lamp" aria-hidden="true"></span>
         <span class="dir-main">
@@ -925,9 +949,20 @@ function renderQuests() {
           <button class="cyc" onclick="cycleQuestStatus(${i})" aria-label="Cycle ${escapeHtml(qq.name)} status (now ${st})">&#8635; CYCLE</button>
           <button class="del" onclick="removeQuest(${i})" aria-label="Remove ${escapeHtml(qq.name)}">&#10005;</button>
         </span>
+        ${stampHtml}
       </div>`;
     })
     .join('');
+  // The stamp is a one-shot CSS animation that ends on a correct static
+  // final frame (Protocol UI-9) — clear the marker class after it plays so a
+  // later re-render (e.g. a search/filter keystroke) doesn't replay it.
+  if (stampName) {
+    setTimeout(() => {
+      questsDiv
+        .querySelectorAll('.dir-slot--stamped')
+        .forEach(el => el.classList.remove('dir-slot--stamped'));
+    }, 1500);
+  }
 }
 function removeQuest(idx) {
   state.quests.splice(idx, 1);
@@ -1073,6 +1108,11 @@ function renderCollectibles() {
   const plaque = document.getElementById('curioMainPlaque');
   if (plaque) plaque.textContent = `◈ ${acquiredCount} OF ${total} ${typeLabel} ON DISPLAY`;
 
+  // FEEDBACK ANIMATION WAVE 1 (#22 EXHIBIT LIGHT-UP) — consume the pending
+  // list exactly once, only for the objects it names, then clear it.
+  const lightNames = new Set(_pendingExhibitLight.map(n => n.toLowerCase()));
+  _pendingExhibitLight = [];
+
   const icon = _curioObjectIconHtml(category);
   container.innerHTML = defs
     .map(d => {
@@ -1082,9 +1122,11 @@ function renderCollectibles() {
         ? 'acquired; tap to mark missing'
         : 'missing; tap to mark acquired' +
           (d.location ? ` — last known location ${escapeHtml(d.location)}` : '');
+      const isLighting = lightNames.has(d.name.toLowerCase());
       const cls =
         'curio-obj tracker-row tracker-toggle ' +
-        (isAcq ? 'tracker-toggle--active' : 'tracker-toggle--inactive');
+        (isAcq ? 'tracker-toggle--active' : 'tracker-toggle--inactive') +
+        (isLighting ? ' curio-lightup' : '');
       return (
         `<div class="curio-cell"><button class="${cls}" data-name="${safeAttr}" ` +
         `onclick="toggleCollectible(this.dataset.name)" aria-label="${escapeHtml(d.name)} — ${word}">` +
@@ -1093,8 +1135,20 @@ function renderCollectibles() {
       );
     })
     .join('');
+  if (lightNames.size) {
+    setTimeout(() => {
+      container
+        .querySelectorAll('.curio-lightup')
+        .forEach(el => el.classList.remove('curio-lightup'));
+    }, 1600);
+  }
 }
 
+// _pendingExhibitLight (FEEDBACK ANIMATION WAVE 1, #22 EXHIBIT LIGHT-UP) — an
+// array of newly-acquired names, never state.*, declared in state.js (loaded
+// by test.html's reduced boot chain too — Protocol 27), consumed by
+// renderCollectibles() the next time it paints (the same deferred-consumption
+// pattern as _pendingSurveyPing/_pendingQuestStamp).
 function toggleCollectible(name) {
   if (!state.collectibles) state.collectibles = [];
   const lowerName = name.toLowerCase();
@@ -1104,6 +1158,7 @@ function toggleCollectible(name) {
   } else {
     state.collectibles.push(name);
     RobcoEvents.emit('collectible.acquired', { name }); // U8 auto-log
+    _pendingExhibitLight.push(name);
   }
   renderCollectibles();
   renderSessionStats();
@@ -1950,6 +2005,14 @@ function renderWorldMap() {
     )
     .join('');
 
+  // FEEDBACK ANIMATION WAVE 1 (#26 SURVEY PING, §5 of the build plan) —
+  // consumed ONLY here, on the WORLD GRID paint (never the zoomed sector
+  // sheet, which returns early above) so the ping is always actually seen:
+  // marking from the zoomed sheet waits until the user taps < WORLD GRID; an
+  // AI discovery while off-map waits until the user next opens the map.
+  const pingZone = _pendingSurveyPing ? zoneByLoc[String(_pendingSurveyPing).toLowerCase()] : null;
+  _pendingSurveyPing = null;
+
   _mapLastNodes = [];
   let signalCount = 0;
   const nodesSvg = zones
@@ -1974,7 +2037,11 @@ function renderWorldMap() {
           ? 'unsurveyed signal return'
           : 'surveyed node';
       const safeName = escapeHtml(z.name.replace(/'/g, "\\'"));
-      return `<g class="node${fog ? ' fog' : ''}" id="mapNode-${i}" tabindex="0" role="button"
+      const isPingTarget = pingZone === z;
+      const pingSvg = isPingTarget
+        ? `<circle class="survey-ping-ring" cx="${x}" cy="${y}" r="8.5"/>`
+        : '';
+      return `<g class="node${fog ? ' fog' : ''}${isPingTarget ? ' survey-ping' : ''}" id="mapNode-${i}" tabindex="0" role="button"
         aria-label="${escapeHtml(z.name)} — ${statusWord}${signal ? ', ' + signal.label.toLowerCase() : ''}; Enter pulls the sector sheet"
         onclick="zoomMapToZone('${safeName}')"
         onkeydown="_mapNodeKeyNav(event, '${safeName}')">
@@ -1982,7 +2049,7 @@ function renderWorldMap() {
         <circle class="focusring" cx="${x}" cy="${y}" r="13"/>
         <circle class="halo" cx="${x}" cy="${y}" r="8.5"/>
         <circle class="dot" cx="${x}" cy="${y}" r="${fog ? 4 : 4.4}"/>
-        ${label}${sigSvg}
+        ${pingSvg}${label}${sigSvg}
       </g>`;
     })
     .join('');
@@ -2090,6 +2157,13 @@ function _facPinPct(data) {
   return Math.min(100, Math.max(0, (fam / total) * 100));
 }
 
+// _pendingRepStamp (FEEDBACK ANIMATION WAVE 1, #14 REPUTATION STAMP) — a
+// transient module var, never state.*, declared in state.js (loaded by
+// test.html's reduced boot chain too — Protocol 27), consumed by
+// renderFactionRep() the next time it paints (the same deferred-consumption
+// pattern as _pendingSurveyPing/_pendingQuestStamp). Only shows when the
+// affected faction is the currently-SELECTED channel (a mismatch just means
+// no on-panel stamp that render; the echo still fires regardless).
 function renderFactionRep() {
   const container = document.getElementById('factionContainer');
   if (!container) return;
@@ -2149,6 +2223,15 @@ function renderFactionRep() {
   const selStanding = standingOf(sel);
   const selPinPct = _facPinPct(selData);
 
+  // FEEDBACK ANIMATION WAVE 1 (#14) — consume the pending stamp exactly
+  // once, only when the affected channel is the one being painted.
+  let repStampHtml = '';
+  if (_pendingRepStamp && _pendingRepStamp.key === sel.key) {
+    const dir = _pendingRepStamp.direction === 'vilified' ? 'vilified' : 'idolized';
+    repStampHtml = `<span class="facon-stamp facon-stamp--${dir}" aria-hidden="true">${dir === 'vilified' ? 'VILIFIED' : 'IDOLIZED'}</span>`;
+  }
+  _pendingRepStamp = null;
+
   const stripHtml = registry
     .map(f => {
       const st = standingOf(f);
@@ -2160,6 +2243,7 @@ function renderFactionRep() {
   container.innerHTML = `
     <div class="facon-groups">${selectorHtml}</div>
     <div class="facon-meter-wrap">
+      ${repStampHtml}
       <div class="facon-title">
         <span class="facon-name">${escapeHtml(sel.name).toUpperCase()}</span>
         <span class="facon-standing" style="color:${selStanding.color}">${selStanding.label.toUpperCase()}</span>
@@ -2185,6 +2269,15 @@ function renderFactionRep() {
   // UI-2), reusing the one persistence helper rather than a second mechanism.
   if (typeof _wireDynamicSubPanel === 'function') {
     _wireDynamicSubPanel(container.querySelector('[data-sub-id="minor_factions_channel"]'));
+  }
+  // The stamp is a one-shot CSS animation ending on a correct static final
+  // frame (Protocol UI-9) — remove it after it plays so a later re-render
+  // (e.g. switching channels back) doesn't replay it.
+  if (repStampHtml) {
+    setTimeout(() => {
+      const el = container.querySelector('.facon-stamp');
+      if (el) el.remove();
+    }, 1600);
   }
 }
 

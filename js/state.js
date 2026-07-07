@@ -1625,6 +1625,22 @@ function syncStateFromDom() {
 // helper so the map's CURRENT / VISITED / UNKNOWN status can never desync from reality.
 // Game-agnostic (Protocol 38): operates on the location string only — no game literals.
 // Does NOT save or push to cloud; the caller persists via saveState (cloud stays manual).
+// _pendingSurveyPing (FEEDBACK ANIMATION WAVE 1, §5): a transient module var —
+// never state.* — read/cleared by renderWorldMap() in ui-render.js (same
+// global lexical scope; classic <script> tags share one realm, no window.
+// prefix needed, matching the existing _mapActiveZone/_lastRadThreshold
+// pattern elsewhere in this codebase).
+let _pendingSurveyPing = null;
+// The three siblings below (#14/#22/#23-24) are set at their emit site in
+// api.js (which tests/test.html's reduced boot chain DOES load) and consumed
+// by ui-render.js's render functions (which that reduced chain deliberately
+// does NOT load) — declared here in state.js, like _pendingSurveyPing above,
+// so every environment that loads api.js also has them defined (Protocol 27
+// fix: a ReferenceError surfaced in the test.html harness because these were
+// originally declared in ui-render.js only).
+let _pendingRepStamp = null; // #14 REPUTATION STAMP
+let _pendingQuestStamp = null; // #23 CASE-CLOSED STAMP / #24 FILAMENT DIE
+let _pendingExhibitLight = []; // #22 EXHIBIT LIGHT-UP
 function recordLocationVisit(locName) {
   const loc = (locName == null ? '' : String(locName)).trim();
   if (!loc) return;
@@ -1632,6 +1648,14 @@ function recordLocationVisit(locName) {
   const lower = loc.toLowerCase();
   if (!state.locationHistory.some(l => String(l || '').toLowerCase() === lower)) {
     state.locationHistory.push(loc);
+    // FEEDBACK ANIMATION WAVE 1: the single choke point for every discovery
+    // path (manual mark-visited, arrival, AI autoImport) — one emit covers
+    // all of them (Protocol 22). SURVEY PING (#26) is deferred: it sets a
+    // transient pending var (never state.*) that renderWorldMap() consumes
+    // only when it next paints the WORLD GRID view, so the ping is always
+    // actually seen instead of playing off-screen or under a zoomed sheet.
+    RobcoEvents.emit('location.visited', { loc });
+    _pendingSurveyPing = loc;
   }
 }
 

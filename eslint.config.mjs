@@ -96,6 +96,15 @@ export default [
         sanitizeImportedContainer: 'readonly',
         syncStateFromDom: 'readonly',
         recordLocationVisit: 'readonly',
+        // FEEDBACK ANIMATION WAVE 1 — pending vars declared in state.js
+        // (loaded by every environment, including tests/test.html's reduced
+        // boot chain — Protocol 27), set at an emit site (api.js / ui-render.js)
+        // and consumed+cleared by the render function that owns the home
+        // animation (ui-render.js)
+        _pendingSurveyPing: 'writable', // state.js -> ui-render.js (renderWorldMap, #26 SURVEY PING)
+        _pendingQuestStamp: 'writable', // state.js -> ui-render.js/api.js (#23/#24 quest stamp)
+        _pendingRepStamp: 'writable', // state.js -> ui-render.js/api.js (#14 REPUTATION STAMP)
+        _pendingExhibitLight: 'writable', // state.js -> ui-render.js/api.js (#22 EXHIBIT LIGHT-UP)
         generateSyncPayload: 'readonly',
         restoreChatHistory: 'readonly',
         chatHistory: 'writable',

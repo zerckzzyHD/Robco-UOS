@@ -623,7 +623,19 @@ function autoImportState(jsonString) {
     // All five limbs including head
     ['la', 'ra', 'll', 'rl', 'hd'].forEach(limb => {
       const v = parsed[limb] !== undefined ? parsed[limb] : parsed[limb.toUpperCase()];
-      if (v !== undefined) state[limb] = String(v).toUpperCase() === 'CRIPPLED' ? 'CRIPPLED' : 'OK';
+      if (v !== undefined) {
+        const wasOk = state[limb] === 'OK';
+        const newVal = String(v).toUpperCase() === 'CRIPPLED' ? 'CRIPPLED' : 'OK';
+        state[limb] = newVal;
+        // FEEDBACK ANIMATION WAVE 1 (#6 X-RAY FLASH / #7 SPLINT WRAP) — the
+        // SAME limb.state event the native toggleLimb() emits (ui-core.js),
+        // fired only on a genuine change so an unchanged AI resend never
+        // replays the animation (Protocol 22).
+        const nowOk = newVal === 'OK';
+        if (wasOk !== nowOk) {
+          RobcoEvents.emit('limb.state', { limb, state: nowOk ? 'ok' : 'crippled' });
+        }
+      }
     });
     // Snapshot factions BEFORE update for auto-logging
     const factionsBefore = state.factions ? JSON.parse(JSON.stringify(state.factions)) : {};
@@ -793,6 +805,18 @@ function autoImportState(jsonString) {
           } else if (newStatus === 'FAILED' && typeof playQuestFailSound === 'function') {
             playQuestFailSound();
           }
+          // FEEDBACK ANIMATION WAVE 1 (#23 CASE-CLOSED STAMP / #24 FILAMENT
+          // DIE) — the SAME quest.status event the native cycleQuestStatus()
+          // emits (ui-render.js), so the annunciator/home animation react
+          // identically to an AI-driven status change (Protocol 22).
+          if (curr.status === 'complete' || curr.status === 'failed') {
+            RobcoEvents.emit('quest.status', {
+              name: curr.name,
+              status: curr.status,
+              prevStatus: prev.status,
+            });
+            _pendingQuestStamp = { name: curr.name, status: curr.status };
+          }
         }
       });
     }
@@ -908,6 +932,9 @@ function autoImportState(jsonString) {
             curNet,
             prevNet,
           });
+          // FEEDBACK ANIMATION WAVE 1 (#14 REPUTATION STAMP) — consumed by
+          // renderFactionRep() the next time it paints (Protocol 22).
+          _pendingRepStamp = { key: f.key, direction: 'vilified' };
         }
         // Crossing into Idolized
         if (prevNet < 750 && curNet >= 750) {
@@ -918,6 +945,7 @@ function autoImportState(jsonString) {
             curNet,
             prevNet,
           });
+          _pendingRepStamp = { key: f.key, direction: 'idolized' };
         }
       });
     }
@@ -946,11 +974,22 @@ function autoImportState(jsonString) {
         typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.collectibles)
           ? new Set(FALLOUT_REGISTRY.collectibles.map(c => c.name))
           : new Set();
+      const _collectBefore = new Set((state.collectibles || []).map(n => n.toLowerCase()));
       const _collectSeen = new Set();
       state.collectibles = parsed.collectibles.filter(c => {
         if (typeof c !== 'string' || !_collectNames.has(c) || _collectSeen.has(c)) return false;
         _collectSeen.add(c);
         return true;
+      });
+      // FEEDBACK ANIMATION WAVE 1 (#22 EXHIBIT LIGHT-UP) — the SAME
+      // collectible.acquired event the native toggleCollectible() emits
+      // (ui-render.js), fired only for genuinely NEW names so an AI resend
+      // of an already-collected item never replays the animation.
+      state.collectibles.forEach(name => {
+        if (!_collectBefore.has(name.toLowerCase())) {
+          RobcoEvents.emit('collectible.acquired', { name });
+          _pendingExhibitLight.push(name);
+        }
       });
     }
 

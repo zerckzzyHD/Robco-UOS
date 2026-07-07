@@ -9079,7 +9079,7 @@ function Test-OnCallsInsideWiringFn($src, $fnNames) {
     return @{ total = $total; inside = $inside }
 }
 $audioCheck135 = Test-OnCallsInsideWiringFn $uiAudioSrc135 '_wireAudioEventBusSubscribers'
-$coreCheck135  = Test-OnCallsInsideWiringFn $uiCoreSrc135 @('_wireCoreEventBusSubscribers', '_wireChassisCoreEventBusSubscribers')
+$coreCheck135  = Test-OnCallsInsideWiringFn $uiCoreSrc135 @('_wireCoreEventBusSubscribers', '_wireChassisCoreEventBusSubscribers', '_wireFeedbackEchoSubscribers')
 $apiCheck135   = Test-OnCallsInsideWiringFn $apiSrc '_wireApiEventBusSubscribers'
 Check (
     ($audioCheck135.total -eq $audioCheck135.inside) -and ($audioCheck135.total -gt 0) -and
@@ -17222,7 +17222,7 @@ try {
   }
   const cycleFnSrc = 'function cycleQuestStatus(idx) ' + extractFunctionBody(src, 'cycleQuestStatus');
   const cycleConstMatch = src.match(/const _QUEST_CYCLE = \{[^}]*\};/);
-  const sandbox = { state: { quests: [{ name: 'Test Directive', status: 'active' }] }, saveState: () => {}, renderQuests: () => {}, updateMath: () => {}, console };
+  const sandbox = { state: { quests: [{ name: 'Test Directive', status: 'active' }] }, saveState: () => {}, renderQuests: () => {}, updateMath: () => {}, RobcoEvents: { emit: () => {} }, _pendingQuestStamp: null, console };
   vm.createContext(sandbox);
   vm.runInContext((cycleConstMatch ? cycleConstMatch[0] : '') + '\n' + cycleFnSrc, sandbox);
   vm.runInContext('cycleQuestStatus(0)', sandbox);
@@ -18999,6 +18999,277 @@ $iconBtnRule195 = [System.Text.RegularExpressions.Regex]::Match($cssStripped195,
 Check (
     ($iconBtnRule195 -match 'width:\s*32px') -and ($iconBtnRule195 -match 'min-width:\s*32px')
 ) '195.8: .icon-btn-round keeps its 32px (>=28px Protocol 17) tap target -- the help button repositioning only changed top/right, never its size'
+
+# ===========================================================
+# Suite 196 -- FEEDBACK ANIMATION WAVE 1: the STATUS ANNUNCIATOR echo
+# mechanism, 4 new additive RobcoEvents emits (rad.tier/limb.state/
+# quest.status/location.visited + the collectible.acquired AI-path emit),
+# and the 8 Tier-S flagship home-panel animations
+# (planning/FEEDBACK_ANIMATION_BUILD_PLAN.md -- WAVE 1).
+# 37 tests
+# ===========================================================
+Sep "Suite 196 -- FEEDBACK ANIMATION WAVE 1: annunciator + new emits + 8 flagships"
+$stateSrc196 = Read-Src "js/state.js"
+$coreSrc196 = Read-Src "js/ui-core.js"
+$renderSrc196 = Read-Src "js/ui-render.js"
+$apiSrc196 = Read-Src "js/api.js"
+$htmlSrc196 = Read-Src "index.html"
+$css196 = Read-Src "css/terminal.css"
+$cssStripped196 = [regex]::Replace($css196, '/\*[\s\S]*?\*/', '')
+
+# 196.1  rad.tier emitted once at the existing radThreshold crossing
+#        detector in updateMath() -- the hp.critical precedent, reusing
+#        _bioScanCompute's own NONE/MINOR/ADVANCED/SEVERE breakpoints.
+$updateMathBody196 = Get-FunctionBody $coreSrc196 'updateMath'
+Check (
+    ($updateMathBody196 -match "RobcoEvents\.emit\(\s*['`"]rad\.tier['`"]") -and
+    ($updateMathBody196 -match '_lastRadThreshold\s*=\s*radThreshold')
+) '196.1: updateMath() emits rad.tier exactly at the existing _lastRadThreshold crossing detector'
+
+# 196.2  _radTierName() maps the threshold ladder onto _bioScanCompute's own
+#        NONE/MINOR/ADVANCED/SEVERE tier names -- no new breakpoint table.
+Check (
+    ($coreSrc196 -match 'function _radTierName\(threshold\)') -and
+    ($coreSrc196 -match "'SEVERE'") -and ($coreSrc196 -match "'ADVANCED'") -and
+    ($coreSrc196 -match "'MINOR'") -and ($coreSrc196 -match "'NONE'")
+) '196.2: _radTierName() reuses the NONE/MINOR/ADVANCED/SEVERE tier vocabulary (no second breakpoint table)'
+
+# 196.3  limb.state emitted from the native toggleLimb() setter.
+$toggleLimbBody196 = Get-FunctionBody $coreSrc196 'toggleLimb'
+Check (
+    $toggleLimbBody196 -match "RobcoEvents\.emit\(\s*['`"]limb\.state['`"]"
+) '196.3: toggleLimb() emits limb.state on every native limb toggle'
+
+# 196.4  limb.state ALSO emitted from the AI limb-set path in
+#        autoImportState() (api.js) -- fired only on a genuine change.
+Check (
+    ($apiSrc196 -match "const wasOk = state\[limb\] === 'OK';") -and
+    ($apiSrc196 -match "RobcoEvents\.emit\(\s*['`"]limb\.state['`"]") -and
+    ($apiSrc196 -match 'if \(wasOk !== nowOk\)')
+) '196.4: the AI limb-set path in autoImportState() also emits limb.state, gated on a genuine OK<->CRIPPLED change'
+
+# 196.5  quest.status emitted from the native cycleQuestStatus() -- the ONE
+#        native quest-status write path (Suite 189) -- AND from the AI
+#        quest-status-diff in autoImportState() (Protocol 14 AI-contract:
+#        both paths drive the SAME event, never a fork).
+$cycleBody196 = Get-FunctionBody $renderSrc196 'cycleQuestStatus'
+Check (
+    $cycleBody196 -match "RobcoEvents\.emit\(\s*['`"]quest\.status['`"]"
+) '196.5: cycleQuestStatus() emits quest.status on a genuine complete/failed transition'
+Check (
+    [System.Text.RegularExpressions.Regex]::IsMatch(
+        $apiSrc196,
+        "if \(prev && prev\.status !== curr\.status\) \{[\s\S]{0,1200}RobcoEvents\.emit\(\s*['`"]quest\.status['`"]"
+    )
+) '196.6: the AI quest-status-diff in autoImportState() also emits quest.status (same event as the native cycle key)'
+
+# 196.7  location.visited emitted from the SINGLE choke point
+#        recordLocationVisit() (state.js) -- covers manual mark-visited,
+#        arrival, and the AI autoImport path in one emit (Protocol 22).
+$recordBody196 = Get-FunctionBody $stateSrc196 'recordLocationVisit'
+Check (
+    $recordBody196 -match "RobcoEvents\.emit\(\s*['`"]location\.visited['`"]"
+) '196.7: recordLocationVisit() emits location.visited -- the single choke point for every discovery path'
+
+# 196.8  collectible.acquired ALSO emitted on the AI collectible-add path
+#        (previously only the native toggleCollectible() emitted it) --
+#        fired only for genuinely NEW names (never an AI resend replay).
+Check (
+    ($apiSrc196 -match '_collectBefore\.has\(name\.toLowerCase\(\)\)') -and
+    ($apiSrc196 -match "RobcoEvents\.emit\(\s*['`"]collectible\.acquired['`"]")
+) '196.8: the AI collectible-add path in autoImportState() emits collectible.acquired for genuinely new items only'
+
+# 196.9  the casing-top readout is a real <button> (Protocol UI-5), with
+#        role=status + aria-live=polite (doubles as an SR notification) and
+#        a static aria-label (so an empty button always has an accessible
+#        name -- the a11y button-name rule).
+Check (
+    [System.Text.RegularExpressions.Regex]::IsMatch(
+        $htmlSrc196,
+        '(?s)<button[\s\S]{0,300}id="statusAnnunciator"[\s\S]{0,200}role="status"[\s\S]{0,200}aria-live="polite"[\s\S]{0,300}aria-label="[^"]+"'
+    ) -and ($htmlSrc196 -match 'onclick="_echoJump\(\)"')
+) '196.9: #statusAnnunciator is a real <button> with role=status, aria-live=polite, a static aria-label, and tap-to-jump wired to _echoJump()'
+
+# 196.10 the suppression rule (the viewability core): _echoPush() fires IFF
+#        the event's home subsystem != the active one -- never both.
+$echoPushBody196 = Get-FunctionBody $coreSrc196 '_echoPush'
+Check (
+    $echoPushBody196 -match '_echoActiveSubsystem\(\) === homeSubsystem\) return;'
+) "196.10: _echoPush() suppresses the echo when the active subsystem already equals the event's home (no redundant echo)"
+
+# 196.11 identical-consecutive collapse (xN) -- never floods with repeats.
+Check (
+    ($echoPushBody196 -match '_echoCurrent\.count\+\+') -and ($echoPushBody196 -match 'tail\.count\+\+')
+) '196.11: _echoPush() collapses an identical consecutive event into a xN count bump instead of a new entry'
+Check (
+    $coreSrc196 -match "count > 1 \? ' ×' \+ c\.count"
+) '196.11b: _echoRenderCurrent() actually renders the xN suffix when count > 1'
+
+# 196.12 FIFO queue, cap 6, drop-oldest -- never floods.
+Check (
+    ($coreSrc196 -match 'const ECHO_QUEUE_CAP = 6;') -and
+    ($coreSrc196 -match '_echoQueue\.length > ECHO_QUEUE_CAP\) _echoQueue\.shift\(\);')
+) '196.12: the echo queue is capped at 6 with a drop-oldest (shift) policy'
+
+# 196.13 tap-to-jump routes through the SAME selectSubsystem()/switchTab()
+#        router every bezel keycap already uses (Protocol 22 -- no forked
+#        routing) -- never a bespoke navigation path.
+$echoJumpBody196 = Get-FunctionBody $coreSrc196 '_echoJump'
+Check (
+    $echoJumpBody196 -match 'selectSubsystem\(home\)'
+) '196.13: _echoJump() calls the existing selectSubsystem() router -- no forked navigation'
+
+# 196.14 the visibility gate is DELIBERATELY narrower than
+#        _coreShouldAnimate(): the readout must stay visible at every
+#        Immersion tier and under reduced-motion (only the entrance/exit
+#        FLOURISH quiets there, automatically, via the global
+#        prefers-reduced-motion block) -- fully suppressed only when there
+#        is truly no viewer (hidden tab / runtime powered down).
+$gateBody196 = Get-FunctionBody $coreSrc196 '_echoShouldShow'
+Check (
+    (-not ($gateBody196 -match 'immersionAllows')) -and
+    (-not ($gateBody196 -match 'prefers-reduced-motion')) -and
+    ($gateBody196 -match 'document\.hidden') -and
+    ($gateBody196 -match "STANDBY['`"]|SHUTDOWN['`"]|OFF['`"]")
+) '196.14: _echoShouldShow() does NOT gate on immersion tier or reduced-motion (essential feedback stays visible) -- only on document.hidden / runtime STANDBY-SHUTDOWN-OFF'
+Check (
+    [System.Text.RegularExpressions.Regex]::IsMatch($coreSrc196, "_echoPush\(evt\) \{\s*\n\s*if \(!evt \|\| !_echoShouldShow\(\)\) return;")
+) '196.14b: _echoPush() is gated by _echoShouldShow() before anything else -- no viewer means no push'
+
+# 196.15 the annunciator entrance/exit are plain @keyframes (never
+#        transition-only) so the existing global prefers-reduced-motion
+#        block auto-neutralizes them to a correct, instant final frame --
+#        no bespoke carve-out (Protocol UI-9).
+Check (
+    ($cssStripped196 -match '@keyframes annunciator-in') -and
+    ($cssStripped196 -match '@keyframes annunciator-out') -and
+    ([System.Text.RegularExpressions.Regex]::IsMatch($cssStripped196, '(?s)\.status-annunciator\.show \{[^\}]*animation:\s*annunciator-in'))
+) '196.15: the annunciator entrance/exit are plain @keyframes animations (reduced-motion-safe by construction)'
+
+# 196.16 _wireFeedbackEchoSubscribers() is called from window.onload (the
+#        U7 boot-order lesson -- never a bare top-level RobcoEvents.on()).
+$onloadIdx196 = $coreSrc196.IndexOf('window.onload')
+$wireIdx196 = $coreSrc196.IndexOf('_wireFeedbackEchoSubscribers();')
+Check (
+    ($coreSrc196 -match '_wireFeedbackEchoSubscribers\(\);') -and
+    ($onloadIdx196 -ge 0) -and ($wireIdx196 -gt $onloadIdx196)
+) '196.16: _wireFeedbackEchoSubscribers() is called from window.onload, after it is declared'
+
+# 196.17 the annunciator subscribes to every (b)-class WAVE 1 event -- the
+#        8 flagships each also drive an annunciation.
+$wireBody196 = Get-FunctionBody $coreSrc196 '_wireFeedbackEchoSubscribers'
+foreach ($evt196 in @('hp.critical', 'rad.tier', 'limb.state', 'level.up', 'faction.threshold', 'quest.status', 'location.visited', 'collectible.acquired')) {
+    Check (
+        $wireBody196.Contains("'$evt196'")
+    ) "196.17: _wireFeedbackEchoSubscribers() subscribes to $evt196"
+}
+
+# 196.18  #1 FLATLINE WARNING -- a one-shot EKG stutter on the HP trace at
+#         the hp.critical crossing, PLUS a continuous red vignette for as
+#         long as HP stays critical (both gated on the same pct<25).
+Check (
+    ($cssStripped196 -match '@keyframes flatline-stutter') -and
+    ($cssStripped196 -match '@keyframes hp-vignette-breathe') -and
+    ($coreSrc196 -match "hpTrace\.classList\.add\('flatline-stutter'\)") -and
+    ($coreSrc196 -match "classList\.toggle\('hp-critical-vignette', pct < 25 && hpMax > 0\)")
+) '196.18: #1 FLATLINE WARNING -- one-shot HP-trace stutter (on crossing) + continuous vignette (while critical)'
+
+# 196.19  #4 GEIGER SPIKE / #5 RADAWAY DRAIN -- RAD trace chatter/drain +
+#         film-grain flourish, triggered off the new rad.tier event.
+Check (
+    ($cssStripped196 -match '@keyframes rad-spike-chatter') -and
+    ($cssStripped196 -match '@keyframes rad-drain-bubble') -and
+    ($cssStripped196 -match '@keyframes geiger-film-grain') -and
+    ($coreSrc196 -match "RobcoEvents\.on\(\s*['`"]rad\.tier['`"], p => \{")
+) '196.19: #4 GEIGER SPIKE / #5 RADAWAY DRAIN -- RAD trace chatter/drain + film grain, triggered by rad.tier'
+
+# 196.20  #6 X-RAY FLASH / #7 SPLINT WRAP -- bone-white inversion + a
+#         per-zone fracture/wrap, triggered off the new limb.state event.
+Check (
+    ($cssStripped196 -match '@keyframes xray-invert-flash') -and
+    ($cssStripped196 -match '@keyframes zone-fracture-draw') -and
+    ($cssStripped196 -match '@keyframes zone-splint-wrap') -and
+    ($coreSrc196 -match "RobcoEvents\.on\(\s*['`"]limb\.state['`"], p => \{")
+) '196.20: #6 X-RAY FLASH / #7 SPLINT WRAP -- zone-body inversion + per-zone fracture/wrap, triggered by limb.state'
+
+# 196.21  #9 VAULT-BOY LEVEL CARD (the flagship) -- a static, always-in-DOM
+#         card toggled by a one-shot 'show' class on level.up, with a paired
+#         XP-bar sweep-shimmer.
+Check (
+    ($htmlSrc196 -match 'id="levelUpCard"') -and
+    ($htmlSrc196 -match 'id="levelUpCardText"') -and
+    ($cssStripped196 -match '@keyframes level-card-in') -and
+    ($cssStripped196 -match '@keyframes level-card-sunburst') -and
+    ($cssStripped196 -match '@keyframes xp-sweep-shimmer') -and
+    ($coreSrc196 -match "card\.classList\.add\('show'\)")
+) '196.21: #9 VAULT-BOY LEVEL CARD -- static card + sunburst + XP sweep-shimmer, toggled on level.up'
+
+# 196.22  #14 REPUTATION STAMP -- a rubber-stamp slam consumed exactly once
+#         by renderFactionRep(), deferred via a pending var (survives the
+#         innerHTML rebuild race, the _pendingSurveyPing pattern).
+Check (
+    ($cssStripped196 -match '@keyframes facon-stamp-slam') -and
+    ($stateSrc196 -match 'let _pendingRepStamp = null;') -and
+    ($renderSrc196 -match '_pendingRepStamp && _pendingRepStamp\.key === sel\.key') -and
+    ($renderSrc196 -match '_pendingRepStamp = null;')
+) '196.22: #14 REPUTATION STAMP -- pending-var (state.js) deferred consumption in renderFactionRep(), cleared after one use'
+
+# 196.23  #23 CASE-CLOSED STAMP / #24 FILAMENT DIE -- a stamp + lamp
+#         steady/flicker-out consumed exactly once by renderQuests().
+Check (
+    ($cssStripped196 -match '@keyframes dir-stamp-punch') -and
+    ($cssStripped196 -match '@keyframes dir-lamp-steady') -and
+    ($cssStripped196 -match '@keyframes dir-lamp-flicker-out') -and
+    ($stateSrc196 -match 'let _pendingQuestStamp = null;') -and
+    ($renderSrc196 -match 'stampName = _pendingQuestStamp') -and
+    ($renderSrc196 -match '_pendingQuestStamp = null;')
+) '196.23: #23 CASE-CLOSED STAMP / #24 FILAMENT DIE -- pending-var (state.js) deferred consumption in renderQuests(), cleared after one use'
+
+# 196.24  #22 EXHIBIT LIGHT-UP -- a case-spotlight flourish consumed exactly
+#         once by renderCollectibles().
+Check (
+    ($cssStripped196 -match '@keyframes curio-lightup') -and
+    ($stateSrc196 -match 'let _pendingExhibitLight = \[\];') -and
+    ($renderSrc196 -match 'lightNames = new Set\(_pendingExhibitLight\.map') -and
+    ($renderSrc196 -match '_pendingExhibitLight = \[\];')
+) '196.24: #22 EXHIBIT LIGHT-UP -- pending-list (state.js) deferred consumption in renderCollectibles(), cleared after one use'
+
+# 196.25  #26 SURVEY PING (Section 5) -- deferred: consumed ONLY on the
+#         WORLD GRID paint (never the zoomed sector sheet, which returns
+#         early above it in renderWorldMap()), so the ping is always
+#         actually seen.
+$mapBody196 = Get-FunctionBody $renderSrc196 'renderWorldMap'
+$sectorSheetIdx196 = $mapBody196.IndexOf('if (_mapActiveZone)')
+$pingConsumeIdx196 = $mapBody196.IndexOf('const pingZone = _pendingSurveyPing')
+Check (
+    ($cssStripped196 -match '@keyframes survey-ping-ring') -and
+    ($sectorSheetIdx196 -ge 0) -and ($pingConsumeIdx196 -ge 0) -and
+    ($pingConsumeIdx196 -gt $sectorSheetIdx196)
+) '196.25: #26 SURVEY PING is consumed AFTER the zoomed-sector-sheet early return -- only the WORLD GRID paint ever plays it'
+Check (
+    $mapBody196 -match '_pendingSurveyPing = null;'
+) '196.25b: renderWorldMap() clears _pendingSurveyPing after consuming it (never replays on the next paint)'
+
+# 196.26  zero campaign-state write -- every WAVE 1 addition is transient
+#         (module vars / DOM classes) or an event payload; none of it ever
+#         assigns state.<field> or calls saveState()/robco_v8.
+$waveBodies196 = (Get-FunctionBody $coreSrc196 '_echoPush') + "`n" +
+    (Get-FunctionBody $coreSrc196 '_echoAdvance') + "`n" +
+    (Get-FunctionBody $coreSrc196 '_echoRenderCurrent') + "`n" +
+    (Get-FunctionBody $coreSrc196 '_echoJump') + "`n" +
+    (Get-FunctionBody $coreSrc196 '_wireFeedbackEchoSubscribers')
+Check (
+    (-not ($waveBodies196 -match 'state\.\w+\s*=')) -and (-not ($waveBodies196 -match 'saveState\(\)'))
+) '196.26: the annunciator mechanism never assigns state.* or calls saveState() -- purely transient/presentational'
+
+# 196.27  the level-up card and every stamp/overlay are aria-hidden (purely
+#         decorative) -- consistent with every other one-shot flourish
+#         already shipped (Protocol UI-10 gate-stacking precedent).
+Check (
+    ($htmlSrc196 -match 'id="levelUpCard" aria-hidden="true"') -and
+    ($renderSrc196 -match 'class="facon-stamp facon-stamp--\$\{dir\}" aria-hidden="true"') -and
+    ($renderSrc196 -match 'class="dir-stamp dir-stamp--\$\{stampStatus\}" aria-hidden="true"')
+) '196.27: the level-up card and the rep/quest stamps are aria-hidden (decorative, never double-announced)'
 
 # ===========================================================
 # Results

@@ -292,6 +292,24 @@
           </button>
         </div>
         <div class="vents" aria-hidden="true"></div>
+        <!-- STATUS ANNUNCIATOR (FEEDBACK ANIMATION WAVE 1) — a compact,
+             always-present casing-top echo that surfaces a (b)-class event
+             regardless of the active subsystem, generalizing the mini-core
+             dual-paint pattern (planning/FEEDBACK_ANIMATION_BUILD_PLAN.md
+             §2). Empty/inert until _echoPush() populates it (ui-core.js);
+             role=status + aria-live=polite doubles as a screen-reader
+             notification. A real <button> (Protocol UI-5) — tap jumps to
+             the reacting panel via _echoJump(). -->
+        <button
+          type="button"
+          class="status-annunciator"
+          id="statusAnnunciator"
+          role="status"
+          aria-live="polite"
+          aria-label="System status annunciator — tap to jump to the reacting panel"
+          onclick="_echoJump()"
+          title="Tap to jump to the reacting panel"
+        ></button>
         <!-- CHASSIS mini core mirror — a small dedicated readout window built
              into the casing-top header (owner request: the core reads better
              here than squeezed into the Director Uplink header, and this
@@ -556,6 +574,24 @@
                     />
                     <label>CPM</label>
                   </span>
+                </div>
+
+                <!-- FEEDBACK ANIMATION WAVE 1 (#9 VAULT-BOY LEVEL CARD, the
+                     flagship) — a static, always-in-DOM card toggled by a
+                     one-shot 'show' class on 'level.up' (ui-core.js), so it
+                     survives independent of any innerHTML re-render
+                     (Protocol 22, the mini-core static-element precedent).
+                     Lives INSIDE .crt-mon (position:relative) so its
+                     position:absolute overlay actually anchors to the CRT
+                     monitor, not some larger ancestor — and inherits the
+                     SAME harmless-decorative-bleed exclusion every other
+                     .crt-mon overlay (the glow-dot, fader cap) already has
+                     in tests/render-check.mjs. Purely decorative; zero
+                     campaign-state write. -->
+                <div class="level-card" id="levelUpCard" aria-hidden="true">
+                  <div class="lc-sunburst"></div>
+                  <div class="lc-figure">☺</div>
+                  <div class="lc-stencil" id="levelUpCardText">LEVEL —</div>
                 </div>
               </div>
 

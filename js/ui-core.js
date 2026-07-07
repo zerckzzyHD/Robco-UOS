@@ -2954,6 +2954,7 @@ window.onload = async function () {
     _wireAudioEventBusSubscribers();
     _wireApiEventBusSubscribers();
     _wireChassisCoreEventBusSubscribers(); // CHASSIS LIVING CORE: runtime.state/level.up/data.write/stat.change
+    _wireFeedbackEchoSubscribers(); // FEEDBACK ANIMATION WAVE 1: the STATUS ANNUNCIATOR
     // P2: reconcile device prefs from IndexedDB (bounded + fail-safe) BEFORE the rest of boot reads them.
     await _hydrateMetaFromIdb();
     _hydrateStateFromStorage();
@@ -5424,6 +5425,10 @@ function commitStat(el) {
 function toggleLimb(limb) {
   let wasOk = state[limb] === 'OK';
   state[limb] = wasOk ? 'CRIPPLED' : 'OK';
+  // FEEDBACK ANIMATION WAVE 1 (#6 X-RAY FLASH / #7 SPLINT WRAP): one
+  // additive emit at this existing setter (U7/U8 precedent) — the AI limb-set
+  // path in autoImportState() (js/api.js) emits the same event.
+  RobcoEvents.emit('limb.state', { limb, state: wasOk ? 'crippled' : 'ok' });
   if (wasOk) {
     if (limb === 'hd') {
       playHeadCrippleSound();
@@ -5910,6 +5915,18 @@ let _lastKarma = null,
 // Contextual terminal message gate variables
 // Each tracks the last-emitted threshold so we only fire once per crossing.
 let _lastRadThreshold = 0; // 0 / 200 / 400 / 600 / 1000
+// FEEDBACK ANIMATION WAVE 1: maps the threshold ladder above onto the SAME
+// NONE/MINOR/ADVANCED/SEVERE tier names _bioScanCompute() already uses
+// (Protocol 22 — no second breakpoint table).
+function _radTierName(threshold) {
+  return threshold >= 600
+    ? 'SEVERE'
+    : threshold >= 400
+      ? 'ADVANCED'
+      : threshold >= 200
+        ? 'MINOR'
+        : 'NONE';
+}
 let _lastGameHourBand = -1; // 0=night(20-5), 1=morning(6-11), 2=day(12-18), 3=evening(19)
 let _lastChemExpiry = new Set(); // names of chems we've already warned about
 
@@ -5927,6 +5944,19 @@ function _wireCoreEventBusSubscribers() {
     document.body.classList.add('crit-hp-flash');
     setTimeout(() => document.body.classList.remove('crit-hp-flash'), 750);
     if (typeof triggerHaptic === 'function') triggerHaptic('lowhealth'); // WU-F2 haptic
+    // FEEDBACK ANIMATION WAVE 1 (#1 FLATLINE WARNING) — a one-shot EKG
+    // stutter layered on the HP trace itself (add-class→reflow→remove, the
+    // _coreOneShot pattern), alongside the existing body flash/haptic above
+    // (Protocol 22, never forked). The continuous red vignette is a SEPARATE
+    // state-driven class toggled every updateMath() tick so it tracks HP
+    // staying critical, not just the crossing (see updateMath()).
+    const hpTrace = document.getElementById('opTraceHp');
+    if (hpTrace) {
+      hpTrace.classList.remove('flatline-stutter');
+      void hpTrace.offsetWidth;
+      hpTrace.classList.add('flatline-stutter');
+      setTimeout(() => hpTrace.classList.remove('flatline-stutter'), 1600);
+    }
   });
   // PHASE 3 · OPERATOR: the COMMIT LEVEL-UP key (#btnLevelUp) flashes its own
   // label on a successful level-up — reacts to the SAME 'level.up' bus event
@@ -5942,8 +5972,266 @@ function _wireCoreEventBusSubscribers() {
       tag.textContent = '▲ LEVEL UP';
     }, 1200);
   });
+  // FEEDBACK ANIMATION WAVE 1 (#9 VAULT-BOY LEVEL CARD, the flagship) — a
+  // static, always-in-DOM card (index.html, inside BUS-01) toggled by a
+  // one-shot 'show' class so it survives independent of any innerHTML
+  // re-render (Protocol 22, the mini-core static-element precedent). The XP
+  // bar gets a paired sweep-shimmer one-shot at the same trigger.
+  RobcoEvents.on('level.up', p => {
+    const card = document.getElementById('levelUpCard');
+    if (!card) return;
+    const textEl = document.getElementById('levelUpCardText');
+    const newLvl = p && typeof p.newLvl === 'number' ? p.newLvl : state.lvl;
+    if (textEl) textEl.textContent = 'LEVEL ' + newLvl;
+    card.classList.remove('show');
+    void card.offsetWidth;
+    card.classList.add('show');
+    clearTimeout(_levelUpCardTimer);
+    _levelUpCardTimer = setTimeout(() => card.classList.remove('show'), 2600);
+    const xpFill = document.getElementById('xp_bar_fill');
+    if (xpFill) {
+      xpFill.classList.remove('xp-sweep-shimmer');
+      void xpFill.offsetWidth;
+      xpFill.classList.add('xp-sweep-shimmer');
+      setTimeout(() => xpFill.classList.remove('xp-sweep-shimmer'), 1400);
+    }
+  });
+  // FEEDBACK ANIMATION WAVE 1 (#4 GEIGER SPIKE / #5 RADAWAY DRAIN) — the RAD
+  // trace chatters (up) or bubbles-drains (down); an amber ☢ film-grain
+  // flourish rides the escalating case only. Gated by nothing beyond the
+  // existing global prefers-reduced-motion block (Protocol UI-9) — a rad
+  // crossing is essential feedback, matching the rad-warning/-critical/-fatal
+  // classes already unconditional elsewhere in updateMath().
+  RobcoEvents.on('rad.tier', p => {
+    const radLine = document.getElementById('opRadLineWrap');
+    if (radLine) {
+      const cls = p && p.direction === 'down' ? 'rad-drain' : 'rad-spike';
+      radLine.classList.remove('rad-spike', 'rad-drain');
+      void radLine.offsetWidth;
+      radLine.classList.add(cls);
+      setTimeout(() => radLine.classList.remove(cls), 1100);
+    }
+    if (p && p.direction !== 'down' && p.tier !== 'NONE') {
+      document.body.classList.remove('geiger-film-grain');
+      void document.body.offsetWidth;
+      document.body.classList.add('geiger-film-grain');
+      setTimeout(() => document.body.classList.remove('geiger-film-grain'), 1000);
+    }
+  });
+  // FEEDBACK ANIMATION WAVE 1 (#6 X-RAY FLASH / #7 SPLINT WRAP) — a one-shot
+  // bone-white inversion across the whole zone-body silhouette plus a
+  // per-zone flash/wrap on the affected limb only.
+  RobcoEvents.on('limb.state', p => {
+    if (!p || !p.limb) return;
+    const zoneBody = document.querySelector('.zone-body');
+    if (zoneBody && p.state === 'crippled') {
+      zoneBody.classList.remove('zone-xray-flash');
+      void zoneBody.offsetWidth;
+      zoneBody.classList.add('zone-xray-flash');
+      setTimeout(() => zoneBody.classList.remove('zone-xray-flash'), 500);
+    }
+    const zone = document.querySelector('.zone[data-limb="' + p.limb + '"]');
+    if (zone) {
+      const cls = p.state === 'crippled' ? 'zone-fracture' : 'zone-splint-wrap';
+      zone.classList.remove('zone-fracture', 'zone-splint-wrap');
+      void zone.offsetWidth;
+      zone.classList.add(cls);
+      setTimeout(() => zone.classList.remove(cls), 900);
+    }
+  });
 }
 let _levelUpKeyFlashTimer = null;
+let _levelUpCardTimer = null;
+
+// ── STATUS ANNUNCIATOR (FEEDBACK ANIMATION WAVE 1 — planning/FEEDBACK_
+// ANIMATION_BUILD_PLAN.md §2) ────────────────────────────────────────────
+// A themed flagship animation plays on its HOME panel, but the triggering
+// event often fires while the user is on a DIFFERENT subsystem (above all
+// AI/autoImportState changes landing while the user is on UPLINK/chat) —
+// off-panel, the home animation is unseen. The annunciator generalizes the
+// mini-core dual-paint pattern: a compact, always-present casing-top readout
+// that surfaces the event regardless of the active subsystem.
+//
+// THE SUPPRESSION RULE (the viewability core): _echoPush(evt) fires IFF the
+// event's home subsystem != the currently active one (body.dataset.
+// subsystem, set by switchTab()). If the user is already on the home panel,
+// the home animation IS the feedback — no redundant echo.
+//
+// Purely presentational — transient module vars + DOM classes only, never
+// state.*/saveState()/robco_v8 (Protocol 22).
+const ECHO_QUEUE_CAP = 6;
+let _echoQueue = [];
+let _echoTimer = null;
+let _echoCurrent = null; // {tone, glyph, label, homeSubsystem, sig, count}
+
+// Visibility gate — DELIBERATELY narrower than _coreShouldAnimate(): the
+// readout is essential feedback and stays visible at every Immersion tier
+// and under reduced-motion (only the entrance/exit FLOURISH quiets there,
+// via the existing global prefers-reduced-motion block — automatic, no
+// bespoke carve-out). Fully suppressed only when there is truly no viewer:
+// a hidden tab or the runtime powered down (the standby-coordinator
+// STANDBY/SHUTDOWN/OFF precedent).
+function _echoShouldShow() {
+  if (typeof document !== 'undefined' && document.hidden) return false;
+  const rt =
+    typeof AmbientRuntime !== 'undefined' && AmbientRuntime ? AmbientRuntime.getState() : 'ACTIVE';
+  if (rt === 'STANDBY' || rt === 'SHUTDOWN' || rt === 'OFF') return false;
+  return true;
+}
+
+function _echoActiveSubsystem() {
+  return (document.body && document.body.dataset && document.body.dataset.subsystem) || '';
+}
+
+// tone: 'green' | 'amber' | 'red'. homeSubsystem: the subsystem key
+// (selectSubsystem()'s vocabulary) whose own animation already serves as
+// the feedback when the user is already there.
+function _echoPush(evt) {
+  if (!evt || !_echoShouldShow()) return;
+  const { tone, glyph, label, homeSubsystem } = evt;
+  if (homeSubsystem && _echoActiveSubsystem() === homeSubsystem) return; // on-panel: home animation IS the feedback
+  // Identical-consecutive collapse (never floods with repeats) — bump the
+  // count on whichever entry (currently showing, or queue tail) matches.
+  const sig = tone + '|' + glyph + '|' + label + '|' + homeSubsystem;
+  if (_echoCurrent && _echoCurrent.sig === sig) {
+    _echoCurrent.count++;
+    _echoRenderCurrent();
+    return;
+  }
+  const tail = _echoQueue[_echoQueue.length - 1];
+  if (tail && tail.sig === sig) {
+    tail.count++;
+    return;
+  }
+  _echoQueue.push({ tone, glyph, label, homeSubsystem, sig, count: 1 });
+  if (_echoQueue.length > ECHO_QUEUE_CAP) _echoQueue.shift(); // drop-oldest, never floods
+  if (!_echoTimer && !_echoCurrent) _echoAdvance();
+}
+window._echoPush = _echoPush;
+
+function _echoRenderCurrent() {
+  const el = document.getElementById('statusAnnunciator');
+  if (!el || !_echoCurrent) return;
+  const c = _echoCurrent;
+  el.classList.remove('tone-green', 'tone-amber', 'tone-red');
+  el.classList.add('tone-' + c.tone);
+  const safeLabel = typeof escapeHtml === 'function' ? escapeHtml(c.label) : c.label;
+  el.innerHTML =
+    '<span class="an-glyph" aria-hidden="true">' +
+    c.glyph +
+    '</span><span class="an-label">' +
+    safeLabel +
+    (c.count > 1 ? ' ×' + c.count : '') +
+    '</span>';
+  el.dataset.home = c.homeSubsystem || '';
+}
+
+// FIFO advance: shows the next queued item for ~2000ms, then advances — a
+// burst plays in sequence, oldest-first, nothing missed, one annunciation
+// visible at a time (never floods).
+function _echoAdvance() {
+  clearTimeout(_echoTimer);
+  _echoTimer = null;
+  const el = document.getElementById('statusAnnunciator');
+  const next = _echoQueue.shift();
+  if (!next) {
+    _echoCurrent = null;
+    if (el) el.classList.remove('show', 'hide');
+    return;
+  }
+  _echoCurrent = next;
+  if (el) {
+    el.classList.remove('hide');
+    _echoRenderCurrent();
+    void el.offsetWidth; // reflow — a re-trigger restarts the entrance cleanly
+    el.classList.add('show');
+  }
+  _echoTimer = setTimeout(() => {
+    if (el) el.classList.add('hide');
+    setTimeout(_echoAdvance, 220); // matches the annunciator-out keyframe duration
+  }, 2000);
+}
+
+// TAP-TO-JUMP (owner-added): tapping the annunciator jumps to the reacting
+// panel via the SAME selectSubsystem()/switchTab() router every bezel keycap
+// already uses (Protocol 22 — no forked routing).
+function _echoJump() {
+  const el = document.getElementById('statusAnnunciator');
+  const home = el && el.dataset && el.dataset.home;
+  if (!home) return;
+  if (typeof selectSubsystem === 'function') selectSubsystem(home);
+}
+window._echoJump = _echoJump;
+
+// Subscribes the annunciator to every (b)-class WAVE 1 event — each also
+// drives one of the 8 Tier-S flagship animations, so the echo is exercised
+// across every subsystem from day one. Wiring is deferred to a function
+// called from window.onload (the U7 boot-order lesson), never run at this
+// file's top level.
+function _wireFeedbackEchoSubscribers() {
+  RobcoEvents.on('hp.critical', () =>
+    _echoPush({ tone: 'red', glyph: '☢', label: 'HP CRITICAL', homeSubsystem: 'operator' })
+  );
+  RobcoEvents.on('rad.tier', p =>
+    _echoPush({
+      tone: p && p.direction === 'down' ? 'green' : 'amber',
+      glyph: '☢',
+      label: 'RADS: ' + ((p && p.tier) || 'NONE'),
+      homeSubsystem: 'operator',
+    })
+  );
+  RobcoEvents.on('limb.state', p =>
+    _echoPush({
+      tone: p && p.state === 'crippled' ? 'red' : 'green',
+      glyph: '⚠',
+      label:
+        ((p && p.limb) || '').toUpperCase() +
+        (p && p.state === 'crippled' ? ' CRIPPLED' : ' MENDED'),
+      homeSubsystem: 'operator',
+    })
+  );
+  RobcoEvents.on('level.up', p =>
+    _echoPush({
+      tone: 'green',
+      glyph: '▲',
+      label: 'LEVEL ' + (p && typeof p.newLvl === 'number' ? p.newLvl : ''),
+      homeSubsystem: 'operator',
+    })
+  );
+  RobcoEvents.on('faction.threshold', p =>
+    _echoPush({
+      tone: p && p.direction === 'vilified' ? 'red' : 'green',
+      glyph: '⚑',
+      label: ((p && p.name) || '').toUpperCase() + ' ' + ((p && p.direction) || '').toUpperCase(),
+      homeSubsystem: 'operator',
+    })
+  );
+  RobcoEvents.on('quest.status', p =>
+    _echoPush({
+      tone: p && p.status === 'failed' ? 'red' : 'green',
+      glyph: p && p.status === 'failed' ? '✗' : '✓',
+      label: ((p && p.name) || '').toUpperCase() + ' ' + ((p && p.status) || '').toUpperCase(),
+      homeSubsystem: 'databank',
+    })
+  );
+  RobcoEvents.on('location.visited', p =>
+    _echoPush({
+      tone: 'green',
+      glyph: '⦿',
+      label: 'SURVEYED: ' + ((p && p.loc) || ''),
+      homeSubsystem: 'databank',
+    })
+  );
+  RobcoEvents.on('collectible.acquired', p =>
+    _echoPush({
+      tone: 'green',
+      glyph: '★',
+      label: ((p && p.name) || '').toUpperCase(),
+      homeSubsystem: 'operations',
+    })
+  );
+}
+// ── STATUS ANNUNCIATOR END ────────────────────────────────────────────────
 
 // PHASE 3 · OPERATOR — S.P.E.C.I.A.L. fader steppers (BUS-02). Sets the
 // existing s_<key> input's value then routes through the EXACT SAME
@@ -6255,6 +6543,12 @@ function updateMath() {
       RobcoEvents.emit('hp.critical', { pct });
     }
     _lastHpPct = pct;
+    // FEEDBACK ANIMATION WAVE 1 (#1 FLATLINE WARNING) — a continuous red
+    // glass-edge vignette for as long as HP stays critical (not just the
+    // crossing), breathing in time with the existing HEARTBEAT channel —
+    // both gated on the SAME pct<25 condition (Protocol 22), so they can
+    // never drift out of sync with each other.
+    document.body.classList.toggle('hp-critical-vignette', pct < 25 && hpMax > 0);
     // H4: Low Health Heartbeat — start when HP < 25%, stop when >= 25%
     // Deferred to the first user gesture (_armAmbientAudio, ui-audio.js) — an
     // existing save loaded already-critical spams blocked-autoplay warnings
@@ -6418,6 +6712,14 @@ function updateMath() {
         // De-escalating
         appendToChat('> RADIATION LEVELS DECLINING. DECONTAMINATION IN PROGRESS.', 'sys', true);
       }
+      // FEEDBACK ANIMATION WAVE 1 (#4 GEIGER SPIKE / #5 RADAWAY DRAIN): one
+      // additive emit at this EXISTING crossing detector (U7 hp.critical
+      // precedent) — reuses _bioScanCompute's own NONE/MINOR/ADVANCED/SEVERE
+      // breakpoints (200/400/600), never a new literal (Protocol 22/38).
+      RobcoEvents.emit('rad.tier', {
+        tier: _radTierName(radThreshold),
+        direction: radThreshold > _lastRadThreshold ? 'up' : 'down',
+      });
       _lastRadThreshold = radThreshold;
     }
 
