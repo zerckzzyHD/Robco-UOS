@@ -1684,14 +1684,32 @@ function setMapView(v) {
   renderWorldMap();
 }
 
+// Owner report fix: renderWorldMap() replaces #worldMapDisplay's entire
+// innerHTML — going into or out of the zoomed sector sheet destroys whatever
+// DOM node currently holds focus (the tapped node's <g>, or the
+// "< SURVEY CHART" back button), and losing focus to <body> like that is a
+// well-known trigger for browsers to auto-scroll the page to an unrelated
+// position. Captures + restores the scroll offset of whichever element
+// actually scrolls (the SAME _scrollElFor() lookup switchTab()'s per-subsystem
+// scroll memory already uses — Protocol 22, no second scroll-detection path)
+// around the re-render, so the cartography table visibly stays exactly where
+// it was instead of jumping away.
+function _rerenderMapPreservingScroll() {
+  const el = typeof _scrollElFor === 'function' ? _scrollElFor('databank') : null;
+  const scrollVal = el ? el.scrollTop : window.scrollY || 0;
+  renderWorldMap();
+  if (el) el.scrollTop = scrollVal;
+  else window.scrollTo(0, scrollVal);
+}
+
 function zoomMapToZone(zoneName) {
   _mapActiveZone = zoneName;
-  renderWorldMap();
+  _rerenderMapPreservingScroll();
 }
 
 function resetMapZoom() {
   _mapActiveZone = null;
-  renderWorldMap();
+  _rerenderMapPreservingScroll();
 }
 
 // WU-F11: native "mark visited" — flags a WORLD GRID location as discovered directly from
@@ -1704,7 +1722,7 @@ function markLocationVisited(loc) {
   if (!loc) return;
   recordLocationVisit(loc);
   if (typeof saveState === 'function') saveState();
-  renderWorldMap();
+  _rerenderMapPreservingScroll();
 }
 
 // Arrow-key traversal between rendered SVG nodes (nearest node in the pressed
@@ -1979,6 +1997,18 @@ function renderWorldMap() {
     const z = zoneByLoc[String(loc || '').toLowerCase()];
     if (z && trailZones[trailZones.length - 1] !== z) trailZones.push(z);
   });
+
+  // FEEDBACK ANIMATION WAVE 1 (#26 SURVEY PING, §5 of the build plan) —
+  // consumed ONLY here, on the WORLD GRID paint (never the zoomed sector
+  // sheet, which returns early above) so the ping is always actually seen:
+  // marking from the zoomed sheet waits until the user taps < WORLD GRID; an
+  // AI discovery while off-map waits until the user next opens the map.
+  // Moved ABOVE routeSegs (was built after it) so the route-line-draw fix
+  // below can identify the newly-added segment using the SAME pingZone/
+  // consumption gate the ping ring itself already uses.
+  const pingZone = _pendingSurveyPing ? zoneByLoc[String(_pendingSurveyPing).toLowerCase()] : null;
+  _pendingSurveyPing = null;
+
   const routeSegs = [];
   const seenSeg = new Set();
   trailZones.slice(-25).forEach((z, i, arr) => {
@@ -1993,6 +2023,21 @@ function renderWorldMap() {
     routeSegs.push([a, b]);
   });
 
+  // Owner report fix: the route segment leading to a freshly-surveyed node
+  // used to render already fully drawn by the time the (correctly-deferred)
+  // ping ring showed — the user never watched the line draw itself. Deferred
+  // by the SAME pingZone/consumption gate as the ping ring (never a second
+  // mechanism, Protocol 22): only the LAST segment arriving at pingZone (the
+  // one just added to the trail) gets the one-shot stroke-dashoffset "draw
+  // itself" reveal; every other segment, and this same one on any later
+  // render, keeps the plain static dashed look.
+  let newRouteSegIdx = -1;
+  if (pingZone) {
+    routeSegs.forEach(([, b], i) => {
+      if (b === pingZone) newRouteSegIdx = i;
+    });
+  }
+
   const rings = [0.35, 0.68, 1]
     .map(
       k =>
@@ -2000,18 +2045,18 @@ function renderWorldMap() {
     )
     .join('');
   const routesSvg = routeSegs
-    .map(
-      ([a, b]) => `<line class="route" x1="${nx(a)}" y1="${ny(a)}" x2="${nx(b)}" y2="${ny(b)}"/>`
-    )
+    .map(([a, b], i) => {
+      const x1 = nx(a),
+        y1 = ny(a),
+        x2 = nx(b),
+        y2 = ny(b);
+      if (i !== newRouteSegIdx) {
+        return `<line class="route" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+      }
+      const len = Math.hypot(x2 - x1, y2 - y1).toFixed(2);
+      return `<line class="route route-draw-in" style="--route-len:${len}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+    })
     .join('');
-
-  // FEEDBACK ANIMATION WAVE 1 (#26 SURVEY PING, §5 of the build plan) —
-  // consumed ONLY here, on the WORLD GRID paint (never the zoomed sector
-  // sheet, which returns early above) so the ping is always actually seen:
-  // marking from the zoomed sheet waits until the user taps < WORLD GRID; an
-  // AI discovery while off-map waits until the user next opens the map.
-  const pingZone = _pendingSurveyPing ? zoneByLoc[String(_pendingSurveyPing).toLowerCase()] : null;
-  _pendingSurveyPing = null;
 
   _mapLastNodes = [];
   let signalCount = 0;

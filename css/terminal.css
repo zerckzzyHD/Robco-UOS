@@ -9102,10 +9102,24 @@ button.drawer.active .d-count {
   border-color: var(--bezel-wire);
   color: var(--bezel-wire);
 }
+/* Owner report fix: the app-wide CRT glass overlay (.crt-overlay, a DIRECT
+   child of .glass-frame at z-index:9999 — see terminal.css's crt-overlay
+   rule) spans the FULL scrollable page height on a single-column layout, not
+   just one screen's worth, so its periodic refresh-bar sweep passes over
+   EVERY panel's content — including this board's, whose unusually dark/clean
+   background (#02120c) makes that normally-subtle sweep read as "a bright
+   line crossing the text." .table-frame/.survey-legend/.kbd-hint sit in the
+   SAME stacking context as .crt-overlay (no intermediate ancestor between
+   .glass-frame and #worldMapPanel establishes its own stacking context — the
+   two-column desktop shell's .col-left/.main-grid are both position:static),
+   so a comfortably-higher z-index here is enough to keep this board's own
+   content on top WITHOUT touching the global overlay (which stays exactly as
+   it is everywhere else — Protocol 22, no forked/duplicated CRT effect). */
 .table-frame {
   margin: 12px auto 0;
   max-width: 560px;
   position: relative;
+  z-index: 10000;
   border: 1px solid rgba(var(--robco-green-rgb), 0.5);
   background: #02120c;
   padding: 22px;
@@ -9175,6 +9189,36 @@ button.drawer.active .d-count {
   stroke-dasharray: 5 4;
   stroke-linecap: round;
   filter: drop-shadow(0 0 2px rgba(var(--robco-green-rgb), 0.5));
+}
+/* Owner report fix (#26 SURVEY PING route-line draw, deferred the same way
+   the ping ring itself is deferred — js/ui-render.js's newRouteSegIdx): the
+   classic stroke-dashoffset "draws itself" reveal needs stroke-dasharray set
+   to the line's own length (one dash spanning it end to end) for the
+   duration of the reveal, which is why this can't just reuse the static "5 4"
+   pattern directly — the keyframe snaps to that pattern only once the line
+   is fully drawn (99%->100%), so the segment settles into the exact same
+   look as every other known-route line. --route-len is a unitless custom
+   property set per-element (its real length varies segment to segment);
+   calc(...*1px) is the standard technique for using it in a length context.
+   A plain @keyframes animation, so the existing global prefers-reduced-motion
+   block collapses it to an instant, correctly-drawn final frame — no bespoke
+   carve-out (Protocol UI-9). */
+@keyframes route-draw-in {
+  0% {
+    stroke-dasharray: calc(var(--route-len) * 1px) calc(var(--route-len) * 1px);
+    stroke-dashoffset: calc(var(--route-len) * 1px);
+  }
+  85% {
+    stroke-dasharray: calc(var(--route-len) * 1px) calc(var(--route-len) * 1px);
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dasharray: 5 4;
+    stroke-dashoffset: 0;
+  }
+}
+.route.route-draw-in {
+  animation: route-draw-in 1.4s ease-out both;
 }
 g.node {
   cursor: pointer;
@@ -9256,6 +9300,9 @@ g.node:focus-visible .focusring {
   filter: drop-shadow(0 0 3px rgba(var(--robco-green-rgb), 0.7));
 }
 .kbd-hint {
+  /* See the .table-frame comment above — same fix, same reason. */
+  position: relative;
+  z-index: 10000;
   text-align: center;
   font-size: 8px;
   letter-spacing: 1px;
@@ -9264,6 +9311,9 @@ g.node:focus-visible .focusring {
   text-transform: none;
 }
 .survey-legend {
+  /* See the .table-frame comment above — same fix, same reason. */
+  position: relative;
+  z-index: 10000;
   display: flex;
   flex-wrap: wrap;
   justify-content: center; /* centering rule */

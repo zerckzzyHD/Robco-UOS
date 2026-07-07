@@ -14235,13 +14235,18 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   // semantics (Protocol 22).
   const markCss126 = (css126.match(/\.loc-row button\.mark\s*\{[\s\S]*?\}/) || [''])[0];
 
-  // 126.1  the handler exists and routes through the single-source helper → persist → re-render
+  // 126.1  the handler exists and routes through the single-source helper →
+  //        persist → re-render. Re-render now goes through
+  //        _rerenderMapPreservingScroll() (Suite 196's map scroll-restore fix)
+  //        rather than calling renderWorldMap() directly — that wrapper is
+  //        what actually calls renderWorldMap(), so the re-render still
+  //        happens, just with the scroll position preserved around it.
   assert(
     /function markLocationVisited\(loc\)/.test(render126) &&
       /recordLocationVisit\(loc\)/.test(markFn126) &&
       /saveState\(\)/.test(markFn126) &&
-      /renderWorldMap\(\)/.test(markFn126),
-    '126.1: markLocationVisited() calls recordLocationVisit(loc) → saveState() → renderWorldMap()'
+      /_rerenderMapPreservingScroll\(\)/.test(markFn126),
+    '126.1: markLocationVisited() calls recordLocationVisit(loc) → saveState() → _rerenderMapPreservingScroll() (which itself calls renderWorldMap())'
   );
 
   // 126.2  NO AI — the handler does no network/Director call
@@ -30006,7 +30011,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  owner-reported bug fixes: the CASE-CLOSED/FAILED stamp overlapping the
 //  CYCLE button (196.28), and the CRITICAL USE-dims-the-screen lockup
 //  (196.29 — a pre-existing transmitMessage() gap, not a Wave 1 regression).
-//  39 tests
+//  Further extended with 3 DATABANK CARTOGRAPHY TABLE fixes: the global CRT
+//  refresh-bar sweep crossing over the map's legend/hint text (196.30), the
+//  map scrolling away when backing out of a zoomed node (196.31), and the
+//  survey-ping route line drawing itself already-complete instead of being
+//  watchable (196.32/196.33).
+//  50 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 196 — FEEDBACK ANIMATION WAVE 1: annunciator + new emits + 8 flagships');
@@ -30503,6 +30513,104 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
           (threw ? ' — ' + (threw.message || threw) : '')
       );
     })()
+  );
+
+  // 196.30  Owner report fix: the app-wide CRT refresh-bar sweep (.crt-overlay,
+  //         z-index:9999, spans the full scrollable page — not just one
+  //         screen) was crossing over the CARTOGRAPHY TABLE's own legend/hint
+  //         text and the map's node labels. .table-frame/.survey-legend/
+  //         .kbd-hint now carry a comfortably-higher z-index (10000) so this
+  //         board's own content always paints above it, without touching the
+  //         global overlay itself (Protocol 22 — no forked CRT effect).
+  {
+    const tableFrameRule196 = (cssStripped196.match(/\.table-frame\s*\{[^}]*\}/) || [''])[0];
+    const kbdHintRule196 = (cssStripped196.match(/\.kbd-hint\s*\{[^}]*\}/) || [''])[0];
+    const surveyLegendRule196 = (cssStripped196.match(/\.survey-legend\s*\{[^}]*\}/) || [''])[0];
+    [
+      ['table-frame', tableFrameRule196],
+      ['kbd-hint', kbdHintRule196],
+      ['survey-legend', surveyLegendRule196],
+    ].forEach(([name, rule]) => {
+      assert(
+        /position:\s*relative/.test(rule) && /z-index:\s*10000/.test(rule),
+        `196.30: .${name} carries position:relative + z-index:10000 (renders above the global .crt-overlay sweep at z-index:9999)`
+      );
+    });
+  }
+
+  // 196.31  Owner report fix: zoomMapToZone()/resetMapZoom()/markLocationVisited()
+  //         each replace #worldMapDisplay's entire innerHTML — destroying
+  //         whatever DOM node currently holds focus (the tapped node, or the
+  //         "< SURVEY CHART" back button), which is a well-known trigger for
+  //         browsers to auto-scroll the page to an unrelated position. All
+  //         three now route through the SAME _rerenderMapPreservingScroll()
+  //         helper (Protocol 22 — one scroll-preserve path, never duplicated)
+  //         instead of calling renderWorldMap() directly, so the cartography
+  //         table visibly stays exactly where it was.
+  {
+    const resetFnBody196 = extractFunctionBody(renderSrc196, '_rerenderMapPreservingScroll');
+    assert(
+      /_scrollElFor\(\s*['"]databank['"]\s*\)/.test(resetFnBody196) &&
+        /el\.scrollTop = scrollVal/.test(resetFnBody196) &&
+        /window\.scrollTo\(0, scrollVal\)/.test(resetFnBody196) &&
+        /renderWorldMap\(\)/.test(resetFnBody196),
+      '196.31: _rerenderMapPreservingScroll() captures the scroll offset via the shared _scrollElFor() lookup, re-renders, then restores it'
+    );
+    const zoomBody196 = extractFunctionBody(renderSrc196, 'zoomMapToZone');
+    const resetZoomBody196 = extractFunctionBody(renderSrc196, 'resetMapZoom');
+    const markVisitedBody196 = extractFunctionBody(renderSrc196, 'markLocationVisited');
+    [
+      ['zoomMapToZone', zoomBody196],
+      ['resetMapZoom', resetZoomBody196],
+      ['markLocationVisited', markVisitedBody196],
+    ].forEach(([name, body]) => {
+      assert(
+        /_rerenderMapPreservingScroll\(\);/.test(body) && !/\brenderWorldMap\(\);/.test(body),
+        `196.31: ${name}() re-renders via _rerenderMapPreservingScroll() — not a direct renderWorldMap() call`
+      );
+    });
+  }
+
+  // 196.32  Owner report fix: the route segment leading to a freshly-surveyed
+  //         node used to render already fully drawn by the time the
+  //         (correctly-deferred) ping ring showed — the user never watched
+  //         the line draw itself. pingZone is now computed BEFORE routeSegs
+  //         (was after) so the new segment can be identified and given a
+  //         one-shot stroke-dashoffset "draw itself" reveal, deferred by the
+  //         SAME pingZone/consumption gate as the ping ring (never a second
+  //         mechanism).
+  {
+    const mapBody196b = extractFunctionBody(renderSrc196, 'renderWorldMap');
+    const pingZoneIdx = mapBody196b.indexOf('const pingZone = _pendingSurveyPing');
+    const routeSegsIdx = mapBody196b.indexOf('const routeSegs = [];');
+    const newRouteSegIdx = mapBody196b.indexOf('let newRouteSegIdx = -1;');
+    assert(
+      pingZoneIdx !== -1 &&
+        routeSegsIdx !== -1 &&
+        pingZoneIdx < routeSegsIdx &&
+        newRouteSegIdx > routeSegsIdx,
+      '196.32: pingZone is computed BEFORE routeSegs (moved earlier) so the newly-added segment can be identified for the deferred draw-in'
+    );
+    assert(
+      /if \(b === pingZone\) newRouteSegIdx = i;/.test(mapBody196b) &&
+        /route route-draw-in/.test(mapBody196b) &&
+        /--route-len:\$\{len\}/.test(mapBody196b),
+      '196.32b: only the segment arriving at pingZone gets the route-draw-in class + a computed --route-len'
+    );
+    assert(
+      /@keyframes route-draw-in/.test(cssStripped196) &&
+        /100% \{\s*stroke-dasharray:\s*5 4;\s*stroke-dashoffset:\s*0;\s*\}/.test(cssStripped196) &&
+        /\.route\.route-draw-in \{\s*animation:\s*route-draw-in/.test(cssStripped196),
+      '196.32c: the route-draw-in keyframe is a plain @keyframes animation that settles into the SAME static "5 4" dasharray every other route line uses'
+    );
+  }
+
+  // 196.33  zero campaign-state write — the map scroll-preserve fix is purely
+  //         transient (scrollTop/scrollY only), never state.*/saveState().
+  assert(
+    !/state\.\w+\s*=/.test(extractFunctionBody(renderSrc196, '_rerenderMapPreservingScroll')) &&
+      !/saveState\(\)/.test(extractFunctionBody(renderSrc196, '_rerenderMapPreservingScroll')),
+    '196.33: _rerenderMapPreservingScroll() never assigns state.* or calls saveState() — purely transient scroll bookkeeping'
   );
 }
 

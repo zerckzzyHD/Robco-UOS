@@ -8099,9 +8099,12 @@ $recFn126  = [regex]::Match($state126, '(?s)function recordLocationVisit\([\s\S]
 # part of the BUS-16 sector-sheet reskin -- same handler, same add-only semantics.
 $markCss126 = [regex]::Match($css126, '(?s)\.loc-row button\.mark\s*\{[\s\S]*?\}').Value
 
-# 126.1  the handler exists and routes through the single-source helper -> persist -> re-render
-Check (($render126 -match 'function markLocationVisited\(loc\)') -and ($markFn126 -match 'recordLocationVisit\(loc\)') -and ($markFn126 -match 'saveState\(\)') -and ($markFn126 -match 'renderWorldMap\(\)')) `
-    '126.1: markLocationVisited() calls recordLocationVisit(loc) -> saveState() -> renderWorldMap()'
+# 126.1  the handler exists and routes through the single-source helper ->
+#        persist -> re-render. Re-render now goes through
+#        _rerenderMapPreservingScroll() (Suite 196's map scroll-restore fix)
+#        rather than calling renderWorldMap() directly.
+Check (($render126 -match 'function markLocationVisited\(loc\)') -and ($markFn126 -match 'recordLocationVisit\(loc\)') -and ($markFn126 -match 'saveState\(\)') -and ($markFn126 -match '_rerenderMapPreservingScroll\(\)')) `
+    '126.1: markLocationVisited() calls recordLocationVisit(loc) -> saveState() -> _rerenderMapPreservingScroll() (which itself calls renderWorldMap())'
 
 # 126.2  NO AI -- the handler does no network/Director call
 Check (-not ($markFn126 -match 'fetch\(|XMLHttpRequest|transmitMessage\(|generativelanguage|gemini')) `
@@ -19017,7 +19020,12 @@ Check (
 # owner-reported bug fixes: the CASE-CLOSED/FAILED stamp overlapping the
 # CYCLE button (196.28), and the CRITICAL USE-dims-the-screen lockup
 # (196.29 -- a pre-existing transmitMessage() gap, not a Wave 1 regression).
-# 39 tests
+# Further extended with 3 DATABANK CARTOGRAPHY TABLE fixes: the global CRT
+# refresh-bar sweep crossing over the map's legend/hint text (196.30), the
+# map scrolling away when backing out of a zoomed node (196.31), and the
+# survey-ping route line drawing itself already-complete instead of being
+# watchable (196.32/196.33).
+# 50 tests
 # ===========================================================
 Sep "Suite 196 -- FEEDBACK ANIMATION WAVE 1: annunciator + new emits + 8 flagships"
 $stateSrc196 = Read-Src "js/state.js"
@@ -19407,6 +19415,89 @@ try {
 } catch {
     Fail "196.29: transmitMessage() behavioral USE-dim-lockup proof  (harness error: $_)"
 }
+
+# 196.30  Owner report fix: the app-wide CRT refresh-bar sweep (.crt-overlay,
+#         z-index:9999, spans the full scrollable page -- not just one
+#         screen) was crossing over the CARTOGRAPHY TABLE's own legend/hint
+#         text and the map's node labels. .table-frame/.survey-legend/
+#         .kbd-hint now carry a comfortably-higher z-index (10000) so this
+#         board's own content always paints above it, without touching the
+#         global overlay itself (Protocol 22 -- no forked CRT effect).
+$tableFrameRule196 = [System.Text.RegularExpressions.Regex]::Match($cssStripped196, '\.table-frame\s*\{[^\}]*\}').Value
+$kbdHintRule196 = [System.Text.RegularExpressions.Regex]::Match($cssStripped196, '\.kbd-hint\s*\{[^\}]*\}').Value
+$surveyLegendRule196 = [System.Text.RegularExpressions.Regex]::Match($cssStripped196, '\.survey-legend\s*\{[^\}]*\}').Value
+foreach ($pair196 in @(
+    @('table-frame', $tableFrameRule196),
+    @('kbd-hint', $kbdHintRule196),
+    @('survey-legend', $surveyLegendRule196)
+)) {
+    $name196 = $pair196[0]
+    $rule196 = $pair196[1]
+    Check (
+        ($rule196 -match 'position:\s*relative') -and ($rule196 -match 'z-index:\s*10000')
+    ) "196.30: .$name196 carries position:relative + z-index:10000 (renders above the global .crt-overlay sweep at z-index:9999)"
+}
+
+# 196.31  Owner report fix: zoomMapToZone()/resetMapZoom()/markLocationVisited()
+#         each replace #worldMapDisplay's entire innerHTML -- destroying
+#         whatever DOM node currently holds focus, which is a well-known
+#         trigger for browsers to auto-scroll the page to an unrelated
+#         position. All three now route through the SAME
+#         _rerenderMapPreservingScroll() helper (Protocol 22) instead of
+#         calling renderWorldMap() directly.
+$resetFnBody196 = Get-FunctionBody $renderSrc196 '_rerenderMapPreservingScroll'
+Check (
+    ($resetFnBody196 -match "_scrollElFor\(\s*['`"]databank['`"]\s*\)") -and
+    ($resetFnBody196 -match 'el\.scrollTop = scrollVal') -and
+    ($resetFnBody196 -match 'window\.scrollTo\(0, scrollVal\)') -and
+    ($resetFnBody196 -match 'renderWorldMap\(\)')
+) '196.31: _rerenderMapPreservingScroll() captures the scroll offset via the shared _scrollElFor() lookup, re-renders, then restores it'
+$zoomBody196 = Get-FunctionBody $renderSrc196 'zoomMapToZone'
+$resetZoomBody196 = Get-FunctionBody $renderSrc196 'resetMapZoom'
+$markVisitedBody196 = Get-FunctionBody $renderSrc196 'markLocationVisited'
+foreach ($pair196b in @(
+    @('zoomMapToZone', $zoomBody196),
+    @('resetMapZoom', $resetZoomBody196),
+    @('markLocationVisited', $markVisitedBody196)
+)) {
+    $name196b = $pair196b[0]
+    $body196b = $pair196b[1]
+    Check (
+        ($body196b -match '_rerenderMapPreservingScroll\(\);') -and (-not ($body196b -match 'renderWorldMap\(\);'))
+    ) "196.31: $name196b() re-renders via _rerenderMapPreservingScroll() -- not a direct renderWorldMap() call"
+}
+
+# 196.32  Owner report fix: the route segment leading to a freshly-surveyed
+#         node used to render already fully drawn by the time the
+#         (correctly-deferred) ping ring showed -- the user never watched
+#         the line draw itself. pingZone is now computed BEFORE routeSegs
+#         (was after) so the new segment can be identified and given a
+#         one-shot stroke-dashoffset "draw itself" reveal, deferred by the
+#         SAME pingZone/consumption gate as the ping ring.
+$mapBody196b = Get-FunctionBody $renderSrc196 'renderWorldMap'
+$pingZoneIdx196 = $mapBody196b.IndexOf('const pingZone = _pendingSurveyPing')
+$routeSegsIdx196 = $mapBody196b.IndexOf('const routeSegs = [];')
+$newRouteSegIdx196 = $mapBody196b.IndexOf('let newRouteSegIdx = -1;')
+Check (
+    ($pingZoneIdx196 -ge 0) -and ($routeSegsIdx196 -ge 0) -and
+    ($pingZoneIdx196 -lt $routeSegsIdx196) -and ($newRouteSegIdx196 -gt $routeSegsIdx196)
+) '196.32: pingZone is computed BEFORE routeSegs (moved earlier) so the newly-added segment can be identified for the deferred draw-in'
+Check (
+    ($mapBody196b -match 'if \(b === pingZone\) newRouteSegIdx = i;') -and
+    ($mapBody196b -match 'route route-draw-in') -and
+    ($mapBody196b -match '--route-len:\$\{len\}')
+) '196.32b: only the segment arriving at pingZone gets the route-draw-in class + a computed --route-len'
+Check (
+    ($cssStripped196 -match '@keyframes route-draw-in') -and
+    ([System.Text.RegularExpressions.Regex]::IsMatch($cssStripped196, "100% \{\s*stroke-dasharray:\s*5 4;\s*stroke-dashoffset:\s*0;\s*\}")) -and
+    ([System.Text.RegularExpressions.Regex]::IsMatch($cssStripped196, "\.route\.route-draw-in \{\s*animation:\s*route-draw-in"))
+) '196.32c: the route-draw-in keyframe is a plain @keyframes animation that settles into the SAME static "5 4" dasharray every other route line uses'
+
+# 196.33  zero campaign-state write -- the map scroll-preserve fix is purely
+#         transient (scrollTop/scrollY only), never state.*/saveState().
+Check (
+    (-not ($resetFnBody196 -match 'state\.\w+\s*=')) -and (-not ($resetFnBody196 -match 'saveState\(\)'))
+) '196.33: _rerenderMapPreservingScroll() never assigns state.* or calls saveState() -- purely transient scroll bookkeeping'
 
 # ===========================================================
 # Results
