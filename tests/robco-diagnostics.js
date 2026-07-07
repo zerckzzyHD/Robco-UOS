@@ -28927,7 +28927,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       /rotateY/.test(cssStripped192) &&
       /rotateZ/.test(cssStripped192) &&
       /\.chassis-core-shape\.core-stat-burst \.c-ring\.r1/.test(cssStripped192) &&
-      /\.chassis-core-shape\.core-stat-burst \.c-ring\.r2/.test(cssStripped192) &&
       /\.chassis-core-shape\.core-stat-burst \.c-ring\.r3/.test(cssStripped192) &&
       /\.core-still,[\s\S]*\.c-ring,[\s\S]*\.c-heart/.test(cssStripped192),
     '192.31: the 3D orbital burst (rotateX/rotateY/rotateZ per-ring keyframes on .core-stat-burst) applies to the same .chassis-core-shape used by both cores, and is stilled by the existing generic .core-still .c-ring gate — no bespoke reduced-motion carve-out'
@@ -29015,7 +29014,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       /rotateY\(720deg\)/.test(burstCssBlock192) &&
       /rotateZ\(720deg\)/.test(burstCssBlock192) &&
       /chassisCoreOrbitBurst1 1\.8s/.test(burstCssBlock192) &&
-      /chassisCoreOrbitBurst2 1\.8s/.test(burstCssBlock192) &&
       /chassisCoreOrbitBurst3 1\.8s/.test(burstCssBlock192) &&
       /_coreOneShot\('core-stat-burst',\s*1800\)/.test(statBurstBody192) &&
       /\.core-stat-burst \.c-heart\s*\{[^}]*box-shadow/.test(burstCssBlock192),
@@ -29059,7 +29057,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     evenlySpaced192 &&
       proportional192 &&
       /chassisCoreOrbitBurst1 1\.8s ease-in-out/.test(burstCssBlock192) &&
-      /chassisCoreOrbitBurst2 1\.8s ease-in-out/.test(burstCssBlock192) &&
       /chassisCoreOrbitBurst3 1\.8s ease-in-out/.test(burstCssBlock192) &&
       !/cubic-bezier\(0\.34,\s*1\.56/.test(burstCssBlock192) &&
       /will-change:\s*transform/.test(ringRule192),
@@ -29127,12 +29124,64 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   const miniBeforeBoostRule192 = (cssStripped192.match(
     /\.chassis-core-shape\.chassis-core-mini::before\s*\{[^}]*\}/
   ) || [''])[0];
+  const miniBoostBorderW192 = Number(
+    (miniBeforeBoostRule192.match(/border-width:\s*(\d+)px/) || ['', '0'])[1]
+  );
+  const fullPerpBorderW192 = Number(
+    (beforeRule192.match(/border(?:-width)?:\s*(\d+)px/) || ['', '0'])[1]
+  );
   assert(
     Number(miniPerspRule192) >= 100 &&
       Number(miniPerspRule192) > Number(fullPerspRule192) * 0.5 &&
-      /border-width:\s*2px/.test(miniBeforeBoostRule192) &&
+      miniBoostBorderW192 > fullPerpBorderW192 &&
       /border-color:\s*rgba\(var\(--robco-green-rgb\),\s*0\.8\)/.test(miniBeforeBoostRule192),
-    `192.37: the mini core's perpendicular ring is no longer near-invisible — perspective loosened from 55px to ${miniPerspRule192}px (no longer disproportionately tighter than the full core's own ${fullPerspRule192}px/96px ratio) and its border is bolder/higher-contrast than the full core's copy, fixing the owner-reported "can't even be seen" bug`
+    `192.37: the mini core's perpendicular ring is no longer near-invisible — perspective loosened from 55px to ${miniPerspRule192}px (no longer disproportionately tighter than the full core's own ${fullPerspRule192}px/96px ratio) and its border (${miniBoostBorderW192}px) is bolder than the full core's copy (${fullPerpBorderW192}px), fixing the owner-reported "can't even be seen" bug`
+  );
+
+  // 192.38  owner follow-up — the always-on diagonal ring was widened so it
+  //         genuinely reads as 3D "sideways": at the edge-on point of its
+  //         diagonal tumble a thin stroke collapses to a near-invisible
+  //         hairline, exactly the moment that's supposed to show depth. The
+  //         ring's own size (inset) and border stroke were both widened on
+  //         the full core, and the mini core's already-boosted copy widened
+  //         to match proportionally, so the edge-on silhouette keeps real
+  //         visible width instead of vanishing.
+  const fullPerpInset192 = Number((beforeRule192.match(/inset:\s*(\d+)%/) || ['', '100'])[1]);
+  assert(
+    fullPerpInset192 <= 6 && fullPerpBorderW192 >= 3 && miniBoostBorderW192 >= 4,
+    `192.38: the always-on perpendicular ring was widened (inset ${fullPerpInset192}%, border ${fullPerpBorderW192}px full / ${miniBoostBorderW192}px mini) so its edge-on silhouette during the diagonal tumble reads as a visible 3D band, not a near-invisible hairline`
+  );
+
+  // 192.39  owner follow-up — the full core had one more ring (r2) than the
+  //         mini core ever carried, reading as cluttered and making the two
+  //         cores visually mismatched. r2 was removed from the full core's
+  //         markup entirely (never added to the mini, since the mini never
+  //         had it) so BOTH cores now render the exact same ring set: r1,
+  //         r3, and the shared .chassis-core-shape::before perpendicular
+  //         ring. Sync is structural, not per-core: both #chassisCore and
+  //         #chassisCoreMini elements carry the SAME class-based rules
+  //         (chassisCoreSpin durations, the ::before diagonal tumble), with
+  //         no ID-scoped override anywhere that could desync one core's
+  //         rotation from the other's — and _coreShells()/_coreRefresh()/
+  //         _coreOneShot() (checked earlier in this suite) always update
+  //         every .chassis-core-shape element in the same synchronous pass,
+  //         so a state change always lands on both cores at once.
+  const coreBtnBlock192 = (html192.match(
+    /<button[^>]*id="chassisCore"[^>]*>[\s\S]*?<\/button>/
+  ) || [''])[0];
+  const miniSpanBlock192 = (html192.match(
+    /<span[^>]*id="chassisCoreMini"[^>]*>[\s\S]*?<\/span>\s*<\/span>/
+  ) || [''])[0];
+  const ringIds = block => (block.match(/c-ring r\d/g) || []).map(s => s.replace('c-ring ', ''));
+  const fullRingIds192 = ringIds(coreBtnBlock192).sort();
+  const miniRingIds192 = ringIds(miniSpanBlock192).sort();
+  assert(
+    fullRingIds192.length === 2 &&
+      JSON.stringify(fullRingIds192) === JSON.stringify(miniRingIds192) &&
+      !/c-ring r2/.test(html192) &&
+      !/\.c-ring\.r2\b/.test(cssStripped192) &&
+      !/#chassisCore\s*\.c-ring|#chassisCoreMini\s*\.c-ring/.test(cssStripped192),
+    `192.39: the full core and mini core now render the IDENTICAL ring set (${JSON.stringify(fullRingIds192)} on both — the redundant r2 removed entirely, not just from one core), with zero ID-scoped per-core animation override anywhere that could desync their rotation`
   );
 }
 

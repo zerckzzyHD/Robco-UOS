@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2508/2508 | Cache: robco-terminal-v2.7.0-r106 -->
+﻿## [Unreleased]<!-- Tests: 2510/2510 | Cache: robco-terminal-v2.7.0-r107 -->
 
 ### Added
 
@@ -28,7 +28,7 @@
 - Your quest log is now a numbered directive rack with a lit status lamp on every entry, filterable to ALL, ACTIVE, COMPLETE, or FAILED with a live count on each, plus a search box to find one quickly. Every quest now has a CYCLE button so you can advance its status yourself — Active to Complete to Failed and back around — without waiting on the AI to update it for you.
 - The DATABANK search panel, campaign record, campaign notes, and session stats panels all got matching hardware makeovers to go with the new map and quest log — an amber archive-query terminal for search, a tape-spool campaign chronicle for your recorded history, a filterable field-notes ledger, and a mechanical odometer-style counter bank for your session stats.
 - The power core's rings now visibly tumble in real 3D for a moment whenever a stat actually changes — leveling up, or adjusting a S.P.E.C.I.A.L. attribute, a skill, your HP, XP, or radiation level — on both the main core and its mirror in the top casing, with the core's heart flaring bright at the same time so the moment is easy to catch. The tumble itself now flows smoothly from start to finish instead of the choppier motion it launched with, and plays a touch slower for a more graceful feel. It only plays on a genuine change, never just from looking at the screen, and settles right back into its normal gentle spin afterward.
-- The power core now has a ring that tumbles diagonally in true 3D at all times — not just during a stat change — its opposite corners swapping through depth as it turns, giving the core a subtle gyroscope-like presence even at rest. It shows up clearly on both the main core and its mirror in the top casing.
+- The power core now has a wider ring that tumbles diagonally in true 3D at all times — not just during a stat change — its opposite corners swapping through depth as it turns, giving the core a subtle gyroscope-like presence even at rest. It shows up clearly on both the main core and its mirror in the top casing, rotating in exact sync between the two.
 
 ### Changed
 

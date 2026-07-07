@@ -9826,10 +9826,12 @@ button.chassis-core-shape {
   border-style: dashed;
   animation: chassisCoreSpin 14s linear infinite;
 }
-.chassis-core-shape .c-ring.r2 {
-  inset: 14%;
-  opacity: 0.7;
-}
+/* r2 was removed (owner follow-up — the full core had one more ring than
+   the mini core ever did, reading as cluttered and making the two cores
+   visually mismatched). The mini core never carried r2 in its own markup
+   (Protocol 22 — one shared .chassis-core-shape ruleset means removing it
+   from the full core's markup is the only change needed; both cores now
+   render the identical r1/r3/perpendicular-ring set from this same file). */
 .chassis-core-shape .c-ring.r3 {
   inset: 28%;
   border-style: dashed;
@@ -9853,12 +9855,19 @@ button.chassis-core-shape {
    r1/r3 idle-spin convention — linear is correct for an unbounded loop,
    never ease-in-out, which would visibly hitch at the seam) + will-change
    keeps it fluid and GPU-composited. */
+/* Owner follow-up: "make the always 3d one have more width so it actually
+   looks 3d sideways" — a thin stroke collapses to a near-invisible hairline
+   at the edge-on point of the diagonal tumble, which is exactly the moment
+   that's supposed to read as depth. Widened both the ring's own size
+   (inset 8% -> 6%, a bigger ellipse) and its border stroke (1.5px -> 3px)
+   so the edge-on silhouette itself has visible width/thickness — it reads
+   as a solid 3D band swinging through depth rather than vanishing. */
 .chassis-core-shape::before {
   content: '';
   position: absolute;
-  inset: 8%;
+  inset: 6%;
   border-radius: 50%;
-  border: 1.5px solid rgba(var(--robco-green-rgb), 0.55);
+  border: 3px solid rgba(var(--robco-green-rgb), 0.55);
   will-change: transform;
   animation: chassisCoreOrbitPerp 6s linear infinite;
 }
@@ -9869,7 +9878,7 @@ button.chassis-core-shape {
    rather than lost among them (the same "small elements need bolder
    strokes to stay legible" reasoning already used elsewhere in the file). */
 .chassis-core-shape.chassis-core-mini::before {
-  border-width: 2px;
+  border-width: 4px;
   border-color: rgba(var(--robco-green-rgb), 0.8);
 }
 @keyframes chassisCoreOrbitPerp {
@@ -10038,8 +10047,14 @@ button.chassis-core-shape {
     filter: brightness(1.45);
   }
 }
-.chassis-core-shape.core-radio .c-ring.r2 {
-  animation: chassisCoreRadio 1.8s ease-in-out infinite;
+/* r2 (the shimmer's original target) was removed — see the c-ring.r1/r3
+   comment above. r3 is the closest remaining ring; it already spins
+   (chassisCoreSpin), so the radio shimmer is layered on as a SECOND,
+   comma-separated animation rather than replacing the spin outright. */
+.chassis-core-shape.core-radio .c-ring.r3 {
+  animation:
+    chassisCoreSpin 9s linear infinite reverse,
+    chassisCoreRadio 1.8s ease-in-out infinite;
 }
 /* Overclock strain (#12) — several signals active at once works the core
    visibly harder: faster spin layered over whichever power-state is active. */
@@ -10129,23 +10144,6 @@ button.chassis-core-shape {
     transform: rotateX(720deg) rotateY(720deg) rotateZ(720deg);
   }
 }
-@keyframes chassisCoreOrbitBurst2 {
-  0% {
-    transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg);
-  }
-  25% {
-    transform: rotateX(-180deg) rotateY(180deg) rotateZ(-180deg);
-  }
-  50% {
-    transform: rotateX(-360deg) rotateY(360deg) rotateZ(-360deg);
-  }
-  75% {
-    transform: rotateX(-540deg) rotateY(540deg) rotateZ(-540deg);
-  }
-  100% {
-    transform: rotateX(-720deg) rotateY(720deg) rotateZ(-720deg);
-  }
-}
 @keyframes chassisCoreOrbitBurst3 {
   0% {
     transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg);
@@ -10169,9 +10167,9 @@ button.chassis-core-shape {
      720deg double tumble, just more graceful. */
   animation: chassisCoreOrbitBurst1 1.8s ease-in-out 1;
 }
-.chassis-core-shape.core-stat-burst .c-ring.r2 {
-  animation: chassisCoreOrbitBurst2 1.8s ease-in-out 1;
-}
+/* r2's own burst tumble (chassisCoreOrbitBurst2) was removed along with the
+   ring itself — see the c-ring.r1/r3 comment above. r1 and r3 still tumble
+   independently (Burst1/Burst3), so the burst keeps two distinct orbits. */
 .chassis-core-shape.core-stat-burst .c-ring.r3 {
   animation: chassisCoreOrbitBurst3 1.8s ease-in-out 1;
 }

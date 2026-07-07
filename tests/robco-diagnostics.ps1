@@ -18257,7 +18257,6 @@ Check (
     ($cssStripped192 -match 'rotateY') -and
     ($cssStripped192 -match 'rotateZ') -and
     ($cssStripped192 -match '\.chassis-core-shape\.core-stat-burst \.c-ring\.r1') -and
-    ($cssStripped192 -match '\.chassis-core-shape\.core-stat-burst \.c-ring\.r2') -and
     ($cssStripped192 -match '\.chassis-core-shape\.core-stat-burst \.c-ring\.r3') -and
     ($cssStripped192 -match '(?s)\.core-still,[\s\S]*\.c-ring,[\s\S]*\.c-heart')
 ) '192.31: the 3D orbital burst (rotateX/rotateY/rotateZ per-ring keyframes on .core-stat-burst) applies to the same .chassis-core-shape used by both cores, and is stilled by the existing generic .core-still .c-ring gate -- no bespoke reduced-motion carve-out'
@@ -18324,7 +18323,6 @@ Check (
     ($burstCssBlock192 -match 'rotateY\(720deg\)') -and
     ($burstCssBlock192 -match 'rotateZ\(720deg\)') -and
     ($burstCssBlock192 -match 'chassisCoreOrbitBurst1 1\.8s') -and
-    ($burstCssBlock192 -match 'chassisCoreOrbitBurst2 1\.8s') -and
     ($burstCssBlock192 -match 'chassisCoreOrbitBurst3 1\.8s') -and
     ($statBurstBody192 -match "_coreOneShot\('core-stat-burst',\s*1800\)") -and
     ($burstCssBlock192 -match '(?s)\.core-stat-burst \.c-heart\s*\{[^\}]*box-shadow')
@@ -18358,7 +18356,6 @@ Check (
     $evenlySpaced192 -and
     $proportional192 -and
     ($burstCssBlock192 -match 'chassisCoreOrbitBurst1 1\.8s ease-in-out') -and
-    ($burstCssBlock192 -match 'chassisCoreOrbitBurst2 1\.8s ease-in-out') -and
     ($burstCssBlock192 -match 'chassisCoreOrbitBurst3 1\.8s ease-in-out') -and
     (-not ($burstCssBlock192 -match 'cubic-bezier\(0\.34,\s*1\.56')) -and
     ($ringRule192 -match 'will-change:\s*transform')
@@ -18413,12 +18410,59 @@ if (-not $miniPerspRule192) { $miniPerspRule192 = '0' }
 $fullPerspRule192 = [regex]::Match($cssStripped192, '\.chassis-core-shape\s*\{\s*perspective:\s*(\d+)px').Groups[1].Value
 if (-not $fullPerspRule192) { $fullPerspRule192 = '0' }
 $miniBeforeBoostRule192 = [regex]::Match($cssStripped192, '\.chassis-core-shape\.chassis-core-mini::before\s*\{[^\}]*\}').Value
+$miniBoostBorderW192 = [int]([regex]::Match($miniBeforeBoostRule192, 'border-width:\s*(\d+)px').Groups[1].Value)
+$fullPerpBorderWMatch192 = [regex]::Match($beforeRule192, 'border(?:-width)?:\s*(\d+)px')
+$fullPerpBorderW192 = 0
+if ($fullPerpBorderWMatch192.Success) { $fullPerpBorderW192 = [int]$fullPerpBorderWMatch192.Groups[1].Value }
 Check (
     ([int]$miniPerspRule192 -ge 100) -and
     ([int]$miniPerspRule192 -gt ([int]$fullPerspRule192 * 0.5)) -and
-    ($miniBeforeBoostRule192 -match 'border-width:\s*2px') -and
+    ($miniBoostBorderW192 -gt $fullPerpBorderW192) -and
     ($miniBeforeBoostRule192 -match 'border-color:\s*rgba\(var\(--robco-green-rgb\),\s*0\.8\)')
-) "192.37: the mini core's perpendicular ring is no longer near-invisible -- perspective loosened from 55px to ${miniPerspRule192}px (no longer disproportionately tighter than the full core's own ${fullPerspRule192}px/96px ratio) and its border is bolder/higher-contrast than the full core's copy, fixing the owner-reported can't-even-be-seen bug"
+) "192.37: the mini core's perpendicular ring is no longer near-invisible -- perspective loosened from 55px to ${miniPerspRule192}px (no longer disproportionately tighter than the full core's own ${fullPerspRule192}px/96px ratio) and its border (${miniBoostBorderW192}px) is bolder than the full core's copy (${fullPerpBorderW192}px), fixing the owner-reported can't-even-be-seen bug"
+
+# 192.38  owner follow-up -- the always-on diagonal ring was widened so it
+#         genuinely reads as 3D "sideways": at the edge-on point of its
+#         diagonal tumble a thin stroke collapses to a near-invisible
+#         hairline, exactly the moment that's supposed to show depth. The
+#         ring's own size (inset) and border stroke were both widened on
+#         the full core, and the mini core's already-boosted copy widened
+#         to match proportionally, so the edge-on silhouette keeps real
+#         visible width instead of vanishing.
+$fullPerpInsetMatch192 = [regex]::Match($beforeRule192, 'inset:\s*(\d+)%')
+$fullPerpInset192 = 100
+if ($fullPerpInsetMatch192.Success) { $fullPerpInset192 = [int]$fullPerpInsetMatch192.Groups[1].Value }
+Check (
+    ($fullPerpInset192 -le 6) -and
+    ($fullPerpBorderW192 -ge 3) -and
+    ($miniBoostBorderW192 -ge 4)
+) "192.38: the always-on perpendicular ring was widened (inset ${fullPerpInset192}%, border ${fullPerpBorderW192}px full / ${miniBoostBorderW192}px mini) so its edge-on silhouette during the diagonal tumble reads as a visible 3D band, not a near-invisible hairline"
+
+# 192.39  owner follow-up -- the full core had one more ring (r2) than the
+#         mini core ever carried, reading as cluttered and making the two
+#         cores visually mismatched. r2 was removed from the full core's
+#         markup entirely (never added to the mini, since the mini never
+#         had it) so BOTH cores now render the exact same ring set: r1, r3,
+#         and the shared .chassis-core-shape::before perpendicular ring.
+#         Sync is structural, not per-core: both #chassisCore and
+#         #chassisCoreMini elements carry the SAME class-based rules
+#         (chassisCoreSpin durations, the ::before diagonal tumble), with no
+#         ID-scoped override anywhere that could desync one core's rotation
+#         from the other's -- and _coreShells()/_coreRefresh()/
+#         _coreOneShot() (checked earlier in this suite) always update
+#         every .chassis-core-shape element in the same synchronous pass, so
+#         a state change always lands on both cores at once.
+$coreBtnBlock192 = [regex]::Match($html192, '(?s)<button[^>]*id="chassisCore"[^>]*>[\s\S]*?</button>').Value
+$miniSpanBlock192 = [regex]::Match($html192, '(?s)<span[^>]*id="chassisCoreMini"[^>]*>[\s\S]*?</span>\s*</span>').Value
+$fullRingIds192 = ([regex]::Matches($coreBtnBlock192, 'c-ring r\d') | ForEach-Object { $_.Value -replace 'c-ring ', '' } | Sort-Object)
+$miniRingIds192 = ([regex]::Matches($miniSpanBlock192, 'c-ring r\d') | ForEach-Object { $_.Value -replace 'c-ring ', '' } | Sort-Object)
+Check (
+    ($fullRingIds192.Count -eq 2) -and
+    (($fullRingIds192 -join ',') -eq ($miniRingIds192 -join ',')) -and
+    (-not ($html192 -match 'c-ring r2')) -and
+    (-not ($cssStripped192 -match '\.c-ring\.r2\b')) -and
+    (-not ($cssStripped192 -match '#chassisCore\s*\.c-ring|#chassisCoreMini\s*\.c-ring'))
+) "192.39: the full core and mini core now render the IDENTICAL ring set ($($fullRingIds192 -join ',') on both -- the redundant r2 removed entirely, not just from one core), with zero ID-scoped per-core animation override anywhere that could desync their rotation"
 
 # ===========================================================
 # Suite 193 -- Owner polish batch: tap-highlight kill + CURIO ARCHIVE
