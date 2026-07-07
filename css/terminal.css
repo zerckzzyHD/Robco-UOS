@@ -9770,6 +9770,23 @@ g.node:focus-visible .focusring {
   display: inline-flex;
   flex-shrink: 0;
 }
+/* Behavior #3 SPIN INERTIA (batch 2, further below): registering these two
+   custom properties makes them INTERPOLATABLE, so the `transition:` on the
+   base .chassis-core-shape rule below eases the multiplier itself — which in
+   turn eases the r1/r3 ring's computed animation-duration (calc() re-reads a
+   changing custom property live) — instead of the state classes snapping the
+   duration instantly. Progressive enhancement: a browser without @property
+   support just keeps today's instant snap (no worse than before). */
+@property --core-spin-mul-r1 {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 1;
+}
+@property --core-spin-mul-r3 {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 1;
+}
 .chassis-core-shape {
   position: relative;
   width: 96px;
@@ -9780,6 +9797,11 @@ g.node:focus-visible .focusring {
   padding: 0;
   min-height: 0; /* override the global button{min-height:28px} — a decorative
                     circle sized by width/height, not line-height */
+  --core-spin-mul-r1: 1;
+  --core-spin-mul-r3: 1;
+  transition:
+    --core-spin-mul-r1 1.6s ease,
+    --core-spin-mul-r3 1.6s ease;
   /* Owner follow-up fix (Protocol 42, found live during render-verify at the
      new 26px mini size): the ring/heart children are positioned by percentage
      inset + a border, and at small sizes that combination can round to a
@@ -9824,7 +9846,9 @@ button.chassis-core-shape {
 .chassis-core-shape .c-ring.r1 {
   inset: 0;
   border-style: dashed;
-  animation: chassisCoreSpin 14s linear infinite;
+  /* calc() re-reads --core-spin-mul-r1 live (behavior #3 spin inertia) — the
+     multiplier is what eases; 14s is the idle-baseline duration (mul: 1). */
+  animation: chassisCoreSpin calc(14s / var(--core-spin-mul-r1)) linear infinite;
 }
 /* r2 was removed (owner follow-up — the full core had one more ring than
    the mini core ever did, reading as cluttered and making the two cores
@@ -9835,7 +9859,9 @@ button.chassis-core-shape {
 .chassis-core-shape .c-ring.r3 {
   inset: 28%;
   border-style: dashed;
-  animation: chassisCoreSpin 9s linear infinite reverse;
+  /* calc() re-reads --core-spin-mul-r3 live (behavior #3 spin inertia) — the
+     multiplier is what eases; 9s is the idle-baseline duration (mul: 1). */
+  animation: chassisCoreSpin calc(9s / var(--core-spin-mul-r3)) linear infinite reverse;
 }
 /* Always-on perpendicular ring (owner follow-up, corrected) — a 4th ring,
    built as a ::before pseudo-element so no HTML markup changes anywhere
@@ -9906,9 +9932,13 @@ button.chassis-core-shape {
   );
   box-shadow: 0 0 26px rgba(var(--robco-green-rgb), 0.85);
   animation: chassisCorePulse 2.6s ease-in-out infinite;
+  /* filter 1.2s eases behavior #1 (thermal glow, batch 2 below) in/out slowly —
+     a "cooling"/"warming" feel distinct from the snappier box-shadow/transform
+     one-shot flourishes. */
   transition:
     box-shadow 0.4s,
-    transform 0.4s;
+    transform 0.4s,
+    filter 1.2s ease;
 }
 @keyframes chassisCorePulse {
   50% {
@@ -9945,23 +9975,25 @@ button.chassis-core-shape {
 }
 
 /* ── power-state classes (continuous, paused as a group by .core-still) ── */
-.chassis-core-shape.core-boot .c-ring.r1 {
-  animation-duration: 2.2s;
-}
-.chassis-core-shape.core-boot .c-ring.r3 {
-  animation-duration: 1.4s;
+/* Behavior #3 SPIN INERTIA (batch 2, below in file) replaces each of these
+   r1/r3 `animation-duration: Xs` snaps with a --core-spin-mul-r1/-r3
+   multiplier instead — the multiplier is what actually eases (see the
+   @property block below), so the target duration below is reproduced
+   exactly (regression-safe) once multiplied against the r1/r3 base
+   durations (14s/9s), just no longer applied as an instant jump. The
+   heart's own animation-duration is untouched (spin inertia is a ROTATION
+   behavior, not a pulse-rate one). */
+.chassis-core-shape.core-boot {
+  --core-spin-mul-r1: 6.3636; /* 14s / 2.2s */
+  --core-spin-mul-r3: 6.4286; /* 9s / 1.4s */
 }
 .chassis-core-shape.core-boot .c-heart {
   animation-duration: 0.6s;
 }
 .chassis-core-shape.core-standby {
   opacity: 0.5;
-}
-.chassis-core-shape.core-standby .c-ring.r1 {
-  animation-duration: 40s;
-}
-.chassis-core-shape.core-standby .c-ring.r3 {
-  animation-duration: 26s;
+  --core-spin-mul-r1: 0.35; /* 14s / 40s */
+  --core-spin-mul-r3: 0.3462; /* 9s / 26s */
 }
 .chassis-core-shape.core-standby .c-heart {
   animation-duration: 6s;
@@ -9969,11 +10001,9 @@ button.chassis-core-shape {
 /* AI revs (#2) — faster spin + a brighter heart while the Director is
    thinking/speaking (the SAME setOverseerState() lifecycle the Overseer
    scope already reacts to — Protocol 22, no re-instrumentation). */
-.chassis-core-shape.core-thinking .c-ring.r1 {
-  animation-duration: 3s;
-}
-.chassis-core-shape.core-thinking .c-ring.r3 {
-  animation-duration: 2s;
+.chassis-core-shape.core-thinking {
+  --core-spin-mul-r1: 4.6667; /* 14s / 3s */
+  --core-spin-mul-r3: 4.5; /* 9s / 2s */
 }
 .chassis-core-shape.core-thinking .c-heart {
   animation-duration: 0.9s;
@@ -10057,12 +10087,12 @@ button.chassis-core-shape {
     chassisCoreRadio 1.8s ease-in-out infinite;
 }
 /* Overclock strain (#12) — several signals active at once works the core
-   visibly harder: faster spin layered over whichever power-state is active. */
-.chassis-core-shape.core-overclock .c-ring.r1 {
-  animation-duration: 1.6s;
-}
-.chassis-core-shape.core-overclock .c-ring.r3 {
-  animation-duration: 1s;
+   visibly harder: faster spin layered over whichever power-state is active.
+   Multiplier-driven (behavior #3 spin inertia) like boot/standby/thinking
+   above — 14s/1.6s and 9s/1s reproduce the original targets exactly. */
+.chassis-core-shape.core-overclock {
+  --core-spin-mul-r1: 8.75; /* 14s / 1.6s */
+  --core-spin-mul-r3: 9; /* 9s / 1s */
 }
 .chassis-core-shape.core-overclock .c-heart {
   box-shadow: 0 0 42px rgba(231, 76, 60, 0.75);
@@ -10189,10 +10219,220 @@ button.chassis-core-shape {
 .core-still,
 .core-still .c-ring,
 .core-still .c-heart,
+.core-still .c-spark,
 .core-still::before,
 .core-still.core-fault::after {
   animation-play-state: paused !important;
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   CHASSIS LIVING CORE — 10 owner-approved new behaviors (batch 2). Every
+   rule below follows the SAME contract as the block above it: painted on
+   BOTH shells from _coreRefresh()'s one snapshot (ui-core.js), continuous
+   motion gated as a GROUP by .core-still (extended above), one-shot
+   flourishes use `transition:`/a timed class (settle correctly even while
+   .core-still has paused the continuous loops), and zero campaign-state
+   write anywhere — every new signal is transient/in-memory or MetaStore
+   device telemetry, never a state field, saveState(), or robco_v8. Behavior #1
+   (thermal glow, filter added to .c-heart) and #3 (spin inertia, the
+   --core-spin-mul-r1/-r3 @property pair) are threaded into the existing
+   rules above rather than duplicated here (Protocol 22 — one rule per
+   concern). #10 (a center readout glyph) was evaluated and DROPPED — see
+   the commit/CHANGELOG note; it could not be made legible on the small
+   casing-top mini core without hurting the design.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* #1 THERMAL GLOW — the running "temperature" (js: _coreTemp, tracked by
+   _coreThermalTick()) tints .c-heart from green toward amber/red via
+   filter:hue-rotate() rather than a hardcoded amber/red rgb — this rides
+   whatever optics colour (--robco-green) is currently active, so it works
+   correctly under every theme/optic pick (Protocol 38, optic-agnostic).
+   Eased in/out slowly (the "filter 1.2s ease" added to .c-heart's own
+   transition list above) for a genuine warm/cool feel, distinct from the
+   snappier one-shot flourishes. */
+.chassis-core-shape.core-temp-warm .c-heart {
+  filter: hue-rotate(-25deg) saturate(1.3);
+}
+.chassis-core-shape.core-temp-hot .c-heart {
+  filter: hue-rotate(-55deg) saturate(1.6) brightness(1.1);
+}
+
+/* #2 ENERGY SPARKS — small particles orbiting the core. Reuses the classic
+   CSS "orbit around the element's own center" trick (rotate() then
+   translateX() — no wrapper element needed, transforms compose in the
+   coordinate space the previous function established): the dot sits AT the
+   shape's exact center, rotating carries it in a circle of radius
+   var(--spark-r). Density/brightness track real activity (thinking/radio/
+   overclock/hot-thermal show a second, brighter/faster spark) — never a
+   demo loop. --spark-r is scaled down for the small mini core so the orbit
+   stays inside its own (smaller) box instead of being clipped by
+   overflow:hidden. */
+@keyframes chassisCoreOrbitDot {
+  from {
+    transform: rotate(0deg) translateX(var(--spark-r, 40px));
+  }
+  to {
+    transform: rotate(360deg) translateX(var(--spark-r, 40px));
+  }
+}
+.chassis-core-shape .c-spark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  border-radius: 50%;
+  background: var(--robco-green);
+  box-shadow: 0 0 6px var(--robco-green);
+  opacity: 0.5;
+  will-change: transform;
+  --spark-r: 40px;
+}
+.chassis-core-mini .c-spark {
+  width: 2px;
+  height: 2px;
+  margin: -1px 0 0 -1px;
+  box-shadow: 0 0 3px var(--robco-green);
+  --spark-r: 15px; /* keeps the orbit inside the mini core's much smaller box */
+}
+.chassis-core-shape .c-spark.s1 {
+  animation: chassisCoreOrbitDot 5s linear infinite;
+}
+.chassis-core-shape .c-spark.s2 {
+  animation: chassisCoreOrbitDot 3.4s linear infinite reverse;
+  opacity: 0; /* hidden at rest — busy states below reveal it (sparse when idle) */
+}
+.chassis-core-shape.core-thinking .c-spark.s2,
+.chassis-core-shape.core-overclock .c-spark.s2,
+.chassis-core-shape.core-temp-hot .c-spark.s2 {
+  opacity: 0.9;
+}
+.chassis-core-shape.core-overclock .c-spark.s1 {
+  animation-duration: 1.6s;
+}
+.chassis-core-shape.core-overclock .c-spark.s2 {
+  animation-duration: 1.1s;
+}
+.chassis-core-shape.core-standby .c-spark {
+  opacity: 0.15;
+}
+
+/* #4 POWER-SURGE RIPPLE — a ring ripples outward on the SAME data.write/
+   level.up/connection (reconnect) signals the core already reacts to
+   (Protocol 22, no new triggers). A dedicated child span (not ::after —
+   ::after is already the fault ring's pseudo-element, and a ripple can
+   legitimately overlap a buffered fault) toggled one-shot, add-then-remove
+   (the Suite 135/162 reflow-restart pattern), so a repeated trigger always
+   restarts cleanly. */
+@keyframes chassisCoreRipple {
+  0% {
+    box-shadow: 0 0 0 0 rgba(var(--robco-green-rgb), 0.55);
+    opacity: 1;
+  }
+  100% {
+    box-shadow: 0 0 0 22px rgba(var(--robco-green-rgb), 0);
+    opacity: 0;
+  }
+}
+.chassis-core-shape .c-ripple {
+  position: absolute;
+  inset: 6%;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+}
+.chassis-core-shape.core-ripple .c-ripple {
+  animation: chassisCoreRipple 0.9s ease-out 1;
+}
+
+/* #5 IDLE FLARES — occasional faint RANDOM flares during long idle, "the
+   reactor settling" — registered as a dial-gated, non-persisted
+   AmbientRuntime observer (initChassisCore(), ui-core.js), mirroring the
+   DO-O Overseer idle-blip timer exactly (Protocol 22). Deliberately fainter
+   than the flare/datapulse/tap/milestone group below (a settling murmur,
+   not an event flourish). */
+.chassis-core-shape.core-idle-flare .c-heart {
+  box-shadow: 0 0 32px rgba(var(--robco-green-rgb), 0.75);
+  transform: scale(1.08);
+}
+
+/* #7 RECOVERY ANIMATION — when a buffered fault CLEARS (error count -> 0),
+   the core visibly stabilizes back to calm green instead of the red fault
+   ring just vanishing. Safe to reuse ::after here (unlike the ripple above):
+   _coreRefresh() (ui-core.js) applies `core-recovering` in the EXACT same
+   pass that removes `core-fault`, so the two classes are never present on
+   the same element at once — no fight over the shared pseudo-element. */
+@keyframes chassisCoreRecover {
+  0% {
+    box-shadow: 0 0 26px rgba(231, 76, 60, 0.9);
+    border-color: rgba(231, 76, 60, 0.7);
+  }
+  100% {
+    box-shadow: 0 0 0 rgba(231, 76, 60, 0);
+    border-color: rgba(var(--robco-green-rgb), 0);
+  }
+}
+.chassis-core-shape.core-recovering::after {
+  content: '';
+  position: absolute;
+  inset: -6%;
+  border-radius: 50%;
+  border: 1.5px solid rgba(231, 76, 60, 0.7);
+  animation: chassisCoreRecover 1.2s ease-out 1;
+  pointer-events: none;
+}
+.chassis-core-shape.core-recovering .c-heart {
+  box-shadow: 0 0 40px rgba(var(--robco-green-rgb), 0.9);
+}
+
+/* #8 UPTIME-MILESTONE PULSE — a small celebratory pulse each time the
+   session uptime clock (ui-core.js _tickUptimeClock()) crosses an hour
+   mark. Reuses the SAME brighten-then-settle .c-heart transition the
+   flare/datapulse/tap group already relies on (Protocol 22). */
+.chassis-core-shape.core-milestone .c-heart {
+  box-shadow: 0 0 62px rgba(var(--robco-green-rgb), 1);
+  transform: scale(1.32);
+}
+
+/* #9 TAP-AND-HOLD OVERCHARGE — extends tap-to-poke (#13 above) with a
+   press-and-HOLD gesture: core-charging plays while held (ring spin-up via
+   the SAME --core-spin-mul-r1/-r3 inertia mechanism as #3, a nice reuse —
+   Protocol 22), core-charged marks the ready threshold, and releasing AFTER
+   charged fires core-overcharge — the identical 3D tumble keyframes the
+   #14 stat-change burst already uses (chassisCoreOrbitBurst1/3), just a
+   distinct trigger path (a real user hold-release, never a stat change). */
+.chassis-core-shape.core-charging {
+  --core-spin-mul-r1: 3;
+  --core-spin-mul-r3: 3;
+}
+.chassis-core-shape.core-charging .c-heart {
+  box-shadow: 0 0 36px rgba(var(--robco-green-rgb), 0.95);
+  transform: scale(1.1);
+}
+.chassis-core-shape.core-charged .c-heart {
+  box-shadow: 0 0 60px rgba(var(--robco-green-rgb), 1);
+  transform: scale(1.22);
+}
+.chassis-core-shape.core-overcharge .c-ring.r1 {
+  animation: chassisCoreOrbitBurst1 1.8s ease-in-out 1;
+}
+.chassis-core-shape.core-overcharge .c-ring.r3 {
+  animation: chassisCoreOrbitBurst3 1.8s ease-in-out 1;
+}
+.chassis-core-shape.core-overcharge .c-heart {
+  box-shadow: 0 0 72px rgba(var(--robco-green-rgb), 1);
+  transform: scale(1.38);
+}
+
+/* The gate (batch 2) — extends the SAME .core-still mechanism above to
+   every new continuous/one-shot element added in this block. The one-shot
+   flourishes (ripple/recovery/milestone/charging/charged/overcharge) all
+   ride `transition:`/timed classes exactly like the flare/datapulse/tap
+   group, so the existing global prefers-reduced-motion block (transition-
+   duration:0.01ms) neutralises them the same way — no bespoke carve-out
+   needed for those. Only the CONTINUOUS spark loop needs pausing here
+   (already added to the .core-still selector list above this block). */
 
 /* ── BUS-23 · IDENTITY PLATE & BREAKERS ── */
 .id-plate {

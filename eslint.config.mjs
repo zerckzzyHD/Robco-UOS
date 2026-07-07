@@ -260,6 +260,9 @@ export default [
         _armAmbientAudio: 'readonly',
         startCrtHum: 'readonly',
         stopCrtHum: 'readonly',
+        startReactorHum: 'readonly', // LIVING CORE #6 (ui-audio.js)
+        stopReactorHum: 'readonly', // LIVING CORE #6 (ui-audio.js)
+        _updateReactorHumLevel: 'readonly', // LIVING CORE #6 (ui-audio.js)
         startTinnitus: 'readonly',
         stopTinnitus: 'readonly',
         runBootSequence: 'readonly',

@@ -314,6 +314,8 @@
             aria-hidden="true"
           >
             <span class="c-ring r1"></span><span class="c-ring r3"></span>
+            <span class="c-spark s1"></span><span class="c-spark s2"></span>
+            <span class="c-ripple"></span>
             <span class="c-heart"></span>
           </span>
         </div>
@@ -2086,6 +2088,9 @@
                   >
                     <span class="c-ring r1" aria-hidden="true"></span>
                     <span class="c-ring r3" aria-hidden="true"></span>
+                    <span class="c-spark s1" aria-hidden="true"></span>
+                    <span class="c-spark s2" aria-hidden="true"></span>
+                    <span class="c-ripple" aria-hidden="true"></span>
                     <span class="c-heart" aria-hidden="true"></span>
                     <span class="c-cap" aria-hidden="true">SUSTAINED CELL &mdash; LIVE DRAW</span>
                   </button>
@@ -2557,7 +2562,7 @@
                         <span class="panel-substatus" id="sum-slot02"></span>
                       </summary>
                       <span class="bay-slot-tag">SLOT 02</span>
-                      <span class="bay-part-no">PN RBC-SND-13 &middot; 13-CHANNEL WAVE TABLE</span>
+                      <span class="bay-part-no">PN RBC-SND-14 &middot; 14-CHANNEL WAVE TABLE</span>
 
                       <div class="bay-module bay-module--eject">
                         <input
@@ -2781,6 +2786,19 @@
                           />
                           <label for="muteFactionThresholdToggle" class="chip-card"
                             >FACTION ALRT<span class="pin-id">CH-13</span></label
+                          >
+                        </div>
+                        <!-- LIVING CORE #6: REACTOR HUM — a second synthesized tone tuned to
+                        blend with CH-02's CRT hum (Protocol 7 own channel). -->
+                        <div class="chip-wrap">
+                          <input
+                            type="checkbox"
+                            id="muteReactorHumToggle"
+                            class="chip-input"
+                            onchange="toggleAudio('robco_reactorhum_muted', this.checked)"
+                          />
+                          <label for="muteReactorHumToggle" class="chip-card"
+                            >REACTOR HUM<span class="pin-id">CH-14</span></label
                           >
                         </div>
                       </div>

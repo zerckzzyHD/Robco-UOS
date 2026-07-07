@@ -40,6 +40,7 @@ const AudioSettings = {
   questFail: MetaStore.get('robco_questfail_muted') === 'true', // quest fail tone
   factionThreshold: MetaStore.get('robco_factionthreshold_muted') === 'true', // faction standing alert
   hardwareSfx: MetaStore.get('robco_hardwaresfx_muted') === 'true', // B2c: chip/board install-eject click
+  reactorHum: MetaStore.get('robco_reactorhum_muted') === 'true', // LIVING CORE #6: reactor hum
   // WU-F5 Pip-Boy Radio: ON semantics (true = playing), NOT a mute flag. Default
   // OFF (opt-in). initRadio() does the autoplay-safe first-gesture restore at boot;
   // this initialiser just reflects the saved preference into the cache.
@@ -1081,6 +1082,15 @@ function _tickUptimeClock() {
   let el = document.getElementById('uptimeClock');
   if (el)
     el.innerText = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  // LIVING CORE #8 uptime-milestone pulse — a one-shot celebratory flourish
+  // each time this session's uptime crosses a whole hour. h > 0 skips the
+  // (uninteresting) 0-hour mark; the in-memory _lastCoreUptimeMilestone guard
+  // (declared alongside the other LIVING CORE transient signals above) means
+  // this fires exactly once per crossed hour, never once per second.
+  if (h > _lastCoreUptimeMilestone) {
+    _lastCoreUptimeMilestone = h;
+    if (typeof _coreMilestonePulse === 'function') _coreMilestonePulse();
+  }
 }
 
 // Memory-cycle observer tick: the periodic ambient "memory cycle" flash. Registered
@@ -1888,6 +1898,41 @@ window.initOverseerScope = initOverseerScope;
 // ── CHASSIS CORE START ──────────────────────────────────────────────────
 const CORE_POWER_CLASSES = ['core-boot', 'core-idle', 'core-standby', 'core-shutdown'];
 
+// ── LIVING CORE — 10 owner-approved new behaviors (batch 2) ────────────────
+// #1 THERMAL GLOW state — an in-memory-only "temperature" (0-100, never
+// persisted — a purely cosmetic running average of recent activity, not a
+// campaign stat). _coreThermalTick() (registered as an AmbientRuntime
+// observer below, mirroring the DO-O idle-blip timer pattern — Protocol 22)
+// is the ONLY place that mutates it; _coreRefresh() only ever READS it to
+// paint the current tier.
+let _coreTemp = 0;
+// #7 RECOVERY / #4 RECONNECT-RIPPLE edge detection — the previous call's
+// fault count / disconnected flag, so _coreRefresh() can tell a GENUINE
+// transition (fault cleared, carrier just came back) from "still zero" /
+// "still connected" and never fire the one-shot on every repaint.
+let _lastCoreFaultCount = 0;
+let _lastCoreDisconnected = false;
+// #8 UPTIME-MILESTONE PULSE — the last whole hour of session uptime already
+// celebrated this session (in-memory only, resets on reload — mirrors every
+// other transient LIVING CORE signal, never a saved/campaign value).
+let _lastCoreUptimeMilestone = 0;
+
+// #1 thermal accumulator tick — a real, activity-derived running value (busy
+// -> warms, idle -> cools), NOT a demo timer: the SAME three signals
+// _coreRefresh()'s own #12 overclock check already reads (thinking/radio/a
+// buffered fault). cadenceMs 4000 keeps the ramp "sustained load", not an
+// instant flicker.
+function _coreThermalTick() {
+  const thinking =
+    typeof getOverseerState === 'function' &&
+    (getOverseerState() === 'thinking' || getOverseerState() === 'speaking');
+  const radioOn = typeof _radioPlaying === 'function' && _radioPlaying();
+  const faultCount = typeof _readErrorLog === 'function' ? _readErrorLog().length : 0;
+  const busy = thinking || radioOn || faultCount > 0;
+  _coreTemp = busy ? Math.min(100, _coreTemp + 8) : Math.max(0, _coreTemp - 5);
+  _coreRefresh();
+}
+
 // #1/#4/#5/#7 — idle heartbeat / standby dim / shutdown collapse / boot
 // ignition all derive from the ONE canonical Ambient Runtime state (no
 // separate observers registered — RobcoEvents' existing 'runtime.state'
@@ -1946,6 +1991,14 @@ function _coreRefresh() {
   // #12 Overclock strain — several signals active at once works the core
   // visibly harder. Recomputed live every call, no separate decay timer.
   const overclock = [thinking, radioOn, faultCount > 0].filter(Boolean).length >= 2;
+  // #1 Thermal glow — _coreThermalTick() (an AmbientRuntime observer) is the
+  // only mutator of _coreTemp; this just reads the current tier to paint.
+  const tempWarm = _coreTemp >= 34 && _coreTemp < 67;
+  const tempHot = _coreTemp >= 67;
+  // #7 Recovery — a fault buffer that just emptied (was >0, now 0).
+  const justRecovered = _lastCoreFaultCount > 0 && faultCount === 0;
+  // #4 Reconnect ripple — the carrier just came back (was disconnected, now not).
+  const justReconnected = _lastCoreDisconnected && !disconnected;
 
   shells.forEach(el => {
     CORE_POWER_CLASSES.forEach(c => el.classList.toggle(c, c === power));
@@ -1954,11 +2007,27 @@ function _coreRefresh() {
     el.classList.toggle('core-fault', faultCount > 0);
     el.classList.toggle('core-radio', radioOn);
     el.classList.toggle('core-overclock', overclock);
+    el.classList.toggle('core-temp-warm', tempWarm);
+    el.classList.toggle('core-temp-hot', tempHot);
     el.classList.toggle('core-still', !animate);
   });
 
   const led = document.getElementById('corePowerLed');
   if (led) led.classList.toggle('red', faultCount > 0);
+
+  // #7/#4 one-shot flourishes — fired AFTER the main paint above so
+  // core-fault is already off the element by the time core-recovering goes
+  // on (they can never coexist — see the CSS comment on .core-recovering::after).
+  if (justRecovered) _coreOneShot('core-recovering', 1200);
+  if (justReconnected) _coreOneShot('core-ripple', 900);
+  _lastCoreFaultCount = faultCount;
+  _lastCoreDisconnected = disconnected;
+
+  // #6 Reactor hum — the SAME activity signals this function already
+  // computed drive the hum's live intensity (Protocol 22, no re-derivation).
+  if (typeof _updateReactorHumLevel === 'function') {
+    _updateReactorHumLevel(thinking, radioOn, faultCount > 0);
+  }
 }
 window._coreRefresh = _coreRefresh;
 
@@ -1989,15 +2058,84 @@ function _coreDataPulse() {
 }
 window._coreDataPulse = _coreDataPulse;
 
+// #4 Power-surge ripple — fired alongside the EXISTING flare/datapulse calls
+// (save-to-slot, cloud push/pull, level-up) plus the reconnect edge detected
+// inside _coreRefresh() itself (Protocol 22 — reuses data.write/level.up/
+// connection, never a new trigger).
+function _coreRipple() {
+  _coreOneShot('core-ripple', 900);
+}
+window._coreRipple = _coreRipple;
+
+// #8 Uptime-milestone pulse — a small celebratory flourish, distinct from
+// the brighter flare/datapulse/tap group.
+function _coreMilestonePulse() {
+  _coreOneShot('core-milestone', 1000);
+}
+window._coreMilestonePulse = _coreMilestonePulse;
+
 // #13 Tap-to-poke — the #chassisCore button's onclick. An optional short
 // synth kick via the EXISTING hardware-SFX channel (Protocol 7 —
 // playChipClick() already guards masterMute + the hardwareSfx pref; reused
-// as-is, never forked). Purely cosmetic — no campaign write.
+// as-is, never forked). Purely cosmetic — no campaign write. Suppressed once
+// (see #9 below) when the click follows a completed hold-to-overcharge —
+// a pointerup always fires a trailing click event regardless of how long the
+// button was held, so without this guard a charged release would fire BOTH
+// the overcharge burst AND a plain poke.
+let _coreSuppressNextTap = false;
 function _coreTapPoke() {
+  if (_coreSuppressNextTap) {
+    _coreSuppressNextTap = false;
+    return;
+  }
   _coreOneShot('core-tap', 500);
   if (typeof playChipClick === 'function') playChipClick(true);
 }
 window._coreTapPoke = _coreTapPoke;
+
+// #9 Tap-and-hold overcharge — extends tap-to-poke with a press-and-HOLD
+// gesture. Wired to #chassisCore's pointerdown/up/cancel/leave in
+// initChassisCore() below. Holding CORE_HOLD_MS ramps the ring spin via the
+// SAME --core-spin-mul-r1/-r3 inertia mechanism #3 uses (Protocol 22);
+// releasing AFTER the charge threshold fires a bigger burst (reusing the
+// #14 stat-change burst's own tumble keyframes) plus an optional heavier
+// synth kick via the EXISTING hardware-SFX board-thunk channel (Protocol 7 —
+// playBoardThunk() already guards masterMute + hardwareSfx). Gated the same
+// way every other flourish is: when _coreShouldAnimate() is closed, the
+// charging visual never starts, so a hold under reduced-motion/low-immersion/
+// hidden-tab/standby degrades to a no-op hold + a plain click — never a
+// broken half-state.
+const CORE_HOLD_MS = 850;
+let _coreHoldTimer = null;
+let _coreHeld = false; // true once THIS press reached the charge threshold
+function _coreHoldStart() {
+  _coreHeld = false;
+  clearTimeout(_coreHoldTimer);
+  _coreHoldTimer = null;
+  if (!_coreShouldAnimate()) return; // gate closed — no charge visual, plain tap still works
+  _coreShells().forEach(el => el.classList.add('core-charging'));
+  _coreHoldTimer = setTimeout(() => {
+    _coreHeld = true;
+    _coreShells().forEach(el => {
+      el.classList.remove('core-charging');
+      el.classList.add('core-charged');
+    });
+  }, CORE_HOLD_MS);
+}
+function _coreHoldEnd() {
+  clearTimeout(_coreHoldTimer);
+  _coreHoldTimer = null;
+  const wasCharged = _coreHeld;
+  _coreHeld = false;
+  _coreShells().forEach(el => el.classList.remove('core-charging', 'core-charged'));
+  if (wasCharged) {
+    _coreOneShot('core-overcharge', 1800);
+    if (typeof playBoardThunk === 'function') playBoardThunk(true);
+  }
+  _coreSuppressNextTap = wasCharged; // consume: the trailing click must not ALSO poke
+}
+window._coreHoldStart = _coreHoldStart;
+window._coreHoldEnd = _coreHoldEnd;
 
 // #14 3D ring burst on a real stat change (owner follow-up) — a genuine 3D
 // orbital tumble (rotateX/rotateY/rotateZ), distinct from the flat 2D
@@ -2085,6 +2223,42 @@ const CORE_HELP = [
     cmd: '3D RING BURST',
     desc: "The cell's rings tumble in a real 3D orbit for a moment whenever you actually change a stat — a S.P.E.C.I.A.L. attribute, a skill, your HP, XP, or radiation level — or level up.",
   },
+  {
+    cmd: 'THERMAL GLOW',
+    desc: 'The cell warms from green toward amber and red the longer it stays busy, and cools back down once things quiet.',
+  },
+  {
+    cmd: 'ENERGY SPARKS',
+    desc: 'Small particles orbit the cell — more of them, brighter, while the cell is busy; just a faint one at rest.',
+  },
+  {
+    cmd: 'SPIN INERTIA',
+    desc: 'The rings ease smoothly into a new speed instead of snapping — a momentum feel, not an instant jump.',
+  },
+  {
+    cmd: 'POWER-SURGE RIPPLE',
+    desc: 'A ring ripples outward whenever the carrier reconnects, in addition to the data-pulse and level-up flourishes above.',
+  },
+  {
+    cmd: 'IDLE FLARES',
+    desc: 'Every so often during a long quiet stretch, the cell flares faintly — the reactor settling.',
+  },
+  {
+    cmd: 'REACTOR HUM',
+    desc: 'A synthesized hum tuned to blend with the CRT hum, rising with the cell’s activity and louder while you’re looking at CHASSIS.',
+  },
+  {
+    cmd: 'RECOVERY',
+    desc: 'When a buffered fault clears, the cell visibly stabilizes back to calm green instead of the fault ring just vanishing.',
+  },
+  {
+    cmd: 'UPTIME MILESTONE',
+    desc: 'A small celebratory pulse marks every hour the terminal has been powered on this session.',
+  },
+  {
+    cmd: 'HOLD TO OVERCHARGE',
+    desc: 'Press and HOLD the cell to spin it up, then release for a bigger burst than a plain tap.',
+  },
 ];
 function showCoreHelpModal() {
   openModal({
@@ -2120,6 +2294,60 @@ function initChassisCore() {
     if (typeof mq.addEventListener === 'function')
       mq.addEventListener('change', () => _coreRefresh());
   }
+
+  // #9 Tap-and-hold overcharge — pointer wiring on the real button only (the
+  // mini core is a decorative, non-interactive aria-hidden mirror).
+  const coreBtn = document.getElementById('chassisCore');
+  if (coreBtn) {
+    coreBtn.addEventListener('pointerdown', _coreHoldStart);
+    coreBtn.addEventListener('pointerup', _coreHoldEnd);
+    coreBtn.addEventListener('pointercancel', _coreHoldEnd);
+    coreBtn.addEventListener('pointerleave', _coreHoldEnd);
+  }
+
+  if (typeof AmbientRuntime !== 'undefined' && AmbientRuntime && AmbientRuntime.register) {
+    // #1 Thermal glow accumulator — a real activity-derived running value,
+    // ticking only while the terminal is genuinely awake (ACTIVE/IDLE, never
+    // STANDBY/SHUTDOWN/OFF — those states are already gated off/dimmed).
+    AmbientRuntime.register({
+      id: 'core-thermal',
+      states: ['ACTIVE', 'IDLE'],
+      tier: 'balanced',
+      cadenceMs: 4000,
+      onTick: _coreThermalTick,
+    });
+
+    // #5 Idle flares — low-rate, dial-gated, non-persisted, mirrors the DO-O
+    // Overseer idle-blip timer exactly (Protocol 22): only during genuine
+    // idle, roughly half the ticks, a faint settling flare.
+    AmbientRuntime.register({
+      id: 'core-idle-flare',
+      states: ['IDLE'],
+      tier: 'balanced',
+      cadenceMs: 42000,
+      onTick: () => {
+        if (Math.random() > 0.5) return;
+        _coreOneShot('core-idle-flare', 1100);
+      },
+    });
+
+    // #6 Reactor hum power link — mirrors the SAME 'crt-hum-power' pattern
+    // (_wireAmbientExperiences() above) so the reactor hum stops on a genuine
+    // power-down and resumes (autoplay-safe, deferred to the first gesture)
+    // when the terminal comes back — a functional power link, not tier-gated,
+    // exactly like the CRT hum's own link.
+    AmbientRuntime.register({
+      id: 'reactor-hum-power',
+      states: ['SHUTDOWN', 'OFF'],
+      onEnter: () => {
+        if (typeof stopReactorHum === 'function') stopReactorHum();
+      },
+      onExit: () => {
+        if (typeof startReactorHum !== 'function') return;
+        _armAmbientAudio(() => startReactorHum());
+      },
+    });
+  }
 }
 window.initChassisCore = initChassisCore;
 
@@ -2142,6 +2370,11 @@ function _wireChassisCoreEventBusSubscribers() {
   // skill/HP/XP/RAD edit via the new 'stat.change' event.
   RobcoEvents.on('level.up', () => _coreStatBurst());
   RobcoEvents.on('stat.change', () => _coreStatBurst());
+  // #4 Power-surge ripple — the SAME data.write/level.up signals above, plus
+  // the reconnect edge detected separately inside _coreRefresh() itself
+  // (Protocol 22 — reuses existing signals, never a new trigger).
+  RobcoEvents.on('level.up', () => _coreRipple());
+  RobcoEvents.on('data.write', () => _coreRipple());
 }
 // ── CHASSIS CORE END ────────────────────────────────────────────────────
 
@@ -2364,6 +2597,10 @@ function _restoreDevicePrefs() {
   }
   if (MetaStore.get('robco_factionthreshold_muted') === 'true') {
     let el = document.getElementById('muteFactionThresholdToggle');
+    if (el) el.checked = true;
+  }
+  if (MetaStore.get('robco_reactorhum_muted') === 'true') {
+    let el = document.getElementById('muteReactorHumToggle');
     if (el) el.checked = true;
   }
   // Master mute restore
@@ -2731,6 +2968,7 @@ window.onload = async function () {
     _wireBioHarnessZones(); // PHASE 3 · OPERATOR BUS-03: SVG zone taps route through toggleLimb()
     _wireFaderDrag(); // PHASE 3 follow-up · OPERATOR BUS-02: fader-ladder drag routes through commitStat()
     _armAmbientAudio(startCrtHum); // continuous ambient — deferred to first gesture (blocked-autoplay spam fix)
+    if (typeof startReactorHum === 'function') _armAmbientAudio(startReactorHum); // LIVING CORE #6: same autoplay-safe first-gesture arm
     initRegistryAutocomplete();
     initAmmoDatalist();
     initLocationDatalist();

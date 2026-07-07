@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2510/2510 | Cache: robco-terminal-v2.7.0-r107 -->
+﻿## [Unreleased]<!-- Tests: 2531/2531 | Cache: robco-terminal-v2.7.0-r108 -->
 
 ### Added
 
@@ -29,6 +29,7 @@
 - The DATABANK search panel, campaign record, campaign notes, and session stats panels all got matching hardware makeovers to go with the new map and quest log — an amber archive-query terminal for search, a tape-spool campaign chronicle for your recorded history, a filterable field-notes ledger, and a mechanical odometer-style counter bank for your session stats.
 - The power core's rings now visibly tumble in real 3D for a moment whenever a stat actually changes — leveling up, or adjusting a S.P.E.C.I.A.L. attribute, a skill, your HP, XP, or radiation level — on both the main core and its mirror in the top casing, with the core's heart flaring bright at the same time so the moment is easy to catch. The tumble itself now flows smoothly from start to finish instead of the choppier motion it launched with, and plays a touch slower for a more graceful feel. It only plays on a genuine change, never just from looking at the screen, and settles right back into its normal gentle spin afterward.
 - The power core now has a wider ring that tumbles diagonally in true 3D at all times — not just during a stat change — its opposite corners swapping through depth as it turns, giving the core a subtle gyroscope-like presence even at rest. It shows up clearly on both the main core and its mirror in the top casing, rotating in exact sync between the two.
+- The power core got ten more ways to react to what's actually happening on your terminal, all visible on both the main core and its mirror in the top casing. It now warms from green toward amber and red the longer it stays busy, cooling back down once things quiet. Small sparks orbit it, more of them and brighter while it's working hard, just a faint one at rest. Its rings now ease smoothly into a new speed instead of snapping. A ring ripples outward whenever your connection reconnects, on top of the existing save and level-up pulses. Every so often during a long quiet stretch it flares faintly, as if the reactor is settling. A second synthesized hum now plays alongside the existing CRT hum, tuned to blend with it rather than clash, rising when the core is busy and louder while you're looking at CHASSIS — it has its own on/off switch next to the other sound channels. When a buffered error clears, the core now visibly settles back to calm green instead of the fault ring just disappearing. It marks each hour of your session with a small celebratory pulse. And you can now press and hold the core to charge it up, releasing for a bigger burst than a quick tap.
 
 ### Changed
 

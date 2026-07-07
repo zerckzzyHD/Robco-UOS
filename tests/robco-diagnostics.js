@@ -19669,9 +19669,11 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '155.1: the "CHASSIS RIT-V300 · INTERNAL SERVICE VIEW · BUS VOLTAGE NOMINAL" subheader is present in the bay header'
   );
 
-  // 155.2  SLOT 02: the 13 mute checkboxes are now a DIP-chip grid — exact
-  //        ids/onchange calls survive verbatim (Protocol 4/22), CH-01..CH-13
-  //        pin ids are present, and the old plain-checkbox-list markup is gone
+  // 155.2  SLOT 02: the mute checkboxes are a DIP-chip grid — exact
+  //        ids/onchange calls survive verbatim (Protocol 4/22), CH-01..CH-14
+  //        pin ids are present (CH-14 REACTOR HUM added by the CHASSIS LIVING
+  //        CORE behavior-batch unit), and the old plain-checkbox-list markup
+  //        is gone
   const muteKeys155 = [
     'robco_sfx_muted',
     'robco_hum_muted',
@@ -19686,18 +19688,19 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     'robco_questcomplete_muted',
     'robco_questfail_muted',
     'robco_factionthreshold_muted',
+    'robco_reactorhum_muted',
   ];
   assert(
-    (html155.match(/class="chip-wrap"/g) || []).length === 13 &&
-      (html155.match(/class="chip-input"/g) || []).length === 13 &&
-      (html155.match(/class="chip-card"/g) || []).length === 13 &&
-      Array.from({ length: 13 }, (_, i) => `CH-${String(i + 1).padStart(2, '0')}`).every(ch =>
+    (html155.match(/class="chip-wrap"/g) || []).length === 14 &&
+      (html155.match(/class="chip-input"/g) || []).length === 14 &&
+      (html155.match(/class="chip-card"/g) || []).length === 14 &&
+      Array.from({ length: 14 }, (_, i) => `CH-${String(i + 1).padStart(2, '0')}`).every(ch =>
         html155.includes(ch)
       ) &&
       muteKeys155.every(k => html155.includes(`toggleAudio('${k}', this.checked)`)) &&
       !/class="audio-row"/.test(html155) &&
       !/class="bay-channel-list"/.test(html155),
-    '155.2: the 13 SLOT-02 channels render as a chip-grid of chip-wrap/chip-input/chip-card triples with CH-01..CH-13 pin ids, every toggleAudio() call unchanged, and the old audio-row/bay-channel-list markup is fully retired'
+    '155.2: the 14 SLOT-02 channels render as a chip-grid of chip-wrap/chip-input/chip-card triples with CH-01..CH-14 pin ids, every toggleAudio() call unchanged, and the old audio-row/bay-channel-list markup is fully retired'
   );
 
   // 155.3  chip polarity is INVERTED in CSS only (Protocol 25 sanctioned
@@ -29331,6 +29334,396 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     ),
     '193.8: #lincolnMemorabiliaDisplay is still wrapped by .curio-caselist.curio-caselist--linc, the exact scope the Lincoln-only compact-cell/select rules (193.5/193.6) target'
   );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 194 — CHASSIS LIVING CORE: 10 owner-approved new behaviors
+//  (batch 2). #1 thermal glow, #2 energy sparks, #3 spin inertia, #4
+//  power-surge ripple, #5 idle flares, #6 reactor hum (a second
+//  synthesized WebAudio channel), #7 recovery animation, #8 uptime-
+//  milestone pulse, #9 tap-and-hold overcharge. #10 (a center readout
+//  glyph) was evaluated and DROPPED — it could not be made legible on
+//  the small casing-top mini core (33-54px, already sharing its circle
+//  with 3 rings + the heart) without hurting the design; guarded here by
+//  a negative check that no half-shipped readout markup exists.
+//  21 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 194 — CHASSIS LIVING CORE: 10 owner-approved new behaviors (batch 2)');
+  const html194 = readFile('index.html');
+  const css194 = readFile('css/terminal.css');
+  const cssStripped194 = css194.replace(/\/\*[\s\S]*?\*\//g, '');
+  const core194 = readFile('js/ui-core.js');
+  const audio194 = readFile('js/ui-audio.js');
+  const state194 = readFile('js/state.js');
+
+  // 194.1  #1 thermal glow: a real activity-derived accumulator (_coreTemp),
+  //        mutated ONLY by _coreThermalTick() (never by _coreRefresh(),
+  //        which just paints it), registered as a dial-gated AmbientRuntime
+  //        observer on the awake states — never a bare setInterval.
+  assert(
+    /let _coreTemp = 0;/.test(core194) &&
+      /function _coreThermalTick\(\)/.test(core194) &&
+      /_coreTemp = busy \? Math\.min\(100, _coreTemp \+ 8\) : Math\.max\(0, _coreTemp - 5\)/.test(
+        core194
+      ) &&
+      /id: 'core-thermal',\s*\n\s*states: \['ACTIVE', 'IDLE'\],\s*\n\s*tier: 'balanced',\s*\n\s*cadenceMs: 4000,\s*\n\s*onTick: _coreThermalTick,/.test(
+        core194
+      ),
+    "194.1: _coreTemp is a real activity-derived accumulator, mutated only by _coreThermalTick() (thinking/radio/fault -> warm, otherwise cool), registered as a dial-gated 'core-thermal' AmbientRuntime observer on ACTIVE/IDLE — never a bare polling timer"
+  );
+
+  // 194.2  #1 thermal tint rides filter:hue-rotate() on .c-heart (optic-
+  //        agnostic — works with whatever --robco-green the active theme
+  //        picks, never a hardcoded amber/red rgb), and _coreRefresh() only
+  //        READS _coreTemp to paint core-temp-warm/-hot, never mutates it.
+  assert(
+    /\.chassis-core-shape\.core-temp-warm \.c-heart\s*\{\s*filter:\s*hue-rotate\(-?\d+deg\)/.test(
+      cssStripped194
+    ) &&
+      /\.chassis-core-shape\.core-temp-hot \.c-heart\s*\{\s*filter:\s*hue-rotate\(-?\d+deg\)/.test(
+        cssStripped194
+      ) &&
+      /filter 1\.2s ease/.test(cssStripped194) &&
+      /const tempWarm = _coreTemp >= 34 && _coreTemp < 67;/.test(core194) &&
+      /const tempHot = _coreTemp >= 67;/.test(core194),
+    '194.2: the warm/hot thermal tiers tint .c-heart via filter:hue-rotate() (rides whatever optic colour is active, Protocol 38/optic-agnostic) eased by a 1.2s transition, and _coreRefresh() only reads _coreTemp to choose the tier'
+  );
+
+  // 194.3  #2 energy sparks: the SAME two-span markup (s1 always-on, s2
+  //        busy-only) exists on BOTH #chassisCore and #chassisCoreMini
+  //        (Protocol 22 — one shared child set, never a per-core fork).
+  assert(
+    (html194.match(/class="c-spark s1"/g) || []).length === 2 &&
+      (html194.match(/class="c-spark s2"/g) || []).length === 2,
+    '194.3: both #chassisCore and #chassisCoreMini carry the identical c-spark s1/s2 markup (Protocol 22 — one shared child set, never a per-core fork)'
+  );
+
+  // 194.4  #2 sparks orbit via the classic rotate()+translateX() technique
+  //        (no wrapper element), scaled down for the mini core so the orbit
+  //        stays inside its own smaller box (never clipped by overflow:
+  //        hidden), and s2 is hidden at rest — only busy states reveal it.
+  assert(
+    /@keyframes chassisCoreOrbitDot/.test(cssStripped194) &&
+      /translateX\(var\(--spark-r, 40px\)\)/.test(cssStripped194) &&
+      /\.chassis-core-mini \.c-spark\s*\{[^}]*--spark-r:\s*15px/.test(cssStripped194) &&
+      /\.chassis-core-shape \.c-spark\.s2\s*\{[^}]*opacity:\s*0;/.test(cssStripped194) &&
+      /\.core-thinking \.c-spark\.s2,\s*\n\.chassis-core-shape\.core-overclock \.c-spark\.s2,\s*\n\.chassis-core-shape\.core-temp-hot \.c-spark\.s2\s*\{/.test(
+        css194
+      ),
+    '194.4: sparks orbit via rotate()+translateX(--spark-r) (no wrapper element needed), --spark-r is scaled down for the mini core so the orbit stays inside its smaller box, and the second spark is hidden at rest — only thinking/overclock/hot-thermal reveal it (density tracks real activity)'
+  );
+
+  // 194.5  #2 gate: .c-spark is added to the SAME .core-still pause list
+  //        every other continuous LIVING CORE element already uses.
+  assert(
+    /\.core-still,\s*\n\.core-still \.c-ring,\s*\n\.core-still \.c-heart,\s*\n\.core-still \.c-spark,/.test(
+      css194
+    ),
+    '194.5: .c-spark is paused by the SAME .core-still gate group as .c-ring/.c-heart — no bespoke reduced-motion/low-immersion/hidden-tab/standby carve-out'
+  );
+
+  // 194.6  #3 spin inertia: --core-spin-mul-r1/-r3 are registered as
+  //        INTERPOLATABLE @property custom properties (numeric, initial 1),
+  //        and the base .chassis-core-shape rule transitions them.
+  assert(
+    /@property --core-spin-mul-r1\s*\{\s*syntax:\s*'<number>';\s*inherits:\s*true;\s*initial-value:\s*1;\s*\}/.test(
+      cssStripped194
+    ) &&
+      /@property --core-spin-mul-r3\s*\{\s*syntax:\s*'<number>';\s*inherits:\s*true;\s*initial-value:\s*1;\s*\}/.test(
+        cssStripped194
+      ) &&
+      /--core-spin-mul-r1 1\.6s ease,\s*\n\s*--core-spin-mul-r3 1\.6s ease;/.test(css194),
+    '194.6: --core-spin-mul-r1/-r3 are registered via @property as interpolatable numbers (initial-value 1), and .chassis-core-shape transitions both over 1.6s — the multiplier easing IS the spin-inertia effect (progressive enhancement: unsupported browsers just keep the old instant snap)'
+  );
+
+  // 194.7  #3 the r1/r3 ring animation-duration is computed from the
+  //        multiplier via calc() (live-reread on every custom-property
+  //        change), replacing the old hardcoded per-state animation-
+  //        duration snaps — core-boot/standby/thinking/overclock now set
+  //        ONLY the multiplier for r1/r3, never a raw animation-duration.
+  assert(
+    /animation:\s*chassisCoreSpin calc\(14s \/ var\(--core-spin-mul-r1\)\) linear infinite;/.test(
+      cssStripped194
+    ) &&
+      /animation:\s*chassisCoreSpin calc\(9s \/ var\(--core-spin-mul-r3\)\) linear infinite reverse;/.test(
+        cssStripped194
+      ) &&
+      !/\.chassis-core-shape\.core-boot \.c-ring\.r1\s*\{\s*animation-duration/.test(
+        cssStripped194
+      ) &&
+      !/\.chassis-core-shape\.core-thinking \.c-ring\.r1\s*\{\s*animation-duration/.test(
+        cssStripped194
+      ) &&
+      !/\.chassis-core-shape\.core-overclock \.c-ring\.r1\s*\{\s*animation-duration/.test(
+        cssStripped194
+      ),
+    '194.7: r1/r3 animation-duration is calc()-driven from --core-spin-mul-r1/-r3 (re-read live), and core-boot/thinking/overclock no longer set a raw animation-duration on r1 directly — the multiplier is the one source of truth'
+  );
+
+  // 194.8  #3 regression-safety: every per-state multiplier reproduces the
+  //        EXACT original target duration (14s/9s base) that shipped before
+  //        this unit — the ramp is new, the destination speeds are not.
+  {
+    const wantR1 = { boot: 2.2, standby: 40, thinking: 3, overclock: 1.6 };
+    const wantR3 = { boot: 1.4, standby: 26, thinking: 2, overclock: 1 };
+    const mulR1 = {
+      boot: (cssStripped194.match(/\.core-boot\s*\{[^}]*--core-spin-mul-r1:\s*([\d.]+)/) || [])[1],
+      standby: (cssStripped194.match(/\.core-standby\s*\{[^}]*--core-spin-mul-r1:\s*([\d.]+)/) ||
+        [])[1],
+      thinking: (cssStripped194.match(/\.core-thinking\s*\{[^}]*--core-spin-mul-r1:\s*([\d.]+)/) ||
+        [])[1],
+      overclock: (cssStripped194.match(
+        /\.core-overclock\s*\{[^}]*--core-spin-mul-r1:\s*([\d.]+)/
+      ) || [])[1],
+    };
+    const mulR3 = {
+      boot: (cssStripped194.match(/\.core-boot\s*\{[^}]*--core-spin-mul-r3:\s*([\d.]+)/) || [])[1],
+      standby: (cssStripped194.match(/\.core-standby\s*\{[^}]*--core-spin-mul-r3:\s*([\d.]+)/) ||
+        [])[1],
+      thinking: (cssStripped194.match(/\.core-thinking\s*\{[^}]*--core-spin-mul-r3:\s*([\d.]+)/) ||
+        [])[1],
+      overclock: (cssStripped194.match(
+        /\.core-overclock\s*\{[^}]*--core-spin-mul-r3:\s*([\d.]+)/
+      ) || [])[1],
+    };
+    let allClose = true;
+    Object.keys(wantR1).forEach(k => {
+      if (!mulR1[k] || Math.abs(14 / Number(mulR1[k]) - wantR1[k]) > 0.01) allClose = false;
+      if (!mulR3[k] || Math.abs(9 / Number(mulR3[k]) - wantR3[k]) > 0.01) allClose = false;
+    });
+    assert(
+      allClose,
+      '194.8: every core-boot/standby/thinking/overclock multiplier reproduces the exact pre-existing r1 (14s base) and r3 (9s base) target durations to within 0.01s — regression-safe, only the ramp BETWEEN targets is new'
+    );
+  }
+
+  // 194.9  #4 power-surge ripple: a dedicated .c-ripple child (not ::after —
+  //        ::after is already the fault ring's pseudo-element, and a ripple
+  //        can legitimately overlap a buffered fault) exists identically on
+  //        both cores, with its own expanding-then-fading keyframes.
+  assert(
+    (html194.match(/class="c-ripple"/g) || []).length === 2 &&
+      /@keyframes chassisCoreRipple/.test(cssStripped194) &&
+      /\.chassis-core-shape\.core-ripple \.c-ripple\s*\{\s*animation:\s*chassisCoreRipple/.test(
+        cssStripped194
+      ),
+    "194.9: both cores carry an identical .c-ripple child (Protocol 22, never sharing the fault ring's ::after) driven by a dedicated expanding/fading chassisCoreRipple keyframe"
+  );
+
+  // 194.10  #4 the ripple fires on the SAME data.write/level.up signals the
+  //         core already reacts to, PLUS a reconnect edge computed inside
+  //         _coreRefresh() itself — never a new/invented trigger.
+  assert(
+    /RobcoEvents\.on\('level\.up', \(\) => _coreRipple\(\)\);/.test(core194) &&
+      /RobcoEvents\.on\('data\.write', \(\) => _coreRipple\(\)\);/.test(core194) &&
+      /const justReconnected = _lastCoreDisconnected && !disconnected;/.test(core194) &&
+      /if \(justReconnected\) _coreOneShot\('core-ripple', 900\);/.test(core194),
+    '194.10: the ripple is wired to the EXISTING level.up/data.write RobcoEvents signals plus a reconnect edge (_lastCoreDisconnected -> !disconnected) computed inside _coreRefresh() itself — Protocol 22, no invented trigger'
+  );
+
+  // 194.11  #5 idle flares: a dial-gated, non-persisted AmbientRuntime
+  //         observer mirroring the DO-O Overseer idle-blip timer exactly —
+  //         only during genuine IDLE, at the 'balanced' tier, roughly half
+  //         the ticks, and it never writes to campaign state or localStorage.
+  assert(
+    /id: 'core-idle-flare',\s*\n\s*states: \['IDLE'\],\s*\n\s*tier: 'balanced',\s*\n\s*cadenceMs: 42000,/.test(
+      core194
+    ) &&
+      /if \(Math\.random\(\) > 0\.5\) return;\s*\n\s*_coreOneShot\('core-idle-flare', 1100\);/.test(
+        core194
+      ) &&
+      /\.chassis-core-shape\.core-idle-flare \.c-heart\s*\{/.test(cssStripped194),
+    "194.11: 'core-idle-flare' is a dial-gated ('balanced' tier), non-persisted AmbientRuntime observer that only runs during genuine IDLE, firing a faint faded flare roughly half the time — mirrors the DO-O Overseer idle-blip timer pattern exactly (Protocol 22)"
+  );
+
+  // 194.12  #6 reactor hum: its own Protocol-7 audio channel — masterMute
+  //         guarded first, then its own mute pref, exactly like every
+  //         sibling channel (crtHum/radio/hardwareSfx) — registered in
+  //         META_MANIFEST, seeded into AudioSettings, and tuned to a
+  //         perfect-fifth (90Hz) above the CRT hum's 60Hz fundamental so the
+  //         two tones blend harmonically rather than beat/clash.
+  assert(
+    /function startReactorHum\(\) \{\s*\n\s*if \(reactorHumNode \|\| AudioSettings\.masterMute \|\| AudioSettings\.reactorHum\) return;/.test(
+      audio194
+    ) &&
+      /reactorHumNode\.frequency\.value = 90; \/\/ perfect fifth above the CRT hum's 60Hz fundamental/.test(
+        audio194
+      ) &&
+      /robco_reactorhum_muted: \{ type: 'bool', default: false, owner: 'ui-audio\.js' \}/.test(
+        state194
+      ) &&
+      /reactorHum: MetaStore\.get\('robco_reactorhum_muted'\) === 'true'/.test(core194),
+    "194.12: startReactorHum() guards masterMute THEN its own AudioSettings.reactorHum pref (Protocol 7, same order as every sibling channel), is tuned to 90Hz — a perfect fifth (3:2 ratio) above the CRT hum's 60Hz fundamental so the two blend harmonically — and robco_reactorhum_muted is a registered META_MANIFEST device pref seeded into AudioSettings"
+  );
+
+  // 194.13  #6 reactor hum has its own CH-14 chip in the SLOT 02 SONIC
+  //         PROCESSOR board, wired through the SAME toggleAudio() choke
+  //         point every sibling channel already uses (never a forked
+  //         toggle), and is included in toggleAudio's mute-flag keyMap.
+  assert(
+    /id="muteReactorHumToggle"[\s\S]{0,80}onchange="toggleAudio\('robco_reactorhum_muted', this\.checked\)"/.test(
+      html194
+    ) &&
+      /CH-14/.test(html194) &&
+      /robco_reactorhum_muted: 'reactorHum', \/\/ LIVING CORE #6: reactor hum/.test(audio194),
+    "194.13: the CH-14 REACTOR HUM chip routes through the SAME toggleAudio() choke point (Protocol 22), and robco_reactorhum_muted is in toggleAudio's mute-flag keyMap"
+  );
+
+  // 194.14  #6 toggleMasterMute() silences/resumes the reactor hum exactly
+  //         like it already does for the CRT hum and radio — never bypasses
+  //         the reactor hum's own channel-mute guard.
+  assert(
+    /if \(reactorHumGain\) \{\s*\n\s*reactorHumGain\.gain\.linearRampToValueAtTime\(0, audioCtx\.currentTime \+ 0\.3\);\s*\n\s*\}/.test(
+      audio194
+    ) &&
+      /if \(!reactorHumNode && !AudioSettings\.reactorHum\) \{\s*\n\s*startReactorHum\(\);/.test(
+        audio194
+      ),
+    '194.14: toggleMasterMute() ramps the reactor hum to silence on mute and resumes it (only if its own channel pref is still on) on unmute — mirrors the existing CRT hum/radio master-mute handling exactly'
+  );
+
+  // 194.15  #6 the hum's live intensity is driven from _coreRefresh()'s own
+  //         already-computed activity signals (never a second polling
+  //         loop), and reads the CHASSIS-subsystem-active signal for the
+  //         louder-on-CHASSIS requirement.
+  assert(
+    /function _updateReactorHumLevel\(thinking, radioOn, hasFault\)/.test(audio194) &&
+      /document\.body\.dataset\.subsystem === 'chassis'/.test(audio194) &&
+      /if \(typeof _updateReactorHumLevel === 'function'\) \{\s*\n\s*_updateReactorHumLevel\(thinking, radioOn, faultCount > 0\);/.test(
+        core194
+      ),
+    "194.15: _updateReactorHumLevel() is called from _coreRefresh() with the SAME thinking/radioOn/faultCount signals already computed there (never a second polling loop), and reads document.body.dataset.subsystem === 'chassis' to go louder while CHASSIS is the active view"
+  );
+
+  // 194.16  #7 recovery animation: a one-shot stabilize transition fires
+  //         exactly when a buffered fault count transitions from >0 to 0
+  //         (never on every repaint), reusing ::after safely because
+  //         core-fault and core-recovering can never coexist (removed in
+  //         the SAME classList pass, before the one-shot is applied).
+  assert(
+    /const justRecovered = _lastCoreFaultCount > 0 && faultCount === 0;/.test(core194) &&
+      /if \(justRecovered\) _coreOneShot\('core-recovering', 1200\);/.test(core194) &&
+      /@keyframes chassisCoreRecover/.test(cssStripped194) &&
+      /\.chassis-core-shape\.core-recovering::after\s*\{/.test(cssStripped194),
+    '194.16: core-recovering fires as a one-shot exactly on the fault-count >0 -> 0 edge (never every repaint), safely reusing ::after because core-fault is already removed in the same _coreRefresh() pass before core-recovering is applied'
+  );
+
+  // 194.17  #8 uptime-milestone pulse: fires exactly once per crossed hour
+  //         (a strictly-increasing in-memory guard, never re-fired for the
+  //         same hour), derived from the EXISTING uptime clock tick.
+  assert(
+    /if \(h > _lastCoreUptimeMilestone\) \{\s*\n\s*_lastCoreUptimeMilestone = h;\s*\n\s*if \(typeof _coreMilestonePulse === 'function'\) _coreMilestonePulse\(\);/.test(
+      core194
+    ) &&
+      /function _coreMilestonePulse\(\) \{\s*\n\s*_coreOneShot\('core-milestone', 1000\);/.test(
+        core194
+      ) &&
+      /\.chassis-core-shape\.core-milestone \.c-heart\s*\{/.test(cssStripped194),
+    '194.17: _coreMilestonePulse() fires exactly once per crossed hour of session uptime (a strictly-increasing _lastCoreUptimeMilestone guard inside the EXISTING _tickUptimeClock(), never a separate timer)'
+  );
+
+  // 194.18  #9 tap-and-hold overcharge: a real hold-threshold state machine
+  //         wired to #chassisCore's pointer events, reusing the #14 stat-
+  //         burst tumble keyframes for the release flourish (Protocol 22),
+  //         and consuming the trailing click so a charged release never
+  //         ALSO fires a plain tap-poke.
+  assert(
+    /coreBtn\.addEventListener\('pointerdown', _coreHoldStart\);/.test(core194) &&
+      /coreBtn\.addEventListener\('pointerup', _coreHoldEnd\);/.test(core194) &&
+      /coreBtn\.addEventListener\('pointercancel', _coreHoldEnd\);/.test(core194) &&
+      /coreBtn\.addEventListener\('pointerleave', _coreHoldEnd\);/.test(core194) &&
+      /_coreSuppressNextTap = wasCharged;/.test(core194) &&
+      /if \(_coreSuppressNextTap\) \{\s*\n\s*_coreSuppressNextTap = false;\s*\n\s*return;/.test(
+        core194
+      ) &&
+      /\.chassis-core-shape\.core-overcharge \.c-ring\.r1\s*\{\s*animation:\s*chassisCoreOrbitBurst1/.test(
+        cssStripped194
+      ),
+    '194.18: #chassisCore wires pointerdown/up/cancel/leave to _coreHoldStart/_coreHoldEnd, a charged release reuses the #14 stat-burst tumble keyframes (Protocol 22), and _coreSuppressNextTap consumes the trailing click so a charged release never ALSO fires a plain tap-poke'
+  );
+
+  // 194.19  #9 the charging visual is GATED — _coreHoldStart() returns
+  //         before adding any class when _coreShouldAnimate() is closed, so
+  //         a hold under reduced-motion/low-immersion/hidden-tab/standby
+  //         degrades to a no-op hold (plain click still works) rather than
+  //         a broken half-state, and charging reuses the #3 inertia
+  //         multiplier mechanism (a nice cross-behavior reuse).
+  assert(
+    /if \(!_coreShouldAnimate\(\)\) return; \/\/ gate closed — no charge visual, plain tap still works/.test(
+      core194
+    ) &&
+      /\.chassis-core-shape\.core-charging\s*\{\s*\n\s*--core-spin-mul-r1:\s*3;\s*\n\s*--core-spin-mul-r3:\s*3;/.test(
+        cssStripped194
+      ),
+    '194.19: _coreHoldStart() is gated by _coreShouldAnimate() before adding any charging class (a closed gate degrades to a plain no-flourish hold, never a broken half-state), and .core-charging reuses the #3 --core-spin-mul-r1/-r3 inertia mechanism (Protocol 22)'
+  );
+
+  // 194.20  #10 (center readout) was evaluated and correctly DROPPED — no
+  //         half-shipped readout markup/class exists anywhere.
+  assert(
+    !/c-readout/.test(html194) &&
+      !/c-readout/.test(css194) &&
+      !/c-readout/.test(core194) &&
+      !/coreReadout/.test(core194),
+    '194.20: #10 (a center readout glyph) was correctly dropped rather than half-shipped — no c-readout/coreReadout markup, CSS, or JS exists anywhere'
+  );
+
+  // 194.21  zero campaign-state write across every new function this batch
+  //         added — every new signal is transient in-memory or a MetaStore
+  //         device pref, never state.<field>/saveState()/robco_v8, extending
+  //         the 192.15/192.32 guard to this batch's own new functions. Uses a
+  //         brace-counting extractor (not a `\n}` regex, which is fragile
+  //         against nested blocks) to bound each function body precisely, and
+  //         excludes `===`/`!==` comparisons from the assignment check (a
+  //         bare `\s*=` would false-positive on a `state.x === 'y'` read).
+  {
+    function extractFnBody194(src, name) {
+      const start = src.indexOf('function ' + name + '(');
+      if (start === -1) return null;
+      const braceStart = src.indexOf('{', start);
+      if (braceStart === -1) return null;
+      let depth = 0;
+      for (let i = braceStart; i < src.length; i++) {
+        if (src[i] === '{') depth++;
+        else if (src[i] === '}') {
+          depth--;
+          if (depth === 0) return src.slice(braceStart + 1, i);
+        }
+      }
+      return null;
+    }
+    const writeRe = /saveState\(|robco_v8|state\.\w+\s*=(?!=)/;
+    const fnNames194 = [
+      '_coreThermalTick',
+      '_coreRipple',
+      '_coreMilestonePulse',
+      '_coreHoldStart',
+      '_coreHoldEnd',
+    ];
+    let clean194 = true;
+    let foundAll194 = true;
+    fnNames194.forEach(name => {
+      const body = extractFnBody194(core194, name);
+      if (body === null) {
+        foundAll194 = false;
+        return;
+      }
+      if (writeRe.test(body)) clean194 = false;
+    });
+    ['startReactorHum', 'stopReactorHum', '_updateReactorHumLevel'].forEach(name => {
+      const body = extractFnBody194(audio194, name);
+      if (body === null) {
+        foundAll194 = false;
+        return;
+      }
+      if (writeRe.test(body)) clean194 = false;
+    });
+    assert(
+      clean194 && foundAll194,
+      '194.21: every new LIVING CORE function this batch added (_coreThermalTick/_coreRipple/_coreMilestonePulse/_coreHoldStart/_coreHoldEnd, plus the reactor-hum audio functions) is free of saveState()/robco_v8/state.<field>= writes — transient/MetaStore only'
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

@@ -340,6 +340,91 @@ function stopThermalLoad() {
   crtHumGain.gain.linearRampToValueAtTime(baseGain, audioCtx.currentTime + 0.5);
 }
 
+// ── CHASSIS LIVING CORE #6: REACTOR HUM ─────────────────────────
+// A second, distinct synthesized WebAudio tone for the LIVING CORE (a
+// cross-game reactor voice, unlike the CRT hum — which becomes NV-specific
+// once FO3 gets its own Pip-Boy skin). Tuned to sit a PERFECT FIFTH above
+// the CRT hum's 60Hz fundamental (60 * 1.5 = 90Hz) — a 3:2 frequency ratio
+// is the most consonant interval after the octave, so the two tones
+// reinforce rather than beat/clash. Its own LFO drift rate (0.05Hz) is
+// deliberately different from the CRT hum's own (0.08Hz) so the two drifts
+// never lock into a repeating beat pattern. Own audio channel per Protocol 7:
+// AudioSettings.reactorHum (a MUTE flag, same semantics as every sibling
+// chip) + masterMute guard, routed through the same toggleAudio()/
+// toggleMasterMute() choke points every other channel already uses.
+let reactorHumNode = null,
+  reactorHumGain = null,
+  reactorHumLfo = null,
+  reactorHumLfoGain = null;
+
+function startReactorHum() {
+  if (reactorHumNode || AudioSettings.masterMute || AudioSettings.reactorHum) return;
+  ensureAudioCtx();
+  reactorHumNode = audioCtx.createOscillator();
+  reactorHumGain = audioCtx.createGain();
+  reactorHumLfo = audioCtx.createOscillator();
+  reactorHumLfoGain = audioCtx.createGain();
+  reactorHumNode.type = 'sine';
+  reactorHumNode.frequency.value = 90; // perfect fifth above the CRT hum's 60Hz fundamental
+  reactorHumGain.gain.value = 0.0001; // near-silent — _updateReactorHumLevel() drives the real target
+  reactorHumLfo.type = 'sine';
+  reactorHumLfo.frequency.value = 0.05; // distinct drift rate from the CRT hum's own 0.08Hz LFO
+  reactorHumLfoGain.gain.value = 0.8;
+  reactorHumLfo.connect(reactorHumLfoGain);
+  reactorHumLfoGain.connect(reactorHumNode.frequency);
+  reactorHumNode.connect(reactorHumGain);
+  reactorHumGain.connect(audioCtx.destination);
+  reactorHumNode.start();
+  reactorHumLfo.start();
+  if (typeof _updateReactorHumLevel === 'function') _updateReactorHumLevel();
+}
+
+// Mirrors stopCrtHum()'s full-teardown pattern (stop+disconnect+null every
+// node) so a subsequent startReactorHum() call is free to recreate the graph.
+function stopReactorHum() {
+  if (reactorHumLfo) {
+    try {
+      reactorHumLfo.stop();
+    } catch (e) {}
+    reactorHumLfo.disconnect();
+    reactorHumLfo = null;
+  }
+  if (reactorHumLfoGain) {
+    reactorHumLfoGain.disconnect();
+    reactorHumLfoGain = null;
+  }
+  if (reactorHumNode) {
+    try {
+      reactorHumNode.stop();
+    } catch (e) {}
+    reactorHumNode.disconnect();
+    reactorHumNode = null;
+  }
+  if (reactorHumGain) {
+    reactorHumGain.disconnect();
+    reactorHumGain = null;
+  }
+}
+
+// Reactor hum intensity — called from _coreRefresh() (ui-core.js), the SAME
+// choke point that already computes the core's activity signals, so this is
+// never a second polling loop. Louder while the CHASSIS subsystem is the
+// active bezel view (document.body.dataset.subsystem, the same choke point
+// DO-O's mobile self-contained view already reads), quieter elsewhere.
+function _updateReactorHumLevel(thinking, radioOn, hasFault) {
+  if (!reactorHumGain || !reactorHumNode || !audioCtx) return;
+  const busy = [!!thinking, !!radioOn, !!hasFault].filter(Boolean).length;
+  const onChassis =
+    typeof document !== 'undefined' &&
+    document.body &&
+    document.body.dataset.subsystem === 'chassis';
+  let target = 0.006 + busy * 0.004;
+  target *= onChassis ? 1.6 : 0.6;
+  reactorHumGain.gain.cancelScheduledValues(audioCtx.currentTime);
+  reactorHumGain.gain.linearRampToValueAtTime(target, audioCtx.currentTime + 1.5);
+}
+window._updateReactorHumLevel = _updateReactorHumLevel;
+
 // ── LIMB TRAUMA SOUNDS ─────────────────────────────────────────
 function playLimbCrippleSound(limb) {
   if (AudioSettings.masterMute || AudioSettings.ambient) return;
@@ -745,6 +830,7 @@ function toggleAudio(key, isMuted) {
     robco_questfail_muted: 'questFail', // quest fail tone
     robco_factionthreshold_muted: 'factionThreshold', // faction standing alert
     robco_hardwaresfx_muted: 'hardwareSfx', // B2c: chip/board install-eject click
+    robco_reactorhum_muted: 'reactorHum', // LIVING CORE #6: reactor hum
   };
   if (keyMap[key] !== undefined) AudioSettings[keyMap[key]] = isMuted;
 
@@ -788,6 +874,19 @@ function toggleAudio(key, isMuted) {
       if (rads >= 600) startTinnitus();
     }
   }
+  if (key === 'robco_reactorhum_muted') {
+    if (isMuted) {
+      if (reactorHumGain) {
+        reactorHumGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
+      }
+    } else {
+      if (!reactorHumNode) {
+        startReactorHum();
+      } else if (typeof _updateReactorHumLevel === 'function') {
+        _updateReactorHumLevel();
+      }
+    }
+  }
   if (typeof _updateSonicBoardStatus === 'function') _updateSonicBoardStatus();
 }
 
@@ -816,6 +915,9 @@ function toggleMasterMute(isMuted) {
     if (crtHumGain) {
       crtHumGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
     }
+    if (reactorHumGain) {
+      reactorHumGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
+    }
   } else {
     let rads = parseInt(document.getElementById('stat_rads').value) || 0;
     setGeigerRate(rads >= 1000 ? 25 : rads >= 600 ? 12 : rads >= 200 ? 0.33 : 0);
@@ -824,6 +926,15 @@ function toggleMasterMute(isMuted) {
       crtHumGain.gain.linearRampToValueAtTime(0.007, audioCtx.currentTime + 0.3);
     }
     if (AudioSettings.radio) startRadio(); // WU-F5: resume the radio if it was on
+    if (!reactorHumNode && !AudioSettings.reactorHum) {
+      startReactorHum(); // LIVING CORE #6: resume if it was never started (e.g. muted at boot)
+    } else if (
+      reactorHumGain &&
+      !AudioSettings.reactorHum &&
+      typeof _updateReactorHumLevel === 'function'
+    ) {
+      _updateReactorHumLevel();
+    }
   }
   _updateRadioUI();
   _updateSonicBoardStatus();
@@ -1018,6 +1129,7 @@ function _updateSonicBoardStatus() {
     'robco_questcomplete_muted',
     'robco_questfail_muted',
     'robco_factionthreshold_muted',
+    'robco_reactorhum_muted',
   ];
   const total = keys.length;
   const active = keys.filter(k => MetaStore.get(k) !== 'true').length;

@@ -39,6 +39,7 @@ const META_MANIFEST = {
   robco_questfail_muted: { type: 'bool', default: false, owner: 'ui-audio.js' },
   robco_factionthreshold_muted: { type: 'bool', default: false, owner: 'ui-audio.js' },
   robco_hardwaresfx_muted: { type: 'bool', default: false, owner: 'ui-audio.js' },
+  robco_reactorhum_muted: { type: 'bool', default: false, owner: 'ui-audio.js' }, // LIVING CORE #6
   robco_master_muted: { type: 'bool', default: false, owner: 'ui-audio.js' },
   robco_radio_on: { type: 'bool', default: false, owner: 'ui-audio.js' },
   robco_wakelock_enabled: { type: 'bool', default: false, owner: 'ui-core.js' },

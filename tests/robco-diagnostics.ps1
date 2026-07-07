@@ -11735,27 +11735,29 @@ Check (
     ($html155 -match 'BUS VOLTAGE NOMINAL')
 ) "155.1: the ""CHASSIS RIT-V300 . INTERNAL SERVICE VIEW . BUS VOLTAGE NOMINAL"" subheader is present in the bay header"
 
-# 155.2  SLOT 02: the 13 mute checkboxes are now a DIP-chip grid -- exact
-#        ids/onchange calls survive verbatim (Protocol 4/22), CH-01..CH-13
-#        pin ids are present, and the old plain-checkbox-list markup is gone
+# 155.2  SLOT 02: the mute checkboxes are a DIP-chip grid -- exact
+#        ids/onchange calls survive verbatim (Protocol 4/22), CH-01..CH-14
+#        pin ids are present (CH-14 REACTOR HUM added by the CHASSIS LIVING
+#        CORE behavior-batch unit), and the old plain-checkbox-list markup
+#        is gone
 $muteKeys155 = @(
     'robco_sfx_muted','robco_hum_muted','robco_geiger_muted','robco_tinnitus_muted',
     'robco_ambient_muted','robco_wake_muted','robco_panelclick_muted','robco_bootdrone_muted',
     'robco_levelup_muted','robco_heartbeat_muted','robco_questcomplete_muted',
-    'robco_questfail_muted','robco_factionthreshold_muted'
+    'robco_questfail_muted','robco_factionthreshold_muted','robco_reactorhum_muted'
 )
 $allMutes155 = $true
 foreach ($k in $muteKeys155) { if (-not $html155.Contains("toggleAudio('$k', this.checked)")) { $allMutes155 = $false } }
 $allChNums155 = $true
-for ($i = 1; $i -le 13; $i++) { $ch = "CH-{0:D2}" -f $i; if (-not $html155.Contains($ch)) { $allChNums155 = $false } }
+for ($i = 1; $i -le 14; $i++) { $ch = "CH-{0:D2}" -f $i; if (-not $html155.Contains($ch)) { $allChNums155 = $false } }
 Check (
-    ([regex]::Matches($html155, 'class="chip-wrap"').Count -eq 13) -and
-    ([regex]::Matches($html155, 'class="chip-input"').Count -eq 13) -and
-    ([regex]::Matches($html155, 'class="chip-card"').Count -eq 13) -and
+    ([regex]::Matches($html155, 'class="chip-wrap"').Count -eq 14) -and
+    ([regex]::Matches($html155, 'class="chip-input"').Count -eq 14) -and
+    ([regex]::Matches($html155, 'class="chip-card"').Count -eq 14) -and
     $allChNums155 -and $allMutes155 -and
     (-not ($html155 -match 'class="audio-row"')) -and
     (-not ($html155 -match 'class="bay-channel-list"'))
-) "155.2: the 13 SLOT-02 channels render as a chip-grid of chip-wrap/chip-input/chip-card triples with CH-01..CH-13 pin ids, every toggleAudio() call unchanged, and the old audio-row/bay-channel-list markup is fully retired"
+) "155.2: the 14 SLOT-02 channels render as a chip-grid of chip-wrap/chip-input/chip-card triples with CH-01..CH-14 pin ids, every toggleAudio() call unchanged, and the old audio-row/bay-channel-list markup is fully retired"
 
 # 155.3  chip polarity is INVERTED in CSS only (Protocol 25 sanctioned
 #        exception) -- the checkbox keeps writing the same `muted` boolean;
@@ -18573,6 +18575,263 @@ Check (
 Check (
     [System.Text.RegularExpressions.Regex]::IsMatch($html193, '(?s)class="curio-caselist curio-caselist--linc"[\s\S]{0,150}id="lincolnMemorabiliaDisplay"')
 ) '193.8: #lincolnMemorabiliaDisplay is still wrapped by .curio-caselist.curio-caselist--linc, the exact scope the Lincoln-only compact-cell/select rules (193.5/193.6) target'
+
+# ===========================================================
+# Suite 194 -- CHASSIS LIVING CORE: 10 owner-approved new behaviors
+# (batch 2). #1 thermal glow, #2 energy sparks, #3 spin inertia, #4
+# power-surge ripple, #5 idle flares, #6 reactor hum (a second
+# synthesized WebAudio channel), #7 recovery animation, #8 uptime-
+# milestone pulse, #9 tap-and-hold overcharge. #10 (a center readout
+# glyph) was evaluated and DROPPED -- it could not be made legible on the
+# small casing-top mini core (33-54px, already sharing its circle with 3
+# rings + the heart) without hurting the design; guarded here by a
+# negative check that no half-shipped readout markup exists. (PS mirror
+# of JS Suite 194.)
+# 21 tests
+# ===========================================================
+Sep "Suite 194 -- CHASSIS LIVING CORE: 10 owner-approved new behaviors (batch 2)"
+$html194 = Read-Src "index.html"
+$css194 = Read-Src "css/terminal.css"
+$cssStripped194 = [regex]::Replace($css194, '/\*[\s\S]*?\*/', '')
+$core194 = Read-Src "js/ui-core.js"
+$audio194 = Read-Src "js/ui-audio.js"
+$state194 = Read-Src "js/state.js"
+
+# 194.1  #1 thermal glow: a real activity-derived accumulator (_coreTemp),
+#        mutated ONLY by _coreThermalTick() (never by _coreRefresh(),
+#        which just paints it), registered as a dial-gated AmbientRuntime
+#        observer on the awake states -- never a bare setInterval.
+Check (
+    ($core194 -match 'let _coreTemp = 0;') -and
+    ($core194 -match 'function _coreThermalTick\(\)') -and
+    ($core194 -match [regex]::Escape('_coreTemp = busy ? Math.min(100, _coreTemp + 8) : Math.max(0, _coreTemp - 5)')) -and
+    ([System.Text.RegularExpressions.Regex]::IsMatch($core194, "id: 'core-thermal',\s*`n\s*states: \['ACTIVE', 'IDLE'\],\s*`n\s*tier: 'balanced',\s*`n\s*cadenceMs: 4000,\s*`n\s*onTick: _coreThermalTick,"))
+) "194.1: _coreTemp is a real activity-derived accumulator, mutated only by _coreThermalTick() (thinking/radio/fault -> warm, otherwise cool), registered as a dial-gated 'core-thermal' AmbientRuntime observer on ACTIVE/IDLE -- never a bare polling timer"
+
+# 194.2  #1 thermal tint rides filter:hue-rotate() on .c-heart (optic-
+#        agnostic), and _coreRefresh() only READS _coreTemp to paint
+#        core-temp-warm/-hot, never mutates it.
+Check (
+    ([System.Text.RegularExpressions.Regex]::IsMatch($cssStripped194, '\.chassis-core-shape\.core-temp-warm \.c-heart\s*\{\s*filter:\s*hue-rotate\(-?\d+deg\)')) -and
+    ([System.Text.RegularExpressions.Regex]::IsMatch($cssStripped194, '\.chassis-core-shape\.core-temp-hot \.c-heart\s*\{\s*filter:\s*hue-rotate\(-?\d+deg\)')) -and
+    ($cssStripped194 -match 'filter 1\.2s ease') -and
+    ($core194 -match [regex]::Escape('const tempWarm = _coreTemp >= 34 && _coreTemp < 67;')) -and
+    ($core194 -match [regex]::Escape('const tempHot = _coreTemp >= 67;'))
+) '194.2: the warm/hot thermal tiers tint .c-heart via filter:hue-rotate() (rides whatever optic colour is active, Protocol 38/optic-agnostic) eased by a 1.2s transition, and _coreRefresh() only reads _coreTemp to choose the tier'
+
+# 194.3  #2 energy sparks: the SAME two-span markup (s1 always-on, s2
+#        busy-only) exists on BOTH #chassisCore and #chassisCoreMini
+#        (Protocol 22 -- one shared child set, never a per-core fork).
+$s1Count194 = ([regex]::Matches($html194, 'class="c-spark s1"')).Count
+$s2Count194 = ([regex]::Matches($html194, 'class="c-spark s2"')).Count
+Check (
+    ($s1Count194 -eq 2) -and ($s2Count194 -eq 2)
+) '194.3: both #chassisCore and #chassisCoreMini carry the identical c-spark s1/s2 markup (Protocol 22 -- one shared child set, never a per-core fork)'
+
+# 194.4  #2 sparks orbit via the classic rotate()+translateX() technique
+#        (no wrapper element), scaled down for the mini core so the orbit
+#        stays inside its own smaller box, and s2 is hidden at rest --
+#        only busy states reveal it.
+Check (
+    ($cssStripped194 -match '@keyframes chassisCoreOrbitDot') -and
+    ($cssStripped194 -match [regex]::Escape('translateX(var(--spark-r, 40px))')) -and
+    ([System.Text.RegularExpressions.Regex]::IsMatch($cssStripped194, '\.chassis-core-mini \.c-spark\s*\{[^\}]*--spark-r:\s*15px')) -and
+    ([System.Text.RegularExpressions.Regex]::IsMatch($cssStripped194, '\.chassis-core-shape \.c-spark\.s2\s*\{[^\}]*opacity:\s*0;')) -and
+    ([System.Text.RegularExpressions.Regex]::IsMatch($css194, "\.core-thinking \.c-spark\.s2,\s*`n\.chassis-core-shape\.core-overclock \.c-spark\.s2,\s*`n\.chassis-core-shape\.core-temp-hot \.c-spark\.s2\s*\{"))
+) '194.4: sparks orbit via rotate()+translateX(--spark-r) (no wrapper element needed), --spark-r is scaled down for the mini core so the orbit stays inside its smaller box, and the second spark is hidden at rest -- only thinking/overclock/hot-thermal reveal it (density tracks real activity)'
+
+# 194.5  #2 gate: .c-spark is added to the SAME .core-still pause list
+#        every other continuous LIVING CORE element already uses.
+Check (
+    [System.Text.RegularExpressions.Regex]::IsMatch($css194, "\.core-still,\s*`n\.core-still \.c-ring,\s*`n\.core-still \.c-heart,\s*`n\.core-still \.c-spark,")
+) '194.5: .c-spark is paused by the SAME .core-still gate group as .c-ring/.c-heart -- no bespoke reduced-motion/low-immersion/hidden-tab/standby carve-out'
+
+# 194.6  #3 spin inertia: --core-spin-mul-r1/-r3 are registered as
+#        INTERPOLATABLE @property custom properties (numeric, initial 1),
+#        and the base .chassis-core-shape rule transitions them.
+Check (
+    ([System.Text.RegularExpressions.Regex]::IsMatch($cssStripped194, "@property --core-spin-mul-r1\s*\{\s*syntax:\s*'<number>';\s*inherits:\s*true;\s*initial-value:\s*1;\s*\}")) -and
+    ([System.Text.RegularExpressions.Regex]::IsMatch($cssStripped194, "@property --core-spin-mul-r3\s*\{\s*syntax:\s*'<number>';\s*inherits:\s*true;\s*initial-value:\s*1;\s*\}")) -and
+    ([System.Text.RegularExpressions.Regex]::IsMatch($css194, "--core-spin-mul-r1 1\.6s ease,\s*`n\s*--core-spin-mul-r3 1\.6s ease;"))
+) "194.6: --core-spin-mul-r1/-r3 are registered via @property as interpolatable numbers (initial-value 1), and .chassis-core-shape transitions both over 1.6s -- the multiplier easing IS the spin-inertia effect (progressive enhancement: unsupported browsers just keep the old instant snap)"
+
+# 194.7  #3 the r1/r3 ring animation-duration is computed from the
+#        multiplier via calc(), replacing the old hardcoded per-state
+#        animation-duration snaps -- core-boot/standby/thinking/overclock
+#        now set ONLY the multiplier for r1/r3, never a raw
+#        animation-duration.
+Check (
+    ($cssStripped194 -match [regex]::Escape('animation: chassisCoreSpin calc(14s / var(--core-spin-mul-r1)) linear infinite;')) -and
+    ($cssStripped194 -match [regex]::Escape('animation: chassisCoreSpin calc(9s / var(--core-spin-mul-r3)) linear infinite reverse;')) -and
+    (-not ([System.Text.RegularExpressions.Regex]::IsMatch($cssStripped194, '\.chassis-core-shape\.core-boot \.c-ring\.r1\s*\{\s*animation-duration'))) -and
+    (-not ([System.Text.RegularExpressions.Regex]::IsMatch($cssStripped194, '\.chassis-core-shape\.core-thinking \.c-ring\.r1\s*\{\s*animation-duration'))) -and
+    (-not ([System.Text.RegularExpressions.Regex]::IsMatch($cssStripped194, '\.chassis-core-shape\.core-overclock \.c-ring\.r1\s*\{\s*animation-duration')))
+) '194.7: r1/r3 animation-duration is calc()-driven from --core-spin-mul-r1/-r3 (re-read live), and core-boot/thinking/overclock no longer set a raw animation-duration on r1 directly -- the multiplier is the one source of truth'
+
+# 194.8  #3 regression-safety: every per-state multiplier reproduces the
+#        EXACT original target duration (14s/9s base) that shipped before
+#        this unit -- the ramp is new, the destination speeds are not.
+function Get-Mul194([string]$stateClass, [string]$prop) {
+    $m = [regex]::Match($cssStripped194, "\.${stateClass}\s*\{[^\}]*${prop}:\s*([\d.]+)")
+    if ($m.Success) { return [double]$m.Groups[1].Value } else { return $null }
+}
+$allClose194 = $true
+$wantR1_194 = @{ 'core-boot' = 2.2; 'core-standby' = 40; 'core-thinking' = 3; 'core-overclock' = 1.6 }
+$wantR3_194 = @{ 'core-boot' = 1.4; 'core-standby' = 26; 'core-thinking' = 2; 'core-overclock' = 1 }
+foreach ($k in $wantR1_194.Keys) {
+    $mr1 = Get-Mul194 $k '--core-spin-mul-r1'
+    $mr3 = Get-Mul194 $k '--core-spin-mul-r3'
+    if (($null -eq $mr1) -or ([Math]::Abs((14 / $mr1) - $wantR1_194[$k]) -gt 0.01)) { $allClose194 = $false }
+    if (($null -eq $mr3) -or ([Math]::Abs((9 / $mr3) - $wantR3_194[$k]) -gt 0.01)) { $allClose194 = $false }
+}
+Check (
+    $allClose194
+) '194.8: every core-boot/standby/thinking/overclock multiplier reproduces the exact pre-existing r1 (14s base) and r3 (9s base) target durations to within 0.01s -- regression-safe, only the ramp BETWEEN targets is new'
+
+# 194.9  #4 power-surge ripple: a dedicated .c-ripple child (not ::after)
+#        exists identically on both cores, with its own expanding-then-
+#        fading keyframes.
+$rippleCount194 = ([regex]::Matches($html194, 'class="c-ripple"')).Count
+Check (
+    ($rippleCount194 -eq 2) -and
+    ($cssStripped194 -match '@keyframes chassisCoreRipple') -and
+    ([System.Text.RegularExpressions.Regex]::IsMatch($cssStripped194, '\.chassis-core-shape\.core-ripple \.c-ripple\s*\{\s*animation:\s*chassisCoreRipple'))
+) "194.9: both cores carry an identical .c-ripple child (Protocol 22, never sharing the fault ring's ::after) driven by a dedicated expanding/fading chassisCoreRipple keyframe"
+
+# 194.10  #4 the ripple fires on the SAME data.write/level.up signals the
+#         core already reacts to, PLUS a reconnect edge computed inside
+#         _coreRefresh() itself -- never a new/invented trigger.
+Check (
+    ($core194 -match [regex]::Escape("RobcoEvents.on('level.up', () => _coreRipple());")) -and
+    ($core194 -match [regex]::Escape("RobcoEvents.on('data.write', () => _coreRipple());")) -and
+    ($core194 -match [regex]::Escape('const justReconnected = _lastCoreDisconnected && !disconnected;')) -and
+    ($core194 -match [regex]::Escape("if (justReconnected) _coreOneShot('core-ripple', 900);"))
+) "194.10: the ripple is wired to the EXISTING level.up/data.write RobcoEvents signals plus a reconnect edge (_lastCoreDisconnected -> !disconnected) computed inside _coreRefresh() itself -- Protocol 22, no invented trigger"
+
+# 194.11  #5 idle flares: a dial-gated, non-persisted AmbientRuntime
+#         observer mirroring the DO-O Overseer idle-blip timer exactly.
+Check (
+    ([System.Text.RegularExpressions.Regex]::IsMatch($core194, "id: 'core-idle-flare',\s*`n\s*states: \['IDLE'\],\s*`n\s*tier: 'balanced',\s*`n\s*cadenceMs: 42000,")) -and
+    ([System.Text.RegularExpressions.Regex]::IsMatch($core194, "if \(Math\.random\(\) > 0\.5\) return;\s*`n\s*_coreOneShot\('core-idle-flare', 1100\);")) -and
+    ([System.Text.RegularExpressions.Regex]::IsMatch($cssStripped194, '\.chassis-core-shape\.core-idle-flare \.c-heart\s*\{'))
+) "194.11: 'core-idle-flare' is a dial-gated ('balanced' tier), non-persisted AmbientRuntime observer that only runs during genuine IDLE, firing a faint faded flare roughly half the time -- mirrors the DO-O Overseer idle-blip timer pattern exactly (Protocol 22)"
+
+# 194.12  #6 reactor hum: its own Protocol-7 audio channel -- masterMute
+#         guarded first, then its own mute pref -- tuned to a
+#         perfect-fifth (90Hz) above the CRT hum's 60Hz fundamental.
+Check (
+    ([System.Text.RegularExpressions.Regex]::IsMatch($audio194, "function startReactorHum\(\) \{\s*`n\s*if \(reactorHumNode \|\| AudioSettings\.masterMute \|\| AudioSettings\.reactorHum\) return;")) -and
+    ($audio194 -match [regex]::Escape("reactorHumNode.frequency.value = 90; // perfect fifth above the CRT hum's 60Hz fundamental")) -and
+    ($state194 -match [regex]::Escape("robco_reactorhum_muted: { type: 'bool', default: false, owner: 'ui-audio.js' }")) -and
+    ($core194 -match [regex]::Escape("reactorHum: MetaStore.get('robco_reactorhum_muted') === 'true'"))
+) "194.12: startReactorHum() guards masterMute THEN its own AudioSettings.reactorHum pref (Protocol 7, same order as every sibling channel), is tuned to 90Hz -- a perfect fifth (3:2 ratio) above the CRT hum's 60Hz fundamental so the two blend harmonically -- and robco_reactorhum_muted is a registered META_MANIFEST device pref seeded into AudioSettings"
+
+# 194.13  #6 reactor hum has its own CH-14 chip in the SLOT 02 SONIC
+#         PROCESSOR board, wired through the SAME toggleAudio() choke
+#         point every sibling channel already uses.
+Check (
+    ([System.Text.RegularExpressions.Regex]::IsMatch($html194, '(?s)id="muteReactorHumToggle"[\s\S]{0,80}onchange="toggleAudio\(''robco_reactorhum_muted'', this\.checked\)"')) -and
+    ($html194 -match 'CH-14') -and
+    ($audio194 -match [regex]::Escape("robco_reactorhum_muted: 'reactorHum', // LIVING CORE #6: reactor hum"))
+) "194.13: the CH-14 REACTOR HUM chip routes through the SAME toggleAudio() choke point (Protocol 22), and robco_reactorhum_muted is in toggleAudio's mute-flag keyMap"
+
+# 194.14  #6 toggleMasterMute() silences/resumes the reactor hum exactly
+#         like it already does for the CRT hum and radio.
+Check (
+    ([System.Text.RegularExpressions.Regex]::IsMatch($audio194, "if \(reactorHumGain\) \{\s*`n\s*reactorHumGain\.gain\.linearRampToValueAtTime\(0, audioCtx\.currentTime \+ 0\.3\);\s*`n\s*\}")) -and
+    ([System.Text.RegularExpressions.Regex]::IsMatch($audio194, "if \(!reactorHumNode && !AudioSettings\.reactorHum\) \{\s*`n\s*startReactorHum\(\);"))
+) '194.14: toggleMasterMute() ramps the reactor hum to silence on mute and resumes it (only if its own channel pref is still on) on unmute -- mirrors the existing CRT hum/radio master-mute handling exactly'
+
+# 194.15  #6 the hum's live intensity is driven from _coreRefresh()'s own
+#         already-computed activity signals, and reads the
+#         CHASSIS-subsystem-active signal for the louder-on-CHASSIS
+#         requirement.
+Check (
+    ($audio194 -match [regex]::Escape('function _updateReactorHumLevel(thinking, radioOn, hasFault)')) -and
+    ($audio194 -match [regex]::Escape("document.body.dataset.subsystem === 'chassis'")) -and
+    ([System.Text.RegularExpressions.Regex]::IsMatch($core194, "if \(typeof _updateReactorHumLevel === 'function'\) \{\s*`n\s*_updateReactorHumLevel\(thinking, radioOn, faultCount > 0\);"))
+) "194.15: _updateReactorHumLevel() is called from _coreRefresh() with the SAME thinking/radioOn/faultCount signals already computed there (never a second polling loop), and reads document.body.dataset.subsystem === 'chassis' to go louder while CHASSIS is the active view"
+
+# 194.16  #7 recovery animation: a one-shot stabilize transition fires
+#         exactly when a buffered fault count transitions from >0 to 0.
+Check (
+    ($core194 -match [regex]::Escape('const justRecovered = _lastCoreFaultCount > 0 && faultCount === 0;')) -and
+    ($core194 -match [regex]::Escape("if (justRecovered) _coreOneShot('core-recovering', 1200);")) -and
+    ($cssStripped194 -match '@keyframes chassisCoreRecover') -and
+    ([System.Text.RegularExpressions.Regex]::IsMatch($cssStripped194, '\.chassis-core-shape\.core-recovering::after\s*\{'))
+) '194.16: core-recovering fires as a one-shot exactly on the fault-count >0 -> 0 edge (never every repaint), safely reusing ::after because core-fault is already removed in the same _coreRefresh() pass before core-recovering is applied'
+
+# 194.17  #8 uptime-milestone pulse: fires exactly once per crossed hour.
+Check (
+    ([System.Text.RegularExpressions.Regex]::IsMatch($core194, "if \(h > _lastCoreUptimeMilestone\) \{\s*`n\s*_lastCoreUptimeMilestone = h;\s*`n\s*if \(typeof _coreMilestonePulse === 'function'\) _coreMilestonePulse\(\);")) -and
+    ([System.Text.RegularExpressions.Regex]::IsMatch($core194, "function _coreMilestonePulse\(\) \{\s*`n\s*_coreOneShot\('core-milestone', 1000\);")) -and
+    ([System.Text.RegularExpressions.Regex]::IsMatch($cssStripped194, '\.chassis-core-shape\.core-milestone \.c-heart\s*\{'))
+) '194.17: _coreMilestonePulse() fires exactly once per crossed hour of session uptime (a strictly-increasing _lastCoreUptimeMilestone guard inside the EXISTING _tickUptimeClock(), never a separate timer)'
+
+# 194.18  #9 tap-and-hold overcharge: a real hold-threshold state machine
+#         wired to #chassisCore's pointer events, reusing the #14
+#         stat-burst tumble keyframes for the release flourish.
+Check (
+    ($core194 -match [regex]::Escape("coreBtn.addEventListener('pointerdown', _coreHoldStart);")) -and
+    ($core194 -match [regex]::Escape("coreBtn.addEventListener('pointerup', _coreHoldEnd);")) -and
+    ($core194 -match [regex]::Escape("coreBtn.addEventListener('pointercancel', _coreHoldEnd);")) -and
+    ($core194 -match [regex]::Escape("coreBtn.addEventListener('pointerleave', _coreHoldEnd);")) -and
+    ($core194 -match [regex]::Escape('_coreSuppressNextTap = wasCharged;')) -and
+    ([System.Text.RegularExpressions.Regex]::IsMatch($core194, "if \(_coreSuppressNextTap\) \{\s*`n\s*_coreSuppressNextTap = false;\s*`n\s*return;")) -and
+    ([System.Text.RegularExpressions.Regex]::IsMatch($cssStripped194, '\.chassis-core-shape\.core-overcharge \.c-ring\.r1\s*\{\s*animation:\s*chassisCoreOrbitBurst1'))
+) '194.18: #chassisCore wires pointerdown/up/cancel/leave to _coreHoldStart/_coreHoldEnd, a charged release reuses the #14 stat-burst tumble keyframes (Protocol 22), and _coreSuppressNextTap consumes the trailing click so a charged release never ALSO fires a plain tap-poke'
+
+# 194.19  #9 the charging visual is GATED and reuses the #3 inertia
+#         multiplier mechanism.
+Check (
+    ($core194 -match [regex]::Escape('if (!_coreShouldAnimate()) return; // gate closed — no charge visual, plain tap still works')) -and
+    ([System.Text.RegularExpressions.Regex]::IsMatch($cssStripped194, "\.chassis-core-shape\.core-charging\s*\{\s*`n\s*--core-spin-mul-r1:\s*3;\s*`n\s*--core-spin-mul-r3:\s*3;"))
+) '194.19: _coreHoldStart() is gated by _coreShouldAnimate() before adding any charging class (a closed gate degrades to a plain no-flourish hold, never a broken half-state), and .core-charging reuses the #3 --core-spin-mul-r1/-r3 inertia mechanism (Protocol 22)'
+
+# 194.20  #10 (center readout) was evaluated and correctly DROPPED -- no
+#         half-shipped readout markup/class exists anywhere.
+Check (
+    (-not ($html194 -match 'c-readout')) -and
+    (-not ($css194 -match 'c-readout')) -and
+    (-not ($core194 -match 'c-readout')) -and
+    (-not ($core194 -match 'coreReadout'))
+) '194.20: #10 (a center readout glyph) was correctly dropped rather than half-shipped -- no c-readout/coreReadout markup, CSS, or JS exists anywhere'
+
+# 194.21  zero campaign-state write across every new function this batch
+#         added -- brace-counting extractor bounds each function body
+#         precisely; excludes ===/!== from the assignment check.
+function Get-FnBody194([string]$src, [string]$name) {
+    $startTok = "function $name("
+    $start = $src.IndexOf($startTok)
+    if ($start -lt 0) { return $null }
+    $braceStart = $src.IndexOf('{', $start)
+    if ($braceStart -lt 0) { return $null }
+    $depth = 0
+    for ($i = $braceStart; $i -lt $src.Length; $i++) {
+        if ($src[$i] -eq '{') { $depth++ }
+        elseif ($src[$i] -eq '}') {
+            $depth--
+            if ($depth -eq 0) { return $src.Substring($braceStart + 1, $i - $braceStart - 1) }
+        }
+    }
+    return $null
+}
+$writeRe194 = 'saveState\(|robco_v8|state\.\w+\s*=(?!=)'
+$clean194 = $true
+$foundAll194 = $true
+foreach ($name in @('_coreThermalTick','_coreRipple','_coreMilestonePulse','_coreHoldStart','_coreHoldEnd')) {
+    $body = Get-FnBody194 $core194 $name
+    if ($null -eq $body) { $foundAll194 = $false; continue }
+    if ($body -match $writeRe194) { $clean194 = $false }
+}
+foreach ($name in @('startReactorHum','stopReactorHum','_updateReactorHumLevel')) {
+    $body = Get-FnBody194 $audio194 $name
+    if ($null -eq $body) { $foundAll194 = $false; continue }
+    if ($body -match $writeRe194) { $clean194 = $false }
+}
+Check (
+    $clean194 -and $foundAll194
+) '194.21: every new LIVING CORE function this batch added (_coreThermalTick/_coreRipple/_coreMilestonePulse/_coreHoldStart/_coreHoldEnd, plus the reactor-hum audio functions) is free of saveState()/robco_v8/state.<field>= writes -- transient/MetaStore only'
 
 # ===========================================================
 # Results
