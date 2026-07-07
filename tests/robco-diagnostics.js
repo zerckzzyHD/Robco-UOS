@@ -16296,6 +16296,13 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       } catch (e) {
         err137 = e;
       }
+      // Re-emit this proof's OWN suite header immediately before its assert()
+      // — _pendingAsync now holds deferred proofs from multiple suites (196
+      // joined this one), and their internal await chains can resolve in
+      // either order, so each must self-announce right before its own result
+      // line rather than relying solely on the generic re-emit before
+      // Promise.all() below (which only covers whichever suite is named there).
+      header('Suite 137 — Step 2 Phase 0 U11/U12 hygiene ledgers + modal consolidation');
       assert(
         yesResult === true && noResult === false && closeResult === false && !err137,
         'confirmAction() behavioral: CONFIRM click resolves true; CANCEL click and closeModal() (Escape/CLOSE path) both resolve false' +
@@ -20918,9 +20925,15 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       thermalIdx !== -1 && thinkingIdx !== -1 && thinkingIdx > thermalIdx,
       "162.4: transmitMessage() calls window.setOverseerState('thinking') at the thermal-load window"
     );
+    // Protocol 27 fix (owner report: USE dims the screen forever) moved the
+    // finally block's reset logic into a shared _resetTransmitUI() helper —
+    // also called from a new setup-phase catch, so a throw before the
+    // network try/finally undims the screen too (Protocol 22, one reset
+    // path). The getOverseerState()==='thinking' guard now lives there.
+    const resetFn162 = extractFunctionBody(apiSource, '_resetTransmitUI');
     assert(
-      /getOverseerState\(\) === 'thinking'/.test(tm162) && /finally/.test(tm162),
-      "162.5: transmitMessage()'s finally block only resets the scope when getOverseerState() === 'thinking'"
+      /getOverseerState\(\) === 'thinking'/.test(resetFn162) && /finally/.test(tm162),
+      "162.5: transmitMessage()'s finally block calls _resetTransmitUI(), which only resets the scope when getOverseerState() === 'thinking'"
     );
   }
 
@@ -21217,14 +21230,19 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //         quick-log routing for every click after the FIRST round-trip
   {
     const tm162b = extractFunctionBody(apiSource, 'transmitMessage');
+    // Protocol 27 fix moved the '↑'/onclick reset into the shared
+    // _resetTransmitUI() helper the finally block now calls — check the
+    // combined body of both functions (Protocol 22, one reset path).
+    const resetFn162b = extractFunctionBody(apiSource, '_resetTransmitUI');
+    const combined162b = tm162b + '\n' + resetFn162b;
     assert(
       /btn\.textContent = '⋯';/.test(tm162b) &&
         /btn\.textContent = '✕';/.test(tm162b) &&
-        /btn\.textContent = '↑';/.test(tm162b) &&
-        /btn\.onclick = \(\) => submitCommandInput\(\);/.test(tm162b) &&
-        !/btn\.onclick = \(\) => transmitMessage\(\);/.test(tm162b) &&
-        !/btn\.innerText = '> TRANSMIT PROTOCOL'/.test(tm162b),
-      "162.22: transmitMessage()'s busy (⋯) / cancel (✕) / reset (↑) states use short glyphs, and the finally block restores onclick to submitCommandInput() — not transmitMessage() directly (Protocol 42 fix: the prior direct rebind silently skipped TERMINAL-mode routing on every click after the first round-trip)"
+        /btn\.textContent = '↑';/.test(resetFn162b) &&
+        /btn\.onclick = \(\) => submitCommandInput\(\);/.test(resetFn162b) &&
+        !/btn\.onclick = \(\) => transmitMessage\(\);/.test(combined162b) &&
+        !/btn\.innerText = '> TRANSMIT PROTOCOL'/.test(combined162b),
+      "162.22: transmitMessage()'s busy (⋯) / cancel (✕) states use short glyphs, and the shared _resetTransmitUI() helper restores the '↑' glyph + onclick to submitCommandInput() — not transmitMessage() directly (Protocol 42 fix: the prior direct rebind silently skipped TERMINAL-mode routing on every click after the first round-trip)"
     );
   }
 
@@ -29984,8 +30002,11 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  mechanism, 4 new additive RobcoEvents emits (rad.tier/limb.state/
 //  quest.status/location.visited + the collectible.acquired AI-path emit),
 //  and the 8 Tier-S flagship home-panel animations
-//  (planning/FEEDBACK_ANIMATION_BUILD_PLAN.md — WAVE 1).
-//  37 tests
+//  (planning/FEEDBACK_ANIMATION_BUILD_PLAN.md — WAVE 1). Extended with two
+//  owner-reported bug fixes: the CASE-CLOSED/FAILED stamp overlapping the
+//  CYCLE button (196.28), and the CRITICAL USE-dims-the-screen lockup
+//  (196.29 — a pre-existing transmitMessage() gap, not a Wave 1 regression).
+//  39 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 196 — FEEDBACK ANIMATION WAVE 1: annunciator + new emits + 8 flagships');
@@ -30321,6 +30342,167 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       /class="facon-stamp facon-stamp--\$\{dir\}" aria-hidden="true"/.test(renderSrc196) &&
       /class="dir-stamp dir-stamp--\$\{stampStatus\}" aria-hidden="true"/.test(renderSrc196),
     '196.27: the level-up card and the rep/quest stamps are aria-hidden (decorative, never double-announced)'
+  );
+
+  // 196.28  Owner report fix: the CASE-CLOSED/FAILED stamp used to be
+  //         position:absolute at right:10px/top:50%, landing directly on top
+  //         of .dir-keys (the CYCLE/DELETE buttons), which also settles to the
+  //         slot's right edge via margin-left:auto. It's now a normal-flow
+  //         flex child pinned to its own line ABOVE everything else in the
+  //         slot (order:-1 + a full-width flex-basis) — never absolutely
+  //         positioned, so it can never re-overlap the buttons at any width.
+  {
+    const dirStampRule196 = (cssStripped196.match(/\.dir-stamp\s*\{[^}]*\}/) || [''])[0];
+    assert(
+      /order:\s*-1/.test(dirStampRule196) &&
+        /flex:\s*1 0 100%/.test(dirStampRule196) &&
+        !/position:\s*absolute/.test(dirStampRule196),
+      '196.28: .dir-stamp is a normal-flow flex child pinned above the row (order:-1, full flex-basis) — never position:absolute, so it can never land on .dir-keys again'
+    );
+  }
+
+  // 196.29  BEHAVIORAL — owner-reported CRITICAL bug: clicking USE dimmed the
+  //         whole screen and locked out all interaction. Root-caused
+  //         (Protocol 27) to transmitMessage()'s own pre-existing uiPanel
+  //         dim-in (pointer-events:none/opacity:0.5, applied well before the
+  //         network try/finally that is supposed to undo it) — a throw
+  //         anywhere in the unguarded setup zone between the dim and the
+  //         network try (image/VATS-scan setup, generateSyncPayload(),
+  //         apiContents building) left the dim stuck forever with no
+  //         recovery. Pre-existing (this code predates Wave 1; nothing in it
+  //         was touched by the feedback-animation work) — reproduced live by
+  //         forcing generateSyncPayload() to throw, then fixed by wrapping
+  //         that whole setup zone in its own try/catch that reuses the SAME
+  //         _resetTransmitUI() the network path's finally already calls
+  //         (Protocol 22 — one reset path, never duplicated). This proof
+  //         actually EXECUTES the real transmitMessage()/_resetTransmitUI()
+  //         bodies in a Node vm sandbox with a forced setup-phase throw, not
+  //         just a structural grep.
+  _pendingAsync.push(
+    (async () => {
+      let uiPanelState = null;
+      let threw = null;
+      let chatMessages = [];
+      try {
+        const vm196 = require('vm');
+        function declareFn196(src, name) {
+          const nameIdx = src.indexOf('function ' + name);
+          const parenIdx = src.indexOf('(', nameIdx);
+          const braceIdx = src.indexOf('{', parenIdx);
+          const params = src.slice(parenIdx, braceIdx);
+          const isAsync = src.slice(Math.max(0, nameIdx - 6), nameIdx) === 'async ';
+          return (
+            (isAsync ? 'async ' : '') + 'function ' + name + params + extractFunctionBody(src, name)
+          );
+        }
+        const src196 =
+          declareFn196(apiSrc196, '_resetTransmitUI') +
+          '\n' +
+          declareFn196(apiSrc196, 'transmitMessage');
+
+        const mockEl = () => ({
+          value: '',
+          textContent: '',
+          disabled: false,
+          onclick: null,
+          style: {},
+          classList: {
+            _set: new Set(),
+            add(c) {
+              this._set.add(c);
+            },
+            remove(c) {
+              this._set.delete(c);
+            },
+            contains(c) {
+              return this._set.has(c);
+            },
+          },
+          setAttribute() {},
+          getAttribute() {
+            return null;
+          },
+          focus() {},
+        });
+        const els196 = {
+          chatInput: mockEl(),
+          transmitBtn: mockEl(),
+          uiPanel: mockEl(),
+          imagePreviewContainer: mockEl(),
+          imagePreview: mockEl(),
+          imageInput: mockEl(),
+        };
+        els196.chatInput.value = '> [USE] Test Item';
+
+        const sandbox196 = {
+          document: {
+            getElementById: id => els196[id] || mockEl(),
+            body: {
+              classList: {
+                _set: new Set(),
+                add(c) {
+                  this._set.add(c);
+                },
+                remove(c) {
+                  this._set.delete(c);
+                },
+                contains(c) {
+                  return this._set.has(c);
+                },
+              },
+            },
+          },
+          window: {},
+          chatHistory: [],
+          attachedImageData: null,
+          attachedImageMimeType: null,
+          appendToChat: (text, sender) => chatMessages.push({ text, sender }),
+          _routeNativeCommand: () => false,
+          _isPrecisePointer: () => false,
+          MetaStore: { has: () => false },
+          _commGet: () => 'FAKE-TEST-KEY',
+          // The forced setup-phase failure — the exact class of throw that used
+          // to leave the screen dimmed forever.
+          generateSyncPayload: () => {
+            throw new Error('SIMULATED setup-phase throw');
+          },
+          submitCommandInput: () => {},
+          console: { warn() {}, error() {} },
+        };
+        vm196.createContext(sandbox196);
+        vm196.runInContext(src196, sandbox196);
+        try {
+          await vm196.runInContext('transmitMessage()', sandbox196);
+        } catch (e) {
+          threw = e;
+        }
+        uiPanelState = {
+          opacity: els196.uiPanel.style.opacity,
+          pointerEvents: els196.uiPanel.style.pointerEvents,
+          thermalLoad: sandbox196.document.body.classList.contains('thermal-load'),
+        };
+      } catch (e) {
+        threw = e;
+      }
+      // Re-emit the Suite 196 header immediately before this deferred proof's
+      // own assert() (the Suite 137/137.6 precedent): _pendingAsync now holds
+      // proofs from TWO suites, and gate.js's per-suite parity parser
+      // attributes each console line to whichever header printed LAST — the
+      // generic re-emit right before Promise.all() below only covers
+      // whichever suite is named there, so each deferred proof must announce
+      // its own suite immediately before its own result line prints.
+      header('Suite 196 — FEEDBACK ANIMATION WAVE 1: annunciator + new emits + 8 flagships');
+      assert(
+        !threw &&
+          uiPanelState &&
+          uiPanelState.opacity === '1' &&
+          uiPanelState.pointerEvents === 'auto' &&
+          !uiPanelState.thermalLoad &&
+          chatMessages.some(m => /TRANSMIT SETUP FAILURE/.test(m.text)),
+        '196.29: transmitMessage() behavioral — a setup-phase throw (e.g. generateSyncPayload() failing) no longer leaves #uiPanel dimmed/un-clickable; _resetTransmitUI() restores opacity/pointer-events/thermal-load and a clear error is posted to chat' +
+          (threw ? ' — ' + (threw.message || threw) : '')
+      );
+    })()
   );
 }
 

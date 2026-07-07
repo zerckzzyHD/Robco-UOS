@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2576/2576 | Cache: robco-terminal-v2.7.0-r110 -->
+﻿## [Unreleased]<!-- Tests: 2578/2578 | Cache: robco-terminal-v2.7.0-r111 -->
 
 ### Added
 
@@ -131,6 +131,8 @@
 - Fixed your CURIO ARCHIVE's Lincoln memorabilia relics stacking one to a row instead of sitting side by side like your snow globes or bobbleheads. They now display in the same multi-column layout as the rest of your collectibles.
 - Fixed the OPERATIONAL TEMPO dial's readout not updating until you let go of the knob — dragging it now shows the position and description update live as the needle passes each one, snapping to the nearest choice the moment you release.
 - Fixed the power core's main body and its small mirror in the top casing still not quite matching each other visually, even after an earlier pass meant to bring them in sync — the mirror's 3D depth was noticeably flatter than the main core's. Also fixed the core's always-on diagonal ring, which had grown too wide across its whole diameter instead of reading as a solid, rounded band — it's now smaller across and genuinely thicker, with shading that makes it look like a real curved surface rather than a flat outline. And nudged the core's "?" help button up and to the side so the ring no longer visibly cuts through it.
+- Fixed the CASE-CLOSED / FAILED stamp on a directive slot landing right on top of its CYCLE button instead of sitting clear of it. The stamp now always shows above the slot's controls.
+- Fixed a critical bug where using an item from your cargo manifest could dim the entire screen and lock out all interaction with no way to recover short of reloading. The terminal already dims the screen briefly while waiting on a reply — the bug was that an unexpected hiccup right at the start of that wait could leave it stuck dimmed forever instead of clearing normally. Any transmission that runs into trouble now always restores the screen and lets you keep using the terminal.
 
 ### Improved
 

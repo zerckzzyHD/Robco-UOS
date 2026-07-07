@@ -12695,9 +12695,13 @@ $thinkingIdx162 = $tm162.IndexOf("window.setOverseerState('thinking')")
 Check (
     ($thermalIdx162 -ge 0) -and ($thinkingIdx162 -ge 0) -and ($thinkingIdx162 -gt $thermalIdx162)
 ) "162.4: transmitMessage() calls window.setOverseerState('thinking') at the thermal-load window"
+# Protocol 27 fix (owner report: USE dims the screen forever) moved the
+# finally block's reset logic into a shared _resetTransmitUI() helper --
+# also called from a new setup-phase catch (Protocol 22, one reset path).
+$resetFn162 = Get-FunctionBody $api162 "_resetTransmitUI"
 Check (
-    ($tm162 -match "getOverseerState\(\) === 'thinking'") -and ($tm162 -match 'finally')
-) "162.5: transmitMessage()'s finally block only resets the scope when getOverseerState() === 'thinking'"
+    ($resetFn162 -match "getOverseerState\(\) === 'thinking'") -and ($tm162 -match 'finally')
+) "162.5: transmitMessage()'s finally block calls _resetTransmitUI(), which only resets the scope when getOverseerState() === 'thinking'"
 
 # 162.6  appendToChat() sets 'speaking' at the AI typewriter start and
 #        'listening' at completion, guarded on !isHistoryLoad in both branches
@@ -12951,14 +12955,18 @@ Check (
 #         TERMINAL-mode/quick-log routing for every click after the FIRST
 #         round-trip
 $tm162b = Get-FunctionBody $api162 "transmitMessage"
+# Protocol 27 fix moved the '↑'/onclick reset into the shared
+# _resetTransmitUI() helper the finally block now calls (Protocol 22).
+$resetFn162b = Get-FunctionBody $api162 "_resetTransmitUI"
+$combined162b = $tm162b + "`n" + $resetFn162b
 Check (
     ($tm162b.Contains("btn.textContent = '⋯';")) -and
     ($tm162b.Contains("btn.textContent = '✕';")) -and
-    ($tm162b.Contains("btn.textContent = '↑';")) -and
-    ($tm162b.Contains("btn.onclick = () => submitCommandInput();")) -and
-    (-not ($tm162b.Contains("btn.onclick = () => transmitMessage();"))) -and
-    (-not ($tm162b.Contains("btn.innerText = '> TRANSMIT PROTOCOL'")))
-) "162.22: transmitMessage()'s busy/cancel/reset states use short glyphs, and the finally block restores onclick to submitCommandInput() -- not transmitMessage() directly (Protocol 42 fix: the prior direct rebind silently skipped TERMINAL-mode routing on every click after the first round-trip)"
+    ($resetFn162b.Contains("btn.textContent = '↑';")) -and
+    ($resetFn162b.Contains("btn.onclick = () => submitCommandInput();")) -and
+    (-not ($combined162b.Contains("btn.onclick = () => transmitMessage();"))) -and
+    (-not ($combined162b.Contains("btn.innerText = '> TRANSMIT PROTOCOL'")))
+) "162.22: transmitMessage()'s busy/cancel states use short glyphs, and the shared _resetTransmitUI() helper restores the up-arrow glyph + onclick to submitCommandInput() -- not transmitMessage() directly (Protocol 42 fix: the prior direct rebind silently skipped TERMINAL-mode routing on every click after the first round-trip)"
 
 # 162.23  owner-report fix (real-terminal-screen batch): .transcript-card no
 #         longer carries a box (border/radius/background) -- the transcript
@@ -19005,8 +19013,11 @@ Check (
 # mechanism, 4 new additive RobcoEvents emits (rad.tier/limb.state/
 # quest.status/location.visited + the collectible.acquired AI-path emit),
 # and the 8 Tier-S flagship home-panel animations
-# (planning/FEEDBACK_ANIMATION_BUILD_PLAN.md -- WAVE 1).
-# 37 tests
+# (planning/FEEDBACK_ANIMATION_BUILD_PLAN.md -- WAVE 1). Extended with two
+# owner-reported bug fixes: the CASE-CLOSED/FAILED stamp overlapping the
+# CYCLE button (196.28), and the CRITICAL USE-dims-the-screen lockup
+# (196.29 -- a pre-existing transmitMessage() gap, not a Wave 1 regression).
+# 39 tests
 # ===========================================================
 Sep "Suite 196 -- FEEDBACK ANIMATION WAVE 1: annunciator + new emits + 8 flagships"
 $stateSrc196 = Read-Src "js/state.js"
@@ -19270,6 +19281,132 @@ Check (
     ($renderSrc196 -match 'class="facon-stamp facon-stamp--\$\{dir\}" aria-hidden="true"') -and
     ($renderSrc196 -match 'class="dir-stamp dir-stamp--\$\{stampStatus\}" aria-hidden="true"')
 ) '196.27: the level-up card and the rep/quest stamps are aria-hidden (decorative, never double-announced)'
+
+# 196.28  Owner report fix: the CASE-CLOSED/FAILED stamp used to be
+#         position:absolute at right:10px/top:50%, landing directly on top
+#         of .dir-keys (the CYCLE/DELETE buttons). It's now a normal-flow
+#         flex child pinned above the row (order:-1 + full flex-basis) --
+#         never position:absolute -- so it can never re-overlap the buttons.
+$dirStampRule196 = [System.Text.RegularExpressions.Regex]::Match($cssStripped196, '\.dir-stamp\s*\{[^\}]*\}').Value
+Check (
+    ($dirStampRule196 -match 'order:\s*-1') -and
+    ($dirStampRule196 -match 'flex:\s*1 0 100%') -and
+    (-not ($dirStampRule196 -match 'position:\s*absolute'))
+) '196.28: .dir-stamp is a normal-flow flex child pinned above the row (order:-1, full flex-basis) -- never position:absolute, so it can never land on .dir-keys again'
+
+# 196.29  BEHAVIORAL (shells out to node, temp-file transport -- Protocol 42)
+#         owner-reported CRITICAL bug: clicking USE dimmed the whole screen
+#         and locked out all interaction. Root-caused to transmitMessage()'s
+#         own pre-existing uiPanel dim-in, applied well before the network
+#         try/finally that undoes it -- a throw anywhere in the unguarded
+#         setup zone (generateSyncPayload(), apiContents building) left the
+#         dim stuck forever. Pre-existing (predates Wave 1) -- fixed by
+#         wrapping that setup zone in its own try/catch reusing the SAME
+#         _resetTransmitUI() the network path's finally already calls.
+try {
+    $nodeCheck196 = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCheck196) {
+        $apiPathNode196 = (Join-Path $Root "js/api.js").Replace('\', '/')
+        $testScript196 = @"
+const fs = require('fs');
+const vm = require('vm');
+try {
+  const src = fs.readFileSync('$apiPathNode196', 'utf8');
+  function extractFunctionBody(source, fnName) {
+    let idx = source.indexOf('function ' + fnName);
+    let i = source.indexOf('{', idx);
+    let depth = 0;
+    const start = i;
+    while (i < source.length) {
+      if (source[i] === '{') depth++;
+      else if (source[i] === '}' && --depth === 0) return source.slice(start, i + 1);
+      i++;
+    }
+  }
+  function declareFn(src, name) {
+    const nameIdx = src.indexOf('function ' + name);
+    const parenIdx = src.indexOf('(', nameIdx);
+    const braceIdx = src.indexOf('{', parenIdx);
+    const params = src.slice(parenIdx, braceIdx);
+    const isAsync = src.slice(Math.max(0, nameIdx - 6), nameIdx) === 'async ';
+    return (isAsync ? 'async ' : '') + 'function ' + name + params + extractFunctionBody(src, name);
+  }
+  const src196 = declareFn(src, '_resetTransmitUI') + '\n' + declareFn(src, 'transmitMessage');
+
+  const mockEl = () => ({
+    value: '', textContent: '', disabled: false, onclick: null, style: {},
+    classList: {
+      _set: new Set(),
+      add(c) { this._set.add(c); },
+      remove(c) { this._set.delete(c); },
+      contains(c) { return this._set.has(c); },
+    },
+    setAttribute() {}, getAttribute() { return null; }, focus() {},
+  });
+  const els = {
+    chatInput: mockEl(), transmitBtn: mockEl(), uiPanel: mockEl(),
+    imagePreviewContainer: mockEl(), imagePreview: mockEl(), imageInput: mockEl(),
+  };
+  els.chatInput.value = '> [USE] Test Item';
+
+  let chatMessages = [];
+  const sandbox = {
+    document: {
+      getElementById: id => els[id] || mockEl(),
+      body: { classList: {
+        _set: new Set(),
+        add(c) { this._set.add(c); },
+        remove(c) { this._set.delete(c); },
+        contains(c) { return this._set.has(c); },
+      } },
+    },
+    window: {},
+    chatHistory: [],
+    attachedImageData: null,
+    attachedImageMimeType: null,
+    appendToChat: (text, sender) => chatMessages.push({ text, sender }),
+    _routeNativeCommand: () => false,
+    _isPrecisePointer: () => false,
+    MetaStore: { has: () => false },
+    _commGet: () => 'FAKE-TEST-KEY',
+    generateSyncPayload: () => { throw new Error('SIMULATED setup-phase throw'); },
+    submitCommandInput: () => {},
+    console,
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(src196, sandbox);
+  (async () => {
+    let threw = null;
+    try { await vm.runInContext('transmitMessage()', sandbox); } catch (e) { threw = e; }
+    const ok = !threw &&
+      els.uiPanel.style.opacity === '1' &&
+      els.uiPanel.style.pointerEvents === 'auto' &&
+      !sandbox.document.body.classList.contains('thermal-load') &&
+      chatMessages.some(m => /TRANSMIT SETUP FAILURE/.test(m.text));
+    console.log('RESULT:' + (ok ? '1' : '0'));
+  })();
+} catch (e) { console.log('RESULT:0'); }
+"@
+        $tmpScript196 = [System.IO.Path]::GetTempFileName() + '.js'
+        [System.IO.File]::WriteAllText($tmpScript196, $testScript196, [System.Text.Encoding]::UTF8)
+        try {
+            $out196 = (node $tmpScript196 2>&1 | Out-String)
+        } finally {
+            Remove-Item -Path $tmpScript196 -Force -ErrorAction SilentlyContinue
+        }
+        $rm196 = [regex]::Match($out196, 'RESULT:([01])')
+        if ($rm196.Success) {
+            Check ($rm196.Groups[1].Value -eq '1') "196.29: transmitMessage() behavioral -- a setup-phase throw (e.g. generateSyncPayload() failing) no longer leaves #uiPanel dimmed/un-clickable; _resetTransmitUI() restores opacity/pointer-events/thermal-load and a clear error is posted to chat"
+        } else {
+            $err196 = if ([string]::IsNullOrWhiteSpace($out196)) { "No output from node" } else { $out196.Trim() }
+            Fail "196.29: transmitMessage() behavioral USE-dim-lockup proof  (runtime error: $err196)"
+        }
+    } else {
+        Fail "196.29: transmitMessage() behavioral USE-dim-lockup proof  (node not available in PATH)"
+    }
+} catch {
+    Fail "196.29: transmitMessage() behavioral USE-dim-lockup proof  (harness error: $_)"
+}
 
 # ===========================================================
 # Results

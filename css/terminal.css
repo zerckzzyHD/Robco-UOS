@@ -11130,11 +11130,20 @@ body.geiger-film-grain .crt-overlay {
     transform: scale(1) rotate(0deg);
   }
 }
+/* Owner report fix: the stamp used to be position:absolute at right:10px/
+   top:50%, landing directly on top of .dir-keys (the CYCLE/DELETE buttons),
+   which also settles to the slot's right edge via margin-left:auto — the two
+   fought for the same space and the stamp covered the controls. It's now a
+   normal-flow flex child pinned to its own line ABOVE everything else in the
+   slot (order:-1 + flex-basis:100%, .dir-slot is already display:flex;
+   flex-wrap:wrap), so it can never overlap .dir-main or .dir-keys at any
+   viewport width — no absolute positioning, no coordinate math to keep in
+   sync with the buttons' own layout. */
 .dir-stamp {
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
+  order: -1;
+  flex: 1 0 100%;
+  width: fit-content;
+  margin: 0 0 4px;
   padding: 2px 8px;
   border: 2px solid var(--robco-green);
   border-radius: 3px;
@@ -11148,9 +11157,6 @@ body.geiger-film-grain .crt-overlay {
 .dir-stamp--failed {
   border-color: var(--robco-danger);
   color: var(--robco-danger);
-}
-.dir-slot {
-  position: relative;
 }
 @keyframes dir-lamp-flicker-out {
   0%,
