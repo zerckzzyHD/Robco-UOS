@@ -9827,18 +9827,24 @@ button.chassis-core-shape {
   border-style: dashed;
   animation: chassisCoreSpin 9s linear infinite reverse;
 }
-/* Always-on perpendicular ring (owner follow-up) — a 4th ring, built as a
-   ::before pseudo-element so no HTML markup changes anywhere (both the full
-   BUS-22 core and the casing-top mini core share this rule automatically,
-   since both carry .chassis-core-shape — Protocol 22, one source, no
-   drift). Tilted 90° on X so it sits on a plane PERPENDICULAR to the flat
-   r1/r2/r3 rings (which only ever rotateZ), then continuously spun on Y —
-   the classic atom-orbit/gyroscope look, genuinely reading as a ring
-   orbiting the core in 3D at all times, not just during the #14 burst.
-   `perspective` (below) gives it real depth; transform-only + linear
-   infinite (matching the existing r1/r3 idle-spin convention — linear is
-   correct for an unbounded loop, never ease-in-out, which would visibly
-   hitch at the seam) + will-change keeps it fluid and GPU-composited. */
+/* Always-on perpendicular ring (owner follow-up, corrected) — a 4th ring,
+   built as a ::before pseudo-element so no HTML markup changes anywhere
+   (both the full BUS-22 core and the casing-top mini core share this rule
+   automatically, since both carry .chassis-core-shape — Protocol 22, one
+   source, no drift). The owner's actual ask: NOT a flat ring spinning
+   around the vertical axis (rotateX(90deg)+rotateY, the first attempt) —
+   a ring that continuously tumbles around a DIAGONAL 3D axis, so its two
+   diagonal corner-pairs swap through depth as it turns (upper-left/
+   bottom-right <-> bottom-left/upper-right), the ring's plane visibly
+   tilting edge-on and back into the screen. `rotate3d(1, 1, 0, deg)`
+   rotates around the diagonal axis running through the shape's other two
+   corners, which is exactly this diagonal-corner-swap tumble (unlike
+   rotateX/rotateY, which only ever spin around the screen's horizontal or
+   vertical axis). `perspective` (already on .chassis-core-shape) gives it
+   real depth; transform-only + linear infinite (matching the existing
+   r1/r3 idle-spin convention — linear is correct for an unbounded loop,
+   never ease-in-out, which would visibly hitch at the seam) + will-change
+   keeps it fluid and GPU-composited. */
 .chassis-core-shape::before {
   content: '';
   position: absolute;
@@ -9850,10 +9856,10 @@ button.chassis-core-shape {
 }
 @keyframes chassisCoreOrbitPerp {
   0% {
-    transform: rotateX(90deg) rotateY(0deg);
+    transform: rotate3d(1, 1, 0, 0deg);
   }
   100% {
-    transform: rotateX(90deg) rotateY(360deg);
+    transform: rotate3d(1, 1, 0, 360deg);
   }
 }
 @keyframes chassisCoreSpin {

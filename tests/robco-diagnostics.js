@@ -29066,19 +29066,23 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '192.35: the 3D ring burst keyframes are now evenly spaced with each axis held exactly proportional to its keyframe percent (constant angular velocity), driven by a smooth ease-in-out instead of the old overshoot "back" bezier, and the always-animating .c-ring carries will-change:transform for GPU compositing — fixing the owner-reported choppy/jerky tumble'
   );
 
-  // 192.36  owner follow-up — always-on perpendicular 3D ring: a 4th ring,
-  //         built as a ::before pseudo-element (no HTML markup change, so
-  //         both the full core AND the casing-top mini core share it
-  //         automatically via the same .chassis-core-shape class,
-  //         Protocol 22), tilted 90deg on X (a plane perpendicular to the
-  //         flat r1/r2/r3 rings, which only ever rotateZ) and continuously
-  //         spun on Y forever — a genuine always-on 3D orbit, not just
-  //         during the #14 stat-change burst. transform-only + linear
-  //         infinite (matching the r1/r3 idle-spin convention) +
-  //         will-change keeps it GPU-composited. preserve-3d on the shape
-  //         lets it compose in the same 3D space as the burst rings. The
-  //         SAME .core-still gate (Protocol UI-10) stills it — no bespoke
-  //         carve-out for this new continuous loop.
+  // 192.36  owner follow-up — always-on perpendicular 3D ring, CORRECTED to
+  //         a diagonal-axis tumble: a 4th ring, built as a ::before
+  //         pseudo-element (no HTML markup change, so both the full core
+  //         AND the casing-top mini core share it automatically via the
+  //         same .chassis-core-shape class, Protocol 22). The first attempt
+  //         (rotateX(90deg)+rotateY) was a flat ring spinning around the
+  //         vertical axis, not what the owner asked for; corrected to
+  //         rotate3d(1, 1, 0, deg), which spins around a DIAGONAL 3D axis
+  //         so the ring's two diagonal corner-pairs swap through depth as
+  //         it turns (upper-left/bottom-right <-> bottom-left/upper-right)
+  //         — a genuine always-on diagonal 3D tumble, not just during the
+  //         #14 stat-change burst. transform-only + linear infinite
+  //         (matching the r1/r3 idle-spin convention) + will-change keeps
+  //         it GPU-composited. preserve-3d on the shape lets it compose in
+  //         the same 3D space as the burst rings. The SAME .core-still gate
+  //         (Protocol UI-10) stills it — no bespoke carve-out for this new
+  //         continuous loop.
   const beforeRule192 = (cssStripped192.match(/\.chassis-core-shape::before\s*\{[^}]*\}/) || [
     '',
   ])[0];
@@ -29094,12 +29098,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       /animation:\s*chassisCoreOrbitPerp/.test(beforeRule192) &&
       /infinite/.test(beforeRule192) &&
       /will-change:\s*transform/.test(beforeRule192) &&
-      /rotateX\(90deg\)/.test(orbitPerpKF192) &&
-      /rotateY\(0deg\)/.test(orbitPerpKF192) &&
-      /rotateY\(360deg\)/.test(orbitPerpKF192) &&
+      /rotate3d\(1,\s*1,\s*0,\s*0deg\)/.test(orbitPerpKF192) &&
+      /rotate3d\(1,\s*1,\s*0,\s*360deg\)/.test(orbitPerpKF192) &&
+      !/rotateX\(90deg\)/.test(orbitPerpKF192) &&
       /transform-style:\s*preserve-3d/.test(shapeBaseRule192) &&
       /\.core-still::before/.test(coreStillGateRule192),
-    '192.36: an always-on perpendicular ring (.chassis-core-shape::before, tilted 90deg on X then continuously spun on Y — a real gyroscope/atom-orbit 3D loop, not just during the burst) is shared by both cores via the same base class, and is stilled by the SAME .core-still gate as everything else — no bespoke carve-out'
+    "192.36: an always-on perpendicular ring (.chassis-core-shape::before) now tumbles around a DIAGONAL 3D axis via rotate3d(1,1,0,deg) — the corrected owner ask, swapping the ring's diagonal corner-pairs through depth rather than flatly spinning around the vertical axis — is shared by both cores via the same base class, and is stilled by the SAME .core-still gate as everything else — no bespoke carve-out"
   );
 }
 
