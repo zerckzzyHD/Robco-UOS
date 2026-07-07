@@ -11294,3 +11294,347 @@ body.geiger-film-grain .crt-overlay {
 .node.survey-ping .dot {
   animation: survey-ping-dot-pulse 1.6s ease-out both;
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   FEEDBACK ANIMATION WAVE 2 (planning/FEEDBACK_ANIMATION_BUILD_PLAN.md)
+   Same rules as WAVE 1 above: every rule is a plain @keyframes (never
+   transition-only), auto-neutralized to an instant correct final frame by
+   the existing global prefers-reduced-motion block (Protocol UI-9).
+   Transform/opacity/filter only — compositor friendly, mobile-safe.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── #10 XP CHUNK FILL — BUS-01 GRADE trace (Group 2) ───────────────── */
+@keyframes xp-chunk-brighten {
+  0% {
+    filter: brightness(1);
+  }
+  25% {
+    filter: brightness(2.2);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+.hp-bar-fill.xp-chunk-fill {
+  animation: xp-chunk-brighten 0.7s ease-out;
+}
+@keyframes xp-ticker-float {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 0);
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -22px);
+  }
+}
+#xp_bar_container {
+  position: relative;
+  overflow: visible;
+}
+.xp-ticker {
+  position: absolute;
+  left: 50%;
+  top: -2px;
+  font-size: 10px;
+  color: var(--robco-blue);
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 5;
+  animation: xp-ticker-float 1.15s ease-out forwards;
+}
+
+/* ── #11 SERVO RECALIBRATE — BUS-02 SPECIAL fader (Group 2) ─────────── */
+@keyframes servo-cap-overshoot {
+  0% {
+    transform: translateY(0);
+  }
+  35% {
+    transform: translateY(-16px);
+  }
+  65% {
+    transform: translateY(4px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+.fd-cap.servo-overshoot {
+  animation: servo-cap-overshoot 0.55s cubic-bezier(0.3, 1.3, 0.55, 1);
+}
+@keyframes servo-letter-flash {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  40% {
+    filter: brightness(2.4);
+    text-shadow: 0 0 8px var(--robco-green);
+  }
+}
+.fd-letter.servo-flash {
+  animation: servo-letter-flash 0.55s ease-out;
+}
+
+/* ── #12 INK STAMP — skill-book spine / magazine cover racks (Group 2) ─ */
+@keyframes ink-stamp-land {
+  0% {
+    transform: scale(1.4) rotate(0deg);
+    opacity: 0.5;
+  }
+  55% {
+    transform: scale(0.95) rotate(4deg);
+    opacity: 1;
+    filter: drop-shadow(-6px 4px 0 rgba(var(--robco-green-rgb), 0.35))
+      drop-shadow(8px -3px 0 rgba(var(--robco-green-rgb), 0.3));
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    filter: drop-shadow(0 0 0 transparent);
+  }
+}
+button.spine.ink-stamp-land,
+button.mag.ink-stamp-land {
+  animation: ink-stamp-land 0.5s ease-out;
+}
+
+/* ── #17 CAPS ODOMETER SPIN — BUS-10 requisition credit tile (Group 4) ─ */
+@keyframes caps-digit-roll {
+  0% {
+    filter: blur(0) brightness(1);
+  }
+  35% {
+    filter: blur(1.5px) brightness(2);
+  }
+  100% {
+    filter: blur(0) brightness(1);
+  }
+}
+#c_caps.caps-digit-roll {
+  animation: caps-digit-roll 0.5s ease-out;
+}
+@keyframes caps-glyph-arc {
+  0% {
+    opacity: 0;
+    transform: translate(0, 10px) scale(0.6) rotate(0deg);
+  }
+  40% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(0, -26px) scale(1) rotate(180deg);
+  }
+}
+.rb-tile.wire {
+  position: relative;
+  overflow: visible;
+}
+.caps-arc-glyph {
+  position: absolute;
+  right: 8px;
+  top: -6px;
+  font-size: 13px;
+  color: var(--bezel-wire, var(--robco-alert));
+  pointer-events: none;
+  z-index: 5;
+  animation: caps-glyph-arc 0.85s ease-out forwards;
+}
+
+/* ── #18 MANIFEST PUNCH — CARGO MANIFEST rows + drawer badges (Group 4) ─ */
+@keyframes manifest-row-slide-in {
+  0% {
+    transform: translateX(-14px);
+    opacity: 0.3;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+.mrow.manifest-punch-in {
+  animation: manifest-row-slide-in 0.4s ease-out;
+}
+@keyframes manifest-eyelet-punch {
+  0% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.mrow.manifest-punch-in .hole {
+  animation: manifest-eyelet-punch 0.4s ease-out;
+}
+@keyframes drawer-count-blip {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.5);
+    color: var(--bezel-wire, var(--robco-alert));
+  }
+}
+[data-dcount].drawer-count-blip {
+  animation: drawer-count-blip 0.45s ease-out;
+}
+
+/* ── #20 WELD SPARKS + TAG — BUS-12 fabrication bench (Group 4) ──────── */
+@keyframes weld-spark-flash {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  20%,
+  40%,
+  60%,
+  80% {
+    opacity: 1;
+  }
+}
+#craftPanel.weld-spark-flash > summary .board-led {
+  animation: weld-spark-flash 0.4s steps(2, end);
+  box-shadow: 0 0 10px 3px var(--robco-alert);
+}
+@keyframes claim-tag-tear {
+  0% {
+    clip-path: inset(0 0 0 0);
+    opacity: 1;
+    transform: translateY(0) rotate(0deg);
+  }
+  70% {
+    clip-path: inset(0 0 0 0);
+    opacity: 1;
+  }
+  100% {
+    clip-path: inset(0 60% 0 0);
+    opacity: 0;
+    transform: translateY(6px) rotate(-3deg);
+  }
+}
+#craftPanel {
+  position: relative;
+}
+.craft-claim-tag {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  background: rgba(0, 0, 0, 0.75);
+  border: 1px solid var(--robco-alert);
+  padding: 2px 8px;
+  font-size: 10px;
+  color: var(--robco-alert);
+  z-index: 5;
+  pointer-events: none;
+  animation: claim-tag-tear 1.6s ease-in forwards;
+}
+
+/* ── #30 CLOCK SPIN-DOZE — chrono board + glass (Group 5) ────────────── */
+@keyframes doze-scanline-collapse {
+  0% {
+    transform: scaleY(1);
+  }
+  40%,
+  70% {
+    transform: scaleY(0.02);
+  }
+  100% {
+    transform: scaleY(1);
+  }
+}
+body.sleep-doze .glass-frame .crt-overlay {
+  animation: doze-scanline-collapse 1.4s ease-in-out;
+  transform-origin: center;
+}
+@keyframes doze-flip-spin {
+  0% {
+    transform: rotateX(0deg);
+  }
+  100% {
+    transform: rotateX(1080deg);
+  }
+}
+body.sleep-doze .chrono-wrap .flip {
+  animation: doze-flip-spin 0.9s linear;
+}
+
+/* ── #2 CRT FLINCH — BUS-01 monitor (Group 1) ────────────────────────── */
+@keyframes crt-flinch-tear {
+  0%,
+  100% {
+    filter: none;
+    transform: translateX(0);
+  }
+  30% {
+    filter: contrast(2) brightness(1.8);
+    transform: translateX(-3px);
+  }
+  50% {
+    filter: contrast(2.4) brightness(0.6);
+    transform: translateX(4px);
+  }
+}
+.crt-mon.crt-flinch {
+  animation: crt-flinch-tear 0.26s steps(2, end);
+}
+
+/* ── #31 HOLOTAPE COMMIT — SAVE ARCHIVE panel (Group 6) ──────────────── */
+#savesPanel {
+  position: relative;
+}
+@keyframes holotape-slide-in {
+  0% {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+@keyframes holotape-reel-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+.holotape-commit-badge {
+  position: absolute;
+  right: 8px;
+  top: 6px;
+  font-size: 11px;
+  color: var(--robco-green);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  pointer-events: none;
+  z-index: 5;
+  animation: holotape-slide-in 0.35s ease-out;
+}
+.holotape-commit-badge .htc-reel {
+  display: inline-block;
+  animation: holotape-reel-spin 1s linear;
+}
+@keyframes carrier-ripple {
+  0% {
+    box-shadow: 0 0 0 0 rgba(var(--robco-green-rgb), 0.5);
+  }
+  100% {
+    box-shadow: 0 0 0 14px rgba(var(--robco-green-rgb), 0);
+  }
+}
+#savesPanel.carrier-ripple > summary {
+  animation: carrier-ripple 0.9s ease-out;
+  border-radius: 4px;
+}

@@ -710,6 +710,13 @@ function autoImportState(jsonString) {
     let inv = parsed.inventory || parsed.Inventory || parsed.inv;
     if (inv && Array.isArray(inv)) {
       if (!state.ammo) state.ammo = {};
+      // FEEDBACK ANIMATION WAVE 2 (#18 MANIFEST PUNCH) — captured BEFORE the
+      // merge so the AI resending its whole inventory array each turn never
+      // replays the animation for items the player already had (the
+      // collectible.acquired/quest.status AI-path precedent, Protocol 22).
+      const _invNamesBefore = new Set(
+        (state.inventory || []).map(it => String(it.name).toLowerCase())
+      );
       state.inventory = inv
         .map(it => {
           let wgt = parseFloat(it.wgt ?? it.weight ?? 0) || 0;
@@ -741,6 +748,16 @@ function autoImportState(jsonString) {
           }
           return true;
         });
+      state.inventory.forEach(it => {
+        if (!_invNamesBefore.has(String(it.name).toLowerCase())) {
+          RobcoEvents.emit('item.added', {
+            name: it.name,
+            qty: it.qty,
+            source: 'ai',
+            type: it.type,
+          });
+        }
+      });
     }
     if (parsed.squad && Array.isArray(parsed.squad)) {
       state.squad = parsed.squad.map(m => ({

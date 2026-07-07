@@ -19500,6 +19500,234 @@ Check (
 ) '196.33: _rerenderMapPreservingScroll() never assigns state.* or calls saveState() -- purely transient scroll bookkeeping'
 
 # ===========================================================
+# Suite 197 -- FEEDBACK ANIMATION WAVE 2: the 9 Tier-A animations + the
+# one new additive item.added emit (planning/FEEDBACK_ANIMATION_BUILD_
+# PLAN.md -- WAVE 2). item.added fires from three call sites (addItem()'s
+# manual path, doLoot()'s loot-apply path, and the AI inventory-merge diff
+# in autoImportState(), Protocol 14 AI-contract precedent). The 9 home-
+# panel reactions live in _wireCoreEventBusSubscribers() (ui-core.js);
+# the [home + echo] items (XP/SERVO/CRT-FLINCH/CAPS/MANIFEST-PUNCH) also
+# get an annunciator echo push in _wireFeedbackEchoSubscribers() -- INK
+# STAMP/WELD SPARKS/CLOCK SPIN-DOZE/HOLOTAPE COMMIT are home-only by
+# owner decision and deliberately carry no echo.
+# 26 tests
+# ===========================================================
+Sep "Suite 197 -- FEEDBACK ANIMATION WAVE 2: item.added + 9 Tier-A animations"
+$coreSrc197 = Read-Src "js/ui-core.js"
+$renderSrc197 = Read-Src "js/ui-render.js"
+$apiSrc197 = Read-Src "js/api.js"
+$css197 = Read-Src "css/terminal.css"
+$cssStripped197 = [regex]::Replace($css197, '/\*[\s\S]*?\*/', '')
+
+# 197.1  addItem() emits item.added on the manual-add path.
+$addItemBody197 = Get-FunctionBody $renderSrc197 'addItem'
+Check (
+    [System.Text.RegularExpressions.Regex]::IsMatch(
+        $addItemBody197,
+        "RobcoEvents\.emit\(\s*['`"]item\.added['`"][\s\S]{0,200}source:\s*'manual'"
+    )
+) "197.1: addItem() emits item.added with source:'manual' on every manual add"
+
+# 197.2  doLoot() emits item.added on the LOOT-apply path.
+$doLootBody197 = Get-FunctionBody $renderSrc197 'doLoot'
+Check (
+    [System.Text.RegularExpressions.Regex]::IsMatch(
+        $doLootBody197,
+        "RobcoEvents\.emit\(\s*['`"]item\.added['`"][\s\S]{0,200}source:\s*'loot'"
+    )
+) "197.2: doLoot() emits item.added with source:'loot' after _lootAdd() applies"
+
+# 197.3  the AI inventory-merge in autoImportState() emits item.added ONLY
+#        for genuinely new item names (a Set captured BEFORE the merge),
+#        the collectible.acquired/quest.status AI-path precedent.
+Check (
+    ($apiSrc197 -match '_invNamesBefore = new Set') -and
+    ($apiSrc197 -match 'if \(!_invNamesBefore\.has\(String\(it\.name\)\.toLowerCase\(\)\)\)') -and
+    ([System.Text.RegularExpressions.Regex]::IsMatch(
+        $apiSrc197,
+        "RobcoEvents\.emit\(\s*['`"]item\.added['`"][\s\S]{0,80}source:\s*'ai'"
+    ))
+) "197.3: the AI inventory-merge emits item.added with source:'ai' only for names absent from the pre-merge Set"
+
+# -- the 9 home-panel animations (_wireCoreEventBusSubscribers) --
+$wireCoreBody197 = Get-FunctionBody $coreSrc197 '_wireCoreEventBusSubscribers'
+
+# 197.4  #10 XP CHUNK FILL -- fires only on a genuine XP increase.
+Check (
+    ([System.Text.RegularExpressions.Regex]::IsMatch($wireCoreBody197, "p\.key === 'xp' &&[\s\S]{0,120}p\.newVal > p\.oldVal")) -and
+    ($wireCoreBody197 -match 'xp-chunk-fill') -and
+    ($wireCoreBody197 -match 'xp-ticker')
+) '197.4: #10 XP CHUNK FILL fires only when newVal > oldVal, brightening #xp_bar_fill + a floating +N XP ticker'
+
+# 197.5  #11 SERVO RECALIBRATE -- targets the changed SPECIAL channel's
+#        ladder + letter via the existing data-fd-ladder/.fader markup,
+#        and reuses the existing playChipClick() SFX (Protocol 22).
+Check (
+    ($wireCoreBody197 -match '_SPECIAL_KEYS\.includes\(p\.key\)') -and
+    ($wireCoreBody197 -match 'data-fd-ladder') -and
+    ($wireCoreBody197 -match 'servo-overshoot') -and
+    ($wireCoreBody197 -match 'servo-flash') -and
+    ($wireCoreBody197 -match 'playChipClick\(\)')
+) "197.5: #11 SERVO RECALIBRATE overshoots the SPECIAL channel's .fd-cap + flashes .fd-letter, pairing with playChipClick()"
+
+# 197.6  #2 CRT FLINCH -- fires only when HP genuinely dropped.
+Check (
+    ([System.Text.RegularExpressions.Regex]::IsMatch($wireCoreBody197, "p\.key === 'hp' &&[\s\S]{0,120}p\.newVal < p\.oldVal")) -and
+    ($wireCoreBody197 -match 'crt-flinch')
+) '197.6: #2 CRT FLINCH fires only when newVal < oldVal, tearing across .crt-mon'
+
+# 197.7  #17 CAPS ODOMETER SPIN -- the digit-roll half reacts to
+#        stat.change key=caps; the arc-glyph half reacts to trade.bought
+#        AND trade.sold (both compose with the roll on a trade).
+Check (
+    ($wireCoreBody197 -match "p\.key === 'caps'") -and
+    ($wireCoreBody197 -match 'caps-digit-roll') -and
+    ($wireCoreBody197 -match '_playCapsArc') -and
+    ($wireCoreBody197 -match "RobcoEvents\.on\(\s*['`"]trade\.bought['`"],\s*_playCapsArc\)") -and
+    ($wireCoreBody197 -match "RobcoEvents\.on\(\s*['`"]trade\.sold['`"],\s*_playCapsArc\)") -and
+    ($wireCoreBody197 -match 'caps-arc-glyph')
+) '197.7: #17 CAPS ODOMETER SPIN digit-rolls #c_caps on stat.change(caps) and arcs a cap glyph on both trade.bought and trade.sold'
+
+# 197.8  updateMath() feeds stat.change(caps) via the SAME shared
+#        _emitStatChangeIfDiffers() helper hp/xp/rads already use
+#        (Protocol 22) -- caps has no dedicated drag setter of its own.
+$updateMathBody197 = Get-FunctionBody $coreSrc197 'updateMath'
+Check (
+    $updateMathBody197 -match "_emitStatChangeIfDiffers\(\s*['`"]caps['`"]"
+) "197.8: updateMath() calls _emitStatChangeIfDiffers('caps', ...) reading the real #c_caps field every tick"
+
+# 197.9  #18 MANIFEST PUNCH -- blips the type-keyed drawer badge
+#        regardless of which drawer is open, and punches the freight-tag
+#        row only when it is actually rendered (matched by visible name).
+Check (
+    ($wireCoreBody197 -match "RobcoEvents\.on\(\s*['`"]item\.added['`"]") -and
+    ($wireCoreBody197 -match 'data-dcount') -and
+    ($wireCoreBody197 -match 'drawer-count-blip') -and
+    ($wireCoreBody197 -match 'manifest-punch-in')
+) '197.9: #18 MANIFEST PUNCH blips the [data-dcount] drawer badge and punches the matching .mrow when rendered'
+
+# 197.10  #20 WELD SPARKS + TAG -- home-only reaction to the EXISTING
+#         craft.completed event, a transient claim-tag node (never
+#         persisted markup).
+Check (
+    ($wireCoreBody197 -match "RobcoEvents\.on\(\s*['`"]craft\.completed['`"]") -and
+    ($wireCoreBody197 -match 'weld-spark-flash') -and
+    ($wireCoreBody197 -match 'craft-claim-tag') -and
+    ($wireCoreBody197 -match 'craftPanel')
+) '197.10: #20 WELD SPARKS + TAG reacts to the existing craft.completed event on #craftPanel with a transient claim-tag node'
+
+# 197.11  #30 CLOCK SPIN-DOZE -- home-only reaction to the EXISTING
+#         sleep.completed event.
+Check (
+    ($wireCoreBody197 -match "RobcoEvents\.on\(\s*['`"]sleep\.completed['`"]") -and
+    ($wireCoreBody197 -match 'sleep-doze')
+) '197.11: #30 CLOCK SPIN-DOZE reacts to the existing sleep.completed event via a one-shot body.sleep-doze class'
+
+# 197.12  #31 HOLOTAPE COMMIT -- home-only reaction to the EXISTING
+#         data.write event; cloud kinds additionally get a carrier ripple.
+Check (
+    ($wireCoreBody197 -match "RobcoEvents\.on\(\s*['`"]data\.write['`"]") -and
+    ($wireCoreBody197 -match 'holotape-commit-badge') -and
+    ($wireCoreBody197 -match 'savesPanel') -and
+    ($wireCoreBody197 -match "kind === 'cloud-push' \|\| kind === 'cloud-pull'") -and
+    ($wireCoreBody197 -match 'carrier-ripple')
+) '197.12: #31 HOLOTAPE COMMIT reacts to the existing data.write event on #savesPanel; cloud-push/cloud-pull additionally ripple'
+
+# 197.13  #12 INK STAMP -- a shared helper (_playInkStamp), called from
+#         BOTH toggleSkillBook() and toggleMagazine() ONLY on the
+#         unread->read/consumed transition (never the reverse un-mark).
+Check (
+    ($renderSrc197 -match 'function _playInkStamp\(containerId, name\)') -and
+    ($renderSrc197 -match 'ink-stamp-land')
+) '197.13: _playInkStamp() is a shared helper toggling the ink-stamp-land one-shot class'
+$toggleSkillBookBody197 = Get-FunctionBody $renderSrc197 'toggleSkillBook'
+Check (
+    ($toggleSkillBookBody197 -match 'const wasUnread = idx === -1;') -and
+    ($toggleSkillBookBody197 -match "if \(wasUnread\) _playInkStamp\('skillBooksDisplay', name\);")
+) "197.14: toggleSkillBook() plays the ink stamp only on the unread->read transition, never on unmark"
+$toggleMagazineBody197 = Get-FunctionBody $renderSrc197 'toggleMagazine'
+Check (
+    ($toggleMagazineBody197 -match 'const wasUnread = idx === -1;') -and
+    ($toggleMagazineBody197 -match "if \(wasUnread\) _playInkStamp\('magazinesDisplay', name\);")
+) "197.15: toggleMagazine() plays the ink stamp only on the unread->consumed transition, never on unmark"
+
+# -- the annunciator echo wiring (the 5 [home + echo] items) --
+$wireEchoBody197 = Get-FunctionBody $coreSrc197 '_wireFeedbackEchoSubscribers'
+
+# 197.16  echo pushes exist for XP/SERVO/CRT-FLINCH/CAPS (all riding the
+#         SAME stat.change subscription, gated per-key) and item.added.
+Check (
+    ($wireEchoBody197 -match 'p\.newVal > p\.oldVal') -and
+    ([System.Text.RegularExpressions.Regex]::IsMatch($wireEchoBody197, "_echoPush\(\{[\s\S]{0,80}glyph: '◆'"))
+) '197.16: the echo subscriber pushes an XP annunciation on a genuine XP increase'
+Check (
+    ($wireEchoBody197 -match '_SPECIAL_KEYS\.includes\(p\.key\)') -and
+    ($wireEchoBody197 -match 'RECALIBRATED')
+) '197.17: the echo subscriber pushes a SERVO RECALIBRATE annunciation for a SPECIAL change'
+Check (
+    ($wireEchoBody197 -match 'p\.newVal < p\.oldVal') -and
+    ($wireEchoBody197 -match 'DAMAGE:')
+) '197.18: the echo subscriber pushes a CRT FLINCH (damage) annunciation on an HP decrease'
+Check (
+    ($wireEchoBody197 -match "p\.key === 'caps'") -and
+    ($wireEchoBody197 -match 'CAPS:')
+) '197.19: the echo subscriber pushes a CAPS annunciation on a caps change'
+Check (
+    ([System.Text.RegularExpressions.Regex]::IsMatch($wireEchoBody197, "RobcoEvents\.on\(\s*['`"]item\.added['`"][\s\S]{0,150}_echoPush")) -and
+    ($wireEchoBody197 -match 'ADDED:')
+) '197.20: the echo subscriber pushes a MANIFEST PUNCH (ADDED) annunciation for item.added'
+
+# 197.21  the home-only items get NO echo wiring -- craft.completed,
+#         sleep.completed, and data.write are never subscribed inside
+#         the echo function (only inside the home-panel function above).
+Check (
+    (-not ($wireEchoBody197 -match 'craft\.completed')) -and
+    (-not ($wireEchoBody197 -match 'sleep\.completed')) -and
+    (-not ($wireEchoBody197 -match 'data\.write'))
+) '197.21: craft.completed/sleep.completed/data.write are never subscribed in the echo function (home-only, no echo)'
+
+# -- CSS keyframe presence (Protocol UI-9) --
+$wave2Keyframes197 = @(
+    'xp-chunk-brighten', 'servo-cap-overshoot', 'servo-letter-flash', 'ink-stamp-land',
+    'caps-digit-roll', 'caps-glyph-arc', 'manifest-row-slide-in', 'weld-spark-flash',
+    'claim-tag-tear', 'doze-scanline-collapse', 'doze-flip-spin', 'crt-flinch-tear',
+    'holotape-slide-in', 'holotape-reel-spin', 'carrier-ripple'
+)
+$allKeyframesFound197 = $true
+foreach ($name in $wave2Keyframes197) {
+    if (-not [System.Text.RegularExpressions.Regex]::IsMatch($cssStripped197, "@keyframes $name\b")) {
+        $allKeyframesFound197 = $false
+    }
+}
+Check (
+    $allKeyframesFound197
+) '197.22: every WAVE 2 animation has its own plain @keyframes rule in terminal.css'
+
+# 197.23  zero campaign-state write -- every WAVE 2 home-panel reaction is
+#         purely presentational (transient DOM classes/nodes only).
+Check (
+    (-not ($wireCoreBody197 -match 'state\.\w+\s*=')) -and (-not ($wireCoreBody197 -match 'saveState\(\)'))
+) '197.23: _wireCoreEventBusSubscribers() (incl. all WAVE 2 additions) never assigns state.* or calls saveState()'
+Check (
+    (-not ($wireEchoBody197 -match 'state\.\w+\s*=')) -and (-not ($wireEchoBody197 -match 'saveState\(\)'))
+) '197.24: _wireFeedbackEchoSubscribers() (incl. all WAVE 2 echo additions) never assigns state.* or calls saveState()'
+
+# 197.25  game-agnostic (Protocol 38) -- no hardcoded game literal anywhere
+#         in the WAVE 2 additions.
+Check (
+    (-not ($wireCoreBody197 -match '\bFNV\b|\bFO3\b|New Vegas|Fallout 3')) -and
+    (-not ($wireEchoBody197 -match '\bFNV\b|\bFO3\b|New Vegas|Fallout 3'))
+) '197.25: the WAVE 2 home-panel + echo additions carry no hardcoded game literal'
+
+# 197.26  the wiring functions are still called from window.onload (the
+#         U7 boot-order lesson) -- unchanged from WAVE 1, re-asserted so a
+#         future refactor can't silently drop the call site.
+Check (
+    ($coreSrc197 -match '_wireCoreEventBusSubscribers\(\);') -and
+    ($coreSrc197 -match '_wireFeedbackEchoSubscribers\(\); // FEEDBACK ANIMATION WAVE 1')
+) '197.26: both wiring functions are still invoked from window.onload'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

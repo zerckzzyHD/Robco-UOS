@@ -38,6 +38,11 @@ function addItem() {
     if (ex.val === 0 && v > 0) ex.val = v;
     if (ex.type === 'misc' && t !== 'misc') ex.type = t;
   } else state.inventory.push({ name: n, qty: q, wgt: w, val: v, type: t });
+  // FEEDBACK ANIMATION WAVE 2 (#18 MANIFEST PUNCH) — new additive emit
+  // (Protocol 13 regression test covers it), fired for every manual add
+  // regardless of whether it created a new row or bumped an existing one —
+  // the home animation itself no-ops gracefully if the row isn't visible.
+  RobcoEvents.emit('item.added', { name: n, qty: q, source: 'manual', type: t });
   document.getElementById('newItemName').value = '';
   document.getElementById('newItemQty').value = '';
   document.getElementById('newItemWeight').value = '';
@@ -1422,15 +1427,37 @@ function renderSkillBooks() {
   });
 }
 
+// FEEDBACK ANIMATION WAVE 2 (#12 INK STAMP) — plays only on the unread→read/
+// consumed transition (never the reverse un-mark, since a rubber stamp
+// physically LANDING only makes sense once); shared by the skill-book spine
+// rack and the magazine cover rack (Protocol 22 — one helper, two callers),
+// since both use the identical button[data-name] row shape. Looked up AFTER
+// the container's full re-render (both toggles rebuild innerHTML), so the
+// class is applied to the freshly-painted button, not a stale reference.
+function _playInkStamp(containerId, name) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const btn = Array.from(container.querySelectorAll('button[data-name]')).find(
+    b => b.dataset.name === name
+  );
+  if (!btn) return;
+  btn.classList.remove('ink-stamp-land');
+  void btn.offsetWidth;
+  btn.classList.add('ink-stamp-land');
+  setTimeout(() => btn.classList.remove('ink-stamp-land'), 900);
+}
+
 function toggleSkillBook(name) {
   if (!Array.isArray(state.skillBooks)) state.skillBooks = [];
   const idx = state.skillBooks.indexOf(name);
+  const wasUnread = idx === -1;
   if (idx !== -1) {
     state.skillBooks.splice(idx, 1);
   } else {
     state.skillBooks.push(name);
   }
   renderSkillBooks();
+  if (wasUnread) _playInkStamp('skillBooksDisplay', name);
   // Owner batch item 2: the "n/13 READ" #opBooksStatus summary (BUS-05a's
   // <summary> line, doubling as the collapsed-state readout) is painted by
   // _syncOperatorTelemetry() — previously only reached via the next unrelated
@@ -1468,12 +1495,14 @@ function renderMagazines() {
 function toggleMagazine(name) {
   if (!Array.isArray(state.magazines)) state.magazines = [];
   const idx = state.magazines.indexOf(name);
+  const wasUnread = idx === -1;
   if (idx !== -1) {
     state.magazines.splice(idx, 1);
   } else {
     state.magazines.push(name);
   }
   renderMagazines();
+  if (wasUnread) _playInkStamp('magazinesDisplay', name);
   // Same #opMagsStatus live-count fix as toggleSkillBook() (Protocol 22 — the
   // identical root cause, same fix, same sync function).
   if (typeof _syncOperatorTelemetry === 'function') _syncOperatorTelemetry();
@@ -3130,6 +3159,14 @@ async function doLoot(name) {
   });
   if (!ok) return;
   state.inventory = _lootAdd(state.inventory, item, qty, db);
+  // FEEDBACK ANIMATION WAVE 2 (#18 MANIFEST PUNCH) — same additive item.added
+  // emit as addItem()'s manual path (Protocol 22, one signal, two setters).
+  RobcoEvents.emit('item.added', {
+    name: item.name,
+    qty,
+    source: 'loot',
+    type: db ? db.type : item.type,
+  });
   if (typeof renderInventory === 'function') renderInventory();
   if (typeof updateMath === 'function') updateMath();
   renderLootList();

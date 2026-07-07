@@ -30615,6 +30615,263 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 197 — FEEDBACK ANIMATION WAVE 2: the 9 Tier-A animations + the
+//  one new additive item.added emit (planning/FEEDBACK_ANIMATION_BUILD_
+//  PLAN.md — WAVE 2). item.added fires from three call sites (addItem()'s
+//  manual path, doLoot()'s loot-apply path, and the AI inventory-merge diff
+//  in autoImportState(), Protocol 14 AI-contract precedent). The 9 home-
+//  panel reactions live in _wireCoreEventBusSubscribers() (ui-core.js);
+//  the [home + echo] items (XP/SERVO/CRT-FLINCH/CAPS/MANIFEST-PUNCH) also
+//  get an annunciator echo push in _wireFeedbackEchoSubscribers() — INK
+//  STAMP/WELD SPARKS/CLOCK SPIN-DOZE/HOLOTAPE COMMIT are home-only by
+//  owner decision and deliberately carry no echo.
+//  26 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 197 — FEEDBACK ANIMATION WAVE 2: item.added + 9 Tier-A animations');
+  const coreSrc197 = readFile('js/ui-core.js');
+  const renderSrc197 = readFile('js/ui-render.js');
+  const apiSrc197 = readFile('js/api.js');
+  const css197 = readFile('css/terminal.css');
+  const cssStripped197 = css197.replace(/\/\*[\s\S]*?\*\//g, '');
+
+  // ── item.added — the one new additive emit (3 call sites) ─────────────
+
+  // 197.1  addItem() emits item.added on the manual-add path.
+  assert(
+    /RobcoEvents\.emit\(\s*['"]item\.added['"][\s\S]{0,200}source:\s*'manual'/.test(
+      extractFunctionBody(renderSrc197, 'addItem')
+    ),
+    "197.1: addItem() emits item.added with source:'manual' on every manual add"
+  );
+
+  // 197.2  doLoot() emits item.added on the LOOT-apply path.
+  assert(
+    /RobcoEvents\.emit\(\s*['"]item\.added['"][\s\S]{0,200}source:\s*'loot'/.test(
+      extractFunctionBody(renderSrc197, 'doLoot')
+    ),
+    "197.2: doLoot() emits item.added with source:'loot' after _lootAdd() applies"
+  );
+
+  // 197.3  the AI inventory-merge in autoImportState() emits item.added ONLY
+  //        for genuinely new item names (a Set captured BEFORE the merge),
+  //        the collectible.acquired/quest.status AI-path precedent.
+  assert(
+    /_invNamesBefore = new Set/.test(apiSrc197) &&
+      /if \(!_invNamesBefore\.has\(String\(it\.name\)\.toLowerCase\(\)\)\)/.test(apiSrc197) &&
+      /RobcoEvents\.emit\(\s*['"]item\.added['"][\s\S]{0,80}source:\s*'ai'/.test(apiSrc197),
+    "197.3: the AI inventory-merge emits item.added with source:'ai' only for names absent from the pre-merge Set"
+  );
+
+  // ── the 9 home-panel animations (_wireCoreEventBusSubscribers) ─────────
+  const wireCoreBody197 = extractFunctionBody(coreSrc197, '_wireCoreEventBusSubscribers');
+
+  // 197.4  #10 XP CHUNK FILL — fires only on a genuine XP increase.
+  assert(
+    /p\.key === 'xp' &&[\s\S]{0,120}p\.newVal > p\.oldVal/.test(wireCoreBody197) &&
+      /xp-chunk-fill/.test(wireCoreBody197) &&
+      /xp-ticker/.test(wireCoreBody197),
+    '197.4: #10 XP CHUNK FILL fires only when newVal > oldVal, brightening #xp_bar_fill + a floating +N XP ticker'
+  );
+
+  // 197.5  #11 SERVO RECALIBRATE — targets the changed SPECIAL channel's
+  //        ladder + letter via the existing data-fd-ladder/.fader markup,
+  //        and reuses the existing playChipClick() SFX (Protocol 22).
+  assert(
+    /_SPECIAL_KEYS\.includes\(p\.key\)/.test(wireCoreBody197) &&
+      /data-fd-ladder/.test(wireCoreBody197) &&
+      /servo-overshoot/.test(wireCoreBody197) &&
+      /servo-flash/.test(wireCoreBody197) &&
+      /playChipClick\(\)/.test(wireCoreBody197),
+    "197.5: #11 SERVO RECALIBRATE overshoots the SPECIAL channel's .fd-cap + flashes .fd-letter, pairing with playChipClick()"
+  );
+
+  // 197.6  #2 CRT FLINCH — fires only when HP genuinely dropped.
+  assert(
+    /p\.key === 'hp' &&[\s\S]{0,120}p\.newVal < p\.oldVal/.test(wireCoreBody197) &&
+      /crt-flinch/.test(wireCoreBody197),
+    '197.6: #2 CRT FLINCH fires only when newVal < oldVal, tearing across .crt-mon'
+  );
+
+  // 197.7  #17 CAPS ODOMETER SPIN — the digit-roll half reacts to
+  //        stat.change key=caps; the arc-glyph half reacts to trade.bought
+  //        AND trade.sold (both compose with the roll on a trade).
+  assert(
+    /p\.key === 'caps'/.test(wireCoreBody197) &&
+      /caps-digit-roll/.test(wireCoreBody197) &&
+      /_playCapsArc/.test(wireCoreBody197) &&
+      /RobcoEvents\.on\(\s*['"]trade\.bought['"],\s*_playCapsArc\)/.test(wireCoreBody197) &&
+      /RobcoEvents\.on\(\s*['"]trade\.sold['"],\s*_playCapsArc\)/.test(wireCoreBody197) &&
+      /caps-arc-glyph/.test(wireCoreBody197),
+    '197.7: #17 CAPS ODOMETER SPIN digit-rolls #c_caps on stat.change(caps) and arcs a cap glyph on both trade.bought and trade.sold'
+  );
+
+  // 197.8  updateMath() feeds stat.change(caps) via the SAME shared
+  //        _emitStatChangeIfDiffers() helper hp/xp/rads already use
+  //        (Protocol 22) — caps has no dedicated drag setter of its own.
+  assert(
+    /_emitStatChangeIfDiffers\(\s*['"]caps['"]/.test(extractFunctionBody(coreSrc197, 'updateMath')),
+    "197.8: updateMath() calls _emitStatChangeIfDiffers('caps', ...) reading the real #c_caps field every tick"
+  );
+
+  // 197.9  #18 MANIFEST PUNCH — blips the type-keyed drawer badge
+  //        regardless of which drawer is open, and punches the freight-tag
+  //        row only when it is actually rendered (matched by visible name).
+  assert(
+    /RobcoEvents\.on\(\s*['"]item\.added['"]/.test(wireCoreBody197) &&
+      /data-dcount/.test(wireCoreBody197) &&
+      /drawer-count-blip/.test(wireCoreBody197) &&
+      /manifest-punch-in/.test(wireCoreBody197),
+    '197.9: #18 MANIFEST PUNCH blips the [data-dcount] drawer badge and punches the matching .mrow when rendered'
+  );
+
+  // 197.10  #20 WELD SPARKS + TAG — home-only reaction to the EXISTING
+  //         craft.completed event, a transient claim-tag node (never
+  //         persisted markup).
+  assert(
+    /RobcoEvents\.on\(\s*['"]craft\.completed['"]/.test(wireCoreBody197) &&
+      /weld-spark-flash/.test(wireCoreBody197) &&
+      /craft-claim-tag/.test(wireCoreBody197) &&
+      /craftPanel/.test(wireCoreBody197),
+    '197.10: #20 WELD SPARKS + TAG reacts to the existing craft.completed event on #craftPanel with a transient claim-tag node'
+  );
+
+  // 197.11  #30 CLOCK SPIN-DOZE — home-only reaction to the EXISTING
+  //         sleep.completed event.
+  assert(
+    /RobcoEvents\.on\(\s*['"]sleep\.completed['"]/.test(wireCoreBody197) &&
+      /sleep-doze/.test(wireCoreBody197),
+    '197.11: #30 CLOCK SPIN-DOZE reacts to the existing sleep.completed event via a one-shot body.sleep-doze class'
+  );
+
+  // 197.12  #31 HOLOTAPE COMMIT — home-only reaction to the EXISTING
+  //         data.write event; cloud kinds additionally get a carrier ripple.
+  assert(
+    /RobcoEvents\.on\(\s*['"]data\.write['"]/.test(wireCoreBody197) &&
+      /holotape-commit-badge/.test(wireCoreBody197) &&
+      /savesPanel/.test(wireCoreBody197) &&
+      /kind === 'cloud-push' \|\| kind === 'cloud-pull'/.test(wireCoreBody197) &&
+      /carrier-ripple/.test(wireCoreBody197),
+    '197.12: #31 HOLOTAPE COMMIT reacts to the existing data.write event on #savesPanel; cloud-push/cloud-pull additionally ripple'
+  );
+
+  // 197.13  #12 INK STAMP — a shared helper (_playInkStamp), called from
+  //         BOTH toggleSkillBook() and toggleMagazine() ONLY on the
+  //         unread->read/consumed transition (never the reverse un-mark).
+  assert(
+    /function _playInkStamp\(containerId, name\)/.test(renderSrc197) &&
+      /ink-stamp-land/.test(renderSrc197),
+    '197.13: _playInkStamp() is a shared helper toggling the ink-stamp-land one-shot class'
+  );
+  assert(
+    /const wasUnread = idx === -1;/.test(extractFunctionBody(renderSrc197, 'toggleSkillBook')) &&
+      /if \(wasUnread\) _playInkStamp\('skillBooksDisplay', name\);/.test(
+        extractFunctionBody(renderSrc197, 'toggleSkillBook')
+      ),
+    '197.14: toggleSkillBook() plays the ink stamp only on the unread->read transition, never on unmark'
+  );
+  assert(
+    /const wasUnread = idx === -1;/.test(extractFunctionBody(renderSrc197, 'toggleMagazine')) &&
+      /if \(wasUnread\) _playInkStamp\('magazinesDisplay', name\);/.test(
+        extractFunctionBody(renderSrc197, 'toggleMagazine')
+      ),
+    '197.15: toggleMagazine() plays the ink stamp only on the unread->consumed transition, never on unmark'
+  );
+
+  // ── the annunciator echo wiring (§the 5 [home + echo] items) ───────────
+  const wireEchoBody197 = extractFunctionBody(coreSrc197, '_wireFeedbackEchoSubscribers');
+
+  // 197.16  echo pushes exist for XP/SERVO/CRT-FLINCH/CAPS (all riding the
+  //         SAME stat.change subscription, gated per-key) and item.added.
+  assert(
+    /p\.newVal > p\.oldVal/.test(wireEchoBody197) &&
+      /_echoPush\(\{[\s\S]{0,80}glyph: '◆'/.test(wireEchoBody197),
+    '197.16: the echo subscriber pushes an XP annunciation on a genuine XP increase'
+  );
+  assert(
+    /_SPECIAL_KEYS\.includes\(p\.key\)/.test(wireEchoBody197) &&
+      /RECALIBRATED/.test(wireEchoBody197),
+    '197.17: the echo subscriber pushes a SERVO RECALIBRATE annunciation for a SPECIAL change'
+  );
+  assert(
+    /p\.newVal < p\.oldVal/.test(wireEchoBody197) && /DAMAGE:/.test(wireEchoBody197),
+    '197.18: the echo subscriber pushes a CRT FLINCH (damage) annunciation on an HP decrease'
+  );
+  assert(
+    /p\.key === 'caps'/.test(wireEchoBody197) && /CAPS:/.test(wireEchoBody197),
+    '197.19: the echo subscriber pushes a CAPS annunciation on a caps change'
+  );
+  assert(
+    /RobcoEvents\.on\(\s*['"]item\.added['"][\s\S]{0,150}_echoPush/.test(wireEchoBody197) &&
+      /ADDED:/.test(wireEchoBody197),
+    '197.20: the echo subscriber pushes a MANIFEST PUNCH (ADDED) annunciation for item.added'
+  );
+
+  // 197.21  the home-only items get NO echo wiring — craft.completed,
+  //         sleep.completed, and data.write are never subscribed inside
+  //         the echo function (only inside the home-panel function above).
+  assert(
+    !/craft\.completed/.test(wireEchoBody197) &&
+      !/sleep\.completed/.test(wireEchoBody197) &&
+      !/data\.write/.test(wireEchoBody197),
+    '197.21: craft.completed/sleep.completed/data.write are never subscribed in the echo function (home-only, no echo)'
+  );
+
+  // ── CSS keyframe presence (Protocol UI-9 — plain @keyframes, never
+  //    transition-only, so the global prefers-reduced-motion block already
+  //    neutralizes every one of these to a correct final frame) ──────────
+  const wave2Keyframes197 = [
+    'xp-chunk-brighten',
+    'servo-cap-overshoot',
+    'servo-letter-flash',
+    'ink-stamp-land',
+    'caps-digit-roll',
+    'caps-glyph-arc',
+    'manifest-row-slide-in',
+    'weld-spark-flash',
+    'claim-tag-tear',
+    'doze-scanline-collapse',
+    'doze-flip-spin',
+    'crt-flinch-tear',
+    'holotape-slide-in',
+    'holotape-reel-spin',
+    'carrier-ripple',
+  ];
+  assert(
+    wave2Keyframes197.every(name => new RegExp(`@keyframes ${name}\\b`).test(cssStripped197)),
+    '197.22: every WAVE 2 animation has its own plain @keyframes rule in terminal.css'
+  );
+
+  // 197.23  zero campaign-state write — every WAVE 2 home-panel reaction is
+  //         purely presentational (transient DOM classes/nodes only).
+  assert(
+    !/state\.\w+\s*=/.test(wireCoreBody197) && !/saveState\(\)/.test(wireCoreBody197),
+    '197.23: _wireCoreEventBusSubscribers() (incl. all WAVE 2 additions) never assigns state.* or calls saveState()'
+  );
+  assert(
+    !/state\.\w+\s*=/.test(wireEchoBody197) && !/saveState\(\)/.test(wireEchoBody197),
+    '197.24: _wireFeedbackEchoSubscribers() (incl. all WAVE 2 echo additions) never assigns state.* or calls saveState()'
+  );
+
+  // 197.25  game-agnostic (Protocol 38) — no hardcoded game literal anywhere
+  //         in the WAVE 2 additions.
+  assert(
+    !/\bFNV\b|\bFO3\b|New Vegas|Fallout 3/.test(wireCoreBody197) &&
+      !/\bFNV\b|\bFO3\b|New Vegas|Fallout 3/.test(wireEchoBody197),
+    '197.25: the WAVE 2 home-panel + echo additions carry no hardcoded game literal'
+  );
+
+  // 197.26  the wiring functions are still called from window.onload (the
+  //         U7 boot-order lesson) — unchanged from WAVE 1, re-asserted so a
+  //         future refactor can't silently drop the call site.
+  assert(
+    /_wireCoreEventBusSubscribers\(\);/.test(coreSrc197) &&
+      /_wireFeedbackEchoSubscribers\(\); \/\/ FEEDBACK ANIMATION WAVE 1/.test(coreSrc197),
+    '197.26: both wiring functions are still invoked from window.onload'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail

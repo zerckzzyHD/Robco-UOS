@@ -6039,6 +6039,201 @@ function _wireCoreEventBusSubscribers() {
       setTimeout(() => zone.classList.remove(cls), 900);
     }
   });
+
+  // ── FEEDBACK ANIMATION WAVE 2 (planning/FEEDBACK_ANIMATION_BUILD_PLAN.md,
+  // Tier-A) — home-panel reactions to signals already on the bus, plus the
+  // one new item.added additive emit (Protocol 22, add-class/reflow/remove
+  // one-shots throughout, never a forked handler).
+  RobcoEvents.on('stat.change', p => {
+    if (!p) return;
+    // #10 XP CHUNK FILL — only the genuine-increase case; the fill brightens
+    // 2x then settles and a floating "+N XP" ticker climbs and fades.
+    if (
+      p.key === 'xp' &&
+      typeof p.oldVal === 'number' &&
+      typeof p.newVal === 'number' &&
+      p.newVal > p.oldVal
+    ) {
+      const xpFill = document.getElementById('xp_bar_fill');
+      if (xpFill) {
+        xpFill.classList.remove('xp-chunk-fill');
+        void xpFill.offsetWidth;
+        xpFill.classList.add('xp-chunk-fill');
+        setTimeout(() => xpFill.classList.remove('xp-chunk-fill'), 700);
+      }
+      const wrap = document.getElementById('xp_bar_container');
+      if (wrap) {
+        const ticker = document.createElement('span');
+        ticker.className = 'xp-ticker';
+        ticker.textContent = '+' + (p.newVal - p.oldVal) + ' XP';
+        wrap.appendChild(ticker);
+        setTimeout(() => ticker.remove(), 1150);
+      }
+    }
+    // #11 SERVO RECALIBRATE — the changed SPECIAL channel's cap overshoots
+    // past its new seated position and settles; the letter flashes stencil-
+    // bright once; pairs with the existing chip-click SFX (Protocol 22, no
+    // new audio channel — the closest shipped "servo click" sound).
+    if (typeof p.key === 'string' && _SPECIAL_KEYS.includes(p.key)) {
+      const ladder = document.querySelector('[data-fd-ladder="' + p.key + '"]');
+      if (ladder) {
+        const cap = ladder.querySelector('.fd-cap');
+        if (cap) {
+          cap.classList.remove('servo-overshoot');
+          void cap.offsetWidth;
+          cap.classList.add('servo-overshoot');
+          setTimeout(() => cap.classList.remove('servo-overshoot'), 550);
+        }
+        const fader = ladder.closest('.fader');
+        const letter = fader ? fader.querySelector('.fd-letter') : null;
+        if (letter) {
+          letter.classList.remove('servo-flash');
+          void letter.offsetWidth;
+          letter.classList.add('servo-flash');
+          setTimeout(() => letter.classList.remove('servo-flash'), 550);
+        }
+      }
+      if (typeof playChipClick === 'function') playChipClick();
+    }
+    // #2 CRT FLINCH — HP damage taken: a one-shot horizontal tear across the
+    // BUS-01 monitor, distinct from the continuous #1 FLATLINE WARNING (which
+    // only plays once HP is actually critical).
+    if (
+      p.key === 'hp' &&
+      typeof p.oldVal === 'number' &&
+      typeof p.newVal === 'number' &&
+      p.newVal < p.oldVal
+    ) {
+      const mon = document.querySelector('.crt-mon');
+      if (mon) {
+        mon.classList.remove('crt-flinch');
+        void mon.offsetWidth;
+        mon.classList.add('crt-flinch');
+        setTimeout(() => mon.classList.remove('crt-flinch'), 260);
+      }
+    }
+    // #17 CAPS ODOMETER SPIN — the readout digit-rolls on ANY caps change
+    // (manual/AI/trade); the trade case ALSO gets its own cap-glyph arc via
+    // the trade.bought/trade.sold subscriber below, composing with this.
+    if (p.key === 'caps') {
+      const capsEl = document.getElementById('c_caps');
+      if (capsEl) {
+        capsEl.classList.remove('caps-digit-roll');
+        void capsEl.offsetWidth;
+        capsEl.classList.add('caps-digit-roll');
+        setTimeout(() => capsEl.classList.remove('caps-digit-roll'), 500);
+      }
+    }
+  });
+
+  // #17 CAPS ODOMETER SPIN (trade half) — a bottle-cap glyph arcs into the
+  // caps tile on a completed trade, layering on top of the digit-roll the
+  // accompanying stat.change(caps) above already fires.
+  const _playCapsArc = () => {
+    const tile = document.querySelector('.rb-tile.wire');
+    if (!tile) return;
+    const glyph = document.createElement('span');
+    glyph.className = 'caps-arc-glyph';
+    glyph.setAttribute('aria-hidden', 'true');
+    glyph.textContent = '◉'; // ◉
+    tile.appendChild(glyph);
+    setTimeout(() => glyph.remove(), 850);
+  };
+  RobcoEvents.on('trade.bought', _playCapsArc);
+  RobcoEvents.on('trade.sold', _playCapsArc);
+
+  // #18 MANIFEST PUNCH — the drawer's own count badge blips regardless of
+  // which drawer is currently open; the freight-tag row itself only animates
+  // when its drawer is the one actually rendered (a no-op elsewhere is
+  // correct — the row simply isn't in the DOM to animate).
+  //
+  // Deferred one tick (setTimeout 0): all three item.added call sites
+  // (addItem()/doLoot() in ui-render.js, the AI merge in autoImportState())
+  // emit BEFORE their own caller's renderInventory()/loadUI() paints the new
+  // row — a real gap caught live during Wave 2 verification (Protocol 42) —
+  // so a same-tick row lookup always misses. Deferring to the next tick lets
+  // that synchronous render finish first; the badge (always in static markup)
+  // doesn't strictly need the defer but is included for one consistent path.
+  RobcoEvents.on('item.added', p => {
+    if (!p) return;
+    setTimeout(() => {
+      const cat = p.type === 'ammo' ? 'ammo' : p.type || 'misc';
+      const badge = document.querySelector('[data-dcount="' + cat + '"]');
+      if (badge) {
+        badge.classList.remove('drawer-count-blip');
+        void badge.offsetWidth;
+        badge.classList.add('drawer-count-blip');
+        setTimeout(() => badge.classList.remove('drawer-count-blip'), 450);
+      }
+      const list = document.getElementById('invList');
+      if (list && p.name) {
+        const row = Array.from(list.querySelectorAll('.mrow .m-name')).find(
+          el => el.textContent === p.name
+        );
+        const li = row ? row.closest('.mrow') : null;
+        if (li) {
+          li.classList.remove('manifest-punch-in');
+          void li.offsetWidth;
+          li.classList.add('manifest-punch-in');
+          setTimeout(() => li.classList.remove('manifest-punch-in'), 450);
+        }
+      }
+    }, 0);
+  });
+
+  // #20 WELD SPARKS + TAG — home-only (the user crafts on-panel). A brief
+  // spark flicker on the bench's board LED, then a claim tag typewriter-
+  // prints the output name and tears off (a transient DOM node, never
+  // persisted markup — Protocol 22, no new index.html structure needed).
+  RobcoEvents.on('craft.completed', p => {
+    const panel = document.getElementById('craftPanel');
+    if (!panel) return;
+    panel.classList.remove('weld-spark-flash');
+    void panel.offsetWidth;
+    panel.classList.add('weld-spark-flash');
+    setTimeout(() => panel.classList.remove('weld-spark-flash'), 400);
+    const tag = document.createElement('div');
+    tag.className = 'craft-claim-tag';
+    tag.textContent = (p && p.name) || '';
+    panel.appendChild(tag);
+    setTimeout(() => tag.remove(), 1650);
+  });
+
+  // #30 CLOCK SPIN-DOZE — home-only. The scanline collapses to a bright
+  // line (micro power-nap) while the MISSION CLOCK's flip-card drums spin,
+  // then both re-wake/bloom back — the SAME sleep.completed event
+  // _nativeSleep() already emits (Protocol 22).
+  RobcoEvents.on('sleep.completed', () => {
+    document.body.classList.remove('sleep-doze');
+    void document.body.offsetWidth;
+    document.body.classList.add('sleep-doze');
+    setTimeout(() => document.body.classList.remove('sleep-doze'), 1450);
+  });
+
+  // #31 HOLOTAPE COMMIT — home-only, NO separate annunciator echo (owner
+  // decision — the existing mini-core write-pulse already signals off-panel).
+  // A holotape glyph slides into the SAVE ARCHIVE panel, reels spin ~1s; a
+  // cloud-kind write additionally gets a carrier ripple on the panel itself.
+  RobcoEvents.on('data.write', p => {
+    const panel = document.getElementById('savesPanel');
+    if (!panel) return;
+    const summary = panel.querySelector('summary');
+    if (summary) {
+      const badge = document.createElement('span');
+      badge.className = 'holotape-commit-badge';
+      badge.setAttribute('aria-hidden', 'true');
+      badge.innerHTML = '<span class="htc-reel">◎</span> WRITTEN';
+      summary.appendChild(badge);
+      setTimeout(() => badge.remove(), 1050);
+    }
+    const kind = p && p.kind;
+    if (kind === 'cloud-push' || kind === 'cloud-pull') {
+      panel.classList.remove('carrier-ripple');
+      void panel.offsetWidth;
+      panel.classList.add('carrier-ripple');
+      setTimeout(() => panel.classList.remove('carrier-ripple'), 950);
+    }
+  });
 }
 let _levelUpKeyFlashTimer = null;
 let _levelUpCardTimer = null;
@@ -6227,6 +6422,62 @@ function _wireFeedbackEchoSubscribers() {
       tone: 'green',
       glyph: '★',
       label: ((p && p.name) || '').toUpperCase(),
+      homeSubsystem: 'operations',
+    })
+  );
+  // FEEDBACK ANIMATION WAVE 2 — echo wiring for the [home + echo] items only
+  // (INK STAMP/WELD SPARKS/CLOCK SPIN-DOZE/HOLOTAPE COMMIT are home-only by
+  // owner decision and deliberately get no echo push here).
+  RobcoEvents.on('stat.change', p => {
+    if (!p) return;
+    if (
+      p.key === 'xp' &&
+      typeof p.oldVal === 'number' &&
+      typeof p.newVal === 'number' &&
+      p.newVal > p.oldVal
+    ) {
+      _echoPush({
+        tone: 'green',
+        glyph: '◆',
+        label: '+' + (p.newVal - p.oldVal) + ' XP',
+        homeSubsystem: 'operator',
+      });
+    }
+    if (typeof p.key === 'string' && _SPECIAL_KEYS.includes(p.key)) {
+      _echoPush({
+        tone: 'green',
+        glyph: '⚙',
+        label: p.key.toUpperCase() + ' RECALIBRATED: ' + p.newVal,
+        homeSubsystem: 'operator',
+      });
+    }
+    if (
+      p.key === 'hp' &&
+      typeof p.oldVal === 'number' &&
+      typeof p.newVal === 'number' &&
+      p.newVal < p.oldVal
+    ) {
+      _echoPush({
+        tone: 'red',
+        glyph: '✕',
+        label: 'DAMAGE: ' + (p.oldVal - p.newVal),
+        homeSubsystem: 'operator',
+      });
+    }
+    if (p.key === 'caps') {
+      _echoPush({
+        tone: 'amber',
+        glyph: '◉',
+        label: 'CAPS: ' + p.newVal,
+        homeSubsystem: 'operations',
+      });
+    }
+  });
+  RobcoEvents.on('item.added', p =>
+    _echoPush({
+      tone: 'green',
+      glyph: '◈',
+      label: 'ADDED: ' + ((p && p.name) || '').toUpperCase(),
       homeSubsystem: 'operations',
     })
   );
@@ -6591,6 +6842,15 @@ function updateMath() {
     }
   }
   _lastKarma = curKarma;
+
+  // FEEDBACK ANIMATION WAVE 2 (#17 CAPS ODOMETER SPIN) — caps has no
+  // dedicated drag setter like hp/xp/rads, so this reads the one real #c_caps
+  // field every updateMath() tick (the karma-flash pattern just above) and
+  // routes through the SAME shared _emitStatChangeIfDiffers() helper
+  // (Protocol 22) — covers manual edits, doBuy/doSell's caps mirror, and any
+  // AI caps write, since every one of those paths already calls updateMath().
+  const capsEl = document.getElementById('c_caps');
+  if (capsEl) _emitStatChangeIfDiffers('caps', parseInt(capsEl.value) || 0);
 
   // Day/Night Indicator (#12) — toggle class based on in-game hour
   const gameHour = Math.floor(((state.ticks || 0) % 240) / 10);
