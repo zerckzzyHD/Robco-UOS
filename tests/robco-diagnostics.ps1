@@ -18302,11 +18302,11 @@ Check (
     ($tier480ScreenW192 -gt $tier400ScreenW192) -and
     ($desktopCoreW192 -gt $tier480CoreW192) -and
     ($tier480CoreW192 -gt $tier400CoreW192) -and
-    ($tier400ScreenW192 -gt 36) -and
-    ($tier400CoreW192 -gt 20) -and
-    ($desktopScreenW192 -ge 60) -and
-    ($desktopCoreW192 -ge 36)
-) "192.33: the casing-top screen/mini-core scale across three strictly-decreasing size tiers (desktop $desktopScreenW192/${desktopCoreW192}px > 401-480px tier $tier480ScreenW192/${tier480CoreW192}px > <=400px tier $tier400ScreenW192/${tier400CoreW192}px), and every tier is bigger than the pre-prominence-pass baseline (44/26px desktop, 36/20px old mobile)"
+    ($tier400ScreenW192 -gt 46) -and
+    ($tier400CoreW192 -gt 27) -and
+    ($desktopScreenW192 -ge 80) -and
+    ($desktopCoreW192 -ge 44)
+) "192.33: the casing-top screen/mini-core scale across three strictly-decreasing size tiers (desktop $desktopScreenW192/${desktopCoreW192}px > 401-480px tier $tier480ScreenW192/${tier480CoreW192}px > <=400px tier $tier400ScreenW192/${tier400CoreW192}px), and every tier is bigger than the pre-second-bump baseline (72/44px desktop, 46/27px old narrowest mobile)"
 
 # 192.34  owner prominence-pass follow-up -- the 3D ring burst is now
 #         substantially bigger and longer: every axis completes a full
@@ -18395,6 +18395,30 @@ Check (
     ($shapeBaseRule192 -match 'transform-style:\s*preserve-3d') -and
     ($coreStillGateRule192 -match '\.core-still::before')
 ) "192.36: an always-on perpendicular ring (.chassis-core-shape::before) now tumbles around a DIAGONAL 3D axis via rotate3d(1,1,0,deg) -- the corrected owner ask, swapping the ring's diagonal corner-pairs through depth rather than flatly spinning around the vertical axis -- is shared by both cores via the same base class, and is stilled by the SAME .core-still gate as everything else -- no bespoke carve-out"
+
+# 192.37  owner follow-up -- the perpendicular ring "can't even be seen" in
+#         the mini core: root-caused to a perspective distance far tighter
+#         (relative to the mini core's own size) than the full core's,
+#         causing much more aggressive foreshortening on top of an already-
+#         crowded tiny circle sharing space with three other rings + the
+#         heart. Fixed by loosening the mini perspective (55px -> 130px, no
+#         longer disproportionately tighter than the full core's own
+#         200px/96px ratio) and giving the mini copy of the ring a bolder,
+#         higher-contrast border
+#         (.chassis-core-shape.chassis-core-mini::before) than the full
+#         core's, alongside the second size bump (screen/core enlarged
+#         again on top of the first prominence pass).
+$miniPerspRule192 = [regex]::Match($cssStripped192, '\.chassis-core-shape\.chassis-core-mini\s*\{\s*perspective:\s*(\d+)px').Groups[1].Value
+if (-not $miniPerspRule192) { $miniPerspRule192 = '0' }
+$fullPerspRule192 = [regex]::Match($cssStripped192, '\.chassis-core-shape\s*\{\s*perspective:\s*(\d+)px').Groups[1].Value
+if (-not $fullPerspRule192) { $fullPerspRule192 = '0' }
+$miniBeforeBoostRule192 = [regex]::Match($cssStripped192, '\.chassis-core-shape\.chassis-core-mini::before\s*\{[^\}]*\}').Value
+Check (
+    ([int]$miniPerspRule192 -ge 100) -and
+    ([int]$miniPerspRule192 -gt ([int]$fullPerspRule192 * 0.5)) -and
+    ($miniBeforeBoostRule192 -match 'border-width:\s*2px') -and
+    ($miniBeforeBoostRule192 -match 'border-color:\s*rgba\(var\(--robco-green-rgb\),\s*0\.8\)')
+) "192.37: the mini core's perpendicular ring is no longer near-invisible -- perspective loosened from 55px to ${miniPerspRule192}px (no longer disproportionately tighter than the full core's own ${fullPerspRule192}px/96px ratio) and its border is bolder/higher-contrast than the full core's copy, fixing the owner-reported can't-even-be-seen bug"
 
 # ===========================================================
 # Suite 193 -- Owner polish batch: tap-highlight kill + CURIO ARCHIVE

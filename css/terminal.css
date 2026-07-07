@@ -629,14 +629,19 @@ button.lamp {
    own line at narrow widths instead of ever forcing horizontal overflow;
    three size tiers (this desktop base, the >400-480px tier below, and the
    <=400px tier further down) keep it appropriately scaled at every width
-   while staying noticeably bigger than before at all of them. */
+   while staying noticeably bigger than before at all of them.
+   Owner follow-up (second bump — the perpendicular ring "can't even be
+   seen" in the mini core): enlarged again, 72x54 -> 88x66, on top of the
+   first bump — more absolute pixels makes the extra diagonal ring easier
+   to pick out from the other overlapping rings/heart sharing the same tiny
+   circle. */
 .chassis-screen-mini {
   margin-left: auto;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 72px;
-  height: 54px;
+  width: 88px;
+  height: 66px;
   flex-shrink: 0;
   border: 1px solid rgba(0, 0, 0, 0.7);
   border-radius: 4px;
@@ -652,10 +657,11 @@ button.lamp {
    has the SAME specificity as `.chassis-core-shape { ... }`, so whichever one
    is later in source order wins regardless of which is "supposed to"
    override the other — this compound form (0,2,0) always beats the shared
-   base (0,1,0) no matter where either rule sits in the file. */
+   base (0,1,0) no matter where either rule sits in the file. Second bump:
+   44px -> 54px. */
 .chassis-core-shape.chassis-core-mini {
-  width: 44px;
-  height: 44px;
+  width: 54px;
+  height: 54px;
 }
 
 /* The curved glass — CRT-frame chrome. Curvature/vignette live on THIS
@@ -3556,14 +3562,15 @@ button.mode-pill--overseer:hover {
      — see the base rule's comment) keeps this shrink effective regardless of
      source order relative to the shared .chassis-core-shape base rule. This
      is the >400-480px tier (roughly 412-428px phones); a stricter <=400px
-     tier further down the file shrinks it once more for narrower phones. */
+     tier further down the file shrinks it once more for narrower phones.
+     Second bump (owner follow-up): 56x44 / 32px -> 68x54 / 40px. */
   .chassis-screen-mini {
-    width: 56px;
-    height: 44px;
+    width: 68px;
+    height: 54px;
   }
   .chassis-core-shape.chassis-core-mini {
-    width: 32px;
-    height: 32px;
+    width: 40px;
+    height: 40px;
   }
 
   /* Nested value wrappers (HP/LVL "cur / max") and the limb button groups stay
@@ -3637,15 +3644,16 @@ button.mode-pill--overseer:hover {
    to wrap into cleanly. Still noticeably bigger than the pre-prominence-pass
    size at every tier. A later, narrower media query wins over the wider
    @media (max-width: 480px) block above for the same selector at equal
-   specificity purely by source order — deliberately placed after it. */
+   specificity purely by source order — deliberately placed after it.
+   Second bump (owner follow-up): 46x36 / 27px -> 56x44 / 33px. */
 @media (max-width: 400px) {
   .chassis-screen-mini {
-    width: 46px;
-    height: 36px;
+    width: 56px;
+    height: 44px;
   }
   .chassis-core-shape.chassis-core-mini {
-    width: 27px;
-    height: 27px;
+    width: 33px;
+    height: 33px;
   }
 }
 
@@ -9854,6 +9862,16 @@ button.chassis-core-shape {
   will-change: transform;
   animation: chassisCoreOrbitPerp 6s linear infinite;
 }
+/* Owner follow-up: give the mini core's copy of this ring a bolder,
+   higher-contrast border than the full core's — it shares the casing-top
+   screen with three other rings + the heart in a much smaller box, so a
+   proportionally thicker/brighter stroke is what keeps it distinguishable
+   rather than lost among them (the same "small elements need bolder
+   strokes to stay legible" reasoning already used elsewhere in the file). */
+.chassis-core-shape.chassis-core-mini::before {
+  border-width: 2px;
+  border-color: rgba(var(--robco-green-rgb), 0.8);
+}
 @keyframes chassisCoreOrbitPerp {
   0% {
     transform: rotate3d(1, 1, 0, 0deg);
@@ -10081,8 +10099,18 @@ button.chassis-core-shape {
 .chassis-core-shape {
   perspective: 200px;
 }
+/* Owner follow-up: the always-on perpendicular ring (::before, further
+   below) "can't even be seen" in the mini core. Root cause was a perspective
+   distance disproportionately tighter than the full core's own ratio
+   (55px on a 44px shape ~= 1.25x, vs the full core's 200px on 96px ~= 2.1x)
+   -- the tighter ratio meant much MORE foreshortening for the mini ring
+   relative to its own size, on top of it now sharing an even smaller box
+   with three other rings + the heart. Loosened to 130px (roughly matching
+   the full core's own looser ratio against the mini core's now-bigger 54px
+   size, Protocol 42), so the diagonal tumble reads clearly instead of
+   collapsing to a near-invisible sliver at the extremes of its rotation. */
 .chassis-core-shape.chassis-core-mini {
-  perspective: 55px;
+  perspective: 130px;
 }
 @keyframes chassisCoreOrbitBurst1 {
   0% {
