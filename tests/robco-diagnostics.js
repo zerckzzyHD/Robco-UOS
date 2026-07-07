@@ -29000,10 +29000,11 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //         substantially bigger and longer: every axis completes a full
   //         720deg double rotation (not the old 360deg single swing), the
   //         CSS animation-duration and the JS _coreOneShot() removal timeout
-  //         both moved from 900ms/900 to a matching 1.4s/1400, and the burst
-  //         now also flares the heart (paired with the ring tumble so the
-  //         whole event reads as one unmistakable flourish, not just the
-  //         rings) via the same box-shadow/transform mechanism every other
+  //         both move together (owner follow-up: 1.4s/1400 -> 1.8s/1800, "a
+  //         bit slower" for a more graceful tumble), and the burst also
+  //         flares the heart (paired with the ring tumble so the whole
+  //         event reads as one unmistakable flourish, not just the rings)
+  //         via the same box-shadow/transform mechanism every other
   //         one-shot flourish already uses (Protocol 22).
   const burstCss192 = cssStripped192.match(
     /@keyframes chassisCoreOrbitBurst1[\s\S]*?\.chassis-core-shape\.core-stat-burst \.c-heart[\s\S]*?\}/
@@ -29013,12 +29014,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     /rotateX\(720deg\)/.test(burstCssBlock192) &&
       /rotateY\(720deg\)/.test(burstCssBlock192) &&
       /rotateZ\(720deg\)/.test(burstCssBlock192) &&
-      /chassisCoreOrbitBurst1 1\.4s/.test(burstCssBlock192) &&
-      /chassisCoreOrbitBurst2 1\.4s/.test(burstCssBlock192) &&
-      /chassisCoreOrbitBurst3 1\.4s/.test(burstCssBlock192) &&
-      /_coreOneShot\('core-stat-burst',\s*1400\)/.test(statBurstBody192) &&
+      /chassisCoreOrbitBurst1 1\.8s/.test(burstCssBlock192) &&
+      /chassisCoreOrbitBurst2 1\.8s/.test(burstCssBlock192) &&
+      /chassisCoreOrbitBurst3 1\.8s/.test(burstCssBlock192) &&
+      /_coreOneShot\('core-stat-burst',\s*1800\)/.test(statBurstBody192) &&
       /\.core-stat-burst \.c-heart\s*\{[^}]*box-shadow/.test(burstCssBlock192),
-    '192.34: the 3D ring burst now completes a full 720deg double rotation on every axis over a matching 1.4s CSS/JS duration, and flares the heart alongside the ring tumble — a substantially more prominent event than the old 360deg/900ms swing'
+    '192.34: the 3D ring burst now completes a full 720deg double rotation on every axis over a matching 1.8s CSS/JS duration, and flares the heart alongside the ring tumble — a substantially more prominent and graceful event than the old 360deg/900ms swing'
   );
 
   // 192.35  owner fluidity pass — the previous 0/40/70/100 keyframes with an
@@ -29057,12 +29058,48 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   assert(
     evenlySpaced192 &&
       proportional192 &&
-      /chassisCoreOrbitBurst1 1\.4s ease-in-out/.test(burstCssBlock192) &&
-      /chassisCoreOrbitBurst2 1\.4s ease-in-out/.test(burstCssBlock192) &&
-      /chassisCoreOrbitBurst3 1\.4s ease-in-out/.test(burstCssBlock192) &&
+      /chassisCoreOrbitBurst1 1\.8s ease-in-out/.test(burstCssBlock192) &&
+      /chassisCoreOrbitBurst2 1\.8s ease-in-out/.test(burstCssBlock192) &&
+      /chassisCoreOrbitBurst3 1\.8s ease-in-out/.test(burstCssBlock192) &&
       !/cubic-bezier\(0\.34,\s*1\.56/.test(burstCssBlock192) &&
       /will-change:\s*transform/.test(ringRule192),
     '192.35: the 3D ring burst keyframes are now evenly spaced with each axis held exactly proportional to its keyframe percent (constant angular velocity), driven by a smooth ease-in-out instead of the old overshoot "back" bezier, and the always-animating .c-ring carries will-change:transform for GPU compositing — fixing the owner-reported choppy/jerky tumble'
+  );
+
+  // 192.36  owner follow-up — always-on perpendicular 3D ring: a 4th ring,
+  //         built as a ::before pseudo-element (no HTML markup change, so
+  //         both the full core AND the casing-top mini core share it
+  //         automatically via the same .chassis-core-shape class,
+  //         Protocol 22), tilted 90deg on X (a plane perpendicular to the
+  //         flat r1/r2/r3 rings, which only ever rotateZ) and continuously
+  //         spun on Y forever — a genuine always-on 3D orbit, not just
+  //         during the #14 stat-change burst. transform-only + linear
+  //         infinite (matching the r1/r3 idle-spin convention) +
+  //         will-change keeps it GPU-composited. preserve-3d on the shape
+  //         lets it compose in the same 3D space as the burst rings. The
+  //         SAME .core-still gate (Protocol UI-10) stills it — no bespoke
+  //         carve-out for this new continuous loop.
+  const beforeRule192 = (cssStripped192.match(/\.chassis-core-shape::before\s*\{[^}]*\}/) || [
+    '',
+  ])[0];
+  const orbitPerpKF192 = (cssStripped192.match(
+    /@keyframes chassisCoreOrbitPerp\s*\{[\s\S]*?\n\}/
+  ) || [''])[0];
+  const shapeBaseRule192 = (cssStripped192.match(/\.chassis-core-shape\s*\{[^}]*\}/) || [''])[0];
+  const coreStillGateRule192 = (cssStripped192.match(
+    /\.core-still,[\s\S]*?animation-play-state:\s*paused\s*!important;\s*\}/
+  ) || [''])[0];
+  assert(
+    /content:\s*['"]['"]/.test(beforeRule192) &&
+      /animation:\s*chassisCoreOrbitPerp/.test(beforeRule192) &&
+      /infinite/.test(beforeRule192) &&
+      /will-change:\s*transform/.test(beforeRule192) &&
+      /rotateX\(90deg\)/.test(orbitPerpKF192) &&
+      /rotateY\(0deg\)/.test(orbitPerpKF192) &&
+      /rotateY\(360deg\)/.test(orbitPerpKF192) &&
+      /transform-style:\s*preserve-3d/.test(shapeBaseRule192) &&
+      /\.core-still::before/.test(coreStillGateRule192),
+    '192.36: an always-on perpendicular ring (.chassis-core-shape::before, tilted 90deg on X then continuously spun on Y — a real gyroscope/atom-orbit 3D loop, not just during the burst) is shared by both cores via the same base class, and is stilled by the SAME .core-still gate as everything else — no bespoke carve-out'
   );
 }
 

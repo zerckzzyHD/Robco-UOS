@@ -18312,22 +18312,23 @@ Check (
 #         substantially bigger and longer: every axis completes a full
 #         720deg double rotation (not the old 360deg single swing), the CSS
 #         animation-duration and the JS _coreOneShot() removal timeout both
-#         moved from 900ms/900 to a matching 1.4s/1400, and the burst now
-#         also flares the heart (paired with the ring tumble so the whole
-#         event reads as one unmistakable flourish, not just the rings) via
-#         the same box-shadow/transform mechanism every other one-shot
-#         flourish already uses (Protocol 22).
+#         move together (owner follow-up: 1.4s/1400 -> 1.8s/1800, "a bit
+#         slower" for a more graceful tumble), and the burst also flares the
+#         heart (paired with the ring tumble so the whole event reads as one
+#         unmistakable flourish, not just the rings) via the same
+#         box-shadow/transform mechanism every other one-shot flourish
+#         already uses (Protocol 22).
 $burstCssBlock192 = [regex]::Match($cssStripped192, '(?s)@keyframes chassisCoreOrbitBurst1[\s\S]*?\.chassis-core-shape\.core-stat-burst \.c-heart[\s\S]*?\}').Value
 Check (
     ($burstCssBlock192 -match 'rotateX\(720deg\)') -and
     ($burstCssBlock192 -match 'rotateY\(720deg\)') -and
     ($burstCssBlock192 -match 'rotateZ\(720deg\)') -and
-    ($burstCssBlock192 -match 'chassisCoreOrbitBurst1 1\.4s') -and
-    ($burstCssBlock192 -match 'chassisCoreOrbitBurst2 1\.4s') -and
-    ($burstCssBlock192 -match 'chassisCoreOrbitBurst3 1\.4s') -and
-    ($statBurstBody192 -match "_coreOneShot\('core-stat-burst',\s*1400\)") -and
+    ($burstCssBlock192 -match 'chassisCoreOrbitBurst1 1\.8s') -and
+    ($burstCssBlock192 -match 'chassisCoreOrbitBurst2 1\.8s') -and
+    ($burstCssBlock192 -match 'chassisCoreOrbitBurst3 1\.8s') -and
+    ($statBurstBody192 -match "_coreOneShot\('core-stat-burst',\s*1800\)") -and
     ($burstCssBlock192 -match '(?s)\.core-stat-burst \.c-heart\s*\{[^\}]*box-shadow')
-) '192.34: the 3D ring burst now completes a full 720deg double rotation on every axis over a matching 1.4s CSS/JS duration, and flares the heart alongside the ring tumble -- a substantially more prominent event than the old 360deg/900ms swing'
+) '192.34: the 3D ring burst now completes a full 720deg double rotation on every axis over a matching 1.8s CSS/JS duration, and flares the heart alongside the ring tumble -- a substantially more prominent and graceful event than the old 360deg/900ms swing'
 
 # 192.35  owner fluidity pass -- the previous 0/40/70/100 keyframes with an
 #         overshoot "back" bezier bounced at every segment boundary, reading
@@ -18356,12 +18357,40 @@ $ringRule192 = [regex]::Match($cssStripped192, '\.chassis-core-shape \.c-ring\s*
 Check (
     $evenlySpaced192 -and
     $proportional192 -and
-    ($burstCssBlock192 -match 'chassisCoreOrbitBurst1 1\.4s ease-in-out') -and
-    ($burstCssBlock192 -match 'chassisCoreOrbitBurst2 1\.4s ease-in-out') -and
-    ($burstCssBlock192 -match 'chassisCoreOrbitBurst3 1\.4s ease-in-out') -and
+    ($burstCssBlock192 -match 'chassisCoreOrbitBurst1 1\.8s ease-in-out') -and
+    ($burstCssBlock192 -match 'chassisCoreOrbitBurst2 1\.8s ease-in-out') -and
+    ($burstCssBlock192 -match 'chassisCoreOrbitBurst3 1\.8s ease-in-out') -and
     (-not ($burstCssBlock192 -match 'cubic-bezier\(0\.34,\s*1\.56')) -and
     ($ringRule192 -match 'will-change:\s*transform')
 ) '192.35: the 3D ring burst keyframes are now evenly spaced with each axis held exactly proportional to its keyframe percent (constant angular velocity), driven by a smooth ease-in-out instead of the old overshoot "back" bezier, and the always-animating .c-ring carries will-change:transform for GPU compositing -- fixing the owner-reported choppy/jerky tumble'
+
+# 192.36  owner follow-up -- always-on perpendicular 3D ring: a 4th ring,
+#         built as a ::before pseudo-element (no HTML markup change, so both
+#         the full core AND the casing-top mini core share it automatically
+#         via the same .chassis-core-shape class, Protocol 22), tilted 90deg
+#         on X (a plane perpendicular to the flat r1/r2/r3 rings, which only
+#         ever rotateZ) and continuously spun on Y forever -- a genuine
+#         always-on 3D orbit, not just during the #14 stat-change burst.
+#         transform-only + linear infinite (matching the r1/r3 idle-spin
+#         convention) + will-change keeps it GPU-composited. preserve-3d on
+#         the shape lets it compose in the same 3D space as the burst rings.
+#         The SAME .core-still gate (Protocol UI-10) stills it -- no bespoke
+#         carve-out for this new continuous loop.
+$beforeRule192 = [regex]::Match($cssStripped192, '\.chassis-core-shape::before\s*\{[^\}]*\}').Value
+$orbitPerpKF192 = [regex]::Match($cssStripped192, '(?s)@keyframes chassisCoreOrbitPerp\s*\{[\s\S]*?\n\}').Value
+$shapeBaseRule192 = [regex]::Match($cssStripped192, '\.chassis-core-shape\s*\{[^\}]*\}').Value
+$coreStillGateRule192 = [regex]::Match($cssStripped192, '(?s)\.core-still,[\s\S]*?animation-play-state:\s*paused\s*!important;\s*\}').Value
+Check (
+    ($beforeRule192 -match 'content:\s*''''') -and
+    ($beforeRule192 -match 'animation:\s*chassisCoreOrbitPerp') -and
+    ($beforeRule192 -match 'infinite') -and
+    ($beforeRule192 -match 'will-change:\s*transform') -and
+    ($orbitPerpKF192 -match 'rotateX\(90deg\)') -and
+    ($orbitPerpKF192 -match 'rotateY\(0deg\)') -and
+    ($orbitPerpKF192 -match 'rotateY\(360deg\)') -and
+    ($shapeBaseRule192 -match 'transform-style:\s*preserve-3d') -and
+    ($coreStillGateRule192 -match '\.core-still::before')
+) '192.36: an always-on perpendicular ring (.chassis-core-shape::before, tilted 90deg on X then continuously spun on Y -- a real gyroscope/atom-orbit 3D loop, not just during the burst) is shared by both cores via the same base class, and is stilled by the SAME .core-still gate as everything else -- no bespoke carve-out'
 
 # ===========================================================
 # Suite 193 -- Owner polish batch: tap-highlight kill + CURIO ARCHIVE

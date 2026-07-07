@@ -2004,12 +2004,12 @@ window._coreTapPoke = _coreTapPoke;
 // chassisCoreSpin the rings idle with, layered on via the same one-shot
 // add-then-reflow-then-remove pattern as every other flourish above. Fires
 // through _coreOneShot(), so it is already gated by _coreShouldAnimate() —
-// no bespoke reduced-motion carve-out. 1400ms matches the CSS
-// chassisCoreOrbitBurst1/2/3 animation-duration (prominence pass — a longer,
-// bigger-amplitude tumble reads clearly as 3D rotation instead of a subtle
-// wobble) so the class is removed right as the animation finishes.
+// no bespoke reduced-motion carve-out. 1800ms matches the CSS
+// chassisCoreOrbitBurst1/2/3 animation-duration (owner follow-up: "a bit
+// slower" than the previous 1.4s, same 720deg double tumble, just more
+// graceful) so the class is removed right as the animation finishes.
 function _coreStatBurst() {
-  _coreOneShot('core-stat-burst', 1400);
+  _coreOneShot('core-stat-burst', 1800);
 }
 window._coreStatBurst = _coreStatBurst;
 

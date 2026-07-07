@@ -9782,6 +9782,12 @@ g.node:focus-visible .focusring {
      and .core-help-btn is a SIBLING of this class inside .chassis-core-shell,
      never a descendant, so it is unaffected. */
   overflow: hidden;
+  /* Always-on perpendicular ring (owner follow-up — "perpendicular rings
+     that rotate around in 3d always"): preserve-3d lets the shape's 3D
+     children (this element's own ::before ring below, plus the burst's
+     rotateX/Y/Z rings) compose in one shared 3D space rather than each
+     being flattened independently. */
+  transform-style: preserve-3d;
 }
 button.chassis-core-shape {
   width: 96px; /* override the global button{width:100%} (Protocol UI-5) */
@@ -9820,6 +9826,35 @@ button.chassis-core-shape {
   inset: 28%;
   border-style: dashed;
   animation: chassisCoreSpin 9s linear infinite reverse;
+}
+/* Always-on perpendicular ring (owner follow-up) — a 4th ring, built as a
+   ::before pseudo-element so no HTML markup changes anywhere (both the full
+   BUS-22 core and the casing-top mini core share this rule automatically,
+   since both carry .chassis-core-shape — Protocol 22, one source, no
+   drift). Tilted 90° on X so it sits on a plane PERPENDICULAR to the flat
+   r1/r2/r3 rings (which only ever rotateZ), then continuously spun on Y —
+   the classic atom-orbit/gyroscope look, genuinely reading as a ring
+   orbiting the core in 3D at all times, not just during the #14 burst.
+   `perspective` (below) gives it real depth; transform-only + linear
+   infinite (matching the existing r1/r3 idle-spin convention — linear is
+   correct for an unbounded loop, never ease-in-out, which would visibly
+   hitch at the seam) + will-change keeps it fluid and GPU-composited. */
+.chassis-core-shape::before {
+  content: '';
+  position: absolute;
+  inset: 8%;
+  border-radius: 50%;
+  border: 1.5px solid rgba(var(--robco-green-rgb), 0.55);
+  will-change: transform;
+  animation: chassisCoreOrbitPerp 6s linear infinite;
+}
+@keyframes chassisCoreOrbitPerp {
+  0% {
+    transform: rotateX(90deg) rotateY(0deg);
+  }
+  100% {
+    transform: rotateX(90deg) rotateY(360deg);
+  }
 }
 @keyframes chassisCoreSpin {
   to {
@@ -10095,13 +10130,16 @@ button.chassis-core-shape {
   }
 }
 .chassis-core-shape.core-stat-burst .c-ring.r1 {
-  animation: chassisCoreOrbitBurst1 1.4s ease-in-out 1;
+  /* Owner follow-up: "a bit slower" — 1.4s -> 1.8s (matches the JS
+     _coreOneShot('core-stat-burst', 1800) removal timeout below), same
+     720deg double tumble, just more graceful. */
+  animation: chassisCoreOrbitBurst1 1.8s ease-in-out 1;
 }
 .chassis-core-shape.core-stat-burst .c-ring.r2 {
-  animation: chassisCoreOrbitBurst2 1.4s ease-in-out 1;
+  animation: chassisCoreOrbitBurst2 1.8s ease-in-out 1;
 }
 .chassis-core-shape.core-stat-burst .c-ring.r3 {
-  animation: chassisCoreOrbitBurst3 1.4s ease-in-out 1;
+  animation: chassisCoreOrbitBurst3 1.8s ease-in-out 1;
 }
 .chassis-core-shape.core-stat-burst .c-heart {
   box-shadow: 0 0 58px rgba(var(--robco-green-rgb), 1);
@@ -10112,10 +10150,14 @@ button.chassis-core-shape {
    OFF each suppress every CONTINUOUS loop above as one group; the state
    classes themselves (colour/opacity/overlay) still apply instantly, so a
    state CHANGE always paints one correct static frame — no bespoke
-   per-behaviour carve-out. */
+   per-behaviour carve-out. `.core-still::before` extends the SAME gate to
+   the always-on perpendicular ring above — a continuous 3D loop is caught
+   by this exact mechanism exactly like the existing idle spin, no separate
+   carve-out. */
 .core-still,
 .core-still .c-ring,
 .core-still .c-heart,
+.core-still::before,
 .core-still.core-fault::after {
   animation-play-state: paused !important;
 }
