@@ -29106,53 +29106,78 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     "192.36: an always-on perpendicular ring (.chassis-core-shape::before) now tumbles around a DIAGONAL 3D axis via rotate3d(1,1,0,deg) — the corrected owner ask, swapping the ring's diagonal corner-pairs through depth rather than flatly spinning around the vertical axis — is shared by both cores via the same base class, and is stilled by the SAME .core-still gate as everything else — no bespoke carve-out"
   );
 
-  // 192.37  owner follow-up — the perpendicular ring "can't even be seen" in
-  //         the mini core: root-caused to a perspective distance far
-  //         tighter (relative to the mini core's own size) than the full
-  //         core's, causing much more aggressive foreshortening on top of
-  //         an already-crowded tiny circle sharing space with three other
-  //         rings + the heart. Fixed by loosening the mini perspective
-  //         (55px -> 130px, no longer disproportionately tighter than the
-  //         full core's own 200px/96px ratio) and giving the mini copy of
-  //         the ring a bolder, higher-contrast border
-  //         (.chassis-core-shape.chassis-core-mini::before) than the full
-  //         core's, alongside the second size bump (screen/core enlarged
-  //         again on top of the first prominence pass).
+  // 192.37  SUPERSEDED by the big/mini visual-parity fix (see the updated
+  //         assertion below): the original "55px -> 130px, mini bolder than
+  //         full" fix made the mini ring visible again, but a flat 130px
+  //         mini perspective — never adjusted per responsive tier — meant
+  //         the perspective-to-size RATIO drifted far narrower than the
+  //         full core's constant 200/96 ratio as the mini shrank on phones,
+  //         which is the actual reason the two cores never looked alike.
+  //         This assertion now locks the CORRECTED contract: the mini
+  //         core's desktop-tier perspective (.chassis-core-shape.chassis-
+  //         core-mini, 54px) holds the SAME ~2.08x ratio to its own size
+  //         that the full core (200px/96px) does, within a small tolerance
+  //         — true parity, not just "big enough to see."
+  // Negative lookbehind excludes the "body "-prefixed responsive-tier
+  // overrides (Suite 195 unit) so this grabs the desktop-tier base rule.
   const miniPerspRule192 = (cssStripped192.match(
-    /\.chassis-core-shape\.chassis-core-mini\s*\{\s*perspective:\s*(\d+)px/
+    /(?<!body )\.chassis-core-shape\.chassis-core-mini\s*\{\s*perspective:\s*(\d+)px/
   ) || ['', '0'])[1];
   const fullPerspRule192 = (cssStripped192.match(
     /\.chassis-core-shape\s*\{\s*perspective:\s*(\d+)px/
   ) || ['', '0'])[1];
-  const miniBeforeBoostRule192 = (cssStripped192.match(
-    /\.chassis-core-shape\.chassis-core-mini::before\s*\{[^}]*\}/
-  ) || [''])[0];
+  // Three `.chassis-core-shape.chassis-core-mini::before` rules now exist —
+  // the two responsive-tier overrides (480px/400px media blocks, EARLIER in
+  // file order) plus the base desktop-tier (54px) rule LAST in file order —
+  // so a plain (non-global) .match() would silently grab the wrong (tier-
+  // override) one. Take the LAST occurrence, which is always the base rule.
+  const miniBeforeBoostMatches192 = [
+    ...cssStripped192.matchAll(/\.chassis-core-shape\.chassis-core-mini::before\s*\{[^}]*\}/g),
+  ];
+  const miniBeforeBoostRule192 = miniBeforeBoostMatches192.length
+    ? miniBeforeBoostMatches192[miniBeforeBoostMatches192.length - 1][0]
+    : '';
   const miniBoostBorderW192 = Number(
     (miniBeforeBoostRule192.match(/border-width:\s*(\d+)px/) || ['', '0'])[1]
   );
   const fullPerpBorderW192 = Number(
     (beforeRule192.match(/border(?:-width)?:\s*(\d+)px/) || ['', '0'])[1]
   );
+  const fullRatio192 = Number(fullPerspRule192) / 96;
+  const miniRatio192 = Number(miniPerspRule192) / 54;
   assert(
     Number(miniPerspRule192) >= 100 &&
-      Number(miniPerspRule192) > Number(fullPerspRule192) * 0.5 &&
-      miniBoostBorderW192 > fullPerpBorderW192 &&
+      Math.abs(miniRatio192 - fullRatio192) < 0.15 &&
       /border-color:\s*rgba\(var\(--robco-green-rgb\),\s*0\.8\)/.test(miniBeforeBoostRule192),
-    `192.37: the mini core's perpendicular ring is no longer near-invisible — perspective loosened from 55px to ${miniPerspRule192}px (no longer disproportionately tighter than the full core's own ${fullPerspRule192}px/96px ratio) and its border (${miniBoostBorderW192}px) is bolder than the full core's copy (${fullPerpBorderW192}px), fixing the owner-reported "can't even be seen" bug`
+    `192.37: the mini core's desktop-tier perspective (${miniPerspRule192}px / 54px = ${miniRatio192.toFixed(2)}x) now holds the SAME ratio as the full core's (${fullPerspRule192}px / 96px = ${fullRatio192.toFixed(2)}x) — a flat, per-tier-unadjusted 130px previously drifted the ratio far narrower on phones, which was the real reason the two cores never visually matched — and the mini ring keeps its own higher-contrast border color`
   );
 
-  // 192.38  owner follow-up — the always-on diagonal ring was widened so it
-  //         genuinely reads as 3D "sideways": at the edge-on point of its
-  //         diagonal tumble a thin stroke collapses to a near-invisible
-  //         hairline, exactly the moment that's supposed to show depth. The
-  //         ring's own size (inset) and border stroke were both widened on
-  //         the full core, and the mini core's already-boosted copy widened
-  //         to match proportionally, so the edge-on silhouette keeps real
-  //         visible width instead of vanishing.
+  // 192.38  Owner correction: "wider" was misread as bigger diameter — the
+  //         actual ask was a THICKER, genuinely 3D band (a torus/sphere-
+  //         shell with volume), and the previous inset:6% (an 88%-diameter
+  //         ellipse) was reported as oversized, especially in the cramped
+  //         mini screen. The ring's diameter is now SMALLER (inset raised
+  //         to 20%, nesting between r1 at 100% and r3 at 44%), its border
+  //         is a genuinely thick band (not a hairline), and a box-shadow
+  //         pair (inset dark + inset light + outer glow) shades it like a
+  //         lit, rounded tube rather than a flat outline. The mini core's
+  //         border-width is now deliberately SMALLER than the full core's
+  //         (not bigger, as the old fix had it) — matching the SAME ~15-17%
+  //         border-to-diameter ratio at every size is the actual parity
+  //         fix, not an arbitrary "bolder for legibility" bump.
   const fullPerpInset192 = Number((beforeRule192.match(/inset:\s*(\d+)%/) || ['', '100'])[1]);
+  const hasVolumeShadow192 =
+    /box-shadow:\s*\n?\s*inset[^;]*,\s*\n?\s*inset[^;]*,\s*\n?\s*0 0[^;]*rgba\(var\(--robco-green-rgb\)/.test(
+      beforeRule192
+    );
   assert(
-    fullPerpInset192 <= 6 && fullPerpBorderW192 >= 3 && miniBoostBorderW192 >= 4,
-    `192.38: the always-on perpendicular ring was widened (inset ${fullPerpInset192}%, border ${fullPerpBorderW192}px full / ${miniBoostBorderW192}px mini) so its edge-on silhouette during the diagonal tumble reads as a visible 3D band, not a near-invisible hairline`
+    fullPerpInset192 >= 15 &&
+      fullPerpInset192 < 44 &&
+      fullPerpBorderW192 >= 7 &&
+      miniBoostBorderW192 >= 3 &&
+      miniBoostBorderW192 < fullPerpBorderW192 &&
+      hasVolumeShadow192,
+    `192.38: the always-on perpendicular ring's DIAMETER shrank (inset raised to ${fullPerpInset192}%, nesting between r1/r3 rather than nearly filling the shape) while its border became a genuinely thick band (${fullPerpBorderW192}px full / ${miniBoostBorderW192}px mini, proportionally matched — mini deliberately thinner in absolute px, not thicker) shaded by an inset+outer box-shadow trio so it reads as a lit 3D tube, not a flat wide ellipse — the owner's "thicker, not wider" correction`
   );
 
   // 192.39  owner follow-up — the full core had one more ring (r2) than the
@@ -29724,6 +29749,227 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       '194.21: every new LIVING CORE function this batch added (_coreThermalTick/_coreRipple/_coreMilestonePulse/_coreHoldStart/_coreHoldEnd, plus the reactor-hum audio functions) is free of saveState()/robco_v8/state.<field>= writes — transient/MetaStore only'
     );
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 195 — LIVING CORE ring visual-parity fix (owner audit): the
+//  full core and mini core still looked different despite the earlier
+//  "sync confirmed" claim; root cause was a flat, per-tier-unadjusted
+//  mini perspective (130px regardless of the mini's own 54/40/33px
+//  responsive sizes) drifting the perspective-to-size ratio away from
+//  the full core's constant 200/96 ratio, compounded by a flat mini
+//  border-width. Also: "wider" was the wrong read of an earlier ask —
+//  the owner meant THICKER/volumetric, not bigger in diameter (which was
+//  actually too large, especially in the mini) — and the core "?" button
+//  sat close enough to the shape's corner that the r1 ring crossed
+//  through it.
+//  8 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 195 — LIVING CORE ring visual-parity fix (owner audit)');
+  const css195 = readFile('css/terminal.css');
+  const cssStripped195 = css195.replace(/\/\*[\s\S]*?\*\//g, '');
+
+  // 195.1  perspective holds the SAME ratio-to-own-size at EVERY mini tier
+  //        (54px desktop, 40px @480px, 33px @400px) that the full core
+  //        holds at 96px — not just "big enough," true parity at every
+  //        breakpoint, which is what the earlier flat-130px fix missed.
+  const fullPersp195 = Number(
+    (cssStripped195.match(/\.chassis-core-shape\s*\{\s*perspective:\s*(\d+)px/) || ['', '0'])[1]
+  );
+  // Negative lookbehind excludes the "body "-prefixed tier overrides
+  // (480px/400px media blocks, below) — a plain substring match would
+  // otherwise happily match ".chassis-core-shape.chassis-core-mini {" even
+  // when it's actually preceded by "body ", grabbing the WRONG (tier)
+  // value instead of this desktop-tier base rule.
+  const baseMiniPersp195 = Number(
+    (cssStripped195.match(
+      /(?<!body )\.chassis-core-shape\.chassis-core-mini\s*\{\s*perspective:\s*(\d+)px/
+    ) || ['', '0'])[1]
+  );
+  const tier480Block195 = (cssStripped195.match(
+    /@media \(max-width:\s*480px\)\s*\{[\s\S]*?\n\}\n/
+  ) || [''])[0];
+  const tier400Block195 = (cssStripped195.match(
+    /@media \(max-width:\s*400px\)\s*\{[\s\S]*?\n\}\n/
+  ) || [''])[0];
+  // A bare `.chassis-core-shape.chassis-core-mini { perspective: ... }`
+  // inside these media blocks would be CASCADE-DEAD: an unconditional,
+  // equal-specificity rule for this exact property sits further down the
+  // file (near the ring's own definition) and — media queries add no
+  // specificity of their own — always wins regardless of viewport, since
+  // it comes LAST in source order. The fix requires a `body ` specificity
+  // bump (0,2,0 -> 0,2,1) on these tier overrides; this regex requires it
+  // explicitly so a regression back to the dead bare selector is caught.
+  const tier480Persp195 = Number(
+    (tier480Block195.match(
+      /body \.chassis-core-shape\.chassis-core-mini\s*\{[^}]*perspective:\s*(\d+)px/
+    ) || ['', '0'])[1]
+  );
+  const tier400Persp195 = Number(
+    (tier400Block195.match(
+      /body \.chassis-core-shape\.chassis-core-mini\s*\{[^}]*perspective:\s*(\d+)px/
+    ) || ['', '0'])[1]
+  );
+  const fullRatio195 = fullPersp195 / 96;
+  const ratioClose195 = (persp, size) => Math.abs(persp / size - fullRatio195) < 0.15;
+  assert(
+    fullPersp195 === 200 &&
+      ratioClose195(baseMiniPersp195, 54) &&
+      ratioClose195(tier480Persp195, 40) &&
+      ratioClose195(tier400Persp195, 33) &&
+      // Regression guard: a BARE (un-prefixed) perspective declaration
+      // inside either media block would be dead on arrival (see comment
+      // above) — this is exactly the bug a live-render check caught after
+      // the first version of this fix shipped without the "body " prefix.
+      !/(?<!body )\.chassis-core-shape\.chassis-core-mini\s*\{[^}]*perspective:/.test(
+        tier480Block195
+      ) &&
+      !/(?<!body )\.chassis-core-shape\.chassis-core-mini\s*\{[^}]*perspective:/.test(
+        tier400Block195
+      ),
+    `195.1: perspective holds the full core's own ~${fullRatio195.toFixed(2)}x ratio at EVERY mini tier — 54px (${baseMiniPersp195}px), 40px @480px (${tier480Persp195}px), and 33px @400px (${tier400Persp195}px) — not a flat value that drifts the ratio narrower as the mini shrinks, and each tier override uses the required "body " specificity bump (never a bare, cascade-dead duplicate) so it actually wins against the later unconditional base rule`
+  );
+
+  // 195.2  the diagonal ring's border-width is likewise proportionally
+  //        matched (not just "bolder") at every tier — mini deliberately
+  //        thinner in absolute px than the full core, holding roughly the
+  //        SAME border-to-diameter ratio (~15-17%) at every size.
+  const fullBorderW195 = Number(
+    (cssStripped195.match(/\.chassis-core-shape::before\s*\{[^}]*border:\s*(\d+)px/) || [
+      '',
+      '0',
+    ])[1]
+  );
+  const fullInset195 = Number(
+    (cssStripped195.match(/\.chassis-core-shape::before\s*\{[^}]*inset:\s*(\d+)%/) || ['', '0'])[1]
+  );
+  const baseMiniBorderW195 = Number(
+    ([...cssStripped195.matchAll(/\.chassis-core-shape\.chassis-core-mini::before\s*\{[^}]*\}/g)]
+      .pop()?.[0]
+      ?.match(/border-width:\s*(\d+)px/) || ['', '0'])[1]
+  );
+  // Same cascade-dead trap as the perspective tiers above (195.1) — the
+  // "body " specificity bump is required here too, since the mini ::before
+  // border-width has its own later, unconditional base rule.
+  const tier480BorderW195 = Number(
+    (tier480Block195.match(
+      /body \.chassis-core-shape\.chassis-core-mini::before\s*\{[^}]*border-width:\s*(\d+)px/
+    ) || ['', '0'])[1]
+  );
+  const tier400BorderW195 = Number(
+    (tier400Block195.match(
+      /body \.chassis-core-shape\.chassis-core-mini::before\s*\{[^}]*border-width:\s*(\d+)px/
+    ) || ['', '0'])[1]
+  );
+  const fullDiam195 = 96 * (1 - fullInset195 / 50); // inset applies to both sides
+  const fullBorderRatio195 = fullBorderW195 / fullDiam195;
+  const ratioNear195 = (border, size) => {
+    const diam = size * (1 - fullInset195 / 50);
+    return Math.abs(border / diam - fullBorderRatio195) < 0.06;
+  };
+  assert(
+    fullBorderW195 >= 7 &&
+      baseMiniBorderW195 < fullBorderW195 &&
+      ratioNear195(baseMiniBorderW195, 54) &&
+      ratioNear195(tier480BorderW195, 40) &&
+      ratioNear195(tier400BorderW195, 33) &&
+      // Same regression guard as 195.1: a bare (un-prefixed) border-width
+      // declaration inside either media block is cascade-dead against the
+      // later unconditional base ::before rule.
+      !/(?<!body )\.chassis-core-shape\.chassis-core-mini::before\s*\{[^}]*border-width:/.test(
+        tier480Block195
+      ) &&
+      !/(?<!body )\.chassis-core-shape\.chassis-core-mini::before\s*\{[^}]*border-width:/.test(
+        tier400Block195
+      ),
+    `195.2: the diagonal ring's border-width holds roughly the SAME border-to-diameter ratio (~${(fullBorderRatio195 * 100).toFixed(0)}%) at every size — full ${fullBorderW195}px, mini 54px=${baseMiniBorderW195}px, 40px=${tier480BorderW195}px, 33px=${tier400BorderW195}px — deliberately thinner in absolute px on the mini, never just "bolder", and each tier override uses the required "body " specificity bump (never a bare, cascade-dead duplicate)`
+  );
+
+  // 195.3  the ring's diameter genuinely shrank and now nests strictly
+  //        between r1 (inset 0%, 100% diameter) and r3 (inset 28%, 44%
+  //        diameter) — smaller than before's near-full-shape ellipse.
+  const r3Inset195 = Number(
+    (cssStripped195.match(/\.chassis-core-shape \.c-ring\.r3\s*\{\s*inset:\s*(\d+)%/) || [
+      '',
+      '0',
+    ])[1]
+  );
+  assert(
+    fullInset195 > 0 && fullInset195 < r3Inset195,
+    `195.3: the diagonal ring's inset (${fullInset195}%) sits strictly between r1's (0%, full diameter) and r3's (${r3Inset195}%, its own smaller diameter) — a genuinely reduced ring, not the earlier near-full-shape ellipse`
+  );
+
+  // 195.4  the ring is shaded with a volumetric box-shadow trio (inset dark
+  //        "underside" + inset light "lip" + outer glow "reflected bloom")
+  //        so a THICK border reads as a lit, rounded 3D band rather than a
+  //        flat wide outline — the owner's actual "thicker/genuinely 3D"
+  //        ask, achieved via box-shadow (never border-image, which fights
+  //        border-radius on a circle across browsers).
+  const beforeRule195 = (cssStripped195.match(/\.chassis-core-shape::before\s*\{[^}]*\}/) || [
+    '',
+  ])[0];
+  assert(
+    /box-shadow:/.test(beforeRule195) &&
+      (beforeRule195.match(/inset 0 0/g) || []).length >= 2 &&
+      /0 0 \d+px rgba\(var\(--robco-green-rgb\)/.test(beforeRule195) &&
+      !/border-image/.test(beforeRule195),
+    '195.4: the diagonal ring is shaded with a box-shadow trio (two inset shadows + an outer glow) simulating a lit, rounded 3D band — never border-image, which does not reliably compose with border-radius on a circular element across browsers'
+  );
+
+  // 195.5  the core "?" help button was nudged further up and right so the
+  //        r1 ring (inset:0, a circle of radius 48px centered on the 96x96
+  //        shape) no longer visibly crosses through it — an owner-reported
+  //        live-render bug. This computes the ACTUAL geometry (not just a
+  //        "bigger than before" range) — a live-measured first attempt
+  //        (-11px/-10px) still put the button's nearest corner at ~37.5px
+  //        from the shape's center, well INSIDE the 48px ring radius, so
+  //        the ring still crossed it despite reading as "moved further."
+  //        The button's bottom-left corner (nearest the circle) sits at
+  //        (64+right, 32-top) relative to the shape's own (0,0)-(96,96)
+  //        box (32 = the .icon-btn-round size); its distance from the
+  //        center (48,48) must clear the ring's ~48px radius with margin
+  //        for the ring's own ~2px stroke.
+  const helpBtnRule195 = (cssStripped195.match(/\.core-help-btn\s*\{[^}]*\}/) || [''])[0];
+  const helpTop195 = Number((helpBtnRule195.match(/top:\s*-(\d+)px/) || ['', '0'])[1]);
+  const helpRight195 = Number((helpBtnRule195.match(/right:\s*-(\d+)px/) || ['', '0'])[1]);
+  const cornerX195 = 64 + helpRight195;
+  const cornerY195 = 32 - helpTop195;
+  const cornerDist195 = Math.sqrt((cornerX195 - 48) ** 2 + (cornerY195 - 48) ** 2);
+  assert(
+    helpTop195 > 6 && helpRight195 > 6 && cornerDist195 >= 49,
+    `195.5: .core-help-btn moved from -6px/-6px to -${helpTop195}px top / -${helpRight195}px right — its nearest corner to the shape's center is now ${cornerDist195.toFixed(1)}px away, clearing the r1 ring's own 48px-radius edge (a first attempt at -11px/-10px only reached ~37.5px, still inside the ring — this assertion catches that class of under-correction)`
+  );
+
+  // 195.6  no ID-scoped override of the ring's perspective/border-width/
+  //        inset exists anywhere for #chassisCore or #chassisCoreMini —
+  //        every value affecting the ring's visual parity still comes from
+  //        the ONE shared .chassis-core-shape/.chassis-core-mini class
+  //        selectors, never a per-id divergence that could desync them.
+  assert(
+    !/#chassisCore\s*\{[^}]*(?:perspective|border-width|inset)/.test(cssStripped195) &&
+      !/#chassisCoreMini\s*\{[^}]*(?:perspective|border-width|inset)/.test(cssStripped195),
+    '195.6: no #chassisCore/#chassisCoreMini ID-scoped rule overrides perspective/border-width/inset anywhere — every ring-parity value still comes from the shared .chassis-core-shape/.chassis-core-mini class selectors (Protocol 22, one source)'
+  );
+
+  // 195.7  the gate-stacking mechanism (.core-still) still pauses the
+  //        perpendicular ring's continuous loop — unaffected by this
+  //        visual-only pass.
+  assert(
+    /\.core-still::before/.test(cssStripped195),
+    '195.7: .core-still::before still pauses the diagonal ring — the gate-stacking mechanism (reduced-motion/low-immersion/hidden-tab/standby) is untouched by this visual-only fix'
+  );
+
+  // 195.8  Protocol 17: the help button's own tap target (.icon-btn-round,
+  //        32px) is unaffected by the position nudge — only top/right
+  //        moved, width/height/min-width/min-height are untouched.
+  const iconBtnRule195 = (cssStripped195.match(
+    /\.composer-icon-btn,\s*\n\.composer-send-btn,\s*\n\.icon-btn-round\s*\{[^}]*\}/
+  ) || [''])[0];
+  assert(
+    /width:\s*32px/.test(iconBtnRule195) && /min-width:\s*32px/.test(iconBtnRule195),
+    '195.8: .icon-btn-round keeps its 32px (>=28px Protocol 17) tap target — the help button repositioning only changed top/right, never its size'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════

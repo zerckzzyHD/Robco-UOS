@@ -18395,50 +18395,60 @@ Check (
     ($coreStillGateRule192 -match '\.core-still::before')
 ) "192.36: an always-on perpendicular ring (.chassis-core-shape::before) now tumbles around a DIAGONAL 3D axis via rotate3d(1,1,0,deg) -- the corrected owner ask, swapping the ring's diagonal corner-pairs through depth rather than flatly spinning around the vertical axis -- is shared by both cores via the same base class, and is stilled by the SAME .core-still gate as everything else -- no bespoke carve-out"
 
-# 192.37  owner follow-up -- the perpendicular ring "can't even be seen" in
-#         the mini core: root-caused to a perspective distance far tighter
-#         (relative to the mini core's own size) than the full core's,
-#         causing much more aggressive foreshortening on top of an already-
-#         crowded tiny circle sharing space with three other rings + the
-#         heart. Fixed by loosening the mini perspective (55px -> 130px, no
-#         longer disproportionately tighter than the full core's own
-#         200px/96px ratio) and giving the mini copy of the ring a bolder,
-#         higher-contrast border
-#         (.chassis-core-shape.chassis-core-mini::before) than the full
-#         core's, alongside the second size bump (screen/core enlarged
-#         again on top of the first prominence pass).
-$miniPerspRule192 = [regex]::Match($cssStripped192, '\.chassis-core-shape\.chassis-core-mini\s*\{\s*perspective:\s*(\d+)px').Groups[1].Value
+# 192.37  SUPERSEDED by the big/mini visual-parity fix (see the updated
+#         assertion below): a flat 130px mini perspective, never adjusted
+#         per responsive tier, drifted the perspective-to-size RATIO far
+#         narrower than the full core's constant 200/96 ratio as the mini
+#         shrank on phones -- the actual reason the two cores never looked
+#         alike. This now locks the CORRECTED contract: the mini core's
+#         desktop-tier perspective (54px) holds the SAME ~2.08x ratio to
+#         its own size that the full core (200px/96px) does.
+# Negative lookbehind excludes the "body "-prefixed responsive-tier
+# overrides (Suite 195 unit) so this grabs the desktop-tier base rule.
+$miniPerspRule192 = [regex]::Match($cssStripped192, '(?<!body )\.chassis-core-shape\.chassis-core-mini\s*\{\s*perspective:\s*(\d+)px').Groups[1].Value
 if (-not $miniPerspRule192) { $miniPerspRule192 = '0' }
 $fullPerspRule192 = [regex]::Match($cssStripped192, '\.chassis-core-shape\s*\{\s*perspective:\s*(\d+)px').Groups[1].Value
 if (-not $fullPerspRule192) { $fullPerspRule192 = '0' }
-$miniBeforeBoostRule192 = [regex]::Match($cssStripped192, '\.chassis-core-shape\.chassis-core-mini::before\s*\{[^\}]*\}').Value
+# Three .chassis-core-shape.chassis-core-mini::before rules now exist -- the
+# two responsive-tier overrides (480px/400px media blocks, EARLIER in file
+# order) plus the base desktop-tier (54px) rule LAST in file order -- so
+# take the LAST match, which is always the base rule.
+$miniBeforeBoostMatches192 = [regex]::Matches($cssStripped192, '\.chassis-core-shape\.chassis-core-mini::before\s*\{[^\}]*\}')
+$miniBeforeBoostRule192 = ''
+if ($miniBeforeBoostMatches192.Count -gt 0) { $miniBeforeBoostRule192 = $miniBeforeBoostMatches192[$miniBeforeBoostMatches192.Count - 1].Value }
 $miniBoostBorderW192 = [int]([regex]::Match($miniBeforeBoostRule192, 'border-width:\s*(\d+)px').Groups[1].Value)
 $fullPerpBorderWMatch192 = [regex]::Match($beforeRule192, 'border(?:-width)?:\s*(\d+)px')
 $fullPerpBorderW192 = 0
 if ($fullPerpBorderWMatch192.Success) { $fullPerpBorderW192 = [int]$fullPerpBorderWMatch192.Groups[1].Value }
+$fullRatio192 = [double]$fullPerspRule192 / 96
+$miniRatio192 = [double]$miniPerspRule192 / 54
 Check (
     ([int]$miniPerspRule192 -ge 100) -and
-    ([int]$miniPerspRule192 -gt ([int]$fullPerspRule192 * 0.5)) -and
-    ($miniBoostBorderW192 -gt $fullPerpBorderW192) -and
+    ([Math]::Abs($miniRatio192 - $fullRatio192) -lt 0.15) -and
     ($miniBeforeBoostRule192 -match 'border-color:\s*rgba\(var\(--robco-green-rgb\),\s*0\.8\)')
-) "192.37: the mini core's perpendicular ring is no longer near-invisible -- perspective loosened from 55px to ${miniPerspRule192}px (no longer disproportionately tighter than the full core's own ${fullPerspRule192}px/96px ratio) and its border (${miniBoostBorderW192}px) is bolder than the full core's copy (${fullPerpBorderW192}px), fixing the owner-reported can't-even-be-seen bug"
+) "192.37: the mini core's desktop-tier perspective (${miniPerspRule192}px / 54px = $([Math]::Round($miniRatio192,2))x) now holds the SAME ratio as the full core's (${fullPerspRule192}px / 96px = $([Math]::Round($fullRatio192,2))x) -- a flat, per-tier-unadjusted 130px previously drifted the ratio far narrower on phones, which was the real reason the two cores never visually matched -- and the mini ring keeps its own higher-contrast border color"
 
-# 192.38  owner follow-up -- the always-on diagonal ring was widened so it
-#         genuinely reads as 3D "sideways": at the edge-on point of its
-#         diagonal tumble a thin stroke collapses to a near-invisible
-#         hairline, exactly the moment that's supposed to show depth. The
-#         ring's own size (inset) and border stroke were both widened on
-#         the full core, and the mini core's already-boosted copy widened
-#         to match proportionally, so the edge-on silhouette keeps real
-#         visible width instead of vanishing.
+# 192.38  Owner correction: "wider" was misread as bigger diameter -- the
+#         actual ask was a THICKER, genuinely 3D band (a torus/sphere-shell
+#         with volume), and the previous inset:6% (an 88%-diameter ellipse)
+#         was reported as oversized, especially in the cramped mini screen.
+#         The ring's diameter is now SMALLER (inset raised to 20%, nesting
+#         between r1 at 100% and r3 at 44%), its border is a genuinely
+#         thick band, and a box-shadow pair shades it like a lit, rounded
+#         tube. The mini core's border-width is now deliberately SMALLER
+#         than the full core's (not bigger) -- matching the SAME ~15-17%
+#         border-to-diameter ratio at every size is the actual parity fix.
 $fullPerpInsetMatch192 = [regex]::Match($beforeRule192, 'inset:\s*(\d+)%')
 $fullPerpInset192 = 100
 if ($fullPerpInsetMatch192.Success) { $fullPerpInset192 = [int]$fullPerpInsetMatch192.Groups[1].Value }
+$hasVolumeShadow192 = [System.Text.RegularExpressions.Regex]::IsMatch($beforeRule192, "(?s)box-shadow:\s*\n?\s*inset[^;]*,\s*\n?\s*inset[^;]*,\s*\n?\s*0 0[^;]*rgba\(var\(--robco-green-rgb\)")
 Check (
-    ($fullPerpInset192 -le 6) -and
-    ($fullPerpBorderW192 -ge 3) -and
-    ($miniBoostBorderW192 -ge 4)
-) "192.38: the always-on perpendicular ring was widened (inset ${fullPerpInset192}%, border ${fullPerpBorderW192}px full / ${miniBoostBorderW192}px mini) so its edge-on silhouette during the diagonal tumble reads as a visible 3D band, not a near-invisible hairline"
+    ($fullPerpInset192 -ge 15) -and ($fullPerpInset192 -lt 44) -and
+    ($fullPerpBorderW192 -ge 7) -and
+    ($miniBoostBorderW192 -ge 3) -and
+    ($miniBoostBorderW192 -lt $fullPerpBorderW192) -and
+    $hasVolumeShadow192
+) "192.38: the always-on perpendicular ring's DIAMETER shrank (inset raised to ${fullPerpInset192}%, nesting between r1/r3 rather than nearly filling the shape) while its border became a genuinely thick band (${fullPerpBorderW192}px full / ${miniBoostBorderW192}px mini, proportionally matched -- mini deliberately thinner in absolute px, not thicker) shaded by an inset+outer box-shadow trio so it reads as a lit 3D tube, not a flat wide ellipse -- the owner's thicker-not-wider correction"
 
 # 192.39  owner follow-up -- the full core had one more ring (r2) than the
 #         mini core ever carried, reading as cluttered and making the two
@@ -18832,6 +18842,163 @@ foreach ($name in @('startReactorHum','stopReactorHum','_updateReactorHumLevel')
 Check (
     $clean194 -and $foundAll194
 ) '194.21: every new LIVING CORE function this batch added (_coreThermalTick/_coreRipple/_coreMilestonePulse/_coreHoldStart/_coreHoldEnd, plus the reactor-hum audio functions) is free of saveState()/robco_v8/state.<field>= writes -- transient/MetaStore only'
+
+# ===========================================================
+# Suite 195 -- LIVING CORE ring visual-parity fix (owner audit): the full
+# core and mini core still looked different despite the earlier "sync
+# confirmed" claim; root cause was a flat, per-tier-unadjusted mini
+# perspective (130px regardless of the mini's own 54/40/33px responsive
+# sizes) drifting the perspective-to-size ratio away from the full core's
+# constant 200/96 ratio, compounded by a flat mini border-width. Also:
+# "wider" was the wrong read of an earlier ask -- the owner meant
+# THICKER/volumetric, not bigger in diameter (which was actually too
+# large, especially in the mini) -- and the core "?" button sat close
+# enough to the shape's corner that the r1 ring crossed through it. (PS
+# mirror of JS Suite 195.)
+# 8 tests
+# ===========================================================
+Sep "Suite 195 -- LIVING CORE ring visual-parity fix (owner audit)"
+$css195 = Read-Src "css/terminal.css"
+$cssStripped195 = [regex]::Replace($css195, '/\*[\s\S]*?\*/', '')
+
+# 195.1  perspective holds the SAME ratio-to-own-size at EVERY mini tier
+#        (54px desktop, 40px @480px, 33px @400px) that the full core
+#        holds at 96px -- not just "big enough," true parity at every
+#        breakpoint, which is what the earlier flat-130px fix missed.
+$fullPersp195 = [int]([regex]::Match($cssStripped195, '\.chassis-core-shape\s*\{\s*perspective:\s*(\d+)px').Groups[1].Value)
+# Negative lookbehind excludes the "body "-prefixed tier overrides below --
+# a plain substring match would otherwise happily match this selector even
+# when it's actually preceded by "body ", grabbing the WRONG (tier) value.
+$baseMiniPersp195 = [int]([System.Text.RegularExpressions.Regex]::Match($cssStripped195, '(?<!body )\.chassis-core-shape\.chassis-core-mini\s*\{\s*perspective:\s*(\d+)px').Groups[1].Value)
+$tier480Match195 = [System.Text.RegularExpressions.Regex]::Match($cssStripped195, "(?s)@media \(max-width:\s*480px\)\s*\{.*?\n\}\n")
+$tier480Block195 = ''
+if ($tier480Match195.Success) { $tier480Block195 = $tier480Match195.Value }
+$tier400Match195 = [System.Text.RegularExpressions.Regex]::Match($cssStripped195, "(?s)@media \(max-width:\s*400px\)\s*\{.*?\n\}\n")
+$tier400Block195 = ''
+if ($tier400Match195.Success) { $tier400Block195 = $tier400Match195.Value }
+# A bare (un-prefixed) perspective declaration inside these media blocks
+# would be CASCADE-DEAD: an unconditional, equal-specificity rule for this
+# exact property sits further down the file and -- media queries add no
+# specificity of their own -- always wins regardless of viewport, since it
+# comes LAST in source order. The fix requires a "body " specificity bump
+# (0,2,0 -> 0,2,1); these regexes require it explicitly.
+$tier480Persp195 = [int]([regex]::Match($tier480Block195, 'body \.chassis-core-shape\.chassis-core-mini\s*\{[^\}]*perspective:\s*(\d+)px').Groups[1].Value)
+$tier400Persp195 = [int]([regex]::Match($tier400Block195, 'body \.chassis-core-shape\.chassis-core-mini\s*\{[^\}]*perspective:\s*(\d+)px').Groups[1].Value)
+$fullRatio195 = [double]$fullPersp195 / 96
+function RatioClose195([int]$persp, [int]$size) {
+    return [Math]::Abs(([double]$persp / $size) - $fullRatio195) -lt 0.15
+}
+$bareTier480Persp195 = [System.Text.RegularExpressions.Regex]::IsMatch($tier480Block195, '(?<!body )\.chassis-core-shape\.chassis-core-mini\s*\{[^\}]*perspective:')
+$bareTier400Persp195 = [System.Text.RegularExpressions.Regex]::IsMatch($tier400Block195, '(?<!body )\.chassis-core-shape\.chassis-core-mini\s*\{[^\}]*perspective:')
+Check (
+    ($fullPersp195 -eq 200) -and
+    (RatioClose195 $baseMiniPersp195 54) -and
+    (RatioClose195 $tier480Persp195 40) -and
+    (RatioClose195 $tier400Persp195 33) -and
+    (-not $bareTier480Persp195) -and (-not $bareTier400Persp195)
+) "195.1: perspective holds the full core's own ~$([Math]::Round($fullRatio195,2))x ratio at EVERY mini tier -- 54px (${baseMiniPersp195}px), 40px @480px (${tier480Persp195}px), and 33px @400px (${tier400Persp195}px) -- not a flat value that drifts the ratio narrower as the mini shrinks, and each tier override uses the required body specificity bump (never a bare, cascade-dead duplicate) so it actually wins against the later unconditional base rule"
+
+# 195.2  the diagonal ring's border-width is likewise proportionally
+#        matched (not just "bolder") at every tier -- mini deliberately
+#        thinner in absolute px than the full core, holding roughly the
+#        SAME border-to-diameter ratio (~15-17%) at every size.
+$fullBorderW195 = [int]([regex]::Match($cssStripped195, '\.chassis-core-shape::before\s*\{[^\}]*border:\s*(\d+)px').Groups[1].Value)
+$fullInset195 = [int]([regex]::Match($cssStripped195, '\.chassis-core-shape::before\s*\{[^\}]*inset:\s*(\d+)%').Groups[1].Value)
+$miniBeforeMatches195 = [regex]::Matches($cssStripped195, '\.chassis-core-shape\.chassis-core-mini::before\s*\{[^\}]*\}')
+$baseMiniBeforeRule195 = ''
+if ($miniBeforeMatches195.Count -gt 0) { $baseMiniBeforeRule195 = $miniBeforeMatches195[$miniBeforeMatches195.Count - 1].Value }
+$baseMiniBorderW195 = [int]([regex]::Match($baseMiniBeforeRule195, 'border-width:\s*(\d+)px').Groups[1].Value)
+# Same cascade-dead trap as the perspective tiers above -- the "body "
+# specificity bump is required here too.
+$tier480BorderW195 = [int]([regex]::Match($tier480Block195, 'body \.chassis-core-shape\.chassis-core-mini::before\s*\{[^\}]*border-width:\s*(\d+)px').Groups[1].Value)
+$tier400BorderW195 = [int]([regex]::Match($tier400Block195, 'body \.chassis-core-shape\.chassis-core-mini::before\s*\{[^\}]*border-width:\s*(\d+)px').Groups[1].Value)
+$fullDiam195 = 96 * (1 - $fullInset195 / 50)
+$fullBorderRatio195 = $fullBorderW195 / $fullDiam195
+function RatioNear195([int]$border, [int]$size) {
+    $diam = $size * (1 - $fullInset195 / 50)
+    return [Math]::Abs(($border / $diam) - $fullBorderRatio195) -lt 0.06
+}
+$bareTier480Border195 = [System.Text.RegularExpressions.Regex]::IsMatch($tier480Block195, '(?<!body )\.chassis-core-shape\.chassis-core-mini::before\s*\{[^\}]*border-width:')
+$bareTier400Border195 = [System.Text.RegularExpressions.Regex]::IsMatch($tier400Block195, '(?<!body )\.chassis-core-shape\.chassis-core-mini::before\s*\{[^\}]*border-width:')
+Check (
+    ($fullBorderW195 -ge 7) -and
+    ($baseMiniBorderW195 -lt $fullBorderW195) -and
+    (RatioNear195 $baseMiniBorderW195 54) -and
+    (RatioNear195 $tier480BorderW195 40) -and
+    (RatioNear195 $tier400BorderW195 33) -and
+    (-not $bareTier480Border195) -and (-not $bareTier400Border195)
+) "195.2: the diagonal ring's border-width holds roughly the SAME border-to-diameter ratio (~$([Math]::Round($fullBorderRatio195*100,0))%) at every size -- full ${fullBorderW195}px, mini 54px=${baseMiniBorderW195}px, 40px=${tier480BorderW195}px, 33px=${tier400BorderW195}px -- deliberately thinner in absolute px on the mini, never just bolder, and each tier override uses the required body specificity bump (never a bare, cascade-dead duplicate)"
+
+# 195.3  the ring's diameter genuinely shrank and now nests strictly
+#        between r1 (inset 0%, 100% diameter) and r3 (inset 28%, 44%
+#        diameter) -- smaller than before's near-full-shape ellipse.
+$r3Inset195 = [int]([regex]::Match($cssStripped195, '\.chassis-core-shape \.c-ring\.r3\s*\{\s*inset:\s*(\d+)%').Groups[1].Value)
+Check (
+    ($fullInset195 -gt 0) -and ($fullInset195 -lt $r3Inset195)
+) "195.3: the diagonal ring's inset (${fullInset195}%) sits strictly between r1's (0%, full diameter) and r3's (${r3Inset195}%, its own smaller diameter) -- a genuinely reduced ring, not the earlier near-full-shape ellipse"
+
+# 195.4  the ring is shaded with a volumetric box-shadow trio (inset dark
+#        "underside" + inset light "lip" + outer glow "reflected bloom")
+#        so a THICK border reads as a lit, rounded 3D band rather than a
+#        flat wide outline -- the owner's actual thicker/genuinely-3D ask,
+#        achieved via box-shadow (never border-image, which fights
+#        border-radius on a circle across browsers).
+$beforeRule195 = [regex]::Match($cssStripped195, '\.chassis-core-shape::before\s*\{[^\}]*\}').Value
+$insetCount195 = ([regex]::Matches($beforeRule195, 'inset 0 0')).Count
+Check (
+    ($beforeRule195 -match 'box-shadow:') -and
+    ($insetCount195 -ge 2) -and
+    ($beforeRule195 -match 'rgba\(var\(--robco-green-rgb\)') -and
+    (-not ($beforeRule195 -match 'border-image'))
+) '195.4: the diagonal ring is shaded with a box-shadow trio (two inset shadows + an outer glow) simulating a lit, rounded 3D band -- never border-image, which does not reliably compose with border-radius on a circular element across browsers'
+
+# 195.5  the core "?" help button was nudged further up and right so the
+#        r1 ring (inset:0, a circle of radius 48px centered on the 96x96
+#        shape) no longer visibly crosses through it -- an owner-reported
+#        live-render bug. This computes the ACTUAL geometry (not just a
+#        "bigger than before" range) -- a live-measured first attempt
+#        (-11px/-10px) still put the button's nearest corner at ~37.5px
+#        from the shape's center, well INSIDE the 48px ring radius, so the
+#        ring still crossed it despite reading as "moved further." The
+#        button's bottom-left corner (nearest the circle) sits at
+#        (64+right, 32-top) relative to the shape's own (0,0)-(96,96) box
+#        (32 = the .icon-btn-round size); its distance from the center
+#        (48,48) must clear the ring's ~48px radius with margin for the
+#        ring's own ~2px stroke.
+$helpBtnRule195 = [regex]::Match($cssStripped195, '\.core-help-btn\s*\{[^\}]*\}').Value
+$helpTop195 = [int]([regex]::Match($helpBtnRule195, 'top:\s*-(\d+)px').Groups[1].Value)
+$helpRight195 = [int]([regex]::Match($helpBtnRule195, 'right:\s*-(\d+)px').Groups[1].Value)
+$cornerX195 = 64 + $helpRight195
+$cornerY195 = 32 - $helpTop195
+$cornerDist195 = [Math]::Sqrt([Math]::Pow($cornerX195 - 48, 2) + [Math]::Pow($cornerY195 - 48, 2))
+Check (
+    ($helpTop195 -gt 6) -and ($helpRight195 -gt 6) -and ($cornerDist195 -ge 49)
+) "195.5: .core-help-btn moved from -6px/-6px to -${helpTop195}px top / -${helpRight195}px right -- its nearest corner to the shape's center is now $([Math]::Round($cornerDist195,1))px away, clearing the r1 ring's own 48px-radius edge (a first attempt at -11px/-10px only reached ~37.5px, still inside the ring -- this assertion catches that class of under-correction)"
+
+# 195.6  no ID-scoped override of the ring's perspective/border-width/
+#        inset exists anywhere for #chassisCore or #chassisCoreMini --
+#        every value affecting the ring's visual parity still comes from
+#        the ONE shared .chassis-core-shape/.chassis-core-mini class
+#        selectors, never a per-id divergence that could desync them.
+Check (
+    (-not [System.Text.RegularExpressions.Regex]::IsMatch($cssStripped195, '#chassisCore\s*\{[^\}]*(?:perspective|border-width|inset)')) -and
+    (-not [System.Text.RegularExpressions.Regex]::IsMatch($cssStripped195, '#chassisCoreMini\s*\{[^\}]*(?:perspective|border-width|inset)'))
+) '195.6: no #chassisCore/#chassisCoreMini ID-scoped rule overrides perspective/border-width/inset anywhere -- every ring-parity value still comes from the shared .chassis-core-shape/.chassis-core-mini class selectors (Protocol 22, one source)'
+
+# 195.7  the gate-stacking mechanism (.core-still) still pauses the
+#        perpendicular ring's continuous loop -- unaffected by this
+#        visual-only pass.
+Check (
+    $cssStripped195 -match '\.core-still::before'
+) '195.7: .core-still::before still pauses the diagonal ring -- the gate-stacking mechanism (reduced-motion/low-immersion/hidden-tab/standby) is untouched by this visual-only fix'
+
+# 195.8  Protocol 17: the help button's own tap target (.icon-btn-round,
+#        32px) is unaffected by the position nudge -- only top/right
+#        moved, width/height/min-width/min-height are untouched.
+$iconBtnRule195 = [System.Text.RegularExpressions.Regex]::Match($cssStripped195, "(?s)\.composer-icon-btn,\s*\n\.composer-send-btn,\s*\n\.icon-btn-round\s*\{[^\}]*\}").Value
+Check (
+    ($iconBtnRule195 -match 'width:\s*32px') -and ($iconBtnRule195 -match 'min-width:\s*32px')
+) '195.8: .icon-btn-round keeps its 32px (>=28px Protocol 17) tap target -- the help button repositioning only changed top/right, never its size'
 
 # ===========================================================
 # Results

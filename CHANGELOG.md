@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2531/2531 | Cache: robco-terminal-v2.7.0-r108 -->
+﻿## [Unreleased]<!-- Tests: 2539/2539 | Cache: robco-terminal-v2.7.0-r109 -->
 
 ### Added
 
@@ -129,6 +129,7 @@
 - Fixed the browser's own default tap/press highlight flashing on buttons across the whole terminal, most noticeably washing out the power core's own pulse when you tapped it. Pressing or tapping any control now shows only its own designed feedback, with no stray highlight box — keyboard focus rings are completely unaffected.
 - Fixed your CURIO ARCHIVE's Lincoln memorabilia relics stacking one to a row instead of sitting side by side like your snow globes or bobbleheads. They now display in the same multi-column layout as the rest of your collectibles.
 - Fixed the OPERATIONAL TEMPO dial's readout not updating until you let go of the knob — dragging it now shows the position and description update live as the needle passes each one, snapping to the nearest choice the moment you release.
+- Fixed the power core's main body and its small mirror in the top casing still not quite matching each other visually, even after an earlier pass meant to bring them in sync — the mirror's 3D depth was noticeably flatter than the main core's. Also fixed the core's always-on diagonal ring, which had grown too wide across its whole diameter instead of reading as a solid, rounded band — it's now smaller across and genuinely thicker, with shading that makes it look like a real curved surface rather than a flat outline. And nudged the core's "?" help button up and to the side so the ring no longer visibly cuts through it.
 
 ### Improved
 

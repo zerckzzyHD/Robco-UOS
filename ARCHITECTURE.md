@@ -69,8 +69,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2531-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2531-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2539-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2539-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -1081,6 +1081,68 @@ mechanism (no bespoke carve-out), zero campaign-state write:
 | 8   | Uptime-milestone pulse       | `_tickUptimeClock()` (the existing session-uptime tick) compares the current whole-hour count against `_lastCoreUptimeMilestone`; crossing a new hour fires `_coreMilestonePulse()` exactly once.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | 9   | Tap-and-hold overcharge      | `_coreHoldStart()`/`_coreHoldEnd()` wired to `#chassisCore`'s `pointerdown`/`pointerup`/`pointercancel`/`pointerleave`. Holding `CORE_HOLD_MS` (850ms) ramps `core-charging` (reusing the #3 `--core-spin-mul-r1`/`-r3` inertia mechanism) to `core-charged`; releasing after that threshold fires `core-overcharge` — reusing the #14 stat-change burst's own `chassisCoreOrbitBurst1`/`3` tumble keyframes — plus an optional `playBoardThunk()` kick (Protocol 7, already guarded). `_coreSuppressNextTap` consumes the trailing `click` event a charged release still generates, so it never ALSO fires a plain tap-poke. Gated by `_coreShouldAnimate()` at the top of `_coreHoldStart()` — a closed gate degrades to a plain no-flourish hold, never a broken half-state.                                                                                                                                                          |
 | 10  | Center readout — **dropped** | Evaluated and intentionally not shipped: a live glyph/number could not be made legible on the small casing-top mini core (33-54px across its responsive tiers, already sharing its circle with 3 rings + the heart) without hurting the design — the owner's own stated escape hatch for this item.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+
+### LIVING CORE ring visual-parity fix (owner audit, Suite 195)
+
+An owner audit found the full core and mini core still visually mismatched
+despite the batch-1/batch-2 "sync confirmed" claims, plus two follow-on
+visual corrections. Root cause (Protocol 27): the mini core's `perspective`
+was a **flat 130px regardless of its own responsive size** (54px desktop,
+40px @480px, 33px @400px), so the perspective-to-size ratio drifted from
+~2.4x down to ~3.94x as the mini shrank — never matching the full core's
+constant `200px / 96px ≈ 2.08x` ratio. Every mini tier now carries its OWN
+`perspective` holding that same ~2.08x ratio (113px / 83px / 69px for the
+54px / 40px / 33px tiers respectively), and the diagonal ring's
+`border-width` is likewise proportionally matched at each tier (9px full /
+5px / 4px / 3px mini — deliberately **thinner** in absolute px on the
+smaller mini, reversing the earlier "mini bolder" assumption) at a
+consistent ~15-17% border-to-diameter ratio.
+
+Separately, an earlier "make it wider" ask had been misread as bigger
+diameter. The owner clarified: **thicker / genuinely 3D (a torus/sphere-
+shell band with volume)**, never wider in diameter — the previous
+`inset: 6%` (an 88%-diameter ellipse) was oversized, especially cramped in
+the tiny mini screen. Fixed by raising the inset to 20% (a ~60%-diameter
+ring nesting cleanly between r1 at 100% and r3 at 44%) and adding a
+`box-shadow` trio (two inset shadows + an outer glow) that shades the now-
+thicker border like a lit, rounded tube — `box-shadow`, not `border-image`,
+since the latter does not reliably compose with `border-radius` on a
+circular element across browsers.
+
+Finally, the core "?" help button (`.core-help-btn`) moved from `top:-6px;
+right:-6px` to `top:-24px; right:-22px` — the r1 ring (`inset: 0`, a circle
+of radius 48px centered on the 96x96 shape) was visibly crossing through the
+button's circle at the old offset. A first attempt (`-11px; -10px`) was
+verified live to be insufficient: the button's own nearest corner (computed
+from its 32px `.icon-btn-round` box) sat only ~37.5px from the shape's
+center, still inside the 48px ring radius, so the ring kept crossing it
+despite reading as "moved further." The final offset was computed precisely
+(not eyeballed) so the button's nearest corner clears the ring radius with
+margin (~55px).
+
+All three fixes are CSS-only (`css/terminal.css`), shared by both cores
+from the same `.chassis-core-shape`/`.chassis-core-mini` selectors with
+zero ID-scoped divergence (Suite 195.6), touch nothing in `js/ui-core.js`
+or `js/ui-audio.js`, write nothing durable to the campaign, and leave the
+existing `.core-still` gate-stacking mechanism untouched.
+
+**A second issue was caught during this same unit's own live render-
+verification (Protocol 42):** the two per-tier `perspective`/`border-width`
+media-query overrides (480px/400px, added for the ratio-matching fix above)
+were initially CASCADE-DEAD — an unconditional, equal-specificity rule for
+each of those exact properties already existed much further down the file
+(the pre-existing 130px/5px flat values these overrides were replacing), and
+since media queries add no specificity of their own, that later,
+unconditional rule always won regardless of viewport. Live measurement (not
+just the static test suite, which only checked that the CSS text existed —
+it did not simulate the cascade) caught the mini core rendering with the
+same 113px/5px values at every breakpoint. Fixed with a `body ` ancestor-
+selector specificity bump (0,2,0 → 0,2,1) on the four tier-override
+declarations, which reliably beats the later unconditional rule regardless
+of file position — verified live afterward at 360px/412px/desktop, each
+resolving its own correct tier value. Suite 195.1/195.2 (and the reworked
+192.37) now assert this "body "-prefixed form explicitly and fail if a
+future edit reverts to the bare, cascade-dead selector.
 
 ---
 
@@ -2671,7 +2733,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2531-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2539-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

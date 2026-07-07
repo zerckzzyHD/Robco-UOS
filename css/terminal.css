@@ -3572,6 +3572,22 @@ button.mode-pill--overseer:hover {
     width: 40px;
     height: 40px;
   }
+  /* perspective + the diagonal ring's border-width both hold the SAME
+     ratio to this tier's 40px size that the full core keeps at 96px (see
+     the base .chassis-core-shape.chassis-core-mini rule's comment) — big/
+     mini visual-parity fix, not a new design choice at this breakpoint.
+     `body ` is a deliberate specificity bump (0,2,0 -> 0,2,1): the
+     UNCONDITIONAL base rules for these two properties live much further
+     down the file (near the ring's own definition, for comment cohesion)
+     and would otherwise always win regardless of viewport — media queries
+     add no specificity of their own, so equal-specificity + later-in-file
+     beats an earlier, narrower media block every time without this. */
+  body .chassis-core-shape.chassis-core-mini {
+    perspective: 83px;
+  }
+  body .chassis-core-shape.chassis-core-mini::before {
+    border-width: 4px;
+  }
 
   /* Nested value wrappers (HP/LVL "cur / max") and the limb button groups stay
      inside the row and may wrap rather than clip. */
@@ -3654,6 +3670,19 @@ button.mode-pill--overseer:hover {
   .chassis-core-shape.chassis-core-mini {
     width: 33px;
     height: 33px;
+  }
+  /* perspective + the diagonal ring's border-width both hold the SAME
+     ratio to this tier's 33px size that the full core keeps at 96px — the
+     narrowest-phone leg of the same big/mini visual-parity fix. `body `
+     is the same deliberate specificity bump as the 480px tier above (see
+     its comment) — needed here too since this block's own later position
+     (relative to the 480px block) only settles the fight BETWEEN the two
+     media tiers, not against the unconditional base rule further down. */
+  body .chassis-core-shape.chassis-core-mini {
+    perspective: 69px;
+  }
+  body .chassis-core-shape.chassis-core-mini::before {
+    border-width: 3px;
   }
 }
 
@@ -9827,10 +9856,25 @@ button.chassis-core-shape {
      top of the broad html/button rules above. */
   -webkit-tap-highlight-color: transparent;
 }
+/* Owner report: at -6px/-6px the button sat close enough to the shape's
+   top-right corner that the r1 ring's own outer edge (inset:0 -- radius
+   48px from the shape's own 96x96 center) visibly crossed through the "?"
+   circle as it rotated. A first nudge to -11px/-10px was verified (via the
+   button's own 32px box geometry) to STILL leave its nearest corner only
+   ~37.5px from the shape's center -- inside the 48px ring radius, so the
+   ring still crossed it. Worked out precisely: the button's nearest
+   corner is at (64+right, 32-top) relative to the shape's own (0,0)-(96,96)
+   box, so top/right both need to push that corner's distance from the
+   center (48,48) comfortably past 48px (the ring itself has ~2px of
+   stroke straddling that radius). -24px/-22px puts the nearest corner at
+   ~55px from center -- a clean, verified clearance, not a guess. Still
+   comfortably inside its 32px .icon-btn-round tap target (Protocol 17)
+   and still a sibling of .chassis-core-shape inside .chassis-core-shell,
+   never overlapping the shape's own overflow:hidden clip. */
 .core-help-btn {
   position: absolute;
-  top: -6px;
-  right: -6px;
+  top: -24px;
+  right: -22px;
 }
 .chassis-core-shape .c-ring {
   position: absolute;
@@ -9881,30 +9925,46 @@ button.chassis-core-shape {
    r1/r3 idle-spin convention — linear is correct for an unbounded loop,
    never ease-in-out, which would visibly hitch at the seam) + will-change
    keeps it fluid and GPU-composited. */
-/* Owner follow-up: "make the always 3d one have more width so it actually
-   looks 3d sideways" — a thin stroke collapses to a near-invisible hairline
-   at the edge-on point of the diagonal tumble, which is exactly the moment
-   that's supposed to read as depth. Widened both the ring's own size
-   (inset 8% -> 6%, a bigger ellipse) and its border stroke (1.5px -> 3px)
-   so the edge-on silhouette itself has visible width/thickness — it reads
-   as a solid 3D band swinging through depth rather than vanishing. */
+/* Owner correction: "wider" was the wrong read of the earlier ask — the
+   owner means THICKER / genuinely 3D (a torus/sphere-shell BAND with
+   volume), never wider in DIAMETER. The previous inset (6%, an 88%-
+   diameter ellipse) read as oversized, especially cramped inside the tiny
+   mini screen. Shrunk to inset 20% (a ~60%-diameter ring, nesting cleanly
+   between r1 at 100% and r3 at 44%) and given real volume via a much
+   thicker border PLUS an inset/outer box-shadow pair that shades it like a
+   lit, rounded tube rather than a flat hairline outline — a dark inner
+   shadow reads as the far/underside of the band, a faint inner highlight
+   as its near lip, and a soft outer glow as reflected bloom off its
+   surface. box-shadow (not border-image, which fights border-radius on a
+   circle across browsers) is the same glow idiom every other flourish in
+   this file already uses (Protocol 22). Shared by both cores from this ONE
+   rule — only the per-size border-width below is a necessary override
+   (CSS border-width has no percentage form), never a diverging design. */
 .chassis-core-shape::before {
   content: '';
   position: absolute;
-  inset: 6%;
+  inset: 20%;
   border-radius: 50%;
-  border: 3px solid rgba(var(--robco-green-rgb), 0.55);
+  border: 9px solid rgba(var(--robco-green-rgb), 0.6);
+  box-shadow:
+    inset 0 0 4px rgba(0, 0, 0, 0.6),
+    inset 0 0 1px rgba(255, 255, 255, 0.25),
+    0 0 3px rgba(var(--robco-green-rgb), 0.35);
   will-change: transform;
   animation: chassisCoreOrbitPerp 6s linear infinite;
 }
-/* Owner follow-up: give the mini core's copy of this ring a bolder,
-   higher-contrast border than the full core's — it shares the casing-top
-   screen with three other rings + the heart in a much smaller box, so a
-   proportionally thicker/brighter stroke is what keeps it distinguishable
-   rather than lost among them (the same "small elements need bolder
-   strokes to stay legible" reasoning already used elsewhere in the file). */
+/* Mini-core border-width overrides (this desktop-tier 54px size; the
+   40px/33px tiers get their own overrides alongside their own width/height
+   media-query blocks further down) — sized to hold roughly the SAME
+   border-to-diameter ratio as the full core (~15-17%) at every size, so the
+   band reads with consistent thickness/volume regardless of which core or
+   viewport tier is showing it (the previous flat 4px mini override, never
+   adjusted per breakpoint, is what let the two cores drift apart visually
+   as the mini shrank). border-color keeps its own higher-contrast opacity —
+   the mini shares the casing-top screen with three other rings + the heart,
+   so a bolder stroke is still what keeps it legible there. */
 .chassis-core-shape.chassis-core-mini::before {
-  border-width: 4px;
+  border-width: 5px;
   border-color: rgba(var(--robco-green-rgb), 0.8);
 }
 @keyframes chassisCoreOrbitPerp {
@@ -10144,18 +10204,19 @@ button.chassis-core-shape {
 .chassis-core-shape {
   perspective: 200px;
 }
-/* Owner follow-up: the always-on perpendicular ring (::before, further
-   below) "can't even be seen" in the mini core. Root cause was a perspective
-   distance disproportionately tighter than the full core's own ratio
-   (55px on a 44px shape ~= 1.25x, vs the full core's 200px on 96px ~= 2.1x)
-   -- the tighter ratio meant much MORE foreshortening for the mini ring
-   relative to its own size, on top of it now sharing an even smaller box
-   with three other rings + the heart. Loosened to 130px (roughly matching
-   the full core's own looser ratio against the mini core's now-bigger 54px
-   size, Protocol 42), so the diagonal tumble reads clearly instead of
-   collapsing to a near-invisible sliver at the extremes of its rotation. */
+/* Owner correction (big/mini visual-mismatch fix): a FLAT 130px mini
+   perspective, applied regardless of which of the mini core's three
+   responsive size tiers (54px here / 40px / 33px, in the media queries
+   further down) was actually showing, meant the perspective-to-size RATIO
+   drifted a lot narrower on phones (130/40 ~= 3.25x, 130/33 ~= 3.94x) than
+   the full core's constant 200/96 ~= 2.08x ratio -- more foreshortening at
+   every tier than the full core ever shows, which is a real, measurable
+   reason the two cores never looked alike. Each tier below now gets its
+   OWN perspective holding that SAME ~2.08x ratio against its own current
+   size (54 * 2.08 ~= 113, matching the media-query overrides further down
+   for the 40px and 33px tiers) -- true parity, not just "big enough to see." */
 .chassis-core-shape.chassis-core-mini {
-  perspective: 130px;
+  perspective: 113px;
 }
 @keyframes chassisCoreOrbitBurst1 {
   0% {
