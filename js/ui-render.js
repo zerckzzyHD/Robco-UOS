@@ -2147,6 +2147,38 @@ function markLocationVisited(loc) {
   _rerenderMapPreservingScroll();
 }
 
+// Native "travel here" — sets a sector-sheet location as CURRENT (moves the [CURRENT]
+// marker there), unlike markLocationVisited() above which only flags a place discovered
+// without ever touching state.loc. Routes through the SAME shared onLocationChange
+// (overrideLoc) setter the #stat_loc field itself uses (Protocol 22 — never a forked
+// setter): it mirrors the new value into #stat_loc, syncs state, records BOTH the left
+// and arrived location visited via recordLocationVisit(), saves, and re-renders. No AI,
+// no transmitMessage — fully offline and player-authored (Protocol 24).
+//
+// onLocationChange() re-renders via its own bare renderWorldMap() call (it also fires
+// from the unrelated #stat_loc onchange on OPERATOR, far from the map, where scroll-
+// preserving would make no sense there), so calling it from inside the zoomed sector
+// sheet hits the exact same innerHTML-replaces-the-focused-node scroll jump that
+// _rerenderMapPreservingScroll() exists to fix (WU-F11 / Suite 196 / Suite 198). Since
+// onLocationChange() already owns that one render call, this can't delegate to
+// _rerenderMapPreservingScroll() itself (that would render the map twice) — instead it
+// captures/restores the same panel-anchor delta around the call, reusing the identical
+// _scrollElFor('databank') lookup (Protocol 22 — still one scroll-detection path).
+function travelToLocation(loc) {
+  if (!loc) return;
+  const panel = document.getElementById('worldMapPanel');
+  const before = panel ? panel.getBoundingClientRect().top : null;
+  onLocationChange(loc);
+  if (panel && before !== null) {
+    const el = typeof _scrollElFor === 'function' ? _scrollElFor('databank') : null;
+    const delta = panel.getBoundingClientRect().top - before;
+    if (delta) {
+      if (el) el.scrollTop += delta;
+      else window.scrollTo(0, (window.scrollY || 0) + delta);
+    }
+  }
+}
+
 // Arrow-key traversal between rendered SVG nodes (nearest node in the pressed
 // direction, by real grid coordinate) + Enter/Space pulls the sector sheet.
 // Reads _mapLastNodes (set by renderWorldMap's strategic-view branch) so it
@@ -2320,11 +2352,27 @@ function renderWorldMap() {
                 loc
               )} as surveyed">&#9656; MARK SURVEYED</button>`;
 
+        // Native "travel here" affordance — sets this location as CURRENT (moves the
+        // [CURRENT] marker), distinct from MARK SURVEYED which only flags a place
+        // discovered. Suppressed only on the already-current row (no-op there); shown on
+        // both surveyed and unsurveyed rows, since fast-traveling to a known OR a freshly-
+        // charted location is the whole point. No AI, no network — travelToLocation() routes
+        // through the same shared onLocationChange(overrideLoc) setter the #stat_loc field
+        // itself uses (Protocol 22).
+        const travelBtn = isYou
+          ? ''
+          : `<button class="mark" data-loc="${escapeHtml(
+              loc
+            )}" onclick="travelToLocation(this.dataset.loc)" aria-label="Travel to ${escapeHtml(
+              loc
+            )} — set as current location">&#8594; TRAVEL HERE</button>`;
+
         html += `
           <div class="${rowCls}">
             <b>${escapeHtml(loc)}</b>
             ${statusText}
             ${markBtn}
+            ${travelBtn}
           </div>
         `;
       });

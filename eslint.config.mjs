@@ -152,6 +152,9 @@ export default [
         // after clearing #chatInput so the box resets to its small size after every send
         _autoGrowComposer: 'readonly',
         markLocationVisited: 'readonly',
+        // Native "travel here" — sets the tapped sector-sheet location as CURRENT
+        // (js/ui-render.js), routing through the shared onLocationChange() setter
+        travelToLocation: 'readonly',
         // Step 2 Phase 2 A1 — Ambient Runtime (js/runtime.js): lifecycle state machine + observer scheduler
         AmbientRuntime: 'readonly',
         initAmbientRuntime: 'readonly',

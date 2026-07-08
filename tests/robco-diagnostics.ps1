@@ -21176,6 +21176,162 @@ console.log('RESULT:' + results.map(function (r) { return r ? '1' : '0'; }).join
 }
 
 # ===========================================================
+# Suite 203 -- native "TRAVEL HERE" map control: sets the tapped sector-sheet
+# location as CURRENT (moves the [CURRENT] marker), distinct from MARK
+# SURVEYED (WU-F11) which only flags a place discovered. Routes through the
+# SAME shared onLocationChange(overrideLoc) setter the #stat_loc field itself
+# uses (Protocol 22 -- never a forked setter); no AI, no network (Protocol
+# 24); real <button>, literal aria-label (UI-5/UI-3); suppressed only on the
+# already-current row. (PS mirror of JS 203.)
+# 8 tests
+# ===========================================================
+Sep "Suite 203 -- native TRAVEL HERE map control"
+$render203 = Read-Src "js/ui-render.js"
+$travelFn203 = Get-FunctionBody $render203 'travelToLocation'
+$travelBtnSrc203 = [regex]::Match($render203, 'const travelBtn = isYou[\s\S]*?</button>`;').Value
+
+# 203.1  the handler exists and delegates entirely to the shared setter --
+#        it never assigns state.loc directly and never calls
+#        recordLocationVisit()/saveState() itself (onLocationChange() owns
+#        all of that), so there is exactly one place that can set CURRENT.
+Check (
+    ($render203 -match 'function travelToLocation\(loc\)') -and
+    ($travelFn203 -match 'onLocationChange\(loc\)') -and
+    (-not ($travelFn203 -match 'state\.loc\s*=')) -and
+    (-not ($travelFn203 -match 'recordLocationVisit\(')) -and
+    (-not ($travelFn203 -match '\bsaveState\(\)'))
+) '203.1: travelToLocation() routes through the shared onLocationChange(loc) setter -- never assigns state.loc or calls recordLocationVisit()/saveState() itself (no forked setter, Protocol 22)'
+
+# 203.2  NO AI -- the handler does no network/Director call
+Check (-not ($travelFn203 -match 'fetch\(|XMLHttpRequest|transmitMessage\(|generativelanguage|gemini')) `
+    '203.2: travelToLocation makes no AI/network call (native, offline, Protocol 24)'
+
+# 203.3  a real TRAVEL HERE <button> is rendered per non-current row, wired
+#        to travelToLocation via an escaped data-loc (apostrophe-safe), not
+#        a <span onclick> (Protocol UI-5)
+Check (
+    ($render203 -match 'onclick="travelToLocation\(this\.dataset\.loc\)"') -and
+    ($render203 -match 'data-loc="\$\{escapeHtml\(') -and
+    ($render203 -match 'TRAVEL HERE</button>')
+) '203.3: each sector-sheet row renders a real TRAVEL HERE <button> wired to travelToLocation via an escaped data-loc'
+
+# 203.4  accessible label -- literal aria-label (UI-3), not diegetic,
+#        explicitly names the "set as current location" effect
+Check (
+    ($render203 -match 'aria-label="Travel to \$\{escapeHtml\(') -and
+    ($render203 -match '— set as current location"')
+) '203.4: the TRAVEL HERE button carries a literal aria-label ("Travel to <loc> -- set as current location")'
+
+# 203.5  suppression gating -- TRAVEL HERE is suppressed ONLY on the
+#        already-current row (isYou), unlike MARK SURVEYED which also hides
+#        on already-visited rows (isYou || wasVisited) -- fast-traveling to
+#        a known, already-surveyed location is the point.
+Check (
+    ($travelBtnSrc203.Length -gt 0) -and
+    ($travelBtnSrc203 -match "^const travelBtn = isYou\s*\r?\n\s*\?\s*''") -and
+    (-not ($travelBtnSrc203 -match 'wasVisited'))
+) '203.5: TRAVEL HERE is suppressed only on the already-current location (isYou) -- shown on both surveyed and unsurveyed rows, unlike MARK SURVEYED'
+
+# 203.6  reuses the SAME shared .mark CSS class MARK SURVEYED already uses
+#        (Suite 126.7 covers its >=28px tap target / width:auto) -- no new,
+#        untested button class introduced for this control.
+Check (
+    $render203 -match 'class="mark" data-loc="\$\{escapeHtml\([\s\S]{0,40}?\)\}" onclick="travelToLocation'
+) '203.6: the TRAVEL HERE button reuses the shared .loc-row button.mark class (same >=28px tap target, no new CSS)'
+
+# 203.7  game-agnostic (Protocol 38) -- no game literal in the handler
+Check (-not ($travelFn203 -match 'New Vegas|Mojave|\bFNV\b|\bFO3\b|Capital Wasteland|Vault 101')) `
+    '203.7: travelToLocation is game-agnostic (operates on the loc string, no game literals)'
+
+# 203.8  BEHAVIORAL -- travelToLocation(loc) captures the #worldMapPanel
+#        scroll anchor BEFORE calling onLocationChange(loc) exactly once with
+#        the given loc, then (since onLocationChange already re-rendered
+#        internally) restores the scroll delta via the SAME shared
+#        _scrollElFor('databank') lookup -- never a second, direct
+#        renderWorldMap() call of its own. Executed via a spawned node
+#        process against the REAL travelToLocation() source (Protocol 42
+#        stdin-corruption-safe transport).
+$labels203 = @(
+    "203.8: [behavioral] travelToLocation('Primm') calls onLocationChange('Primm') exactly once (never renderWorldMap() itself), then restores scroll via the shared _scrollElFor('databank') lookup, correcting scrollTop by the pre/post panel-position delta (500 + (40-100) = 440)"
+)
+try {
+    $nodeCheck203 = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCheck203) {
+        $repoRoot203 = (Get-Item $PSScriptRoot).Parent.FullName
+        $repoRootNode203 = $repoRoot203.Replace('\', '/')
+        $testScript203 = @"
+const vm = require('vm');
+const fs = require('fs');
+const path = require('path');
+const ROOT = '$repoRootNode203';
+function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+const uiRenderSrc = rd('js/ui-render.js');
+function extractBody(src, name) {
+  var idx = src.indexOf('function ' + name);
+  if (idx === -1) throw new Error('missing ' + name);
+  var i = src.indexOf('{', idx);
+  var depth = 0, start = i;
+  while (i < src.length) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) return src.slice(start, i + 1); }
+    i++;
+  }
+  throw new Error('unclosed ' + name);
+}
+var results = [];
+try {
+  var declared = 'function travelToLocation(loc)' + extractBody(uiRenderSrc, 'travelToLocation');
+  var calls = { onLocationChange: [], scrollElFor: [], renderWorldMap: 0 };
+  var rectCall = 0;
+  var panelEl = {
+    getBoundingClientRect: function () {
+      rectCall++;
+      return { top: rectCall === 1 ? 100 : 40 };
+    }
+  };
+  var scrollTarget = { scrollTop: 500 };
+  var sandbox = {
+    document: { getElementById: function (id) { return id === 'worldMapPanel' ? panelEl : null; } },
+    window: { scrollY: 0, scrollTo: function () {} },
+    onLocationChange: function (loc) { calls.onLocationChange.push(loc); },
+    renderWorldMap: function () { calls.renderWorldMap++; },
+    _scrollElFor: function (key) { calls.scrollElFor.push(key); return scrollTarget; }
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(declared, sandbox);
+  vm.runInContext("travelToLocation('Primm');", sandbox);
+  results.push(
+    calls.onLocationChange.length === 1 && calls.onLocationChange[0] === 'Primm' &&
+    calls.renderWorldMap === 0 &&
+    calls.scrollElFor.length === 1 && calls.scrollElFor[0] === 'databank' &&
+    scrollTarget.scrollTop === 440
+  );
+} catch (e) { results.push(false); }
+console.log('RESULT:' + results.map(function (r) { return r ? '1' : '0'; }).join(''));
+"@
+        $tmpScript203 = [System.IO.Path]::GetTempFileName() + '.js'
+        [System.IO.File]::WriteAllText($tmpScript203, $testScript203, [System.Text.Encoding]::UTF8)
+        try {
+            $out203 = (node $tmpScript203 2>&1 | Out-String)
+        } finally {
+            Remove-Item -Path $tmpScript203 -Force -ErrorAction SilentlyContinue
+        }
+        $rm203 = [regex]::Match($out203, 'RESULT:([01]{1})')
+        if ($rm203.Success) {
+            $bits203 = $rm203.Groups[1].Value
+            Check ($bits203.Substring(0, 1) -eq '1') $labels203[0]
+        } else {
+            $err203 = if ([string]::IsNullOrWhiteSpace($out203)) { "No output from node" } else { $out203.Trim() }
+            foreach ($lbl in $labels203) { Fail "$lbl  (runtime error: $err203)" }
+        }
+    } else {
+        foreach ($lbl in $labels203) { Fail "$lbl  (node not available in PATH)" }
+    }
+} catch {
+    foreach ($lbl in $labels203) { Fail "$lbl  (exception: $($_.Exception.Message))" }
+}
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

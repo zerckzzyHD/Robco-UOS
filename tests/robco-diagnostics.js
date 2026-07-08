@@ -32704,6 +32704,150 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 203 — native "TRAVEL HERE" map control: sets the tapped sector-sheet
+//  location as CURRENT (moves the [CURRENT] marker), distinct from MARK
+//  SURVEYED (WU-F11) which only flags a place discovered. Routes through the
+//  SAME shared onLocationChange(overrideLoc) setter the #stat_loc field
+//  itself uses (Protocol 22 — never a forked setter); no AI, no network
+//  (Protocol 24); real <button>, literal aria-label (UI-5/UI-3); suppressed
+//  only on the already-current row.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 203 — native TRAVEL HERE map control');
+  const render203 = readFile('js/ui-render.js');
+  const travelFn203 = extractFunctionBody(render203, 'travelToLocation');
+  const travelBtnSrc203 = (render203.match(/const travelBtn = isYou[\s\S]*?<\/button>`;/) || [
+    '',
+  ])[0];
+
+  // 203.1  the handler exists and delegates entirely to the shared setter —
+  //        it never assigns state.loc directly and never calls
+  //        recordLocationVisit()/saveState() itself (onLocationChange() owns
+  //        all of that), so there is exactly one place that can set CURRENT.
+  assert(
+    /function travelToLocation\(loc\)/.test(render203) &&
+      /onLocationChange\(loc\)/.test(travelFn203) &&
+      !/state\.loc\s*=/.test(travelFn203) &&
+      !/recordLocationVisit\(/.test(travelFn203) &&
+      !/\bsaveState\(\)/.test(travelFn203),
+    '203.1: travelToLocation() routes through the shared onLocationChange(loc) setter — never assigns state.loc or calls recordLocationVisit()/saveState() itself (no forked setter, Protocol 22)'
+  );
+
+  // 203.2  NO AI — the handler does no network/Director call
+  assert(
+    !/fetch\(|XMLHttpRequest|transmitMessage\(|generativelanguage|gemini/i.test(travelFn203),
+    '203.2: travelToLocation makes no AI/network call (native, offline, Protocol 24)'
+  );
+
+  // 203.3  a real TRAVEL HERE <button> is rendered per non-current row, wired
+  //        to travelToLocation via an escaped data-loc (apostrophe-safe), not
+  //        a <span onclick> (Protocol UI-5)
+  assert(
+    /onclick="travelToLocation\(this\.dataset\.loc\)"/.test(render203) &&
+      /data-loc="\$\{escapeHtml\(\s*loc\s*\n\s*\)\}" onclick="travelToLocation/.test(render203) &&
+      /TRAVEL HERE<\/button>/.test(render203),
+    '203.3: each sector-sheet row renders a real TRAVEL HERE <button> wired to travelToLocation via an escaped data-loc'
+  );
+
+  // 203.4  accessible label — literal aria-label (UI-3), not diegetic,
+  //        explicitly names the "set as current location" effect
+  assert(
+    /aria-label="Travel to \$\{escapeHtml\(/.test(render203) &&
+      /— set as current location"/.test(render203),
+    '203.4: the TRAVEL HERE button carries a literal aria-label ("Travel to <loc> — set as current location")'
+  );
+
+  // 203.5  suppression gating — TRAVEL HERE is suppressed ONLY on the
+  //        already-current row (isYou), unlike MARK SURVEYED which also
+  //        hides on already-visited rows (isYou || wasVisited) — fast-
+  //        traveling to a known, already-surveyed location is the point.
+  assert(
+    travelBtnSrc203.length > 0 &&
+      /^const travelBtn = isYou\s*\n\s*\?\s*''/.test(travelBtnSrc203) &&
+      !/wasVisited/.test(travelBtnSrc203),
+    '203.5: TRAVEL HERE is suppressed only on the already-current location (isYou) — shown on both surveyed and unsurveyed rows, unlike MARK SURVEYED'
+  );
+
+  // 203.6  reuses the SAME shared .mark CSS class MARK SURVEYED already uses
+  //        (Suite 126.7 covers its ≥28px tap target / width:auto) — no new,
+  //        untested button class introduced for this control.
+  assert(
+    /class="mark" data-loc="\$\{escapeHtml\(\s*loc\s*\n\s*\)\}" onclick="travelToLocation/.test(
+      render203
+    ),
+    '203.6: the TRAVEL HERE button reuses the shared .loc-row button.mark class (same ≥28px tap target, no new CSS)'
+  );
+
+  // 203.7  game-agnostic (Protocol 38) — no game literal in the handler
+  assert(
+    !/New Vegas|Mojave|\bFNV\b|\bFO3\b|Capital Wasteland|Vault 101/i.test(travelFn203),
+    '203.7: travelToLocation is game-agnostic (operates on the loc string, no game literals)'
+  );
+
+  // 203.8  BEHAVIORAL (vm sandbox) — travelToLocation(loc) captures the
+  //        #worldMapPanel scroll anchor BEFORE calling onLocationChange(loc)
+  //        exactly once with the given loc, then (since onLocationChange
+  //        already re-rendered internally) restores the scroll delta via the
+  //        SAME shared _scrollElFor('databank') lookup — never a second,
+  //        direct renderWorldMap() call of its own.
+  {
+    const vm203 = require('vm');
+    let out203 = null;
+    let err203 = null;
+    try {
+      const declared203 = 'function travelToLocation(loc)' + travelFn203;
+      const calls203 = { onLocationChange: [], scrollElFor: [], renderWorldMap: 0 };
+      let rectCall = 0;
+      const panelEl203 = {
+        getBoundingClientRect() {
+          rectCall++;
+          // First call (before onLocationChange) returns 100; the second call
+          // (after) returns 40 — simulating the innerHTML-rebuild shifting the
+          // panel up, which the delta-restore below must correct for.
+          return { top: rectCall === 1 ? 100 : 40 };
+        },
+      };
+      const scrollTarget203 = { scrollTop: 500 };
+      const sandbox203 = {
+        document: {
+          getElementById(id) {
+            return id === 'worldMapPanel' ? panelEl203 : null;
+          },
+        },
+        window: { scrollY: 0, scrollTo() {} },
+        onLocationChange(loc) {
+          calls203.onLocationChange.push(loc);
+        },
+        renderWorldMap() {
+          calls203.renderWorldMap++;
+        },
+        _scrollElFor(key) {
+          calls203.scrollElFor.push(key);
+          return scrollTarget203;
+        },
+      };
+      vm203.createContext(sandbox203);
+      vm203.runInContext(declared203, sandbox203);
+      vm203.runInContext("travelToLocation('Primm');", sandbox203);
+      out203 = { calls203, scrollTop: scrollTarget203.scrollTop };
+    } catch (e) {
+      err203 = e;
+    }
+    assert(
+      !err203 &&
+        out203.calls203.onLocationChange.length === 1 &&
+        out203.calls203.onLocationChange[0] === 'Primm' &&
+        out203.calls203.renderWorldMap === 0 &&
+        out203.calls203.scrollElFor.length === 1 &&
+        out203.calls203.scrollElFor[0] === 'databank' &&
+        out203.scrollTop === 440,
+      "203.8: [behavioral] travelToLocation('Primm') calls onLocationChange('Primm') exactly once (never renderWorldMap() itself), then restores scroll via the shared _scrollElFor('databank') lookup, correcting scrollTop by the pre/post panel-position delta (500 + (40-100) = 440)" +
+        (err203 ? ' — ' + err203.message : '')
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail

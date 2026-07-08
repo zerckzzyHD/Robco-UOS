@@ -69,8 +69,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2701-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2701-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2709-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2709-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -1652,7 +1652,16 @@ set at render time), Enter/Space pulls the sector sheet. The zoom-detail view is
 "sector sheet" (`.sheet`/`.loc-row`/`.loc-st`) — same `_mapActiveZone`/`zoomMapToZone`/`resetMapZoom`
 logic, only the markup changed; the MARK SURVEYED key (renamed from LOG VISIT, class `.mark`) still
 routes through the unchanged `markLocationVisited()` → `recordLocationVisit()` single source
-(add-only, permanent fog-of-war). The dead `_mapAbbrev`/`_MAP_ABBREV` hand-maintained abbreviation
+(add-only, permanent fog-of-war). A sibling TRAVEL HERE key (same `.mark` class, native, no AI)
+calls a new `travelToLocation(loc)` (`js/ui-render.js`) that delegates to the SAME shared
+`onLocationChange(overrideLoc)` setter the `#stat_loc` field already uses (Protocol 22 — never a
+forked setter) to move `[CURRENT]` to the tapped location and record it visited; since
+`onLocationChange()` owns its own single `renderWorldMap()` call, `travelToLocation()` wraps that
+call with a capture/restore of the `#worldMapPanel` scroll anchor (reusing the identical
+`_scrollElFor('databank')` lookup `_rerenderMapPreservingScroll()` uses) rather than double-
+rendering. Suppressed only on the already-current row — unlike MARK SURVEYED, it stays available on
+already-surveyed rows too, since fast-traveling to a known location is the point. The dead
+`_mapAbbrev`/`_MAP_ABBREV` hand-maintained abbreviation
 table is deleted entirely — nodes are keyed by coordinate identity now, not a name-shortening lookup
 — along with every now-orphaned boxed-grid CSS rule (`.map-cell*`, `.map-detail-*`, `.map-legend`,
 `.map-toggle-btn`, `.map-you-marker`); `.map-back-btn` and `.map-collectible-badge` are kept, still
@@ -2827,7 +2836,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2701-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2709-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable
