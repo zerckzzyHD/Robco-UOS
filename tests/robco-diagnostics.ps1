@@ -3813,24 +3813,30 @@ Check ($broken642.Count -eq 0) `
 Check ([bool]($uiCoreSrc64 -match 'function commitStat\s*\(')) `
     'commitStat is defined in ui-core.js'
 
-# 64.4-64.7  inspect commitStat body
+# 64.4-64.7  inspect commitStat body -- commitStat now DELEGATES its clamp/
+# save/emit to the shared _nativeSetSpecial() choke point (Native USE +
+# TERMINAL stat-edits plan, Protocol 22), so 64.4-64.6 check the CONCATENATION
+# of both bodies -- the same guarantee, just spanning two cooperating functions.
 $commitStatBody64 = ''
+$nativeSetSpecialBody64 = ''
 try { $commitStatBody64 = Get-FunctionBody $uiCoreSrc64 'commitStat' } catch {}
+try { $nativeSetSpecialBody64 = Get-FunctionBody $uiCoreSrc64 '_nativeSetSpecial' } catch {}
+$combined64 = "$commitStatBody64`n$nativeSetSpecialBody64"
 
 # 64.4  1-10 clamp on commit only
-Check ([bool]($commitStatBody64 -match 'Math\.Max\s*\(\s*1,\s*Math\.Min\s*\(\s*10,' -or $commitStatBody64 -match 'Math\.max\s*\(\s*1,\s*Math\.min\s*\(\s*10,')) `
-    'commitStat clamps value to 1-10 on commit (Math.max/min guard)'
+Check ([bool]($combined64 -match 'Math\.Max\s*\(\s*1,\s*Math\.Min\s*\(\s*10,' -or $combined64 -match 'Math\.max\s*\(\s*1,\s*Math\.min\s*\(\s*10,')) `
+    'commitStat (via _nativeSetSpecial) clamps value to 1-10 on commit (Math.max/min guard)'
 
 # 64.5  calls updateMath()
-Check ([bool]($commitStatBody64 -match 'updateMath\s*\(\s*\)')) `
-    'commitStat calls updateMath() to trigger downstream recalcs'
+Check ([bool]($combined64 -match 'updateMath\s*\(\s*\)')) `
+    'commitStat (via _nativeSetSpecial) calls updateMath() to trigger downstream recalcs'
 
 # 64.6  calls saveState()
-Check ([bool]($commitStatBody64 -match 'saveState\s*\(\s*\)')) `
-    'commitStat calls saveState() to debounce-persist the new value'
+Check ([bool]($combined64 -match 'saveState\s*\(\s*\)')) `
+    'commitStat (via _nativeSetSpecial) calls saveState() to debounce-persist the new value'
 
 # 64.7  isNaN guard reverts to prior state value (not hard 1)
-Check (([bool]($commitStatBody64 -match 'isNaN\s*\(v\)')) -and ([bool]($commitStatBody64 -match 'state\s*\[.*k.*\]')) -and ([bool]($commitStatBody64 -match '\|\|\s*5'))) `
+Check (([bool]($combined64 -match 'isNaN\s*\(v\)')) -and ([bool]($combined64 -match 'state\s*\[.*k.*\]')) -and ([bool]($combined64 -match '\|\|\s*5'))) `
     'commitStat reverts empty/NaN to state[k]||5 (not forced to 1) -- regression guard'
 
 # 64.8  All 7 SPECIAL inputs have inputmode="numeric"
@@ -16001,7 +16007,7 @@ try {
   const doc = makeFakeDoc(els, { '.fd-ladder[data-fd-ladder]': [ladder] });
   const sb = { document: doc, state: {}, updateMath: () => {}, saveState: () => {}, Math, parseInt, isNaN, String, RobcoEvents: { emit: () => {} } };
   vm.createContext(sb);
-  vm.runInContext(decl('commitStat') + '\n' + decl('_applyFaderDragValue') + '\n' + decl('_wireFaderDrag'), sb);
+  vm.runInContext(decl('_nativeSetSpecial') + '\n' + decl('commitStat') + '\n' + decl('_applyFaderDragValue') + '\n' + decl('_wireFaderDrag'), sb);
   sb._wireFaderDrag();
   ladder._fire('mousedown', { clientY: 2 });
   const topVal = els.s_s.value;
@@ -18252,7 +18258,11 @@ $applyHpBody192 = Get-FunctionBody $core192 'setupHpBarInteraction'
 $applyXpBody192 = Get-FunctionBody $core192 'setupXpBarInteraction'
 $wireRadBody192 = Get-FunctionBody $core192 '_wireRadDragSurface'
 $skillVuSetBody192 = Get-FunctionBody $core192 '_skillVuSet'
+# commitStat() now delegates its clamp/emit to _nativeSetSpecial() (Native USE +
+# TERMINAL stat-edits plan, Protocol 22) -- the 'stat.change' emit lives in the
+# shared setter, reached from every commitStat() call.
 $commitStatBody192 = Get-FunctionBody $core192 'commitStat'
+$nativeSetSpecialBody192 = Get-FunctionBody $core192 '_nativeSetSpecial'
 Check (
     ($emitDiffersBody192 -match 'old !== undefined') -and
     ($emitDiffersBody192 -match 'old !== newVal') -and
@@ -18261,8 +18271,9 @@ Check (
     ($applyXpBody192 -match "_emitStatChangeIfDiffers\('xp',\s*newXp\)") -and
     ($wireRadBody192 -match "_emitStatChangeIfDiffers\('rads',\s*newRads\)") -and
     ($skillVuSetBody192 -match "_emitStatChangeIfDiffers\('skill:'\s*\+\s*key,\s*v\)") -and
-    ($commitStatBody192 -match "RobcoEvents\.emit\('stat\.change'")
-) '192.30: _emitStatChangeIfDiffers() only fires stat.change on a genuine value change (never the first-seen baseline, never a same-value re-set), and every drag-style stat setter plus commitStat() feeds it/emits directly'
+    ($commitStatBody192 -match '_nativeSetSpecial\(') -and
+    ($nativeSetSpecialBody192 -match "RobcoEvents\.emit\('stat\.change'")
+) '192.30: _emitStatChangeIfDiffers() only fires stat.change on a genuine value change (never the first-seen baseline, never a same-value re-set), and every drag-style stat setter plus commitStat() (via _nativeSetSpecial) feeds it/emits directly'
 
 # 192.31  the 3D orbital burst is real CSS (rotateX/rotateY/rotateZ keyframes,
 #         a distinct per-ring tumble via .core-stat-burst on the SAME
@@ -19957,14 +19968,19 @@ Check (
     ([regex]::IsMatch($equipBody199, "renderInventory\(\);[\s\S]{0,40}saveState\(\);[\s\S]{0,600}if \(!wasEquipped\) \{[\s\S]{0,120}RobcoEvents\.emit\(\s*['`"]item\.equipped['`"]"))
 ) '199.2: toggleEquipItem() emits item.equipped only on an equip, after renderInventory() has already repainted'
 
-# 199.3  effect.applied (user path) -- addStatusEffect() emits only for a
-#        genuinely NEW compound, never a re-application (ticks/type
-#        refresh on an existing effect stays silent).
+# 199.3  effect.applied (user path) -- addStatusEffect() delegates to the
+#        extracted _applyStatusEffect() (Native USE + TERMINAL stat-edits
+#        plan, Protocol 22 -- the same choke point nativeUseItem() calls),
+#        which emits only for a genuinely NEW compound, never a
+#        re-application (ticks/type refresh on an existing effect stays
+#        silent).
 $addEffectBody199 = Get-FunctionBody $renderSrc199 'addStatusEffect'
+$applyStatusEffectBody199 = Get-FunctionBody $renderSrc199 '_applyStatusEffect'
 Check (
-    ([regex]::IsMatch($addEffectBody199, "if \(existing\) \{[\s\S]{0,80}\} else \{[\s\S]{0,500}RobcoEvents\.emit\(\s*['`"]effect\.applied['`"]")) -and
-    ($addEffectBody199 -match '_pendingEffectWarmup\.push\(name\);')
-) '199.3: addStatusEffect() emits effect.applied only for a genuinely new compound (the else branch), never a re-application'
+    ($addEffectBody199 -match '_applyStatusEffect\(') -and
+    ([regex]::IsMatch($applyStatusEffectBody199, "if \(existing\) \{[\s\S]{0,80}\} else \{[\s\S]{0,500}RobcoEvents\.emit\(\s*['`"]effect\.applied['`"]")) -and
+    ($applyStatusEffectBody199 -match '_pendingEffectWarmup\.push\(nm\);')
+) '199.3: addStatusEffect() delegates to _applyStatusEffect() (Protocol 22 -- reused by nativeUseItem() too), which emits effect.applied only for a genuinely new compound (the else branch), never a re-application'
 
 # 199.4  effect.applied (AI path) -- the AI status-set in
 #        autoImportState() diffs a pre-overwrite name Set (the item.added/
@@ -20210,6 +20226,548 @@ Check (
     (-not ($wireCoreBody199 -match '\bFNV\b|\bFO3\b|New Vegas|Fallout 3')) -and
     (-not ($wireEchoBody199 -match '\bFNV\b|\bFO3\b|New Vegas|Fallout 3'))
 ) '199.31: the WAVE 3 home-panel + echo additions carry no hardcoded game literal'
+
+# ===========================================================
+# Suite 200 -- Native USE (Native USE + TERMINAL stat-edits plan, Part A)
+# Consuming an aid item from the CARGO MANIFEST now applies its CHEMS.CSV
+# effect deterministically (heal/rads/limb-heal/timed BUFF/addiction-clear/
+# poison-clear) with ZERO AI round-trip. USE is gated to cat==='aid';
+# _computeAidUse()/_durationToTicks() are pure parsers over getChemsTable()
+# (game-agnostic); nativeUseItem() applies through the shared A.2 native
+# setters + the extracted _applyStatusEffect() (Protocol 22).
+# 14 tests
+# ===========================================================
+Sep "Suite 200 -- Native USE (deterministic item consumption, no AI)"
+$renderSrc200 = Read-Src "js/ui-render.js"
+$coreSrc200 = Read-Src "js/ui-core.js"
+$dbNvSrc200 = Read-Src "js/db_nv.js"
+$dbFo3Src200 = Read-Src "js/db_fo3.js"
+
+# 200.1  nativeUseItem() defined; the CARGO MANIFEST click handler calls it
+#        (not transmitMessage()) -- the no-AI guard on the USE path.
+$invBody200 = Get-FunctionBody $renderSrc200 'renderInventory'
+$useMatch200 = [regex]::Match($invBody200, "const use = e\.target\.closest\('\[data-use\]'\);[\s\S]{0,150}")
+$useHandlerSlice200 = if ($useMatch200.Success) { $useMatch200.Value } else { '' }
+Check (
+    ($renderSrc200 -match 'function nativeUseItem\s*\(') -and
+    ($useHandlerSlice200 -match 'nativeUseItem\(\+use\.dataset\.use\)') -and
+    (-not ($useHandlerSlice200 -match 'transmitMessage'))
+) '200.1: nativeUseItem() is defined and the CARGO MANIFEST USE click handler calls it directly -- no more chatInput+transmitMessage() round-trip to the AI'
+
+# 200.2  the use-btn is rendered only for cat==='aid'.
+Check (
+    ($invBody200.Contains("cat === 'aid' ?")) -and ($invBody200.Contains('class="use-btn"'))
+) "200.2: renderInventory()'s use-btn is gated to cat==='aid' -- no more USE button on weapons/armor/ammo/mod/misc rows"
+
+# 200.3  _applyStatusEffect(name,ticks,type) is extracted and addStatusEffect()
+#        delegates to it (Protocol 22).
+$addEffectBody200 = Get-FunctionBody $renderSrc200 'addStatusEffect'
+Check (
+    ($renderSrc200 -match 'function _applyStatusEffect\s*\(') -and
+    ($addEffectBody200.Contains('_applyStatusEffect(name, ticks, type)'))
+) '200.3: _applyStatusEffect() is extracted from addStatusEffect() and addStatusEffect() delegates to it (Protocol 22)'
+
+# 200.4  getChemsTable() now exposes a `duration` field in BOTH db_nv.js and
+#        db_fo3.js (game-agnostic parity).
+Check (
+    ($dbNvSrc200.Contains("const di = headers.indexOf('Duration');")) -and
+    ($dbFo3Src200.Contains("const di = headers.indexOf('Duration');")) -and
+    ($dbNvSrc200.Contains("duration: di >= 0 ? (cols[di] || '').trim() : ''")) -and
+    ($dbFo3Src200.Contains("duration: di >= 0 ? (cols[di] || '').trim() : ''"))
+) '200.4: getChemsTable() exposes the raw Duration column as `duration` in BOTH db_nv.js and db_fo3.js (game-agnostic parity)'
+
+# 200.5  clauses split on whitespace-bounded " / ", never a bare "/".
+$computeBody200 = Get-FunctionBody $renderSrc200 '_computeAidUse'
+Check (
+    $computeBody200.Contains('.split(/\s+\/\s+/)')
+) '200.5: _computeAidUse() splits clauses on whitespace-bounded " / ", never a bare "/" -- preserves "+N HP/s for Ss" clauses intact'
+
+# 200.6  Protocol 38 -- no hardcoded game item name; items resolve via
+#        getChemsTable() only.
+$useItemBody200 = Get-FunctionBody $renderSrc200 'nativeUseItem'
+Check (
+    (-not (($computeBody200 + $useItemBody200) -match 'Stimpak|RadAway|Buffout|Hydra|Fixer|Antivenom')) -and
+    ($useItemBody200.Contains('getChemsTable()'))
+) '200.6: nativeUseItem()/_computeAidUse() contain no hardcoded game item name -- items resolve via getChemsTable() only'
+
+# 200.7  Protocol 24 -- zero AI on the USE path.
+Check (
+    -not (($computeBody200 + $useItemBody200) -match 'fetch\(|XMLHttpRequest|transmitMessage')
+) '200.7: no fetch/XMLHttpRequest/transmitMessage anywhere in _computeAidUse()/nativeUseItem() -- the USE path is fully offline'
+
+# 200.8-200.12  BEHAVIORAL -- executed via a spawned node process against the
+# REAL source files (Protocol 42 stdin-corruption-safe transport: write to a
+# temp file, invoke `node <file>`, never pipe a large heredoc to node).
+$labels200 = @(
+    '200.8: _durationToTicks() behavioral: "4m"->1, "1h"->10, "30s"->1, "5m"->1 (sub-tick rounds UP to at least 1), "0"/empty/unparseable->0',
+    '200.9: _computeAidUse() behavioral against real CHEMS.CSV shapes from both games (Stimpak/Super Stimpak/RadAway/Rad-X/Buffout/Cram/Caravan Lunch/Bighorner Steak/Doctor''s Bag/Hydra/Fixer/Antivenom/crafting-ingredient/null)',
+    '200.10: adding Buffout''s BUFF status effect via Native USE then running the real _bioScanCompute() yields an ADDICTION RISK: BUFFOUT advisory -- proves USE reuses BIO-SCAN''s existing addiction surfacing',
+    '200.11: nativeUseItem() behavioral (real function, real A.2 setters): heals via _nativeSetHp, decrements qty by exactly 1, removes the row at qty 0, and clamps a heal past hpMax at hpMax',
+    '200.12: using a crafting-ingredient aid item or an aid item absent from CHEMS.CSV leaves qty UNCHANGED -- an item is never spent for zero effect'
+)
+try {
+    $nodeCheck200 = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCheck200) {
+        $repoRoot200 = (Get-Item $PSScriptRoot).Parent.FullName
+        $repoRootNode200 = $repoRoot200.Replace('\', '/')
+        $testScript200 = @"
+const vm = require('vm');
+const fs = require('fs');
+const path = require('path');
+const ROOT = '$repoRootNode200';
+function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+const renderSrc = rd('js/ui-render.js');
+const coreSrc = rd('js/ui-core.js');
+function extractBody(src, name) {
+  var idx = src.indexOf('function ' + name);
+  if (idx === -1) throw new Error('missing ' + name);
+  var i = src.indexOf('{', idx);
+  var depth = 0, start = i;
+  while (i < src.length) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) return src.slice(start, i + 1); }
+    i++;
+  }
+  throw new Error('unclosed ' + name);
+}
+function declareFn(src, name) {
+  var nameIdx = src.indexOf('function ' + name);
+  var parenIdx = src.indexOf('(', nameIdx);
+  var braceIdx = src.indexOf('{', parenIdx);
+  var params = src.slice(parenIdx, braceIdx);
+  return 'function ' + name + params + extractBody(src, name);
+}
+var results = [];
+try {
+  var sb1 = {};
+  vm.createContext(sb1);
+  vm.runInContext(declareFn(renderSrc, '_durationToTicks'), sb1);
+  var r1 = sb1._durationToTicks;
+  results.push(r1('4m') === 1 && r1('1h') === 10 && r1('30s') === 1 && r1('5m') === 1 && r1('0') === 0 && r1('') === 0 && r1('garbage') === 0);
+} catch (e) { results.push(false); }
+try {
+  var aidDefaultLine = (renderSrc.match(/const _AID_DEFAULT_HEAL = \d+;/) || [''])[0];
+  var src2 = aidDefaultLine + '\n' + declareFn(renderSrc, '_durationToTicks') + '\n' + declareFn(renderSrc, '_computeAidUse');
+  var sb2 = {};
+  vm.createContext(sb2);
+  vm.runInContext(src2, sb2);
+  var c = sb2._computeAidUse;
+  var stimpakFnv = c({ name: 'Stimpak', effect: 'Restore HP', duration: '0' });
+  var stimpakFo3 = c({ name: 'Stimpak', effect: 'Restore 30 HP', duration: '0' });
+  var superStimpakFo3 = c({ name: 'Super Stimpak', effect: 'Restore 100 HP / -1 STR (1m)', duration: '1m' });
+  var radaway = c({ name: 'RadAway', effect: 'Remove 150 Rads', duration: '0' });
+  var radx = c({ name: 'Rad-X', effect: '+25 Rad Resistance', duration: '4m' });
+  var buffout = c({ name: 'Buffout', effect: '+2 STR / +2 END / +60 Max HP', duration: '4m' });
+  var cramFo3 = c({ name: 'Cram', effect: '+10 HP / +5 RAD', duration: '0' });
+  var caravanLunch = c({ name: 'Caravan Lunch', effect: 'Restore HP', duration: '0' });
+  var bighornerSteak = c({ name: 'Bighorner Steak', effect: '+2 HP/s for 10s', duration: '0' });
+  var docBagFnv = c({ name: "Doctor's Bag", effect: 'Restore all crippled limbs', duration: '0' });
+  var docBagFo3 = c({ name: "Doctor's Bag", effect: 'Heal limbs', duration: '0' });
+  var hydra = c({ name: 'Hydra', effect: 'Restore crippled limb', duration: '0' });
+  var fixer = c({ name: 'Fixer', effect: 'Remove addiction', duration: '0' });
+  var antivenom = c({ name: 'Antivenom', effect: 'Remove Poison', duration: '0' });
+  var brocFlower = c({ name: 'Broc Flower', effect: 'Stimpak crafting ingredient', duration: '0' });
+  var noData = c(null);
+  results.push(
+    stimpakFnv.heal === 20 && stimpakFnv.recognized === true &&
+    stimpakFo3.heal === 30 &&
+    superStimpakFo3.heal === 100 && superStimpakFo3.buff && superStimpakFo3.buff.name === 'Super Stimpak' && superStimpakFo3.buff.ticks > 0 &&
+    radaway.radDelta === -150 &&
+    radx.buff && radx.buff.name === 'Rad-X' && radx.heal === 0 && radx.radDelta === 0 &&
+    buffout.buff && buffout.buff.name === 'Buffout' && buffout.buff.ticks > 0 && buffout.heal === 0 &&
+    cramFo3.heal === 10 && cramFo3.radDelta === 5 &&
+    caravanLunch.heal === 20 &&
+    bighornerSteak.heal === 20 &&
+    docBagFnv.healLimbs === 'all' && docBagFo3.healLimbs === 'all' &&
+    hydra.healLimbs === 'one' &&
+    fixer.clearAddiction === true &&
+    antivenom.clearPoison === true &&
+    brocFlower.recognized === false &&
+    !noData.recognized
+  );
+} catch (e) { results.push(false); }
+try {
+  var bioSrc = declareFn(renderSrc, '_bioChemHasRisk') + '\n' + declareFn(renderSrc, '_bioScanCompute');
+  var limbsLine = (renderSrc.match(/const _BIO_LIMBS = \[[\s\S]*?\];/) || [''])[0];
+  var sb3 = {};
+  vm.createContext(sb3);
+  vm.runInContext(limbsLine + '\n' + bioSrc, sb3);
+  var chemsFixture = [{ name: 'Buffout', effect: '+2 STR / +2 END / +60 Max HP', addictionRisk: '25%', family: 'Buffout' }];
+  var advisory = sb3._bioScanCompute({ status: [{ name: 'Buffout', ticks: 1, type: 'BUFF' }] }, chemsFixture);
+  results.push(advisory.advisories.some(function (a) { return a.kind === 'addiction' && /BUFFOUT/.test(a.text); }));
+} catch (e) { results.push(false); }
+try {
+  function mockEl(initial) {
+    var v = String(initial == null ? '' : initial);
+    return { get value() { return v; }, set value(x) { v = String(x); } };
+  }
+  var els4 = { stat_hp_cur: mockEl(50), stat_hp_max: mockEl(100), stat_rads: mockEl(0) };
+  var sb4 = {
+    document: { getElementById: function (id) { return els4[id] || null; } },
+    state: { hpCur: 50, hpMax: 100, rads: 0, status: [], inventory: [] },
+    updateMath: function () {}, saveState: function () {}, appendToChat: function () {},
+    renderInventory: function () {}, renderStatus: function () {}, loadUI: function () {},
+    getChemsTable: function () { return [{ name: 'Stimpak', effect: 'Restore 30 HP', duration: '0' }]; },
+    RobcoEvents: { emit: function () {} },
+    _emitStatChangeIfDiffers: function () {},
+    _resolveMaxRads: function () { return 1000; },
+    _pendingEffectWarmup: [],
+    Math: Math, parseInt: parseInt, String: String
+  };
+  vm.createContext(sb4);
+  vm.runInContext(declareFn(coreSrc, '_nativeSetHp') + '\n' + declareFn(coreSrc, '_nativeSetRads'), sb4);
+  vm.runInContext(
+    declareFn(renderSrc, '_applyStatusEffect') + '\n' +
+    (renderSrc.match(/const _AID_DEFAULT_HEAL = \d+;/) || [''])[0] + '\n' +
+    declareFn(renderSrc, '_durationToTicks') + '\n' +
+    declareFn(renderSrc, '_computeAidUse') + '\n' +
+    declareFn(renderSrc, 'nativeUseItem'),
+    sb4
+  );
+  sb4.state.inventory = [{ name: 'Stimpak', qty: 2, wgt: 0.5, val: 20, type: 'aid' }];
+  sb4.nativeUseItem(0);
+  var hpAfterFirst = sb4.state.hpCur;
+  var qtyAfterFirst = sb4.state.inventory[0] && sb4.state.inventory[0].qty;
+  var rowsAfterFirst = sb4.state.inventory.length;
+  sb4.nativeUseItem(0);
+  var rowsAfterSecond = sb4.state.inventory.length;
+  sb4.state.inventory = [{ name: 'Stimpak', qty: 1, wgt: 0.5, val: 20, type: 'aid' }];
+  sb4.state.hpCur = 90;
+  sb4.nativeUseItem(0);
+  var clampedHp = sb4.state.hpCur;
+  results.push(hpAfterFirst === 80 && qtyAfterFirst === 1 && rowsAfterFirst === 1 && rowsAfterSecond === 0 && clampedHp === 100);
+} catch (e) { results.push(false); }
+try {
+  var sb5 = {
+    document: { getElementById: function () { return null; } },
+    state: { hpCur: 50, hpMax: 100, rads: 0, status: [], inventory: [] },
+    updateMath: function () {}, saveState: function () {}, appendToChat: function () {},
+    renderInventory: function () {}, renderStatus: function () {}, loadUI: function () {},
+    getChemsTable: function () {
+      return [
+        { name: 'Broc Flower', effect: 'Stimpak crafting ingredient', duration: '0' },
+        { name: 'Rusty Tin Can', effect: '', duration: '0' }
+      ];
+    },
+    RobcoEvents: { emit: function () {} },
+    _emitStatChangeIfDiffers: function () {},
+    _nativeSetHp: function () {}, _nativeSetRads: function () {},
+    _resolveMaxRads: function () { return 1000; },
+    _pendingEffectWarmup: [],
+    Math: Math, parseInt: parseInt, String: String
+  };
+  vm.createContext(sb5);
+  vm.runInContext(
+    declareFn(renderSrc, '_applyStatusEffect') + '\n' +
+    (renderSrc.match(/const _AID_DEFAULT_HEAL = \d+;/) || [''])[0] + '\n' +
+    declareFn(renderSrc, '_durationToTicks') + '\n' +
+    declareFn(renderSrc, '_computeAidUse') + '\n' +
+    declareFn(renderSrc, 'nativeUseItem'),
+    sb5
+  );
+  sb5.state.inventory = [{ name: 'Broc Flower', qty: 3, wgt: 0.01, val: 3, type: 'aid' }];
+  sb5.nativeUseItem(0);
+  var qtyAfterIngredient = sb5.state.inventory[0].qty;
+  sb5.state.inventory = [{ name: 'Rusty Tin Can', qty: 2, wgt: 1, val: 1, type: 'aid' }];
+  sb5.nativeUseItem(0);
+  var qtyAfterNoData = sb5.state.inventory[0].qty;
+  results.push(qtyAfterIngredient === 3 && qtyAfterNoData === 2);
+} catch (e) { results.push(false); }
+console.log('RESULT:' + results.map(function (r) { return r ? '1' : '0'; }).join(''));
+"@
+        $tmpScript200 = [System.IO.Path]::GetTempFileName() + '.js'
+        [System.IO.File]::WriteAllText($tmpScript200, $testScript200, [System.Text.Encoding]::UTF8)
+        try {
+            $out200 = (node $tmpScript200 2>&1 | Out-String)
+        } finally {
+            Remove-Item -Path $tmpScript200 -Force -ErrorAction SilentlyContinue
+        }
+        $rm200 = [regex]::Match($out200, 'RESULT:([01]{5})')
+        if ($rm200.Success) {
+            $bits200 = $rm200.Groups[1].Value
+            for ($bi = 0; $bi -lt 5; $bi++) { Check ($bits200.Substring($bi, 1) -eq '1') $labels200[$bi] }
+        } else {
+            $err200 = if ([string]::IsNullOrWhiteSpace($out200)) { "No output from node" } else { $out200.Trim() }
+            foreach ($lbl in $labels200) { Fail "$lbl  (runtime error: $err200)" }
+        }
+    } else {
+        foreach ($lbl in $labels200) { Fail "$lbl  (node not available in PATH)" }
+    }
+} catch {
+    foreach ($lbl in $labels200) { Fail "$lbl  (exception: $($_.Exception.Message))" }
+}
+
+# 200.13  a non-aid item forced through nativeUseItem() shows "not a
+#         consumable" and never decrements -- the type gate is enforced in
+#         the executor too, not just the render-time button gating (200.2).
+Check (
+    ($useItemBody200.Contains("if (String(item.type || '').toLowerCase() !== 'aid') {")) -and
+    ($useItemBody200.Contains('is not a consumable'))
+) '200.13: nativeUseItem() itself (not just the render gate) refuses a non-aid item with "not a consumable" and no decrement -- defense in depth'
+
+# 200.14  offline-safe (Protocol 24) -- no feature-flag/API-key gate.
+Check (
+    -not ($useItemBody200 -imatch 'isFeatureEnabled|apiKey|GEMINI')
+) '200.14: nativeUseItem() never reads a feature-flag/API-key gate -- fully offline-safe like the other native terminals'
+
+# ===========================================================
+# Suite 201 -- TERMINAL stat edits (Native USE + TERMINAL stat-edits plan,
+# Part B). TERMINAL mode now edits EVERY stat deterministically -- the
+# generic "<stat> <N>" SET grammar, both delta forms, and the "level up"
+# phrase -- all resolved via _resolveStatToken() and applied through the SAME
+# A.2 native setters Native USE uses (Protocol 22). Zero AI on every path.
+# 6 tests
+# ===========================================================
+Sep "Suite 201 -- TERMINAL stat edits (deterministic, no AI)"
+$apiSrc201 = Read-Src "js/api.js"
+$coreSrc201 = Read-Src "js/ui-core.js"
+
+# 201.1  the 4 new QUICK_LOG_PATTERNS entries + _resolveStatToken exist.
+Check (
+    ($apiSrc201.Contains("id: 'levelup'")) -and
+    ($apiSrc201.Contains("id: 'stat_set'")) -and
+    ($apiSrc201.Contains("id: 'stat_delta_lead'")) -and
+    ($apiSrc201.Contains("id: 'stat_delta_trail'")) -and
+    ($apiSrc201 -match 'function _resolveStatToken\s*\(')
+) '201.1: QUICK_LOG_PATTERNS defines levelup/stat_set/stat_delta_lead/stat_delta_trail, and _resolveStatToken() is defined'
+
+# 201.2  commitStat(el) delegates to _nativeSetSpecial (Protocol 22).
+$commitStatBody201 = Get-FunctionBody $coreSrc201 'commitStat'
+Check (
+    ($commitStatBody201.Contains('_nativeSetSpecial(k, v)')) -and
+    ($coreSrc201 -match 'function _nativeSetSpecial\s*\(')
+) '201.2: commitStat(el) delegates to _nativeSetSpecial(k, v) -- the SPECIAL DOM onchange path, Native USE, and TERMINAL stat edits all clamp through one function'
+
+# 201.3  UNRECOGNIZED hint lists the new stat commands; COMMAND_REGISTRY
+#        carries a STAT EDITS group; _commandSuggestions gained the
+#        _statTokenSuggestions fallback branch.
+Check (
+    ($apiSrc201.Contains('stat edit like "hp 80", "+2 str", "rads 50", "level up", "guns 45"')) -and
+    ($coreSrc201.Contains("group: 'STAT EDITS -- TERMINAL, OFFLINE'") -or $coreSrc201.Contains("group: 'STAT EDITS — TERMINAL, OFFLINE'")) -and
+    ($apiSrc201 -match 'function _statTokenSuggestions\s*\(') -and
+    ($apiSrc201.Contains('return _statTokenSuggestions(text);'))
+) '201.3: the UNRECOGNIZED hint lists stat-edit examples, COMMAND_REGISTRY has a STAT EDITS -- TERMINAL, OFFLINE group, and _quickLogContentSuggestions() falls back to _statTokenSuggestions() for autocomplete'
+
+# 201.4-201.5  BEHAVIORAL -- executed via a spawned node process against the
+# REAL source files (Protocol 42 stdin-corruption-safe transport).
+$labels201 = @(
+    '201.4: TERMINAL stat-edit grammar behavioral -- set/delta/level-up/multi-action/unresolved-fallthrough, all via the real _resolveStatToken/_quickLogStatSet/_quickLogStatDelta/_routeQuickLog/_routeQuickLogMulti + the real A.2 native setters',
+    '201.5: FNV "guns 45" sets the skill; FO3 (no "guns" skill) "guns 45" is UNRECOGNIZED while "small_guns 45" sets it -- registry-driven via getSkillKeys(), no hardcoded skill list',
+    '201.6: a skill delta ("+10 guns" from a base of 15) reports the real committed value (25) in its TERMINAL message -- regression guard for _skillVuSet() not returning its clamped value (previously surfaced as "... -> undefined.")'
+)
+try {
+    $nodeCheck201 = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCheck201) {
+        $repoRoot201 = (Get-Item $PSScriptRoot).Parent.FullName
+        $repoRootNode201 = $repoRoot201.Replace('\', '/')
+        $testScript201 = @"
+const vm = require('vm');
+const fs = require('fs');
+const path = require('path');
+const ROOT = '$repoRootNode201';
+function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+const apiSrc = rd('js/api.js');
+const coreSrc = rd('js/ui-core.js');
+function extractBody(src, name) {
+  var idx = src.indexOf('function ' + name);
+  if (idx === -1) throw new Error('missing ' + name);
+  var i = src.indexOf('{', idx);
+  var depth = 0, start = i;
+  while (i < src.length) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) return src.slice(start, i + 1); }
+    i++;
+  }
+  throw new Error('unclosed ' + name);
+}
+function declareFn(src, name) {
+  var nameIdx = src.indexOf('function ' + name);
+  var parenIdx = src.indexOf('(', nameIdx);
+  var braceIdx = src.indexOf('{', parenIdx);
+  var params = src.slice(parenIdx, braceIdx);
+  return 'function ' + name + params + extractBody(src, name);
+}
+function declareConstObj(src, name) {
+  var idx = src.indexOf('const ' + name);
+  var eqIdx = src.indexOf('=', idx);
+  var braceIdx = src.indexOf('{', eqIdx);
+  var depth = 0, i = braceIdx;
+  while (i < src.length) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) { i++; break; } }
+    i++;
+  }
+  return src.slice(idx, i) + ';';
+}
+function declareConstArr(src, name) {
+  var idx = src.indexOf('const ' + name);
+  var eqIdx = src.indexOf('=', idx);
+  var bracketIdx = src.indexOf('[', eqIdx);
+  var depth = 0, i = bracketIdx;
+  while (i < src.length) {
+    if (src[i] === '[') depth++;
+    else if (src[i] === ']') { depth--; if (depth === 0) { i++; break; } }
+    i++;
+  }
+  return src.slice(idx, i) + ';';
+}
+var apiDeclSrc =
+  declareConstObj(apiSrc, '_SCALAR_STAT_ALIASES') + '\n' +
+  declareConstObj(apiSrc, '_SPECIAL_STAT_ALIASES') + '\n' +
+  declareFn(apiSrc, '_resolveStatToken') + '\n' +
+  declareFn(apiSrc, '_readStatCurrent') + '\n' +
+  declareFn(apiSrc, '_applyStatToken') + '\n' +
+  declareFn(apiSrc, '_statTokenLabel') + '\n' +
+  declareFn(apiSrc, '_quickLogStatSet') + '\n' +
+  declareFn(apiSrc, '_quickLogStatDelta') + '\n' +
+  declareFn(apiSrc, '_stripPrompt') + '\n' +
+  declareConstArr(apiSrc, 'QUICK_LOG_PATTERNS') + '\n' +
+  declareFn(apiSrc, '_routeQuickLog') + '\n' +
+  declareFn(apiSrc, '_routeQuickLogMulti');
+var coreDeclSrc =
+  declareFn(coreSrc, '_nativeSetHp') + '\n' +
+  declareFn(coreSrc, '_nativeSetRads') + '\n' +
+  declareFn(coreSrc, '_nativeSetXp') + '\n' +
+  declareFn(coreSrc, '_nativeSetLevel') + '\n' +
+  declareFn(coreSrc, '_nativeSetSpecial') + '\n' +
+  declareFn(coreSrc, '_nativeSetKarma') + '\n' +
+  declareFn(coreSrc, '_nativeSetCaps') + '\n' +
+  declareFn(coreSrc, '_skillVuSet') + '\n' +
+  declareFn(coreSrc, '_nativeSetSkill') + '\n' +
+  declareFn(coreSrc, 'nativeLevelUp') + '\n' +
+  (coreSrc.match(/const MAX_PLAYER_LEVEL = \d+;/) || [''])[0];
+function mockEl(initial) {
+  var v = String(initial == null ? '' : initial);
+  return { get value() { return v; }, set value(x) { v = String(x); } };
+}
+function makeSandbox(opts) {
+  opts = opts || {};
+  var num = function (x, d) { return x != null ? x : d; };
+  var els = {
+    stat_hp_cur: mockEl(num(opts.hpCur, 50)), stat_hp_max: mockEl(num(opts.hpMax, 100)),
+    stat_rads: mockEl(num(opts.rads, 0)), stat_xp: mockEl(num(opts.xp, 0)),
+    stat_lvl: mockEl(num(opts.lvl, 1)), stat_karma: mockEl(num(opts.karma, 0)),
+    c_caps: mockEl(num(opts.caps, 0)),
+    s_s: mockEl(5), s_p: mockEl(5), s_e: mockEl(5), s_c: mockEl(5), s_i: mockEl(5), s_a: mockEl(5), s_l: mockEl(5),
+    sk_guns: mockEl(15), sk_small_guns: mockEl(15)
+  };
+  var levelUpEvents = [];
+  var sb = {
+    document: { getElementById: function (id) { return els[id] || null; }, querySelector: function () { return null; } },
+    state: {
+      hpCur: num(opts.hpCur, 50), hpMax: num(opts.hpMax, 100), rads: num(opts.rads, 0), xp: num(opts.xp, 0),
+      lvl: num(opts.lvl, 1), karma: num(opts.karma, 0), caps: num(opts.caps, 0),
+      s: 5, p: 5, e: 5, c: 5, i: 5, a: 5, l: 5, skills: { guns: 15, small_guns: 15 }
+    },
+    updateMath: function () {}, updateKarmaUI: function () {}, saveState: function () {}, appendToChat: function () {},
+    adjustFaction: function () {}, onLocationChange: function () {}, _logEvent: function () {},
+    getFactionRegistry: function () { return []; },
+    getSkillKeys: opts.getSkillKeys || function () { return ['guns']; },
+    SKILL_LABELS: {},
+    RobcoEvents: { emit: function (name, p) { if (name === 'level.up') levelUpEvents.push(p); } },
+    _emitStatChangeIfDiffers: function () {},
+    _resolveMaxRads: function () { return opts.maxRads != null ? opts.maxRads : 1000; },
+    Math: Math, parseInt: parseInt, String: String, Array: Array
+  };
+  vm.createContext(sb);
+  vm.runInContext(coreDeclSrc, sb);
+  vm.runInContext(apiDeclSrc, sb);
+  return { sb: sb, els: els, levelUpEvents: levelUpEvents };
+}
+var results = [];
+try {
+  var t1 = makeSandbox({});
+  t1.sb._routeQuickLog('hp 80');
+  var t2 = makeSandbox({});
+  t2.sb._routeQuickLog('str 8'); var str8 = t2.sb.state.s;
+  t2.sb._routeQuickLog('str 99'); var str99 = t2.sb.state.s;
+  t2.sb._routeQuickLog('str 0'); var str0 = t2.sb.state.s;
+  var t3 = makeSandbox({});
+  t3.sb._routeQuickLog('+2 str'); var strPlus2 = t3.sb.state.s;
+  t3.sb._routeQuickLog('str +2'); var strPlus2Again = t3.sb.state.s;
+  t3.sb._routeQuickLog('-1 per'); var perMinus1 = t3.sb.state.p;
+  var t4 = makeSandbox({});
+  t4.sb._routeQuickLog('rads 50'); var rads50 = t4.sb.state.rads;
+  t4.sb._routeQuickLog('+50 rads'); var rads100 = t4.sb.state.rads;
+  t4.sb._routeQuickLog('-30 rads'); var rads70 = t4.sb.state.rads;
+  var t5 = makeSandbox({ lvl: 1 });
+  t5.sb._routeQuickLog('xp 500'); var xpClamped = t5.sb.state.xp;
+  var t6 = makeSandbox({});
+  t6.sb._routeQuickLog('level 5'); var levelSet = t6.sb.state.lvl;
+  var t7 = makeSandbox({ lvl: 5 });
+  t7.sb._routeQuickLog('level up'); var levelAfterUp = t7.sb.state.lvl;
+  t7.sb._routeQuickLog('leveled up'); var levelAfterUp2 = t7.sb.state.lvl;
+  var t8 = makeSandbox({});
+  t8.sb._routeQuickLog('karma 250'); var karma250 = t8.sb.state.karma;
+  t8.sb._routeQuickLog('-100 karma'); var karma150 = t8.sb.state.karma;
+  var t9 = makeSandbox({});
+  t9.sb._routeQuickLog('caps 30'); var caps30 = t9.sb.state.caps;
+  var t10 = makeSandbox({});
+  var multi = t10.sb._routeQuickLogMulti('hp 100, +2 str, rads 0');
+  var t11 = makeSandbox({});
+  var fooResult = t11.sb._routeQuickLog('foo 5');
+  results.push(
+    t1.sb.state.hpCur === 80 && t1.els.stat_hp_cur.value === '80' &&
+    str8 === 8 && str99 === 10 && str0 === 1 &&
+    strPlus2 === 7 && strPlus2Again === 9 && perMinus1 === 4 &&
+    rads50 === 50 && rads100 === 100 && rads70 === 70 &&
+    xpClamped === 199 && levelSet === 5 &&
+    levelAfterUp === 6 && levelAfterUp2 === 7 && t7.levelUpEvents.length === 2 &&
+    karma250 === 250 && karma150 === 150 && caps30 === 30 &&
+    multi.anyMatched === true && multi.anyUnmatched === false &&
+    t10.sb.state.hpCur === 100 && t10.sb.state.s === 7 && t10.sb.state.rads === 0 &&
+    fooResult === false
+  );
+} catch (e) { results.push(false); }
+try {
+  var tFnv = makeSandbox({ getSkillKeys: function () { return ['guns']; } });
+  var gunsResultFnv = tFnv.sb._routeQuickLog('guns 45');
+  var gunsMirrorFnv = tFnv.els.sk_guns.value;
+  var tFo3 = makeSandbox({ getSkillKeys: function () { return ['small_guns', 'big_guns']; } });
+  var gunsResultFo3 = tFo3.sb._routeQuickLog('guns 45');
+  var smallGunsResultFo3 = tFo3.sb._routeQuickLog('small_guns 45');
+  var smallGunsMirrorFo3 = tFo3.els.sk_small_guns.value;
+  results.push(
+    gunsResultFnv !== false && gunsMirrorFnv === '45' &&
+    gunsResultFo3 === false &&
+    smallGunsResultFo3 !== false && smallGunsMirrorFo3 === '45'
+  );
+} catch (e) { results.push(false); }
+try {
+  var t6 = makeSandbox({ getSkillKeys: function () { return ['guns']; } });
+  var chatLog6 = [];
+  t6.sb.appendToChat = function (msg) { chatLog6.push(msg); };
+  t6.sb._routeQuickLog('+10 guns');
+  var lastMsg6 = chatLog6[chatLog6.length - 1] || '';
+  results.push(
+    t6.els.sk_guns.value === '25' &&
+    !/undefined/.test(lastMsg6) &&
+    /25/.test(lastMsg6)
+  );
+} catch (e) { results.push(false); }
+console.log('RESULT:' + results.map(function (r) { return r ? '1' : '0'; }).join(''));
+"@
+        $tmpScript201 = [System.IO.Path]::GetTempFileName() + '.js'
+        [System.IO.File]::WriteAllText($tmpScript201, $testScript201, [System.Text.Encoding]::UTF8)
+        try {
+            $out201 = (node $tmpScript201 2>&1 | Out-String)
+        } finally {
+            Remove-Item -Path $tmpScript201 -Force -ErrorAction SilentlyContinue
+        }
+        $rm201 = [regex]::Match($out201, 'RESULT:([01]{3})')
+        if ($rm201.Success) {
+            $bits201 = $rm201.Groups[1].Value
+            for ($bi = 0; $bi -lt 3; $bi++) { Check ($bits201.Substring($bi, 1) -eq '1') $labels201[$bi] }
+        } else {
+            $err201 = if ([string]::IsNullOrWhiteSpace($out201)) { "No output from node" } else { $out201.Trim() }
+            foreach ($lbl in $labels201) { Fail "$lbl  (runtime error: $err201)" }
+        }
+    } else {
+        foreach ($lbl in $labels201) { Fail "$lbl  (node not available in PATH)" }
+    }
+} catch {
+    foreach ($lbl in $labels201) { Fail "$lbl  (exception: $($_.Exception.Message))" }
+}
 
 # ===========================================================
 # Results

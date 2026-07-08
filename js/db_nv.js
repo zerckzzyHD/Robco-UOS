@@ -887,6 +887,7 @@ function getChemsTable() {
   const headers = lines[0].split(',').map(h => h.trim());
   const ni = headers.indexOf('Name');
   const ei = headers.indexOf('Effect');
+  const di = headers.indexOf('Duration');
   const ari = headers.indexOf('Addiction_Risk');
   const adi = headers.indexOf('Addiction_Debuff');
   const fi = headers.indexOf('Chem_Family');
@@ -898,6 +899,11 @@ function getChemsTable() {
     _chemsTableCache.push({
       name,
       effect: ei >= 0 ? (cols[ei] || '').trim() : '',
+      // Native USE (Part A): the raw Duration column ("4m"/"1h"/"30s"/"0"), needed to
+      // decide whether a leftover modifier clause becomes a timed BUFF status effect
+      // (see _durationToTicks() in ui-render.js). Previously unexposed — BIO-SCAN never
+      // needed it, but the deterministic USE parser does (Protocol 3 — data authority).
+      duration: di >= 0 ? (cols[di] || '').trim() : '',
       addictionRisk: ari >= 0 ? (cols[ari] || '').trim() : '',
       addictionDebuff: adi >= 0 ? (cols[adi] || '').trim() : '',
       family: fi >= 0 ? (cols[fi] || '').trim() : '',

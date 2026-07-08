@@ -296,6 +296,18 @@ export default [
         wipeTerminal: 'readonly',
         _fmtOverseerDuration: 'readonly', // WU-F7 duration formatter, reused by U9-2 CURRENT SITTING (js/ui-core.js)
         _odoTile: 'readonly', // BUS-21 SERVICE TALLY digit-wheel helper (js/ui-render.js), reused by CHASSIS BUS-22 renderOverseerLog()
+        // Native USE + TERMINAL stat-edits (js/ui-core.js A.2 shared setters) --
+        // called cross-file from js/ui-render.js (nativeUseItem) and js/api.js
+        // (_applyStatToken/QUICK_LOG_PATTERNS' levelup handler).
+        _nativeSetHp: 'readonly',
+        _nativeSetRads: 'readonly',
+        _nativeSetXp: 'readonly',
+        _nativeSetLevel: 'readonly',
+        _nativeSetSpecial: 'readonly',
+        _nativeSetSkill: 'readonly',
+        _nativeSetKarma: 'readonly',
+        _nativeSetCaps: 'readonly',
+        nativeLevelUp: 'readonly',
         attachedImageData: 'writable',
         attachedImageMimeType: 'writable',
         _buildFactions: 'readonly',

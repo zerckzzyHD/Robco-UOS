@@ -1411,6 +1411,130 @@ function _quickLogFaction(key, dir) {
   return true;
 }
 
+// ── TERMINAL STAT EDITS (deterministic, no AI) ──────────────────────────────
+// Universal Fallout mechanics — the scalar stats and the 7 SPECIAL attributes —
+// are static alias maps here, NOT game-specific data (Protocol 38 targets
+// per-game literals like faction keys/file paths, not universal mechanics).
+// Only skill resolution below is registry-driven via getSkillKeys(), since the
+// skill SET differs by game (FNV "guns" vs FO3 "small_guns"/"big_guns").
+const _SCALAR_STAT_ALIASES = {
+  hp: 'hp',
+  rads: 'rads',
+  rad: 'rads',
+  xp: 'xp',
+  level: 'level',
+  lvl: 'level',
+  karma: 'karma',
+  caps: 'caps',
+};
+const _SPECIAL_STAT_ALIASES = {
+  str: 's',
+  strength: 's',
+  per: 'p',
+  perception: 'p',
+  end: 'e',
+  endurance: 'e',
+  cha: 'c',
+  chr: 'c',
+  charisma: 'c',
+  int: 'i',
+  intelligence: 'i',
+  agi: 'a',
+  agl: 'a',
+  agility: 'a',
+  lck: 'l',
+  luck: 'l',
+};
+
+// Resolves a normalized TERMINAL token to which native setter (ui-core.js A.2)
+// owns it. Returns null when the token isn't a recognized stat/SPECIAL/skill —
+// callers then return false so the line falls through to the UNRECOGNIZED hint
+// (the established "shape matched, content didn't" convention — _quickLogFaction
+// above is the precedent).
+function _resolveStatToken(token) {
+  const norm = String(token || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '_');
+  if (!norm) return null;
+  if (_SCALAR_STAT_ALIASES[norm]) return { kind: 'scalar', key: _SCALAR_STAT_ALIASES[norm] };
+  if (_SPECIAL_STAT_ALIASES[norm]) return { kind: 'special', key: _SPECIAL_STAT_ALIASES[norm] };
+  const skillKeys = typeof getSkillKeys === 'function' ? getSkillKeys() : [];
+  const labelNorm = k =>
+    typeof SKILL_LABELS !== 'undefined' && SKILL_LABELS[k]
+      ? SKILL_LABELS[k].toLowerCase().replace(/\s+/g, '_')
+      : '';
+  const skillMatch = skillKeys.find(k => k === norm || labelNorm(k) === norm);
+  if (skillMatch) return { kind: 'skill', key: skillMatch };
+  return null;
+}
+
+// Reads the CURRENT value for a resolved token straight from state — the
+// authoritative source a delta is applied on top of.
+function _readStatCurrent(resolved) {
+  if (resolved.kind === 'scalar') {
+    if (resolved.key === 'hp') return state.hpCur || 0;
+    if (resolved.key === 'rads') return state.rads || 0;
+    if (resolved.key === 'xp') return state.xp || 0;
+    if (resolved.key === 'level') return state.lvl || 1;
+    if (resolved.key === 'karma') return state.karma || 0;
+    if (resolved.key === 'caps') return state.caps || 0;
+    return 0;
+  }
+  if (resolved.kind === 'special') return state[resolved.key] || 5;
+  if (resolved.kind === 'skill') return (state.skills && state.skills[resolved.key]) || 0;
+  return 0;
+}
+
+// Applies a resolved token to its owning native setter (Protocol 22 — one
+// choke point per stat, shared with Native USE and the SPECIAL DOM onchange
+// path). Returns the actual clamped value the setter applied.
+function _applyStatToken(resolved, value) {
+  if (resolved.kind === 'scalar') {
+    if (resolved.key === 'hp') return _nativeSetHp(value);
+    if (resolved.key === 'rads') return _nativeSetRads(value);
+    if (resolved.key === 'xp') return _nativeSetXp(value);
+    if (resolved.key === 'level') return _nativeSetLevel(value);
+    if (resolved.key === 'karma') return _nativeSetKarma(value);
+    if (resolved.key === 'caps') return _nativeSetCaps(value);
+    return value;
+  }
+  if (resolved.kind === 'special') return _nativeSetSpecial(resolved.key, value);
+  if (resolved.kind === 'skill') return _nativeSetSkill(resolved.key, value);
+  return value;
+}
+
+function _statTokenLabel(resolved) {
+  if (resolved.kind === 'skill') {
+    return (typeof SKILL_LABELS !== 'undefined' && SKILL_LABELS[resolved.key]) || resolved.key;
+  }
+  return resolved.key.toUpperCase();
+}
+
+function _quickLogStatSet(token, valueStr) {
+  const resolved = _resolveStatToken(token);
+  if (!resolved) return false;
+  const v = parseInt(valueStr, 10);
+  if (isNaN(v)) return false;
+  const applied = _applyStatToken(resolved, v);
+  appendToChat(`> [TERM] ${_statTokenLabel(resolved)} set to ${applied}.`, 'sys');
+  return true;
+}
+
+function _quickLogStatDelta(token, deltaStr) {
+  const resolved = _resolveStatToken(token);
+  if (!resolved) return false;
+  const delta = parseInt(deltaStr, 10);
+  if (isNaN(delta)) return false;
+  const cur = _readStatCurrent(resolved);
+  const applied = _applyStatToken(resolved, cur + delta);
+  appendToChat(
+    `> [TERM] ${_statTokenLabel(resolved)} ${delta >= 0 ? '+' : ''}${delta} → ${applied}.`,
+    'sys'
+  );
+  return true;
+}
+
 const QUICK_LOG_PATTERNS = [
   {
     id: 'kill',
@@ -1443,6 +1567,42 @@ const QUICK_LOG_PATTERNS = [
     hint: 'rep <faction> up/down',
     tag: 'Quick-log: adjust faction reputation',
     handler: m => _quickLogFaction(m[1], m[2].toLowerCase()),
+  },
+  // ── Stat edits (Part B) — placed after the four patterns above (zero
+  // regression: "+50 caps" still hits the specific caps pattern first) and
+  // before the generic set/delta patterns (a bare numeric arg never gets
+  // mistaken for a stat name — the level-up PHRASE has no numeric arg at all).
+  {
+    id: 'levelup',
+    re: /^level(?:ed)?\s*up$/i,
+    stub: 'level up',
+    hint: 'level up',
+    tag: 'Stat edit: gain one level (deterministic)',
+    handler: () => (typeof nativeLevelUp === 'function' ? (nativeLevelUp(), true) : false),
+  },
+  {
+    id: 'stat_set',
+    re: /^([a-z][a-z _]*?)\s+(\d+)$/i,
+    stub: 'hp 80',
+    hint: '<stat> <N>',
+    tag: 'Stat edit: set a stat, SPECIAL, or skill to an exact value',
+    handler: m => _quickLogStatSet(m[1], m[2]),
+  },
+  {
+    id: 'stat_delta_lead',
+    re: /^([+-]\d+)\s+([a-z][a-z _]*?)$/i,
+    stub: '+2 str',
+    hint: '+/-N <stat>',
+    tag: 'Stat edit: nudge a stat, SPECIAL, or skill up/down',
+    handler: m => _quickLogStatDelta(m[2], m[1]),
+  },
+  {
+    id: 'stat_delta_trail',
+    re: /^([a-z][a-z _]*?)\s+([+-]\d+)$/i,
+    stub: 'str +2',
+    hint: '<stat> +/-N',
+    tag: 'Stat edit: nudge a stat, SPECIAL, or skill up/down',
+    handler: m => _quickLogStatDelta(m[1], m[2]),
   },
 ];
 window.QUICK_LOG_PATTERNS = QUICK_LOG_PATTERNS;
@@ -1527,7 +1687,7 @@ async function transmitTerminal(overrideText) {
     return;
   }
   appendToChat(
-    '> [TERM] UNRECOGNIZED — did you mean a native command (see [FEATURES]) or a quick-log entry like "killed <target>", "+50 caps", "arrived <location>", or "rep <faction> up/down"?',
+    '> [TERM] UNRECOGNIZED — did you mean a native command (see [FEATURES]), a quick-log entry like "killed <target>", "+50 caps", "arrived <location>", "rep <faction> up/down", or a stat edit like "hp 80", "+2 str", "rads 50", "level up", "guns 45"?',
     'sys'
   );
 }
@@ -1649,7 +1809,33 @@ function _quickLogContentSuggestions(text) {
       .slice(0, 8)
       .map(n => ({ name: lead + n, type: 'creature' }));
   }
-  return null;
+  return _statTokenSuggestions(text);
+}
+
+// Stat-edit token completion (Part B, owner spec #3): a bare partial word (no
+// verb lead-in matched above) that prefix-matches a scalar-stat alias, a
+// SPECIAL alias, or a getSkillKeys() skill suggests "<token> " so the Courier
+// can then type the value/delta. Game-agnostic — skill names are read from
+// getSkillKeys()/SKILL_LABELS, never a hardcoded list (Protocol 38).
+function _statTokenSuggestions(text) {
+  const m = text.match(/^([a-z][a-z _]*)$/i);
+  if (!m) return null;
+  const partial = m[1].toLowerCase();
+  if (!partial) return null;
+  const candidates = new Set();
+  Object.keys(_SCALAR_STAT_ALIASES).forEach(k => candidates.add(k));
+  Object.keys(_SPECIAL_STAT_ALIASES).forEach(k => candidates.add(k));
+  const skillKeys = typeof getSkillKeys === 'function' ? getSkillKeys() : [];
+  skillKeys.forEach(k => {
+    candidates.add(k);
+    candidates.add(k.replace(/_/g, ' '));
+  });
+  const lead = text.slice(0, text.length - m[1].length);
+  const matches = Array.from(candidates)
+    .filter(c => c.startsWith(partial))
+    .slice(0, 8);
+  if (!matches.length) return null;
+  return matches.map(c => ({ name: lead + c + ' ', type: 'Stat edit: set/nudge this stat' }));
 }
 
 // Autocomplete source for #chatInput in TERMINAL mode (extends the shared

@@ -1,7 +1,7 @@
 ﻿# RobCo U.O.S. — System Architecture
 
 > **Version:** 2.7.0
-> **Last Updated:** 2026-07-07
+> **Last Updated:** 2026-07-08
 > **Purpose:** Living reference for any engineer (human or AI) working on this project.
 > This document maps every system, its dependencies, its persistence contract, and the
 > historical lessons that shaped it.
@@ -69,8 +69,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2659-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2659-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2679-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2679-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -2046,6 +2046,24 @@ tracked weapon/armor/headgear can currently only be set by the AI. Scoped out of
 one violation the unit named — affinity); worth a dedicated small unit later (an "equip from inventory"
 action on each inventory row would close it using the same pattern as the other CRUD helpers above).
 
+**Native USE + TERMINAL stat edits (v2.8.0):** two more entry points joined this audit's "OK" column
+without changing any field's status. (1) The CARGO MANIFEST's USE button, previously a free-text
+`> [USE] <name>` round-trip to the AI, is now the deterministic `nativeUseItem()` (`js/ui-render.js`)
+— gated to `cat==='aid'`, it parses the active game's `getChemsTable()` Effect/Duration columns via the
+pure `_computeAidUse()`/`_durationToTicks()` parsers into heal/rad/limb-heal/timed-BUFF/addiction-clear/
+poison-clear, applied through the shared A.2 native setters below and the extracted
+`_applyStatusEffect()` (Protocol 22, reused by `addStatusEffect()` too) — closing the `status`/`hpCur`/
+`rads`/limb fields' AI-narrative dependency for the single most common player action (consuming an
+item). (2) TERMINAL mode (`js/api.js`) now edits every scalar stat, SPECIAL, and skill directly — a
+generic `"<stat> <N>"` SET grammar, both delta forms, and a `"level up"`/`"leveled up"` phrase, all
+resolved via `_resolveStatToken()` (static scalar/SPECIAL alias maps — universal Fallout mechanics —
+plus `getSkillKeys()` for the per-game skill set) and applied through the SAME shared setters. Those
+setters — `_nativeSetHp`/`_nativeSetRads`/`_nativeSetXp`/`_nativeSetLevel`/`_nativeSetSpecial`/
+`_nativeSetSkill`/`_nativeSetKarma`/`_nativeSetCaps` (`js/ui-core.js`) — are the ONE clamp/mirror/emit/
+save choke point per stat (Protocol 22): `commitStat()`'s own SPECIAL DOM `onchange` path now delegates
+to `_nativeSetSpecial()` rather than clamping independently, so the DOM path, Native USE, and TERMINAL
+edits can never disagree on a clamp. No new `state` field — Protocol 4's 4-file dance does not apply.
+
 ---
 
 ## Command-Line MODE (`js/api.js` + `js/ui-core.js` — Step 2 · Phase 2 · B1)
@@ -2733,7 +2751,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2659-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2679-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

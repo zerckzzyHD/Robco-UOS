@@ -6618,32 +6618,48 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   // 64.3  commitStat is defined in ui-core.js
   assert(/function commitStat\s*\(/.test(uiCoreSrc64), 'commitStat is defined in ui-core.js');
 
-  // 64.4–64.7: inspect commitStat body
+  // 64.4–64.7: inspect commitStat body — commitStat now DELEGATES its clamp/
+  // save/emit to the shared _nativeSetSpecial() choke point (Native USE +
+  // TERMINAL stat-edits plan, Protocol 22 — one clamp shared by the DOM
+  // onchange path, the USE handler, and the TERMINAL stat grammar), so 64.4–64.6
+  // check the CONCATENATION of both bodies — the same guarantee, just spanning
+  // the two cooperating functions instead of living in commitStat alone.
   {
     let commitStatBody = '';
+    let nativeSetSpecialBody64 = '';
     try {
       commitStatBody = extractFunctionBody(uiCoreSrc64, 'commitStat');
     } catch (_) {}
+    try {
+      nativeSetSpecialBody64 = extractFunctionBody(uiCoreSrc64, '_nativeSetSpecial');
+    } catch (_) {}
+    const combined64 = commitStatBody + '\n' + nativeSetSpecialBody64;
 
     // 64.4  1–10 clamp on commit only
-    guards(commitStatBody, [
+    guards(combined64, [
       [
         /Math\.max\s*\(\s*1,\s*Math\.min\s*\(\s*10,/,
-        'commitStat clamps value to 1–10 on commit (Math.max/min guard)',
+        'commitStat (via _nativeSetSpecial) clamps value to 1–10 on commit (Math.max/min guard)',
       ],
 
       // 64.5  calls updateMath() for downstream recalcs
-      [/updateMath\s*\(\s*\)/, 'commitStat calls updateMath() to trigger downstream recalcs'],
+      [
+        /updateMath\s*\(\s*\)/,
+        'commitStat (via _nativeSetSpecial) calls updateMath() to trigger downstream recalcs',
+      ],
 
       // 64.6  calls saveState() to persist
-      [/saveState\s*\(\s*\)/, 'commitStat calls saveState() to debounce-persist the new value'],
+      [
+        /saveState\s*\(\s*\)/,
+        'commitStat (via _nativeSetSpecial) calls saveState() to debounce-persist the new value',
+      ],
     ]);
 
     // 64.7  isNaN guard reverts to prior state value (not a hard 1)
     assert(
-      /isNaN\s*\(v\)/.test(commitStatBody) &&
-        /state\s*\[.*k.*\]/.test(commitStatBody) &&
-        /\|\|\s*5/.test(commitStatBody),
+      /isNaN\s*\(v\)/.test(combined64) &&
+        /state\s*\[.*k.*\]/.test(combined64) &&
+        /\|\|\s*5/.test(combined64),
       'commitStat reverts empty/NaN to state[k]||5 (not forced to 1) — regression guard'
     );
   }
@@ -19039,13 +19055,42 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       const params = src.slice(parenIdx, braceIdx);
       return 'function ' + name + params + extractFunctionBody(src, name);
     }
-    const src153b = declareFn153b(apiSrc153, '_quickLogContentSuggestions');
+    // extract a top-level `const NAME = { ... };` block by brace-balancing —
+    // needed for the two Part B stat-alias maps _statTokenSuggestions() reads.
+    function declareConstObj153b(src, name) {
+      const idx = src.indexOf('const ' + name);
+      const eqIdx = src.indexOf('=', idx);
+      const braceIdx = src.indexOf('{', eqIdx);
+      let depth = 0,
+        i = braceIdx;
+      while (i < src.length) {
+        if (src[i] === '{') depth++;
+        else if (src[i] === '}' && --depth === 0) {
+          i++;
+          break;
+        }
+        i++;
+      }
+      return src.slice(idx, i) + ';';
+    }
+    // Part B's _statTokenSuggestions() fallback (the new last branch of
+    // _quickLogContentSuggestions()) needs its own alias maps + getSkillKeys()
+    // in scope, or a bare call to it throws ReferenceError inside the sandbox.
+    const src153b =
+      declareConstObj153b(apiSrc153, '_SCALAR_STAT_ALIASES') +
+      '\n' +
+      declareConstObj153b(apiSrc153, '_SPECIAL_STAT_ALIASES') +
+      '\n' +
+      declareFn153b(apiSrc153, '_statTokenSuggestions') +
+      '\n' +
+      declareFn153b(apiSrc153, '_quickLogContentSuggestions');
 
     function runContent153(text, fixtures) {
       const sb = {
         getFactionRegistry: () => fixtures.factions || [],
         FALLOUT_REGISTRY: { locations: fixtures.locations || [] },
         getBestiaryNames: () => fixtures.creatures || [],
+        getSkillKeys: () => fixtures.skills || [],
       };
       vm153b.createContext(sb);
       vm153b.runInContext(src153b, sb);
@@ -25718,7 +25763,9 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       };
       vm182.createContext(sb);
       vm182.runInContext(
-        declareFn182(uiCore182, 'commitStat') +
+        declareFn182(uiCore182, '_nativeSetSpecial') +
+          '\n' +
+          declareFn182(uiCore182, 'commitStat') +
           '\n' +
           declareFn182(uiCore182, '_applyFaderDragValue') +
           '\n' +
@@ -28939,7 +28986,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   const applyXpBody192 = extractFunctionBody(core192, 'setupXpBarInteraction');
   const wireRadBody192 = extractFunctionBody(core192, '_wireRadDragSurface');
   const skillVuSetBody192 = extractFunctionBody(core192, '_skillVuSet');
+  // commitStat() now delegates its clamp/emit to _nativeSetSpecial() (Native USE
+  // + TERMINAL stat-edits plan, Protocol 22) — the 'stat.change' emit lives in
+  // the shared setter, reached from every commitStat() call, so the check below
+  // covers the concatenation rather than commitStat's own (now-delegating) body.
   const commitStatBody192 = extractFunctionBody(core192, 'commitStat');
+  const nativeSetSpecialBody192 = extractFunctionBody(core192, '_nativeSetSpecial');
   assert(
     /old !== undefined/.test(emitDiffersBody192) &&
       /old !== newVal/.test(emitDiffersBody192) &&
@@ -28948,8 +29000,9 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       /_emitStatChangeIfDiffers\('xp',\s*newXp\)/.test(applyXpBody192) &&
       /_emitStatChangeIfDiffers\('rads',\s*newRads\)/.test(wireRadBody192) &&
       /_emitStatChangeIfDiffers\('skill:'\s*\+\s*key,\s*v\)/.test(skillVuSetBody192) &&
-      /RobcoEvents\.emit\('stat\.change'/.test(commitStatBody192),
-    '192.30: _emitStatChangeIfDiffers() only fires stat.change on a genuine value change (never the first-seen baseline, never a same-value re-set), and every drag-style stat setter plus commitStat() feeds it/emits directly'
+      /_nativeSetSpecial\(/.test(commitStatBody192) &&
+      /RobcoEvents\.emit\('stat\.change'/.test(nativeSetSpecialBody192),
+    '192.30: _emitStatChangeIfDiffers() only fires stat.change on a genuine value change (never the first-seen baseline, never a same-value re-set), and every drag-style stat setter plus commitStat() (via _nativeSetSpecial) feeds it/emits directly'
   );
 
   // 192.31  the 3D orbital burst is real CSS (rotateX/rotateY/rotateZ
@@ -31134,15 +31187,21 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '199.2: toggleEquipItem() emits item.equipped only on an equip, after renderInventory() has already repainted'
   );
 
-  // 199.3  effect.applied (user path) — addStatusEffect() emits only for a
-  //        genuinely NEW compound, never a re-application (ticks/type
-  //        refresh on an existing effect stays silent).
+  // 199.3  effect.applied (user path) — addStatusEffect() delegates to the
+  //        extracted _applyStatusEffect() (Native USE + TERMINAL stat-edits
+  //        plan, Protocol 22 — the same choke point nativeUseItem() calls),
+  //        which emits only for a genuinely NEW compound, never a
+  //        re-application (ticks/type refresh on an existing effect stays
+  //        silent).
   const addEffectBody199 = extractFunctionBody(renderSrc199, 'addStatusEffect');
+  const applyStatusEffectBody199 = extractFunctionBody(renderSrc199, '_applyStatusEffect');
   assert(
-    /if \(existing\) \{[\s\S]{0,80}\} else \{[\s\S]{0,500}RobcoEvents\.emit\(\s*['"]effect\.applied['"]/.test(
-      addEffectBody199
-    ) && /_pendingEffectWarmup\.push\(name\);/.test(addEffectBody199),
-    '199.3: addStatusEffect() emits effect.applied only for a genuinely new compound (the else branch), never a re-application'
+    /_applyStatusEffect\(/.test(addEffectBody199) &&
+      /if \(existing\) \{[\s\S]{0,80}\} else \{[\s\S]{0,500}RobcoEvents\.emit\(\s*['"]effect\.applied['"]/.test(
+        applyStatusEffectBody199
+      ) &&
+      /_pendingEffectWarmup\.push\(nm\);/.test(applyStatusEffectBody199),
+    '199.3: addStatusEffect() delegates to _applyStatusEffect() (Protocol 22 — reused by nativeUseItem() too), which emits effect.applied only for a genuinely new compound (the else branch), never a re-application'
   );
 
   // 199.4  effect.applied (AI path) — the AI status-set in
@@ -31425,6 +31484,789 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       !/\bFNV\b|\bFO3\b|New Vegas|Fallout 3/.test(wireEchoBody199),
     '199.31: the WAVE 3 home-panel + echo additions carry no hardcoded game literal'
   );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 200 — Native USE (Native USE + TERMINAL stat-edits plan, Part A)
+//  Consuming an aid item from the CARGO MANIFEST now applies its CHEMS.CSV
+//  effect deterministically (heal/rads/limb-heal/timed BUFF/addiction-clear/
+//  poison-clear) with ZERO AI round-trip — replacing the old "> [USE] <name>"
+//  free-text message to the Director. USE is gated to cat==='aid';
+//  _computeAidUse()/_durationToTicks() are pure, unit-tested parsers over
+//  getChemsTable() (game-agnostic, both games — no hardcoded item names);
+//  nativeUseItem() applies through the shared A.2 native setters
+//  (ui-core.js) + the extracted _applyStatusEffect() (Protocol 22),
+//  decrementing qty by exactly 1 only when at least one effect was
+//  genuinely applied.
+//  14 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 200 — Native USE (deterministic item consumption, no AI)');
+  const renderSrc200 = readFile('js/ui-render.js');
+  const dbNvSrc200 = readFile('js/db_nv.js');
+  const dbFo3Src200 = readFile('js/db_fo3.js');
+
+  function declareFn200(src, name) {
+    const nameIdx = src.indexOf('function ' + name);
+    const parenIdx = src.indexOf('(', nameIdx);
+    const braceIdx = src.indexOf('{', parenIdx);
+    const params = src.slice(parenIdx, braceIdx);
+    return 'function ' + name + params + extractFunctionBody(src, name);
+  }
+
+  // 200.1  static — nativeUseItem() defined; the CARGO MANIFEST click handler
+  //        calls it (not transmitMessage()) — the no-AI guard on the USE path.
+  const invBody200 = extractFunctionBody(renderSrc200, 'renderInventory');
+  const useHandlerSlice200 = (invBody200.match(
+    /const use = e\.target\.closest\('\[data-use\]'\);[\s\S]{0,150}/
+  ) || [''])[0];
+  assert(
+    /function nativeUseItem\s*\(/.test(renderSrc200) &&
+      /nativeUseItem\(\+use\.dataset\.use\)/.test(useHandlerSlice200) &&
+      !/transmitMessage/.test(useHandlerSlice200),
+    '200.1: nativeUseItem() is defined and the CARGO MANIFEST USE click handler calls it directly — no more chatInput+transmitMessage() round-trip to the AI'
+  );
+
+  // 200.2  static — the use-btn is rendered only for cat==='aid' (weapons/
+  //        armor have EQUIP, ammo/mod/misc have no consume semantics).
+  assert(
+    /cat === 'aid' \? `<button class="use-btn"/.test(invBody200),
+    "200.2: renderInventory()'s use-btn is gated to cat==='aid' — no more USE button on weapons/armor/ammo/mod/misc rows"
+  );
+
+  // 200.3  static — _applyStatusEffect(name,ticks,type) is extracted and
+  //        addStatusEffect() delegates to it (Protocol 22 — one emit site
+  //        for effect.applied, shared with nativeUseItem()'s BUFF apply).
+  const addEffectBody200 = extractFunctionBody(renderSrc200, 'addStatusEffect');
+  assert(
+    /function _applyStatusEffect\s*\(/.test(renderSrc200) &&
+      /_applyStatusEffect\(name, ticks, type\)/.test(addEffectBody200),
+    '200.3: _applyStatusEffect() is extracted from addStatusEffect() and addStatusEffect() delegates to it (Protocol 22)'
+  );
+
+  // 200.4  static — getChemsTable() now exposes a `duration` field (the raw
+  //        CHEMS.CSV Duration column) in BOTH db_nv.js and db_fo3.js — needed
+  //        by _durationToTicks()/the BUFF decision (parity, Protocol 15/38).
+  assert(
+    /const di = headers\.indexOf\('Duration'\);/.test(dbNvSrc200) &&
+      /const di = headers\.indexOf\('Duration'\);/.test(dbFo3Src200) &&
+      /duration: di >= 0 \? \(cols\[di\] \|\| ''\)\.trim\(\) : ''/.test(dbNvSrc200) &&
+      /duration: di >= 0 \? \(cols\[di\] \|\| ''\)\.trim\(\) : ''/.test(dbFo3Src200),
+    '200.4: getChemsTable() exposes the raw Duration column as `duration` in BOTH db_nv.js and db_fo3.js (game-agnostic parity)'
+  );
+
+  // 200.5  static — clauses split on whitespace-bounded " / ", never a bare
+  //        "/" — several FNV foods carry an un-spaced "/" inside a single
+  //        clause ("+2 HP/s for 10s"), which a naive split-on-"/" would tear
+  //        in half (verified against the real CHEMS.CSV data for both games).
+  const computeBody200 = extractFunctionBody(renderSrc200, '_computeAidUse');
+  assert(
+    /\.split\(\/\\s\+\\\/\\s\+\/\)/.test(computeBody200),
+    '200.5: _computeAidUse() splits clauses on whitespace-bounded " / ", never a bare "/" — preserves "+N HP/s for Ss" clauses intact'
+  );
+
+  // 200.6  static (Protocol 38) — the USE handler/parser carries no hardcoded
+  //        game item name (Stimpak/RadAway/Buffout/etc.) — items resolve via
+  //        getChemsTable() only, so a new game needs zero handler changes.
+  const useItemBody200 = extractFunctionBody(renderSrc200, 'nativeUseItem');
+  assert(
+    !/Stimpak|RadAway|Buffout|Hydra|Fixer|Antivenom/.test(computeBody200 + useItemBody200) &&
+      /getChemsTable\(\)/.test(useItemBody200),
+    '200.6: nativeUseItem()/_computeAidUse() contain no hardcoded game item name — items resolve via getChemsTable() only'
+  );
+
+  // 200.7  static (Protocol 24) — zero AI on the USE path: no fetch/
+  //        XMLHttpRequest/transmitMessage anywhere in the parser or executor.
+  assert(
+    !/fetch\(|XMLHttpRequest|transmitMessage/.test(computeBody200 + useItemBody200),
+    '200.7: no fetch/XMLHttpRequest/transmitMessage anywhere in _computeAidUse()/nativeUseItem() — the USE path is fully offline'
+  );
+
+  // 200.8  BEHAVIORAL — _durationToTicks() against the app's canonical
+  //        6-minute tick scale (1h=10 ticks per _nativeWait(hours*10)).
+  {
+    const vm200 = require('vm');
+    const durSrc200 = declareFn200(renderSrc200, '_durationToTicks');
+    const sb200 = { Math, parseInt, parseFloat, String };
+    vm200.createContext(sb200);
+    vm200.runInContext(durSrc200, sb200);
+    const results200 = {
+      '4m': sb200._durationToTicks('4m'),
+      '1h': sb200._durationToTicks('1h'),
+      '30s': sb200._durationToTicks('30s'),
+      '5m': sb200._durationToTicks('5m'),
+      0: sb200._durationToTicks('0'),
+      empty: sb200._durationToTicks(''),
+      junk: sb200._durationToTicks('garbage'),
+    };
+    assert(
+      results200['4m'] === 1 &&
+        results200['1h'] === 10 &&
+        results200['30s'] === 1 &&
+        results200['5m'] === 1 &&
+        results200['0'] === 0 &&
+        results200.empty === 0 &&
+        results200.junk === 0,
+      '200.8: _durationToTicks() behavioral: "4m"→1, "1h"→10, "30s"→1, "5m"→1 (sub-tick rounds UP to at least 1), "0"/empty/unparseable→0'
+    );
+  }
+
+  // 200.9  BEHAVIORAL — _computeAidUse() against the REAL CHEMS.CSV effect
+  //        shapes from BOTH games (not synthetic strings) — every A.1 clause
+  //        shape from the plan, read straight off the shipped data.
+  {
+    const vm200b = require('vm');
+    const src200b =
+      (renderSrc200.match(/const _AID_DEFAULT_HEAL = \d+;/) || [''])[0] +
+      '\n' +
+      declareFn200(renderSrc200, '_durationToTicks') +
+      '\n' +
+      declareFn200(renderSrc200, '_computeAidUse');
+    const sb200b = { Math, parseInt, parseFloat, String };
+    vm200b.createContext(sb200b);
+    vm200b.runInContext(src200b, sb200b);
+    const compute200b = sb200b._computeAidUse;
+
+    const stimpakFnv = compute200b({ name: 'Stimpak', effect: 'Restore HP', duration: '0' });
+    const stimpakFo3 = compute200b({ name: 'Stimpak', effect: 'Restore 30 HP', duration: '0' });
+    const superStimpakFo3 = compute200b({
+      name: 'Super Stimpak',
+      effect: 'Restore 100 HP / -1 STR (1m)',
+      duration: '1m',
+    });
+    const radaway = compute200b({ name: 'RadAway', effect: 'Remove 150 Rads', duration: '0' });
+    const radx = compute200b({ name: 'Rad-X', effect: '+25 Rad Resistance', duration: '4m' });
+    const buffout = compute200b({
+      name: 'Buffout',
+      effect: '+2 STR / +2 END / +60 Max HP',
+      duration: '4m',
+    });
+    const cramFo3 = compute200b({ name: 'Cram', effect: '+10 HP / +5 RAD', duration: '0' });
+    const caravanLunch = compute200b({
+      name: 'Caravan Lunch',
+      effect: 'Restore HP',
+      duration: '0',
+    });
+    const bighornerSteak = compute200b({
+      name: 'Bighorner Steak',
+      effect: '+2 HP/s for 10s',
+      duration: '0',
+    });
+    const docBagFnv = compute200b({
+      name: "Doctor's Bag",
+      effect: 'Restore all crippled limbs',
+      duration: '0',
+    });
+    const docBagFo3 = compute200b({ name: "Doctor's Bag", effect: 'Heal limbs', duration: '0' });
+    const hydra = compute200b({ name: 'Hydra', effect: 'Restore crippled limb', duration: '0' });
+    const fixer = compute200b({ name: 'Fixer', effect: 'Remove addiction', duration: '0' });
+    const antivenom = compute200b({ name: 'Antivenom', effect: 'Remove Poison', duration: '0' });
+    const brocFlower = compute200b({
+      name: 'Broc Flower',
+      effect: 'Stimpak crafting ingredient',
+      duration: '0',
+    });
+    const noData = compute200b(null);
+
+    assert(
+      stimpakFnv.heal === 20 &&
+        stimpakFnv.recognized === true &&
+        stimpakFo3.heal === 30 &&
+        superStimpakFo3.heal === 100 &&
+        superStimpakFo3.buff &&
+        superStimpakFo3.buff.name === 'Super Stimpak' &&
+        superStimpakFo3.buff.ticks > 0 &&
+        radaway.radDelta === -150 &&
+        radx.buff &&
+        radx.buff.name === 'Rad-X' &&
+        radx.heal === 0 &&
+        radx.radDelta === 0 &&
+        buffout.buff &&
+        buffout.buff.name === 'Buffout' &&
+        buffout.buff.ticks > 0 &&
+        buffout.heal === 0 &&
+        cramFo3.heal === 10 &&
+        cramFo3.radDelta === 5 &&
+        caravanLunch.heal === 20 &&
+        bighornerSteak.heal === 20 &&
+        docBagFnv.healLimbs === 'all' &&
+        docBagFo3.healLimbs === 'all' &&
+        hydra.healLimbs === 'one' &&
+        fixer.clearAddiction === true &&
+        antivenom.clearPoison === true &&
+        brocFlower.recognized === false &&
+        !noData.recognized,
+      '200.9: _computeAidUse() behavioral against real CHEMS.CSV shapes — FNV Stimpak (bare Restore HP)→+20, FO3 Stimpak (Restore 30 HP)→+30, FO3 Super Stimpak→+100 HP + a timed Super Stimpak BUFF (not a permanent SPECIAL change), RadAway→-150 rads, Rad-X→a Rad-X BUFF with no HP/rad change, Buffout→a Buffout BUFF with no permanent SPECIAL/hpMax change, FO3 Cram→+10 HP AND +5 rads, Caravan Lunch (bare)→+20, "+2 HP/s for 10s"→+20 (the un-spaced-slash regression guard), both games\' Doctor\'s Bag→heal ALL limbs, Hydra→heal ONE limb, Fixer→clears addiction, Antivenom→clears poison, a crafting ingredient→unrecognized/no-op, null input→unrecognized/no-op'
+    );
+  }
+
+  // 200.10  BEHAVIORAL — the addiction-risk reuse: adding Buffout's BUFF
+  //         status then running the REAL _bioScanCompute()/_bioChemHasRisk()
+  //         (unchanged from BIO-SCAN) yields an ADDICTION RISK: BUFFOUT
+  //         advisory — proves Native USE reuses the existing surfacing
+  //         (Protocol 22) rather than a second addiction mechanism.
+  {
+    const vm200c = require('vm');
+    const bioSrc200c =
+      declareFn200(renderSrc200, '_bioChemHasRisk') +
+      '\n' +
+      declareFn200(renderSrc200, '_bioScanCompute');
+    const sb200c = { Math, String, Number, Array, Set };
+    // _bioScanCompute references the module-level _BIO_LIMBS array literal —
+    // extract it too so the sandbox mirrors the real file exactly.
+    const limbsLine200c = (renderSrc200.match(/const _BIO_LIMBS = \[[\s\S]*?\];/) || [''])[0];
+    vm200c.createContext(sb200c);
+    vm200c.runInContext(limbsLine200c + '\n' + bioSrc200c, sb200c);
+    const chemsFixture200c = [
+      {
+        name: 'Buffout',
+        effect: '+2 STR / +2 END / +60 Max HP',
+        addictionRisk: '25%',
+        family: 'Buffout',
+      },
+    ];
+    const advisory200c = sb200c._bioScanCompute(
+      { status: [{ name: 'Buffout', ticks: 1, type: 'BUFF' }] },
+      chemsFixture200c
+    );
+    assert(
+      advisory200c.advisories.some(a => a.kind === 'addiction' && /BUFFOUT/.test(a.text)),
+      "200.10: adding Buffout's BUFF status effect via Native USE then running the real _bioScanCompute() yields an ADDICTION RISK: BUFFOUT advisory — proves USE reuses BIO-SCAN's existing addiction surfacing rather than a second mechanism"
+    );
+  }
+
+  // 200.11  BEHAVIORAL — the full apply path: heals HP clamped at hpMax,
+  //         decrements qty by 1, and removes the row at qty 0 — via the
+  //         REAL nativeUseItem() + the REAL A.2 setters (ui-core.js) run
+  //         together in one sandbox (the Suite 133/182 real-function idiom).
+  {
+    const vm200d = require('vm');
+    const coreSrc200d = readFile('js/ui-core.js');
+    function declareFnCore200d(name) {
+      const nameIdx = coreSrc200d.indexOf('function ' + name);
+      const parenIdx = coreSrc200d.indexOf('(', nameIdx);
+      const braceIdx = coreSrc200d.indexOf('{', parenIdx);
+      const params = coreSrc200d.slice(parenIdx, braceIdx);
+      return 'function ' + name + params + extractFunctionBody(coreSrc200d, name);
+    }
+    function mockEl200d(initial) {
+      let v = String(initial == null ? '' : initial);
+      return {
+        get value() {
+          return v;
+        },
+        set value(x) {
+          v = String(x);
+        },
+      };
+    }
+    const els200d = {
+      stat_hp_cur: mockEl200d(50),
+      stat_hp_max: mockEl200d(100),
+      stat_rads: mockEl200d(0),
+    };
+    const sb200d = {
+      document: { getElementById: id => els200d[id] || null },
+      state: { hpCur: 50, hpMax: 100, rads: 0, status: [], inventory: [] },
+      updateMath: () => {},
+      saveState: () => {},
+      appendToChat: () => {},
+      renderInventory: () => {},
+      renderStatus: () => {},
+      loadUI: () => {},
+      getChemsTable: () => [{ name: 'Stimpak', effect: 'Restore 30 HP', duration: '0' }],
+      RobcoEvents: { emit: () => {} },
+      _emitStatChangeIfDiffers: () => {},
+      _resolveMaxRads: () => 1000,
+      _pendingEffectWarmup: [],
+      Math,
+      parseInt,
+      String,
+    };
+    vm200d.createContext(sb200d);
+    vm200d.runInContext(
+      declareFnCore200d('_nativeSetHp') + '\n' + declareFnCore200d('_nativeSetRads'),
+      sb200d
+    );
+    vm200d.runInContext(
+      declareFn200(renderSrc200, '_applyStatusEffect') +
+        '\n' +
+        (renderSrc200.match(/const _AID_DEFAULT_HEAL = \d+;/) || [''])[0] +
+        '\n' +
+        declareFn200(renderSrc200, '_durationToTicks') +
+        '\n' +
+        declareFn200(renderSrc200, '_computeAidUse') +
+        '\n' +
+        declareFn200(renderSrc200, 'nativeUseItem'),
+      sb200d
+    );
+
+    sb200d.state.inventory = [{ name: 'Stimpak', qty: 2, wgt: 0.5, val: 20, type: 'aid' }];
+    sb200d.nativeUseItem(0);
+    const afterFirstUse = {
+      hp: sb200d.state.hpCur,
+      qty: sb200d.state.inventory[0] && sb200d.state.inventory[0].qty,
+      rowsLeft: sb200d.state.inventory.length,
+    };
+    sb200d.nativeUseItem(0);
+    const afterSecondUse = { rowsLeft: sb200d.state.inventory.length };
+
+    // Clamp check: heal past hpMax stays capped.
+    sb200d.state.inventory = [{ name: 'Stimpak', qty: 1, wgt: 0.5, val: 20, type: 'aid' }];
+    sb200d.state.hpCur = 90;
+    sb200d.nativeUseItem(0);
+    const clampedHp = sb200d.state.hpCur;
+
+    assert(
+      afterFirstUse.hp === 80 &&
+        afterFirstUse.qty === 1 &&
+        afterFirstUse.rowsLeft === 1 &&
+        afterSecondUse.rowsLeft === 0 &&
+        clampedHp === 100,
+      '200.11: nativeUseItem() behavioral (real function, real A.2 setters): using a Stimpak (Restore 30 HP) heals +30 via _nativeSetHp, decrements qty by exactly 1, removes the row at qty 0, and a heal past hpMax clamps at hpMax (100)'
+    );
+  }
+
+  // 200.12  BEHAVIORAL — a crafting-ingredient / unknown-aid use leaves qty
+  //         UNCHANGED (Protocol 24: never spend an item for no effect).
+  {
+    const vm200e = require('vm');
+    const sb200e = {
+      document: { getElementById: () => null },
+      state: { hpCur: 50, hpMax: 100, rads: 0, status: [], inventory: [] },
+      updateMath: () => {},
+      saveState: () => {},
+      appendToChat: () => {},
+      renderInventory: () => {},
+      renderStatus: () => {},
+      loadUI: () => {},
+      getChemsTable: () => [
+        { name: 'Broc Flower', effect: 'Stimpak crafting ingredient', duration: '0' },
+        { name: 'Rusty Tin Can', effect: '', duration: '0' },
+      ],
+      RobcoEvents: { emit: () => {} },
+      _emitStatChangeIfDiffers: () => {},
+      _nativeSetHp: () => {},
+      _nativeSetRads: () => {},
+      _resolveMaxRads: () => 1000,
+      _pendingEffectWarmup: [],
+      Math,
+      parseInt,
+      String,
+    };
+    vm200e.createContext(sb200e);
+    vm200e.runInContext(
+      declareFn200(renderSrc200, '_applyStatusEffect') +
+        '\n' +
+        (renderSrc200.match(/const _AID_DEFAULT_HEAL = \d+;/) || [''])[0] +
+        '\n' +
+        declareFn200(renderSrc200, '_durationToTicks') +
+        '\n' +
+        declareFn200(renderSrc200, '_computeAidUse') +
+        '\n' +
+        declareFn200(renderSrc200, 'nativeUseItem'),
+      sb200e
+    );
+    sb200e.state.inventory = [{ name: 'Broc Flower', qty: 3, wgt: 0.01, val: 3, type: 'aid' }];
+    sb200e.nativeUseItem(0);
+    const qtyAfterIngredient = sb200e.state.inventory[0].qty;
+
+    sb200e.state.inventory = [{ name: 'Rusty Tin Can', qty: 2, wgt: 1, val: 1, type: 'aid' }];
+    sb200e.nativeUseItem(0);
+    const qtyAfterNoData = sb200e.state.inventory[0].qty;
+
+    assert(
+      qtyAfterIngredient === 3 && qtyAfterNoData === 2,
+      '200.12: using a crafting-ingredient aid item (recognized:false) or an aid item absent from CHEMS.CSV leaves qty UNCHANGED and applies no state change — an item is never spent for zero effect'
+    );
+  }
+
+  // 200.13  static — a non-aid item forced through nativeUseItem() (e.g. a
+  //         stale row from an older save) shows "not a consumable" and never
+  //         decrements — the type gate is enforced in the executor too, not
+  //         just the render-time button gating (200.2).
+  assert(
+    /if \(String\(item\.type \|\| ''\)\.toLowerCase\(\) !== 'aid'\) \{/.test(useItemBody200) &&
+      /is not a consumable/.test(useItemBody200),
+    '200.13: nativeUseItem() itself (not just the render gate) refuses a non-aid item with "not a consumable" and no decrement — defense in depth'
+  );
+
+  // 200.14  static — offline-safe (Protocol 24): nativeUseItem() never reads
+  //         a network/auth-gated value before applying — it works with no
+  //         Gemini key and no network, exactly like every other native
+  //         terminal (VATS/THREAT/BIO-SCAN/etc).
+  assert(
+    !/isFeatureEnabled|apiKey|GEMINI/i.test(useItemBody200),
+    '200.14: nativeUseItem() never reads a feature-flag/API-key gate — fully offline-safe like the other native terminals'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 201 — TERMINAL stat edits (Native USE + TERMINAL stat-edits plan,
+//  Part B). TERMINAL mode now edits EVERY stat deterministically — the
+//  generic "<stat> <N>" SET grammar, both delta forms ("+N <stat>"/"<stat>
+//  +N"), and the "level up"/"leveled up" phrase — all resolved via
+//  _resolveStatToken() (universal scalar/SPECIAL alias maps + getSkillKeys()
+//  for the per-game skill set, Protocol 38) and applied through the SAME A.2
+//  native setters Native USE uses (Protocol 22). Zero AI on every path.
+//  6 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 201 — TERMINAL stat edits (deterministic, no AI)');
+  const apiSrc201 = readFile('js/api.js');
+  const coreSrc201 = readFile('js/ui-core.js');
+
+  function declareFnApi201(name) {
+    const nameIdx = apiSrc201.indexOf('function ' + name);
+    const parenIdx = apiSrc201.indexOf('(', nameIdx);
+    const braceIdx = apiSrc201.indexOf('{', parenIdx);
+    const params = apiSrc201.slice(parenIdx, braceIdx);
+    return 'function ' + name + params + extractFunctionBody(apiSrc201, name);
+  }
+  function declareFnCore201(name) {
+    const nameIdx = coreSrc201.indexOf('function ' + name);
+    const parenIdx = coreSrc201.indexOf('(', nameIdx);
+    const braceIdx = coreSrc201.indexOf('{', parenIdx);
+    const params = coreSrc201.slice(parenIdx, braceIdx);
+    return 'function ' + name + params + extractFunctionBody(coreSrc201, name);
+  }
+  function declareConstObj201(src, name) {
+    const idx = src.indexOf('const ' + name);
+    const eqIdx = src.indexOf('=', idx);
+    const braceIdx = src.indexOf('{', eqIdx);
+    let depth = 0,
+      i = braceIdx;
+    while (i < src.length) {
+      if (src[i] === '{') depth++;
+      else if (src[i] === '}' && --depth === 0) {
+        i++;
+        break;
+      }
+      i++;
+    }
+    return src.slice(idx, i) + ';';
+  }
+  function declareConstArr201(src, name) {
+    const idx = src.indexOf('const ' + name);
+    const eqIdx = src.indexOf('=', idx);
+    const bracketIdx = src.indexOf('[', eqIdx);
+    let depth = 0,
+      i = bracketIdx;
+    while (i < src.length) {
+      if (src[i] === '[') depth++;
+      else if (src[i] === ']' && --depth === 0) {
+        i++;
+        break;
+      }
+      i++;
+    }
+    return src.slice(idx, i) + ';';
+  }
+
+  // 201.1  static — the 4 new QUICK_LOG_PATTERNS entries + _resolveStatToken exist.
+  assert(
+    /id:\s*'levelup'/.test(apiSrc201) &&
+      /id:\s*'stat_set'/.test(apiSrc201) &&
+      /id:\s*'stat_delta_lead'/.test(apiSrc201) &&
+      /id:\s*'stat_delta_trail'/.test(apiSrc201) &&
+      /function _resolveStatToken\s*\(/.test(apiSrc201),
+    '201.1: QUICK_LOG_PATTERNS defines levelup/stat_set/stat_delta_lead/stat_delta_trail, and _resolveStatToken() is defined'
+  );
+
+  // 201.2  static — commitStat(el) delegates to _nativeSetSpecial (Protocol 22
+  //        — one clamp/save choke point shared by the DOM onchange path, the
+  //        USE handler, and the TERMINAL stat grammar).
+  const commitStatBody201 = extractFunctionBody(coreSrc201, 'commitStat');
+  assert(
+    /_nativeSetSpecial\(k, v\)/.test(commitStatBody201) &&
+      /function _nativeSetSpecial\s*\(/.test(coreSrc201),
+    '201.2: commitStat(el) delegates to _nativeSetSpecial(k, v) — the SPECIAL DOM onchange path, Native USE, and TERMINAL stat edits all clamp through one function'
+  );
+
+  // 201.3  static — UNRECOGNIZED hint lists the new stat commands; the
+  //        COMMAND_REGISTRY carries a STAT EDITS group; _commandSuggestions
+  //        gained the _statTokenSuggestions fallback branch (registry↔hint↔
+  //        autocomplete lock-step, the Suite 113 pattern).
+  assert(
+    /stat edit like "hp 80", "\+2 str", "rads 50", "level up", "guns 45"/.test(apiSrc201) &&
+      /group:\s*'STAT EDITS — TERMINAL, OFFLINE'/.test(coreSrc201) &&
+      /function _statTokenSuggestions\s*\(/.test(apiSrc201) &&
+      /return _statTokenSuggestions\(text\);/.test(apiSrc201),
+    '201.3: the UNRECOGNIZED hint lists stat-edit examples, COMMAND_REGISTRY has a STAT EDITS — TERMINAL, OFFLINE group, and _quickLogContentSuggestions() falls back to _statTokenSuggestions() for autocomplete'
+  );
+
+  // 201.4  BEHAVIORAL — the full grammar (set + both delta forms + level-up
+  //        phrase + multi-action + unresolved-token fallthrough), executed
+  //        via the REAL _resolveStatToken/_quickLogStatSet/_quickLogStatDelta/
+  //        _routeQuickLog/_routeQuickLogMulti (api.js) + the REAL A.2 native
+  //        setters + nativeLevelUp/_skillVuSet (ui-core.js), against a
+  //        synthetic DOM + state (the Suite 133/151/194 real-function idiom).
+  {
+    const vm201 = require('vm');
+    const src201 =
+      declareConstObj201(apiSrc201, '_SCALAR_STAT_ALIASES') +
+      '\n' +
+      declareConstObj201(apiSrc201, '_SPECIAL_STAT_ALIASES') +
+      '\n' +
+      declareFnApi201('_resolveStatToken') +
+      '\n' +
+      declareFnApi201('_readStatCurrent') +
+      '\n' +
+      declareFnApi201('_applyStatToken') +
+      '\n' +
+      declareFnApi201('_statTokenLabel') +
+      '\n' +
+      declareFnApi201('_quickLogStatSet') +
+      '\n' +
+      declareFnApi201('_quickLogStatDelta') +
+      '\n' +
+      declareFnApi201('_stripPrompt') +
+      '\n' +
+      declareConstArr201(apiSrc201, 'QUICK_LOG_PATTERNS') +
+      '\n' +
+      declareFnApi201('_routeQuickLog') +
+      '\n' +
+      declareFnApi201('_routeQuickLogMulti');
+    const coreDeclSrc201 =
+      declareFnCore201('_nativeSetHp') +
+      '\n' +
+      declareFnCore201('_nativeSetRads') +
+      '\n' +
+      declareFnCore201('_nativeSetXp') +
+      '\n' +
+      declareFnCore201('_nativeSetLevel') +
+      '\n' +
+      declareFnCore201('_nativeSetSpecial') +
+      '\n' +
+      declareFnCore201('_nativeSetKarma') +
+      '\n' +
+      declareFnCore201('_nativeSetCaps') +
+      '\n' +
+      declareFnCore201('_skillVuSet') +
+      '\n' +
+      declareFnCore201('_nativeSetSkill') +
+      '\n' +
+      declareFnCore201('nativeLevelUp') +
+      '\n' +
+      (coreSrc201.match(/const MAX_PLAYER_LEVEL = \d+;/) || [''])[0];
+
+    function mockEl201(initial) {
+      let v = String(initial == null ? '' : initial);
+      return {
+        get value() {
+          return v;
+        },
+        set value(x) {
+          v = String(x);
+        },
+      };
+    }
+
+    function makeSandbox201(opts) {
+      opts = opts || {};
+      const els = {
+        stat_hp_cur: mockEl201(opts.hpCur != null ? opts.hpCur : 50),
+        stat_hp_max: mockEl201(opts.hpMax != null ? opts.hpMax : 100),
+        stat_rads: mockEl201(opts.rads != null ? opts.rads : 0),
+        stat_xp: mockEl201(opts.xp != null ? opts.xp : 0),
+        stat_lvl: mockEl201(opts.lvl != null ? opts.lvl : 1),
+        stat_karma: mockEl201(opts.karma != null ? opts.karma : 0),
+        c_caps: mockEl201(opts.caps != null ? opts.caps : 0),
+        s_s: mockEl201(5),
+        s_p: mockEl201(5),
+        s_e: mockEl201(5),
+        s_c: mockEl201(5),
+        s_i: mockEl201(5),
+        s_a: mockEl201(5),
+        s_l: mockEl201(5),
+        sk_guns: mockEl201(15),
+        sk_small_guns: mockEl201(15),
+      };
+      const levelUpEvents = [];
+      const sb = {
+        document: {
+          getElementById: id => els[id] || null,
+          querySelector: () => null,
+        },
+        state: {
+          hpCur: opts.hpCur != null ? opts.hpCur : 50,
+          hpMax: opts.hpMax != null ? opts.hpMax : 100,
+          rads: opts.rads != null ? opts.rads : 0,
+          xp: opts.xp != null ? opts.xp : 0,
+          lvl: opts.lvl != null ? opts.lvl : 1,
+          karma: opts.karma != null ? opts.karma : 0,
+          caps: opts.caps != null ? opts.caps : 0,
+          s: 5,
+          p: 5,
+          e: 5,
+          c: 5,
+          i: 5,
+          a: 5,
+          l: 5,
+          skills: { guns: 15, small_guns: 15 },
+        },
+        updateMath: () => {},
+        updateKarmaUI: () => {},
+        saveState: () => {},
+        appendToChat: () => {},
+        adjustFaction: () => {},
+        onLocationChange: () => {},
+        _logEvent: () => {},
+        getFactionRegistry: () => [],
+        getSkillKeys: opts.getSkillKeys || (() => ['guns']),
+        SKILL_LABELS: {},
+        RobcoEvents: {
+          emit: (name, p) => {
+            if (name === 'level.up') levelUpEvents.push(p);
+          },
+        },
+        _emitStatChangeIfDiffers: () => {},
+        _resolveMaxRads: () => (opts.maxRads != null ? opts.maxRads : 1000),
+        Math,
+        parseInt,
+        String,
+        Array,
+      };
+      vm201.createContext(sb);
+      vm201.runInContext(coreDeclSrc201, sb);
+      vm201.runInContext(src201, sb);
+      return { sb, els, levelUpEvents };
+    }
+
+    // hp 80 → clamped, DOM mirror
+    const t1 = makeSandbox201({});
+    t1.sb._routeQuickLog('hp 80');
+    // str 8 / str 99(→10) / str 0(→1)
+    const t2 = makeSandbox201({});
+    t2.sb._routeQuickLog('str 8');
+    const str8 = t2.sb.state.s;
+    t2.sb._routeQuickLog('str 99');
+    const str99 = t2.sb.state.s;
+    t2.sb._routeQuickLog('str 0');
+    const str0 = t2.sb.state.s;
+    // +2 str / str +2 / -1 per
+    const t3 = makeSandbox201({});
+    t3.sb._routeQuickLog('+2 str');
+    const strPlus2 = t3.sb.state.s; // 5+2=7
+    t3.sb._routeQuickLog('str +2');
+    const strPlus2Again = t3.sb.state.s; // 7+2=9
+    t3.sb._routeQuickLog('-1 per');
+    const perMinus1 = t3.sb.state.p; // 5-1=4
+    // rads 50 / +50 rads / -30 rads clamped
+    const t4 = makeSandbox201({});
+    t4.sb._routeQuickLog('rads 50');
+    const rads50 = t4.sb.state.rads;
+    t4.sb._routeQuickLog('+50 rads');
+    const rads100 = t4.sb.state.rads;
+    t4.sb._routeQuickLog('-30 rads');
+    const rads70 = t4.sb.state.rads;
+    // xp 500 clamped to band (level 1 → xpNext-1 = 199)
+    const t5 = makeSandbox201({ lvl: 1 });
+    t5.sb._routeQuickLog('xp 500');
+    const xpClamped = t5.sb.state.xp;
+    // level 5
+    const t6 = makeSandbox201({});
+    t6.sb._routeQuickLog('level 5');
+    const levelSet = t6.sb.state.lvl;
+    // level up / leveled up
+    const t7 = makeSandbox201({ lvl: 5 });
+    t7.sb._routeQuickLog('level up');
+    const levelAfterUp = t7.sb.state.lvl;
+    t7.sb._routeQuickLog('leveled up');
+    const levelAfterUp2 = t7.sb.state.lvl;
+    // karma 250 / -100 karma
+    const t8 = makeSandbox201({});
+    t8.sb._routeQuickLog('karma 250');
+    const karma250 = t8.sb.state.karma;
+    t8.sb._routeQuickLog('-100 karma');
+    const karma150 = t8.sb.state.karma;
+    // caps 30
+    const t9 = makeSandbox201({});
+    t9.sb._routeQuickLog('caps 30');
+    const caps30 = t9.sb.state.caps;
+    // multi-action
+    const t10 = makeSandbox201({});
+    const multi = t10.sb._routeQuickLogMulti('hp 100, +2 str, rads 0');
+    // unresolved token → false (falls through to UNRECOGNIZED, not a silent no-op)
+    const t11 = makeSandbox201({});
+    const fooResult = t11.sb._routeQuickLog('foo 5');
+
+    assert(
+      t1.sb.state.hpCur === 80 &&
+        t1.els.stat_hp_cur.value === '80' &&
+        str8 === 8 &&
+        str99 === 10 &&
+        str0 === 1 &&
+        strPlus2 === 7 &&
+        strPlus2Again === 9 &&
+        perMinus1 === 4 &&
+        rads50 === 50 &&
+        rads100 === 100 &&
+        rads70 === 70 &&
+        xpClamped === 199 &&
+        levelSet === 5 &&
+        levelAfterUp === 6 &&
+        levelAfterUp2 === 7 &&
+        t7.levelUpEvents.length === 2 &&
+        karma250 === 250 &&
+        karma150 === 150 &&
+        caps30 === 30 &&
+        multi.anyMatched === true &&
+        multi.anyUnmatched === false &&
+        t10.sb.state.hpCur === 100 &&
+        t10.sb.state.s === 7 &&
+        t10.sb.state.rads === 0 &&
+        fooResult === false,
+      '201.4: TERMINAL stat-edit grammar behavioral — "hp 80" clamps+mirrors DOM; "str 8"/"str 99"(→10)/"str 0"(→1); "+2 str"/"str +2" both nudge (5→7→9); "-1 per" nudges down (5→4); "rads 50"/"+50 rads"/"-30 rads" (50→100→70); "xp 500" clamps to the level-1 band (199); "level 5" sets; "level up"/"leveled up" each +1 and emit level.up; "karma 250"/"-100 karma" (250→150); "caps 30" sets; "hp 100, +2 str, rads 0" applies all three via _routeQuickLogMulti; "foo 5" resolves to false (UNRECOGNIZED), never a silent no-op'
+    );
+
+    // 201.5  BEHAVIORAL (Protocol 38) — FNV "guns 45" sets the skill (DOM
+    //        mirror); FO3 (no "guns" skill) "guns 45" is UNRECOGNIZED while
+    //        "small_guns 45" sets it — proves registry-driven resolution via
+    //        getSkillKeys(), never a hardcoded skill list.
+    const tFnv = makeSandbox201({ getSkillKeys: () => ['guns'] });
+    const gunsResultFnv = tFnv.sb._routeQuickLog('guns 45');
+    const gunsMirrorFnv = tFnv.els.sk_guns.value;
+
+    const tFo3 = makeSandbox201({ getSkillKeys: () => ['small_guns', 'big_guns'] });
+    const gunsResultFo3 = tFo3.sb._routeQuickLog('guns 45');
+    const smallGunsResultFo3 = tFo3.sb._routeQuickLog('small_guns 45');
+    const smallGunsMirrorFo3 = tFo3.els.sk_small_guns.value;
+
+    assert(
+      gunsResultFnv !== false &&
+        gunsMirrorFnv === '45' &&
+        gunsResultFo3 === false &&
+        smallGunsResultFo3 !== false &&
+        smallGunsMirrorFo3 === '45',
+      '201.5: FNV "guns 45" sets the skill (DOM mirror "45"); FO3 has no "guns" skill so "guns 45" resolves to false/UNRECOGNIZED while "small_guns 45" sets it — registry-driven via getSkillKeys(), no hardcoded skill list'
+    );
+
+    // 201.6  REGRESSION (Protocol 42 — caught during this unit's own live
+    //        verification, not a pre-existing shipped bug): a skill delta
+    //        ("+10 guns") must report the real committed value in its
+    //        TERMINAL message, not "undefined". _skillVuSet() never returned
+    //        its clamped value (harmless for its original drag/arrow-key
+    //        callers, which ignore the return), but _nativeSetSkill() (this
+    //        plan's new thin wrapper) and _applyStatToken() propagate that
+    //        return straight into the chat message — so every skill set/delta
+    //        silently rendered "... → undefined." until _skillVuSet() was
+    //        fixed to `return v;`.
+    {
+      const t6 = makeSandbox201({ getSkillKeys: () => ['guns'] });
+      const chatLog6 = [];
+      t6.sb.appendToChat = msg => chatLog6.push(msg);
+      t6.sb._routeQuickLog('+10 guns');
+      const lastMsg6 = chatLog6[chatLog6.length - 1] || '';
+      // state.skills[key] itself is only synced by the REAL saveState() ->
+      // syncStateFromDom() (stubbed as a no-op in this sandbox, per the Suite
+      // 182 precedent) — the DOM mirror is the correct behavioral proof here.
+      assert(
+        t6.els.sk_guns.value === '25' && !/undefined/.test(lastMsg6) && /25/.test(lastMsg6),
+        '201.6: a skill delta ("+10 guns" from a base of 15) reports the real committed value (25) in its TERMINAL message — regression guard for _skillVuSet() not returning its clamped value (previously surfaced as "... → undefined.")'
+      );
+    }
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

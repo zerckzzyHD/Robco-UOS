@@ -5282,6 +5282,23 @@ const COMMAND_REGISTRY = [
     ],
   },
   {
+    group: 'STAT EDITS — TERMINAL, OFFLINE',
+    cmds: [
+      {
+        cmd: '<stat> <N>',
+        desc: 'Set any stat to an exact value: hp, rads, xp, level, karma, caps, a SPECIAL (str/per/end/cha/int/agi/lck), or a skill. Offline.',
+      },
+      {
+        cmd: '+N <stat> / <stat> +N',
+        desc: 'Nudge a stat up or down by N instead of setting it outright. Offline.',
+      },
+      {
+        cmd: 'level up / leveled up',
+        desc: 'Gain exactly one level, deterministic — no XP threshold required. Offline.',
+      },
+    ],
+  },
+  {
     group: 'INVENTORY & PROGRESSION',
     cmds: [
       { cmd: '[CRAFT]', desc: 'Consume ingredients to build (craft panel).' },
@@ -5447,21 +5464,131 @@ function capRadsMax(el) {
   const maxRads = _resolveMaxRads();
   if (n > maxRads) el.value = String(maxRads);
 }
+// ── NATIVE STAT SETTERS (Native USE + TERMINAL stat edits) ──────────────────
+// The ONE clamp/mirror/emit/save choke point per stat (Protocol 22) — shared by
+// the native USE handler (nativeUseItem() in ui-render.js), the TERMINAL
+// stat-edit grammar (_resolveStatToken() in api.js), and commitStat()'s own DOM
+// onchange path just below. Each setter mirrors BOTH state.<field> AND the
+// matching DOM input's .value — the WU-N2 caps lesson: saveState() always runs
+// syncStateFromDom() first, which reads the DOM back into state, so an
+// in-memory-only write would be silently reverted on the very next save.
+function _nativeSetHp(v) {
+  const hpMaxEl = document.getElementById('stat_hp_max');
+  const hpMax = (hpMaxEl && parseInt(hpMaxEl.value, 10)) || state.hpMax || 0;
+  const val = Math.max(0, Math.min(hpMax, parseInt(v, 10) || 0));
+  const el = document.getElementById('stat_hp_cur');
+  if (el) el.value = String(val);
+  state.hpCur = val;
+  _emitStatChangeIfDiffers('hp', val); // CHASSIS LIVING CORE #14
+  updateMath();
+  saveState();
+  return val;
+}
+
+function _nativeSetRads(v) {
+  const maxRads = _resolveMaxRads();
+  const val = Math.max(0, Math.min(maxRads, parseInt(v, 10) || 0));
+  const el = document.getElementById('stat_rads');
+  if (el) el.value = String(val);
+  state.rads = val;
+  _emitStatChangeIfDiffers('rads', val); // CHASSIS LIVING CORE #14
+  updateMath();
+  saveState();
+  return val;
+}
+
+// Clamp curve matches onXpInputChanged()'s xpNext formula exactly (Protocol 22
+// — never a second XP-band formula).
+function _nativeSetXp(v) {
+  const lvlEl = document.getElementById('stat_lvl');
+  const lvl = Math.max(1, (lvlEl && parseInt(lvlEl.value, 10)) || state.lvl || 1);
+  const xpNext = 75 * ((lvl + 1) * (lvl + 1)) - 25 * (lvl + 1) - 50;
+  const val = Math.max(0, Math.min(xpNext - 1, parseInt(v, 10) || 0));
+  const el = document.getElementById('stat_xp');
+  if (el) el.value = String(val);
+  state.xp = val;
+  _emitStatChangeIfDiffers('xp', val); // CHASSIS LIVING CORE #14
+  updateMath();
+  saveState();
+  return val;
+}
+
+// Same clamp + 'level.up' emit shape as nativeLevelUp() (Protocol 22) — this is
+// the "set to an exact level" sibling; nativeLevelUp()/the "level up" TERMINAL
+// phrase stay the "+1" entry point and are reused verbatim, not forked here.
+function _nativeSetLevel(v) {
+  const lvlEl = document.getElementById('stat_lvl');
+  const old = Math.max(1, (lvlEl && parseInt(lvlEl.value, 10)) || state.lvl || 1);
+  const val = Math.max(1, Math.min(MAX_PLAYER_LEVEL, parseInt(v, 10) || old));
+  if (lvlEl) lvlEl.value = String(val);
+  state.lvl = val;
+  if (val > old) RobcoEvents.emit('level.up', { oldLvl: old, newLvl: val });
+  updateMath();
+  saveState();
+  return val;
+}
+
+// SPECIAL setter — the exact clamp/emit/save commitStat(el) already did,
+// extracted so the DOM onchange path and the TERMINAL/USE paths share one
+// choke point (Protocol 22). commitStat() below now delegates to this.
+function _nativeSetSpecial(key, v) {
+  let val = parseInt(v, 10);
+  if (isNaN(val)) val = (state && state[key]) || 5;
+  val = Math.max(1, Math.min(10, val));
+  const el = document.getElementById('s_' + key);
+  if (el) el.value = String(val);
+  const old = state && state[key];
+  if (state) state[key] = val;
+  // CHASSIS LIVING CORE #14 (3D ring burst on stat change) — a genuine
+  // committed SPECIAL edit, not a re-render; RobcoEvents.emit is a no-op
+  // with zero subscribers if the core hasn't wired up yet (Protocol 22).
+  if (old !== undefined && old !== val)
+    RobcoEvents.emit('stat.change', { key, oldVal: old, newVal: val });
+  updateMath();
+  saveState();
+  return val;
+}
+
+// Thin wrapper — _skillVuSet() (@5661) already clamps [0,100], mirrors
+// #sk_<key> + the VU fill/aria, emits 'stat.change' skill:<key>, and calls
+// saveState() (Protocol 22 — reused verbatim, never forked).
+function _nativeSetSkill(key, v) {
+  return _skillVuSet(key, v);
+}
+
+// Karma's own oninput handler (index.html #stat_karma) calls BOTH
+// updateKarmaUI() and updateMath() explicitly — updateMath() does not cascade
+// into updateKarmaUI() on its own, so this setter must call both too.
+function _nativeSetKarma(v) {
+  const val = Math.max(-1000, Math.min(1000, parseInt(v, 10) || 0));
+  const el = document.getElementById('stat_karma');
+  if (el) el.value = String(val);
+  state.karma = val;
+  updateKarmaUI();
+  updateMath();
+  saveState();
+  return val;
+}
+
+// Absolute-set sibling of the existing delta-only _quickLogCaps() (api.js) —
+// that function stays as-is for the "+/-N caps" quick-log pattern; this is the
+// new "set to an exact value" entry point USE/TERMINAL stat-edits need.
+function _nativeSetCaps(v) {
+  const val = Math.max(0, parseInt(v, 10) || 0);
+  const el = document.getElementById('c_caps');
+  if (el) el.value = String(val);
+  state.caps = val;
+  _logEvent('caps', 'Caps set to ' + val + '.');
+  updateMath();
+  saveState();
+  return val;
+}
+
 function commitStat(el) {
   const k = el.id.slice(2);
   let v = parseInt(el.value, 10);
   if (isNaN(v)) v = (state && state[k]) || 5;
-  v = Math.max(1, Math.min(10, v));
-  el.value = String(v);
-  const old = state && state[k];
-  if (state) state[k] = v;
-  // CHASSIS LIVING CORE #14 (3D ring burst on stat change) — a genuine
-  // committed SPECIAL edit, not a re-render; RobcoEvents.emit is a no-op
-  // with zero subscribers if the core hasn't wired up yet (Protocol 22).
-  if (old !== undefined && old !== v)
-    RobcoEvents.emit('stat.change', { key: k, oldVal: old, newVal: v });
-  updateMath();
-  saveState();
+  _nativeSetSpecial(k, v);
 }
 function toggleLimb(limb) {
   let wasOk = state[limb] === 'OK';
@@ -5672,6 +5799,7 @@ function _skillVuSet(key, rawVal) {
   // keystroke, never a settled value).
   _emitStatChangeIfDiffers('skill:' + key, v);
   saveState();
+  return v;
 }
 
 // Live-preview the fill as the user types, without rewriting the field

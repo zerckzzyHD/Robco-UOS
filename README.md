@@ -149,7 +149,7 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 | **PWA**         | Service Worker + Manifest                        | Installable, offline-capable, reliable auto-update           |
 | **Hosting**     | GitHub Pages (prod) + Cloudflare Pages (staging) | Release-gated production; auto-deployed staging              |
 | **Dev Tooling** | ESLint + Prettier + Vite                         | Linting, formatting, dev server                              |
-| **Testing**     | Node + PowerShell + Playwright                   | 2659-test gate at parity + boot-smoke / render / a11y checks |
+| **Testing**     | Node + PowerShell + Playwright                   | 2679-test gate at parity + boot-smoke / render / a11y checks |
 
 ### Per-game data system
 
@@ -179,7 +179,7 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 ├── sw.js                   Service Worker (cache-first, atomic precache, reliable update)
 ├── manifest.json           PWA manifest (version-less name + app shortcuts)
 ├── tests/
-│   ├── robco-diagnostics.js   Node persistence/structure audit (2659 tests, 200 suites)
+│   ├── robco-diagnostics.js   Node persistence/structure audit (2679 tests, 202 suites)
 │   ├── robco-diagnostics.ps1  PowerShell mirror (parity-locked)
 │   ├── test.html              Browser-side runtime import-contract audit
 │   └── *.mjs                  Playwright boot-smoke / render-check / a11y-baseline
@@ -269,7 +269,7 @@ Commits and pushes are blocked unless the gate is green. The pre-commit hook run
 
 ### Commit Workflow (dev-branch model)
 
-All unreleased work goes to **`dev`**; **`main` is release-only**. Each commit keeps docs + the 2659-test count in sync and bumps `CACHE_NAME` when a served file changes.
+All unreleased work goes to **`dev`**; **`main` is release-only**. Each commit keeps docs + the 2679-test count in sync and bumps `CACHE_NAME` when a served file changes.
 
 ```
 npm run lint && npm run format
@@ -318,11 +318,12 @@ A **production-quality, two-game browser application** with:
 - **OPERATOR — SKILL MATRIX / STATUS EFFECTS / FACTION STANDING reskins** _(Design Overhaul, dev-only)_ — your skills show as a 13-channel drag-to-set VU meter array, active status effects light up as color-coded compound lamps (buff/debuff/neutral) with a tick countdown and purge key, and faction standing is one shared INFAMY◂▸FAME reputation console with a per-faction channel selector and an all-faction mini-pin strip so nothing is hidden
 - **DATABANK — The Records Bay** _(Design Overhaul, dev-only)_ — your world map is a real spatial "Phosphor Cartography" chart: surveyed locations glow as connected nodes tracing a known-route trail, a radar sweep and a blinking "YOU ARE HERE" marker bring it to life, and uncollected snow globes/bobbleheads/Lincoln memorabilia show as distinct signal-return glyphs; your quest log is a numbered directive rack with status lamps, a filterable status drawer bank, and a native CYCLE key to advance a quest's status yourself; the databank search, campaign record, campaign notes, and session stats all match with an amber query terminal, a tape-spool chronicle, a filterable field-notes ledger, and a mechanical odometer counter bank
 - **Full character/world systems** — SPECIAL, per-game skills, limbs, perks, quests, factions, world-grid map with mark-visited, and trackers (collectibles, Lincoln memorabilia, traits, skill books, magazines) + a crafting panel
+- **Native USE + TERMINAL stat edits** — using an aid item now applies its real effect (heal, rads, limb repair, a timed buff, clearing an addiction or poison) instantly and offline, with no AI round-trip; typing straight into the TERMINAL command line can set or nudge any stat, SPECIAL attribute, or skill, or grant a level, all deterministic and fully offline
 - **Optional AI Director** — Tri-Node JSON, validated import, resilient + prompt-injection-hardened
 - **Saves & cloud** — auto-save, A/B/C slots (with confirm-gated overwrite/delete + version history), export/import + migration, rolling checksummed backups, additive Firestore sync (with its own confirm-gated overwrite/delete + version history), Google sign-in, remote kill-switch, per-game filtered saves list
 - **Accessibility + PWA** — focus rings, reduced-motion, live regions, dialog focus traps, AA contrast; installable, offline, reliable auto-update; touch-first responsive
 - **Wiki-sourced data** — per-game Fallout Data Registries + combat databases (weapons, armor, bestiary, chems, recipes, vendors, quest items), all from the Independent Fallout Wiki
-- **A self-improving gate** — **2659 tests across 200 suites**, mirrored in the Node and PowerShell runners at exact parity (per-suite composition, not just the grand total), plus Playwright boot-smoke / render-check / a11y baseline and a `test.html` runtime audit; CI + a nightly run back it up
+- **A self-improving gate** — **2679 tests across 202 suites**, mirrored in the Node and PowerShell runners at exact parity (per-suite composition, not just the grand total), plus Playwright boot-smoke / render-check / a11y baseline and a `test.html` runtime audit; CI + a nightly run back it up
 
 ---
 
