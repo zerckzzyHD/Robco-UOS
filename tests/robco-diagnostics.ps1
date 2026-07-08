@@ -19869,6 +19869,49 @@ Check (
     [System.Text.RegularExpressions.Regex]::IsMatch($cssStripped198, '\.trait-chips \.tracker-row\.tracker-toggle--inactive\s*\{')
 ) '198.11: .trait-chips .tracker-row.tracker-toggle--inactive is still declared, and now matches (row+toggle merged onto one element)'
 
+# -- DATABANK CARTOGRAPHY TABLE -- sweep-radar containment (owner re-fix,
+#    moving cyan line confirmed on real mobile hardware). .sweep-radar
+#    rotates via `transform` with no clipping ancestor -- its rotated
+#    bounding box measurably grows past .table-frame's own edges for most of
+#    its 8s rotation cycle (a rotated square's bbox grows up to sqrt(2)x),
+#    geometrically reaching .survey-legend's own bounding box. Desktop-engine
+#    z-index/DOM-order happened to still protect the text in every tested
+#    run, but mix-blend-mode:screen with no isolation:isolate boundary is a
+#    documented class of cross-device/GPU compositing inconsistency that
+#    couldn't be ruled out. Fixed defensively: .table-frame now clips
+#    (overflow:hidden) so the sweep can never visually escape its own board
+#    regardless of engine, and isolation:isolate gives the blend mode an
+#    unambiguous compositing boundary -- a real behavioral proof
+#    (tests/render-check.mjs) forces the sweep to its worst-case 45deg bleed
+#    angle and confirms nothing paints outside the board; this static suite
+#    locks the CSS shape that proof depends on. --------------------------
+$tableFrameMatch198b = [System.Text.RegularExpressions.Regex]::Match($cssStripped198, '\.table-frame\s*\{[^}]*\}')
+$tableFrameRule198b = if ($tableFrameMatch198b.Success) { $tableFrameMatch198b.Value } else { '' }
+
+# 198.12  .table-frame clips its rotating sweep-radar child (overflow:hidden)
+#         and isolates its blend-mode compositing (isolation:isolate),
+#         alongside the existing z-index:10000 defense-in-depth.
+Check (
+    ($tableFrameRule198b -match 'overflow:\s*hidden') -and
+    ($tableFrameRule198b -match 'isolation:\s*isolate') -and
+    ($tableFrameRule198b -match 'z-index:\s*10000')
+) '198.12: .table-frame clips (overflow:hidden) + isolates (isolation:isolate) its rotating sweep-radar child, on top of the existing z-index:10000'
+
+# 198.13  .survey-legend/.kbd-hint markup appears AFTER .table-frame's own
+#         opening tag in renderWorldMap()'s template, in that DOM order -- a
+#         lightweight structural sanity check backing the authoritative
+#         runtime proof in tests/render-check.mjs (a real tf.contains()
+#         descendant check), which is what actually guards the sibling
+#         (never-nested) relationship this containment fix depends on.
+$renderWorldMapBody198 = Get-FunctionBody $renderSrc198 'renderWorldMap'
+$tfIdx198 = $renderWorldMapBody198.IndexOf('class="table-frame"')
+$legendIdx198 = $renderWorldMapBody198.IndexOf('class="survey-legend"')
+$kbdIdx198 = $renderWorldMapBody198.IndexOf('class="kbd-hint"')
+Check (
+    ($tfIdx198 -ge 0) -and ($legendIdx198 -ge 0) -and ($kbdIdx198 -ge 0) -and
+    ($tfIdx198 -lt $legendIdx198) -and ($legendIdx198 -lt $kbdIdx198)
+) '198.13: renderWorldMap() emits .table-frame, then .survey-legend, then .kbd-hint, in that DOM order'
+
 # ===========================================================
 # Results
 # ===========================================================

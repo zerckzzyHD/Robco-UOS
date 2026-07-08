@@ -9113,24 +9113,48 @@ button.drawer.active .d-count {
   border-color: var(--bezel-wire);
   color: var(--bezel-wire);
 }
-/* Owner report fix: the app-wide CRT glass overlay (.crt-overlay, a DIRECT
-   child of .glass-frame at z-index:9999 — see terminal.css's crt-overlay
-   rule) spans the FULL scrollable page height on a single-column layout, not
-   just one screen's worth, so its periodic refresh-bar sweep passes over
-   EVERY panel's content — including this board's, whose unusually dark/clean
-   background (#02120c) makes that normally-subtle sweep read as "a bright
-   line crossing the text." .table-frame/.survey-legend/.kbd-hint sit in the
-   SAME stacking context as .crt-overlay (no intermediate ancestor between
-   .glass-frame and #worldMapPanel establishes its own stacking context — the
-   two-column desktop shell's .col-left/.main-grid are both position:static),
-   so a comfortably-higher z-index here is enough to keep this board's own
-   content on top WITHOUT touching the global overlay (which stays exactly as
-   it is everywhere else — Protocol 22, no forked/duplicated CRT effect). */
+/* Owner report fix (original): the app-wide CRT glass overlay (.crt-overlay,
+   a DIRECT child of .glass-frame at z-index:9999 — see terminal.css's
+   crt-overlay rule) spans the FULL scrollable page height on a
+   single-column layout, not just one screen's worth, so its periodic
+   refresh-bar sweep passes over EVERY panel's content — including this
+   board's, whose unusually dark/clean background (#02120c) makes that
+   normally-subtle sweep read as "a bright line crossing the text."
+   .table-frame/.survey-legend/.kbd-hint sit in the SAME stacking context as
+   .crt-overlay (no intermediate ancestor between .glass-frame and
+   #worldMapPanel establishes its own stacking context — the two-column
+   desktop shell's .col-left/.main-grid are both position:static), so a
+   comfortably-higher z-index here is enough to keep this board's own
+   content on top WITHOUT touching the global overlay (which stays exactly
+   as it is everywhere else — Protocol 22, no forked/duplicated CRT effect).
+
+   Owner report re-fix (moving cyan line, real mobile device — a headless
+   desktop repro never reproduced it, but the mechanism was confirmed live):
+   .sweep-radar (below) rotates via `transform` with NO clipping ancestor —
+   its rotated bounding box measurably extends past .table-frame's own
+   edges for most of its 8s rotation (a rotated square's bounding box grows
+   by up to sqrt(2)x). On desktop-engine testing the z-index order above
+   still kept .survey-legend/.kbd-hint painted on top regardless of the
+   geometric overlap, but .sweep-radar's `mix-blend-mode: screen` has no
+   `isolation: isolate` boundary — undefined/inconsistent blend compositing
+   across GPU/mobile rendering paths is a well-documented class of
+   cross-device bug, and is the most likely explanation for a moving bleed
+   that shows on real hardware but never in headless Chromium/WebKit.
+   `overflow: hidden` makes the escape geometrically impossible regardless
+   of engine (the sweep can now never paint outside this box, full stop);
+   `isolation: isolate` gives the blend mode an unambiguous, self-contained
+   compositing boundary. .survey-legend/.kbd-hint already live OUTSIDE this
+   element as later DOM siblings (Protocol 22 — no restructuring needed),
+   so clipping the plot to its own box is sufficient on its own to keep the
+   sweep off the legend row, with the z-index order above kept as
+   defense-in-depth. */
 .table-frame {
   margin: 12px auto 0;
   max-width: 560px;
   position: relative;
   z-index: 10000;
+  overflow: hidden;
+  isolation: isolate;
   border: 1px solid rgba(var(--robco-green-rgb), 0.5);
   background: #02120c;
   padding: 22px;

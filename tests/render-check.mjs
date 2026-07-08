@@ -492,6 +492,96 @@ for (const vp of VIEWPORTS) {
     }
   }
 
+  // Owner re-fix (moving cyan line, confirmed on real mobile hardware — never
+  // reproduced in headless desktop testing, but the mechanism was confirmed
+  // live): .sweep-radar rotates via `transform` with no clipping ancestor, so
+  // its rotated bounding box measurably grows past .table-frame's own edges
+  // for most of its 8s rotation (a rotated square's bbox grows up to sqrt(2)x)
+  // — geometrically reaching .survey-legend's own bounding box. Desktop-engine
+  // z-index/DOM-order happened to still protect the text in every test run,
+  // but mix-blend-mode:screen with no isolation:isolate boundary is a
+  // documented class of cross-device/GPU compositing inconsistency this
+  // couldn't rule out. Fixed defensively: .table-frame now clips
+  // (overflow:hidden) so the sweep can never visually escape its own board
+  // regardless of engine, and isolation:isolate gives the blend mode an
+  // unambiguous compositing boundary. This proof forces the sweep to its
+  // worst-case 45° bleed angle and asserts nothing paints outside the board.
+  {
+    const clipCheck = await page.evaluate(() => {
+      const tf = document.querySelector('.table-frame');
+      const sweep = document.querySelector('.sweep-radar');
+      const legend = document.querySelector('.survey-legend');
+      const kbd = document.querySelector('.kbd-hint');
+      if (!tf || !sweep || !legend || !kbd) return null;
+      const cs = getComputedStyle(tf);
+      // legend/kbd must sit OUTSIDE the clipped container (later DOM siblings,
+      // never descendants) — the clip alone is what keeps the sweep off them.
+      const legendIsDescendant = tf.contains(legend);
+      const kbdIsDescendant = tf.contains(kbd);
+
+      sweep.style.animation = 'none';
+      sweep.style.transform = 'rotate(45deg)'; // the measured worst-case bleed angle
+      const wasPE = sweep.style.pointerEvents;
+      sweep.style.pointerEvents = 'auto'; // probe only — CSS default is none
+      const probe = el => {
+        const r = el.getBoundingClientRect();
+        const cx = r.left + r.width / 2,
+          cy = r.top + r.height / 2;
+        const el2 = document.elementFromPoint(cx, cy);
+        return el2 === sweep ? 'COVERED-BY-SWEEP' : 'ok';
+      };
+      const result = { legend: probe(legend), kbd: probe(kbd) };
+      sweep.style.pointerEvents = wasPE;
+      sweep.style.animation = '';
+      sweep.style.transform = '';
+      return {
+        overflow: cs.overflow,
+        isolation: cs.isolation,
+        legendIsDescendant,
+        kbdIsDescendant,
+        ...result,
+      };
+    });
+    if (!clipCheck) {
+      pass('map sweep-radar containment — elements not present (game may lack a map), skipped');
+    } else {
+      if (clipCheck.overflow === 'hidden') {
+        pass('map sweep-radar containment — .table-frame clips (overflow:hidden)');
+      } else {
+        fail(
+          `map sweep-radar containment — .table-frame overflow is "${clipCheck.overflow}", expected "hidden"`
+        );
+      }
+      if (clipCheck.isolation === 'isolate') {
+        pass(
+          'map sweep-radar containment — .table-frame isolates blend-mode compositing (isolation:isolate)'
+        );
+      } else {
+        fail(
+          `map sweep-radar containment — .table-frame isolation is "${clipCheck.isolation}", expected "isolate"`
+        );
+      }
+      if (!clipCheck.legendIsDescendant && !clipCheck.kbdIsDescendant) {
+        pass(
+          'map sweep-radar containment — .survey-legend/.kbd-hint sit outside the clipped .table-frame'
+        );
+      } else {
+        fail(
+          'map sweep-radar containment — .survey-legend/.kbd-hint are descendants of the clipped .table-frame (should be later siblings)'
+        );
+      }
+      if (clipCheck.legend !== 'COVERED-BY-SWEEP' && clipCheck.kbd !== 'COVERED-BY-SWEEP') {
+        pass(
+          `map sweep-radar containment — at the worst-case 45° bleed angle, nothing paints over legend/kbd-hint (${JSON.stringify(clipCheck)})`
+        );
+      } else {
+        fail(
+          `map sweep-radar containment — the sweep covers the legend/kbd-hint at 45°! ${JSON.stringify(clipCheck)}`
+        );
+      }
+    }
+  }
+
   // node-back scroll preservation: tap a node deep in a long scroll, back out,
   // and assert the panel's own viewport position is unchanged (Protocol 27 —
   // a raw scrollTop restore breaks because the full-grid vs sector-sheet

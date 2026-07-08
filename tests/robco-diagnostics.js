@@ -31034,6 +31034,54 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     /\.trait-chips \.tracker-row\.tracker-toggle--inactive\s*\{/.test(cssStripped198),
     '198.11: .trait-chips .tracker-row.tracker-toggle--inactive is still declared, and now matches (row+toggle merged onto one element)'
   );
+
+  // ── DATABANK CARTOGRAPHY TABLE — sweep-radar containment (owner re-fix,
+  //    moving cyan line confirmed on real mobile hardware). .sweep-radar
+  //    rotates via `transform` with no clipping ancestor — its rotated
+  //    bounding box measurably grows past .table-frame's own edges for most
+  //    of its 8s rotation cycle (a rotated square's bbox grows up to
+  //    sqrt(2)x), geometrically reaching .survey-legend's own bounding box.
+  //    Desktop-engine z-index/DOM-order happened to still protect the text
+  //    in every tested run, but mix-blend-mode:screen with no
+  //    isolation:isolate boundary is a documented class of cross-device/GPU
+  //    compositing inconsistency that couldn't be ruled out. Fixed
+  //    defensively: .table-frame now clips (overflow:hidden) so the sweep
+  //    can never visually escape its own board regardless of engine, and
+  //    isolation:isolate gives the blend mode an unambiguous compositing
+  //    boundary — a real behavioral proof (tests/render-check.mjs) forces
+  //    the sweep to its worst-case 45° bleed angle and confirms nothing
+  //    paints outside the board; this static suite locks the CSS shape that
+  //    proof depends on. ───────────────────────────────────────────────
+  const tableFrameRule198b = (cssStripped198.match(/\.table-frame\s*\{[^}]*\}/) || [''])[0];
+
+  // 198.12  .table-frame clips its rotating sweep-radar child (overflow:
+  //         hidden) and isolates its blend-mode compositing (isolation:
+  //         isolate), alongside the existing z-index:10000 defense-in-depth.
+  assert(
+    /overflow:\s*hidden/.test(tableFrameRule198b) &&
+      /isolation:\s*isolate/.test(tableFrameRule198b) &&
+      /z-index:\s*10000/.test(tableFrameRule198b),
+    '198.12: .table-frame clips (overflow:hidden) + isolates (isolation:isolate) its rotating sweep-radar child, on top of the existing z-index:10000'
+  );
+
+  // 198.13  .survey-legend/.kbd-hint markup appears AFTER .table-frame's own
+  //         opening tag in renderWorldMap()'s template, in that DOM order —
+  //         a lightweight structural sanity check backing the authoritative
+  //         runtime proof in tests/render-check.mjs (a real tf.contains()
+  //         descendant check), which is what actually guards the sibling
+  //         (never-nested) relationship this containment fix depends on.
+  const renderWorldMapBody198 = extractFunctionBody(renderSrc198, 'renderWorldMap');
+  assert(
+    (() => {
+      const tfIdx = renderWorldMapBody198.indexOf('class="table-frame"');
+      const legendIdx = renderWorldMapBody198.indexOf('class="survey-legend"');
+      const kbdIdx = renderWorldMapBody198.indexOf('class="kbd-hint"');
+      return (
+        tfIdx !== -1 && legendIdx !== -1 && kbdIdx !== -1 && tfIdx < legendIdx && legendIdx < kbdIdx
+      );
+    })(),
+    '198.13: renderWorldMap() emits .table-frame, then .survey-legend, then .kbd-hint, in that DOM order'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════
