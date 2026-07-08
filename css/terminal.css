@@ -1005,8 +1005,13 @@ button.lamp {
     bottom: 0;
     z-index: 60;
     margin-top: 0;
+    /* Mobile immersion pass — the same brushed-steel pinstripe .machine
+       already carries (Gap 1), plus rounded top corners so the fixed dock
+       reads as cut from the same physical casing as the header above. */
+    border-radius: 10px 10px 0 0;
     border-top: 1px solid rgba(0, 0, 0, 0.5);
     background:
+      repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.014) 0 2px, transparent 2px 5px),
       linear-gradient(
         180deg,
         rgba(255, 255, 255, 0.03),
@@ -1019,9 +1024,26 @@ button.lamp {
   }
   /* Reserve space at the end of the scrollable page equal to the fixed
      bezel's own height so the dock never covers the last panel's
-     content or controls (Protocol 17). */
+     content or controls (Protocol 17).
+     Mobile immersion pass (owner follow-up to the desktop bezel fidelity
+     pass) — the casing gets its own scaled-down depth cues: rounded top
+     corners + a soft outer shadow, so it reads as a physical device edge
+     against the page background instead of a flat rectangle. Both
+     box-shadow and border-radius are frame-only (Protocol UI-7) — neither
+     affects layout width/scrollWidth, so this adds zero horizontal-overflow
+     risk and costs zero content area. The blur (16px) and the shadow color
+     are deliberately much smaller than the desktop pass's 60px glow, since
+     body's mobile padding is only 10px (vs desktop's 20px) — enough room
+     for a soft edge, not a dramatic one. The full box-shadow list is
+     restated here (not merged) because .container.machine is more specific
+     than the base .machine rule it otherwise inherits from, exactly like
+     the desktop gated override above. */
   .container.machine {
     padding-bottom: 100px;
+    border-radius: 10px 10px 0 0;
+    box-shadow:
+      0 0 16px rgba(0, 0, 0, 0.6),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.05);
   }
   /* Bezel fidelity pass — disciplined mobile edge: hide the desktop-only
      decorative flourishes (governor dial, serial plate, field-kit line)

@@ -69,8 +69,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2686-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2686-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2689-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2689-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -746,6 +746,27 @@ already owns `::after` — delivering the mockup's glass depth with zero DOM res
 `.bezel::before` hazard strip is desktop-only. Mobile (360/412px) keeps the disciplined edge exactly
 as before: dial/serial/field-kit/hazard-strip/`.nk-sub` all hidden, zero new horizontal overflow.
 Guarded by Suite 158.21–158.27 (both runners at parity, +7 tests, 2686 total). Cache r118.
+
+**Mobile immersion pass (owner follow-up — the mobile complement to the bezel fidelity pass
+above):** mobile was intentionally left as a disciplined flat edge by the desktop-only pass;
+this unit gives mobile (`≤999.98px`) its own scaled-down casing depth, inside the existing mobile
+media query, with zero content-area cost (box-shadow/border-radius never affect layout width or
+`scrollWidth`). `.container.machine` gains rounded top corners (`10px 10px 0 0`) plus a soft outer
+shadow (`0 0 16px`, deliberately far smaller than desktop's 60px glow, since mobile `body` padding
+is only 10px vs desktop's 20px) — the bottom stays square, since the fixed keycap dock sits flush
+at the true viewport bottom and a rounded seam there would look stitched-on rather than physical.
+The fixed `.bezel` dock picks up the identical brushed-steel pinstripe texture `.machine` already
+carries (Protocol 22 reuse, not a new texture) plus its own matching rounded top corners, so the
+two pieces read as cut from the same casing. The glass sheen (`.glass-frame::before`) and the
+pinstripe (`.machine`'s own background) already applied unconditionally at every breakpoint from
+the desktop pass — no change was needed there; the mobile screen already read as recessed glass.
+An optional compact serial/flavor micro-line was evaluated and deliberately skipped: the approved
+`nv-machine-412.png` mobile reference shows zero decorative text on mobile, so omitting it keeps
+the disciplined mobile edge faithful to the golden reference rather than forcing a fit. Verified
+live at 360/412/desktop with zero horizontal overflow and the desktop gate completely untouched.
+Guarded by Suite 158.28–158.30 (both runners at parity, +3 tests, 2689 total); this unit also
+caught and fixed a stale Suite 158 header-comment test count that had drifted since the bezel
+fidelity pass (Protocol 42 — harness/doc-only, no functional impact). Cache r119.
 
 ---
 
@@ -2775,7 +2796,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2686-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2689-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2686/2686 | Cache: robco-terminal-v2.7.0-r118 -->
+﻿## [Unreleased]<!-- Tests: 2689/2689 | Cache: robco-terminal-v2.7.0-r119 -->
 
 ### Added
 
@@ -153,6 +153,7 @@
 - The Save & Data help button now matches the modern round design already used on the Comm-Link's help button, instead of the older bracket style.
 - Every line in the Director Uplink transcript now carries a small OVERSEER tag when the Director itself is speaking, so it's easy to tell at a glance which lines came from the AI versus your own typed or logged commands.
 - The terminal's outer casing now has real depth on a desktop screen — a framed, shadowed housing with a subtle brushed-metal texture, deeper raised keycaps along the bottom control strip, a recessed glow behind the screen, a small rotary GOVERNOR dial, and a unit serial plate. On a phone, the casing stays the same clean, compact edge it's always been.
+- On a phone, the terminal's casing now also picks up a touch of that same physical depth — softly rounded top corners and a subtle shadow around the whole device, and the row of hardware buttons docked at the bottom now shares the same brushed-metal texture as the casing above it, so the whole thing reads as one physical device rather than a flat rectangle. It costs no extra screen space and nothing about how any button works has changed.
 
 ### Under the Hood
 

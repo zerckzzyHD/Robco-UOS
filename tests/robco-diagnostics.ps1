@@ -12229,8 +12229,16 @@ Check (
 # (switchTab, hotkeys, #go= deep-links, robco_active_tab), adds no campaign
 # write, and honors the mobile/reduced-motion/centering-rule invariants.
 # UPDATED (Step 2 v2.8.0 Settings-tab unit): extended with the 7th [6]
-# SETTINGS keycap (158.19/158.20).
-# 20 tests.
+# SETTINGS keycap (158.19/158.20). UPDATED (bezel fidelity pass): extended
+# with 158.21-158.27 (Gaps 1-7, desktop framed-casing fidelity). UPDATED
+# (mobile immersion pass): extended with 158.28-158.30 (the mobile-scale
+# complement -- rounded casing corners + a soft outer shadow on the fixed
+# keycap dock too, plus a guard that the desktop gate stays untouched).
+# Protocol 42 note: this header's declared count had drifted stale after
+# the bezel fidelity pass added 7 tests without updating it -- corrected
+# here alongside this unit's own +3 (harness-only drift, no functional
+# impact; the actual assertions always ran, only the doc comment lagged).
+# 35 tests.
 # ===========================================================
 Sep "Suite 158 -- DO-N: bezel chrome + subsystem nav"
 $html158 = Read-Src "index.html"
@@ -12437,6 +12445,28 @@ Check (
 Check (
     $css158 -match "(?s)@media \(min-width: 1000px\) and \(hover: hover\) and \(pointer: fine\) \{.*?\.container\.machine\s*\{[^}]*box-shadow:\s*\n?\s*0 0 60px rgba\(0, 0, 0, 0\.9\)"
 ) "158.27: the framed-casing outer shadow (Gap 1) lives inside the existing hover+fine desktop gate"
+
+# 158.28  MOBILE IMMERSION PASS -- the mobile-scoped .container.machine picks
+# up its own rounded top corners + a soft outer shadow (the mobile-scale
+# complement to Gap 1), inside the existing max-width:999.98px block
+Check (
+    $css158 -match "(?s)@media \(max-width: 999\.98px\) \{.*?\.container\.machine\s*\{[^}]*border-radius:\s*10px 10px 0 0;[^}]*box-shadow:\s*\n?\s*0 0 16px rgba\(0, 0, 0, 0\.6\)"
+) "158.28: mobile .container.machine gets rounded top corners + a scaled-down outer shadow (mobile immersion pass)"
+
+# 158.29  the fixed mobile keycap dock (.bezel) picks up the SAME pinstripe
+# texture as .machine plus rounded top corners, so the bottom dock reads as
+# cut from the same physical casing as the header (Protocol 22 -- reused
+# texture, not a new one)
+Check (
+    $css158 -match "(?s)@media \(max-width: 999\.98px\) \{.*?\.bezel\s*\{[^}]*border-radius:\s*10px 10px 0 0;[^}]*repeating-linear-gradient\(90deg, rgba\(255, 255, 255, 0\.014\) 0 2px, transparent 2px 5px\)"
+) "158.29: the fixed mobile .bezel dock reuses the .machine pinstripe texture and gets rounded top corners"
+
+# 158.30  the mobile immersion additions never touch the desktop gated
+# .container.machine -- the full 10px-all-corners radius + 60px glow stay
+# exactly as the bezel fidelity pass shipped them (sibling to Suite 129)
+Check (
+    $css158 -match "(?s)@media \(min-width: 1000px\) and \(hover: hover\) and \(pointer: fine\) \{.*?\.container\.machine\s*\{\s*box-shadow:\s*\n?\s*0 0 60px rgba\(0, 0, 0, 0\.9\),\s*\n?\s*inset 0 0 0 1px rgba\(255, 255, 255, 0\.05\);\s*\n?\s*border-radius:\s*10px;"
+) "158.30: the desktop gated .container.machine (60px glow + 10px full-corner radius) is untouched by the mobile immersion pass"
 
 # ===========================================================
 # Suite 159 -- Owner bug-fix batch: eventLog live-render + centering rule (2 tests)
