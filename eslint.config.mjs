@@ -105,6 +105,11 @@ export default [
         _pendingQuestStamp: 'writable', // state.js -> ui-render.js/api.js (#23/#24 quest stamp)
         _pendingRepStamp: 'writable', // state.js -> ui-render.js/api.js (#14 REPUTATION STAMP)
         _pendingExhibitLight: 'writable', // state.js -> ui-render.js/api.js (#22 EXHIBIT LIGHT-UP)
+        // FEEDBACK ANIMATION WAVE 3 — same state.js-declared pending-var
+        // pattern as WAVE 1 above.
+        _pendingQuestFiled: 'writable', // state.js -> ui-saves.js/ui-render.js (#25 DIRECTIVE FILED)
+        _pendingPerkSeat: 'writable', // state.js -> ui-render.js (#13 CARD SEAT)
+        _pendingEffectWarmup: 'writable', // state.js -> ui-render.js/api.js (#28 TUNGSTEN WARM-UP)
         generateSyncPayload: 'readonly',
         restoreChatHistory: 'readonly',
         chatHistory: 'writable',

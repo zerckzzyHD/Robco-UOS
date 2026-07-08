@@ -73,6 +73,20 @@ function adjItemQty(idx, delta) {
   renderInventory();
   updateMath();
   saveState();
+  // FEEDBACK ANIMATION WAVE 3 (#33 QTY DIGIT FLIP) — home-only; a one-shot
+  // digit-flip on the freshly-painted quantity readout, skipped when the row
+  // was removed entirely (next === 0, nothing left to flip).
+  if (next > 0) {
+    const list = document.getElementById('invList');
+    const stepBtn = list ? list.querySelector('[data-qtyidx="' + idx + '"]') : null;
+    const qEl = stepBtn ? stepBtn.parentElement.querySelector('.q') : null;
+    if (qEl) {
+      qEl.classList.remove('qty-digit-flip');
+      void qEl.offsetWidth;
+      qEl.classList.add('qty-digit-flip');
+      setTimeout(() => qEl.classList.remove('qty-digit-flip'), 400);
+    }
+  }
 }
 
 // Phase 3 · Piece 2: native EQUIP control, closing the U10 audit gap
@@ -90,10 +104,19 @@ function toggleEquipItem(idx) {
   const slot = cat === 'weapon' ? 'weapon' : cat === 'armor' ? 'armor' : null;
   if (!slot) return;
   if (!state.equipped) state.equipped = { weapon: null, armor: null, headgear: null };
+  const wasEquipped = state.equipped[slot] === it.name;
   state.equipped[slot] = state.equipped[slot] === it.name ? null : it.name;
   renderEquipped();
   renderInventory();
   saveState();
+  // FEEDBACK ANIMATION WAVE 3 (#19 IN-SERVICE STAMP) — new additive emit,
+  // fired only on an EQUIP (never an unequip — a stamp physically landing
+  // only makes sense once, the #12 INK STAMP precedent). Fires AFTER
+  // renderInventory() has already repainted, so the home-panel subscriber's
+  // row lookup is never stale (no defer needed, unlike item.added).
+  if (!wasEquipped) {
+    RobcoEvents.emit('item.equipped', { slot, name: it.name });
+  }
 }
 
 // Drawer bank labels + the state.inventory/state.ammo count each drawer badge
@@ -606,6 +629,11 @@ function renderStatus() {
     _applyChemHighlights();
     return;
   }
+  // FEEDBACK ANIMATION WAVE 3 (#28 TUNGSTEN WARM-UP) — consume the pending
+  // list exactly once (the _pendingRepStamp/_pendingQuestStamp deferred-
+  // consumption pattern), applying the warm-up class to every matching tile.
+  const warmupNames = (_pendingEffectWarmup || []).map(n => String(n).toLowerCase());
+  _pendingEffectWarmup = [];
   statusDiv.innerHTML =
     '<div class="stlamp-grid">' +
     effects
@@ -619,7 +647,16 @@ function renderStatus() {
           ticks > 0
             ? `<span class="stlamp-pips" aria-hidden="true">${_stlampPips(ticks, ticks)}</span>`
             : '';
-        return `<div class="stlamp-tile ${typeCls}">
+        const isWarmup = warmupNames.includes(String(eff.name || '').toLowerCase());
+        // #29 GUTTERING LAMP — a continuous, state-driven flicker for as long
+        // as the effect is genuinely expiring soon (never a one-shot; the
+        // slate calls for "slow distress flicker UNTIL it expires"), so no
+        // separate cleanup timer is needed — the next render simply drops
+        // the class once ticks hits 0 and the row is removed.
+        const isGuttering = ticks > 0 && ticks <= 2;
+        const tileCls =
+          typeCls + (isWarmup ? ' tungsten-warmup' : '') + (isGuttering ? ' lamp-guttering' : '');
+        return `<div class="stlamp-tile ${tileCls}">
           <div class="stlamp-head">
             <span class="stlamp-led" aria-hidden="true"></span>
             <span class="stlamp-name">${name}</span>
@@ -634,6 +671,13 @@ function renderStatus() {
       })
       .join('') +
     '</div>';
+  if (warmupNames.length) {
+    setTimeout(() => {
+      statusDiv
+        .querySelectorAll('.tungsten-warmup')
+        .forEach(el => el.classList.remove('tungsten-warmup'));
+    }, 950);
+  }
   // G3: Apply chem boost highlights to Skill Matrix rows
   _applyChemHighlights();
 }
@@ -716,6 +760,12 @@ function addStatusEffect() {
     existing.type = type;
   } else {
     state.status.push({ name, ticks, type });
+    // FEEDBACK ANIMATION WAVE 3 (#28 TUNGSTEN WARM-UP) — new additive emit,
+    // fired only for a genuinely NEW compound (never a re-application — the
+    // #12 INK STAMP "lands once" precedent); the AI status-set path in
+    // autoImportState() (api.js) emits the same event.
+    RobcoEvents.emit('effect.applied', { name, type });
+    _pendingEffectWarmup.push(name);
   }
 
   nameInput.value = '';
@@ -748,6 +798,10 @@ function renderPerks() {
     perksDiv.innerHTML = emptyState('NO PERK MATCHES');
     return;
   }
+  // FEEDBACK ANIMATION WAVE 3 (#13 CARD SEAT) — consume the pending marker
+  // exactly once (the _pendingQuestStamp deferred-consumption pattern).
+  const seatName = _pendingPerkSeat ? String(_pendingPerkSeat).toLowerCase() : null;
+  _pendingPerkSeat = null;
   const rows = displayPerks
     .map(p => {
       const rank = Math.max(1, parseInt(p.rank) || 1);
@@ -755,8 +809,9 @@ function renderPerks() {
       const levelTag = p.level_taken
         ? `<span class="s-meta">REQ LVL ${parseInt(p.level_taken)}</span>`
         : '';
+      const isSeated = seatName && p.name.toLowerCase() === seatName;
       return (
-        `<div class="slot-row">` +
+        `<div class="slot-row${isSeated ? ' slot-row--seated' : ''}">` +
         `<span class="s-idx">SLOT ${String(p._origIdx + 1).padStart(2, '0')}</span>` +
         `<span class="s-name">${escapeHtml(p.name)}</span>` +
         `<span class="s-rank" title="Rank ${rank}">${pips}</span>` +
@@ -776,6 +831,16 @@ function renderPerks() {
       `<div class="slot-row vacant">SLOT ${String(perks.length + i + 1).padStart(2, '0')} — VACANT</div>`
   ).join('');
   perksDiv.innerHTML = rows + vacantRows;
+  // The seat is a one-shot CSS animation ending on a correct static final
+  // frame (Protocol UI-9) — remove it after it plays so a later re-render
+  // (e.g. a search keystroke) doesn't replay it.
+  if (seatName) {
+    setTimeout(() => {
+      perksDiv
+        .querySelectorAll('.slot-row--seated')
+        .forEach(el => el.classList.remove('slot-row--seated'));
+    }, 700);
+  }
 }
 
 function removePerk(idx) {
@@ -797,6 +862,9 @@ function addPerk() {
     ex.rank = Math.max(ex.rank, rank);
   } else {
     state.perks.push({ name, rank, level_taken: levelTaken || null });
+    // FEEDBACK ANIMATION WAVE 3 (#13 CARD SEAT) — a transient module var
+    // (never state.*), consumed by renderPerks() the next time it paints.
+    _pendingPerkSeat = name;
   }
   document.getElementById('newPerkName').value = '';
   document.getElementById('newPerkRank').value = '';
@@ -931,6 +999,11 @@ function renderQuests() {
   const stampName = _pendingQuestStamp ? String(_pendingQuestStamp.name || '').toLowerCase() : null;
   const stampStatus = _pendingQuestStamp ? _pendingQuestStamp.status : null;
   _pendingQuestStamp = null;
+  // FEEDBACK ANIMATION WAVE 3 (#25 DIRECTIVE FILED) — same deferred-
+  // consumption pattern, set by addQuest() (ui-saves.js). A freshly-filed
+  // quest is never simultaneously stamped, so the two markers can't collide.
+  const filedName = _pendingQuestFiled ? String(_pendingQuestFiled).toLowerCase() : null;
+  _pendingQuestFiled = null;
 
   questsDiv.innerHTML = shown
     .map(({ quest: qq, i }) => {
@@ -942,7 +1015,8 @@ function renderQuests() {
       const stampHtml = isStamped
         ? `<span class="dir-stamp dir-stamp--${stampStatus}" aria-hidden="true">${stampStatus === 'failed' ? 'FAILED' : 'COMPLETE'}</span>`
         : '';
-      return `<div class="dir-slot ${st}${isStamped ? ' dir-slot--stamped' : ''}">
+      const isFiled = filedName && String(qq.name || '').toLowerCase() === filedName;
+      return `<div class="dir-slot ${st}${isStamped ? ' dir-slot--stamped' : ''}${isFiled ? ' dir-slot--filed' : ''}">
         <span class="s-idx">SLOT ${String(i + 1).padStart(2, '0')}</span>
         <span class="dir-lamp" aria-hidden="true"></span>
         <span class="dir-main">
@@ -967,6 +1041,13 @@ function renderQuests() {
         .querySelectorAll('.dir-slot--stamped')
         .forEach(el => el.classList.remove('dir-slot--stamped'));
     }, 1500);
+  }
+  if (filedName) {
+    setTimeout(() => {
+      questsDiv
+        .querySelectorAll('.dir-slot--filed')
+        .forEach(el => el.classList.remove('dir-slot--filed'));
+    }, 900);
   }
 }
 function removeQuest(idx) {
@@ -2256,6 +2337,17 @@ function adjustFaction(key, field, delta) {
   saveState();
   renderFactionRep();
   _updatePanelBadges();
+  // FEEDBACK ANIMATION WAVE 3 (#15 NEEDLE KICK) — home-only; renderFactionRep()
+  // just repainted synchronously above for THIS key (the button that calls
+  // adjustFaction always targets the currently-selected channel), so the pin
+  // is looked up directly, no defer needed.
+  const pin = document.querySelector('.facon-pin');
+  if (pin) {
+    pin.classList.remove('needle-kick');
+    void pin.offsetWidth;
+    pin.classList.add('needle-kick');
+    setTimeout(() => pin.classList.remove('needle-kick'), 500);
+  }
 }
 
 // BUS-08 · REPUTATION CONSOLE (Phase 3 OPERATOR batch 2, ground-up reskin) —

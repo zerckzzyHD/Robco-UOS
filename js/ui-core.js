@@ -908,6 +908,10 @@ function _readErrorLog() {
   }
 }
 
+// FEEDBACK ANIMATION WAVE 3 (#32 FAULT, polish tier) — the "did this
+// ACTUALLY change?" crossing cache (the _lastRadThreshold/_lastWeightSeized
+// precedent). Deliberately does NOT seed at boot.
+let _lastFaultHasErrors = null;
 // DO-N: the casing-top FAULT lamp reads the existing error ring-buffer
 // (read-only device telemetry, no new state) — lit whenever a client error
 // has been recorded this device, cleared by the existing [LOGS] CLEAR action.
@@ -915,8 +919,23 @@ function _updateFaultLamp() {
   const lamp = document.getElementById('lampFault');
   const hasErrors = _readErrorLog().length > 0;
   if (lamp) lamp.classList.toggle('fault', hasErrors);
+  // #32 FAULT — a one-shot flicker on the lamp + the BUS-24 counter, fired
+  // only on the genuine false->true crossing (a fresh fault, never every
+  // re-render while already lit); home-only — the always-present lamp is
+  // already the echo (build plan §8 Q6), no annunciator push needed.
+  const isNewFault = _lastFaultHasErrors === false && hasErrors === true;
+  _lastFaultHasErrors = hasErrors;
   if (typeof renderServiceFaultConsole === 'function') renderServiceFaultConsole();
   if (typeof _coreRefresh === 'function') _coreRefresh(); // LIVING CORE behavior #6: fault strain
+  if (isNewFault) {
+    [lamp, document.getElementById('svcFaultNum')].forEach(el => {
+      if (!el) return;
+      el.classList.remove('fault-flicker-in');
+      void el.offsetWidth;
+      el.classList.add('fault-flicker-in');
+      setTimeout(() => el.classList.remove('fault-flicker-in'), 700);
+    });
+  }
 }
 
 // BUS-24 SERVICE & FAULT CONSOLE (CHASSIS) — the fault-annunciator half; the
@@ -4330,6 +4349,28 @@ function onLocationChange(overrideLoc) {
   recordLocationVisit(state.loc);
   saveState();
   renderWorldMap();
+  // FEEDBACK ANIMATION WAVE 3 (#27 TRIANGULATE) — a direct reaction to this
+  // EXISTING arrival path (no new bus event — the build plan's "onLocation-
+  // Change path" signal), distinct from #26 SURVEY PING (new-discovery only,
+  // via location.visited). Fires on every arrival, including a revisit; a
+  // no-op when the WORLD GRID isn't currently painted (zoomed sector sheet,
+  // or the user elsewhere) — the direct annunciator push below covers that
+  // "elsewhere" case regardless.
+  const youGroup = document.querySelector('#worldMapDisplay .you');
+  if (youGroup) {
+    youGroup.classList.remove('you-triangulate');
+    void youGroup.offsetWidth;
+    youGroup.classList.add('you-triangulate');
+    setTimeout(() => youGroup.classList.remove('you-triangulate'), 700);
+  }
+  if (state.loc) {
+    _echoPush({
+      tone: 'amber',
+      glyph: '⦿',
+      label: 'ARRIVED: ' + String(state.loc).toUpperCase(),
+      homeSubsystem: 'databank',
+    });
+  }
 }
 
 // Called by autoImportState() after a state delta with the changed category key.
@@ -5491,6 +5532,11 @@ const _KARMA_TIERS = [
   { label: 'Good', test: k => k < 750 },
   { label: 'Messiah', test: () => true },
 ];
+// FEEDBACK ANIMATION WAVE 3 (#16 SCALES TIP) — the "did this ACTUALLY
+// change?" cache for the tier crossing (the _emitStatChangeIfDiffers /
+// _lastRadThreshold precedent). Deliberately does NOT seed at boot — the
+// first evaluation each session only establishes the baseline (no bounce).
+let _lastKarmaTier = null;
 function updateKarmaUI() {
   const k = parseInt(document.getElementById('stat_karma').value) || 0;
   const tier = _KARMA_TIERS.find(t => t.test(k)) || _KARMA_TIERS[2];
@@ -5507,6 +5553,29 @@ function updateKarmaUI() {
     needle.style.transform = 'rotate(' + ((k / 1000) * 82).toFixed(1) + 'deg)';
     needle.classList.toggle('evil', k < 0);
   }
+
+  // FEEDBACK ANIMATION WAVE 3 (#16 SCALES TIP): new additive emit — reuses
+  // the SAME _KARMA_TIERS breakpoints already computed above, no new literal
+  // (Protocol 22/38). The needle double-bounce + a halo/horns glyph blink
+  // beside the standing word are applied directly here, at the crossing.
+  if (_lastKarmaTier !== null && _lastKarmaTier !== label) {
+    RobcoEvents.emit('karma.tier', { tier: label });
+    if (needle) {
+      needle.classList.remove('scales-tip');
+      void needle.offsetWidth;
+      needle.classList.add('scales-tip');
+      setTimeout(() => needle.classList.remove('scales-tip'), 700);
+    }
+    if (labelEl) {
+      const glyph = document.createElement('span');
+      glyph.className = 'karma-tier-glyph';
+      glyph.setAttribute('aria-hidden', 'true');
+      glyph.textContent = k < 0 ? '☠' : '☼';
+      labelEl.appendChild(glyph);
+      setTimeout(() => glyph.remove(), 900);
+    }
+  }
+  _lastKarmaTier = label;
 
   const valEl = document.getElementById('karmaValReadout');
   if (valEl) valEl.textContent = 'KARMA ' + (k >= 0 ? '+' : '') + k + ' OF ±1000';
@@ -6124,6 +6193,32 @@ function _wireCoreEventBusSubscribers() {
         setTimeout(() => capsEl.classList.remove('caps-digit-roll'), 500);
       }
     }
+    // FEEDBACK ANIMATION WAVE 3 (#3 STIM FLUSH) — HP genuinely healed: the
+    // trace refills with a bright leading edge; a small medical + blinks
+    // twice beside CONDITION.
+    if (
+      p.key === 'hp' &&
+      typeof p.oldVal === 'number' &&
+      typeof p.newVal === 'number' &&
+      p.newVal > p.oldVal
+    ) {
+      const hpFillEl = document.getElementById('hp_bar_fill');
+      if (hpFillEl) {
+        hpFillEl.classList.remove('stim-flush');
+        void hpFillEl.offsetWidth;
+        hpFillEl.classList.add('stim-flush');
+        setTimeout(() => hpFillEl.classList.remove('stim-flush'), 700);
+      }
+      const condWord = document.getElementById('opCondWord');
+      if (condWord) {
+        const plus = document.createElement('span');
+        plus.className = 'stim-plus-blink';
+        plus.setAttribute('aria-hidden', 'true');
+        plus.textContent = '+';
+        condWord.appendChild(plus);
+        setTimeout(() => plus.remove(), 700);
+      }
+    }
   });
 
   // #17 CAPS ODOMETER SPIN (trade half) — a bottle-cap glyph arcs into the
@@ -6233,6 +6328,50 @@ function _wireCoreEventBusSubscribers() {
       panel.classList.add('carrier-ripple');
       setTimeout(() => panel.classList.remove('carrier-ripple'), 950);
     }
+  });
+
+  // ── FEEDBACK ANIMATION WAVE 3 (planning/FEEDBACK_ANIMATION_BUILD_PLAN.md,
+  // Tier-B/C) — the remaining home-panel reactions, plus the 5 new emits
+  // wired above at their existing setters (Protocol 22, add-class/reflow/
+  // remove one-shots throughout, never a forked handler).
+
+  // #19 IN-SERVICE STAMP — home-only; the emit site (toggleEquipItem) already
+  // gates unequip out, so this only ever fires on a genuine equip. Targets
+  // the freshly-equipped row via the SAME .equip-btn markup renderInventory()
+  // already paints — fired AFTER that render, so no defer is needed.
+  RobcoEvents.on('item.equipped', p => {
+    if (!p || !p.name) return;
+    const list = document.getElementById('invList');
+    if (!list) return;
+    const nameEl = Array.from(list.querySelectorAll('.mrow .m-name')).find(
+      el => el.textContent === p.name
+    );
+    const li = nameEl ? nameEl.closest('.mrow') : null;
+    const btn = li ? li.querySelector('.equip-btn') : null;
+    if (btn) {
+      btn.classList.remove('in-service-stamp');
+      void btn.offsetWidth;
+      btn.classList.add('in-service-stamp');
+      setTimeout(() => btn.classList.remove('in-service-stamp'), 500);
+    }
+  });
+
+  // #21 PART DROP — home-only reaction to the EXISTING craft.scrapped event;
+  // the item silhouette splits into 2-3 part glyphs that drop into the yield
+  // card with a settle bounce (transient DOM nodes, never persisted markup —
+  // the #20 WELD SPARKS + TAG precedent).
+  RobcoEvents.on('craft.scrapped', () => {
+    const card = document.getElementById('scrapItemCard');
+    if (!card) return;
+    ['⚙', '▪', '◆'].forEach((g, i) => {
+      const part = document.createElement('span');
+      part.className = 'scrap-part-drop';
+      part.style.animationDelay = i * 90 + 'ms';
+      part.setAttribute('aria-hidden', 'true');
+      part.textContent = g;
+      card.appendChild(part);
+      setTimeout(() => part.remove(), 750 + i * 90);
+    });
   });
 }
 let _levelUpKeyFlashTimer = null;
@@ -6472,6 +6611,21 @@ function _wireFeedbackEchoSubscribers() {
         homeSubsystem: 'operations',
       });
     }
+    // FEEDBACK ANIMATION WAVE 3 (#3 STIM FLUSH) — the echo half; the home
+    // animation lives in _wireCoreEventBusSubscribers().
+    if (
+      p.key === 'hp' &&
+      typeof p.oldVal === 'number' &&
+      typeof p.newVal === 'number' &&
+      p.newVal > p.oldVal
+    ) {
+      _echoPush({
+        tone: 'green',
+        glyph: '✚',
+        label: 'HEALED: +' + (p.newVal - p.oldVal),
+        homeSubsystem: 'operator',
+      });
+    }
   });
   RobcoEvents.on('item.added', p =>
     _echoPush({
@@ -6479,6 +6633,37 @@ function _wireFeedbackEchoSubscribers() {
       glyph: '◈',
       label: 'ADDED: ' + ((p && p.name) || '').toUpperCase(),
       homeSubsystem: 'operations',
+    })
+  );
+
+  // ── FEEDBACK ANIMATION WAVE 3 — echo wiring for the [home + echo] items
+  // only (CARD SEAT/NEEDLE KICK/IN-SERVICE STAMP/PART DROP/DIRECTIVE FILED/
+  // FAULT/QTY DIGIT FLIP are home-only by the build plan's routing table and
+  // deliberately get no echo push here; #27 TRIANGULATE pushes directly from
+  // onLocationChange() rather than through this bus-subscriber function,
+  // since its signal is the existing onLocationChange path, not a new emit).
+  RobcoEvents.on('weight.seized', () =>
+    _echoPush({ tone: 'amber', glyph: '⚠', label: 'CARGO SEIZED', homeSubsystem: 'operations' })
+  );
+  RobcoEvents.on('karma.tier', p => {
+    const t = (p && p.tier) || '';
+    const tone = /evil/i.test(t) ? 'red' : t === 'Neutral' ? 'amber' : 'green';
+    _echoPush({ tone, glyph: '⚖', label: 'KARMA: ' + t.toUpperCase(), homeSubsystem: 'operator' });
+  });
+  RobcoEvents.on('effect.applied', p =>
+    _echoPush({
+      tone: p && p.type === 'DEBUFF' ? 'red' : 'green',
+      glyph: '✦',
+      label: 'APPLIED: ' + ((p && p.name) || '').toUpperCase(),
+      homeSubsystem: 'operator',
+    })
+  );
+  RobcoEvents.on('effect.expiring', p =>
+    _echoPush({
+      tone: 'amber',
+      glyph: '✦',
+      label: 'EXPIRING: ' + ((p && p.name) || '').toUpperCase(),
+      homeSubsystem: 'operator',
     })
   );
 }
@@ -6720,6 +6905,11 @@ function _syncOperatorTelemetry() {
 // existing global prefers-reduced-motion block collapses to an instant snap
 // (transition-duration:0.01ms) with no bespoke carve-out. Zero new state —
 // source of truth stays curWt/maxWeight; this only paints a second projection.
+// FEEDBACK ANIMATION WAVE 3 (#8 BRIDGE CLANG) — the "did this ACTUALLY
+// change?" crossing cache (the _lastRadThreshold precedent). Deliberately
+// does NOT seed at boot — the first evaluation each session only
+// establishes the baseline (no clang on load with an already-heavy save).
+let _lastWeightSeized = null;
 function _paintWeighBridge(curWt, maxWeight) {
   const path = document.getElementById('opsBeamPath');
   if (!path) return; // OPERATIONS markup not present (e.g. a stripped test harness)
@@ -6733,6 +6923,22 @@ function _paintWeighBridge(curWt, maxWeight) {
     block.setAttribute('y', (midY - 16).toFixed(1));
   }
   const seized = curWt >= maxWeight;
+  // FEEDBACK ANIMATION WAVE 3 (#8 BRIDGE CLANG): one additive emit on the
+  // false->true crossing (U7 hp.critical/rad.tier precedent); the shudder +
+  // rebound + dust-speck home animation is applied directly here since the
+  // crossing is already computed right above (Protocol 22 — no forked
+  // detection logic; body.weight-over's OWN continuous shudder is unchanged).
+  if (_lastWeightSeized === false && seized === true) {
+    RobcoEvents.emit('weight.seized', { seized: true });
+    const instrument = document.querySelector('.beam-instrument');
+    if (instrument) {
+      instrument.classList.remove('bridge-clang');
+      void instrument.offsetWidth;
+      instrument.classList.add('bridge-clang');
+      setTimeout(() => instrument.classList.remove('bridge-clang'), 500);
+    }
+  }
+  _lastWeightSeized = seized;
   const heavy = !seized && curWt >= maxWeight * 0.75;
   const tag = seized ? 'SEIZED — OVER-ENCUMBERED' : heavy ? 'heavy load' : 'nominal';
   const pctText = document.getElementById('opsBeamPct');

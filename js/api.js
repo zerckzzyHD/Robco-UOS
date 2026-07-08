@@ -696,6 +696,13 @@ function autoImportState(jsonString) {
 
     let st = parsed.status || parsed.Status || parsed.STATUS;
     if (st && Array.isArray(st)) {
+      // FEEDBACK ANIMATION WAVE 3 (#28 TUNGSTEN WARM-UP): captured BEFORE the
+      // wholesale AI overwrite below (the item.added/#18 AI-path precedent) so
+      // an AI turn that resends the SAME status array unchanged never replays
+      // the animation for effects the player already had.
+      const _statusNamesBefore = new Set(
+        (state.status || []).map(e => String(e.name).toLowerCase())
+      );
       state.status = st.map(item => {
         if (typeof item === 'string') return { name: item, ticks: 0, type: 'BUFF' };
         return {
@@ -705,6 +712,12 @@ function autoImportState(jsonString) {
             ? String(item.type).toUpperCase()
             : 'BUFF',
         };
+      });
+      state.status.forEach(eff => {
+        if (!_statusNamesBefore.has(String(eff.name).toLowerCase())) {
+          RobcoEvents.emit('effect.applied', { name: eff.name, type: eff.type });
+          _pendingEffectWarmup.push(eff.name);
+        }
       });
     }
     let inv = parsed.inventory || parsed.Inventory || parsed.inv;
@@ -912,11 +925,19 @@ function autoImportState(jsonString) {
       const elapsed = Math.max(1, tickDelta);
       state.status = state.status.filter(eff => {
         if (eff.ticks > 0) {
+          const beforeTicks = eff.ticks;
           eff.ticks = Math.max(0, eff.ticks - elapsed);
           if (eff.ticks === 0) {
             // Effect expired — notify Courier
             appendToChat(`> [SYS] STATUS EXPIRED: ${eff.name}`, 'sys', true);
             return false; // Remove from array
+          }
+          // FEEDBACK ANIMATION WAVE 3 (#29 GUTTERING LAMP): new additive emit
+          // (U7 rad.tier crossing-detector precedent) — fires once on the
+          // crossing INTO the "expiring soon" window, never every tick while
+          // already inside it.
+          if (beforeTicks > 2 && eff.ticks > 0 && eff.ticks <= 2) {
+            RobcoEvents.emit('effect.expiring', { name: eff.name, ticks: eff.ticks });
           }
         }
         return true;

@@ -11673,3 +11673,368 @@ body.sleep-doze .chrono-wrap .flip {
   animation: carrier-ripple 0.9s ease-out;
   border-radius: 4px;
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   FEEDBACK ANIMATION WAVE 3 (planning/FEEDBACK_ANIMATION_BUILD_PLAN.md)
+   Same rules as WAVE 1/2 above: every rule is a plain @keyframes (never
+   transition-only), auto-neutralized to an instant correct final frame by
+   the existing global prefers-reduced-motion block (Protocol UI-9).
+   Transform/opacity/filter only — compositor friendly, mobile-safe.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── #3 STIM FLUSH — BUS-01 HP trace (Group 1) ───────────────────────── */
+@keyframes stim-flush-fill {
+  0% {
+    filter: brightness(2.4);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+.hp-bar-fill.stim-flush {
+  animation: stim-flush-fill 0.7s ease-out;
+}
+@keyframes stim-plus-blink {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  25%,
+  75% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+.stim-plus-blink {
+  display: inline-block;
+  margin-left: 4px;
+  color: var(--robco-green);
+  animation: stim-plus-blink 0.7s steps(1, end);
+}
+
+/* ── #8 BRIDGE CLANG — OPERATIONS BUS-10 weigh bridge (Group 1) ──────── */
+@keyframes bridge-clang-shake {
+  0% {
+    transform: translateY(0);
+  }
+  20% {
+    transform: translateY(3px);
+  }
+  40% {
+    transform: translateY(-4px);
+  }
+  60% {
+    transform: translateY(2px);
+  }
+  80% {
+    transform: translateY(-1px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+.beam-instrument.bridge-clang {
+  animation: bridge-clang-shake 0.5s cubic-bezier(0.3, 1.3, 0.4, 1);
+}
+@keyframes bridge-dust-puff {
+  0% {
+    opacity: 0.8;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.4);
+  }
+}
+.beam-instrument.bridge-clang::before,
+.beam-instrument.bridge-clang::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(var(--robco-green-rgb), 0.6);
+  animation: bridge-dust-puff 0.5s ease-out;
+  pointer-events: none;
+}
+.beam-instrument.bridge-clang::before {
+  left: 26%;
+}
+.beam-instrument.bridge-clang::after {
+  left: 72%;
+  animation-delay: 60ms;
+}
+
+/* ── #13 CARD SEAT — BUS-06 perk loadout rack (Group 2) ──────────────── */
+@keyframes card-seat-drop {
+  0% {
+    opacity: 0;
+    transform: translateY(-18px);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(3px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.slot-row.slot-row--seated {
+  animation: card-seat-drop 0.4s cubic-bezier(0.3, 1.3, 0.5, 1);
+}
+@keyframes card-pin-spark {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  30%,
+  70% {
+    filter: brightness(2.6);
+  }
+}
+.slot-row--seated .s-rank {
+  animation: card-pin-spark 0.4s ease-out;
+}
+
+/* ── #15 NEEDLE KICK — BUS-08 reputation console meter (Group 3) ─────── */
+@keyframes needle-kick-bounce {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  25% {
+    filter: brightness(2.6);
+  }
+  50% {
+    filter: brightness(1);
+  }
+  70% {
+    filter: brightness(2);
+  }
+}
+.facon-pin.needle-kick {
+  animation: needle-kick-bounce 0.5s ease-out;
+}
+
+/* ── #16 SCALES TIP — BUS-09 karma alignment needle (Group 3) ────────── */
+@keyframes scales-tip-bounce {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  30% {
+    filter: brightness(2.4);
+  }
+  55% {
+    filter: brightness(1);
+  }
+  75% {
+    filter: brightness(2);
+  }
+}
+.kn-needle.scales-tip {
+  animation: scales-tip-bounce 0.7s ease-out;
+}
+@keyframes karma-tier-glyph-blink {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+.karma-tier-glyph {
+  display: inline-block;
+  margin-left: 5px;
+  animation: karma-tier-glyph-blink 0.9s ease-out;
+}
+
+/* ── #19 IN-SERVICE STAMP — CARGO MANIFEST equip button (Group 4) ────── */
+@keyframes in-service-stamp-slap {
+  0% {
+    opacity: 0;
+    transform: scale(1.6) skewX(-8deg);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(0.95) skewX(3deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) skewX(0deg);
+  }
+}
+.equip-btn.in-service-stamp {
+  animation: in-service-stamp-slap 0.5s ease-out;
+}
+
+/* ── #21 PART DROP — BREAKDOWN VISE yield card (Group 4) ──────────────── */
+@keyframes scrap-part-drop {
+  0% {
+    opacity: 0;
+    transform: translateY(-14px) rotate(-15deg);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(2px) rotate(6deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) rotate(0deg);
+  }
+}
+.scrap-part-drop {
+  display: inline-block;
+  margin-left: 4px;
+  color: var(--robco-green);
+  animation: scrap-part-drop 0.4s ease-out both;
+}
+
+/* ── #25 DIRECTIVE FILED — BUS-17 slot (Group 5) ──────────────────────── */
+@keyframes dir-slot-filed-in {
+  0% {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.dir-slot--filed {
+  animation: dir-slot-filed-in 0.35s ease-out;
+}
+@keyframes dir-lamp-warmup {
+  0% {
+    background: #3a3d35;
+    box-shadow: none;
+  }
+  100% {
+    background: var(--bezel-wire);
+    box-shadow: 0 0 8px var(--bezel-wire);
+  }
+}
+.dir-slot--filed .dir-lamp {
+  animation: dir-lamp-warmup 0.9s ease-out both;
+}
+
+/* ── #27 TRIANGULATE — BUS-16 cartography table [YOU] reticle (Group 5) ─ */
+@keyframes you-triangulate-hop {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  15% {
+    opacity: 0.25;
+    transform: scale(1.3);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(0.85);
+  }
+  45% {
+    opacity: 0.25;
+    transform: scale(1.3);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.you.you-triangulate circle {
+  animation: you-triangulate-hop 0.7s ease-in-out;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+
+/* ── #28 TUNGSTEN WARM-UP — BUS-07 status lamp bank (Group 5) ────────── */
+@keyframes tungsten-warmup-glow {
+  0% {
+    filter: brightness(0.25) saturate(0.3);
+    opacity: 0.4;
+  }
+  100% {
+    filter: brightness(1) saturate(1);
+    opacity: 1;
+  }
+}
+.stlamp-tile.tungsten-warmup {
+  animation: tungsten-warmup-glow 0.95s ease-out both;
+}
+
+/* ── #29 GUTTERING LAMP — BUS-07 status lamp bank (Group 5) ──────────── */
+@keyframes lamp-gutter-flicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  20% {
+    opacity: 0.4;
+  }
+  35% {
+    opacity: 0.9;
+  }
+  50% {
+    opacity: 0.3;
+  }
+  65% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 0.5;
+  }
+}
+.stlamp-tile.lamp-guttering .stlamp-led {
+  animation: lamp-gutter-flicker 1.8s ease-in-out infinite;
+}
+
+/* ── #32 FAULT (polish) — casing FAULT lamp + BUS-24 counter (Group 6) ─ */
+@keyframes fault-flicker-in {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  15%,
+  45% {
+    opacity: 0.2;
+  }
+  30%,
+  60% {
+    opacity: 0.8;
+  }
+}
+#lampFault.fault-flicker-in,
+#svcFaultNum.fault-flicker-in {
+  animation: fault-flicker-in 0.7s steps(6, end);
+}
+
+/* ── #33 QTY DIGIT FLIP — CARGO MANIFEST qty stepper (Group 6) ───────── */
+@keyframes qty-digit-flip-anim {
+  0% {
+    transform: rotateX(0deg);
+    filter: brightness(1);
+  }
+  50% {
+    transform: rotateX(90deg);
+    filter: brightness(2);
+  }
+  100% {
+    transform: rotateX(0deg);
+    filter: brightness(1);
+  }
+}
+.qtybox .q.qty-digit-flip {
+  display: inline-block;
+  animation: qty-digit-flip-anim 0.4s ease-in-out;
+}

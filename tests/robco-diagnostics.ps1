@@ -19913,6 +19913,305 @@ Check (
 ) '198.13: renderWorldMap() emits .table-frame, then .survey-legend, then .kbd-hint, in that DOM order'
 
 # ===========================================================
+# Suite 199 -- FEEDBACK ANIMATION WAVE 3: the 13 remaining Tier-B/C
+# animations + the 5 new additive emits (planning/FEEDBACK_ANIMATION_
+# BUILD_PLAN.md -- WAVE 3, the final wave; #5 RADAWAY DRAIN and #7 SPLINT
+# WRAP shipped early as free companions of #4/#6 in WAVE 1). The 5 new
+# emits (karma.tier/item.equipped/effect.applied/effect.expiring/
+# weight.seized) fire at their existing setters (U7/U8 precedent); the 13
+# home-panel reactions live in _wireCoreEventBusSubscribers() or directly
+# at their emit site (ui-core.js/ui-render.js/ui-saves.js); the 6
+# [home + echo] items also get an annunciator push in
+# _wireFeedbackEchoSubscribers() -- the remaining 7 are home-only by the
+# build plan's routing table and deliberately carry no echo.
+# 31 tests
+# ===========================================================
+Sep "Suite 199 -- FEEDBACK ANIMATION WAVE 3: 5 new emits + the final 13 Tier-B/C animations"
+$coreSrc199 = Read-Src "js/ui-core.js"
+$renderSrc199 = Read-Src "js/ui-render.js"
+$savesSrc199 = Read-Src "js/ui-saves.js"
+$apiSrc199 = Read-Src "js/api.js"
+$stateSrc199 = Read-Src "js/state.js"
+$css199 = Read-Src "css/terminal.css"
+$cssStripped199 = [regex]::Replace($css199, '/\*[\s\S]*?\*/', '')
+
+# -- the 5 new additive emits --
+
+# 199.1  karma.tier -- updateKarmaUI() emits only on a genuine tier
+#        crossing (a "did this ACTUALLY change?" cache, never seeded at
+#        boot -- the _lastRadThreshold/_emitStatChangeIfDiffers precedent).
+$karmaBody199 = Get-FunctionBody $coreSrc199 'updateKarmaUI'
+Check (
+    ($coreSrc199 -match 'let _lastKarmaTier = null;') -and
+    ($karmaBody199 -match '_lastKarmaTier !== null && _lastKarmaTier !== label') -and
+    ([regex]::IsMatch($karmaBody199, "RobcoEvents\.emit\(\s*['`"]karma\.tier['`"]")) -and
+    ($karmaBody199 -match '_lastKarmaTier = label;')
+) '199.1: updateKarmaUI() emits karma.tier only on a genuine tier crossing, never every call'
+
+# 199.2  item.equipped -- toggleEquipItem() emits only on an EQUIP, never
+#        an unequip (the #12 INK STAMP "lands once" precedent), AFTER the
+#        row has already repainted.
+$equipBody199 = Get-FunctionBody $renderSrc199 'toggleEquipItem'
+Check (
+    ($equipBody199 -match 'const wasEquipped = state\.equipped\[slot\] === it\.name;') -and
+    ([regex]::IsMatch($equipBody199, "renderInventory\(\);[\s\S]{0,40}saveState\(\);[\s\S]{0,600}if \(!wasEquipped\) \{[\s\S]{0,120}RobcoEvents\.emit\(\s*['`"]item\.equipped['`"]"))
+) '199.2: toggleEquipItem() emits item.equipped only on an equip, after renderInventory() has already repainted'
+
+# 199.3  effect.applied (user path) -- addStatusEffect() emits only for a
+#        genuinely NEW compound, never a re-application (ticks/type
+#        refresh on an existing effect stays silent).
+$addEffectBody199 = Get-FunctionBody $renderSrc199 'addStatusEffect'
+Check (
+    ([regex]::IsMatch($addEffectBody199, "if \(existing\) \{[\s\S]{0,80}\} else \{[\s\S]{0,500}RobcoEvents\.emit\(\s*['`"]effect\.applied['`"]")) -and
+    ($addEffectBody199 -match '_pendingEffectWarmup\.push\(name\);')
+) '199.3: addStatusEffect() emits effect.applied only for a genuinely new compound (the else branch), never a re-application'
+
+# 199.4  effect.applied (AI path) -- the AI status-set in
+#        autoImportState() diffs a pre-overwrite name Set (the item.added/
+#        #18 AI-path precedent) so a resent-unchanged array never replays.
+Check (
+    ($apiSrc199 -match '_statusNamesBefore = new Set') -and
+    ($apiSrc199 -match 'if \(!_statusNamesBefore\.has\(String\(eff\.name\)\.toLowerCase\(\)\)\)') -and
+    ([regex]::IsMatch($apiSrc199, "RobcoEvents\.emit\(\s*['`"]effect\.applied['`"][\s\S]{0,60}name: eff\.name")) -and
+    ($apiSrc199 -match '_pendingEffectWarmup\.push\(eff\.name\);')
+) '199.4: the AI status-set path in autoImportState() emits effect.applied only for names absent from the pre-overwrite Set'
+
+# 199.5  effect.expiring -- the tick-down crossing detector fires once on
+#        the crossing INTO the expiring-soon window, never every tick
+#        while already inside it.
+Check (
+    ($apiSrc199 -match 'const beforeTicks = eff\.ticks;') -and
+    ($apiSrc199 -match 'if \(beforeTicks > 2 && eff\.ticks > 0 && eff\.ticks <= 2\)') -and
+    ([regex]::IsMatch($apiSrc199, "RobcoEvents\.emit\(\s*['`"]effect\.expiring['`"]"))
+) '199.5: the STATUS EFFECT TICK-DOWN loop emits effect.expiring only on the crossing into the >0 && <=2 ticks window'
+
+# 199.6  weight.seized -- _paintWeighBridge() emits only on the false->true
+#        crossing (never every render while already seized).
+$bridgeBody199 = Get-FunctionBody $coreSrc199 '_paintWeighBridge'
+Check (
+    ($coreSrc199 -match 'let _lastWeightSeized = null;') -and
+    ($bridgeBody199 -match '_lastWeightSeized === false && seized === true') -and
+    ([regex]::IsMatch($bridgeBody199, "RobcoEvents\.emit\(\s*['`"]weight\.seized['`"]")) -and
+    ($bridgeBody199 -match '_lastWeightSeized = seized;')
+) '199.6: _paintWeighBridge() emits weight.seized only on the genuine false->true crossing'
+
+# -- the 13 home-panel animations --
+$wireCoreBody199 = Get-FunctionBody $coreSrc199 '_wireCoreEventBusSubscribers'
+
+# 199.7  #3 STIM FLUSH -- HP genuinely healed: the trace refills bright and
+#        a "+" blinks twice beside CONDITION.
+Check (
+    ([regex]::IsMatch($wireCoreBody199, "p\.key === 'hp' &&[\s\S]{0,120}p\.newVal > p\.oldVal")) -and
+    ($wireCoreBody199 -match 'stim-flush') -and
+    ($wireCoreBody199 -match 'stim-plus-blink') -and
+    ($wireCoreBody199 -match 'opCondWord')
+) '199.7: #3 STIM FLUSH fires only when newVal > oldVal, brightening #hp_bar_fill + a blinking + beside #opCondWord'
+
+# 199.8  #8 BRIDGE CLANG -- applied directly at the weight.seized crossing
+#        (not through a bus subscriber) on .beam-instrument.
+Check (
+    $bridgeBody199 -match 'bridge-clang'
+) '199.8: #8 BRIDGE CLANG is applied directly inside _paintWeighBridge() on the weight.seized crossing'
+
+# 199.9  #13 CARD SEAT -- addPerk() sets a pending marker only for a
+#        genuinely new perk (never an existing-perk rank bump), consumed
+#        exactly once by renderPerks().
+$addPerkBody199 = Get-FunctionBody $renderSrc199 'addPerk'
+$renderPerksBody199 = Get-FunctionBody $renderSrc199 'renderPerks'
+Check (
+    ([regex]::IsMatch($addPerkBody199, "if \(ex\) \{[\s\S]{0,60}\} else \{[\s\S]{0,350}_pendingPerkSeat = name;")) -and
+    ($renderPerksBody199 -match 'const seatName = _pendingPerkSeat') -and
+    ($renderPerksBody199 -match '_pendingPerkSeat = null;') -and
+    ($renderPerksBody199 -match 'slot-row--seated')
+) '199.9: addPerk() sets _pendingPerkSeat only for a NEW perk; renderPerks() consumes it once into .slot-row--seated'
+
+# 199.10  #15 NEEDLE KICK -- adjustFaction() triggers a one-shot bounce on
+#         the freshly-repainted .facon-pin, directly (no bus event).
+$adjustFactionBody199 = Get-FunctionBody $renderSrc199 'adjustFaction'
+Check (
+    [regex]::IsMatch($adjustFactionBody199, "renderFactionRep\(\);[\s\S]{0,550}needle-kick")
+) '199.10: adjustFaction() triggers a needle-kick one-shot on .facon-pin after renderFactionRep() repaints'
+
+# 199.11  #16 SCALES TIP -- applied directly inside updateKarmaUI() at the
+#         karma.tier crossing: the needle bounces + a halo/horns glyph
+#         blinks beside the standing word.
+Check (
+    ($karmaBody199 -match 'scales-tip') -and
+    ($karmaBody199 -match 'karma-tier-glyph') -and
+    ($karmaBody199 -match "k < 0 \? '☠' : '☼'")
+) '199.11: #16 SCALES TIP (needle bounce + halo/horns glyph) is applied directly inside updateKarmaUI() at the tier crossing'
+
+# 199.12  #19 IN-SERVICE STAMP -- home-only reaction to item.equipped,
+#         targeting the freshly-equipped row's .equip-btn by name.
+Check (
+    ([regex]::IsMatch($wireCoreBody199, "RobcoEvents\.on\(\s*['`"]item\.equipped['`"]")) -and
+    ($wireCoreBody199 -match 'in-service-stamp') -and
+    ($wireCoreBody199 -match '\.equip-btn')
+) '199.12: #19 IN-SERVICE STAMP reacts to item.equipped, stamping the matching row .equip-btn'
+
+# 199.13  #21 PART DROP -- home-only reaction to the EXISTING
+#         craft.scrapped event; transient part-glyph nodes dropped into
+#         #scrapItemCard (never persisted markup).
+Check (
+    ([regex]::IsMatch($wireCoreBody199, "RobcoEvents\.on\(\s*['`"]craft\.scrapped['`"]")) -and
+    ($wireCoreBody199 -match 'scrapItemCard') -and
+    ($wireCoreBody199 -match 'scrap-part-drop')
+) '199.13: #21 PART DROP reacts to the existing craft.scrapped event, dropping transient glyphs into #scrapItemCard'
+
+# 199.14  #25 DIRECTIVE FILED -- addQuest() (ui-saves.js) sets a pending
+#         marker, consumed exactly once by renderQuests() (ui-render.js)
+#         into .dir-slot--filed, distinct from the #23/#24 stamp marker.
+$addQuestBody199 = Get-FunctionBody $savesSrc199 'addQuest'
+$renderQuestsBody199 = Get-FunctionBody $renderSrc199 'renderQuests'
+Check (
+    ($addQuestBody199 -match '_pendingQuestFiled = name;') -and
+    ($renderQuestsBody199 -match 'const filedName = _pendingQuestFiled') -and
+    ($renderQuestsBody199 -match '_pendingQuestFiled = null;') -and
+    ($renderQuestsBody199 -match 'dir-slot--filed')
+) '199.14: addQuest() sets _pendingQuestFiled; renderQuests() consumes it once into .dir-slot--filed'
+
+# 199.15  #27 TRIANGULATE -- a direct reaction to the EXISTING
+#         onLocationChange() arrival path (no new bus event), distinct
+#         from #26 SURVEY PING; a no-op when the WORLD GRID isn't
+#         currently painted.
+$onLocChangeBody199 = Get-FunctionBody $coreSrc199 'onLocationChange'
+Check (
+    ([regex]::IsMatch($onLocChangeBody199, "renderWorldMap\(\);[\s\S]{0,700}you-triangulate")) -and
+    ($onLocChangeBody199 -match '#worldMapDisplay \.you')
+) '199.15: #27 TRIANGULATE fires directly inside onLocationChange() after renderWorldMap(), targeting the .you reticle group'
+
+# 199.16  #28 TUNGSTEN WARM-UP -- renderStatus() consumes the pending
+#         warm-up list exactly once, applying the glow class only to
+#         matching tiles.
+$renderStatusBody199 = Get-FunctionBody $renderSrc199 'renderStatus'
+Check (
+    ([regex]::IsMatch($renderStatusBody199, "const warmupNames = \(_pendingEffectWarmup \|\| \[\]\)")) -and
+    ($renderStatusBody199 -match '_pendingEffectWarmup = \[\];') -and
+    ($renderStatusBody199 -match 'tungsten-warmup')
+) '199.16: renderStatus() consumes _pendingEffectWarmup once, applying .tungsten-warmup only to matching tiles'
+
+# 199.17  #29 GUTTERING LAMP -- a continuous, state-driven flicker class
+#         (never a one-shot) for as long as an effect is genuinely
+#         expiring soon (0 < ticks <= 2).
+Check (
+    ($renderStatusBody199 -match 'const isGuttering = ticks > 0 && ticks <= 2;') -and
+    ($renderStatusBody199 -match 'lamp-guttering')
+) '199.17: renderStatus() computes a continuous .lamp-guttering class whenever 0 < ticks <= 2'
+
+# 199.18  #32 FAULT (polish) -- a one-shot flicker on the lamp + the
+#         BUS-24 counter, fired only on the genuine false->true crossing.
+$faultLampBody199 = Get-FunctionBody $coreSrc199 '_updateFaultLamp'
+Check (
+    ($coreSrc199 -match 'let _lastFaultHasErrors = null;') -and
+    ($faultLampBody199 -match '_lastFaultHasErrors === false && hasErrors === true') -and
+    ($faultLampBody199 -match 'fault-flicker-in') -and
+    ($faultLampBody199 -match 'svcFaultNum')
+) '199.18: _updateFaultLamp() flickers #lampFault + #svcFaultNum only on the genuine false->true fault crossing'
+
+# 199.19  #33 QTY DIGIT FLIP -- a one-shot digit-flip on the freshly-
+#         painted quantity readout, skipped when the row was removed
+#         (next === 0, nothing left to flip).
+$adjQtyBody199 = Get-FunctionBody $renderSrc199 'adjItemQty'
+Check (
+    [regex]::IsMatch($adjQtyBody199, "if \(next > 0\) \{[\s\S]{0,400}qty-digit-flip")
+) '199.19: adjItemQty() applies a one-shot .qty-digit-flip only when the row survives (next > 0)'
+
+# -- the annunciator echo wiring (the 6 [home + echo] items) --
+$wireEchoBody199 = Get-FunctionBody $coreSrc199 '_wireFeedbackEchoSubscribers'
+
+# 199.20  echo push for #3 STIM FLUSH (HP genuinely healed).
+Check (
+    ([regex]::IsMatch($wireEchoBody199, "p\.newVal > p\.oldVal[\s\S]{0,160}glyph: '✚'")) -and
+    ($wireEchoBody199 -match 'HEALED:')
+) '199.20: the echo subscriber pushes a HEALED annunciation on a genuine HP increase'
+
+# 199.21  echo push for weight.seized (#8 BRIDGE CLANG).
+Check (
+    [regex]::IsMatch($wireEchoBody199, "RobcoEvents\.on\(\s*['`"]weight\.seized['`"][\s\S]{0,80}CARGO SEIZED")
+) '199.21: the echo subscriber pushes a CARGO SEIZED annunciation on weight.seized'
+
+# 199.22  echo push for karma.tier (#16 SCALES TIP), tone derived from the
+#         tier label.
+Check (
+    ([regex]::IsMatch($wireEchoBody199, "RobcoEvents\.on\(\s*['`"]karma\.tier['`"]")) -and
+    ($wireEchoBody199 -match '/evil/i\.test\(t\)') -and
+    ($wireEchoBody199 -match "glyph: '⚖'")
+) '199.22: the echo subscriber pushes a KARMA annunciation on karma.tier, tone derived from the tier label'
+
+# 199.23  echo push for effect.applied (#28 TUNGSTEN WARM-UP).
+Check (
+    [regex]::IsMatch($wireEchoBody199, "RobcoEvents\.on\(\s*['`"]effect\.applied['`"][\s\S]{0,120}APPLIED:")
+) '199.23: the echo subscriber pushes an APPLIED annunciation on effect.applied'
+
+# 199.24  echo push for effect.expiring (#29 GUTTERING LAMP).
+Check (
+    [regex]::IsMatch($wireEchoBody199, "RobcoEvents\.on\(\s*['`"]effect\.expiring['`"][\s\S]{0,120}EXPIRING:")
+) '199.24: the echo subscriber pushes an EXPIRING annunciation on effect.expiring'
+
+# 199.25  #27 TRIANGULATE pushes directly from onLocationChange() rather
+#         than through a bus subscription in the echo-wiring function.
+Check (
+    ([regex]::IsMatch($onLocChangeBody199, "_echoPush\(\{[\s\S]{0,120}glyph: '⦿'[\s\S]{0,80}ARRIVED:")) -and
+    (-not ($wireEchoBody199 -match 'ARRIVED:'))
+) '199.25: #27 TRIANGULATE pushes its annunciation directly from onLocationChange(), never through a bus subscription'
+
+# 199.26  the 7 home-only WAVE 3 items get NO echo wiring -- item.equipped
+#         and craft.scrapped (the two bus events among the home-only set)
+#         are never subscribed inside the echo function.
+Check (
+    (-not ($wireEchoBody199 -match 'item\.equipped')) -and
+    (-not ($wireEchoBody199 -match 'craft\.scrapped'))
+) '199.26: item.equipped/craft.scrapped are never subscribed in the echo function (home-only, no echo)'
+
+# -- CSS keyframe presence (Protocol UI-9) --
+$wave3Keyframes199 = @(
+    'stim-flush-fill', 'stim-plus-blink', 'bridge-clang-shake', 'bridge-dust-puff',
+    'card-seat-drop', 'card-pin-spark', 'needle-kick-bounce', 'scales-tip-bounce',
+    'karma-tier-glyph-blink', 'in-service-stamp-slap', 'scrap-part-drop',
+    'dir-slot-filed-in', 'dir-lamp-warmup', 'you-triangulate-hop', 'tungsten-warmup-glow',
+    'lamp-gutter-flicker', 'fault-flicker-in', 'qty-digit-flip-anim'
+)
+$allKeyframesFound199 = $true
+foreach ($name in $wave3Keyframes199) {
+    if (-not [regex]::IsMatch($cssStripped199, "@keyframes $name\b")) {
+        $allKeyframesFound199 = $false
+    }
+}
+Check (
+    $allKeyframesFound199
+) '199.27: every WAVE 3 animation has its own plain @keyframes rule in terminal.css'
+
+# -- zero campaign-state write (the reactive wiring only) --
+
+# 199.28  _wireCoreEventBusSubscribers() (incl. all WAVE 3 additions)
+#         never assigns state.* or calls saveState().
+Check (
+    (-not ($wireCoreBody199 -match 'state\.\w+\s*=')) -and (-not ($wireCoreBody199 -match 'saveState\(\)'))
+) '199.28: _wireCoreEventBusSubscribers() (incl. all WAVE 3 additions) never assigns state.* or calls saveState()'
+
+# 199.29  _wireFeedbackEchoSubscribers() (incl. all WAVE 3 echo
+#         additions) never assigns state.* or calls saveState().
+Check (
+    (-not ($wireEchoBody199 -match 'state\.\w+\s*=')) -and (-not ($wireEchoBody199 -match 'saveState\(\)'))
+) '199.29: _wireFeedbackEchoSubscribers() (incl. all WAVE 3 echo additions) never assigns state.* or calls saveState()'
+
+# 199.30  the 3 new pending markers live in state.js (Protocol 27 --
+#         loaded by every environment, including test.html's reduced
+#         boot chain, the _pendingQuestStamp/_pendingRepStamp precedent).
+Check (
+    ($stateSrc199 -match 'let _pendingQuestFiled = null;') -and
+    ($stateSrc199 -match 'let _pendingPerkSeat = null;') -and
+    ([regex]::IsMatch($stateSrc199, 'let _pendingEffectWarmup = \[\];'))
+) '199.30: the 3 new WAVE 3 pending markers (_pendingQuestFiled/_pendingPerkSeat/_pendingEffectWarmup) are declared in state.js'
+
+# 199.31  game-agnostic (Protocol 38) -- no hardcoded game literal
+#         anywhere in the WAVE 3 home-panel or echo additions.
+Check (
+    (-not ($wireCoreBody199 -match '\bFNV\b|\bFO3\b|New Vegas|Fallout 3')) -and
+    (-not ($wireEchoBody199 -match '\bFNV\b|\bFO3\b|New Vegas|Fallout 3'))
+) '199.31: the WAVE 3 home-panel + echo additions carry no hardcoded game literal'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

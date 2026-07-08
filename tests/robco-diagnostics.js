@@ -31085,6 +31085,349 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 199 — FEEDBACK ANIMATION WAVE 3: the 13 remaining Tier-B/C
+//  animations + the 5 new additive emits (planning/FEEDBACK_ANIMATION_
+//  BUILD_PLAN.md — WAVE 3, the final wave; #5 RADAWAY DRAIN and #7 SPLINT
+//  WRAP shipped early as free companions of #4/#6 in WAVE 1). The 5 new
+//  emits (karma.tier/item.equipped/effect.applied/effect.expiring/
+//  weight.seized) fire at their existing setters (U7/U8 precedent); the 13
+//  home-panel reactions live in _wireCoreEventBusSubscribers() or directly
+//  at their emit site (ui-core.js/ui-render.js/ui-saves.js); the 6
+//  [home + echo] items also get an annunciator push in
+//  _wireFeedbackEchoSubscribers() — the remaining 7 are home-only by the
+//  build plan's routing table and deliberately carry no echo.
+//  31 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 199 — FEEDBACK ANIMATION WAVE 3: 5 new emits + the final 13 Tier-B/C animations');
+  const coreSrc199 = readFile('js/ui-core.js');
+  const renderSrc199 = readFile('js/ui-render.js');
+  const savesSrc199 = readFile('js/ui-saves.js');
+  const apiSrc199 = readFile('js/api.js');
+  const stateSrc199 = readFile('js/state.js');
+  const css199 = readFile('css/terminal.css');
+  const cssStripped199 = css199.replace(/\/\*[\s\S]*?\*\//g, '');
+
+  // ── the 5 new additive emits ────────────────────────────────────────
+
+  // 199.1  karma.tier — updateKarmaUI() emits only on a genuine tier
+  //        crossing (a "did this ACTUALLY change?" cache, never seeded at
+  //        boot — the _lastRadThreshold/_emitStatChangeIfDiffers precedent).
+  const karmaBody199 = extractFunctionBody(coreSrc199, 'updateKarmaUI');
+  assert(
+    /let _lastKarmaTier = null;/.test(coreSrc199) &&
+      /_lastKarmaTier !== null && _lastKarmaTier !== label/.test(karmaBody199) &&
+      /RobcoEvents\.emit\(\s*['"]karma\.tier['"]/.test(karmaBody199) &&
+      /_lastKarmaTier = label;/.test(karmaBody199),
+    '199.1: updateKarmaUI() emits karma.tier only on a genuine tier crossing, never every call'
+  );
+
+  // 199.2  item.equipped — toggleEquipItem() emits only on an EQUIP, never
+  //        an unequip (the #12 INK STAMP "lands once" precedent), AFTER the
+  //        row has already repainted.
+  const equipBody199 = extractFunctionBody(renderSrc199, 'toggleEquipItem');
+  assert(
+    /const wasEquipped = state\.equipped\[slot\] === it\.name;/.test(equipBody199) &&
+      /renderInventory\(\);[\s\S]{0,40}saveState\(\);[\s\S]{0,600}if \(!wasEquipped\) \{[\s\S]{0,120}RobcoEvents\.emit\(\s*['"]item\.equipped['"]/.test(
+        equipBody199
+      ),
+    '199.2: toggleEquipItem() emits item.equipped only on an equip, after renderInventory() has already repainted'
+  );
+
+  // 199.3  effect.applied (user path) — addStatusEffect() emits only for a
+  //        genuinely NEW compound, never a re-application (ticks/type
+  //        refresh on an existing effect stays silent).
+  const addEffectBody199 = extractFunctionBody(renderSrc199, 'addStatusEffect');
+  assert(
+    /if \(existing\) \{[\s\S]{0,80}\} else \{[\s\S]{0,500}RobcoEvents\.emit\(\s*['"]effect\.applied['"]/.test(
+      addEffectBody199
+    ) && /_pendingEffectWarmup\.push\(name\);/.test(addEffectBody199),
+    '199.3: addStatusEffect() emits effect.applied only for a genuinely new compound (the else branch), never a re-application'
+  );
+
+  // 199.4  effect.applied (AI path) — the AI status-set in
+  //        autoImportState() diffs a pre-overwrite name Set (the item.added/
+  //        #18 AI-path precedent) so a resent-unchanged array never replays.
+  assert(
+    /_statusNamesBefore = new Set/.test(apiSrc199) &&
+      /if \(!_statusNamesBefore\.has\(String\(eff\.name\)\.toLowerCase\(\)\)\)/.test(apiSrc199) &&
+      /RobcoEvents\.emit\(\s*['"]effect\.applied['"][\s\S]{0,60}name: eff\.name/.test(apiSrc199) &&
+      /_pendingEffectWarmup\.push\(eff\.name\);/.test(apiSrc199),
+    '199.4: the AI status-set path in autoImportState() emits effect.applied only for names absent from the pre-overwrite Set'
+  );
+
+  // 199.5  effect.expiring — the tick-down crossing detector fires once on
+  //        the crossing INTO the expiring-soon window, never every tick
+  //        while already inside it.
+  assert(
+    /const beforeTicks = eff\.ticks;/.test(apiSrc199) &&
+      /if \(beforeTicks > 2 && eff\.ticks > 0 && eff\.ticks <= 2\)/.test(apiSrc199) &&
+      /RobcoEvents\.emit\(\s*['"]effect\.expiring['"]/.test(apiSrc199),
+    '199.5: the STATUS EFFECT TICK-DOWN loop emits effect.expiring only on the crossing into the >0 && <=2 ticks window'
+  );
+
+  // 199.6  weight.seized — _paintWeighBridge() emits only on the false->true
+  //        crossing (never every render while already seized).
+  const bridgeBody199 = extractFunctionBody(coreSrc199, '_paintWeighBridge');
+  assert(
+    /let _lastWeightSeized = null;/.test(coreSrc199) &&
+      /_lastWeightSeized === false && seized === true/.test(bridgeBody199) &&
+      /RobcoEvents\.emit\(\s*['"]weight\.seized['"]/.test(bridgeBody199) &&
+      /_lastWeightSeized = seized;/.test(bridgeBody199),
+    '199.6: _paintWeighBridge() emits weight.seized only on the genuine false->true crossing'
+  );
+
+  // ── the 13 home-panel animations ────────────────────────────────────
+  const wireCoreBody199 = extractFunctionBody(coreSrc199, '_wireCoreEventBusSubscribers');
+
+  // 199.7  #3 STIM FLUSH — HP genuinely healed: the trace refills bright and
+  //        a "+" blinks twice beside CONDITION.
+  assert(
+    /p\.key === 'hp' &&[\s\S]{0,120}p\.newVal > p\.oldVal/.test(wireCoreBody199) &&
+      /stim-flush/.test(wireCoreBody199) &&
+      /stim-plus-blink/.test(wireCoreBody199) &&
+      /opCondWord/.test(wireCoreBody199),
+    '199.7: #3 STIM FLUSH fires only when newVal > oldVal, brightening #hp_bar_fill + a blinking + beside #opCondWord'
+  );
+
+  // 199.8  #8 BRIDGE CLANG — applied directly at the weight.seized crossing
+  //        (not through a bus subscriber) on .beam-instrument.
+  assert(
+    /bridge-clang/.test(bridgeBody199),
+    '199.8: #8 BRIDGE CLANG is applied directly inside _paintWeighBridge() on the weight.seized crossing'
+  );
+
+  // 199.9  #13 CARD SEAT — addPerk() sets a pending marker only for a
+  //        genuinely new perk (never an existing-perk rank bump), consumed
+  //        exactly once by renderPerks().
+  const addPerkBody199 = extractFunctionBody(renderSrc199, 'addPerk');
+  const renderPerksBody199 = extractFunctionBody(renderSrc199, 'renderPerks');
+  assert(
+    /if \(ex\) \{[\s\S]{0,60}\} else \{[\s\S]{0,350}_pendingPerkSeat = name;/.test(
+      addPerkBody199
+    ) &&
+      /const seatName = _pendingPerkSeat/.test(renderPerksBody199) &&
+      /_pendingPerkSeat = null;/.test(renderPerksBody199) &&
+      /slot-row--seated/.test(renderPerksBody199),
+    '199.9: addPerk() sets _pendingPerkSeat only for a NEW perk; renderPerks() consumes it once into .slot-row--seated'
+  );
+
+  // 199.10  #15 NEEDLE KICK — adjustFaction() triggers a one-shot bounce on
+  //         the freshly-repainted .facon-pin, directly (no bus event).
+  const adjustFactionBody199 = extractFunctionBody(renderSrc199, 'adjustFaction');
+  assert(
+    /renderFactionRep\(\);[\s\S]{0,550}needle-kick/.test(adjustFactionBody199),
+    '199.10: adjustFaction() triggers a needle-kick one-shot on .facon-pin after renderFactionRep() repaints'
+  );
+
+  // 199.11  #16 SCALES TIP — applied directly inside updateKarmaUI() at the
+  //         karma.tier crossing: the needle bounces + a halo/horns glyph
+  //         blinks beside the standing word.
+  assert(
+    /scales-tip/.test(karmaBody199) &&
+      /karma-tier-glyph/.test(karmaBody199) &&
+      /k < 0 \? '☠' : '☼'/.test(karmaBody199),
+    '199.11: #16 SCALES TIP (needle bounce + halo/horns glyph) is applied directly inside updateKarmaUI() at the tier crossing'
+  );
+
+  // 199.12  #19 IN-SERVICE STAMP — home-only reaction to item.equipped,
+  //         targeting the freshly-equipped row's .equip-btn by name.
+  assert(
+    /RobcoEvents\.on\(\s*['"]item\.equipped['"]/.test(wireCoreBody199) &&
+      /in-service-stamp/.test(wireCoreBody199) &&
+      /\.equip-btn/.test(wireCoreBody199),
+    '199.12: #19 IN-SERVICE STAMP reacts to item.equipped, stamping the matching row .equip-btn'
+  );
+
+  // 199.13  #21 PART DROP — home-only reaction to the EXISTING
+  //         craft.scrapped event; transient part-glyph nodes dropped into
+  //         #scrapItemCard (never persisted markup).
+  assert(
+    /RobcoEvents\.on\(\s*['"]craft\.scrapped['"]/.test(wireCoreBody199) &&
+      /scrapItemCard/.test(wireCoreBody199) &&
+      /scrap-part-drop/.test(wireCoreBody199),
+    '199.13: #21 PART DROP reacts to the existing craft.scrapped event, dropping transient glyphs into #scrapItemCard'
+  );
+
+  // 199.14  #25 DIRECTIVE FILED — addQuest() (ui-saves.js) sets a pending
+  //         marker, consumed exactly once by renderQuests() (ui-render.js)
+  //         into .dir-slot--filed, distinct from the #23/#24 stamp marker.
+  const addQuestBody199 = extractFunctionBody(savesSrc199, 'addQuest');
+  const renderQuestsBody199 = extractFunctionBody(renderSrc199, 'renderQuests');
+  assert(
+    /_pendingQuestFiled = name;/.test(addQuestBody199) &&
+      /const filedName = _pendingQuestFiled/.test(renderQuestsBody199) &&
+      /_pendingQuestFiled = null;/.test(renderQuestsBody199) &&
+      /dir-slot--filed/.test(renderQuestsBody199),
+    '199.14: addQuest() sets _pendingQuestFiled; renderQuests() consumes it once into .dir-slot--filed'
+  );
+
+  // 199.15  #27 TRIANGULATE — a direct reaction to the EXISTING
+  //         onLocationChange() arrival path (no new bus event), distinct
+  //         from #26 SURVEY PING; a no-op when the WORLD GRID isn't
+  //         currently painted.
+  const onLocChangeBody199 = extractFunctionBody(coreSrc199, 'onLocationChange');
+  assert(
+    /renderWorldMap\(\);[\s\S]{0,700}you-triangulate/.test(onLocChangeBody199) &&
+      /#worldMapDisplay \.you/.test(onLocChangeBody199),
+    '199.15: #27 TRIANGULATE fires directly inside onLocationChange() after renderWorldMap(), targeting the .you reticle group'
+  );
+
+  // 199.16  #28 TUNGSTEN WARM-UP — renderStatus() consumes the pending
+  //         warm-up list exactly once, applying the glow class only to
+  //         matching tiles.
+  const renderStatusBody199 = extractFunctionBody(renderSrc199, 'renderStatus');
+  assert(
+    /const warmupNames = \(_pendingEffectWarmup \|\| \[\]\)/.test(renderStatusBody199) &&
+      /_pendingEffectWarmup = \[\];/.test(renderStatusBody199) &&
+      /tungsten-warmup/.test(renderStatusBody199),
+    '199.16: renderStatus() consumes _pendingEffectWarmup once, applying .tungsten-warmup only to matching tiles'
+  );
+
+  // 199.17  #29 GUTTERING LAMP — a continuous, state-driven flicker class
+  //         (never a one-shot) for as long as an effect is genuinely
+  //         expiring soon (0 < ticks <= 2).
+  assert(
+    /const isGuttering = ticks > 0 && ticks <= 2;/.test(renderStatusBody199) &&
+      /lamp-guttering/.test(renderStatusBody199),
+    '199.17: renderStatus() computes a continuous .lamp-guttering class whenever 0 < ticks <= 2'
+  );
+
+  // 199.18  #32 FAULT (polish) — a one-shot flicker on the lamp + the
+  //         BUS-24 counter, fired only on the genuine false->true crossing.
+  const faultLampBody199 = extractFunctionBody(coreSrc199, '_updateFaultLamp');
+  assert(
+    /let _lastFaultHasErrors = null;/.test(coreSrc199) &&
+      /_lastFaultHasErrors === false && hasErrors === true/.test(faultLampBody199) &&
+      /fault-flicker-in/.test(faultLampBody199) &&
+      /svcFaultNum/.test(faultLampBody199),
+    '199.18: _updateFaultLamp() flickers #lampFault + #svcFaultNum only on the genuine false->true fault crossing'
+  );
+
+  // 199.19  #33 QTY DIGIT FLIP — a one-shot digit-flip on the freshly-
+  //         painted quantity readout, skipped when the row was removed
+  //         (next === 0, nothing left to flip).
+  const adjQtyBody199 = extractFunctionBody(renderSrc199, 'adjItemQty');
+  assert(
+    /if \(next > 0\) \{[\s\S]{0,400}qty-digit-flip/.test(adjQtyBody199),
+    '199.19: adjItemQty() applies a one-shot .qty-digit-flip only when the row survives (next > 0)'
+  );
+
+  // ── the annunciator echo wiring (the 6 [home + echo] items) ────────────
+  const wireEchoBody199 = extractFunctionBody(coreSrc199, '_wireFeedbackEchoSubscribers');
+
+  // 199.20  echo push for #3 STIM FLUSH (HP genuinely healed).
+  assert(
+    /p\.newVal > p\.oldVal[\s\S]{0,160}glyph: '✚'/.test(wireEchoBody199) &&
+      /HEALED:/.test(wireEchoBody199),
+    '199.20: the echo subscriber pushes a HEALED annunciation on a genuine HP increase'
+  );
+
+  // 199.21  echo push for weight.seized (#8 BRIDGE CLANG).
+  assert(
+    /RobcoEvents\.on\(\s*['"]weight\.seized['"][\s\S]{0,80}CARGO SEIZED/.test(wireEchoBody199),
+    '199.21: the echo subscriber pushes a CARGO SEIZED annunciation on weight.seized'
+  );
+
+  // 199.22  echo push for karma.tier (#16 SCALES TIP), tone derived from the
+  //         tier label.
+  assert(
+    /RobcoEvents\.on\(\s*['"]karma\.tier['"]/.test(wireEchoBody199) &&
+      /\/evil\/i\.test\(t\)/.test(wireEchoBody199) &&
+      /glyph: '⚖'/.test(wireEchoBody199),
+    '199.22: the echo subscriber pushes a KARMA annunciation on karma.tier, tone derived from the tier label'
+  );
+
+  // 199.23  echo push for effect.applied (#28 TUNGSTEN WARM-UP).
+  assert(
+    /RobcoEvents\.on\(\s*['"]effect\.applied['"][\s\S]{0,120}APPLIED:/.test(wireEchoBody199),
+    '199.23: the echo subscriber pushes an APPLIED annunciation on effect.applied'
+  );
+
+  // 199.24  echo push for effect.expiring (#29 GUTTERING LAMP).
+  assert(
+    /RobcoEvents\.on\(\s*['"]effect\.expiring['"][\s\S]{0,120}EXPIRING:/.test(wireEchoBody199),
+    '199.24: the echo subscriber pushes an EXPIRING annunciation on effect.expiring'
+  );
+
+  // 199.25  #27 TRIANGULATE pushes directly from onLocationChange() rather
+  //         than through a bus subscription in the echo-wiring function.
+  assert(
+    /_echoPush\(\{[\s\S]{0,120}glyph: '⦿'[\s\S]{0,80}ARRIVED:/.test(onLocChangeBody199) &&
+      !/ARRIVED:/.test(wireEchoBody199),
+    '199.25: #27 TRIANGULATE pushes its annunciation directly from onLocationChange(), never through a bus subscription'
+  );
+
+  // 199.26  the 7 home-only WAVE 3 items get NO echo wiring — item.equipped
+  //         and craft.scrapped (the two bus events among the home-only set)
+  //         are never subscribed inside the echo function.
+  assert(
+    !/item\.equipped/.test(wireEchoBody199) && !/craft\.scrapped/.test(wireEchoBody199),
+    '199.26: item.equipped/craft.scrapped are never subscribed in the echo function (home-only, no echo)'
+  );
+
+  // ── CSS keyframe presence (Protocol UI-9) ──────────────────────────────
+  const wave3Keyframes199 = [
+    'stim-flush-fill',
+    'stim-plus-blink',
+    'bridge-clang-shake',
+    'bridge-dust-puff',
+    'card-seat-drop',
+    'card-pin-spark',
+    'needle-kick-bounce',
+    'scales-tip-bounce',
+    'karma-tier-glyph-blink',
+    'in-service-stamp-slap',
+    'scrap-part-drop',
+    'dir-slot-filed-in',
+    'dir-lamp-warmup',
+    'you-triangulate-hop',
+    'tungsten-warmup-glow',
+    'lamp-gutter-flicker',
+    'fault-flicker-in',
+    'qty-digit-flip-anim',
+  ];
+  assert(
+    wave3Keyframes199.every(name => new RegExp(`@keyframes ${name}\\b`).test(cssStripped199)),
+    '199.27: every WAVE 3 animation has its own plain @keyframes rule in terminal.css'
+  );
+
+  // ── zero campaign-state write (the reactive wiring only) ───────────────
+
+  // 199.28  _wireCoreEventBusSubscribers() (incl. all WAVE 3 additions)
+  //         never assigns state.* or calls saveState().
+  assert(
+    !/state\.\w+\s*=/.test(wireCoreBody199) && !/saveState\(\)/.test(wireCoreBody199),
+    '199.28: _wireCoreEventBusSubscribers() (incl. all WAVE 3 additions) never assigns state.* or calls saveState()'
+  );
+
+  // 199.29  _wireFeedbackEchoSubscribers() (incl. all WAVE 3 echo
+  //         additions) never assigns state.* or calls saveState().
+  assert(
+    !/state\.\w+\s*=/.test(wireEchoBody199) && !/saveState\(\)/.test(wireEchoBody199),
+    '199.29: _wireFeedbackEchoSubscribers() (incl. all WAVE 3 echo additions) never assigns state.* or calls saveState()'
+  );
+
+  // 199.30  the 3 new pending markers live in state.js (Protocol 27 —
+  //         loaded by every environment, including test.html's reduced
+  //         boot chain, the _pendingQuestStamp/_pendingRepStamp precedent).
+  assert(
+    /let _pendingQuestFiled = null;/.test(stateSrc199) &&
+      /let _pendingPerkSeat = null;/.test(stateSrc199) &&
+      /let _pendingEffectWarmup = \[\];/.test(stateSrc199),
+    '199.30: the 3 new WAVE 3 pending markers (_pendingQuestFiled/_pendingPerkSeat/_pendingEffectWarmup) are declared in state.js'
+  );
+
+  // 199.31  game-agnostic (Protocol 38) — no hardcoded game literal
+  //         anywhere in the WAVE 3 home-panel or echo additions.
+  assert(
+    !/\bFNV\b|\bFO3\b|New Vegas|Fallout 3/.test(wireCoreBody199) &&
+      !/\bFNV\b|\bFO3\b|New Vegas|Fallout 3/.test(wireEchoBody199),
+    '199.31: the WAVE 3 home-panel + echo additions carry no hardcoded game literal'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail

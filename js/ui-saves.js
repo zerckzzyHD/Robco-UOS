@@ -525,6 +525,9 @@ function addQuest() {
   const obj = (document.getElementById('newQuestObjective') || {}).value?.trim() || null;
   if (!state.quests) state.quests = [];
   state.quests.push({ name, status, objective: obj });
+  // FEEDBACK ANIMATION WAVE 3 (#25 DIRECTIVE FILED) — a transient module var
+  // (never state.*), consumed by renderQuests() the next time it paints.
+  _pendingQuestFiled = name;
   document.getElementById('newQuestName').value = '';
   document.getElementById('newQuestObjective').value = '';
   renderQuests();

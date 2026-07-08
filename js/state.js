@@ -1641,6 +1641,13 @@ let _pendingSurveyPing = null;
 let _pendingRepStamp = null; // #14 REPUTATION STAMP
 let _pendingQuestStamp = null; // #23 CASE-CLOSED STAMP / #24 FILAMENT DIE
 let _pendingExhibitLight = []; // #22 EXHIBIT LIGHT-UP
+// FEEDBACK ANIMATION WAVE 3 pending markers — same deferred-consumption
+// pattern, same reason for living here (set from api.js's AI paths, which
+// test.html's reduced boot chain loads; consumed by ui-render.js's render
+// functions, which it doesn't — Protocol 27).
+let _pendingQuestFiled = null; // #25 DIRECTIVE FILED
+let _pendingPerkSeat = null; // #13 CARD SEAT
+let _pendingEffectWarmup = []; // #28 TUNGSTEN WARM-UP
 function recordLocationVisit(locName) {
   const loc = (locName == null ? '' : String(locName)).trim();
   if (!loc) return;
