@@ -186,6 +186,7 @@
 - The Director Uplink presence described above is built as a visual layer over the existing conversation system rather than a separate one, so nothing about how messages are actually sent or received has changed. Each supported game's identity profile (added in an earlier update) now also carries its own Director Uplink flavor — panel title, relay name, and status wording — with a generic fallback for a game that hasn't had its own written yet. It stores nothing new to your save; the waveform's state lives only in memory.
 - Your quick-draw gear shortcuts are now stored as real, player-controlled data on your device instead of living nowhere durable — previously the AI had to remember what you'd bound to each slot itself, with no actual record kept. The AI can no longer see or change a binding; only you can, through the new Tool Deck panel.
 - Tidied up the project's repo layout by moving the app icon and the four shortcut icons into their own folder. Everything that points at them was updated to match, so the installed app icon and its shortcuts look and work exactly as before. Internal housekeeping only — no visible change.
+- Added a permanent automated check confirming the "what's new" patch-notes popup only ever opens once per update, on the first visit after a new version is published, never on every reload. Investigated after an owner report about an unexpected popup; the underlying logic was already correct — this check exists so it's caught immediately if that ever regresses. Internal only — no visible change.
 
 ---
 

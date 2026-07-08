@@ -616,6 +616,49 @@ for (const vp of VIEWPORTS) {
   await ctx.close();
 }
 
+// ── PATCH NOTES auto-open gate (owner report investigation — Protocol 42:
+// verified harness-only, not a bug, locking the invariant with a permanent
+// regression guard). _runBootSequenceAndBriefing() (ui-core.js) shows the
+// changelog modal automatically after boot ONLY when
+// MetaStore.get('robco_version') !== APP_VERSION, then immediately persists
+// APP_VERSION via MetaStore.set() — an intentional, once-per-version "what's
+// new" feature (WU-C11/Suite 62), not a per-boot popup. Confirmed live: with
+// robco_version pre-seeded to the CURRENT APP_VERSION (simulating a device
+// that has already seen this version's patch notes), the modal correctly
+// stays closed through boot. This proof locks that gate so a future
+// regression (e.g. the version stamp landing after the read, or a duplicate
+// call site) can't silently turn this into an every-reload popup.
+{
+  const ctx = await browser.newContext({ viewport: { width: 412, height: 900 } });
+  const page = await ctx.newPage();
+  await page.goto(`file://${INDEX.replace(/\\/g, '/')}`);
+  await page.waitForTimeout(1000);
+  const appVersion = await page.evaluate(() =>
+    typeof APP_VERSION !== 'undefined' ? APP_VERSION : null
+  );
+  if (!appVersion) {
+    pass('PATCH NOTES auto-open gate — APP_VERSION not present, skipped');
+  } else {
+    await page.evaluate(v => localStorage.setItem('robco_version', v), appVersion);
+    await page.reload({ waitUntil: 'load' });
+    await page.waitForTimeout(4500); // past the ~3.9s post-boot changelog-fetch window
+    const modalDisplay = await page.evaluate(() => {
+      const m = document.getElementById('sysModal');
+      return m ? getComputedStyle(m).display : 'no-element';
+    });
+    if (modalDisplay === 'none') {
+      pass(
+        `PATCH NOTES auto-open gate — with robco_version already matching APP_VERSION (${appVersion}), the modal stays closed through boot`
+      );
+    } else {
+      fail(
+        `PATCH NOTES auto-open gate — the changelog modal opened even though robco_version already matched APP_VERSION (${appVersion})! This would make it a per-reload popup instead of a once-per-version one.`
+      );
+    }
+  }
+  await ctx.close();
+}
+
 // ── OPERATOR TRAITS (FNV) — uniform chip size + full-row clickability
 // (owner report). Every trait chip must render at the SAME width and the
 // whole chip (not just its inner toggle glyph) must be clickable.
