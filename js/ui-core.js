@@ -3271,6 +3271,24 @@ function nativeLevelUp() {
   RobcoEvents.emit('level.up', { oldLvl: lvl, newLvl });
   updateMath();
   saveState();
+  // AI→native survey Part C.1 — skill-point allocation on level-up. The
+  // Director used to auto-award (10 + INT/2) skill points and pick the
+  // distribution itself; that pool is now just REPORTED here (same formula,
+  // computed offline) and the player allocates it themselves through the
+  // EXISTING skill setters — the SKILL MATRIX VU meters (_skillVuSet) or the
+  // TERMINAL "<skill> +N" grammar (Part B) — never auto-assigned here
+  // (Protocol 24, player-driven, deterministic). Native LEVEL UP jumps the
+  // view to SKILL MATRIX the same way [GPS]/[MAP] jumps to the map
+  // (Protocol 22 — expandPanelForCategory is the one panel-opening path).
+  const intScore = parseInt(state.i, 10) || 5;
+  const skillPoints = 10 + Math.floor(intScore / 2);
+  if (typeof appendToChat === 'function') {
+    appendToChat(
+      `> [LEVEL UP] Level ${newLvl} committed. ${skillPoints} skill point${skillPoints === 1 ? '' : 's'} available (10 + INT/2) — allocate via SKILL MATRIX.`,
+      'sys'
+    );
+  }
+  if (typeof expandPanelForCategory === 'function') expandPanelForCategory('skills');
 }
 
 // C5: Playthrough type handler — writes state field (Protocol 4).
@@ -4267,6 +4285,20 @@ function openBezelDirectory() {
   openModal({ title: '> SUBSYSTEM DIRECTORY', body });
 }
 
+// AI→native survey Part C.1 — [GPS] / [MAP] compass grid. Previously a
+// free-text Director round-trip that returned an AI-drawn ASCII grid; now
+// opens/scrolls to the existing native CARTOGRAPHY TABLE (DATABANK tab) —
+// zero AI round-trip. Reuses the SAME expandPanelForCategory('map') path
+// the typed panel-nav aliases ("map"/"world"/"locations", PANEL_NAV_ALIASES
+// in api.js) already use (Protocol 22) — one panel-opening mechanism for
+// every route to the world map.
+function _nativeOpenMap() {
+  if (typeof closeModal === 'function') closeModal();
+  if (typeof expandPanelForCategory === 'function') expandPanelForCategory('map');
+  if (typeof appendToChat === 'function')
+    appendToChat('> [GPS] Local grid fixed — CARTOGRAPHY TABLE displayed.', 'sys');
+}
+
 // Restore the last-focused non-tab subsystem (uplink) highlight on boot —
 // visual only, never scrolls/focuses anything on page load. chassis/settings
 // are now real tabs (Step 2 v2.8.0 Settings-tab unit) restored by initTabs()
@@ -4441,8 +4473,17 @@ function expandPanelForCategory(categoryKey) {
   // SKILL BOOKS/SKILL MAGAZINES are top-level .panel h2 boards (BUS-05a/
   // BUS-05b, Phase 3 OPERATOR batch 3) — the .sub-panel h3 half of this
   // selector still covers any other nested sub-panel target (Protocol 22).
+  // Protocol 42 fix (found live while verifying the AI->native survey's
+  // native LEVEL UP jump-to-SKILL-MATRIX): many reskinned boards render
+  // their heading as `> <span class="board-led"></span> NAME` split across
+  // multiple lines, so raw textContent carries a doubled space and embedded
+  // newlines (e.g. "> \n  VITAL\n  TELEMETRY") that never matched the plain
+  // single-spaced target string below — collapsing all whitespace runs to a
+  // single space on both sides makes the match immune to that markup shape.
+  const norm = s => s.replace(/\s+/g, ' ').trim();
+  const normTarget = norm(target);
   const h2 = Array.from(document.querySelectorAll('.panel h2, .sub-panel h3')).find(el =>
-    el.textContent.trim().startsWith(target)
+    norm(el.textContent).startsWith(normTarget)
   );
   if (!h2) return;
   const details = h2.closest('details.panel');
@@ -5279,6 +5320,14 @@ const COMMAND_REGISTRY = [
         cmd: '[LOOT] / [LT]',
         desc: 'Salvage terminal — add a database item to your pack at its value. Offline.',
       },
+      {
+        cmd: '[GPS] / [MAP]',
+        desc: 'Localized geographic compass grid — opens the CARTOGRAPHY TABLE. Offline.',
+      },
+      {
+        cmd: '[PERKS] / [PK]',
+        desc: 'Perks you qualify for at your current level — registry lookup. Offline.',
+      },
     ],
   },
   {
@@ -5317,7 +5366,6 @@ const COMMAND_REGISTRY = [
   {
     group: 'NAVIGATION & WORLD STATE',
     cmds: [
-      { cmd: '[GPS] / [MAP]', desc: 'Localized geographic compass grid.' },
       { cmd: '[WAIT: X Hrs]', desc: 'Advance the clock by X hours; restock.' },
       { cmd: '[SLEEP]', desc: 'Advance 8 hours; heal HP & limbs. Offline.' },
     ],

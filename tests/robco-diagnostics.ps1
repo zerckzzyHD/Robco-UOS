@@ -8420,17 +8420,17 @@ const sandbox = {
 vm.createContext(sandbox);
 vm.runInContext(allFnSrc + '\nthis.getSystemDirective = getSystemDirective;', sandbox);
 const matrix = [
-  { ctx: 'FNV', ps: undefined, pt: undefined, cm: undefined, sha256: 'ede29d0a8b2892b1f7962730467f24aa143a7284278e2aa7db8e3f7e5e08ec39' },
-  { ctx: 'FNV', ps: 'melee',   pt: undefined, cm: undefined, sha256: '68455f8ca104cde06703e9a3a849492d658d44a45bddc1730c1f73b124fe9736' },
-  { ctx: 'FNV', ps: undefined, pt: 'minmaxed', cm: undefined, sha256: '8368aab7620742cc14a000425a55b176120fa4085a61693bcbefb0ac88b2b1dc' },
-  { ctx: 'FNV', ps: undefined, pt: 'completionist', cm: undefined, sha256: 'bcf934e2dea2c8c5dd91dc57db11b7fddc8d1d82d323d4c414ab49063cffde27' },
-  { ctx: 'FNV', ps: undefined, pt: 'casual', cm: undefined, sha256: '481d2b9e2a4541b2eb80ea73890c448aba25ebd83979e3845efa4ad68b666621' },
-  { ctx: 'FNV', ps: undefined, pt: 'speedrun', cm: undefined, sha256: 'f7cea26ec145b7fa1540aca6be010a825db7c82cf3a9d7874e18df52adf9a0ba' },
-  { ctx: 'FNV', ps: undefined, pt: undefined, cm: 'rng', sha256: '1c015a880abfc1654d4372fcac4d5081adfa20833ef2baede2aa539ad5f98556' },
-  { ctx: 'FNV', ps: undefined, pt: undefined, cm: 'rng-locked', sha256: 'e55ab9da48e0c41107252724fa9360c29affd3ed80cbd497b429d84588159106' },
-  { ctx: 'FNV', ps: 'melee', pt: 'minmaxed', cm: 'rng-locked', sha256: '17028953718ce184cdd1e309de0406a24882a9b2ace0dc89976e18ca4e45c2a6' },
-  { ctx: 'FO3', ps: undefined, pt: undefined, cm: undefined, sha256: 'a6a2ec157fff83fd142a0ba2ece1d6d133213e6cf2b45be9011a11f8b7dd946a' },
-  { ctx: 'FO3', ps: 'melee', pt: undefined, cm: 'rng-locked', sha256: '1bacfa4696b96d35aba0d566b58f5ec4ec3c4f654e1f073d36198c17cb5b4e89' },
+  { ctx: 'FNV', ps: undefined, pt: undefined, cm: undefined, sha256: 'ac01cf4e1328001cde804a099d1d06494b7ce3382792c74b2758a48e8ba34fc3' },
+  { ctx: 'FNV', ps: 'melee',   pt: undefined, cm: undefined, sha256: '3f07321147caa26cf7f1188edbe629c535b585d05ef24a893dca59662c38584f' },
+  { ctx: 'FNV', ps: undefined, pt: 'minmaxed', cm: undefined, sha256: 'df9349d0f0cae81d2c41933a92ffd37a81d0a4c088715d45ff675faa1993a7b0' },
+  { ctx: 'FNV', ps: undefined, pt: 'completionist', cm: undefined, sha256: 'f2a73fa23f3d7130caccbfae04d15dc6ef5225c61e25a15236fff5e1ba873b47' },
+  { ctx: 'FNV', ps: undefined, pt: 'casual', cm: undefined, sha256: '74ada35e33bef7c250a543fed13046cca358f6fdb028a1f4a1de099b45f09916' },
+  { ctx: 'FNV', ps: undefined, pt: 'speedrun', cm: undefined, sha256: 'df637bca2fdb284a9f47a9eff85a0efbbb8515d7ce3ae03c2a092ada51f2b179' },
+  { ctx: 'FNV', ps: undefined, pt: undefined, cm: 'rng', sha256: '37a49139cec9465d8c9189dc25f01bf587da5528ffaa1e6eb7fe108afce8d2f1' },
+  { ctx: 'FNV', ps: undefined, pt: undefined, cm: 'rng-locked', sha256: 'ab98a1f90d7d6f543e340cc75eb63eec53dfab61a3a649fdc5f3b6c5cd92cdd0' },
+  { ctx: 'FNV', ps: 'melee', pt: 'minmaxed', cm: 'rng-locked', sha256: '260656c7efdab70fb2615cc15b6959542fb6e0d7d08877c0470a4847115bb74f' },
+  { ctx: 'FO3', ps: undefined, pt: undefined, cm: undefined, sha256: 'd1f4f7ecb807ac2975b5398d475eec4bd142eeeaf065522215207fe5477b8c78' },
+  { ctx: 'FO3', ps: 'melee', pt: undefined, cm: 'rng-locked', sha256: '0f569794e9f02d1318850899efb9cf68d67a1a72737147f345ed60e8bac24e78' },
 ];
 const bits = matrix.map(m => {
   try {
@@ -20905,6 +20905,274 @@ console.log('RESULT:' + results.map(function (r) { return r ? '1' : '0'; }).join
     }
 } catch {
     foreach ($lbl in $labels201) { Fail "$lbl  (exception: $($_.Exception.Message))" }
+}
+
+# ===========================================================
+# Suite 202 -- AI->native survey Part C.1: [GPS]/[MAP] cartography,
+# level-up skill-point allocation, and [PERKS]/[PK] eligible-perks lookup
+# (all three converted from AI round-trips to deterministic, offline native
+# commands -- Protocol 27 confirmed each's prior AI-only routing before
+# conversion; Protocol 22 reuses expandPanelForCategory/FALLOUT_REGISTRY/the
+# existing skill setters throughout).
+# 7 tests
+# ===========================================================
+Sep "Suite 202 -- AI->native: GPS/MAP, level-up skill points, eligible perks"
+$apiSrc202 = Read-Src "js/api.js"
+$uiCoreSrc202 = Read-Src "js/ui-core.js"
+$uiRenderSrc202 = Read-Src "js/ui-render.js"
+
+# 202.1  the native router carries [GPS]/[MAP] -> _nativeOpenMap() and
+#        [PERKS]/[PK] -> renderEligiblePerks(); all three functions exist.
+Check (
+    ($apiSrc202 -match "'\[GPS\]':\s*\(\)\s*=>\s*_nativeOpenMap\(\)") -and
+    ($apiSrc202 -match "'\[MAP\]':\s*\(\)\s*=>\s*_nativeOpenMap\(\)") -and
+    ($apiSrc202 -match "'\[PERKS\]':\s*\(\)\s*=>\s*renderEligiblePerks\(\)") -and
+    ($apiSrc202 -match "'\[PK\]':\s*\(\)\s*=>\s*renderEligiblePerks\(\)") -and
+    ($uiCoreSrc202 -match 'function _nativeOpenMap\s*\(') -and
+    ($uiRenderSrc202 -match 'function renderEligiblePerks\s*\(') -and
+    ($uiRenderSrc202 -match 'function _computeEligiblePerks\s*\(')
+) '202.1: NATIVE_COMMAND_ROUTER wires [GPS]/[MAP] -> _nativeOpenMap() and [PERKS]/[PK] -> renderEligiblePerks(); all three functions are defined'
+
+# 202.2  zero AI on every new native path.
+$openMapBody202 = Get-FunctionBody $uiCoreSrc202 '_nativeOpenMap'
+$eligibleBody202 = Get-FunctionBody $uiRenderSrc202 'renderEligiblePerks'
+$computeBody202 = Get-FunctionBody $uiRenderSrc202 '_computeEligiblePerks'
+function Test-NoAi202($b) { -not ($b -match 'fetch\(|XMLHttpRequest|transmitMessage\(') }
+Check (
+    (Test-NoAi202 $openMapBody202) -and (Test-NoAi202 $eligibleBody202) -and (Test-NoAi202 $computeBody202)
+) '202.2: _nativeOpenMap()/renderEligiblePerks()/_computeEligiblePerks() contain no fetch/XMLHttpRequest/transmitMessage() call -- fully offline'
+
+# 202.3  COMMAND_REGISTRY: [GPS]/[MAP] moved into NATIVE TERMINALS -- OFFLINE,
+#        NO AI (no longer NAVIGATION & WORLD STATE); [PERKS]/[PK] entry exists
+#        in the same group, both marked Offline.
+$nativeGroupIdx202 = $uiCoreSrc202.IndexOf("group: 'NATIVE TERMINALS")
+$navGroupIdx202 = $uiCoreSrc202.IndexOf("group: 'NAVIGATION & WORLD STATE'")
+$gpsIdx202 = $uiCoreSrc202.IndexOf("cmd: '[GPS] / [MAP]'")
+$perksIdx202 = $uiCoreSrc202.IndexOf("cmd: '[PERKS] / [PK]'")
+Check (
+    ($nativeGroupIdx202 -ge 0) -and ($navGroupIdx202 -gt $nativeGroupIdx202) -and
+    ($gpsIdx202 -gt $nativeGroupIdx202) -and ($gpsIdx202 -lt $navGroupIdx202) -and
+    ($perksIdx202 -gt $nativeGroupIdx202) -and ($perksIdx202 -lt $navGroupIdx202) -and
+    ($uiCoreSrc202 -match "cmd:\s*'\[GPS\] / \[MAP\]',\s*\r?\n\s*desc:\s*'[^']*Offline\.'") -and
+    ($uiCoreSrc202 -match "cmd:\s*'\[PERKS\] / \[PK\]',\s*\r?\n\s*desc:\s*'[^']*Offline\.'")
+) '202.3: COMMAND_REGISTRY lists [GPS]/[MAP] and [PERKS]/[PK] inside the NATIVE TERMINALS -- OFFLINE, NO AI group (not NAVIGATION & WORLD STATE), each marked Offline'
+
+# 202.4  the AI directive: no longer names [GPS] as a modal trigger or a
+#        "type":"GPS" schema, and no longer instructs the AI to award skill
+#        points on level-up -- both explicitly defer to the native calculators.
+$builderNames202 = @(
+    'getSystemDirective', '_directiveConstraints', '_directivePersonaAndContract',
+    '_directiveCoreTracking', '_directiveSkills', '_directiveFactions',
+    '_directiveSystems', '_directiveTrackers', '_directiveInjectionBoundary'
+)
+$directiveBody202 = ($builderNames202 | ForEach-Object {
+    try { Get-FunctionBody $apiSrc202 $_ } catch { '' }
+}) -join "`n"
+Check (
+    (-not ($directiveBody202 -match 'MENU, ROADMAP, STATS, \[GPS\], OR LEVEL UP')) -and
+    ($directiveBody202 -match 'MENU, ROADMAP, STATS, OR LEVEL UP') -and
+    ($directiveBody202 -match 'native offline cartography view') -and
+    (-not ($directiveBody202 -match 'award \(10 \+ INT/2\) skill points')) -and
+    ($directiveBody202 -match 'native deterministic LEVEL UP terminal \(10 \+ INT/2 points') -and
+    (-not ($directiveBody202 -match '"GPS"'))
+) '202.4: the AI directive no longer triggers a GPS modal or a "type":"GPS" schema, and no longer instructs the AI to award skill points on level-up -- both explicitly defer to the native calculators'
+
+# 202.5-202.6  BEHAVIORAL -- executed via a spawned node process against the
+# REAL source files (Protocol 42 stdin-corruption-safe transport).
+$labels202 = @(
+    '202.5: [behavioral] _computeEligiblePerks() at level 5 with "Intense Training" already owned returns exactly [Comprehension, Educated] -- excludes the owned perk, the level-6 perk, and the level:0 special perk',
+    '202.6: [behavioral] nativeLevelUp() at INT 7, level 4->5, reports "13 skill points available (10 + INT/2)" via appendToChat and jumps the view to SKILL MATRIX via expandPanelForCategory(''skills'') -- deterministic, no AI'
+)
+try {
+    $nodeCheck202 = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCheck202) {
+        $repoRoot202 = (Get-Item $PSScriptRoot).Parent.FullName
+        $repoRootNode202 = $repoRoot202.Replace('\', '/')
+        $testScript202 = @"
+const vm = require('vm');
+const fs = require('fs');
+const path = require('path');
+const ROOT = '$repoRootNode202';
+function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+const uiRenderSrc = rd('js/ui-render.js');
+const uiCoreSrc = rd('js/ui-core.js');
+function extractBody(src, name) {
+  var idx = src.indexOf('function ' + name);
+  if (idx === -1) throw new Error('missing ' + name);
+  var i = src.indexOf('{', idx);
+  var depth = 0, start = i;
+  while (i < src.length) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) return src.slice(start, i + 1); }
+    i++;
+  }
+  throw new Error('unclosed ' + name);
+}
+var results = [];
+try {
+  var fnSrc = 'function _computeEligiblePerks()' + extractBody(uiRenderSrc, '_computeEligiblePerks');
+  var sandbox = {
+    FALLOUT_REGISTRY: { perks: [
+      { name: 'Intense Training', type: 'regular', level: 2 },
+      { name: 'Educated', type: 'regular', level: 4 },
+      { name: 'Toughness', type: 'regular', level: 6 },
+      { name: 'Comprehension', type: 'regular', level: 4 },
+      { name: 'Power Armor Training', type: 'special', level: 0 }
+    ] },
+    state: { lvl: 5, perks: [{ name: 'intense training', rank: 1 }] },
+    parseInt: parseInt, String: String, Set: Set, Math: Math
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(fnSrc + '\nthis.__out = _computeEligiblePerks();', sandbox);
+  var out = sandbox.__out;
+  results.push(
+    out.length === 2 && out[0].name === 'Comprehension' && out[1].name === 'Educated' &&
+    !out.some(function (p) { return p.name === 'Intense Training'; }) &&
+    !out.some(function (p) { return p.name === 'Toughness'; }) &&
+    !out.some(function (p) { return p.name === 'Power Armor Training'; })
+  );
+} catch (e) { results.push(false); }
+try {
+  var declared = 'function nativeLevelUp()' + extractBody(uiCoreSrc, 'nativeLevelUp');
+  var chatLog = [];
+  var expandCalls = [];
+  var sb2 = {
+    console: { warn: function () {} },
+    state: { lvl: 4, i: 7 },
+    RobcoEvents: { emit: function () {} },
+    updateMath: function () {}, saveState: function () {},
+    appendToChat: function (msg) { chatLog.push(msg); },
+    expandPanelForCategory: function (cat) { expandCalls.push(cat); },
+    document: { getElementById: function (id) { return id === 'stat_lvl' ? sb2._lvlInput : null; } },
+    _lvlInput: { value: '4' }
+  };
+  vm.createContext(sb2);
+  vm.runInContext('const MAX_PLAYER_LEVEL = 50;\n' + declared, sb2);
+  vm.runInContext('nativeLevelUp()', sb2);
+  var lastChat = chatLog[chatLog.length - 1] || '';
+  results.push(
+    sb2.state.lvl === 5 &&
+    /13 skill points available/.test(lastChat) &&
+    /10 \+ INT\/2/.test(lastChat) &&
+    expandCalls.length === 1 && expandCalls[0] === 'skills'
+  );
+} catch (e) { results.push(false); }
+console.log('RESULT:' + results.map(function (r) { return r ? '1' : '0'; }).join(''));
+"@
+        $tmpScript202 = [System.IO.Path]::GetTempFileName() + '.js'
+        [System.IO.File]::WriteAllText($tmpScript202, $testScript202, [System.Text.Encoding]::UTF8)
+        try {
+            $out202 = (node $tmpScript202 2>&1 | Out-String)
+        } finally {
+            Remove-Item -Path $tmpScript202 -Force -ErrorAction SilentlyContinue
+        }
+        $rm202 = [regex]::Match($out202, 'RESULT:([01]{2})')
+        if ($rm202.Success) {
+            $bits202 = $rm202.Groups[1].Value
+            for ($bi = 0; $bi -lt 2; $bi++) { Check ($bits202.Substring($bi, 1) -eq '1') $labels202[$bi] }
+        } else {
+            $err202 = if ([string]::IsNullOrWhiteSpace($out202)) { "No output from node" } else { $out202.Trim() }
+            foreach ($lbl in $labels202) { Fail "$lbl  (runtime error: $err202)" }
+        }
+    } else {
+        foreach ($lbl in $labels202) { Fail "$lbl  (node not available in PATH)" }
+    }
+} catch {
+    foreach ($lbl in $labels202) { Fail "$lbl  (exception: $($_.Exception.Message))" }
+}
+
+# 202.7  Protocol 38 -- _computeEligiblePerks() reads FALLOUT_REGISTRY.perks
+#        and never hardcodes a specific perk name -- game-agnostic.
+$computeBody202b = Get-FunctionBody $uiRenderSrc202 '_computeEligiblePerks'
+Check (
+    ($computeBody202b -match 'FALLOUT_REGISTRY\.perks') -and
+    (-not ($computeBody202b -match "'Intense Training'|'Educated'|'Toughness'|'Comprehension'"))
+) '202.7: _computeEligiblePerks() reads FALLOUT_REGISTRY.perks with no hardcoded perk name -- game-agnostic (Protocol 38)'
+
+# 202.8  REGRESSION (Protocol 42 -- caught live while verifying nativeLevelUp()'s
+#        new expandPanelForCategory('skills') jump): many reskinned boards render
+#        their heading as `> <span class="board-led"></span> NAME` split across
+#        lines, so the real textContent never matched the plain single-spaced
+#        target string -- a REAL shipped-path defect affecting every category
+#        whose board uses this markup, not just the one this unit touched. Fixed
+#        by collapsing whitespace runs on both sides before the startsWith match.
+$labels202b = @(
+    '202.8: [behavioral, Protocol 42 regression] expandPanelForCategory() correctly opens a board whose real heading textContent is multi-line/double-spaced (the `> <span class="board-led">` markup shape) by collapsing whitespace before the startsWith match -- previously silently no-opped'
+)
+try {
+    $nodeCheck202b = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCheck202b) {
+        $repoRoot202b = (Get-Item $PSScriptRoot).Parent.FullName
+        $repoRootNode202b = $repoRoot202b.Replace('\', '/')
+        $testScript202b = @"
+const vm = require('vm');
+const fs = require('fs');
+const path = require('path');
+const ROOT = '$repoRootNode202b';
+function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+const uiCoreSrc = rd('js/ui-core.js');
+function extractBody(src, name) {
+  var idx = src.indexOf('function ' + name);
+  if (idx === -1) throw new Error('missing ' + name);
+  var i = src.indexOf('{', idx);
+  var depth = 0, start = i;
+  while (i < src.length) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) return src.slice(start, i + 1); }
+    i++;
+  }
+  throw new Error('unclosed ' + name);
+}
+var results = [];
+try {
+  var declared = 'function expandPanelForCategory(categoryKey)' + extractBody(uiCoreSrc, 'expandPanelForCategory');
+  function makeDetails(initialOpen) {
+    var details = {
+      open: initialOpen, dataset: {},
+      setAttribute: function (k) { if (k === 'open') details.open = true; },
+      querySelector: function () { return null; }
+    };
+    return details;
+  }
+  function makeEl(textContent, details) {
+    return { textContent: textContent, closest: function () { return details; } };
+  }
+  var detailsSpecial = makeDetails(false);
+  var elSpecial = makeEl('\n                  >  VITAL\n                  TELEMETRY\n                ', detailsSpecial);
+  var sandbox = {
+    document: { querySelectorAll: function () { return [elSpecial]; } },
+    switchTab: function () {},
+    MetaStore: { get: function () { return '{}'; }, set: function () {} },
+    setInvFilter: function () {},
+    JSON: JSON, Array: Array, String: String
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(declared, sandbox);
+  vm.runInContext("expandPanelForCategory('special');", sandbox);
+  results.push(detailsSpecial.open === true);
+} catch (e) { results.push(false); }
+console.log('RESULT:' + results.map(function (r) { return r ? '1' : '0'; }).join(''));
+"@
+        $tmpScript202b = [System.IO.Path]::GetTempFileName() + '.js'
+        [System.IO.File]::WriteAllText($tmpScript202b, $testScript202b, [System.Text.Encoding]::UTF8)
+        try {
+            $out202b = (node $tmpScript202b 2>&1 | Out-String)
+        } finally {
+            Remove-Item -Path $tmpScript202b -Force -ErrorAction SilentlyContinue
+        }
+        $rm202b = [regex]::Match($out202b, 'RESULT:([01]{1})')
+        if ($rm202b.Success) {
+            $bits202b = $rm202b.Groups[1].Value
+            Check ($bits202b.Substring(0, 1) -eq '1') $labels202b[0]
+        } else {
+            $err202b2 = if ([string]::IsNullOrWhiteSpace($out202b)) { "No output from node" } else { $out202b.Trim() }
+            foreach ($lbl in $labels202b) { Fail "$lbl  (runtime error: $err202b2)" }
+        }
+    } else {
+        foreach ($lbl in $labels202b) { Fail "$lbl  (node not available in PATH)" }
+    }
+} catch {
+    foreach ($lbl in $labels202b) { Fail "$lbl  (exception: $($_.Exception.Message))" }
 }
 
 # ===========================================================

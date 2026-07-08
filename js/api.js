@@ -86,10 +86,9 @@ Data Fallback: If databases drop from memory, output a ⚙️ [SYS-ALERT: DATA C
 - You MUST format your entire response as a SINGLE, valid JSON object containing up to three nodes: "narrative", "state", and "modal".
 - The "narrative" node MUST be an ARRAY OF STRINGS.
 - The "state" node MUST mirror the uploaded state structure, including the "squad" array.
-- The "modal" node is triggered ONLY WHEN THE USER ASKS FOR A MENU, ROADMAP, STATS, [GPS], OR LEVEL UP. Do NOT draw ASCII Unicode boxes (┌─┐) in the narrative array for these. (TRADE/barter is a native offline terminal — never emit a TRADE modal.)
-- You must include a "type" field in the modal node (e.g. "TEXT", "GPS").
+- The "modal" node is triggered ONLY WHEN THE USER ASKS FOR A MENU, ROADMAP, STATS, OR LEVEL UP. Do NOT draw ASCII Unicode boxes (┌─┐) in the narrative array for these. (TRADE/barter is a native offline terminal — never emit a TRADE modal. [GPS]/[MAP] is a native offline cartography view — never emit a GPS modal or grid.)
+- You must include a "type" field in the modal node (e.g. "TEXT").
 - If type is "TEXT", "content" is an array of strings.
-- If type is "GPS", "content" must be a 2D array of strings representing the grid (e.g. [["[ ]","[X]"],["[S]","[ ]"]]).
 
 Example Schema:
 {
@@ -159,7 +158,7 @@ function _directiveSkills(ctx) {
 ### **Skill System**
 ${GAME_DEFS[ctx].ai.skillSystemText}
 USE skills for: Barter trade prices, Speech/Lockpick/Science checks, crafting requirements, VATS accuracy bonuses.
-On [LEVEL UP]: award (10 + INT/2) skill points. Return updated state.skills in the state node.
+Skill-point award on level-up: handled by the native deterministic LEVEL UP terminal (10 + INT/2 points, computed offline, player-allocated). Do NOT award or auto-distribute skill points on level-up; defer to the local calculator. Still return the full state.skills object whenever skills genuinely change during play (training, quest rewards, etc.).
 Skill formula (base): 2 x governing SPECIAL + (LUCK / 2). Tag skills get +15. Hard cap at 100.
 
 ### **Head Trauma**
@@ -1213,6 +1212,16 @@ const NATIVE_COMMAND_ROUTER = {
   '[VATS SIM]': () => showVATSOverlay(),
   '[VS]': () => showVATSOverlay(),
   '[VATS]': () => showVATSOverlay(),
+  // AI→native survey Part C.1: [GPS]/[MAP] used to round-trip to the Director
+  // for an AI-drawn ASCII compass grid; now opens the existing native
+  // CARTOGRAPHY TABLE directly (_nativeOpenMap(), ui-core.js). No AI.
+  '[GPS]': () => _nativeOpenMap(),
+  '[MAP]': () => _nativeOpenMap(),
+  // AI→native survey Part C.1: a fully-deterministic offline lookup of the
+  // perks the Courier is eligible for at their current level (registry data,
+  // never AI-computed). Never grants a perk — read-only, like CONSULT.
+  '[PERKS]': () => renderEligiblePerks(),
+  '[PK]': () => renderEligiblePerks(),
 };
 
 // WU-HF2: precise-pointer probe (mouse/trackpad, not touch). Used to decide whether to

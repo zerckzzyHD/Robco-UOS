@@ -126,6 +126,8 @@ export default [
         renderConsult: 'readonly',
         renderDatabankPanel: 'readonly',
         renderBioScan: 'readonly',
+        renderEligiblePerks: 'readonly', // AI->native survey Part C.1 (ui-render.js), called from api.js's NATIVE_COMMAND_ROUTER
+        _nativeOpenMap: 'readonly', // AI->native survey Part C.1 [GPS]/[MAP] (ui-core.js), called from api.js's NATIVE_COMMAND_ROUTER
         _nativePadBind: 'readonly', // Tool Deck + Quick-Draw Holster (ui-core.js), called from _routeNativeCommand (api.js)
         _nativePadFire: 'readonly', // Tool Deck + Quick-Draw Holster (ui-core.js), called from _routeNativeCommand (api.js)
         _openSysModal: 'readonly',

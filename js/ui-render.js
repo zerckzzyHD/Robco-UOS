@@ -3915,6 +3915,65 @@ function renderConsult(topic) {
   }
 }
 
+// ── Native [PERKS] / [PK] — eligible-perks lookup (AI→native survey Part C.1) ──
+// Deterministic, read-only, offline lookup of the perks the Courier qualifies
+// for RIGHT NOW at their current level, sourced from the active game's
+// FALLOUT_REGISTRY.perks. Only level-gated "regular" perks are considered —
+// "special" (condition-gated) perks carry level:0 and are earned through other
+// means, never a level threshold. Never auto-grants a perk (state.perks is
+// untouched) — a pure query, mirroring CONSULT's read-only contract. Replaces
+// the Director's old "eligible perks at your level" free-text answer; the AI's
+// generative build-goal-aware [ROADMAP] is untouched (still AI — a different,
+// hybrid feature per the survey). Game-agnostic (Protocol 38): reads
+// FALLOUT_REGISTRY, never a hardcoded perk name.
+function _computeEligiblePerks() {
+  const registry = (typeof FALLOUT_REGISTRY !== 'undefined' && FALLOUT_REGISTRY.perks) || [];
+  const lvl = Math.max(1, parseInt(state.lvl, 10) || 1);
+  const owned = new Set((state.perks || []).map(p => String(p.name || '').toLowerCase()));
+  return registry
+    .filter(p => p.type === 'regular' && (parseInt(p.level, 10) || 0) <= lvl)
+    .filter(p => !owned.has(String(p.name || '').toLowerCase()))
+    .slice()
+    .sort(
+      (a, b) =>
+        (parseInt(a.level, 10) || 0) - (parseInt(b.level, 10) || 0) || a.name.localeCompare(b.name)
+    );
+}
+
+function renderEligiblePerks() {
+  const modal = document.getElementById('sysModal');
+  const title = document.getElementById('modalTitle');
+  const content = document.getElementById('modalContent');
+  if (!modal || !title || !content) return;
+  title.innerText = '> ELIGIBLE PERKS';
+  const lvl = Math.max(1, parseInt(state.lvl, 10) || 1);
+  const eligible = _computeEligiblePerks();
+  if (!eligible.length) {
+    content.innerHTML =
+      '<pre class="threat-empty" style="white-space:pre-wrap;font-family:inherit;margin:0;color:var(--robco-dim);">' +
+      `NO UNCLAIMED PERKS AT LEVEL ${lvl}.` +
+      '</pre>';
+  } else {
+    content.innerHTML =
+      '<div class="consult-card">' +
+      `<div class="consult-query">ELIGIBLE AT LEVEL ${lvl}</div>` +
+      eligible
+        .map(
+          p =>
+            `<div class="consult-hit"><span class="consult-hit-name">${escapeHtml(p.name)}</span>` +
+            `<span class="consult-hit-meta">REQ LVL ${parseInt(p.level, 10) || 0}</span></div>`
+        )
+        .join('') +
+      '</div>';
+  }
+  if (typeof openModal === 'function') openModal();
+  if (typeof appendToChat === 'function')
+    appendToChat(
+      `> [PERKS] ${eligible.length} eligible perk${eligible.length === 1 ? '' : 's'} at level ${lvl}.`,
+      'sys'
+    );
+}
+
 // BUS-19 · CATALOG QUERY (Phase 3 · Piece 3) — DATABANK panel path (DATA tab):
 // persistent inline lookup. Reads #databankSearch and renders the SAME shared
 // CONSULT engine into #databankResults (Protocol 22 — _consultSearch/

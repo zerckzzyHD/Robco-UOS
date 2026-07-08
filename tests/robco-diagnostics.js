@@ -14724,77 +14724,77 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         ps: undefined,
         pt: undefined,
         cm: undefined,
-        sha256: 'ede29d0a8b2892b1f7962730467f24aa143a7284278e2aa7db8e3f7e5e08ec39',
+        sha256: 'ac01cf4e1328001cde804a099d1d06494b7ce3382792c74b2758a48e8ba34fc3',
       },
       {
         ctx: 'FNV',
         ps: 'melee',
         pt: undefined,
         cm: undefined,
-        sha256: '68455f8ca104cde06703e9a3a849492d658d44a45bddc1730c1f73b124fe9736',
+        sha256: '3f07321147caa26cf7f1188edbe629c535b585d05ef24a893dca59662c38584f',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'minmaxed',
         cm: undefined,
-        sha256: '8368aab7620742cc14a000425a55b176120fa4085a61693bcbefb0ac88b2b1dc',
+        sha256: 'df9349d0f0cae81d2c41933a92ffd37a81d0a4c088715d45ff675faa1993a7b0',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'completionist',
         cm: undefined,
-        sha256: 'bcf934e2dea2c8c5dd91dc57db11b7fddc8d1d82d323d4c414ab49063cffde27',
+        sha256: 'f2a73fa23f3d7130caccbfae04d15dc6ef5225c61e25a15236fff5e1ba873b47',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'casual',
         cm: undefined,
-        sha256: '481d2b9e2a4541b2eb80ea73890c448aba25ebd83979e3845efa4ad68b666621',
+        sha256: '74ada35e33bef7c250a543fed13046cca358f6fdb028a1f4a1de099b45f09916',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'speedrun',
         cm: undefined,
-        sha256: 'f7cea26ec145b7fa1540aca6be010a825db7c82cf3a9d7874e18df52adf9a0ba',
+        sha256: 'df637bca2fdb284a9f47a9eff85a0efbbb8515d7ce3ae03c2a092ada51f2b179',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: undefined,
         cm: 'rng',
-        sha256: '1c015a880abfc1654d4372fcac4d5081adfa20833ef2baede2aa539ad5f98556',
+        sha256: '37a49139cec9465d8c9189dc25f01bf587da5528ffaa1e6eb7fe108afce8d2f1',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: undefined,
         cm: 'rng-locked',
-        sha256: 'e55ab9da48e0c41107252724fa9360c29affd3ed80cbd497b429d84588159106',
+        sha256: 'ab98a1f90d7d6f543e340cc75eb63eec53dfab61a3a649fdc5f3b6c5cd92cdd0',
       },
       {
         ctx: 'FNV',
         ps: 'melee',
         pt: 'minmaxed',
         cm: 'rng-locked',
-        sha256: '17028953718ce184cdd1e309de0406a24882a9b2ace0dc89976e18ca4e45c2a6',
+        sha256: '260656c7efdab70fb2615cc15b6959542fb6e0d7d08877c0470a4847115bb74f',
       },
       {
         ctx: 'FO3',
         ps: undefined,
         pt: undefined,
         cm: undefined,
-        sha256: 'a6a2ec157fff83fd142a0ba2ece1d6d133213e6cf2b45be9011a11f8b7dd946a',
+        sha256: 'd1f4f7ecb807ac2975b5398d475eec4bd142eeeaf065522215207fe5477b8c78',
       },
       {
         ctx: 'FO3',
         ps: 'melee',
         pt: undefined,
         cm: 'rng-locked',
-        sha256: '1bacfa4696b96d35aba0d566b58f5ec4ec3c4f654e1f073d36198c17cb5b4e89',
+        sha256: '0f569794e9f02d1318850899efb9cf68d67a1a72737147f345ed60e8bac24e78',
       },
     ];
 
@@ -32438,6 +32438,268 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         '201.6: a skill delta ("+10 guns" from a base of 15) reports the real committed value (25) in its TERMINAL message — regression guard for _skillVuSet() not returning its clamped value (previously surfaced as "... → undefined.")'
       );
     }
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 202 — AI→native survey Part C.1: [GPS]/[MAP] cartography,
+//  level-up skill-point allocation, and [PERKS]/[PK] eligible-perks lookup
+//  (all three converted from AI round-trips to deterministic, offline
+//  native commands — Protocol 27 confirmed each's prior AI-only routing
+//  before conversion; Protocol 22 reuses expandPanelForCategory/
+//  FALLOUT_REGISTRY/the existing skill setters throughout).
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 202 — AI→native: GPS/MAP, level-up skill points, eligible perks');
+  const apiSrc202 = readFile('js/api.js');
+  const uiCoreSrc202 = readFile('js/ui-core.js');
+  const uiRenderSrc202 = readFile('js/ui-render.js');
+
+  // 202.1  static — the native router carries [GPS]/[MAP] → _nativeOpenMap()
+  //        and [PERKS]/[PK] → renderEligiblePerks(); all four functions exist.
+  assert(
+    /'\[GPS\]':\s*\(\)\s*=>\s*_nativeOpenMap\(\)/.test(apiSrc202) &&
+      /'\[MAP\]':\s*\(\)\s*=>\s*_nativeOpenMap\(\)/.test(apiSrc202) &&
+      /'\[PERKS\]':\s*\(\)\s*=>\s*renderEligiblePerks\(\)/.test(apiSrc202) &&
+      /'\[PK\]':\s*\(\)\s*=>\s*renderEligiblePerks\(\)/.test(apiSrc202) &&
+      /function _nativeOpenMap\s*\(/.test(uiCoreSrc202) &&
+      /function renderEligiblePerks\s*\(/.test(uiRenderSrc202) &&
+      /function _computeEligiblePerks\s*\(/.test(uiRenderSrc202),
+    '202.1: NATIVE_COMMAND_ROUTER wires [GPS]/[MAP] → _nativeOpenMap() and [PERKS]/[PK] → renderEligiblePerks(); all three functions are defined'
+  );
+
+  // 202.2  static (Protocol 24) — zero AI on every new native path: no
+  //        fetch/XMLHttpRequest/transmitMessage anywhere in the new functions.
+  {
+    const openMapBody202 = extractFunctionBody(uiCoreSrc202, '_nativeOpenMap');
+    const eligibleBody202 = extractFunctionBody(uiRenderSrc202, 'renderEligiblePerks');
+    const computeBody202 = extractFunctionBody(uiRenderSrc202, '_computeEligiblePerks');
+    const noAi202 = b => !/fetch\(|XMLHttpRequest|transmitMessage\(/.test(b);
+    assert(
+      noAi202(openMapBody202) && noAi202(eligibleBody202) && noAi202(computeBody202),
+      '202.2: _nativeOpenMap()/renderEligiblePerks()/_computeEligiblePerks() contain no fetch/XMLHttpRequest/transmitMessage() call — fully offline'
+    );
+  }
+
+  // 202.3  static — COMMAND_REGISTRY: [GPS]/[MAP] moved into the
+  //        "NATIVE TERMINALS — OFFLINE, NO AI" group (no longer under
+  //        NAVIGATION & WORLD STATE) and a [PERKS]/[PK] entry exists in the
+  //        same group, both marked Offline (Suite 113 registry↔router lock-step).
+  {
+    const nativeGroupIdx202 = uiCoreSrc202.indexOf("group: 'NATIVE TERMINALS — OFFLINE, NO AI'");
+    const navGroupIdx202 = uiCoreSrc202.indexOf("group: 'NAVIGATION & WORLD STATE'");
+    const gpsIdx202 = uiCoreSrc202.indexOf("cmd: '[GPS] / [MAP]'");
+    const perksIdx202 = uiCoreSrc202.indexOf("cmd: '[PERKS] / [PK]'");
+    assert(
+      nativeGroupIdx202 >= 0 &&
+        navGroupIdx202 > nativeGroupIdx202 &&
+        gpsIdx202 > nativeGroupIdx202 &&
+        gpsIdx202 < navGroupIdx202 &&
+        perksIdx202 > nativeGroupIdx202 &&
+        perksIdx202 < navGroupIdx202 &&
+        /cmd:\s*'\[GPS\] \/ \[MAP\]',\s*\n\s*desc:\s*'[^']*Offline\.'/.test(uiCoreSrc202) &&
+        /cmd:\s*'\[PERKS\] \/ \[PK\]',\s*\n\s*desc:\s*'[^']*Offline\.'/.test(uiCoreSrc202),
+      '202.3: COMMAND_REGISTRY lists [GPS]/[MAP] and [PERKS]/[PK] inside the NATIVE TERMINALS — OFFLINE, NO AI group (not NAVIGATION & WORLD STATE), each marked Offline'
+    );
+  }
+
+  // 202.4  static — the AI directive itself: getSystemDirective()'s composed
+  //        text no longer names [GPS] as a modal trigger or instructs the AI
+  //        to award skill points on level-up; both now explicitly defer to
+  //        the native calculators (the established BIO-SCAN/THREAT/VATS/LOOT
+  //        retirement-note pattern).
+  {
+    const directiveBody202 = getDirectiveFullBody(apiSrc202);
+    assert(
+      !/MENU, ROADMAP, STATS, \[GPS\], OR LEVEL UP/.test(directiveBody202) &&
+        /MENU, ROADMAP, STATS, OR LEVEL UP/.test(directiveBody202) &&
+        /native offline cartography view/.test(directiveBody202) &&
+        !/award \(10 \+ INT\/2\) skill points/.test(directiveBody202) &&
+        /native deterministic LEVEL UP terminal \(10 \+ INT\/2 points/.test(directiveBody202) &&
+        !/"GPS"/.test(directiveBody202),
+      '202.4: the AI directive no longer triggers a GPS modal or a "type":"GPS" schema, and no longer instructs the AI to award skill points on level-up — both explicitly defer to the native calculators'
+    );
+  }
+
+  // 202.5  BEHAVIORAL (vm sandbox) — _computeEligiblePerks(): only "regular"
+  //        (level-gated) perks at or below the current level, excluding
+  //        already-owned perks (case-insensitive), sorted by level then name.
+  //        "special" (condition-gated, level:0) perks are never surfaced as
+  //        "eligible by level".
+  {
+    const vm202 = require('vm');
+    let out202 = null;
+    let err202 = null;
+    try {
+      const fnSrc202 =
+        'function _computeEligiblePerks()' +
+        extractFunctionBody(uiRenderSrc202, '_computeEligiblePerks');
+      const sandbox202 = {
+        FALLOUT_REGISTRY: {
+          perks: [
+            { name: 'Intense Training', type: 'regular', level: 2 },
+            { name: 'Educated', type: 'regular', level: 4 },
+            { name: 'Toughness', type: 'regular', level: 6 },
+            { name: 'Comprehension', type: 'regular', level: 4 },
+            { name: 'Power Armor Training', type: 'special', level: 0 },
+          ],
+        },
+        state: { lvl: 5, perks: [{ name: 'intense training', rank: 1 }] },
+        parseInt,
+        String,
+        Set,
+        Math,
+      };
+      vm202.createContext(sandbox202);
+      vm202.runInContext(fnSrc202 + '\nthis.__out = _computeEligiblePerks();', sandbox202);
+      out202 = sandbox202.__out;
+    } catch (e) {
+      err202 = e;
+    }
+    assert(
+      !err202 &&
+        out202.length === 2 &&
+        out202[0].name === 'Comprehension' &&
+        out202[1].name === 'Educated' &&
+        !out202.some(p => p.name === 'Intense Training') &&
+        !out202.some(p => p.name === 'Toughness') &&
+        !out202.some(p => p.name === 'Power Armor Training'),
+      '202.5: [behavioral] _computeEligiblePerks() at level 5 with "Intense Training" already owned returns exactly [Comprehension, Educated] (level-gated "regular" perks at/under level, sorted by level then name) — excludes the already-owned perk (case-insensitive), the level-6 perk (too high), and the level:0 "special" perk (condition-gated, never level-eligible)' +
+        (err202 ? ' — ' + err202.message : '')
+    );
+  }
+
+  // 202.6  BEHAVIORAL (vm sandbox, the Suite 173.9 idiom) — nativeLevelUp()
+  //        still does everything Suite 173 already locks (exactly +1 per
+  //        press, level.up emit, MAX_PLAYER_LEVEL clamp — unchanged, not
+  //        re-asserted here) AND now additionally reports a native skill-point
+  //        pool (10 + floor(INT/2)) via appendToChat and jumps the view to
+  //        SKILL MATRIX via expandPanelForCategory('skills') — reusing the
+  //        existing panel-nav mechanism, no AI, no invented allocation.
+  {
+    let out202b = null;
+    let err202b = null;
+    try {
+      const declared202b =
+        'function nativeLevelUp()' + extractFunctionBody(uiCoreSrc202, 'nativeLevelUp');
+      const chatLog202b = [];
+      const expandCalls202b = [];
+      const sandbox202b = {
+        console: { warn() {} },
+        state: { lvl: 4, i: 7 },
+        RobcoEvents: { emit() {} },
+        updateMath() {},
+        saveState() {},
+        appendToChat(msg) {
+          chatLog202b.push(msg);
+        },
+        expandPanelForCategory(cat) {
+          expandCalls202b.push(cat);
+        },
+        document: {
+          getElementById(id) {
+            if (id === 'stat_lvl') return sandbox202b._lvlInput;
+            return null;
+          },
+        },
+        _lvlInput: { value: '4' },
+      };
+      const vm202b = require('vm');
+      vm202b.createContext(sandbox202b);
+      vm202b.runInContext('const MAX_PLAYER_LEVEL = 50;\n' + declared202b, sandbox202b);
+      vm202b.runInContext('nativeLevelUp()', sandbox202b);
+      out202b = {
+        lvl: sandbox202b.state.lvl,
+        lastChat: chatLog202b[chatLog202b.length - 1] || '',
+        expandCalls: expandCalls202b,
+      };
+    } catch (e) {
+      err202b = e;
+    }
+    assert(
+      !err202b &&
+        out202b.lvl === 5 &&
+        /13 skill points available/.test(out202b.lastChat) &&
+        /10 \+ INT\/2/.test(out202b.lastChat) &&
+        out202b.expandCalls.length === 1 &&
+        out202b.expandCalls[0] === 'skills',
+      '202.6: [behavioral] nativeLevelUp() at INT 7, level 4→5, reports "13 skill points available (10 + INT/2)" via appendToChat and jumps the view to SKILL MATRIX via expandPanelForCategory(\'skills\') — deterministic, no AI, allocation itself left to the existing skill setters' +
+        (err202b ? ' — ' + err202b.message : '')
+    );
+  }
+
+  // 202.7  static (Protocol 38) — _computeEligiblePerks() reads
+  //        FALLOUT_REGISTRY.perks and never hardcodes a specific perk name —
+  //        game-agnostic, works for any registry the active game loads.
+  {
+    const computeBody202b = extractFunctionBody(uiRenderSrc202, '_computeEligiblePerks');
+    assert(
+      /FALLOUT_REGISTRY\.perks/.test(computeBody202b) &&
+        !/'Intense Training'|'Educated'|'Toughness'|'Comprehension'/.test(computeBody202b),
+      '202.7: _computeEligiblePerks() reads FALLOUT_REGISTRY.perks with no hardcoded perk name — game-agnostic (Protocol 38)'
+    );
+  }
+
+  // 202.8  REGRESSION (Protocol 42 — caught live while verifying nativeLevelUp()'s
+  //        new expandPanelForCategory('skills') jump, not a pre-existing shipped
+  //        bug this plan introduced): many reskinned boards render their heading
+  //        as `> <span class="board-led"></span> NAME` split across lines, so the
+  //        real textContent (e.g. "> \n  VITAL\n  TELEMETRY") never matched the
+  //        plain single-spaced target string ("> VITAL TELEMETRY") — a REAL
+  //        shipped-path defect affecting every category whose board uses this
+  //        markup (special/skills/bio/map/log/databank/config), not just the
+  //        one this unit touched. Fixed by collapsing whitespace runs on both
+  //        sides before the startsWith match. Executed against the REAL
+  //        expandPanelForCategory() body in a vm sandbox with a synthetic DOM
+  //        reproducing the exact multi-line/doubled-space markup shape.
+  {
+    const vm202c = require('vm');
+    let out202c = null;
+    let err202c = null;
+    try {
+      const declared202c =
+        'function expandPanelForCategory(categoryKey)' +
+        extractFunctionBody(uiCoreSrc202, 'expandPanelForCategory');
+      function makeDetails202c(initialOpen) {
+        const details = {
+          open: initialOpen,
+          dataset: {},
+          setAttribute(k) {
+            if (k === 'open') details.open = true;
+          },
+          querySelector: () => null,
+        };
+        return details;
+      }
+      function makeEl202c(textContent, details) {
+        return { textContent, closest: () => details };
+      }
+      const detailsSpecial = makeDetails202c(false);
+      const elSpecial = makeEl202c(
+        '\n                  >  VITAL\n                  TELEMETRY\n                ',
+        detailsSpecial
+      );
+      const sandbox202c = {
+        document: { querySelectorAll: () => [elSpecial] },
+        switchTab() {},
+        MetaStore: { get: () => '{}', set: () => {} },
+        setInvFilter() {},
+        JSON,
+        Array,
+        String,
+      };
+      vm202c.createContext(sandbox202c);
+      vm202c.runInContext(declared202c, sandbox202c);
+      vm202c.runInContext("expandPanelForCategory('special');", sandbox202c);
+      out202c = { openedAfter: detailsSpecial.open };
+    } catch (e) {
+      err202c = e;
+    }
+    assert(
+      !err202c && out202c.openedAfter === true,
+      '202.8: [behavioral, Protocol 42 regression] expandPanelForCategory() correctly opens a board whose real heading textContent is multi-line/double-spaced (the `> <span class="board-led">` markup shape, e.g. "VITAL TELEMETRY") by collapsing whitespace before the startsWith match — previously silently no-opped (found live while verifying native LEVEL UP\'s jump to SKILL MATRIX; affects every board using this markup, not just skills)' +
+        (err202c ? ' — ' + err202c.message : '')
+    );
   }
 }
 
