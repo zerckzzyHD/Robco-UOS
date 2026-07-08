@@ -69,8 +69,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2679-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2679-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2686-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2686-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -722,6 +722,30 @@ it), and (b) fixed the amber connector/vent-pin strips (`details.bay-board::afte
 the strip's actual responsive width evenly, leaving a stray thin partial pin at the end — to
 `background-repeat: round`, which rescales the tile so a whole number of pins always fits. Guarded
 by Suite 160 (both runners at parity, 6 tests).
+
+**Bezel fidelity pass (Protocol 8 Sonnet-stage implementation of `planning/BEZEL_FIDELITY_PLAN.md`):**
+closes the gap between the shipped chrome and the approved `nv-machine-mockup.html`/
+`campaign-configs.html` reference — a **fidelity** reskin only (Protocol 25), same layout, no
+relocation. `.machine` gains a subtle vertical pinstripe texture + inset hairline at every
+breakpoint; the full outer drop-shadow frame + rounded casing corners are desktop-only, added
+inside the existing Suite-129-guarded `(min-width:1000px) and (hover:hover) and (pointer:fine)`
+gate. `.navkey` keycaps deepen from a 2px to a 3px raised relief with a matching 2px `:active`
+travel, plus a desktop-only 52px size bump — the base rule keeps its Suite-158.11-guarded 44px
+floor untouched. Two new absolutely-positioned, `pointer-events:none`, desktop-only decorative
+flourishes anchor to a newly `position:relative` `.bezel`: a GOVERNOR dial (`.bezel-side.left` +
+`.bezel-dial`) and a field-kit flavor line (`.bezel-side.right`). A new serial plate (`.serial`,
+top-right of `.casing-top`) and the field-kit text are both **game-agnostic** via
+`[data-game]`-toggled static spans — the identical mechanism `.chassis-flavor` already uses
+(Protocol 38, never a JS ctx branch); adding `.serial`'s own `margin-left: auto` meant the mini
+core's matching auto-margin had to move to a fixed `margin-left: 14px` inside the desktop gate
+only (two auto-margin flex siblings would otherwise split the free space and separate them — mobile
+is unaffected, since `.serial` is `display:none` there and the mini core's base auto-margin works
+alone). `.glass-frame` gains a new `::before` sheen + recessed-vignette pseudo-element — `.sweep`
+already owns `::after` — delivering the mockup's glass depth with zero DOM restructure (no
+`.glass-frame > .glass` wrapper), plus a desktop-only radius/padding bump. A low-opacity
+`.bezel::before` hazard strip is desktop-only. Mobile (360/412px) keeps the disciplined edge exactly
+as before: dial/serial/field-kit/hazard-strip/`.nk-sub` all hidden, zero new horizontal overflow.
+Guarded by Suite 158.21–158.27 (both runners at parity, +7 tests, 2686 total). Cache r118.
 
 ---
 
@@ -2751,7 +2775,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2679-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2686-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

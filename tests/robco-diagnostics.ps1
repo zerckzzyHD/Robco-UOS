@@ -12385,6 +12385,59 @@ Check (
     ($core158 -match "(?s)_NAV_TAB_FOR = \{.*?chassis:\s*'chassis',.*?settings:\s*'settings',")
 ) "158.20: SHORTCUT_ROUTES.settings routes #go=settings through switchTab('settings'); TAB_NAMES/NAV_KEYS/_NAV_TAB_FOR all include 'settings' and 'chassis' is a real tab"
 
+# 158.21  BEZEL FIDELITY PASS -- .bezel is position:relative, anchoring the
+# desktop-only .bezel-side dial/field-kit (Gap 3/7)
+Check (
+    $css158 -match '\.bezel\s*\{[^}]*position:\s*relative'
+) "158.21: .bezel is position:relative (anchors the absolute governor dial + field-kit line)"
+
+# 158.22  raised keycaps -- 3px relief on the base .navkey rule (deeper than
+# the pre-fidelity-pass 2px), 2px :active travel to match (Gap 2)
+Check (
+    ($css158 -match "(?s)\.navkey\s*\{[^}]*box-shadow:\s*\n?\s*0 3px 0 #0c0e0a") -and
+    ($css158 -match '\.navkey:active\s*\{[^}]*transform:\s*translateY\(2px\)')
+) "158.22: .navkey keeps the raised 3px relief + matching 2px :active travel (bezel fidelity pass)"
+
+# 158.23  GOVERNOR dial CSS + markup exist (Gap 3), desktop-only
+Check (
+    ($css158 -match '\.bezel-dial\s*\{') -and
+    ($css158 -match '\.bezel-dial::after\s*\{') -and
+    ($html158 -match 'class="bezel-side left" aria-hidden="true"') -and
+    ($css158 -match "(?s)@media \(max-width: 999\.98px\) \{.*?\.bezel-side\s*\{\s*display:\s*none")
+) "158.23: .bezel-dial (GOVERNOR) CSS + markup exist and are hidden on mobile"
+
+# 158.24  serial plate is game-agnostic -- [data-game]-toggled static spans,
+# never a JS ctx branch (Protocol 38/UI-7, Gap 4), hidden on mobile
+Check (
+    ($html158 -match 'class="serial" aria-hidden="true"') -and
+    ($html158 -match 'serial-flavor--generic') -and
+    ($html158 -match 'serial-flavor--fnv') -and
+    ($css158 -match "\[data-game='FNV'\] \.serial-flavor--fnv\s*\{\s*display:\s*inline") -and
+    ($css158 -match "(?s)@media \(max-width: 999\.98px\) \{.*?\.serial\s*\{\s*display:\s*none")
+) "158.24: .serial plate is [data-game]-toggled (generic/FNV), no JS ctx branch, hidden on mobile"
+
+# 158.25  field-kit line is the same game-agnostic toggle pattern (Gap 7)
+Check (
+    ($html158 -match 'class="bezel-side right" aria-hidden="true"') -and
+    ($html158 -match 'fieldkit--generic') -and
+    ($html158 -match 'fieldkit--fnv') -and
+    ($css158 -match "\[data-game='FNV'\] \.fieldkit--fnv\s*\{\s*display:\s*inline")
+) "158.25: .bezel-side.right (field-kit) is [data-game]-toggled the same way as .serial"
+
+# 158.26  glass sheen/vignette -- .glass-frame::before exists, inert and
+# layered correctly (Gap 5); no DOM restructure (.sweep keeps ::after)
+Check (
+    ($css158 -match '\.glass-frame::before\s*\{[^}]*pointer-events:\s*none') -and
+    ($css158 -match '\.glass-frame\.sweep::after\s*\{')
+) "158.26: .glass-frame::before delivers the glass sheen/vignette (pointer-events:none), .sweep::after untouched"
+
+# 158.27  no desktop fidelity CSS escapes the Suite-129-guarded hover+fine
+# gate -- the outer casing shadow lives inside the existing gated block,
+# never a bare min-width:1000px query (Suite 129 regression guard)
+Check (
+    $css158 -match "(?s)@media \(min-width: 1000px\) and \(hover: hover\) and \(pointer: fine\) \{.*?\.container\.machine\s*\{[^}]*box-shadow:\s*\n?\s*0 0 60px rgba\(0, 0, 0, 0\.9\)"
+) "158.27: the framed-casing outer shadow (Gap 1) lives inside the existing hover+fine desktop gate"
+
 # ===========================================================
 # Suite 159 -- Owner bug-fix batch: eventLog live-render + centering rule (2 tests)
 # Two cross-cutting fixes from a batch of owner-reported staging bugs that don't have a

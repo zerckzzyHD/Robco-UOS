@@ -292,6 +292,20 @@
           </button>
         </div>
         <div class="vents" aria-hidden="true"></div>
+        <!-- Serial plate (bezel fidelity pass, Gap 4) — desktop-only unit
+             plate, hidden on mobile (css). Game-agnostic via the same
+             [data-game]-toggled static-span mechanism as .chassis-flavor
+             above (Protocol 38/UI-7) — never a JS ctx branch. -->
+        <div class="serial" aria-hidden="true">
+          <span class="serial-flavor serial-flavor--generic"
+            >UNIT RBC-DT-0000 &middot; REFURBISHED FIELD UNIT</span
+          ><span class="serial-flavor serial-flavor--fnv"
+            >UNIT RBC-DT-4077 &middot; SALVAGE REFURB &mdash; MOJAVE EXPRESS, GOODSPRINGS</span
+          >
+          <span class="scratch scratch--fnv"
+            >&quot;property of courier six &mdash; hands off&quot;</span
+          >
+        </div>
         <!-- STATUS ANNUNCIATOR (FEEDBACK ANIMATION WAVE 1) — a compact,
              always-present casing-top echo that surfaces a (b)-class event
              regardless of the active subsystem, generalizing the mini-core
@@ -434,6 +448,20 @@
             <span class="nk-led" aria-hidden="true"></span><span class="nk-num">[0]</span>
             <span class="nk-label">DIR</span><span class="nk-sub">FLAT</span>
           </button>
+        </div>
+        <!-- GOVERNOR dial (left) + field-kit flavor line (right) — bezel
+             fidelity pass, Gaps 3/7. Desktop-only decorative flourishes
+             (hidden on mobile, css); purely cosmetic, aria-hidden, and
+             pointer-events:none so they never intercept a keycap tap.
+             Field-kit is game-agnostic via the same [data-game]-toggled
+             static-span mechanism as .chassis-flavor/.serial-flavor
+             (Protocol 38/UI-7) — never a JS ctx branch. -->
+        <div class="bezel-side left" aria-hidden="true">
+          <span class="bezel-dial"></span><span>GOVERNOR</span>
+        </div>
+        <div class="bezel-side right" aria-hidden="true">
+          <span class="fieldkit fieldkit--generic">FIELD KIT</span
+          ><span class="fieldkit fieldkit--fnv">MOJAVE FIELD KIT</span>
         </div>
       </div>
 

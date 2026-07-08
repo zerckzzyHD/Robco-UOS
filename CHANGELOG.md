@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2679/2679 | Cache: robco-terminal-v2.7.0-r117 -->
+﻿## [Unreleased]<!-- Tests: 2686/2686 | Cache: robco-terminal-v2.7.0-r118 -->
 
 ### Added
 
@@ -152,6 +152,7 @@
 - The Atmospheric Regulator dial can now be turned by dragging or sliding it with a mouse or finger, not just tapping — dial in the level you want in one smooth motion. Tapping still works exactly as before.
 - The Save & Data help button now matches the modern round design already used on the Comm-Link's help button, instead of the older bracket style.
 - Every line in the Director Uplink transcript now carries a small OVERSEER tag when the Director itself is speaking, so it's easy to tell at a glance which lines came from the AI versus your own typed or logged commands.
+- The terminal's outer casing now has real depth on a desktop screen — a framed, shadowed housing with a subtle brushed-metal texture, deeper raised keycaps along the bottom control strip, a recessed glow behind the screen, a small rotary GOVERNOR dial, and a unit serial plate. On a phone, the casing stays the same clean, compact edge it's always been.
 
 ### Under the Hood
 

@@ -511,12 +511,12 @@ textarea {
 }
 
 .machine {
-  background: linear-gradient(
-    180deg,
-    var(--bezel-steel-3),
-    var(--bezel-steel-1) 35%,
-    var(--bezel-steel-2)
-  );
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.014) 0 2px, transparent 2px 5px),
+    linear-gradient(180deg, var(--bezel-steel-3), var(--bezel-steel-1) 35%, var(--bezel-steel-2));
+  /* Bezel fidelity pass — subtle hairline at all breakpoints; the full
+     outer drop-shadow frame is desktop-only (see the hover+fine gate). */
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
 .casing-top {
@@ -527,6 +527,7 @@ textarea {
   padding: 6px 4px 10px;
   margin-bottom: 8px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.5);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
   color: var(--bezel-etch);
 }
 .brand-plate {
@@ -552,6 +553,38 @@ textarea {
 }
 [data-game='FNV'] .chassis-flavor--fnv {
   display: inline;
+}
+/* Serial plate (Gap 4, bezel fidelity pass) — desktop-only decorative
+   unit plate, top-right of the casing-top header. Game-agnostic via the
+   same [data-game]-toggled static-span mechanism as .chassis-flavor
+   above (Protocol 38/UI-7 — never a JS ctx branch). Hidden on mobile. */
+.serial {
+  margin-left: auto;
+  font-size: 8.5px;
+  letter-spacing: 1px;
+  text-align: right;
+  line-height: 1.5;
+  opacity: 0.85;
+}
+.serial .scratch {
+  display: block;
+  font-style: italic;
+  color: rgba(230, 215, 175, 0.5);
+  transform: rotate(-0.8deg);
+  letter-spacing: 0.5px;
+}
+.serial-flavor--fnv,
+.serial .scratch--fnv {
+  display: none;
+}
+[data-game='FNV'] .serial-flavor--generic {
+  display: none;
+}
+[data-game='FNV'] .serial-flavor--fnv {
+  display: inline;
+}
+[data-game='FNV'] .serial .scratch--fnv {
+  display: block;
 }
 .lamp-row {
   display: flex;
@@ -669,11 +702,31 @@ button.lamp {
 .glass-frame {
   border-radius: 14px;
   padding: 6px;
-  background: linear-gradient(160deg, #101209, #05060a 40%, #0c0e0a);
+  background: linear-gradient(160deg, #131509, #05060a 42%, #0d0f0a);
   box-shadow:
-    inset 0 2px 6px rgba(0, 0, 0, 0.9),
-    inset 0 0 60px rgba(var(--robco-green-rgb), 0.03);
+    inset 0 2px 8px rgba(0, 0, 0, 0.92),
+    inset 0 -1px 2px rgba(255, 255, 255, 0.045),
+    inset 0 0 60px rgba(var(--robco-green-rgb), 0.03),
+    0 1px 0 rgba(255, 255, 255, 0.04);
   min-width: 0;
+}
+/* Gap 5 (bezel fidelity pass) — glass sheen + recessed inner vignette.
+   .sweep already owns ::after, so this is a ::before; inset matches the
+   frame's own padding so it sits exactly over the screen. z-index 8 sits
+   above .main-grid content within .glass-frame's own stacking context and
+   below .crt-overlay's z-index:9999 — pointer-events:none, purely inert,
+   never dims/distorts the text underneath (Protocol UI-7). */
+.glass-frame::before {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border-radius: 10px;
+  z-index: 8;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 130% 60% at 22% -12%, rgba(255, 255, 255, 0.045), transparent 45%),
+    radial-gradient(ellipse at center, transparent 60%, rgba(0, 0, 0, 0.55) 100%);
+  box-shadow: inset 0 0 46px rgba(0, 0, 0, 0.85);
 }
 
 /* SWEEP — the DO-N "re-tune the channel" motion verb on subsystem change
@@ -718,10 +771,66 @@ button.lamp {
 
 /* ─── BEZEL — illuminated subsystem selector (replaces the tab bar) ──── */
 .bezel {
+  position: relative; /* anchors the desktop-only .bezel-side dial/field-kit */
   margin-top: 8px;
   padding-top: 6px;
   border-top: 1px solid rgba(0, 0, 0, 0.5);
 }
+/* GOVERNOR dial (left) + field-kit flavor line (right) — desktop-only
+   decorative flourishes (Gap 3/7, bezel fidelity pass). Absolutely
+   positioned against the (now position:relative) .bezel; pointer-events
+   none so they never intercept a keycap tap. Hidden on mobile below. */
+.bezel-side {
+  position: absolute;
+  bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--bezel-etch-dim);
+  font-size: 8px;
+  letter-spacing: 1.5px;
+  pointer-events: none;
+}
+.bezel-side.left {
+  left: 18px;
+}
+.bezel-side.right {
+  right: 18px;
+}
+.bezel-dial {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 0, 0, 0.7);
+  background: radial-gradient(circle at 35% 30%, #383c30, #15170f 75%);
+  box-shadow:
+    0 2px 3px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  position: relative;
+}
+.bezel-dial::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 3px;
+  width: 2px;
+  height: 10px;
+  background: var(--bezel-etch);
+  transform: translateX(-50%);
+}
+/* field-kit flavor text (right side) — game-agnostic [data-game] toggle,
+   the same static-span mechanism as .chassis-flavor (never a JS branch). */
+.fieldkit--fnv {
+  display: none;
+}
+[data-game='FNV'] .fieldkit--generic {
+  display: none;
+}
+[data-game='FNV'] .fieldkit--fnv {
+  display: inline;
+}
+/* bezel hazard strip (Gap 6) — low-opacity amber flavor stripe along the
+   bezel's top edge, desktop-only (added in the gated block below). */
 .telemetry {
   margin: 0 auto 8px;
   max-width: 100%;
@@ -778,10 +887,11 @@ button.lamp {
   padding: 5px 2px 4px;
   border: 1px solid rgba(0, 0, 0, 0.75);
   border-radius: 5px;
-  background: linear-gradient(180deg, #31352b, #1d201a 60%, #171a14);
+  background: linear-gradient(180deg, #363b30, #1d201a 58%, #14170f);
   box-shadow:
-    0 2px 0 #0c0e0a,
-    inset 0 1px 0 rgba(255, 255, 255, 0.09);
+    0 3px 0 #0c0e0a,
+    0 4px 6px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
   color: var(--bezel-etch);
   display: flex;
   flex-direction: column;
@@ -794,7 +904,7 @@ button.lamp {
   background: linear-gradient(180deg, #383d31, #22251e 60%, #191c16);
 }
 .navkey:active {
-  transform: translateY(1px);
+  transform: translateY(2px);
   box-shadow:
     0 1px 0 #0c0e0a,
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
@@ -912,6 +1022,19 @@ button.lamp {
      content or controls (Protocol 17). */
   .container.machine {
     padding-bottom: 100px;
+  }
+  /* Bezel fidelity pass — disciplined mobile edge: hide the desktop-only
+     decorative flourishes (governor dial, serial plate, field-kit line)
+     and the keycap sub-label so the bottom dock stays compact at 360/412px
+     (matches nv-machine-mockup.html's own mobile block). */
+  .nk-sub {
+    display: none;
+  }
+  .bezel-side {
+    display: none;
+  }
+  .serial {
+    display: none;
   }
 }
 
@@ -3055,6 +3178,16 @@ body.thermal-load .panel {
     display: flex;
     flex-direction: column;
   }
+  /* Bezel fidelity pass (Gap 1) — the full framed-device outer shadow +
+     rounded casing corners, desktop-only per Suite 129 (never a bare
+     min-width:1000px query). body{padding:20px} above already reserves
+     room for the shadow to render without clipping. */
+  .container.machine {
+    box-shadow:
+      0 0 60px rgba(0, 0, 0, 0.9),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+  }
   /* Desk-terminal shell: casing on top, the bezel keycap strip visually at
      the BOTTOM (a real console's control strip sits under the screen), the
      glass in between — via CSS `order`, not DOM order, so keyboard/tab
@@ -3066,15 +3199,57 @@ body.thermal-load .panel {
     order: 1;
     flex-shrink: 0;
   }
+  /* Gap 4 (serial plate): .serial now carries the row's one margin-left:auto
+     on desktop, absorbing the free space to push it to the right edge; the
+     mini core follows with a small fixed gap instead of its own auto margin
+     (two auto-margin siblings would split the free space and separate
+     them). Mobile is unaffected — .serial is display:none there, so the
+     mini core's base margin-left:auto (unchanged) still works alone. */
+  .chassis-screen-mini {
+    margin-left: 14px;
+  }
   .glass-frame {
     order: 2;
     flex: 1 1 auto;
     min-height: 0;
     display: flex;
+    /* Gap 5 — fuller recessed-glass framing at desktop size. */
+    border-radius: 20px;
+    margin: 0;
+    padding: 7px;
+  }
+  .glass-frame::before {
+    inset: 7px;
+    border-radius: 14px;
   }
   .bezel {
     order: 3;
     flex-shrink: 0;
+    /* Gap 3/6/7 — desktop bezel gains side room for the flanking governor
+       dial + field-kit line, plus the hazard strip along its top edge. */
+    padding: 10px 24px 16px;
+  }
+  .bezel::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 12%;
+    right: 12%;
+    height: 3px;
+    background: repeating-linear-gradient(
+      115deg,
+      rgba(var(--bezel-wire-rgb), 0.35) 0 8px,
+      rgba(0, 0, 0, 0.5) 8px 16px
+    );
+    opacity: 0.4;
+    pointer-events: none;
+  }
+  .navkey {
+    min-height: 52px;
+    padding: 6px 4px 5px;
+  }
+  .navkey.dirkey {
+    min-width: 52px;
   }
   .main-grid {
     grid-template-columns: 380px 1fr;
