@@ -12238,7 +12238,10 @@ Check (
 # the bezel fidelity pass added 7 tests without updating it -- corrected
 # here alongside this unit's own +3 (harness-only drift, no functional
 # impact; the actual assertions always ran, only the doc comment lagged).
-# 35 tests.
+# UPDATED (owner-report fix -- keycap label wrap + active pressed-state):
+# extended with 158.31-158.32 (label nowrap + ellipsis safety net, and
+# the pressed-in active-keycap look).
+# 37 tests.
 # ===========================================================
 Sep "Suite 158 -- DO-N: bezel chrome + subsystem nav"
 $html158 = Read-Src "index.html"
@@ -12467,6 +12470,28 @@ Check (
 Check (
     $css158 -match "(?s)@media \(min-width: 1000px\) and \(hover: hover\) and \(pointer: fine\) \{.*?\.container\.machine\s*\{\s*box-shadow:\s*\n?\s*0 0 60px rgba\(0, 0, 0, 0\.9\),\s*\n?\s*inset 0 0 0 1px rgba\(255, 255, 255, 0\.05\);\s*\n?\s*border-radius:\s*10px;"
 ) "158.30: the desktop gated .container.machine (60px glow + 10px full-corner radius) is untouched by the mobile immersion pass"
+
+# 158.31  owner-report fix -- .nk-label renders on ONE line (no more
+# OPERATIONS/DATABANK/SETTINGS mid-word wrap at 360px): white-space:nowrap
+# replaces the old overflow-wrap:anywhere/word-break:break-word, with an
+# overflow:hidden + text-overflow:ellipsis safety net
+Check (
+    ($css158 -match '\.nk-label\s*\{[^}]*white-space:\s*nowrap') -and
+    ($css158 -match '\.nk-label\s*\{[^}]*overflow:\s*hidden') -and
+    ($css158 -match '\.nk-label\s*\{[^}]*text-overflow:\s*ellipsis') -and
+    (-not ($css158 -match '\.nk-label\s*\{[^}]*overflow-wrap:\s*anywhere')) -and
+    (-not ($css158 -match '\.nk-label\s*\{[^}]*word-break:\s*break-word'))
+) "158.31: .nk-label is white-space:nowrap (no mid-word wrap) with an overflow:hidden/ellipsis safety net"
+
+# 158.32  owner-report fix -- the ACTIVE keycap reads as physically pressed
+# in (inset box-shadow + a downward translateY), not merely lit/colored;
+# driven off the existing .navkey.active class selectSubsystem() already
+# toggles (Protocol 22 -- CSS only, no nav wiring/hotkey/ARIA touched),
+# applying identically on mobile and the desktop 3px-relief variant
+Check (
+    ($css158 -match "(?s)\.navkey\.active\s*\{[^}]*transform:\s*translateY\(1px\)") -and
+    ($css158 -match "(?s)\.navkey\.active\s*\{[^}]*box-shadow:\s*\n?\s*inset 0 2px 3px rgba\(0, 0, 0, 0\.65\)")
+) "158.32: .navkey.active is pressed-in (inset box-shadow + translateY), distinct from the raised default relief"
 
 # ===========================================================
 # Suite 159 -- Owner bug-fix batch: eventLog live-render + centering rule (2 tests)

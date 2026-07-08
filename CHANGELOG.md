@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2689/2689 | Cache: robco-terminal-v2.7.0-r119 -->
+﻿## [Unreleased]<!-- Tests: 2691/2691 | Cache: robco-terminal-v2.7.0-r120 -->
 
 ### Added
 
@@ -141,6 +141,8 @@
 - Fixed backing out of a surveyed location's detail view leaving the map scrolled to the wrong spot — showing only part of the chart instead of the whole thing you'd been looking at before you tapped in. The map now returns to exactly the same spot every time, no matter how tall or short the view you're coming back from was.
 - Fixed a newly discovered location's route line on the map appearing already fully drawn instead of tracing itself in — you can now actually watch it connect to the new point.
 - Fixed your TRAITS list showing inconsistent-sized entries — a couple of traits with shorter descriptions rendered narrower and indented compared to the rest. Every trait now displays at the same uniform size. Tapping anywhere on a trait's row now toggles it on or off, not just its small indicator, and that indicator has been modernized to a clearer lit/unlit marker.
+- Fixed the bottom row of subsystem buttons (OPERATOR, OPERATIONS, DATABANK, and so on) wrapping their labels onto two lines on a phone screen. Every button's label now always fits on one line.
+- Fixed the currently active subsystem button looking almost the same as the others, just a different color. It now visibly presses in like a real switch, so it's obvious at a glance which screen you're on.
 
 ### Improved
 

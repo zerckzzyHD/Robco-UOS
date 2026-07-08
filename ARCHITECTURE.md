@@ -69,8 +69,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2689-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2689-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2691-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2691-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -767,6 +767,22 @@ live at 360/412/desktop with zero horizontal overflow and the desktop gate compl
 Guarded by Suite 158.28–158.30 (both runners at parity, +3 tests, 2689 total); this unit also
 caught and fixed a stale Suite 158 header-comment test count that had drifted since the bezel
 fidelity pass (Protocol 42 — harness/doc-only, no functional impact). Cache r119.
+
+Owner-report fix — bezel nav keycap label wrap + active pressed-state (Suite 158.31–158.32,
++2 tests, 2691 total). Two follow-up fixes to the DO-N/mobile-immersion bezel nav: (1)
+OPERATIONS/DATABANK/SETTINGS keycap labels were wrapping mid-word at 360px because a shared
+`flex: 1 1 60px` forced all six keycaps to an identical, too-narrow width regardless of label
+length; `.navkey` switches to content-sized `flex: 0 1 auto` (plus a trimmed 1px keycap padding
+and a 0.4px `.nk-label` letter-spacing) so each keycap claims only the width its own label
+needs — UPLINK/CHASSIS/DIR stay compact, OPERATIONS gets a little more — with
+`white-space: nowrap` plus an `overflow: hidden`/`text-overflow: ellipsis` safety net on
+`.nk-label` replacing the old wrap-enabling rules. (2) the active subsystem keycap now reads
+as physically pressed in — an inset box-shadow plus a 1px downward `translateY` on
+`.navkey.active` — instead of differing only by color, driven off the existing `.active` class
+`selectSubsystem()` already toggles (Protocol 22 — CSS only, no nav wiring/hotkey/ARIA change).
+Verified live at 360px, 412px, and desktop: zero label wrap, zero horizontal overflow, zero
+clipping on any keycap, and the pressed look correctly follows the active tab through
+`selectSubsystem()`. Cache r120.
 
 ---
 
@@ -2796,7 +2812,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2689-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2691-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

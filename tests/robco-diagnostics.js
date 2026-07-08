@@ -20385,7 +20385,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  the bezel fidelity pass added 7 tests without updating it — corrected
 //  here alongside this unit's own +3 (harness-only drift, no functional
 //  impact; the actual assertions always ran, only the doc comment lagged).
-//  35 tests
+//  UPDATED (owner-report fix — keycap label wrap + active pressed-state):
+//  extended with 158.31-158.32 (label nowrap + ellipsis safety net, and
+//  the pressed-in active-keycap look).
+//  37 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 158 — DO-N: bezel chrome + subsystem nav');
@@ -20674,6 +20677,32 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       cssSource158
     ),
     '158.30: the desktop gated .container.machine (60px glow + 10px full-corner radius) is untouched by the mobile immersion pass'
+  );
+
+  // 158.31  owner-report fix — .nk-label renders on ONE line (no more
+  // OPERATIONS/DATABANK/SETTINGS mid-word wrap at 360px): white-space:nowrap
+  // replaces the old overflow-wrap:anywhere/word-break:break-word, with an
+  // overflow:hidden + text-overflow:ellipsis safety net
+  assert(
+    /\.nk-label\s*\{[^}]*white-space:\s*nowrap/.test(cssSource158) &&
+      /\.nk-label\s*\{[^}]*overflow:\s*hidden/.test(cssSource158) &&
+      /\.nk-label\s*\{[^}]*text-overflow:\s*ellipsis/.test(cssSource158) &&
+      !/\.nk-label\s*\{[^}]*overflow-wrap:\s*anywhere/.test(cssSource158) &&
+      !/\.nk-label\s*\{[^}]*word-break:\s*break-word/.test(cssSource158),
+    '158.31: .nk-label is white-space:nowrap (no mid-word wrap) with an overflow:hidden/ellipsis safety net'
+  );
+
+  // 158.32  owner-report fix — the ACTIVE keycap reads as physically pressed
+  // in (inset box-shadow + a downward translateY), not merely lit/colored;
+  // driven off the existing .navkey.active class selectSubsystem() already
+  // toggles (Protocol 22 — CSS only, no nav wiring/hotkey/ARIA touched),
+  // applying identically on mobile and the desktop 3px-relief variant
+  assert(
+    /\.navkey\.active\s*\{[^}]*transform:\s*translateY\(1px\)/.test(cssSource158) &&
+      /\.navkey\.active\s*\{[^}]*box-shadow:\s*\n?\s*inset 0 2px 3px rgba\(0, 0, 0, 0\.65\)/.test(
+        cssSource158
+      ),
+    '158.32: .navkey.active is pressed-in (inset box-shadow + translateY), distinct from the raised default relief'
   );
 }
 
