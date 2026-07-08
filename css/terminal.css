@@ -857,6 +857,17 @@ button.lamp {
   align-items: stretch;
   gap: clamp(4px, 1.4vw, 10px);
   flex-wrap: wrap;
+  /* Owner-report fix (uniform-keycap-width pass) — a single fixed width
+     shared by every .navkey (the 6 nav-cluster tabs AND the sibling
+     dirkey button both read this custom property, since it inherits down
+     from .nav-row to both). Content-based sizing (the previous ea4aef3
+     fix) rendered 7 UNEVEN keycap widths (OPERATIONS/DATABANK/SETTINGS
+     wide, UPLINK/CHASSIS/DIR narrow) — every keycap now claims the exact
+     same width, and .nk-label's font-size (below) is shrunk to fit the
+     longest labels (OPERATIONS/DATABANK/SETTINGS) inside it instead.
+     Desktop overrides this to a larger value in its own gated block
+     (Suite 129 — never a bare min-width query). */
+  --navkey-w: 42px;
 }
 .nav-cluster {
   display: flex;
@@ -878,26 +889,28 @@ button.lamp {
 }
 .navkey {
   position: relative;
-  width: auto;
+  /* Owner-report fix (uniform-keycap-width pass) — every keycap (the 6
+     nav-cluster tabs AND the sibling dirkey button) now claims the exact
+     same fixed width via the shared --navkey-w custom property (declared
+     on .nav-row above so it inherits identically to both flex contexts,
+     avoiding the proportional-shrink drift a nested flex-grow split would
+     introduce). flex-shrink stays enabled (min-width:0) as a last-resort
+     safety net for genuinely extreme widths, even though --navkey-w is
+     sized to already fit with margin at every tested breakpoint. This
+     replaces the prior content-sized (Fix 1, ea4aef3) behavior, which
+     rendered 7 uneven widths — see the .nk-label font-size comment below
+     for how the longest labels still fit one line at this narrower,
+     uniform width. */
+  width: var(--navkey-w);
+  flex: 0 1 var(--navkey-w);
   min-width: 0;
   box-sizing: border-box;
-  /* Owner-report fix (Fix 1) — content-sized instead of forced-uniform:
-     a shared flex-basis:60px equally shrank all 6 keys to ~44px content
-     width regardless of label length, which is too narrow for OPERATIONS/
-     DATABANK/SETTINGS on one line without shrinking every OTHER label's
-     font down with them. flex-basis:auto lets each keycap claim only the
-     width its own label actually needs (UPLINK/CHASSIS/DIR stay compact,
-     OPERATIONS gets a little more) — flex-shrink:1 + min-width:0 keep the
-     no-overflow guarantee at extreme widths, with the nk-label
-     overflow/ellipsis fallback below as the last-resort safety net. */
-  flex: 0 1 auto;
-  max-width: 110px;
   min-height: 44px;
-  /* Owner-report fix: horizontal padding trimmed 2px->1px per side to free
-     up label content-box room (Fix 1 below) — the tap target itself is
-     unaffected, since Protocol 17's 44px floor is a min-height, not width,
-     constraint. */
-  padding: 5px 1px 4px;
+  /* Owner-report fix: horizontal padding dropped to 0 (was 1px/side) to
+     free up every spare px of content-box room for the uniform width's
+     smaller footprint — the tap target itself is unaffected, since
+     Protocol 17's 44px floor is a min-height, not width, constraint. */
+  padding: 5px 0 4px;
   border: 1px solid rgba(0, 0, 0, 0.75);
   border-radius: 5px;
   background: linear-gradient(180deg, #363b30, #1d201a 58%, #14170f);
@@ -962,19 +975,25 @@ button.lamp {
   letter-spacing: 1px;
 }
 .nk-label {
-  font-size: clamp(7.5px, 2.4vw, 9px);
-  /* Owner-report fix (Fix 1) — labels must render on ONE line: OPERATIONS/
-     DATABANK/SETTINGS were wrapping mid-word ("OPERATO/R") at 360px. The
-     old wrap-enabling rules (an overflow-wrap of "anywhere" plus a
-     word-break of "break-word", which together caused the mid-word wrap)
-     are replaced with white-space:nowrap; letter-spacing trimmed
-     0.5px->0.4px for a little extra fit margin, and overflow:hidden +
-     text-overflow:ellipsis is a defensive fallback (never triggers at any
-     tested breakpoint, given the padding/letter-spacing room freed above,
-     but guards against font-metric variance across browsers/OSes). */
-  letter-spacing: 0.4px;
+  /* Owner-report fix (uniform-keycap-width pass) — the uniform 42px
+     mobile --navkey-w is narrower than OPERATIONS/DATABANK/SETTINGS ever
+     rendered at under the old content-sized (Fix 1, ea4aef3) behavior, so
+     the SAME shared font-size shrinks to fit the longest label
+     (OPERATIONS, 10 chars) one line at that width instead of letting each
+     keycap size itself to its own label. Desktop's much larger
+     --navkey-w (gated block below) restores a bigger, easier-to-read
+     size since desktop has ample room. letter-spacing trimmed further
+     (0.4px->0.2px) for a little extra fit margin at the smaller mobile
+     size. */
+  font-size: 6px;
+  letter-spacing: 0.2px;
   line-height: 1.15;
   max-width: 100%;
+  /* white-space:nowrap (Fix 1) is still load-bearing — labels must render
+     on ONE line, never wrapping mid-word ("OPERATO/R"). overflow:hidden +
+     text-overflow:ellipsis remains a defensive fallback (never triggers
+     at any tested breakpoint given the width/font sizing above, but
+     guards against font-metric variance across browsers/OSes). */
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -985,11 +1004,10 @@ button.lamp {
   opacity: 0.45;
   letter-spacing: 1px;
 }
-.navkey.dirkey {
-  flex: 0 1 44px;
-  min-width: 40px;
-  max-width: 52px;
-}
+/* .navkey.dirkey no longer overrides width/flex (uniform-keycap-width
+   pass) — DIR now shares the exact same --navkey-w-driven size as the
+   other 6 keycaps via the base .navkey rule above, per the owner's
+   "all 7 keycaps the same size" directive. */
 /* SETTINGS keycap gets a subtle amber service-stripe so it reads as the
    config/service cap, distinct from the phosphor-green subsystem keys. */
 .navkey.setkey::after {
@@ -3300,12 +3318,25 @@ body.thermal-load .panel {
     opacity: 0.4;
     pointer-events: none;
   }
+  /* Owner-report fix (uniform-keycap-width pass) — desktop's own uniform
+     width, comfortably larger than mobile's since the desk-terminal shell
+     has far more horizontal room (verified safe down to the 1000px gate
+     floor). dirkey no longer needs its own min-width override — it now
+     shares this same value via the base .navkey rule (Protocol 22, one
+     source of truth via --navkey-w). */
+  .nav-row {
+    --navkey-w: 100px;
+  }
   .navkey {
     min-height: 52px;
     padding: 6px 4px 5px;
   }
-  .navkey.dirkey {
-    min-width: 52px;
+  .nk-label {
+    /* Desktop has ample content-box room at the larger uniform width, so
+       the label restores a bigger, easier-to-read size/spacing than the
+       mobile-shrunk values above. */
+    font-size: 9px;
+    letter-spacing: 0.4px;
   }
   .main-grid {
     grid-template-columns: 380px 1fr;

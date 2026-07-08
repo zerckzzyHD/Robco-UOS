@@ -69,8 +69,8 @@
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2691-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2691-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2693-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2693-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -783,6 +783,21 @@ as physically pressed in — an inset box-shadow plus a 1px downward `translateY
 Verified live at 360px, 412px, and desktop: zero label wrap, zero horizontal overflow, zero
 clipping on any keycap, and the pressed look correctly follows the active tab through
 `selectSubsystem()`. Cache r120.
+
+Owner-report fix — uniform bezel nav keycap width (Suite 158.33–158.34, +2 tests, 2693 total).
+The `flex: 0 1 auto` content-sizing from the previous fix (r120) rendered 7 UNEVEN keycap
+widths — OPERATIONS/DATABANK/SETTINGS wide, UPLINK/CHASSIS/DIR narrow. Every `.navkey`
+(the 6 nav-cluster tabs plus the sibling `dirkey` button) now shares one fixed width via a
+`--navkey-w` custom property declared on `.nav-row` (so it inherits identically into both flex
+contexts, avoiding the proportional-shrink drift a nested flex-grow split across two containers
+would introduce); `.navkey.dirkey` no longer overrides its own width/flex. `.nk-label`'s
+font-size shrinks (6px, letter-spacing 0.2px) to keep the longest labels
+(OPERATIONS/DATABANK/SETTINGS) on one line at the narrower 42px mobile width; the desktop gate
+(`@media (min-width:1000px) and (hover:hover) and (pointer:fine)`, Suite 129) overrides
+`--navkey-w` to 100px and restores a larger 9px label size, since the desk-terminal shell has
+far more horizontal room. Verified live at 360px, 412px, and desktop (1000px floor and 1280px):
+all 7 keycaps render pixel-identical widths, no label wraps or is ellipsis-clipped, zero
+horizontal overflow, and the active keycap's pressed-in look (r120) is untouched. Cache r121.
 
 ---
 
@@ -2812,7 +2827,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2691-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2693-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

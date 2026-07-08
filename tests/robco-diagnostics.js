@@ -20388,7 +20388,11 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  UPDATED (owner-report fix — keycap label wrap + active pressed-state):
 //  extended with 158.31-158.32 (label nowrap + ellipsis safety net, and
 //  the pressed-in active-keycap look).
-//  37 tests
+//  UPDATED (owner-report fix — uniform keycap width): extended with
+//  158.33-158.34 (all 7 keycaps share one fixed width via --navkey-w,
+//  with the label font shrunk to fit the longest labels at that width;
+//  desktop scales both up inside the existing hover+fine gate).
+//  39 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 158 — DO-N: bezel chrome + subsystem nav');
@@ -20703,6 +20707,40 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         cssSource158
       ),
     '158.32: .navkey.active is pressed-in (inset box-shadow + translateY), distinct from the raised default relief'
+  );
+
+  // 158.33  owner-report fix (uniform-keycap-width pass) — all 7 keycaps
+  // (the 6 nav-cluster tabs + the sibling dirkey button) now share ONE
+  // fixed width via a --navkey-w custom property declared on .nav-row (so
+  // it inherits identically into both flex contexts) and consumed by the
+  // base .navkey rule — replacing the ea4aef3 content-sized (flex:0 1 auto)
+  // behavior that rendered 7 uneven widths. .navkey.dirkey no longer
+  // overrides its own width/flex, so DIR matches the other 6 exactly.
+  assert(
+    /\.nav-row\s*\{[^}]*--navkey-w:\s*42px;/.test(cssSource158) &&
+      /\.navkey\s*\{[^}]*width:\s*var\(--navkey-w\);[^}]*flex:\s*0 1 var\(--navkey-w\);/.test(
+        cssSource158
+      ) &&
+      !/\.navkey\.dirkey\s*\{[^}]*flex:/.test(cssSource158) &&
+      !/\.navkey\s*\{[^}]*flex:\s*0 1 auto;/.test(cssSource158),
+    '158.33: every .navkey (including dirkey) shares one fixed width via --navkey-w — no more content-sized/uneven keycaps'
+  );
+
+  // 158.34  the uniform width scales up for desktop — .nav-row's --navkey-w
+  // is overridden to a larger value strictly inside the existing Suite-129
+  // hover+fine+min-width gate (never a bare min-width query), and .nk-label
+  // restores a bigger, easier-to-read font-size in the same gated block —
+  // the mobile default stays small enough to fit the longest labels
+  // (OPERATIONS/DATABANK/SETTINGS) at the narrower mobile --navkey-w
+  assert(
+    /@media \(min-width: 1000px\) and \(hover: hover\) and \(pointer: fine\) \{[\s\S]*?\.nav-row\s*\{\s*--navkey-w:\s*100px;/.test(
+      cssSource158
+    ) &&
+      /@media \(min-width: 1000px\) and \(hover: hover\) and \(pointer: fine\) \{[\s\S]*?\.nk-label\s*\{[^}]*font-size:\s*9px;/.test(
+        cssSource158
+      ) &&
+      /\.nk-label\s*\{[^}]*font-size:\s*6px;/.test(cssSource158),
+    '158.34: desktop overrides --navkey-w to a larger value + a bigger .nk-label font-size inside the existing hover+fine desktop gate; mobile default stays fit to the longest label'
   );
 }
 

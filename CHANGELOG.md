@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2691/2691 | Cache: robco-terminal-v2.7.0-r120 -->
+﻿## [Unreleased]<!-- Tests: 2693/2693 | Cache: robco-terminal-v2.7.0-r121 -->
 
 ### Added
 
@@ -143,6 +143,7 @@
 - Fixed your TRAITS list showing inconsistent-sized entries — a couple of traits with shorter descriptions rendered narrower and indented compared to the rest. Every trait now displays at the same uniform size. Tapping anywhere on a trait's row now toggles it on or off, not just its small indicator, and that indicator has been modernized to a clearer lit/unlit marker.
 - Fixed the bottom row of subsystem buttons (OPERATOR, OPERATIONS, DATABANK, and so on) wrapping their labels onto two lines on a phone screen. Every button's label now always fits on one line.
 - Fixed the currently active subsystem button looking almost the same as the others, just a different color. It now visibly presses in like a real switch, so it's obvious at a glance which screen you're on.
+- Fixed the bottom row of subsystem buttons rendering at uneven widths, each one sized to fit its own label — some noticeably wider or narrower than the others. Every button is now the exact same size, with the text shrunk just enough to still fit on one line without wrapping or getting cut off.
 
 ### Improved
 
