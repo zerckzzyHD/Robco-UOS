@@ -2974,6 +2974,7 @@ window.onload = async function () {
     _wireApiEventBusSubscribers();
     _wireChassisCoreEventBusSubscribers(); // CHASSIS LIVING CORE: runtime.state/level.up/data.write/stat.change
     _wireFeedbackEchoSubscribers(); // FEEDBACK ANIMATION WAVE 1: the STATUS ANNUNCIATOR
+    _wireLocationCardSubscriber(); // LOCATION CONFIRMATION CARD: top-right arrival toast
     // P2: reconcile device prefs from IndexedDB (bounded + fail-safe) BEFORE the rest of boot reads them.
     await _hydrateMetaFromIdb();
     _hydrateStateFromStorage();
@@ -4395,13 +4396,23 @@ function onLocationChange(overrideLoc) {
     youGroup.classList.add('you-triangulate');
     setTimeout(() => youGroup.classList.remove('you-triangulate'), 700);
   }
-  if (state.loc) {
-    _echoPush({
-      tone: 'amber',
-      glyph: '⦿',
-      label: 'ARRIVED: ' + String(state.loc).toUpperCase(),
-      homeSubsystem: 'databank',
-    });
+  // LOCATION CONFIRMATION CARD (Suite 204) — the single location-change
+  // confirmation, fired only on a GENUINE change (never a same-value
+  // re-set) via a 'location.current' bus emit, consumed by the top-right
+  // toast subscriber (_wireLocationCardSubscriber() below). Retires the
+  // older inline "ARRIVED" annunciator push that used to live here (#27
+  // TRIANGULATE's echo half, Suite 199.25) so the player sees ONE clean
+  // location confirmation instead of two competing toasts; the "you"
+  // reticle pulse directly above (TRIANGULATE's home half) is untouched.
+  const locChanged =
+    String(prevLoc || '')
+      .trim()
+      .toLowerCase() !==
+    String(state.loc || '')
+      .trim()
+      .toLowerCase();
+  if (locChanged && state.loc) {
+    RobcoEvents.emit('location.current', { loc: state.loc });
   }
 }
 
@@ -6844,6 +6855,51 @@ function _wireFeedbackEchoSubscribers() {
   );
 }
 // ── STATUS ANNUNCIATOR END ────────────────────────────────────────────────
+
+// ══════════════════════════════════════════════════════════════════════
+// LOCATION CONFIRMATION CARD — top-right arrival toast (Suite 204). A
+// RobcoEvents subscriber driving a transient DOM element, matching the
+// STATUS ANNUNCIATOR's own architecture (Protocol 22) but shown regardless
+// of the active subsystem — unlike the annunciator's homeSubsystem
+// suppression, "where did I just go" is meaningful everywhere, including
+// while looking at the CARTOGRAPHY TABLE itself. Fired from the single
+// onLocationChange() choke point via 'location.current' (guarded there on
+// a genuine change). Purely presentational — a transient module timer +
+// DOM classes only, never state.*/saveState()/robco_v8.
+// ══════════════════════════════════════════════════════════════════════
+let _locCardTimer = null;
+let _locCardHideTimer = null;
+
+function _locationCardShow(loc) {
+  if (!_echoShouldShow()) return; // same hidden-tab/powered-down suppression as the annunciator
+  const el = document.getElementById('locationCard');
+  if (!el) return;
+  const labelEl = el.querySelector('.loc-card-label');
+  if (labelEl) {
+    labelEl.innerHTML = typeof escapeHtml === 'function' ? escapeHtml(String(loc)) : String(loc);
+  }
+  clearTimeout(_locCardTimer);
+  clearTimeout(_locCardHideTimer);
+  el.setAttribute('aria-hidden', 'false');
+  el.classList.remove('hide');
+  void el.offsetWidth; // reflow — a re-trigger restarts the entrance cleanly on a rapid re-trigger
+  el.classList.add('show');
+  _locCardTimer = setTimeout(() => {
+    el.classList.remove('show');
+    el.classList.add('hide');
+    _locCardHideTimer = setTimeout(() => {
+      el.classList.remove('hide');
+      el.setAttribute('aria-hidden', 'true');
+    }, 240); // matches the location-card-out keyframe duration
+  }, 2200);
+}
+window._locationCardShow = _locationCardShow;
+
+// Wiring is deferred to a function called from window.onload (the U7
+// boot-order lesson), never a bare top-level RobcoEvents.on() call.
+function _wireLocationCardSubscriber() {
+  RobcoEvents.on('location.current', p => _locationCardShow((p && p.loc) || ''));
+}
 
 // PHASE 3 · OPERATOR — S.P.E.C.I.A.L. fader steppers (BUS-02). Sets the
 // existing s_<key> input's value then routes through the EXACT SAME

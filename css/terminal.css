@@ -11193,6 +11193,91 @@ button.chassis-core-shape {
   }
 }
 
+/* ── LOCATION CONFIRMATION CARD — top-right arrival toast (Suite 204) ───
+   Distinct from the STATUS ANNUNCIATOR above: a dedicated, more prominent
+   slide-in/out card confirming the player's CURRENT location changed,
+   shown regardless of the active subsystem — reuses the same
+   _echoShouldShow() visibility gate (js/ui-core.js) but skips the
+   annunciator's homeSubsystem suppression, since "where did I just go" is
+   meaningful even while looking at the CARTOGRAPHY TABLE itself. Retires
+   the older inline "ARRIVED" annunciator chip (#27 TRIANGULATE's echo
+   half) so the player sees ONE clean location confirmation instead of two
+   competing toasts; the map's own "you" reticle pulse (TRIANGULATE's home
+   half) is untouched. Lives at BODY level in index.html (never inside
+   .container/.machine) so it is never subject to the ambient-runtime
+   filter/transform containing-block trade-off documented above the fixed
+   bezel dock. Plain @keyframes (Protocol UI-9) — the existing global
+   prefers-reduced-motion block neutralizes both to an instant
+   appear/disappear with no bespoke carve-out. */
+@keyframes location-card-in {
+  0% {
+    opacity: 0;
+    transform: translate(28px, -14px);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+}
+@keyframes location-card-out {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(28px, -14px);
+  }
+}
+.location-card {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 5000;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(280px, calc(100vw - 24px));
+  padding: 8px 14px;
+  border: 1px solid var(--bezel-wire, var(--robco-green));
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.72);
+  color: var(--robco-green);
+  font-size: 11px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+}
+.location-card.show {
+  opacity: 1;
+  animation: location-card-in 260ms ease-out;
+}
+.location-card.hide {
+  animation: location-card-out 220ms ease-in forwards;
+}
+.location-card .loc-card-glyph {
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.location-card .loc-card-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 480px) {
+  .location-card {
+    top: 8px;
+    right: 8px;
+    max-width: min(240px, calc(100vw - 16px));
+    font-size: 10px;
+    padding: 6px 10px;
+  }
+}
+
 /* ── #1 FLATLINE WARNING — BUS-01 HP trace (Group 1) ────────────────── */
 @keyframes flatline-stutter {
   0%,

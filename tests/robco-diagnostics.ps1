@@ -9090,7 +9090,7 @@ function Test-OnCallsInsideWiringFn($src, $fnNames) {
     return @{ total = $total; inside = $inside }
 }
 $audioCheck135 = Test-OnCallsInsideWiringFn $uiAudioSrc135 '_wireAudioEventBusSubscribers'
-$coreCheck135  = Test-OnCallsInsideWiringFn $uiCoreSrc135 @('_wireCoreEventBusSubscribers', '_wireChassisCoreEventBusSubscribers', '_wireFeedbackEchoSubscribers')
+$coreCheck135  = Test-OnCallsInsideWiringFn $uiCoreSrc135 @('_wireCoreEventBusSubscribers', '_wireChassisCoreEventBusSubscribers', '_wireFeedbackEchoSubscribers', '_wireLocationCardSubscriber')
 $apiCheck135   = Test-OnCallsInsideWiringFn $apiSrc '_wireApiEventBusSubscribers'
 Check (
     ($audioCheck135.total -eq $audioCheck135.inside) -and ($audioCheck135.total -gt 0) -and
@@ -20302,12 +20302,20 @@ Check (
     [regex]::IsMatch($wireEchoBody199, "RobcoEvents\.on\(\s*['`"]effect\.expiring['`"][\s\S]{0,120}EXPIRING:")
 ) '199.24: the echo subscriber pushes an EXPIRING annunciation on effect.expiring'
 
-# 199.25  #27 TRIANGULATE pushes directly from onLocationChange() rather
-#         than through a bus subscription in the echo-wiring function.
+# 199.25  #27 TRIANGULATE's echo half is RETIRED (Suite 204, the LOCATION
+#         CONFIRMATION CARD): onLocationChange() no longer pushes an
+#         "ARRIVED" annunciator chip directly -- it emits a guarded
+#         'location.current' bus event instead, so the player sees ONE
+#         clean location confirmation (the top-right card) instead of two
+#         competing toasts. The map's own "you" reticle pulse (tested
+#         above, 199.15) is untouched, and the annunciator echo-wiring
+#         function still carries no ARRIVED text (superseded, never
+#         duplicated).
 Check (
-    ([regex]::IsMatch($onLocChangeBody199, "_echoPush\(\{[\s\S]{0,120}glyph: '⦿'[\s\S]{0,80}ARRIVED:")) -and
+    ([regex]::IsMatch($onLocChangeBody199, "RobcoEvents\.emit\(\s*['`"]location\.current['`"]")) -and
+    (-not ([regex]::IsMatch($onLocChangeBody199, "_echoPush\(\{[\s\S]{0,120}ARRIVED:"))) -and
     (-not ($wireEchoBody199 -match 'ARRIVED:'))
-) '199.25: #27 TRIANGULATE pushes its annunciation directly from onLocationChange(), never through a bus subscription'
+) '199.25: onLocationChange() retires the direct "ARRIVED" annunciator push in favor of a guarded location.current bus emit, consumed by the LOCATION CONFIRMATION CARD (Suite 204) -- one clean location confirmation, not two competing toasts'
 
 # 199.26  the 7 home-only WAVE 3 items get NO echo wiring -- item.equipped
 #         and craft.scrapped (the two bus events among the home-only set)
@@ -21330,6 +21338,302 @@ console.log('RESULT:' + results.map(function (r) { return r ? '1' : '0'; }).join
 } catch {
     foreach ($lbl in $labels203) { Fail "$lbl  (exception: $($_.Exception.Message))" }
 }
+
+# ===========================================================
+# Suite 204 -- LOCATION CONFIRMATION CARD: a top-right toast confirming the
+# player's CURRENT location changed. Fires from the SAME single choke point
+# every location-change path already routes through (onLocationChange()),
+# which now emits a guarded 'location.current' bus event (genuine change
+# only -- never a same-value re-set) consumed by exactly one subscriber
+# (_wireLocationCardSubscriber()). Retires the older inline "ARRIVED"
+# annunciator push (#27 TRIANGULATE's echo half, see the reworked 199.25) so
+# the player sees ONE clean confirmation instead of two competing toasts;
+# the map's own "you" reticle pulse (TRIANGULATE's home half) and the
+# SURVEYED annunciator reaction (location.visited, new-discovery-only) are
+# both untouched. Plain @keyframes (Protocol UI-9), zero campaign-state
+# write, mobile-safe fixed positioning (Protocol 17). (PS mirror of JS 204.)
+# 10 tests
+# ===========================================================
+Sep "Suite 204 -- LOCATION CONFIRMATION CARD (top-right arrival toast)"
+$coreSrc204 = Read-Src "js/ui-core.js"
+$htmlSrc204 = Read-Src "index.html"
+$css204 = Read-Src "css/terminal.css"
+$cssStripped204 = [regex]::Replace($css204, '/\*[\s\S]*?\*/', '')
+$onLocChangeBody204 = Get-FunctionBody $coreSrc204 'onLocationChange'
+$showBody204 = Get-FunctionBody $coreSrc204 '_locationCardShow'
+$wireLocBody204 = Get-FunctionBody $coreSrc204 '_wireLocationCardSubscriber'
+$wireEchoBody204 = Get-FunctionBody $coreSrc204 '_wireFeedbackEchoSubscribers'
+
+# 204.1  #locationCard is a real, always-in-DOM element (role=status +
+#        aria-live=polite doubles as an SR announcement), starts
+#        aria-hidden, and lives at BODY level -- BEFORE .container.machine
+#        -- so the ambient-runtime filter/transform containing-block
+#        trade-off documented above the fixed bezel dock never applies.
+$cardIdx204 = $htmlSrc204.IndexOf('id="locationCard"')
+$containerIdx204 = $htmlSrc204.IndexOf('class="container machine"')
+Check (
+    ([regex]::IsMatch($htmlSrc204, '<div[\s\S]{0,60}id="locationCard"[\s\S]{0,200}class="location-card"[\s\S]{0,200}role="status"[\s\S]{0,120}aria-live="polite"[\s\S]{0,120}aria-hidden="true"')) -and
+    ($htmlSrc204 -match 'class="loc-card-glyph"') -and
+    ($htmlSrc204 -match 'class="loc-card-label"></span>') -and
+    ($cardIdx204 -ne -1) -and ($containerIdx204 -ne -1) -and
+    ($cardIdx204 -lt $containerIdx204)
+) '204.1: #locationCard is a role=status/aria-live=polite toast (starts aria-hidden) with a glyph + label span, placed at body level before .container.machine'
+
+# 204.2  onLocationChange() emits 'location.current' guarded on a GENUINE
+#        change (a case-insensitive prevLoc-vs-new comparison) -- never an
+#        unconditional push, so a same-value re-set stays silent.
+Check (
+    ([regex]::IsMatch($onLocChangeBody204, "const locChanged =[\s\S]{0,220}toLowerCase\(\) !==[\s\S]{0,220}toLowerCase\(\);")) -and
+    ([regex]::IsMatch($onLocChangeBody204, "if \(locChanged && state\.loc\) \{[\s\S]{0,80}RobcoEvents\.emit\(\s*['`"]location\.current['`"]"))
+) '204.2: onLocationChange() emits location.current only when locChanged is true (a genuine, case-insensitive prevLoc-vs-new-loc difference) -- a same-value re-set never fires'
+
+# 204.3  BEHAVIORAL -- a real arrival emits location.current with the new
+#        loc; re-setting to the SAME location (even a different case) emits
+#        nothing; a further genuine change emits again. Executed via a
+#        spawned node process against the REAL onLocationChange() source
+#        (Protocol 42 stdin-corruption-safe transport).
+$labels204a = @(
+    "204.3: [behavioral] onLocationChange() emits location.current on Goodsprings->Novac and Novac->Primm, but stays silent on the same-value case-insensitive re-set Novac->novac -- never a naive unconditional push"
+)
+try {
+    $nodeCheck204a = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCheck204a) {
+        $repoRoot204a = (Get-Item $PSScriptRoot).Parent.FullName
+        $repoRootNode204a = $repoRoot204a.Replace('\', '/')
+        $testScript204a = @"
+const vm = require('vm');
+const fs = require('fs');
+const path = require('path');
+const ROOT = '$repoRootNode204a';
+function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+const uiCoreSrc = rd('js/ui-core.js');
+function extractBody(src, name) {
+  var idx = src.indexOf('function ' + name);
+  if (idx === -1) throw new Error('missing ' + name);
+  var i = src.indexOf('{', idx);
+  var depth = 0, start = i;
+  while (i < src.length) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) return src.slice(start, i + 1); }
+    i++;
+  }
+  throw new Error('unclosed ' + name);
+}
+var results = [];
+try {
+  var declared = 'function onLocationChange(overrideLoc)' + extractBody(uiCoreSrc, 'onLocationChange');
+  var emits = [];
+  var locEl = { value: 'Goodsprings' };
+  var stateObj = { loc: 'Goodsprings' };
+  var sandbox = {
+    state: stateObj,
+    document: {
+      getElementById: function (id) { return id === 'stat_loc' ? locEl : null; },
+      querySelector: function () { return null; }
+    },
+    syncStateFromDom: function () { stateObj.loc = locEl.value; },
+    recordLocationVisit: function () {},
+    saveState: function () {},
+    renderWorldMap: function () {},
+    setTimeout: function () {},
+    RobcoEvents: { emit: function (name, payload) { emits.push({ name: name, payload: payload }); } }
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(declared, sandbox);
+  vm.runInContext("onLocationChange('Novac');", sandbox);
+  vm.runInContext("onLocationChange('novac');", sandbox);
+  vm.runInContext("onLocationChange('Primm');", sandbox);
+  results.push(
+    emits.length === 2 &&
+    emits[0].name === 'location.current' && emits[0].payload.loc === 'Novac' &&
+    emits[1].name === 'location.current' && emits[1].payload.loc === 'Primm' &&
+    stateObj.loc === 'Primm'
+  );
+} catch (e) { results.push(false); }
+console.log('RESULT:' + results.map(function (r) { return r ? '1' : '0'; }).join(''));
+"@
+        $tmpScript204a = [System.IO.Path]::GetTempFileName() + '.js'
+        [System.IO.File]::WriteAllText($tmpScript204a, $testScript204a, [System.Text.Encoding]::UTF8)
+        try {
+            $out204a = (node $tmpScript204a 2>&1 | Out-String)
+        } finally {
+            Remove-Item -Path $tmpScript204a -Force -ErrorAction SilentlyContinue
+        }
+        $rm204a = [regex]::Match($out204a, 'RESULT:([01]{1})')
+        if ($rm204a.Success) {
+            $bits204a = $rm204a.Groups[1].Value
+            Check ($bits204a.Substring(0, 1) -eq '1') $labels204a[0]
+        } else {
+            $err204a = if ([string]::IsNullOrWhiteSpace($out204a)) { "No output from node" } else { $out204a.Trim() }
+            foreach ($lbl in $labels204a) { Fail "$lbl  (runtime error: $err204a)" }
+        }
+    } else {
+        foreach ($lbl in $labels204a) { Fail "$lbl  (node not available in PATH)" }
+    }
+} catch {
+    foreach ($lbl in $labels204a) { Fail "$lbl  (exception: $($_.Exception.Message))" }
+}
+
+# 204.4  _locationCardShow() escapes the location name via the SAME
+#        escapeHtml() helper used app-wide before writing it into the DOM
+#        (XSS-safe).
+Check (
+    ($showBody204 -match 'escapeHtml\(String\(loc\)\)') -and
+    ($showBody204 -match 'labelEl\.innerHTML =')
+) '204.4: _locationCardShow() escapes the location name via escapeHtml() before writing it into .loc-card-label'
+
+# 204.5  BEHAVIORAL -- _locationCardShow() shows the card (aria-hidden=false,
+#        .show class, escaped label), then auto-dismisses (.hide after the
+#        display timer, fully hidden again -- aria-hidden=true, no .hide
+#        class -- after the exit-animation timer). Executed via a spawned
+#        node process against the REAL _locationCardShow() source (Protocol
+#        42 stdin-corruption-safe transport).
+$labels204b = @(
+    "204.5: [behavioral] _locationCardShow() escapes the loc, shows the card (aria-hidden=false, .show), then auto-dismisses (.hide after the display timer, fully reset -- aria-hidden=true, no .hide -- after the exit-animation timer)"
+)
+try {
+    $nodeCheck204b = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCheck204b) {
+        $repoRoot204b = (Get-Item $PSScriptRoot).Parent.FullName
+        $repoRootNode204b = $repoRoot204b.Replace('\', '/')
+        $testScript204b = @"
+const vm = require('vm');
+const fs = require('fs');
+const path = require('path');
+const ROOT = '$repoRootNode204b';
+function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+const uiCoreSrc = rd('js/ui-core.js');
+function extractBody(src, name) {
+  var idx = src.indexOf('function ' + name);
+  if (idx === -1) throw new Error('missing ' + name);
+  var i = src.indexOf('{', idx);
+  var depth = 0, start = i;
+  while (i < src.length) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) return src.slice(start, i + 1); }
+    i++;
+  }
+  throw new Error('unclosed ' + name);
+}
+var results = [];
+try {
+  var showBody = extractBody(uiCoreSrc, '_locationCardShow');
+  var declared = "let _locCardTimer = null; let _locCardHideTimer = null;\n" +
+    "function _locationCardShow(loc)" + showBody;
+  var timers = [];
+  var classes = {};
+  var attrs = {};
+  var labelStub = { innerHTML: '' };
+  var elStub = {
+    querySelector: function (sel) { return sel === '.loc-card-label' ? labelStub : null; },
+    classList: {
+      add: function (c) { classes[c] = true; },
+      remove: function (c) { delete classes[c]; }
+    },
+    setAttribute: function (n, v) { attrs[n] = v; },
+    get offsetWidth() { return 0; }
+  };
+  var sandbox = {
+    document: { getElementById: function (id) { return id === 'locationCard' ? elStub : null; } },
+    escapeHtml: function (s) { return String(s).replace(/</g, '&lt;').replace(/>/g, '&gt;'); },
+    _echoShouldShow: function () { return true; },
+    clearTimeout: function () {},
+    setTimeout: function (fn, ms) { var id = timers.length + 1; timers.push({ id: id, fn: fn, ms: ms }); return id; }
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(declared, sandbox);
+  vm.runInContext("_locationCardShow('<b>Novac</b>');", sandbox);
+  var afterShowHasShow = !!classes['show'];
+  var afterShowAriaHidden = attrs['aria-hidden'];
+  var afterShowLabel = labelStub.innerHTML;
+  var displayTimer = null;
+  for (var i = 0; i < timers.length; i++) { if (timers[i].ms === 2200) displayTimer = timers[i]; }
+  displayTimer.fn();
+  var afterHideStartHasHide = !!classes['hide'];
+  var afterHideStartHasShow = !!classes['show'];
+  var exitTimer = null;
+  for (var j = 0; j < timers.length; j++) { if (timers[j].ms === 240) exitTimer = timers[j]; }
+  exitTimer.fn();
+  var afterFinalHasHide = !!classes['hide'];
+  var afterFinalAriaHidden = attrs['aria-hidden'];
+  results.push(
+    afterShowHasShow && afterShowAriaHidden === 'false' && afterShowLabel === '&lt;b&gt;Novac&lt;/b&gt;' &&
+    afterHideStartHasHide && !afterHideStartHasShow &&
+    !afterFinalHasHide && afterFinalAriaHidden === 'true'
+  );
+} catch (e) { results.push(false); }
+console.log('RESULT:' + results.map(function (r) { return r ? '1' : '0'; }).join(''));
+"@
+        $tmpScript204b = [System.IO.Path]::GetTempFileName() + '.js'
+        [System.IO.File]::WriteAllText($tmpScript204b, $testScript204b, [System.Text.Encoding]::UTF8)
+        try {
+            $out204b = (node $tmpScript204b 2>&1 | Out-String)
+        } finally {
+            Remove-Item -Path $tmpScript204b -Force -ErrorAction SilentlyContinue
+        }
+        $rm204b = [regex]::Match($out204b, 'RESULT:([01]{1})')
+        if ($rm204b.Success) {
+            $bits204b = $rm204b.Groups[1].Value
+            Check ($bits204b.Substring(0, 1) -eq '1') $labels204b[0]
+        } else {
+            $err204b = if ([string]::IsNullOrWhiteSpace($out204b)) { "No output from node" } else { $out204b.Trim() }
+            foreach ($lbl in $labels204b) { Fail "$lbl  (runtime error: $err204b)" }
+        }
+    } else {
+        foreach ($lbl in $labels204b) { Fail "$lbl  (node not available in PATH)" }
+    }
+} catch {
+    foreach ($lbl in $labels204b) { Fail "$lbl  (exception: $($_.Exception.Message))" }
+}
+
+# 204.6  reduced-motion-safe: plain @keyframes for both the entrance and
+#        exit (never transition-only), so the existing global
+#        prefers-reduced-motion block auto-neutralizes both (Protocol UI-9).
+Check (
+    ($cssStripped204 -match '@keyframes location-card-in') -and
+    ($cssStripped204 -match '@keyframes location-card-out') -and
+    ([regex]::IsMatch($cssStripped204, '\.location-card\.show \{[^}]*animation:\s*location-card-in')) -and
+    ([regex]::IsMatch($cssStripped204, '\.location-card\.hide \{[^}]*animation:\s*location-card-out'))
+) '204.6: the location card entrance/exit are plain @keyframes animations (reduced-motion-safe by construction, no bespoke carve-out)'
+
+# 204.7  mobile-safe: fixed, viewport-relative sizing that can never force
+#        horizontal overflow at 360/412px (Protocol 17).
+Check (
+    ([regex]::IsMatch($cssStripped204, '\.location-card \{[^}]*position:\s*fixed')) -and
+    ([regex]::IsMatch($cssStripped204, '\.location-card \{[^}]*max-width:\s*min\(280px,\s*calc\(100vw - 24px\)\)'))
+) '204.7: .location-card is position:fixed with a viewport-clamped max-width (min(280px, 100vw-24px)) -- cannot force horizontal overflow at any width'
+
+# 204.8  ZERO campaign-state write anywhere in the new card code -- purely
+#        transient DOM (Protocol 22): no saveState()/robco_v8, and no
+#        state.<field> ASSIGNMENT (a read of state.loc for the genuine-
+#        change comparison, tested separately above, is expected and fine).
+$newCode204 = $showBody204 + "`n" + $wireLocBody204
+Check (
+    (-not ($newCode204 -match 'saveState\(\)')) -and
+    (-not ($newCode204 -match 'robco_v8')) -and
+    (-not ([regex]::IsMatch($newCode204, 'state\.\w+\s*=')))
+) '204.8: the LOCATION CONFIRMATION CARD code (_locationCardShow/_wireLocationCardSubscriber) never calls saveState() or touches robco_v8/state.* -- transient DOM only'
+
+# 204.9  _wireLocationCardSubscriber() is called from window.onload (the U7
+#        boot-order lesson), and 'location.current' is subscribed EXACTLY
+#        once -- never duplicated inside the annunciator's own echo-wiring
+#        function (which would double-fire the reaction).
+$onloadIdx204 = $coreSrc204.IndexOf('window.onload')
+$wireIdx204 = $coreSrc204.IndexOf('_wireLocationCardSubscriber();')
+Check (
+    ($coreSrc204 -match '_wireLocationCardSubscriber\(\);') -and
+    ($onloadIdx204 -ne -1) -and ($wireIdx204 -gt $onloadIdx204) -and
+    ([regex]::IsMatch($wireLocBody204, "RobcoEvents\.on\(\s*['`"]location\.current['`"]")) -and
+    (-not ($wireEchoBody204 -match 'location\.current'))
+) "204.9: _wireLocationCardSubscriber() is called from window.onload and is the ONLY subscriber to location.current -- never also wired inside _wireFeedbackEchoSubscribers() (no double-fire)"
+
+# 204.10  the pre-existing SURVEYED reaction (location.visited, new-
+#         discovery-only) is untouched and stays architecturally distinct
+#         from the new arrival card -- two different signals, not a
+#         duplicate of the same one.
+Check (
+    [regex]::IsMatch($wireEchoBody204, "RobcoEvents\.on\(\s*['`"]location\.visited['`"][\s\S]{0,120}SURVEYED:")
+) '204.10: the SURVEYED annunciator reaction (location.visited, first-discovery only) is untouched -- a distinct signal from the new arrival card, not removed or merged'
 
 # ===========================================================
 # Results

@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2709/2709 | Cache: robco-terminal-v2.7.0-r123 -->
+﻿## [Unreleased]<!-- Tests: 2719/2719 | Cache: robco-terminal-v2.7.0-r124 -->
 
 ### Added
 
@@ -36,6 +36,7 @@
 - You can now type a stat change straight into the TERMINAL command line and have it apply instantly, fully offline. Set any stat outright — "hp 80", "rads 50", "xp 200", "level 5", "karma 100", "caps 30", a S.P.E.C.I.A.L. attribute like "str 8", or a skill like "guns 45" (each game only recognizes its own skill names) — or nudge one up or down with "+2 str" or "str +2". "level up" or "leveled up" grants a level the same way the LEVEL UP button already does. The command list and its autocomplete suggestions now include all of these.
 - Typing [GPS] or [MAP] now takes you straight to your CARTOGRAPHY TABLE instantly, with no round trip to the AI. Leveling up now also tells you exactly how many skill points you have to spend (based on your Intelligence) and jumps you straight to your SKILL MATRIX so you can assign them yourself, deterministically, every time. And a new [PERKS] command lists every perk you already qualify for at your current level, pulled straight from the game's own records — no AI needed for any of it.
 - Your CARTOGRAPHY TABLE now lets you set your current location right from the map. Tap a location's entry and you'll see a new TRAVEL HERE button next to MARK SURVEYED — tap it and that spot instantly becomes your current position, with the map updating right away, no AI round trip needed.
+- Moving to a new location — whether you travel there from the map, type it into your Position field, log an arrival in TERMINAL mode, or the AI moves you — now shows a small confirmation card in the top-right corner naming exactly where you ended up, which slides away on its own a couple of seconds later.
 
 ### Changed
 

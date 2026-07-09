@@ -239,6 +239,28 @@
       </div>
     </div>
 
+    <!-- LOCATION CONFIRMATION CARD — a transient top-right toast confirming
+         the player's CURRENT location just changed (map TRAVEL HERE, the
+         POSITION panel field, a quick-log arrival, or an AI import — every
+         path funnels through the single onLocationChange() choke point,
+         which emits 'location.current' on a genuine change only, js/ui-
+         core.js). Lives at BODY level (never inside .container/.machine)
+         so it is never affected by the ambient-runtime filter/transform
+         containing-block trade-off documented above the fixed bezel dock
+         (terminal.css). Empty/inert until _locationCardShow() populates
+         it; role=status + aria-live=polite doubles as a screen-reader
+         announcement. Purely transient DOM — zero campaign-state write. -->
+    <div
+      id="locationCard"
+      class="location-card"
+      role="status"
+      aria-live="polite"
+      aria-hidden="true"
+    >
+      <span class="loc-card-glyph" aria-hidden="true">&#10687;</span>
+      <span class="loc-card-label"></span>
+    </div>
+
     <div class="container machine" id="uosMachine">
       <!-- ════════════════════════════════════════════════════════════════
            DEVICE CHRome (DO-N, Protocol UI-7): the app becomes a physical

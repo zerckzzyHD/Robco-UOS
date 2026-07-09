@@ -15908,6 +15908,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       '_wireCoreEventBusSubscribers',
       '_wireChassisCoreEventBusSubscribers',
       '_wireFeedbackEchoSubscribers', // FEEDBACK ANIMATION WAVE 1 — the STATUS ANNUNCIATOR's own wiring fn
+      '_wireLocationCardSubscriber', // Suite 204 — the LOCATION CONFIRMATION CARD's own wiring fn
     ]);
     const apiCheck135 = onCallsInsideWiringFn(apiSource, '_wireApiEventBusSubscribers');
     assert(
@@ -31581,12 +31582,20 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '199.24: the echo subscriber pushes an EXPIRING annunciation on effect.expiring'
   );
 
-  // 199.25  #27 TRIANGULATE pushes directly from onLocationChange() rather
-  //         than through a bus subscription in the echo-wiring function.
+  // 199.25  #27 TRIANGULATE's echo half is RETIRED (Suite 204, the LOCATION
+  //         CONFIRMATION CARD): onLocationChange() no longer pushes an
+  //         "ARRIVED" annunciator chip directly — it emits a guarded
+  //         'location.current' bus event instead, so the player sees ONE
+  //         clean location confirmation (the top-right card) instead of two
+  //         competing toasts. The map's own "you" reticle pulse (tested
+  //         above, 199.15) is untouched, and the annunciator echo-wiring
+  //         function still carries no ARRIVED text (superseded, never
+  //         duplicated).
   assert(
-    /_echoPush\(\{[\s\S]{0,120}glyph: '⦿'[\s\S]{0,80}ARRIVED:/.test(onLocChangeBody199) &&
+    /RobcoEvents\.emit\(\s*['"]location\.current['"]/.test(onLocChangeBody199) &&
+      !/_echoPush\(\{[\s\S]{0,120}ARRIVED:/.test(onLocChangeBody199) &&
       !/ARRIVED:/.test(wireEchoBody199),
-    '199.25: #27 TRIANGULATE pushes its annunciation directly from onLocationChange(), never through a bus subscription'
+    '199.25: onLocationChange() retires the direct "ARRIVED" annunciator push in favor of a guarded location.current bus emit, consumed by the LOCATION CONFIRMATION CARD (Suite 204) — one clean location confirmation, not two competing toasts'
   );
 
   // 199.26  the 7 home-only WAVE 3 items get NO echo wiring — item.equipped
@@ -32845,6 +32854,268 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         (err203 ? ' — ' + err203.message : '')
     );
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 204 — LOCATION CONFIRMATION CARD: a top-right toast confirming the
+//  player's CURRENT location changed. Fires from the SAME single choke point
+//  every location-change path already routes through (onLocationChange()),
+//  which now emits a guarded 'location.current' bus event (genuine change
+//  only — never a same-value re-set) consumed by exactly one subscriber
+//  (_wireLocationCardSubscriber()). Retires the older inline "ARRIVED"
+//  annunciator push (#27 TRIANGULATE's echo half, see the reworked 199.25)
+//  so the player sees ONE clean confirmation instead of two competing
+//  toasts; the map's own "you" reticle pulse (TRIANGULATE's home half) and
+//  the SURVEYED annunciator reaction (location.visited, new-discovery-only)
+//  are both untouched. Plain @keyframes (Protocol UI-9), zero campaign-state
+//  write, mobile-safe fixed positioning (Protocol 17).
+//  10 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 204 — LOCATION CONFIRMATION CARD (top-right arrival toast)');
+  const coreSrc204 = readFile('js/ui-core.js');
+  const htmlSrc204 = readFile('index.html');
+  const css204 = readFile('css/terminal.css');
+  const cssStripped204 = css204.replace(/\/\*[\s\S]*?\*\//g, '');
+  const onLocChangeBody204 = extractFunctionBody(coreSrc204, 'onLocationChange');
+  const showBody204 = extractFunctionBody(coreSrc204, '_locationCardShow');
+  const wireLocBody204 = extractFunctionBody(coreSrc204, '_wireLocationCardSubscriber');
+  const wireEchoBody204 = extractFunctionBody(coreSrc204, '_wireFeedbackEchoSubscribers');
+
+  // 204.1  #locationCard is a real, always-in-DOM element (role=status +
+  //        aria-live=polite doubles as an SR announcement), starts
+  //        aria-hidden, and lives at BODY level — BEFORE .container.machine
+  //        — so the ambient-runtime filter/transform containing-block
+  //        trade-off documented above the fixed bezel dock never applies.
+  {
+    const cardIdx204 = htmlSrc204.indexOf('id="locationCard"');
+    const containerIdx204 = htmlSrc204.indexOf('class="container machine"');
+    assert(
+      /<div[\s\S]{0,60}id="locationCard"[\s\S]{0,200}class="location-card"[\s\S]{0,200}role="status"[\s\S]{0,120}aria-live="polite"[\s\S]{0,120}aria-hidden="true"/.test(
+        htmlSrc204
+      ) &&
+        /class="loc-card-glyph"/.test(htmlSrc204) &&
+        /class="loc-card-label"><\/span>/.test(htmlSrc204) &&
+        cardIdx204 !== -1 &&
+        containerIdx204 !== -1 &&
+        cardIdx204 < containerIdx204,
+      '204.1: #locationCard is a role=status/aria-live=polite toast (starts aria-hidden) with a glyph + label span, placed at body level before .container.machine'
+    );
+  }
+
+  // 204.2  onLocationChange() emits 'location.current' guarded on a GENUINE
+  //        change (a case-insensitive prevLoc-vs-new comparison) — never an
+  //        unconditional push, so a same-value re-set stays silent.
+  assert(
+    /const locChanged =[\s\S]{0,220}toLowerCase\(\) !==[\s\S]{0,220}toLowerCase\(\);/.test(
+      onLocChangeBody204
+    ) &&
+      /if \(locChanged && state\.loc\) \{[\s\S]{0,80}RobcoEvents\.emit\(\s*['"]location\.current['"]/.test(
+        onLocChangeBody204
+      ),
+    '204.2: onLocationChange() emits location.current only when locChanged is true (a genuine, case-insensitive prevLoc-vs-new-loc difference) — a same-value re-set never fires'
+  );
+
+  // 204.3  BEHAVIORAL (vm sandbox) — a real arrival emits location.current
+  //        with the new loc; re-setting to the SAME location (even a
+  //        different case) emits nothing; a further genuine change emits
+  //        again.
+  {
+    const vm204 = require('vm');
+    let out204 = null;
+    let err204 = null;
+    try {
+      const declared204 = 'function onLocationChange(overrideLoc)' + onLocChangeBody204;
+      const emits204 = [];
+      const locEl204 = { value: 'Goodsprings' };
+      const stateObj204 = { loc: 'Goodsprings' };
+      const sandbox204 = {
+        state: stateObj204,
+        document: {
+          getElementById: id => (id === 'stat_loc' ? locEl204 : null),
+          querySelector: () => null,
+        },
+        syncStateFromDom() {
+          stateObj204.loc = locEl204.value;
+        },
+        recordLocationVisit() {},
+        saveState() {},
+        renderWorldMap() {},
+        setTimeout() {},
+        RobcoEvents: {
+          emit(name, payload) {
+            emits204.push({ name, payload });
+          },
+        },
+      };
+      vm204.createContext(sandbox204);
+      vm204.runInContext(declared204, sandbox204);
+      vm204.runInContext("onLocationChange('Novac');", sandbox204);
+      vm204.runInContext("onLocationChange('novac');", sandbox204); // same value, different case — no-op
+      vm204.runInContext("onLocationChange('Primm');", sandbox204);
+      out204 = { emits: emits204, finalLoc: stateObj204.loc };
+    } catch (e) {
+      err204 = e;
+    }
+    assert(
+      !err204 &&
+        out204.emits.length === 2 &&
+        out204.emits[0].name === 'location.current' &&
+        out204.emits[0].payload.loc === 'Novac' &&
+        out204.emits[1].name === 'location.current' &&
+        out204.emits[1].payload.loc === 'Primm' &&
+        out204.finalLoc === 'Primm',
+      '204.3: [behavioral] onLocationChange() emits location.current on Goodsprings→Novac and Novac→Primm, but stays silent on the same-value case-insensitive re-set Novac→novac — never a naive unconditional push' +
+        (err204 ? ' — ' + err204.message : '')
+    );
+  }
+
+  // 204.4  _locationCardShow() escapes the location name via the SAME
+  //        escapeHtml() helper used app-wide before writing it into the DOM
+  //        (XSS-safe).
+  assert(
+    /escapeHtml\(String\(loc\)\)/.test(showBody204) && /labelEl\.innerHTML =/.test(showBody204),
+    '204.4: _locationCardShow() escapes the location name via escapeHtml() before writing it into .loc-card-label'
+  );
+
+  // 204.5  BEHAVIORAL (vm sandbox) — _locationCardShow() shows the card
+  //        (aria-hidden=false, .show class, escaped label), then auto-
+  //        dismisses (.hide after the display timer, fully hidden again —
+  //        aria-hidden=true, no .hide class — after the exit-animation
+  //        timer) — a real slide-in/out lifecycle, not a bare toggle.
+  {
+    const vm204b = require('vm');
+    let out204b = null;
+    let err204b = null;
+    try {
+      const declared204b =
+        'let _locCardTimer = null; let _locCardHideTimer = null;\nfunction _locationCardShow(loc)' +
+        showBody204;
+      const timers204b = [];
+      const classes204b = new Set();
+      const attrs204b = {};
+      const labelStub204b = { innerHTML: '' };
+      const elStub204b = {
+        querySelector: sel => (sel === '.loc-card-label' ? labelStub204b : null),
+        classList: {
+          add: c => classes204b.add(c),
+          remove: c => classes204b.delete(c),
+        },
+        setAttribute: (n, v) => {
+          attrs204b[n] = v;
+        },
+        get offsetWidth() {
+          return 0;
+        },
+      };
+      const sandbox204b = {
+        document: { getElementById: id => (id === 'locationCard' ? elStub204b : null) },
+        escapeHtml: s => String(s).replace(/</g, '&lt;').replace(/>/g, '&gt;'),
+        _echoShouldShow: () => true,
+        clearTimeout: () => {},
+        setTimeout: (fn, ms) => {
+          const id = timers204b.length + 1;
+          timers204b.push({ id, fn, ms });
+          return id;
+        },
+      };
+      vm204b.createContext(sandbox204b);
+      vm204b.runInContext(declared204b, sandbox204b);
+      vm204b.runInContext("_locationCardShow('<b>Novac</b>');", sandbox204b);
+      const afterShow204b = {
+        hasShow: classes204b.has('show'),
+        ariaHidden: attrs204b['aria-hidden'],
+        label: labelStub204b.innerHTML,
+      };
+      const displayTimer204b = timers204b.find(t => t.ms === 2200);
+      displayTimer204b.fn();
+      const afterHideStart204b = {
+        hasHide: classes204b.has('hide'),
+        hasShow: classes204b.has('show'),
+      };
+      const exitTimer204b = timers204b.find(t => t.ms === 240);
+      exitTimer204b.fn();
+      const afterFinal204b = {
+        hasHide: classes204b.has('hide'),
+        ariaHidden: attrs204b['aria-hidden'],
+      };
+      out204b = { afterShow204b, afterHideStart204b, afterFinal204b };
+    } catch (e) {
+      err204b = e;
+    }
+    assert(
+      !err204b &&
+        out204b.afterShow204b.hasShow &&
+        out204b.afterShow204b.ariaHidden === 'false' &&
+        out204b.afterShow204b.label === '&lt;b&gt;Novac&lt;/b&gt;' &&
+        out204b.afterHideStart204b.hasHide &&
+        !out204b.afterHideStart204b.hasShow &&
+        !out204b.afterFinal204b.hasHide &&
+        out204b.afterFinal204b.ariaHidden === 'true',
+      '204.5: [behavioral] _locationCardShow() escapes the loc, shows the card (aria-hidden=false, .show), then auto-dismisses (.hide after the display timer, fully reset — aria-hidden=true, no .hide — after the exit-animation timer)' +
+        (err204b ? ' — ' + err204b.message : '')
+    );
+  }
+
+  // 204.6  reduced-motion-safe: plain @keyframes for both the entrance and
+  //        exit (never transition-only), so the existing global
+  //        prefers-reduced-motion block auto-neutralizes both (Protocol UI-9).
+  assert(
+    /@keyframes location-card-in/.test(cssStripped204) &&
+      /@keyframes location-card-out/.test(cssStripped204) &&
+      /\.location-card\.show \{[^}]*animation:\s*location-card-in/.test(cssStripped204) &&
+      /\.location-card\.hide \{[^}]*animation:\s*location-card-out/.test(cssStripped204),
+    '204.6: the location card entrance/exit are plain @keyframes animations (reduced-motion-safe by construction, no bespoke carve-out)'
+  );
+
+  // 204.7  mobile-safe: fixed, viewport-relative sizing that can never force
+  //        horizontal overflow at 360/412px (Protocol 17).
+  assert(
+    /\.location-card \{[^}]*position:\s*fixed/.test(cssStripped204) &&
+      /\.location-card \{[^}]*max-width:\s*min\(280px,\s*calc\(100vw - 24px\)\)/.test(
+        cssStripped204
+      ),
+    '204.7: .location-card is position:fixed with a viewport-clamped max-width (min(280px, 100vw-24px)) — cannot force horizontal overflow at any width'
+  );
+
+  // 204.8  ZERO campaign-state write anywhere in the new card code — purely
+  //        transient DOM (Protocol 22): no saveState()/robco_v8, and no
+  //        state.<field> ASSIGNMENT (a read of state.loc for the genuine-
+  //        change comparison, tested separately above, is expected and fine).
+  {
+    const newCode204 = showBody204 + '\n' + wireLocBody204;
+    assert(
+      !/saveState\(\)/.test(newCode204) &&
+        !/robco_v8/.test(newCode204) &&
+        !/state\.\w+\s*=/.test(newCode204),
+      '204.8: the LOCATION CONFIRMATION CARD code (_locationCardShow/_wireLocationCardSubscriber) never calls saveState() or touches robco_v8/state.* — transient DOM only'
+    );
+  }
+
+  // 204.9  _wireLocationCardSubscriber() is called from window.onload (the
+  //        U7 boot-order lesson), and 'location.current' is subscribed
+  //        EXACTLY once — never duplicated inside the annunciator's own
+  //        echo-wiring function (which would double-fire the reaction).
+  assert(
+    /_wireLocationCardSubscriber\(\);/.test(coreSrc204) &&
+      (() => {
+        const onloadIdx = coreSrc204.indexOf('window.onload');
+        const wireIdx = coreSrc204.indexOf('_wireLocationCardSubscriber();');
+        return onloadIdx !== -1 && wireIdx > onloadIdx;
+      })() &&
+      /RobcoEvents\.on\(\s*['"]location\.current['"]/.test(wireLocBody204) &&
+      !/location\.current/.test(wireEchoBody204),
+    '204.9: _wireLocationCardSubscriber() is called from window.onload and is the ONLY subscriber to location.current — never also wired inside _wireFeedbackEchoSubscribers() (no double-fire)'
+  );
+
+  // 204.10  the pre-existing SURVEYED reaction (location.visited, new-
+  //         discovery-only) is untouched and stays architecturally distinct
+  //         from the new arrival card — two different signals, not a
+  //         duplicate of the same one.
+  assert(
+    /RobcoEvents\.on\(\s*['"]location\.visited['"][\s\S]{0,120}SURVEYED:/.test(wireEchoBody204),
+    '204.10: the SURVEYED annunciator reaction (location.visited, first-discovery only) is untouched — a distinct signal from the new arrival card, not removed or merged'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════
