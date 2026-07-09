@@ -183,6 +183,12 @@ export default [
         doLoot: 'readonly',
         _lootAdd: 'readonly',
         renderVisualParsePreview: 'readonly', // Visual Upload OCR Unit 2 (ui-render.js), called from js/ocr.js's runVisualOcr
+        // Visual Upload OCR Unit 3 (js/ocr.js) — hybrid routing, called from
+        // js/ui-saves.js's handleImageSelection() and js/ui-render.js's
+        // renderVisualParsePreview() TRY AI VISION / onClose handlers
+        routeVisualUpload: 'readonly',
+        _tryAiVisionFallback: 'readonly',
+        _clearVisualUploadStash: 'readonly',
         expandPanelForCategory: 'readonly',
         closeModal: 'readonly',
         playSyncTone: 'readonly',

@@ -3724,6 +3724,12 @@ function applyVisualParse(parsed) {
 // up on modal close. Transient only; never persisted.
 let _pendingVisualParse = null;
 let _pendingVisualScanUrl = null;
+// Set true ONLY by the TRY AI VISION button (Unit 3) for the one closeModal()
+// call it makes itself, so the modal's onClose below can tell "closing to
+// hand off to the AI-vision fallback" apart from every other close reason
+// (CONFIRM/CANCEL/MANUAL ENTRY/Escape/X) — the former must NOT clear the
+// image stash (transmitMessage() still needs it), the latter all must.
+let _visualParseRoutingToAiVision = false;
 
 // renderVisualParsePreview(parsed, file) — the confirm-gated preview modal
 // (§3.4), built on the SAME openModal()/#sysModal shell every other native
@@ -3787,8 +3793,9 @@ function renderVisualParsePreview(parsed, file) {
     thumbHtml +
     (nothingDetected
       ? '<div class="empty-state">NOTHING DETECTED — the optical scan found no recognizable items or stats in this image.</div>' +
-        '<div class="visparse-hint">Try a clearer, closer screenshot, or add items directly.</div>' +
+        '<div class="visparse-hint">Try a clearer, closer screenshot, ask Director vision instead, or add items directly.</div>' +
         '<div class="modal-confirm-actions">' +
+        '<button type="button" id="visTryAiBtn" class="blue-btn">[ TRY AI VISION ]</button>' +
         '<button type="button" id="visManualEntryBtn" class="blue-btn">[ MANUAL ENTRY ]</button>' +
         '</div>'
       : (inventory.length
@@ -3808,12 +3815,22 @@ function renderVisualParsePreview(parsed, file) {
   openModal({
     title: '> OPTICAL SCAN — REVIEW & CONFIRM',
     body,
+    // Unit 3: every close reason EXCEPT "routing to AI vision" releases the
+    // image stash (attachedImageData/attachedImageMimeType) — the TRY AI
+    // VISION handler below is the one call site that sets the flag right
+    // before its own closeModal() so this callback skips the clear and lets
+    // transmitMessage() own (and later release) the stash instead.
     onClose: () => {
       if (_pendingVisualScanUrl) {
         URL.revokeObjectURL(_pendingVisualScanUrl);
         _pendingVisualScanUrl = null;
       }
       _pendingVisualParse = null;
+      if (_visualParseRoutingToAiVision) {
+        _visualParseRoutingToAiVision = false;
+      } else if (typeof _clearVisualUploadStash === 'function') {
+        _clearVisualUploadStash();
+      }
     },
   });
 
@@ -3826,6 +3843,15 @@ function renderVisualParsePreview(parsed, file) {
     manualBtn.addEventListener('click', () => {
       closeModal();
       if (typeof expandPanelForCategory === 'function') expandPanelForCategory('inventory');
+    });
+  const tryAiBtn = document.getElementById('visTryAiBtn');
+  if (tryAiBtn)
+    tryAiBtn.addEventListener('click', () => {
+      _visualParseRoutingToAiVision = true;
+      closeModal();
+      if (typeof _tryAiVisionFallback === 'function') {
+        _tryAiVisionFallback('> [SYS] ROUTING TO DIRECTOR VISION…');
+      }
     });
 }
 

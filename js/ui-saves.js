@@ -791,6 +791,14 @@ async function importBundle(parsed) {
 function triggerImageUpload() {
   document.getElementById('imageInput').click();
 }
+// Visual Upload OCR Unit 3 (planning/VISUAL_UPLOAD_OCR_PLAN.md §4): the stash
+// of attachedImageData/attachedImageMimeType + the #imagePreview thumbnail is
+// UNCHANGED (Protocol 22 — the AI-vision fallback still needs both globals
+// set verbatim). What changes is what happens next — routeVisualUpload(file)
+// (js/ocr.js) now runs the on-device OCR pipeline as the PRIMARY path the
+// instant a screenshot is picked, falling back to the existing AI-vision
+// pipeline only when OCR is unavailable/failing or the player explicitly
+// requests it from the preview modal.
 function handleImageSelection(event) {
   const file = event.target.files[0];
   if (!file) return;
@@ -801,6 +809,7 @@ function handleImageSelection(event) {
     const preview = document.getElementById('imagePreview');
     preview.src = attachedImageData;
     preview.style.display = 'block';
+    if (typeof routeVisualUpload === 'function') routeVisualUpload(file);
   };
   reader.readAsDataURL(file);
 }

@@ -14733,77 +14733,77 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         ps: undefined,
         pt: undefined,
         cm: undefined,
-        sha256: 'ac01cf4e1328001cde804a099d1d06494b7ce3382792c74b2758a48e8ba34fc3',
+        sha256: 'e92b2945f9bff31f3a3db11467880d9d452faa125a6517e6234ef50ffac46a3a',
       },
       {
         ctx: 'FNV',
         ps: 'melee',
         pt: undefined,
         cm: undefined,
-        sha256: '3f07321147caa26cf7f1188edbe629c535b585d05ef24a893dca59662c38584f',
+        sha256: 'e5352c15f4e3de08af348cc692b9825dad15c9f01f8d90db5913d3fd6578dcba',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'minmaxed',
         cm: undefined,
-        sha256: 'df9349d0f0cae81d2c41933a92ffd37a81d0a4c088715d45ff675faa1993a7b0',
+        sha256: '39394b3dc5bc8e2c638bccb30bb270d1dbe47f9268332d155bd398bc0a54b1f6',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'completionist',
         cm: undefined,
-        sha256: 'f2a73fa23f3d7130caccbfae04d15dc6ef5225c61e25a15236fff5e1ba873b47',
+        sha256: 'c7a7520d07101c123567dc5d02e82642339bbc84f3c6e75241f781a50a3c95d5',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'casual',
         cm: undefined,
-        sha256: '74ada35e33bef7c250a543fed13046cca358f6fdb028a1f4a1de099b45f09916',
+        sha256: '97a4add09688c9436a8a64eb3998b03655a9b0c502eb411e4bc086389f7a2f13',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'speedrun',
         cm: undefined,
-        sha256: 'df637bca2fdb284a9f47a9eff85a0efbbb8515d7ce3ae03c2a092ada51f2b179',
+        sha256: '996649468f82f2ea43a097ba309322841f29940322284da2fd3ceed00c5e7f14',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: undefined,
         cm: 'rng',
-        sha256: '37a49139cec9465d8c9189dc25f01bf587da5528ffaa1e6eb7fe108afce8d2f1',
+        sha256: '6f83cc4cbfbbd4278d85cb68c1a57261844e41e924ccfe201764e49911c2161b',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: undefined,
         cm: 'rng-locked',
-        sha256: 'ab98a1f90d7d6f543e340cc75eb63eec53dfab61a3a649fdc5f3b6c5cd92cdd0',
+        sha256: '1d2198aab4462c1a3974c74d765483799622171cc60d947e07f837f7a217f5af',
       },
       {
         ctx: 'FNV',
         ps: 'melee',
         pt: 'minmaxed',
         cm: 'rng-locked',
-        sha256: '260656c7efdab70fb2615cc15b6959542fb6e0d7d08877c0470a4847115bb74f',
+        sha256: 'c7c87793f9fc241ab84044b6bf00f8761623ea1bc2611209424223e92fe3d5e7',
       },
       {
         ctx: 'FO3',
         ps: undefined,
         pt: undefined,
         cm: undefined,
-        sha256: 'd1f4f7ecb807ac2975b5398d475eec4bd142eeeaf065522215207fe5477b8c78',
+        sha256: 'dcf88fbb28078817e0f993394412e219c63bd1e34dc442184531de220a7e373f',
       },
       {
         ctx: 'FO3',
         ps: 'melee',
         pt: undefined,
         cm: 'rng-locked',
-        sha256: '0f569794e9f02d1318850899efb9cf68d67a1a72737147f345ed60e8bac24e78',
+        sha256: '07b3c98f687417f2360455351491a6086117a14bcb5ac4f276a3a8ee20df5be4',
       },
     ];
 
@@ -33901,6 +33901,492 @@ header('Suite 206 — VISUAL UPLOAD OCR Unit 2 (parser + preview/confirm + apply
         !/state\.visual/i.test(renderSrc206) &&
         !/state\.ocr/i.test(renderSrc206),
       '206.16: applyVisualParse() writes only through state.inventory and the existing native setters — no new campaign-state field is introduced (Protocol 4 not triggered)'
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 207 — VISUAL UPLOAD OCR Unit 3 (hybrid wiring + kill-switch)
+//  planning/VISUAL_UPLOAD_OCR_PLAN.md §4: the two fail-open feature flags
+//  (visualOcr primary / visualAiVision fallback, js/cloud.js), the hybrid
+//  router (routeVisualUpload(), js/ocr.js) wired into the REAL composer [+]
+//  attach flow (handleImageSelection(), js/ui-saves.js), the TRY AI VISION
+//  escape hatch in the preview modal's NOTHING DETECTED state, the
+//  FAIL_THRESHOLD auto-disable (Protocol 35 client analogue), the graceful
+//  manual-entry dead end (Protocol 33), and the reframed AI directive
+//  (Protocol 14 — fallback-only framing, no-clobber rule preserved). The
+//  pre-existing AI-vision transmitMessage() inlineData branch is reused
+//  verbatim as the fallback (Protocol 22) — this unit retires the AI-ONLY
+//  default without deleting or forking that code path.
+//  17 tests
+// ══════════════════════════════════════════════════════════════
+header('Suite 207 — VISUAL UPLOAD OCR Unit 3 (hybrid wiring + kill-switch)');
+{
+  const ocrSrc207 = readFile('js/ocr.js');
+  const savesSrc207 = readFile('js/ui-saves.js');
+  const apiSrc207 = readFile('js/api.js');
+  const renderSrc207 = readFile('js/ui-render.js');
+  const coreSrc207 = readFile('js/ui-core.js');
+  const cloudSrc207 = readFile('js/cloud.js');
+
+  // 207.1 static — cloud.js registers both fail-open flags (Protocol 32/33)
+  assert(
+    /visualOcr:\s*true,/.test(cloudSrc207) && /visualAiVision:\s*true,/.test(cloudSrc207),
+    '207.1: js/cloud.js registers visualOcr:true and visualAiVision:true in _featureFlags (fail-open defaults, Protocol 32/33)'
+  );
+
+  // 207.2 static — js/ocr.js declares all 6 hybrid-routing functions and
+  //       exposes each on window (same export idiom as Units 1/2).
+  {
+    const hybridFns207 = [
+      '_visualOcrEnabled',
+      '_aiVisionAvailable',
+      '_clearVisualUploadStash',
+      '_tryAiVisionFallback',
+      '_visualUploadDeadEnd',
+      'routeVisualUpload',
+    ];
+    assert(
+      hybridFns207.every(n => new RegExp(`function ${n}\\(`).test(ocrSrc207)) &&
+        hybridFns207.every(n => new RegExp(`window\\.${n} = ${n};`).test(ocrSrc207)),
+      '207.2: js/ocr.js declares _visualOcrEnabled/_aiVisionAvailable/_clearVisualUploadStash/_tryAiVisionFallback/_visualUploadDeadEnd/routeVisualUpload and exposes each on window'
+    );
+  }
+
+  // 207.3 static — handleImageSelection() (ui-saves.js) stashes
+  //       attachedImageData exactly as before, THEN calls routeVisualUpload(file)
+  //       — and the pre-existing AI-vision inlineData branch (api.js) is
+  //       still present, untouched (Protocol 22 — reused, not forked).
+  {
+    const handleBody207 = extractFunctionBody(savesSrc207, 'handleImageSelection');
+    const stashIdx207 = handleBody207.indexOf('attachedImageData = e.target.result;');
+    const routeIdx207 = handleBody207.indexOf('routeVisualUpload(file)');
+    assert(
+      stashIdx207 !== -1 &&
+        routeIdx207 !== -1 &&
+        routeIdx207 > stashIdx207 &&
+        /inlineData:\s*\{\s*mimeType:\s*attachedImageMimeType/.test(apiSrc207),
+      '207.3: handleImageSelection() stashes attachedImageData then calls routeVisualUpload(file); the AI-vision inlineData branch (api.js) remains present and untouched'
+    );
+  }
+
+  // 207.4 static — routeVisualUpload() gates on _visualOcrEnabled() FIRST and
+  //       routes straight to the fallback without ever calling runVisualOcr()
+  //       when OCR itself is killed (visualOcr off).
+  {
+    const routeBody207 = extractFunctionBody(ocrSrc207, 'routeVisualUpload');
+    const gateIdx207 = routeBody207.indexOf('if (!_visualOcrEnabled())');
+    const fallbackIdx207 = routeBody207.indexOf('_tryAiVisionFallback(');
+    const ocrCallIdx207 = routeBody207.indexOf('runVisualOcr(file');
+    assert(
+      gateIdx207 !== -1 &&
+        fallbackIdx207 !== -1 &&
+        ocrCallIdx207 !== -1 &&
+        gateIdx207 < fallbackIdx207 &&
+        fallbackIdx207 < ocrCallIdx207,
+      '207.4: routeVisualUpload() checks _visualOcrEnabled() before anything else and hands off to _tryAiVisionFallback() without ever reaching runVisualOcr() when OCR is killed'
+    );
+  }
+
+  // 207.5 static — routeVisualUpload()'s catch block records the failure via
+  //       the REAL window._recordFeatureFailure('visualOcr', …) then routes
+  //       to _tryAiVisionFallback() (Protocol 32/35 client analogue).
+  {
+    const routeBody207 = extractFunctionBody(ocrSrc207, 'routeVisualUpload');
+    const catchIdx207 = routeBody207.indexOf('} catch (err) {');
+    const catchBody207 = catchIdx207 !== -1 ? routeBody207.slice(catchIdx207) : '';
+    assert(
+      /window\._recordFeatureFailure\(\s*'visualOcr'/.test(catchBody207) &&
+        /_tryAiVisionFallback\(/.test(catchBody207),
+      "207.5: routeVisualUpload()'s catch block calls window._recordFeatureFailure('visualOcr', …) then _tryAiVisionFallback() — an OCR failure both counts toward auto-disable and hands off to the fallback"
+    );
+  }
+
+  // 207.6 static — _aiVisionAvailable() reuses the REAL _isUplinkConnected()
+  //       (ui-core.js) rather than re-deriving a second key/online check
+  //       (Protocol 22), gated additionally by the visualAiVision flag.
+  {
+    const aiAvailBody207 = extractFunctionBody(ocrSrc207, '_aiVisionAvailable');
+    assert(
+      /window\.isFeatureEnabled\('visualAiVision'\)/.test(aiAvailBody207) &&
+        /_isUplinkConnected\(\)/.test(aiAvailBody207) &&
+        /function _isUplinkConnected\(\)/.test(coreSrc207),
+      '207.6: _aiVisionAvailable() gates on the visualAiVision flag AND reuses the real _isUplinkConnected() (ui-core.js) — no forked key/online check'
+    );
+  }
+
+  // 207.7 static — _tryAiVisionFallback() reuses the REAL transmitMessage()
+  //       verbatim (the exact '[VISUAL UPLOAD]' override token) when AI
+  //       vision is available, else falls to _visualUploadDeadEnd().
+  {
+    const fallbackBody207 = extractFunctionBody(ocrSrc207, '_tryAiVisionFallback');
+    assert(
+      /transmitMessage\('\[VISUAL UPLOAD\]'\)/.test(fallbackBody207) &&
+        /_visualUploadDeadEnd\(\)/.test(fallbackBody207) &&
+        /async function transmitMessage\(overrideText\)/.test(apiSrc207),
+      "207.7: _tryAiVisionFallback() calls the real transmitMessage('[VISUAL UPLOAD]') when available, else _visualUploadDeadEnd() — the AI-vision pipeline is reused verbatim (Protocol 22), never rewritten"
+    );
+  }
+
+  // 207.8 static — _visualUploadDeadEnd() clears the image stash AND appends
+  //       a plain-English message pointing at CARGO MANIFEST — the app never
+  //       dead-ends with no way forward (Protocol 33).
+  {
+    const deadEndBody207 = extractFunctionBody(ocrSrc207, '_visualUploadDeadEnd');
+    assert(
+      /_clearVisualUploadStash\(\)/.test(deadEndBody207) &&
+        /CARGO MANIFEST/.test(deadEndBody207) &&
+        /appendToChat\(/.test(deadEndBody207),
+      '207.8: _visualUploadDeadEnd() clears the image stash and appends a plain-English "both offline — add items via CARGO MANIFEST" message (Protocol 33 — never a dead screen)'
+    );
+  }
+
+  // 207.9 static — the NOTHING DETECTED empty state renders BOTH the hybrid
+  //       TRY AI VISION escape hatch and the pre-existing MANUAL ENTRY button.
+  {
+    const previewBody207 = extractFunctionBody(renderSrc207, 'renderVisualParsePreview');
+    const nothingIdx207 = previewBody207.indexOf('nothingDetected');
+    const tryAiIdx207 = previewBody207.indexOf('id="visTryAiBtn"');
+    const manualIdx207 = previewBody207.indexOf('id="visManualEntryBtn"');
+    assert(
+      nothingIdx207 !== -1 &&
+        tryAiIdx207 > nothingIdx207 &&
+        manualIdx207 > nothingIdx207 &&
+        /\[ TRY AI VISION \]/.test(previewBody207),
+      "207.9: renderVisualParsePreview()'s NOTHING DETECTED empty state renders both #visTryAiBtn (TRY AI VISION) and #visManualEntryBtn"
+    );
+  }
+
+  // 207.10 static — the TRY AI VISION handler sets the routing flag and calls
+  //        closeModal() BEFORE handing off to _tryAiVisionFallback() — it
+  //        never clears the image stash itself (that is onClose's job).
+  {
+    const previewBody207 = extractFunctionBody(renderSrc207, 'renderVisualParsePreview');
+    const tryAiBlockIdx207 = previewBody207.indexOf("getElementById('visTryAiBtn')");
+    const tryAiBlock207 = tryAiBlockIdx207 !== -1 ? previewBody207.slice(tryAiBlockIdx207) : '';
+    const flagIdx207 = tryAiBlock207.indexOf('_visualParseRoutingToAiVision = true;');
+    const closeIdx207 = tryAiBlock207.indexOf('closeModal();');
+    const fallbackIdx207 = tryAiBlock207.indexOf('_tryAiVisionFallback(');
+    assert(
+      flagIdx207 !== -1 &&
+        closeIdx207 !== -1 &&
+        fallbackIdx207 !== -1 &&
+        flagIdx207 < closeIdx207 &&
+        closeIdx207 < fallbackIdx207 &&
+        !/_clearVisualUploadStash/.test(tryAiBlock207),
+      '207.10: the TRY AI VISION button sets _visualParseRoutingToAiVision = true, then closeModal(), then hands off to _tryAiVisionFallback() — it never calls _clearVisualUploadStash() itself'
+    );
+  }
+
+  // 207.11 static — the modal's onClose callback clears the image stash on
+  //        every close EXCEPT when routing to AI vision (the flag
+  //        short-circuits the clear so transmitMessage() keeps the stash).
+  {
+    const previewBody207 = extractFunctionBody(renderSrc207, 'renderVisualParsePreview');
+    const onCloseIdx207 = previewBody207.indexOf('onClose: () => {');
+    const wireIdx207 = previewBody207.indexOf("getElementById('visConfirmBtn')");
+    const onCloseBody207 =
+      onCloseIdx207 !== -1 && wireIdx207 !== -1
+        ? previewBody207.slice(onCloseIdx207, wireIdx207)
+        : '';
+    assert(
+      /if \(_visualParseRoutingToAiVision\) \{/.test(onCloseBody207) &&
+        /_visualParseRoutingToAiVision = false;/.test(onCloseBody207) &&
+        /\}\s*else if \(typeof _clearVisualUploadStash === 'function'\) \{/.test(onCloseBody207) &&
+        /_clearVisualUploadStash\(\);/.test(onCloseBody207),
+      "207.11: the preview modal's onClose callback clears the image stash on every close reason EXCEPT when _visualParseRoutingToAiVision is set (which it only consumes and resets)"
+    );
+  }
+
+  // 207.12 static — Protocol 14: the AI directive is reframed to fallback-only
+  //        framing (the old default-imperative "Execute > [VISUAL UPLOAD:
+  //        CATEGORY]" wording is gone), while the no-clobber rule survives
+  //        verbatim — the reframe changes WHEN the AI is invoked, not the
+  //        safety rule governing what it may touch.
+  {
+    const directiveFull207 = getDirectiveFullBody(apiSrc207);
+    assert(
+      /Visual Upload Fallback/.test(directiveFull207) &&
+        !/Execute > \[VISUAL UPLOAD: CATEGORY\]/.test(directiveFull207) &&
+        /STRICTLY FORBIDDEN from deleting un-pictured items/.test(directiveFull207),
+      '207.12: the AI directive is reframed to "Visual Upload Fallback" framing (the old default-imperative wording is gone) while the STRICTLY FORBIDDEN no-clobber rule survives verbatim (Protocol 14)'
+    );
+  }
+
+  // 207.13 static — COMMAND_REGISTRY's Visual Upload entry documents the
+  //        native [+] button + AI-vision fallback, not the retired
+  //        typed-command framing.
+  {
+    const registry207 = (coreSrc207.match(/const COMMAND_REGISTRY = \[([\s\S]*?)\n\];/) || [
+      '',
+      '',
+    ])[1];
+    assert(
+      /\[\+\] VISUAL UPLOAD/.test(registry207) &&
+        /Director vision/.test(registry207) &&
+        !/\[VISUAL UPLOAD: X\]/.test(registry207),
+      "207.13: COMMAND_REGISTRY's Visual Upload entry documents the native [+] attach control + the Director-vision fallback, replacing the retired [VISUAL UPLOAD: X] typed-command framing"
+    );
+  }
+
+  // 207.14 BEHAVIORAL — the real _visualOcrEnabled()/_aiVisionAvailable()
+  //        fail-open (Protocol 33) when isFeatureEnabled is undefined,
+  //        disable on an explicit false flag, and _aiVisionAvailable()
+  //        additionally requires a live carrier via _isUplinkConnected().
+  {
+    const vm207a = require('vm');
+    let ok207a = false;
+    let err207a = null;
+    try {
+      function declareFn207(src, name) {
+        const nameIdx = src.indexOf('function ' + name);
+        const params = src.slice(
+          src.indexOf('(', nameIdx),
+          src.indexOf('{', src.indexOf('(', nameIdx))
+        );
+        return 'function ' + name + params + extractFunctionBody(src, name);
+      }
+      const gateSrc207 =
+        declareFn207(ocrSrc207, '_visualOcrEnabled') +
+        '\n' +
+        declareFn207(ocrSrc207, '_aiVisionAvailable');
+      const sb = { window: {}, _isUplinkConnected: () => true };
+      sb.window = sb;
+      vm207a.createContext(sb);
+      vm207a.runInContext(gateSrc207, sb);
+
+      const failOpenOcr = sb._visualOcrEnabled();
+      const failOpenAi = sb._aiVisionAvailable();
+
+      sb.window.isFeatureEnabled = key => key !== 'visualOcr';
+      const explicitOffOcr = sb._visualOcrEnabled();
+
+      sb.window.isFeatureEnabled = key => key !== 'visualAiVision';
+      const explicitOffAi = sb._aiVisionAvailable();
+
+      sb.window.isFeatureEnabled = () => true;
+      sb._isUplinkConnected = () => false;
+      const noCarrierAi = sb._aiVisionAvailable();
+
+      ok207a =
+        failOpenOcr === true &&
+        failOpenAi === true &&
+        explicitOffOcr === false &&
+        explicitOffAi === false &&
+        noCarrierAi === false;
+    } catch (e) {
+      err207a = e;
+    }
+    assert(
+      ok207a,
+      '207.14: [behavioral] _visualOcrEnabled()/_aiVisionAvailable() fail-open when isFeatureEnabled is undefined (Protocol 33), disable on an explicit false flag, and _aiVisionAvailable() also requires a live carrier (_isUplinkConnected)' +
+        (err207a ? ' — ' + err207a.message : '')
+    );
+  }
+
+  // 207.15 BEHAVIORAL — the real cloud.js _recordFeatureFailure()/
+  //        FAIL_THRESHOLD auto-disables visualOcr after the 3rd recorded
+  //        failure (session-scoped, Protocol 35 client analogue).
+  {
+    const vm207b = require('vm');
+    let ok207b = false;
+    let err207b = null;
+    try {
+      function declareFn207b(src, name) {
+        const nameIdx = src.indexOf('function ' + name);
+        const params = src.slice(
+          src.indexOf('(', nameIdx),
+          src.indexOf('{', src.indexOf('(', nameIdx))
+        );
+        return 'function ' + name + params + extractFunctionBody(src, name);
+      }
+      const thresholdMatch207 = cloudSrc207.match(/const FAIL_THRESHOLD = (\d+);/);
+      const isEnabledFn207 = extractAssignedFunction(cloudSrc207, 'isFeatureEnabled');
+      const sb = {
+        _featureFlags: { visualOcr: true },
+        _autoDisabled: {},
+        _failCounts: {},
+        appendToChat: () => {},
+      };
+      vm207b.createContext(sb);
+      vm207b.runInContext(
+        `const FAIL_THRESHOLD = ${thresholdMatch207[1]};\n` +
+          declareFn207b(cloudSrc207, '_recordFeatureFailure') +
+          '\n' +
+          `var isFeatureEnabled = function ${isEnabledFn207.params} ${isEnabledFn207.body};`,
+        sb
+      );
+      const enabledAt0 = sb.isFeatureEnabled('visualOcr');
+      sb._recordFeatureFailure('visualOcr', '>> msg <<');
+      sb._recordFeatureFailure('visualOcr', '>> msg <<');
+      const enabledAt2 = sb.isFeatureEnabled('visualOcr');
+      sb._recordFeatureFailure('visualOcr', '>> msg <<');
+      const disabledAt3 = sb.isFeatureEnabled('visualOcr');
+      ok207b = enabledAt0 === true && enabledAt2 === true && disabledAt3 === false;
+    } catch (e) {
+      err207b = e;
+    }
+    assert(
+      ok207b,
+      "207.15: [behavioral] the real cloud.js _recordFeatureFailure()/FAIL_THRESHOLD auto-disables visualOcr after the 3rd recorded failure — isFeatureEnabled('visualOcr') stays true through 2 failures and flips false on the 3rd (Protocol 35 client analogue)" +
+        (err207b ? ' — ' + err207b.message : '')
+    );
+  }
+
+  // 207.16 BEHAVIORAL — routeVisualUpload() end-to-end via the REAL functions:
+  //        OCR success never falls back; an OCR failure records exactly one
+  //        failure and hands off to AI-vision; visualOcr-off skips OCR
+  //        entirely; AI-vision-unavailable degrades to the manual-entry
+  //        message with the stash cleared. Deferred (async), per the Suite
+  //        137.6 precedent — this runner body is otherwise synchronous.
+  _pendingAsync.push(
+    (async () => {
+      const vm207c = require('vm');
+      let ok207c = false;
+      let err207c = null;
+      try {
+        function declareFn207c(src, name) {
+          const nameIdx = src.indexOf('function ' + name);
+          const asyncPrefix =
+            src.slice(Math.max(0, nameIdx - 6), nameIdx) === 'async ' ? 'async ' : '';
+          const params = src.slice(
+            src.indexOf('(', nameIdx),
+            src.indexOf('{', src.indexOf('(', nameIdx))
+          );
+          return asyncPrefix + 'function ' + name + params + extractFunctionBody(src, name);
+        }
+        const hybridSrc207c = [
+          '_visualOcrEnabled',
+          '_aiVisionAvailable',
+          '_clearVisualUploadStash',
+          '_tryAiVisionFallback',
+          '_visualUploadDeadEnd',
+          'routeVisualUpload',
+        ]
+          .map(n => declareFn207c(ocrSrc207, n))
+          .join('\n\n');
+
+        function makeSandbox207c(opts) {
+          const calls = { recordFailure: [], transmit: [], chat: [], classToggles: [] };
+          const containerEl = {
+            classList: {
+              add: c => calls.classToggles.push('add:' + c),
+              remove: c => calls.classToggles.push('remove:' + c),
+            },
+          };
+          const previewEl = { style: {} };
+          const inputEl = { value: 'x' };
+          const sb = {
+            document: {
+              getElementById: id => {
+                if (id === 'imagePreviewContainer') return containerEl;
+                if (id === 'imagePreview') return previewEl;
+                if (id === 'imageInput') return inputEl;
+                return null;
+              },
+            },
+            attachedImageData: 'data:image/png;base64,x',
+            attachedImageMimeType: 'image/png',
+            appendToChat: msg => calls.chat.push(msg),
+            transmitMessage: t => calls.transmit.push(t),
+            _isUplinkConnected: () => !!opts.uplink,
+            runVisualOcr: opts.ocrShouldFail
+              ? () => Promise.reject(new Error('ocr-fail'))
+              : () => Promise.resolve({}),
+            console,
+          };
+          sb.window = sb;
+          sb.window.isFeatureEnabled = key =>
+            opts.flags && key in opts.flags ? opts.flags[key] : true;
+          sb.window._recordFeatureFailure = (key, msg) => calls.recordFailure.push({ key, msg });
+          vm207c.createContext(sb);
+          vm207c.runInContext(hybridSrc207c, sb);
+          return { sb, calls };
+        }
+
+        // Case A: OCR succeeds — no fallback, vats-scanning added then removed.
+        const A207 = makeSandbox207c({ ocrShouldFail: false });
+        await A207.sb.routeVisualUpload({});
+        const aOk207 =
+          A207.calls.recordFailure.length === 0 &&
+          A207.calls.transmit.length === 0 &&
+          A207.calls.classToggles[0] === 'add:vats-scanning' &&
+          A207.calls.classToggles[A207.calls.classToggles.length - 1] === 'remove:vats-scanning';
+
+        // Case B: OCR fails, AI-vision available — records ONE failure, hands off.
+        const B207 = makeSandbox207c({
+          ocrShouldFail: true,
+          uplink: true,
+          flags: { visualAiVision: true },
+        });
+        await B207.sb.routeVisualUpload({});
+        const bOk207 =
+          B207.calls.recordFailure.length === 1 &&
+          B207.calls.recordFailure[0].key === 'visualOcr' &&
+          B207.calls.transmit.length === 1 &&
+          B207.calls.transmit[0] === '[VISUAL UPLOAD]';
+
+        // Case C: visualOcr off from the start — skips OCR entirely (no
+        // vats-scanning class ever touched), routes straight to AI-vision.
+        const C207 = makeSandbox207c({ flags: { visualOcr: false }, uplink: true });
+        await C207.sb.routeVisualUpload({});
+        const cOk207 =
+          C207.calls.recordFailure.length === 0 &&
+          C207.calls.transmit.length === 1 &&
+          C207.calls.classToggles.length === 0;
+
+        // Case D: OCR fails, AI-vision unavailable (no carrier) — graceful
+        // dead end: no transmitMessage call, stash cleared, chat message shown.
+        const D207 = makeSandbox207c({
+          ocrShouldFail: true,
+          uplink: false,
+          flags: { visualAiVision: true },
+        });
+        await D207.sb.routeVisualUpload({});
+        const dOk207 =
+          D207.calls.transmit.length === 0 &&
+          D207.sb.attachedImageData === null &&
+          D207.calls.chat.some(m => /CARGO MANIFEST/.test(m));
+
+        ok207c = aOk207 && bOk207 && cOk207 && dOk207;
+      } catch (e) {
+        err207c = e;
+      }
+      // Re-emit this proof's OWN suite header immediately before its assert()
+      // — the Suite 137.6 precedent (Protocol 42): _pendingAsync now holds
+      // deferred proofs from multiple suites whose internal await chains can
+      // resolve in either order, so each must self-announce right before its
+      // own result line rather than relying on whichever suite happens to be
+      // re-emitted before Promise.all() below.
+      header('Suite 207 — VISUAL UPLOAD OCR Unit 3 (hybrid wiring + kill-switch)');
+      assert(
+        ok207c,
+        '207.16: [behavioral] routeVisualUpload() end-to-end: OCR success never falls back, an OCR failure records exactly one failure and hands off to AI-vision, visualOcr-off skips OCR entirely, and AI-vision-unavailable degrades to the manual-entry message with the stash cleared' +
+          (err207c ? ' — ' + err207c.message : '')
+      );
+    })()
+  );
+
+  // 207.17 static — zero new campaign-state field: the Unit 3 hybrid-routing
+  //        additions never touch state.*/saveState() directly — the ONLY
+  //        writes anywhere in this feature remain inside applyVisualParse()
+  //        (Unit 2), untouched by this unit's routing layer.
+  {
+    const hybridCombined207 = [
+      '_visualOcrEnabled',
+      '_aiVisionAvailable',
+      '_clearVisualUploadStash',
+      '_tryAiVisionFallback',
+      '_visualUploadDeadEnd',
+      'routeVisualUpload',
+    ]
+      .map(n => extractFunctionBody(ocrSrc207, n))
+      .join('\n');
+    assert(
+      !/saveState\(\)/.test(hybridCombined207) &&
+        !/\bstate\.\w+\s*=/.test(hybridCombined207) &&
+        !/autoImportState/.test(hybridCombined207),
+      '207.17: the Unit 3 hybrid-routing functions never call saveState()/assign state.*/call autoImportState — no new campaign-state field, writes stay confined to applyVisualParse() (Unit 2, Protocol 4 not triggered)'
     );
   }
 }

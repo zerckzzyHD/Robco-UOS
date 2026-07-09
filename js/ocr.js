@@ -385,6 +385,141 @@ async function runVisualOcr(file, onStatus) {
   return parsed;
 }
 
+// ── UNIT 3: HYBRID ROUTING + KILL-SWITCH (planning/VISUAL_UPLOAD_OCR_PLAN.md §4) ──
+// routeVisualUpload(file) is the ONE new entry point handleImageSelection()
+// (js/ui-saves.js) calls, immediately after it stashes attachedImageData/
+// attachedImageMimeType exactly as before (Protocol 22 — the AI-vision
+// fallback below needs those two globals set verbatim; nothing about that
+// stash changes). This is the hybrid: on-device OCR is PRIMARY
+// (isFeatureEnabled('visualOcr')); the existing, UNTOUCHED transmitMessage()
+// inlineData branch (api.js ~2174) is the FALLBACK, reached only when OCR is
+// off/failing or the player explicitly taps TRY AI VISION in the "NOTHING
+// DETECTED" empty state (renderVisualParsePreview, js/ui-render.js). Both
+// flags are fail-open (Protocol 33) via window.isFeatureEnabled(), which
+// itself defaults every unset/unreachable/malformed remote flag to true
+// (js/cloud.js) — a broken kill-switch read can never strand the player with
+// neither path. After FAIL_THRESHOLD OCR failures, _recordFeatureFailure
+// (js/cloud.js — the same client analogue Protocol 35 already uses for
+// cloudSync) auto-disables OCR for the rest of the session, degrading every
+// subsequent attach straight to the AI-vision fallback with no reload
+// (Protocol 32). attachedImageData/attachedImageMimeType are declared with
+// `let` at the top of js/ui-core.js, which loads AFTER this file in the boot
+// chain — referencing them by bare name here is safe because every reference
+// below lives inside a function body, evaluated only at a real user action
+// (long after full boot), matching the exact same forward-reference pattern
+// js/ui-saves.js's handleImageSelection() already relies on (Protocol 22).
+
+function _visualOcrEnabled() {
+  return (
+    typeof window.isFeatureEnabled !== 'function' || window.isFeatureEnabled('visualOcr') !== false
+  );
+}
+
+// AI-vision needs the SAME three signals transmitMessage() itself already
+// gates on (a Gemini key present, the aiChat flag on, navigator.onLine) —
+// reuses the Overseer's existing _isUplinkConnected() (js/ui-core.js) rather
+// than re-deriving a second key/online check (Protocol 22), plus its own
+// visualAiVision kill-switch on top.
+function _aiVisionAvailable() {
+  const flagOn =
+    typeof window.isFeatureEnabled !== 'function' ||
+    window.isFeatureEnabled('visualAiVision') !== false;
+  const connected = typeof _isUplinkConnected === 'function' ? _isUplinkConnected() : false;
+  return flagOn && connected;
+}
+
+// Releases the attach stash + the visible preview/file-input — the ONE place
+// this feature clears attachedImageData/attachedImageMimeType once neither
+// the OCR nor the AI-vision path needs them anymore (OCR applied/discarded
+// via the preview modal's CONFIRM/CANCEL/MANUAL ENTRY, or the dead-end
+// message below). The AI-vision hand-off path deliberately does NOT call
+// this — transmitMessage() clears the same two globals itself at the end of
+// its own round trip (_resetTransmitUI(), api.js), so there is exactly one
+// clear site per path and they can never race each other (Protocol 22).
+function _clearVisualUploadStash() {
+  attachedImageData = null;
+  attachedImageMimeType = null;
+  const preview = document.getElementById('imagePreview');
+  if (preview) {
+    preview.style.display = 'none';
+    preview.src = '';
+  }
+  const input = document.getElementById('imageInput');
+  if (input) input.value = '';
+  const container = document.getElementById('imagePreviewContainer');
+  if (container) container.classList.remove('vats-scanning');
+}
+
+// Hands the already-stashed image to the existing, UNCHANGED AI-vision
+// pipeline (transmitMessage()'s inlineData branch, api.js) — reused
+// verbatim, never forked (Protocol 22). Degrades to the manual-entry dead
+// end when neither visualAiVision nor a live carrier is available; the app
+// stays fully usable either way, never a dead screen (Protocol 33).
+function _tryAiVisionFallback(reasonLine) {
+  if (!_aiVisionAvailable()) {
+    _visualUploadDeadEnd();
+    return;
+  }
+  if (reasonLine && typeof appendToChat === 'function') appendToChat(reasonLine, 'sys');
+  if (typeof transmitMessage === 'function') transmitMessage('[VISUAL UPLOAD]');
+}
+
+// Neither the primary nor the fallback path is available right now —
+// graceful, fully-usable degradation (Protocol 33). Clears the stash (no
+// network call is ever going to consume it) and points the player at the
+// native CARGO MANIFEST add-item form instead. Never a black screen.
+function _visualUploadDeadEnd() {
+  _clearVisualUploadStash();
+  if (typeof appendToChat === 'function') {
+    appendToChat(
+      '> Optical scan and Director vision are both offline — add items via CARGO MANIFEST.',
+      'sys'
+    );
+  }
+}
+
+// routeVisualUpload(file) — called the instant a screenshot is picked
+// (handleImageSelection(), js/ui-saves.js). Primary: on-device OCR
+// (runVisualOcr(), Unit 2) → the confirm-gated preview modal, writing
+// nothing to state until the player taps CONFIRM & APPLY. On an OCR
+// load/recognize failure, or when visualOcr itself is killed, routes to the
+// AI-vision fallback instead — the vats-scanning CSS class is added/removed
+// by THIS function only around the OCR attempt itself (never left on/wrapped
+// in a blanket finally), so it can never fight the AI-vision path's own
+// identical class toggle inside transmitMessage() when a fallback hands off
+// to it (Protocol 27 — verified against the real synchronous-then-async
+// shape of transmitMessage(), not assumed).
+async function routeVisualUpload(file) {
+  if (!_visualOcrEnabled()) {
+    _tryAiVisionFallback(
+      '> [SYS] OPTICAL SCAN OFFLINE (OPERATOR-DISABLED) — ROUTING TO DIRECTOR VISION…'
+    );
+    return;
+  }
+  const container = document.getElementById('imagePreviewContainer');
+  if (container) container.classList.add('vats-scanning');
+  try {
+    await runVisualOcr(file, () => {});
+    if (container) container.classList.remove('vats-scanning');
+  } catch (err) {
+    if (container) container.classList.remove('vats-scanning');
+    if (typeof window._recordFeatureFailure === 'function') {
+      window._recordFeatureFailure(
+        'visualOcr',
+        '>> OPTICAL SCAN PAUSED after repeated errors — using Director vision when available. <<'
+      );
+    }
+    _tryAiVisionFallback('> [SYS] OPTICAL SCAN FAILED — ROUTING TO DIRECTOR VISION…');
+  }
+}
+
+window._visualOcrEnabled = _visualOcrEnabled;
+window._aiVisionAvailable = _aiVisionAvailable;
+window._clearVisualUploadStash = _clearVisualUploadStash;
+window._tryAiVisionFallback = _tryAiVisionFallback;
+window._visualUploadDeadEnd = _visualUploadDeadEnd;
+window.routeVisualUpload = routeVisualUpload;
+
 window._ensureTesseract = _ensureTesseract;
 window.runVisualOcrTest = runVisualOcrTest;
 window._parseOcrText = _parseOcrText;

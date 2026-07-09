@@ -68,12 +68,12 @@
 │   ├── db_nv.js        ~54KB  FNV CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
-├── js/ocr.js                  Visual Upload on-device OCR: lazy Tesseract.js load (Unit 1) + deterministic parser (Unit 2)
+├── js/ocr.js                  Visual Upload on-device OCR: lazy Tesseract.js load, deterministic parser, hybrid routing + kill-switch (primary path, AI-vision fallback)
 ├── js/vendor/                 Self-hosted Tesseract.js (Apache-2.0) — main API, worker, wasm core
 ├── assets/ocr/                Vendored OCR language data (eng.traineddata.gz, runtime-cached)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2756-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2756-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2773-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2773-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -260,9 +260,10 @@ Scripts are loaded via `<script>` tags in `index.html` in this exact order:
                        addQuest, triggerFileInput, triggerImageUpload
 7. js/ui-account.js → defines: renderAccount, renderCloudSavePicker, undoLastSync
 8. js/ocr.js        → defines: window._ensureTesseract, window.runVisualOcrTest, window._parseOcrText,
-                       window.runVisualOcr (Visual Upload on-device OCR, Unit 1 infra proof + Unit 2
-                       deterministic parser — LAZY, never loads Tesseract.js itself at boot; see
-                       Visual Upload OCR below)
+                       window.runVisualOcr, window.routeVisualUpload (Visual Upload on-device OCR —
+                       lazy Tesseract.js load + deterministic parser + hybrid routing/kill-switch,
+                       the feature's native-primary/AI-vision-fallback entry point — LAZY, never
+                       loads Tesseract.js itself at boot; see Visual Upload OCR below)
 9. js/runtime.js    → defines: window.AmbientRuntime, window.initAmbientRuntime
                        (loaded before ui-core.js; top level defines only — see Ambient Runtime below)
 10. js/ui-core.js    → defines: AudioSettings, appendToChat, loadUI, updateMath, etc.
@@ -274,7 +275,7 @@ Scripts are loaded via `<script>` tags in `index.html` in this exact order:
                        attaches: window.pushToCloud, window.pullFromCloud
 ```
 
-**Visual Upload OCR (`js/ocr.js` + `js/ui-render.js`, Unit 1 infra proof + Unit 2 parser/apply —
+**Visual Upload OCR (`js/ocr.js` + `js/ui-render.js` + `js/cloud.js`, complete — Units 1–3,
 `planning/VISUAL_UPLOAD_OCR_PLAN.md`):** self-hosted, lazy-loaded Tesseract.js (Apache-2.0,
 `js/vendor/`) — `_ensureTesseract()` injects `js/vendor/tesseract.min.js` only on first use
 (idempotent via a module-scope promise, never at boot), and the shared `_runOcrPipeline(file)`
@@ -308,11 +309,38 @@ ONLY write path in this feature: inventory rows merge additively via
 un-pictured item — Protocol 34), and stat rows apply via the real `_applyStatToken()` → the A.2
 native setters (`ui-core.js`), which already clamp (SPECIAL 1–10, HP≤max, etc. — Protocol 24, an
 OCR misread can never exceed a real limit). No new campaign-state field (Protocol 4 not
-triggered) — every write rides `state.inventory` and the existing native setters. Today's entry
-point is a staging-only Developer Console board (`_wireOcrTest` for the Unit 1 raw-text dump,
-`_wireVisualParseTest` for the Unit 2 full pipeline, both `js/test-console.js`); the existing
-AI-vision Visual Upload path (`handleImageSelection`/`transmitMessage`'s `inlineData` branch) is
-completely untouched. Unit 3 (hybrid routing + kill-switch) is a separate, later unit.
+triggered) — every write rides `state.inventory` and the existing native setters.
+
+Unit 3 wires this into the real composer `[+]` attach control and completes the feature as a
+**hybrid** (`planning/VISUAL_UPLOAD_OCR_PLAN.md` §4): `handleImageSelection()`
+(`js/ui-saves.js`) stashes `attachedImageData`/`attachedImageMimeType` exactly as before, then
+calls the new `routeVisualUpload(file)` (`js/ocr.js`), which is now the feature's single entry
+point. On-device OCR is the **primary** path — gated on `isFeatureEnabled('visualOcr')`
+(`js/cloud.js` `_featureFlags`, fail-open, Protocol 33). The pre-existing, byte-for-byte
+UNCHANGED `transmitMessage()` `inlineData` AI-vision branch (`js/api.js`) is now the
+**fallback only** — reused verbatim (Protocol 22), reached via `_tryAiVisionFallback()` when
+`visualOcr` is off, an OCR load/recognize attempt throws, or the player explicitly taps a
+**TRY AI VISION** button that Unit 3 adds to the preview modal's "NOTHING DETECTED" empty
+state (alongside the existing MANUAL ENTRY). The fallback is itself gated on
+`_aiVisionAvailable()` — the `visualAiVision` flag AND the real `_isUplinkConnected()`
+(`js/ui-core.js`, the same key/aiChat-flag/online signal the Director Uplink scope already
+uses, Protocol 22 — no forked check). An OCR failure also calls the real
+`window._recordFeatureFailure('visualOcr', …)` (`js/cloud.js`), auto-disabling OCR into the
+fallback after `FAIL_THRESHOLD` (3) failures for the rest of the session (Protocol 35's client
+analogue) — no reload needed. When neither path is available (both flags off, no key, or
+offline), `_visualUploadDeadEnd()` clears the attach stash and posts a plain-English
+"add items via CARGO MANIFEST" message — the app is never left with no way forward
+(Protocol 33). The image stash is released at exactly one place per path:
+`_clearVisualUploadStash()` on every preview-modal close EXCEPT a TRY AI VISION hand-off
+(tracked by a one-shot `_visualParseRoutingToAiVision` flag the modal's `onClose` callback
+consumes), and `transmitMessage()`'s own existing `_resetTransmitUI()` at the end of an
+AI-vision round trip. The AI directive's old "Visual Upload Override" imperative
+(`_directiveCoreTracking()`, `js/api.js`) is reframed to "Visual Upload Fallback" framing —
+native OCR is primary; the AI now only ever sees an image via the fallback — with the
+STRICTLY FORBIDDEN no-clobber rule preserved verbatim (Protocol 14). The staging-only
+Developer Console boards (`_wireOcrTest` for the Unit 1 raw-text dump, `_wireVisualParseTest`
+for the Unit 2 pipeline, both `js/test-console.js`) are unchanged and remain useful for
+debugging the pipeline independent of the hybrid routing.
 
 **Critical constraint:** Because these are `<script>` tags (not modules), all globals are shared
 in the window scope. The ESLint config (`eslint.config.mjs`) declares every cross-file global
@@ -2883,7 +2911,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2756-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2773-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

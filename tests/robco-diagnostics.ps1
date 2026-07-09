@@ -8427,17 +8427,17 @@ const sandbox = {
 vm.createContext(sandbox);
 vm.runInContext(allFnSrc + '\nthis.getSystemDirective = getSystemDirective;', sandbox);
 const matrix = [
-  { ctx: 'FNV', ps: undefined, pt: undefined, cm: undefined, sha256: 'ac01cf4e1328001cde804a099d1d06494b7ce3382792c74b2758a48e8ba34fc3' },
-  { ctx: 'FNV', ps: 'melee',   pt: undefined, cm: undefined, sha256: '3f07321147caa26cf7f1188edbe629c535b585d05ef24a893dca59662c38584f' },
-  { ctx: 'FNV', ps: undefined, pt: 'minmaxed', cm: undefined, sha256: 'df9349d0f0cae81d2c41933a92ffd37a81d0a4c088715d45ff675faa1993a7b0' },
-  { ctx: 'FNV', ps: undefined, pt: 'completionist', cm: undefined, sha256: 'f2a73fa23f3d7130caccbfae04d15dc6ef5225c61e25a15236fff5e1ba873b47' },
-  { ctx: 'FNV', ps: undefined, pt: 'casual', cm: undefined, sha256: '74ada35e33bef7c250a543fed13046cca358f6fdb028a1f4a1de099b45f09916' },
-  { ctx: 'FNV', ps: undefined, pt: 'speedrun', cm: undefined, sha256: 'df637bca2fdb284a9f47a9eff85a0efbbb8515d7ce3ae03c2a092ada51f2b179' },
-  { ctx: 'FNV', ps: undefined, pt: undefined, cm: 'rng', sha256: '37a49139cec9465d8c9189dc25f01bf587da5528ffaa1e6eb7fe108afce8d2f1' },
-  { ctx: 'FNV', ps: undefined, pt: undefined, cm: 'rng-locked', sha256: 'ab98a1f90d7d6f543e340cc75eb63eec53dfab61a3a649fdc5f3b6c5cd92cdd0' },
-  { ctx: 'FNV', ps: 'melee', pt: 'minmaxed', cm: 'rng-locked', sha256: '260656c7efdab70fb2615cc15b6959542fb6e0d7d08877c0470a4847115bb74f' },
-  { ctx: 'FO3', ps: undefined, pt: undefined, cm: undefined, sha256: 'd1f4f7ecb807ac2975b5398d475eec4bd142eeeaf065522215207fe5477b8c78' },
-  { ctx: 'FO3', ps: 'melee', pt: undefined, cm: 'rng-locked', sha256: '0f569794e9f02d1318850899efb9cf68d67a1a72737147f345ed60e8bac24e78' },
+  { ctx: 'FNV', ps: undefined, pt: undefined, cm: undefined, sha256: 'e92b2945f9bff31f3a3db11467880d9d452faa125a6517e6234ef50ffac46a3a' },
+  { ctx: 'FNV', ps: 'melee',   pt: undefined, cm: undefined, sha256: 'e5352c15f4e3de08af348cc692b9825dad15c9f01f8d90db5913d3fd6578dcba' },
+  { ctx: 'FNV', ps: undefined, pt: 'minmaxed', cm: undefined, sha256: '39394b3dc5bc8e2c638bccb30bb270d1dbe47f9268332d155bd398bc0a54b1f6' },
+  { ctx: 'FNV', ps: undefined, pt: 'completionist', cm: undefined, sha256: 'c7a7520d07101c123567dc5d02e82642339bbc84f3c6e75241f781a50a3c95d5' },
+  { ctx: 'FNV', ps: undefined, pt: 'casual', cm: undefined, sha256: '97a4add09688c9436a8a64eb3998b03655a9b0c502eb411e4bc086389f7a2f13' },
+  { ctx: 'FNV', ps: undefined, pt: 'speedrun', cm: undefined, sha256: '996649468f82f2ea43a097ba309322841f29940322284da2fd3ceed00c5e7f14' },
+  { ctx: 'FNV', ps: undefined, pt: undefined, cm: 'rng', sha256: '6f83cc4cbfbbd4278d85cb68c1a57261844e41e924ccfe201764e49911c2161b' },
+  { ctx: 'FNV', ps: undefined, pt: undefined, cm: 'rng-locked', sha256: '1d2198aab4462c1a3974c74d765483799622171cc60d947e07f837f7a217f5af' },
+  { ctx: 'FNV', ps: 'melee', pt: 'minmaxed', cm: 'rng-locked', sha256: 'c7c87793f9fc241ab84044b6bf00f8761623ea1bc2611209424223e92fe3d5e7' },
+  { ctx: 'FO3', ps: undefined, pt: undefined, cm: undefined, sha256: 'dcf88fbb28078817e0f993394412e219c63bd1e34dc442184531de220a7e373f' },
+  { ctx: 'FO3', ps: 'melee', pt: undefined, cm: 'rng-locked', sha256: '07b3c98f687417f2360455351491a6086117a14bcb5ac4f276a3a8ee20df5be4' },
 ];
 const bits = matrix.map(m => {
   try {
@@ -22270,6 +22270,362 @@ Check (
     (-not ([regex]::IsMatch($renderSrc206, 'state\.visual', 'IgnoreCase'))) -and
     (-not ([regex]::IsMatch($renderSrc206, 'state\.ocr', 'IgnoreCase')))
 ) "206.16: applyVisualParse() writes only through state.inventory and the existing native setters -- no new campaign-state field is introduced (Protocol 4 not triggered)"
+
+# ===========================================================
+# Suite 207 -- VISUAL UPLOAD OCR Unit 3 (hybrid wiring + kill-switch)
+# planning/VISUAL_UPLOAD_OCR_PLAN.md Sec4: the two fail-open feature flags
+# (visualOcr primary / visualAiVision fallback, js/cloud.js), the hybrid
+# router (routeVisualUpload(), js/ocr.js) wired into the REAL composer [+]
+# attach flow (handleImageSelection(), js/ui-saves.js), the TRY AI VISION
+# escape hatch in the preview modal's NOTHING DETECTED state, the
+# FAIL_THRESHOLD auto-disable (Protocol 35 client analogue), the graceful
+# manual-entry dead end (Protocol 33), and the reframed AI directive
+# (Protocol 14 -- fallback-only framing, no-clobber rule preserved). The
+# pre-existing AI-vision transmitMessage() inlineData branch is reused
+# verbatim as the fallback (Protocol 22) -- this unit retires the AI-ONLY
+# default without deleting or forking that code path.
+# 17 tests
+# ===========================================================
+Sep "Suite 207 -- VISUAL UPLOAD OCR Unit 3 (hybrid wiring + kill-switch)"
+$ocrSrc207 = Read-Src "js/ocr.js"
+$savesSrc207 = Read-Src "js/ui-saves.js"
+$apiSrc207 = Read-Src "js/api.js"
+$renderSrc207 = Read-Src "js/ui-render.js"
+$coreSrc207 = Read-Src "js/ui-core.js"
+$cloudSrc207 = Read-Src "js/cloud.js"
+
+# 207.1 static -- cloud.js registers both fail-open flags (Protocol 32/33)
+Check (
+    ($cloudSrc207 -match 'visualOcr:\s*true,') -and
+    ($cloudSrc207 -match 'visualAiVision:\s*true,')
+) "207.1: js/cloud.js registers visualOcr:true and visualAiVision:true in _featureFlags (fail-open defaults, Protocol 32/33)"
+
+# 207.2 static -- js/ocr.js declares all 6 hybrid-routing functions and
+#       exposes each on window (same export idiom as Units 1/2).
+$hybridFns207 = @('_visualOcrEnabled', '_aiVisionAvailable', '_clearVisualUploadStash', '_tryAiVisionFallback', '_visualUploadDeadEnd', 'routeVisualUpload')
+$allDeclared207 = $true
+$allExported207 = $true
+foreach ($n in $hybridFns207) {
+    if (-not ($ocrSrc207 -match "function $n\(")) { $allDeclared207 = $false }
+    if (-not ($ocrSrc207 -match [regex]::Escape("window.$n = $n;"))) { $allExported207 = $false }
+}
+Check ($allDeclared207 -and $allExported207) "207.2: js/ocr.js declares _visualOcrEnabled/_aiVisionAvailable/_clearVisualUploadStash/_tryAiVisionFallback/_visualUploadDeadEnd/routeVisualUpload and exposes each on window"
+
+# 207.3 static -- handleImageSelection() (ui-saves.js) stashes
+#       attachedImageData exactly as before, THEN calls routeVisualUpload(file)
+#       -- and the pre-existing AI-vision inlineData branch (api.js) is
+#       still present, untouched (Protocol 22 -- reused, not forked).
+$handleBody207 = Get-FunctionBody $savesSrc207 'handleImageSelection'
+$stashIdx207 = $handleBody207.IndexOf('attachedImageData = e.target.result;')
+$routeIdx207 = $handleBody207.IndexOf('routeVisualUpload(file)')
+Check (
+    ($stashIdx207 -ne -1) -and ($routeIdx207 -ne -1) -and ($routeIdx207 -gt $stashIdx207) -and
+    ([regex]::IsMatch($apiSrc207, 'inlineData:\s*\{\s*mimeType:\s*attachedImageMimeType'))
+) "207.3: handleImageSelection() stashes attachedImageData then calls routeVisualUpload(file); the AI-vision inlineData branch (api.js) remains present and untouched"
+
+# 207.4 static -- routeVisualUpload() gates on _visualOcrEnabled() FIRST and
+#       routes straight to the fallback without ever calling runVisualOcr()
+#       when OCR itself is killed (visualOcr off).
+$routeBody207 = Get-FunctionBody $ocrSrc207 'routeVisualUpload'
+$gateIdx207 = $routeBody207.IndexOf('if (!_visualOcrEnabled())')
+$fallbackIdx207 = $routeBody207.IndexOf('_tryAiVisionFallback(')
+$ocrCallIdx207 = $routeBody207.IndexOf('runVisualOcr(file')
+Check (
+    ($gateIdx207 -ne -1) -and ($fallbackIdx207 -ne -1) -and ($ocrCallIdx207 -ne -1) -and
+    ($gateIdx207 -lt $fallbackIdx207) -and ($fallbackIdx207 -lt $ocrCallIdx207)
+) "207.4: routeVisualUpload() checks _visualOcrEnabled() before anything else and hands off to _tryAiVisionFallback() without ever reaching runVisualOcr() when OCR is killed"
+
+# 207.5 static -- routeVisualUpload()'s catch block records the failure via
+#       the REAL window._recordFeatureFailure('visualOcr', ...) then routes
+#       to _tryAiVisionFallback() (Protocol 32/35 client analogue).
+$catchIdx207 = $routeBody207.IndexOf('} catch (err) {')
+$catchBody207 = if ($catchIdx207 -ne -1) { $routeBody207.Substring($catchIdx207) } else { '' }
+Check (
+    ([regex]::IsMatch($catchBody207, "window\._recordFeatureFailure\(\s*'visualOcr'")) -and
+    ($catchBody207 -match [regex]::Escape('_tryAiVisionFallback('))
+) "207.5: routeVisualUpload()'s catch block calls window._recordFeatureFailure('visualOcr', ...) then _tryAiVisionFallback() -- an OCR failure both counts toward auto-disable and hands off to the fallback"
+
+# 207.6 static -- _aiVisionAvailable() reuses the REAL _isUplinkConnected()
+#       (ui-core.js) rather than re-deriving a second key/online check
+#       (Protocol 22), gated additionally by the visualAiVision flag.
+$aiAvailBody207 = Get-FunctionBody $ocrSrc207 '_aiVisionAvailable'
+Check (
+    ($aiAvailBody207 -match [regex]::Escape("window.isFeatureEnabled('visualAiVision')")) -and
+    ($aiAvailBody207 -match [regex]::Escape('_isUplinkConnected()')) -and
+    ($coreSrc207 -match 'function _isUplinkConnected\(\)')
+) "207.6: _aiVisionAvailable() gates on the visualAiVision flag AND reuses the real _isUplinkConnected() (ui-core.js) -- no forked key/online check"
+
+# 207.7 static -- _tryAiVisionFallback() reuses the REAL transmitMessage()
+#       verbatim (the exact '[VISUAL UPLOAD]' override token) when AI
+#       vision is available, else falls to _visualUploadDeadEnd().
+$fallbackBody207 = Get-FunctionBody $ocrSrc207 '_tryAiVisionFallback'
+Check (
+    ($fallbackBody207 -match [regex]::Escape("transmitMessage('[VISUAL UPLOAD]')")) -and
+    ($fallbackBody207 -match [regex]::Escape('_visualUploadDeadEnd()')) -and
+    ($apiSrc207 -match 'async function transmitMessage\(overrideText\)')
+) "207.7: _tryAiVisionFallback() calls the real transmitMessage('[VISUAL UPLOAD]') when available, else _visualUploadDeadEnd() -- the AI-vision pipeline is reused verbatim (Protocol 22), never rewritten"
+
+# 207.8 static -- _visualUploadDeadEnd() clears the image stash AND appends
+#       a plain-English message pointing at CARGO MANIFEST -- the app never
+#       dead-ends with no way forward (Protocol 33).
+$deadEndBody207 = Get-FunctionBody $ocrSrc207 '_visualUploadDeadEnd'
+Check (
+    ($deadEndBody207 -match [regex]::Escape('_clearVisualUploadStash()')) -and
+    ($deadEndBody207 -match 'CARGO MANIFEST') -and
+    ($deadEndBody207 -match [regex]::Escape('appendToChat('))
+) "207.8: _visualUploadDeadEnd() clears the image stash and appends a plain-English 'both offline -- add items via CARGO MANIFEST' message (Protocol 33 -- never a dead screen)"
+
+# 207.9 static -- the NOTHING DETECTED empty state renders BOTH the hybrid
+#       TRY AI VISION escape hatch and the pre-existing MANUAL ENTRY button.
+$previewBody207 = Get-FunctionBody $renderSrc207 'renderVisualParsePreview'
+$nothingIdx207 = $previewBody207.IndexOf('nothingDetected')
+$tryAiIdx207 = $previewBody207.IndexOf('id="visTryAiBtn"')
+$manualIdx207 = $previewBody207.IndexOf('id="visManualEntryBtn"')
+Check (
+    ($nothingIdx207 -ne -1) -and ($tryAiIdx207 -gt $nothingIdx207) -and ($manualIdx207 -gt $nothingIdx207) -and
+    ($previewBody207 -match [regex]::Escape('[ TRY AI VISION ]'))
+) "207.9: renderVisualParsePreview()'s NOTHING DETECTED empty state renders both #visTryAiBtn (TRY AI VISION) and #visManualEntryBtn"
+
+# 207.10 static -- the TRY AI VISION handler sets the routing flag and calls
+#        closeModal() BEFORE handing off to _tryAiVisionFallback() -- it
+#        never clears the image stash itself (that is onClose's job).
+$tryAiBlockIdx207 = $previewBody207.IndexOf("getElementById('visTryAiBtn')")
+$tryAiBlock207 = if ($tryAiBlockIdx207 -ne -1) { $previewBody207.Substring($tryAiBlockIdx207) } else { '' }
+$flagIdx207 = $tryAiBlock207.IndexOf('_visualParseRoutingToAiVision = true;')
+$closeIdx207 = $tryAiBlock207.IndexOf('closeModal();')
+$fallbackCallIdx207 = $tryAiBlock207.IndexOf('_tryAiVisionFallback(')
+Check (
+    ($flagIdx207 -ne -1) -and ($closeIdx207 -ne -1) -and ($fallbackCallIdx207 -ne -1) -and
+    ($flagIdx207 -lt $closeIdx207) -and ($closeIdx207 -lt $fallbackCallIdx207) -and
+    (-not ($tryAiBlock207 -match '_clearVisualUploadStash'))
+) "207.10: the TRY AI VISION button sets _visualParseRoutingToAiVision = true, then closeModal(), then hands off to _tryAiVisionFallback() -- it never calls _clearVisualUploadStash() itself"
+
+# 207.11 static -- the modal's onClose callback clears the image stash on
+#        every close EXCEPT when routing to AI vision (the flag
+#        short-circuits the clear so transmitMessage() keeps the stash).
+$onCloseIdx207 = $previewBody207.IndexOf('onClose: () => {')
+$wireIdx207 = $previewBody207.IndexOf("getElementById('visConfirmBtn')")
+$onCloseBody207 = if (($onCloseIdx207 -ne -1) -and ($wireIdx207 -ne -1)) { $previewBody207.Substring($onCloseIdx207, $wireIdx207 - $onCloseIdx207) } else { '' }
+Check (
+    ($onCloseBody207 -match [regex]::Escape('if (_visualParseRoutingToAiVision) {')) -and
+    ($onCloseBody207 -match [regex]::Escape('_visualParseRoutingToAiVision = false;')) -and
+    ([regex]::IsMatch($onCloseBody207, "\}\s*else if \(typeof _clearVisualUploadStash === 'function'\) \{")) -and
+    ($onCloseBody207 -match [regex]::Escape('_clearVisualUploadStash();'))
+) "207.11: the preview modal's onClose callback clears the image stash on every close reason EXCEPT when _visualParseRoutingToAiVision is set (which it only consumes and resets)"
+
+# 207.12 static -- Protocol 14: the AI directive is reframed to fallback-only
+#        framing (the old default-imperative wording is gone), while the
+#        no-clobber rule survives verbatim.
+$directiveFull207 = Get-DirectiveFullBody $apiSrc207
+Check (
+    ($directiveFull207 -match 'Visual Upload Fallback') -and
+    (-not ($directiveFull207 -match [regex]::Escape('Execute > [VISUAL UPLOAD: CATEGORY]'))) -and
+    ($directiveFull207 -match 'STRICTLY FORBIDDEN from deleting un-pictured items')
+) "207.12: the AI directive is reframed to 'Visual Upload Fallback' framing (the old default-imperative wording is gone) while the STRICTLY FORBIDDEN no-clobber rule survives verbatim (Protocol 14)"
+
+# 207.13 static -- COMMAND_REGISTRY's Visual Upload entry documents the
+#        native [+] button + AI-vision fallback, not the retired
+#        typed-command framing.
+$registry207m = [regex]::Match($coreSrc207, 'const COMMAND_REGISTRY = \[([\s\S]*?)\n\];')
+$registry207 = if ($registry207m.Success) { $registry207m.Groups[1].Value } else { '' }
+Check (
+    ($registry207 -match [regex]::Escape('[+] VISUAL UPLOAD')) -and
+    ($registry207 -match 'Director vision') -and
+    (-not ($registry207 -match [regex]::Escape('[VISUAL UPLOAD: X]')))
+) "207.13: COMMAND_REGISTRY's Visual Upload entry documents the native [+] attach control + the Director-vision fallback, replacing the retired [VISUAL UPLOAD: X] typed-command framing"
+
+# 207.14-207.16 BEHAVIORAL -- the real hybrid-routing functions (js/ocr.js)
+# and the real cloud.js kill-switch (_recordFeatureFailure/FAIL_THRESHOLD/
+# isFeatureEnabled), executed via a spawned node process against the ACTUAL
+# source (Protocol 42 stdin-corruption-safe transport -- a temp file, never
+# piped stdin -- mirrors the Suite 131/206 pattern).
+$labels207 = @(
+    "207.14: [behavioral] _visualOcrEnabled()/_aiVisionAvailable() fail-open when isFeatureEnabled is undefined (Protocol 33), disable on an explicit false flag, and _aiVisionAvailable() also requires a live carrier (_isUplinkConnected)",
+    "207.15: [behavioral] the real cloud.js _recordFeatureFailure()/FAIL_THRESHOLD auto-disables visualOcr after the 3rd recorded failure -- isFeatureEnabled('visualOcr') stays true through 2 failures and flips false on the 3rd (Protocol 35 client analogue)",
+    "207.16: [behavioral] routeVisualUpload() end-to-end: OCR success never falls back, an OCR failure records exactly one failure and hands off to AI-vision, visualOcr-off skips OCR entirely, and AI-vision-unavailable degrades to the manual-entry message with the stash cleared"
+)
+try {
+    $nodeCheck207 = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCheck207) {
+        $repoRoot207 = (Get-Item $PSScriptRoot).Parent.FullName
+        $repoRootNode207 = $repoRoot207.Replace('\', '/')
+        $testScript207 = @"
+const vm = require('vm');
+const fs = require('fs');
+const path = require('path');
+const ROOT = '$repoRootNode207';
+function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+function extractBody(src, name) {
+  var idx = src.indexOf('function ' + name);
+  if (idx === -1) throw new Error('missing ' + name);
+  var i = src.indexOf('{', idx);
+  var depth = 0, start = i;
+  while (i < src.length) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) return src.slice(start, i + 1); }
+    i++;
+  }
+  throw new Error('unclosed ' + name);
+}
+function declareFn(src, name) {
+  var nameIdx = src.indexOf('function ' + name);
+  var asyncPrefix = src.slice(Math.max(0, nameIdx - 6), nameIdx) === 'async ' ? 'async ' : '';
+  var parenIdx = src.indexOf('(', nameIdx);
+  var braceIdx = src.indexOf('{', parenIdx);
+  var params = src.slice(parenIdx, braceIdx);
+  return asyncPrefix + 'function ' + name + params + extractBody(src, name);
+}
+
+const ocrSrc = rd('js/ocr.js');
+const cloudSrc = rd('js/cloud.js');
+
+var results = [];
+
+// 207.14
+try {
+  var gateSrc = declareFn(ocrSrc, '_visualOcrEnabled') + '\n' + declareFn(ocrSrc, '_aiVisionAvailable');
+  var sbA = { window: {}, _isUplinkConnected: function () { return true; } };
+  sbA.window = sbA;
+  vm.createContext(sbA);
+  vm.runInContext(gateSrc, sbA);
+  var failOpenOcr = sbA._visualOcrEnabled();
+  var failOpenAi = sbA._aiVisionAvailable();
+  sbA.window.isFeatureEnabled = function (key) { return key !== 'visualOcr'; };
+  var explicitOffOcr = sbA._visualOcrEnabled();
+  sbA.window.isFeatureEnabled = function (key) { return key !== 'visualAiVision'; };
+  var explicitOffAi = sbA._aiVisionAvailable();
+  sbA.window.isFeatureEnabled = function () { return true; };
+  sbA._isUplinkConnected = function () { return false; };
+  var noCarrierAi = sbA._aiVisionAvailable();
+  results.push(
+    failOpenOcr === true && failOpenAi === true &&
+    explicitOffOcr === false && explicitOffAi === false && noCarrierAi === false
+  );
+} catch (e) { results.push(false); }
+
+// 207.15
+try {
+  var thresholdMatch = cloudSrc.match(/const FAIL_THRESHOLD = (\d+);/);
+  var recordSrc = 'const FAIL_THRESHOLD = ' + thresholdMatch[1] + ';\n' + declareFn(cloudSrc, '_recordFeatureFailure');
+  var isEnabledMatch = cloudSrc.match(/window\.isFeatureEnabled\s*=\s*function\s*\(([^)]*)\)\s*\{/);
+  var sbB = { _featureFlags: { visualOcr: true }, _autoDisabled: {}, _failCounts: {}, appendToChat: function () {} };
+  vm.createContext(sbB);
+  // isFeatureEnabled is a window.X = function(){} assignment, not a plain declaration --
+  // extract it directly by brace-matching from the 'window.isFeatureEnabled = function' index.
+  var ieOpenParen = cloudSrc.indexOf('(', isEnabledMatch.index);
+  var ieOpenBrace = cloudSrc.indexOf('{', ieOpenParen);
+  var ieParams = cloudSrc.slice(ieOpenParen, ieOpenBrace);
+  var ieDepth = 0, ii = ieOpenBrace, ieEnd = -1;
+  while (ii < cloudSrc.length) {
+    if (cloudSrc[ii] === '{') ieDepth++;
+    else if (cloudSrc[ii] === '}') { ieDepth--; if (ieDepth === 0) { ieEnd = ii + 1; break; } }
+    ii++;
+  }
+  var ieFullBody = cloudSrc.slice(ieOpenBrace, ieEnd);
+  vm.runInContext(recordSrc + '\nvar isFeatureEnabled = function ' + ieParams + ' ' + ieFullBody + ';', sbB);
+  var enabledAt0 = sbB.isFeatureEnabled('visualOcr');
+  sbB._recordFeatureFailure('visualOcr', '>> msg <<');
+  sbB._recordFeatureFailure('visualOcr', '>> msg <<');
+  var enabledAt2 = sbB.isFeatureEnabled('visualOcr');
+  sbB._recordFeatureFailure('visualOcr', '>> msg <<');
+  var disabledAt3 = sbB.isFeatureEnabled('visualOcr');
+  results.push(enabledAt0 === true && enabledAt2 === true && disabledAt3 === false);
+} catch (e) { results.push(false); }
+
+// 207.16
+(async function () {
+  try {
+    var hybridSrc = ['_visualOcrEnabled', '_aiVisionAvailable', '_clearVisualUploadStash', '_tryAiVisionFallback', '_visualUploadDeadEnd', 'routeVisualUpload']
+      .map(function (n) { return declareFn(ocrSrc, n); }).join('\n\n');
+
+    function makeSandbox(opts) {
+      var calls = { recordFailure: [], transmit: [], chat: [], classToggles: [] };
+      var containerEl = { classList: { add: function (c) { calls.classToggles.push('add:' + c); }, remove: function (c) { calls.classToggles.push('remove:' + c); } } };
+      var previewEl = { style: {} };
+      var inputEl = { value: 'x' };
+      var sb = {
+        document: { getElementById: function (id) {
+          if (id === 'imagePreviewContainer') return containerEl;
+          if (id === 'imagePreview') return previewEl;
+          if (id === 'imageInput') return inputEl;
+          return null;
+        } },
+        attachedImageData: 'data:image/png;base64,x',
+        attachedImageMimeType: 'image/png',
+        appendToChat: function (msg) { calls.chat.push(msg); },
+        transmitMessage: function (t) { calls.transmit.push(t); },
+        _isUplinkConnected: function () { return !!opts.uplink; },
+        runVisualOcr: opts.ocrShouldFail ? function () { return Promise.reject(new Error('ocr-fail')); } : function () { return Promise.resolve({}); },
+        console: console
+      };
+      sb.window = sb;
+      sb.window.isFeatureEnabled = function (key) { return (opts.flags && (key in opts.flags)) ? opts.flags[key] : true; };
+      sb.window._recordFeatureFailure = function (key, msg) { calls.recordFailure.push({ key: key, msg: msg }); };
+      vm.createContext(sb);
+      vm.runInContext(hybridSrc, sb);
+      return { sb: sb, calls: calls };
+    }
+
+    var A = makeSandbox({ ocrShouldFail: false });
+    await A.sb.routeVisualUpload({});
+    var aOk = A.calls.recordFailure.length === 0 && A.calls.transmit.length === 0 &&
+      A.calls.classToggles[0] === 'add:vats-scanning' &&
+      A.calls.classToggles[A.calls.classToggles.length - 1] === 'remove:vats-scanning';
+
+    var B = makeSandbox({ ocrShouldFail: true, uplink: true, flags: { visualAiVision: true } });
+    await B.sb.routeVisualUpload({});
+    var bOk = B.calls.recordFailure.length === 1 && B.calls.recordFailure[0].key === 'visualOcr' &&
+      B.calls.transmit.length === 1 && B.calls.transmit[0] === '[VISUAL UPLOAD]';
+
+    var C = makeSandbox({ flags: { visualOcr: false }, uplink: true });
+    await C.sb.routeVisualUpload({});
+    var cOk = C.calls.recordFailure.length === 0 && C.calls.transmit.length === 1 && C.calls.classToggles.length === 0;
+
+    var D = makeSandbox({ ocrShouldFail: true, uplink: false, flags: { visualAiVision: true } });
+    await D.sb.routeVisualUpload({});
+    var dOk = D.calls.transmit.length === 0 && D.sb.attachedImageData === null &&
+      D.calls.chat.some(function (m) { return /CARGO MANIFEST/.test(m); });
+
+    results.push(aOk && bOk && cOk && dOk);
+  } catch (e) { results.push(false); }
+
+  console.log('RESULT:' + results.map(function (r) { return r ? '1' : '0'; }).join(''));
+})();
+"@
+        $tmpScript207 = [System.IO.Path]::GetTempFileName() + '.js'
+        [System.IO.File]::WriteAllText($tmpScript207, $testScript207, [System.Text.Encoding]::UTF8)
+        try {
+            $out207 = (node $tmpScript207 2>&1 | Out-String)
+        } finally {
+            Remove-Item -Path $tmpScript207 -Force -ErrorAction SilentlyContinue
+        }
+        $rm207 = [regex]::Match($out207, 'RESULT:([01]{3})')
+        if ($rm207.Success) {
+            $bits207 = $rm207.Groups[1].Value
+            for ($bi207 = 0; $bi207 -lt $labels207.Count; $bi207++) {
+                Check ($bits207.Substring($bi207, 1) -eq '1') $labels207[$bi207]
+            }
+        } else {
+            $err207 = if ([string]::IsNullOrWhiteSpace($out207)) { "No output from node" } else { $out207.Trim() }
+            foreach ($lbl in $labels207) { Fail "$lbl  (runtime error: $err207)" }
+        }
+    } else {
+        foreach ($lbl in $labels207) { Fail "$lbl  (node not available in PATH)" }
+    }
+} catch {
+    foreach ($lbl in $labels207) { Fail "$lbl  (exception: $($_.Exception.Message))" }
+}
+
+# 207.17 static -- zero new campaign-state field: the Unit 3 hybrid-routing
+#        additions never touch state.*/saveState() directly -- the ONLY
+#        writes anywhere in this feature remain inside applyVisualParse()
+#        (Unit 2), untouched by this unit's routing layer.
+$hybridCombined207 = ($hybridFns207 | ForEach-Object { Get-FunctionBody $ocrSrc207 $_ }) -join "`n"
+Check (
+    (-not ($hybridCombined207 -match 'saveState\(\)')) -and
+    (-not ([regex]::IsMatch($hybridCombined207, 'state\.\w+\s*='))) -and
+    (-not ($hybridCombined207 -match 'autoImportState'))
+) "207.17: the Unit 3 hybrid-routing functions never call saveState()/assign state.*/call autoImportState -- no new campaign-state field, writes stay confined to applyVisualParse() (Unit 2, Protocol 4 not triggered)"
 
 # ===========================================================
 # Results

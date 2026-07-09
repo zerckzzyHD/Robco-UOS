@@ -4071,11 +4071,12 @@
     <script src="js/ui-render.js"></script>
     <script src="js/ui-saves.js"></script>
     <script src="js/ui-account.js"></script>
-    <!-- Visual Upload OCR (Unit 1, planning/VISUAL_UPLOAD_OCR_PLAN.md): lazy-loaded, never
-         imports Tesseract.js itself at boot -- only exposes _ensureTesseract()/
-         runVisualOcrTest() for a later trigger (today: the staging-only Dev Console OCR
-         test board below). Must load after ui-render.js (openModal/escapeHtml precedent)
-         and before ui-core.js (Protocol 22 -- no forked helper). -->
+    <!-- Visual Upload OCR (planning/VISUAL_UPLOAD_OCR_PLAN.md): lazy-loaded, never
+         imports Tesseract.js itself at boot; only exposes _ensureTesseract(),
+         runVisualOcrTest(), the deterministic parser, and routeVisualUpload()'s hybrid
+         routing (the composer [+] attach flow's entry point, plus the staging-only Dev
+         Console OCR test boards). Must load after ui-render.js (openModal/escapeHtml
+         precedent) and before ui-core.js (Protocol 22, no forked helper). -->
     <script src="js/ocr.js"></script>
     <script src="js/runtime.js"></script>
     <script src="js/ui-core.js"></script>

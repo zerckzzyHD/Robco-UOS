@@ -5362,7 +5362,10 @@ const COMMAND_REGISTRY = [
     group: 'INVENTORY & PROGRESSION',
     cmds: [
       { cmd: '[CRAFT]', desc: 'Consume ingredients to build (craft panel).' },
-      { cmd: '[VISUAL UPLOAD: X]', desc: 'Parse a screenshot into inventory (Wpn / App / Msc).' },
+      {
+        cmd: '[+] VISUAL UPLOAD',
+        desc: 'Attach a screenshot — parsed on-device by optical scan (offline, primary), review & confirm, then apply. Falls back to Director vision only if the scan is unavailable.',
+      },
       {
         cmd: '[BIND: X, DIR]',
         desc: 'Quick-Draw Holster — holster gear X to a vector socket. Offline.',

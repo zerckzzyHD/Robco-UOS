@@ -64,6 +64,16 @@ let _featureFlags = {
   // today (fails/no-ops offline, nothing queued). The remote /config/flags doc can
   // flip features.offlineQueue to disable it live (Protocol 32/35).
   offlineQueue: true,
+  // Visual Upload OCR Unit 3 (planning/VISUAL_UPLOAD_OCR_PLAN.md §4.1) — the hybrid
+  // pair. visualOcr gates the on-device Tesseract.js pipeline (js/ocr.js), the
+  // PRIMARY path a Visual Upload now takes. visualAiVision gates the existing,
+  // UNTOUCHED Gemini-vision inlineData branch (transmitMessage(), api.js), which is
+  // now reached only as the FALLBACK — on an OCR load/recognize failure, when
+  // visualOcr is killed, or when the player explicitly taps TRY AI VISION. Both
+  // default enabled (fail-open, Protocol 33); either can be flipped off live via
+  // /config/flags with no reload (Protocol 32).
+  visualOcr: true,
+  visualAiVision: true,
 };
 try {
   // cloud.js is the one ES module in the boot chain; cross-file globals from the

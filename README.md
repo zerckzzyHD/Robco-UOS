@@ -139,18 +139,18 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 
 ### Technology Stack
 
-| Layer           | Technology                                       | Purpose                                                        |
-| --------------- | ------------------------------------------------ | -------------------------------------------------------------- |
-| **Frontend**    | Vanilla HTML5 / CSS3 / ES2022                    | Zero-framework, browser-native (global-scope script tags)      |
-| **Styling**     | CSS Custom Properties                            | Dynamic theming via `--robco-*` variables                      |
-| **Audio**       | Web Audio API                                    | Procedural synthesis — no audio files                          |
-| **AI**          | Google Gemini API                                | Optional structured-JSON game master                           |
-| **OCR**         | Tesseract.js (Apache-2.0, self-hosted, lazy)     | On-device Visual Upload text recognition (infra proof, Unit 1) |
-| **Cloud**       | Firebase Auth + Firestore                        | Cross-device save sync, sign-in, remote feature flags          |
-| **PWA**         | Service Worker + Manifest                        | Installable, offline-capable, reliable auto-update             |
-| **Hosting**     | GitHub Pages (prod) + Cloudflare Pages (staging) | Release-gated production; auto-deployed staging                |
-| **Dev Tooling** | ESLint + Prettier + Vite                         | Linting, formatting, dev server                                |
-| **Testing**     | Node + PowerShell + Playwright                   | 2756-test gate at parity + boot-smoke / render / a11y checks   |
+| Layer           | Technology                                       | Purpose                                                                     |
+| --------------- | ------------------------------------------------ | --------------------------------------------------------------------------- |
+| **Frontend**    | Vanilla HTML5 / CSS3 / ES2022                    | Zero-framework, browser-native (global-scope script tags)                   |
+| **Styling**     | CSS Custom Properties                            | Dynamic theming via `--robco-*` variables                                   |
+| **Audio**       | Web Audio API                                    | Procedural synthesis — no audio files                                       |
+| **AI**          | Google Gemini API                                | Optional structured-JSON game master                                        |
+| **OCR**         | Tesseract.js (Apache-2.0, self-hosted, lazy)     | On-device Visual Upload text recognition (primary path, AI-vision fallback) |
+| **Cloud**       | Firebase Auth + Firestore                        | Cross-device save sync, sign-in, remote feature flags                       |
+| **PWA**         | Service Worker + Manifest                        | Installable, offline-capable, reliable auto-update                          |
+| **Hosting**     | GitHub Pages (prod) + Cloudflare Pages (staging) | Release-gated production; auto-deployed staging                             |
+| **Dev Tooling** | ESLint + Prettier + Vite                         | Linting, formatting, dev server                                             |
+| **Testing**     | Node + PowerShell + Playwright                   | 2773-test gate at parity + boot-smoke / render / a11y checks                |
 
 ### Per-game data system
 
@@ -177,12 +177,12 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 │   ├── ui-core.js          UI lifecycle, COMMAND_REGISTRY, native command surfaces, badges
 │   ├── api.js              System directive, NATIVE_COMMAND_ROUTER, autoImportState, transmit
 │   ├── cloud.js            Firebase auth + Firestore push/pull + remote config (ES module)
-│   ├── ocr.js              Visual Upload on-device OCR: lazy Tesseract.js load + raw-text proof (Unit 1)
+│   ├── ocr.js              Visual Upload on-device OCR: lazy Tesseract.js, parser, hybrid routing + kill-switch
 │   └── vendor/             Self-hosted Tesseract.js (Apache-2.0) — main API, worker, wasm core
 ├── sw.js                   Service Worker (cache-first, atomic precache, reliable update)
 ├── manifest.json           PWA manifest (version-less name + app shortcuts)
 ├── tests/
-│   ├── robco-diagnostics.js   Node persistence/structure audit (2756 tests, 207 suites)
+│   ├── robco-diagnostics.js   Node persistence/structure audit (2773 tests, 208 suites)
 │   ├── robco-diagnostics.ps1  PowerShell mirror (parity-locked)
 │   ├── test.html              Browser-side runtime import-contract audit
 │   └── *.mjs                  Playwright boot-smoke / render-check / a11y-baseline
@@ -272,7 +272,7 @@ Commits and pushes are blocked unless the gate is green. The pre-commit hook run
 
 ### Commit Workflow (dev-branch model)
 
-All unreleased work goes to **`dev`**; **`main` is release-only**. Each commit keeps docs + the 2756-test count in sync and bumps `CACHE_NAME` when a served file changes.
+All unreleased work goes to **`dev`**; **`main` is release-only**. Each commit keeps docs + the 2773-test count in sync and bumps `CACHE_NAME` when a served file changes.
 
 ```
 npm run lint && npm run format
@@ -324,12 +324,12 @@ A **production-quality, two-game browser application** with:
 - **Native USE + TERMINAL stat edits** — using an aid item now applies its real effect (heal, rads, limb repair, a timed buff, clearing an addiction or poison) instantly and offline, with no AI round-trip; typing straight into the TERMINAL command line can set or nudge any stat, SPECIAL attribute, or skill, or grant a level, all deterministic and fully offline
 - **[GPS]/[MAP] and eligible-perks lookup — native, no AI** — the compass-grid command now jumps straight to the CARTOGRAPHY TABLE instead of round-tripping to the AI; leveling up reports your real skill-point pool (10 + INT/2) and jumps to SKILL MATRIX so you allocate it yourself; and a new `[PERKS]`/`[PK]` command lists every perk you already qualify for at your current level, straight from the registry
 - **TRAVEL HERE on the world map — native, no AI** — tapping a location's sector sheet on the CARTOGRAPHY TABLE now offers a TRAVEL HERE button beside MARK SURVEYED, instantly setting that location as your CURRENT position (and marking it visited) with no AI round-trip
-- **Visual Upload on-device OCR — infra proof (Unit 1)** — a self-hosted, lazy-loaded Tesseract.js pipeline (image → preprocess → OCR → raw text) now proves out end-to-end behind the scenes (staging-only test board); no parser or state-apply yet, and the existing AI-vision Visual Upload path is untouched — full native conversion lands in later units
+- **Visual Upload — native on-device OCR, AI-vision fallback** — attaching a screenshot now scans it right on your device by default (self-hosted, lazy-loaded Tesseract.js), works fully offline after first use, and shows a review screen you confirm before anything is added; if the on-device scan is unavailable or fails, it hands off to the existing Gemini-vision path automatically, or on request via a TRY AI VISION button — both are remotely kill-switched with a graceful "add items manually" fallback if neither is available
 - **Optional AI Director** — Tri-Node JSON, validated import, resilient + prompt-injection-hardened
 - **Saves & cloud** — auto-save, A/B/C slots (with confirm-gated overwrite/delete + version history), export/import + migration, rolling checksummed backups, additive Firestore sync (with its own confirm-gated overwrite/delete + version history), Google sign-in, remote kill-switch, per-game filtered saves list
 - **Accessibility + PWA** — focus rings, reduced-motion, live regions, dialog focus traps, AA contrast; installable, offline, reliable auto-update; touch-first responsive
 - **Wiki-sourced data** — per-game Fallout Data Registries + combat databases (weapons, armor, bestiary, chems, recipes, vendors, quest items), all from the Independent Fallout Wiki
-- **A self-improving gate** — **2756 tests across 207 suites**, mirrored in the Node and PowerShell runners at exact parity (per-suite composition, not just the grand total), plus Playwright boot-smoke / render-check / a11y baseline and a `test.html` runtime audit; CI + a nightly run back it up
+- **A self-improving gate** — **2773 tests across 208 suites**, mirrored in the Node and PowerShell runners at exact parity (per-suite composition, not just the grand total), plus Playwright boot-smoke / render-check / a11y baseline and a `test.html` runtime audit; CI + a nightly run back it up
 
 ---
 
