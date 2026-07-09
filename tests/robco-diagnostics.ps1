@@ -21896,6 +21896,382 @@ Check (
 ) "repomix.config.json ignores js/vendor/** and assets/ocr/** (Protocol 37 -- vendored binary/minified blobs excluded from the AI-context pack)"
 
 # ===========================================================
+# Suite 206 -- VISUAL UPLOAD OCR Unit 2 (parser + preview/confirm + apply)
+# planning/VISUAL_UPLOAD_OCR_PLAN.md Sec3.3/3.4/3.5: the deterministic,
+# game-agnostic _parseOcrText() (js/ocr.js), the confirm-gated preview modal
+# (renderVisualParsePreview/_confirmVisualParse), and the validated additive
+# apply (_visualParseInventoryMerge/applyVisualParse, both js/ui-render.js).
+# Nothing writes to state anywhere in this feature except applyVisualParse(),
+# which only ever runs from _confirmVisualParse() -- itself only reachable
+# via the preview modal's own CONFIRM & APPLY button. No hybrid/kill-switch
+# routing here (Unit 3 scope) -- the pipeline is reached via the
+# staging-only Dev Console SCAN & PARSE board, same visibility gate as Unit 1.
+# 16 tests
+# ===========================================================
+Sep "Suite 206 -- VISUAL UPLOAD OCR Unit 2 (parser + preview/confirm + apply)"
+$ocrSrc206 = Read-Src "js/ocr.js"
+$renderSrc206 = Read-Src "js/ui-render.js"
+$apiSrc206 = Read-Src "js/api.js"
+$coreSrc206 = Read-Src "js/ui-core.js"
+$consoleSrc206 = Read-Src "js/test-console.js"
+$htmlSrc206 = Read-Src "index.html"
+
+# 206.1 static -- _parseOcrText is defined in js/ocr.js and exposed on window
+Check (
+    ($ocrSrc206 -match 'function _parseOcrText\(text, ctx\)') -and
+    ($ocrSrc206 -match [regex]::Escape('window._parseOcrText = _parseOcrText;'))
+) "206.1: _parseOcrText(text, ctx) is defined in js/ocr.js and exposed as window._parseOcrText"
+
+# 206.2 static -- the preview/confirm/apply functions all exist in js/ui-render.js
+Check (
+    ($renderSrc206 -match 'function renderVisualParsePreview\(parsed, file\)') -and
+    ($renderSrc206 -match 'function applyVisualParse\(parsed\)') -and
+    ($renderSrc206 -match 'function _visualParseInventoryMerge\(inventory, row\)') -and
+    ($renderSrc206 -match 'function _confirmVisualParse\(\)')
+) "206.2: renderVisualParsePreview/applyVisualParse/_visualParseInventoryMerge/_confirmVisualParse are all defined in js/ui-render.js"
+
+# 206.3 static -- confirm-gate at the pipeline level: runVisualOcr() calls
+#       _parseOcrText() then renderVisualParsePreview(), and NEVER calls
+#       applyVisualParse()/saveState() itself. 'runVisualOcr(' (with the
+#       paren) disambiguates from the earlier-declared runVisualOcrTest,
+#       whose name is a prefix of this one.
+$runBody206 = Get-FunctionBody $ocrSrc206 'runVisualOcr('
+Check (
+    ($runBody206 -match [regex]::Escape('_parseOcrText(text, ctx)')) -and
+    ($runBody206 -match [regex]::Escape('renderVisualParsePreview(parsed, file)')) -and
+    (-not ($runBody206 -match 'applyVisualParse')) -and
+    (-not ($runBody206 -match 'saveState\(\)'))
+) "206.3: runVisualOcr() runs OCR -> _parseOcrText() -> renderVisualParsePreview() only -- it never calls applyVisualParse()/saveState() itself (the write only happens from inside the modal)"
+
+# 206.4 static -- the write path is gated behind exactly one call site:
+#       applyVisualParse() is invoked ONLY from inside _confirmVisualParse(),
+#       which is wired ONLY to #visConfirmBtn's click listener inside
+#       renderVisualParsePreview() -- the preview render itself never calls it.
+$confirmBody206 = Get-FunctionBody $renderSrc206 '_confirmVisualParse'
+$previewBody206 = Get-FunctionBody $renderSrc206 'renderVisualParsePreview'
+Check (
+    ($confirmBody206 -match [regex]::Escape('applyVisualParse({ inventory: keptInventory, stats: keptStats });')) -and
+    (-not ($previewBody206 -match 'applyVisualParse\(')) -and
+    ($previewBody206 -match [regex]::Escape("confirmBtn.addEventListener('click', _confirmVisualParse);"))
+) "206.4: applyVisualParse() is called from _confirmVisualParse(), which renderVisualParsePreview() only wires to #visConfirmBtn's click listener -- the preview render itself never calls applyVisualParse()"
+
+# 206.5 static -- game-agnostic (Protocol 38): no FNV/FO3/Fallout literal in
+#       any of the new parser/preview/apply functions.
+$parserFnNames206 = @('_parseOcrText', '_cleanOcrLine', '_tryParseStatLine', '_tryParseInventoryLine', '_looksLikeItemName', 'runVisualOcr(')
+$parserFns206 = ($parserFnNames206 | ForEach-Object { Get-FunctionBody $ocrSrc206 $_ }) -join "`n"
+$applyFnNames206 = @('renderVisualParsePreview', 'applyVisualParse', '_visualParseInventoryMerge', '_confirmVisualParse')
+$applyFns206 = ($applyFnNames206 | ForEach-Object { Get-FunctionBody $renderSrc206 $_ }) -join "`n"
+$combined206 = $parserFns206 + $applyFns206
+Check (
+    (-not ($combined206 -match 'FNV')) -and
+    (-not ($combined206 -match 'FO3')) -and
+    (-not ($combined206 -match 'Fallout'))
+) "206.5: the new parser/preview/apply functions contain no FNV/FO3/Fallout literal (Protocol 38 -- lookupItemInDb/_resolveStatToken/getSkillKeys are already active-game-aware)"
+
+# 206.6 static -- the SCAN & PARSE dev console board lives inside the same
+#       inert <template id="testConsoleTemplate"> as the Unit-1 board, and
+#       _wireVisualParseTest() is wired from initTestConsole() after the
+#       _devConsoleUnlocked() guard (the Suite 205.16/205.17 pattern).
+$tplStart206 = $htmlSrc206.IndexOf('<template id="testConsoleTemplate">')
+$tplEnd206 = $htmlSrc206.IndexOf('</template>', $tplStart206)
+$inputIdx206 = $htmlSrc206.IndexOf('id="visualParseTestInput"')
+$initBody206 = Get-FunctionBody $consoleSrc206 'initTestConsole'
+$guardIdx206 = $initBody206.IndexOf('_devConsoleUnlocked()')
+$wireIdx206 = $initBody206.IndexOf('_wireVisualParseTest(panel)')
+Check (
+    ($tplStart206 -ne -1) -and ($tplEnd206 -ne -1) -and
+    ($inputIdx206 -gt $tplStart206) -and ($inputIdx206 -lt $tplEnd206) -and
+    ($consoleSrc206 -match 'function _wireVisualParseTest\(panel\)') -and
+    ($guardIdx206 -ne -1) -and ($wireIdx206 -ne -1) -and ($wireIdx206 -gt $guardIdx206)
+) "206.6: #visualParseTestInput lives inside <template id=`"testConsoleTemplate`">, and _wireVisualParseTest(panel) is called from initTestConsole() after the _devConsoleUnlocked() gate"
+
+# 206.7 static -- _wireVisualParseTest() itself writes nothing durable -- it
+#       only calls window.runVisualOcr(), never saveState()/robco_v8.
+$wireBody206 = Get-FunctionBody $consoleSrc206 '_wireVisualParseTest'
+Check (
+    ([regex]::IsMatch($wireBody206, 'window\s*\.\s*runVisualOcr\(')) -and
+    (-not ($wireBody206 -match 'saveState\(\)')) -and
+    (-not ($wireBody206 -match 'robco_v8'))
+) "206.7: _wireVisualParseTest() only invokes window.runVisualOcr() -- no saveState()/robco_v8 touch of its own"
+
+# 206.8 static -- _resolveStatToken/_applyStatToken (js/api.js) are reused
+#       verbatim (Protocol 22) -- the OCR stat-line parser and apply path
+#       never re-implement their own alias table or clamp logic.
+$statLineBody206 = Get-FunctionBody $ocrSrc206 '_tryParseStatLine'
+$applyVisBody206 = Get-FunctionBody $renderSrc206 'applyVisualParse'
+Check (
+    ($statLineBody206 -match [regex]::Escape('_resolveStatToken(m[1])')) -and
+    ($applyVisBody206 -match [regex]::Escape('_applyStatToken({ kind: row.kind, key: row.key }, row.value)'))
+) "206.8: _tryParseStatLine() resolves via the real _resolveStatToken(), and applyVisualParse() applies via the real _applyStatToken() -- no forked alias/clamp table"
+
+# 206.9-206.15 BEHAVIORAL -- the real parser (js/ocr.js) and the real
+# preview/apply/confirm functions (js/ui-render.js), executed via a spawned
+# node process against the ACTUAL source (Protocol 42 stdin-corruption-safe
+# transport -- the harness reads the real files at runtime, never embeds
+# their content literally in this script).
+$labels206 = @(
+    "206.9: [behavioral] a clean OCR sample resolves 4 inventory rows (3 DB-matched + 1 unmatched-but-plausible flagged), and 3 stats (SPECIAL/skill/scalar) via the real _resolveStatToken()",
+    "206.10: [behavioral] noisy OCR text fuzzy-matches a typo-mangled item name, dedupes a repeated stat line to one entry, and drops pure-symbol noise to ``unparsed`` instead of fabricating rows",
+    "206.11: [behavioral] `"Stimpak`" + `"Stimpak x2`" in the same OCR pass merge into one row with qty 3, not two separate rows",
+    "206.12: [behavioral] _visualParseInventoryMerge() increments an existing row's qty and backfills wgt/val from 0, while every other row is left byte-for-byte untouched",
+    "206.13: [behavioral] applyVisualParse() adds additively (pre-existing inventory untouched), clamps SPECIAL/HP OCR misreads through the real native setters, emits item.added, and saves at least once",
+    "206.14: [behavioral] unchecking every row before CONFIRM & APPLY writes nothing -- the discarded Stimpak row never reaches state.inventory and the discarded SPECIAL edit never reaches state.s",
+    "206.15: [behavioral] _parseOcrText() runs with no ``state`` in scope at all and cannot reference/mutate it -- parsing is fully side-effect-free until the player explicitly confirms"
+)
+try {
+    $nodeCheck206 = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCheck206) {
+        $repoRoot206 = (Get-Item $PSScriptRoot).Parent.FullName
+        $repoRootNode206 = $repoRoot206.Replace('\', '/')
+        $testScript206 = @"
+const vm = require('vm');
+const fs = require('fs');
+const path = require('path');
+const ROOT = '$repoRootNode206';
+function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+function extractBody(src, name) {
+  var idx = src.indexOf('function ' + name);
+  if (idx === -1) throw new Error('missing ' + name);
+  var i = src.indexOf('{', idx);
+  var depth = 0, start = i;
+  while (i < src.length) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) return src.slice(start, i + 1); }
+    i++;
+  }
+  throw new Error('unclosed ' + name);
+}
+function declareFn(src, name) {
+  var nameIdx = src.indexOf('function ' + name);
+  var parenIdx = src.indexOf('(', nameIdx);
+  var braceIdx = src.indexOf('{', parenIdx);
+  var params = src.slice(parenIdx, braceIdx);
+  return 'function ' + name + params + extractBody(src, name);
+}
+function declareConstObj(src, name) {
+  var idx = src.indexOf('const ' + name);
+  var eqIdx = src.indexOf('=', idx);
+  var braceIdx = src.indexOf('{', eqIdx);
+  var depth = 0, i = braceIdx;
+  while (i < src.length) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) { i++; break; } }
+    i++;
+  }
+  return src.slice(idx, i) + ';';
+}
+
+const ocrSrc = rd('js/ocr.js');
+const apiSrc = rd('js/api.js');
+const coreSrc = rd('js/ui-core.js');
+const renderSrc = rd('js/ui-render.js');
+
+var results = [];
+
+var lookupFn = "function lookupItemInDb(name) {\n" +
+  "  var key = String(name || '').toLowerCase().trim();\n" +
+  "  var db = { stimpak: { wgt: 1, val: 45, type: 'aid' }, '10mm pistol': { wgt: 3, val: 120, type: 'weapon' }, 'sunset sarsaparilla': { wgt: 1, val: 5, type: 'aid' } };\n" +
+  "  if (db[key]) return db[key];\n" +
+  "  if (key.length < 3) return null;\n" +
+  "  var best = null, bestLen = 0;\n" +
+  "  for (var k in db) { if (k.indexOf(key) !== -1 || key.indexOf(k) !== -1) { if (k.length > bestLen) { best = db[k]; bestLen = k.length; } } }\n" +
+  "  return best;\n" +
+  "}\n";
+
+var parserSrc = lookupFn +
+  declareConstObj(apiSrc, '_SCALAR_STAT_ALIASES') + '\n' +
+  declareConstObj(apiSrc, '_SPECIAL_STAT_ALIASES') + '\n' +
+  declareFn(apiSrc, '_resolveStatToken') + '\n' +
+  declareFn(apiSrc, '_statTokenLabel') + '\n' +
+  declareFn(ocrSrc, '_cleanOcrLine') + '\n' +
+  declareFn(ocrSrc, '_looksLikeItemName') + '\n' +
+  declareFn(ocrSrc, '_tryParseStatLine') + '\n' +
+  declareFn(ocrSrc, '_tryParseInventoryLine') + '\n' +
+  declareFn(ocrSrc, '_parseOcrText');
+
+function makeParserSandbox() {
+  var sb = { getSkillKeys: function () { return ['guns']; }, SKILL_LABELS: { guns: 'Guns' }, Math: Math, parseInt: parseInt, String: String, Array: Array, Number: Number, Set: Set };
+  vm.createContext(sb);
+  vm.runInContext(parserSrc, sb);
+  return sb;
+}
+
+try {
+  var sb9 = makeParserSandbox();
+  var cleanText = '3x Stimpak\n10mm Pistol x2\nSunset Sarsaparilla 4\nSTR 8\nGuns 45\nLevel 12\nMystery Trinket';
+  var out9 = sb9._parseOcrText(cleanText, 'FNV');
+  var inv9 = out9.inventory;
+  var stimpak9 = inv9.filter(function (i) { return i.name === 'Stimpak'; })[0];
+  var pistol9 = inv9.filter(function (i) { return i.name === '10mm Pistol'; })[0];
+  var soda9 = inv9.filter(function (i) { return i.name === 'Sunset Sarsaparilla'; })[0];
+  var trinket9 = inv9.filter(function (i) { return i.name === 'Mystery Trinket'; })[0];
+  var str9 = out9.stats.filter(function (s) { return s.kind === 'special' && s.key === 's'; })[0];
+  var guns9 = out9.stats.filter(function (s) { return s.kind === 'skill' && s.key === 'guns'; })[0];
+  var lvl9 = out9.stats.filter(function (s) { return s.kind === 'scalar' && s.key === 'level'; })[0];
+  results.push(
+    inv9.length === 4 && stimpak9 && stimpak9.qty === 3 && stimpak9.matched === true && stimpak9.wgt === 1 && stimpak9.val === 45 &&
+    pistol9 && pistol9.qty === 2 && pistol9.matched === true &&
+    soda9 && soda9.qty === 4 && soda9.matched === true &&
+    trinket9 && trinket9.qty === 1 && trinket9.matched === false && trinket9.wgt === 0 && trinket9.val === 0 &&
+    out9.stats.length === 3 && str9 && str9.value === 8 && guns9 && guns9.value === 45 && lvl9 && lvl9.value === 12 &&
+    out9.unparsed.length === 0
+  );
+} catch (e) { results.push(false); }
+
+try {
+  var sb10 = makeParserSandbox();
+  var noisyText = '3x Stimpakk\n==========\n10mm Pisto1 x2\n!!@#`$%\nStr 8\nSTR 8\n)( )( ][';
+  var out10 = sb10._parseOcrText(noisyText, 'FNV');
+  var stimpakk10 = out10.inventory.filter(function (i) { return i.name === 'Stimpakk'; })[0];
+  var pisto1_10 = out10.inventory.filter(function (i) { return i.name === '10mm Pisto1'; })[0];
+  results.push(
+    out10.inventory.length === 2 && stimpakk10 && stimpakk10.qty === 3 && stimpakk10.matched === true &&
+    pisto1_10 && pisto1_10.qty === 2 && pisto1_10.matched === false &&
+    out10.stats.length === 1 && out10.stats[0].kind === 'special' && out10.stats[0].key === 's' && out10.stats[0].value === 8 &&
+    out10.unparsed.length === 3
+  );
+} catch (e) { results.push(false); }
+
+try {
+  var sb11 = makeParserSandbox();
+  var out11 = sb11._parseOcrText('Stimpak\nStimpak x2', 'FNV');
+  results.push(out11.inventory.length === 1 && out11.inventory[0].qty === 3);
+} catch (e) { results.push(false); }
+
+function mockEl(initial) {
+  var v = initial;
+  var o = {};
+  Object.defineProperty(o, 'value', { get: function () { return String(v); }, set: function (x) { v = x; } });
+  Object.defineProperty(o, 'checked', { get: function () { return !!v; }, set: function (x) { v = x; } });
+  return o;
+}
+var coreDecl = declareFn(coreSrc, '_nativeSetHp') + '\n' + declareFn(coreSrc, '_nativeSetSpecial');
+var applySrc = declareFn(renderSrc, '_visualParseInventoryMerge') + '\n' +
+  declareFn(apiSrc, '_applyStatToken') + '\n' +
+  'var _pendingVisualParse = null;\n' +
+  declareFn(renderSrc, 'applyVisualParse') + '\n' +
+  declareFn(renderSrc, '_confirmVisualParse');
+
+function makeApplySandbox() {
+  var savedCalls = [];
+  var emitted = [];
+  var chatMsgs = [];
+  var els = { stat_hp_cur: mockEl(50), stat_hp_max: mockEl(100), s_s: mockEl(5) };
+  var sb = {
+    document: { getElementById: function (id) { return els[id] || null; } },
+    state: { inventory: [{ name: 'Pre-Existing Junk', qty: 1, wgt: 0, val: 0, type: 'misc' }], hpCur: 50, hpMax: 100, s: 5 },
+    RobcoEvents: { emit: function (name, p) { emitted.push({ name: name, p: p }); } },
+    saveState: function () { savedCalls.push(1); },
+    appendToChat: function (msg) { chatMsgs.push(msg); },
+    renderInventory: function () {},
+    updateMath: function () {},
+    _emitStatChangeIfDiffers: function () {},
+    Math: Math, parseInt: parseInt, String: String, Array: Array, Number: Number, Boolean: Boolean
+  };
+  sb.closeModal = function () { sb._pendingVisualParse = null; };
+  vm.createContext(sb);
+  vm.runInContext(coreDecl, sb);
+  vm.runInContext(applySrc, sb);
+  return { sb: sb, savedCalls: savedCalls, emitted: emitted, chatMsgs: chatMsgs };
+}
+
+try {
+  var a12 = makeApplySandbox();
+  var inv1 = a12.sb._visualParseInventoryMerge(
+    [{ name: 'Stimpak', qty: 2, wgt: 0, val: 0, type: 'misc' }, { name: 'Other Item', qty: 5, wgt: 3, val: 10, type: 'misc' }],
+    { name: 'Stimpak', qty: 3, wgt: 1, val: 45, type: 'aid' }
+  );
+  var stimpak12 = inv1.filter(function (i) { return i.name === 'Stimpak'; })[0];
+  var other12 = inv1.filter(function (i) { return i.name === 'Other Item'; })[0];
+  results.push(
+    inv1.length === 2 && stimpak12.qty === 5 && stimpak12.wgt === 1 && stimpak12.val === 45 &&
+    other12.qty === 5 && other12.wgt === 3 && other12.val === 10
+  );
+} catch (e) { results.push(false); }
+
+try {
+  var a13 = makeApplySandbox();
+  var result13 = a13.sb.applyVisualParse({
+    inventory: [{ name: 'Stimpak', qty: 3, wgt: 1, val: 45, type: 'aid', matched: true }],
+    stats: [ { kind: 'special', key: 's', value: 99 }, { kind: 'scalar', key: 'hp', value: 9999 } ]
+  });
+  var pre13 = a13.sb.state.inventory.filter(function (i) { return i.name === 'Pre-Existing Junk'; })[0];
+  var stimpak13 = a13.sb.state.inventory.filter(function (i) { return i.name === 'Stimpak'; })[0];
+  results.push(
+    result13.itemsApplied === 1 && result13.statsApplied === 2 &&
+    pre13 && pre13.qty === 1 &&
+    stimpak13 && stimpak13.qty === 3 &&
+    a13.sb.state.s === 10 && a13.sb.state.hpCur === 100 &&
+    a13.savedCalls.length >= 1 &&
+    a13.emitted.some(function (e) { return e.name === 'item.added' && e.p.name === 'Stimpak'; }) &&
+    a13.chatMsgs.some(function (m) { return /Applied 1 item\(s\), 2 stat edit\(s\)\./.test(m); })
+  );
+} catch (e) { results.push(false); }
+
+try {
+  var a14 = makeApplySandbox();
+  a14.sb._pendingVisualParse = {
+    inventory: [{ name: 'Stimpak', qty: 3, wgt: 1, val: 45, type: 'aid', matched: true }],
+    stats: [{ kind: 'special', key: 's', value: 9 }]
+  };
+  var keepInv14 = { checked: false, value: '3' };
+  var keepStat14 = { checked: false, value: '9' };
+  a14.sb.document.getElementById = function (id) {
+    if (id === 'visKeepInv0') return keepInv14;
+    if (id === 'visKeepStat0') return keepStat14;
+    return null;
+  };
+  a14.sb._confirmVisualParse();
+  results.push(
+    !a14.sb.state.inventory.some(function (i) { return i.name === 'Stimpak'; }) &&
+    a14.sb.state.s === 5 &&
+    a14.sb._pendingVisualParse === null
+  );
+} catch (e) { results.push(false); }
+
+try {
+  var sb15 = makeParserSandbox();
+  sb15._parseOcrText('3x Stimpak\nSTR 8', 'FNV');
+  results.push(typeof sb15.state === 'undefined');
+} catch (e) { results.push(false); }
+
+console.log('RESULT:' + results.map(function (r) { return r ? '1' : '0'; }).join(''));
+"@
+        $tmpScript206 = [System.IO.Path]::GetTempFileName() + '.js'
+        [System.IO.File]::WriteAllText($tmpScript206, $testScript206, [System.Text.Encoding]::UTF8)
+        try {
+            $out206 = (node $tmpScript206 2>&1 | Out-String)
+        } finally {
+            Remove-Item -Path $tmpScript206 -Force -ErrorAction SilentlyContinue
+        }
+        $rm206 = [regex]::Match($out206, 'RESULT:([01]{7})')
+        if ($rm206.Success) {
+            $bits206 = $rm206.Groups[1].Value
+            for ($bi206 = 0; $bi206 -lt $labels206.Count; $bi206++) {
+                Check ($bits206.Substring($bi206, 1) -eq '1') $labels206[$bi206]
+            }
+        } else {
+            $err206 = if ([string]::IsNullOrWhiteSpace($out206)) { "No output from node" } else { $out206.Trim() }
+            foreach ($lbl in $labels206) { Fail "$lbl  (runtime error: $err206)" }
+        }
+    } else {
+        foreach ($lbl in $labels206) { Fail "$lbl  (node not available in PATH)" }
+    }
+} catch {
+    foreach ($lbl in $labels206) { Fail "$lbl  (exception: $($_.Exception.Message))" }
+}
+
+# 206.16 static -- no new campaign-state field: Protocol 4 is not triggered
+#        (the plan's explicit call-out). Every write rides state.inventory
+#        and the existing native setters.
+Check (
+    ($applyVisBody206 -match [regex]::Escape('state.inventory = _visualParseInventoryMerge')) -and
+    (-not ([regex]::IsMatch($applyVisBody206, 'state\.\w+\s*=\s*\[\]'))) -and
+    (-not ([regex]::IsMatch($renderSrc206, 'state\.visual', 'IgnoreCase'))) -and
+    (-not ([regex]::IsMatch($renderSrc206, 'state\.ocr', 'IgnoreCase')))
+) "206.16: applyVisualParse() writes only through state.inventory and the existing native setters -- no new campaign-state field is introduced (Protocol 4 not triggered)"
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

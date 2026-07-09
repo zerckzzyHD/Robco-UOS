@@ -2351,6 +2351,71 @@ details.sub-panel[open] > summary h3::after {
   opacity: 0.6;
   margin-top: 6px;
 }
+/* Visual Upload OCR Unit 2 — preview/confirm modal (renderVisualParsePreview,
+   js/ui-render.js). min-width:0 + overflow-wrap on the name span, and ≥16px
+   font/≥28px min-height on every input (Protocol 17), keep this overflow-safe
+   and tap-safe at 360/412px. */
+.visparse-thumb {
+  display: block;
+  max-width: 100%;
+  max-height: 160px;
+  object-fit: contain;
+  margin: 0 auto 10px auto;
+  border: 1px solid var(--robco-green);
+  opacity: 0.9;
+}
+.visparse-section-label {
+  font-size: 11px;
+  letter-spacing: 1px;
+  opacity: 0.75;
+  border-bottom: 1px dashed rgba(var(--robco-green-rgb), 0.4);
+  padding-bottom: 3px;
+  margin: 10px 0 4px 0;
+}
+.visparse-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 3px 0;
+  font-size: 11px;
+}
+.visparse-keep,
+.visparse-stat-keep {
+  flex-shrink: 0;
+  width: auto;
+  min-width: 20px;
+  min-height: 20px;
+}
+.visparse-qty,
+.visparse-stat-value {
+  flex-shrink: 0;
+  width: 56px;
+  font-size: 16px; /* Protocol 17 — no iOS/Android focus auto-zoom */
+  min-height: 28px; /* Protocol 17 — ≥28px tap target */
+}
+.visparse-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.visparse-meta {
+  white-space: nowrap;
+  opacity: 0.7;
+  font-size: 10px;
+}
+.visparse-unmatched {
+  flex-shrink: 0;
+  color: var(--robco-danger, #ff4136);
+  font-size: 9px;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+.visparse-hint {
+  font-size: 9px;
+  opacity: 0.6;
+  margin-top: 8px;
+}
 /* WU-N3: THREAT ASSESSMENT card (native bestiary + TTK). minmax(0,1fr) + overflow-wrap
    keep long enemy/weapon names from forcing horizontal overflow at 360px. */
 .threat-card {

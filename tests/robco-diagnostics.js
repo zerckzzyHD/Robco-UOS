@@ -33388,6 +33388,524 @@ header('Suite 205 — VISUAL UPLOAD OCR Unit 1 (infra proof)');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 206 — VISUAL UPLOAD OCR Unit 2 (parser + preview/confirm + apply)
+//  planning/VISUAL_UPLOAD_OCR_PLAN.md §3.3/3.4/3.5: the deterministic,
+//  game-agnostic _parseOcrText() (js/ocr.js), the confirm-gated preview
+//  modal (renderVisualParsePreview/_confirmVisualParse), and the validated
+//  additive apply (_visualParseInventoryMerge/applyVisualParse, both
+//  js/ui-render.js). Nothing writes to state anywhere in this feature except
+//  applyVisualParse(), which only ever runs from _confirmVisualParse() —
+//  itself only reachable via the preview modal's own CONFIRM & APPLY button.
+//  No hybrid/kill-switch routing here (Unit 3 scope) — the pipeline is
+//  reached via the staging-only Dev Console SCAN & PARSE board, same
+//  visibility gate as Unit 1.
+//  16 tests
+// ══════════════════════════════════════════════════════════════
+header('Suite 206 — VISUAL UPLOAD OCR Unit 2 (parser + preview/confirm + apply)');
+{
+  const ocrSrc206 = readFile('js/ocr.js');
+  const renderSrc206 = readFile('js/ui-render.js');
+  const apiSrc206 = readFile('js/api.js');
+  const coreSrc206 = readFile('js/ui-core.js');
+  const consoleSrc206 = readFile('js/test-console.js');
+  const htmlSrc206 = readFile('index.html');
+
+  // 206.1 static — _parseOcrText is defined in js/ocr.js and exposed on window
+  assert(
+    /function _parseOcrText\(text, ctx\)/.test(ocrSrc206) &&
+      /window\._parseOcrText = _parseOcrText;/.test(ocrSrc206),
+    '206.1: _parseOcrText(text, ctx) is defined in js/ocr.js and exposed as window._parseOcrText'
+  );
+
+  // 206.2 static — the preview/confirm/apply functions all exist in js/ui-render.js
+  assert(
+    /function renderVisualParsePreview\(parsed, file\)/.test(renderSrc206) &&
+      /function applyVisualParse\(parsed\)/.test(renderSrc206) &&
+      /function _visualParseInventoryMerge\(inventory, row\)/.test(renderSrc206) &&
+      /function _confirmVisualParse\(\)/.test(renderSrc206),
+    '206.2: renderVisualParsePreview/applyVisualParse/_visualParseInventoryMerge/_confirmVisualParse are all defined in js/ui-render.js'
+  );
+
+  // 206.3 static — confirm-gate at the pipeline level: runVisualOcr() calls
+  //       _parseOcrText() then renderVisualParsePreview(), and NEVER calls
+  //       applyVisualParse()/saveState() itself.
+  {
+    // 'runVisualOcr(' (with the paren) disambiguates from the earlier-declared
+    // runVisualOcrTest, whose name is a prefix of this one.
+    const runBody206 = extractFunctionBody(ocrSrc206, 'runVisualOcr(');
+    assert(
+      /_parseOcrText\(text, ctx\)/.test(runBody206) &&
+        /renderVisualParsePreview\(parsed, file\)/.test(runBody206) &&
+        !/applyVisualParse/.test(runBody206) &&
+        !/saveState\(\)/.test(runBody206),
+      '206.3: runVisualOcr() runs OCR → _parseOcrText() → renderVisualParsePreview() only — it never calls applyVisualParse()/saveState() itself (the write only happens from inside the modal)'
+    );
+  }
+
+  // 206.4 static — the write path is gated behind exactly one call site:
+  //       applyVisualParse() is invoked ONLY from inside _confirmVisualParse(),
+  //       which is wired ONLY to #visConfirmBtn's click listener inside
+  //       renderVisualParsePreview() — no other call site anywhere.
+  {
+    const confirmBody206 = extractFunctionBody(renderSrc206, '_confirmVisualParse');
+    const previewBody206 = extractFunctionBody(renderSrc206, 'renderVisualParsePreview');
+    assert(
+      /applyVisualParse\(\{ inventory: keptInventory, stats: keptStats \}\);/.test(
+        confirmBody206
+      ) &&
+        !/applyVisualParse\(/.test(previewBody206) &&
+        /confirmBtn\.addEventListener\('click', _confirmVisualParse\);/.test(previewBody206),
+      "206.4: applyVisualParse() is called from _confirmVisualParse(), which renderVisualParsePreview() only wires to #visConfirmBtn's click listener — the preview render itself never calls applyVisualParse()"
+    );
+  }
+
+  // 206.5 static — game-agnostic (Protocol 38): no FNV/FO3/Fallout literal in
+  //       any of the new parser/preview/apply functions.
+  {
+    const parserFns206 = [
+      '_parseOcrText',
+      '_cleanOcrLine',
+      '_tryParseStatLine',
+      '_tryParseInventoryLine',
+      '_looksLikeItemName',
+      'runVisualOcr(',
+    ]
+      .map(n => extractFunctionBody(ocrSrc206, n))
+      .join('\n');
+    const applyFns206 = [
+      'renderVisualParsePreview',
+      'applyVisualParse',
+      '_visualParseInventoryMerge',
+      '_confirmVisualParse',
+    ]
+      .map(n => extractFunctionBody(renderSrc206, n))
+      .join('\n');
+    const combined206 = parserFns206 + applyFns206;
+    assert(
+      !/\bFNV\b/.test(combined206) && !/\bFO3\b/.test(combined206) && !/Fallout/.test(combined206),
+      '206.5: the new parser/preview/apply functions contain no FNV/FO3/Fallout literal (Protocol 38 — lookupItemInDb/_resolveStatToken/getSkillKeys are already active-game-aware)'
+    );
+  }
+
+  // 206.6 static — the SCAN & PARSE dev console board lives inside the same
+  //       inert <template id="testConsoleTemplate"> as the Unit-1 board, and
+  //       _wireVisualParseTest() is wired from initTestConsole() after the
+  //       _devConsoleUnlocked() guard (the Suite 205.16/205.17 pattern).
+  {
+    const tplStart206 = htmlSrc206.indexOf('<template id="testConsoleTemplate">');
+    const tplEnd206 = htmlSrc206.indexOf('</template>', tplStart206);
+    const inputIdx206 = htmlSrc206.indexOf('id="visualParseTestInput"');
+    const initBody206 = extractFunctionBody(consoleSrc206, 'initTestConsole');
+    const guardIdx206 = initBody206.indexOf('_devConsoleUnlocked()');
+    const wireIdx206 = initBody206.indexOf('_wireVisualParseTest(panel)');
+    assert(
+      tplStart206 !== -1 &&
+        tplEnd206 !== -1 &&
+        inputIdx206 > tplStart206 &&
+        inputIdx206 < tplEnd206 &&
+        /function _wireVisualParseTest\(panel\)/.test(consoleSrc206) &&
+        guardIdx206 !== -1 &&
+        wireIdx206 !== -1 &&
+        wireIdx206 > guardIdx206,
+      '206.6: #visualParseTestInput lives inside <template id="testConsoleTemplate">, and _wireVisualParseTest(panel) is called from initTestConsole() after the _devConsoleUnlocked() gate'
+    );
+  }
+
+  // 206.7 static — _wireVisualParseTest() itself writes nothing durable — it
+  //       only calls window.runVisualOcr(), never saveState()/robco_v8.
+  {
+    const wireBody206 = extractFunctionBody(consoleSrc206, '_wireVisualParseTest');
+    assert(
+      /window\s*\.\s*runVisualOcr\(/.test(wireBody206) &&
+        !/saveState\(\)/.test(wireBody206) &&
+        !/\brobco_v8\b/.test(wireBody206),
+      '206.7: _wireVisualParseTest() only invokes window.runVisualOcr() — no saveState()/robco_v8 touch of its own'
+    );
+  }
+
+  // 206.8 static — _resolveStatToken/_applyStatToken (js/api.js) are reused
+  //       verbatim (Protocol 22) — the OCR stat-line parser and apply path
+  //       never re-implement their own alias table or clamp logic.
+  assert(
+    /_resolveStatToken\(m\[1\]\)/.test(extractFunctionBody(ocrSrc206, '_tryParseStatLine')) &&
+      /_applyStatToken\(\{ kind: row\.kind, key: row\.key \}, row\.value\)/.test(
+        extractFunctionBody(renderSrc206, 'applyVisualParse')
+      ),
+    '206.8: _tryParseStatLine() resolves via the real _resolveStatToken(), and applyVisualParse() applies via the real _applyStatToken() — no forked alias/clamp table'
+  );
+
+  // ── BEHAVIORAL (Node vm) — the real parser against clean + noisy OCR text ──
+  function declareFn206(src, name) {
+    const nameIdx = src.indexOf('function ' + name);
+    const parenIdx = src.indexOf('(', nameIdx);
+    const braceIdx = src.indexOf('{', parenIdx);
+    const params = src.slice(parenIdx, braceIdx);
+    return 'function ' + name + params + extractFunctionBody(src, name);
+  }
+  function declareConstObj206(src, name) {
+    const idx = src.indexOf('const ' + name);
+    const eqIdx = src.indexOf('=', idx);
+    const braceIdx = src.indexOf('{', eqIdx);
+    let depth = 0,
+      i = braceIdx;
+    while (i < src.length) {
+      if (src[i] === '{') depth++;
+      else if (src[i] === '}' && --depth === 0) {
+        i++;
+        break;
+      }
+      i++;
+    }
+    return src.slice(idx, i) + ';';
+  }
+
+  const vm206 = require('vm');
+
+  // A tiny fixture DB mirrors lookupItemInDb()'s real exact→fuzzy-substring
+  // contract (db_nv.js/db_fo3.js) without loading the full CSV — this suite
+  // proves _parseOcrText()'s INTEGRATION with lookupItemInDb() (it calls it
+  // and trusts the result), not lookupItemInDb()'s own fuzzy logic (covered
+  // elsewhere).
+  const parserSandboxSrc206 =
+    `function lookupItemInDb(name) {
+      var key = String(name || '').toLowerCase().trim();
+      var db = {
+        stimpak: { wgt: 1, val: 45, type: 'aid' },
+        '10mm pistol': { wgt: 3, val: 120, type: 'weapon' },
+        'sunset sarsaparilla': { wgt: 1, val: 5, type: 'aid' },
+      };
+      if (db[key]) return db[key];
+      if (key.length < 3) return null;
+      var best = null, bestLen = 0;
+      for (var k in db) {
+        if (k.indexOf(key) !== -1 || key.indexOf(k) !== -1) {
+          if (k.length > bestLen) { best = db[k]; bestLen = k.length; }
+        }
+      }
+      return best;
+    }\n` +
+    declareConstObj206(apiSrc206, '_SCALAR_STAT_ALIASES') +
+    '\n' +
+    declareConstObj206(apiSrc206, '_SPECIAL_STAT_ALIASES') +
+    '\n' +
+    declareFn206(apiSrc206, '_resolveStatToken') +
+    '\n' +
+    declareFn206(apiSrc206, '_statTokenLabel') +
+    '\n' +
+    declareFn206(ocrSrc206, '_cleanOcrLine') +
+    '\n' +
+    declareFn206(ocrSrc206, '_looksLikeItemName') +
+    '\n' +
+    declareFn206(ocrSrc206, '_tryParseStatLine') +
+    '\n' +
+    declareFn206(ocrSrc206, '_tryParseInventoryLine') +
+    '\n' +
+    declareFn206(ocrSrc206, '_parseOcrText');
+
+  function makeParserSandbox206() {
+    const sb = {
+      getSkillKeys: () => ['guns'],
+      SKILL_LABELS: { guns: 'Guns' },
+      Math,
+      parseInt,
+      String,
+      Array,
+      Number,
+      Set,
+    };
+    vm206.createContext(sb);
+    vm206.runInContext(parserSandboxSrc206, sb);
+    return sb;
+  }
+
+  // 206.9  BEHAVIORAL — a clean OCR sample resolves inventory (exact DB match),
+  //        stats (SPECIAL/skill/scalar via the real _resolveStatToken), and an
+  //        unresolved-but-plausible name is still surfaced flagged unmatched.
+  {
+    const sb = makeParserSandbox206();
+    const cleanText =
+      '3x Stimpak\n10mm Pistol x2\nSunset Sarsaparilla 4\nSTR 8\nGuns 45\nLevel 12\nMystery Trinket';
+    const out = sb._parseOcrText(cleanText, 'FNV');
+    const inv = out.inventory;
+    const stimpak = inv.find(i => i.name === 'Stimpak');
+    const pistol = inv.find(i => i.name === '10mm Pistol');
+    const soda = inv.find(i => i.name === 'Sunset Sarsaparilla');
+    const trinket = inv.find(i => i.name === 'Mystery Trinket');
+    const strStat = out.stats.find(s => s.kind === 'special' && s.key === 's');
+    const gunsStat = out.stats.find(s => s.kind === 'skill' && s.key === 'guns');
+    const lvlStat = out.stats.find(s => s.kind === 'scalar' && s.key === 'level');
+    assert(
+      inv.length === 4 &&
+        stimpak &&
+        stimpak.qty === 3 &&
+        stimpak.matched === true &&
+        stimpak.wgt === 1 &&
+        stimpak.val === 45 &&
+        pistol &&
+        pistol.qty === 2 &&
+        pistol.matched === true &&
+        soda &&
+        soda.qty === 4 &&
+        soda.matched === true &&
+        trinket &&
+        trinket.qty === 1 &&
+        trinket.matched === false &&
+        trinket.wgt === 0 &&
+        trinket.val === 0 &&
+        out.stats.length === 3 &&
+        strStat &&
+        strStat.value === 8 &&
+        gunsStat &&
+        gunsStat.value === 45 &&
+        lvlStat &&
+        lvlStat.value === 12 &&
+        out.unparsed.length === 0,
+      '206.9: [behavioral] a clean OCR sample resolves 4 inventory rows (3 DB-matched + 1 unmatched-but-plausible flagged), and 3 stats (SPECIAL/skill/scalar) via the real _resolveStatToken()'
+    );
+  }
+
+  // 206.10 BEHAVIORAL — noisy/garbled OCR: a fuzzy-matchable typo resolves via
+  //        lookupItemInDb's substring match, a duplicate stat line is deduped
+  //        to one entry, and pure-symbol noise lines are dropped to `unparsed`
+  //        rather than fabricated into fake rows.
+  {
+    const sb = makeParserSandbox206();
+    const noisyText = '3x Stimpakk\n==========\n10mm Pisto1 x2\n!!@#$%\nStr 8\nSTR 8\n)( )( ][';
+    const out = sb._parseOcrText(noisyText, 'FNV');
+    const stimpakk = out.inventory.find(i => i.name === 'Stimpakk');
+    const pisto1 = out.inventory.find(i => i.name === '10mm Pisto1');
+    assert(
+      out.inventory.length === 2 &&
+        stimpakk &&
+        stimpakk.qty === 3 &&
+        stimpakk.matched === true && // fuzzy substring match to "stimpak"
+        pisto1 &&
+        pisto1.qty === 2 &&
+        pisto1.matched === false && // "1" for "l" typo does not fuzzy-match
+        out.stats.length === 1 &&
+        out.stats[0].kind === 'special' &&
+        out.stats[0].key === 's' &&
+        out.stats[0].value === 8 && // "Str 8" then "STR 8" — deduped to one
+        out.unparsed.length === 3, // the three symbol-noise lines, dropped rather than invented
+      '206.10: [behavioral] noisy OCR text fuzzy-matches a typo-mangled item name, dedupes a repeated stat line to one entry, and drops pure-symbol noise to `unparsed` instead of fabricating rows'
+    );
+  }
+
+  // 206.11 BEHAVIORAL — duplicate inventory lines merge additively (qty
+  //        summed) within a single parse pass, never double-counted as two rows.
+  {
+    const sb = makeParserSandbox206();
+    const out = sb._parseOcrText('Stimpak\nStimpak x2', 'FNV');
+    assert(
+      out.inventory.length === 1 && out.inventory[0].qty === 3,
+      '206.11: [behavioral] "Stimpak" + "Stimpak x2" in the same OCR pass merge into one row with qty 3, not two separate rows'
+    );
+  }
+
+  // ── BEHAVIORAL (Node vm) — _visualParseInventoryMerge / applyVisualParse /
+  //    _confirmVisualParse against a synthetic DOM + state (the Suite 201 idiom) ──
+  const coreDeclSrc206 =
+    declareFn206(coreSrc206, '_nativeSetHp') + '\n' + declareFn206(coreSrc206, '_nativeSetSpecial');
+  // NOTE test-harness detail: `var` (not `let`) here is deliberate — inside a
+  // Node `vm` context, a top-level `var` aliases to a property on the
+  // sandbox/global object (so an external `sb._pendingVisualParse = ...`
+  // assignment is visible to _confirmVisualParse()'s closure); a top-level
+  // `let` would create a separate lexical binding the sandbox object can't
+  // reach from outside. The real js/ui-render.js source correctly uses `let`
+  // — this `var` substitution is test-only and has no bearing on production
+  // behavior (a real <script> tag's module-scope closures are self-contained).
+  const applySandboxSrc206 =
+    declareFn206(renderSrc206, '_visualParseInventoryMerge') +
+    '\n' +
+    declareFn206(apiSrc206, '_applyStatToken') +
+    '\n' +
+    'var _pendingVisualParse = null;\n' +
+    declareFn206(renderSrc206, 'applyVisualParse') +
+    '\n' +
+    declareFn206(renderSrc206, '_confirmVisualParse');
+
+  function mockEl206(initial) {
+    let v = initial;
+    return {
+      get value() {
+        return String(v);
+      },
+      set value(x) {
+        v = x;
+      },
+      get checked() {
+        return !!v;
+      },
+      set checked(x) {
+        v = x;
+      },
+    };
+  }
+
+  function makeApplySandbox206() {
+    const savedCalls = [];
+    const emitted = [];
+    const chatMsgs = [];
+    const els = {
+      stat_hp_cur: mockEl206(50),
+      stat_hp_max: mockEl206(100),
+      s_s: mockEl206(5),
+    };
+    const sb = {
+      document: {
+        getElementById: id => els[id] || null,
+      },
+      state: {
+        inventory: [{ name: 'Pre-Existing Junk', qty: 1, wgt: 0, val: 0, type: 'misc' }],
+        hpCur: 50,
+        hpMax: 100,
+        s: 5,
+      },
+      RobcoEvents: { emit: (name, p) => emitted.push({ name, p }) },
+      saveState: () => savedCalls.push(1),
+      appendToChat: msg => chatMsgs.push(msg),
+      renderInventory: () => {},
+      updateMath: () => {},
+      _emitStatChangeIfDiffers: () => {},
+      Math,
+      parseInt,
+      String,
+      Array,
+      Number,
+      Boolean,
+    };
+    // closeModal() mock — mirrors the real modal's onClose hook, which clears
+    // _pendingVisualParse on close. Assigned as a property (not inside the vm
+    // source) but works correctly because _pendingVisualParse is declared
+    // `var` above (aliased to the sandbox object — see the note above).
+    sb.closeModal = () => {
+      sb._pendingVisualParse = null;
+    };
+    vm206.createContext(sb);
+    vm206.runInContext(coreDeclSrc206, sb);
+    vm206.runInContext(applySandboxSrc206, sb);
+    return { sb, els, savedCalls, emitted, chatMsgs };
+  }
+
+  // 206.12 BEHAVIORAL — _visualParseInventoryMerge() is a pure additive merge:
+  //        a new row is pushed, an existing row's qty increments, wgt/val
+  //        backfill from 0, and every OTHER row is left untouched (no-clobber).
+  {
+    const { sb } = makeApplySandbox206();
+    const inv1 = sb._visualParseInventoryMerge(
+      [
+        { name: 'Stimpak', qty: 2, wgt: 0, val: 0, type: 'misc' },
+        { name: 'Other Item', qty: 5, wgt: 3, val: 10, type: 'misc' },
+      ],
+      { name: 'Stimpak', qty: 3, wgt: 1, val: 45, type: 'aid' }
+    );
+    const stimpak = inv1.find(i => i.name === 'Stimpak');
+    const other = inv1.find(i => i.name === 'Other Item');
+    assert(
+      inv1.length === 2 &&
+        stimpak.qty === 5 &&
+        stimpak.wgt === 1 &&
+        stimpak.val === 45 &&
+        other.qty === 5 &&
+        other.wgt === 3 &&
+        other.val === 10,
+      "206.12: [behavioral] _visualParseInventoryMerge() increments an existing row's qty and backfills wgt/val from 0, while every other row is left byte-for-byte untouched"
+    );
+  }
+
+  // 206.13 BEHAVIORAL — applyVisualParse() writes additively (the pre-existing
+  //        inventory row is never touched/removed), clamps a SPECIAL/HP OCR
+  //        misread through the REAL _applyStatToken()/_nativeSetSpecial()/
+  //        _nativeSetHp() (SPECIAL "99" → 10, HP "9999" → hpMax 100), emits
+  //        item.added once per applied row, and saves at least once (each
+  //        native stat setter already saves itself, same as Native USE/
+  //        TERMINAL stat edits — Protocol 22, not a bug to dedupe here).
+  {
+    const { sb, savedCalls, emitted, chatMsgs } = makeApplySandbox206();
+    const result = sb.applyVisualParse({
+      inventory: [{ name: 'Stimpak', qty: 3, wgt: 1, val: 45, type: 'aid', matched: true }],
+      stats: [
+        { kind: 'special', key: 's', value: 99 },
+        { kind: 'scalar', key: 'hp', value: 9999 },
+      ],
+    });
+    const preExisting = sb.state.inventory.find(i => i.name === 'Pre-Existing Junk');
+    const stimpak = sb.state.inventory.find(i => i.name === 'Stimpak');
+    assert(
+      result.itemsApplied === 1 &&
+        result.statsApplied === 2 &&
+        preExisting &&
+        preExisting.qty === 1 && // additive — the un-pictured pre-existing item is untouched
+        stimpak &&
+        stimpak.qty === 3 &&
+        sb.state.s === 10 && // clamped 1–10 through the real _nativeSetSpecial
+        sb.state.hpCur === 100 && // clamped ≤ hpMax through the real _nativeSetHp
+        savedCalls.length >= 1 &&
+        emitted.some(e => e.name === 'item.added' && e.p.name === 'Stimpak') &&
+        chatMsgs.some(m => /Applied 1 item\(s\), 2 stat edit\(s\)\./.test(m)),
+      '206.13: [behavioral] applyVisualParse() adds additively (pre-existing inventory untouched), clamps SPECIAL/HP OCR misreads through the real native setters, emits item.added, and saves at least once'
+    );
+  }
+
+  // 206.14 BEHAVIORAL — confirm-gate: discarding EVERY row (all keep
+  //        checkboxes unchecked) via _confirmVisualParse() writes nothing —
+  //        no inventory change, no stat change, and saveState() is still
+  //        only called through applyVisualParse()'s own single call, never
+  //        skipped/duplicated.
+  {
+    const { sb } = makeApplySandbox206();
+    sb._pendingVisualParse = {
+      inventory: [{ name: 'Stimpak', qty: 3, wgt: 1, val: 45, type: 'aid', matched: true }],
+      stats: [{ kind: 'special', key: 's', value: 9 }],
+    };
+    // Explicitly simulate BOTH rows unchecked via real keep-checkbox elements
+    // (getElementById returning null would be treated as "kept" by the real
+    // UI's `if (keepEl && !keepEl.checked) return;` guard).
+    const keepInv = { checked: false, value: '3' };
+    const keepStat = { checked: false, value: '9' };
+    sb.document.getElementById = id => {
+      if (id === 'visKeepInv0') return keepInv;
+      if (id === 'visKeepStat0') return keepStat;
+      return null;
+    };
+    sb._confirmVisualParse();
+    assert(
+      !sb.state.inventory.some(i => i.name === 'Stimpak') &&
+        sb.state.s === 5 && // unchanged from the sandbox's initial value
+        sb._pendingVisualParse === null, // cleared by closeModal's onClose in the real modal; here just confirms the confirm handler ran
+      '206.14: [behavioral] unchecking every row before CONFIRM & APPLY writes nothing — the discarded Stimpak row never reaches state.inventory and the discarded SPECIAL edit never reaches state.s'
+    );
+  }
+
+  // 206.15 BEHAVIORAL — confirm-gate at the earlier stage: building the
+  //        parsed preview object (real _parseOcrText()) never itself touches
+  //        any state — parsing alone is side-effect-free.
+  {
+    const sb = makeParserSandbox206();
+    const before = JSON.stringify({});
+    sb._parseOcrText('3x Stimpak\nSTR 8', 'FNV');
+    assert(
+      typeof sb.state === 'undefined' && before === JSON.stringify({}),
+      '206.15: [behavioral] _parseOcrText() runs with no `state` in scope at all and cannot reference/mutate it — parsing is fully side-effect-free until the player explicitly confirms'
+    );
+  }
+
+  // 206.16 static — no new campaign-state field: Protocol 4 is not triggered
+  //        (the plan's explicit call-out). Every write rides state.inventory
+  //        and the existing native setters.
+  {
+    const applyBody206 = extractFunctionBody(renderSrc206, 'applyVisualParse');
+    assert(
+      /state\.inventory = _visualParseInventoryMerge/.test(applyBody206) &&
+        !/state\.\w+\s*=\s*\[\]/.test(applyBody206) &&
+        !/state\.visual/i.test(renderSrc206) &&
+        !/state\.ocr/i.test(renderSrc206),
+      '206.16: applyVisualParse() writes only through state.inventory and the existing native setters — no new campaign-state field is introduced (Protocol 4 not triggered)'
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail

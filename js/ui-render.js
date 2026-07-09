@@ -3630,6 +3630,235 @@ async function doLoot(name) {
     );
 }
 
+// ── VISUAL UPLOAD OCR Unit 2: preview / confirm / additive apply ──────────
+// planning/VISUAL_UPLOAD_OCR_PLAN.md §3.4/3.5. js/ocr.js's pure _parseOcrText()
+// hands off a structured { inventory, stats, unparsed } object here; this
+// section owns the confirm-gated modal and the validated write path. Nothing
+// in js/ocr.js ever touches state — the ONLY writes anywhere in this feature
+// happen inside _confirmVisualParse(), and only after the player taps CONFIRM
+// & APPLY (Protocol 24 — OCR is a suggestion, the player is the authority).
+
+// Pure additive merge for a single OCR-detected inventory row — mirrors
+// addItem()'s find-or-increment idiom (backfill wgt/val from 0, backfill type
+// from 'misc') as a pure, testable function, the same shape as the existing
+// _lootAdd() (Protocol 22 — new call site, since OCR rows are programmatic
+// rather than DOM-input-driven, not a forked merge algorithm). Never deletes
+// or touches any other row — additive-only (Protocol 34), which is what
+// enforces the AI directive's old "never delete un-pictured items" rule in
+// code rather than only in a prompt.
+function _visualParseInventoryMerge(inventory, row) {
+  const inv = Array.isArray(inventory) ? inventory.map(i => ({ ...i })) : [];
+  const name = String((row && row.name) || '').trim();
+  if (!name) return inv;
+  const qty = Math.max(1, Math.min(999, Math.floor(Number(row.qty) || 1)));
+  const wgt = Number(row.wgt) || 0;
+  const val = Number(row.val) || 0;
+  const type = row.type || 'misc';
+  const ex = inv.find(i => String(i.name).toLowerCase() === name.toLowerCase());
+  if (ex) {
+    ex.qty = (ex.qty || 0) + qty;
+    if ((!ex.wgt || ex.wgt === 0) && wgt) ex.wgt = wgt;
+    if ((!ex.val || ex.val === 0) && val) ex.val = val;
+    if (ex.type === 'misc' && type !== 'misc') ex.type = type;
+  } else {
+    inv.push({ name, qty, wgt, val, type });
+  }
+  return inv;
+}
+
+// applyVisualParse(parsed) — the validated, additive, confirm-gated write
+// path (§3.5). `parsed` is the ALREADY keep/discard-filtered + edited row set
+// (built by _confirmVisualParse() from the live preview DOM) — this function
+// itself does not read any DOM, so it is directly unit-testable the same way
+// _lootAdd()/_threatCompute() are. Inventory rows route through
+// _visualParseInventoryMerge() (additive, no-clobber); stat rows route
+// through the SAME _resolveStatToken()/_applyStatToken() choke point Native
+// USE and TERMINAL stat edits already use (js/api.js, Protocol 22) — those
+// setters already clamp (SPECIAL 1–10, skill 0–100, HP≤max, rads≤maxRads,
+// level≤MAX_PLAYER_LEVEL) and call saveState() themselves, so an OCR
+// misread (e.g. "S: 99") can never exceed a real limit (Protocol 24). No new
+// campaign-state field — everything rides state.inventory / the existing
+// native setters, already covered by sanitizeImportedContainer()/
+// migrateState() and the cloud save (Protocol 34 serialized-whole).
+function applyVisualParse(parsed) {
+  parsed = parsed && typeof parsed === 'object' ? parsed : {};
+  const inventoryRows = Array.isArray(parsed.inventory) ? parsed.inventory : [];
+  const statRows = Array.isArray(parsed.stats) ? parsed.stats : [];
+
+  let itemsApplied = 0;
+  inventoryRows.forEach(row => {
+    const name = String((row && row.name) || '').trim();
+    if (!name) return;
+    state.inventory = _visualParseInventoryMerge(state.inventory, row);
+    const qty = Math.max(1, Math.min(999, Math.floor(Number(row.qty) || 1)));
+    // FEEDBACK ANIMATION WAVE 2 (#18 MANIFEST PUNCH) — same additive
+    // item.added signal the manual/LOOT paths already emit (Protocol 22).
+    if (typeof RobcoEvents !== 'undefined' && RobcoEvents.emit) {
+      RobcoEvents.emit('item.added', { name, qty, source: 'ocr', type: row.type || 'misc' });
+    }
+    itemsApplied++;
+  });
+
+  let statsApplied = 0;
+  statRows.forEach(row => {
+    if (!row || !row.kind || !row.key) return;
+    if (typeof _applyStatToken !== 'function') return;
+    _applyStatToken({ kind: row.kind, key: row.key }, row.value);
+    statsApplied++;
+  });
+
+  if (itemsApplied > 0 && typeof renderInventory === 'function') renderInventory();
+  if (typeof updateMath === 'function') updateMath();
+  saveState();
+  if (typeof appendToChat === 'function') {
+    appendToChat(
+      `> [OPTICAL SCAN] Applied ${itemsApplied} item(s), ${statsApplied} stat edit(s).`,
+      'sys'
+    );
+  }
+  return { itemsApplied, statsApplied };
+}
+
+// Module-scope handle to whatever screenshot/parse the preview modal is
+// currently showing — read only by _confirmVisualParse() (below) and cleaned
+// up on modal close. Transient only; never persisted.
+let _pendingVisualParse = null;
+let _pendingVisualScanUrl = null;
+
+// renderVisualParsePreview(parsed, file) — the confirm-gated preview modal
+// (§3.4), built on the SAME openModal()/#sysModal shell every other native
+// terminal (LOOT, THREAT, CONSULT) already uses. Two keep/discard-toggled,
+// editable sections (DETECTED INVENTORY / DETECTED STATS); a "NOTHING
+// DETECTED" empty state offers MANUAL ENTRY (jumps to the native CARGO
+// MANIFEST add-item form — no AI). The hybrid "TRY AI VISION" fallback
+// (planning/VISUAL_UPLOAD_OCR_PLAN.md §4) is Unit 3 scope and is
+// deliberately NOT wired here. Mobile-first (Protocol 17): ≥16px inputs,
+// ≥28px tap targets, no horizontal overflow at 360/412 (verified live).
+function renderVisualParsePreview(parsed, file) {
+  parsed =
+    parsed && typeof parsed === 'object' ? parsed : { inventory: [], stats: [], unparsed: [] };
+  const inventory = Array.isArray(parsed.inventory) ? parsed.inventory : [];
+  const stats = Array.isArray(parsed.stats) ? parsed.stats : [];
+
+  if (_pendingVisualScanUrl) {
+    URL.revokeObjectURL(_pendingVisualScanUrl);
+    _pendingVisualScanUrl = null;
+  }
+  let thumbHtml = '';
+  if (file && typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+    try {
+      _pendingVisualScanUrl = URL.createObjectURL(file);
+      thumbHtml = `<img src="${_pendingVisualScanUrl}" alt="Scanned screenshot" class="visparse-thumb" />`;
+    } catch (_) {
+      /* the thumbnail is cosmetic only — never block the preview on it */
+    }
+  }
+
+  const invRowsHtml = inventory
+    .map((row, i) => {
+      const qty = Math.max(1, Math.min(999, Math.floor(Number(row.qty) || 1)));
+      return (
+        `<div class="visparse-row" data-idx="${i}">` +
+        `<input type="checkbox" class="visparse-keep" id="visKeepInv${i}" checked aria-label="Keep ${escapeHtml(row.name)}" />` +
+        `<input type="number" class="visparse-qty" id="visQtyInv${i}" value="${qty}" min="1" max="999" aria-label="Quantity for ${escapeHtml(row.name)}" />` +
+        `<span class="visparse-name">${escapeHtml(row.name)}</span>` +
+        `<span class="visparse-meta">${escapeHtml(row.type || 'misc')} &middot; ${Number(row.wgt) || 0} wgt &middot; ${Number(row.val) || 0}c</span>` +
+        (row.matched ? '' : '<span class="visparse-unmatched">UNMATCHED</span>') +
+        `</div>`
+      );
+    })
+    .join('');
+
+  const statRowsHtml = stats
+    .map((row, i) => {
+      const val = Math.round(Number(row.value) || 0);
+      return (
+        `<div class="visparse-row visparse-stat-row" data-idx="${i}">` +
+        `<input type="checkbox" class="visparse-stat-keep" id="visKeepStat${i}" checked aria-label="Keep ${escapeHtml(row.label)}" />` +
+        `<span class="visparse-name">${escapeHtml(row.label)}</span>` +
+        `<input type="number" class="visparse-stat-value" id="visValStat${i}" value="${val}" aria-label="Value for ${escapeHtml(row.label)}" />` +
+        `</div>`
+      );
+    })
+    .join('');
+
+  const nothingDetected = !inventory.length && !stats.length;
+  const body =
+    thumbHtml +
+    (nothingDetected
+      ? '<div class="empty-state">NOTHING DETECTED — the optical scan found no recognizable items or stats in this image.</div>' +
+        '<div class="visparse-hint">Try a clearer, closer screenshot, or add items directly.</div>' +
+        '<div class="modal-confirm-actions">' +
+        '<button type="button" id="visManualEntryBtn" class="blue-btn">[ MANUAL ENTRY ]</button>' +
+        '</div>'
+      : (inventory.length
+          ? `<div class="visparse-section-label">DETECTED INVENTORY (${inventory.length})</div>${invRowsHtml}`
+          : '') +
+        (stats.length
+          ? `<div class="visparse-section-label">DETECTED STATS (${stats.length})</div>${statRowsHtml}`
+          : '') +
+        '<div class="visparse-hint">Uncheck a row to discard it, or edit the value before confirming. Nothing is saved until CONFIRM &amp; APPLY.</div>' +
+        '<div class="modal-confirm-actions">' +
+        '<button type="button" id="visConfirmBtn" class="blue-btn">[ CONFIRM &amp; APPLY ]</button>' +
+        '<button type="button" id="visCancelBtn" class="blue-btn">[ CANCEL ]</button>' +
+        '</div>');
+
+  _pendingVisualParse = { inventory, stats };
+
+  openModal({
+    title: '> OPTICAL SCAN — REVIEW & CONFIRM',
+    body,
+    onClose: () => {
+      if (_pendingVisualScanUrl) {
+        URL.revokeObjectURL(_pendingVisualScanUrl);
+        _pendingVisualScanUrl = null;
+      }
+      _pendingVisualParse = null;
+    },
+  });
+
+  const confirmBtn = document.getElementById('visConfirmBtn');
+  if (confirmBtn) confirmBtn.addEventListener('click', _confirmVisualParse);
+  const cancelBtn = document.getElementById('visCancelBtn');
+  if (cancelBtn) cancelBtn.addEventListener('click', () => closeModal());
+  const manualBtn = document.getElementById('visManualEntryBtn');
+  if (manualBtn)
+    manualBtn.addEventListener('click', () => {
+      closeModal();
+      if (typeof expandPanelForCategory === 'function') expandPanelForCategory('inventory');
+    });
+}
+
+// _confirmVisualParse() — reads the LIVE preview DOM (keep checkboxes +
+// edited qty/value inputs), builds the final row set, and is the ONLY call
+// site anywhere in this feature that invokes applyVisualParse(). Nothing is
+// written before this fires (Protocol 24 — the confirm gate).
+function _confirmVisualParse() {
+  const pending = _pendingVisualParse;
+  if (!pending) return;
+
+  const keptInventory = [];
+  (pending.inventory || []).forEach((row, i) => {
+    const keepEl = document.getElementById('visKeepInv' + i);
+    if (keepEl && !keepEl.checked) return;
+    const qtyEl = document.getElementById('visQtyInv' + i);
+    const qty = qtyEl ? parseInt(qtyEl.value, 10) : row.qty;
+    keptInventory.push({ ...row, qty: Number.isFinite(qty) && qty > 0 ? qty : row.qty });
+  });
+
+  const keptStats = [];
+  (pending.stats || []).forEach((row, i) => {
+    const keepEl = document.getElementById('visKeepStat' + i);
+    if (keepEl && !keepEl.checked) return;
+    const valEl = document.getElementById('visValStat' + i);
+    const value = valEl ? parseInt(valEl.value, 10) : row.value;
+    keptStats.push({ ...row, value: Number.isFinite(value) ? value : row.value });
+  });
+
+  applyVisualParse({ inventory: keptInventory, stats: keptStats });
+  closeModal();
+}
+
 // ── WU-N3: THREAT — native bestiary assessment + TTK ──────────────────────
 // Pure combat math (no DOM) so the gate can unit-test it. Read-only. Floors
 // avoid divide-by-zero / negative effective damage when DT meets/exceeds output.

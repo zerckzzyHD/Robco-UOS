@@ -135,21 +135,21 @@ function _loadImageFromFile(file) {
   });
 }
 
-// runVisualOcrTest(file, onStatus) -- the Unit-1 proof: pick -> preprocess ->
-// OCR -> return the raw recognized text. No parser, no state write of any
-// kind (Unit 2 adds the deterministic _parseOcrText(); Unit 3 wires the
-// hybrid/kill-switch routing) -- this purely proves the wasm/worker/CSP/
-// cache infra actually works end-to-end. corePath deliberately points at the
-// EXACT vendored core file (not a bare directory): Tesseract's own
-// getCore.js auto-selects a SIMD-vs-non-SIMD core variant when corePath is a
-// directory, which would 404 since only the non-SIMD lstm-only core is
-// vendored here (kept the repo-weight addition to a single ~6.7MB core
-// instead of ~15MB for both variants) -- pointing at the literal filename
-// sidesteps that probe entirely and guarantees only the one vendored file is
-// ever requested (Protocol 27: verified against the actual vendored
-// package's resolution logic, not assumed from the plan's illustrative
-// snippet).
-async function runVisualOcrTest(file, onStatus) {
+// _runOcrPipeline(file, onStatus) -- the shared pick -> preprocess -> OCR ->
+// raw-text core (Unit 1 infra proof), factored out so BOTH the Unit-1 raw-
+// text test board (runVisualOcrTest, unchanged below) and the Unit-2 full
+// parse/preview/apply pipeline (runVisualOcr) share the ONE Tesseract
+// invocation (Protocol 22 -- never a second worker-config call site).
+// corePath deliberately points at the EXACT vendored core file (not a bare
+// directory): Tesseract's own getCore.js auto-selects a SIMD-vs-non-SIMD
+// core variant when corePath is a directory, which would 404 since only the
+// non-SIMD lstm-only core is vendored here (kept the repo-weight addition to
+// a single ~6.7MB core instead of ~15MB for both variants) -- pointing at
+// the literal filename sidesteps that probe entirely and guarantees only the
+// one vendored file is ever requested (Protocol 27: verified against the
+// actual vendored package's resolution logic, not assumed from the plan's
+// illustrative snippet).
+async function _runOcrPipeline(file, onStatus) {
   const status = typeof onStatus === 'function' ? onStatus : () => {};
   status('LOADING OPTICAL SCAN ENGINE...');
   const Tesseract = await _ensureTesseract();
@@ -192,5 +192,200 @@ async function runVisualOcrTest(file, onStatus) {
   return text;
 }
 
+// runVisualOcrTest(file, onStatus) -- the Unit-1 proof: pick -> preprocess ->
+// OCR -> return the raw recognized text. No parser, no state write of any
+// kind -- purely proves the wasm/worker/CSP/cache infra works end-to-end.
+// Unchanged behavior after the _runOcrPipeline extraction (Protocol 22).
+async function runVisualOcrTest(file, onStatus) {
+  return _runOcrPipeline(file, onStatus);
+}
+
+// ── UNIT 2: DETERMINISTIC PARSER (planning/VISUAL_UPLOAD_OCR_PLAN.md §3.3) ──
+// _parseOcrText(text, ctx) is PURE -- no DOM, no state read/write -- so it is
+// directly VM-sandbox-testable (Protocol 14/20/24). It never invents data: a
+// line either resolves against a real cross-reference (lookupItemInDb() for
+// items, _resolveStatToken() for stats/SPECIAL/skills, both already
+// game-agnostic via the active game's loaded DB / getSkillKeys() -- Protocol
+// 38, no game literal anywhere below) or, if it merely LOOKS like a plausible
+// item name, is still surfaced flagged as unmatched for the player to
+// confirm/edit/discard (Protocol 24 -- OCR is a suggestion, never an
+// authority). Lines that are neither a resolvable stat nor a plausible item
+// name are dropped into `unparsed` rather than fabricated into a fake row.
+// `ctx` is accepted for API-contract clarity/future tuning but not consumed
+// directly here -- lookupItemInDb()/_resolveStatToken()/getSkillKeys() are
+// already active-game-aware internally (they read whatever DB/registry the
+// active game loaded), so no game-literal branch is needed in this file.
+
+// Strips leading OCR bullet/border noise ("- ", "* ", "• ", "> ") and
+// collapses internal whitespace runs (multi-space/tab artifacts from a
+// misread column gap) into single spaces.
+function _cleanOcrLine(raw) {
+  return String(raw || '')
+    .replace(/^[\s•\-*·▪●○◦>]+/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Plausibility gate for an inventory-candidate name: must carry at least 2
+// letters, stay under a sane length, and not be mostly punctuation/symbol
+// noise (a common OCR-on-a-table-border artifact). This is what keeps a
+// misread scanline ("|||  ===") from becoming a fake inventory row instead
+// of falling through to `unparsed`.
+function _looksLikeItemName(name) {
+  if (!name) return false;
+  const letters = (name.match(/[A-Za-z]/g) || []).length;
+  if (letters < 2) return false;
+  if (name.length > 48) return false;
+  const junk = (name.match(/[^A-Za-z0-9 '\-.]/g) || []).length;
+  if (junk / name.length > 0.3) return false;
+  return true;
+}
+
+// A single "LABEL <number>" (optionally "LABEL: <number>" / "LABEL -
+// <number>" / "LABEL <cur>/<max>") line -- resolved ONLY when the label
+// cross-references a real stat/SPECIAL/skill via the shared _resolveStatToken()
+// (js/api.js -- the exact resolver Native USE and the TERMINAL stat-edit
+// grammar already use, Protocol 22, zero forked alias table). Returns null
+// (never a guess) when the line doesn't match the shape or the label doesn't
+// resolve -- the caller then tries the line as an inventory candidate instead,
+// so a line like "Stimpak 3" (unresolved label "Stimpak") correctly falls
+// through to the inventory parser rather than being dropped here.
+function _tryParseStatLine(line) {
+  if (typeof _resolveStatToken !== 'function') return null;
+  const m = line.match(
+    /^([A-Za-z][A-Za-z .'-]{0,24}?)\s*[:-]{0,2}\s*(-?\d{1,5})(?:\s*\/\s*-?\d{1,5})?\s*$/
+  );
+  if (!m) return null;
+  const resolved = _resolveStatToken(m[1]);
+  if (!resolved) return null;
+  const value = parseInt(m[2], 10);
+  if (isNaN(value)) return null;
+  const label =
+    typeof _statTokenLabel === 'function' ? _statTokenLabel(resolved) : m[1].trim().toUpperCase();
+  return { kind: resolved.kind, key: resolved.key, label, value, raw: line };
+}
+
+// An inventory-candidate line: extracts a quantity (leading "3x Stimpak" /
+// "3 Stimpak", trailing "Stimpak x3" / "Stimpak (3)" / "Stimpak 3", or a bare
+// name with an implicit qty of 1) and cross-references the cleaned name
+// against lookupItemInDb() (whichever per-game database file the active game
+// loaded -- Protocol 38, no game literal here; exact-then-fuzzy-substring
+// match already built in, e.g. an
+// OCR-mangled "Stimpakk" fuzzy-resolves to "Stimpak"). `matched=true` only
+// when the DB resolves it; an unresolved-but-plausible name is still
+// returned (wgt/val=0, type='misc' -- the exact addItem() unmatched-item
+// default, never a fabricated non-zero value) so the preview can flag it
+// amber for the player to confirm/correct. Returns null for anything that
+// doesn't even look like a plausible item name (Protocol 24 -- never invent).
+function _tryParseInventoryLine(line) {
+  let qty = 1;
+  let name = line;
+  let m;
+  if ((m = line.match(/^(\d{1,4})\s*[xX]\s+(.+)$/))) {
+    qty = parseInt(m[1], 10);
+    name = m[2];
+  } else if ((m = line.match(/^(\d{1,4})\s+(.+)$/))) {
+    qty = parseInt(m[1], 10);
+    name = m[2];
+  } else if ((m = line.match(/^(.+?)\s*[xX]\s*(\d{1,4})$/))) {
+    name = m[1];
+    qty = parseInt(m[2], 10);
+  } else if ((m = line.match(/^(.+?)\s*\(\s*(\d{1,4})\s*\)$/))) {
+    name = m[1];
+    qty = parseInt(m[2], 10);
+  } else if ((m = line.match(/^(.+?)\s+(\d{1,4})$/))) {
+    name = m[1];
+    qty = parseInt(m[2], 10);
+  }
+  name = _cleanOcrLine(name)
+    .replace(/[:-]+$/, '')
+    .trim();
+  if (!_looksLikeItemName(name)) return null;
+  if (!Number.isFinite(qty) || qty < 1) qty = 1;
+  if (qty > 999) qty = 999;
+  const db = typeof lookupItemInDb === 'function' ? lookupItemInDb(name) : null;
+  const matched = !!db;
+  return {
+    raw: line,
+    name,
+    qty,
+    wgt: matched ? Number(db.wgt) || 0 : 0,
+    val: matched && db.val != null ? Number(db.val) || 0 : 0,
+    type: matched && db.type ? db.type : 'misc',
+    matched,
+  };
+}
+
+// _parseOcrText(text, ctx) -- the deterministic, game-agnostic parser.
+// Returns { inventory: [...], stats: [...], unparsed: [...] } and NEVER
+// touches state -- js/ui-render.js's renderVisualParsePreview()/
+// applyVisualParse() own the preview/confirm/write path (Unit 2 §3.4/3.5).
+// Each line is tried as a stat line FIRST (so "Level 12"/"Big Guns 45" never
+// misparse as an inventory row named "Level"/"Big Guns"), then as an
+// inventory line; a stat key is kept only once (first occurrence -- a
+// repeated/duplicate OCR read of the same line is not a second edit).
+function _parseOcrText(text, ctx) {
+  const lines = String(text || '')
+    .split(/\r?\n/)
+    .map(l => _cleanOcrLine(l))
+    .filter(Boolean);
+
+  const inventory = [];
+  const stats = [];
+  const unparsed = [];
+  const seenStatKeys = new Set();
+  const seenInvNames = new Set();
+
+  lines.forEach(line => {
+    const statHit = _tryParseStatLine(line);
+    if (statHit) {
+      const dedupeKey = statHit.kind + ':' + statHit.key;
+      if (!seenStatKeys.has(dedupeKey)) {
+        seenStatKeys.add(dedupeKey);
+        stats.push(statHit);
+      }
+      return;
+    }
+
+    const invHit = _tryParseInventoryLine(line);
+    if (invHit) {
+      const key = invHit.name.toLowerCase();
+      if (seenInvNames.has(key)) {
+        const ex = inventory.find(i => i.name.toLowerCase() === key);
+        if (ex) ex.qty = Math.min(999, ex.qty + invHit.qty);
+      } else {
+        seenInvNames.add(key);
+        inventory.push(invHit);
+      }
+      return;
+    }
+
+    unparsed.push(line);
+  });
+
+  return { inventory, stats, unparsed, ctx: ctx || null };
+}
+
+// runVisualOcr(file, onStatus) -- Unit 2's full pipeline: OCR (via the shared
+// _runOcrPipeline) -> _parseOcrText() -> renderVisualParsePreview() (the
+// confirm-gated preview modal, js/ui-render.js). Nothing is written to state
+// anywhere in this file or this call chain -- applyVisualParse() only runs
+// from the preview modal's own CONFIRM button, after the player reviews/
+// edits every row (Protocol 24).
+async function runVisualOcr(file, onStatus) {
+  const status = typeof onStatus === 'function' ? onStatus : () => {};
+  const text = await _runOcrPipeline(file, status);
+  status('PARSING RECOGNIZED TEXT...');
+  const ctx = typeof getGameContext === 'function' ? getGameContext() : null;
+  const parsed = _parseOcrText(text, ctx);
+  status('DONE');
+  if (typeof renderVisualParsePreview === 'function') {
+    renderVisualParsePreview(parsed, file);
+  }
+  return parsed;
+}
+
 window._ensureTesseract = _ensureTesseract;
 window.runVisualOcrTest = runVisualOcrTest;
+window._parseOcrText = _parseOcrText;
+window.runVisualOcr = runVisualOcr;

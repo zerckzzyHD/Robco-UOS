@@ -117,6 +117,12 @@ export default [
         transmitMessage: 'readonly',
         _wireApiEventBusSubscribers: 'readonly', // U7 OS event bus (api.js)
         fetchAuthorizedModels: 'readonly',
+        // Visual Upload OCR Unit 2 (js/api.js) — the shared stat-token resolver/
+        // clamp choke point (Native USE/TERMINAL stat edits), reused by the OCR
+        // parser (js/ocr.js) and the OCR apply path (js/ui-render.js)
+        _resolveStatToken: 'readonly',
+        _statTokenLabel: 'readonly',
+        _applyStatToken: 'readonly',
         lookupItemInDb: 'readonly',
         lookupWeaponStats: 'readonly',
         lookupBestiaryEntry: 'readonly',
@@ -176,6 +182,7 @@ export default [
         _deckTargetSuggestions: 'readonly', // Tool Deck #deckTarget autocomplete source (ui-render.js), wired from ui-saves.js
         doLoot: 'readonly',
         _lootAdd: 'readonly',
+        renderVisualParsePreview: 'readonly', // Visual Upload OCR Unit 2 (ui-render.js), called from js/ocr.js's runVisualOcr
         expandPanelForCategory: 'readonly',
         closeModal: 'readonly',
         playSyncTone: 'readonly',

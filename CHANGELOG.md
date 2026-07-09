@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2740/2740 | Cache: robco-terminal-v2.7.0-r125 -->
+﻿## [Unreleased]<!-- Tests: 2756/2756 | Cache: robco-terminal-v2.7.0-r126 -->
 
 ### Added
 
@@ -38,6 +38,7 @@
 - Your CARTOGRAPHY TABLE now lets you set your current location right from the map. Tap a location's entry and you'll see a new TRAVEL HERE button next to MARK SURVEYED — tap it and that spot instantly becomes your current position, with the map updating right away, no AI round trip needed.
 - Moving to a new location — whether you travel there from the map, type it into your Position field, log an arrival in TERMINAL mode, or the AI moves you — now shows a small confirmation card in the top-right corner naming exactly where you ended up, which slides away on its own a couple of seconds later.
 - Laid the groundwork for reading your screenshots on your own device instead of sending them out — this first piece proves the on-device scanning engine actually works, but doesn't change anything about Visual Upload yet; using it to fill in your inventory or stats comes in a later update.
+- The on-device screenshot scanner can now actually read a screenshot and turn it into inventory items and stats — but it's still a step away from your everyday Visual Upload button. It shows you exactly what it found in a review screen first, with a quantity you can adjust or a value you can correct, and a checkbox to leave out anything it got wrong; nothing is added to your campaign until you tap CONFIRM & APPLY. Adding items this way never removes or overwrites anything already in your inventory, and a misread stat can never push a value past its real limit. Turning this into the actual replacement for the AI-powered Visual Upload comes in a later update.
 
 ### Changed
 

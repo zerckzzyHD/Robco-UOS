@@ -247,6 +247,34 @@
             "
           ></pre>
         </div>
+        <div class="input-group" style="flex-direction: column; align-items: stretch">
+          <label class="optics-label" for="visualParseTestInput"
+            >SCAN &amp; PARSE TEST (VISUAL UPLOAD OCR — UNIT 2)</label
+          >
+          <p style="font-size: 10px">
+            Full pipeline: OCR &rarr; deterministic parser &rarr; the real preview/confirm modal
+            &rarr; additive apply. Nothing is written to the campaign until CONFIRM &amp; APPLY is
+            tapped in the modal. Same underlying OCR engine as the Unit-1 board above.
+          </p>
+          <input
+            type="file"
+            id="visualParseTestInput"
+            accept="image/*"
+            aria-label="Select a screenshot to run through the full OCR parse/preview pipeline"
+            style="font-size: 16px"
+          />
+          <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px">
+            <button
+              type="button"
+              class="btn-sm"
+              id="visualParseTestBtn"
+              aria-label="Run the full OCR scan, parse, and preview pipeline on the selected image"
+            >
+              SCAN &amp; PARSE
+            </button>
+          </div>
+          <span id="visualParseTestStatus" aria-live="polite" style="font-size: 10px">&mdash;</span>
+        </div>
         <!-- EXTENSION POINT: a future ambient feature (broadcasts, weather, boot
              flavors, etc.) adds one more trigger button here, wired in
              js/test-console.js — call the feature's existing entry point,

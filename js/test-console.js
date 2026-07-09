@@ -258,6 +258,41 @@
     });
   }
 
+  // Visual Upload OCR Unit 2 (planning/VISUAL_UPLOAD_OCR_PLAN.md §3): the full
+  // OCR -> deterministic parser -> preview/confirm modal -> additive apply
+  // pipeline. This wiring itself writes NOTHING durable -- it only invokes
+  // window.runVisualOcr() (js/ocr.js), which opens the real preview/confirm
+  // modal (renderVisualParsePreview, js/ui-render.js); every campaign write
+  // happens only if/when the player taps CONFIRM & APPLY inside that modal.
+  function _wireVisualParseTest(panel) {
+    var input = panel.querySelector('#visualParseTestInput');
+    var btn = panel.querySelector('#visualParseTestBtn');
+    var status = panel.querySelector('#visualParseTestStatus');
+    if (!input || !btn || !status) return;
+    btn.addEventListener('click', function () {
+      var file = input.files && input.files[0];
+      if (!file) {
+        status.textContent = 'SELECT AN IMAGE FIRST';
+        return;
+      }
+      if (typeof window.runVisualOcr !== 'function') {
+        status.textContent = 'OCR MODULE NOT LOADED (js/ocr.js)';
+        return;
+      }
+      btn.disabled = true;
+      window
+        .runVisualOcr(file, function (msg) {
+          status.textContent = msg;
+        })
+        .catch(function (err) {
+          status.textContent = 'FAILED: ' + (err && err.message ? err.message : 'unknown error');
+        })
+        .finally(function () {
+          btn.disabled = false;
+        });
+    });
+  }
+
   function _wireImmersionSelect(panel) {
     var sel = panel.querySelector('#testConsoleImmersionSelect');
     if (!sel) return;
@@ -350,6 +385,7 @@
       _wireResetControls(panel);
       _wireReplayHatch(panel);
       _wireOcrTest(panel);
+      _wireVisualParseTest(panel);
       _wireImmersionSelect(panel);
       _wireLiveRefresh(panel);
       _refresh(panel);
