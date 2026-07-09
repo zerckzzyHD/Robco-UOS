@@ -1,7 +1,7 @@
 ﻿# RobCo U.O.S. — System Architecture
 
 > **Version:** 2.7.0
-> **Last Updated:** 2026-07-08
+> **Last Updated:** 2026-07-09
 > **Purpose:** Living reference for any engineer (human or AI) working on this project.
 > This document maps every system, its dependencies, its persistence contract, and the
 > historical lessons that shaped it.
@@ -68,9 +68,12 @@
 │   ├── db_nv.js        ~54KB  FNV CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 │   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
+├── js/ocr.js                  Visual Upload on-device OCR: lazy Tesseract.js load + raw-text proof (Unit 1)
+├── js/vendor/                 Self-hosted Tesseract.js (Apache-2.0) — main API, worker, wasm core
+├── assets/ocr/                Vendored OCR language data (eng.traineddata.gz, runtime-cached)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2719-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2719-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2740-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2740-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -256,16 +259,39 @@ Scripts are loaded via `<script>` tags in `index.html` in this exact order:
                        initRegistryAutocomplete (wireInput), initAmmoDatalist,
                        addQuest, triggerFileInput, triggerImageUpload
 7. js/ui-account.js → defines: renderAccount, renderCloudSavePicker, undoLastSync
-8. js/runtime.js    → defines: window.AmbientRuntime, window.initAmbientRuntime
+8. js/ocr.js        → defines: window._ensureTesseract, window.runVisualOcrTest (Visual Upload
+                       on-device OCR, Unit 1 infra proof — LAZY, never loads Tesseract.js itself
+                       at boot; see Visual Upload OCR below)
+9. js/runtime.js    → defines: window.AmbientRuntime, window.initAmbientRuntime
                        (loaded before ui-core.js; top level defines only — see Ambient Runtime below)
-9. js/ui-core.js    → defines: AudioSettings, appendToChat, loadUI, updateMath, etc.
-10. js/test-console.js → defines: window.initTestConsole (loaded after ui-core.js — needs
+10. js/ui-core.js    → defines: AudioSettings, appendToChat, loadUI, updateMath, etc.
+11. js/test-console.js → defines: window.initTestConsole (loaded after ui-core.js — needs
                        _isStagingEnv; gated by _devConsoleUnlocked(), no-ops until unlocked —
                        see Developer Console below)
-11. js/api.js       → defines: autoImportState, transmitMessage, fetchAuthorizedModels
-12. js/cloud.js     → loaded as <script type="module"> (ES import from Firebase CDN)
+12. js/api.js       → defines: autoImportState, transmitMessage, fetchAuthorizedModels
+13. js/cloud.js     → loaded as <script type="module"> (ES import from Firebase CDN)
                        attaches: window.pushToCloud, window.pullFromCloud
 ```
+
+**Visual Upload OCR (`js/ocr.js`, Unit 1 infra proof — `planning/VISUAL_UPLOAD_OCR_PLAN.md`):**
+self-hosted, lazy-loaded Tesseract.js (Apache-2.0, `js/vendor/`) — `_ensureTesseract()` injects
+`js/vendor/tesseract.min.js` only on first use (idempotent via a module-scope promise, never at
+boot), and `runVisualOcrTest(file)` preprocesses the image on a `<canvas>` (grayscale, mean-
+luminance threshold, invert dark-on-light), OCRs it via a same-origin `Worker`
+(`workerBlobURL: false`, `corePath` pointed at the exact vendored core file — never a bare
+directory, which would trigger Tesseract's SIMD-vs-non-SIMD auto-probe and 404 since only the
+non-SIMD lstm-only core is vendored), and returns the raw recognized text. The CSP `script-src`
+gained `'wasm-unsafe-eval'` (required for `WebAssembly.instantiate`; does not affect the
+`unsafe-inline` tripwire). `sw.js` ASSETS precaches only the small `tesseract.min.js`/
+`worker.min.js` shims; the heavy core (`tesseract-core-lstm.wasm(.js)`) and language data
+(`assets/ocr/eng.traineddata.gz`, ~9.5MB total) cache at runtime, best-effort, on first OCR use
+(`_cacheOcrAssetsBestEffort`, reusing the SYSTEM STATUS active-cache-name lookup) — offline works
+only after that first use. Today's only entry point is a staging-only Developer Console board
+(`_wireOcrTest`, `js/test-console.js`) that dumps the raw text for a live pipeline proof; there is
+no parser and no state write anywhere in this unit, and the existing AI-vision Visual Upload path
+(`handleImageSelection`/`transmitMessage`'s `inlineData` branch) is completely untouched. Unit 2
+(deterministic parser + preview/confirm apply) and Unit 3 (hybrid routing + kill-switch) are
+separate, later units.
 
 **Critical constraint:** Because these are `<script>` tags (not modules), all globals are shared
 in the window scope. The ESLint config (`eslint.config.mjs`) declares every cross-file global
@@ -2836,7 +2862,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2719-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2740-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

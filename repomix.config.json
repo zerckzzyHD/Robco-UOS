@@ -36,7 +36,9 @@
       "RULES.md",
       "CLAUDE.md",
       ".claude/**",
-      "tests/robco-diagnostics.ps1"
+      "tests/robco-diagnostics.ps1",
+      "js/vendor/**",
+      "assets/ocr/**"
     ]
   },
   "security": {

@@ -11,14 +11,18 @@
     <!-- CSP enforcing: stage 2 — verified clean in report-only mode (boot + Firebase + auth + Firestore
          produced zero violations). 'unsafe-inline' intentionally retained in script-src and style-src:
          ~148 inline event handlers require it; adding a sha256/nonce token would silently disable
-         unsafe-inline per CSP Level 2+, breaking all inline handlers (tripwire guards 55.10–55.11). -->
+         unsafe-inline per CSP Level 2+, breaking all inline handlers (tripwire guards 55.10–55.11).
+         'wasm-unsafe-eval' (Visual Upload OCR Unit 1) is a standard, narrowly-scoped keyword source —
+         it permits WebAssembly.instantiate/compile (needed by the self-hosted Tesseract.js OCR engine,
+         js/ocr.js) and nothing else; it does NOT enable plain JS eval()/Function() and does NOT trip
+         the unsafe-inline tripwire above (Suite 55). -->
     <!-- frame-ancestors is intentionally OMITTED here: it is only enforceable via an HTTP
          response header, never via a <meta> tag — browsers silently ignore it in meta and
          log a console warning for the no-op directive. Every other directive below still
          works in meta and stays enforced. -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; connect-src 'self' https://generativelanguage.googleapis.com https://firestore.googleapis.com https://firebase.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://nv-overlord.firebaseapp.com https://content-firebaseappcheck.googleapis.com https://firebaseappcheck.googleapis.com https://www.google.com https://www.gstatic.com; img-src 'self' data: blob: https://www.gstatic.com; style-src 'self' 'unsafe-inline'; font-src 'self'; object-src 'none'; base-uri 'none'; frame-src https://nv-overlord.firebaseapp.com https://www.google.com https://accounts.google.com; worker-src 'self'; form-action 'self'"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://www.gstatic.com https://www.google.com https://apis.google.com; connect-src 'self' https://generativelanguage.googleapis.com https://firestore.googleapis.com https://firebase.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://nv-overlord.firebaseapp.com https://content-firebaseappcheck.googleapis.com https://firebaseappcheck.googleapis.com https://www.google.com https://www.gstatic.com; img-src 'self' data: blob: https://www.gstatic.com; style-src 'self' 'unsafe-inline'; font-src 'self'; object-src 'none'; base-uri 'none'; frame-src https://nv-overlord.firebaseapp.com https://www.google.com https://accounts.google.com; worker-src 'self'; form-action 'self'"
     />
     <link rel="stylesheet" href="css/terminal.css" />
     <script>
@@ -153,6 +157,11 @@
          tier is the existing device pref, same as the real dial). See
          js/test-console.js for the extension point where a future ambient
          feature (broadcasts, weather, boot flavors, etc.) adds its own trigger.
+         Also hosts one-off infra-proof harnesses for not-yet-live features
+         (e.g. the Visual Upload OCR Unit-1 board below) — this IS the one
+         canonical dev/debug console (Protocol 22), not just an Ambient
+         Runtime tool. Any such board still writes NOTHING durable to the
+         campaign, same as every other control here.
          ════════════════════════════════════════════════════════════════════ -->
     <template id="testConsoleTemplate">
       <details class="panel" id="testConsolePanel" style="margin: 8px">
@@ -198,6 +207,45 @@
               REPLAY HATCH
             </button>
           </div>
+        </div>
+        <div class="input-group" style="flex-direction: column; align-items: stretch">
+          <label class="optics-label" for="ocrTestInput"
+            >OPTICAL SCAN TEST (VISUAL UPLOAD OCR — UNIT 1)</label
+          >
+          <p style="font-size: 10px">
+            Infra proof only — dumps the RAW on-device OCR text, no parser/apply yet (Unit 2/3).
+            Lazy-loads self-hosted Tesseract.js on first use; does not touch the existing composer
+            Visual Upload / Director-vision path at all.
+          </p>
+          <input
+            type="file"
+            id="ocrTestInput"
+            accept="image/*"
+            aria-label="Select a screenshot to run through the on-device OCR test"
+            style="font-size: 16px"
+          />
+          <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px">
+            <button
+              type="button"
+              class="btn-sm"
+              id="ocrTestScanBtn"
+              aria-label="Run the on-device OCR test on the selected image"
+            >
+              SCAN
+            </button>
+          </div>
+          <span id="ocrTestStatus" aria-live="polite" style="font-size: 10px">&mdash;</span>
+          <pre
+            id="ocrTestOutput"
+            style="
+              font-size: 11px;
+              white-space: pre-wrap;
+              overflow-wrap: anywhere;
+              max-height: 240px;
+              overflow-y: auto;
+              margin-top: 6px;
+            "
+          ></pre>
         </div>
         <!-- EXTENSION POINT: a future ambient feature (broadcasts, weather, boot
              flavors, etc.) adds one more trigger button here, wired in
@@ -3995,6 +4043,12 @@
     <script src="js/ui-render.js"></script>
     <script src="js/ui-saves.js"></script>
     <script src="js/ui-account.js"></script>
+    <!-- Visual Upload OCR (Unit 1, planning/VISUAL_UPLOAD_OCR_PLAN.md): lazy-loaded, never
+         imports Tesseract.js itself at boot -- only exposes _ensureTesseract()/
+         runVisualOcrTest() for a later trigger (today: the staging-only Dev Console OCR
+         test board below). Must load after ui-render.js (openModal/escapeHtml precedent)
+         and before ui-core.js (Protocol 22 -- no forked helper). -->
+    <script src="js/ocr.js"></script>
     <script src="js/runtime.js"></script>
     <script src="js/ui-core.js"></script>
     <script src="js/test-console.js"></script>

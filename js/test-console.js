@@ -218,6 +218,46 @@
     });
   }
 
+  // Visual Upload OCR Unit-1 infra proof (planning/VISUAL_UPLOAD_OCR_PLAN.md
+  // Sec7 Stage 1): a thin wiring layer only -- the actual OCR pipeline
+  // (lazy Tesseract.js load, canvas preprocessing, worker.recognize) lives in
+  // js/ocr.js (Protocol 23 layering). Writes NOTHING durable to the campaign;
+  // dumps the raw recognized text into #ocrTestOutput for a live proof.
+  function _wireOcrTest(panel) {
+    var input = panel.querySelector('#ocrTestInput');
+    var btn = panel.querySelector('#ocrTestScanBtn');
+    var status = panel.querySelector('#ocrTestStatus');
+    var output = panel.querySelector('#ocrTestOutput');
+    if (!input || !btn || !status || !output) return;
+    btn.addEventListener('click', function () {
+      var file = input.files && input.files[0];
+      if (!file) {
+        status.textContent = 'SELECT AN IMAGE FIRST';
+        return;
+      }
+      if (typeof window.runVisualOcrTest !== 'function') {
+        status.textContent = 'OCR MODULE NOT LOADED (js/ocr.js)';
+        return;
+      }
+      btn.disabled = true;
+      output.textContent = '';
+      window
+        .runVisualOcrTest(file, function (msg) {
+          status.textContent = msg;
+        })
+        .then(function (text) {
+          status.textContent = 'DONE';
+          output.textContent = text && text.trim() ? text : '[NO TEXT DETECTED]';
+        })
+        .catch(function (err) {
+          status.textContent = 'FAILED: ' + (err && err.message ? err.message : 'unknown error');
+        })
+        .finally(function () {
+          btn.disabled = false;
+        });
+    });
+  }
+
   function _wireImmersionSelect(panel) {
     var sel = panel.querySelector('#testConsoleImmersionSelect');
     if (!sel) return;
@@ -309,6 +349,7 @@
       _renderTransitionButtons(panel);
       _wireResetControls(panel);
       _wireReplayHatch(panel);
+      _wireOcrTest(panel);
       _wireImmersionSelect(panel);
       _wireLiveRefresh(panel);
       _refresh(panel);

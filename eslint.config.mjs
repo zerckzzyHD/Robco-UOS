@@ -25,6 +25,7 @@ export default [
         Blob: 'readonly',
         File: 'readonly',
         FileReader: 'readonly',
+        Image: 'readonly',
         FormData: 'readonly',
         Headers: 'readonly',
         Request: 'readonly',
@@ -132,6 +133,7 @@ export default [
         _nativePadFire: 'readonly', // Tool Deck + Quick-Draw Holster (ui-core.js), called from _routeNativeCommand (api.js)
         _openSysModal: 'readonly',
         openModal: 'readonly', // Step 2 Phase 0 U12 consolidated modal driver (ui-core.js)
+        _readActiveCacheName: 'readonly', // SYSTEM STATUS active-cache-name lookup (ui-core.js), reused by ocr.js
         confirmAction: 'readonly', // Step 2 Phase 0 U12 diegetic confirm() replacement (ui-core.js)
         _vatsIsMelee: 'readonly',
         getGameContext: 'readonly',
@@ -424,6 +426,7 @@ export default [
       'tests/browser-shared.mjs',
       'tests/_diag*.mjs',
       'scripts/cf-staging-build.mjs',
+      'js/vendor/', // vendored third-party dependency (Visual Upload OCR, Unit 1) — not our code
     ],
   },
 ];

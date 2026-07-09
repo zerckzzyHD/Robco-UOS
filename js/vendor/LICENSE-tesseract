@@ -1,0 +1,23 @@
+Vendored dependency: Tesseract.js (and Tesseract.js-core)
+Version: 5.1.1
+License: Apache License 2.0
+Homepage: https://github.com/naptha/tesseract.js
+Homepage (core): https://github.com/naptha/tesseract.js-core
+
+Files vendored under js/vendor/:
+  tesseract.min.js            — main API (dist/tesseract.min.js)
+  worker.min.js                — worker script (dist/worker.min.js)
+  tesseract-core-lstm.wasm.js  — WebAssembly OCR engine glue (LSTM-only build)
+  tesseract-core-lstm.wasm     — WebAssembly OCR engine binary (LSTM-only build)
+
+Language data vendored under assets/ocr/:
+  eng.traineddata.gz — English trained data (LSTM "best_int" model), sourced
+  from the tesseract.js-data distribution, itself derived from the Tesseract
+  OCR project's tessdata_fast/tessdata_best models (Apache License 2.0).
+
+These files are committed unmodified (Protocol 39 UTF-8/binary integrity) and
+self-hosted so the app never depends on a third-party CDN at runtime (CSP:
+script-src/worker-src 'self'). See https://github.com/naptha/tesseract.js/blob/master/LICENSE.md
+and https://github.com/tesseract-ocr/tessdata_fast for upstream license text.
+
+Full Apache License 2.0 text: https://www.apache.org/licenses/LICENSE-2.0

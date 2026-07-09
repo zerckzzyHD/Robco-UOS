@@ -5355,8 +5355,9 @@ header('Suite 54 — Prompt-Injection Hardening, Input Caps, Quota Warning');
 // ══════════════════════════════════════════════════════════════
 //  Suite 55 — CSP Stage 2 Origin Guards + Firebase Pin
 //  Protocol-20 origin guard (load-bearing CSP origins),
-//  unsafe-inline tripwire, blob: img-src guard, Firebase version-pin guard.
-//  13 tests
+//  unsafe-inline tripwire, blob: img-src guard, Firebase version-pin guard,
+//  'wasm-unsafe-eval' guard (Visual Upload OCR Unit 1).
+//  14 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 55 — CSP Stage 1 Origin Guards + Firebase Pin');
 {
@@ -5457,6 +5458,14 @@ header('Suite 55 — CSP Stage 1 Origin Guards + Firebase Pin');
   assert(
     /img-src[^;]*blob:/.test(htmlSource55),
     'CSP img-src contains blob: (canvas/screenshot-preview images — Protocol 20 guard)'
+  );
+
+  // 55.14 'wasm-unsafe-eval' present in script-src (Visual Upload OCR Unit 1 — required
+  // for WebAssembly.instantiate/compile under CSP; a standard keyword source, not a
+  // hash/nonce, so it does not trip the 55.11 unsafe-inline tripwire above)
+  assert(
+    /script-src[^;]*'wasm-unsafe-eval'/.test(htmlSource55),
+    "CSP script-src contains 'wasm-unsafe-eval' (Visual Upload OCR — required for WebAssembly.instantiate under CSP)"
   );
 }
 
@@ -33116,6 +33125,266 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     /RobcoEvents\.on\(\s*['"]location\.visited['"][\s\S]{0,120}SURVEYED:/.test(wireEchoBody204),
     '204.10: the SURVEYED annunciator reaction (location.visited, first-discovery only) is untouched — a distinct signal from the new arrival card, not removed or merged'
   );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 205 — VISUAL UPLOAD OCR Unit 1 (infra proof)
+//  planning/VISUAL_UPLOAD_OCR_PLAN.md §7 Stage 1: vendor + lazy-load
+//  self-hosted Tesseract.js, the 'wasm-unsafe-eval' CSP addition, the
+//  install-safe SW caching split (small shims in ASSETS, heavy core+lang
+//  runtime-best-effort only), and a raw-text-dump proof wired into the
+//  staging-only Dev Console. NO parser, NO state write, NO change to the
+//  existing AI-vision Visual Upload path anywhere in this unit (Unit 2/3).
+//  20 tests
+// ══════════════════════════════════════════════════════════════
+header('Suite 205 — VISUAL UPLOAD OCR Unit 1 (infra proof)');
+{
+  const ocrSrc205 = readFile('js/ocr.js');
+  const htmlSrc205 = readFile('index.html');
+  const swSrc205 = readFile('sw.js');
+  const consoleSrc205 = readFile('js/test-console.js');
+  const repomix205 = readFile('repomix.config.json');
+
+  // 205.1 js/ocr.js exists on disk
+  assert(fs.existsSync(path.join(ROOT, 'js/ocr.js')), 'js/ocr.js file exists (Unit 1 infra)');
+
+  // 205.2 the vendored Tesseract.js files exist on disk (self-hosted, no CDN)
+  assert(
+    fs.existsSync(path.join(ROOT, 'js/vendor/tesseract.min.js')) &&
+      fs.existsSync(path.join(ROOT, 'js/vendor/worker.min.js')) &&
+      fs.existsSync(path.join(ROOT, 'js/vendor/tesseract-core-lstm.wasm.js')) &&
+      fs.existsSync(path.join(ROOT, 'js/vendor/tesseract-core-lstm.wasm')) &&
+      fs.existsSync(path.join(ROOT, 'assets/ocr/eng.traineddata.gz')) &&
+      fs.existsSync(path.join(ROOT, 'js/vendor/LICENSE-tesseract')),
+    'js/vendor/{tesseract.min.js,worker.min.js,tesseract-core-lstm.wasm(.js)}, assets/ocr/eng.traineddata.gz, and js/vendor/LICENSE-tesseract all exist on disk (self-hosted, Apache-2.0 attributed)'
+  );
+
+  // 205.3 <script src="js/ocr.js"> present in index.html
+  assert(/"js\/ocr\.js"/.test(htmlSrc205), '<script src="js/ocr.js"> present in index.html');
+
+  // 205.4 ocr.js loads after ui-render.js and before ui-core.js (plan-mandated boot order)
+  {
+    const renderIdx205 = htmlSrc205.indexOf('"js/ui-render.js"');
+    const ocrIdx205 = htmlSrc205.indexOf('"js/ocr.js"');
+    const coreIdx205 = htmlSrc205.indexOf('"js/ui-core.js"');
+    assert(
+      renderIdx205 !== -1 &&
+        ocrIdx205 !== -1 &&
+        coreIdx205 !== -1 &&
+        renderIdx205 < ocrIdx205 &&
+        ocrIdx205 < coreIdx205,
+      'js/ocr.js <script> tag sits after ui-render.js and before ui-core.js in index.html (Protocol 22 boot-order guard)'
+    );
+  }
+
+  // 205.5 './js/ocr.js' and the small vendor shims (tesseract.min.js/worker.min.js) are
+  //       in the all-or-nothing sw.js ASSETS precache list
+  assert(
+    /['"]\.\/js\/ocr\.js['"]/.test(swSrc205) &&
+      /['"]\.\/js\/vendor\/tesseract\.min\.js['"]/.test(swSrc205) &&
+      /['"]\.\/js\/vendor\/worker\.min\.js['"]/.test(swSrc205),
+    "sw.js ASSETS precache includes './js/ocr.js', './js/vendor/tesseract.min.js', and './js/vendor/worker.min.js' (small, safe shims)"
+  );
+
+  // 205.6 install-safety guard: the HEAVY core+lang files are NEVER in the
+  //       all-or-nothing sw.js ASSETS precache list (Protocol 1 — install
+  //       failure/bloat risk). They are cached at runtime, best-effort, on
+  //       first OCR use instead. Checks actual quoted array ENTRY lines
+  //       only (skips // comment lines, which name the files in prose to
+  //       document why they're excluded).
+  {
+    const assetsBlock205 = (swSrc205.match(/const ASSETS = \[([\s\S]*?)\];/) || ['', ''])[1];
+    const entryLines205 = assetsBlock205.split('\n').filter(l => /^\s*['"]/.test(l)); // real array entries only, never a // comment line
+    const hasHeavy205 = entryLines205.some(
+      l => /tesseract-core-lstm\.wasm/.test(l) || /eng\.traineddata/.test(l)
+    );
+    assert(
+      !hasHeavy205,
+      'sw.js ASSETS precache list does NOT include a tesseract-core-lstm.wasm(.js) or eng.traineddata.gz array ENTRY (heavy files stay runtime-best-effort-only, never install-time all-or-nothing)'
+    );
+  }
+
+  // 205.7 CSP script-src contains 'wasm-unsafe-eval' (required for
+  //       WebAssembly.instantiate under CSP — cross-checked here too,
+  //       independent of the Suite 55.14 guard, since this is this
+  //       feature's own hard load-bearing prerequisite)
+  assert(
+    /script-src[^;]*'wasm-unsafe-eval'/.test(htmlSrc205),
+    "CSP script-src contains 'wasm-unsafe-eval' (Visual Upload OCR's load-bearing prerequisite)"
+  );
+
+  // 205.8 worker-src 'self' is still present (no CDN/blob workers introduced)
+  assert(
+    /worker-src\s+'self'/.test(htmlSrc205),
+    "CSP worker-src 'self' is unchanged (no blob:/CDN worker introduced by the OCR feature)"
+  );
+
+  // 205.9 Tesseract is lazy: no <script> tag loads it directly and ocr.js
+  //       itself never calls _ensureTesseract() at module-eval time (only
+  //       from inside runVisualOcrTest(), triggered by an explicit user
+  //       action).
+  assert(
+    !/tesseract\.min\.js/.test(htmlSrc205.replace(/<!--[\s\S]*?-->/g, '')) &&
+      !/<script[^>]*src=["']js\/vendor/.test(htmlSrc205),
+    'index.html never <script>-tags a js/vendor/* Tesseract file directly — it is injected dynamically, only on first use'
+  );
+
+  // 205.10 _ensureTesseract() is idempotent (module-scope promise guard) and
+  //        is called ONLY from within runVisualOcrTest(), never at module
+  //        top-level or from any boot phase.
+  {
+    const callSites205 = (ocrSrc205.match(/(?<!function )_ensureTesseract\(\)/g) || []).length;
+    assert(
+      /if \(_tesseractPromise\) return _tesseractPromise;/.test(ocrSrc205) && callSites205 === 1,
+      '_ensureTesseract() guards on a module-scope _tesseractPromise (idempotent) and is called from exactly one site in ocr.js (inside runVisualOcrTest, never eagerly)'
+    );
+  }
+
+  // 205.11 BEHAVIORAL (vm sandbox) — calling _ensureTesseract() twice injects
+  //        exactly ONE <script> tag and both calls resolve the SAME promise
+  //        (no duplicate load on repeated OCR use).
+  {
+    const vm205 = require('vm');
+    let out205 = null;
+    let err205 = null;
+    try {
+      const ensureBody205 = extractFunctionBody(ocrSrc205, '_ensureTesseract');
+      const declared205 =
+        'let _tesseractPromise = null;\nfunction _ensureTesseract()' + ensureBody205;
+      const appended205 = [];
+      const fakeScript205 = { set src(v) {}, onload: null, onerror: null };
+      const sandbox205 = {
+        window: {},
+        document: {
+          createElement: () => fakeScript205,
+          head: { appendChild: el => appended205.push(el) },
+        },
+      };
+      sandbox205.window = sandbox205; // window.Tesseract reads resolve against the sandbox itself
+      vm205.createContext(sandbox205);
+      vm205.runInContext(declared205, sandbox205);
+      const p1 = vm205.runInContext('_ensureTesseract()', sandbox205);
+      const p2 = vm205.runInContext('_ensureTesseract()', sandbox205);
+      out205 = { same: p1 === p2, scriptCount: appended205.length };
+    } catch (e) {
+      err205 = e;
+    }
+    assert(
+      !err205 && out205.same && out205.scriptCount === 1,
+      '205.11: [behavioral] two back-to-back _ensureTesseract() calls return the identical promise and inject exactly one <script> tag' +
+        (err205 ? ' — ' + err205.message : '')
+    );
+  }
+
+  // 205.12 corePath points at the EXACT vendored core file (not a bare
+  //        directory) — Tesseract's own SIMD-vs-non-SIMD auto-detection
+  //        would 404 against a directory since only the non-SIMD lstm-only
+  //        core is vendored (repo-weight tradeoff, Protocol 27 verified
+  //        against the actual package's resolution logic). Resolved to an
+  //        ABSOLUTE URL via new URL(..., location.href) — confirmed live
+  //        (Protocol 27) that a dedicated Worker resolves a relative
+  //        importScripts() path against the WORKER's own location, not the
+  //        page's, which silently doubled the path
+  //        (".../js/vendor/js/vendor/tesseract-core-lstm.wasm.js", a 404)
+  //        before this fix.
+  assert(
+    /corePath:\s*new URL\(\s*['"]js\/vendor\/tesseract-core-lstm\.wasm\.js['"]\s*,\s*location\.href\s*\)\.href/.test(
+      ocrSrc205
+    ),
+    "runVisualOcrTest() resolves corePath to an ABSOLUTE URL for the exact vendored core filename (not a bare directory, not a page-relative path) — sidesteps both Tesseract's SIMD auto-probe (would 404 since only the non-SIMD core is vendored) and the worker-relative-path doubling bug (Protocol 27, confirmed via live browser verification)"
+  );
+
+  // 205.13 workerBlobURL: false is set (CSP worker-src 'self' forbids blob: workers)
+  assert(
+    /workerBlobURL:\s*false/.test(ocrSrc205),
+    "createWorker() is configured with workerBlobURL: false (a genuine same-origin Worker, never a blob: URL — required by worker-src 'self')"
+  );
+
+  // 205.14 zero state write anywhere in ocr.js — Unit 1 is pure infra/proof,
+  //        no parser, no apply (Protocol 22/24 — Unit 2 adds the validated
+  //        apply path).
+  assert(
+    !/saveState\(\)/.test(ocrSrc205) &&
+      !/\brobco_v8\b/.test(ocrSrc205) &&
+      !/\bstate\.\w+\s*=/.test(ocrSrc205) &&
+      !/autoImportState/.test(ocrSrc205),
+    'js/ocr.js never calls saveState()/touches robco_v8/assigns state.* or autoImportState — Unit 1 writes nothing durable to the campaign'
+  );
+
+  // 205.15 game-agnostic (Protocol 38): no game literal anywhere in ocr.js
+  assert(
+    !/\bFNV\b/.test(ocrSrc205) && !/\bFO3\b/.test(ocrSrc205) && !/Fallout/.test(ocrSrc205),
+    'js/ocr.js contains no FNV/FO3/Fallout literal (Protocol 38 — game-agnostic infra)'
+  );
+
+  // 205.16 the Dev Console OCR test board lives inert inside
+  //        <template id="testConsoleTemplate"> (WU-E2 pattern) — cannot
+  //        render outside the staging-only console.
+  {
+    const tplStart205 = htmlSrc205.indexOf('<template id="testConsoleTemplate">');
+    const tplEnd205 = htmlSrc205.indexOf('</template>', tplStart205);
+    const ocrInputIdx205 = htmlSrc205.indexOf('id="ocrTestInput"');
+    assert(
+      tplStart205 !== -1 &&
+        tplEnd205 !== -1 &&
+        ocrInputIdx205 > tplStart205 &&
+        ocrInputIdx205 < tplEnd205,
+      '#ocrTestInput lives inside <template id="testConsoleTemplate"> — inert until js/test-console.js explicitly clones it in (WU-E2 pattern)'
+    );
+  }
+
+  // 205.17 _wireOcrTest() is wired from initTestConsole() AFTER the
+  //        _devConsoleUnlocked() early-return guard — no separate
+  //        visibility bypass for the OCR test board.
+  {
+    const initBody205 = extractFunctionBody(consoleSrc205, 'initTestConsole');
+    const guardIdx205 = initBody205.indexOf('_devConsoleUnlocked()');
+    const wireIdx205 = initBody205.indexOf('_wireOcrTest(panel)');
+    assert(
+      /function _wireOcrTest\(panel\)/.test(consoleSrc205) &&
+        guardIdx205 !== -1 &&
+        wireIdx205 !== -1 &&
+        wireIdx205 > guardIdx205,
+      '_wireOcrTest(panel) is defined and called from initTestConsole() after the _devConsoleUnlocked() gate — same staging-only visibility as every other console control'
+    );
+  }
+
+  // 205.18 the OCR test wiring never writes durable campaign state (dumps
+  //        raw text into #ocrTestOutput only).
+  {
+    const wireOcrBody205 = extractFunctionBody(consoleSrc205, '_wireOcrTest');
+    assert(
+      !/saveState\(\)/.test(wireOcrBody205) &&
+        !/\brobco_v8\b/.test(wireOcrBody205) &&
+        /output\.textContent\s*=/.test(wireOcrBody205),
+      '_wireOcrTest() writes the raw recognized text into #ocrTestOutput.textContent only — no saveState()/robco_v8 touch'
+    );
+  }
+
+  // 205.19 the pre-existing AI-vision Visual Upload path is untouched:
+  //        handleImageSelection() and transmitMessage()'s inlineData branch
+  //        still exist unmodified (Unit 1 is additive-only).
+  {
+    const savesSrc205 = readFile('js/ui-saves.js');
+    const apiSrc205 = readFile('js/api.js');
+    assert(
+      /function handleImageSelection\(event\)/.test(savesSrc205) &&
+        /attachedImageData = e\.target\.result;/.test(savesSrc205) &&
+        /inlineData:\s*\{\s*mimeType:\s*attachedImageMimeType/.test(apiSrc205),
+      'handleImageSelection() and the transmitMessage() inlineData AI-vision branch are both present and unmodified — the existing Visual Upload path is untouched by Unit 1'
+    );
+  }
+
+  // 205.20 repomix.config.json ignores the vendored binary/minified blobs so
+  //        the AI-context pack stays lean (Protocol 37).
+  {
+    const repomixJson205 = JSON.parse(repomix205);
+    const ignorePatterns205 = repomixJson205.ignore.customPatterns;
+    assert(
+      ignorePatterns205.includes('js/vendor/**') && ignorePatterns205.includes('assets/ocr/**'),
+      'repomix.config.json ignores js/vendor/** and assets/ocr/** (Protocol 37 — vendored binary/minified blobs excluded from the AI-context pack)'
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

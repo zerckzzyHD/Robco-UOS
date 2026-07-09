@@ -4,7 +4,7 @@
 // Changing this string is the ONLY thing that triggers the "REBOOT TERMINAL" update
 // prompt for users who already have the site cached. Forgetting to bump means cached
 // users silently run the old UI until they manually clear their browser cache.
-const CACHE_NAME = 'robco-terminal-v2.7.0-r124';
+const CACHE_NAME = 'robco-terminal-v2.7.0-r125';
 const ASSETS = [
   './',
   './index.html',
@@ -31,6 +31,15 @@ const ASSETS = [
   './js/registry-core.js',
   './js/runtime.js',
   './js/test-console.js',
+  // Visual Upload OCR Unit 1 (planning/VISUAL_UPLOAD_OCR_PLAN.md) — small, safe shims only.
+  // The heavy Tesseract core+lang (~9.5MB: js/vendor/tesseract-core-lstm.wasm(.js) +
+  // assets/ocr/eng.traineddata.gz) are DELIBERATELY excluded here: cache.addAll below is
+  // all-or-nothing, so putting multi-MB files in the install-time precache would bloat
+  // and risk install failure. They are cached at runtime, best-effort, on first OCR use
+  // (js/ocr.js _cacheOcrAssetsBestEffort) instead — offline works only AFTER first use.
+  './js/ocr.js',
+  './js/vendor/tesseract.min.js',
+  './js/vendor/worker.min.js',
 ];
 
 self.addEventListener('install', event => {
