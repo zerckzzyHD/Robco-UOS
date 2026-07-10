@@ -1,7 +1,7 @@
 ﻿# RobCo U.O.S. — System Architecture
 
 > **Version:** 2.7.0
-> **Last Updated:** 2026-07-09
+> **Last Updated:** 2026-07-10
 > **Purpose:** Living reference for any engineer (human or AI) working on this project.
 > This document maps every system, its dependencies, its persistence contract, and the
 > historical lessons that shaped it.
@@ -72,8 +72,8 @@
 ├── js/vendor/                 Self-hosted Tesseract.js (Apache-2.0) — main API, worker, wasm core
 ├── assets/ocr/                Vendored OCR language data (eng.traineddata.gz, runtime-cached)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2803-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2803-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2813-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2813-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -1869,6 +1869,46 @@ invariant, boot-integrity (the `_bootActive` window / `onComplete` / three-flavo
 
 ---
 
+## Mobile Density Standard, Tier-1 (`css/terminal.css` — planning/MOBILE_DENSITY_PLAN.md §2/§3)
+
+Owner-approved Tier-1 mobile spacing tightening. The plan measured every board's spacing (padding,
+inter-board gap, header subtitle, tile padding) as using its base, desktop-shared value on mobile —
+no spacing-token system existed, and density was "per-board-random." Tier-1 introduces a small
+mobile-only spacing-token scale in `:root` (`--d-board-pad-block`/`-btm`/`-inline`, `--d-board-gap`,
+`--d-section-gap`, `--d-subtitle-mb`) plus its `@media (max-width: 480px)` override, and applies the
+8 concrete F1-F8 fixes:
+
+- **F1** — shared board shell (`details.bay-board` padding, `.panel.bay-board`/`.bay-grid`/
+  `details.sub-panel` inter-board gap) — the highest-impact fix, multiplied across ~30 boards.
+- **F2** — `.bay-part-no` header-subtitle margin tightens; the subtitle itself is never hidden
+  (Protocol 25 — it carries the real, searchable control label the Module-Bay redesign requires).
+- **F3/F4** — FACTION STANDING keycaps/meter-wrap and STATUS EFFECTS lamp tiles/grid trim, with the
+  keycap floor-checked at 34px (still above the 28px Protocol 17 tap-target floor).
+- **F5/F6** — PERK LOADOUT/SKILL BOOKS/SKILL MAGAZINES slot rows and SKILL MATRIX VU rows trim,
+  leaving their floor-bearing children (`.pk-x` delete button, `.vu-track` drag surface) untouched.
+- **F7** — DIRECTOR UPLINK `#chatDisplay`/`.composer` padding+gap trim, leaving `.composer-input`'s
+  16px-font/40px-min-height floor untouched.
+- **F8** — inner readout/light rows (`.op-light-row`) trim.
+
+Every fix is scoped inside `@media (max-width: 480px)` only — desktop (the `≥1000px` hover/pointer
+gate, Suite 129) is never touched. Tier-2 items (outer bezel padding, the custom SETTINGS hardware
+controls, the signature fader/karma instruments, default-collapsing boards) are explicitly
+owner-declined and out of scope for this unit.
+
+**Cascade-order placement (Protocol 42):** the whole density block is deliberately placed at the
+true end of `terminal.css`, after every one of its own selectors' earlier, unconditional base rule.
+CSS resolves equal-specificity ties by source order, so an override block placed _before_ its own
+base rule would be silently beaten by it — a real footgun caught before shipping. Living at the end
+of the file guarantees the block always wins the `≤480px` cascade regardless of where a future edit
+adds a same-selector rule earlier in the file.
+
+Guarded by Suite 209 (both runners at parity, 10 tests): the token scale (base + mobile-tuned
+values), each F1-F8 selector's mobile values, the never-`display:none` subtitle guardrail, the
+untouched floor-bearing children (`.pk-x`, `.vu-track`, `.composer-input`), the block's cascade-order
+placement after every base rule, and the no-desktop-gate-leak guard.
+
+---
+
 ## State Architecture
 
 ### The `state` Object (js/state.js)
@@ -2970,7 +3010,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2803-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2813-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

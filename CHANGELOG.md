@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2803/2803 | Cache: robco-terminal-v2.7.0-r128 -->
+﻿## [Unreleased]<!-- Tests: 2813/2813 | Cache: robco-terminal-v2.7.0-r129 -->
 
 ### Added
 
@@ -168,6 +168,7 @@
 - Every line in the Director Uplink transcript now carries a small OVERSEER tag when the Director itself is speaking, so it's easy to tell at a glance which lines came from the AI versus your own typed or logged commands.
 - The terminal's outer casing now has real depth on a desktop screen — a framed, shadowed housing with a subtle brushed-metal texture, deeper raised keycaps along the bottom control strip, a recessed glow behind the screen, a small rotary GOVERNOR dial, and a unit serial plate. On a phone, the casing stays the same clean, compact edge it's always been.
 - On a phone, the terminal's casing now also picks up a touch of that same physical depth — softly rounded top corners and a subtle shadow around the whole device, and the row of hardware buttons docked at the bottom now shares the same brushed-metal texture as the casing above it, so the whole thing reads as one physical device rather than a flat rectangle. It costs no extra screen space and nothing about how any button works has changed.
+- On a phone, the boards across every screen now sit a little closer together — tighter spacing between boards, a trimmed header line under each one, and less padding on faction badges, status effect tiles, perk/skill-book/magazine rows, and the skill meters — so you scroll noticeably less to see everything. Every button and input is still comfortably large enough to tap or type into; nothing about how anything works has changed, and a desktop screen looks exactly as it did before.
 
 ### Under the Hood
 

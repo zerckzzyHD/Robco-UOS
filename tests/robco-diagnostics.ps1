@@ -23305,6 +23305,140 @@ Check (
 ) "208.29: the M2 greeting consumer and the M5 _motionSeat() trigger carry no hardcoded ctx === 'FNV'/'FO3' branch -- all per-game flavor rides identity data (M2) or CSS [data-game] selectors (M5), never a JS branch (Protocol 38)"
 
 # ===========================================================
+# Suite 209 -- MOBILE DENSITY STANDARD, TIER-1 (planning/MOBILE_DENSITY_PLAN.md
+# Section 2/3, owner-approved Tier-1 only): a small mobile-only spacing-token
+# scale (--d-board-pad-block/-btm/-inline, --d-board-gap, --d-section-gap,
+# --d-subtitle-mb) plus the 8 concrete F1-F8 fixes (shared board shell, header
+# subtitle, faction keycaps, status lamps, perk/skill-book/magazine slot rows,
+# skill-matrix VU rows, UPLINK transcript/composer, inner readout rows), all
+# scoped to @media(max-width:480px) only. Desktop is untouched; every trimmed
+# interactive tile stays >=28px (Protocol 17); the .bay-part-no subtitle is
+# never hidden (Protocol 25). The whole block is deliberately placed at the
+# END of terminal.css so it always wins the cascade over each selector's
+# earlier, unconditional base rule.
+# 10 tests
+# ===========================================================
+Sep "Suite 209 -- MOBILE DENSITY STANDARD, TIER-1"
+$css209 = Read-Src "css/terminal.css"
+$cssStripped209 = [regex]::Replace($css209, '/\*[\s\S]*?\*/', '')
+
+$rootMatch209 = [regex]::Match($cssStripped209, ':root\s*\{[^}]*\}')
+$baseRoot209 = if ($rootMatch209.Success) { $rootMatch209.Value } else { '' }
+
+$densityBlockMatch209 = [regex]::Match($cssStripped209, '@media \(max-width: 480px\) \{\s*:root \{[\s\S]*?--d-subtitle-mb: 4px;\s*\}[\s\S]*?\n\}')
+$densityBlock209 = if ($densityBlockMatch209.Success) { $densityBlockMatch209.Value } else { '' }
+
+# 209.1 static -- the six base/desktop tokens are declared in the main :root
+#       block with values matching today's existing hardcoded board-chrome
+#       numbers verbatim (10/12/10/12/10/8).
+Check (
+    ($baseRoot209 -match '--d-board-pad-block: 10px;') -and
+    ($baseRoot209 -match '--d-board-pad-btm: 12px;') -and
+    ($baseRoot209 -match '--d-board-pad-inline: 10px;') -and
+    ($baseRoot209 -match '--d-board-gap: 12px;') -and
+    ($baseRoot209 -match '--d-section-gap: 10px;') -and
+    ($baseRoot209 -match '--d-subtitle-mb: 8px;')
+) "209.1: the six Mobile Density Standard tokens are declared in the base :root block, matching today's existing hardcoded board-chrome values (10/12/10/12/10/8) -- desktop stays unchanged"
+
+# 209.2 static -- a @media(max-width:480px) block exists and re-declares the
+#       same six tokens with the tuned mobile values (7/8/8/8/8/4).
+Check (
+    ($densityBlock209.Length -gt 0) -and
+    ($densityBlock209 -match '--d-board-pad-block: 7px;') -and
+    ($densityBlock209 -match '--d-board-pad-btm: 8px;') -and
+    ($densityBlock209 -match '--d-board-pad-inline: 8px;') -and
+    ($densityBlock209 -match '--d-board-gap: 8px;') -and
+    ($densityBlock209 -match '--d-section-gap: 8px;') -and
+    ($densityBlock209 -match '--d-subtitle-mb: 4px;')
+) "209.2: a single @media(max-width:480px) block re-declares the same six tokens tuned for mobile (7/8/8/8/8/4)"
+
+# 209.3 static -- F1: the shared board shell (details.bay-board padding,
+#       .panel.bay-board / .bay-grid / details.sub-panel gap) all resolve via
+#       the tokens inside the mobile density block.
+Check (
+    ($densityBlock209 -match 'details\.bay-board \{\s*padding: var\(--d-board-pad-block\) var\(--d-board-pad-inline\) var\(--d-board-pad-btm\);\s*\}') -and
+    ($densityBlock209 -match '\.panel\.bay-board \{\s*margin-top: var\(--d-board-gap\);\s*\}') -and
+    ($densityBlock209 -match '\.bay-grid \{\s*gap: var\(--d-board-gap\);\s*\}') -and
+    ($densityBlock209 -match 'details\.sub-panel \{\s*margin-top: var\(--d-board-gap\);\s*\}')
+) "209.3: F1 -- details.bay-board padding, .panel.bay-board margin-top, .bay-grid gap, and details.sub-panel margin-top all resolve via the --d-board-* tokens inside the mobile density block"
+
+# 209.4 static -- F2: .bay-part-no's mobile margin tightens via the token,
+#       and the subtitle is NEVER display:none anywhere in the whole
+#       stylesheet (Protocol 25 searchable-label guardrail).
+Check (
+    ($densityBlock209 -match '\.bay-part-no \{\s*margin: 1px 0 var\(--d-subtitle-mb\);\s*\}') -and
+    (-not ($cssStripped209 -match '\.bay-part-no\s*\{[^}]*display:\s*none'))
+) "209.4: F2 -- .bay-part-no mobile margin tightens to 1px 0 var(--d-subtitle-mb) and is never display:none anywhere (Protocol 25 -- the real, searchable control label always stays visible)"
+
+# 209.5 static -- F3/F4: FACTION STANDING keycap/meter-wrap and STATUS
+#       EFFECTS lamp tile/grid trims, with the keycap floor-checked (34px >=
+#       the 28px Protocol 17 tap-target floor).
+Check (
+    ($densityBlock209 -match '\.facon-chan \{\s*min-height: 34px;\s*\}') -and
+    ($densityBlock209 -match '\.facon-meter-wrap \{\s*padding: 8px 10px 9px;\s*\}') -and
+    ($densityBlock209 -match '\.stlamp-tile \{\s*padding: 6px 9px 7px;\s*\}') -and
+    ($densityBlock209 -match '\.stlamp-grid \{\s*gap: 6px;\s*\}')
+) "209.5: F3/F4 -- .facon-chan min-height trims to 34px (>= the 28px Protocol 17 floor), .facon-meter-wrap/.stlamp-tile padding and .stlamp-grid gap all tighten as specified"
+
+# 209.6 static -- F5/F6: PERK LOADOUT/SKILL BOOKS/SKILL MAGAZINES slot rows
+#       and SKILL MATRIX VU rows trim, WITHOUT the density block ever
+#       redefining the floor-bearing children (.pk-x delete button, .vu-track
+#       drag surface) -- those stay untouched at their existing >=28px / 20px
+#       sizes.
+Check (
+    ($densityBlock209 -match '\.slot-row \{\s*padding: 5px 8px;\s*margin-bottom: 5px;\s*\}') -and
+    ($densityBlock209 -match '\.vu-row \{\s*padding: 3px 0;\s*\}') -and
+    (-not ($densityBlock209 -match '\.pk-x')) -and
+    (-not ($densityBlock209 -match '\.vu-track'))
+) "209.6: F5/F6 -- .slot-row padding/margin-bottom and .vu-row padding both trim, and the density block never redefines the floor-bearing .pk-x delete button or .vu-track drag surface (left at their existing sizes)"
+
+# 209.7 static -- F7: DIRECTOR UPLINK #chatDisplay/.composer padding+gap
+#       trim, WITHOUT the density block redefining .composer-input's
+#       16px-font / 40px-min-height floors.
+Check (
+    ($densityBlock209 -match '#chatDisplay \{\s*padding: 10px;\s*gap: 10px;\s*\}') -and
+    ($densityBlock209 -match '\.composer \{\s*padding: 6px 10px 8px;\s*\}') -and
+    (-not ($densityBlock209 -match '\.composer-input'))
+) "209.7: F7 -- #chatDisplay padding/gap and .composer padding both trim, and the density block never redefines .composer-input (its 16px font / 40px min-height floor stays untouched)"
+
+# 209.8 static -- F8: inner readout/light rows (.op-light-row) trim.
+Check (
+    $densityBlock209 -match '\.op-light-row \{\s*margin-top: 6px;\s*padding-top: 6px;\s*\}'
+) "209.8: F8 -- .op-light-row margin-top/padding-top both trim from 8px to 6px"
+
+# 209.9 static (Protocol 42 -- a real cascade-order footgun caught before
+#       shipping) -- the mobile density block's own text sits AFTER every one
+#       of its 10 base-rule selectors' FIRST unconditional definition
+#       elsewhere in the file. CSS resolves equal-specificity ties by source
+#       order, so an override block placed BEFORE its own base rule would be
+#       silently beaten by it -- this guard locks the block at the true end
+#       of the file so a future edit can't reintroduce that bug by inserting
+#       a same-selector rule after it.
+$blockStart209 = $cssStripped209.IndexOf("@media (max-width: 480px) {`n  :root {`n    --d-board-pad-block: 7px;")
+$baseSelectors209 = @(
+    'details.bay-board {', '.panel.bay-board {', '.bay-grid {', 'details.sub-panel {',
+    '.bay-part-no {', '.facon-chan {', '.facon-meter-wrap {', '.stlamp-tile {',
+    '.stlamp-grid {', '.slot-row {', '.vu-row {', '#chatDisplay {', '.composer {', '.op-light-row {'
+)
+$allBefore209 = $true
+foreach ($sel in $baseSelectors209) {
+    $idx = $cssStripped209.IndexOf($sel)
+    if ($idx -lt 0 -or $idx -ge $blockStart209) { $allBefore209 = $false }
+}
+Check (
+    ($blockStart209 -ge 0) -and $allBefore209
+) "209.9: the mobile density block sits after every one of its base-rule selectors' first definition in source order -- it always wins the <=480px cascade rather than being silently beaten by a same-specificity base rule that comes later in the file"
+
+# 209.10 static (Suite 129 discipline) -- the mobile density block is a
+#        standalone @media(max-width:480px) query, never nested inside or
+#        adjacent to the desktop (min-width:1000px)+hover+pointer gate, so
+#        desktop rendering is guaranteed unchanged.
+Check (
+    (-not ($densityBlock209 -match 'min-width:\s*1000px')) -and
+    (-not ($densityBlock209 -match 'hover:\s*hover'))
+) "209.10: the mobile density block carries no min-width:1000px / hover:hover desktop-gate condition -- it is scoped purely to the <=480px narrow-phone query, so desktop stays byte-identical"
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

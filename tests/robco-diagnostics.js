@@ -34982,6 +34982,169 @@ header('Suite 208 — CEREMONY MOMENTS WAVE 1 (M1-M5)');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 209 — MOBILE DENSITY STANDARD, TIER-1 (planning/MOBILE_DENSITY_PLAN.md
+//  §2/§3, owner-approved Tier-1 only): a small mobile-only spacing-token scale
+//  (--d-board-pad-block/-btm/-inline, --d-board-gap, --d-section-gap,
+//  --d-subtitle-mb) plus the 8 concrete F1-F8 fixes (shared board shell,
+//  header subtitle, faction keycaps, status lamps, perk/skill-book/magazine
+//  slot rows, skill-matrix VU rows, UPLINK transcript/composer, inner
+//  readout rows), all scoped to @media(max-width:480px) only. Desktop is
+//  untouched; every trimmed interactive tile stays >=28px (Protocol 17); the
+//  .bay-part-no subtitle is never hidden (Protocol 25). The whole block is
+//  deliberately placed at the END of terminal.css so it always wins the
+//  cascade over each selector's earlier, unconditional base rule.
+//  10 tests
+// ══════════════════════════════════════════════════════════════
+header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
+{
+  const css209 = readFile('css/terminal.css');
+  const cssStripped209 = css209.replace(/\/\*[\s\S]*?\*\//g, '');
+
+  const rootMatch209 = cssStripped209.match(/:root\s*\{[^}]*\}/);
+  const baseRoot209 = rootMatch209 ? rootMatch209[0] : '';
+
+  const densityBlockMatch209 = cssStripped209.match(
+    /@media \(max-width: 480px\) \{\s*:root \{[\s\S]*?--d-subtitle-mb: 4px;\s*\}[\s\S]*?\n\}/
+  );
+  const densityBlock209 = densityBlockMatch209 ? densityBlockMatch209[0] : '';
+
+  // 209.1 static — the six base/desktop tokens are declared in the main
+  //        :root block with values matching today's existing hardcoded
+  //        board-chrome numbers verbatim (10/12/10/12/10/8).
+  assert(
+    /--d-board-pad-block: 10px;/.test(baseRoot209) &&
+      /--d-board-pad-btm: 12px;/.test(baseRoot209) &&
+      /--d-board-pad-inline: 10px;/.test(baseRoot209) &&
+      /--d-board-gap: 12px;/.test(baseRoot209) &&
+      /--d-section-gap: 10px;/.test(baseRoot209) &&
+      /--d-subtitle-mb: 8px;/.test(baseRoot209),
+    "209.1: the six Mobile Density Standard tokens are declared in the base :root block, matching today's existing hardcoded board-chrome values (10/12/10/12/10/8) — desktop stays unchanged"
+  );
+
+  // 209.2 static — a @media(max-width:480px) block exists and re-declares
+  //        the same six tokens with the tuned mobile values (7/8/8/8/8/4).
+  assert(
+    densityBlock209.length > 0 &&
+      /--d-board-pad-block: 7px;/.test(densityBlock209) &&
+      /--d-board-pad-btm: 8px;/.test(densityBlock209) &&
+      /--d-board-pad-inline: 8px;/.test(densityBlock209) &&
+      /--d-board-gap: 8px;/.test(densityBlock209) &&
+      /--d-section-gap: 8px;/.test(densityBlock209) &&
+      /--d-subtitle-mb: 4px;/.test(densityBlock209),
+    '209.2: a single @media(max-width:480px) block re-declares the same six tokens tuned for mobile (7/8/8/8/8/4)'
+  );
+
+  // 209.3 static — F1: the shared board shell (details.bay-board padding,
+  //        .panel.bay-board / .bay-grid / details.sub-panel gap) all
+  //        resolve via the tokens inside the mobile density block.
+  assert(
+    /details\.bay-board \{\s*padding: var\(--d-board-pad-block\) var\(--d-board-pad-inline\) var\(--d-board-pad-btm\);\s*\}/.test(
+      densityBlock209
+    ) &&
+      /\.panel\.bay-board \{\s*margin-top: var\(--d-board-gap\);\s*\}/.test(densityBlock209) &&
+      /\.bay-grid \{\s*gap: var\(--d-board-gap\);\s*\}/.test(densityBlock209) &&
+      /details\.sub-panel \{\s*margin-top: var\(--d-board-gap\);\s*\}/.test(densityBlock209),
+    '209.3: F1 — details.bay-board padding, .panel.bay-board margin-top, .bay-grid gap, and details.sub-panel margin-top all resolve via the --d-board-* tokens inside the mobile density block'
+  );
+
+  // 209.4 static — F2: .bay-part-no's mobile margin tightens via the token,
+  //        and the subtitle is NEVER display:none anywhere in the whole
+  //        stylesheet (Protocol 25 searchable-label guardrail).
+  assert(
+    /\.bay-part-no \{\s*margin: 1px 0 var\(--d-subtitle-mb\);\s*\}/.test(densityBlock209) &&
+      !/\.bay-part-no\s*\{[^}]*display:\s*none/.test(cssStripped209),
+    '209.4: F2 — .bay-part-no mobile margin tightens to 1px 0 var(--d-subtitle-mb) and is never display:none anywhere (Protocol 25 — the real, searchable control label always stays visible)'
+  );
+
+  // 209.5 static — F3/F4: FACTION STANDING keycap/meter-wrap and STATUS
+  //        EFFECTS lamp tile/grid trims, with the keycap floor-checked
+  //        (34px >= the 28px Protocol 17 tap-target floor).
+  assert(
+    /\.facon-chan \{\s*min-height: 34px;\s*\}/.test(densityBlock209) &&
+      /\.facon-meter-wrap \{\s*padding: 8px 10px 9px;\s*\}/.test(densityBlock209) &&
+      /\.stlamp-tile \{\s*padding: 6px 9px 7px;\s*\}/.test(densityBlock209) &&
+      /\.stlamp-grid \{\s*gap: 6px;\s*\}/.test(densityBlock209),
+    '209.5: F3/F4 — .facon-chan min-height trims to 34px (>= the 28px Protocol 17 floor), .facon-meter-wrap/.stlamp-tile padding and .stlamp-grid gap all tighten as specified'
+  );
+
+  // 209.6 static — F5/F6: PERK LOADOUT/SKILL BOOKS/SKILL MAGAZINES slot rows
+  //        and SKILL MATRIX VU rows trim, WITHOUT the density block ever
+  //        redefining the floor-bearing children (.pk-x delete button,
+  //        .vu-track drag surface) — those stay untouched at their existing
+  //        >=28px / 20px sizes.
+  assert(
+    /\.slot-row \{\s*padding: 5px 8px;\s*margin-bottom: 5px;\s*\}/.test(densityBlock209) &&
+      /\.vu-row \{\s*padding: 3px 0;\s*\}/.test(densityBlock209) &&
+      !/\.pk-x/.test(densityBlock209) &&
+      !/\.vu-track/.test(densityBlock209),
+    '209.6: F5/F6 — .slot-row padding/margin-bottom and .vu-row padding both trim, and the density block never redefines the floor-bearing .pk-x delete button or .vu-track drag surface (left at their existing sizes)'
+  );
+
+  // 209.7 static — F7: DIRECTOR UPLINK #chatDisplay/.composer padding+gap
+  //        trim, WITHOUT the density block redefining .composer-input's
+  //        16px-font / 40px-min-height floors.
+  assert(
+    /#chatDisplay \{\s*padding: 10px;\s*gap: 10px;\s*\}/.test(densityBlock209) &&
+      /\.composer \{\s*padding: 6px 10px 8px;\s*\}/.test(densityBlock209) &&
+      !/\.composer-input/.test(densityBlock209),
+    '209.7: F7 — #chatDisplay padding/gap and .composer padding both trim, and the density block never redefines .composer-input (its 16px font / 40px min-height floor stays untouched)'
+  );
+
+  // 209.8 static — F8: inner readout/light rows (.op-light-row) trim.
+  assert(
+    /\.op-light-row \{\s*margin-top: 6px;\s*padding-top: 6px;\s*\}/.test(densityBlock209),
+    '209.8: F8 — .op-light-row margin-top/padding-top both trim from 8px to 6px'
+  );
+
+  // 209.9 static (Protocol 42 — a real cascade-order footgun caught before
+  //        shipping) — the mobile density block's own text sits AFTER every
+  //        one of its 10 base-rule selectors' FIRST unconditional definition
+  //        elsewhere in the file. CSS resolves equal-specificity ties by
+  //        source order, so an override block placed BEFORE its own base
+  //        rule would be silently beaten by it — this guard locks the block
+  //        at the true end of the file so a future edit can't reintroduce
+  //        that bug by inserting a same-selector rule after it.
+  {
+    const blockStart209 = cssStripped209.indexOf(
+      '@media (max-width: 480px) {\n  :root {\n    --d-board-pad-block: 7px;'
+    );
+    const baseSelectors209 = [
+      'details.bay-board {',
+      '.panel.bay-board {',
+      '.bay-grid {',
+      'details.sub-panel {',
+      '.bay-part-no {',
+      '.facon-chan {',
+      '.facon-meter-wrap {',
+      '.stlamp-tile {',
+      '.stlamp-grid {',
+      '.slot-row {',
+      '.vu-row {',
+      '#chatDisplay {',
+      '.composer {',
+      '.op-light-row {',
+    ];
+    const allBefore209 = baseSelectors209.every(sel => {
+      const idx = cssStripped209.indexOf(sel);
+      return idx !== -1 && idx < blockStart209;
+    });
+    assert(
+      blockStart209 !== -1 && allBefore209,
+      "209.9: the mobile density block sits after every one of its base-rule selectors' first definition in source order — it always wins the ≤480px cascade rather than being silently beaten by a same-specificity base rule that comes later in the file"
+    );
+  }
+
+  // 209.10 static (Suite 129 discipline) — the mobile density block is a
+  //         standalone @media(max-width:480px) query, never nested inside
+  //         or adjacent to the desktop (min-width:1000px)+hover+pointer
+  //         gate, so desktop rendering is guaranteed unchanged.
+  assert(
+    !/min-width:\s*1000px/.test(densityBlock209) && !/hover:\s*hover/.test(densityBlock209),
+    '209.10: the mobile density block carries no min-width:1000px / hover:hover desktop-gate condition — it is scoped purely to the ≤480px narrow-phone query, so desktop stays byte-identical'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail
