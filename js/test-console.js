@@ -218,11 +218,29 @@
   // non-destructive tool's action fires immediately. Fail-safe: if
   // confirmAction() itself is unavailable or throws, a destructive action
   // never fires (the safe direction).
-  function _invoke(tool) {
+  // U4b: gained an optional `arg` passthrough — a parameterized cheat tool
+  // (control:'input'/'select'/'select-input', see _renderShell()) captures
+  // its live input/select value at click-time and hands it to _invoke(),
+  // which forwards it to tool.action(arg) unchanged. Every pre-existing
+  // zero-arg tool.action() ignores the extra parameter (JS callers may pass
+  // more arguments than a function declares) — behavior-preserving.
+  //
+  // U4b (Protocol 42 fix, found via this unit's own live Playwright
+  // verification): the confirm dialog below reuses the shared #sysModal
+  // (via confirmAction()), which normally sits BELOW the shell's own
+  // scrim/drawer (terminal.css) so the shell stays reachable over an
+  // already-open app modal (e.g. the first-visit patch-notes popup). That
+  // left every destructive tool's OWN confirm dialog rendered behind the
+  // shell and genuinely unclickable. body.dsh-modal-elevate (terminal.css)
+  // temporarily elevates #sysModal above the shell for exactly the
+  // duration of this one confirmAction() call — added right before, removed
+  // the instant the promise settles (confirmed or cancelled) — so no other
+  // #sysModal use anywhere else in the app is ever affected.
+  function _invoke(tool, arg) {
     if (!tool || typeof tool.action !== 'function') return;
     var run = function () {
       try {
-        tool.action();
+        tool.action(arg);
       } catch (_) {
         /* a tool action must never break the console */
       }
@@ -233,15 +251,18 @@
     }
     try {
       if (typeof confirmAction !== 'function') return; // fail-safe: no confirm path available, no destructive action
+      document.body.classList.add('dsh-modal-elevate');
       confirmAction({
         title: '> ' + tool.label,
         warning: tool.tooltip || 'This is a destructive diagnostic action.',
         confirmLabel: 'EXECUTE',
         cancelLabel: 'ABORT',
       }).then(function (ok) {
+        document.body.classList.remove('dsh-modal-elevate');
         if (ok) run();
       });
     } catch (_) {
+      document.body.classList.remove('dsh-modal-elevate');
       /* a confirm-gate failure must never fire a destructive action */
     }
   }
@@ -1125,6 +1146,1137 @@
       triggers: [],
       anchor: '[data-dsh-anchor="dshInspectCopy"]',
     },
+
+    // ── U4b: STATE SETUP — cheats (planning/DIAGNOSTIC_SHELL_PLAN.md §4/§11
+    // U4). ALL tier:'staging' + destructive:true (auto-confirm-gated by
+    // _invoke(), §2.3) — every one mutates the live campaign, so none can
+    // ever appear on a prod-minigame build (leak-proof by construction,
+    // §2.2). Every action routes through an existing native setter (Protocol
+    // 22/24, see the helper block above for the full rationale).
+    {
+      id: 'state-full-heal',
+      label: 'FULL HEAL',
+      subLabel: '_nativeSetHp(state.hpMax)',
+      icon: '✚',
+      category: 'state',
+      group: 'VITALS',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Set current HP to max HP.',
+      triggers: [],
+      action: () => _dshFullHeal(),
+    },
+    {
+      id: 'state-set-hp-pct',
+      label: 'SET HP %',
+      subLabel: '_nativeSetHp(round(hpMax × pct))',
+      icon: '✚',
+      category: 'state',
+      group: 'VITALS',
+      tier: 'staging',
+      destructive: true,
+      control: 'input',
+      inputType: 'number',
+      inputPlaceholder: '1-100',
+      tooltip: 'Set current HP to a percentage of max HP.',
+      triggers: [],
+      action: v => _dshSetHpPct(v),
+    },
+    {
+      id: 'state-kill',
+      label: 'KILL (0 HP)',
+      subLabel: '_nativeSetHp(0)',
+      icon: '☠',
+      category: 'state',
+      group: 'VITALS',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Set current HP to 0.',
+      triggers: [],
+      action: () => _dshKill(),
+    },
+    {
+      id: 'state-add-rads',
+      label: 'ADD RADS',
+      subLabel: '_nativeSetRads(rads + delta)',
+      icon: '☢',
+      category: 'state',
+      group: 'VITALS',
+      tier: 'staging',
+      destructive: true,
+      control: 'input',
+      inputType: 'number',
+      inputPlaceholder: 'delta, e.g. 100 or -100',
+      tooltip: 'Add (or subtract) a rad delta, clamped to the per-game rad ceiling.',
+      triggers: [],
+      action: v => _dshAddRads(v),
+    },
+    {
+      id: 'state-clear-rads',
+      label: 'CLEAR RADS',
+      subLabel: '_nativeSetRads(0)',
+      icon: '☢',
+      category: 'state',
+      group: 'VITALS',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Set radiation to 0.',
+      triggers: [],
+      action: () => _dshClearRads(),
+    },
+    {
+      id: 'state-max-rads',
+      label: 'MAX RADS',
+      subLabel: '_nativeSetRads(_resolveMaxRads())',
+      icon: '☢',
+      category: 'state',
+      group: 'VITALS',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Set radiation to the per-game fatal ceiling.',
+      triggers: [],
+      action: () => _dshMaxRads(),
+    },
+    {
+      id: 'state-set-level',
+      label: 'SET LEVEL',
+      subLabel: '_nativeSetLevel(v)',
+      icon: '▲',
+      category: 'state',
+      group: 'PROGRESSION',
+      tier: 'staging',
+      destructive: true,
+      control: 'input',
+      inputType: 'number',
+      inputPlaceholder: '1-50',
+      tooltip: 'Set the exact player level (clamped 1-MAX_PLAYER_LEVEL).',
+      triggers: [],
+      action: v => _dshSetLevel(v),
+    },
+    {
+      id: 'state-plus-one-level',
+      label: '+1 LEVEL',
+      subLabel: 'nativeLevelUp()',
+      icon: '▲',
+      category: 'state',
+      group: 'PROGRESSION',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'The real +1 LEVEL UP control (fires level.up + the skill-point report).',
+      triggers: [],
+      action: () => _dshPlusOneLevel(),
+    },
+    {
+      id: 'state-max-level',
+      label: 'MAX LEVEL',
+      subLabel: '_nativeSetLevel(MAX_PLAYER_LEVEL)',
+      icon: '▲',
+      category: 'state',
+      group: 'PROGRESSION',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Set the player level to the maximum (50).',
+      triggers: [],
+      action: () => _dshMaxLevel(),
+    },
+    {
+      id: 'state-add-xp',
+      label: 'ADD XP',
+      subLabel: '_nativeSetXp(xp + delta)',
+      icon: '▲',
+      category: 'state',
+      group: 'PROGRESSION',
+      tier: 'staging',
+      destructive: true,
+      control: 'input',
+      inputType: 'number',
+      inputPlaceholder: 'delta',
+      tooltip: 'Add an XP delta, clamped to the current level band.',
+      triggers: [],
+      action: v => _dshAddXp(v),
+    },
+    {
+      id: 'state-special-max-all',
+      label: 'MAX ALL (10s)',
+      subLabel: '_nativeSetSpecial(k, 10) × 7',
+      icon: '■',
+      category: 'state',
+      group: 'SPECIAL',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Set every S.P.E.C.I.A.L. channel to 10.',
+      triggers: [],
+      action: () => _dshMaxAllSpecial(),
+    },
+    {
+      id: 'state-special-zero',
+      label: 'ZERO (floor 1)',
+      subLabel: '_nativeSetSpecial(k, 1) × 7',
+      icon: '■',
+      category: 'state',
+      group: 'SPECIAL',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Set every S.P.E.C.I.A.L. channel to the real minimum (1).',
+      triggers: [],
+      action: () => _dshZeroSpecial(),
+    },
+    {
+      id: 'state-special-set-one',
+      label: 'SET ONE',
+      subLabel: '_nativeSetSpecial(sel, val)',
+      icon: '■',
+      category: 'state',
+      group: 'SPECIAL',
+      tier: 'staging',
+      destructive: true,
+      control: 'select-input',
+      selectOptions: [
+        { value: 's', label: 'STRENGTH' },
+        { value: 'p', label: 'PERCEPTION' },
+        { value: 'e', label: 'ENDURANCE' },
+        { value: 'c', label: 'CHARISMA' },
+        { value: 'i', label: 'INTELLIGENCE' },
+        { value: 'a', label: 'AGILITY' },
+        { value: 'l', label: 'LUCK' },
+      ],
+      inputType: 'number',
+      inputPlaceholder: '1-10',
+      tooltip: 'Set a single S.P.E.C.I.A.L. channel to an exact value (clamped 1-10).',
+      triggers: [],
+      action: arg => _dshSetOneSpecial(arg),
+    },
+    {
+      id: 'state-skills-max-all',
+      label: 'MAX ALL (100)',
+      subLabel: '_nativeSetSkill(sk, 100) × getSkillKeys()',
+      icon: '◆',
+      category: 'state',
+      group: 'SKILLS',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Set every skill (active game only) to 100.',
+      triggers: [],
+      action: () => _dshMaxAllSkills(),
+    },
+    {
+      id: 'state-skills-set-one',
+      label: 'SET ONE',
+      subLabel: '_nativeSetSkill(sel, val)',
+      icon: '◆',
+      category: 'state',
+      group: 'SKILLS',
+      tier: 'staging',
+      destructive: true,
+      control: 'select-input',
+      selectOptions: () =>
+        getSkillKeys().map(sk => ({ value: sk, label: (SKILL_LABELS[sk] || sk).toUpperCase() })),
+      inputType: 'number',
+      inputPlaceholder: '0-100',
+      tooltip: 'Set a single skill (active game) to an exact value (clamped 0-100).',
+      triggers: [],
+      action: arg => _dshSetOneSkill(arg),
+    },
+    {
+      id: 'state-skills-boost-combat',
+      label: 'BOOST COMBAT SKILLS',
+      subLabel: '_nativeSetSkill(sk, 100) — GAME_DEFS[ctx].combatSkills',
+      icon: '◆',
+      category: 'state',
+      group: 'SKILLS',
+      tier: 'staging',
+      destructive: true,
+      tooltip:
+        'No tagged-skill concept in this app — boosts the active game’s documented combat-skill set (GAME_DEFS[ctx].combatSkills) to 100.',
+      triggers: [],
+      action: () => _dshBoostCombatSkills(),
+    },
+    {
+      id: 'state-karma-good',
+      label: 'SET KARMA GOOD',
+      subLabel: '_nativeSetKarma(1000)',
+      icon: '☼',
+      category: 'state',
+      group: 'KARMA',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Set karma to +1000 (Messiah).',
+      triggers: [],
+      action: () => _dshSetKarmaGood(),
+    },
+    {
+      id: 'state-karma-neutral',
+      label: 'SET KARMA NEUTRAL',
+      subLabel: '_nativeSetKarma(0)',
+      icon: '☼',
+      category: 'state',
+      group: 'KARMA',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Set karma to 0.',
+      triggers: [],
+      action: () => _dshSetKarmaNeutral(),
+    },
+    {
+      id: 'state-karma-evil',
+      label: 'SET KARMA EVIL',
+      subLabel: '_nativeSetKarma(-1000)',
+      icon: '☠',
+      category: 'state',
+      group: 'KARMA',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Set karma to -1000 (Very Evil).',
+      triggers: [],
+      action: () => _dshSetKarmaEvil(),
+    },
+    {
+      id: 'state-caps-add1k',
+      label: 'ADD 1,000 CAPS',
+      subLabel: '_nativeSetCaps(caps + 1000)',
+      icon: '◉',
+      category: 'state',
+      group: 'ECONOMY',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Add 1,000 caps.',
+      triggers: [],
+      action: () => _dshAddCaps1k(),
+    },
+    {
+      id: 'state-caps-max',
+      label: 'MAX CAPS',
+      subLabel: '_nativeSetCaps(999999)',
+      icon: '◉',
+      category: 'state',
+      group: 'ECONOMY',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Set caps to 999,999.',
+      triggers: [],
+      action: () => _dshMaxCaps(),
+    },
+    {
+      id: 'state-caps-zero',
+      label: 'ZERO CAPS',
+      subLabel: '_nativeSetCaps(0)',
+      icon: '◉',
+      category: 'state',
+      group: 'ECONOMY',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Set caps to 0.',
+      triggers: [],
+      action: () => _dshZeroCaps(),
+    },
+    {
+      id: 'state-give-item',
+      label: 'GIVE ITEM',
+      subLabel: 'addItem()-equivalent — registry/DB-validated name + qty 1',
+      icon: '◈',
+      category: 'state',
+      group: 'INVENTORY',
+      tier: 'staging',
+      destructive: true,
+      control: 'input',
+      inputType: 'text',
+      inputPlaceholder: 'e.g. 10mm Pistol',
+      tooltip: 'Add one of the named item to the cargo manifest (DB-validated weight/value/type).',
+      triggers: ['item.added'],
+      action: v => _dshGiveItem(v),
+    },
+    {
+      id: 'state-full-loadout',
+      label: 'ADD FULL LOADOUT',
+      subLabel: 'weapon + armor + 2× aid + 2× misc + ammo',
+      icon: '◈',
+      category: 'state',
+      group: 'INVENTORY',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Add one weapon, one armor, aid, misc, and a starter ammo reserve.',
+      triggers: [],
+      action: () => _dshFullLoadout(),
+    },
+    {
+      id: 'state-empty-inventory',
+      label: 'EMPTY INVENTORY',
+      subLabel: 'inventory=[] · ammo={} · equipped=null',
+      icon: '◈',
+      category: 'state',
+      group: 'INVENTORY',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Clear all inventory, ammo, and equipped items.',
+      triggers: [],
+      action: () => _dshEmptyInventory(),
+    },
+    {
+      id: 'state-over-encumber',
+      label: 'OVER-ENCUMBER',
+      subLabel: '+5× 200wgt TEST BALLAST items',
+      icon: '⚠',
+      category: 'state',
+      group: 'INVENTORY',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Add heavy placeholder items to push carry weight over the limit.',
+      triggers: [],
+      action: () => _dshOverEncumber(),
+    },
+    {
+      id: 'state-add-ammo',
+      label: 'ADD AMMO',
+      subLabel: 'state.ammo[getAmmoCalibers()[0]] += 50',
+      icon: '◈',
+      category: 'state',
+      group: 'INVENTORY',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Add 50 rounds of the active game’s first ammo caliber.',
+      triggers: [],
+      action: () => _dshAddAmmo(),
+    },
+    {
+      id: 'state-faction-set-max',
+      label: 'SET ONE MAX (IDOLIZED)',
+      subLabel: 'adjustFaction-equivalent — fame:1000, infamy:0',
+      icon: '⚑',
+      category: 'state',
+      group: 'FACTIONS',
+      tier: 'staging',
+      destructive: true,
+      control: 'select',
+      selectOptions: () => getFactionRegistry().map(f => ({ value: f.key, label: f.name })),
+      tooltip: 'Set the chosen faction to maximum standing (Idolized).',
+      triggers: [],
+      action: sel => _dshSetFactionMax(sel),
+    },
+    {
+      id: 'state-faction-set-min',
+      label: 'SET ONE MIN (VILIFIED)',
+      subLabel: 'adjustFaction-equivalent — fame:0, infamy:1000',
+      icon: '⚑',
+      category: 'state',
+      group: 'FACTIONS',
+      tier: 'staging',
+      destructive: true,
+      control: 'select',
+      selectOptions: () => getFactionRegistry().map(f => ({ value: f.key, label: f.name })),
+      tooltip: 'Set the chosen faction to minimum standing (Vilified).',
+      triggers: [],
+      action: sel => _dshSetFactionMin(sel),
+    },
+    {
+      id: 'state-factions-idolized',
+      label: 'ALL IDOLIZED',
+      subLabel: 'every faction → fame:1000, infamy:0',
+      icon: '⚑',
+      category: 'state',
+      group: 'FACTIONS',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Set every faction (active game) to Idolized.',
+      triggers: [],
+      action: () => _dshAllFactionsIdolized(),
+    },
+    {
+      id: 'state-factions-vilified',
+      label: 'ALL VILIFIED',
+      subLabel: 'every faction → fame:0, infamy:1000',
+      icon: '⚑',
+      category: 'state',
+      group: 'FACTIONS',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Set every faction (active game) to Vilified.',
+      triggers: [],
+      action: () => _dshAllFactionsVilified(),
+    },
+    {
+      id: 'state-collectibles-unlock-all',
+      label: 'UNLOCK ALL',
+      subLabel: 'every collectible (+ Lincoln relics on FO3) marked acquired',
+      icon: '★',
+      category: 'state',
+      group: 'COLLECTIBLES',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Mark every collectible (and FO3 Lincoln memorabilia) as acquired.',
+      triggers: ['collectible.acquired'],
+      action: () => _dshCollectiblesUnlockAll(),
+    },
+    {
+      id: 'state-collectibles-clear-all',
+      label: 'CLEAR ALL',
+      subLabel: 'collectibles=[] · lincolnItems={}',
+      icon: '★',
+      category: 'state',
+      group: 'COLLECTIBLES',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Clear every acquired collectible (and FO3 Lincoln memorabilia).',
+      triggers: [],
+      action: () => _dshCollectiblesClearAll(),
+    },
+    {
+      id: 'state-grant-perk',
+      label: 'GRANT PERK',
+      subLabel: 'addPerk()-equivalent — free-text name',
+      icon: '◆',
+      category: 'state',
+      group: 'PERKS / TRAITS / BOOKS',
+      tier: 'staging',
+      destructive: true,
+      control: 'input',
+      inputType: 'text',
+      inputPlaceholder: 'e.g. Toughness',
+      tooltip: 'Grant a named perk (rank 1).',
+      triggers: [],
+      action: v => _dshGrantPerk(v),
+    },
+    {
+      id: 'state-grant-all-eligible-perks',
+      label: 'GRANT ALL ELIGIBLE',
+      subLabel: '_computeEligiblePerks() → state.perks',
+      icon: '◆',
+      category: 'state',
+      group: 'PERKS / TRAITS / BOOKS',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Grant every perk the player is level-eligible for and doesn’t already own.',
+      triggers: [],
+      action: () => _dshGrantAllEligiblePerks(),
+    },
+    {
+      id: 'state-clear-perks',
+      label: 'CLEAR PERKS',
+      subLabel: 'state.perks = []',
+      icon: '◆',
+      category: 'state',
+      group: 'PERKS / TRAITS / BOOKS',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Clear every owned perk.',
+      triggers: [],
+      action: () => _dshClearPerks(),
+    },
+    {
+      id: 'state-mark-all-books-read',
+      label: 'MARK ALL BOOKS READ',
+      subLabel: 'state.skillBooks = every registry title',
+      icon: '◆',
+      category: 'state',
+      group: 'PERKS / TRAITS / BOOKS',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Mark every skill book (active game) as read.',
+      triggers: [],
+      action: () => _dshMarkAllBooksRead(),
+    },
+    {
+      id: 'state-mark-all-mags-read',
+      label: 'MARK ALL MAGAZINES READ',
+      subLabel: 'state.magazines = every registry title (FNV only)',
+      icon: '◆',
+      category: 'state',
+      group: 'PERKS / TRAITS / BOOKS',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Mark every skill magazine as consumed (no-op on a game without magazines).',
+      triggers: [],
+      action: () => _dshMarkAllMagsRead(),
+    },
+    {
+      id: 'state-add-quest',
+      label: 'ADD DIRECTIVE',
+      subLabel: 'addQuest()-equivalent — free-text or registry name',
+      icon: '✓',
+      category: 'state',
+      group: 'QUESTS',
+      tier: 'staging',
+      destructive: true,
+      control: 'input',
+      inputType: 'text',
+      inputPlaceholder: 'leave blank for a registry pick',
+      tooltip: 'Add an active directive (leave blank to pick the first unused registry quest).',
+      triggers: [],
+      action: v => _dshAddQuestCheat(v),
+    },
+    {
+      id: 'state-complete-all-quests',
+      label: 'COMPLETE ALL',
+      subLabel: 'every directive → status:"complete"',
+      icon: '✓',
+      category: 'state',
+      group: 'QUESTS',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Set every directive to COMPLETE.',
+      triggers: [],
+      action: () => _dshCompleteAllQuests(),
+    },
+    {
+      id: 'state-fail-all-quests',
+      label: 'FAIL ALL',
+      subLabel: 'every directive → status:"failed"',
+      icon: '✓',
+      category: 'state',
+      group: 'QUESTS',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Set every directive to FAILED.',
+      triggers: [],
+      action: () => _dshFailAllQuests(),
+    },
+    {
+      id: 'state-clear-quests',
+      label: 'CLEAR DIRECTIVES',
+      subLabel: 'state.quests = []',
+      icon: '✓',
+      category: 'state',
+      group: 'QUESTS',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Clear every directive.',
+      triggers: [],
+      action: () => _dshClearQuests(),
+    },
+    {
+      id: 'state-reveal-all-fog',
+      label: 'REVEAL ALL FOG',
+      subLabel: 'recordLocationVisit() × every zone + named location',
+      icon: '⦿',
+      category: 'state',
+      group: 'MAP',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Discover every zone and named location on the world map.',
+      triggers: ['location.visited'],
+      action: () => _dshRevealAllFog(),
+    },
+    {
+      id: 'state-clear-fog',
+      label: 'CLEAR FOG',
+      subLabel: 'state.locationHistory = [] (DEV-ONLY bypass of the add-only invariant)',
+      icon: '⦿',
+      category: 'state',
+      group: 'MAP',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Clear every discovered map location.',
+      triggers: [],
+      action: () => _dshResetMapFog(),
+    },
+    {
+      id: 'state-set-current-location',
+      label: 'SET CURRENT LOCATION',
+      subLabel: 'onLocationChange(v)',
+      icon: '⦿',
+      category: 'state',
+      group: 'MAP',
+      tier: 'staging',
+      destructive: true,
+      control: 'input',
+      inputType: 'text',
+      inputPlaceholder: 'e.g. Novac',
+      tooltip: 'Set the player’s current location.',
+      triggers: ['location.current'],
+      action: v => _dshSetCurrentLocationCheat(v),
+    },
+    {
+      id: 'state-apply-buff',
+      label: 'APPLY BUFF',
+      subLabel: "_applyStatusEffect('Buffout', 300, 'BUFF')",
+      icon: '✚',
+      category: 'state',
+      group: 'CONDITIONS',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Apply a sample BUFF status effect.',
+      triggers: ['effect.applied'],
+      action: () => _dshApplyBuff(),
+    },
+    {
+      id: 'state-apply-debuff',
+      label: 'APPLY DEBUFF',
+      subLabel: "_applyStatusEffect('Withdrawal', 300, 'DEBUFF')",
+      icon: '✚',
+      category: 'state',
+      group: 'CONDITIONS',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Apply a sample DEBUFF status effect.',
+      triggers: ['effect.applied'],
+      action: () => _dshApplyDebuff(),
+    },
+    {
+      id: 'state-add-addiction',
+      label: 'ADD ADDICTION',
+      subLabel: 'a getChemsTable() addictive-chem status effect',
+      icon: '✚',
+      category: 'state',
+      group: 'CONDITIONS',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Apply an active status effect that BIO-SCAN recognizes as an addiction risk.',
+      triggers: ['effect.applied'],
+      action: () => _dshAddAddiction(),
+    },
+    {
+      id: 'state-cripple-limb',
+      label: 'CRIPPLE LIMB',
+      subLabel: 'toggleLimb(sel) — forces CRIPPLED',
+      icon: '⚠',
+      category: 'state',
+      group: 'CONDITIONS',
+      tier: 'staging',
+      destructive: true,
+      control: 'select',
+      selectOptions: [
+        { value: 'la', label: 'LEFT ARM' },
+        { value: 'ra', label: 'RIGHT ARM' },
+        { value: 'll', label: 'LEFT LEG' },
+        { value: 'rl', label: 'RIGHT LEG' },
+        { value: 'hd', label: 'HEAD' },
+      ],
+      tooltip: 'Cripple the chosen limb.',
+      triggers: ['limb.state'],
+      action: sel => _dshCrippleLimb(sel),
+    },
+    {
+      id: 'state-heal-all-limbs',
+      label: 'HEAL ALL LIMBS',
+      subLabel: 'toggleLimb(l) for every crippled limb',
+      icon: '✚',
+      category: 'state',
+      group: 'CONDITIONS',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Restore every crippled limb to OK.',
+      triggers: ['limb.state'],
+      action: () => _dshHealAllLimbs(),
+    },
+    {
+      id: 'state-clear-all-effects',
+      label: 'CLEAR ALL EFFECTS',
+      subLabel: 'state.status = []',
+      icon: '✚',
+      category: 'state',
+      group: 'CONDITIONS',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Clear every active status effect.',
+      triggers: [],
+      action: () => _dshClearAllEffects(),
+    },
+    {
+      id: 'state-add-companion',
+      label: 'ADD COMPANION',
+      subLabel: 'addSquadMember()-equivalent — free-text or registry pick',
+      icon: '◈',
+      category: 'state',
+      group: 'COMPANIONS',
+      tier: 'staging',
+      destructive: true,
+      control: 'input',
+      inputType: 'text',
+      inputPlaceholder: 'leave blank for a registry pick',
+      tooltip: 'Add a squad member (leave blank to pick the first unused registry companion).',
+      triggers: [],
+      action: v => _dshAddCompanion(v),
+    },
+    {
+      id: 'state-max-affinity',
+      label: 'MAX ALL AFFINITY',
+      subLabel: 'adjustAffinity(i, 100) × every squad member',
+      icon: '◈',
+      category: 'state',
+      group: 'COMPANIONS',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Set every current squad member’s affinity to 100.',
+      triggers: [],
+      action: () => _dshMaxAffinity(),
+    },
+    {
+      id: 'state-clear-squad',
+      label: 'CLEAR SQUAD',
+      subLabel: 'state.squad = []',
+      icon: '◈',
+      category: 'state',
+      group: 'COMPANIONS',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Clear every squad member.',
+      triggers: [],
+      action: () => _dshClearSquad(),
+    },
+    {
+      id: 'state-set-time-of-day',
+      label: 'SET TIME OF DAY',
+      subLabel: 'state.ticks — same in-game day, new hour',
+      icon: '◐',
+      category: 'state',
+      group: 'TIME',
+      tier: 'staging',
+      destructive: true,
+      control: 'select',
+      selectOptions: [
+        { value: 'dawn', label: 'DAWN (06:00)' },
+        { value: 'noon', label: 'NOON (12:00)' },
+        { value: 'dusk', label: 'DUSK (18:00)' },
+        { value: 'midnight', label: 'MIDNIGHT (00:00)' },
+      ],
+      tooltip: 'Jump to the chosen time of day on the current in-game day.',
+      triggers: [],
+      action: sel => _dshSetTimeOfDay(sel),
+    },
+    {
+      id: 'state-advance-time',
+      label: 'ADVANCE TIME',
+      subLabel: 'state.ticks += hours × 10',
+      icon: '◐',
+      category: 'state',
+      group: 'TIME',
+      tier: 'staging',
+      destructive: true,
+      control: 'input',
+      inputType: 'number',
+      inputPlaceholder: 'hours',
+      tooltip: 'Advance the in-game clock by N hours.',
+      triggers: [],
+      action: v => _dshAdvanceTime(v),
+    },
+    {
+      id: 'state-preset-max-everything',
+      label: 'MAX EVERYTHING',
+      subLabel: 'full heal + max SPECIAL/skills/level/caps + clear rads/effects',
+      icon: '▲',
+      category: 'state',
+      group: 'MEGA PRESETS',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'God-character preset: max out HP, SPECIAL, skills, level, and caps.',
+      triggers: [],
+      action: () => _dshPresetMaxEverything(),
+    },
+    {
+      id: 'state-preset-fresh-start',
+      label: 'FRESH START',
+      subLabel: 'character sheet reset to level-1 defaults',
+      icon: '▲',
+      category: 'state',
+      group: 'MEGA PRESETS',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Reset level/XP/HP/SPECIAL/skills/caps/karma/rads/limbs/status to fresh defaults.',
+      triggers: [],
+      action: () => _dshPresetFreshStart(),
+    },
+    {
+      id: 'state-preset-low-hp',
+      label: 'SCENARIO: LOW HP',
+      subLabel: '_dshSetHpPct(10)',
+      icon: '▲',
+      category: 'state',
+      group: 'MEGA PRESETS',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Scenario preset: HP set to 10% of max.',
+      triggers: [],
+      action: () => _dshPresetLowHp(),
+    },
+    {
+      id: 'state-preset-crippled',
+      label: 'SCENARIO: CRIPPLED',
+      subLabel: 'left arm + right leg crippled',
+      icon: '▲',
+      category: 'state',
+      group: 'MEGA PRESETS',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Scenario preset: cripple the left arm and right leg.',
+      triggers: [],
+      action: () => _dshPresetCrippled(),
+    },
+    {
+      id: 'state-preset-over-encumbered',
+      label: 'SCENARIO: OVER-ENCUMBERED',
+      subLabel: 'same as OVER-ENCUMBER above',
+      icon: '▲',
+      category: 'state',
+      group: 'MEGA PRESETS',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Scenario preset: push carry weight over the limit.',
+      triggers: [],
+      action: () => _dshPresetOverEncumbered(),
+    },
+    {
+      id: 'state-preset-addicted',
+      label: 'SCENARIO: ADDICTED',
+      subLabel: 'same as ADD ADDICTION above',
+      icon: '▲',
+      category: 'state',
+      group: 'MEGA PRESETS',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Scenario preset: apply an addictive-chem status effect.',
+      triggers: [],
+      action: () => _dshPresetAddicted(),
+    },
+    {
+      id: 'state-preset-high-level',
+      label: 'SCENARIO: HIGH LEVEL',
+      subLabel: 'level 30, SPECIAL 7, skills 60',
+      icon: '▲',
+      category: 'state',
+      group: 'MEGA PRESETS',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Scenario preset: a well-developed level-30 character.',
+      triggers: [],
+      action: () => _dshPresetHighLevel(),
+    },
+
+    // ── U4b: RESETS — granular, confirm-gated, staging-only (planning
+    // §4/§11 U4). The task-prompt's "map fog / quests / inventory /
+    // SPECIAL+skills / stats+counters / campaign notes / first-run flags"
+    // list plus the plan's own device/view-once-flag list.
+    {
+      id: 'reset-first-run',
+      label: 'RESET FIRST-RUN FLAG',
+      subLabel: "MetaStore.remove('robco_booted_before')",
+      icon: '⌦',
+      category: 'resets',
+      group: 'VIEW-ONCE / DEV FLAGS',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Clear the first-ever-cold-boot flag.',
+      triggers: ['robco_booted_before'],
+      action: () => _dshResetFirstRun(),
+    },
+    {
+      id: 'reset-firmware-seen',
+      label: 'RESET FIRMWARE-SEEN FLAG',
+      subLabel: "MetaStore.remove('robco_last_seen_version')",
+      icon: '⌦',
+      category: 'resets',
+      group: 'VIEW-ONCE / DEV FLAGS',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Clear the last-seen-version flag (M3 firmware flash).',
+      triggers: ['robco_last_seen_version'],
+      action: () => _dshResetFirmwareSeen(),
+    },
+    {
+      id: 'reset-hatch-flag',
+      label: 'RESET HATCH FLAG',
+      subLabel: "MetaStore.remove('robco_bay_opened') (flag only, no DOM re-show)",
+      icon: '⌦',
+      category: 'resets',
+      group: 'VIEW-ONCE / DEV FLAGS',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Clear the Module Bay hatch view-once flag.',
+      triggers: ['robco_bay_opened'],
+      action: () => _dshResetHatchFlag(),
+    },
+    {
+      id: 'reset-greet-flag',
+      label: 'RESET GREETING FLAG',
+      subLabel: '_overseerGreeted = false (session var)',
+      icon: '⌦',
+      category: 'resets',
+      group: 'VIEW-ONCE / DEV FLAGS',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Clear the M2 Overseer-greeting session flag.',
+      triggers: [],
+      action: () => _dshResetGreetFlag(),
+    },
+    {
+      id: 'reset-error-log',
+      label: 'RESET ERROR LOG',
+      subLabel: '_clearErrorLog()',
+      icon: '⌦',
+      category: 'resets',
+      group: 'VIEW-ONCE / DEV FLAGS',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Clear the client error ring-buffer.',
+      triggers: [],
+      action: () => _dshResetErrorLog(),
+    },
+    {
+      id: 'reset-device-prefs',
+      label: 'RESET ALL DEVICE PREFS',
+      subLabel: 'MetaStore.remove(k) × every registered key — never a campaign key',
+      icon: '⌦',
+      category: 'resets',
+      group: 'VIEW-ONCE / DEV FLAGS',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Clear every registered device preference (audio, optics, UI layout, telemetry).',
+      triggers: [],
+      action: () => _dshResetDevicePrefs(),
+    },
+    {
+      id: 'reset-bezel-view',
+      label: 'RESET BEZEL VIEW',
+      subLabel: "MetaStore.remove('robco_bezel_subsystem')",
+      icon: '⌦',
+      category: 'resets',
+      group: 'VIEW-ONCE / DEV FLAGS',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Clear the last-selected bezel subsystem preference.',
+      triggers: [],
+      action: () => _dshResetBezelView(),
+    },
+    {
+      id: 'reset-map-fog',
+      label: 'RESET MAP FOG',
+      subLabel: 'state.locationHistory = []',
+      icon: '⌦',
+      category: 'resets',
+      group: 'CAMPAIGN DATA',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Clear every discovered map location.',
+      triggers: [],
+      action: () => _dshResetMapFog(),
+    },
+    {
+      id: 'reset-quests',
+      label: 'RESET DIRECTIVES',
+      subLabel: 'state.quests = []',
+      icon: '⌦',
+      category: 'resets',
+      group: 'CAMPAIGN DATA',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Clear every directive (quest).',
+      triggers: [],
+      action: () => _dshClearQuests(),
+    },
+    {
+      id: 'reset-inventory',
+      label: 'RESET INVENTORY',
+      subLabel: 'inventory=[] · ammo={} · equipped=null',
+      icon: '⌦',
+      category: 'resets',
+      group: 'CAMPAIGN DATA',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Clear all inventory, ammo, and equipped items.',
+      triggers: [],
+      action: () => _dshEmptyInventory(),
+    },
+    {
+      id: 'reset-special-skills',
+      label: 'RESET SPECIAL + SKILLS',
+      subLabel: 'SPECIAL → 5 each · skills → 15 each',
+      icon: '⌦',
+      category: 'resets',
+      group: 'CAMPAIGN DATA',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Reset every S.P.E.C.I.A.L. channel to 5 and every skill (active game) to 15.',
+      triggers: [],
+      action: () => _dshResetSpecialSkills(),
+    },
+    {
+      id: 'reset-stats-counters',
+      label: 'RESET STATS + COUNTERS',
+      subLabel: 'resetSessionStats()',
+      icon: '⌦',
+      category: 'resets',
+      group: 'CAMPAIGN DATA',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Reset kills, caps earned, damage dealt, and the session clock.',
+      triggers: [],
+      action: () => _dshResetStatsCounters(),
+    },
+    {
+      id: 'reset-campaign-notes',
+      label: 'RESET CAMPAIGN NOTES',
+      subLabel: 'state.campaign_notes = []',
+      icon: '⌦',
+      category: 'resets',
+      group: 'CAMPAIGN DATA',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Clear every field note (manual + auto-logged).',
+      triggers: [],
+      action: () => _dshResetCampaignNotes(),
+    },
+
+    // ── U4b: FIXTURES — Load NV Test Campaign (planning §4/§11 U4) ─────────
+    {
+      id: 'fixture-nv-test-campaign',
+      label: 'LOAD NV TEST CAMPAIGN',
+      subLabel: 'a fully-populated New Vegas fixture — OVERWRITES the live campaign',
+      icon: '▣',
+      category: 'fixtures',
+      group: 'FIXTURES',
+      tier: 'staging',
+      destructive: true,
+      tooltip:
+        'Loads a fully-populated New Vegas test campaign (inventory/quests/perks/traits/skills/SPECIAL/factions/collectibles/karma/locations/status effects/caps/level/companions/notes). Overwrites the current campaign. Requires the New Vegas cartridge to already be active.',
+      triggers: [],
+      action: () => _dshLoadNvTestCampaign(),
+    },
+
+    // ── U4b: INLINE DEV-RESET BUTTONS (planning §5) — category:'inline',
+    // anchored to a STATIC element on the real panel, mounted by
+    // _mountInlineResets() (staging-only by construction). Each reuses the
+    // SAME action as its RESETS-category sibling (Protocol 22 — one
+    // function, two entry points).
+    {
+      id: 'inline-reset-map-fog',
+      label: 'RESET FOG',
+      subLabel: 'inline on-panel twin of RESETS ▸ RESET MAP FOG',
+      icon: '⌦',
+      category: 'inline',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'DEV: clear every discovered map location.',
+      triggers: [],
+      anchor: '#worldMapPanel .bay-part-no',
+      placement: 'after',
+      action: () => _dshResetMapFog(),
+    },
+    {
+      id: 'inline-reset-quests',
+      label: 'RESET DIRECTIVES',
+      subLabel: 'inline on-panel twin of RESETS ▸ RESET DIRECTIVES',
+      icon: '⌦',
+      category: 'inline',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'DEV: clear every directive (quest).',
+      triggers: [],
+      anchor: '#questLogPanel .bay-part-no',
+      placement: 'after',
+      action: () => _dshClearQuests(),
+    },
+    {
+      id: 'inline-reset-cargo',
+      label: 'RESET CARGO',
+      subLabel: 'inline on-panel twin of RESETS ▸ RESET INVENTORY',
+      icon: '⌦',
+      category: 'inline',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'DEV: clear inventory, ammo, and equipped items.',
+      triggers: [],
+      anchor: '#opsManifestPanel .bay-part-no',
+      placement: 'after',
+      action: () => _dshEmptyInventory(),
+    },
   ];
   // Exposed read-only for the harness (the VM behavioral proof, mirroring how
   // the OCR test wiring is reachable) — never mutated at runtime.
@@ -1284,6 +2436,81 @@
             wrapper.appendChild(grid);
             groupGrids[groupKey] = grid;
           }
+          // U4b: a parameterized cheat (control:'input'|'select'|'select-input')
+          // synthesizes a labeled row — a select and/or a text/number input plus
+          // a GO button — instead of a plain button, still inside the SAME group
+          // grid/wrapper machinery (Protocol 22, one render path). The captured
+          // value(s) are handed to _invoke(tool, arg) at click-time, never
+          // read again later, so a confirm-gated tool always acts on exactly
+          // what was on screen when GO was pressed.
+          if (
+            tool.control === 'input' ||
+            tool.control === 'select' ||
+            tool.control === 'select-input'
+          ) {
+            var row = document.createElement('div');
+            row.className = 'dsh-tool-row';
+            row.style.cssText =
+              'display:flex;flex-wrap:wrap;gap:4px;align-items:center;width:100%;margin-bottom:6px';
+            row.setAttribute(
+              'data-dsh-search',
+              (tool.label + ' ' + (tool.subLabel || '')).toLowerCase()
+            );
+            if (tool.tooltip) row.title = tool.tooltip;
+            var rowLbl = document.createElement('span');
+            rowLbl.style.cssText = 'font-size:10px;opacity:0.75;flex-basis:100%';
+            var rowIcon = document.createElement('span');
+            rowIcon.className = 'dsh-tool-icon';
+            rowIcon.setAttribute('aria-hidden', 'true');
+            rowIcon.textContent = (tool.icon || DEV_MARKER) + ' ';
+            rowLbl.appendChild(rowIcon);
+            rowLbl.appendChild(document.createTextNode(tool.label));
+            row.appendChild(rowLbl);
+            var selectEl = null;
+            var inputEl = null;
+            if (tool.control === 'select' || tool.control === 'select-input') {
+              selectEl = document.createElement('select');
+              selectEl.style.cssText = 'font-size:16px;flex:1 1 120px;min-height:28px';
+              selectEl.setAttribute('aria-label', tool.label + ' — choose');
+              var opts =
+                typeof tool.selectOptions === 'function'
+                  ? tool.selectOptions()
+                  : tool.selectOptions || [];
+              opts.forEach(function (o) {
+                var optEl = document.createElement('option');
+                optEl.value = o.value;
+                optEl.textContent = o.label;
+                selectEl.appendChild(optEl);
+              });
+              row.appendChild(selectEl);
+            }
+            if (tool.control === 'input' || tool.control === 'select-input') {
+              inputEl = document.createElement('input');
+              inputEl.type = tool.inputType || 'text';
+              if (tool.inputPlaceholder) inputEl.placeholder = tool.inputPlaceholder;
+              if (tool.inputDefault !== undefined) inputEl.value = tool.inputDefault;
+              inputEl.style.cssText = 'font-size:16px;flex:1 1 100px;min-height:28px';
+              inputEl.setAttribute('aria-label', tool.label + ' — value');
+              row.appendChild(inputEl);
+            }
+            var goBtn = document.createElement('button');
+            goBtn.type = 'button';
+            goBtn.className = 'btn-sm dsh-tool-btn';
+            goBtn.textContent = 'GO';
+            goBtn.setAttribute('aria-label', 'Apply: ' + tool.label);
+            goBtn.addEventListener('click', function () {
+              if (tool.control === 'select') {
+                _invoke(tool, selectEl.value);
+              } else if (tool.control === 'select-input') {
+                _invoke(tool, { sel: selectEl.value, val: inputEl.value });
+              } else {
+                _invoke(tool, inputEl.value);
+              }
+            });
+            row.appendChild(goBtn);
+            grid.appendChild(row);
+            return;
+          }
           var btn = document.createElement('button');
           btn.type = 'button';
           btn.className = 'btn-sm dsh-tool-btn';
@@ -1371,6 +2598,48 @@
         });
         sec.style.display = anySectionVisible ? '' : 'none';
       });
+    });
+  }
+
+  // ── U4b: INLINE DEV-RESET BUTTONS (planning/DIAGNOSTIC_SHELL_PLAN.md §5) ──
+  // Small confirm-gated reset buttons rendered ON the real panel they affect
+  // (e.g. a tiny RESET FOG button beside the CARTOGRAPHY TABLE's own static
+  // header line), sharing the SAME registry/gate/confirm path as every other
+  // tool (Protocol 22) — never a parallel button/confirm mechanism. A
+  // category:'inline' tool carries an `anchor` (a STATIC selector — the
+  // panel's own <summary>/.bay-part-no line, never a target inside a
+  // render*()-owned innerHTML region, so a later re-render can never wipe
+  // the injected button) and an optional `placement` ('after' default,
+  // 'before', or 'prepend'). Re-checks _shellTier()==='staging' itself
+  // (leak-proof by construction, U1 §2.2) — a prod-minigame-unlocked build
+  // (_shellVisible()===true but _shellTier()==='prod') mounts none of these,
+  // even though initTestConsole() itself already ran.
+  function _mountInlineResets() {
+    if (_shellTier() !== 'staging') return;
+    DIAGNOSTIC_SHELL_TOOLS.forEach(function (tool) {
+      if (tool.category !== 'inline' || !tool.anchor) return;
+      if (!_toolVisible(tool, 'staging')) return;
+      if (document.querySelector('[data-dsh-inline="' + tool.id + '"]')) return; // idempotent
+      var el = document.querySelector(tool.anchor);
+      if (!el || !el.parentNode) return;
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn-sm dsh-inline-reset';
+      btn.setAttribute('data-dsh-inline', tool.id);
+      btn.setAttribute('aria-label', tool.tooltip || 'DEV reset: ' + tool.label);
+      if (tool.tooltip) btn.title = tool.tooltip;
+      var glyph = document.createElement('span');
+      glyph.setAttribute('aria-hidden', 'true');
+      glyph.textContent = DEV_MARKER + ' ';
+      btn.appendChild(glyph);
+      btn.appendChild(document.createTextNode(tool.label));
+      btn.addEventListener('click', function () {
+        _invoke(tool);
+      });
+      var placement = tool.placement || 'after';
+      if (placement === 'before') el.parentNode.insertBefore(btn, el);
+      else if (placement === 'prepend') el.insertBefore(btn, el.firstChild);
+      else el.parentNode.insertBefore(btn, el.nextSibling);
     });
   }
 
@@ -2115,6 +3384,838 @@
     document.body.classList.toggle('time-night');
   }
 
+  // ── U4b: STATE SETUP CHEATS + RESETS + FIXTURES ───────────────────────────
+  // (planning/DIAGNOSTIC_SHELL_PLAN.md §4 STATE SETUP/RESETS/FIXTURES, §11 U4)
+  // Every cheat below routes through an EXISTING native setter/mutator
+  // (Protocol 22) — _nativeSetHp/_nativeSetRads/_nativeSetSpecial/
+  // _nativeSetSkill/_nativeSetLevel/_nativeSetXp/_nativeSetKarma/
+  // _nativeSetCaps/toggleLimb/_applyStatusEffect/adjustAffinity/
+  // adjustFaction/recordLocationVisit/onLocationChange — so a cheat is
+  // clamped and validated exactly like the real player action would be
+  // (Protocol 24), never a parallel unclamped write path. Every registry
+  // entry that fires one of these is tier:'staging' + destructive:true
+  // (auto-confirm-gated by _invoke(), §2.3) since each one mutates the live
+  // campaign — never tier:'prod' (leak-proof by construction, §2.2). All
+  // read/write bare globals (state, getSkillKeys(), getFactionRegistry(),
+  // FALLOUT_REGISTRY, GAME_DEFS, render*()) exactly like the pre-existing U3
+  // helpers above (classic <script> tags share one realm — no window.
+  // prefix needed). Game-agnostic (Protocol 38): every per-game set (skills,
+  // factions, combat skills, ammo calibers, collectibles) is read from the
+  // active game's registry/GAME_DEFS, never a hardcoded two-game literal.
+
+  // A direct-DOM-write twin of the state+DOM-together idiom every
+  // _nativeSetXxx() setter already follows, for the handful of places below
+  // (the fixture, FRESH START) that set several DOM-synced fields at once
+  // rather than through one dedicated native setter per field — see the
+  // Protocol 42 note inside _dshLoadNvTestCampaign() for the full story.
+  function _dshSyncDom(id, val) {
+    var el = document.getElementById(id);
+    if (el) el.value = String(val);
+  }
+
+  // ── VITALS ──
+  function _dshFullHeal() {
+    _nativeSetHp(state.hpMax);
+  }
+  function _dshSetHpPct(pctStr) {
+    var pct = Math.max(1, Math.min(100, parseInt(pctStr, 10) || 100));
+    _nativeSetHp(Math.round((state.hpMax || 100) * (pct / 100)));
+  }
+  function _dshKill() {
+    _nativeSetHp(0);
+  }
+  function _dshAddRads(deltaStr) {
+    var delta = parseInt(deltaStr, 10) || 0;
+    _nativeSetRads((state.rads || 0) + delta);
+  }
+  function _dshClearRads() {
+    _nativeSetRads(0);
+  }
+  function _dshMaxRads() {
+    _nativeSetRads(window._resolveMaxRads ? window._resolveMaxRads() : 1000);
+  }
+
+  // ── PROGRESSION ──
+  function _dshSetLevel(valStr) {
+    _nativeSetLevel(parseInt(valStr, 10) || 1);
+  }
+  function _dshPlusOneLevel() {
+    nativeLevelUp();
+  }
+  function _dshMaxLevel() {
+    _nativeSetLevel(MAX_PLAYER_LEVEL);
+  }
+  function _dshAddXp(deltaStr) {
+    var delta = parseInt(deltaStr, 10) || 0;
+    _nativeSetXp((state.xp || 0) + delta);
+  }
+
+  // ── SPECIAL ──
+  var _DSH_SPECIAL_KEYS = ['s', 'p', 'e', 'c', 'i', 'a', 'l'];
+  function _dshMaxAllSpecial() {
+    _DSH_SPECIAL_KEYS.forEach(function (k) {
+      _nativeSetSpecial(k, 10);
+    });
+  }
+  function _dshZeroSpecial() {
+    // _nativeSetSpecial's own clamp floors at 1 — "zero" sets every channel
+    // to the real minimum a player can ever reach (Protocol 24).
+    _DSH_SPECIAL_KEYS.forEach(function (k) {
+      _nativeSetSpecial(k, 1);
+    });
+  }
+  function _dshSetOneSpecial(arg) {
+    var k = String((arg && arg.sel) || '').toLowerCase();
+    if (_DSH_SPECIAL_KEYS.indexOf(k) === -1) return;
+    _nativeSetSpecial(k, parseInt(arg && arg.val, 10));
+  }
+
+  // ── SKILLS ──
+  function _dshMaxAllSkills() {
+    getSkillKeys().forEach(function (sk) {
+      _nativeSetSkill(sk, 100);
+    });
+  }
+  function _dshSetOneSkill(arg) {
+    var sk = (arg && arg.sel) || '';
+    if (getSkillKeys().indexOf(sk) === -1) return;
+    _nativeSetSkill(sk, parseInt(arg && arg.val, 10) || 0);
+  }
+  // This app has no "tagged skill" concept (skills are plain 0-100 values,
+  // no boolean tag flag) — reinterpreted honestly as a boost of the active
+  // game's own documented combatSkills set (GAME_DEFS[ctx].combatSkills,
+  // the same field WU-N1 VATS already reads), never a fabricated field.
+  function _dshBoostCombatSkills() {
+    var def =
+      typeof GAME_DEFS !== 'undefined' && typeof getGameContext === 'function'
+        ? GAME_DEFS[getGameContext()]
+        : null;
+    var keys = def && Array.isArray(def.combatSkills) ? def.combatSkills : [];
+    keys.forEach(function (sk) {
+      _nativeSetSkill(sk, 100);
+    });
+  }
+
+  // ── KARMA ──
+  function _dshSetKarmaGood() {
+    _nativeSetKarma(1000);
+  }
+  function _dshSetKarmaNeutral() {
+    _nativeSetKarma(0);
+  }
+  function _dshSetKarmaEvil() {
+    _nativeSetKarma(-1000);
+  }
+
+  // ── ECONOMY ──
+  function _dshAddCaps1k() {
+    _nativeSetCaps((state.caps || 0) + 1000);
+  }
+  function _dshMaxCaps() {
+    _nativeSetCaps(999999);
+  }
+  function _dshZeroCaps() {
+    _nativeSetCaps(0);
+  }
+
+  // ── INVENTORY ──
+  function _dshGiveItem(nameStr) {
+    var n = String(nameStr || '').trim();
+    if (!n) return;
+    var dbEntry = typeof lookupItemInDb === 'function' ? lookupItemInDb(n) : null;
+    var w = dbEntry ? dbEntry.wgt : 0;
+    var v = dbEntry ? dbEntry.val : 0;
+    var t = (dbEntry && dbEntry.type) || 'misc';
+    if (t === 'ammo') {
+      if (!state.ammo) state.ammo = {};
+      state.ammo[n] = (state.ammo[n] || 0) + 1;
+      renderAmmo();
+      updateMath();
+      saveState();
+      return;
+    }
+    if (!state.inventory) state.inventory = [];
+    var ex = state.inventory.find(function (i) {
+      return i.name.toLowerCase() === n.toLowerCase();
+    });
+    if (ex) ex.qty += 1;
+    else state.inventory.push({ name: n, qty: 1, wgt: w, val: v, type: t });
+    RobcoEvents.emit('item.added', { name: n, qty: 1, source: 'manual', type: t });
+    renderInventory();
+    updateMath();
+    saveState();
+  }
+  function _dshFullLoadout() {
+    var reg = (typeof FALLOUT_REGISTRY !== 'undefined' && FALLOUT_REGISTRY.items) || [];
+    ['weapon', 'armor', 'aid', 'misc'].forEach(function (cat) {
+      var entry = reg.find(function (it) {
+        return it.type === cat;
+      });
+      if (entry) _dshGiveItem(entry.name);
+    });
+    var calibers = typeof getAmmoCalibers === 'function' ? getAmmoCalibers() : [];
+    if (calibers.length) {
+      if (!state.ammo) state.ammo = {};
+      state.ammo[calibers[0]] = (state.ammo[calibers[0]] || 0) + 100;
+      renderAmmo();
+      saveState();
+    }
+  }
+  function _dshEmptyInventory() {
+    state.inventory = [];
+    state.ammo = {};
+    state.equipped = { weapon: null, armor: null, headgear: null };
+    renderInventory();
+    renderAmmo();
+    renderEquipped();
+    updateMath();
+    saveState();
+  }
+  function _dshOverEncumber() {
+    if (!state.inventory) state.inventory = [];
+    for (var i = 0; i < 5; i++) {
+      state.inventory.push({
+        name: 'TEST BALLAST ' + (i + 1),
+        qty: 1,
+        wgt: 200,
+        val: 0,
+        type: 'misc',
+      });
+    }
+    renderInventory();
+    updateMath();
+    saveState();
+  }
+  function _dshAddAmmo() {
+    var calibers = typeof getAmmoCalibers === 'function' ? getAmmoCalibers() : [];
+    if (!calibers.length) return;
+    if (!state.ammo) state.ammo = {};
+    state.ammo[calibers[0]] = (state.ammo[calibers[0]] || 0) + 50;
+    renderAmmo();
+    updateMath();
+    saveState();
+  }
+
+  // ── FACTIONS ──
+  function _dshSetFactionExtreme(key, mode) {
+    if (!key) return;
+    if (!state.factions) state.factions = {};
+    state.factions[key] = mode === 'max' ? { fame: 1000, infamy: 0 } : { fame: 0, infamy: 1000 };
+    saveState();
+    renderFactionRep();
+    _updatePanelBadges();
+  }
+  function _dshSetFactionMax(sel) {
+    _dshSetFactionExtreme(sel, 'max');
+  }
+  function _dshSetFactionMin(sel) {
+    _dshSetFactionExtreme(sel, 'min');
+  }
+  function _dshAllFactionsExtreme(mode) {
+    getFactionRegistry().forEach(function (f) {
+      _dshSetFactionExtreme(f.key, mode);
+    });
+  }
+  function _dshAllFactionsIdolized() {
+    _dshAllFactionsExtreme('max');
+  }
+  function _dshAllFactionsVilified() {
+    _dshAllFactionsExtreme('min');
+  }
+
+  // ── COLLECTIBLES ──
+  function _dshCollectiblesUnlockAll() {
+    var cs = (typeof FALLOUT_REGISTRY !== 'undefined' && FALLOUT_REGISTRY.collectibles) || [];
+    state.collectibles = cs.map(function (c) {
+      return c.name;
+    });
+    if (_activeDef().tracksLincoln) {
+      var lm =
+        (typeof FALLOUT_REGISTRY !== 'undefined' && FALLOUT_REGISTRY.lincolnMemorabilia) || [];
+      state.lincolnItems = {};
+      lm.forEach(function (d) {
+        state.lincolnItems[d.name] = 'found';
+      });
+      renderLincolnMemorabilia();
+    }
+    renderCollectibles();
+    renderSessionStats();
+    updateMath();
+    saveState();
+  }
+  function _dshCollectiblesClearAll() {
+    state.collectibles = [];
+    state.lincolnItems = {};
+    renderCollectibles();
+    if (_activeDef().tracksLincoln) renderLincolnMemorabilia();
+    updateMath();
+    saveState();
+  }
+
+  // ── PERKS / TRAITS / BOOKS ──
+  function _dshGrantPerk(nameStr) {
+    var n = String(nameStr || '').trim();
+    if (!n) return;
+    if (!state.perks) state.perks = [];
+    if (
+      state.perks.some(function (p) {
+        return p.name.toLowerCase() === n.toLowerCase();
+      })
+    )
+      return;
+    state.perks.push({ name: n, rank: 1, level_taken: null });
+    _pendingPerkSeat = n;
+    renderPerks();
+    updateMath();
+    saveState();
+  }
+  function _dshGrantAllEligiblePerks() {
+    var eligible = typeof _computeEligiblePerks === 'function' ? _computeEligiblePerks() : [];
+    if (!state.perks) state.perks = [];
+    eligible.forEach(function (p) {
+      state.perks.push({ name: p.name, rank: 1, level_taken: p.level || null });
+    });
+    renderPerks();
+    updateMath();
+    saveState();
+  }
+  function _dshClearPerks() {
+    state.perks = [];
+    renderPerks();
+    updateMath();
+    saveState();
+  }
+  function _dshMarkAllBooksRead() {
+    var defs = (typeof FALLOUT_REGISTRY !== 'undefined' && FALLOUT_REGISTRY.skillBooks) || [];
+    state.skillBooks = defs.map(function (b) {
+      return b.name;
+    });
+    renderSkillBooks();
+    saveState();
+  }
+  function _dshMarkAllMagsRead() {
+    if (!_activeDef().hasMagazines) return;
+    var defs = (typeof FALLOUT_REGISTRY !== 'undefined' && FALLOUT_REGISTRY.magazines) || [];
+    state.magazines = defs.map(function (m) {
+      return m.name;
+    });
+    renderMagazines();
+    saveState();
+  }
+
+  // ── QUESTS ──
+  function _dshAddQuestCheat(nameStr) {
+    var n = String(nameStr || '').trim();
+    if (!n) {
+      var reg = (typeof FALLOUT_REGISTRY !== 'undefined' && FALLOUT_REGISTRY.quests) || [];
+      var existing = new Set(
+        (state.quests || []).map(function (q) {
+          return q.name.toLowerCase();
+        })
+      );
+      var pick = reg.find(function (q) {
+        return !existing.has(q.name.toLowerCase());
+      });
+      n = pick ? pick.name : 'Test Directive';
+    }
+    if (!state.quests) state.quests = [];
+    state.quests.push({ name: n, status: 'active', objective: null });
+    _pendingQuestFiled = n;
+    renderQuests();
+    updateMath();
+    saveState();
+  }
+  function _dshCompleteAllQuests() {
+    (state.quests || []).forEach(function (q) {
+      q.status = 'complete';
+    });
+    renderQuests();
+    updateMath();
+    saveState();
+  }
+  function _dshFailAllQuests() {
+    (state.quests || []).forEach(function (q) {
+      q.status = 'failed';
+    });
+    renderQuests();
+    updateMath();
+    saveState();
+  }
+  function _dshClearQuests() {
+    state.quests = [];
+    renderQuests();
+    updateMath();
+    saveState();
+  }
+
+  // ── MAP ──
+  function _dshRevealAllFog() {
+    var zones = (typeof FALLOUT_REGISTRY !== 'undefined' && FALLOUT_REGISTRY.zones) || [];
+    zones.forEach(function (z) {
+      if (z && z.name) recordLocationVisit(z.name);
+      (z.locations || []).forEach(function (l) {
+        recordLocationVisit(l);
+      });
+    });
+    saveState();
+    renderWorldMap();
+  }
+  // Shared by the STATE SETUP "clear fog" cheat, the RESETS "reset map fog"
+  // tool, AND the on-panel inline reset button (Protocol 22 — one action,
+  // three registry entry points). A deliberate DEV-ONLY bypass of the
+  // player-facing recordLocationVisit()'s add-only/no-un-discovery
+  // invariant — that invariant governs normal play, not a staging reset.
+  function _dshResetMapFog() {
+    state.locationHistory = [];
+    saveState();
+    renderWorldMap();
+  }
+  function _dshSetCurrentLocationCheat(nameStr) {
+    var n = String(nameStr || '').trim();
+    if (!n) return;
+    var locEl = document.getElementById('stat_loc');
+    if (locEl) locEl.value = n;
+    onLocationChange(n);
+  }
+
+  // ── CONDITIONS ──
+  function _dshApplyBuff() {
+    _applyStatusEffect('Buffout', 300, 'BUFF');
+    renderStatus();
+    updateMath();
+  }
+  function _dshApplyDebuff() {
+    _applyStatusEffect('Withdrawal', 300, 'DEBUFF');
+    renderStatus();
+    updateMath();
+  }
+  // Addiction is derived (BIO-SCAN, ui-render.js) from an active status
+  // effect whose name matches a chem with a non-zero Addiction_Risk column —
+  // never a dedicated state field. Sourced live from getChemsTable() so this
+  // stays game-agnostic (Protocol 38), falling back to a real, documented
+  // FNV/FO3 chem name only if the table is unexpectedly empty.
+  function _dshAddAddiction() {
+    var chems = typeof getChemsTable === 'function' ? getChemsTable() : [];
+    var addictive = chems.find(function (c) {
+      var r = String((c && c.addictionRisk) || '').replace(/[^0-9.]/g, '');
+      return r && parseFloat(r) > 0;
+    });
+    var name = addictive ? addictive.name : 'Jet';
+    _applyStatusEffect(name, 200, 'DEBUFF');
+    renderStatus();
+    updateMath();
+  }
+  var _DSH_LIMB_KEYS = ['la', 'ra', 'll', 'rl', 'hd'];
+  function _dshCrippleLimb(sel) {
+    var limb = String(sel || '').toLowerCase();
+    if (_DSH_LIMB_KEYS.indexOf(limb) === -1) return;
+    if (state[limb] !== 'CRIPPLED') toggleLimb(limb);
+  }
+  function _dshHealAllLimbs() {
+    _DSH_LIMB_KEYS.forEach(function (l) {
+      if (state[l] !== 'OK') toggleLimb(l);
+    });
+  }
+  function _dshClearAllEffects() {
+    state.status = [];
+    renderStatus();
+    updateMath();
+    saveState();
+  }
+
+  // ── COMPANIONS ──
+  function _dshAddCompanion(nameStr) {
+    var n = String(nameStr || '').trim();
+    if (!n) {
+      var reg = (typeof FALLOUT_REGISTRY !== 'undefined' && FALLOUT_REGISTRY.companions) || [];
+      var existing = new Set(
+        (state.squad || []).map(function (m) {
+          return m.name.toLowerCase();
+        })
+      );
+      var pick = reg.find(function (c) {
+        return !existing.has(c.name.toLowerCase());
+      });
+      n = pick ? pick.name : 'Test Companion';
+    }
+    if (!state.squad) state.squad = [];
+    if (
+      state.squad.some(function (m) {
+        return m.name.toLowerCase() === n.toLowerCase();
+      })
+    )
+      return;
+    state.squad.push({
+      name: n,
+      hp: 100,
+      hpMax: 100,
+      weapon: 'Unarmed',
+      ammo: 0,
+      condition: 'OK',
+      affinity: 0,
+    });
+    renderSquad();
+    updateMath();
+    saveState();
+  }
+  function _dshMaxAffinity() {
+    (state.squad || []).forEach(function (m, i) {
+      adjustAffinity(i, 100);
+    });
+  }
+  function _dshClearSquad() {
+    state.squad = [];
+    renderSquad();
+    updateMath();
+    saveState();
+  }
+
+  // ── TIME ──
+  var _DSH_TIME_OF_DAY = { dawn: 6, noon: 12, dusk: 18, midnight: 0 };
+  // Both setters below call loadUI() BEFORE saveState() — state.ticks is one
+  // of the fields syncStateFromDom() (called inside saveState()) reads BACK
+  // from the #cal_month/#cal_day/#cal_year/#time_hour/#time_min DOM inputs;
+  // saving before those inputs are repainted from the fresh state.ticks
+  // would silently revert it to whatever calendar was on screen a moment
+  // ago (the same Protocol 42 lesson as the MEGA PRESETS/FIXTURE fix above).
+  function _dshSetTimeOfDay(sel) {
+    var h = _DSH_TIME_OF_DAY[String(sel || '').toLowerCase()];
+    if (h === undefined) return;
+    var daysElapsed = Math.floor((state.ticks || 0) / 240);
+    state.ticks = daysElapsed * 240 + h * 10;
+    updateMath();
+    loadUI();
+    saveState();
+    renderWorldMap();
+  }
+  function _dshAdvanceTime(hoursStr) {
+    var hrs = parseInt(hoursStr, 10) || 0;
+    state.ticks = Math.max(0, (state.ticks || 0) + hrs * 10);
+    updateMath();
+    loadUI();
+    saveState();
+  }
+
+  // ── MEGA PRESETS (confirm-gated — every one mutates several fields at
+  // once) ──
+  function _dshPresetMaxEverything() {
+    _dshFullHeal();
+    _dshMaxAllSpecial();
+    _dshMaxAllSkills();
+    _dshMaxLevel();
+    _dshMaxCaps();
+    _dshClearRads();
+    state.status = [];
+    renderStatus();
+    saveState();
+  }
+  function _dshPresetFreshStart() {
+    state.lvl = 1;
+    state.xp = 0;
+    state.hpMax = 100;
+    state.hpCur = 100;
+    _DSH_SPECIAL_KEYS.forEach(function (k) {
+      state[k] = 5;
+    });
+    var defSkills = {};
+    getSkillKeys().forEach(function (sk) {
+      defSkills[sk] = 15;
+    });
+    state.skills = defSkills;
+    state.caps = 0;
+    state.karma = 0;
+    state.rads = 0;
+    state.status = [];
+    ['la', 'ra', 'll', 'rl', 'hd'].forEach(function (l) {
+      state[l] = 'OK';
+    });
+    // Protocol 42 fix (found via this unit's own live Playwright
+    // verification, the identical root cause documented in
+    // _dshLoadNvTestCampaign()): loadUI()'s dirty-check does not reliably
+    // repaint the DOM for a direct backdoor state.* write like this preset's,
+    // so saveState()'s own syncStateFromDom() silently reverted lvl/xp/hp/
+    // SPECIAL/caps/karma/rads/skills back to whatever was on screen before —
+    // every DOM-synced field is written directly here instead (the same
+    // idiom every _nativeSetXxx() setter already uses).
+    _dshSyncDom('stat_lvl', state.lvl);
+    _dshSyncDom('stat_xp', state.xp);
+    _dshSyncDom('stat_hp_max', state.hpMax);
+    _dshSyncDom('stat_hp_cur', state.hpCur);
+    _DSH_SPECIAL_KEYS.forEach(function (k) {
+      _dshSyncDom('s_' + k, state[k]);
+    });
+    _dshSyncDom('c_caps', state.caps);
+    _dshSyncDom('stat_karma', state.karma);
+    _dshSyncDom('stat_rads', state.rads);
+    Object.keys(defSkills).forEach(function (sk) {
+      _dshSyncDom('sk_' + sk, defSkills[sk]);
+    });
+    updateMath();
+    loadUI();
+    saveState();
+  }
+  function _dshPresetLowHp() {
+    _dshSetHpPct('10');
+  }
+  function _dshPresetCrippled() {
+    _dshCrippleLimb('la');
+    _dshCrippleLimb('rl');
+  }
+  function _dshPresetOverEncumbered() {
+    _dshOverEncumber();
+  }
+  function _dshPresetAddicted() {
+    _dshAddAddiction();
+  }
+  function _dshPresetHighLevel() {
+    _nativeSetLevel(30);
+    _DSH_SPECIAL_KEYS.forEach(function (k) {
+      _nativeSetSpecial(k, 7);
+    });
+    getSkillKeys().forEach(function (sk) {
+      _nativeSetSkill(sk, 60);
+    });
+  }
+
+  // ── RESETS (category:'resets' — device/view-once flags) ──
+  function _dshResetFirstRun() {
+    MetaStore.remove('robco_booted_before');
+  }
+  function _dshResetFirmwareSeen() {
+    MetaStore.remove('robco_last_seen_version');
+  }
+  function _dshResetHatchFlag() {
+    MetaStore.remove('robco_bay_opened');
+  }
+  function _dshResetGreetFlag() {
+    _overseerGreeted = false;
+  }
+  function _dshResetErrorLog() {
+    if (typeof _clearErrorLog === 'function') _clearErrorLog();
+    else MetaStore.remove('robco_error_log');
+  }
+  function _dshResetDevicePrefs() {
+    MetaStore.keys().forEach(function (k) {
+      MetaStore.remove(k);
+    });
+  }
+  function _dshResetBezelView() {
+    MetaStore.remove('robco_bezel_subsystem');
+  }
+  function _dshResetSpecialSkills() {
+    _DSH_SPECIAL_KEYS.forEach(function (k) {
+      _nativeSetSpecial(k, 5);
+    });
+    getSkillKeys().forEach(function (sk) {
+      _nativeSetSkill(sk, 15);
+    });
+  }
+  function _dshResetStatsCounters() {
+    resetSessionStats();
+  }
+  function _dshResetCampaignNotes() {
+    state.campaign_notes = [];
+    renderCampaignNotes();
+    updateMath();
+    saveState();
+  }
+
+  // ── FIXTURES ──
+  // Builds a FULLY-POPULATED New Vegas test campaign into the LIVE state —
+  // deliberately written in a game-agnostic STYLE (reads FALLOUT_REGISTRY /
+  // GAME_DEFS / getSkillKeys() / getFactionRegistry() / getAmmoCalibers()
+  // rather than hardcoded item/quest/perk literals) even though its
+  // deliverable target is specifically the NV fixture. Guarded on the
+  // ACTIVE game context already being FNV: FALLOUT_REGISTRY is whichever
+  // per-game file the GAME_FILES boot manifest loaded at PAGE LOAD
+  // (index.html, Protocol 38 sanctioned map) — it is NOT swappable at
+  // runtime without a full onGameContextChange() reload, so populating this
+  // fixture while an FO3 session is active would silently write FO3 registry
+  // data under a mislabeled gameContext:'FNV' (a real state-corruption risk
+  // caught during this unit's own design review, Protocol 27). No-ops with a
+  // chat hint instead of corrupting state.
+  function _dshLoadNvTestCampaign() {
+    if (typeof state === 'undefined' || !state) return;
+    if (getGameContext() !== 'FNV') {
+      appendToChat(
+        '> [DIAGNOSTIC SHELL] Switch to the New Vegas cartridge first (SETTINGS ▸ CAMPAIGN CONFIGS), then load the NV test fixture.',
+        'sys'
+      );
+      return;
+    }
+    var reg = (typeof FALLOUT_REGISTRY !== 'undefined' && FALLOUT_REGISTRY) || {};
+
+    state.lvl = 18;
+    state.xp = 4200;
+    state.hpMax = 165;
+    state.hpCur = 120;
+    state.s = 6;
+    state.p = 7;
+    state.e = 5;
+    state.c = 4;
+    state.i = 8;
+    state.a = 6;
+    state.l = 5;
+    state.caps = 3450;
+    state.karma = 220;
+    state.rads = 140;
+    state.la = 'OK';
+    state.ra = 'CRIPPLED';
+    state.ll = 'OK';
+    state.rl = 'OK';
+    state.hd = 'OK';
+
+    var skillKeys = getSkillKeys();
+    state.skills = {};
+    skillKeys.forEach(function (sk, i) {
+      state.skills[sk] = 20 + ((i * 13) % 70);
+    });
+
+    // Protocol 42 fix (found via this unit's own live Playwright
+    // verification): saveState() below calls syncStateFromDom() FIRST,
+    // which reads lvl/xp/hpCur/hpMax/SPECIAL/caps/rads/karma/skills straight
+    // BACK OUT of their #stat_*/#s_*/#sk_* DOM inputs — loadUI()'s own
+    // dirty-check (_isDirty(), ui-core.js) does not reliably repaint those
+    // inputs for a direct backdoor state.* write like this fixture's, so a
+    // later saveState() silently reverted every one of these fields back to
+    // whatever was on screen before the fixture ran (inventory/quests/
+    // perks/factions/etc. are NOT read back by syncStateFromDom(), so those
+    // populated correctly and masked the bug in an earlier pass). Every
+    // DOM-synced field is now written directly here — the same
+    // state+DOM-together idiom every _nativeSetXxx() setter already uses —
+    // so saveState() reads back exactly what this fixture just set.
+    _dshSyncDom('stat_lvl', state.lvl);
+    _dshSyncDom('stat_xp', state.xp);
+    _dshSyncDom('stat_hp_max', state.hpMax);
+    _dshSyncDom('stat_hp_cur', state.hpCur);
+    _DSH_SPECIAL_KEYS.forEach(function (k) {
+      _dshSyncDom('s_' + k, state[k]);
+    });
+    _dshSyncDom('c_caps', state.caps);
+    _dshSyncDom('stat_rads', state.rads);
+    _dshSyncDom('stat_karma', state.karma);
+    skillKeys.forEach(function (sk) {
+      _dshSyncDom('sk_' + sk, state.skills[sk]);
+    });
+
+    var items = reg.items || [];
+    var weapon = items.find(function (it) {
+      return it.type === 'weapon';
+    });
+    var armor = items.find(function (it) {
+      return it.type === 'armor';
+    });
+    var aid = items
+      .filter(function (it) {
+        return it.type === 'aid';
+      })
+      .slice(0, 2);
+    var misc = items
+      .filter(function (it) {
+        return it.type === 'misc';
+      })
+      .slice(0, 2);
+    state.inventory = [];
+    if (weapon)
+      state.inventory.push({ name: weapon.name, qty: 1, wgt: 8, val: 250, type: 'weapon' });
+    if (armor) state.inventory.push({ name: armor.name, qty: 1, wgt: 12, val: 400, type: 'armor' });
+    aid.forEach(function (it) {
+      state.inventory.push({ name: it.name, qty: 3, wgt: 0.1, val: 20, type: 'aid' });
+    });
+    misc.forEach(function (it) {
+      state.inventory.push({ name: it.name, qty: 1, wgt: 1, val: 10, type: 'misc' });
+    });
+    state.equipped = {
+      weapon: weapon ? weapon.name : null,
+      armor: armor ? armor.name : null,
+      headgear: null,
+    };
+    state.ammo = {};
+    var calibers = typeof getAmmoCalibers === 'function' ? getAmmoCalibers() : [];
+    calibers.slice(0, 2).forEach(function (c) {
+      state.ammo[c] = 60;
+    });
+
+    var quests = (reg.quests || []).slice(0, 6);
+    state.quests = quests.map(function (q, i) {
+      var status = i % 3 === 0 ? 'complete' : i % 3 === 1 ? 'active' : 'failed';
+      return { name: q.name, status: status, objective: null };
+    });
+
+    var perks = (reg.perks || [])
+      .filter(function (p) {
+        return p.type === 'regular';
+      })
+      .slice(0, 4);
+    state.perks = perks.map(function (p) {
+      return { name: p.name, rank: 1, level_taken: p.level || null };
+    });
+
+    state.traits = (reg.traits || []).slice(0, 2).map(function (t) {
+      return t.name;
+    });
+    state.skillBooks = (reg.skillBooks || []).slice(0, 5).map(function (b) {
+      return b.name;
+    });
+    state.magazines = (reg.magazines || []).slice(0, 4).map(function (m) {
+      return m.name;
+    });
+    state.collectibles = (reg.collectibles || []).slice(0, 3).map(function (c) {
+      return c.name;
+    });
+
+    state.factions = {};
+    getFactionRegistry().forEach(function (f, i) {
+      state.factions[f.key] =
+        i % 3 === 0
+          ? { fame: 700, infamy: 50 }
+          : i % 3 === 1
+            ? { fame: 50, infamy: 600 }
+            : { fame: 200, infamy: 200 };
+    });
+
+    var zones = (reg.zones || []).slice(0, 5);
+    state.locationHistory = [];
+    zones.forEach(function (z) {
+      if (z && z.name) state.locationHistory.push(z.name);
+    });
+    state.loc = zones.length ? zones[zones.length - 1].name : state.loc;
+    _dshSyncDom('stat_loc', state.loc); // also DOM-synced (Protocol 42, see the note above)
+
+    state.status = [
+      { name: 'Buffout', ticks: 300, type: 'BUFF' },
+      { name: 'Jet', ticks: 1, type: 'DEBUFF' },
+      { name: 'Radiation Sickness', ticks: 80, type: 'DEBUFF' },
+    ];
+
+    var companions = (reg.companions || []).slice(0, 3);
+    state.squad = companions.map(function (c, i) {
+      return {
+        name: c.name,
+        hp: 100,
+        hpMax: 100,
+        weapon: 'Varmint Rifle',
+        ammo: 40,
+        condition: 'OK',
+        affinity: 30 + i * 25,
+      };
+    });
+
+    state.campaign_notes = [
+      'Diagnostic Shell NV test fixture loaded.',
+      'Arrived at ' + state.loc + '.',
+      'Faction standings varied for testing.',
+    ];
+
+    // loadUI() before saveState() — see the identical Protocol 42 note on
+    // _dshPresetFreshStart() above; saveState()'s own syncStateFromDom()
+    // would otherwise silently revert lvl/caps/SPECIAL/etc. back to
+    // whatever was on screen before the fixture ran.
+    updateMath();
+    loadUI();
+    saveState();
+  }
+
   function _toolById(id) {
     for (var i = 0; i < DIAGNOSTIC_SHELL_TOOLS.length; i++) {
       if (DIAGNOSTIC_SHELL_TOOLS[i].id === id) return DIAGNOSTIC_SHELL_TOOLS[i];
@@ -2510,6 +4611,7 @@
       _wireImmersionSelect(panel);
       _wireInspectCopy(panel);
       _wireSearch(panel);
+      _mountInlineResets();
       _wireShellToggle();
       _wireFabDrag();
       _restoreFabPosition();

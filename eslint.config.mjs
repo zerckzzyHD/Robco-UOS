@@ -176,6 +176,15 @@ export default [
         AmbientRuntime: 'readonly',
         initAmbientRuntime: 'readonly',
         initTestConsole: 'readonly', // staging/dev-only Test Console (js/test-console.js)
+        // Diagnostic Shell U4b (js/test-console.js) — STATE SETUP cheats read/write these
+        // existing native setters/mutators directly (ui-core.js/ui-render.js/ui-saves.js)
+        MAX_PLAYER_LEVEL: 'readonly',
+        _computeEligiblePerks: 'readonly',
+        _applyStatusEffect: 'readonly',
+        toggleLimb: 'readonly',
+        adjustAffinity: 'readonly',
+        _clearErrorLog: 'readonly',
+        resetSessionStats: 'readonly',
         getAmmoCalibers: 'readonly',
         getVendors: 'readonly',
         getTradeCatalog: 'readonly',

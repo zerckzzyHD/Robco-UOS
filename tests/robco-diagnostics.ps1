@@ -10577,6 +10577,13 @@ Check (
 # ===========================================================
 Sep "Suite 149 -- Developer Console: the ONE canonical dev/debug console"
 $testConsole149 = Read-Src "js/test-console.js"
+# U4b (Suite 215) deliberately, documentedly widened the Hard Boundary: the
+# STATE SETUP/RESETS/FIXTURES/INLINE apparatus explicitly reads/writes
+# campaign state and calls saveState() -- that is the entire point of a
+# cheat/reset/fixture tool (planning/DIAGNOSTIC_SHELL_PLAN.md Sec4). 149.9/
+# 149.13 below still hold the ORIGINAL boundary for everything BEFORE that
+# block; Suite 215 independently proves the U4b block's own correctness.
+$testConsole149PreU4b = $testConsole149.Substring(0, $testConsole149.IndexOf('U4b: STATE SETUP'))
 $sw149 = Read-Src "sw.js"
 $index149 = Read-Src "index.html"
 $uiCore149 = Read-Src "js/ui-core.js"
@@ -10652,8 +10659,8 @@ Check (
 #        no direct localStorage (device prefs route through the reused
 #        onImmersionChange/getImmersionTier setters, never a raw write here).
 Check (
-    -not ($testConsole149 -match 'saveState|robco_v8|_logEvent|\beventLog\b|localStorage\.')
-) '149.9: test-console.js never calls saveState / touches robco_v8 / localStorage / eventLog / _logEvent (device + in-memory only -- Phase-2 prime invariant #1)'
+    -not ($testConsole149PreU4b -match 'saveState|robco_v8|_logEvent|\beventLog\b|localStorage\.')
+) '149.9: the pre-U4b portion of test-console.js never calls saveState / touches robco_v8 / localStorage / eventLog / _logEvent (device + in-memory only -- Phase-2 prime invariant #1); the U4b STATE SETUP/RESETS/FIXTURES cheats are the documented exception, proved correct by Suite 215'
 
 # 149.10  the Immersion-tier control REUSES the real dial's own setter
 #         (onImmersionChange/getImmersionTier) rather than re-implementing
@@ -10683,8 +10690,8 @@ Check (
 
 # 149.13  game-agnostic (Protocol 38): pure dev-tooling, no game literals
 Check (
-    -not ($testConsole149 -match 'FNV|FO3|New Vegas|Fallout 3')
-) '149.13: the Developer Console is game-agnostic (no FNV/FO3/game-title literals -- pure dev tooling)'
+    -not ($testConsole149PreU4b -match 'FNV|FO3|New Vegas|Fallout 3')
+) '149.13: the pre-U4b Developer Console is game-agnostic (no FNV/FO3/game-title literals -- pure dev tooling); the U4b LOAD NV TEST CAMPAIGN fixture is a sanctioned, owner-named exception (Suite 215.12/.13)'
 
 # 149.14  the minigame-unlock seam is documented on _devConsoleUnlocked()
 #         itself, so a future refactor can't silently lose the one place a
@@ -23576,11 +23583,12 @@ try {
   function scenario(destructive, confirmResult, confirmDefined) {
     var sandbox = { console: console };
     vm.createContext(sandbox);
-    var src = 'var __fired = false; var __confirmArgs = null;\n';
+    var src = 'var __fired = false; var __confirmArgs = null;\n' +
+      'var __classes = {}; var document = { body: { classList: { add: function (c) { __classes[c] = true; }, remove: function (c) { delete __classes[c]; } } } };\n';
     if (confirmDefined) {
       src += 'function confirmAction(opts) { __confirmArgs = opts; return { then: function (cb) { cb(' + (confirmResult ? 'true' : 'false') + '); } }; }\n';
     }
-    src += 'function _invoke(tool) ' + invokeBody + '\n';
+    src += 'function _invoke(tool, arg) ' + invokeBody + '\n';
     src += '_invoke({ destructive: ' + (destructive ? 'true' : 'false') + ", label: 'X', tooltip: 'a tip', action: function () { __fired = true; } });\n";
     vm.runInContext(src, sandbox);
     return { fired: sandbox.__fired, confirmArgs: sandbox.__confirmArgs };
@@ -24073,14 +24081,15 @@ Sep "Suite 212 -- Diagnostic Shell U3: TRIGGERS catalog + Protocol 44"
 $testConsole212 = Read-Src "js/test-console.js"
 $claude212 = Read-Src "CLAUDE.md"
 
-# 212.1, 212.3, 212.4, 212.5, 212.9, 212.10, 212.11, 212.12, 212.16
+# 212.1, 212.2, 212.3, 212.4, 212.5, 212.9, 212.10, 212.11, 212.12, 212.16
 # BEHAVIORAL -- the real registry + _renderShell()/_toolVisible()/
 # _fireBootFlavor()/_replayAbsence() bodies, executed via a spawned node
 # process against the ACTUAL source (Protocol 42 stdin-corruption-safe
 # transport -- a temp file, never piped stdin -- mirrors the Suite 210/211
 # pattern).
 $labels212 = @(
-    "212.1: [behavioral] DIAGNOSTIC_SHELL_TOOLS registers all 45 new U3 tool ids (living core states/flare/burst, boot flavors, ceremonies M1-M5, day/night, fire-anim bus events, fire-pending animations) with no duplicate id, for a total of 61 (54 from U1+U3 plus the 7 U4a INSPECT tools added in Suite 214)",
+    "212.1: [behavioral] DIAGNOSTIC_SHELL_TOOLS registers all 45 new U3 tool ids (living core states/flare/burst, boot flavors, ceremonies M1-M5, day/night, fire-anim bus events, fire-pending animations) with no duplicate id, for a total of 141 (54 from U1+U3, +7 U4a INSPECT tools, +80 U4b STATE SETUP/RESETS/FIXTURES/INLINE tools)",
+    "212.2: [behavioral] every new U3 tool (scoped to category:'triggers', so U4b's 80 tools never leak into this count) carries no ``anchor``, and _renderShell()'s synthesis path builds a real .dsh-tool-btn button (wired through _invoke(tool)) inside a .dsh-tool-grid nested in its own collapsible group",
     "212.3: [behavioral] _renderShell(), run against a synthetic DOM with two anchor-less tools sharing a `group`, builds ONE collapsible group wrapper (via _buildGroupDetails()) holding ONE .dsh-tool-grid with both synthesized buttons, and clicking the first fires _invoke() with that exact tool",
     "212.4: [Protocol 42] exactly the 7 fire-anim-<event> tools whose bus event has a reactive campaign-event-log-writing subscriber are tier:'staging'+destructive:true; every other one of the 22 fire-anim-<event> tools is tier:'prod'+destructive:false",
     "212.5: [behavioral] re-proving the Suite 210.6 leak-proof invariant against the FULL current 54-tool registry: every tier:'staging' tool is invisible under a stubbed 'prod' tier and visible under 'staging'; every tier:'prod' tool is visible under both",
@@ -24153,10 +24162,32 @@ try {
     'fire-pending-quest-filed','fire-pending-perk-seat','fire-pending-effect-warmup',
   ];
   results.push(
-    tools1.length === 61 &&
+    tools1.length === 141 &&
       expected1.length === 45 &&
       expected1.every(function (id) { return ids1.indexOf(id) !== -1; }) &&
       new Set(ids1).size === ids1.length
+  );
+} catch (e) { results.push(false); }
+
+// 212.2 -- scoped to category:'triggers' (U4b's 80 tools, Suite 215, are all
+// category:'state'/'resets'/'fixtures'/'inline', never 'triggers') so the
+// count stays exactly the 45 U3-specific ids regardless of what U4b adds.
+try {
+  var toolsA2 = evalRealTools();
+  var u3ToolsA2 = toolsA2.filter(function (t) { return ['ocr-unit1-scan', 'ocr-unit2-scan'].indexOf(t.id) === -1; });
+  var migratedIdsA2 = ['inspect-runtime-state','runtime-force-transition','reboot','wake-active','a11y-immersion','inspect-observers','replay-hatch'];
+  var newToolsA2 = u3ToolsA2.filter(function (t) {
+    return t.category === 'triggers' && migratedIdsA2.indexOf(t.id) === -1 && t.id.indexOf('inspect-') !== 0;
+  });
+  var renderShellBodyA2 = extractBody(testConsoleSrc, '_renderShell');
+  results.push(
+    newToolsA2.length === 45 &&
+      newToolsA2.every(function (t) { return !t.anchor; }) &&
+      renderShellBodyA2.indexOf('_buildGroupDetails(') !== -1 &&
+      renderShellBodyA2.indexOf('dsh-tool-grid') !== -1 &&
+      renderShellBodyA2.indexOf('dsh-tool-btn') !== -1 &&
+      renderShellBodyA2.indexOf('_invoke(tool)') !== -1 &&
+      renderShellBodyA2.indexOf('var groupName = tool.group || tool.label;') !== -1
   );
 } catch (e) { results.push(false); }
 
@@ -24377,7 +24408,7 @@ console.log('RESULT:' + results.map(function (r) { return r ? '1' : '0'; }).join
         } finally {
             Remove-Item -Path $tmpScript212 -Force -ErrorAction SilentlyContinue
         }
-        $rm212 = [regex]::Match($out212, 'RESULT:([01]{9})')
+        $rm212 = [regex]::Match($out212, 'RESULT:([01]{10})')
         if ($rm212.Success) {
             $bits212 = $rm212.Groups[1].Value
             for ($bi212 = 0; $bi212 -lt $labels212.Count; $bi212++) {
@@ -24394,27 +24425,6 @@ console.log('RESULT:' + results.map(function (r) { return r ? '1' : '0'; }).join
     foreach ($lbl in $labels212) { Fail "$lbl  (harness error: $($_.Exception.Message))" }
 }
 
-# 212.2 every new U3 tool carries no `anchor` (the synthesis path applies)
-#       and _renderShell() implements that synthesis: creates a real
-#       <button>, wires it through _invoke(tool), and groups by the
-#       `group` field into a labeled sub-heading.
-$toolsStart212 = $testConsole212.IndexOf('var DIAGNOSTIC_SHELL_TOOLS = [')
-$toolsEnd212 = $testConsole212.IndexOf("`n  ];", $toolsStart212)
-$toolsBlock212 = $testConsole212.Substring($toolsStart212, $toolsEnd212 - $toolsStart212)
-$entries212 = [regex]::Matches($toolsBlock212, '\{[^{}]*\}')
-$anchorlessCount212 = 0
-foreach ($m in $entries212) {
-    if ($m.Value -notmatch 'anchor:') { $anchorlessCount212++ }
-}
-$renderShellBody212 = Get-FunctionBody $testConsole212 '_renderShell'
-Check (
-    ($anchorlessCount212 -eq 45) -and
-    ($renderShellBody212 -match '_buildGroupDetails\(') -and
-    ($renderShellBody212 -match 'dsh-tool-grid') -and
-    ($renderShellBody212 -match 'dsh-tool-btn') -and
-    ($renderShellBody212 -match '_invoke\(tool\)') -and
-    ($renderShellBody212 -match "var groupName = tool\.group \|\| tool\.label;")
-) "212.2: every new U3 tool carries no ``anchor``, and _renderShell()'s synthesis path builds a real .dsh-tool-btn button (wired through _invoke(tool)) inside a .dsh-tool-grid nested in its own collapsible group (via U4a's _buildGroupDetails(), keyed by the tool's ``group`` field) -- a future trigger with zero index.html markup"
 
 # 212.6 ceremony-firmware calls the flourish DIRECTLY, never
 #       _checkFirmwareFlash() (which reads AND WRITES the real
@@ -24451,6 +24461,7 @@ Check (
 #        .dsh-tool-subhead rule is retired (U4a, Suite 214) in favor of every
 #        group being its own collapsible details.sub-panel.
 $css212 = Read-Src "css/terminal.css"
+$renderShellBody212 = Get-FunctionBody $testConsole212 '_renderShell'
 Check (
     ($renderShellBody212 -match 'flex-wrap:\s*wrap') -and
     (-not ($css212 -match '(?s)\.dsh-tool-subhead\s*\{')) -and
@@ -24648,7 +24659,7 @@ $labels214 = @(
     "214.4: [behavioral] _buildGroupDetails('triggers','FIRE ANIMATION') produces NO open attribute (collapsed by default) while _buildGroupDetails('triggers','LIVING CORE') DOES (open by default); both route through _wireDynamicSubPanel()",
     "214.5: [behavioral] against the real registry, all 3 FIRE ANIMATION tier-split groups (~28 buttons total) collapse by default via _dshGroupDefaultOpen() -- the shell-opens-compact guarantee",
     "214.6: every one of the 9 migrated U1 anchor tools carries an explicit, non-empty `group` field -- never silently falling through to the tool.label fallback",
-    "214.8: the 7 new U4a INSPECT tools exist under category:'inspect', the relocated inspect-runtime-state/inspect-observers now share the DEVICE / SYSTEM group, and the full registry (61 tools) carries no duplicate id",
+    "214.8: the 7 new U4a INSPECT tools exist under category:'inspect', the relocated inspect-runtime-state/inspect-observers now share the DEVICE / SYSTEM group, and the full registry (141 tools, after U4b) carries no duplicate id",
     "214.9: INSPECT's 7 readable-summary tools are tier:'prod'; the 2 genuinely dev-only internals (sw-internal/flags-internal) are tier:'staging' -- and every one of the 9 inspect-* tools is destructive:false (read-only)",
     "214.13: [behavioral] _inspectVitalsHtml(), run against a synthetic state/GAME_DEFS, renders labeled readable lines with the correct active-quest count -- never a JSON-shaped blob",
     "214.14: [behavioral] _inspectConnectionHtml() renders readable CARRIER/AI CHAT/NETWORK words and _inspectFlagsHtml() renders a readable ENABLED/DISABLED line per flag -- both from synthetic globals, never raw booleans or JSON"
@@ -24790,7 +24801,7 @@ try {
   tools8.forEach(function (t) { idSet8[t.id] = (idSet8[t.id] || 0) + 1; });
   var dupFree8 = Object.keys(idSet8).every(function (k) { return idSet8[k] === 1; });
   results.push(
-    tools8.length === 61 &&
+    tools8.length === 141 &&
       newIds8.every(function (id) {
         var t = tools8.filter(function (x) { return x.id === id; })[0];
         return t && t.category === 'inspect';
@@ -25000,6 +25011,607 @@ Check (
     (-not ($combined214c -match 'saveState\(|robco_v8|_logEvent\(|\beventLog\b|localStorage\.')) -and
     (-not ($combined214c -match 'FNV|FO3|New Vegas|Fallout 3'))
 ) '214.16: the new U4a collapsible-group + INSPECT functions never touch the campaign save (no saveState/robco_v8/_logEvent/eventLog/localStorage) and carry no hardcoded game literal (Protocol 38 -- GAME_DEFS[getGameContext()].label is read generically)'
+
+# ===========================================================
+# Suite 215 -- Diagnostic Shell U4b: STATE SETUP + RESETS + FIXTURES +
+# submenu visual hierarchy (planning/DIAGNOSTIC_SHELL_PLAN.md Sec4/Sec5/
+# Sec11 U4, Protocol 8 Sonnet stage). Mirrors JS Suite 215. 80 new
+# tier:'staging'+destructive:true registry entries (63 STATE SETUP cheats,
+# 13 RESETS, 1 FIXTURE, 3 INLINE dev-reset buttons), bringing the registry
+# to 141 tools. Every cheat routes through an existing native setter
+# (Protocol 22/24). _renderShell() gained a parameterized-tool synthesis
+# path (control:'input'|'select'|'select-input') and _invoke(tool, arg)
+# gained an optional arg passthrough. _mountInlineResets() renders the 3
+# on-panel DEV-MARKER reset buttons at STATIC anchors, staging-only by
+# construction. The NV test-campaign fixture is guarded on the ACTIVE game
+# genuinely being FNV before it writes a single field. A CSS fix gives a
+# nested group sub-panel a left indent + dimmer heading. 16 tests (14
+# initial + 2 Protocol 42 regressions found by this unit's own live
+# Playwright verification).
+# ===========================================================
+Sep "Suite 215 -- Diagnostic Shell U4b: STATE SETUP + RESETS + FIXTURES + submenu hierarchy"
+$testConsole215 = Read-Src "js/test-console.js"
+$index215 = Read-Src "index.html"
+$terminalCss215 = Read-Src "css/terminal.css"
+
+# 215.1-215.13, 215.15 -- BEHAVIORAL, via a spawned node process against the
+# ACTUAL source (Protocol 42 stdin-corruption-safe transport -- a temp file).
+$labels215 = @(
+    "215.1: all 80 new U4b tool ids (63 STATE SETUP + 13 RESETS + 1 FIXTURE + 3 INLINE) are registered exactly once, bringing the full DIAGNOSTIC_SHELL_TOOLS registry to 141 with no duplicate id",
+    "215.2: [behavioral] leak-proof re-proof -- every one of the 80 U4b tools is tier:'staging' + destructive:true and is invisible under a stubbed 'prod' tier / visible under 'staging'",
+    "215.3: _renderShell()'s synthesis path recognizes control:'input'/'select'/'select-input', builds a .dsh-tool-row with a select and/or input plus a GO button, and routes the click through _invoke(tool, <captured value(s)>)",
+    "215.4: [behavioral] _renderShell(), run against a synthetic DOM, builds a real select/input/GO row for both control:'input' and control:'select-input' tools, and clicking GO invokes _invoke() with the exact live typed/selected value(s)",
+    "215.5: [behavioral] _invoke(tool, arg) forwards a payload unchanged into tool.action(arg) on both the immediate non-destructive path and the confirmed destructive path, and never fires on cancel",
+    "215.6: a representative sample of STATE SETUP cheats route through the expected existing native setter/mutator, never a parallel unclamped write path",
+    "215.7: all 16 STATE SETUP groups exist with at least one tool (63 total), and MEGA PRESETS carries all 7 owner-named presets",
+    "215.8: RESETS registers exactly 13 tools split across VIEW-ONCE / DEV FLAGS (7) and CAMPAIGN DATA (6), every one tier:'staging' + destructive:true",
+    "215.9: _mountInlineResets() re-checks _shellTier()==='staging' before mounting anything, filters to category:'inline' tools, is idempotent via a data-dsh-inline guard, and routes every click through _invoke(tool)",
+    "215.10: all 3 inline dev-reset tools carry a real anchor (WORLD MAP / DIRECTIVE REGISTRY / CARGO MANIFEST panels' own STATIC .bay-part-no line) and all 3 target panel ids genuinely exist in index.html",
+    "215.11: [behavioral] _mountInlineResets(), run against a synthetic document exposing the 3 real anchor selectors, mounts exactly 3 DEV-MARKER buttons on the first pass and mounts NOTHING new on a second pass",
+    "215.12: the LOAD NV TEST CAMPAIGN tool is tier:'staging', destructive:true, category:'fixtures', and its guard (getGameContext() !== 'FNV') sits BEFORE its first state.* assignment in source order",
+    "215.13: [behavioral] _dshLoadNvTestCampaign() writes NOTHING to a synthetic state when the active game context is 'FO3' (posts one chat hint instead), and populates every required field when 'FNV'",
+    "215.15: [regression, Protocol 42] BEHAVIORAL -- _dshLoadNvTestCampaign()/_dshPresetFreshStart(), run against a REALISTIC saveState() that reads lvl/caps/hpMax/SPECIAL back out of the DOM (the real syncStateFromDom() mechanism), still show the fixture/preset's own intended values afterward"
+)
+try {
+    $nodeCheck215 = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCheck215) {
+        $repoRootNode215 = $Root.Replace('\', '/')
+        $testScript215 = @"
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+const ROOT = '$repoRootNode215';
+function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+function extractBody(src, name) {
+  var idx = src.indexOf('function ' + name);
+  if (idx === -1) throw new Error('missing ' + name);
+  var i = src.indexOf('{', idx);
+  var depth = 0, start = i;
+  while (i < src.length) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) return src.slice(start, i + 1); }
+    i++;
+  }
+  throw new Error('unclosed ' + name);
+}
+
+const testConsoleSrc = rd('js/test-console.js');
+var results = [];
+
+function evalRealTools() {
+  var toolsStart = testConsoleSrc.indexOf('var DIAGNOSTIC_SHELL_TOOLS = [');
+  var toolsEnd = testConsoleSrc.indexOf('\n  ];', toolsStart) + '\n  ];'.length;
+  var toolsSrc = testConsoleSrc.slice(toolsStart, toolsEnd);
+  var replayHatchBody = extractBody(testConsoleSrc, '_replayHatch');
+  var src = '(function () {\n function _replayHatch() ' + replayHatchBody + '\n' + toolsSrc + '\n return DIAGNOSTIC_SHELL_TOOLS; })()';
+  return eval(src);
+}
+
+// 215.1
+try {
+  var tools1 = evalRealTools();
+  var ids1 = tools1.map(function (t) { return t.id; });
+  var newIds1 = [
+    'state-full-heal','state-set-hp-pct','state-kill','state-add-rads','state-clear-rads','state-max-rads',
+    'state-set-level','state-plus-one-level','state-max-level','state-add-xp',
+    'state-special-max-all','state-special-zero','state-special-set-one',
+    'state-skills-max-all','state-skills-set-one','state-skills-boost-combat',
+    'state-karma-good','state-karma-neutral','state-karma-evil',
+    'state-caps-add1k','state-caps-max','state-caps-zero',
+    'state-give-item','state-full-loadout','state-empty-inventory','state-over-encumber','state-add-ammo',
+    'state-faction-set-max','state-faction-set-min','state-factions-idolized','state-factions-vilified',
+    'state-collectibles-unlock-all','state-collectibles-clear-all',
+    'state-grant-perk','state-grant-all-eligible-perks','state-clear-perks','state-mark-all-books-read','state-mark-all-mags-read',
+    'state-add-quest','state-complete-all-quests','state-fail-all-quests','state-clear-quests',
+    'state-reveal-all-fog','state-clear-fog','state-set-current-location',
+    'state-apply-buff','state-apply-debuff','state-add-addiction','state-cripple-limb','state-heal-all-limbs','state-clear-all-effects',
+    'state-add-companion','state-max-affinity','state-clear-squad',
+    'state-set-time-of-day','state-advance-time',
+    'state-preset-max-everything','state-preset-fresh-start','state-preset-low-hp','state-preset-crippled','state-preset-over-encumbered','state-preset-addicted','state-preset-high-level',
+    'reset-first-run','reset-firmware-seen','reset-hatch-flag','reset-greet-flag','reset-error-log','reset-device-prefs','reset-bezel-view',
+    'reset-map-fog','reset-quests','reset-inventory','reset-special-skills','reset-stats-counters','reset-campaign-notes',
+    'fixture-nv-test-campaign',
+    'inline-reset-map-fog','inline-reset-quests','inline-reset-cargo',
+  ];
+  var idCounts1 = {};
+  ids1.forEach(function (id) { idCounts1[id] = (idCounts1[id] || 0) + 1; });
+  var noDupes1 = Object.keys(idCounts1).every(function (k) { return idCounts1[k] === 1; });
+  results.push(
+    newIds1.length === 80 &&
+      tools1.length === 141 &&
+      newIds1.every(function (id) { return ids1.indexOf(id) !== -1; }) &&
+      noDupes1
+  );
+} catch (e) { results.push(false); }
+
+// 215.2
+try {
+  var toolVisBody2 = extractBody(testConsoleSrc, '_toolVisible');
+  var fn2 = new Function('tool', 'tier', toolVisBody2.slice(1, -1));
+  var tools2 = evalRealTools();
+  var u4bTools2 = tools2.filter(function (t) {
+    return ['state', 'resets', 'fixtures'].indexOf(t.category) !== -1 ||
+      (t.category === 'inline' && t.id.indexOf('inline-') === 0);
+  });
+  results.push(
+    u4bTools2.length === 80 &&
+      u4bTools2.every(function (t) {
+        return t.tier === 'staging' && t.destructive === true &&
+          fn2(t, 'prod') === false && fn2(t, 'staging') === true;
+      })
+  );
+} catch (e) { results.push(false); }
+
+// 215.3
+try {
+  var renderShellBody3 = extractBody(testConsoleSrc, '_renderShell');
+  results.push(
+    renderShellBody3.indexOf("tool.control === 'input'") !== -1 &&
+      renderShellBody3.indexOf("tool.control === 'select'") !== -1 &&
+      renderShellBody3.indexOf("tool.control === 'select-input'") !== -1 &&
+      renderShellBody3.indexOf('dsh-tool-row') !== -1 &&
+      renderShellBody3.indexOf('_invoke(tool, selectEl.value)') !== -1 &&
+      renderShellBody3.indexOf('_invoke(tool, { sel: selectEl.value, val: inputEl.value })') !== -1 &&
+      renderShellBody3.indexOf('_invoke(tool, inputEl.value)') !== -1
+  );
+} catch (e) { results.push(false); }
+
+// 215.4
+try {
+  function makeEl4(tag) {
+    var listeners = {};
+    return {
+      tagName: tag, children: [], className: '', textContent: '', title: '', type: '', value: '', placeholder: '', style: {}, attrs: {},
+      setAttribute: function (k, v) { this.attrs[k] = v; },
+      getAttribute: function (k) { return this.attrs[k]; },
+      appendChild: function (child) { this.children.push(child); return child; },
+      insertBefore: function (child, ref) {
+        var idx = this.children.indexOf(ref);
+        this.children.splice(idx === -1 ? 0 : idx, 0, child);
+        return child;
+      },
+      querySelector: function (sel) { return (this.__map && this.__map[sel]) || null; },
+      addEventListener: function (type, fn) { (listeners[type] = listeners[type] || []).push(fn); },
+      _fire: function (type) { (listeners[type] || []).forEach(function (fn) { fn(); }); },
+    };
+  }
+  var sectionsHost4 = makeEl4('div');
+  var envBanner4 = makeEl4('span');
+  var panel4 = makeEl4('div');
+  panel4.__map = { '#dshSections': sectionsHost4, '#dshEnvBanner': envBanner4 };
+  var bodySrc4 = extractBody(testConsoleSrc, '_renderShell');
+  var invokedTool4 = null, invokedArg4 = null;
+  var src4 =
+    "var DEV_MARKER = '⚙';\n" +
+    "var CATEGORY_ORDER = ['state'];\n" +
+    "var CATEGORY_META = { state: { stagingTitle: 'STATE SETUP', prodTitle: 'STATE SETUP', icon: '◆' } };\n" +
+    'function _invoke(tool, arg) { __invoked(tool, arg); }\n' +
+    "function _toolVisible(tool, tier) { if (tool.tier === 'prod') return true; return tier === 'staging'; }\n" +
+    "function _shellTier() { return 'staging'; }\n" +
+    'function _paintEnvBanner() {}\n' +
+    'function _wireDynamicSubPanel() {}\n' +
+    'function _dshGroupDefaultOpen() { return true; }\n' +
+    'function _buildGroupDetails(cat, headingText) {\n' +
+    "  var gd = document.createElement('details');\n" +
+    "  gd.className = 'sub-panel';\n" +
+    "  gd.setAttribute('data-sub-id', 'dsh_group_' + cat + '_' + String(headingText).toLowerCase());\n" +
+    '  return gd;\n' +
+    '}\n' +
+    "var DIAGNOSTIC_SHELL_TOOLS = [\n" +
+    "  { id: 'synth-input', label: 'SYNTH INPUT', subLabel: 's', icon: '◆', category: 'state', group: 'G', tier: 'staging', destructive: true, control: 'input', inputType: 'text', tooltip: 't', triggers: [], action: function () {} },\n" +
+    "  { id: 'synth-selinput', label: 'SYNTH SEL', subLabel: 's', icon: '◆', category: 'state', group: 'G', tier: 'staging', destructive: true, control: 'select-input', selectOptions: [{ value: 'x', label: 'X' }], inputType: 'number', tooltip: 't', triggers: [], action: function () {} },\n" +
+    "];\n" +
+    'function _renderShell(panel) ' + bodySrc4;
+  var document4 = {
+    createElement: function (tag) { return makeEl4(tag); },
+    createTextNode: function (text) { return { nodeType: 3, textContent: text }; },
+  };
+  var sandbox4 = { console: console, document: document4, __invoked: function (tool, arg) { invokedTool4 = tool.id; invokedArg4 = arg; } };
+  vm.createContext(sandbox4);
+  vm.runInContext(src4 + '\nthis._renderShellRef = _renderShell;', sandbox4);
+  sandbox4._renderShellRef(panel4);
+  var details4 = sectionsHost4.children[0];
+  var groupWrapper4 = details4.children.filter(function (c) { return c.className === 'sub-panel'; })[0];
+  var gridNode4 = groupWrapper4.children.filter(function (c) { return c.className === 'dsh-tool-grid'; })[0];
+  var rows4 = gridNode4.children.filter(function (c) { return c.className === 'dsh-tool-row'; });
+  var inputRow4 = rows4[0], selRow4 = rows4[1];
+  var inputEl4 = inputRow4.children.filter(function (c) { return c.tagName === 'input'; })[0];
+  var goBtn4a = inputRow4.children.filter(function (c) { return c.tagName === 'button'; })[0];
+  inputEl4.value = 'Stimpak';
+  goBtn4a._fire('click');
+  var selEl4 = selRow4.children.filter(function (c) { return c.tagName === 'select'; })[0];
+  var numEl4 = selRow4.children.filter(function (c) { return c.tagName === 'input'; })[0];
+  var goBtn4b = selRow4.children.filter(function (c) { return c.tagName === 'button'; })[0];
+  selEl4.value = 'x';
+  numEl4.value = '7';
+  goBtn4b._fire('click');
+  var ok4 = rows4.length === 2 && invokedTool4 === 'synth-selinput' && invokedArg4.sel === 'x' && invokedArg4.val === '7';
+  invokedTool4 = null; invokedArg4 = null;
+  goBtn4a._fire('click');
+  ok4 = ok4 && invokedTool4 === 'synth-input' && invokedArg4 === 'Stimpak';
+  results.push(ok4);
+} catch (e) { results.push(false); }
+
+// 215.5
+try {
+  var invokeBody5 = extractBody(testConsoleSrc, '_invoke');
+  function scenario5(destructive, confirmResult) {
+    var sandbox = { console: console };
+    vm.createContext(sandbox);
+    var src = 'var __arg = "unset"; var __fired = false;\n' +
+      'var __classes = {}; var document = { body: { classList: { add: function (c) { __classes[c] = true; }, remove: function (c) { delete __classes[c]; } } } };\n' +
+      'function confirmAction(opts) { return { then: function (cb) { cb(' + (confirmResult ? 'true' : 'false') + '); } }; }\n' +
+      'function _invoke(tool, arg) ' + invokeBody5 + '\n' +
+      '_invoke({ destructive: ' + (destructive ? 'true' : 'false') + ', label: "X", action: function (a) { __fired = true; __arg = a; } }, "PAYLOAD");\n';
+    vm.runInContext(src, sandbox);
+    return { fired: sandbox.__fired, arg: sandbox.__arg };
+  }
+  var nd5 = scenario5(false, true);
+  var dc5 = scenario5(true, true);
+  var dx5 = scenario5(true, false);
+  results.push(
+    nd5.fired === true && nd5.arg === 'PAYLOAD' &&
+      dc5.fired === true && dc5.arg === 'PAYLOAD' &&
+      dx5.fired === false
+  );
+} catch (e) { results.push(false); }
+
+// 215.6
+try {
+  var tools6 = evalRealTools();
+  var expectedRef6 = {
+    'state-full-heal': '_dshFullHeal', 'state-set-hp-pct': '_dshSetHpPct', 'state-max-rads': '_dshMaxRads',
+    'state-set-level': '_dshSetLevel', 'state-special-max-all': '_dshMaxAllSpecial', 'state-skills-max-all': '_dshMaxAllSkills',
+    'state-karma-good': '_dshSetKarmaGood', 'state-caps-add1k': '_dshAddCaps1k', 'state-give-item': '_dshGiveItem',
+    'state-cripple-limb': '_dshCrippleLimb', 'state-max-affinity': '_dshMaxAffinity',
+    'state-reveal-all-fog': '_dshRevealAllFog', 'state-set-current-location': '_dshSetCurrentLocationCheat',
+  };
+  var nativeRefs6 = {
+    _dshFullHeal: '_nativeSetHp', _dshSetHpPct: '_nativeSetHp', _dshMaxRads: '_nativeSetRads', _dshSetLevel: '_nativeSetLevel',
+    _dshMaxAllSpecial: '_nativeSetSpecial', _dshMaxAllSkills: '_nativeSetSkill', _dshSetKarmaGood: '_nativeSetKarma',
+    _dshAddCaps1k: '_nativeSetCaps', _dshCrippleLimb: 'toggleLimb', _dshMaxAffinity: 'adjustAffinity',
+    _dshRevealAllFog: 'recordLocationVisit', _dshSetCurrentLocationCheat: 'onLocationChange',
+  };
+  var ok6 = Object.keys(expectedRef6).every(function (id) {
+    var t = tools6.filter(function (x) { return x.id === id; })[0];
+    var helperName = expectedRef6[id];
+    if (!t || t.action.toString().indexOf(helperName) === -1) return false;
+    if (helperName === '_dshGiveItem') return true;
+    var nativeRef = nativeRefs6[helperName];
+    if (!nativeRef) return true;
+    var helperBody = extractBody(testConsoleSrc, helperName);
+    return helperBody.indexOf(nativeRef) !== -1;
+  });
+  var giveItemBody6 = extractBody(testConsoleSrc, '_dshGiveItem');
+  ok6 = ok6 && giveItemBody6.indexOf('lookupItemInDb') !== -1 && giveItemBody6.indexOf("RobcoEvents.emit('item.added'") !== -1;
+  results.push(ok6);
+} catch (e) { results.push(false); }
+
+// 215.7
+try {
+  var tools7 = evalRealTools();
+  var stateTools7 = tools7.filter(function (t) { return t.category === 'state'; });
+  var expectedGroups7 = ['VITALS','PROGRESSION','SPECIAL','SKILLS','KARMA','ECONOMY','INVENTORY','FACTIONS','COLLECTIBLES','PERKS / TRAITS / BOOKS','QUESTS','MAP','CONDITIONS','COMPANIONS','TIME','MEGA PRESETS'];
+  var megaIds7 = ['state-preset-max-everything','state-preset-fresh-start','state-preset-low-hp','state-preset-crippled','state-preset-over-encumbered','state-preset-addicted','state-preset-high-level'];
+  results.push(
+    stateTools7.length === 63 &&
+      expectedGroups7.every(function (g) { return stateTools7.some(function (t) { return t.group === g; }); }) &&
+      megaIds7.every(function (id) { return stateTools7.some(function (t) { return t.id === id && t.group === 'MEGA PRESETS'; }); })
+  );
+} catch (e) { results.push(false); }
+
+// 215.8
+try {
+  var tools8b = evalRealTools();
+  var resetTools8 = tools8b.filter(function (t) { return t.category === 'resets'; });
+  var flagGroup8 = resetTools8.filter(function (t) { return t.group === 'VIEW-ONCE / DEV FLAGS'; });
+  var dataGroup8 = resetTools8.filter(function (t) { return t.group === 'CAMPAIGN DATA'; });
+  results.push(
+    resetTools8.length === 13 && flagGroup8.length === 7 && dataGroup8.length === 6 &&
+      resetTools8.every(function (t) { return t.tier === 'staging' && t.destructive === true; })
+  );
+} catch (e) { results.push(false); }
+
+// 215.9
+try {
+  var mountInlineBody9 = extractBody(testConsoleSrc, '_mountInlineResets');
+  results.push(
+    mountInlineBody9.indexOf("if (_shellTier() !== 'staging') return;") !== -1 &&
+      mountInlineBody9.indexOf("category !== 'inline'") !== -1 &&
+      mountInlineBody9.indexOf('data-dsh-inline') !== -1 &&
+      mountInlineBody9.indexOf('_invoke(tool)') !== -1
+  );
+} catch (e) { results.push(false); }
+
+// 215.10
+try {
+  var tools10 = evalRealTools();
+  var inlineTools10 = tools10.filter(function (t) { return t.category === 'inline'; });
+  var expectedAnchors10 = {
+    'inline-reset-map-fog': '#worldMapPanel .bay-part-no',
+    'inline-reset-quests': '#questLogPanel .bay-part-no',
+    'inline-reset-cargo': '#opsManifestPanel .bay-part-no',
+  };
+  var indexSrc10 = rd('index.html');
+  results.push(
+    inlineTools10.length === 3 &&
+      Object.keys(expectedAnchors10).every(function (id) {
+        var t = inlineTools10.filter(function (x) { return x.id === id; })[0];
+        return t && t.anchor === expectedAnchors10[id] && t.placement === 'after';
+      }) &&
+      indexSrc10.indexOf('id="worldMapPanel"') !== -1 &&
+      indexSrc10.indexOf('id="questLogPanel"') !== -1 &&
+      indexSrc10.indexOf('id="opsManifestPanel"') !== -1 &&
+      indexSrc10.indexOf('class="bay-part-no"') !== -1
+  );
+} catch (e) { results.push(false); }
+
+// 215.11
+try {
+  var mountBody11 = extractBody(testConsoleSrc, '_mountInlineResets');
+  var toolsStart11 = testConsoleSrc.indexOf('var DIAGNOSTIC_SHELL_TOOLS = [');
+  var toolsEnd11 = testConsoleSrc.indexOf('\n  ];', toolsStart11) + '\n  ];'.length;
+  var toolsSrc11 = testConsoleSrc.slice(toolsStart11, toolsEnd11);
+  var replayHatchBody11 = extractBody(testConsoleSrc, '_replayHatch');
+  function makeAnchorParent11() { return { children: [], insertBefore: function (child) { this.children.push(child); } }; }
+  function makeAnchor11() { return { parentNode: makeAnchorParent11(), nextSibling: null }; }
+  var anchors11 = {
+    '#worldMapPanel .bay-part-no': makeAnchor11(),
+    '#questLogPanel .bay-part-no': makeAnchor11(),
+    '#opsManifestPanel .bay-part-no': makeAnchor11(),
+  };
+  function makeEl11(tag) {
+    var listeners = {};
+    return {
+      __tag: tag, attrs: {}, textParts: [],
+      setAttribute: function (k, v) { this.attrs[k] = v; },
+      appendChild: function (child) { this.textParts.push(child); },
+      addEventListener: function (type, fn) { (listeners[type] = listeners[type] || []).push(fn); },
+      _fire: function (type) { (listeners[type] || []).forEach(function (fn) { fn(); }); },
+    };
+  }
+  var invoked11 = [];
+  var mountedIds11 = [];
+  var documentMock11 = {
+    querySelector: function (sel) {
+      if (sel.indexOf('[data-dsh-inline=') === 0) {
+        var id11 = sel.slice(sel.indexOf('"') + 1, sel.lastIndexOf('"'));
+        return mountedIds11.indexOf(id11) !== -1 ? {} : null;
+      }
+      return anchors11[sel] || null;
+    },
+    createElement: function (tag) { return makeEl11(tag); },
+    createTextNode: function (text) { return { nodeType: 3, textContent: text }; },
+  };
+  var sandbox11 = { console: console, document: documentMock11, __invoked: function (id) { invoked11.push(id); } };
+  var src11 =
+    "var DEV_MARKER = '⚙';\n" +
+    "function _shellTier() { return 'staging'; }\n" +
+    "function _toolVisible(tool, tier) { if (tool.tier === 'prod') return true; return tier === 'staging'; }\n" +
+    'function _invoke(tool) { __invoked(tool.id); }\n' +
+    'function _replayHatch() ' + replayHatchBody11 + '\n' +
+    toolsSrc11 + '\n' +
+    'function _mountInlineResets() ' + mountBody11;
+  vm.createContext(sandbox11);
+  vm.runInContext(src11 + '\nthis._mountInlineResetsRef = _mountInlineResets;', sandbox11);
+  sandbox11._mountInlineResetsRef();
+  function insertedButtons11() {
+    return Object.keys(anchors11).reduce(function (sum, k) { return sum + anchors11[k].parentNode.children.length; }, 0);
+  }
+  var firstPassCount11 = insertedButtons11();
+  var firstPassButtons11 = [];
+  Object.keys(anchors11).forEach(function (k) { anchors11[k].parentNode.children.forEach(function (b) { firstPassButtons11.push(b); }); });
+  var allDevMarker11 = firstPassButtons11.every(function (b) { return b.textParts[0] && b.textParts[0].textContent === '⚙ '; });
+  firstPassButtons11.forEach(function (b) { mountedIds11.push(b.attrs['data-dsh-inline']); });
+  sandbox11._mountInlineResetsRef();
+  var secondPassCount11 = insertedButtons11();
+  var oneBtn11 = firstPassButtons11[0];
+  oneBtn11._fire('click');
+  results.push(
+    firstPassCount11 === 3 && secondPassCount11 === 3 && allDevMarker11 &&
+      invoked11.length === 1 && invoked11[0] === oneBtn11.attrs['data-dsh-inline']
+  );
+} catch (e) { results.push(false); }
+
+// 215.12
+try {
+  var tools12 = evalRealTools();
+  var fixtureTool12 = tools12.filter(function (t) { return t.id === 'fixture-nv-test-campaign'; })[0];
+  var fnBody12 = extractBody(testConsoleSrc, '_dshLoadNvTestCampaign');
+  var guardIdx12 = fnBody12.indexOf("getGameContext() !== 'FNV'");
+  var firstWriteIdx12 = fnBody12.indexOf('state.lvl = 18');
+  results.push(
+    !!fixtureTool12 && fixtureTool12.tier === 'staging' && fixtureTool12.destructive === true &&
+      fixtureTool12.category === 'fixtures' && guardIdx12 !== -1 && firstWriteIdx12 !== -1 && guardIdx12 < firstWriteIdx12
+  );
+} catch (e) { results.push(false); }
+
+// 215.13
+try {
+  var fnBody13 = extractBody(testConsoleSrc, '_dshLoadNvTestCampaign');
+  function freshState13() {
+    return {
+      lvl: 1, xp: 0, hpMax: 100, hpCur: 100, s: 5, p: 5, e: 5, c: 5, i: 5, a: 5, l: 5,
+      caps: 0, karma: 0, rads: 0, la: 'OK', ra: 'OK', ll: 'OK', rl: 'OK', hd: 'OK',
+      skills: {}, inventory: [], quests: [], perks: [], traits: [], skillBooks: [], magazines: [],
+      collectibles: [], factions: {}, locationHistory: [], loc: 'Goodsprings', status: [], squad: [],
+      equipped: { weapon: null, armor: null, headgear: null }, ammo: {}, campaign_notes: [],
+    };
+  }
+  function run13(ctx) {
+    var state = freshState13();
+    var chatLines = [];
+    var reg = {
+      items: [
+        { name: 'Test Weapon', type: 'weapon' }, { name: 'Test Armor', type: 'armor' },
+        { name: 'Test Aid A', type: 'aid' }, { name: 'Test Aid B', type: 'aid' },
+        { name: 'Test Misc A', type: 'misc' }, { name: 'Test Misc B', type: 'misc' },
+      ],
+      quests: [{ name: 'Q1' }, { name: 'Q2' }, { name: 'Q3' }, { name: 'Q4' }, { name: 'Q5' }, { name: 'Q6' }],
+      perks: [{ name: 'Perk1', type: 'regular', level: 2 }, { name: 'Perk2', type: 'regular', level: 4 }],
+      traits: [{ name: 'Trait1' }, { name: 'Trait2' }],
+      skillBooks: [{ name: 'Book1' }],
+      magazines: [{ name: 'Mag1' }],
+      collectibles: [{ name: 'Globe1' }],
+      zones: [{ name: 'ZoneA', locations: [] }, { name: 'ZoneB', locations: [] }],
+      companions: [{ name: 'Comp1' }, { name: 'Comp2' }],
+    };
+    var sandbox = { console: console, __state: state, __reg: reg, __chat: function (msg) { chatLines.push(msg); } };
+    var src =
+      'var state = __state;\n' +
+      'var FALLOUT_REGISTRY = __reg;\n' +
+      "function getGameContext() { return '" + ctx + "'; }\n" +
+      "function getSkillKeys() { return ['guns', 'sneak', 'speech']; }\n" +
+      "function getFactionRegistry() { return [{ key: 'ncr', name: 'NCR' }, { key: 'legion', name: 'Legion' }]; }\n" +
+      "function getAmmoCalibers() { return ['9mm', '.44 Magnum']; }\n" +
+      'function appendToChat(msg) { __chat(msg); }\n' +
+      'function updateMath() {}\n' +
+      'function saveState() {}\n' +
+      'function loadUI() {}\n' +
+      "var _DSH_SPECIAL_KEYS = ['s', 'p', 'e', 'c', 'i', 'a', 'l'];\n" +
+      'var __domInputs = {};\n' +
+      'var document = { getElementById: function (id) { if (!__domInputs[id]) __domInputs[id] = { value: "" }; return __domInputs[id]; } };\n' +
+      'function _dshSyncDom(id, val) { var el = document.getElementById(id); if (el) el.value = String(val); }\n' +
+      'function _dshLoadNvTestCampaign() ' + fnBody13 + '\n' +
+      '_dshLoadNvTestCampaign();\n';
+    vm.createContext(sandbox);
+    vm.runInContext(src, sandbox);
+    return { state: state, chatLines: chatLines };
+  }
+  var fo3Run13 = run13('FO3');
+  var fnvRun13 = run13('FNV');
+  var untouched13 = fo3Run13.state.lvl === 1 && fo3Run13.state.inventory.length === 0 && fo3Run13.state.quests.length === 0 && fo3Run13.chatLines.length === 1;
+  var s13 = fnvRun13.state;
+  var populated13 =
+    s13.inventory.length > 0 && s13.quests.length > 0 && s13.perks.length > 0 && s13.traits.length > 0 &&
+    s13.skillBooks.length > 0 && s13.magazines.length > 0 && s13.collectibles.length > 0 &&
+    Object.keys(s13.skills).length > 0 && s13.s !== 5 && Object.keys(s13.factions).length > 0 &&
+    s13.locationHistory.length > 0 && s13.status.length > 0 && s13.caps !== 0 && s13.lvl !== 1 &&
+    s13.squad.length > 0 && s13.campaign_notes.length > 0;
+  results.push(untouched13 && populated13);
+} catch (e) { results.push(false); }
+
+// 215.15 -- [regression, Protocol 42] found via this unit's own LIVE
+// Playwright verification, not by 215.13 (which stubs saveState() as a
+// no-op and so never exercised the real bug): run the fixture/FRESH START
+// preset against a REALISTIC saveState() that actually reads lvl/caps/
+// hpMax/SPECIAL back out of the DOM (the real syncStateFromDom()
+// mechanism), proving _dshSyncDom()'s direct DOM writes survive a real
+// save cycle instead of being silently reverted.
+try {
+  var fixtureBody15 = extractBody(testConsoleSrc, '_dshLoadNvTestCampaign');
+  var presetBody15 = extractBody(testConsoleSrc, '_dshPresetFreshStart');
+  var syncDomBody15 = extractBody(testConsoleSrc, '_dshSyncDom');
+  function runWithRealisticSave15(fnName, fnBody, ctxOverride) {
+    var state = {
+      lvl: 1, xp: 0, hpMax: 100, hpCur: 100, s: 5, p: 5, e: 5, c: 5, i: 5, a: 5, l: 5,
+      caps: 0, karma: 0, rads: 0, la: 'OK', ra: 'OK', ll: 'OK', rl: 'OK', hd: 'OK',
+      skills: {}, inventory: [], quests: [], perks: [], traits: [], skillBooks: [], magazines: [],
+      collectibles: [], factions: {}, locationHistory: [], loc: 'Goodsprings', status: [], squad: [],
+      equipped: { weapon: null, armor: null, headgear: null }, ammo: {}, campaign_notes: [],
+    };
+    var reg = {
+      items: [
+        { name: 'Test Weapon', type: 'weapon' }, { name: 'Test Armor', type: 'armor' },
+        { name: 'Test Aid', type: 'aid' }, { name: 'Test Misc', type: 'misc' },
+      ],
+      quests: [{ name: 'Q1' }],
+      perks: [{ name: 'Perk1', type: 'regular', level: 2 }],
+      traits: [{ name: 'Trait1' }],
+      skillBooks: [{ name: 'Book1' }],
+      magazines: [{ name: 'Mag1' }],
+      collectibles: [{ name: 'Globe1' }],
+      zones: [{ name: 'ZoneA', locations: [] }],
+      companions: [{ name: 'Comp1' }],
+    };
+    var sandbox = { console: console, __state: state, __reg: reg };
+    var src =
+      'var state = __state;\n' +
+      'var FALLOUT_REGISTRY = __reg;\n' +
+      "function getGameContext() { return '" + ctxOverride + "'; }\n" +
+      "function getSkillKeys() { return ['guns', 'sneak', 'speech']; }\n" +
+      "function getFactionRegistry() { return [{ key: 'ncr', name: 'NCR' }]; }\n" +
+      "function getAmmoCalibers() { return ['9mm']; }\n" +
+      'function appendToChat() {}\n' +
+      'function updateMath() {}\n' +
+      "var _DSH_SPECIAL_KEYS = ['s', 'p', 'e', 'c', 'i', 'a', 'l'];\n" +
+      'var __domInputs = {};\n' +
+      'var document = { getElementById: function (id) { if (!__domInputs[id]) __domInputs[id] = { value: "" }; return __domInputs[id]; } };\n' +
+      'function _dshSyncDom(id, val) ' + syncDomBody15 + '\n' +
+      'function loadUI() {}\n' +
+      'function saveState() {\n' +
+      '  var lvlEl = document.getElementById("stat_lvl"); if (lvlEl.value !== "") state.lvl = parseInt(lvlEl.value, 10) || 1;\n' +
+      '  var xpEl = document.getElementById("stat_xp"); if (xpEl.value !== "") state.xp = parseInt(xpEl.value, 10) || 0;\n' +
+      '  var hpMaxEl = document.getElementById("stat_hp_max"); if (hpMaxEl.value !== "") state.hpMax = parseInt(hpMaxEl.value, 10) || 100;\n' +
+      '  var hpCurEl = document.getElementById("stat_hp_cur"); if (hpCurEl.value !== "") state.hpCur = parseInt(hpCurEl.value, 10) || 0;\n' +
+      '  _DSH_SPECIAL_KEYS.forEach(function (k) { var el = document.getElementById("s_" + k); if (el.value !== "") state[k] = parseInt(el.value, 10) || 5; });\n' +
+      '  var capsEl = document.getElementById("c_caps"); if (capsEl.value !== "") state.caps = parseInt(capsEl.value, 10) || 0;\n' +
+      '  var karmaEl = document.getElementById("stat_karma"); if (karmaEl.value !== "") state.karma = parseInt(karmaEl.value, 10) || 0;\n' +
+      '  var radsEl = document.getElementById("stat_rads"); if (radsEl.value !== "") state.rads = parseInt(radsEl.value, 10) || 0;\n' +
+      '}\n' +
+      'function ' + fnName + '() ' + fnBody + '\n' +
+      fnName + '();\n';
+    vm.createContext(sandbox);
+    vm.runInContext(src, sandbox);
+    return state;
+  }
+  var fixtureState15 = runWithRealisticSave15('_dshLoadNvTestCampaign', fixtureBody15, 'FNV');
+  var presetState15 = runWithRealisticSave15('_dshPresetFreshStart', presetBody15, 'FNV');
+  results.push(
+    fixtureState15.lvl === 18 && fixtureState15.caps === 3450 && fixtureState15.hpMax === 165 &&
+      fixtureState15.s === 6 &&
+      presetState15.lvl === 1 && presetState15.caps === 0 && presetState15.s === 5
+  );
+} catch (e) { results.push(false); }
+
+console.log('RESULT:' + results.map(function (r) { return r ? '1' : '0'; }).join(''));
+"@
+        $tmpScript215 = [System.IO.Path]::GetTempFileName() + '.js'
+        [System.IO.File]::WriteAllText($tmpScript215, $testScript215, [System.Text.Encoding]::UTF8)
+        try {
+            $out215 = (node $tmpScript215 2>&1 | Out-String)
+        } finally {
+            Remove-Item -Path $tmpScript215 -Force -ErrorAction SilentlyContinue
+        }
+        $rm215 = [regex]::Match($out215, 'RESULT:([01]{14})')
+        if ($rm215.Success) {
+            $bits215 = $rm215.Groups[1].Value
+            for ($bi215 = 0; $bi215 -lt $labels215.Count; $bi215++) {
+                Check ($bits215.Substring($bi215, 1) -eq '1') $labels215[$bi215]
+            }
+        } else {
+            $err215 = if ([string]::IsNullOrWhiteSpace($out215)) { "No output from node" } else { $out215.Trim() }
+            foreach ($lbl in $labels215) { Fail "$lbl  (runtime error: $err215)" }
+        }
+    } else {
+        foreach ($lbl in $labels215) { Fail "$lbl  (node.exe not found on PATH -- cannot run behavioral proof)" }
+    }
+} catch {
+    foreach ($lbl in $labels215) { Fail "$lbl  (harness error: $($_.Exception.Message))" }
+}
+
+# 215.14 SUBMENU VISUAL HIERARCHY -- terminal.css gives a nested group
+#        sub-panel (inside a category sub-panel, both under #dshSections) a
+#        left indent + a dimmer heading than its parent category.
+Check (
+    ($terminalCss215 -match [regex]::Escape('#dshSections details.sub-panel details.sub-panel') + '\s*\{[^}]*margin-left:\s*10px;[^}]*border-left:') -and
+    ($terminalCss215 -match [regex]::Escape('#dshSections details.sub-panel details.sub-panel > summary h3') + '\s*\{[^}]*opacity:\s*0\.6;')
+) '215.14: terminal.css gives a nested group sub-panel (inside a category sub-panel, both under #dshSections) a left indent (margin-left + border-left) and a dimmer (opacity 0.6) heading than its parent category'
+
+# 215.16 [regression, Protocol 42] found via this unit's own LIVE Playwright
+#        verification: _invoke()'s destructive-tool confirm dialog reuses
+#        the shared #sysModal, which normally sits BELOW the Diagnostic
+#        Shell's own scrim/drawer -- that left the shell's OWN confirm
+#        dialog rendered behind itself and genuinely unclickable (confirmed
+#        live via document.elementFromPoint() landing on #dshScrim).
+#        _invoke() now toggles body.dsh-modal-elevate for exactly the
+#        duration of its confirmAction() call.
+$invokeBody215b = Get-FunctionBody $testConsole215 '_invoke'
+Check (
+    ($invokeBody215b -match "document\.body\.classList\.add\('dsh-modal-elevate'\)") -and
+    ($invokeBody215b -match "document\.body\.classList\.remove\('dsh-modal-elevate'\)") -and
+    ($terminalCss215 -match 'body\.dsh-modal-elevate #sysModal')
+) "215.16: [regression, Protocol 42] _invoke() adds body.dsh-modal-elevate before calling confirmAction() and removes it once the promise settles, and terminal.css's body.dsh-modal-elevate #sysModal rule elevates the shared confirm modal above the shell for exactly that window"
 
 # ===========================================================
 # Results

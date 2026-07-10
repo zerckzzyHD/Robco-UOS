@@ -17928,6 +17928,21 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 {
   header('Suite 149 — Developer Console: the ONE canonical dev/debug console');
   const testConsole149 = readFile('js/test-console.js');
+  // U4b (Suite 215) deliberately, documentedly widened the Hard Boundary:
+  // the STATE SETUP/RESETS/FIXTURES/INLINE apparatus (~80 registry entries +
+  // their _dsh*-prefixed helper functions) explicitly reads/writes campaign
+  // state and calls saveState() — that is the entire point of a cheat/reset/
+  // fixture tool, per planning/DIAGNOSTIC_SHELL_PLAN.md §4 and the file's own
+  // updated header comment. 149.9/149.13 below still hold the ORIGINAL
+  // Hard-Boundary/game-agnostic invariant for everything BEFORE that block —
+  // the runtime/immersion-only console this suite was written to guard —
+  // while Suite 215 independently proves the U4b block's own correctness
+  // (native-setter routing, tier:'staging'+destructive:true leak-proofing,
+  // the FNV-context guard preceding every write in the fixture).
+  const testConsole149PreU4b = testConsole149.slice(
+    0,
+    testConsole149.indexOf('U4b: STATE SETUP — cheats')
+  );
   const sw149 = readFile('sw.js');
   const index149 = readFile('index.html');
   const uiCore149 = readFile('js/ui-core.js');
@@ -18053,13 +18068,17 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     );
   }
 
-  // 149.9  HARD atmosphere/save boundary: test-console.js never writes the
-  //        campaign save — no saveState, no robco_v8, no eventLog/_logEvent,
-  //        no direct localStorage (device prefs route through the reused
-  //        onImmersionChange/getImmersionTier setters, never a raw write here).
+  // 149.9  HARD atmosphere/save boundary: the PRE-U4b portion of
+  //        test-console.js never writes the campaign save — no saveState, no
+  //        robco_v8, no eventLog/_logEvent, no direct localStorage (device
+  //        prefs route through the reused onImmersionChange/getImmersionTier
+  //        setters, never a raw write here). The U4b STATE SETUP/RESETS/
+  //        FIXTURES block is the documented, narrow exception (see the
+  //        testConsole149PreU4b comment above) — proved correct separately
+  //        by Suite 215.
   assert(
-    !/saveState|robco_v8|_logEvent|\beventLog\b|localStorage\./.test(testConsole149),
-    '149.9: test-console.js never calls saveState / touches robco_v8 / localStorage / eventLog / _logEvent (device + in-memory only — Phase-2 prime invariant #1)'
+    !/saveState|robco_v8|_logEvent|\beventLog\b|localStorage\./.test(testConsole149PreU4b),
+    '149.9: the pre-U4b portion of test-console.js never calls saveState / touches robco_v8 / localStorage / eventLog / _logEvent (device + in-memory only — Phase-2 prime invariant #1); the U4b STATE SETUP/RESETS/FIXTURES cheats are the documented exception, proved correct by Suite 215'
   );
 
   // 149.10  the Immersion-tier control REUSES the real dial's own setter
@@ -18093,10 +18112,16 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '149.12: transition-button labels and the observer read-out run every dynamic value through escapeHtml() before innerHTML (XSS-safe)'
   );
 
-  // 149.13  game-agnostic (Protocol 38): pure dev-tooling, no game literals
+  // 149.13  game-agnostic (Protocol 38): pure dev-tooling, no game literals —
+  //         scoped to the pre-U4b portion (see the testConsole149PreU4b
+  //         comment above). The LOAD NV TEST CAMPAIGN fixture is, by its own
+  //         owner-directed name and purpose, deliberately NV-specific — a
+  //         sanctioned Protocol 38 exception mirroring the GAME_DEFS
+  //         declaration block itself, not a silent per-game coercion; its
+  //         literal 'FNV' guard is independently locked by Suite 215.12/.13.
   assert(
-    !/FNV|FO3|New Vegas|Fallout 3/.test(testConsole149),
-    '149.13: the Developer Console is game-agnostic (no FNV/FO3/game-title literals — pure dev tooling)'
+    !/FNV|FO3|New Vegas|Fallout 3/.test(testConsole149PreU4b),
+    '149.13: the pre-U4b Developer Console is game-agnostic (no FNV/FO3/game-title literals — pure dev tooling); the U4b LOAD NV TEST CAMPAIGN fixture is a sanctioned, owner-named exception (Suite 215.12/.13)'
   );
 
   // 149.14  the minigame-unlock seam is documented on _devConsoleUnlocked()
@@ -35407,14 +35432,19 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       function scenario210(destructive, confirmResult, confirmDefined) {
         const sandbox = { console };
         vm210.createContext(sandbox);
-        let src = 'var __fired = false; var __confirmArgs = null;\n';
+        let src =
+          'var __fired = false; var __confirmArgs = null;\n' +
+          // U4b: _invoke() toggles document.body.classList('dsh-modal-elevate')
+          // around its confirmAction() call (Protocol 42 z-index fix) — a
+          // minimal stub so this sandbox exercises the real extracted body.
+          'var __classes = {}; var document = { body: { classList: { add: function (c) { __classes[c] = true; }, remove: function (c) { delete __classes[c]; } } } };\n';
         if (confirmDefined) {
           src +=
             'function confirmAction(opts) { __confirmArgs = opts; return { then: function (cb) { cb(' +
             (confirmResult ? 'true' : 'false') +
             '); } }; }\n';
         }
-        src += `function _invoke(tool) ${invokeBody210}\n`;
+        src += `function _invoke(tool, arg) ${invokeBody210}\n`;
         src += `_invoke({ destructive: ${destructive ? 'true' : 'false'}, label: 'X', tooltip: 'a tip', action: function () { __fired = true; } });\n`;
         vm210.runInContext(src, sandbox);
         return { fired: sandbox.__fired, confirmArgs: sandbox.__confirmArgs };
@@ -36040,9 +36070,10 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       ];
       ok212 =
         // U4a (Suite 214) added 7 new INSPECT tools on top of this unit's 54
-        // (9 U1 + 45 U3) — the total below reflects that later addition;
-        // this test's own scope stays the 45 U3-specific ids.
-        tools212.length === 61 &&
+        // (9 U1 + 45 U3), for 61; U4b (Suite 215) then added 80 more (63
+        // STATE SETUP + 13 RESETS + 1 FIXTURE + 3 INLINE), for 141 — this
+        // test's own scope stays the 45 U3-specific ids.
+        tools212.length === 141 &&
         expectedNew212.length === 45 &&
         expectedNew212.every(id => toolIds212.includes(id)) &&
         new Set(toolIds212).size === toolIds212.length; // no duplicate ids
@@ -36051,7 +36082,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     }
     assert(
       ok212,
-      '212.1: DIAGNOSTIC_SHELL_TOOLS registers all 45 new U3 tool ids (living core states/flare/burst, boot flavors, ceremonies M1-M5, day/night, fire-anim bus events, fire-pending animations) with no duplicate id, for a total of 61 (54 from U1+U3 plus the 7 U4a INSPECT tools added in Suite 214)' +
+      '212.1: DIAGNOSTIC_SHELL_TOOLS registers all 45 new U3 tool ids (living core states/flare/burst, boot flavors, ceremonies M1-M5, day/night, fire-anim bus events, fire-pending animations) with no duplicate id, for a total of 141 (54 from U1+U3, +7 U4a INSPECT tools, +80 U4b STATE SETUP/RESETS/FIXTURES/INLINE tools)' +
         (err212 ? ' — ' + err212.message : '')
     );
   }
@@ -36071,6 +36102,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       const u3Tools212 = tools212.filter(t => !['ocr-unit1-scan', 'ocr-unit2-scan'].includes(t.id));
       const newTools212 = u3Tools212.filter(
         t =>
+          t.category === 'triggers' && // U4b's 80 tools (Suite 215) are all category:'state'/'resets'/'fixtures'/'inline', never 'triggers'
           t.id !== 'inspect-runtime-state' &&
           t.id !== 'runtime-force-transition' &&
           t.id !== 'reboot' &&
@@ -37092,7 +37124,9 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
         'inspect-copy',
       ];
       ok214 =
-        tools214.length === 61 &&
+        // U4b (Suite 215) added 80 more tools after this unit shipped, so
+        // the registry now totals 141 (61 at this unit's own ship time + 80).
+        tools214.length === 141 &&
         newIds214.every(id => {
           const t = tools214.find(x => x.id === id);
           return t && t.category === 'inspect';
@@ -37105,7 +37139,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     }
     assert(
       ok214,
-      '214.8: the 7 new U4a INSPECT tools (vitals/device-detail/sw-internal/connection/flags/flags-internal/copy) exist under category:"inspect", the relocated inspect-runtime-state/inspect-observers now share the DEVICE / SYSTEM group, and the full registry (61 tools) carries no duplicate id' +
+      '214.8: the 7 new U4a INSPECT tools (vitals/device-detail/sw-internal/connection/flags/flags-internal/copy) exist under category:"inspect", the relocated inspect-runtime-state/inspect-observers now share the DEVICE / SYSTEM group, and the full registry (141 tools, after U4b) carries no duplicate id' +
         (err214 ? ' — ' + err214.message : '')
     );
   }
@@ -37347,6 +37381,1077 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       !/saveState\(|robco_v8|_logEvent\(|\beventLog\b|localStorage\./.test(newFns214) &&
         !/FNV|FO3|New Vegas|Fallout 3/.test(newFns214),
       '214.16: the new U4a collapsible-group + INSPECT functions never touch the campaign save (no saveState/robco_v8/_logEvent/eventLog/localStorage) and carry no hardcoded game literal (Protocol 38 — GAME_DEFS[getGameContext()].label is read generically)'
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 215 — Diagnostic Shell U4b: STATE SETUP + RESETS + FIXTURES +
+//  submenu visual hierarchy (planning/DIAGNOSTIC_SHELL_PLAN.md §4/§5/§11 U4,
+//  Protocol 8 Sonnet stage) (16 tests — 14 initial + 2 Protocol 42
+//  regressions found by this unit's own live Playwright verification: the
+//  DOM-sync revert bug in the fixture/FRESH START preset, and the shell's
+//  own confirm dialog rendering unreachable behind itself)
+// ──────────────────────────────────────────────────────────────
+//  80 new tier:'staging'+destructive:true registry entries (63 STATE SETUP
+//  cheats across VITALS/PROGRESSION/SPECIAL/SKILLS/KARMA/ECONOMY/INVENTORY/
+//  FACTIONS/COLLECTIBLES/PERKS-TRAITS-BOOKS/QUESTS/MAP/CONDITIONS/
+//  COMPANIONS/TIME/MEGA PRESETS, 13 RESETS, 1 FIXTURE, 3 INLINE dev-reset
+//  buttons), bringing the registry to 141 tools. Every cheat routes through
+//  an existing native setter (Protocol 22/24). _renderShell() gained a
+//  parameterized-tool synthesis path (control:'input'|'select'|
+//  'select-input' — a select/input + GO button) and _invoke(tool, arg)
+//  gained an optional arg passthrough. _mountInlineResets() renders the 3
+//  on-panel DEV-MARKER reset buttons at STATIC anchors, staging-only by
+//  construction. The NV test-campaign fixture (_dshLoadNvTestCampaign) is
+//  guarded on the ACTIVE game genuinely being FNV before it writes a single
+//  field — FALLOUT_REGISTRY is whichever per-game file the boot manifest
+//  loaded, not swappable at runtime, so populating it during an FO3 session
+//  would silently corrupt state under a mislabeled context (a Protocol 27
+//  finding from this unit's own design review). A CSS fix (terminal.css)
+//  gives a nested group sub-panel (inside a category sub-panel, both under
+//  #dshSections) a left indent + dimmer heading so it reads as visually
+//  NESTED, never same-level as its parent category.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 215 — Diagnostic Shell U4b: STATE SETUP + RESETS + FIXTURES + submenu hierarchy');
+  const testConsole215 = readFile('js/test-console.js');
+  const index215 = readFile('index.html');
+  const terminalCss215 = readFile('css/terminal.css');
+
+  function _evalRealTools215() {
+    const toolsStart = testConsole215.indexOf('var DIAGNOSTIC_SHELL_TOOLS = [');
+    const toolsEnd = testConsole215.indexOf('\n  ];', toolsStart) + '\n  ];'.length;
+    const toolsSrc = testConsole215.slice(toolsStart, toolsEnd);
+    const replayHatchBody = extractFunctionBody(testConsole215, '_replayHatch');
+    const src = `(function () {
+      function _replayHatch() ${replayHatchBody}
+      ${toolsSrc}
+      return DIAGNOSTIC_SHELL_TOOLS;
+    })()`;
+    return eval(src);
+  }
+
+  // 215.1  every one of the 80 new U4b tool ids is registered exactly once,
+  //        and the full registry now totals 141 (61 from U1/U3/U4a + 80).
+  {
+    let ok215 = false;
+    let err215 = null;
+    try {
+      const tools215 = _evalRealTools215();
+      const ids215 = tools215.map(t => t.id);
+      const newIds215 = [
+        'state-full-heal',
+        'state-set-hp-pct',
+        'state-kill',
+        'state-add-rads',
+        'state-clear-rads',
+        'state-max-rads',
+        'state-set-level',
+        'state-plus-one-level',
+        'state-max-level',
+        'state-add-xp',
+        'state-special-max-all',
+        'state-special-zero',
+        'state-special-set-one',
+        'state-skills-max-all',
+        'state-skills-set-one',
+        'state-skills-boost-combat',
+        'state-karma-good',
+        'state-karma-neutral',
+        'state-karma-evil',
+        'state-caps-add1k',
+        'state-caps-max',
+        'state-caps-zero',
+        'state-give-item',
+        'state-full-loadout',
+        'state-empty-inventory',
+        'state-over-encumber',
+        'state-add-ammo',
+        'state-faction-set-max',
+        'state-faction-set-min',
+        'state-factions-idolized',
+        'state-factions-vilified',
+        'state-collectibles-unlock-all',
+        'state-collectibles-clear-all',
+        'state-grant-perk',
+        'state-grant-all-eligible-perks',
+        'state-clear-perks',
+        'state-mark-all-books-read',
+        'state-mark-all-mags-read',
+        'state-add-quest',
+        'state-complete-all-quests',
+        'state-fail-all-quests',
+        'state-clear-quests',
+        'state-reveal-all-fog',
+        'state-clear-fog',
+        'state-set-current-location',
+        'state-apply-buff',
+        'state-apply-debuff',
+        'state-add-addiction',
+        'state-cripple-limb',
+        'state-heal-all-limbs',
+        'state-clear-all-effects',
+        'state-add-companion',
+        'state-max-affinity',
+        'state-clear-squad',
+        'state-set-time-of-day',
+        'state-advance-time',
+        'state-preset-max-everything',
+        'state-preset-fresh-start',
+        'state-preset-low-hp',
+        'state-preset-crippled',
+        'state-preset-over-encumbered',
+        'state-preset-addicted',
+        'state-preset-high-level',
+        'reset-first-run',
+        'reset-firmware-seen',
+        'reset-hatch-flag',
+        'reset-greet-flag',
+        'reset-error-log',
+        'reset-device-prefs',
+        'reset-bezel-view',
+        'reset-map-fog',
+        'reset-quests',
+        'reset-inventory',
+        'reset-special-skills',
+        'reset-stats-counters',
+        'reset-campaign-notes',
+        'fixture-nv-test-campaign',
+        'inline-reset-map-fog',
+        'inline-reset-quests',
+        'inline-reset-cargo',
+      ];
+      ok215 =
+        newIds215.length === 80 &&
+        tools215.length === 141 &&
+        newIds215.every(id => ids215.includes(id)) &&
+        new Set(ids215).size === ids215.length;
+    } catch (e) {
+      err215 = e;
+    }
+    assert(
+      ok215,
+      '215.1: all 80 new U4b tool ids (63 STATE SETUP + 13 RESETS + 1 FIXTURE + 3 INLINE) are registered exactly once, bringing the full DIAGNOSTIC_SHELL_TOOLS registry to 141 with no duplicate id' +
+        (err215 ? ' — ' + err215.message : '')
+    );
+  }
+
+  // 215.2  BEHAVIORAL leak-proof re-proof restricted to the U4b subset: every
+  //        new tool is tier:'staging' + destructive:true, invisible under a
+  //        stubbed 'prod' tier and visible under 'staging' — none can ever
+  //        reach a prod-minigame player (U1 §2.2 gate, unchanged).
+  {
+    let ok215 = false;
+    let err215 = null;
+    try {
+      const toolVisBody215 = extractFunctionBody(testConsole215, '_toolVisible');
+      const fn215 = new Function('tool', 'tier', toolVisBody215.slice(1, -1));
+      const tools215 = _evalRealTools215();
+      const u4bTools215 = tools215.filter(
+        t =>
+          ['state', 'resets', 'fixtures'].includes(t.category) ||
+          (t.category === 'inline' && t.id.startsWith('inline-'))
+      );
+      ok215 =
+        u4bTools215.length === 80 &&
+        u4bTools215.every(
+          t =>
+            t.tier === 'staging' &&
+            t.destructive === true &&
+            fn215(t, 'prod') === false &&
+            fn215(t, 'staging') === true
+        );
+    } catch (e) {
+      err215 = e;
+    }
+    assert(
+      ok215,
+      "215.2: BEHAVIORAL leak-proof re-proof — every one of the 80 U4b tools is tier:'staging' + destructive:true and is invisible under a stubbed 'prod' tier / visible under 'staging' (_toolVisible(), the same filter _renderShell() runs before any DOM insertion)" +
+        (err215 ? ' — ' + err215.message : '')
+    );
+  }
+
+  // 215.3  _renderShell() gained a parameterized-tool synthesis path: it
+  //        checks tool.control for 'input'/'select'/'select-input', builds a
+  //        .dsh-tool-row (select and/or input + a GO button), and routes the
+  //        GO click through _invoke(tool, <captured value>).
+  {
+    const renderShellBody215 = extractFunctionBody(testConsole215, '_renderShell');
+    assert(
+      // Format-resilient: three separate checks rather than one long
+      // multi-line boolean regex, so a Prettier line-wrap of the real
+      // if-condition can never desync this test from the source.
+      /tool\.control === 'input'/.test(renderShellBody215) &&
+        /tool\.control === 'select'/.test(renderShellBody215) &&
+        /tool\.control === 'select-input'/.test(renderShellBody215) &&
+        /dsh-tool-row/.test(renderShellBody215) &&
+        /_invoke\(tool, selectEl\.value\)/.test(renderShellBody215) &&
+        /_invoke\(tool, \{ sel: selectEl\.value, val: inputEl\.value \}\)/.test(
+          renderShellBody215
+        ) &&
+        /_invoke\(tool, inputEl\.value\)/.test(renderShellBody215),
+      "215.3: _renderShell()'s synthesis path recognizes control:'input'/'select'/'select-input', builds a .dsh-tool-row with a select and/or input plus a GO button, and routes the click through _invoke(tool, <captured value(s)>)"
+    );
+  }
+
+  // 215.4  BEHAVIORAL: _renderShell(), run against a synthetic DOM with a
+  //        synthetic control:'input' tool and a control:'select-input' tool,
+  //        actually builds the select/input/GO row and clicking GO invokes
+  //        _invoke() with the exact live value(s) — not just source text
+  //        mentioning the right identifiers.
+  {
+    let ok215 = false;
+    let err215 = null;
+    try {
+      const vm215 = require('vm');
+      function makeEl215(tag) {
+        const listeners = {};
+        const el = {
+          tagName: tag,
+          children: [],
+          className: '',
+          textContent: '',
+          title: '',
+          type: '',
+          value: '',
+          placeholder: '',
+          style: {},
+          attrs: {},
+          setAttribute(k, v) {
+            this.attrs[k] = v;
+          },
+          getAttribute(k) {
+            return this.attrs[k];
+          },
+          appendChild(child) {
+            this.children.push(child);
+            return child;
+          },
+          insertBefore(child, ref) {
+            const idx = this.children.indexOf(ref);
+            this.children.splice(idx === -1 ? 0 : idx, 0, child);
+            return child;
+          },
+          querySelector(sel) {
+            return (this.__map && this.__map[sel]) || null;
+          },
+          addEventListener(type, fn) {
+            (listeners[type] = listeners[type] || []).push(fn);
+          },
+          _fire(type) {
+            (listeners[type] || []).forEach(fn => fn());
+          },
+        };
+        return el;
+      }
+      const sectionsHost215 = makeEl215('div');
+      const envBanner215 = makeEl215('span');
+      const panel215 = makeEl215('div');
+      panel215.__map = { '#dshSections': sectionsHost215, '#dshEnvBanner': envBanner215 };
+      const bodySrc215 = extractFunctionBody(testConsole215, '_renderShell');
+      let invokedTool215 = null;
+      let invokedArg215 = null;
+      const src215 = `
+        var DEV_MARKER = '⚙';
+        var CATEGORY_ORDER = ['state'];
+        var CATEGORY_META = { state: { stagingTitle: 'STATE SETUP', prodTitle: 'STATE SETUP', icon: '◆' } };
+        function _invoke(tool, arg) { __invoked(tool, arg); }
+        function _toolVisible(tool, tier) { if (tool.tier === 'prod') return true; return tier === 'staging'; }
+        function _shellTier() { return 'staging'; }
+        function _paintEnvBanner() {}
+        function _wireDynamicSubPanel() {}
+        function _dshGroupDefaultOpen() { return true; }
+        function _buildGroupDetails(cat, headingText) {
+          var gd = document.createElement('details');
+          gd.className = 'sub-panel';
+          gd.setAttribute('data-sub-id', 'dsh_group_' + cat + '_' + String(headingText).toLowerCase());
+          return gd;
+        }
+        var DIAGNOSTIC_SHELL_TOOLS = [
+          { id: 'synth-input', label: 'SYNTH INPUT', subLabel: 's', icon: '◆', category: 'state', group: 'G', tier: 'staging', destructive: true, control: 'input', inputType: 'text', tooltip: 't', triggers: [], action: function () {} },
+          { id: 'synth-selinput', label: 'SYNTH SEL', subLabel: 's', icon: '◆', category: 'state', group: 'G', tier: 'staging', destructive: true, control: 'select-input', selectOptions: [{ value: 'x', label: 'X' }], inputType: 'number', tooltip: 't', triggers: [], action: function () {} },
+        ];
+        function _renderShell(panel) ${bodySrc215}
+      `;
+      const document215 = {
+        createElement: tag => makeEl215(tag),
+        createTextNode: text => ({ nodeType: 3, textContent: text }),
+      };
+      const sandbox215 = {
+        console,
+        document: document215,
+        __invoked: (tool, arg) => {
+          invokedTool215 = tool.id;
+          invokedArg215 = arg;
+        },
+      };
+      vm215.createContext(sandbox215);
+      vm215.runInContext(src215 + '\nthis._renderShellRef = _renderShell;', sandbox215);
+      sandbox215._renderShellRef(panel215);
+      const details215 = sectionsHost215.children[0];
+      const groupWrapper215 = details215.children.find(c => c.className === 'sub-panel');
+      const gridNode215 = groupWrapper215.children.find(c => c.className === 'dsh-tool-grid');
+      const rows215 = gridNode215.children.filter(c => c.className === 'dsh-tool-row');
+      const inputRow215 = rows215[0];
+      const selRow215 = rows215[1];
+      const inputEl215 = inputRow215.children.find(c => c.tagName === 'input');
+      const goBtn215a = inputRow215.children.find(c => c.tagName === 'button');
+      inputEl215.value = 'Stimpak';
+      goBtn215a._fire('click');
+      const selEl215 = selRow215.children.find(c => c.tagName === 'select');
+      const numEl215 = selRow215.children.find(c => c.tagName === 'input');
+      const goBtn215b = selRow215.children.find(c => c.tagName === 'button');
+      selEl215.value = 'x';
+      numEl215.value = '7';
+      goBtn215b._fire('click');
+      ok215 =
+        rows215.length === 2 &&
+        invokedTool215 === 'synth-selinput' &&
+        invokedArg215.sel === 'x' &&
+        invokedArg215.val === '7';
+      // re-fire the input-only row and check its own captured value too
+      invokedTool215 = null;
+      invokedArg215 = null;
+      goBtn215a._fire('click');
+      ok215 = ok215 && invokedTool215 === 'synth-input' && invokedArg215 === 'Stimpak';
+    } catch (e) {
+      err215 = e;
+    }
+    assert(
+      ok215,
+      "215.4: BEHAVIORAL — _renderShell(), run against a synthetic DOM, builds a real select/input/GO row for both control:'input' and control:'select-input' tools, and clicking GO invokes _invoke() with the exact live typed/selected value(s)" +
+        (err215 ? ' — ' + err215.message : '')
+    );
+  }
+
+  // 215.5  BEHAVIORAL: _invoke(tool, arg) forwards arg unchanged to
+  //        tool.action(arg) on both the immediate (non-destructive) and the
+  //        confirmed (destructive) path.
+  {
+    let ok215 = false;
+    let err215 = null;
+    try {
+      const vm215 = require('vm');
+      const invokeBody215 = extractFunctionBody(testConsole215, '_invoke');
+      function scenario215(destructive, confirmResult) {
+        const sandbox = { console };
+        vm215.createContext(sandbox);
+        let src =
+          'var __arg = "unset"; var __fired = false;\n' +
+          'var __classes = {}; var document = { body: { classList: { add: function (c) { __classes[c] = true; }, remove: function (c) { delete __classes[c]; } } } };\n' +
+          'function confirmAction(opts) { return { then: function (cb) { cb(' +
+          (confirmResult ? 'true' : 'false') +
+          '); } }; }\n';
+        src += `function _invoke(tool, arg) ${invokeBody215}\n`;
+        src += `_invoke({ destructive: ${destructive ? 'true' : 'false'}, label: 'X', action: function (a) { __fired = true; __arg = a; } }, 'PAYLOAD');\n`;
+        vm215.runInContext(src, sandbox);
+        return { fired: sandbox.__fired, arg: sandbox.__arg };
+      }
+      const nonDestructive215 = scenario215(false, true);
+      const destructiveConfirmed215 = scenario215(true, true);
+      const destructiveCancelled215 = scenario215(true, false);
+      ok215 =
+        nonDestructive215.fired === true &&
+        nonDestructive215.arg === 'PAYLOAD' &&
+        destructiveConfirmed215.fired === true &&
+        destructiveConfirmed215.arg === 'PAYLOAD' &&
+        destructiveCancelled215.fired === false;
+    } catch (e) {
+      err215 = e;
+    }
+    assert(
+      ok215,
+      "215.5: BEHAVIORAL — _invoke(tool, arg) forwards 'PAYLOAD' unchanged into tool.action(arg) on both the immediate non-destructive path and the confirmed destructive path, and never fires on cancel" +
+        (err215 ? ' — ' + err215.message : '')
+    );
+  }
+
+  // 215.6  spot-check native-setter routing: a representative sample of
+  //        STATE SETUP cheat action bodies reference the expected existing
+  //        native setter/mutator (Protocol 22/24 — never a parallel
+  //        unclamped write path).
+  {
+    let ok215 = false;
+    let err215 = null;
+    try {
+      const tools215 = _evalRealTools215();
+      const expectedRef215 = {
+        'state-full-heal': '_dshFullHeal',
+        'state-set-hp-pct': '_dshSetHpPct',
+        'state-max-rads': '_dshMaxRads',
+        'state-set-level': '_dshSetLevel',
+        'state-special-max-all': '_dshMaxAllSpecial',
+        'state-skills-max-all': '_dshMaxAllSkills',
+        'state-karma-good': '_dshSetKarmaGood',
+        'state-caps-add1k': '_dshAddCaps1k',
+        'state-give-item': '_dshGiveItem',
+        'state-cripple-limb': '_dshCrippleLimb',
+        'state-max-affinity': '_dshMaxAffinity',
+        'state-reveal-all-fog': '_dshRevealAllFog',
+        'state-set-current-location': '_dshSetCurrentLocationCheat',
+      };
+      const nativeSetterRefs215 = {
+        _dshFullHeal: '_nativeSetHp',
+        _dshSetHpPct: '_nativeSetHp',
+        _dshMaxRads: '_nativeSetRads',
+        _dshSetLevel: '_nativeSetLevel',
+        _dshMaxAllSpecial: '_nativeSetSpecial',
+        _dshMaxAllSkills: '_nativeSetSkill',
+        _dshSetKarmaGood: '_nativeSetKarma',
+        _dshAddCaps1k: '_nativeSetCaps',
+        _dshCrippleLimb: 'toggleLimb',
+        _dshMaxAffinity: 'adjustAffinity',
+        _dshRevealAllFog: 'recordLocationVisit',
+        _dshSetCurrentLocationCheat: 'onLocationChange',
+      };
+      ok215 = Object.keys(expectedRef215).every(id => {
+        const t = tools215.find(x => x.id === id);
+        const helperName = expectedRef215[id];
+        if (!t || t.action.toString().indexOf(helperName) === -1) return false;
+        if (helperName === '_dshGiveItem') return true; // its own body is checked separately below
+        const nativeRef = nativeSetterRefs215[helperName];
+        if (!nativeRef) return true;
+        const helperBody = extractFunctionBody(testConsole215, helperName);
+        return helperBody.indexOf(nativeRef) !== -1;
+      });
+      const giveItemBody215 = extractFunctionBody(testConsole215, '_dshGiveItem');
+      ok215 =
+        ok215 &&
+        /lookupItemInDb/.test(giveItemBody215) &&
+        /RobcoEvents\.emit\('item\.added'/.test(giveItemBody215);
+    } catch (e) {
+      err215 = e;
+    }
+    assert(
+      ok215,
+      '215.6: a representative sample of STATE SETUP cheats (HP/rads/level/SPECIAL/skills/karma/caps/give-item/cripple-limb/affinity/reveal-fog/set-location) route through the expected existing native setter/mutator (_nativeSetHp/_nativeSetRads/_nativeSetLevel/_nativeSetSpecial/_nativeSetSkill/_nativeSetKarma/_nativeSetCaps/lookupItemInDb+addItem-equivalent/toggleLimb/adjustAffinity/recordLocationVisit/onLocationChange), never a parallel unclamped write path' +
+        (err215 ? ' — ' + err215.message : '')
+    );
+  }
+
+  // 215.7  every STATE SETUP group (VITALS/PROGRESSION/SPECIAL/SKILLS/
+  //        KARMA/ECONOMY/INVENTORY/FACTIONS/COLLECTIBLES/PERKS-TRAITS-BOOKS/
+  //        QUESTS/MAP/CONDITIONS/COMPANIONS/TIME/MEGA PRESETS) exists with
+  //        at least one tool, and MEGA PRESETS carries all 7 owner-named
+  //        presets.
+  {
+    let ok215 = false;
+    let err215 = null;
+    try {
+      const tools215 = _evalRealTools215();
+      const stateTools215 = tools215.filter(t => t.category === 'state');
+      const expectedGroups215 = [
+        'VITALS',
+        'PROGRESSION',
+        'SPECIAL',
+        'SKILLS',
+        'KARMA',
+        'ECONOMY',
+        'INVENTORY',
+        'FACTIONS',
+        'COLLECTIBLES',
+        'PERKS / TRAITS / BOOKS',
+        'QUESTS',
+        'MAP',
+        'CONDITIONS',
+        'COMPANIONS',
+        'TIME',
+        'MEGA PRESETS',
+      ];
+      const megaPresetIds215 = [
+        'state-preset-max-everything',
+        'state-preset-fresh-start',
+        'state-preset-low-hp',
+        'state-preset-crippled',
+        'state-preset-over-encumbered',
+        'state-preset-addicted',
+        'state-preset-high-level',
+      ];
+      ok215 =
+        stateTools215.length === 63 &&
+        expectedGroups215.every(g => stateTools215.some(t => t.group === g)) &&
+        megaPresetIds215.every(id =>
+          stateTools215.find(t => t.id === id && t.group === 'MEGA PRESETS')
+        );
+    } catch (e) {
+      err215 = e;
+    }
+    assert(
+      ok215,
+      '215.7: all 16 STATE SETUP groups exist with at least one tool (63 total), and MEGA PRESETS carries all 7 owner-named presets (MAX EVERYTHING / FRESH START / and the 5 scenario presets)' +
+        (err215 ? ' — ' + err215.message : '')
+    );
+  }
+
+  // 215.8  RESETS: 13 ids, split across VIEW-ONCE / DEV FLAGS (7) and
+  //        CAMPAIGN DATA (6), every one tier:'staging' + destructive:true.
+  {
+    let ok215 = false;
+    let err215 = null;
+    try {
+      const tools215 = _evalRealTools215();
+      const resetTools215 = tools215.filter(t => t.category === 'resets');
+      const flagGroup215 = resetTools215.filter(t => t.group === 'VIEW-ONCE / DEV FLAGS');
+      const dataGroup215 = resetTools215.filter(t => t.group === 'CAMPAIGN DATA');
+      ok215 =
+        resetTools215.length === 13 &&
+        flagGroup215.length === 7 &&
+        dataGroup215.length === 6 &&
+        resetTools215.every(t => t.tier === 'staging' && t.destructive === true);
+    } catch (e) {
+      err215 = e;
+    }
+    assert(
+      ok215,
+      "215.8: RESETS registers exactly 13 tools split across VIEW-ONCE / DEV FLAGS (7) and CAMPAIGN DATA (6), every one tier:'staging' + destructive:true" +
+        (err215 ? ' — ' + err215.message : '')
+    );
+  }
+
+  // 215.9  _mountInlineResets(): re-checks _shellTier()==='staging' before
+  //        mounting anything (leak-proof by construction, even though
+  //        initTestConsole() only calls it when _devConsoleUnlocked() is
+  //        true — a prod-minigame-unlocked build must still see none of
+  //        these), is idempotent via a data-dsh-inline guard, and routes
+  //        every click through _invoke(tool) — the same auto-confirm-gate
+  //        path as every other tool.
+  {
+    const mountInlineBody215 = extractFunctionBody(testConsole215, '_mountInlineResets');
+    assert(
+      /if \(_shellTier\(\) !== 'staging'\) return;/.test(mountInlineBody215) &&
+        /category !== 'inline'/.test(mountInlineBody215) &&
+        /data-dsh-inline/.test(mountInlineBody215) &&
+        /_invoke\(tool\)/.test(mountInlineBody215),
+      "215.9: _mountInlineResets() re-checks _shellTier()==='staging' before mounting anything, filters to category:'inline' tools, is idempotent via a data-dsh-inline guard, and routes every click through _invoke(tool)"
+    );
+  }
+
+  // 215.10  every one of the 3 inline tools carries a real `anchor` selector
+  //         matching a STATIC element that genuinely exists in index.html
+  //         (the WORLD MAP / DIRECTIVE REGISTRY / CARGO MANIFEST panels'
+  //         own .bay-part-no line — never a target inside a render*()-owned
+  //         innerHTML region, so a later re-render can never wipe it).
+  {
+    let ok215 = false;
+    let err215 = null;
+    try {
+      const tools215 = _evalRealTools215();
+      const inlineTools215 = tools215.filter(t => t.category === 'inline');
+      const expectedAnchors215 = {
+        'inline-reset-map-fog': '#worldMapPanel .bay-part-no',
+        'inline-reset-quests': '#questLogPanel .bay-part-no',
+        'inline-reset-cargo': '#opsManifestPanel .bay-part-no',
+      };
+      ok215 =
+        inlineTools215.length === 3 &&
+        Object.keys(expectedAnchors215).every(id => {
+          const t = inlineTools215.find(x => x.id === id);
+          return t && t.anchor === expectedAnchors215[id] && t.placement === 'after';
+        }) &&
+        index215.indexOf('id="worldMapPanel"') !== -1 &&
+        index215.indexOf('id="questLogPanel"') !== -1 &&
+        index215.indexOf('id="opsManifestPanel"') !== -1 &&
+        /class="bay-part-no"/.test(index215);
+    } catch (e) {
+      err215 = e;
+    }
+    assert(
+      ok215,
+      '215.10: all 3 inline dev-reset tools carry a real `anchor` (WORLD MAP / DIRECTIVE REGISTRY / CARGO MANIFEST panels’ own STATIC .bay-part-no line, placement:"after") and all 3 target panel ids genuinely exist in index.html' +
+        (err215 ? ' — ' + err215.message : '')
+    );
+  }
+
+  // 215.11  BEHAVIORAL: _mountInlineResets(), run against a synthetic
+  //         document with the 3 real anchor selectors present, inserts
+  //         exactly 3 confirm-gated buttons carrying the DEV-MARKER glyph,
+  //         and re-running it a second time inserts NOTHING more (the
+  //         data-dsh-inline idempotency guard).
+  {
+    let ok215 = false;
+    let err215 = null;
+    try {
+      const vm215 = require('vm');
+      const mountBody215 = extractFunctionBody(testConsole215, '_mountInlineResets');
+      const toolsStart = testConsole215.indexOf('var DIAGNOSTIC_SHELL_TOOLS = [');
+      const toolsEnd = testConsole215.indexOf('\n  ];', toolsStart) + '\n  ];'.length;
+      const toolsSrc = testConsole215.slice(toolsStart, toolsEnd);
+      const replayHatchBody = extractFunctionBody(testConsole215, '_replayHatch');
+      function makeAnchorParent215() {
+        return {
+          children: [],
+          insertBefore(child) {
+            this.children.push(child);
+          },
+        };
+      }
+      function makeAnchor215() {
+        return { parentNode: makeAnchorParent215(), nextSibling: null };
+      }
+      const anchors = {
+        '#worldMapPanel .bay-part-no': makeAnchor215(),
+        '#questLogPanel .bay-part-no': makeAnchor215(),
+        '#opsManifestPanel .bay-part-no': makeAnchor215(),
+      };
+      function makeEl215(tag) {
+        const listeners = {};
+        return {
+          __tag: tag,
+          attrs: {},
+          textParts: [],
+          setAttribute(k, v) {
+            this.attrs[k] = v;
+          },
+          appendChild(child) {
+            this.textParts.push(child);
+          },
+          addEventListener(type, fn) {
+            (listeners[type] = listeners[type] || []).push(fn);
+          },
+          _fire(type) {
+            (listeners[type] || []).forEach(fn => fn());
+          },
+        };
+      }
+      const src215 = `
+        var DEV_MARKER = '⚙';
+        function _shellTier() { return 'staging'; }
+        function _toolVisible(tool, tier) { if (tool.tier === 'prod') return true; return tier === 'staging'; }
+        function _invoke(tool) { __invoked(tool.id); }
+        function _replayHatch() ${replayHatchBody}
+        ${toolsSrc}
+        function _mountInlineResets() ${mountBody215}
+      `;
+      const documentMock215 = {
+        __mountedIds: [],
+        querySelector: function (sel) {
+          if (sel.indexOf('[data-dsh-inline=') === 0) {
+            const id215 = sel.slice(sel.indexOf('"') + 1, sel.lastIndexOf('"'));
+            return this.__mountedIds.indexOf(id215) !== -1 ? {} : null;
+          }
+          return anchors[sel] || null;
+        },
+        createElement: tag => makeEl215(tag),
+        createTextNode: text => ({ nodeType: 3, textContent: text }),
+      };
+      const sandbox215 = {
+        console,
+        document: documentMock215,
+        __invoked: id => invoked215.push(id),
+      };
+      const invoked215 = [];
+      vm215.createContext(sandbox215);
+      vm215.runInContext(src215 + '\nthis._mountInlineResetsRef = _mountInlineResets;', sandbox215);
+      sandbox215._mountInlineResetsRef();
+      const insertedButtons215 = () =>
+        Object.keys(anchors).reduce((sum, k) => sum + anchors[k].parentNode.children.length, 0);
+      const firstPassCount215 = insertedButtons215();
+      const firstPassButtons215 = Object.keys(anchors).flatMap(k => anchors[k].parentNode.children);
+      const allDevMarker215 = firstPassButtons215.every(
+        b => b.textParts[0] && b.textParts[0].textContent === '⚙ '
+      );
+      // simulate the idempotency guard by marking the mounted ids present
+      firstPassButtons215.forEach(b =>
+        documentMock215.__mountedIds.push(b.attrs['data-dsh-inline'])
+      );
+      sandbox215._mountInlineResetsRef();
+      const secondPassCount215 = insertedButtons215();
+      // fire one button's click and confirm it invoked its own tool id
+      const oneBtn215 = firstPassButtons215[0];
+      oneBtn215._fire('click');
+      ok215 =
+        firstPassCount215 === 3 &&
+        secondPassCount215 === 3 && // idempotent — nothing new mounted on the second pass
+        allDevMarker215 &&
+        invoked215.length === 1 &&
+        invoked215[0] === oneBtn215.attrs['data-dsh-inline'];
+    } catch (e) {
+      err215 = e;
+    }
+    assert(
+      ok215,
+      '215.11: BEHAVIORAL — _mountInlineResets(), run against a synthetic document exposing the 3 real anchor selectors, mounts exactly 3 DEV-MARKER buttons on the first pass and mounts NOTHING new on a second pass (the data-dsh-inline idempotency guard)' +
+        (err215 ? ' — ' + err215.message : '')
+    );
+  }
+
+  // 215.12  the fixture tool is tier:'staging'+destructive:true, and
+  //         _dshLoadNvTestCampaign()'s own source guards on
+  //         getGameContext() !== 'FNV' and returns BEFORE any state.*
+  //         assignment (source-order check) — the Protocol 27 finding that
+  //         FALLOUT_REGISTRY is whichever per-game file the boot manifest
+  //         loaded, not swappable at runtime.
+  {
+    let ok215 = false;
+    let err215 = null;
+    try {
+      const tools215 = _evalRealTools215();
+      const fixtureTool215 = tools215.find(t => t.id === 'fixture-nv-test-campaign');
+      const fnBody215 = extractFunctionBody(testConsole215, '_dshLoadNvTestCampaign');
+      const guardIdx215 = fnBody215.indexOf("getGameContext() !== 'FNV'");
+      const firstStateWriteIdx215 = fnBody215.indexOf('state.lvl = 18');
+      ok215 =
+        !!fixtureTool215 &&
+        fixtureTool215.tier === 'staging' &&
+        fixtureTool215.destructive === true &&
+        fixtureTool215.category === 'fixtures' &&
+        guardIdx215 !== -1 &&
+        firstStateWriteIdx215 !== -1 &&
+        guardIdx215 < firstStateWriteIdx215;
+    } catch (e) {
+      err215 = e;
+    }
+    assert(
+      ok215,
+      "215.12: the LOAD NV TEST CAMPAIGN tool is category:'fixtures', tier:'staging', destructive:true, and _dshLoadNvTestCampaign()'s own guard (getGameContext() !== 'FNV') sits BEFORE its first state.* assignment in source order — the active-game-context corruption check runs before any write" +
+        (err215 ? ' — ' + err215.message : '')
+    );
+  }
+
+  // 215.13  BEHAVIORAL: _dshLoadNvTestCampaign(), executed against a
+  //         synthetic FALLOUT_REGISTRY/GAME_DEFS/state, writes NOTHING when
+  //         the active context is 'FO3' (posts a chat hint instead), and —
+  //         when the active context is 'FNV' — populates every required
+  //         field (inventory/quests/perks/traits/skillBooks/magazines/
+  //         skills/SPECIAL/factions/collectibles/karma/locationHistory/
+  //         status/caps/lvl/squad/campaign_notes).
+  {
+    let ok215 = false;
+    let err215 = null;
+    try {
+      const vm215 = require('vm');
+      const fnBody215 = extractFunctionBody(testConsole215, '_dshLoadNvTestCampaign');
+      function freshState215() {
+        return {
+          lvl: 1,
+          xp: 0,
+          hpMax: 100,
+          hpCur: 100,
+          s: 5,
+          p: 5,
+          e: 5,
+          c: 5,
+          i: 5,
+          a: 5,
+          l: 5,
+          caps: 0,
+          karma: 0,
+          rads: 0,
+          la: 'OK',
+          ra: 'OK',
+          ll: 'OK',
+          rl: 'OK',
+          hd: 'OK',
+          skills: {},
+          inventory: [],
+          quests: [],
+          perks: [],
+          traits: [],
+          skillBooks: [],
+          magazines: [],
+          collectibles: [],
+          factions: {},
+          locationHistory: [],
+          loc: 'Goodsprings',
+          status: [],
+          squad: [],
+          equipped: { weapon: null, armor: null, headgear: null },
+          ammo: {},
+          campaign_notes: [],
+        };
+      }
+      function run215(ctx) {
+        const state = freshState215();
+        const chatLines = [];
+        const reg = {
+          items: [
+            { name: 'Test Weapon', type: 'weapon' },
+            { name: 'Test Armor', type: 'armor' },
+            { name: 'Test Aid A', type: 'aid' },
+            { name: 'Test Aid B', type: 'aid' },
+            { name: 'Test Misc A', type: 'misc' },
+            { name: 'Test Misc B', type: 'misc' },
+          ],
+          quests: [
+            { name: 'Q1' },
+            { name: 'Q2' },
+            { name: 'Q3' },
+            { name: 'Q4' },
+            { name: 'Q5' },
+            { name: 'Q6' },
+          ],
+          perks: [
+            { name: 'Perk1', type: 'regular', level: 2 },
+            { name: 'Perk2', type: 'regular', level: 4 },
+          ],
+          traits: [{ name: 'Trait1' }, { name: 'Trait2' }],
+          skillBooks: [{ name: 'Book1' }],
+          magazines: [{ name: 'Mag1' }],
+          collectibles: [{ name: 'Globe1' }],
+          zones: [
+            { name: 'ZoneA', locations: [] },
+            { name: 'ZoneB', locations: [] },
+          ],
+          companions: [{ name: 'Comp1' }, { name: 'Comp2' }],
+        };
+        const src = `
+          var state = __state;
+          var FALLOUT_REGISTRY = __reg;
+          function getGameContext() { return '${ctx}'; }
+          function getSkillKeys() { return ['guns', 'sneak', 'speech']; }
+          function getFactionRegistry() { return [{ key: 'ncr', name: 'NCR' }, { key: 'legion', name: 'Legion' }]; }
+          function getAmmoCalibers() { return ['9mm', '.44 Magnum']; }
+          function appendToChat(msg) { __chat(msg); }
+          function updateMath() {}
+          function saveState() {}
+          function loadUI() {}
+          var _DSH_SPECIAL_KEYS = ['s', 'p', 'e', 'c', 'i', 'a', 'l'];
+          var __domInputs = {};
+          var document = {
+            getElementById: function (id) {
+              if (!__domInputs[id]) __domInputs[id] = { value: '' };
+              return __domInputs[id];
+            },
+          };
+          function _dshSyncDom(id, val) {
+            var el = document.getElementById(id);
+            if (el) el.value = String(val);
+          }
+          function _dshLoadNvTestCampaign() ${fnBody215}
+          _dshLoadNvTestCampaign();
+        `;
+        const sandbox = {
+          console,
+          __state: state,
+          __reg: reg,
+          __chat: msg => chatLines.push(msg),
+        };
+        vm215.createContext(sandbox);
+        vm215.runInContext(src, sandbox);
+        return { state, chatLines };
+      }
+      const fo3Run215 = run215('FO3');
+      const fnvRun215 = run215('FNV');
+      const untouchedOnFo3_215 =
+        fo3Run215.state.lvl === 1 &&
+        fo3Run215.state.inventory.length === 0 &&
+        fo3Run215.state.quests.length === 0 &&
+        fo3Run215.chatLines.length === 1;
+      const s215 = fnvRun215.state;
+      const populatedOnFnv215 =
+        s215.inventory.length > 0 &&
+        s215.quests.length > 0 &&
+        s215.perks.length > 0 &&
+        s215.traits.length > 0 &&
+        s215.skillBooks.length > 0 &&
+        s215.magazines.length > 0 &&
+        s215.collectibles.length > 0 &&
+        Object.keys(s215.skills).length > 0 &&
+        s215.s !== 5 &&
+        Object.keys(s215.factions).length > 0 &&
+        s215.locationHistory.length > 0 &&
+        s215.status.length > 0 &&
+        s215.caps !== 0 &&
+        s215.lvl !== 1 &&
+        s215.squad.length > 0 &&
+        s215.campaign_notes.length > 0;
+      ok215 = untouchedOnFo3_215 && populatedOnFnv215;
+    } catch (e) {
+      err215 = e;
+    }
+    assert(
+      ok215,
+      "215.13: BEHAVIORAL — _dshLoadNvTestCampaign() writes NOTHING to a synthetic state (posts one chat hint instead) when the active game context is 'FO3', and — when 'FNV' — populates inventory/quests/perks/traits/skillBooks/magazines/skills/SPECIAL/factions/collectibles/locationHistory/status/caps/level/squad/campaign_notes all at once" +
+        (err215 ? ' — ' + err215.message : '')
+    );
+  }
+
+  // 215.14  SUBMENU VISUAL HIERARCHY: terminal.css gives a nested group
+  //         sub-panel (any details.sub-panel that is a descendant of
+  //         another details.sub-panel, both scoped under #dshSections) a
+  //         left indent (margin-left/border-left) AND a dimmer/smaller
+  //         heading than its parent category — the owner screenshot fix.
+  {
+    assert(
+      /#dshSections details\.sub-panel details\.sub-panel\s*\{[^}]*margin-left:\s*10px;[^}]*border-left:/.test(
+        terminalCss215
+      ) &&
+        /#dshSections details\.sub-panel details\.sub-panel > summary h3\s*\{[^}]*opacity:\s*0\.6;/.test(
+          terminalCss215
+        ),
+      '215.14: terminal.css gives a nested group sub-panel (inside a category sub-panel, both under #dshSections) a left indent (margin-left + border-left) and a dimmer (opacity 0.6) heading than its parent category — so a group like OPTICAL SCAN TEST visibly reads as nested under RESILIENCE & INFRA, never same-level'
+    );
+  }
+
+  // 215.15  [regression, Protocol 42] found via this unit's own LIVE
+  //         Playwright verification, not by 215.13's own VM-sandbox proof
+  //         (which stubs saveState() as a no-op and so never exercised the
+  //         real bug): _dshLoadNvTestCampaign() and _dshPresetFreshStart()
+  //         both write every DOM-synced field (lvl/xp/hpMax/hpCur/SPECIAL/
+  //         caps/karma/rads/skills) through _dshSyncDom() — the real
+  //         document.getElementById(id).value write every _nativeSetXxx()
+  //         setter also performs — so a real saveState() (which calls
+  //         syncStateFromDom() FIRST, reading those same inputs BACK into
+  //         state) can never silently revert them to whatever was on screen
+  //         before the fixture/preset ran. BEHAVIORAL: executed against a
+  //         REALISTIC syncStateFromDom() stub that actually reads the DOM
+  //         back (unlike 215.13's no-op), proving the fix survives a real
+  //         save cycle, not just a source-text grep.
+  {
+    let ok215 = false;
+    let err215 = null;
+    try {
+      const vm215 = require('vm');
+      const fixtureBody215 = extractFunctionBody(testConsole215, '_dshLoadNvTestCampaign');
+      const presetBody215 = extractFunctionBody(testConsole215, '_dshPresetFreshStart');
+      const syncDomBody215 = extractFunctionBody(testConsole215, '_dshSyncDom');
+      function runWithRealisticSave215(fnName, fnBody, ctxOverride) {
+        const state = {
+          lvl: 1,
+          xp: 0,
+          hpMax: 100,
+          hpCur: 100,
+          s: 5,
+          p: 5,
+          e: 5,
+          c: 5,
+          i: 5,
+          a: 5,
+          l: 5,
+          caps: 0,
+          karma: 0,
+          rads: 0,
+          la: 'OK',
+          ra: 'OK',
+          ll: 'OK',
+          rl: 'OK',
+          hd: 'OK',
+          skills: {},
+          inventory: [],
+          quests: [],
+          perks: [],
+          traits: [],
+          skillBooks: [],
+          magazines: [],
+          collectibles: [],
+          factions: {},
+          locationHistory: [],
+          loc: 'Goodsprings',
+          status: [],
+          squad: [],
+          equipped: { weapon: null, armor: null, headgear: null },
+          ammo: {},
+          campaign_notes: [],
+        };
+        const reg = {
+          items: [
+            { name: 'Test Weapon', type: 'weapon' },
+            { name: 'Test Armor', type: 'armor' },
+            { name: 'Test Aid', type: 'aid' },
+            { name: 'Test Misc', type: 'misc' },
+          ],
+          quests: [{ name: 'Q1' }],
+          perks: [{ name: 'Perk1', type: 'regular', level: 2 }],
+          traits: [{ name: 'Trait1' }],
+          skillBooks: [{ name: 'Book1' }],
+          magazines: [{ name: 'Mag1' }],
+          collectibles: [{ name: 'Globe1' }],
+          zones: [{ name: 'ZoneA', locations: [] }],
+          companions: [{ name: 'Comp1' }],
+        };
+        const src = `
+          var state = __state;
+          var FALLOUT_REGISTRY = __reg;
+          function getGameContext() { return '${ctxOverride}'; }
+          function getSkillKeys() { return ['guns', 'sneak', 'speech']; }
+          function getFactionRegistry() { return [{ key: 'ncr', name: 'NCR' }]; }
+          function getAmmoCalibers() { return ['9mm']; }
+          function appendToChat() {}
+          function updateMath() {}
+          var _DSH_SPECIAL_KEYS = ['s', 'p', 'e', 'c', 'i', 'a', 'l'];
+          var __domInputs = {};
+          var document = {
+            getElementById: function (id) {
+              if (!__domInputs[id]) __domInputs[id] = { value: '' };
+              return __domInputs[id];
+            },
+          };
+          function _dshSyncDom(id, val) ${syncDomBody215}
+          function loadUI() {}
+          // REALISTIC saveState(): actually reads the DOM back into state
+          // for every field the real syncStateFromDom() reads — the exact
+          // mechanism that silently reverted lvl/caps/etc. before the fix.
+          function saveState() {
+            var lvlEl = document.getElementById('stat_lvl');
+            if (lvlEl.value !== '') state.lvl = parseInt(lvlEl.value, 10) || 1;
+            var xpEl = document.getElementById('stat_xp');
+            if (xpEl.value !== '') state.xp = parseInt(xpEl.value, 10) || 0;
+            var hpMaxEl = document.getElementById('stat_hp_max');
+            if (hpMaxEl.value !== '') state.hpMax = parseInt(hpMaxEl.value, 10) || 100;
+            var hpCurEl = document.getElementById('stat_hp_cur');
+            if (hpCurEl.value !== '') state.hpCur = parseInt(hpCurEl.value, 10) || 0;
+            _DSH_SPECIAL_KEYS.forEach(function (k) {
+              var el = document.getElementById('s_' + k);
+              if (el.value !== '') state[k] = parseInt(el.value, 10) || 5;
+            });
+            var capsEl = document.getElementById('c_caps');
+            if (capsEl.value !== '') state.caps = parseInt(capsEl.value, 10) || 0;
+            var karmaEl = document.getElementById('stat_karma');
+            if (karmaEl.value !== '') state.karma = parseInt(karmaEl.value, 10) || 0;
+            var radsEl = document.getElementById('stat_rads');
+            if (radsEl.value !== '') state.rads = parseInt(radsEl.value, 10) || 0;
+          }
+          function ${fnName}() ${fnBody}
+          ${fnName}();
+        `;
+        const sandbox = { console, __state: state, __reg: reg };
+        vm215.createContext(sandbox);
+        vm215.runInContext(src, sandbox);
+        return state;
+      }
+      const fixtureState215 = runWithRealisticSave215(
+        '_dshLoadNvTestCampaign',
+        fixtureBody215,
+        'FNV'
+      );
+      const presetState215 = runWithRealisticSave215('_dshPresetFreshStart', presetBody215, 'FNV');
+      ok215 =
+        fixtureState215.lvl === 18 &&
+        fixtureState215.caps === 3450 &&
+        fixtureState215.hpMax === 165 &&
+        fixtureState215.s === 6 &&
+        presetState215.lvl === 1 &&
+        presetState215.caps === 0 &&
+        presetState215.s === 5;
+    } catch (e) {
+      err215 = e;
+    }
+    assert(
+      ok215,
+      "215.15: [regression, Protocol 42] BEHAVIORAL — _dshLoadNvTestCampaign()/_dshPresetFreshStart(), run against a REALISTIC saveState() that reads lvl/caps/hpMax/SPECIAL back out of the DOM (the real syncStateFromDom() mechanism), still show the fixture/preset's own intended values afterward — proving _dshSyncDom()'s direct DOM writes prevent the silent revert this unit's live verification originally caught" +
+        (err215 ? ' — ' + err215.message : '')
+    );
+  }
+
+  // 215.16  [regression, Protocol 42] found via this unit's own LIVE
+  //         Playwright verification: _invoke()'s destructive-tool confirm
+  //         dialog reuses the shared #sysModal, which normally sits BELOW
+  //         the Diagnostic Shell's own scrim/drawer (terminal.css) so the
+  //         shell stays reachable over an already-open app modal — that
+  //         left the shell's OWN confirm dialog rendered behind itself and
+  //         genuinely unclickable (confirmed live via
+  //         document.elementFromPoint() landing on #dshScrim). _invoke()
+  //         now toggles body.dsh-modal-elevate for exactly the duration of
+  //         its confirmAction() call.
+  {
+    const invokeBody215b = extractFunctionBody(testConsole215, '_invoke');
+    assert(
+      /document\.body\.classList\.add\('dsh-modal-elevate'\)/.test(invokeBody215b) &&
+        /document\.body\.classList\.remove\('dsh-modal-elevate'\)/.test(invokeBody215b) &&
+        /#dshSections details\.sub-panel details\.sub-panel/.test(terminalCss215) === true && // sanity: terminalCss215 loaded
+        /body\.dsh-modal-elevate #sysModal/.test(terminalCss215),
+      "215.16: [regression, Protocol 42] _invoke() adds body.dsh-modal-elevate before calling confirmAction() and removes it once the promise settles, and terminal.css's body.dsh-modal-elevate #sysModal rule elevates the shared confirm modal above the shell for exactly that window — so a destructive tool's own confirm dialog can never render unreachable behind the shell that triggered it"
     );
   }
 }

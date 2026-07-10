@@ -1691,6 +1691,28 @@ button.lamp {
   justify-content: center;
   backdrop-filter: blur(2px);
 }
+/* U4b (Protocol 42 fix, found via this unit's own live Playwright
+   verification): #sysModal normally sits at z-index:2000, BELOW the
+   Diagnostic Shell's .dsh-scrim/.dsh-drawer/.dsh-fab (20000-20002) — a
+   deliberate U1/U2 choice so the shell stays reachable over whatever app
+   modal was already open (e.g. the first-visit PATCH NOTES popup). That
+   same ordering silently made every one of U4b's 77 destructive:true tools
+   unusable: _invoke()'s auto-confirm-gate opens THIS SAME #sysModal for its
+   CONFIRM/ABORT dialog, which rendered behind the shell's own scrim and was
+   genuinely unclickable (confirmed via document.elementFromPoint() landing
+   on #dshScrim, not the button) — not a test artifact, a real dead end for
+   a real user. A blanket z-index swap was tried first and reverted: it
+   fixed the shell's own confirm dialog but broke the ORIGINAL case this
+   ordering protected (a genuinely common one — the patch-notes popup then
+   blocked the FAB). The fix is instead scoped and temporary: _invoke()
+   (js/test-console.js) adds this class to <body> for the exact duration of
+   its own confirmAction() call (removed as soon as the promise settles,
+   confirmed or cancelled), so ONLY a confirm dialog the shell itself
+   triggered is ever elevated — every other #sysModal use (patch notes, save
+   help, etc.) keeps the original z-index:2000, unaffected. */
+body.dsh-modal-elevate #sysModal {
+  z-index: 20010;
+}
 .panel h2 {
   margin: -10px -10px 10px -10px;
   padding: 10px;
@@ -1773,6 +1795,12 @@ details.panel:not([open]) summary h2 {
    z-index sits above ordinary content/modals (sysModal 2000, location-card
    5000) but well below the system-critical overlays that must always win
    over a dev tool (#bootScreen 100000, the shutdown covers 99998-100002).
+   U4b (Protocol 42 fix): a confirm dialog the shell's OWN _invoke() opens
+   (via the shared #sysModal) is the one exception — see the scoped
+   body.dsh-modal-elevate rule on .modal-overlay, toggled only for the
+   duration of that one confirmAction() call, so it is never buried behind
+   this z-index range while every other #sysModal use stays exactly where
+   this comment describes.
    The slide-in is a plain `animation:` (Protocol UI-9) — the existing
    global prefers-reduced-motion block (animation-duration:0.01ms on *)
    neutralizes it to an instant open with no bespoke carve-out.
@@ -2102,6 +2130,57 @@ details.panel:not([open]) summary h2 {
    (border-top + summary cursor); the retired .dsh-tool-subhead (a flat,
    always-expanded label div) is gone — a collapsible heading replaces it.
    .dsh-tool-grid (the synthesized-button flex-wrap row) is unchanged. */
+
+/* U4b: SUBMENU VISUAL HIERARCHY (owner screenshot report — a nested group
+   heading, e.g. OPTICAL SCAN TEST under RESILIENCE & INFRA, read as the SAME
+   level as its parent category heading, since both reused the identical
+   plain `details.sub-panel` rule above with zero visual distinction). Scoped
+   to `#dshSections` (unique to the Diagnostic Shell drawer) so no other
+   nested-sub-panel usage in the app (e.g. AMMO RESERVES inside BACKPACK
+   INVENTORY, which is only ONE level deep, not sub-panel-inside-sub-panel)
+   is touched — a genuinely NESTED sub-panel (any details.sub-panel that is a
+   descendant of another details.sub-panel, both inside #dshSections) gets a
+   left indent + a dimmer/smaller heading so it visibly reads as a child of
+   its category, never a sibling. */
+#dshSections details.sub-panel details.sub-panel {
+  margin-left: 10px;
+  padding-left: 8px;
+  border-left: 2px solid rgba(var(--robco-green-rgb), 0.25);
+  border-top-color: rgba(var(--robco-green-rgb), 0.25);
+}
+#dshSections details.sub-panel details.sub-panel > summary h3 {
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+/* U4b: a synthesized parameterized-cheat row (control:'input'|'select'|
+   'select-input' — a select and/or an input plus a GO button, see
+   _renderShell() in js/test-console.js) sits inside the same .dsh-tool-grid
+   flex-wrap row as the plain buttons; the row's own label wraps to its own
+   line (flex-basis:100%) so the select/input/GO trio always reads below it,
+   never crammed onto one crowded line at 360/412px. */
+.dsh-tool-row select,
+.dsh-tool-row input {
+  box-sizing: border-box;
+}
+
+/* U4b: the small on-panel DEV-MARKER reset button (_mountInlineResets(),
+   js/test-console.js) — a dimmed .btn-sm variant so it reads as a
+   staging-only affordance riding alongside the panel's own real controls,
+   never mistaken for one of them. .btn-sm already guarantees the Protocol 17
+   28px tap-target floor; this only tweaks color/size/spacing. */
+.dsh-inline-reset {
+  opacity: 0.6;
+  border-color: rgba(var(--robco-green-rgb), 0.4);
+  color: var(--bezel-wire, var(--robco-green));
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  margin: 4px 0;
+}
+.dsh-inline-reset:hover,
+.dsh-inline-reset:focus-visible {
+  opacity: 1;
+}
 
 /* U4a: a labeled read-only INSPECT line (js/test-console.js _inspectRow(),
    shared with _chassisIdRow()) — human-readable "LABEL: VALUE" text only,
