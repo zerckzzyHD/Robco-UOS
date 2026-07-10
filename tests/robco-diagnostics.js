@@ -2494,12 +2494,24 @@ header('Keyboard Shortcuts Group');
 
   // 36.3 Global keydown listener calls closeModal() on Escape
   {
-    const kdIdx = uiSrc36.indexOf("document.addEventListener('keydown'");
-    const kdSnippet = kdIdx >= 0 ? uiSrc36.slice(kdIdx, kdIdx + 4000) : '';
-    assert(
-      /Escape/.test(kdSnippet) && /closeModal/.test(kdSnippet),
-      "Global keydown listener handles 'Escape' → closeModal() (Esc closes dialog)"
-    );
+    // Protocol 42 (harness-only): a naive first-match indexOf() assumed only
+    // one document.addEventListener('keydown', ...) call existed in this
+    // file — Ceremony Moments Wave 1's M1 ignition-skip listener added a
+    // second, unrelated one earlier in the file. Scan every occurrence
+    // instead, and pass if ANY of them is the real Escape/closeModal handler.
+    let found = false;
+    let searchFrom36 = 0;
+    for (;;) {
+      const kdIdx = uiSrc36.indexOf("document.addEventListener('keydown'", searchFrom36);
+      if (kdIdx === -1) break;
+      const kdSnippet = uiSrc36.slice(kdIdx, kdIdx + 4000);
+      if (/Escape/.test(kdSnippet) && /closeModal/.test(kdSnippet)) {
+        found = true;
+        break;
+      }
+      searchFrom36 = kdIdx + 1;
+    }
+    assert(found, "Global keydown listener handles 'Escape' → closeModal() (Esc closes dialog)");
   }
 
   // 36.4 closeModal() function exists in ui.js
@@ -13351,7 +13363,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         /function _readOverseerLog\(\)/.test(uiCore119) &&
         /MetaStore\.get\(OVERSEER_LOG_KEY\)/.test(rd) &&
         /catch/.test(rd) &&
-        /bootCount: 0, totalPowerOnMs: 0, longestSessionMs: 0/.test(rd),
+        /bootCount: 0,\s*totalPowerOnMs: 0,\s*longestSessionMs: 0,/.test(rd),
       '119.1: OVERSEER_LOG_KEY + _readOverseerLog() back the log with a localStorage device stat and return zeroes on parse failure (never throws)'
     );
   }
@@ -20055,7 +20067,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //         — so the click itself never bypasses the master-mute guard
   const masterMuteFn156 = extractFunctionBody(audio156, 'toggleMasterMute');
   assert(
-    /if \(isMuted\) playBoardThunk\(false\);\s*\n\s*MetaStore\.set\('robco_master_muted', isMuted\);\s*\n\s*AudioSettings\.masterMute = isMuted;\s*\n\s*if \(!isMuted\) playBoardThunk\(true\);/.test(
+    /if \(isMuted\) playBoardThunk\(false\);\s*\n\s*MetaStore\.set\('robco_master_muted', isMuted\);\s*\n\s*AudioSettings\.masterMute = isMuted;\s*\n\s*if \(!isMuted\) \{\s*\n\s*playBoardThunk\(true\);/.test(
       masterMuteFn156
     ),
     "156.10: toggleMasterMute() plays the eject thunk before the flag flips true and the reseat thunk after it flips back false, so playBoardThunk()'s own masterMute guard is never the thing suppressing it"
@@ -34389,6 +34401,584 @@ header('Suite 207 — VISUAL UPLOAD OCR Unit 3 (hybrid wiring + kill-switch)');
       '207.17: the Unit 3 hybrid-routing functions never call saveState()/assign state.*/call autoImportState — no new campaign-state field, writes stay confined to applyVisualParse() (Unit 2, Protocol 4 not triggered)'
     );
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 208 — CEREMONY MOMENTS WAVE 1 (M1-M5): campaign ignition,
+//  Director greeting, firmware flash, long-absence recalibration, SEAT verb
+//  planning/CEREMONY_MOMENTS_SLATE.md Tier 1: M1 Campaign Ignition (a short,
+//  skippable commissioning ceremony replacing wipeTerminal()'s two bare chat
+//  lines), M2 Director on the Wire (consumes the previously-orphaned
+//  identity.overseer.greeting), M3 Firmware Flash (a post-update boot POST
+//  line via a new registered robco_last_seen_version MetaStore pref), M4
+//  Long-Absence Recalibration (a "UNIT IDLE N DAYS" boot line via a new
+//  additive lastFlushAt field on the existing Overseer's Log blob), and M5
+//  SEAT (the Protocol UI-9 pending motion verb, adopted at 4 install call
+//  sites). Every moment is transient/MetaStore-only (Protocol 4 not
+//  triggered) and game-agnostic (Protocol 38).
+//  29 tests
+// ══════════════════════════════════════════════════════════════
+header('Suite 208 — CEREMONY MOMENTS WAVE 1 (M1-M5)');
+{
+  const coreSrc208 = readFile('js/ui-core.js');
+  const audioSrc208 = readFile('js/ui-audio.js');
+  const stateSrc208 = readFile('js/state.js');
+  const css208 = readFile('css/terminal.css');
+  const cssStripped208 = css208.replace(/\/\*[\s\S]*?\*\//g, '');
+  const claudeSrc208 = readFile('CLAUDE.md');
+
+  const ignitionBody208 = extractFunctionBody(coreSrc208, '_runCampaignIgnition');
+  const wipeBody208 = extractFunctionBody(coreSrc208, 'wipeTerminal');
+  const greetBody208 = extractFunctionBody(coreSrc208, '_maybeGreetOverseer');
+  const selectSubsystemBody208 = extractFunctionBody(coreSrc208, 'selectSubsystem');
+  const motionSeatBody208 = extractFunctionBody(coreSrc208, '_motionSeat');
+  const bezelSweepBody208 = extractFunctionBody(coreSrc208, '_bezelSweep');
+  const seatGameCartridgeBody208 = extractFunctionBody(coreSrc208, '_seatGameCartridge');
+  const openToolDeckBody208 = extractFunctionBody(coreSrc208, 'openToolDeck');
+  const readOverseerLogBody208 = extractFunctionBody(coreSrc208, '_readOverseerLog');
+  const flushOverseerLogBody208 = extractFunctionBody(coreSrc208, '_flushOverseerLog');
+
+  const checkFirmwareFlashBody208 = extractFunctionBody(audioSrc208, '_checkFirmwareFlash');
+  const fireFlashFlourishBody208 = extractFunctionBody(audioSrc208, '_fireFirmwareFlashFlourish');
+  const checkLongAbsenceBody208 = extractFunctionBody(audioSrc208, '_checkLongAbsence');
+  const runBootSequenceBody208 = extractFunctionBody(audioSrc208, 'runBootSequence');
+  const startCrtHumBody208 = extractFunctionBody(audioSrc208, 'startCrtHum');
+  const seatOpticsTubeBody208 = extractFunctionBody(audioSrc208, '_seatOpticsTube');
+  const toggleMasterMuteBody208 = extractFunctionBody(audioSrc208, 'toggleMasterMute');
+  const initBezelSubsystemBody208 = extractFunctionBody(coreSrc208, 'initBezelSubsystem');
+
+  // ── M1 CAMPAIGN IGNITION ────────────────────────────────────────────────
+
+  // 208.1 static — the ignition sequence types all 4 commissioning lines,
+  //        toggles ignition-dim, and is skippable via pointerdown/keydown
+  //        (wired then cleanly removed on finish).
+  assert(
+    /'> UNIT RE-COMMISSIONED'/.test(ignitionBody208) &&
+      /'> REGISTERING NEW OPERATOR……… \[OK\]'/.test(ignitionBody208) &&
+      /'> CALIBRATING S\.P\.E\.C\.I\.A\.L\. BASELINE… \[OK\]'/.test(ignitionBody208) &&
+      /'> DIRECTIVE REGISTRY: EMPTY — AWAITING ORDERS'/.test(ignitionBody208) &&
+      /classList\.add\('ignition-dim'\)/.test(ignitionBody208) &&
+      /classList\.remove\('ignition-dim'\)/.test(ignitionBody208) &&
+      /addEventListener\('pointerdown', finish, true\)/.test(ignitionBody208) &&
+      /addEventListener\('keydown', finish, true\)/.test(ignitionBody208) &&
+      /removeEventListener\('pointerdown', finish, true\)/.test(ignitionBody208) &&
+      /removeEventListener\('keydown', finish, true\)/.test(ignitionBody208),
+    '208.1: _runCampaignIgnition() types all 4 commissioning lines, toggles .ignition-dim, and wires a skip via both pointerdown and keydown (added and cleanly removed on finish)'
+  );
+
+  // 208.2 static — wipeTerminal() replaces the old two bare chat lines with
+  //        _runCampaignIgnition(...), and the functional SELECT GAME CONTEXT
+  //        prompt still follows, unchanged, inside the completion callback.
+  assert(
+    /_runCampaignIgnition\(\(\) => \{/.test(wipeBody208) &&
+      /'> SELECT GAME CONTEXT:'/.test(wipeBody208) &&
+      !/TERMINAL WIPED\. INITIATING NEW CAMPAIGN/.test(wipeBody208) &&
+      /Type \[CONTEXT: \$\{d\.id\}\] for \$\{d\.label\}/.test(wipeBody208) &&
+      /Or the AI will detect your game automatically\./.test(wipeBody208),
+    '208.2: wipeTerminal() calls _runCampaignIgnition() instead of the old bare "TERMINAL WIPED" line, with the unchanged SELECT GAME CONTEXT prompt riding the completion callback'
+  );
+
+  // 208.3 static — the ignition reuses _coreFlare() (CHASSIS living core,
+  //        Protocol 22) and the SAME greeting consumer M2 uses, and marks
+  //        _overseerGreeted so a same-session UPLINK visit doesn't re-greet.
+  assert(
+    /_coreFlare\(\)/.test(ignitionBody208) &&
+      /_overseerIdentity\(\)/.test(ignitionBody208) &&
+      /OVERSEER_GENERIC_FALLBACK\.greeting/.test(ignitionBody208) &&
+      /_overseerGreeted = true/.test(ignitionBody208),
+    '208.3: _runCampaignIgnition() reuses _coreFlare() and the same _overseerIdentity()/OVERSEER_GENERIC_FALLBACK greeting consumer as M2 (Protocol 22), and sets _overseerGreeted so a same-session UPLINK visit does not re-greet'
+  );
+
+  // 208.4 static — ZERO campaign-state write: no saveState()/state.<field>=
+  //        assignment/robco_v8 anywhere in the ignition sequence.
+  assert(
+    !/saveState\(\)/.test(ignitionBody208) &&
+      !/\bstate\.\w+\s*=/.test(ignitionBody208) &&
+      !/robco_v8/.test(ignitionBody208),
+    '208.4: _runCampaignIgnition() never calls saveState() or assigns state.*/robco_v8 — every line is the normal un-persisted appendToChat(...,true) convention'
+  );
+
+  // 208.5 static (CSS) — the dim is a plain @keyframes animation (reduced-
+  //        motion-safe by construction, Protocol UI-9), never transition-only.
+  assert(
+    /\.glass-frame\.ignition-dim \{\s*animation:\s*ignitionDim/.test(cssStripped208) &&
+      /@keyframes ignitionDim/.test(cssStripped208),
+    '208.5: .glass-frame.ignition-dim is a plain @keyframes animation (auto-neutralized by the global reduced-motion block), not a transition-only effect'
+  );
+
+  // 208.6 BEHAVIORAL (vm sandbox) — an un-skipped run posts every line (4
+  //        commissioning + the greeting), flares the core once, and calls
+  //        onComplete exactly once; a mid-sequence skip flushes every
+  //        remaining line at once and still flares/completes exactly once.
+  //        Uses a self-rescheduling setTimeout mock (never setInterval) —
+  //        ui-core.js retired its standalone setInterval timers (Suite
+  //        148.6), so _runCampaignIgnition() chains setTimeout instead.
+  {
+    const vm208a = require('vm');
+    let out208a = null;
+    let err208a = null;
+    try {
+      const declared208a = 'function _runCampaignIgnition(onComplete)' + ignitionBody208;
+      function makeRig208a() {
+        let currentTimer = null;
+        let nextId = 1;
+        const classes = new Set();
+        const listeners = {};
+        const chatLines = [];
+        const complete = { n: 0 };
+        let flareCount = 0;
+        const glassEl = {
+          classList: {
+            add: c => classes.add(c),
+            remove: c => classes.delete(c),
+          },
+        };
+        const sandbox = {
+          document: {
+            querySelector: sel => (sel === '.glass-frame' ? glassEl : null),
+            addEventListener: (evt, fn) => {
+              (listeners[evt] = listeners[evt] || []).push(fn);
+            },
+            removeEventListener: (evt, fn) => {
+              if (!listeners[evt]) return;
+              listeners[evt] = listeners[evt].filter(f => f !== fn);
+            },
+          },
+          appendToChat: line => chatLines.push(line),
+          setTimeout: fn => {
+            currentTimer = fn;
+            return nextId++;
+          },
+          clearTimeout: () => {
+            currentTimer = null;
+          },
+          _coreFlare: () => {
+            flareCount++;
+          },
+          _overseerIdentity: () => ({ greeting: '▸ TEST GREETING' }),
+          OVERSEER_GENERIC_FALLBACK: { greeting: '▸ FALLBACK GREETING' },
+          _overseerGreeted: false,
+          _testComplete: complete,
+        };
+        return {
+          sandbox,
+          fireTimer: () => {
+            const fn = currentTimer;
+            currentTimer = null;
+            if (fn) fn();
+          },
+          fireListener: evt => (listeners[evt] || []).slice().forEach(f => f()),
+          classes,
+          chatLines,
+          getFlareCount: () => flareCount,
+          getCompleteCount: () => complete.n,
+        };
+      }
+      // Case A: run to completion via the setTimeout chain (never skipped).
+      const rigA = makeRig208a();
+      vm208a.createContext(rigA.sandbox);
+      vm208a.runInContext(declared208a, rigA.sandbox);
+      vm208a.runInContext('_runCampaignIgnition(function(){ _testComplete.n++; });', rigA.sandbox);
+      for (let n = 0; n < 5; n++) rigA.fireTimer(); // 4 lines + the finishing tick
+      // Case B: skip mid-sequence (after exactly 1 real tick).
+      const rigB = makeRig208a();
+      vm208a.createContext(rigB.sandbox);
+      vm208a.runInContext(declared208a, rigB.sandbox);
+      vm208a.runInContext('_runCampaignIgnition(function(){ _testComplete.n++; });', rigB.sandbox);
+      rigB.fireTimer(); // one real line posted
+      rigB.fireListener('pointerdown'); // skip — flush the rest at once
+      out208a = {
+        aLines: rigA.chatLines.length,
+        aDim: rigA.classes.has('ignition-dim'),
+        aFlare: rigA.getFlareCount(),
+        aComplete: rigA.getCompleteCount(),
+        aLast: rigA.chatLines[rigA.chatLines.length - 1],
+        bLines: rigB.chatLines.length,
+        bDim: rigB.classes.has('ignition-dim'),
+        bFlare: rigB.getFlareCount(),
+        bComplete: rigB.getCompleteCount(),
+      };
+    } catch (e) {
+      err208a = e;
+    }
+    assert(
+      !err208a &&
+        out208a.aLines === 5 &&
+        !out208a.aDim &&
+        out208a.aFlare === 1 &&
+        out208a.aComplete === 1 &&
+        out208a.aLast === '▸ TEST GREETING' &&
+        out208a.bLines === 5 &&
+        !out208a.bDim &&
+        out208a.bFlare === 1 &&
+        out208a.bComplete === 1,
+      '208.6: [behavioral] an un-skipped ignition posts every line (4 commissioning + greeting), flares the core once, and calls onComplete once; a mid-sequence skip flushes every remaining line at once and still flares/completes exactly once — the dim class is always cleared either way' +
+        (err208a ? ' — ' + err208a.message : '')
+    );
+  }
+
+  // ── M2 DIRECTOR ON THE WIRE ─────────────────────────────────────────────
+
+  // 208.7 static — _maybeGreetOverseer() gates on a session flag PLUS a live
+  //        carrier, renders the greeting un-persisted, and pulses the scope.
+  assert(
+    /if \(_overseerGreeted\) return;/.test(greetBody208) &&
+      /_isUplinkConnected\(\)/.test(greetBody208) &&
+      /_overseerGreeted = true;/.test(greetBody208) &&
+      /appendToChat\(greeting, 'sys', true\)/.test(greetBody208) &&
+      /_scopePulse\(\)/.test(greetBody208),
+    '208.7: _maybeGreetOverseer() gates on the session-scoped _overseerGreeted flag AND a live carrier (_isUplinkConnected()), renders via the un-persisted appendToChat(...,true) convention, and pulses the scope'
+  );
+
+  // 208.8 static — OVERSEER_GENERIC_FALLBACK carries a greeting (Protocol 38
+  //        generic fallback for an unauthored game — never borrowed fiction).
+  assert(
+    /OVERSEER_GENERIC_FALLBACK = \{[\s\S]{0,500}greeting:/.test(coreSrc208),
+    '208.8: OVERSEER_GENERIC_FALLBACK carries its own greeting string (Protocol 38 — a generic fallback for an unauthored game, never another game’s borrowed fiction)'
+  );
+
+  // 208.9 static — _maybeGreetOverseer() is called from BOTH genuine
+  //        user-initiated UPLINK arrivals (selectSubsystem's uplink branch
+  //        and the #go=comm PWA deep link), but NEVER from the boot-time
+  //        bezel-highlight restore (initBezelSubsystem) — the Module Bay
+  //        hatch-ceremony precedent (Protocol 42: never fire at page load).
+  assert(
+    /_maybeGreetOverseer\(\); \/\/ M2/.test(selectSubsystemBody208) &&
+      !/_maybeGreetOverseer/.test(initBezelSubsystemBody208),
+    '208.9: selectSubsystem()’s uplink branch calls _maybeGreetOverseer(), while initBezelSubsystem() (the boot-time restore) never does — a genuine per-visit gate, not a boot-time fire'
+  );
+  {
+    const shortcutRoutesSrc208 = coreSrc208.slice(
+      coreSrc208.indexOf('const SHORTCUT_ROUTES'),
+      coreSrc208.indexOf('function routeLaunchShortcut')
+    );
+    assert(
+      /_maybeGreetOverseer\(\); \/\/ M2/.test(shortcutRoutesSrc208),
+      '208.9b: the #go=comm PWA shortcut deep-link route also calls _maybeGreetOverseer() — a genuine UPLINK arrival, not just the bezel-keycap path'
+    );
+  }
+
+  // 208.10 static — ZERO write: _maybeGreetOverseer() never calls
+  //         saveState()/MetaStore.set/touches state.* — _overseerGreeted is
+  //         a transient module var only.
+  assert(
+    !/saveState\(\)/.test(greetBody208) &&
+      !/MetaStore\.set/.test(greetBody208) &&
+      !/\bstate\.\w+\s*=/.test(greetBody208),
+    '208.10: _maybeGreetOverseer() never calls saveState()/MetaStore.set or assigns state.* — _overseerGreeted is a transient in-memory module var only'
+  );
+
+  // 208.11 BEHAVIORAL (vm sandbox) — fires exactly once across two calls
+  //         while connected; never fires at all while disconnected.
+  {
+    const vm208b = require('vm');
+    let out208b = null;
+    let err208b = null;
+    try {
+      const declared208b =
+        'let _overseerGreeted = false;\nfunction _maybeGreetOverseer()' + greetBody208;
+      function run208b(connected) {
+        const chatLines = [];
+        let pulses = 0;
+        const sandbox = {
+          _isUplinkConnected: () => connected,
+          _overseerIdentity: () => ({ greeting: 'GREETING' }),
+          OVERSEER_GENERIC_FALLBACK: { greeting: 'FALLBACK' },
+          appendToChat: line => chatLines.push(line),
+          _scopePulse: () => {
+            pulses++;
+          },
+        };
+        vm208b.createContext(sandbox);
+        vm208b.runInContext(declared208b, sandbox);
+        vm208b.runInContext('_maybeGreetOverseer();', sandbox);
+        vm208b.runInContext('_maybeGreetOverseer();', sandbox); // a second arrival this session
+        const greeted = vm208b.runInContext('_overseerGreeted;', sandbox);
+        return { lines: chatLines.length, pulses, greeted };
+      }
+      out208b = { connected: run208b(true), disconnected: run208b(false) };
+    } catch (e) {
+      err208b = e;
+    }
+    assert(
+      !err208b &&
+        out208b.connected.lines === 1 &&
+        out208b.connected.pulses === 1 &&
+        out208b.connected.greeted === true &&
+        out208b.disconnected.lines === 0 &&
+        out208b.disconnected.pulses === 0 &&
+        out208b.disconnected.greeted === false,
+      '208.11: [behavioral] _maybeGreetOverseer() greets exactly once across two calls while the carrier is live, but never fires at all while disconnected' +
+        (err208b ? ' — ' + err208b.message : '')
+    );
+  }
+
+  // ── M3 FIRMWARE FLASH ────────────────────────────────────────────────────
+
+  // 208.12 static — robco_last_seen_version is registered in META_MANIFEST
+  //         (Protocol 4/UI-6 — a device pref, not a campaign-state field).
+  assert(
+    /robco_last_seen_version:\s*\{\s*type:\s*'string'/.test(stateSrc208),
+    '208.12: robco_last_seen_version is registered in META_MANIFEST (state.js) as a string device preference'
+  );
+
+  // 208.13 static — _checkFirmwareFlash() always stamps APP_VERSION, and
+  //         only reports a flash when a PRIOR value existed and differs.
+  assert(
+    /const lastSeen = MetaStore\.get\('robco_last_seen_version'\);/.test(
+      checkFirmwareFlashBody208
+    ) &&
+      /const flashedFrom = lastSeen && lastSeen !== APP_VERSION \? lastSeen : null;/.test(
+        checkFirmwareFlashBody208
+      ) &&
+      /MetaStore\.set\('robco_last_seen_version', APP_VERSION\);/.test(checkFirmwareFlashBody208) &&
+      /return flashedFrom;/.test(checkFirmwareFlashBody208),
+    '208.13: _checkFirmwareFlash() always stamps robco_last_seen_version to the live APP_VERSION, and reports a flash ONLY when a prior value existed and differs (absent = treated as already seen)'
+  );
+
+  // 208.14 BEHAVIORAL (vm sandbox) — absent key never flashes (and gets
+  //         stamped for next time); a stale, differing key flashes with the
+  //         correct fromVersion; a key matching the current version never
+  //         flashes.
+  {
+    const vm208c = require('vm');
+    let out208c = null;
+    let err208c = null;
+    try {
+      const declared208c =
+        "const APP_VERSION = '2.7.0';\nfunction _checkFirmwareFlash()" + checkFirmwareFlashBody208;
+      function run208c(initial) {
+        const store = { robco_last_seen_version: initial };
+        const sandbox = {
+          MetaStore: {
+            get: k => (Object.prototype.hasOwnProperty.call(store, k) ? store[k] : null),
+            set: (k, v) => {
+              store[k] = v;
+            },
+          },
+        };
+        vm208c.createContext(sandbox);
+        vm208c.runInContext(declared208c, sandbox);
+        const result = vm208c.runInContext('_checkFirmwareFlash();', sandbox);
+        return { result, stamped: store.robco_last_seen_version };
+      }
+      out208c = {
+        absent: run208c(null),
+        stale: run208c('2.6.0'),
+        current: run208c('2.7.0'),
+      };
+    } catch (e) {
+      err208c = e;
+    }
+    assert(
+      !err208c &&
+        out208c.absent.result === null &&
+        out208c.absent.stamped === '2.7.0' &&
+        out208c.stale.result === '2.6.0' &&
+        out208c.stale.stamped === '2.7.0' &&
+        out208c.current.result === null &&
+        out208c.current.stamped === '2.7.0',
+      '208.14: [behavioral] _checkFirmwareFlash() never flashes on an absent prior version (but stamps it for next time), flashes with the correct fromVersion on a genuine stale-version mismatch, and never flashes when the stored version already matches' +
+        (err208c ? ' — ' + err208c.message : '')
+    );
+  }
+
+  // 208.15 static — runBootSequence() splices the FIRMWARE FLASH POST line
+  //         only when a flash was detected, using the same "just before the
+  //         final line" splice convention as the pre-existing WU-T3 line;
+  //         boot-integrity (the _bootActive window + onComplete + the
+  //         three-flavor _bootLinesFor() call) is fully preserved.
+  assert(
+    /const _flashFromVersion = _checkFirmwareFlash\(\);/.test(runBootSequenceBody208) &&
+      /if \(_flashFromVersion\) \{[\s\S]{0,260}FIRMWARE FLASH DETECTED/.test(
+        runBootSequenceBody208
+      ) &&
+      /_bootActive = true;/.test(runBootSequenceBody208) &&
+      /_bootActive = false;/.test(runBootSequenceBody208) &&
+      /if \(onComplete\) onComplete\(\);/.test(runBootSequenceBody208) &&
+      /_bootLinesFor\(flavor\)/.test(runBootSequenceBody208),
+    '208.15: runBootSequence() splices the FIRMWARE FLASH DETECTED POST line only when _checkFirmwareFlash() reports a change, and the pre-existing boot-integrity contract (_bootActive open/close, onComplete, the three-flavor _bootLinesFor() call) is untouched'
+  );
+
+  // 208.16 static (CSS) — the serial-plate glint + REV LOG pulse are plain
+  //         @keyframes animations (reduced-motion-safe).
+  assert(
+    /\.serial\.firmware-glint \{\s*animation:\s*firmwareGlint/.test(cssStripped208) &&
+      /@keyframes firmwareGlint/.test(cssStripped208) &&
+      /#btnViewChangelog\.firmware-pulse \{\s*animation:\s*firmwarePulse/.test(cssStripped208) &&
+      /@keyframes firmwarePulse/.test(cssStripped208),
+    '208.16: .serial.firmware-glint and #btnViewChangelog.firmware-pulse are both plain @keyframes animations (auto-neutralized by the global reduced-motion block)'
+  );
+
+  // 208.17 static — the flourish fires ONLY from inside the boot-completion
+  //         path, and ONLY when a flash was actually detected this boot.
+  assert(
+    /if \(_flashFromVersion && typeof _fireFirmwareFlashFlourish === 'function'\) \{/.test(
+      runBootSequenceBody208
+    ) &&
+      /classList\.remove\('firmware-glint'\)/.test(fireFlashFlourishBody208) &&
+      /classList\.add\('firmware-glint'\)/.test(fireFlashFlourishBody208),
+    '208.17: _fireFirmwareFlashFlourish() is called only when _flashFromVersion is truthy, and toggles its classes via the same remove/reflow/add restart pattern as every other one-shot flourish in the codebase'
+  );
+
+  // ── M4 LONG-ABSENCE RECALIBRATION ───────────────────────────────────────
+
+  // 208.18 static — lastFlushAt is an additive, zeroes-safe field on the
+  //         existing Overseer's Log blob, written on every flush.
+  assert(
+    /lastFlushAt: num\(o\.lastFlushAt\),/.test(readOverseerLogBody208) &&
+      /lastFlushAt: 0,/.test(readOverseerLogBody208) &&
+      /o\.lastFlushAt = Date\.now\(\);/.test(flushOverseerLogBody208),
+    '208.18: _readOverseerLog() parses an additive, zeroes-safe lastFlushAt field (both the JSON.parse path and the catch fallback), and _flushOverseerLog() stamps it on every flush'
+  );
+
+  // 208.19 static — _checkLongAbsence() reads lastFlushAt via
+  //         _readOverseerLog(), never fires when absent, and the threshold
+  //         is exactly 3 days.
+  assert(
+    /const LONG_ABSENCE_DAYS = 3;/.test(audioSrc208) &&
+      /const lastFlushAt = _readOverseerLog\(\)\.lastFlushAt;/.test(checkLongAbsenceBody208) &&
+      /if \(!lastFlushAt\) return null;/.test(checkLongAbsenceBody208) &&
+      /return days >= LONG_ABSENCE_DAYS \? days : null;/.test(checkLongAbsenceBody208),
+    '208.19: _checkLongAbsence() reads lastFlushAt via _readOverseerLog(), returns null when absent (never fires on a first-ever session), and gates on a 3-day threshold (LONG_ABSENCE_DAYS)'
+  );
+
+  // 208.20 BEHAVIORAL (vm sandbox) — absent lastFlushAt never fires; 1 day
+  //         idle stays silent (under threshold); 5 days idle fires with the
+  //         correct whole-day count.
+  {
+    const vm208d = require('vm');
+    let out208d = null;
+    let err208d = null;
+    try {
+      const declared208d =
+        'const LONG_ABSENCE_DAYS = 3;\nfunction _checkLongAbsence()' + checkLongAbsenceBody208;
+      function run208d(lastFlushAt) {
+        const sandbox = { _readOverseerLog: () => ({ lastFlushAt }) };
+        vm208d.createContext(sandbox);
+        vm208d.runInContext(declared208d, sandbox);
+        return vm208d.runInContext('_checkLongAbsence();', sandbox);
+      }
+      const now = Date.now();
+      out208d = {
+        absent: run208d(0),
+        oneDay: run208d(now - 1 * 86400000),
+        fiveDays: run208d(now - 5 * 86400000 - 60000),
+      };
+    } catch (e) {
+      err208d = e;
+    }
+    assert(
+      !err208d && out208d.absent === null && out208d.oneDay === null && out208d.fiveDays === 5,
+      '208.20: [behavioral] _checkLongAbsence() never fires with no recorded lastFlushAt or under the 3-day threshold, but returns the correct whole-day count once past it' +
+        (err208d ? ' — ' + err208d.message : '')
+    );
+  }
+
+  // 208.21 static — runBootSequence() splices the UNIT IDLE POST line only
+  //         when _checkLongAbsence() reports idle days, and sets
+  //         _longAbsenceBoot for the hum-ramp nicety; boot-integrity intact.
+  assert(
+    /const _idleDays = _checkLongAbsence\(\);/.test(runBootSequenceBody208) &&
+      /_longAbsenceBoot = !!_idleDays;/.test(runBootSequenceBody208) &&
+      /if \(_idleDays\) \{[\s\S]{0,220}UNIT IDLE/.test(runBootSequenceBody208),
+    '208.21: runBootSequence() splices the UNIT IDLE POST line only when _checkLongAbsence() reports idle days, and sets _longAbsenceBoot for the startCrtHum() nicety'
+  );
+
+  // 208.22 static — the long-absence hum-ramp nicety is STRICTLY additive:
+  //         the non-long-absence branch is the exact pre-existing instant
+  //         gain assignment, untouched.
+  assert(
+    /if \(_longAbsenceBoot && audioCtx\) \{/.test(startCrtHumBody208) &&
+      /crtHumGain\.gain\.setValueAtTime\(0, audioCtx\.currentTime\);/.test(startCrtHumBody208) &&
+      /crtHumGain\.gain\.linearRampToValueAtTime\(0\.007, audioCtx\.currentTime \+ 2\.2\);/.test(
+        startCrtHumBody208
+      ) &&
+      /\} else \{\s*crtHumGain\.gain\.value = 0\.007;\s*\}/.test(startCrtHumBody208),
+    '208.22: startCrtHum()’s long-absence branch is purely additive — every other boot still runs the exact pre-existing instant crtHumGain.gain.value = 0.007 assignment, unchanged'
+  );
+
+  // ── M5 SEAT ──────────────────────────────────────────────────────────────
+
+  // 208.23 static — _motionSeat(el) mirrors _bezelSweep()'s exact
+  //         remove/reflow/add restart pattern.
+  assert(
+    /el\.classList\.remove\('seat'\);/.test(motionSeatBody208) &&
+      /void el\.offsetWidth;/.test(motionSeatBody208) &&
+      /el\.classList\.add\('seat'\);/.test(motionSeatBody208) &&
+      /wrap\.classList\.remove\('sweep'\);/.test(bezelSweepBody208) &&
+      /void wrap\.offsetWidth;/.test(bezelSweepBody208) &&
+      /wrap\.classList\.add\('sweep'\);/.test(bezelSweepBody208),
+    '208.23: _motionSeat(el) mirrors _bezelSweep()’s exact remove-then-reflow-then-add restart pattern'
+  );
+
+  // 208.24 static (CSS) — .seat is a plain @keyframes animation, filter/
+  //         box-shadow only (never transform, to avoid colliding with
+  //         .cart’s stack-peek transform / .tool-deck’s own deckUp slide-in),
+  //         with a CSS-only [data-game='FO3'] texture variant.
+  assert(
+    /\.seat \{\s*animation:\s*seatSettle/.test(cssStripped208) &&
+      /@keyframes seatSettle \{[^}]*filter:[^}]*box-shadow:/.test(cssStripped208) &&
+      !/@keyframes seatSettle \{[^}]*transform:/.test(cssStripped208) &&
+      /\[data-game='FO3'\] \.seat \{\s*animation-name:\s*seatSettleClunk;/.test(cssStripped208) &&
+      /@keyframes seatSettleClunk/.test(cssStripped208),
+    "208.24: .seat is a plain @keyframes animation (filter/box-shadow only, never transform) with a CSS-only [data-game='FO3'] texture-variant override — no JS branch (Protocol 38)"
+  );
+
+  // 208.25 static — _motionSeat(...) is adopted at all 4 install call sites:
+  //         the phosphor tube pick, the Sonic Processor board reseat, the
+  //         program-cartridge seat tap, and the Tool Deck's grip bar (never
+  //         #toolDeck itself, avoiding the animation-shorthand collision
+  //         with its own pre-existing deckUp slide-in).
+  assert(
+    /_motionSeat\(btnEl\);/.test(seatOpticsTubeBody208) &&
+      /_motionSeat\(document\.getElementById\('chipGrid'\)\);/.test(toggleMasterMuteBody208) &&
+      /_motionSeat\(btn\);/.test(seatGameCartridgeBody208) &&
+      /_motionSeat\(deck\.querySelector\('\.deck-grip'\)\);/.test(openToolDeckBody208),
+    '208.25: _motionSeat() is called from all 4 adopted M5 install sites — _seatOpticsTube(), toggleMasterMute()’s reseat branch, _seatGameCartridge(), and openToolDeck() (targeting the grip bar, not #toolDeck itself)'
+  );
+
+  // 208.26 static — toggleMasterMute() only triggers SEAT on the reseat
+  //         (un-mute) transition, never on eject (mute).
+  assert(
+    /if \(!isMuted\) \{\s*playBoardThunk\(true\);[\s\S]{0,260}_motionSeat\(document\.getElementById\('chipGrid'\)\);\s*\}/.test(
+      toggleMasterMuteBody208
+    ),
+    '208.26: toggleMasterMute() fires the SEAT flourish only on the reseat (un-mute) branch, never on eject (mute)'
+  );
+
+  // 208.27 static — CLAUDE.md documents SEAT as adopted at this unit
+  //         (Protocol UI-9).
+  assert(
+    /Protocol UI-9 — Motion-Verb Grammar \(adopted at the Design Overhaul DO-N unit, SWEEP token; SEAT adopted at the Ceremony Moments Wave 1 unit\)/.test(
+      claudeSrc208
+    ) && /\*\*SEAT\*\* \(introduced at Ceremony Moments Wave 1, M5\)/.test(claudeSrc208),
+    '208.27: CLAUDE.md’s Protocol UI-9 documents SEAT as adopted at the Ceremony Moments Wave 1 unit'
+  );
+
+  // ── CROSS-CUTTING ────────────────────────────────────────────────────────
+
+  // 208.28 static — no new campaign-state field anywhere in M1-M5 (Protocol
+  //         4 not triggered): the `let state = {` default block is
+  //         untouched by this unit (only META_MANIFEST/the Overseer's Log
+  //         MetaStore blob grew a field, never campaign state).
+  assert(
+    !/state\.robco_last_seen_version/.test(coreSrc208 + audioSrc208) &&
+      !/state\.lastFlushAt/.test(coreSrc208 + audioSrc208) &&
+      !/state\.ignition/i.test(coreSrc208) &&
+      !/state\.overseerGreeted/i.test(coreSrc208),
+    '208.28: none of M1-M5’s new fields (robco_last_seen_version, lastFlushAt, the ignition sequence, _overseerGreeted) ever became a campaign-state field — Protocol 4 is not triggered anywhere in this unit'
+  );
+
+  // 208.29 static — game-agnostic (Protocol 38): M2’s greeting reads
+  //         per-game identity data (no hardcoded ctx literal in the
+  //         greeting consumer), and M5’s per-game texture is a CSS
+  //         [data-game] selector, never a JS ctx branch.
+  assert(
+    !/ctx === 'FNV'/.test(greetBody208 + ignitionBody208 + motionSeatBody208) &&
+      !/ctx === 'FO3'/.test(greetBody208 + ignitionBody208 + motionSeatBody208),
+    "208.29: the M2 greeting consumer and the M5 _motionSeat() trigger carry no hardcoded ctx === 'FNV'/'FO3' branch — all per-game flavor rides identity data (M2) or CSS [data-game] selectors (M5), never a JS branch (Protocol 38)"
+  );
 }
 
 // ══════════════════════════════════════════════════════════════

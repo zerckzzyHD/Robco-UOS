@@ -72,8 +72,8 @@
 ├── js/vendor/                 Self-hosted Tesseract.js (Apache-2.0) — main API, worker, wasm core
 ├── assets/ocr/                Vendored OCR language data (eng.traineddata.gz, runtime-cached)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2773-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2773-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2803-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2803-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -1810,6 +1810,65 @@ and the game-agnostic guard (no hardcoded FNV/FO3/region literal in the new rend
 
 ---
 
+## Ceremony Moments Wave 1 (`js/ui-core.js` + `js/ui-audio.js` + `js/state.js` + `css/terminal.css` — Suite 208)
+
+Five small transition/ceremony beats picked from `planning/CEREMONY_MOMENTS_SLATE.md`'s Tier-1
+slate — none touch campaign state (Protocol 4 not triggered); every write is a transient module
+var or a registered MetaStore device pref.
+
+- **M1 Campaign Ignition** (`_runCampaignIgnition()`, ui-core.js) — a short (~2.5s), skippable
+  commissioning ceremony replacing `wipeTerminal()`'s old two bare chat lines. Dims the glass
+  (`.ignition-dim` / `@keyframes ignitionDim`), types 4 commissioning lines via a
+  self-rescheduling `setTimeout` chain (never `setInterval` — ui-core.js retired its standalone
+  setInterval timers at Suite 148.6 in favor of the AmbientRuntime heartbeat), fires the existing
+  CHASSIS `_coreFlare()` ignition flare (Protocol 22 reuse), and posts the Director's own greeting
+  as the campaign's first line. Any tap/keydown mid-sequence flushes every remaining line at once
+  instead of blocking input — never a silent drop.
+- **M2 Director on the Wire** (`_maybeGreetOverseer()`, ui-core.js) — consumes the DO-K
+  `identity.overseer.greeting` block (authored for all three games back at the Director Uplink
+  unit, but rendered nowhere until now). A session-scoped `_overseerGreeted` flag fires it at
+  most once, the first time the UPLINK subsystem genuinely activates with a live carrier
+  (`selectSubsystem()`'s uplink branch and the `#go=comm` PWA deep link both call it; the
+  boot-time `initBezelSubsystem()` bezel-highlight restore never does — the Module Bay
+  hatch-ceremony precedent, Protocol 42). Renders via the same un-persisted
+  `appendToChat(...,true)` convention the DO-O idle-blip observer already used.
+- **M3 Firmware Flash** (`_checkFirmwareFlash()`, ui-audio.js) — a new registered MetaStore pref
+  `robco_last_seen_version` (state.js META_MANIFEST), read/compared/set inside
+  `runBootSequence()` next to the existing `robco_booted_before` write. An absent prior value is
+  treated as already-seen, so no existing device fires the flash on the commit that ships the
+  key — only a genuine version change on a device that has already recorded one splices a
+  `FIRMWARE FLASH DETECTED` POST line (the same "just before the final line" splice convention
+  WU-T3's per-game identity line already uses), plus a one-shot amber glint on the casing serial
+  plate and a REV LOG button pulse (`_fireFirmwareFlashFlourish()`, fired only from the
+  boot-completion callback).
+- **M4 Long-Absence Recalibration** (`_checkLongAbsence()`, ui-audio.js) — an additive
+  `lastFlushAt` field on the existing WU-F7 Overseer's Log MetaStore blob (`_flushOverseerLog()`
+  stamps it on every 30s/hidden/pagehide flush; `_readOverseerLog()`'s zeroes-safe parsing covers
+  it on both the JSON.parse and catch paths). Read BEFORE the current session's own
+  `initOverseerLog()` write touches it, so a ≥3-day gap (`LONG_ABSENCE_DAYS`) splices a
+  "UNIT IDLE N DAYS" POST line and sets a `_longAbsenceBoot` flag consumed only by an additive
+  branch in `startCrtHum()` (a marginally slower hum ramp-in) — every other boot keeps the exact
+  pre-existing instant gain assignment, byte-identical.
+- **M5 SEAT** — formalizes the third Protocol UI-9 motion verb (after SWEEP): a 220ms settle
+  (`.seat` / `@keyframes seatSettle`, deliberately filter/box-shadow only, never `transform`,
+  since two of its four adoption sites — the program-cartridge stack-peek offset and the Tool
+  Deck's own `deckUp` slide-in — already own `transform`/`animation` for their own purposes, and a
+  competing rule would silently replace rather than compose with them) triggered by a
+  `_motionSeat(el)` helper (ui-core.js) mirroring `_bezelSweep()`'s remove/reflow/add restart
+  exactly. Adopted at 4 sites: the phosphor tube pick (`_seatOpticsTube()`), the Sonic Processor
+  board reseat (`toggleMasterMute()`'s un-mute branch only, never eject), the program-cartridge
+  tap (`_seatGameCartridge()`, fired independently of the subsequent reload-confirm dialog so it
+  never touches the reload path), and the Tool Deck open (targeting the `.deck-grip` bar, not
+  `#toolDeck` itself, for the same animation-collision reason). Textured per game via a CSS-only
+  `[data-game='FO3']` keyframe override reading `identity.motionTexture.seat` — never a JS branch
+  (Protocol 38).
+
+Guarded by Suite 208 (both runners at parity, 30 tests): each moment's trigger, the zero-write
+invariant, boot-integrity (the `_bootActive` window / `onComplete` / three-flavor
+`_bootLinesFor()` call all preserved), and the game-agnostic guard.
+
+---
+
 ## State Architecture
 
 ### The `state` Object (js/state.js)
@@ -2911,7 +2970,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2773-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2803-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

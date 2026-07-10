@@ -264,7 +264,18 @@ function startCrtHum() {
   crtHumLfoGain = audioCtx.createGain();
   crtHumNode.type = 'sine';
   crtHumNode.frequency.value = 60;
-  crtHumGain.gain.value = 0.007;
+  // M4 Long-Absence Recalibration (Ceremony Moments Wave 1) — a returning-
+  // after-a-while boot ramps the hum in marginally slower instead of the
+  // usual instant snap, a tiny audio-only "warming back up" nicety gated
+  // behind the existing first-gesture autoplay policy exactly like every
+  // other boot audio cue. Every other boot is completely unchanged (the
+  // same instant gain assignment as before this unit).
+  if (_longAbsenceBoot && audioCtx) {
+    crtHumGain.gain.setValueAtTime(0, audioCtx.currentTime);
+    crtHumGain.gain.linearRampToValueAtTime(0.007, audioCtx.currentTime + 2.2);
+  } else {
+    crtHumGain.gain.value = 0.007;
+  }
   crtHumLfo.type = 'sine';
   crtHumLfo.frequency.value = 0.08;
   crtHumLfoGain.gain.value = 1.2;
@@ -767,6 +778,8 @@ function _seatOpticsTube(btnEl) {
   changeOpticsColor(key);
   if (isFamilyMember) _collapseOpticsFamily(true);
   if (typeof renderModuleBay === 'function') renderModuleBay();
+  // M5 SEAT (Ceremony Moments Wave 1) — the tapped tube physically installs.
+  if (typeof _motionSeat === 'function') _motionSeat(btnEl);
 }
 window._seatOpticsTube = _seatOpticsTube;
 
@@ -902,7 +915,11 @@ function toggleMasterMute(isMuted) {
   if (isMuted) playBoardThunk(false);
   MetaStore.set('robco_master_muted', isMuted);
   AudioSettings.masterMute = isMuted;
-  if (!isMuted) playBoardThunk(true);
+  if (!isMuted) {
+    playBoardThunk(true);
+    // M5 SEAT (Ceremony Moments Wave 1) — the Sonic Processor board reseats.
+    if (typeof _motionSeat === 'function') _motionSeat(document.getElementById('chipGrid'));
+  }
   if (isMuted) {
     geigerRunning = false;
     if (geigerTimeout) {
@@ -1528,6 +1545,65 @@ function _bootLinesFor(flavor) {
   ];
 }
 
+// ── M3 · FIRMWARE FLASH (Ceremony Moments Wave 1) ──────────────────────────
+// Detects a post-update first boot by comparing MetaStore
+// robco_last_seen_version against the live APP_VERSION — read/compared/set
+// right here, next to the existing robco_booted_before write. Absent (a
+// device that predates this unit, or the very first boot after it ships)
+// is treated as "already seen" so no existing device fires the flash on the
+// commit that introduces the key — only a REAL version change on a device
+// that has already recorded one fires it (the WU-F6 cold-boot gating
+// precedent). Returns the previously-seen version string, or null.
+// MetaStore.set never throws (private mode / quota fails soft).
+function _checkFirmwareFlash() {
+  const lastSeen = MetaStore.get('robco_last_seen_version');
+  const flashedFrom = lastSeen && lastSeen !== APP_VERSION ? lastSeen : null;
+  MetaStore.set('robco_last_seen_version', APP_VERSION);
+  return flashedFrom;
+}
+
+// One-shot amber glint on the casing serial plate + a REV LOG button pulse,
+// acknowledging a completed update — fires once boot completes (both
+// elements sit behind the boot overlay but are always in the DOM). Toggled
+// classes only (Protocol UI-9 — the CSS keyframes are auto-neutralized by
+// the existing global reduced-motion block); purely decorative, never
+// blocks anything.
+function _fireFirmwareFlashFlourish() {
+  const serial = document.querySelector('.serial');
+  const revBtn = document.getElementById('btnViewChangelog');
+  if (serial) {
+    serial.classList.remove('firmware-glint');
+    void serial.offsetWidth; // force reflow so a repeated trigger restarts cleanly
+    serial.classList.add('firmware-glint');
+    setTimeout(() => serial.classList.remove('firmware-glint'), 1600);
+  }
+  if (revBtn) {
+    revBtn.classList.remove('firmware-pulse');
+    void revBtn.offsetWidth;
+    revBtn.classList.add('firmware-pulse');
+    setTimeout(() => revBtn.classList.remove('firmware-pulse'), 1600);
+  }
+}
+
+// ── M4 · LONG-ABSENCE RECALIBRATION (Ceremony Moments Wave 1) ──────────────
+// Reads the Overseer's Log lastFlushAt — an additive field on the existing
+// robco_overseer_log MetaStore JSON blob (_flushOverseerLog() is the one
+// writer, ui-core.js) — BEFORE this session's own initOverseerLog() call
+// (which runs earlier in the same window.onload but only ever touches
+// bootCount/firstBoot, never lastFlushAt), so the value read here is still
+// the PREVIOUS session's last flush. Absent (first-ever session, or a
+// device that predates this unit) never fires — silence under the threshold
+// is deliberate. Returns whole days idle, or null.
+const LONG_ABSENCE_DAYS = 3;
+let _longAbsenceBoot = false; // read by startCrtHum()'s gentle-ramp nicety below
+function _checkLongAbsence() {
+  if (typeof _readOverseerLog !== 'function') return null;
+  const lastFlushAt = _readOverseerLog().lastFlushAt;
+  if (!lastFlushAt) return null;
+  const days = Math.floor((Date.now() - lastFlushAt) / 86400000);
+  return days >= LONG_ABSENCE_DAYS ? days : null;
+}
+
 function runBootSequence(onComplete) {
   const bootScreen = document.getElementById('bootScreen');
   if (!bootScreen) {
@@ -1553,6 +1629,35 @@ function runBootSequence(onComplete) {
   const _t3flavor = String(_t3theme.bootFlavor || 'WASTELAND UPLINK').toUpperCase();
   // Place it just before the final "SECURE LINK ESTABLISHED…" line.
   lines.splice(Math.max(0, lines.length - 1), 0, '> ' + _t3model + ' — ' + _t3flavor);
+  // M3 Firmware Flash — one extra POST line acknowledging a completed update,
+  // spliced the same "just before the final line" way as the WU-T3 line above.
+  const _flashFromVersion = _checkFirmwareFlash();
+  if (_flashFromVersion) {
+    lines.splice(
+      Math.max(0, lines.length - 1),
+      0,
+      '> FIRMWARE FLASH DETECTED — U.O.S. v' +
+        _flashFromVersion +
+        ' → v' +
+        APP_VERSION +
+        ' ...... [OK]'
+    );
+  }
+  // M4 Long-Absence Recalibration — one extra POST line when the unit has
+  // been idle a while; under the threshold, silence is deliberate.
+  const _idleDays = _checkLongAbsence();
+  _longAbsenceBoot = !!_idleDays;
+  if (_idleDays) {
+    lines.splice(
+      Math.max(0, lines.length - 1),
+      0,
+      '> UNIT IDLE ' +
+        _idleDays +
+        ' DAY' +
+        (_idleDays === 1 ? '' : 'S') +
+        ' — RE-CALIBRATING PHOSPHOR ...... [OK]'
+    );
+  }
   let i = 0;
   const iv = setInterval(() => {
     if (i < lines.length) {
@@ -1567,6 +1672,9 @@ function runBootSequence(onComplete) {
           bootScreen.style.display = 'none';
           bootScreen.classList.remove('boot-degraded'); // hygiene for any re-entry
           _bootActive = false; // WU-B10: boot window closed — suppress any stale drone
+          if (_flashFromVersion && typeof _fireFirmwareFlashFlourish === 'function') {
+            _fireFirmwareFlashFlourish();
+          }
           if (onComplete) onComplete();
         }, 400);
       }, 200);

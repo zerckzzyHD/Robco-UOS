@@ -216,6 +216,8 @@ export default [
         _isUplinkConnected: 'readonly', // SU-4: renderAccount() reads the shared carrier signal (js/ui-core.js)
         _coreRefresh: 'readonly', // CHASSIS LIVING CORE (Protocol UI-10) single choke point (js/ui-core.js), called from js/ui-audio.js's _updateRadioUI()
         _scrollElFor: 'readonly', // per-subsystem scroll-position lookup (js/ui-core.js), reused by ui-render.js's map scroll-preserve fix
+        _motionSeat: 'readonly', // Ceremony Moments Wave 1, M5 SEAT verb trigger helper (js/ui-core.js), called from js/ui-audio.js's _seatOpticsTube()/toggleMasterMute()
+        _readOverseerLog: 'readonly', // WU-F7 Overseer's Log reader (js/ui-core.js), read by js/ui-audio.js's M4 _checkLongAbsence()
         // Saves module cross-file globals (js/ui-saves.js ↔ js/ui.js)
         CHAT_MAX: 'readonly',
         _chatSaveTimer: 'writable',

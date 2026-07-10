@@ -586,6 +586,41 @@ textarea {
 [data-game='FNV'] .serial .scratch--fnv {
   display: block;
 }
+/* M3 FIRMWARE FLASH (Ceremony Moments Wave 1) — a one-shot amber glint on
+   the serial plate + a REV LOG button pulse acknowledging a completed
+   update (_fireFirmwareFlashFlourish(), ui-audio.js). Plain @keyframes,
+   auto-neutralized by the existing global prefers-reduced-motion block
+   (Protocol UI-9) — no bespoke carve-out. filter/box-shadow only, never
+   transform, so neither collides with any other animation on these
+   elements. */
+.serial.firmware-glint {
+  animation: firmwareGlint 1.6s ease-out;
+}
+@keyframes firmwareGlint {
+  0% {
+    filter: brightness(1);
+  }
+  20% {
+    filter: brightness(2.2);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+#btnViewChangelog.firmware-pulse {
+  animation: firmwarePulse 1.6s ease-out;
+}
+@keyframes firmwarePulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(var(--bezel-wire-rgb), 0.6);
+  }
+  40% {
+    box-shadow: 0 0 12px 3px rgba(var(--bezel-wire-rgb), 0.6);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(var(--bezel-wire-rgb), 0);
+  }
+}
 .lamp-row {
   display: flex;
   gap: 10px;
@@ -766,6 +801,73 @@ button.lamp {
   }
   to {
     transform: translateX(105%);
+  }
+}
+
+/* M1 CAMPAIGN IGNITION (Ceremony Moments Wave 1) — the glass dips toward
+   near-black then eases back up as the commissioning sequence types on
+   (_runCampaignIgnition(), ui-core.js). Plain @keyframes, auto-neutralized
+   by the existing global prefers-reduced-motion block (Protocol UI-9) — a
+   reduced-motion user sees the correct resting (full-brightness) frame with
+   no bespoke carve-out. Skipping removes the class immediately, snapping
+   back to full brightness instantly (no forwards needed — brightness(1) at
+   100% already matches the unanimated resting state). */
+.glass-frame.ignition-dim {
+  animation: ignitionDim 2.4s ease-out;
+}
+@keyframes ignitionDim {
+  0% {
+    filter: brightness(0.15);
+  }
+  15% {
+    filter: brightness(0.15);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+
+/* M5 SEAT — the Protocol UI-9 "component physically installs" motion verb
+   (Ceremony Moments Wave 1), adopted here alongside SWEEP above. Triggered
+   by _motionSeat(el) (ui-core.js, mirrors _bezelSweep()) at every "install"
+   interaction: Module Bay board reseat, phosphor tube pick, program
+   cartridge seat, Tool Deck open. Deliberately filter/box-shadow only —
+   never transform — since several of those targets (.cart's stack-peek
+   offset, .tool-deck's own deckUp slide-in) already own `transform` for
+   their own purposes; a competing transform animation would visibly fight
+   them for the animation's duration. Plain @keyframes, auto-neutralized by
+   the existing global prefers-reduced-motion block (Protocol UI-9) — no
+   bespoke carve-out; not `forwards`, so the element cleanly reverts to
+   whatever its own CSS cascade specifies once the 220ms settle ends (no
+   stuck override, even on an element with its own resting box-shadow).
+   Textured per game via identity.motionTexture.seat (thunk-and-spin NV /
+   mechanical-clunk FO3, state.js) — CSS-only [data-game] variant, never a
+   JS branch (Protocol 38): NV's default below reads brighter/springier,
+   FO3's variant is a single flatter, stiffer flash. */
+.seat {
+  animation: seatSettle 0.22s ease-out;
+}
+@keyframes seatSettle {
+  0% {
+    filter: brightness(1.6);
+    box-shadow: 0 0 0 3px rgba(var(--robco-green-rgb), 0.45);
+  }
+  100% {
+    filter: brightness(1);
+    box-shadow: 0 0 0 0 rgba(var(--robco-green-rgb), 0);
+  }
+}
+[data-game='FO3'] .seat {
+  animation-name: seatSettleClunk;
+}
+@keyframes seatSettleClunk {
+  0% {
+    filter: brightness(1.3);
+    box-shadow: 0 0 0 2px rgba(var(--bezel-wire-rgb), 0.5);
+  }
+  100% {
+    filter: brightness(1);
+    box-shadow: 0 0 0 0 rgba(var(--bezel-wire-rgb), 0);
   }
 }
 

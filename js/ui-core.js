@@ -176,9 +176,19 @@ function _readOverseerLog() {
       totalPowerOnMs: num(o.totalPowerOnMs),
       longestSessionMs: num(o.longestSessionMs),
       firstBoot: num(o.firstBoot),
+      // M4 Long-Absence Recalibration (Ceremony Moments Wave 1) — additive
+      // field, zeroes-safe like every sibling above; 0 reads identically to
+      // "never flushed" (no prior session to compare against).
+      lastFlushAt: num(o.lastFlushAt),
     };
   } catch (_) {
-    return { bootCount: 0, totalPowerOnMs: 0, longestSessionMs: 0, firstBoot: 0 };
+    return {
+      bootCount: 0,
+      totalPowerOnMs: 0,
+      longestSessionMs: 0,
+      firstBoot: 0,
+      lastFlushAt: 0,
+    };
   }
 }
 function _writeOverseerLog(o) {
@@ -198,6 +208,11 @@ function _flushOverseerLog() {
   const session = _overseerSessionMs();
   o.totalPowerOnMs = _overseerBaseMs + session;
   if (session > o.longestSessionMs) o.longestSessionMs = session;
+  // M4 Long-Absence Recalibration — stamped on every flush (30s tick,
+  // visibilitychange-hidden, pagehide), so the NEXT boot's runBootSequence()
+  // reads THIS session's last flush (initOverseerLog()'s own write, which
+  // runs earlier in the same window.onload, never touches this field).
+  o.lastFlushAt = Date.now();
   _writeOverseerLog(o);
   return o;
 }
@@ -1556,6 +1571,9 @@ const OVERSEER_GENERIC_FALLBACK = {
     disabled: '[ NO CARRIER ]',
     offline: '[ OFFLINE ]',
   },
+  // M2 Director on the Wire (Ceremony Moments Wave 1) — generic fallback for
+  // an unauthored game (Protocol 38: never borrowed fiction).
+  greeting: '▸ CARRIER ESTABLISHED. Transmit when ready.',
 };
 const OVERSEER_STATES = ['listening', 'thinking', 'speaking', 'disabled', 'offline'];
 
@@ -1893,6 +1911,97 @@ function initOverseerScope() {
 }
 window.initOverseerScope = initOverseerScope;
 // ── DO-O END ────────────────────────────────────────────────────────────
+
+// ── M2 · DIRECTOR ON THE WIRE (Ceremony Moments Wave 1) ────────────────────
+// Consumes the DO-K identity.overseer.greeting authored for all three games
+// (state.js) but rendered nowhere until now. Fires at most once per session,
+// the first time the UPLINK subsystem genuinely becomes active (a user tap/
+// hotkey/deep-link — never a boot-time bezel-highlight restore) with a live
+// carrier (_isUplinkConnected(), the same signal the UPLINK lamp/bezel
+// telemetry already share). Renders via appendToChat(...,true) — the DO-O
+// idle-blip precedent: a device-template ambient line, never persisted to
+// chatHistory/robco_v8, never AI output (Protocol UI-10). Writes NOTHING
+// durable to the campaign — _overseerGreeted is a transient module var.
+let _overseerGreeted = false;
+function _maybeGreetOverseer() {
+  if (_overseerGreeted) return;
+  if (typeof _isUplinkConnected !== 'function' || !_isUplinkConnected()) return;
+  _overseerGreeted = true; // gate first — a throw below must never re-arm this session
+  const ov = _overseerIdentity();
+  const greeting = (ov && ov.greeting) || OVERSEER_GENERIC_FALLBACK.greeting;
+  if (greeting && typeof appendToChat === 'function') appendToChat(greeting, 'sys', true);
+  if (typeof _scopePulse === 'function') _scopePulse();
+}
+window._maybeGreetOverseer = _maybeGreetOverseer;
+// ── M2 END ──────────────────────────────────────────────────────────────
+
+// ── M1 · CAMPAIGN IGNITION (Ceremony Moments Wave 1) ────────────────────────
+// Replaces wipeTerminal()'s two bare chat lines with a short (~2.5s),
+// skippable "commissioning" sequence — the new-campaign ceremony every RPG
+// opening has, but this app never had. Typed lines reuse the runBootSequence()
+// timed-reveal precedent, but as a self-rescheduling setTimeout chain rather
+// than setInterval — ui-core.js's standalone-timer retirement (Suite 148.6,
+// Phase 2 A2) makes the AmbientRuntime heartbeat the one setInterval-based
+// scheduler in this file; a one-shot, self-cancelling reveal like this one is
+// exactly what setTimeout chaining is for. The ignition flare reuses the
+// CHASSIS living core's existing _coreFlare() (Protocol 22); the closing line
+// reuses M2's greeting consumer (_overseerIdentity()/OVERSEER_GENERIC_FALLBACK)
+// directly — a wipe usually happens from SETTINGS, not UPLINK, so this does
+// not gate on carrier status the way _maybeGreetOverseer() does; it also sets
+// _overseerGreeted so a same-session UPLINK visit right after doesn't
+// re-greet redundantly. Any tap/keydown during the sequence fast-forwards to
+// the end frame (posting every remaining line at once, never silently
+// dropped) instead of blocking input. Writes NOTHING durable to the campaign
+// — every line is the normal un-persisted appendToChat(...,true) sys-line
+// convention wipeTerminal() already used; the dim is a toggled CSS class +
+// plain @keyframes (Protocol UI-9, auto-neutralized by the global
+// reduced-motion block).
+function _runCampaignIgnition(onComplete) {
+  const glass = document.querySelector('.glass-frame');
+  const lines = [
+    '> UNIT RE-COMMISSIONED',
+    '> REGISTERING NEW OPERATOR……… [OK]',
+    '> CALIBRATING S.P.E.C.I.A.L. BASELINE… [OK]',
+    '> DIRECTIVE REGISTRY: EMPTY — AWAITING ORDERS',
+  ];
+  let i = 0;
+  let finished = false;
+  let timer = null;
+  function finish() {
+    if (finished) return;
+    finished = true;
+    clearTimeout(timer);
+    document.removeEventListener('pointerdown', finish, true);
+    document.removeEventListener('keydown', finish, true);
+    if (glass) glass.classList.remove('ignition-dim');
+    // A skip mid-sequence posts every remaining line at once, in order —
+    // never silently dropped.
+    for (; i < lines.length; i++) {
+      if (typeof appendToChat === 'function') appendToChat(lines[i], 'sys', true);
+    }
+    if (typeof _coreFlare === 'function') _coreFlare();
+    const ov = typeof _overseerIdentity === 'function' ? _overseerIdentity() : null;
+    const greeting = (ov && ov.greeting) || OVERSEER_GENERIC_FALLBACK.greeting;
+    if (greeting && typeof appendToChat === 'function') appendToChat(greeting, 'sys', true);
+    _overseerGreeted = true; // M2: the ignition's own greeting counts for this session
+    if (onComplete) onComplete();
+  }
+  function tick() {
+    if (i < lines.length) {
+      if (typeof appendToChat === 'function') appendToChat(lines[i], 'sys', true);
+      i++;
+      timer = setTimeout(tick, 550);
+    } else {
+      finish();
+    }
+  }
+  if (glass) glass.classList.add('ignition-dim');
+  document.addEventListener('pointerdown', finish, true);
+  document.addEventListener('keydown', finish, true);
+  timer = setTimeout(tick, 550);
+}
+window._runCampaignIgnition = _runCampaignIgnition;
+// ── M1 END ──────────────────────────────────────────────────────────────
 
 // ── CHASSIS [5] — THE LIVING CORE (Protocol UI-10) ─────────────────────────
 // A decorative layer OVER real machine signals — the SAME pattern DO-O
@@ -3421,6 +3530,12 @@ window._confirmGameContextChange = _confirmGameContextChange;
 function _seatGameCartridge(ctx) {
   const sel = document.getElementById('gameContextSelect');
   if (sel) sel.value = ctx;
+  // M5 SEAT — fires the instant the cartridge is tapped (the physical
+  // "press it into the slot" moment), independent of whether the player
+  // then confirms or cancels the reload dialog below; never touches the
+  // reload path itself (zero boot risk).
+  const btn = document.getElementById('cart-' + String(ctx).toLowerCase());
+  if (typeof _motionSeat === 'function') _motionSeat(btn);
   _confirmGameContextChange(ctx);
 }
 window._seatGameCartridge = _seatGameCartridge;
@@ -4209,6 +4324,19 @@ function _bezelSweep() {
   wrap.classList.add('sweep');
 }
 
+// SEAT (Ceremony Moments Wave 1, M5) — the Protocol UI-9 "component
+// physically installs" motion verb, mirroring _bezelSweep() above. Textured
+// per game via [data-game] CSS selectors reading identity.motionTexture.seat
+// (Protocol 38 — no JS branch here). Reduced-motion is handled by the same
+// existing global prefers-reduced-motion CSS block.
+function _motionSeat(el) {
+  if (!el) return;
+  el.classList.remove('seat');
+  void el.offsetWidth; // force reflow so a repeated trigger restarts cleanly
+  el.classList.add('seat');
+}
+window._motionSeat = _motionSeat;
+
 // selectSubsystem(view) — the bezel keycap click handler.
 function selectSubsystem(view) {
   const tab = _NAV_TAB_FOR[view];
@@ -4245,6 +4373,7 @@ function selectSubsystem(view) {
       i.focus();
     }
     _syncBezelNav('uplink');
+    if (typeof _maybeGreetOverseer === 'function') _maybeGreetOverseer(); // M2
     // FIX 2: a remembered offset overrides the jump-to-composer default above;
     // a first-ever visit (nothing saved) keeps that default untouched.
     _restoreScrollFor('uplink', false);
@@ -4327,6 +4456,7 @@ const SHORTCUT_ROUTES = {
       i.focus();
     }
     _syncBezelNav('uplink'); // DO-N: keep the bezel highlight consistent with this deep-link
+    if (typeof _maybeGreetOverseer === 'function') _maybeGreetOverseer(); // M2
     _restoreScrollFor('uplink', false); // FIX 2: override the jump above if a memory exists
     _lastScrollSubsystem = 'uplink';
   },
@@ -7661,6 +7791,12 @@ function openToolDeck() {
   key.classList.add('open');
   key.setAttribute('aria-expanded', 'true');
   if (typeof renderHolster === 'function') renderHolster();
+  // M5 SEAT — targets the grip bar, not #toolDeck itself: the deck already
+  // owns its own `deckUp` slide-in `animation` (unchanged), and CSS
+  // `animation` is a single property — a second rule setting it on the same
+  // element would silently replace deckUp rather than run alongside it.
+  // The grip bar has no animation of its own, so SEAT lands there cleanly.
+  if (typeof _motionSeat === 'function') _motionSeat(deck.querySelector('.deck-grip'));
   // Deliberately no autofocus on #deckTarget here (owner report — auto-popping the
   // mobile keyboard on deck OPEN covered the Quick-Draw Holster sockets below it).
   // The field still focuses itself when the user taps it, or via the BIND ▸ flow
@@ -7901,17 +8037,22 @@ async function wipeTerminal() {
   // Save the wiped state (now that syncStateFromDom will see clean DOM)
   saveState();
 
-  // Show context selection prompt in chat
-  appendToChat('> TERMINAL WIPED. INITIATING NEW CAMPAIGN...', 'sys', true);
-  appendToChat('> SELECT GAME CONTEXT:', 'sys', true);
-  // DO-K: skip designOnly entries (FO4) — advertising a context nothing can actually select
-  // would be a real, visible regression the moment GAME_DEFS grows a third game.
-  Object.values(GAME_DEFS)
-    .filter(d => !d.designOnly)
-    .forEach(d => {
-      appendToChat(`> Type [CONTEXT: ${d.id}] for ${d.label}`, 'sys', true);
-    });
-  appendToChat('> Or the AI will detect your game automatically.', 'sys', true);
+  // M1 Campaign Ignition (Ceremony Moments Wave 1) — a short, skippable
+  // commissioning ceremony replaces the old two bare chat lines
+  // (_runCampaignIgnition(), above). The context-selection prompt below is
+  // unchanged functional copy, not ceremony, and always follows once
+  // ignition completes (or is skipped).
+  _runCampaignIgnition(() => {
+    appendToChat('> SELECT GAME CONTEXT:', 'sys', true);
+    // DO-K: skip designOnly entries (FO4) — advertising a context nothing can actually select
+    // would be a real, visible regression the moment GAME_DEFS grows a third game.
+    Object.values(GAME_DEFS)
+      .filter(d => !d.designOnly)
+      .forEach(d => {
+        appendToChat(`> Type [CONTEXT: ${d.id}] for ${d.label}`, 'sys', true);
+      });
+    appendToChat('> Or the AI will detect your game automatically.', 'sys', true);
+  });
 }
 
 // ── SAVE SLOTS (#6) ────────────────────────────────────────────────

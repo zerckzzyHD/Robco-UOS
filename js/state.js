@@ -66,6 +66,12 @@ const META_MANIFEST = {
     family: true, // dynamic per-game key: robco_optic_<ctx>, e.g. robco_optic_FNV
   },
   robco_booted_before: { type: 'bool', default: false, owner: 'ui-audio.js' },
+  // M3 Firmware Flash (Ceremony Moments Wave 1) — the version last SEEN at a
+  // boot POST, read/compared/set inside runBootSequence() next to
+  // robco_booted_before. Absent (a device that predates this unit) is
+  // treated as "already seen" so existing devices never fire the flash on
+  // the very unit that ships it (owner precedent: cold-boot gating logic).
+  robco_last_seen_version: { type: 'string', default: '', owner: 'ui-audio.js' },
   robco_feature_flags: { type: 'json', default: '{}', owner: 'cloud.js' },
   robco_sw_installed: { type: 'bool', default: false, owner: 'index.html' },
   robco_bay_opened: { type: 'bool', default: false, owner: 'ui-core.js' },

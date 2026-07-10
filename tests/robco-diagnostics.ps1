@@ -1412,9 +1412,21 @@ $kbCount36 = ([regex]::Matches($kbCmds36, 'cmd\s*:')).Count
 Check ($kbCount36 -ge 6) "KEYBOARD SHORTCUTS group has >=6 entries (found $kbCount36)"
 
 # 36.3 Global keydown listener calls closeModal() on Escape
-$kdIdx36 = $uiSrc36.IndexOf("document.addEventListener('keydown'")
-$kdSnippet36 = if ($kdIdx36 -ge 0) { $uiSrc36.Substring($kdIdx36, [Math]::Min(4000, $uiSrc36.Length - $kdIdx36)) } else { '' }
-Check (($kdSnippet36 -match 'Escape') -and ($kdSnippet36 -match 'closeModal')) "Global keydown listener handles 'Escape' -> closeModal() (Esc closes dialog)"
+# Protocol 42 (harness-only): a naive first-match IndexOf() assumed only one
+# document.addEventListener('keydown', ...) call existed in this file --
+# Ceremony Moments Wave 1's M1 ignition-skip listener added a second,
+# unrelated one earlier in the file. Scan every occurrence instead, and pass
+# if ANY of them is the real Escape/closeModal handler.
+$kdFound36 = $false
+$kdSearchFrom36 = 0
+while ($true) {
+    $kdIdx36 = $uiSrc36.IndexOf("document.addEventListener('keydown'", $kdSearchFrom36)
+    if ($kdIdx36 -lt 0) { break }
+    $kdSnippet36 = $uiSrc36.Substring($kdIdx36, [Math]::Min(4000, $uiSrc36.Length - $kdIdx36))
+    if (($kdSnippet36 -match 'Escape') -and ($kdSnippet36 -match 'closeModal')) { $kdFound36 = $true; break }
+    $kdSearchFrom36 = $kdIdx36 + 1
+}
+Check $kdFound36 "Global keydown listener handles 'Escape' -> closeModal() (Esc closes dialog)"
 
 # 36.4 closeModal() function exists in ui.js
 Check ([bool]($uiSrc36 -match 'function\s+closeModal\s*\(')) 'closeModal() function defined in ui.js'
@@ -7660,7 +7672,10 @@ $ovIdx119 = $html119.IndexOf('unitPowerPlantPanel')
 $ovSlice119 = if ($ovIdx119 -ge 0) { $html119.Substring($ovIdx119, [Math]::Min(600, $html119.Length - $ovIdx119)) } else { '' }
 
 # 119.1  telemetry store constant + tolerant reader (localStorage device stat, not state)
-Check (($uiCore119 -match "const OVERSEER_LOG_KEY = 'robco_overseer_log'") -and ($uiCore119 -match 'function _readOverseerLog\(\)') -and ($rd119 -match 'MetaStore\.get\(OVERSEER_LOG_KEY\)') -and ($rd119 -match 'catch') -and ($rd119 -match 'bootCount: 0, totalPowerOnMs: 0, longestSessionMs: 0')) `
+# Ceremony Moments Wave 1 (Protocol 42): the catch-block zeroes object is now
+# multi-line (the additive lastFlushAt field forced a legitimate reformat) --
+# tolerate line breaks between the properties instead of one single-line literal.
+Check (($uiCore119 -match "const OVERSEER_LOG_KEY = 'robco_overseer_log'") -and ($uiCore119 -match 'function _readOverseerLog\(\)') -and ($rd119 -match 'MetaStore\.get\(OVERSEER_LOG_KEY\)') -and ($rd119 -match 'catch') -and ($rd119 -match 'bootCount: 0,\s*totalPowerOnMs: 0,\s*longestSessionMs: 0,')) `
     '119.1: OVERSEER_LOG_KEY + _readOverseerLog() back the log with a localStorage device stat and return zeroes on parse failure (never throws)'
 
 # 119.2  writer wrapped so a quota / disabled store can never throw
@@ -12011,8 +12026,12 @@ Check (
 #         flips true), heard arriving on reseat (after it flips back false)
 #         -- so the click itself never bypasses the master-mute guard
 $masterMuteFn156 = Get-FunctionBody $audio156 'toggleMasterMute'
+# Ceremony Moments Wave 1 (Protocol 42): the reseat call is now wrapped in a
+# block (M5 SEAT's trigger sits alongside playBoardThunk(true) inside the
+# same if (!isMuted) { ... } braces) -- tolerate the brace; the ordering
+# guarantee itself (thunk before/after the flag flip) is unchanged.
 Check (
-    $masterMuteFn156 -match "(?s)if \(isMuted\) playBoardThunk\(false\);\s*MetaStore\.set\('robco_master_muted', isMuted\);\s*AudioSettings\.masterMute = isMuted;\s*if \(!isMuted\) playBoardThunk\(true\);"
+    $masterMuteFn156 -match "(?s)if \(isMuted\) playBoardThunk\(false\);\s*MetaStore\.set\('robco_master_muted', isMuted\);\s*AudioSettings\.masterMute = isMuted;\s*if \(!isMuted\) \{\s*playBoardThunk\(true\);"
 ) "156.10: toggleMasterMute() plays the eject thunk before the flag flips true and the reseat thunk after it flips back false, so playBoardThunk()'s own masterMute guard is never the thing suppressing it"
 
 # 156.11  B2c: the other bay-module install/eject toggles (radio, power
@@ -22626,6 +22645,664 @@ Check (
     (-not ([regex]::IsMatch($hybridCombined207, 'state\.\w+\s*='))) -and
     (-not ($hybridCombined207 -match 'autoImportState'))
 ) "207.17: the Unit 3 hybrid-routing functions never call saveState()/assign state.*/call autoImportState -- no new campaign-state field, writes stay confined to applyVisualParse() (Unit 2, Protocol 4 not triggered)"
+
+# ===========================================================
+# Suite 208 -- CEREMONY MOMENTS WAVE 1 (M1-M5): campaign ignition,
+# Director greeting, firmware flash, long-absence recalibration, SEAT verb
+# planning/CEREMONY_MOMENTS_SLATE.md Tier 1: M1 Campaign Ignition (a short,
+# skippable commissioning ceremony replacing wipeTerminal()'s two bare chat
+# lines), M2 Director on the Wire (consumes the previously-orphaned
+# identity.overseer.greeting), M3 Firmware Flash (a post-update boot POST
+# line via a new registered robco_last_seen_version MetaStore pref), M4
+# Long-Absence Recalibration (a "UNIT IDLE N DAYS" boot line via a new
+# additive lastFlushAt field on the existing Overseer's Log blob), and M5
+# SEAT (the Protocol UI-9 pending motion verb, adopted at 4 install call
+# sites). Every moment is transient/MetaStore-only (Protocol 4 not
+# triggered) and game-agnostic (Protocol 38).
+# 30 tests
+# ===========================================================
+Sep "Suite 208 -- CEREMONY MOMENTS WAVE 1 (M1-M5)"
+$coreSrc208 = Read-Src "js/ui-core.js"
+$audioSrc208 = Read-Src "js/ui-audio.js"
+$stateSrc208 = Read-Src "js/state.js"
+$css208 = Read-Src "css/terminal.css"
+$cssStripped208 = [regex]::Replace($css208, '/\*[\s\S]*?\*/', '')
+$claudeSrc208 = Read-Src "CLAUDE.md"
+
+$ignitionBody208 = Get-FunctionBody $coreSrc208 '_runCampaignIgnition'
+$wipeBody208 = Get-FunctionBody $coreSrc208 'wipeTerminal'
+$greetBody208 = Get-FunctionBody $coreSrc208 '_maybeGreetOverseer'
+$selectSubsystemBody208 = Get-FunctionBody $coreSrc208 'selectSubsystem'
+$motionSeatBody208 = Get-FunctionBody $coreSrc208 '_motionSeat'
+$bezelSweepBody208 = Get-FunctionBody $coreSrc208 '_bezelSweep'
+$seatGameCartridgeBody208 = Get-FunctionBody $coreSrc208 '_seatGameCartridge'
+$openToolDeckBody208 = Get-FunctionBody $coreSrc208 'openToolDeck'
+$readOverseerLogBody208 = Get-FunctionBody $coreSrc208 '_readOverseerLog'
+$flushOverseerLogBody208 = Get-FunctionBody $coreSrc208 '_flushOverseerLog'
+$initBezelSubsystemBody208 = Get-FunctionBody $coreSrc208 'initBezelSubsystem'
+
+$checkFirmwareFlashBody208 = Get-FunctionBody $audioSrc208 '_checkFirmwareFlash'
+$fireFlashFlourishBody208 = Get-FunctionBody $audioSrc208 '_fireFirmwareFlashFlourish'
+$checkLongAbsenceBody208 = Get-FunctionBody $audioSrc208 '_checkLongAbsence'
+$runBootSequenceBody208 = Get-FunctionBody $audioSrc208 'runBootSequence'
+$startCrtHumBody208 = Get-FunctionBody $audioSrc208 'startCrtHum'
+$seatOpticsTubeBody208 = Get-FunctionBody $audioSrc208 '_seatOpticsTube'
+$toggleMasterMuteBody208 = Get-FunctionBody $audioSrc208 'toggleMasterMute'
+
+# -- M1 CAMPAIGN IGNITION --------------------------------------------------
+
+# 208.1 static -- the ignition sequence types all 4 commissioning lines,
+#       toggles ignition-dim, and is skippable via pointerdown/keydown
+#       (wired then cleanly removed on finish).
+Check (
+    ($ignitionBody208 -match "'> UNIT RE-COMMISSIONED'") -and
+    ($ignitionBody208 -match [regex]::Escape("'> REGISTERING NEW OPERATOR……… [OK]'")) -and
+    ($ignitionBody208 -match [regex]::Escape("'> CALIBRATING S.P.E.C.I.A.L. BASELINE… [OK]'")) -and
+    ($ignitionBody208 -match [regex]::Escape("'> DIRECTIVE REGISTRY: EMPTY — AWAITING ORDERS'")) -and
+    ($ignitionBody208 -match [regex]::Escape("classList.add('ignition-dim')")) -and
+    ($ignitionBody208 -match [regex]::Escape("classList.remove('ignition-dim')")) -and
+    ($ignitionBody208 -match [regex]::Escape("addEventListener('pointerdown', finish, true)")) -and
+    ($ignitionBody208 -match [regex]::Escape("addEventListener('keydown', finish, true)")) -and
+    ($ignitionBody208 -match [regex]::Escape("removeEventListener('pointerdown', finish, true)")) -and
+    ($ignitionBody208 -match [regex]::Escape("removeEventListener('keydown', finish, true)"))
+) "208.1: _runCampaignIgnition() types all 4 commissioning lines, toggles .ignition-dim, and wires a skip via both pointerdown and keydown (added and cleanly removed on finish)"
+
+# 208.2 static -- wipeTerminal() replaces the old two bare chat lines with
+#       _runCampaignIgnition(...), and the functional SELECT GAME CONTEXT
+#       prompt still follows, unchanged, inside the completion callback.
+Check (
+    ($wipeBody208 -match [regex]::Escape('_runCampaignIgnition(() => {')) -and
+    ($wipeBody208 -match [regex]::Escape("'> SELECT GAME CONTEXT:'")) -and
+    (-not ($wipeBody208 -match 'TERMINAL WIPED\. INITIATING NEW CAMPAIGN')) -and
+    ($wipeBody208 -match 'Type \[CONTEXT: \$\{d\.id\}\] for \$\{d\.label\}') -and
+    ($wipeBody208 -match [regex]::Escape('Or the AI will detect your game automatically.'))
+) '208.2: wipeTerminal() calls _runCampaignIgnition() instead of the old bare "TERMINAL WIPED" line, with the unchanged SELECT GAME CONTEXT prompt riding the completion callback'
+
+# 208.3 static -- the ignition reuses _coreFlare() (CHASSIS living core,
+#       Protocol 22) and the SAME greeting consumer M2 uses, and marks
+#       _overseerGreeted so a same-session UPLINK visit doesn't re-greet.
+Check (
+    ($ignitionBody208 -match [regex]::Escape('_coreFlare()')) -and
+    ($ignitionBody208 -match [regex]::Escape('_overseerIdentity()')) -and
+    ($ignitionBody208 -match [regex]::Escape('OVERSEER_GENERIC_FALLBACK.greeting')) -and
+    ($ignitionBody208 -match [regex]::Escape('_overseerGreeted = true'))
+) "208.3: _runCampaignIgnition() reuses _coreFlare() and the same _overseerIdentity()/OVERSEER_GENERIC_FALLBACK greeting consumer as M2 (Protocol 22), and sets _overseerGreeted so a same-session UPLINK visit does not re-greet"
+
+# 208.4 static -- ZERO campaign-state write: no saveState()/state.<field>=
+#       assignment/robco_v8 anywhere in the ignition sequence.
+Check (
+    (-not ($ignitionBody208 -match 'saveState\(\)')) -and
+    (-not ($ignitionBody208 -match 'state\.\w+\s*=')) -and
+    (-not ($ignitionBody208 -match 'robco_v8'))
+) "208.4: _runCampaignIgnition() never calls saveState() or assigns state.*/robco_v8 -- every line is the normal un-persisted appendToChat(...,true) convention"
+
+# 208.5 static (CSS) -- the dim is a plain @keyframes animation
+#       (reduced-motion-safe by construction, Protocol UI-9), never
+#       transition-only.
+Check (
+    ($cssStripped208 -match '\.glass-frame\.ignition-dim \{\s*animation:\s*ignitionDim') -and
+    ($cssStripped208 -match '@keyframes ignitionDim')
+) "208.5: .glass-frame.ignition-dim is a plain @keyframes animation (auto-neutralized by the global reduced-motion block), not a transition-only effect"
+
+# 208.6 BEHAVIORAL -- an un-skipped run posts every line (4 commissioning +
+#       the greeting), flares the core once, and calls onComplete exactly
+#       once; a mid-sequence skip flushes every remaining line at once and
+#       still flares/completes exactly once. Uses a self-rescheduling
+#       setTimeout mock (never setInterval) -- ui-core.js retired its
+#       standalone setInterval timers (Suite 148.6), so
+#       _runCampaignIgnition() chains setTimeout instead. Executed via a
+#       spawned node process against the REAL source (Protocol 42
+#       stdin-corruption-safe transport).
+$labels208a = @(
+    "208.6: [behavioral] an un-skipped ignition posts every line (4 commissioning + greeting), flares the core once, and calls onComplete once; a mid-sequence skip flushes every remaining line at once and still flares/completes exactly once -- the dim class is always cleared either way"
+)
+try {
+    $nodeCheck208a = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCheck208a) {
+        $repoRoot208 = (Get-Item $PSScriptRoot).Parent.FullName
+        $repoRootNode208 = $repoRoot208.Replace('\', '/')
+        $testScript208a = @"
+const vm = require('vm');
+const fs = require('fs');
+const path = require('path');
+const ROOT = '$repoRootNode208';
+function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+function extractBody(src, name) {
+  var idx = src.indexOf('function ' + name);
+  if (idx === -1) throw new Error('missing ' + name);
+  var i = src.indexOf('{', idx);
+  var depth = 0, start = i;
+  while (i < src.length) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) return src.slice(start, i + 1); }
+    i++;
+  }
+  throw new Error('unclosed ' + name);
+}
+var coreSrc = rd('js/ui-core.js');
+var results = [];
+try {
+  var ignitionBody = extractBody(coreSrc, '_runCampaignIgnition');
+  var declared = 'function _runCampaignIgnition(onComplete)' + ignitionBody;
+  function makeRig() {
+    var currentTimer = null;
+    var nextId = 1;
+    var classes = new Set();
+    var listeners = {};
+    var chatLines = [];
+    var complete = { n: 0 };
+    var flareCount = 0;
+    var glassEl = {
+      classList: {
+        add: function (c) { classes.add(c); },
+        remove: function (c) { classes.delete(c); }
+      }
+    };
+    var sandbox = {
+      document: {
+        querySelector: function (sel) { return sel === '.glass-frame' ? glassEl : null; },
+        addEventListener: function (evt, fn) { (listeners[evt] = listeners[evt] || []).push(fn); },
+        removeEventListener: function (evt, fn) {
+          if (!listeners[evt]) return;
+          listeners[evt] = listeners[evt].filter(function (f) { return f !== fn; });
+        }
+      },
+      appendToChat: function (line) { chatLines.push(line); },
+      setTimeout: function (fn) { currentTimer = fn; return nextId++; },
+      clearTimeout: function () { currentTimer = null; },
+      _coreFlare: function () { flareCount++; },
+      _overseerIdentity: function () { return { greeting: 'TEST GREETING' }; },
+      OVERSEER_GENERIC_FALLBACK: { greeting: 'FALLBACK GREETING' },
+      _overseerGreeted: false,
+      _testComplete: complete
+    };
+    return {
+      sandbox: sandbox,
+      fireTimer: function () { var fn = currentTimer; currentTimer = null; if (fn) fn(); },
+      fireListener: function (evt) { (listeners[evt] || []).slice().forEach(function (f) { f(); }); },
+      classes: classes,
+      chatLines: chatLines,
+      getFlareCount: function () { return flareCount; },
+      getCompleteCount: function () { return complete.n; }
+    };
+  }
+  var rigA = makeRig();
+  vm.createContext(rigA.sandbox);
+  vm.runInContext(declared, rigA.sandbox);
+  vm.runInContext('_runCampaignIgnition(function(){ _testComplete.n++; });', rigA.sandbox);
+  for (var n = 0; n < 5; n++) rigA.fireTimer();
+  var rigB = makeRig();
+  vm.createContext(rigB.sandbox);
+  vm.runInContext(declared, rigB.sandbox);
+  vm.runInContext('_runCampaignIgnition(function(){ _testComplete.n++; });', rigB.sandbox);
+  rigB.fireTimer();
+  rigB.fireListener('pointerdown');
+  results.push(
+    rigA.chatLines.length === 5 && !rigA.classes.has('ignition-dim') &&
+    rigA.getFlareCount() === 1 && rigA.getCompleteCount() === 1 &&
+    rigA.chatLines[rigA.chatLines.length - 1] === 'TEST GREETING' &&
+    rigB.chatLines.length === 5 && !rigB.classes.has('ignition-dim') &&
+    rigB.getFlareCount() === 1 && rigB.getCompleteCount() === 1
+  );
+} catch (e) { results.push(false); }
+console.log('RESULT:' + results.map(function (r) { return r ? '1' : '0'; }).join(''));
+"@
+        $tmpScript208a = [System.IO.Path]::GetTempFileName() + '.js'
+        [System.IO.File]::WriteAllText($tmpScript208a, $testScript208a, [System.Text.Encoding]::UTF8)
+        try {
+            $out208a = (node $tmpScript208a 2>&1 | Out-String)
+        } finally {
+            Remove-Item -Path $tmpScript208a -Force -ErrorAction SilentlyContinue
+        }
+        $rm208a = [regex]::Match($out208a, 'RESULT:([01]{1})')
+        if ($rm208a.Success) {
+            $bits208a = $rm208a.Groups[1].Value
+            Check ($bits208a.Substring(0, 1) -eq '1') $labels208a[0]
+        } else {
+            $err208a = if ([string]::IsNullOrWhiteSpace($out208a)) { "No output from node" } else { $out208a.Trim() }
+            foreach ($lbl in $labels208a) { Fail "$lbl  (runtime error: $err208a)" }
+        }
+    } else {
+        foreach ($lbl in $labels208a) { Fail "$lbl  (node not available in PATH)" }
+    }
+} catch {
+    foreach ($lbl in $labels208a) { Fail "$lbl  (exception: $($_.Exception.Message))" }
+}
+
+# -- M2 DIRECTOR ON THE WIRE ------------------------------------------------
+
+# 208.7 static -- _maybeGreetOverseer() gates on a session flag PLUS a live
+#       carrier, renders the greeting un-persisted, and pulses the scope.
+Check (
+    ($greetBody208 -match [regex]::Escape('if (_overseerGreeted) return;')) -and
+    ($greetBody208 -match [regex]::Escape('_isUplinkConnected()')) -and
+    ($greetBody208 -match [regex]::Escape('_overseerGreeted = true;')) -and
+    ($greetBody208 -match [regex]::Escape("appendToChat(greeting, 'sys', true)")) -and
+    ($greetBody208 -match [regex]::Escape('_scopePulse()'))
+) "208.7: _maybeGreetOverseer() gates on the session-scoped _overseerGreeted flag AND a live carrier (_isUplinkConnected()), renders via the un-persisted appendToChat(...,true) convention, and pulses the scope"
+
+# 208.8 static -- OVERSEER_GENERIC_FALLBACK carries a greeting (Protocol 38
+#       generic fallback for an unauthored game -- never borrowed fiction).
+Check (
+    $coreSrc208 -match 'OVERSEER_GENERIC_FALLBACK = \{[\s\S]{0,500}greeting:'
+) "208.8: OVERSEER_GENERIC_FALLBACK carries its own greeting string (Protocol 38 -- a generic fallback for an unauthored game, never another game's borrowed fiction)"
+
+# 208.9 static -- _maybeGreetOverseer() is called from BOTH genuine
+#       user-initiated UPLINK arrivals (selectSubsystem's uplink branch and
+#       the #go=comm PWA deep link), but NEVER from the boot-time
+#       bezel-highlight restore (initBezelSubsystem) -- the Module Bay
+#       hatch-ceremony precedent (Protocol 42: never fire at page load).
+Check (
+    ($selectSubsystemBody208 -match [regex]::Escape('_maybeGreetOverseer(); // M2')) -and
+    (-not ($initBezelSubsystemBody208 -match '_maybeGreetOverseer'))
+) "208.9: selectSubsystem()'s uplink branch calls _maybeGreetOverseer(), while initBezelSubsystem() (the boot-time restore) never does -- a genuine per-visit gate, not a boot-time fire"
+
+$shortcutRoutesIdx208 = $coreSrc208.IndexOf('const SHORTCUT_ROUTES')
+$routeLaunchIdx208 = $coreSrc208.IndexOf('function routeLaunchShortcut')
+$shortcutRoutesSrc208 = if (($shortcutRoutesIdx208 -ge 0) -and ($routeLaunchIdx208 -gt $shortcutRoutesIdx208)) {
+    $coreSrc208.Substring($shortcutRoutesIdx208, $routeLaunchIdx208 - $shortcutRoutesIdx208)
+} else { '' }
+Check (
+    $shortcutRoutesSrc208 -match [regex]::Escape('_maybeGreetOverseer(); // M2')
+) "208.9b: the #go=comm PWA shortcut deep-link route also calls _maybeGreetOverseer() -- a genuine UPLINK arrival, not just the bezel-keycap path"
+
+# 208.10 static -- ZERO write: _maybeGreetOverseer() never calls
+#        saveState()/MetaStore.set/touches state.* -- _overseerGreeted is a
+#        transient module var only.
+Check (
+    (-not ($greetBody208 -match 'saveState\(\)')) -and
+    (-not ($greetBody208 -match 'MetaStore\.set')) -and
+    (-not ($greetBody208 -match 'state\.\w+\s*='))
+) "208.10: _maybeGreetOverseer() never calls saveState()/MetaStore.set or assigns state.* -- _overseerGreeted is a transient in-memory module var only"
+
+# 208.11 BEHAVIORAL -- fires exactly once across two calls while connected;
+#        never fires at all while disconnected. Executed via a spawned node
+#        process against the REAL source (Protocol 42 stdin-corruption-safe
+#        transport).
+$labels208b = @(
+    "208.11: [behavioral] _maybeGreetOverseer() greets exactly once across two calls while the carrier is live, but never fires at all while disconnected"
+)
+try {
+    $nodeCheck208b = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCheck208b) {
+        $testScript208b = @"
+const vm = require('vm');
+const fs = require('fs');
+const path = require('path');
+const ROOT = '$repoRootNode208';
+function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+function extractBody(src, name) {
+  var idx = src.indexOf('function ' + name);
+  if (idx === -1) throw new Error('missing ' + name);
+  var i = src.indexOf('{', idx);
+  var depth = 0, start = i;
+  while (i < src.length) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) return src.slice(start, i + 1); }
+    i++;
+  }
+  throw new Error('unclosed ' + name);
+}
+var coreSrc = rd('js/ui-core.js');
+var results = [];
+try {
+  var greetBody = extractBody(coreSrc, '_maybeGreetOverseer');
+  var declared = "let _overseerGreeted = false;\nfunction _maybeGreetOverseer()" + greetBody;
+  function run(connected) {
+    var chatLines = [];
+    var pulses = 0;
+    var sandbox = {
+      _isUplinkConnected: function () { return connected; },
+      _overseerIdentity: function () { return { greeting: 'GREETING' }; },
+      OVERSEER_GENERIC_FALLBACK: { greeting: 'FALLBACK' },
+      appendToChat: function (line) { chatLines.push(line); },
+      _scopePulse: function () { pulses++; }
+    };
+    vm.createContext(sandbox);
+    vm.runInContext(declared, sandbox);
+    vm.runInContext('_maybeGreetOverseer();', sandbox);
+    vm.runInContext('_maybeGreetOverseer();', sandbox);
+    var greeted = vm.runInContext('_overseerGreeted;', sandbox);
+    return { lines: chatLines.length, pulses: pulses, greeted: greeted };
+  }
+  var connected = run(true);
+  var disconnected = run(false);
+  results.push(
+    connected.lines === 1 && connected.pulses === 1 && connected.greeted === true &&
+    disconnected.lines === 0 && disconnected.pulses === 0 && disconnected.greeted === false
+  );
+} catch (e) { results.push(false); }
+console.log('RESULT:' + results.map(function (r) { return r ? '1' : '0'; }).join(''));
+"@
+        $tmpScript208b = [System.IO.Path]::GetTempFileName() + '.js'
+        [System.IO.File]::WriteAllText($tmpScript208b, $testScript208b, [System.Text.Encoding]::UTF8)
+        try {
+            $out208b = (node $tmpScript208b 2>&1 | Out-String)
+        } finally {
+            Remove-Item -Path $tmpScript208b -Force -ErrorAction SilentlyContinue
+        }
+        $rm208b = [regex]::Match($out208b, 'RESULT:([01]{1})')
+        if ($rm208b.Success) {
+            $bits208b = $rm208b.Groups[1].Value
+            Check ($bits208b.Substring(0, 1) -eq '1') $labels208b[0]
+        } else {
+            $err208b = if ([string]::IsNullOrWhiteSpace($out208b)) { "No output from node" } else { $out208b.Trim() }
+            foreach ($lbl in $labels208b) { Fail "$lbl  (runtime error: $err208b)" }
+        }
+    } else {
+        foreach ($lbl in $labels208b) { Fail "$lbl  (node not available in PATH)" }
+    }
+} catch {
+    foreach ($lbl in $labels208b) { Fail "$lbl  (exception: $($_.Exception.Message))" }
+}
+
+# -- M3 FIRMWARE FLASH -------------------------------------------------------
+
+# 208.12 static -- robco_last_seen_version is registered in META_MANIFEST
+#        (Protocol 4/UI-6 -- a device pref, not a campaign-state field).
+Check (
+    $stateSrc208 -match "robco_last_seen_version:\s*\{\s*type:\s*'string'"
+) "208.12: robco_last_seen_version is registered in META_MANIFEST (state.js) as a string device preference"
+
+# 208.13 static -- _checkFirmwareFlash() always stamps APP_VERSION, and only
+#        reports a flash when a PRIOR value existed and differs.
+Check (
+    ($checkFirmwareFlashBody208 -match [regex]::Escape("const lastSeen = MetaStore.get('robco_last_seen_version');")) -and
+    ($checkFirmwareFlashBody208 -match [regex]::Escape('const flashedFrom = lastSeen && lastSeen !== APP_VERSION ? lastSeen : null;')) -and
+    ($checkFirmwareFlashBody208 -match [regex]::Escape("MetaStore.set('robco_last_seen_version', APP_VERSION);")) -and
+    ($checkFirmwareFlashBody208 -match [regex]::Escape('return flashedFrom;'))
+) "208.13: _checkFirmwareFlash() always stamps robco_last_seen_version to the live APP_VERSION, and reports a flash ONLY when a prior value existed and differs (absent = treated as already seen)"
+
+# 208.14 BEHAVIORAL -- absent key never flashes (and gets stamped for next
+#        time); a stale, differing key flashes with the correct fromVersion;
+#        a key matching the current version never flashes. Executed via a
+#        spawned node process against the REAL source.
+$labels208c = @(
+    "208.14: [behavioral] _checkFirmwareFlash() never flashes on an absent prior version (but stamps it for next time), flashes with the correct fromVersion on a genuine stale-version mismatch, and never flashes when the stored version already matches"
+)
+try {
+    $nodeCheck208c = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCheck208c) {
+        $testScript208c = @"
+const vm = require('vm');
+const fs = require('fs');
+const path = require('path');
+const ROOT = '$repoRootNode208';
+function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+function extractBody(src, name) {
+  var idx = src.indexOf('function ' + name);
+  if (idx === -1) throw new Error('missing ' + name);
+  var i = src.indexOf('{', idx);
+  var depth = 0, start = i;
+  while (i < src.length) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) return src.slice(start, i + 1); }
+    i++;
+  }
+  throw new Error('unclosed ' + name);
+}
+var audioSrc = rd('js/ui-audio.js');
+var results = [];
+try {
+  var body = extractBody(audioSrc, '_checkFirmwareFlash');
+  var declared = "const APP_VERSION = '2.7.0';\nfunction _checkFirmwareFlash()" + body;
+  function run(initial) {
+    var store = { robco_last_seen_version: initial };
+    var sandbox = {
+      MetaStore: {
+        get: function (k) { return Object.prototype.hasOwnProperty.call(store, k) ? store[k] : null; },
+        set: function (k, v) { store[k] = v; }
+      }
+    };
+    vm.createContext(sandbox);
+    vm.runInContext(declared, sandbox);
+    var result = vm.runInContext('_checkFirmwareFlash();', sandbox);
+    return { result: result, stamped: store.robco_last_seen_version };
+  }
+  var absent = run(null);
+  var stale = run('2.6.0');
+  var current = run('2.7.0');
+  results.push(
+    absent.result === null && absent.stamped === '2.7.0' &&
+    stale.result === '2.6.0' && stale.stamped === '2.7.0' &&
+    current.result === null && current.stamped === '2.7.0'
+  );
+} catch (e) { results.push(false); }
+console.log('RESULT:' + results.map(function (r) { return r ? '1' : '0'; }).join(''));
+"@
+        $tmpScript208c = [System.IO.Path]::GetTempFileName() + '.js'
+        [System.IO.File]::WriteAllText($tmpScript208c, $testScript208c, [System.Text.Encoding]::UTF8)
+        try {
+            $out208c = (node $tmpScript208c 2>&1 | Out-String)
+        } finally {
+            Remove-Item -Path $tmpScript208c -Force -ErrorAction SilentlyContinue
+        }
+        $rm208c = [regex]::Match($out208c, 'RESULT:([01]{1})')
+        if ($rm208c.Success) {
+            $bits208c = $rm208c.Groups[1].Value
+            Check ($bits208c.Substring(0, 1) -eq '1') $labels208c[0]
+        } else {
+            $err208c = if ([string]::IsNullOrWhiteSpace($out208c)) { "No output from node" } else { $out208c.Trim() }
+            foreach ($lbl in $labels208c) { Fail "$lbl  (runtime error: $err208c)" }
+        }
+    } else {
+        foreach ($lbl in $labels208c) { Fail "$lbl  (node not available in PATH)" }
+    }
+} catch {
+    foreach ($lbl in $labels208c) { Fail "$lbl  (exception: $($_.Exception.Message))" }
+}
+
+# 208.15 static -- runBootSequence() splices the FIRMWARE FLASH POST line
+#        only when a flash was detected, using the same "just before the
+#        final line" splice convention as the pre-existing WU-T3 line;
+#        boot-integrity (the _bootActive window + onComplete + the
+#        three-flavor _bootLinesFor() call) is fully preserved.
+Check (
+    ($runBootSequenceBody208 -match [regex]::Escape('const _flashFromVersion = _checkFirmwareFlash();')) -and
+    ($runBootSequenceBody208 -match 'if \(_flashFromVersion\) \{[\s\S]{0,260}FIRMWARE FLASH DETECTED') -and
+    ($runBootSequenceBody208 -match [regex]::Escape('_bootActive = true;')) -and
+    ($runBootSequenceBody208 -match [regex]::Escape('_bootActive = false;')) -and
+    ($runBootSequenceBody208 -match [regex]::Escape('if (onComplete) onComplete();')) -and
+    ($runBootSequenceBody208 -match [regex]::Escape('_bootLinesFor(flavor)'))
+) "208.15: runBootSequence() splices the FIRMWARE FLASH DETECTED POST line only when _checkFirmwareFlash() reports a change, and the pre-existing boot-integrity contract (_bootActive open/close, onComplete, the three-flavor _bootLinesFor() call) is untouched"
+
+# 208.16 static (CSS) -- the serial-plate glint + REV LOG pulse are plain
+#        @keyframes animations (reduced-motion-safe).
+Check (
+    ($cssStripped208 -match '\.serial\.firmware-glint \{\s*animation:\s*firmwareGlint') -and
+    ($cssStripped208 -match '@keyframes firmwareGlint') -and
+    ($cssStripped208 -match '#btnViewChangelog\.firmware-pulse \{\s*animation:\s*firmwarePulse') -and
+    ($cssStripped208 -match '@keyframes firmwarePulse')
+) "208.16: .serial.firmware-glint and #btnViewChangelog.firmware-pulse are both plain @keyframes animations (auto-neutralized by the global reduced-motion block)"
+
+# 208.17 static -- the flourish fires ONLY from inside the boot-completion
+#        path, and ONLY when a flash was actually detected this boot.
+Check (
+    ($runBootSequenceBody208 -match [regex]::Escape("if (_flashFromVersion && typeof _fireFirmwareFlashFlourish === 'function') {")) -and
+    ($fireFlashFlourishBody208 -match [regex]::Escape("classList.remove('firmware-glint')")) -and
+    ($fireFlashFlourishBody208 -match [regex]::Escape("classList.add('firmware-glint')"))
+) "208.17: _fireFirmwareFlashFlourish() is called only when _flashFromVersion is truthy, and toggles its classes via the same remove/reflow/add restart pattern as every other one-shot flourish in the codebase"
+
+# -- M4 LONG-ABSENCE RECALIBRATION -------------------------------------------
+
+# 208.18 static -- lastFlushAt is an additive, zeroes-safe field on the
+#        existing Overseer's Log blob, written on every flush.
+Check (
+    ($readOverseerLogBody208 -match [regex]::Escape('lastFlushAt: num(o.lastFlushAt),')) -and
+    ($readOverseerLogBody208 -match [regex]::Escape('lastFlushAt: 0,')) -and
+    ($flushOverseerLogBody208 -match [regex]::Escape('o.lastFlushAt = Date.now();'))
+) "208.18: _readOverseerLog() parses an additive, zeroes-safe lastFlushAt field (both the JSON.parse path and the catch fallback), and _flushOverseerLog() stamps it on every flush"
+
+# 208.19 static -- _checkLongAbsence() reads lastFlushAt via
+#        _readOverseerLog(), never fires when absent, and the threshold is
+#        exactly 3 days.
+Check (
+    ($audioSrc208 -match [regex]::Escape('const LONG_ABSENCE_DAYS = 3;')) -and
+    ($checkLongAbsenceBody208 -match [regex]::Escape('const lastFlushAt = _readOverseerLog().lastFlushAt;')) -and
+    ($checkLongAbsenceBody208 -match [regex]::Escape('if (!lastFlushAt) return null;')) -and
+    ($checkLongAbsenceBody208 -match [regex]::Escape('return days >= LONG_ABSENCE_DAYS ? days : null;'))
+) "208.19: _checkLongAbsence() reads lastFlushAt via _readOverseerLog(), returns null when absent (never fires on a first-ever session), and gates on a 3-day threshold (LONG_ABSENCE_DAYS)"
+
+# 208.20 BEHAVIORAL -- absent lastFlushAt never fires; 1 day idle stays
+#        silent (under threshold); 5 days idle fires with the correct
+#        whole-day count. Executed via a spawned node process against the
+#        REAL source.
+$labels208d = @(
+    "208.20: [behavioral] _checkLongAbsence() never fires with no recorded lastFlushAt or under the 3-day threshold, but returns the correct whole-day count once past it"
+)
+try {
+    $nodeCheck208d = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCheck208d) {
+        $testScript208d = @"
+const vm = require('vm');
+const fs = require('fs');
+const path = require('path');
+const ROOT = '$repoRootNode208';
+function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+function extractBody(src, name) {
+  var idx = src.indexOf('function ' + name);
+  if (idx === -1) throw new Error('missing ' + name);
+  var i = src.indexOf('{', idx);
+  var depth = 0, start = i;
+  while (i < src.length) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) return src.slice(start, i + 1); }
+    i++;
+  }
+  throw new Error('unclosed ' + name);
+}
+var audioSrc = rd('js/ui-audio.js');
+var results = [];
+try {
+  var body = extractBody(audioSrc, '_checkLongAbsence');
+  var declared = 'const LONG_ABSENCE_DAYS = 3;\nfunction _checkLongAbsence()' + body;
+  function run(lastFlushAt) {
+    var sandbox = { _readOverseerLog: function () { return { lastFlushAt: lastFlushAt }; } };
+    vm.createContext(sandbox);
+    vm.runInContext(declared, sandbox);
+    return vm.runInContext('_checkLongAbsence();', sandbox);
+  }
+  var now = Date.now();
+  var absent = run(0);
+  var oneDay = run(now - 1 * 86400000);
+  var fiveDays = run(now - 5 * 86400000 - 60000);
+  results.push(absent === null && oneDay === null && fiveDays === 5);
+} catch (e) { results.push(false); }
+console.log('RESULT:' + results.map(function (r) { return r ? '1' : '0'; }).join(''));
+"@
+        $tmpScript208d = [System.IO.Path]::GetTempFileName() + '.js'
+        [System.IO.File]::WriteAllText($tmpScript208d, $testScript208d, [System.Text.Encoding]::UTF8)
+        try {
+            $out208d = (node $tmpScript208d 2>&1 | Out-String)
+        } finally {
+            Remove-Item -Path $tmpScript208d -Force -ErrorAction SilentlyContinue
+        }
+        $rm208d = [regex]::Match($out208d, 'RESULT:([01]{1})')
+        if ($rm208d.Success) {
+            $bits208d = $rm208d.Groups[1].Value
+            Check ($bits208d.Substring(0, 1) -eq '1') $labels208d[0]
+        } else {
+            $err208d = if ([string]::IsNullOrWhiteSpace($out208d)) { "No output from node" } else { $out208d.Trim() }
+            foreach ($lbl in $labels208d) { Fail "$lbl  (runtime error: $err208d)" }
+        }
+    } else {
+        foreach ($lbl in $labels208d) { Fail "$lbl  (node not available in PATH)" }
+    }
+} catch {
+    foreach ($lbl in $labels208d) { Fail "$lbl  (exception: $($_.Exception.Message))" }
+}
+
+# 208.21 static -- runBootSequence() splices the UNIT IDLE POST line only
+#        when _checkLongAbsence() reports idle days, and sets
+#        _longAbsenceBoot for the hum-ramp nicety; boot-integrity intact.
+Check (
+    ($runBootSequenceBody208 -match [regex]::Escape('const _idleDays = _checkLongAbsence();')) -and
+    ($runBootSequenceBody208 -match [regex]::Escape('_longAbsenceBoot = !!_idleDays;')) -and
+    ($runBootSequenceBody208 -match 'if \(_idleDays\) \{[\s\S]{0,220}UNIT IDLE')
+) "208.21: runBootSequence() splices the UNIT IDLE POST line only when _checkLongAbsence() reports idle days, and sets _longAbsenceBoot for the startCrtHum() nicety"
+
+# 208.22 static -- the long-absence hum-ramp nicety is STRICTLY additive:
+#        the non-long-absence branch is the exact pre-existing instant gain
+#        assignment, untouched.
+Check (
+    ($startCrtHumBody208 -match [regex]::Escape('if (_longAbsenceBoot && audioCtx) {')) -and
+    ($startCrtHumBody208 -match [regex]::Escape('crtHumGain.gain.setValueAtTime(0, audioCtx.currentTime);')) -and
+    ($startCrtHumBody208 -match [regex]::Escape('crtHumGain.gain.linearRampToValueAtTime(0.007, audioCtx.currentTime + 2.2);')) -and
+    ($startCrtHumBody208 -match '\}\s*else\s*\{\s*crtHumGain\.gain\.value = 0\.007;\s*\}')
+) "208.22: startCrtHum()'s long-absence branch is purely additive -- every other boot still runs the exact pre-existing instant crtHumGain.gain.value = 0.007 assignment, unchanged"
+
+# -- M5 SEAT ------------------------------------------------------------------
+
+# 208.23 static -- _motionSeat(el) mirrors _bezelSweep()'s exact
+#        remove/reflow/add restart pattern.
+Check (
+    ($motionSeatBody208 -match [regex]::Escape("el.classList.remove('seat');")) -and
+    ($motionSeatBody208 -match [regex]::Escape('void el.offsetWidth;')) -and
+    ($motionSeatBody208 -match [regex]::Escape("el.classList.add('seat');")) -and
+    ($bezelSweepBody208 -match [regex]::Escape("wrap.classList.remove('sweep');")) -and
+    ($bezelSweepBody208 -match [regex]::Escape('void wrap.offsetWidth;')) -and
+    ($bezelSweepBody208 -match [regex]::Escape("wrap.classList.add('sweep');"))
+) "208.23: _motionSeat(el) mirrors _bezelSweep()'s exact remove-then-reflow-then-add restart pattern"
+
+# 208.24 static (CSS) -- .seat is a plain @keyframes animation, filter/
+#        box-shadow only (never transform, to avoid colliding with .cart's
+#        stack-peek transform / .tool-deck's own deckUp slide-in), with a
+#        CSS-only [data-game='FO3'] texture variant.
+Check (
+    ($cssStripped208 -match '\.seat \{\s*animation:\s*seatSettle') -and
+    ($cssStripped208 -match '@keyframes seatSettle \{[^}]*filter:[^}]*box-shadow:') -and
+    (-not ($cssStripped208 -match '@keyframes seatSettle \{[^}]*transform:')) -and
+    ($cssStripped208 -match "\[data-game='FO3'\] \.seat \{\s*animation-name:\s*seatSettleClunk;") -and
+    ($cssStripped208 -match '@keyframes seatSettleClunk')
+) "208.24: .seat is a plain @keyframes animation (filter/box-shadow only, never transform) with a CSS-only [data-game='FO3'] texture-variant override -- no JS branch (Protocol 38)"
+
+# 208.25 static -- _motionSeat(...) is adopted at all 4 install call sites:
+#        the phosphor tube pick, the Sonic Processor board reseat, the
+#        program-cartridge seat tap, and the Tool Deck's grip bar (never
+#        #toolDeck itself, avoiding the animation-shorthand collision with
+#        its own pre-existing deckUp slide-in).
+Check (
+    ($seatOpticsTubeBody208 -match [regex]::Escape('_motionSeat(btnEl);')) -and
+    ($toggleMasterMuteBody208 -match [regex]::Escape("_motionSeat(document.getElementById('chipGrid'));")) -and
+    ($seatGameCartridgeBody208 -match [regex]::Escape('_motionSeat(btn);')) -and
+    ($openToolDeckBody208 -match [regex]::Escape("_motionSeat(deck.querySelector('.deck-grip'));"))
+) "208.25: _motionSeat() is called from all 4 adopted M5 install sites -- _seatOpticsTube(), toggleMasterMute()'s reseat branch, _seatGameCartridge(), and openToolDeck() (targeting the grip bar, not #toolDeck itself)"
+
+# 208.26 static -- toggleMasterMute() only triggers SEAT on the reseat
+#        (un-mute) transition, never on eject (mute).
+Check (
+    $toggleMasterMuteBody208 -match "if \(!isMuted\) \{\s*playBoardThunk\(true\);[\s\S]{0,260}_motionSeat\(document\.getElementById\('chipGrid'\)\);\s*\}"
+) "208.26: toggleMasterMute() fires the SEAT flourish only on the reseat (un-mute) branch, never on eject (mute)"
+
+# 208.27 static -- CLAUDE.md documents SEAT as adopted at this unit
+#        (Protocol UI-9).
+Check (
+    ($claudeSrc208 -match [regex]::Escape('Protocol UI-9 — Motion-Verb Grammar (adopted at the Design Overhaul DO-N unit, SWEEP token; SEAT adopted at the Ceremony Moments Wave 1 unit)')) -and
+    ($claudeSrc208 -match [regex]::Escape('**SEAT** (introduced at Ceremony Moments Wave 1, M5)'))
+) "208.27: CLAUDE.md's Protocol UI-9 documents SEAT as adopted at the Ceremony Moments Wave 1 unit"
+
+# -- CROSS-CUTTING ------------------------------------------------------------
+
+# 208.28 static -- no new campaign-state field anywhere in M1-M5 (Protocol 4
+#        not triggered): only META_MANIFEST/the Overseer's Log MetaStore
+#        blob grew a field, never campaign state.
+$combined208 = $coreSrc208 + $audioSrc208
+Check (
+    (-not ($combined208 -match 'state\.robco_last_seen_version')) -and
+    (-not ($combined208 -match 'state\.lastFlushAt')) -and
+    (-not ($coreSrc208 -match '(?i)state\.ignition')) -and
+    (-not ($coreSrc208 -match '(?i)state\.overseerGreeted'))
+) "208.28: none of M1-M5's new fields (robco_last_seen_version, lastFlushAt, the ignition sequence, _overseerGreeted) ever became a campaign-state field -- Protocol 4 is not triggered anywhere in this unit"
+
+# 208.29 static -- game-agnostic (Protocol 38): M2's greeting reads per-game
+#        identity data (no hardcoded ctx literal in the greeting consumer),
+#        and M5's per-game texture is a CSS [data-game] selector, never a
+#        JS ctx branch.
+$combined208b = $greetBody208 + $ignitionBody208 + $motionSeatBody208
+Check (
+    (-not ($combined208b -match "ctx === 'FNV'")) -and
+    (-not ($combined208b -match "ctx === 'FO3'"))
+) "208.29: the M2 greeting consumer and the M5 _motionSeat() trigger carry no hardcoded ctx === 'FNV'/'FO3' branch -- all per-game flavor rides identity data (M2) or CSS [data-game] selectors (M5), never a JS branch (Protocol 38)"
 
 # ===========================================================
 # Results
