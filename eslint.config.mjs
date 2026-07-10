@@ -111,6 +111,13 @@ export default [
         _pendingQuestFiled: 'writable', // state.js -> ui-saves.js/ui-render.js (#25 DIRECTIVE FILED)
         _pendingPerkSeat: 'writable', // state.js -> ui-render.js (#13 CARD SEAT)
         _pendingEffectWarmup: 'writable', // state.js -> ui-render.js/api.js (#28 TUNGSTEN WARM-UP)
+        // Diagnostic Shell U3 TRIGGERS catalog (js/test-console.js) reads/writes
+        // these `let` bindings declared in ui-render.js/ui-core.js directly — the
+        // same shared classic-script-scope pattern as the _pendingXxx vars above.
+        _facChannel: 'writable', // ui-render.js -> test-console.js (fire-pending-rep-stamp)
+        setFactionChannel: 'readonly', // ui-render.js -> test-console.js
+        _mapActiveZone: 'writable', // ui-render.js -> test-console.js (fire-pending-survey-ping)
+        _overseerGreeted: 'writable', // ui-core.js -> test-console.js (ceremony-greet replay)
         generateSyncPayload: 'readonly',
         restoreChatHistory: 'readonly',
         chatHistory: 'writable',

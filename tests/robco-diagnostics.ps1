@@ -24043,6 +24043,421 @@ Check (
 ) '211.13: [regression guard] #testConsolePanel can never silently revert to a document-flow <details class="panel"> -- it must stay a role=dialog fixed overlay drawer'
 
 # ===========================================================
+# Suite 212 -- Diagnostic Shell U3: TRIGGERS catalog + Protocol 44
+# (planning/DIAGNOSTIC_SHELL_PLAN.md Sec4/Sec7/Sec11, Protocol 8 Sonnet
+# stage). Mirrors JS Suite 212. ~45 new registry entries under
+# category:'triggers' -- fire any of the 33 feedback animations (bus-emit +
+# pending-var), force each Living Core state, force each boot flavor,
+# replay ceremonies M1-M5 (never clearing a real persisted view-once flag).
+# None of these had pre-existing markup, so _renderShell() (U1) gained a
+# synthesis path: an anchor-less tool becomes a real <button>, grouped by
+# the optional `group` field. Protocol 44 (NEW, CLAUDE.md) requires every
+# future hard-to-trigger feature to register a trigger in the same commit,
+# enforced by a gate suite that cross-references every
+# RobcoEvents.emit('<name>') literal and the known view-once MetaStore
+# flags against the union of every tool's triggers[]. A Protocol 42 finding
+# landed in the same commit: seven bus events have a REACTIVE state.js
+# subscriber that writes the campaign event log on every fire, contradicting
+# the plan's own "firing an animation is inherently non-destructive" premise
+# for those seven specifically -- corrected to tier:'staging'+
+# destructive:true rather than the plan's literal 'prod'. 16 tests.
+# ===========================================================
+Sep "Suite 212 -- Diagnostic Shell U3: TRIGGERS catalog + Protocol 44"
+$testConsole212 = Read-Src "js/test-console.js"
+$claude212 = Read-Src "CLAUDE.md"
+
+# 212.1, 212.3, 212.4, 212.5, 212.9, 212.10, 212.11, 212.12, 212.16
+# BEHAVIORAL -- the real registry + _renderShell()/_toolVisible()/
+# _fireBootFlavor()/_replayAbsence() bodies, executed via a spawned node
+# process against the ACTUAL source (Protocol 42 stdin-corruption-safe
+# transport -- a temp file, never piped stdin -- mirrors the Suite 210/211
+# pattern).
+$labels212 = @(
+    "212.1: [behavioral] DIAGNOSTIC_SHELL_TOOLS registers all 45 new U3 tool ids (living core states/flare/burst, boot flavors, ceremonies M1-M5, day/night, fire-anim bus events, fire-pending animations) with no duplicate id, for an exact total of 54",
+    "212.3: [behavioral] _renderShell(), run against a synthetic DOM with two anchor-less tools sharing a `group`, builds ONE .dsh-tool-subhead + .dsh-tool-grid holding both synthesized buttons, and clicking the first fires _invoke() with that exact tool",
+    "212.4: [Protocol 42] exactly the 7 fire-anim-<event> tools whose bus event has a reactive campaign-event-log-writing subscriber are tier:'staging'+destructive:true; every other one of the 22 fire-anim-<event> tools is tier:'prod'+destructive:false",
+    "212.5: [behavioral] re-proving the Suite 210.6 leak-proof invariant against the FULL current 54-tool registry: every tier:'staging' tool is invisible under a stubbed 'prod' tier and visible under 'staging'; every tier:'prod' tool is visible under both",
+    "212.9: _fireBootFlavor(flavor) sets window.__robcoBootFlavor then calls the existing _rebootFromConsole(); each boot-flavor-<normal|cold|degraded> tool action calls it with the matching flavor string",
+    "212.10: every fire-anim-<event> tool's action fires the EXACT event-name string its own `triggers[0]` declares -- either inline or through a dedicated resolver helper -- the registry metadata and the fired event can never drift apart",
+    "212.11: [Protocol 44 guard] every real RobcoEvents.emit('<name>') string literal in js/*.js (scanned live from source, excluding the allowlisted runtime.state) and all 3 known view-once MetaStore flags are covered by the union of every DIAGNOSTIC_SHELL_TOOLS triggers[] array",
+    "212.12: [Protocol 44 guard, negative proof] a synthetic event name absent from every tool's triggers[] is correctly flagged as missing by the same discovery-regex + coverage-check logic 212.11 uses",
+    "212.16: [behavioral] _replayAbsence(), executed against a synchronous-mock runBootSequence, restores window._checkLongAbsence to the ORIGINAL function once the (mocked) boot completes"
+)
+try {
+    $nodeCheck212 = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCheck212) {
+        $repoRootNode212 = $Root.Replace('\', '/')
+        $testScript212 = @"
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+const ROOT = '$repoRootNode212';
+function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+function extractBody(src, name) {
+  var idx = src.indexOf('function ' + name);
+  if (idx === -1) throw new Error('missing ' + name);
+  var i = src.indexOf('{', idx);
+  var depth = 0, start = i;
+  while (i < src.length) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) return src.slice(start, i + 1); }
+    i++;
+  }
+  throw new Error('unclosed ' + name);
+}
+
+const testConsoleSrc = rd('js/test-console.js');
+var results = [];
+
+function evalRealTools() {
+  var toolsStart = testConsoleSrc.indexOf('var DIAGNOSTIC_SHELL_TOOLS = [');
+  var toolsEnd = testConsoleSrc.indexOf('\n  ];', toolsStart) + '\n  ];'.length;
+  var toolsSrc = testConsoleSrc.slice(toolsStart, toolsEnd);
+  var replayHatchBody = extractBody(testConsoleSrc, '_replayHatch');
+  var stubNames = [
+    '_fireAnimEvent', '_fireFactionThreshold', '_fireLocationVisited', '_fireLocationCurrent',
+    '_fireCollectibleAcquired', '_fireLevelUp', '_firePendingRepStamp', '_firePendingQuestStamp',
+    '_firePendingQuestFiled', '_firePendingExhibitLight', '_firePendingSurveyPing', '_firePendingPerkSeat',
+    '_firePendingEffectWarmup', '_fireBootFlavor', '_replayIgnition', '_replayGreet', '_replayFirmware',
+    '_replayAbsence', '_replaySeat', '_toggleDayNight',
+  ];
+  var stubs = stubNames.map(function (n) { return 'function ' + n + '() {}'; }).join('\n');
+  var src = '(function () {\n function _replayHatch() ' + replayHatchBody + '\n' + stubs + '\n' + toolsSrc + '\n return DIAGNOSTIC_SHELL_TOOLS; })()';
+  return eval(src);
+}
+
+// 212.1
+try {
+  var tools1 = evalRealTools();
+  var ids1 = tools1.map(function (t) { return t.id; });
+  var expected1 = [
+    'core-state-thinking','core-state-speaking','core-state-listening','core-state-disabled','core-state-offline',
+    'core-flare','core-burst',
+    'boot-flavor-normal','boot-flavor-cold','boot-flavor-degraded',
+    'ceremony-ignition','ceremony-greet','ceremony-firmware','ceremony-absence','ceremony-seat',
+    'time-daynight',
+    'fire-anim-limb.state','fire-anim-effect.applied','fire-anim-item.added','fire-anim-quest.status',
+    'fire-anim-effect.expiring','fire-anim-faction.threshold','fire-anim-data.write','fire-anim-location.visited',
+    'fire-anim-stat.change','fire-anim-location.current','fire-anim-karma.tier','fire-anim-weight.seized',
+    'fire-anim-hp.critical','fire-anim-rad.tier','fire-anim-item.equipped',
+    'fire-anim-level.up','fire-anim-collectible.acquired','fire-anim-craft.completed','fire-anim-craft.scrapped',
+    'fire-anim-trade.bought','fire-anim-trade.sold','fire-anim-sleep.completed',
+    'fire-pending-rep-stamp','fire-pending-quest-stamp','fire-pending-exhibit-light','fire-pending-survey-ping',
+    'fire-pending-quest-filed','fire-pending-perk-seat','fire-pending-effect-warmup',
+  ];
+  results.push(
+    tools1.length === 54 &&
+      expected1.length === 45 &&
+      expected1.every(function (id) { return ids1.indexOf(id) !== -1; }) &&
+      new Set(ids1).size === ids1.length
+  );
+} catch (e) { results.push(false); }
+
+// 212.3
+try {
+  function makeEl(tag) {
+    var listeners = {};
+    var el = {
+      tagName: tag, children: [], className: '', textContent: '', title: '', type: '', style: {}, attrs: {},
+      setAttribute: function (k, v) { this.attrs[k] = v; },
+      getAttribute: function (k) { return this.attrs[k]; },
+      appendChild: function (child) { this.children.push(child); return child; },
+      insertBefore: function (child, ref) {
+        var idx = this.children.indexOf(ref);
+        this.children.splice(idx === -1 ? 0 : idx, 0, child);
+        return child;
+      },
+      querySelector: function (sel) { return this.__map && this.__map[sel] ? this.__map[sel] : null; },
+      addEventListener: function (type, fn) { (listeners[type] = listeners[type] || []).push(fn); },
+      _fire: function (type) { (listeners[type] || []).forEach(function (fn) { fn(); }); },
+    };
+    return el;
+  }
+  var sectionsHost3 = makeEl('div');
+  var envBanner3 = makeEl('span');
+  var panel3 = makeEl('div');
+  panel3.__map = { '#dshSections': sectionsHost3, '#dshEnvBanner': envBanner3 };
+  var bodySrc3 = extractBody(testConsoleSrc, '_renderShell');
+  var src3 =
+    "var DEV_MARKER = '⚙';\n" +
+    "var CATEGORY_ORDER = ['triggers'];\n" +
+    "var CATEGORY_META = { triggers: { stagingTitle: 'TRIGGERS', prodTitle: 'STIMULUS BENCH', icon: '▲' } };\n" +
+    'var _invoked = null;\n' +
+    'function _invoke(tool) { _invoked = tool.id; }\n' +
+    "function _toolVisible(tool, tier) { if (tool.tier === 'prod') return true; return tier === 'staging'; }\n" +
+    "function _shellTier() { return 'prod'; }\n" +
+    "var DIAGNOSTIC_SHELL_TOOLS = [\n" +
+    "  { id: 'synthetic-a', label: 'SYNTH A', subLabel: 'sub a', icon: '◆', category: 'triggers', group: 'GROUP ONE', tier: 'prod', destructive: false, tooltip: 't', triggers: [], action: function () {} },\n" +
+    "  { id: 'synthetic-b', label: 'SYNTH B', subLabel: 'sub b', icon: '◆', category: 'triggers', group: 'GROUP ONE', tier: 'prod', destructive: false, tooltip: 't', triggers: [], action: function () {} },\n" +
+    "];\n" +
+    'function _paintEnvBanner() {}\n' +
+    'function _wireDynamicSubPanel() {}\n' +
+    'function _renderShell(panel) ' + bodySrc3;
+  var document3 = {
+    createElement: function (tag) { return makeEl(tag); },
+    createTextNode: function (text) { return { nodeType: 3, textContent: text }; },
+  };
+  var sandbox3 = { console: console, document: document3 };
+  vm.createContext(sandbox3);
+  vm.runInContext(src3 + '\nthis._renderShellRef = _renderShell; this._invokedRef = function () { return _invoked; };', sandbox3);
+  sandbox3._renderShellRef(panel3);
+  var details3 = sectionsHost3.children[0];
+  var subheadNode3 = details3.children.filter(function (c) { return c.className === 'dsh-tool-subhead'; })[0];
+  var gridNode3 = details3.children.filter(function (c) { return c.className === 'dsh-tool-grid'; })[0];
+  var btns3 = gridNode3 ? gridNode3.children : [];
+  var ok3 = !!subheadNode3 && subheadNode3.textContent === 'GROUP ONE' && btns3.length === 2;
+  if (ok3) {
+    btns3[0]._fire('click');
+    ok3 = sandbox3._invokedRef() === 'synthetic-a';
+  }
+  results.push(ok3);
+} catch (e) { results.push(false); }
+
+// 212.4
+try {
+  var tools4 = evalRealTools();
+  var writers4 = [
+    'fire-anim-level.up','fire-anim-collectible.acquired','fire-anim-craft.completed','fire-anim-craft.scrapped',
+    'fire-anim-trade.bought','fire-anim-trade.sold','fire-anim-sleep.completed',
+  ];
+  var fireAnim4 = tools4.filter(function (t) { return t.id.indexOf('fire-anim-') === 0; });
+  results.push(
+    fireAnim4.length === 22 &&
+      writers4.every(function (id) {
+        var t = fireAnim4.filter(function (x) { return x.id === id; })[0];
+        return t && t.tier === 'staging' && t.destructive === true;
+      }) &&
+      fireAnim4.filter(function (t) { return writers4.indexOf(t.id) === -1; })
+        .every(function (t) { return t.tier === 'prod' && t.destructive === false; })
+  );
+} catch (e) { results.push(false); }
+
+// 212.5
+try {
+  var toolVisBody5 = extractBody(testConsoleSrc, '_toolVisible');
+  var tools5 = evalRealTools();
+  var fn5 = new Function('tool', 'tier', toolVisBody5.slice(1, -1));
+  var staging5 = tools5.filter(function (t) { return t.tier === 'staging'; });
+  var prod5 = tools5.filter(function (t) { return t.tier === 'prod'; });
+  results.push(
+    staging5.length >= 10 &&
+      prod5.length >= 40 &&
+      staging5.every(function (t) { return fn5(t, 'prod') === false && fn5(t, 'staging') === true; }) &&
+      prod5.every(function (t) { return fn5(t, 'prod') === true && fn5(t, 'staging') === true; })
+  );
+} catch (e) { results.push(false); }
+
+// 212.9
+try {
+  var helperBody9 = extractBody(testConsoleSrc, '_fireBootFlavor');
+  var tools9 = evalRealTools();
+  var flavors9 = { normal: 'boot-flavor-normal', cold: 'boot-flavor-cold', degraded: 'boot-flavor-degraded' };
+  var ok9 = helperBody9.indexOf('window.__robcoBootFlavor = flavor') !== -1 && helperBody9.indexOf('_rebootFromConsole') !== -1;
+  Object.keys(flavors9).forEach(function (fl) {
+    var t = tools9.filter(function (x) { return x.id === flavors9[fl]; })[0];
+    if (!t || t.action.toString().indexOf("_fireBootFlavor('" + fl + "')") === -1) ok9 = false;
+  });
+  results.push(ok9);
+} catch (e) { results.push(false); }
+
+// 212.10
+try {
+  var tools10 = evalRealTools();
+  var fireAnim10 = tools10.filter(function (t) { return t.id.indexOf('fire-anim-') === 0; });
+  var helperNames10 = ['_fireAnimEvent','_fireFactionThreshold','_fireLocationVisited','_fireLocationCurrent','_fireCollectibleAcquired','_fireLevelUp'];
+  var helperSrc10 = helperNames10.map(function (n) { try { return extractBody(testConsoleSrc, n); } catch (e) { return ''; } }).join('\n');
+  var ok10 =
+    fireAnim10.length === 22 &&
+    fireAnim10.every(function (t) {
+      var eventName = t.triggers[0];
+      var actionSrc = t.action.toString();
+      return (
+        actionSrc.indexOf("'" + eventName + "'") !== -1 ||
+        (eventName === 'faction.threshold' && actionSrc.indexOf('_fireFactionThreshold') !== -1) ||
+        (eventName === 'location.visited' && actionSrc.indexOf('_fireLocationVisited') !== -1) ||
+        (eventName === 'location.current' && actionSrc.indexOf('_fireLocationCurrent') !== -1) ||
+        (eventName === 'collectible.acquired' && actionSrc.indexOf('_fireCollectibleAcquired') !== -1) ||
+        (eventName === 'level.up' && actionSrc.indexOf('_fireLevelUp') !== -1)
+      );
+    }) &&
+    helperSrc10.indexOf("'faction.threshold'") !== -1 &&
+    helperSrc10.indexOf("'location.visited'") !== -1 &&
+    helperSrc10.indexOf("'location.current'") !== -1 &&
+    helperSrc10.indexOf("'collectible.acquired'") !== -1 &&
+    helperSrc10.indexOf("'level.up'") !== -1;
+  results.push(ok10);
+} catch (e) { results.push(false); }
+
+// 212.11 + 212.12 (Protocol 44 guard + negative proof)
+var ALLOWLIST_212 = ['runtime.state'];
+var KNOWN_FLAGS_212 = ['robco_bay_opened', 'robco_last_seen_version', 'robco_booted_before'];
+function scanRealEmitEvents() {
+  var jsDir = path.join(ROOT, 'js');
+  var files = fs.readdirSync(jsDir).filter(function (f) { return f.endsWith('.js') && f !== 'test-console.js'; });
+  var names = {};
+  files.forEach(function (f) {
+    var src = fs.readFileSync(path.join(jsDir, f), 'utf8');
+    var re = /RobcoEvents\.emit\(\s*'([^']+)'/g;
+    var m;
+    while ((m = re.exec(src))) names[m[1]] = true;
+  });
+  return Object.keys(names);
+}
+function triggersUnion(tools) {
+  var set = {};
+  tools.forEach(function (t) { (t.triggers || []).forEach(function (x) { set[x] = true; }); });
+  return set;
+}
+try {
+  var tools11 = evalRealTools();
+  var union11 = triggersUnion(tools11);
+  var real11 = scanRealEmitEvents();
+  var missing11 = real11.filter(function (n) { return ALLOWLIST_212.indexOf(n) === -1 && !union11[n]; });
+  var missingFlags11 = KNOWN_FLAGS_212.filter(function (f) { return !union11[f]; });
+  results.push(real11.length >= 20 && missing11.length === 0 && missingFlags11.length === 0);
+} catch (e) { results.push(false); }
+try {
+  var tools12 = evalRealTools();
+  var union12 = triggersUnion(tools12);
+  var synth12 = 'synthetic.uncovered.event';
+  var wouldCatch12 = ALLOWLIST_212.indexOf(synth12) === -1 && !union12[synth12];
+  var probe12 = "RobcoEvents.emit('synthetic.uncovered.event', {});";
+  var re12 = /RobcoEvents\.emit\(\s*'([^']+)'/g;
+  var found12 = re12.exec(probe12);
+  results.push(wouldCatch12 && !!found12 && found12[1] === synth12);
+} catch (e) { results.push(false); }
+
+// 212.16
+try {
+  var body16 = extractBody(testConsoleSrc, '_replayAbsence');
+  var src16 =
+    'function makeEl() { return { style: {}, classList: { add: function(){}, remove: function(){} } }; }\n' +
+    'var document = { getElementById: function () { return makeEl(); } };\n' +
+    'var original = function () { return 3; };\n' +
+    'window._checkLongAbsence = original;\n' +
+    'var bootCalled = false;\n' +
+    'window.runBootSequence = function (onComplete) { bootCalled = true; onComplete(); };\n' +
+    'function _refresh() {}\n' +
+    'function _replayAbsence() ' + body16 + '\n_replayAbsence();\n' +
+    'var result16 = { bootCalled: bootCalled, restored: window._checkLongAbsence === original };\n';
+  var sandbox16 = { window: {}, console: console };
+  vm.createContext(sandbox16);
+  vm.runInContext(src16 + '\nthis.__result16 = result16;', sandbox16);
+  results.push(sandbox16.__result16.bootCalled === true && sandbox16.__result16.restored === true);
+} catch (e) { results.push(false); }
+
+console.log('RESULT:' + results.map(function (r) { return r ? '1' : '0'; }).join(''));
+"@
+        $tmpScript212 = [System.IO.Path]::GetTempFileName() + '.js'
+        [System.IO.File]::WriteAllText($tmpScript212, $testScript212, [System.Text.Encoding]::UTF8)
+        try {
+            $out212 = (node $tmpScript212 2>&1 | Out-String)
+        } finally {
+            Remove-Item -Path $tmpScript212 -Force -ErrorAction SilentlyContinue
+        }
+        $rm212 = [regex]::Match($out212, 'RESULT:([01]{9})')
+        if ($rm212.Success) {
+            $bits212 = $rm212.Groups[1].Value
+            for ($bi212 = 0; $bi212 -lt $labels212.Count; $bi212++) {
+                Check ($bits212.Substring($bi212, 1) -eq '1') $labels212[$bi212]
+            }
+        } else {
+            $err212 = if ([string]::IsNullOrWhiteSpace($out212)) { "No output from node" } else { $out212.Trim() }
+            foreach ($lbl in $labels212) { Fail "$lbl  (runtime error: $err212)" }
+        }
+    } else {
+        foreach ($lbl in $labels212) { Fail "$lbl  (node.exe not found on PATH -- cannot run behavioral proof)" }
+    }
+} catch {
+    foreach ($lbl in $labels212) { Fail "$lbl  (harness error: $($_.Exception.Message))" }
+}
+
+# 212.2 every new U3 tool carries no `anchor` (the synthesis path applies)
+#       and _renderShell() implements that synthesis: creates a real
+#       <button>, wires it through _invoke(tool), and groups by the
+#       `group` field into a labeled sub-heading.
+$toolsStart212 = $testConsole212.IndexOf('var DIAGNOSTIC_SHELL_TOOLS = [')
+$toolsEnd212 = $testConsole212.IndexOf("`n  ];", $toolsStart212)
+$toolsBlock212 = $testConsole212.Substring($toolsStart212, $toolsEnd212 - $toolsStart212)
+$entries212 = [regex]::Matches($toolsBlock212, '\{[^{}]*\}')
+$anchorlessCount212 = 0
+foreach ($m in $entries212) {
+    if ($m.Value -notmatch 'anchor:') { $anchorlessCount212++ }
+}
+$renderShellBody212 = Get-FunctionBody $testConsole212 '_renderShell'
+Check (
+    ($anchorlessCount212 -eq 45) -and
+    ($renderShellBody212 -match 'dsh-tool-subhead') -and
+    ($renderShellBody212 -match 'dsh-tool-grid') -and
+    ($renderShellBody212 -match 'dsh-tool-btn') -and
+    ($renderShellBody212 -match '_invoke\(tool\)') -and
+    ($renderShellBody212 -match "tool\.group\s*&&\s*tool\.group\s*!==\s*curGroup")
+) "212.2: every new U3 tool carries no ``anchor``, and _renderShell()'s synthesis path builds a real .dsh-tool-btn button (wired through _invoke(tool)) grouped by the tool's ``group`` field into a .dsh-tool-subhead + .dsh-tool-grid -- a future trigger with zero index.html markup"
+
+# 212.6 ceremony-firmware calls the flourish DIRECTLY, never
+#       _checkFirmwareFlash() (which reads AND WRITES the real
+#       robco_last_seen_version MetaStore flag).
+$replayFirmwareBody212 = Get-FunctionBody $testConsole212 '_replayFirmware'
+Check (
+    ($replayFirmwareBody212 -match '_fireFirmwareFlashFlourish') -and
+    (-not ($replayFirmwareBody212 -match '_checkFirmwareFlash'))
+) '212.6: _replayFirmware() calls _fireFirmwareFlashFlourish() directly and never calls _checkFirmwareFlash() (which would read+write the real robco_last_seen_version MetaStore flag) -- the ceremony replays without consuming the view-once flag'
+
+# 212.7 ceremony-greet resets ONLY the transient session flag
+#       (_overseerGreeted, a ui-core.js `let`, never MetaStore) before
+#       calling the real _maybeGreetOverseer().
+$replayGreetBody212 = Get-FunctionBody $testConsole212 '_replayGreet'
+Check (
+    ($replayGreetBody212 -match '_overseerGreeted\s*=\s*false') -and
+    ($replayGreetBody212 -match '_maybeGreetOverseer') -and
+    (-not ($replayGreetBody212 -match 'MetaStore|localStorage'))
+) '212.7: _replayGreet() resets ONLY the transient session flag _overseerGreeted (never MetaStore/localStorage) before calling the real _maybeGreetOverseer() -- a replay, not a persisted-flag reset'
+
+# 212.8 ceremony-absence temporarily substitutes window._checkLongAbsence
+#       for exactly one runBootSequence() call and restores it afterward --
+#       never touches localStorage/MetaStore directly itself.
+$replayAbsenceBody212 = Get-FunctionBody $testConsole212 '_replayAbsence'
+Check (
+    ($replayAbsenceBody212 -match 'window\._checkLongAbsence\s*=\s*function') -and
+    ($replayAbsenceBody212 -match 'restore\(\)') -and
+    ($replayAbsenceBody212 -match 'window\.runBootSequence') -and
+    (-not ($replayAbsenceBody212 -match 'MetaStore\.(set|remove)|localStorage\.(set|remove)'))
+) '212.8: _replayAbsence() temporarily substitutes window._checkLongAbsence for exactly one real runBootSequence() call and restores the original afterward -- never writes MetaStore/localStorage itself'
+
+# 212.13 mobile fit: the synthesized tool grid is a flex-wrap container,
+#        and .dsh-tool-subhead is a real, styled CSS rule.
+$css212 = Read-Src "css/terminal.css"
+Check (
+    ($renderShellBody212 -match 'flex-wrap:\s*wrap') -and
+    ($css212 -match '(?s)\.dsh-tool-subhead\s*\{') -and
+    ($renderShellBody212 -match 'btn-sm dsh-tool-btn')
+) "212.13: the synthesized tool grid is a flex-wrap container (no fixed-width overflow risk at 360/412px), every synthesized button reuses the existing .btn-sm class (an established >=28px Protocol 17 tap target), and .dsh-tool-subhead is a real terminal.css rule"
+
+# 212.14 HARD atmosphere/save boundary extended to the new prod-tier U3
+#        helper functions -- none of them ever touch the campaign save or
+#        localStorage directly. The 7 staging-tier event-log-writing tools
+#        are deliberately EXCLUDED (212.4 is their correct control).
+$prodHelperNames212 = @(
+    '_fireAnimEvent', '_fireFactionThreshold', '_fireLocationVisited', '_fireLocationCurrent',
+    '_firePendingRepStamp', '_firePendingQuestStamp', '_firePendingQuestFiled', '_firePendingExhibitLight',
+    '_firePendingSurveyPing', '_firePendingPerkSeat', '_firePendingEffectWarmup', '_fireBootFlavor',
+    '_replayIgnition', '_replayGreet', '_replayFirmware', '_replaySeat', '_toggleDayNight'
+)
+$combined212 = ($prodHelperNames212 | ForEach-Object { Get-FunctionBody $testConsole212 $_ }) -join "`n"
+Check (
+    (-not ($combined212 -match 'saveState\(|robco_v8|_logEvent\(|\beventLog\b|localStorage\.')) -and
+    (-not ($combined212 -match 'FNV|FO3|New Vegas|Fallout 3'))
+) "212.14: the new tier:'prod' U3 helper functions never touch the campaign save (no saveState/robco_v8/_logEvent/eventLog/localStorage) and carry no game literal (Protocol 38) -- the 7 staging-tier event-log-writing tools are the deliberate, documented exception (212.4)"
+
+# 212.15 Protocol 44 is documented in CLAUDE.md (canonical) with its
+#        enforcement mechanism.
+Check (
+    ($claude212 -match [regex]::Escape('## Protocol 44 — Every Hard-to-Trigger Feature Ships a Diagnostic Shell Trigger')) -and
+    ($claude212 -match [regex]::Escape('triggers: [...]')) -and
+    ($claude212 -match "RobcoEvents\.emit\('<name>', …\)")
+) '212.15: Protocol 44 is documented in CLAUDE.md (canonical), naming its enforcement mechanism (the triggers[] cross-reference against every RobcoEvents.emit literal)'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

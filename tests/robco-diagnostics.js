@@ -35903,6 +35903,677 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 212 — Diagnostic Shell U3: TRIGGERS catalog + Protocol 44
+//  (planning/DIAGNOSTIC_SHELL_PLAN.md §4/§7/§11, Protocol 8 Sonnet stage)
+//  (16 tests)
+// ──────────────────────────────────────────────────────────────
+//  ~45 new registry entries under category:'triggers' — fire any of the 33
+//  feedback animations (bus-emit + pending-var), force each Living Core
+//  state, force each boot flavor, replay ceremonies M1-M5 (never clearing
+//  a real persisted view-once flag). None of these had pre-existing markup,
+//  so _renderShell() (U1) gained a synthesis path: an anchor-less tool
+//  becomes a real <button>, grouped by the optional `group` field. Protocol
+//  44 (NEW, CLAUDE.md) requires every future hard-to-trigger feature to
+//  register a trigger in the same commit, enforced by a gate suite that
+//  cross-references every RobcoEvents.emit('<name>') literal and the known
+//  view-once MetaStore flags against the union of every tool's triggers[].
+//  A Protocol 42 finding landed in the same commit: seven bus events have a
+//  REACTIVE state.js subscriber that writes state.eventLog on every fire,
+//  contradicting the plan's own "firing an animation is inherently
+//  non-destructive" premise for those seven specifically — corrected to
+//  tier:'staging' + destructive:true rather than the plan's literal 'prod'.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 212 — Diagnostic Shell U3: TRIGGERS catalog + Protocol 44');
+  const testConsole212 = readFile('js/test-console.js');
+  const claude212 = readFile('CLAUDE.md');
+
+  // Live-evaluate the REAL DIAGNOSTIC_SHELL_TOOLS array (the eval-sandbox
+  // technique Suite 210 already established) — every assertion below reads
+  // the actual shipped registry, not a hand-copied expectation.
+  function _evalRealTools() {
+    const toolsStart = testConsole212.indexOf('var DIAGNOSTIC_SHELL_TOOLS = [');
+    const toolsEnd = testConsole212.indexOf('\n  ];', toolsStart) + '\n  ];'.length;
+    const toolsSrc = testConsole212.slice(toolsStart, toolsEnd);
+    const replayHatchBody = extractFunctionBody(testConsole212, '_replayHatch');
+    // Stub every helper an action arrow references, so the array literal
+    // evaluates without throwing — the point here is the DATA, not execution.
+    const stubs = [
+      '_replayHatch',
+      '_fireAnimEvent',
+      '_fireFactionThreshold',
+      '_fireLocationVisited',
+      '_fireLocationCurrent',
+      '_fireCollectibleAcquired',
+      '_fireLevelUp',
+      '_firePendingRepStamp',
+      '_firePendingQuestStamp',
+      '_firePendingQuestFiled',
+      '_firePendingExhibitLight',
+      '_firePendingSurveyPing',
+      '_firePendingPerkSeat',
+      '_firePendingEffectWarmup',
+      '_fireBootFlavor',
+      '_replayIgnition',
+      '_replayGreet',
+      '_replayFirmware',
+      '_replayAbsence',
+      '_replaySeat',
+      '_toggleDayNight',
+    ]
+      .filter(n => n !== '_replayHatch')
+      .map(n => `function ${n}() {}`)
+      .join('\n');
+    const src = `(function () {
+      function _replayHatch() ${replayHatchBody}
+      ${stubs}
+      ${toolsSrc}
+      return DIAGNOSTIC_SHELL_TOOLS;
+    })()`;
+    return eval(src);
+  }
+
+  // 212.1  registers one entry for every U3 tool id, across every group, at
+  //        the exact total (9 U1 + 45 U3 = 54).
+  {
+    let ok212 = false;
+    let err212 = null;
+    let toolIds212 = [];
+    try {
+      const tools212 = _evalRealTools();
+      toolIds212 = tools212.map(t => t.id);
+      const expectedNew212 = [
+        'core-state-thinking',
+        'core-state-speaking',
+        'core-state-listening',
+        'core-state-disabled',
+        'core-state-offline',
+        'core-flare',
+        'core-burst',
+        'boot-flavor-normal',
+        'boot-flavor-cold',
+        'boot-flavor-degraded',
+        'ceremony-ignition',
+        'ceremony-greet',
+        'ceremony-firmware',
+        'ceremony-absence',
+        'ceremony-seat',
+        'time-daynight',
+        'fire-anim-limb.state',
+        'fire-anim-effect.applied',
+        'fire-anim-item.added',
+        'fire-anim-quest.status',
+        'fire-anim-effect.expiring',
+        'fire-anim-faction.threshold',
+        'fire-anim-data.write',
+        'fire-anim-location.visited',
+        'fire-anim-stat.change',
+        'fire-anim-location.current',
+        'fire-anim-karma.tier',
+        'fire-anim-weight.seized',
+        'fire-anim-hp.critical',
+        'fire-anim-rad.tier',
+        'fire-anim-item.equipped',
+        'fire-anim-level.up',
+        'fire-anim-collectible.acquired',
+        'fire-anim-craft.completed',
+        'fire-anim-craft.scrapped',
+        'fire-anim-trade.bought',
+        'fire-anim-trade.sold',
+        'fire-anim-sleep.completed',
+        'fire-pending-rep-stamp',
+        'fire-pending-quest-stamp',
+        'fire-pending-exhibit-light',
+        'fire-pending-survey-ping',
+        'fire-pending-quest-filed',
+        'fire-pending-perk-seat',
+        'fire-pending-effect-warmup',
+      ];
+      ok212 =
+        tools212.length === 54 &&
+        expectedNew212.length === 45 &&
+        expectedNew212.every(id => toolIds212.includes(id)) &&
+        new Set(toolIds212).size === toolIds212.length; // no duplicate ids
+    } catch (e) {
+      err212 = e;
+    }
+    assert(
+      ok212,
+      '212.1: DIAGNOSTIC_SHELL_TOOLS registers all 45 new U3 tool ids (living core states/flare/burst, boot flavors, ceremonies M1-M5, day/night, fire-anim bus events, fire-pending animations) with no duplicate id, for an exact total of 54' +
+        (err212 ? ' — ' + err212.message : '')
+    );
+  }
+
+  // 212.2  every new U3 tool carries no `anchor` (the synthesis path
+  //        applies) and _renderShell() actually implements that synthesis:
+  //        creates a real <button>, wires it through _invoke(tool), and
+  //        groups by the `group` field into a labeled sub-heading.
+  {
+    let ok212 = false;
+    let err212 = null;
+    try {
+      const tools212 = _evalRealTools();
+      const u3Tools212 = tools212.filter(t => !['ocr-unit1-scan', 'ocr-unit2-scan'].includes(t.id));
+      const newTools212 = u3Tools212.filter(
+        t =>
+          t.id !== 'inspect-runtime-state' &&
+          t.id !== 'runtime-force-transition' &&
+          t.id !== 'reboot' &&
+          t.id !== 'wake-active' &&
+          t.id !== 'a11y-immersion' &&
+          t.id !== 'inspect-observers' &&
+          t.id !== 'replay-hatch'
+      );
+      const renderShellBody212 = extractFunctionBody(testConsole212, '_renderShell');
+      ok212 =
+        newTools212.length === 45 &&
+        newTools212.every(t => !t.anchor) &&
+        /dsh-tool-subhead/.test(renderShellBody212) &&
+        /dsh-tool-grid/.test(renderShellBody212) &&
+        /dsh-tool-btn/.test(renderShellBody212) &&
+        /_invoke\(tool\)/.test(renderShellBody212) &&
+        /tool\.group\s*&&\s*tool\.group\s*!==\s*curGroup/.test(renderShellBody212);
+    } catch (e) {
+      err212 = e;
+    }
+    assert(
+      ok212,
+      "212.2: every new U3 tool carries no `anchor`, and _renderShell()'s synthesis path builds a real .dsh-tool-btn button (wired through _invoke(tool)) grouped by the tool's `group` field into a .dsh-tool-subhead + .dsh-tool-grid — a future trigger with zero index.html markup" +
+        (err212 ? ' — ' + err212.message : '')
+    );
+  }
+
+  // 212.3  BEHAVIORAL: _renderShell()'s synthesis path, executed against a
+  //        synthetic DOM (the Suite 211.9 technique), actually creates a
+  //        clickable button for an anchor-less tool that fires its action
+  //        via _invoke() — proving the wiring works, not just that the
+  //        source text mentions the right identifiers.
+  {
+    let ok212 = false;
+    let err212 = null;
+    try {
+      const vm212 = require('vm');
+      function makeEl212(tag) {
+        const listeners = {};
+        const el = {
+          tagName: tag,
+          children: [],
+          className: '',
+          textContent: '',
+          title: '',
+          type: '',
+          style: {},
+          attrs: {},
+          setAttribute(k, v) {
+            this.attrs[k] = v;
+          },
+          getAttribute(k) {
+            return this.attrs[k];
+          },
+          appendChild(child) {
+            this.children.push(child);
+            return child;
+          },
+          insertBefore(child, ref) {
+            const idx = this.children.indexOf(ref);
+            this.children.splice(idx === -1 ? 0 : idx, 0, child);
+            return child;
+          },
+          querySelector(sel) {
+            return this.__map && this.__map[sel] ? this.__map[sel] : null;
+          },
+          addEventListener(type, fn) {
+            (listeners[type] = listeners[type] || []).push(fn);
+          },
+          _fire(type) {
+            (listeners[type] || []).forEach(fn => fn());
+          },
+        };
+        return el;
+      }
+      const sectionsHost212 = makeEl212('div');
+      const envBanner212 = makeEl212('span');
+      const panel212 = makeEl212('div');
+      panel212.__map = { '#dshSections': sectionsHost212, '#dshEnvBanner': envBanner212 };
+      const bodySrc212 = extractFunctionBody(testConsole212, '_renderShell');
+      const src212 = `
+        var DEV_MARKER = '⚙';
+        var CATEGORY_ORDER = ['triggers'];
+        var CATEGORY_META = { triggers: { stagingTitle: 'TRIGGERS', prodTitle: 'STIMULUS BENCH', icon: '▲' } };
+        var _invoked = null;
+        function _invoke(tool) { _invoked = tool.id; }
+        function _toolVisible(tool, tier) { if (tool.tier === 'prod') return true; return tier === 'staging'; }
+        function _shellTier() { return 'prod'; }
+        var DIAGNOSTIC_SHELL_TOOLS = [
+          { id: 'synthetic-a', label: 'SYNTH A', subLabel: 'sub a', icon: '◆', category: 'triggers', group: 'GROUP ONE', tier: 'prod', destructive: false, tooltip: 't', triggers: [], action: function () {} },
+          { id: 'synthetic-b', label: 'SYNTH B', subLabel: 'sub b', icon: '◆', category: 'triggers', group: 'GROUP ONE', tier: 'prod', destructive: false, tooltip: 't', triggers: [], action: function () {} },
+        ];
+        function _paintEnvBanner() {}
+        function _wireDynamicSubPanel() {}
+        function _renderShell(panel) ${bodySrc212}
+      `;
+      const document212 = {
+        createElement: tag => makeEl212(tag),
+        createTextNode: text => ({ nodeType: 3, textContent: text }),
+      };
+      const sandbox212 = { console, document: document212 };
+      vm212.createContext(sandbox212);
+      vm212.runInContext(
+        src212 +
+          '\nthis._renderShellRef = _renderShell; this._invokedRef = function () { return _invoked; };',
+        sandbox212
+      );
+      sandbox212._renderShellRef(panel212);
+      const details212 = sectionsHost212.children[0];
+      const subheadNode212 = details212.children.find(c => c.className === 'dsh-tool-subhead');
+      const gridNode212 = details212.children.find(c => c.className === 'dsh-tool-grid');
+      const btns212 = gridNode212 ? gridNode212.children : [];
+      ok212 =
+        !!subheadNode212 && subheadNode212.textContent === 'GROUP ONE' && btns212.length === 2;
+      if (ok212) {
+        btns212[0]._fire('click');
+        ok212 = sandbox212._invokedRef() === 'synthetic-a';
+      }
+    } catch (e) {
+      err212 = e;
+    }
+    assert(
+      ok212,
+      '212.3: BEHAVIORAL — _renderShell(), run against a synthetic DOM with two anchor-less tools sharing a `group`, builds ONE .dsh-tool-subhead + .dsh-tool-grid holding both synthesized buttons, and clicking the first fires _invoke() with that exact tool' +
+        (err212 ? ' — ' + err212.message : '')
+    );
+  }
+
+  // 212.4  Protocol 42 finding: exactly the 7 bus events with a reactive
+  //        state.eventLog-writing subscriber (state.js U8 auto-log) are
+  //        tier:'staging' + destructive:true; every OTHER fire-anim-<event>
+  //        tool (confirmed presentation-only) is tier:'prod' +
+  //        destructive:false — the deliberate correction to the plan's own
+  //        "firing a bus animation is inherently non-destructive" premise.
+  {
+    let ok212 = false;
+    let err212 = null;
+    try {
+      const tools212 = _evalRealTools();
+      const eventLogWriters212 = [
+        'fire-anim-level.up',
+        'fire-anim-collectible.acquired',
+        'fire-anim-craft.completed',
+        'fire-anim-craft.scrapped',
+        'fire-anim-trade.bought',
+        'fire-anim-trade.sold',
+        'fire-anim-sleep.completed',
+      ];
+      const fireAnimTools212 = tools212.filter(t => t.id.startsWith('fire-anim-'));
+      ok212 =
+        fireAnimTools212.length === 22 &&
+        eventLogWriters212.every(id => {
+          const t = fireAnimTools212.find(x => x.id === id);
+          return t && t.tier === 'staging' && t.destructive === true;
+        }) &&
+        fireAnimTools212
+          .filter(t => !eventLogWriters212.includes(t.id))
+          .every(t => t.tier === 'prod' && t.destructive === false);
+    } catch (e) {
+      err212 = e;
+    }
+    assert(
+      ok212,
+      "212.4: [Protocol 42] exactly the 7 fire-anim-<event> tools whose bus event has a reactive state.eventLog-writing subscriber (level.up, collectible.acquired, craft.completed, craft.scrapped, trade.bought, trade.sold, sleep.completed) are tier:'staging'+destructive:true; every other one of the 22 fire-anim-<event> tools is tier:'prod'+destructive:false" +
+        (err212 ? ' — ' + err212.message : '')
+    );
+  }
+
+  // 212.5  BEHAVIORAL leak-proof re-proof (the Suite 210.6 technique) run
+  //        against the FULL, current 54-tool registry: the new U3 entries
+  //        don't weaken the existing leak-proof guarantee — every
+  //        tier:'staging' tool (now including the 7 event-log writers) is
+  //        invisible under 'prod' and visible under 'staging'; every
+  //        tier:'prod' tool (now including all 38 new prod tools) is
+  //        visible under both.
+  {
+    let ok212 = false;
+    let err212 = null;
+    try {
+      const toolVisBody212 = extractFunctionBody(testConsole212, '_toolVisible');
+      const tools212 = _evalRealTools();
+      const fn212 = new Function('tool', 'tier', toolVisBody212.slice(1, -1));
+      const stagingTools212 = tools212.filter(t => t.tier === 'staging');
+      const prodTools212 = tools212.filter(t => t.tier === 'prod');
+      ok212 =
+        stagingTools212.length >= 10 &&
+        prodTools212.length >= 40 &&
+        stagingTools212.every(t => fn212(t, 'prod') === false && fn212(t, 'staging') === true) &&
+        prodTools212.every(t => fn212(t, 'prod') === true && fn212(t, 'staging') === true);
+    } catch (e) {
+      err212 = e;
+    }
+    assert(
+      ok212,
+      "212.5: BEHAVIORAL — re-proving Suite 210.6's leak-proof invariant against the FULL current 54-tool registry: every tier:'staging' tool (now including the 7 event-log-writing fire-anim tools) is invisible under a stubbed 'prod' tier and visible under 'staging'; every tier:'prod' tool is visible under both" +
+        (err212 ? ' — ' + err212.message : '')
+    );
+  }
+
+  // 212.6  ceremony-firmware calls the flourish DIRECTLY, never
+  //        _checkFirmwareFlash() (which reads AND WRITES the real
+  //        robco_last_seen_version MetaStore flag) — a replay, not a flag
+  //        consumption.
+  {
+    const body212 = extractFunctionBody(testConsole212, '_replayFirmware');
+    assert(
+      /_fireFirmwareFlashFlourish/.test(body212) && !/_checkFirmwareFlash/.test(body212),
+      '212.6: _replayFirmware() calls _fireFirmwareFlashFlourish() directly and never calls _checkFirmwareFlash() (which would read+write the real robco_last_seen_version MetaStore flag) — the ceremony replays without consuming the view-once flag'
+    );
+  }
+
+  // 212.7  ceremony-greet resets ONLY the transient session flag
+  //        (_overseerGreeted, a ui-core.js `let`, never MetaStore) before
+  //        calling the real _maybeGreetOverseer().
+  {
+    const body212 = extractFunctionBody(testConsole212, '_replayGreet');
+    assert(
+      /_overseerGreeted\s*=\s*false/.test(body212) &&
+        /_maybeGreetOverseer/.test(body212) &&
+        !/MetaStore|localStorage/.test(body212),
+      '212.7: _replayGreet() resets ONLY the transient session flag _overseerGreeted (never MetaStore/localStorage) before calling the real _maybeGreetOverseer() — a replay, not a persisted-flag reset'
+    );
+  }
+
+  // 212.8  ceremony-absence temporarily substitutes window._checkLongAbsence
+  //        (a pure read, confirmed never writing MetaStore) for exactly one
+  //        runBootSequence() call and restores it afterward — never touches
+  //        localStorage/MetaStore directly itself.
+  {
+    const body212 = extractFunctionBody(testConsole212, '_replayAbsence');
+    assert(
+      /window\._checkLongAbsence\s*=\s*function/.test(body212) &&
+        /restore\(\)/.test(body212) &&
+        /window\.runBootSequence/.test(body212) &&
+        !/MetaStore\.(set|remove)|localStorage\.(set|remove)/.test(body212),
+      '212.8: _replayAbsence() temporarily substitutes window._checkLongAbsence for exactly one real runBootSequence() call and restores the original afterward — never writes MetaStore/localStorage itself'
+    );
+  }
+
+  // 212.9  boot-flavor-<f> actions set window.__robcoBootFlavor to the
+  //        correct flavor via the shared _fireBootFlavor() helper, which
+  //        replays the boot sequence via the existing _rebootFromConsole().
+  {
+    const helperBody212 = extractFunctionBody(testConsole212, '_fireBootFlavor');
+    let ok212 = false;
+    let err212 = null;
+    try {
+      const tools212 = _evalRealTools();
+      const flavors212 = {
+        normal: 'boot-flavor-normal',
+        cold: 'boot-flavor-cold',
+        degraded: 'boot-flavor-degraded',
+      };
+      ok212 =
+        /window\.__robcoBootFlavor\s*=\s*flavor/.test(helperBody212) &&
+        /_rebootFromConsole/.test(helperBody212) &&
+        Object.keys(flavors212).every(fl => {
+          const t = tools212.find(x => x.id === flavors212[fl]);
+          return t && t.action.toString().includes(`_fireBootFlavor('${fl}')`);
+        });
+    } catch (e) {
+      err212 = e;
+    }
+    assert(
+      ok212,
+      '212.9: _fireBootFlavor(flavor) sets window.__robcoBootFlavor then calls the existing _rebootFromConsole(); each boot-flavor-<normal|cold|degraded> tool action calls it with the matching flavor string' +
+        (err212 ? ' — ' + err212.message : '')
+    );
+  }
+
+  // 212.10  every fire-anim-<event> tool's action fires RobcoEvents.emit
+  //         (directly or via the shared _fireAnimEvent()/dedicated helper)
+  //         with the exact event-name string its own `triggers[0]` declares
+  //         — the registry data and the actual fired event can never drift.
+  {
+    let ok212 = false;
+    let err212 = null;
+    try {
+      const tools212 = _evalRealTools();
+      const fireAnimTools212 = tools212.filter(t => t.id.startsWith('fire-anim-'));
+      const helperSrc212 = [
+        '_fireAnimEvent',
+        '_fireFactionThreshold',
+        '_fireLocationVisited',
+        '_fireLocationCurrent',
+        '_fireCollectibleAcquired',
+        '_fireLevelUp',
+      ]
+        .map(n => {
+          try {
+            return extractFunctionBody(testConsole212, n);
+          } catch (_) {
+            return '';
+          }
+        })
+        .join('\n');
+      ok212 =
+        fireAnimTools212.length === 22 &&
+        fireAnimTools212.every(t => {
+          const eventName = t.triggers[0];
+          const actionSrc = t.action.toString();
+          // Either the action's own source names the event literally, or it
+          // delegates to one of the dedicated resolver helpers (which are
+          // independently proven to emit the matching name via helperSrc212).
+          return (
+            actionSrc.includes(`'${eventName}'`) ||
+            (eventName === 'faction.threshold' && /_fireFactionThreshold/.test(actionSrc)) ||
+            (eventName === 'location.visited' && /_fireLocationVisited/.test(actionSrc)) ||
+            (eventName === 'location.current' && /_fireLocationCurrent/.test(actionSrc)) ||
+            (eventName === 'collectible.acquired' && /_fireCollectibleAcquired/.test(actionSrc)) ||
+            (eventName === 'level.up' && /_fireLevelUp/.test(actionSrc))
+          );
+        }) &&
+        new RegExp("'faction\\.threshold'").test(helperSrc212) &&
+        new RegExp("'location\\.visited'").test(helperSrc212) &&
+        new RegExp("'location\\.current'").test(helperSrc212) &&
+        new RegExp("'collectible\\.acquired'").test(helperSrc212) &&
+        new RegExp("'level\\.up'").test(helperSrc212);
+    } catch (e) {
+      err212 = e;
+    }
+    assert(
+      ok212,
+      "212.10: every fire-anim-<event> tool's action fires the EXACT event-name string its own `triggers[0]` declares — either inline or through one of the dedicated resolver helpers (each independently confirmed to emit that same name) — the registry metadata and the fired event can never drift apart" +
+        (err212 ? ' — ' + err212.message : '')
+    );
+  }
+
+  // 212.11  Protocol 44 GUARD: cross-reference every REAL RobcoEvents.emit
+  //         string literal (scanned from every js/*.js file EXCEPT
+  //         test-console.js itself — the catalog, not a source of new
+  //         canonical events) and the 3 known view-once MetaStore flags
+  //         against the union of every DIAGNOSTIC_SHELL_TOOLS `triggers[]`
+  //         array. A curated allowlist covers deliberately-internal events
+  //         (runtime.state — infra, already exercised as a side effect of
+  //         the FORCE TRANSITION / WAKE tools).
+  const ALLOWLISTED_EVENTS_212 = ['runtime.state'];
+  const KNOWN_VIEW_ONCE_FLAGS_212 = [
+    'robco_bay_opened',
+    'robco_last_seen_version',
+    'robco_booted_before',
+  ];
+  function _scanRealEmitEvents212() {
+    const jsDir = path.join(ROOT, 'js');
+    const files = fs.readdirSync(jsDir).filter(f => f.endsWith('.js') && f !== 'test-console.js');
+    const names = new Set();
+    files.forEach(f => {
+      const src = fs.readFileSync(path.join(jsDir, f), 'utf8');
+      const re = /RobcoEvents\.emit\(\s*'([^']+)'/g;
+      let m;
+      while ((m = re.exec(src))) names.add(m[1]);
+    });
+    return names;
+  }
+  function _triggersUnion212(tools) {
+    const set = new Set();
+    tools.forEach(t => (t.triggers || []).forEach(x => set.add(x)));
+    return set;
+  }
+  {
+    let ok212 = false;
+    let err212 = null;
+    let missing212 = [];
+    try {
+      const tools212 = _evalRealTools();
+      const union212 = _triggersUnion212(tools212);
+      const realEvents212 = _scanRealEmitEvents212();
+      missing212 = [...realEvents212].filter(
+        n => !ALLOWLISTED_EVENTS_212.includes(n) && !union212.has(n)
+      );
+      const missingFlags212 = KNOWN_VIEW_ONCE_FLAGS_212.filter(f => !union212.has(f));
+      ok212 = realEvents212.size >= 20 && missing212.length === 0 && missingFlags212.length === 0;
+    } catch (e) {
+      err212 = e;
+    }
+    assert(
+      ok212,
+      "212.11: [Protocol 44 guard] every real RobcoEvents.emit('<name>') string literal in js/*.js (scanned live from source, excluding the allowlisted runtime.state) and all 3 known view-once MetaStore flags (robco_bay_opened, robco_last_seen_version, robco_booted_before) are covered by the union of every DIAGNOSTIC_SHELL_TOOLS `triggers[]` array" +
+        (missing212.length ? ' — missing: ' + missing212.join(', ') : '') +
+        (err212 ? ' — ' + err212.message : '')
+    );
+  }
+
+  // 212.12  Protocol 44 GUARD negative proof: the SAME guard logic, run
+  //         against a synthetic event name that appears nowhere in any
+  //         tool's `triggers[]`, correctly reports it as missing — proving
+  //         the guard would actually fail the build on a genuine gap, not
+  //         just pass trivially because today's registry happens to be
+  //         complete.
+  {
+    let ok212 = false;
+    let err212 = null;
+    try {
+      const tools212 = _evalRealTools();
+      const union212 = _triggersUnion212(tools212);
+      const syntheticName212 = 'synthetic.uncovered.event';
+      const wouldBeCaught212 =
+        !ALLOWLISTED_EVENTS_212.includes(syntheticName212) && !union212.has(syntheticName212);
+      // And the discovery regex genuinely finds a synthetic literal when one
+      // is present in source text (not just an always-true string check).
+      const probe212 = "RobcoEvents.emit('synthetic.uncovered.event', {});";
+      const re212 = /RobcoEvents\.emit\(\s*'([^']+)'/g;
+      const found212 = re212.exec(probe212);
+      ok212 = wouldBeCaught212 && !!found212 && found212[1] === syntheticName212;
+    } catch (e) {
+      err212 = e;
+    }
+    assert(
+      ok212,
+      "212.12: [Protocol 44 guard, negative proof] a synthetic event name absent from every tool's triggers[] is correctly flagged as missing by the same discovery-regex + coverage-check logic 212.11 uses — the guard genuinely fails on a real gap, not just passing because the registry happens to be complete today" +
+        (err212 ? ' — ' + err212.message : '')
+    );
+  }
+
+  // 212.13  mobile fit: the synthesized tool grid is a flex-wrap container
+  //         (never a fixed-width row that could overflow at 360/412px), and
+  //         .dsh-tool-subhead is a real, styled CSS rule (not unstyled
+  //         block text) — CSS-in-JS via cssText plus a terminal.css rule.
+  {
+    const renderShellBody212 = extractFunctionBody(testConsole212, '_renderShell');
+    const css212 = readFile('css/terminal.css');
+    assert(
+      /flex-wrap:\s*wrap/.test(renderShellBody212) &&
+        /\.dsh-tool-subhead\s*\{/.test(css212) &&
+        /btn-sm dsh-tool-btn/.test(renderShellBody212),
+      '212.13: the synthesized tool grid is a flex-wrap container (no fixed-width overflow risk at 360/412px), every synthesized button reuses the existing .btn-sm class (an established >=28px Protocol 17 tap target), and .dsh-tool-subhead is a real terminal.css rule'
+    );
+  }
+
+  // 212.14  HARD atmosphere/save boundary extended to the new prod-tier U3
+  //         helper functions (the 210.13/211.11 pattern) — none of them
+  //         ever touch the campaign save or localStorage directly. The 7
+  //         staging-tier event-log-writing tools are deliberately EXCLUDED
+  //         from this specific check (212.4 is their correct control — they
+  //         are honestly tiered staging+destructive precisely because they
+  //         DO cause a downstream write, documented, confirm-gated).
+  {
+    const prodHelperNames212 = [
+      '_fireAnimEvent',
+      '_fireFactionThreshold',
+      '_fireLocationVisited',
+      '_fireLocationCurrent',
+      '_firePendingRepStamp',
+      '_firePendingQuestStamp',
+      '_firePendingQuestFiled',
+      '_firePendingExhibitLight',
+      '_firePendingSurveyPing',
+      '_firePendingPerkSeat',
+      '_firePendingEffectWarmup',
+      '_fireBootFlavor',
+      '_replayIgnition',
+      '_replayGreet',
+      '_replayFirmware',
+      '_replaySeat',
+      '_toggleDayNight',
+    ];
+    const combined212 = prodHelperNames212
+      .map(n => extractFunctionBody(testConsole212, n))
+      .join('\n');
+    assert(
+      !/saveState\(|robco_v8|_logEvent\(|\beventLog\b|localStorage\./.test(combined212) &&
+        !/FNV|FO3|New Vegas|Fallout 3/.test(combined212),
+      "212.14: the new tier:'prod' U3 helper functions never touch the campaign save (no saveState/robco_v8/_logEvent/eventLog/localStorage) and carry no game literal (Protocol 38) — the 7 staging-tier event-log-writing tools are the deliberate, documented exception (212.4)"
+    );
+  }
+
+  // 212.15  Protocol 44 is documented in CLAUDE.md (canonical) with its
+  //         enforcement mechanism.
+  assert(
+    /## Protocol 44 — Every Hard-to-Trigger Feature Ships a Diagnostic Shell Trigger/.test(
+      claude212
+    ) &&
+      /triggers:\s*\[\.\.\.\]/.test(claude212) &&
+      /RobcoEvents\.emit\('<name>', …\)/.test(claude212),
+    '212.15: Protocol 44 is documented in CLAUDE.md (canonical), naming its enforcement mechanism (the triggers[] cross-reference against every RobcoEvents.emit literal)'
+  );
+
+  // 212.16  BEHAVIORAL: _replayAbsence(), run against a synthetic
+  //         window/document with a synchronous-mock runBootSequence, leaves
+  //         window._checkLongAbsence restored to the ORIGINAL function
+  //         after the (mocked) boot completes — the monkeypatch never
+  //         leaks past its one intended call.
+  {
+    let ok212 = false;
+    let err212 = null;
+    try {
+      const vm212 = require('vm');
+      const body212 = extractFunctionBody(testConsole212, '_replayAbsence');
+      const src212 = `
+        function makeEl() { return { style: {}, classList: { add: function(){}, remove: function(){} } }; }
+        var document = {
+          getElementById: function () { return makeEl(); },
+        };
+        var original = function () { return 3; };
+        window._checkLongAbsence = original;
+        var bootCalled = false;
+        window.runBootSequence = function (onComplete) { bootCalled = true; onComplete(); };
+        function _refresh() {}
+        function _replayAbsence() ${body212}
+        _replayAbsence();
+        var result = { bootCalled: bootCalled, restored: window._checkLongAbsence === original };
+      `;
+      const sandbox212 = { window: {}, console };
+      vm212.createContext(sandbox212);
+      vm212.runInContext(src212 + '\nthis.__result = result;', sandbox212);
+      ok212 = sandbox212.__result.bootCalled === true && sandbox212.__result.restored === true;
+    } catch (e) {
+      err212 = e;
+    }
+    assert(
+      ok212,
+      '212.16: BEHAVIORAL — _replayAbsence(), executed against a synchronous-mock runBootSequence, restores window._checkLongAbsence to the ORIGINAL function once the (mocked) boot completes — the temporary substitution never leaks past its one intended call' +
+        (err212 ? ' — ' + err212.message : '')
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail

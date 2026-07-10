@@ -1,6 +1,6 @@
 // ── DIAGNOSTIC SHELL — the ONE canonical dev/debug console (Step 2 · Phase 2,
-//    Diagnostic Shell U2: mobile overlay + identity + icons, on top of U1's
-//    registry spine + two-signal gate) ────────────────────────────────────
+//    Diagnostic Shell U3: TRIGGERS catalog + Protocol 44, on top of U2's
+//    mobile overlay/identity and U1's registry spine + two-signal gate) ───
 //
 // A live inspector + trigger panel for the Ambient Runtime (js/runtime.js) so
 // the accumulating Phase-2 ambient features are testable without waiting on
@@ -74,13 +74,45 @@
 // since it is a distinct dialog surface, not a #sysModal caller — Protocol
 // 23: this file owns its own dialog, it doesn't fork the shared one).
 //
+// ── U3: TRIGGERS CATALOG + PROTOCOL 44 (planning/DIAGNOSTIC_SHELL_PLAN.md
+// §4/§7/§11 U3) ───────────────────────────────────────────────────────────
+// Adds ~45 new registry entries under category:'triggers' — fire any of the
+// 33 feedback animations (bus-emit + pending-var), force each Living Core
+// state, force each boot flavor, and replay ceremonies M1-M5 (never clearing
+// their real persisted view-once flag — see each _replayXxx()'s own
+// comment). None of these have pre-existing markup, so _renderShell() (U1)
+// gained a synthesis path: an anchor-less tool becomes a real <button>,
+// grouped by the optional `group` field into a labeled sub-heading + grid —
+// "one more registry entry" (Protocol 44) is now literally true even for a
+// brand-new trigger with zero index.html changes.
+//
+// PROTOCOL 42 FINDING — see the long comment above _fireAnimEvent() below
+// for the full account: seven bus events (level.up, collectible.acquired,
+// craft.completed, craft.scrapped, trade.bought, trade.sold,
+// sleep.completed) have a REACTIVE state.js subscriber that writes
+// the campaign event log every time they fire, contradicting the plan's own
+// "firing a bus animation is inherently non-destructive" premise for those
+// seven specifically. They are tier:'staging' + destructive:true (auto-
+// confirm-gated) — the one documented, narrow exception to this file's Hard
+// Boundary below, and it is never reachable by a production player (the
+// existing leak-proof gate, unchanged).
+//
+// Protocol 44 (NEW, CLAUDE.md) requires every future ambient/conditional/
+// hard-to-trigger feature to register a trigger here in the same commit as
+// the feature; the enforcement guard (both test runners) cross-references
+// every RobcoEvents.emit('<name>') literal and the known view-once MetaStore
+// flags against the union of every tool's `triggers:[...]` array.
+//
 // ── HARD ATMOSPHERE/SAVE BOUNDARY (Phase-2 prime invariant #1) ────────────────
 // This file touches ONLY in-memory Ambient Runtime state and the Immersion
 // tier (an existing MetaStore device pref, same as the real dial in Security &
 // Config). It never reads or writes the campaign save, stats, or event log,
 // and never pushes anything to the cloud. No auto-anything (Phase-2 invariant
 // #2) — every action here is an explicit developer button/select, never
-// triggered on its own.
+// triggered on its own. ONE documented, narrow exception (U3, above): the 7
+// tier:'staging' + destructive:true fire-anim-<event> tools that re-emit a
+// bus event with a reactive campaign-event-log-writing subscriber — confirm-
+// gated, staging-only, never reachable by a production player.
 //
 // Game-agnostic (Protocol 38): pure dev-tooling, no game literals.
 (function () {
@@ -299,6 +331,634 @@
       triggers: [],
       anchor: '[data-dsh-anchor="visualParseTestInput"]',
     },
+
+    // ── U3: TRIGGERS CATALOG (planning/DIAGNOSTIC_SHELL_PLAN.md §4/§11 U3) ──
+    // No `anchor` — none of these have pre-existing markup; _renderShell()
+    // synthesizes a real <button> per entry (grouped by `group`, a display-
+    // only sub-heading) and wires it through _invoke(). One more registry
+    // entry really is the whole cost of adding a future trigger (Protocol 44).
+
+    // Living core states (setOverseerState — the ONE state-setter, Protocol 22).
+    {
+      id: 'core-state-thinking',
+      label: 'CORE: THINKING',
+      subLabel: "setOverseerState('thinking')",
+      icon: '●',
+      category: 'triggers',
+      group: 'LIVING CORE',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Force the Living Core / Overseer scope into the THINKING state.',
+      triggers: [],
+      action: () => window.setOverseerState && window.setOverseerState('thinking'),
+    },
+    {
+      id: 'core-state-speaking',
+      label: 'CORE: SPEAKING',
+      subLabel: "setOverseerState('speaking')",
+      icon: '●',
+      category: 'triggers',
+      group: 'LIVING CORE',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Force the Living Core / Overseer scope into the SPEAKING state.',
+      triggers: [],
+      action: () => window.setOverseerState && window.setOverseerState('speaking'),
+    },
+    {
+      id: 'core-state-listening',
+      label: 'CORE: LISTENING',
+      subLabel: "setOverseerState('listening')",
+      icon: '●',
+      category: 'triggers',
+      group: 'LIVING CORE',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Force the Living Core / Overseer scope into the LISTENING (resting) state.',
+      triggers: [],
+      action: () => window.setOverseerState && window.setOverseerState('listening'),
+    },
+    {
+      id: 'core-state-disabled',
+      label: 'CORE: DISABLED',
+      subLabel: "setOverseerState('disabled')",
+      icon: '●',
+      category: 'triggers',
+      group: 'LIVING CORE',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Force the Living Core / Overseer scope into the DISABLED (no key) state.',
+      triggers: [],
+      action: () => window.setOverseerState && window.setOverseerState('disabled'),
+    },
+    {
+      id: 'core-state-offline',
+      label: 'CORE: OFFLINE',
+      subLabel: "setOverseerState('offline')",
+      icon: '●',
+      category: 'triggers',
+      group: 'LIVING CORE',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Force the Living Core / Overseer scope into the OFFLINE (no carrier) state.',
+      triggers: [],
+      action: () => window.setOverseerState && window.setOverseerState('offline'),
+    },
+    {
+      id: 'core-flare',
+      label: 'CORE: FLARE',
+      subLabel: '_coreFlare()',
+      icon: '▲',
+      category: 'triggers',
+      group: 'LIVING CORE',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Fire the Living Core level-up flare flourish.',
+      triggers: [],
+      action: () => window._coreFlare && window._coreFlare(),
+    },
+    {
+      id: 'core-burst',
+      label: 'CORE: STAT BURST',
+      subLabel: '_coreStatBurst()',
+      icon: '▲',
+      category: 'triggers',
+      group: 'LIVING CORE',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Fire the Living Core 3D ring stat-change burst.',
+      triggers: [],
+      action: () => window._coreStatBurst && window._coreStatBurst(),
+    },
+
+    // Boot flavors (window.__robcoBootFlavor override + a real reboot).
+    {
+      id: 'boot-flavor-normal',
+      label: 'BOOT: NORMAL',
+      subLabel: "__robcoBootFlavor='normal' + reboot",
+      icon: '↻',
+      category: 'triggers',
+      group: 'BOOT FLAVOR',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Replay the boot sequence forced to the normal warm-boot POST.',
+      triggers: [],
+      action: () => _fireBootFlavor('normal'),
+    },
+    {
+      id: 'boot-flavor-cold',
+      label: 'BOOT: COLD START',
+      subLabel: "__robcoBootFlavor='cold' + reboot",
+      icon: '↻',
+      category: 'triggers',
+      group: 'BOOT FLAVOR',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Replay the boot sequence forced to the first-ever cold-start POST.',
+      triggers: ['robco_booted_before'],
+      action: () => _fireBootFlavor('cold'),
+    },
+    {
+      id: 'boot-flavor-degraded',
+      label: 'BOOT: DEGRADED TUBE',
+      subLabel: "__robcoBootFlavor='degraded' + reboot",
+      icon: '↻',
+      category: 'triggers',
+      group: 'BOOT FLAVOR',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Replay the boot sequence forced to the rare degraded-CRT-tube POST.',
+      triggers: [],
+      action: () => _fireBootFlavor('degraded'),
+    },
+
+    // Ceremonies M1-M5 (Ceremony Moments Wave 1) — replay only, never clears
+    // the real persisted view-once flag (planning §4).
+    {
+      id: 'ceremony-ignition',
+      label: 'CEREMONY: IGNITION (M1)',
+      subLabel: '_runCampaignIgnition()',
+      icon: '⚙',
+      category: 'triggers',
+      group: 'CEREMONIES',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Replay the M1 Campaign Ignition commissioning sequence.',
+      triggers: [],
+      action: () => _replayIgnition(),
+    },
+    {
+      id: 'ceremony-greet',
+      label: 'CEREMONY: OVERSEER GREETING (M2)',
+      subLabel: '_maybeGreetOverseer() (session flag reset, not MetaStore)',
+      icon: '⚙',
+      category: 'triggers',
+      group: 'CEREMONIES',
+      tier: 'prod',
+      destructive: false,
+      tooltip:
+        'Replay the M2 Director-on-the-Wire greeting. Requires a live AI carrier — silent otherwise (the real gate).',
+      triggers: [],
+      action: () => _replayGreet(),
+    },
+    {
+      id: 'ceremony-firmware',
+      label: 'CEREMONY: FIRMWARE FLASH (M3)',
+      subLabel: '_fireFirmwareFlashFlourish() (no version-flag mutation)',
+      icon: '⚙',
+      category: 'triggers',
+      group: 'CEREMONIES',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Replay the M3 firmware-flash flourish (serial-plate glint + REV LOG pulse).',
+      triggers: ['robco_last_seen_version'],
+      action: () => _replayFirmware(),
+    },
+    {
+      id: 'ceremony-absence',
+      label: 'CEREMONY: LONG-ABSENCE (M4)',
+      subLabel: 'synthetic idle-days + runBootSequence()',
+      icon: '⚙',
+      category: 'triggers',
+      group: 'CEREMONIES',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Replay the M4 long-absence boot POST line via a real (but synthetic) reboot.',
+      triggers: [],
+      action: () => _replayAbsence(),
+    },
+    {
+      id: 'ceremony-seat',
+      label: 'CEREMONY: SEAT (M5)',
+      subLabel: '_motionSeat(el)',
+      icon: '⚙',
+      category: 'triggers',
+      group: 'CEREMONIES',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Fire the M5 SEAT motion verb on the Diagnostic Shell drawer icon.',
+      triggers: [],
+      action: () => _replaySeat(),
+    },
+    {
+      id: 'time-daynight',
+      label: 'TOGGLE DAY / NIGHT',
+      subLabel: 'body.classList.toggle(time-night)',
+      icon: '◐',
+      category: 'triggers',
+      group: 'CEREMONIES',
+      tier: 'prod',
+      destructive: false,
+      tooltip:
+        'Preview the Day/Night Indicator visual (#12) — self-corrects on the next real updateMath() tick.',
+      triggers: [],
+      action: () => _toggleDayNight(),
+    },
+
+    // Fire any of the 33 feedback animations — bus events (planning §1.4).
+    // One registry entry per UNIQUE event name (not per named animation): a
+    // single emit already drives every animation subscribed to it, exactly
+    // as in real play (e.g. limb.state alone fires BOTH #6 X-RAY FLASH and
+    // #7 SPLINT WRAP). tier:'prod' below is confirmed non-destructive per the
+    // Protocol 42 finding at the top of this file's U3 helpers.
+    {
+      id: 'fire-anim-limb.state',
+      label: 'FIRE: LIMB STATE',
+      subLabel: "RobcoEvents.emit('limb.state')",
+      icon: '⚠',
+      category: 'triggers',
+      group: 'FIRE ANIMATION',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Fires #6 X-RAY FLASH / #7 SPLINT WRAP.',
+      triggers: ['limb.state'],
+      action: () => _fireAnimEvent('limb.state', { limb: 'la', state: 'crippled' }),
+    },
+    {
+      id: 'fire-anim-effect.applied',
+      label: 'FIRE: EFFECT APPLIED',
+      subLabel: "RobcoEvents.emit('effect.applied')",
+      icon: '✚',
+      category: 'triggers',
+      group: 'FIRE ANIMATION',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Fires the STATUS EFFECTS lamp-lit reaction.',
+      triggers: ['effect.applied'],
+      action: () => _fireAnimEvent('effect.applied', { name: 'Buffout', type: 'BUFF' }),
+    },
+    {
+      id: 'fire-anim-item.added',
+      label: 'FIRE: ITEM ADDED',
+      subLabel: "RobcoEvents.emit('item.added')",
+      icon: '◈',
+      category: 'triggers',
+      group: 'FIRE ANIMATION',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Fires #18 MANIFEST PUNCH.',
+      triggers: ['item.added'],
+      action: () =>
+        _fireAnimEvent('item.added', { name: 'Stimpak', qty: 1, source: 'manual', type: 'aid' }),
+    },
+    {
+      id: 'fire-anim-quest.status',
+      label: 'FIRE: QUEST STATUS',
+      subLabel: "RobcoEvents.emit('quest.status')",
+      icon: '✓',
+      category: 'triggers',
+      group: 'FIRE ANIMATION',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Fires #23 CASE-CLOSED STAMP / #24 FILAMENT DIE.',
+      triggers: ['quest.status'],
+      action: () =>
+        _fireAnimEvent('quest.status', {
+          name: 'Sample Directive',
+          status: 'complete',
+          prevStatus: 'active',
+        }),
+    },
+    {
+      id: 'fire-anim-effect.expiring',
+      label: 'FIRE: EFFECT EXPIRING',
+      subLabel: "RobcoEvents.emit('effect.expiring')",
+      icon: '✚',
+      category: 'triggers',
+      group: 'FIRE ANIMATION',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Fires #29 GUTTERING LAMP.',
+      triggers: ['effect.expiring'],
+      action: () => _fireAnimEvent('effect.expiring', { name: 'Buffout', ticks: 2 }),
+    },
+    {
+      id: 'fire-anim-faction.threshold',
+      label: 'FIRE: FACTION THRESHOLD',
+      subLabel: "RobcoEvents.emit('faction.threshold')",
+      icon: '⚑',
+      category: 'triggers',
+      group: 'FIRE ANIMATION',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Fires the FACTION ALERT chat line + sound/haptic (registry-driven target).',
+      triggers: ['faction.threshold'],
+      action: () => _fireFactionThreshold(),
+    },
+    {
+      id: 'fire-anim-data.write',
+      label: 'FIRE: DATA WRITE',
+      subLabel: "RobcoEvents.emit('data.write')",
+      icon: '◎',
+      category: 'triggers',
+      group: 'FIRE ANIMATION',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Fires #31 HOLOTAPE COMMIT + the Living Core write-pulse.',
+      triggers: ['data.write'],
+      action: () => _fireAnimEvent('data.write', { kind: 'local-save' }),
+    },
+    {
+      id: 'fire-anim-location.visited',
+      label: 'FIRE: LOCATION VISITED',
+      subLabel: "RobcoEvents.emit('location.visited')",
+      icon: '⦿',
+      category: 'triggers',
+      group: 'FIRE ANIMATION',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Fires the #26 SURVEY PING annunciator echo (registry-driven target).',
+      triggers: ['location.visited'],
+      action: () => _fireLocationVisited(),
+    },
+    {
+      id: 'fire-anim-stat.change',
+      label: 'FIRE: STAT CHANGE',
+      subLabel: "RobcoEvents.emit('stat.change')",
+      icon: '◆',
+      category: 'triggers',
+      group: 'FIRE ANIMATION',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Fires #3 STIM FLUSH (an HP increase).',
+      triggers: ['stat.change'],
+      action: () => _fireAnimEvent('stat.change', { key: 'hp', oldVal: 10, newVal: 20 }),
+    },
+    {
+      id: 'fire-anim-location.current',
+      label: 'FIRE: LOCATION CURRENT',
+      subLabel: "RobcoEvents.emit('location.current')",
+      icon: '⦿',
+      category: 'triggers',
+      group: 'FIRE ANIMATION',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Fires the LOCATION CONFIRMATION CARD toast.',
+      triggers: ['location.current'],
+      action: () => _fireLocationCurrent(),
+    },
+    {
+      id: 'fire-anim-karma.tier',
+      label: 'FIRE: KARMA TIER',
+      subLabel: "RobcoEvents.emit('karma.tier')",
+      icon: '◆',
+      category: 'triggers',
+      group: 'FIRE ANIMATION',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Fires #15 NEEDLE KICK.',
+      triggers: ['karma.tier'],
+      action: () => _fireAnimEvent('karma.tier', { tier: 'GOOD' }),
+    },
+    {
+      id: 'fire-anim-weight.seized',
+      label: 'FIRE: WEIGHT SEIZED',
+      subLabel: "RobcoEvents.emit('weight.seized')",
+      icon: '⚠',
+      category: 'triggers',
+      group: 'FIRE ANIMATION',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Fires #8 BRIDGE CLANG.',
+      triggers: ['weight.seized'],
+      action: () => _fireAnimEvent('weight.seized', { seized: true }),
+    },
+    {
+      id: 'fire-anim-hp.critical',
+      label: 'FIRE: HP CRITICAL',
+      subLabel: "RobcoEvents.emit('hp.critical')",
+      icon: '⚠',
+      category: 'triggers',
+      group: 'FIRE ANIMATION',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Fires #1 FLATLINE WARNING (one-shot stutter) + haptic.',
+      triggers: ['hp.critical'],
+      action: () => _fireAnimEvent('hp.critical', { pct: 20 }),
+    },
+    {
+      id: 'fire-anim-rad.tier',
+      label: 'FIRE: RAD TIER',
+      subLabel: "RobcoEvents.emit('rad.tier')",
+      icon: '☢',
+      category: 'triggers',
+      group: 'FIRE ANIMATION',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Fires #4 GEIGER SPIKE.',
+      triggers: ['rad.tier'],
+      action: () => _fireAnimEvent('rad.tier', { tier: 'ADVANCED', direction: 'up' }),
+    },
+    {
+      id: 'fire-anim-item.equipped',
+      label: 'FIRE: ITEM EQUIPPED',
+      subLabel: "RobcoEvents.emit('item.equipped')",
+      icon: '◈',
+      category: 'triggers',
+      group: 'FIRE ANIMATION',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Fires #19 IN-SERVICE STAMP.',
+      triggers: ['item.equipped'],
+      action: () => _fireAnimEvent('item.equipped', { slot: 'weapon', name: 'Sample Weapon' }),
+    },
+
+    // The 7 bus events with a REACTIVE auto-log subscriber (Protocol 42
+    // finding, documented above) — writes the campaign event log, so these are
+    // correctly staging-tier + destructive (auto-confirm-gated), NOT prod.
+    {
+      id: 'fire-anim-level.up',
+      label: 'FIRE: LEVEL UP',
+      subLabel: "RobcoEvents.emit('level.up') — WRITES the campaign event log (U8 auto-log)",
+      icon: '▲',
+      category: 'triggers',
+      group: 'FIRE ANIMATION (WRITES EVENT LOG)',
+      tier: 'staging',
+      destructive: true,
+      tooltip:
+        'Fires #9 VAULT-BOY LEVEL CARD + the Living Core flare/burst. Also appends a real entry to the campaign event log (state.js U8 auto-log subscriber) — staging-only, confirm-gated.',
+      triggers: ['level.up'],
+      action: () => _fireLevelUp(),
+    },
+    {
+      id: 'fire-anim-collectible.acquired',
+      label: 'FIRE: COLLECTIBLE ACQUIRED',
+      subLabel:
+        "RobcoEvents.emit('collectible.acquired') — WRITES the campaign event log (U8 auto-log)",
+      icon: '★',
+      category: 'triggers',
+      group: 'FIRE ANIMATION (WRITES EVENT LOG)',
+      tier: 'staging',
+      destructive: true,
+      tooltip:
+        'Fires the #22 EXHIBIT LIGHT-UP annunciator echo. Also appends a real entry to the campaign event log — staging-only, confirm-gated.',
+      triggers: ['collectible.acquired'],
+      action: () => _fireCollectibleAcquired(),
+    },
+    {
+      id: 'fire-anim-craft.completed',
+      label: 'FIRE: CRAFT COMPLETED',
+      subLabel: "RobcoEvents.emit('craft.completed') — WRITES the campaign event log (U8 auto-log)",
+      icon: '⚒',
+      category: 'triggers',
+      group: 'FIRE ANIMATION (WRITES EVENT LOG)',
+      tier: 'staging',
+      destructive: true,
+      tooltip:
+        'Fires #20 WELD SPARKS + TAG. Also appends a real entry to the campaign event log — staging-only, confirm-gated.',
+      triggers: ['craft.completed'],
+      action: () => _fireAnimEvent('craft.completed', { name: 'Sample Item', qty: 1 }),
+    },
+    {
+      id: 'fire-anim-craft.scrapped',
+      label: 'FIRE: CRAFT SCRAPPED',
+      subLabel: "RobcoEvents.emit('craft.scrapped') — WRITES the campaign event log (U8 auto-log)",
+      icon: '⚒',
+      category: 'triggers',
+      group: 'FIRE ANIMATION (WRITES EVENT LOG)',
+      tier: 'staging',
+      destructive: true,
+      tooltip:
+        'Fires #21 PART DROP. Also appends a real entry to the campaign event log — staging-only, confirm-gated.',
+      triggers: ['craft.scrapped'],
+      action: () => _fireAnimEvent('craft.scrapped', { name: 'Sample Item', qty: 1 }),
+    },
+    {
+      id: 'fire-anim-trade.bought',
+      label: 'FIRE: TRADE BOUGHT',
+      subLabel: "RobcoEvents.emit('trade.bought') — WRITES the campaign event log (U8 auto-log)",
+      icon: '◉',
+      category: 'triggers',
+      group: 'FIRE ANIMATION (WRITES EVENT LOG)',
+      tier: 'staging',
+      destructive: true,
+      tooltip:
+        'Fires the #17 CAPS ODOMETER SPIN trade half. Also appends a real entry to the campaign event log — staging-only, confirm-gated.',
+      triggers: ['trade.bought'],
+      action: () => _fireAnimEvent('trade.bought', { name: 'Sample Item', price: 10 }),
+    },
+    {
+      id: 'fire-anim-trade.sold',
+      label: 'FIRE: TRADE SOLD',
+      subLabel: "RobcoEvents.emit('trade.sold') — WRITES the campaign event log (U8 auto-log)",
+      icon: '◉',
+      category: 'triggers',
+      group: 'FIRE ANIMATION (WRITES EVENT LOG)',
+      tier: 'staging',
+      destructive: true,
+      tooltip:
+        'Fires the #17 CAPS ODOMETER SPIN trade half. Also appends a real entry to the campaign event log — staging-only, confirm-gated.',
+      triggers: ['trade.sold'],
+      action: () => _fireAnimEvent('trade.sold', { name: 'Sample Item', price: 10 }),
+    },
+    {
+      id: 'fire-anim-sleep.completed',
+      label: 'FIRE: SLEEP COMPLETED',
+      subLabel: "RobcoEvents.emit('sleep.completed') — WRITES the campaign event log (U8 auto-log)",
+      icon: '◐',
+      category: 'triggers',
+      group: 'FIRE ANIMATION (WRITES EVENT LOG)',
+      tier: 'staging',
+      destructive: true,
+      tooltip:
+        'Fires #30 CLOCK SPIN-DOZE. Also appends a real entry to the campaign event log — staging-only, confirm-gated.',
+      triggers: ['sleep.completed'],
+      action: () => _fireAnimEvent('sleep.completed', { ticksAdded: 80 }),
+    },
+
+    // Fire any of the 7 pending-var animations (planning §1.4).
+    {
+      id: 'fire-pending-rep-stamp',
+      label: 'FIRE: REPUTATION STAMP',
+      subLabel: '_pendingRepStamp + renderFactionRep()',
+      icon: '◆',
+      category: 'triggers',
+      group: 'FIRE ANIMATION (PENDING)',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Fires #14 REPUTATION STAMP on the currently-selected faction channel.',
+      triggers: [],
+      action: () => _firePendingRepStamp(),
+    },
+    {
+      id: 'fire-pending-quest-stamp',
+      label: 'FIRE: QUEST STAMP',
+      subLabel: '_pendingQuestStamp + renderQuests()',
+      icon: '✓',
+      category: 'triggers',
+      group: 'FIRE ANIMATION (PENDING)',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Fires #23 CASE-CLOSED STAMP / #24 FILAMENT DIE on the first directive.',
+      triggers: [],
+      action: () => _firePendingQuestStamp(),
+    },
+    {
+      id: 'fire-pending-exhibit-light',
+      label: 'FIRE: EXHIBIT LIGHT-UP',
+      subLabel: '_pendingExhibitLight + renderCollectibles()',
+      icon: '★',
+      category: 'triggers',
+      group: 'FIRE ANIMATION (PENDING)',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Fires #22 EXHIBIT LIGHT-UP on the first tracked collectible.',
+      triggers: [],
+      action: () => _firePendingExhibitLight(),
+    },
+    {
+      id: 'fire-pending-survey-ping',
+      label: 'FIRE: SURVEY PING',
+      subLabel: '_pendingSurveyPing + renderWorldMap() (forces the WORLD GRID view)',
+      icon: '⦿',
+      category: 'triggers',
+      group: 'FIRE ANIMATION (PENDING)',
+      tier: 'prod',
+      destructive: false,
+      tooltip:
+        'Fires #26 SURVEY PING at the current location — switches to the WORLD GRID view first.',
+      triggers: [],
+      action: () => _firePendingSurveyPing(),
+    },
+    {
+      id: 'fire-pending-quest-filed',
+      label: 'FIRE: DIRECTIVE FILED',
+      subLabel: '_pendingQuestFiled + renderQuests()',
+      icon: '✓',
+      category: 'triggers',
+      group: 'FIRE ANIMATION (PENDING)',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Fires #25 DIRECTIVE FILED on the first directive.',
+      triggers: [],
+      action: () => _firePendingQuestFiled(),
+    },
+    {
+      id: 'fire-pending-perk-seat',
+      label: 'FIRE: CARD SEAT',
+      subLabel: '_pendingPerkSeat + renderPerks()',
+      icon: '◆',
+      category: 'triggers',
+      group: 'FIRE ANIMATION (PENDING)',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Fires #13 CARD SEAT on the first perk.',
+      triggers: [],
+      action: () => _firePendingPerkSeat(),
+    },
+    {
+      id: 'fire-pending-effect-warmup',
+      label: 'FIRE: TUNGSTEN WARM-UP',
+      subLabel: '_pendingEffectWarmup + renderStatus()',
+      icon: '✚',
+      category: 'triggers',
+      group: 'FIRE ANIMATION (PENDING)',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Fires #28 TUNGSTEN WARM-UP on the first active status effect.',
+      triggers: [],
+      action: () => _firePendingEffectWarmup(),
+    },
   ];
   // Exposed read-only for the harness (the VM behavioral proof, mirroring how
   // the OCR test wiring is reachable) — never mutated at runtime.
@@ -383,8 +1043,52 @@
       h3.insertBefore(secIcon, h3.firstChild);
       summary.appendChild(h3);
       details.appendChild(summary);
+      // U3: anchor-less tools (planning §4/§11 — the TRIGGERS catalog has no
+      // pre-existing markup to move) are synthesized as real <button>s here,
+      // grouped by the optional `group` field into their own labeled
+      // sub-heading + flex-wrap grid. Iterated in DIAGNOSTIC_SHELL_TOOLS
+      // array order, so same-group tools stay adjacent without needing a
+      // second pass or a sort. One more registry entry (icon/label/tooltip/
+      // action, no `anchor`) is the entire cost of a future trigger.
+      var curGroup = null;
+      var curGrid = null;
       visibleTools.forEach(function (tool) {
-        if (!tool.anchor || moved[tool.anchor]) return; // a shared anchor already placed
+        if (!tool.anchor) {
+          if (tool.group && tool.group !== curGroup) {
+            var subhead = document.createElement('div');
+            subhead.className = 'dsh-tool-subhead';
+            subhead.textContent = tool.group;
+            details.appendChild(subhead);
+            curGroup = tool.group;
+            curGrid = null;
+          }
+          if (!curGrid) {
+            curGrid = document.createElement('div');
+            curGrid.className = 'dsh-tool-grid';
+            curGrid.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px';
+            details.appendChild(curGrid);
+          }
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'btn-sm dsh-tool-btn';
+          btn.setAttribute(
+            'data-dsh-search',
+            (tool.label + ' ' + (tool.subLabel || '')).toLowerCase()
+          );
+          if (tool.tooltip) btn.title = tool.tooltip;
+          var btnIcon = document.createElement('span');
+          btnIcon.className = 'dsh-tool-icon';
+          btnIcon.setAttribute('aria-hidden', 'true');
+          btnIcon.textContent = (tool.icon || DEV_MARKER) + ' ';
+          btn.appendChild(btnIcon);
+          btn.appendChild(document.createTextNode(tool.label));
+          btn.addEventListener('click', function () {
+            _invoke(tool);
+          });
+          curGrid.appendChild(btn);
+          return;
+        }
+        if (moved[tool.anchor]) return; // a shared anchor already placed
         var anchorEl = panel.querySelector(tool.anchor);
         if (!anchorEl) return;
         anchorEl.setAttribute(
@@ -699,6 +1403,219 @@
     } catch (_) {
       /* a console failure must never break boot or leak to production */
     }
+  }
+
+  // ── U3: TRIGGERS CATALOG (planning/DIAGNOSTIC_SHELL_PLAN.md §4/§11 U3) ────
+  // Every helper below fires the REAL shipped entry point (Protocol 22) — a
+  // genuine RobcoEvents.emit() with the exact payload shape the real call
+  // sites use, the real setOverseerState()/_coreFlare()/_coreStatBurst(), the
+  // real runBootSequence() (via window.__robcoBootFlavor), or the real
+  // ceremony/motion function — never a fabricated parallel animation. This
+  // is what makes Protocol 44's cross-reference guard meaningful: a trigger
+  // that faked its own animation would prove nothing about the shipped code.
+  //
+  // PROTOCOL 42 FINDING (Protocol 8 Sonnet-stage plan review): the plan's own
+  // premise — "the durable state write always happens at the CALL SITE
+  // before the emit; the subscriber is display-only, so emitting the event
+  // from the shell fires ONLY the animation" — does NOT hold for seven bus
+  // events. state.js's U8 auto-log subscribers (RobcoEvents.on('level.up',
+  // ...), collectible.acquired, craft.completed, craft.scrapped,
+  // trade.bought, trade.sold, sleep.completed) call the U8 auto-log handler, which
+  // pushes a real entry into the campaign event log — a genuine, durable campaign-
+  // save write — every time the event fires, REGARDLESS of source. Firing
+  // one of these from the console would therefore write to the campaign
+  // event log, directly violating this file's own pre-existing Hard Boundary
+  // invariant ("never reads or writes the campaign save, stats, or event
+  // log" — see the file header). Confirmed by reading every subscriber body
+  // for all ~23 bus events (Protocol 27 — not assumed from the plan's
+  // general premise). These seven are therefore tier:'staging' +
+  // destructive:true below (auto-confirm-gated, like every other
+  // state-mutating tool) rather than tier:'prod' as the plan's own tool
+  // table lists them — a deliberate, documented correction. Every other bus
+  // event's subscribers were confirmed presentation-only (DOM class toggles
+  // / transient annunciator pushes / sound / haptic / the transient
+  // _pendingXxx vars) and stay tier:'prod'.
+  function _fireAnimEvent(name, payload) {
+    if (window.RobcoEvents && typeof window.RobcoEvents.emit === 'function') {
+      window.RobcoEvents.emit(name, payload);
+    }
+  }
+  // faction.threshold and location.*/collectible.acquired need a REAL
+  // registry-driven target (Protocol 38 — never a hardcoded game literal),
+  // resolved at fire-time rather than baked into a static payload object.
+  function _fireFactionThreshold() {
+    var registry = typeof getFactionRegistry === 'function' ? getFactionRegistry() : [];
+    if (!registry.length) return;
+    var f = registry[0];
+    _fireAnimEvent('faction.threshold', {
+      key: f.key,
+      name: f.name,
+      direction: 'idolized',
+      curNet: 100,
+      prevNet: 50,
+    });
+  }
+  function _fireLocationVisited() {
+    var zones = (typeof FALLOUT_REGISTRY !== 'undefined' && FALLOUT_REGISTRY.zones) || [];
+    var loc =
+      (typeof state !== 'undefined' && state.loc) || (zones[0] && zones[0].name) || 'Unknown';
+    _fireAnimEvent('location.visited', { loc: loc });
+  }
+  function _fireLocationCurrent() {
+    var loc = (typeof state !== 'undefined' && state.loc) || 'Unknown';
+    _fireAnimEvent('location.current', { loc: loc });
+  }
+  function _fireCollectibleAcquired() {
+    var cs = (typeof FALLOUT_REGISTRY !== 'undefined' && FALLOUT_REGISTRY.collectibles) || [];
+    var name = (cs[0] && cs[0].name) || 'Sample Collectible';
+    _fireAnimEvent('collectible.acquired', { name: name });
+  }
+  function _fireLevelUp() {
+    var lvl = (typeof state !== 'undefined' && state.lvl) || 1;
+    _fireAnimEvent('level.up', { oldLvl: lvl, newLvl: lvl + 1 });
+  }
+
+  // ── Pending-var animations (planning §1.4/§4) — set the transient
+  // module-scope var (never state.*, the established sanctioned pattern —
+  // "a transient module var, never state.*" per every _pendingXxx site) then
+  // call the owning render*() so it consumes it exactly once, mirroring how
+  // the real feature sets it. Guards for "no campaign data of that kind yet"
+  // by simply no-op'ing (the underlying render*() already handles an empty
+  // list gracefully — no separate guard needed here, planning §10). Reads
+  // _facChannel/_mapActiveZone/_pendingXxx as bare identifiers — they are
+  // `let` bindings at the top level of ui-render.js/state.js, which (unlike
+  // `window.X`) are still reachable from this file's shared classic-script
+  // global scope, exactly like the state inspector's direct `state` read.
+  function _firePendingRepStamp() {
+    var registry = typeof getFactionRegistry === 'function' ? getFactionRegistry() : [];
+    if (!registry.length) return;
+    var key =
+      typeof _facChannel !== 'undefined' && _facChannel && registry.some(f => f.key === _facChannel)
+        ? _facChannel
+        : registry[0].key;
+    if (typeof setFactionChannel === 'function') setFactionChannel(key);
+    _pendingRepStamp = { key: key, direction: 'idolized' };
+    if (typeof renderFactionRep === 'function') renderFactionRep();
+  }
+  function _firePendingQuestStamp() {
+    var qs = (typeof state !== 'undefined' && state.quests) || [];
+    if (!qs.length) return;
+    _pendingQuestStamp = { name: qs[0].name, status: 'complete' };
+    if (typeof renderQuests === 'function') renderQuests();
+  }
+  function _firePendingQuestFiled() {
+    var qs = (typeof state !== 'undefined' && state.quests) || [];
+    if (!qs.length) return;
+    _pendingQuestFiled = qs[0].name;
+    if (typeof renderQuests === 'function') renderQuests();
+  }
+  function _firePendingExhibitLight() {
+    var cs = (typeof state !== 'undefined' && state.collectibles) || [];
+    if (!cs.length) return;
+    _pendingExhibitLight.push(cs[0]);
+    if (typeof renderCollectibles === 'function') renderCollectibles();
+  }
+  // Planning §12 risk item: survey ping only paints on the WORLD GRID view,
+  // not the zoomed sector sheet — the trigger resets _mapActiveZone first.
+  function _firePendingSurveyPing() {
+    if (typeof _mapActiveZone !== 'undefined') _mapActiveZone = null;
+    var zones = (typeof FALLOUT_REGISTRY !== 'undefined' && FALLOUT_REGISTRY.zones) || [];
+    var loc = (typeof state !== 'undefined' && state.loc) || (zones[0] && zones[0].name);
+    if (!loc) return;
+    _pendingSurveyPing = loc;
+    if (typeof renderWorldMap === 'function') renderWorldMap();
+  }
+  function _firePendingPerkSeat() {
+    var pk = (typeof state !== 'undefined' && state.perks) || [];
+    if (!pk.length) return;
+    _pendingPerkSeat = pk[0].name;
+    if (typeof renderPerks === 'function') renderPerks();
+  }
+  function _firePendingEffectWarmup() {
+    var st = (typeof state !== 'undefined' && state.status) || [];
+    if (!st.length) return;
+    _pendingEffectWarmup.push(st[0].name);
+    if (typeof renderStatus === 'function') renderStatus();
+  }
+
+  // ── Living core / boot flavor / ceremonies (planning §1.4/§4) ────────────
+  function _fireBootFlavor(flavor) {
+    window.__robcoBootFlavor = flavor;
+    _rebootFromConsole(document.getElementById('testConsolePanel'));
+  }
+  function _replayIgnition() {
+    if (typeof window._runCampaignIgnition === 'function') {
+      window._runCampaignIgnition(function () {});
+    }
+  }
+  // Resets the transient SESSION flag only (ui-core.js `let _overseerGreeted`)
+  // — never MetaStore — so this is a replay, not a flag reset (planning §4).
+  function _replayGreet() {
+    _overseerGreeted = false;
+    if (typeof window._maybeGreetOverseer === 'function') window._maybeGreetOverseer();
+  }
+  // Calls the flourish DIRECTLY — never _checkFirmwareFlash(), which reads
+  // AND WRITES the real robco_last_seen_version MetaStore flag (planning §4:
+  // "no version-flag mutation").
+  function _replayFirmware() {
+    if (typeof window._fireFirmwareFlashFlourish === 'function') {
+      window._fireFirmwareFlashFlourish();
+    }
+  }
+  // _checkLongAbsence() (ui-audio.js) is a pure read — it never writes
+  // MetaStore — but its result depends on genuine elapsed wall-clock time
+  // since the last flush, so a live replay can't just call it again. Instead
+  // this temporarily substitutes a synthetic idle-day count for exactly one
+  // runBootSequence() call (restoring the real function immediately after,
+  // in the SAME tick the boot completes or throws) — reusing the real
+  // runBootSequence()/POST-line-splice code path (Protocol 22) rather than
+  // duplicating its line text, and never touching robco_overseer_log's
+  // lastFlushAt or any other persisted flag. Note: like the pre-existing
+  // REBOOT control, this necessarily also re-runs _checkFirmwareFlash()
+  // internally (runBootSequence()'s own unconditional call) — an existing
+  // REBOOT/boot-flavor characteristic, not a new one this trigger introduces.
+  function _replayAbsence() {
+    if (
+      typeof window._checkLongAbsence !== 'function' ||
+      typeof window.runBootSequence !== 'function'
+    )
+      return;
+    var orig = window._checkLongAbsence;
+    var restore = function () {
+      window._checkLongAbsence = orig;
+    };
+    window._checkLongAbsence = function () {
+      return 5;
+    };
+    try {
+      var panel = document.getElementById('testConsolePanel');
+      var bootScreen = document.getElementById('bootScreen');
+      var bootLines = document.getElementById('bootLines');
+      if (bootScreen) {
+        bootScreen.style.display = '';
+        bootScreen.classList.remove('boot-fade-out', 'boot-degraded');
+      }
+      if (bootLines) bootLines.innerHTML = '';
+      window.runBootSequence(function () {
+        restore();
+        _refresh(panel);
+      });
+    } catch (_) {
+      restore();
+    }
+  }
+  function _replaySeat() {
+    var el = document.querySelector('#testConsolePanel .dsh-drawer-icon');
+    if (typeof window._motionSeat === 'function') window._motionSeat(el);
+  }
+  // Direct class toggle — the SAME body.time-night class updateMath() (Day/
+  // Night Indicator, #12) drives off state.ticks every tick; never writes
+  // state.ticks itself, so the next real updateMath() tick naturally
+  // corrects it back to the genuine in-game time (a preview, not a durable
+  // override) — planning §12's day/night risk item, resolved by reusing the
+  // real CSS hook rather than inventing a new persistent field.
+  function _toggleDayNight() {
+    document.body.classList.toggle('time-night');
   }
 
   function _toolById(id) {

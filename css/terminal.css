@@ -1878,6 +1878,20 @@ details.panel:not([open]) summary h2 {
   margin-right: 5px;
   color: var(--bezel-wire, var(--robco-green));
 }
+/* U3: a display-only group label (registry `group` field) dividing a
+   section's synthesized button grid (js/test-console.js _renderShell()) —
+   e.g. TRIGGERS' LIVING CORE / BOOT FLAVOR / CEREMONIES / FIRE ANIMATION
+   groups. Not itself a search target — only its buttons are. */
+.dsh-tool-subhead {
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  opacity: 0.65;
+  margin: 8px 0 4px;
+  text-transform: uppercase;
+}
+.dsh-tool-subhead:first-child {
+  margin-top: 0;
+}
 
 /* ─── Sub-Panel (nested <details> inside a top-level panel) ──────── */
 /* Used by AMMO RESERVES nested inside BACKPACK INVENTORY */
