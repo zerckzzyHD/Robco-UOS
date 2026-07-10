@@ -23892,11 +23892,18 @@ try {
     var registry = new Map();
     function makeEl(id) {
       var listeners = {};
+      var classes = {};
       var el = {
         id: id, hidden: true, _attrs: {}, _focused: false,
+        classList: {
+          add: function (c) { classes[c] = true; },
+          remove: function (c) { delete classes[c]; },
+          contains: function (c) { return !!classes[c]; },
+        },
         setAttribute: function (k, v) { el._attrs[k] = v; },
         getAttribute: function (k) { return el._attrs[k]; },
         focus: function () { el._focused = true; },
+        blur: function () { el._focused = false; },
         addEventListener: function (type, fn) { (listeners[type] = listeners[type] || []).push(fn); },
         _fire: function (type, evt) { (listeners[type] || []).forEach(function (fn) { fn(evt || {}); }); },
         querySelector: function (sel) {
@@ -23923,7 +23930,7 @@ try {
       },
     };
   }
-  var src9 = "var DEV_MARKER = '⚙';\nvar _shellTriggerEl = null;\n" +
+  var src9 = "var DEV_MARKER = '⚙';\nvar _shellTriggerEl = null;\nvar _fabDragSuppressClick = false;\n" +
     declareFn(testConsoleSrc, '_shellFocusables') + '\n' +
     declareFn(testConsoleSrc, '_shellKeydown') + '\n' +
     declareFn(testConsoleSrc, '_openShell') + '\n' +
@@ -24456,6 +24463,137 @@ Check (
     ($claude212 -match [regex]::Escape('triggers: [...]')) -and
     ($claude212 -match "RobcoEvents\.emit\('<name>', …\)")
 ) '212.15: Protocol 44 is documented in CLAUDE.md (canonical), naming its enforcement mechanism (the triggers[] cross-reference against every RobcoEvents.emit literal)'
+
+# ===========================================================
+# Suite 213 -- Diagnostic Shell mobile chrome fixes (owner report)
+# ===========================================================
+# Mirrors JS Suite 213 (8 tests). Five presentation fixes on top of U1-U3,
+# MOBILE ONLY (the exact inverse of the (min-width:1000px)... Suite 129
+# desktop gate) -- desktop stays byte-identical to what U2 shipped. See the
+# JS runner's Suite 213 header comment for the full fix-by-fix rundown.
+Sep "Suite 213 -- Diagnostic Shell mobile chrome fixes (owner report)"
+$testConsole213 = Read-Src "js/test-console.js"
+$index213 = Read-Src "index.html"
+$css213 = Read-Src "css/terminal.css"
+$stateSrc213 = Read-Src "js/state.js"
+
+function Get-MobileBlocks213($src) {
+    $out = ''
+    $re = [regex]'@media\s*\(max-width:\s*999\.98px\)\s*\{'
+    $m = $re.Match($src)
+    while ($m.Success) {
+        $depth = 1
+        $i = $m.Index + $m.Length
+        $start = $i
+        while ($depth -gt 0 -and $i -lt $src.Length) {
+            $ch = $src[$i]
+            if ($ch -eq '{') { $depth++ }
+            elseif ($ch -eq '}') { $depth-- }
+            $i++
+        }
+        $out += $src.Substring($start, ($i - 1) - $start) + "`n"
+        $m = $re.Match($src, $i)
+    }
+    return $out
+}
+$mobileCss213 = Get-MobileBlocks213 $css213
+
+# 213.1 FIX 1 -- the drawer is a resizable PARTIAL-height bottom sheet on
+#       mobile, while the BASE (desktop) .dsh-drawer rule stays the
+#       original right-side full-height shape -- desktop untouched.
+$baseDrawerIdx213 = $css213.IndexOf('.dsh-drawer {')
+$baseDrawer213 = $css213.Substring($baseDrawerIdx213, [Math]::Min(700, $css213.Length - $baseDrawerIdx213))
+Check (
+    ($baseDrawer213 -match 'top:\s*0;') -and
+    ($baseDrawer213 -match 'width:\s*min\(92vw,\s*420px\)') -and
+    (-not ($baseDrawer213 -match '--dsh-sheet-h')) -and
+    ($mobileCss213 -match '--dsh-sheet-h:\s*50vh') -and
+    ($mobileCss213 -match 'height:\s*var\(--dsh-sheet-h,\s*50vh\)') -and
+    ($mobileCss213 -match 'bottom:\s*0;')
+) '213.1: FIX 1 -- the base (desktop) .dsh-drawer rule is unchanged (top:0, width:min(92vw,420px), no --dsh-sheet-h reference); the mobile-only block declares --dsh-sheet-h:50vh and makes .dsh-drawer a bottom-anchored, variable-height sheet'
+
+# 213.2 FIX 1 -- the drag handle + expand toggle exist, and _setSheetVh() is
+#       the one choke point clamping + writing both the CSS var and
+#       aria-valuenow.
+$tplStart213 = $index213.IndexOf('<template id="testConsoleTemplate">')
+$tplEnd213 = $index213.IndexOf('</template>', $tplStart213)
+$tplSrc213 = if ($tplStart213 -ge 0) { $index213.Substring($tplStart213, $tplEnd213 - $tplStart213) } else { '' }
+$setVhBody213 = Get-FunctionBody $testConsole213 '_setSheetVh'
+Check (
+    ($tplSrc213 -match '(?s)id="dshDragHandle"[\s\S]{0,200}role="slider"[\s\S]{0,200}tabindex="0"') -and
+    ($tplSrc213 -match 'id="dshExpandToggle"') -and
+    ($setVhBody213 -match 'Math\.max\(SHEET_MIN_VH,\s*Math\.min\(SHEET_MAX_VH,\s*vh\)\)') -and
+    ($setVhBody213 -match "setProperty\('--dsh-sheet-h'") -and
+    ($setVhBody213 -match "setAttribute\('aria-valuenow'") -and
+    ($testConsole213 -match '_sheetPointerMove|_sheetKeydown|_toggleSheetExpand')
+) '213.2: FIX 1 -- #dshDragHandle (role=slider, tabindex=0) and #dshExpandToggle exist in the template; _setSheetVh() is the single choke point clamping to [SHEET_MIN_VH,SHEET_MAX_VH] and writing both --dsh-sheet-h and the handle aria-valuenow, shared by the pointer drag, the ArrowUp/ArrowDown keyboard handler, and the expand/collapse toggle'
+
+# 213.3 FIX 2 -- the FAB is draggable ONLY on mobile, and a dragged position
+#       persists through MetaStore (never a bare localStorage call).
+$wireFabDragBody213 = Get-FunctionBody $testConsole213 '_wireFabDrag'
+$restoreFabBody213 = Get-FunctionBody $testConsole213 '_restoreFabPosition'
+$fabPointerEndBody213 = Get-FunctionBody $testConsole213 '_fabPointerEnd'
+Check (
+    ($wireFabDragBody213 -match 'if\s*\(!_dshIsMobile\(\)\)\s*return;') -and
+    ($restoreFabBody213 -match 'if\s*\(!_dshIsMobile\(\)\)\s*return;') -and
+    ($fabPointerEndBody213 -match "MetaStore\.set\(\s*'robco_dsh_fab_pos'") -and
+    ($stateSrc213 -match "robco_dsh_fab_pos:\s*\{\s*type:\s*'json'")
+) "213.3: FIX 2 -- _wireFabDrag()/_restoreFabPosition() both gate on !_dshIsMobile() (desktop's FAB stays click-only), a genuine drag persists {left,top} through MetaStore.set('robco_dsh_fab_pos', ...) rather than a bare localStorage call, and robco_dsh_fab_pos is a registered META_MANIFEST json device pref (Protocol 4/UI-6)"
+
+# 213.4 FIX 3 -- the highlighted look on mobile is driven by .dsh-fab--open;
+#       desktop keeps [aria-expanded='true'] untouched.
+$openBody213 = Get-FunctionBody $testConsole213 '_openShell'
+$closeBody213 = Get-FunctionBody $testConsole213 '_closeShell'
+$openClassTotal213 = ([regex]::Matches($css213, [regex]::Escape('.dsh-fab.dsh-fab--open'))).Count
+$openClassInMobile213 = ([regex]::Matches($mobileCss213, [regex]::Escape('.dsh-fab.dsh-fab--open'))).Count
+Check (
+    ($openBody213 -match "fab\.classList\.add\('dsh-fab--open'\)") -and
+    ($closeBody213 -match "fab\.classList\.remove\('dsh-fab--open'\)") -and
+    ($css213 -match "(?s)\.dsh-fab\[aria-expanded='true'\]\s*\{") -and
+    ($openClassTotal213 -gt 0) -and
+    ($openClassTotal213 -eq $openClassInMobile213)
+) "213.4: FIX 3 -- _openShell()/_closeShell() toggle fab.classList's dsh-fab--open; every .dsh-fab.dsh-fab--open declaration in the file lives inside a mobile-only block (none at top level/desktop), and the base .dsh-fab[aria-expanded='true'] highlight rule (desktop) is untouched"
+
+# 213.5 FIX 4 -- the glyph span gets its own line-height:1 (all
+#       breakpoints, not mobile-gated).
+Check (
+    ($css213 -match '(?s)\.dsh-fab span\s*\{[^}]*line-height:\s*1;') -and
+    (-not ($css213 -match '(?s)@media[^{]*\{[^}]*\.dsh-fab span'))
+) '213.5: FIX 4 -- .dsh-fab span gets its own line-height:1 centering fix, declared unconditionally (every breakpoint) rather than inside a media-query block, since it corrects a font-metrics issue present at every size'
+
+# 213.6 FIX 5 + Protocol 42 regression guard -- the mobile .telemetry rule
+#       pins a deterministic px height and clamps overflow with
+#       -webkit-line-clamp:2; the base (desktop) rule carries neither.
+$baseTelemetryIdx213 = $css213.IndexOf('.telemetry {')
+$baseTelemetry213 = $css213.Substring($baseTelemetryIdx213, [Math]::Min(400, $css213.Length - $baseTelemetryIdx213))
+Check (
+    ($mobileCss213 -match 'height:\s*36px;') -and
+    ($mobileCss213 -match 'line-height:\s*13px;') -and
+    ($mobileCss213 -match '-webkit-line-clamp:\s*2;') -and
+    (-not ($baseTelemetry213 -match 'height:\s*36px')) -and
+    (-not ($baseTelemetry213 -match '-webkit-line-clamp'))
+) '213.6: FIX 5 -- the mobile .telemetry rule pins a deterministic 36px height + 13px line-height and clamps overflow to 2 lines via -webkit-line-clamp, so the fixed bottom bezel dock can no longer grow/shrink with the live SUBSYSTEM status text length; the base (desktop, document-flow) .telemetry rule carries neither override'
+
+# 213.7 [Protocol 42 regression guard] box-sizing:border-box is required on
+#       the mobile .dsh-drawer override (an earlier version overflowed the
+#       viewport by its own horizontal padding under content-box).
+$mobileDrawerIdx213 = $mobileCss213.IndexOf('.dsh-drawer {')
+$mobileDrawerSlice213 = if ($mobileDrawerIdx213 -ge 0) { $mobileCss213.Substring($mobileDrawerIdx213, [Math]::Min(400, $mobileCss213.Length - $mobileDrawerIdx213)) } else { '' }
+Check (
+    ($mobileCss213 -match 'box-sizing:\s*border-box;') -and
+    ($mobileDrawerSlice213 -match 'box-sizing:\s*border-box')
+) '213.7: [Protocol 42 regression guard] the mobile .dsh-drawer override declares box-sizing:border-box -- without it, left:0;right:0;width:100% is over-constrained under the default content-box and the horizontal padding silently pushes the sheet past the viewport edge (caught live: right computed to 388px against a 360px viewport)'
+
+# 213.8 [Protocol 42 regression guard] the drag handle/expand toggle
+#       show/hide rules must use MATCHING (id) selectors -- a lower-
+#       specificity class show rule would always lose to an id-based hide
+#       rule regardless of source order.
+Check (
+    ($css213 -match '(?s)#dshDragHandle\s*\{\s*display:\s*none;\s*\}') -and
+    ($css213 -match '(?s)#dshExpandToggle\s*\{\s*display:\s*none;\s*\}') -and
+    ($mobileCss213 -match '(?s)#dshDragHandle\s*\{\s*display:\s*flex;\s*\}') -and
+    ($mobileCss213 -match '(?s)#dshExpandToggle\s*\{\s*display:\s*inline-block;\s*\}')
+) "213.8: [Protocol 42 regression guard] both #dshDragHandle and #dshExpandToggle are hidden by an id-selector display:none base rule, and shown by an EQUAL-specificity id-selector rule inside the mobile block -- a class-selector show rule (lower specificity than an id) would always lose to the id-based hide rule regardless of source order, exactly the bug this locks against"
 
 # ===========================================================
 # Results

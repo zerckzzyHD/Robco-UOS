@@ -115,6 +115,46 @@
 // gated, staging-only, never reachable by a production player.
 //
 // Game-agnostic (Protocol 38): pure dev-tooling, no game literals.
+//
+// ── OWNER REPORT — MOBILE CHROME FIXES (five presentation fixes on top of
+// U1-U3, no registry/gate/tier change) ────────────────────────────────────
+// FIXES 1-3 ARE MOBILE-ONLY (max-width:999.98px, the exact inverse of the
+// (min-width:1000px)... Suite 129 desktop gate) — desktop's FAB/drawer stay
+// BYTE-IDENTICAL to what U2 shipped: right-side full-height drawer, a
+// dimming/click-blocking scrim, a click-only bubble highlighted via
+// [aria-expanded]. _dshIsMobile() is the one gate every mobile-only JS path
+// below goes through. FIX 4 is a pure font-metrics correction (no layout
+// change) and applies everywhere; FIX 5 lives entirely in terminal.css
+// (already mobile-scoped, no JS).
+// FIX 1 (mobile only): #testConsolePanel (.dsh-drawer) becomes a resizable
+//   PARTIAL-height BOTTOM SHEET (terminal.css --dsh-sheet-h, default 50vh)
+//   instead of the desktop right-side FULL-HEIGHT drawer — the app screen
+//   stays visible AND usable above it while a trigger fires. _setSheetVh()
+//   is the one choke point the drag handle (#dshDragHandle, pointer +
+//   ArrowUp/ArrowDown) and the expand/collapse button (#dshExpandToggle)
+//   both go through. #dshScrim goes permanently inert (transparent,
+//   pointer-events:none) on mobile only — a "tap outside to dismiss"
+//   gesture no longer applies there, since outside IS the terminal and it
+//   must stay usable; on desktop the scrim is unchanged and still closes
+//   the drawer on click, exactly as U2 shipped.
+// FIX 2 (mobile only): #dshFab is draggable anywhere on screen
+//   (_wireFabDrag, mirrors the Immersion dial's tap-vs-drag pointer pattern
+//   in two dimensions) and its last dropped position persists via
+//   MetaStore (robco_dsh_fab_pos, Protocol UI-6), re-clamped to the current
+//   viewport on every apply.
+// FIX 3 (mobile only): the bubble's highlighted look is driven by the
+//   .dsh-fab--open class (toggled by _openShell()/_closeShell(), harmless
+//   on desktop where the CSS never references it) instead of the
+//   touch-sticky-hover-prone [aria-expanded] rule desktop still uses — so
+//   on mobile it lights up exactly when, and only when, the sheet is
+//   genuinely open.
+// FIX 4 (all breakpoints): the glyph span gets its own line-height:1 + a
+//   small optical nudge (terminal.css .dsh-fab span) so it centers inside
+//   the already flex-centered button instead of reading slightly high.
+// FIX 5 (terminal.css only, no JS, already mobile-scoped): the fixed
+//   bottom bezel dock's height no longer tracks the live ▸ SUBSYSTEM status
+//   strip's own content length — see the mobile @media
+//   (max-width: 999.98px) .telemetry rule.
 (function () {
   'use strict';
 
@@ -1223,7 +1263,14 @@
     _shellTriggerEl = document.activeElement || null;
     panel.hidden = false;
     if (scrim) scrim.hidden = false;
-    if (fab) fab.setAttribute('aria-expanded', 'true');
+    if (fab) {
+      fab.setAttribute('aria-expanded', 'true');
+      // FIX 3 (owner report, mobile chrome batch): the bubble's highlighted
+      // look is driven ONLY by this class — never by :hover (mobile's
+      // touch-sticky :hover bug) or [aria-expanded] — so it lights up
+      // exactly when, and only when, the sheet is genuinely open.
+      fab.classList.add('dsh-fab--open');
+    }
     document.addEventListener('keydown', _shellKeydown, true);
     var closeBtn = document.getElementById('dshClose');
     if (closeBtn) closeBtn.focus();
@@ -1236,7 +1283,10 @@
     if (!panel) return;
     panel.hidden = true;
     if (scrim) scrim.hidden = true;
-    if (fab) fab.setAttribute('aria-expanded', 'false');
+    if (fab) {
+      fab.setAttribute('aria-expanded', 'false');
+      fab.classList.remove('dsh-fab--open');
+    }
     document.removeEventListener('keydown', _shellKeydown, true);
     if (_shellTriggerEl && typeof _shellTriggerEl.focus === 'function') {
       _shellTriggerEl.focus();
@@ -1245,6 +1295,14 @@
     }
     _shellTriggerEl = null;
   }
+
+  // FIX 2/3 (owner report, mobile chrome batch): set by a genuine FAB drag
+  // (see _wireFabDrag below) so the trailing synthetic `click` a pointerup
+  // fires inside the button bounds doesn't ALSO toggle the sheet open/closed
+  // — the exact _dialDragSuppressClick pattern the Immersion dial already
+  // established (ui-core.js). Left false for a plain tap or keyboard
+  // activation, which still opens/closes exactly as before.
+  var _fabDragSuppressClick = false;
 
   function _wireShellToggle() {
     var fab = document.getElementById('dshFab');
@@ -1257,16 +1315,264 @@
       var glyphEl = fab.querySelector('span');
       if (glyphEl) glyphEl.textContent = DEV_MARKER;
       fab.addEventListener('click', function () {
+        if (_fabDragSuppressClick) {
+          _fabDragSuppressClick = false;
+          return;
+        }
         var panel = document.getElementById('testConsolePanel');
         if (panel && panel.hidden) {
           _openShell();
         } else {
           _closeShell();
         }
+        // FIX 3: a mobile tap leaves :hover matched with no pointerleave to
+        // clear it — blur so the CSS hover fill can never stick (mirrors
+        // toggleInputMode()'s identical mode-pill fix, ui-core.js).
+        fab.blur();
       });
     }
+    // FIX 1 (MOBILE ONLY, terminal.css): below max-width:999.98px the scrim
+    // goes fully inert (transparent + pointer-events:none) — a "tap outside
+    // to dismiss" gesture no longer applies there, since outside IS the now-
+    // usable terminal, so a click can never reach this listener on mobile.
+    // On desktop the scrim is unchanged from U2 (dims + blocks), so this
+    // listener still closes the drawer exactly as it always did.
     if (scrim) scrim.addEventListener('click', _closeShell);
     if (closeBtn) closeBtn.addEventListener('click', _closeShell);
+  }
+
+  // Mobile-only gate (owner report, mobile chrome batch): mirrors the exact
+  // max-width:999.98px signal terminal.css gates FIX 1/2/3's new mobile
+  // rules behind (the inverse of the (min-width:1000px)... desktop check
+  // _scrollElFor() already uses, ui-core.js) — desktop's FAB/drawer stay
+  // fully click-only/right-side, byte-identical to what U2 shipped.
+  function _dshIsMobile() {
+    return (
+      typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 999.98px)').matches
+    );
+  }
+
+  // ── FIX 2: draggable FAB (MOBILE ONLY, owner report — mobile chrome
+  // batch) ───────────────────────────────────────────────────────────────
+  // Mirrors the Immersion dial's tap-vs-drag pointer pattern (ui-core.js
+  // _dialPointerDown/_dialPointerMove/_dialPointerEnd) exactly, in two
+  // dimensions instead of one: pointerdown captures the pointer and the
+  // bubble's current on-screen position; pointermove (past a small
+  // threshold, so a plain tap never counts as a drag) repositions it via
+  // inline left/top, clamped to the viewport so it can never be dragged
+  // off-screen; pointerup releases capture and, only if the bubble
+  // genuinely moved, persists the final position (Protocol UI-6) and arms
+  // _fabDragSuppressClick so the trailing click doesn't also toggle the
+  // sheet. Desktop's FAB stays click-only (Suite 129 pattern) — see
+  // _wireFabDrag()/_restoreFabPosition() below.
+  var FAB_DRAG_THRESHOLD_PX = 6;
+  var _fabDrag = null; // { startX, startY, startLeft, startTop, moved, fab }
+
+  function _fabClampPosition(left, top, fab) {
+    var w = fab.offsetWidth || 46;
+    var h = fab.offsetHeight || 46;
+    var maxLeft = Math.max(0, window.innerWidth - w);
+    var maxTop = Math.max(0, window.innerHeight - h);
+    return {
+      left: Math.max(0, Math.min(maxLeft, left)),
+      top: Math.max(0, Math.min(maxTop, top)),
+    };
+  }
+
+  function _fabPointerMove(ev) {
+    if (!_fabDrag) return;
+    var dx = ev.clientX - _fabDrag.startX;
+    var dy = ev.clientY - _fabDrag.startY;
+    if (
+      !_fabDrag.moved &&
+      (Math.abs(dx) > FAB_DRAG_THRESHOLD_PX || Math.abs(dy) > FAB_DRAG_THRESHOLD_PX)
+    ) {
+      _fabDrag.moved = true;
+    }
+    if (!_fabDrag.moved) return;
+    var fab = _fabDrag.fab;
+    var pos = _fabClampPosition(_fabDrag.startLeft + dx, _fabDrag.startTop + dy, fab);
+    fab.style.left = pos.left + 'px';
+    fab.style.top = pos.top + 'px';
+    fab.style.bottom = 'auto';
+    fab.style.right = 'auto';
+  }
+
+  function _fabPointerEnd(ev) {
+    if (!_fabDrag) return;
+    var fab = _fabDrag.fab;
+    try {
+      fab.releasePointerCapture(ev.pointerId);
+    } catch (e) {
+      /* already released */
+    }
+    var moved = _fabDrag.moved;
+    _fabDrag = null;
+    fab.removeEventListener('pointermove', _fabPointerMove);
+    fab.removeEventListener('pointerup', _fabPointerEnd);
+    fab.removeEventListener('pointercancel', _fabPointerEnd);
+    if (!moved) return;
+    _fabDragSuppressClick = true;
+    try {
+      var rect = fab.getBoundingClientRect();
+      if (window.MetaStore && typeof window.MetaStore.set === 'function') {
+        window.MetaStore.set(
+          'robco_dsh_fab_pos',
+          JSON.stringify({ left: Math.round(rect.left), top: Math.round(rect.top) })
+        );
+      }
+    } catch (_) {
+      /* a persistence failure must never break the bubble */
+    }
+  }
+
+  function _fabPointerDown(ev) {
+    if (ev.button !== 0) return; // left mouse only; touch/pen report 0 per spec
+    var fab = ev.currentTarget;
+    var rect = fab.getBoundingClientRect();
+    _fabDrag = {
+      startX: ev.clientX,
+      startY: ev.clientY,
+      startLeft: rect.left,
+      startTop: rect.top,
+      moved: false,
+      fab: fab,
+    };
+    try {
+      fab.setPointerCapture(ev.pointerId);
+    } catch (e) {
+      /* unsupported — drag still tracks via the listeners below */
+    }
+    fab.addEventListener('pointermove', _fabPointerMove);
+    fab.addEventListener('pointerup', _fabPointerEnd);
+    fab.addEventListener('pointercancel', _fabPointerEnd);
+  }
+
+  function _wireFabDrag() {
+    if (!_dshIsMobile()) return; // desktop's FAB stays click-only (Suite 129 pattern)
+    var fab = document.getElementById('dshFab');
+    if (!fab || typeof window.PointerEvent === 'undefined') return; // graceful fallback: tap-to-open still works
+    fab.addEventListener('pointerdown', _fabPointerDown);
+  }
+
+  // Restores a previously-dragged FAB position (Protocol UI-6) — re-clamped
+  // to the CURRENT viewport on every apply, since a position saved from a
+  // wider/taller viewport could otherwise park the bubble off-screen after
+  // a resize/rotate. Mobile-only, like the drag itself — a desktop viewport
+  // never applies a saved mobile-dragged position, so its FAB always sits
+  // at the original CSS resting spot.
+  function _restoreFabPosition() {
+    if (!_dshIsMobile()) return;
+    var fab = document.getElementById('dshFab');
+    if (!fab || !window.MetaStore || typeof window.MetaStore.get !== 'function') return;
+    try {
+      var raw = window.MetaStore.get('robco_dsh_fab_pos');
+      if (!raw) return;
+      var pos = JSON.parse(raw);
+      if (!pos || typeof pos.left !== 'number' || typeof pos.top !== 'number') return;
+      var clamped = _fabClampPosition(pos.left, pos.top, fab);
+      fab.style.left = clamped.left + 'px';
+      fab.style.top = clamped.top + 'px';
+      fab.style.bottom = 'auto';
+      fab.style.right = 'auto';
+    } catch (_) {
+      /* a malformed/missing saved position must never break the bubble */
+    }
+  }
+
+  // ── FIX 1: sheet drag-to-resize + expand/collapse (owner report — mobile
+  // chrome batch) ─────────────────────────────────────────────────────────
+  // --dsh-sheet-h (terminal.css) is a viewport-height custom property read
+  // by .dsh-drawer; _setSheetVh() is the ONE choke point that writes it, so
+  // the drag handle, the keyboard ArrowUp/ArrowDown, and the expand/collapse
+  // button can never drift out of sync with each other or with the
+  // handle's own aria-valuenow.
+  var SHEET_MIN_VH = 30;
+  var SHEET_MAX_VH = 92;
+  var SHEET_DEFAULT_VH = 50;
+  var SHEET_EXPANDED_VH = 85;
+  var _sheetDrag = null; // { startY, startVh, handle }
+
+  function _currentSheetVh() {
+    var raw = getComputedStyle(document.documentElement).getPropertyValue('--dsh-sheet-h');
+    var n = parseFloat(raw);
+    return isNaN(n) ? SHEET_DEFAULT_VH : n;
+  }
+
+  function _setSheetVh(vh) {
+    vh = Math.max(SHEET_MIN_VH, Math.min(SHEET_MAX_VH, vh));
+    document.documentElement.style.setProperty('--dsh-sheet-h', vh + 'vh');
+    var handle = document.getElementById('dshDragHandle');
+    if (handle) handle.setAttribute('aria-valuenow', String(Math.round(vh)));
+    var expandBtn = document.getElementById('dshExpandToggle');
+    if (expandBtn) {
+      var expanded = vh > (SHEET_DEFAULT_VH + SHEET_EXPANDED_VH) / 2;
+      expandBtn.setAttribute('aria-pressed', String(expanded));
+    }
+    return vh;
+  }
+
+  function _toggleSheetExpand() {
+    var cur = _currentSheetVh();
+    var expanded = cur > (SHEET_DEFAULT_VH + SHEET_EXPANDED_VH) / 2;
+    _setSheetVh(expanded ? SHEET_DEFAULT_VH : SHEET_EXPANDED_VH);
+  }
+
+  function _sheetPointerMove(ev) {
+    if (!_sheetDrag) return;
+    var dy = _sheetDrag.startY - ev.clientY; // dragging up grows the sheet
+    var deltaVh = (dy / window.innerHeight) * 100;
+    _setSheetVh(_sheetDrag.startVh + deltaVh);
+  }
+
+  function _sheetPointerEnd(ev) {
+    if (!_sheetDrag) return;
+    var handle = _sheetDrag.handle;
+    try {
+      handle.releasePointerCapture(ev.pointerId);
+    } catch (e) {
+      /* already released */
+    }
+    _sheetDrag = null;
+    handle.removeEventListener('pointermove', _sheetPointerMove);
+    handle.removeEventListener('pointerup', _sheetPointerEnd);
+    handle.removeEventListener('pointercancel', _sheetPointerEnd);
+  }
+
+  function _sheetPointerDown(ev) {
+    if (ev.button !== 0) return;
+    var handle = ev.currentTarget;
+    _sheetDrag = { startY: ev.clientY, startVh: _currentSheetVh(), handle: handle };
+    try {
+      handle.setPointerCapture(ev.pointerId);
+    } catch (e) {
+      /* unsupported — the expand/collapse button is a full fallback */
+    }
+    handle.addEventListener('pointermove', _sheetPointerMove);
+    handle.addEventListener('pointerup', _sheetPointerEnd);
+    handle.addEventListener('pointercancel', _sheetPointerEnd);
+  }
+
+  function _sheetKeydown(ev) {
+    if (ev.key === 'ArrowUp') {
+      ev.preventDefault();
+      _setSheetVh(_currentSheetVh() + 5);
+    } else if (ev.key === 'ArrowDown') {
+      ev.preventDefault();
+      _setSheetVh(_currentSheetVh() - 5);
+    }
+  }
+
+  function _wireSheetResize() {
+    var handle = document.getElementById('dshDragHandle');
+    if (handle) {
+      if (typeof window.PointerEvent !== 'undefined') {
+        handle.addEventListener('pointerdown', _sheetPointerDown);
+      }
+      handle.addEventListener('keydown', _sheetKeydown);
+    }
+    var expandBtn = document.getElementById('dshExpandToggle');
+    if (expandBtn) expandBtn.addEventListener('click', _toggleSheetExpand);
   }
 
   // Owner report fix: COLD_BOOT/READY/ACTIVE are normal-operation states with no A3
@@ -1809,6 +2115,9 @@
       _wireImmersionSelect(panel);
       _wireSearch(panel);
       _wireShellToggle();
+      _wireFabDrag();
+      _restoreFabPosition();
+      _wireSheetResize();
       _wireLiveRefresh(panel);
       _refresh(panel);
     } catch (_) {

@@ -195,166 +195,191 @@
         aria-labelledby="dshDrawerTitle"
         hidden
       >
+        <div
+          id="dshDragHandle"
+          class="dsh-drag-handle"
+          role="slider"
+          tabindex="0"
+          aria-label="Resize the Diagnostic Shell sheet"
+          aria-orientation="vertical"
+          aria-valuemin="30"
+          aria-valuemax="92"
+          aria-valuenow="50"
+        ></div>
         <div class="dsh-drawer-head">
           <span class="dsh-drawer-icon" aria-hidden="true">&#9881;</span>
           <h2 id="dshDrawerTitle">&gt; DIAGNOSTIC SHELL &mdash; SUBROUTINE ACCESS</h2>
+          <button
+            type="button"
+            class="dx"
+            id="dshExpandToggle"
+            aria-label="Expand the Diagnostic Shell sheet"
+            aria-pressed="false"
+            title="Expand/collapse"
+          >
+            &#10530;
+          </button>
           <button type="button" class="dx" id="dshClose" aria-label="Close the Diagnostic Shell">
             &#10005;
           </button>
         </div>
-        <div id="dshEnvBanner" class="panel-substatus" aria-live="polite">&mdash;</div>
-        <p style="font-size: 10px">
-          Staging/dev environments only &mdash; never shown on the live site. Renders from the
-          DIAGNOSTIC_SHELL_TOOLS registry (js/test-console.js); triggers in-memory runtime states
-          and the device Immersion tier only, no campaign data is read or written here.
-        </p>
-        <div class="input-group" style="flex-direction: column; align-items: stretch">
-          <label class="optics-label" for="dshSearch">FILTER TOOLS</label>
-          <input
-            type="text"
-            id="dshSearch"
-            placeholder="LABEL OR CONTROL NAME..."
-            aria-label="Filter Diagnostic Shell tools by label"
-            style="width: 100%; font-size: 16px"
-          />
-        </div>
-        <div
-          class="input-group"
-          style="flex-direction: column; align-items: stretch"
-          data-dsh-anchor="testConsoleState"
-        >
-          <label class="optics-label">RUNTIME STATE</label>
-          <span id="testConsoleState" aria-live="polite">&mdash;</span>
-        </div>
-        <div
-          class="input-group"
-          style="flex-direction: column; align-items: stretch"
-          data-dsh-anchor="testConsoleTransitions"
-        >
-          <label class="optics-label">FORCE TRANSITION</label>
-          <div id="testConsoleTransitions" style="display: flex; flex-wrap: wrap; gap: 6px"></div>
-        </div>
-        <div
-          class="input-group"
-          style="flex-direction: column; align-items: stretch"
-          data-dsh-anchor="testConsoleImmersionSelect"
-        >
-          <label class="optics-label" for="testConsoleImmersionSelect">IMMERSION TIER</label>
-          <select
-            id="testConsoleImmersionSelect"
-            aria-label="Set the Immersion tier from the test console"
-            style="width: 100%; font-size: 16px"
-          >
-            <option value="full">Full</option>
-            <option value="balanced">Balanced</option>
-            <option value="minimal">Minimal</option>
-          </select>
-        </div>
-        <div
-          class="input-group"
-          style="flex-direction: column; align-items: stretch"
-          data-dsh-anchor="testConsoleObservers"
-        >
-          <label class="optics-label">REGISTERED OBSERVERS</label>
-          <div id="testConsoleObservers" style="font-size: 10px">&mdash;</div>
-        </div>
-        <div
-          class="input-group"
-          style="flex-direction: column; align-items: stretch"
-          data-dsh-anchor="testConsoleReplayHatch"
-        >
-          <label class="optics-label">VIEW-ONCE CEREMONIES</label>
-          <div style="display: flex; flex-wrap: wrap; gap: 6px">
-            <button
-              type="button"
-              class="btn-sm"
-              id="testConsoleReplayHatch"
-              aria-label="Reset the Module Bay hatch so it replays on next open"
-            >
-              REPLAY HATCH
-            </button>
-          </div>
-        </div>
-        <div
-          class="input-group"
-          style="flex-direction: column; align-items: stretch"
-          data-dsh-anchor="ocrTestInput"
-        >
-          <label class="optics-label" for="ocrTestInput"
-            >OPTICAL SCAN TEST (VISUAL UPLOAD OCR — UNIT 1)</label
-          >
+        <div class="dsh-drawer-scroll">
+          <div id="dshEnvBanner" class="panel-substatus" aria-live="polite">&mdash;</div>
           <p style="font-size: 10px">
-            Infra proof only — dumps the RAW on-device OCR text, no parser/apply yet (Unit 2/3).
-            Lazy-loads self-hosted Tesseract.js on first use; does not touch the existing composer
-            Visual Upload / Director-vision path at all.
+            Staging/dev environments only &mdash; never shown on the live site. Renders from the
+            DIAGNOSTIC_SHELL_TOOLS registry (js/test-console.js); triggers in-memory runtime states
+            and the device Immersion tier only, no campaign data is read or written here.
           </p>
-          <input
-            type="file"
-            id="ocrTestInput"
-            accept="image/*"
-            aria-label="Select a screenshot to run through the on-device OCR test"
-            style="font-size: 16px"
-          />
-          <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px">
-            <button
-              type="button"
-              class="btn-sm"
-              id="ocrTestScanBtn"
-              aria-label="Run the on-device OCR test on the selected image"
-            >
-              SCAN
-            </button>
+          <div class="input-group" style="flex-direction: column; align-items: stretch">
+            <label class="optics-label" for="dshSearch">FILTER TOOLS</label>
+            <input
+              type="text"
+              id="dshSearch"
+              placeholder="LABEL OR CONTROL NAME..."
+              aria-label="Filter Diagnostic Shell tools by label"
+              style="width: 100%; font-size: 16px"
+            />
           </div>
-          <span id="ocrTestStatus" aria-live="polite" style="font-size: 10px">&mdash;</span>
-          <pre
-            id="ocrTestOutput"
-            style="
-              font-size: 11px;
-              white-space: pre-wrap;
-              overflow-wrap: anywhere;
-              max-height: 240px;
-              overflow-y: auto;
-              margin-top: 6px;
-            "
-          ></pre>
-        </div>
-        <div
-          class="input-group"
-          style="flex-direction: column; align-items: stretch"
-          data-dsh-anchor="visualParseTestInput"
-        >
-          <label class="optics-label" for="visualParseTestInput"
-            >SCAN &amp; PARSE TEST (VISUAL UPLOAD OCR — UNIT 2)</label
+          <div
+            class="input-group"
+            style="flex-direction: column; align-items: stretch"
+            data-dsh-anchor="testConsoleState"
           >
-          <p style="font-size: 10px">
-            Full pipeline: OCR &rarr; deterministic parser &rarr; the real preview/confirm modal
-            &rarr; additive apply. Nothing is written to the campaign until CONFIRM &amp; APPLY is
-            tapped in the modal. Same underlying OCR engine as the Unit-1 board above.
-          </p>
-          <input
-            type="file"
-            id="visualParseTestInput"
-            accept="image/*"
-            aria-label="Select a screenshot to run through the full OCR parse/preview pipeline"
-            style="font-size: 16px"
-          />
-          <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px">
-            <button
-              type="button"
-              class="btn-sm"
-              id="visualParseTestBtn"
-              aria-label="Run the full OCR scan, parse, and preview pipeline on the selected image"
-            >
-              SCAN &amp; PARSE
-            </button>
+            <label class="optics-label">RUNTIME STATE</label>
+            <span id="testConsoleState" aria-live="polite">&mdash;</span>
           </div>
-          <span id="visualParseTestStatus" aria-live="polite" style="font-size: 10px">&mdash;</span>
+          <div
+            class="input-group"
+            style="flex-direction: column; align-items: stretch"
+            data-dsh-anchor="testConsoleTransitions"
+          >
+            <label class="optics-label">FORCE TRANSITION</label>
+            <div id="testConsoleTransitions" style="display: flex; flex-wrap: wrap; gap: 6px"></div>
+          </div>
+          <div
+            class="input-group"
+            style="flex-direction: column; align-items: stretch"
+            data-dsh-anchor="testConsoleImmersionSelect"
+          >
+            <label class="optics-label" for="testConsoleImmersionSelect">IMMERSION TIER</label>
+            <select
+              id="testConsoleImmersionSelect"
+              aria-label="Set the Immersion tier from the test console"
+              style="width: 100%; font-size: 16px"
+            >
+              <option value="full">Full</option>
+              <option value="balanced">Balanced</option>
+              <option value="minimal">Minimal</option>
+            </select>
+          </div>
+          <div
+            class="input-group"
+            style="flex-direction: column; align-items: stretch"
+            data-dsh-anchor="testConsoleObservers"
+          >
+            <label class="optics-label">REGISTERED OBSERVERS</label>
+            <div id="testConsoleObservers" style="font-size: 10px">&mdash;</div>
+          </div>
+          <div
+            class="input-group"
+            style="flex-direction: column; align-items: stretch"
+            data-dsh-anchor="testConsoleReplayHatch"
+          >
+            <label class="optics-label">VIEW-ONCE CEREMONIES</label>
+            <div style="display: flex; flex-wrap: wrap; gap: 6px">
+              <button
+                type="button"
+                class="btn-sm"
+                id="testConsoleReplayHatch"
+                aria-label="Reset the Module Bay hatch so it replays on next open"
+              >
+                REPLAY HATCH
+              </button>
+            </div>
+          </div>
+          <div
+            class="input-group"
+            style="flex-direction: column; align-items: stretch"
+            data-dsh-anchor="ocrTestInput"
+          >
+            <label class="optics-label" for="ocrTestInput"
+              >OPTICAL SCAN TEST (VISUAL UPLOAD OCR — UNIT 1)</label
+            >
+            <p style="font-size: 10px">
+              Infra proof only — dumps the RAW on-device OCR text, no parser/apply yet (Unit 2/3).
+              Lazy-loads self-hosted Tesseract.js on first use; does not touch the existing composer
+              Visual Upload / Director-vision path at all.
+            </p>
+            <input
+              type="file"
+              id="ocrTestInput"
+              accept="image/*"
+              aria-label="Select a screenshot to run through the on-device OCR test"
+              style="font-size: 16px"
+            />
+            <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px">
+              <button
+                type="button"
+                class="btn-sm"
+                id="ocrTestScanBtn"
+                aria-label="Run the on-device OCR test on the selected image"
+              >
+                SCAN
+              </button>
+            </div>
+            <span id="ocrTestStatus" aria-live="polite" style="font-size: 10px">&mdash;</span>
+            <pre
+              id="ocrTestOutput"
+              style="
+                font-size: 11px;
+                white-space: pre-wrap;
+                overflow-wrap: anywhere;
+                max-height: 240px;
+                overflow-y: auto;
+                margin-top: 6px;
+              "
+            ></pre>
+          </div>
+          <div
+            class="input-group"
+            style="flex-direction: column; align-items: stretch"
+            data-dsh-anchor="visualParseTestInput"
+          >
+            <label class="optics-label" for="visualParseTestInput"
+              >SCAN &amp; PARSE TEST (VISUAL UPLOAD OCR — UNIT 2)</label
+            >
+            <p style="font-size: 10px">
+              Full pipeline: OCR &rarr; deterministic parser &rarr; the real preview/confirm modal
+              &rarr; additive apply. Nothing is written to the campaign until CONFIRM &amp; APPLY is
+              tapped in the modal. Same underlying OCR engine as the Unit-1 board above.
+            </p>
+            <input
+              type="file"
+              id="visualParseTestInput"
+              accept="image/*"
+              aria-label="Select a screenshot to run through the full OCR parse/preview pipeline"
+              style="font-size: 16px"
+            />
+            <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px">
+              <button
+                type="button"
+                class="btn-sm"
+                id="visualParseTestBtn"
+                aria-label="Run the full OCR scan, parse, and preview pipeline on the selected image"
+              >
+                SCAN &amp; PARSE
+              </button>
+            </div>
+            <span id="visualParseTestStatus" aria-live="polite" style="font-size: 10px"
+              >&mdash;</span
+            >
+          </div>
+          <div id="dshSections"></div>
+          <!-- EXTENSION POINT: a future hard-to-trigger feature adds one more entry to
+               DIAGNOSTIC_SHELL_TOOLS (js/test-console.js) with an `anchor` selector
+               pointing at a new .input-group block placed here — never write campaign
+               state, never bypass confirmAction() for a destructive:true tool. -->
         </div>
-        <div id="dshSections"></div>
-        <!-- EXTENSION POINT: a future hard-to-trigger feature adds one more entry to
-             DIAGNOSTIC_SHELL_TOOLS (js/test-console.js) with an `anchor` selector
-             pointing at a new .input-group block placed here — never write campaign
-             state, never bypass confirmAction() for a destructive:true tool. -->
       </div>
     </template>
     <!-- U2: still an empty body-level mount, unchanged location (a sibling of

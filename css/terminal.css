@@ -1187,6 +1187,31 @@ button.lamp {
       linear-gradient(180deg, var(--bezel-steel-3), var(--bezel-steel-1) 80%, var(--bezel-steel-2));
     box-shadow: 0 -3px 12px rgba(0, 0, 0, 0.7);
   }
+  /* Owner report: the fixed bottom dock's real height tracked the live
+     ▸ SUBSYSTEM status strip's own content length (VITALS/RAD/CARRIER +
+     per-subsystem suffix text — _bezelStatusSuffix()/_bezelTelemetryText(),
+     ui-core.js), so the dock visibly grew/shrank switching between a short
+     page (e.g. CHASSIS) and a long one (e.g. OPERATIONS with a manifest
+     count, or a crippled-limb/high-rad state) — reproduced live: 99px vs
+     110px+ at 360px depending on subsystem/campaign state. .telemetry gets
+     a deterministic fixed height here (mobile fixed-dock context only —
+     desktop's document-flow .telemetry, styled by the unchanged base rule
+     above, is untouched) sized for exactly 2 lines at a locked px
+     line-height (never the browser/font-default "normal", which is what
+     made the 2-vs-3-line boundary content-dependent in the first place);
+     any content past 2 lines is clamped with an ellipsis rather than
+     pushing the dock taller. The subsystem name (always first) and most of
+     the live status stay readable; only the rare longest-tail combination
+     ever loses characters off the end. */
+  .telemetry {
+    height: 36px;
+    line-height: 13px;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    text-overflow: ellipsis;
+  }
   /* Reserve space at the end of the scrollable page equal to the fixed
      bezel's own height so the dock never covers the last panel's
      content or controls (Protocol 17).
@@ -1750,7 +1775,18 @@ details.panel:not([open]) summary h2 {
    over a dev tool (#bootScreen 100000, the shutdown covers 99998-100002).
    The slide-in is a plain `animation:` (Protocol UI-9) — the existing
    global prefers-reduced-motion block (animation-duration:0.01ms on *)
-   neutralizes it to an instant open with no bespoke carve-out. ══════════ */
+   neutralizes it to an instant open with no bespoke carve-out.
+   Owner report (mobile chrome batch, MOBILE ONLY — desktop stays exactly
+   as U2 shipped it, the Suite 129 (min-width:1000px)/(max-width:999.98px)
+   split this file already uses everywhere else): U2's shape (a right-side,
+   FULL-HEIGHT drawer) covered the entire mobile screen, so a tester
+   couldn't watch a trigger's effect on the terminal while using the tools.
+   Below (max-width:999.98px), #testConsolePanel becomes a resizable
+   PARTIAL-height BOTTOM SHEET (js/test-console.js _wireSheetResize()) and
+   #dshScrim goes permanently inert (transparent + pointer-events:none) so
+   the visible terminal above the sheet stays fully USABLE, not just
+   visible. The desktop rules directly below are BYTE-IDENTICAL to what U2
+   shipped. ══════════════════════════════════════════════════════════ */
 .dsh-fab {
   position: fixed;
   left: 12px;
@@ -1774,7 +1810,40 @@ details.panel:not([open]) summary h2 {
     0 0 10px rgba(0, 0, 0, 0.6),
     0 0 8px rgba(var(--bezel-wire-rgb), 0.35);
 }
-.dsh-fab:hover,
+.dsh-fab span {
+  /* Owner report (FIX 4, all breakpoints — a pure font-metrics correction,
+     not a layout change): the bare glyph read visibly off-center inside
+     the already flex-centered button — the gear glyph's own font metrics
+     (leading/descender space Courier New bakes into the glyph box) aren't
+     removed by a line-height:1 on the BUTTON alone. Locking the SPAN's own
+     line-height/display strips that inherited leading from the glyph's own
+     box, and the 1px nudge corrects the small residual optical offset. */
+  display: block;
+  line-height: 1;
+  transform: translateY(-1px);
+}
+/* Owner report (FIX 3, all breakpoints): button:hover's fill "stuck" after
+   a mobile tap (no pointerleave to clear it on touch), so the bubble read
+   identically to its OPEN look even while genuinely closed. Reset the
+   hover look unconditionally first (every pointer type), then layer the
+   real hover fill back in for hover-capable pointers only — the same
+   (hover: hover) and (pointer: fine) gate the mode-pill fix already
+   established (Suite 129's own signal). On an actual desktop (hover:hover
+   true) this reproduces the ORIGINAL unconditional hover rule exactly —
+   same two colors, same trigger — so desktop's hover feedback is
+   unaffected; only a touch device (hover:hover false), which can never
+   satisfy the gated rule, gets the fix. :focus-visible stays unconditional
+   (Protocol 17 — keyboard focus is never hover-gated). */
+.dsh-fab:hover {
+  background: rgba(0, 0, 0, 0.78);
+  color: var(--bezel-wire, var(--robco-green));
+}
+@media (hover: hover) and (pointer: fine) {
+  .dsh-fab:hover {
+    background: var(--bezel-wire, var(--robco-green));
+    color: #000;
+  }
+}
 .dsh-fab:focus-visible {
   background: var(--bezel-wire, var(--robco-green));
   color: #000;
@@ -1784,10 +1853,32 @@ details.panel:not([open]) summary h2 {
   color: #000;
 }
 /* Mobile: sit above the fixed bezel dock (60px z, reserved via the machine's
-   own 100px padding-bottom) instead of behind/under it. */
+   own 100px padding-bottom) instead of behind/under it. This is only the
+   fallback resting spot for a device that has never dragged the bubble —
+   _wireFabDrag() (js/test-console.js, MOBILE-ONLY-WIRED) overrides
+   left/top with an inline style the instant it's dragged, and restores a
+   persisted position (robco_dsh_fab_pos, MetaStore) on every mount. */
 @media (max-width: 999.98px) {
   .dsh-fab {
     bottom: 112px;
+    /* Owner report (FIX 2, MOBILE ONLY — desktop's bubble stays click-only,
+       exactly as U2 shipped it): the bubble is draggable anywhere on
+       screen (js/test-console.js _wireFabDrag(), wired only under this
+       same max-width:999.98px signal) — touch-action:none hands the
+       gesture entirely to the pointer handlers instead of the browser
+       interpreting a touch-drag as a page scroll (the tempo-dial/
+       Immersion-dial drag precedent, ui-core.js/ui-render.js). */
+    touch-action: none;
+  }
+  /* Owner report (FIX 3, MOBILE ONLY): the bubble's highlighted look is
+     driven ONLY by .dsh-fab--open (toggled by _openShell()/_closeShell())
+     on mobile — never by [aria-expanded], which desktop still uses above
+     — so it lights up exactly when, and only when, the sheet is genuinely
+     open, immune to the touch-sticky-hover confusion this fix targets.
+     Desktop keeps its original [aria-expanded='true'] rule untouched. */
+  .dsh-fab.dsh-fab--open {
+    background: var(--bezel-wire, var(--robco-green));
+    color: #000;
   }
 }
 .dsh-scrim {
@@ -1830,6 +1921,127 @@ details.panel:not([open]) summary h2 {
 .dsh-drawer[hidden] {
   display: none;
 }
+/* #dshDragHandle/#dshExpandToggle are new mobile-only controls (FIX 1) —
+   hidden by default so the desktop drawer's header renders exactly as
+   before (icon + title + close button only); the mobile block below shows
+   them. Both "show" overrides inside that block target the SAME id
+   selectors used here (equal specificity, later in source) rather than a
+   lower-specificity class — an earlier version of this fix used
+   `.dsh-drag-handle { display: flex }` for the show rule, which an id
+   selector's specificity always beats regardless of source order, so the
+   handle stayed display:none on mobile until this was caught live. */
+#dshDragHandle {
+  display: none;
+}
+#dshExpandToggle {
+  display: none;
+}
+/* Owner report (FIX 1, MOBILE ONLY): #testConsolePanel becomes a resizable
+   PARTIAL-height BOTTOM SHEET — 50% of the viewport by default — instead
+   of the desktop-style right-side full-height drawer above, so the app
+   screen stays visible AND usable above it. --dsh-sheet-h is written on
+   <html> by _wireSheetResize() (js/test-console.js) via drag
+   (#dshDragHandle) or the expand/collapse toggle (#dshExpandToggle); the
+   :root default below is the pre-drag, first-open size. #dshScrim also
+   goes fully inert here — a "tap outside to dismiss" gesture no longer
+   applies once the terminal above the sheet must stay clickable, so the
+   sheet closes only via #dshClose, Escape, or dragging the handle down.
+   Desktop is completely untouched by this block. */
+@media (max-width: 999.98px) {
+  :root {
+    --dsh-sheet-h: 50vh;
+  }
+  .dsh-scrim {
+    background: transparent;
+    pointer-events: none;
+  }
+  @keyframes dsh-slide-up {
+    from {
+      transform: translateY(28px);
+      opacity: 0.35;
+    }
+    to {
+      transform: none;
+      opacity: 1;
+    }
+  }
+  .dsh-drawer {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: var(--dsh-sheet-h, 50vh);
+    min-height: 180px;
+    max-height: 94vh;
+    /* box-sizing:border-box is required here — left:0;right:0;width:100%
+       is over-constrained under the default content-box, and the browser
+       drops `right` to satisfy it, so the horizontal padding below would
+       otherwise silently push the sheet's right edge past the viewport
+       (caught live at 360px: right computed to 388 against a 360
+       viewport). border-box keeps the declared 100% width as the OUTER
+       edge the padding is carved out of. */
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-left: none;
+    border-top: 1px solid var(--bezel-wire, var(--robco-green));
+    border-radius: 16px 16px 0 0;
+    box-shadow:
+      0 -8px 30px rgba(0, 0, 0, 0.8),
+      0 0 18px rgba(var(--bezel-wire-rgb), 0.15);
+    padding: 0 14px 16px;
+    animation: dsh-slide-up 0.22s ease-out;
+  }
+  /* Drag handle — resizes the sheet height on pointer drag, or via
+     ArrowUp/ArrowDown when focused (role=slider, tabindex=0, the
+     tempo-dial keyboard-slider precedent). A genuine >=28px tap target
+     (Protocol 17) even though the visible grip is a thin decorative
+     ::before bar. touch-action:none hands the vertical gesture entirely to
+     the pointer handlers instead of scrolling the page underneath (the
+     tempo-dial/Immersion-dial precedent). Hidden on desktop above — the
+     display override here targets the id selector (not .dsh-drag-handle)
+     to match that hide rule's specificity, so it actually wins here. */
+  #dshDragHandle {
+    display: flex;
+  }
+  .dsh-drag-handle {
+    flex-shrink: 0;
+    width: 100%;
+    min-height: 28px;
+    align-items: center;
+    justify-content: center;
+    cursor: ns-resize;
+    touch-action: none;
+  }
+  .dsh-drag-handle::before {
+    content: '';
+    width: 42px;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(var(--bezel-wire-rgb), 0.5);
+  }
+  .dsh-drag-handle:hover::before,
+  .dsh-drag-handle:focus-visible::before {
+    background: var(--bezel-wire, var(--robco-green));
+  }
+  /* Everything below the drag handle + head scrolls internally — the
+     handle and title bar stay pinned at the top of the sheet regardless
+     of scroll position. On desktop this wrapper is a plain, unstyled div
+     and the ORIGINAL .dsh-drawer overflow-y:auto (above) keeps scrolling
+     the whole drawer exactly as U2 shipped it. */
+  .dsh-drawer-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(var(--bezel-wire-rgb), 0.4) transparent;
+  }
+  #dshExpandToggle {
+    display: inline-block;
+  }
+}
 .dsh-drawer-head {
   display: flex;
   align-items: center;
@@ -1868,6 +2080,10 @@ details.panel:not([open]) summary h2 {
 }
 .dsh-drawer-head .dx:hover {
   background: rgba(var(--bezel-wire-rgb), 0.15);
+}
+.dsh-drawer-head .dx[aria-pressed='true'] {
+  background: var(--bezel-wire, var(--robco-green));
+  color: #000;
 }
 /* Per-tool icon glyph (registry `icon` field) prepended to each migrated
    control's existing .optics-label by _renderShell() (js/test-console.js);

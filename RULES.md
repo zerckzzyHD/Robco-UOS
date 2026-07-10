@@ -15,7 +15,7 @@ there.
 
 Quick facts (see `CLAUDE.md` for the authoritative detail):
 
-- The gate requires **2856 tests** to pass, mirrored at parity across the Node
+- The gate requires **2864 tests** to pass, mirrored at parity across the Node
   and PowerShell runners in `tests/`.
 - State persists to the `localStorage` key `robco_v8`.
 - Bump `CACHE_NAME` in `sw.js` on any served-file change (Protocol 1).

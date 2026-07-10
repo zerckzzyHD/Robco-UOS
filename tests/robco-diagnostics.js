@@ -35732,11 +35732,17 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
         const registry = new Map();
         function makeEl(id) {
           const listeners = {};
+          const classes = new Set();
           const el = {
             id,
             hidden: true,
             _attrs: {},
             _focused: false,
+            classList: {
+              add: c => classes.add(c),
+              remove: c => classes.delete(c),
+              contains: c => classes.has(c),
+            },
             setAttribute(k, v) {
               el._attrs[k] = v;
             },
@@ -35745,6 +35751,9 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
             },
             focus() {
               el._focused = true;
+            },
+            blur() {
+              el._focused = false;
             },
             addEventListener(type, fn) {
               (listeners[type] = listeners[type] || []).push(fn);
@@ -35790,7 +35799,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
         return 'function ' + name + params + extractFunctionBody(src, name);
       }
       const src211 =
-        "var DEV_MARKER = '⚙';\nvar _shellTriggerEl = null;\n" +
+        "var DEV_MARKER = '⚙';\nvar _shellTriggerEl = null;\nvar _fabDragSuppressClick = false;\n" +
         declareFn211(testConsole211, '_shellFocusables') +
         '\n' +
         declareFn211(testConsole211, '_shellKeydown') +
@@ -36571,6 +36580,198 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
         (err212 ? ' — ' + err212.message : '')
     );
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 213 — Diagnostic Shell mobile chrome fixes (owner report) (8 tests)
+// ──────────────────────────────────────────────────────────────
+//  Five presentation fixes on top of U1-U3, MOBILE ONLY (the exact inverse
+//  of the (min-width:1000px)... Suite 129 desktop gate) — desktop stays
+//  byte-identical to what U2 shipped: FIX 1 turns the right-side
+//  full-height drawer into a resizable partial-height bottom sheet with a
+//  drag handle + expand/collapse toggle and an inert scrim; FIX 2 makes the
+//  FAB draggable with its position persisted via MetaStore; FIX 3 drives
+//  the FAB's highlighted look off a dedicated .dsh-fab--open class instead
+//  of the touch-sticky-hover-prone :hover/[aria-expanded]; FIX 4 centers
+//  the glyph inside the FAB (all breakpoints — a pure font-metrics fix);
+//  FIX 5 (terminal.css only) pins the fixed bottom bezel dock to a constant
+//  height regardless of the live ▸ SUBSYSTEM status strip's content length.
+//  213.6/213.7 lock the two Protocol 42 regressions caught during this
+//  unit's own live verification (a content-box/width:100% overflow, and an
+//  id-vs-class CSS specificity mismatch that silently kept the new mobile
+//  controls at display:none).
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 213 — Diagnostic Shell mobile chrome fixes (owner report)');
+  const testConsole213 = readFile('js/test-console.js');
+  const index213 = readFile('index.html');
+  const css213 = readFile('css/terminal.css');
+  // Pulls every top-level @media(max-width:999.98px){...} block's body and
+  // concatenates them — this file has several such blocks (bezel, FAB,
+  // drawer/sheet, telemetry), so a single-block regex would miss content in
+  // a later one.
+  function allMobileBlocks213(src) {
+    let out = '';
+    const re = /@media\s*\(max-width:\s*999\.98px\)\s*\{/g;
+    while (re.exec(src)) {
+      let depth = 1;
+      let i = re.lastIndex;
+      const start = i;
+      while (depth > 0 && i < src.length) {
+        if (src[i] === '{') depth++;
+        else if (src[i] === '}') depth--;
+        i++;
+      }
+      out += src.slice(start, i - 1) + '\n';
+      re.lastIndex = i;
+    }
+    return out;
+  }
+  const mobileCss213 = allMobileBlocks213(css213);
+
+  // 213.1  FIX 1 — the drawer is a resizable PARTIAL-height bottom sheet on
+  //        mobile (height:var(--dsh-sheet-h), bottom-anchored, box-sizing
+  //        border-box), while the BASE (desktop) .dsh-drawer rule stays the
+  //        original right-side full-height shape (top:0;bottom:0;
+  //        width:min(92vw,420px)) with no --dsh-sheet-h/box-sizing override
+  //        — desktop untouched.
+  {
+    const baseDrawer213 = css213.slice(
+      css213.indexOf('.dsh-drawer {'),
+      css213.indexOf('.dsh-drawer {') + 700
+    );
+    assert(
+      /top:\s*0;/.test(baseDrawer213) &&
+        /width:\s*min\(92vw,\s*420px\)/.test(baseDrawer213) &&
+        !/--dsh-sheet-h/.test(baseDrawer213) &&
+        /--dsh-sheet-h:\s*50vh/.test(mobileCss213) &&
+        /height:\s*var\(--dsh-sheet-h,\s*50vh\)/.test(mobileCss213) &&
+        /bottom:\s*0;/.test(mobileCss213),
+      '213.1: FIX 1 — the base (desktop) .dsh-drawer rule is unchanged (top:0, width:min(92vw,420px), no --dsh-sheet-h reference); the mobile-only block declares --dsh-sheet-h:50vh and makes .dsh-drawer a bottom-anchored, variable-height sheet'
+    );
+  }
+
+  // 213.2  FIX 1 — the drag handle (#dshDragHandle, role=slider,
+  //        tabindex=0, ArrowUp/ArrowDown keyboard support) and the
+  //        expand/collapse toggle (#dshExpandToggle) both exist in the
+  //        template, and _setSheetVh() is the one choke point that clamps
+  //        [30,92] and writes both --dsh-sheet-h and the handle's
+  //        aria-valuenow — the drag, the keyboard, and the toggle can never
+  //        drift out of sync with each other.
+  {
+    const tplStart213 = index213.indexOf('<template id="testConsoleTemplate">');
+    const tplEnd213 = index213.indexOf('</template>', tplStart213);
+    const tplSrc213 = tplStart213 !== -1 ? index213.slice(tplStart213, tplEnd213) : '';
+    const setVhBody213 = extractFunctionBody(testConsole213, '_setSheetVh');
+    assert(
+      /id="dshDragHandle"[\s\S]{0,200}role="slider"[\s\S]{0,200}tabindex="0"/.test(tplSrc213) &&
+        /id="dshExpandToggle"/.test(tplSrc213) &&
+        /Math\.max\(SHEET_MIN_VH,\s*Math\.min\(SHEET_MAX_VH,\s*vh\)\)/.test(setVhBody213) &&
+        /setProperty\('--dsh-sheet-h'/.test(setVhBody213) &&
+        /setAttribute\('aria-valuenow'/.test(setVhBody213) &&
+        /_sheetPointerMove|_sheetKeydown|_toggleSheetExpand/.test(testConsole213),
+      '213.2: FIX 1 — #dshDragHandle (role=slider, tabindex=0) and #dshExpandToggle exist in the template; _setSheetVh() is the single choke point clamping to [SHEET_MIN_VH,SHEET_MAX_VH] and writing both --dsh-sheet-h and the handle aria-valuenow, shared by the pointer drag, the ArrowUp/ArrowDown keyboard handler, and the expand/collapse toggle'
+    );
+  }
+
+  // 213.3  FIX 2 — the FAB is draggable ONLY on mobile: _wireFabDrag() and
+  //        _restoreFabPosition() both early-return via the shared
+  //        _dshIsMobile() gate, and a dragged position persists through
+  //        MetaStore under robco_dsh_fab_pos (registered in state.js,
+  //        Protocol 4/UI-6) — never a bare localStorage call.
+  {
+    const wireFabDragBody213 = extractFunctionBody(testConsole213, '_wireFabDrag');
+    const restoreFabBody213 = extractFunctionBody(testConsole213, '_restoreFabPosition');
+    const fabPointerEndBody213 = extractFunctionBody(testConsole213, '_fabPointerEnd');
+    assert(
+      /if\s*\(!_dshIsMobile\(\)\)\s*return;/.test(wireFabDragBody213) &&
+        /if\s*\(!_dshIsMobile\(\)\)\s*return;/.test(restoreFabBody213) &&
+        /MetaStore\.set\(\s*['"]robco_dsh_fab_pos['"]/.test(fabPointerEndBody213) &&
+        /robco_dsh_fab_pos:\s*\{\s*type:\s*'json'/.test(stateSource),
+      "213.3: FIX 2 — _wireFabDrag()/_restoreFabPosition() both gate on !_dshIsMobile() (desktop's FAB stays click-only), a genuine drag persists {left,top} through MetaStore.set('robco_dsh_fab_pos', ...) rather than a bare localStorage call, and robco_dsh_fab_pos is a registered META_MANIFEST json device pref (Protocol 4/UI-6)"
+    );
+  }
+
+  // 213.4  FIX 3 — the FAB's highlighted look on mobile is driven by
+  //        .dsh-fab--open (toggled by _openShell()/_closeShell()), declared
+  //        ONLY inside the mobile media block; the BASE (desktop) rule
+  //        keeps the original [aria-expanded='true'] highlight untouched,
+  //        with no .dsh-fab--open reference anywhere outside the mobile
+  //        block — desktop's highlight mechanism is unchanged.
+  {
+    const openBody213 = extractFunctionBody(testConsole213, '_openShell');
+    const closeBody213 = extractFunctionBody(testConsole213, '_closeShell');
+    // .dsh-fab.dsh-fab--open must appear the SAME number of times in the
+    // whole file as inside the mobile-only blocks — i.e., every occurrence
+    // lives inside one of them, never at top level (desktop).
+    const openClassTotal213 = (css213.match(/\.dsh-fab\.dsh-fab--open/g) || []).length;
+    const openClassInMobile213 = (mobileCss213.match(/\.dsh-fab\.dsh-fab--open/g) || []).length;
+    assert(
+      /fab\.classList\.add\('dsh-fab--open'\)/.test(openBody213) &&
+        /fab\.classList\.remove\('dsh-fab--open'\)/.test(closeBody213) &&
+        /\.dsh-fab\[aria-expanded='true'\]\s*\{/.test(css213) &&
+        openClassTotal213 > 0 &&
+        openClassTotal213 === openClassInMobile213,
+      "213.4: FIX 3 — _openShell()/_closeShell() toggle fab.classList's dsh-fab--open; every .dsh-fab.dsh-fab--open declaration in the file lives inside a mobile-only block (none at top level/desktop), and the base .dsh-fab[aria-expanded='true'] highlight rule (desktop) is untouched"
+    );
+  }
+
+  // 213.5  FIX 4 — the glyph span gets its own line-height:1 (all
+  //        breakpoints, not mobile-gated — a pure font-metrics correction).
+  assert(
+    /\.dsh-fab span\s*\{[^}]*line-height:\s*1;/.test(css213) &&
+      !new RegExp('@media[^{]*\\{[^}]*\\.dsh-fab span').test(css213),
+    '213.5: FIX 4 — .dsh-fab span gets its own line-height:1 centering fix, declared unconditionally (every breakpoint) rather than inside a media-query block, since it corrects a font-metrics issue present at every size'
+  );
+
+  // 213.6  FIX 5 + Protocol 42 regression guard — the mobile .telemetry
+  //        rule pins a deterministic px height (never the content-dependent
+  //        browser-default line-height) and clamps overflow with
+  //        -webkit-line-clamp:2 rather than letting the bezel dock grow;
+  //        the base (desktop) .telemetry rule carries neither.
+  {
+    const baseTelemetry213 = css213.slice(
+      css213.indexOf('.telemetry {'),
+      css213.indexOf('.telemetry {') + 400
+    );
+    assert(
+      /height:\s*36px;/.test(mobileCss213) &&
+        /line-height:\s*13px;/.test(mobileCss213) &&
+        /-webkit-line-clamp:\s*2;/.test(mobileCss213) &&
+        !/height:\s*36px/.test(baseTelemetry213) &&
+        !/-webkit-line-clamp/.test(baseTelemetry213),
+      '213.6: FIX 5 — the mobile .telemetry rule pins a deterministic 36px height + 13px line-height and clamps overflow to 2 lines via -webkit-line-clamp, so the fixed bottom bezel dock can no longer grow/shrink with the live ▸ SUBSYSTEM status text length; the base (desktop, document-flow) .telemetry rule carries neither override'
+    );
+  }
+
+  // 213.7  Protocol 42 regression guard — the earlier version of this fix
+  //        used width:100% + left:0;right:0 on .dsh-drawer under the
+  //        default content-box, which silently pushed the sheet's right
+  //        edge past the viewport by exactly its own horizontal padding
+  //        (caught live at 360px). box-sizing:border-box is required on
+  //        the mobile .dsh-drawer override so this can't regress.
+  assert(
+    /box-sizing:\s*border-box;/.test(mobileCss213) &&
+      /\.dsh-drawer\s*\{[\s\S]{0,400}box-sizing:\s*border-box/.test(
+        '.dsh-drawer {' + mobileCss213.slice(mobileCss213.indexOf('.dsh-drawer {') + 13)
+      ),
+    '213.7: [Protocol 42 regression guard] the mobile .dsh-drawer override declares box-sizing:border-box — without it, left:0;right:0;width:100% is over-constrained under the default content-box and the horizontal padding silently pushes the sheet past the viewport edge (caught live: right computed to 388px against a 360px viewport)'
+  );
+
+  // 213.8  Protocol 42 regression guard — #dshDragHandle/#dshExpandToggle's
+  //        mobile "show" rule must target the SAME id selector as the base
+  //        "hide" rule (equal specificity, later source wins); an earlier
+  //        version used a lower-specificity .dsh-drag-handle class for the
+  //        show rule, which the id-based hide rule always beat regardless
+  //        of source order, silently keeping the handle at display:none on
+  //        mobile until this was caught live.
+  assert(
+    /#dshDragHandle\s*\{\s*display:\s*none;\s*\}/.test(css213) &&
+      /#dshExpandToggle\s*\{\s*display:\s*none;\s*\}/.test(css213) &&
+      /#dshDragHandle\s*\{\s*display:\s*flex;\s*\}/.test(mobileCss213) &&
+      /#dshExpandToggle\s*\{\s*display:\s*inline-block;\s*\}/.test(mobileCss213),
+    '213.8: [Protocol 42 regression guard] both #dshDragHandle and #dshExpandToggle are hidden by an id-selector display:none base rule, and shown by an EQUAL-specificity id-selector rule inside the mobile block — a class-selector show rule (lower specificity than an id) would always lose to the id-based hide rule regardless of source order, exactly the bug this locks against'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════

@@ -87,6 +87,13 @@ const META_MANIFEST = {
   // Phase 3 · Piece 3 — DATABANK BUS-17 DIRECTIVE REGISTRY: which status
   // drawer (all/active/complete/failed) was last open (Protocol UI-6).
   robco_databank_qdrawer: { type: 'string', default: 'all', owner: 'ui-render.js' },
+  // Diagnostic Shell mobile-chrome batch (owner report, FIX 2): the last
+  // dragged position of the #dshFab bubble, {left, top} viewport px,
+  // clamped to the current viewport on every apply (Protocol UI-6 —
+  // "everything remembers on reload," extended to a dragged position, not
+  // just a picked mode/value). Absent/unset falls back to the CSS default
+  // resting spot (bottom-left, above the mobile bezel dock).
+  robco_dsh_fab_pos: { type: 'json', default: '{}', owner: 'test-console.js' },
 };
 // Fire-and-forget write-through of a device-pref op to IndexedDB's 'meta' store
 // (Step 2 · Phase 1 · P1). The ONLY seam through which MetaStore touches IdbStore
