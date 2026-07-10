@@ -255,23 +255,12 @@
   // more entry (see the EXTENSION POINT comment beside the template).
   var DIAGNOSTIC_SHELL_TOOLS = [
     {
-      id: 'inspect-runtime-state',
-      label: 'RUNTIME STATE',
-      subLabel: 'AmbientRuntime.getState() readout',
-      icon: '◉',
-      category: 'inspect',
-      tier: 'prod',
-      destructive: false,
-      tooltip: 'Live Ambient Runtime state readout.',
-      triggers: ['runtime.state'],
-      anchor: '[data-dsh-anchor="testConsoleState"]',
-    },
-    {
       id: 'runtime-force-transition',
       label: 'FORCE TRANSITION',
       subLabel: 'AmbientRuntime.forceState(IDLE / STANDBY / SHUTDOWN / OFF)',
       icon: '▲',
       category: 'triggers',
+      group: 'FORCE TRANSITION',
       tier: 'prod',
       destructive: false,
       tooltip: 'Force the Ambient Runtime into IDLE, STANDBY, SHUTDOWN, or OFF.',
@@ -284,6 +273,7 @@
       subLabel: 'runBootSequence() replay',
       icon: '↻',
       category: 'triggers',
+      group: 'FORCE TRANSITION',
       tier: 'prod',
       destructive: false,
       tooltip: 'Replay the boot sequence.',
@@ -296,6 +286,7 @@
       subLabel: "AmbientRuntime.forceState('ACTIVE')",
       icon: '●',
       category: 'triggers',
+      group: 'FORCE TRANSITION',
       tier: 'prod',
       destructive: false,
       tooltip:
@@ -309,6 +300,7 @@
       subLabel: 'onImmersionChange() / getImmersionTier()',
       icon: '■',
       category: 'env',
+      group: 'IMMERSION TIER',
       tier: 'prod',
       destructive: false,
       tooltip: 'Set the device Immersion tier (mirrors the real Security & Config dial).',
@@ -316,23 +308,12 @@
       anchor: '[data-dsh-anchor="testConsoleImmersionSelect"]',
     },
     {
-      id: 'inspect-observers',
-      label: 'REGISTERED OBSERVERS',
-      subLabel: 'AmbientRuntime.listObservers() readout',
-      icon: '◉',
-      category: 'inspect',
-      tier: 'prod',
-      destructive: false,
-      tooltip: 'Live list of registered Ambient Runtime observers.',
-      triggers: [],
-      anchor: '[data-dsh-anchor="testConsoleObservers"]',
-    },
-    {
       id: 'replay-hatch',
       label: 'REPLAY HATCH',
       subLabel: "MetaStore.remove('robco_bay_opened')",
       icon: '⚙',
       category: 'triggers',
+      group: 'VIEW-ONCE CEREMONIES',
       tier: 'staging',
       destructive: true,
       tooltip: 'Reset the Module Bay hatch so its view-once ceremony replays on next open.',
@@ -352,6 +333,7 @@
       subLabel: 'runVisualOcrTest() — raw on-device OCR text dump',
       icon: '⚒',
       category: 'infra',
+      group: 'OPTICAL SCAN TEST',
       tier: 'staging',
       destructive: false,
       tooltip:
@@ -365,6 +347,7 @@
       subLabel: 'runVisualOcr() — full parse / preview / confirm pipeline',
       icon: '⚒',
       category: 'infra',
+      group: 'SCAN & PARSE TEST',
       tier: 'staging',
       destructive: false,
       tooltip: 'Run a screenshot through the full OCR parse + preview/confirm pipeline.',
@@ -999,6 +982,149 @@
       triggers: [],
       action: () => _firePendingEffectWarmup(),
     },
+
+    // ── U4a: INSPECT BUILD-OUT (planning/DIAGNOSTIC_SHELL_PLAN.md §3.1/§11 U4)
+    // A read-only "system diagnostics" readout — NEVER a raw JSON blob (owner
+    // directive). Every group below is built from _inspectXxxHtml() helpers
+    // (see the U4a INSPECT section further down this file) that assemble
+    // labeled, human-readable lines only — the same _chassisIdRow()/
+    // _chassisBreaker() reuse the CHASSIS SYSTEM STATUS board already
+    // established (Protocol 22), never a second raw-dump renderer. The
+    // readable summary is safe on a minigame-unlocked PRODUCTION build
+    // (tier:'prod' — the same class of telemetry a network tab already
+    // shows); genuinely dev-only internals (SW registration guts, the raw
+    // feature-flag LKG cache) stay tier:'staging', but are STILL rendered as
+    // labeled text, never JSON.stringify. Grouped: VITALS & CAMPAIGN
+    // SUMMARY / DEVICE & SYSTEM (also hosts the migrated RUNTIME STATE +
+    // REGISTERED OBSERVERS anchors above) / CONNECTION / FLAGS. INSPECT
+    // itself is the LAST category in CATEGORY_ORDER (below) so the readout
+    // sits at the bottom of the shell.
+    {
+      id: 'inspect-vitals',
+      label: 'VITALS & CAMPAIGN SUMMARY',
+      subLabel: 'readable state readout — game/level/XP/HP/location/caps/karma/directives',
+      icon: '◉',
+      category: 'inspect',
+      group: 'VITALS & CAMPAIGN SUMMARY',
+      tier: 'prod',
+      destructive: false,
+      tooltip:
+        'A read-only, human-readable summary of the active campaign — never a raw data dump.',
+      triggers: [],
+      anchor: '[data-dsh-anchor="dshInspectVitals"]',
+    },
+    // Relocated verbatim from their original U1 array position (Protocol 22 —
+    // no behavior change, same id/anchor/tooltip) so the "DEVICE / SYSTEM"
+    // group's first-encountered tool sits after VITALS in registry order —
+    // that ordering is what determines each group wrapper's position among
+    // its siblings in _renderShell() (first tool of a group wins the slot).
+    {
+      id: 'inspect-runtime-state',
+      label: 'RUNTIME STATE',
+      subLabel: 'AmbientRuntime.getState() readout',
+      icon: '◉',
+      category: 'inspect',
+      group: 'DEVICE / SYSTEM',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Live Ambient Runtime state readout.',
+      triggers: ['runtime.state'],
+      anchor: '[data-dsh-anchor="testConsoleState"]',
+    },
+    {
+      id: 'inspect-observers',
+      label: 'REGISTERED OBSERVERS',
+      subLabel: 'AmbientRuntime.listObservers() readout',
+      icon: '◉',
+      category: 'inspect',
+      group: 'DEVICE / SYSTEM',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Live list of registered Ambient Runtime observers.',
+      triggers: [],
+      anchor: '[data-dsh-anchor="testConsoleObservers"]',
+    },
+    {
+      id: 'inspect-device-detail',
+      label: 'DEVICE DETAIL',
+      subLabel: 'APP VERSION + active Cache Storage revision (read-only)',
+      icon: '◉',
+      category: 'inspect',
+      group: 'DEVICE / SYSTEM',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Read-only APP VERSION + active cache revision readout.',
+      triggers: [],
+      anchor: '[data-dsh-anchor="dshInspectDevice"]',
+    },
+    {
+      id: 'inspect-sw-internal',
+      label: 'SERVICE WORKER INTERNALS',
+      subLabel: 'navigator.serviceWorker.getRegistration() (read-only, staging only)',
+      icon: '⚒',
+      category: 'inspect',
+      group: 'DEVICE / SYSTEM',
+      tier: 'staging',
+      destructive: false,
+      tooltip:
+        'Dev-only Service Worker registration detail (scope/active/waiting/installing) — rendered as labeled text, never raw.',
+      triggers: [],
+      anchor: '[data-dsh-anchor="dshInspectSwInternal"]',
+    },
+    {
+      id: 'inspect-connection',
+      label: 'CONNECTION',
+      subLabel: 'carrier / AI chat / network readout (read-only)',
+      icon: '◉',
+      category: 'inspect',
+      group: 'CONNECTION',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Read-only carrier, AI chat, and network status readout.',
+      triggers: [],
+      anchor: '[data-dsh-anchor="dshInspectConnection"]',
+    },
+    {
+      id: 'inspect-flags',
+      label: 'FEATURE FLAGS',
+      subLabel: 'isFeatureEnabled() per known flag (read-only)',
+      icon: '◉',
+      category: 'inspect',
+      group: 'FLAGS',
+      tier: 'prod',
+      destructive: false,
+      tooltip:
+        'A readable ENABLED/DISABLED line per remote kill-switch flag — the same telemetry the CHASSIS SYSTEM STATUS board already shows.',
+      triggers: [],
+      anchor: '[data-dsh-anchor="dshInspectFlags"]',
+    },
+    {
+      id: 'inspect-flags-internal',
+      label: 'FEATURE FLAGS — RAW CACHE',
+      subLabel: "MetaStore.get('robco_feature_flags') presence (read-only, staging only)",
+      icon: '⚒',
+      category: 'inspect',
+      group: 'FLAGS',
+      tier: 'staging',
+      destructive: false,
+      tooltip:
+        'Dev-only readout of the local last-known-good feature-flag cache — rendered as labeled text, never raw JSON.',
+      triggers: [],
+      anchor: '[data-dsh-anchor="dshInspectFlagsInternal"]',
+    },
+    {
+      id: 'inspect-copy',
+      label: 'COPY DIAGNOSTICS',
+      subLabel: 'navigator.clipboard.writeText() of the readable readout above (never raw JSON)',
+      icon: '⧉',
+      category: 'inspect',
+      group: 'COPY DIAGNOSTICS',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Copy the readable INSPECT readout to the clipboard — never a raw JSON dump.',
+      triggers: [],
+      anchor: '[data-dsh-anchor="dshInspectCopy"]',
+    },
   ];
   // Exposed read-only for the harness (the VM behavioral proof, mirroring how
   // the OCR test wiring is reachable) — never mutated at runtime.
@@ -1010,7 +1136,9 @@
   // populates triggers/inspect/env/infra; state/resets/fixtures/inline stay
   // empty (no tools yet) and are skipped entirely — a section with zero
   // visible tools for the current tier is never rendered.
-  var CATEGORY_ORDER = ['triggers', 'state', 'resets', 'infra', 'inspect', 'fixtures', 'env'];
+  // U4a: INSPECT moved to LAST — the readable diagnostics readout sits at
+  // the bottom of the shell (planning/DIAGNOSTIC_SHELL_PLAN.md §11 U4).
+  var CATEGORY_ORDER = ['triggers', 'state', 'resets', 'infra', 'fixtures', 'env', 'inspect'];
   // Each section carries its own icon (U2 — "icons everywhere", planning
   // §3.2), prepended to its <h3> in _renderShell() below.
   var CATEGORY_META = {
@@ -1026,6 +1154,47 @@
   // the FAB, and reserved for the inline dev-reset buttons a future unit
   // (U4) will add via category:'inline' registry entries (planning §5/§9).
   var DEV_MARKER = '⚙';
+
+  // ── U4a: collapsible GROUP wrappers (planning/DIAGNOSTIC_SHELL_PLAN.md
+  // §11 U4) ──────────────────────────────────────────────────────────────
+  // U1-U3 rendered every registry `group` as a flat, always-expanded
+  // .dsh-tool-subhead + .dsh-tool-grid (synthesized tools) or moved an
+  // anchor's markup straight into the category (migrated tools) — with 45
+  // TRIGGERS entries that made the shell one giant always-open scroll. Every
+  // group (anchor-based or synthesized) now becomes its own collapsible
+  // details.sub-panel, nested inside its category's own details.sub-panel,
+  // wired through the SAME _wireDynamicSubPanel() persistence helper the
+  // category itself already uses (Protocol 22/UI-1/UI-2) — not a second
+  // persistence mechanism. Defaults OPEN except the FIRE ANIMATION family
+  // (~28 buttons across its 3 tier-split groups), which defaults COLLAPSED
+  // so the shell opens compact.
+  function _dshGroupSlug(str) {
+    return String(str || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+  }
+  function _dshGroupDefaultOpen(headingText) {
+    return !/^FIRE ANIMATION/.test(headingText || '');
+  }
+  function _buildGroupDetails(cat, headingText, headingIcon) {
+    var groupDetails = document.createElement('details');
+    groupDetails.className = 'sub-panel';
+    groupDetails.setAttribute('data-sub-id', 'dsh_group_' + cat + '_' + _dshGroupSlug(headingText));
+    if (_dshGroupDefaultOpen(headingText)) groupDetails.setAttribute('open', '');
+    var groupSummary = document.createElement('summary');
+    var groupH3 = document.createElement('h3');
+    groupH3.textContent = '> ' + headingText;
+    var groupIcon = document.createElement('span');
+    groupIcon.className = 'dsh-section-icon';
+    groupIcon.setAttribute('aria-hidden', 'true');
+    groupIcon.textContent = (headingIcon || DEV_MARKER) + ' ';
+    groupH3.insertBefore(groupIcon, groupH3.firstChild);
+    groupSummary.appendChild(groupH3);
+    groupDetails.appendChild(groupSummary);
+    if (typeof _wireDynamicSubPanel === 'function') _wireDynamicSubPanel(groupDetails);
+    return groupDetails;
+  }
 
   function _paintEnvBanner(panel, tier) {
     var el = panel.querySelector('#dshEnvBanner');
@@ -1083,30 +1252,37 @@
       h3.insertBefore(secIcon, h3.firstChild);
       summary.appendChild(h3);
       details.appendChild(summary);
-      // U3: anchor-less tools (planning §4/§11 — the TRIGGERS catalog has no
-      // pre-existing markup to move) are synthesized as real <button>s here,
-      // grouped by the optional `group` field into their own labeled
-      // sub-heading + flex-wrap grid. Iterated in DIAGNOSTIC_SHELL_TOOLS
-      // array order, so same-group tools stay adjacent without needing a
-      // second pass or a sort. One more registry entry (icon/label/tooltip/
-      // action, no `anchor`) is the entire cost of a future trigger.
-      var curGroup = null;
-      var curGrid = null;
+      // U4a: every tool's `group` (anchor-based or synthesized) becomes its
+      // own collapsible details.sub-panel NESTED inside this category's
+      // details.sub-panel — _buildGroupDetails() above builds it (and wires
+      // its own persistence) the first time a group name is encountered;
+      // every later tool of the same group reuses the cached wrapper via
+      // groupWrappers[groupKey], regardless of whether it's an anchor tool
+      // or a synthesized button, and regardless of whether it actually ends
+      // up claiming anything (a shared-anchor tool that loses the `moved`
+      // race below still resolves to the SAME already-created wrapper, never
+      // a stray duplicate). One more registry entry (icon/label/tooltip/
+      // action/group, anchor optional) is the entire cost of a future
+      // trigger (Protocol 44).
+      var groupWrappers = {};
+      var groupGrids = {};
       visibleTools.forEach(function (tool) {
+        var groupName = tool.group || tool.label;
+        var groupKey = cat + '::' + groupName;
+        var wrapper = groupWrappers[groupKey];
+        if (!wrapper) {
+          wrapper = _buildGroupDetails(cat, groupName, tool.icon);
+          groupWrappers[groupKey] = wrapper;
+          details.appendChild(wrapper);
+        }
         if (!tool.anchor) {
-          if (tool.group && tool.group !== curGroup) {
-            var subhead = document.createElement('div');
-            subhead.className = 'dsh-tool-subhead';
-            subhead.textContent = tool.group;
-            details.appendChild(subhead);
-            curGroup = tool.group;
-            curGrid = null;
-          }
-          if (!curGrid) {
-            curGrid = document.createElement('div');
-            curGrid.className = 'dsh-tool-grid';
-            curGrid.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px';
-            details.appendChild(curGrid);
+          var grid = groupGrids[groupKey];
+          if (!grid) {
+            grid = document.createElement('div');
+            grid.className = 'dsh-tool-grid';
+            grid.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px';
+            wrapper.appendChild(grid);
+            groupGrids[groupKey] = grid;
           }
           var btn = document.createElement('button');
           btn.type = 'button';
@@ -1125,7 +1301,7 @@
           btn.addEventListener('click', function () {
             _invoke(tool);
           });
-          curGrid.appendChild(btn);
+          grid.appendChild(btn);
           return;
         }
         if (moved[tool.anchor]) return; // a shared anchor already placed
@@ -1150,7 +1326,7 @@
           toolIcon.textContent = (tool.icon || DEV_MARKER) + ' ';
           labelEl.insertBefore(toolIcon, labelEl.firstChild);
         }
-        details.appendChild(anchorEl); // moves the existing node — no markup rebuilt
+        wrapper.appendChild(anchorEl); // moves the existing node — no markup rebuilt
         moved[tool.anchor] = true;
       });
       if (typeof _wireDynamicSubPanel === 'function') _wireDynamicSubPanel(details);
@@ -1174,15 +1350,26 @@
       var q = input.value.trim().toLowerCase();
       var sections = panel.querySelectorAll('#dshSections > details.sub-panel');
       Array.prototype.forEach.call(sections, function (sec) {
-        var anchors = sec.querySelectorAll('[data-dsh-search]');
-        var anyVisible = !anchors.length; // an empty section (shouldn't happen) stays visible
-        Array.prototype.forEach.call(anchors, function (a) {
-          var hay = a.getAttribute('data-dsh-search') || '';
-          var show = !q || hay.indexOf(q) !== -1;
-          a.style.display = show ? '' : 'none';
-          if (show) anyVisible = true;
+        // U4a: a category's tools now live one level deeper, inside their own
+        // nested group details.sub-panel(s) — filter within each group too,
+        // so a search that matches nothing in a group hides that group's
+        // (now collapsible) heading, not just its individual controls.
+        var groups = sec.querySelectorAll('details.sub-panel');
+        var groupsList = groups.length ? Array.prototype.slice.call(groups) : [sec];
+        var anySectionVisible = false;
+        groupsList.forEach(function (grp) {
+          var anchors = grp.querySelectorAll('[data-dsh-search]');
+          var anyVisible = !anchors.length; // an empty group (shouldn't happen) stays visible
+          Array.prototype.forEach.call(anchors, function (a) {
+            var hay = a.getAttribute('data-dsh-search') || '';
+            var show = !q || hay.indexOf(q) !== -1;
+            a.style.display = show ? '' : 'none';
+            if (show) anyVisible = true;
+          });
+          if (grp !== sec) grp.style.display = anyVisible ? '' : 'none';
+          if (anyVisible) anySectionVisible = true;
         });
-        sec.style.display = anyVisible ? '' : 'none';
+        sec.style.display = anySectionVisible ? '' : 'none';
       });
     });
   }
@@ -1274,6 +1461,10 @@
     document.addEventListener('keydown', _shellKeydown, true);
     var closeBtn = document.getElementById('dshClose');
     if (closeBtn) closeBtn.focus();
+    // U4a: refresh the async INSPECT readouts (cache revision, SW internals)
+    // every time the drawer opens — cheap, and keeps them from going stale
+    // across a long session without polling them on the 500ms tick.
+    if (typeof _updateInspectAsync === 'function') _updateInspectAsync(panel);
   }
 
   function _closeShell() {
@@ -2040,8 +2231,212 @@
     });
   }
 
+  // ── U4a: INSPECT BUILD-OUT (planning/DIAGNOSTIC_SHELL_PLAN.md §3.1/§11 U4)
+  // A read-only "system diagnostics" readout — the owner directive is that
+  // this NEVER renders a raw JSON blob, in staging OR prod. Every builder
+  // below returns already-escaped, labeled HTML lines built from
+  // _chassisIdRow()/_chassisBreaker() (js/ui-core.js, the CHASSIS SYSTEM
+  // STATUS board's own readable-row helpers — reused verbatim, Protocol 22,
+  // never a second raw-dump renderer) — never JSON.stringify. Every function
+  // here only READS state/globals; none of them ever write.
+  var _INSPECT_FLAG_KEYS = [
+    'cloudSync',
+    'googleSignIn',
+    'aiChat',
+    'keySync',
+    'saveMigration',
+    'offlineQueue',
+    'visualOcr',
+    'visualAiVision',
+  ];
+  function _inspectRow(label, val) {
+    if (typeof _chassisIdRow === 'function') return _chassisIdRow(label, val);
+    // Fail-safe fallback (should never trigger — _chassisIdRow ships in
+    // ui-core.js, always loaded before this file — Protocol 22 reuse is the
+    // real path): a labeled line in the SAME .dsh-inspect-line style.
+    return (
+      '<div class="dsh-inspect-line"><b>' +
+      escapeHtml(label) +
+      '</b><span>' +
+      escapeHtml(val === undefined || val === null ? '—' : String(val)) +
+      '</span></div>'
+    );
+  }
+  function _inspectVitalsHtml() {
+    try {
+      if (typeof state === 'undefined' || !state) return '<div>NO CAMPAIGN LOADED</div>';
+      var gameLabel = 'UNKNOWN';
+      if (typeof GAME_DEFS !== 'undefined' && typeof getGameContext === 'function') {
+        var def = GAME_DEFS[getGameContext()];
+        if (def && def.label) gameLabel = def.label;
+      }
+      var activeDirectives = Array.isArray(state.quests)
+        ? state.quests.filter(function (q) {
+            return String((q && q.status) || 'active').toLowerCase() === 'active';
+          }).length
+        : 0;
+      return (
+        _inspectRow('GAME', gameLabel) +
+        _inspectRow('LEVEL', state.lvl) +
+        _inspectRow('XP', state.xp) +
+        _inspectRow('HP', String(state.hpCur) + ' / ' + String(state.hpMax)) +
+        _inspectRow('LOCATION', state.loc || 'UNKNOWN') +
+        _inspectRow('CAPS', state.caps) +
+        _inspectRow('KARMA', state.karma) +
+        _inspectRow('ACTIVE DIRECTIVES', activeDirectives)
+      );
+    } catch (_) {
+      return '<div>UNAVAILABLE</div>';
+    }
+  }
+  function _inspectConnectionHtml() {
+    try {
+      var carrier = typeof window._isUplinkConnected === 'function' && window._isUplinkConnected();
+      var aiOn =
+        typeof window.isFeatureEnabled !== 'function' ||
+        window.isFeatureEnabled('aiChat') !== false;
+      var online = typeof navigator === 'undefined' || navigator.onLine !== false;
+      return (
+        (typeof _chassisBreaker === 'function'
+          ? _chassisBreaker('CARRIER', carrier, true, 'CONNECTED', 'OFFLINE')
+          : _inspectRow('CARRIER', carrier ? 'CONNECTED' : 'OFFLINE')) +
+        _inspectRow('AI CHAT', aiOn ? 'ENABLED' : 'DISABLED') +
+        _inspectRow('NETWORK', online ? 'ONLINE' : 'OFFLINE')
+      );
+    } catch (_) {
+      return '<div>UNAVAILABLE</div>';
+    }
+  }
+  function _inspectFlagsHtml() {
+    try {
+      if (typeof window.isFeatureEnabled !== 'function')
+        return '<div>FLAG SYSTEM UNAVAILABLE</div>';
+      return _INSPECT_FLAG_KEYS
+        .map(function (k) {
+          var on = window.isFeatureEnabled(k) !== false;
+          return typeof _chassisBreaker === 'function'
+            ? _chassisBreaker(k.toUpperCase(), on, false, 'ENABLED', 'DISABLED')
+            : _inspectRow(k, on ? 'ENABLED' : 'DISABLED');
+        })
+        .join('');
+    } catch (_) {
+      return '<div>UNAVAILABLE</div>';
+    }
+  }
+  // Staging-only: readable readout of the LOCAL last-known-good feature-flag
+  // cache — reports PRESENCE + a count, never dumps the raw cached object.
+  function _inspectFlagsInternalHtml() {
+    try {
+      var raw =
+        window.MetaStore && typeof window.MetaStore.get === 'function'
+          ? window.MetaStore.get('robco_feature_flags')
+          : null;
+      var count = 0;
+      if (raw) {
+        try {
+          var parsed = JSON.parse(raw);
+          count = parsed && typeof parsed === 'object' ? Object.keys(parsed).length : 0;
+        } catch (_) {
+          /* malformed cache — count stays 0, presence still reported */
+        }
+      }
+      return (
+        _inspectRow('LOCAL LKG CACHE', raw ? 'PRESENT' : 'ABSENT') +
+        _inspectRow('CACHED FLAG COUNT', count)
+      );
+    } catch (_) {
+      return '<div>UNAVAILABLE</div>';
+    }
+  }
+  // Async readouts (Cache Storage / Service Worker registration) — resolved
+  // once at mount + once per drawer open (never on the 500ms tick, since
+  // this data rarely changes mid-session — see _wireLiveRefresh()).
+  function _updateInspectAsync(panel) {
+    if (!panel) return;
+    var deviceEl = panel.querySelector('#dshInspectDevice');
+    if (deviceEl) {
+      var appVersionLine = _inspectRow('APP VERSION', window.APP_VERSION || 'UNKNOWN');
+      if (typeof _readActiveCacheName === 'function') {
+        _readActiveCacheName(function (cacheName) {
+          deviceEl.innerHTML =
+            appVersionLine + _inspectRow('CACHE REVISION', cacheName || 'NONE ACTIVE');
+        });
+      } else {
+        deviceEl.innerHTML = appVersionLine + _inspectRow('CACHE REVISION', 'UNSUPPORTED');
+      }
+    }
+    var swEl = panel.querySelector('#dshInspectSwInternal');
+    if (
+      swEl &&
+      typeof navigator !== 'undefined' &&
+      navigator.serviceWorker &&
+      typeof navigator.serviceWorker.getRegistration === 'function'
+    ) {
+      navigator.serviceWorker
+        .getRegistration()
+        .then(function (reg) {
+          swEl.innerHTML = reg
+            ? _inspectRow('REGISTRATION', 'PRESENT') +
+              _inspectRow('SCOPE', reg.scope || '—') +
+              _inspectRow('ACTIVE WORKER', reg.active ? 'YES' : 'NO') +
+              _inspectRow('WAITING WORKER', reg.waiting ? 'YES' : 'NO') +
+              _inspectRow('INSTALLING WORKER', reg.installing ? 'YES' : 'NO')
+            : _inspectRow('REGISTRATION', 'ABSENT');
+        })
+        .catch(function () {
+          swEl.innerHTML = _inspectRow('REGISTRATION', 'UNAVAILABLE');
+        });
+    } else if (swEl) {
+      swEl.innerHTML = _inspectRow('SERVICE WORKER', 'UNSUPPORTED');
+    }
+  }
+  // Synchronous INSPECT readouts — folded into the existing 500ms live-
+  // refresh tick (_refresh(), below) alongside RUNTIME STATE/OBSERVERS
+  // rather than a second competing timer (Protocol 22).
+  function _wireInspectRefresh(panel) {
+    var vitalsEl = panel.querySelector('#dshInspectVitals');
+    if (vitalsEl) vitalsEl.innerHTML = _inspectVitalsHtml();
+    var connEl = panel.querySelector('#dshInspectConnection');
+    if (connEl) connEl.innerHTML = _inspectConnectionHtml();
+    var flagsEl = panel.querySelector('#dshInspectFlags');
+    if (flagsEl) flagsEl.innerHTML = _inspectFlagsHtml();
+    var flagsIntEl = panel.querySelector('#dshInspectFlagsInternal');
+    if (flagsIntEl) flagsIntEl.innerHTML = _inspectFlagsInternalHtml();
+  }
+  // COPY DIAGNOSTICS — copies the READABLE rendered INSPECT text (the actual
+  // DOM textContent already built by the functions above), never a
+  // JSON.stringify of state/config. Read-only: nothing here writes.
+  function _copyDiagnostics(panel, statusEl) {
+    try {
+      var section = panel.querySelector('[data-sub-id="dsh_inspect"]');
+      var text = section ? section.textContent.replace(/[ \t]+\n/g, '\n').trim() : '';
+      if (
+        text &&
+        typeof navigator !== 'undefined' &&
+        navigator.clipboard &&
+        typeof navigator.clipboard.writeText === 'function'
+      ) {
+        navigator.clipboard.writeText(text);
+        if (statusEl) statusEl.textContent = 'COPIED';
+      } else if (statusEl) {
+        statusEl.textContent = 'CLIPBOARD UNAVAILABLE';
+      }
+    } catch (_) {
+      if (statusEl) statusEl.textContent = 'COPY FAILED';
+    }
+  }
+  function _wireInspectCopy(panel) {
+    var btn = panel.querySelector('#dshInspectCopyBtn');
+    if (!btn) return;
+    var statusEl = panel.querySelector('#dshInspectCopyStatus');
+    btn.addEventListener('click', function () {
+      _copyDiagnostics(panel, statusEl);
+    });
+  }
+
   function _refresh(panel) {
     try {
+      _wireInspectRefresh(panel);
       var stateEl = panel.querySelector('#testConsoleState');
       if (
         stateEl &&
@@ -2113,6 +2508,7 @@
       _wireOcrTest(panel);
       _wireVisualParseTest(panel);
       _wireImmersionSelect(panel);
+      _wireInspectCopy(panel);
       _wireSearch(panel);
       _wireShellToggle();
       _wireFabDrag();
@@ -2120,6 +2516,7 @@
       _wireSheetResize();
       _wireLiveRefresh(panel);
       _refresh(panel);
+      _updateInspectAsync(panel);
     } catch (_) {
       /* fail-safe: a console failure can never break boot or leak to production */
     }

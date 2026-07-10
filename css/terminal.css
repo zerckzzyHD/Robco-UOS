@@ -2094,19 +2094,35 @@ details.panel:not([open]) summary h2 {
   margin-right: 5px;
   color: var(--bezel-wire, var(--robco-green));
 }
-/* U3: a display-only group label (registry `group` field) dividing a
-   section's synthesized button grid (js/test-console.js _renderShell()) —
-   e.g. TRIGGERS' LIVING CORE / BOOT FLAVOR / CEREMONIES / FIRE ANIMATION
-   groups. Not itself a search target — only its buttons are. */
-.dsh-tool-subhead {
-  font-size: 10px;
-  letter-spacing: 0.05em;
-  opacity: 0.65;
-  margin: 8px 0 4px;
-  text-transform: uppercase;
+/* U4a: every registry `group` (e.g. TRIGGERS' LIVING CORE / BOOT FLAVOR /
+   CEREMONIES / FIRE ANIMATION, or an anchor's FORCE TRANSITION / VIEW-ONCE
+   CEREMONIES / etc.) is now its own collapsible details.sub-panel NESTED
+   inside the category's details.sub-panel — see _buildGroupDetails() in
+   js/test-console.js. The plain .sub-panel rule below already styles it
+   (border-top + summary cursor); the retired .dsh-tool-subhead (a flat,
+   always-expanded label div) is gone — a collapsible heading replaces it.
+   .dsh-tool-grid (the synthesized-button flex-wrap row) is unchanged. */
+
+/* U4a: a labeled read-only INSPECT line (js/test-console.js _inspectRow(),
+   shared with _chassisIdRow()) — human-readable "LABEL: VALUE" text only,
+   never a raw data dump. */
+.dsh-inspect-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  padding: 2px 0;
+  flex-wrap: wrap;
 }
-.dsh-tool-subhead:first-child {
-  margin-top: 0;
+.dsh-inspect-line b {
+  font-weight: normal;
+  opacity: 0.6;
+}
+.dsh-inspect-line span {
+  text-align: right;
+  overflow-wrap: break-word;
+  min-width: 0;
 }
 
 /* ─── Sub-Panel (nested <details> inside a top-level panel) ──────── */

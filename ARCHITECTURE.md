@@ -72,8 +72,8 @@
 ├── js/vendor/                 Self-hosted Tesseract.js (Apache-2.0) — main API, worker, wasm core
 ├── assets/ocr/                Vendored OCR language data (eng.traineddata.gz, runtime-cached)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2864-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2864-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2880-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2880-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -421,7 +421,7 @@ ON`) fixes this: it is hidden by default and shown **only** via the SAME `body.r
 
 ---
 
-## Developer Console / Diagnostic Shell (`js/test-console.js` — Step 2 · Phase 2, Diagnostic Shell U1/U2)
+## Developer Console / Diagnostic Shell (`js/test-console.js` — Step 2 · Phase 2, Diagnostic Shell U1-U4a)
 
 **This IS the canonical developer/debug console** — the same one the roadmap's hacking minigame will later unlock in normal builds, not a separate throwaway test panel. A live inspector + trigger panel for the Ambient Runtime, built to keep pace with the accumulating Phase-2 ambient features (UPLINK, Hardware Life, etc. — each future feature adds one more registry entry here).
 
@@ -462,6 +462,12 @@ Guarded by Suite 149 (both runners: staging-gate fail-safe both-sides, no-durabl
 - **FIX 5 — constant-size bezel dock (`terminal.css` only, no JS).** The mobile `.telemetry` rule (the `▸ SUBSYSTEM …` status strip inside the fixed `.bezel` dock) is pinned to a deterministic `height: 36px; line-height: 13px;` with `-webkit-line-clamp: 2`, so the dock can no longer grow or shrink with the live status text's length (which varies by subsystem and campaign state — reproduced live: 99px vs 110px+ at 360px before the fix).
 
 Guarded by Suite 213 (both runners, 8 tests): the base/mobile CSS split for the drawer/scrim/FAB-highlight (desktop untouched), the drag-handle/expand-toggle template markup + `_setSheetVh()` choke point, the FAB-drag mobile gate + MetaStore persistence, the glyph-centering rule, the bezel `.telemetry` fixed-height rule, and two Protocol 42 regression guards for the `box-sizing:border-box` overflow fix and the id-vs-class CSS specificity mismatch (an earlier version's `.dsh-drag-handle{display:flex}` show rule — lower specificity than the `#dshDragHandle{display:none}` id-selector hide rule — always lost regardless of source order, silently keeping the handle hidden on mobile until caught live).
+
+**Diagnostic Shell U4a (`planning/DIAGNOSTIC_SHELL_PLAN.md` §3.1/§11 U4, Protocol 8) — collapsible groups + INSPECT build-out.** With the U3 TRIGGERS catalog landed, a 45-tool category made the shell one giant always-expanded scroll: every registry `group` (not just the top-level CATEGORY) is now its own nested collapsible `details.sub-panel`, built by `_buildGroupDetails(cat, headingText, headingIcon)` and wired through the SAME `_wireDynamicSubPanel()` persistence helper the category itself uses (Protocol 22/UI-1/UI-2 — not a second mechanism). `_dshGroupDefaultOpen(headingText)` defaults every group OPEN except any heading starting with `FIRE ANIMATION` (the ~28 buttons across its 3 tier-split groups), which defaults COLLAPSED so the shell opens compact. `_renderShell()`'s per-tool loop now resolves a `groupKey` (`tool.group || tool.label`) per category, builds the wrapper on first encounter, and reuses it for every later tool of that group — whether the tool is anchor-based (an existing `.input-group` moved in) or synthesized (a `.dsh-tool-btn` in a `.dsh-tool-grid`). The retired flat `.dsh-tool-subhead` label div (a non-collapsible group heading) is gone.
+
+**INSPECT rebuild.** `CATEGORY_ORDER` moves `'inspect'` to the LAST slot, so the readout renders at the bottom of the shell. INSPECT is a read-only "system diagnostics" readout — **never a raw JSON blob**, in staging or production — grouped into **VITALS & CAMPAIGN SUMMARY** (`_inspectVitalsHtml()`: game/level/XP/HP/location/caps/karma/active-directive-count, reading `state`/`GAME_DEFS[getGameContext()].label`), **DEVICE / SYSTEM** (the migrated `RUNTIME STATE`/`REGISTERED OBSERVERS` anchors plus new `DEVICE DETAIL` — app version + active Cache Storage revision via the existing `_readActiveCacheName()`, ui-core.js — and a staging-only `SERVICE WORKER INTERNALS` board), **CONNECTION** (`_inspectConnectionHtml()`: carrier/AI chat/network, reusing `_isUplinkConnected()`), and **FLAGS** (`_inspectFlagsHtml()`: a readable ENABLED/DISABLED line per known flag, plus a staging-only `FEATURE FLAGS — RAW CACHE` presence/count readout). Every field is built from `_chassisIdRow()`/`_chassisBreaker()` — the CHASSIS SYSTEM STATUS board's own labeled-row helpers (Protocol 22, reused verbatim, never a parallel raw-dump renderer). The readable summary (7 of the 9 `inspect-*` tools) is `tier:'prod'` — safe on a minigame-unlocked production build, the same class of telemetry a network tab already reveals; the 2 genuinely dev-only internals stay `tier:'staging'`, still rendered as labeled text, never `JSON.stringify`. A `COPY DIAGNOSTICS` button (`_copyDiagnostics()`) copies the rendered section's own `textContent` — the already-readable DOM — via `navigator.clipboard.writeText`, never a fresh state dump. INSPECT is fully read-only: none of its functions ever call `saveState()`/`MetaStore.set()`/assign `state.*`.
+
+Guarded by Suite 214 (both runners, 16 tests): the group-collapse default-open/collapsed rule (static + a Node `vm`-sandbox behavioral proof against both a synthetic and the real registry), `_buildGroupDetails()`'s shape and its `_wireDynamicSubPanel()` reuse, that every migrated U1 tool now carries an explicit `group`, `CATEGORY_ORDER`'s `'inspect'`-last placement, the 7 new INSPECT tool ids/categories/anchors, the prod/staging tier + all-read-only (`destructive:false`) split across the 9 `inspect-*` tools, a static "never `JSON.stringify`" guard across every INSPECT builder function, a static read-only guard (no `saveState`/`MetaStore.set`/`robco_v8`/state-write), Node `vm`-sandbox behavioral proofs of `_inspectVitalsHtml()`/`_inspectConnectionHtml()`/`_inspectFlagsHtml()` against synthetic globals, and the atmosphere/save boundary + game-agnosticism extended to every new U4a function by name.
 
 ---
 
@@ -3033,7 +3039,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2864-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2880-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

@@ -36039,7 +36039,10 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
         'fire-pending-effect-warmup',
       ];
       ok212 =
-        tools212.length === 54 &&
+        // U4a (Suite 214) added 7 new INSPECT tools on top of this unit's 54
+        // (9 U1 + 45 U3) — the total below reflects that later addition;
+        // this test's own scope stays the 45 U3-specific ids.
+        tools212.length === 61 &&
         expectedNew212.length === 45 &&
         expectedNew212.every(id => toolIds212.includes(id)) &&
         new Set(toolIds212).size === toolIds212.length; // no duplicate ids
@@ -36048,7 +36051,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     }
     assert(
       ok212,
-      '212.1: DIAGNOSTIC_SHELL_TOOLS registers all 45 new U3 tool ids (living core states/flare/burst, boot flavors, ceremonies M1-M5, day/night, fire-anim bus events, fire-pending animations) with no duplicate id, for an exact total of 54' +
+      '212.1: DIAGNOSTIC_SHELL_TOOLS registers all 45 new U3 tool ids (living core states/flare/burst, boot flavors, ceremonies M1-M5, day/night, fire-anim bus events, fire-pending animations) with no duplicate id, for a total of 61 (54 from U1+U3 plus the 7 U4a INSPECT tools added in Suite 214)' +
         (err212 ? ' — ' + err212.message : '')
     );
   }
@@ -36056,7 +36059,10 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   // 212.2  every new U3 tool carries no `anchor` (the synthesis path
   //        applies) and _renderShell() actually implements that synthesis:
   //        creates a real <button>, wires it through _invoke(tool), and
-  //        groups by the `group` field into a labeled sub-heading.
+  //        groups by the `group` field into its own collapsible wrapper
+  //        (U4a's _buildGroupDetails() — see Suite 214 — replaced the flat
+  //        always-expanded .dsh-tool-subhead label div this test originally
+  //        checked for).
   {
     let ok212 = false;
     let err212 = null;
@@ -36071,23 +36077,24 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
           t.id !== 'wake-active' &&
           t.id !== 'a11y-immersion' &&
           t.id !== 'inspect-observers' &&
-          t.id !== 'replay-hatch'
+          t.id !== 'replay-hatch' &&
+          !t.id.startsWith('inspect-') // the 7 U4a INSPECT tools (Suite 214) aren't part of U3's 45
       );
       const renderShellBody212 = extractFunctionBody(testConsole212, '_renderShell');
       ok212 =
         newTools212.length === 45 &&
         newTools212.every(t => !t.anchor) &&
-        /dsh-tool-subhead/.test(renderShellBody212) &&
+        /_buildGroupDetails\(/.test(renderShellBody212) &&
         /dsh-tool-grid/.test(renderShellBody212) &&
         /dsh-tool-btn/.test(renderShellBody212) &&
         /_invoke\(tool\)/.test(renderShellBody212) &&
-        /tool\.group\s*&&\s*tool\.group\s*!==\s*curGroup/.test(renderShellBody212);
+        /var groupName = tool\.group \|\| tool\.label;/.test(renderShellBody212);
     } catch (e) {
       err212 = e;
     }
     assert(
       ok212,
-      "212.2: every new U3 tool carries no `anchor`, and _renderShell()'s synthesis path builds a real .dsh-tool-btn button (wired through _invoke(tool)) grouped by the tool's `group` field into a .dsh-tool-subhead + .dsh-tool-grid — a future trigger with zero index.html markup" +
+      "212.2: every new U3 tool carries no `anchor`, and _renderShell()'s synthesis path builds a real .dsh-tool-btn button (wired through _invoke(tool)) inside a .dsh-tool-grid nested in its own collapsible group (via U4a's _buildGroupDetails(), keyed by the tool's `group` field) — a future trigger with zero index.html markup" +
         (err212 ? ' — ' + err212.message : '')
     );
   }
@@ -36159,6 +36166,16 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
         ];
         function _paintEnvBanner() {}
         function _wireDynamicSubPanel() {}
+        // U4a stub: mirrors the real _buildGroupDetails() shape (sub-panel
+        // class + data-sub-id) closely enough to prove _renderShell()'s own
+        // nesting/reuse logic — the REAL _buildGroupDetails() source itself
+        // is independently locked by Suite 214.
+        function _buildGroupDetails(cat, headingText, headingIcon) {
+          var gd = document.createElement('details');
+          gd.className = 'sub-panel';
+          gd.setAttribute('data-sub-id', 'dsh_group_' + cat + '_' + String(headingText).toLowerCase());
+          return gd;
+        }
         function _renderShell(panel) ${bodySrc212}
       `;
       const document212 = {
@@ -36174,11 +36191,19 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       );
       sandbox212._renderShellRef(panel212);
       const details212 = sectionsHost212.children[0];
-      const subheadNode212 = details212.children.find(c => c.className === 'dsh-tool-subhead');
-      const gridNode212 = details212.children.find(c => c.className === 'dsh-tool-grid');
+      const groupWrapper212 = details212.children.find(c => c.className === 'sub-panel');
+      const gridNode212 = groupWrapper212
+        ? groupWrapper212.children.find(c => c.className === 'dsh-tool-grid')
+        : null;
       const btns212 = gridNode212 ? gridNode212.children : [];
+      const groupWrapperCount212 = details212.children.filter(
+        c => c.className === 'sub-panel'
+      ).length;
       ok212 =
-        !!subheadNode212 && subheadNode212.textContent === 'GROUP ONE' && btns212.length === 2;
+        !!groupWrapper212 &&
+        String(groupWrapper212.attrs['data-sub-id']).indexOf('dsh_group_triggers_') === 0 &&
+        groupWrapperCount212 === 1 && // both synthetic-a/synthetic-b share ONE group wrapper (not two)
+        btns212.length === 2;
       if (ok212) {
         btns212[0]._fire('click');
         ok212 = sandbox212._invokedRef() === 'synthetic-a';
@@ -36188,7 +36213,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     }
     assert(
       ok212,
-      '212.3: BEHAVIORAL — _renderShell(), run against a synthetic DOM with two anchor-less tools sharing a `group`, builds ONE .dsh-tool-subhead + .dsh-tool-grid holding both synthesized buttons, and clicking the first fires _invoke() with that exact tool' +
+      '212.3: BEHAVIORAL — _renderShell(), run against a synthetic DOM with two anchor-less tools sharing a `group`, builds ONE collapsible group wrapper (via _buildGroupDetails()) holding ONE .dsh-tool-grid with both synthesized buttons, and clicking the first fires _invoke() with that exact tool' +
         (err212 ? ' — ' + err212.message : '')
     );
   }
@@ -36481,16 +36506,19 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 
   // 212.13  mobile fit: the synthesized tool grid is a flex-wrap container
   //         (never a fixed-width row that could overflow at 360/412px), and
-  //         .dsh-tool-subhead is a real, styled CSS rule (not unstyled
-  //         block text) — CSS-in-JS via cssText plus a terminal.css rule.
+  //         every synthesized button reuses the existing .btn-sm class. The
+  //         formerly-checked .dsh-tool-subhead rule is retired (U4a, Suite
+  //         214) in favor of every group being its own collapsible
+  //         details.sub-panel, styled by the pre-existing generic
+  //         details.sub-panel rule.
   {
     const renderShellBody212 = extractFunctionBody(testConsole212, '_renderShell');
     const css212 = readFile('css/terminal.css');
     assert(
       /flex-wrap:\s*wrap/.test(renderShellBody212) &&
-        /\.dsh-tool-subhead\s*\{/.test(css212) &&
+        !/\.dsh-tool-subhead\s*\{/.test(css212) &&
         /btn-sm dsh-tool-btn/.test(renderShellBody212),
-      '212.13: the synthesized tool grid is a flex-wrap container (no fixed-width overflow risk at 360/412px), every synthesized button reuses the existing .btn-sm class (an established >=28px Protocol 17 tap target), and .dsh-tool-subhead is a real terminal.css rule'
+      '212.13: the synthesized tool grid is a flex-wrap container (no fixed-width overflow risk at 360/412px), every synthesized button reuses the existing .btn-sm class (an established >=28px Protocol 17 tap target), and the retired .dsh-tool-subhead CSS RULE stays gone (U4a replaced it with collapsible group wrappers) — a documentation mention of the retired class name in a comment is fine'
     );
   }
 
@@ -36772,6 +36800,555 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       /#dshExpandToggle\s*\{\s*display:\s*inline-block;\s*\}/.test(mobileCss213),
     '213.8: [Protocol 42 regression guard] both #dshDragHandle and #dshExpandToggle are hidden by an id-selector display:none base rule, and shown by an EQUAL-specificity id-selector rule inside the mobile block — a class-selector show rule (lower specificity than an id) would always lose to the id-based hide rule regardless of source order, exactly the bug this locks against'
   );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 214 — Diagnostic Shell U4a: collapsible groups + INSPECT build-out
+//  (planning/DIAGNOSTIC_SHELL_PLAN.md §3.1/§11 U4, Protocol 8 Sonnet stage)
+//  (16 tests)
+// ──────────────────────────────────────────────────────────────
+//  Two U4a deliverables: (1) EVERY registry `group` (not just the top-level
+//  CATEGORY) is now its own collapsible details.sub-panel, nested inside its
+//  category's, persisted through the SAME _wireDynamicSubPanel() helper the
+//  category itself uses — defaulting OPEN except the FIRE ANIMATION family
+//  (~28 buttons across its 3 tier-split groups), which defaults COLLAPSED so
+//  the shell opens compact; (2) INSPECT is rebuilt into a read-only "system
+//  diagnostics" readout, grouped VITALS & CAMPAIGN SUMMARY / DEVICE & SYSTEM
+//  / CONNECTION / FLAGS, and moved to the LAST category in CATEGORY_ORDER.
+//  The readout NEVER renders a raw JSON blob — every field is a labeled,
+//  human-readable line built from the CHASSIS SYSTEM STATUS board's own
+//  _chassisIdRow()/_chassisBreaker() row helpers (Protocol 22, reused, not
+//  forked). The readable summary is tier:'prod' (safe on a minigame-unlocked
+//  production build); genuinely dev-only internals (SW registration guts,
+//  the raw feature-flag LKG cache) stay tier:'staging', still rendered as
+//  labeled text. INSPECT is fully read-only — nothing in it ever writes.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 214 — Diagnostic Shell U4a: collapsible groups + INSPECT build-out');
+  const testConsole214 = readFile('js/test-console.js');
+  const index214 = readFile('index.html');
+  const tplStart214 = index214.indexOf('<template id="testConsoleTemplate">');
+  const tplEnd214 = index214.indexOf('</template>', tplStart214);
+  const tplSrc214 = tplStart214 !== -1 ? index214.slice(tplStart214, tplEnd214) : '';
+
+  function _evalRealTools214() {
+    const toolsStart = testConsole214.indexOf('var DIAGNOSTIC_SHELL_TOOLS = [');
+    const toolsEnd = testConsole214.indexOf('\n  ];', toolsStart) + '\n  ];'.length;
+    const toolsSrc = testConsole214.slice(toolsStart, toolsEnd);
+    const replayHatchBody = extractFunctionBody(testConsole214, '_replayHatch');
+    const stubs = [
+      '_replayHatch',
+      '_fireAnimEvent',
+      '_fireFactionThreshold',
+      '_fireLocationVisited',
+      '_fireLocationCurrent',
+      '_fireCollectibleAcquired',
+      '_fireLevelUp',
+      '_firePendingRepStamp',
+      '_firePendingQuestStamp',
+      '_firePendingQuestFiled',
+      '_firePendingExhibitLight',
+      '_firePendingSurveyPing',
+      '_firePendingPerkSeat',
+      '_firePendingEffectWarmup',
+      '_fireBootFlavor',
+      '_replayIgnition',
+      '_replayGreet',
+      '_replayFirmware',
+      '_replayAbsence',
+      '_replaySeat',
+      '_toggleDayNight',
+    ]
+      .filter(n => n !== '_replayHatch')
+      .map(n => `function ${n}() {}`)
+      .join('\n');
+    const src = `(function () {
+      function _replayHatch() ${replayHatchBody}
+      ${stubs}
+      ${toolsSrc}
+      return DIAGNOSTIC_SHELL_TOOLS;
+    })()`;
+    return eval(src);
+  }
+
+  // 214.1  _dshGroupDefaultOpen() source: collapses ONLY headings starting
+  //        with "FIRE ANIMATION", true (open) otherwise.
+  {
+    const body214 = extractFunctionBody(testConsole214, '_dshGroupDefaultOpen');
+    assert(
+      /!\/\^FIRE ANIMATION\//.test(body214),
+      '214.1: _dshGroupDefaultOpen() collapses (returns false) only for a heading matching /^FIRE ANIMATION/ — every other group/anchor defaults open'
+    );
+  }
+
+  // 214.2  BEHAVIORAL: _dshGroupDefaultOpen() actually executed against a
+  //        FIRE ANIMATION heading (false) vs a non-FIRE-ANIMATION heading
+  //        (true), including the two other FIRE ANIMATION variant titles.
+  {
+    let ok214 = false;
+    let err214 = null;
+    try {
+      const body214 = extractFunctionBody(testConsole214, '_dshGroupDefaultOpen');
+      const fn214 = new Function('headingText', body214.slice(1, -1));
+      ok214 =
+        fn214('FIRE ANIMATION') === false &&
+        fn214('FIRE ANIMATION (WRITES EVENT LOG)') === false &&
+        fn214('FIRE ANIMATION (PENDING)') === false &&
+        fn214('LIVING CORE') === true &&
+        fn214('FORCE TRANSITION') === true &&
+        fn214('VITALS & CAMPAIGN SUMMARY') === true;
+    } catch (e) {
+      err214 = e;
+    }
+    assert(
+      ok214,
+      '214.2: BEHAVIORAL — _dshGroupDefaultOpen() returns false (collapsed) for all 3 real FIRE ANIMATION group titles, and true (open) for LIVING CORE / FORCE TRANSITION / VITALS & CAMPAIGN SUMMARY' +
+        (err214 ? ' — ' + err214.message : '')
+    );
+  }
+
+  // 214.3  _buildGroupDetails() static shape: className='sub-panel', a
+  //        'dsh_group_'-prefixed data-sub-id, a conditional `open` attribute
+  //        gated on _dshGroupDefaultOpen(), an '> HEADING' <h3> summary with
+  //        an icon (Protocol UI-1), and reuses _wireDynamicSubPanel() (not a
+  //        second persistence mechanism, Protocol 22).
+  {
+    const body214 = extractFunctionBody(testConsole214, '_buildGroupDetails');
+    assert(
+      /groupDetails\.className = 'sub-panel'/.test(body214) &&
+        /setAttribute\('data-sub-id', 'dsh_group_' \+ cat \+ '_' \+ _dshGroupSlug\(headingText\)\)/.test(
+          body214
+        ) &&
+        /_dshGroupDefaultOpen\(headingText\)/.test(body214) &&
+        /groupDetails\.setAttribute\('open', ''\)/.test(body214) &&
+        /groupH3\.textContent = '> ' \+ headingText/.test(body214) &&
+        /_wireDynamicSubPanel\(groupDetails\)/.test(body214),
+      "214.3: _buildGroupDetails() builds a details.sub-panel with a 'dsh_group_'-prefixed data-sub-id, an open attribute conditioned on _dshGroupDefaultOpen(), an '> HEADING' <h3> summary, and wires it through the existing _wireDynamicSubPanel() persistence helper"
+    );
+  }
+
+  // 214.4  BEHAVIORAL (Node vm sandbox): _buildGroupDetails() actually
+  //        executed — a FIRE ANIMATION heading produces NO `open` attribute
+  //        (collapsed by default); a non-FIRE-ANIMATION heading DOES get
+  //        one (open by default); and _wireDynamicSubPanel() is invoked
+  //        with the created element both times.
+  {
+    let ok214 = false;
+    let err214 = null;
+    try {
+      const vm214 = require('vm');
+      const slugBody214 = extractFunctionBody(testConsole214, '_dshGroupSlug');
+      const defaultOpenBody214 = extractFunctionBody(testConsole214, '_dshGroupDefaultOpen');
+      const buildBody214 = extractFunctionBody(testConsole214, '_buildGroupDetails');
+      function makeEl214() {
+        return {
+          className: '',
+          attrs: {},
+          children: [],
+          setAttribute(k, v) {
+            this.attrs[k] = v;
+          },
+          insertBefore(child) {
+            this.children.unshift(child);
+          },
+          appendChild(child) {
+            this.children.push(child);
+            return child;
+          },
+        };
+      }
+      const src214 = `
+        var DEV_MARKER = '⚙';
+        var _wiredEls = [];
+        function _wireDynamicSubPanel(el) { _wiredEls.push(el); }
+        function _dshGroupSlug(str) ${slugBody214}
+        function _dshGroupDefaultOpen(headingText) ${defaultOpenBody214}
+        function _buildGroupDetails(cat, headingText, headingIcon) ${buildBody214}
+      `;
+      const document214 = { createElement: () => makeEl214() };
+      const sandbox214 = { document: document214, console };
+      vm214.createContext(sandbox214);
+      vm214.runInContext(
+        src214 +
+          '\nthis._buildGroupDetailsRef = _buildGroupDetails; this._wiredCountRef = function () { return _wiredEls.length; };',
+        sandbox214
+      );
+      const fireAnimGroup214 = sandbox214._buildGroupDetailsRef('triggers', 'FIRE ANIMATION', '⚠');
+      const livingCoreGroup214 = sandbox214._buildGroupDetailsRef('triggers', 'LIVING CORE', '●');
+      ok214 =
+        fireAnimGroup214.attrs.open === undefined &&
+        livingCoreGroup214.attrs.open === '' &&
+        fireAnimGroup214.className === 'sub-panel' &&
+        fireAnimGroup214.attrs['data-sub-id'] === 'dsh_group_triggers_fire_animation' &&
+        sandbox214._wiredCountRef() === 2;
+    } catch (e) {
+      err214 = e;
+    }
+    assert(
+      ok214,
+      "214.4: BEHAVIORAL — _buildGroupDetails('triggers','FIRE ANIMATION') produces NO open attribute (collapsed by default) while _buildGroupDetails('triggers','LIVING CORE') DOES (open by default); both route through _wireDynamicSubPanel()" +
+        (err214 ? ' — ' + err214.message : '')
+    );
+  }
+
+  // 214.5  every one of the 3 real FIRE ANIMATION registry groups (against
+  //        the ACTUAL shipped registry, not a hand-copied list) collapses
+  //        by default via _dshGroupDefaultOpen() — the ~28-button "shell
+  //        opens compact" guarantee.
+  {
+    let ok214 = false;
+    let err214 = null;
+    try {
+      const tools214 = _evalRealTools214();
+      const defaultOpenBody214 = extractFunctionBody(testConsole214, '_dshGroupDefaultOpen');
+      const fn214 = new Function('headingText', defaultOpenBody214.slice(1, -1));
+      const fireAnimGroups214 = [
+        ...new Set(
+          tools214
+            .filter(t => t.category === 'triggers' && (t.group || '').startsWith('FIRE ANIMATION'))
+            .map(t => t.group)
+        ),
+      ];
+      ok214 =
+        fireAnimGroups214.length === 3 &&
+        fireAnimGroups214.every(g => fn214(g) === false) &&
+        tools214.filter(t => (t.group || '').startsWith('FIRE ANIMATION')).length >= 28;
+    } catch (e) {
+      err214 = e;
+    }
+    assert(
+      ok214,
+      '214.5: BEHAVIORAL — against the real registry, all 3 FIRE ANIMATION tier-split groups (~28 buttons total) collapse by default via _dshGroupDefaultOpen() — the "shell opens compact" guarantee' +
+        (err214 ? ' — ' + err214.message : '')
+    );
+  }
+
+  // 214.6  every one of the 9 migrated U1 anchor tools now carries an
+  //        explicit, non-empty `group` field — a regression guard against
+  //        silently falling through to the tool.label fallback (which would
+  //        create a stray one-tool-wide group per shared-anchor sibling).
+  {
+    let ok214 = false;
+    let err214 = null;
+    try {
+      const tools214 = _evalRealTools214();
+      const u1Ids214 = [
+        'inspect-runtime-state',
+        'runtime-force-transition',
+        'reboot',
+        'wake-active',
+        'a11y-immersion',
+        'inspect-observers',
+        'replay-hatch',
+        'ocr-unit1-scan',
+        'ocr-unit2-scan',
+      ];
+      ok214 = u1Ids214.every(id => {
+        const t = tools214.find(x => x.id === id);
+        return t && typeof t.group === 'string' && t.group.length > 0;
+      });
+    } catch (e) {
+      err214 = e;
+    }
+    assert(
+      ok214,
+      '214.6: every one of the 9 migrated U1 anchor tools carries an explicit, non-empty `group` field (FORCE TRANSITION / VIEW-ONCE CEREMONIES / IMMERSION TIER / DEVICE & SYSTEM / OPTICAL SCAN TEST / SCAN & PARSE TEST) — never silently falling through to the tool.label fallback' +
+        (err214 ? ' — ' + err214.message : '')
+    );
+  }
+
+  // 214.7  CATEGORY_ORDER places 'inspect' LAST — the readable diagnostics
+  //        readout sits at the bottom of the shell.
+  {
+    const catOrderSrc214 = testConsole214.slice(
+      testConsole214.indexOf('var CATEGORY_ORDER = ['),
+      testConsole214.indexOf('];', testConsole214.indexOf('var CATEGORY_ORDER = [')) + 2
+    );
+    const listMatch214 = catOrderSrc214.match(/\[([^\]]+)\]/);
+    const order214 = listMatch214
+      ? listMatch214[1].split(',').map(s => s.trim().replace(/'/g, ''))
+      : [];
+    assert(
+      order214.length === 7 && order214[order214.length - 1] === 'inspect',
+      "214.7: CATEGORY_ORDER's last entry is 'inspect' — the diagnostics readout renders at the bottom of the shell"
+    );
+  }
+
+  // 214.8  the 7 new U4a INSPECT tools exist with the correct category and
+  //        the two relocated U1 ids (inspect-runtime-state/inspect-observers)
+  //        still exist, unchanged, now sharing the DEVICE / SYSTEM group.
+  {
+    let ok214 = false;
+    let err214 = null;
+    try {
+      const tools214 = _evalRealTools214();
+      const newIds214 = [
+        'inspect-vitals',
+        'inspect-device-detail',
+        'inspect-sw-internal',
+        'inspect-connection',
+        'inspect-flags',
+        'inspect-flags-internal',
+        'inspect-copy',
+      ];
+      ok214 =
+        tools214.length === 61 &&
+        newIds214.every(id => {
+          const t = tools214.find(x => x.id === id);
+          return t && t.category === 'inspect';
+        }) &&
+        tools214.find(t => t.id === 'inspect-runtime-state').group === 'DEVICE / SYSTEM' &&
+        tools214.find(t => t.id === 'inspect-observers').group === 'DEVICE / SYSTEM' &&
+        new Set(tools214.map(t => t.id)).size === tools214.length; // no duplicate ids anywhere
+    } catch (e) {
+      err214 = e;
+    }
+    assert(
+      ok214,
+      '214.8: the 7 new U4a INSPECT tools (vitals/device-detail/sw-internal/connection/flags/flags-internal/copy) exist under category:"inspect", the relocated inspect-runtime-state/inspect-observers now share the DEVICE / SYSTEM group, and the full registry (61 tools) carries no duplicate id' +
+        (err214 ? ' — ' + err214.message : '')
+    );
+  }
+
+  // 214.9  INSPECT tier/destructive split: the readable summary tools are
+  //        tier:'prod' (safe on a minigame-unlocked production build); the
+  //        genuinely dev-only internals (SW registration, raw flag cache)
+  //        stay tier:'staging' — and NOT ONE inspect-* tool is
+  //        destructive:true anywhere (INSPECT never mutates anything).
+  {
+    let ok214 = false;
+    let err214 = null;
+    try {
+      const tools214 = _evalRealTools214();
+      const inspectTools214 = tools214.filter(t => t.category === 'inspect');
+      const prodIds214 = [
+        'inspect-vitals',
+        'inspect-runtime-state',
+        'inspect-observers',
+        'inspect-device-detail',
+        'inspect-connection',
+        'inspect-flags',
+        'inspect-copy',
+      ];
+      const stagingIds214 = ['inspect-sw-internal', 'inspect-flags-internal'];
+      ok214 =
+        inspectTools214.length === 9 &&
+        prodIds214.every(id => tools214.find(t => t.id === id).tier === 'prod') &&
+        stagingIds214.every(id => tools214.find(t => t.id === id).tier === 'staging') &&
+        inspectTools214.every(t => t.destructive === false);
+    } catch (e) {
+      err214 = e;
+    }
+    assert(
+      ok214,
+      "214.9: INSPECT's 7 readable-summary tools (vitals/runtime-state/observers/device-detail/connection/flags/copy) are tier:'prod'; the 2 genuinely dev-only internals (sw-internal/flags-internal) are tier:'staging' — and every one of the 9 inspect-* tools is destructive:false (read-only)" +
+        (err214 ? ' — ' + err214.message : '')
+    );
+  }
+
+  // 214.10  every new INSPECT anchor selector matches a literal
+  //         data-dsh-anchor attribute inside the inert
+  //         <template id="testConsoleTemplate"> — the same migration
+  //         cross-reference Suite 210.2 already runs for U1's 7 anchors.
+  {
+    const newAnchors214 = [
+      'dshInspectVitals',
+      'dshInspectDevice',
+      'dshInspectSwInternal',
+      'dshInspectConnection',
+      'dshInspectFlags',
+      'dshInspectFlagsInternal',
+      'dshInspectCopy',
+    ];
+    assert(
+      tplStart214 !== -1 && newAnchors214.every(a => tplSrc214.includes(`data-dsh-anchor="${a}"`)),
+      '214.10: every new U4a INSPECT anchor selector matches a literal data-dsh-anchor attribute inside the inert <template id="testConsoleTemplate">'
+    );
+  }
+
+  // 214.11  STATIC — "never raw JSON" guarantee: none of the INSPECT
+  //         builder functions ever call JSON.stringify (the raw-dump this
+  //         unit's owner directive explicitly forbids).
+  {
+    const inspectFnNames214 = [
+      '_inspectRow',
+      '_inspectVitalsHtml',
+      '_inspectConnectionHtml',
+      '_inspectFlagsHtml',
+      '_inspectFlagsInternalHtml',
+      '_updateInspectAsync',
+      '_wireInspectRefresh',
+      '_copyDiagnostics',
+    ];
+    const combined214 = inspectFnNames214
+      .map(n => extractFunctionBody(testConsole214, n))
+      .join('\n');
+    assert(
+      !/JSON\.stringify/.test(combined214),
+      '214.11: [owner directive] none of the INSPECT builder/wiring functions ever call JSON.stringify — the readout is always labeled, human-readable lines, never a raw data dump, in staging or prod'
+    );
+  }
+
+  // 214.12  STATIC — INSPECT is fully read-only: none of its functions ever
+  //         write the campaign save, a device pref, or robco_v8.
+  {
+    const inspectFnNames214b = [
+      '_inspectRow',
+      '_inspectVitalsHtml',
+      '_inspectConnectionHtml',
+      '_inspectFlagsHtml',
+      '_inspectFlagsInternalHtml',
+      '_updateInspectAsync',
+      '_wireInspectRefresh',
+      '_wireInspectCopy',
+      '_copyDiagnostics',
+    ];
+    const combined214b = inspectFnNames214b
+      .map(n => extractFunctionBody(testConsole214, n))
+      .join('\n');
+    assert(
+      !/saveState\(|MetaStore\.set\(|robco_v8|state\.\w+\s*=(?!=)/.test(combined214b),
+      '214.12: INSPECT is read-only — none of its builder/wiring functions ever call saveState()/MetaStore.set()/assign state.*/touch robco_v8'
+    );
+  }
+
+  // 214.13  BEHAVIORAL: _inspectVitalsHtml(), executed against a synthetic
+  //         state/GAME_DEFS/getGameContext/_chassisIdRow, produces labeled
+  //         readable lines (LEVEL/HP/LOCATION/etc.) — never JSON.
+  {
+    let ok214 = false;
+    let err214 = null;
+    try {
+      const vm214 = require('vm');
+      const body214 = extractFunctionBody(testConsole214, '_inspectVitalsHtml');
+      const rowBody214 = extractFunctionBody(testConsole214, '_inspectRow');
+      const src214 = `
+        function escapeHtml(s) { return String(s); }
+        var state = { lvl: 9, xp: 1200, hpCur: 80, hpMax: 100, loc: 'Goodsprings', caps: 350, karma: 120,
+          quests: [{ status: 'active' }, { status: 'complete' }, { status: 'active' }] };
+        var GAME_DEFS = { FNV: { label: 'Fallout: New Vegas' } };
+        function getGameContext() { return 'FNV'; }
+        function _chassisIdRow(label, val) {
+          return '<div class="id-row"><b>' + escapeHtml(label) + '</b><span>' + escapeHtml(val) + '</span></div>';
+        }
+        function _inspectRow(label, val) ${rowBody214}
+        function _inspectVitalsHtml() ${body214}
+      `;
+      const sandbox214 = { console };
+      vm214.createContext(sandbox214);
+      vm214.runInContext(src214 + '\nthis.__html = _inspectVitalsHtml();', sandbox214);
+      const html214 = sandbox214.__html;
+      ok214 =
+        typeof html214 === 'string' &&
+        /LEVEL/.test(html214) &&
+        /9/.test(html214) &&
+        /80 \/ 100/.test(html214) &&
+        /Goodsprings/.test(html214) &&
+        /Fallout: New Vegas/.test(html214) &&
+        /ACTIVE DIRECTIVES/.test(html214) &&
+        />2</.test(html214) && // 2 of the 3 synthetic quests are active
+        !/[{[]"/.test(html214); // never a JSON-looking blob
+    } catch (e) {
+      err214 = e;
+    }
+    assert(
+      ok214,
+      '214.13: BEHAVIORAL — _inspectVitalsHtml(), run against a synthetic state/GAME_DEFS, renders labeled readable lines (GAME/LEVEL/HP/LOCATION/ACTIVE DIRECTIVES) with the correct active-quest count — never a JSON-shaped blob' +
+        (err214 ? ' — ' + err214.message : '')
+    );
+  }
+
+  // 214.14  BEHAVIORAL: _inspectConnectionHtml()/_inspectFlagsHtml(),
+  //         executed against synthetic globals, render readable
+  //         CONNECTED/DISABLED/ENABLED text, never raw booleans/JSON.
+  {
+    let ok214 = false;
+    let err214 = null;
+    try {
+      const vm214 = require('vm');
+      const connBody214 = extractFunctionBody(testConsole214, '_inspectConnectionHtml');
+      const flagsBody214 = extractFunctionBody(testConsole214, '_inspectFlagsHtml');
+      const rowBody214 = extractFunctionBody(testConsole214, '_inspectRow');
+      const src214 = `
+        function escapeHtml(s) { return String(s); }
+        function _chassisIdRow(label, val) {
+          return '<div class="id-row"><b>' + escapeHtml(label) + '</b><span>' + escapeHtml(val) + '</span></div>';
+        }
+        function _inspectRow(label, val) ${rowBody214}
+        function _chassisBreaker(label, on, wire, onWord, offWord) {
+          return '<div>' + label + ':' + (on ? onWord : offWord) + '</div>';
+        }
+        var window = {
+          _isUplinkConnected: function () { return true; },
+          isFeatureEnabled: function (k) { return k !== 'aiChat'; },
+        };
+        var navigator = { onLine: true };
+        function _inspectConnectionHtml() ${connBody214}
+        var _INSPECT_FLAG_KEYS = ['aiChat', 'cloudSync'];
+        function _inspectFlagsHtml() ${flagsBody214}
+      `;
+      const sandbox214 = { console };
+      vm214.createContext(sandbox214);
+      vm214.runInContext(
+        src214 + '\nthis.__conn = _inspectConnectionHtml(); this.__flags = _inspectFlagsHtml();',
+        sandbox214
+      );
+      ok214 =
+        /CONNECTED/.test(sandbox214.__conn) &&
+        /DISABLED/.test(sandbox214.__conn) && // aiChat off in this synthetic scenario
+        /ONLINE/.test(sandbox214.__conn) &&
+        /AICHAT:DISABLED/i.test(sandbox214.__flags.replace(/\s/g, '')) &&
+        /CLOUDSYNC:ENABLED/i.test(sandbox214.__flags.replace(/\s/g, ''));
+    } catch (e) {
+      err214 = e;
+    }
+    assert(
+      ok214,
+      '214.14: BEHAVIORAL — _inspectConnectionHtml() renders readable CARRIER/AI CHAT/NETWORK words (CONNECTED/DISABLED/ONLINE) and _inspectFlagsHtml() renders a readable ENABLED/DISABLED line per flag — both from synthetic globals, never raw booleans or JSON' +
+        (err214 ? ' — ' + err214.message : '')
+    );
+  }
+
+  // 214.15  _copyDiagnostics() sources the copied text from the RENDERED
+  //         section's own textContent (the already-readable DOM the
+  //         builders above produced) — never a fresh JSON.stringify(state)
+  //         — and gates on navigator.clipboard.writeText.
+  {
+    const body214 = extractFunctionBody(testConsole214, '_copyDiagnostics');
+    assert(
+      /section\.textContent/.test(body214) &&
+        /navigator\.clipboard\.writeText/.test(body214) &&
+        !/JSON\.stringify/.test(body214),
+      "214.15: _copyDiagnostics() copies the rendered section's own textContent (the readable DOM already built by the INSPECT functions) via navigator.clipboard.writeText — never a fresh JSON.stringify(state) dump"
+    );
+  }
+
+  // 214.16  HARD atmosphere/save boundary + game-agnosticism (the
+  //         210.13/211.11/212.14 pattern) extended to the new U4a
+  //         collapsible-group + INSPECT functions by name.
+  {
+    const newFns214 = [
+      '_dshGroupSlug',
+      '_dshGroupDefaultOpen',
+      '_buildGroupDetails',
+      '_inspectRow',
+      '_inspectVitalsHtml',
+      '_inspectConnectionHtml',
+      '_inspectFlagsHtml',
+      '_inspectFlagsInternalHtml',
+      '_updateInspectAsync',
+      '_wireInspectRefresh',
+      '_copyDiagnostics',
+      '_wireInspectCopy',
+    ]
+      .map(n => extractFunctionBody(testConsole214, n))
+      .join('\n');
+    assert(
+      !/saveState\(|robco_v8|_logEvent\(|\beventLog\b|localStorage\./.test(newFns214) &&
+        !/FNV|FO3|New Vegas|Fallout 3/.test(newFns214),
+      '214.16: the new U4a collapsible-group + INSPECT functions never touch the campaign save (no saveState/robco_v8/_logEvent/eventLog/localStorage) and carry no hardcoded game literal (Protocol 38 — GAME_DEFS[getGameContext()].label is read generically)'
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

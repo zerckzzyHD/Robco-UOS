@@ -374,6 +374,85 @@
               >&mdash;</span
             >
           </div>
+          <!-- U4a: INSPECT build-out (planning/DIAGNOSTIC_SHELL_PLAN.md §3.1/§11 U4)
+               — a read-only "system diagnostics" readout, NEVER a raw JSON blob.
+               js/test-console.js's _inspectXxxHtml() builders fill each container
+               below with labeled, human-readable lines only (reusing the CHASSIS
+               SYSTEM STATUS board's own _chassisIdRow()/_chassisBreaker() row
+               helpers, Protocol 22). The INSPECT category itself renders LAST
+               (CATEGORY_ORDER), so these anchors sit at the bottom of the shell
+               regardless of where they live in this template. -->
+          <div
+            class="input-group"
+            style="flex-direction: column; align-items: stretch"
+            data-dsh-anchor="dshInspectVitals"
+          >
+            <label class="optics-label">VITALS &amp; CAMPAIGN SUMMARY</label>
+            <div id="dshInspectVitals" style="font-size: 10px">&mdash;</div>
+          </div>
+          <div
+            class="input-group"
+            style="flex-direction: column; align-items: stretch"
+            data-dsh-anchor="dshInspectDevice"
+          >
+            <label class="optics-label">DEVICE DETAIL</label>
+            <div id="dshInspectDevice" style="font-size: 10px">&mdash;</div>
+          </div>
+          <div
+            class="input-group"
+            style="flex-direction: column; align-items: stretch"
+            data-dsh-anchor="dshInspectSwInternal"
+          >
+            <label class="optics-label">SERVICE WORKER INTERNALS (STAGING ONLY)</label>
+            <div id="dshInspectSwInternal" style="font-size: 10px">&mdash;</div>
+          </div>
+          <div
+            class="input-group"
+            style="flex-direction: column; align-items: stretch"
+            data-dsh-anchor="dshInspectConnection"
+          >
+            <label class="optics-label">CONNECTION</label>
+            <div id="dshInspectConnection" style="font-size: 10px">&mdash;</div>
+          </div>
+          <div
+            class="input-group"
+            style="flex-direction: column; align-items: stretch"
+            data-dsh-anchor="dshInspectFlags"
+          >
+            <label class="optics-label">FEATURE FLAGS</label>
+            <div id="dshInspectFlags" style="font-size: 10px">&mdash;</div>
+          </div>
+          <div
+            class="input-group"
+            style="flex-direction: column; align-items: stretch"
+            data-dsh-anchor="dshInspectFlagsInternal"
+          >
+            <label class="optics-label">FEATURE FLAGS &mdash; RAW CACHE (STAGING ONLY)</label>
+            <div id="dshInspectFlagsInternal" style="font-size: 10px">&mdash;</div>
+          </div>
+          <div
+            class="input-group"
+            style="flex-direction: column; align-items: stretch"
+            data-dsh-anchor="dshInspectCopy"
+          >
+            <label class="optics-label">COPY DIAGNOSTICS</label>
+            <p style="font-size: 10px">
+              Copies the readable diagnostics readout above to the clipboard &mdash; never raw JSON.
+            </p>
+            <div style="display: flex; flex-wrap: wrap; gap: 6px">
+              <button
+                type="button"
+                class="btn-sm"
+                id="dshInspectCopyBtn"
+                aria-label="Copy the readable diagnostics readout to the clipboard"
+              >
+                COPY READOUT
+              </button>
+            </div>
+            <span id="dshInspectCopyStatus" aria-live="polite" style="font-size: 10px"
+              >&mdash;</span
+            >
+          </div>
           <div id="dshSections"></div>
           <!-- EXTENSION POINT: a future hard-to-trigger feature adds one more entry to
                DIAGNOSTIC_SHELL_TOOLS (js/test-console.js) with an `anchor` selector

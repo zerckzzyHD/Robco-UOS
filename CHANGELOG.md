@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2864/2864 | Cache: robco-terminal-v2.7.0-r133 -->
+﻿## [Unreleased]<!-- Tests: 2880/2880 | Cache: robco-terminal-v2.7.0-r134 -->
 
 ### Added
 
@@ -210,6 +210,7 @@
 - Rebuilt the developer/debug console on a single internal list of tools instead of hand-wired one-off controls, with a second, stricter check layered on top of the existing dev/staging-only gate so a future non-destructive preview mode and the full toolbench can safely share one panel without any risky control ever slipping into the safer mode. Every existing developer control — the state readouts, the state-forcing buttons, reboot, wake, the immersion picker, and both screenshot-scanning test tools — still works exactly as before. The one exception: replaying the Module Bay's hatch ceremony now asks for confirmation first, since it's the console's one control that resets something, matching how every other reset-style control in the app already works. Developer/staging tooling only — never visible on the live site.
 - The developer/debug console no longer pushes the whole terminal down the page when it's open — it now floats over the screen as a small toggle button and a slide-out drawer instead of sitting inline above everything else, and it's been given its own dressed-up "DIAGNOSTIC SHELL" name and matching icons throughout. Developer/staging tooling only — never visible on the live site, and nothing about any of its existing controls changed.
 - The DIAGNOSTIC SHELL now has a full library of one-tap test triggers — one for every ambient animation, boot variation, and one-time welcome moment already in the app — so each can be replayed and checked on demand instead of waiting for it to happen naturally during real play. A new internal rule now requires every future feature like these to ship with its own on-demand trigger from the start, so none of them are ever left untestable. Developer/staging tooling only — never visible on the live site, and nothing about any existing feature's behavior changed.
+- Every group of controls inside the DIAGNOSTIC SHELL can now be collapsed and expanded on its own, not just the section it sits in — and its biggest list, the full library of animation triggers, now opens collapsed by default so the panel loads compact instead of as one giant always-open scroll. Its inspector was also rebuilt into a clean, plain-English system status readout — your campaign summary, device info, connection status, and feature settings, each in their own group — with a copy button, instead of ever showing raw technical data. Developer/staging tooling only — never visible on the live site, and nothing about any existing feature's behavior changed.
 
 ---
 

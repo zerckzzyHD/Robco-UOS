@@ -147,6 +147,8 @@ export default [
         _openSysModal: 'readonly',
         openModal: 'readonly', // Step 2 Phase 0 U12 consolidated modal driver (ui-core.js)
         _readActiveCacheName: 'readonly', // SYSTEM STATUS active-cache-name lookup (ui-core.js), reused by ocr.js
+        _chassisIdRow: 'readonly', // SYSTEM STATUS labeled-row helper (ui-core.js), reused by the Diagnostic Shell U4a INSPECT readout (test-console.js)
+        _chassisBreaker: 'readonly', // SYSTEM STATUS breaker-row helper (ui-core.js), reused by the Diagnostic Shell U4a INSPECT readout (test-console.js)
         confirmAction: 'readonly', // Step 2 Phase 0 U12 diegetic confirm() replacement (ui-core.js)
         _vatsIsMelee: 'readonly',
         getGameContext: 'readonly',
