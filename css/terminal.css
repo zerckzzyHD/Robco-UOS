@@ -1729,6 +1729,156 @@ details.panel:not([open]) summary h2 {
   color: var(--robco-green);
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   DIAGNOSTIC SHELL — mobile overlay (U2, planning/DIAGNOSTIC_SHELL_PLAN.md
+   §6). Replaces the U1 document-flow <details class="panel"> (which shoved
+   the machine down on mobile) with a floating toggle (#dshFab) + a fixed
+   overlay drawer (#testConsolePanel) + a scrim, all mounted BODY-LEVEL as
+   siblings of .container.machine (js/test-console.js appends them straight
+   into #testConsoleMount, which sits before .container.machine in
+   index.html — the exact placement #locationCard already uses above).
+   Every piece here is position:fixed, so #testConsoleMount itself always
+   collapses to zero height regardless of whether the drawer is open —
+   zero document-flow displacement, open or closed. Being a body-level
+   sibling (never a descendant of .container) also means these three
+   elements are NEVER subject to the filter/transform containing-block
+   trade-off documented above the fixed .bezel dock (idle/night/shutdown
+   apply filter/transform to .container only) — they stay pinned to the
+   viewport in every ambient-runtime state, mirroring #locationCard.
+   z-index sits above ordinary content/modals (sysModal 2000, location-card
+   5000) but well below the system-critical overlays that must always win
+   over a dev tool (#bootScreen 100000, the shutdown covers 99998-100002).
+   The slide-in is a plain `animation:` (Protocol UI-9) — the existing
+   global prefers-reduced-motion block (animation-duration:0.01ms on *)
+   neutralizes it to an instant open with no bespoke carve-out. ══════════ */
+.dsh-fab {
+  position: fixed;
+  left: 12px;
+  bottom: 16px;
+  z-index: 20002;
+  width: 46px;
+  height: 46px;
+  min-width: 46px;
+  min-height: 46px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--bezel-wire, var(--robco-green));
+  background: rgba(0, 0, 0, 0.78);
+  color: var(--bezel-wire, var(--robco-green));
+  font-size: 20px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    0 0 10px rgba(0, 0, 0, 0.6),
+    0 0 8px rgba(var(--bezel-wire-rgb), 0.35);
+}
+.dsh-fab:hover,
+.dsh-fab:focus-visible {
+  background: var(--bezel-wire, var(--robco-green));
+  color: #000;
+}
+.dsh-fab[aria-expanded='true'] {
+  background: var(--bezel-wire, var(--robco-green));
+  color: #000;
+}
+/* Mobile: sit above the fixed bezel dock (60px z, reserved via the machine's
+   own 100px padding-bottom) instead of behind/under it. */
+@media (max-width: 999.98px) {
+  .dsh-fab {
+    bottom: 112px;
+  }
+}
+.dsh-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  background: rgba(0, 0, 0, 0.6);
+}
+.dsh-scrim[hidden] {
+  display: none;
+}
+@keyframes dsh-slide-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0.35;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+.dsh-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20001;
+  width: min(92vw, 420px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(var(--bezel-wire-rgb), 0.4) transparent;
+  border-left: 1px solid var(--bezel-wire, var(--robco-green));
+  background: linear-gradient(180deg, rgba(var(--bezel-wire-rgb), 0.06), transparent 20%), #050803;
+  box-shadow:
+    -8px 0 30px rgba(0, 0, 0, 0.8),
+    0 0 18px rgba(var(--bezel-wire-rgb), 0.15);
+  padding: 12px 14px 24px;
+  animation: dsh-slide-in 0.22s ease-out;
+}
+.dsh-drawer[hidden] {
+  display: none;
+}
+.dsh-drawer-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px dashed rgba(var(--bezel-wire-rgb), 0.4);
+}
+.dsh-drawer-icon {
+  font-size: 16px;
+  color: var(--bezel-wire, var(--robco-green));
+  flex-shrink: 0;
+}
+.dsh-drawer-head h2 {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: var(--bezel-wire, var(--robco-green));
+  overflow-wrap: anywhere;
+  margin: 0;
+}
+.dsh-drawer-head .dx {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  min-width: 28px;
+  min-height: 28px;
+  border-radius: 50%;
+  border: 1px solid rgba(var(--bezel-wire-rgb), 0.5);
+  background: transparent;
+  color: var(--bezel-wire, var(--robco-green));
+  font-size: 13px;
+  line-height: 1;
+  padding: 0;
+}
+.dsh-drawer-head .dx:hover {
+  background: rgba(var(--bezel-wire-rgb), 0.15);
+}
+/* Per-tool icon glyph (registry `icon` field) prepended to each migrated
+   control's existing .optics-label by _renderShell() (js/test-console.js);
+   a per-category glyph is likewise prepended to each section's <h3>. */
+.dsh-tool-icon,
+.dsh-section-icon {
+  display: inline-block;
+  margin-right: 5px;
+  color: var(--bezel-wire, var(--robco-green));
+}
+
 /* ─── Sub-Panel (nested <details> inside a top-level panel) ──────── */
 /* Used by AMMO RESERVES nested inside BACKPACK INVENTORY */
 details.sub-panel {

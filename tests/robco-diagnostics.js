@@ -35549,6 +35549,360 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 211 — Diagnostic Shell U2: mobile overlay + identity + icons
+//  (planning/DIAGNOSTIC_SHELL_PLAN.md §6, Protocol 8 Sonnet stage) (13 tests)
+// ──────────────────────────────────────────────────────────────
+//  U1's document-flow <details class="panel"> (which shoved the whole
+//  machine down on mobile whenever the console mounted) is replaced by a
+//  floating toggle (#dshFab, the DEV-MARKER gear glyph) + a fixed overlay
+//  drawer (#testConsolePanel, role=dialog) + a scrim (#dshScrim) — all three
+//  mounted body-level as siblings of .container.machine (the same placement
+//  #locationCard already uses) and all three position:fixed, so
+//  #testConsoleMount stays a zero-height wrapper whether the drawer is open
+//  or closed. _renderShell() now also injects a per-category icon into
+//  every section <h3> and a per-tool icon into every migrated control's
+//  label (registry `icon` field, planning §3.2 "icons everywhere"). The
+//  drawer carries its own self-contained Tab focus-trap + Escape-close
+//  (_openShell/_closeShell/_shellKeydown), mirroring the existing #sysModal
+//  trap's shape without forking it (Protocol 23 — a distinct dialog
+//  surface). U1's registry/gate/leak-proof invariants (Suite 210) are
+//  otherwise completely unchanged — U2 is presentation/mounting only.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 211 — Diagnostic Shell U2: mobile overlay + identity + icons');
+  const testConsole211 = readFile('js/test-console.js');
+  const index211 = readFile('index.html');
+  const css211 = readFile('css/terminal.css');
+  const tplStart211 = index211.indexOf('<template id="testConsoleTemplate">');
+  const tplEnd211 = index211.indexOf('</template>', tplStart211);
+  const tplSrc211 = tplStart211 !== -1 ? index211.slice(tplStart211, tplEnd211) : '';
+
+  // 211.1  the template carries a #dshFab toggle button, a #dshScrim, and
+  //        #testConsolePanel re-shaped into a fixed dialog drawer (no longer
+  //        a document-flow <details class="panel">) — every piece the U2
+  //        mobile-overlay fix depends on.
+  assert(
+    /<button[\s\S]{0,200}id="dshFab"[\s\S]{0,200}aria-haspopup="dialog"[\s\S]{0,200}aria-expanded="false"[\s\S]{0,200}aria-controls="testConsolePanel"/.test(
+      tplSrc211
+    ) &&
+      /<div[^>]*id="dshScrim"[^>]*hidden/.test(tplSrc211) &&
+      /<div[\s\S]{0,120}id="testConsolePanel"[\s\S]{0,200}class="dsh-drawer"[\s\S]{0,200}role="dialog"[\s\S]{0,200}aria-modal="true"[\s\S]{0,200}aria-labelledby="dshDrawerTitle"[\s\S]{0,200}hidden/.test(
+        tplSrc211
+      ) &&
+      !/<details class="panel" id="testConsolePanel"/.test(index211),
+    '211.1: <template id="testConsoleTemplate"> carries #dshFab (aria-haspopup=dialog, aria-controls=testConsolePanel), #dshScrim (hidden), and #testConsolePanel now a role=dialog aria-modal=true hidden <div class="dsh-drawer"> — no longer the U1 document-flow <details class="panel">'
+  );
+
+  // 211.2  float-over-content invariant: the FAB, scrim, and drawer are all
+  //        position:fixed in CSS (never contribute to document-flow layout
+  //        height), and both scrim/drawer explicitly collapse via [hidden].
+  assert(
+    /\.dsh-fab\s*\{[^}]*position:\s*fixed/.test(css211) &&
+      /\.dsh-scrim\s*\{[^}]*position:\s*fixed/.test(css211) &&
+      /\.dsh-drawer\s*\{[^}]*position:\s*fixed/.test(css211) &&
+      /\.dsh-scrim\[hidden\]\s*\{\s*display:\s*none/.test(css211) &&
+      /\.dsh-drawer\[hidden\]\s*\{\s*display:\s*none/.test(css211),
+    '211.2: .dsh-fab / .dsh-scrim / .dsh-drawer are all position:fixed (zero document-flow footprint), and [hidden] collapses both the scrim and the drawer to display:none'
+  );
+
+  // 211.3  #testConsoleMount stays the same literal empty body-level <div>,
+  //        still sitting before .container.machine in source order — the
+  //        FAB/scrim/drawer that get cloned into it inherit that same
+  //        body-level placement (mirroring #locationCard, also above
+  //        .container.machine).
+  assert(
+    /<div id="testConsoleMount"><\/div>/.test(index211) &&
+      index211.indexOf('<div id="testConsoleMount"></div>') <
+        index211.indexOf('<div class="container machine"'),
+    '211.3: #testConsoleMount is still the literal empty body-level <div>, positioned before <div class="container machine"> in source order — the FAB/scrim/drawer it mounts inherit that same body-level (never in-flow-inside-.container) placement'
+  );
+
+  // 211.4  _mountConsole() appends the FAB and scrim (new in U2) alongside
+  //        the drawer, and STILL calls the exact literal
+  //        `mount.appendChild(panel)` after `_renderShell(panel)` — the
+  //        Suite 210.7 leak-proof-ordering invariant is unchanged by the
+  //        two new appends.
+  {
+    const mountBody211 = extractFunctionBody(testConsole211, '_mountConsole');
+    const renderCallIdx211 = mountBody211.indexOf('_renderShell(panel)');
+    const appendIdx211 = mountBody211.indexOf('mount.appendChild(panel)');
+    assert(
+      /mount\.appendChild\(fab\)/.test(mountBody211) &&
+        /mount\.appendChild\(scrim\)/.test(mountBody211) &&
+        renderCallIdx211 !== -1 &&
+        appendIdx211 !== -1 &&
+        renderCallIdx211 < appendIdx211,
+      '211.4: _mountConsole() now also appends the FAB and scrim, but the drawer itself still reaches the document via the exact `mount.appendChild(panel)` call AFTER `_renderShell(panel)` — the U1 filter-before-DOM-insertion invariant (Suite 210.7) is unchanged'
+    );
+  }
+
+  // 211.5  identity rebrand: the drawer header carries the DIAGNOSTIC SHELL
+  //        title (dressed to the machine-language standard, matching the
+  //        Tool Deck's own diegetic header convention), tied to the
+  //        aria-labelledby target.
+  assert(
+    /id="dshDrawerTitle"[^>]*>[^<]*DIAGNOSTIC SHELL/.test(tplSrc211) &&
+      /class="dsh-drawer-icon"/.test(tplSrc211),
+    '211.5: the drawer header (#dshDrawerTitle, the aria-labelledby target) reads DIAGNOSTIC SHELL, dressed with a machine-language icon glyph — the identity rebrand carries into the U2 drawer chrome'
+  );
+
+  // 211.6  icons everywhere (planning §3.2): every section in CATEGORY_META
+  //        carries an `icon`, every registry tool still carries an `icon`
+  //        (U1, unchanged), and _renderShell() injects both a per-section
+  //        (.dsh-section-icon) and a per-tool (.dsh-tool-icon) glyph rather
+  //        than rendering plain text only.
+  {
+    const catMetaSrc211 = testConsole211.slice(
+      testConsole211.indexOf('var CATEGORY_META = {'),
+      testConsole211.indexOf('};', testConsole211.indexOf('var CATEGORY_META = {')) + 2
+    );
+    const catKeys211 = ['triggers', 'state', 'resets', 'infra', 'inspect', 'fixtures', 'env'];
+    const everyCatHasIcon211 = catKeys211.every(k =>
+      new RegExp(k + ":\\s*\\{[^}]*icon:\\s*'[^']+'").test(catMetaSrc211)
+    );
+    let everyToolHasIcon211;
+    try {
+      const toolsStart211 = testConsole211.indexOf('var DIAGNOSTIC_SHELL_TOOLS = [');
+      const toolsEnd211 = testConsole211.indexOf('\n  ];', toolsStart211) + '\n  ];'.length;
+      const toolsSrc211 = testConsole211.slice(toolsStart211, toolsEnd211);
+      const replayHatchBody211 = extractFunctionBody(testConsole211, '_replayHatch');
+      const tools211 = eval(
+        `(function () { function _replayHatch() ${replayHatchBody211}\n ${toolsSrc211}\n return DIAGNOSTIC_SHELL_TOOLS; })()`
+      );
+      everyToolHasIcon211 =
+        tools211.length >= 9 &&
+        tools211.every(t => typeof t.icon === 'string' && t.icon.length > 0);
+    } catch (_) {
+      everyToolHasIcon211 = false;
+    }
+    const renderShellBody211 = extractFunctionBody(testConsole211, '_renderShell');
+    assert(
+      everyCatHasIcon211 &&
+        everyToolHasIcon211 &&
+        /dsh-section-icon/.test(renderShellBody211) &&
+        /dsh-tool-icon/.test(renderShellBody211) &&
+        /\.optics-label/.test(renderShellBody211),
+      '211.6: every CATEGORY_META section carries an icon (U2), every DIAGNOSTIC_SHELL_TOOLS entry still carries an icon (U1), and _renderShell() injects both a .dsh-section-icon (per section) and a .dsh-tool-icon (per migrated control, into its .optics-label) — icons everywhere, not plain text only'
+    );
+  }
+
+  // 211.7  DEV-MARKER glyph consistency (planning §9): ONE shared glyph
+  //        constant, used both as the section/tool icon fallback and set
+  //        onto the FAB by _wireShellToggle() — reserved for the U4 inline
+  //        dev-reset buttons per the same constant, never a second literal.
+  assert(
+    /var DEV_MARKER = '[^']+'/.test(testConsole211) &&
+      /glyphEl\.textContent = DEV_MARKER/.test(testConsole211) &&
+      (testConsole211.match(/DEV_MARKER/g) || []).length >= 4,
+    '211.7: ONE DEV_MARKER glyph constant is declared and reused — as the icon fallback (section + tool) and set onto the #dshFab glyph by _wireShellToggle() — never a second hardcoded glyph literal'
+  );
+
+  // 211.8  a11y: _openShell()/_closeShell() manage aria-expanded on the FAB
+  //        and focus (closeBtn focus on open, trigger-element restore on
+  //        close); _shellKeydown() implements Escape-close and a Tab-cycle
+  //        focus trap (first/last focusable wraparound), mirroring the
+  //        shape of the existing #sysModal trap without forking it.
+  {
+    const openBody211 = extractFunctionBody(testConsole211, '_openShell');
+    const closeBody211 = extractFunctionBody(testConsole211, '_closeShell');
+    const keydownBody211 = extractFunctionBody(testConsole211, '_shellKeydown');
+    assert(
+      /fab\.setAttribute\('aria-expanded', 'true'\)/.test(openBody211) &&
+        /closeBtn\.focus\(\)/.test(openBody211) &&
+        /fab\.setAttribute\('aria-expanded', 'false'\)/.test(closeBody211) &&
+        /_shellTriggerEl[\s\S]*\.focus\(\)/.test(closeBody211) &&
+        /e\.key === 'Escape'/.test(keydownBody211) &&
+        /_closeShell\(\)/.test(keydownBody211) &&
+        /e\.key !== 'Tab'/.test(keydownBody211) &&
+        /document\.activeElement === first/.test(keydownBody211) &&
+        /document\.activeElement === last/.test(keydownBody211),
+      "211.8: _openShell() sets aria-expanded=true on the FAB and focuses the close button; _closeShell() sets aria-expanded=false and restores focus to the trigger element; _shellKeydown() closes on Escape and Tab-cycles within the drawer's own focusable set (first/last wraparound) — a self-contained focus trap, not a fork of #sysModal's"
+    );
+  }
+
+  // 211.9  BEHAVIORAL: a synthetic DOM proves the FAB/scrim/close-button/
+  //        Escape wiring actually opens and closes the drawer — not just
+  //        that the source text looks right.
+  {
+    let ok211 = false;
+    let err211 = null;
+    try {
+      const vm211 = require('vm');
+      function makeShellDom() {
+        const registry = new Map();
+        function makeEl(id) {
+          const listeners = {};
+          const el = {
+            id,
+            hidden: true,
+            _attrs: {},
+            _focused: false,
+            setAttribute(k, v) {
+              el._attrs[k] = v;
+            },
+            getAttribute(k) {
+              return el._attrs[k];
+            },
+            focus() {
+              el._focused = true;
+            },
+            addEventListener(type, fn) {
+              (listeners[type] = listeners[type] || []).push(fn);
+            },
+            _fire(type, evt) {
+              (listeners[type] || []).forEach(fn => fn(evt || {}));
+            },
+            querySelector(sel) {
+              if (sel === '#dshClose') return registry.get('dshClose');
+              if (sel === 'span') return registry.get('__fabSpan');
+              return null;
+            },
+            querySelectorAll() {
+              return [];
+            },
+          };
+          return el;
+        }
+        ['testConsolePanel', 'dshScrim', 'dshFab', 'dshClose'].forEach(id =>
+          registry.set(id, makeEl(id))
+        );
+        registry.set('__fabSpan', makeEl('__fabSpan'));
+        const docListeners = {};
+        return {
+          registry,
+          activeElement: null,
+          getElementById: id => registry.get(id) || null,
+          addEventListener(type, fn) {
+            (docListeners[type] = docListeners[type] || []).push(fn);
+          },
+          removeEventListener(type, fn) {
+            const arr = docListeners[type] || [];
+            const i = arr.indexOf(fn);
+            if (i !== -1) arr.splice(i, 1);
+          },
+        };
+      }
+      function declareFn211(src, name) {
+        const nameIdx = src.indexOf('function ' + name);
+        const parenIdx = src.indexOf('(', nameIdx);
+        const braceIdx = src.indexOf('{', parenIdx);
+        const params = src.slice(parenIdx, braceIdx);
+        return 'function ' + name + params + extractFunctionBody(src, name);
+      }
+      const src211 =
+        "var DEV_MARKER = '⚙';\nvar _shellTriggerEl = null;\n" +
+        declareFn211(testConsole211, '_shellFocusables') +
+        '\n' +
+        declareFn211(testConsole211, '_shellKeydown') +
+        '\n' +
+        declareFn211(testConsole211, '_openShell') +
+        '\n' +
+        declareFn211(testConsole211, '_closeShell') +
+        '\n' +
+        declareFn211(testConsole211, '_wireShellToggle');
+      const sb = { document: null, console: { warn() {} } };
+      sb.document = makeShellDom();
+      vm211.createContext(sb);
+      vm211.runInContext(src211, sb);
+      sb._wireShellToggle();
+      const panel = sb.document.getElementById('testConsolePanel');
+      const scrim = sb.document.getElementById('dshScrim');
+      const fab = sb.document.getElementById('dshFab');
+
+      // FAB click #1 opens
+      fab._fire('click');
+      const openedByFab = panel.hidden === false && scrim.hidden === false;
+      const expandedTrue = fab.getAttribute('aria-expanded') === 'true';
+      // FAB click #2 (same button) closes
+      fab._fire('click');
+      const closedByFabToggle = panel.hidden === true && scrim.hidden === true;
+      const expandedFalse = fab.getAttribute('aria-expanded') === 'false';
+
+      // Re-open, then scrim click closes
+      fab._fire('click');
+      scrim._fire('click');
+      const closedByScrim = panel.hidden === true;
+
+      // Re-open, then close-button click closes
+      fab._fire('click');
+      sb.document.getElementById('dshClose')._fire('click');
+      const closedByCloseBtn = panel.hidden === true;
+
+      // Re-open, then Escape (via _shellKeydown) closes
+      fab._fire('click');
+      sb._shellKeydown({ key: 'Escape', preventDefault() {} });
+      const closedByEscape = panel.hidden === true;
+
+      ok211 =
+        openedByFab &&
+        expandedTrue &&
+        closedByFabToggle &&
+        expandedFalse &&
+        closedByScrim &&
+        closedByCloseBtn &&
+        closedByEscape;
+    } catch (e) {
+      err211 = e;
+    }
+    assert(
+      ok211,
+      '211.9: BEHAVIORAL (synthetic DOM) — tapping the FAB opens the drawer + scrim and sets aria-expanded=true; tapping it again closes both and resets aria-expanded=false; re-opening then tapping the scrim, the close button, or pressing Escape each independently closes the drawer' +
+        (err211 ? ' — ' + err211.message : '')
+    );
+  }
+
+  // 211.10  reduced-motion-safe slide (Protocol UI-9): the drawer's open
+  //         animation is a plain `animation:` @keyframes declaration, never
+  //         a bespoke reduced-motion carve-out — the existing global block
+  //         neutralizes it automatically.
+  assert(
+    /@keyframes dsh-slide-in/.test(css211) &&
+      /\.dsh-drawer\s*\{[^}]*animation:\s*dsh-slide-in/.test(css211),
+    "211.10: .dsh-drawer's open slide is a plain @keyframes dsh-slide-in animation (Protocol UI-9) — auto-neutralized to an instant open by the existing global prefers-reduced-motion block, no bespoke carve-out"
+  );
+
+  // 211.11  HARD atmosphere/save boundary (extends 149.9/210.13 to the new
+  //         U2 mount/open/close/focus-trap functions by name).
+  {
+    const newFns211 = [
+      '_mountConsole',
+      '_openShell',
+      '_closeShell',
+      '_shellKeydown',
+      '_shellFocusables',
+      '_wireShellToggle',
+    ]
+      .map(n => extractFunctionBody(testConsole211, n))
+      .join('\n');
+    assert(
+      !/saveState|robco_v8|_logEvent|\beventLog\b|localStorage\./.test(newFns211) &&
+        !/FNV|FO3|New Vegas|Fallout 3/.test(newFns211),
+      '211.11: the new U2 mount/open/close/focus-trap functions never touch the campaign save (no saveState/robco_v8/eventLog/localStorage) and carry no game literal (Protocol 38)'
+    );
+  }
+
+  // 211.12  mobile baseline (Protocol 17): the FAB is a genuine ≥28px tap
+  //         target (46px), and the drawer's close button keeps a ≥28px
+  //         min-height/min-width floor.
+  assert(
+    /\.dsh-fab\s*\{[^}]*width:\s*46px[^}]*height:\s*46px/.test(css211) &&
+      /\.dsh-drawer-head \.dx\s*\{[^}]*min-width:\s*28px[^}]*min-height:\s*28px/.test(css211),
+    '211.12: .dsh-fab is a genuine 46px (>=28px Protocol 17) tap target, and .dsh-drawer-head .dx (the close button) keeps a >=28px min-width/min-height floor'
+  );
+
+  // 211.13  regression guard: the U1 document-flow shape (<details
+  //         class="panel" id="testConsolePanel">) can never silently come
+  //         back — #testConsolePanel must stay a role=dialog aria-modal
+  //         fixed drawer.
+  assert(
+    !/<details[^>]*class="[^"]*\bpanel\b[^"]*"[^>]*id="testConsolePanel"/.test(index211) &&
+      !/<details[^>]*id="testConsolePanel"[^>]*class="[^"]*\bpanel\b[^"]*"/.test(index211) &&
+      /id="testConsolePanel"[\s\S]{0,200}role="dialog"/.test(tplSrc211),
+    '211.13: [regression guard] #testConsolePanel can never silently revert to a document-flow <details class="panel"> — it must stay a role=dialog fixed overlay drawer'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail

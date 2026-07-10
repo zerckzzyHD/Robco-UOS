@@ -1,5 +1,6 @@
 // ── DIAGNOSTIC SHELL — the ONE canonical dev/debug console (Step 2 · Phase 2,
-//    Diagnostic Shell U1: registry spine + two-signal gate) ──────────────────
+//    Diagnostic Shell U2: mobile overlay + identity + icons, on top of U1's
+//    registry spine + two-signal gate) ────────────────────────────────────
 //
 // A live inspector + trigger panel for the Ambient Runtime (js/runtime.js) so
 // the accumulating Phase-2 ambient features are testable without waiting on
@@ -51,6 +52,27 @@
 // DIAGNOSTIC_SHELL_TOOLS (below) is the single source of truth this panel
 // renders from. Adding a future trigger/reset/inspector is one more registry
 // entry — see the EXTENSION POINT comment near the template in index.html.
+//
+// ── U2: MOBILE OVERLAY (planning/DIAGNOSTIC_SHELL_PLAN.md §6) ───────────────
+// U1 mounted the panel as a document-flow <details class="panel"> at the top
+// of the body — it always occupied real vertical space, shoving the whole
+// machine down on mobile whenever the console mounted. U2 replaces that with
+// a floating toggle (#dshFab, the DEV-MARKER gear glyph) + a fixed overlay
+// drawer (#testConsolePanel, role=dialog) + a scrim (#dshScrim) — all three
+// mounted body-level, as siblings of .container.machine (same placement
+// #locationCard already uses), and all three position:fixed in CSS. A
+// position:fixed element contributes nothing to its parent's layout height,
+// so #testConsoleMount stays a genuine zero-height wrapper whether the
+// drawer is open or closed — the machine is never displaced. Being
+// body-level (never a descendant of .container) also means the FAB/drawer
+// are immune to the filter/transform containing-block trade-off documented
+// above the fixed .bezel dock in terminal.css (idle/night/shutdown apply
+// filter/transform to .container only) — they stay pinned in every ambient
+// state, exactly like #locationCard. _openShell()/_closeShell() implement a
+// self-contained Tab focus-trap + Escape-close (mirroring the existing
+// #sysModal trap in _wireKeyboardShortcuts(), but scoped to this drawer
+// since it is a distinct dialog surface, not a #sysModal caller — Protocol
+// 23: this file owns its own dialog, it doesn't fork the shared one).
 //
 // ── HARD ATMOSPHERE/SAVE BOUNDARY (Phase-2 prime invariant #1) ────────────────
 // This file touches ONLY in-memory Ambient Runtime state and the Immersion
@@ -289,15 +311,21 @@
   // empty (no tools yet) and are skipped entirely — a section with zero
   // visible tools for the current tier is never rendered.
   var CATEGORY_ORDER = ['triggers', 'state', 'resets', 'infra', 'inspect', 'fixtures', 'env'];
+  // Each section carries its own icon (U2 — "icons everywhere", planning
+  // §3.2), prepended to its <h3> in _renderShell() below.
   var CATEGORY_META = {
-    triggers: { stagingTitle: 'TRIGGERS', prodTitle: 'STIMULUS BENCH' },
-    state: { stagingTitle: 'STATE SETUP', prodTitle: 'STATE SETUP' },
-    resets: { stagingTitle: 'RESETS', prodTitle: 'RESETS' },
-    infra: { stagingTitle: 'RESILIENCE & INFRA', prodTitle: 'RESILIENCE & INFRA' },
-    inspect: { stagingTitle: 'INSPECT', prodTitle: 'READOUTS' },
-    fixtures: { stagingTitle: 'FIXTURES', prodTitle: 'FIXTURES' },
-    env: { stagingTitle: 'ENVIRONMENT & UNLOCK', prodTitle: 'ACCESS' },
+    triggers: { stagingTitle: 'TRIGGERS', prodTitle: 'STIMULUS BENCH', icon: '▲' },
+    state: { stagingTitle: 'STATE SETUP', prodTitle: 'STATE SETUP', icon: '◆' },
+    resets: { stagingTitle: 'RESETS', prodTitle: 'RESETS', icon: '⌦' },
+    infra: { stagingTitle: 'RESILIENCE & INFRA', prodTitle: 'RESILIENCE & INFRA', icon: '⚒' },
+    inspect: { stagingTitle: 'INSPECT', prodTitle: 'READOUTS', icon: '◉' },
+    fixtures: { stagingTitle: 'FIXTURES', prodTitle: 'FIXTURES', icon: '▣' },
+    env: { stagingTitle: 'ENVIRONMENT & UNLOCK', prodTitle: 'ACCESS', icon: '■' },
   };
+  // The shared DEV-MARKER glyph (U2 — one glyph, every dev-only affordance):
+  // the FAB, and reserved for the inline dev-reset buttons a future unit
+  // (U4) will add via category:'inline' registry entries (planning §5/§9).
+  var DEV_MARKER = '⚙';
 
   function _paintEnvBanner(panel, tier) {
     var el = panel.querySelector('#dshEnvBanner');
@@ -345,6 +373,14 @@
         (tier === 'staging'
           ? meta.stagingTitle
           : meta.prodTitle || meta.stagingTitle || cat.toUpperCase());
+      // U2 — section icon (planning §3.2 "icons everywhere"): prepended as a
+      // separate node AFTER the textContent assignment above (never folded
+      // into that assignment itself, so the '> HEADING' text stays intact).
+      var secIcon = document.createElement('span');
+      secIcon.className = 'dsh-section-icon';
+      secIcon.setAttribute('aria-hidden', 'true');
+      secIcon.textContent = (meta.icon || DEV_MARKER) + ' ';
+      h3.insertBefore(secIcon, h3.firstChild);
       summary.appendChild(h3);
       details.appendChild(summary);
       visibleTools.forEach(function (tool) {
@@ -355,6 +391,21 @@
           'data-dsh-search',
           (tool.label + ' ' + (tool.subLabel || '')).toLowerCase()
         );
+        if (tool.tooltip) anchorEl.title = tool.tooltip;
+        // U2 — per-tool icon (registry `icon` field), prepended into the
+        // anchor's own .optics-label so every migrated control reads with
+        // an icon, not plain text only. A shared anchor (e.g. FORCE
+        // TRANSITION/REBOOT/WAKE all point at #testConsoleTransitions) only
+        // ever gets the FIRST claiming tool's icon (the `moved` guard above
+        // already ensures only one tool ever reaches this point per anchor).
+        var labelEl = anchorEl.querySelector('.optics-label');
+        if (labelEl && (tool.icon || DEV_MARKER) && !labelEl.querySelector('.dsh-tool-icon')) {
+          var toolIcon = document.createElement('span');
+          toolIcon.className = 'dsh-tool-icon';
+          toolIcon.setAttribute('aria-hidden', 'true');
+          toolIcon.textContent = (tool.icon || DEV_MARKER) + ' ';
+          labelEl.insertBefore(toolIcon, labelEl.firstChild);
+        }
         details.appendChild(anchorEl); // moves the existing node — no markup rebuilt
         moved[tool.anchor] = true;
       });
@@ -392,6 +443,14 @@
     });
   }
 
+  // _mountConsole — U2: the clone now carries THREE top-level siblings (the
+  // FAB, the scrim, and the drawer itself) rather than one panel. All three
+  // are pulled out of the same detached fragment and appended individually
+  // — the drawer via the exact same `mount.appendChild(panel)` call U1
+  // already used (Suite 210.7 asserts this literal call happens AFTER
+  // _renderShell(panel), so the tier-filter always runs before ANY of this
+  // reaches the document; that invariant is unchanged by U2, just joined by
+  // two more appends for the FAB/scrim).
   function _mountConsole() {
     var mount = document.getElementById('testConsoleMount');
     var tpl = document.getElementById('testConsoleTemplate');
@@ -400,10 +459,110 @@
     if (existing) return existing;
     var frag = tpl.content.cloneNode(true); // detached — not part of the document yet
     var panel = frag.querySelector('#testConsolePanel');
+    var fab = frag.querySelector('#dshFab');
+    var scrim = frag.querySelector('#dshScrim');
     if (!panel) return null;
     _renderShell(panel); // filter + reorganize BEFORE the panel ever touches the document
+    if (fab) mount.appendChild(fab);
+    if (scrim) mount.appendChild(scrim);
     mount.appendChild(panel); // only the surviving, tier-appropriate DOM is inserted
     return panel;
+  }
+
+  // ── U2: drawer open/close + focus trap ───────────────────────────────────
+  // A self-contained Tab-cycle + Escape-close, mirroring the existing
+  // #sysModal trap in _wireKeyboardShortcuts() (ui-core.js) but scoped to
+  // this drawer specifically — the Diagnostic Shell is its own dialog
+  // surface, not a #sysModal caller, so it owns its own trap rather than
+  // forking or overloading the shared one (Protocol 23).
+  var _shellTriggerEl = null;
+
+  function _shellFocusables(panel) {
+    if (!panel) return [];
+    return Array.prototype.filter.call(
+      panel.querySelectorAll(
+        'button:not([disabled]),[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
+      ),
+      function (el) {
+        return el.offsetParent !== null;
+      }
+    );
+  }
+
+  function _shellKeydown(e) {
+    var panel = document.getElementById('testConsolePanel');
+    if (!panel || panel.hidden) return;
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      _closeShell();
+      return;
+    }
+    if (e.key !== 'Tab') return;
+    var focusables = _shellFocusables(panel);
+    if (!focusables.length) return;
+    var first = focusables[0];
+    var last = focusables[focusables.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
+
+  function _openShell() {
+    var panel = document.getElementById('testConsolePanel');
+    var scrim = document.getElementById('dshScrim');
+    var fab = document.getElementById('dshFab');
+    if (!panel) return;
+    _shellTriggerEl = document.activeElement || null;
+    panel.hidden = false;
+    if (scrim) scrim.hidden = false;
+    if (fab) fab.setAttribute('aria-expanded', 'true');
+    document.addEventListener('keydown', _shellKeydown, true);
+    var closeBtn = document.getElementById('dshClose');
+    if (closeBtn) closeBtn.focus();
+  }
+
+  function _closeShell() {
+    var panel = document.getElementById('testConsolePanel');
+    var scrim = document.getElementById('dshScrim');
+    var fab = document.getElementById('dshFab');
+    if (!panel) return;
+    panel.hidden = true;
+    if (scrim) scrim.hidden = true;
+    if (fab) fab.setAttribute('aria-expanded', 'false');
+    document.removeEventListener('keydown', _shellKeydown, true);
+    if (_shellTriggerEl && typeof _shellTriggerEl.focus === 'function') {
+      _shellTriggerEl.focus();
+    } else if (fab) {
+      fab.focus();
+    }
+    _shellTriggerEl = null;
+  }
+
+  function _wireShellToggle() {
+    var fab = document.getElementById('dshFab');
+    var scrim = document.getElementById('dshScrim');
+    var closeBtn = document.getElementById('dshClose');
+    if (fab) {
+      // Single source of truth for the DEV-MARKER glyph (also reserved for
+      // the U4 inline dev-reset buttons) — set here from DEV_MARKER rather
+      // than trusting the static HTML entity to stay in sync.
+      var glyphEl = fab.querySelector('span');
+      if (glyphEl) glyphEl.textContent = DEV_MARKER;
+      fab.addEventListener('click', function () {
+        var panel = document.getElementById('testConsolePanel');
+        if (panel && panel.hidden) {
+          _openShell();
+        } else {
+          _closeShell();
+        }
+      });
+    }
+    if (scrim) scrim.addEventListener('click', _closeShell);
+    if (closeBtn) closeBtn.addEventListener('click', _closeShell);
   }
 
   // Owner report fix: COLD_BOOT/READY/ACTIVE are normal-operation states with no A3
@@ -732,6 +891,7 @@
       _wireVisualParseTest(panel);
       _wireImmersionSelect(panel);
       _wireSearch(panel);
+      _wireShellToggle();
       _wireLiveRefresh(panel);
       _refresh(panel);
     } catch (_) {

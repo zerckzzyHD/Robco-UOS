@@ -72,8 +72,8 @@
 ├── js/vendor/                 Self-hosted Tesseract.js (Apache-2.0) — main API, worker, wasm core
 ├── assets/ocr/                Vendored OCR language data (eng.traineddata.gz, runtime-cached)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2827-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2827-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2840-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2840-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -421,7 +421,7 @@ ON`) fixes this: it is hidden by default and shown **only** via the SAME `body.r
 
 ---
 
-## Developer Console / Diagnostic Shell (`js/test-console.js` — Step 2 · Phase 2, Diagnostic Shell U1)
+## Developer Console / Diagnostic Shell (`js/test-console.js` — Step 2 · Phase 2, Diagnostic Shell U1/U2)
 
 **This IS the canonical developer/debug console** — the same one the roadmap's hacking minigame will later unlock in normal builds, not a separate throwaway test panel. A live inspector + trigger panel for the Ambient Runtime, built to keep pace with the accumulating Phase-2 ambient features (UPLINK, Hardware Life, etc. — each future feature adds one more registry entry here).
 
@@ -445,7 +445,13 @@ ON`) fixes this: it is hidden by default and shown **only** via the SAME `body.r
 
 **Extension point.** A future hard-to-trigger feature (broadcasts, weather, boot flavors, etc.) adds one more `DIAGNOSTIC_SHELL_TOOLS` entry with an `anchor` selector pointing at a new `.input-group` block placed beside the existing ones in `#testConsoleTemplate` (`index.html`) — never writing campaign state, never bypassing `confirmAction()` for a `destructive:true` tool. Protocol 44 (a future unit) will make this a gate-enforced requirement for every new `RobcoEvents` event / view-once flag.
 
-Guarded by Suite 149 (both runners: staging-gate fail-safe both-sides, no-durable-write boundary, template inert-by-default, reused env signal, minigame-unlock-seam comment presence) + Suite 210 (both runners: registry completeness, the two-signal gate's fail-safe-to-prod behavior — both structural and a real behavioral eval — the leak-proof `_toolVisible()` filtering proof against the live registry, the filter-before-DOM-insertion ordering, the static destructive/staging-category invariant, a Node `vm`-sandbox proof of `_invoke()`'s auto-confirm-gate, and a Protocol 42 regression test (Suite 210.14) locking that every `destructive:true` tool in the real registry carries a callable `action` — added after live browser verification caught `replay-hatch`'s `action` field missing entirely, which made `_invoke()` silently no-op the button with no confirm dialog and no thrown error, undetected by the suite's own synthetic-tool-object proofs) + Suite 19 in `tests/test.html` (real-browser fail-safe-to-hidden proof + `listObservers()` behavioral proof).
+**Diagnostic Shell U2 (`planning/DIAGNOSTIC_SHELL_PLAN.md` §6, Protocol 8) — mobile overlay + identity + icons.** U1's document-flow `<details class="panel" id="testConsolePanel">` always occupied real vertical space, shoving the whole machine down on mobile whenever the console mounted. U2 replaces it with three body-level `position:fixed` elements — a floating toggle (`#dshFab`, the shared `DEV_MARKER` gear glyph), a scrim (`#dshScrim`), and the drawer itself (`#testConsolePanel`, now a `role="dialog" aria-modal="true"` `<div class="dsh-drawer">` sliding in from the right, `width:min(92vw,420px)`) — all mounted as siblings of `.container.machine`, the same body-level placement `#locationCard` already uses. Since every one of the three is `position:fixed`, `#testConsoleMount` (unchanged location, still a plain empty `<div>` before `.container.machine`) contributes zero layout height whether the drawer is open or closed, and being body-level (never a descendant of `.container`) means the FAB/drawer are immune to the `filter`/`transform` containing-block trade-off the fixed `.bezel` dock documents (idle/night/shutdown apply `filter`/`transform` to `.container` only) — they stay pinned in every ambient-runtime state, mirroring `#locationCard`.
+
+- **`_mountConsole()`** now pulls the FAB and scrim out of the same detached template clone and appends them alongside the drawer — the drawer still reaches the document via the exact `mount.appendChild(panel)` call _after_ `_renderShell(panel)`, so the U1 filter-before-DOM-insertion ordering (Suite 210.7) is unchanged by the two new appends.
+- **`_openShell()`/`_closeShell()`/`_shellKeydown()`/`_shellFocusables()`** implement a self-contained Tab focus-trap + Escape-close, mirroring the shape of the existing `#sysModal` trap in `_wireKeyboardShortcuts()` (`ui-core.js`) without forking it — the Diagnostic Shell is its own dialog surface, not a `#sysModal` caller (Protocol 23). Opening sets `aria-expanded="true"` on the FAB and focuses the close button; closing restores focus to whatever triggered the open and resets `aria-expanded="false"`. The slide-in (`@keyframes dsh-slide-in`) is a plain `animation:` declaration (Protocol UI-9) — the existing global `prefers-reduced-motion` block neutralizes it to an instant open automatically.
+- **Icons everywhere.** `_renderShell()` now prepends a per-category glyph (`CATEGORY_META[cat].icon`) to every section `<h3>` and a per-tool glyph (the registry `icon` field) into every migrated control's `.optics-label`, via two new CSS classes (`.dsh-section-icon`/`.dsh-tool-icon`). A single `DEV_MARKER` constant (`⚙`) is the shared glyph — used as the icon fallback and set onto the FAB by `_wireShellToggle()` — reserved for the inline dev-reset buttons a future unit (U4) will add.
+
+Guarded by Suite 149 (both runners: staging-gate fail-safe both-sides, no-durable-write boundary, template inert-by-default, reused env signal, minigame-unlock-seam comment presence) + Suite 210 (both runners: U1 registry completeness, the two-signal gate's fail-safe-to-prod behavior — both structural and a real behavioral eval — the leak-proof `_toolVisible()` filtering proof against the live registry, the filter-before-DOM-insertion ordering, the static destructive/staging-category invariant, a Node `vm`-sandbox proof of `_invoke()`'s auto-confirm-gate, and a Protocol 42 regression test (Suite 210.14) locking that every `destructive:true` tool in the real registry carries a callable `action`) + Suite 211 (both runners: the U2 mobile-overlay markup/CSS shape, the float-over-content `position:fixed` invariant, the `#testConsoleMount` zero-height placement, the `_mountConsole()` append ordering extended to the FAB/scrim, the DIAGNOSTIC SHELL identity rebrand, a Node `vm`-sandbox synthetic-DOM behavioral proof that the FAB/scrim/close-button/Escape wiring actually opens and closes the drawer, the reduced-motion-safe slide, the atmosphere/save boundary extended to the new U2 functions, the Protocol 17 mobile tap-target floor, and a regression guard that the U1 document-flow shape can never silently come back) + Suite 19 in `tests/test.html` (real-browser fail-safe-to-hidden proof + `listObservers()` behavioral proof).
 
 ---
 
@@ -3017,7 +3023,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2827-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2840-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

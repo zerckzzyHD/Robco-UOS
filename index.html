@@ -143,12 +143,22 @@
     </template>
 
     <!-- ════════════════════════════════════════════════════════════════════
-         TEST CONSOLE (Step 2 · Phase 2) — STAGING/DEV ONLY, NEVER ON PRODUCTION.
+         DIAGNOSTIC SHELL (Step 2 · Phase 2, Diagnostic Shell U2: mobile overlay
+         + identity + icons) — STAGING/DEV ONLY, NEVER ON PRODUCTION.
          Lives inert inside a <template> (WU-E2 pattern, same as the banners
          above) so it can never render even by accident. js/test-console.js
          clones it into #testConsoleMount ONLY when _isStagingEnv() (ui-core.js,
          Protocol 43/WU-C11) returns true — the same fail-safe-to-hidden env
          gate the changelog viewer uses to hide [Unreleased] on production.
+         U2: the panel is no longer a document-flow details/panel element (the
+         U1 shape, which shoved the machine down on mobile) — it is now a
+         FLOATING toggle (#dshFab) + a FIXED overlay DRAWER (#testConsolePanel,
+         role=dialog), both mounted body-level as siblings of .container.machine
+         — the SAME body-level placement #locationCard already uses below —
+         so they float over content with zero document-flow footprint and stay
+         pinned through the ambient-runtime filter/transform states (idle/
+         night/shutdown degrade the FIXED BEZEL DOCK the same way; a body-level
+         sibling of .container is never subject to that trade-off at all).
          A live inspector + trigger panel for the Ambient Runtime (js/runtime.js):
          current state, forced state transitions, the Immersion dial, and the
          registered-observer list — so Phase-2 ambient features are testable
@@ -164,8 +174,34 @@
          campaign, same as every other control here.
          ════════════════════════════════════════════════════════════════════ -->
     <template id="testConsoleTemplate">
-      <details class="panel" id="testConsolePanel" style="margin: 8px">
-        <summary><h2>&gt; DIAGNOSTIC SHELL</h2></summary>
+      <button
+        type="button"
+        id="dshFab"
+        class="dsh-fab"
+        aria-haspopup="dialog"
+        aria-expanded="false"
+        aria-controls="testConsolePanel"
+        aria-label="Open the Diagnostic Shell"
+        title="Diagnostic Shell (dev)"
+      >
+        <span aria-hidden="true">&#9881;</span>
+      </button>
+      <div id="dshScrim" class="dsh-scrim" hidden></div>
+      <div
+        id="testConsolePanel"
+        class="dsh-drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="dshDrawerTitle"
+        hidden
+      >
+        <div class="dsh-drawer-head">
+          <span class="dsh-drawer-icon" aria-hidden="true">&#9881;</span>
+          <h2 id="dshDrawerTitle">&gt; DIAGNOSTIC SHELL &mdash; SUBROUTINE ACCESS</h2>
+          <button type="button" class="dx" id="dshClose" aria-label="Close the Diagnostic Shell">
+            &#10005;
+          </button>
+        </div>
         <div id="dshEnvBanner" class="panel-substatus" aria-live="polite">&mdash;</div>
         <p style="font-size: 10px">
           Staging/dev environments only &mdash; never shown on the live site. Renders from the
@@ -319,8 +355,13 @@
              DIAGNOSTIC_SHELL_TOOLS (js/test-console.js) with an `anchor` selector
              pointing at a new .input-group block placed here — never write campaign
              state, never bypass confirmAction() for a destructive:true tool. -->
-      </details>
+      </div>
     </template>
+    <!-- U2: still an empty body-level mount, unchanged location (a sibling of
+         .container.machine, before it in source order) — but now everything
+         cloned into it (the FAB, the scrim, and the fixed drawer) is
+         position:fixed, so this <div> contributes ZERO layout height and the
+         machine below it is never pushed down, open or closed. -->
     <div id="testConsoleMount"></div>
 
     <div id="bootScreen">

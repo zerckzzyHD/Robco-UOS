@@ -23763,6 +23763,286 @@ try {
 }
 
 # ===========================================================
+# Suite 211 -- Diagnostic Shell U2: mobile overlay + identity + icons
+# (planning/DIAGNOSTIC_SHELL_PLAN.md Sec6, Protocol 8 Sonnet stage). Mirrors
+# JS Suite 211. U1's document-flow <details class="panel"> (which shoved the
+# whole machine down on mobile whenever the console mounted) is replaced by
+# a floating toggle (#dshFab, the DEV-MARKER gear glyph) + a fixed overlay
+# drawer (#testConsolePanel, role=dialog) + a scrim (#dshScrim) -- all three
+# mounted body-level as siblings of .container.machine (the same placement
+# #locationCard already uses) and all three position:fixed, so
+# #testConsoleMount stays a zero-height wrapper whether the drawer is open
+# or closed. _renderShell() also injects a per-category icon into every
+# section <h3> and a per-tool icon into every migrated control's label. The
+# drawer carries its own self-contained Tab focus-trap + Escape-close. 13
+# tests.
+# ===========================================================
+Sep "Suite 211 -- Diagnostic Shell U2: mobile overlay + identity + icons"
+$testConsole211 = Read-Src "js/test-console.js"
+$index211 = Read-Src "index.html"
+$css211 = Read-Src "css/terminal.css"
+$tplStart211 = $index211.IndexOf('<template id="testConsoleTemplate">')
+$tplEnd211 = $index211.IndexOf('</template>', $tplStart211)
+$tplSrc211 = if ($tplStart211 -ge 0) { $index211.Substring($tplStart211, $tplEnd211 - $tplStart211) } else { '' }
+
+# 211.1 the template carries a #dshFab toggle button, a #dshScrim, and
+#       #testConsolePanel re-shaped into a fixed dialog drawer.
+Check (
+    ($tplSrc211 -match '(?s)<button[\s\S]{0,200}id="dshFab"[\s\S]{0,200}aria-haspopup="dialog"[\s\S]{0,200}aria-expanded="false"[\s\S]{0,200}aria-controls="testConsolePanel"') -and
+    ($tplSrc211 -match '<div[^>]*id="dshScrim"[^>]*hidden') -and
+    ($tplSrc211 -match '(?s)<div[\s\S]{0,120}id="testConsolePanel"[\s\S]{0,200}class="dsh-drawer"[\s\S]{0,200}role="dialog"[\s\S]{0,200}aria-modal="true"[\s\S]{0,200}aria-labelledby="dshDrawerTitle"[\s\S]{0,200}hidden') -and
+    (-not ($index211 -match '<details class="panel" id="testConsolePanel"'))
+) '211.1: <template id="testConsoleTemplate"> carries #dshFab (aria-haspopup=dialog, aria-controls=testConsolePanel), #dshScrim (hidden), and #testConsolePanel now a role=dialog aria-modal=true hidden <div class="dsh-drawer"> -- no longer the U1 document-flow <details class="panel">'
+
+# 211.2 float-over-content invariant: FAB/scrim/drawer are all
+#       position:fixed, and both scrim/drawer collapse via [hidden].
+Check (
+    ($css211 -match '(?s)\.dsh-fab\s*\{[^}]*position:\s*fixed') -and
+    ($css211 -match '(?s)\.dsh-scrim\s*\{[^}]*position:\s*fixed') -and
+    ($css211 -match '(?s)\.dsh-drawer\s*\{[^}]*position:\s*fixed') -and
+    ($css211 -match '(?s)\.dsh-scrim\[hidden\]\s*\{\s*display:\s*none') -and
+    ($css211 -match '(?s)\.dsh-drawer\[hidden\]\s*\{\s*display:\s*none')
+) '211.2: .dsh-fab / .dsh-scrim / .dsh-drawer are all position:fixed (zero document-flow footprint), and [hidden] collapses both the scrim and the drawer to display:none'
+
+# 211.3 #testConsoleMount stays the same literal empty body-level <div>,
+#       still sitting before .container.machine in source order.
+Check (
+    ($index211 -match '<div id="testConsoleMount"></div>') -and
+    ($index211.IndexOf('<div id="testConsoleMount"></div>') -lt $index211.IndexOf('<div class="container machine"'))
+) '211.3: #testConsoleMount is still the literal empty body-level <div>, positioned before <div class="container machine"> in source order -- the FAB/scrim/drawer it mounts inherit that same body-level (never in-flow-inside-.container) placement'
+
+# 211.4 _mountConsole() appends the FAB and scrim alongside the drawer, and
+#       still calls the exact literal `mount.appendChild(panel)` after
+#       `_renderShell(panel)`.
+$mountBody211 = Get-FunctionBody $testConsole211 '_mountConsole'
+$renderCallIdx211 = $mountBody211.IndexOf('_renderShell(panel)')
+$appendIdx211 = $mountBody211.IndexOf('mount.appendChild(panel)')
+Check (
+    ($mountBody211 -match 'mount\.appendChild\(fab\)') -and
+    ($mountBody211 -match 'mount\.appendChild\(scrim\)') -and
+    ($renderCallIdx211 -ge 0) -and ($appendIdx211 -ge 0) -and ($renderCallIdx211 -lt $appendIdx211)
+) '211.4: _mountConsole() now also appends the FAB and scrim, but the drawer itself still reaches the document via the exact `mount.appendChild(panel)` call AFTER `_renderShell(panel)` -- the U1 filter-before-DOM-insertion invariant (Suite 210.7) is unchanged'
+
+# 211.5 identity rebrand: the drawer header carries the DIAGNOSTIC SHELL title.
+Check (
+    ($tplSrc211 -match '(?s)id="dshDrawerTitle"[^>]*>[^<]*DIAGNOSTIC SHELL') -and
+    ($tplSrc211 -match 'class="dsh-drawer-icon"')
+) '211.5: the drawer header (#dshDrawerTitle, the aria-labelledby target) reads DIAGNOSTIC SHELL, dressed with a machine-language icon glyph -- the identity rebrand carries into the U2 drawer chrome'
+
+# 211.6-211.9 BEHAVIORAL -- executed via a spawned node process against the
+# ACTUAL source (Protocol 42 stdin-corruption-safe transport, mirroring the
+# Suite 210 pattern): 211.6 also needs the real DIAGNOSTIC_SHELL_TOOLS array
+# evaluated (every entry carries an icon), and 211.9 drives a synthetic DOM
+# to prove the FAB/scrim/close-button/Escape wiring actually opens/closes.
+$labels211 = @(
+    "211.6: [behavioral] every CATEGORY_META section carries an icon (U2) and every DIAGNOSTIC_SHELL_TOOLS entry still carries an icon (U1) -- icons everywhere, not plain text only",
+    "211.9: [behavioral] tapping the FAB opens the drawer + scrim and sets aria-expanded=true; tapping it again closes both; the scrim, the close button, and Escape each independently close the drawer"
+)
+try {
+    $nodeCheck211 = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCheck211) {
+        $repoRootNode211 = $Root.Replace('\', '/')
+        $testScript211 = @"
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+const ROOT = '$repoRootNode211';
+function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+function extractBody(src, name) {
+  var idx = src.indexOf('function ' + name);
+  if (idx === -1) throw new Error('missing ' + name);
+  var i = src.indexOf('{', idx);
+  var depth = 0, start = i;
+  while (i < src.length) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) return src.slice(start, i + 1); }
+    i++;
+  }
+  throw new Error('unclosed ' + name);
+}
+function declareFn(src, name) {
+  var nameIdx = src.indexOf('function ' + name);
+  var parenIdx = src.indexOf('(', nameIdx);
+  var braceIdx = src.indexOf('{', parenIdx);
+  var params = src.slice(parenIdx, braceIdx);
+  return 'function ' + name + params + extractBody(src, name);
+}
+
+const testConsoleSrc = rd('js/test-console.js');
+var results = [];
+
+// 211.6
+try {
+  var toolsStart = testConsoleSrc.indexOf('var DIAGNOSTIC_SHELL_TOOLS = [');
+  var toolsEnd = testConsoleSrc.indexOf('\n  ];', toolsStart) + '\n  ];'.length;
+  var toolsSrc = testConsoleSrc.slice(toolsStart, toolsEnd);
+  var replayHatchBody = extractBody(testConsoleSrc, '_replayHatch');
+  var toolsSandbox = eval('(function () {\n function _replayHatch() ' + replayHatchBody + '\n ' + toolsSrc + '\n return DIAGNOSTIC_SHELL_TOOLS; })()');
+  var everyToolHasIcon = toolsSandbox.length >= 9 && toolsSandbox.every(function (t) { return typeof t.icon === 'string' && t.icon.length > 0; });
+  var catMetaSrc = testConsoleSrc.slice(testConsoleSrc.indexOf('var CATEGORY_META = {'), testConsoleSrc.indexOf('};', testConsoleSrc.indexOf('var CATEGORY_META = {')) + 2);
+  var catKeys = ['triggers', 'state', 'resets', 'infra', 'inspect', 'fixtures', 'env'];
+  var everyCatHasIcon = catKeys.every(function (k) { return new RegExp(k + ":\\s*\\{[^}]*icon:\\s*'[^']+'").test(catMetaSrc); });
+  var renderShellBody6 = extractBody(testConsoleSrc, '_renderShell');
+  results.push(everyToolHasIcon && everyCatHasIcon && /dsh-section-icon/.test(renderShellBody6) && /dsh-tool-icon/.test(renderShellBody6) && /\.optics-label/.test(renderShellBody6));
+} catch (e) { results.push(false); }
+
+// 211.9
+try {
+  function makeShellDom() {
+    var registry = new Map();
+    function makeEl(id) {
+      var listeners = {};
+      var el = {
+        id: id, hidden: true, _attrs: {}, _focused: false,
+        setAttribute: function (k, v) { el._attrs[k] = v; },
+        getAttribute: function (k) { return el._attrs[k]; },
+        focus: function () { el._focused = true; },
+        addEventListener: function (type, fn) { (listeners[type] = listeners[type] || []).push(fn); },
+        _fire: function (type, evt) { (listeners[type] || []).forEach(function (fn) { fn(evt || {}); }); },
+        querySelector: function (sel) {
+          if (sel === '#dshClose') return registry.get('dshClose');
+          if (sel === 'span') return registry.get('__fabSpan');
+          return null;
+        },
+        querySelectorAll: function () { return []; },
+      };
+      return el;
+    }
+    ['testConsolePanel', 'dshScrim', 'dshFab', 'dshClose'].forEach(function (id) { registry.set(id, makeEl(id)); });
+    registry.set('__fabSpan', makeEl('__fabSpan'));
+    var docListeners = {};
+    return {
+      registry: registry,
+      activeElement: null,
+      getElementById: function (id) { return registry.get(id) || null; },
+      addEventListener: function (type, fn) { (docListeners[type] = docListeners[type] || []).push(fn); },
+      removeEventListener: function (type, fn) {
+        var arr = docListeners[type] || [];
+        var i = arr.indexOf(fn);
+        if (i !== -1) arr.splice(i, 1);
+      },
+    };
+  }
+  var src9 = "var DEV_MARKER = '⚙';\nvar _shellTriggerEl = null;\n" +
+    declareFn(testConsoleSrc, '_shellFocusables') + '\n' +
+    declareFn(testConsoleSrc, '_shellKeydown') + '\n' +
+    declareFn(testConsoleSrc, '_openShell') + '\n' +
+    declareFn(testConsoleSrc, '_closeShell') + '\n' +
+    declareFn(testConsoleSrc, '_wireShellToggle');
+  var sb = { document: null, console: { warn: function () {} } };
+  sb.document = makeShellDom();
+  vm.createContext(sb);
+  vm.runInContext(src9, sb);
+  sb._wireShellToggle();
+  var panel = sb.document.getElementById('testConsolePanel');
+  var scrim = sb.document.getElementById('dshScrim');
+  var fab = sb.document.getElementById('dshFab');
+
+  fab._fire('click');
+  var openedByFab = panel.hidden === false && scrim.hidden === false;
+  var expandedTrue = fab.getAttribute('aria-expanded') === 'true';
+  fab._fire('click');
+  var closedByFabToggle = panel.hidden === true && scrim.hidden === true;
+  var expandedFalse = fab.getAttribute('aria-expanded') === 'false';
+
+  fab._fire('click');
+  scrim._fire('click');
+  var closedByScrim = panel.hidden === true;
+
+  fab._fire('click');
+  sb.document.getElementById('dshClose')._fire('click');
+  var closedByCloseBtn = panel.hidden === true;
+
+  fab._fire('click');
+  sb._shellKeydown({ key: 'Escape', preventDefault: function () {} });
+  var closedByEscape = panel.hidden === true;
+
+  results.push(openedByFab && expandedTrue && closedByFabToggle && expandedFalse && closedByScrim && closedByCloseBtn && closedByEscape);
+} catch (e) { results.push(false); }
+
+console.log('RESULT:' + results.map(function (r) { return r ? '1' : '0'; }).join(''));
+"@
+        $tmpScript211 = [System.IO.Path]::GetTempFileName() + '.js'
+        [System.IO.File]::WriteAllText($tmpScript211, $testScript211, [System.Text.Encoding]::UTF8)
+        try {
+            $out211 = (node $tmpScript211 2>&1 | Out-String)
+        } finally {
+            Remove-Item -Path $tmpScript211 -Force -ErrorAction SilentlyContinue
+        }
+        $rm211 = [regex]::Match($out211, 'RESULT:([01]{2})')
+        if ($rm211.Success) {
+            $bits211 = $rm211.Groups[1].Value
+            for ($bi211 = 0; $bi211 -lt $labels211.Count; $bi211++) {
+                Check ($bits211.Substring($bi211, 1) -eq '1') $labels211[$bi211]
+            }
+        } else {
+            $err211 = if ([string]::IsNullOrWhiteSpace($out211)) { "No output from node" } else { $out211.Trim() }
+            foreach ($lbl in $labels211) { Fail "$lbl  (runtime error: $err211)" }
+        }
+    } else {
+        foreach ($lbl in $labels211) { Fail "$lbl  (node.exe not found on PATH -- cannot run behavioral proof)" }
+    }
+} catch {
+    foreach ($lbl in $labels211) { Fail "$lbl  (harness error: $($_.Exception.Message))" }
+}
+
+# 211.7 DEV-MARKER glyph consistency: ONE shared glyph constant, used both
+#       as the icon fallback and set onto the FAB by _wireShellToggle().
+$devMarkerCount211 = ([regex]::Matches($testConsole211, 'DEV_MARKER')).Count
+Check (
+    ($testConsole211 -match "var DEV_MARKER = '[^']+'") -and
+    ($testConsole211 -match 'glyphEl\.textContent = DEV_MARKER') -and
+    ($devMarkerCount211 -ge 4)
+) '211.7: ONE DEV_MARKER glyph constant is declared and reused -- as the icon fallback (section + tool) and set onto the #dshFab glyph by _wireShellToggle() -- never a second hardcoded glyph literal'
+
+# 211.8 a11y: _openShell()/_closeShell() manage aria-expanded + focus;
+#       _shellKeydown() implements Escape-close and a Tab-cycle focus trap.
+$openBody211 = Get-FunctionBody $testConsole211 '_openShell'
+$closeBody211 = Get-FunctionBody $testConsole211 '_closeShell'
+$keydownBody211 = Get-FunctionBody $testConsole211 '_shellKeydown'
+Check (
+    ($openBody211 -match "fab\.setAttribute\('aria-expanded', 'true'\)") -and
+    ($openBody211 -match 'closeBtn\.focus\(\)') -and
+    ($closeBody211 -match "fab\.setAttribute\('aria-expanded', 'false'\)") -and
+    ($closeBody211 -match '(?s)_shellTriggerEl[\s\S]*\.focus\(\)') -and
+    ($keydownBody211 -match "e\.key === 'Escape'") -and
+    ($keydownBody211 -match '_closeShell\(\)') -and
+    ($keydownBody211 -match "e\.key !== 'Tab'") -and
+    ($keydownBody211 -match 'document\.activeElement === first') -and
+    ($keydownBody211 -match 'document\.activeElement === last')
+) "211.8: _openShell() sets aria-expanded=true on the FAB and focuses the close button; _closeShell() sets aria-expanded=false and restores focus to the trigger element; _shellKeydown() closes on Escape and Tab-cycles within the drawer's own focusable set (first/last wraparound) -- a self-contained focus trap, not a fork of #sysModal's"
+
+# 211.10 reduced-motion-safe slide (Protocol UI-9): a plain @keyframes
+#        animation, no bespoke reduced-motion carve-out.
+Check (
+    ($css211 -match '@keyframes dsh-slide-in') -and
+    ($css211 -match '(?s)\.dsh-drawer\s*\{[^}]*animation:\s*dsh-slide-in')
+) "211.10: .dsh-drawer's open slide is a plain @keyframes dsh-slide-in animation (Protocol UI-9) -- auto-neutralized to an instant open by the existing global prefers-reduced-motion block, no bespoke carve-out"
+
+# 211.11 HARD atmosphere/save boundary across the new U2 functions.
+$newFnNames211 = @('_mountConsole', '_openShell', '_closeShell', '_shellKeydown', '_shellFocusables', '_wireShellToggle')
+$newFnsCombined211 = ($newFnNames211 | ForEach-Object { Get-FunctionBody $testConsole211 $_ }) -join "`n"
+Check (
+    (-not ($newFnsCombined211 -match 'saveState|robco_v8|_logEvent|\beventLog\b|localStorage\.')) -and
+    (-not ($newFnsCombined211 -match 'FNV|FO3|New Vegas|Fallout 3'))
+) '211.11: the new U2 mount/open/close/focus-trap functions never touch the campaign save (no saveState/robco_v8/eventLog/localStorage) and carry no game literal (Protocol 38)'
+
+# 211.12 mobile baseline (Protocol 17): the FAB is a genuine >=28px tap
+#        target (46px), and the close button keeps a >=28px floor.
+Check (
+    ($css211 -match '(?s)\.dsh-fab\s*\{[^}]*width:\s*46px[^}]*height:\s*46px') -and
+    ($css211 -match '(?s)\.dsh-drawer-head \.dx\s*\{[^}]*min-width:\s*28px[^}]*min-height:\s*28px')
+) '211.12: .dsh-fab is a genuine 46px (>=28px Protocol 17) tap target, and .dsh-drawer-head .dx (the close button) keeps a >=28px min-width/min-height floor'
+
+# 211.13 regression guard: the U1 document-flow shape can never silently
+#        come back.
+Check (
+    (-not ($index211 -match '<details[^>]*class="[^"]*\bpanel\b[^"]*"[^>]*id="testConsolePanel"')) -and
+    (-not ($index211 -match '<details[^>]*id="testConsolePanel"[^>]*class="[^"]*\bpanel\b[^"]*"')) -and
+    ($tplSrc211 -match '(?s)id="testConsolePanel"[\s\S]{0,200}role="dialog"')
+) '211.13: [regression guard] #testConsolePanel can never silently revert to a document-flow <details class="panel"> -- it must stay a role=dialog fixed overlay drawer'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"
