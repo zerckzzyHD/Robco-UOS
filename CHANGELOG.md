@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2813/2813 | Cache: robco-terminal-v2.7.0-r129 -->
+﻿## [Unreleased]<!-- Tests: 2827/2827 | Cache: robco-terminal-v2.7.0-r130 -->
 
 ### Added
 
@@ -207,6 +207,7 @@
 - Your quick-draw gear shortcuts are now stored as real, player-controlled data on your device instead of living nowhere durable — previously the AI had to remember what you'd bound to each slot itself, with no actual record kept. The AI can no longer see or change a binding; only you can, through the new Tool Deck panel.
 - Tidied up the project's repo layout by moving the app icon and the four shortcut icons into their own folder. Everything that points at them was updated to match, so the installed app icon and its shortcuts look and work exactly as before. Internal housekeeping only — no visible change.
 - Added a permanent automated check confirming the "what's new" patch-notes popup only ever opens once per update, on the first visit after a new version is published, never on every reload. Investigated after an owner report about an unexpected popup; the underlying logic was already correct — this check exists so it's caught immediately if that ever regresses. Internal only — no visible change.
+- Rebuilt the developer/debug console on a single internal list of tools instead of hand-wired one-off controls, with a second, stricter check layered on top of the existing dev/staging-only gate so a future non-destructive preview mode and the full toolbench can safely share one panel without any risky control ever slipping into the safer mode. Every existing developer control — the state readouts, the state-forcing buttons, reboot, wake, the immersion picker, and both screenshot-scanning test tools — still works exactly as before. The one exception: replaying the Module Bay's hatch ceremony now asks for confirmation first, since it's the console's one control that resets something, matching how every other reset-style control in the app already works. Developer/staging tooling only — never visible on the live site.
 
 ---
 

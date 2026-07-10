@@ -1,4 +1,5 @@
-// ── DEVELOPER CONSOLE — the ONE canonical dev/debug console (Step 2 · Phase 2) ─
+// ── DIAGNOSTIC SHELL — the ONE canonical dev/debug console (Step 2 · Phase 2,
+//    Diagnostic Shell U1: registry spine + two-signal gate) ──────────────────
 //
 // A live inspector + trigger panel for the Ambient Runtime (js/runtime.js) so
 // the accumulating Phase-2 ambient features are testable without waiting on
@@ -26,6 +27,31 @@
 // somehow bypassed — it only enters the DOM when initTestConsole() explicitly
 // clones it in.
 //
+// ── U1: THE TWO-SIGNAL GATE (planning/DIAGNOSTIC_SHELL_PLAN.md §2.2) ─────────
+// One signal used to answer "show it or not." This panel now serves two
+// audiences (an owner-only staging toolbench, and a future non-destructive
+// prod-minigame sandbox), so a second signal decides WHICH tools may render:
+//   - _shellVisible() — does the shell exist at all? Unchanged philosophy,
+//     a thin alias for _devConsoleUnlocked(). Fails to false (absent).
+//   - _shellTier() — 'staging' ONLY on a POSITIVE staging signal, otherwise
+//     the RESTRICTIVE 'prod' tier. Fails to 'prod' on any uncertainty — same
+//     fail-safe direction as _devConsoleUnlocked() and the changelog viewer.
+//   - _toolVisible(tool, tier) — the ONE filter every registry tool passes
+//     through BEFORE it ever touches the document. A tier:'staging' tool has
+//     exactly one way to render (a positively-confirmed staging tier), so it
+//     can never leak to a production player. See _renderShell() below: every
+//     tier-invisible tool's anchor is stripped out of a DETACHED clone of the
+//     <template> before that clone is ever appended to the document — nothing
+//     filtered ever becomes reachable DOM.
+//   - _invoke(tool) — every destructive:true tool's action is auto-wrapped in
+//     the existing confirmAction() helper (Protocol 22/34) so no caller can
+//     forget a confirm gate; it is a property of the registry data, enforced
+//     by this one call path.
+//
+// DIAGNOSTIC_SHELL_TOOLS (below) is the single source of truth this panel
+// renders from. Adding a future trigger/reset/inspector is one more registry
+// entry — see the EXTENSION POINT comment near the template in index.html.
+//
 // ── HARD ATMOSPHERE/SAVE BOUNDARY (Phase-2 prime invariant #1) ────────────────
 // This file touches ONLY in-memory Ambient Runtime state and the Immersion
 // tier (an existing MetaStore device pref, same as the real dial in Security &
@@ -33,13 +59,6 @@
 // and never pushes anything to the cloud. No auto-anything (Phase-2 invariant
 // #2) — every action here is an explicit developer button/select, never
 // triggered on its own.
-//
-// ── EXTENSION POINT ───────────────────────────────────────────────────────────
-// To add a trigger for a future ambient feature (broadcasts, weather, boot
-// flavors, etc.), add one more control inside #testConsoleTemplate's body
-// (index.html) and wire it here the same way _renderTransitionButtons /
-// _wireImmersionSelect do — call the feature's existing entry point directly,
-// never write campaign state, never bypass an existing confirm gate.
 //
 // Game-agnostic (Protocol 38): pure dev-tooling, no game literals.
 (function () {
@@ -67,14 +86,324 @@
     }
   }
 
+  // _shellVisible — existence gate (U1): does the shell mount AT ALL? A thin,
+  // literally-named alias over _devConsoleUnlocked() — same fail-safe-to-false
+  // philosophy, never a second re-derived check (Protocol 22).
+  function _shellVisible() {
+    return _devConsoleUnlocked();
+  }
+
+  // _shellTier — WHICH tools may render, once the shell is visible. 'staging'
+  // ONLY when the staging signal is POSITIVELY confirmed; otherwise the
+  // RESTRICTIVE 'prod' tier. Fails to 'prod' on any throw/missing function —
+  // the same fail-safe direction as _devConsoleUnlocked()'s "default to
+  // hidden"/the changelog viewer's "default to production".
+  function _shellTier() {
+    try {
+      return typeof window._isStagingEnv === 'function' && window._isStagingEnv()
+        ? 'staging'
+        : 'prod';
+    } catch (_) {
+      return 'prod';
+    }
+  }
+
+  // _toolVisible — the ONE filter every registry tool passes through before
+  // it ever enters the document. A tier:'prod' tool always shows (both
+  // audiences); a tier:'staging' tool shows ONLY when staging is positively
+  // confirmed. See _renderShell() for where this runs (before DOM insertion).
+  function _toolVisible(tool, tier) {
+    if (!tool) return false;
+    if (tool.tier === 'prod') return true;
+    return tier === 'staging';
+  }
+
+  // _invoke — the auto-confirm-gate (U1): a destructive:true tool's action
+  // is ALWAYS wrapped in the existing confirmAction() helper (Protocol 22/34,
+  // the diegetic Promise-based confirm, never the blocking confirm()). A
+  // non-destructive tool's action fires immediately. Fail-safe: if
+  // confirmAction() itself is unavailable or throws, a destructive action
+  // never fires (the safe direction).
+  function _invoke(tool) {
+    if (!tool || typeof tool.action !== 'function') return;
+    var run = function () {
+      try {
+        tool.action();
+      } catch (_) {
+        /* a tool action must never break the console */
+      }
+    };
+    if (!tool.destructive) {
+      run();
+      return;
+    }
+    try {
+      if (typeof confirmAction !== 'function') return; // fail-safe: no confirm path available, no destructive action
+      confirmAction({
+        title: '> ' + tool.label,
+        warning: tool.tooltip || 'This is a destructive diagnostic action.',
+        confirmLabel: 'EXECUTE',
+        cancelLabel: 'ABORT',
+      }).then(function (ok) {
+        if (ok) run();
+      });
+    } catch (_) {
+      /* a confirm-gate failure must never fire a destructive action */
+    }
+  }
+
+  // ── DIAGNOSTIC_SHELL_TOOLS — the single source of truth this panel renders
+  // from (planning/DIAGNOSTIC_SHELL_PLAN.md §2.1). U1 re-expresses every
+  // existing control (the 9 items below) as a registry entry; each `anchor`
+  // selector names the existing markup block inside <template
+  // id="testConsoleTemplate"> (index.html) that control already lives in —
+  // migration only, no new tools. A future trigger/reset/inspector is one
+  // more entry (see the EXTENSION POINT comment beside the template).
+  var DIAGNOSTIC_SHELL_TOOLS = [
+    {
+      id: 'inspect-runtime-state',
+      label: 'RUNTIME STATE',
+      subLabel: 'AmbientRuntime.getState() readout',
+      icon: '◉',
+      category: 'inspect',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Live Ambient Runtime state readout.',
+      triggers: ['runtime.state'],
+      anchor: '[data-dsh-anchor="testConsoleState"]',
+    },
+    {
+      id: 'runtime-force-transition',
+      label: 'FORCE TRANSITION',
+      subLabel: 'AmbientRuntime.forceState(IDLE / STANDBY / SHUTDOWN / OFF)',
+      icon: '▲',
+      category: 'triggers',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Force the Ambient Runtime into IDLE, STANDBY, SHUTDOWN, or OFF.',
+      triggers: ['runtime.state'],
+      anchor: '[data-dsh-anchor="testConsoleTransitions"]',
+    },
+    {
+      id: 'reboot',
+      label: 'REBOOT',
+      subLabel: 'runBootSequence() replay',
+      icon: '↻',
+      category: 'triggers',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Replay the boot sequence.',
+      triggers: [],
+      anchor: '[data-dsh-anchor="testConsoleTransitions"]',
+    },
+    {
+      id: 'wake-active',
+      label: 'WAKE → ACTIVE',
+      subLabel: "AmbientRuntime.forceState('ACTIVE')",
+      icon: '●',
+      category: 'triggers',
+      tier: 'prod',
+      destructive: false,
+      tooltip:
+        'Force the Ambient Runtime back to ACTIVE — the one-click undo for the force-transition buttons.',
+      triggers: ['runtime.state'],
+      anchor: '[data-dsh-anchor="testConsoleTransitions"]',
+    },
+    {
+      id: 'a11y-immersion',
+      label: 'IMMERSION TIER',
+      subLabel: 'onImmersionChange() / getImmersionTier()',
+      icon: '■',
+      category: 'env',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Set the device Immersion tier (mirrors the real Security & Config dial).',
+      triggers: [],
+      anchor: '[data-dsh-anchor="testConsoleImmersionSelect"]',
+    },
+    {
+      id: 'inspect-observers',
+      label: 'REGISTERED OBSERVERS',
+      subLabel: 'AmbientRuntime.listObservers() readout',
+      icon: '◉',
+      category: 'inspect',
+      tier: 'prod',
+      destructive: false,
+      tooltip: 'Live list of registered Ambient Runtime observers.',
+      triggers: [],
+      anchor: '[data-dsh-anchor="testConsoleObservers"]',
+    },
+    {
+      id: 'replay-hatch',
+      label: 'REPLAY HATCH',
+      subLabel: "MetaStore.remove('robco_bay_opened')",
+      icon: '⚙',
+      category: 'triggers',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Reset the Module Bay hatch so its view-once ceremony replays on next open.',
+      triggers: ['robco_bay_opened'],
+      anchor: '[data-dsh-anchor="testConsoleReplayHatch"]',
+      // action is the ONLY tool this unit routes through _invoke() (every other
+      // migrated control keeps its own dedicated wiring below) — a Protocol 42
+      // fix landed here after live verification caught this field missing
+      // entirely, which made _invoke()'s `typeof tool.action !== 'function'`
+      // guard silently no-op the button (no confirm dialog, no action, no
+      // thrown error) — see Suite 210.14's registry-completeness regression test.
+      action: _replayHatch,
+    },
+    {
+      id: 'ocr-unit1-scan',
+      label: 'OPTICAL SCAN TEST',
+      subLabel: 'runVisualOcrTest() — raw on-device OCR text dump',
+      icon: '⚒',
+      category: 'infra',
+      tier: 'staging',
+      destructive: false,
+      tooltip:
+        'Run a screenshot through the on-device OCR pipeline and dump the raw recognized text.',
+      triggers: [],
+      anchor: '[data-dsh-anchor="ocrTestInput"]',
+    },
+    {
+      id: 'ocr-unit2-scan',
+      label: 'SCAN & PARSE TEST',
+      subLabel: 'runVisualOcr() — full parse / preview / confirm pipeline',
+      icon: '⚒',
+      category: 'infra',
+      tier: 'staging',
+      destructive: false,
+      tooltip: 'Run a screenshot through the full OCR parse + preview/confirm pipeline.',
+      triggers: [],
+      anchor: '[data-dsh-anchor="visualParseTestInput"]',
+    },
+  ];
+  // Exposed read-only for the harness (the VM behavioral proof, mirroring how
+  // the OCR test wiring is reachable) — never mutated at runtime.
+  window._DIAGNOSTIC_SHELL_TOOLS = DIAGNOSTIC_SHELL_TOOLS;
+  window._toolVisible = _toolVisible;
+  window._shellTier = _shellTier;
+
+  // Section order + chrome (planning/DIAGNOSTIC_SHELL_PLAN.md §3.1). U1 only
+  // populates triggers/inspect/env/infra; state/resets/fixtures/inline stay
+  // empty (no tools yet) and are skipped entirely — a section with zero
+  // visible tools for the current tier is never rendered.
+  var CATEGORY_ORDER = ['triggers', 'state', 'resets', 'infra', 'inspect', 'fixtures', 'env'];
+  var CATEGORY_META = {
+    triggers: { stagingTitle: 'TRIGGERS', prodTitle: 'STIMULUS BENCH' },
+    state: { stagingTitle: 'STATE SETUP', prodTitle: 'STATE SETUP' },
+    resets: { stagingTitle: 'RESETS', prodTitle: 'RESETS' },
+    infra: { stagingTitle: 'RESILIENCE & INFRA', prodTitle: 'RESILIENCE & INFRA' },
+    inspect: { stagingTitle: 'INSPECT', prodTitle: 'READOUTS' },
+    fixtures: { stagingTitle: 'FIXTURES', prodTitle: 'FIXTURES' },
+    env: { stagingTitle: 'ENVIRONMENT & UNLOCK', prodTitle: 'ACCESS' },
+  };
+
+  function _paintEnvBanner(panel, tier) {
+    var el = panel.querySelector('#dshEnvBanner');
+    if (!el) return;
+    el.textContent =
+      tier === 'staging'
+        ? 'STAGING TOOLBENCH — ALL SYSTEMS EXPOSED'
+        : 'RESTRICTED DIAGNOSTIC ACCESS — SANDBOX';
+    el.classList.toggle('dsh-banner-staging', tier === 'staging');
+    el.classList.toggle('dsh-banner-prod', tier !== 'staging');
+  }
+
+  // _renderShell — the single render pipeline (planning/DIAGNOSTIC_SHELL_PLAN.md
+  // §3.3). Runs on a DETACHED clone of <template id="testConsoleTemplate">
+  // (see _mountConsole()) — nothing here has touched the document yet. For
+  // every category, in order: gather the tools that pass _toolVisible() for
+  // the CURRENT tier, skip the whole section if none survive, otherwise build
+  // a collapsible sub-panel and MOVE each surviving tool's existing anchor
+  // element into it. Any anchor never claimed by a visible tool (tier-filtered
+  // out) is explicitly stripped from the tree at the end — so a tier:'staging'
+  // tool has no path to the document unless _shellTier() genuinely returned
+  // 'staging'. This is what makes the filter run BEFORE DOM insertion: the
+  // caller only appends the surviving `panel` to the document after this
+  // function returns.
+  function _renderShell(panel) {
+    var tier = _shellTier();
+    _paintEnvBanner(panel, tier);
+    var sectionsHost = panel.querySelector('#dshSections');
+    if (!sectionsHost) return;
+    sectionsHost.innerHTML = '';
+    var moved = {};
+    CATEGORY_ORDER.forEach(function (cat) {
+      var visibleTools = DIAGNOSTIC_SHELL_TOOLS.filter(function (t) {
+        return t.category === cat && _toolVisible(t, tier);
+      });
+      if (!visibleTools.length) return; // section hidden entirely this tier
+      var meta = CATEGORY_META[cat] || {};
+      var details = document.createElement('details');
+      details.className = 'sub-panel';
+      details.setAttribute('data-sub-id', 'dsh_' + cat);
+      var summary = document.createElement('summary');
+      var h3 = document.createElement('h3');
+      h3.textContent =
+        '> ' +
+        (tier === 'staging'
+          ? meta.stagingTitle
+          : meta.prodTitle || meta.stagingTitle || cat.toUpperCase());
+      summary.appendChild(h3);
+      details.appendChild(summary);
+      visibleTools.forEach(function (tool) {
+        if (!tool.anchor || moved[tool.anchor]) return; // a shared anchor already placed
+        var anchorEl = panel.querySelector(tool.anchor);
+        if (!anchorEl) return;
+        anchorEl.setAttribute(
+          'data-dsh-search',
+          (tool.label + ' ' + (tool.subLabel || '')).toLowerCase()
+        );
+        details.appendChild(anchorEl); // moves the existing node — no markup rebuilt
+        moved[tool.anchor] = true;
+      });
+      if (typeof _wireDynamicSubPanel === 'function') _wireDynamicSubPanel(details);
+      sectionsHost.appendChild(details);
+    });
+    // Leak-proof guarantee: an anchor no visible tool ever claimed (every tool
+    // pointing at it was filtered out by _toolVisible for this tier) is
+    // stripped from the tree here, before this panel is ever appended to the
+    // document — it never becomes reachable DOM.
+    DIAGNOSTIC_SHELL_TOOLS.forEach(function (tool) {
+      if (!tool.anchor || moved[tool.anchor]) return;
+      var leftover = panel.querySelector(tool.anchor);
+      if (leftover && leftover.parentNode) leftover.parentNode.removeChild(leftover);
+    });
+  }
+
+  function _wireSearch(panel) {
+    var input = panel.querySelector('#dshSearch');
+    if (!input) return;
+    input.addEventListener('input', function () {
+      var q = input.value.trim().toLowerCase();
+      var sections = panel.querySelectorAll('#dshSections > details.sub-panel');
+      Array.prototype.forEach.call(sections, function (sec) {
+        var anchors = sec.querySelectorAll('[data-dsh-search]');
+        var anyVisible = !anchors.length; // an empty section (shouldn't happen) stays visible
+        Array.prototype.forEach.call(anchors, function (a) {
+          var hay = a.getAttribute('data-dsh-search') || '';
+          var show = !q || hay.indexOf(q) !== -1;
+          a.style.display = show ? '' : 'none';
+          if (show) anyVisible = true;
+        });
+        sec.style.display = anyVisible ? '' : 'none';
+      });
+    });
+  }
+
   function _mountConsole() {
     var mount = document.getElementById('testConsoleMount');
     var tpl = document.getElementById('testConsoleTemplate');
     if (!mount || !tpl || !tpl.content) return null;
-    if (!document.getElementById('testConsolePanel')) {
-      mount.appendChild(tpl.content.cloneNode(true));
-    }
-    return document.getElementById('testConsolePanel');
+    var existing = document.getElementById('testConsolePanel');
+    if (existing) return existing;
+    var frag = tpl.content.cloneNode(true); // detached — not part of the document yet
+    var panel = frag.querySelector('#testConsolePanel');
+    if (!panel) return null;
+    _renderShell(panel); // filter + reorganize BEFORE the panel ever touches the document
+    mount.appendChild(panel); // only the surviving, tier-appropriate DOM is inserted
+    return panel;
   }
 
   // Owner report fix: COLD_BOOT/READY/ACTIVE are normal-operation states with no A3
@@ -194,7 +523,10 @@
   // #bayHatch overlay itself back into its closed, pre-ceremony state so the next
   // look at Security & Config replays it, without a page reload. Dev/staging-console
   // only (Protocol 22 — reuses the exact same MetaStore key releaseBayHatch() sets,
-  // never a parallel flag); never touches campaign state.
+  // never a parallel flag); never touches campaign state. U1: this is the console's
+  // one pre-existing destructive-leaning control, so it is now tier:'staging' and
+  // destructive:true in the registry — DIAGNOSTIC_SHELL_TOOLS['replay-hatch'] — and
+  // fires through _invoke() so a confirm gate can never be skipped.
   function _replayHatch() {
     try {
       if (window.MetaStore && typeof window.MetaStore.remove === 'function') {
@@ -210,11 +542,23 @@
     }
   }
 
+  function _toolById(id) {
+    for (var i = 0; i < DIAGNOSTIC_SHELL_TOOLS.length; i++) {
+      if (DIAGNOSTIC_SHELL_TOOLS[i].id === id) return DIAGNOSTIC_SHELL_TOOLS[i];
+    }
+    return null;
+  }
+
   function _wireReplayHatch(panel) {
     var btn = panel.querySelector('#testConsoleReplayHatch');
     if (!btn) return;
+    var tool = _toolById('replay-hatch');
     btn.addEventListener('click', function () {
-      _replayHatch();
+      if (tool) {
+        _invoke(tool);
+      } else {
+        _replayHatch(); // fail-safe: registry entry missing, still never skip the action
+      }
     });
   }
 
@@ -387,6 +731,7 @@
       _wireOcrTest(panel);
       _wireVisualParseTest(panel);
       _wireImmersionSelect(panel);
+      _wireSearch(panel);
       _wireLiveRefresh(panel);
       _refresh(panel);
     } catch (_) {

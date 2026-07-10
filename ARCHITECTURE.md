@@ -72,8 +72,8 @@
 ├── js/vendor/                 Self-hosted Tesseract.js (Apache-2.0) — main API, worker, wasm core
 ├── assets/ocr/                Vendored OCR language data (eng.traineddata.gz, runtime-cached)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2813-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2813-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2827-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2827-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -421,24 +421,31 @@ ON`) fixes this: it is hidden by default and shown **only** via the SAME `body.r
 
 ---
 
-## Developer Console (`js/test-console.js` — Step 2 · Phase 2)
+## Developer Console / Diagnostic Shell (`js/test-console.js` — Step 2 · Phase 2, Diagnostic Shell U1)
 
-**This IS the canonical developer/debug console** — the same one the roadmap's hacking minigame will later unlock in normal builds, not a separate throwaway test panel. A live inspector + trigger panel for the Ambient Runtime, built to keep pace with the accumulating Phase-2 ambient features (UPLINK, Hardware Life, etc. — each future feature adds one more trigger here).
+**This IS the canonical developer/debug console** — the same one the roadmap's hacking minigame will later unlock in normal builds, not a separate throwaway test panel. A live inspector + trigger panel for the Ambient Runtime, built to keep pace with the accumulating Phase-2 ambient features (UPLINK, Hardware Life, etc. — each future feature adds one more registry entry here).
 
-**ONE canonical visibility gate.** `_devConsoleUnlocked()` is the single, centralized decision point (Protocol 22 — never re-derived elsewhere) for whether this console is shown:
+**ONE canonical existence gate.** `_devConsoleUnlocked()` is the single, centralized decision point (Protocol 22 — never re-derived elsewhere) for whether this console mounts at all:
 
 - **Today:** it delegates verbatim to `_isStagingEnv()` (`ui-core.js`, Protocol 43) — the exact same environment signal the changelog viewer (Suite 62 / WU-C11) uses to hide `[Unreleased]` — so a dev/staging build shows the console with no minigame needed ("dev builds skip the hack"). Fail-safe to **HIDDEN**: any uncertainty (the function missing, a throw, an unrecognized host) defaults to production behavior.
 - **MINIGAME-UNLOCK SEAM:** on a production build `_devConsoleUnlocked()` is false today, and stays false until the future hacking minigame is built — at which point its unlock check (e.g. a persisted unlock flag) is added to this exact function, and nowhere else. A comment on the function itself documents this seam so it can't be silently lost in a refactor (locked by Suite 149.14).
 
-**Inert-by-default markup (the WU-E2 pattern).** The panel's HTML lives inside `<template id="testConsoleTemplate">` in `index.html` — a `<template>`'s content is parsed but never rendered or activated, so it cannot appear even if the JS gate were somehow bypassed. `initTestConsole()` (a named `window.onload` boot phase, called after `initAmbientRuntime()`) only clones the template into `#testConsoleMount` when `_devConsoleUnlocked()` returns `true`; otherwise it is a no-op.
+**Diagnostic Shell U1 (`planning/DIAGNOSTIC_SHELL_PLAN.md`, Protocol 8) — the two-signal gate.** The panel now serves two future audiences (an owner-only staging toolbench and a non-destructive prod-minigame sandbox), so a second signal governs WHICH tools may render, on top of the unchanged existence gate:
 
-**Surfaces (v1):** the live `AmbientRuntime.getState()` readout (refreshed via its own runtime observer, tier `'minimal'` so it is never dial-muted — a dev tool, not atmosphere); one force-transition `<button>` per canonical state (`AmbientRuntime.transition()` / `shutdown()`); an Immersion-tier `<select>` that reuses the real dial's own `onImmersionChange()`/`getImmersionTier()` setters and mirrors the real `#immersionSelect` in Security & Configuration; and a read-out of every registered observer via `AmbientRuntime.listObservers()`.
+- **`_shellVisible()`** — a thin, literally-named alias over `_devConsoleUnlocked()` (existence only, same fail-safe-to-hidden philosophy, not a second re-derived check).
+- **`_shellTier()`** — `'staging'` **only** when `_isStagingEnv()` positively confirms it; otherwise the RESTRICTIVE `'prod'` tier, including on any throw or missing function (same fail-safe direction as the existence gate).
+- **`_toolVisible(tool, tier)`** — the ONE filter every `DIAGNOSTIC_SHELL_TOOLS` registry entry passes through. A `tier:'prod'` tool always shows; a `tier:'staging'` tool shows only when `_shellTier()` genuinely returned `'staging'`.
+- **`_invoke(tool)`** — auto-wraps any `destructive:true` tool's action in the existing `confirmAction()` helper (Protocol 22/34) so a confirm gate can never be forgotten by a caller; it is a property of the registry data, not something wired per-button.
 
-**Hard atmosphere/save boundary.** Identical invariant to the runtime itself: the console touches ONLY in-memory Ambient Runtime state and the Immersion device pref (MetaStore) — it never reads or writes the campaign save, stats, or event log, and triggers nothing automatically (every action is an explicit developer button/select). Gate-guarded (Suite 149.9).
+**`DIAGNOSTIC_SHELL_TOOLS` — the data-driven registry.** A single `{id, label, subLabel, icon, category, tier, destructive, tooltip, triggers, anchor}` array is the one source of truth `_renderShell()` renders from. `_mountConsole()` clones `<template id="testConsoleTemplate">` into a **detached** fragment, calls `_renderShell()` to filter (moving each tier-visible tool's existing markup `anchor` — a `data-dsh-anchor="…"` attribute on its `.input-group` block — into a collapsible `<details class="sub-panel">` per category, and explicitly stripping any anchor no visible tool ever claimed) and **only then** appends the surviving panel to `#testConsoleMount` — so a `tier:'staging'` tool has no path to the document unless staging was positively confirmed at render time. Categories (`triggers`/`state`/`resets`/`infra`/`inspect`/`fixtures`/`env`) are skipped entirely when they have zero visible tools for the current tier; U1 populates `triggers`/`inspect`/`env`/`infra` only (`state`/`resets`/`fixtures` are reserved for later units). An env banner (`STAGING TOOLBENCH — ALL SYSTEMS EXPOSED` vs `RESTRICTED DIAGNOSTIC ACCESS — SANDBOX`) and a live label/sub-label search filter are driven from the same tier.
 
-**Extension point.** Each future ambient feature (broadcasts, weather, boot flavors, etc.) adds one more trigger control inside `#testConsoleTemplate`'s body (`index.html`) and wires it in `js/test-console.js` alongside `_renderTransitionButtons`/`_wireImmersionSelect` — calling the feature's existing entry point directly, never bypassing a confirm gate.
+**Migration (U1): zero behavior change.** All 9 pre-existing controls — the `AmbientRuntime.getState()` readout, one force-transition `<button>` per canonical state, REBOOT, WAKE → ACTIVE, the Immersion-tier `<select>`, the `listObservers()` readout, REPLAY HATCH, and both OCR test boards (Visual Upload Unit 1/2) — are re-expressed as registry entries pointing at their existing markup anchors, with their underlying wiring functions (`_renderTransitionButtons`, `_rebootFromConsole`, `_wakeToActive`, `_wireImmersionSelect`, `_refresh`, `_replayHatch`, `_wireOcrTest`, `_wireVisualParseTest`) unchanged. The one deliberate exception: REPLAY HATCH (the console's one pre-existing destructive-leaning control) is now `tier:'staging'` + `destructive:true` in the registry, so it correctly gains the `confirmAction()` gate via `_invoke()` instead of firing unconfirmed — a safety tightening the plan calls for explicitly, not a regression.
 
-Guarded by Suite 149 (both runners: staging-gate fail-safe both-sides, no-durable-write boundary, template inert-by-default, reused env signal, minigame-unlock-seam comment presence) + Suite 19 in `tests/test.html` (real-browser fail-safe-to-hidden proof + `listObservers()` behavioral proof).
+**Hard atmosphere/save boundary.** Identical invariant to the runtime itself: the console touches ONLY in-memory Ambient Runtime state and the Immersion device pref (MetaStore) — it never reads or writes the campaign save, stats, or event log, and triggers nothing automatically (every action is an explicit developer button/select). Gate-guarded (Suite 149.9, extended to the new U1 functions by Suite 210.13).
+
+**Extension point.** A future hard-to-trigger feature (broadcasts, weather, boot flavors, etc.) adds one more `DIAGNOSTIC_SHELL_TOOLS` entry with an `anchor` selector pointing at a new `.input-group` block placed beside the existing ones in `#testConsoleTemplate` (`index.html`) — never writing campaign state, never bypassing `confirmAction()` for a `destructive:true` tool. Protocol 44 (a future unit) will make this a gate-enforced requirement for every new `RobcoEvents` event / view-once flag.
+
+Guarded by Suite 149 (both runners: staging-gate fail-safe both-sides, no-durable-write boundary, template inert-by-default, reused env signal, minigame-unlock-seam comment presence) + Suite 210 (both runners: registry completeness, the two-signal gate's fail-safe-to-prod behavior — both structural and a real behavioral eval — the leak-proof `_toolVisible()` filtering proof against the live registry, the filter-before-DOM-insertion ordering, the static destructive/staging-category invariant, a Node `vm`-sandbox proof of `_invoke()`'s auto-confirm-gate, and a Protocol 42 regression test (Suite 210.14) locking that every `destructive:true` tool in the real registry carries a callable `action` — added after live browser verification caught `replay-hatch`'s `action` field missing entirely, which made `_invoke()` silently no-op the button with no confirm dialog and no thrown error, undetected by the suite's own synthetic-tool-object proofs) + Suite 19 in `tests/test.html` (real-browser fail-safe-to-hidden proof + `listObservers()` behavioral proof).
 
 ---
 
@@ -3010,7 +3017,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2813-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2827-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

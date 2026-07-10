@@ -1714,6 +1714,21 @@ details.panel:not([open]) summary h2 {
   text-overflow: ellipsis;
 }
 
+/* Diagnostic Shell env banner (U1) — STAGING TOOLBENCH vs RESTRICTED DIAGNOSTIC
+   ACCESS, driven off _shellTier(). Opacity raised above the base .panel-substatus
+   so the environment read stays legible, not just a dim footnote. */
+#dshEnvBanner {
+  opacity: 0.9;
+  font-weight: bold;
+  white-space: normal;
+}
+#dshEnvBanner.dsh-banner-staging {
+  color: rgb(var(--amber-rgb, 255, 182, 66));
+}
+#dshEnvBanner.dsh-banner-prod {
+  color: var(--robco-green);
+}
+
 /* ─── Sub-Panel (nested <details> inside a top-level panel) ──────── */
 /* Used by AMMO RESERVES nested inside BACKPACK INVENTORY */
 details.sub-panel {

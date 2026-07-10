@@ -23439,6 +23439,330 @@ Check (
 ) "209.10: the mobile density block carries no min-width:1000px / hover:hover desktop-gate condition -- it is scoped purely to the <=480px narrow-phone query, so desktop stays byte-identical"
 
 # ===========================================================
+# Suite 210 -- Diagnostic Shell U1: registry spine + two-signal gate
+# (planning/DIAGNOSTIC_SHELL_PLAN.md, Protocol 8 Sonnet stage). Mirrors JS
+# Suite 210. The Developer Console (Suite 149) is re-founded on a
+# data-driven DIAGNOSTIC_SHELL_TOOLS registry that auto-filters by a
+# two-signal environment gate: _shellVisible() (existence, an alias over the
+# unchanged _devConsoleUnlocked()) and _shellTier() ('staging' ONLY on a
+# positive staging signal, else the RESTRICTIVE 'prod' tier). _toolVisible()
+# is the one filter every registry entry passes through BEFORE
+# _mountConsole() ever appends the rendered panel to the document, and
+# destructive:true tools are auto-wrapped in confirmAction() by _invoke().
+# All 9 pre-existing controls are migrated as registry entries pointing at
+# their existing markup anchors -- zero behavior change except REPLAY HATCH,
+# which now correctly gains the confirm gate the plan tiers it for. 14 tests
+# (210.14 is a Protocol 42 regression test added after live browser
+# verification caught replay-hatch's registry entry missing its `action`
+# field, which made _invoke() silently no-op the button).
+# ===========================================================
+Sep "Suite 210 -- Diagnostic Shell U1: registry spine + two-signal gate"
+$testConsole210 = Read-Src "js/test-console.js"
+$index210 = Read-Src "index.html"
+
+# 210.1 DIAGNOSTIC_SHELL_TOOLS registers one entry for each of the 9
+#       migrated controls (planning/DIAGNOSTIC_SHELL_PLAN.md Sec1.3).
+$ids210 = @('inspect-runtime-state', 'runtime-force-transition', 'reboot', 'wake-active', 'a11y-immersion', 'inspect-observers', 'replay-hatch', 'ocr-unit1-scan', 'ocr-unit2-scan')
+$allIds210 = $true
+foreach ($id in $ids210) {
+    if (-not ($testConsole210 -match "id:\s*'$id'")) { $allIds210 = $false }
+}
+Check (
+    ($testConsole210 -match 'var DIAGNOSTIC_SHELL_TOOLS = \[') -and $allIds210
+) '210.1: DIAGNOSTIC_SHELL_TOOLS registers one entry for each of the 9 migrated Developer Console controls'
+
+# 210.2 every registry tool `anchor` selector matches a literal
+#       data-dsh-anchor="..." attribute inside the inert
+#       <template id="testConsoleTemplate"> -- the migration cross-reference.
+$tplStart210 = $index210.IndexOf('<template id="testConsoleTemplate">')
+$tplEnd210 = $index210.IndexOf('</template>', $tplStart210)
+$tplSrc210 = if ($tplStart210 -ge 0) { $index210.Substring($tplStart210, $tplEnd210 - $tplStart210) } else { '' }
+$anchors210 = @('testConsoleState', 'testConsoleTransitions', 'testConsoleImmersionSelect', 'testConsoleObservers', 'testConsoleReplayHatch', 'ocrTestInput', 'visualParseTestInput')
+$allAnchors210 = $true
+foreach ($a in $anchors210) {
+    if (-not $tplSrc210.Contains("data-dsh-anchor=`"$a`"")) { $allAnchors210 = $false }
+}
+Check (
+    ($tplStart210 -ge 0) -and $allAnchors210
+) '210.2: every DIAGNOSTIC_SHELL_TOOLS anchor selector matches a literal data-dsh-anchor attribute inside the inert <template id="testConsoleTemplate">'
+
+# 210.3 _shellVisible() is a thin alias over the UNCHANGED
+#       _devConsoleUnlocked() -- the existence gate keeps its verbatim
+#       philosophy, not a second re-derived check.
+$shellVisibleBody210 = Get-FunctionBody $testConsole210 '_shellVisible'
+Check (
+    $shellVisibleBody210 -match 'return _devConsoleUnlocked\(\);'
+) '210.3: _shellVisible() delegates verbatim to _devConsoleUnlocked() (Protocol 22 -- one existence gate, not two)'
+
+# 210.4 _shellTier() source shape: 'staging' only when
+#       window._isStagingEnv() genuinely returns true, else the RESTRICTIVE
+#       'prod' tier -- including on a throw.
+$shellTierBody210 = Get-FunctionBody $testConsole210 '_shellTier'
+Check (
+    ($shellTierBody210 -match "typeof window\._isStagingEnv === 'function' && window\._isStagingEnv\(\)") -and
+    ($shellTierBody210 -match "(?s)\?\s*\n?\s*'staging'") -and
+    ($shellTierBody210 -match "(?s):\s*\n?\s*'prod';") -and
+    ($shellTierBody210 -match "(?s)catch \(_\) \{\s*\n?\s*return 'prod';")
+) "210.4: _shellTier() returns 'staging' only when window._isStagingEnv() genuinely returns true, otherwise (including any throw) the restrictive 'prod' tier"
+
+# 210.5-210.9 BEHAVIORAL -- the real _shellTier()/_toolVisible()/_invoke()
+# functions plus the real DIAGNOSTIC_SHELL_TOOLS registry, executed via a
+# spawned node process against the ACTUAL source (Protocol 42
+# stdin-corruption-safe transport -- a temp file, never piped stdin --
+# mirrors the Suite 131/206/207 pattern).
+$labels210 = @(
+    "210.5: [behavioral] _shellTier() resolves to 'prod' when the staging signal is missing/throws/false, and 'staging' only when it genuinely returns true (both-sides)",
+    "210.6: [behavioral] BEHAVIORAL LEAK-PROOF PROOF -- _toolVisible() filters every tier:'staging' tool (replay-hatch, both OCR test boards) out of the 'prod' tier and shows them under 'staging'; every tier:'prod' tool shows under both",
+    "210.9: [behavioral] _invoke() fires a non-destructive tool immediately (never calling confirmAction()); a destructive:true tool only fires after confirmAction() resolves true, never on a cancel; and a destructive tool never fires when confirmAction() itself is unavailable (fail-safe)"
+)
+try {
+    $nodeCheck210 = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCheck210) {
+        $repoRootNode210 = $Root.Replace('\', '/')
+        $testScript210 = @"
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+const ROOT = '$repoRootNode210';
+function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+function extractBody(src, name) {
+  var idx = src.indexOf('function ' + name);
+  if (idx === -1) throw new Error('missing ' + name);
+  var i = src.indexOf('{', idx);
+  var depth = 0, start = i;
+  while (i < src.length) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) return src.slice(start, i + 1); }
+    i++;
+  }
+  throw new Error('unclosed ' + name);
+}
+
+const testConsoleSrc = rd('js/test-console.js');
+var results = [];
+
+// 210.5
+try {
+  var body = extractBody(testConsoleSrc, '_shellTier');
+  var src = '(function _shellTier()' + body + ')';
+  var missing = (function () { var window = {}; return eval(src)(); })();
+  var throwing = (function () { var window = { _isStagingEnv: function () { throw new Error('boom'); } }; return eval(src)(); })();
+  var falseSignal = (function () { var window = { _isStagingEnv: function () { return false; } }; return eval(src)(); })();
+  var trueSignal = (function () { var window = { _isStagingEnv: function () { return true; } }; return eval(src)(); })();
+  results.push(missing === 'prod' && throwing === 'prod' && falseSignal === 'prod' && trueSignal === 'staging');
+} catch (e) { results.push(false); }
+
+// 210.6
+try {
+  var toolVisBody = extractBody(testConsoleSrc, '_toolVisible');
+  var replayHatchBody6 = extractBody(testConsoleSrc, '_replayHatch');
+  var toolsStart = testConsoleSrc.indexOf('var DIAGNOSTIC_SHELL_TOOLS = [');
+  var toolsEnd = testConsoleSrc.indexOf('\n  ];', toolsStart) + '\n  ];'.length;
+  var toolsSrc = testConsoleSrc.slice(toolsStart, toolsEnd);
+  var src2 = '(function () {\n function _toolVisible(tool, tier) ' + toolVisBody + '\n function _replayHatch() ' + replayHatchBody6 + '\n ' + toolsSrc + '\n return { _toolVisible: _toolVisible, DIAGNOSTIC_SHELL_TOOLS: DIAGNOSTIC_SHELL_TOOLS }; })()';
+  var sandbox = eval(src2);
+  var tools = sandbox.DIAGNOSTIC_SHELL_TOOLS;
+  var stagingTools = tools.filter(function (t) { return t.tier === 'staging'; });
+  var prodTools = tools.filter(function (t) { return t.tier === 'prod'; });
+  var noneVisibleInProd = stagingTools.every(function (t) { return sandbox._toolVisible(t, 'prod') === false; });
+  var allVisibleInStaging = stagingTools.every(function (t) { return sandbox._toolVisible(t, 'staging') === true; });
+  var prodAlwaysVisible = prodTools.every(function (t) { return sandbox._toolVisible(t, 'prod') === true && sandbox._toolVisible(t, 'staging') === true; });
+  results.push(stagingTools.length > 0 && prodTools.length > 0 && noneVisibleInProd && allVisibleInStaging && prodAlwaysVisible);
+} catch (e) { results.push(false); }
+
+// 210.9
+try {
+  var invokeBody = extractBody(testConsoleSrc, '_invoke');
+  function scenario(destructive, confirmResult, confirmDefined) {
+    var sandbox = { console: console };
+    vm.createContext(sandbox);
+    var src = 'var __fired = false; var __confirmArgs = null;\n';
+    if (confirmDefined) {
+      src += 'function confirmAction(opts) { __confirmArgs = opts; return { then: function (cb) { cb(' + (confirmResult ? 'true' : 'false') + '); } }; }\n';
+    }
+    src += 'function _invoke(tool) ' + invokeBody + '\n';
+    src += '_invoke({ destructive: ' + (destructive ? 'true' : 'false') + ", label: 'X', tooltip: 'a tip', action: function () { __fired = true; } });\n";
+    vm.runInContext(src, sandbox);
+    return { fired: sandbox.__fired, confirmArgs: sandbox.__confirmArgs };
+  }
+  var nonDestructive = scenario(false, true, true);
+  var destructiveConfirmed = scenario(true, true, true);
+  var destructiveCancelled = scenario(true, false, true);
+  var destructiveNoConfirmFn = scenario(true, true, false);
+  results.push(
+    nonDestructive.fired === true && nonDestructive.confirmArgs === null &&
+    destructiveConfirmed.fired === true && !!destructiveConfirmed.confirmArgs && destructiveConfirmed.confirmArgs.title === '> X' &&
+    destructiveCancelled.fired === false &&
+    destructiveNoConfirmFn.fired === false
+  );
+} catch (e) { results.push(false); }
+
+console.log('RESULT:' + results.map(function (r) { return r ? '1' : '0'; }).join(''));
+"@
+        $tmpScript210 = [System.IO.Path]::GetTempFileName() + '.js'
+        [System.IO.File]::WriteAllText($tmpScript210, $testScript210, [System.Text.Encoding]::UTF8)
+        try {
+            $out210 = (node $tmpScript210 2>&1 | Out-String)
+        } finally {
+            Remove-Item -Path $tmpScript210 -Force -ErrorAction SilentlyContinue
+        }
+        $rm210 = [regex]::Match($out210, 'RESULT:([01]{3})')
+        if ($rm210.Success) {
+            $bits210 = $rm210.Groups[1].Value
+            for ($bi210 = 0; $bi210 -lt $labels210.Count; $bi210++) {
+                Check ($bits210.Substring($bi210, 1) -eq '1') $labels210[$bi210]
+            }
+        } else {
+            $err210 = if ([string]::IsNullOrWhiteSpace($out210)) { "No output from node" } else { $out210.Trim() }
+            foreach ($lbl in $labels210) { Fail "$lbl  (runtime error: $err210)" }
+        }
+    } else {
+        foreach ($lbl in $labels210) { Fail "$lbl  (node.exe not found on PATH -- cannot run behavioral proof)" }
+    }
+} catch {
+    foreach ($lbl in $labels210) { Fail "$lbl  (harness error: $($_.Exception.Message))" }
+}
+
+# 210.7 static -- _mountConsole() calls _renderShell() (which filters via
+#       _toolVisible() and strips every never-claimed anchor) BEFORE
+#       mount.appendChild(panel) -- the panel that ever touches the document
+#       has already been filtered for the current tier.
+$renderShellBody210 = Get-FunctionBody $testConsole210 '_renderShell'
+$mountBody210 = Get-FunctionBody $testConsole210 '_mountConsole'
+$renderCallIdx210 = $mountBody210.IndexOf('_renderShell(panel)')
+$appendIdx210 = $mountBody210.IndexOf('mount.appendChild(panel)')
+Check (
+    ($renderShellBody210 -match '_toolVisible\(t, tier\)') -and
+    ($renderShellBody210 -match 'leftover\.parentNode\.removeChild\(leftover\)') -and
+    ($renderCallIdx210 -ge 0) -and ($appendIdx210 -ge 0) -and ($renderCallIdx210 -lt $appendIdx210)
+) '210.7: _mountConsole() calls _renderShell() -- which filters via _toolVisible() and strips every tier-filtered anchor -- BEFORE mount.appendChild(panel), so filtering always runs before DOM insertion'
+
+# 210.8 static leak-proof invariant -- every destructive:true tool is
+#       tier:'staging', and every tool in a staging-only category
+#       (state/resets/infra/fixtures/inline) is tier:'staging'.
+$toolsStart210 = $testConsole210.IndexOf('var DIAGNOSTIC_SHELL_TOOLS = [')
+$toolsEnd210 = $testConsole210.IndexOf("`n  ];", $toolsStart210)
+$toolsBlock210 = $testConsole210.Substring($toolsStart210, $toolsEnd210 - $toolsStart210)
+$toolEntries210 = [regex]::Matches($toolsBlock210, '\{[^{}]*\}')
+$stagingCats210 = @('state', 'resets', 'infra', 'fixtures', 'inline')
+$leakProofOk210 = $toolEntries210.Count -gt 0
+foreach ($m in $toolEntries210) {
+    $entry = $m.Value
+    $isDestructive = $entry -match 'destructive:\s*true'
+    $catMatch = [regex]::Match($entry, "category:\s*'([a-z]+)'")
+    $tierMatch = [regex]::Match($entry, "tier:\s*'([a-z]+)'")
+    $cat = if ($catMatch.Success) { $catMatch.Groups[1].Value } else { '' }
+    $tier = if ($tierMatch.Success) { $tierMatch.Groups[1].Value } else { '' }
+    if ($isDestructive -and $tier -ne 'staging') { $leakProofOk210 = $false }
+    if (($stagingCats210 -contains $cat) -and $tier -ne 'staging') { $leakProofOk210 = $false }
+}
+Check (
+    $leakProofOk210
+) "210.8: static leak-proof invariant -- every destructive:true registry tool is tier:'staging', and every tool in a staging-only category (state/resets/infra/fixtures/inline) is tier:'staging' -- no destructive/cheat/inspection tool can ever be prod-tier"
+
+# 210.10 REPLAY HATCH (the one pre-existing destructive-leaning control) is
+#        wired through _invoke()/_toolById('replay-hatch') rather than
+#        calling _replayHatch() directly -- so its new confirm gate can
+#        never be bypassed by its own button handler.
+$wireReplayHatchBody210 = Get-FunctionBody $testConsole210 '_wireReplayHatch'
+Check (
+    ($wireReplayHatchBody210 -match "_toolById\('replay-hatch'\)") -and
+    ($wireReplayHatchBody210 -match '_invoke\(tool\)') -and
+    ($testConsole210 -match 'var tool = _toolById')
+) "210.10: _wireReplayHatch() routes the button's click through _invoke(_toolById('replay-hatch')) -- the registry's auto-confirm-gate path -- rather than calling _replayHatch() directly"
+
+# 210.11 env banner text is driven off _shellTier() -- the two distinct
+#        diegetic strings.
+$bannerBody210 = Get-FunctionBody $testConsole210 '_paintEnvBanner'
+Check (
+    ($bannerBody210 -match 'STAGING TOOLBENCH — ALL SYSTEMS EXPOSED') -and
+    ($bannerBody210 -match 'RESTRICTED DIAGNOSTIC ACCESS — SANDBOX') -and
+    ($bannerBody210 -match "tier === 'staging'")
+) "210.11: the env banner reads 'STAGING TOOLBENCH -- ALL SYSTEMS EXPOSED' on the staging tier and 'RESTRICTED DIAGNOSTIC ACCESS -- SANDBOX' otherwise, driven off _shellTier()"
+
+# 210.12 sections are collapsible sub-panels wired through the existing
+#        Protocol UI-2 dynamic sub-panel persistence helper (reused, not
+#        re-derived -- Protocol 22), and use the sub-panel <h3>> HEADING
+#        convention (Protocol UI-1).
+$renderShellBody210b = Get-FunctionBody $testConsole210 '_renderShell'
+Check (
+    ($renderShellBody210b -match "details\.className = 'sub-panel'") -and
+    ($renderShellBody210b -match "setAttribute\('data-sub-id', 'dsh_' \+ cat\)") -and
+    ($renderShellBody210b -match "(?s)h3\.textContent =\s*\n?\s*'> '") -and
+    ($renderShellBody210b -match '_wireDynamicSubPanel\(details\)')
+) "210.12: _renderShell() builds each category as a details.sub-panel with a data-sub-id, an '> HEADING' <h3> summary (Protocol UI-1), and wires it through the existing _wireDynamicSubPanel() persistence helper (Protocol UI-2/22 -- not a re-derived mechanism)"
+
+# 210.13 HARD atmosphere/save boundary + game-agnosticism hold across the
+#        new U1 registry/gate code specifically.
+$newFnNames210 = @('_shellVisible', '_shellTier', '_toolVisible', '_invoke', '_renderShell', '_paintEnvBanner', '_wireSearch', '_mountConsole')
+$newFnsCombined210 = ($newFnNames210 | ForEach-Object { Get-FunctionBody $testConsole210 $_ }) -join "`n"
+Check (
+    (-not ($newFnsCombined210 -match 'saveState|robco_v8|_logEvent|\beventLog\b|localStorage\.')) -and
+    (-not ($newFnsCombined210 -match 'FNV|FO3|New Vegas|Fallout 3'))
+) '210.13: the new U1 registry/gate/render functions never touch the campaign save (no saveState/robco_v8/eventLog/localStorage) and carry no game literal (Protocol 38)'
+
+# 210.14 Protocol 42 regression test -- found during LIVE verification, not by
+#        any test above: replay-hatch's registry entry was originally missing
+#        an `action` field entirely, so _invoke()'s
+#        `typeof tool.action !== 'function'` guard silently returned before
+#        ever calling confirmAction() -- no dialog, no action, no thrown
+#        error, so nothing in Suite 210's OWN tests (which invoked _invoke()
+#        against a synthetic tool object with a real `action`) ever caught
+#        it. Locks that every destructive:true tool in the REAL registry
+#        carries a callable `action` -- a real behavioral proof via node,
+#        mirroring the JS runner's eval technique.
+try {
+    $nodeCheck210b = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCheck210b) {
+        $repoRootNode210b = $Root.Replace('\', '/')
+        $testScript210b = @"
+const fs = require('fs');
+const path = require('path');
+const ROOT = '$repoRootNode210b';
+function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+function extractBody(src, name) {
+  var idx = src.indexOf('function ' + name);
+  if (idx === -1) throw new Error('missing ' + name);
+  var i = src.indexOf('{', idx);
+  var depth = 0, start = i;
+  while (i < src.length) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) return src.slice(start, i + 1); }
+    i++;
+  }
+  throw new Error('unclosed ' + name);
+}
+const testConsoleSrc = rd('js/test-console.js');
+try {
+  var toolsStart = testConsoleSrc.indexOf('var DIAGNOSTIC_SHELL_TOOLS = [');
+  var toolsEnd = testConsoleSrc.indexOf('\n  ];', toolsStart) + '\n  ];'.length;
+  var toolsSrc = testConsoleSrc.slice(toolsStart, toolsEnd);
+  var replayHatchBody = extractBody(testConsoleSrc, '_replayHatch');
+  var src = '(function () {\n function _replayHatch() ' + replayHatchBody + '\n ' + toolsSrc + '\n return DIAGNOSTIC_SHELL_TOOLS; })()';
+  var tools = eval(src);
+  var destructiveTools = tools.filter(function (t) { return t.destructive; });
+  var ok = destructiveTools.length > 0 && destructiveTools.every(function (t) { return typeof t.action === 'function'; });
+  console.log('RESULT:' + (ok ? '1' : '0'));
+} catch (e) { console.log('RESULT:0'); }
+"@
+        $tmpScript210b = [System.IO.Path]::GetTempFileName() + '.js'
+        [System.IO.File]::WriteAllText($tmpScript210b, $testScript210b, [System.Text.Encoding]::UTF8)
+        try {
+            $out210b = (node $tmpScript210b 2>&1 | Out-String)
+        } finally {
+            Remove-Item -Path $tmpScript210b -Force -ErrorAction SilentlyContinue
+        }
+        Check (
+            $out210b -match 'RESULT:1'
+        ) '210.14: [regression, Protocol 42] every destructive:true tool in the REAL registry (replay-hatch) carries a real, callable `action` -- the field _invoke() requires before it will ever call confirmAction(); its earlier absence made the REPLAY HATCH button silently do nothing, caught only by live-clicking it in a real browser'
+    } else {
+        Fail "210.14: [regression, Protocol 42] every destructive:true tool carries a callable action (node.exe not found on PATH -- cannot run behavioral proof)"
+    }
+} catch {
+    Fail "210.14: [regression, Protocol 42] every destructive:true tool carries a callable action (harness error: $($_.Exception.Message))"
+}
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

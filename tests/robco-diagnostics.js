@@ -35145,6 +35145,410 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 210 — Diagnostic Shell U1: registry spine + two-signal gate
+//  (planning/DIAGNOSTIC_SHELL_PLAN.md, Protocol 8 Sonnet stage) (14 tests)
+// ──────────────────────────────────────────────────────────────
+//  The Developer Console (Suite 149) is re-founded on a data-driven
+//  DIAGNOSTIC_SHELL_TOOLS registry that auto-filters by a two-signal
+//  environment gate: _shellVisible() (existence, an alias over the unchanged
+//  _devConsoleUnlocked()) and _shellTier() ('staging' ONLY on a positive
+//  staging signal, else the RESTRICTIVE 'prod' tier — same fail-safe
+//  direction). _toolVisible(tool, tier) is the one filter every registry
+//  entry passes through BEFORE _mountConsole() ever appends the rendered
+//  panel to the document, so a tier:'staging' tool (replay-hatch, both OCR
+//  test boards) has no path to a production player. destructive:true tools
+//  are auto-wrapped in the existing confirmAction() helper by _invoke() — a
+//  property of the registry data, not something a caller can forget. All 9
+//  pre-existing controls (RUNTIME STATE / FORCE TRANSITION / REBOOT / WAKE →
+//  ACTIVE / IMMERSION TIER / REGISTERED OBSERVERS / REPLAY HATCH / both OCR
+//  test boards) are migrated as registry entries pointing at their existing
+//  markup anchors — zero behavior change, except REPLAY HATCH (the one
+//  pre-existing destructive-leaning control) now correctly gains the
+//  confirm gate the plan tiers it for (planning §4).
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 210 — Diagnostic Shell U1: registry spine + two-signal gate');
+  const testConsole210 = readFile('js/test-console.js');
+  const index210 = readFile('index.html');
+
+  // 210.1  DIAGNOSTIC_SHELL_TOOLS registers one entry for each of the 9
+  //        migrated controls (planning/DIAGNOSTIC_SHELL_PLAN.md §1.3).
+  {
+    const ids210 = [
+      'inspect-runtime-state',
+      'runtime-force-transition',
+      'reboot',
+      'wake-active',
+      'a11y-immersion',
+      'inspect-observers',
+      'replay-hatch',
+      'ocr-unit1-scan',
+      'ocr-unit2-scan',
+    ];
+    assert(
+      /var DIAGNOSTIC_SHELL_TOOLS = \[/.test(testConsole210) &&
+        ids210.every(id => new RegExp(`id:\\s*'${id}'`).test(testConsole210)),
+      '210.1: DIAGNOSTIC_SHELL_TOOLS registers one entry for each of the 9 migrated Developer Console controls'
+    );
+  }
+
+  // 210.2  every registry tool `anchor` selector matches a literal
+  //        data-dsh-anchor="..." attribute inside the inert
+  //        <template id="testConsoleTemplate"> — the migration cross-reference.
+  {
+    const tplStart210 = index210.indexOf('<template id="testConsoleTemplate">');
+    const tplEnd210 = index210.indexOf('</template>', tplStart210);
+    const tplSrc210 = tplStart210 !== -1 ? index210.slice(tplStart210, tplEnd210) : '';
+    const anchors210 = [
+      'testConsoleState',
+      'testConsoleTransitions',
+      'testConsoleImmersionSelect',
+      'testConsoleObservers',
+      'testConsoleReplayHatch',
+      'ocrTestInput',
+      'visualParseTestInput',
+    ];
+    assert(
+      tplStart210 !== -1 && anchors210.every(a => tplSrc210.includes(`data-dsh-anchor="${a}"`)),
+      '210.2: every DIAGNOSTIC_SHELL_TOOLS anchor selector matches a literal data-dsh-anchor attribute inside the inert <template id="testConsoleTemplate">'
+    );
+  }
+
+  // 210.3  _shellVisible() is a thin alias over the UNCHANGED
+  //        _devConsoleUnlocked() — the existence gate keeps its verbatim
+  //        philosophy (planning §2.2), not a second re-derived check.
+  {
+    const body210 = extractFunctionBody(testConsole210, '_shellVisible');
+    assert(
+      /return _devConsoleUnlocked\(\);/.test(body210),
+      '210.3: _shellVisible() delegates verbatim to _devConsoleUnlocked() (Protocol 22 — one existence gate, not two)'
+    );
+  }
+
+  // 210.4  _shellTier() source shape: 'staging' only when
+  //        window._isStagingEnv() genuinely returns true, else the
+  //        RESTRICTIVE 'prod' tier — including on a throw.
+  {
+    const body210 = extractFunctionBody(testConsole210, '_shellTier');
+    assert(
+      /typeof window\._isStagingEnv === 'function' && window\._isStagingEnv\(\)/.test(body210) &&
+        /\?\s*\n?\s*'staging'/.test(body210) &&
+        /:\s*\n?\s*'prod';/.test(body210) &&
+        /catch \(_\) \{\s*\n?\s*return 'prod';/.test(body210),
+      "210.4: _shellTier() returns 'staging' only when window._isStagingEnv() genuinely returns true, otherwise (including any throw) the restrictive 'prod' tier"
+    );
+  }
+
+  // 210.5  BEHAVIORAL both-sides (the Suite 149.8/62.5 eval technique):
+  //        _shellTier() actually executed against a missing/throwing/false/
+  //        true window._isStagingEnv.
+  {
+    let ok210 = false;
+    let err210 = null;
+    try {
+      const params210 = testConsole210.slice(
+        testConsole210.indexOf('(', testConsole210.indexOf('function _shellTier')),
+        testConsole210.indexOf('{', testConsole210.indexOf('function _shellTier'))
+      );
+      const body210 = extractFunctionBody(testConsole210, '_shellTier');
+      const src210 = `(function _shellTier${params210}${body210})`;
+      const missing210 = (() => {
+        const window = {};
+        void window;
+        return eval(src210)();
+      })();
+      const throwing210 = (() => {
+        const window = {
+          _isStagingEnv: () => {
+            throw new Error('boom');
+          },
+        };
+        void window;
+        return eval(src210)();
+      })();
+      const falseSignal210 = (() => {
+        const window = { _isStagingEnv: () => false };
+        void window;
+        return eval(src210)();
+      })();
+      const trueSignal210 = (() => {
+        const window = { _isStagingEnv: () => true };
+        void window;
+        return eval(src210)();
+      })();
+      ok210 =
+        missing210 === 'prod' &&
+        throwing210 === 'prod' &&
+        falseSignal210 === 'prod' &&
+        trueSignal210 === 'staging';
+    } catch (e) {
+      err210 = e;
+    }
+    assert(
+      ok210,
+      "_shellTier(): resolves to 'prod' when the staging signal is missing/throws/false, and 'staging' only when it genuinely returns true (both-sides behavioral)" +
+        (err210 ? ' — ' + err210.message : '')
+    );
+  }
+
+  // 210.6  BEHAVIORAL LEAK-PROOF PROOF: _toolVisible() executed against the
+  //        REAL DIAGNOSTIC_SHELL_TOOLS array — every tier:'staging' tool
+  //        (replay-hatch, both OCR test boards) is INVISIBLE under a
+  //        stubbed 'prod' tier and VISIBLE under 'staging'; every
+  //        tier:'prod' tool is visible under both. This is the exact filter
+  //        _renderShell() runs before any DOM insertion (210.7).
+  {
+    let ok210 = false;
+    let err210 = null;
+    try {
+      const toolVisBody210 = extractFunctionBody(testConsole210, '_toolVisible');
+      const replayHatchBody210 = extractFunctionBody(testConsole210, '_replayHatch');
+      const toolsStart210 = testConsole210.indexOf('var DIAGNOSTIC_SHELL_TOOLS = [');
+      const toolsEnd210 = testConsole210.indexOf('\n  ];', toolsStart210) + '\n  ];'.length;
+      const toolsSrc210 = testConsole210.slice(toolsStart210, toolsEnd210);
+      const src210 = `(function () {
+        function _toolVisible(tool, tier) ${toolVisBody210}
+        function _replayHatch() ${replayHatchBody210}
+        ${toolsSrc210}
+        return { _toolVisible: _toolVisible, DIAGNOSTIC_SHELL_TOOLS: DIAGNOSTIC_SHELL_TOOLS };
+      })()`;
+      const sandbox210 = eval(src210);
+      const tools210 = sandbox210.DIAGNOSTIC_SHELL_TOOLS;
+      const stagingTools210 = tools210.filter(t => t.tier === 'staging');
+      const prodTools210 = tools210.filter(t => t.tier === 'prod');
+      const noneVisibleInProd210 = stagingTools210.every(
+        t => sandbox210._toolVisible(t, 'prod') === false
+      );
+      const allVisibleInStaging210 = stagingTools210.every(
+        t => sandbox210._toolVisible(t, 'staging') === true
+      );
+      const prodAlwaysVisible210 = prodTools210.every(
+        t =>
+          sandbox210._toolVisible(t, 'prod') === true &&
+          sandbox210._toolVisible(t, 'staging') === true
+      );
+      ok210 =
+        stagingTools210.length > 0 &&
+        prodTools210.length > 0 &&
+        noneVisibleInProd210 &&
+        allVisibleInStaging210 &&
+        prodAlwaysVisible210;
+    } catch (e) {
+      err210 = e;
+    }
+    assert(
+      ok210,
+      "BEHAVIORAL: _toolVisible() filters every tier:'staging' tool (replay-hatch, both OCR test boards) out of the 'prod' tier and shows them under 'staging'; every tier:'prod' tool shows under both — the exact filter _renderShell() runs before any DOM insertion" +
+        (err210 ? ' — ' + err210.message : '')
+    );
+  }
+
+  // 210.7  static: _mountConsole() calls _renderShell() (which filters via
+  //        _toolVisible() and strips every never-claimed anchor) BEFORE
+  //        mount.appendChild(panel) — the panel that ever touches the
+  //        document has already been filtered for the current tier.
+  {
+    const renderShellBody210 = extractFunctionBody(testConsole210, '_renderShell');
+    const mountBody210 = extractFunctionBody(testConsole210, '_mountConsole');
+    const renderCallIdx210 = mountBody210.indexOf('_renderShell(panel)');
+    const appendIdx210 = mountBody210.indexOf('mount.appendChild(panel)');
+    assert(
+      /_toolVisible\(t, tier\)/.test(renderShellBody210) &&
+        /leftover\.parentNode\.removeChild\(leftover\)/.test(renderShellBody210) &&
+        renderCallIdx210 !== -1 &&
+        appendIdx210 !== -1 &&
+        renderCallIdx210 < appendIdx210,
+      '210.7: _mountConsole() calls _renderShell() — which filters via _toolVisible() and strips every tier-filtered anchor — BEFORE mount.appendChild(panel), so filtering always runs before DOM insertion'
+    );
+  }
+
+  // 210.8  static leak-proof invariant (planning §8): every destructive:true
+  //        tool is tier:'staging' — a destructive tool can never be prod-tier.
+  {
+    const toolsStart210b = testConsole210.indexOf('var DIAGNOSTIC_SHELL_TOOLS = [');
+    const toolsEnd210b = testConsole210.indexOf('\n  ];', toolsStart210b) + '\n  ];'.length;
+    const toolsSrc210b = testConsole210.slice(toolsStart210b, toolsEnd210b);
+    const replayHatchBody210b = extractFunctionBody(testConsole210, '_replayHatch');
+    let ok210b = false;
+    let err210b = null;
+    try {
+      const src210b = `(function () { function _replayHatch() ${replayHatchBody210b}\n ${toolsSrc210b}\n return DIAGNOSTIC_SHELL_TOOLS; })()`;
+      const tools210b = eval(src210b);
+      ok210b =
+        tools210b.length > 0 &&
+        tools210b.every(t => !t.destructive || t.tier === 'staging') &&
+        tools210b.every(
+          t =>
+            !['state', 'resets', 'infra', 'fixtures', 'inline'].includes(t.category) ||
+            t.tier === 'staging'
+        );
+    } catch (e) {
+      err210b = e;
+    }
+    assert(
+      ok210b,
+      "210.8: static leak-proof invariant — every destructive:true registry tool is tier:'staging', and every tool in a staging-only category (state/resets/infra/fixtures/inline) is tier:'staging' — no destructive/cheat/inspection tool can ever be prod-tier" +
+        (err210b ? ' — ' + err210b.message : '')
+    );
+  }
+
+  // 210.9  BEHAVIORAL auto-confirm-gate: _invoke() wraps a destructive:true
+  //        tool's action in confirmAction() — CONFIRM fires it, CANCEL never
+  //        does; a non-destructive tool fires immediately without ever
+  //        calling confirmAction(); and the fail-safe direction holds when
+  //        confirmAction() itself is unavailable (destructive action never
+  //        fires). Exercised against a real Node vm sandbox per tool.
+  {
+    let ok210 = false;
+    let err210 = null;
+    try {
+      const vm210 = require('vm');
+      const invokeBody210 = extractFunctionBody(testConsole210, '_invoke');
+      function scenario210(destructive, confirmResult, confirmDefined) {
+        const sandbox = { console };
+        vm210.createContext(sandbox);
+        let src = 'var __fired = false; var __confirmArgs = null;\n';
+        if (confirmDefined) {
+          src +=
+            'function confirmAction(opts) { __confirmArgs = opts; return { then: function (cb) { cb(' +
+            (confirmResult ? 'true' : 'false') +
+            '); } }; }\n';
+        }
+        src += `function _invoke(tool) ${invokeBody210}\n`;
+        src += `_invoke({ destructive: ${destructive ? 'true' : 'false'}, label: 'X', tooltip: 'a tip', action: function () { __fired = true; } });\n`;
+        vm210.runInContext(src, sandbox);
+        return { fired: sandbox.__fired, confirmArgs: sandbox.__confirmArgs };
+      }
+      const nonDestructive210 = scenario210(false, true, true);
+      const destructiveConfirmed210 = scenario210(true, true, true);
+      const destructiveCancelled210 = scenario210(true, false, true);
+      const destructiveNoConfirmFn210 = scenario210(true, true, false);
+      ok210 =
+        nonDestructive210.fired === true &&
+        nonDestructive210.confirmArgs === null &&
+        destructiveConfirmed210.fired === true &&
+        !!destructiveConfirmed210.confirmArgs &&
+        destructiveConfirmed210.confirmArgs.title === '> X' &&
+        destructiveCancelled210.fired === false &&
+        destructiveNoConfirmFn210.fired === false;
+    } catch (e) {
+      err210 = e;
+    }
+    assert(
+      ok210,
+      '210.9: BEHAVIORAL — _invoke() fires a non-destructive tool immediately (never calling confirmAction()); a destructive:true tool only fires after confirmAction() resolves true, never on a cancel; and a destructive tool never fires when confirmAction() itself is unavailable (fail-safe)' +
+        (err210 ? ' — ' + err210.message : '')
+    );
+  }
+
+  // 210.10  REPLAY HATCH (the one pre-existing destructive-leaning control)
+  //         is wired through _invoke()/_toolById('replay-hatch') rather than
+  //         calling _replayHatch() directly — so its new confirm gate can
+  //         never be bypassed by its own button handler.
+  {
+    const wireBody210 = extractFunctionBody(testConsole210, '_wireReplayHatch');
+    assert(
+      /_toolById\('replay-hatch'\)/.test(wireBody210) &&
+        /_invoke\(tool\)/.test(wireBody210) &&
+        /var tool = _toolById/.test(testConsole210),
+      "210.10: _wireReplayHatch() routes the button's click through _invoke(_toolById('replay-hatch')) — the registry's auto-confirm-gate path — rather than calling _replayHatch() directly"
+    );
+  }
+
+  // 210.11  env banner text is driven off _shellTier() — the two distinct
+  //         diegetic strings from planning §3.2.
+  {
+    const bannerBody210 = extractFunctionBody(testConsole210, '_paintEnvBanner');
+    assert(
+      /STAGING TOOLBENCH — ALL SYSTEMS EXPOSED/.test(bannerBody210) &&
+        /RESTRICTED DIAGNOSTIC ACCESS — SANDBOX/.test(bannerBody210) &&
+        /tier === 'staging'/.test(bannerBody210),
+      "210.11: the env banner reads 'STAGING TOOLBENCH — ALL SYSTEMS EXPOSED' on the staging tier and 'RESTRICTED DIAGNOSTIC ACCESS — SANDBOX' otherwise, driven off _shellTier()"
+    );
+  }
+
+  // 210.12  sections are collapsible sub-panels wired through the existing
+  //         Protocol UI-2 dynamic sub-panel persistence helper (reused, not
+  //         re-derived — Protocol 22), and use the sub-panel <h3>> HEADING
+  //         convention (Protocol UI-1).
+  {
+    const renderShellBody210b = extractFunctionBody(testConsole210, '_renderShell');
+    assert(
+      /details\.className = 'sub-panel'/.test(renderShellBody210b) &&
+        /setAttribute\('data-sub-id', 'dsh_' \+ cat\)/.test(renderShellBody210b) &&
+        /h3\.textContent =\s*\n?\s*'> '/.test(renderShellBody210b) &&
+        /_wireDynamicSubPanel\(details\)/.test(renderShellBody210b),
+      "210.12: _renderShell() builds each category as a details.sub-panel with a data-sub-id, an '> HEADING' <h3> summary (Protocol UI-1), and wires it through the existing _wireDynamicSubPanel() persistence helper (Protocol UI-2/22 — not a re-derived mechanism)"
+    );
+  }
+
+  // 210.13  HARD atmosphere/save boundary + game-agnosticism hold across the
+  //         new U1 registry/gate code specifically (extends 149.9/149.13 to
+  //         the new functions by name, in case a future edit narrows the
+  //         whole-file scan).
+  {
+    const newFns210 = [
+      '_shellVisible',
+      '_shellTier',
+      '_toolVisible',
+      '_invoke',
+      '_renderShell',
+      '_paintEnvBanner',
+      '_wireSearch',
+      '_mountConsole',
+    ]
+      .map(n => extractFunctionBody(testConsole210, n))
+      .join('\n');
+    assert(
+      !/saveState|robco_v8|_logEvent|\beventLog\b|localStorage\./.test(newFns210) &&
+        !/FNV|FO3|New Vegas|Fallout 3/.test(newFns210),
+      '210.13: the new U1 registry/gate/render functions never touch the campaign save (no saveState/robco_v8/eventLog/localStorage) and carry no game literal (Protocol 38)'
+    );
+  }
+
+  // 210.14  Protocol 42 regression test — found during LIVE verification, not
+  //         by the tests above: replay-hatch's registry entry was originally
+  //         missing an `action` field entirely, so _invoke()'s
+  //         `typeof tool.action !== 'function'` guard silently returned
+  //         before ever calling confirmAction() — no dialog, no action, no
+  //         thrown error, so nothing in Suite 210's OWN tests (which invoked
+  //         _invoke() against a synthetic tool object with a real `action`)
+  //         ever caught it. Locks BOTH that replay-hatch's real registry
+  //         entry carries a callable `action`, and — more generally — that
+  //         every destructive:true tool in the REAL registry does (the same
+  //         invariant that would catch this class of bug for any future tool).
+  {
+    let ok210 = false;
+    let err210 = null;
+    try {
+      const toolsStart210c = testConsole210.indexOf('var DIAGNOSTIC_SHELL_TOOLS = [');
+      const toolsEnd210c = testConsole210.indexOf('\n  ];', toolsStart210c) + '\n  ];'.length;
+      const toolsSrc210c = testConsole210.slice(toolsStart210c, toolsEnd210c);
+      const replayHatchFnBody210 = extractFunctionBody(testConsole210, '_replayHatch');
+      const src210c = `(function () {
+        function _replayHatch() ${replayHatchFnBody210}
+        ${toolsSrc210c}
+        return DIAGNOSTIC_SHELL_TOOLS;
+      })()`;
+      const tools210c = eval(src210c);
+      const destructiveTools210 = tools210c.filter(t => t.destructive);
+      ok210 =
+        destructiveTools210.length > 0 &&
+        destructiveTools210.every(t => typeof t.action === 'function') &&
+        tools210c.find(t => t.id === 'replay-hatch').action ===
+          tools210c.find(t => t.id === 'replay-hatch').action; // action is present and stable (not re-derived per read)
+    } catch (e) {
+      err210 = e;
+    }
+    assert(
+      ok210,
+      '210.14: [regression, Protocol 42] every destructive:true tool in the REAL registry (replay-hatch) carries a real, callable `action` — the field _invoke() requires before it will ever call confirmAction(); its earlier absence made the REPLAY HATCH button silently do nothing, caught only by live-clicking it in a real browser' +
+        (err210 ? ' — ' + err210.message : '')
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail

@@ -165,21 +165,44 @@
          ════════════════════════════════════════════════════════════════════ -->
     <template id="testConsoleTemplate">
       <details class="panel" id="testConsolePanel" style="margin: 8px">
-        <summary><h2>&gt; TEST CONSOLE (DEV)</h2></summary>
+        <summary><h2>&gt; DIAGNOSTIC SHELL</h2></summary>
+        <div id="dshEnvBanner" class="panel-substatus" aria-live="polite">&mdash;</div>
         <p style="font-size: 10px">
-          Staging/dev environments only &mdash; never shown on the live site. Triggers in-memory
-          runtime states and the device Immersion tier only; no campaign data is read or written
-          here.
+          Staging/dev environments only &mdash; never shown on the live site. Renders from the
+          DIAGNOSTIC_SHELL_TOOLS registry (js/test-console.js); triggers in-memory runtime states
+          and the device Immersion tier only, no campaign data is read or written here.
         </p>
         <div class="input-group" style="flex-direction: column; align-items: stretch">
+          <label class="optics-label" for="dshSearch">FILTER TOOLS</label>
+          <input
+            type="text"
+            id="dshSearch"
+            placeholder="LABEL OR CONTROL NAME..."
+            aria-label="Filter Diagnostic Shell tools by label"
+            style="width: 100%; font-size: 16px"
+          />
+        </div>
+        <div
+          class="input-group"
+          style="flex-direction: column; align-items: stretch"
+          data-dsh-anchor="testConsoleState"
+        >
           <label class="optics-label">RUNTIME STATE</label>
           <span id="testConsoleState" aria-live="polite">&mdash;</span>
         </div>
-        <div class="input-group" style="flex-direction: column; align-items: stretch">
+        <div
+          class="input-group"
+          style="flex-direction: column; align-items: stretch"
+          data-dsh-anchor="testConsoleTransitions"
+        >
           <label class="optics-label">FORCE TRANSITION</label>
           <div id="testConsoleTransitions" style="display: flex; flex-wrap: wrap; gap: 6px"></div>
         </div>
-        <div class="input-group" style="flex-direction: column; align-items: stretch">
+        <div
+          class="input-group"
+          style="flex-direction: column; align-items: stretch"
+          data-dsh-anchor="testConsoleImmersionSelect"
+        >
           <label class="optics-label" for="testConsoleImmersionSelect">IMMERSION TIER</label>
           <select
             id="testConsoleImmersionSelect"
@@ -191,11 +214,19 @@
             <option value="minimal">Minimal</option>
           </select>
         </div>
-        <div class="input-group" style="flex-direction: column; align-items: stretch">
+        <div
+          class="input-group"
+          style="flex-direction: column; align-items: stretch"
+          data-dsh-anchor="testConsoleObservers"
+        >
           <label class="optics-label">REGISTERED OBSERVERS</label>
           <div id="testConsoleObservers" style="font-size: 10px">&mdash;</div>
         </div>
-        <div class="input-group" style="flex-direction: column; align-items: stretch">
+        <div
+          class="input-group"
+          style="flex-direction: column; align-items: stretch"
+          data-dsh-anchor="testConsoleReplayHatch"
+        >
           <label class="optics-label">VIEW-ONCE CEREMONIES</label>
           <div style="display: flex; flex-wrap: wrap; gap: 6px">
             <button
@@ -208,7 +239,11 @@
             </button>
           </div>
         </div>
-        <div class="input-group" style="flex-direction: column; align-items: stretch">
+        <div
+          class="input-group"
+          style="flex-direction: column; align-items: stretch"
+          data-dsh-anchor="ocrTestInput"
+        >
           <label class="optics-label" for="ocrTestInput"
             >OPTICAL SCAN TEST (VISUAL UPLOAD OCR — UNIT 1)</label
           >
@@ -247,7 +282,11 @@
             "
           ></pre>
         </div>
-        <div class="input-group" style="flex-direction: column; align-items: stretch">
+        <div
+          class="input-group"
+          style="flex-direction: column; align-items: stretch"
+          data-dsh-anchor="visualParseTestInput"
+        >
           <label class="optics-label" for="visualParseTestInput"
             >SCAN &amp; PARSE TEST (VISUAL UPLOAD OCR — UNIT 2)</label
           >
@@ -275,10 +314,11 @@
           </div>
           <span id="visualParseTestStatus" aria-live="polite" style="font-size: 10px">&mdash;</span>
         </div>
-        <!-- EXTENSION POINT: a future ambient feature (broadcasts, weather, boot
-             flavors, etc.) adds one more trigger button here, wired in
-             js/test-console.js — call the feature's existing entry point,
-             never write campaign state, never bypass a confirm gate. -->
+        <div id="dshSections"></div>
+        <!-- EXTENSION POINT: a future hard-to-trigger feature adds one more entry to
+             DIAGNOSTIC_SHELL_TOOLS (js/test-console.js) with an `anchor` selector
+             pointing at a new .input-group block placed here — never write campaign
+             state, never bypass confirmAction() for a destructive:true tool. -->
       </details>
     </template>
     <div id="testConsoleMount"></div>

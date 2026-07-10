@@ -150,7 +150,7 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 | **PWA**         | Service Worker + Manifest                        | Installable, offline-capable, reliable auto-update                          |
 | **Hosting**     | GitHub Pages (prod) + Cloudflare Pages (staging) | Release-gated production; auto-deployed staging                             |
 | **Dev Tooling** | ESLint + Prettier + Vite                         | Linting, formatting, dev server                                             |
-| **Testing**     | Node + PowerShell + Playwright                   | 2813-test gate at parity + boot-smoke / render / a11y checks                |
+| **Testing**     | Node + PowerShell + Playwright                   | 2827-test gate at parity + boot-smoke / render / a11y checks                |
 
 ### Per-game data system
 
@@ -182,7 +182,7 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 ├── sw.js                   Service Worker (cache-first, atomic precache, reliable update)
 ├── manifest.json           PWA manifest (version-less name + app shortcuts)
 ├── tests/
-│   ├── robco-diagnostics.js   Node persistence/structure audit (2813 tests, 210 suites)
+│   ├── robco-diagnostics.js   Node persistence/structure audit (2827 tests, 211 suites)
 │   ├── robco-diagnostics.ps1  PowerShell mirror (parity-locked)
 │   ├── test.html              Browser-side runtime import-contract audit
 │   └── *.mjs                  Playwright boot-smoke / render-check / a11y-baseline
@@ -327,11 +327,12 @@ A **production-quality, two-game browser application** with:
 - **Visual Upload — native on-device OCR, AI-vision fallback** — attaching a screenshot now scans it right on your device by default (self-hosted, lazy-loaded Tesseract.js), works fully offline after first use, and shows a review screen you confirm before anything is added; if the on-device scan is unavailable or fails, it hands off to the existing Gemini-vision path automatically, or on request via a TRY AI VISION button — both are remotely kill-switched with a graceful "add items manually" fallback if neither is available
 - **Ceremony Moments** — starting a new campaign runs a short, skippable commissioning sequence instead of two bare reset lines; the Director now greets you the first time you open the Uplink each session; a post-update boot calls out the update with a POST line, a casing glint, and a highlighted revision-log button; returning after a few days away gets a quiet "recalibrating" boot line; and Module Bay/cartridge/Tool Deck installs now get a consistent physical settle flourish (SEAT, the third Protocol UI-9 motion verb)
 - **Tighter mobile boards** — on narrow phones, board spacing, faction/status/perk/skill tiles, and the Director Uplink transcript all sit a little closer together, trimming a noticeable amount of scrolling with every tap target still comfortably above the minimum touch size
+- **Diagnostic Shell** _(dev/staging-only)_ — the developer console is re-founded on a data-driven tool registry with a two-signal environment gate, so a future non-destructive sandbox and an owner-only toolbench can share one panel without ever leaking a destructive tool to a live player; every existing dev control still works exactly as before
 - **Optional AI Director** — Tri-Node JSON, validated import, resilient + prompt-injection-hardened
 - **Saves & cloud** — auto-save, A/B/C slots (with confirm-gated overwrite/delete + version history), export/import + migration, rolling checksummed backups, additive Firestore sync (with its own confirm-gated overwrite/delete + version history), Google sign-in, remote kill-switch, per-game filtered saves list
 - **Accessibility + PWA** — focus rings, reduced-motion, live regions, dialog focus traps, AA contrast; installable, offline, reliable auto-update; touch-first responsive
 - **Wiki-sourced data** — per-game Fallout Data Registries + combat databases (weapons, armor, bestiary, chems, recipes, vendors, quest items), all from the Independent Fallout Wiki
-- **A self-improving gate** — **2813 tests across 210 suites**, mirrored in the Node and PowerShell runners at exact parity (per-suite composition, not just the grand total), plus Playwright boot-smoke / render-check / a11y baseline and a `test.html` runtime audit; CI + a nightly run back it up
+- **A self-improving gate** — **2827 tests across 211 suites**, mirrored in the Node and PowerShell runners at exact parity (per-suite composition, not just the grand total), plus Playwright boot-smoke / render-check / a11y baseline and a `test.html` runtime audit; CI + a nightly run back it up
 
 ---
 
