@@ -26136,6 +26136,102 @@ Check (
 ) '216.20: _fireUnlockCeremony() opens the drawer, flashes the in-fiction "RESTRICTED ACCESS GRANTED" line, and settles back via the existing _paintEnvBanner() -- with no MetaStore/state/saveState reference anywhere in its own body'
 
 # ===========================================================
+# Suite 217 -- Mobile UX polish: SAVE TO CLOUD prominence + transient vs.
+# persistent pop-up audit (owner report). Mirrors JS Suite 217.
+# (1) #btnSaveToCloud existed but wasn't discoverable on mobile -- it lived
+# alone in a small blue-bordered row above the saves list. It now sits in
+# the same row as EXPORT SAVE at equal size/weight (Protocol 22 -- zero
+# change to its id/onclick/renderAccount() sign-in gating).
+# (2) A full inventory of transient (auto-dismiss) vs. persistent
+# (state-driven) pop-ups found NO live full-width "banner" popup outside
+# the already-shipped compact top-right toasts (#locationCard,
+# #statusAnnunciator) -- everything else is either inert template markup
+# (.update-banner, .fo3-warning-banner -- never cloned live), a persistent
+# status tied to ongoing state (.rng-banner, #opsSeizedStamp/
+# #opsSeizedNote -- CARGO SEIZED), or a small in-panel flourish (the
+# Feedback Animation Waves). These tests lock that audit as a regression
+# guard.
+# 9 tests
+# ===========================================================
+Sep "Suite 217 -- Mobile UX polish: cloud-save prominence + toast audit"
+$htmlSrc217 = Read-Src "index.html"
+$uiCore217 = Read-Src "js/ui-core.js"
+$uiAccount217 = Read-Src "js/ui-account.js"
+$cssSrc217 = Read-Src "css/terminal.css"
+
+# 217.1  #btnSaveToCloud sits in the SAME row as the EXPORT SAVE button.
+$idx217 = $htmlSrc217.IndexOf('id="btnSaveToCloud"')
+$forwardSlice217 = if ($idx217 -ge 0) { $htmlSrc217.Substring($idx217, [Math]::Min(650, $htmlSrc217.Length - $idx217)) } else { '' }
+Check (
+    ($idx217 -ge 0) -and
+    ($forwardSlice217 -match 'onclick="exportSaveFile\(\)"')
+) '217.1: #btnSaveToCloud sits in the same flex row as the EXPORT SAVE button (owner report: SAVE TO CLOUD was not discoverable on mobile)'
+
+# 217.2  the button keeps its exact pre-existing wiring.
+Check (
+    $htmlSrc217 -match 'onclick="if \(window\.saveCurrentToCloud\) window\.saveCurrentToCloud\(\);"'
+) '217.2: #btnSaveToCloud keeps its exact onclick="...saveCurrentToCloud()" wiring (Protocol 22 -- reskin/reposition only)'
+
+# 217.3  renderAccount() still shows/hides #btnSaveToCloud by sign-in state.
+Check (
+    ($uiAccount217 -match "getElementById\('btnSaveToCloud'\)") -and
+    ($uiAccount217 -match "btnSave\.style\.display = isSignedIn \? '' : 'none';")
+) '217.3: renderAccount() still shows #btnSaveToCloud only when signed in (unchanged sign-in gate)'
+
+# 217.4  prominence parity -- SAVE TO CLOUD renders at the same font-size as
+#        its new row-mate EXPORT SAVE (not the old, smaller 10px treatment).
+$rowStart217b = [Math]::Max(0, $idx217 - 300)
+$rowSlice217b = if ($idx217 -ge 0) { $htmlSrc217.Substring($rowStart217b, [Math]::Min(700, $htmlSrc217.Length - $rowStart217b)) } else { '' }
+Check (
+    ($rowSlice217b -match 'font-size:\s*11px') -and
+    (-not ($rowSlice217b -match 'font-size:\s*10px'))
+) '217.4: #btnSaveToCloud renders at the same 11px weight as EXPORT SAVE, not the old smaller 10px treatment'
+
+# 217.5  banner-selector allowlist -- every CSS selector matching *banner* is
+#        one of the four already-reviewed, non-transient elements.
+$bannerMatches217 = [regex]::Matches($cssSrc217, '(?m)^[.#][a-zA-Z0-9_-]*[Bb]anner[a-zA-Z0-9_-]*(?=[\s,{.])')
+$bannerSelectors217 = $bannerMatches217 | ForEach-Object { $_.Value } | Select-Object -Unique
+$known217 = @('.fo3-warning-banner', '#dshEnvBanner', '.update-banner', '.rng-banner')
+$unknown217 = $bannerSelectors217 | Where-Object { $known217 -notcontains $_ }
+Check (
+    ($bannerSelectors217.Count -gt 0) -and
+    ($unknown217.Count -eq 0)
+) ('217.5: every "*banner*" CSS selector is one of the four known, already-reviewed elements (.fo3-warning-banner/#dshEnvBanner/.update-banner/.rng-banner) -- no new full-width banner-style popup introduced' + $(if ($unknown217.Count) { ' -- unexpected: ' + ($unknown217 -join ', ') } else { '' }))
+
+# 217.6  .update-banner stays inert -- lives only inside <template id="updateBannerTemplate">.
+$tplIdx217 = $htmlSrc217.IndexOf('id="updateBannerTemplate"')
+$tplEnd217 = if ($tplIdx217 -ge 0) { $htmlSrc217.IndexOf('</template>', $tplIdx217) } else { -1 }
+$tplBody217 = if ($tplIdx217 -ge 0 -and $tplEnd217 -ge 0) { $htmlSrc217.Substring($tplIdx217, $tplEnd217 - $tplIdx217) } else { '' }
+Check (
+    ($tplIdx217 -ge 0) -and
+    ($tplBody217 -match 'class="update-banner"')
+) '217.6: .update-banner markup lives inside <template id="updateBannerTemplate"> (inert-by-default, never a live rendered banner)'
+
+# 217.7  .fo3-warning-banner stays inert -- same inert-template pattern.
+$tplIdx217b = $htmlSrc217.IndexOf('id="fo3WarningBannerTemplate"')
+$tplEnd217b = if ($tplIdx217b -ge 0) { $htmlSrc217.IndexOf('</template>', $tplIdx217b) } else { -1 }
+$tplBody217b = if ($tplIdx217b -ge 0 -and $tplEnd217b -ge 0) { $htmlSrc217.Substring($tplIdx217b, $tplEnd217b - $tplIdx217b) } else { '' }
+Check (
+    ($tplIdx217b -ge 0) -and
+    ($tplBody217b -match 'fo3-warning-banner|fo3WarningBanner')
+) '217.7: .fo3-warning-banner/#fo3WarningBanner markup lives inside <template id="fo3WarningBannerTemplate"> (inert-by-default, never a live rendered banner)'
+
+# 217.8  CARGO SEIZED (#opsSeizedStamp/#opsSeizedNote) stays a PERSISTENT,
+#        state-driven indicator -- never a timed auto-dismiss.
+$weighBridgeFn217 = Get-FunctionBody $uiCore217 '_paintWeighBridge'
+Check (
+    ($weighBridgeFn217 -match "stamp\.style\.display = seized \? '' : 'none';") -and
+    ($weighBridgeFn217 -match "note\.style\.display = seized \? '' : 'none';")
+) "217.8: CARGO SEIZED's #opsSeizedStamp/#opsSeizedNote visibility is a direct ternary of the live seized state (persistent while over-encumbered), never a setTimeout-based auto-dismiss -- must NOT be converted to a transient toast"
+
+# 217.9  the RNG interlock armed/locked banners stay state-driven the same way.
+$interlockFn217 = Get-FunctionBody $uiCore217 '_syncInterlockUI'
+Check (
+    ($interlockFn217 -match "armedBanner\.style\.display = rngState === 'armed' \? 'block' : 'none';") -and
+    ($interlockFn217 -match "lockedBanner\.style\.display = rngState === 'locked' \? 'block' : 'none';")
+) '217.9: the RNG interlock #rngModeBanner/#rngLockedBanner visibility stays a direct ternary of rngState (persistent status), never converted to a timed auto-dismiss toast'
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

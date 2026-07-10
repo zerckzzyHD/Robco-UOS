@@ -39285,6 +39285,152 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 217 — Mobile UX polish: SAVE TO CLOUD prominence + transient
+//  vs. persistent pop-up audit (owner report)
+// ──────────────────────────────────────────────────────────────
+//  (1) #btnSaveToCloud existed but wasn't discoverable on mobile — it lived
+//  alone in a small blue-bordered row above the saves list. It now sits in
+//  the same row as EXPORT SAVE at equal size/weight (Protocol 22 — zero
+//  change to its id/onclick/renderAccount() sign-in gating).
+//  (2) A full inventory of transient (auto-dismiss) vs. persistent
+//  (state-driven) pop-ups found NO live full-width "banner" popup outside
+//  the already-shipped compact top-right toasts (#locationCard,
+//  #statusAnnunciator) — everything else is either inert template markup
+//  (.update-banner, .fo3-warning-banner — never cloned live), a persistent
+//  status tied to ongoing state (.rng-banner, #opsSeizedStamp/
+//  #opsSeizedNote — CARGO SEIZED), or a small in-panel flourish (the
+//  Feedback Animation Waves). These tests lock that audit as a regression
+//  guard: CARGO SEIZED and the RNG interlock banners stay state-driven
+//  (never converted to a timed auto-dismiss), and no new full-width banner
+//  class sneaks in outside the known, already-reviewed set.
+//  9 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 217 — Mobile UX polish: cloud-save prominence + toast audit');
+  const htmlSource217 = readFile('index.html');
+  const uiCore217 = readFile('js/ui-core.js');
+  const uiAccount217 = readFile('js/ui-account.js');
+  const cssSource217 = readFile('css/terminal.css');
+
+  // 217.1  #btnSaveToCloud sits in the SAME row as the EXPORT SAVE button —
+  //        the two primary "preserve your campaign" actions at equal weight.
+  {
+    const idx217 = htmlSource217.indexOf('id="btnSaveToCloud"');
+    const forwardSlice217 = htmlSource217.slice(idx217, idx217 + 650);
+    assert(
+      idx217 !== -1 && /onclick="exportSaveFile\(\)"/.test(forwardSlice217),
+      '217.1: #btnSaveToCloud sits in the same flex row as the EXPORT SAVE button (owner report: SAVE TO CLOUD was not discoverable on mobile)'
+    );
+  }
+
+  // 217.2  the button keeps its exact pre-existing wiring — reskin/placement
+  //        only, never a fork of the additive addDoc cloud save.
+  assert(
+    /onclick="if \(window\.saveCurrentToCloud\) window\.saveCurrentToCloud\(\);"/.test(
+      htmlSource217
+    ),
+    '217.2: #btnSaveToCloud keeps its exact onclick="...saveCurrentToCloud()" wiring (Protocol 22 — reskin/reposition only)'
+  );
+
+  // 217.3  renderAccount() (ui-account.js) still shows/hides #btnSaveToCloud
+  //        by sign-in state — the move didn't orphan the existing gating.
+  assert(
+    /getElementById\('btnSaveToCloud'\)/.test(uiAccount217) &&
+      /btnSave\.style\.display = isSignedIn \? '' : 'none';/.test(uiAccount217),
+    '217.3: renderAccount() still shows #btnSaveToCloud only when signed in (unchanged sign-in gate)'
+  );
+
+  // 217.4  prominence parity — SAVE TO CLOUD renders at the same font-size as
+  //        its new row-mate EXPORT SAVE (not the old, smaller 10px treatment).
+  {
+    const idx217b = htmlSource217.indexOf('id="btnSaveToCloud"');
+    const rowSlice217b = htmlSource217.slice(Math.max(0, idx217b - 300), idx217b + 400);
+    assert(
+      /font-size:\s*11px/.test(rowSlice217b) && !/font-size:\s*10px/.test(rowSlice217b),
+      '217.4: #btnSaveToCloud renders at the same 11px weight as EXPORT SAVE, not the old smaller 10px treatment'
+    );
+  }
+
+  // 217.5  banner-selector allowlist — every CSS selector matching *banner*
+  //        is one of the four already-reviewed, non-transient elements. A
+  //        new full-width banner-style popup introduced later without going
+  //        through the compact toast pattern will fail this test.
+  {
+    const bannerSelectors217 = new Set();
+    const re217 = /^[.#][a-zA-Z0-9_-]*[Bb]anner[a-zA-Z0-9_-]*(?=[\s,{.])/gm;
+    let m217;
+    while ((m217 = re217.exec(cssSource217))) {
+      bannerSelectors217.add(m217[0]);
+    }
+    const known217 = new Set([
+      '.fo3-warning-banner',
+      '#dshEnvBanner',
+      '.update-banner',
+      '.rng-banner',
+    ]);
+    const unknown217 = [...bannerSelectors217].filter(s => !known217.has(s));
+    assert(
+      bannerSelectors217.size > 0 && unknown217.length === 0,
+      '217.5: every "*banner*" CSS selector is one of the four known, already-reviewed elements (.fo3-warning-banner/#dshEnvBanner/.update-banner/.rng-banner) — no new full-width banner-style popup introduced' +
+        (unknown217.length ? ' — unexpected: ' + unknown217.join(', ') : '')
+    );
+  }
+
+  // 217.6  .update-banner stays inert — its markup lives only inside
+  //        <template id="updateBannerTemplate">, never cloned/instantiated
+  //        live by any script (confirmed unchanged from prior commits).
+  {
+    const tplIdx217 = htmlSource217.indexOf('id="updateBannerTemplate"');
+    const tplEnd217 = htmlSource217.indexOf('</template>', tplIdx217);
+    const tplBody217 = htmlSource217.slice(tplIdx217, tplEnd217);
+    assert(
+      tplIdx217 !== -1 && /class="update-banner"/.test(tplBody217),
+      '217.6: .update-banner markup lives inside <template id="updateBannerTemplate"> (inert-by-default, never a live rendered banner)'
+    );
+  }
+
+  // 217.7  .fo3-warning-banner stays inert — same inert-template pattern.
+  {
+    const tplIdx217b = htmlSource217.indexOf('id="fo3WarningBannerTemplate"');
+    const tplEnd217b = htmlSource217.indexOf('</template>', tplIdx217b);
+    const tplBody217b = htmlSource217.slice(tplIdx217b, tplEnd217b);
+    assert(
+      tplIdx217b !== -1 && /fo3-warning-banner|fo3WarningBanner/.test(tplBody217b),
+      '217.7: .fo3-warning-banner/#fo3WarningBanner markup lives inside <template id="fo3WarningBannerTemplate"> (inert-by-default, never a live rendered banner)'
+    );
+  }
+
+  // 217.8  CARGO SEIZED (#opsSeizedStamp/#opsSeizedNote) stays a PERSISTENT,
+  //        state-driven indicator — display is a direct ternary of the
+  //        `seized` boolean, never a timed auto-dismiss (regression guard:
+  //        the owner explicitly wants this left as-is, not converted).
+  {
+    const weighBridgeFn217 = extractFunctionBody(uiCore217, '_paintWeighBridge');
+    assert(
+      /stamp\.style\.display = seized \? '' : 'none';/.test(weighBridgeFn217) &&
+        /note\.style\.display = seized \? '' : 'none';/.test(weighBridgeFn217),
+      "217.8: CARGO SEIZED's #opsSeizedStamp/#opsSeizedNote visibility is a direct ternary of the live `seized` state (persistent while over-encumbered), never a setTimeout-based auto-dismiss — must NOT be converted to a transient toast"
+    );
+  }
+
+  // 217.9  the RNG interlock armed/locked banners stay state-driven the same
+  //        way — _syncInterlockUI()'s display toggle is a direct ternary of
+  //        rngState, never a timer.
+  {
+    const interlockFn217 = extractFunctionBody(uiCore217, '_syncInterlockUI');
+    assert(
+      /armedBanner\.style\.display = rngState === 'armed' \? 'block' : 'none';/.test(
+        interlockFn217
+      ) &&
+        /lockedBanner\.style\.display = rngState === 'locked' \? 'block' : 'none';/.test(
+          interlockFn217
+        ),
+      '217.9: the RNG interlock #rngModeBanner/#rngLockedBanner visibility stays a direct ternary of rngState (persistent status), never converted to a timed auto-dismiss toast'
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail

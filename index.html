@@ -3480,19 +3480,6 @@
                   "
                 >
                   <button
-                    id="btnSaveToCloud"
-                    class="action-btn"
-                    style="
-                      font-size: 10px;
-                      border-color: var(--robco-blue);
-                      color: var(--robco-blue);
-                      display: none;
-                    "
-                    onclick="if (window.saveCurrentToCloud) window.saveCurrentToCloud();"
-                  >
-                    SAVE TO CLOUD
-                  </button>
-                  <button
                     id="btnSyncSlotsToCloud"
                     class="action-btn"
                     style="
@@ -3508,10 +3495,33 @@
                 </div>
               </div>
 
-              <div style="display: flex; gap: 10px; margin-top: 10px">
+              <!-- Owner report: SAVE TO CLOUD existed but wasn't discoverable on mobile
+                   (it lived alone in a small blue-bordered row above the list). It now
+                   sits paired with EXPORT SAVE at equal size/weight -- the two primary
+                   ways to preserve a campaign -- with zero change to its id/onclick/
+                   wiring (Protocol 22: still the existing additive addDoc cloud save via
+                   window.saveCurrentToCloud(), still anonymous-user + contentHash guarded
+                   in cloud.js; still shown/hidden by renderAccount() per sign-in state,
+                   Suite 159.2's centering-rule guard preserved via justify-content:center). -->
+              <div style="display: flex; gap: 10px; margin-top: 10px; justify-content: center">
+                <button
+                  id="btnSaveToCloud"
+                  class="action-btn"
+                  style="
+                    font-size: 11px;
+                    border-color: var(--robco-blue);
+                    color: var(--robco-blue);
+                    display: none;
+                  "
+                  onclick="if (window.saveCurrentToCloud) window.saveCurrentToCloud();"
+                >
+                  &gt; SAVE TO CLOUD
+                </button>
                 <button class="action-btn" onclick="exportSaveFile()" style="font-size: 11px">
                   > EXPORT SAVE
                 </button>
+              </div>
+              <div style="display: flex; gap: 10px; margin-top: 6px">
                 <button class="action-btn" onclick="triggerFileInput()" style="font-size: 11px">
                   > IMPORT SAVE
                 </button>
